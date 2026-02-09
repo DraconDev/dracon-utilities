@@ -118,7 +118,6 @@ fn is_excluded_dir_name(name: &str) -> bool {
             | "dist"
             | "build"
             | "archives"
-            | ".git"
     )
 }
 
@@ -220,15 +219,28 @@ fn discover_git_repos(roots: &[PathBuf]) -> Vec<PathBuf> {
     repos.into_iter().collect()
 }
 
-const REMOTE_OP_TIMEOUT_SECS: u64 = 20;
+const REMOTE_OP_TIMEOUT_SECS: u64 = 6;
+const REPO_SYNC_TIMEOUT_SECS: u64 = 45;
+
+fn has_origin_remote(repo: &Path) -> bool {
+    std::process::Command::new("git")
+        .arg("remote")
+        .arg("get-url")
+        .arg("origin")
+        .current_dir(repo)
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
+}
 
 async fn sync_repo(repo: &Path, policy: &SyncPolicy) -> Result<bool> {
     let svc = GitService::new(repo)?;
     if !svc.is_git_repo().await? {
         return Ok(false);
     }
+    let has_origin = has_origin_remote(repo);
 
-    if policy.auto_pull {
+    if policy.auto_pull && has_origin {
         match tokio::time::timeout(Duration::from_secs(REMOTE_OP_TIMEOUT_SECS), svc.pull_rebase())
             .await
         {
@@ -240,6 +252,8 @@ async fn sync_repo(repo: &Path, policy: &SyncPolicy) -> Result<bool> {
                 REMOTE_OP_TIMEOUT_SECS
             ),
         }
+    } else if policy.auto_pull && !has_origin {
+        eprintln!("ℹ️ skip pull/rebase for {} (no origin remote)", repo.display());
     }
 
     let status = svc.get_status().await?;
@@ -250,7 +264,7 @@ async fn sync_repo(repo: &Path, policy: &SyncPolicy) -> Result<bool> {
             let proto_entries = to_proto_entries(&entries);
             let msg = build_sync_commit_payload(repo, &proto_status, &proto_entries);
             svc.commit_all(&msg).await?;
-            if policy.auto_push {
+            if policy.auto_push && has_origin {
                 match tokio::time::timeout(Duration::from_secs(REMOTE_OP_TIMEOUT_SECS), svc.push())
                     .await
                 {
@@ -262,12 +276,14 @@ async fn sync_repo(repo: &Path, policy: &SyncPolicy) -> Result<bool> {
                         REMOTE_OP_TIMEOUT_SECS
                     ),
                 }
+            } else if policy.auto_push && !has_origin {
+                eprintln!("ℹ️ skip push for {} (no origin remote)", repo.display());
             }
             return Ok(true);
         }
     }
 
-    if policy.auto_push && status.ahead > 0 {
+    if policy.auto_push && status.ahead > 0 && has_origin {
         match tokio::time::timeout(Duration::from_secs(REMOTE_OP_TIMEOUT_SECS), svc.push()).await {
             Ok(Ok(())) => {}
             Ok(Err(e)) => eprintln!("⚠️ push skipped for {}: {}", repo.display(), e),
@@ -277,6 +293,8 @@ async fn sync_repo(repo: &Path, policy: &SyncPolicy) -> Result<bool> {
                 REMOTE_OP_TIMEOUT_SECS
             ),
         }
+    } else if policy.auto_push && status.ahead > 0 && !has_origin {
+        eprintln!("ℹ️ skip push for {} (no origin remote)", repo.display());
     }
 
     Ok(false)
@@ -294,13 +312,25 @@ async fn run_once(policy_path: &Path) -> Result<()> {
 
     let mut changed = 0usize;
     for repo in repos {
-        match sync_repo(&repo, &policy).await {
-            Ok(true) => {
+        match tokio::time::timeout(
+            Duration::from_secs(REPO_SYNC_TIMEOUT_SECS),
+            sync_repo(&repo, &policy),
+        )
+        .await
+        {
+            Err(_) => {
+                eprintln!(
+                    "⚠️ repo sync timeout for {} after {}s",
+                    repo.display(),
+                    REPO_SYNC_TIMEOUT_SECS
+                );
+            }
+            Ok(Ok(true)) => {
                 changed += 1;
                 println!("🔁 synced {}", repo.display());
             }
-            Ok(false) => {}
-            Err(e) => eprintln!("⚠️ sync failed for {}: {}", repo.display(), e),
+            Ok(Ok(false)) => {}
+            Ok(Err(e)) => eprintln!("⚠️ sync failed for {}: {}", repo.display(), e),
         }
     }
 
@@ -332,9 +362,12 @@ async fn main() -> Result<()> {
     match cli.cmd {
         Command::Status => {
             let policy = SyncPolicy::load(&policy_path)?;
+            let roots = policy.watch_root_paths();
+            let repos = discover_git_repos(&roots);
             let freeze = freeze_reason(&policy_path);
             println!("📜 POLICY: {}", policy_path.display());
-            println!("🔁 ROOTS: {:?}", policy.watch_root_paths());
+            println!("🔁 ROOTS: {:?}", roots);
+            println!("📦 REPOS_DISCOVERED: {}", repos.len());
             println!("⏱️ PULSE: {}s", policy.pulse_interval_secs);
             println!(
                 "⏸️ FREEZE: {}",
