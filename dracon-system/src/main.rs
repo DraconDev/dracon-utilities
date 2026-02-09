@@ -1,6 +1,6 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use tokio::process::Command;
@@ -38,10 +38,10 @@ enum Commands {
         apply: bool,
         #[arg(long)]
         allow_tracked: bool,
-        #[arg(long, default_value_t = 512)]
-        min_size_mb: u64,
-        #[arg(long, default_value = "rust-build,node-deps,build-output,cache")]
-        kinds: String,
+        #[arg(long)]
+        min_size_mb: Option<u64>,
+        #[arg(long)]
+        kinds: Option<String>,
     },
 }
 
@@ -50,6 +50,7 @@ struct StatusReport {
     system_root: String,
     nixos_root: String,
     sync_policy: String,
+    system_policy: String,
     sync_service_active: bool,
     warden_service_active: bool,
 }
@@ -71,6 +72,40 @@ struct CleanupConfig {
     allow_tracked: bool,
     min_size_mb: u64,
     kinds: HashSet<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Default)]
+struct SystemPolicy {
+    #[serde(default)]
+    storage: StoragePolicy,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct StoragePolicy {
+    #[serde(default)]
+    default_root: String,
+    #[serde(default = "default_min_size_mb")]
+    min_size_mb: u64,
+    #[serde(default = "default_kinds")]
+    kinds: String,
+}
+
+impl Default for StoragePolicy {
+    fn default() -> Self {
+        Self {
+            default_root: String::new(),
+            min_size_mb: default_min_size_mb(),
+            kinds: default_kinds(),
+        }
+    }
+}
+
+fn default_min_size_mb() -> u64 {
+    512
+}
+
+fn default_kinds() -> String {
+    "rust-build,node-deps,build-output,cache".to_string()
 }
 
 fn human_bytes(bytes: u64) -> String {
@@ -98,6 +133,37 @@ fn parse_kinds(csv: &str) -> HashSet<String> {
         .collect()
 }
 
+fn resolve_system_policy_path() -> Option<PathBuf> {
+    if let Ok(custom) = std::env::var("DRACON_SYSTEM_POLICY") {
+        let p = PathBuf::from(custom);
+        if p.exists() {
+            return Some(p);
+        }
+    }
+
+    let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("/home"));
+    let candidates = [
+        home.join("dracon/utilities/system/dracon-system.toml"),
+        home.join("dracon/utilities/system/config.toml"),
+        home.join("dracon/system/dracon-system.toml"),
+        home.join("dracon/system/config.toml"),
+    ];
+
+    candidates.into_iter().find(|p| p.exists())
+}
+
+fn load_system_policy() -> (Option<PathBuf>, SystemPolicy) {
+    let Some(path) = resolve_system_policy_path() else {
+        return (None, SystemPolicy::default());
+    };
+    let content = match std::fs::read_to_string(&path) {
+        Ok(c) => c,
+        Err(_) => return (Some(path), SystemPolicy::default()),
+    };
+    let parsed: SystemPolicy = toml::from_str(&content).unwrap_or_default();
+    (Some(path), parsed)
+}
+
 async fn is_user_service_active(service: &str) -> bool {
     let output = Command::new("systemctl")
         .args(["--user", "is-active", service])
@@ -114,6 +180,7 @@ async fn is_user_service_active(service: &str) -> bool {
 
 async fn build_status_report() -> StatusReport {
     let root = canonical_system_root();
+    let (system_policy_path, _) = load_system_policy();
     StatusReport {
         system_root: root.display().to_string(),
         nixos_root: root.join("nixos").display().to_string(),
@@ -121,6 +188,9 @@ async fn build_status_report() -> StatusReport {
             .join("utilities/sync/dracon-sync.toml")
             .display()
             .to_string(),
+        system_policy: system_policy_path
+            .map(|p| p.display().to_string())
+            .unwrap_or_else(|| "<default>".to_string()),
         sync_service_active: is_user_service_active("dracon-sync.service").await,
         warden_service_active: is_user_service_active("dracon-warden.service").await,
     }
@@ -199,6 +269,7 @@ async fn main() -> Result<()> {
                 println!("system_root: {}", report.system_root);
                 println!("nixos_root: {}", report.nixos_root);
                 println!("sync_policy: {}", report.sync_policy);
+                println!("system_policy: {}", report.system_policy);
                 println!("sync_service_active: {}", report.sync_service_active);
                 println!("warden_service_active: {}", report.warden_service_active);
             }
@@ -226,11 +297,17 @@ async fn main() -> Result<()> {
             min_size_mb,
             kinds,
         } => {
+            let (_, policy) = load_system_policy();
             let root = root.unwrap_or_else(|| {
+                if !policy.storage.default_root.trim().is_empty() {
+                    return PathBuf::from(policy.storage.default_root.clone());
+                }
                 dirs::home_dir()
                     .unwrap_or_else(|| PathBuf::from("/home"))
                     .join("Dev")
             });
+            let min_size_mb = min_size_mb.unwrap_or(policy.storage.min_size_mb);
+            let kinds = kinds.unwrap_or_else(|| policy.storage.kinds.clone());
 
             let report = analyze_workspace_storage(&root, 15, 25).await?;
 
