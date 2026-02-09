@@ -47,6 +47,10 @@ struct SyncPolicy {
     watch_roots: Vec<String>,
     #[serde(default)]
     extra_remotes: HashMap<String, String>,
+    #[serde(default = "default_exclude_dir_names")]
+    exclude_dir_names: Vec<String>,
+    #[serde(default = "default_max_stage_file_bytes")]
+    max_stage_file_bytes: u64,
 }
 
 fn default_true() -> bool {
@@ -57,12 +61,38 @@ fn default_pulse_interval() -> u64 {
     300
 }
 
+fn default_exclude_dir_names() -> Vec<String> {
+    [
+        "target",
+        "node_modules",
+        ".cache",
+        ".direnv",
+        ".venv",
+        "dist",
+        "build",
+        "archives",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect()
+}
+
+fn default_max_stage_file_bytes() -> u64 {
+    100 * 1024 * 1024
+}
+
 impl SyncPolicy {
     fn load(path: &Path) -> Result<Self> {
         let content = std::fs::read_to_string(path)
             .with_context(|| format!("failed to read policy {}", path.display()))?;
-        let policy: Self = toml::from_str(&content)
+        let mut policy: Self = toml::from_str(&content)
             .with_context(|| format!("failed to parse policy {}", path.display()))?;
+        if policy.exclude_dir_names.is_empty() {
+            policy.exclude_dir_names = default_exclude_dir_names();
+        }
+        if policy.max_stage_file_bytes == 0 {
+            policy.max_stage_file_bytes = default_max_stage_file_bytes();
+        }
         Ok(policy)
     }
 
@@ -107,24 +137,60 @@ fn resolve_policy_path() -> Result<PathBuf> {
     ))
 }
 
-fn is_excluded_dir_name(name: &str) -> bool {
-    matches!(
-        name,
-        "target"
-            | "node_modules"
-            | ".cache"
-            | ".direnv"
-            | ".venv"
-            | "dist"
-            | "build"
-            | "archives"
-    )
+fn normalized_dir_name(value: &str) -> String {
+    value.trim_matches('/').to_ascii_lowercase()
 }
 
-fn is_excluded_change_path(path: &Path) -> bool {
+fn excluded_dir_names_set(policy: &SyncPolicy) -> BTreeSet<String> {
+    policy
+        .exclude_dir_names
+        .iter()
+        .map(|d| normalized_dir_name(d))
+        .filter(|d| !d.is_empty())
+        .collect()
+}
+
+fn is_excluded_dir_name(name: &str, excluded_dir_names: &BTreeSet<String>) -> bool {
+    excluded_dir_names.contains(&normalized_dir_name(name))
+}
+
+fn is_excluded_change_path(path: &Path, excluded_dir_names: &BTreeSet<String>) -> bool {
     path.components()
         .filter_map(|c| c.as_os_str().to_str())
-        .any(is_excluded_dir_name)
+        .any(|name| is_excluded_dir_name(name, excluded_dir_names))
+}
+
+fn should_stage_entry(
+    repo: &Path,
+    entry: &dracon_git::types::DiffFile,
+    excluded_dir_names: &BTreeSet<String>,
+    max_stage_file_bytes: u64,
+) -> bool {
+    if matches!(entry.status, dracon_git::types::FileStatus::Deleted) {
+        return true;
+    }
+
+    if is_excluded_change_path(&entry.path, excluded_dir_names) {
+        return false;
+    }
+
+    let full_path = repo.join(&entry.path);
+    match std::fs::metadata(&full_path) {
+        Ok(meta) if meta.is_file() => {
+            if meta.len() > max_stage_file_bytes {
+                eprintln!(
+                    "ℹ️ skip large file {} ({} bytes > {} bytes)",
+                    full_path.display(),
+                    meta.len(),
+                    max_stage_file_bytes
+                );
+                return false;
+            }
+            true
+        }
+        Ok(_) => true,
+        Err(_) => true,
+    }
 }
 
 fn env_freeze_enabled() -> bool {
@@ -190,7 +256,7 @@ fn to_proto_entries(entries: &[dracon_git::types::DiffFile]) -> Vec<ProtoDiffFil
         .collect()
 }
 
-fn discover_git_repos(roots: &[PathBuf]) -> Vec<PathBuf> {
+fn discover_git_repos(roots: &[PathBuf], excluded_dir_names: &BTreeSet<String>) -> Vec<PathBuf> {
     let mut repos = BTreeSet::new();
 
     for root in roots {
@@ -207,7 +273,7 @@ fn discover_git_repos(roots: &[PathBuf]) -> Vec<PathBuf> {
                     return true;
                 }
                 let name = e.file_name().to_string_lossy();
-                !is_excluded_dir_name(&name)
+                !is_excluded_dir_name(&name, excluded_dir_names)
             });
 
         for entry in walker.filter_map(|e| e.ok()) {
@@ -239,7 +305,11 @@ fn has_origin_remote(repo: &Path) -> bool {
         .unwrap_or(false)
 }
 
-async fn sync_repo(repo: &Path, policy: &SyncPolicy) -> Result<bool> {
+async fn sync_repo(
+    repo: &Path,
+    policy: &SyncPolicy,
+    excluded_dir_names: &BTreeSet<String>,
+) -> Result<bool> {
     let svc = GitService::new(repo)?;
     if !svc.is_git_repo().await? {
         return Ok(false);
@@ -267,7 +337,9 @@ async fn sync_repo(repo: &Path, policy: &SyncPolicy) -> Result<bool> {
         let entries = svc.get_diff_entries().await?;
         let filtered_entries: Vec<_> = entries
             .into_iter()
-            .filter(|e| !is_excluded_change_path(&e.path))
+            .filter(|e| {
+                should_stage_entry(repo, e, excluded_dir_names, policy.max_stage_file_bytes)
+            })
             .collect();
         if !filtered_entries.is_empty() {
             let proto_status = to_proto_status(&status);
@@ -323,13 +395,14 @@ async fn run_once(policy_path: &Path) -> Result<()> {
 
     let policy = SyncPolicy::load(policy_path)?;
     let roots = policy.watch_root_paths();
-    let repos = discover_git_repos(&roots);
+    let excluded_dir_names = excluded_dir_names_set(&policy);
+    let repos = discover_git_repos(&roots, &excluded_dir_names);
 
     let mut changed = 0usize;
     for repo in repos {
         match tokio::time::timeout(
             Duration::from_secs(REPO_SYNC_TIMEOUT_SECS),
-            sync_repo(&repo, &policy),
+            sync_repo(&repo, &policy, &excluded_dir_names),
         )
         .await
         {
@@ -378,7 +451,8 @@ async fn main() -> Result<()> {
         Command::Status => {
             let policy = SyncPolicy::load(&policy_path)?;
             let roots = policy.watch_root_paths();
-            let repos = discover_git_repos(&roots);
+            let excluded_dir_names = excluded_dir_names_set(&policy);
+            let repos = discover_git_repos(&roots, &excluded_dir_names);
             let freeze = freeze_reason(&policy_path);
             println!("📜 POLICY: {}", policy_path.display());
             println!("🔁 ROOTS: {:?}", roots);
@@ -394,6 +468,11 @@ async fn main() -> Result<()> {
                 "⚙️ FLAGS: auto_commit={} auto_pull={} auto_push={}",
                 policy.auto_commit, policy.auto_pull, policy.auto_push
             );
+            println!(
+                "📏 MAX_STAGE_FILE_BYTES: {}",
+                policy.max_stage_file_bytes
+            );
+            println!("🚫 EXCLUDE_DIRS: {:?}", policy.exclude_dir_names);
             if !policy.system_repo.is_empty() {
                 println!("🏛️ SYSTEM_REPO: {}", policy.system_repo);
             }
@@ -417,7 +496,8 @@ async fn main() -> Result<()> {
                 return Ok(());
             }
             let policy = SyncPolicy::load(&policy_path)?;
-            if sync_repo(&repo, &policy).await? {
+            let excluded_dir_names = excluded_dir_names_set(&policy);
+            if sync_repo(&repo, &policy, &excluded_dir_names).await? {
                 println!("🔁 synced {}", repo.display());
             } else {
                 println!("✅ no sync changes {}", repo.display());
