@@ -122,6 +122,39 @@ fn is_excluded_dir_name(name: &str) -> bool {
     )
 }
 
+fn env_freeze_enabled() -> bool {
+    matches!(
+        std::env::var("DRACON_SYNC_FREEZE")
+            .unwrap_or_default()
+            .to_ascii_lowercase()
+            .as_str(),
+        "1" | "true" | "yes" | "on"
+    )
+}
+
+fn freeze_marker_paths(policy_path: &Path) -> Vec<PathBuf> {
+    let mut paths = Vec::new();
+    if let Some(dir) = policy_path.parent() {
+        paths.push(dir.join(".freeze"));
+        paths.push(dir.join("freeze"));
+    }
+    paths
+}
+
+fn freeze_reason(policy_path: &Path) -> Option<String> {
+    if env_freeze_enabled() {
+        return Some("env DRACON_SYNC_FREEZE".to_string());
+    }
+
+    for marker in freeze_marker_paths(policy_path) {
+        if marker.exists() {
+            return Some(format!("marker {}", marker.display()));
+        }
+    }
+
+    None
+}
+
 fn to_proto_status(s: &dracon_git::types::RepoStatus) -> ProtoRepoStatus {
     ProtoRepoStatus {
         branch: s.branch.clone(),
@@ -220,6 +253,11 @@ async fn sync_repo(repo: &Path, policy: &SyncPolicy) -> Result<bool> {
 }
 
 async fn run_once(policy_path: &Path) -> Result<()> {
+    if let Some(reason) = freeze_reason(policy_path) {
+        println!("⏸️ sync frozen ({})", reason);
+        return Ok(());
+    }
+
     let policy = SyncPolicy::load(policy_path)?;
     let roots = policy.watch_root_paths();
     let repos = discover_git_repos(&roots);
@@ -242,13 +280,16 @@ async fn run_once(policy_path: &Path) -> Result<()> {
 
 async fn run_daemon(policy_path: PathBuf) -> Result<()> {
     loop {
-        if let Err(e) = run_once(&policy_path).await {
-            eprintln!("⚠️ sync pass failed: {}", e);
-        }
-
         let interval = SyncPolicy::load(&policy_path)
             .map(|p| p.pulse_interval_secs.max(5))
             .unwrap_or(300);
+
+        if let Some(reason) = freeze_reason(&policy_path) {
+            println!("⏸️ sync daemon paused ({})", reason);
+        } else if let Err(e) = run_once(&policy_path).await {
+            eprintln!("⚠️ sync pass failed: {}", e);
+        }
+
         sleep(Duration::from_secs(interval)).await;
     }
 }
@@ -261,9 +302,16 @@ async fn main() -> Result<()> {
     match cli.cmd {
         Command::Status => {
             let policy = SyncPolicy::load(&policy_path)?;
+            let freeze = freeze_reason(&policy_path);
             println!("📜 POLICY: {}", policy_path.display());
             println!("🔁 ROOTS: {:?}", policy.watch_root_paths());
             println!("⏱️ PULSE: {}s", policy.pulse_interval_secs);
+            println!(
+                "⏸️ FREEZE: {}",
+                freeze
+                    .map(|r| format!("ON ({})", r))
+                    .unwrap_or_else(|| "OFF".to_string())
+            );
             println!(
                 "⚙️ FLAGS: auto_commit={} auto_pull={} auto_push={}",
                 policy.auto_commit, policy.auto_pull, policy.auto_push
@@ -286,6 +334,10 @@ async fn main() -> Result<()> {
             run_daemon(policy_path).await?;
         }
         Command::SyncNow { repo } => {
+            if let Some(reason) = freeze_reason(&policy_path) {
+                println!("⏸️ sync frozen ({})", reason);
+                return Ok(());
+            }
             let policy = SyncPolicy::load(&policy_path)?;
             if sync_repo(&repo, &policy).await? {
                 println!("🔁 synced {}", repo.display());
