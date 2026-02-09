@@ -93,6 +93,7 @@ struct DoctorReport {
     canonical_libs_exists: bool,
     canonical_utils_exists: bool,
     sync_policy_exists: bool,
+    legacy_config_dracon_exists: bool,
     sync_service_active: bool,
     warden_service_active: bool,
 }
@@ -429,6 +430,9 @@ async fn build_doctor_report() -> DoctorReport {
         .unwrap_or_else(|| PathBuf::from("/home"))
         .join("Dev/dracon-utilities");
     let policy = root.join("utilities/sync/dracon-sync.toml");
+    let legacy_cfg = dirs::home_dir()
+        .unwrap_or_else(|| PathBuf::from("/home"))
+        .join(".config/dracon");
 
     DoctorReport {
         system_root_exists: root.exists(),
@@ -436,6 +440,7 @@ async fn build_doctor_report() -> DoctorReport {
         canonical_libs_exists: libs.exists(),
         canonical_utils_exists: utils.exists(),
         sync_policy_exists: policy.exists(),
+        legacy_config_dracon_exists: legacy_cfg.exists(),
         sync_service_active: is_user_service_active("dracon-sync.service").await,
         warden_service_active: is_user_service_active("dracon-warden.service").await,
     }
@@ -507,6 +512,10 @@ async fn main() -> Result<()> {
                 println!("canonical_libs_exists: {}", report.canonical_libs_exists);
                 println!("canonical_utils_exists: {}", report.canonical_utils_exists);
                 println!("sync_policy_exists: {}", report.sync_policy_exists);
+                println!(
+                    "legacy_config_dracon_exists: {}",
+                    report.legacy_config_dracon_exists
+                );
                 println!("sync_service_active: {}", report.sync_service_active);
                 println!("warden_service_active: {}", report.warden_service_active);
             }
