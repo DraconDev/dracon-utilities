@@ -121,6 +121,12 @@ fn is_excluded_dir_name(name: &str) -> bool {
     )
 }
 
+fn is_excluded_change_path(path: &Path) -> bool {
+    path.components()
+        .filter_map(|c| c.as_os_str().to_str())
+        .any(is_excluded_dir_name)
+}
+
 fn env_freeze_enabled() -> bool {
     matches!(
         std::env::var("DRACON_SYNC_FREEZE")
@@ -259,11 +265,20 @@ async fn sync_repo(repo: &Path, policy: &SyncPolicy) -> Result<bool> {
     let status = svc.get_status().await?;
     if !status.is_clean && policy.auto_commit {
         let entries = svc.get_diff_entries().await?;
-        if !entries.is_empty() {
+        let filtered_entries: Vec<_> = entries
+            .into_iter()
+            .filter(|e| !is_excluded_change_path(&e.path))
+            .collect();
+        if !filtered_entries.is_empty() {
             let proto_status = to_proto_status(&status);
-            let proto_entries = to_proto_entries(&entries);
+            let proto_entries = to_proto_entries(&filtered_entries);
             let msg = build_sync_commit_payload(repo, &proto_status, &proto_entries);
-            svc.commit_all(&msg).await?;
+            let stage_paths: Vec<String> = filtered_entries
+                .iter()
+                .map(|e| e.path.to_string_lossy().to_string())
+                .collect();
+            svc.add_paths(&stage_paths).await?;
+            svc.commit(&msg).await?;
             if policy.auto_push && has_origin {
                 match tokio::time::timeout(Duration::from_secs(REMOTE_OP_TIMEOUT_SECS), svc.push())
                     .await
