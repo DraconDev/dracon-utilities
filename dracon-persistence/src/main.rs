@@ -8,17 +8,21 @@ mod config;
 use config::{PersistencePolicy, BackupPolicy};
 
 #[derive(Parser)]
-#[command(name = "dracon-persistence", about = "Persistence Manager - Autonomous Git & Symmetry", version)]
+#[command(
+    name = "dracon-persistence",
+    about = "Legacy state linker (sync responsibilities moved to dracon-sync)",
+    version
+)]
 struct Cli { #[command(subcommand)] cmd: Cmd }
 
 #[derive(Subcommand)]
 #[command(rename_all = "kebab-case")]
 enum Cmd {
-    /// 🛠️  Perform guided initial setup
+    /// 🛠️  Legacy setup (sync moved to dracon-sync)
     Install,
-    /// 📡 Start background persistence daemon
+    /// 📡 Deprecated: use dracon-sync daemon
     Daemon,
-    /// 🏗️  Manually trigger synchronization for a specific repository
+    /// 🏗️  Deprecated: use dracon-sync sync-now <repo>
     SyncNow { path: PathBuf },
     /// 🚚 Relocate a folder to persistent storage and link it back
     RelocateState { path: String, #[arg(short, long)] target: Option<String> },
@@ -35,38 +39,20 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
     match cli.cmd {
         Cmd::Install => {
-            println!("🛠️  DRACON PERSISTENCE GUIDED SETUP\n");
-            let mut policy = PersistencePolicy::load()?;
-            print!("Enter primary persistent repo path (default: {:?}): ", policy.system_repo);
-            io::stdout().flush()?;
-            let mut input = String::new(); io::stdin().read_line(&mut input)?;
-            let input = input.trim();
-            if !input.is_empty() { policy.system_repo = PathBuf::from(input); }
-            policy.save()?;
-            println!("\n✅ Persistence environment initialized."); Ok(())
+            println!("⚠️  dracon-persistence install is deprecated.");
+            println!("Use dracon-sync + dracon-warden for runtime automation.");
+            Ok(())
         },
         Cmd::Daemon => {
-            let _ = kill_previous("dracon-persistence");
-            let mut policy = PersistencePolicy::load()?;
-            println!("🔥 Persistence Daemon active. Monitoring {:?}...", policy.watch_roots);
-            let (tx, mut rx) = mpsc::unbounded_channel();
-            let mut watcher = notify::recommended_watcher(move |res| { if let Ok(e) = res { let _ = tx.send(e); } })?;
-            for root in &policy.watch_roots { if root.exists() { let _ = watcher.watch(root, RecursiveMode::Recursive); } }
-            if let Ok(cp) = PersistencePolicy::path() { let _ = watcher.watch(&cp, RecursiveMode::NonRecursive); }
-            
-            loop {
-                // Execute sync pulse
-                for repo in discover_repos(policy.watch_roots.clone()) { let _ = sync_repo(&repo, &policy); }
-                if let Ok(rx_res) = tokio::time::timeout(tokio::time::Duration::from_secs(policy.pulse_interval_secs), rx.recv()).await {
-                    if let Some(event) = rx_res {
-                        if event.paths.iter().any(|p| p.to_string_lossy().contains("dracon-persistence.toml")) {
-                            if let Ok(new_policy) = PersistencePolicy::load() { policy = new_policy; println!("🔄 Policy reloaded."); }
-                        }
-                    }
-                }
-            }
+            println!("⚠️  dracon-persistence daemon is deprecated.");
+            println!("Use: dracon-sync daemon");
+            Ok(())
         },
-        Cmd::SyncNow { path } => { sync_repo(&path, &PersistencePolicy::load()?) },
+        Cmd::SyncNow { path } => {
+            println!("⚠️  dracon-persistence sync-now is deprecated: {}", path.display());
+            println!("Use: dracon-sync sync-now {}", path.display());
+            Ok(())
+        },
         Cmd::RelocateState { path, target } => {
             let mut policy = PersistencePolicy::load()?;
             let source_abs = expand_home(&path)?;
