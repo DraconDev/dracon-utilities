@@ -2,6 +2,8 @@
 
 Deterministic by default. No AI runtime responsibilities in these tools unless explicitly stated.
 
+Canonical library ownership is defined in `dracon-libs/docs/capability-boundaries.md`.
+
 ## Canonical runtime owners
 
 - `dracon-sync`
@@ -27,3 +29,4 @@ Deterministic by default. No AI runtime responsibilities in these tools unless e
 - Do not introduce another daemon that auto-commits repos outside `dracon-sync`.
 - Do not introduce another watcher that enforces protected path policy outside `dracon-warden`.
 - Keep system cleanup/health logic in `dracon-system`.
+- Keep reusable capability logic in `dracon-libs`; utilities are wrappers/orchestrators.
