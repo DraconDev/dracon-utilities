@@ -6,6 +6,7 @@ Canonical library ownership is defined in `dracon-libs/docs/capability-boundarie
 
 ## Canonical runtime owners
 
+- Core utility set is exactly three: `dracon-sync`, `dracon-warden`, `dracon-system`.
 - `dracon-sync`
   - Owns git sync automation (watch roots, pull/commit/push, deterministic commit payloads, freeze toggle).
   - Commit generation is deterministic only; AI commit generation is out-of-scope.
@@ -21,12 +22,12 @@ Canonical library ownership is defined in `dracon-libs/docs/capability-boundarie
 
 ## Utility roles (non-overlapping)
 
-- `dracon-security`
-  - Filter utility (`clean`/`smudge`) for protected file content transformation.
-  - Not a daemon; not a repo sync orchestrator.
-- `dracon-persistence` (legacy)
-  - Retained only for state relocation/symlink repair flows.
-  - Sync/daemon behavior is deprecated in favor of `dracon-sync`.
+- `dracon-security` (legacy, deprecated)
+  - Old transitional utility from pre-split architecture.
+  - Not part of the canonical runtime model; scheduled for removal.
+- `dracon-persistence` (legacy, deprecated)
+  - Old transitional utility from pre-split architecture.
+  - Not part of the canonical runtime model; scheduled for removal.
 - `dracon-ai`
   - Optional AI utility, separate from sync/warden/system deterministic runtime loops.
 
@@ -42,4 +43,4 @@ Canonical library ownership is defined in `dracon-libs/docs/capability-boundarie
 
 - `demon-*` naming is legacy and should not be used for new binaries/crates.
 - Active runtime binaries are `dracon-sync`, `dracon-warden`, and `dracon-system`.
-- `dracon-security` is a filter utility and not an overlapping daemon.
+- `dracon-security` and `dracon-persistence` are deprecated legacy artifacts, not runtime owners.
