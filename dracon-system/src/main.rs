@@ -2,7 +2,11 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
+use std::fs;
+#[cfg(unix)]
+use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::process::Command;
 
 use dracon_system_lib::analyze_workspace_storage;
@@ -43,6 +47,33 @@ enum Commands {
         #[arg(long)]
         kinds: Option<String>,
     },
+    /// Manage deterministic symlink ownership for system setup.
+    Link {
+        #[command(subcommand)]
+        cmd: LinkCommands,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum LinkCommands {
+    /// Show link reconciliation status from policy.
+    Status {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Diagnose link drift and invalid targets.
+    Doctor {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Apply link policy by creating/fixing symlinks.
+    Apply {
+        #[arg(long)]
+        json: bool,
+        /// Replace non-symlink paths at link locations (backs up existing content first).
+        #[arg(long)]
+        force_replace: bool,
+    },
 }
 
 #[derive(Debug, Serialize)]
@@ -78,6 +109,8 @@ struct CleanupConfig {
 struct SystemPolicy {
     #[serde(default)]
     storage: StoragePolicy,
+    #[serde(default)]
+    links: LinkPolicy,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -98,6 +131,18 @@ impl Default for StoragePolicy {
             kinds: default_kinds(),
         }
     }
+}
+
+#[derive(Debug, Clone, Deserialize, Default)]
+struct LinkPolicy {
+    #[serde(default)]
+    entries: Vec<LinkEntry>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct LinkEntry {
+    link: String,
+    target: String,
 }
 
 fn default_min_size_mb() -> u64 {
@@ -125,12 +170,190 @@ fn canonical_system_root() -> PathBuf {
         .join("dracon")
 }
 
+fn expand_tilde(raw: &str) -> PathBuf {
+    if raw == "~" {
+        return dirs::home_dir().unwrap_or_else(|| PathBuf::from("/home"));
+    }
+    if let Some(rest) = raw.strip_prefix("~/") {
+        return dirs::home_dir()
+            .unwrap_or_else(|| PathBuf::from("/home"))
+            .join(rest);
+    }
+    PathBuf::from(raw)
+}
+
 fn parse_kinds(csv: &str) -> HashSet<String> {
     csv.split(',')
         .map(|s| s.trim())
         .filter(|s| !s.is_empty())
         .map(|s| s.to_string())
         .collect()
+}
+
+#[derive(Debug, Serialize)]
+struct LinkEntryStatus {
+    link: String,
+    target: String,
+    exists: bool,
+    is_symlink: bool,
+    target_exists: bool,
+    points_to: String,
+    in_sync: bool,
+    issue: String,
+}
+
+#[derive(Debug, Serialize)]
+struct LinkStatusReport {
+    entries: Vec<LinkEntryStatus>,
+    total: usize,
+    healthy: usize,
+    drifted: usize,
+    missing_target: usize,
+    missing_link: usize,
+}
+
+fn path_display(path: &Path) -> String {
+    path.display().to_string()
+}
+
+fn evaluate_link(entry: &LinkEntry) -> LinkEntryStatus {
+    let link = expand_tilde(&entry.link);
+    let target = expand_tilde(&entry.target);
+    let target_exists = target.exists();
+    let meta = fs::symlink_metadata(&link).ok();
+    let exists = meta.is_some();
+    let is_symlink = meta
+        .as_ref()
+        .map(|m| m.file_type().is_symlink())
+        .unwrap_or(false);
+
+    let mut points_to = String::new();
+    let mut in_sync = false;
+    let issue = if !target_exists {
+        "target_missing".to_string()
+    } else if !exists {
+        "link_missing".to_string()
+    } else if !is_symlink {
+        "path_not_symlink".to_string()
+    } else {
+        match fs::read_link(&link) {
+            Ok(actual) => {
+                let actual_abs = if actual.is_absolute() {
+                    actual
+                } else {
+                    link.parent().unwrap_or_else(|| Path::new("/")).join(actual)
+                };
+                points_to = path_display(&actual_abs);
+                if normalize_path(&actual_abs) == normalize_path(&target) {
+                    in_sync = true;
+                    "ok".to_string()
+                } else {
+                    "link_target_mismatch".to_string()
+                }
+            }
+            Err(_) => "readlink_failed".to_string(),
+        }
+    };
+
+    LinkEntryStatus {
+        link: path_display(&link),
+        target: path_display(&target),
+        exists,
+        is_symlink,
+        target_exists,
+        points_to,
+        in_sync,
+        issue,
+    }
+}
+
+fn normalize_path(path: &Path) -> PathBuf {
+    path.canonicalize().unwrap_or_else(|_| path.to_path_buf())
+}
+
+fn build_link_report(policy: &SystemPolicy) -> LinkStatusReport {
+    let mut entries = Vec::with_capacity(policy.links.entries.len());
+    let mut healthy = 0usize;
+    let mut drifted = 0usize;
+    let mut missing_target = 0usize;
+    let mut missing_link = 0usize;
+
+    for entry in &policy.links.entries {
+        let status = evaluate_link(entry);
+        match status.issue.as_str() {
+            "ok" => healthy += 1,
+            "target_missing" => {
+                drifted += 1;
+                missing_target += 1;
+            }
+            "link_missing" => {
+                drifted += 1;
+                missing_link += 1;
+            }
+            _ => drifted += 1,
+        }
+        entries.push(status);
+    }
+
+    LinkStatusReport {
+        total: entries.len(),
+        entries,
+        healthy,
+        drifted,
+        missing_target,
+        missing_link,
+    }
+}
+
+fn backup_path_for(link: &Path) -> PathBuf {
+    let ts = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let name = link
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_else(|| "link".to_string());
+    let backup_name = format!("{name}.dracon-system-backup-{ts}");
+    link.with_file_name(backup_name)
+}
+
+fn apply_link_policy(policy: &SystemPolicy, force_replace: bool) -> Result<LinkStatusReport> {
+    for entry in &policy.links.entries {
+        let link = expand_tilde(&entry.link);
+        let target = expand_tilde(&entry.target);
+
+        if !target.exists() {
+            continue;
+        }
+
+        if let Some(parent) = link.parent() {
+            fs::create_dir_all(parent)?;
+        }
+
+        let meta = fs::symlink_metadata(&link).ok();
+        if let Some(meta) = meta {
+            if meta.file_type().is_symlink() {
+                fs::remove_file(&link)?;
+            } else if force_replace {
+                let backup = backup_path_for(&link);
+                fs::rename(&link, backup)?;
+            } else {
+                continue;
+            }
+        }
+
+        #[cfg(unix)]
+        {
+            symlink(&target, &link)?;
+        }
+        #[cfg(not(unix))]
+        {
+            return Err(anyhow::anyhow!("link apply is only supported on unix"));
+        }
+    }
+
+    Ok(build_link_report(policy))
 }
 
 fn resolve_system_policy_path() -> Option<PathBuf> {
@@ -399,6 +622,49 @@ async fn main() -> Result<()> {
                     }
                 } else {
                     println!("No changes made. Re-run with --apply to execute cleanup.");
+                }
+            }
+        }
+        Commands::Link { cmd } => {
+            let (_, policy) = load_system_policy();
+            match cmd {
+                LinkCommands::Status { json } | LinkCommands::Doctor { json } => {
+                    let report = build_link_report(&policy);
+                    if json {
+                        println!("{}", serde_json::to_string_pretty(&report)?);
+                    } else {
+                        println!("links_total: {}", report.total);
+                        println!("links_healthy: {}", report.healthy);
+                        println!("links_drifted: {}", report.drifted);
+                        println!("links_missing_target: {}", report.missing_target);
+                        println!("links_missing_link: {}", report.missing_link);
+                        for item in report.entries {
+                            println!(
+                                "- {} -> {} [{}]",
+                                item.link,
+                                item.target,
+                                if item.issue == "ok" {
+                                    "ok".to_string()
+                                } else {
+                                    item.issue
+                                }
+                            );
+                        }
+                    }
+                }
+                LinkCommands::Apply {
+                    json,
+                    force_replace,
+                } => {
+                    let report = apply_link_policy(&policy, force_replace)?;
+                    if json {
+                        println!("{}", serde_json::to_string_pretty(&report)?);
+                    } else {
+                        println!("Applied link policy.");
+                        println!("links_total: {}", report.total);
+                        println!("links_healthy: {}", report.healthy);
+                        println!("links_drifted: {}", report.drifted);
+                    }
                 }
             }
         }

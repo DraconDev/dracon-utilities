@@ -19,6 +19,7 @@ Canonical library ownership is defined in `dracon-libs/docs/capability-boundarie
   - Owns security hardening/watcher behavior (managed `.gitignore`/`.gitattributes`, protected paths).
 - `dracon-system`
   - Owns system diagnostics + storage analysis/cleanup + service health checks.
+  - Owns setup symlink reconciliation via `[links]` policy in `/home/dracon/dracon/utilities/system/dracon-system.toml`.
 
 ## Utility roles (non-overlapping)
 
