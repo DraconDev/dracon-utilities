@@ -10,6 +10,7 @@ Canonical library ownership is defined in `dracon-libs/docs/capability-boundarie
   - Owns git sync automation (watch roots, pull/commit/push, deterministic commit payloads, freeze toggle).
   - Commit generation is deterministic only; AI commit generation is out-of-scope.
   - Policy path: `/home/dracon/dracon/utilities/sync/dracon-sync.toml`.
+  - Operating model doc: `/home/dracon/dracon/utilities/sync/AI_SYNC_MODEL.md`.
   - Required policy controls:
     - `exclude_dir_names` for repo discovery + staging exclusions.
     - `max_stage_file_bytes` (default 104857600 / 100 MiB) for large-file staging guard.
@@ -35,6 +36,7 @@ Canonical library ownership is defined in `dracon-libs/docs/capability-boundarie
 - Do not introduce another watcher that enforces protected path policy outside `dracon-warden`.
 - Keep system cleanup/health logic in `dracon-system`.
 - Keep reusable capability logic in `dracon-libs`; utilities are wrappers/orchestrators.
+- Protected branches should use one commit voice (`dracon-sync`) with deterministic JSON payloads.
 
 ## Naming + transition policy
 
