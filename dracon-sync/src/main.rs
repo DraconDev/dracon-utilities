@@ -220,6 +220,8 @@ fn discover_git_repos(roots: &[PathBuf]) -> Vec<PathBuf> {
     repos.into_iter().collect()
 }
 
+const REMOTE_OP_TIMEOUT_SECS: u64 = 20;
+
 async fn sync_repo(repo: &Path, policy: &SyncPolicy) -> Result<bool> {
     let svc = GitService::new(repo)?;
     if !svc.is_git_repo().await? {
@@ -227,7 +229,17 @@ async fn sync_repo(repo: &Path, policy: &SyncPolicy) -> Result<bool> {
     }
 
     if policy.auto_pull {
-        let _ = svc.pull_rebase().await;
+        match tokio::time::timeout(Duration::from_secs(REMOTE_OP_TIMEOUT_SECS), svc.pull_rebase())
+            .await
+        {
+            Ok(Ok(())) => {}
+            Ok(Err(e)) => eprintln!("⚠️ pull/rebase skipped for {}: {}", repo.display(), e),
+            Err(_) => eprintln!(
+                "⚠️ pull/rebase timeout for {} after {}s",
+                repo.display(),
+                REMOTE_OP_TIMEOUT_SECS
+            ),
+        }
     }
 
     let status = svc.get_status().await?;
@@ -239,14 +251,32 @@ async fn sync_repo(repo: &Path, policy: &SyncPolicy) -> Result<bool> {
             let msg = build_sync_commit_payload(repo, &proto_status, &proto_entries);
             svc.commit_all(&msg).await?;
             if policy.auto_push {
-                let _ = svc.push().await;
+                match tokio::time::timeout(Duration::from_secs(REMOTE_OP_TIMEOUT_SECS), svc.push())
+                    .await
+                {
+                    Ok(Ok(())) => {}
+                    Ok(Err(e)) => eprintln!("⚠️ push skipped for {}: {}", repo.display(), e),
+                    Err(_) => eprintln!(
+                        "⚠️ push timeout for {} after {}s",
+                        repo.display(),
+                        REMOTE_OP_TIMEOUT_SECS
+                    ),
+                }
             }
             return Ok(true);
         }
     }
 
     if policy.auto_push && status.ahead > 0 {
-        let _ = svc.push().await;
+        match tokio::time::timeout(Duration::from_secs(REMOTE_OP_TIMEOUT_SECS), svc.push()).await {
+            Ok(Ok(())) => {}
+            Ok(Err(e)) => eprintln!("⚠️ push skipped for {}: {}", repo.display(), e),
+            Err(_) => eprintln!(
+                "⚠️ push timeout for {} after {}s",
+                repo.display(),
+                REMOTE_OP_TIMEOUT_SECS
+            ),
+        }
     }
 
     Ok(false)
