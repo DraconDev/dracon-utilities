@@ -5,6 +5,7 @@ use dracon_protocols::git::{DiffFile as ProtoDiffFile, FileStatus as ProtoFileSt
 use serde::Deserialize;
 use std::collections::{BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
+use tokio::process::Command as TokioCommand;
 use tokio::time::{Duration, sleep};
 
 #[derive(Parser, Debug)]
@@ -291,8 +292,8 @@ fn discover_git_repos(roots: &[PathBuf], excluded_dir_names: &BTreeSet<String>) 
     repos.into_iter().collect()
 }
 
-const REMOTE_OP_TIMEOUT_SECS: u64 = 6;
-const REPO_SYNC_TIMEOUT_SECS: u64 = 45;
+const REMOTE_OP_TIMEOUT_SECS: u64 = 20;
+const REPO_SYNC_TIMEOUT_SECS: u64 = 90;
 
 fn has_origin_remote(repo: &Path) -> bool {
     std::process::Command::new("git")
@@ -303,6 +304,71 @@ fn has_origin_remote(repo: &Path) -> bool {
         .output()
         .map(|o| o.status.success())
         .unwrap_or(false)
+}
+
+async fn kill_descendants(pid: u32) {
+    let pid_s = pid.to_string();
+    let _ = TokioCommand::new("pkill")
+        .args(["-TERM", "-P", &pid_s])
+        .output()
+        .await;
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    let _ = TokioCommand::new("pkill")
+        .args(["-KILL", "-P", &pid_s])
+        .output()
+        .await;
+}
+
+async fn run_git_with_timeout(
+    repo: &Path,
+    args: &[&str],
+    timeout_secs: u64,
+    op_label: &str,
+) -> Result<()> {
+    let mut child = TokioCommand::new("git")
+        .args(args)
+        .current_dir(repo)
+        .kill_on_drop(true)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .with_context(|| format!("failed to spawn git {} in {}", op_label, repo.display()))?;
+
+    let pid = child.id();
+    match tokio::time::timeout(Duration::from_secs(timeout_secs), child.wait()).await {
+        Ok(Ok(status)) => {
+            if status.success() {
+                return Ok(());
+            }
+            return Err(anyhow::anyhow!(
+                "git {} failed in {} with status {}",
+                op_label,
+                repo.display(),
+                status
+            ));
+        }
+        Ok(Err(e)) => {
+            return Err(anyhow::anyhow!(
+                "git {} failed in {}: {}",
+                op_label,
+                repo.display(),
+                e
+            ));
+        }
+        Err(_) => {
+            if let Some(pid) = pid {
+                kill_descendants(pid).await;
+            }
+            let _ = child.start_kill();
+            let _ = child.wait().await;
+            return Err(anyhow::anyhow!(
+                "git {} timeout in {} after {}s",
+                op_label,
+                repo.display(),
+                timeout_secs
+            ));
+        }
+    }
 }
 
 async fn sync_repo(
@@ -317,16 +383,16 @@ async fn sync_repo(
     let has_origin = has_origin_remote(repo);
 
     if policy.auto_pull && has_origin {
-        match tokio::time::timeout(Duration::from_secs(REMOTE_OP_TIMEOUT_SECS), svc.pull_rebase())
-            .await
+        match run_git_with_timeout(
+            repo,
+            &["pull", "--rebase", "--autostash"],
+            REMOTE_OP_TIMEOUT_SECS,
+            "pull/rebase",
+        )
+        .await
         {
-            Ok(Ok(())) => {}
-            Ok(Err(e)) => eprintln!("⚠️ pull/rebase skipped for {}: {}", repo.display(), e),
-            Err(_) => eprintln!(
-                "⚠️ pull/rebase timeout for {} after {}s",
-                repo.display(),
-                REMOTE_OP_TIMEOUT_SECS
-            ),
+            Ok(()) => {}
+            Err(e) => eprintln!("⚠️ pull/rebase skipped for {}: {}", repo.display(), e),
         }
     } else if policy.auto_pull && !has_origin {
         eprintln!("ℹ️ skip pull/rebase for {} (no origin remote)", repo.display());
@@ -352,16 +418,16 @@ async fn sync_repo(
             svc.add_paths(&stage_paths).await?;
             svc.commit(&msg).await?;
             if policy.auto_push && has_origin {
-                match tokio::time::timeout(Duration::from_secs(REMOTE_OP_TIMEOUT_SECS), svc.push())
-                    .await
+                match run_git_with_timeout(
+                    repo,
+                    &["push", "origin", "HEAD"],
+                    REMOTE_OP_TIMEOUT_SECS,
+                    "push",
+                )
+                .await
                 {
-                    Ok(Ok(())) => {}
-                    Ok(Err(e)) => eprintln!("⚠️ push skipped for {}: {}", repo.display(), e),
-                    Err(_) => eprintln!(
-                        "⚠️ push timeout for {} after {}s",
-                        repo.display(),
-                        REMOTE_OP_TIMEOUT_SECS
-                    ),
+                    Ok(()) => {}
+                    Err(e) => eprintln!("⚠️ push skipped for {}: {}", repo.display(), e),
                 }
             } else if policy.auto_push && !has_origin {
                 eprintln!("ℹ️ skip push for {} (no origin remote)", repo.display());
@@ -371,14 +437,16 @@ async fn sync_repo(
     }
 
     if policy.auto_push && status.ahead > 0 && has_origin {
-        match tokio::time::timeout(Duration::from_secs(REMOTE_OP_TIMEOUT_SECS), svc.push()).await {
-            Ok(Ok(())) => {}
-            Ok(Err(e)) => eprintln!("⚠️ push skipped for {}: {}", repo.display(), e),
-            Err(_) => eprintln!(
-                "⚠️ push timeout for {} after {}s",
-                repo.display(),
-                REMOTE_OP_TIMEOUT_SECS
-            ),
+        match run_git_with_timeout(
+            repo,
+            &["push", "origin", "HEAD"],
+            REMOTE_OP_TIMEOUT_SECS,
+            "push",
+        )
+        .await
+        {
+            Ok(()) => {}
+            Err(e) => eprintln!("⚠️ push skipped for {}: {}", repo.display(), e),
         }
     } else if policy.auto_push && status.ahead > 0 && !has_origin {
         eprintln!("ℹ️ skip push for {} (no origin remote)", repo.display());
