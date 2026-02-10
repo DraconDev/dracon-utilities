@@ -119,7 +119,6 @@ fn resolve_policy_path() -> Result<PathBuf> {
         home.join("dracon/utilities/sync/dracon-sync.toml"),
         home.join("dracon/utilities/sync/config.toml"),
         home.join("dracon/git/dracon-git.toml"),
-        home.join("demon/git/dracon-git.toml"),
     ];
 
     for p in &candidates {
