@@ -7,6 +7,7 @@ use dracon_protocols::git::{
 use serde::Deserialize;
 use std::collections::{BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
+use std::process::Command as StdCommand;
 use tokio::process::Command as TokioCommand;
 use tokio::time::{sleep, Duration};
 
@@ -22,12 +23,16 @@ struct Cli {
 enum Command {
     /// Show resolved policy path and sync scope.
     Status,
+    /// One-off report across discovered repositories.
+    Repos,
     /// Run one sync pass.
     Once,
     /// Run continuous sync loop.
     Daemon,
     /// Sync a specific repository now.
     SyncNow { repo: PathBuf },
+    /// Open sync policy in the system editor.
+    EditConfig,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -647,6 +652,162 @@ async fn run_daemon(policy_path: PathBuf) -> Result<()> {
     }
 }
 
+fn truncate(value: &str, max_chars: usize) -> String {
+    if value.chars().count() <= max_chars {
+        return value.to_string();
+    }
+    let shortened: String = value.chars().take(max_chars.saturating_sub(1)).collect();
+    format!("{}…", shortened)
+}
+
+async fn git_log_field(repo: &Path, format: &str) -> Option<String> {
+    let output = TokioCommand::new("git")
+        .args(["log", "-1", &format!("--pretty=format:{}", format)])
+        .current_dir(repo)
+        .output()
+        .await
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let value = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if value.is_empty() {
+        None
+    } else {
+        Some(value)
+    }
+}
+
+async fn run_repos_report(policy_path: &Path) -> Result<()> {
+    let policy = SyncPolicy::load(policy_path)?;
+    let roots = policy.watch_root_paths();
+    let excluded_dir_names = excluded_dir_names_set(&policy);
+    let repos = discover_git_repos(&roots, &excluded_dir_names);
+
+    println!("📜 POLICY: {}", policy_path.display());
+    println!("📦 REPOS_DISCOVERED: {}", repos.len());
+    println!();
+
+    for repo in repos {
+        let svc = match GitService::new(&repo) {
+            Ok(svc) => svc,
+            Err(e) => {
+                println!("❌ {} | init_failed: {}", repo.display(), e);
+                continue;
+            }
+        };
+
+        let status = match svc.get_status().await {
+            Ok(status) => status,
+            Err(e) => {
+                println!("❌ {} | status_failed: {}", repo.display(), e);
+                continue;
+            }
+        };
+
+        let has_origin = has_origin_remote(&repo);
+        let has_upstream = has_tracking_upstream(&repo);
+
+        let mut flags = Vec::new();
+        if !status.is_clean {
+            flags.push("DIRTY".to_string());
+        }
+        if status.ahead > 0 {
+            flags.push(format!("AHEAD:{}", status.ahead));
+        }
+        if status.behind > 0 {
+            flags.push(format!("BEHIND:{}", status.behind));
+        }
+        if !has_origin {
+            flags.push("NO_ORIGIN".to_string());
+        }
+        if has_origin && !has_upstream {
+            flags.push("NO_UPSTREAM".to_string());
+        }
+        if flags.is_empty() {
+            flags.push("OK".to_string());
+        }
+
+        let last_hash = status
+            .last_commit_hash
+            .as_deref()
+            .map(|h| truncate(h, 12))
+            .unwrap_or_else(|| "-".to_string());
+        let last_msg = status
+            .last_commit_msg
+            .as_deref()
+            .map(|m| truncate(m, 72))
+            .unwrap_or_else(|| "-".to_string());
+        let last_author = git_log_field(&repo, "%an")
+            .await
+            .unwrap_or_else(|| "-".to_string());
+        let last_when = git_log_field(&repo, "%ar")
+            .await
+            .unwrap_or_else(|| "-".to_string());
+
+        println!(
+            "{}\n  state={} branch={} modified={} staged={} ahead={} behind={}\n  last={} by {} ({}) {}\n",
+            repo.display(),
+            flags.join(","),
+            status.branch,
+            status.modified_files,
+            status.staged_files,
+            status.ahead,
+            status.behind,
+            last_hash,
+            last_author,
+            last_when,
+            last_msg
+        );
+    }
+
+    Ok(())
+}
+
+fn open_policy_in_editor(policy_path: &Path) -> Result<()> {
+    let mut editors = Vec::new();
+    if let Ok(visual) = std::env::var("VISUAL") {
+        if !visual.trim().is_empty() {
+            editors.push(visual);
+        }
+    }
+    if let Ok(editor) = std::env::var("EDITOR") {
+        if !editor.trim().is_empty() {
+            editors.push(editor);
+        }
+    }
+    for fallback in ["nvim", "vim", "nano", "vi"] {
+        editors.push(fallback.to_string());
+    }
+
+    for editor in editors {
+        match StdCommand::new(editor.trim()).arg(policy_path).status() {
+            Ok(status) if status.success() => return Ok(()),
+            Ok(status) => {
+                return Err(anyhow::anyhow!(
+                    "editor exited non-zero ({}). policy: {}",
+                    status,
+                    policy_path.display()
+                ));
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(e) => {
+                return Err(anyhow::anyhow!(
+                    "failed to launch editor '{}' for {}: {}",
+                    editor,
+                    policy_path.display(),
+                    e
+                ));
+            }
+        }
+    }
+
+    Err(anyhow::anyhow!(
+        "no editor available. set VISUAL or EDITOR to open {}",
+        policy_path.display()
+    ))
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
@@ -692,6 +853,9 @@ async fn main() -> Result<()> {
             }
             println!("🌐 EXTRA_REMOTES: {}", policy.extra_remotes.len());
         }
+        Command::Repos => {
+            run_repos_report(&policy_path).await?;
+        }
         Command::Once => {
             run_once(&policy_path).await?;
         }
@@ -710,6 +874,9 @@ async fn main() -> Result<()> {
             } else {
                 println!("✅ no sync changes {}", repo.display());
             }
+        }
+        Command::EditConfig => {
+            open_policy_in_editor(&policy_path)?;
         }
     }
 
