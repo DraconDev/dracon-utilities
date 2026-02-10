@@ -96,7 +96,6 @@ struct DoctorReport {
     canonical_utils_exists: bool,
     sync_policy_exists: bool,
     legacy_config_dracon_exists: bool,
-    legacy_demon_root_exists: bool,
     sync_service_active: bool,
     warden_service_active: bool,
 }
@@ -436,9 +435,6 @@ async fn build_doctor_report() -> DoctorReport {
     let legacy_cfg = dirs::home_dir()
         .unwrap_or_else(|| PathBuf::from("/home"))
         .join(".config/dracon");
-    let legacy_demon = dirs::home_dir()
-        .unwrap_or_else(|| PathBuf::from("/home"))
-        .join("demon");
 
     DoctorReport {
         system_root_exists: root.exists(),
@@ -447,7 +443,6 @@ async fn build_doctor_report() -> DoctorReport {
         canonical_utils_exists: utils.exists(),
         sync_policy_exists: policy.exists(),
         legacy_config_dracon_exists: legacy_cfg.exists(),
-        legacy_demon_root_exists: legacy_demon.exists(),
         sync_service_active: is_user_service_active("dracon-sync.service").await,
         warden_service_active: is_user_service_active("dracon-warden.service").await,
     }
@@ -523,7 +518,6 @@ async fn main() -> Result<()> {
                     "legacy_config_dracon_exists: {}",
                     report.legacy_config_dracon_exists
                 );
-                println!("legacy_demon_root_exists: {}", report.legacy_demon_root_exists);
                 println!("sync_service_active: {}", report.sync_service_active);
                 println!("warden_service_active: {}", report.warden_service_active);
             }
@@ -531,9 +525,6 @@ async fn main() -> Result<()> {
                 let mut violations = Vec::new();
                 if report.legacy_config_dracon_exists {
                     violations.push("legacy ~/.config/dracon exists".to_string());
-                }
-                if report.legacy_demon_root_exists {
-                    violations.push("legacy ~/demon root exists".to_string());
                 }
                 if !violations.is_empty() {
                     return Err(anyhow::anyhow!(
