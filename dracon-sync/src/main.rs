@@ -24,7 +24,17 @@ enum Command {
     /// Show resolved policy path and sync scope.
     Status,
     /// One-off report across discovered repositories.
-    Repos,
+    Repos {
+        /// Show only concern repos.
+        #[arg(long)]
+        only_concern: bool,
+    },
+    /// Repair concern repos (dry-run by default; use --apply to execute).
+    RepairConcerns {
+        /// Execute git operations to repair concerns.
+        #[arg(long)]
+        apply: bool,
+    },
     /// Run one sync pass.
     Once,
     /// Run continuous sync loop.
@@ -697,7 +707,7 @@ async fn git_log_unix_timestamp(repo: &Path) -> Option<i64> {
         .and_then(|s| s.parse::<i64>().ok())
 }
 
-async fn run_repos_report(policy_path: &Path) -> Result<()> {
+async fn run_repos_report(policy_path: &Path, only_concern: bool) -> Result<()> {
     #[derive(Debug)]
     struct RepoRow {
         repo: PathBuf,
@@ -823,13 +833,29 @@ async fn run_repos_report(policy_path: &Path) -> Result<()> {
 
     rows.sort_by(|a, b| b.last_unix.cmp(&a.last_unix));
 
+    let concern_count_all = rows.iter().filter(|r| r.concern).count();
+    let warn_count_all = rows.iter().filter(|r| r.warn).count();
+    let ok_count_all = rows
+        .len()
+        .saturating_sub(concern_count_all + warn_count_all);
+    if only_concern {
+        rows.retain(|r| r.concern);
+    }
+
     let concern_count = rows.iter().filter(|r| r.concern).count();
     let warn_count = rows.iter().filter(|r| r.warn).count();
     let ok_count = rows.len().saturating_sub(concern_count + warn_count);
 
     println!("📜 POLICY: {}", policy_path.display());
+    if only_concern {
+        println!(
+            "📊 FILTER: only concern repos (showing {} of {})",
+            rows.len(),
+            concern_count_all
+        );
+    }
     println!(
-        "📦 REPOS: {}  {} {}  {} {}  {} {}  ❌ {}",
+        "📦 REPOS: {}  {} {}  {} {}  {} {}  ❌ {}{}",
         rows.len(),
         paint("OK", "32"),
         ok_count,
@@ -837,7 +863,15 @@ async fn run_repos_report(policy_path: &Path) -> Result<()> {
         warn_count,
         paint("CONCERN", "31"),
         concern_count,
-        init_or_status_failures
+        init_or_status_failures,
+        if only_concern {
+            format!(
+                "  (all: OK {} WARN {} CONCERN {})",
+                ok_count_all, warn_count_all, concern_count_all
+            )
+        } else {
+            String::new()
+        }
     );
     println!("🕒 SORT: last modified (newest first)");
     println!();
@@ -867,6 +901,172 @@ async fn run_repos_report(policy_path: &Path) -> Result<()> {
             row.last_hash, row.last_author, row.last_msg
         );
         println!();
+    }
+
+    Ok(())
+}
+
+async fn run_repair_concerns(policy_path: &Path, apply: bool) -> Result<()> {
+    let policy = SyncPolicy::load(policy_path)?;
+    let roots = policy.watch_root_paths();
+    let excluded_dir_names = excluded_dir_names_set(&policy);
+    let repos = discover_git_repos(&roots, &excluded_dir_names);
+
+    let mut concerns = 0usize;
+    let mut attempted_ops = 0usize;
+    let mut succeeded_ops = 0usize;
+    let mut manual_only = 0usize;
+    let mut resolved = 0usize;
+
+    println!("📜 POLICY: {}", policy_path.display());
+    println!(
+        "🛠️ MODE: {}",
+        if apply {
+            "APPLY (mutating)"
+        } else {
+            "DRY-RUN (no changes)"
+        }
+    );
+
+    for repo in repos {
+        let svc = match GitService::new(&repo) {
+            Ok(svc) => svc,
+            Err(e) => {
+                eprintln!("⚠️ {} init_failed: {}", repo.display(), e);
+                continue;
+            }
+        };
+        let status = match svc.get_status().await {
+            Ok(status) => status,
+            Err(e) => {
+                eprintln!("⚠️ {} status_failed: {}", repo.display(), e);
+                continue;
+            }
+        };
+
+        let has_origin = has_origin_remote(&repo);
+        let mut has_upstream = has_tracking_upstream(&repo);
+        let is_concern =
+            status.ahead > 0 || status.behind > 0 || !has_origin || (has_origin && !has_upstream);
+        if !is_concern {
+            continue;
+        }
+        concerns += 1;
+
+        println!(
+            "\n🔎 {}  state: ahead={} behind={} clean={} origin={} upstream={}",
+            repo.display(),
+            status.ahead,
+            status.behind,
+            status.is_clean,
+            has_origin,
+            has_upstream
+        );
+
+        if !has_origin {
+            manual_only += 1;
+            println!("   manual: NO_ORIGIN (configure remote before sync can repair)");
+            continue;
+        }
+
+        if !has_upstream {
+            attempted_ops += 1;
+            println!("   plan: set upstream via `git push -u origin HEAD`");
+            if apply {
+                match run_git_with_timeout(
+                    &repo,
+                    &["push", "-u", "origin", "HEAD"],
+                    policy.push_op_timeout_secs,
+                    "push -u",
+                )
+                .await
+                {
+                    Ok(()) => {
+                        succeeded_ops += 1;
+                        has_upstream = true;
+                        println!("   ok: upstream configured");
+                    }
+                    Err(e) => {
+                        println!("   fail: upstream configure failed: {}", e);
+                        continue;
+                    }
+                }
+            }
+        }
+
+        if status.behind > 0 && has_upstream {
+            attempted_ops += 1;
+            println!("   plan: pull --rebase --autostash");
+            if apply {
+                match run_git_with_timeout(
+                    &repo,
+                    &["pull", "--rebase", "--autostash"],
+                    policy.pull_op_timeout_secs,
+                    "pull/rebase",
+                )
+                .await
+                {
+                    Ok(()) => {
+                        succeeded_ops += 1;
+                        println!("   ok: pulled");
+                    }
+                    Err(e) => println!("   fail: pull failed: {}", e),
+                }
+            }
+        }
+
+        if status.ahead > 0 && has_upstream {
+            attempted_ops += 1;
+            println!("   plan: push origin HEAD");
+            if apply {
+                match run_git_with_timeout(
+                    &repo,
+                    &["push", "origin", "HEAD"],
+                    policy.push_op_timeout_secs,
+                    "push",
+                )
+                .await
+                {
+                    Ok(()) => {
+                        succeeded_ops += 1;
+                        println!("   ok: pushed");
+                    }
+                    Err(e) => println!("   fail: push failed: {}", e),
+                }
+            }
+        }
+
+        if apply {
+            if let Ok(next) = svc.get_status().await {
+                let still_concern = next.ahead > 0
+                    || next.behind > 0
+                    || !has_origin_remote(&repo)
+                    || (has_origin_remote(&repo) && !has_tracking_upstream(&repo));
+                if !still_concern {
+                    resolved += 1;
+                    println!("   resolved: concern cleared");
+                } else {
+                    println!(
+                        "   remaining: ahead={} behind={} origin={} upstream={}",
+                        next.ahead,
+                        next.behind,
+                        has_origin_remote(&repo),
+                        has_tracking_upstream(&repo)
+                    );
+                }
+            }
+        }
+    }
+
+    println!("\n✅ concern management summary");
+    println!("   concerns_found: {}", concerns);
+    println!("   operations_planned: {}", attempted_ops);
+    println!("   operations_succeeded: {}", succeeded_ops);
+    println!("   manual_only: {}", manual_only);
+    if apply {
+        println!("   concerns_resolved_now: {}", resolved);
+    } else {
+        println!("   dry_run: true (rerun with --apply to execute)");
     }
 
     Ok(())
@@ -1157,8 +1357,11 @@ async fn main() -> Result<()> {
             }
             println!("🌐 EXTRA_REMOTES: {}", policy.extra_remotes.len());
         }
-        Command::Repos => {
-            run_repos_report(&policy_path).await?;
+        Command::Repos { only_concern } => {
+            run_repos_report(&policy_path, only_concern).await?;
+        }
+        Command::RepairConcerns { apply } => {
+            run_repair_concerns(&policy_path, apply).await?;
         }
         Command::Once => {
             run_once(&policy_path).await?;
