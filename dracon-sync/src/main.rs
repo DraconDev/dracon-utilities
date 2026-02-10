@@ -292,7 +292,8 @@ fn discover_git_repos(roots: &[PathBuf], excluded_dir_names: &BTreeSet<String>) 
     repos.into_iter().collect()
 }
 
-const REMOTE_OP_TIMEOUT_SECS: u64 = 20;
+const PULL_OP_TIMEOUT_SECS: u64 = 20;
+const PUSH_OP_TIMEOUT_SECS: u64 = 60;
 const REPO_SYNC_TIMEOUT_SECS: u64 = 90;
 
 fn has_origin_remote(repo: &Path) -> bool {
@@ -300,6 +301,15 @@ fn has_origin_remote(repo: &Path) -> bool {
         .arg("remote")
         .arg("get-url")
         .arg("origin")
+        .current_dir(repo)
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
+}
+
+fn has_tracking_upstream(repo: &Path) -> bool {
+    std::process::Command::new("git")
+        .args(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"])
         .current_dir(repo)
         .output()
         .map(|o| o.status.success())
@@ -381,12 +391,13 @@ async fn sync_repo(
         return Ok(false);
     }
     let has_origin = has_origin_remote(repo);
+    let has_upstream = has_tracking_upstream(repo);
 
-    if policy.auto_pull && has_origin {
+    if policy.auto_pull && has_origin && has_upstream {
         match run_git_with_timeout(
             repo,
             &["pull", "--rebase", "--autostash"],
-            REMOTE_OP_TIMEOUT_SECS,
+            PULL_OP_TIMEOUT_SECS,
             "pull/rebase",
         )
         .await
@@ -396,6 +407,11 @@ async fn sync_repo(
         }
     } else if policy.auto_pull && !has_origin {
         eprintln!("ℹ️ skip pull/rebase for {} (no origin remote)", repo.display());
+    } else if policy.auto_pull && has_origin && !has_upstream {
+        eprintln!(
+            "ℹ️ skip pull/rebase for {} (no tracking upstream on current branch)",
+            repo.display()
+        );
     }
 
     let status = svc.get_status().await?;
@@ -421,7 +437,7 @@ async fn sync_repo(
                 match run_git_with_timeout(
                     repo,
                     &["push", "origin", "HEAD"],
-                    REMOTE_OP_TIMEOUT_SECS,
+                    PUSH_OP_TIMEOUT_SECS,
                     "push",
                 )
                 .await
@@ -440,7 +456,7 @@ async fn sync_repo(
         match run_git_with_timeout(
             repo,
             &["push", "origin", "HEAD"],
-            REMOTE_OP_TIMEOUT_SECS,
+            PUSH_OP_TIMEOUT_SECS,
             "push",
         )
         .await
