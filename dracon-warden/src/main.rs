@@ -34,6 +34,8 @@ struct WardenPolicy {
     #[serde(default)]
     protected_patterns: Vec<String>,
     #[serde(default)]
+    plaintext_patterns: Vec<String>,
+    #[serde(default)]
     hygiene_patterns: Vec<String>,
     #[serde(default)]
     watch_roots: Vec<String>,
@@ -176,6 +178,9 @@ fn build_gitignore_block(policy: &WardenPolicy) -> String {
     for p in &policy.protected_patterns {
         lines.push(format!("!{}", p));
     }
+    for p in &policy.plaintext_patterns {
+        lines.push(format!("!{}", p));
+    }
     lines.push(BLOCK_END.to_string());
     lines.join("\n")
 }
@@ -186,6 +191,9 @@ fn build_gitattributes_block(policy: &WardenPolicy) -> String {
     lines.push("# managed by dracon-warden".to_string());
     for p in &policy.protected_patterns {
         lines.push(format!("{} filter=dracon diff=dracon merge=dracon", p));
+    }
+    for p in &policy.plaintext_patterns {
+        lines.push(format!("{} -filter -diff -merge", p));
     }
     lines.push(BLOCK_END.to_string());
     lines.join("\n")
