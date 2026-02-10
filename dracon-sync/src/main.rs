@@ -8,6 +8,7 @@ use serde::Deserialize;
 use std::collections::{BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
 use std::process::Command as StdCommand;
+use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::process::Command as TokioCommand;
 use tokio::time::{sleep, Duration};
 
@@ -34,6 +35,15 @@ enum Command {
         /// Execute git operations to repair concerns.
         #[arg(long)]
         apply: bool,
+        /// Only repair this repository path.
+        #[arg(long)]
+        repo: Option<PathBuf>,
+        /// Override push timeout seconds for this run.
+        #[arg(long)]
+        push_timeout_secs: Option<u64>,
+        /// Retry count for push operations.
+        #[arg(long, default_value_t = 3)]
+        push_retries: u32,
     },
     /// Run one sync pass.
     Once,
@@ -438,6 +448,53 @@ async fn run_git_with_timeout(
     }
 }
 
+async fn push_with_retries(
+    repo: &Path,
+    timeout_secs: u64,
+    retries: u32,
+    op_label: &str,
+) -> Result<()> {
+    let attempts = retries.max(1);
+    let mut last_err: Option<anyhow::Error> = None;
+    for attempt in 1..=attempts {
+        match run_git_with_timeout(repo, &["push", "origin", "HEAD"], timeout_secs, op_label).await
+        {
+            Ok(()) => return Ok(()),
+            Err(e) => {
+                let err_text = e.to_string();
+                let is_timeout = err_text.contains("timeout");
+                last_err = Some(e);
+                if attempt < attempts && is_timeout {
+                    let backoff = (attempt as u64).min(5);
+                    eprintln!(
+                        "⏱️ push retry {}/{} for {} after {}s",
+                        attempt + 1,
+                        attempts,
+                        repo.display(),
+                        backoff
+                    );
+                    sleep(Duration::from_secs(backoff)).await;
+                    continue;
+                }
+                break;
+            }
+        }
+    }
+    Err(last_err.unwrap_or_else(|| anyhow::anyhow!("push failed")))
+}
+
+fn run_git_capture_output(repo: &Path, args: &[&str], op_label: &str) -> Result<String> {
+    let output = StdCommand::new("git")
+        .args(args)
+        .current_dir(repo)
+        .output()
+        .with_context(|| format!("failed to run git {} in {}", op_label, repo.display()))?;
+    let mut text = String::new();
+    text.push_str(&String::from_utf8_lossy(&output.stdout));
+    text.push_str(&String::from_utf8_lossy(&output.stderr));
+    Ok(text)
+}
+
 async fn git_list_paths(repo: &Path, args: &[&str]) -> Result<Vec<PathBuf>> {
     let output = TokioCommand::new("git")
         .args(args)
@@ -506,6 +563,145 @@ async fn unstage_excluded_paths(
         }
     }
     Ok(removed)
+}
+
+fn current_branch(repo: &Path) -> Option<String> {
+    StdCommand::new("git")
+        .args(["rev-parse", "--abbrev-ref", "HEAD"])
+        .current_dir(repo)
+        .output()
+        .ok()
+        .and_then(|o| {
+            if o.status.success() {
+                Some(String::from_utf8_lossy(&o.stdout).trim().to_string())
+            } else {
+                None
+            }
+        })
+        .filter(|s| !s.is_empty())
+}
+
+fn remote_branch_exists(repo: &Path, branch: &str) -> bool {
+    StdCommand::new("git")
+        .args(["show-ref", "--verify", "--quiet"])
+        .arg(format!("refs/remotes/origin/{branch}"))
+        .current_dir(repo)
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
+}
+
+fn set_upstream_to_branch(repo: &Path, branch: &str) -> Result<()> {
+    let target = format!("origin/{branch}");
+    let status = StdCommand::new("git")
+        .args(["branch", "--set-upstream-to"])
+        .arg(&target)
+        .arg(branch)
+        .current_dir(repo)
+        .status()
+        .with_context(|| format!("failed to set upstream for {}", repo.display()))?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(anyhow::anyhow!(
+            "set-upstream failed for {} -> {}",
+            repo.display(),
+            target
+        ))
+    }
+}
+
+fn detect_large_blobs_ahead(repo: &Path, min_bytes: u64) -> Result<Vec<(u64, String)>> {
+    let script = format!(
+        "git rev-list --objects @{{u}}..HEAD | \
+         git cat-file --batch-check='%(objectname) %(objecttype) %(objectsize) %(rest)' | \
+         awk '$2==\"blob\" && $3>{} {{printf \"%s\\t%s\\n\", $3, $4}}' | sort -nr",
+        min_bytes
+    );
+    let output = StdCommand::new("sh")
+        .args(["-lc", &script])
+        .current_dir(repo)
+        .output()
+        .with_context(|| format!("failed large-blob scan in {}", repo.display()))?;
+    if !output.status.success() {
+        return Ok(Vec::new());
+    }
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut out = Vec::new();
+    for line in stdout.lines() {
+        let mut parts = line.splitn(2, '\t');
+        let size = parts
+            .next()
+            .and_then(|s| s.trim().parse::<u64>().ok())
+            .unwrap_or(0);
+        let path = parts.next().map(str::trim).unwrap_or_default().to_string();
+        if size > 0 && !path.is_empty() {
+            out.push((size, path));
+        }
+    }
+    Ok(out)
+}
+
+fn top_level_dir(path: &str) -> Option<String> {
+    path.split('/').next().map(|s| s.to_string())
+}
+
+fn timestamp_secs() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
+
+fn rewrite_ahead_excluded_dirs(
+    repo: &Path,
+    dirs_to_remove: &[String],
+    backup_prefix: &str,
+) -> Result<Option<String>> {
+    if dirs_to_remove.is_empty() {
+        return Ok(None);
+    }
+    let backup_branch = format!("{backup_prefix}-{}", timestamp_secs());
+    let create_backup = StdCommand::new("git")
+        .args(["branch", &backup_branch])
+        .current_dir(repo)
+        .status()
+        .with_context(|| format!("failed backup branch in {}", repo.display()))?;
+    if !create_backup.success() {
+        return Err(anyhow::anyhow!(
+            "failed to create backup branch {} in {}",
+            backup_branch,
+            repo.display()
+        ));
+    }
+
+    let mut index_filter = String::from("git rm -r --cached --ignore-unmatch");
+    for dir in dirs_to_remove {
+        index_filter.push(' ');
+        index_filter.push_str(dir);
+    }
+
+    let rewrite = StdCommand::new("git")
+        .args([
+            "filter-branch",
+            "--force",
+            "--index-filter",
+            &index_filter,
+            "--prune-empty",
+            "@{u}..HEAD",
+        ])
+        .current_dir(repo)
+        .status()
+        .with_context(|| format!("failed history rewrite in {}", repo.display()))?;
+    if !rewrite.success() {
+        return Err(anyhow::anyhow!(
+            "history rewrite failed in {} (backup: {})",
+            repo.display(),
+            backup_branch
+        ));
+    }
+
+    Ok(Some(backup_branch))
 }
 
 async fn sync_repo(
@@ -945,11 +1141,31 @@ async fn run_repos_report(policy_path: &Path, only_concern: bool) -> Result<()> 
     Ok(())
 }
 
-async fn run_repair_concerns(policy_path: &Path, apply: bool) -> Result<()> {
+async fn run_repair_concerns(
+    policy_path: &Path,
+    apply: bool,
+    only_repo: Option<PathBuf>,
+    push_timeout_override: Option<u64>,
+    push_retries: u32,
+) -> Result<()> {
     let policy = SyncPolicy::load(policy_path)?;
     let roots = policy.watch_root_paths();
     let excluded_dir_names = excluded_dir_names_set(&policy);
-    let repos = discover_git_repos(&roots, &excluded_dir_names);
+    let mut repos = discover_git_repos(&roots, &excluded_dir_names);
+    if let Some(target_repo) = only_repo {
+        repos.retain(|r| r == &target_repo);
+        if repos.is_empty() {
+            println!(
+                "⚠️ target repo not discovered in policy roots: {}",
+                target_repo.display()
+            );
+            return Ok(());
+        }
+    }
+    let push_timeout_secs = push_timeout_override
+        .unwrap_or(policy.push_op_timeout_secs)
+        .max(10);
+    let push_retries = push_retries.max(1);
 
     let mut concerns = 0usize;
     let mut attempted_ops = 0usize;
@@ -965,6 +1181,10 @@ async fn run_repair_concerns(policy_path: &Path, apply: bool) -> Result<()> {
         } else {
             "DRY-RUN (no changes)"
         }
+    );
+    println!(
+        "⚙️ PUSH: timeout={}s retries={}",
+        push_timeout_secs, push_retries
     );
 
     for repo in repos {
@@ -1015,7 +1235,7 @@ async fn run_repair_concerns(policy_path: &Path, apply: bool) -> Result<()> {
                 match run_git_with_timeout(
                     &repo,
                     &["push", "-u", "origin", "HEAD"],
-                    policy.push_op_timeout_secs,
+                    push_timeout_secs,
                     "push -u",
                 )
                 .await
@@ -1058,19 +1278,140 @@ async fn run_repair_concerns(policy_path: &Path, apply: bool) -> Result<()> {
             attempted_ops += 1;
             println!("   plan: push origin HEAD");
             if apply {
-                match run_git_with_timeout(
-                    &repo,
-                    &["push", "origin", "HEAD"],
-                    policy.push_op_timeout_secs,
-                    "push",
-                )
-                .await
-                {
+                let mut push_ok = false;
+                match push_with_retries(&repo, push_timeout_secs, push_retries, "push").await {
                     Ok(()) => {
                         succeeded_ops += 1;
+                        push_ok = true;
                         println!("   ok: pushed");
                     }
-                    Err(e) => println!("   fail: push failed: {}", e),
+                    Err(e) => {
+                        println!("   fail: push failed: {}", e);
+
+                        let large =
+                            detect_large_blobs_ahead(&repo, 100 * 1024 * 1024).unwrap_or_default();
+                        if !large.is_empty() {
+                            println!(
+                                "   detect: large blobs in ahead range ({} entries)",
+                                large.len()
+                            );
+                            let mut dirs = BTreeSet::new();
+                            for (_, path) in &large {
+                                if let Some(dir) = top_level_dir(path) {
+                                    if is_excluded_dir_name(&dir, &excluded_dir_names) {
+                                        dirs.insert(dir);
+                                    }
+                                }
+                            }
+                            let dirs: Vec<String> = dirs.into_iter().collect();
+                            if dirs.is_empty() {
+                                println!("   manual: large blobs found but not in excluded dirs");
+                            } else {
+                                println!("   plan: rewrite ahead history removing dirs {:?}", dirs);
+                                match rewrite_ahead_excluded_dirs(
+                                    &repo,
+                                    &dirs,
+                                    "backup/pre-sync-largeblob-fix",
+                                ) {
+                                    Ok(Some(backup_branch)) => {
+                                        println!(
+                                            "   ok: rewrite complete (backup branch: {})",
+                                            backup_branch
+                                        );
+                                        match push_with_retries(
+                                            &repo,
+                                            push_timeout_secs,
+                                            push_retries,
+                                            "push-after-rewrite",
+                                        )
+                                        .await
+                                        {
+                                            Ok(()) => {
+                                                succeeded_ops += 1;
+                                                push_ok = true;
+                                                println!("   ok: pushed after rewrite");
+                                            }
+                                            Err(e2) => {
+                                                println!(
+                                                    "   fail: push after rewrite failed: {}",
+                                                    e2
+                                                )
+                                            }
+                                        }
+                                    }
+                                    Ok(None) => {}
+                                    Err(rewrite_err) => {
+                                        println!("   fail: rewrite failed: {}", rewrite_err)
+                                    }
+                                }
+                            }
+                        } else {
+                            let branch = current_branch(&repo).unwrap_or_default();
+                            let dry_run = run_git_capture_output(
+                                &repo,
+                                &["push", "--dry-run", "origin", "HEAD"],
+                                "push --dry-run",
+                            )
+                            .unwrap_or_default();
+                            let looks_branch_mismatch =
+                                dry_run.to_ascii_lowercase().contains("up-to-date");
+                            if looks_branch_mismatch
+                                && !branch.is_empty()
+                                && remote_branch_exists(&repo, &branch)
+                                && has_tracking_upstream(&repo)
+                            {
+                                println!(
+                                    "   plan: align upstream to origin/{} (possible branch mismatch)",
+                                    branch
+                                );
+                                match set_upstream_to_branch(&repo, &branch) {
+                                    Ok(()) => {
+                                        println!("   ok: upstream realigned");
+                                        match push_with_retries(
+                                            &repo,
+                                            push_timeout_secs,
+                                            push_retries,
+                                            "push-after-upstream-align",
+                                        )
+                                        .await
+                                        {
+                                            Ok(()) => {
+                                                succeeded_ops += 1;
+                                                push_ok = true;
+                                                println!("   ok: pushed after upstream align");
+                                            }
+                                            Err(e2) => {
+                                                println!(
+                                                    "   fail: push after upstream align failed: {}",
+                                                    e2
+                                                )
+                                            }
+                                        }
+                                    }
+                                    Err(set_err) => {
+                                        println!("   fail: upstream align failed: {}", set_err)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                if !push_ok {
+                    // kept for clarity in logs when concerns persist after apply
+                } else if let Ok(next_after_push) = svc.get_status().await {
+                    if next_after_push.ahead > 0 {
+                        let branch = current_branch(&repo).unwrap_or_default();
+                        if !branch.is_empty() && remote_branch_exists(&repo, &branch) {
+                            println!(
+                                "   plan: realign upstream to origin/{} (ahead still > 0 after push)",
+                                branch
+                            );
+                            match set_upstream_to_branch(&repo, &branch) {
+                                Ok(()) => println!("   ok: upstream realigned"),
+                                Err(e) => println!("   fail: upstream realign failed: {}", e),
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -1399,8 +1740,13 @@ async fn main() -> Result<()> {
         Command::Repos { only_concern } => {
             run_repos_report(&policy_path, only_concern).await?;
         }
-        Command::RepairConcerns { apply } => {
-            run_repair_concerns(&policy_path, apply).await?;
+        Command::RepairConcerns {
+            apply,
+            repo,
+            push_timeout_secs,
+            push_retries,
+        } => {
+            run_repair_concerns(&policy_path, apply, repo, push_timeout_secs, push_retries).await?;
         }
         Command::Once => {
             run_once(&policy_path).await?;
