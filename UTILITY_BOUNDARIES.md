@@ -23,12 +23,10 @@ Canonical library ownership is defined in `dracon-libs/docs/capability-boundarie
 
 ## Utility roles (non-overlapping)
 
-- `dracon-security` (legacy, deprecated)
-  - Old transitional utility from pre-split architecture.
-  - Not part of the canonical runtime model; scheduled for removal.
-- `dracon-persistence` (legacy, deprecated)
-  - Old transitional utility from pre-split architecture.
-  - Not part of the canonical runtime model; scheduled for removal.
+- `dracon-security` (removed runtime utility)
+  - Legacy transitional utility removed from canonical runtime.
+- `dracon-persistence` (removed runtime utility)
+  - Legacy transitional utility removed from canonical runtime.
 - `dracon-ai`
   - Optional AI utility, separate from sync/warden/system deterministic runtime loops.
 - `dracon-code` (planned)
@@ -47,4 +45,4 @@ Canonical library ownership is defined in `dracon-libs/docs/capability-boundarie
 
 - old branding prefixes are legacy and should not be used for new binaries/crates.
 - Active runtime binaries are `dracon-sync`, `dracon-warden`, and `dracon-system`.
-- `dracon-security` and `dracon-persistence` are deprecated legacy artifacts, not runtime owners.
+- `dracon-security` and `dracon-persistence` are removed runtime artifacts, not runtime owners.
