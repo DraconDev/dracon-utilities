@@ -204,6 +204,16 @@ fn env_freeze_enabled() -> bool {
     )
 }
 
+fn debug_enabled() -> bool {
+    matches!(
+        std::env::var("DRACON_SYNC_DEBUG")
+            .unwrap_or_default()
+            .to_ascii_lowercase()
+            .as_str(),
+        "1" | "true" | "yes" | "on"
+    )
+}
+
 fn freeze_marker_paths(policy_path: &Path) -> Vec<PathBuf> {
     let mut paths = Vec::new();
     if let Some(dir) = policy_path.parent() {
@@ -381,6 +391,46 @@ async fn run_git_with_timeout(
     }
 }
 
+async fn git_list_paths(repo: &Path, args: &[&str]) -> Result<Vec<PathBuf>> {
+    let output = TokioCommand::new("git")
+        .args(args)
+        .current_dir(repo)
+        .output()
+        .await
+        .with_context(|| format!("failed to run git {:?} in {}", args, repo.display()))?;
+    if !output.status.success() {
+        return Ok(Vec::new());
+    }
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    Ok(stdout
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty())
+        .map(PathBuf::from)
+        .collect())
+}
+
+async fn cli_diff_entries(repo: &Path) -> Result<Vec<dracon_git::types::DiffFile>> {
+    let mut paths = BTreeSet::new();
+    for args in [
+        &["diff", "--name-only"][..],
+        &["diff", "--cached", "--name-only"][..],
+        &["ls-files", "--others", "--exclude-standard"][..],
+    ] {
+        for p in git_list_paths(repo, args).await? {
+            paths.insert(p);
+        }
+    }
+
+    Ok(paths
+        .into_iter()
+        .map(|path| dracon_git::types::DiffFile {
+            path,
+            status: dracon_git::types::FileStatus::Modified,
+        })
+        .collect())
+}
+
 async fn sync_repo(
     repo: &Path,
     policy: &SyncPolicy,
@@ -388,6 +438,9 @@ async fn sync_repo(
 ) -> Result<bool> {
     let svc = GitService::new(repo)?;
     if !svc.is_git_repo().await? {
+        if debug_enabled() {
+            eprintln!("🐛 {} is not recognized as git repo", repo.display());
+        }
         return Ok(false);
     }
     let has_origin = has_origin_remote(repo);
@@ -414,15 +467,48 @@ async fn sync_repo(
         );
     }
 
-    let status = svc.get_status().await?;
+    let mut status = svc.get_status().await?;
+    let mut entries = svc.get_diff_entries().await?;
+    if debug_enabled() {
+        eprintln!(
+            "🐛 {} status: clean={} modified={} staged={} entries(libgit2)={}",
+            repo.display(),
+            status.is_clean,
+            status.modified_files,
+            status.staged_files,
+            entries.len()
+        );
+    }
+    if entries.is_empty() {
+        let fallback_entries = cli_diff_entries(repo).await?;
+        if !fallback_entries.is_empty() {
+            status.is_clean = false;
+            status.modified_files = fallback_entries.len();
+            entries = fallback_entries;
+            if debug_enabled() {
+                eprintln!(
+                    "🐛 {} fallback entries(cli)={} => forcing dirty",
+                    repo.display(),
+                    status.modified_files
+                );
+            }
+        }
+    }
+
     if !status.is_clean && policy.auto_commit {
-        let entries = svc.get_diff_entries().await?;
         let filtered_entries: Vec<_> = entries
             .into_iter()
             .filter(|e| {
                 should_stage_entry(repo, e, excluded_dir_names, policy.max_stage_file_bytes)
             })
             .collect();
+        if debug_enabled() {
+            eprintln!(
+                "🐛 {} filtered_entries={}",
+                repo.display(),
+                filtered_entries.len()
+            );
+        }
         if !filtered_entries.is_empty() {
             let proto_status = to_proto_status(&status);
             let proto_entries = to_proto_entries(&filtered_entries);
