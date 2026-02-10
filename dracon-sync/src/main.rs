@@ -451,6 +451,129 @@ async fn run_git_with_timeout(
     }
 }
 
+async fn run_git_with_timeout_env(
+    repo: &Path,
+    args: &[&str],
+    timeout_secs: u64,
+    op_label: &str,
+    env: &[(&str, &str)],
+) -> Result<()> {
+    let mut cmd = TokioCommand::new("git");
+    cmd.args(args)
+        .current_dir(repo)
+        .kill_on_drop(true)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::piped());
+    for (k, v) in env {
+        cmd.env(k, v);
+    }
+
+    let mut child = cmd
+        .spawn()
+        .with_context(|| format!("failed to spawn git {} in {}", op_label, repo.display()))?;
+
+    let pid = child.id();
+    match tokio::time::timeout(Duration::from_secs(timeout_secs), child.wait()).await {
+        Ok(Ok(status)) => {
+            if status.success() {
+                Ok(())
+            } else {
+                Err(anyhow::anyhow!(
+                    "git {} failed in {} with status {}",
+                    op_label,
+                    repo.display(),
+                    status
+                ))
+            }
+        }
+        Ok(Err(e)) => Err(anyhow::anyhow!(
+            "git {} failed in {}: {}",
+            op_label,
+            repo.display(),
+            e
+        )),
+        Err(_) => {
+            if let Some(pid) = pid {
+                kill_descendants(pid).await;
+            }
+            let _ = child.start_kill();
+            let _ = child.wait().await;
+            Err(anyhow::anyhow!(
+                "git {} timeout in {} after {}s",
+                op_label,
+                repo.display(),
+                timeout_secs
+            ))
+        }
+    }
+}
+
+fn origin_url(repo: &Path) -> Option<String> {
+    let out = StdCommand::new("git")
+        .args(["remote", "get-url", "origin"])
+        .current_dir(repo)
+        .output()
+        .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    let url = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    if url.is_empty() {
+        None
+    } else {
+        Some(url)
+    }
+}
+
+fn github_https_url(origin: &str) -> Option<String> {
+    if let Some(rest) = origin.strip_prefix("git@github.com:") {
+        return Some(format!("https://github.com/{}", rest));
+    }
+    if let Some(rest) = origin.strip_prefix("ssh://git@github.com/") {
+        return Some(format!("https://github.com/{}", rest));
+    }
+    if origin.starts_with("https://github.com/") {
+        return Some(origin.to_string());
+    }
+    None
+}
+
+async fn push_with_transport_fallbacks(
+    repo: &Path,
+    timeout_secs: u64,
+    op_label: &str,
+) -> Result<()> {
+    let ssh_hardening = "ssh -o ConnectTimeout=10 -o ConnectionAttempts=1 -o ServerAliveInterval=5 -o ServerAliveCountMax=2";
+    match run_git_with_timeout_env(
+        repo,
+        &["push", "origin", "HEAD"],
+        timeout_secs,
+        &format!("{op_label}-ssh-hardened"),
+        &[("GIT_SSH_COMMAND", ssh_hardening)],
+    )
+    .await
+    {
+        Ok(()) => return Ok(()),
+        Err(e) => {
+            let origin = origin_url(repo).unwrap_or_default();
+            if let Some(https) = github_https_url(&origin) {
+                let branch = current_branch(repo).unwrap_or_else(|| "master".to_string());
+                let refspec = format!("HEAD:refs/heads/{branch}");
+                run_git_with_timeout(
+                    repo,
+                    &["push", &https, &refspec],
+                    timeout_secs,
+                    &format!("{op_label}-https-fallback"),
+                )
+                .await
+                .with_context(|| format!("ssh fallback failed first: {}", e))
+            } else {
+                Err(e)
+            }
+        }
+    }
+}
+
 async fn push_with_retries(
     repo: &Path,
     timeout_secs: u64,
@@ -459,6 +582,7 @@ async fn push_with_retries(
 ) -> Result<()> {
     let attempts = retries.max(1);
     let mut last_err: Option<anyhow::Error> = None;
+    let mut timeout_seen = false;
     for attempt in 1..=attempts {
         match run_git_with_timeout(repo, &["push", "origin", "HEAD"], timeout_secs, op_label).await
         {
@@ -466,6 +590,7 @@ async fn push_with_retries(
             Err(e) => {
                 let err_text = e.to_string();
                 let is_timeout = err_text.contains("timeout");
+                timeout_seen |= is_timeout;
                 last_err = Some(e);
                 if attempt < attempts && is_timeout {
                     let backoff = (attempt as u64).min(5);
@@ -481,6 +606,11 @@ async fn push_with_retries(
                 }
                 break;
             }
+        }
+    }
+    if timeout_seen {
+        if let Ok(()) = push_with_transport_fallbacks(repo, timeout_secs, op_label).await {
+            return Ok(());
         }
     }
     Err(last_err.unwrap_or_else(|| anyhow::anyhow!("push failed")))
