@@ -1,7 +1,9 @@
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
+use dracon_security_kit::{DraconWarden, Warden};
 use notify::{Event, RecursiveMode, Watcher};
 use serde::Deserialize;
+use std::io::{Read, Write};
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -27,6 +29,16 @@ enum Command {
     Once,
     /// Show resolved policy path and watch roots.
     Status,
+    /// Git filter clean operation (stdin -> stdout).
+    FilterClean {
+        /// Optional path from git filter (%f)
+        path: Option<String>,
+    },
+    /// Git filter smudge operation (stdin -> stdout).
+    FilterSmudge {
+        /// Optional path from git filter (%f)
+        path: Option<String>,
+    },
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -305,22 +317,43 @@ fn run_daemon(policy_path: PathBuf) -> Result<()> {
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
-    let policy_path = resolve_policy_path()?;
 
     match cli.cmd {
+        Command::FilterClean { path } => {
+            run_filter(true, path.as_deref())?;
+        }
+        Command::FilterSmudge { path } => {
+            run_filter(false, path.as_deref())?;
+        }
         Command::Status => {
+            let policy_path = resolve_policy_path()?;
             let policy = WardenPolicy::load(&policy_path)?;
             println!("📜 POLICY: {}", policy_path.display());
             println!("🛡️ ROOTS: {:?}", policy.watch_root_paths());
         }
         Command::Once => {
+            let policy_path = resolve_policy_path()?;
             let policy = WardenPolicy::load(&policy_path)?;
             harden_all(&policy)?;
         }
         Command::Daemon => {
+            let policy_path = resolve_policy_path()?;
             run_daemon(policy_path)?;
         }
     }
 
+    Ok(())
+}
+
+fn run_filter(is_clean: bool, path: Option<&str>) -> Result<()> {
+    let mut input = Vec::new();
+    std::io::stdin().read_to_end(&mut input)?;
+    let warden = DraconWarden::new()?;
+    let output = if is_clean {
+        warden.clean(&input, path)?
+    } else {
+        warden.smudge(&input, path)?
+    };
+    std::io::stdout().write_all(&output)?;
     Ok(())
 }
