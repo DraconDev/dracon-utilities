@@ -9,7 +9,7 @@
         let
           pkgs = nixpkgs.legacyPackages.${system};
           src = pkgs.lib.cleanSourceWith {
-            filter = name: type: let base = baseNameOf name; in !(type == "directory" && (base == "target" || base == ".git" || base == ".demon"));
+            filter = name: type: let base = baseNameOf name; in !(type == "directory" && (base == "target" || base == ".git"));
             src = ./.;
           };
         in {

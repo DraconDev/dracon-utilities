@@ -80,7 +80,6 @@ fn resolve_policy_path() -> Result<PathBuf> {
         home.join("dracon/utilities/warden/dracon-security.toml"),
         home.join("dracon/utilities/warden/config.toml"),
         home.join("dracon/security/dracon-security.toml"),
-        home.join("demon/security/dracon-security.toml"),
     ];
 
     for p in &candidates {
