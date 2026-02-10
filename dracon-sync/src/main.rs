@@ -1,12 +1,14 @@
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
-use dracon_git::{GitService, build_sync_commit_payload};
-use dracon_protocols::git::{DiffFile as ProtoDiffFile, FileStatus as ProtoFileStatus, RepoStatus as ProtoRepoStatus};
+use dracon_git::{build_sync_commit_payload, GitService};
+use dracon_protocols::git::{
+    DiffFile as ProtoDiffFile, FileStatus as ProtoFileStatus, RepoStatus as ProtoRepoStatus,
+};
 use serde::Deserialize;
 use std::collections::{BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
 use tokio::process::Command as TokioCommand;
-use tokio::time::{Duration, sleep};
+use tokio::time::{sleep, Duration};
 
 #[derive(Parser, Debug)]
 #[command(name = "dracon-sync")]
@@ -52,6 +54,12 @@ struct SyncPolicy {
     exclude_dir_names: Vec<String>,
     #[serde(default = "default_max_stage_file_bytes")]
     max_stage_file_bytes: u64,
+    #[serde(default = "default_pull_op_timeout_secs")]
+    pull_op_timeout_secs: u64,
+    #[serde(default = "default_push_op_timeout_secs")]
+    push_op_timeout_secs: u64,
+    #[serde(default = "default_repo_sync_timeout_secs")]
+    repo_sync_timeout_secs: u64,
 }
 
 fn default_true() -> bool {
@@ -82,6 +90,18 @@ fn default_max_stage_file_bytes() -> u64 {
     100 * 1024 * 1024
 }
 
+fn default_pull_op_timeout_secs() -> u64 {
+    30
+}
+
+fn default_push_op_timeout_secs() -> u64 {
+    300
+}
+
+fn default_repo_sync_timeout_secs() -> u64 {
+    420
+}
+
 impl SyncPolicy {
     fn load(path: &Path) -> Result<Self> {
         let content = std::fs::read_to_string(path)
@@ -94,6 +114,23 @@ impl SyncPolicy {
         if policy.max_stage_file_bytes == 0 {
             policy.max_stage_file_bytes = default_max_stage_file_bytes();
         }
+        if policy.pull_op_timeout_secs == 0 {
+            policy.pull_op_timeout_secs = default_pull_op_timeout_secs();
+        }
+        if policy.push_op_timeout_secs == 0 {
+            policy.push_op_timeout_secs = default_push_op_timeout_secs();
+        }
+        if policy.repo_sync_timeout_secs == 0 {
+            policy.repo_sync_timeout_secs = default_repo_sync_timeout_secs();
+        }
+        policy.pull_op_timeout_secs = policy.pull_op_timeout_secs.max(5);
+        policy.push_op_timeout_secs = policy.push_op_timeout_secs.max(10);
+        policy.repo_sync_timeout_secs = policy.repo_sync_timeout_secs.max(
+            policy
+                .push_op_timeout_secs
+                .saturating_add(30)
+                .max(policy.pull_op_timeout_secs.saturating_add(30)),
+        );
         Ok(policy)
     }
 
@@ -301,10 +338,6 @@ fn discover_git_repos(roots: &[PathBuf], excluded_dir_names: &BTreeSet<String>) 
     repos.into_iter().collect()
 }
 
-const PULL_OP_TIMEOUT_SECS: u64 = 20;
-const PUSH_OP_TIMEOUT_SECS: u64 = 60;
-const REPO_SYNC_TIMEOUT_SECS: u64 = 90;
-
 fn has_origin_remote(repo: &Path) -> bool {
     std::process::Command::new("git")
         .arg("remote")
@@ -449,7 +482,7 @@ async fn sync_repo(
         match run_git_with_timeout(
             repo,
             &["pull", "--rebase", "--autostash"],
-            PULL_OP_TIMEOUT_SECS,
+            policy.pull_op_timeout_secs,
             "pull/rebase",
         )
         .await
@@ -458,7 +491,10 @@ async fn sync_repo(
             Err(e) => eprintln!("⚠️ pull/rebase skipped for {}: {}", repo.display(), e),
         }
     } else if policy.auto_pull && !has_origin {
-        eprintln!("ℹ️ skip pull/rebase for {} (no origin remote)", repo.display());
+        eprintln!(
+            "ℹ️ skip pull/rebase for {} (no origin remote)",
+            repo.display()
+        );
     } else if policy.auto_pull && has_origin && !has_upstream {
         eprintln!(
             "ℹ️ skip pull/rebase for {} (no tracking upstream on current branch)",
@@ -522,7 +558,7 @@ async fn sync_repo(
                 match run_git_with_timeout(
                     repo,
                     &["push", "origin", "HEAD"],
-                    PUSH_OP_TIMEOUT_SECS,
+                    policy.push_op_timeout_secs,
                     "push",
                 )
                 .await
@@ -541,7 +577,7 @@ async fn sync_repo(
         match run_git_with_timeout(
             repo,
             &["push", "origin", "HEAD"],
-            PUSH_OP_TIMEOUT_SECS,
+            policy.push_op_timeout_secs,
             "push",
         )
         .await
@@ -570,7 +606,7 @@ async fn run_once(policy_path: &Path) -> Result<()> {
     let mut changed = 0usize;
     for repo in repos {
         match tokio::time::timeout(
-            Duration::from_secs(REPO_SYNC_TIMEOUT_SECS),
+            Duration::from_secs(policy.repo_sync_timeout_secs),
             sync_repo(&repo, &policy, &excluded_dir_names),
         )
         .await
@@ -579,7 +615,7 @@ async fn run_once(policy_path: &Path) -> Result<()> {
                 eprintln!(
                     "⚠️ repo sync timeout for {} after {}s",
                     repo.display(),
-                    REPO_SYNC_TIMEOUT_SECS
+                    policy.repo_sync_timeout_secs
                 );
             }
             Ok(Ok(true)) => {
@@ -598,7 +634,7 @@ async fn run_once(policy_path: &Path) -> Result<()> {
 async fn run_daemon(policy_path: PathBuf) -> Result<()> {
     loop {
         let interval = SyncPolicy::load(&policy_path)
-            .map(|p| p.pulse_interval_secs.max(5))
+            .map(|p| p.pulse_interval_secs.max(1))
             .unwrap_or(300);
 
         if let Some(reason) = freeze_reason(&policy_path) {
@@ -637,11 +673,14 @@ async fn main() -> Result<()> {
                 "⚙️ FLAGS: auto_commit={} auto_pull={} auto_push={}",
                 policy.auto_commit, policy.auto_pull, policy.auto_push
             );
-            println!(
-                "📏 MAX_STAGE_FILE_BYTES: {}",
-                policy.max_stage_file_bytes
-            );
+            println!("📏 MAX_STAGE_FILE_BYTES: {}", policy.max_stage_file_bytes);
             println!("🚫 EXCLUDE_DIRS: {:?}", policy.exclude_dir_names);
+            println!(
+                "⏱️ TIMEOUTS: pull={}s push={}s repo={}s",
+                policy.pull_op_timeout_secs,
+                policy.push_op_timeout_secs,
+                policy.repo_sync_timeout_secs
+            );
             if !policy.system_repo.is_empty() {
                 println!("🏛️ SYSTEM_REPO: {}", policy.system_repo);
             }

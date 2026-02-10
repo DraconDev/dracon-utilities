@@ -15,6 +15,7 @@ Canonical library ownership is defined in `dracon-libs/docs/capability-boundarie
   - Required policy controls:
     - `exclude_dir_names` for repo discovery + staging exclusions.
     - `max_stage_file_bytes` (default 104857600 / 100 MiB) for large-file staging guard.
+    - `pull_op_timeout_secs`, `push_op_timeout_secs`, `repo_sync_timeout_secs` for remote latency tolerance without false "stuck" signals.
 - `dracon-warden`
   - Owns security hardening/watcher behavior (managed `.gitignore`/`.gitattributes`, protected paths).
 - `dracon-system`
