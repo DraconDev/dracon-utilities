@@ -31,6 +31,9 @@ Canonical library ownership is defined in `dracon-libs/docs/capability-boundarie
   - Not part of the canonical runtime model; scheduled for removal.
 - `dracon-ai`
   - Optional AI utility, separate from sync/warden/system deterministic runtime loops.
+- `dracon-code` (planned)
+  - Optional coding/automation orchestrator utility.
+  - May consume `dracon-ai`, but does not own sync/warden/system runtime roles.
 
 ## De-dup policy
 
