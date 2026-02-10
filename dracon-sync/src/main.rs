@@ -478,6 +478,36 @@ async fn cli_diff_entries(repo: &Path) -> Result<Vec<dracon_git::types::DiffFile
         .collect())
 }
 
+async fn staged_paths(repo: &Path) -> Result<Vec<PathBuf>> {
+    git_list_paths(repo, &["diff", "--cached", "--name-only"]).await
+}
+
+async fn unstage_excluded_paths(
+    repo: &Path,
+    excluded_dir_names: &BTreeSet<String>,
+) -> Result<usize> {
+    let staged = staged_paths(repo).await?;
+    let mut removed = 0usize;
+    for path in staged {
+        if !is_excluded_change_path(&path, excluded_dir_names) {
+            continue;
+        }
+        let status = TokioCommand::new("git")
+            .args(["reset", "-q", "HEAD", "--"])
+            .arg(&path)
+            .current_dir(repo)
+            .status()
+            .await
+            .with_context(|| {
+                format!("failed to unstage {} in {}", path.display(), repo.display())
+            })?;
+        if status.success() {
+            removed += 1;
+        }
+    }
+    Ok(removed)
+}
+
 async fn sync_repo(
     repo: &Path,
     policy: &SyncPolicy,
@@ -513,6 +543,15 @@ async fn sync_repo(
     } else if policy.auto_pull && has_origin && !has_upstream {
         eprintln!(
             "ℹ️ skip pull/rebase for {} (no tracking upstream on current branch)",
+            repo.display()
+        );
+    }
+
+    let unstaged = unstage_excluded_paths(repo, excluded_dir_names).await?;
+    if unstaged > 0 {
+        eprintln!(
+            "🧹 removed {} staged excluded paths in {}",
+            unstaged,
             repo.display()
         );
     }
