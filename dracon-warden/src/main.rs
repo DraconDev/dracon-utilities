@@ -3,9 +3,9 @@ use clap::{Parser, Subcommand};
 use dracon_security_kit::{DraconWarden, Warden};
 use notify::{Event, RecursiveMode, Watcher};
 use serde::Deserialize;
-use std::io::{Read, Write};
 use std::collections::BTreeSet;
 use std::fs;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
@@ -49,6 +49,12 @@ struct WardenPolicy {
     plaintext_patterns: Vec<String>,
     #[serde(default)]
     hygiene_patterns: Vec<String>,
+    #[serde(default)]
+    watch_roots: Vec<String>,
+}
+
+#[derive(Debug, Deserialize, Default, Clone)]
+struct SyncRootsPolicy {
     #[serde(default)]
     watch_roots: Vec<String>,
 }
@@ -126,7 +132,11 @@ fn discover_git_repos(roots: &[PathBuf]) -> Vec<PathBuf> {
                 if e.depth() == 0 {
                     return true;
                 }
-                if name == "target" || name == "node_modules" || name == ".cache" || name == ".direnv" {
+                if name == "target"
+                    || name == "node_modules"
+                    || name == ".cache"
+                    || name == ".direnv"
+                {
                     return false;
                 }
                 true
@@ -145,6 +155,52 @@ fn discover_git_repos(roots: &[PathBuf]) -> Vec<PathBuf> {
     }
 
     repos.into_iter().collect()
+}
+
+fn resolve_sync_policy_path() -> Option<PathBuf> {
+    if let Ok(custom) = std::env::var("DRACON_SYNC_POLICY") {
+        let p = PathBuf::from(custom);
+        if p.exists() {
+            return Some(p);
+        }
+    }
+
+    let home = dirs::home_dir()?;
+    let candidates = [
+        home.join("dracon/utilities/sync/dracon-sync.toml"),
+        home.join("dracon/utilities/sync/config.toml"),
+        home.join("dracon/git/dracon-git.toml"),
+    ];
+    candidates.into_iter().find(|p| p.exists())
+}
+
+fn load_sync_watch_roots() -> Vec<PathBuf> {
+    let Some(path) = resolve_sync_policy_path() else {
+        return Vec::new();
+    };
+    let Ok(content) = fs::read_to_string(path) else {
+        return Vec::new();
+    };
+    let Ok(policy) = toml::from_str::<SyncRootsPolicy>(&content) else {
+        return Vec::new();
+    };
+    policy
+        .watch_roots
+        .into_iter()
+        .map(PathBuf::from)
+        .filter(|p| p.exists())
+        .collect()
+}
+
+fn effective_watch_roots(policy: &WardenPolicy) -> Vec<PathBuf> {
+    let mut roots = BTreeSet::new();
+    for root in policy.watch_root_paths() {
+        roots.insert(root);
+    }
+    for root in load_sync_watch_roots() {
+        roots.insert(root);
+    }
+    roots.into_iter().collect()
 }
 
 fn replace_managed_block(current: &str, managed_block: &str) -> String {
@@ -220,25 +276,130 @@ fn apply_managed_file(path: &Path, block: &str) -> Result<bool> {
     Ok(false)
 }
 
-fn harden_repo(repo: &Path, policy: &WardenPolicy) -> Result<(bool, bool)> {
+fn newest_file(paths: Vec<PathBuf>) -> Option<PathBuf> {
+    let mut with_mtime = paths
+        .into_iter()
+        .filter_map(|p| {
+            let mtime = fs::metadata(&p)
+                .and_then(|m| m.modified())
+                .ok()
+                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                .map(|d| d.as_secs())
+                .unwrap_or(0);
+            if p.exists() {
+                Some((mtime, p))
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+    with_mtime.sort_by(|a, b| b.0.cmp(&a.0));
+    with_mtime.into_iter().next().map(|(_, p)| p)
+}
+
+fn owner_pubkeys_in(dir: &Path) -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    let read_dir = match fs::read_dir(dir) {
+        Ok(rd) => rd,
+        Err(_) => return out,
+    };
+
+    for entry in read_dir.flatten() {
+        let path = entry.path();
+        let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+            continue;
+        };
+        if name.starts_with("owner_") && name.ends_with(".pub") {
+            out.push(path);
+        }
+    }
+    out
+}
+
+fn resolve_local_pubkey_path() -> Option<PathBuf> {
+    if let Ok(custom) = std::env::var("DRACON_OWNER_PUBKEY") {
+        let p = PathBuf::from(custom);
+        if p.exists() {
+            return Some(p);
+        }
+    }
+
+    let home = dirs::home_dir()?;
+    let owner_candidates = [
+        home.join("dracon/data/keys"),
+        home.join(".demon/keys"),
+        home.join("dracon/keys"),
+    ]
+    .into_iter()
+    .flat_map(|dir| owner_pubkeys_in(&dir))
+    .collect::<Vec<_>>();
+
+    if let Some(newest_owner) = newest_file(owner_candidates) {
+        return Some(newest_owner);
+    }
+
+    let identity_candidates = vec![
+        home.join("dracon/identity.pub"),
+        home.join(".demon/identity.pub"),
+    ];
+    newest_file(identity_candidates)
+}
+
+fn publish_repo_pubkey(repo: &Path, pubkey_path: &Path) -> Result<bool> {
+    let target_dir = repo.join(".dracon/data/keys");
+    fs::create_dir_all(&target_dir)
+        .with_context(|| format!("failed creating {}", target_dir.display()))?;
+
+    let name = pubkey_path
+        .file_name()
+        .map(|n| n.to_owned())
+        .unwrap_or_else(|| "owner.pub".into());
+    let target = target_dir.join(name);
+
+    let source_bytes = fs::read(pubkey_path)
+        .with_context(|| format!("failed reading pubkey {}", pubkey_path.display()))?;
+    let current_bytes = fs::read(&target).ok();
+    if current_bytes.as_deref() == Some(source_bytes.as_slice()) {
+        return Ok(false);
+    }
+
+    fs::write(&target, source_bytes)
+        .with_context(|| format!("failed writing {}", target.display()))?;
+    Ok(true)
+}
+
+fn harden_repo(
+    repo: &Path,
+    policy: &WardenPolicy,
+    pubkey_path: Option<&Path>,
+) -> Result<(bool, bool, bool)> {
     let gitignore_path = repo.join(".gitignore");
     let gitattributes_path = repo.join(".gitattributes");
 
     let gitignore_changed = apply_managed_file(&gitignore_path, &build_gitignore_block(policy))?;
-    let gitattributes_changed = apply_managed_file(&gitattributes_path, &build_gitattributes_block(policy))?;
+    let gitattributes_changed =
+        apply_managed_file(&gitattributes_path, &build_gitattributes_block(policy))?;
+    let key_changed = match pubkey_path {
+        Some(pubkey) => publish_repo_pubkey(repo, pubkey)?,
+        None => false,
+    };
 
-    Ok((gitignore_changed, gitattributes_changed))
+    Ok((gitignore_changed, gitattributes_changed, key_changed))
 }
 
 fn harden_all(policy: &WardenPolicy) -> Result<()> {
-    let roots = policy.watch_root_paths();
+    let roots = effective_watch_roots(policy);
     let repos = discover_git_repos(&roots);
+    let pubkey_path = resolve_local_pubkey_path();
+    if pubkey_path.is_none() {
+        eprintln!("⚠️ no public key found for repo publish; set DRACON_OWNER_PUBKEY to override");
+    }
 
     let mut changed = 0usize;
     for repo in repos {
-        match harden_repo(&repo, policy) {
-            Ok((a, b)) => {
-                if a || b {
+        match harden_repo(&repo, policy, pubkey_path.as_deref()) {
+            Ok((a, b, c)) => {
+                if a || b || c {
                     changed += 1;
                     println!("🔒 hardened {}", repo.display());
                 }
@@ -252,7 +413,13 @@ fn harden_all(policy: &WardenPolicy) -> Result<()> {
 }
 
 fn should_process_event(event: &Event, roots: &[PathBuf]) -> bool {
-    let ignore_fragments = ["/target/", "/node_modules/", "/.cache/", "/.git/objects/", "/.git/index.lock"];
+    let ignore_fragments = [
+        "/target/",
+        "/node_modules/",
+        "/.cache/",
+        "/.git/objects/",
+        "/.git/index.lock",
+    ];
 
     for p in &event.paths {
         let s = p.to_string_lossy();
@@ -268,7 +435,7 @@ fn should_process_event(event: &Event, roots: &[PathBuf]) -> bool {
 
 fn run_daemon(policy_path: PathBuf) -> Result<()> {
     let policy = WardenPolicy::load(&policy_path)?;
-    let roots = policy.watch_root_paths();
+    let roots = effective_watch_roots(&policy);
     if roots.is_empty() {
         return Err(anyhow::anyhow!("no valid watch_roots in policy"));
     }
@@ -329,7 +496,13 @@ fn main() -> Result<()> {
             let policy_path = resolve_policy_path()?;
             let policy = WardenPolicy::load(&policy_path)?;
             println!("📜 POLICY: {}", policy_path.display());
-            println!("🛡️ ROOTS: {:?}", policy.watch_root_paths());
+            println!("🛡️ ROOTS: {:?}", effective_watch_roots(&policy));
+            println!(
+                "🔑 PUBKEY_SOURCE: {}",
+                resolve_local_pubkey_path()
+                    .map(|p| p.display().to_string())
+                    .unwrap_or_else(|| "NOT_FOUND (set DRACON_OWNER_PUBKEY)".to_string())
+            );
         }
         Command::Once => {
             let policy_path = resolve_policy_path()?;

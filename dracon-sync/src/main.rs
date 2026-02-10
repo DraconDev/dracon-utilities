@@ -660,6 +660,19 @@ fn truncate(value: &str, max_chars: usize) -> String {
     format!("{}…", shortened)
 }
 
+fn colors_enabled() -> bool {
+    std::env::var_os("NO_COLOR").is_none()
+        && std::env::var("TERM").map(|t| t != "dumb").unwrap_or(true)
+}
+
+fn paint(value: &str, code: &str) -> String {
+    if colors_enabled() {
+        format!("\x1b[{}m{}\x1b[0m", code, value)
+    } else {
+        value.to_string()
+    }
+}
+
 async fn git_log_field(repo: &Path, format: &str) -> Option<String> {
     let output = TokioCommand::new("git")
         .args(["log", "-1", &format!("--pretty=format:{}", format)])
@@ -678,21 +691,49 @@ async fn git_log_field(repo: &Path, format: &str) -> Option<String> {
     }
 }
 
+async fn git_log_unix_timestamp(repo: &Path) -> Option<i64> {
+    git_log_field(repo, "%ct")
+        .await
+        .and_then(|s| s.parse::<i64>().ok())
+}
+
 async fn run_repos_report(policy_path: &Path) -> Result<()> {
+    #[derive(Debug)]
+    struct RepoRow {
+        repo: PathBuf,
+        state_flags: Vec<String>,
+        branch: String,
+        modified: usize,
+        staged: usize,
+        ahead: usize,
+        behind: usize,
+        last_hash: String,
+        last_author: String,
+        last_when: String,
+        last_msg: String,
+        last_unix: i64,
+        concern: bool,
+        warn: bool,
+    }
+
     let policy = SyncPolicy::load(policy_path)?;
     let roots = policy.watch_root_paths();
     let excluded_dir_names = excluded_dir_names_set(&policy);
     let repos = discover_git_repos(&roots, &excluded_dir_names);
-
-    println!("📜 POLICY: {}", policy_path.display());
-    println!("📦 REPOS_DISCOVERED: {}", repos.len());
-    println!();
+    let mut rows: Vec<RepoRow> = Vec::new();
+    let mut init_or_status_failures = 0usize;
 
     for repo in repos {
         let svc = match GitService::new(&repo) {
             Ok(svc) => svc,
             Err(e) => {
-                println!("❌ {} | init_failed: {}", repo.display(), e);
+                init_or_status_failures += 1;
+                println!(
+                    "{} {} | init_failed: {}",
+                    paint("❌", "31"),
+                    repo.display(),
+                    e
+                );
                 continue;
             }
         };
@@ -700,7 +741,13 @@ async fn run_repos_report(policy_path: &Path) -> Result<()> {
         let status = match svc.get_status().await {
             Ok(status) => status,
             Err(e) => {
-                println!("❌ {} | status_failed: {}", repo.display(), e);
+                init_or_status_failures += 1;
+                println!(
+                    "{} {} | status_failed: {}",
+                    paint("❌", "31"),
+                    repo.display(),
+                    e
+                );
                 continue;
             }
         };
@@ -724,6 +771,12 @@ async fn run_repos_report(policy_path: &Path) -> Result<()> {
         if has_origin && !has_upstream {
             flags.push("NO_UPSTREAM".to_string());
         }
+        if status.ahead > 0 && has_origin && has_upstream {
+            flags.push("STUCK_PUSH".to_string());
+        }
+        if status.behind > 0 && has_origin && has_upstream {
+            flags.push("STUCK_PULL".to_string());
+        }
         if flags.is_empty() {
             flags.push("OK".to_string());
         }
@@ -744,21 +797,76 @@ async fn run_repos_report(policy_path: &Path) -> Result<()> {
         let last_when = git_log_field(&repo, "%ar")
             .await
             .unwrap_or_else(|| "-".to_string());
+        let last_unix = git_log_unix_timestamp(&repo).await.unwrap_or(0);
 
-        println!(
-            "{}\n  state={} branch={} modified={} staged={} ahead={} behind={}\n  last={} by {} ({}) {}\n",
-            repo.display(),
-            flags.join(","),
-            status.branch,
-            status.modified_files,
-            status.staged_files,
-            status.ahead,
-            status.behind,
+        let concern =
+            status.ahead > 0 || status.behind > 0 || !has_origin || (has_origin && !has_upstream);
+        let warn = !concern && !status.is_clean;
+
+        rows.push(RepoRow {
+            repo,
+            state_flags: flags,
+            branch: status.branch,
+            modified: status.modified_files,
+            staged: status.staged_files,
+            ahead: status.ahead,
+            behind: status.behind,
             last_hash,
             last_author,
             last_when,
-            last_msg
+            last_msg,
+            last_unix,
+            concern,
+            warn,
+        });
+    }
+
+    rows.sort_by(|a, b| b.last_unix.cmp(&a.last_unix));
+
+    let concern_count = rows.iter().filter(|r| r.concern).count();
+    let warn_count = rows.iter().filter(|r| r.warn).count();
+    let ok_count = rows.len().saturating_sub(concern_count + warn_count);
+
+    println!("📜 POLICY: {}", policy_path.display());
+    println!(
+        "📦 REPOS: {}  {} {}  {} {}  {} {}  ❌ {}",
+        rows.len(),
+        paint("OK", "32"),
+        ok_count,
+        paint("WARN", "33"),
+        warn_count,
+        paint("CONCERN", "31"),
+        concern_count,
+        init_or_status_failures
+    );
+    println!("🕒 SORT: last modified (newest first)");
+    println!();
+
+    for (idx, row) in rows.iter().enumerate() {
+        let severity = if row.concern {
+            paint("CONCERN", "31")
+        } else if row.warn {
+            paint("WARN", "33")
+        } else {
+            paint("OK", "32")
+        };
+
+        println!("{}. [{}] {}", idx + 1, severity, row.repo.display(),);
+        println!(
+            "   updated={} branch={} state={} modified={} staged={} ahead={} behind={}",
+            row.last_when,
+            row.branch,
+            row.state_flags.join(","),
+            row.modified,
+            row.staged,
+            row.ahead,
+            row.behind
         );
+        println!(
+            "   last={} by {} {}",
+            row.last_hash, row.last_author, row.last_msg
+        );
+        println!();
     }
 
     Ok(())
