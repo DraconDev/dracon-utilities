@@ -916,6 +916,202 @@ fn open_policy_in_editor(policy_path: &Path) -> Result<()> {
     ))
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::{Mutex, OnceLock};
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn env_lock() -> &'static Mutex<()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+    }
+
+    struct TempDir {
+        path: PathBuf,
+    }
+
+    impl TempDir {
+        fn new(prefix: &str) -> Self {
+            let unique = format!(
+                "{}_{}_{}",
+                prefix,
+                std::process::id(),
+                SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .expect("time")
+                    .as_nanos()
+            );
+            let path = std::env::temp_dir().join(unique);
+            std::fs::create_dir_all(&path).expect("create temp dir");
+            Self { path }
+        }
+
+        fn path(&self) -> &Path {
+            &self.path
+        }
+    }
+
+    impl Drop for TempDir {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.path);
+        }
+    }
+
+    fn test_policy() -> SyncPolicy {
+        SyncPolicy {
+            system_repo: String::new(),
+            pulse_interval_secs: 5,
+            auto_commit: true,
+            auto_pull: true,
+            auto_push: true,
+            backup_policy: String::new(),
+            backup_dir: String::new(),
+            watch_roots: vec![],
+            extra_remotes: HashMap::new(),
+            exclude_dir_names: vec!["target".into(), "node_modules".into()],
+            max_stage_file_bytes: 1024,
+            pull_op_timeout_secs: 10,
+            push_op_timeout_secs: 10,
+            repo_sync_timeout_secs: 40,
+        }
+    }
+
+    #[test]
+    fn defaults_are_stable() {
+        assert!(default_true());
+        assert_eq!(default_pulse_interval(), 300);
+        assert!(default_exclude_dir_names().contains(&"target".to_string()));
+        assert_eq!(default_max_stage_file_bytes(), 100 * 1024 * 1024);
+        assert_eq!(default_pull_op_timeout_secs(), 30);
+        assert_eq!(default_push_op_timeout_secs(), 300);
+        assert_eq!(default_repo_sync_timeout_secs(), 420);
+    }
+
+    #[test]
+    fn normalized_dir_name_handles_wrapping_and_case() {
+        assert_eq!(normalized_dir_name("/Target/"), "target");
+        assert_eq!(normalized_dir_name("Node_Modules"), "node_modules");
+        assert_eq!(normalized_dir_name(""), "");
+    }
+
+    #[test]
+    fn excluded_checks_work() {
+        let mut p = test_policy();
+        p.exclude_dir_names = vec!["Target".into(), "build".into()];
+        let set = excluded_dir_names_set(&p);
+        assert!(is_excluded_dir_name("target", &set));
+        assert!(is_excluded_dir_name("TARGET", &set));
+        assert!(is_excluded_change_path(Path::new("a/Build/x.txt"), &set));
+        assert!(!is_excluded_change_path(Path::new("a/src/x.txt"), &set));
+    }
+
+    #[test]
+    fn should_stage_entry_respects_rules() {
+        let td = TempDir::new("sync_should_stage");
+        let repo = td.path().join("repo");
+        std::fs::create_dir_all(&repo).expect("repo");
+        let excluded = BTreeSet::from(["target".to_string()]);
+
+        let deleted = dracon_git::types::DiffFile {
+            path: PathBuf::from("target/missing.bin"),
+            status: dracon_git::types::FileStatus::Deleted,
+        };
+        assert!(should_stage_entry(&repo, &deleted, &excluded, 10));
+
+        let excluded_file = dracon_git::types::DiffFile {
+            path: PathBuf::from("target/file.bin"),
+            status: dracon_git::types::FileStatus::Modified,
+        };
+        assert!(!should_stage_entry(&repo, &excluded_file, &excluded, 10));
+
+        let big_path = repo.join("big.bin");
+        std::fs::write(&big_path, vec![1u8; 64]).expect("write big");
+        let big = dracon_git::types::DiffFile {
+            path: PathBuf::from("big.bin"),
+            status: dracon_git::types::FileStatus::Modified,
+        };
+        assert!(!should_stage_entry(&repo, &big, &BTreeSet::new(), 16));
+
+        let missing = dracon_git::types::DiffFile {
+            path: PathBuf::from("gone.bin"),
+            status: dracon_git::types::FileStatus::Modified,
+        };
+        assert!(should_stage_entry(&repo, &missing, &BTreeSet::new(), 16));
+    }
+
+    #[test]
+    fn freeze_helpers_work() {
+        let _guard = env_lock().lock().expect("lock");
+        std::env::remove_var("DRACON_SYNC_FREEZE");
+
+        let td = TempDir::new("sync_freeze");
+        let policy = td.path().join("dracon-sync.toml");
+        std::fs::write(&policy, "").expect("policy");
+
+        let markers = freeze_marker_paths(&policy);
+        assert_eq!(markers.len(), 2);
+        assert!(freeze_reason(&policy).is_none());
+
+        std::fs::write(markers[0].clone(), "").expect("marker");
+        let reason = freeze_reason(&policy).expect("freeze reason");
+        assert!(reason.contains("marker"));
+
+        std::env::set_var("DRACON_SYNC_FREEZE", "1");
+        assert_eq!(
+            freeze_reason(&policy).as_deref(),
+            Some("env DRACON_SYNC_FREEZE")
+        );
+        std::env::remove_var("DRACON_SYNC_FREEZE");
+    }
+
+    #[test]
+    fn truncate_and_paint_behave() {
+        assert_eq!(truncate("short", 10), "short");
+        assert!(truncate("very long value", 8).ends_with('…'));
+        let _guard = env_lock().lock().expect("lock");
+        std::env::set_var("NO_COLOR", "1");
+        assert_eq!(paint("x", "31"), "x");
+        std::env::remove_var("NO_COLOR");
+    }
+
+    #[test]
+    fn discover_git_repos_finds_and_excludes() {
+        let td = TempDir::new("sync_discover");
+        let root = td.path().join("root");
+        std::fs::create_dir_all(root.join("repo-a/.git")).expect("repo-a");
+        std::fs::create_dir_all(root.join("target/repo-b/.git")).expect("repo-b");
+        std::fs::create_dir_all(root.join("nested/repo-c/.git")).expect("repo-c");
+        let excluded = BTreeSet::from(["target".to_string()]);
+
+        let repos = discover_git_repos(&[root], &excluded);
+        let as_text = repos
+            .iter()
+            .map(|p| p.display().to_string())
+            .collect::<Vec<_>>();
+        assert!(as_text.iter().any(|s| s.contains("repo-a")));
+        assert!(as_text.iter().any(|s| s.contains("repo-c")));
+        assert!(!as_text.iter().any(|s| s.contains("repo-b")));
+    }
+
+    #[test]
+    fn normalization_scenarios_repeated() {
+        for i in 0..240usize {
+            let input = if i % 3 == 0 {
+                format!("/TaRgEt/{i}/")
+            } else if i % 3 == 1 {
+                format!("NODE_MODULES/{i}")
+            } else {
+                format!("build/{i}")
+            };
+            let out = normalized_dir_name(&input);
+            assert_eq!(out, out.to_ascii_lowercase());
+            assert!(!out.starts_with('/'));
+            assert!(!out.ends_with('/'));
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();

@@ -486,6 +486,152 @@ async fn is_git_tracked_dir(path: &Path) -> Result<bool> {
     Ok(!String::from_utf8_lossy(&ls_out.stdout).trim().is_empty())
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::{Mutex, OnceLock};
+
+    fn env_lock() -> &'static Mutex<()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+    }
+
+    #[test]
+    fn defaults_are_expected() {
+        assert_eq!(default_min_size_mb(), 512);
+        assert_eq!(default_kinds(), "rust-build,node-deps,build-output,cache");
+    }
+
+    #[test]
+    fn human_bytes_formats_units() {
+        assert_eq!(human_bytes(1), "1.0 B");
+        assert_eq!(human_bytes(1024), "1.0 KiB");
+        assert_eq!(human_bytes(1024 * 1024), "1.0 MiB");
+    }
+
+    #[test]
+    fn parse_kinds_trims_and_dedupes() {
+        let kinds = parse_kinds(" rust-build, node-deps ,rust-build,,cache ");
+        assert_eq!(kinds.len(), 3);
+        assert!(kinds.contains("rust-build"));
+        assert!(kinds.contains("node-deps"));
+        assert!(kinds.contains("cache"));
+    }
+
+    #[test]
+    fn expand_tilde_uses_home_when_available() {
+        let _guard = env_lock().lock().expect("lock");
+        let old_home = std::env::var("HOME").ok();
+        std::env::set_var("HOME", "/tmp/dracon-home-test");
+
+        assert_eq!(expand_tilde("~"), PathBuf::from("/tmp/dracon-home-test"));
+        assert_eq!(
+            expand_tilde("~/Dev/project"),
+            PathBuf::from("/tmp/dracon-home-test/Dev/project")
+        );
+        assert_eq!(expand_tilde("/x/y"), PathBuf::from("/x/y"));
+
+        if let Some(v) = old_home {
+            std::env::set_var("HOME", v);
+        } else {
+            std::env::remove_var("HOME");
+        }
+    }
+
+    #[test]
+    fn build_link_report_counts_states() {
+        let policy = SystemPolicy {
+            storage: StoragePolicy::default(),
+            links: LinkPolicy {
+                entries: vec![LinkEntry {
+                    link: "/tmp/does-not-exist-link".into(),
+                    target: "/tmp/does-not-exist-target".into(),
+                }],
+            },
+        };
+        let report = build_link_report(&policy);
+        assert_eq!(report.total, 1);
+        assert_eq!(report.healthy, 0);
+        assert_eq!(report.drifted, 1);
+        assert_eq!(report.missing_target, 1);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn evaluate_link_handles_missing_and_sync_cases() {
+        let base = std::env::temp_dir().join(format!(
+            "dracon_system_test_{}_{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("time")
+                .as_nanos()
+        ));
+        fs::create_dir_all(&base).expect("base dir");
+
+        let target = base.join("target.txt");
+        fs::write(&target, "x").expect("target");
+
+        let missing_link = LinkEntry {
+            link: base.join("missing-link").display().to_string(),
+            target: target.display().to_string(),
+        };
+        let s1 = evaluate_link(&missing_link);
+        assert_eq!(s1.issue, "link_missing");
+
+        let normal_file_link = base.join("normal-file");
+        fs::write(&normal_file_link, "x").expect("file");
+        let not_symlink = LinkEntry {
+            link: normal_file_link.display().to_string(),
+            target: target.display().to_string(),
+        };
+        let s2 = evaluate_link(&not_symlink);
+        assert_eq!(s2.issue, "path_not_symlink");
+
+        let good_link = base.join("good-link");
+        symlink(&target, &good_link).expect("symlink");
+        let synced = LinkEntry {
+            link: good_link.display().to_string(),
+            target: target.display().to_string(),
+        };
+        let s3 = evaluate_link(&synced);
+        assert_eq!(s3.issue, "ok");
+        assert!(s3.in_sync);
+
+        let wrong_target = base.join("other.txt");
+        fs::write(&wrong_target, "y").expect("other");
+        let mismatch_link = base.join("mismatch-link");
+        symlink(&wrong_target, &mismatch_link).expect("symlink mismatch");
+        let mismatch = LinkEntry {
+            link: mismatch_link.display().to_string(),
+            target: target.display().to_string(),
+        };
+        let s4 = evaluate_link(&mismatch);
+        assert_eq!(s4.issue, "link_target_mismatch");
+
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn parse_and_format_repeated_scenarios() {
+        for i in 0..220usize {
+            let csv = if i % 2 == 0 {
+                "rust-build,node-deps,cache"
+            } else {
+                " rust-build , build-output , cache , rust-build "
+            };
+            let kinds = parse_kinds(csv);
+            assert!(kinds.contains("rust-build"));
+            assert!(kinds.contains("cache"));
+
+            let bytes = (i as u64 + 1) * 2048;
+            let out = human_bytes(bytes);
+            assert!(!out.is_empty());
+            assert!(out.contains(' '));
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();

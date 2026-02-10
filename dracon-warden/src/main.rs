@@ -530,3 +530,240 @@ fn run_filter(is_clean: bool, path: Option<&str>) -> Result<()> {
     std::io::stdout().write_all(&output)?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::{Mutex, OnceLock};
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn env_lock() -> &'static Mutex<()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+    }
+
+    struct TempDir {
+        path: PathBuf,
+    }
+
+    impl TempDir {
+        fn new(prefix: &str) -> Self {
+            let unique = format!(
+                "{}_{}_{}",
+                prefix,
+                std::process::id(),
+                SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .expect("time")
+                    .as_nanos()
+            );
+            let path = std::env::temp_dir().join(unique);
+            fs::create_dir_all(&path).expect("create temp dir");
+            Self { path }
+        }
+
+        fn path(&self) -> &Path {
+            &self.path
+        }
+    }
+
+    impl Drop for TempDir {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.path);
+        }
+    }
+
+    fn sample_policy() -> WardenPolicy {
+        WardenPolicy {
+            protected_patterns: vec!["*.env".into(), "secrets/**".into()],
+            plaintext_patterns: vec!["*.pub".into()],
+            hygiene_patterns: vec!["target/".into(), "*.log".into()],
+            watch_roots: vec![],
+        }
+    }
+
+    #[test]
+    fn replace_managed_block_appends_when_missing() {
+        let current = "a=1\n";
+        let block = format!("{BLOCK_BEGIN}\nmanaged\n{BLOCK_END}");
+        let next = replace_managed_block(current, &block);
+        assert!(next.contains("a=1"));
+        assert!(next.contains("managed"));
+        assert!(next.contains(BLOCK_BEGIN));
+        assert!(next.contains(BLOCK_END));
+    }
+
+    #[test]
+    fn replace_managed_block_replaces_existing_and_keeps_tail() {
+        let current = format!("head\n{BLOCK_BEGIN}\nold\n{BLOCK_END}\n\nend\n");
+        let block = format!("{BLOCK_BEGIN}\nnew\n{BLOCK_END}");
+        let next = replace_managed_block(&current, &block);
+        assert!(next.contains("head"));
+        assert!(next.contains("new"));
+        assert!(!next.contains("old"));
+        assert!(next.contains("end"));
+    }
+
+    #[test]
+    fn build_gitignore_block_includes_expected_lines() {
+        let block = build_gitignore_block(&sample_policy());
+        assert!(block.contains(BLOCK_BEGIN));
+        assert!(block.contains("target/"));
+        assert!(block.contains("!*.env"));
+        assert!(block.contains("!secrets/**"));
+        assert!(block.contains("!*.pub"));
+        assert!(block.contains(BLOCK_END));
+    }
+
+    #[test]
+    fn build_gitattributes_block_includes_expected_lines() {
+        let block = build_gitattributes_block(&sample_policy());
+        assert!(block.contains("*.env filter=dracon"));
+        assert!(block.contains("secrets/** filter=dracon"));
+        assert!(block.contains("*.pub -filter -diff -merge"));
+    }
+
+    #[test]
+    fn owner_pubkeys_in_filters_only_owner_pub() {
+        let td = TempDir::new("warden_owner_pubkeys");
+        fs::write(td.path().join("owner_a.pub"), "a").expect("write");
+        fs::write(td.path().join("owner_a.key"), "a").expect("write");
+        fs::write(td.path().join("identity.pub"), "a").expect("write");
+        let keys = owner_pubkeys_in(td.path());
+        assert_eq!(keys.len(), 1);
+        assert_eq!(
+            keys[0].file_name().and_then(|n| n.to_str()),
+            Some("owner_a.pub")
+        );
+    }
+
+    #[test]
+    fn newest_file_picks_newest_existing() {
+        let td = TempDir::new("warden_newest");
+        let a = td.path().join("a.pub");
+        let b = td.path().join("b.pub");
+        fs::write(&a, "a").expect("write a");
+        std::thread::sleep(Duration::from_secs(1));
+        fs::write(&b, "b").expect("write b");
+        let picked = newest_file(vec![a.clone(), b.clone()]).expect("picked");
+        assert_eq!(picked, b);
+    }
+
+    #[test]
+    fn publish_repo_pubkey_writes_and_is_idempotent() {
+        let td = TempDir::new("warden_publish_key");
+        let repo = td.path().join("repo");
+        fs::create_dir_all(&repo).expect("repo");
+        let key = td.path().join("owner_test.pub");
+        fs::write(&key, "age1xxx").expect("key");
+
+        assert!(publish_repo_pubkey(&repo, &key).expect("first publish"));
+        assert!(!publish_repo_pubkey(&repo, &key).expect("second publish"));
+        let out = repo.join(".dracon/data/keys/owner_test.pub");
+        assert_eq!(fs::read_to_string(out).expect("read out"), "age1xxx");
+    }
+
+    #[test]
+    fn harden_repo_changes_files_and_writes_key() {
+        let td = TempDir::new("warden_harden_repo");
+        let repo = td.path().join("repo");
+        fs::create_dir_all(&repo).expect("repo");
+        let key = td.path().join("owner_test.pub");
+        fs::write(&key, "age1yyy").expect("key");
+
+        let (a, b, c) = harden_repo(&repo, &sample_policy(), Some(&key)).expect("harden");
+        assert!(a);
+        assert!(b);
+        assert!(c);
+        assert!(repo.join(".gitignore").exists());
+        assert!(repo.join(".gitattributes").exists());
+        assert!(repo.join(".dracon/data/keys/owner_test.pub").exists());
+    }
+
+    #[test]
+    fn load_sync_watch_roots_reads_override_policy() {
+        let _guard = env_lock().lock().expect("env lock");
+        let td = TempDir::new("warden_sync_roots");
+        let a = td.path().join("a");
+        let b = td.path().join("b");
+        fs::create_dir_all(&a).expect("a");
+        fs::create_dir_all(&b).expect("b");
+        let sync_policy = td.path().join("sync.toml");
+        fs::write(
+            &sync_policy,
+            format!(
+                "watch_roots = [\"{}\", \"{}\"]\n",
+                a.display(),
+                b.display()
+            ),
+        )
+        .expect("write sync policy");
+        std::env::set_var("DRACON_SYNC_POLICY", &sync_policy);
+
+        let roots = load_sync_watch_roots();
+        assert!(roots.contains(&a));
+        assert!(roots.contains(&b));
+
+        std::env::remove_var("DRACON_SYNC_POLICY");
+    }
+
+    #[test]
+    fn effective_watch_roots_merges_and_dedupes() {
+        let _guard = env_lock().lock().expect("env lock");
+        let td = TempDir::new("warden_effective_roots");
+        let p1 = td.path().join("one");
+        let p2 = td.path().join("two");
+        fs::create_dir_all(&p1).expect("p1");
+        fs::create_dir_all(&p2).expect("p2");
+
+        let sync_policy = td.path().join("sync.toml");
+        fs::write(
+            &sync_policy,
+            format!(
+                "watch_roots = [\"{}\", \"{}\"]\n",
+                p1.display(),
+                p2.display()
+            ),
+        )
+        .expect("sync policy");
+        std::env::set_var("DRACON_SYNC_POLICY", &sync_policy);
+
+        let policy = WardenPolicy {
+            protected_patterns: vec![],
+            plaintext_patterns: vec![],
+            hygiene_patterns: vec![],
+            watch_roots: vec![p1.display().to_string()],
+        };
+        let merged = effective_watch_roots(&policy);
+        assert_eq!(merged.len(), 2);
+        assert!(merged.contains(&p1));
+        assert!(merged.contains(&p2));
+
+        std::env::remove_var("DRACON_SYNC_POLICY");
+    }
+
+    #[test]
+    fn apply_managed_file_detects_noop_second_write() {
+        let td = TempDir::new("warden_apply_noop");
+        let file = td.path().join(".gitignore");
+        let block = format!("{BLOCK_BEGIN}\nfoo\n{BLOCK_END}");
+        assert!(apply_managed_file(&file, &block).expect("first"));
+        assert!(!apply_managed_file(&file, &block).expect("second"));
+    }
+
+    #[test]
+    fn repeated_replace_block_scenarios_are_stable() {
+        for idx in 0..200usize {
+            let current = if idx % 2 == 0 {
+                format!("prefix-{idx}\n")
+            } else {
+                format!("prefix-{idx}\n{BLOCK_BEGIN}\nold\n{BLOCK_END}\n")
+            };
+            let block = format!("{BLOCK_BEGIN}\nnew-{idx}\n{BLOCK_END}");
+            let next = replace_managed_block(&current, &block);
+            assert!(next.contains(&format!("new-{idx}")));
+            assert!(next.contains(BLOCK_BEGIN));
+            assert!(next.contains(BLOCK_END));
+        }
+    }
+}
