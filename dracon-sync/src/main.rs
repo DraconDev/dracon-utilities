@@ -44,6 +44,9 @@ enum Command {
         /// Retry count for push operations.
         #[arg(long, default_value_t = 3)]
         push_retries: u32,
+        /// Allow rewrite of large blobs even when paths are outside excluded dirs.
+        #[arg(long)]
+        rewrite_large_any: bool,
     },
     /// Run one sync pass.
     Once,
@@ -653,12 +656,12 @@ fn timestamp_secs() -> u64 {
         .unwrap_or(0)
 }
 
-fn rewrite_ahead_excluded_dirs(
+fn rewrite_ahead_paths(
     repo: &Path,
-    dirs_to_remove: &[String],
+    paths_to_remove: &[String],
     backup_prefix: &str,
 ) -> Result<Option<String>> {
-    if dirs_to_remove.is_empty() {
+    if paths_to_remove.is_empty() {
         return Ok(None);
     }
     let backup_branch = format!("{backup_prefix}-{}", timestamp_secs());
@@ -676,9 +679,9 @@ fn rewrite_ahead_excluded_dirs(
     }
 
     let mut index_filter = String::from("git rm -r --cached --ignore-unmatch");
-    for dir in dirs_to_remove {
+    for path in paths_to_remove {
         index_filter.push(' ');
-        index_filter.push_str(dir);
+        index_filter.push_str(path);
     }
 
     let rewrite = StdCommand::new("git")
@@ -1147,6 +1150,7 @@ async fn run_repair_concerns(
     only_repo: Option<PathBuf>,
     push_timeout_override: Option<u64>,
     push_retries: u32,
+    rewrite_large_any: bool,
 ) -> Result<()> {
     let policy = SyncPolicy::load(policy_path)?;
     let roots = policy.watch_root_paths();
@@ -1304,13 +1308,28 @@ async fn run_repair_concerns(
                                 }
                             }
                             let dirs: Vec<String> = dirs.into_iter().collect();
-                            if dirs.is_empty() {
+                            let rewrite_paths: Vec<String> = if !dirs.is_empty() {
+                                dirs
+                            } else if rewrite_large_any {
+                                let mut unique = BTreeSet::new();
+                                for (_, p) in &large {
+                                    unique.insert(p.clone());
+                                }
+                                unique.into_iter().collect()
+                            } else {
+                                Vec::new()
+                            };
+
+                            if rewrite_paths.is_empty() {
                                 println!("   manual: large blobs found but not in excluded dirs");
                             } else {
-                                println!("   plan: rewrite ahead history removing dirs {:?}", dirs);
-                                match rewrite_ahead_excluded_dirs(
+                                println!(
+                                    "   plan: rewrite ahead history removing paths {:?}",
+                                    rewrite_paths
+                                );
+                                match rewrite_ahead_paths(
                                     &repo,
-                                    &dirs,
+                                    &rewrite_paths,
                                     "backup/pre-sync-largeblob-fix",
                                 ) {
                                     Ok(Some(backup_branch)) => {
@@ -1745,8 +1764,17 @@ async fn main() -> Result<()> {
             repo,
             push_timeout_secs,
             push_retries,
+            rewrite_large_any,
         } => {
-            run_repair_concerns(&policy_path, apply, repo, push_timeout_secs, push_retries).await?;
+            run_repair_concerns(
+                &policy_path,
+                apply,
+                repo,
+                push_timeout_secs,
+                push_retries,
+                rewrite_large_any,
+            )
+            .await?;
         }
         Command::Once => {
             run_once(&policy_path).await?;
