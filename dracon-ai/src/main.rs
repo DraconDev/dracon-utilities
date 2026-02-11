@@ -1,6 +1,6 @@
 use anyhow::{Result, anyhow};
 use clap::{Parser, Subcommand};
-use std::{fs, path::PathBuf, process::Command, io::{self, Write}};
+use std::{fs, process::Command, io::{self, Write}};
 use reqwest::Client;
 use serde_json::json;
 
@@ -91,4 +91,41 @@ async fn call_provider(cfg: &AiConfig, route: &ModelRoute, prompt: &str) -> Resu
         .ok_or_else(|| anyhow!("Malformed AI response: {:?}", json))?;
     
     Ok(content.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Cli, Cmd};
+    use clap::Parser;
+
+    #[test]
+    fn parses_chat_with_default_intent() {
+        let cli = Cli::try_parse_from(["dracon-ai", "chat", "hello world"]).expect("chat parses");
+        match cli.cmd {
+            Cmd::Chat { intent, prompt } => {
+                assert_eq!(intent, "engineer");
+                assert_eq!(prompt, "hello world");
+            }
+            _ => panic!("expected chat command"),
+        }
+    }
+
+    #[test]
+    fn parses_chat_with_explicit_intent() {
+        let cli = Cli::try_parse_from(["dracon-ai", "chat", "--intent", "commit", "ship it"])
+            .expect("chat with explicit intent parses");
+        match cli.cmd {
+            Cmd::Chat { intent, prompt } => {
+                assert_eq!(intent, "commit");
+                assert_eq!(prompt, "ship it");
+            }
+            _ => panic!("expected chat command"),
+        }
+    }
+
+    #[test]
+    fn parses_status_subcommand() {
+        let cli = Cli::try_parse_from(["dracon-ai", "status"]).expect("status parses");
+        assert!(matches!(cli.cmd, Cmd::Status));
+    }
 }

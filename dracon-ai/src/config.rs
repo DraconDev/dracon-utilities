@@ -67,3 +67,36 @@ impl AiConfig {
     pub fn dir() -> Result<PathBuf> { let home = dirs::home_dir().unwrap(); Ok(home.join("dracon/ai")) }
     pub fn path() -> Result<PathBuf> { Ok(Self::dir()?.join("dracon-ai.toml")) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::AiConfig;
+
+    #[test]
+    fn defaults_include_expected_routes_and_providers() {
+        let cfg = AiConfig::default();
+        assert!(cfg.intents.contains_key("commit"));
+        assert!(cfg.intents.contains_key("engineer"));
+        assert_eq!(
+            cfg.providers.get("openrouter").map(String::as_str),
+            Some("https://openrouter.ai/api/v1")
+        );
+        assert!(cfg.local_endpoint.is_some());
+    }
+
+    #[test]
+    fn config_toml_roundtrip_preserves_core_fields() {
+        let cfg = AiConfig::default();
+        let s = toml::to_string_pretty(&cfg).expect("config serializes");
+        let decoded: AiConfig = toml::from_str(&s).expect("config deserializes");
+
+        assert_eq!(
+            decoded.intents.get("engineer").map(|r| r.provider.as_str()),
+            Some("openrouter")
+        );
+        assert_eq!(
+            decoded.intents.get("commit").map(|r| r.model.as_str()),
+            Some("google/gemini-2.0-flash-exp:free")
+        );
+    }
+}
