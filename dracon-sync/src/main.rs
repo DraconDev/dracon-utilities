@@ -4,7 +4,7 @@ use dracon_git::{build_sync_commit_payload, GitService};
 use dracon_protocols::git::{
     DiffFile as ProtoDiffFile, FileStatus as ProtoFileStatus, RepoStatus as ProtoRepoStatus,
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::{BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
 use std::process::Command as StdCommand;
@@ -29,6 +29,9 @@ enum Command {
         /// Show only concern repos.
         #[arg(long)]
         only_concern: bool,
+        /// Show only warn repos.
+        #[arg(long, conflicts_with = "only_concern")]
+        only_warn: bool,
     },
     /// Repair concern repos (dry-run by default; use --apply to execute).
     RepairConcerns {
@@ -47,6 +50,15 @@ enum Command {
         /// Allow rewrite of large blobs even when paths are outside excluded dirs.
         #[arg(long)]
         rewrite_large_any: bool,
+    },
+    /// Repair warn repos (dirty-only triage; dry-run by default).
+    RepairWarns {
+        /// Execute git operations to repair warns.
+        #[arg(long)]
+        apply: bool,
+        /// Only repair this repository path.
+        #[arg(long)]
+        repo: Option<PathBuf>,
     },
     /// Run one sync pass.
     Once,
@@ -144,6 +156,27 @@ fn default_repo_sync_timeout_secs() -> u64 {
 
 fn default_push_retries() -> u32 {
     3
+}
+
+const DEFAULT_GIT_HOST_BLOB_LIMIT_BYTES: u64 = 100 * 1024 * 1024;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RepoFilter {
+    All,
+    Concern,
+    Warn,
+}
+
+#[derive(Debug, Serialize)]
+struct IncidentRecord {
+    ts_unix: u64,
+    scope: String,
+    repo: String,
+    reason: String,
+    action: String,
+    backup_branch: Option<String>,
+    result: String,
+    details: Option<String>,
 }
 
 impl SyncPolicy {
@@ -843,6 +876,110 @@ fn timestamp_secs() -> u64 {
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_secs())
         .unwrap_or(0)
+}
+
+fn incident_ledger_path(policy_path: &Path) -> PathBuf {
+    policy_path
+        .parent()
+        .map(|d| d.join("dracon-sync-incidents.jsonl"))
+        .unwrap_or_else(|| PathBuf::from("dracon-sync-incidents.jsonl"))
+}
+
+fn append_incident_record(policy_path: &Path, record: &IncidentRecord) {
+    let path = incident_ledger_path(policy_path);
+    let line = match serde_json::to_string(record) {
+        Ok(v) => v,
+        Err(e) => {
+            eprintln!("⚠️ incident serialize failed: {}", e);
+            return;
+        }
+    };
+    let parent = path.parent().map(Path::to_path_buf);
+    if let Some(dir) = parent {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    match std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+    {
+        Ok(mut file) => {
+            use std::io::Write;
+            if let Err(e) = writeln!(file, "{}", line) {
+                eprintln!("⚠️ incident write failed ({}): {}", path.display(), e);
+            }
+        }
+        Err(e) => eprintln!("⚠️ incident open failed ({}): {}", path.display(), e),
+    }
+}
+
+fn repo_state_flags(
+    status: &dracon_git::types::RepoStatus,
+    has_origin: bool,
+    has_upstream: bool,
+) -> Vec<String> {
+    let mut flags = Vec::new();
+    if !status.is_clean {
+        flags.push("DIRTY".to_string());
+    }
+    if status.ahead > 0 {
+        flags.push(format!("AHEAD:{}", status.ahead));
+    }
+    if status.behind > 0 {
+        flags.push(format!("BEHIND:{}", status.behind));
+    }
+    if !has_origin {
+        flags.push("NO_ORIGIN".to_string());
+    }
+    if has_origin && !has_upstream {
+        flags.push("NO_UPSTREAM".to_string());
+    }
+    if status.ahead > 0 && has_origin && has_upstream {
+        flags.push("STUCK_PUSH".to_string());
+    }
+    if status.behind > 0 && has_origin && has_upstream {
+        flags.push("STUCK_PULL".to_string());
+    }
+    if flags.is_empty() {
+        flags.push("OK".to_string());
+    }
+    flags
+}
+
+fn repo_is_concern(status: &dracon_git::types::RepoStatus, has_origin: bool, has_upstream: bool) -> bool {
+    status.ahead > 0 || status.behind > 0 || !has_origin || (has_origin && !has_upstream)
+}
+
+fn repo_is_warn(status: &dracon_git::types::RepoStatus, has_origin: bool, has_upstream: bool) -> bool {
+    !repo_is_concern(status, has_origin, has_upstream) && !status.is_clean
+}
+
+fn repo_hint(flags: &[String], warn: bool, concern: bool) -> String {
+    if flags.iter().any(|f| f == "NO_ORIGIN") {
+        return "set origin remote".to_string();
+    }
+    if flags.iter().any(|f| f == "NO_UPSTREAM") {
+        return "run repair-concerns --apply (set upstream)".to_string();
+    }
+    if flags.iter().any(|f| f.starts_with("AHEAD:")) {
+        return "run repair-concerns --apply (push or rewrite)".to_string();
+    }
+    if flags.iter().any(|f| f.starts_with("BEHIND:")) {
+        return "run repair-concerns --apply (pull/rebase)".to_string();
+    }
+    if warn {
+        return "run repair-warns --apply".to_string();
+    }
+    if concern {
+        return "run repair-concerns --apply".to_string();
+    }
+    "healthy".to_string()
+}
+
+fn push_large_blob_threshold_bytes(policy: &SyncPolicy) -> u64 {
+    policy
+        .max_stage_file_bytes
+        .min(DEFAULT_GIT_HOST_BLOB_LIMIT_BYTES)
 }
 
 fn rewrite_ahead_paths(
