@@ -2350,6 +2350,7 @@ fn open_policy_in_editor(policy_path: &Path) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::Value;
     use std::sync::{Mutex, OnceLock};
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -2409,6 +2410,25 @@ mod tests {
             auto_repair_concerns: true,
             auto_rewrite_large_blobs: false,
             push_retries: 2,
+        }
+    }
+
+    fn mk_status(
+        is_clean: bool,
+        ahead: usize,
+        behind: usize,
+        modified_files: usize,
+        staged_files: usize,
+    ) -> dracon_git::types::RepoStatus {
+        dracon_git::types::RepoStatus {
+            branch: "master".to_string(),
+            ahead,
+            behind,
+            modified_files,
+            staged_files,
+            is_clean,
+            last_commit_msg: None,
+            last_commit_hash: None,
         }
     }
 
@@ -2546,6 +2566,69 @@ mod tests {
             assert!(!out.ends_with('/'));
         }
     }
+
+    #[test]
+    fn repo_state_classification_paths() {
+        let clean = mk_status(true, 0, 0, 0, 0);
+        assert!(!repo_is_concern(&clean, true, true));
+        assert!(!repo_is_warn(&clean, true, true));
+
+        let dirty = mk_status(false, 0, 0, 3, 1);
+        assert!(!repo_is_concern(&dirty, true, true));
+        assert!(repo_is_warn(&dirty, true, true));
+
+        let ahead = mk_status(true, 2, 0, 0, 0);
+        assert!(repo_is_concern(&ahead, true, true));
+        assert!(!repo_is_warn(&ahead, true, true));
+    }
+
+    #[test]
+    fn repo_state_flags_and_hint_are_consistent() {
+        let st = mk_status(false, 7, 0, 2, 1);
+        let flags = repo_state_flags(&st, true, true);
+        assert!(flags.iter().any(|f| f == "DIRTY"));
+        assert!(flags.iter().any(|f| f == "AHEAD:7"));
+        assert!(flags.iter().any(|f| f == "STUCK_PUSH"));
+        let hint = repo_hint(&flags, false, true);
+        assert!(hint.contains("repair-concerns"));
+    }
+
+    #[test]
+    fn push_blob_threshold_is_guardrailed() {
+        let mut p = test_policy();
+        p.max_stage_file_bytes = 200 * 1024 * 1024;
+        assert_eq!(
+            push_large_blob_threshold_bytes(&p),
+            DEFAULT_GIT_HOST_BLOB_LIMIT_BYTES
+        );
+        p.max_stage_file_bytes = 50 * 1024 * 1024;
+        assert_eq!(push_large_blob_threshold_bytes(&p), 50 * 1024 * 1024);
+    }
+
+    #[test]
+    fn incident_ledger_write_roundtrip() {
+        let td = TempDir::new("sync_ledger");
+        let policy = td.path().join("dracon-sync.toml");
+        std::fs::write(&policy, "watch_roots=[]").expect("policy");
+        let record = IncidentRecord {
+            ts_unix: 1,
+            scope: "concern".to_string(),
+            repo: "/tmp/repo".to_string(),
+            reason: "AHEAD:1".to_string(),
+            action: "push_origin_head".to_string(),
+            backup_branch: None,
+            result: "ok".to_string(),
+            details: Some("d".to_string()),
+        };
+        append_incident_record(&policy, &record);
+        let ledger = incident_ledger_path(&policy);
+        let body = std::fs::read_to_string(&ledger).expect("ledger");
+        assert!(!body.trim().is_empty());
+        let first = body.lines().next().expect("line");
+        let parsed: Value = serde_json::from_str(first).expect("json");
+        assert_eq!(parsed["scope"], "concern");
+        assert_eq!(parsed["result"], "ok");
+    }
 }
 
 #[tokio::main]
@@ -2583,6 +2666,10 @@ async fn main() -> Result<()> {
                 policy.auto_rewrite_large_blobs
             );
             println!("📏 MAX_STAGE_FILE_BYTES: {}", policy.max_stage_file_bytes);
+            println!(
+                "🧱 PUSH_BLOB_THRESHOLD_BYTES: {}",
+                push_large_blob_threshold_bytes(&policy)
+            );
             println!("🚫 EXCLUDE_DIRS: {:?}", policy.exclude_dir_names);
             println!(
                 "⏱️ TIMEOUTS: pull={}s push={}s repo={}s retries={}",
