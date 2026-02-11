@@ -260,6 +260,16 @@ struct RepairJson {
     ledger: String,
 }
 
+#[derive(Debug, Default, Clone, Copy)]
+struct RepairSummary {
+    found: usize,
+    planned: usize,
+    attempted: usize,
+    succeeded: usize,
+    resolved_now: usize,
+    manual_only: usize,
+}
+
 #[derive(Debug, Serialize)]
 struct IncidentRecord {
     ts_unix: u64,
@@ -1760,7 +1770,9 @@ async fn run_repair_concerns(
     push_timeout_override: Option<u64>,
     push_retries: u32,
     rewrite_large_any: bool,
-) -> Result<()> {
+    filter: ConcernRepairFilter,
+    json: bool,
+) -> Result<RepairSummary> {
     let policy = SyncPolicy::load(policy_path)?;
     let roots = policy.watch_root_paths();
     let excluded_dir_names = excluded_dir_names_set(&policy);
@@ -1772,7 +1784,7 @@ async fn run_repair_concerns(
                 "⚠️ target repo not discovered in policy roots: {}",
                 target_repo.display()
             );
-            return Ok(());
+            return Ok(RepairSummary::default());
         }
     }
     let push_timeout_secs = push_timeout_override
@@ -1821,6 +1833,14 @@ async fn run_repair_concerns(
         let mut has_upstream = has_tracking_upstream(&repo);
         let is_concern = repo_is_concern(&status, has_origin, has_upstream);
         if !is_concern {
+            continue;
+        }
+        let stuck_push = status.ahead > 0 && has_origin && has_upstream;
+        let stuck_pull = status.behind > 0 && has_origin && has_upstream;
+        if matches!(filter, ConcernRepairFilter::StuckPush) && !stuck_push {
+            continue;
+        }
+        if matches!(filter, ConcernRepairFilter::StuckPull) && !stuck_pull {
             continue;
         }
         concerns += 1;
@@ -2281,19 +2301,43 @@ async fn run_repair_concerns(
         }
     }
 
-    println!("\n✅ concern management summary");
-    println!("   concerns_found: {}", concerns);
-    println!("   operations_planned: {}", attempted_ops);
-    println!("   operations_succeeded: {}", succeeded_ops);
-    println!("   manual_only: {}", manual_only);
-    if apply {
-        println!("   concerns_resolved_now: {}", resolved);
+    let summary = RepairSummary {
+        found: concerns,
+        planned: attempted_ops,
+        attempted: if apply { attempted_ops } else { 0 },
+        succeeded: succeeded_ops,
+        resolved_now: if apply { resolved } else { 0 },
+        manual_only,
+    };
+    if json {
+        let payload = RepairJson {
+            policy: policy_path.display().to_string(),
+            scope: "concern".to_string(),
+            mode: if apply { "apply".to_string() } else { "dry_run".to_string() },
+            found: summary.found,
+            planned: summary.planned,
+            attempted: summary.attempted,
+            succeeded: summary.succeeded,
+            resolved_now: summary.resolved_now,
+            manual_only: summary.manual_only,
+            ledger: incident_ledger_path(policy_path).display().to_string(),
+        };
+        println!("{}", serde_json::to_string_pretty(&payload)?);
     } else {
-        println!("   dry_run: true (rerun with --apply to execute)");
+        println!("\n✅ concern management summary");
+        println!("   concerns_found: {}", summary.found);
+        println!("   operations_planned: {}", summary.planned);
+        println!("   operations_succeeded: {}", summary.succeeded);
+        println!("   manual_only: {}", summary.manual_only);
+        if apply {
+            println!("   concerns_resolved_now: {}", summary.resolved_now);
+        } else {
+            println!("   dry_run: true (rerun with --apply to execute)");
+        }
+        println!("   ledger: {}", incident_ledger_path(policy_path).display());
     }
-    println!("   ledger: {}", incident_ledger_path(policy_path).display());
 
-    Ok(())
+    Ok(summary)
 }
 
 async fn run_repair_warns(policy_path: &Path, apply: bool, only_repo: Option<PathBuf>) -> Result<()> {
