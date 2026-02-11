@@ -2143,7 +2143,163 @@ async fn run_repair_concerns(
     } else {
         println!("   dry_run: true (rerun with --apply to execute)");
     }
+    println!("   ledger: {}", incident_ledger_path(policy_path).display());
 
+    Ok(())
+}
+
+async fn run_repair_warns(policy_path: &Path, apply: bool, only_repo: Option<PathBuf>) -> Result<()> {
+    let policy = SyncPolicy::load(policy_path)?;
+    let roots = policy.watch_root_paths();
+    let excluded_dir_names = excluded_dir_names_set(&policy);
+    let mut repos = discover_git_repos(&roots, &excluded_dir_names);
+    if let Some(target_repo) = only_repo {
+        repos.retain(|r| r == &target_repo);
+        if repos.is_empty() {
+            println!(
+                "⚠️ target repo not discovered in policy roots: {}",
+                target_repo.display()
+            );
+            return Ok(());
+        }
+    }
+
+    let mut warns = 0usize;
+    let mut attempted = 0usize;
+    let mut succeeded = 0usize;
+
+    println!("📜 POLICY: {}", policy_path.display());
+    println!(
+        "🧹 WARN MODE: {}",
+        if apply {
+            "APPLY (mutating)"
+        } else {
+            "DRY-RUN (no changes)"
+        }
+    );
+
+    for repo in repos {
+        let svc = match GitService::new(&repo) {
+            Ok(svc) => svc,
+            Err(e) => {
+                eprintln!("⚠️ {} init_failed: {}", repo.display(), e);
+                continue;
+            }
+        };
+        let status = match svc.get_status().await {
+            Ok(status) => status,
+            Err(e) => {
+                eprintln!("⚠️ {} status_failed: {}", repo.display(), e);
+                continue;
+            }
+        };
+        let has_origin = has_origin_remote(&repo);
+        let has_upstream = has_tracking_upstream(&repo);
+        if !repo_is_warn(&status, has_origin, has_upstream) {
+            continue;
+        }
+        warns += 1;
+        let flags = repo_state_flags(&status, has_origin, has_upstream);
+        let reason = flags.join(",");
+        println!(
+            "\n🟡 {}  state={} modified={} staged={}",
+            repo.display(),
+            reason,
+            status.modified_files,
+            status.staged_files
+        );
+        println!("   plan: run normal sync triage (stage/commit/push)");
+        if !apply {
+            append_incident_record(
+                policy_path,
+                &IncidentRecord {
+                    ts_unix: timestamp_secs(),
+                    scope: "warn".to_string(),
+                    repo: repo.display().to_string(),
+                    reason,
+                    action: "dry_run_sync_triage".to_string(),
+                    backup_branch: None,
+                    result: "planned".to_string(),
+                    details: None,
+                },
+            );
+            continue;
+        }
+
+        attempted += 1;
+        match tokio::time::timeout(
+            Duration::from_secs(policy.repo_sync_timeout_secs),
+            sync_repo(&repo, &policy, &excluded_dir_names),
+        )
+        .await
+        {
+            Err(_) => {
+                println!(
+                    "   fail: sync timeout after {}s",
+                    policy.repo_sync_timeout_secs
+                );
+                append_incident_record(
+                    policy_path,
+                    &IncidentRecord {
+                        ts_unix: timestamp_secs(),
+                        scope: "warn".to_string(),
+                        repo: repo.display().to_string(),
+                        reason,
+                        action: "sync_triage".to_string(),
+                        backup_branch: None,
+                        result: "fail".to_string(),
+                        details: Some(format!(
+                            "timeout={}s",
+                            policy.repo_sync_timeout_secs
+                        )),
+                    },
+                );
+            }
+            Ok(Ok(changed)) => {
+                succeeded += 1;
+                println!("   ok: triage complete changed={}", changed);
+                append_incident_record(
+                    policy_path,
+                    &IncidentRecord {
+                        ts_unix: timestamp_secs(),
+                        scope: "warn".to_string(),
+                        repo: repo.display().to_string(),
+                        reason,
+                        action: "sync_triage".to_string(),
+                        backup_branch: None,
+                        result: "ok".to_string(),
+                        details: Some(format!("changed={}", changed)),
+                    },
+                );
+            }
+            Ok(Err(e)) => {
+                println!("   fail: sync triage failed: {}", e);
+                append_incident_record(
+                    policy_path,
+                    &IncidentRecord {
+                        ts_unix: timestamp_secs(),
+                        scope: "warn".to_string(),
+                        repo: repo.display().to_string(),
+                        reason,
+                        action: "sync_triage".to_string(),
+                        backup_branch: None,
+                        result: "fail".to_string(),
+                        details: Some(e.to_string()),
+                    },
+                );
+            }
+        }
+    }
+
+    println!("\n✅ warn management summary");
+    println!("   warns_found: {}", warns);
+    println!("   operations_planned: {}", warns);
+    println!("   operations_attempted: {}", attempted);
+    println!("   operations_succeeded: {}", succeeded);
+    if !apply {
+        println!("   dry_run: true (rerun with --apply to execute)");
+    }
+    println!("   ledger: {}", incident_ledger_path(policy_path).display());
     Ok(())
 }
 
@@ -2446,8 +2602,18 @@ async fn main() -> Result<()> {
             }
             println!("🌐 EXTRA_REMOTES: {}", policy.extra_remotes.len());
         }
-        Command::Repos { only_concern } => {
-            run_repos_report(&policy_path, only_concern).await?;
+        Command::Repos {
+            only_concern,
+            only_warn,
+        } => {
+            let filter = if only_concern {
+                RepoFilter::Concern
+            } else if only_warn {
+                RepoFilter::Warn
+            } else {
+                RepoFilter::All
+            };
+            run_repos_report(&policy_path, filter).await?;
         }
         Command::RepairConcerns {
             apply,
@@ -2465,6 +2631,9 @@ async fn main() -> Result<()> {
                 rewrite_large_any,
             )
             .await?;
+        }
+        Command::RepairWarns { apply, repo } => {
+            run_repair_warns(&policy_path, apply, repo).await?;
         }
         Command::Once => {
             run_once(&policy_path).await?;
