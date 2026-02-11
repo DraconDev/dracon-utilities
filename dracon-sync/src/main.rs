@@ -3005,60 +3005,60 @@ async fn main() -> Result<()> {
                     extra_remotes: policy.extra_remotes.len(),
                 };
                 println!("{}", serde_json::to_string_pretty(&payload)?);
-                continue;
-            }
-            println!("📜 POLICY: {}", policy_path.display());
-            println!("🔁 ROOTS: {:?}", roots);
-            println!("📦 REPOS_DISCOVERED: {}", repos.len());
-            println!("⏱️ PULSE: {}s", policy.pulse_interval_secs);
-            println!(
-                "⏳ INACTIVITY_PUSH_DELAY: {}s",
-                policy.inactivity_push_delay_secs
-            );
-            println!(
-                "⏸️ FREEZE: {}",
-                freeze
-                    .map(|r| format!("ON ({})", r))
-                    .unwrap_or_else(|| "OFF".to_string())
-            );
-            println!(
-                "⚙️ FLAGS: auto_commit={} auto_pull={} auto_push={} auto_repair_concerns={} auto_repair_warns={} auto_rewrite_large_blobs={}",
-                policy.auto_commit,
-                policy.auto_pull,
-                policy.auto_push,
-                policy.auto_repair_concerns,
-                policy.auto_repair_warns,
-                policy.auto_rewrite_large_blobs
-            );
-            println!("📏 MAX_STAGE_FILE_BYTES: {}", policy.max_stage_file_bytes);
-            println!(
-                "🧱 PUSH_BLOB_THRESHOLD_BYTES: {}",
-                push_large_blob_threshold_bytes(&policy)
-            );
-            println!("🚫 EXCLUDE_DIRS: {:?}", policy.exclude_dir_names);
-            println!(
-                "⏱️ TIMEOUTS: pull={}s push={}s repo={}s retries={}",
-                policy.pull_op_timeout_secs,
-                policy.push_op_timeout_secs,
-                policy.repo_sync_timeout_secs,
-                policy.push_retries
-            );
-            println!(
-                "🧯 REPAIR: cooldown={}s ledger_max_lines={} ledger_max_age_days={}",
-                policy.repair_cooldown_secs,
-                policy.incident_ledger_max_lines,
-                policy.incident_ledger_max_age_days
-            );
-            if !policy.system_repo.is_empty() {
-                println!("🏛️ SYSTEM_REPO: {}", policy.system_repo);
-            }
-            if !policy.backup_policy.is_empty() || !policy.backup_dir.is_empty() {
+            } else {
+                println!("📜 POLICY: {}", policy_path.display());
+                println!("🔁 ROOTS: {:?}", roots);
+                println!("📦 REPOS_DISCOVERED: {}", repos.len());
+                println!("⏱️ PULSE: {}s", policy.pulse_interval_secs);
                 println!(
-                    "🧰 BACKUP: policy={} dir={}",
-                    policy.backup_policy, policy.backup_dir
+                    "⏳ INACTIVITY_PUSH_DELAY: {}s",
+                    policy.inactivity_push_delay_secs
                 );
+                println!(
+                    "⏸️ FREEZE: {}",
+                    freeze
+                        .map(|r| format!("ON ({})", r))
+                        .unwrap_or_else(|| "OFF".to_string())
+                );
+                println!(
+                    "⚙️ FLAGS: auto_commit={} auto_pull={} auto_push={} auto_repair_concerns={} auto_repair_warns={} auto_rewrite_large_blobs={}",
+                    policy.auto_commit,
+                    policy.auto_pull,
+                    policy.auto_push,
+                    policy.auto_repair_concerns,
+                    policy.auto_repair_warns,
+                    policy.auto_rewrite_large_blobs
+                );
+                println!("📏 MAX_STAGE_FILE_BYTES: {}", policy.max_stage_file_bytes);
+                println!(
+                    "🧱 PUSH_BLOB_THRESHOLD_BYTES: {}",
+                    push_large_blob_threshold_bytes(&policy)
+                );
+                println!("🚫 EXCLUDE_DIRS: {:?}", policy.exclude_dir_names);
+                println!(
+                    "⏱️ TIMEOUTS: pull={}s push={}s repo={}s retries={}",
+                    policy.pull_op_timeout_secs,
+                    policy.push_op_timeout_secs,
+                    policy.repo_sync_timeout_secs,
+                    policy.push_retries
+                );
+                println!(
+                    "🧯 REPAIR: cooldown={}s ledger_max_lines={} ledger_max_age_days={}",
+                    policy.repair_cooldown_secs,
+                    policy.incident_ledger_max_lines,
+                    policy.incident_ledger_max_age_days
+                );
+                if !policy.system_repo.is_empty() {
+                    println!("🏛️ SYSTEM_REPO: {}", policy.system_repo);
+                }
+                if !policy.backup_policy.is_empty() || !policy.backup_dir.is_empty() {
+                    println!(
+                        "🧰 BACKUP: policy={} dir={}",
+                        policy.backup_policy, policy.backup_dir
+                    );
+                }
+                println!("🌐 EXTRA_REMOTES: {}", policy.extra_remotes.len());
             }
-            println!("🌐 EXTRA_REMOTES: {}", policy.extra_remotes.len());
         }
         Command::Repos {
             only_concern,
