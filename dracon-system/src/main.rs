@@ -1237,6 +1237,50 @@ async fn main() -> Result<()> {
                 }
             }
         }
+        Commands::Guard { cmd } => {
+            let (_, policy) = load_system_policy();
+            let mut guard = policy.guard;
+            normalize_guard_policy(&mut guard);
+            let mut runtime = GuardRuntimeState::default();
+            match cmd {
+                GuardCommands::Once { json } => {
+                    let report = run_guard_once(&guard, &mut runtime).await?;
+                    if json {
+                        println!("{}", serde_json::to_string_pretty(&report)?);
+                    } else {
+                        println!("guard_enabled: {}", report.enabled);
+                        println!("disk_use_percent: {}", report.disk_use_percent);
+                        println!("disk_state: {}", report.disk_state);
+                        println!("sync_frozen: {}", report.sync_frozen);
+                        println!("alerts: {}", report.alerts.len());
+                        for a in report.alerts {
+                            println!(
+                                "- pid={} cmd={} cpu={:.1}% rss={}MiB sustained={}s action={}",
+                                a.pid,
+                                a.command,
+                                a.cpu_percent,
+                                a.rss_mb,
+                                a.sustained_secs,
+                                a.action
+                            );
+                        }
+                    }
+                }
+                GuardCommands::Daemon => {
+                    if !guard.enabled {
+                        println!("guard disabled in policy");
+                        return Ok(());
+                    }
+                    println!("guard daemon started (interval={}s)", guard.interval_secs);
+                    loop {
+                        if let Err(e) = run_guard_once(&guard, &mut runtime).await {
+                            eprintln!("guard pass failed: {}", e);
+                        }
+                        sleep(Duration::from_secs(guard.interval_secs)).await;
+                    }
+                }
+            }
+        }
     }
 
     Ok(())
