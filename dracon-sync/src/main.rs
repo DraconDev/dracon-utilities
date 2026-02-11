@@ -1047,6 +1047,7 @@ async fn sync_repo(
     }
     let has_origin = has_origin_remote(repo);
     let has_upstream = has_tracking_upstream(repo);
+    let blob_threshold = push_large_blob_threshold_bytes(policy);
 
     if policy.auto_pull && has_origin && has_upstream {
         match run_git_with_timeout(
@@ -1142,6 +1143,16 @@ async fn sync_repo(
             svc.add_paths(&stage_paths).await?;
             svc.commit(&msg).await?;
             if policy.auto_push && has_origin {
+                let ahead_large = detect_large_blobs_ahead(repo, blob_threshold).unwrap_or_default();
+                if !ahead_large.is_empty() {
+                    eprintln!(
+                        "⚠️ skip push for {}: large blob(s) above {} bytes in ahead range ({} found)",
+                        repo.display(),
+                        blob_threshold,
+                        ahead_large.len()
+                    );
+                    return Ok(true);
+                }
                 match run_git_with_timeout(
                     repo,
                     &["push", "origin", "HEAD"],
@@ -1161,6 +1172,16 @@ async fn sync_repo(
     }
 
     if policy.auto_push && status.ahead > 0 && has_origin {
+        let ahead_large = detect_large_blobs_ahead(repo, blob_threshold).unwrap_or_default();
+        if !ahead_large.is_empty() {
+            eprintln!(
+                "⚠️ skip push for {}: large blob(s) above {} bytes in ahead range ({} found)",
+                repo.display(),
+                blob_threshold,
+                ahead_large.len()
+            );
+            return Ok(false);
+        }
         match run_git_with_timeout(
             repo,
             &["push", "origin", "HEAD"],
@@ -1395,7 +1416,7 @@ async fn git_log_unix_timestamp(repo: &Path) -> Option<i64> {
         .and_then(|s| s.parse::<i64>().ok())
 }
 
-async fn run_repos_report(policy_path: &Path, only_concern: bool) -> Result<()> {
+async fn run_repos_report(policy_path: &Path, filter: RepoFilter) -> Result<()> {
     #[derive(Debug)]
     struct RepoRow {
         repo: PathBuf,
@@ -1412,6 +1433,7 @@ async fn run_repos_report(policy_path: &Path, only_concern: bool) -> Result<()> 
         last_unix: i64,
         concern: bool,
         warn: bool,
+        hint: String,
     }
 
     let policy = SyncPolicy::load(policy_path)?;
@@ -1453,31 +1475,7 @@ async fn run_repos_report(policy_path: &Path, only_concern: bool) -> Result<()> 
         let has_origin = has_origin_remote(&repo);
         let has_upstream = has_tracking_upstream(&repo);
 
-        let mut flags = Vec::new();
-        if !status.is_clean {
-            flags.push("DIRTY".to_string());
-        }
-        if status.ahead > 0 {
-            flags.push(format!("AHEAD:{}", status.ahead));
-        }
-        if status.behind > 0 {
-            flags.push(format!("BEHIND:{}", status.behind));
-        }
-        if !has_origin {
-            flags.push("NO_ORIGIN".to_string());
-        }
-        if has_origin && !has_upstream {
-            flags.push("NO_UPSTREAM".to_string());
-        }
-        if status.ahead > 0 && has_origin && has_upstream {
-            flags.push("STUCK_PUSH".to_string());
-        }
-        if status.behind > 0 && has_origin && has_upstream {
-            flags.push("STUCK_PULL".to_string());
-        }
-        if flags.is_empty() {
-            flags.push("OK".to_string());
-        }
+        let flags = repo_state_flags(&status, has_origin, has_upstream);
 
         let last_hash = status
             .last_commit_hash
@@ -1497,9 +1495,9 @@ async fn run_repos_report(policy_path: &Path, only_concern: bool) -> Result<()> 
             .unwrap_or_else(|| "-".to_string());
         let last_unix = git_log_unix_timestamp(&repo).await.unwrap_or(0);
 
-        let concern =
-            status.ahead > 0 || status.behind > 0 || !has_origin || (has_origin && !has_upstream);
-        let warn = !concern && !status.is_clean;
+        let concern = repo_is_concern(&status, has_origin, has_upstream);
+        let warn = repo_is_warn(&status, has_origin, has_upstream);
+        let hint = repo_hint(&flags, warn, concern);
 
         rows.push(RepoRow {
             repo,
@@ -1516,6 +1514,7 @@ async fn run_repos_report(policy_path: &Path, only_concern: bool) -> Result<()> 
             last_unix,
             concern,
             warn,
+            hint,
         });
     }
 
@@ -1526,8 +1525,10 @@ async fn run_repos_report(policy_path: &Path, only_concern: bool) -> Result<()> 
     let ok_count_all = rows
         .len()
         .saturating_sub(concern_count_all + warn_count_all);
-    if only_concern {
-        rows.retain(|r| r.concern);
+    match filter {
+        RepoFilter::All => {}
+        RepoFilter::Concern => rows.retain(|r| r.concern),
+        RepoFilter::Warn => rows.retain(|r| r.warn),
     }
 
     let concern_count = rows.iter().filter(|r| r.concern).count();
@@ -1535,12 +1536,22 @@ async fn run_repos_report(policy_path: &Path, only_concern: bool) -> Result<()> 
     let ok_count = rows.len().saturating_sub(concern_count + warn_count);
 
     println!("📜 POLICY: {}", policy_path.display());
-    if only_concern {
-        println!(
-            "📊 FILTER: only concern repos (showing {} of {})",
-            rows.len(),
-            concern_count_all
-        );
+    match filter {
+        RepoFilter::All => {}
+        RepoFilter::Concern => {
+            println!(
+                "📊 FILTER: only concern repos (showing {} of {})",
+                rows.len(),
+                concern_count_all
+            );
+        }
+        RepoFilter::Warn => {
+            println!(
+                "📊 FILTER: only warn repos (showing {} of {})",
+                rows.len(),
+                warn_count_all
+            );
+        }
     }
     println!(
         "📦 REPOS: {}  {} {}  {} {}  {} {}  ❌ {}{}",
@@ -1552,13 +1563,12 @@ async fn run_repos_report(policy_path: &Path, only_concern: bool) -> Result<()> 
         paint("CONCERN", "31"),
         concern_count,
         init_or_status_failures,
-        if only_concern {
-            format!(
+        match filter {
+            RepoFilter::All => String::new(),
+            RepoFilter::Concern | RepoFilter::Warn => format!(
                 "  (all: OK {} WARN {} CONCERN {})",
                 ok_count_all, warn_count_all, concern_count_all
-            )
-        } else {
-            String::new()
+            ),
         }
     );
     println!("🕒 SORT: last modified (newest first)");
@@ -1588,6 +1598,7 @@ async fn run_repos_report(policy_path: &Path, only_concern: bool) -> Result<()> 
             "   last={} by {} {}",
             row.last_hash, row.last_author, row.last_msg
         );
+        println!("   hint={}", row.hint);
         println!();
     }
 
