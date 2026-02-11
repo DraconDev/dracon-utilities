@@ -1425,6 +1425,7 @@ async fn run_daemon(policy_path: PathBuf) -> Result<()> {
     }
 
     let mut activity: HashMap<PathBuf, RepoActivity> = HashMap::new();
+    let mut repair_cooldowns: HashMap<PathBuf, Instant> = HashMap::new();
 
     loop {
         let policy = match SyncPolicy::load(&policy_path) {
@@ -1442,6 +1443,7 @@ async fn run_daemon(policy_path: PathBuf) -> Result<()> {
         let repos = discover_git_repos(&roots, &excluded_dir_names);
         let repo_set: BTreeSet<PathBuf> = repos.iter().cloned().collect();
         activity.retain(|repo, _| repo_set.contains(repo));
+        repair_cooldowns.retain(|repo, _| repo_set.contains(repo));
 
         if let Some(reason) = freeze_reason(&policy_path) {
             println!("⏸️ sync daemon paused ({})", reason);
@@ -1450,6 +1452,13 @@ async fn run_daemon(policy_path: PathBuf) -> Result<()> {
         }
 
         for repo in repos {
+            let now = Instant::now();
+            if let Some(until) = repair_cooldowns.get(&repo).copied() {
+                if now < until {
+                    continue;
+                }
+                repair_cooldowns.remove(&repo);
+            }
             let svc = match GitService::new(&repo) {
                 Ok(svc) => svc,
                 Err(e) => {
@@ -1475,7 +1484,6 @@ async fn run_daemon(policy_path: PathBuf) -> Result<()> {
                 "{}:{}:{}:{}:{}",
                 status.branch, status.modified_files, status.staged_files, status.ahead, status.behind
             );
-            let now = Instant::now();
             let Some(entry) = activity.get_mut(&repo) else {
                 activity.insert(
                     repo.clone(),
@@ -1513,19 +1521,49 @@ async fn run_daemon(policy_path: PathBuf) -> Result<()> {
                 Ok(Err(e)) => eprintln!("⚠️ sync failed for {}: {}", repo.display(), e),
             }
 
+            let mut should_cooldown = false;
             if policy.auto_repair_concerns {
-                if let Err(e) = run_repair_concerns(
+                match run_repair_concerns(
                     &policy_path,
                     true,
                     Some(repo.clone()),
                     Some(policy.push_op_timeout_secs),
                     policy.push_retries,
                     policy.auto_rewrite_large_blobs,
+                    ConcernRepairFilter::All,
+                    false,
                 )
                 .await
                 {
-                    eprintln!("⚠️ auto-repair concerns failed for {}: {}", repo.display(), e);
+                    Ok(summary) => {
+                        if summary.found > 0 && summary.resolved_now == 0 && summary.succeeded == 0 {
+                            should_cooldown = true;
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("⚠️ auto-repair concerns failed for {}: {}", repo.display(), e);
+                        should_cooldown = true;
+                    }
                 }
+            }
+            if policy.auto_repair_warns {
+                match run_repair_warns(&policy_path, true, Some(repo.clone()), false).await {
+                    Ok(summary) => {
+                        if summary.found > 0 && summary.attempted > 0 && summary.succeeded == 0 {
+                            should_cooldown = true;
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("⚠️ auto-repair warns failed for {}: {}", repo.display(), e);
+                        should_cooldown = true;
+                    }
+                }
+            }
+            if should_cooldown {
+                repair_cooldowns.insert(
+                    repo.clone(),
+                    Instant::now() + Duration::from_secs(policy.repair_cooldown_secs.max(1)),
+                );
             }
 
             activity.remove(&repo);
@@ -2886,11 +2924,12 @@ async fn main() -> Result<()> {
                     .unwrap_or_else(|| "OFF".to_string())
             );
             println!(
-                "⚙️ FLAGS: auto_commit={} auto_pull={} auto_push={} auto_repair_concerns={} auto_rewrite_large_blobs={}",
+                "⚙️ FLAGS: auto_commit={} auto_pull={} auto_push={} auto_repair_concerns={} auto_repair_warns={} auto_rewrite_large_blobs={}",
                 policy.auto_commit,
                 policy.auto_pull,
                 policy.auto_push,
                 policy.auto_repair_concerns,
+                policy.auto_repair_warns,
                 policy.auto_rewrite_large_blobs
             );
             println!("📏 MAX_STAGE_FILE_BYTES: {}", policy.max_stage_file_bytes);
@@ -2906,6 +2945,12 @@ async fn main() -> Result<()> {
                 policy.repo_sync_timeout_secs,
                 policy.push_retries
             );
+            println!(
+                "🧯 REPAIR: cooldown={}s ledger_max_lines={} ledger_max_age_days={}",
+                policy.repair_cooldown_secs,
+                policy.incident_ledger_max_lines,
+                policy.incident_ledger_max_age_days
+            );
             if !policy.system_repo.is_empty() {
                 println!("🏛️ SYSTEM_REPO: {}", policy.system_repo);
             }
@@ -2920,6 +2965,7 @@ async fn main() -> Result<()> {
         Command::Repos {
             only_concern,
             only_warn,
+            json,
         } => {
             let filter = if only_concern {
                 RepoFilter::Concern
@@ -2928,7 +2974,7 @@ async fn main() -> Result<()> {
             } else {
                 RepoFilter::All
             };
-            run_repos_report(&policy_path, filter).await?;
+            run_repos_report(&policy_path, filter, json).await?;
         }
         Command::RepairConcerns {
             apply,
@@ -2936,7 +2982,17 @@ async fn main() -> Result<()> {
             push_timeout_secs,
             push_retries,
             rewrite_large_any,
+            only_stuck_push,
+            only_stuck_pull,
+            json,
         } => {
+            let filter = if only_stuck_push {
+                ConcernRepairFilter::StuckPush
+            } else if only_stuck_pull {
+                ConcernRepairFilter::StuckPull
+            } else {
+                ConcernRepairFilter::All
+            };
             run_repair_concerns(
                 &policy_path,
                 apply,
@@ -2944,11 +3000,13 @@ async fn main() -> Result<()> {
                 push_timeout_secs,
                 push_retries,
                 rewrite_large_any,
+                filter,
+                json,
             )
             .await?;
         }
-        Command::RepairWarns { apply, repo } => {
-            run_repair_warns(&policy_path, apply, repo).await?;
+        Command::RepairWarns { apply, repo, json } => {
+            run_repair_warns(&policy_path, apply, repo, json).await?;
         }
         Command::Once => {
             run_once(&policy_path).await?;
