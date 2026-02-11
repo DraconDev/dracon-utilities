@@ -32,6 +32,9 @@ enum Command {
         /// Show only warn repos.
         #[arg(long, conflicts_with = "only_concern")]
         only_warn: bool,
+        /// Emit machine-readable JSON.
+        #[arg(long)]
+        json: bool,
     },
     /// Repair concern repos (dry-run by default; use --apply to execute).
     RepairConcerns {
@@ -50,6 +53,15 @@ enum Command {
         /// Allow rewrite of large blobs even when paths are outside excluded dirs.
         #[arg(long)]
         rewrite_large_any: bool,
+        /// Only repair stuck push concerns.
+        #[arg(long, conflicts_with = "only_stuck_pull")]
+        only_stuck_push: bool,
+        /// Only repair stuck pull concerns.
+        #[arg(long, conflicts_with = "only_stuck_push")]
+        only_stuck_pull: bool,
+        /// Emit machine-readable JSON.
+        #[arg(long)]
+        json: bool,
     },
     /// Repair warn repos (dirty-only triage; dry-run by default).
     RepairWarns {
@@ -59,6 +71,9 @@ enum Command {
         /// Only repair this repository path.
         #[arg(long)]
         repo: Option<PathBuf>,
+        /// Emit machine-readable JSON.
+        #[arg(long)]
+        json: bool,
     },
     /// Run one sync pass.
     Once,
@@ -104,10 +119,20 @@ struct SyncPolicy {
     repo_sync_timeout_secs: u64,
     #[serde(default = "default_true")]
     auto_repair_concerns: bool,
+    #[serde(default = "default_true")]
+    auto_repair_warns: bool,
     #[serde(default)]
     auto_rewrite_large_blobs: bool,
     #[serde(default = "default_push_retries")]
     push_retries: u32,
+    #[serde(default = "default_repair_cooldown_secs")]
+    repair_cooldown_secs: u64,
+    #[serde(default = "default_max_push_blob_bytes")]
+    max_push_blob_bytes: u64,
+    #[serde(default = "default_incident_ledger_max_lines")]
+    incident_ledger_max_lines: usize,
+    #[serde(default = "default_incident_ledger_max_age_days")]
+    incident_ledger_max_age_days: u64,
 }
 
 fn default_true() -> bool {
@@ -158,6 +183,22 @@ fn default_push_retries() -> u32 {
     3
 }
 
+fn default_repair_cooldown_secs() -> u64 {
+    60
+}
+
+fn default_max_push_blob_bytes() -> u64 {
+    DEFAULT_GIT_HOST_BLOB_LIMIT_BYTES
+}
+
+fn default_incident_ledger_max_lines() -> usize {
+    10_000
+}
+
+fn default_incident_ledger_max_age_days() -> u64 {
+    30
+}
+
 const DEFAULT_GIT_HOST_BLOB_LIMIT_BYTES: u64 = 100 * 1024 * 1024;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -165,6 +206,58 @@ enum RepoFilter {
     All,
     Concern,
     Warn,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ConcernRepairFilter {
+    All,
+    StuckPush,
+    StuckPull,
+}
+
+#[derive(Debug, Serialize)]
+struct RepoReportRow {
+    repo: String,
+    state_flags: Vec<String>,
+    branch: String,
+    modified: usize,
+    staged: usize,
+    ahead: usize,
+    behind: usize,
+    last_hash: String,
+    last_author: String,
+    last_when: String,
+    last_msg: String,
+    last_unix: i64,
+    concern: bool,
+    warn: bool,
+    hint: String,
+}
+
+#[derive(Debug, Serialize)]
+struct RepoReportJson {
+    policy: String,
+    filter: String,
+    repos: usize,
+    ok: usize,
+    warn: usize,
+    concern: usize,
+    failures: usize,
+    rows: Vec<RepoReportRow>,
+}
+
+#[derive(Debug, Serialize)]
+struct RepairJson {
+    policy: String,
+    scope: String,
+    mode: String,
+    found: usize,
+    planned: usize,
+    attempted: usize,
+    succeeded: usize,
+    resolved_now: usize,
+    manual_only: usize,
+    ledger: String,
 }
 
 #[derive(Debug, Serialize)]
