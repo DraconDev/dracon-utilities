@@ -23,7 +23,11 @@ struct Cli {
 #[derive(Subcommand, Debug)]
 enum Command {
     /// Show resolved policy path and sync scope.
-    Status,
+    Status {
+        /// Emit machine-readable JSON.
+        #[arg(long)]
+        json: bool,
+    },
     /// One-off report across discovered repositories.
     Repos {
         /// Show only concern repos.
@@ -244,6 +248,36 @@ struct RepoReportJson {
     concern: usize,
     failures: usize,
     rows: Vec<RepoReportRow>,
+}
+
+#[derive(Debug, Serialize)]
+struct StatusJson {
+    policy: String,
+    roots: Vec<String>,
+    repos_discovered: usize,
+    pulse_interval_secs: u64,
+    inactivity_push_delay_secs: u64,
+    freeze: String,
+    auto_commit: bool,
+    auto_pull: bool,
+    auto_push: bool,
+    auto_repair_concerns: bool,
+    auto_repair_warns: bool,
+    auto_rewrite_large_blobs: bool,
+    max_stage_file_bytes: u64,
+    push_blob_threshold_bytes: u64,
+    exclude_dirs: Vec<String>,
+    pull_op_timeout_secs: u64,
+    push_op_timeout_secs: u64,
+    repo_sync_timeout_secs: u64,
+    push_retries: u32,
+    repair_cooldown_secs: u64,
+    incident_ledger_max_lines: usize,
+    incident_ledger_max_age_days: u64,
+    system_repo: String,
+    backup_policy: String,
+    backup_dir: String,
+    extra_remotes: usize,
 }
 
 #[derive(Debug, Serialize)]
