@@ -1,10 +1,6 @@
 use anyhow::{Context, Result};
-use async_trait::async_trait;
 use clap::{Parser, Subcommand};
 use dracon_git::{build_sync_commit_payload, GitService};
-use dracon_persistence_kit::{
-    pulse::PersistencePulse, RepoStatus as PersistenceRepoStatus, RepositorySyncer,
-};
 use dracon_protocols::git::{
     DiffFile as ProtoDiffFile, FileStatus as ProtoFileStatus, RepoStatus as ProtoRepoStatus,
 };
@@ -12,7 +8,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
 use std::process::Command as StdCommand;
-use std::sync::Arc;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use tokio::process::Command as TokioCommand;
 use tokio::time::{sleep, Duration};
@@ -381,54 +376,6 @@ impl SyncPolicy {
             .map(PathBuf::from)
             .filter(|p| p.exists())
             .collect()
-    }
-}
-
-#[derive(Clone, Debug)]
-struct PolicySyncer {
-    policy_path: PathBuf,
-}
-
-#[async_trait]
-impl RepositorySyncer for PolicySyncer {
-    async fn sync(&self) -> Result<()> {
-        run_once(&self.policy_path).await
-    }
-
-    async fn status(&self) -> Result<PersistenceRepoStatus> {
-        let policy = SyncPolicy::load(&self.policy_path)?;
-        let roots = policy.watch_root_paths();
-        let excluded_dir_names = excluded_dir_names_set(&policy);
-        let repos = discover_git_repos(&roots, &excluded_dir_names);
-
-        let mut ahead_total = 0usize;
-        let mut behind_total = 0usize;
-        let mut all_clean = true;
-        let mut branch = String::new();
-
-        for repo in repos {
-            let svc = GitService::new(&repo)?;
-            let status = svc.get_status().await?;
-            ahead_total += status.ahead;
-            behind_total += status.behind;
-            all_clean &= status.is_clean;
-            if branch.is_empty() {
-                branch = status.branch.clone();
-            } else if branch != status.branch {
-                branch = "multi".to_string();
-            }
-        }
-
-        if branch.is_empty() {
-            branch = "none".to_string();
-        }
-
-        Ok(PersistenceRepoStatus {
-            branch,
-            is_clean: all_clean,
-            ahead: ahead_total,
-            behind: behind_total,
-        })
     }
 }
 
@@ -1504,14 +1451,6 @@ async fn run_once(policy_path: &Path) -> Result<()> {
             eprintln!("⚠️ auto-repair warns failed: {}", e);
         }
     }
-    Ok(())
-}
-
-async fn run_pulse_daemon(policy_path: PathBuf) -> Result<()> {
-    let interval_secs = SyncPolicy::load(&policy_path)?.pulse_interval_secs.max(1);
-    let syncer = Arc::new(PolicySyncer { policy_path });
-    let pulse = PersistencePulse::new(syncer, interval_secs);
-    pulse.run().await;
     Ok(())
 }
 
