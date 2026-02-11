@@ -8,7 +8,7 @@ use serde::Deserialize;
 use std::collections::{BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
 use std::process::Command as StdCommand;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use tokio::process::Command as TokioCommand;
 use tokio::time::{sleep, Duration};
 
