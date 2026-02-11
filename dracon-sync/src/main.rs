@@ -1294,16 +1294,19 @@ async fn sync_repo(
     let blob_threshold = push_large_blob_threshold_bytes(policy);
 
     if policy.auto_pull && has_origin && has_upstream {
-        match run_git_with_timeout(
-            repo,
-            &["pull", "--rebase", "--autostash"],
-            policy.pull_op_timeout_secs,
-            "pull/rebase",
+        match tokio::time::timeout(
+            Duration::from_secs(policy.pull_op_timeout_secs),
+            svc.pull_rebase(),
         )
         .await
         {
-            Ok(()) => {}
-            Err(e) => eprintln!("⚠️ pull/rebase skipped for {}: {}", repo.display(), e),
+            Ok(Ok(())) => {}
+            Ok(Err(e)) => eprintln!("⚠️ pull/rebase skipped for {}: {}", repo.display(), e),
+            Err(_) => eprintln!(
+                "⚠️ pull/rebase timeout for {} after {}s",
+                repo.display(),
+                policy.pull_op_timeout_secs
+            ),
         }
     } else if policy.auto_pull && !has_origin {
         eprintln!(
@@ -1501,6 +1504,14 @@ async fn run_once(policy_path: &Path) -> Result<()> {
             eprintln!("⚠️ auto-repair warns failed: {}", e);
         }
     }
+    Ok(())
+}
+
+async fn run_pulse_daemon(policy_path: PathBuf) -> Result<()> {
+    let interval_secs = SyncPolicy::load(&policy_path)?.pulse_interval_secs.max(1);
+    let syncer = Arc::new(PolicySyncer { policy_path });
+    let pulse = PersistencePulse::new(syncer, interval_secs);
+    pulse.run().await;
     Ok(())
 }
 
@@ -3160,10 +3171,19 @@ async fn main() -> Result<()> {
             run_repair_warns(&policy_path, apply, repo, json).await?;
         }
         Command::Once => {
-            run_once(&policy_path).await?;
+            let syncer = PolicySyncer {
+                policy_path: policy_path.clone(),
+            };
+            syncer.sync().await?;
         }
         Command::Daemon => {
-            run_daemon(policy_path).await?;
+            let daemon_mode =
+                std::env::var("DRACON_SYNC_DAEMON_MODE").unwrap_or_else(|_| "activity".to_string());
+            if daemon_mode.eq_ignore_ascii_case("pulse") {
+                run_pulse_daemon(policy_path).await?;
+            } else {
+                run_daemon(policy_path).await?;
+            }
         }
         Command::SyncNow { repo } => {
             if let Some(reason) = freeze_reason(&policy_path) {
