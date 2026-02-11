@@ -1069,6 +1069,20 @@ async fn run_once(policy_path: &Path) -> Result<()> {
     }
 
     println!("✅ sync pass complete (repos changed: {})", changed);
+    if policy.auto_repair_concerns {
+        if let Err(e) = run_repair_concerns(
+            policy_path,
+            true,
+            None,
+            Some(policy.push_op_timeout_secs),
+            policy.push_retries,
+            policy.auto_rewrite_large_blobs,
+        )
+        .await
+        {
+            eprintln!("⚠️ auto-repair concerns failed: {}", e);
+        }
+    }
     Ok(())
 }
 
@@ -1761,6 +1775,9 @@ mod tests {
             pull_op_timeout_secs: 10,
             push_op_timeout_secs: 10,
             repo_sync_timeout_secs: 40,
+            auto_repair_concerns: true,
+            auto_rewrite_large_blobs: false,
+            push_retries: 2,
         }
     }
 
@@ -1922,16 +1939,21 @@ async fn main() -> Result<()> {
                     .unwrap_or_else(|| "OFF".to_string())
             );
             println!(
-                "⚙️ FLAGS: auto_commit={} auto_pull={} auto_push={}",
-                policy.auto_commit, policy.auto_pull, policy.auto_push
+                "⚙️ FLAGS: auto_commit={} auto_pull={} auto_push={} auto_repair_concerns={} auto_rewrite_large_blobs={}",
+                policy.auto_commit,
+                policy.auto_pull,
+                policy.auto_push,
+                policy.auto_repair_concerns,
+                policy.auto_rewrite_large_blobs
             );
             println!("📏 MAX_STAGE_FILE_BYTES: {}", policy.max_stage_file_bytes);
             println!("🚫 EXCLUDE_DIRS: {:?}", policy.exclude_dir_names);
             println!(
-                "⏱️ TIMEOUTS: pull={}s push={}s repo={}s",
+                "⏱️ TIMEOUTS: pull={}s push={}s repo={}s retries={}",
                 policy.pull_op_timeout_secs,
                 policy.push_op_timeout_secs,
-                policy.repo_sync_timeout_secs
+                policy.repo_sync_timeout_secs,
+                policy.push_retries
             );
             if !policy.system_repo.is_empty() {
                 println!("🏛️ SYSTEM_REPO: {}", policy.system_repo);
