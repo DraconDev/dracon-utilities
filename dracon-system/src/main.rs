@@ -948,6 +948,7 @@ mod tests {
                     target: "/tmp/does-not-exist-target".into(),
                 }],
             },
+            guard: GuardPolicy::default(),
         };
         let report = build_link_report(&policy);
         assert_eq!(report.total, 1);
