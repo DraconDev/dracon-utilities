@@ -1682,7 +1682,7 @@ async fn run_repos_report(policy_path: &Path, filter: RepoFilter, json: bool) ->
         let warn = repo_is_warn(&status, has_origin, has_upstream);
         let hint = repo_hint(&flags, warn, concern);
 
-        rows.push(RepoRow {
+        rows.push(RepoReportRow {
             repo: repo.display().to_string(),
             state_flags: flags,
             branch: status.branch,
@@ -2889,7 +2889,7 @@ mod tests {
         let policy = td.path().join("dracon-sync.toml");
         std::fs::write(&policy, "watch_roots=[]").expect("policy");
         let record = IncidentRecord {
-            ts_unix: 1,
+            ts_unix: timestamp_secs(),
             scope: "concern".to_string(),
             repo: "/tmp/repo".to_string(),
             reason: "AHEAD:1".to_string(),
