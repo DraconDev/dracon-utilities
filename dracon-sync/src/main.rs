@@ -934,6 +934,14 @@ async fn sync_repo(
             repo.display()
         );
     }
+    let unstaged_oversized = unstage_oversized_paths(repo, policy.max_stage_file_bytes).await?;
+    if unstaged_oversized > 0 {
+        eprintln!(
+            "🧹 removed {} oversized staged paths in {}",
+            unstaged_oversized,
+            repo.display()
+        );
+    }
 
     let mut status = svc.get_status().await?;
     let mut entries = svc.get_diff_entries().await?;
