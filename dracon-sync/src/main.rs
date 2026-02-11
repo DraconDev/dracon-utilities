@@ -64,6 +64,8 @@ struct SyncPolicy {
     system_repo: String,
     #[serde(default = "default_pulse_interval")]
     pulse_interval_secs: u64,
+    #[serde(default = "default_inactivity_push_delay_secs")]
+    inactivity_push_delay_secs: u64,
     #[serde(default = "default_true")]
     auto_commit: bool,
     #[serde(default = "default_true")]
@@ -102,6 +104,10 @@ fn default_true() -> bool {
 
 fn default_pulse_interval() -> u64 {
     300
+}
+
+fn default_inactivity_push_delay_secs() -> u64 {
+    3
 }
 
 fn default_exclude_dir_names() -> Vec<String> {
@@ -163,6 +169,9 @@ impl SyncPolicy {
         }
         if policy.push_retries == 0 {
             policy.push_retries = default_push_retries();
+        }
+        if policy.inactivity_push_delay_secs == 0 {
+            policy.inactivity_push_delay_secs = default_inactivity_push_delay_secs();
         }
         policy.pull_op_timeout_secs = policy.pull_op_timeout_secs.max(5);
         policy.push_op_timeout_secs = policy.push_op_timeout_secs.max(10);
@@ -1087,18 +1096,120 @@ async fn run_once(policy_path: &Path) -> Result<()> {
 }
 
 async fn run_daemon(policy_path: PathBuf) -> Result<()> {
+    #[derive(Debug, Clone)]
+    struct RepoActivity {
+        fingerprint: String,
+        changed_at: Instant,
+    }
+
+    let mut activity: HashMap<PathBuf, RepoActivity> = HashMap::new();
+
     loop {
-        let interval = SyncPolicy::load(&policy_path)
-            .map(|p| p.pulse_interval_secs.max(1))
-            .unwrap_or(300);
+        let policy = match SyncPolicy::load(&policy_path) {
+            Ok(p) => p,
+            Err(e) => {
+                eprintln!("⚠️ failed loading policy: {}", e);
+                sleep(Duration::from_secs(2)).await;
+                continue;
+            }
+        };
+        let scan_interval = policy.pulse_interval_secs.max(1);
+        let inactivity_delay = Duration::from_secs(policy.inactivity_push_delay_secs.max(1));
+        let roots = policy.watch_root_paths();
+        let excluded_dir_names = excluded_dir_names_set(&policy);
+        let repos = discover_git_repos(&roots, &excluded_dir_names);
+        let repo_set: BTreeSet<PathBuf> = repos.iter().cloned().collect();
+        activity.retain(|repo, _| repo_set.contains(repo));
 
         if let Some(reason) = freeze_reason(&policy_path) {
             println!("⏸️ sync daemon paused ({})", reason);
-        } else if let Err(e) = run_once(&policy_path).await {
-            eprintln!("⚠️ sync pass failed: {}", e);
+            sleep(Duration::from_secs(scan_interval)).await;
+            continue;
         }
 
-        sleep(Duration::from_secs(interval)).await;
+        for repo in repos {
+            let svc = match GitService::new(&repo) {
+                Ok(svc) => svc,
+                Err(e) => {
+                    eprintln!("⚠️ {} init_failed: {}", repo.display(), e);
+                    continue;
+                }
+            };
+            let status = match svc.get_status().await {
+                Ok(status) => status,
+                Err(e) => {
+                    eprintln!("⚠️ {} status_failed: {}", repo.display(), e);
+                    continue;
+                }
+            };
+            let has_local_or_pending_work =
+                !status.is_clean || status.ahead > 0 || status.behind > 0;
+            if !has_local_or_pending_work {
+                activity.remove(&repo);
+                continue;
+            }
+
+            let fingerprint = format!(
+                "{}:{}:{}:{}:{}",
+                status.branch, status.modified_files, status.staged_files, status.ahead, status.behind
+            );
+            let now = Instant::now();
+            let Some(entry) = activity.get_mut(&repo) else {
+                activity.insert(
+                    repo.clone(),
+                    RepoActivity {
+                        fingerprint,
+                        changed_at: now,
+                    },
+                );
+                continue;
+            };
+            if entry.fingerprint != fingerprint {
+                entry.fingerprint = fingerprint;
+                entry.changed_at = now;
+                continue;
+            }
+            if now.duration_since(entry.changed_at) < inactivity_delay {
+                continue;
+            }
+
+            match tokio::time::timeout(
+                Duration::from_secs(policy.repo_sync_timeout_secs),
+                sync_repo(&repo, &policy, &excluded_dir_names),
+            )
+            .await
+            {
+                Err(_) => {
+                    eprintln!(
+                        "⚠️ repo sync timeout for {} after {}s",
+                        repo.display(),
+                        policy.repo_sync_timeout_secs
+                    );
+                }
+                Ok(Ok(true)) => println!("🔁 synced {}", repo.display()),
+                Ok(Ok(false)) => {}
+                Ok(Err(e)) => eprintln!("⚠️ sync failed for {}: {}", repo.display(), e),
+            }
+
+            if policy.auto_repair_concerns {
+                if let Err(e) = run_repair_concerns(
+                    &policy_path,
+                    true,
+                    Some(repo.clone()),
+                    Some(policy.push_op_timeout_secs),
+                    policy.push_retries,
+                    policy.auto_rewrite_large_blobs,
+                )
+                .await
+                {
+                    eprintln!("⚠️ auto-repair concerns failed for {}: {}", repo.display(), e);
+                }
+            }
+
+            activity.remove(&repo);
+        }
+
+        sleep(Duration::from_secs(scan_interval)).await;
     }
 }
 
