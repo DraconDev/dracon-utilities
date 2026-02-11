@@ -1852,6 +1852,15 @@ async fn run_repair_concerns(
     filter: ConcernRepairFilter,
     json: bool,
 ) -> Result<RepairSummary> {
+    let human = !json;
+    macro_rules! out {
+        ($($arg:tt)*) => {{
+            if human {
+                println!($($arg)*);
+            }
+        }};
+    }
+
     let policy = SyncPolicy::load(policy_path)?;
     let roots = policy.watch_root_paths();
     let excluded_dir_names = excluded_dir_names_set(&policy);
@@ -1859,7 +1868,7 @@ async fn run_repair_concerns(
     if let Some(target_repo) = only_repo {
         repos.retain(|r| r == &target_repo);
         if repos.is_empty() {
-            println!(
+            out!(
                 "⚠️ target repo not discovered in policy roots: {}",
                 target_repo.display()
             );
@@ -1878,8 +1887,8 @@ async fn run_repair_concerns(
     let mut manual_only = 0usize;
     let mut resolved = 0usize;
 
-    println!("📜 POLICY: {}", policy_path.display());
-    println!(
+    out!("📜 POLICY: {}", policy_path.display());
+    out!(
         "🛠️ MODE: {}",
         if apply {
             "APPLY (mutating)"
@@ -1887,7 +1896,7 @@ async fn run_repair_concerns(
             "DRY-RUN (no changes)"
         }
     );
-    println!(
+    out!(
         "⚙️ PUSH: timeout={}s retries={}",
         push_timeout_secs, push_retries
     );
@@ -1926,7 +1935,7 @@ async fn run_repair_concerns(
         let flags = repo_state_flags(&status, has_origin, has_upstream);
         let reason = flags.join(",");
 
-        println!(
+        out!(
             "\n🔎 {}  state: ahead={} behind={} clean={} origin={} upstream={}",
             repo.display(),
             status.ahead,
@@ -1938,7 +1947,7 @@ async fn run_repair_concerns(
 
         if !has_origin {
             manual_only += 1;
-            println!("   manual: NO_ORIGIN (configure remote before sync can repair)");
+            out!("   manual: NO_ORIGIN (configure remote before sync can repair)");
             append_incident_record(
                 policy_path,
                 &IncidentRecord {
@@ -1957,7 +1966,7 @@ async fn run_repair_concerns(
 
         if !has_upstream {
             attempted_ops += 1;
-            println!("   plan: set upstream via `git push -u origin HEAD`");
+            out!("   plan: set upstream via `git push -u origin HEAD`");
             if apply {
                 match run_git_with_timeout(
                     &repo,
@@ -1970,7 +1979,7 @@ async fn run_repair_concerns(
                     Ok(()) => {
                         succeeded_ops += 1;
                         has_upstream = true;
-                        println!("   ok: upstream configured");
+                        out!("   ok: upstream configured");
                         append_incident_record(
                             policy_path,
                             &IncidentRecord {
@@ -1986,7 +1995,7 @@ async fn run_repair_concerns(
                         );
                     }
                     Err(e) => {
-                        println!("   fail: upstream configure failed: {}", e);
+                        out!("   fail: upstream configure failed: {}", e);
                         append_incident_record(
                             policy_path,
                             &IncidentRecord {
@@ -2008,7 +2017,7 @@ async fn run_repair_concerns(
 
         if status.behind > 0 && has_upstream {
             attempted_ops += 1;
-            println!("   plan: pull --rebase --autostash");
+            out!("   plan: pull --rebase --autostash");
             if apply {
                 match run_git_with_timeout(
                     &repo,
@@ -2020,7 +2029,7 @@ async fn run_repair_concerns(
                 {
                     Ok(()) => {
                         succeeded_ops += 1;
-                        println!("   ok: pulled");
+                        out!("   ok: pulled");
                         append_incident_record(
                             policy_path,
                             &IncidentRecord {
@@ -2036,7 +2045,7 @@ async fn run_repair_concerns(
                         );
                     }
                     Err(e) => {
-                        println!("   fail: pull failed: {}", e);
+                        out!("   fail: pull failed: {}", e);
                         append_incident_record(
                             policy_path,
                             &IncidentRecord {
@@ -2057,14 +2066,14 @@ async fn run_repair_concerns(
 
         if status.ahead > 0 && has_upstream {
             attempted_ops += 1;
-            println!("   plan: push origin HEAD");
+            out!("   plan: push origin HEAD");
             if apply {
                 let mut push_ok = false;
                 match push_with_retries(&repo, push_timeout_secs, push_retries, "push").await {
                     Ok(()) => {
                         succeeded_ops += 1;
                         push_ok = true;
-                        println!("   ok: pushed");
+                        out!("   ok: pushed");
                         append_incident_record(
                             policy_path,
                             &IncidentRecord {
@@ -2080,12 +2089,12 @@ async fn run_repair_concerns(
                         );
                     }
                     Err(e) => {
-                        println!("   fail: push failed: {}", e);
+                        out!("   fail: push failed: {}", e);
 
                         let large = detect_large_blobs_ahead(&repo, blob_threshold)
                             .unwrap_or_default();
                         if !large.is_empty() {
-                            println!(
+                            out!(
                                 "   detect: large blobs in ahead range ({} entries)",
                                 large.len()
                             );
@@ -2111,7 +2120,7 @@ async fn run_repair_concerns(
                             };
 
                             if rewrite_paths.is_empty() {
-                                println!("   manual: large blobs found but not in excluded dirs");
+                                out!("   manual: large blobs found but not in excluded dirs");
                                 append_incident_record(
                                     policy_path,
                                     &IncidentRecord {
@@ -2130,7 +2139,7 @@ async fn run_repair_concerns(
                                     },
                                 );
                             } else {
-                                println!(
+                                out!(
                                     "   plan: rewrite ahead history removing paths {:?}",
                                     rewrite_paths
                                 );
@@ -2141,7 +2150,7 @@ async fn run_repair_concerns(
                                 ) {
                                     Ok(Some(backup_branch)) => {
                                         let backup_branch_for_log = backup_branch.clone();
-                                        println!(
+                                        out!(
                                             "   ok: rewrite complete (backup branch: {})",
                                             backup_branch
                                         );
@@ -2156,7 +2165,7 @@ async fn run_repair_concerns(
                                             Ok(()) => {
                                                 succeeded_ops += 1;
                                                 push_ok = true;
-                                                println!("   ok: pushed after rewrite");
+                                                out!("   ok: pushed after rewrite");
                                                 append_incident_record(
                                                     policy_path,
                                                     &IncidentRecord {
@@ -2175,7 +2184,7 @@ async fn run_repair_concerns(
                                                 );
                                             }
                                             Err(e2) => {
-                                                println!(
+                                                out!(
                                                     "   fail: push after rewrite failed: {}",
                                                     e2
                                                 );
@@ -2197,7 +2206,7 @@ async fn run_repair_concerns(
                                     }
                                     Ok(None) => {}
                                     Err(rewrite_err) => {
-                                        println!("   fail: rewrite failed: {}", rewrite_err);
+                                        out!("   fail: rewrite failed: {}", rewrite_err);
                                         append_incident_record(
                                             policy_path,
                                             &IncidentRecord {
@@ -2229,13 +2238,13 @@ async fn run_repair_concerns(
                                 && remote_branch_exists(&repo, &branch)
                                 && has_tracking_upstream(&repo)
                             {
-                                println!(
+                                out!(
                                     "   plan: align upstream to origin/{} (possible branch mismatch)",
                                     branch
                                 );
                                 match set_upstream_to_branch(&repo, &branch) {
                                     Ok(()) => {
-                                        println!("   ok: upstream realigned");
+                                        out!("   ok: upstream realigned");
                                         match push_with_retries(
                                             &repo,
                                             push_timeout_secs,
@@ -2247,7 +2256,7 @@ async fn run_repair_concerns(
                                             Ok(()) => {
                                                 succeeded_ops += 1;
                                                 push_ok = true;
-                                                println!("   ok: pushed after upstream align");
+                                                out!("   ok: pushed after upstream align");
                                                 append_incident_record(
                                                     policy_path,
                                                     &IncidentRecord {
@@ -2266,7 +2275,7 @@ async fn run_repair_concerns(
                                                 );
                                             }
                                             Err(e2) => {
-                                                println!(
+                                                out!(
                                                     "   fail: push after upstream align failed: {}",
                                                     e2
                                                 );
@@ -2287,7 +2296,7 @@ async fn run_repair_concerns(
                                         }
                                     }
                                     Err(set_err) => {
-                                        println!("   fail: upstream align failed: {}", set_err)
+                                        out!("   fail: upstream align failed: {}", set_err)
                                     }
                                 }
                             }
@@ -2314,13 +2323,13 @@ async fn run_repair_concerns(
                     if next_after_push.ahead > 0 {
                         let branch = current_branch(&repo).unwrap_or_default();
                         if !branch.is_empty() && remote_branch_exists(&repo, &branch) {
-                            println!(
+                            out!(
                                 "   plan: realign upstream to origin/{} (ahead still > 0 after push)",
                                 branch
                             );
                             match set_upstream_to_branch(&repo, &branch) {
-                                Ok(()) => println!("   ok: upstream realigned"),
-                                Err(e) => println!("   fail: upstream realign failed: {}", e),
+                                Ok(()) => out!("   ok: upstream realigned"),
+                                Err(e) => out!("   fail: upstream realign failed: {}", e),
                             }
                         }
                     }
@@ -2337,7 +2346,7 @@ async fn run_repair_concerns(
                     || (has_origin_remote(&repo) && !has_tracking_upstream(&repo));
                 if !still_concern {
                     resolved += 1;
-                    println!("   resolved: concern cleared");
+                    out!("   resolved: concern cleared");
                     append_incident_record(
                         policy_path,
                         &IncidentRecord {
@@ -2352,7 +2361,7 @@ async fn run_repair_concerns(
                         },
                     );
                 } else {
-                    println!(
+                    out!(
                         "   remaining: ahead={} behind={} origin={} upstream={}",
                         next.ahead,
                         next.behind,
