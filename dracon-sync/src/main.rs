@@ -103,11 +103,11 @@ fn default_true() -> bool {
 }
 
 fn default_pulse_interval() -> u64 {
-    300
+    1
 }
 
 fn default_inactivity_push_delay_secs() -> u64 {
-    3
+    5
 }
 
 fn default_exclude_dir_names() -> Vec<String> {
@@ -1896,8 +1896,8 @@ mod tests {
     #[test]
     fn defaults_are_stable() {
         assert!(default_true());
-        assert_eq!(default_pulse_interval(), 300);
-        assert_eq!(default_inactivity_push_delay_secs(), 3);
+        assert_eq!(default_pulse_interval(), 1);
+        assert_eq!(default_inactivity_push_delay_secs(), 5);
         assert!(default_exclude_dir_names().contains(&"target".to_string()));
         assert_eq!(default_max_stage_file_bytes(), 100 * 1024 * 1024);
         assert_eq!(default_pull_op_timeout_secs(), 30);
