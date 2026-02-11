@@ -88,6 +88,12 @@ struct SyncPolicy {
     push_op_timeout_secs: u64,
     #[serde(default = "default_repo_sync_timeout_secs")]
     repo_sync_timeout_secs: u64,
+    #[serde(default = "default_true")]
+    auto_repair_concerns: bool,
+    #[serde(default)]
+    auto_rewrite_large_blobs: bool,
+    #[serde(default = "default_push_retries")]
+    push_retries: u32,
 }
 
 fn default_true() -> bool {
@@ -130,6 +136,10 @@ fn default_repo_sync_timeout_secs() -> u64 {
     420
 }
 
+fn default_push_retries() -> u32 {
+    3
+}
+
 impl SyncPolicy {
     fn load(path: &Path) -> Result<Self> {
         let content = std::fs::read_to_string(path)
@@ -150,6 +160,9 @@ impl SyncPolicy {
         }
         if policy.repo_sync_timeout_secs == 0 {
             policy.repo_sync_timeout_secs = default_repo_sync_timeout_secs();
+        }
+        if policy.push_retries == 0 {
+            policy.push_retries = default_push_retries();
         }
         policy.pull_op_timeout_secs = policy.pull_op_timeout_secs.max(5);
         policy.push_op_timeout_secs = policy.push_op_timeout_secs.max(10);
@@ -693,6 +706,43 @@ async fn unstage_excluded_paths(
             })?;
         if status.success() {
             removed += 1;
+        }
+    }
+    Ok(removed)
+}
+
+async fn unstage_oversized_paths(repo: &Path, max_stage_file_bytes: u64) -> Result<usize> {
+    let staged = staged_paths(repo).await?;
+    let mut removed = 0usize;
+    for path in staged {
+        let full = repo.join(&path);
+        let meta = match std::fs::metadata(&full) {
+            Ok(m) => m,
+            Err(_) => continue,
+        };
+        if !meta.is_file() || meta.len() <= max_stage_file_bytes {
+            continue;
+        }
+        let status = TokioCommand::new("git")
+            .args(["reset", "-q", "HEAD", "--"])
+            .arg(&path)
+            .current_dir(repo)
+            .status()
+            .await
+            .with_context(|| {
+                format!(
+                    "failed to unstage oversized path {} in {}",
+                    path.display(),
+                    repo.display()
+                )
+            })?;
+        if status.success() {
+            removed += 1;
+            eprintln!(
+                "🧹 removed oversized staged path {} ({} bytes)",
+                full.display(),
+                meta.len()
+            );
         }
     }
     Ok(removed)
