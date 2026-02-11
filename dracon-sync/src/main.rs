@@ -1401,10 +1401,17 @@ async fn run_once(policy_path: &Path) -> Result<()> {
             Some(policy.push_op_timeout_secs),
             policy.push_retries,
             policy.auto_rewrite_large_blobs,
+            ConcernRepairFilter::All,
+            false,
         )
         .await
         {
             eprintln!("⚠️ auto-repair concerns failed: {}", e);
+        }
+    }
+    if policy.auto_repair_warns {
+        if let Err(e) = run_repair_warns(policy_path, true, None, false).await {
+            eprintln!("⚠️ auto-repair warns failed: {}", e);
         }
     }
     Ok(())
@@ -2340,7 +2347,12 @@ async fn run_repair_concerns(
     Ok(summary)
 }
 
-async fn run_repair_warns(policy_path: &Path, apply: bool, only_repo: Option<PathBuf>) -> Result<()> {
+async fn run_repair_warns(
+    policy_path: &Path,
+    apply: bool,
+    only_repo: Option<PathBuf>,
+    json: bool,
+) -> Result<RepairSummary> {
     let policy = SyncPolicy::load(policy_path)?;
     let roots = policy.watch_root_paths();
     let excluded_dir_names = excluded_dir_names_set(&policy);
@@ -2352,7 +2364,7 @@ async fn run_repair_warns(policy_path: &Path, apply: bool, only_repo: Option<Pat
                 "⚠️ target repo not discovered in policy roots: {}",
                 target_repo.display()
             );
-            return Ok(());
+            return Ok(RepairSummary::default());
         }
     }
 
@@ -2483,16 +2495,40 @@ async fn run_repair_warns(policy_path: &Path, apply: bool, only_repo: Option<Pat
         }
     }
 
-    println!("\n✅ warn management summary");
-    println!("   warns_found: {}", warns);
-    println!("   operations_planned: {}", warns);
-    println!("   operations_attempted: {}", attempted);
-    println!("   operations_succeeded: {}", succeeded);
-    if !apply {
-        println!("   dry_run: true (rerun with --apply to execute)");
+    let summary = RepairSummary {
+        found: warns,
+        planned: warns,
+        attempted,
+        succeeded,
+        resolved_now: 0,
+        manual_only: 0,
+    };
+    if json {
+        let payload = RepairJson {
+            policy: policy_path.display().to_string(),
+            scope: "warn".to_string(),
+            mode: if apply { "apply".to_string() } else { "dry_run".to_string() },
+            found: summary.found,
+            planned: summary.planned,
+            attempted: summary.attempted,
+            succeeded: summary.succeeded,
+            resolved_now: summary.resolved_now,
+            manual_only: summary.manual_only,
+            ledger: incident_ledger_path(policy_path).display().to_string(),
+        };
+        println!("{}", serde_json::to_string_pretty(&payload)?);
+    } else {
+        println!("\n✅ warn management summary");
+        println!("   warns_found: {}", summary.found);
+        println!("   operations_planned: {}", summary.planned);
+        println!("   operations_attempted: {}", summary.attempted);
+        println!("   operations_succeeded: {}", summary.succeeded);
+        if !apply {
+            println!("   dry_run: true (rerun with --apply to execute)");
+        }
+        println!("   ledger: {}", incident_ledger_path(policy_path).display());
     }
-    println!("   ledger: {}", incident_ledger_path(policy_path).display());
-    Ok(())
+    Ok(summary)
 }
 
 fn open_policy_in_editor(policy_path: &Path) -> Result<()> {
