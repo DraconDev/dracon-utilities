@@ -256,6 +256,66 @@ fn default_kinds() -> String {
     "rust-build,node-deps,build-output,cache".to_string()
 }
 
+fn default_true() -> bool {
+    true
+}
+
+fn default_guard_enabled() -> bool {
+    true
+}
+
+fn default_guard_interval_secs() -> u64 {
+    30
+}
+
+fn default_disk_warn_percent() -> u8 {
+    85
+}
+
+fn default_disk_action_percent() -> u8 {
+    92
+}
+
+fn default_disk_critical_percent() -> u8 {
+    97
+}
+
+fn default_sync_freeze_marker() -> String {
+    "/home/dracon/dracon/utilities/sync/.freeze".to_string()
+}
+
+fn default_unfreeze_below_percent() -> u8 {
+    88
+}
+
+fn default_process_cpu_percent() -> f32 {
+    180.0
+}
+
+fn default_process_rss_mb() -> u64 {
+    4096
+}
+
+fn default_process_sustain_secs() -> u64 {
+    30
+}
+
+fn default_process_exempt_names() -> String {
+    "systemd,dbus-daemon,Xorg,kwin_wayland,plasmashell".to_string()
+}
+
+fn default_notify_command() -> String {
+    "notify-send".to_string()
+}
+
+fn default_notify_cooldown_secs() -> u64 {
+    120
+}
+
+fn default_renice_value() -> i32 {
+    10
+}
+
 fn human_bytes(bytes: u64) -> String {
     const UNITS: [&str; 5] = ["B", "KiB", "MiB", "GiB", "TiB"];
     let mut value = bytes as f64;
@@ -291,6 +351,220 @@ fn parse_kinds(csv: &str) -> HashSet<String> {
         .filter(|s| !s.is_empty())
         .map(|s| s.to_string())
         .collect()
+}
+
+fn parse_names(csv: &str) -> HashSet<String> {
+    csv.split(',')
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+        .collect()
+}
+
+#[derive(Debug, Clone)]
+struct ProcSample {
+    pid: i32,
+    cpu_percent: f32,
+    rss_mb: u64,
+    command: String,
+}
+
+#[derive(Debug, Default)]
+struct GuardRuntimeState {
+    heavy_since: HashMap<i32, Instant>,
+    notify_cooldowns: HashMap<String, Instant>,
+    last_disk_state: String,
+}
+
+fn parse_df_use_percent(output: &str) -> Option<u8> {
+    output
+        .lines()
+        .nth(1)
+        .and_then(|line| line.split_whitespace().nth(4))
+        .and_then(|v| v.trim_end_matches('%').parse::<u8>().ok())
+}
+
+fn parse_ps_output(output: &str) -> Vec<ProcSample> {
+    output
+        .lines()
+        .filter_map(|line| {
+            let mut parts = line.split_whitespace();
+            let pid = parts.next()?.parse::<i32>().ok()?;
+            let cpu_percent = parts.next()?.parse::<f32>().ok()?;
+            let rss_kb = parts.next()?.parse::<u64>().ok()?;
+            let command = parts.next()?.to_string();
+            Some(ProcSample {
+                pid,
+                cpu_percent,
+                rss_mb: rss_kb / 1024,
+                command,
+            })
+        })
+        .collect()
+}
+
+async fn root_disk_use_percent() -> Result<u8> {
+    let out = Command::new("df").args(["-P", "/"]).output().await?;
+    if !out.status.success() {
+        return Err(anyhow::anyhow!("df command failed"));
+    }
+    let text = String::from_utf8_lossy(&out.stdout);
+    parse_df_use_percent(&text).ok_or_else(|| anyhow::anyhow!("failed parsing df output"))
+}
+
+async fn process_samples() -> Result<Vec<ProcSample>> {
+    let out = Command::new("ps")
+        .args(["-eo", "pid=,pcpu=,rss=,comm="])
+        .output()
+        .await?;
+    if !out.status.success() {
+        return Err(anyhow::anyhow!("ps command failed"));
+    }
+    Ok(parse_ps_output(&String::from_utf8_lossy(&out.stdout)))
+}
+
+fn disk_state(used: u8, guard: &GuardPolicy) -> &'static str {
+    if used >= guard.disk_critical_percent {
+        "critical"
+    } else if used >= guard.disk_action_percent {
+        "action"
+    } else if used >= guard.disk_warn_percent {
+        "warn"
+    } else {
+        "ok"
+    }
+}
+
+async fn send_notification(guard: &GuardPolicy, title: &str, body: &str) {
+    if !guard.notify || guard.notify_command.trim().is_empty() {
+        return;
+    }
+    let _ = Command::new(guard.notify_command.trim())
+        .arg(title)
+        .arg(body)
+        .output()
+        .await;
+}
+
+fn should_notify(state: &mut GuardRuntimeState, key: &str, cooldown_secs: u64) -> bool {
+    let now = Instant::now();
+    if let Some(until) = state.notify_cooldowns.get(key).copied() {
+        if now < until {
+            return false;
+        }
+    }
+    state.notify_cooldowns.insert(
+        key.to_string(),
+        now + Duration::from_secs(cooldown_secs.max(1)),
+    );
+    true
+}
+
+fn sync_freeze_marker_path(guard: &GuardPolicy) -> PathBuf {
+    PathBuf::from(guard.sync_freeze_marker.clone())
+}
+
+async fn renice_process(pid: i32, value: i32) {
+    let _ = Command::new("renice")
+        .args(["-n", &value.to_string(), "-p", &pid.to_string()])
+        .output()
+        .await;
+}
+
+async fn run_guard_once(
+    guard: &GuardPolicy,
+    state: &mut GuardRuntimeState,
+) -> Result<GuardReport> {
+    let used = root_disk_use_percent().await?;
+    let dstate = disk_state(used, guard).to_string();
+    let marker = sync_freeze_marker_path(guard);
+    let mut sync_frozen = marker.exists();
+
+    if guard.freeze_sync_at_action && (dstate == "action" || dstate == "critical") {
+        if !sync_frozen {
+            if let Some(parent) = marker.parent() {
+                let _ = fs::create_dir_all(parent);
+            }
+            let _ = fs::write(&marker, format!("dracon-system guard freeze: disk={}%\n", used));
+            sync_frozen = true;
+        }
+    } else if sync_frozen && used <= guard.unfreeze_below_percent {
+        let _ = fs::remove_file(&marker);
+        sync_frozen = false;
+    }
+
+    if state.last_disk_state != dstate {
+        let key = format!("disk-state-{dstate}");
+        if should_notify(state, &key, guard.notify_cooldown_secs) {
+            send_notification(
+                guard,
+                "Dracon System Guard",
+                &format!("Disk pressure state changed to {} (used={}%)", dstate, used),
+            )
+            .await;
+        }
+        state.last_disk_state = dstate.clone();
+    }
+
+    let exempt = parse_names(&guard.process_exempt_names);
+    let samples = process_samples().await?;
+    let mut current_heavy = HashSet::new();
+    let mut alerts = Vec::new();
+
+    for p in samples {
+        if exempt.contains(&p.command) {
+            continue;
+        }
+        let heavy = p.cpu_percent >= guard.process_cpu_percent || p.rss_mb >= guard.process_rss_mb;
+        if !heavy {
+            continue;
+        }
+        current_heavy.insert(p.pid);
+        let now = Instant::now();
+        let since = state.heavy_since.entry(p.pid).or_insert(now);
+        let sustained = now.duration_since(*since).as_secs();
+        if sustained < guard.process_sustain_secs {
+            continue;
+        }
+
+        let mut action = "notify".to_string();
+        if guard.auto_renice {
+            renice_process(p.pid, guard.renice_value).await;
+            action = format!("renice:{}", guard.renice_value);
+        }
+
+        let key = format!("proc-{}", p.pid);
+        if should_notify(state, &key, guard.notify_cooldown_secs) {
+            send_notification(
+                guard,
+                "Dracon System Guard",
+                &format!(
+                    "Heavy process {} (pid={} cpu={:.1}% rss={}MiB) sustained {}s",
+                    p.command, p.pid, p.cpu_percent, p.rss_mb, sustained
+                ),
+            )
+            .await;
+        }
+
+        alerts.push(GuardProcessAlert {
+            pid: p.pid,
+            command: p.command,
+            cpu_percent: p.cpu_percent,
+            rss_mb: p.rss_mb,
+            sustained_secs: sustained,
+            action,
+        });
+    }
+
+    state.heavy_since.retain(|pid, _| current_heavy.contains(pid));
+
+    Ok(GuardReport {
+        enabled: guard.enabled,
+        disk_use_percent: used,
+        disk_state: dstate,
+        sync_frozen,
+        alerts,
+    })
 }
 
 #[derive(Debug, Serialize)]
@@ -519,6 +793,32 @@ async fn build_status_report() -> StatusReport {
             .unwrap_or_else(|| "<default>".to_string()),
         sync_service_active: is_user_service_active("dracon-sync.service").await,
         warden_service_active: is_user_service_active("dracon-warden.service").await,
+    }
+}
+
+fn normalize_guard_policy(policy: &mut GuardPolicy) {
+    policy.interval_secs = policy.interval_secs.max(5);
+    policy.disk_warn_percent = policy.disk_warn_percent.max(1).min(100);
+    policy.disk_action_percent = policy
+        .disk_action_percent
+        .max(policy.disk_warn_percent)
+        .min(100);
+    policy.disk_critical_percent = policy
+        .disk_critical_percent
+        .max(policy.disk_action_percent)
+        .min(100);
+    policy.unfreeze_below_percent = policy
+        .unfreeze_below_percent
+        .min(policy.disk_action_percent.saturating_sub(1));
+    policy.process_cpu_percent = policy.process_cpu_percent.max(1.0);
+    policy.process_rss_mb = policy.process_rss_mb.max(64);
+    policy.process_sustain_secs = policy.process_sustain_secs.max(5);
+    policy.notify_cooldown_secs = policy.notify_cooldown_secs.max(5);
+    if policy.sync_freeze_marker.trim().is_empty() {
+        policy.sync_freeze_marker = default_sync_freeze_marker();
+    }
+    if policy.notify_command.trim().is_empty() {
+        policy.notify_command = default_notify_command();
     }
 }
 
