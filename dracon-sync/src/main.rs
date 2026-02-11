@@ -1631,6 +1631,7 @@ async fn run_repair_concerns(
         .unwrap_or(policy.push_op_timeout_secs)
         .max(10);
     let push_retries = push_retries.max(1);
+    let blob_threshold = push_large_blob_threshold_bytes(&policy);
 
     let mut concerns = 0usize;
     let mut attempted_ops = 0usize;
@@ -1670,12 +1671,13 @@ async fn run_repair_concerns(
 
         let has_origin = has_origin_remote(&repo);
         let mut has_upstream = has_tracking_upstream(&repo);
-        let is_concern =
-            status.ahead > 0 || status.behind > 0 || !has_origin || (has_origin && !has_upstream);
+        let is_concern = repo_is_concern(&status, has_origin, has_upstream);
         if !is_concern {
             continue;
         }
         concerns += 1;
+        let flags = repo_state_flags(&status, has_origin, has_upstream);
+        let reason = flags.join(",");
 
         println!(
             "\n🔎 {}  state: ahead={} behind={} clean={} origin={} upstream={}",
@@ -1690,6 +1692,19 @@ async fn run_repair_concerns(
         if !has_origin {
             manual_only += 1;
             println!("   manual: NO_ORIGIN (configure remote before sync can repair)");
+            append_incident_record(
+                policy_path,
+                &IncidentRecord {
+                    ts_unix: timestamp_secs(),
+                    scope: "concern".to_string(),
+                    repo: repo.display().to_string(),
+                    reason: reason.clone(),
+                    action: "manual_no_origin".to_string(),
+                    backup_branch: None,
+                    result: "manual".to_string(),
+                    details: Some("configure origin remote".to_string()),
+                },
+            );
             continue;
         }
 
@@ -1709,9 +1724,35 @@ async fn run_repair_concerns(
                         succeeded_ops += 1;
                         has_upstream = true;
                         println!("   ok: upstream configured");
+                        append_incident_record(
+                            policy_path,
+                            &IncidentRecord {
+                                ts_unix: timestamp_secs(),
+                                scope: "concern".to_string(),
+                                repo: repo.display().to_string(),
+                                reason: reason.clone(),
+                                action: "set_upstream_push_u".to_string(),
+                                backup_branch: None,
+                                result: "ok".to_string(),
+                                details: None,
+                            },
+                        );
                     }
                     Err(e) => {
                         println!("   fail: upstream configure failed: {}", e);
+                        append_incident_record(
+                            policy_path,
+                            &IncidentRecord {
+                                ts_unix: timestamp_secs(),
+                                scope: "concern".to_string(),
+                                repo: repo.display().to_string(),
+                                reason: reason.clone(),
+                                action: "set_upstream_push_u".to_string(),
+                                backup_branch: None,
+                                result: "fail".to_string(),
+                                details: Some(e.to_string()),
+                            },
+                        );
                         continue;
                     }
                 }
@@ -1733,8 +1774,36 @@ async fn run_repair_concerns(
                     Ok(()) => {
                         succeeded_ops += 1;
                         println!("   ok: pulled");
+                        append_incident_record(
+                            policy_path,
+                            &IncidentRecord {
+                                ts_unix: timestamp_secs(),
+                                scope: "concern".to_string(),
+                                repo: repo.display().to_string(),
+                                reason: reason.clone(),
+                                action: "pull_rebase_autostash".to_string(),
+                                backup_branch: None,
+                                result: "ok".to_string(),
+                                details: None,
+                            },
+                        );
                     }
-                    Err(e) => println!("   fail: pull failed: {}", e),
+                    Err(e) => {
+                        println!("   fail: pull failed: {}", e);
+                        append_incident_record(
+                            policy_path,
+                            &IncidentRecord {
+                                ts_unix: timestamp_secs(),
+                                scope: "concern".to_string(),
+                                repo: repo.display().to_string(),
+                                reason: reason.clone(),
+                                action: "pull_rebase_autostash".to_string(),
+                                backup_branch: None,
+                                result: "fail".to_string(),
+                                details: Some(e.to_string()),
+                            },
+                        );
+                    }
                 }
             }
         }
@@ -1749,12 +1818,25 @@ async fn run_repair_concerns(
                         succeeded_ops += 1;
                         push_ok = true;
                         println!("   ok: pushed");
+                        append_incident_record(
+                            policy_path,
+                            &IncidentRecord {
+                                ts_unix: timestamp_secs(),
+                                scope: "concern".to_string(),
+                                repo: repo.display().to_string(),
+                                reason: reason.clone(),
+                                action: "push_origin_head".to_string(),
+                                backup_branch: None,
+                                result: "ok".to_string(),
+                                details: None,
+                            },
+                        );
                     }
                     Err(e) => {
                         println!("   fail: push failed: {}", e);
 
-                        let large =
-                            detect_large_blobs_ahead(&repo, 100 * 1024 * 1024).unwrap_or_default();
+                        let large = detect_large_blobs_ahead(&repo, blob_threshold)
+                            .unwrap_or_default();
                         if !large.is_empty() {
                             println!(
                                 "   detect: large blobs in ahead range ({} entries)",
@@ -1783,6 +1865,23 @@ async fn run_repair_concerns(
 
                             if rewrite_paths.is_empty() {
                                 println!("   manual: large blobs found but not in excluded dirs");
+                                append_incident_record(
+                                    policy_path,
+                                    &IncidentRecord {
+                                        ts_unix: timestamp_secs(),
+                                        scope: "concern".to_string(),
+                                        repo: repo.display().to_string(),
+                                        reason: reason.clone(),
+                                        action: "large_blob_detected".to_string(),
+                                        backup_branch: None,
+                                        result: "manual".to_string(),
+                                        details: Some(format!(
+                                            "threshold={} entries={} rewrite_allowed=false",
+                                            blob_threshold,
+                                            large.len()
+                                        )),
+                                    },
+                                );
                             } else {
                                 println!(
                                     "   plan: rewrite ahead history removing paths {:?}",
@@ -1794,6 +1893,7 @@ async fn run_repair_concerns(
                                     "backup/pre-sync-largeblob-fix",
                                 ) {
                                     Ok(Some(backup_branch)) => {
+                                        let backup_branch_for_log = backup_branch.clone();
                                         println!(
                                             "   ok: rewrite complete (backup branch: {})",
                                             backup_branch
@@ -1810,18 +1910,60 @@ async fn run_repair_concerns(
                                                 succeeded_ops += 1;
                                                 push_ok = true;
                                                 println!("   ok: pushed after rewrite");
+                                                append_incident_record(
+                                                    policy_path,
+                                                    &IncidentRecord {
+                                                        ts_unix: timestamp_secs(),
+                                                        scope: "concern".to_string(),
+                                                        repo: repo.display().to_string(),
+                                                        reason: reason.clone(),
+                                                        action: "rewrite_then_push".to_string(),
+                                                        backup_branch: Some(backup_branch_for_log),
+                                                        result: "ok".to_string(),
+                                                        details: Some(format!(
+                                                            "paths={:?}",
+                                                            rewrite_paths
+                                                        )),
+                                                    },
+                                                );
                                             }
                                             Err(e2) => {
                                                 println!(
                                                     "   fail: push after rewrite failed: {}",
                                                     e2
-                                                )
+                                                );
+                                                append_incident_record(
+                                                    policy_path,
+                                                    &IncidentRecord {
+                                                        ts_unix: timestamp_secs(),
+                                                        scope: "concern".to_string(),
+                                                        repo: repo.display().to_string(),
+                                                        reason: reason.clone(),
+                                                        action: "rewrite_then_push".to_string(),
+                                                        backup_branch: Some(backup_branch),
+                                                        result: "fail".to_string(),
+                                                        details: Some(e2.to_string()),
+                                                    },
+                                                );
                                             }
                                         }
                                     }
                                     Ok(None) => {}
                                     Err(rewrite_err) => {
-                                        println!("   fail: rewrite failed: {}", rewrite_err)
+                                        println!("   fail: rewrite failed: {}", rewrite_err);
+                                        append_incident_record(
+                                            policy_path,
+                                            &IncidentRecord {
+                                                ts_unix: timestamp_secs(),
+                                                scope: "concern".to_string(),
+                                                repo: repo.display().to_string(),
+                                                reason: reason.clone(),
+                                                action: "rewrite_large_blob".to_string(),
+                                                backup_branch: None,
+                                                result: "fail".to_string(),
+                                                details: Some(rewrite_err.to_string()),
+                                            },
+                                        );
                                     }
                                 }
                             }
@@ -1859,12 +2001,41 @@ async fn run_repair_concerns(
                                                 succeeded_ops += 1;
                                                 push_ok = true;
                                                 println!("   ok: pushed after upstream align");
+                                                append_incident_record(
+                                                    policy_path,
+                                                    &IncidentRecord {
+                                                        ts_unix: timestamp_secs(),
+                                                        scope: "concern".to_string(),
+                                                        repo: repo.display().to_string(),
+                                                        reason: reason.clone(),
+                                                        action: "realign_upstream_then_push".to_string(),
+                                                        backup_branch: None,
+                                                        result: "ok".to_string(),
+                                                        details: Some(format!(
+                                                            "branch={}",
+                                                            branch
+                                                        )),
+                                                    },
+                                                );
                                             }
                                             Err(e2) => {
                                                 println!(
                                                     "   fail: push after upstream align failed: {}",
                                                     e2
-                                                )
+                                                );
+                                                append_incident_record(
+                                                    policy_path,
+                                                    &IncidentRecord {
+                                                        ts_unix: timestamp_secs(),
+                                                        scope: "concern".to_string(),
+                                                        repo: repo.display().to_string(),
+                                                        reason: reason.clone(),
+                                                        action: "realign_upstream_then_push".to_string(),
+                                                        backup_branch: None,
+                                                        result: "fail".to_string(),
+                                                        details: Some(e2.to_string()),
+                                                    },
+                                                );
                                             }
                                         }
                                     }
@@ -1877,8 +2048,22 @@ async fn run_repair_concerns(
                     }
                 }
                 if !push_ok {
-                    // kept for clarity in logs when concerns persist after apply
-                } else if let Ok(next_after_push) = svc.get_status().await {
+                    append_incident_record(
+                        policy_path,
+                        &IncidentRecord {
+                            ts_unix: timestamp_secs(),
+                            scope: "concern".to_string(),
+                            repo: repo.display().to_string(),
+                            reason: reason.clone(),
+                            action: "push_origin_head".to_string(),
+                            backup_branch: None,
+                            result: "fail".to_string(),
+                            details: Some("push did not clear concern".to_string()),
+                        },
+                    );
+                }
+                if push_ok {
+                    if let Ok(next_after_push) = svc.get_status().await {
                     if next_after_push.ahead > 0 {
                         let branch = current_branch(&repo).unwrap_or_default();
                         if !branch.is_empty() && remote_branch_exists(&repo, &branch) {
@@ -1891,6 +2076,7 @@ async fn run_repair_concerns(
                                 Err(e) => println!("   fail: upstream realign failed: {}", e),
                             }
                         }
+                    }
                     }
                 }
             }
@@ -1905,6 +2091,19 @@ async fn run_repair_concerns(
                 if !still_concern {
                     resolved += 1;
                     println!("   resolved: concern cleared");
+                    append_incident_record(
+                        policy_path,
+                        &IncidentRecord {
+                            ts_unix: timestamp_secs(),
+                            scope: "concern".to_string(),
+                            repo: repo.display().to_string(),
+                            reason,
+                            action: "verify_resolved".to_string(),
+                            backup_branch: None,
+                            result: "ok".to_string(),
+                            details: None,
+                        },
+                    );
                 } else {
                     println!(
                         "   remaining: ahead={} behind={} origin={} upstream={}",
@@ -1912,6 +2111,22 @@ async fn run_repair_concerns(
                         next.behind,
                         has_origin_remote(&repo),
                         has_tracking_upstream(&repo)
+                    );
+                    append_incident_record(
+                        policy_path,
+                        &IncidentRecord {
+                            ts_unix: timestamp_secs(),
+                            scope: "concern".to_string(),
+                            repo: repo.display().to_string(),
+                            reason,
+                            action: "verify_resolved".to_string(),
+                            backup_branch: None,
+                            result: "remaining".to_string(),
+                            details: Some(format!(
+                                "ahead={} behind={}",
+                                next.ahead, next.behind
+                            )),
+                        },
                     );
                 }
             }
