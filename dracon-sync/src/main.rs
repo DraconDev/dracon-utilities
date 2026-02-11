@@ -2674,8 +2674,13 @@ mod tests {
             push_op_timeout_secs: 10,
             repo_sync_timeout_secs: 40,
             auto_repair_concerns: true,
+            auto_repair_warns: true,
             auto_rewrite_large_blobs: false,
             push_retries: 2,
+            repair_cooldown_secs: 60,
+            max_push_blob_bytes: DEFAULT_GIT_HOST_BLOB_LIMIT_BYTES,
+            incident_ledger_max_lines: 1000,
+            incident_ledger_max_age_days: 30,
         }
     }
 
@@ -2708,6 +2713,10 @@ mod tests {
         assert_eq!(default_pull_op_timeout_secs(), 30);
         assert_eq!(default_push_op_timeout_secs(), 300);
         assert_eq!(default_repo_sync_timeout_secs(), 420);
+        assert_eq!(default_repair_cooldown_secs(), 60);
+        assert_eq!(default_max_push_blob_bytes(), DEFAULT_GIT_HOST_BLOB_LIMIT_BYTES);
+        assert_eq!(default_incident_ledger_max_lines(), 10_000);
+        assert_eq!(default_incident_ledger_max_age_days(), 30);
     }
 
     #[test]
@@ -2863,6 +2872,9 @@ mod tests {
     fn push_blob_threshold_is_guardrailed() {
         let mut p = test_policy();
         p.max_stage_file_bytes = 200 * 1024 * 1024;
+        p.max_push_blob_bytes = 80 * 1024 * 1024;
+        assert_eq!(push_large_blob_threshold_bytes(&p), 80 * 1024 * 1024);
+        p.max_push_blob_bytes = 200 * 1024 * 1024;
         assert_eq!(
             push_large_blob_threshold_bytes(&p),
             DEFAULT_GIT_HOST_BLOB_LIMIT_BYTES
