@@ -1874,6 +1874,7 @@ mod tests {
         SyncPolicy {
             system_repo: String::new(),
             pulse_interval_secs: 5,
+            inactivity_push_delay_secs: 3,
             auto_commit: true,
             auto_pull: true,
             auto_push: true,
@@ -1896,6 +1897,7 @@ mod tests {
     fn defaults_are_stable() {
         assert!(default_true());
         assert_eq!(default_pulse_interval(), 300);
+        assert_eq!(default_inactivity_push_delay_secs(), 3);
         assert!(default_exclude_dir_names().contains(&"target".to_string()));
         assert_eq!(default_max_stage_file_bytes(), 100 * 1024 * 1024);
         assert_eq!(default_pull_op_timeout_secs(), 30);
@@ -2043,6 +2045,10 @@ async fn main() -> Result<()> {
             println!("🔁 ROOTS: {:?}", roots);
             println!("📦 REPOS_DISCOVERED: {}", repos.len());
             println!("⏱️ PULSE: {}s", policy.pulse_interval_secs);
+            println!(
+                "⏳ INACTIVITY_PUSH_DELAY: {}s",
+                policy.inactivity_push_delay_secs
+            );
             println!(
                 "⏸️ FREEZE: {}",
                 freeze
