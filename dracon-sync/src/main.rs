@@ -2434,6 +2434,15 @@ async fn run_repair_warns(
     only_repo: Option<PathBuf>,
     json: bool,
 ) -> Result<RepairSummary> {
+    let human = !json;
+    macro_rules! out {
+        ($($arg:tt)*) => {{
+            if human {
+                println!($($arg)*);
+            }
+        }};
+    }
+
     let policy = SyncPolicy::load(policy_path)?;
     let roots = policy.watch_root_paths();
     let excluded_dir_names = excluded_dir_names_set(&policy);
@@ -2441,7 +2450,7 @@ async fn run_repair_warns(
     if let Some(target_repo) = only_repo {
         repos.retain(|r| r == &target_repo);
         if repos.is_empty() {
-            println!(
+            out!(
                 "⚠️ target repo not discovered in policy roots: {}",
                 target_repo.display()
             );
@@ -2453,8 +2462,8 @@ async fn run_repair_warns(
     let mut attempted = 0usize;
     let mut succeeded = 0usize;
 
-    println!("📜 POLICY: {}", policy_path.display());
-    println!(
+    out!("📜 POLICY: {}", policy_path.display());
+    out!(
         "🧹 WARN MODE: {}",
         if apply {
             "APPLY (mutating)"
@@ -2486,14 +2495,14 @@ async fn run_repair_warns(
         warns += 1;
         let flags = repo_state_flags(&status, has_origin, has_upstream);
         let reason = flags.join(",");
-        println!(
+        out!(
             "\n🟡 {}  state={} modified={} staged={}",
             repo.display(),
             reason,
             status.modified_files,
             status.staged_files
         );
-        println!("   plan: run normal sync triage (stage/commit/push)");
+        out!("   plan: run normal sync triage (stage/commit/push)");
         if !apply {
             append_incident_record(
                 policy_path,
@@ -2519,7 +2528,7 @@ async fn run_repair_warns(
         .await
         {
             Err(_) => {
-                println!(
+                out!(
                     "   fail: sync timeout after {}s",
                     policy.repo_sync_timeout_secs
                 );
@@ -2542,7 +2551,7 @@ async fn run_repair_warns(
             }
             Ok(Ok(changed)) => {
                 succeeded += 1;
-                println!("   ok: triage complete changed={}", changed);
+                out!("   ok: triage complete changed={}", changed);
                 append_incident_record(
                     policy_path,
                     &IncidentRecord {
@@ -2558,7 +2567,7 @@ async fn run_repair_warns(
                 );
             }
             Ok(Err(e)) => {
-                println!("   fail: sync triage failed: {}", e);
+                out!("   fail: sync triage failed: {}", e);
                 append_incident_record(
                     policy_path,
                     &IncidentRecord {
@@ -2958,12 +2967,46 @@ async fn main() -> Result<()> {
     let policy_path = resolve_policy_path()?;
 
     match cli.cmd {
-        Command::Status => {
+        Command::Status { json } => {
             let policy = SyncPolicy::load(&policy_path)?;
             let roots = policy.watch_root_paths();
             let excluded_dir_names = excluded_dir_names_set(&policy);
             let repos = discover_git_repos(&roots, &excluded_dir_names);
             let freeze = freeze_reason(&policy_path);
+            if json {
+                let payload = StatusJson {
+                    policy: policy_path.display().to_string(),
+                    roots: roots.iter().map(|p| p.display().to_string()).collect(),
+                    repos_discovered: repos.len(),
+                    pulse_interval_secs: policy.pulse_interval_secs,
+                    inactivity_push_delay_secs: policy.inactivity_push_delay_secs,
+                    freeze: freeze
+                        .map(|r| format!("ON ({})", r))
+                        .unwrap_or_else(|| "OFF".to_string()),
+                    auto_commit: policy.auto_commit,
+                    auto_pull: policy.auto_pull,
+                    auto_push: policy.auto_push,
+                    auto_repair_concerns: policy.auto_repair_concerns,
+                    auto_repair_warns: policy.auto_repair_warns,
+                    auto_rewrite_large_blobs: policy.auto_rewrite_large_blobs,
+                    max_stage_file_bytes: policy.max_stage_file_bytes,
+                    push_blob_threshold_bytes: push_large_blob_threshold_bytes(&policy),
+                    exclude_dirs: policy.exclude_dir_names.clone(),
+                    pull_op_timeout_secs: policy.pull_op_timeout_secs,
+                    push_op_timeout_secs: policy.push_op_timeout_secs,
+                    repo_sync_timeout_secs: policy.repo_sync_timeout_secs,
+                    push_retries: policy.push_retries,
+                    repair_cooldown_secs: policy.repair_cooldown_secs,
+                    incident_ledger_max_lines: policy.incident_ledger_max_lines,
+                    incident_ledger_max_age_days: policy.incident_ledger_max_age_days,
+                    system_repo: policy.system_repo.clone(),
+                    backup_policy: policy.backup_policy.clone(),
+                    backup_dir: policy.backup_dir.clone(),
+                    extra_remotes: policy.extra_remotes.len(),
+                };
+                println!("{}", serde_json::to_string_pretty(&payload)?);
+                continue;
+            }
             println!("📜 POLICY: {}", policy_path.display());
             println!("🔁 ROOTS: {:?}", roots);
             println!("📦 REPOS_DISCOVERED: {}", repos.len());
