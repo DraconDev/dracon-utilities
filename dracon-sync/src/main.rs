@@ -995,6 +995,39 @@ fn incident_ledger_path(policy_path: &Path) -> PathBuf {
 }
 
 fn append_incident_record(policy_path: &Path, record: &IncidentRecord) {
+    fn enforce_retention(path: &Path, policy: &SyncPolicy) -> Result<()> {
+        let content = std::fs::read_to_string(path)?;
+        let now = timestamp_secs();
+        let age_cutoff = now.saturating_sub(policy.incident_ledger_max_age_days.saturating_mul(86_400));
+
+        let mut kept: Vec<String> = Vec::new();
+        for line in content.lines() {
+            let line = line.trim();
+            if line.is_empty() {
+                continue;
+            }
+            let keep_by_age = serde_json::from_str::<serde_json::Value>(line)
+                .ok()
+                .and_then(|v| v.get("ts_unix").and_then(|t| t.as_u64()))
+                .map(|ts| ts >= age_cutoff)
+                .unwrap_or(true);
+            if keep_by_age {
+                kept.push(line.to_string());
+            }
+        }
+        if kept.len() > policy.incident_ledger_max_lines {
+            let drop_n = kept.len() - policy.incident_ledger_max_lines;
+            kept.drain(0..drop_n);
+        }
+        let mut out = String::new();
+        for line in kept {
+            out.push_str(&line);
+            out.push('\n');
+        }
+        std::fs::write(path, out)?;
+        Ok(())
+    }
+
     let path = incident_ledger_path(policy_path);
     let line = match serde_json::to_string(record) {
         Ok(v) => v,
@@ -1016,6 +1049,10 @@ fn append_incident_record(policy_path: &Path, record: &IncidentRecord) {
             use std::io::Write;
             if let Err(e) = writeln!(file, "{}", line) {
                 eprintln!("⚠️ incident write failed ({}): {}", path.display(), e);
+            } else if let Ok(policy) = SyncPolicy::load(policy_path) {
+                if let Err(e) = enforce_retention(&path, &policy) {
+                    eprintln!("⚠️ incident retention failed ({}): {}", path.display(), e);
+                }
             }
         }
         Err(e) => eprintln!("⚠️ incident open failed ({}): {}", path.display(), e),
@@ -1526,31 +1563,12 @@ async fn git_log_unix_timestamp(repo: &Path) -> Option<i64> {
         .and_then(|s| s.parse::<i64>().ok())
 }
 
-async fn run_repos_report(policy_path: &Path, filter: RepoFilter) -> Result<()> {
-    #[derive(Debug)]
-    struct RepoRow {
-        repo: PathBuf,
-        state_flags: Vec<String>,
-        branch: String,
-        modified: usize,
-        staged: usize,
-        ahead: usize,
-        behind: usize,
-        last_hash: String,
-        last_author: String,
-        last_when: String,
-        last_msg: String,
-        last_unix: i64,
-        concern: bool,
-        warn: bool,
-        hint: String,
-    }
-
+async fn run_repos_report(policy_path: &Path, filter: RepoFilter, json: bool) -> Result<()> {
     let policy = SyncPolicy::load(policy_path)?;
     let roots = policy.watch_root_paths();
     let excluded_dir_names = excluded_dir_names_set(&policy);
     let repos = discover_git_repos(&roots, &excluded_dir_names);
-    let mut rows: Vec<RepoRow> = Vec::new();
+    let mut rows: Vec<RepoReportRow> = Vec::new();
     let mut init_or_status_failures = 0usize;
 
     for repo in repos {
@@ -1610,7 +1628,7 @@ async fn run_repos_report(policy_path: &Path, filter: RepoFilter) -> Result<()> 
         let hint = repo_hint(&flags, warn, concern);
 
         rows.push(RepoRow {
-            repo,
+            repo: repo.display().to_string(),
             state_flags: flags,
             branch: status.branch,
             modified: status.modified_files,
@@ -1644,6 +1662,26 @@ async fn run_repos_report(policy_path: &Path, filter: RepoFilter) -> Result<()> 
     let concern_count = rows.iter().filter(|r| r.concern).count();
     let warn_count = rows.iter().filter(|r| r.warn).count();
     let ok_count = rows.len().saturating_sub(concern_count + warn_count);
+    let filter_text = match filter {
+        RepoFilter::All => "all",
+        RepoFilter::Concern => "only_concern",
+        RepoFilter::Warn => "only_warn",
+    };
+
+    if json {
+        let payload = RepoReportJson {
+            policy: policy_path.display().to_string(),
+            filter: filter_text.to_string(),
+            repos: rows.len(),
+            ok: ok_count,
+            warn: warn_count,
+            concern: concern_count,
+            failures: init_or_status_failures,
+            rows,
+        };
+        println!("{}", serde_json::to_string_pretty(&payload)?);
+        return Ok(());
+    }
 
     println!("📜 POLICY: {}", policy_path.display());
     match filter {
@@ -1693,7 +1731,7 @@ async fn run_repos_report(policy_path: &Path, filter: RepoFilter) -> Result<()> 
             paint("OK", "32")
         };
 
-        println!("{}. [{}] {}", idx + 1, severity, row.repo.display(),);
+        println!("{}. [{}] {}", idx + 1, severity, row.repo);
         println!(
             "   updated={} branch={} state={} modified={} staged={} ahead={} behind={}",
             row.last_when,
