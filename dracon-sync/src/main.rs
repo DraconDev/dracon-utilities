@@ -299,8 +299,24 @@ impl SyncPolicy {
         if policy.inactivity_push_delay_secs == 0 {
             policy.inactivity_push_delay_secs = default_inactivity_push_delay_secs();
         }
+        if policy.repair_cooldown_secs == 0 {
+            policy.repair_cooldown_secs = default_repair_cooldown_secs();
+        }
+        if policy.max_push_blob_bytes == 0 {
+            policy.max_push_blob_bytes = default_max_push_blob_bytes();
+        }
+        if policy.incident_ledger_max_lines == 0 {
+            policy.incident_ledger_max_lines = default_incident_ledger_max_lines();
+        }
+        if policy.incident_ledger_max_age_days == 0 {
+            policy.incident_ledger_max_age_days = default_incident_ledger_max_age_days();
+        }
         policy.pull_op_timeout_secs = policy.pull_op_timeout_secs.max(5);
         policy.push_op_timeout_secs = policy.push_op_timeout_secs.max(10);
+        policy.max_push_blob_bytes = policy
+            .max_push_blob_bytes
+            .min(DEFAULT_GIT_HOST_BLOB_LIMIT_BYTES)
+            .max(1);
         policy.repo_sync_timeout_secs = policy.repo_sync_timeout_secs.max(
             policy
                 .push_op_timeout_secs
@@ -1072,6 +1088,7 @@ fn repo_hint(flags: &[String], warn: bool, concern: bool) -> String {
 fn push_large_blob_threshold_bytes(policy: &SyncPolicy) -> u64 {
     policy
         .max_stage_file_bytes
+        .min(policy.max_push_blob_bytes)
         .min(DEFAULT_GIT_HOST_BLOB_LIMIT_BYTES)
 }
 
