@@ -1,13 +1,14 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 #[cfg(unix)]
 use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::process::Command;
+use tokio::time::sleep;
 
 use dracon_system_lib::analyze_workspace_storage;
 
@@ -54,6 +55,11 @@ enum Commands {
         #[command(subcommand)]
         cmd: LinkCommands,
     },
+    /// Guard runtime: monitor disk/process pressure and notify/mitigate.
+    Guard {
+        #[command(subcommand)]
+        cmd: GuardCommands,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -76,6 +82,17 @@ enum LinkCommands {
         #[arg(long)]
         force_replace: bool,
     },
+}
+
+#[derive(Subcommand, Debug)]
+enum GuardCommands {
+    /// Run one guard evaluation pass.
+    Once {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Run continuous guard loop.
+    Daemon,
 }
 
 #[derive(Debug, Serialize)]
@@ -114,6 +131,8 @@ struct SystemPolicy {
     storage: StoragePolicy,
     #[serde(default)]
     links: LinkPolicy,
+    #[serde(default)]
+    guard: GuardPolicy,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -146,6 +165,87 @@ struct LinkPolicy {
 struct LinkEntry {
     link: String,
     target: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct GuardPolicy {
+    #[serde(default = "default_guard_enabled")]
+    enabled: bool,
+    #[serde(default = "default_guard_interval_secs")]
+    interval_secs: u64,
+    #[serde(default = "default_disk_warn_percent")]
+    disk_warn_percent: u8,
+    #[serde(default = "default_disk_action_percent")]
+    disk_action_percent: u8,
+    #[serde(default = "default_disk_critical_percent")]
+    disk_critical_percent: u8,
+    #[serde(default = "default_true")]
+    freeze_sync_at_action: bool,
+    #[serde(default = "default_sync_freeze_marker")]
+    sync_freeze_marker: String,
+    #[serde(default = "default_unfreeze_below_percent")]
+    unfreeze_below_percent: u8,
+    #[serde(default = "default_process_cpu_percent")]
+    process_cpu_percent: f32,
+    #[serde(default = "default_process_rss_mb")]
+    process_rss_mb: u64,
+    #[serde(default = "default_process_sustain_secs")]
+    process_sustain_secs: u64,
+    #[serde(default = "default_process_exempt_names")]
+    process_exempt_names: String,
+    #[serde(default = "default_true")]
+    notify: bool,
+    #[serde(default = "default_notify_command")]
+    notify_command: String,
+    #[serde(default = "default_notify_cooldown_secs")]
+    notify_cooldown_secs: u64,
+    #[serde(default)]
+    auto_renice: bool,
+    #[serde(default = "default_renice_value")]
+    renice_value: i32,
+}
+
+impl Default for GuardPolicy {
+    fn default() -> Self {
+        Self {
+            enabled: default_guard_enabled(),
+            interval_secs: default_guard_interval_secs(),
+            disk_warn_percent: default_disk_warn_percent(),
+            disk_action_percent: default_disk_action_percent(),
+            disk_critical_percent: default_disk_critical_percent(),
+            freeze_sync_at_action: default_true(),
+            sync_freeze_marker: default_sync_freeze_marker(),
+            unfreeze_below_percent: default_unfreeze_below_percent(),
+            process_cpu_percent: default_process_cpu_percent(),
+            process_rss_mb: default_process_rss_mb(),
+            process_sustain_secs: default_process_sustain_secs(),
+            process_exempt_names: default_process_exempt_names(),
+            notify: default_true(),
+            notify_command: default_notify_command(),
+            notify_cooldown_secs: default_notify_cooldown_secs(),
+            auto_renice: false,
+            renice_value: default_renice_value(),
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+struct GuardProcessAlert {
+    pid: i32,
+    command: String,
+    cpu_percent: f32,
+    rss_mb: u64,
+    sustained_secs: u64,
+    action: String,
+}
+
+#[derive(Debug, Serialize)]
+struct GuardReport {
+    enabled: bool,
+    disk_use_percent: u8,
+    disk_state: String,
+    sync_frozen: bool,
+    alerts: Vec<GuardProcessAlert>,
 }
 
 fn default_min_size_mb() -> u64 {
