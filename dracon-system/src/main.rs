@@ -1030,6 +1030,49 @@ mod tests {
             assert!(out.contains(' '));
         }
     }
+
+    #[test]
+    fn parse_df_use_percent_works() {
+        let sample = "Filesystem 1024-blocks Used Available Capacity Mounted on\n/dev/root 100 91 9 91% /\n";
+        assert_eq!(parse_df_use_percent(sample), Some(91));
+    }
+
+    #[test]
+    fn parse_ps_output_works() {
+        let sample = "123 250.5 4194304 git\n456 12.0 2048 zsh\n";
+        let rows = parse_ps_output(sample);
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0].pid, 123);
+        assert_eq!(rows[0].command, "git");
+        assert_eq!(rows[0].rss_mb, 4096);
+    }
+
+    #[test]
+    fn guard_policy_normalization_is_safe() {
+        let mut p = GuardPolicy::default();
+        p.interval_secs = 0;
+        p.disk_warn_percent = 99;
+        p.disk_action_percent = 10;
+        p.disk_critical_percent = 20;
+        p.unfreeze_below_percent = 255;
+        p.process_cpu_percent = 0.0;
+        p.process_rss_mb = 0;
+        p.process_sustain_secs = 0;
+        p.notify_cooldown_secs = 0;
+        p.sync_freeze_marker = String::new();
+        p.notify_command = String::new();
+        normalize_guard_policy(&mut p);
+        assert!(p.interval_secs >= 5);
+        assert!(p.disk_action_percent >= p.disk_warn_percent);
+        assert!(p.disk_critical_percent >= p.disk_action_percent);
+        assert!(p.unfreeze_below_percent < p.disk_action_percent);
+        assert!(p.process_cpu_percent >= 1.0);
+        assert!(p.process_rss_mb >= 64);
+        assert!(p.process_sustain_secs >= 5);
+        assert!(p.notify_cooldown_secs >= 5);
+        assert!(!p.sync_freeze_marker.is_empty());
+        assert!(!p.notify_command.is_empty());
+    }
 }
 
 #[tokio::main]
