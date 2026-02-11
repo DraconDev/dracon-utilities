@@ -3110,19 +3110,10 @@ async fn main() -> Result<()> {
             run_repair_warns(&policy_path, apply, repo, json).await?;
         }
         Command::Once => {
-            let syncer = PolicySyncer {
-                policy_path: policy_path.clone(),
-            };
-            syncer.sync().await?;
+            run_once(&policy_path).await?;
         }
         Command::Daemon => {
-            let daemon_mode =
-                std::env::var("DRACON_SYNC_DAEMON_MODE").unwrap_or_else(|_| "activity".to_string());
-            if daemon_mode.eq_ignore_ascii_case("pulse") {
-                run_pulse_daemon(policy_path).await?;
-            } else {
-                run_daemon(policy_path).await?;
-            }
+            run_daemon(policy_path).await?;
         }
         Command::SyncNow { repo } => {
             if let Some(reason) = freeze_reason(&policy_path) {
