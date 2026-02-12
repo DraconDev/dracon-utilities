@@ -12,7 +12,15 @@ use std::time::{Duration, Instant};
 
 const BLOCK_BEGIN: &str = "# --- BEGIN DRACON MANAGED BLOCK ---";
 const BLOCK_END: &str = "# --- END DRACON MANAGED BLOCK ---";
-const DEFAULT_PLAINTEXT_PATTERNS: &[&str] = &["config/envs/*.env"];
+const DEFAULT_PLAINTEXT_PATTERNS: &[&str] = &[
+    "config/envs/*.env",
+    "config/licenses.json",
+    "config/licenses.test.json",
+    "config/services.json",
+    "config/services.test.json",
+    "plan/pages/snapshots/*.json",
+    "plan/pages/templates/*.json",
+];
 
 #[derive(Parser, Debug)]
 #[command(name = "dracon-warden")]
@@ -309,6 +317,19 @@ fn apply_managed_file(path: &Path, block: &str) -> Result<bool> {
     Ok(false)
 }
 
+fn apply_overwrite_file(path: &Path, content: &str) -> Result<bool> {
+    let current = fs::read_to_string(path).unwrap_or_default();
+    let mut next = content.to_string();
+    if !next.ends_with('\n') {
+        next.push('\n');
+    }
+    if next != current {
+        fs::write(path, next).with_context(|| format!("failed writing {}", path.display()))?;
+        return Ok(true);
+    }
+    Ok(false)
+}
+
 fn newest_file(paths: Vec<PathBuf>) -> Option<PathBuf> {
     let mut with_mtime = paths
         .into_iter()
@@ -411,7 +432,7 @@ fn harden_repo(
 
     let gitignore_changed = apply_managed_file(&gitignore_path, &build_gitignore_block(policy))?;
     let gitattributes_changed =
-        apply_managed_file(&gitattributes_path, &build_gitattributes_block(policy))?;
+        apply_overwrite_file(&gitattributes_path, &build_gitattributes_block(policy))?;
     let key_changed = match pubkey_path {
         Some(pubkey) => publish_repo_pubkey(repo, pubkey)?,
         None => false,
@@ -650,6 +671,9 @@ mod tests {
         assert!(block.contains("!secrets/**"));
         assert!(block.contains("!*.pub"));
         assert!(block.contains("!config/envs/*.env"));
+        assert!(block.contains("!config/licenses.json"));
+        assert!(block.contains("!config/services.test.json"));
+        assert!(block.contains("!plan/pages/templates/*.json"));
         assert!(block.contains(BLOCK_END));
     }
 
@@ -660,6 +684,9 @@ mod tests {
         assert!(block.contains("secrets/** filter=dracon"));
         assert!(block.contains("*.pub -filter -diff -merge"));
         assert!(block.contains("config/envs/*.env -filter -diff -merge"));
+        assert!(block.contains("config/licenses.json -filter -diff -merge"));
+        assert!(block.contains("config/services.test.json -filter -diff -merge"));
+        assert!(block.contains("plan/pages/templates/*.json -filter -diff -merge"));
     }
 
     #[test]
@@ -812,6 +839,15 @@ mod tests {
         let block = format!("{BLOCK_BEGIN}\nfoo\n{BLOCK_END}");
         assert!(apply_managed_file(&file, &block).expect("first"));
         assert!(!apply_managed_file(&file, &block).expect("second"));
+    }
+
+    #[test]
+    fn apply_overwrite_file_detects_noop_second_write() {
+        let td = TempDir::new("warden_apply_overwrite_noop");
+        let file = td.path().join(".gitattributes");
+        let body = "a\nb\n";
+        assert!(apply_overwrite_file(&file, body).expect("first"));
+        assert!(!apply_overwrite_file(&file, body).expect("second"));
     }
 
     #[test]
