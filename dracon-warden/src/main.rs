@@ -444,6 +444,13 @@ fn harden_repo(
 fn harden_all(policy: &WardenPolicy) -> Result<()> {
     let roots = effective_watch_roots(policy);
     let repos = discover_git_repos(&roots);
+    harden_repos(policy, repos)
+}
+
+fn harden_repos<I>(policy: &WardenPolicy, repos: I) -> Result<()>
+where
+    I: IntoIterator<Item = PathBuf>,
+{
     let pubkey_path = resolve_local_pubkey_path();
     if pubkey_path.is_none() {
         eprintln!("⚠️ no public key found for repo publish; set DRACON_OWNER_PUBKEY to override");
@@ -466,7 +473,28 @@ fn harden_all(policy: &WardenPolicy) -> Result<()> {
     Ok(())
 }
 
-fn should_process_event(event: &Event, roots: &[PathBuf]) -> bool {
+fn repo_root_for_path(path: &Path, roots: &[PathBuf]) -> Option<PathBuf> {
+    if !roots.iter().any(|r| path.starts_with(r)) {
+        return None;
+    }
+
+    let mut cur = if path.is_file() {
+        path.parent().map(Path::to_path_buf)?
+    } else {
+        path.to_path_buf()
+    };
+    loop {
+        if cur.join(".git").exists() {
+            return Some(cur);
+        }
+        if !cur.pop() {
+            break;
+        }
+    }
+    None
+}
+
+fn repos_for_event(event: &Event, roots: &[PathBuf]) -> BTreeSet<PathBuf> {
     let ignore_fragments = [
         "/target/",
         "/node_modules/",
@@ -475,16 +503,17 @@ fn should_process_event(event: &Event, roots: &[PathBuf]) -> bool {
         "/.git/index.lock",
     ];
 
+    let mut repos = BTreeSet::new();
     for p in &event.paths {
         let s = p.to_string_lossy();
         if ignore_fragments.iter().any(|f| s.contains(f)) {
             continue;
         }
-        if roots.iter().any(|r| p.starts_with(r)) {
-            return true;
+        if let Some(repo) = repo_root_for_path(p, roots) {
+            repos.insert(repo);
         }
     }
-    false
+    repos
 }
 
 fn run_daemon(policy_path: PathBuf) -> Result<()> {
@@ -493,8 +522,6 @@ fn run_daemon(policy_path: PathBuf) -> Result<()> {
     if roots.is_empty() {
         return Err(anyhow::anyhow!("no valid watch_roots in policy"));
     }
-
-    harden_all(&policy)?;
 
     let (tx, rx) = mpsc::channel::<notify::Result<Event>>();
     let mut watcher = notify::recommended_watcher(move |res| {
@@ -509,14 +536,12 @@ fn run_daemon(policy_path: PathBuf) -> Result<()> {
 
     let mut last_run = Instant::now();
     let debounce = Duration::from_secs(2);
-    let mut dirty = false;
+    let mut pending_repos = BTreeSet::new();
 
     loop {
         match rx.recv_timeout(Duration::from_secs(1)) {
             Ok(Ok(event)) => {
-                if should_process_event(&event, &roots) {
-                    dirty = true;
-                }
+                pending_repos.extend(repos_for_event(&event, &roots));
             }
             Ok(Err(e)) => {
                 eprintln!("⚠️ watch error: {}", e);
@@ -527,11 +552,11 @@ fn run_daemon(policy_path: PathBuf) -> Result<()> {
             }
         }
 
-        if dirty && last_run.elapsed() >= debounce {
+        if !pending_repos.is_empty() && last_run.elapsed() >= debounce {
             let policy = WardenPolicy::load(&policy_path)?;
-            harden_all(&policy)?;
+            let repos = std::mem::take(&mut pending_repos);
+            harden_repos(&policy, repos)?;
             last_run = Instant::now();
-            dirty = false;
         }
     }
 }
@@ -711,6 +736,25 @@ mod tests {
         assert!(should_passthrough_filter_path(Some("config\\envs\\local.env")));
         assert!(!should_passthrough_filter_path(Some(".env")));
         assert!(!should_passthrough_filter_path(None));
+    }
+
+    #[test]
+    fn repos_for_event_ignores_target_and_maps_repo_root() {
+        let td = TempDir::new("warden_event_repo_root");
+        let repo = td.path().join("repo");
+        fs::create_dir_all(repo.join(".git")).expect("git dir");
+        fs::create_dir_all(repo.join("src")).expect("src");
+        fs::create_dir_all(repo.join("target")).expect("target");
+        let roots = vec![td.path().to_path_buf()];
+
+        let ev = Event {
+            kind: notify::EventKind::Modify(notify::event::ModifyKind::Any),
+            paths: vec![repo.join("src/main.rs"), repo.join("target/tmp.o")],
+            attrs: notify::event::EventAttributes::default(),
+        };
+        let repos = repos_for_event(&ev, &roots);
+        assert_eq!(repos.len(), 1);
+        assert!(repos.contains(&repo));
     }
 
     #[test]
