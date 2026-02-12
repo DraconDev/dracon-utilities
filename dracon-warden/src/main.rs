@@ -12,14 +12,7 @@ use std::time::{Duration, Instant};
 
 const BLOCK_BEGIN: &str = "# --- BEGIN DRACON MANAGED BLOCK ---";
 const BLOCK_END: &str = "# --- END DRACON MANAGED BLOCK ---";
-const DEFAULT_PLAINTEXT_PATTERNS: &[&str] = &[
-    "config/licenses.json",
-    "config/licenses.test.json",
-    "config/services.json",
-    "config/services.test.json",
-    "plan/pages/snapshots/*.json",
-    "plan/pages/templates/*.json",
-];
+const DEFAULT_PLAINTEXT_PATTERNS: &[&str] = &[];
 
 #[derive(Parser, Debug)]
 #[command(name = "dracon-warden")]
@@ -694,9 +687,9 @@ mod tests {
         assert!(block.contains("!*.env"));
         assert!(block.contains("!secrets/**"));
         assert!(block.contains("!*.pub"));
-        assert!(block.contains("!config/licenses.json"));
-        assert!(block.contains("!config/services.test.json"));
-        assert!(block.contains("!plan/pages/templates/*.json"));
+        assert!(!block.contains("!config/licenses.json"));
+        assert!(!block.contains("!config/services.test.json"));
+        assert!(!block.contains("!plan/pages/templates/*.json"));
         assert!(block.contains(BLOCK_END));
     }
 
@@ -706,9 +699,9 @@ mod tests {
         assert!(block.contains("*.env filter=dracon"));
         assert!(block.contains("secrets/** filter=dracon"));
         assert!(block.contains("*.pub -filter -diff -merge"));
-        assert!(block.contains("config/licenses.json -filter -diff -merge"));
-        assert!(block.contains("config/services.test.json -filter -diff -merge"));
-        assert!(block.contains("plan/pages/templates/*.json -filter -diff -merge"));
+        assert!(!block.contains("config/licenses.json -filter -diff -merge"));
+        assert!(!block.contains("config/services.test.json -filter -diff -merge"));
+        assert!(!block.contains("plan/pages/templates/*.json -filter -diff -merge"));
     }
 
     #[test]
