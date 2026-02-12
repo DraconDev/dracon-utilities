@@ -13,7 +13,6 @@ use std::time::{Duration, Instant};
 const BLOCK_BEGIN: &str = "# --- BEGIN DRACON MANAGED BLOCK ---";
 const BLOCK_END: &str = "# --- END DRACON MANAGED BLOCK ---";
 const DEFAULT_PLAINTEXT_PATTERNS: &[&str] = &[
-    "config/envs/*.env",
     "config/licenses.json",
     "config/licenses.test.json",
     "config/services.json",
@@ -295,16 +294,9 @@ fn build_gitattributes_block(policy: &WardenPolicy) -> String {
     lines.join("\n")
 }
 
-fn normalize_filter_path(path: &str) -> String {
-    path.replace('\\', "/").trim_start_matches("./").to_string()
-}
-
 fn should_passthrough_filter_path(path: Option<&str>) -> bool {
-    let Some(path) = path else {
-        return false;
-    };
-    let normalized = normalize_filter_path(path);
-    normalized.starts_with("config/envs/")
+    let _ = path;
+    false
 }
 
 fn apply_managed_file(path: &Path, block: &str) -> Result<bool> {
@@ -695,7 +687,6 @@ mod tests {
         assert!(block.contains("!*.env"));
         assert!(block.contains("!secrets/**"));
         assert!(block.contains("!*.pub"));
-        assert!(block.contains("!config/envs/*.env"));
         assert!(block.contains("!config/licenses.json"));
         assert!(block.contains("!config/services.test.json"));
         assert!(block.contains("!plan/pages/templates/*.json"));
@@ -708,7 +699,6 @@ mod tests {
         assert!(block.contains("*.env filter=dracon"));
         assert!(block.contains("secrets/** filter=dracon"));
         assert!(block.contains("*.pub -filter -diff -merge"));
-        assert!(block.contains("config/envs/*.env -filter -diff -merge"));
         assert!(block.contains("config/licenses.json -filter -diff -merge"));
         assert!(block.contains("config/services.test.json -filter -diff -merge"));
         assert!(block.contains("plan/pages/templates/*.json -filter -diff -merge"));
@@ -731,9 +721,9 @@ mod tests {
 
     #[test]
     fn passthrough_filter_path_matches_config_envs() {
-        assert!(should_passthrough_filter_path(Some("config/envs/local.env")));
-        assert!(should_passthrough_filter_path(Some("./config/envs/local.env")));
-        assert!(should_passthrough_filter_path(Some("config\\envs\\local.env")));
+        assert!(!should_passthrough_filter_path(Some("config/envs/local.env")));
+        assert!(!should_passthrough_filter_path(Some("./config/envs/local.env")));
+        assert!(!should_passthrough_filter_path(Some("config\\envs\\local.env")));
         assert!(!should_passthrough_filter_path(Some(".env")));
         assert!(!should_passthrough_filter_path(None));
     }
