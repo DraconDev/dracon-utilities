@@ -54,12 +54,6 @@ struct WardenPolicy {
     watch_roots: Vec<String>,
 }
 
-#[derive(Debug, Deserialize, Default, Clone)]
-struct SyncRootsPolicy {
-    #[serde(default)]
-    watch_roots: Vec<String>,
-}
-
 impl WardenPolicy {
     fn load(path: &Path) -> Result<Self> {
         let content = fs::read_to_string(path)
@@ -156,41 +150,6 @@ fn discover_git_repos(roots: &[PathBuf]) -> Vec<PathBuf> {
     }
 
     repos.into_iter().collect()
-}
-
-fn resolve_sync_policy_path() -> Option<PathBuf> {
-    if let Ok(custom) = std::env::var("DRACON_SYNC_POLICY") {
-        let p = PathBuf::from(custom);
-        if p.exists() {
-            return Some(p);
-        }
-    }
-
-    let home = dirs::home_dir()?;
-    let candidates = [
-        home.join("dracon/utilities/sync/dracon-sync.toml"),
-        home.join("dracon/utilities/sync/config.toml"),
-        home.join("dracon/git/dracon-git.toml"),
-    ];
-    candidates.into_iter().find(|p| p.exists())
-}
-
-fn load_sync_watch_roots() -> Vec<PathBuf> {
-    let Some(path) = resolve_sync_policy_path() else {
-        return Vec::new();
-    };
-    let Ok(content) = fs::read_to_string(path) else {
-        return Vec::new();
-    };
-    let Ok(policy) = toml::from_str::<SyncRootsPolicy>(&content) else {
-        return Vec::new();
-    };
-    policy
-        .watch_roots
-        .into_iter()
-        .map(PathBuf::from)
-        .filter(|p| p.exists())
-        .collect()
 }
 
 fn effective_watch_roots(policy: &WardenPolicy) -> Vec<PathBuf> {
@@ -802,52 +761,10 @@ mod tests {
     }
 
     #[test]
-    fn load_sync_watch_roots_reads_override_policy() {
-        let _guard = env_lock().lock().expect("env lock");
-        let td = TempDir::new("warden_sync_roots");
-        let a = td.path().join("a");
-        let b = td.path().join("b");
-        fs::create_dir_all(&a).expect("a");
-        fs::create_dir_all(&b).expect("b");
-        let sync_policy = td.path().join("sync.toml");
-        fs::write(
-            &sync_policy,
-            format!(
-                "watch_roots = [\"{}\", \"{}\"]\n",
-                a.display(),
-                b.display()
-            ),
-        )
-        .expect("write sync policy");
-        std::env::set_var("DRACON_SYNC_POLICY", &sync_policy);
-
-        let roots = load_sync_watch_roots();
-        assert!(roots.contains(&a));
-        assert!(roots.contains(&b));
-
-        std::env::remove_var("DRACON_SYNC_POLICY");
-    }
-
-    #[test]
     fn effective_watch_roots_merges_and_dedupes() {
-        let _guard = env_lock().lock().expect("env lock");
         let td = TempDir::new("warden_effective_roots");
         let p1 = td.path().join("one");
-        let p2 = td.path().join("two");
         fs::create_dir_all(&p1).expect("p1");
-        fs::create_dir_all(&p2).expect("p2");
-
-        let sync_policy = td.path().join("sync.toml");
-        fs::write(
-            &sync_policy,
-            format!(
-                "watch_roots = [\"{}\", \"{}\"]\n",
-                p1.display(),
-                p2.display()
-            ),
-        )
-        .expect("sync policy");
-        std::env::set_var("DRACON_SYNC_POLICY", &sync_policy);
 
         let policy = WardenPolicy {
             protected_patterns: vec![],
@@ -858,8 +775,6 @@ mod tests {
         let merged = effective_watch_roots(&policy);
         assert_eq!(merged.len(), 1);
         assert!(merged.contains(&p1));
-
-        std::env::remove_var("DRACON_SYNC_POLICY");
     }
 
     #[test]
