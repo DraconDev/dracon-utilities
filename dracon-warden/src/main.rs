@@ -243,10 +243,17 @@ fn build_gitignore_block(policy: &WardenPolicy) -> String {
     for p in &policy.hygiene_patterns {
         lines.push(p.clone());
     }
+    let mut plaintext_patterns = BTreeSet::new();
+    for p in &policy.plaintext_patterns {
+        plaintext_patterns.insert(p.clone());
+    }
+    for p in DEFAULT_PLAINTEXT_PATTERNS {
+        plaintext_patterns.insert((*p).to_string());
+    }
     for p in &policy.protected_patterns {
         lines.push(format!("!{}", p));
     }
-    for p in &policy.plaintext_patterns {
+    for p in plaintext_patterns {
         lines.push(format!("!{}", p));
     }
     lines.push(BLOCK_END.to_string());
@@ -257,15 +264,21 @@ fn build_gitattributes_block(policy: &WardenPolicy) -> String {
     let mut lines = Vec::new();
     lines.push(BLOCK_BEGIN.to_string());
     lines.push("# managed by dracon-warden".to_string());
-    for p in &policy.protected_patterns {
-        lines.push(format!("{} filter=dracon diff=dracon merge=dracon", p));
-    }
     let mut plaintext_patterns = BTreeSet::new();
     for p in &policy.plaintext_patterns {
         plaintext_patterns.insert(p.clone());
     }
     for p in DEFAULT_PLAINTEXT_PATTERNS {
         plaintext_patterns.insert((*p).to_string());
+    }
+    let mut protected_patterns = BTreeSet::new();
+    for p in &policy.protected_patterns {
+        if !plaintext_patterns.contains(p) {
+            protected_patterns.insert(p.clone());
+        }
+    }
+    for p in protected_patterns {
+        lines.push(format!("{} filter=dracon diff=dracon merge=dracon", p));
     }
     for p in plaintext_patterns {
         lines.push(format!("{} -filter -diff -merge", p));
@@ -636,6 +649,7 @@ mod tests {
         assert!(block.contains("!*.env"));
         assert!(block.contains("!secrets/**"));
         assert!(block.contains("!*.pub"));
+        assert!(block.contains("!config/envs/*.env"));
         assert!(block.contains(BLOCK_END));
     }
 
@@ -646,6 +660,21 @@ mod tests {
         assert!(block.contains("secrets/** filter=dracon"));
         assert!(block.contains("*.pub -filter -diff -merge"));
         assert!(block.contains("config/envs/*.env -filter -diff -merge"));
+    }
+
+    #[test]
+    fn plaintext_overrides_protected_without_duplicate_filter_rule() {
+        let policy = WardenPolicy {
+            protected_patterns: vec!["config/envs/*.env".into(), "*.env".into()],
+            plaintext_patterns: vec!["config/envs/*.env".into()],
+            hygiene_patterns: vec![],
+            watch_roots: vec![],
+        };
+        let block = build_gitattributes_block(&policy);
+        let filter_rule = "config/envs/*.env filter=dracon diff=dracon merge=dracon";
+        let plaintext_rule = "config/envs/*.env -filter -diff -merge";
+        assert!(!block.contains(filter_rule));
+        assert!(block.contains(plaintext_rule));
     }
 
     #[test]
