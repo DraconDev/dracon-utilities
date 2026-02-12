@@ -2896,6 +2896,36 @@ mod tests {
     }
 
     #[test]
+    fn parse_name_status_line_maps_deleted_and_rename() {
+        let deleted = parse_name_status_line("D\tplans/old.md").expect("deleted parsed");
+        assert_eq!(deleted.0, PathBuf::from("plans/old.md"));
+        assert!(matches!(
+            deleted.1,
+            dracon_git::types::FileStatus::Deleted
+        ));
+
+        let renamed =
+            parse_name_status_line("R100\tplans/old.md\tplans/new.md").expect("rename parsed");
+        assert_eq!(renamed.0, PathBuf::from("plans/new.md"));
+        assert!(matches!(
+            renamed.1,
+            dracon_git::types::FileStatus::Renamed
+        ));
+    }
+
+    #[test]
+    fn fallback_status_rank_prefers_deleted() {
+        use dracon_git::types::FileStatus;
+        assert!(
+            fallback_status_rank(&FileStatus::Deleted) > fallback_status_rank(&FileStatus::Added)
+        );
+        assert!(
+            fallback_status_rank(&FileStatus::Deleted)
+                > fallback_status_rank(&FileStatus::Modified)
+        );
+    }
+
+    #[test]
     fn freeze_helpers_work() {
         let _guard = env_lock().lock().expect("lock");
         std::env::remove_var("DRACON_SYNC_FREEZE");
