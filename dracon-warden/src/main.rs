@@ -198,9 +198,6 @@ fn effective_watch_roots(policy: &WardenPolicy) -> Vec<PathBuf> {
     for root in policy.watch_root_paths() {
         roots.insert(root);
     }
-    for root in load_sync_watch_roots() {
-        roots.insert(root);
-    }
     roots.into_iter().collect()
 }
 
@@ -856,12 +853,11 @@ mod tests {
             protected_patterns: vec![],
             plaintext_patterns: vec![],
             hygiene_patterns: vec![],
-            watch_roots: vec![p1.display().to_string()],
+            watch_roots: vec![p1.display().to_string(), p1.display().to_string()],
         };
         let merged = effective_watch_roots(&policy);
-        assert_eq!(merged.len(), 2);
+        assert_eq!(merged.len(), 1);
         assert!(merged.contains(&p1));
-        assert!(merged.contains(&p2));
 
         std::env::remove_var("DRACON_SYNC_POLICY");
     }
