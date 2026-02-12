@@ -28,7 +28,6 @@ build/
 !Cargo.lock
 !Cargo.toml
 !clippy.toml
-!config/envs/*.env
 !config/licenses.json
 !config/licenses.test.json
 !config/services.json

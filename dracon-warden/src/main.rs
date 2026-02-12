@@ -520,8 +520,15 @@ fn run_daemon(policy_path: PathBuf) -> Result<()> {
         let _ = tx.send(res);
     })?;
 
+    let mut watched = 0usize;
     for root in &roots {
-        watcher.watch(root, RecursiveMode::Recursive)?;
+        match watcher.watch(root, RecursiveMode::Recursive) {
+            Ok(()) => watched += 1,
+            Err(e) => eprintln!("⚠️ failed to watch {}: {}", root.display(), e),
+        }
+    }
+    if watched == 0 {
+        return Err(anyhow::anyhow!("no watch roots could be registered"));
     }
 
     println!("🛡️ dracon-warden active. Monitoring {:?}", roots);
