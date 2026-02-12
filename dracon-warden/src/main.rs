@@ -12,6 +12,7 @@ use std::time::{Duration, Instant};
 
 const BLOCK_BEGIN: &str = "# --- BEGIN DRACON MANAGED BLOCK ---";
 const BLOCK_END: &str = "# --- END DRACON MANAGED BLOCK ---";
+const DEFAULT_PLAINTEXT_PATTERNS: &[&str] = &["config/envs/*.env"];
 
 #[derive(Parser, Debug)]
 #[command(name = "dracon-warden")]
@@ -259,11 +260,30 @@ fn build_gitattributes_block(policy: &WardenPolicy) -> String {
     for p in &policy.protected_patterns {
         lines.push(format!("{} filter=dracon diff=dracon merge=dracon", p));
     }
+    let mut plaintext_patterns = BTreeSet::new();
     for p in &policy.plaintext_patterns {
+        plaintext_patterns.insert(p.clone());
+    }
+    for p in DEFAULT_PLAINTEXT_PATTERNS {
+        plaintext_patterns.insert((*p).to_string());
+    }
+    for p in plaintext_patterns {
         lines.push(format!("{} -filter -diff -merge", p));
     }
     lines.push(BLOCK_END.to_string());
     lines.join("\n")
+}
+
+fn normalize_filter_path(path: &str) -> String {
+    path.replace('\\', "/").trim_start_matches("./").to_string()
+}
+
+fn should_passthrough_filter_path(path: Option<&str>) -> bool {
+    let Some(path) = path else {
+        return false;
+    };
+    let normalized = normalize_filter_path(path);
+    normalized.starts_with("config/envs/")
 }
 
 fn apply_managed_file(path: &Path, block: &str) -> Result<bool> {
@@ -521,6 +541,10 @@ fn main() -> Result<()> {
 fn run_filter(is_clean: bool, path: Option<&str>) -> Result<()> {
     let mut input = Vec::new();
     std::io::stdin().read_to_end(&mut input)?;
+    if should_passthrough_filter_path(path) {
+        std::io::stdout().write_all(&input)?;
+        return Ok(());
+    }
     let warden = DraconWarden::new()?;
     let output = if is_clean {
         warden.clean(&input, path)?
@@ -621,6 +645,16 @@ mod tests {
         assert!(block.contains("*.env filter=dracon"));
         assert!(block.contains("secrets/** filter=dracon"));
         assert!(block.contains("*.pub -filter -diff -merge"));
+        assert!(block.contains("config/envs/*.env -filter -diff -merge"));
+    }
+
+    #[test]
+    fn passthrough_filter_path_matches_config_envs() {
+        assert!(should_passthrough_filter_path(Some("config/envs/local.env")));
+        assert!(should_passthrough_filter_path(Some("./config/envs/local.env")));
+        assert!(should_passthrough_filter_path(Some("config\\envs\\local.env")));
+        assert!(!should_passthrough_filter_path(Some(".env")));
+        assert!(!should_passthrough_filter_path(None));
     }
 
     #[test]
