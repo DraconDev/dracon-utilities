@@ -5,7 +5,7 @@ use dracon_protocols::git::{
     DiffFile as ProtoDiffFile, FileStatus as ProtoFileStatus, RepoStatus as ProtoRepoStatus,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
 use std::process::Command as StdCommand;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
@@ -855,23 +855,92 @@ async fn git_list_paths(repo: &Path, args: &[&str]) -> Result<Vec<PathBuf>> {
         .collect())
 }
 
+fn parse_name_status_line(line: &str) -> Option<(PathBuf, dracon_git::types::FileStatus)> {
+    let mut parts = line.split('\t');
+    let status_raw = parts.next()?.trim();
+    if status_raw.is_empty() {
+        return None;
+    }
+    let status_char = status_raw.chars().next()?;
+    let (path, status) = match status_char {
+        'M' => (parts.next()?, dracon_git::types::FileStatus::Modified),
+        'A' => (parts.next()?, dracon_git::types::FileStatus::Added),
+        'D' => (parts.next()?, dracon_git::types::FileStatus::Deleted),
+        'T' => (parts.next()?, dracon_git::types::FileStatus::TypeChange),
+        'R' => {
+            let _old = parts.next()?;
+            let new = parts.next()?;
+            (new, dracon_git::types::FileStatus::Renamed)
+        }
+        _ => return None,
+    };
+    Some((PathBuf::from(path.trim()), status))
+}
+
+async fn git_name_status_entries(
+    repo: &Path,
+    args: &[&str],
+) -> Result<Vec<(PathBuf, dracon_git::types::FileStatus)>> {
+    let output = TokioCommand::new("git")
+        .args(args)
+        .current_dir(repo)
+        .output()
+        .await
+        .with_context(|| format!("failed to run git {:?} in {}", args, repo.display()))?;
+    if !output.status.success() {
+        return Ok(Vec::new());
+    }
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    Ok(stdout
+        .lines()
+        .filter_map(parse_name_status_line)
+        .collect::<Vec<_>>())
+}
+
+fn fallback_status_rank(status: &dracon_git::types::FileStatus) -> u8 {
+    match status {
+        dracon_git::types::FileStatus::Deleted => 5,
+        dracon_git::types::FileStatus::Renamed => 4,
+        dracon_git::types::FileStatus::TypeChange => 3,
+        dracon_git::types::FileStatus::Added => 2,
+        dracon_git::types::FileStatus::Modified => 1,
+        dracon_git::types::FileStatus::Unknown => 0,
+    }
+}
+
 async fn cli_diff_entries(repo: &Path) -> Result<Vec<dracon_git::types::DiffFile>> {
-    let mut paths = BTreeSet::new();
+    let mut entries: BTreeMap<PathBuf, dracon_git::types::FileStatus> = BTreeMap::new();
+
     for args in [
-        &["diff", "--name-only"][..],
-        &["diff", "--cached", "--name-only"][..],
-        &["ls-files", "--others", "--exclude-standard"][..],
+        &["diff", "--name-status"][..],
+        &["diff", "--cached", "--name-status"][..],
     ] {
-        for p in git_list_paths(repo, args).await? {
-            paths.insert(p);
+        for (path, status) in git_name_status_entries(repo, args).await? {
+            let should_replace = entries
+                .get(&path)
+                .map(|old| fallback_status_rank(&status) >= fallback_status_rank(old))
+                .unwrap_or(true);
+            if should_replace {
+                entries.insert(path, status);
+            }
         }
     }
 
-    Ok(paths
+    for path in git_list_paths(repo, &["ls-files", "--others", "--exclude-standard"]).await? {
+        let should_replace = entries
+            .get(&path)
+            .map(|old| fallback_status_rank(&dracon_git::types::FileStatus::Added) >= fallback_status_rank(old))
+            .unwrap_or(true);
+        if should_replace {
+            entries.insert(path, dracon_git::types::FileStatus::Added);
+        }
+    }
+
+    Ok(entries
         .into_iter()
-        .map(|path| dracon_git::types::DiffFile {
+        .map(|(path, status)| dracon_git::types::DiffFile {
             path,
-            status: dracon_git::types::FileStatus::Modified,
+            status,
         })
         .collect())
 }
