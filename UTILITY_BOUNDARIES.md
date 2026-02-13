@@ -19,6 +19,8 @@ Canonical library ownership is defined in `dracon-libs/docs/capability-boundarie
     - `pull_op_timeout_secs`, `push_op_timeout_secs`, `repo_sync_timeout_secs` for remote latency tolerance without false "stuck" signals.
 - `dracon-warden`
   - Owns security hardening/watcher behavior (managed `.gitignore`/`.gitattributes`, protected paths).
+  - Policy path: `/home/dracon/dracon/utilities/warden/dracon-warden.toml`.
+  - Plaintext invariants: product config JSON (`config/services*.json`, `config/licenses*.json`) and plan JSON (`plan/pages/{templates,snapshots}/*.json`) must remain valid plaintext JSON (never filter-redacted into markers).
 - `dracon-system`
   - Owns system diagnostics + storage analysis/cleanup + service health checks.
   - Owns setup symlink reconciliation via explicit `[links]` policy in `/home/dracon/dracon/utilities/system/dracon-system.toml` (default: no legacy compatibility links and no `~/.config/dracon` linkage).
