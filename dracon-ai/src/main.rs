@@ -4,7 +4,7 @@ use dracon_ai_contracts::{RoutingTask, SelectionConstraints};
 use dracon_ai_runtime_contracts::models::{ChatMessage, ChatRequest, UsageStats};
 use dracon_ai_runtime_contracts::traits::AiProvider;
 use futures::StreamExt;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::io::{IsTerminal, Read};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -25,16 +25,42 @@ struct Cli {
 #[derive(Subcommand)]
 #[command(rename_all = "kebab-case")]
 enum Cmd {
+    /// 🛠️ Computer-context assistant (plans commands, can execute them with --apply)
+    Do {
+        /// Execute the planned commands (otherwise prints plan only).
+        #[arg(long)]
+        apply: bool,
+
+        /// Allow potentially destructive shell commands (sudo/rm/etc).
+        #[arg(long)]
+        dangerous: bool,
+
+        /// Max AI iterations (plan/execute/respond loops).
+        #[arg(long, default_value_t = 5)]
+        max_steps: u32,
+
+        /// Timeout (seconds) per executed command.
+        #[arg(long, default_value_t = 20)]
+        timeout_secs: u64,
+
+        /// Max bytes captured per command (stdout+stderr combined).
+        #[arg(long, default_value_t = 200_000)]
+        max_bytes: usize,
+
+        /// Output final result as JSON.
+        #[arg(long)]
+        json: bool,
+
+        /// Task description. If omitted, enters interactive mode.
+        #[arg(value_name = "TASK", num_args = 0.., trailing_var_arg = true)]
+        task: Vec<String>,
+    },
+
     /// 💬 Send a prompt to the gateway (or start interactive chat if no prompt is provided)
     Chat {
         /// Intent/lane hint (e.g. commit, engineer, verify)
         #[arg(short, long, default_value = "engineer")]
         intent: String,
-
-        /// Pin a specific model id (must exist in dracon-libs runtime config).
-        /// Example: `--model z-ai/glm-4.7-flash`
-        #[arg(short, long)]
-        model: Option<String>,
 
         /// Read prompt from stdin (entire stream).
         /// You can also use `-` as PROMPT.
@@ -64,10 +90,6 @@ enum Cmd {
         /// Intent/lane hint (e.g. commit, engineer, verify)
         #[arg(short, long, default_value = "engineer")]
         intent: String,
-
-        /// Pin a specific model id (must exist in dracon-libs runtime config).
-        #[arg(short, long)]
-        model: Option<String>,
 
         /// Timeout (seconds) for the command execution.
         #[arg(long, default_value_t = 10)]
@@ -100,20 +122,60 @@ async fn main() -> Result<()> {
     let _ = env_logger::try_init();
 
     let cli = Cli::parse();
-    let cmd = cli.cmd.unwrap_or(Cmd::Chat {
-        intent: "engineer".to_string(),
-        model: None,
-        stdin: false,
-        file: None,
+    let cmd = cli.cmd.unwrap_or(Cmd::Do {
+        apply: std::env::var_os("DRACON_AI_APPLY").is_some(),
+        dangerous: std::env::var_os("DRACON_AI_DANGEROUS").is_some(),
+        max_steps: 5,
+        timeout_secs: 20,
+        max_bytes: 200_000,
         json: false,
-        no_stream: false,
-        prompt: vec![],
+        task: vec![],
     });
 
     match cmd {
+        Cmd::Do {
+            apply,
+            dangerous,
+            max_steps,
+            timeout_secs,
+            max_bytes,
+            json,
+            task,
+        } => {
+            let router = build_router()?;
+            let task = if task.is_empty() {
+                if json {
+                    return Err(anyhow!("--json is not supported in interactive mode"));
+                }
+                return run_do_repl(&router, apply, dangerous, max_steps, timeout_secs, max_bytes)
+                    .await;
+            } else {
+                task.join(" ")
+            };
+
+            let resp = run_do_task(
+                &router,
+                &task,
+                apply,
+                dangerous,
+                max_steps,
+                timeout_secs,
+                max_bytes,
+            )
+            .await?;
+
+            if json {
+                println!("{}", serde_json::to_string_pretty(&resp)?);
+            } else {
+                print!("{}", resp.content);
+                if !resp.content.ends_with('\n') {
+                    println!();
+                }
+            }
+            Ok(())
+        }
         Cmd::Chat {
             intent,
-            model,
             stdin,
             file,
             json,
@@ -122,7 +184,7 @@ async fn main() -> Result<()> {
         } => {
             let intent = normalize_intent(&intent);
             let mut lane = intent_to_lane(&intent);
-            let mut pinned_model = model;
+            let pinned_model: Option<String> = None;
 
             let router = build_router()?;
 
@@ -131,7 +193,7 @@ async fn main() -> Result<()> {
                 if json {
                     return Err(anyhow!("--json is not supported in interactive mode"));
                 }
-                return run_repl(&router, &mut lane, &mut pinned_model).await;
+                return run_chat_repl(&router, &mut lane, &mut None).await;
             }
 
             let prompt = resolve_prompt_text(stdin, file.as_deref(), &prompt)?;
@@ -159,13 +221,17 @@ async fn main() -> Result<()> {
         }
         Cmd::Cmd {
             intent,
-            model,
             timeout_secs,
             max_bytes,
             json,
             no_stream,
             command,
         } => {
+            if std::env::var_os("DRACON_AI_ALLOW_CMD").is_none() {
+                return Err(anyhow!(
+                    "raw cmd execution disabled. Set DRACON_AI_ALLOW_CMD=1 to enable."
+                ));
+            }
             let intent = normalize_intent(&intent);
             let lane = intent_to_lane(&intent);
             let router = build_router()?;
@@ -188,7 +254,7 @@ Captured output:\n```\n{}\n```",
             let response = ask_one(
                 &router,
                 lane,
-                model.as_deref(),
+                None,
                 &prompt,
                 OutputMode {
                     stream: !no_stream && !json && std::io::stdout().is_terminal(),
