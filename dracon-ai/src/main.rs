@@ -4,6 +4,7 @@ use dracon_ai_contracts::{RoutingTask, SelectionConstraints};
 use dracon_ai_runtime_contracts::traits::AiProvider;
 use std::io::Read;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
+use std::io::IsTerminal;
 
 #[derive(Parser)]
 #[command(
@@ -87,6 +88,30 @@ fn intent_to_lane(intent: &str) -> RoutingTask {
     }
 }
 
+fn color_enabled() -> bool {
+    // Enable colors only when stdout is a terminal and NO_COLOR is not set.
+    std::io::stdout().is_terminal() && std::env::var_os("NO_COLOR").is_none()
+}
+
+fn ansi(code: &str, s: &str) -> String {
+    if !color_enabled() {
+        return s.to_string();
+    }
+    format!("\x1b[{}m{}\x1b[0m", code, s)
+}
+
+fn prompt_label(lane: &RoutingTask) -> String {
+    let tool = ansi("1;36", "dracon-ai"); // bold cyan
+    let lane_txt = match lane {
+        RoutingTask::General => "general",
+        RoutingTask::Coding => "coding",
+        RoutingTask::Fast => "fast",
+        RoutingTask::Custom(v) => v.as_str(),
+    };
+    let lane = ansi("33", lane_txt); // yellow
+    format!("{}[{}]", tool, lane)
+}
+
 fn build_router() -> Result<ai_routing_runtime::SmartRouter<dyn AiProvider>> {
     let resolved = ai_runtime_config::resolve_ai_runtime_config();
 
@@ -122,13 +147,20 @@ async fn run_repl(
     router: &ai_routing_runtime::SmartRouter<dyn AiProvider>,
     lane: &mut RoutingTask,
 ) -> Result<()> {
-    eprintln!("dracon-ai interactive mode. Ctrl-D or /exit to quit. Use /intent <name> to change intent.");
+    let title = ansi("1;36", "dracon-ai");
+    let dim = |s: &str| ansi("90", s); // bright black / dim
+    eprintln!(
+        "{} {}",
+        title,
+        dim("interactive mode. Ctrl-D or /exit to quit. Use /intent <name> to change intent.")
+    );
     let stdin = tokio::io::stdin();
     let mut reader = tokio::io::BufReader::new(stdin);
     let mut stdout = tokio::io::stdout();
 
     loop {
-        stdout.write_all(b"> ").await?;
+        let p = format!("{}> ", prompt_label(lane));
+        stdout.write_all(p.as_bytes()).await?;
         stdout.flush().await?;
 
         let mut line = String::new();
@@ -146,13 +178,18 @@ async fn run_repl(
         if let Some(rest) = line.strip_prefix("/intent ") {
             let next = normalize_intent(rest);
             *lane = intent_to_lane(&next);
-            eprintln!("intent set: {}", next);
+            eprintln!(
+                "{} {} {}",
+                ansi("1;36", "intent"),
+                dim("set to"),
+                ansi("33", &next)
+            );
             continue;
         }
 
         match ask_with_router(router, lane.clone(), line).await {
             Ok(text) => println!("{}", text),
-            Err(err) => eprintln!("error: {}", err),
+            Err(err) => eprintln!("{}: {}", ansi("1;31", "error"), err),
         }
     }
     Ok(())
