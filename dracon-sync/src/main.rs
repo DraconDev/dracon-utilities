@@ -1543,7 +1543,30 @@ async fn sync_repo(
                 .iter()
                 .map(|e| e.path.to_string_lossy().to_string())
                 .collect();
+
+            // Guardrail: avoid Cargo.lock-only commits (common noise from local builds/tooling).
+            if policy.avoid_cargo_lock_only_commits
+                && !stage_paths.is_empty()
+                && stage_paths.iter().all(|p| is_lockfile_path(p))
+            {
+                eprintln!(
+                    "🧹 skipping Cargo.lock-only commit in {} (reverting {} path(s))",
+                    repo.display(),
+                    stage_paths.len()
+                );
+                restore_paths(repo, &stage_paths).await?;
+                return Ok(true);
+            }
+
             svc.add_paths(&stage_paths).await?;
+
+            // Optional: bump patch version for Rust repos, then stage it.
+            if policy.auto_bump_patch_version {
+                if bump_patch_version_in_repo(repo)? {
+                    let _ = run_git_with_timeout(repo, &["add", "Cargo.toml"], 30, "add").await;
+                }
+            }
+
             svc.commit(&msg).await?;
             if policy.auto_push && has_origin {
                 let ahead_large = detect_large_blobs_ahead(repo, blob_threshold).unwrap_or_default();
