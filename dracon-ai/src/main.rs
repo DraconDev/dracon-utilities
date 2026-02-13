@@ -22,6 +22,16 @@ struct DraconAiConfig {
     do_auto_probe_nix: bool,
 }
 
+fn env_bool(name: &str) -> Option<bool> {
+    let v = std::env::var(name).ok()?;
+    let v = v.trim().to_ascii_lowercase();
+    match v.as_str() {
+        "1" | "true" | "yes" | "on" => Some(true),
+        "0" | "false" | "no" | "off" => Some(false),
+        _ => None,
+    }
+}
+
 fn resolve_config_path() -> Option<PathBuf> {
     // Keep consistent with other utilities: system repo is the canonical policy owner.
     // Allow override for experimentation.
@@ -59,11 +69,11 @@ enum Cmd {
     /// 🛠️ Computer-context assistant (plans commands, can execute them with --apply)
     Do {
         /// Execute the planned commands (otherwise prints plan only).
-        #[arg(long)]
+        #[arg(long, default_value_t = true, action = clap::ArgAction::Set)]
         apply: bool,
 
         /// Allow potentially destructive shell commands (sudo/rm/etc).
-        #[arg(long)]
+        #[arg(long, default_value_t = false, action = clap::ArgAction::Set)]
         dangerous: bool,
 
         /// Max AI iterations (plan/execute/respond loops).
@@ -154,8 +164,10 @@ async fn main() -> Result<()> {
 
     let cli = Cli::parse();
     let cmd = cli.cmd.unwrap_or(Cmd::Do {
-        apply: std::env::var_os("DRACON_AI_APPLY").is_some(),
-        dangerous: std::env::var_os("DRACON_AI_DANGEROUS").is_some(),
+        // Default is APPLY ON. This tool is meant to change the computer state.
+        // Use `--apply=false` (or DRACON_AI_APPLY=0) to plan-only.
+        apply: env_bool("DRACON_AI_APPLY").unwrap_or(true),
+        dangerous: env_bool("DRACON_AI_DANGEROUS").unwrap_or(false),
         max_steps: 5,
         timeout_secs: 20,
         max_bytes: 200_000,
@@ -662,7 +674,7 @@ async fn run_do_task(
             return Ok(DoCliResponse {
                 task: task.to_string(),
                 content: format!(
-                    "Plan only (set DRACON_AI_APPLY=1 or pass --apply to execute).\n{}",
+                    "Plan only (pass --apply=false or set DRACON_AI_APPLY=0 to execute-disabled).\n{}",
                     agent.summary
                 ),
                 commands_ran,
@@ -747,11 +759,7 @@ async fn run_do_repl(
     let mut last_task: Option<String> = None;
 
     loop {
-        let prompt = if cur_apply {
-            "do(apply=on)> "
-        } else {
-            "do(apply=off)> "
-        };
+        let prompt = if cur_apply { "do(apply=on)> " } else { "do(apply=off)> " };
         let line = tokio::task::block_in_place(|| rl.readline(prompt));
         match line {
             Ok(line) => {
@@ -821,6 +829,10 @@ async fn run_do_repl(
                 if effective.contains("--apply") {
                     cur_apply = true;
                     effective = effective.replace("--apply", "").trim().to_string();
+                }
+                if effective.contains("--no-apply") {
+                    cur_apply = false;
+                    effective = effective.replace("--no-apply", "").trim().to_string();
                 }
                 if effective.contains("--dangerous") {
                     cur_dangerous = true;
@@ -1293,9 +1305,19 @@ mod tests {
             .expect("do parses");
         match cli.cmd.expect("cmd") {
             Cmd::Do { task, apply, .. } => {
-                assert!(!apply);
+                assert!(apply);
                 assert_eq!(task, vec!["add", "nix", "package", "ripgrep"]);
             }
+            _ => panic!("expected do"),
+        }
+    }
+
+    #[test]
+    fn parses_do_apply_false() {
+        let cli =
+            Cli::try_parse_from(["dracon-ai", "do", "--apply=false", "echo", "hi"]).expect("do");
+        match cli.cmd.expect("cmd") {
+            Cmd::Do { apply, .. } => assert!(!apply),
             _ => panic!("expected do"),
         }
     }
