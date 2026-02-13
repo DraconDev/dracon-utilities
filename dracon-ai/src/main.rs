@@ -701,9 +701,9 @@ async fn run_do_task(
             content: "You have reached the step limit. Produce a final answer now. Set done=true and commands=[].".to_string(),
         });
         if let Ok(agent) = agent_next(router, &messages).await {
-            if agent.done {
-                last_answer = agent.final_answer.or(Some(agent.summary));
-            }
+            // Even if the model fails to follow the done=true instruction, we still want to
+            // return something useful instead of a dead-end string.
+            last_answer = agent.final_answer.or(Some(agent.summary));
         }
     }
 
