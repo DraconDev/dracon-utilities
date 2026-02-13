@@ -304,10 +304,34 @@ struct AiCliResponse {
     usage: Option<UsageStats>,
 }
 
+#[derive(Debug, Clone, Serialize)]
+struct DoCliResponse {
+    task: String,
+    content: String,
+    commands_ran: Vec<String>,
+}
+
 #[derive(Debug)]
 struct CommandCapture {
     status_code: Option<i32>,
     output: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct AgentResponse {
+    done: bool,
+    summary: String,
+    #[serde(default)]
+    commands: Vec<AgentCommand>,
+    #[serde(default)]
+    final_answer: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct AgentCommand {
+    cmd: String,
+    #[serde(default)]
+    why: String,
 }
 
 fn normalize_intent(intent: &str) -> String {
@@ -416,6 +440,259 @@ fn trim_history(messages: &mut Vec<ChatMessage>) {
     }
     keep.extend(messages.iter().rev().take(MAX_MESSAGES.saturating_sub(1)).cloned().rev());
     *messages = keep;
+}
+
+fn agent_system_prompt() -> String {
+    // Hard rule: the agent must reply with pure JSON so the CLI can parse and act on it.
+    // Keep this strict and repetitive; models tend to drift into Markdown otherwise.
+    [
+        "You are dracon-ai, a computer-context assistant.",
+        "Your job is to propose shell commands to accomplish the user's task, then react to captured outputs.",
+        "Reply with ONLY a single JSON object matching this schema:",
+        r#"{ "done": boolean, "summary": string, "commands": [ { "cmd": string, "why": string } ], "final_answer": string|null }"#,
+        "Rules:",
+        "- If you need to execute commands, set done=false and provide 1-3 commands.",
+        "- Commands must be safe, minimal, and non-destructive by default.",
+        "- Do not include markdown fences, no prose outside JSON, no backticks.",
+        "- When finished, set done=true and provide final_answer.",
+    ]
+    .join("\n")
+}
+
+fn extract_first_json_object(s: &str) -> Option<&str> {
+    let start = s.find('{')?;
+    let end = s.rfind('}')?;
+    if end <= start {
+        return None;
+    }
+    Some(&s[start..=end])
+}
+
+fn is_dangerous_shell(cmd: &str) -> bool {
+    let c = cmd.to_ascii_lowercase();
+    let c = c.trim();
+    // Very small heuristic set: enough to prevent accidental foot-guns.
+    c.starts_with("sudo ")
+        || c == "sudo"
+        || c.starts_with("rm ")
+        || c.contains(" rm ")
+        || c.starts_with("mv ")
+        || c.contains(" mv ")
+        || c.contains(" --force")
+        || c.contains(" -rf")
+        || c.contains(" mkfs")
+        || c.contains(" dd ")
+}
+
+async fn agent_next(
+    router: &ai_routing_runtime::SmartRouter<dyn AiProvider>,
+    messages: &[ChatMessage],
+) -> Result<AgentResponse> {
+    let req = ChatRequest {
+        project_id: "default".to_string(),
+        messages: messages.to_vec(),
+        client_intent: Some(RoutingTask::Custom("system".to_string())),
+        routing_constraints: SelectionConstraints::default(),
+        resolved_service_level: None,
+    };
+    let (text, _usage) = {
+        let (provider, _trace) = router
+            .route_with_trace(
+                "default",
+                Some(RoutingTask::Custom("system".to_string())),
+                None,
+                &messages
+                    .iter()
+                    .map(|m| ai_routing_runtime::RoutingMessage {
+                        role: m.role.clone(),
+                        content: m.content.clone(),
+                    })
+                    .collect::<Vec<_>>(),
+                SelectionConstraints::default(),
+            )
+            .await?;
+        provider.ask_and_collect(req).await?
+    };
+
+    let json = extract_first_json_object(&text).ok_or_else(|| anyhow!("agent returned no JSON"))?;
+    serde_json::from_str::<AgentResponse>(json)
+        .with_context(|| format!("failed parsing agent JSON: {}", json))
+}
+
+async fn run_do_task(
+    router: &ai_routing_runtime::SmartRouter<dyn AiProvider>,
+    task: &str,
+    apply: bool,
+    dangerous: bool,
+    max_steps: u32,
+    timeout_secs: u64,
+    max_bytes: usize,
+) -> Result<DoCliResponse> {
+    let mut messages: Vec<ChatMessage> = vec![
+        ChatMessage {
+            role: "system".to_string(),
+            content: agent_system_prompt(),
+        },
+        ChatMessage {
+            role: "system".to_string(),
+            content: format!(
+                "Context: os={} arch={} cwd={}",
+                std::env::consts::OS,
+                std::env::consts::ARCH,
+                std::env::current_dir()
+                    .unwrap_or_else(|_| PathBuf::from("."))
+                    .display()
+            ),
+        },
+        ChatMessage {
+            role: "user".to_string(),
+            content: task.to_string(),
+        },
+    ];
+
+    let mut commands_ran: Vec<String> = Vec::new();
+    let mut last_answer: Option<String> = None;
+
+    for step_idx in 0..max_steps {
+        let agent = agent_next(router, &messages).await?;
+        if agent.done {
+            last_answer = agent.final_answer.or(Some(agent.summary));
+            break;
+        }
+
+        if agent.commands.is_empty() {
+            return Err(anyhow!("agent returned done=false but no commands"));
+        }
+
+        eprintln!("{}", dim(&format!("step {}/{}: {}", step_idx + 1, max_steps, agent.summary)));
+        for (i, c) in agent.commands.iter().enumerate() {
+            eprintln!("{} {}", dim(&format!("  {}.", i + 1)), c.cmd);
+        }
+
+        if !apply {
+            return Ok(DoCliResponse {
+                task: task.to_string(),
+                content: format!(
+                    "Plan only (set DRACON_AI_APPLY=1 or pass --apply to execute).\n{}",
+                    agent.summary
+                ),
+                commands_ran,
+            });
+        }
+
+        for c in agent.commands {
+            if !dangerous && is_dangerous_shell(&c.cmd) {
+                return Err(anyhow!(
+                    "refusing dangerous command without --dangerous/DRACON_AI_DANGEROUS: {}",
+                    c.cmd
+                ));
+            }
+            eprintln!("{}", dim(&format!("run: {}", c.cmd)));
+            let capture =
+                run_shell_capture(&c.cmd, Duration::from_secs(timeout_secs), max_bytes).await?;
+            commands_ran.push(c.cmd.clone());
+            let msg = format!(
+                "Command executed.\ncmd={}\nexit={}\noutput:\n{}",
+                c.cmd,
+                capture
+                    .status_code
+                    .map(|c| c.to_string())
+                    .unwrap_or_else(|| "unknown".to_string()),
+                capture.output
+            );
+            messages.push(ChatMessage {
+                role: "system".to_string(),
+                content: msg,
+            });
+        }
+    }
+
+    Ok(DoCliResponse {
+        task: task.to_string(),
+        content: last_answer.unwrap_or_else(|| "No final answer (max steps reached).".to_string()),
+        commands_ran,
+    })
+}
+
+async fn run_do_repl(
+    router: &ai_routing_runtime::SmartRouter<dyn AiProvider>,
+    apply: bool,
+    dangerous: bool,
+    max_steps: u32,
+    timeout_secs: u64,
+    max_bytes: usize,
+) -> Result<()> {
+    use rustyline::error::ReadlineError;
+    use rustyline::Editor;
+
+    eprintln!(
+        "{} {}",
+        ansi("1;36", "dracon-ai"),
+        dim("do mode. Type a task, Ctrl-D or /exit. Use /apply on|off.")
+    );
+
+    let mut rl = Editor::<(), rustyline::history::DefaultHistory>::new()?;
+    if let Some(hp) = history_path() {
+        if let Some(parent) = hp.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        let _ = rl.load_history(&hp);
+    }
+
+    let mut cur_apply = apply;
+    let mut cur_dangerous = dangerous;
+
+    loop {
+        let line = tokio::task::block_in_place(|| rl.readline("do> "));
+        match line {
+            Ok(line) => {
+                let line = line.trim();
+                if line.is_empty() {
+                    continue;
+                }
+                rl.add_history_entry(line)?;
+                if let Some(hp) = history_path() {
+                    let _ = rl.append_history(&hp);
+                }
+
+                if line == "/exit" || line == "/quit" {
+                    break;
+                }
+                if let Some(rest) = line.strip_prefix("/apply ") {
+                    let v = rest.trim();
+                    cur_apply = v == "1" || v == "on" || v == "true" || v == "yes";
+                    eprintln!("{}", dim(&format!("apply={}", cur_apply)));
+                    continue;
+                }
+                if let Some(rest) = line.strip_prefix("/dangerous ") {
+                    let v = rest.trim();
+                    cur_dangerous = v == "1" || v == "on" || v == "true" || v == "yes";
+                    eprintln!("{}", dim(&format!("dangerous={}", cur_dangerous)));
+                    continue;
+                }
+
+                let resp = run_do_task(
+                    router,
+                    line,
+                    cur_apply,
+                    cur_dangerous,
+                    max_steps,
+                    timeout_secs,
+                    max_bytes,
+                )
+                .await?;
+                println!("{}", resp.content);
+            }
+            Err(ReadlineError::Interrupted) => {
+                eprintln!("{}", dim("^C"));
+                continue;
+            }
+            Err(ReadlineError::Eof) => break,
+            Err(e) => return Err(anyhow!(e)),
+        }
+    }
+
+    Ok(())
 }
 
 async fn ask_one(
