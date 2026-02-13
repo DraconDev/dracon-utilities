@@ -8,7 +8,7 @@ use serde::Serialize;
 use std::io::{IsTerminal, Read};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
-use tokio::io::{AsyncWriteExt, BufReader};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};
 use tokio::process::Command;
 
 #[derive(Parser)]
@@ -453,6 +453,27 @@ async fn ask_with_messages(
 }
 
 async fn run_shell_capture(cmd: &str, timeout: Duration, max_bytes: usize) -> Result<CommandCapture> {
+    async fn read_limited(mut r: impl AsyncRead + Unpin, limit: usize) -> Result<Vec<u8>> {
+        let mut out = Vec::new();
+        let mut buf = [0u8; 8192];
+        loop {
+            let n = r.read(&mut buf).await?;
+            if n == 0 {
+                break;
+            }
+            let remaining = limit.saturating_sub(out.len());
+            if remaining == 0 {
+                break;
+            }
+            let take = n.min(remaining);
+            out.extend_from_slice(&buf[..take]);
+            if out.len() >= limit {
+                break;
+            }
+        }
+        Ok(out)
+    }
+
     let mut child = Command::new("sh")
         .arg("-lc")
         .arg(cmd)
@@ -465,39 +486,37 @@ async fn run_shell_capture(cmd: &str, timeout: Duration, max_bytes: usize) -> Re
     let mut stdout = child.stdout.take().ok_or_else(|| anyhow!("missing stdout"))?;
     let mut stderr = child.stderr.take().ok_or_else(|| anyhow!("missing stderr"))?;
 
-    let read_task = tokio::spawn(async move {
-        let mut out = Vec::new();
-        let mut buf = vec![0u8; 8192];
-        loop {
-            tokio::select! {
-                r = stdout.read(&mut buf) => {
-                    let n = r?;
-                    if n == 0 { break; }
-                    out.extend_from_slice(&buf[..n]);
-                    if out.len() >= max_bytes { break; }
-                }
-                r = stderr.read(&mut buf) => {
-                    let n = r?;
-                    if n == 0 { break; }
-                    out.extend_from_slice(&buf[..n]);
-                    if out.len() >= max_bytes { break; }
-                }
-            }
+    let per_stream_limit = max_bytes.saturating_div(2).max(4096);
+    let out_task = tokio::spawn(async move { read_limited(&mut stdout, per_stream_limit).await });
+    let err_task = tokio::spawn(async move { read_limited(&mut stderr, per_stream_limit).await });
+
+    let status = match tokio::time::timeout(timeout, child.wait()).await {
+        Ok(Ok(s)) => Some(s),
+        Ok(Err(_)) => None,
+        Err(_) => {
+            let _ = child.kill().await;
+            let _ = child.wait().await;
+            None
         }
-        Ok::<Vec<u8>, anyhow::Error>(out)
-    });
+    };
 
-    let status = tokio::time::timeout(timeout, child.wait())
+    let out_bytes = tokio::time::timeout(timeout, out_task)
         .await
-        .ok()
-        .transpose()
-        .unwrap_or(None);
-
-    let out = tokio::time::timeout(timeout, read_task)
+        .map_err(|_| anyhow!("stdout capture timeout after {:?}", timeout))???
+        ;
+    let err_bytes = tokio::time::timeout(timeout, err_task)
         .await
-        .map_err(|_| anyhow!("capture timeout after {:?}", timeout))??;
+        .map_err(|_| anyhow!("stderr capture timeout after {:?}", timeout))???
+        ;
 
-    let mut s = String::from_utf8_lossy(&out).to_string();
+    let mut combined = Vec::new();
+    combined.extend_from_slice(&out_bytes);
+    if !out_bytes.is_empty() && !err_bytes.is_empty() {
+        combined.extend_from_slice(b"\n");
+    }
+    combined.extend_from_slice(&err_bytes);
+
+    let mut s = String::from_utf8_lossy(&combined).to_string();
     if s.len() > max_bytes {
         s.truncate(max_bytes);
     }
@@ -774,4 +793,3 @@ mod tests {
         assert!(matches!(cli.cmd, Some(Cmd::Status)));
     }
 }
-
