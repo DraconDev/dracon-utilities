@@ -320,11 +320,63 @@ fn owner_pubkeys_in(dir: &Path) -> Vec<PathBuf> {
     out
 }
 
+fn is_owner_pubkey_filename(path: &Path) -> bool {
+    let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+        return false;
+    };
+    name.starts_with("owner_") && name.ends_with(".pub")
+}
+
+fn validate_owner_age_pubkey_bytes(path: &Path, bytes: &[u8]) -> Result<()> {
+    if !is_owner_pubkey_filename(path) {
+        return Err(anyhow::anyhow!(
+            "refusing to publish non-owner pubkey: {}",
+            path.display()
+        ));
+    }
+    if bytes.len() > 256 {
+        return Err(anyhow::anyhow!(
+            "refusing to publish suspicious pubkey (too large): {}",
+            path.display()
+        ));
+    }
+    let s = std::str::from_utf8(bytes).map_err(|_| {
+        anyhow::anyhow!(
+            "refusing to publish pubkey with non-utf8 bytes: {}",
+            path.display()
+        )
+    })?;
+    let s = s.trim();
+    if s.is_empty() {
+        return Err(anyhow::anyhow!(
+            "refusing to publish empty pubkey: {}",
+            path.display()
+        ));
+    }
+    if s.contains("AGE-SECRET-KEY-") {
+        return Err(anyhow::anyhow!(
+            "refusing to publish secret key material as pubkey: {}",
+            path.display()
+        ));
+    }
+    if !s.starts_with("age1") {
+        return Err(anyhow::anyhow!(
+            "refusing to publish non-age recipient key: {}",
+            path.display()
+        ));
+    }
+    Ok(())
+}
+
 fn resolve_local_pubkey_path() -> Option<PathBuf> {
     if let Ok(custom) = std::env::var("DRACON_OWNER_PUBKEY") {
         let p = PathBuf::from(custom);
         if p.exists() {
-            return Some(p);
+            let bytes = fs::read(&p).ok()?;
+            if validate_owner_age_pubkey_bytes(&p, &bytes).is_ok() {
+                return Some(p);
+            }
+            return None;
         }
     }
 
@@ -338,8 +390,30 @@ fn resolve_local_pubkey_path() -> Option<PathBuf> {
     .flat_map(|dir| owner_pubkeys_in(&dir))
     .collect::<Vec<_>>();
 
-    if let Some(newest_owner) = newest_file(owner_candidates) {
-        return Some(newest_owner);
+    // Prefer newest valid owner pubkey.
+    let mut owners = owner_candidates;
+    owners.sort_by(|a, b| {
+        let ma = fs::metadata(a)
+            .and_then(|m| m.modified())
+            .ok()
+            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        let mb = fs::metadata(b)
+            .and_then(|m| m.modified())
+            .ok()
+            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        mb.cmp(&ma)
+    });
+    for p in owners {
+        let Ok(bytes) = fs::read(&p) else {
+            continue;
+        };
+        if validate_owner_age_pubkey_bytes(&p, &bytes).is_ok() {
+            return Some(p);
+        }
     }
 
     let identity_candidates = vec![
@@ -362,6 +436,7 @@ fn publish_repo_pubkey(repo: &Path, pubkey_path: &Path) -> Result<bool> {
 
     let source_bytes = fs::read(pubkey_path)
         .with_context(|| format!("failed reading pubkey {}", pubkey_path.display()))?;
+    validate_owner_age_pubkey_bytes(pubkey_path, &source_bytes)?;
     let current_bytes = fs::read(&target).ok();
     if current_bytes.as_deref() == Some(source_bytes.as_slice()) {
         return Ok(false);
@@ -397,6 +472,7 @@ fn harden_repo(
 fn harden_all(policy: &WardenPolicy) -> Result<()> {
     let roots = effective_watch_roots(policy);
     let repos = discover_git_repos(&roots);
+    scrub_markers(policy, &repos, true)?;
     harden_repos(policy, repos)
 }
 
@@ -515,7 +591,9 @@ fn run_daemon(policy_path: PathBuf) -> Result<()> {
         if !pending_repos.is_empty() && last_run.elapsed() >= debounce {
             let policy = WardenPolicy::load(&policy_path)?;
             let repos = std::mem::take(&mut pending_repos);
-            harden_repos(&policy, repos)?;
+            let repos_vec = repos.into_iter().collect::<Vec<_>>();
+            scrub_markers(&policy, &repos_vec, true)?;
+            harden_repos(&policy, repos_vec)?;
             last_run = Instant::now();
         }
     }
