@@ -29,8 +29,8 @@ Shows the resolved AI runtime view from `dracon-libs`:
 
 Computer-context assistant. It returns a small set of shell commands to run for the task.
 
-- Without `--apply`, it prints the plan only.
-- With `--apply` (or `DRACON_AI_APPLY=1`), it runs the commands, captures output, and continues until done (bounded iterations).
+- By default it runs the commands, captures output, and continues until done (bounded iterations).
+- Plan-only: `dracon-ai do --apply=false ...` (or `DRACON_AI_APPLY=0`).
 
 Interactive helpers:
 
