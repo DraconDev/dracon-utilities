@@ -1932,6 +1932,31 @@ async fn sync_repo(
                 if outcome.updated_cargo_lock {
                     let _ = run_git_with_timeout(repo, &["add", "Cargo.lock"], 30, "add").await;
                 }
+                if outcome.bumped_workspace_package && repo.join("Cargo.lock").exists() {
+                    // Workspace version bumps will cause Cargo.lock churn until it's regenerated.
+                    // Do it immediately so we never end up with a follow-up Cargo.lock-only commit.
+                    match run_cmd_with_timeout(
+                        repo,
+                        "cargo",
+                        &["generate-lockfile"],
+                        180,
+                        "generate-lockfile",
+                    )
+                    .await
+                    {
+                        Ok(()) => {
+                            let _ =
+                                run_git_with_timeout(repo, &["add", "Cargo.lock"], 30, "add").await;
+                        }
+                        Err(e) => {
+                            eprintln!(
+                                "⚠️ {}: failed to refresh Cargo.lock after workspace version bump: {}",
+                                repo.display(),
+                                e
+                            );
+                        }
+                    }
+                }
 
                 // Node/TS: package.json (+ optional package-lock.json alignment).
                 let outcome = bump_node_package_version_in_repo(repo)?;
