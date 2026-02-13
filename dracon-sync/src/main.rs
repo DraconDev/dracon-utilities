@@ -3548,8 +3548,16 @@ mod tests {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // If output is piped (e.g. `dracon-sync repos | head`), avoid panicking on SIGPIPE.
-    std::io::set_panic_on_broken_pipe(false);
+    // If output is piped (e.g. `dracon-sync repos | head`), stdout can become a broken pipe.
+    // Rust's default printing panics on write errors; convert that specific panic into a clean exit.
+    let default_panic_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        let msg = info.to_string();
+        if msg.contains("Broken pipe") {
+            std::process::exit(0);
+        }
+        default_panic_hook(info);
+    }));
 
     let cli = Cli::parse();
     let policy_path = resolve_policy_path()?;
