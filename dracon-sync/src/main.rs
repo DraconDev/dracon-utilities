@@ -99,6 +99,14 @@ struct SyncPolicy {
     inactivity_push_delay_secs: u64,
     #[serde(default = "default_true")]
     auto_commit: bool,
+    /// If true, bump Rust Cargo.toml version (patch only) before an auto-commit.
+    /// Best-effort, only applies when `Cargo.toml` exists at repo root.
+    #[serde(default)]
+    auto_bump_patch_version: bool,
+    /// If true, revert and skip commits that would only include Cargo.lock changes.
+    /// This prevents noisy lockfile-only commits from local builds/tooling.
+    #[serde(default = "default_true")]
+    avoid_cargo_lock_only_commits: bool,
     #[serde(default = "default_true")]
     auto_pull: bool,
     #[serde(default = "default_true")]
