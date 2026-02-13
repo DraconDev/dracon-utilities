@@ -659,6 +659,64 @@ fn is_marker_string(s: &str) -> bool {
     s.contains("[DEMON_SECRET:") || s.contains("[DRACON_SECRET:")
 }
 
+fn marker_prefix_at(s: &str, idx: usize) -> Option<&'static str> {
+    if s[idx..].starts_with("[DEMON_SECRET:") {
+        Some("[DEMON_SECRET:")
+    } else if s[idx..].starts_with("[DRACON_SECRET:") {
+        Some("[DRACON_SECRET:")
+    } else {
+        None
+    }
+}
+
+// Best-effort salvage for invalid JSON where marker tokens were injected as raw values/keys.
+// This only touches marker substrings; everything else is preserved.
+fn salvage_invalid_json_markers(content: &str) -> Option<String> {
+    if !is_marker_string(content) {
+        return None;
+    }
+
+    let mut out = String::with_capacity(content.len());
+    let mut i = 0usize;
+    let bytes = content.as_bytes();
+    while i < content.len() {
+        if marker_prefix_at(content, i).is_none() {
+            out.push(bytes[i] as char);
+            i += 1;
+            continue;
+        }
+
+        // Find closing bracket of marker token.
+        let Some(end_rel) = content[i..].find(']') else {
+            // malformed marker; stop salvage
+            return None;
+        };
+        let end = i + end_rel; // points at ']'
+
+        // Decide whether marker was used as an object key or as a value.
+        // If the next non-ws char after ']' is ':', it's being used as a key.
+        let mut j = end + 1;
+        while j < content.len() && content.as_bytes()[j].is_ascii_whitespace() {
+            j += 1;
+        }
+        let is_key = j < content.len() && content.as_bytes()[j] == b':';
+
+        if is_key {
+            out.push_str("\"__scrubbed__\"");
+        } else {
+            out.push_str("null");
+        }
+
+        i = end + 1;
+    }
+
+    if out != content {
+        Some(out)
+    } else {
+        None
+    }
+}
+
 fn scrub_json_value(v: &mut serde_json::Value) {
     match v {
         serde_json::Value::String(s) => {
@@ -752,14 +810,32 @@ fn scrub_markers(policy: &WardenPolicy, repos: &[PathBuf], apply: bool) -> Resul
             }
 
             // Attempt structured scrub; if parse fails (broken JSON), do not guess.
-            let mut v: serde_json::Value = match serde_json::from_str(&content) {
+            let parsed: serde_json::Value = match serde_json::from_str(&content) {
                 Ok(v) => v,
                 Err(_) => {
-                    skipped += 1;
-                    eprintln!("⚠️ cannot scrub invalid JSON (manual fix needed): {}", path.display());
-                    continue;
+                    // Fallback: try to salvage invalid JSON where markers were injected as raw tokens.
+                    let Some(salvaged) = salvage_invalid_json_markers(&content) else {
+                        skipped += 1;
+                        eprintln!(
+                            "⚠️ cannot scrub invalid JSON (manual fix needed): {}",
+                            path.display()
+                        );
+                        continue;
+                    };
+                    match serde_json::from_str(&salvaged) {
+                        Ok(v) => v,
+                        Err(_) => {
+                            skipped += 1;
+                            eprintln!(
+                                "⚠️ cannot scrub invalid JSON (manual fix needed): {}",
+                                path.display()
+                            );
+                            continue;
+                        }
+                    }
                 }
             };
+            let mut v = parsed;
 
             scrub_json_value(&mut v);
             let next = serde_json::to_string_pretty(&v)?;
@@ -1004,6 +1080,20 @@ mod tests {
         let secret = td.path().join("owner_secret.pub");
         fs::write(&secret, "AGE-SECRET-KEY-1XXXX").expect("write");
         assert!(publish_repo_pubkey(&repo, &secret).is_err());
+    }
+
+    #[test]
+    fn salvage_invalid_json_replaces_marker_tokens_and_parses() {
+        let a = "{[DEMON_SECRET:abc]: \"x\"}";
+        let salvaged = salvage_invalid_json_markers(a).expect("salvaged");
+        let v: serde_json::Value = serde_json::from_str(&salvaged).expect("parse");
+        assert_eq!(v["__scrubbed__"], serde_json::Value::String("x".to_string()));
+
+        let b = "{ \"track_id\": [DEMON_SECRET:abc], \"x\": 1 }";
+        let salvaged = salvage_invalid_json_markers(b).expect("salvaged");
+        let v: serde_json::Value = serde_json::from_str(&salvaged).expect("parse");
+        assert!(v["track_id"].is_null());
+        assert_eq!(v["x"], serde_json::Value::from(1));
     }
 
     #[test]
