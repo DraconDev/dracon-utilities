@@ -1100,11 +1100,22 @@ fn timestamp_secs() -> u64 {
         .unwrap_or(0)
 }
 
-fn incident_ledger_path(policy_path: &Path) -> PathBuf {
-    policy_path
-        .parent()
-        .map(|d| d.join("dracon-sync-incidents.jsonl"))
-        .unwrap_or_else(|| PathBuf::from("dracon-sync-incidents.jsonl"))
+fn incident_ledger_path(_policy_path: &Path) -> PathBuf {
+    // IMPORTANT: Keep this ledger OUT of git repositories by default.
+    // The policy file typically lives inside the system repo; writing next to it
+    // causes perpetual DIRTY state and churn.
+    if let Ok(custom) = std::env::var("DRACON_SYNC_LEDGER") {
+        let p = PathBuf::from(custom);
+        if !p.as_os_str().is_empty() {
+            return p;
+        }
+    }
+
+    if let Some(home) = dirs::home_dir() {
+        return home.join(".dracon").join("dracon-sync-incidents.jsonl");
+    }
+
+    PathBuf::from("/tmp/dracon-sync-incidents.jsonl")
 }
 
 fn append_incident_record(policy_path: &Path, record: &IncidentRecord) {
