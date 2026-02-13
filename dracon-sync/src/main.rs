@@ -159,6 +159,127 @@ fn default_inactivity_push_delay_secs() -> u64 {
     5
 }
 
+fn is_lockfile_path(p: &str) -> bool {
+    p == "Cargo.lock" || p.ends_with("/Cargo.lock")
+}
+
+fn bump_patch_version_in_repo(repo: &Path) -> Result<bool> {
+    fn bump_in_section(content: &str, target_section: &str) -> Option<String> {
+        let mut out = String::with_capacity(content.len() + 16);
+        let mut section = String::new();
+        let mut changed = false;
+
+        for raw in content.split_inclusive('\n') {
+            let line = raw.trim_end_matches('\n');
+            let newline = if raw.ends_with('\n') { "\n" } else { "" };
+            let trimmed = line.trim();
+
+            if trimmed.starts_with('[') && trimmed.ends_with(']') {
+                section = trimmed
+                    .trim_matches(&['[', ']'][..])
+                    .trim()
+                    .to_string();
+                out.push_str(line);
+                out.push_str(newline);
+                continue;
+            }
+
+            if !changed && section == target_section {
+                // Match `version = "x.y.z"` only inside the target section.
+                if let Some(rest) = trimmed.strip_prefix("version") {
+                    let rest = rest.trim_start();
+                    if let Some(rest) = rest.strip_prefix('=') {
+                        let rest = rest.trim_start();
+                        if let Some((_, after_q1)) = rest.split_once('"') {
+                            if let Some((ver, after_q2)) = after_q1.split_once('"') {
+                                let parts: Vec<&str> = ver.split('.').collect();
+                                if parts.len() >= 3
+                                    && parts[0].chars().all(|c| c.is_ascii_digit())
+                                    && parts[1].chars().all(|c| c.is_ascii_digit())
+                                    && parts[2].chars().all(|c| c.is_ascii_digit())
+                                {
+                                    let major: u64 = parts[0].parse().ok()?;
+                                    let minor: u64 = parts[1].parse().ok()?;
+                                    let patch: u64 = parts[2].parse().ok()?;
+                                    let new_ver = format!("{}.{}.{}", major, minor, patch + 1);
+
+                                    // Reconstruct preserving indentation and any trailing comment.
+                                    let indent = line.splitn(2, 'v').next().unwrap_or("");
+                                    out.push_str(indent);
+                                    out.push_str("version = \"");
+                                    out.push_str(&new_ver);
+                                    out.push('"');
+                                    out.push_str(after_q2);
+                                    out.push_str(newline);
+                                    changed = true;
+                                    continue;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            out.push_str(line);
+            out.push_str(newline);
+        }
+
+        if changed { Some(out) } else { None }
+    }
+
+    let cargo = repo.join("Cargo.toml");
+    let Ok(content) = std::fs::read_to_string(&cargo) else {
+        return Ok(false);
+    };
+
+    // Prefer workspace versioning when present.
+    let next = bump_in_section(&content, "workspace.package")
+        .or_else(|| bump_in_section(&content, "package"));
+    let Some(next) = next else {
+        return Ok(false);
+    };
+
+    if next == content {
+        return Ok(false);
+    }
+    std::fs::write(&cargo, next)
+        .with_context(|| format!("failed writing {}", cargo.display()))?;
+    Ok(true)
+}
+
+async fn restore_paths(repo: &Path, paths: &[String]) -> Result<()> {
+    if paths.is_empty() {
+        return Ok(());
+    }
+
+    // Prefer `git restore` (newer git). Fallback to `reset` + `checkout`.
+    let mut args: Vec<String> = Vec::new();
+    args.push("restore".to_string());
+    args.push("--staged".to_string());
+    args.push("--worktree".to_string());
+    args.push("--".to_string());
+    args.extend(paths.iter().cloned());
+    let args_ref: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+    if run_git_with_timeout(repo, &args_ref, 30, "restore").await.is_ok() {
+        return Ok(());
+    }
+
+    let mut reset: Vec<String> = Vec::new();
+    reset.push("reset".to_string());
+    reset.push("HEAD".to_string());
+    reset.push("--".to_string());
+    reset.extend(paths.iter().cloned());
+    let reset_ref: Vec<&str> = reset.iter().map(|s| s.as_str()).collect();
+    let _ = run_git_with_timeout(repo, &reset_ref, 30, "reset").await;
+
+    let mut checkout: Vec<String> = Vec::new();
+    checkout.push("checkout".to_string());
+    checkout.push("--".to_string());
+    checkout.extend(paths.iter().cloned());
+    let checkout_ref: Vec<&str> = checkout.iter().map(|s| s.as_str()).collect();
+    run_git_with_timeout(repo, &checkout_ref, 30, "checkout").await
+}
+
 fn default_exclude_dir_names() -> Vec<String> {
     [
         "target",
