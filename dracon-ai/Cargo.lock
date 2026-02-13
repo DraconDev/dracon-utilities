@@ -36,7 +36,7 @@ dependencies = [
 
 [[package]]
 name = "ai-catalog-ingest"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -58,7 +58,7 @@ dependencies = [
 
 [[package]]
 name = "ai-runtime-adapters"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "ai-catalog-ingest",
  "ai-runtime-config",
@@ -89,7 +89,7 @@ dependencies = [
 
 [[package]]
 name = "ai-selection-engine"
-version = "0.1.2"
+version = "0.1.3"
 
 [[package]]
 name = "ai-service"
@@ -559,7 +559,7 @@ dependencies = [
 
 [[package]]
 name = "dracon-ai-contracts"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "serde",
  "serde_json",
