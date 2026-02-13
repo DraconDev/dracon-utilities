@@ -1,96 +1,118 @@
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use clap::{Parser, Subcommand};
-use std::{fs, process::Command, io::{self, Write}};
-use reqwest::Client;
-use serde_json::json;
-
-mod config;
-use config::{AiConfig, ModelRoute};
+use dracon_ai_contracts::{RoutingTask, SelectionConstraints};
+use dracon_ai_runtime_contracts::traits::AiProvider;
 
 #[derive(Parser)]
-#[command(name = "dracon-ai", about = "Intelligence Manager - Autonomous AI Gateway", version)]
+#[command(
+    name = "dracon-ai",
+    about = "AI Gateway (thin CLI over dracon-libs AI runtime)",
+    version
+)]
 struct Cli { #[command(subcommand)] cmd: Cmd }
 
 #[derive(Subcommand)]
 #[command(rename_all = "kebab-case")]
 enum Cmd {
-    /// 🛠️  Perform guided intelligence setup
-    Install,
     /// 💬 Send a prompt to the gateway with specific intent
     Chat { 
-        /// Intent (e.g. commit, engineer, verify)
+        /// Intent/lane hint (e.g. commit, engineer, verify)
         #[arg(short, long, default_value = "engineer")]
         intent: String,
         /// The prompt message
         prompt: String 
     },
-    /// 📜 Show intelligence status and active model routes
+    /// 📜 Show AI runtime status (resolved policy + active/dev models)
     Status,
-    /// ⚙️ Open the intelligence policy in your system editor
-    Edit,
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
     match cli.cmd {
-        Cmd::Install => {
-            println!("🛠️  DRACON INTELLIGENCE GUIDED SETUP\n");
-            let mut cfg = AiConfig::load()?;
-            
-            print!("Enter primary AI provider endpoint (default: {:?}): ", cfg.providers.get("openrouter"));
-            io::stdout().flush()?;
-            let mut input = String::new(); io::stdin().read_line(&mut input)?;
-            let input = input.trim();
-            if !input.is_empty() { cfg.providers.insert("primary".to_string(), input.to_string()); }
-
-            cfg.save()?;
-            println!("\n✅ Intelligence setup complete. Policy: {:?}", AiConfig::path()?); Ok(())
-        },
         Cmd::Chat { intent, prompt } => {
-            let cfg = AiConfig::load()?;
-            let route = cfg.intents.get(&intent).ok_or_else(|| anyhow!("Unknown intent: {}", intent))?;
-            let response = call_provider(&cfg, route, &prompt).await?;
-            println!("{}", response); Ok(())
-        },
-        Cmd::Status => {
-            let cfg = AiConfig::load()?;
-            println!("📜 POLICY: {:?}", AiConfig::path()?);
-            println!("📡 INTENTS: {}", cfg.intents.len());
-            for (intent, route) in &cfg.intents { println!("  - {}: {} via {}", intent, route.model, route.provider); }
+            let intent = normalize_intent(&intent);
+            let lane = intent_to_lane(&intent);
+            let response = ask_once(lane, &prompt).await?;
+            println!("{}", response);
             Ok(())
         },
-        Cmd::Edit => {
-            let editor = std::env::var("EDITOR").unwrap_or_else(|_| "nano".to_string());
-            Command::new(editor).arg(AiConfig::path()?).status()?; Ok(())
-        }
+        Cmd::Status => {
+            let resolved = ai_runtime_config::resolve_ai_runtime_config();
+            println!("📜 AI_RUNTIME: dracon-libs policy + secrets (ai-runtime-config)");
+            println!("📦 PROVIDERS: {}", resolved.provider_specs.len());
+            println!("✅ ACTIVE_MODELS: {}", resolved.active_model_ids.len());
+            for id in &resolved.active_model_ids {
+                println!("  - {}", id);
+            }
+            println!("🧪 DEV_MODELS: {}", resolved.dev_model_ids.len());
+            for id in &resolved.dev_model_ids {
+                println!("  - {}", id);
+            }
+            Ok(())
+        },
     }
 }
 
-async fn call_provider(cfg: &AiConfig, route: &ModelRoute, prompt: &str) -> Result<String> {
-    let client = Client::new();
-    let url = cfg.providers.get(&route.provider).ok_or_else(|| anyhow!("Unknown provider: {}", route.provider))?;
-    
-    // SAFETY: Key shielding via Security Manager path convention
-    let key_path = dirs::home_dir().unwrap().join("dracon/security/keys").join(format!("{}.key", route.provider));
-    let key = if key_path.exists() { fs::read_to_string(key_path)?.trim().to_string() } 
-              else { std::env::var(format!("{}_KEY", route.provider.to_uppercase())).unwrap_or_default() };
+fn normalize_intent(intent: &str) -> String {
+    intent.trim().to_ascii_lowercase()
+}
 
-    if key.is_empty() { return Err(anyhow!("No API key found for {}. Place it in: dracon/security/keys/{}.key", route.provider, route.provider)); }
+fn intent_to_lane(intent: &str) -> RoutingTask {
+    match intent {
+        "commit" | "engineer" | "coding" => RoutingTask::Coding,
+        "verify" | "fast" | "summary" => RoutingTask::Fast,
+        "general" => RoutingTask::General,
+        other => RoutingTask::Custom(other.to_string()),
+    }
+}
 
-    let res = client.post(format!("{}/chat/completions", url))
-        .header("Authorization", format!("Bearer {}", key))
-        .json(&json!({
-            "model": route.model,
-            "messages": [{"role": "user", "content": prompt}]
-        }))
-        .send().await?;
+async fn ask_once(lane: RoutingTask, prompt: &str) -> Result<String> {
+    let resolved = ai_runtime_config::resolve_ai_runtime_config();
 
-    let json: serde_json::Value = res.json().await?;
-    let content = json["choices"][0]["message"]["content"].as_str()
-        .ok_or_else(|| anyhow!("Malformed AI response: {:?}", json))?;
-    
-    Ok(content.to_string())
+    let mut registry: ai_routing_runtime::ProviderRegistry<dyn AiProvider> =
+        ai_routing_runtime::ProviderRegistry::new();
+    for spec in &resolved.provider_specs {
+        let provider: std::sync::Arc<dyn AiProvider> =
+            std::sync::Arc::new(ai_runtime_adapters::GenericOpenAIAdapter::new_with_auth(
+                spec.api_key.clone(),
+                spec.endpoint.clone(),
+                spec.payload_model.clone(),
+                spec.auth_header_name.clone(),
+                spec.auth_header_prefix.clone(),
+            ));
+        registry.register(&spec.model_id, provider);
+    }
+
+    if resolved.active_model_ids.is_empty() && resolved.dev_model_ids.is_empty() {
+        return Err(anyhow!(
+            "No active/dev models configured. Check dracon-libs platform policy + secrets."
+        ));
+    }
+
+    let router = ai_routing_runtime::SmartRouter::new(
+        registry,
+        resolved.dev_model_ids.clone(),
+        resolved.active_model_ids.clone(),
+        resolved.lane_model_policy.clone(),
+    );
+
+    let messages = vec![ai_routing_runtime::RoutingMessage {
+        role: "user".to_string(),
+        content: prompt.to_string(),
+    }];
+
+    let (provider, _trace) = router
+        .route_with_trace(
+            "default",
+            Some(lane),
+            None,
+            &messages,
+            SelectionConstraints::default(),
+        )
+        .await?;
+
+    provider.generate_response(prompt).await
 }
 
 #[cfg(test)]
