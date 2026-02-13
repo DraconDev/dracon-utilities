@@ -163,11 +163,18 @@ fn is_lockfile_path(p: &str) -> bool {
     p == "Cargo.lock" || p.ends_with("/Cargo.lock")
 }
 
-fn bump_patch_version_in_repo(repo: &Path) -> Result<bool> {
-    fn bump_in_section(content: &str, target_section: &str) -> Option<String> {
+#[derive(Debug, Clone, Copy)]
+struct BumpOutcome {
+    bumped_cargo_toml: bool,
+    updated_cargo_lock: bool,
+}
+
+fn bump_patch_version_in_repo(repo: &Path) -> Result<BumpOutcome> {
+    fn bump_in_section(content: &str, target_section: &str) -> Option<(String, String)> {
         let mut out = String::with_capacity(content.len() + 16);
         let mut section = String::new();
         let mut changed = false;
+        let mut new_version = String::new();
 
         for raw in content.split_inclusive('\n') {
             let line = raw.trim_end_matches('\n');
@@ -201,13 +208,13 @@ fn bump_patch_version_in_repo(repo: &Path) -> Result<bool> {
                                     let major: u64 = parts[0].parse().ok()?;
                                     let minor: u64 = parts[1].parse().ok()?;
                                     let patch: u64 = parts[2].parse().ok()?;
-                                    let new_ver = format!("{}.{}.{}", major, minor, patch + 1);
+                                    new_version = format!("{}.{}.{}", major, minor, patch + 1);
 
                                     // Reconstruct preserving indentation and any trailing comment.
                                     let indent = line.splitn(2, 'v').next().unwrap_or("");
                                     out.push_str(indent);
                                     out.push_str("version = \"");
-                                    out.push_str(&new_ver);
+                                    out.push_str(&new_version);
                                     out.push('"');
                                     out.push_str(after_q2);
                                     out.push_str(newline);
@@ -224,27 +231,151 @@ fn bump_patch_version_in_repo(repo: &Path) -> Result<bool> {
             out.push_str(newline);
         }
 
-        if changed { Some(out) } else { None }
+        if changed {
+            Some((out, new_version))
+        } else {
+            None
+        }
+    }
+
+    fn find_package_name(content: &str, target_section: &str) -> Option<String> {
+        let mut section = String::new();
+        for raw in content.split_inclusive('\n') {
+            let line = raw.trim_end_matches('\n');
+            let trimmed = line.trim();
+            if trimmed.starts_with('[') && trimmed.ends_with(']') {
+                section = trimmed
+                    .trim_matches(&['[', ']'][..])
+                    .trim()
+                    .to_string();
+                continue;
+            }
+            if section != target_section {
+                continue;
+            }
+            if let Some(rest) = trimmed.strip_prefix("name") {
+                let rest = rest.trim_start();
+                if let Some(rest) = rest.strip_prefix('=') {
+                    let value = rest.trim();
+                    if let Some(s) = value.strip_prefix('"').and_then(|v| v.strip_suffix('"')) {
+                        return Some(s.to_string());
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    fn update_cargo_lock_package_version(
+        repo: &Path,
+        package_name: &str,
+        new_version: &str,
+    ) -> Result<bool> {
+        let lock_path = repo.join("Cargo.lock");
+        let Ok(content) = std::fs::read_to_string(&lock_path) else {
+            return Ok(false);
+        };
+
+        let mut out = String::with_capacity(content.len());
+        let mut in_pkg = false;
+        let mut name_matches = false;
+        let mut changed = false;
+
+        for raw in content.split_inclusive('\n') {
+            let line = raw.trim_end_matches('\n');
+            let newline = if raw.ends_with('\n') { "\n" } else { "" };
+            let trimmed = line.trim();
+
+            if trimmed == "[[package]]" {
+                in_pkg = true;
+                name_matches = false;
+                out.push_str(line);
+                out.push_str(newline);
+                continue;
+            }
+
+            if in_pkg {
+                if let Some(rest) = trimmed.strip_prefix("name") {
+                    let rest = rest.trim_start();
+                    if let Some(rest) = rest.strip_prefix('=') {
+                        let value = rest.trim();
+                        if let Some(s) = value.strip_prefix('"').and_then(|v| v.strip_suffix('"')) {
+                            name_matches = s == package_name;
+                        }
+                    }
+                    out.push_str(line);
+                    out.push_str(newline);
+                    continue;
+                }
+            }
+
+            if in_pkg && name_matches && trimmed.starts_with("version") {
+                let rest = trimmed["version".len()..].trim_start();
+                if rest.starts_with('=') {
+                    let replacement = format!("version = \"{}\"", new_version);
+                    if trimmed != replacement {
+                        changed = true;
+                        out.push_str(&replacement);
+                        out.push_str(newline);
+                        continue;
+                    }
+                }
+            }
+
+            out.push_str(line);
+            out.push_str(newline);
+        }
+
+        if changed {
+            std::fs::write(&lock_path, out)
+                .with_context(|| format!("failed writing {}", lock_path.display()))?;
+        }
+        Ok(changed)
     }
 
     let cargo = repo.join("Cargo.toml");
     let Ok(content) = std::fs::read_to_string(&cargo) else {
-        return Ok(false);
+        return Ok(BumpOutcome {
+            bumped_cargo_toml: false,
+            updated_cargo_lock: false,
+        });
     };
 
     // Prefer workspace versioning when present.
-    let next = bump_in_section(&content, "workspace.package")
-        .or_else(|| bump_in_section(&content, "package"));
-    let Some(next) = next else {
-        return Ok(false);
+    let (next, new_ver, bumped_section) = if let Some((next, v)) = bump_in_section(&content, "workspace.package") {
+        (next, v, "workspace.package")
+    } else if let Some((next, v)) = bump_in_section(&content, "package") {
+        (next, v, "package")
+    } else {
+        return Ok(BumpOutcome {
+            bumped_cargo_toml: false,
+            updated_cargo_lock: false,
+        });
     };
 
     if next == content {
-        return Ok(false);
+        return Ok(BumpOutcome {
+            bumped_cargo_toml: false,
+            updated_cargo_lock: false,
+        });
     }
-    std::fs::write(&cargo, next)
-        .with_context(|| format!("failed writing {}", cargo.display()))?;
-    Ok(true)
+
+    std::fs::write(&cargo, next).with_context(|| format!("failed writing {}", cargo.display()))?;
+
+    // Keep Cargo.lock consistent for single-package repos: if we can find the package name in
+    // the same bumped section (typically [package]), update the matching lock entry's version.
+    let mut updated_cargo_lock = false;
+    if bumped_section == "package" && !new_ver.is_empty() {
+        if let Some(name) = find_package_name(&content, "package") {
+            updated_cargo_lock =
+                update_cargo_lock_package_version(repo, &name, &new_ver).unwrap_or(false);
+        }
+    }
+
+    Ok(BumpOutcome {
+        bumped_cargo_toml: true,
+        updated_cargo_lock,
+    })
 }
 
 async fn restore_paths(repo: &Path, paths: &[String]) -> Result<()> {
