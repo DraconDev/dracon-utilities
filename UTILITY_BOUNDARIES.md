@@ -15,12 +15,13 @@ Canonical library ownership is defined in `dracon-libs/docs/capability-boundarie
   - Operating model doc: `/home/dracon/dracon/utilities/sync/AI_SYNC_MODEL.md`.
   - Required policy controls:
     - `exclude_dir_names` for repo discovery + staging exclusions.
-    - `max_stage_file_bytes` (default 104857600 / 100 MiB) for large-file staging guard.
+    - `max_stage_file_bytes` (default 52428800 / 50 MiB) for large-file staging guard.
     - `pull_op_timeout_secs`, `push_op_timeout_secs`, `repo_sync_timeout_secs` for remote latency tolerance without false "stuck" signals.
 - `dracon-warden`
   - Owns security hardening/watcher behavior (managed `.gitignore`/`.gitattributes`, protected paths).
   - Policy path: `/home/dracon/dracon/utilities/warden/dracon-warden.toml`.
   - Plaintext invariants: product config JSON (`config/services*.json`, `config/licenses*.json`) and plan JSON (`plan/pages/{templates,snapshots}/*.json`) must remain valid plaintext JSON (never filter-redacted into markers).
+  - Repair command: `dracon-warden scrub-markers` scans tracked plaintext JSON for `[DEMON_SECRET:...]` / `[DRACON_SECRET:...]` markers outside protected paths, and can scrub them in-place with `--apply`.
 - `dracon-system`
   - Owns system diagnostics + storage analysis/cleanup + service health checks.
   - Owns setup symlink reconciliation via explicit `[links]` policy in `/home/dracon/dracon/utilities/system/dracon-system.toml` (default: no legacy compatibility links and no `~/.config/dracon` linkage).
