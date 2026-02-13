@@ -1143,6 +1143,68 @@ async fn run_git_with_timeout_env(
     }
 }
 
+async fn run_cmd_with_timeout(
+    repo: &Path,
+    program: &str,
+    args: &[&str],
+    timeout_secs: u64,
+    op_label: &str,
+) -> Result<()> {
+    let mut child = TokioCommand::new(program)
+        .args(args)
+        .current_dir(repo)
+        .kill_on_drop(true)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .with_context(|| {
+            format!(
+                "failed to spawn {} {} in {}",
+                program,
+                op_label,
+                repo.display()
+            )
+        })?;
+
+    let pid = child.id();
+    match tokio::time::timeout(Duration::from_secs(timeout_secs), child.wait()).await {
+        Ok(Ok(status)) => {
+            if status.success() {
+                Ok(())
+            } else {
+                Err(anyhow::anyhow!(
+                    "{} {} failed in {} with status {}",
+                    program,
+                    op_label,
+                    repo.display(),
+                    status
+                ))
+            }
+        }
+        Ok(Err(e)) => Err(anyhow::anyhow!(
+            "{} {} failed in {}: {}",
+            program,
+            op_label,
+            repo.display(),
+            e
+        )),
+        Err(_) => {
+            if let Some(pid) = pid {
+                kill_descendants(pid).await;
+            }
+            let _ = child.start_kill();
+            let _ = child.wait().await;
+            Err(anyhow::anyhow!(
+                "{} {} timeout in {} after {}s",
+                program,
+                op_label,
+                repo.display(),
+                timeout_secs
+            ))
+        }
+    }
+}
+
 fn origin_url(repo: &Path) -> Option<String> {
     let out = StdCommand::new("git")
         .args(["remote", "get-url", "origin"])
