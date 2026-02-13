@@ -2,6 +2,7 @@ use anyhow::{anyhow, Result};
 use clap::{Parser, Subcommand};
 use dracon_ai_contracts::{RoutingTask, SelectionConstraints};
 use dracon_ai_runtime_contracts::traits::AiProvider;
+use std::io::Read;
 
 #[derive(Parser)]
 #[command(
@@ -19,8 +20,8 @@ enum Cmd {
         /// Intent/lane hint (e.g. commit, engineer, verify)
         #[arg(short, long, default_value = "engineer")]
         intent: String,
-        /// The prompt message
-        prompt: String 
+        /// The prompt message. Use `-` to read from stdin.
+        prompt: String,
     },
     /// 📜 Show AI runtime status (resolved policy + active/dev models)
     Status,
@@ -33,6 +34,13 @@ async fn main() -> Result<()> {
         Cmd::Chat { intent, prompt } => {
             let intent = normalize_intent(&intent);
             let lane = intent_to_lane(&intent);
+            let prompt = if prompt.trim() == "-" {
+                let mut buf = String::new();
+                std::io::stdin().read_to_string(&mut buf)?;
+                buf
+            } else {
+                prompt
+            };
             let response = ask_once(lane, &prompt).await?;
             println!("{}", response);
             Ok(())
