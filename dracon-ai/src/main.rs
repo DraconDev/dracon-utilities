@@ -683,10 +683,24 @@ async fn run_do_task(
 
         for c in agent.commands {
             if !dangerous && is_dangerous_shell(&c.cmd) {
-                return Err(anyhow!(
-                    "refusing dangerous command without --dangerous/DRACON_AI_DANGEROUS: {}",
-                    c.cmd
-                ));
+                // Don't hard-fail: print the command so the user can copy/paste, but refuse to
+                // execute it automatically without an explicit opt-in.
+                let mut out = String::new();
+                out.push_str("Refused to run potentially dangerous command(s) without --dangerous (or DRACON_AI_DANGEROUS=1).\n");
+                out.push_str("You can run these manually, or re-run with --dangerous to let dracon-ai execute them.\n\n");
+                out.push_str("Suggested command:\n");
+                out.push_str(&c.cmd);
+                out.push('\n');
+                if !c.why.trim().is_empty() {
+                    out.push_str("Reason: ");
+                    out.push_str(c.why.trim());
+                    out.push('\n');
+                }
+                return Ok(DoCliResponse {
+                    task: task.to_string(),
+                    content: out,
+                    commands_ran,
+                });
             }
             eprintln!("{}", dim(&format!("run: {}", c.cmd)));
             let capture =
