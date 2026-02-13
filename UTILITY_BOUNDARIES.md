@@ -20,8 +20,12 @@ Canonical library ownership is defined in `dracon-libs/docs/capability-boundarie
 - `dracon-warden`
   - Owns security hardening/watcher behavior (managed `.gitignore`/`.gitattributes`, protected paths).
   - Policy path: `/home/dracon/dracon/utilities/warden/dracon-warden.toml`.
-  - Plaintext invariants: product config JSON (`config/services*.json`, `config/licenses*.json`) and plan JSON (`plan/pages/{templates,snapshots}/*.json`) must remain valid plaintext JSON (never filter-redacted into markers).
-  - Repair command: `dracon-warden scrub-markers` scans tracked plaintext JSON for `[DEMON_SECRET:...]` / `[DRACON_SECRET:...]` markers outside protected paths, and can scrub them in-place with `--apply`.
+  - Secret invariants:
+    - Files on `protected_patterns` are encrypted-at-rest in git (via filter), but plaintext on disk via smudge.
+    - Tracked plaintext JSON must never contain `[DEMON_SECRET:...]` / `[DRACON_SECRET:...]` markers (they indicate a secret leak path).
+  - Auto-repair:
+    - `dracon-warden once` and `dracon-warden daemon` automatically run the marker scrub pass before hardening.
+    - Manual command: `dracon-warden scrub-markers --apply`.
 - `dracon-system`
   - Owns system diagnostics + storage analysis/cleanup + service health checks.
   - Owns setup symlink reconciliation via explicit `[links]` policy in `/home/dracon/dracon/utilities/system/dracon-system.toml` (default: no legacy compatibility links and no `~/.config/dracon` linkage).

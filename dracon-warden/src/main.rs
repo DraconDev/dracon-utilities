@@ -416,11 +416,7 @@ fn resolve_local_pubkey_path() -> Option<PathBuf> {
         }
     }
 
-    let identity_candidates = vec![
-        home.join("dracon/identity.pub"),
-        home.join(".demon/identity.pub"),
-    ];
-    newest_file(identity_candidates)
+    None
 }
 
 fn publish_repo_pubkey(repo: &Path, pubkey_path: &Path) -> Result<bool> {
@@ -990,6 +986,21 @@ mod tests {
         assert!(repo.join(".gitignore").exists());
         assert!(repo.join(".gitattributes").exists());
         assert!(repo.join(".dracon/data/keys/owner_test.pub").exists());
+    }
+
+    #[test]
+    fn publish_repo_pubkey_rejects_non_owner_or_secret_key_material() {
+        let td = TempDir::new("warden_publish_key_rejects");
+        let repo = td.path().join("repo");
+        fs::create_dir_all(&repo).expect("repo");
+
+        let not_owner = td.path().join("identity.pub");
+        fs::write(&not_owner, "age1xxx").expect("write");
+        assert!(publish_repo_pubkey(&repo, &not_owner).is_err());
+
+        let secret = td.path().join("owner_secret.pub");
+        fs::write(&secret, "AGE-SECRET-KEY-1XXXX").expect("write");
+        assert!(publish_repo_pubkey(&repo, &secret).is_err());
     }
 
     #[test]
