@@ -1693,10 +1693,14 @@ async fn sync_repo(
 
             svc.add_paths(&stage_paths).await?;
 
-            // Optional: bump patch version for Rust repos, then stage it.
+            // Optional: bump patch version for Rust repos, then stage it (and any lock adjustment).
             if policy.auto_bump_patch_version {
-                if bump_patch_version_in_repo(repo)? {
+                let outcome = bump_patch_version_in_repo(repo)?;
+                if outcome.bumped_cargo_toml {
                     let _ = run_git_with_timeout(repo, &["add", "Cargo.toml"], 30, "add").await;
+                }
+                if outcome.updated_cargo_lock {
+                    let _ = run_git_with_timeout(repo, &["add", "Cargo.lock"], 30, "add").await;
                 }
             }
 
