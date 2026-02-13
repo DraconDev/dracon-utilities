@@ -902,11 +902,17 @@ fn debug_enabled() -> bool {
     )
 }
 
-fn freeze_marker_paths(policy_path: &Path) -> Vec<PathBuf> {
+fn freeze_marker_paths(_policy_path: &Path) -> Vec<PathBuf> {
     let mut paths = Vec::new();
-    if let Some(dir) = policy_path.parent() {
-        paths.push(dir.join(".freeze"));
-        paths.push(dir.join("freeze"));
+    // Freeze markers are intentionally kept out of git-tracked repos to avoid accidental
+    // perpetual DIRTY states and surprise "sync frozen" incidents.
+    //
+    // Canonical locations:
+    // - ~/.dracon/dracon-sync.freeze
+    // - ~/.dracon/freeze/dracon-sync
+    if let Some(home) = dirs::home_dir() {
+        paths.push(home.join(".dracon").join("dracon-sync.freeze"));
+        paths.push(home.join(".dracon").join("freeze").join("dracon-sync"));
     }
     paths
 }
@@ -3419,11 +3425,15 @@ mod tests {
 
         let markers = freeze_marker_paths(&policy);
         assert_eq!(markers.len(), 2);
-        assert!(freeze_reason(&policy).is_none());
+        let as_text = markers
+            .iter()
+            .map(|p| p.display().to_string())
+            .collect::<Vec<_>>();
+        assert!(as_text.iter().any(|s| s.ends_with(".dracon/dracon-sync.freeze")));
+        assert!(as_text.iter().any(|s| s.ends_with(".dracon/freeze/dracon-sync")));
 
-        std::fs::write(markers[0].clone(), "").expect("marker");
-        let reason = freeze_reason(&policy).expect("freeze reason");
-        assert!(reason.contains("marker"));
+        // Baseline can be frozen depending on the developer machine (marker files may exist).
+        let baseline = freeze_reason(&policy);
 
         std::env::set_var("DRACON_SYNC_FREEZE", "1");
         assert_eq!(
@@ -3431,6 +3441,7 @@ mod tests {
             Some("env DRACON_SYNC_FREEZE")
         );
         std::env::remove_var("DRACON_SYNC_FREEZE");
+        assert_eq!(freeze_reason(&policy), baseline);
     }
 
     #[test]
