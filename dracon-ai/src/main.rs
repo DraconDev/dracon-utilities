@@ -566,7 +566,16 @@ async fn run_do_task(
 
         eprintln!("{}", dim(&format!("step {}/{}: {}", step_idx + 1, max_steps, agent.summary)));
         for (i, c) in agent.commands.iter().enumerate() {
-            eprintln!("{} {}", dim(&format!("  {}.", i + 1)), c.cmd);
+            if c.why.trim().is_empty() {
+                eprintln!("{} {}", dim(&format!("  {}.", i + 1)), c.cmd);
+            } else {
+                eprintln!(
+                    "{} {} {}",
+                    dim(&format!("  {}.", i + 1)),
+                    c.cmd,
+                    dim(&format!("# {}", c.why.trim()))
+                );
+            }
         }
 
         if !apply {
@@ -1125,5 +1134,18 @@ mod tests {
     fn parses_status_subcommand() {
         let cli = Cli::try_parse_from(["dracon-ai", "status"]).expect("status parses");
         assert!(matches!(cli.cmd, Some(Cmd::Status)));
+    }
+
+    #[test]
+    fn parses_do_subcommand() {
+        let cli = Cli::try_parse_from(["dracon-ai", "do", "add", "nix", "package", "ripgrep"])
+            .expect("do parses");
+        match cli.cmd.expect("cmd") {
+            Cmd::Do { task, apply, .. } => {
+                assert!(!apply);
+                assert_eq!(task, vec!["add", "nix", "package", "ripgrep"]);
+            }
+            _ => panic!("expected do"),
+        }
     }
 }
