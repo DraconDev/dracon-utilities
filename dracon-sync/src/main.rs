@@ -2951,6 +2951,8 @@ mod tests {
             auto_commit: true,
             auto_pull: true,
             auto_push: true,
+            auto_bump_patch_version: false,
+            avoid_cargo_lock_only_commits: true,
             backup_policy: String::new(),
             backup_dir: String::new(),
             watch_roots: vec![],
