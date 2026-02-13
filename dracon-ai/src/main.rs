@@ -693,6 +693,20 @@ async fn run_do_task(
         }
     }
 
+    if last_answer.is_none() {
+        // If we hit the step limit after executing commands, do one final non-executing
+        // reasoning pass so the user still gets a useful answer.
+        messages.push(ChatMessage {
+            role: "system".to_string(),
+            content: "You have reached the step limit. Produce a final answer now. Set done=true and commands=[].".to_string(),
+        });
+        if let Ok(agent) = agent_next(router, &messages).await {
+            if agent.done {
+                last_answer = agent.final_answer.or(Some(agent.summary));
+            }
+        }
+    }
+
     Ok(DoCliResponse {
         task: task.to_string(),
         content: last_answer.unwrap_or_else(|| "No final answer (max steps reached).".to_string()),
