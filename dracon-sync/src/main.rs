@@ -99,22 +99,13 @@ struct SyncPolicy {
     inactivity_push_delay_secs: u64,
     #[serde(default = "default_true")]
     auto_commit: bool,
-    /// If true, bump Rust Cargo.toml version (patch only) before an auto-commit.
-    /// Best-effort, only applies when `Cargo.toml` exists at repo root.
-    #[serde(default)]
-    auto_bump_patch_version: bool,
-    /// If true, bump Node/TS package.json version (patch only) before an auto-commit.
-    /// Best-effort, only applies when `package.json` exists at repo root.
-    #[serde(default)]
-    auto_bump_node_package_version: bool,
-    /// If true, bump a repo-local VERSION file (patch only) before an auto-commit.
-    /// This is language-agnostic and useful for Go repos where versions are typically tags.
-    #[serde(default)]
-    auto_bump_version_file: bool,
-    /// If true, revert and skip commits that would only include Cargo.lock changes.
-    /// This prevents noisy lockfile-only commits from local builds/tooling.
+    /// If true, bump patch versions before an auto-commit (best-effort).
+    /// Applies to common files when present at repo root:
+    /// - Rust: `Cargo.toml` (and keep `Cargo.lock` aligned for root package)
+    /// - Node/TS: `package.json` (and align `package-lock.json` root `version` when applicable)
+    /// - Generic: `VERSION`
     #[serde(default = "default_true")]
-    avoid_cargo_lock_only_commits: bool,
+    auto_bump_versions: bool,
     #[serde(default = "default_true")]
     auto_pull: bool,
     #[serde(default = "default_true")]
@@ -173,14 +164,8 @@ fn is_lockfile_path(p: &str) -> bool {
 
 #[derive(Debug, Deserialize, Default, Clone)]
 struct RepoPolicyOverride {
-    /// Optional per-repo override for `auto_bump_patch_version`.
-    auto_bump_patch_version: Option<bool>,
-    /// Optional per-repo override for `auto_bump_node_package_version`.
-    auto_bump_node_package_version: Option<bool>,
-    /// Optional per-repo override for `auto_bump_version_file`.
-    auto_bump_version_file: Option<bool>,
-    /// Optional per-repo override for `avoid_cargo_lock_only_commits`.
-    avoid_cargo_lock_only_commits: Option<bool>,
+    /// Optional per-repo override for `auto_bump_versions`.
+    auto_bump_versions: Option<bool>,
 }
 
 fn load_repo_override(repo: &Path) -> RepoPolicyOverride {
@@ -691,10 +676,7 @@ struct StatusJson {
     auto_commit: bool,
     auto_pull: bool,
     auto_push: bool,
-    auto_bump_patch_version: bool,
-    auto_bump_node_package_version: bool,
-    auto_bump_version_file: bool,
-    avoid_cargo_lock_only_commits: bool,
+    auto_bump_versions: bool,
     auto_repair_concerns: bool,
     auto_repair_warns: bool,
     auto_rewrite_large_blobs: bool,
