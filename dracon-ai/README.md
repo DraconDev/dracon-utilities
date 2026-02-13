@@ -100,8 +100,9 @@ Resolution prefers environment variables first, then the secrets file.
 
 Composition is supported in three ways:
 
+- `dracon-ai do --apply ...` (plan+execute loop)
 - stdin/file prompt modes (outside the REPL)
-- `dracon-ai cmd ...` (one-shot capture+ask)
+- `dracon-ai cmd ...` (one-shot capture+ask; requires `DRACON_AI_ALLOW_CMD=1`)
 - REPL slash command: `/cmd <shell>`
 
 Tool execution is intentionally bounded:
