@@ -11,6 +11,12 @@ Instead, it consumes the canonical AI runtime from `dracon-libs` (policy, secret
 
 ## Commands
 
+### `dracon-ai` (default)
+
+Starts `do` mode interactively.
+
+Use this when your goal is something related to the computer (Nix changes, repo hygiene, service debugging, file operations).
+
 ### `dracon-ai status`
 
 Shows the resolved AI runtime view from `dracon-libs`:
@@ -19,9 +25,12 @@ Shows the resolved AI runtime view from `dracon-libs`:
 - active model ids
 - dev model ids
 
-### `dracon-ai` (interactive)
+### `dracon-ai do [--apply] [task...]`
 
-Starts an interactive REPL (line editing + history).
+Computer-context assistant. It returns a small set of shell commands to run for the task.
+
+- Without `--apply`, it prints the plan only.
+- With `--apply` (or `DRACON_AI_APPLY=1`), it runs the commands, captures output, and continues until done (bounded iterations).
 
 ### `dracon-ai chat [options] [prompt...]`
 
