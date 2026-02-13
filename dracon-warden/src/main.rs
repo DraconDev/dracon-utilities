@@ -169,6 +169,7 @@ fn effective_watch_roots(policy: &WardenPolicy) -> Vec<PathBuf> {
     roots.into_iter().collect()
 }
 
+#[allow(dead_code)]
 fn replace_managed_block(current: &str, managed_block: &str) -> String {
     if let Some(start) = current.find(BLOCK_BEGIN) {
         if let Some(end_rel) = current[start..].find(BLOCK_END) {
@@ -257,6 +258,7 @@ fn should_passthrough_filter_path(path: Option<&str>) -> bool {
     false
 }
 
+#[allow(dead_code)]
 fn apply_managed_file(path: &Path, block: &str) -> Result<bool> {
     let current = fs::read_to_string(path).unwrap_or_default();
     let next = replace_managed_block(&current, block);
@@ -280,6 +282,7 @@ fn apply_overwrite_file(path: &Path, content: &str) -> Result<bool> {
     Ok(false)
 }
 
+#[allow(dead_code)]
 fn newest_file(paths: Vec<PathBuf>) -> Option<PathBuf> {
     let mut with_mtime = paths
         .into_iter()
