@@ -390,6 +390,8 @@ struct StatusJson {
     auto_commit: bool,
     auto_pull: bool,
     auto_push: bool,
+    auto_bump_patch_version: bool,
+    avoid_cargo_lock_only_commits: bool,
     auto_repair_concerns: bool,
     auto_repair_warns: bool,
     auto_rewrite_large_blobs: bool,
@@ -3253,6 +3255,8 @@ async fn main() -> Result<()> {
                     auto_commit: policy.auto_commit,
                     auto_pull: policy.auto_pull,
                     auto_push: policy.auto_push,
+                    auto_bump_patch_version: policy.auto_bump_patch_version,
+                    avoid_cargo_lock_only_commits: policy.avoid_cargo_lock_only_commits,
                     auto_repair_concerns: policy.auto_repair_concerns,
                     auto_repair_warns: policy.auto_repair_warns,
                     auto_rewrite_large_blobs: policy.auto_rewrite_large_blobs,
@@ -3288,10 +3292,12 @@ async fn main() -> Result<()> {
                         .unwrap_or_else(|| "OFF".to_string())
                 );
                 println!(
-                    "⚙️ FLAGS: auto_commit={} auto_pull={} auto_push={} auto_repair_concerns={} auto_repair_warns={} auto_rewrite_large_blobs={}",
+                    "⚙️ FLAGS: auto_commit={} auto_pull={} auto_push={} auto_bump_patch_version={} avoid_cargo_lock_only_commits={} auto_repair_concerns={} auto_repair_warns={} auto_rewrite_large_blobs={}",
                     policy.auto_commit,
                     policy.auto_pull,
                     policy.auto_push,
+                    policy.auto_bump_patch_version,
+                    policy.avoid_cargo_lock_only_commits,
                     policy.auto_repair_concerns,
                     policy.auto_repair_warns,
                     policy.auto_rewrite_large_blobs
