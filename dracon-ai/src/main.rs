@@ -431,9 +431,19 @@ async fn ask_with_messages(
     let mut buf = String::new();
     let mut usage: Option<UsageStats> = None;
     let mut stdout = tokio::io::stdout();
+    let interrupt = tokio::signal::ctrl_c();
+    tokio::pin!(interrupt);
 
-    while let Some(item) = stream.next().await {
-        let chunk = item?;
+    loop {
+        tokio::select! {
+            _ = &mut interrupt => {
+                // Treat Ctrl-C as "stop streaming" not "crash the whole CLI".
+                // Return what we have so far.
+                break;
+            }
+            next = stream.next() => {
+                let Some(item) = next else { break; };
+                let chunk = item?;
         if !chunk.token.is_empty() {
             stdout.write_all(chunk.token.as_bytes()).await?;
             stdout.flush().await?;
@@ -441,6 +451,8 @@ async fn ask_with_messages(
         }
         if chunk.usage.is_some() {
             usage = chunk.usage;
+        }
+            }
         }
     }
 
