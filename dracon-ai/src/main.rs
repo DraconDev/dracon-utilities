@@ -154,14 +154,16 @@ async fn run_repl(
         title,
         dim("interactive mode. Ctrl-D or /exit to quit. Use /intent <name> to change intent.")
     );
+    eprintln!("{}", dim("Tip: use /paste then paste multi-line text, end with /end."));
     let stdin = tokio::io::stdin();
     let mut reader = tokio::io::BufReader::new(stdin);
-    let mut stdout = tokio::io::stdout();
+    let mut stdout = tokio::io::stdout(); // model output
+    let mut stderr = tokio::io::stderr(); // prompt + meta
 
     loop {
         let p = format!("{}> ", prompt_label(lane));
-        stdout.write_all(p.as_bytes()).await?;
-        stdout.flush().await?;
+        stderr.write_all(p.as_bytes()).await?;
+        stderr.flush().await?;
 
         let mut line = String::new();
         let n = reader.read_line(&mut line).await?;
@@ -175,6 +177,13 @@ async fn run_repl(
         if line == "/exit" || line == "/quit" {
             break;
         }
+        if line == "/help" || line == "/?" {
+            eprintln!("{}", dim("Commands:"));
+            eprintln!("{}", dim("  /intent <name>   set intent/lane hint"));
+            eprintln!("{}", dim("  /paste           begin multi-line paste (end with /end)"));
+            eprintln!("{}", dim("  /exit            quit"));
+            continue;
+        }
         if let Some(rest) = line.strip_prefix("/intent ") {
             let next = normalize_intent(rest);
             *lane = intent_to_lane(&next);
@@ -186,9 +195,51 @@ async fn run_repl(
             );
             continue;
         }
+        if line == "/paste" {
+            eprintln!(
+                "{} {}",
+                ansi("1;36", "paste"),
+                dim("mode: paste your text, then type /end on its own line.")
+            );
+            let mut buf = String::new();
+            loop {
+                let mut pline = String::new();
+                let n = reader.read_line(&mut pline).await?;
+                if n == 0 {
+                    break;
+                }
+                let trimmed = pline.trim_end_matches(&['\r', '\n'][..]).trim();
+                if trimmed == "/end" || trimmed == "/done" {
+                    break;
+                }
+                buf.push_str(&pline);
+            }
+            let prompt = buf.trim();
+            if prompt.is_empty() {
+                eprintln!("{}", dim("paste: empty input, cancelled"));
+                continue;
+            }
+            match ask_with_router(router, lane.clone(), prompt).await {
+                Ok(text) => {
+                    stdout.write_all(text.as_bytes()).await?;
+                    if !text.ends_with('\n') {
+                        stdout.write_all(b"\n").await?;
+                    }
+                    stdout.flush().await?;
+                }
+                Err(err) => eprintln!("{}: {}", ansi("1;31", "error"), err),
+            }
+            continue;
+        }
 
         match ask_with_router(router, lane.clone(), line).await {
-            Ok(text) => println!("{}", text),
+            Ok(text) => {
+                stdout.write_all(text.as_bytes()).await?;
+                if !text.ends_with('\n') {
+                    stdout.write_all(b"\n").await?;
+                }
+                stdout.flush().await?;
+            }
             Err(err) => eprintln!("{}: {}", ansi("1;31", "error"), err),
         }
     }
