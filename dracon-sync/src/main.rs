@@ -1754,6 +1754,22 @@ async fn sync_repo(
     let has_upstream = has_tracking_upstream(repo);
     let blob_threshold = push_large_blob_threshold_bytes(policy);
 
+    // Optional per-repo overrides (untracked local settings).
+    // Path: `<repo>/.dracon/dracon-sync.toml`
+    let repo_override = load_repo_override(repo);
+    let avoid_cargo_lock_only_commits = repo_override
+        .avoid_cargo_lock_only_commits
+        .unwrap_or(policy.avoid_cargo_lock_only_commits);
+    let auto_bump_patch_version = repo_override
+        .auto_bump_patch_version
+        .unwrap_or(policy.auto_bump_patch_version);
+    let auto_bump_node_package_version = repo_override
+        .auto_bump_node_package_version
+        .unwrap_or(policy.auto_bump_node_package_version);
+    let auto_bump_version_file = repo_override
+        .auto_bump_version_file
+        .unwrap_or(policy.auto_bump_version_file);
+
     if policy.auto_pull && has_origin && has_upstream {
         match tokio::time::timeout(
             Duration::from_secs(policy.pull_op_timeout_secs),
@@ -1848,7 +1864,7 @@ async fn sync_repo(
                 .collect();
 
             // Guardrail: avoid Cargo.lock-only commits (common noise from local builds/tooling).
-            if policy.avoid_cargo_lock_only_commits
+            if avoid_cargo_lock_only_commits
                 && !stage_paths.is_empty()
                 && stage_paths.iter().all(|p| is_lockfile_path(p))
             {
@@ -1863,14 +1879,32 @@ async fn sync_repo(
 
             svc.add_paths(&stage_paths).await?;
 
-            // Optional: bump patch version for Rust repos, then stage it (and any lock adjustment).
-            if policy.auto_bump_patch_version {
+            // Optional: bump patch versions, then stage any files we touched (best-effort).
+            // Rust: Cargo.toml (+ optional Cargo.lock alignment).
+            if auto_bump_patch_version {
                 let outcome = bump_patch_version_in_repo(repo)?;
                 if outcome.bumped_cargo_toml {
                     let _ = run_git_with_timeout(repo, &["add", "Cargo.toml"], 30, "add").await;
                 }
                 if outcome.updated_cargo_lock {
                     let _ = run_git_with_timeout(repo, &["add", "Cargo.lock"], 30, "add").await;
+                }
+            }
+            // Node/TS: package.json (+ optional package-lock.json alignment).
+            if auto_bump_node_package_version {
+                let outcome = bump_node_package_version_in_repo(repo)?;
+                if outcome.bumped {
+                    let _ = run_git_with_timeout(repo, &["add", "package.json"], 30, "add").await;
+                }
+                if outcome.updated_lock {
+                    let _ =
+                        run_git_with_timeout(repo, &["add", "package-lock.json"], 30, "add").await;
+                }
+            }
+            // Generic: VERSION file.
+            if auto_bump_version_file {
+                if bump_version_file_in_repo(repo)? {
+                    let _ = run_git_with_timeout(repo, &["add", "VERSION"], 30, "add").await;
                 }
             }
 
@@ -3260,19 +3294,21 @@ mod tests {
         }
     }
 
-    fn test_policy() -> SyncPolicy {
-        SyncPolicy {
-            system_repo: String::new(),
-            pulse_interval_secs: 5,
-            inactivity_push_delay_secs: 3,
-            auto_commit: true,
-            auto_pull: true,
-            auto_push: true,
-            auto_bump_patch_version: false,
-            avoid_cargo_lock_only_commits: true,
-            backup_policy: String::new(),
-            backup_dir: String::new(),
-            watch_roots: vec![],
+	    fn test_policy() -> SyncPolicy {
+	        SyncPolicy {
+	            system_repo: String::new(),
+	            pulse_interval_secs: 5,
+	            inactivity_push_delay_secs: 3,
+	            auto_commit: true,
+	            auto_pull: true,
+	            auto_push: true,
+	            auto_bump_patch_version: false,
+	            auto_bump_node_package_version: false,
+	            auto_bump_version_file: false,
+	            avoid_cargo_lock_only_commits: true,
+	            backup_policy: String::new(),
+	            backup_dir: String::new(),
+	            watch_roots: vec![],
             extra_remotes: HashMap::new(),
             exclude_dir_names: vec!["target".into(), "node_modules".into()],
             max_stage_file_bytes: 1024,
