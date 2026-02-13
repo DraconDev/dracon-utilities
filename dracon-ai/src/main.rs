@@ -479,11 +479,14 @@ fn agent_system_prompt() -> String {
     [
         "You are dracon-ai, a computer-context assistant.",
         "Your job is to propose shell commands to accomplish the user's task, then react to captured outputs.",
+        "Environment: NixOS. Prefer declarative changes in the system repo and Nix tooling.",
         "Reply with ONLY a single JSON object matching this schema:",
         r#"{ "done": boolean, "summary": string, "commands": [ { "cmd": string, "why": string } ], "final_answer": string|null }"#,
         "Rules:",
         "- If you need to execute commands, set done=false and provide 1-3 commands.",
         "- Commands must be safe, minimal, and non-destructive by default.",
+        "- Do NOT use `nix-env` (imperative installs) unless explicitly requested; prefer editing the Nix config under the system repo and rebuilding.",
+        "- Avoid global `pip install` by default. Prefer Nix shells/devshells or project-local venv/uv workflows. If unsure, ask for the project context.",
         "- Do not include markdown fences, no prose outside JSON, no backticks.",
         "- When finished, set done=true and provide final_answer.",
     ]
@@ -728,7 +731,7 @@ async fn run_do_repl(
     eprintln!(
         "{} {}",
         ansi("1;36", "dracon-ai"),
-        dim("do mode. Type a task, Ctrl-D or /exit. Use /apply on|off.")
+        dim("do mode. Type a task, Ctrl-D or /exit. /help for commands.")
     );
 
     let mut rl = Editor::<(), rustyline::history::DefaultHistory>::new()?;
@@ -741,9 +744,15 @@ async fn run_do_repl(
 
     let mut cur_apply = apply;
     let mut cur_dangerous = dangerous;
+    let mut last_task: Option<String> = None;
 
     loop {
-        let line = tokio::task::block_in_place(|| rl.readline("do> "));
+        let prompt = if cur_apply {
+            "do(apply=on)> "
+        } else {
+            "do(apply=off)> "
+        };
+        let line = tokio::task::block_in_place(|| rl.readline(prompt));
         match line {
             Ok(line) => {
                 let line = line.trim();
@@ -757,6 +766,15 @@ async fn run_do_repl(
 
                 if line == "/exit" || line == "/quit" {
                     break;
+                }
+                if line == "/help" || line == "/?" {
+                    eprintln!("{}", dim("Commands:"));
+                    eprintln!("{}", dim("  /apply on|off       toggle execution (default off)"));
+                    eprintln!("{}", dim("  /dangerous on|off   allow dangerous commands (sudo/rm/etc)"));
+                    eprintln!("{}", dim("  /config             show resolved dracon-ai config"));
+                    eprintln!("{}", dim("  do so | do it       re-run last task (uses current apply/dangerous toggles)"));
+                    eprintln!("{}", dim("  /exit               quit"));
+                    continue;
                 }
                 if let Some(rest) = line.strip_prefix("/apply ") {
                     let v = rest.trim();
@@ -788,9 +806,34 @@ async fn run_do_repl(
                     continue;
                 }
 
+                // UX sugar: allow "do so"/"do it" to re-run last task without retyping.
+                let mut effective = line.to_string();
+                if matches!(line, "do so" | "do it" | "run it") {
+                    if let Some(t) = last_task.clone() {
+                        effective = t;
+                    } else {
+                        eprintln!("{}", dim("no previous task to re-run"));
+                        continue;
+                    }
+                }
+
+                // Allow a common habit: appending `--apply` to mean "run it now".
+                if effective.contains("--apply") {
+                    cur_apply = true;
+                    effective = effective.replace("--apply", "").trim().to_string();
+                }
+                if effective.contains("--dangerous") {
+                    cur_dangerous = true;
+                    effective = effective.replace("--dangerous", "").trim().to_string();
+                }
+                if effective.is_empty() {
+                    continue;
+                }
+
+                last_task = Some(effective.clone());
                 let resp = run_do_task(
                     router,
-                    line,
+                    &effective,
                     cur_apply,
                     cur_dangerous,
                     max_steps,

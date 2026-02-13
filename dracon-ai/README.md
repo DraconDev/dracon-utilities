@@ -32,6 +32,12 @@ Computer-context assistant. It returns a small set of shell commands to run for 
 - Without `--apply`, it prints the plan only.
 - With `--apply` (or `DRACON_AI_APPLY=1`), it runs the commands, captures output, and continues until done (bounded iterations).
 
+Interactive helpers:
+
+- `/apply on|off`
+- `/dangerous on|off`
+- `do so` (re-run the last task)
+
 ### `dracon-ai chat [options] [prompt...]`
 
 Sends a single prompt through the `dracon-libs` routing runtime.
