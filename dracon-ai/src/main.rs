@@ -11,6 +11,37 @@ use std::time::Duration;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};
 use tokio::process::Command;
 
+#[derive(Debug, Clone, Default, Deserialize)]
+struct DraconAiConfig {
+    /// System repo root (usually ~/dracon)
+    system_root: Option<PathBuf>,
+    /// NixOS config root (usually ~/dracon/nixos)
+    nixos_root: Option<PathBuf>,
+    /// Whether do-mode should auto-run a Nix context probe when task mentions Nix/NixOS.
+    #[serde(default)]
+    do_auto_probe_nix: bool,
+}
+
+fn resolve_config_path() -> Option<PathBuf> {
+    // Keep consistent with other utilities: system repo is the canonical policy owner.
+    // Allow override for experimentation.
+    if let Ok(p) = std::env::var("DRACON_AI_CONFIG") {
+        return Some(PathBuf::from(p));
+    }
+    let home = dirs::home_dir()?;
+    Some(home.join("dracon").join("utilities").join("ai").join("dracon-ai.toml"))
+}
+
+fn load_config() -> DraconAiConfig {
+    let Some(path) = resolve_config_path() else {
+        return DraconAiConfig::default();
+    };
+    let Ok(raw) = std::fs::read_to_string(&path) else {
+        return DraconAiConfig::default();
+    };
+    toml::from_str(&raw).unwrap_or_default()
+}
+
 #[derive(Parser)]
 #[command(
     name = "dracon-ai",
@@ -528,6 +559,7 @@ async fn run_do_task(
     timeout_secs: u64,
     max_bytes: usize,
 ) -> Result<DoCliResponse> {
+    let cfg = load_config();
     let mut messages: Vec<ChatMessage> = vec![
         ChatMessage {
             role: "system".to_string(),
@@ -536,12 +568,20 @@ async fn run_do_task(
         ChatMessage {
             role: "system".to_string(),
             content: format!(
-                "Context: os={} arch={} cwd={}",
+                "Context: os={} arch={} cwd={} system_root={} nixos_root={}",
                 std::env::consts::OS,
                 std::env::consts::ARCH,
                 std::env::current_dir()
                     .unwrap_or_else(|_| PathBuf::from("."))
-                    .display()
+                    .display(),
+                cfg.system_root
+                    .as_deref()
+                    .unwrap_or_else(|| Path::new("/home/dracon/dracon"))
+                    .display(),
+                cfg.nixos_root
+                    .as_deref()
+                    .unwrap_or_else(|| Path::new("/home/dracon/dracon/nixos"))
+                    .display(),
             ),
         },
         ChatMessage {
@@ -552,6 +592,43 @@ async fn run_do_task(
 
     let mut commands_ran: Vec<String> = Vec::new();
     let mut last_answer: Option<String> = None;
+
+    // Optional: if apply is enabled and task is Nix-ish, probe a little state up front.
+    // This keeps "do mode" effective without making the user educate the agent each time.
+    let task_lc = task.to_ascii_lowercase();
+    let mentions_nix = task_lc.contains("nix")
+        || task_lc.contains("nixos")
+        || task_lc.contains("home-manager")
+        || task_lc.contains("flake");
+    if apply && cfg.do_auto_probe_nix && mentions_nix {
+        let nixos_root = cfg
+            .nixos_root
+            .clone()
+            .unwrap_or_else(|| PathBuf::from("/home/dracon/dracon/nixos"));
+        let probes = [
+            ("nix --version", "confirm nix is available"),
+            ("nixos-rebuild --version", "confirm rebuild tool is available"),
+            ("ls -la", "show cwd"),
+            (&format!("ls -la {}", nixos_root.display()), "show nixos root"),
+            (&format!("git -C {} status -sb", nixos_root.display()), "show nixos git status"),
+        ];
+        for (cmd, _why) in probes {
+            let capture = run_shell_capture(cmd, Duration::from_secs(timeout_secs), max_bytes).await?;
+            commands_ran.push(cmd.to_string());
+            messages.push(ChatMessage {
+                role: "system".to_string(),
+                content: format!(
+                    "Pre-probe output.\ncmd={}\nexit={}\noutput:\n{}",
+                    cmd,
+                    capture
+                        .status_code
+                        .map(|c| c.to_string())
+                        .unwrap_or_else(|| "unknown".to_string()),
+                    capture.output
+                ),
+            });
+        }
+    }
 
     for step_idx in 0..max_steps {
         let agent = agent_next(router, &messages).await?;
@@ -677,6 +754,23 @@ async fn run_do_repl(
                     let v = rest.trim();
                     cur_dangerous = v == "1" || v == "on" || v == "true" || v == "yes";
                     eprintln!("{}", dim(&format!("dangerous={}", cur_dangerous)));
+                    continue;
+                }
+                if line == "/config" {
+                    let cfg = load_config();
+                    eprintln!(
+                        "{} system_root={} nixos_root={} do_auto_probe_nix={}",
+                        dim("config:"),
+                        cfg.system_root
+                            .as_deref()
+                            .unwrap_or_else(|| Path::new("/home/dracon/dracon"))
+                            .display(),
+                        cfg.nixos_root
+                            .as_deref()
+                            .unwrap_or_else(|| Path::new("/home/dracon/dracon/nixos"))
+                            .display(),
+                        cfg.do_auto_probe_nix
+                    );
                     continue;
                 }
 
