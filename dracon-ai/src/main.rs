@@ -2,7 +2,7 @@ use anyhow::{anyhow, Result};
 use clap::{Parser, Subcommand};
 use dracon_ai_contracts::{RoutingTask, SelectionConstraints};
 use dracon_ai_runtime_contracts::traits::AiProvider;
-use std::io::Read;
+use std::io::{BufRead, Read, Write};
 
 #[derive(Parser)]
 #[command(
@@ -20,8 +20,9 @@ enum Cmd {
         /// Intent/lane hint (e.g. commit, engineer, verify)
         #[arg(short, long, default_value = "engineer")]
         intent: String,
-        /// The prompt message. Use `-` to read from stdin.
-        prompt: String,
+        /// Prompt text. If omitted, enters interactive mode. Use `-` to read from stdin.
+        #[arg(value_name = "PROMPT", num_args = 0.., trailing_var_arg = true)]
+        prompt: Vec<String>,
     },
     /// 📜 Show AI runtime status (resolved policy + active/dev models)
     Status,
@@ -33,15 +34,25 @@ async fn main() -> Result<()> {
     match cli.cmd {
         Cmd::Chat { intent, prompt } => {
             let intent = normalize_intent(&intent);
-            let lane = intent_to_lane(&intent);
-            let prompt = if prompt.trim() == "-" {
+            let mut lane = intent_to_lane(&intent);
+
+            // Build router once per invocation; reused for interactive sessions.
+            let router = build_router()?;
+
+            // Interactive mode: `dracon-ai chat` with no prompt args.
+            if prompt.is_empty() {
+                return run_repl(&router, &mut lane);
+            }
+
+            let prompt = if prompt.len() == 1 && prompt[0].trim() == "-" {
                 let mut buf = String::new();
                 std::io::stdin().read_to_string(&mut buf)?;
                 buf
             } else {
-                prompt
+                prompt.join(" ")
             };
-            let response = ask_once(lane, &prompt).await?;
+
+            let response = ask_with_router(&router, lane, &prompt).await?;
             println!("{}", response);
             Ok(())
         },
@@ -75,7 +86,7 @@ fn intent_to_lane(intent: &str) -> RoutingTask {
     }
 }
 
-async fn ask_once(lane: RoutingTask, prompt: &str) -> Result<String> {
+fn build_router() -> Result<ai_routing_runtime::SmartRouter<dyn AiProvider>> {
     let resolved = ai_runtime_config::resolve_ai_runtime_config();
 
     let mut registry: ai_routing_runtime::ProviderRegistry<dyn AiProvider> =
@@ -98,13 +109,57 @@ async fn ask_once(lane: RoutingTask, prompt: &str) -> Result<String> {
         ));
     }
 
-    let router = ai_routing_runtime::SmartRouter::new(
+    Ok(ai_routing_runtime::SmartRouter::new(
         registry,
         resolved.dev_model_ids.clone(),
         resolved.active_model_ids.clone(),
         resolved.lane_model_policy.clone(),
-    );
+    ))
+}
 
+fn run_repl(router: &ai_routing_runtime::SmartRouter<dyn AiProvider>, lane: &mut RoutingTask) -> Result<()> {
+    eprintln!("dracon-ai interactive mode. Ctrl-D or /exit to quit. Use /intent <name> to change intent.");
+    let stdin = std::io::stdin();
+    let mut stdout = std::io::stdout();
+
+    loop {
+        write!(&mut stdout, "> ")?;
+        stdout.flush()?;
+
+        let mut line = String::new();
+        let n = stdin.lock().read_line(&mut line)?;
+        if n == 0 {
+            break;
+        }
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        if line == "/exit" || line == "/quit" {
+            break;
+        }
+        if let Some(rest) = line.strip_prefix("/intent ") {
+            let next = normalize_intent(rest);
+            *lane = intent_to_lane(&next);
+            eprintln!("intent set: {}", next);
+            continue;
+        }
+
+        // Execute one prompt. (Run on the current tokio runtime.)
+        let response = tokio::runtime::Handle::current().block_on(ask_with_router(router, lane.clone(), line));
+        match response {
+            Ok(text) => println!("{}", text),
+            Err(err) => eprintln!("error: {}", err),
+        }
+    }
+    Ok(())
+}
+
+async fn ask_with_router(
+    router: &ai_routing_runtime::SmartRouter<dyn AiProvider>,
+    lane: RoutingTask,
+    prompt: &str,
+) -> Result<String> {
     let messages = vec![ai_routing_runtime::RoutingMessage {
         role: "user".to_string(),
         content: prompt.to_string(),
@@ -130,11 +185,11 @@ mod tests {
 
     #[test]
     fn parses_chat_with_default_intent() {
-        let cli = Cli::try_parse_from(["dracon-ai", "chat", "hello world"]).expect("chat parses");
+        let cli = Cli::try_parse_from(["dracon-ai", "chat", "hello", "world"]).expect("chat parses");
         match cli.cmd {
             Cmd::Chat { intent, prompt } => {
                 assert_eq!(intent, "engineer");
-                assert_eq!(prompt, "hello world");
+                assert_eq!(prompt, vec!["hello", "world"]);
             }
             _ => panic!("expected chat command"),
         }
@@ -142,12 +197,24 @@ mod tests {
 
     #[test]
     fn parses_chat_with_explicit_intent() {
-        let cli = Cli::try_parse_from(["dracon-ai", "chat", "--intent", "commit", "ship it"])
+        let cli = Cli::try_parse_from(["dracon-ai", "chat", "--intent", "commit", "ship", "it"])
             .expect("chat with explicit intent parses");
         match cli.cmd {
             Cmd::Chat { intent, prompt } => {
                 assert_eq!(intent, "commit");
-                assert_eq!(prompt, "ship it");
+                assert_eq!(prompt, vec!["ship", "it"]);
+            }
+            _ => panic!("expected chat command"),
+        }
+    }
+
+    #[test]
+    fn parses_chat_without_prompt_for_interactive_mode() {
+        let cli = Cli::try_parse_from(["dracon-ai", "chat"]).expect("chat parses");
+        match cli.cmd {
+            Cmd::Chat { intent, prompt } => {
+                assert_eq!(intent, "engineer");
+                assert!(prompt.is_empty());
             }
             _ => panic!("expected chat command"),
         }
