@@ -3,4 +3,4 @@
 - we have the ai lib already lets try to use it via dracon ai 
 
 - dracon code 
-  - make sure the context of the convo is always saved in the 
+  - make sure the context of the convo is always saved in the repo, we are using git as an ai version control
