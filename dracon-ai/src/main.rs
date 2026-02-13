@@ -2,7 +2,8 @@ use anyhow::{anyhow, Result};
 use clap::{Parser, Subcommand};
 use dracon_ai_contracts::{RoutingTask, SelectionConstraints};
 use dracon_ai_runtime_contracts::traits::AiProvider;
-use std::io::{BufRead, Read, Write};
+use std::io::Read;
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
 
 #[derive(Parser)]
 #[command(
@@ -41,7 +42,7 @@ async fn main() -> Result<()> {
 
             // Interactive mode: `dracon-ai chat` with no prompt args.
             if prompt.is_empty() {
-                return run_repl(&router, &mut lane);
+                return run_repl(&router, &mut lane).await;
             }
 
             let prompt = if prompt.len() == 1 && prompt[0].trim() == "-" {
@@ -117,17 +118,21 @@ fn build_router() -> Result<ai_routing_runtime::SmartRouter<dyn AiProvider>> {
     ))
 }
 
-fn run_repl(router: &ai_routing_runtime::SmartRouter<dyn AiProvider>, lane: &mut RoutingTask) -> Result<()> {
+async fn run_repl(
+    router: &ai_routing_runtime::SmartRouter<dyn AiProvider>,
+    lane: &mut RoutingTask,
+) -> Result<()> {
     eprintln!("dracon-ai interactive mode. Ctrl-D or /exit to quit. Use /intent <name> to change intent.");
-    let stdin = std::io::stdin();
-    let mut stdout = std::io::stdout();
+    let stdin = tokio::io::stdin();
+    let mut reader = tokio::io::BufReader::new(stdin);
+    let mut stdout = tokio::io::stdout();
 
     loop {
-        write!(&mut stdout, "> ")?;
-        stdout.flush()?;
+        stdout.write_all(b"> ").await?;
+        stdout.flush().await?;
 
         let mut line = String::new();
-        let n = stdin.lock().read_line(&mut line)?;
+        let n = reader.read_line(&mut line).await?;
         if n == 0 {
             break;
         }
@@ -145,9 +150,7 @@ fn run_repl(router: &ai_routing_runtime::SmartRouter<dyn AiProvider>, lane: &mut
             continue;
         }
 
-        // Execute one prompt. (Run on the current tokio runtime.)
-        let response = tokio::runtime::Handle::current().block_on(ask_with_router(router, lane.clone(), line));
-        match response {
+        match ask_with_router(router, lane.clone(), line).await {
             Ok(text) => println!("{}", text),
             Err(err) => eprintln!("error: {}", err),
         }
