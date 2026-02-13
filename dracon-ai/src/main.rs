@@ -502,12 +502,12 @@ async fn run_shell_capture(cmd: &str, timeout: Duration, max_bytes: usize) -> Re
 
     let out_bytes = tokio::time::timeout(timeout, out_task)
         .await
-        .map_err(|_| anyhow!("stdout capture timeout after {:?}", timeout))???
-        ;
+        .map_err(|_| anyhow!("stdout capture timeout after {:?}", timeout))?
+        .map_err(|e| anyhow!("stdout capture join failed: {}", e))??;
     let err_bytes = tokio::time::timeout(timeout, err_task)
         .await
-        .map_err(|_| anyhow!("stderr capture timeout after {:?}", timeout))???
-        ;
+        .map_err(|_| anyhow!("stderr capture timeout after {:?}", timeout))?
+        .map_err(|e| anyhow!("stderr capture join failed: {}", e))??;
 
     let mut combined = Vec::new();
     combined.extend_from_slice(&out_bytes);
