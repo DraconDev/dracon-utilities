@@ -1,5 +1,5 @@
 - dracon code 
   - make sure the context of the convo is always saved in the repo, we are using git as an ai version control
   - high auto
-    - meaing we are planning on 
+    - ideally super strict and detailed plan 
   - 
