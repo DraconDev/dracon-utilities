@@ -1,6 +1,7 @@
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use dracon_security_kit::{DraconWarden, Warden};
+use globset::{Glob, GlobSet, GlobSetBuilder};
 use notify::{Event, RecursiveMode, Watcher};
 use serde::Deserialize;
 use std::collections::BTreeSet;
@@ -39,6 +40,14 @@ enum Command {
     FilterSmudge {
         /// Optional path from git filter (%f)
         path: Option<String>,
+    },
+    /// Scan plaintext JSON files for DEMON_SECRET/DRACON_SECRET markers and optionally scrub them.
+    ScrubMarkers {
+        /// Apply edits in-place. Without this flag, the command is a dry-run report.
+        #[arg(long)]
+        apply: bool,
+        /// Optional repo path to scan. If omitted, scans repos under warden watch_roots.
+        repo: Option<PathBuf>,
     },
 }
 
@@ -540,8 +549,156 @@ fn main() -> Result<()> {
             let policy_path = resolve_policy_path()?;
             run_daemon(policy_path)?;
         }
+        Command::ScrubMarkers { apply, repo } => {
+            let policy_path = resolve_policy_path()?;
+            let policy = WardenPolicy::load(&policy_path)?;
+            let roots = effective_watch_roots(&policy);
+            let repos = if let Some(r) = repo {
+                vec![r]
+            } else {
+                discover_git_repos(&roots)
+            };
+            scrub_markers(&policy, &repos, apply)?;
+        }
     }
 
+    Ok(())
+}
+
+fn build_globset(patterns: &[String]) -> Result<GlobSet> {
+    let mut b = GlobSetBuilder::new();
+    for p in patterns {
+        // globset expects / separators
+        let pat = p.replace('\\', "/");
+        b.add(Glob::new(&pat).with_context(|| format!("invalid glob pattern: {p}"))?);
+    }
+    Ok(b.build()?)
+}
+
+fn is_marker_string(s: &str) -> bool {
+    s.contains("[DEMON_SECRET:") || s.contains("[DRACON_SECRET:")
+}
+
+fn scrub_json_value(v: &mut serde_json::Value) {
+    match v {
+        serde_json::Value::String(s) => {
+            if is_marker_string(s) {
+                // Default: remove marker payloads in plaintext JSON.
+                *v = serde_json::Value::Null;
+            }
+        }
+        serde_json::Value::Array(a) => {
+            for it in a {
+                scrub_json_value(it);
+            }
+        }
+        serde_json::Value::Object(m) => {
+            // Heuristic fix for known nav templates: href_key can be inferred from href.
+            let href = m.get("href").and_then(|v| v.as_str()).map(|s| s.to_string());
+            if let (Some(href), Some(href_key)) = (href, m.get_mut("href_key")) {
+                if let serde_json::Value::String(hk) = href_key {
+                    if is_marker_string(hk) {
+                        let replacement = match href.as_str() {
+                            "/products" => Some("public_products"),
+                            "/licensing" => Some("public_licensing"),
+                            "/products/cortex" => Some("cortex_home"),
+                            _ => None,
+                        };
+                        if let Some(r) = replacement {
+                            *href_key = serde_json::Value::String(r.to_string());
+                        } else {
+                            *href_key = serde_json::Value::Null;
+                        }
+                    }
+                }
+            }
+
+            for (_, vv) in m.iter_mut() {
+                scrub_json_value(vv);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn scrub_markers(policy: &WardenPolicy, repos: &[PathBuf], apply: bool) -> Result<()> {
+    let protected = build_globset(&policy.protected_patterns)?;
+
+    let mut found = 0usize;
+    let mut changed = 0usize;
+    let mut skipped = 0usize;
+
+    for repo in repos {
+        if !repo.join(".git").exists() {
+            continue;
+        }
+
+        // Scan only tracked files to avoid touching local noise.
+        let out = std::process::Command::new("git")
+            .arg("-C")
+            .arg(repo)
+            .arg("ls-files")
+            .output()
+            .with_context(|| format!("git ls-files failed for {}", repo.display()))?;
+        if !out.status.success() {
+            continue;
+        }
+
+        let stdout = String::from_utf8_lossy(&out.stdout);
+        for rel in stdout.lines() {
+            if rel.is_empty() {
+                continue;
+            }
+            let rel_norm = rel.replace('\\', "/");
+            if protected.is_match(&rel_norm) {
+                continue; // markers are allowed in protected/encrypted files.
+            }
+            if !rel_norm.ends_with(".json") {
+                continue;
+            }
+
+            let path = repo.join(rel);
+            let Ok(content) = fs::read_to_string(&path) else {
+                continue;
+            };
+            if !is_marker_string(&content) {
+                continue;
+            }
+
+            found += 1;
+            if !apply {
+                println!("⚠️ markers found: {}", path.display());
+                continue;
+            }
+
+            // Attempt structured scrub; if parse fails (broken JSON), do not guess.
+            let mut v: serde_json::Value = match serde_json::from_str(&content) {
+                Ok(v) => v,
+                Err(_) => {
+                    skipped += 1;
+                    eprintln!("⚠️ cannot scrub invalid JSON (manual fix needed): {}", path.display());
+                    continue;
+                }
+            };
+
+            scrub_json_value(&mut v);
+            let next = serde_json::to_string_pretty(&v)?;
+            if next != content {
+                fs::write(&path, next)?;
+                changed += 1;
+                println!("✅ scrubbed: {}", path.display());
+            }
+        }
+    }
+
+    if apply {
+        println!(
+            "✅ scrub complete (found: {}, changed: {}, skipped_invalid_json: {})",
+            found, changed, skipped
+        );
+    } else {
+        println!("✅ scrub report complete (found: {})", found);
+    }
     Ok(())
 }
 
