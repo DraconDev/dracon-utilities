@@ -260,6 +260,7 @@ fn set_first_json_string_field_to_value(
 struct BumpOutcome {
     bumped_cargo_toml: bool,
     updated_cargo_lock: bool,
+    bumped_workspace_package: bool,
 }
 
 fn bump_patch_version_in_repo(repo: &Path) -> Result<BumpOutcome> {
@@ -431,6 +432,7 @@ fn bump_patch_version_in_repo(repo: &Path) -> Result<BumpOutcome> {
         return Ok(BumpOutcome {
             bumped_cargo_toml: false,
             updated_cargo_lock: false,
+            bumped_workspace_package: false,
         });
     };
 
@@ -443,6 +445,7 @@ fn bump_patch_version_in_repo(repo: &Path) -> Result<BumpOutcome> {
         return Ok(BumpOutcome {
             bumped_cargo_toml: false,
             updated_cargo_lock: false,
+            bumped_workspace_package: false,
         });
     };
 
@@ -450,6 +453,7 @@ fn bump_patch_version_in_repo(repo: &Path) -> Result<BumpOutcome> {
         return Ok(BumpOutcome {
             bumped_cargo_toml: false,
             updated_cargo_lock: false,
+            bumped_workspace_package: false,
         });
     }
 
@@ -468,6 +472,7 @@ fn bump_patch_version_in_repo(repo: &Path) -> Result<BumpOutcome> {
     Ok(BumpOutcome {
         bumped_cargo_toml: true,
         updated_cargo_lock,
+        bumped_workspace_package: bumped_section == "workspace.package",
     })
 }
 
