@@ -380,7 +380,10 @@ fn harden_repo(
     let gitignore_path = repo.join(".gitignore");
     let gitattributes_path = repo.join(".gitattributes");
 
-    let gitignore_changed = apply_managed_file(&gitignore_path, &build_gitignore_block(policy))?;
+    // Be aggressive: fully overwrite these files so other tooling (ex: Demon)
+    // cannot keep re-introducing conflicting managed blocks that cause churn.
+    let gitignore_changed =
+        apply_overwrite_file(&gitignore_path, &build_gitignore_block(policy))?;
     let gitattributes_changed =
         apply_overwrite_file(&gitattributes_path, &build_gitattributes_block(policy))?;
     let key_changed = match pubkey_path {

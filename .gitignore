@@ -28,9 +28,15 @@ build/
 !Cargo.lock
 !Cargo.toml
 !clippy.toml
+!config/licenses.json
+!config/licenses.test.json
+!config/services.json
+!config/services.test.json
 !deny.toml
 !flake.lock
 !flake.nix
+!plan/pages/snapshots/*.json
+!plan/pages/templates/*.json
 !rust-toolchain.toml
 !rustfmt.toml
 # --- END DRACON MANAGED BLOCK ---
