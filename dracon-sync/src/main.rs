@@ -1739,18 +1739,9 @@ async fn sync_repo(
     // Optional per-repo overrides (untracked local settings).
     // Path: `<repo>/.dracon/dracon-sync.toml`
     let repo_override = load_repo_override(repo);
-    let avoid_cargo_lock_only_commits = repo_override
-        .avoid_cargo_lock_only_commits
-        .unwrap_or(policy.avoid_cargo_lock_only_commits);
-    let auto_bump_patch_version = repo_override
-        .auto_bump_patch_version
-        .unwrap_or(policy.auto_bump_patch_version);
-    let auto_bump_node_package_version = repo_override
-        .auto_bump_node_package_version
-        .unwrap_or(policy.auto_bump_node_package_version);
-    let auto_bump_version_file = repo_override
-        .auto_bump_version_file
-        .unwrap_or(policy.auto_bump_version_file);
+    let auto_bump_versions = repo_override
+        .auto_bump_versions
+        .unwrap_or(policy.auto_bump_versions);
 
     if policy.auto_pull && has_origin && has_upstream {
         match tokio::time::timeout(
@@ -1845,11 +1836,8 @@ async fn sync_repo(
                 .map(|e| e.path.to_string_lossy().to_string())
                 .collect();
 
-            // Guardrail: avoid Cargo.lock-only commits (common noise from local builds/tooling).
-            if avoid_cargo_lock_only_commits
-                && !stage_paths.is_empty()
-                && stage_paths.iter().all(|p| is_lockfile_path(p))
-            {
+            // Guardrail: always avoid Cargo.lock-only commits (common noise from local builds/tooling).
+            if !stage_paths.is_empty() && stage_paths.iter().all(|p| is_lockfile_path(p)) {
                 eprintln!(
                     "🧹 skipping Cargo.lock-only commit in {} (reverting {} path(s))",
                     repo.display(),
@@ -1863,7 +1851,7 @@ async fn sync_repo(
 
             // Optional: bump patch versions, then stage any files we touched (best-effort).
             // Rust: Cargo.toml (+ optional Cargo.lock alignment).
-            if auto_bump_patch_version {
+            if auto_bump_versions {
                 let outcome = bump_patch_version_in_repo(repo)?;
                 if outcome.bumped_cargo_toml {
                     let _ = run_git_with_timeout(repo, &["add", "Cargo.toml"], 30, "add").await;
@@ -1871,9 +1859,8 @@ async fn sync_repo(
                 if outcome.updated_cargo_lock {
                     let _ = run_git_with_timeout(repo, &["add", "Cargo.lock"], 30, "add").await;
                 }
-            }
-            // Node/TS: package.json (+ optional package-lock.json alignment).
-            if auto_bump_node_package_version {
+
+                // Node/TS: package.json (+ optional package-lock.json alignment).
                 let outcome = bump_node_package_version_in_repo(repo)?;
                 if outcome.bumped {
                     let _ = run_git_with_timeout(repo, &["add", "package.json"], 30, "add").await;
@@ -1882,9 +1869,8 @@ async fn sync_repo(
                     let _ =
                         run_git_with_timeout(repo, &["add", "package-lock.json"], 30, "add").await;
                 }
-            }
-            // Generic: VERSION file.
-            if auto_bump_version_file {
+
+                // Generic: VERSION file.
                 if bump_version_file_in_repo(repo)? {
                     let _ = run_git_with_timeout(repo, &["add", "VERSION"], 30, "add").await;
                 }
@@ -3284,15 +3270,12 @@ mod tests {
 	            auto_commit: true,
 	            auto_pull: true,
 	            auto_push: true,
-	            auto_bump_patch_version: false,
-	            auto_bump_node_package_version: false,
-	            auto_bump_version_file: false,
-	            avoid_cargo_lock_only_commits: true,
+	            auto_bump_versions: true,
 	            backup_policy: String::new(),
 	            backup_dir: String::new(),
 	            watch_roots: vec![],
-            extra_remotes: HashMap::new(),
-            exclude_dir_names: vec!["target".into(), "node_modules".into()],
+	            extra_remotes: HashMap::new(),
+	            exclude_dir_names: vec!["target".into(), "node_modules".into()],
             max_stage_file_bytes: 1024,
             pull_op_timeout_secs: 10,
             push_op_timeout_secs: 10,
@@ -3588,10 +3571,7 @@ async fn main() -> Result<()> {
                     auto_commit: policy.auto_commit,
                     auto_pull: policy.auto_pull,
                     auto_push: policy.auto_push,
-                    auto_bump_patch_version: policy.auto_bump_patch_version,
-                    auto_bump_node_package_version: policy.auto_bump_node_package_version,
-                    auto_bump_version_file: policy.auto_bump_version_file,
-                    avoid_cargo_lock_only_commits: policy.avoid_cargo_lock_only_commits,
+                    auto_bump_versions: policy.auto_bump_versions,
                     auto_repair_concerns: policy.auto_repair_concerns,
                     auto_repair_warns: policy.auto_repair_warns,
                     auto_rewrite_large_blobs: policy.auto_rewrite_large_blobs,
@@ -3627,14 +3607,11 @@ async fn main() -> Result<()> {
                         .unwrap_or_else(|| "OFF".to_string())
                 );
                 println!(
-                    "⚙️ FLAGS: auto_commit={} auto_pull={} auto_push={} auto_bump_patch_version={} auto_bump_node_package_version={} auto_bump_version_file={} avoid_cargo_lock_only_commits={} auto_repair_concerns={} auto_repair_warns={} auto_rewrite_large_blobs={}",
+                    "⚙️ FLAGS: auto_commit={} auto_pull={} auto_push={} auto_bump_versions={} auto_repair_concerns={} auto_repair_warns={} auto_rewrite_large_blobs={}",
                     policy.auto_commit,
                     policy.auto_pull,
                     policy.auto_push,
-                    policy.auto_bump_patch_version,
-                    policy.auto_bump_node_package_version,
-                    policy.auto_bump_version_file,
-                    policy.avoid_cargo_lock_only_commits,
+                    policy.auto_bump_versions,
                     policy.auto_repair_concerns,
                     policy.auto_repair_warns,
                     policy.auto_rewrite_large_blobs
