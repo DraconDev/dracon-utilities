@@ -19,19 +19,43 @@ Shows the resolved AI runtime view from `dracon-libs`:
 - active model ids
 - dev model ids
 
-### `dracon-ai chat [--intent <intent>] <prompt|->`
+### `dracon-ai` (interactive)
+
+Starts an interactive REPL (line editing + history).
+
+### `dracon-ai chat [options] [prompt...]`
 
 Sends a single prompt through the `dracon-libs` routing runtime.
 
 - `--intent` is treated as a lane hint (mapped to `dracon-libs` routing tasks).
-- If the prompt argument is `-`, `dracon-ai` reads the prompt from stdin (so it composes with system utilities).
+- If no prompt is provided, `dracon-ai chat` enters interactive mode.
+- Input modes:
+  - `--stdin` (or `-` as prompt) reads full stdin
+  - `--file <path>` reads prompt from a file
+- Output modes:
+  - streaming tokens to stdout by default when TTY
+  - `--no-stream` collects then prints
+  - `--json` prints a structured response object
 
 Examples:
 
 ```sh
-dracon-ai chat "Say 'ok' only."
-printf "Say 'ok' only.\n" | dracon-ai chat -
+dracon-ai
+dracon-ai chat Say ok only.
+printf "Say ok only.\n" | dracon-ai chat --stdin
+dracon-ai chat --file prompt.txt
 dracon-ai chat --intent engineer "Refactor this function."
+```
+
+### `dracon-ai cmd [options] <command...>`
+
+Runs a local command via `sh -lc`, captures bounded output, then asks the AI to analyze it.
+
+Examples:
+
+```sh
+dracon-ai cmd "journalctl --user -u dracon-sync.service -n 200"
+dracon-ai cmd --timeout-secs 20 --max-bytes 200000 "rg -n \"DEMON_SECRET\" -S ."
 ```
 
 ## Routing Model
@@ -63,13 +87,16 @@ Canonical files (in `dracon-libs`):
 Secrets are referenced by env-var name (for example `ZAI_API_KEY`) via `api_key_env` entries in the routing policy.
 Resolution prefers environment variables first, then the secrets file.
 
-## “System Utilities” / Tool Execution (Planned)
+## “System Utilities” / Tool Execution (Implemented)
 
-Right now, composition is done via stdin piping (use `-`).
+Composition is supported in three ways:
 
-Future direction (not implemented yet):
+- stdin/file prompt modes (outside the REPL)
+- `dracon-ai cmd ...` (one-shot capture+ask)
+- REPL slash command: `/cmd <shell>`
 
-- An explicit tool registry (`--allow-exec`) with strict schemas and tight output bounds.
-- Deterministic transcripts for any tool calls.
-- Sandbox-by-default behavior so the AI CLI cannot “just run anything”.
+Tool execution is intentionally bounded:
 
+- default timeout is short
+- output is truncated to a max byte budget
+- captured output is injected into context as a `system` message
