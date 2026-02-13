@@ -3548,6 +3548,9 @@ mod tests {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // If output is piped (e.g. `dracon-sync repos | head`), avoid panicking on SIGPIPE.
+    std::io::set_panic_on_broken_pipe(false);
+
     let cli = Cli::parse();
     let policy_path = resolve_policy_path()?;
 
