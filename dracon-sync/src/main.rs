@@ -103,6 +103,14 @@ struct SyncPolicy {
     /// Best-effort, only applies when `Cargo.toml` exists at repo root.
     #[serde(default)]
     auto_bump_patch_version: bool,
+    /// If true, bump Node/TS package.json version (patch only) before an auto-commit.
+    /// Best-effort, only applies when `package.json` exists at repo root.
+    #[serde(default)]
+    auto_bump_node_package_version: bool,
+    /// If true, bump a repo-local VERSION file (patch only) before an auto-commit.
+    /// This is language-agnostic and useful for Go repos where versions are typically tags.
+    #[serde(default)]
+    auto_bump_version_file: bool,
     /// If true, revert and skip commits that would only include Cargo.lock changes.
     /// This prevents noisy lockfile-only commits from local builds/tooling.
     #[serde(default = "default_true")]
@@ -161,6 +169,106 @@ fn default_inactivity_push_delay_secs() -> u64 {
 
 fn is_lockfile_path(p: &str) -> bool {
     p == "Cargo.lock" || p.ends_with("/Cargo.lock")
+}
+
+#[derive(Debug, Deserialize, Default, Clone)]
+struct RepoPolicyOverride {
+    /// Optional per-repo override for `auto_bump_patch_version`.
+    auto_bump_patch_version: Option<bool>,
+    /// Optional per-repo override for `auto_bump_node_package_version`.
+    auto_bump_node_package_version: Option<bool>,
+    /// Optional per-repo override for `auto_bump_version_file`.
+    auto_bump_version_file: Option<bool>,
+    /// Optional per-repo override for `avoid_cargo_lock_only_commits`.
+    avoid_cargo_lock_only_commits: Option<bool>,
+}
+
+fn load_repo_override(repo: &Path) -> RepoPolicyOverride {
+    let path = repo.join(".dracon").join("dracon-sync.toml");
+    let Ok(content) = std::fs::read_to_string(&path) else {
+        return RepoPolicyOverride::default();
+    };
+    toml::from_str(&content).unwrap_or_default()
+}
+
+fn bump_semver_patch(ver: &str) -> Option<String> {
+    let parts: Vec<&str> = ver.split('.').collect();
+    if parts.len() < 3 {
+        return None;
+    }
+    if !parts[0].chars().all(|c| c.is_ascii_digit())
+        || !parts[1].chars().all(|c| c.is_ascii_digit())
+        || !parts[2].chars().all(|c| c.is_ascii_digit())
+    {
+        return None;
+    }
+    let major: u64 = parts[0].parse().ok()?;
+    let minor: u64 = parts[1].parse().ok()?;
+    let patch: u64 = parts[2].parse().ok()?;
+    Some(format!("{}.{}.{}", major, minor, patch + 1))
+}
+
+fn bump_first_json_string_field(content: &str, key: &str) -> Option<(String, String, String)> {
+    // Tiny, formatting-preserving bump helper:
+    // finds the first `"key": "x.y.z"` occurrence and bumps patch.
+    let needle = format!("\"{}\"", key);
+    let mut start = 0usize;
+    while let Some(idx) = content[start..].find(&needle) {
+        let key_pos = start + idx;
+        let after_key = key_pos + needle.len();
+        let rest = &content[after_key..];
+        let colon_rel = rest.find(':')?;
+        let after_colon = after_key + colon_rel + 1;
+        let rest2 = &content[after_colon..];
+        let q1_rel = rest2.find('"')?;
+        let q1 = after_colon + q1_rel + 1;
+        let rest3 = &content[q1..];
+        let q2_rel = rest3.find('"')?;
+        let q2 = q1 + q2_rel;
+        let old_ver = &content[q1..q2];
+        if let Some(new_ver) = bump_semver_patch(old_ver) {
+            let mut out = String::with_capacity(content.len());
+            out.push_str(&content[..q1]);
+            out.push_str(&new_ver);
+            out.push_str(&content[q2..]);
+            return Some((out, old_ver.to_string(), new_ver));
+        }
+        start = after_key;
+    }
+    None
+}
+
+fn set_first_json_string_field_to_value(
+    content: &str,
+    key: &str,
+    expected_old: &str,
+    new_value: &str,
+) -> Option<String> {
+    let needle = format!("\"{}\"", key);
+    let mut start = 0usize;
+    while let Some(idx) = content[start..].find(&needle) {
+        let key_pos = start + idx;
+        let after_key = key_pos + needle.len();
+        let rest = &content[after_key..];
+        let colon_rel = rest.find(':')?;
+        let after_colon = after_key + colon_rel + 1;
+        let rest2 = &content[after_colon..];
+        let q1_rel = rest2.find('"')?;
+        let q1 = after_colon + q1_rel + 1;
+        let rest3 = &content[q1..];
+        let q2_rel = rest3.find('"')?;
+        let q2 = q1 + q2_rel;
+        let old = &content[q1..q2];
+        if old == expected_old {
+            let mut out = String::with_capacity(content.len());
+            out.push_str(&content[..q1]);
+            out.push_str(new_value);
+            out.push_str(&content[q2..]);
+            return Some(out);
+        }
+        start = after_key;
+    }
+    None
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -378,6 +486,68 @@ fn bump_patch_version_in_repo(repo: &Path) -> Result<BumpOutcome> {
     })
 }
 
+#[derive(Debug, Clone, Copy)]
+struct SimpleBumpOutcome {
+    bumped: bool,
+    updated_lock: bool,
+}
+
+fn bump_node_package_version_in_repo(repo: &Path) -> Result<SimpleBumpOutcome> {
+    let pkg = repo.join("package.json");
+    let Ok(content) = std::fs::read_to_string(&pkg) else {
+        return Ok(SimpleBumpOutcome {
+            bumped: false,
+            updated_lock: false,
+        });
+    };
+    let Some((next, old_ver, new_ver)) = bump_first_json_string_field(&content, "version") else {
+        return Ok(SimpleBumpOutcome {
+            bumped: false,
+            updated_lock: false,
+        });
+    };
+    if next != content {
+        std::fs::write(&pkg, next).with_context(|| format!("failed writing {}", pkg.display()))?;
+    }
+
+    // Best-effort: keep package-lock.json root version aligned if it matches the old version.
+    let mut updated_lock = false;
+    let lock = repo.join("package-lock.json");
+    if let Ok(lock_content) = std::fs::read_to_string(&lock) {
+        if let Some(lock_next) =
+            set_first_json_string_field_to_value(&lock_content, "version", &old_ver, &new_ver)
+        {
+            if lock_next != lock_content {
+                std::fs::write(&lock, lock_next)
+                    .with_context(|| format!("failed writing {}", lock.display()))?;
+                updated_lock = true;
+            }
+        }
+    }
+
+    Ok(SimpleBumpOutcome {
+        bumped: true,
+        updated_lock,
+    })
+}
+
+fn bump_version_file_in_repo(repo: &Path) -> Result<bool> {
+    let p = repo.join("VERSION");
+    let Ok(content) = std::fs::read_to_string(&p) else {
+        return Ok(false);
+    };
+    let raw = content.trim();
+    let Some(new_ver) = bump_semver_patch(raw) else {
+        return Ok(false);
+    };
+    let next = format!("{}\n", new_ver);
+    if next != content {
+        std::fs::write(&p, next).with_context(|| format!("failed writing {}", p.display()))?;
+        return Ok(true);
+    }
+    Ok(false)
+}
+
 async fn restore_paths(repo: &Path, paths: &[String]) -> Result<()> {
     if paths.is_empty() {
         return Ok(());
@@ -522,6 +692,8 @@ struct StatusJson {
     auto_pull: bool,
     auto_push: bool,
     auto_bump_patch_version: bool,
+    auto_bump_node_package_version: bool,
+    auto_bump_version_file: bool,
     avoid_cargo_lock_only_commits: bool,
     auto_repair_concerns: bool,
     auto_repair_warns: bool,
@@ -3399,6 +3571,8 @@ async fn main() -> Result<()> {
                     auto_pull: policy.auto_pull,
                     auto_push: policy.auto_push,
                     auto_bump_patch_version: policy.auto_bump_patch_version,
+                    auto_bump_node_package_version: policy.auto_bump_node_package_version,
+                    auto_bump_version_file: policy.auto_bump_version_file,
                     avoid_cargo_lock_only_commits: policy.avoid_cargo_lock_only_commits,
                     auto_repair_concerns: policy.auto_repair_concerns,
                     auto_repair_warns: policy.auto_repair_warns,
@@ -3435,11 +3609,13 @@ async fn main() -> Result<()> {
                         .unwrap_or_else(|| "OFF".to_string())
                 );
                 println!(
-                    "⚙️ FLAGS: auto_commit={} auto_pull={} auto_push={} auto_bump_patch_version={} avoid_cargo_lock_only_commits={} auto_repair_concerns={} auto_repair_warns={} auto_rewrite_large_blobs={}",
+                    "⚙️ FLAGS: auto_commit={} auto_pull={} auto_push={} auto_bump_patch_version={} auto_bump_node_package_version={} auto_bump_version_file={} avoid_cargo_lock_only_commits={} auto_repair_concerns={} auto_repair_warns={} auto_rewrite_large_blobs={}",
                     policy.auto_commit,
                     policy.auto_pull,
                     policy.auto_push,
                     policy.auto_bump_patch_version,
+                    policy.auto_bump_node_package_version,
+                    policy.auto_bump_version_file,
                     policy.avoid_cargo_lock_only_commits,
                     policy.auto_repair_concerns,
                     policy.auto_repair_warns,
