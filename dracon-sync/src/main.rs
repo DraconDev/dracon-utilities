@@ -1670,8 +1670,6 @@ async fn sync_repo(
         }
         if !filtered_entries.is_empty() {
             let proto_status = to_proto_status(&status);
-            let proto_entries = to_proto_entries(&filtered_entries);
-            let msg = build_sync_commit_payload(repo, &proto_status, &proto_entries);
             let stage_paths: Vec<String> = filtered_entries
                 .iter()
                 .map(|e| e.path.to_string_lossy().to_string())
@@ -1703,6 +1701,16 @@ async fn sync_repo(
                     let _ = run_git_with_timeout(repo, &["add", "Cargo.lock"], 30, "add").await;
                 }
             }
+
+            // Build the payload from what we're actually going to commit (cached diff),
+            // so version bumps don't silently add files not reflected in the JSON.
+            let staged = git_name_status_entries(repo, &["diff", "--cached", "--name-status"]).await?;
+            let committed_entries: Vec<dracon_git::types::DiffFile> = staged
+                .into_iter()
+                .map(|(path, status)| dracon_git::types::DiffFile { path, status })
+                .collect();
+            let proto_entries = to_proto_entries(&committed_entries);
+            let msg = build_sync_commit_payload(repo, &proto_status, &proto_entries);
 
             svc.commit(&msg).await?;
             if policy.auto_push && has_origin {
