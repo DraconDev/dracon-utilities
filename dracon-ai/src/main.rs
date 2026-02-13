@@ -193,7 +193,7 @@ async fn main() -> Result<()> {
                 if json {
                     return Err(anyhow!("--json is not supported in interactive mode"));
                 }
-                return run_chat_repl(&router, &mut lane, &mut None).await;
+                return run_chat_repl(&router, &mut lane).await;
             }
 
             let prompt = resolve_prompt_text(stdin, file.as_deref(), &prompt)?;
@@ -885,10 +885,9 @@ async fn run_shell_capture(cmd: &str, timeout: Duration, max_bytes: usize) -> Re
     })
 }
 
-async fn run_repl(
+async fn run_chat_repl(
     router: &ai_routing_runtime::SmartRouter<dyn AiProvider>,
     lane: &mut RoutingTask,
-    pinned_model: &mut Option<String>,
 ) -> Result<()> {
     use rustyline::error::ReadlineError;
     use rustyline::Editor;
@@ -937,7 +936,6 @@ async fn run_repl(
                     eprintln!("{}", dim("Commands:"));
                     eprintln!("{}", dim("  /intent <name>   set intent/lane hint"));
                     eprintln!("{}", dim("  /lane <name>     alias for /intent"));
-                    eprintln!("{}", dim("  /model <id>      pin model id (or: /model off)"));
                     eprintln!("{}", dim("  /clear           clear conversation context"));
                     eprintln!("{}", dim("  /paste           begin multi-line paste (end with /end)"));
                     eprintln!("{}", dim("  /cmd <shell>     run local command, add output to context"));
@@ -959,25 +957,6 @@ async fn run_repl(
                 if line == "/clear" {
                     messages.truncate(1); // keep system
                     eprintln!("{}", dim("context cleared"));
-                    continue;
-                }
-                if let Some(rest) = line.strip_prefix("/model") {
-                    let rest = rest.trim();
-                    if rest.is_empty() {
-                        let cur = pinned_model
-                            .as_deref()
-                            .unwrap_or("<auto>");
-                        eprintln!("{} {}", ansi("1;36", "model"), ansi("33", cur));
-                        continue;
-                    }
-                    let rest = rest.strip_prefix(' ').unwrap_or(rest);
-                    if rest == "off" || rest == "auto" || rest == "clear" {
-                        *pinned_model = None;
-                        eprintln!("{} {}", ansi("1;36", "model"), dim("set to auto"));
-                        continue;
-                    }
-                    *pinned_model = Some(rest.to_string());
-                    eprintln!("{} {}", ansi("1;36", "model"), ansi("33", rest));
                     continue;
                 }
                 if line == "/paste" {
@@ -1057,7 +1036,7 @@ async fn run_repl(
                 match ask_with_messages(
                     router,
                     lane.clone(),
-                    pinned_model.as_deref(),
+                    None,
                     &mut messages,
                     out,
                 )
