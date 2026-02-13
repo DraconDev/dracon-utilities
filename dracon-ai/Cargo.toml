@@ -14,6 +14,7 @@ futures = "0.3"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 rustyline = "14.0"
+toml = "0.8"
 
 # AI runtime is owned by dracon-libs; dracon-ai is a thin CLI consumer.
 ai-runtime-config = { path = "../../dracon-libs/platform/crates/ai-runtime-config" }
