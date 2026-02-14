@@ -806,7 +806,7 @@ async fn run_do_task(
             return Ok(DoCliResponse {
                 task: task.to_string(),
                 content: format!(
-                    "Plan only (pass --plan or set DRACON_AI_APPLY=0 to execute-disabled).\n{}",
+                    "Plan only (--plan).\nRemove --plan (or set DRACON_AI_APPLY=1) to allow execution.\n{}",
                     agent.summary
                 ),
                 commands_ran,

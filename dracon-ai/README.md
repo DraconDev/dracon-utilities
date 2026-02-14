@@ -31,6 +31,7 @@ Computer-context assistant. It returns a small set of shell commands to run for 
 
 - By default it runs the commands, captures output, and continues until done (bounded iterations).
 - Plan-only: `dracon-ai do --plan ...` (or `DRACON_AI_APPLY=0`).
+- Potentially dangerous commands are refused unless you pass `--dangerous` (or `DRACON_AI_DANGEROUS=1`). When refused, the command is printed so you can run it manually.
 
 Interactive helpers:
 
