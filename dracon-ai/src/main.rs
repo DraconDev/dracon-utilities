@@ -612,7 +612,7 @@ fn which(bin: &str) -> Option<PathBuf> {
     None
 }
 
-fn spawn_new_terminal_for_interactive_chat(intent: &str) -> Result<bool> {
+fn spawn_new_terminal_tab(args: &[String]) -> Result<bool> {
     fn status_ok(bin: &str, args: &[&str]) -> bool {
         std::process::Command::new(bin)
             .args(args)
@@ -625,11 +625,7 @@ fn spawn_new_terminal_for_interactive_chat(intent: &str) -> Result<bool> {
     if std::env::var_os("TMUX").is_some() {
         if which("tmux").is_some() {
             let exe = std::env::current_exe().context("current_exe")?;
-            let cmd = format!(
-                "{} chat --intent {} --same-terminal",
-                exe.display(),
-                shell_escape_simple(intent)
-            );
+            let cmd = shell_join(exe.display().to_string().as_str(), args);
             if status_ok("tmux", &["new-window", "-n", "dracon-ai", &cmd]) {
                 return Ok(true);
             }
@@ -643,19 +639,12 @@ fn spawn_new_terminal_for_interactive_chat(intent: &str) -> Result<bool> {
 
     let exe = std::env::current_exe().context("current_exe")?;
     let exe_s = exe.to_string_lossy().to_string();
-    let args = vec![
-        "chat".to_string(),
-        "--intent".to_string(),
-        intent.to_string(),
-        "--same-terminal".to_string(),
-    ];
 
     // WezTerm: try a new tab in an existing instance first.
     if which("wezterm").is_some() {
         // `wezterm cli spawn` returns quickly (good for success/failure detection).
         let mut a = vec!["cli", "spawn", "--new-tab", "--", &exe_s];
-        let a_owned: Vec<String> = args.clone();
-        let a_refs: Vec<&str> = a_owned.iter().map(|s| s.as_str()).collect();
+        let a_refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
         a.extend_from_slice(&a_refs);
         if status_ok("wezterm", &a) {
             return Ok(true);
@@ -674,8 +663,7 @@ fn spawn_new_terminal_for_interactive_chat(intent: &str) -> Result<bool> {
                 "--",
                 &exe_s,
             ];
-            let a_owned: Vec<String> = args.clone();
-            let a_refs: Vec<&str> = a_owned.iter().map(|s| s.as_str()).collect();
+            let a_refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
             a.extend_from_slice(&a_refs);
             if status_ok("kitty", &a) {
                 return Ok(true);
@@ -687,7 +675,7 @@ fn spawn_new_terminal_for_interactive_chat(intent: &str) -> Result<bool> {
     if which("gnome-terminal").is_some() {
         let mut c = std::process::Command::new("gnome-terminal");
         c.args(["--tab", "--title=dracon-ai", "--", &exe_s])
-            .args(&args);
+            .args(args);
         if c.spawn().is_ok() {
             return Ok(true);
         }
@@ -697,7 +685,7 @@ fn spawn_new_terminal_for_interactive_chat(intent: &str) -> Result<bool> {
     if which("konsole").is_some() {
         if std::process::Command::new("konsole")
             .args(["--new-tab", "-p", "tabtitle=dracon-ai", "-e", &exe_s])
-            .args(&args)
+            .args(args)
             .spawn()
             .is_ok()
         {
@@ -721,6 +709,15 @@ fn shell_escape_simple(s: &str) -> String {
     }
     out.push('\'');
     out
+}
+
+fn shell_join(exe: &str, args: &[String]) -> String {
+    let mut parts = Vec::with_capacity(1 + args.len());
+    parts.push(shell_escape_simple(exe));
+    for a in args {
+        parts.push(shell_escape_simple(a));
+    }
+    parts.join(" ")
 }
 
 fn resolve_prompt_text(stdin_flag: bool, file: Option<&Path>, prompt: &[String]) -> Result<String> {
