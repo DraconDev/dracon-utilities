@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};
 use tokio::process::Command;
+use tokio::sync::oneshot;
 
 #[derive(Debug, Clone, Default, Deserialize)]
 struct DraconAiConfig {
@@ -405,6 +406,10 @@ fn dim(s: &str) -> String {
     ansi("90", s)
 }
 
+fn stderr_is_tty() -> bool {
+    std::io::stderr().is_terminal()
+}
+
 fn prompt_label(lane: &RoutingTask) -> String {
     let tool = ansi("1;36", "dracon-ai"); // bold cyan
     let lane_txt = match lane {
@@ -415,6 +420,53 @@ fn prompt_label(lane: &RoutingTask) -> String {
     };
     let lane = ansi("33", lane_txt); // yellow
     format!("{}[{}]", tool, lane)
+}
+
+struct Spinner {
+    stop_tx: Option<oneshot::Sender<()>>,
+    handle: tokio::task::JoinHandle<()>,
+}
+
+impl Spinner {
+    fn start(label: String) -> Self {
+        let (stop_tx, mut stop_rx) = oneshot::channel::<()>();
+        let handle = tokio::spawn(async move {
+            if !stderr_is_tty() {
+                return;
+            }
+            let frames = ["|", "/", "-", "\\"];
+            let mut idx = 0usize;
+            let mut stderr = tokio::io::stderr();
+            loop {
+                tokio::select! {
+                    _ = &mut stop_rx => {
+                        // Clear line.
+                        let _ = stderr.write_all(b"\r\x1b[2K").await;
+                        let _ = stderr.flush().await;
+                        break;
+                    }
+                    _ = tokio::time::sleep(Duration::from_millis(120)) => {
+                        let frame = frames[idx % frames.len()];
+                        idx += 1;
+                        let line = format!("\r{} {}", frame, label);
+                        let _ = stderr.write_all(line.as_bytes()).await;
+                        let _ = stderr.flush().await;
+                    }
+                }
+            }
+        });
+        Self {
+            stop_tx: Some(stop_tx),
+            handle,
+        }
+    }
+
+    async fn stop(mut self) {
+        if let Some(tx) = self.stop_tx.take() {
+            let _ = tx.send(());
+        }
+        let _ = self.handle.await;
+    }
 }
 
 fn history_path() -> Option<PathBuf> {
@@ -565,6 +617,20 @@ async fn agent_next(
         .with_context(|| format!("failed parsing agent JSON: {}", json))
 }
 
+async fn agent_next_with_ui(
+    router: &ai_routing_runtime::SmartRouter<dyn AiProvider>,
+    messages: &[ChatMessage],
+    timeout: Duration,
+) -> Result<AgentResponse> {
+    let spinner = Spinner::start(dim("thinking...".to_string().as_str()).to_string());
+    let res = tokio::time::timeout(timeout, agent_next(router, messages)).await;
+    spinner.stop().await;
+    match res {
+        Ok(r) => r,
+        Err(_) => Err(anyhow!("agent timeout after {:?}", timeout)),
+    }
+}
+
 async fn run_do_task(
     router: &ai_routing_runtime::SmartRouter<dyn AiProvider>,
     task: &str,
@@ -607,6 +673,7 @@ async fn run_do_task(
 
     let mut commands_ran: Vec<String> = Vec::new();
     let mut last_answer: Option<String> = None;
+    let mut repeat_guard: std::collections::BTreeMap<String, u32> = std::collections::BTreeMap::new();
 
     // Optional: if apply is enabled and task is Nix-ish, probe a little state up front.
     // This keeps "do mode" effective without making the user educate the agent each time.
@@ -646,7 +713,7 @@ async fn run_do_task(
     }
 
     for step_idx in 0..max_steps {
-        let agent = agent_next(router, &messages).await?;
+        let agent = agent_next_with_ui(router, &messages, Duration::from_secs(60)).await?;
         if agent.done {
             last_answer = agent.final_answer.or(Some(agent.summary));
             break;
@@ -656,7 +723,38 @@ async fn run_do_task(
             return Err(anyhow!("agent returned done=false but no commands"));
         }
 
-        eprintln!("{}", dim(&format!("step {}/{}: {}", step_idx + 1, max_steps, agent.summary)));
+        let sig = format!(
+            "{}|{}",
+            agent.summary,
+            agent
+                .commands
+                .iter()
+                .map(|c| c.cmd.as_str())
+                .collect::<Vec<_>>()
+                .join(" ; ")
+        );
+        let n = repeat_guard.entry(sig).or_insert(0);
+        *n += 1;
+        if *n >= 3 {
+            return Ok(DoCliResponse {
+                task: task.to_string(),
+                content: format!(
+                    "Agent appears stuck (repeated the same plan multiple times). Stopping.\nLast summary: {}",
+                    agent.summary
+                ),
+                commands_ran,
+            });
+        }
+
+        eprintln!(
+            "{}",
+            dim(&format!(
+                "step {}/{}: {}",
+                step_idx + 1,
+                max_steps,
+                agent.summary
+            ))
+        );
         for (i, c) in agent.commands.iter().enumerate() {
             if c.why.trim().is_empty() {
                 eprintln!("{} {}", dim(&format!("  {}.", i + 1)), c.cmd);
@@ -702,9 +800,10 @@ async fn run_do_task(
                     commands_ran,
                 });
             }
-            eprintln!("{}", dim(&format!("run: {}", c.cmd)));
+            let spinner = Spinner::start(dim(&format!("running: {}", c.cmd)));
             let capture =
                 run_shell_capture(&c.cmd, Duration::from_secs(timeout_secs), max_bytes).await?;
+            spinner.stop().await;
             commands_ran.push(c.cmd.clone());
             let msg = format!(
                 "Command executed.\ncmd={}\nexit={}\noutput:\n{}",
@@ -729,7 +828,7 @@ async fn run_do_task(
             role: "system".to_string(),
             content: "You have reached the step limit. Produce a final answer now. Set done=true and commands=[].".to_string(),
         });
-        if let Ok(agent) = agent_next(router, &messages).await {
+        if let Ok(agent) = agent_next_with_ui(router, &messages, Duration::from_secs(45)).await {
             // Even if the model fails to follow the done=true instruction, we still want to
             // return something useful instead of a dead-end string.
             last_answer = agent.final_answer.or(Some(agent.summary));
