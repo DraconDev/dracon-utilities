@@ -1607,29 +1607,22 @@ async fn run_chat_repl(
                     });
                 }
 
-                // Ask AI with accumulated messages; stream by default in TTY.
+                // REPL UX: collect-then-render.
+                // This keeps the view readable (labels, selected model id) and avoids spinner/stream
+                // interleaving in terminals.
                 let out = OutputMode {
-                    stream: std::io::stdout().is_terminal(),
+                    stream: false,
                     json: false,
                 };
 
-                let mut stdout = tokio::io::stdout();
-                match ask_with_messages(router, lane.clone(), None, &mut messages, out).await {
-                    Ok(resp) => {
-                        // When streaming, resp.content already hit stdout. Ensure newline.
-                        if std::io::stdout().is_terminal() {
-                            if !resp.content.ends_with('\n') {
-                                stdout.write_all(b"\n").await?;
-                                stdout.flush().await?;
-                            }
-                        } else {
-                            stdout.write_all(resp.content.as_bytes()).await?;
-                            if !resp.content.ends_with('\n') {
-                                stdout.write_all(b"\n").await?;
-                            }
-                            stdout.flush().await?;
-                        }
+                let spinner = Spinner::start(dim("thinking...".to_string().as_str()).to_string());
+                let resp = ask_with_messages(router, lane.clone(), None, &mut messages, out).await;
+                spinner.stop().await;
 
+                match resp {
+                    Ok(resp) => {
+                        print_assistant_header(&resp.selected_model);
+                        print_markdownish(&resp.content);
                         messages.push(ChatMessage {
                             role: "assistant".to_string(),
                             content: resp.content,
@@ -1654,6 +1647,40 @@ async fn run_chat_repl(
     }
 
     Ok(())
+}
+
+fn print_assistant_header(selected_model: &str) {
+    let who = ansi("1;35", "assistant");
+    if selected_model.trim().is_empty() {
+        println!("{who}");
+        return;
+    }
+    println!(
+        "{} {}",
+        who,
+        dim(&format!("(model: {})", ansi("33", selected_model)))
+    );
+}
+
+fn print_markdownish(s: &str) {
+    // Tiny renderer: code fences get a different color so "thinking prose" vs "code" is obvious.
+    let mut in_code = false;
+    for line in s.lines() {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with("```") {
+            in_code = !in_code;
+            println!("{}", dim(line));
+            continue;
+        }
+        if in_code {
+            println!("{}", ansi("36", line));
+        } else {
+            println!("{}", line);
+        }
+    }
+    if !s.ends_with('\n') {
+        println!();
+    }
 }
 
 #[cfg(test)]
