@@ -98,6 +98,7 @@ enum GuardCommands {
     },
     /// Run continuous guard loop.
     Daemon,
+}
 
 #[derive(Subcommand, Debug)]
 enum SecretsCommands {
@@ -117,7 +118,6 @@ enum SecretsCommands {
         #[arg(long)]
         strict: bool,
     },
-}
 }
 
 #[derive(Debug, Serialize)]
