@@ -30,7 +30,7 @@ Shows the resolved AI runtime view from `dracon-libs`:
 Computer-context assistant. It returns a small set of shell commands to run for the task.
 
 - By default it runs the commands, captures output, and continues until done (bounded iterations).
-- Plan-only: `dracon-ai do --apply=false ...` (or `DRACON_AI_APPLY=0`).
+- Plan-only: `dracon-ai do --plan ...` (or `DRACON_AI_APPLY=0`).
 
 Interactive helpers:
 

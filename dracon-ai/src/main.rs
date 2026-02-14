@@ -69,12 +69,12 @@ struct Cli {
 enum Cmd {
     /// 🛠️ Computer-context assistant (plans commands, can execute them with --apply)
     Do {
-        /// Execute the planned commands (otherwise prints plan only).
-        #[arg(long, default_value_t = true, action = clap::ArgAction::Set)]
-        apply: bool,
+        /// Plan only (do not execute). Default is execute.
+        #[arg(long, alias = "no-apply")]
+        plan: bool,
 
         /// Allow potentially destructive shell commands (sudo/rm/etc).
-        #[arg(long, default_value_t = false, action = clap::ArgAction::Set)]
+        #[arg(long)]
         dangerous: bool,
 
         /// Max AI iterations (plan/execute/respond loops).
@@ -166,8 +166,8 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
     let cmd = cli.cmd.unwrap_or(Cmd::Do {
         // Default is APPLY ON. This tool is meant to change the computer state.
-        // Use `--apply=false` (or DRACON_AI_APPLY=0) to plan-only.
-        apply: env_bool("DRACON_AI_APPLY").unwrap_or(true),
+        // Use `--plan` (or DRACON_AI_APPLY=0) for plan-only.
+        plan: env_bool("DRACON_AI_APPLY").map(|v| !v).unwrap_or(false),
         dangerous: env_bool("DRACON_AI_DANGEROUS").unwrap_or(false),
         max_steps: 5,
         timeout_secs: 20,
@@ -178,7 +178,7 @@ async fn main() -> Result<()> {
 
     match cmd {
         Cmd::Do {
-            apply,
+            plan,
             dangerous,
             max_steps,
             timeout_secs,
@@ -187,6 +187,7 @@ async fn main() -> Result<()> {
             task,
         } => {
             let router = build_router()?;
+            let apply = !plan;
             let task = if task.is_empty() {
                 if json {
                     return Err(anyhow!("--json is not supported in interactive mode"));
@@ -772,7 +773,7 @@ async fn run_do_task(
             return Ok(DoCliResponse {
                 task: task.to_string(),
                 content: format!(
-                    "Plan only (pass --apply=false or set DRACON_AI_APPLY=0 to execute-disabled).\n{}",
+                    "Plan only (pass --plan or set DRACON_AI_APPLY=0 to execute-disabled).\n{}",
                     agent.summary
                 ),
                 commands_ran,
@@ -1417,8 +1418,8 @@ mod tests {
         let cli = Cli::try_parse_from(["dracon-ai", "do", "add", "nix", "package", "ripgrep"])
             .expect("do parses");
         match cli.cmd.expect("cmd") {
-            Cmd::Do { task, apply, .. } => {
-                assert!(apply);
+            Cmd::Do { task, plan, .. } => {
+                assert!(!plan);
                 assert_eq!(task, vec!["add", "nix", "package", "ripgrep"]);
             }
             _ => panic!("expected do"),
@@ -1426,11 +1427,10 @@ mod tests {
     }
 
     #[test]
-    fn parses_do_apply_false() {
-        let cli =
-            Cli::try_parse_from(["dracon-ai", "do", "--apply=false", "echo", "hi"]).expect("do");
+    fn parses_do_plan() {
+        let cli = Cli::try_parse_from(["dracon-ai", "do", "--plan", "echo", "hi"]).expect("do");
         match cli.cmd.expect("cmd") {
-            Cmd::Do { apply, .. } => assert!(!apply),
+            Cmd::Do { plan, .. } => assert!(plan),
             _ => panic!("expected do"),
         }
     }
