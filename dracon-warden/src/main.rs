@@ -81,6 +81,48 @@ impl WardenPolicy {
         Ok(policy)
     }
 
+    fn validate(&self) -> Result<()> {
+        let protected = self
+            .protected_patterns
+            .iter()
+            .cloned()
+            .collect::<BTreeSet<_>>();
+
+        let mut plaintext = self
+            .plaintext_patterns
+            .iter()
+            .cloned()
+            .collect::<BTreeSet<_>>();
+        for p in DEFAULT_PLAINTEXT_PATTERNS {
+            plaintext.insert((*p).to_string());
+        }
+
+        let intersection = protected
+            .intersection(&plaintext)
+            .cloned()
+            .collect::<Vec<_>>();
+        if !intersection.is_empty() {
+            return Err(anyhow::anyhow!(
+                "invalid policy: patterns cannot be both protected and plaintext: {}",
+                intersection.join(", ")
+            ));
+        }
+
+        for p in &plaintext {
+            let pl = p.to_lowercase();
+            if FORBIDDEN_PLAINTEXT_SUBSTRINGS
+                .iter()
+                .any(|needle| pl.contains(&needle.to_lowercase()))
+            {
+                return Err(anyhow::anyhow!(
+                    "invalid policy: refusing plaintext_patterns entry that disables encryption for secret-ish paths: {p}"
+                ));
+            }
+        }
+
+        Ok(())
+    }
+
     fn watch_root_paths(&self) -> Vec<PathBuf> {
         self.watch_roots
             .iter()
@@ -211,7 +253,8 @@ fn replace_managed_block(current: &str, managed_block: &str) -> String {
     out
 }
 
-fn build_gitignore_block(policy: &WardenPolicy) -> String {
+fn build_gitignore_block(policy: &WardenPolicy) -> Result<String> {
+    policy.validate()?;
     let mut lines = Vec::new();
     lines.push(BLOCK_BEGIN.to_string());
     lines.push("# managed by dracon-warden".to_string());
@@ -232,10 +275,11 @@ fn build_gitignore_block(policy: &WardenPolicy) -> String {
         lines.push(format!("!{}", p));
     }
     lines.push(BLOCK_END.to_string());
-    lines.join("\n")
+    Ok(lines.join("\n"))
 }
 
-fn build_gitattributes_block(policy: &WardenPolicy) -> String {
+fn build_gitattributes_block(policy: &WardenPolicy) -> Result<String> {
+    policy.validate()?;
     let mut lines = Vec::new();
     lines.push(BLOCK_BEGIN.to_string());
     lines.push("# managed by dracon-warden".to_string());
@@ -259,7 +303,7 @@ fn build_gitattributes_block(policy: &WardenPolicy) -> String {
         lines.push(format!("{} -filter -diff -merge", p));
     }
     lines.push(BLOCK_END.to_string());
-    lines.join("\n")
+    Ok(lines.join("\n"))
 }
 
 fn should_passthrough_filter_path(path: Option<&str>) -> bool {
@@ -460,15 +504,16 @@ fn harden_repo(
     policy: &WardenPolicy,
     pubkey_path: Option<&Path>,
 ) -> Result<(bool, bool, bool)> {
+    policy.validate()?;
     let gitignore_path = repo.join(".gitignore");
     let gitattributes_path = repo.join(".gitattributes");
 
     // Be aggressive: fully overwrite these files so other tooling (ex: Demon)
     // cannot keep re-introducing conflicting managed blocks that cause churn.
     let gitignore_changed =
-        apply_overwrite_file(&gitignore_path, &build_gitignore_block(policy))?;
+        apply_overwrite_file(&gitignore_path, &build_gitignore_block(policy)?)?;
     let gitattributes_changed =
-        apply_overwrite_file(&gitattributes_path, &build_gitattributes_block(policy))?;
+        apply_overwrite_file(&gitattributes_path, &build_gitattributes_block(policy)?)?;
     let key_changed = match pubkey_path {
         Some(pubkey) => publish_repo_pubkey(repo, pubkey)?,
         None => false,
@@ -555,6 +600,7 @@ fn repos_for_event(event: &Event, roots: &[PathBuf]) -> BTreeSet<PathBuf> {
 
 fn run_daemon(policy_path: PathBuf) -> Result<()> {
     let policy = WardenPolicy::load(&policy_path)?;
+    policy.validate()?;
     let roots = effective_watch_roots(&policy);
     if roots.is_empty() {
         return Err(anyhow::anyhow!("no valid watch_roots in policy"));
@@ -598,6 +644,7 @@ fn run_daemon(policy_path: PathBuf) -> Result<()> {
 
         if !pending_repos.is_empty() && last_run.elapsed() >= debounce {
             let policy = WardenPolicy::load(&policy_path)?;
+            policy.validate()?;
             let repos = std::mem::take(&mut pending_repos);
             let repos_vec = repos.into_iter().collect::<Vec<_>>();
             scrub_markers(&policy, &repos_vec, true)?;
@@ -620,6 +667,7 @@ fn main() -> Result<()> {
         Command::Status => {
             let policy_path = resolve_policy_path()?;
             let policy = WardenPolicy::load(&policy_path)?;
+            policy.validate()?;
             println!("📜 POLICY: {}", policy_path.display());
             println!("🛡️ ROOTS: {:?}", effective_watch_roots(&policy));
             println!(
@@ -632,6 +680,7 @@ fn main() -> Result<()> {
         Command::Once => {
             let policy_path = resolve_policy_path()?;
             let policy = WardenPolicy::load(&policy_path)?;
+            policy.validate()?;
             harden_all(&policy)?;
         }
         Command::Daemon => {
@@ -641,6 +690,7 @@ fn main() -> Result<()> {
         Command::ScrubMarkers { apply, repo } => {
             let policy_path = resolve_policy_path()?;
             let policy = WardenPolicy::load(&policy_path)?;
+            policy.validate()?;
             let roots = effective_watch_roots(&policy);
             let repos = if let Some(r) = repo {
                 vec![r]
@@ -953,7 +1003,7 @@ mod tests {
 
     #[test]
     fn build_gitignore_block_includes_expected_lines() {
-        let block = build_gitignore_block(&sample_policy());
+        let block = build_gitignore_block(&sample_policy()).expect("block");
         assert!(block.contains(BLOCK_BEGIN));
         assert!(block.contains("target/"));
         assert!(block.contains("!*.env"));
@@ -967,7 +1017,7 @@ mod tests {
 
     #[test]
     fn build_gitattributes_block_includes_expected_lines() {
-        let block = build_gitattributes_block(&sample_policy());
+        let block = build_gitattributes_block(&sample_policy()).expect("block");
         assert!(block.contains("*.env filter=dracon"));
         assert!(block.contains("secrets/** filter=dracon"));
         assert!(block.contains("*.pub -filter -diff -merge"));
@@ -977,18 +1027,14 @@ mod tests {
     }
 
     #[test]
-    fn plaintext_overrides_protected_without_duplicate_filter_rule() {
+    fn plaintext_cannot_overlap_protected_or_disable_env_encryption() {
         let policy = WardenPolicy {
             protected_patterns: vec!["config/envs/*.env".into(), "*.env".into()],
             plaintext_patterns: vec!["config/envs/*.env".into()],
             hygiene_patterns: vec![],
             watch_roots: vec![],
         };
-        let block = build_gitattributes_block(&policy);
-        let filter_rule = "config/envs/*.env filter=dracon diff=dracon merge=dracon";
-        let plaintext_rule = "config/envs/*.env -filter -diff -merge";
-        assert!(!block.contains(filter_rule));
-        assert!(block.contains(plaintext_rule));
+        assert!(build_gitattributes_block(&policy).is_err());
     }
 
     #[test]
