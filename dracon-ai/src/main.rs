@@ -84,6 +84,10 @@ enum Cmd {
         #[arg(long)]
         dangerous: bool,
 
+        /// Keep interactive do-mode in the current terminal (do not spawn a new tab).
+        #[arg(long)]
+        same_terminal: bool,
+
         /// Max AI iterations (plan/execute/respond loops).
         #[arg(long, default_value_t = 5)]
         max_steps: u32,
@@ -180,6 +184,7 @@ async fn main() -> Result<()> {
         // Use `--plan` (or DRACON_AI_APPLY=0) for plan-only.
         plan: env_bool("DRACON_AI_APPLY").map(|v| !v).unwrap_or(false),
         dangerous: env_bool("DRACON_AI_DANGEROUS").unwrap_or(false),
+        same_terminal: false,
         max_steps: 5,
         timeout_secs: 20,
         max_bytes: 200_000,
@@ -191,6 +196,7 @@ async fn main() -> Result<()> {
         Cmd::Do {
             plan,
             dangerous,
+            same_terminal,
             max_steps,
             timeout_secs,
             max_bytes,
@@ -202,6 +208,28 @@ async fn main() -> Result<()> {
             let task = if task.is_empty() {
                 if json {
                     return Err(anyhow!("--json is not supported in interactive mode"));
+                }
+                if !same_terminal {
+                    match spawn_new_terminal_tab(&[
+                        "do".to_string(),
+                        "--same-terminal".to_string(),
+                    ]) {
+                        Ok(true) => return Ok(()),
+                        Ok(false) => {
+                            eprintln!(
+                                "{}",
+                                dim("do: could not spawn a new tab; continuing in current terminal (pass --same-terminal to silence).")
+                            );
+                        }
+                        Err(e) => {
+                            eprintln!(
+                                "{}",
+                                dim(&format!(
+                                    "do: spawn failed: {e}. continuing in current terminal (pass --same-terminal to silence)."
+                                ))
+                            );
+                        }
+                    }
                 }
                 return run_do_repl(
                     &router,
@@ -258,12 +286,17 @@ async fn main() -> Result<()> {
                     return Err(anyhow!("--json is not supported in interactive mode"));
                 }
                 if !same_terminal {
-                    match spawn_new_terminal_for_interactive_chat(&intent) {
+                    match spawn_new_terminal_tab(&[
+                        "chat".to_string(),
+                        "--intent".to_string(),
+                        intent.clone(),
+                        "--same-terminal".to_string(),
+                    ]) {
                         Ok(true) => return Ok(()),
                         Ok(false) => {
                             eprintln!(
                                 "{}",
-                                dim("chat: could not spawn a new terminal; continuing in current terminal (pass --same-terminal to silence).")
+                                dim("chat: could not spawn a new tab; continuing in current terminal (pass --same-terminal to silence).")
                             );
                         }
                         Err(e) => {
