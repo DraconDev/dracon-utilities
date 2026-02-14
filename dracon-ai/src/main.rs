@@ -773,6 +773,7 @@ fn agent_system_prompt() -> String {
         "- Commands must be safe, minimal, and non-destructive by default.",
         "- Do NOT use `nix-env` (imperative installs) unless explicitly requested; prefer editing the Nix config under the system repo and rebuilding.",
         "- Avoid global `pip install` by default. Prefer Nix shells/devshells or project-local venv/uv workflows. If unsure, ask for the project context.",
+        "- JSON must be strict RFC8259: no trailing commas, no comments, no NaN/Infinity.",
         "- Do not include markdown fences, no prose outside JSON, no backticks.",
         "- When finished, set done=true and provide final_answer.",
     ]
@@ -786,6 +787,51 @@ fn extract_first_json_object(s: &str) -> Option<&str> {
         return None;
     }
     Some(&s[start..=end])
+}
+
+fn strip_trailing_commas(json: &str) -> String {
+    // Minimal "JSON5 -> JSON" cleanup: remove trailing commas like:
+    //   { "a": 1, }
+    //   [1, 2,]
+    // We do not attempt to support comments or other JSON5 features.
+    let mut out = String::with_capacity(json.len());
+    let mut chars = json.chars().peekable();
+    let mut in_str = false;
+    let mut esc = false;
+    while let Some(ch) = chars.next() {
+        if in_str {
+            out.push(ch);
+            if esc {
+                esc = false;
+            } else if ch == '\\' {
+                esc = true;
+            } else if ch == '"' {
+                in_str = false;
+            }
+            continue;
+        }
+
+        match ch {
+            '"' => {
+                in_str = true;
+                out.push(ch);
+            }
+            ',' => {
+                // Peek ahead to see if this is a trailing comma before } or ].
+                let mut look = chars.clone();
+                while matches!(look.peek(), Some(c) if c.is_whitespace()) {
+                    look.next();
+                }
+                if matches!(look.peek(), Some('}') | Some(']')) {
+                    // Skip this comma.
+                } else {
+                    out.push(ch);
+                }
+            }
+            _ => out.push(ch),
+        }
+    }
+    out
 }
 
 fn is_dangerous_shell(cmd: &str) -> bool {
@@ -835,8 +881,18 @@ async fn agent_next(
     };
 
     let json = extract_first_json_object(&text).ok_or_else(|| anyhow!("agent returned no JSON"))?;
-    serde_json::from_str::<AgentResponse>(json)
-        .with_context(|| format!("failed parsing agent JSON: {}", json))
+    match serde_json::from_str::<AgentResponse>(json) {
+        Ok(v) => Ok(v),
+        Err(e) => {
+            let repaired = strip_trailing_commas(json);
+            serde_json::from_str::<AgentResponse>(&repaired).with_context(|| {
+                format!(
+                    "failed parsing agent JSON (and repair failed).\nerror={}\njson={}",
+                    e, json
+                )
+            })
+        }
+    }
 }
 
 async fn agent_next_with_ui(
