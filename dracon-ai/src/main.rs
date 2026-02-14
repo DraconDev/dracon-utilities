@@ -444,6 +444,12 @@ struct AgentResponse {
     final_answer: Option<String>,
 }
 
+#[derive(Debug, Clone)]
+struct AgentStep {
+    selected_model: String,
+    resp: AgentResponse,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 struct AgentCommand {
     cmd: String,
@@ -851,7 +857,7 @@ fn is_dangerous_shell(cmd: &str) -> bool {
 async fn agent_next(
     router: &ai_routing_runtime::SmartRouter<dyn AiProvider>,
     messages: &[ChatMessage],
-) -> Result<AgentResponse> {
+) -> Result<AgentStep> {
     let req = ChatRequest {
         project_id: "default".to_string(),
         messages: messages.to_vec(),
@@ -859,8 +865,8 @@ async fn agent_next(
         routing_constraints: SelectionConstraints::default(),
         resolved_service_level: None,
     };
-    let (text, _usage) = {
-        let (provider, _trace) = router
+    let (text, selected_model) = {
+        let (provider, trace) = router
             .route_with_trace(
                 "default",
                 Some(RoutingTask::Custom("system".to_string())),
@@ -875,12 +881,13 @@ async fn agent_next(
                 SelectionConstraints::default(),
             )
             .await?;
-        provider.ask_and_collect(req).await?
+        let (text, _usage) = provider.ask_and_collect(req).await?;
+        (text, trace.selected_model)
     };
 
     let json = extract_first_json_object(&text).ok_or_else(|| anyhow!("agent returned no JSON"))?;
-    match serde_json::from_str::<AgentResponse>(json) {
-        Ok(v) => Ok(v),
+    let resp = match serde_json::from_str::<AgentResponse>(json) {
+        Ok(v) => v,
         Err(e) => {
             let repaired = strip_trailing_commas(json);
             serde_json::from_str::<AgentResponse>(&repaired).with_context(|| {
@@ -888,16 +895,21 @@ async fn agent_next(
                     "failed parsing agent JSON (and repair failed).\nerror={}\njson={}",
                     e, json
                 )
-            })
+            })?
         }
-    }
+    };
+
+    Ok(AgentStep {
+        selected_model,
+        resp,
+    })
 }
 
 async fn agent_next_with_ui(
     router: &ai_routing_runtime::SmartRouter<dyn AiProvider>,
     messages: &[ChatMessage],
     timeout: Duration,
-) -> Result<AgentResponse> {
+) -> Result<AgentStep> {
     let spinner = Spinner::start(dim("thinking...".to_string().as_str()).to_string());
     let res = tokio::time::timeout(timeout, agent_next(router, messages)).await;
     spinner.stop().await;
