@@ -6,6 +6,8 @@ use dracon_ai_runtime_contracts::traits::AiProvider;
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use std::io::{IsTerminal, Read};
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};
@@ -108,6 +110,10 @@ enum Cmd {
         /// Intent/lane hint (e.g. commit, engineer, verify)
         #[arg(short, long, default_value = "engineer")]
         intent: String,
+
+        /// Keep interactive chat in the current terminal (do not spawn a new tab/window).
+        #[arg(long)]
+        same_terminal: bool,
 
         /// Read prompt from stdin (entire stream).
         /// You can also use `-` as PROMPT.
@@ -233,6 +239,7 @@ async fn main() -> Result<()> {
         }
         Cmd::Chat {
             intent,
+            same_terminal,
             stdin,
             file,
             json,
@@ -249,6 +256,25 @@ async fn main() -> Result<()> {
             if is_interactive {
                 if json {
                     return Err(anyhow!("--json is not supported in interactive mode"));
+                }
+                if !same_terminal {
+                    match spawn_new_terminal_for_interactive_chat(&intent) {
+                        Ok(true) => return Ok(()),
+                        Ok(false) => {
+                            eprintln!(
+                                "{}",
+                                dim("chat: could not spawn a new terminal; continuing in current terminal (pass --same-terminal to silence).")
+                            );
+                        }
+                        Err(e) => {
+                            eprintln!(
+                                "{}",
+                                dim(&format!(
+                                    "chat: spawn failed: {e}. continuing in current terminal (pass --same-terminal to silence)."
+                                ))
+                            );
+                        }
+                    }
                 }
                 return run_chat_repl(&router, &mut lane).await;
             }
