@@ -547,6 +547,202 @@ fn build_router() -> Result<ai_routing_runtime::SmartRouter<dyn AiProvider>> {
     ))
 }
 
+fn has_gui_session() -> bool {
+    std::env::var_os("WAYLAND_DISPLAY").is_some() || std::env::var_os("DISPLAY").is_some()
+}
+
+fn is_executable_file(path: &Path) -> bool {
+    let Ok(meta) = std::fs::metadata(path) else {
+        return false;
+    };
+    if !meta.is_file() {
+        return false;
+    }
+    #[cfg(unix)]
+    {
+        (meta.permissions().mode() & 0o111) != 0
+    }
+    #[cfg(not(unix))]
+    {
+        true
+    }
+}
+
+fn which(bin: &str) -> Option<PathBuf> {
+    let path = std::env::var_os("PATH")?;
+    for dir in std::env::split_paths(&path) {
+        let full = dir.join(bin);
+        if is_executable_file(&full) {
+            return Some(full);
+        }
+    }
+    None
+}
+
+fn spawn_new_terminal_for_interactive_chat(intent: &str) -> Result<bool> {
+    // Prefer tmux when present: no GUI dependency, and "new tab" is a new tmux window.
+    if std::env::var_os("TMUX").is_some() {
+        if which("tmux").is_some() {
+            let exe = std::env::current_exe().context("current_exe")?;
+            let cmd = format!(
+                "{} chat --intent {} --same-terminal",
+                exe.display(),
+                shell_escape_simple(intent)
+            );
+            std::process::Command::new("tmux")
+                .args(["new-window", "-n", "dracon-ai", &cmd])
+                .spawn()
+                .context("spawn tmux new-window")?;
+            return Ok(true);
+        }
+    }
+
+    // GUI terminal emulators.
+    if !has_gui_session() {
+        return Ok(false);
+    }
+
+    let exe = std::env::current_exe().context("current_exe")?;
+    let exe_s = exe.to_string_lossy().to_string();
+    let args = vec![
+        "chat".to_string(),
+        "--intent".to_string(),
+        intent.to_string(),
+        "--same-terminal".to_string(),
+    ];
+
+    // WezTerm: prefer spawning a new tab when inside wezterm, else start a new window.
+    if which("wezterm").is_some() {
+        if std::env::var_os("WEZTERM_PANE").is_some() && which("wezterm").is_some() {
+            // `wezterm cli spawn` requires a running instance.
+            if std::process::Command::new("wezterm")
+                .args(["cli", "spawn", "--new-tab", "--", &exe_s])
+                .args(&args)
+                .spawn()
+                .is_ok()
+            {
+                return Ok(true);
+            }
+        }
+        if std::process::Command::new("wezterm")
+            .args(["start", "--", &exe_s])
+            .args(&args)
+            .spawn()
+            .is_ok()
+        {
+            return Ok(true);
+        }
+    }
+
+    // Kitty: if already in kitty, try remote-control tab spawn; otherwise open a new window.
+    if which("kitty").is_some() {
+        if std::env::var_os("KITTY_WINDOW_ID").is_some() {
+            if std::process::Command::new("kitty")
+                .args([
+                    "@",
+                    "launch",
+                    "--type=tab",
+                    "--title",
+                    "dracon-ai",
+                    "--",
+                    &exe_s,
+                ])
+                .args(&args)
+                .spawn()
+                .is_ok()
+            {
+                return Ok(true);
+            }
+        }
+        if std::process::Command::new("kitty")
+            .args(["--title", "dracon-ai", "--", &exe_s])
+            .args(&args)
+            .spawn()
+            .is_ok()
+        {
+            return Ok(true);
+        }
+    }
+
+    // GNOME Terminal (tabs).
+    for bin in ["gnome-terminal", "kgx"] {
+        if which(bin).is_some() {
+            let mut c = std::process::Command::new(bin);
+            if bin == "gnome-terminal" {
+                c.args(["--tab", "--title=dracon-ai", "--", &exe_s])
+                    .args(&args);
+            } else {
+                // GNOME Console (kgx) doesn't support tabs consistently; spawn a new window.
+                c.args(["--", &exe_s]).args(&args);
+            }
+            if c.spawn().is_ok() {
+                return Ok(true);
+            }
+        }
+    }
+
+    // Konsole (tabs).
+    if which("konsole").is_some() {
+        if std::process::Command::new("konsole")
+            .args(["--new-tab", "-p", "tabtitle=dracon-ai", "-e", &exe_s])
+            .args(&args)
+            .spawn()
+            .is_ok()
+        {
+            return Ok(true);
+        }
+    }
+
+    // Alacritty/foot/xterm (new window).
+    if which("alacritty").is_some() {
+        if std::process::Command::new("alacritty")
+            .args(["--title", "dracon-ai", "-e", &exe_s])
+            .args(&args)
+            .spawn()
+            .is_ok()
+        {
+            return Ok(true);
+        }
+    }
+    if which("foot").is_some() {
+        if std::process::Command::new("foot")
+            .args(["--title", "dracon-ai", "-e", &exe_s])
+            .args(&args)
+            .spawn()
+            .is_ok()
+        {
+            return Ok(true);
+        }
+    }
+    if which("xterm").is_some() {
+        if std::process::Command::new("xterm")
+            .args(["-T", "dracon-ai", "-e", &exe_s])
+            .args(&args)
+            .spawn()
+            .is_ok()
+        {
+            return Ok(true);
+        }
+    }
+
+    Ok(false)
+}
+
+fn shell_escape_simple(s: &str) -> String {
+    // Minimal shell escaping for tmux command string: wrap in single quotes and escape single quotes.
+    let mut out = String::with_capacity(s.len() + 2);
+    out.push('\'');
+    for ch in s.chars() {
+        if ch == '\'' {
+            out.push_str("'\\''");
+        } else {
+            out.push(ch);
+        }
+    }
+    out.push('\'');
+    out
+}
+
 fn resolve_prompt_text(stdin_flag: bool, file: Option<&Path>, prompt: &[String]) -> Result<String> {
     if let Some(file) = file {
         return std::fs::read_to_string(file)
