@@ -8,6 +8,7 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
+use std::process::Command as ProcessCommand;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
@@ -52,6 +53,16 @@ enum Command {
     },
     /// Scan plaintext JSON files for DEMON_SECRET/DRACON_SECRET markers and optionally scrub them.
     ScrubMarkers {
+        /// Apply edits in-place. Without this flag, the command is a dry-run report.
+        #[arg(long)]
+        apply: bool,
+        /// Optional repo path to scan. If omitted, scans repos under warden watch_roots.
+        repo: Option<PathBuf>,
+    },
+    /// Fix working-tree files that are still ciphertext (contain DRACON_SECRET/DEMON_SECRET markers).
+    ///
+    /// This can happen if filters were misconfigured at checkout time, or after branch switching.
+    Resmudge {
         /// Apply edits in-place. Without this flag, the command is a dry-run report.
         #[arg(long)]
         apply: bool,
@@ -725,6 +736,18 @@ fn main() -> Result<()> {
             };
             scrub_markers(&policy, &repos, apply)?;
         }
+        Command::Resmudge { apply, repo } => {
+            let policy_path = resolve_policy_path()?;
+            let policy = WardenPolicy::load(&policy_path)?;
+            policy.validate()?;
+            let roots = effective_watch_roots(&policy);
+            let repos = if let Some(r) = repo {
+                vec![r]
+            } else {
+                discover_git_repos(&roots)
+            };
+            resmudge_repos(&policy, &repos, apply)?;
+        }
     }
 
     Ok(())
@@ -940,6 +963,114 @@ fn scrub_markers(policy: &WardenPolicy, repos: &[PathBuf], apply: bool) -> Resul
     } else {
         println!("✅ scrub report complete (found: {})", found);
     }
+    Ok(())
+}
+
+fn git_ls_files(repo: &Path) -> Result<Vec<String>> {
+    let out = ProcessCommand::new("git")
+        .arg("-C")
+        .arg(repo)
+        .arg("ls-files")
+        .arg("-z")
+        .output()
+        .with_context(|| format!("failed to run git ls-files in {}", repo.display()))?;
+    if !out.status.success() {
+        return Err(anyhow::anyhow!(
+            "git ls-files failed in {} (exit={})",
+            repo.display(),
+            out.status
+        ));
+    }
+
+    let mut paths = Vec::new();
+    for part in out.stdout.split(|b| *b == 0) {
+        if part.is_empty() {
+            continue;
+        }
+        let s = std::str::from_utf8(part)
+            .with_context(|| format!("git ls-files returned non-utf8 path in {}", repo.display()))?;
+        paths.push(s.to_string());
+    }
+    Ok(paths)
+}
+
+fn resmudge_repo(repo: &Path, policy: &WardenPolicy, apply: bool) -> Result<(usize, usize)> {
+    let protected = build_globset(&policy.protected_patterns)?;
+    let files = git_ls_files(repo)?;
+
+    let mut found = 0usize;
+    let mut changed = 0usize;
+    let warden = if apply { Some(DraconWarden::new()?) } else { None };
+
+    for rel in files {
+        let rel_norm = rel.replace("\\", "/");
+        if !protected.is_match(&rel_norm) {
+            continue;
+        }
+
+        let full = repo.join(&rel);
+        let bytes = match fs::read(&full) {
+            Ok(b) => b,
+            Err(_) => continue,
+        };
+
+        if !is_marker_string(&String::from_utf8_lossy(&bytes)) {
+            continue;
+        }
+
+        found += 1;
+
+        if !apply {
+            println!("🔎 ciphertext in worktree: {}", full.display());
+            continue;
+        }
+
+        let Some(warden) = &warden else {
+            continue;
+        };
+
+        match warden.smudge(&bytes, Some(&rel_norm)) {
+            Ok(out) => {
+                if out != bytes {
+                    if let Err(e) = fs::write(&full, out) {
+                        eprintln!("⚠️ resmudge write failed {}: {}", full.display(), e);
+                        continue;
+                    }
+                    changed += 1;
+                    println!("✅ resmudged: {}", full.display());
+                }
+            }
+            Err(e) => {
+                eprintln!("⚠️ resmudge failed {}: {}", full.display(), e);
+            }
+        }
+    }
+
+    Ok((found, changed))
+}
+
+fn resmudge_repos(policy: &WardenPolicy, repos: &[PathBuf], apply: bool) -> Result<()> {
+    policy.validate()?;
+
+    let mut total_found = 0usize;
+    let mut total_changed = 0usize;
+
+    for repo in repos {
+        match resmudge_repo(repo, policy, apply) {
+            Ok((found, changed)) => {
+                total_found += found;
+                total_changed += changed;
+            }
+            Err(e) => eprintln!("⚠️ resmudge failed for {}: {}", repo.display(), e),
+        }
+    }
+
+    if apply {
+        println!("✅ resmudge complete (found: {}, changed: {})", total_found, total_changed);
+    } else {
+        println!("✅ resmudge report complete (found: {})", total_found);
+    }
+
     Ok(())
 }
 
