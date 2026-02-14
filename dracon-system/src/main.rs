@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use clap::{Parser, Subcommand};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -33,11 +33,6 @@ enum Commands {
         json: bool,
         #[arg(long)]
         strict: bool,
-    },
-    /// Repair secret filter fallout (ciphertext stuck in working tree, marker corruption, etc).
-    Secrets {
-        #[command(subcommand)]
-        cmd: SecretsCommands,
     },
     /// Analyze storage hotspots and optionally clean safe build/cache dirs.
     Storage {
@@ -100,22 +95,6 @@ enum GuardCommands {
     Daemon,
 }
 
-#[derive(Subcommand, Debug)]
-enum SecretsCommands {
-    /// System-wide repair pass for secret-related corruption.
-    ///
-    /// Default is APPLY because this command is explicitly a repair tool.
-    Clean {
-        /// Only report; do not modify files.
-        #[arg(long)]
-        dry_run: bool,
-        /// Optional repo path. If omitted, uses warden watch_roots (system-wide).
-        repo: Option<PathBuf>,
-        /// Fail non-zero if ciphertext markers still remain in protected working-tree files.
-        #[arg(long)]
-        strict: bool,
-    },
-}
 
 #[derive(Debug, Serialize)]
 struct StatusReport {
@@ -806,41 +785,6 @@ async fn is_user_service_active(service: &str) -> bool {
 }
 
 
-async fn run_warden(args: &[&str]) -> Result<(String, String)> {
-    let out = Command::new("dracon-warden")
-        .args(args)
-        .output()
-        .await
-        .with_context(|| format!("failed to run dracon-warden {}", args.join(" ") ))?;
-
-    let stdout = String::from_utf8_lossy(&out.stdout).to_string();
-    let stderr = String::from_utf8_lossy(&out.stderr).to_string();
-
-    if !out.status.success() {
-        return Err(anyhow::anyhow!(
-            "dracon-warden {} failed (exit={})\n{}",
-            args.join(" "),
-            out.status,
-            stderr.trim_end()
-        ));
-    }
-
-    Ok((stdout, stderr))
-}
-
-fn parse_resmudge_found(stdout: &str) -> Option<usize> {
-    for line in stdout.lines() {
-        let line = line.trim();
-        let prefix = "✅ resmudge report complete (found: ";
-        if let Some(rest) = line.strip_prefix(prefix) {
-            let rest = rest.trim_end_matches(')');
-            if let Ok(n) = rest.parse::<usize>() {
-                return Some(n);
-            }
-        }
-    }
-    None
-}
 
 async fn build_status_report() -> StatusReport {
     let root = canonical_system_root();
@@ -1188,41 +1132,6 @@ async fn main() -> Result<()> {
                 }
             }
         }
-        Commands::Secrets { cmd } => match cmd {
-            SecretsCommands::Clean {
-                dry_run,
-                repo,
-                strict,
-            } => {
-                let apply = !dry_run;
-
-                if apply {
-                    let _ = run_warden(&["once"]).await?;
-                    let mut args: Vec<String> = vec!["resmudge".into(), "--apply".into()];
-                    if let Some(repo) = repo.as_ref() {
-                        args.push(repo.display().to_string());
-                    }
-                    let args_ref: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-                    let _ = run_warden(&args_ref).await?;
-                }
-
-                let mut verify: Vec<String> = vec!["resmudge".into()];
-                if let Some(repo) = repo.as_ref() {
-                    verify.push(repo.display().to_string());
-                }
-                let verify_ref: Vec<&str> = verify.iter().map(|s| s.as_str()).collect();
-                let (stdout, _stderr) = run_warden(&verify_ref).await?;
-                if let Some(found) = parse_resmudge_found(&stdout) {
-                    if found > 0 {
-                        let msg = format!("ciphertext markers remain in working tree (count={})", found);
-                        if strict {
-                            return Err(anyhow::anyhow!(msg));
-                        }
-                        eprintln!("⚠️ {}", msg);
-                    }
-                }
-            }
-        },
         Commands::Storage {
             root,
             json,
