@@ -25,7 +25,7 @@ Shows the resolved AI runtime view from `dracon-libs`:
 - active model ids
 - dev model ids
 
-### `dracon-ai do [--apply] [task...]`
+### `dracon-ai do [--plan] [--dangerous] [task...]`
 
 Computer-context assistant. It returns a small set of shell commands to run for the task.
 
@@ -106,7 +106,7 @@ Resolution prefers environment variables first, then the secrets file.
 
 Composition is supported in three ways:
 
-- `dracon-ai do --apply ...` (plan+execute loop)
+- `dracon-ai do ...` (plan+execute loop, default)
 - stdin/file prompt modes (outside the REPL)
 - `dracon-ai cmd ...` (one-shot capture+ask; requires `DRACON_AI_ALLOW_CMD=1`)
 - REPL slash command: `/cmd <shell>`

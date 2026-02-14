@@ -40,7 +40,12 @@ fn resolve_config_path() -> Option<PathBuf> {
         return Some(PathBuf::from(p));
     }
     let home = dirs::home_dir()?;
-    Some(home.join("dracon").join("utilities").join("ai").join("dracon-ai.toml"))
+    Some(
+        home.join("dracon")
+            .join("utilities")
+            .join("ai")
+            .join("dracon-ai.toml"),
+    )
 }
 
 fn load_config() -> DraconAiConfig {
@@ -67,7 +72,7 @@ struct Cli {
 #[derive(Subcommand)]
 #[command(rename_all = "kebab-case")]
 enum Cmd {
-    /// 🛠️ Computer-context assistant (plans commands, can execute them with --apply)
+    /// 🛠️ Computer-context assistant (plans commands and executes by default)
     Do {
         /// Plan only (do not execute). Default is execute.
         #[arg(long, alias = "no-apply")]
@@ -192,8 +197,15 @@ async fn main() -> Result<()> {
                 if json {
                     return Err(anyhow!("--json is not supported in interactive mode"));
                 }
-                return run_do_repl(&router, apply, dangerous, max_steps, timeout_secs, max_bytes)
-                    .await;
+                return run_do_repl(
+                    &router,
+                    apply,
+                    dangerous,
+                    max_steps,
+                    timeout_secs,
+                    max_bytes,
+                )
+                .await;
             } else {
                 task.join(" ")
             };
@@ -292,7 +304,10 @@ Command:\n```\n{}\n```\n\n\
 Exit status: {}\n\n\
 Captured output:\n```\n{}\n```",
                 cmd_s,
-                capture.status_code.map(|c| c.to_string()).unwrap_or_else(|| "unknown".to_string()),
+                capture
+                    .status_code
+                    .map(|c| c.to_string())
+                    .unwrap_or_else(|| "unknown".to_string()),
                 capture.output
             );
 
@@ -534,7 +549,14 @@ fn trim_history(messages: &mut Vec<ChatMessage>) {
     if let Some(first) = messages.first().cloned() {
         keep.push(first);
     }
-    keep.extend(messages.iter().rev().take(MAX_MESSAGES.saturating_sub(1)).cloned().rev());
+    keep.extend(
+        messages
+            .iter()
+            .rev()
+            .take(MAX_MESSAGES.saturating_sub(1))
+            .cloned()
+            .rev(),
+    );
     *messages = keep;
 }
 
@@ -674,7 +696,8 @@ async fn run_do_task(
 
     let mut commands_ran: Vec<String> = Vec::new();
     let mut last_answer: Option<String> = None;
-    let mut repeat_guard: std::collections::BTreeMap<String, u32> = std::collections::BTreeMap::new();
+    let mut repeat_guard: std::collections::BTreeMap<String, u32> =
+        std::collections::BTreeMap::new();
 
     // Optional: if apply is enabled and task is Nix-ish, probe a little state up front.
     // This keeps "do mode" effective without making the user educate the agent each time.
@@ -690,13 +713,23 @@ async fn run_do_task(
             .unwrap_or_else(|| PathBuf::from("/home/dracon/dracon/nixos"));
         let probes = [
             ("nix --version", "confirm nix is available"),
-            ("nixos-rebuild --version", "confirm rebuild tool is available"),
+            (
+                "nixos-rebuild --version",
+                "confirm rebuild tool is available",
+            ),
             ("ls -la", "show cwd"),
-            (&format!("ls -la {}", nixos_root.display()), "show nixos root"),
-            (&format!("git -C {} status -sb", nixos_root.display()), "show nixos git status"),
+            (
+                &format!("ls -la {}", nixos_root.display()),
+                "show nixos root",
+            ),
+            (
+                &format!("git -C {} status -sb", nixos_root.display()),
+                "show nixos git status",
+            ),
         ];
         for (cmd, _why) in probes {
-            let capture = run_shell_capture(cmd, Duration::from_secs(timeout_secs), max_bytes).await?;
+            let capture =
+                run_shell_capture(cmd, Duration::from_secs(timeout_secs), max_bytes).await?;
             commands_ran.push(cmd.to_string());
             messages.push(ChatMessage {
                 role: "system".to_string(),
@@ -873,7 +906,12 @@ async fn run_do_repl(
     let mut last_task: Option<String> = None;
 
     loop {
-        let prompt = if cur_apply { "do(apply=on)> " } else { "do(apply=off)> " };
+        let prompt = match (cur_apply, cur_dangerous) {
+            (true, true) => "do(apply=on,danger=on)> ",
+            (true, false) => "do(apply=on,danger=off)> ",
+            (false, true) => "do(apply=off,danger=on)> ",
+            (false, false) => "do(apply=off,danger=off)> ",
+        };
         let line = tokio::task::block_in_place(|| rl.readline(prompt));
         match line {
             Ok(line) => {
@@ -891,9 +929,18 @@ async fn run_do_repl(
                 }
                 if line == "/help" || line == "/?" {
                     eprintln!("{}", dim("Commands:"));
-                    eprintln!("{}", dim("  /apply on|off       toggle execution (default off)"));
-                    eprintln!("{}", dim("  /dangerous on|off   allow dangerous commands (sudo/rm/etc)"));
-                    eprintln!("{}", dim("  /config             show resolved dracon-ai config"));
+                    eprintln!(
+                        "{}",
+                        dim("  /apply on|off       toggle execution (default on)")
+                    );
+                    eprintln!(
+                        "{}",
+                        dim("  /dangerous on|off   allow dangerous commands (sudo/rm/etc)")
+                    );
+                    eprintln!(
+                        "{}",
+                        dim("  /config             show resolved dracon-ai config")
+                    );
                     eprintln!("{}", dim("  do so | do it       re-run last task (uses current apply/dangerous toggles)"));
                     eprintln!("{}", dim("  /exit               quit"));
                     continue;
@@ -939,10 +986,14 @@ async fn run_do_repl(
                     }
                 }
 
-                // Allow a common habit: appending `--apply` to mean "run it now".
+                // Inline toggles: allow appending flag-like words in the REPL.
                 if effective.contains("--apply") {
                     cur_apply = true;
                     effective = effective.replace("--apply", "").trim().to_string();
+                }
+                if effective.contains("--plan") {
+                    cur_apply = false;
+                    effective = effective.replace("--plan", "").trim().to_string();
                 }
                 if effective.contains("--no-apply") {
                     cur_apply = false;
@@ -1093,7 +1144,11 @@ async fn ask_with_messages(
     })
 }
 
-async fn run_shell_capture(cmd: &str, timeout: Duration, max_bytes: usize) -> Result<CommandCapture> {
+async fn run_shell_capture(
+    cmd: &str,
+    timeout: Duration,
+    max_bytes: usize,
+) -> Result<CommandCapture> {
     async fn read_limited(mut r: impl AsyncRead + Unpin, limit: usize) -> Result<Vec<u8>> {
         let mut out = Vec::new();
         let mut buf = [0u8; 8192];
@@ -1124,8 +1179,14 @@ async fn run_shell_capture(cmd: &str, timeout: Duration, max_bytes: usize) -> Re
         .spawn()
         .with_context(|| format!("failed to spawn shell command: {cmd}"))?;
 
-    let mut stdout = child.stdout.take().ok_or_else(|| anyhow!("missing stdout"))?;
-    let mut stderr = child.stderr.take().ok_or_else(|| anyhow!("missing stderr"))?;
+    let mut stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| anyhow!("missing stdout"))?;
+    let mut stderr = child
+        .stderr
+        .take()
+        .ok_or_else(|| anyhow!("missing stderr"))?;
 
     let per_stream_limit = max_bytes.saturating_div(2).max(4096);
     let out_task = tokio::spawn(async move { read_limited(&mut stdout, per_stream_limit).await });
@@ -1184,8 +1245,14 @@ async fn run_chat_repl(
         title,
         dim("interactive mode. Ctrl-D or /exit to quit. /help for commands.")
     );
-    eprintln!("{}", dim("Tip: /paste then paste multi-line text, end with /end."));
-    eprintln!("{}", dim("Tip: /cmd <shell> captures local output into context (logs, status, etc)."));
+    eprintln!(
+        "{}",
+        dim("Tip: /paste then paste multi-line text, end with /end.")
+    );
+    eprintln!(
+        "{}",
+        dim("Tip: /cmd <shell> captures local output into context (logs, status, etc).")
+    );
 
     let mut rl = Editor::<(), rustyline::history::DefaultHistory>::new()?;
     if let Some(hp) = history_path() {
@@ -1223,8 +1290,14 @@ async fn run_chat_repl(
                     eprintln!("{}", dim("  /intent <name>   set intent/lane hint"));
                     eprintln!("{}", dim("  /lane <name>     alias for /intent"));
                     eprintln!("{}", dim("  /clear           clear conversation context"));
-                    eprintln!("{}", dim("  /paste           begin multi-line paste (end with /end)"));
-                    eprintln!("{}", dim("  /cmd <shell>     run local command, add output to context"));
+                    eprintln!(
+                        "{}",
+                        dim("  /paste           begin multi-line paste (end with /end)")
+                    );
+                    eprintln!(
+                        "{}",
+                        dim("  /cmd <shell>     run local command, add output to context")
+                    );
                     eprintln!("{}", dim("  /exit            quit"));
                     continue;
                 }
@@ -1319,15 +1392,7 @@ async fn run_chat_repl(
                 };
 
                 let mut stdout = tokio::io::stdout();
-                match ask_with_messages(
-                    router,
-                    lane.clone(),
-                    None,
-                    &mut messages,
-                    out,
-                )
-                .await
-                {
+                match ask_with_messages(router, lane.clone(), None, &mut messages, out).await {
                     Ok(resp) => {
                         // When streaming, resp.content already hit stdout. Ensure newline.
                         if std::io::stdout().is_terminal() {
@@ -1376,7 +1441,8 @@ mod tests {
 
     #[test]
     fn parses_chat_with_default_intent() {
-        let cli = Cli::try_parse_from(["dracon-ai", "chat", "hello", "world"]).expect("chat parses");
+        let cli =
+            Cli::try_parse_from(["dracon-ai", "chat", "hello", "world"]).expect("chat parses");
         match cli.cmd.expect("cmd") {
             Cmd::Chat { intent, prompt, .. } => {
                 assert_eq!(intent, "engineer");
