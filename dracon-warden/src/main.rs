@@ -69,6 +69,22 @@ enum Command {
         /// Optional repo path to scan. If omitted, scans repos under warden watch_roots.
         repo: Option<PathBuf>,
     },
+    /// System-wide repair pass for secret-related corruption.
+    ///
+    /// - Runs a hardening pass ("once") to reconcile .gitignore/.gitattributes and scrub marker
+    ///   corruption where possible.
+    /// - Attempts to re-smudge protected files (decrypt marker ciphertext stuck in working tree).
+    /// - Reports remaining ciphertext markers (often indicates missing identities, not corruption).
+    Repair {
+        /// Only report; do not modify files.
+        #[arg(long)]
+        dry_run: bool,
+        /// Fail non-zero if ciphertext markers still remain in protected working-tree files.
+        #[arg(long)]
+        strict: bool,
+        /// Optional repo path to scan. If omitted, scans repos under warden watch_roots.
+        repo: Option<PathBuf>,
+    },
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -458,7 +474,7 @@ fn validate_owner_age_pubkey_bytes(path: &Path, bytes: &[u8]) -> Result<()> {
             path.display()
         ));
     }
-    Ok(())
+    Ok((total_found, total_changed))
 }
 
 fn resolve_local_pubkey_path() -> Option<PathBuf> {
@@ -746,7 +762,35 @@ fn main() -> Result<()> {
             } else {
                 discover_git_repos(&roots)
             };
-            resmudge_repos(&policy, &repos, apply)?;
+            let _ = resmudge_repos(&policy, &repos, apply)?;
+        }
+        Command::Repair { dry_run, strict, repo } => {
+            let policy_path = resolve_policy_path()?;
+            let policy = WardenPolicy::load(&policy_path)?;
+            policy.validate()?;
+            let roots = effective_watch_roots(&policy);
+            let repos = if let Some(r) = repo {
+                vec![r]
+            } else {
+                discover_git_repos(&roots)
+            };
+
+            if !dry_run {
+                // Hardening (managed blocks + marker scrub)
+                scrub_markers(&policy, &repos, true)?;
+                harden_repos(&policy, repos.clone())?;
+                // Fix ciphertext stuck in worktree (if identities allow).
+                let _ = resmudge_repos(&policy, &repos, true)?;
+            }
+
+            // Always report remaining ciphertext markers.
+            let (found, _changed) = resmudge_repos(&policy, &repos, false)?;
+            if strict && found > 0 {
+                return Err(anyhow::anyhow!(
+                    "ciphertext markers remain in working tree (count={})",
+                    found
+                ));
+            }
         }
     }
 
@@ -1049,7 +1093,7 @@ fn resmudge_repo(repo: &Path, policy: &WardenPolicy, apply: bool) -> Result<(usi
     Ok((found, changed))
 }
 
-fn resmudge_repos(policy: &WardenPolicy, repos: &[PathBuf], apply: bool) -> Result<()> {
+fn resmudge_repos(policy: &WardenPolicy, repos: &[PathBuf], apply: bool) -> Result<(usize, usize)> {
     policy.validate()?;
 
     let mut total_found = 0usize;
