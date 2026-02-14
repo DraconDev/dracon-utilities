@@ -474,7 +474,7 @@ fn validate_owner_age_pubkey_bytes(path: &Path, bytes: &[u8]) -> Result<()> {
             path.display()
         ));
     }
-    Ok((total_found, total_changed))
+    Ok(())
 }
 
 fn resolve_local_pubkey_path() -> Option<PathBuf> {
@@ -1115,7 +1115,7 @@ fn resmudge_repos(policy: &WardenPolicy, repos: &[PathBuf], apply: bool) -> Resu
         println!("✅ resmudge report complete (found: {})", total_found);
     }
 
-    Ok(())
+    Ok((total_found, total_changed))
 }
 
 fn run_filter(is_clean: bool, path: Option<&str>) -> Result<()> {
