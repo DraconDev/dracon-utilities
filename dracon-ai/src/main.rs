@@ -485,8 +485,23 @@ fn dim(s: &str) -> String {
     ansi("90", s)
 }
 
+fn cyan(s: &str) -> String {
+    ansi("36", s)
+}
+
+fn magenta_bold(s: &str) -> String {
+    ansi("1;35", s)
+}
+
 fn stderr_is_tty() -> bool {
     std::io::stderr().is_terminal()
+}
+
+fn set_title(title: &str) {
+    if !stderr_is_tty() {
+        return;
+    }
+    eprint!("\x1b]0;{}\x07", title);
 }
 
 fn prompt_label(lane: &RoutingTask) -> String {
@@ -1152,6 +1167,7 @@ async fn run_do_repl(
     use rustyline::error::ReadlineError;
     use rustyline::Editor;
 
+    set_title("dracon-ai do");
     eprintln!(
         "{} {}",
         ansi("1;36", "dracon-ai"),
@@ -1504,6 +1520,7 @@ async fn run_chat_repl(
     use rustyline::error::ReadlineError;
     use rustyline::Editor;
 
+    set_title("dracon-ai chat");
     let title = ansi("1;36", "dracon-ai");
     eprintln!(
         "{} {}",
@@ -1693,7 +1710,7 @@ async fn run_chat_repl(
 }
 
 fn print_assistant_header(selected_model: &str) {
-    let who = ansi("1;35", "assistant");
+    let who = magenta_bold("assistant");
     if selected_model.trim().is_empty() {
         println!("{who}");
         return;
@@ -1716,7 +1733,7 @@ fn print_markdownish(s: &str) {
             continue;
         }
         if in_code {
-            println!("{}", ansi("36", line));
+            println!("{}", cyan(line));
         } else {
             println!("{}", line);
         }
