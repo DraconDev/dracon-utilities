@@ -39,7 +39,8 @@ Canonical library ownership is defined in `dracon-libs/docs/capability-boundarie
 - `dracon-ai`
   - Optional AI utility, separate from sync/warden/system deterministic runtime loops.
 - `dracon-code` (planned)
-  - Optional coding/automation orchestrator utility.
+  - Optional coding workflow utility (repo scaffolding + context persistence).
+  - Owns `do.md` + `plan/` conventions for "git as AI version control".
   - May consume `dracon-ai`, but does not own sync/warden/system runtime roles.
 
 ## De-dup policy
