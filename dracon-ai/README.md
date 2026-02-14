@@ -44,7 +44,7 @@ Interactive helpers:
 Sends a single prompt through the `dracon-libs` routing runtime.
 
 - `--intent` is treated as a lane hint (mapped to `dracon-libs` routing tasks).
-- If no prompt is provided, `dracon-ai chat` starts interactive mode in a **new terminal tab/window** when possible.
+- If no prompt is provided, `dracon-ai chat` starts interactive mode in a **new terminal tab** when possible.
 - Use `--same-terminal` to force interactive chat in the current terminal.
 - Input modes:
   - `--stdin` (or `-` as prompt) reads full stdin

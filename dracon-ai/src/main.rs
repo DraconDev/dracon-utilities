@@ -580,6 +580,14 @@ fn which(bin: &str) -> Option<PathBuf> {
 }
 
 fn spawn_new_terminal_for_interactive_chat(intent: &str) -> Result<bool> {
+    fn status_ok(bin: &str, args: &[&str]) -> bool {
+        std::process::Command::new(bin)
+            .args(args)
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false)
+    }
+
     // Prefer tmux when present: no GUI dependency, and "new tab" is a new tmux window.
     if std::env::var_os("TMUX").is_some() {
         if which("tmux").is_some() {
@@ -589,11 +597,9 @@ fn spawn_new_terminal_for_interactive_chat(intent: &str) -> Result<bool> {
                 exe.display(),
                 shell_escape_simple(intent)
             );
-            std::process::Command::new("tmux")
-                .args(["new-window", "-n", "dracon-ai", &cmd])
-                .spawn()
-                .context("spawn tmux new-window")?;
-            return Ok(true);
+            if status_ok("tmux", &["new-window", "-n", "dracon-ai", &cmd]) {
+                return Ok(true);
+            }
         }
     }
 
@@ -611,73 +617,46 @@ fn spawn_new_terminal_for_interactive_chat(intent: &str) -> Result<bool> {
         "--same-terminal".to_string(),
     ];
 
-    // WezTerm: prefer spawning a new tab when inside wezterm, else start a new window.
+    // WezTerm: try a new tab in an existing instance first.
     if which("wezterm").is_some() {
-        if std::env::var_os("WEZTERM_PANE").is_some() && which("wezterm").is_some() {
-            // `wezterm cli spawn` requires a running instance.
-            if std::process::Command::new("wezterm")
-                .args(["cli", "spawn", "--new-tab", "--", &exe_s])
-                .args(&args)
-                .spawn()
-                .is_ok()
-            {
-                return Ok(true);
-            }
-        }
-        if std::process::Command::new("wezterm")
-            .args(["start", "--", &exe_s])
-            .args(&args)
-            .spawn()
-            .is_ok()
-        {
+        // `wezterm cli spawn` returns quickly (good for success/failure detection).
+        let mut a = vec!["cli", "spawn", "--new-tab", "--", &exe_s];
+        let a_owned: Vec<String> = args.clone();
+        let a_refs: Vec<&str> = a_owned.iter().map(|s| s.as_str()).collect();
+        a.extend_from_slice(&a_refs);
+        if status_ok("wezterm", &a) {
             return Ok(true);
         }
     }
 
-    // Kitty: if already in kitty, try remote-control tab spawn; otherwise open a new window.
+    // Kitty: remote-control new tab only (we don't spawn a new window because the user asked for tabs).
     if which("kitty").is_some() {
         if std::env::var_os("KITTY_WINDOW_ID").is_some() {
-            if std::process::Command::new("kitty")
-                .args([
-                    "@",
-                    "launch",
-                    "--type=tab",
-                    "--title",
-                    "dracon-ai",
-                    "--",
-                    &exe_s,
-                ])
-                .args(&args)
-                .spawn()
-                .is_ok()
-            {
+            let mut a = vec![
+                "@",
+                "launch",
+                "--type=tab",
+                "--title",
+                "dracon-ai",
+                "--",
+                &exe_s,
+            ];
+            let a_owned: Vec<String> = args.clone();
+            let a_refs: Vec<&str> = a_owned.iter().map(|s| s.as_str()).collect();
+            a.extend_from_slice(&a_refs);
+            if status_ok("kitty", &a) {
                 return Ok(true);
             }
-        }
-        if std::process::Command::new("kitty")
-            .args(["--title", "dracon-ai", "--", &exe_s])
-            .args(&args)
-            .spawn()
-            .is_ok()
-        {
-            return Ok(true);
         }
     }
 
     // GNOME Terminal (tabs).
-    for bin in ["gnome-terminal", "kgx"] {
-        if which(bin).is_some() {
-            let mut c = std::process::Command::new(bin);
-            if bin == "gnome-terminal" {
-                c.args(["--tab", "--title=dracon-ai", "--", &exe_s])
-                    .args(&args);
-            } else {
-                // GNOME Console (kgx) doesn't support tabs consistently; spawn a new window.
-                c.args(["--", &exe_s]).args(&args);
-            }
-            if c.spawn().is_ok() {
-                return Ok(true);
-            }
+    if which("gnome-terminal").is_some() {
+        let mut c = std::process::Command::new("gnome-terminal");
+        c.args(["--tab", "--title=dracon-ai", "--", &exe_s])
+            .args(&args);
+        if c.spawn().is_ok() {
+            return Ok(true);
         }
     }
 
@@ -685,38 +664,6 @@ fn spawn_new_terminal_for_interactive_chat(intent: &str) -> Result<bool> {
     if which("konsole").is_some() {
         if std::process::Command::new("konsole")
             .args(["--new-tab", "-p", "tabtitle=dracon-ai", "-e", &exe_s])
-            .args(&args)
-            .spawn()
-            .is_ok()
-        {
-            return Ok(true);
-        }
-    }
-
-    // Alacritty/foot/xterm (new window).
-    if which("alacritty").is_some() {
-        if std::process::Command::new("alacritty")
-            .args(["--title", "dracon-ai", "-e", &exe_s])
-            .args(&args)
-            .spawn()
-            .is_ok()
-        {
-            return Ok(true);
-        }
-    }
-    if which("foot").is_some() {
-        if std::process::Command::new("foot")
-            .args(["--title", "dracon-ai", "-e", &exe_s])
-            .args(&args)
-            .spawn()
-            .is_ok()
-        {
-            return Ok(true);
-        }
-    }
-    if which("xterm").is_some() {
-        if std::process::Command::new("xterm")
-            .args(["-T", "dracon-ai", "-e", &exe_s])
             .args(&args)
             .spawn()
             .is_ok()
