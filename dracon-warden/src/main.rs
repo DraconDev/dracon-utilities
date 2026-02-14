@@ -14,6 +14,15 @@ use std::time::{Duration, Instant};
 const BLOCK_BEGIN: &str = "# --- BEGIN DRACON MANAGED BLOCK ---";
 const BLOCK_END: &str = "# --- END DRACON MANAGED BLOCK ---";
 const DEFAULT_PLAINTEXT_PATTERNS: &[&str] = &[];
+const FORBIDDEN_PLAINTEXT_SUBSTRINGS: &[&str] = &[
+    // Patterns that almost always carry secret material in our workflow.
+    ".env",
+    "secrets/",
+    "/secrets",
+    "*.key",
+    "*.pem",
+    "*.age",
+];
 
 #[derive(Parser, Debug)]
 #[command(name = "dracon-warden")]

@@ -489,6 +489,7 @@ dependencies = [
  "regex",
  "secrecy",
  "serde",
+ "serde_json",
  "sha2",
  "walkdir",
  "zeroize",
