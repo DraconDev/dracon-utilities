@@ -17,6 +17,8 @@ Starts `do` mode interactively.
 
 Use this when your goal is something related to the computer (Nix changes, repo hygiene, service debugging, file operations).
 
+By default, interactive `do` mode is opened in a **new terminal tab** when possible. Use `dracon-ai do --same-terminal` to keep it in the current terminal.
+
 ### `dracon-ai status`
 
 Shows the resolved AI runtime view from `dracon-libs`:

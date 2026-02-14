@@ -210,10 +210,8 @@ async fn main() -> Result<()> {
                     return Err(anyhow!("--json is not supported in interactive mode"));
                 }
                 if !same_terminal {
-                    match spawn_new_terminal_tab(&[
-                        "do".to_string(),
-                        "--same-terminal".to_string(),
-                    ]) {
+                    match spawn_new_terminal_tab(&["do".to_string(), "--same-terminal".to_string()])
+                    {
                         Ok(true) => return Ok(()),
                         Ok(false) => {
                             eprintln!(
@@ -1720,6 +1718,24 @@ fn print_markdownish(s: &str) {
 mod tests {
     use super::{Cli, Cmd};
     use clap::Parser;
+
+    #[test]
+    fn agent_json_trailing_comma_is_repaired() {
+        let bad = r#"{
+  "done": false,
+  "summary": "x",
+  "commands": [
+    { "cmd": "echo hi", "why": "x", }
+  ],
+  "final_answer": null,
+}"#;
+        let repaired = super::strip_trailing_commas(bad);
+        let v: super::AgentResponse =
+            serde_json::from_str(&repaired).expect("repaired json parses");
+        assert!(!v.done);
+        assert_eq!(v.commands.len(), 1);
+        assert_eq!(v.commands[0].cmd, "echo hi");
+    }
 
     #[test]
     fn parses_chat_with_default_intent() {
