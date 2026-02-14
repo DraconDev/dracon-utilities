@@ -1026,9 +1026,11 @@ async fn run_do_task(
         }
     }
 
-        for step_idx in 0..max_steps {
-        let step = agent_next_with_ui(router, &messages, Duration::from_secs(60)).await?;
-        let agent = step.resp;
+    for step_idx in 0..max_steps {
+        let AgentStep {
+            selected_model,
+            resp: agent,
+        } = agent_next_with_ui(router, &messages, Duration::from_secs(60)).await?;
         if agent.done {
             last_answer = agent.final_answer.or(Some(agent.summary));
             break;
@@ -1062,22 +1064,14 @@ async fn run_do_task(
         }
 
         eprintln!(
-            "{}",
-            dim(&format!(
-                "step {}/{} [{}]: {}",
-                step_idx + 1,
-                max_steps,
-                ansi("33", &step.selected_model),
-                agent.summary
-            ))
+            "{} {} {}",
+            dim(&format!("step {}/{}:", step_idx + 1, max_steps)),
+            ansi("33", &selected_model),
+            agent.summary
         );
         for (i, c) in agent.commands.iter().enumerate() {
             if c.why.trim().is_empty() {
-                eprintln!(
-                    "{} {}",
-                    dim(&format!("  {}.", i + 1)),
-                    cyan(&c.cmd)
-                );
+                eprintln!("{} {}", dim(&format!("  {}.", i + 1)), cyan(&c.cmd));
             } else {
                 eprintln!(
                     "{} {} {}",
