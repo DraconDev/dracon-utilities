@@ -106,11 +106,8 @@ enum SecretsCommands {
     ///
     /// Default is APPLY because this command is explicitly a repair tool.
     Clean {
-        /// Apply edits (default). Use --dry-run to only report.
-        #[arg(long, default_value_t = true)]
-        apply: bool,
         /// Only report; do not modify files.
-        #[arg(long, default_value_t = false)]
+        #[arg(long)]
         dry_run: bool,
         /// Optional repo path. If omitted, uses warden watch_roots (system-wide).
         repo: Option<PathBuf>,
@@ -1193,12 +1190,11 @@ async fn main() -> Result<()> {
         }
         Commands::Secrets { cmd } => match cmd {
             SecretsCommands::Clean {
-                apply,
                 dry_run,
                 repo,
                 strict,
             } => {
-                let apply = if dry_run { false } else { apply };
+                let apply = !dry_run;
 
                 if apply {
                     let _ = run_warden(&["once"]).await?;
