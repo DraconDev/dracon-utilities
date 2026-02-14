@@ -82,6 +82,27 @@ impl WardenPolicy {
     }
 
     fn validate(&self) -> Result<()> {
+        fn is_allowed_plaintext_pattern(p: &str) -> bool {
+            // Keep this tight. Plaintext patterns are an explicit escape hatch that disables
+            // encryption in git history.
+            matches!(
+                p,
+                "Cargo.lock"
+                    | "Cargo.toml"
+                    | "rust-toolchain.toml"
+                    | "rustfmt.toml"
+                    | "clippy.toml"
+                    | "deny.toml"
+                    | "flake.nix"
+                    | "flake.lock"
+                    | ".dracon/data/"
+                    | ".dracon/data/keys/"
+                    | ".dracon/data/keys/*.pub"
+                    | "*.pub"
+            ) || p.ends_with(".pub")
+                || p.replace('\\', "/").starts_with(".dracon/data/")
+        }
+
         let protected = self
             .protected_patterns
             .iter()
@@ -109,6 +130,11 @@ impl WardenPolicy {
         }
 
         for p in &plaintext {
+            if !is_allowed_plaintext_pattern(p) {
+                return Err(anyhow::anyhow!(
+                    "invalid policy: plaintext_patterns is allowlisted; refusing: {p}"
+                ));
+            }
             let pl = p.to_lowercase();
             if FORBIDDEN_PLAINTEXT_SUBSTRINGS
                 .iter()
