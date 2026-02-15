@@ -8,6 +8,7 @@ Instead, it consumes the canonical AI runtime from `dracon-libs` (policy, secret
 
 - No direct provider hookup logic in this repo (no OpenRouter/OpenAI/Anthropic “native” client logic in `dracon-ai`).
 - No AI dependencies in deterministic daemons (`dracon-sync`, `dracon-warden`, `dracon-system`).
+- No ownership of `dracon-code` workflows (`do.md`, blueprint gates, project execution policy); those belong in the `dracon-code` project.
 
 ## Commands
 
