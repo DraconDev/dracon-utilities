@@ -38,7 +38,10 @@ enum Command {
     /// Run forever with filesystem event debounce.
     Daemon,
     /// Run one hardening pass and exit.
-    Once,
+    Once {
+        /// Optional repo path to harden. If omitted, hardens repos under warden watch_roots.
+        repo: Option<PathBuf>,
+    },
     /// Show resolved policy path and watch roots.
     Status,
     /// Git filter clean operation (stdin -> stdout).
@@ -678,7 +681,9 @@ fn run_daemon(policy_path: PathBuf) -> Result<()> {
     println!("🛡️ dracon-warden active. Monitoring {:?}", roots);
 
     let mut last_run = Instant::now();
+    let mut last_sweep = Instant::now();
     let debounce = Duration::from_secs(2);
+    let sweep_every = Duration::from_secs(300);
     let mut pending_repos = BTreeSet::new();
 
     loop {
@@ -703,6 +708,13 @@ fn run_daemon(policy_path: PathBuf) -> Result<()> {
             scrub_markers(&policy, &repos_vec, true)?;
             harden_repos(&policy, repos_vec)?;
             last_run = Instant::now();
+        }
+
+        if last_sweep.elapsed() >= sweep_every {
+            let policy = WardenPolicy::load(&policy_path)?;
+            policy.validate()?;
+            harden_all(&policy)?;
+            last_sweep = Instant::now();
         }
     }
 }
@@ -730,11 +742,16 @@ fn main() -> Result<()> {
                     .unwrap_or_else(|| "NOT_FOUND (set DRACON_OWNER_PUBKEY)".to_string())
             );
         }
-        Command::Once => {
+        Command::Once { repo } => {
             let policy_path = resolve_policy_path()?;
             let policy = WardenPolicy::load(&policy_path)?;
             policy.validate()?;
-            harden_all(&policy)?;
+            if let Some(r) = repo {
+                scrub_markers(&policy, std::slice::from_ref(&r), true)?;
+                harden_repos(&policy, vec![r])?;
+            } else {
+                harden_all(&policy)?;
+            }
         }
         Command::Daemon => {
             let policy_path = resolve_policy_path()?;
