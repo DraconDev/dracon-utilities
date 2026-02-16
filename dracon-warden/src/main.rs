@@ -39,7 +39,7 @@ enum Command {
     Daemon,
     /// Run one hardening pass and exit.
     Once {
-        /// Optional repo path to harden. If omitted, hardens repos under warden watch_roots.
+        /// Optional repo path to harden. If omitted, hardens repos in warden discovery scope.
         repo: Option<PathBuf>,
     },
     /// Show resolved policy path and watch roots.
@@ -59,7 +59,7 @@ enum Command {
         /// Apply edits in-place. Without this flag, the command is a dry-run report.
         #[arg(long)]
         apply: bool,
-        /// Optional repo path to scan. If omitted, scans repos under warden watch_roots.
+        /// Optional repo path to scan. If omitted, scans repos in warden discovery scope.
         repo: Option<PathBuf>,
     },
     /// Fix working-tree files that are still ciphertext (contain DRACON_SECRET/DEMON_SECRET markers).
@@ -69,7 +69,7 @@ enum Command {
         /// Apply edits in-place. Without this flag, the command is a dry-run report.
         #[arg(long)]
         apply: bool,
-        /// Optional repo path to scan. If omitted, scans repos under warden watch_roots.
+        /// Optional repo path to scan. If omitted, scans repos in warden discovery scope.
         repo: Option<PathBuf>,
     },
     /// System-wide repair pass for secret-related corruption.
@@ -85,7 +85,7 @@ enum Command {
         /// Fail non-zero if ciphertext markers still remain in protected working-tree files.
         #[arg(long)]
         strict: bool,
-        /// Optional repo path to scan. If omitted, scans repos under warden watch_roots.
+        /// Optional repo path to scan. If omitted, scans repos in warden discovery scope.
         repo: Option<PathBuf>,
     },
 }
@@ -100,6 +100,8 @@ struct WardenPolicy {
     hygiene_patterns: Vec<String>,
     #[serde(default)]
     watch_roots: Vec<String>,
+    #[serde(default)]
+    discover_roots: Vec<String>,
 }
 
 impl WardenPolicy {
@@ -181,6 +183,14 @@ impl WardenPolicy {
 
     fn watch_root_paths(&self) -> Vec<PathBuf> {
         self.watch_roots
+            .iter()
+            .map(PathBuf::from)
+            .filter(|p| p.exists())
+            .collect()
+    }
+
+    fn discover_root_paths(&self) -> Vec<PathBuf> {
+        self.discover_roots
             .iter()
             .map(PathBuf::from)
             .filter(|p| p.exists())
@@ -271,6 +281,17 @@ fn discover_git_repos(roots: &[PathBuf]) -> Vec<PathBuf> {
 fn effective_watch_roots(policy: &WardenPolicy) -> Vec<PathBuf> {
     let mut roots = BTreeSet::new();
     for root in policy.watch_root_paths() {
+        roots.insert(root);
+    }
+    roots.into_iter().collect()
+}
+
+fn effective_discovery_roots(policy: &WardenPolicy) -> Vec<PathBuf> {
+    let mut roots = BTreeSet::new();
+    for root in policy.watch_root_paths() {
+        roots.insert(root);
+    }
+    for root in policy.discover_root_paths() {
         roots.insert(root);
     }
     roots.into_iter().collect()
@@ -579,7 +600,7 @@ fn harden_repo(
 }
 
 fn harden_all(policy: &WardenPolicy) -> Result<()> {
-    let roots = effective_watch_roots(policy);
+    let roots = effective_discovery_roots(policy);
     let repos = discover_git_repos(&roots);
     scrub_markers(policy, &repos, true)?;
     harden_repos(policy, repos)
@@ -734,7 +755,11 @@ fn main() -> Result<()> {
             let policy = WardenPolicy::load(&policy_path)?;
             policy.validate()?;
             println!("📜 POLICY: {}", policy_path.display());
-            println!("🛡️ ROOTS: {:?}", effective_watch_roots(&policy));
+            println!("🛡️ WATCH_ROOTS: {:?}", effective_watch_roots(&policy));
+            println!(
+                "🧭 DISCOVERY_ROOTS: {:?}",
+                effective_discovery_roots(&policy)
+            );
             println!(
                 "🔑 PUBKEY_SOURCE: {}",
                 resolve_local_pubkey_path()
@@ -761,7 +786,7 @@ fn main() -> Result<()> {
             let policy_path = resolve_policy_path()?;
             let policy = WardenPolicy::load(&policy_path)?;
             policy.validate()?;
-            let roots = effective_watch_roots(&policy);
+            let roots = effective_discovery_roots(&policy);
             let repos = if let Some(r) = repo {
                 vec![r]
             } else {
@@ -773,7 +798,7 @@ fn main() -> Result<()> {
             let policy_path = resolve_policy_path()?;
             let policy = WardenPolicy::load(&policy_path)?;
             policy.validate()?;
-            let roots = effective_watch_roots(&policy);
+            let roots = effective_discovery_roots(&policy);
             let repos = if let Some(r) = repo {
                 vec![r]
             } else {
@@ -785,7 +810,7 @@ fn main() -> Result<()> {
             let policy_path = resolve_policy_path()?;
             let policy = WardenPolicy::load(&policy_path)?;
             policy.validate()?;
-            let roots = effective_watch_roots(&policy);
+            let roots = effective_discovery_roots(&policy);
             let repos = if let Some(r) = repo {
                 vec![r]
             } else {
@@ -1194,6 +1219,7 @@ mod tests {
             plaintext_patterns: vec!["*.pub".into()],
             hygiene_patterns: vec!["target/".into(), "*.log".into()],
             watch_roots: vec![],
+            discover_roots: vec![],
         }
     }
 
@@ -1251,6 +1277,7 @@ mod tests {
             plaintext_patterns: vec!["config/envs/*.env".into()],
             hygiene_patterns: vec![],
             watch_roots: vec![],
+            discover_roots: vec![],
         };
         assert!(build_gitattributes_block(&policy).is_err());
     }
@@ -1380,10 +1407,32 @@ mod tests {
             plaintext_patterns: vec![],
             hygiene_patterns: vec![],
             watch_roots: vec![p1.display().to_string(), p1.display().to_string()],
+            discover_roots: vec![],
         };
         let merged = effective_watch_roots(&policy);
         assert_eq!(merged.len(), 1);
         assert!(merged.contains(&p1));
+    }
+
+    #[test]
+    fn effective_discovery_roots_merges_watch_and_discover_deduped() {
+        let td = TempDir::new("warden_effective_discovery_roots");
+        let p1 = td.path().join("one");
+        let p2 = td.path().join("two");
+        fs::create_dir_all(&p1).expect("p1");
+        fs::create_dir_all(&p2).expect("p2");
+
+        let policy = WardenPolicy {
+            protected_patterns: vec![],
+            plaintext_patterns: vec![],
+            hygiene_patterns: vec![],
+            watch_roots: vec![p1.display().to_string()],
+            discover_roots: vec![p1.display().to_string(), p2.display().to_string()],
+        };
+        let merged = effective_discovery_roots(&policy);
+        assert_eq!(merged.len(), 2);
+        assert!(merged.contains(&p1));
+        assert!(merged.contains(&p2));
     }
 
     #[test]
