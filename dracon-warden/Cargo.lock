@@ -475,7 +475,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "dracon-security-kit"
+name = "dracon-security"
 version = "0.1.0"
 dependencies = [
  "aes-gcm",
@@ -502,7 +502,7 @@ dependencies = [
  "anyhow",
  "clap",
  "dirs 6.0.0",
- "dracon-security-kit",
+ "dracon-security",
  "globset",
  "notify",
  "serde",

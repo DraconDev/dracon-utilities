@@ -13,4 +13,4 @@ serde_json = "1.0"
 toml = "0.8"
 walkdir = "2.5"
 dirs = "6.0"
-dracon-security-kit = { path = "../../dracon-libs/tools/security/dracon-security-kit" }
+dracon-security-kit = { package = "dracon-security", path = "../../dracon-libs/tools/security/dracon-security" }
