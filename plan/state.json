@@ -10,7 +10,9 @@
   "slice_attempts": {},
   "mailbox_offset": 0,
   "last_checkpoint_at": null,
-  "last_activity_at": null,
+  "last_activity_at": 1771278433,
   "stall_recovery_count": 0,
-  "updated_at": 1771222101
+  "last_compiled_intent_sig": null,
+  "last_compiled_note_sig": null,
+  "updated_at": 1771278433
 }
