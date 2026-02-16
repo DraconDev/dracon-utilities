@@ -756,10 +756,12 @@ fn main() -> Result<()> {
             policy.validate()?;
             println!("📜 POLICY: {}", policy_path.display());
             println!("🛡️ WATCH_ROOTS: {:?}", effective_watch_roots(&policy));
-            println!(
-                "🧭 DISCOVERY_ROOTS: {:?}",
-                effective_discovery_roots(&policy)
-            );
+            if !policy.discover_roots.is_empty() {
+                println!(
+                    "🧭 DISCOVERY_ROOTS: {:?}",
+                    effective_discovery_roots(&policy)
+                );
+            }
             println!(
                 "🔑 PUBKEY_SOURCE: {}",
                 resolve_local_pubkey_path()
