@@ -597,6 +597,7 @@ fn default_exclude_dir_names() -> Vec<String> {
         "dist",
         "build",
         "archives",
+        ".tmp-*",
     ]
     .into_iter()
     .map(String::from)
