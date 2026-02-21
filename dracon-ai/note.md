@@ -1,1 +1,0 @@
-when we paste we should not show the entire thing but only the first 3 lines then just say how many more we left out 

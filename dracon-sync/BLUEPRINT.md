@@ -71,7 +71,16 @@
 
 ---
 
-## Remaining (Low Priority - 3)
+---
+
+## Automatic Large File Handling
+
+### 20. Auto-add large untracked files to .gitignore
+- **Status:** [x]
+- **Problem:** Large untracked files (> max_stage_file_bytes, default 50MB) were perpetually detected but never handled, causing repeated warnings
+- **Fix:** Added `is_large_untracked()` and `append_to_gitignore()` functions. Large untracked files are now automatically added to .gitignore after the managed block
+- **Priority:** High
+- **Location:** `main.rs:925-980, 2175-2270`
 
 ### 17. Policy reload race
 - **Problem:** Policy is reloaded every loop iteration, could cause inconsistency mid-sync

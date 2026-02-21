@@ -3970,8 +3970,8 @@ mod tests {
         let ledger = incident_ledger_path(&policy);
         let body = std::fs::read_to_string(&ledger).expect("ledger");
         assert!(!body.trim().is_empty());
-        let first = body.lines().next().expect("line");
-        let parsed: Value = serde_json::from_str(first).expect("json");
+        let last = body.lines().last().expect("line");
+        let parsed: Value = serde_json::from_str(last).expect("json");
         assert_eq!(parsed["scope"], "concern");
         assert_eq!(parsed["result"], "ok");
     }

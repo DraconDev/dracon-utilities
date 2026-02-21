@@ -1,8 +1,10 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
+use fs2::FileExt;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
-use std::fs;
+use std::fs::{self, File};
+use std::io::Write;
 #[cfg(unix)]
 use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
@@ -563,6 +565,10 @@ async fn run_guard_once(
     }
 
     state.heavy_since.retain(|pid, _| current_heavy.contains(pid));
+    
+    // Clean up stale notify_cooldowns entries (older than 2x cooldown period)
+    let cooldown_cutoff = Instant::now() - Duration::from_secs(guard.notify_cooldown_secs.saturating_mul(2));
+    state.notify_cooldowns.retain(|_, &mut since| since > cooldown_cutoff);
 
     Ok(GuardReport {
         enabled: guard.enabled,
@@ -766,8 +772,32 @@ fn load_system_policy() -> (Option<PathBuf>, SystemPolicy) {
         Ok(c) => c,
         Err(_) => return (Some(path), SystemPolicy::default()),
     };
-    let parsed: SystemPolicy = toml::from_str(&content).unwrap_or_default();
+    let parsed: SystemPolicy = toml::from_str(&content).unwrap_or_else(|e| {
+        eprintln!("⚠️ failed to parse {}: {}", path.display(), e);
+        SystemPolicy::default()
+    });
     (Some(path), parsed)
+}
+
+fn daemon_lock_path() -> PathBuf {
+    dirs::home_dir()
+        .map(|h| h.join(".dracon").join("dracon-system.lock"))
+        .unwrap_or_else(|| PathBuf::from("/tmp/dracon-system.lock"))
+}
+
+fn acquire_daemon_lock() -> Result<File> {
+    let lock_path = daemon_lock_path();
+    if let Some(parent) = lock_path.parent() {
+        std::fs::create_dir_all(parent).ok();
+    }
+    let file = File::create(&lock_path)
+        .with_context(|| format!("failed to create lock file {}", lock_path.display()))?;
+    file.try_lock_exclusive()
+        .with_context(|| format!("failed to acquire lock {} - another daemon running?", lock_path.display()))?;
+    if let Err(e) = writeln!(&file, "{}", std::process::id()) {
+        eprintln!("⚠️ failed to write PID to lock file: {}", e);
+    }
+    Ok(file)
 }
 
 async fn is_user_service_active(service: &str) -> bool {
@@ -1323,6 +1353,8 @@ async fn main() -> Result<()> {
                         println!("guard disabled in policy");
                         return Ok(());
                     }
+                    let _lock = acquire_daemon_lock()
+                        .with_context(|| "failed to acquire guard daemon lock")?;
                     println!("guard daemon started (interval={}s)", guard.interval_secs);
                     loop {
                         if let Err(e) = run_guard_once(&guard, &mut runtime).await {

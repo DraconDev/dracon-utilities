@@ -453,15 +453,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "dracon-protocols"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "serde",
-]
-
-[[package]]
 name = "dracon-system"
 version = "0.1.0"
 dependencies = [
@@ -469,6 +460,7 @@ dependencies = [
  "clap",
  "dirs",
  "dracon-system 0.3.0",
+ "fs2",
  "serde",
  "serde_json",
  "tokio",
@@ -480,10 +472,8 @@ name = "dracon-system"
 version = "0.3.0"
 dependencies = [
  "anyhow",
- "async-trait",
  "dirs",
  "dracon-config",
- "dracon-protocols",
  "libc",
  "log",
  "notify-rust",
@@ -615,6 +605,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cb4cb245038516f5f85277875cdaa4f7d2c9a0fa0468de06ed190163b1581fcf"
 dependencies = [
  "percent-encoding",
+]
+
+[[package]]
+name = "fs2"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9564fc758e15025b46aa6643b1b77d047d1a56a1aea6e01002ac0c7026876213"
+dependencies = [
+ "libc",
+ "winapi",
 ]
 
 [[package]]

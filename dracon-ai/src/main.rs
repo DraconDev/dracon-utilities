@@ -57,7 +57,10 @@ fn load_config() -> DraconAiConfig {
     let Ok(raw) = std::fs::read_to_string(&path) else {
         return DraconAiConfig::default();
     };
-    toml::from_str(&raw).unwrap_or_default()
+    toml::from_str(&raw).unwrap_or_else(|e| {
+        eprintln!("⚠️ failed to parse {}: {}", path.display(), e);
+        DraconAiConfig::default()
+    })
 }
 
 #[derive(Parser)]
@@ -393,7 +396,7 @@ Captured output:\n```\n{}\n```",
         Cmd::Status => {
             let resolved = ai_runtime_config::resolve_ai_runtime_config();
             println!("📜 AI_RUNTIME: dracon-libs policy + secrets (ai-runtime-config)");
-            println!("📦 PROVIDERS: {}", resolved.provider_specs.len());
+            println!("📦 PROVIDERS: {} OpenAI + {} Bedrock", resolved.openai_providers.len(), resolved.bedrock_providers.len());
             println!("✅ ACTIVE_MODELS: {}", resolved.active_model_ids.len());
             for id in &resolved.active_model_ids {
                 println!("  - {}", id);
@@ -464,6 +467,7 @@ fn normalize_intent(intent: &str) -> String {
 fn intent_to_lane(intent: &str) -> RoutingTask {
     match intent {
         "commit" | "engineer" | "coding" => RoutingTask::Coding,
+        "writing" | "write" | "docs" | "documentation" => RoutingTask::Writing,
         "verify" | "fast" | "summary" => RoutingTask::Fast,
         "general" => RoutingTask::General,
         other => RoutingTask::Custom(other.to_string()),
@@ -509,6 +513,7 @@ fn prompt_label(lane: &RoutingTask) -> String {
     let lane_txt = match lane {
         RoutingTask::General => "general",
         RoutingTask::Coding => "coding",
+        RoutingTask::Writing => "writing",
         RoutingTask::Fast => "fast",
         RoutingTask::Custom(v) => v.as_str(),
     };
@@ -573,7 +578,7 @@ fn build_router() -> Result<ai_routing_runtime::SmartRouter<dyn AiProvider>> {
 
     let mut registry: ai_routing_runtime::ProviderRegistry<dyn AiProvider> =
         ai_routing_runtime::ProviderRegistry::new();
-    for spec in &resolved.provider_specs {
+    for spec in &resolved.openai_providers {
         let provider: std::sync::Arc<dyn AiProvider> =
             std::sync::Arc::new(ai_runtime_adapters::GenericOpenAIAdapter::new_with_auth(
                 spec.api_key.clone(),
@@ -801,11 +806,34 @@ fn agent_system_prompt() -> String {
 
 fn extract_first_json_object(s: &str) -> Option<&str> {
     let start = s.find('{')?;
-    let end = s.rfind('}')?;
-    if end <= start {
-        return None;
+    let mut depth = 0i32;
+    let mut in_str = false;
+    let mut esc = false;
+    
+    for (i, ch) in s[start..].char_indices() {
+        if in_str {
+            if esc {
+                esc = false;
+            } else if ch == '\\' {
+                esc = true;
+            } else if ch == '"' {
+                in_str = false;
+            }
+            continue;
+        }
+        match ch {
+            '"' => in_str = true,
+            '{' => depth += 1,
+            '}' => {
+                depth -= 1;
+                if depth == 0 {
+                    return Some(&s[start..=start + i]);
+                }
+            }
+            _ => {}
+        }
     }
-    Some(&s[start..=end])
+    None
 }
 
 fn strip_trailing_commas(json: &str) -> String {
