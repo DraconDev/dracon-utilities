@@ -977,6 +977,11 @@ fn scrub_markers(policy: &WardenPolicy, repos: &[PathBuf], apply: bool) -> Resul
             .output()
             .with_context(|| format!("git ls-files failed for {}", repo.display()))?;
         if !out.status.success() {
+            eprintln!(
+                "⚠️ git ls-files failed for {} (status {})",
+                repo.display(),
+                out.status
+            );
             continue;
         }
 

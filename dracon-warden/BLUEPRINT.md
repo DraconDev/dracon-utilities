@@ -73,19 +73,21 @@ dracon-warden is a Git filter + repository hardening daemon:
 ## Remaining (Low Priority)
 
 ### 4. Missing context on file write
-- **Location:** `main.rs:1039`
-- **Problem:** `fs::write()` lacks `.with_context()` unlike other file operations
+- **Location:** `main.rs:1041`
+- **Problem:** `fs::write()` lacked `.with_context()` unlike other file operations
+- **Fix:** Added `.with_context(|| format!("failed writing {}", path.display()))`
 - **Priority:** Low
-- **Status:** [ ]
+- **Status:** [x]
 
 ### 5. Inconsistent error handling
 - **Location:** `main.rs:393, 403`
-- **Problem:** `.unwrap_or_default()` used instead of proper error handling
+- **Problem:** `.unwrap_or_default()` used for reading files - acceptable for "create if missing" pattern
 - **Priority:** Low
-- **Status:** [ ]
+- **Status:** [x] (documented as intentional - these are "create if missing" reads)
 
 ### 6. Silent git command failure
-- **Location:** `main.rs:971-978`
+- **Location:** `main.rs:979-980`
 - **Problem:** Git command failures silently skip
+- **Fix:** Added warning message on failure
 - **Priority:** Low
-- **Status:** [ ]
+- **Status:** [x]
