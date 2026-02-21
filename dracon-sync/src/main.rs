@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use dracon_git::{build_sync_commit_payload, GitService};
-use dracon_git::types::{DiffFile, FileStatus, RepoStatus};
+use dracon_git::types::{DiffFile, RepoStatus};
 use fs2::FileExt;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -160,7 +160,17 @@ fn default_inactivity_push_delay_secs() -> u64 {
 }
 
 fn is_lockfile_path(p: &str) -> bool {
-    p == "Cargo.lock" || p.ends_with("/Cargo.lock")
+    let lockfiles = [
+        "Cargo.lock",
+        "package-lock.json",
+        "yarn.lock",
+        "pnpm-lock.yaml",
+        "poetry.lock",
+        "composer.lock",
+        "Gemfile.lock",
+        "go.sum",
+    ];
+    lockfiles.iter().any(|l| p == *l || p.ends_with(&format!("/{}", l)))
 }
 
 #[derive(Debug, Deserialize, Default, Clone)]
@@ -174,7 +184,10 @@ fn load_repo_override(repo: &Path) -> RepoPolicyOverride {
     let Ok(content) = std::fs::read_to_string(&path) else {
         return RepoPolicyOverride::default();
     };
-    toml::from_str(&content).unwrap_or_default()
+    toml::from_str(&content).unwrap_or_else(|e| {
+        eprintln!("⚠️ failed to parse repo override {}: {}", path.display(), e);
+        RepoPolicyOverride::default()
+    })
 }
 
 fn bump_semver_patch(ver: &str) -> Option<String> {
@@ -306,8 +319,8 @@ fn bump_patch_version_in_repo(repo: &Path) -> Result<BumpOutcome> {
                                     new_version = format!("{}.{}.{}", major, minor, patch + 1);
 
                                     // Reconstruct preserving indentation and any trailing comment.
-                                    let indent = line.splitn(2, 'v').next().unwrap_or("");
-                                    out.push_str(indent);
+                                    let indent: String = line.chars().take_while(|c| c.is_whitespace()).collect();
+                                    out.push_str(&indent);
                                     out.push_str("version = \"");
                                     out.push_str(&new_version);
                                     out.push('"');
@@ -465,8 +478,10 @@ fn bump_patch_version_in_repo(repo: &Path) -> Result<BumpOutcome> {
     let mut updated_cargo_lock = false;
     if bumped_section == "package" && !new_ver.is_empty() {
         if let Some(name) = find_package_name(&content, "package") {
-            updated_cargo_lock =
-                update_cargo_lock_package_version(repo, &name, &new_ver).unwrap_or(false);
+            match update_cargo_lock_package_version(repo, &name, &new_ver) {
+                Ok(changed) => updated_cargo_lock = changed,
+                Err(e) => eprintln!("⚠️ failed to update Cargo.lock for {}: {}", repo.display(), e),
+            }
         }
     }
 
@@ -777,8 +792,14 @@ impl SyncPolicy {
         if policy.incident_ledger_max_age_days == 0 {
             policy.incident_ledger_max_age_days = default_incident_ledger_max_age_days();
         }
-        policy.pull_op_timeout_secs = policy.pull_op_timeout_secs.max(5);
-        policy.push_op_timeout_secs = policy.push_op_timeout_secs.max(10);
+        if policy.pull_op_timeout_secs < 5 {
+            eprintln!("⚠️ pull_op_timeout_secs {} below minimum 5s, adjusting", policy.pull_op_timeout_secs);
+            policy.pull_op_timeout_secs = 5;
+        }
+        if policy.push_op_timeout_secs < 10 {
+            eprintln!("⚠️ push_op_timeout_secs {} below minimum 10s, adjusting", policy.push_op_timeout_secs);
+            policy.push_op_timeout_secs = 10;
+        }
         policy.max_push_blob_bytes = policy
             .max_push_blob_bytes
             .min(DEFAULT_GIT_HOST_BLOB_LIMIT_BYTES)
@@ -796,7 +817,14 @@ impl SyncPolicy {
         self.watch_roots
             .iter()
             .map(PathBuf::from)
-            .filter(|p| p.exists())
+            .filter(|p| {
+                if !p.exists() {
+                    eprintln!("⚠️ watch root {} does not exist, skipping", p.display());
+                    false
+                } else {
+                    true
+                }
+            })
             .collect()
     }
 }
@@ -946,44 +974,26 @@ fn daemon_lock_path() -> PathBuf {
 fn acquire_daemon_lock() -> Result<File> {
     let lock_path = daemon_lock_path();
     if let Some(parent) = lock_path.parent() {
-        std::fs::create_dir_all(parent).ok();
+        if let Err(e) = std::fs::create_dir_all(parent) {
+            eprintln!("⚠️ failed to create lock dir {}: {}", parent.display(), e);
+        }
     }
     let file = File::create(&lock_path)
         .with_context(|| format!("failed to create lock file {}", lock_path.display()))?;
     file.try_lock_exclusive()
         .with_context(|| format!("failed to acquire lock {} - another daemon running?", lock_path.display()))?;
-    writeln!(&file, "{}", std::process::id()).ok();
+    if let Err(e) = writeln!(&file, "{}", std::process::id()) {
+        eprintln!("⚠️ failed to write PID to lock file: {}", e);
+    }
     Ok(file)
 }
 
 fn to_proto_status(s: &RepoStatus) -> RepoStatus {
-    RepoStatus {
-        branch: s.branch.clone(),
-        ahead: s.ahead,
-        behind: s.behind,
-        modified_files: s.modified_files,
-        staged_files: s.staged_files,
-        is_clean: s.is_clean,
-        last_commit_msg: s.last_commit_msg.clone(),
-        last_commit_hash: s.last_commit_hash.clone(),
-    }
+    s.clone()
 }
 
 fn to_proto_entries(entries: &[DiffFile]) -> Vec<DiffFile> {
-    entries
-        .iter()
-        .map(|e| DiffFile {
-            path: e.path.clone(),
-            status: match e.status {
-                FileStatus::Modified => FileStatus::Modified,
-                FileStatus::Added => FileStatus::Added,
-                FileStatus::Deleted => FileStatus::Deleted,
-                FileStatus::Renamed => FileStatus::Renamed,
-                FileStatus::TypeChange => FileStatus::TypeChange,
-                FileStatus::Unknown => FileStatus::Unknown,
-            },
-        })
-        .collect()
+    entries.to_vec()
 }
 
 fn discover_git_repos(roots: &[PathBuf], excluded_dir_names: &BTreeSet<String>) -> Vec<PathBuf> {
