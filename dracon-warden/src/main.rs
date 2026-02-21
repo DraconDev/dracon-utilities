@@ -1038,7 +1038,8 @@ fn scrub_markers(policy: &WardenPolicy, repos: &[PathBuf], apply: bool) -> Resul
             scrub_json_value(&mut v);
             let next = serde_json::to_string_pretty(&v)?;
             if next != content {
-                fs::write(&path, next)?;
+                fs::write(&path, &next)
+                    .with_context(|| format!("failed writing {}", path.display()))?;
                 changed += 1;
                 println!("✅ scrubbed: {}", path.display());
             }
