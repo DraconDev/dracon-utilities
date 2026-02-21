@@ -29,10 +29,10 @@
 
 ---
 
-## Code Quality Fixes
+## Code Quality Fixes (All Fixed)
 
 ### 7. Incorrect indent calculation in version bumping
-- **Status:** [x] Fixed to use proper whitespace extraction
+- **Status:** [x] Fixed to use `chars().take_while(|c| c.is_whitespace())`
 
 ### 8. Silent value clamping in policy validation
 - **Status:** [x] Added warning messages when values are adjusted
@@ -44,7 +44,7 @@
 - **Status:** [x] Simplified to `s.clone()` and `entries.to_vec()`
 
 ### 11. Limited lockfile detection
-- **Status:** [x] Expanded to detect 8 common lockfile types
+- **Status:** [x] Expanded to detect: Cargo.lock, package-lock.json, yarn.lock, pnpm-lock.yaml, poetry.lock, composer.lock, Gemfile.lock, go.sum
 
 ### 12. TOML/Cargo.lock parse errors silently ignored
 - **Status:** [x] Added warning on parse failure
@@ -73,6 +73,48 @@
 
 ## Remaining (Low Priority - 3)
 
-- [ ] #5 - Policy reload race (clone policy at start of each repo iteration)
-- [ ] #6 - Repo discovery race (check repo existence before processing)
-- [ ] #11 - Status inconsistency in CLI fallback (recalculate all status fields)
+### 17. Policy reload race
+- **Problem:** Policy is reloaded every loop iteration, could cause inconsistency mid-sync
+- **Fix:** Clone policy at start of each repo iteration
+- **Priority:** Low
+- **Status:** [ ]
+
+### 18. Repo discovery race
+- **Problem:** If a repo is deleted between discovery and processing, sync fails
+- **Fix:** Check repo existence before processing, handle ENOENT gracefully
+- **Priority:** Low
+- **Status:** [ ]
+
+### 19. Status inconsistency in CLI fallback
+- **Problem:** When fallback CLI entries are used, `status.staged_files` is not recalculated
+- **Fix:** Recalculate all status fields in fallback path
+- **Priority:** Low
+- **Status:** [ ]
+
+---
+
+## Config Notes
+
+### Current dracon-sync.toml values (all valid):
+- `pulse_interval_secs = 1` - OK (minimum 1)
+- `inactivity_push_delay_secs = 5` - OK (minimum 1)
+- `pull_op_timeout_secs = 10` - OK (minimum 5)
+- `push_op_timeout_secs = 300` - OK (minimum 10)
+- `repo_sync_timeout_secs = 900` - OK (must be > push + 30)
+- `push_retries = 3` - OK
+- `repair_cooldown_secs = 60` - OK (minimum 1)
+- `max_push_blob_bytes = 52428800` (50MB) - OK (below 100MB host limit)
+- `max_stage_file_bytes = 52428800` (50MB) - OK (below 100MB default)
+- `incident_ledger_max_lines = 10000` - OK
+- `incident_ledger_max_age_days = 30` - OK
+
+### Note on "duplicate" file limits:
+The config has TWO separate size limits that happen to have the same value:
+- `max_push_blob_bytes` (line 48) - Guardrail to skip push if commits contain blobs > this size
+- `max_stage_file_bytes` (line 80) - Skip auto-staging files > this size during commit
+
+These serve DIFFERENT purposes:
+1. Staging limit prevents accidentally adding huge files to commits
+2. Push limit prevents pushing commits that already contain huge files
+
+They're intentionally both set to 50MB to keep things simple, but could be configured differently if needed.
