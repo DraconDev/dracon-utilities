@@ -1,9 +1,7 @@
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use dracon_git::{build_sync_commit_payload, GitService};
-use dracon_protocols::git::{
-    DiffFile as ProtoDiffFile, FileStatus as ProtoFileStatus, RepoStatus as ProtoRepoStatus,
-};
+use dracon_git::types::{DiffFile, FileStatus, RepoStatus};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
@@ -936,8 +934,8 @@ fn freeze_reason(policy_path: &Path) -> Option<String> {
     None
 }
 
-fn to_proto_status(s: &dracon_git::types::RepoStatus) -> ProtoRepoStatus {
-    ProtoRepoStatus {
+fn to_proto_status(s: &RepoStatus) -> RepoStatus {
+    RepoStatus {
         branch: s.branch.clone(),
         ahead: s.ahead,
         behind: s.behind,
@@ -949,18 +947,18 @@ fn to_proto_status(s: &dracon_git::types::RepoStatus) -> ProtoRepoStatus {
     }
 }
 
-fn to_proto_entries(entries: &[dracon_git::types::DiffFile]) -> Vec<ProtoDiffFile> {
+fn to_proto_entries(entries: &[DiffFile]) -> Vec<DiffFile> {
     entries
         .iter()
-        .map(|e| ProtoDiffFile {
+        .map(|e| DiffFile {
             path: e.path.clone(),
             status: match e.status {
-                dracon_git::types::FileStatus::Modified => ProtoFileStatus::Modified,
-                dracon_git::types::FileStatus::Added => ProtoFileStatus::Added,
-                dracon_git::types::FileStatus::Deleted => ProtoFileStatus::Deleted,
-                dracon_git::types::FileStatus::Renamed => ProtoFileStatus::Renamed,
-                dracon_git::types::FileStatus::TypeChange => ProtoFileStatus::TypeChange,
-                dracon_git::types::FileStatus::Unknown => ProtoFileStatus::Unknown,
+                FileStatus::Modified => FileStatus::Modified,
+                FileStatus::Added => FileStatus::Added,
+                FileStatus::Deleted => FileStatus::Deleted,
+                FileStatus::Renamed => FileStatus::Renamed,
+                FileStatus::TypeChange => FileStatus::TypeChange,
+                FileStatus::Unknown => FileStatus::Unknown,
             },
         })
         .collect()
@@ -1987,6 +1985,21 @@ async fn sync_repo(
             let msg = build_sync_commit_payload(repo, &proto_status, &proto_entries);
 
             svc.commit(&msg).await?;
+            
+            // Restore any excluded paths that weren't committed
+            if !to_restore.is_empty() {
+                let excluded_paths: Vec<String> = to_restore
+                    .iter()
+                    .map(|e| e.path.to_string_lossy().to_string())
+                    .collect();
+                eprintln!(
+                    "🧹 restoring {} excluded path(s) in {} after commit",
+                    excluded_paths.len(),
+                    repo.display()
+                );
+                restore_paths(repo, &excluded_paths).await?;
+            }
+            
             if policy.auto_push && has_origin {
                 let ahead_large = detect_large_blobs_ahead(repo, blob_threshold).unwrap_or_default();
                 if !ahead_large.is_empty() {
@@ -1996,7 +2009,7 @@ async fn sync_repo(
                         blob_threshold,
                         ahead_large.len()
                     );
-                    return Ok(true);
+                    return Ok(false);
                 }
                 match run_git_with_timeout(
                     repo,

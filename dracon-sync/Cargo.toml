@@ -13,4 +13,3 @@ tokio = { version = "1", features = ["macros", "process", "rt-multi-thread", "ti
 toml = "0.8"
 walkdir = "2.5"
 dracon-git = { path = "../../dracon-libs/tools/sync/dracon-git" }
-dracon-protocols = { path = "../../dracon-libs/domains/crates/dracon-protocols" }
