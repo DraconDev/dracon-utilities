@@ -953,35 +953,33 @@ fn append_to_gitignore(repo: &Path, patterns: &[String]) -> Result<()> {
     }
     
     // Find if there's a managed block - add after it, otherwise append at end
-    let block_end = lines.iter().position(|l| l.contains("--- END DRACON MANAGED BLOCK"));
+    let block_end_idx = lines.iter().position(|l| l.contains("--- END DRACON MANAGED BLOCK"));
     
-    let insert_idx = if let Some(idx) = block_end {
-        idx + 1
-    } else {
-        lines.len()
+    let insert_at = match block_end_idx {
+        Some(idx) => idx + 1,
+        None => lines.len(),
     };
     
-    // Add blank line before if needed
-    if insert_idx > 0 && !lines.get(insert_idx - 1).map(|l| l.is_empty()).unwrap_or(false) {
-        lines.insert(insert_idx, String::new());
-    }
-    
-    // Add comment header if this is a new section
+    // Check if we already have a large files section
     let has_large_files_section = lines.iter().any(|l| l.contains("# Large files"));
+    
+    // Build the new lines to insert
+    let mut to_insert = Vec::new();
+    to_insert.push(String::new()); // blank line
     if !has_large_files_section {
-        lines.insert(insert_idx.max(1), "# Large files (auto-added by dracon-sync)".to_string());
+        to_insert.push("# Large files (auto-added by dracon-sync)".to_string());
+    }
+    for pattern in added {
+        to_insert.push(pattern);
     }
     
-    for pattern in added {
-        lines.push(pattern);
+    // Insert at the calculated position
+    for (i, line) in to_insert.into_iter().enumerate() {
+        lines.insert(insert_at + i, line);
     }
     
     let new_content = lines.join("\n");
-    if !new_content.ends_with('\n') {
-        std::fs::write(&gitignore, new_content + "\n")?;
-    } else {
-        std::fs::write(&gitignore, &new_content)?;
-    }
+    std::fs::write(&gitignore, new_content)?;
     
     Ok(())
 }
