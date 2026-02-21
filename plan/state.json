@@ -8,13 +8,10 @@
   "completed_slices": [],
   "failed_slices": [],
   "slice_attempts": {},
-  "mailbox_offset": 0,
   "last_checkpoint_at": null,
   "last_activity_at": 1771278433,
   "stall_recovery_count": 0,
-  "last_compiled_intent_sig": null,
-  "last_compiled_note_sig": null,
   "last_report_at": null,
   "last_heartbeat_at": null,
-  "updated_at": 1771673530
+  "updated_at": 1771679495
 }
