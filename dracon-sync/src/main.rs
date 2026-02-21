@@ -921,6 +921,71 @@ fn can_restore_entry(entry: &dracon_git::types::DiffFile) -> bool {
     matches!(entry.status, FileStatus::Modified | FileStatus::TypeChange | FileStatus::Renamed)
 }
 
+fn is_large_untracked(entry: &dracon_git::types::DiffFile, repo: &Path, threshold: u64) -> bool {
+    use dracon_git::types::FileStatus;
+    if entry.status != FileStatus::Added {
+        return false;
+    }
+    let full_path = repo.join(&entry.path);
+    match std::fs::metadata(&full_path) {
+        Ok(meta) if meta.is_file() => meta.len() > threshold,
+        _ => false,
+    }
+}
+
+fn append_to_gitignore(repo: &Path, patterns: &[String]) -> Result<()> {
+    let gitignore = repo.join(".gitignore");
+    let current = std::fs::read_to_string(&gitignore).unwrap_or_default();
+    
+    let mut lines: Vec<String> = current.lines().map(String::from).collect();
+    let mut added = Vec::new();
+    
+    for pattern in patterns {
+        let pattern_line = pattern.trim();
+        if pattern_line.is_empty() || lines.iter().any(|l| l.trim() == pattern_line) {
+            continue;
+        }
+        added.push(pattern_line.to_string());
+    }
+    
+    if added.is_empty() {
+        return Ok(());
+    }
+    
+    // Find if there's a managed block - add after it, otherwise append at end
+    let block_end = lines.iter().position(|l| l.contains("--- END DRACON MANAGED BLOCK"));
+    
+    let insert_idx = if let Some(idx) = block_end {
+        idx + 1
+    } else {
+        lines.len()
+    };
+    
+    // Add blank line before if needed
+    if insert_idx > 0 && !lines.get(insert_idx - 1).map(|l| l.is_empty()).unwrap_or(false) {
+        lines.insert(insert_idx, String::new());
+    }
+    
+    // Add comment header if this is a new section
+    let has_large_files_section = lines.iter().any(|l| l.contains("# Large files"));
+    if !has_large_files_section {
+        lines.insert(insert_idx.max(1), "# Large files (auto-added by dracon-sync)".to_string());
+    }
+    
+    for pattern in added {
+        lines.push(pattern);
+    }
+    
+    let new_content = lines.join("\n");
+    if !new_content.ends_with('\n') {
+        std::fs::write(&gitignore, new_content + "\n")?;
+    } else {
+        std::fs::write(&gitignore, &new_content)?;
+    }
+    
+    Ok(())
+}
+
 fn env_freeze_enabled() -> bool {
     matches!(
         std::env::var("DRACON_SYNC_FREEZE")
