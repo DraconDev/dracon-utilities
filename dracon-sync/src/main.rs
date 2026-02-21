@@ -2,8 +2,11 @@ use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use dracon_git::{build_sync_commit_payload, GitService};
 use dracon_git::types::{DiffFile, FileStatus, RepoStatus};
+use fs2::FileExt;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::fs::File;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command as StdCommand;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
@@ -934,6 +937,25 @@ fn freeze_reason(policy_path: &Path) -> Option<String> {
     None
 }
 
+fn daemon_lock_path() -> PathBuf {
+    dirs::home_dir()
+        .map(|h| h.join(".dracon").join("dracon-sync.lock"))
+        .unwrap_or_else(|| PathBuf::from("/tmp/dracon-sync.lock"))
+}
+
+fn acquire_daemon_lock() -> Result<File> {
+    let lock_path = daemon_lock_path();
+    if let Some(parent) = lock_path.parent() {
+        std::fs::create_dir_all(parent).ok();
+    }
+    let file = File::create(&lock_path)
+        .with_context(|| format!("failed to create lock file {}", lock_path.display()))?;
+    file.try_lock_exclusive()
+        .with_context(|| format!("failed to acquire lock {} - another daemon running?", lock_path.display()))?;
+    writeln!(&file, "{}", std::process::id()).ok();
+    Ok(file)
+}
+
 fn to_proto_status(s: &RepoStatus) -> RepoStatus {
     RepoStatus {
         branch: s.branch.clone(),
@@ -1017,6 +1039,19 @@ fn has_tracking_upstream(repo: &Path) -> bool {
         .output()
         .map(|o| o.status.success())
         .unwrap_or(false)
+}
+
+fn is_rebase_in_progress(repo: &Path) -> bool {
+    repo.join(".git").join("rebase-merge").exists()
+        || repo.join(".git").join("rebase-apply").exists()
+}
+
+fn is_merge_in_progress(repo: &Path) -> bool {
+    repo.join(".git").join("MERGE_HEAD").exists()
+}
+
+fn is_cherry_pick_in_progress(repo: &Path) -> bool {
+    repo.join(".git").join("CHERRY_PICK_HEAD").exists()
 }
 
 async fn kill_descendants(pid: u32) {
@@ -1803,6 +1838,21 @@ async fn sync_repo(
         }
         return Ok(false);
     }
+    
+    // Bail out early if repo is in a conflict state - manual intervention required
+    if is_rebase_in_progress(repo) {
+        eprintln!("⚠️ {} has rebase in progress, skipping (manual intervention required)", repo.display());
+        return Ok(false);
+    }
+    if is_merge_in_progress(repo) {
+        eprintln!("⚠️ {} has merge in progress, skipping (manual intervention required)", repo.display());
+        return Ok(false);
+    }
+    if is_cherry_pick_in_progress(repo) {
+        eprintln!("⚠️ {} has cherry-pick in progress, skipping (manual intervention required)", repo.display());
+        return Ok(false);
+    }
+    
     let has_origin = has_origin_remote(repo);
     let has_upstream = has_tracking_upstream(repo);
     let blob_threshold = push_large_blob_threshold_bytes(policy);
@@ -1822,6 +1872,10 @@ async fn sync_repo(
         .await
         {
             Ok(Ok(())) => {}
+            Ok(Err(dracon_git::error::GitError::MergeConflict)) => {
+                eprintln!("⚠️ pull/rebase conflict in {} (manual intervention required)", repo.display());
+                return Ok(false);
+            }
             Ok(Err(e)) => eprintln!("⚠️ pull/rebase skipped for {}: {}", repo.display(), e),
             Err(_) => eprintln!(
                 "⚠️ pull/rebase timeout for {} after {}s",
@@ -2143,10 +2197,13 @@ async fn run_once(policy_path: &Path) -> Result<()> {
 }
 
 async fn run_daemon(policy_path: PathBuf) -> Result<()> {
+    let _lock = acquire_daemon_lock()?;
+    
     #[derive(Debug, Clone)]
     struct RepoActivity {
         fingerprint: String,
         changed_at: Instant,
+        failure_count: usize,
     }
 
     let mut activity: HashMap<PathBuf, RepoActivity> = HashMap::new();
@@ -2215,6 +2272,7 @@ async fn run_daemon(policy_path: PathBuf) -> Result<()> {
                     RepoActivity {
                         fingerprint,
                         changed_at: now,
+                        failure_count: 0,
                     },
                 );
                 continue;
@@ -2222,13 +2280,27 @@ async fn run_daemon(policy_path: PathBuf) -> Result<()> {
             if entry.fingerprint != fingerprint {
                 entry.fingerprint = fingerprint;
                 entry.changed_at = now;
+                entry.failure_count = 0;
                 continue;
             }
             if now.duration_since(entry.changed_at) < inactivity_delay {
                 continue;
             }
+            
+            const MAX_FAILURES: usize = 5;
+            if entry.failure_count >= MAX_FAILURES {
+                if entry.failure_count == MAX_FAILURES {
+                    eprintln!(
+                        "⚠️ {} exceeded max failures ({}), skipping until resolved",
+                        repo.display(),
+                        MAX_FAILURES
+                    );
+                    entry.failure_count += 1;
+                }
+                continue;
+            }
 
-            match tokio::time::timeout(
+            let sync_success = match tokio::time::timeout(
                 Duration::from_secs(policy.repo_sync_timeout_secs),
                 sync_repo(&repo, &policy, &excluded_dir_names),
             )
@@ -2240,11 +2312,18 @@ async fn run_daemon(policy_path: PathBuf) -> Result<()> {
                         repo.display(),
                         policy.repo_sync_timeout_secs
                     );
+                    false
                 }
-                Ok(Ok(true)) => println!("🔁 synced {}", repo.display()),
-                Ok(Ok(false)) => {}
-                Ok(Err(e)) => eprintln!("⚠️ sync failed for {}: {}", repo.display(), e),
-            }
+                Ok(Ok(true)) => {
+                    println!("🔁 synced {}", repo.display());
+                    true
+                }
+                Ok(Ok(false)) => true,
+                Ok(Err(e)) => {
+                    eprintln!("⚠️ sync failed for {}: {}", repo.display(), e);
+                    false
+                }
+            };
 
             let mut should_cooldown = false;
             if policy.auto_repair_concerns {
@@ -2291,7 +2370,12 @@ async fn run_daemon(policy_path: PathBuf) -> Result<()> {
                 );
             }
 
-            activity.remove(&repo);
+            if sync_success {
+                entry.failure_count = 0;
+                activity.remove(&repo);
+            } else {
+                entry.failure_count += 1;
+            }
         }
 
         sleep(Duration::from_secs(scan_interval)).await;
