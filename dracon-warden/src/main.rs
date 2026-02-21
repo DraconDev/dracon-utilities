@@ -17,12 +17,7 @@ const BLOCK_END: &str = "# --- END DRACON MANAGED BLOCK ---";
 const DEFAULT_PLAINTEXT_PATTERNS: &[&str] = &[];
 const FORBIDDEN_PLAINTEXT_SUBSTRINGS: &[&str] = &[
     // Patterns that almost always carry secret material in our workflow.
-    ".env",
-    "secrets/",
-    "/secrets",
-    "*.key",
-    "*.pem",
-    "*.age",
+    ".env", "secrets/", "/secrets", "*.key", "*.pem", "*.age",
 ];
 
 #[derive(Parser, Debug)]
@@ -383,11 +378,6 @@ fn build_gitattributes_block(policy: &WardenPolicy) -> Result<String> {
     Ok(lines.join("\n"))
 }
 
-fn should_passthrough_filter_path(path: Option<&str>) -> bool {
-    let _ = path;
-    false
-}
-
 #[allow(dead_code)]
 fn apply_managed_file(path: &Path, block: &str) -> Result<bool> {
     let current = fs::read_to_string(path).unwrap_or_default();
@@ -587,8 +577,7 @@ fn harden_repo(
 
     // Be aggressive: fully overwrite these files so other tooling (ex: Demon)
     // cannot keep re-introducing conflicting managed blocks that cause churn.
-    let gitignore_changed =
-        apply_overwrite_file(&gitignore_path, &build_gitignore_block(policy)?)?;
+    let gitignore_changed = apply_overwrite_file(&gitignore_path, &build_gitignore_block(policy)?)?;
     let gitattributes_changed =
         apply_overwrite_file(&gitattributes_path, &build_gitattributes_block(policy)?)?;
     let key_changed = match pubkey_path {
@@ -808,7 +797,11 @@ fn main() -> Result<()> {
             };
             let _ = resmudge_repos(&policy, &repos, apply)?;
         }
-        Command::Repair { dry_run, strict, repo } => {
+        Command::Repair {
+            dry_run,
+            strict,
+            repo,
+        } => {
             let policy_path = resolve_policy_path()?;
             let policy = WardenPolicy::load(&policy_path)?;
             policy.validate()?;
@@ -824,7 +817,7 @@ fn main() -> Result<()> {
                 scrub_markers(&policy, &repos, true)?;
                 harden_repos(&policy, repos.clone())?;
                 // Fix ciphertext stuck in worktree (if identities allow).
-                let _ = resmudge_repos(&policy, &repos, true)?;
+                resmudge_repos(&policy, &repos, true)?;
             }
 
             // Always report remaining ciphertext markers.
@@ -928,7 +921,10 @@ fn scrub_json_value(v: &mut serde_json::Value) {
         }
         serde_json::Value::Object(m) => {
             // Heuristic fix for known nav templates: href_key can be inferred from href.
-            let href = m.get("href").and_then(|v| v.as_str()).map(|s| s.to_string());
+            let href = m
+                .get("href")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
             if let (Some(href), Some(href_key)) = (href, m.get_mut("href_key")) {
                 if let serde_json::Value::String(hk) = href_key {
                     if is_marker_string(hk) {
@@ -1075,8 +1071,9 @@ fn git_ls_files(repo: &Path) -> Result<Vec<String>> {
         if part.is_empty() {
             continue;
         }
-        let s = std::str::from_utf8(part)
-            .with_context(|| format!("git ls-files returned non-utf8 path in {}", repo.display()))?;
+        let s = std::str::from_utf8(part).with_context(|| {
+            format!("git ls-files returned non-utf8 path in {}", repo.display())
+        })?;
         paths.push(s.to_string());
     }
     Ok(paths)
@@ -1088,7 +1085,11 @@ fn resmudge_repo(repo: &Path, policy: &WardenPolicy, apply: bool) -> Result<(usi
 
     let mut found = 0usize;
     let mut changed = 0usize;
-    let warden = if apply { Some(DraconWarden::new()?) } else { None };
+    let warden = if apply {
+        Some(DraconWarden::new()?)
+    } else {
+        None
+    };
 
     for rel in files {
         let rel_norm = rel.replace("\\", "/");
@@ -1154,7 +1155,10 @@ fn resmudge_repos(policy: &WardenPolicy, repos: &[PathBuf], apply: bool) -> Resu
     }
 
     if apply {
-        println!("✅ resmudge complete (found: {}, changed: {})", total_found, total_changed);
+        println!(
+            "✅ resmudge complete (found: {}, changed: {})",
+            total_found, total_changed
+        );
     } else {
         println!("✅ resmudge report complete (found: {})", total_found);
     }
@@ -1286,9 +1290,15 @@ mod tests {
 
     #[test]
     fn passthrough_filter_path_matches_config_envs() {
-        assert!(!should_passthrough_filter_path(Some("config/envs/local.env")));
-        assert!(!should_passthrough_filter_path(Some("./config/envs/local.env")));
-        assert!(!should_passthrough_filter_path(Some("config\\envs\\local.env")));
+        assert!(!should_passthrough_filter_path(Some(
+            "config/envs/local.env"
+        )));
+        assert!(!should_passthrough_filter_path(Some(
+            "./config/envs/local.env"
+        )));
+        assert!(!should_passthrough_filter_path(Some(
+            "config\\envs\\local.env"
+        )));
         assert!(!should_passthrough_filter_path(Some(".env")));
         assert!(!should_passthrough_filter_path(None));
     }
@@ -1389,7 +1399,10 @@ mod tests {
         let a = "{[DEMON_SECRET:abc]: \"x\"}";
         let salvaged = salvage_invalid_json_markers(a).expect("salvaged");
         let v: serde_json::Value = serde_json::from_str(&salvaged).expect("parse");
-        assert_eq!(v["__scrubbed__"], serde_json::Value::String("x".to_string()));
+        assert_eq!(
+            v["__scrubbed__"],
+            serde_json::Value::String("x".to_string())
+        );
 
         let b = "{ \"track_id\": [DEMON_SECRET:abc], \"x\": 1 }";
         let salvaged = salvage_invalid_json_markers(b).expect("salvaged");
