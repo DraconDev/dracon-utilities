@@ -3784,6 +3784,19 @@ mod tests {
     }
 
     #[test]
+    fn excluded_pattern_matching_works() {
+        let mut p = test_policy();
+        p.exclude_dir_names = vec![".tmp-*".into(), "cache-*".into()];
+        let set = excluded_dir_names_set(&p);
+        assert!(is_excluded_dir_name(".tmp-dracon-code-patch-123", &set));
+        assert!(is_excluded_dir_name(".tmp-anything", &set));
+        assert!(!is_excluded_dir_name(".tmp", &set));
+        assert!(is_excluded_dir_name("cache-redis", &set));
+        assert!(is_excluded_dir_name("cache-local", &set));
+        assert!(!is_excluded_dir_name("cache", &set));
+    }
+
+    #[test]
     fn should_stage_entry_respects_rules() {
         let td = TempDir::new("sync_should_stage");
         let repo = td.path().join("repo");
