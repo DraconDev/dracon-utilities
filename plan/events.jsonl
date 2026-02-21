@@ -1,1 +1,3 @@
 {"ts":1771278433,"kind":"control_replan","message":"returned to planning","slice_id":null,"status":0}
+{"ts":1771650326,"kind":"blueprint_blocked","message":"blueprint load error: read /home/dracon/Dev/dracon-utilities/plan/blueprint.toml","slice_id":null,"status":null}
+{"ts":1771650326,"kind":"trigger_transition","message":"none -> BLOCKED (prev_reason=None, next_reason=Some(\"blueprint load error: read /home/dracon/Dev/dracon-utilities/plan/blueprint.toml\"))","slice_id":null,"status":null}
