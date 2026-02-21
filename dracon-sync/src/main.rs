@@ -1889,20 +1889,22 @@ async fn sync_repo(
     }
 
     if !status.is_clean && policy.auto_commit {
-        let filtered_entries: Vec<_> = entries
+        let entries_len = entries.len();
+        let (to_stage, to_restore): (Vec<_>, Vec<_>) = entries
             .into_iter()
-            .filter(|e| {
+            .partition(|e| {
                 should_stage_entry(repo, e, excluded_dir_names, policy.max_stage_file_bytes)
-            })
-            .collect();
+            });
         if debug_enabled() {
             eprintln!(
-                "🐛 {} filtered_entries={}",
+                "🐛 {} to_stage={} to_restore={}",
                 repo.display(),
-                filtered_entries.len()
+                to_stage.len(),
+                to_restore.len()
             );
         }
-        if !filtered_entries.is_empty() {
+        if !to_stage.is_empty() {
+            let filtered_entries = to_stage;
             let proto_status = to_proto_status(&status);
             let stage_paths: Vec<String> = filtered_entries
                 .iter()
@@ -2011,6 +2013,30 @@ async fn sync_repo(
                 eprintln!("ℹ️ skip push for {} (no origin remote)", repo.display());
             }
             return Ok(true);
+        }
+        // All changes were filtered out (excluded dirs, oversized files, etc.)
+        // Restore them to avoid perpetual dirty state.
+        if !to_restore.is_empty() {
+            let excluded_paths: Vec<String> = to_restore
+                .iter()
+                .map(|e| e.path.to_string_lossy().to_string())
+                .collect();
+            eprintln!(
+                "🧹 restoring {} excluded path(s) in {} (all changes filtered)",
+                excluded_paths.len(),
+                repo.display()
+            );
+            restore_paths(repo, &excluded_paths).await?;
+            return Ok(true);
+        }
+        // Dirty repo with entries but none passed filters and none marked for restore
+        // This can happen if entries was empty but status was dirty - log for visibility
+        if entries_len > 0 {
+            eprintln!(
+                "ℹ️ {} has {} dirty entries but none restorable",
+                repo.display(),
+                entries_len
+            );
         }
     }
 
