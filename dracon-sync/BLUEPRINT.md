@@ -123,31 +123,79 @@
 
 ---
 
-## Completed Fixes
+## Code Quality Fixes (Second Pass)
 
-### [x] Stalling on excluded-only changes
-- **Location:** `src/main.rs`
-- **Problem:** When a repo had only excluded changes, `sync_repo()` would skip commit but not clean the dirty state.
-- **Fix:** Partition entries into `to_stage` and `to_restore`. Restore excluded paths after commit or when all changes are filtered.
+### 13. Incorrect indent calculation in version bumping
+- **Location:** `bump_in_section` function
+- **Problem:** `line.splitn(2, 'v').next()` was incorrect logic for extracting indentation.
+- **Impact:** Broken indentation preservation in Cargo.toml version bumps
+- **Fix:** Use `line.chars().take_while(|c| c.is_whitespace()).collect()`
+- **Priority:** High
+- **Status:** [x]
 
-### [x] Missing dracon-protocols dependency
-- **Location:** `Cargo.toml`, imports
-- **Problem:** `dracon-protocols` crate doesn't exist in the workspace.
-- **Fix:** Use `dracon-git::types` directly instead of protocol types.
+### 14. Silent value clamping in policy validation
+- **Location:** `SyncPolicy::normalize()`
+- **Problem:** Timeout values were silently clamped without user notification.
+- **Impact:** Users unaware their config was being modified
+- **Fix:** Added warning messages when values are adjusted
+- **Priority:** Medium
+- **Status:** [x]
 
-### [x] Inconsistent return value on large blob skip
-- **Location:** `src/main.rs`
-- **Problem:** Returned `Ok(true)` after skipping push due to large blobs, inconsistent with non-commit path.
-- **Fix:** Changed to `Ok(false)` for consistency.
+### 15. Non-existent watch roots silently skipped
+- **Location:** `watch_root_paths()`
+- **Problem:** Invalid paths in config were silently ignored.
+- **Impact:** Configuration errors hidden from users
+- **Fix:** Added warning message for non-existent paths
+- **Priority:** Medium
+- **Status:** [x]
+
+### 16. Redundant proto conversion functions
+- **Location:** `to_proto_status`, `to_proto_entries`
+- **Problem:** Identity transformations after removing dracon-protocols dependency.
+- **Impact:** Dead code, confusion
+- **Fix:** Simplified to `s.clone()` and `entries.to_vec()`
+- **Priority:** Low
+- **Status:** [x]
+
+### 17. Limited lockfile detection
+- **Location:** `is_lockfile_path()`
+- **Problem:** Only detected `Cargo.lock`, not other common lockfiles.
+- **Impact:** Lockfile noise from other ecosystems would be committed
+- **Fix:** Expanded to detect package-lock.json, yarn.lock, pnpm-lock.yaml, poetry.lock, composer.lock, Gemfile.lock, go.sum
+- **Priority:** Medium
+- **Status:** [x]
+
+### 18. TOML parse errors silently ignored
+- **Location:** `load_repo_override()`
+- **Problem:** Parse errors returned default without logging.
+- **Impact:** Debugging difficulty for misconfigured repos
+- **Fix:** Added warning on parse failure
+- **Priority:** Medium
+- **Status:** [x]
+
+### 19. Cargo.lock update errors silently ignored
+- **Location:** `bump_patch_version_in_repo()`
+- **Problem:** `unwrap_or(false)` swallowed errors.
+- **Impact:** Silent failures in lockfile updates
+- **Fix:** Log error on failure
+- **Priority:** Medium
+- **Status:** [x]
+
+### 20. Confusing nested if structure
+- **Location:** `run_repair_concerns()` push handling
+- **Problem:** Double-nested `if` without proper braces was hard to read.
+- **Impact:** Maintainability, potential bugs
+- **Fix:** Fixed indentation and braces
+- **Priority:** Low
+- **Status:** [x]
 
 ---
 
 ## Summary
 
-**Completed:** 10 issues
-- #1, #2, #3, #4, #7, #8, #9, #10, #12 + original stalling fix
+**Total Completed:** 20 issues
 
-**Remaining (Low Priority):**
+**Remaining (Low Priority - 3):**
 - #5 - Policy reload race
-- #6 - Repo discovery race  
+- #6 - Repo discovery race
 - #11 - Status inconsistency in CLI fallback

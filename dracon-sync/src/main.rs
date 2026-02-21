@@ -3167,19 +3167,19 @@ async fn run_repair_concerns(
                 }
                 if push_ok {
                     if let Ok(next_after_push) = svc.get_status().await {
-                    if next_after_push.ahead > 0 {
-                        let branch = current_branch(&repo).unwrap_or_default();
-                        if !branch.is_empty() && remote_branch_exists(&repo, &branch) {
-                            out!(
-                                "   plan: realign upstream to origin/{} (ahead still > 0 after push)",
-                                branch
-                            );
-                            match set_upstream_to_branch(&repo, &branch) {
-                                Ok(()) => out!("   ok: upstream realigned"),
-                                Err(e) => out!("   fail: upstream realign failed: {}", e),
+                        if next_after_push.ahead > 0 {
+                            let branch = current_branch(&repo).unwrap_or_default();
+                            if !branch.is_empty() && remote_branch_exists(&repo, &branch) {
+                                out!(
+                                    "   plan: realign upstream to origin/{} (ahead still > 0 after push)",
+                                    branch
+                                );
+                                match set_upstream_to_branch(&repo, &branch) {
+                                    Ok(()) => out!("   ok: upstream realigned"),
+                                    Err(e) => out!("   fail: upstream realign failed: {}", e),
+                                }
                             }
                         }
-                    }
                     }
                 }
             }
