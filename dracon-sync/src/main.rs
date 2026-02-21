@@ -875,7 +875,19 @@ fn excluded_dir_names_set(policy: &SyncPolicy) -> BTreeSet<String> {
 }
 
 fn is_excluded_dir_name(name: &str, excluded_dir_names: &BTreeSet<String>) -> bool {
-    excluded_dir_names.contains(&normalized_dir_name(name))
+    let normalized = normalized_dir_name(name);
+    for pattern in excluded_dir_names {
+        if *pattern == normalized {
+            return true;
+        }
+        if pattern.ends_with('-') && pattern.starts_with('.') && normalized.starts_with(&pattern[..pattern.len()-1]) {
+            return true;
+        }
+        if pattern.ends_with('*') && normalized.starts_with(&pattern[..pattern.len()-1]) {
+            return true;
+        }
+    }
+    false
 }
 
 fn is_excluded_change_path(path: &Path, excluded_dir_names: &BTreeSet<String>) -> bool {
