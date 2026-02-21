@@ -82,6 +82,22 @@
 - **Priority:** High
 - **Location:** `main.rs:925-980, 2175-2270`
 
+---
+
+## Default Exclude Patterns
+
+### 21. Pattern-based directory exclusion
+- **Status:** [x]
+- **Problem:** Temp directories (`.tmp-*`) pollute repo listings with false CONCERNs
+- **Fix:** Added `.tmp-*` to default excludes, enhanced `is_excluded_dir_name()` to support glob-like patterns (`prefix*`)
+- **Priority:** Medium
+- **Location:** `main.rs:594, 877-893`
+- **Default excludes:** `target`, `node_modules`, `.cache`, `.direnv`, `.venv`, `dist`, `build`, `archives`, `.tmp-*`
+
+---
+
+## Test Fixes
+
 ### 17. Policy reload race
 - **Problem:** Policy is reloaded every loop iteration, could cause inconsistency mid-sync
 - **Fix:** Clone policy at start of each repo iteration
