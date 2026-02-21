@@ -379,6 +379,12 @@ fn build_gitattributes_block(policy: &WardenPolicy) -> Result<String> {
 }
 
 #[allow(dead_code)]
+fn should_passthrough_filter_path(path: Option<&str>) -> bool {
+    let _ = path;
+    false
+}
+
+#[allow(dead_code)]
 fn apply_managed_file(path: &Path, block: &str) -> Result<bool> {
     let current = fs::read_to_string(path).unwrap_or_default();
     let next = replace_managed_block(&current, block);
