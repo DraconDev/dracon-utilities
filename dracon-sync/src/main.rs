@@ -1797,6 +1797,44 @@ fn rewrite_ahead_paths(
         ));
     }
 
+    // Try git-filter-repo first (preferred, faster, actively maintained)
+    let filter_repo_available = StdCommand::new("git")
+        .args(["filter-repo", "--version"])
+        .current_dir(repo)
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false);
+
+    if filter_repo_available {
+        let mut args: Vec<String> = vec![
+            "filter-repo".to_string(),
+            "--invert-paths".to_string(),
+            "--force".to_string(),
+        ];
+        for path in paths_to_remove {
+            args.push("--path".to_string());
+            args.push(path.clone());
+        }
+        let args_ref: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+        let rewrite = StdCommand::new("git")
+            .args(&args_ref)
+            .current_dir(repo)
+            .status()
+            .with_context(|| format!("failed filter-repo in {}", repo.display()))?;
+        if !rewrite.success() {
+            return Err(anyhow::anyhow!(
+                "filter-repo failed in {} (backup: {})",
+                repo.display(),
+                backup_branch
+            ));
+        }
+        return Ok(Some(backup_branch));
+    }
+
+    // Fallback to deprecated git filter-branch
+    eprintln!(
+        "⚠️ git-filter-repo not found, using deprecated filter-branch. Install git-filter-repo for better performance."
+    );
     let mut index_filter = String::from("git rm -r --cached --ignore-unmatch");
     for path in paths_to_remove {
         index_filter.push(' ');
@@ -1964,14 +2002,24 @@ async fn sync_repo(
                 .collect();
 
             // Guardrail: always avoid Cargo.lock-only commits (common noise from local builds/tooling).
+            // But only if there are no pre-existing staged files we'd accidentally revert.
             if !stage_paths.is_empty() && stage_paths.iter().all(|p| is_lockfile_path(p)) {
-                eprintln!(
-                    "🧹 skipping Cargo.lock-only commit in {} (reverting {} path(s))",
-                    repo.display(),
-                    stage_paths.len()
-                );
-                restore_paths(repo, &stage_paths).await?;
-                return Ok(true);
+                let pre_staged = staged_paths(repo).await.unwrap_or_default();
+                if pre_staged.is_empty() {
+                    eprintln!(
+                        "🧹 skipping Cargo.lock-only commit in {} (reverting {} path(s))",
+                        repo.display(),
+                        stage_paths.len()
+                    );
+                    restore_paths(repo, &stage_paths).await?;
+                    return Ok(true);
+                } else {
+                    eprintln!(
+                        "ℹ️ {} has Cargo.lock-only changes but {} pre-staged file(s), proceeding",
+                        repo.display(),
+                        pre_staged.len()
+                    );
+                }
             }
 
             svc.add_paths(&stage_paths).await?;
@@ -2055,7 +2103,13 @@ async fn sync_repo(
             }
             
             if policy.auto_push && has_origin {
-                let ahead_large = detect_large_blobs_ahead(repo, blob_threshold).unwrap_or_default();
+                let ahead_large = match detect_large_blobs_ahead(repo, blob_threshold) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        eprintln!("⚠️ large blob detection failed for {}: {} - skipping push", repo.display(), e);
+                        return Ok(false);
+                    }
+                };
                 if !ahead_large.is_empty() {
                     eprintln!(
                         "⚠️ skip push for {}: large blob(s) above {} bytes in ahead range ({} found)",
@@ -2107,8 +2161,16 @@ async fn sync_repo(
         }
     }
 
-    if policy.auto_push && status.ahead > 0 && has_origin {
-        let ahead_large = detect_large_blobs_ahead(repo, blob_threshold).unwrap_or_default();
+    // Re-fetch status for push decision (may have changed after pull/commit)
+    let current_status = svc.get_status().await?;
+    if policy.auto_push && current_status.ahead > 0 && has_origin {
+        let ahead_large = match detect_large_blobs_ahead(repo, blob_threshold) {
+            Ok(v) => v,
+            Err(e) => {
+                eprintln!("⚠️ large blob detection failed for {}: {} - skipping push", repo.display(), e);
+                return Ok(false);
+            }
+        };
         if !ahead_large.is_empty() {
             eprintln!(
                 "⚠️ skip push for {}: large blob(s) above {} bytes in ahead range ({} found)",
@@ -2129,7 +2191,7 @@ async fn sync_repo(
             Ok(()) => {}
             Err(e) => eprintln!("⚠️ push skipped for {}: {}", repo.display(), e),
         }
-    } else if policy.auto_push && status.ahead > 0 && !has_origin {
+    } else if policy.auto_push && current_status.ahead > 0 && !has_origin {
         eprintln!("ℹ️ skip push for {} (no origin remote)", repo.display());
     }
 

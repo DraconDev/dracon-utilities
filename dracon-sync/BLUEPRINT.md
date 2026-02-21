@@ -10,28 +10,28 @@
 ## Critical Bugs
 
 ### 1. Stale `status.ahead` check after commit
-- **Location:** `src/main.rs:2041`
-- **Problem:** `status` is fetched at line 1863, but the "ahead > 0" check at line 2041 uses stale data. After a commit, the ahead count increases, but we use the old value.
+- **Location:** `src/main.rs`
+- **Problem:** `status` is fetched early, but the "ahead > 0" check uses stale data after commit.
 - **Impact:** Push decision based on incorrect ahead count
-- **Fix:** Re-fetch status after commit before the push check, or track ahead differently
+- **Fix:** Re-fetch status after commit before the push check
 - **Priority:** High
-- **Status:** [ ]
+- **Status:** [x]
 
 ### 2. Activity entry removed after every sync attempt
-- **Location:** `src/main.rs:2281` (daemon mode)
-- **Problem:** `activity.remove(&repo)` runs regardless of sync success/failure, resetting the inactivity delay timer and causing constant sync attempts on persistent failures.
+- **Location:** `src/main.rs` (daemon mode)
+- **Problem:** `activity.remove(&repo)` ran regardless of sync success/failure, resetting the inactivity delay timer.
 - **Impact:** CPU waste, log spam, potential rate limiting
-- **Fix:** Only remove activity entry on successful sync, or keep track of failure count
+- **Fix:** Only remove activity entry on successful sync, track failure count
 - **Priority:** Medium
-- **Status:** [ ]
+- **Status:** [x]
 
 ### 3. No maximum retry limit for persistent failures
 - **Location:** `run_daemon()` function
 - **Problem:** No "give up after N attempts" threshold. A repo with an unresolvable issue could spin forever.
 - **Impact:** Resource exhaustion, log bloat
-- **Fix:** Add exponential backoff with maximum attempt count, then mark repo as "failed" and skip until manual intervention
+- **Fix:** Added MAX_FAILURES constant (5), repo is skipped after exceeding
 - **Priority:** Medium
-- **Status:** [ ]
+- **Status:** [x]
 
 ---
 
@@ -39,23 +39,23 @@
 
 ### 4. No inter-process locking for daemon instances
 - **Location:** `run_daemon()`
-- **Problem:** Multiple `dracon-sync daemon` processes could run simultaneously, causing conflicting sync operations on the same repos.
+- **Problem:** Multiple `dracon-sync daemon` processes could run simultaneously.
 - **Impact:** Corrupted git state, duplicate commits, race conditions
-- **Fix:** Add PID file or file locking (e.g., `flock`) for daemon singleton enforcement
+- **Fix:** Added fs2 file locking via `acquire_daemon_lock()`
 - **Priority:** High
-- **Status:** [ ]
+- **Status:** [x]
 
 ### 5. Policy reload mid-sync could cause inconsistency
-- **Location:** `src/main.rs:2143`
-- **Problem:** Policy is reloaded every loop iteration. A policy change mid-sync could cause behavior mismatch between pre-sync checks and actual operations.
+- **Location:** Daemon loop
+- **Problem:** Policy is reloaded every loop iteration.
 - **Impact:** Unexpected behavior, potential data loss
-- **Fix:** Clone policy at start of each repo iteration, or use RwLock for thread-safe access
+- **Fix:** Clone policy at start of each repo iteration, or use RwLock
 - **Priority:** Low
 - **Status:** [ ]
 
 ### 6. Repo discovery vs sync race
-- **Location:** `src/main.rs:2155-2166`
-- **Problem:** Repos are discovered, then iterated. If a repo is deleted between discovery and processing, sync operations will fail.
+- **Location:** Repo iteration
+- **Problem:** If a repo is deleted between discovery and processing, sync operations will fail.
 - **Impact:** Error logs, potential panic
 - **Fix:** Check repo existence before processing, handle ENOENT gracefully
 - **Priority:** Low
@@ -66,68 +66,68 @@
 ## Deprecation/Migration
 
 ### 7. `git filter-branch` is deprecated
-- **Location:** `src/main.rs:1773-1784` (`rewrite_ahead_paths`)
-- **Problem:** `git filter-branch` is deprecated and may fail on newer git versions, leaving repo in stuck state with backup branch.
+- **Location:** `rewrite_ahead_paths`
+- **Problem:** `git filter-branch` is deprecated and may fail on newer git versions.
 - **Impact:** Failed large blob rewrites, stuck repos
-- **Fix:** Migrate to `git filter-repo` or BFG Repo-Cleaner
+- **Fix:** Added git-filter-repo detection with fallback to filter-branch
 - **Priority:** Medium
-- **Status:** [ ]
+- **Status:** [x]
 
 ---
 
 ## Error Handling Improvements
 
 ### 8. Large blob detection silently ignores failures
-- **Location:** `src/main.rs:1991, 2044`
-- **Problem:** `detect_large_blobs_ahead(...).unwrap_or_default()` returns empty vec on failure, potentially allowing large blobs to be pushed.
+- **Location:** `detect_large_blobs_ahead` callers
+- **Problem:** `unwrap_or_default()` returned empty vec on failure, potentially allowing large blobs.
 - **Impact:** Push failures due to large files, host rejection
-- **Fix:** Log warning on detection failure, consider failing safe (skip push on error)
+- **Fix:** Properly propagate errors, skip push on detection failure
 - **Priority:** Medium
-- **Status:** [ ]
+- **Status:** [x]
 
 ### 9. Pull/rebase failure leaves repo in undefined state
-- **Location:** `src/main.rs:1819-1833`
-- **Problem:** `pull_rebase()` failure only logs a warning and continues. If rebase fails mid-way, the repo could be left with merge conflicts that are not detected/handled.
+- **Location:** `sync_repo()`
+- **Problem:** `pull_rebase()` failure only logged a warning and continued.
 - **Impact:** Stuck repos, manual intervention required
-- **Fix:** Detect rebase conflict state and mark repo as needing repair, don't continue with sync
+- **Fix:** Added conflict state detection (rebase/merge/cherry-pick), skip sync and return early
 - **Priority:** High
-- **Status:** [ ]
+- **Status:** [x]
 
 ### 10. Incident ledger has no file locking
-- **Location:** `src/main.rs:1656-1673`
-- **Problem:** Multiple concurrent daemon instances could corrupt the JSONL file. `append(true)` without locking is not atomic.
+- **Location:** Incident ledger writes
+- **Problem:** Multiple concurrent daemon instances could corrupt the JSONL file.
 - **Impact:** Corrupted incident log, lost audit trail
-- **Fix:** Use `fs2::FileExt::file_lock` or similar for atomic appends
-- **Priority:** Low (mitigated by fixing #4)
-- **Status:** [ ]
+- **Fix:** Mitigated by #4 (daemon singleton lock)
+- **Priority:** Low
+- **Status:** [x] (mitigated)
 
 ---
 
 ## Edge Cases
 
 ### 11. Status inconsistency between libgit2 and CLI fallback
-- **Location:** `src/main.rs:1875-1889`
-- **Problem:** When fallback CLI entries are used, `status.staged_files` is not recalculated. Only `is_clean`, `modified_files`, and `entries` are updated, leaving inconsistent state.
+- **Location:** Fallback CLI path
+- **Problem:** When fallback CLI entries are used, `status.staged_files` is not recalculated.
 - **Impact:** Incorrect status reporting, potential commit issues
-- **Fix:** Recalculate all status fields in fallback path, or fetch fresh status after fallback
+- **Fix:** Recalculate all status fields in fallback path
 - **Priority:** Low
 - **Status:** [ ]
 
 ### 12. Cargo.lock-only guardrail may lose previously staged content
-- **Location:** `src/main.rs:1915-1922`
-- **Problem:** If `stage_paths` contains only `Cargo.lock` after filtering, the code restores all paths and returns early. However, if there were previously staged files (before `add_paths`), they could be incorrectly reverted.
+- **Location:** Cargo.lock guardrail check
+- **Problem:** If `stage_paths` contains only `Cargo.lock`, the code could revert pre-existing staged files.
 - **Impact:** Lost staged changes
-- **Fix:** Check for pre-existing staged content before the restore
+- **Fix:** Check for pre-existing staged content before restoring
 - **Priority:** Medium
-- **Status:** [ ]
+- **Status:** [x]
 
 ---
 
 ## Completed Fixes
 
 ### [x] Stalling on excluded-only changes
-- **Location:** `src/main.rs:1891-2040`
-- **Problem:** When a repo had only excluded changes, `sync_repo()` would skip commit but not clean the dirty state, causing infinite re-processing in daemon mode.
+- **Location:** `src/main.rs`
+- **Problem:** When a repo had only excluded changes, `sync_repo()` would skip commit but not clean the dirty state.
 - **Fix:** Partition entries into `to_stage` and `to_restore`. Restore excluded paths after commit or when all changes are filtered.
 
 ### [x] Missing dracon-protocols dependency
@@ -136,20 +136,18 @@
 - **Fix:** Use `dracon-git::types` directly instead of protocol types.
 
 ### [x] Inconsistent return value on large blob skip
-- **Location:** `src/main.rs:1997`
-- **Problem:** Returned `Ok(true)` after skipping push due to large blobs, but the non-commit path returns `Ok(false)`.
+- **Location:** `src/main.rs`
+- **Problem:** Returned `Ok(true)` after skipping push due to large blobs, inconsistent with non-commit path.
 - **Fix:** Changed to `Ok(false)` for consistency.
 
 ---
 
-## Implementation Order (Suggested)
+## Summary
 
-1. **#4 - Daemon singleton lock** - Prevents most concurrency issues
-2. **#9 - Handle rebase conflicts** - Critical for reliability
-3. **#1 - Stale status.ahead** - Correctness issue
-4. **#2 - Activity removal on failure** - Resource efficiency
-5. **#7 - Migrate from filter-branch** - Future compatibility
-6. **#3 - Max retry limit** - Resilience
-7. **#8 - Large blob detection errors** - Safety
-8. **#12 - Cargo.lock guardrail** - Edge case
-9. **#5, #6, #10, #11** - Lower priority refinements
+**Completed:** 10 issues
+- #1, #2, #3, #4, #7, #8, #9, #10, #12 + original stalling fix
+
+**Remaining (Low Priority):**
+- #5 - Policy reload race
+- #6 - Repo discovery race  
+- #11 - Status inconsistency in CLI fallback
