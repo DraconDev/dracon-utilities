@@ -2170,13 +2170,35 @@ async fn sync_repo(
             
             // Restore any excluded modified paths that weren't committed (skip untracked files)
             let restorable: Vec<_> = to_restore.iter().filter(|e| can_restore_entry(e)).collect();
-            let untracked: Vec<_> = to_restore.iter().filter(|e| !can_restore_entry(e)).collect();
+            let large_untracked: Vec<_> = to_restore
+                .iter()
+                .filter(|e| is_large_untracked(e, repo, policy.max_stage_file_bytes))
+                .collect();
             
-            if !untracked.is_empty() {
+            if !large_untracked.is_empty() {
+                let patterns: Vec<String> = large_untracked
+                    .iter()
+                    .map(|e| e.path.to_string_lossy().to_string())
+                    .collect();
                 eprintln!(
-                    "ℹ️ {} has {} untracked excluded file(s) - add to .gitignore to clean",
+                    "📝 {} has {} large untracked file(s) > {} bytes - adding to .gitignore",
                     repo.display(),
-                    untracked.len()
+                    patterns.len(),
+                    policy.max_stage_file_bytes
+                );
+                append_to_gitignore(repo, &patterns)?;
+            }
+            
+            let other_untracked: Vec<_> = to_restore
+                .iter()
+                .filter(|e| !can_restore_entry(e) && !is_large_untracked(e, repo, policy.max_stage_file_bytes))
+                .collect();
+            
+            if !other_untracked.is_empty() {
+                eprintln!(
+                    "ℹ️ {} has {} small untracked excluded file(s)",
+                    repo.display(),
+                    other_untracked.len()
                 );
             }
             
@@ -2229,13 +2251,35 @@ async fn sync_repo(
         // All changes were filtered out (excluded dirs, oversized files, etc.)
         // Restore modified files to avoid perpetual dirty state. Untracked files can't be restored.
         let restorable: Vec<_> = to_restore.iter().filter(|e| can_restore_entry(e)).collect();
-        let untracked: Vec<_> = to_restore.iter().filter(|e| !can_restore_entry(e)).collect();
+        let large_untracked: Vec<_> = to_restore
+            .iter()
+            .filter(|e| is_large_untracked(e, repo, policy.max_stage_file_bytes))
+            .collect();
         
-        if !untracked.is_empty() {
+        if !large_untracked.is_empty() {
+            let patterns: Vec<String> = large_untracked
+                .iter()
+                .map(|e| e.path.to_string_lossy().to_string())
+                .collect();
             eprintln!(
-                "ℹ️ {} has {} untracked excluded file(s) - add to .gitignore to clean",
+                "📝 {} has {} large untracked file(s) > {} bytes - adding to .gitignore",
                 repo.display(),
-                untracked.len()
+                patterns.len(),
+                policy.max_stage_file_bytes
+            );
+            append_to_gitignore(repo, &patterns)?;
+        }
+        
+        let other_untracked: Vec<_> = to_restore
+            .iter()
+            .filter(|e| !can_restore_entry(e) && !is_large_untracked(e, repo, policy.max_stage_file_bytes))
+            .collect();
+        
+        if !other_untracked.is_empty() {
+            eprintln!(
+                "ℹ️ {} has {} small untracked excluded file(s)",
+                repo.display(),
+                other_untracked.len()
             );
         }
         
