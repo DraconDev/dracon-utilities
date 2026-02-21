@@ -916,6 +916,11 @@ fn should_stage_entry(
     }
 }
 
+fn can_restore_entry(entry: &dracon_git::types::DiffFile) -> bool {
+    use dracon_git::types::FileStatus;
+    matches!(entry.status, FileStatus::Modified | FileStatus::TypeChange | FileStatus::Renamed)
+}
+
 fn env_freeze_enabled() -> bool {
     matches!(
         std::env::var("DRACON_SYNC_FREEZE")
@@ -2098,9 +2103,20 @@ async fn sync_repo(
 
             svc.commit(&msg).await?;
             
-            // Restore any excluded paths that weren't committed
-            if !to_restore.is_empty() {
-                let excluded_paths: Vec<String> = to_restore
+            // Restore any excluded modified paths that weren't committed (skip untracked files)
+            let restorable: Vec<_> = to_restore.iter().filter(|e| can_restore_entry(e)).collect();
+            let untracked: Vec<_> = to_restore.iter().filter(|e| !can_restore_entry(e)).collect();
+            
+            if !untracked.is_empty() {
+                eprintln!(
+                    "ℹ️ {} has {} untracked excluded file(s) - add to .gitignore to clean",
+                    repo.display(),
+                    untracked.len()
+                );
+            }
+            
+            if !restorable.is_empty() {
+                let excluded_paths: Vec<String> = restorable
                     .iter()
                     .map(|e| e.path.to_string_lossy().to_string())
                     .collect();
@@ -2146,9 +2162,20 @@ async fn sync_repo(
             return Ok(true);
         }
         // All changes were filtered out (excluded dirs, oversized files, etc.)
-        // Restore them to avoid perpetual dirty state.
-        if !to_restore.is_empty() {
-            let excluded_paths: Vec<String> = to_restore
+        // Restore modified files to avoid perpetual dirty state. Untracked files can't be restored.
+        let restorable: Vec<_> = to_restore.iter().filter(|e| can_restore_entry(e)).collect();
+        let untracked: Vec<_> = to_restore.iter().filter(|e| !can_restore_entry(e)).collect();
+        
+        if !untracked.is_empty() {
+            eprintln!(
+                "ℹ️ {} has {} untracked excluded file(s) - add to .gitignore to clean",
+                repo.display(),
+                untracked.len()
+            );
+        }
+        
+        if !restorable.is_empty() {
+            let excluded_paths: Vec<String> = restorable
                 .iter()
                 .map(|e| e.path.to_string_lossy().to_string())
                 .collect();
@@ -2160,11 +2187,10 @@ async fn sync_repo(
             restore_paths(repo, &excluded_paths).await?;
             return Ok(true);
         }
-        // Dirty repo with entries but none passed filters and none marked for restore
-        // This can happen if entries was empty but status was dirty - log for visibility
+        // Dirty repo with entries but none passed filters and none restorable
         if entries_len > 0 {
             eprintln!(
-                "ℹ️ {} has {} dirty entries but none restorable",
+                "ℹ️ {} has {} dirty entries but none restorable (all untracked or excluded)",
                 repo.display(),
                 entries_len
             );
