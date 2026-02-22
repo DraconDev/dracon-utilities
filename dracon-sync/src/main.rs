@@ -965,31 +965,41 @@ fn append_to_gitignore(repo: &Path, patterns: &[String]) -> Result<()> {
         return Ok(());
     }
     
-    // Find if there's a managed block - insert BEFORE the end marker to stay inside the managed section
-    // This is important because dracon-warden resets anything outside its managed block
-    let block_end_idx = lines.iter().position(|l| l.contains("--- END DRACON MANAGED BLOCK"));
+    // Check if there's a warden-managed block - if so, we should NOT modify .gitignore
+    // because warden will reset it. Instead, log a message for the user.
+    let has_warden_block = lines.iter().any(|l| l.contains("--- BEGIN DRACON MANAGED BLOCK ---"))
+        && lines.iter().any(|l| l.contains("--- END DRACON MANAGED BLOCK ---"));
     
-    let insert_at = match block_end_idx {
-        Some(idx) => idx, // Insert BEFORE the end marker (inside managed block)
-        None => lines.len(),
-    };
+    if has_warden_block {
+        // Warden manages this .gitignore - don't modify it directly
+        // Log a message for the user to add to their warden policy
+        eprintln!(
+            "⚠️ {} has a dracon-warden managed .gitignore. To ignore large files, add these patterns to your warden hygiene_patterns:",
+            repo.display()
+        );
+        for pattern in &added {
+            eprintln!("   {}", pattern);
+        }
+        // Still return Ok - we've handled the situation by informing the user
+        return Ok(());
+    }
     
-    // Check if we already have a large files section inside the managed block
-    let has_large_files_section = lines.iter().take(insert_at).any(|l| l.contains("# Large files (auto-added by dracon-sync)"));
+    // No warden block - we can safely append
+    // Check if we already have a large files section
+    let has_large_files_section = lines.iter().any(|l| l.contains("# Large files (auto-added by dracon-sync)"));
     
-    // Build the new lines to insert
-    let mut to_insert = Vec::new();
+    // Build the new lines to append
+    let mut to_append = Vec::new();
     if !has_large_files_section {
-        to_insert.push("# Large files (auto-added by dracon-sync)".to_string());
+        to_append.push(String::new()); // blank line
+        to_append.push("# Large files (auto-added by dracon-sync)".to_string());
     }
     for pattern in added {
-        to_insert.push(pattern);
+        to_append.push(pattern);
     }
     
-    // Insert at the calculated position (before the end marker)
-    for (i, line) in to_insert.into_iter().enumerate() {
-        lines.insert(insert_at + i, line);
-    }
+    // Append to the end
+    lines.extend(to_append);
     
     let new_content = lines.join("\n");
     std::fs::write(&gitignore, new_content)?;
