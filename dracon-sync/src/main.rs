@@ -965,22 +965,42 @@ fn append_to_gitignore(repo: &Path, patterns: &[String]) -> Result<()> {
         return Ok(());
     }
     
-    // Check if there's a warden-managed block - if so, we should NOT modify .gitignore
-    // because warden will reset it. Instead, log a message for the user.
-    let has_warden_block = lines.iter().any(|l| l.contains("--- BEGIN DRACON MANAGED BLOCK ---"))
-        && lines.iter().any(|l| l.contains("--- END DRACON MANAGED BLOCK ---"));
+    // Check if there's a warden-managed block
+    let block_begin_idx = lines.iter().position(|l| l.contains("--- BEGIN DRACON MANAGED BLOCK ---"));
+    let block_end_idx = lines.iter().position(|l| l.contains("--- END DRACON MANAGED BLOCK ---"));
     
-    if has_warden_block {
-        // Warden manages this .gitignore - don't modify it directly
-        // Log a message for the user to add to their warden policy
+    if let (Some(begin_idx), Some(end_idx)) = (block_begin_idx, block_end_idx) {
+        // Warden manages this .gitignore - insert patterns INSIDE the managed block
+        // (before the END marker) so warden will preserve them
+        let insert_at = end_idx;
+        
+        // Check if we already have a large files section inside the managed block
+        let has_large_files_section = lines[begin_idx..end_idx]
+            .iter()
+            .any(|l| l.contains("# Large files (auto-added by dracon-sync)"));
+        
+        let mut to_insert = Vec::new();
+        if !has_large_files_section {
+            to_insert.push("# Large files (auto-added by dracon-sync)".to_string());
+        }
+        for pattern in &added {
+            to_insert.push(pattern.clone());
+        }
+        
+        // Insert before the END marker
+        for (i, line) in to_insert.into_iter().enumerate() {
+            lines.insert(insert_at + i, line);
+        }
+        
+        let new_content = lines.join("\n");
+        std::fs::write(&gitignore, new_content)?;
+        
         eprintln!(
-            "⚠️ {} has a dracon-warden managed .gitignore. To ignore large files, add these patterns to your warden hygiene_patterns:",
+            "📝 added {} large file pattern(s) to .gitignore in {} (inside warden managed block)",
+            added.len(),
             repo.display()
         );
-        for pattern in &added {
-            eprintln!("   {}", pattern);
-        }
-        // Still return Ok - we've handled the situation by informing the user
+        
         return Ok(());
     }
     
