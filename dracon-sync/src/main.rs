@@ -965,20 +965,20 @@ fn append_to_gitignore(repo: &Path, patterns: &[String]) -> Result<()> {
         return Ok(());
     }
     
-    // Find if there's a managed block - add after it, otherwise append at end
+    // Find if there's a managed block - insert BEFORE the end marker to stay inside the managed section
+    // This is important because dracon-warden resets anything outside its managed block
     let block_end_idx = lines.iter().position(|l| l.contains("--- END DRACON MANAGED BLOCK"));
     
     let insert_at = match block_end_idx {
-        Some(idx) => idx + 1,
+        Some(idx) => idx, // Insert BEFORE the end marker (inside managed block)
         None => lines.len(),
     };
     
-    // Check if we already have a large files section
-    let has_large_files_section = lines.iter().any(|l| l.contains("# Large files"));
+    // Check if we already have a large files section inside the managed block
+    let has_large_files_section = lines.iter().take(insert_at).any(|l| l.contains("# Large files (auto-added by dracon-sync)"));
     
     // Build the new lines to insert
     let mut to_insert = Vec::new();
-    to_insert.push(String::new()); // blank line
     if !has_large_files_section {
         to_insert.push("# Large files (auto-added by dracon-sync)".to_string());
     }
@@ -986,7 +986,7 @@ fn append_to_gitignore(repo: &Path, patterns: &[String]) -> Result<()> {
         to_insert.push(pattern);
     }
     
-    // Insert at the calculated position
+    // Insert at the calculated position (before the end marker)
     for (i, line) in to_insert.into_iter().enumerate() {
         lines.insert(insert_at + i, line);
     }
