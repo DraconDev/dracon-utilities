@@ -2267,6 +2267,7 @@ async fn sync_repo(
             .filter(|e| is_large_untracked(e, repo, policy.max_stage_file_bytes))
             .collect();
         
+        let mut gitignore_updated = false;
         if !large_untracked.is_empty() {
             let patterns: Vec<String> = large_untracked
                 .iter()
@@ -2279,6 +2280,7 @@ async fn sync_repo(
                 policy.max_stage_file_bytes
             );
             append_to_gitignore(repo, &patterns)?;
+            gitignore_updated = true;
         }
         
         let other_untracked: Vec<_> = to_restore
@@ -2307,8 +2309,42 @@ async fn sync_repo(
             restore_paths(repo, &excluded_paths).await?;
             return Ok(true);
         }
+
+        // If we updated .gitignore, commit it so the repo becomes clean
+        if gitignore_updated && policy.auto_commit {
+            let gitignore_path = ".gitignore";
+            match run_git_with_timeout(repo, &["add", gitignore_path], 30, "add").await {
+                Ok(()) => {
+                    // Check if there's anything staged now
+                    if let Ok(staged) = staged_paths(repo).await {
+                        if !staged.is_empty() {
+                            let proto_status = to_proto_status(&status);
+                            let msg = build_sync_commit_payload(repo, &proto_status, &[]);
+                            match svc.commit(&msg).await {
+                                Ok(()) => {
+                                    eprintln!("📝 committed .gitignore update in {}", repo.display());
+                                    if policy.auto_push && has_origin {
+                                        let _ = run_git_with_timeout(
+                                            repo,
+                                            &["push", "origin", "HEAD"],
+                                            policy.push_op_timeout_secs,
+                                            "push",
+                                        )
+                                        .await;
+                                    }
+                                    return Ok(true);
+                                }
+                                Err(e) => eprintln!("⚠️ failed to commit .gitignore in {}: {}", repo.display(), e),
+                            }
+                        }
+                    }
+                }
+                Err(e) => eprintln!("⚠️ failed to stage .gitignore in {}: {}", repo.display(), e),
+            }
+        }
+
         // Dirty repo with entries but none passed filters and none restorable
-        if entries_len > 0 {
+        if entries_len > 0 && !gitignore_updated {
             eprintln!(
                 "ℹ️ {} has {} dirty entries but none restorable (all untracked or excluded)",
                 repo.display(),
