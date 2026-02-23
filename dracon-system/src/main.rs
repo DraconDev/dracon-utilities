@@ -1118,6 +1118,82 @@ async fn run_guard_once(
     let cooldown_cutoff = Instant::now() - Duration::from_secs(guard.notify_cooldown_secs.saturating_mul(2));
     state.notify_cooldowns.retain(|_, &mut since| since > cooldown_cutoff);
 
+    // Inode monitoring
+    if guard.monitor_inodes {
+        if let Ok(inode_percent) = inode_use_percent().await {
+            if inode_percent >= guard.inode_warn_percent {
+                let key = "inode-warning".to_string();
+                if should_notify(state, &key, guard.notify_cooldown_secs.max(1800)) {
+                    send_notification(
+                        guard,
+                        "Dracon System Guard - Inode Warning",
+                        &format!(
+                            "Inode usage at {}% (threshold: {}%) - disk may have space but no file slots",
+                            inode_percent, guard.inode_warn_percent
+                        ),
+                    )
+                    .await;
+                }
+            }
+        }
+    }
+
+    // Zombie process monitoring
+    if guard.monitor_zombies {
+        if let Ok(zombie_count) = count_zombie_processes().await {
+            if zombie_count > guard.zombie_threshold {
+                let key = "zombie-warning".to_string();
+                if should_notify(state, &key, guard.notify_cooldown_secs.max(3600)) {
+                    send_notification(
+                        guard,
+                        "Dracon System Guard - Zombie Processes",
+                        &format!(
+                            "Detected {} zombie processes (threshold: {})",
+                            zombie_count, guard.zombie_threshold
+                        ),
+                    )
+                    .await;
+                }
+            }
+        }
+    }
+
+    // Large log file monitoring
+    if guard.monitor_logs && !guard.log_dirs.trim().is_empty() {
+        let log_dirs: Vec<PathBuf> = guard.log_dirs
+            .split(',')
+            .filter_map(|s| {
+                let s = s.trim();
+                if s.is_empty() { return None; }
+                let p = expand_tilde(s);
+                if p.exists() { Some(p) } else { None }
+            })
+            .collect();
+        
+        if !log_dirs.is_empty() {
+            let min_size = guard.log_size_mb * 1024 * 1024;
+            match find_large_log_files(&log_dirs, min_size).await {
+                Ok(logs) if !logs.is_empty() => {
+                    let key = "log-size-warning".to_string();
+                    if should_notify(state, &key, guard.notify_cooldown_secs.max(3600)) {
+                        let top_logs: Vec<_> = logs.iter().take(3).collect();
+                        let msg = format!(
+                            "Found {} large log files (>{:.0} MiB): {}",
+                            logs.len(),
+                            guard.log_size_mb,
+                            top_logs.iter()
+                                .map(|(p, s)| format!("{} ({})", p.display(), human_bytes(*s)))
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        );
+                        send_notification(guard, "Dracon System Guard - Large Log Files", &msg).await;
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
     Ok(GuardReport {
         enabled: guard.enabled,
         disk_use_percent: used,
