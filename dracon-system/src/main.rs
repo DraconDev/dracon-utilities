@@ -233,6 +233,7 @@ impl Default for GuardPolicy {
         Self {
             enabled: default_guard_enabled(),
             interval_secs: default_guard_interval_secs(),
+            disk_early_warn_percent: default_disk_early_warn_percent(),
             disk_warn_percent: default_disk_warn_percent(),
             disk_action_percent: default_disk_action_percent(),
             disk_critical_percent: default_disk_critical_percent(),
@@ -248,6 +249,12 @@ impl Default for GuardPolicy {
             notify_cooldown_secs: default_notify_cooldown_secs(),
             auto_renice: false,
             renice_value: default_renice_value(),
+            auto_cleanup_rust: default_auto_cleanup_rust(),
+            cleanup_min_size_mb: default_cleanup_min_size_mb(),
+            rust_search_roots: default_rust_search_roots(),
+            protect_recent_minutes: default_protect_recent_minutes(),
+            track_trends: default_true(),
+            trend_warn_hours: default_trend_warn_hours(),
         }
     }
 }
