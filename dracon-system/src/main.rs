@@ -813,6 +813,101 @@ async fn auto_cleanup_rust_targets(
     Ok(result)
 }
 
+/// Get inode usage percent for root filesystem
+async fn inode_use_percent() -> Result<u8> {
+    let out = Command::new("df")
+        .args(["-Pi", "/"])
+        .output()
+        .await?;
+    
+    if !out.status.success() {
+        return Err(anyhow::anyhow!("df -i command failed"));
+    }
+    
+    let text = String::from_utf8_lossy(&out.stdout);
+    // Parse: Filesystem Inodes IUsed IFree IUse% Mounted on
+    text.lines()
+        .nth(1)
+        .and_then(|line| line.split_whitespace().nth(4))
+        .and_then(|v| v.trim_end_matches('%').parse::<u8>().ok())
+        .ok_or_else(|| anyhow::anyhow!("failed parsing df -i output"))
+}
+
+/// Count zombie processes
+async fn count_zombie_processes() -> Result<u64> {
+    let out = Command::new("ps")
+        .args(["-eo", "stat="])
+        .output()
+        .await?;
+    
+    if !out.status.success() {
+        return Err(anyhow::anyhow!("ps command failed"));
+    }
+    
+    let text = String::from_utf8_lossy(&out.stdout);
+    let count = text.lines()
+        .filter(|line| {
+            let stat = line.trim();
+            // Zombie processes have 'Z' in their stat
+            stat.contains('Z') || stat.starts_with('Z')
+        })
+        .count();
+    
+    Ok(count as u64)
+}
+
+/// Find large log files
+async fn find_large_log_files(dirs: &[PathBuf], min_size_bytes: u64) -> Result<Vec<(PathBuf, u64)>> {
+    use walkdir::WalkDir;
+    
+    let mut logs = Vec::new();
+    
+    for dir in dirs {
+        if !dir.exists() {
+            continue;
+        }
+        
+        for entry in WalkDir::new(dir)
+            .max_depth(3)
+            .follow_links(false)
+            .into_iter()
+            .filter_map(|e| e.ok())
+        {
+            if !entry.file_type().is_file() {
+                continue;
+            }
+            
+            let path = entry.path();
+            let name = path.file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_default();
+            
+            // Check if it looks like a log file
+            if !name.ends_with(".log") && 
+               !name.ends_with(".log.old") &&
+               !name.contains(".log.") &&
+               name != "journal" &&
+               !name.ends_with(".journal") {
+                continue;
+            }
+            
+            let size = match fs::metadata(path) {
+                Ok(m) => m.len(),
+                Err(_) => continue,
+            };
+            
+            if size >= min_size_bytes {
+                logs.push((path.to_path_buf(), size));
+            }
+        }
+    }
+    
+    // Sort by size descending
+    logs.sort_by(|a, b| b.1.cmp(&a.1));
+    
+    Ok(logs)
+}
+
 /// Predict when disk will fill based on trend
 fn predict_fill_time(history: &[(Instant, u8)], _interval_secs: u64) -> Option<f64> {
     if history.len() < 3 {
