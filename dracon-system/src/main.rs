@@ -409,7 +409,7 @@ fn default_notify_command() -> String {
 }
 
 fn default_notify_cooldown_secs() -> u64 {
-    120
+    300  // 5 minutes - reduces notification spam during sustained issues
 }
 
 fn default_renice_value() -> i32 {
