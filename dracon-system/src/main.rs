@@ -604,12 +604,12 @@ async fn find_rust_target_dirs(roots: &[PathBuf]) -> Result<Vec<TargetDirInfo>> 
             continue;
         }
         
-        let walker = WalkDir::new(root)
+        for entry in WalkDir::new(root)
             .max_depth(5)  // Don't go too deep
             .follow_links(false)
-            .into_iter();
-            
-        for entry in walker.filter_map(|e| e.ok()) {
+            .into_iter()
+            .filter_map(|e| e.ok())
+        {
             if !entry.file_type().is_dir() {
                 continue;
             }
@@ -773,7 +773,7 @@ async fn auto_cleanup_rust_targets(
 }
 
 /// Predict when disk will fill based on trend
-fn predict_fill_time(history: &[(Instant, u8)], interval_secs: u64) -> Option<f64> {
+fn predict_fill_time(history: &[(Instant, u8)], _interval_secs: u64) -> Option<f64> {
     if history.len() < 3 {
         return None;
     }
