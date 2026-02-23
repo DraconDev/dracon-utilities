@@ -856,6 +856,184 @@ async fn count_zombie_processes() -> Result<u64> {
     Ok(count as u64)
 }
 
+/// Find directories with many files (inode hogs)
+async fn find_inode_hogs(dirs: &[PathBuf], min_file_count: u64) -> Result<Vec<(PathBuf, u64)>> {
+    use walkdir::WalkDir;
+    
+    let mut hogs = Vec::new();
+    
+    for dir in dirs {
+        if !dir.exists() {
+            continue;
+        }
+        
+        for entry in WalkDir::new(dir)
+            .max_depth(4)
+            .follow_links(false)
+            .into_iter()
+            .filter_map(|e| e.ok())
+        {
+            if !entry.file_type().is_dir() {
+                continue;
+            }
+            
+            let path = entry.path();
+            
+            // Count files in this directory (non-recursive)
+            let file_count = match std::fs::read_dir(path) {
+                Ok(entries) => entries.count() as u64,
+                Err(_) => continue,
+            };
+            
+            if file_count >= min_file_count {
+                hogs.push((path.to_path_buf(), file_count));
+            }
+        }
+    }
+    
+    // Sort by file count descending
+    hogs.sort_by(|a, b| b.1.cmp(&a.1));
+    
+    Ok(hogs)
+}
+
+/// Get inode info for root filesystem
+async fn get_inode_info() -> Result<(u64, u64, u64)> {
+    let out = Command::new("df")
+        .args(["-Pi", "/"])
+        .output()
+        .await?;
+    
+    if !out.status.success() {
+        return Err(anyhow::anyhow!("df -i command failed"));
+    }
+    
+    let text = String::from_utf8_lossy(&out.stdout);
+    // Parse: Filesystem Inodes IUsed IFree IUse% Mounted on
+    let line = text.lines().nth(1).ok_or_else(|| anyhow::anyhow!("no data line"))?;
+    let parts: Vec<&str> = line.split_whitespace().collect();
+    
+    let total = parts.get(1).and_then(|v| v.parse().ok()).unwrap_or(0);
+    let used = parts.get(2).and_then(|v| v.parse().ok()).unwrap_or(0);
+    let free = parts.get(3).and_then(|v| v.parse().ok()).unwrap_or(0);
+    
+    Ok((total, used, free))
+}
+
+/// Clean Docker resources
+async fn docker_prune(all: bool, volumes: bool) -> Result<u64> {
+    let mut args = vec!["system", "prune", "-f"];
+    if all {
+        args.push("--all");
+    }
+    if volumes {
+        args.push("--volumes");
+    }
+    
+    let out = Command::new("docker")
+        .args(&args)
+        .output()
+        .await?;
+    
+    if !out.status.success() {
+        return Err(anyhow::anyhow!("docker prune failed"));
+    }
+    
+    // Try to parse reclaimed space from output
+    let text = String::from_utf8_lossy(&out.stdout);
+    for line in text.lines() {
+        if line.contains("reclaimed") {
+            // Parse "Total reclaimed space: 1.5GB"
+            if let Some(pos) = line.find(':') {
+                let size_str = line[pos + 1..].trim();
+                // Parse size - this is approximate
+                let bytes = parse_docker_size(size_str);
+                return Ok(bytes);
+            }
+        }
+    }
+    
+    Ok(0)
+}
+
+fn parse_docker_size(s: &str) -> u64 {
+    let s = s.trim();
+    let num: String = s.chars().take_while(|c| c.is_numeric() || *c == '.').collect();
+    let unit: String = s.chars().skip_while(|c| c.is_numeric() || *c == '.' || *c == ' ').collect();
+    
+    let value: f64 = num.parse().unwrap_or(0.0);
+    let multiplier = match unit.to_uppercase().as_str() {
+        "B" => 1.0,
+        "KB" | "KIB" => 1024.0,
+        "MB" | "MIB" => 1024.0 * 1024.0,
+        "GB" | "GIB" => 1024.0 * 1024.0 * 1024.0,
+        "TB" | "TIB" => 1024.0 * 1024.0 * 1024.0 * 1024.0,
+        _ => 1.0,
+    };
+    
+    (value * multiplier) as u64
+}
+
+/// Clean package manager caches
+async fn clean_package_caches(cargo: bool, npm: bool, pip: bool, go: bool) -> Result<(u64, Vec<String>)> {
+    let mut reclaimed = 0u64;
+    let mut cleaned = Vec::new();
+    
+    if cargo {
+        if let Some(home) = dirs::home_dir() {
+            let cargo_cache = home.join(".cargo/registry/cache");
+            if cargo_cache.exists() {
+                let size = get_dir_size(&cargo_cache).await.unwrap_or(0);
+                if size > 0 {
+                    cleaned.push(format!("cargo registry cache ({})", human_bytes(size)));
+                    reclaimed += size;
+                }
+            }
+        }
+    }
+    
+    if npm {
+        if let Some(home) = dirs::home_dir() {
+            let npm_cache = home.join(".npm");
+            if npm_cache.exists() {
+                let size = get_dir_size(&npm_cache).await.unwrap_or(0);
+                if size > 0 {
+                    cleaned.push(format!("npm cache ({})", human_bytes(size)));
+                    reclaimed += size;
+                }
+            }
+        }
+    }
+    
+    if pip {
+        if let Some(home) = dirs::home_dir() {
+            let pip_cache = home.join(".cache/pip");
+            if pip_cache.exists() {
+                let size = get_dir_size(&pip_cache).await.unwrap_or(0);
+                if size > 0 {
+                    cleaned.push(format!("pip cache ({})", human_bytes(size)));
+                    reclaimed += size;
+                }
+            }
+        }
+    }
+    
+    if go {
+        if let Some(home) = dirs::home_dir() {
+            let go_cache = home.join(".cache/go-build");
+            if go_cache.exists() {
+                let size = get_dir_size(&go_cache).await.unwrap_or(0);
+                if size > 0 {
+                    cleaned.push(format!("go build cache ({})", human_bytes(size)));
+                    reclaimed += size;
+                }
+            }
+        }
+    }
+    
+    Ok((reclaimed, cleaned))
+}
+
 /// Find large log files
 async fn find_large_log_files(dirs: &[PathBuf], min_size_bytes: u64) -> Result<Vec<(PathBuf, u64)>> {
     use walkdir::WalkDir;
