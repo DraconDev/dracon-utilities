@@ -364,12 +364,8 @@ fn default_cleanup_min_size_mb() -> u64 {
 }
 
 fn default_rust_search_roots() -> String {
-    let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("/home"));
-    format!(
-        "{}/Dev,{}/dracon",
-        home.display(),
-        home.display()
-    )
+    // Empty by default - must be configured
+    String::new()
 }
 
 fn default_protect_recent_minutes() -> u64 {
