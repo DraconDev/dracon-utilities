@@ -355,6 +355,31 @@ fn default_renice_value() -> i32 {
     10
 }
 
+fn default_auto_cleanup_rust() -> bool {
+    true
+}
+
+fn default_cleanup_min_size_mb() -> u64 {
+    256  // 256 MiB minimum for auto-cleanup consideration
+}
+
+fn default_rust_search_roots() -> String {
+    let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("/home"));
+    format!(
+        "{}/Dev,{}/dracon",
+        home.display(),
+        home.display()
+    )
+}
+
+fn default_protect_recent_minutes() -> u64 {
+    30  // Don't clean target dirs modified in last 30 mins
+}
+
+fn default_trend_warn_hours() -> u64 {
+    24  // Warn if disk will fill within 24 hours
+}
+
 fn human_bytes(bytes: u64) -> String {
     const UNITS: [&str; 5] = ["B", "KiB", "MiB", "GiB", "TiB"];
     let mut value = bytes as f64;
