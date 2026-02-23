@@ -176,6 +176,8 @@ struct GuardPolicy {
     enabled: bool,
     #[serde(default = "default_guard_interval_secs")]
     interval_secs: u64,
+    #[serde(default = "default_disk_early_warn_percent")]
+    disk_early_warn_percent: u8,
     #[serde(default = "default_disk_warn_percent")]
     disk_warn_percent: u8,
     #[serde(default = "default_disk_action_percent")]
@@ -206,6 +208,24 @@ struct GuardPolicy {
     auto_renice: bool,
     #[serde(default = "default_renice_value")]
     renice_value: i32,
+    /// Automatically clean Rust build artifacts when disk hits action level
+    #[serde(default = "default_auto_cleanup_rust")]
+    auto_cleanup_rust: bool,
+    /// Minimum size (MiB) for a target dir to be considered for auto-cleanup
+    #[serde(default = "default_cleanup_min_size_mb")]
+    cleanup_min_size_mb: u64,
+    /// Directories to search for Rust target directories
+    #[serde(default = "default_rust_search_roots")]
+    rust_search_roots: String,
+    /// Protect target dirs that have been modified within this many minutes
+    #[serde(default = "default_protect_recent_minutes")]
+    protect_recent_minutes: u64,
+    /// Enable disk space trend tracking and prediction
+    #[serde(default = "default_true")]
+    track_trends: bool,
+    /// Warn when disk is predicted to fill within this many hours
+    #[serde(default = "default_trend_warn_hours")]
+    trend_warn_hours: u64,
 }
 
 impl Default for GuardPolicy {
