@@ -226,6 +226,27 @@ struct GuardPolicy {
     /// Warn when disk is predicted to fill within this many hours
     #[serde(default = "default_trend_warn_hours")]
     trend_warn_hours: u64,
+    /// Enable inode monitoring (warn when inode usage is high)
+    #[serde(default = "default_true")]
+    monitor_inodes: bool,
+    /// Inode usage percent threshold for warning
+    #[serde(default = "default_inode_warn_percent")]
+    inode_warn_percent: u8,
+    /// Enable zombie process detection
+    #[serde(default = "default_true")]
+    monitor_zombies: bool,
+    /// Maximum number of zombie processes before alert
+    #[serde(default = "default_zombie_threshold")]
+    zombie_threshold: u64,
+    /// Enable large log file detection
+    #[serde(default = "default_true")]
+    monitor_logs: bool,
+    /// Log file size threshold in MiB
+    #[serde(default = "default_log_size_mb")]
+    log_size_mb: u64,
+    /// Directories to scan for large log files
+    #[serde(default = "default_log_dirs")]
+    log_dirs: String,
 }
 
 impl Default for GuardPolicy {
@@ -374,6 +395,23 @@ fn default_protect_recent_minutes() -> u64 {
 
 fn default_trend_warn_hours() -> u64 {
     24  // Warn if disk will fill within 24 hours
+}
+
+fn default_inode_warn_percent() -> u8 {
+    80  // Warn at 80% inode usage
+}
+
+fn default_zombie_threshold() -> u64 {
+    10  // Alert if more than 10 zombie processes
+}
+
+fn default_log_size_mb() -> u64 {
+    100  // Alert on log files > 100 MiB
+}
+
+fn default_log_dirs() -> String {
+    // Empty by default - must be configured
+    String::new()
 }
 
 fn human_bytes(bytes: u64) -> String {
