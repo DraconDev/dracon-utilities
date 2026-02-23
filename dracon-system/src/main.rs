@@ -438,6 +438,27 @@ struct GuardRuntimeState {
     heavy_since: HashMap<i32, Instant>,
     notify_cooldowns: HashMap<String, Instant>,
     last_disk_state: String,
+    /// History of disk usage samples for trend prediction (timestamp, percent)
+    disk_history: Vec<(Instant, u8)>,
+    /// Active cargo build PIDs detected
+    active_build_pids: HashSet<i32>,
+}
+
+/// Information about a Rust target directory for cleanup consideration
+#[derive(Debug, Clone)]
+struct TargetDirInfo {
+    path: PathBuf,
+    bytes: u64,
+    modified_secs_ago: u64,
+}
+
+/// Result of automatic cleanup operation
+#[derive(Debug, Serialize)]
+struct AutoCleanupResult {
+    cleaned_count: usize,
+    reclaimed_bytes: u64,
+    cleaned_paths: Vec<String>,
+    protected_paths: Vec<String>,
 }
 
 fn parse_df_use_percent(output: &str) -> Option<u8> {
