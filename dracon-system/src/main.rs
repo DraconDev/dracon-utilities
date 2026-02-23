@@ -438,11 +438,11 @@ fn default_trend_warn_hours() -> u64 {
 }
 
 fn default_inode_warn_percent() -> u8 {
-    80  // Warn at 80% inode usage
+    85  // Warn at 85% inode usage (inodes rarely an issue on modern filesystems)
 }
 
 fn default_zombie_threshold() -> u64 {
-    10  // Alert if more than 10 zombie processes
+    20  // Alert if more than 20 zombie processes (a few zombies are normal)
 }
 
 fn default_log_size_mb() -> u64 {
