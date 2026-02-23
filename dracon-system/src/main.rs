@@ -271,16 +271,20 @@ fn default_guard_interval_secs() -> u64 {
     30
 }
 
+fn default_disk_early_warn_percent() -> u8 {
+    70
+}
+
 fn default_disk_warn_percent() -> u8 {
-    85
+    80
 }
 
 fn default_disk_action_percent() -> u8 {
-    92
+    90
 }
 
 fn default_disk_critical_percent() -> u8 {
-    97
+    95
 }
 
 fn default_sync_freeze_marker() -> String {
