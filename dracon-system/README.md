@@ -179,7 +179,7 @@ disk_critical_percent = 95
 # Automatic Rust target cleanup
 auto_cleanup_rust = true
 cleanup_min_size_mb = 256
-rust_search_roots = "~/Dev,~/dracon,~/projects"
+rust_search_roots = "~/Dev"  # Default; add more paths as needed
 protect_recent_minutes = 30
 
 # Trend prediction
@@ -188,11 +188,11 @@ trend_warn_hours = 24
 
 # Inode monitoring
 monitor_inodes = true
-inode_warn_percent = 80
+inode_warn_percent = 85
 
 # Zombie process detection
 monitor_zombies = true
-zombie_threshold = 10
+zombie_threshold = 20
 
 # Large log file detection
 monitor_logs = true
@@ -202,7 +202,7 @@ log_dirs = "/var/log,~/logs"
 # Notifications
 notify = true
 notify_command = "notify-send"
-notify_cooldown_secs = 120
+notify_cooldown_secs = 300
 
 # Sync freeze (for use with dracon-sync)
 freeze_sync_at_action = true
