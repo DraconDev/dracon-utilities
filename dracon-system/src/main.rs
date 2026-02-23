@@ -2207,6 +2207,86 @@ async fn main() -> Result<()> {
                         sleep(Duration::from_secs(guard.interval_secs)).await;
                     }
                 }
+                GuardCommands::Prune { json, docker, docker_volumes, package_caches, apply } => {
+                    let mut reclaimed_total = 0u64;
+                    let mut actions = Vec::new();
+                    
+                    // Docker prune
+                    if docker || docker_volumes {
+                        match docker_prune(docker, docker_volumes).await {
+                            Ok(bytes) => {
+                                actions.push(format!("Docker prune: {}", human_bytes(bytes)));
+                                reclaimed_total += bytes;
+                            }
+                            Err(e) => {
+                                actions.push(format!("Docker prune failed: {}", e));
+                            }
+                        }
+                    }
+                    
+                    // Package cache cleanup
+                    if package_caches {
+                        match clean_package_caches(true, true, true, true).await {
+                            Ok((bytes, cleaned)) => {
+                                for c in cleaned {
+                                    actions.push(format!("Package cache: {}", c));
+                                }
+                                reclaimed_total += bytes;
+                            }
+                            Err(e) => {
+                                actions.push(format!("Package cache cleanup failed: {}", e));
+                            }
+                        }
+                    }
+                    
+                    // If no specific flags, show what would be cleaned
+                    if !docker && !docker_volumes && !package_caches {
+                        // Show disk usage info
+                        let disk = root_disk_use_percent().await?;
+                        println!("Disk usage: {}%", disk);
+                        
+                        // Show inode info
+                        if let Ok((total, used, free)) = get_inode_info().await {
+                            let pct = if total > 0 { (used * 100 / total) as u8 } else { 0 };
+                            println!("Inode usage: {}% ({}/{} inodes used)", pct, used, total);
+                        }
+                        
+                        // Show potential cleanup targets
+                        println!();
+                        println!("Potential cleanup targets:");
+                        println!("  --docker          Prune unused Docker images/containers");
+                        println!("  --docker-volumes  Prune Docker volumes too (aggressive)");
+                        println!("  --package-caches  Clean cargo/npm/pip/go caches");
+                        println!();
+                        println!("Add --apply to execute cleanup.");
+                    }
+                    
+                    if json {
+                        #[derive(Serialize)]
+                        struct PruneReport {
+                            reclaimed_bytes: u64,
+                            reclaimed_human: String,
+                            actions: Vec<String>,
+                        }
+                        let report = PruneReport {
+                            reclaimed_bytes: reclaimed_total,
+                            reclaimed_human: human_bytes(reclaimed_total),
+                            actions,
+                        };
+                        println!("{}", serde_json::to_string_pretty(&report)?);
+                    } else if !actions.is_empty() {
+                        println!("Prune results:");
+                        for a in &actions {
+                            println!("  - {}", a);
+                        }
+                        println!("Total reclaimed: {}", human_bytes(reclaimed_total));
+                        
+                        if !apply && (docker || docker_volumes || package_caches) {
+                            println!();
+                            println!("Note: This was a dry-run. Add --apply to execute.");
+                        }
+                    }
+                }
             }
         }
     }
