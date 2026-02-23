@@ -1,5 +1,69 @@
 # Dracon-System Blueprint
 
+## Enhanced Disk Space Monitoring (v0.2.0)
+
+### New Features
+
+#### 1. Early Warning System (70% threshold)
+- **New threshold:** `disk_early_warn_percent` (default: 70%)
+- Provides proactive notification before reaching warning state
+- Gives you time to clean up before space becomes critical
+
+#### 2. Automatic Rust Target Cleanup
+- **Enabled by default:** `auto_cleanup_rust = true`
+- Automatically cleans `target/` directories when disk hits action level (90%)
+- Smart protection for active builds:
+  - Detects running `cargo`, `rustc`, `clippy-driver` processes
+  - Protects target dirs in their working directories
+  - Protects recently modified target dirs (default: 30 minutes)
+- Configurable minimum size threshold (default: 256 MiB)
+- Searches configurable directories: `~/Dev`, `~/dracon`
+
+#### 3. Build-Aware Monitoring
+- Detects active Rust build processes
+- Protects their target directories from cleanup
+- Prevents breaking active compilation
+
+#### 4. Disk Space Trend Prediction
+- Tracks disk usage history over time
+- Predicts when disk will fill based on usage rate
+- Warns if disk predicted to fill within configurable hours (default: 24h)
+- Uses linear regression on recent samples
+
+### New Configuration Options
+
+```toml
+[guard]
+# Early warning at 70% (before warning state)
+disk_early_warn_percent = 70
+
+# Warning at 80%, Action at 90%, Critical at 95%
+disk_warn_percent = 80
+disk_action_percent = 90
+disk_critical_percent = 95
+
+# Automatic Rust target cleanup
+auto_cleanup_rust = true
+cleanup_min_size_mb = 256
+rust_search_roots = "~/Dev,~/dracon"
+protect_recent_minutes = 30
+
+# Trend prediction
+track_trends = true
+trend_warn_hours = 24
+```
+
+### Threshold Summary
+
+| State | Default Threshold | Action |
+|-------|------------------|--------|
+| early-warn | 70% | Notification only |
+| warn | 80% | Notification, state change |
+| action | 90% | Freeze sync, auto-cleanup Rust targets |
+| critical | 95% | All above actions, more aggressive |
+
+---
+
 ## Issues Fixed
 
 ### 1. Missing daemon lock for Guard daemon
