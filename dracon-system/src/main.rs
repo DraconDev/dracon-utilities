@@ -828,6 +828,52 @@ async fn run_guard_once(
     let marker = sync_freeze_marker_path(guard);
     let mut sync_frozen = marker.exists();
 
+    // Track disk history for trend prediction
+    if guard.track_trends {
+        let now = Instant::now();
+        state.disk_history.push((now, used));
+        
+        // Keep only last 100 samples (about 50 minutes at 30s interval)
+        if state.disk_history.len() > 100 {
+            let excess = state.disk_history.len() - 100;
+            state.disk_history.drain(0..excess);
+        }
+        
+        // Check for trend prediction warning
+        if let Some(hours_until_full) = predict_fill_time(&state.disk_history, guard.interval_secs) {
+            if hours_until_full > 0.0 && hours_until_full <= guard.trend_warn_hours as f64 {
+                let key = "disk-trend-warning".to_string();
+                if should_notify(state, &key, guard.notify_cooldown_secs.max(3600)) {
+                    send_notification(
+                        guard,
+                        "Dracon System Guard - Disk Trend Warning",
+                        &format!(
+                            "Disk predicted to fill in {:.1} hours (currently {}%)",
+                            hours_until_full, used
+                        ),
+                    )
+                    .await;
+                }
+            }
+        }
+    }
+
+    // Early warning notification (70% threshold)
+    if used >= guard.disk_early_warn_percent && used < guard.disk_warn_percent {
+        let key = "disk-early-warn".to_string();
+        if should_notify(state, &key, guard.notify_cooldown_secs.max(1800)) {
+            send_notification(
+                guard,
+                "Dracon System Guard - Early Warning",
+                &format!(
+                    "Disk usage at {}% (early warning threshold: {}%)",
+                    used, guard.disk_early_warn_percent
+                ),
+            )
+            .await;
+        }
+    }
+
     if guard.freeze_sync_at_action && (dstate == "action" || dstate == "critical") {
         if !sync_frozen {
             if let Some(parent) = marker.parent() {
@@ -839,6 +885,32 @@ async fn run_guard_once(
     } else if sync_frozen && used <= guard.unfreeze_below_percent {
         let _ = fs::remove_file(&marker);
         sync_frozen = false;
+    }
+
+    // Automatic Rust target cleanup when disk hits action level
+    if guard.auto_cleanup_rust && (dstate == "action" || dstate == "critical") {
+        let cleanup_result = auto_cleanup_rust_targets(guard, state).await?;
+        
+        if cleanup_result.cleaned_count > 0 {
+            let key = "auto-cleanup".to_string();
+            if should_notify(state, &key, guard.notify_cooldown_secs.max(600)) {
+                send_notification(
+                    guard,
+                    "Dracon System Guard - Auto Cleanup",
+                    &format!(
+                        "Cleaned {} Rust target dirs, reclaimed {}",
+                        cleanup_result.cleaned_count,
+                        human_bytes(cleanup_result.reclaimed_bytes)
+                    ),
+                )
+                .await;
+            }
+            
+            // Log cleaned paths
+            for path in &cleanup_result.cleaned_paths {
+                eprintln!("🧹 Cleaned: {}", path);
+            }
+        }
     }
 
     if state.last_disk_state != dstate {
