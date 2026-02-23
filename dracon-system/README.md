@@ -186,6 +186,19 @@ protect_recent_minutes = 30
 track_trends = true
 trend_warn_hours = 24
 
+# Inode monitoring
+monitor_inodes = true
+inode_warn_percent = 80
+
+# Zombie process detection
+monitor_zombies = true
+zombie_threshold = 10
+
+# Large log file detection
+monitor_logs = true
+log_size_mb = 100
+log_dirs = "/var/log,~/logs"
+
 # Notifications
 notify = true
 notify_command = "notify-send"
