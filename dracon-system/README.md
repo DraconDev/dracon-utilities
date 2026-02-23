@@ -28,6 +28,21 @@ A deterministic system utility for proactive disk space monitoring and automatic
 - Predicts when disk will fill based on usage rate
 - Warns if disk predicted to fill within configurable hours
 
+### Inode Monitoring
+- Monitors inode usage on root filesystem
+- Warns when inode usage exceeds threshold (default 80%)
+- Critical for systems with many small files
+
+### Zombie Process Detection
+- Detects accumulated zombie processes
+- Alerts when zombie count exceeds threshold (default 10)
+- Helps identify parent processes not reaping children
+
+### Large Log File Detection
+- Scans configured directories for large log files
+- Alerts on files exceeding size threshold (default 100 MiB)
+- Helps identify runaway logging
+
 ## Installation
 
 ### Quick Install (User Service)
