@@ -276,6 +276,13 @@ impl Default for GuardPolicy {
             protect_recent_minutes: default_protect_recent_minutes(),
             track_trends: default_true(),
             trend_warn_hours: default_trend_warn_hours(),
+            monitor_inodes: default_true(),
+            inode_warn_percent: default_inode_warn_percent(),
+            monitor_zombies: default_true(),
+            zombie_threshold: default_zombie_threshold(),
+            monitor_logs: default_true(),
+            log_size_mb: default_log_size_mb(),
+            log_dirs: default_log_dirs(),
         }
     }
 }
