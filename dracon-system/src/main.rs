@@ -425,8 +425,7 @@ fn default_cleanup_min_size_mb() -> u64 {
 }
 
 fn default_rust_search_roots() -> String {
-    // Empty by default - must be configured
-    String::new()
+    "~/Dev".to_string()  // Default search location for Rust target directories
 }
 
 fn default_protect_recent_minutes() -> u64 {
