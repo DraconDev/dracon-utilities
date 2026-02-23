@@ -247,6 +247,21 @@ struct GuardPolicy {
     /// Directories to scan for large log files
     #[serde(default = "default_log_dirs")]
     log_dirs: String,
+    /// Enable Docker pruning when disk is critical
+    #[serde(default = "default_true")]
+    docker_prune: bool,
+    /// Prune Docker volumes too (more aggressive)
+    #[serde(default)]
+    docker_prune_volumes: bool,
+    /// Clean package caches when disk is critical
+    #[serde(default = "default_true")]
+    clean_package_caches: bool,
+    /// Directories to scan for inode hogs
+    #[serde(default = "default_inode_hog_dirs")]
+    inode_hog_dirs: String,
+    /// Minimum file count to consider a directory an inode hog
+    #[serde(default = "default_inode_hog_threshold")]
+    inode_hog_threshold: u64,
 }
 
 impl Default for GuardPolicy {
