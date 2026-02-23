@@ -436,6 +436,15 @@ fn default_log_dirs() -> String {
     String::new()
 }
 
+fn default_inode_hog_dirs() -> String {
+    // Empty by default - must be configured
+    String::new()
+}
+
+fn default_inode_hog_threshold() -> u64 {
+    1000  // Directories with 1000+ files are inode hogs
+}
+
 fn human_bytes(bytes: u64) -> String {
     const UNITS: [&str; 5] = ["B", "KiB", "MiB", "GiB", "TiB"];
     let mut value = bytes as f64;
