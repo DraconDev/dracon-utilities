@@ -298,6 +298,11 @@ impl Default for GuardPolicy {
             monitor_logs: default_true(),
             log_size_mb: default_log_size_mb(),
             log_dirs: default_log_dirs(),
+            docker_prune: default_true(),
+            docker_prune_volumes: false,
+            clean_package_caches: default_true(),
+            inode_hog_dirs: default_inode_hog_dirs(),
+            inode_hog_threshold: default_inode_hog_threshold(),
         }
     }
 }
