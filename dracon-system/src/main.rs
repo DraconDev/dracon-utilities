@@ -95,6 +95,19 @@ enum GuardCommands {
     },
     /// Run continuous guard loop.
     Daemon,
+    /// Prune system caches and Docker resources.
+    Prune {
+        #[arg(long)]
+        json: bool,
+        #[arg(long)]
+        docker: bool,
+        #[arg(long)]
+        docker_volumes: bool,
+        #[arg(long)]
+        package_caches: bool,
+        #[arg(long)]
+        apply: bool,
+    },
 }
 
 
