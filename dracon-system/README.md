@@ -30,12 +30,12 @@ A deterministic system utility for proactive disk space monitoring and automatic
 
 ### Inode Monitoring
 - Monitors inode usage on root filesystem
-- Warns when inode usage exceeds threshold (default 80%)
+- Warns when inode usage exceeds threshold (default 85%)
 - Critical for systems with many small files
 
 ### Zombie Process Detection
 - Detects accumulated zombie processes
-- Alerts when zombie count exceeds threshold (default 10)
+- Alerts when zombie count exceeds threshold (default 20)
 - Helps identify parent processes not reaping children
 
 ### Large Log File Detection
