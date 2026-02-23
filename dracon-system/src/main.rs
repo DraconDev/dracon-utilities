@@ -556,6 +556,269 @@ async fn renice_process(pid: i32, value: i32) {
         .await;
 }
 
+/// Detect active cargo/rustc processes and return their PIDs and working directories
+async fn detect_active_rust_builds() -> Result<HashSet<i32>> {
+    let out = Command::new("ps")
+        .args(["-eo", "pid=,comm="])
+        .output()
+        .await?;
+    
+    if !out.status.success() {
+        return Ok(HashSet::new());
+    }
+
+    let mut build_pids = HashSet::new();
+    for line in String::from_utf8_lossy(&out.stdout).lines() {
+        let mut parts = line.split_whitespace();
+        let pid = match parts.next().and_then(|p| p.parse::<i32>().ok()) {
+            Some(p) => p,
+            None => continue,
+        };
+        let comm = parts.next().unwrap_or("");
+        
+        // Detect cargo, rustc, cargo-build, etc.
+        if comm.contains("cargo") || comm.contains("rustc") || comm == "clippy-driver" {
+            build_pids.insert(pid);
+        }
+    }
+
+    Ok(build_pids)
+}
+
+/// Get the working directory of a process (to protect its target dir)
+#[allow(dead_code)]
+async fn get_process_cwd(pid: i32) -> Option<PathBuf> {
+    let cwd_path = format!("/proc/{}/cwd", pid);
+    std::fs::read_link(&cwd_path).ok()
+}
+
+/// Find all Rust target directories under the given search roots
+async fn find_rust_target_dirs(roots: &[PathBuf]) -> Result<Vec<TargetDirInfo>> {
+    use walkdir::WalkDir;
+    
+    let mut targets = Vec::new();
+    let now = SystemTime::now();
+    
+    for root in roots {
+        if !root.exists() {
+            continue;
+        }
+        
+        let walker = WalkDir::new(root)
+            .max_depth(5)  // Don't go too deep
+            .follow_links(false)
+            .into_iter();
+            
+        for entry in walker.filter_map(|e| e.ok()) {
+            if !entry.file_type().is_dir() {
+                continue;
+            }
+            
+            if entry.file_name() != "target" {
+                continue;
+            }
+            
+            let path = entry.path().to_path_buf();
+            
+            // Check if there's a Cargo.toml in parent (confirm it's a Rust project)
+            let parent = match path.parent() {
+                Some(p) => p,
+                None => continue,
+            };
+            
+            if !parent.join("Cargo.toml").exists() {
+                continue;
+            }
+            
+            // Get directory size using du
+            let bytes = match get_dir_size(&path).await {
+                Ok(b) => b,
+                Err(_) => continue,
+            };
+            
+            // Get modification time
+            let modified_secs_ago = match fs::metadata(&path).and_then(|m| m.modified()) {
+                Ok(mtime) => now.duration_since(mtime).map(|d| d.as_secs()).unwrap_or(0),
+                Err(_) => 0,
+            };
+            
+            targets.push(TargetDirInfo {
+                path,
+                bytes,
+                modified_secs_ago,
+            });
+        }
+    }
+    
+    // Sort by size descending (clean largest first)
+    targets.sort_by(|a, b| b.bytes.cmp(&a.bytes));
+    
+    Ok(targets)
+}
+
+/// Get directory size using du command
+async fn get_dir_size(path: &Path) -> Result<u64> {
+    let out = Command::new("du")
+        .args(["-sb", "--"])
+        .arg(path)
+        .output()
+        .await?;
+    
+    if !out.status.success() {
+        return Err(anyhow::anyhow!("du failed for {}", path.display()));
+    }
+    
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    let bytes = stdout
+        .split_whitespace()
+        .next()
+        .ok_or_else(|| anyhow::anyhow!("unexpected du output"))?
+        .parse::<u64>()
+        .unwrap_or(0);
+    
+    Ok(bytes)
+}
+
+/// Perform automatic cleanup of Rust target directories
+async fn auto_cleanup_rust_targets(
+    guard: &GuardPolicy,
+    state: &mut GuardRuntimeState,
+) -> Result<AutoCleanupResult> {
+    let mut result = AutoCleanupResult {
+        cleaned_count: 0,
+        reclaimed_bytes: 0,
+        cleaned_paths: Vec::new(),
+        protected_paths: Vec::new(),
+    };
+    
+    // Parse search roots
+    let roots: Vec<PathBuf> = guard.rust_search_roots
+        .split(',')
+        .filter_map(|s| {
+            let s = s.trim();
+            if s.is_empty() { return None; }
+            let p = expand_tilde(s);
+            if p.exists() { Some(p) } else { None }
+        })
+        .collect();
+    
+    if roots.is_empty() {
+        return Ok(result);
+    }
+    
+    // Find all target directories
+    let targets = find_rust_target_dirs(&roots).await?;
+    
+    // Detect active builds
+    let active_builds = detect_active_rust_builds().await?;
+    state.active_build_pids = active_builds.clone();
+    
+    // Get CWDs of active builds to protect their target dirs
+    let mut protected_cwds: Vec<PathBuf> = Vec::new();
+    for pid in &active_builds {
+        if let Some(cwd) = get_process_cwd(*pid).await {
+            protected_cwds.push(cwd);
+        }
+    }
+    
+    let min_size_bytes = guard.cleanup_min_size_mb * 1024 * 1024;
+    let protect_threshold_secs = guard.protect_recent_minutes * 60;
+    
+    for target in targets {
+        // Skip if too small
+        if target.bytes < min_size_bytes {
+            continue;
+        }
+        
+        // Skip if recently modified (likely active build)
+        if target.modified_secs_ago < protect_threshold_secs {
+            result.protected_paths.push(format!(
+                "{} (modified {}s ago)",
+                target.path.display(),
+                target.modified_secs_ago
+            ));
+            continue;
+        }
+        
+        // Skip if in a protected CWD path
+        let target_parent = target.path.parent().unwrap_or(&target.path);
+        let is_protected = protected_cwds.iter().any(|cwd| {
+            cwd.starts_with(target_parent) || target_parent.starts_with(cwd)
+        });
+        
+        if is_protected {
+            result.protected_paths.push(format!(
+                "{} (active build)",
+                target.path.display()
+            ));
+            continue;
+        }
+        
+        // Delete the target directory
+        if let Err(e) = tokio::fs::remove_dir_all(&target.path).await {
+            eprintln!("⚠️ failed to remove {}: {}", target.path.display(), e);
+            continue;
+        }
+        
+        result.cleaned_count += 1;
+        result.reclaimed_bytes += target.bytes;
+        result.cleaned_paths.push(format!(
+            "{} ({})",
+            target.path.display(),
+            human_bytes(target.bytes)
+        ));
+    }
+    
+    Ok(result)
+}
+
+/// Predict when disk will fill based on trend
+fn predict_fill_time(history: &[(Instant, u8)], interval_secs: u64) -> Option<f64> {
+    if history.len() < 3 {
+        return None;
+    }
+    
+    // Simple linear regression on the last N samples
+    let n = history.len().min(20);  // Use up to 20 samples
+    let recent = &history[history.len().saturating_sub(n)..];
+    
+    if recent.len() < 3 {
+        return None;
+    }
+    
+    // Calculate rate of change (percent per second)
+    let mut total_rate = 0.0;
+    let mut count = 0;
+    
+    for i in 1..recent.len() {
+        let dt = recent[i].0.duration_since(recent[i - 1].0).as_secs_f64();
+        if dt <= 0.0 {
+            continue;
+        }
+        let dp = (recent[i].1 as f64) - (recent[i - 1].1 as f64);
+        total_rate += dp / dt;
+        count += 1;
+    }
+    
+    if count == 0 {
+        return None;
+    }
+    
+    let avg_rate = total_rate / count as f64;
+    
+    // If rate is negative or zero, disk isn't filling
+    if avg_rate <= 0.0 {
+        return None;
+    }
+    
+    // Time until 100% from current
+    let current = recent.last()?.1 as f64;
+    let remaining_percent = 100.0 - current;
+    let seconds_until_full = remaining_percent / avg_rate;
+    
+    Some(seconds_until_full / 3600.0)  // Return hours
+}
+
 async fn run_guard_once(
     guard: &GuardPolicy,
     state: &mut GuardRuntimeState,
