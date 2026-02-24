@@ -2252,8 +2252,8 @@ async fn main() -> Result<()> {
                     // If no specific flags, show what would be cleaned
                     if !docker && !docker_volumes && !package_caches {
                         // Show disk usage info
-                        let disk = root_disk_use_percent().await?;
-                        println!("Disk usage: {}%", disk);
+                        let disk = disk_use_percent_for(&guard.disk_mount_path).await?;
+                        println!("Disk usage: {}% (mount: {})", disk, guard.disk_mount_path);
                         
                         // Show inode info
                         if let Ok((total, used, free)) = get_inode_info().await {
