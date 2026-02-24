@@ -283,6 +283,7 @@ impl Default for GuardPolicy {
     fn default() -> Self {
         Self {
             enabled: default_guard_enabled(),
+            disk_mount_path: default_disk_mount_path(),
             interval_secs: default_guard_interval_secs(),
             disk_early_warn_percent: default_disk_early_warn_percent(),
             disk_warn_percent: default_disk_warn_percent(),
@@ -580,8 +581,8 @@ fn parse_ps_output(output: &str) -> Vec<ProcSample> {
         .collect()
 }
 
-async fn root_disk_use_percent() -> Result<u8> {
-    let out = Command::new("df").args(["-P", "/"]).output().await?;
+async fn disk_use_percent_for(path: &str) -> Result<u8> {
+    let out = Command::new("df").args(["-P", path]).output().await?;
     if !out.status.success() {
         return Err(anyhow::anyhow!("df command failed"));
     }
