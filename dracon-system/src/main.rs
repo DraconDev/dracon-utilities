@@ -187,6 +187,8 @@ struct LinkEntry {
 struct GuardPolicy {
     #[serde(default = "default_guard_enabled")]
     enabled: bool,
+    #[serde(default = "default_disk_mount_path")]
+    disk_mount_path: String,
     #[serde(default = "default_guard_interval_secs")]
     interval_secs: u64,
     #[serde(default = "default_disk_early_warn_percent")]
@@ -353,6 +355,14 @@ fn default_true() -> bool {
 
 fn default_guard_enabled() -> bool {
     true
+}
+
+fn default_disk_mount_path() -> String {
+    if PathBuf::from("/nix").exists() {
+        "/nix".to_string()
+    } else {
+        "/".to_string()
+    }
 }
 
 fn default_guard_interval_secs() -> u64 {
