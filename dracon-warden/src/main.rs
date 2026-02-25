@@ -436,6 +436,11 @@ fn build_gitattributes_block(policy: &WardenPolicy) -> Result<String> {
     Ok(lines.join("\n"))
 }
 
+fn should_passthrough_filter_path(path: Option<&str>) -> bool {
+    let _ = path;
+    false
+}
+
 #[cfg(test)]
 fn apply_managed_file(path: &Path, block: &str) -> Result<bool> {
     let current = fs::read_to_string(path).unwrap_or_default();
