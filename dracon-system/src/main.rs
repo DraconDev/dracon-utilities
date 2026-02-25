@@ -108,6 +108,29 @@ enum GuardCommands {
         #[arg(long)]
         apply: bool,
     },
+    /// Clean all reclaimable space (targets, trash, nix, caches, node_modules).
+    Clean {
+        #[arg(long)]
+        json: bool,
+        #[arg(long)]
+        apply: bool,
+        #[arg(long)]
+        rust: bool,
+        #[arg(long)]
+        trash: bool,
+        #[arg(long)]
+        nix: bool,
+        #[arg(long)]
+        caches: bool,
+        #[arg(long)]
+        node_modules: bool,
+        #[arg(long)]
+        docker: bool,
+        #[arg(long)]
+        all: bool,
+        #[arg(long)]
+        min_size_mb: Option<u64>,
+    },
 }
 
 
@@ -271,6 +294,18 @@ struct GuardPolicy {
     /// Clean package caches when disk is critical
     #[serde(default = "default_true")]
     clean_package_caches: bool,
+    /// Empty trash when disk is critical
+    #[serde(default = "default_true")]
+    clean_trash: bool,
+    /// Run nix-collect-garbage when disk is critical
+    #[serde(default = "default_true")]
+    clean_nix_garbage: bool,
+    /// Clean old nix generations (keep last N)
+    #[serde(default = "default_nix_keep_generations")]
+    nix_keep_generations: u32,
+    /// Clean old node_modules (older than N days)
+    #[serde(default = "default_node_modules_max_age_days")]
+    node_modules_max_age_days: u64,
     /// Directories to scan for inode hogs
     #[serde(default = "default_inode_hog_dirs")]
     inode_hog_dirs: String,
@@ -319,6 +354,10 @@ impl Default for GuardPolicy {
             clean_package_caches: default_true(),
             inode_hog_dirs: default_inode_hog_dirs(),
             inode_hog_threshold: default_inode_hog_threshold(),
+            clean_trash: default_true(),
+            clean_nix_garbage: default_true(),
+            nix_keep_generations: 5,
+            node_modules_max_age_days: default_node_modules_max_age_days(),
         }
     }
 }
@@ -471,6 +510,14 @@ fn default_inode_hog_dirs() -> String {
 
 fn default_inode_hog_threshold() -> u64 {
     1000  // Directories with 1000+ files are inode hogs
+}
+
+fn default_node_modules_max_age_days() -> u64 {
+    30  // Clean node_modules not touched in 30 days
+}
+
+fn default_nix_keep_generations() -> u32 {
+    5  // Keep last 5 nix generations
 }
 
 fn human_bytes(bytes: u64) -> String {
@@ -776,6 +823,7 @@ async fn get_dir_size(path: &Path) -> Result<u64> {
 async fn auto_cleanup_rust_targets(
     guard: &GuardPolicy,
     state: &mut GuardRuntimeState,
+    apply: bool,
 ) -> Result<AutoCleanupResult> {
     let mut result = AutoCleanupResult {
         cleaned_count: 0,
@@ -802,20 +850,28 @@ async fn auto_cleanup_rust_targets(
     // Find all target directories
     let targets = find_rust_target_dirs(&roots).await?;
     
-    // Detect active builds
+    // Detect active builds - ONLY protection mechanism
+    // We protect target dirs where cargo/rustc is actively running
     let active_builds = detect_active_rust_builds().await?;
     state.active_build_pids = active_builds.clone();
     
     // Get CWDs of active builds to protect their target dirs
-    let mut protected_cwds: Vec<PathBuf> = Vec::new();
+    let mut protected_project_dirs: Vec<PathBuf> = Vec::new();
     for pid in &active_builds {
         if let Some(cwd) = get_process_cwd(*pid).await {
-            protected_cwds.push(cwd);
+            // Find the project root (where Cargo.toml is)
+            let mut dir = cwd.clone();
+            while dir.parent().is_some() {
+                if dir.join("Cargo.toml").exists() {
+                    protected_project_dirs.push(dir);
+                    break;
+                }
+                dir = dir.parent().unwrap().to_path_buf();
+            }
         }
     }
     
     let min_size_bytes = guard.cleanup_min_size_mb * 1024 * 1024;
-    let protect_threshold_secs = guard.protect_recent_minutes * 60;
     
     for target in targets {
         // Skip if too small
@@ -823,34 +879,26 @@ async fn auto_cleanup_rust_targets(
             continue;
         }
         
-        // Skip if recently modified (likely active build)
-        if target.modified_secs_ago < protect_threshold_secs {
-            result.protected_paths.push(format!(
-                "{} (modified {}s ago)",
-                target.path.display(),
-                target.modified_secs_ago
-            ));
-            continue;
-        }
-        
-        // Skip if in a protected CWD path
-        let target_parent = target.path.parent().unwrap_or(&target.path);
-        let is_protected = protected_cwds.iter().any(|cwd| {
-            cwd.starts_with(target_parent) || target_parent.starts_with(cwd)
+        // Only skip if there's an ACTIVELY RUNNING cargo/rustc in this project
+        let target_project = target.path.parent().unwrap_or(&target.path);
+        let has_active_build = protected_project_dirs.iter().any(|proj| {
+            target_project == proj
         });
         
-        if is_protected {
+        if has_active_build {
             result.protected_paths.push(format!(
-                "{} (active build)",
+                "{} (active cargo/rustc process)",
                 target.path.display()
             ));
             continue;
         }
         
-        // Delete the target directory
-        if let Err(e) = tokio::fs::remove_dir_all(&target.path).await {
-            eprintln!("⚠️ failed to remove {}: {}", target.path.display(), e);
-            continue;
+        if apply {
+            // Delete the target directory
+            if let Err(e) = tokio::fs::remove_dir_all(&target.path).await {
+                eprintln!("⚠️ failed to remove {}: {}", target.path.display(), e);
+                continue;
+            }
         }
         
         result.cleaned_count += 1;
@@ -1086,6 +1134,158 @@ async fn clean_package_caches(cargo: bool, npm: bool, pip: bool, go: bool) -> Re
     Ok((reclaimed, cleaned))
 }
 
+/// Empty trash
+async fn empty_trash(apply: bool) -> Result<(u64, Vec<String>)> {
+    let mut reclaimed = 0u64;
+    let mut cleaned = Vec::new();
+    
+    if let Some(home) = dirs::home_dir() {
+        let trash_files = home.join(".local/share/Trash/files");
+        let trash_info = home.join(".local/share/Trash/info");
+        
+        if trash_files.exists() {
+            let size = get_dir_size(&trash_files).await.unwrap_or(0);
+            if size > 0 {
+                cleaned.push(format!("trash files ({})", human_bytes(size)));
+                reclaimed += size;
+                if apply {
+                    let _ = tokio::fs::remove_dir_all(&trash_files).await;
+                    let _ = tokio::fs::create_dir_all(&trash_files).await;
+                }
+            }
+        }
+        
+        if trash_info.exists() {
+            let info_size = get_dir_size(&trash_info).await.unwrap_or(0);
+            if info_size > 0 && apply {
+                let _ = tokio::fs::remove_dir_all(&trash_info).await;
+                let _ = tokio::fs::create_dir_all(&trash_info).await;
+            }
+        }
+    }
+    
+    Ok((reclaimed, cleaned))
+}
+
+/// Run nix-collect-garbage
+async fn clean_nix_garbage(keep_generations: u32, apply: bool) -> Result<(u64, Vec<String>)> {
+    let mut reclaimed = 0u64;
+    let mut cleaned = Vec::new();
+    
+    // First, delete old generations
+    if keep_generations > 0 {
+        let gen_arg = keep_generations.to_string();
+        let _ = Command::new("nix-env")
+            .arg("-d")
+            .arg(&gen_arg)
+            .arg("--delete-generations")
+            .output()
+            .await;
+        
+        // Also for user profile
+        let _ = Command::new("nix-env")
+            .arg("-d")
+            .arg(&gen_arg)
+            .arg("--delete-generations")
+            .arg("-p")
+            .arg("/nix/var/nix/profiles/default")
+            .output()
+            .await;
+    }
+    
+    // Run nix-collect-garbage
+    let mut args = vec!["collect-garbage"];
+    if apply {
+        args.push("-d");
+    } else {
+        args.push("--dry-run");
+    }
+    
+    let out = Command::new("nix-store")
+        .args(&args)
+        .output()
+        .await;
+    
+    if let Ok(out) = out {
+        if out.status.success() {
+            let text = String::from_utf8_lossy(&out.stdout);
+            // Parse lines like "deleting '/nix/store/xxxxx...'"
+            let delete_count = text.lines().filter(|l| l.contains("deleting")).count();
+            if delete_count > 0 {
+                cleaned.push(format!("nix store garbage ({} paths)", delete_count));
+                // Estimate ~1MB per path on average (rough)
+                reclaimed = delete_count as u64 * 1024 * 1024;
+            }
+        }
+    }
+    
+    Ok((reclaimed, cleaned))
+}
+
+/// Clean old node_modules directories
+async fn clean_old_node_modules(roots: &[PathBuf], max_age_days: u64, apply: bool) -> Result<(u64, Vec<String>)> {
+    use walkdir::WalkDir;
+    
+    let mut reclaimed = 0u64;
+    let mut cleaned = Vec::new();
+    let now = SystemTime::now();
+    let max_age_secs = max_age_days * 24 * 3600;
+    
+    for root in roots {
+        if !root.exists() {
+            continue;
+        }
+        
+        for entry in WalkDir::new(root)
+            .max_depth(5)
+            .follow_links(false)
+            .into_iter()
+            .filter_map(|e| e.ok())
+        {
+            if !entry.file_type().is_dir() {
+                continue;
+            }
+            
+            if entry.file_name() != "node_modules" {
+                continue;
+            }
+            
+            let path = entry.path().to_path_buf();
+            
+            // Check age
+            let modified_secs_ago = match fs::metadata(&path).and_then(|m| m.modified()) {
+                Ok(mtime) => now.duration_since(mtime).map(|d| d.as_secs()).unwrap_or(0),
+                Err(_) => continue,
+            };
+            
+            if modified_secs_ago < max_age_secs {
+                continue;
+            }
+            
+            let size = match get_dir_size(&path).await {
+                Ok(s) => s,
+                Err(_) => continue,
+            };
+            
+            if size > 0 {
+                cleaned.push(format!(
+                    "{} ({} days old, {})",
+                    path.display(),
+                    modified_secs_ago / 86400,
+                    human_bytes(size)
+                ));
+                reclaimed += size;
+                
+                if apply {
+                    let _ = tokio::fs::remove_dir_all(&path).await;
+                }
+            }
+        }
+    }
+    
+    Ok((reclaimed, cleaned))
+}
+
 /// Find large log files
 async fn find_large_log_files(dirs: &[PathBuf], min_size_bytes: u64) -> Result<Vec<(PathBuf, u64)>> {
     use walkdir::WalkDir;
@@ -1253,28 +1453,91 @@ async fn run_guard_once(
         sync_frozen = false;
     }
 
-    // Automatic Rust target cleanup when disk hits action level
-    if guard.auto_cleanup_rust && (dstate == "action" || dstate == "critical") {
-        let cleanup_result = auto_cleanup_rust_targets(guard, state).await?;
+    // Comprehensive auto-cleanup when disk hits action/critical level
+    if dstate == "action" || dstate == "critical" {
+        let mut total_reclaimed = 0u64;
+        let mut all_cleaned: Vec<String> = Vec::new();
         
-        if cleanup_result.cleaned_count > 0 {
+        // Rust target directories
+        if guard.auto_cleanup_rust {
+            let result = auto_cleanup_rust_targets(guard, state, true).await?;
+            total_reclaimed += result.reclaimed_bytes;
+            for p in &result.cleaned_paths {
+                eprintln!("🧹 Rust: {}", p);
+            }
+            all_cleaned.extend(result.cleaned_paths);
+        }
+        
+        // Trash
+        if guard.clean_trash {
+            let (bytes, cleaned) = empty_trash(true).await.unwrap_or((0, vec![]));
+            total_reclaimed += bytes;
+            all_cleaned.extend(cleaned.iter().map(|s| format!("Trash: {}", s)));
+            for c in &cleaned {
+                eprintln!("🗑️ {}", c);
+            }
+        }
+        
+        // Nix garbage
+        if guard.clean_nix_garbage {
+            let (bytes, cleaned) = clean_nix_garbage(guard.nix_keep_generations, true).await.unwrap_or((0, vec![]));
+            total_reclaimed += bytes;
+            all_cleaned.extend(cleaned.iter().map(|s| format!("Nix: {}", s)));
+            for c in &cleaned {
+                eprintln!("📦 {}", c);
+            }
+        }
+        
+        // Old node_modules
+        let roots: Vec<PathBuf> = guard.rust_search_roots
+            .split(',')
+            .filter_map(|s| {
+                let s = s.trim();
+                if s.is_empty() { return None; }
+                let p = expand_tilde(s);
+                if p.exists() { Some(p) } else { None }
+            })
+            .collect();
+        let (bytes, cleaned) = clean_old_node_modules(&roots, guard.node_modules_max_age_days, true).await.unwrap_or((0, vec![]));
+        total_reclaimed += bytes;
+        all_cleaned.extend(cleaned.iter().map(|s| format!("Node: {}", s)));
+        for c in &cleaned {
+            eprintln!("📂 {}", c);
+        }
+        
+        // Package caches
+        if guard.clean_package_caches {
+            let (bytes, cleaned) = clean_package_caches(true, true, true, true).await.unwrap_or((0, vec![]));
+            total_reclaimed += bytes;
+            all_cleaned.extend(cleaned.iter().map(|s| format!("Cache: {}", s)));
+            for c in &cleaned {
+                eprintln!("💾 {}", c);
+            }
+        }
+        
+        // Docker
+        if guard.docker_prune {
+            let bytes = docker_prune(true, guard.docker_prune_volumes).await.unwrap_or(0);
+            total_reclaimed += bytes;
+            if bytes > 0 {
+                eprintln!("🐳 Docker prune: {}", human_bytes(bytes));
+            }
+        }
+        
+        // Notify if anything was cleaned
+        if total_reclaimed > 0 {
             let key = "auto-cleanup".to_string();
             if should_notify(state, &key, guard.notify_cooldown_secs.max(600)) {
                 send_notification(
                     guard,
                     "Dracon System Guard - Auto Cleanup",
                     &format!(
-                        "Cleaned {} Rust target dirs, reclaimed {}",
-                        cleanup_result.cleaned_count,
-                        human_bytes(cleanup_result.reclaimed_bytes)
+                        "Reclaimed {} ({} items cleaned)",
+                        human_bytes(total_reclaimed),
+                        all_cleaned.len()
                     ),
                 )
                 .await;
-            }
-            
-            // Log cleaned paths
-            for path in &cleanup_result.cleaned_paths {
-                eprintln!("🧹 Cleaned: {}", path);
             }
         }
     }
@@ -2294,6 +2557,122 @@ async fn main() -> Result<()> {
                         if !apply && (docker || docker_volumes || package_caches) {
                             println!();
                             println!("Note: This was a dry-run. Add --apply to execute.");
+                        }
+                    }
+                }
+                GuardCommands::Clean { json, apply, rust, trash, nix, caches, node_modules, docker, all, min_size_mb } => {
+                    // If --all or no specific flags, do everything
+                    let do_all = all || (!rust && !trash && !nix && !caches && !node_modules && !docker);
+                    let do_rust = rust || do_all;
+                    let do_trash = trash || do_all;
+                    let do_nix = nix || do_all;
+                    let do_caches = caches || do_all;
+                    let do_node = node_modules || do_all;
+                    let do_docker = docker || do_all;
+                    
+                    let mut guard_clone = guard.clone();
+                    if let Some(mb) = min_size_mb {
+                        guard_clone.cleanup_min_size_mb = mb;
+                    }
+                    
+                    let mut total_reclaimed = 0u64;
+                    let mut actions: Vec<String> = Vec::new();
+                    
+                    // Rust targets
+                    if do_rust {
+                        let mut runtime = GuardRuntimeState::default();
+                        let result = auto_cleanup_rust_targets(&guard_clone, &mut runtime, apply).await?;
+                        total_reclaimed += result.reclaimed_bytes;
+                        for p in result.cleaned_paths {
+                            actions.push(format!("Rust: {}", p));
+                        }
+                        for p in result.protected_paths {
+                            actions.push(format!("Protected: {}", p));
+                        }
+                    }
+                    
+                    // Trash
+                    if do_trash {
+                        let (bytes, cleaned) = empty_trash(apply).await.unwrap_or((0, vec![]));
+                        total_reclaimed += bytes;
+                        for c in cleaned {
+                            actions.push(format!("Trash: {}", c));
+                        }
+                    }
+                    
+                    // Nix garbage
+                    if do_nix {
+                        let (bytes, cleaned) = clean_nix_garbage(guard_clone.nix_keep_generations, apply).await.unwrap_or((0, vec![]));
+                        total_reclaimed += bytes;
+                        for c in cleaned {
+                            actions.push(format!("Nix: {}", c));
+                        }
+                    }
+                    
+                    // Old node_modules
+                    if do_node {
+                        let roots: Vec<PathBuf> = guard_clone.rust_search_roots
+                            .split(',')
+                            .filter_map(|s| {
+                                let s = s.trim();
+                                if s.is_empty() { return None; }
+                                let p = expand_tilde(s);
+                                if p.exists() { Some(p) } else { None }
+                            })
+                            .collect();
+                        let (bytes, cleaned) = clean_old_node_modules(&roots, guard_clone.node_modules_max_age_days, apply).await.unwrap_or((0, vec![]));
+                        total_reclaimed += bytes;
+                        for c in cleaned {
+                            actions.push(format!("Node: {}", c));
+                        }
+                    }
+                    
+                    // Package caches
+                    if do_caches {
+                        let (bytes, cleaned) = clean_package_caches(true, true, true, true).await.unwrap_or((0, vec![]));
+                        total_reclaimed += bytes;
+                        for c in cleaned {
+                            actions.push(format!("Cache: {}", c));
+                        }
+                    }
+                    
+                    // Docker
+                    if do_docker {
+                        let bytes = docker_prune(true, guard_clone.docker_prune_volumes).await.unwrap_or(0);
+                        total_reclaimed += bytes;
+                        if bytes > 0 {
+                            actions.push(format!("Docker: {}", human_bytes(bytes)));
+                        }
+                    }
+                    
+                    if json {
+                        #[derive(Serialize)]
+                        struct CleanReport {
+                            reclaimed_bytes: u64,
+                            reclaimed_human: String,
+                            actions: Vec<String>,
+                            apply: bool,
+                        }
+                        let report = CleanReport {
+                            reclaimed_bytes: total_reclaimed,
+                            reclaimed_human: human_bytes(total_reclaimed),
+                            actions,
+                            apply,
+                        };
+                        println!("{}", serde_json::to_string_pretty(&report)?);
+                    } else {
+                        if actions.is_empty() {
+                            println!("Nothing to clean.");
+                        } else {
+                            println!("Cleanup {}:", if apply { "results" } else { "preview (dry-run)" });
+                            for a in &actions {
+                                println!("  • {}", a);
+                            }
+                            println!();
+                            println!("Total reclaimable: {}", human_bytes(total_reclaimed));
+                            if !apply {
+                                println!("Add --apply to execute cleanup.");
+                            }
                         }
                     }
                 }
