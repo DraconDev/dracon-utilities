@@ -328,7 +328,7 @@ fn replace_managed_block(current: &str, managed_block: &str) -> String {
 /// Extract patterns from an existing managed block in .gitignore
 fn extract_existing_patterns(content: &str) -> BTreeSet<String> {
     let mut patterns = BTreeSet::new();
-    
+
     // Find the managed block
     let Some(start) = content.find(BLOCK_BEGIN) else {
         return patterns;
@@ -337,7 +337,7 @@ fn extract_existing_patterns(content: &str) -> BTreeSet<String> {
         return patterns;
     };
     let end = start + end_rel;
-    
+
     // Extract lines between begin and end markers
     let block_content = &content[start + BLOCK_BEGIN.len()..end];
     for line in block_content.lines() {
@@ -352,19 +352,22 @@ fn extract_existing_patterns(content: &str) -> BTreeSet<String> {
         }
         patterns.insert(line.to_string());
     }
-    
+
     patterns
 }
 
-fn build_gitignore_block_with_existing(policy: &WardenPolicy, existing_content: &str) -> Result<String> {
+fn build_gitignore_block_with_existing(
+    policy: &WardenPolicy,
+    existing_content: &str,
+) -> Result<String> {
     policy.validate()?;
-    
+
     // Extract patterns that are already in the managed block (e.g., added by dracon-sync)
     let existing_patterns = extract_existing_patterns(existing_content);
-    
+
     // Build set of policy hygiene patterns for quick lookup
     let policy_hygiene: BTreeSet<String> = policy.hygiene_patterns.iter().cloned().collect();
-    
+
     // Merge: start with policy patterns, then add existing patterns not in policy
     let mut all_hygiene: BTreeSet<String> = policy_hygiene.clone();
     for p in existing_patterns {
@@ -373,16 +376,16 @@ fn build_gitignore_block_with_existing(policy: &WardenPolicy, existing_content: 
             all_hygiene.insert(p);
         }
     }
-    
+
     let mut lines = Vec::new();
     lines.push(BLOCK_BEGIN.to_string());
     lines.push("# managed by dracon-warden".to_string());
-    
+
     // Output merged hygiene patterns (sorted for stability)
     for p in all_hygiene {
         lines.push(p);
     }
-    
+
     let mut plaintext_patterns = BTreeSet::new();
     for p in &policy.plaintext_patterns {
         plaintext_patterns.insert(p.clone());
@@ -400,6 +403,7 @@ fn build_gitignore_block_with_existing(policy: &WardenPolicy, existing_content: 
     Ok(lines.join("\n"))
 }
 
+#[cfg(test)]
 fn build_gitignore_block(policy: &WardenPolicy) -> Result<String> {
     build_gitignore_block_with_existing(policy, "")
 }
@@ -637,7 +641,7 @@ fn harden_repo(
 
     // Read existing .gitignore content to preserve patterns added by other tools (e.g., dracon-sync)
     let existing_gitignore = fs::read_to_string(&gitignore_path).unwrap_or_default();
-    
+
     // Build gitignore block while preserving existing non-policy patterns
     let gitignore_changed = apply_overwrite_file(
         &gitignore_path,

@@ -711,7 +711,6 @@ async fn find_rust_target_dirs(roots: &[PathBuf]) -> Result<Vec<TargetDirInfo>> 
     use walkdir::WalkDir;
     
     let mut targets = Vec::new();
-    let now = SystemTime::now();
     
     for root in roots {
         if !root.exists() {
@@ -750,16 +749,9 @@ async fn find_rust_target_dirs(roots: &[PathBuf]) -> Result<Vec<TargetDirInfo>> 
                 Err(_) => continue,
             };
             
-            // Get modification time
-            let modified_secs_ago = match fs::metadata(&path).and_then(|m| m.modified()) {
-                Ok(mtime) => now.duration_since(mtime).map(|d| d.as_secs()).unwrap_or(0),
-                Err(_) => 0,
-            };
-            
             targets.push(TargetDirInfo {
                 path,
                 bytes,
-                modified_secs_ago,
             });
         }
     }
