@@ -930,47 +930,6 @@ async fn count_zombie_processes() -> Result<u64> {
     Ok(count as u64)
 }
 
-/// Find directories with many files (inode hogs)
-async fn find_inode_hogs(dirs: &[PathBuf], min_file_count: u64) -> Result<Vec<(PathBuf, u64)>> {
-    use walkdir::WalkDir;
-    
-    let mut hogs = Vec::new();
-    
-    for dir in dirs {
-        if !dir.exists() {
-            continue;
-        }
-        
-        for entry in WalkDir::new(dir)
-            .max_depth(4)
-            .follow_links(false)
-            .into_iter()
-            .filter_map(|e| e.ok())
-        {
-            if !entry.file_type().is_dir() {
-                continue;
-            }
-            
-            let path = entry.path();
-            
-            // Count files in this directory (non-recursive)
-            let file_count = match std::fs::read_dir(path) {
-                Ok(entries) => entries.count() as u64,
-                Err(_) => continue,
-            };
-            
-            if file_count >= min_file_count {
-                hogs.push((path.to_path_buf(), file_count));
-            }
-        }
-    }
-    
-    // Sort by file count descending
-    hogs.sort_by(|a, b| b.1.cmp(&a.1));
-    
-    Ok(hogs)
-}
-
 /// Get inode info for root filesystem
 async fn get_inode_info() -> Result<(u64, u64, u64)> {
     let out = Command::new("df")
