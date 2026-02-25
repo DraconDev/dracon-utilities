@@ -2169,7 +2169,7 @@ async fn sync_repo(
         let (to_stage, to_restore): (Vec<_>, Vec<_>) = entries
             .into_iter()
             .partition(|e| {
-                should_stage_entry(repo, e, excluded_dir_names, policy.max_stage_file_bytes)
+                should_stage_entry(repo, e, excluded_dir_names, &policy.exclude_file_patterns, policy.max_stage_file_bytes)
             });
         if debug_enabled() {
             eprintln!(
