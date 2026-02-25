@@ -3833,20 +3833,21 @@ mod tests {
         }
     }
 
-	    fn test_policy() -> SyncPolicy {
-	        SyncPolicy {
-	            system_repo: String::new(),
-	            pulse_interval_secs: 5,
-	            inactivity_push_delay_secs: 3,
-	            auto_commit: true,
-	            auto_pull: true,
-	            auto_push: true,
-	            auto_bump_versions: true,
-	            backup_policy: String::new(),
-	            backup_dir: String::new(),
-	            watch_roots: vec![],
-	            extra_remotes: HashMap::new(),
-	            exclude_dir_names: vec!["target".into(), "node_modules".into()],
+fn test_policy() -> SyncPolicy {
+        SyncPolicy {
+            system_repo: String::new(),
+            pulse_interval_secs: 5,
+            inactivity_push_delay_secs: 3,
+            auto_commit: true,
+            auto_pull: true,
+            auto_push: true,
+            auto_bump_versions: true,
+            backup_policy: String::new(),
+            backup_dir: String::new(),
+            watch_roots: vec![],
+            extra_remotes: HashMap::new(),
+            exclude_dir_names: vec!["target".into(), "node_modules".into()],
+            exclude_file_patterns: vec!["events.jsonl".into()],
             max_stage_file_bytes: 1024,
             pull_op_timeout_secs: 10,
             push_op_timeout_secs: 10,
