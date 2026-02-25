@@ -466,10 +466,6 @@ fn default_rust_search_roots() -> String {
     "~/Dev".to_string()  // Default search location for Rust target directories
 }
 
-fn default_protect_recent_minutes() -> u64 {
-    30  // Don't clean target dirs modified in last 30 mins
-}
-
 fn default_trend_warn_hours() -> u64 {
     24  // Warn if disk will fill within 24 hours
 }
