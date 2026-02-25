@@ -292,7 +292,7 @@ fn effective_discovery_roots(policy: &WardenPolicy) -> Vec<PathBuf> {
     roots.into_iter().collect()
 }
 
-#[allow(dead_code)]
+#[cfg(test)]
 fn replace_managed_block(current: &str, managed_block: &str) -> String {
     if let Some(start) = current.find(BLOCK_BEGIN) {
         if let Some(end_rel) = current[start..].find(BLOCK_END) {
