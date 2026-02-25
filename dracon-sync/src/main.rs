@@ -910,10 +910,57 @@ fn is_excluded_change_path(path: &Path, excluded_dir_names: &BTreeSet<String>) -
         .any(|name| is_excluded_dir_name(name, excluded_dir_names))
 }
 
+fn matches_file_pattern(file_name: &str, pattern: &str) -> bool {
+    if pattern == file_name {
+        return true;
+    }
+    if pattern.starts_with("*.") {
+        let ext = &pattern[1..];
+        if file_name.ends_with(ext) {
+            return true;
+        }
+    }
+    if pattern.ends_with(".*") {
+        let prefix = &pattern[..pattern.len() - 1];
+        if file_name.starts_with(prefix) {
+            return true;
+        }
+    }
+    if pattern.contains('*') {
+        let parts: Vec<&str> = pattern.split('*').collect();
+        if parts.len() == 2 {
+            let (prefix, suffix) = (parts[0], parts[1]);
+            if file_name.starts_with(prefix) && file_name.ends_with(suffix) {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+fn is_excluded_file(file_path: &Path, excluded_patterns: &[String]) -> bool {
+    let file_name = file_path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("");
+    let path_str = file_path.to_string_lossy();
+    
+    for pattern in excluded_patterns {
+        if matches_file_pattern(file_name, pattern) {
+            return true;
+        }
+        if path_str.contains(&format!("/{}", pattern.trim_start_matches('*'))) {
+            return true;
+        }
+    }
+    false
+}
+
 fn should_stage_entry(
     repo: &Path,
     entry: &dracon_git::types::DiffFile,
     excluded_dir_names: &BTreeSet<String>,
+    excluded_file_patterns: &[String],
     max_stage_file_bytes: u64,
 ) -> bool {
     if matches!(entry.status, dracon_git::types::FileStatus::Deleted) {
@@ -921,6 +968,10 @@ fn should_stage_entry(
     }
 
     if is_excluded_change_path(&entry.path, excluded_dir_names) {
+        return false;
+    }
+
+    if is_excluded_file(&entry.path, excluded_file_patterns) {
         return false;
     }
 
