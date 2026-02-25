@@ -4251,6 +4251,7 @@ async fn main() -> Result<()> {
                     push_large_blob_threshold_bytes(&policy)
                 );
                 println!("🚫 EXCLUDE_DIRS: {:?}", policy.exclude_dir_names);
+                println!("🚫 EXCLUDE_FILE_PATTERNS: {:?}", policy.exclude_file_patterns);
                 println!(
                     "⏱️ TIMEOUTS: pull={}s push={}s repo={}s retries={}",
                     policy.pull_op_timeout_secs,
