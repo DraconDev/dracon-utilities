@@ -3933,18 +3933,19 @@ mod tests {
         let repo = td.path().join("repo");
         std::fs::create_dir_all(&repo).expect("repo");
         let excluded = BTreeSet::from(["target".to_string()]);
+        let no_file_patterns: Vec<String> = Vec::new();
 
         let deleted = dracon_git::types::DiffFile {
             path: PathBuf::from("target/missing.bin"),
             status: dracon_git::types::FileStatus::Deleted,
         };
-        assert!(should_stage_entry(&repo, &deleted, &excluded, 10));
+        assert!(should_stage_entry(&repo, &deleted, &excluded, &no_file_patterns, 10));
 
         let excluded_file = dracon_git::types::DiffFile {
             path: PathBuf::from("target/file.bin"),
             status: dracon_git::types::FileStatus::Modified,
         };
-        assert!(!should_stage_entry(&repo, &excluded_file, &excluded, 10));
+        assert!(!should_stage_entry(&repo, &excluded_file, &excluded, &no_file_patterns, 10));
 
         let big_path = repo.join("big.bin");
         std::fs::write(&big_path, vec![1u8; 64]).expect("write big");
@@ -3952,13 +3953,40 @@ mod tests {
             path: PathBuf::from("big.bin"),
             status: dracon_git::types::FileStatus::Modified,
         };
-        assert!(!should_stage_entry(&repo, &big, &BTreeSet::new(), 16));
+        assert!(!should_stage_entry(&repo, &big, &BTreeSet::new(), &no_file_patterns, 16));
 
         let missing = dracon_git::types::DiffFile {
             path: PathBuf::from("gone.bin"),
             status: dracon_git::types::FileStatus::Modified,
         };
-        assert!(should_stage_entry(&repo, &missing, &BTreeSet::new(), 16));
+        assert!(should_stage_entry(&repo, &missing, &BTreeSet::new(), &no_file_patterns, 16));
+    }
+
+    #[test]
+    fn should_stage_entry_excludes_file_patterns() {
+        let td = TempDir::new("sync_should_stage_patterns");
+        let repo = td.path().join("repo");
+        std::fs::create_dir_all(&repo).expect("repo");
+        let no_excluded_dirs: BTreeSet<String> = BTreeSet::new();
+        let excluded_patterns = vec!["events.jsonl".to_string(), "*.log".to_string()];
+
+        let events_file = dracon_git::types::DiffFile {
+            path: PathBuf::from("plan/events.jsonl"),
+            status: dracon_git::types::FileStatus::Modified,
+        };
+        assert!(!should_stage_entry(&repo, &events_file, &no_excluded_dirs, &excluded_patterns, 10));
+
+        let log_file = dracon_git::types::DiffFile {
+            path: PathBuf::from("debug.log"),
+            status: dracon_git::types::FileStatus::Modified,
+        };
+        assert!(!should_stage_entry(&repo, &log_file, &no_excluded_dirs, &excluded_patterns, 10));
+
+        let normal_file = dracon_git::types::DiffFile {
+            path: PathBuf::from("src/main.rs"),
+            status: dracon_git::types::FileStatus::Modified,
+        };
+        assert!(should_stage_entry(&repo, &normal_file, &no_excluded_dirs, &excluded_patterns, 10));
     }
 
     #[test]
