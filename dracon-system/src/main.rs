@@ -700,7 +700,6 @@ async fn detect_active_rust_builds() -> Result<HashSet<i32>> {
 }
 
 /// Get the working directory of a process (to protect its target dir)
-#[allow(dead_code)]
 async fn get_process_cwd(pid: i32) -> Option<PathBuf> {
     let cwd_path = format!("/proc/{}/cwd", pid);
     std::fs::read_link(&cwd_path).ok()
