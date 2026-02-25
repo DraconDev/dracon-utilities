@@ -580,7 +580,6 @@ struct GuardRuntimeState {
 struct TargetDirInfo {
     path: PathBuf,
     bytes: u64,
-    modified_secs_ago: u64,
 }
 
 /// Result of automatic cleanup operation
