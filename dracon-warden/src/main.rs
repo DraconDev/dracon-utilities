@@ -460,7 +460,7 @@ fn apply_overwrite_file(path: &Path, content: &str) -> Result<bool> {
     Ok(false)
 }
 
-#[allow(dead_code)]
+#[cfg(test)]
 fn newest_file(paths: Vec<PathBuf>) -> Option<PathBuf> {
     let mut with_mtime = paths
         .into_iter()
