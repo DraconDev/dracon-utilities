@@ -145,6 +145,8 @@ struct SyncPolicy {
     incident_ledger_max_lines: usize,
     #[serde(default = "default_incident_ledger_max_age_days")]
     incident_ledger_max_age_days: u64,
+    #[serde(default = "default_exclude_file_patterns")]
+    exclude_file_patterns: Vec<String>,
 }
 
 fn default_true() -> bool {
