@@ -2452,7 +2452,7 @@ async fn main() -> Result<()> {
                         println!("Disk usage: {}% (mount: {})", disk, guard.disk_mount_path);
                         
                         // Show inode info
-                        if let Ok((total, used, free)) = get_inode_info().await {
+                        if let Ok((total, used, _free)) = get_inode_info().await {
                             let pct = if total > 0 { (used * 100 / total) as u8 } else { 0 };
                             println!("Inode usage: {}% ({}/{} inodes used)", pct, used, total);
                         }
