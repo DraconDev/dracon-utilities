@@ -255,9 +255,6 @@ struct GuardPolicy {
     /// Directories to search for Rust target directories
     #[serde(default = "default_rust_search_roots")]
     rust_search_roots: String,
-    /// Protect target dirs that have been modified within this many minutes
-    #[serde(default = "default_protect_recent_minutes")]
-    protect_recent_minutes: u64,
     /// Enable disk space trend tracking and prediction
     #[serde(default = "default_true")]
     track_trends: bool,
@@ -306,12 +303,6 @@ struct GuardPolicy {
     /// Clean old node_modules (older than N days)
     #[serde(default = "default_node_modules_max_age_days")]
     node_modules_max_age_days: u64,
-    /// Directories to scan for inode hogs
-    #[serde(default = "default_inode_hog_dirs")]
-    inode_hog_dirs: String,
-    /// Minimum file count to consider a directory an inode hog
-    #[serde(default = "default_inode_hog_threshold")]
-    inode_hog_threshold: u64,
 }
 
 impl Default for GuardPolicy {
