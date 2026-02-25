@@ -606,6 +606,18 @@ fn default_exclude_dir_names() -> Vec<String> {
     .collect()
 }
 
+fn default_exclude_file_patterns() -> Vec<String> {
+    [
+        "events.jsonl",
+        "*.events.jsonl",
+        "*.log",
+        "nohup.out",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect()
+}
+
 fn default_max_stage_file_bytes() -> u64 {
     100 * 1024 * 1024
 }
