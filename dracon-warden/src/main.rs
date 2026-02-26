@@ -902,6 +902,9 @@ fn main() -> Result<()> {
                 ));
             }
         }
+        Command::Keygen => {
+            run_keygen()?;
+        }
     }
 
     Ok(())
