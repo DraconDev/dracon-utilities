@@ -773,7 +773,7 @@ fn run_keygen() -> Result<()> {
         "# created by dracon-warden keygen on {}\n# public key: {}\n{}\n",
         chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
         recipient,
-        identity
+        identity.to_string()
     );
     fs::write(&identity_path, &secret_content)
         .with_context(|| format!("failed to write {}", identity_path.display()))?;
