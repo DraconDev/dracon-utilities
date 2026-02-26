@@ -3,6 +3,7 @@ use clap::{Parser, Subcommand};
 use dracon_security_kit::{DraconWarden, Warden};
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use notify::{Event, RecursiveMode, Watcher};
+use secrecy::ExposeSecret;
 use serde::Deserialize;
 use std::collections::BTreeSet;
 use std::fs;
