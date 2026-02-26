@@ -741,18 +741,18 @@ fn repos_for_event(event: &Event, roots: &[PathBuf]) -> BTreeSet<PathBuf> {
 fn run_keygen() -> Result<()> {
     let home = dirs::home_dir().context("home directory not found")?;
 
-    let identity_path = home.join("dracon/identity.age");
     let keys_dir = home.join("dracon/data/keys");
     let hostname = hostname::get()
         .context("failed to get hostname")?
         .to_string_lossy()
         .to_string();
+    let secret_path = keys_dir.join(format!("machine_{}.age", hostname));
     let pubkey_path = keys_dir.join(format!("owner_{}.pub", hostname));
 
-    if identity_path.exists() {
+    if secret_path.exists() {
         return Err(anyhow::anyhow!(
-            "identity already exists at {}, refusing to overwrite",
-            identity_path.display()
+            "secret key already exists at {}, refusing to overwrite",
+            secret_path.display()
         ));
     }
     if pubkey_path.exists() {
@@ -765,8 +765,6 @@ fn run_keygen() -> Result<()> {
     let identity = age::x25519::Identity::generate();
     let recipient = identity.to_public();
 
-    fs::create_dir_all(identity_path.parent().unwrap())
-        .with_context(|| format!("failed to create {}", identity_path.parent().unwrap().display()))?;
     fs::create_dir_all(&keys_dir)
         .with_context(|| format!("failed to create {}", keys_dir.display()))?;
 
@@ -787,16 +785,16 @@ fn run_keygen() -> Result<()> {
         hostname,
         identity.to_string().expose_secret()
     );
-    fs::write(&identity_path, &secret_content)
-        .with_context(|| format!("failed to write {}", identity_path.display()))?;
+    fs::write(&secret_path, &secret_content)
+        .with_context(|| format!("failed to write {}", secret_path.display()))?;
 
     fs::write(&pubkey_path, format!("{}\n", recipient))
         .with_context(|| format!("failed to write {}", pubkey_path.display()))?;
 
     let manifest_path = keys_dir.join("manifest.toml");
     let manifest_entry = format!(
-        "# owner_{}.pub -> repo: {}\n",
-        hostname, repo_name
+        "# machine_{}.age / owner_{}.pub -> repo: {}\n",
+        hostname, hostname, repo_name
     );
     let existing_manifest = fs::read_to_string(&manifest_path).unwrap_or_default();
     if !existing_manifest.contains(&manifest_entry) {
@@ -812,12 +810,12 @@ fn run_keygen() -> Result<()> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        fs::set_permissions(&identity_path, fs::Permissions::from_mode(0o600))
-            .with_context(|| format!("failed to set permissions on {}", identity_path.display()))?;
+        fs::set_permissions(&secret_path, fs::Permissions::from_mode(0o600))
+            .with_context(|| format!("failed to set permissions on {}", secret_path.display()))?;
     }
 
     println!("🔐 Generated age keypair:");
-    println!("   Secret: {}", identity_path.display());
+    println!("   Secret: {}", secret_path.display());
     println!("   Public: {}", pubkey_path.display());
     println!("   Recipient: {}", recipient);
 
