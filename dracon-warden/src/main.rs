@@ -83,6 +83,11 @@ enum Command {
         /// Optional repo path to scan. If omitted, scans repos in warden discovery scope.
         repo: Option<PathBuf>,
     },
+    /// Generate a new age keypair for this machine.
+    ///
+    /// Creates ~/dracon/identity.age (secret) and ~/dracon/data/keys/owner_<hostname>.pub (public).
+    /// Fails if either file already exists to prevent accidental overwrite.
+    Keygen,
 }
 
 #[derive(Debug, Deserialize, Clone)]
