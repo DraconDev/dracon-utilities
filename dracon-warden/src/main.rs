@@ -737,6 +737,65 @@ fn repos_for_event(event: &Event, roots: &[PathBuf]) -> BTreeSet<PathBuf> {
     repos
 }
 
+fn run_keygen() -> Result<()> {
+    let home = dirs::home_dir().context("home directory not found")?;
+
+    let identity_path = home.join("dracon/identity.age");
+    let keys_dir = home.join("dracon/data/keys");
+    let hostname = hostname::get()
+        .context("failed to get hostname")?
+        .to_string_lossy()
+        .to_string();
+    let pubkey_path = keys_dir.join(format!("owner_{}.pub", hostname));
+
+    if identity_path.exists() {
+        return Err(anyhow::anyhow!(
+            "identity already exists at {}, refusing to overwrite",
+            identity_path.display()
+        ));
+    }
+    if pubkey_path.exists() {
+        return Err(anyhow::anyhow!(
+            "pubkey already exists at {}, refusing to overwrite",
+            pubkey_path.display()
+        ));
+    }
+
+    let identity = age::x25519::Identity::generate();
+    let recipient = identity.to_public();
+
+    fs::create_dir_all(identity_path.parent().unwrap())
+        .with_context(|| format!("failed to create {}", identity_path.parent().unwrap().display()))?;
+    fs::create_dir_all(&keys_dir)
+        .with_context(|| format!("failed to create {}", keys_dir.display()))?;
+
+    let secret_content = format!(
+        "# created by dracon-warden keygen on {}\n# public key: {}\n{}\n",
+        chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
+        recipient,
+        identity
+    );
+    fs::write(&identity_path, &secret_content)
+        .with_context(|| format!("failed to write {}", identity_path.display()))?;
+
+    fs::write(&pubkey_path, format!("{}\n", recipient))
+        .with_context(|| format!("failed to write {}", pubkey_path.display()))?;
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&identity_path, fs::Permissions::from_mode(0o600))
+            .with_context(|| format!("failed to set permissions on {}", identity_path.display()))?;
+    }
+
+    println!("🔐 Generated age keypair:");
+    println!("   Secret: {}", identity_path.display());
+    println!("   Public: {}", pubkey_path.display());
+    println!("   Recipient: {}", recipient);
+
+    Ok(())
+}
+
 fn run_daemon(policy_path: PathBuf) -> Result<()> {
     let policy = WardenPolicy::load(&policy_path)?;
     policy.validate()?;
