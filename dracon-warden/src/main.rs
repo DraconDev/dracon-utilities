@@ -744,10 +744,19 @@ fn run_keygen() -> Result<()> {
     let home = dirs::home_dir().context("home directory not found")?;
 
     let keys_dir = home.join("dracon/data/keys");
-    let hostname = hostname::get()
+    let hostname_raw = hostname::get()
         .context("failed to get hostname")?
         .to_string_lossy()
         .to_string();
+    let hostname: String = hostname_raw
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
+        .collect();
+    if hostname.is_empty() {
+        return Err(anyhow::anyhow!(
+            "hostname contains no valid characters for filename"
+        ));
+    }
     let secret_path = keys_dir.join(format!("machine_{}.age", hostname));
     let pubkey_path = keys_dir.join(format!("owner_{}.pub", hostname));
 
