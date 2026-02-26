@@ -770,10 +770,21 @@ fn run_keygen() -> Result<()> {
     fs::create_dir_all(&keys_dir)
         .with_context(|| format!("failed to create {}", keys_dir.display()))?;
 
+    let current_repo = std::env::current_dir()
+        .ok()
+        .and_then(|cwd| find_git_repo(&cwd));
+
+    let repo_name = current_repo
+        .as_ref()
+        .and_then(|p| p.file_name())
+        .and_then(|n| n.to_str())
+        .unwrap_or("unknown");
+
     let secret_content = format!(
-        "# created by dracon-warden keygen on {}\n# public key: {}\n{}\n",
+        "# created by dracon-warden keygen on {}\n# public key: {}\n# machine: {}\n{}\n",
         chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
         recipient,
+        hostname,
         identity.to_string().expose_secret()
     );
     fs::write(&identity_path, &secret_content)
@@ -781,6 +792,22 @@ fn run_keygen() -> Result<()> {
 
     fs::write(&pubkey_path, format!("{}\n", recipient))
         .with_context(|| format!("failed to write {}", pubkey_path.display()))?;
+
+    let manifest_path = keys_dir.join("manifest.toml");
+    let manifest_entry = format!(
+        "# owner_{}.pub -> repo: {}\n",
+        hostname, repo_name
+    );
+    let existing_manifest = fs::read_to_string(&manifest_path).unwrap_or_default();
+    if !existing_manifest.contains(&manifest_entry) {
+        let mut manifest = existing_manifest;
+        if !manifest.ends_with('\n') && !manifest.is_empty() {
+            manifest.push('\n');
+        }
+        manifest.push_str(&manifest_entry);
+        fs::write(&manifest_path, &manifest)
+            .with_context(|| format!("failed to write {}", manifest_path.display()))?;
+    }
 
     #[cfg(unix)]
     {
@@ -794,7 +821,34 @@ fn run_keygen() -> Result<()> {
     println!("   Public: {}", pubkey_path.display());
     println!("   Recipient: {}", recipient);
 
+    if let Some(repo) = &current_repo {
+        match publish_repo_pubkey(repo, &pubkey_path) {
+            Ok(true) => {
+                println!("   Published to: {}/.dracon/data/keys/", repo.display());
+            }
+            Ok(false) => {
+                println!("   Already in: {}/.dracon/data/keys/", repo.display());
+            }
+            Err(e) => {
+                eprintln!("   ⚠️ Failed to publish to repo: {}", e);
+            }
+        }
+    }
+
     Ok(())
+}
+
+fn find_git_repo(path: &Path) -> Option<PathBuf> {
+    let mut cur = path.to_path_buf();
+    loop {
+        if cur.join(".git").exists() {
+            return Some(cur);
+        }
+        if !cur.pop() {
+            break;
+        }
+    }
+    None
 }
 
 fn run_daemon(policy_path: PathBuf) -> Result<()> {
