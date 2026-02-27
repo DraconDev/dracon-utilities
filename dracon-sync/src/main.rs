@@ -1,6 +1,9 @@
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
-use dracon_git::{build_sync_commit_payload, GitService};
+use dracon_git::{
+    build_commit_message, build_legacy_commit_payload, CommitContext,
+    extract_intent, scan_plan_tasks, IntentInfo, GitService,
+};
 use dracon_git::types::{DiffFile, RepoStatus};
 use fs2::FileExt;
 use serde::{Deserialize, Serialize};
