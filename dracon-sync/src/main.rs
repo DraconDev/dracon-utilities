@@ -1176,6 +1176,92 @@ fn to_proto_entries(entries: &[DiffFile]) -> Vec<DiffFile> {
     entries.to_vec()
 }
 
+#[derive(Debug, Clone)]
+enum ReportSignal {
+    ActiveBoardChanged,
+    IndexChanged,
+    BlueprintCreated,
+    BlueprintModified,
+    TaskCompleted,
+    VersionBumped,
+}
+
+fn detect_report_signals(
+    repo: &Path,
+    changed_files: &[DiffFile],
+) -> Vec<ReportSignal> {
+    let mut signals = Vec::new();
+    let plan_dir = repo.join("plan");
+    
+    for file in changed_files {
+        let path_str = file.path.to_string_lossy();
+        
+        if path_str == "plan/ACTIVE_BOARD.md" || path_str.ends_with("/ACTIVE_BOARD.md") {
+            signals.push(ReportSignal::ActiveBoardChanged);
+        }
+        
+        if path_str == "plan/index.md" || path_str.ends_with("/index.md") {
+            signals.push(ReportSignal::IndexChanged);
+        }
+        
+        if path_str.contains("blueprint-") && path_str.ends_with(".md") {
+            if file.status == dracon_git::types::FileStatus::Added {
+                signals.push(ReportSignal::BlueprintCreated);
+            } else {
+                signals.push(ReportSignal::BlueprintModified);
+            }
+        }
+        
+        if path_str.ends_with("Cargo.toml") || path_str == "Cargo.toml" {
+            if let Ok(content) = std::fs::read_to_string(repo.join(&file.path)) {
+                if content.contains("version = \"") {
+                    signals.push(ReportSignal::VersionBumped);
+                }
+            }
+        }
+    }
+    
+    signals
+}
+
+fn build_commit_context(
+    repo: &Path,
+    status: &RepoStatus,
+    entries: &[DiffFile],
+    is_checkpoint: bool,
+    idle_seconds: Option<u64>,
+) -> CommitContext {
+    let changed_paths: Vec<PathBuf> = entries.iter().map(|e| e.path.clone()).collect();
+    let intent_info = extract_intent(repo, &changed_paths, Some(&status.branch));
+    
+    let plan_dir = repo.join("plan");
+    let task_progress = if plan_dir.exists() {
+        let progress = scan_plan_tasks(&plan_dir);
+        if progress.total() > 0 {
+            Some(progress)
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+    
+    let refs = intent_info.blueprint.as_ref().map(|p| {
+        let rel = p.strip_prefix(repo).unwrap_or(p);
+        rel.to_string_lossy().to_string()
+    });
+    
+    CommitContext {
+        intent: intent_info.intent,
+        track: intent_info.track,
+        is_checkpoint,
+        files: entries.to_vec(),
+        task_progress,
+        refs,
+        idle_seconds,
+    }
+}
+
 fn discover_git_repos(roots: &[PathBuf], excluded_dir_names: &BTreeSet<String>) -> Vec<PathBuf> {
     let mut repos = BTreeSet::new();
 
