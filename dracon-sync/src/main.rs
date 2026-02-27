@@ -1210,22 +1210,19 @@ fn build_commit_context(
     status: &RepoStatus,
     entries: &[DiffFile],
     is_checkpoint: bool,
-    idle_seconds: Option<u64>,
+    idle_seconds: u64,
 ) -> CommitContext {
     let changed_paths: Vec<PathBuf> = entries.iter().map(|e| e.path.clone()).collect();
     let intent_info = extract_intent(repo, &changed_paths, Some(&status.branch));
     
-    let plan_dir = repo.join("plan");
-    let task_progress = if plan_dir.exists() {
-        let progress = scan_plan_tasks(&plan_dir);
+    let task_progress = intent_info.blueprint.as_ref().and_then(|bp| {
+        let progress = scan_blueprint_tasks(bp);
         if progress.total() > 0 {
             Some(progress)
         } else {
             None
         }
-    } else {
-        None
-    };
+    });
     
     let refs = intent_info.blueprint.as_ref().map(|p| {
         let rel = p.strip_prefix(repo).unwrap_or(p);
