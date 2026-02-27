@@ -2361,6 +2361,9 @@ async fn sync_repo(
             );
             let msg = build_commit_message(&ctx);
             
+            eprintln!("🔍 intent={} track={:?} is_checkpoint={} files={}", 
+                ctx.intent, ctx.track, ctx.is_checkpoint, ctx.files.len());
+            
             if is_report {
                 println!("📋 Report commit for {}", repo.display());
             }
