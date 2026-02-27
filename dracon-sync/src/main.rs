@@ -1177,7 +1177,7 @@ enum ReportSignal {
 }
 
 fn detect_report_signals(
-    repo: &Path,
+    _repo: &Path,
     changed_files: &[DiffFile],
 ) -> Vec<ReportSignal> {
     let mut signals = Vec::new();
