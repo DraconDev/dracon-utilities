@@ -1215,15 +1215,6 @@ fn build_commit_context(
     let changed_paths: Vec<PathBuf> = entries.iter().map(|e| e.path.clone()).collect();
     let intent_info = extract_intent(repo, &changed_paths, Some(&status.branch));
     
-    let task_progress = intent_info.blueprint.as_ref().and_then(|bp| {
-        let progress = scan_blueprint_tasks(bp);
-        if progress.total() > 0 {
-            Some(progress)
-        } else {
-            None
-        }
-    });
-    
     let refs = intent_info.blueprint.as_ref().map(|p| {
         let rel = p.strip_prefix(repo).unwrap_or(p);
         rel.to_string_lossy().to_string()
@@ -1234,7 +1225,7 @@ fn build_commit_context(
         track: intent_info.track,
         is_checkpoint,
         files: entries.to_vec(),
-        task_progress,
+        task_progress: intent_info.task_progress,
         refs,
         idle_seconds,
     }
