@@ -2517,8 +2517,8 @@ async fn sync_repo(
                     // Check if there's anything staged now
                     if let Ok(staged) = staged_paths(repo).await {
                         if !staged.is_empty() {
-                            let proto_status = to_proto_status(&status);
-                            let msg = build_sync_commit_payload(repo, &proto_status, &[]);
+                            let msg = format!("[{}] update .gitignore", 
+                                extract_intent(repo, &[], Some(&status.branch)).intent);
                             match svc.commit(&msg).await {
                                 Ok(()) => {
                                     eprintln!("📝 committed .gitignore update in {}", repo.display());
