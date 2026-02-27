@@ -2359,8 +2359,22 @@ async fn sync_repo(
                 .into_iter()
                 .map(|(path, status)| dracon_git::types::DiffFile { path, status })
                 .collect();
-            let proto_entries = to_proto_entries(&committed_entries);
-            let msg = build_sync_commit_payload(repo, &proto_status, &proto_entries);
+            
+            let signals = detect_report_signals(repo, &committed_entries);
+            let is_report = !signals.is_empty();
+            
+            let ctx = build_commit_context(
+                repo,
+                &status,
+                &committed_entries,
+                !is_report,
+                None,
+            );
+            let msg = build_commit_message(&ctx);
+            
+            if is_report {
+                println!("📋 Report commit for {}", repo.display());
+            }
 
             svc.commit(&msg).await?;
             
