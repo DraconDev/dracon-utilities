@@ -2578,7 +2578,7 @@ async fn run_once(policy_path: &Path) -> Result<()> {
     for repo in repos {
         match tokio::time::timeout(
             Duration::from_secs(policy.repo_sync_timeout_secs),
-            sync_repo(&repo, &policy, &excluded_dir_names),
+            sync_repo(&repo, &policy, &excluded_dir_names, 0),
         )
         .await
         {
@@ -3725,7 +3725,7 @@ async fn run_repair_warns(
         attempted += 1;
         match tokio::time::timeout(
             Duration::from_secs(policy.repo_sync_timeout_secs),
-            sync_repo(&repo, &policy, &excluded_dir_names),
+            sync_repo(&repo, &policy, &excluded_dir_names, 0),
         )
         .await
         {
