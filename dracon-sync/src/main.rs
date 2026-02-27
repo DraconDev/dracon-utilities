@@ -2729,7 +2729,12 @@ async fn run_daemon(policy_path: PathBuf) -> Result<()> {
 
             let sync_success = match tokio::time::timeout(
                 Duration::from_secs(policy.repo_sync_timeout_secs),
-                sync_repo(&repo, &policy, &excluded_dir_names),
+                sync_repo(
+                    &repo,
+                    &policy,
+                    &excluded_dir_names,
+                    now.duration_since(entry.changed_at).as_secs(),
+                ),
             )
             .await
             {
