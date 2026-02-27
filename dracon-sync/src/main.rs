@@ -2343,7 +2343,6 @@ async fn sync_repo(
         }
         if !to_stage.is_empty() {
             let filtered_entries = to_stage;
-            let proto_status = to_proto_status(&status);
             let stage_paths: Vec<String> = filtered_entries
                 .iter()
                 .map(|e| e.path.to_string_lossy().to_string())
