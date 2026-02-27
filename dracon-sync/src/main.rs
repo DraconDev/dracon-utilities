@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use dracon_git::{
     build_commit_message, CommitContext,
-    extract_intent, scan_plan_tasks, GitService,
+    extract_intent, scan_blueprint_tasks, GitService,
 };
 use dracon_git::types::{DiffFile, RepoStatus};
 use fs2::FileExt;
