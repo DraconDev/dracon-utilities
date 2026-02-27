@@ -2345,7 +2345,7 @@ async fn sync_repo(
                 &status,
                 &committed_entries,
                 !is_report,
-                None,
+                0,
             );
             let msg = build_commit_message(&ctx);
 
