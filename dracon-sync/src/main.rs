@@ -1168,10 +1168,6 @@ fn acquire_daemon_lock() -> Result<File> {
     Ok(file)
 }
 
-fn to_proto_status(s: &RepoStatus) -> RepoStatus {
-    s.clone()
-}
-
 #[derive(Debug, Clone)]
 enum ReportSignal {
     ActiveBoardChanged,
