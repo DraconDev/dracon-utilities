@@ -1172,18 +1172,7 @@ fn to_proto_status(s: &RepoStatus) -> RepoStatus {
     s.clone()
 }
 
-fn to_proto_entries(entries: &[DiffFile]) -> Vec<DiffFile> {
-    entries.to_vec()
-}
-
-#[derive(Debug, Clone)]
-enum ReportSignal {
-    ActiveBoardChanged,
-    IndexChanged,
-    BlueprintCreated,
-    BlueprintModified,
-    VersionBumped,
-}
+fn discover_git_repos(roots: &[PathBuf], excluded_dir_names: &BTreeSet<String>) -> Vec<PathBuf> {
 
 fn detect_report_signals(
     repo: &Path,
