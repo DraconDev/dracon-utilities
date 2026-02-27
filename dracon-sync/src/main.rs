@@ -1,8 +1,8 @@
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use dracon_git::{
-    build_commit_message, build_legacy_commit_payload, CommitContext,
-    extract_intent, scan_plan_tasks, IntentInfo, GitService,
+    build_commit_message, CommitContext,
+    extract_intent, scan_plan_tasks, GitService,
 };
 use dracon_git::types::{DiffFile, RepoStatus};
 use fs2::FileExt;
@@ -1182,7 +1182,6 @@ enum ReportSignal {
     IndexChanged,
     BlueprintCreated,
     BlueprintModified,
-    TaskCompleted,
     VersionBumped,
 }
 
