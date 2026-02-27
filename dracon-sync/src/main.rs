@@ -1174,7 +1174,6 @@ enum ReportSignal {
     IndexChanged,
     BlueprintCreated,
     BlueprintModified,
-    VersionBumped,
 }
 
 fn detect_report_signals(
@@ -1199,14 +1198,6 @@ fn detect_report_signals(
                 signals.push(ReportSignal::BlueprintCreated);
             } else {
                 signals.push(ReportSignal::BlueprintModified);
-            }
-        }
-        
-        if path_str.ends_with("Cargo.toml") || path_str == "Cargo.toml" {
-            if let Ok(content) = std::fs::read_to_string(repo.join(&file.path)) {
-                if content.contains("version = \"") {
-                    signals.push(ReportSignal::VersionBumped);
-                }
             }
         }
     }
