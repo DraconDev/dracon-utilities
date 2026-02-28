@@ -637,6 +637,58 @@ fn publish_repo_pubkey(repo: &Path, pubkey_path: &Path) -> Result<bool> {
     Ok(true)
 }
 
+fn ensure_repo_filter_config(repo: &Path) -> Result<bool> {
+    let desired = [
+        ("filter.dracon.clean", "dracon-warden filter-clean %f"),
+        ("filter.dracon.smudge", "dracon-warden filter-smudge %f"),
+        ("filter.dracon.required", "true"),
+    ];
+
+    let mut changed = false;
+    for (key, value) in desired {
+        let current = ProcessCommand::new("git")
+            .arg("-C")
+            .arg(repo)
+            .arg("config")
+            .arg("--local")
+            .arg("--get")
+            .arg(key)
+            .output()
+            .with_context(|| format!("failed to read git config {} in {}", key, repo.display()))?;
+
+        let needs_update = if current.status.success() {
+            String::from_utf8_lossy(&current.stdout).trim() != value
+        } else {
+            true
+        };
+
+        if needs_update {
+            let status = ProcessCommand::new("git")
+                .arg("-C")
+                .arg(repo)
+                .arg("config")
+                .arg("--local")
+                .arg(key)
+                .arg(value)
+                .status()
+                .with_context(|| {
+                    format!("failed to set git config {} in {}", key, repo.display())
+                })?;
+            if !status.success() {
+                return Err(anyhow::anyhow!(
+                    "git config {} failed in {} (exit={})",
+                    key,
+                    repo.display(),
+                    status
+                ));
+            }
+            changed = true;
+        }
+    }
+
+    Ok(changed)
+}
+
 fn harden_repo(
     repo: &Path,
     policy: &WardenPolicy,
@@ -656,12 +708,17 @@ fn harden_repo(
     )?;
     let gitattributes_changed =
         apply_overwrite_file(&gitattributes_path, &build_gitattributes_block(policy)?)?;
+    let filter_cfg_changed = ensure_repo_filter_config(repo)?;
     let key_changed = match pubkey_path {
         Some(pubkey) => publish_repo_pubkey(repo, pubkey)?,
         None => false,
     };
 
-    Ok((gitignore_changed, gitattributes_changed, key_changed))
+    Ok((
+        gitignore_changed,
+        gitattributes_changed || filter_cfg_changed,
+        key_changed,
+    ))
 }
 
 fn harden_all(policy: &WardenPolicy) -> Result<()> {
