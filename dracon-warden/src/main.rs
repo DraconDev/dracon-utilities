@@ -708,7 +708,11 @@ fn harden_repo(
     )?;
     let gitattributes_changed =
         apply_overwrite_file(&gitattributes_path, &build_gitattributes_block(policy)?)?;
-    let filter_cfg_changed = ensure_repo_filter_config(repo)?;
+    let filter_cfg_changed = if repo.join(".git").exists() {
+        ensure_repo_filter_config(repo)?
+    } else {
+        false
+    };
     let key_changed = match pubkey_path {
         Some(pubkey) => publish_repo_pubkey(repo, pubkey)?,
         None => false,
@@ -1639,6 +1643,64 @@ mod tests {
         assert!(repo.join(".gitignore").exists());
         assert!(repo.join(".gitattributes").exists());
         assert!(repo.join(".dracon/data/keys/owner_test.pub").exists());
+    }
+
+    #[test]
+    fn harden_repo_sets_local_dracon_filter_config() {
+        let td = TempDir::new("warden_harden_repo_filter_cfg");
+        let repo = td.path().join("repo");
+        fs::create_dir_all(&repo).expect("repo");
+        let status = ProcessCommand::new("git")
+            .arg("init")
+            .arg(&repo)
+            .status()
+            .expect("git init");
+        assert!(status.success());
+
+        let (_a, b, _c) = harden_repo(&repo, &sample_policy(), None).expect("harden");
+        assert!(b);
+
+        let clean = ProcessCommand::new("git")
+            .arg("-C")
+            .arg(&repo)
+            .arg("config")
+            .arg("--local")
+            .arg("--get")
+            .arg("filter.dracon.clean")
+            .output()
+            .expect("get clean");
+        assert!(clean.status.success());
+        assert_eq!(
+            String::from_utf8_lossy(&clean.stdout).trim(),
+            "dracon-warden filter-clean %f"
+        );
+
+        let smudge = ProcessCommand::new("git")
+            .arg("-C")
+            .arg(&repo)
+            .arg("config")
+            .arg("--local")
+            .arg("--get")
+            .arg("filter.dracon.smudge")
+            .output()
+            .expect("get smudge");
+        assert!(smudge.status.success());
+        assert_eq!(
+            String::from_utf8_lossy(&smudge.stdout).trim(),
+            "dracon-warden filter-smudge %f"
+        );
+
+        let required = ProcessCommand::new("git")
+            .arg("-C")
+            .arg(&repo)
+            .arg("config")
+            .arg("--local")
+            .arg("--get")
+            .arg("filter.dracon.required")
+            .output()
+            .expect("get required");
+        assert!(required.status.success());
+        assert_eq!(String::from_utf8_lossy(&required.stdout).trim(), "true");
     }
 
     #[test]
