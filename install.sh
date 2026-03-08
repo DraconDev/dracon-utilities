@@ -10,6 +10,12 @@ cargo install --path dracon-system --root ~/.local --force
 cargo install --path dracon-warden --root ~/.local --force
 cargo install --path dracon-ai --root ~/.local --force
 
+mkdir -p ~/.config/systemd/user
+cp dracon-sync/dracon-sync.service ~/.config/systemd/user/dracon-sync.service
+cp dracon-system/dracon-system-guard.service ~/.config/systemd/user/dracon-system-guard.service
+cp dracon-warden/dracon-warden.service ~/.config/systemd/user/dracon-warden.service
+systemctl --user daemon-reload
+
 echo ""
 echo "Installed:"
 ls -la ~/.local/bin/dracon-sync ~/.local/bin/dracon-system ~/.local/bin/dracon-warden ~/.local/bin/dracon-ai 2>/dev/null || true

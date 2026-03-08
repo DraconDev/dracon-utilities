@@ -12,6 +12,7 @@ use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command as StdCommand;
+use std::sync::OnceLock;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use tokio::process::Command as TokioCommand;
 use tokio::time::{sleep, Duration};
@@ -1145,6 +1146,37 @@ fn freeze_reason(policy_path: &Path) -> Option<String> {
     None
 }
 
+fn git_binary() -> &'static Path {
+    static GIT_BIN: OnceLock<PathBuf> = OnceLock::new();
+    GIT_BIN
+        .get_or_init(|| {
+            if let Ok(custom) = std::env::var("DRACON_SYNC_GIT_BIN") {
+                let trimmed = custom.trim();
+                if !trimmed.is_empty() {
+                    return PathBuf::from(trimmed);
+                }
+            }
+
+            for candidate in ["/run/current-system/sw/bin/git", "/usr/bin/git", "/bin/git"] {
+                let path = PathBuf::from(candidate);
+                if path.exists() {
+                    return path;
+                }
+            }
+
+            PathBuf::from("git")
+        })
+        .as_path()
+}
+
+fn std_git_command() -> StdCommand {
+    StdCommand::new(git_binary())
+}
+
+fn tokio_git_command() -> TokioCommand {
+    TokioCommand::new(git_binary())
+}
+
 fn daemon_lock_path() -> PathBuf {
     dirs::home_dir()
         .map(|h| h.join(".dracon").join("dracon-sync.lock"))
@@ -1267,7 +1299,7 @@ fn discover_git_repos(roots: &[PathBuf], excluded_dir_names: &BTreeSet<String>) 
 }
 
 fn has_origin_remote(repo: &Path) -> bool {
-    std::process::Command::new("git")
+    std_git_command()
         .arg("remote")
         .arg("get-url")
         .arg("origin")
@@ -1278,7 +1310,7 @@ fn has_origin_remote(repo: &Path) -> bool {
 }
 
 fn has_tracking_upstream(repo: &Path) -> bool {
-    std::process::Command::new("git")
+    std_git_command()
         .args(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"])
         .current_dir(repo)
         .output()
@@ -1318,7 +1350,7 @@ async fn run_git_with_timeout(
     timeout_secs: u64,
     op_label: &str,
 ) -> Result<()> {
-    let mut child = TokioCommand::new("git")
+    let mut child = tokio_git_command()
         .args(args)
         .current_dir(repo)
         .kill_on_drop(true)
@@ -1371,7 +1403,7 @@ async fn run_git_with_timeout_env(
     op_label: &str,
     env: &[(&str, &str)],
 ) -> Result<()> {
-    let mut cmd = TokioCommand::new("git");
+    let mut cmd = tokio_git_command();
     cmd.args(args)
         .current_dir(repo)
         .kill_on_drop(true)
@@ -1484,7 +1516,7 @@ async fn run_cmd_with_timeout(
 }
 
 fn origin_url(repo: &Path) -> Option<String> {
-    let out = StdCommand::new("git")
+    let out = std_git_command()
         .args(["remote", "get-url", "origin"])
         .current_dir(repo)
         .output()
@@ -1592,7 +1624,7 @@ async fn push_with_retries(
 }
 
 fn run_git_capture_output(repo: &Path, args: &[&str], op_label: &str) -> Result<String> {
-    let output = StdCommand::new("git")
+    let output = std_git_command()
         .args(args)
         .current_dir(repo)
         .output()
@@ -1604,7 +1636,7 @@ fn run_git_capture_output(repo: &Path, args: &[&str], op_label: &str) -> Result<
 }
 
 async fn git_list_paths(repo: &Path, args: &[&str]) -> Result<Vec<PathBuf>> {
-    let output = TokioCommand::new("git")
+    let output = tokio_git_command()
         .args(args)
         .current_dir(repo)
         .output()
@@ -1648,7 +1680,7 @@ async fn git_name_status_entries(
     repo: &Path,
     args: &[&str],
 ) -> Result<Vec<(PathBuf, dracon_git::types::FileStatus)>> {
-    let output = TokioCommand::new("git")
+    let output = tokio_git_command()
         .args(args)
         .current_dir(repo)
         .output()
@@ -1712,6 +1744,37 @@ async fn cli_diff_entries(repo: &Path) -> Result<Vec<dracon_git::types::DiffFile
         .collect())
 }
 
+async fn repo_diff_entries(repo: &Path) -> Result<Vec<dracon_git::types::DiffFile>> {
+    let svc = GitService::new(repo)?;
+    let mut entries = svc.get_diff_entries().await?;
+    if entries.is_empty() {
+        let fallback_entries = cli_diff_entries(repo).await?;
+        if !fallback_entries.is_empty() {
+            entries = fallback_entries;
+        }
+    }
+    Ok(entries)
+}
+
+fn has_sync_relevant_dirty_entries(
+    repo: &Path,
+    entries: &[dracon_git::types::DiffFile],
+    excluded_dir_names: &BTreeSet<String>,
+    excluded_file_patterns: &[String],
+    max_stage_file_bytes: u64,
+) -> bool {
+    entries.iter().any(|entry| {
+        should_stage_entry(
+            repo,
+            entry,
+            excluded_dir_names,
+            excluded_file_patterns,
+            max_stage_file_bytes,
+        ) || can_restore_entry(entry)
+            || is_large_untracked(entry, repo, max_stage_file_bytes)
+    })
+}
+
 async fn staged_paths(repo: &Path) -> Result<Vec<PathBuf>> {
     git_list_paths(repo, &["diff", "--cached", "--name-only"]).await
 }
@@ -1726,7 +1789,7 @@ async fn unstage_excluded_paths(
         if !is_excluded_change_path(&path, excluded_dir_names) {
             continue;
         }
-        let status = TokioCommand::new("git")
+        let status = tokio_git_command()
             .args(["reset", "-q", "HEAD", "--"])
             .arg(&path)
             .current_dir(repo)
@@ -1754,7 +1817,7 @@ async fn unstage_oversized_paths(repo: &Path, max_stage_file_bytes: u64) -> Resu
         if !meta.is_file() || meta.len() <= max_stage_file_bytes {
             continue;
         }
-        let status = TokioCommand::new("git")
+        let status = tokio_git_command()
             .args(["reset", "-q", "HEAD", "--"])
             .arg(&path)
             .current_dir(repo)
@@ -1780,7 +1843,7 @@ async fn unstage_oversized_paths(repo: &Path, max_stage_file_bytes: u64) -> Resu
 }
 
 fn current_branch(repo: &Path) -> Option<String> {
-    StdCommand::new("git")
+    std_git_command()
         .args(["rev-parse", "--abbrev-ref", "HEAD"])
         .current_dir(repo)
         .output()
@@ -1796,7 +1859,7 @@ fn current_branch(repo: &Path) -> Option<String> {
 }
 
 fn remote_branch_exists(repo: &Path, branch: &str) -> bool {
-    StdCommand::new("git")
+    std_git_command()
         .args(["show-ref", "--verify", "--quiet"])
         .arg(format!("refs/remotes/origin/{branch}"))
         .current_dir(repo)
@@ -1807,7 +1870,7 @@ fn remote_branch_exists(repo: &Path, branch: &str) -> bool {
 
 fn set_upstream_to_branch(repo: &Path, branch: &str) -> Result<()> {
     let target = format!("origin/{branch}");
-    let status = StdCommand::new("git")
+    let status = std_git_command()
         .args(["branch", "--set-upstream-to"])
         .arg(&target)
         .arg(branch)
@@ -2029,7 +2092,7 @@ fn rewrite_ahead_paths(
         return Ok(None);
     }
     let backup_branch = format!("{backup_prefix}-{}", timestamp_secs());
-    let create_backup = StdCommand::new("git")
+    let create_backup = std_git_command()
         .args(["branch", &backup_branch])
         .current_dir(repo)
         .status()
@@ -2043,7 +2106,7 @@ fn rewrite_ahead_paths(
     }
 
     // Try git-filter-repo first (preferred, faster, actively maintained)
-    let filter_repo_available = StdCommand::new("git")
+    let filter_repo_available = std_git_command()
         .args(["filter-repo", "--version"])
         .current_dir(repo)
         .output()
@@ -2061,7 +2124,7 @@ fn rewrite_ahead_paths(
             args.push(path.clone());
         }
         let args_ref: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-        let rewrite = StdCommand::new("git")
+        let rewrite = std_git_command()
             .args(&args_ref)
             .current_dir(repo)
             .status()
@@ -2086,7 +2149,7 @@ fn rewrite_ahead_paths(
         index_filter.push_str(path);
     }
 
-    let rewrite = StdCommand::new("git")
+    let rewrite = std_git_command()
         .args([
             "filter-branch",
             "--force",
@@ -2673,8 +2736,16 @@ async fn run_daemon(policy_path: PathBuf) -> Result<()> {
                     continue;
                 }
             };
+            let entries = repo_diff_entries(&repo).await.unwrap_or_default();
+            let effective_dirty = has_sync_relevant_dirty_entries(
+                &repo,
+                &entries,
+                &excluded_dir_names,
+                &policy.exclude_file_patterns,
+                policy.max_stage_file_bytes,
+            );
             let has_local_or_pending_work =
-                !status.is_clean || status.ahead > 0 || status.behind > 0;
+                effective_dirty || status.ahead > 0 || status.behind > 0;
             if !has_local_or_pending_work {
                 activity.remove(&repo);
                 continue;
@@ -2682,7 +2753,11 @@ async fn run_daemon(policy_path: PathBuf) -> Result<()> {
 
             let fingerprint = format!(
                 "{}:{}:{}:{}:{}",
-                status.branch, status.modified_files, status.staged_files, status.ahead, status.behind
+                status.branch,
+                effective_dirty as u8,
+                status.staged_files,
+                status.ahead,
+                status.behind
             );
             let Some(entry) = activity.get_mut(&repo) else {
                 activity.insert(
@@ -2827,7 +2902,7 @@ fn paint(value: &str, code: &str) -> String {
 }
 
 async fn git_log_field(repo: &Path, format: &str) -> Option<String> {
-    let output = TokioCommand::new("git")
+    let output = tokio_git_command()
         .args(["log", "-1", &format!("--pretty=format:{}", format)])
         .current_dir(repo)
         .output()
@@ -2886,11 +2961,24 @@ async fn run_repos_report(policy_path: &Path, filter: RepoFilter, json: bool) ->
                 continue;
             }
         };
+        let entries = repo_diff_entries(&repo).await.unwrap_or_default();
+        let effective_dirty = has_sync_relevant_dirty_entries(
+            &repo,
+            &entries,
+            &excluded_dir_names,
+            &policy.exclude_file_patterns,
+            policy.max_stage_file_bytes,
+        );
+        let effective_status = dracon_git::types::RepoStatus {
+            is_clean: !effective_dirty,
+            modified_files: if effective_dirty { status.modified_files } else { 0 },
+            ..status.clone()
+        };
 
         let has_origin = has_origin_remote(&repo);
         let has_upstream = has_tracking_upstream(&repo);
 
-        let flags = repo_state_flags(&status, has_origin, has_upstream);
+        let flags = repo_state_flags(&effective_status, has_origin, has_upstream);
 
         let last_hash = status
             .last_commit_hash
@@ -2910,18 +2998,18 @@ async fn run_repos_report(policy_path: &Path, filter: RepoFilter, json: bool) ->
             .unwrap_or_else(|| "-".to_string());
         let last_unix = git_log_unix_timestamp(&repo).await.unwrap_or(0);
 
-        let concern = repo_is_concern(&status, has_origin, has_upstream);
-        let warn = repo_is_warn(&status, has_origin, has_upstream);
+        let concern = repo_is_concern(&effective_status, has_origin, has_upstream);
+        let warn = repo_is_warn(&effective_status, has_origin, has_upstream);
         let hint = repo_hint(&flags, warn, concern);
 
         rows.push(RepoReportRow {
             repo: repo.display().to_string(),
             state_flags: flags,
-            branch: status.branch,
-            modified: status.modified_files,
-            staged: status.staged_files,
-            ahead: status.ahead,
-            behind: status.behind,
+            branch: effective_status.branch,
+            modified: effective_status.modified_files,
+            staged: effective_status.staged_files,
+            ahead: effective_status.ahead,
+            behind: effective_status.behind,
             last_hash,
             last_author,
             last_when,
@@ -3685,20 +3773,33 @@ async fn run_repair_warns(
                 continue;
             }
         };
+        let entries = repo_diff_entries(&repo).await.unwrap_or_default();
+        let effective_dirty = has_sync_relevant_dirty_entries(
+            &repo,
+            &entries,
+            &excluded_dir_names,
+            &policy.exclude_file_patterns,
+            policy.max_stage_file_bytes,
+        );
         let has_origin = has_origin_remote(&repo);
         let has_upstream = has_tracking_upstream(&repo);
-        if !repo_is_warn(&status, has_origin, has_upstream) {
+        let effective_status = dracon_git::types::RepoStatus {
+            is_clean: !effective_dirty,
+            modified_files: if effective_dirty { status.modified_files } else { 0 },
+            ..status.clone()
+        };
+        if !repo_is_warn(&effective_status, has_origin, has_upstream) {
             continue;
         }
         warns += 1;
-        let flags = repo_state_flags(&status, has_origin, has_upstream);
+        let flags = repo_state_flags(&effective_status, has_origin, has_upstream);
         let reason = flags.join(",");
         out!(
             "\n🟡 {}  state={} modified={} staged={}",
             repo.display(),
             reason,
-            status.modified_files,
-            status.staged_files
+            effective_status.modified_files,
+            effective_status.staged_files
         );
         out!("   plan: run normal sync triage (stage/commit/push)");
         if !apply {
