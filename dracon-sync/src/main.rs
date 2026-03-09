@@ -2203,6 +2203,7 @@ async fn sync_repo(
     let has_origin = has_origin_remote(repo);
     let has_upstream = has_tracking_upstream(repo);
     let blob_threshold = push_large_blob_threshold_bytes(policy);
+    let initial_status = svc.get_status().await?;
 
     // Optional per-repo overrides (untracked local settings).
     // Path: `<repo>/.dracon/dracon-sync.toml`
@@ -2211,7 +2212,7 @@ async fn sync_repo(
         .auto_bump_versions
         .unwrap_or(policy.auto_bump_versions);
 
-    if policy.auto_pull && has_origin && has_upstream {
+    if policy.auto_pull && has_origin && has_upstream && initial_status.behind > 0 && initial_status.is_clean {
         match tokio::time::timeout(
             Duration::from_secs(policy.pull_op_timeout_secs),
             svc.pull_rebase(),
@@ -2229,6 +2230,20 @@ async fn sync_repo(
                 repo.display(),
                 policy.pull_op_timeout_secs
             ),
+        }
+    } else if policy.auto_pull && has_origin && has_upstream && initial_status.behind == 0 {
+        if debug_enabled() {
+            eprintln!(
+                "🐛 skip pull/rebase for {} (branch not behind upstream)",
+                repo.display()
+            );
+        }
+    } else if policy.auto_pull && has_origin && has_upstream && !initial_status.is_clean {
+        if debug_enabled() {
+            eprintln!(
+                "🐛 skip pull/rebase for {} (dirty repo, commit first)",
+                repo.display()
+            );
         }
     } else if policy.auto_pull && !has_origin {
         eprintln!(
