@@ -2224,12 +2224,18 @@ async fn sync_repo(
                 eprintln!("⚠️ pull/rebase conflict in {} (manual intervention required)", repo.display());
                 return Ok(false);
             }
-            Ok(Err(e)) => eprintln!("⚠️ pull/rebase skipped for {}: {}", repo.display(), e),
-            Err(_) => eprintln!(
-                "⚠️ pull/rebase timeout for {} after {}s",
-                repo.display(),
-                policy.pull_op_timeout_secs
-            ),
+            Ok(Err(e)) => {
+                eprintln!("⚠️ pull/rebase failed for {}: {} - aborting sync pass", repo.display(), e);
+                return Ok(false);
+            }
+            Err(_) => {
+                eprintln!(
+                    "⚠️ pull/rebase timeout for {} after {}s - aborting sync pass",
+                    repo.display(),
+                    policy.pull_op_timeout_secs
+                );
+                return Ok(false);
+            }
         }
     } else if policy.auto_pull && has_origin && has_upstream && initial_status.behind == 0 {
         if debug_enabled() {
@@ -2348,8 +2354,16 @@ async fn sync_repo(
             svc.add_paths(&stage_paths).await?;
 
             // Optional: bump patch versions, then stage any files we touched (best-effort).
-            // Rust: Cargo.toml (+ optional Cargo.lock alignment).
-            if auto_bump_versions {
+            // Context-aware versioning: only bump versions if we touched real code/config
+            // outside the 'plan/' (AI context) directory.
+            let has_non_plan_changes = stage_paths.iter().any(|p| {
+                !p.starts_with("plan/")
+                    && !p.ends_with(".jsonl")
+                    && !p.ends_with(".log")
+                    && !p.ends_with(".db")
+            });
+
+            if auto_bump_versions && has_non_plan_changes {
                 let outcome = bump_patch_version_in_repo(repo)?;
                 if outcome.bumped_cargo_toml {
                     let _ = run_git_with_timeout(repo, &["add", "Cargo.toml"], 30, "add").await;
@@ -2410,13 +2424,22 @@ async fn sync_repo(
             let signals = detect_report_signals(repo, &committed_entries);
             let is_report = !signals.is_empty();
             
-            let ctx = build_commit_context(
+            let mut ctx = build_commit_context(
                 repo,
                 &status,
                 &committed_entries,
                 !is_report,
                 idle_seconds,
             );
+            
+            // Stable identity subject with rich JSON body.
+            let subject = if has_non_plan_changes {
+                format!("[daemon] sync: {} file(s)", committed_entries.len())
+            } else {
+                "[daemon] sync: AI heartbeat".to_string()
+            };
+            
+            ctx.intent = subject;
             let msg = build_commit_message(&ctx);
 
             svc.commit(&msg).await?;
