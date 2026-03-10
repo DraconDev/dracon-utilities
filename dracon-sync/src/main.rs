@@ -1272,13 +1272,13 @@ fn discover_git_repos(roots: &[PathBuf], excluded_dir_names: &BTreeSet<String>) 
                     return true;
                 }
                 let name = e.file_name().to_string_lossy();
+                if name == ".git" {
+                    return true;
+                }
                 !is_excluded_dir_name(&name, excluded_dir_names)
             });
 
         for entry in walker.filter_map(|e| e.ok()) {
-            if !entry.file_type().is_dir() {
-                continue;
-            }
             if entry.file_name() == ".git" {
                 if let Some(parent) = entry.path().parent() {
                     repos.insert(parent.to_path_buf());
