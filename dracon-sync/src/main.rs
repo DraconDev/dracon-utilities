@@ -932,19 +932,14 @@ fn is_excluded_file(file_path: &Path, excluded_patterns: &[String]) -> bool {
         .file_name()
         .and_then(|n| n.to_str())
         .unwrap_or("");
-    let path_str = file_path.to_string_lossy();
-    
+
     for pattern in excluded_patterns {
         if matches_file_pattern(file_name, pattern) {
-            return true;
-        }
-        if path_str.contains(&format!("/{}", pattern.trim_start_matches('*'))) {
             return true;
         }
     }
     false
 }
-
 fn should_stage_entry(
     repo: &Path,
     entry: &dracon_git::types::DiffFile,
