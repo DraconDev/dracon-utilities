@@ -980,6 +980,11 @@ fn should_stage_entry(
         return false;
     }
 
+    // Submodules and directory type changes
+    if matches!(entry.status, dracon_git::types::FileStatus::TypeChange) {
+        return true;
+    }
+
     let full_path = repo.join(&entry.path);
     match std::fs::metadata(&full_path) {
         Ok(meta) if meta.is_file() => {
