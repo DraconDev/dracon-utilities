@@ -614,9 +614,6 @@ fn default_exclude_dir_names() -> Vec<String> {
 
 fn default_exclude_file_patterns() -> Vec<String> {
     [
-        "events.jsonl",
-        "*.events.jsonl",
-        ".events.jsonl",
         "*.log",
         "nohup.out",
     ]
@@ -2345,27 +2342,6 @@ async fn sync_repo(
                 .iter()
                 .map(|e| e.path.to_string_lossy().to_string())
                 .collect();
-
-            // Guardrail: always avoid Cargo.lock-only commits (common noise from local builds/tooling).
-            // But only if there are no pre-existing staged files we'd accidentally revert.
-            if !stage_paths.is_empty() && stage_paths.iter().all(|p| is_lockfile_path(p)) {
-                let pre_staged = staged_paths(repo).await.unwrap_or_default();
-                if pre_staged.is_empty() {
-                    eprintln!(
-                        "🧹 skipping Cargo.lock-only commit in {} (reverting {} path(s))",
-                        repo.display(),
-                        stage_paths.len()
-                    );
-                    restore_paths(repo, &stage_paths).await?;
-                    return Ok(true);
-                } else {
-                    eprintln!(
-                        "ℹ️ {} has Cargo.lock-only changes but {} pre-staged file(s), proceeding",
-                        repo.display(),
-                        pre_staged.len()
-                    );
-                }
-            }
 
             svc.add_paths(&stage_paths).await?;
 
