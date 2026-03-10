@@ -165,22 +165,6 @@ fn default_inactivity_push_delay_secs() -> u64 {
     5
 }
 
-fn is_lockfile_path(p: &str) -> bool {
-    let lockfiles = [
-        "Cargo.lock",
-        "package-lock.json",
-        "yarn.lock",
-        "pnpm-lock.yaml",
-        "poetry.lock",
-        "composer.lock",
-        "Gemfile.lock",
-        "go.sum",
-        "flake.lock",
-        "bun.lockb",
-    ];
-    lockfiles.iter().any(|l| p == *l || p.ends_with(&format!("/{}", l)))
-}
-
 #[derive(Debug, Deserialize, Default, Clone)]
 struct RepoPolicyOverride {
     /// Optional per-repo override for `auto_bump_versions`.
