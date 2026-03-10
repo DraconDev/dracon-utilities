@@ -137,6 +137,7 @@ impl WardenPolicy {
                     | ".dracon/data/keys/*.pub"
                     | "*.pub"
             ) || p.ends_with(".pub")
+                || p.ends_with(".events.jsonl")
                 || p.replace('\\', "/").starts_with(".dracon/data/")
         }
 
