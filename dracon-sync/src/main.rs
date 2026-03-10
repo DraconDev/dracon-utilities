@@ -2354,16 +2354,7 @@ async fn sync_repo(
             svc.add_paths(&stage_paths).await?;
 
             // Optional: bump patch versions, then stage any files we touched (best-effort).
-            // Context-aware versioning: only bump versions if we touched real code/config
-            // outside the 'plan/' (AI context) directory.
-            let has_non_plan_changes = stage_paths.iter().any(|p| {
-                !p.starts_with("plan/")
-                    && !p.ends_with(".jsonl")
-                    && !p.ends_with(".log")
-                    && !p.ends_with(".db")
-            });
-
-            if auto_bump_versions && has_non_plan_changes {
+            if auto_bump_versions {
                 let outcome = bump_patch_version_in_repo(repo)?;
                 if outcome.bumped_cargo_toml {
                     let _ = run_git_with_timeout(repo, &["add", "Cargo.toml"], 30, "add").await;
@@ -2433,13 +2424,7 @@ async fn sync_repo(
             );
             
             // Stable identity subject with rich JSON body.
-            let subject = if has_non_plan_changes {
-                format!("[daemon] sync: {} file(s)", committed_entries.len())
-            } else {
-                "[daemon] sync: AI heartbeat".to_string()
-            };
-            
-            ctx.intent = subject;
+            ctx.intent = format!("[daemon] sync: {} file(s)", committed_entries.len());
             let msg = build_commit_message(&ctx);
 
             svc.commit(&msg).await?;
