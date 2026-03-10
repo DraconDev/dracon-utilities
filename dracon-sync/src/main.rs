@@ -175,6 +175,8 @@ fn is_lockfile_path(p: &str) -> bool {
         "composer.lock",
         "Gemfile.lock",
         "go.sum",
+        "flake.lock",
+        "bun.lockb",
     ];
     lockfiles.iter().any(|l| p == *l || p.ends_with(&format!("/{}", l)))
 }
