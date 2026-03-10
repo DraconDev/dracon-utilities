@@ -999,8 +999,16 @@ fn should_stage_entry(
             }
             true
         }
+        Ok(meta) if meta.is_dir() => {
+            // This is likely a submodule.
+            true
+        }
         Ok(_) => true,
-        Err(_) => true,
+        Err(_) => {
+            // If it's a deleted file, metadata will fail, but we handled Deleted at the top.
+            // For other cases (broken symlinks, etc), default to staging if not excluded.
+            true
+        }
     }
 }
 
