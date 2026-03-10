@@ -130,6 +130,8 @@ impl WardenPolicy {
                     | "deny.toml"
                     | "flake.nix"
                     | "flake.lock"
+                    | "events.jsonl"
+                    | "*.events.jsonl"
                     | ".dracon/data/"
                     | ".dracon/data/keys/"
                     | ".dracon/data/keys/*.pub"
