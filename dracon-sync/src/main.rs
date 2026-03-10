@@ -616,6 +616,7 @@ fn default_exclude_file_patterns() -> Vec<String> {
     [
         "events.jsonl",
         "*.events.jsonl",
+        ".events.jsonl",
         "*.log",
         "nohup.out",
     ]
