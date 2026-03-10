@@ -256,6 +256,9 @@ fn discover_git_repos(roots: &[PathBuf]) -> Vec<PathBuf> {
                 if e.depth() == 0 {
                     return true;
                 }
+                if name == ".git" {
+                    return true;
+                }
                 if name == "target"
                     || name == "node_modules"
                     || name == ".cache"
@@ -267,9 +270,6 @@ fn discover_git_repos(roots: &[PathBuf]) -> Vec<PathBuf> {
             });
 
         for entry in walker.filter_map(|e| e.ok()) {
-            if !entry.file_type().is_dir() {
-                continue;
-            }
             if entry.file_name() == ".git" {
                 if let Some(parent) = entry.path().parent() {
                     repos.insert(parent.to_path_buf());
@@ -1223,11 +1223,14 @@ fn scrub_markers(policy: &WardenPolicy, repos: &[PathBuf], apply: bool) -> Resul
             continue;
         }
 
-        // Scan only tracked files to avoid touching local noise.
+        // Scan both tracked and untracked (but not ignored) files.
         let out = std::process::Command::new("git")
             .arg("-C")
             .arg(repo)
             .arg("ls-files")
+            .arg("--others")
+            .arg("--exclude-standard")
+            .arg("--cached")
             .output()
             .with_context(|| format!("git ls-files failed for {}", repo.display()))?;
         if !out.status.success() {
