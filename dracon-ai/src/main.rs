@@ -368,7 +368,7 @@ Captured output:\n```\n{}\n```",
                     .status_code
                     .map(|c| c.to_string())
                     .unwrap_or_else(|| "unknown".to_string()),
-                capture.output
+                redact_output(&capture.output)
             );
 
             let response = ask_one(
@@ -1091,7 +1091,7 @@ async fn run_do_task(
                         .status_code
                         .map(|c| c.to_string())
                         .unwrap_or_else(|| "unknown".to_string()),
-                    capture.output
+                    redact_output(&capture.output)
                 ),
             });
         }
@@ -1197,7 +1197,7 @@ async fn run_do_task(
                     .status_code
                     .map(|c| c.to_string())
                     .unwrap_or_else(|| "unknown".to_string()),
-                capture.output
+                redact_output(&capture.output)
             );
             messages.push(ChatMessage {
                 role: "system".to_string(),
