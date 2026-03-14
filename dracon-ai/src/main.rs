@@ -884,7 +884,7 @@ fn strip_trailing_commas(json: &str) -> String {
 fn is_dangerous_shell(cmd: &str) -> bool {
     let c = cmd.to_ascii_lowercase();
     let c = c.trim();
-    // Very small heuristic set: enough to prevent accidental foot-guns.
+    // Prevent accidental foot-guns and data exfiltration.
     c.starts_with("sudo ")
         || c == "sudo"
         || c.starts_with("rm ")
@@ -895,6 +895,24 @@ fn is_dangerous_shell(cmd: &str) -> bool {
         || c.contains(" -rf")
         || c.contains(" mkfs")
         || c.contains(" dd ")
+        // Network exfiltration patterns
+        || c.contains("curl ")
+        || c.contains("wget ")
+        || c.contains("nc ")
+        || c.contains("ncat ")
+        || c.contains("ssh ")
+        || c.contains("scp ")
+        || c.contains("sftp ")
+        || c.contains("|nc ")
+        || c.contains("|ncat ")
+        // Dangerous permissions
+        || c.contains("chmod 777")
+        || c.contains("chmod -r 777")
+        // Dangerous execution
+        || c.contains(" eval ")
+        || c.starts_with("eval ")
+        || c.contains(" exec ")
+        || c.starts_with("exec ")
 }
 
 async fn agent_next(
