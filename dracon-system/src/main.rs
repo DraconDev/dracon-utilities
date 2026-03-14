@@ -2569,7 +2569,7 @@ async fn main() -> Result<()> {
                     
                     // Package caches
                     if do_caches {
-                        let (bytes, cleaned) = clean_package_caches(true, true, true, true).await.unwrap_or((0, vec![]));
+                        let (bytes, cleaned) = clean_package_caches(true, true, true, true, apply).await.unwrap_or((0, vec![]));
                         total_reclaimed += bytes;
                         for c in cleaned {
                             actions.push(format!("Cache: {}", c));
