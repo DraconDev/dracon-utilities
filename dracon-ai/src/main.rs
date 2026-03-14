@@ -881,6 +881,31 @@ fn strip_trailing_commas(json: &str) -> String {
     out
 }
 
+/// Redact common secret patterns from command output before sending to AI provider.
+fn redact_output(output: &str) -> String {
+    let mut result = output.to_string();
+    // Redact lines containing common secret patterns
+    let secret_patterns = [
+        "password", "passwd", "secret", "token", "api_key", "apikey",
+        "authorization", "bearer", "private_key", "ssh_key",
+    ];
+    for line in result.lines() {
+        let lower = line.to_ascii_lowercase();
+        for pat in &secret_patterns {
+            if lower.contains(pat) && (lower.contains('=') || lower.contains(':')) {
+                result = result.replace(line, &format!("[REDACTED: contains {}]", pat));
+                break;
+            }
+        }
+    }
+    // Truncate very long outputs to limit token usage and accidental leak
+    if result.len() > 20_000 {
+        result.truncate(20_000);
+        result.push_str("\n... [output truncated]");
+    }
+    result
+}
+
 fn is_dangerous_shell(cmd: &str) -> bool {
     let c = cmd.to_ascii_lowercase();
     let c = c.trim();
