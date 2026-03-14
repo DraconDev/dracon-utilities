@@ -1524,6 +1524,15 @@ fn origin_url(repo: &Path) -> Option<String> {
     }
 }
 
+fn strip_url_credentials(url: &str) -> String {
+    if let Some(stripped) = url.strip_prefix("https://") {
+        if let Some(at_pos) = stripped.find('@') {
+            return format!("https://{}", &stripped[at_pos + 1..]);
+        }
+    }
+    url.to_string()
+}
+
 fn github_https_url(origin: &str) -> Option<String> {
     if let Some(rest) = origin.strip_prefix("git@github.com:") {
         return Some(format!("https://github.com/{}", rest));
@@ -1532,7 +1541,7 @@ fn github_https_url(origin: &str) -> Option<String> {
         return Some(format!("https://github.com/{}", rest));
     }
     if origin.starts_with("https://github.com/") {
-        return Some(origin.to_string());
+        return Some(strip_url_credentials(origin));
     }
     None
 }
