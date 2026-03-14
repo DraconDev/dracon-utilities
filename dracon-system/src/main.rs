@@ -999,7 +999,7 @@ fn parse_docker_size(s: &str) -> u64 {
 }
 
 /// Clean package manager caches
-async fn clean_package_caches(cargo: bool, npm: bool, pip: bool, go: bool) -> Result<(u64, Vec<String>)> {
+async fn clean_package_caches(cargo: bool, npm: bool, pip: bool, go: bool, apply: bool) -> Result<(u64, Vec<String>)> {
     let mut reclaimed = 0u64;
     let mut cleaned = Vec::new();
     
@@ -1009,6 +1009,9 @@ async fn clean_package_caches(cargo: bool, npm: bool, pip: bool, go: bool) -> Re
             if cargo_cache.exists() {
                 let size = get_dir_size(&cargo_cache).await.unwrap_or(0);
                 if size > 0 {
+                    if apply {
+                        let _ = tokio::fs::remove_dir_all(&cargo_cache).await;
+                    }
                     cleaned.push(format!("cargo registry cache ({})", human_bytes(size)));
                     reclaimed += size;
                 }
@@ -1022,6 +1025,9 @@ async fn clean_package_caches(cargo: bool, npm: bool, pip: bool, go: bool) -> Re
             if npm_cache.exists() {
                 let size = get_dir_size(&npm_cache).await.unwrap_or(0);
                 if size > 0 {
+                    if apply {
+                        let _ = tokio::fs::remove_dir_all(&npm_cache).await;
+                    }
                     cleaned.push(format!("npm cache ({})", human_bytes(size)));
                     reclaimed += size;
                 }
@@ -1035,6 +1041,9 @@ async fn clean_package_caches(cargo: bool, npm: bool, pip: bool, go: bool) -> Re
             if pip_cache.exists() {
                 let size = get_dir_size(&pip_cache).await.unwrap_or(0);
                 if size > 0 {
+                    if apply {
+                        let _ = tokio::fs::remove_dir_all(&pip_cache).await;
+                    }
                     cleaned.push(format!("pip cache ({})", human_bytes(size)));
                     reclaimed += size;
                 }
@@ -1048,6 +1057,9 @@ async fn clean_package_caches(cargo: bool, npm: bool, pip: bool, go: bool) -> Re
             if go_cache.exists() {
                 let size = get_dir_size(&go_cache).await.unwrap_or(0);
                 if size > 0 {
+                    if apply {
+                        let _ = tokio::fs::remove_dir_all(&go_cache).await;
+                    }
                     cleaned.push(format!("go build cache ({})", human_bytes(size)));
                     reclaimed += size;
                 }
@@ -1431,7 +1443,7 @@ async fn run_guard_once(
         
         // Package caches
         if guard.clean_package_caches {
-            let (bytes, cleaned) = clean_package_caches(true, true, true, true).await.unwrap_or((0, vec![]));
+            let (bytes, cleaned) = clean_package_caches(true, true, true, true, true).await.unwrap_or((0, vec![]));
             total_reclaimed += bytes;
             all_cleaned.extend(cleaned.iter().map(|s| format!("Cache: {}", s)));
             for c in &cleaned {
