@@ -1890,20 +1890,54 @@ fn set_upstream_to_branch(repo: &Path, branch: &str) -> Result<()> {
 }
 
 fn detect_large_blobs_ahead(repo: &Path, min_bytes: u64) -> Result<Vec<(u64, String)>> {
-    let script = format!(
-        "git rev-list --objects @{{u}}..HEAD | \
-         git cat-file --batch-check='%(objectname) %(objecttype) %(objectsize) %(rest)' | \
-         awk '$2==\"blob\" && $3>{} {{printf \"%s\\t%s\\n\", $3, $4}}' | sort -nr",
-        min_bytes
-    );
-    let output = StdCommand::new("sh")
-        .args(["-lc", &script])
+    // Step 1: Get object IDs from commits ahead of upstream
+    let rev_list = StdCommand::new(std_git_bin())
+        .args(["rev-list", "--objects", "@{u}..HEAD"])
         .current_dir(repo)
         .output()
-        .with_context(|| format!("failed large-blob scan in {}", repo.display()))?;
+        .with_context(|| format!("failed rev-list in {}", repo.display()))?;
+    if !rev_list.status.success() {
+        return Ok(Vec::new());
+    }
+
+    // Step 2: Batch-check object types and sizes (no shell involved)
+    let mut cat_file = StdCommand::new(std_git_bin())
+        .args(["cat-file", "--batch-check=%(objectname) %(objecttype) %(objectsize) %(rest)"])
+        .current_dir(repo)
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .with_context(|| format!("failed cat-file in {}", repo.display()))?;
+
+    if let Some(mut stdin) = cat_file.stdin.take() {
+        use std::io::Write;
+        stdin.write_all(&rev_list.stdout)?;
+    }
+    let output = cat_file.wait_with_output()?;
     if !output.status.success() {
         return Ok(Vec::new());
     }
+
+    // Step 3: Filter blobs > min_bytes in Rust (no shell, no awk)
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut out: Vec<(u64, String)> = stdout
+        .lines()
+        .filter_map(|line| {
+            let mut parts = line.split_whitespace();
+            let _oid = parts.next()?;
+            let obj_type = parts.next()?;
+            let size_str = parts.next()?;
+            let path = parts.next()?;
+            if obj_type == "blob" {
+                let size = size_str.parse::<u64>().ok()?;
+                if size > min_bytes {
+                    return Some((size, path.to_string()));
+                }
+            }
+            None
+        })
+        .collect();
+    out.sort_by(|a, b| b.0.cmp(&a.0));
     let stdout = String::from_utf8_lossy(&output.stdout);
     let mut out = Vec::new();
     for line in stdout.lines() {
