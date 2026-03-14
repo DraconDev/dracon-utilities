@@ -295,10 +295,10 @@ fn effective_watch_roots(policy: &WardenPolicy) -> Vec<PathBuf> {
 
 fn effective_discovery_roots(policy: &WardenPolicy) -> Vec<PathBuf> {
     let mut roots = BTreeSet::new();
-    for root in policy.watch_root_paths() {
+    for root in policy.discover_root_paths() {
         roots.insert(root);
     }
-    for root in policy.discover_root_paths() {
+    for root in policy.watch_root_paths() {
         roots.insert(root);
     }
     roots.into_iter().collect()

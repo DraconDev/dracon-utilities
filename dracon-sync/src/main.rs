@@ -1891,7 +1891,7 @@ fn set_upstream_to_branch(repo: &Path, branch: &str) -> Result<()> {
 
 fn detect_large_blobs_ahead(repo: &Path, min_bytes: u64) -> Result<Vec<(u64, String)>> {
     // Step 1: Get object IDs from commits ahead of upstream
-    let rev_list = StdCommand::new(std_git_bin())
+    let rev_list = std_git_command()
         .args(["rev-list", "--objects", "@{u}..HEAD"])
         .current_dir(repo)
         .output()
@@ -1901,7 +1901,7 @@ fn detect_large_blobs_ahead(repo: &Path, min_bytes: u64) -> Result<Vec<(u64, Str
     }
 
     // Step 2: Batch-check object types and sizes (no shell involved)
-    let mut cat_file = StdCommand::new(std_git_bin())
+    let mut cat_file = std_git_command()
         .args(["cat-file", "--batch-check=%(objectname) %(objecttype) %(objectsize) %(rest)"])
         .current_dir(repo)
         .stdin(std::process::Stdio::piped())
@@ -2180,8 +2180,9 @@ fn rewrite_ahead_paths(
     );
     let mut index_filter = String::from("git rm -r --cached --ignore-unmatch");
     for path in paths_to_remove {
-        index_filter.push(' ');
-        index_filter.push_str(path);
+        index_filter.push_str(" '");
+        index_filter.push_str(&path.replace('\'', "'\\''"));
+        index_filter.push('\'');
     }
 
     let rewrite = std_git_command()
