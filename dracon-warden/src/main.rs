@@ -471,7 +471,15 @@ fn apply_overwrite_file(path: &Path, content: &str) -> Result<bool> {
         next.push('\n');
     }
     if next != current {
-        fs::write(path, next).with_context(|| format!("failed writing {}", path.display()))?;
+        // Write to temp file in same dir, then atomically rename to avoid TOCTOU
+        let parent = path.parent().unwrap_or_else(|| Path::new("."));
+        let tmp = parent.join(format!(
+            ".dracon_tmp_{}",
+            path.file_name().unwrap_or_default().to_string_lossy()
+        ));
+        fs::write(&tmp, &next).with_context(|| format!("failed writing temp {}", tmp.display()))?;
+        fs::rename(&tmp, path)
+            .with_context(|| format!("failed renaming {} -> {}", tmp.display(), path.display()))?;
         return Ok(true);
     }
     Ok(false)
