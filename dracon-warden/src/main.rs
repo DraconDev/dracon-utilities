@@ -12,6 +12,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command as ProcessCommand;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
+use zeroize::Zeroizing;
 
 const BLOCK_BEGIN: &str = "# --- BEGIN DRACON MANAGED BLOCK ---";
 const BLOCK_END: &str = "# --- END DRACON MANAGED BLOCK ---";
