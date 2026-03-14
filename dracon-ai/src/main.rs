@@ -1720,7 +1720,7 @@ async fn run_chat_repl(
                                         .status_code
                                         .map(|c| c.to_string())
                                         .unwrap_or_else(|| "unknown".to_string()),
-                                    capture.output
+                                    redact_output(&capture.output)
                                 ),
                             });
                             eprintln!("{}", dim("cmd: added output to context"));
