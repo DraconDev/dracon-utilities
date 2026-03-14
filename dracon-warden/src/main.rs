@@ -854,13 +854,13 @@ fn run_keygen() -> Result<()> {
         .and_then(|n| n.to_str())
         .unwrap_or("unknown");
 
-    let secret_content = format!(
+    let secret_content = Zeroizing::new(format!(
         "# created by dracon-warden keygen on {}\n# public key: {}\n# machine: {}\n{}\n",
         chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
         recipient,
         hostname,
         identity.to_string().expose_secret()
-    );
+    ));
     // Write secret key with restrictive permissions atomically (no race window)
     #[cfg(unix)]
     {
