@@ -469,6 +469,10 @@ fn default_rust_search_roots() -> String {
     "~/Dev".to_string()  // Default search location for Rust target directories
 }
 
+fn default_node_modules_search_roots() -> String {
+    "~/Dev".to_string()  // Default search location for node_modules directories
+}
+
 fn default_trend_warn_hours() -> u64 {
     24  // Warn if disk will fill within 24 hours
 }
@@ -1428,7 +1432,7 @@ async fn run_guard_once(
         }
         
         // Old node_modules
-        let roots: Vec<PathBuf> = guard.rust_search_roots
+        let roots: Vec<PathBuf> = guard.node_modules_search_roots
             .split(',')
             .filter_map(|s| {
                 let s = s.trim();
