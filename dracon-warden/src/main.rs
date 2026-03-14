@@ -860,8 +860,26 @@ fn run_keygen() -> Result<()> {
         hostname,
         identity.to_string().expose_secret()
     );
-    fs::write(&secret_path, &secret_content)
-        .with_context(|| format!("failed to write {}", secret_path.display()))?;
+    // Write secret key with restrictive permissions atomically (no race window)
+    #[cfg(unix)]
+    {
+        use std::io::Write;
+        use std::os::unix::fs::OpenOptionsExt;
+        let mut f = fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .mode(0o600)
+            .open(&secret_path)
+            .with_context(|| format!("failed to create {}", secret_path.display()))?;
+        f.write_all(secret_content.as_bytes())
+            .with_context(|| format!("failed to write {}", secret_path.display()))?;
+    }
+    #[cfg(not(unix))]
+    {
+        fs::write(&secret_path, &secret_content)
+            .with_context(|| format!("failed to write {}", secret_path.display()))?;
+    }
 
     fs::write(&pubkey_path, format!("{}\n", recipient))
         .with_context(|| format!("failed to write {}", pubkey_path.display()))?;
@@ -880,13 +898,6 @@ fn run_keygen() -> Result<()> {
         manifest.push_str(&manifest_entry);
         fs::write(&manifest_path, &manifest)
             .with_context(|| format!("failed to write {}", manifest_path.display()))?;
-    }
-
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        fs::set_permissions(&secret_path, fs::Permissions::from_mode(0o600))
-            .with_context(|| format!("failed to set permissions on {}", secret_path.display()))?;
     }
 
     println!("🔐 Generated age keypair:");
