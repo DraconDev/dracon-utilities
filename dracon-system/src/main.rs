@@ -2422,14 +2422,18 @@ async fn main() -> Result<()> {
                     
                     // Docker prune
                     if docker || docker_volumes {
-                        match docker_prune(docker, docker_volumes).await {
-                            Ok(bytes) => {
-                                actions.push(format!("Docker prune: {}", human_bytes(bytes)));
-                                reclaimed_total += bytes;
+                        if apply {
+                            match docker_prune(docker, docker_volumes).await {
+                                Ok(bytes) => {
+                                    actions.push(format!("Docker prune: {}", human_bytes(bytes)));
+                                    reclaimed_total += bytes;
+                                }
+                                Err(e) => {
+                                    actions.push(format!("Docker prune failed: {}", e));
+                                }
                             }
-                            Err(e) => {
-                                actions.push(format!("Docker prune failed: {}", e));
-                            }
+                        } else {
+                            actions.push("Docker prune (dry-run, skipped)".to_string());
                         }
                     }
                     
