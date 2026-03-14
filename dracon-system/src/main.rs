@@ -255,6 +255,9 @@ struct GuardPolicy {
     /// Directories to search for Rust target directories
     #[serde(default = "default_rust_search_roots")]
     rust_search_roots: String,
+    /// Directories to search for node_modules directories
+    #[serde(default = "default_node_modules_search_roots")]
+    node_modules_search_roots: String,
     /// Enable disk space trend tracking and prediction
     #[serde(default = "default_true")]
     track_trends: bool,
