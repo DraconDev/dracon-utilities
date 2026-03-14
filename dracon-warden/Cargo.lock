@@ -526,7 +526,7 @@ dependencies = [
 
 [[package]]
 name = "dracon-security"
-version = "0.1.922"
+version = "0.1.1094"
 dependencies = [
  "aes-gcm",
  "age",
@@ -561,6 +561,7 @@ dependencies = [
  "serde_json",
  "toml 0.8.23",
  "walkdir",
+ "zeroize",
 ]
 
 [[package]]
