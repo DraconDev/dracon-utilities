@@ -2435,7 +2435,7 @@ async fn main() -> Result<()> {
                     
                     // Package cache cleanup
                     if package_caches {
-                        match clean_package_caches(true, true, true, true).await {
+                        match clean_package_caches(true, true, true, true, apply).await {
                             Ok((bytes, cleaned)) => {
                                 for c in cleaned {
                                     actions.push(format!("Package cache: {}", c));
