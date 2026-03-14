@@ -868,11 +868,15 @@ fn run_keygen() -> Result<()> {
         use std::os::unix::fs::OpenOptionsExt;
         let mut f = fs::OpenOptions::new()
             .write(true)
-            .create(true)
-            .truncate(true)
+            .create_new(true)
             .mode(0o600)
             .open(&secret_path)
-            .with_context(|| format!("failed to create {}", secret_path.display()))?;
+            .with_context(|| {
+                format!(
+                    "failed to create {} (file may already exist)",
+                    secret_path.display()
+                )
+            })?;
         f.write_all(secret_content.as_bytes())
             .with_context(|| format!("failed to write {}", secret_path.display()))?;
     }
@@ -983,12 +987,25 @@ fn run_daemon(policy_path: PathBuf) -> Result<()> {
         }
 
         if !pending_repos.is_empty() && last_run.elapsed() >= debounce {
-            let policy = WardenPolicy::load(&policy_path)?;
-            policy.validate()?;
+            let policy = match WardenPolicy::load(&policy_path) {
+                Ok(p) => p,
+                Err(e) => {
+                    eprintln!("warden: policy load failed: {}", e);
+                    continue;
+                }
+            };
+            if let Err(e) = policy.validate() {
+                eprintln!("warden: policy invalid: {}", e);
+                continue;
+            }
             let repos = std::mem::take(&mut pending_repos);
             let repos_vec = repos.into_iter().collect::<Vec<_>>();
-            scrub_markers(&policy, &repos_vec, true)?;
-            harden_repos(&policy, repos_vec)?;
+            if let Err(e) = scrub_markers(&policy, &repos_vec, true) {
+                eprintln!("warden: scrub_markers failed: {}", e);
+            }
+            if let Err(e) = harden_repos(&policy, repos_vec) {
+                eprintln!("warden: harden_repos failed: {}", e);
+            }
             last_run = Instant::now();
         }
 
