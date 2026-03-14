@@ -2558,7 +2558,7 @@ async fn main() -> Result<()> {
                     
                     // Old node_modules
                     if do_node {
-                        let roots: Vec<PathBuf> = guard_clone.rust_search_roots
+                        let roots: Vec<PathBuf> = guard_clone.node_modules_search_roots
                             .split(',')
                             .filter_map(|s| {
                                 let s = s.trim();
