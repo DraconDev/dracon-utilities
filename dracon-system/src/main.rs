@@ -333,6 +333,7 @@ impl Default for GuardPolicy {
             auto_cleanup_rust: default_auto_cleanup_rust(),
             cleanup_min_size_mb: default_cleanup_min_size_mb(),
             rust_search_roots: default_rust_search_roots(),
+            node_modules_search_roots: default_node_modules_search_roots(),
             track_trends: default_true(),
             trend_warn_hours: default_trend_warn_hours(),
             monitor_inodes: default_true(),
