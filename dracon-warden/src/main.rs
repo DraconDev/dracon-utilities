@@ -1493,7 +1493,7 @@ mod tests {
 
     #[test]
     fn repos_for_event_ignores_target_and_maps_repo_root() {
-        let td = TempDir::new("warden_event_repo_root");
+        let td = TestDir::new("warden_event_repo_root");
         let repo = td.path().join("repo");
         fs::create_dir_all(repo.join(".git")).expect("git dir");
         fs::create_dir_all(repo.join("src")).expect("src");
@@ -1512,7 +1512,7 @@ mod tests {
 
     #[test]
     fn owner_pubkeys_in_filters_only_owner_pub() {
-        let td = TempDir::new("warden_owner_pubkeys");
+        let td = TestDir::new("warden_owner_pubkeys");
         fs::write(td.path().join("owner_a.pub"), "a").expect("write");
         fs::write(td.path().join("owner_a.key"), "a").expect("write");
         fs::write(td.path().join("identity.pub"), "a").expect("write");
@@ -1526,7 +1526,7 @@ mod tests {
 
     #[test]
     fn newest_file_picks_newest_existing() {
-        let td = TempDir::new("warden_newest");
+        let td = TestDir::new("warden_newest");
         let a = td.path().join("a.pub");
         let b = td.path().join("b.pub");
         fs::write(&a, "a").expect("write a");
@@ -1538,7 +1538,7 @@ mod tests {
 
     #[test]
     fn publish_repo_pubkey_writes_and_is_idempotent() {
-        let td = TempDir::new("warden_publish_key");
+        let td = TestDir::new("warden_publish_key");
         let repo = td.path().join("repo");
         fs::create_dir_all(&repo).expect("repo");
         let key = td.path().join("owner_test.pub");
@@ -1552,7 +1552,7 @@ mod tests {
 
     #[test]
     fn harden_repo_changes_files_and_writes_key() {
-        let td = TempDir::new("warden_harden_repo");
+        let td = TestDir::new("warden_harden_repo");
         let repo = td.path().join("repo");
         fs::create_dir_all(&repo).expect("repo");
         let key = td.path().join("owner_test.pub");
@@ -1569,7 +1569,7 @@ mod tests {
 
     #[test]
     fn harden_repo_sets_local_dracon_filter_config() {
-        let td = TempDir::new("warden_harden_repo_filter_cfg");
+        let td = TestDir::new("warden_harden_repo_filter_cfg");
         let repo = td.path().join("repo");
         fs::create_dir_all(&repo).expect("repo");
         let status = ProcessCommand::new("git")
@@ -1627,7 +1627,7 @@ mod tests {
 
     #[test]
     fn publish_repo_pubkey_rejects_non_owner_or_secret_key_material() {
-        let td = TempDir::new("warden_publish_key_rejects");
+        let td = TestDir::new("warden_publish_key_rejects");
         let repo = td.path().join("repo");
         fs::create_dir_all(&repo).expect("repo");
 
@@ -1659,7 +1659,7 @@ mod tests {
 
     #[test]
     fn effective_watch_roots_merges_and_dedupes() {
-        let td = TempDir::new("warden_effective_roots");
+        let td = TestDir::new("warden_effective_roots");
         let p1 = td.path().join("one");
         fs::create_dir_all(&p1).expect("p1");
 
@@ -1677,7 +1677,7 @@ mod tests {
 
     #[test]
     fn effective_discovery_roots_merges_watch_and_discover_deduped() {
-        let td = TempDir::new("warden_effective_discovery_roots");
+        let td = TestDir::new("warden_effective_discovery_roots");
         let p1 = td.path().join("one");
         let p2 = td.path().join("two");
         fs::create_dir_all(&p1).expect("p1");
@@ -1698,7 +1698,7 @@ mod tests {
 
     #[test]
     fn apply_managed_file_detects_noop_second_write() {
-        let td = TempDir::new("warden_apply_noop");
+        let td = TestDir::new("warden_apply_noop");
         let file = td.path().join(".gitignore");
         let block = format!("{BLOCK_BEGIN}\nfoo\n{BLOCK_END}");
         assert!(apply_managed_file(&file, &block).expect("first"));
@@ -1707,7 +1707,7 @@ mod tests {
 
     #[test]
     fn apply_overwrite_file_detects_noop_second_write() {
-        let td = TempDir::new("warden_apply_overwrite_noop");
+        let td = TestDir::new("warden_apply_overwrite_noop");
         let file = td.path().join(".gitattributes");
         let body = "a\nb\n";
         assert!(apply_overwrite_file(&file, body).expect("first"));
