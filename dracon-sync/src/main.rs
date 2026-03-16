@@ -2055,6 +2055,7 @@ fn append_incident_record(policy_path: &Path, record: &IncidentRecord) {
             out.push_str(&line);
             out.push('\n');
         }
+        std::fs::write(path, &out)?;
 
         Ok(())
     }
