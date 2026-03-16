@@ -2058,7 +2058,6 @@ fn append_incident_record(policy_path: &Path, record: &IncidentRecord) {
 
         Ok(())
     }
-}
 
 // ─── AI Scribe (feature-gated) ──────────────────────────────────────────
 // Integrated into sync flow: called after each commit to update project-state.md.
