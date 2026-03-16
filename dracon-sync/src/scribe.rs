@@ -140,6 +140,10 @@ Keep it factual. Infer from evidence, don't make things up."#,
 
     let status = resp.status();
     if !status.is_success() {
+        // Keep auth failure messages short (happens on every sync when key is missing)
+        if status == reqwest::StatusCode::UNAUTHORIZED {
+            anyhow::bail!("AI provider: auth failed (check ~/.dracon/ai/secrets/)");
+        }
         let err_text = resp.text().await.unwrap_or_default();
         anyhow::bail!("AI provider returned {}: {}", status, err_text);
     }
