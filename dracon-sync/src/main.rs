@@ -757,6 +757,31 @@ struct IncidentRecord {
     details: Option<String>,
 }
 
+impl IncidentRecord {
+    fn new(scope: &str, repo: &str, reason: &str, action: &str, result: &str) -> Self {
+        Self {
+            ts_unix: timestamp_secs(),
+            scope: scope.to_string(),
+            repo: repo.to_string(),
+            reason: reason.to_string(),
+            action: action.to_string(),
+            backup_branch: None,
+            result: result.to_string(),
+            details: None,
+        }
+    }
+
+    fn with_details(mut self, details: &str) -> Self {
+        self.details = Some(details.to_string());
+        self
+    }
+
+    fn with_backup_branch(mut self, branch: &str) -> Self {
+        self.backup_branch = Some(branch.to_string());
+        self
+    }
+}
+
 impl SyncPolicy {
     fn load(path: &Path) -> Result<Self> {
         let content = std::fs::read_to_string(path)
