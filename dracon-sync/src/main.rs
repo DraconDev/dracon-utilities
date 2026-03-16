@@ -2057,6 +2057,7 @@ fn append_incident_record(policy_path: &Path, record: &IncidentRecord) {
     }
 
     Ok(())
+    }
 }
 
 // ─── AI Scribe (feature-gated) ──────────────────────────────────────────
