@@ -1229,24 +1229,6 @@ fn build_provider_entry(
         "payload_model": model_id
     })
 }
-        .collect();
-
-    let mut lane_policy = serde_json::Map::new();
-    lane_policy.insert(
-        "free:*".to_string(),
-        serde_json::Value::Array(active_ids.iter().map(|id| serde_json::Value::String(id.clone())).collect()),
-    );
-    lane_policy.insert(
-        "*:*".to_string(),
-        serde_json::Value::Array(active_ids.iter().map(|id| serde_json::Value::String(id.clone())).collect()),
-    );
-
-    serde_json::json!({
-        "providers": providers,
-        "active_model_ids": active_ids,
-        "lane_model_policy": lane_policy
-    })
-}
 
 async fn run_scribe(repo: &Path) -> Result<()> {
     use std::process::Command as StdCommand;
