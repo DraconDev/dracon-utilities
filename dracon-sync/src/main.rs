@@ -2054,9 +2054,9 @@ fn append_incident_record(policy_path: &Path, record: &IncidentRecord) {
         for line in kept {
             out.push_str(&line);
             out.push('\n');
-    }
+        }
 
-    Ok(())
+        Ok(())
     }
 }
 
