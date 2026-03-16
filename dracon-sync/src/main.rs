@@ -2171,23 +2171,6 @@ async fn update_project_state_from_ai(repo: &Path) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn read_blueprint_content(repo: &Path) -> String {
-    let plan_dir = repo.join("plan");
-    if !plan_dir.exists() {
-        return String::new();
-    }
-    std::fs::read_dir(&plan_dir)
-        .ok()
-        .and_then(|entries| {
-            entries
-                .filter_map(|e| e.ok())
-                .filter(|e| e.path().extension().map_or(false, |ext| ext == "md"))
-                .max_by_key(|e| e.metadata().ok().and_then(|m| m.modified().ok()))
-        })
-        .and_then(|e| std::fs::read_to_string(e.path()).ok())
-        .unwrap_or_default()
-}
-
 fn repo_state_flags(
     status: &dracon_git::types::RepoStatus,
     has_origin: bool,
