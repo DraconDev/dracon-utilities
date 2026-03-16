@@ -1980,19 +1980,6 @@ fn detect_large_blobs_ahead(repo: &Path, min_bytes: u64) -> Result<Vec<(u64, Str
         })
         .collect();
     out.sort_by(|a, b| b.0.cmp(&a.0));
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let mut out = Vec::new();
-    for line in stdout.lines() {
-        let mut parts = line.splitn(2, '\t');
-        let size = parts
-            .next()
-            .and_then(|s| s.trim().parse::<u64>().ok())
-            .unwrap_or(0);
-        let path = parts.next().map(str::trim).unwrap_or_default().to_string();
-        if size > 0 && !path.is_empty() {
-            out.push((size, path));
-        }
-    }
     Ok(out)
 }
 
