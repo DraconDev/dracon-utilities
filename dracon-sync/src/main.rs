@@ -4013,6 +4013,11 @@ mod tests {
     use std::sync::{Mutex, OnceLock};
     use dracon_common::test_support::TestDir;
 
+    fn env_lock() -> &'static Mutex<()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+    }
+
     fn test_policy() -> SyncPolicy {
         SyncPolicy {
             system_repo: String::new(),
