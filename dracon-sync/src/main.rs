@@ -1096,6 +1096,36 @@ fn append_to_gitignore(repo: &Path, patterns: &[String]) -> Result<()> {
     Ok(())
 }
 
+/// Handle large untracked files by adding them to .gitignore.
+/// Returns true if .gitignore was updated.
+fn handle_large_untracked(
+    repo: &Path,
+    to_restore: &[dracon_git::types::DiffFile],
+    policy: &SyncPolicy,
+) -> Result<bool> {
+    let large_untracked: Vec<_> = to_restore
+        .iter()
+        .filter(|e| is_large_untracked(e, repo, policy.max_stage_file_bytes))
+        .collect();
+
+    if large_untracked.is_empty() {
+        return Ok(false);
+    }
+
+    let patterns: Vec<String> = large_untracked
+        .iter()
+        .map(|e| e.path.to_string_lossy().to_string())
+        .collect();
+    eprintln!(
+        "📝 {} has {} large untracked file(s) > {} bytes - adding to .gitignore",
+        repo.display(),
+        patterns.len(),
+        policy.max_stage_file_bytes
+    );
+    append_to_gitignore(repo, &patterns)?;
+    Ok(true)
+}
+
 fn env_freeze_enabled() -> bool {
     matches!(
         std::env::var("DRACON_SYNC_FREEZE")
