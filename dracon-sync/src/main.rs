@@ -834,34 +834,16 @@ impl SyncPolicy {
 }
 
 fn resolve_policy_path() -> Result<PathBuf> {
-    if let Ok(custom) = std::env::var("DRACON_SYNC_POLICY") {
-        let p = PathBuf::from(custom);
-        if p.exists() {
-            return Ok(p);
-        }
-    }
-
     let home = dirs::home_dir().context("home not found")?;
-    let candidates = [
-        home.join(".dracon/utilities/sync/dracon-sync.toml"),
-        home.join(".dracon/utilities/sync/config.toml"),
-        home.join(".dracon/git/dracon-git.toml"),
-    ];
-
-    for p in &candidates {
-        if p.exists() {
-            return Ok(p.clone());
-        }
-    }
-
-    Err(anyhow::anyhow!(
-        "sync policy not found. checked: {} (or DRACON_SYNC_POLICY)",
-        candidates
-            .iter()
-            .map(|p| p.display().to_string())
-            .collect::<Vec<_>>()
-            .join(", ")
-    ))
+    dracon_common::resolve_policy_path(
+        &["DRACON_SYNC_POLICY"],
+        &[
+            home.join(".dracon/utilities/sync/dracon-sync.toml"),
+            home.join(".dracon/utilities/sync/config.toml"),
+            home.join(".dracon/git/dracon-git.toml"),
+        ],
+        "sync policy not found",
+    )
 }
 
 fn normalized_dir_name(value: &str) -> String {
@@ -1169,27 +1151,8 @@ fn tokio_git_command() -> TokioCommand {
     TokioCommand::new(git_binary())
 }
 
-fn daemon_lock_path() -> PathBuf {
-    dirs::home_dir()
-        .map(|h| h.join(".dracon").join("dracon-sync.lock"))
-        .unwrap_or_else(|| PathBuf::from("/tmp/dracon-sync.lock"))
-}
-
 fn acquire_daemon_lock() -> Result<File> {
-    let lock_path = daemon_lock_path();
-    if let Some(parent) = lock_path.parent() {
-        if let Err(e) = std::fs::create_dir_all(parent) {
-            eprintln!("⚠️ failed to create lock dir {}: {}", parent.display(), e);
-        }
-    }
-    let file = File::create(&lock_path)
-        .with_context(|| format!("failed to create lock file {}", lock_path.display()))?;
-    file.try_lock_exclusive()
-        .with_context(|| format!("failed to acquire lock {} - another daemon running?", lock_path.display()))?;
-    if let Err(e) = writeln!(&file, "{}", std::process::id()) {
-        eprintln!("⚠️ failed to write PID to lock file: {}", e);
-    }
-    Ok(file)
+    dracon_common::acquire_daemon_lock("dracon-sync")
 }
 
 #[derive(Debug, Clone)]
@@ -1298,38 +1261,7 @@ fn build_commit_context(
 }
 
 fn discover_git_repos(roots: &[PathBuf], excluded_dir_names: &BTreeSet<String>) -> Vec<PathBuf> {
-    let mut repos = BTreeSet::new();
-
-    for root in roots {
-        if root.join(".git").exists() {
-            repos.insert(root.clone());
-        }
-
-        let walker = walkdir::WalkDir::new(root)
-            .follow_links(false)
-            .max_depth(7)
-            .into_iter()
-            .filter_entry(|e| {
-                if e.depth() == 0 {
-                    return true;
-                }
-                let name = e.file_name().to_string_lossy();
-                if name == ".git" {
-                    return true;
-                }
-                !is_excluded_dir_name(&name, excluded_dir_names)
-            });
-
-        for entry in walker.filter_map(|e| e.ok()) {
-            if entry.file_name() == ".git" {
-                if let Some(parent) = entry.path().parent() {
-                    repos.insert(parent.to_path_buf());
-                }
-            }
-        }
-    }
-
-    repos.into_iter().collect()
+    dracon_common::discover_git_repos(roots, excluded_dir_names)
 }
 
 fn has_origin_remote(repo: &Path) -> bool {
