@@ -13,6 +13,7 @@ tokio = { version = "1", features = ["macros", "process", "rt-multi-thread", "ti
 toml = "0.8"
 walkdir = "2.5"
 dracon-git = { path = "../../dracon-libs/tools/sync/dracon-git" }
+dracon-common = { path = "../../dracon-libs/tools/common/dracon-common" }
 fs2 = "0.4"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"], optional = true }
 ai-runtime-config = { path = "../../dracon-libs/services/crates/ai/ai-runtime-config", optional = true }
