@@ -4531,6 +4531,46 @@ fn test_policy() -> SyncPolicy {
         assert_eq!(parsed["scope"], "concern");
         assert_eq!(parsed["result"], "ok");
     }
+
+    /// Regression test: deleted files must ALWAYS be staged (go to to_stage),
+    /// never filtered out (to_restore). If deleted files land in to_restore,
+    /// the post-commit restore logic would restore them from HEAD.
+    #[test]
+    fn test_deleted_files_always_staged() {
+        use dracon_git::types::{DiffFile, FileStatus};
+        use std::collections::BTreeSet;
+
+        let repo = TempDir::new("deleted_stage");
+
+        let entry = DiffFile {
+            path: PathBuf::from("some/deleted/dir/file.rs"),
+            status: FileStatus::Deleted,
+        };
+
+        let excluded = BTreeSet::new();
+        let patterns: Vec<String> = vec![];
+
+        let result = should_stage_entry(
+            repo.path(),
+            &entry,
+            &excluded,
+            &patterns,
+            10_000_000,
+        );
+
+        assert!(
+            result,
+            "REGRESSION: Deleted file was NOT staged! \
+             This means the post-commit restore would restore it from HEAD. \
+             Deleted files must always go to to_stage."
+        );
+
+        // Also verify can_restore_entry returns false for Deleted
+        assert!(
+            !can_restore_entry(&entry),
+            "can_restore_entry must return false for Deleted files"
+        );
+    }
 }
 
 #[tokio::main]
