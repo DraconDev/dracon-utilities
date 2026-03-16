@@ -2941,18 +2941,7 @@ fn truncate(value: &str, max_chars: usize) -> String {
     format!("{}…", shortened)
 }
 
-fn colors_enabled() -> bool {
-    std::env::var_os("NO_COLOR").is_none()
-        && std::env::var("TERM").map(|t| t != "dumb").unwrap_or(true)
-}
-
-fn paint(value: &str, code: &str) -> String {
-    if colors_enabled() {
-        format!("\x1b[{}m{}\x1b[0m", code, value)
-    } else {
-        value.to_string()
-    }
-}
+use dracon_common::{is_color_enabled, ansi};
 
 async fn git_log_field(repo: &Path, format: &str) -> Option<String> {
     let output = tokio_git_command()
