@@ -47,7 +47,7 @@ dependencies = [
 
 [[package]]
 name = "ai-runtime-adapters"
-version = "0.1.1384"
+version = "0.1.1397"
 dependencies = [
  "ai-routing-runtime",
  "ai-service",
@@ -84,7 +84,7 @@ dependencies = [
 
 [[package]]
 name = "ai-service"
-version = "0.1.1384"
+version = "0.1.1397"
 dependencies = [
  "ai-routing-runtime",
  "anyhow",
@@ -530,7 +530,7 @@ dependencies = [
 
 [[package]]
 name = "config-kit"
-version = "0.1.1384"
+version = "0.1.1397"
 dependencies = [
  "anyhow",
  "serde",
@@ -704,7 +704,7 @@ dependencies = [
 
 [[package]]
 name = "dracon-ai-contracts"
-version = "0.1.1384"
+version = "0.1.1397"
 dependencies = [
  "serde",
  "serde_json",
@@ -712,7 +712,7 @@ dependencies = [
 
 [[package]]
 name = "dracon-ai-runtime-contracts"
-version = "0.1.1384"
+version = "0.1.1397"
 dependencies = [
  "anyhow",
  "async-trait",
