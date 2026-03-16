@@ -223,7 +223,7 @@ dependencies = [
 
 [[package]]
 name = "dracon-ai-contracts"
-version = "0.1.1366"
+version = "0.1.1367"
 dependencies = [
  "serde",
  "serde_json",
@@ -231,7 +231,7 @@ dependencies = [
 
 [[package]]
 name = "dracon-git"
-version = "0.1.1366"
+version = "0.1.1367"
 dependencies = [
  "anyhow",
  "git2",
