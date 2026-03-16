@@ -2102,7 +2102,7 @@ async fn update_project_state_from_ai(repo: &Path) -> anyhow::Result<()> {
         .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
         .unwrap_or_default();
 
-    let blueprint = read_blueprint_content(repo);
+    let blueprint = dracon_git::read_blueprint_content(repo);
 
     // Resolve AI provider from config
     let resolved = ai_runtime_config::resolve_ai_runtime_config();
