@@ -1365,56 +1365,64 @@ async fn kill_descendants(pid: u32) {
         .await;
 }
 
-async fn run_git_with_timeout(
-    repo: &Path,
-    args: &[&str],
+async fn run_child(
+    mut child: tokio::process::Child,
+    workdir: &Path,
     timeout_secs: u64,
-    op_label: &str,
+    label: &str,
 ) -> Result<()> {
-    let mut child = tokio_git_command()
-        .args(args)
-        .current_dir(repo)
-        .kill_on_drop(true)
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::piped())
-        .spawn()
-        .with_context(|| format!("failed to spawn git {} in {}", op_label, repo.display()))?;
-
     let pid = child.id();
     match tokio::time::timeout(Duration::from_secs(timeout_secs), child.wait()).await {
         Ok(Ok(status)) => {
             if status.success() {
-                return Ok(());
+                Ok(())
+            } else {
+                Err(anyhow::anyhow!(
+                    "{} failed in {} with status {}",
+                    label,
+                    workdir.display(),
+                    status
+                ))
             }
-            return Err(anyhow::anyhow!(
-                "git {} failed in {} with status {}",
-                op_label,
-                repo.display(),
-                status
-            ));
         }
-        Ok(Err(e)) => {
-            return Err(anyhow::anyhow!(
-                "git {} failed in {}: {}",
-                op_label,
-                repo.display(),
-                e
-            ));
-        }
+        Ok(Err(e)) => Err(anyhow::anyhow!(
+            "{} failed in {}: {}",
+            label,
+            workdir.display(),
+            e
+        )),
         Err(_) => {
             if let Some(pid) = pid {
                 kill_descendants(pid).await;
             }
             let _ = child.start_kill();
             let _ = child.wait().await;
-            return Err(anyhow::anyhow!(
-                "git {} timeout in {} after {}s",
-                op_label,
-                repo.display(),
+            Err(anyhow::anyhow!(
+                "{} timeout in {} after {}s",
+                label,
+                workdir.display(),
                 timeout_secs
-            ));
+            ))
         }
     }
+}
+
+async fn run_git_with_timeout(
+    repo: &Path,
+    args: &[&str],
+    timeout_secs: u64,
+    op_label: &str,
+) -> Result<()> {
+    let label = format!("git {}", op_label);
+    let child = tokio_git_command()
+        .args(args)
+        .current_dir(repo)
+        .kill_on_drop(true)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .with_context(|| format!("failed to spawn {} in {}", label, repo.display()))?;
+    run_child(child, repo, timeout_secs, &label).await
 }
 
 async fn run_git_with_timeout_env(
@@ -1424,6 +1432,7 @@ async fn run_git_with_timeout_env(
     op_label: &str,
     env: &[(&str, &str)],
 ) -> Result<()> {
+    let label = format!("git {}", op_label);
     let mut cmd = tokio_git_command();
     cmd.args(args)
         .current_dir(repo)
@@ -1433,45 +1442,10 @@ async fn run_git_with_timeout_env(
     for (k, v) in env {
         cmd.env(k, v);
     }
-
-    let mut child = cmd
+    let child = cmd
         .spawn()
-        .with_context(|| format!("failed to spawn git {} in {}", op_label, repo.display()))?;
-
-    let pid = child.id();
-    match tokio::time::timeout(Duration::from_secs(timeout_secs), child.wait()).await {
-        Ok(Ok(status)) => {
-            if status.success() {
-                Ok(())
-            } else {
-                Err(anyhow::anyhow!(
-                    "git {} failed in {} with status {}",
-                    op_label,
-                    repo.display(),
-                    status
-                ))
-            }
-        }
-        Ok(Err(e)) => Err(anyhow::anyhow!(
-            "git {} failed in {}: {}",
-            op_label,
-            repo.display(),
-            e
-        )),
-        Err(_) => {
-            if let Some(pid) = pid {
-                kill_descendants(pid).await;
-            }
-            let _ = child.start_kill();
-            let _ = child.wait().await;
-            Err(anyhow::anyhow!(
-                "git {} timeout in {} after {}s",
-                op_label,
-                repo.display(),
-                timeout_secs
-            ))
-        }
-    }
+        .with_context(|| format!("failed to spawn {} in {}", label, repo.display()))?;
+    run_child(child, repo, timeout_secs, &label).await
 }
 
 async fn run_cmd_with_timeout(
@@ -1481,59 +1455,16 @@ async fn run_cmd_with_timeout(
     timeout_secs: u64,
     op_label: &str,
 ) -> Result<()> {
-    let mut child = TokioCommand::new(program)
+    let label = format!("{} {}", program, op_label);
+    let child = TokioCommand::new(program)
         .args(args)
         .current_dir(repo)
         .kill_on_drop(true)
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::piped())
         .spawn()
-        .with_context(|| {
-            format!(
-                "failed to spawn {} {} in {}",
-                program,
-                op_label,
-                repo.display()
-            )
-        })?;
-
-    let pid = child.id();
-    match tokio::time::timeout(Duration::from_secs(timeout_secs), child.wait()).await {
-        Ok(Ok(status)) => {
-            if status.success() {
-                Ok(())
-            } else {
-                Err(anyhow::anyhow!(
-                    "{} {} failed in {} with status {}",
-                    program,
-                    op_label,
-                    repo.display(),
-                    status
-                ))
-            }
-        }
-        Ok(Err(e)) => Err(anyhow::anyhow!(
-            "{} {} failed in {}: {}",
-            program,
-            op_label,
-            repo.display(),
-            e
-        )),
-        Err(_) => {
-            if let Some(pid) = pid {
-                kill_descendants(pid).await;
-            }
-            let _ = child.start_kill();
-            let _ = child.wait().await;
-            Err(anyhow::anyhow!(
-                "{} {} timeout in {} after {}s",
-                program,
-                op_label,
-                repo.display(),
-                timeout_secs
-            ))
-        }
-    }
+        .with_context(|| format!("failed to spawn {} in {}", label, repo.display()))?;
+    run_child(child, repo, timeout_secs, &label).await
 }
 
 fn origin_url(repo: &Path) -> Option<String> {
