@@ -222,10 +222,10 @@ fn resolve_policy_path() -> Result<PathBuf> {
 
     let home = dirs::home_dir().context("home not found")?;
     let candidates = [
-        home.join("dracon/utilities/warden/dracon-warden.toml"),
-        home.join("dracon/utilities/warden/dracon-security.toml"),
-        home.join("dracon/utilities/warden/config.toml"),
-        home.join("dracon/security/dracon-security.toml"),
+        home.join(".dracon/utilities/warden/dracon-warden.toml"),
+        home.join(".dracon/utilities/warden/dracon-security.toml"),
+        home.join(".dracon/utilities/warden/config.toml"),
+        home.join(".dracon/security/dracon-security.toml"),
     ];
 
     for p in &candidates {
@@ -588,9 +588,9 @@ fn resolve_local_pubkey_path() -> Option<PathBuf> {
 
     let home = dirs::home_dir()?;
     let owner_candidates = [
-        home.join("dracon/data/keys"),
+        home.join(".dracon/data/keys"),
         home.join(".demon/keys"),
-        home.join("dracon/keys"),
+        home.join(".dracon/keys"),
     ]
     .into_iter()
     .flat_map(|dir| owner_pubkeys_in(&dir))
@@ -816,7 +816,7 @@ fn repos_for_event(event: &Event, roots: &[PathBuf]) -> BTreeSet<PathBuf> {
 fn run_keygen() -> Result<()> {
     let home = dirs::home_dir().context("home directory not found")?;
 
-    let keys_dir = home.join("dracon/data/keys");
+    let keys_dir = home.join(".dracon/data/keys");
     let hostname_raw = hostname::get()
         .context("failed to get hostname")?
         .to_string_lossy()

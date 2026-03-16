@@ -17,6 +17,9 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use tokio::process::Command as TokioCommand;
 use tokio::time::{sleep, Duration};
 
+#[cfg(feature = "scribe")]
+mod scribe;
+
 #[derive(Parser, Debug)]
 #[command(name = "dracon-sync")]
 #[command(about = "Dracon sync runtime")]
@@ -843,9 +846,9 @@ fn resolve_policy_path() -> Result<PathBuf> {
 
     let home = dirs::home_dir().context("home not found")?;
     let candidates = [
-        home.join("dracon/utilities/sync/dracon-sync.toml"),
-        home.join("dracon/utilities/sync/config.toml"),
-        home.join("dracon/git/dracon-git.toml"),
+        home.join(".dracon/utilities/sync/dracon-sync.toml"),
+        home.join(".dracon/utilities/sync/config.toml"),
+        home.join(".dracon/git/dracon-git.toml"),
     ];
 
     for p in &candidates {
@@ -1229,6 +1232,40 @@ fn detect_report_signals(
     signals
 }
 
+fn read_project_focus(repo: &Path) -> Option<String> {
+    let state_path = repo.join(".dracon/project-state.md");
+    let content = std::fs::read_to_string(&state_path).ok()?;
+    
+    let mut in_focus = false;
+    let mut lines = Vec::new();
+    
+    for line in content.lines() {
+        let trimmed = line.trim();
+        
+        // Enter focus section
+        if trimmed.starts_with("## ") && trimmed.to_lowercase().contains("current focus") {
+            in_focus = true;
+            continue;
+        }
+        
+        // Exit on next section
+        if in_focus && trimmed.starts_with("## ") {
+            break;
+        }
+        
+        // Collect non-empty lines in focus section
+        if in_focus && !trimmed.is_empty() {
+            lines.push(trimmed.to_string());
+        }
+    }
+    
+    if lines.is_empty() {
+        None
+    } else {
+        Some(lines.join("\n"))
+    }
+}
+
 fn build_commit_context(
     repo: &Path,
     status: &RepoStatus,
@@ -1244,6 +1281,9 @@ fn build_commit_context(
         rel.to_string_lossy().to_string()
     });
     
+    // Read project state for commit body (scribe)
+    let description = read_project_focus(repo);
+    
     CommitContext {
         intent: intent_info.intent,
         track: intent_info.track,
@@ -1252,6 +1292,11 @@ fn build_commit_context(
         task_progress: intent_info.task_progress,
         refs,
         idle_seconds,
+        category: None,
+        scope: None,
+        severity: None,
+        description,
+        semantic_summary: None,
     }
 }
 
@@ -2430,7 +2475,7 @@ async fn sync_repo(
             let signals = detect_report_signals(repo, &committed_entries);
             let is_report = !signals.is_empty();
             
-            let mut ctx = build_commit_context(
+            let ctx = build_commit_context(
                 repo,
                 &status,
                 &committed_entries,
@@ -2439,12 +2484,19 @@ async fn sync_repo(
             );
             
             // Stable identity subject with rich JSON body.
-            ctx.intent = format!("[daemon] sync: {} file(s)", committed_entries.len());
             let msg = build_commit_message(&ctx);
 
             svc.commit(&msg).await?;
             
-            // Restore any excluded modified paths that weren't committed (skip untracked files)
+            // Run scribe: update project-state.md via AI
+            #[cfg(feature = "scribe")]
+            {
+                if let Err(e) = scribe::update_project_state(repo).await {
+                    eprintln!("scribe: {}", e);
+                }
+            }
+            
+            // Restore any excluded modified paths that weren't committed
             let restorable: Vec<_> = to_restore.iter().filter(|e| can_restore_entry(e)).collect();
             let large_untracked: Vec<_> = to_restore
                 .iter()

@@ -517,7 +517,7 @@ fn human_bytes(bytes: u64) -> String {
 fn canonical_system_root() -> PathBuf {
     dirs::home_dir()
         .unwrap_or_else(|| PathBuf::from("/home"))
-        .join("dracon")
+        .join(".dracon")
 }
 
 fn expand_tilde(raw: &str) -> PathBuf {
@@ -1816,10 +1816,10 @@ fn resolve_system_policy_path() -> Option<PathBuf> {
 
     let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("/home"));
     let candidates = [
-        home.join("dracon/utilities/system/dracon-system.toml"),
-        home.join("dracon/utilities/system/config.toml"),
-        home.join("dracon/system/dracon-system.toml"),
-        home.join("dracon/system/config.toml"),
+        home.join(".dracon/utilities/system/dracon-system.toml"),
+        home.join(".dracon/utilities/system/config.toml"),
+        home.join(".dracon/system/dracon-system.toml"),
+        home.join(".dracon/system/config.toml"),
     ];
 
     candidates.into_iter().find(|p| p.exists())

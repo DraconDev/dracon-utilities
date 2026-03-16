@@ -36,7 +36,7 @@ dependencies = [
 
 [[package]]
 name = "ai-catalog-ingest"
-version = "0.1.333"
+version = "0.1.1294"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -47,7 +47,7 @@ dependencies = [
 
 [[package]]
 name = "ai-routing-runtime"
-version = "0.1.0"
+version = "0.1.1294"
 dependencies = [
  "anyhow",
  "dracon-ai-contracts",
@@ -58,15 +58,17 @@ dependencies = [
 
 [[package]]
 name = "ai-runtime-adapters"
-version = "0.1.333"
+version = "0.1.1294"
 dependencies = [
  "ai-catalog-ingest",
  "ai-runtime-config",
  "ai-selection-engine",
  "ai-service",
  "anyhow",
+ "async-stream",
  "async-trait",
  "bytes",
+ "dotenvy",
  "dracon-ai-contracts",
  "dracon-ai-runtime-contracts",
  "futures",
@@ -81,9 +83,10 @@ dependencies = [
 
 [[package]]
 name = "ai-runtime-config"
-version = "0.1.0"
+version = "0.1.1294"
 dependencies = [
  "ai-routing-runtime",
+ "dirs",
  "serde",
  "serde_json",
  "tracing",
@@ -91,11 +94,11 @@ dependencies = [
 
 [[package]]
 name = "ai-selection-engine"
-version = "0.1.333"
+version = "0.1.1294"
 
 [[package]]
 name = "ai-service"
-version = "0.1.0"
+version = "0.1.1294"
 dependencies = [
  "ai-routing-runtime",
  "anyhow",
@@ -580,6 +583,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "dotenvy"
+version = "0.15.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1aaf95b3e5c8f23aa320147307562d361db0ae0d51242340f558153b4eb2439b"
+
+[[package]]
 name = "dracon-ai"
 version = "0.1.0"
 dependencies = [
@@ -594,6 +603,7 @@ dependencies = [
  "env_logger",
  "futures",
  "log",
+ "reqwest",
  "rustyline",
  "serde",
  "serde_json",
@@ -603,7 +613,7 @@ dependencies = [
 
 [[package]]
 name = "dracon-ai-contracts"
-version = "0.1.333"
+version = "0.1.1294"
 dependencies = [
  "serde",
  "serde_json",
@@ -611,7 +621,7 @@ dependencies = [
 
 [[package]]
 name = "dracon-ai-runtime-contracts"
-version = "0.1.0"
+version = "0.1.1294"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2002,6 +2012,7 @@ checksum = "eddd3ca559203180a307f12d114c268abf583f59b03cb906fd0b3ff8646c1147"
 dependencies = [
  "base64 0.22.1",
  "bytes",
+ "futures-channel",
  "futures-core",
  "futures-util",
  "http 1.4.0",

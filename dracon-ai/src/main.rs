@@ -43,7 +43,7 @@ fn resolve_config_path() -> Option<PathBuf> {
     }
     let home = dirs::home_dir()?;
     Some(
-        home.join("dracon")
+        home.join(".dracon")
             .join("utilities")
             .join("ai")
             .join("dracon-ai.toml"),
@@ -174,6 +174,20 @@ enum Cmd {
 
     /// 📜 Show AI runtime status (resolved policy + active/dev models)
     Status,
+
+    /// 📝 Observe a repo and update its project-state.md (scribe)
+    Scribe {
+        /// Path to the git repository to observe.
+        #[arg(value_name = "REPO")]
+        repo: PathBuf,
+    },
+
+    /// 🔧 Initialize ~/.dracon/ai/ config directory with templates
+    Setup {
+        /// Re-discover models from all existing keys (skip prompt)
+        #[arg(long)]
+        refresh: bool,
+    },
 }
 
 #[tokio::main]
@@ -407,6 +421,12 @@ Captured output:\n```\n{}\n```",
             }
             Ok(())
         }
+        Cmd::Scribe { repo } => {
+            run_scribe(&repo).await
+        }
+        Cmd::Setup { refresh } => {
+            run_setup(refresh)
+        }
     }
 }
 
@@ -516,6 +536,8 @@ fn prompt_label(lane: &RoutingTask) -> String {
         RoutingTask::Writing => "writing",
         RoutingTask::Fast => "fast",
         RoutingTask::Custom(v) => v.as_str(),
+        RoutingTask::Dev => "dev",
+        RoutingTask::Free => "free",
     };
     let lane = ansi("33", lane_txt); // yellow
     format!("{}[{}]", tool, lane)
@@ -581,7 +603,7 @@ fn build_router() -> Result<ai_routing_runtime::SmartRouter<dyn AiProvider>> {
     for spec in &resolved.openai_providers {
         let provider: std::sync::Arc<dyn AiProvider> =
             std::sync::Arc::new(ai_runtime_adapters::GenericOpenAIAdapter::new_with_auth(
-                spec.api_key.clone(),
+                spec.api_keys.first().cloned().unwrap_or_default(),
                 spec.endpoint.clone(),
                 spec.payload_model.clone(),
                 spec.auth_header_name.clone(),
@@ -883,21 +905,32 @@ fn strip_trailing_commas(json: &str) -> String {
 
 /// Redact common secret patterns from command output before sending to AI provider.
 fn redact_output(output: &str) -> String {
-    let mut result = output.to_string();
-    // Redact lines containing common secret patterns
     let secret_patterns = [
         "password", "passwd", "secret", "token", "api_key", "apikey",
         "authorization", "bearer", "private_key", "ssh_key",
     ];
-    for line in result.lines() {
+    
+    // Collect lines first to avoid borrow issues
+    let lines: Vec<&str> = output.lines().collect();
+    let mut result = String::with_capacity(output.len());
+    
+    for line in &lines {
         let lower = line.to_ascii_lowercase();
+        let mut redacted = false;
         for pat in &secret_patterns {
             if lower.contains(pat) && (lower.contains('=') || lower.contains(':')) {
-                result = result.replace(line, &format!("[REDACTED: contains {}]", pat));
+                result.push_str(&format!("[REDACTED: contains {}]", pat));
+                result.push('\n');
+                redacted = true;
                 break;
             }
         }
+        if !redacted {
+            result.push_str(line);
+            result.push('\n');
+        }
     }
+    
     // Truncate very long outputs to limit token usage and accidental leak
     if result.len() > 20_000 {
         result.truncate(20_000);
@@ -938,6 +971,489 @@ fn is_dangerous_shell(cmd: &str) -> bool {
         || c.starts_with("eval ")
         || c.contains(" exec ")
         || c.starts_with("exec ")
+}
+
+fn run_setup(refresh: bool) -> Result<()> {
+    use std::io::Write;
+
+    let home = dirs::home_dir().ok_or_else(|| anyhow::anyhow!("no home dir"))?;
+    let ai_dir = home.join(".dracon").join("ai");
+    let secrets_dir = ai_dir.join("secrets");
+    std::fs::create_dir_all(&secrets_dir)?;
+
+    println!("🔧 dracon-ai setup");
+    println!();
+
+    if !refresh {
+        println!("Supported providers (auto-detected from key format):");
+        println!("  OpenRouter  — sk-or-...  (recommended, broadest free coverage)");
+        println!("  OpenAI      — sk-...");
+        println!("  Google AI   — AIza...");
+        println!("  NVIDIA      — nvapi-...");
+        println!();
+        println!("Enter your API key (or press Enter to skip):");
+        print!("> ");
+        std::io::stdout().flush()?;
+
+        let mut key_input = String::new();
+        std::io::stdin().read_line(&mut key_input)?;
+        let key = key_input.trim();
+
+        if !key.is_empty() {
+            let provider = detect_provider(key);
+            let (provider_id, endpoint, env_name) = provider_info(&provider);
+            let env_path = secrets_dir.join(format!("{}.env", provider_id));
+            std::fs::write(&env_path, format!("{}={}\n", env_name, key))?;
+            println!("✅ Key saved to {}", env_path.display());
+        }
+    }
+
+    // Discover from ALL existing keys
+    let all_keys = load_all_keys(&secrets_dir);
+    if all_keys.is_empty() {
+        println!();
+        println!("No API keys found. Add one:");
+        println!("  echo 'OPENROUTER_API_KEY=sk-or-...' > ~/.dracon/ai/secrets/openrouter.env");
+        println!("  dracon-ai setup --refresh");
+        return Ok(());
+    }
+
+    println!();
+    println!("🔍 Discovering models from {} provider(s)...", all_keys.len());
+
+    let mut all_providers = Vec::new();
+    let mut all_active_ids = Vec::new();
+
+    for (provider_id, endpoint, env_name, key, provider) in &all_keys {
+        match discover_models(endpoint, key, *provider) {
+            Ok(models) => {
+                if models.is_empty() {
+                    println!("   {}: no models found", provider_id);
+                    continue;
+                }
+                println!("   {}: {} model(s) discovered", provider_id, models.len());
+
+                for model_id in &models {
+                    let full_id = if model_id.starts_with(&format!("{}/", provider_id)) {
+                        model_id.clone()
+                    } else {
+                        format!("{}/{}", provider_id, model_id)
+                    };
+
+                    all_providers.push(build_provider_entry(
+                        provider_id, endpoint, env_name, model_id, *provider,
+                    ));
+                    all_active_ids.push(full_id);
+                }
+            }
+            Err(e) => {
+                println!("   {}: discovery failed — {}", provider_id, e);
+            }
+        }
+    }
+
+    if all_providers.is_empty() {
+        println!();
+        println!("No models discovered. Check your API keys.");
+        return Ok(());
+    }
+
+    let policy = serde_json::json!({
+        "providers": all_providers,
+        "active_model_ids": all_active_ids,
+        "lane_model_policy": {
+            "free:*": all_active_ids,
+            "*:*": all_active_ids
+        }
+    });
+
+    let policy_path = ai_dir.join("routing-policy.json");
+    std::fs::write(&policy_path, serde_json::to_string_pretty(&policy)?)?;
+    println!("✅ {} providers, {} models → {}", all_keys.len(), all_active_ids.len(), policy_path.display());
+    println!();
+    println!("Run 'dracon-ai status' to verify.");
+
+    Ok(())
+}
+
+fn provider_info(provider: &DetectedProvider) -> (&str, &str, &str) {
+    match provider {
+        DetectedProvider::OpenRouter => ("openrouter", "https://openrouter.ai/api/v1", "OPENROUTER_API_KEY"),
+        DetectedProvider::OpenAI => ("openai", "https://api.openai.com/v1", "OPENAI_API_KEY"),
+        DetectedProvider::Google => ("google", "https://generativelanguage.googleapis.com/v1beta", "GOOGLE_API_KEY"),
+        DetectedProvider::NVIDIA => ("nvidia", "https://integrate.api.nvidia.com/v1", "NVIDIA_API_KEY"),
+        DetectedProvider::Unknown => ("custom", "", "CUSTOM_API_KEY"),
+    }
+}
+
+fn load_all_keys(secrets_dir: &Path) -> Vec<(String, String, String, String, DetectedProvider)> {
+    let mut keys = Vec::new();
+
+    let entries = match std::fs::read_dir(secrets_dir) {
+        Ok(e) => e,
+        Err(_) => return keys,
+    };
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().map_or(true, |e| e != "env") {
+            continue;
+        }
+        let Ok(content) = std::fs::read_to_string(&path) else {
+            continue;
+        };
+        for line in content.lines() {
+            let line = line.trim();
+            if line.is_empty() || line.starts_with('#') {
+                continue;
+            }
+            if let Some((_, value)) = line.split_once('=') {
+                let key = value.trim();
+                if key.is_empty() {
+                    continue;
+                }
+                let provider = detect_provider(key);
+                let (pid, endpoint, env_name) = provider_info(&provider);
+                if !endpoint.is_empty() {
+                    keys.push((pid.to_string(), endpoint.to_string(), env_name.to_string(), key.to_string(), provider));
+                }
+            }
+        }
+    }
+
+    keys
+}
+
+    let provider = detect_provider(key);
+    let (provider_id, endpoint, env_name) = match provider {
+        DetectedProvider::OpenRouter => ("openrouter", "https://openrouter.ai/api/v1", "OPENROUTER_API_KEY"),
+        DetectedProvider::OpenAI => ("openai", "https://api.openai.com/v1", "OPENAI_API_KEY"),
+        DetectedProvider::Google => ("google", "https://generativelanguage.googleapis.com/v1beta", "GOOGLE_API_KEY"),
+        DetectedProvider::NVIDIA => ("nvidia", "https://integrate.api.nvidia.com/v1", "NVIDIA_API_KEY"),
+        DetectedProvider::Unknown => {
+            println!("⚠️  Unknown key format. Assuming OpenAI-compatible.");
+            println!("   Enter the endpoint URL (e.g. https://api.example.com/v1):");
+            print!("> ");
+            std::io::stdout().flush()?;
+            let mut endpoint_input = String::new();
+            std::io::stdin().read_line(&mut endpoint_input)?;
+            let custom_endpoint = endpoint_input.trim().to_string();
+            if custom_endpoint.is_empty() {
+                anyhow::bail!("endpoint required for unknown provider");
+            }
+            // Save as generic provider
+            let env_path = secrets_dir.join("custom.env");
+            std::fs::write(&env_path, format!("CUSTOM_API_KEY={}\n", key))?;
+            println!("✅ Key saved to {}", env_path.display());
+            println!("   Manually configure routing-policy.json for this provider.");
+            return Ok(());
+        }
+    };
+
+    // Save key
+    let env_path = secrets_dir.join(format!("{}.env", provider_id));
+    std::fs::write(&env_path, format!("{}={}\n", env_name, key))?;
+    println!("✅ Key saved to {}", env_path.display());
+
+    // Discover models
+    println!("🔍 Discovering models from {}...", provider_id);
+    match discover_models(endpoint, key, provider) {
+        Ok(models) => {
+            if models.is_empty() {
+                println!("   No models found or no free tier available.");
+                println!("   You can manually configure routing-policy.json.");
+                return Ok(());
+            }
+
+            println!("   Found {} free/available model(s):", models.len());
+            for m in &models {
+                println!("     - {}", m);
+            }
+
+            // Build policy
+            let policy = build_policy(provider_id, endpoint, env_name, &models, provider);
+            let policy_path = ai_dir.join("routing-policy.json");
+            std::fs::write(&policy_path, serde_json::to_string_pretty(&policy)?)?;
+            println!("✅ Policy written to {}", policy_path.display());
+        }
+        Err(e) => {
+            println!("⚠️  Could not discover models: {}", e);
+            println!("   Key saved. Manually configure routing-policy.json.");
+        }
+    }
+
+    println!();
+    println!("Run 'dracon-ai status' to verify.");
+
+    Ok(())
+}
+
+#[derive(Clone, Copy)]
+enum DetectedProvider {
+    OpenRouter,
+    OpenAI,
+    Google,
+    NVIDIA,
+    Unknown,
+}
+
+fn detect_provider(key: &str) -> DetectedProvider {
+    if key.starts_with("sk-or-") || key.starts_with("sk-or-v1-") {
+        DetectedProvider::OpenRouter
+    } else if key.starts_with("sk-") {
+        DetectedProvider::OpenAI
+    } else if key.starts_with("AIza") {
+        DetectedProvider::Google
+    } else if key.starts_with("nvapi-") {
+        DetectedProvider::NVIDIA
+    } else {
+        DetectedProvider::Unknown
+    }
+}
+
+fn discover_models(endpoint: &str, key: &str, provider: DetectedProvider) -> Result<Vec<String>> {
+    let url = format!("{}/models", endpoint.trim_end_matches('/'));
+    let client = reqwest::blocking::Client::new();
+
+    let resp = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", key))
+        .send()
+        .with_context(|| format!("GET {}", url))?;
+
+    if !resp.status().is_success() {
+        anyhow::bail!("HTTP {} from {}", resp.status(), url);
+    }
+
+    let body: serde_json::Value = resp.json()?;
+    let models = match provider {
+        DetectedProvider::OpenRouter => {
+            // OpenRouter: filter for free models
+            body["data"]
+                .as_array()
+                .map(|arr| {
+                    arr.iter()
+                        .filter(|m| {
+                            let id = m["id"].as_str().unwrap_or("");
+                            let pricing = &m["pricing"];
+                            let prompt_free = pricing["prompt"].as_str() == Some("0");
+                            let is_free = id.contains(":free") || prompt_free;
+                            is_free
+                        })
+                        .filter_map(|m| m["id"].as_str().map(String::from))
+                        .collect()
+                })
+                .unwrap_or_default()
+        }
+        _ => {
+            // Generic: return all model IDs
+            body["data"]
+                .as_array()
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|m| m["id"].as_str().map(String::from))
+                        .collect()
+                })
+                .unwrap_or_default()
+        }
+    };
+
+    Ok(models)
+}
+
+fn build_provider_entry(
+    provider_id: &str,
+    endpoint: &str,
+    env_name: &str,
+    model_id: &str,
+    provider: DetectedProvider,
+) -> serde_json::Value {
+    let auth_prefix = match provider {
+        DetectedProvider::Google => "",
+        _ => "Bearer ",
+    };
+    let auth_header = match provider {
+        DetectedProvider::Google => "x-goog-api-key",
+        _ => "Authorization",
+    };
+
+    let full_id = if model_id.starts_with(&format!("{}/", provider_id)) {
+        model_id.to_string()
+    } else {
+        format!("{}/{}", provider_id, model_id)
+    };
+
+    serde_json::json!({
+        "model_id": full_id,
+        "api_key_envs": [env_name],
+        "endpoint": endpoint,
+        "provider_label": provider_id,
+        "auth_header_name": auth_header,
+        "auth_header_prefix": auth_prefix,
+        "payload_model": model_id
+    })
+}
+        .collect();
+
+    let mut lane_policy = serde_json::Map::new();
+    lane_policy.insert(
+        "free:*".to_string(),
+        serde_json::Value::Array(active_ids.iter().map(|id| serde_json::Value::String(id.clone())).collect()),
+    );
+    lane_policy.insert(
+        "*:*".to_string(),
+        serde_json::Value::Array(active_ids.iter().map(|id| serde_json::Value::String(id.clone())).collect()),
+    );
+
+    serde_json::json!({
+        "providers": providers,
+        "active_model_ids": active_ids,
+        "lane_model_policy": lane_policy
+    })
+}
+
+async fn run_scribe(repo: &Path) -> Result<()> {
+    use std::process::Command as StdCommand;
+
+    // Collect context
+    let git_log = StdCommand::new("git")
+        .args(["log", "--format=%s%n  files: %(trailers:key=file,valueonly)", "-20"])
+        .current_dir(repo)
+        .output()
+        .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
+        .unwrap_or_else(|_| "no git history".to_string());
+
+    let git_files = StdCommand::new("git")
+        .args(["log", "--oneline", "--name-only", "-10"])
+        .current_dir(repo)
+        .output()
+        .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
+        .unwrap_or_default();
+
+    // Read blueprint if exists
+    let blueprint = {
+        let plan_dir = repo.join("plan");
+        if plan_dir.exists() {
+            std::fs::read_dir(&plan_dir)
+                .ok()
+                .and_then(|entries| {
+                    entries
+                        .filter_map(|e| e.ok())
+                        .filter(|e| e.path().extension().map_or(false, |ext| ext == "md"))
+                        .max_by_key(|e| e.metadata().ok().and_then(|m| m.modified().ok()))
+                })
+                .and_then(|e| std::fs::read_to_string(e.path()).ok())
+                .unwrap_or_default()
+        } else {
+            String::new()
+        }
+    };
+
+    let prompt = format!(
+        r#"You are a scribe for a software project. Analyze the git history and project state, then write a concise project-state.md.
+
+## Recent Git Log
+{git_log}
+
+## Recent File Changes
+{git_files}
+
+## Blueprint
+{blueprint}
+
+## Instructions
+Write a project-state.md file with EXACTLY this format (no preamble, no explanation):
+
+# Project State
+
+## Current Focus
+{{one line: what the project is actively working on, based on recent commits and blueprint}}
+
+## Completed
+- [x] {{recent completed work from the log}}
+
+## In Progress
+- [x] {{what's actively being worked on based on recent file patterns}}
+
+## Open Issues
+- {{anything that looks broken or blocked based on the evidence}}
+
+Keep it factual. Infer from the evidence, don't make things up. If unclear, say so.
+Write ONLY the markdown, nothing else."#
+    );
+
+    // Build router
+    let resolved = ai_runtime_config::resolve_ai_runtime_config();
+    let mut registry: ai_routing_runtime::ProviderRegistry<dyn AiProvider> =
+        ai_routing_runtime::ProviderRegistry::new();
+    for spec in &resolved.openai_providers {
+        let provider: std::sync::Arc<dyn AiProvider> =
+            std::sync::Arc::new(ai_runtime_adapters::GenericOpenAIAdapter::new_with_auth(
+                spec.api_keys.first().cloned().unwrap_or_default(),
+                spec.endpoint.clone(),
+                spec.payload_model.clone(),
+                spec.auth_header_name.clone(),
+                spec.auth_header_prefix.clone(),
+            ));
+        registry.register(&spec.model_id, provider);
+    }
+
+    let mut free_models = std::collections::HashMap::new();
+    free_models.insert("free:*".to_string(), resolved.active_model_ids.clone());
+    let lane_policy = ai_routing_runtime::LaneModelPolicy::from_entries(free_models);
+
+    let router = ai_routing_runtime::SmartRouter::new(
+        registry,
+        resolved.active_model_ids.clone(),
+        resolved.dev_model_ids,
+        lane_policy,
+    );
+
+    let messages = vec![ai_routing_runtime::RoutingMessage {
+        role: "user".to_string(),
+        content: prompt,
+    }];
+
+    let (provider, _trace) = router
+        .route_with_trace(
+            "scribe",
+            Some(RoutingTask::Free),
+            None,
+            &messages,
+            SelectionConstraints::default(),
+        )
+        .await?;
+
+    let req = ChatRequest {
+        project_id: "scribe".to_string(),
+        messages: vec![ChatMessage {
+            role: "user".to_string(),
+            content: messages[0].content.clone(),
+        }],
+        client_intent: Some(RoutingTask::Free),
+        routing_constraints: SelectionConstraints::default(),
+        resolved_service_level: None,
+    };
+
+    let (text, _usage) = provider.ask_and_collect(req).await?;
+
+    // Write project-state.md
+    let dracon_dir = repo.join(".dracon");
+    std::fs::create_dir_all(&dracon_dir)?;
+    let state_path = dracon_dir.join("project-state.md");
+
+    // Extract just the markdown (in case AI added preamble)
+    let markdown = if let Some(start) = text.find("# Project State") {
+        &text[start..]
+    } else {
+        &text
+    };
+
+    std::fs::write(&state_path, markdown.trim())?;
+    eprintln!("📝 scribe: updated {}", state_path.display());
+    println!("{}", markdown.trim());
+
+    Ok(())
 }
 
 async fn agent_next(
