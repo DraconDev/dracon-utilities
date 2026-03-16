@@ -2630,26 +2630,7 @@ async fn sync_repo(
         // All changes were filtered out (excluded dirs, oversized files, etc.)
         // Restore modified files to avoid perpetual dirty state. Untracked files can't be restored.
         let restorable: Vec<_> = to_restore.iter().filter(|e| can_restore_entry(e)).collect();
-        let large_untracked: Vec<_> = to_restore
-            .iter()
-            .filter(|e| is_large_untracked(e, repo, policy.max_stage_file_bytes))
-            .collect();
-        
-        let mut gitignore_updated = false;
-        if !large_untracked.is_empty() {
-            let patterns: Vec<String> = large_untracked
-                .iter()
-                .map(|e| e.path.to_string_lossy().to_string())
-                .collect();
-            eprintln!(
-                "📝 {} has {} large untracked file(s) > {} bytes - adding to .gitignore",
-                repo.display(),
-                patterns.len(),
-                policy.max_stage_file_bytes
-            );
-            append_to_gitignore(repo, &patterns)?;
-            gitignore_updated = true;
-        }
+        let gitignore_updated = handle_large_untracked(repo, &to_restore, policy)?;
         
         let other_untracked: Vec<_> = to_restore
             .iter()
