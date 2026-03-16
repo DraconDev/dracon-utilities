@@ -4018,38 +4018,9 @@ mod tests {
         LOCK.get_or_init(|| Mutex::new(()))
     }
 
-    struct TempDir {
-        path: PathBuf,
-    }
+    use dracon_common::test_support::TestDir;
 
-    impl TempDir {
-        fn new(prefix: &str) -> Self {
-            let unique = format!(
-                "{}_{}_{}",
-                prefix,
-                std::process::id(),
-                SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .expect("time")
-                    .as_nanos()
-            );
-            let path = std::env::temp_dir().join(unique);
-            std::fs::create_dir_all(&path).expect("create temp dir");
-            Self { path }
-        }
-
-        fn path(&self) -> &Path {
-            &self.path
-        }
-    }
-
-    impl Drop for TempDir {
-        fn drop(&mut self) {
-            let _ = std::fs::remove_dir_all(&self.path);
-        }
-    }
-
-fn test_policy() -> SyncPolicy {
+    fn test_policy() -> SyncPolicy {
         SyncPolicy {
             system_repo: String::new(),
             pulse_interval_secs: 5,
