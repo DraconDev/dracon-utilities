@@ -1491,7 +1491,7 @@ async fn run_guard_once(
         state.last_disk_state = dstate.clone();
     }
 
-    let exempt = parse_names(&guard.process_exempt_names);
+    let exempt = parse_kinds(&guard.process_exempt_names);
     let samples = process_samples().await?;
     let mut current_heavy = HashSet::new();
     let mut alerts = Vec::new();
