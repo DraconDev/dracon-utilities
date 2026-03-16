@@ -206,83 +206,22 @@ impl WardenPolicy {
 }
 
 fn resolve_policy_path() -> Result<PathBuf> {
-    if let Ok(custom) = std::env::var("DRACON_WARDEN_POLICY") {
-        let p = PathBuf::from(custom);
-        if p.exists() {
-            return Ok(p);
-        }
-    }
-
-    if let Ok(custom) = std::env::var("DRACON_SECURITY_POLICY") {
-        let p = PathBuf::from(custom);
-        if p.exists() {
-            return Ok(p);
-        }
-    }
-
     let home = dirs::home_dir().context("home not found")?;
-    let candidates = [
-        home.join(".dracon/utilities/warden/dracon-warden.toml"),
-        home.join(".dracon/utilities/warden/dracon-security.toml"),
-        home.join(".dracon/utilities/warden/config.toml"),
-        home.join(".dracon/security/dracon-security.toml"),
-    ];
-
-    for p in &candidates {
-        if p.exists() {
-            return Ok(p.clone());
-        }
-    }
-
-    Err(anyhow::anyhow!(
-        "policy not found. checked: {} (or DRACON_WARDEN_POLICY/DRACON_SECURITY_POLICY)",
-        candidates
-            .iter()
-            .map(|p| p.display().to_string())
-            .collect::<Vec<_>>()
-            .join(", ")
-    ))
+    dracon_common::resolve_policy_path(
+        &["DRACON_WARDEN_POLICY", "DRACON_SECURITY_POLICY"],
+        &[
+            home.join(".dracon/utilities/warden/dracon-warden.toml"),
+            home.join(".dracon/utilities/warden/dracon-security.toml"),
+            home.join(".dracon/utilities/warden/config.toml"),
+            home.join(".dracon/security/dracon-security.toml"),
+        ],
+        "policy not found",
+    )
 }
 
 fn discover_git_repos(roots: &[PathBuf]) -> Vec<PathBuf> {
-    let mut repos = BTreeSet::new();
-
-    for root in roots {
-        if root.join(".git").exists() {
-            repos.insert(root.clone());
-        }
-
-        let walker = walkdir::WalkDir::new(root)
-            .follow_links(false)
-            .into_iter()
-            .filter_entry(|e| {
-                let name = e.file_name().to_string_lossy();
-                if e.depth() == 0 {
-                    return true;
-                }
-                if name == ".git" {
-                    return true;
-                }
-                if name == "target"
-                    || name == "node_modules"
-                    || name == ".cache"
-                    || name == ".direnv"
-                {
-                    return false;
-                }
-                true
-            });
-
-        for entry in walker.filter_map(|e| e.ok()) {
-            if entry.file_name() == ".git" {
-                if let Some(parent) = entry.path().parent() {
-                    repos.insert(parent.to_path_buf());
-                }
-            }
-        }
-    }
-
-    repos.into_iter().collect()
+    let excluded = BTreeSet::new();
+    dracon_common::discover_git_repos(roots, &excluded)
 }
 
 fn effective_watch_roots(policy: &WardenPolicy) -> Vec<PathBuf> {

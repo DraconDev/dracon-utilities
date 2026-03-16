@@ -1832,25 +1832,8 @@ fn load_system_policy() -> (Option<PathBuf>, SystemPolicy) {
     (Some(path), parsed)
 }
 
-fn daemon_lock_path() -> PathBuf {
-    dirs::home_dir()
-        .map(|h| h.join(".dracon").join("dracon-system.lock"))
-        .unwrap_or_else(|| PathBuf::from("/tmp/dracon-system.lock"))
-}
-
 fn acquire_daemon_lock() -> Result<File> {
-    let lock_path = daemon_lock_path();
-    if let Some(parent) = lock_path.parent() {
-        std::fs::create_dir_all(parent).ok();
-    }
-    let file = File::create(&lock_path)
-        .with_context(|| format!("failed to create lock file {}", lock_path.display()))?;
-    file.try_lock_exclusive()
-        .with_context(|| format!("failed to acquire lock {} - another daemon running?", lock_path.display()))?;
-    if let Err(e) = writeln!(&file, "{}", std::process::id()) {
-        eprintln!("⚠️ failed to write PID to lock file: {}", e);
-    }
-    Ok(file)
+    dracon_common::acquire_daemon_lock("dracon-system")
 }
 
 async fn is_user_service_active(service: &str) -> bool {
