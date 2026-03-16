@@ -2485,10 +2485,10 @@ async fn sync_repo(
 
             svc.commit(&msg).await?;
             
-            // Run scribe: update project-state.md via AI
+            // Scribe: update project-state.md via AI (if configured)
             #[cfg(feature = "scribe")]
             {
-                if let Err(e) = scribe::update_project_state(repo).await {
+                if let Err(e) = update_project_state_from_ai(repo).await {
                     eprintln!("scribe: {}", e);
                 }
             }
