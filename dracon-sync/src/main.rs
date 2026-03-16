@@ -2054,10 +2054,120 @@ fn append_incident_record(policy_path: &Path, record: &IncidentRecord) {
         for line in kept {
             out.push_str(&line);
             out.push('\n');
-        }
-        std::fs::write(path, out)?;
-        Ok(())
     }
+
+    Ok(())
+}
+
+// ─── AI Scribe (feature-gated) ──────────────────────────────────────────
+// Integrated into sync flow: called after each commit to update project-state.md.
+// Uses reqwest directly — no dracon-ai binary, no routing runtime.
+
+#[cfg(feature = "scribe")]
+async fn update_project_state_from_ai(repo: &Path) -> anyhow::Result<()> {
+    use anyhow::Context;
+    use std::process::Command as StdCommand;
+
+    // Collect git context
+    let git_log = StdCommand::new("git")
+        .args(["log", "--format=%s", "-20"])
+        .current_dir(repo)
+        .output()
+        .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
+        .unwrap_or_default();
+
+    let git_files = StdCommand::new("git")
+        .args(["log", "--oneline", "--name-only", "-10"])
+        .current_dir(repo)
+        .output()
+        .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
+        .unwrap_or_default();
+
+    let blueprint = read_blueprint_content(repo);
+
+    // Resolve AI provider from config
+    let resolved = ai_runtime_config::resolve_ai_runtime_config();
+    let provider = match resolved.openai_providers.iter()
+        .find(|p| !p.api_keys.is_empty() && !p.api_keys[0].is_empty())
+    {
+        Some(p) => p,
+        None => anyhow::bail!("no AI provider configured"),
+    };
+
+    let prompt = format!(
+        "You are a scribe. Analyze git history and write a concise project-state.md.\n\n\
+         ## Recent Git Log\n{}\n\n## File Changes\n{}\n\n## Blueprint\n{}\n\n\
+         Write EXACTLY this format:\n\
+         # Project State\n\n## Current Focus\n{{one line}}\n\n\
+         ## Completed\n- [x] {{done}}\n\n## In Progress\n- [ ] {{active}}\n\n\
+         ## Open Issues\n- {{blockers}}\n\n\
+         Be factual. Infer from evidence.",
+        git_log, git_files, blueprint
+    );
+
+    let body = serde_json::json!({
+        "model": &provider.payload_model,
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": 1000,
+        "temperature": 0.3,
+    });
+
+    let client = reqwest::Client::new();
+    let url = format!("{}/chat/completions", provider.endpoint.trim_end_matches('/'));
+    let resp = client
+        .post(&url)
+        .header(
+            &provider.auth_header_name,
+            format!("{}{}", provider.auth_header_prefix, provider.api_keys[0]),
+        )
+        .json(&body)
+        .send()
+        .await
+        .with_context(|| "AI scribe request")?;
+
+    if !resp.status().is_success() {
+        if resp.status() == reqwest::StatusCode::UNAUTHORIZED {
+            anyhow::bail!("auth failed (check ~/.dracon/ai/secrets/)");
+        }
+        anyhow::bail!("AI returned {}", resp.status());
+    }
+
+    let json: serde_json::Value = resp.json().await?;
+    let content = json["choices"][0]["message"]["content"]
+        .as_str()
+        .ok_or_else(|| anyhow::anyhow!("AI response missing content"))?;
+
+    let markdown = if let Some(start) = content.find("# Project State") {
+        content[start..].trim()
+    } else {
+        content.trim()
+    };
+
+    let state_path = repo.join(".dracon/project-state.md");
+    std::fs::create_dir_all(repo.join(".dracon"))?;
+    std::fs::write(&state_path, markdown)
+        .with_context(|| format!("writing {}", state_path.display()))?;
+    eprintln!("📝 scribe: updated {}", state_path.display());
+
+    Ok(())
+}
+
+fn read_blueprint_content(repo: &Path) -> String {
+    let plan_dir = repo.join("plan");
+    if !plan_dir.exists() {
+        return String::new();
+    }
+    std::fs::read_dir(&plan_dir)
+        .ok()
+        .and_then(|entries| {
+            entries
+                .filter_map(|e| e.ok())
+                .filter(|e| e.path().extension().map_or(false |ext| ext == "md"))
+                .max_by_key(|e| e.metadata().ok().and_then(|m| m.modified().ok()))
+        })
+        .and_then(|e| std::fs::read_to_string(e.path()).ok())
+        .unwrap_or_default()
+}
 
     let path = incident_ledger_path(policy_path);
     let line = match serde_json::to_string(record) {
