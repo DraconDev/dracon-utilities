@@ -151,9 +151,6 @@ impl WardenPolicy {
             .iter()
             .cloned()
             .collect::<BTreeSet<_>>();
-        for p in DEFAULT_PLAINTEXT_PATTERNS {
-            plaintext.insert((*p).to_string());
-        }
 
         let intersection = protected
             .intersection(&plaintext)
@@ -339,9 +336,6 @@ fn build_gitignore_block_with_existing(
     for p in &policy.plaintext_patterns {
         plaintext_patterns.insert(p.clone());
     }
-    for p in DEFAULT_PLAINTEXT_PATTERNS {
-        plaintext_patterns.insert((*p).to_string());
-    }
     for p in &policy.protected_patterns {
         lines.push(format!("!{}", p));
     }
@@ -365,9 +359,6 @@ fn build_gitattributes_block(policy: &WardenPolicy) -> Result<String> {
     let mut plaintext_patterns = BTreeSet::new();
     for p in &policy.plaintext_patterns {
         plaintext_patterns.insert(p.clone());
-    }
-    for p in DEFAULT_PLAINTEXT_PATTERNS {
-        plaintext_patterns.insert((*p).to_string());
     }
     let mut protected_patterns = BTreeSet::new();
     for p in &policy.protected_patterns {
