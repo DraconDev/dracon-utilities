@@ -2162,7 +2162,7 @@ fn read_blueprint_content(repo: &Path) -> String {
         .and_then(|entries| {
             entries
                 .filter_map(|e| e.ok())
-                .filter(|e| e.path().extension().map_or(false |ext| ext == "md"))
+                .filter(|e| e.path().extension().map_or(false, |ext| ext == "md"))
                 .max_by_key(|e| e.metadata().ok().and_then(|m| m.modified().ok()))
         })
         .and_then(|e| std::fs::read_to_string(e.path()).ok())
