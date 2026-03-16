@@ -2566,19 +2566,7 @@ async fn sync_repo(
                 .filter(|e| is_large_untracked(e, repo, policy.max_stage_file_bytes))
                 .collect();
             
-            if !large_untracked.is_empty() {
-                let patterns: Vec<String> = large_untracked
-                    .iter()
-                    .map(|e| e.path.to_string_lossy().to_string())
-                    .collect();
-                eprintln!(
-                    "📝 {} has {} large untracked file(s) > {} bytes - adding to .gitignore",
-                    repo.display(),
-                    patterns.len(),
-                    policy.max_stage_file_bytes
-                );
-                append_to_gitignore(repo, &patterns)?;
-            }
+            handle_large_untracked(repo, &to_restore, policy)?;
             
             let other_untracked: Vec<_> = to_restore
                 .iter()
