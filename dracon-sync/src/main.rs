@@ -2058,6 +2058,37 @@ fn append_incident_record(policy_path: &Path, record: &IncidentRecord) {
 
         Ok(())
     }
+    // ── append logic ──
+    let path = incident_ledger_path(policy_path);
+    let line = match serde_json::to_string(record) {
+        Ok(v) => v,
+        Err(e) => {
+            eprintln!("⚠️ incident serialize failed: {}", e);
+            return;
+        }
+    };
+    let parent = path.parent().map(Path::to_path_buf);
+    if let Some(dir) = parent {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    match std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+    {
+        Ok(mut file) => {
+            use std::io::Write;
+            if let Err(e) = writeln!(file, "{}", line) {
+                eprintln!("⚠️ incident write failed ({}): {}", path.display(), e);
+            } else if let Ok(policy) = SyncPolicy::load(policy_path) {
+                if let Err(e) = enforce_retention(&path, &policy) {
+                    eprintln!("⚠️ incident retention failed ({}): {}", path.display(), e);
+                }
+            }
+        }
+        Err(e) => eprintln!("⚠️ incident open failed ({}): {}", path.display(), e),
+    }
+}
 
 // ─── AI Scribe (feature-gated) ──────────────────────────────────────────
 // Integrated into sync flow: called after each commit to update project-state.md.
@@ -2167,37 +2198,6 @@ fn read_blueprint_content(repo: &Path) -> String {
         })
         .and_then(|e| std::fs::read_to_string(e.path()).ok())
         .unwrap_or_default()
-}
-
-    let path = incident_ledger_path(policy_path);
-    let line = match serde_json::to_string(record) {
-        Ok(v) => v,
-        Err(e) => {
-            eprintln!("⚠️ incident serialize failed: {}", e);
-            return;
-        }
-    };
-    let parent = path.parent().map(Path::to_path_buf);
-    if let Some(dir) = parent {
-        let _ = std::fs::create_dir_all(dir);
-    }
-    match std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&path)
-    {
-        Ok(mut file) => {
-            use std::io::Write;
-            if let Err(e) = writeln!(file, "{}", line) {
-                eprintln!("⚠️ incident write failed ({}): {}", path.display(), e);
-            } else if let Ok(policy) = SyncPolicy::load(policy_path) {
-                if let Err(e) = enforce_retention(&path, &policy) {
-                    eprintln!("⚠️ incident retention failed ({}): {}", path.display(), e);
-                }
-            }
-        }
-        Err(e) => eprintln!("⚠️ incident open failed ({}): {}", path.display(), e),
-    }
 }
 
 fn repo_state_flags(
