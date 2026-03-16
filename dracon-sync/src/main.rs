@@ -17,9 +17,6 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use tokio::process::Command as TokioCommand;
 use tokio::time::{sleep, Duration};
 
-#[cfg(feature = "scribe")]
-mod scribe;
-
 #[derive(Parser, Debug)]
 #[command(name = "dracon-sync")]
 #[command(about = "Dracon sync runtime")]
