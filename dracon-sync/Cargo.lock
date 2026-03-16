@@ -223,15 +223,27 @@ dependencies = [
 
 [[package]]
 name = "dracon-ai-contracts"
-version = "0.1.1384"
+version = "0.1.1397"
 dependencies = [
  "serde",
  "serde_json",
 ]
 
 [[package]]
+name = "dracon-common"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "dirs",
+ "fs2",
+ "serde",
+ "serde_json",
+ "walkdir",
+]
+
+[[package]]
 name = "dracon-git"
-version = "0.1.1384"
+version = "0.1.1397"
 dependencies = [
  "anyhow",
  "git2",
@@ -249,6 +261,7 @@ dependencies = [
  "anyhow",
  "clap",
  "dirs",
+ "dracon-common",
  "dracon-git",
  "fs2",
  "reqwest",

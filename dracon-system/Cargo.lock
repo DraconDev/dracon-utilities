@@ -430,6 +430,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "dracon-common"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "dirs",
+ "fs2",
+ "serde",
+ "serde_json",
+ "walkdir",
+]
+
+[[package]]
 name = "dracon-config"
 version = "0.3.0"
 dependencies = [
@@ -449,6 +461,7 @@ dependencies = [
  "anyhow",
  "clap",
  "dirs",
+ "dracon-common",
  "dracon-system 0.3.0",
  "fs2",
  "serde",
