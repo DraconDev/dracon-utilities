@@ -1407,10 +1407,6 @@ fn resmudge_repos(policy: &WardenPolicy, repos: &[PathBuf], apply: bool) -> Resu
 fn run_filter(is_clean: bool, path: Option<&str>) -> Result<()> {
     let mut input = Vec::new();
     std::io::stdin().read_to_end(&mut input)?;
-    if should_passthrough_filter_path(path) {
-        std::io::stdout().write_all(&input)?;
-        return Ok(());
-    }
     let warden = DraconWarden::new()?;
     let output = if is_clean {
         warden.clean(&input, path)?
@@ -1524,21 +1520,6 @@ mod tests {
             discover_roots: vec![],
         };
         assert!(build_gitattributes_block(&policy).is_err());
-    }
-
-    #[test]
-    fn passthrough_filter_path_matches_config_envs() {
-        assert!(!should_passthrough_filter_path(Some(
-            "config/envs/local.env"
-        )));
-        assert!(!should_passthrough_filter_path(Some(
-            "./config/envs/local.env"
-        )));
-        assert!(!should_passthrough_filter_path(Some(
-            "config\\envs\\local.env"
-        )));
-        assert!(!should_passthrough_filter_path(Some(".env")));
-        assert!(!should_passthrough_filter_path(None));
     }
 
     #[test]
