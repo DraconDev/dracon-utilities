@@ -58,3 +58,50 @@ systemctl --user restart dracon-warden.service
 | dracon-sync | ~/dracon/utilities/sync/dracon-sync.toml |
 | dracon-system | ~/dracon/utilities/system/dracon-system.toml |
 | dracon-warden | ~/dracon/utilities/warden/dracon-warden.toml |
+
+## The Scribe
+
+The scribe is **you** (AI). You maintain `.dracon/project-state.md` in each repo you work in. The daemon reads this file and includes the "Current Focus" line in every commit message body.
+
+### When to read
+
+**At the start of every session**, read `.dracon/project-state.md` to understand:
+- What's the current focus?
+- What's been completed recently?
+- What's in progress?
+- Any open issues or blockers?
+
+### When to update
+
+Update `.dracon/project-state.md` when you:
+- Start a new task or change focus
+- Complete a task
+- Discover a blocking issue
+- Make an architectural decision
+- Learn something important about the codebase
+
+### Format
+
+```markdown
+# Project State
+
+## Current Focus
+{one line: what you're working on right now}
+
+## Completed
+- [x] {what you finished, with context}
+
+## In Progress
+- [ ] {what you're actively working on}
+
+## Open Issues
+- {blockers, decisions needed, things to investigate}
+```
+
+### Rules
+
+- **Current Focus** must be one line — it becomes the commit body
+- Be specific: "Fix TOCTOU race in warden keygen" not "fix bugs"
+- Include context: "Binary files bypass encryption — needs user decision on approach"
+- Don't document mechanical changes — only semantic state
+- If the file doesn't exist, create it when you have something meaningful to say
