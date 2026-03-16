@@ -2597,11 +2597,7 @@ async fn sync_repo(
             
             // Scribe: update project-state.md via AI (if configured)
             #[cfg(feature = "scribe")]
-            {
-                if let Err(e) = update_project_state_from_ai(repo).await {
-                    eprintln!("scribe: {}", e);
-                }
-            }
+            update_project_state_from_ai(repo).await.ok();
             
             // Restore any excluded modified paths that weren't committed
             let restorable: Vec<_> = to_restore.iter().filter(|e| can_restore_entry(e)).collect();
