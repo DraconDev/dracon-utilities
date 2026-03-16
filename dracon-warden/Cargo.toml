@@ -18,5 +18,5 @@ serde_json = "1.0"
 toml = "0.8"
 walkdir = "2.5"
 dirs = "6.0"
-dracon-common = { path = "../../dracon-libs/tools/common/dracon-common" }
+dracon-common = { path = "../../dracon-libs/tools/common/dracon-common", features = ["test-support"] }
 dracon-security-kit = { package = "dracon-security", path = "../../dracon-libs/tools/security/dracon-security" }
