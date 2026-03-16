@@ -494,28 +494,7 @@ fn intent_to_lane(intent: &str) -> RoutingTask {
     }
 }
 
-fn color_enabled() -> bool {
-    std::io::stderr().is_terminal() && std::env::var_os("NO_COLOR").is_none()
-}
-
-fn ansi(code: &str, s: &str) -> String {
-    if !color_enabled() {
-        return s.to_string();
-    }
-    format!("\x1b[{}m{}\x1b[0m", code, s)
-}
-
-fn dim(s: &str) -> String {
-    ansi("90", s)
-}
-
-fn cyan(s: &str) -> String {
-    ansi("36", s)
-}
-
-fn magenta_bold(s: &str) -> String {
-    ansi("1;35", s)
-}
+use dracon_common::{ansi, dim, cyan, magenta_bold};
 
 fn stderr_is_tty() -> bool {
     std::io::stderr().is_terminal()
