@@ -2982,7 +2982,7 @@ async fn run_repos_report(policy_path: &Path, filter: RepoFilter, json: bool) ->
                 init_or_status_failures += 1;
                 println!(
                     "{} {} | init_failed: {}",
-                    paint("❌", "31"),
+                    ansi("31", "❌"),
                     repo.display(),
                     e
                 );
@@ -2996,7 +2996,7 @@ async fn run_repos_report(policy_path: &Path, filter: RepoFilter, json: bool) ->
                 init_or_status_failures += 1;
                 println!(
                     "{} {} | status_failed: {}",
-                    paint("❌", "31"),
+                    ansi("31", "❌"),
                     repo.display(),
                     e
                 );
@@ -3121,11 +3121,11 @@ async fn run_repos_report(policy_path: &Path, filter: RepoFilter, json: bool) ->
     println!(
         "📦 REPOS: {}  {} {}  {} {}  {} {}  ❌ {}{}",
         rows.len(),
-        paint("OK", "32"),
+        ansi("32", "OK"),
         ok_count,
-        paint("WARN", "33"),
+        ansi("33", "WARN"),
         warn_count,
-        paint("CONCERN", "31"),
+        ansi("31", "CONCERN"),
         concern_count,
         init_or_status_failures,
         match filter {
@@ -3141,11 +3141,11 @@ async fn run_repos_report(policy_path: &Path, filter: RepoFilter, json: bool) ->
 
     for (idx, row) in rows.iter().enumerate() {
         let severity = if row.concern {
-            paint("CONCERN", "31")
+            ansi("31", "CONCERN")
         } else if row.warn {
-            paint("WARN", "33")
+            ansi("33", "WARN")
         } else {
-            paint("OK", "32")
+            ansi("32", "OK")
         };
 
         println!("{}. [{}] {}", idx + 1, severity, row.repo);
@@ -4273,7 +4273,7 @@ fn test_policy() -> SyncPolicy {
         assert!(truncate("very long value", 8).ends_with('…'));
         let _guard = env_lock().lock().expect("lock");
         std::env::set_var("NO_COLOR", "1");
-        assert_eq!(paint("x", "31"), "x");
+        assert_eq!(ansi("31", "x"), "x");
         std::env::remove_var("NO_COLOR");
     }
 
