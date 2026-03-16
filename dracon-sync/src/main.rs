@@ -4118,7 +4118,7 @@ mod tests {
 
     #[test]
     fn should_stage_entry_respects_rules() {
-        let td = TempDir::new("sync_should_stage");
+        let td = TestDir::new("sync_should_stage");
         let repo = td.path().join("repo");
         std::fs::create_dir_all(&repo).expect("repo");
         let excluded = BTreeSet::from(["target".to_string()]);
@@ -4153,7 +4153,7 @@ mod tests {
 
     #[test]
     fn should_stage_entry_excludes_file_patterns() {
-        let td = TempDir::new("sync_should_stage_patterns");
+        let td = TestDir::new("sync_should_stage_patterns");
         let repo = td.path().join("repo");
         std::fs::create_dir_all(&repo).expect("repo");
         let no_excluded_dirs: BTreeSet<String> = BTreeSet::new();
@@ -4213,7 +4213,7 @@ mod tests {
         let _guard = env_lock().lock().expect("lock");
         std::env::remove_var("DRACON_SYNC_FREEZE");
 
-        let td = TempDir::new("sync_freeze");
+        let td = TestDir::new("sync_freeze");
         let policy = td.path().join("dracon-sync.toml");
         std::fs::write(&policy, "").expect("policy");
 
@@ -4250,7 +4250,7 @@ mod tests {
 
     #[test]
     fn discover_git_repos_finds_and_excludes() {
-        let td = TempDir::new("sync_discover");
+        let td = TestDir::new("sync_discover");
         let root = td.path().join("root");
         std::fs::create_dir_all(root.join("repo-a/.git")).expect("repo-a");
         std::fs::create_dir_all(root.join("target/repo-b/.git")).expect("repo-b");
@@ -4327,7 +4327,7 @@ mod tests {
 
     #[test]
     fn incident_ledger_write_roundtrip() {
-        let td = TempDir::new("sync_ledger");
+        let td = TestDir::new("sync_ledger");
         let policy = td.path().join("dracon-sync.toml");
         std::fs::write(&policy, "watch_roots=[]").expect("policy");
         let record = IncidentRecord {
@@ -4358,7 +4358,7 @@ mod tests {
         use dracon_git::types::{DiffFile, FileStatus};
         use std::collections::BTreeSet;
 
-        let repo = TempDir::new("deleted_stage");
+        let repo = TestDir::new("deleted_stage");
 
         let entry = DiffFile {
             path: PathBuf::from("some/deleted/dir/file.rs"),
