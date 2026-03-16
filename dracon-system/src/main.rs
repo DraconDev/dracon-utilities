@@ -540,14 +540,6 @@ fn parse_kinds(csv: &str) -> HashSet<String> {
         .collect()
 }
 
-fn parse_names(csv: &str) -> HashSet<String> {
-    csv.split(',')
-        .map(|s| s.trim())
-        .filter(|s| !s.is_empty())
-        .map(|s| s.to_string())
-        .collect()
-}
-
 #[derive(Debug, Clone)]
 struct ProcSample {
     pid: i32,
