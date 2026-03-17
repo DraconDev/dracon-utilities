@@ -2299,10 +2299,12 @@ async fn sync_repo(
             Ok(Ok(())) => {}
             Ok(Err(dracon_git::error::GitError::MergeConflict)) => {
                 eprintln!("⚠️ pull/rebase conflict in {} (manual intervention required)", repo.display());
+                emit_event(&DraconEvent::new("sync", EventSeverity::Error, format!("pull/{}", repo.display()), "merge conflict - manual intervention required"));
                 return Ok(false);
             }
             Ok(Err(e)) => {
                 eprintln!("⚠️ pull/rebase failed for {}: {} - aborting sync pass", repo.display(), e);
+                emit_event(&DraconEvent::new("sync", EventSeverity::Warn, format!("pull/{}", repo.display()), format!("failed: {e}")));
                 return Ok(false);
             }
             Err(_) => {
@@ -2311,6 +2313,7 @@ async fn sync_repo(
                     repo.display(),
                     policy.pull_op_timeout_secs
                 );
+                emit_event(&DraconEvent::new("sync", EventSeverity::Warn, format!("pull/{}", repo.display()), format!("timeout after {}s", policy.pull_op_timeout_secs)));
                 return Ok(false);
             }
         }
