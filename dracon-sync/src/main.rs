@@ -2005,6 +2005,16 @@ async fn update_project_state_from_ai(repo: &Path) -> anyhow::Result<()> {
     use anyhow::Context;
     use std::process::Command as StdCommand;
 
+    // Cooldown: skip if project-state.md was updated less than 30 minutes ago
+    let state_path = repo.join(".dracon/project-state.md");
+    if let Ok(meta) = std::fs::metadata(&state_path) {
+        if let Ok(modified) = meta.modified() {
+            if modified.elapsed().unwrap_or_default().as_secs() < 1800 {
+                return Ok(());
+            }
+        }
+    }
+
     // Collect git context
     let git_log = StdCommand::new("git")
         .args(["log", "--format=%s", "-20"])
