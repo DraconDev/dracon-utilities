@@ -63,6 +63,18 @@ enum Commands {
         #[command(subcommand)]
         cmd: GuardCommands,
     },
+    /// Show recent events from the shared event stream.
+    Events {
+        /// Number of recent events to show.
+        #[arg(short, long, default_value = "50")]
+        tail: usize,
+        /// Filter by source (e.g. sync, warden, system).
+        #[arg(short, long)]
+        source: Option<String>,
+        /// Filter by severity (info, warn, error, critical).
+        #[arg(short, long)]
+        severity: Option<String>,
+    },
 }
 
 #[derive(Subcommand, Debug)]
