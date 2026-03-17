@@ -2057,13 +2057,18 @@ async fn update_project_state_from_ai(repo: &Path) -> anyhow::Result<()> {
 
     let client = reqwest::Client::new();
     let url = format!("{}/chat/completions", endpoint.trim_end_matches('/'));
-    let resp = client
+    eprintln!("📝 scribe: calling {} (model: {})", endpoint, model);
+    let request = client
         .post(&url)
         .header("Authorization", format!("Bearer {api_key}"))
         .json(&body)
-        .send()
-        .await
-        .with_context(|| "AI scribe request")?;
+        .send();
+
+    let resp = match tokio::time::timeout(Duration::from_secs(30), request).await {
+        Ok(Ok(r)) => r,
+        Ok(Err(e)) => return Err(anyhow::anyhow!("AI scribe request failed: {e}")),
+        Err(_) => return Err(anyhow::anyhow!("AI scribe request timed out after 30s")),
+    };
 
     if !resp.status().is_success() {
         if resp.status() == reqwest::StatusCode::UNAUTHORIZED {
