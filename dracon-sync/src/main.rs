@@ -2024,8 +2024,10 @@ async fn update_project_state_from_ai(repo: &Path) -> anyhow::Result<()> {
 
     // Resolve AI provider via the config system (reads routing policy + env vars + secrets)
     let resolved = ai_client_config::resolve_ai_runtime_config();
+    // Prefer free models (sufficient for scribe, works without credits)
     let provider = resolved.openai_providers.iter()
-        .find(|p| !p.api_keys.is_empty() && !p.api_keys[0].is_empty());
+        .find(|p| p.model_id.contains(":free") && !p.api_keys.is_empty())
+        .or_else(|| resolved.openai_providers.iter().find(|p| !p.api_keys.is_empty()));
 
     let (api_key, endpoint, model) = match provider {
         Some(p) => (p.api_keys[0].clone(), p.endpoint.clone(), p.payload_model.clone()),
