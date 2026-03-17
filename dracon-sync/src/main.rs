@@ -2709,7 +2709,10 @@ async fn run_once(policy_path: &Path) -> Result<()> {
                 println!("🔁 synced {}", repo.display());
             }
             Ok(Ok(false)) => {}
-            Ok(Err(e)) => eprintln!("⚠️ sync failed for {}: {}", repo.display(), e),
+            Ok(Err(e)) => {
+                eprintln!("⚠️ sync failed for {}: {}", repo.display(), e);
+                emit_event(&DraconEvent::new("sync", EventSeverity::Error, format!("sync/{}", repo.display()), format!("failed: {e}")));
+            }
         }
     }
 
