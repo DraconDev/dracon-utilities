@@ -2941,7 +2941,7 @@ fn truncate(value: &str, max_chars: usize) -> String {
     format!("{}…", shortened)
 }
 
-use dracon_common::ansi;
+use dracon_common::{ansi, emit_event, DraconEvent, EventSeverity};
 
 async fn git_log_field(repo: &Path, format: &str) -> Option<String> {
     let output = tokio_git_command()
