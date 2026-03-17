@@ -540,7 +540,7 @@ dependencies = [
 
 [[package]]
 name = "dracon-security"
-version = "0.1.1415"
+version = "0.1.1419"
 dependencies = [
  "aes-gcm",
  "age",
