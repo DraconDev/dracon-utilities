@@ -1396,12 +1396,12 @@ async fn run_guard_once(
             }
             let _ = fs::write(&marker, format!("dracon-system guard freeze: disk={}%\n", used));
             sync_frozen = true;
-            emit_event(&DraconEvent::new("system", EventSeverity::Warn, "disk/freeze".into(), format!("sync frozen at {}%", used)));
-        }
+            emit_event(&DraconEvent::new("system", EventSeverity::Warn, "disk/freeze", format!("sync frozen at {}%", used)));
+            }
     } else if sync_frozen && used <= guard.unfreeze_below_percent {
         let _ = fs::remove_file(&marker);
         sync_frozen = false;
-        emit_event(&DraconEvent::new("system", EventSeverity::Info, "disk/unfreeze".into(), format!("sync unfrozen at {}%", used)));
+        emit_event(&DraconEvent::new("system", EventSeverity::Info, "disk/unfreeze", format!("sync unfrozen at {}%", used)));
     }
 
     // Comprehensive auto-cleanup when disk hits action/critical level
