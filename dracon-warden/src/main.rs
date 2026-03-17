@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
+use dracon_common::{emit_event, DraconEvent, EventSeverity};
 use dracon_security_kit::{DraconWarden, Warden};
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use notify::{Event, RecursiveMode, Watcher};
@@ -689,9 +690,23 @@ where
                 if a || b || c {
                     changed += 1;
                     println!("🔒 hardened {}", repo.display());
+                    emit_event(&DraconEvent::new(
+                        "warden",
+                        EventSeverity::Info,
+                        format!("harden/{}", repo.display()),
+                        "repo hardened",
+                    ));
                 }
             }
-            Err(e) => eprintln!("⚠️ harden failed for {}: {}", repo.display(), e),
+            Err(e) => {
+                eprintln!("⚠️ harden failed for {}: {}", repo.display(), e);
+                emit_event(&DraconEvent::new(
+                    "warden",
+                    EventSeverity::Error,
+                    format!("harden/{}", repo.display()),
+                    format!("failed: {e}"),
+                ));
+            }
         }
     }
 
