@@ -2486,6 +2486,7 @@ async fn sync_repo(
             let msg = build_commit_message(&ctx);
 
             svc.commit(&msg).await?;
+            emit_event(&DraconEvent::new("sync", EventSeverity::Info, format!("commit/{}", repo.display()), format!("committed {} file(s)", committed_entries.len())));
             
             // Scribe: update project-state.md via AI (if configured)
             if cfg!(feature = "scribe") {
