@@ -2499,7 +2499,9 @@ async fn sync_repo(
             // Scribe: update project-state.md via AI (if configured)
             if cfg!(feature = "scribe") {
                 #[cfg(feature = "scribe")]
-                let _ = update_project_state_from_ai(repo).await;
+                if let Err(e) = update_project_state_from_ai(repo).await {
+                    eprintln!("📝 scribe failed for {}: {}", repo.display(), e);
+                }
             }
             
             // Restore any excluded modified paths that weren't committed
