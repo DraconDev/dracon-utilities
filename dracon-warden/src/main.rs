@@ -931,6 +931,12 @@ fn run_daemon(policy_path: PathBuf) -> Result<()> {
             }
             Ok(Err(e)) => {
                 eprintln!("⚠️ watch error: {}", e);
+                emit_event(&DraconEvent::new(
+                    "warden",
+                    EventSeverity::Warn,
+                    "watch".into(),
+                    format!("error: {e}"),
+                ));
             }
             Err(mpsc::RecvTimeoutError::Timeout) => {}
             Err(mpsc::RecvTimeoutError::Disconnected) => {
