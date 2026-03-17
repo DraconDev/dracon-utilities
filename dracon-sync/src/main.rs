@@ -2005,16 +2005,6 @@ async fn update_project_state_from_ai(repo: &Path) -> anyhow::Result<()> {
     use anyhow::Context;
     use std::process::Command as StdCommand;
 
-    // Cooldown: skip if project-state.md was updated less than 30 minutes ago
-    let state_path = repo.join(".dracon/project-state.md");
-    if let Ok(meta) = std::fs::metadata(&state_path) {
-        if let Ok(modified) = meta.modified() {
-            if modified.elapsed().unwrap_or_default().as_secs() < 1800 {
-                return Ok(());
-            }
-        }
-    }
-
     // Collect git context
     let git_log = StdCommand::new("git")
         .args(["log", "--format=%s", "-20"])
@@ -2045,7 +2035,7 @@ async fn update_project_state_from_ai(repo: &Path) -> anyhow::Result<()> {
     let endpoint = std::env::var("OPENROUTER_API_ENDPOINT")
         .unwrap_or_else(|_| "https://openrouter.ai/api/v1".to_string());
     let model = std::env::var("DRACON_SCRIBE_MODEL")
-        .unwrap_or_else(|_| "google/gemma-3-4b-it:free".to_string());
+        .unwrap_or_else(|_| "openrouter/auto".to_string());
 
     let prompt = format!(
         "You are a scribe. Analyze git history and write a concise project-state.md.\n\n\
