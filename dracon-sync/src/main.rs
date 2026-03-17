@@ -2555,7 +2555,10 @@ async fn sync_repo(
                 .await
                 {
                     Ok(()) => {}
-                    Err(e) => eprintln!("⚠️ push skipped for {}: {}", repo.display(), e),
+                    Err(e) => {
+                        eprintln!("⚠️ push skipped for {}: {}", repo.display(), e);
+                        emit_event(&DraconEvent::new("sync", EventSeverity::Warn, format!("push/{}", repo.display()), format!("failed: {e}")));
+                    }
                 }
             } else if policy.auto_push && !has_origin {
                 eprintln!("ℹ️ skip push for {} (no origin remote)", repo.display());
