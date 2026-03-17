@@ -2023,13 +2023,19 @@ async fn update_project_state_from_ai(repo: &Path) -> anyhow::Result<()> {
     let blueprint = dracon_git::read_blueprint_content(repo);
 
     // Resolve AI provider from env vars
-    let api_key = std::env::var("OPENROUTER_API_KEY")
+    let api_key = match std::env::var("OPENROUTER_API_KEY")
         .or_else(|_| std::env::var("DRACON_AI_API_KEY"))
-        .map_err(|_| anyhow::anyhow!("set OPENROUTER_API_KEY or DRACON_AI_API_KEY for scribe"))?;
+    {
+        Ok(k) if !k.is_empty() && k != "sk-or-v1-FAKEKEY123456789" => k,
+        _ => {
+            eprintln!("📝 scribe: no API key set (set OPENROUTER_API_KEY in ~/.dracon/ai/secrets/openrouter.env)");
+            return Ok(());
+        }
+    };
     let endpoint = std::env::var("OPENROUTER_API_ENDPOINT")
         .unwrap_or_else(|_| "https://openrouter.ai/api/v1".to_string());
     let model = std::env::var("DRACON_SCRIBE_MODEL")
-        .unwrap_or_else(|_| "google/gemini-2.0-flash-001".to_string());
+        .unwrap_or_else(|_| "google/gemma-3-4b-it:free".to_string());
 
     let prompt = format!(
         "You are a scribe. Analyze git history and write a concise project-state.md.\n\n\
