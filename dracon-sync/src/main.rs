@@ -2022,14 +2022,14 @@ async fn update_project_state_from_ai(repo: &Path) -> anyhow::Result<()> {
 
     let blueprint = dracon_git::read_blueprint_content(repo);
 
-    // Resolve AI provider from config
-    let resolved = ai_runtime_config::resolve_ai_runtime_config();
-    let provider = match resolved.openai_providers.iter()
-        .find(|p| !p.api_keys.is_empty() && !p.api_keys[0].is_empty())
-    {
-        Some(p) => p,
-        None => anyhow::bail!("no AI provider configured"),
-    };
+    // Resolve AI provider from env vars
+    let api_key = std::env::var("OPENROUTER_API_KEY")
+        .or_else(|_| std::env::var("DRACON_AI_API_KEY"))
+        .map_err(|_| anyhow::anyhow!("set OPENROUTER_API_KEY or DRACON_AI_API_KEY for scribe"))?;
+    let endpoint = std::env::var("OPENROUTER_API_ENDPOINT")
+        .unwrap_or_else(|_| "https://openrouter.ai/api/v1".to_string());
+    let model = std::env::var("DRACON_SCRIBE_MODEL")
+        .unwrap_or_else(|_| "google/gemini-2.0-flash-001".to_string());
 
     let prompt = format!(
         "You are a scribe. Analyze git history and write a concise project-state.md.\n\n\
@@ -2043,20 +2043,17 @@ async fn update_project_state_from_ai(repo: &Path) -> anyhow::Result<()> {
     );
 
     let body = serde_json::json!({
-        "model": &provider.payload_model,
+        "model": model,
         "messages": [{"role": "user", "content": prompt}],
         "max_tokens": 1000,
         "temperature": 0.3,
     });
 
     let client = reqwest::Client::new();
-    let url = format!("{}/chat/completions", provider.endpoint.trim_end_matches('/'));
+    let url = format!("{}/chat/completions", endpoint.trim_end_matches('/'));
     let resp = client
         .post(&url)
-        .header(
-            &provider.auth_header_name,
-            format!("{}{}", provider.auth_header_prefix, provider.api_keys[0]),
-        )
+        .header("Authorization", format!("Bearer {api_key}"))
         .json(&body)
         .send()
         .await
