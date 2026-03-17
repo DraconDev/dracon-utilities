@@ -2617,6 +2617,37 @@ async fn main() -> Result<()> {
                 }
             }
         }
+        Commands::Events { tail, source, severity } => {
+            let path = dracon_common::events_path();
+            if !path.exists() {
+                println!("No events found ({} does not exist)", path.display());
+                return Ok(());
+            }
+            let contents = std::fs::read_to_string(&path)
+                .with_context(|| format!("failed to read {}", path.display()))?;
+            let lines: Vec<&str> = contents.lines().collect();
+            let start = if lines.len() > tail { lines.len() - tail } else { 0 };
+            let mut shown = 0usize;
+            for line in &lines[start..] {
+                if let Ok(val) = serde_json::from_str::<serde_json::Value>(line) {
+                    if let Some(ref s) = source {
+                        if val.get("src").and_then(|v| v.as_str()) != Some(s.as_str()) {
+                            continue;
+                        }
+                    }
+                    if let Some(ref s) = severity {
+                        if val.get("sev").and_then(|v| v.as_str()) != Some(s.as_str()) {
+                            continue;
+                        }
+                    }
+                    println!("{}", line);
+                    shown += 1;
+                }
+            }
+            if shown == 0 {
+                println!("(no matching events)");
+            }
+        }
     }
 
     Ok(())
