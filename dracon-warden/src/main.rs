@@ -934,7 +934,7 @@ fn run_daemon(policy_path: PathBuf) -> Result<()> {
                 emit_event(&DraconEvent::new(
                     "warden",
                     EventSeverity::Warn,
-                    "watch".into(),
+                    "watch",
                     format!("error: {e}"),
                 ));
             }
