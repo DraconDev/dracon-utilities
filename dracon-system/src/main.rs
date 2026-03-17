@@ -2410,7 +2410,7 @@ async fn main() -> Result<()> {
                     loop {
                         if let Err(e) = run_guard_once(&guard, &mut runtime).await {
                             eprintln!("guard pass failed: {}", e);
-                            emit_event(&DraconEvent::new("system", EventSeverity::Error, "guard".into(), format!("pass failed: {e}")));
+                            emit_event(&DraconEvent::new("system", EventSeverity::Error, "guard", format!("pass failed: {e}")));
                         }
                         sleep(Duration::from_secs(guard.interval_secs)).await;
                     }
