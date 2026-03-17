@@ -952,7 +952,7 @@ fn run_daemon(policy_path: PathBuf) -> Result<()> {
                     emit_event(&DraconEvent::new(
                         "warden",
                         EventSeverity::Error,
-                        "policy".into(),
+                        "policy",
                         format!("load failed: {e}"),
                     ));
                     continue;

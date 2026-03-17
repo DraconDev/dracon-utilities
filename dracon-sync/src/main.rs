@@ -2680,7 +2680,7 @@ async fn sync_repo(
 async fn run_once(policy_path: &Path) -> Result<()> {
     if let Some(reason) = freeze_reason(policy_path) {
         println!("⏸️ sync frozen ({})", reason);
-        emit_event(&DraconEvent::new("sync", EventSeverity::Info, "frozen".into(), reason));
+        emit_event(&DraconEvent::new("sync", EventSeverity::Info, "frozen", reason));
         return Ok(());
     }
 
