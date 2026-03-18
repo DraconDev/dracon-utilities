@@ -3,8 +3,41 @@ use serde::Deserialize;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::Command as StdCommand;
+use std::sync::OnceLock;
+use tokio::process::Command as TokioCommand;
 
 pub(crate) const DEFAULT_GIT_HOST_BLOB_LIMIT_BYTES: u64 = 100 * 1024 * 1024;
+
+pub(crate) fn git_binary() -> &'static Path {
+    static GIT_BIN: OnceLock<PathBuf> = OnceLock::new();
+    GIT_BIN
+        .get_or_init(|| {
+            if let Ok(custom) = std::env::var("DRACON_SYNC_GIT_BIN") {
+                let trimmed = custom.trim();
+                if !trimmed.is_empty() {
+                    return PathBuf::from(trimmed);
+                }
+            }
+
+            for candidate in ["/run/current-system/sw/bin/git", "/usr/bin/git", "/bin/git"] {
+                let path = PathBuf::from(candidate);
+                if path.exists() {
+                    return path;
+                }
+            }
+
+            PathBuf::from("git")
+        })
+        .as_path()
+}
+
+pub(crate) fn std_git_command() -> StdCommand {
+    StdCommand::new(git_binary())
+}
+
+pub(crate) fn tokio_git_command() -> TokioCommand {
+    TokioCommand::new(git_binary())
+}
 
 #[derive(Debug, Deserialize, Clone)]
 pub(crate) struct SyncPolicy {
