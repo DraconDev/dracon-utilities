@@ -2023,7 +2023,7 @@ async fn update_project_state_from_ai(repo: &Path) -> anyhow::Result<()> {
     let blueprint = dracon_git::read_blueprint_content(repo);
 
     // Resolve AI provider via the config system (reads routing policy + env vars + secrets)
-    let resolved = ai_client_config::resolve_ai_runtime_config();
+    let resolved = ai_runtime_adapters::resolve_ai_runtime_config();
     // Prefer free models (sufficient for scribe, works without credits)
     let provider = resolved.openai_providers.iter()
         .find(|p| p.model_id.contains(":free") && !p.api_keys.is_empty())
