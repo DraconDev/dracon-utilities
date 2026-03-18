@@ -118,7 +118,38 @@ async fn main() -> Result<()> {
             let repos = git::discover_git_repos(&roots, &excluded_dir_names);
             let freeze = freeze_reason(&policy_path);
             if json {
-                let payload = report::StatusJson::from_policy(&policy, &policy_path, &roots, repos.len(), freeze);
+                let payload = report::StatusJson {
+                    policy: policy_path.display().to_string(),
+                    roots: roots.iter().map(|p| p.display().to_string()).collect(),
+                    repos_discovered: repos.len(),
+                    pulse_interval_secs: policy.pulse_interval_secs,
+                    inactivity_push_delay_secs: policy.inactivity_push_delay_secs,
+                    freeze: freeze
+                        .map(|r| format!("ON ({})", r))
+                        .unwrap_or_else(|| "OFF".to_string()),
+                    auto_commit: policy.auto_commit,
+                    auto_pull: policy.auto_pull,
+                    auto_push: policy.auto_push,
+                    auto_bump_versions: policy.auto_bump_versions,
+                    auto_repair_concerns: policy.auto_repair_concerns,
+                    auto_repair_warns: policy.auto_repair_warns,
+                    auto_rewrite_large_blobs: policy.auto_rewrite_large_blobs,
+                    max_stage_file_bytes: policy.max_stage_file_bytes,
+                    push_blob_threshold_bytes: push_large_blob_threshold_bytes(&policy),
+                    exclude_dirs: policy.exclude_dir_names.clone(),
+                    exclude_file_patterns: policy.exclude_file_patterns.clone(),
+                    pull_op_timeout_secs: policy.pull_op_timeout_secs,
+                    push_op_timeout_secs: policy.push_op_timeout_secs,
+                    repo_sync_timeout_secs: policy.repo_sync_timeout_secs,
+                    push_retries: policy.push_retries,
+                    repair_cooldown_secs: policy.repair_cooldown_secs,
+                    incident_ledger_max_lines: policy.incident_ledger_max_lines,
+                    incident_ledger_max_age_days: policy.incident_ledger_max_age_days,
+                    system_repo: policy.system_repo.clone(),
+                    backup_policy: policy.backup_policy.clone(),
+                    backup_dir: policy.backup_dir.clone(),
+                    extra_remotes: policy.extra_remotes.len(),
+                };
                 println!("{}", serde_json::to_string_pretty(&payload)?);
             } else {
                 println!("📜 POLICY: {}", policy_path.display());
