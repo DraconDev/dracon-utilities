@@ -415,25 +415,6 @@ pub(crate) async fn repo_diff_entries(repo: &Path) -> Result<Vec<DiffFile>> {
     Ok(entries)
 }
 
-pub(crate) fn has_sync_relevant_dirty_entries(
-    repo: &Path,
-    entries: &[DiffFile],
-    excluded_dir_names: &BTreeSet<String>,
-    excluded_file_patterns: &[String],
-    max_stage_file_bytes: u64,
-) -> bool {
-    entries.iter().any(|entry| {
-        should_stage_entry(
-            repo,
-            entry,
-            excluded_dir_names,
-            excluded_file_patterns,
-            max_stage_file_bytes,
-        ) || can_restore_entry(entry)
-            || is_large_untracked(entry, repo, max_stage_file_bytes)
-    })
-}
-
 pub(crate) async fn staged_paths(repo: &Path) -> Result<Vec<PathBuf>> {
     git_list_paths(repo, &["diff", "--cached", "--name-only"]).await
 }
