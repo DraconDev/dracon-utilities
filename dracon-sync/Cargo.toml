@@ -16,8 +16,8 @@ dracon-git = { path = "../../dracon-libs/tools/sync/dracon-git" }
 dracon-common = { path = "../../dracon-libs/tools/common/dracon-common", features = ["test-support"] }
 fs2 = "0.4"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"], optional = true }
-ai-client-config = { path = "../../dracon-libs/tools/ai/ai-client-config", optional = true }
+ai-runtime-adapters = { path = "../../dracon-libs/services/crates/ai/ai-runtime-adapters", default-features = false, features = ["config-only"], optional = true }
 
 [features]
 default = []
-scribe = ["dep:reqwest", "dep:ai-client-config"]
+scribe = ["dep:reqwest", "dep:ai-runtime-adapters"]
