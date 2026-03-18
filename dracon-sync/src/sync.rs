@@ -238,6 +238,20 @@ pub(crate) async fn sync_repo(
                 .map(|(path, status)| dracon_git::types::DiffFile { path, status })
                 .collect();
 
+            // Scribe: update project-state.md via AI BEFORE building commit context
+            // so the fresh state is included in the commit body
+            if cfg!(feature = "scribe") {
+                #[cfg(feature = "scribe")]
+                if let Err(e) = crate::scribe::update_project_state_from_ai(repo).await {
+                    eprintln!("📝 scribe failed for {}: {}", repo.display(), e);
+                }
+            }
+
+            // Stage project-state.md if scribe updated it
+            if repo.join(".dracon/project-state.md").exists() {
+                let _ = run_git_with_timeout(repo, &["add", ".dracon/project-state.md"], 10, "add-project-state").await;
+            }
+
             let signals = detect_report_signals(repo, &committed_entries);
             let is_report = !signals.is_empty();
 
@@ -254,14 +268,6 @@ pub(crate) async fn sync_repo(
 
             svc.commit(&msg).await?;
             emit_event(&DraconEvent::new("sync", EventSeverity::Info, format!("commit/{}", repo.display()), format!("committed {} file(s)", committed_entries.len())));
-
-            // Scribe: update project-state.md via AI (if configured)
-            if cfg!(feature = "scribe") {
-                #[cfg(feature = "scribe")]
-                if let Err(e) = crate::scribe::update_project_state_from_ai(repo).await {
-                    eprintln!("📝 scribe failed for {}: {}", repo.display(), e);
-                }
-            }
 
             // Restore any excluded modified paths that weren't committed
             let restorable: Vec<_> = to_restore.iter().filter(|e| can_restore_entry(e)).collect();
