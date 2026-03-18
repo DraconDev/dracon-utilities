@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Context, Result};
 use clap::{Parser, Subcommand};
-use dracon_ai_contracts::{RoutingTask, SelectionConstraints};
+use dracon_ai_runtime_contracts::routing::{RoutingTask, SelectionConstraints};
 use dracon_ai_runtime_contracts::models::{ChatMessage, ChatRequest, UsageStats};
 use dracon_ai_runtime_contracts::traits::AiProvider;
 use futures::StreamExt;
