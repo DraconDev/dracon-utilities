@@ -673,3 +673,36 @@ pub(crate) fn rewrite_ahead_paths(
 
     Ok(Some(backup_branch))
 }
+
+pub(crate) async fn restore_paths(repo: &Path, paths: &[String]) -> Result<()> {
+    if paths.is_empty() {
+        return Ok(());
+    }
+
+    // Prefer `git restore` (newer git). Fallback to `reset` + `checkout`.
+    let mut args: Vec<String> = Vec::new();
+    args.push("restore".to_string());
+    args.push("--staged".to_string());
+    args.push("--worktree".to_string());
+    args.push("--".to_string());
+    args.extend(paths.iter().cloned());
+    let args_ref: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+    if run_git_with_timeout(repo, &args_ref, 30, "restore").await.is_ok() {
+        return Ok(());
+    }
+
+    let mut reset: Vec<String> = Vec::new();
+    reset.push("reset".to_string());
+    reset.push("HEAD".to_string());
+    reset.push("--".to_string());
+    reset.extend(paths.iter().cloned());
+    let reset_ref: Vec<&str> = reset.iter().map(|s| s.as_str()).collect();
+    let _ = run_git_with_timeout(repo, &reset_ref, 30, "reset").await;
+
+    let mut checkout: Vec<String> = Vec::new();
+    checkout.push("checkout".to_string());
+    checkout.push("--".to_string());
+    checkout.extend(paths.iter().cloned());
+    let checkout_ref: Vec<&str> = checkout.iter().map(|s| s.as_str()).collect();
+    run_git_with_timeout(repo, &checkout_ref, 30, "checkout").await
+}
