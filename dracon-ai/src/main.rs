@@ -408,7 +408,7 @@ Captured output:\n```\n{}\n```",
             Ok(())
         }
         Cmd::Status => {
-            let resolved = ai_runtime_config::resolve_ai_runtime_config();
+            let resolved = ai_runtime_adapters::resolve_ai_runtime_config();
             println!("📜 AI_RUNTIME: dracon-libs policy + secrets (ai-runtime-config)");
             println!("📦 PROVIDERS: {} OpenAI + {} Bedrock", resolved.openai_providers.len(), resolved.bedrock_providers.len());
             println!("✅ ACTIVE_MODELS: {}", resolved.active_model_ids.len());
@@ -575,7 +575,7 @@ fn history_path() -> Option<PathBuf> {
 }
 
 fn build_router() -> Result<ai_routing_runtime::SmartRouter<dyn AiProvider>> {
-    let resolved = ai_runtime_config::resolve_ai_runtime_config();
+    let resolved = ai_runtime_adapters::resolve_ai_runtime_config();
 
     let mut registry: ai_routing_runtime::ProviderRegistry<dyn AiProvider> =
         ai_routing_runtime::ProviderRegistry::new();
@@ -1280,7 +1280,7 @@ Write ONLY the markdown, nothing else."#
     );
 
     // Build router
-    let resolved = ai_runtime_config::resolve_ai_runtime_config();
+    let resolved = ai_runtime_adapters::resolve_ai_runtime_config();
     let mut registry: ai_routing_runtime::ProviderRegistry<dyn AiProvider> =
         ai_routing_runtime::ProviderRegistry::new();
     for spec in &resolved.openai_providers {
