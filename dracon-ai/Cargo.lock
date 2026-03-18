@@ -39,6 +39,7 @@ name = "ai-routing-runtime"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "dracon-ai-runtime-contracts",
  "regex",
  "serde",
  "tracing",
@@ -46,7 +47,7 @@ dependencies = [
 
 [[package]]
 name = "ai-runtime-adapters"
-version = "0.1.1491"
+version = "0.1.1497"
 dependencies = [
  "ai-routing-runtime",
  "ai-service",
@@ -71,7 +72,7 @@ dependencies = [
 
 [[package]]
 name = "ai-service"
-version = "0.1.1491"
+version = "0.1.1497"
 dependencies = [
  "ai-routing-runtime",
  "anyhow",
@@ -516,7 +517,7 @@ dependencies = [
 
 [[package]]
 name = "config-kit"
-version = "0.1.1491"
+version = "0.1.1497"
 dependencies = [
  "anyhow",
  "serde",
@@ -674,7 +675,6 @@ dependencies = [
  "anyhow",
  "clap",
  "dirs",
- "dracon-ai-contracts",
  "dracon-ai-runtime-contracts",
  "dracon-common",
  "env_logger",
@@ -689,21 +689,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "dracon-ai-contracts"
-version = "0.1.1491"
-dependencies = [
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "dracon-ai-runtime-contracts"
-version = "0.1.1491"
+version = "0.1.1497"
 dependencies = [
  "anyhow",
  "async-trait",
  "futures",
  "serde",
+ "serde_json",
 ]
 
 [[package]]
