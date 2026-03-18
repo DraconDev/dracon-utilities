@@ -26,11 +26,13 @@ pub(crate) async fn update_project_state_from_ai(repo: &Path) -> anyhow::Result<
     let resolved = ai_runtime_adapters::resolve_ai_runtime_config();
     // Use lane model policy to find free-tier models for scribe tasks
     let free_models = resolved.lane_model_policy.resolve("free", None);
-    eprintln!("📝 scribe: free_models={:?}", free_models);
-    eprintln!("📝 scribe: providers_with_keys={:?}", resolved.openai_providers.iter().filter(|p| !p.api_keys.is_empty()).map(|p| &p.model_id).collect::<Vec<_>>());
+    // Iterate free_models in priority order (not provider order) so NVIDIA/Z-AI beat OpenRouter
     let provider = if !free_models.is_empty() {
-        resolved.openai_providers.iter()
-            .find(|p| free_models.contains(&p.model_id) && !p.api_keys.is_empty())
+        free_models.iter()
+            .find_map(|model_id| {
+                resolved.openai_providers.iter()
+                    .find(|p| p.model_id == *model_id && !p.api_keys.is_empty())
+            })
             .or_else(|| resolved.openai_providers.iter().find(|p| !p.api_keys.is_empty()))
     } else {
         resolved.openai_providers.iter().find(|p| !p.api_keys.is_empty())
