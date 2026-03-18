@@ -123,12 +123,12 @@ pub(crate) struct RepairJson {
 
 #[derive(Debug, Default, Clone, Copy)]
 pub(crate) struct RepairSummary {
-    found: usize,
-    planned: usize,
-    attempted: usize,
-    succeeded: usize,
-    resolved_now: usize,
-    manual_only: usize,
+    pub(crate) found: usize,
+    pub(crate) planned: usize,
+    pub(crate) attempted: usize,
+    pub(crate) succeeded: usize,
+    pub(crate) resolved_now: usize,
+    pub(crate) manual_only: usize,
 }
 
 #[derive(Debug, Serialize)]
