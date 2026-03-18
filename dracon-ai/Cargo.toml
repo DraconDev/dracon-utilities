@@ -18,7 +18,6 @@ toml = "0.8"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "blocking"] }
 
 # AI runtime is owned by dracon-libs; dracon-ai is a thin CLI consumer.
-ai-runtime-config = { path = "../../dracon-libs/services/crates/ai/ai-runtime-config" }
 ai-routing-runtime = { path = "../../dracon-libs/services/crates/ai/ai-routing-runtime" }
 ai-runtime-adapters = { path = "../../dracon-libs/services/crates/ai/ai-runtime-adapters" }
 dracon-ai-contracts = { path = "../../dracon-libs/contracts/crates/ai/dracon-ai-contracts" }
