@@ -19,5 +19,5 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "rus
 ai-runtime-adapters = { path = "../../dracon-libs/services/crates/ai/ai-runtime-adapters", default-features = false, features = ["config-only"], optional = true }
 
 [features]
-default = []
+default = ["scribe"]
 scribe = ["dep:reqwest", "dep:ai-runtime-adapters"]

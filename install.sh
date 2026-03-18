@@ -5,11 +5,11 @@ cd "$(dirname "$0")"
 
 echo "Installing dracon utilities to ~/.local/bin/"
 
-# Install dracon-sync with optional scribe feature
+# Install dracon-sync with optional scribe feature (on by default)
 SCRIBE_FEATURE=""
-if [ "$1" = "--scribe" ] || [ "$DRACON_SCRIBE" = "1" ]; then
-    SSCRIBE_FEATURE="--features scribe"
-    echo "  (with AI scribe support)"
+if [ "$1" = "--no-scribe" ] || [ "$DRACON_SCRIBE" = "0" ]; then
+    SSCRIBE_FEATURE="--no-default-features"
+    echo "  (without AI scribe support)"
 fi
 
 cargo install --path dracon-sync --root ~/.local --force $SCRIBE_FEATURE
