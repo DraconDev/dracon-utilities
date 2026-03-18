@@ -24,7 +24,7 @@ dependencies = [
 
 [[package]]
 name = "ai-runtime-adapters"
-version = "0.1.1518"
+version = "0.1.1519"
 dependencies = [
  "ai-routing-runtime",
  "anyhow",
@@ -271,7 +271,7 @@ dependencies = [
 
 [[package]]
 name = "dracon-ai-runtime-contracts"
-version = "0.1.1518"
+version = "0.1.1519"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -295,7 +295,7 @@ dependencies = [
 
 [[package]]
 name = "dracon-git"
-version = "0.1.1518"
+version = "0.1.1519"
 dependencies = [
  "anyhow",
  "git2",
