@@ -27,7 +27,7 @@ use crate::git::{
 };
 use crate::policy::{
     SyncPolicy, resolve_policy_path, freeze_reason, debug_enabled,
-    DEFAULT_GIT_HOST_BLOB_LIMIT_BYTES, tokio_git_command,
+    DEFAULT_GIT_HOST_BLOB_LIMIT_BYTES, tokio_git_command, timestamp_secs,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
