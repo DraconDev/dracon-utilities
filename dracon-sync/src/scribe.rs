@@ -26,6 +26,8 @@ pub(crate) async fn update_project_state_from_ai(repo: &Path) -> anyhow::Result<
     let resolved = ai_runtime_adapters::resolve_ai_runtime_config();
     // Use lane model policy to find free-tier models for scribe tasks
     let free_models = resolved.lane_model_policy.resolve("free", None);
+    eprintln!("📝 scribe: free_models={:?}", free_models);
+    eprintln!("📝 scribe: providers_with_keys={:?}", resolved.openai_providers.iter().filter(|p| !p.api_keys.is_empty()).map(|p| &p.model_id).collect::<Vec<_>>());
     let provider = if !free_models.is_empty() {
         resolved.openai_providers.iter()
             .find(|p| free_models.contains(&p.model_id) && !p.api_keys.is_empty())
