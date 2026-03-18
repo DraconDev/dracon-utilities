@@ -12,7 +12,8 @@ use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
 use policy::{resolve_policy_path, SyncPolicy};
-use policy::{excluded_dir_names_set, freeze_reason, push_large_blob_threshold_bytes};
+use policy::freeze_reason;
+use exclude::{excluded_dir_names_set, push_large_blob_threshold_bytes};
 use report::{ConcernRepairFilter, RepoFilter, run_repair_concerns, run_repair_warns, run_repos_report};
 use daemon::{run_once, run_daemon};
 use sync::sync_repo;
