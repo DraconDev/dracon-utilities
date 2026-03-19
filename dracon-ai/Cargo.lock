@@ -47,7 +47,7 @@ dependencies = [
 
 [[package]]
 name = "ai-runtime-adapters"
-version = "0.1.1549"
+version = "0.1.1551"
 dependencies = [
  "ai-routing-runtime",
  "ai-service",
@@ -71,7 +71,7 @@ dependencies = [
 
 [[package]]
 name = "ai-service"
-version = "0.1.1549"
+version = "0.1.1551"
 dependencies = [
  "ai-routing-runtime",
  "anyhow",
@@ -679,7 +679,7 @@ dependencies = [
 
 [[package]]
 name = "dracon-ai-runtime-contracts"
-version = "0.1.1549"
+version = "0.1.1551"
 dependencies = [
  "anyhow",
  "async-trait",
