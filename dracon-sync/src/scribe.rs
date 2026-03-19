@@ -9,15 +9,16 @@ use tokio::time::{Duration, timeout};
 pub(crate) async fn update_project_state_from_ai(repo: &Path) -> anyhow::Result<()> {
     let workdir = repo.to_path_buf();
     let repo_display = repo.display().to_string();
+    let repo_display_closure = repo_display.clone();
 
     let result = timeout(
-        Duration::from_secs(60),
+        Duration::from_secs(150),
         tokio::task::spawn_blocking(move || {
             StdCommand::new("dracon-ai")
                 .arg("scribe")
                 .arg(&workdir)
                 .output()
-                .with_context(|| format!("failed to run dracon-ai scribe for {repo_display}"))
+                .with_context(|| format!("failed to run dracon-ai scribe for {repo_display_closure}"))
         }),
     )
     .await;
@@ -25,27 +26,30 @@ pub(crate) async fn update_project_state_from_ai(repo: &Path) -> anyhow::Result<
     match result {
         Ok(Ok(Ok(output))) => {
             if output.status.success() {
-                eprintln!("📝 scribe: updated {repo_display}/.dracon/project-state.md");
+                eprintln!("📝 scribe: updated {}/.dracon/project-state.md", repo_display);
                 Ok(())
             } else {
                 let stderr = String::from_utf8_lossy(&output.stderr);
-                // Skip gracefully if no API key configured
+                let stdout = String::from_utf8_lossy(&output.stdout);
                 if stderr.contains("no AI provider")
                     || stderr.contains("401")
                     || stderr.contains("Unauthorized")
+                    || stdout.contains("No provider available")
                 {
-                    eprintln!("📝 scribe: skipped (no API key configured)");
+                    eprintln!("📝 scribe: skipped (no API key or provider unavailable)");
                     return Ok(());
                 }
-                Err(anyhow::anyhow!(
-                    "dracon-ai scribe failed for {repo_display}: {stderr}"
-                ))
+                eprintln!("📝 scribe: failed for {}: {}", repo_display, stderr);
+                if !stdout.is_empty() {
+                    eprintln!("scribe stdout: {}", stdout);
+                }
+                Err(anyhow::anyhow!("dracon-ai scribe failed: {}", stderr))
             }
         }
         Ok(Ok(Err(e))) => Err(e),
-        Ok(Err(e)) => Err(anyhow::anyhow!("dracon-ai scribe task failed: {e}")),
+        Ok(Err(e)) => Err(anyhow::anyhow!("dracon-ai scribe task failed: {}", e)),
         Err(_) => {
-            eprintln!("📝 scribe: timed out after 60s for {repo_display}");
+            eprintln!("📝 scribe: timed out after 150s for {}", repo_display);
             Ok(())
         }
     }
