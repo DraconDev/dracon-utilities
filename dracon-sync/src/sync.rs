@@ -447,7 +447,3 @@ pub(crate) async fn sync_repo(
 
     Ok(false)
 }
-// test no key
-// test2
-// test a
-// test b
