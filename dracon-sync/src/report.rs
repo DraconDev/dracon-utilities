@@ -209,33 +209,13 @@ pub(crate) fn read_project_focus(repo: &Path) -> Option<String> {
     let state_path = repo.join(".dracon/project-state.md");
     let content = std::fs::read_to_string(&state_path).ok()?;
     
-    let mut in_focus = false;
-    let mut lines = Vec::new();
-    
-    for line in content.lines() {
-        let trimmed = line.trim();
-        
-        // Enter focus section
-        if trimmed.starts_with("## ") && trimmed.to_lowercase().contains("current focus") {
-            in_focus = true;
-            continue;
-        }
-        
-        // Exit on next section
-        if in_focus && trimmed.starts_with("## ") {
-            break;
-        }
-        
-        // Collect non-empty lines in focus section
-        if in_focus && !trimmed.is_empty() {
-            lines.push(trimmed.to_string());
-        }
-    }
-    
-    if lines.is_empty() {
+    // Return full project-state.md content for rich commit bodies
+    // This gives AI reading git history full context (Completed, In Progress, Open Issues)
+    let trimmed = content.trim();
+    if trimmed.is_empty() {
         None
     } else {
-        Some(lines.join("\n"))
+        Some(trimmed.to_string())
     }
 }
 
