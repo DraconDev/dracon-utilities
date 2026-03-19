@@ -47,7 +47,7 @@ dependencies = [
 
 [[package]]
 name = "ai-runtime-adapters"
-version = "0.1.1519"
+version = "0.1.1542"
 dependencies = [
  "ai-routing-runtime",
  "ai-service",
@@ -55,7 +55,6 @@ dependencies = [
  "async-stream",
  "async-trait",
  "bytes",
- "config-kit",
  "dirs",
  "dotenvy",
  "dracon-ai-runtime-contracts",
@@ -72,7 +71,7 @@ dependencies = [
 
 [[package]]
 name = "ai-service"
-version = "0.1.1519"
+version = "0.1.1542"
 dependencies = [
  "ai-routing-runtime",
  "anyhow",
@@ -516,16 +515,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "config-kit"
-version = "0.1.1519"
-dependencies = [
- "anyhow",
- "serde",
- "thiserror 1.0.69",
- "toml",
-]
-
-[[package]]
 name = "const-oid"
 version = "0.9.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -690,7 +679,7 @@ dependencies = [
 
 [[package]]
 name = "dracon-ai-runtime-contracts"
-version = "0.1.1519"
+version = "0.1.1542"
 dependencies = [
  "anyhow",
  "async-trait",
