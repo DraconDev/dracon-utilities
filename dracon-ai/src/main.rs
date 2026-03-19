@@ -1295,15 +1295,11 @@ Write ONLY the markdown, nothing else."#
         registry.register(&spec.model_id, provider);
     }
 
-    let mut free_models = std::collections::HashMap::new();
-    free_models.insert("free:*".to_string(), resolved.active_model_ids.clone());
-    let lane_policy = ai_routing_runtime::LaneModelPolicy::from_entries(free_models);
-
     let router = ai_routing_runtime::SmartRouter::new(
         registry,
         resolved.active_model_ids.clone(),
         resolved.dev_model_ids,
-        lane_policy,
+        resolved.lane_model_policy,
     );
 
     let messages = vec![ai_routing_runtime::RoutingMessage {
