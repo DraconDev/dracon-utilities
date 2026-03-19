@@ -17,7 +17,7 @@ pub(crate) async fn update_project_state_from_ai(repo: &Path) -> anyhow::Result<
                 .arg("scribe")
                 .arg(&workdir)
                 .output()
-                .with_context(|| format!("failed to run dracon-ai scribe for {repo_display}"))
+                .with_context(|| format!("failed to run dracon-ai scribe for {}", workdir.display()))
         }),
     )
     .await;
