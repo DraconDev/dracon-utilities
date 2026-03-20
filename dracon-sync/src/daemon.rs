@@ -197,6 +197,18 @@ pub(crate) async fn run_daemon(policy_path: PathBuf) -> Result<()> {
                 continue;
             }
 
+            // Skip repair for repos with permanent failures (manual_only)
+            if policy.auto_repair_concerns && crate::report::has_permanent_failure(&repo) {
+                if entry.failure_count == 0 {
+                    eprintln!(
+                        "⏭️ {} has permanent failure (manual_only), skipping repair",
+                        repo.display()
+                    );
+                }
+                entry.failure_count += 1;
+                continue;
+            }
+
             let sync_success = match tokio::time::timeout(
                 Duration::from_secs(policy.repo_sync_timeout_secs),
                 sync_repo(
