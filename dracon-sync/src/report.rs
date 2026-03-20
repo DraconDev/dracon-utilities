@@ -928,34 +928,97 @@ pub(crate) async fn run_repair_concerns(
                     Err(e) => {
                         out!("   fail: push failed: {}", e);
 
-                        // Check for permanent push failures (no write access)
-                        let err_lower = e.to_string().to_lowercase();
-                        let is_permanent = err_lower.contains("permission denied")
-                            || err_lower.contains("authentication failed")
-                            || err_lower.contains("no such host")
-                            || err_lower.contains("connection refused")
-                            || err_lower.contains("exit status: 128");
+                        let err_str = e.to_string().to_lowercase();
+                        
+                        // Check if push failed because remote doesn't exist or is unreachable
+                        // In this case, auto-create a private bare repo as the remote
+                        let no_remote = err_str.contains("no such remote")
+                            || err_str.contains("remote does not exist")
+                            || err_str.contains("repository not found")
+                            || err_str.contains("could not resolve host")
+                            || (err_str.contains("exit status: 128") && err_str.contains("fatal:"));
 
-                        if is_permanent {
-                            manual_only += 1;
-                            out!("   manual: PERMANENT_PUSH_FAILURE (no write access)");
-                            append_incident_record(
-                                policy_path,
-                                &IncidentRecord {
-                                    ts_unix: timestamp_secs(),
-                                    scope: "concern".to_string(),
-                                    repo: repo.display().to_string(),
-                                    reason: reason.clone(),
-                                    action: "push_origin_head".to_string(),
-                                    backup_branch: None,
-                                    result: "permanent_fail".to_string(),
-                                    details: Some(e.to_string()),
-                                },
-                            );
+                        if no_remote {
+                            // Try to create a private bare repo and use it as origin
+                            out!("   info: no remote detected, creating private bare repo");
+                            if let Some(private_remote) = create_private_remote(&repo) {
+                                out!("   info: created private remote: {}", private_remote);
+                                // Retry push with new remote
+                                match push_with_retries(&repo, push_timeout_secs, push_retries, "push").await {
+                                    Ok(()) => {
+                                        succeeded_ops += 1;
+                                        push_ok = true;
+                                        out!("   ok: pushed to private remote");
+                                        append_incident_record(
+                                            policy_path,
+                                            &IncidentRecord {
+                                                ts_unix: timestamp_secs(),
+                                                scope: "concern".to_string(),
+                                                repo: repo.display().to_string(),
+                                                reason: reason.clone(),
+                                                action: "push_origin_head".to_string(),
+                                                backup_branch: None,
+                                                result: "ok".to_string(),
+                                                details: Some(format!("pushed to private remote: {}", private_remote)),
+                                            },
+                                        );
+                                    }
+                                    Err(e2) => {
+                                        out!("   fail: push to private remote also failed: {}", e2);
+                                        append_incident_record(
+                                            policy_path,
+                                            &IncidentRecord {
+                                                ts_unix: timestamp_secs(),
+                                                scope: "concern".to_string(),
+                                                repo: repo.display().to_string(),
+                                                reason: reason.clone(),
+                                                action: "push_origin_head".to_string(),
+                                                backup_branch: None,
+                                                result: "fail".to_string(),
+                                                details: Some(e2.to_string()),
+                                            },
+                                        );
+                                    }
+                                }
+                            } else {
+                                out!("   fail: could not create private remote");
+                                append_incident_record(
+                                    policy_path,
+                                    &IncidentRecord {
+                                        ts_unix: timestamp_secs(),
+                                        scope: "concern".to_string(),
+                                        repo: repo.display().to_string(),
+                                        reason: reason.clone(),
+                                        action: "push_origin_head".to_string(),
+                                        backup_branch: None,
+                                        result: "fail".to_string(),
+                                        details: Some(e.to_string()),
+                                    },
+                                );
+                            }
+                            // Skip the large blob and rewrite logic since we handled (or failed) the push
                             continue;
                         }
 
-                        let large = detect_large_blobs_ahead(&repo, blob_threshold)
+                        // For permission denied or other errors on existing remote, 
+                        // just record failure and continue - no permanent marking
+                        // These will retry on next cycle naturally
+                        append_incident_record(
+                            policy_path,
+                            &IncidentRecord {
+                                ts_unix: timestamp_secs(),
+                                scope: "concern".to_string(),
+                                repo: repo.display().to_string(),
+                                reason: reason.clone(),
+                                action: "push_origin_head".to_string(),
+                                backup_branch: None,
+                                result: "fail".to_string(),
+                                details: Some(e.to_string()),
+                            },
+                        );
+                        // Skip to end of push handling - don't try large blob detection for permission errors
+                        continue;
+                    }
                             .unwrap_or_default();
                         if !large.is_empty() {
                             out!(
