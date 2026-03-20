@@ -461,33 +461,34 @@ fn resolve_openrouter_key_for_bump() -> Option<String> {
     None
 }
 
-fn resolve_free_model_for_bump() -> String {
+fn resolve_free_models_for_bump() -> Vec<String> {
     let policy_path = dirs::home_dir()
         .unwrap_or_else(|| std::path::PathBuf::from("."))
         .join(".dracon/ai/routing-policy.json");
     
     let content = match std::fs::read_to_string(&policy_path) {
         Ok(c) => c,
-        Err(_) => return "openrouter/google/gemma-3-27b-it:free".to_string(),
+        Err(_) => return vec!["openrouter/google/gemma-3-27b-it:free".to_string()],
     };
     
     let policy: serde_json::Value = match serde_json::from_str(&content) {
         Ok(p) => p,
-        Err(_) => return "openrouter/google/gemma-3-27b-it:free".to_string(),
+        Err(_) => return vec!["openrouter/google/gemma-3-27b-it:free".to_string()],
     };
     
     policy
         .get("lane_model_policy")
         .and_then(|lmp| lmp.get("free:*"))
         .and_then(|models| models.as_array())
-        .and_then(|models| {
+        .map(|models| {
             models
                 .iter()
                 .filter_map(|v| v.as_str())
-                .find(|id| !id.contains("claude") && !id.contains("gpt-4") && !id.contains("o1-"))
+                .filter(|id| !id.contains("claude") && !id.contains("gpt-4") && !id.contains("o1-"))
                 .map(String::from)
+                .collect()
         })
-        .unwrap_or_else(|| "openrouter/google/gemma-3-27b-it:free".to_string())
+        .unwrap_or_else(|| vec!["openrouter/google/gemma-3-27b-it:free".to_string()])
 }
 
 pub fn read_current_version(repo: &Path) -> Option<String> {
@@ -574,7 +575,7 @@ pub async fn ai_decide_bump_level(
         None => return BumpLevel::None,
     };
     
-    let model = resolve_free_model_for_bump();
+    let models = resolve_free_models_for_bump();
     
     let prompt = format!(r##"
 You are a version bump advisor for a software project. Analyze the changes and decide if a version bump is warranted.
@@ -611,42 +612,46 @@ Respond with ONLY ONE WORD: major, minor, patch, or none. Nothing else."##);
         Err(_) => return BumpLevel::None,
     };
     
-    let request = OpenRouterBumpRequest {
-        model: model.clone(),
-        messages: vec![OpenRouterBumpMessage {
-            role: "user".to_string(),
-            content: prompt,
-        }],
-        max_tokens: 20,
-    };
-    
-    let response = client
-        .post("https://openrouter.ai/api/v1/chat/completions")
-        .header("Authorization", format!("Bearer {}", api_key))
-        .header("Content-Type", "application/json")
-        .json(&request)
-        .send()
-        .await;
-    
-    match response {
-        Ok(resp) if resp.status().is_success() => {
-            let body: OpenRouterBumpResponse = match resp.json().await {
-                Ok(b) => b,
-                Err(_) => return BumpLevel::None,
-            };
-            let content = match body.choices.first() {
-                Some(choice) => choice.message.content.trim().to_lowercase(),
-                None => return BumpLevel::None,
-            };
-            match content.as_str() {
-                "major" => BumpLevel::Major,
-                "minor" => BumpLevel::Minor,
-                "patch" => BumpLevel::Patch,
-                _ => BumpLevel::None,
+    for model in &models {
+        let request = OpenRouterBumpRequest {
+            model: model.clone(),
+            messages: vec![OpenRouterBumpMessage {
+                role: "user".to_string(),
+                content: prompt.clone(),
+            }],
+            max_tokens: 20,
+        };
+        
+        let response = client
+            .post("https://openrouter.ai/api/v1/chat/completions")
+            .header("Authorization", format!("Bearer {}", api_key))
+            .header("Content-Type", "application/json")
+            .json(&request)
+            .send()
+            .await;
+        
+        match response {
+            Ok(resp) if resp.status().is_success() => {
+                let body: OpenRouterBumpResponse = match resp.json().await {
+                    Ok(b) => b,
+                    Err(_) => continue,
+                };
+                let content = match body.choices.first() {
+                    Some(choice) => choice.message.content.trim().to_lowercase(),
+                    None => continue,
+                };
+                match content.as_str() {
+                    "major" => return BumpLevel::Major,
+                    "minor" => return BumpLevel::Minor,
+                    "patch" => return BumpLevel::Patch,
+                    _ => return BumpLevel::None,
+                }
             }
+            _ => continue,
         }
-        _ => BumpLevel::None,
     }
+    
+    BumpLevel::None
 }
 
 pub fn apply_version_bump_to_repo(repo: &Path, old_ver: &str, new_ver: &str) -> bool {
