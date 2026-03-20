@@ -555,6 +555,20 @@ pub async fn ai_decide_bump_level(
     staged_diff: &str,
     project_state: &str,
 ) -> BumpLevel {
+    // First check: if only version-related files changed (Cargo.toml, package.json, VERSION, Cargo.lock)
+    // and no source files, skip the bump - it means we already bumped this version
+    let version_only_patterns = ["Cargo.toml", "package.json", "VERSION", "Cargo.lock"];
+    let has_source_changes = staged_diff.lines()
+        .filter(|line| !line.is_empty())
+        .any(|line| {
+            !version_only_patterns.iter().any(|p| line.contains(p))
+        });
+    
+    if !has_source_changes {
+        // Only version files changed - likely a duplicate bump, skip
+        return BumpLevel::None;
+    }
+    
     let api_key = match resolve_openrouter_key_for_bump() {
         Some(k) => k,
         None => return BumpLevel::None,
@@ -571,15 +585,21 @@ You are a version bump advisor for a software project. Analyze the changes and d
 ## Project State
 {project_state}
 
-## Staged Changes (git diff --cached --stat)
+## Staged Changes
 {staged_diff}
 
-## Decision
-Based on the changes above, should I bump the version?
-- If this is a BREAKING change (incompatible API, removed features, etc): respond with "major"
-- If this is a NEW FEATURE (backwards-compatible additions): respond with "minor"  
-- If this is a BUG FIX (backwards-compatible corrections): respond with "patch"
-- If this is NOISY or MINOR (docs only, formatting, small refactors with no user-visible change): respond with "none"
+## Decision Criteria
+- "major": BREAKING CHANGE - incompatible API, removed features/options, major restructuring
+- "minor": NEW FEATURE - backwards-compatible additions, new capabilities users would want
+- "patch": BUG FIX - corrections to existing functionality, performance improvements, refactors with user-visible impact
+- "none": NOISY/CHORE - docs, formatting, comments, CI config, version-only changes, dependencies without feature changes
+
+IMPORTANT: Only bump if there is a MEANINGFUL change to the actual software. If the changes are just:
+- Version/dependency updates without new features
+- Documentation only
+- CI/tooling changes  
+- Small refactors with no user-visible impact
+Then respond "none".
 
 Respond with ONLY ONE WORD: major, minor, patch, or none. Nothing else."##);
     
