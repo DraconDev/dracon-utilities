@@ -462,33 +462,8 @@ fn resolve_openrouter_key_for_bump() -> Option<String> {
 }
 
 fn resolve_free_models_for_bump() -> Vec<String> {
-    let policy_path = dirs::home_dir()
-        .unwrap_or_else(|| std::path::PathBuf::from("."))
-        .join(".dracon/ai/routing-policy.json");
-    
-    let content = match std::fs::read_to_string(&policy_path) {
-        Ok(c) => c,
-        Err(_) => return vec!["openrouter/google/gemma-3-27b-it:free".to_string()],
-    };
-    
-    let policy: serde_json::Value = match serde_json::from_str(&content) {
-        Ok(p) => p,
-        Err(_) => return vec!["openrouter/google/gemma-3-27b-it:free".to_string()],
-    };
-    
-    policy
-        .get("lane_model_policy")
-        .and_then(|lmp| lmp.get("free:*"))
-        .and_then(|models| models.as_array())
-        .map(|models| {
-            models
-                .iter()
-                .filter_map(|v| v.as_str())
-                .filter(|id| !id.contains("claude") && !id.contains("gpt-4") && !id.contains("o1-"))
-                .map(String::from)
-                .collect()
-        })
-        .unwrap_or_else(|| vec!["openrouter/google/gemma-3-27b-it:free".to_string()])
+    // openrouter/free is the gateway that auto-routes to a free model
+    vec!["openrouter/free".to_string()]
 }
 
 pub fn read_current_version(repo: &Path) -> Option<String> {
