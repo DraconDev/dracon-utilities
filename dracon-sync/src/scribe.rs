@@ -24,31 +24,9 @@ fn resolve_openrouter_key() -> Option<String> {
 }
 
 fn resolve_free_models() -> Vec<String> {
-    let policy_path = dirs::home_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join(".dracon/ai/routing-policy.json");
-    
-    let content = match std::fs::read_to_string(&policy_path) {
-        Ok(c) => c,
-        Err(_) => return vec!["openrouter/google/gemma-3-27b-it:free".to_string()],
-    };
-    
-    let policy: RoutingPolicy = match serde_json::from_str(&content) {
-        Ok(p) => p,
-        Err(_) => return vec!["openrouter/google/gemma-3-27b-it:free".to_string()],
-    };
-    
-    policy
-        .lane_model_policy
-        .get("free:*")
-        .map(|models| {
-            models
-                .iter()
-                .filter(|id| !id.contains("claude") && !id.contains("gpt-4") && !id.contains("o1-"))
-                .cloned()
-                .collect()
-        })
-        .unwrap_or_else(|| vec!["openrouter/google/gemma-3-27b-it:free".to_string()])
+    // Only openrouter/free works directly - it's a gateway that auto-routes to free models
+    // Retry on rate limit errors
+    vec!["openrouter/free".to_string()]
 }
 
 fn collect_git_log(repo: &Path) -> String {
@@ -259,24 +237,32 @@ pub(crate) async fn update_project_state_from_ai(repo: &Path) -> anyhow::Result<
         Duration::from_secs(150),
         async {
             let mut last_err = None;
-            for model in &models {
+            for (attempt, model) in models.iter().enumerate() {
                 match call_openrouter(&client, &api_key, model, &prompt).await {
                     Ok(text) => return Ok((model.clone(), text)),
                     Err(e) => {
                         let err_str = e.to_string().to_lowercase();
-                        // Rate limit, invalid model, or temporary failure - try next model
-                        if err_str.contains("rate limit") 
+                        // Rate limit or temporary failure - retry with backoff
+                        let is_retryable = err_str.contains("rate limit") 
                             || err_str.contains("429") 
                             || err_str.contains("no choices") 
                             || err_str.contains("null") 
                             || err_str.contains("timeout")
                             || err_str.contains("400")
                             || err_str.contains("not a valid model")
-                            || err_str.contains("invalid model") {
+                            || err_str.contains("invalid model");
+                        
+                        if is_retryable && attempt < models.len() - 1 {
+                            // Wait before retry (exponential backoff)
+                            let wait_ms = 500 * (attempt + 1).pow(2);
+                            tokio::time::sleep(tokio::time::Duration::from_millis(wait_ms)).await;
                             last_err = Some(e);
                             continue;
                         }
-                        // Permanent error - stop trying
+                        // Last attempt or permanent error
+                        if is_retryable {
+                            last_err = Some(e);
+                        }
                         return Err(e);
                     }
                 }
