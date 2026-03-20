@@ -207,8 +207,8 @@ pub(crate) async fn sync_repo(
                 {
                     use crate::bump::{ai_decide_bump_level, bump_semver_major, bump_semver_minor, bump_semver_patch, read_current_version, BumpLevel};
                     
-                    let staged_diff = staged.iter()
-                        .map(|e| format!("{}: {}", e.status.as_str(), e.path.display()))
+                    let staged_diff = committed_entries.iter()
+                        .map(|e| format!("{:?}: {}", e.status, e.path.display()))
                         .collect::<Vec<_>>()
                         .join("\n");
                     let project_state = std::fs::read_to_string(repo.join(".dracon/project-state.md"))
