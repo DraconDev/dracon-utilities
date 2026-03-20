@@ -549,8 +549,8 @@ fn extract_version_from_json(content: &str, key: &str) -> Option<String> {
     None
 }
 
-pub fn ai_decide_bump_level(
-    repo: &Path,
+pub async fn ai_decide_bump_level(
+    _repo: &Path,
     current_version: &str,
     staged_diff: &str,
     project_state: &str,
@@ -600,40 +600,33 @@ Respond with ONLY ONE WORD: major, minor, patch, or none. Nothing else."##);
         max_tokens: 20,
     };
     
-    let runtime = match tokio::runtime::Runtime::new() {
-        Ok(rt) => rt,
-        Err(_) => return BumpLevel::None,
-    };
-    let result = runtime.block_on(async {
-        let response = client
-            .post("https://openrouter.ai/api/v1/chat/completions")
-            .header("Authorization", format!("Bearer {}", api_key))
-            .header("Content-Type", "application/json")
-            .json(&request)
-            .send()
-            .await;
-        
-        match response {
-            Ok(resp) if resp.status().is_success() => {
-                let body: OpenRouterBumpResponse = match resp.json().await {
-                    Ok(b) => b,
-                    Err(_) => return BumpLevel::None,
-                };
-                let content = match body.choices.first() {
-                    Some(choice) => choice.message.content.trim().to_lowercase(),
-                    None => return BumpLevel::None,
-                };
-                match content.as_str() {
-                    "major" => BumpLevel::Major,
-                    "minor" => BumpLevel::Minor,
-                    "patch" => BumpLevel::Patch,
-                    _ => BumpLevel::None,
-                }
+    let response = client
+        .post("https://openrouter.ai/api/v1/chat/completions")
+        .header("Authorization", format!("Bearer {}", api_key))
+        .header("Content-Type", "application/json")
+        .json(&request)
+        .send()
+        .await;
+    
+    match response {
+        Ok(resp) if resp.status().is_success() => {
+            let body: OpenRouterBumpResponse = match resp.json().await {
+                Ok(b) => b,
+                Err(_) => return BumpLevel::None,
+            };
+            let content = match body.choices.first() {
+                Some(choice) => choice.message.content.trim().to_lowercase(),
+                None => return BumpLevel::None,
+            };
+            match content.as_str() {
+                "major" => BumpLevel::Major,
+                "minor" => BumpLevel::Minor,
+                "patch" => BumpLevel::Patch,
+                _ => BumpLevel::None,
             }
-            _ => BumpLevel::None,
         }
-    });
-    result
+        _ => BumpLevel::None,
+    }
 }
 
 pub fn apply_version_bump_to_repo(repo: &Path, old_ver: &str, new_ver: &str) -> bool {

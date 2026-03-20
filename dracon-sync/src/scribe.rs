@@ -207,16 +207,21 @@ async fn call_openrouter(client: &Client, api_key: &str, model: &str, prompt: &s
         .await
         .context("failed to send request to OpenRouter")?;
     
-    if !response.status().is_success() {
-        let status = response.status();
-        let text = response.text().await.unwrap_or_default();
+    let status = response.status();
+    let text = response.text().await.unwrap_or_default();
+    
+    if !status.is_success() {
         return Err(anyhow!("OpenRouter returned {}: {}", status, text));
     }
     
-    let body: OpenRouterResponse = response
-        .json()
-        .await
-        .context("failed to parse OpenRouter response")?;
+    let body: OpenRouterResponse = match serde_json::from_str::<serde_json::Value>(&text) {
+        Ok(v) => {
+            serde_json::from_value(v).map_err(|e| anyhow!("response struct mismatch: {} - raw: {}", e, &text[..text.len().min(200)]))?
+        }
+        Err(e) => {
+            return Err(anyhow!("failed to parse OpenRouter response as JSON: {} - raw: {}", e, &text[..text.len().min(500)]));
+        }
+    };
     
     body.choices
         .into_iter()

@@ -215,7 +215,7 @@ pub(crate) async fn sync_repo(
                         .unwrap_or_default();
                     
                     if let Some(current_ver) = read_current_version(repo) {
-                        let level = ai_decide_bump_level(repo, &current_ver, &staged_diff, &project_state);
+                        let level = ai_decide_bump_level(repo, &current_ver, &staged_diff, &project_state).await;
                         if level != BumpLevel::None {
                             eprintln!("🤖 ai-bump: {} -> {}", current_ver, level.as_str());
                             let new_ver = match level {
