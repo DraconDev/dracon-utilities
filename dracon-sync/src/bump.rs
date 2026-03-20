@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use serde::{Deserialize, Serialize};
 use std::path::Path;
 
 pub(crate) fn bump_semver_patch(ver: &str) -> Option<String> {
@@ -16,6 +17,40 @@ pub(crate) fn bump_semver_patch(ver: &str) -> Option<String> {
     let minor: u64 = parts[1].parse().ok()?;
     let patch: u64 = parts[2].parse().ok()?;
     Some(format!("{}.{}.{}", major, minor, patch + 1))
+}
+
+pub(crate) fn bump_semver_minor(ver: &str) -> Option<String> {
+    let parts: Vec<&str> = ver.split('.').collect();
+    if parts.len() < 3 {
+        return None;
+    }
+    if !parts[0].chars().all(|c| c.is_ascii_digit())
+        || !parts[1].chars().all(|c| c.is_ascii_digit())
+        || !parts[2].chars().all(|c| c.is_ascii_digit())
+    {
+        return None;
+    }
+    let major: u64 = parts[0].parse().ok()?;
+    let minor: u64 = parts[1].parse().ok()?;
+    let patch: u64 = parts[2].parse().ok()?;
+    Some(format!("{}.{}.{}", major, minor + 1, 0))
+}
+
+pub(crate) fn bump_semver_major(ver: &str) -> Option<String> {
+    let parts: Vec<&str> = ver.split('.').collect();
+    if parts.len() < 3 {
+        return None;
+    }
+    if !parts[0].chars().all(|c| c.is_ascii_digit())
+        || !parts[1].chars().all(|c| c.is_ascii_digit())
+        || !parts[2].chars().all(|c| c.is_ascii_digit())
+    {
+        return None;
+    }
+    let major: u64 = parts[0].parse().ok()?;
+    let minor: u64 = parts[1].parse().ok()?;
+    let patch: u64 = parts[2].parse().ok()?;
+    Some(format!("{}.{}.{}", major + 1, 0, 0))
 }
 
 pub(crate) fn bump_first_json_string_field(
@@ -366,4 +401,237 @@ pub(crate) fn bump_version_file_in_repo(repo: &Path) -> Result<bool> {
         return Ok(true);
     }
     Ok(false)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum BumpLevel {
+    Major,
+    Minor,
+    Patch,
+    None,
+}
+
+impl BumpLevel {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            BumpLevel::Major => "major",
+            BumpLevel::Minor => "minor",
+            BumpLevel::Patch => "patch",
+            BumpLevel::None => "none",
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct OpenRouterBumpRequest {
+    model: String,
+    messages: Vec<OpenRouterBumpMessage>,
+    max_tokens: i32,
+}
+
+#[derive(Serialize)]
+struct OpenRouterBumpMessage {
+    role: String,
+    content: String,
+}
+
+#[derive(Deserialize)]
+struct OpenRouterBumpResponse {
+    choices: Vec<OpenRouterBumpChoice>,
+}
+
+#[derive(Deserialize)]
+struct OpenRouterBumpChoice {
+    message: OpenRouterBumpMessageResponse,
+}
+
+#[derive(Deserialize)]
+struct OpenRouterBumpMessageResponse {
+    content: String,
+}
+
+fn resolve_openrouter_key_for_bump() -> Option<String> {
+    let env_path = dirs::home_dir()?.join(".dracon/ai/secrets/openrouter.env");
+    let content = std::fs::read_to_string(&env_path).ok()?;
+    for line in content.lines() {
+        if line.starts_with("OPENROUTER_API_KEY=") {
+            return Some(line.split('=').nth(1)?.trim().to_string());
+        }
+    }
+    None
+}
+
+fn resolve_free_model_for_bump() -> String {
+    let policy_path = dirs::home_dir()
+        .unwrap_or_else(|| std::path::PathBuf::from("."))
+        .join(".dracon/ai/routing-policy.json");
+    
+    let content = match std::fs::read_to_string(&policy_path) {
+        Ok(c) => c,
+        Err(_) => return "openrouter/google/gemma-3-27b-it:free".to_string(),
+    };
+    
+    let policy: serde_json::Value = match serde_json::from_str(&content) {
+        Ok(p) => p,
+        Err(_) => return "openrouter/google/gemma-3-27b-it:free".to_string(),
+    };
+    
+    policy
+        .get("lane_model_policy")
+        .and_then(|lmp| lmp.get("free:*"))
+        .and_then(|models| models.as_array())
+        .and_then(|models| {
+            models
+                .iter()
+                .filter_map(|v| v.as_str())
+                .find(|id| !id.contains("claude") && !id.contains("gpt-4") && !id.contains("o1-"))
+                .map(String::from)
+        })
+        .unwrap_or_else(|| "openrouter/google/gemma-3-27b-it:free".to_string())
+}
+
+pub fn read_current_version(repo: &Path) -> Option<String> {
+    if let Ok(cargo) = std::fs::read_to_string(repo.join("Cargo.toml")) {
+        if let Some(version) = extract_version_from_cargo(&cargo) {
+            return Some(version);
+        }
+    }
+    if let Ok(pkg) = std::fs::read_to_string(repo.join("package.json")) {
+        if let Some(version) = extract_version_from_json(&pkg, "version") {
+            return Some(version);
+        }
+    }
+    if let Ok(version_file) = std::fs::read_to_string(repo.join("VERSION")) {
+        let trimmed = version_file.trim();
+        if !trimmed.is_empty() {
+            return Some(trimmed.to_string());
+        }
+    }
+    None
+}
+
+fn extract_version_from_cargo(content: &str) -> Option<String> {
+    let mut section = String::new();
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with('[') && trimmed.ends_with(']') {
+            section = trimmed.trim_matches(&['[', ']'][..]).trim().to_string();
+        }
+        if section == "package" || section == "workspace.package" {
+            if let Some(rest) = trimmed.strip_prefix("version") {
+                let rest = rest.trim_start().trim_start_matches('=').trim();
+                if let Some(v) = rest.strip_prefix('"').and_then(|s| s.strip_suffix('"')) {
+                    return Some(v.to_string());
+                }
+            }
+        }
+    }
+    None
+}
+
+fn extract_version_from_json(content: &str, key: &str) -> Option<String> {
+    let needle = format!("\"{}\"", key);
+    let mut start = 0usize;
+    while let Some(idx) = content[start..].find(&needle) {
+        let key_pos = start + idx;
+        let after_key = key_pos + needle.len();
+        let rest = &content[after_key..];
+        let colon_rel = rest.find(':')?;
+        let after_colon = after_key + colon_rel + 1;
+        let rest2 = &content[after_colon..];
+        let q1_rel = rest2.find('"')?;
+        let q1 = after_colon + q1_rel + 1;
+        let rest3 = &content[q1..];
+        let q2_rel = rest3.find('"')?;
+        let q2 = q1 + q2_rel;
+        return Some(content[q1..q2].to_string());
+    }
+    None
+}
+
+pub fn ai_decide_bump_level(
+    repo: &Path,
+    current_version: &str,
+    staged_diff: &str,
+    project_state: &str,
+) -> BumpLevel {
+    let api_key = match resolve_openrouter_key_for_bump() {
+        Some(k) => k,
+        None => return BumpLevel::None,
+    };
+    
+    let model = resolve_free_model_for_bump();
+    
+    let prompt = format!(r##"
+You are a version bump advisor for a software project. Analyze the changes and decide if a version bump is warranted.
+
+## Current Version
+{current_version}
+
+## Project State
+{project_state}
+
+## Staged Changes (git diff --cached --stat)
+{staged_diff}
+
+## Decision
+Based on the changes above, should I bump the version?
+- If this is a BREAKING change (incompatible API, removed features, etc): respond with "major"
+- If this is a NEW FEATURE (backwards-compatible additions): respond with "minor"  
+- If this is a BUG FIX (backwards-compatible corrections): respond with "patch"
+- If this is NOISY or MINOR (docs only, formatting, small refactors with no user-visible change): respond with "none"
+
+Respond with ONLY ONE WORD: major, minor, patch, or none. Nothing else."##);
+    
+    let client = match reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+    {
+        Ok(c) => c,
+        Err(_) => return BumpLevel::None,
+    };
+    
+    let request = OpenRouterBumpRequest {
+        model: model.clone(),
+        messages: vec![OpenRouterBumpMessage {
+            role: "user".to_string(),
+            content: prompt,
+        }],
+        max_tokens: 20,
+    };
+    
+    let runtime = match tokio::runtime::Runtime::new() {
+        Ok(rt) => rt,
+        Err(_) => return BumpLevel::None,
+    };
+    let result = runtime.block_on(async {
+        let response = client
+            .post("https://openrouter.ai/api/v1/chat/completions")
+            .header("Authorization", format!("Bearer {}", api_key))
+            .header("Content-Type", "application/json")
+            .json(&request)
+            .send()
+            .await;
+        
+        match response {
+            Ok(resp) if resp.status().is_success() => {
+                let body: OpenRouterBumpResponse = match resp.json().await {
+                    Ok(b) => b,
+                    Err(_) => return BumpLevel::None,
+                };
+                let content = match body.choices.first() {
+                    Some(choice) => choice.message.content.trim().to_lowercase(),
+                    None => return BumpLevel::None,
+                };
+                match content.as_str() {
+                    "major" => BumpLevel::Major,
+                    "minor" => BumpLevel::Minor,
+                    "patch" => BumpLevel::Patch,
+                    _ => BumpLevel::None,
+                }
+            }
+            _ => BumpLevel::None,
+        }
+    });
+    result
 }
