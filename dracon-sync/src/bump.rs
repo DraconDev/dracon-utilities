@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
-use serde::{Deserialize, Serialize};
 use std::path::Path;
+use tokio::process::Command;
 
 pub(crate) fn bump_semver_patch(ver: &str) -> Option<String> {
     let parts: Vec<&str> = ver.split('.').collect();
@@ -422,49 +422,7 @@ impl BumpLevel {
     }
 }
 
-#[derive(Serialize)]
-struct OpenRouterBumpRequest {
-    model: String,
-    messages: Vec<OpenRouterBumpMessage>,
-    max_tokens: i32,
-}
 
-#[derive(Serialize)]
-struct OpenRouterBumpMessage {
-    role: String,
-    content: String,
-}
-
-#[derive(Deserialize)]
-struct OpenRouterBumpResponse {
-    choices: Vec<OpenRouterBumpChoice>,
-}
-
-#[derive(Deserialize)]
-struct OpenRouterBumpChoice {
-    message: OpenRouterBumpMessageResponse,
-}
-
-#[derive(Deserialize)]
-struct OpenRouterBumpMessageResponse {
-    content: String,
-}
-
-fn resolve_openrouter_key_for_bump() -> Option<String> {
-    let env_path = dirs::home_dir()?.join(".dracon/ai/secrets/openrouter.env");
-    let content = std::fs::read_to_string(&env_path).ok()?;
-    for line in content.lines() {
-        if line.starts_with("OPENROUTER_API_KEY=") {
-            return Some(line.split('=').nth(1)?.trim().to_string());
-        }
-    }
-    None
-}
-
-fn resolve_free_models_for_bump() -> Vec<String> {
-    // openrouter/free is the gateway that auto-routes to a free model
-    vec!["openrouter/free".to_string()]
-}
 
 pub fn read_current_version(repo: &Path) -> Option<String> {
     if let Ok(cargo) = std::fs::read_to_string(repo.join("Cargo.toml")) {
@@ -545,13 +503,6 @@ pub async fn ai_decide_bump_level(
         return BumpLevel::None;
     }
     
-    let api_key = match resolve_openrouter_key_for_bump() {
-        Some(k) => k,
-        None => return BumpLevel::None,
-    };
-    
-    let models = resolve_free_models_for_bump();
-    
     let prompt = format!(r##"
 You are a version bump advisor for a software project. Analyze the changes and decide if a version bump is warranted.
 
@@ -578,55 +529,26 @@ IMPORTANT: Only bump if there is a MEANINGFUL change to the actual software. If 
 Then respond "none".
 
 Respond with ONLY ONE WORD: major, minor, patch, or none. Nothing else."##);
-    
-    let client = match reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(30))
-        .build()
+
+    let output = match Command::new("dracon-ai")
+        .args(["chat", "--no-stream", "--intent", "free", &prompt])
+        .output()
     {
-        Ok(c) => c,
+        Ok(out) => out,
         Err(_) => return BumpLevel::None,
     };
-    
-    for model in &models {
-        let request = OpenRouterBumpRequest {
-            model: model.clone(),
-            messages: vec![OpenRouterBumpMessage {
-                role: "user".to_string(),
-                content: prompt.clone(),
-            }],
-            max_tokens: 20,
-        };
-        
-        let response = client
-            .post("https://openrouter.ai/api/v1/chat/completions")
-            .header("Authorization", format!("Bearer {}", api_key))
-            .header("Content-Type", "application/json")
-            .json(&request)
-            .send()
-            .await;
-        
-        match response {
-            Ok(resp) if resp.status().is_success() => {
-                let body: OpenRouterBumpResponse = match resp.json().await {
-                    Ok(b) => b,
-                    Err(_) => continue,
-                };
-                let content = match body.choices.first() {
-                    Some(choice) => choice.message.content.trim().to_lowercase(),
-                    None => continue,
-                };
-                match content.as_str() {
-                    "major" => return BumpLevel::Major,
-                    "minor" => return BumpLevel::Minor,
-                    "patch" => return BumpLevel::Patch,
-                    _ => return BumpLevel::None,
-                }
-            }
-            _ => continue,
-        }
+
+    if !output.status.success() {
+        return BumpLevel::None;
     }
-    
-    BumpLevel::None
+
+    let content = String::from_utf8_lossy(&output.stdout).trim().to_lowercase();
+    match content.as_str() {
+        "major" => BumpLevel::Major,
+        "minor" => BumpLevel::Minor,
+        "patch" => BumpLevel::Patch,
+        _ => BumpLevel::None,
+    }
 }
 
 pub fn apply_version_bump_to_repo(repo: &Path, old_ver: &str, new_ver: &str) -> bool {
