@@ -906,6 +906,7 @@ pub(crate) async fn run_repair_concerns(
                             || err_str.contains("remote does not exist")
                             || err_str.contains("repository not found")
                             || err_str.contains("could not resolve host")
+                            || err_str.contains("does not appear to be a git repository")
                             || (err_str.contains("exit status: 128") && err_str.contains("fatal:"));
 
                         if no_remote {
