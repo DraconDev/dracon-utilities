@@ -533,6 +533,7 @@ Respond with ONLY ONE WORD: major, minor, patch, or none. Nothing else."##);
     let output = match Command::new("dracon-ai")
         .args(["chat", "--no-stream", "--intent", "free", &prompt])
         .output()
+        .await
     {
         Ok(out) => out,
         Err(_) => return BumpLevel::None,
