@@ -23,31 +23,32 @@ fn resolve_openrouter_key() -> Option<String> {
     None
 }
 
-fn resolve_free_model() -> String {
+fn resolve_free_models() -> Vec<String> {
     let policy_path = dirs::home_dir()
         .unwrap_or_else(|| PathBuf::from("."))
         .join(".dracon/ai/routing-policy.json");
     
     let content = match std::fs::read_to_string(&policy_path) {
         Ok(c) => c,
-        Err(_) => return "openrouter/google/gemma-3-27b-it:free".to_string(),
+        Err(_) => return vec!["openrouter/google/gemma-3-27b-it:free".to_string()],
     };
     
     let policy: RoutingPolicy = match serde_json::from_str(&content) {
         Ok(p) => p,
-        Err(_) => return "openrouter/google/gemma-3-27b-it:free".to_string(),
+        Err(_) => return vec!["openrouter/google/gemma-3-27b-it:free".to_string()],
     };
     
     policy
         .lane_model_policy
         .get("free:*")
-        .and_then(|models| {
+        .map(|models| {
             models
                 .iter()
-                .find(|id| !id.contains("claude") && !id.contains("gpt-4") && !id.contains("o1-"))
+                .filter(|id| !id.contains("claude") && !id.contains("gpt-4") && !id.contains("o1-"))
                 .cloned()
+                .collect()
         })
-        .unwrap_or_else(|| "openrouter/google/gemma-3-27b-it:free".to_string())
+        .unwrap_or_else(|| vec!["openrouter/google/gemma-3-27b-it:free".to_string()])
 }
 
 fn collect_git_log(repo: &Path) -> String {
@@ -249,33 +250,52 @@ pub(crate) async fn update_project_state_from_ai(repo: &Path) -> anyhow::Result<
         }
     };
     
-    let model = resolve_free_model();
+    let models = resolve_free_models();
     let prompt = build_scribe_prompt(repo);
     
     let client = Client::new();
-    let model_clone = model.clone();
-    let prompt_clone = prompt.clone();
     
     let result = timeout(
         Duration::from_secs(150),
         async {
-            call_openrouter(&client, &api_key, &model_clone, &prompt_clone).await
+            let mut last_err = None;
+            for model in &models {
+                match call_openrouter(&client, &api_key, model, &prompt).await {
+                    Ok(text) => return Ok((model.clone(), text)),
+                    Err(e) => {
+                        let err_str = e.to_string().to_lowercase();
+                        // Rate limit or temporary failure - try next model
+                        if err_str.contains("rate limit") 
+                            || err_str.contains("429") 
+                            || err_str.contains("no choices") 
+                            || err_str.contains("null") 
+                            || err_str.contains("timeout") {
+                            last_err = Some(e);
+                            continue;
+                        }
+                        // Permanent error - stop trying
+                        return Err(e);
+                    }
+                }
+            }
+            Err(last_err.unwrap_or_else(|| anyhow!("all models failed")))
         },
     )
     .await;
     
     match result {
-        Ok(Ok(text)) => {
+        Ok(Ok((model_used, text))) => {
             let markdown = extract_markdown(&text);
             let dracon_dir = repo.join(".dracon");
             std::fs::create_dir_all(&dracon_dir)?;
             let state_path = dracon_dir.join("project-state.md");
             std::fs::write(&state_path, markdown.trim())?;
-            eprintln!("📝 scribe: updated {}/.dracon/project-state.md", repo_display);
+            eprintln!("📝 scribe: updated {}/.dracon/project-state.md (model: {})", repo_display, model_used);
             Ok(())
         }
         Ok(Err(e)) => {
-            if e.to_string().contains("401") || e.to_string().contains("Unauthorized") {
+            let err_str = e.to_string().to_lowercase();
+            if err_str.contains("401") || err_str.contains("unauthorized") {
                 eprintln!("📝 scribe: skipped (invalid API key)");
                 return Ok(());
             }
