@@ -13,9 +13,15 @@ tokio = { version = "1", features = ["macros", "process", "rt-multi-thread", "ti
 toml = "0.8"
 walkdir = "2.5"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+async-trait = { version = "0.1", features = ["derive"] }
+futures = "0.3"
 dracon-git = { path = "../../dracon-libs/tools/sync/dracon-git" }
 dracon-common = { path = "../../dracon-libs/tools/common/dracon-common", features = ["test-support"] }
 fs2 = "0.4"
+
+# AI routing
+ai-routing-runtime = { path = "../../dracon-libs/services/ai/ai-routing-runtime" }
+ai-service = { path = "../../dracon-libs/services/ai/ai-service" }
 
 [features]
 default = ["scribe"]
