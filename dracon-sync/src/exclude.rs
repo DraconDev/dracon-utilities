@@ -127,9 +127,10 @@ pub(crate) fn should_stage_entry(
         }
         Ok(_) => true,
         Err(_) => {
-            // If it's a deleted file, metadata will fail, but we handled Deleted at the top.
-            // For other cases (broken symlinks, etc), default to staging if not excluded.
-            true
+            if matches!(entry.status, dracon_git::types::FileStatus::Deleted) {
+                return true;
+            }
+            false
         }
     }
 }
