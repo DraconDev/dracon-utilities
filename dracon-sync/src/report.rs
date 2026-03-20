@@ -903,7 +903,8 @@ pub(crate) async fn run_repair_concerns(
                         let is_permanent = err_lower.contains("permission denied")
                             || err_lower.contains("authentication failed")
                             || err_lower.contains("no such host")
-                            || err_lower.contains("connection refused");
+                            || err_lower.contains("connection refused")
+                            || err_lower.contains("exit status: 128");
 
                         if is_permanent {
                             manual_only += 1;
