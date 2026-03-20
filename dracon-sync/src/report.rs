@@ -344,36 +344,6 @@ pub(crate) fn append_incident_record(policy_path: &Path, record: &IncidentRecord
     }
 }
 
-pub(crate) fn has_permanent_failure(repo: &Path) -> bool {
-    let ledger_path = incident_ledger_path(Path::new("/dummy"));
-    if !ledger_path.exists() {
-        return false;
-    }
-    let repo_display = repo.display().to_string();
-    if let Ok(content) = std::fs::read_to_string(&ledger_path) {
-        for line in content.lines() {
-            let line = line.trim();
-            if line.is_empty() {
-                continue;
-            }
-            if let Ok(v) = serde_json::from_str::<serde_json::Value>(line) {
-                let repo_match = v.get("repo")
-                    .and_then(|r| r.as_str())
-                    .map(|r| r == repo_display)
-                    .unwrap_or(false);
-                let result_perm = v.get("result")
-                    .and_then(|r| r.as_str())
-                    .map(|r| r == "permanent_fail")
-                    .unwrap_or(false);
-                if repo_match && result_perm {
-                    return true;
-                }
-            }
-        }
-    }
-    false
-}
-
 pub(crate) fn repo_state_flags(
     status: &dracon_git::types::RepoStatus,
     has_origin: bool,
