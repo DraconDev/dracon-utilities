@@ -222,7 +222,7 @@ dependencies = [
 
 [[package]]
 name = "dracon-git"
-version = "0.1.1650"
+version = "0.1.1755"
 dependencies = [
  "anyhow",
  "git2",

@@ -898,6 +898,32 @@ pub(crate) async fn run_repair_concerns(
                     Err(e) => {
                         out!("   fail: push failed: {}", e);
 
+                        // Check for permanent push failures (no write access)
+                        let err_lower = e.to_string().to_lowercase();
+                        let is_permanent = err_lower.contains("permission denied")
+                            || err_lower.contains("authentication failed")
+                            || err_lower.contains("no such host")
+                            || err_lower.contains("connection refused");
+
+                        if is_permanent {
+                            manual_only += 1;
+                            out!("   manual: PERMANENT_PUSH_FAILURE (no write access)");
+                            append_incident_record(
+                                policy_path,
+                                &IncidentRecord {
+                                    ts_unix: timestamp_secs(),
+                                    scope: "concern".to_string(),
+                                    repo: repo.display().to_string(),
+                                    reason: reason.clone(),
+                                    action: "push_origin_head".to_string(),
+                                    backup_branch: None,
+                                    result: "permanent_fail".to_string(),
+                                    details: Some(e.to_string()),
+                                },
+                            );
+                            continue;
+                        }
+
                         let large = detect_large_blobs_ahead(&repo, blob_threshold)
                             .unwrap_or_default();
                         if !large.is_empty() {
