@@ -1560,3 +1560,56 @@ pub(crate) async fn run_repair_warns(
     }
     Ok(summary)
 }
+
+fn create_private_remote(repo: &Path) -> Option<String> {
+    let repo_name = repo.file_name()?.to_str()?.to_string();
+    let private_remotes_dir = dirs::home_dir()?.join("dracon/private-remotes");
+    let bare_repo_path = private_remotes_dir.join(format!("{}.git", repo_name));
+    
+    if !private_remotes_dir.exists() {
+        std::fs::create_dir_all(&private_remotes_dir).ok()?;
+    }
+    
+    let mut final_path = bare_repo_path.clone();
+    let mut counter = 1;
+    while final_path.exists() {
+        final_path = private_remotes_dir.join(format!("{}-{}.git", repo_name, counter));
+        counter += 1;
+    }
+    
+    let bare_name = final_path.file_name()?.to_str()?;
+    
+    let output = std::process::Command::new("git")
+        .args(["init", "--bare", bare_name])
+        .current_dir(&private_remotes_dir)
+        .output()
+        .ok()?;
+    
+    if !output.status.success() {
+        std::fs::create_dir_all(&final_path).ok()?;
+        let output = std::process::Command::new("git")
+            .args(["init", "--bare"])
+            .current_dir(&final_path)
+            .output()
+            .ok()?;
+        if !output.status.success() {
+            return None;
+        }
+    }
+    
+    let remote_url = format!("file://{}", final_path.display());
+    
+    let add_remote_result = std::process::Command::new("git")
+        .args(["remote", "add", "origin", &remote_url])
+        .current_dir(repo)
+        .output();
+    
+    if add_remote_result.is_err() {
+        let _ = std::process::Command::new("git")
+            .args(["remote", "set-url", "origin", &remote_url])
+            .current_dir(repo)
+            .output();
+    }
+    
+    Some(remote_url)
+}
