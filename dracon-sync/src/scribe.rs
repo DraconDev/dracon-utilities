@@ -264,12 +264,15 @@ pub(crate) async fn update_project_state_from_ai(repo: &Path) -> anyhow::Result<
                     Ok(text) => return Ok((model.clone(), text)),
                     Err(e) => {
                         let err_str = e.to_string().to_lowercase();
-                        // Rate limit or temporary failure - try next model
+                        // Rate limit, invalid model, or temporary failure - try next model
                         if err_str.contains("rate limit") 
                             || err_str.contains("429") 
                             || err_str.contains("no choices") 
                             || err_str.contains("null") 
-                            || err_str.contains("timeout") {
+                            || err_str.contains("timeout")
+                            || err_str.contains("400")
+                            || err_str.contains("not a valid model")
+                            || err_str.contains("invalid model") {
                             last_err = Some(e);
                             continue;
                         }
