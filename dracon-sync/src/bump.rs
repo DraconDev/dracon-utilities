@@ -635,3 +635,41 @@ Respond with ONLY ONE WORD: major, minor, patch, or none. Nothing else."##);
     });
     result
 }
+
+pub fn apply_version_bump_to_repo(repo: &Path, old_ver: &str, new_ver: &str) -> bool {
+    if repo.join("Cargo.toml").exists() {
+        if let Ok(content) = std::fs::read_to_string(repo.join("Cargo.toml")) {
+            let bumped = bump_version_in_cargo_toml(&content, old_ver, new_ver);
+            if bumped != content {
+                if std::fs::write(repo.join("Cargo.toml"), bumped).is_ok() {
+                    return true;
+                }
+            }
+        }
+    }
+    if repo.join("package.json").exists() {
+        if let Ok(content) = std::fs::read_to_string(repo.join("package.json")) {
+            let bumped = bump_version_in_json(&content, old_ver, new_ver);
+            if bumped != content {
+                if std::fs::write(repo.join("package.json"), bumped).is_ok() {
+                    return true;
+                }
+            }
+        }
+    }
+    if repo.join("VERSION").exists() {
+        if std::fs::write(repo.join("VERSION"), format!("{}\n", new_ver)).is_ok() {
+            return true;
+        }
+    }
+    false
+}
+
+fn bump_version_in_cargo_toml(content: &str, old_ver: &str, new_ver: &str) -> String {
+    content.replace(&format!("version = \"{}\"", old_ver), &format!("version = \"{}\"", new_ver))
+        .replace(&format!("version=\"{}\"", old_ver), &format!("version=\"{}\"", new_ver))
+}
+
+fn bump_version_in_json(content: &str, old_ver: &str, new_ver: &str) -> String {
+    content.replace(&format!("\"version\": \"{}\"", old_ver), &format!("\"version\": \"{}\"", new_ver))
+}

@@ -179,59 +179,7 @@ pub(crate) async fn sync_repo(
 
             svc.add_paths(&stage_paths).await?;
 
-            // Optional: bump patch versions, then stage any files we touched (best-effort).
-            if auto_bump_versions {
-                let outcome = bump_patch_version_in_repo(repo)?;
-                if outcome.bumped_cargo_toml {
-                    let _ = run_git_with_timeout(repo, &["add", "Cargo.toml"], 30, "add").await;
-                }
-                if outcome.updated_cargo_lock {
-                    let _ = run_git_with_timeout(repo, &["add", "Cargo.lock"], 30, "add").await;
-                }
-                if outcome.bumped_workspace_package && repo.join("Cargo.lock").exists() {
-                    // Workspace version bumps will cause Cargo.lock churn until it's regenerated.
-                    // Do it immediately so we never end up with a follow-up Cargo.lock-only commit.
-                    match run_cmd_with_timeout(
-                        repo,
-                        "cargo",
-                        &["generate-lockfile"],
-                        180,
-                        "generate-lockfile",
-                    )
-                    .await
-                    {
-                        Ok(()) => {
-                            let _ =
-                                run_git_with_timeout(repo, &["add", "Cargo.lock"], 30, "add").await;
-                        }
-                        Err(e) => {
-                            eprintln!(
-                                "⚠️ {}: failed to refresh Cargo.lock after workspace version bump: {}",
-                                repo.display(),
-                                e
-                            );
-                        }
-                    }
-                }
-
-                // Node/TS: package.json (+ optional package-lock.json alignment).
-                let outcome = bump_node_package_version_in_repo(repo)?;
-                if outcome.bumped {
-                    let _ = run_git_with_timeout(repo, &["add", "package.json"], 30, "add").await;
-                }
-                if outcome.updated_lock {
-                    let _ =
-                        run_git_with_timeout(repo, &["add", "package-lock.json"], 30, "add").await;
-                }
-
-                // Generic: VERSION file.
-                if bump_version_file_in_repo(repo)? {
-                    let _ = run_git_with_timeout(repo, &["add", "VERSION"], 30, "add").await;
-                }
-            }
-
-            // Build the payload from what we're actually going to commit (cached diff),
-            // so version bumps don't silently add files not reflected in the JSON.
+            // Build the payload from what we're actually going to commit (cached diff)
             let staged = git_name_status_entries(repo, &["diff", "--cached", "--name-status"]).await?;
             let committed_entries: Vec<dracon_git::types::DiffFile> = staged
                 .into_iter()
@@ -251,6 +199,52 @@ pub(crate) async fn sync_repo(
             if repo.join(".dracon/project-state.md").exists() {
                 let _ = run_git_with_timeout(repo, &["add", ".dracon/project-state.md"], 10, "add-project-state").await;
             }
+
+            // AI version bumper: decide IF and what level to bump (after scribe has context)
+            // Replaces blind auto-bump with intelligent AI decision
+            if auto_bump_versions && cfg!(feature = "scribe") {
+                #[cfg(feature = "scribe")]
+                {
+                    use crate::bump::{ai_decide_bump_level, bump_semver_major, bump_semver_minor, bump_semver_patch, read_current_version, BumpLevel};
+                    
+                    let staged_diff = staged.iter()
+                        .map(|e| format!("{}: {}", e.status.as_str(), e.path.display()))
+                        .collect::<Vec<_>>()
+                        .join("\n");
+                    let project_state = std::fs::read_to_string(repo.join(".dracon/project-state.md"))
+                        .unwrap_or_default();
+                    
+                    if let Some(current_ver) = read_current_version(repo) {
+                        let level = ai_decide_bump_level(repo, &current_ver, &staged_diff, &project_state);
+                        if level != BumpLevel::None {
+                            eprintln!("🤖 ai-bump: {} -> {}", current_ver, level.as_str());
+                            let new_ver = match level {
+                                BumpLevel::Major => bump_semver_major(&current_ver),
+                                BumpLevel::Minor => bump_semver_minor(&current_ver),
+                                BumpLevel::Patch => bump_semver_patch(&current_ver),
+                                BumpLevel::None => None,
+                            };
+                            
+                            if let Some(new_ver) = new_ver {
+                                let bumped = crate::bump::apply_version_bump_to_repo(repo, &current_ver, &new_ver);
+                                if bumped {
+                                    let _ = run_git_with_timeout(repo, &["add", "Cargo.toml"], 30, "add").await;
+                                    let _ = run_git_with_timeout(repo, &["add", "package.json"], 30, "add").await;
+                                    let _ = run_git_with_timeout(repo, &["add", "VERSION"], 30, "add").await;
+                                    let _ = run_git_with_timeout(repo, &["add", "Cargo.lock"], 30, "add").await;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Re-get staged entries after potential version bump
+            let staged = git_name_status_entries(repo, &["diff", "--cached", "--name-status"]).await?;
+            let committed_entries: Vec<dracon_git::types::DiffFile> = staged
+                .into_iter()
+                .map(|(path, status)| dracon_git::types::DiffFile { path, status })
+                .collect();
 
             let signals = detect_report_signals(repo, &committed_entries);
             let is_report = !signals.is_empty();
