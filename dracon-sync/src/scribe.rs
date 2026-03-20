@@ -134,7 +134,7 @@ struct OpenRouterChoice {
 
 #[derive(Deserialize)]
 struct OpenRouterMessageResponse {
-    content: String,
+    content: Option<String>,
 }
 
 fn build_scribe_prompt(repo: &Path) -> String {
@@ -226,8 +226,8 @@ async fn call_openrouter(client: &Client, api_key: &str, model: &str, prompt: &s
     body.choices
         .into_iter()
         .next()
-        .map(|c| c.message.content)
-        .ok_or_else(|| anyhow!("no choices in OpenRouter response"))
+        .and_then(|c| c.message.content)
+        .ok_or_else(|| anyhow!("no choices in OpenRouter response or content was null"))
 }
 
 fn extract_markdown(text: &str) -> &str {
