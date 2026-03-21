@@ -75,6 +75,21 @@ enum Commands {
         #[arg(short, long)]
         severity: Option<String>,
     },
+    /// Zram management: show stats and generate NixOS config for tuning.
+    Zram {
+        /// Show current zram statistics.
+        #[arg(long, default_value = "false")]
+        status: bool,
+        /// Generate NixOS configuration for larger zram swap.
+        #[arg(long)]
+        gen_config: bool,
+        /// Target memory percent for zram (e.g., 200 for 2x RAM).
+        #[arg(long)]
+        memory_percent: Option<u32>,
+        /// Compression algorithm (lzo, lz4, lz4hc, zstd).
+        #[arg(long)]
+        algorithm: Option<String>,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -2646,6 +2661,93 @@ async fn main() -> Result<()> {
             }
             if shown == 0 {
                 println!("(no matching events)");
+            }
+        }
+        Commands::Zram { status, gen_config, memory_percent, algorithm } => {
+            if gen_config {
+                let mem_pct = memory_percent.unwrap_or(200);
+                let algo = algorithm.unwrap_or_else(|| "zstd".to_string());
+                let valid_algos = ["lzo", "lzo-rle", "lz4", "lz4hc", "zstd", "deflate", "842"];
+                if !valid_algos.contains(&algo.as_str()) {
+                    return Err(anyhow::anyhow!("Invalid algorithm. Valid: {}", valid_algos.join(", ")));
+                }
+                println!("# Zram configuration for NixOS");
+                println!("# Add this to your ~/.dracon/nixos/configuration.nix");
+                println!();
+                println!("  # --- ZRAM ---");
+                println!("  zramSwap = {{");
+                println!("    enable = true;");
+                println!("    algorithm = \"{}\";", algo);
+                println!("    # {}% of RAM = {}GB virtual swap with current RAM", mem_pct, (mem_pct as f64 / 100.0 * 30.0) as u32);
+                println!("    memoryPercent = {};", mem_pct);
+                println!("  }};");
+                println!();
+                println!("# Then rebuild: sudo nixos-rebuild switch --flake ~/.dracon/nixos#");
+                return Ok(());
+            }
+            
+            if status || (!gen_config) {
+                // Show zram stats
+                let zram_path = "/sys/block/zram0";
+                let mm_stat_path = format!("{}/mm_stat", zram_path);
+                
+                println!("Zram Status");
+                println!("============");
+                
+                // Check if zram exists
+                if !std::path::Path::new(zram_path).exists() {
+                    println!("No zram device found.");
+                    return Ok(());
+                }
+                
+                // Get disksize
+                let disksize = std::fs::read_to_string(format!("{}/disksize", zram_path))
+                    .map(|s| s.trim().parse::<u64>().unwrap_or(0))
+                    .unwrap_or(0);
+                let disksize_gb = disksize / 1024 / 1024 / 1024;
+                
+                // Get current algorithm
+                let algo = std::fs::read_to_string(format!("{}/comp_algorithm", zram_path))
+                    .map(|s| s.trim().to_string())
+                    .unwrap_or_else(|_| "unknown".to_string());
+                
+                // Get mm_stat (original data size, compressed size, memory used)
+                let mm_stat = std::fs::read_to_string(&mm_stat_path)
+                    .map(|s| {
+                        s.split_whitespace()
+                            .filter_map(|v| v.parse::<u64>().ok())
+                            .collect::<Vec<_>>()
+                    })
+                    .unwrap_or_default();
+                
+                // mm_stat fields are in bytes: orig_size, compr_size, mem_used (and more)
+                let orig = mm_stat.get(0).copied().unwrap_or(0);
+                let compr = mm_stat.get(1).copied().unwrap_or(0);
+                let mem_used = mm_stat.get(2).copied().unwrap_or(0);
+                
+                let orig_gb = orig as f64 / 1024.0 / 1024.0 / 1024.0;
+                let compr_gb = compr as f64 / 1024.0 / 1024.0 / 1024.0;
+                let mem_used_gb = mem_used as f64 / 1024.0 / 1024.0 / 1024.0;
+                let ratio = if orig > 0 { compr as f64 / orig as f64 } else { 0.0 };
+                
+                println!();
+                println!("Device: /dev/zram0");
+                println!("Disksize: {} GB", disksize_gb);
+                println!("Algorithm: {}", algo);
+                println!();
+                println!("Memory Usage:");
+                println!("  Original data: {:.1} GB", orig_gb);
+                println!("  Compressed:    {:.1} GB", compr_gb);
+                println!("  RAM used:      {:.1} GB", mem_used_gb);
+                println!("  Compression ratio: {:.1}% ({:.1}x)", ratio * 100.0, if ratio > 0.0 { 1.0 / ratio } else { 0.0 });
+                println!();
+                println!("Configuration options:");
+                println!("  --gen-config           Generate NixOS configuration snippet");
+                println!("  --memory-percent <N>   Set memory percent (default: 200 for 2x RAM)");
+                println!("  --algorithm <algo>     Set algorithm: lzo, lz4, lz4hc, zstd (default: zstd)");
+                println!();
+                println!("Example - generate config for 2x RAM with zstd:");
+                println!("  dracon-system zram --gen-config --memory-percent 200 --algorithm zstd");
             }
         }
     }
