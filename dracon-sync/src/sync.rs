@@ -188,23 +188,10 @@ pub(crate) async fn sync_repo(
 
             // Scribe: update project-state.md via AI BEFORE building commit context
             // so the fresh state is included in the commit body
-            // Only run scribe for meaningful source changes, not version-only or project-state changes
             if cfg!(feature = "scribe") {
                 #[cfg(feature = "scribe")]
-                {
-                    let meaningful_patterns = [".rs", ".js", ".ts", ".tsx", ".jsx", ".py", ".go", ".java", ".c", ".cpp", ".h", ".toml", ".json", ".yaml", ".yml", ".md", ".sh", ".bash"];
-                    let version_patterns = ["Cargo.toml", "package.json", "VERSION", "Cargo.lock", "package-lock.json"];
-                    let has_meaningful = committed_entries.iter().any(|e| {
-                        let path = e.path.to_string_lossy();
-                        !path.contains("project-state.md")
-                            && !version_patterns.iter().any(|v| path.ends_with(v))
-                            && meaningful_patterns.iter().any(|p| path.contains(p))
-                    });
-                    if has_meaningful {
-                        if let Err(e) = crate::scribe::update_project_state_from_ai(repo).await {
-                            eprintln!("📝 scribe failed for {}: {}", repo.display(), e);
-                        }
-                    }
+                if let Err(e) = crate::scribe::update_project_state_from_ai(repo).await {
+                    eprintln!("📝 scribe failed for {}: {}", repo.display(), e);
                 }
             }
 
