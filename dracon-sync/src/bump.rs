@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use ai_router_core::{LaneModelPolicy, RoutingTask};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
@@ -12,6 +13,29 @@ fn resolve_openrouter_key() -> Option<String> {
         }
     }
     None
+}
+
+fn resolve_free_models() -> Vec<String> {
+    let policy_path = dirs::home_dir()
+        .unwrap_or_else(|| std::path::PathBuf::from("."))
+        .join(".dracon/ai/routing-policy.json");
+    
+    let content = match std::fs::read_to_string(&policy_path) {
+        Ok(c) => c,
+        Err(_) => return vec!["openrouter/free".to_string()],
+    };
+    
+    match LaneModelPolicy::from_json(&content) {
+        Ok(policy) => {
+            let models = policy.resolve_for_task(RoutingTask::Free, None);
+            if models.is_empty() {
+                vec!["openrouter/free".to_string()]
+            } else {
+                models
+            }
+        }
+        Err(_) => vec!["openrouter/free".to_string()],
+    }
 }
 
 #[derive(Serialize)]
@@ -583,8 +607,11 @@ Respond with ONLY ONE WORD: major, minor, patch, or none. Nothing else."##);
         Err(_) => return BumpLevel::None,
     };
 
+    let models = resolve_free_models();
+    let model = models.first().cloned().unwrap_or_else(|| "openrouter/free".to_string());
+
     let request = OpenRouterRequest {
-        model: "openrouter/free".to_string(),
+        model,
         messages: vec![Message {
             role: "user".to_string(),
             content: prompt,
