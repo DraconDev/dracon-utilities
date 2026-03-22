@@ -1,6 +1,46 @@
 use anyhow::{Context, Result};
+use reqwest::Client;
+use serde::{Deserialize, Serialize};
 use std::path::Path;
-use tokio::process::Command;
+
+fn resolve_openrouter_key() -> Option<String> {
+    let env_path = dirs::home_dir()?.join(".dracon/ai/secrets/openrouter.env");
+    let content = std::fs::read_to_string(&env_path).ok()?;
+    for line in content.lines() {
+        if line.starts_with("OPENROUTER_API_KEY=") {
+            return Some(line.split('=').nth(1)?.trim().to_string());
+        }
+    }
+    None
+}
+
+#[derive(Serialize)]
+struct OpenRouterRequest {
+    model: String,
+    messages: Vec<Message>,
+    max_tokens: i32,
+}
+
+#[derive(Serialize)]
+struct Message {
+    role: String,
+    content: String,
+}
+
+#[derive(Deserialize)]
+struct OpenRouterResponse {
+    choices: Vec<Choice>,
+}
+
+#[derive(Deserialize)]
+struct Choice {
+    message: ResponseMessage,
+}
+
+#[derive(Deserialize)]
+struct ResponseMessage {
+    content: String,
+}
 
 pub(crate) fn bump_semver_patch(ver: &str) -> Option<String> {
     let parts: Vec<&str> = ver.split('.').collect();
@@ -530,24 +570,53 @@ Then respond "none".
 
 Respond with ONLY ONE WORD: major, minor, patch, or none. Nothing else."##);
 
-    let output = match Command::new("dracon-ai")
-        .args(["chat", "--no-stream", "--intent", "free", &prompt])
-        .output()
-        .await
+    let api_key = match resolve_openrouter_key() {
+        Some(k) => k,
+        None => return BumpLevel::None,
+    };
+
+    let client = match Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
     {
-        Ok(out) => out,
+        Ok(c) => c,
         Err(_) => return BumpLevel::None,
     };
 
-    if !output.status.success() {
-        return BumpLevel::None;
-    }
+    let request = OpenRouterRequest {
+        model: "openrouter/free".to_string(),
+        messages: vec![Message {
+            role: "user".to_string(),
+            content: prompt,
+        }],
+        max_tokens: 20,
+    };
 
-    let content = String::from_utf8_lossy(&output.stdout).trim().to_lowercase();
-    match content.as_str() {
-        "major" => BumpLevel::Major,
-        "minor" => BumpLevel::Minor,
-        "patch" => BumpLevel::Patch,
+    let response = client
+        .post("https://openrouter.ai/api/v1/chat/completions")
+        .header("Authorization", format!("Bearer {}", api_key))
+        .header("Content-Type", "application/json")
+        .json(&request)
+        .send()
+        .await;
+
+    match response {
+        Ok(resp) if resp.status().is_success() => {
+            let body: OpenRouterResponse = match resp.json().await {
+                Ok(b) => b,
+                Err(_) => return BumpLevel::None,
+            };
+            let content = match body.choices.first() {
+                Some(choice) => choice.message.content.trim().to_lowercase(),
+                None => return BumpLevel::None,
+            };
+            match content.as_str() {
+                "major" => BumpLevel::Major,
+                "minor" => BumpLevel::Minor,
+                "patch" => BumpLevel::Patch,
+                _ => BumpLevel::None,
+            }
+        }
         _ => BumpLevel::None,
     }
 }
