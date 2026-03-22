@@ -15,7 +15,6 @@ dependencies = [
 name = "ai-router-core"
 version = "4.0.0"
 dependencies = [
- "anyhow",
  "chrono",
  "regex",
  "serde",
