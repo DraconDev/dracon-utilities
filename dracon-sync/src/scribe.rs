@@ -1,55 +1,205 @@
-use anyhow::Context;
+use ai_adapters::{GenericOpenAIAdapter, ModalAdapter};
+use ai_router::models::{ChatMessage, ChatRequest};
+use ai_router::routing::{RoutingTask, SelectionConstraints};
+use ai_router::traits::{AiModelStore, AiProvider};
+use ai_routing_service::{AiService, ProviderRegistry};
+use anyhow::Result;
 use std::path::Path;
-use std::process::Command as StdCommand;
-use tokio::time::{Duration, timeout};
+use std::sync::Arc;
+
+async fn build_ai_service() -> Result<AiService> {
+    let config = ai_adapters::resolve_ai_runtime_config();
+    let mut registry: ProviderRegistry<dyn AiProvider> = ProviderRegistry::new();
+
+    for spec in &config.openai_providers {
+        if !config.active_model_ids.contains(&spec.model_id) {
+            continue;
+        }
+        let adapter = GenericOpenAIAdapter::new_with_auth_keys(
+            spec.api_keys.clone(),
+            spec.endpoint.clone(),
+            spec.model_id.clone(),
+            &spec.auth_header_name,
+            &spec.auth_header_prefix,
+        );
+        registry.register(&spec.model_id, Arc::new(adapter));
+    }
+
+    for spec in &config.modal_providers {
+        if !config.active_model_ids.contains(&spec.model_id) {
+            continue;
+        }
+        let adapter = ModalAdapter::new(
+            spec.api_keys[0].clone(),
+            spec.model_id.clone(),
+        );
+        registry.register(&spec.model_id, Arc::new(adapter));
+    }
+
+    let store: Arc<dyn AiModelStore> = Arc::new(NoopModelStore);
+    Ok(AiService::new(
+        registry,
+        store,
+        config.dev_model_ids,
+        config.active_model_ids,
+        config.fallback_chain,
+    ).await?)
+}
+
+struct NoopModelStore;
+
+#[async_trait::async_trait]
+impl AiModelStore for NoopModelStore {
+    async fn get_best_model(
+        &self,
+        _task: &str,
+        _constraints: SelectionConstraints,
+    ) -> Result<(String, bool)> {
+        Err(anyhow::anyhow!("NoopModelStore: no data"))
+    }
+
+    async fn get_leaderboard(
+        &self,
+        _req: ai_router::models::LeaderboardRequest,
+    ) -> Result<ai_router::models::LeaderboardResponse> {
+        Ok(ai_router::models::LeaderboardResponse::default())
+    }
+
+    async fn mark_failure(&self, _model_id: &str) -> Result<()> {
+        Ok(())
+    }
+
+    async fn update_latency(&self, _model_id: &str, _latency_ms: u64) -> Result<()> {
+        Ok(())
+    }
+}
+
+fn collect_git_context(repo: &Path) -> (String, String) {
+    let git_log = std::process::Command::new("git")
+        .args(["log", "--format=%s%n  files: %(trailers:key=file,valueonly)", "-20"])
+        .current_dir(repo)
+        .output()
+        .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
+        .unwrap_or_else(|_| "no git history".to_string());
+
+    let git_files = std::process::Command::new("git")
+        .args(["log", "--oneline", "--name-only", "-10"])
+        .current_dir(repo)
+        .output()
+        .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
+        .unwrap_or_default();
+
+    (git_log, git_files)
+}
+
+fn collect_blueprint(repo: &Path) -> String {
+    let plan_dir = repo.join("plan");
+    if !plan_dir.exists() {
+        return String::new();
+    }
+
+    std::fs::read_dir(&plan_dir)
+        .ok()
+        .and_then(|entries| {
+            entries
+                .filter_map(|e| e.ok())
+                .filter(|e| e.path().extension().map_or(false, |ext| ext == "md"))
+                .max_by_key(|e| e.metadata().ok().and_then(|m| m.modified().ok()))
+        })
+        .and_then(|e| std::fs::read_to_string(e.path()).ok())
+        .unwrap_or_default()
+}
+
+fn build_scribe_prompt(repo: &Path) -> String {
+    let (git_log, git_files) = collect_git_context(repo);
+    let blueprint = collect_blueprint(repo);
+
+    format!(
+        r#"You are a scribe for a software project. Analyze the git history and project state, then write a concise project-state.md.
+
+## Recent Git Log
+{git_log}
+
+## Recent File Changes
+{git_files}
+
+## Blueprint
+{blueprint}
+
+## Instructions
+Write a project-state.md file with EXACTLY this format (no preamble, no explanation):
+
+# Project State
+
+## Current Focus
+{{one line: what the project is actively working on, based on recent commits and blueprint}}
+
+## Completed
+- [x] {{recent completed work from the log}}
+
+## In Progress
+- [x] {{what's actively being worked on based on recent file patterns}}
+
+## Open Issues
+- {{anything that looks broken or blocked based on the evidence}}
+
+Keep it factual. Infer from the evidence, don't make things up. If unclear, say so.
+Write ONLY the markdown, nothing else."#
+    )
+}
 
 #[cfg(feature = "scribe")]
 pub(crate) async fn update_project_state_from_ai(repo: &Path) -> anyhow::Result<()> {
-    let workdir = repo.to_path_buf();
     let repo_display = repo.display().to_string();
+    let prompt = build_scribe_prompt(repo);
 
-    let result = timeout(
-        Duration::from_secs(150),
-        tokio::task::spawn_blocking(move || {
-            StdCommand::new("dracon-ai")
-                .arg("scribe")
-                .arg(&workdir)
-                .output()
-                .with_context(|| format!("failed to run dracon-ai scribe for {}", workdir.display()))
-        }),
-    )
-    .await;
+    let service = match build_ai_service().await {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("📝 scribe: failed to build AI service for {}: {}", repo_display, e);
+            return Ok(());
+        }
+    };
 
-    match result {
-        Ok(Ok(Ok(output))) => {
-            if output.status.success() {
-                eprintln!("📝 scribe: updated {repo_display}/.dracon/project-state.md");
-                Ok(())
-            } else {
-                let stderr = String::from_utf8_lossy(&output.stderr);
-                if stderr.contains("no AI provider")
-                    || stderr.contains("401")
-                    || stderr.contains("Unauthorized")
-                {
-                    eprintln!("📝 scribe: skipped (no API key configured)");
-                    return Ok(());
-                }
-                Err(anyhow::anyhow!("dracon-ai scribe failed: {}", stderr))
+    let req = ChatRequest {
+        project_id: "scribe".to_string(),
+        messages: vec![ChatMessage {
+            role: "user".to_string(),
+            content: prompt,
+        }],
+        client_intent: Some(RoutingTask::Free),
+        ..Default::default()
+    };
+
+    let (text, _) = match service.ask_and_collect(req).await {
+        Ok(r) => r,
+        Err(e) => {
+            if e.to_string().contains("no AI provider")
+                || e.to_string().contains("401")
+                || e.to_string().contains("Unauthorized")
+            {
+                eprintln!("📝 scribe: skipped (no API key configured)");
+                return Ok(());
             }
+            eprintln!("📝 scribe: AI request failed for {}: {}", repo_display, e);
+            return Ok(());
         }
-        Ok(Ok(Err(e))) => {
-            eprintln!("📝 scribe: failed for {}: {}", repo_display, e);
-            Err(e)
-        }
-        Ok(Err(e)) => {
-            eprintln!("📝 scribe: timed out for {}", repo_display);
-            Ok(())
-        }
-        Err(_) => {
-            eprintln!("📝 scribe: timed out after 150s for {}", repo_display);
-            Ok(())
-        }
-    }
+    };
+
+    let dracon_dir = repo.join(".dracon");
+    std::fs::create_dir_all(&dracon_dir)?;
+    let state_path = dracon_dir.join("project-state.md");
+
+    let markdown = if let Some(start) = text.find("# Project State") {
+        &text[start..]
+    } else {
+        &text
+    };
+
+    std::fs::write(&state_path, markdown.trim())?;
+    eprintln!("📝 scribe: updated {}/.dracon/project-state.md", repo_display);
+
+    Ok(())
 }
 
 #[cfg(not(feature = "scribe"))]
