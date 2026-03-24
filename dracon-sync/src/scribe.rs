@@ -133,10 +133,14 @@ fn load_routing_policy() -> Result<RoutingPolicyConfig> {
 async fn build_ai_service() -> Result<AiService> {
     let config = load_routing_policy()?;
     
+    eprintln!("DEBUG: loaded {} providers, {} active models",
+        config.providers.len(), config.active_model_ids.len());
+    
     let mut registry: ProviderRegistry<dyn AiProvider> = ProviderRegistry::new();
     
     for spec in &config.providers {
         if !config.active_model_ids.contains(&spec.model_id) {
+            eprintln!("DEBUG: skipping {} (not in active)", spec.model_id);
             continue;
         }
         let adapter = GenericOpenAIAdapter::new_with_auth_keys(
@@ -146,10 +150,12 @@ async fn build_ai_service() -> Result<AiService> {
             &spec.auth_header_name,
             &spec.auth_header_prefix,
         );
+        eprintln!("DEBUG: registering {}", spec.model_id);
         registry.register(&spec.model_id, Arc::new(adapter));
     }
     
     let store: Arc<dyn AiModelStore> = Arc::new(NoopModelStore);
+    eprintln!("DEBUG: fallback_chain loaded");
     Ok(AiService::new(
         registry,
         store,
