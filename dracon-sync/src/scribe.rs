@@ -267,7 +267,7 @@ Write ONLY the markdown, nothing else."#
 #[cfg(feature = "scribe")]
 pub(crate) async fn update_project_state_from_ai(repo: &Path, staged_diff: &str) -> anyhow::Result<()> {
     let repo_display = repo.display().to_string();
-    let prompt = build_scribe_prompt(repo);
+    let prompt = build_scribe_prompt(repo, staged_diff);
 
     let service = match build_ai_service().await {
         Ok(s) => s,
