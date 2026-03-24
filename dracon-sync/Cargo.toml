@@ -10,8 +10,12 @@ dirs = "6.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tokio = { version = "1", features = ["macros", "process", "rt-multi-thread", "time"] }
-reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
-ai-router-core = { path = "../../dracon-libs/services/ai/ai-router-core" }
+futures = "0.3"
+async-trait = "0.1"
+tracing = "0.1"
+ai-adapters = { path = "../../dracon-libs/services/ai/ai-adapters", default-features = false }
+ai-routing-service = { path = "../../dracon-libs/services/ai/ai-routing-service" }
+ai-router = { path = "../../dracon-libs/services/ai/ai-router" }
 toml = "0.8"
 walkdir = "2.5"
 
