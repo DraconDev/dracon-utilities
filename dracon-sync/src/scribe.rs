@@ -223,21 +223,24 @@ fn collect_blueprint(repo: &Path) -> String {
         .unwrap_or_default()
 }
 
-fn build_scribe_prompt(repo: &Path) -> String {
+fn build_scribe_prompt(repo: &Path, staged_diff: &str) -> String {
     let (git_log, git_files) = collect_git_context(repo);
     let blueprint = collect_blueprint(repo);
 
     format!(
-        r#"You are a scribe for a software project. Analyze the git history and project state, then write a concise project-state.md.
+        r#"You are a scribe for a software project. Analyze the git history, current changes, and project state, then write a concise project-state.md.
 
-## Recent Git Log
+## Recent Git Log (history context)
 {git_log}
 
 ## Recent File Changes
 {git_files}
 
-## Blueprint
+## Blueprint (goals)
 {blueprint}
+
+## Current Staged Changes (what is about to be committed)
+{staged_diff}
 
 ## Instructions
 Write a project-state.md file with EXACTLY this format (no preamble, no explanation):
@@ -245,7 +248,7 @@ Write a project-state.md file with EXACTLY this format (no preamble, no explanat
 # Project State
 
 ## Current Focus
-{{one line: what the project is actively working on, based on recent commits and blueprint}}
+{{one line: what the project is actively working on NOW, based on the staged changes, recent commits, and blueprint}}
 
 ## Completed
 - [x] {{recent completed work from the log}}
@@ -262,7 +265,7 @@ Write ONLY the markdown, nothing else."#
 }
 
 #[cfg(feature = "scribe")]
-pub(crate) async fn update_project_state_from_ai(repo: &Path) -> anyhow::Result<()> {
+pub(crate) async fn update_project_state_from_ai(repo: &Path, staged_diff: &str) -> anyhow::Result<()> {
     let repo_display = repo.display().to_string();
     let prompt = build_scribe_prompt(repo);
 
@@ -316,6 +319,6 @@ pub(crate) async fn update_project_state_from_ai(repo: &Path) -> anyhow::Result<
 }
 
 #[cfg(not(feature = "scribe"))]
-pub(crate) async fn update_project_state_from_ai(_repo: &Path) -> anyhow::Result<()> {
+pub(crate) async fn update_project_state_from_ai(_repo: &Path, _staged_diff: &str) -> anyhow::Result<()> {
     Ok(())
 }

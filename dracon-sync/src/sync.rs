@@ -188,9 +188,13 @@ pub(crate) async fn sync_repo(
 
             // Scribe: update project-state.md via AI BEFORE building commit context
             // so the fresh state is included in the commit body
+            let staged_diff = committed_entries.iter()
+                .map(|e| format!("{:?}: {}", e.status, e.path.display()))
+                .collect::<Vec<_>>()
+                .join("\n");
             if cfg!(feature = "scribe") {
                 #[cfg(feature = "scribe")]
-                if let Err(e) = crate::scribe::update_project_state_from_ai(repo).await {
+                if let Err(e) = crate::scribe::update_project_state_from_ai(repo, &staged_diff).await {
                     eprintln!("📝 scribe failed for {}: {}", repo.display(), e);
                 }
             }
