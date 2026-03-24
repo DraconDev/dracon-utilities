@@ -98,12 +98,12 @@ fn load_routing_policy() -> Result<RoutingPolicyConfig> {
         });
     }
     
-    let active_model_ids = parsed.get("active_model_ids")
+    let active_model_ids: Vec<String> = parsed.get("active_model_ids")
         .and_then(|v| v.as_array())
         .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
         .unwrap_or_default();
     
-    let dev_model_ids = active_model_ids.iter()
+    let dev_model_ids: Vec<String> = active_model_ids.iter()
         .filter(|id| id.contains("hunter-alpha"))
         .cloned()
         .collect();
