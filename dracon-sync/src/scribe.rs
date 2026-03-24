@@ -1,16 +1,98 @@
-use ai_adapters::{GenericOpenAIAdapter, ModalAdapter};
+use ai_adapters::GenericOpenAIAdapter;
 use ai_router::models::{ChatMessage, ChatRequest};
 use ai_router::routing::{RoutingTask, SelectionConstraints};
 use ai_router::traits::{AiModelStore, AiProvider};
-use ai_routing_service::{AiService, ProviderRegistry};
-use anyhow::Result;
+use ai_routing_service::{AiService, LaneModelPolicy, ProviderRegistry};
+use anyhow::{Context, Result};
+use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 
-async fn build_ai_service() -> Result<AiService> {
-    let config = ai_adapters::resolve_ai_runtime_config();
-    let mut registry: ProviderRegistry<dyn AiProvider> = ProviderRegistry::new();
+fn load_routing_policy() -> Option<ai_adapters::ResolvedAiRuntimeConfig> {
+    let path = dirs::home_dir()?.join(".dracon/ai/routing-policy.json");
+    if !path.exists() {
+        return None;
+    }
+    let raw = std::fs::read_to_string(&path).ok()?;
+    let parsed: serde_json::Value = serde_json::from_str(&raw).ok()?;
+    
+    let providers = parsed.get("providers")?.as_array()?;
+    let mut openai_providers = Vec::new();
+    
+    for provider in providers {
+        let model_id = provider.get("model_id")?.as_str()?.to_string();
+        let api_key_envs = provider.get("api_key_envs")
+            .and_then(|v| v.as_array())
+            .map(|arr| arr.iter().filter_map(|v| v.as_str()).map(String::from).collect())
+            .unwrap_or_default();
+        let endpoint = provider.get("endpoint").and_then(|v| v.as_str()).unwrap_or("").to_string();
+        let payload_model = provider.get("payload_model").and_then(|v| v.as_str()).unwrap_or(&model_id).to_string();
+        let auth_header_name = provider.get("auth_header_name").and_then(|v| v.as_str()).unwrap_or("Authorization").to_string();
+        let auth_header_prefix = provider.get("auth_header_prefix").and_then(|v| v.as_str()).unwrap_or("Bearer ").to_string();
+        
+        if api_key_envs.is_empty() {
+            continue;
+        }
+        
+        let api_keys: Vec<String> = api_key_envs.iter()
+            .filter_map(|k| std::env::var(k).ok())
+            .collect();
+        
+        if api_keys.is_empty() {
+            continue;
+        }
+        
+        openai_providers.push(ai_adapters::OpenAiCompatProviderSpec {
+            model_id: model_id.clone(),
+            payload_model,
+            api_keys,
+            endpoint,
+            provider_label: provider.get("provider_label").and_then(|v| v.as_str()).unwrap_or("openrouter").to_string(),
+            auth_header_name,
+            auth_header_prefix,
+        });
+    }
+    
+    let active_model_ids = parsed.get("active_model_ids")
+        .and_then(|v| v.as_array())
+        .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+        .unwrap_or_default();
+    
+    let lane_model_policy = parsed.get("lane_model_policy")
+        .and_then(|v| v.as_object())
+        .map(|obj| {
+            let entries: HashMap<String, Vec<String>> = obj.iter()
+                .filter_map(|(k, v)| {
+                    v.as_array()
+                        .map(|arr| (k.clone(), arr.iter().filter_map(|e| e.as_str().map(String::from)).collect()))
+                })
+                .collect();
+            LaneModelPolicy::from_entries(entries)
+        })
+        .unwrap_or_else(|| LaneModelPolicy::from_entries(HashMap::new()));
+    
+    let dev_model_ids = active_model_ids.iter()
+        .filter(|id| id.contains("hunter-alpha"))
+        .cloned()
+        .collect();
+    
+    Some(ai_adapters::ResolvedAiRuntimeConfig {
+        openai_providers,
+        gemini_providers: Vec::new(),
+        bedrock_providers: Vec::new(),
+        modal_providers: Vec::new(),
+        active_model_ids,
+        dev_model_ids,
+        fallback_chain: lane_model_policy,
+    })
+}
 
+async fn build_ai_service() -> Result<AiService> {
+    let config = load_routing_policy()
+        .context("failed to load routing policy from ~/.dracon/ai/routing-policy.json")?;
+    
+    let mut registry: ProviderRegistry<dyn AiProvider> = ProviderRegistry::new();
+    
     for spec in &config.openai_providers {
         if !config.active_model_ids.contains(&spec.model_id) {
             continue;
@@ -24,18 +106,7 @@ async fn build_ai_service() -> Result<AiService> {
         );
         registry.register(&spec.model_id, Arc::new(adapter));
     }
-
-    for spec in &config.modal_providers {
-        if !config.active_model_ids.contains(&spec.model_id) {
-            continue;
-        }
-        let adapter = ModalAdapter::new(
-            spec.api_keys[0].clone(),
-            spec.model_id.clone(),
-        );
-        registry.register(&spec.model_id, Arc::new(adapter));
-    }
-
+    
     let store: Arc<dyn AiModelStore> = Arc::new(NoopModelStore);
     Ok(AiService::new(
         registry,
