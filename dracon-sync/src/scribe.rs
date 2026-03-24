@@ -8,46 +8,91 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 
-fn load_routing_policy() -> Option<ai_adapters::ResolvedAiRuntimeConfig> {
-    let path = dirs::home_dir()?.join(".dracon/ai/routing-policy.json");
+struct RoutingPolicySpec {
+    model_id: String,
+    api_keys: Vec<String>,
+    endpoint: String,
+    payload_model: String,
+    auth_header_name: String,
+    auth_header_prefix: String,
+}
+
+struct RoutingPolicyConfig {
+    providers: Vec<RoutingPolicySpec>,
+    active_model_ids: Vec<String>,
+    dev_model_ids: Vec<String>,
+    fallback_chain: LaneModelPolicy,
+}
+
+fn load_routing_policy() -> Result<RoutingPolicyConfig> {
+    let path = dirs::home_dir()
+        .context("no home dir")?
+        .join(".dracon/ai/routing-policy.json");
+    
     if !path.exists() {
-        return None;
+        anyhow::bail!("routing policy not found at {}", path.display());
     }
-    let raw = std::fs::read_to_string(&path).ok()?;
-    let parsed: serde_json::Value = serde_json::from_str(&raw).ok()?;
     
-    let providers = parsed.get("providers")?.as_array()?;
-    let mut openai_providers = Vec::new();
+    let raw = std::fs::read_to_string(&path)
+        .with_context(|| format!("failed to read {}", path.display()))?;
     
-    for provider in providers {
-        let model_id = provider.get("model_id")?.as_str()?.to_string();
+    let parsed: serde_json::Value = serde_json::from_str(&raw)
+        .with_context(|| "failed to parse routing policy JSON")?;
+    
+    let providers_array = parsed.get("providers")
+        .and_then(|v| v.as_array())
+        .context("providers array not found")?;
+    
+    let mut providers = Vec::new();
+    for provider in providers_array {
+        let model_id = provider.get("model_id")
+            .and_then(|v| v.as_str())
+            .context("model_id missing")?
+            .to_string();
+        
         let api_key_envs = provider.get("api_key_envs")
             .and_then(|v| v.as_array())
-            .map(|arr| arr.iter().filter_map(|v| v.as_str()).map(String::from).collect())
+            .map(|arr| arr.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>())
             .unwrap_or_default();
-        let endpoint = provider.get("endpoint").and_then(|v| v.as_str()).unwrap_or("").to_string();
-        let payload_model = provider.get("payload_model").and_then(|v| v.as_str()).unwrap_or(&model_id).to_string();
-        let auth_header_name = provider.get("auth_header_name").and_then(|v| v.as_str()).unwrap_or("Authorization").to_string();
-        let auth_header_prefix = provider.get("auth_header_prefix").and_then(|v| v.as_str()).unwrap_or("Bearer ").to_string();
         
         if api_key_envs.is_empty() {
             continue;
         }
         
-        let api_keys: Vec<String> = api_key_envs.iter()
-            .filter_map(|k| std::env::var(k).ok())
+        let api_keys: Vec<String> = api_key_envs
+            .iter()
+            .filter_map(|k| std::env::var(*k).ok())
             .collect();
         
         if api_keys.is_empty() {
             continue;
         }
         
-        openai_providers.push(ai_adapters::OpenAiCompatProviderSpec {
-            model_id: model_id.clone(),
-            payload_model,
+        let endpoint = provider.get("endpoint")
+            .and_then(|v| v.as_str())
+            .unwrap_or("https://openrouter.ai/api/v1")
+            .to_string();
+        
+        let payload_model = provider.get("payload_model")
+            .and_then(|v| v.as_str())
+            .unwrap_or(&model_id)
+            .to_string();
+        
+        let auth_header_name = provider.get("auth_header_name")
+            .and_then(|v| v.as_str())
+            .unwrap_or("Authorization")
+            .to_string();
+        
+        let auth_header_prefix = provider.get("auth_header_prefix")
+            .and_then(|v| v.as_str())
+            .unwrap_or("Bearer ")
+            .to_string();
+        
+        providers.push(RoutingPolicySpec {
+            model_id,
             api_keys,
             endpoint,
-            provider_label: provider.get("provider_label").and_then(|v| v.as_str()).unwrap_or("openrouter").to_string(),
+            payload_model,
             auth_header_name,
             auth_header_prefix,
         });
@@ -58,42 +103,39 @@ fn load_routing_policy() -> Option<ai_adapters::ResolvedAiRuntimeConfig> {
         .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
         .unwrap_or_default();
     
-    let lane_model_policy = parsed.get("lane_model_policy")
+    let dev_model_ids = active_model_ids.iter()
+        .filter(|id| id.contains("hunter-alpha"))
+        .cloned()
+        .collect();
+    
+    let fallback_chain = parsed.get("lane_model_policy")
         .and_then(|v| v.as_object())
         .map(|obj| {
             let entries: HashMap<String, Vec<String>> = obj.iter()
                 .filter_map(|(k, v)| {
-                    v.as_array()
-                        .map(|arr| (k.clone(), arr.iter().filter_map(|e| e.as_str().map(String::from)).collect()))
+                    v.as_array().map(|arr| {
+                        (k.clone(), arr.iter().filter_map(|e| e.as_str().map(String::from)).collect())
+                    })
                 })
                 .collect();
             LaneModelPolicy::from_entries(entries)
         })
         .unwrap_or_else(|| LaneModelPolicy::from_entries(HashMap::new()));
     
-    let dev_model_ids = active_model_ids.iter()
-        .filter(|id| id.contains("hunter-alpha"))
-        .cloned()
-        .collect();
-    
-    Some(ai_adapters::ResolvedAiRuntimeConfig {
-        openai_providers,
-        gemini_providers: Vec::new(),
-        bedrock_providers: Vec::new(),
-        modal_providers: Vec::new(),
+    Ok(RoutingPolicyConfig {
+        providers,
         active_model_ids,
         dev_model_ids,
-        fallback_chain: lane_model_policy,
+        fallback_chain,
     })
 }
 
 async fn build_ai_service() -> Result<AiService> {
-    let config = load_routing_policy()
-        .context("failed to load routing policy from ~/.dracon/ai/routing-policy.json")?;
+    let config = load_routing_policy()?;
     
     let mut registry: ProviderRegistry<dyn AiProvider> = ProviderRegistry::new();
     
-    for spec in &config.openai_providers {
+    for spec in &config.providers {
         if !config.active_model_ids.contains(&spec.model_id) {
             continue;
         }
