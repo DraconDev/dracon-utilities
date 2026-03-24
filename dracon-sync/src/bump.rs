@@ -702,3 +702,70 @@ fn bump_version_in_cargo_toml(content: &str, old_ver: &str, new_ver: &str) -> St
 fn bump_version_in_json(content: &str, old_ver: &str, new_ver: &str) -> String {
     content.replace(&format!("\"version\": \"{}\"", old_ver), &format!("\"version\": \"{}\"", new_ver))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_resolve_models_returns_default_without_policy() {
+        let models = resolve_models_for_task(RoutingTask::Free, "test prompt");
+        assert!(!models.is_empty(), "should always return at least one fallback model");
+        assert_eq!(models[0], "openrouter/free");
+    }
+
+    #[test]
+    fn test_policy_resolution_returns_ordered_chain() {
+        let policy = r#"{
+            "free:*": ["openrouter/free-model-a", "openrouter/free-model-b"],
+            "coding:*": ["openrouter/coding-model"]
+        }"#;
+        let p = LaneModelPolicy::from_json(policy).expect("valid policy");
+        let models = p.resolve_for_task(RoutingTask::Free, None);
+        assert_eq!(models.len(), 2);
+        assert_eq!(models[0], "openrouter/free-model-a");
+        assert_eq!(models[1], "openrouter/free-model-b");
+    }
+
+    #[test]
+    fn test_policy_fallback_to_wildcard() {
+        let policy = r#"{"*:*": ["openrouter/default-model"]}"#;
+        let p = LaneModelPolicy::from_json(policy).expect("valid policy");
+        let models = p.resolve_for_task(RoutingTask::Free, None);
+        assert_eq!(models, vec!["openrouter/default-model"]);
+    }
+
+    #[test]
+    fn test_infer_lane_on_bump_prompt() {
+        let prompt = "Analyze the changes and decide if a version bump is warranted. Bug fix or breaking change.";
+        let lane = infer_lane(&[RoutingMessage::user(prompt)]);
+        // Contains "fix" and "change" which match code patterns
+        assert_eq!(lane, RoutingTask::Coding);
+    }
+
+    #[test]
+    fn test_invalid_policy_returns_fallback() {
+        let models = resolve_models_for_task(RoutingTask::Free, "not json content");
+        assert_eq!(models, vec!["openrouter/free"]);
+    }
+
+    #[test]
+    fn test_bump_semver_patch() {
+        assert_eq!(bump_semver_patch("1.2.3"), Some("1.2.4".to_string()));
+        assert_eq!(bump_semver_patch("0.0.0"), Some("0.0.1".to_string()));
+        assert_eq!(bump_semver_patch("v1.2.3"), None);
+        assert_eq!(bump_semver_patch("1.2"), None);
+    }
+
+    #[test]
+    fn test_bump_semver_minor() {
+        assert_eq!(bump_semver_minor("1.2.3"), Some("1.3.0".to_string()));
+        assert_eq!(bump_semver_minor("0.0.0"), Some("0.1.0".to_string()));
+    }
+
+    #[test]
+    fn test_bump_semver_major() {
+        assert_eq!(bump_semver_major("1.2.3"), Some("2.0.0".to_string()));
+        assert_eq!(bump_semver_major("0.9.9"), Some("1.0.0".to_string()));
+    }
+}
