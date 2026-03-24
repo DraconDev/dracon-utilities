@@ -557,44 +557,6 @@ fn extract_version_from_json(content: &str, key: &str) -> Option<String> {
     None
 }
 
-async fn send_openrouter_request(
-    client: &reqwest::Client,
-    api_key: &str,
-    models: &[String],
-    prompt: &str,
-) -> Option<String> {
-    for model in models {
-        let resp = client
-            .post("https://openrouter.ai/api/v1/chat/completions")
-            .header("Authorization", format!("Bearer {}", api_key))
-            .header("Content-Type", "application/json")
-            .json(&serde_json::json!({
-                "model": model,
-                "messages": [{"role": "user", "content": prompt}],
-                "max_tokens": 20
-            }))
-            .send()
-            .await;
-
-        match resp {
-            Ok(r) if r.status().is_success() => {
-                if let Ok(body) = r.json::<serde_json::Value>().await {
-                    if let Some(content) = body
-                        .get("choices")
-                        .and_then(|c| c.get(0))
-                        .and_then(|c| c.get("message"))
-                        .and_then(|m| m.get("content"))
-                        .and_then(|c| c.as_str())
-                    {
-                        return Some(content.to_string());
-                    }
-                }
-            }
-            _ => continue,
-        }
-    }
-    None
-}
 
 pub async fn ai_decide_bump_level(
     _repo: &Path,
@@ -712,48 +674,6 @@ fn bump_version_in_json(content: &str, old_ver: &str, new_ver: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_resolve_models_returns_default_without_policy() {
-        let models = resolve_models_for_task(RoutingTask::Free, "test prompt");
-        assert!(!models.is_empty(), "should always return at least one fallback model");
-        assert_eq!(models[0], "openrouter/free");
-    }
-
-    #[test]
-    fn test_policy_resolution_returns_ordered_chain() {
-        let policy = r#"{
-            "free:*": ["openrouter/free-model-a", "openrouter/free-model-b"],
-            "coding:*": ["openrouter/coding-model"]
-        }"#;
-        let p = LaneModelPolicy::from_json(policy).expect("valid policy");
-        let models = p.resolve_for_task(RoutingTask::Free, None);
-        assert_eq!(models.len(), 2);
-        assert_eq!(models[0], "openrouter/free-model-a");
-        assert_eq!(models[1], "openrouter/free-model-b");
-    }
-
-    #[test]
-    fn test_policy_fallback_to_wildcard() {
-        let policy = r#"{"*:*": ["openrouter/default-model"]}"#;
-        let p = LaneModelPolicy::from_json(policy).expect("valid policy");
-        let models = p.resolve_for_task(RoutingTask::Free, None);
-        assert_eq!(models, vec!["openrouter/default-model"]);
-    }
-
-    #[test]
-    fn test_infer_lane_on_bump_prompt() {
-        let prompt = "Analyze the changes and decide if a version bump is warranted. Bug fix or breaking change.";
-        let lane = infer_lane(&[RoutingMessage::user(prompt)]);
-        // Contains "fix" and "change" which match code patterns
-        assert_eq!(lane, RoutingTask::Coding);
-    }
-
-    #[test]
-    fn test_invalid_policy_returns_fallback() {
-        let models = resolve_models_for_task(RoutingTask::Free, "not json content");
-        assert_eq!(models, vec!["openrouter/free"]);
-    }
 
     #[test]
     fn test_bump_semver_patch() {
