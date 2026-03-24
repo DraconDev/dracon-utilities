@@ -610,12 +610,12 @@ pub async fn ai_decide_bump_level(
         .any(|line| {
             !version_only_patterns.iter().any(|p| line.contains(p))
         });
-    
+
     if !has_source_changes {
         // Only version files changed - likely a duplicate bump, skip
         return BumpLevel::None;
     }
-    
+
     let prompt = format!(r##"
 You are a version bump advisor for a software project. Analyze the changes and decide if a version bump is warranted.
 
@@ -643,29 +643,31 @@ Then respond "none".
 
 Respond with ONLY ONE WORD: major, minor, patch, or none. Nothing else."##);
 
-    let api_key = match resolve_openrouter_key() {
-        Some(k) => k,
-        None => return BumpLevel::None,
-    };
-
-    let client = match Client::builder()
-        .timeout(std::time::Duration::from_secs(30))
-        .build()
-    {
-        Ok(c) => c,
+    let service = match build_ai_service().await {
+        Ok(s) => s,
         Err(_) => return BumpLevel::None,
     };
 
-    let models = resolve_models_for_task(RoutingTask::Free, &prompt);
+    let req = ChatRequest {
+        project_id: "dracon-sync".to_string(),
+        messages: vec![ChatMessage {
+            role: "user".to_string(),
+            content: prompt,
+        }],
+        client_intent: Some(ai_router::routing::RoutingTask::Free),
+        ..Default::default()
+    };
 
-    match send_openrouter_request(&client, &api_key, &models, &prompt).await {
-        Some(content) => match content.trim().to_lowercase().as_str() {
-            "major" => BumpLevel::Major,
-            "minor" => BumpLevel::Minor,
-            "patch" => BumpLevel::Patch,
-            _ => BumpLevel::None,
-        },
-        None => BumpLevel::None,
+    let (content, _) = match service.ask_and_collect(req).await {
+        Ok(r) => r,
+        Err(_) => return BumpLevel::None,
+    };
+
+    match content.trim().to_lowercase().as_str() {
+        "major" => BumpLevel::Major,
+        "minor" => BumpLevel::Minor,
+        "patch" => BumpLevel::Patch,
+        _ => BumpLevel::None,
     }
 }
 
