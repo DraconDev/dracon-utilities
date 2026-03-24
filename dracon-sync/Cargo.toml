@@ -13,7 +13,7 @@ tokio = { version = "1", features = ["macros", "process", "rt-multi-thread", "ti
 futures = "0.3"
 async-trait = "0.1"
 tracing = "0.1"
-ai-adapters = { path = "../../dracon-libs/services/ai/ai-adapters", default-features = false }
+ai-adapters = { path = "../../dracon-libs/services/ai/ai-adapters", default-features = false, features = ["providers"] }
 ai-routing-service = { path = "../../dracon-libs/services/ai/ai-routing-service" }
 ai-router = { path = "../../dracon-libs/services/ai/ai-router" }
 toml = "0.8"
