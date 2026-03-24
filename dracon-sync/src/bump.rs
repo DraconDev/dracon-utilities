@@ -654,22 +654,14 @@ Respond with ONLY ONE WORD: major, minor, patch, or none. Nothing else."##);
 
     let models = resolve_models_for_task(RoutingTask::Free, &prompt);
 
-    let response = send_openrouter_request(&client, &api_key, &models, &prompt).await;
-
-    match response {
-        Ok(body) => {
-            let content = match body.choices.first() {
-                Some(choice) => choice.message.content.trim().to_lowercase(),
-                None => return BumpLevel::None,
-            };
-            match content.as_str() {
-                "major" => BumpLevel::Major,
-                "minor" => BumpLevel::Minor,
-                "patch" => BumpLevel::Patch,
-                _ => BumpLevel::None,
-            }
-        }
-        _ => BumpLevel::None,
+    match send_openrouter_request(&client, &api_key, &models, &prompt).await {
+        Some(content) => match content.trim().to_lowercase().as_str() {
+            "major" => BumpLevel::Major,
+            "minor" => BumpLevel::Minor,
+            "patch" => BumpLevel::Patch,
+            _ => BumpLevel::None,
+        },
+        None => BumpLevel::None,
     }
 }
 
