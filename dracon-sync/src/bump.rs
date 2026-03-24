@@ -1,5 +1,5 @@
+use ai_router_core::{infer_lane, LaneModelPolicy, RoutingMessage, RoutingTask};
 use anyhow::{Context, Result};
-use ai_router_core::{LaneModelPolicy, RoutingTask};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
@@ -15,27 +15,34 @@ fn resolve_openrouter_key() -> Option<String> {
     None
 }
 
-fn resolve_free_models() -> Vec<String> {
+fn load_policy() -> Option<LaneModelPolicy> {
     let policy_path = dirs::home_dir()
         .unwrap_or_else(|| std::path::PathBuf::from("."))
         .join(".dracon/ai/routing-policy.json");
-    
-    let content = match std::fs::read_to_string(&policy_path) {
-        Ok(c) => c,
-        Err(_) => return vec!["openrouter/free".to_string()],
+    let content = std::fs::read_to_string(&policy_path).ok()?;
+    LaneModelPolicy::from_json(&content).ok()
+}
+
+fn resolve_models_for_task(task: RoutingTask, prompt: &str) -> Vec<String> {
+    let policy = match load_policy() {
+        Some(p) => p,
+        None => return vec![format!("openrouter/{}", task.as_task_key())],
     };
-    
-    match LaneModelPolicy::from_json(&content) {
-        Ok(policy) => {
-            let models = policy.resolve_for_task(RoutingTask::Free, None);
-            if models.is_empty() {
-                vec!["openrouter/free".to_string()]
-            } else {
-                models
-            }
-        }
-        Err(_) => vec!["openrouter/free".to_string()],
+
+    let models = policy.resolve_for_task(task, None);
+    if !models.is_empty() {
+        return models;
     }
+
+    let inferred = infer_lane(&[RoutingMessage::user(prompt)]);
+    if inferred != task {
+        let fallback = policy.resolve_for_task(inferred, None);
+        if !fallback.is_empty() {
+            return fallback;
+        }
+    }
+
+    vec![format!("openrouter/{}", task.as_task_key())]
 }
 
 #[derive(Serialize)]
@@ -547,6 +554,44 @@ fn extract_version_from_json(content: &str, key: &str) -> Option<String> {
     None
 }
 
+async fn send_openrouter_request(
+    client: &Client,
+    api_key: &str,
+    models: &[String],
+    prompt: &str,
+) -> Option<String> {
+    for model in models {
+        let request = OpenRouterRequest {
+            model: model.clone(),
+            messages: vec![Message {
+                role: "user".to_string(),
+                content: prompt.to_string(),
+            }],
+            max_tokens: 20,
+        };
+
+        let resp = client
+            .post("https://openrouter.ai/api/v1/chat/completions")
+            .header("Authorization", format!("Bearer {}", api_key))
+            .header("Content-Type", "application/json")
+            .json(&request)
+            .send()
+            .await;
+
+        match resp {
+            Ok(r) if r.status().is_success() => {
+                if let Ok(body) = r.json::<OpenRouterResponse>().await {
+                    if let Some(choice) = body.choices.first() {
+                        return Some(choice.message.content.clone());
+                    }
+                }
+            }
+            _ => continue,
+        }
+    }
+    None
+}
+
 pub async fn ai_decide_bump_level(
     _repo: &Path,
     current_version: &str,
@@ -607,32 +652,12 @@ Respond with ONLY ONE WORD: major, minor, patch, or none. Nothing else."##);
         Err(_) => return BumpLevel::None,
     };
 
-    let models = resolve_free_models();
-    let model = models.first().cloned().unwrap_or_else(|| "openrouter/free".to_string());
+    let models = resolve_models_for_task(RoutingTask::Free, &prompt);
 
-    let request = OpenRouterRequest {
-        model,
-        messages: vec![Message {
-            role: "user".to_string(),
-            content: prompt,
-        }],
-        max_tokens: 20,
-    };
-
-    let response = client
-        .post("https://openrouter.ai/api/v1/chat/completions")
-        .header("Authorization", format!("Bearer {}", api_key))
-        .header("Content-Type", "application/json")
-        .json(&request)
-        .send()
-        .await;
+    let response = send_openrouter_request(&client, &api_key, &models, &prompt).await;
 
     match response {
-        Ok(resp) if resp.status().is_success() => {
-            let body: OpenRouterResponse = match resp.json().await {
-                Ok(b) => b,
-                Err(_) => return BumpLevel::None,
-            };
+        Ok(body) => {
             let content = match body.choices.first() {
                 Some(choice) => choice.message.content.trim().to_lowercase(),
                 None => return BumpLevel::None,
