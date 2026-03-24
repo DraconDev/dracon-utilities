@@ -1,76 +1,79 @@
-use ai_router_core::{infer_lane, LaneModelPolicy, RoutingMessage, RoutingTask};
+use ai_adapters::{GenericOpenAIAdapter, ModalAdapter};
+use ai_router::models::{ChatMessage, ChatRequest, LeaderboardRequest, LeaderboardResponse};
+use ai_router::routing::SelectionConstraints;
+use ai_router::traits::{AiModelStore, AiProvider};
+use ai_routing_service::{AiService, ProviderRegistry};
 use anyhow::{Context, Result};
-use reqwest::Client;
-use serde::{Deserialize, Serialize};
+use futures::Stream;
+use std::pin::Pin;
+use std::sync::Arc;
 use std::path::Path;
 
-fn resolve_openrouter_key() -> Option<String> {
-    let env_path = dirs::home_dir()?.join(".dracon/ai/secrets/openrouter.env");
-    let content = std::fs::read_to_string(&env_path).ok()?;
-    for line in content.lines() {
-        if line.starts_with("OPENROUTER_API_KEY=") {
-            return Some(line.split('=').nth(1)?.trim().to_string());
+async fn build_ai_service() -> Result<AiService> {
+    let config = ai_adapters::resolve_ai_runtime_config();
+    let mut registry: ProviderRegistry<dyn AiProvider> = ProviderRegistry::new();
+
+    for spec in &config.openai_providers {
+        if !config.active_model_ids.contains(&spec.model_id) {
+            continue;
         }
-    }
-    None
-}
-
-fn load_policy() -> Option<LaneModelPolicy> {
-    let policy_path = dirs::home_dir()
-        .unwrap_or_else(|| std::path::PathBuf::from("."))
-        .join(".dracon/ai/routing-policy.json");
-    let content = std::fs::read_to_string(&policy_path).ok()?;
-    LaneModelPolicy::from_json(&content).ok()
-}
-
-fn resolve_models_for_task(task: RoutingTask, prompt: &str) -> Vec<String> {
-    let policy = match load_policy() {
-        Some(p) => p,
-        None => return vec![format!("openrouter/{}", task.as_task_key())],
-    };
-
-    let models = policy.resolve_for_task(task, None);
-    if !models.is_empty() {
-        return models;
+        let adapter = GenericOpenAIAdapter::new_with_auth_keys(
+            spec.api_keys.clone(),
+            spec.endpoint.clone(),
+            spec.model_id.clone(),
+            &spec.auth_header_name,
+            &spec.auth_header_prefix,
+        );
+        registry.register(&spec.model_id, Arc::new(adapter));
     }
 
-    let inferred = infer_lane(&[RoutingMessage::user(prompt)]);
-    if inferred != task {
-        let fallback = policy.resolve_for_task(inferred, None);
-        if !fallback.is_empty() {
-            return fallback;
+    for spec in &config.modal_providers {
+        if !config.active_model_ids.contains(&spec.model_id) {
+            continue;
         }
+        let adapter = ModalAdapter::new(
+            spec.api_keys[0].clone(),
+            spec.model_id.clone(),
+        );
+        registry.register(&spec.model_id, Arc::new(adapter));
     }
 
-    vec![format!("openrouter/{}", task.as_task_key())]
+    let store: Arc<dyn AiModelStore> = Arc::new(NoopModelStore);
+    Ok(AiService::new(
+        registry,
+        store,
+        config.dev_model_ids,
+        config.active_model_ids,
+        config.fallback_chain,
+    ).await?)
 }
 
-#[derive(Serialize)]
-struct OpenRouterRequest {
-    model: String,
-    messages: Vec<Message>,
-    max_tokens: i32,
-}
+struct NoopModelStore;
 
-#[derive(Serialize)]
-struct Message {
-    role: String,
-    content: String,
-}
+#[async_trait::async_trait]
+impl AiModelStore for NoopModelStore {
+    async fn get_best_model(
+        &self,
+        _task: &str,
+        _constraints: SelectionConstraints,
+    ) -> Result<(String, bool)> {
+        Err(anyhow::anyhow!("NoopModelStore: no data"))
+    }
 
-#[derive(Deserialize)]
-struct OpenRouterResponse {
-    choices: Vec<Choice>,
-}
+    async fn get_leaderboard(
+        &self,
+        _req: LeaderboardRequest,
+    ) -> Result<LeaderboardResponse> {
+        Ok(LeaderboardResponse::default())
+    }
 
-#[derive(Deserialize)]
-struct Choice {
-    message: ResponseMessage,
-}
+    async fn mark_failure(&self, _model_id: &str) -> Result<()> {
+        Ok(())
+    }
 
-#[derive(Deserialize)]
-struct ResponseMessage {
-    content: String,
+    async fn update_latency(&self, _model_id: &str, _latency_ms: u64) -> Result<()> {
+        Ok(())
+    }
 }
 
 pub(crate) fn bump_semver_patch(ver: &str) -> Option<String> {
@@ -555,34 +558,35 @@ fn extract_version_from_json(content: &str, key: &str) -> Option<String> {
 }
 
 async fn send_openrouter_request(
-    client: &Client,
+    client: &reqwest::Client,
     api_key: &str,
     models: &[String],
     prompt: &str,
 ) -> Option<String> {
     for model in models {
-        let request = OpenRouterRequest {
-            model: model.clone(),
-            messages: vec![Message {
-                role: "user".to_string(),
-                content: prompt.to_string(),
-            }],
-            max_tokens: 20,
-        };
-
         let resp = client
             .post("https://openrouter.ai/api/v1/chat/completions")
             .header("Authorization", format!("Bearer {}", api_key))
             .header("Content-Type", "application/json")
-            .json(&request)
+            .json(&serde_json::json!({
+                "model": model,
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": 20
+            }))
             .send()
             .await;
 
         match resp {
             Ok(r) if r.status().is_success() => {
-                if let Ok(body) = r.json::<OpenRouterResponse>().await {
-                    if let Some(choice) = body.choices.first() {
-                        return Some(choice.message.content.clone());
+                if let Ok(body) = r.json::<serde_json::Value>().await {
+                    if let Some(content) = body
+                        .get("choices")
+                        .and_then(|c| c.get(0))
+                        .and_then(|c| c.get("message"))
+                        .and_then(|m| m.get("content"))
+                        .and_then(|c| c.as_str())
+                    {
+                        return Some(content.to_string());
                     }
                 }
             }
