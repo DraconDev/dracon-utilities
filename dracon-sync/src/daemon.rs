@@ -1,8 +1,6 @@
 use anyhow::Result;
-use dracon_common::{emit_event, DraconEvent, EventSeverity};
 use dracon_git::GitService;
 use std::collections::{BTreeSet, HashMap};
-use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 use tokio::time::sleep;
@@ -13,14 +11,9 @@ use crate::git::{discover_git_repos, repo_diff_entries, has_origin_remote, has_t
 use crate::report::{ConcernRepairFilter, RepairSummary, run_repair_concerns, run_repair_warns};
 use crate::sync::sync_repo;
 
-pub(crate) fn acquire_daemon_lock() -> Result<File> {
-    dracon_common::acquire_daemon_lock("dracon-sync")
-}
-
 pub(crate) async fn run_once(policy_path: &Path) -> Result<()> {
     if let Some(reason) = freeze_reason(policy_path) {
         println!("⏸️ sync frozen ({})", reason);
-        emit_event(&DraconEvent::new("sync", EventSeverity::Info, "frozen", reason));
         return Ok(());
     }
 
@@ -51,7 +44,6 @@ pub(crate) async fn run_once(policy_path: &Path) -> Result<()> {
             Ok(Ok(false)) => {}
             Ok(Err(e)) => {
                 eprintln!("⚠️ sync failed for {}: {}", repo.display(), e);
-                emit_event(&DraconEvent::new("sync", EventSeverity::Error, format!("sync/{}", repo.display()), format!("failed: {e}")));
             }
         }
     }

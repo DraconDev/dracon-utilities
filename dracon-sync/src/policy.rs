@@ -279,15 +279,20 @@ impl SyncPolicy {
 
 pub(crate) fn resolve_policy_path() -> Result<PathBuf> {
     let home = dirs::home_dir().context("home not found")?;
-    dracon_common::resolve_policy_path(
-        &["DRACON_SYNC_POLICY"],
-        &[
-            home.join(".dracon/utilities/sync/dracon-sync.toml"),
-            home.join(".dracon/utilities/sync/config.toml"),
-            home.join(".dracon/git/dracon-git.toml"),
-        ],
-        "sync policy not found",
-    )
+    if let Ok(val) = std::env::var("DRACON_SYNC_POLICY") {
+        return Ok(PathBuf::from(val));
+    }
+    let paths = [
+        home.join(".dracon/utilities/sync/dracon-sync.toml"),
+        home.join(".dracon/utilities/sync/config.toml"),
+        home.join(".dracon/git/dracon-git.toml"),
+    ];
+    for path in &paths {
+        if path.exists() {
+            return Ok(path.clone());
+        }
+    }
+    anyhow::bail!("sync policy not found")
 }
 
 pub(crate) fn env_freeze_enabled() -> bool {

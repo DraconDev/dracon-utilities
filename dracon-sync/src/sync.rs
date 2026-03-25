@@ -1,5 +1,4 @@
 use anyhow::Result;
-use dracon_common::{emit_event, DraconEvent, EventSeverity};
 use dracon_git::{build_commit_message, extract_intent, CommitContext, GitService};
 use std::collections::BTreeSet;
 use std::path::Path;
@@ -66,12 +65,10 @@ pub(crate) async fn sync_repo(
             Ok(Ok(())) => {}
             Ok(Err(dracon_git::error::GitError::MergeConflict)) => {
                 eprintln!("⚠️ pull/rebase conflict in {} (manual intervention required)", repo.display());
-                emit_event(&DraconEvent::new("sync", EventSeverity::Error, format!("pull/{}", repo.display()), "merge conflict - manual intervention required"));
                 return Ok(false);
             }
             Ok(Err(e)) => {
                 eprintln!("⚠️ pull/rebase failed for {}: {} - aborting sync pass", repo.display(), e);
-                emit_event(&DraconEvent::new("sync", EventSeverity::Warn, format!("pull/{}", repo.display()), format!("failed: {e}")));
                 return Ok(false);
             }
             Err(_) => {
@@ -80,7 +77,6 @@ pub(crate) async fn sync_repo(
                     repo.display(),
                     policy.pull_op_timeout_secs
                 );
-                emit_event(&DraconEvent::new("sync", EventSeverity::Warn, format!("pull/{}", repo.display()), format!("timeout after {}s", policy.pull_op_timeout_secs)));
                 return Ok(false);
             }
         }
@@ -265,7 +261,7 @@ pub(crate) async fn sync_repo(
             let msg = build_commit_message(&ctx);
 
             svc.commit(&msg).await?;
-            emit_event(&DraconEvent::new("sync", EventSeverity::Info, format!("commit/{}", repo.display()), format!("committed {} file(s)", committed_entries.len())));
+            eprintln!("📝 committed {} file(s) in {}", committed_entries.len(), repo.display());
 
             // Restore any excluded modified paths that weren't committed
             let restorable: Vec<_> = to_restore.iter().filter(|e| can_restore_entry(e)).collect();
@@ -326,7 +322,6 @@ pub(crate) async fn sync_repo(
                     Ok(()) => {}
                     Err(e) => {
                         eprintln!("⚠️ push skipped for {}: {}", repo.display(), e);
-                        emit_event(&DraconEvent::new("sync", EventSeverity::Warn, format!("push/{}", repo.display()), format!("failed: {e}")));
                     }
                 }
             } else if policy.auto_push && !has_origin {

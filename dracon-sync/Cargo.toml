@@ -20,7 +20,6 @@ toml = "0.8"
 walkdir = "2.5"
 
 dracon-git = { path = "../../dracon-libs/tools/sync/dracon-git" }
-dracon-common = { path = "../../dracon-libs/tools/common/dracon-common", features = ["test-support"] }
 fs2 = "0.4"
 
 [features]

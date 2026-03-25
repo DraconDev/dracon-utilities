@@ -1,5 +1,4 @@
 use anyhow::{Context, Result};
-use dracon_common::{ansi, emit_event, DraconEvent, EventSeverity};
 use dracon_git::{
     build_commit_message,
     types::{DiffFile, FileStatus, RepoStatus},
@@ -29,6 +28,21 @@ use crate::policy::{
     SyncPolicy, resolve_policy_path, freeze_reason, debug_enabled,
     DEFAULT_GIT_HOST_BLOB_LIMIT_BYTES, tokio_git_command,
 };
+
+fn ansi(color: &str, text: &str) -> String {
+    let codes = match color {
+        "31" => "31",
+        "32" => "32",
+        "33" => "33",
+        "34" => "34",
+        "35" => "35",
+        "36" => "36",
+        "37" => "37",
+        "1" => "1",
+        _ => "0",
+    };
+    format!("\x1b[{}m{}\x1b[0m", codes, text)
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum RepoFilter {
