@@ -74,8 +74,6 @@ pub(crate) async fn run_once(policy_path: &Path) -> Result<()> {
 }
 
 pub(crate) async fn run_daemon(policy_path: PathBuf) -> Result<()> {
-    let _lock = acquire_daemon_lock()?;
-    
     #[derive(Debug, Clone)]
     struct RepoActivity {
         fingerprint: String,
