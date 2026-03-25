@@ -287,7 +287,6 @@ dependencies = [
  "iana-time-zone",
  "js-sys",
  "num-traits",
- "serde",
  "wasm-bindgen",
  "windows-link 0.2.1",
 ]
@@ -443,19 +442,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "dracon-config"
-version = "0.3.0"
-dependencies = [
- "anyhow",
- "chrono",
- "dirs",
- "serde",
- "serde_json",
- "toml",
- "toml_edit 0.22.27",
-]
-
-[[package]]
 name = "dracon-system"
 version = "0.1.0"
 dependencies = [
@@ -478,9 +464,7 @@ version = "0.3.0"
 dependencies = [
  "anyhow",
  "dirs",
- "dracon-config",
  "libc",
- "log",
  "notify-rust",
  "reqwest",
  "serde",
@@ -488,6 +472,7 @@ dependencies = [
  "ssh2",
  "sysinfo",
  "tokio",
+ "tracing",
  "walkdir",
 ]
 
