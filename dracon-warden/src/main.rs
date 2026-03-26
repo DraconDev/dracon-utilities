@@ -297,7 +297,7 @@ impl WardenPolicy {
 
 fn resolve_policy_path_local() -> Result<PathBuf> {
     let home = dirs::home_dir().context("home not found")?;
-    resolve_policy_path(
+    resolve_policy_path_local(
         &["DRACON_WARDEN_POLICY", "DRACON_SECURITY_POLICY"],
         &[
             home.join(".dracon/utilities/warden/dracon-warden.toml"),
@@ -1086,7 +1086,7 @@ fn main() -> Result<()> {
             run_filter(false, path.as_deref())?;
         }
         Command::Status => {
-            let policy_path = resolve_policy_path()?;
+            let policy_path = resolve_policy_path_local()?;
             let policy = WardenPolicy::load(&policy_path)?;
             policy.validate()?;
             println!("📜 POLICY: {}", policy_path.display());
@@ -1105,7 +1105,7 @@ fn main() -> Result<()> {
             );
         }
         Command::Once { repo } => {
-            let policy_path = resolve_policy_path()?;
+            let policy_path = resolve_policy_path_local()?;
             let policy = WardenPolicy::load(&policy_path)?;
             policy.validate()?;
             if let Some(r) = repo {
@@ -1116,11 +1116,11 @@ fn main() -> Result<()> {
             }
         }
         Command::Daemon => {
-            let policy_path = resolve_policy_path()?;
+            let policy_path = resolve_policy_path_local()?;
             run_daemon(policy_path)?;
         }
         Command::ScrubMarkers { apply, repo } => {
-            let policy_path = resolve_policy_path()?;
+            let policy_path = resolve_policy_path_local()?;
             let policy = WardenPolicy::load(&policy_path)?;
             policy.validate()?;
             let roots = effective_discovery_roots(&policy);
@@ -1132,7 +1132,7 @@ fn main() -> Result<()> {
             scrub_markers(&policy, &repos, apply)?;
         }
         Command::Resmudge { apply, repo } => {
-            let policy_path = resolve_policy_path()?;
+            let policy_path = resolve_policy_path_local()?;
             let policy = WardenPolicy::load(&policy_path)?;
             policy.validate()?;
             let roots = effective_discovery_roots(&policy);
@@ -1148,7 +1148,7 @@ fn main() -> Result<()> {
             strict,
             repo,
         } => {
-            let policy_path = resolve_policy_path()?;
+            let policy_path = resolve_policy_path_local()?;
             let policy = WardenPolicy::load(&policy_path)?;
             policy.validate()?;
             let roots = effective_discovery_roots(&policy);
