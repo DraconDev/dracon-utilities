@@ -762,7 +762,7 @@ fn harden_repo(
 
 fn harden_all(policy: &WardenPolicy) -> Result<()> {
     let roots = effective_discovery_roots(policy);
-    let repos = discover_git_repos(&roots);
+    let repos = discover_git_repos_local(&roots);
     scrub_markers(policy, &repos, true)?;
     harden_repos(policy, repos)
 }
@@ -1127,7 +1127,7 @@ fn main() -> Result<()> {
             let repos = if let Some(r) = repo {
                 vec![r]
             } else {
-                discover_git_repos(&roots)
+                discover_git_repos_local(&roots)
             };
             scrub_markers(&policy, &repos, apply)?;
         }
@@ -1139,7 +1139,7 @@ fn main() -> Result<()> {
             let repos = if let Some(r) = repo {
                 vec![r]
             } else {
-                discover_git_repos(&roots)
+                discover_git_repos_local(&roots)
             };
             let _ = resmudge_repos(&policy, &repos, apply)?;
         }
@@ -1155,7 +1155,7 @@ fn main() -> Result<()> {
             let repos = if let Some(r) = repo {
                 vec![r]
             } else {
-                discover_git_repos(&roots)
+                discover_git_repos_local(&roots)
             };
 
             if !dry_run {
@@ -1540,7 +1540,6 @@ fn run_filter(is_clean: bool, path: Option<&str>) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use dracon_common::test_support::TestDir;
 
     fn sample_policy() -> WardenPolicy {
         WardenPolicy {
