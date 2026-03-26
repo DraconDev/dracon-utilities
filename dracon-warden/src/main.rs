@@ -295,9 +295,9 @@ impl WardenPolicy {
     }
 }
 
-fn resolve_policy_path() -> Result<PathBuf> {
+fn resolve_policy_path_local() -> Result<PathBuf> {
     let home = dirs::home_dir().context("home not found")?;
-    dracon_common::resolve_policy_path(
+    resolve_policy_path(
         &["DRACON_WARDEN_POLICY", "DRACON_SECURITY_POLICY"],
         &[
             home.join(".dracon/utilities/warden/dracon-warden.toml"),
@@ -309,9 +309,9 @@ fn resolve_policy_path() -> Result<PathBuf> {
     )
 }
 
-fn discover_git_repos(roots: &[PathBuf]) -> Vec<PathBuf> {
+fn discover_git_repos_local(roots: &[PathBuf]) -> Vec<PathBuf> {
     let excluded = BTreeSet::new();
-    dracon_common::discover_git_repos(roots, &excluded)
+    discover_git_repos(roots, &excluded)
 }
 
 fn effective_watch_roots(policy: &WardenPolicy) -> Vec<PathBuf> {
