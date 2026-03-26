@@ -90,10 +90,6 @@ pub(crate) fn should_stage_entry(
     excluded_file_patterns: &[String],
     max_stage_file_bytes: u64,
 ) -> bool {
-    if matches!(entry.status, dracon_git::types::FileStatus::Deleted) {
-        return true;
-    }
-
     if is_excluded_change_path(&entry.path, excluded_dir_names) {
         return false;
     }
@@ -121,15 +117,14 @@ pub(crate) fn should_stage_entry(
             }
             true
         }
-        Ok(meta) if meta.is_dir() => {
-            // This is likely a submodule.
-            true
-        }
+        Ok(meta) if meta.is_dir() => true,
         Ok(_) => true,
         Err(_) => {
-            if matches!(entry.status, dracon_git::types::FileStatus::Deleted) {
-                return true;
-            }
+            // File doesn't exist on disk - do NOT stage deletions for missing files.
+            // If a file is deleted in git index but doesn't exist on disk, it means:
+            // - Either it was never there (corrupt clone/partial checkout)
+            // - Or it was deleted externally (not by us)
+            // Either way, we should NOT commit a deletion for something that isn't there.
             false
         }
     }
