@@ -494,7 +494,18 @@ fn intent_to_lane(intent: &str) -> RoutingTask {
     }
 }
 
-use dracon_common::{ansi, dim, cyan, magenta_bold};
+fn ansi(color: &str, text: &str) -> String {
+    let codes = match color {
+        "31" => "31", "32" => "32", "33" => "33", "34" => "34",
+        "35" => "35", "36" => "36", "37" => "37", "1" => "1",
+        _ => "0",
+    };
+    format!("\x1b[{}m{}\x1b[0m", codes, text)
+}
+
+fn dim(s: &str) -> String { ansi("2", s) }
+fn cyan(s: &str) -> String { ansi("36", s) }
+fn magenta_bold(s: &str) -> String { ansi("35;1", s) }
 
 fn stderr_is_tty() -> bool {
     std::io::stderr().is_terminal()
