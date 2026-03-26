@@ -1,6 +1,5 @@
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
-use dracon_common::{emit_event, DraconEvent, EventSeverity};
 use fs2::FileExt;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -9,11 +8,94 @@ use std::io::Write;
 #[cfg(unix)]
 use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::process::Command;
 use tokio::time::sleep;
 
 use dracon_system_lib::analyze_workspace_storage;
+
+static ROLLING_LOG: std::sync::OnceLock<Mutex<Vec<String>>> = std::sync::OnceLock::new();
+
+fn get_log() -> &'static Mutex<Vec<String>> {
+    ROLLING_LOG.get_or_init(|| Mutex::new(Vec::new()))
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EventSeverity {
+    Debug,
+    Info,
+    Warn,
+    Error,
+    Critical,
+}
+
+#[derive(Debug, Clone)]
+pub struct DraconEvent {
+    pub domain: String,
+    pub severity: EventSeverity,
+    pub path: String,
+    pub message: String,
+    pub timestamp: String,
+}
+
+impl DraconEvent {
+    pub fn new<T1: ToString, T2: ToString, T3: ToString>(
+        domain: T1,
+        severity: EventSeverity,
+        path: T2,
+        message: T3,
+    ) -> Self {
+        Self {
+            domain: domain.to_string(),
+            severity,
+            path: path.to_string(),
+            message: message.to_string(),
+            timestamp: chrono::Utc::now().to_rfc3339(),
+        }
+    }
+}
+
+pub fn emit_event(event: &DraconEvent) {
+    if let Ok(mut log) = get_log().lock() {
+        if log.len() >= 1000 {
+            log.remove(0);
+        }
+        log.push(format!(
+            "[{}] {:?}: {} - {}",
+            event.timestamp, event.severity, event.path, event.message
+        ));
+    }
+    eprintln!(
+        "[{}] {:?}: {} - {}",
+        event.timestamp, event.severity, event.path, event.message
+    );
+}
+
+fn acquire_daemon_lock(name: &str) -> Result<File> {
+    let lock_dir = dirs::home_dir()
+        .ok_or_else(|| anyhow::anyhow!("no home dir"))?
+        .join(".dracon")
+        .join("locks");
+    
+    std::fs::create_dir_all(&lock_dir)?;
+    let lock_file = lock_dir.join(format!("{}.lock", name));
+    
+    let file = std::fs::OpenOptions::new()
+        .create(true)
+        .truncate(true)
+        .write(true)
+        .open(&lock_file)?;
+    
+    file.lock_exclusive()?;
+    Ok(file)
+}
+
+fn events_path() -> PathBuf {
+    dirs::home_dir()
+        .map(|h| h.join(".dracon/events.jsonl"))
+        .unwrap_or_else(|| PathBuf::from(".dracon/events.jsonl"))
+}
 
 #[derive(Parser, Debug)]
 #[command(name = "dracon-system")]
@@ -1862,10 +1944,6 @@ fn load_system_policy() -> (Option<PathBuf>, SystemPolicy) {
     (Some(path), parsed)
 }
 
-fn acquire_daemon_lock() -> Result<File> {
-    dracon_common::acquire_daemon_lock("dracon-system")
-}
-
 async fn is_user_service_active(service: &str) -> bool {
     let output = Command::new("systemctl")
         .args(["--user", "is-active", service])
@@ -2419,7 +2497,7 @@ async fn main() -> Result<()> {
                         println!("guard disabled in policy");
                         return Ok(());
                     }
-                    let _lock = acquire_daemon_lock()
+                    let _lock = acquire_daemon_lock("dracon-system-guard")
                         .with_context(|| "failed to acquire guard daemon lock")?;
                     println!("guard daemon started (interval={}s)", guard.interval_secs);
                     loop {
@@ -2633,7 +2711,7 @@ async fn main() -> Result<()> {
             }
         }
         Commands::Events { tail, source, severity } => {
-            let path = dracon_common::events_path();
+            let path = events_path();
             if !path.exists() {
                 println!("No events found ({} does not exist)", path.display());
                 return Ok(());
