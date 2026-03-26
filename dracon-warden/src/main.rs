@@ -1,6 +1,5 @@
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
-use dracon_common::{emit_event, DraconEvent, EventSeverity};
 use dracon_security_kit::{DraconWarden, Warden};
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use notify::{Event, RecursiveMode, Watcher};
@@ -12,8 +11,102 @@ use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command as ProcessCommand;
 use std::sync::mpsc;
+use std::sync::Mutex;
 use std::time::{Duration, Instant};
 use zeroize::Zeroizing;
+
+static ROLLING_LOG: std::sync::OnceLock<Mutex<Vec<String>>> = std::sync::OnceLock::new();
+
+fn get_log() -> &'static Mutex<Vec<String>> {
+    ROLLING_LOG.get_or_init(|| Mutex::new(Vec::new()))
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EventSeverity {
+    Debug,
+    Info,
+    Warn,
+    Error,
+    Critical,
+}
+
+#[derive(Debug, Clone)]
+pub struct DraconEvent {
+    pub domain: String,
+    pub severity: EventSeverity,
+    pub path: String,
+    pub message: String,
+    pub timestamp: String,
+}
+
+impl DraconEvent {
+    pub fn new<T1: ToString, T2: ToString, T3: ToString>(
+        domain: T1,
+        severity: EventSeverity,
+        path: T2,
+        message: T3,
+    ) -> Self {
+        Self {
+            domain: domain.to_string(),
+            severity,
+            path: path.to_string(),
+            message: message.to_string(),
+            timestamp: chrono::Utc::now().to_rfc3339(),
+        }
+    }
+}
+
+pub fn emit_event(event: &DraconEvent) {
+    if let Ok(mut log) = get_log().lock() {
+        if log.len() >= 1000 {
+            log.remove(0);
+        }
+        log.push(format!(
+            "[{}] {:?}: {} - {}",
+            event.timestamp, event.severity, event.path, event.message
+        ));
+    }
+    eprintln!(
+        "[{}] {:?}: {} - {}",
+        event.timestamp, event.severity, event.path, event.message
+    );
+}
+
+pub fn resolve_policy_path(
+    env_var: &[&str],
+    paths: &[PathBuf],
+    error_msg: &str,
+) -> anyhow::Result<PathBuf> {
+    for var in env_var {
+        if let Ok(val) = std::env::var(var) {
+            return Ok(PathBuf::from(val));
+        }
+    }
+    for path in paths {
+        if path.exists() {
+            return Ok(path.clone());
+        }
+    }
+    anyhow::bail!("{}", error_msg)
+}
+
+pub fn discover_git_repos(
+    roots: &[PathBuf],
+    _excluded_dir_names: &BTreeSet<String>,
+) -> Vec<PathBuf> {
+    let mut repos = Vec::new();
+    for root in roots {
+        if let Ok(entries) = std::fs::read_dir(root) {
+            for entry in entries.filter_map(|e| e.ok()) {
+                let path = entry.path();
+                if path.is_dir() && path.join(".git").exists() {
+                    repos.push(path);
+                }
+            }
+        }
+    }
+    repos
+}
 
 const BLOCK_BEGIN: &str = "# --- BEGIN DRACON MANAGED BLOCK ---";
 const BLOCK_END: &str = "# --- END DRACON MANAGED BLOCK ---";
