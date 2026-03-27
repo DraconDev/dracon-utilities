@@ -200,32 +200,22 @@ pub(crate) async fn sync_repo(
                 let _ = run_git_with_timeout(repo, &["add", ".dracon/project-state.md"], 10, "add-project-state").await;
             }
 
-            // AI version bumper: decide IF and what level to bump (after scribe has context)
-            // Replaces blind auto-bump with intelligent AI decision
+            // Version bumper: deterministic patch-only (after scribe has context)
             if auto_bump_versions && cfg!(feature = "scribe") {
                 #[cfg(feature = "scribe")]
                 {
-                    use crate::bump::{ai_decide_bump_level, bump_semver_major, bump_semver_minor, bump_semver_patch, read_current_version, BumpLevel};
+                    use crate::bump::{deterministic_decide_bump_level, bump_semver_patch, read_current_version, BumpLevel};
                     
                     let staged_diff = committed_entries.iter()
                         .map(|e| format!("{:?}: {}", e.status, e.path.display()))
                         .collect::<Vec<_>>()
                         .join("\n");
-                    let project_state = std::fs::read_to_string(repo.join(".dracon/project-state.md"))
-                        .unwrap_or_default();
                     
                     if let Some(current_ver) = read_current_version(repo) {
-                        let level = ai_decide_bump_level(repo, &current_ver, &staged_diff, &project_state).await;
+                        let level = deterministic_decide_bump_level(&staged_diff);
                         if level != BumpLevel::None {
-                            eprintln!("🤖 ai-bump: {} -> {}", current_ver, level.as_str());
-                            let new_ver = match level {
-                                BumpLevel::Major => bump_semver_major(&current_ver),
-                                BumpLevel::Minor => bump_semver_minor(&current_ver),
-                                BumpLevel::Patch => bump_semver_patch(&current_ver),
-                                BumpLevel::None => None,
-                            };
-                            
-                            if let Some(new_ver) = new_ver {
+                            eprintln!("📦 bump: {} -> patch", current_ver);
+                            if let Some(new_ver) = bump_semver_patch(&current_ver) {
                                 let bumped = crate::bump::apply_version_bump_to_repo(repo, &current_ver, &new_ver);
                                 if bumped {
                                     let _ = run_git_with_timeout(repo, &["add", "Cargo.toml"], 30, "add").await;
@@ -238,6 +228,45 @@ pub(crate) async fn sync_repo(
                     }
                 }
             }
+
+            // // AI version bumper: decide IF and what level to bump (after scribe has context)
+            // // Replaces blind auto-bump with intelligent AI decision
+            // if auto_bump_versions && cfg!(feature = "scribe") {
+            //     #[cfg(feature = "scribe")]
+            //     {
+            //         use crate::bump::{ai_decide_bump_level, bump_semver_major, bump_semver_minor, bump_semver_patch, read_current_version, BumpLevel};
+            //         
+            //         let staged_diff = committed_entries.iter()
+            //             .map(|e| format!("{:?}: {}", e.status, e.path.display()))
+            //             .collect::<Vec<_>>()
+            //             .join("\n");
+            //         let project_state = std::fs::read_to_string(repo.join(".dracon/project-state.md"))
+            //             .unwrap_or_default();
+            //         
+            //         if let Some(current_ver) = read_current_version(repo) {
+            //             let level = ai_decide_bump_level(repo, &current_ver, &staged_diff, &project_state).await;
+            //             if level != BumpLevel::None {
+            //                 eprintln!("🤖 ai-bump: {} -> {}", current_ver, level.as_str());
+            //                 let new_ver = match level {
+            //                     BumpLevel::Major => bump_semver_major(&current_ver),
+            //                     BumpLevel::Minor => bump_semver_minor(&current_ver),
+            //                     BumpLevel::Patch => bump_semver_patch(&current_ver),
+            //                     BumpLevel::None => None,
+            //                 };
+            //                 
+            //                 if let Some(new_ver) = new_ver {
+            //                     let bumped = crate::bump::apply_version_bump_to_repo(repo, &current_ver, &new_ver);
+            //                     if bumped {
+            //                         let _ = run_git_with_timeout(repo, &["add", "Cargo.toml"], 30, "add").await;
+            //                         let _ = run_git_with_timeout(repo, &["add", "package.json"], 30, "add").await;
+            //                         let _ = run_git_with_timeout(repo, &["add", "VERSION"], 30, "add").await;
+            //                         let _ = run_git_with_timeout(repo, &["add", "Cargo.lock"], 30, "add").await;
+            //                     }
+            //                 }
+            //             }
+            //         }
+            //     }
+            // }
 
             // Re-get staged entries after potential version bump
             let staged = git_name_status_entries(repo, &["diff", "--cached", "--name-status"]).await?;
