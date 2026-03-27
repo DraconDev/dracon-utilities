@@ -50,8 +50,10 @@ async fn build_ai_service() -> Result<AiService> {
     ).await?)
 }
 
+#[cfg(feature = "ai-bumper")]
 struct NoopModelStore;
 
+#[cfg(feature = "ai-bumper")]
 #[async_trait::async_trait]
 impl AiModelStore for NoopModelStore {
     async fn get_best_model(
@@ -615,6 +617,7 @@ fn extract_version_from_json(content: &str, key: &str) -> Option<String> {
 }
 
 
+#[cfg(feature = "ai-bumper")]
 pub async fn ai_decide_bump_level(
     _repo: &Path,
     current_version: &str,
