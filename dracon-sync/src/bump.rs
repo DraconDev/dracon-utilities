@@ -9,6 +9,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::path::Path;
 
+#[cfg(feature = "ai-bumper")]
 async fn build_ai_service() -> Result<AiService> {
     let config = ai_adapters::resolve_ai_runtime_config();
     let mut registry: ProviderRegistry<dyn AiProvider> = ProviderRegistry::new();
