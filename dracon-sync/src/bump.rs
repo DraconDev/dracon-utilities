@@ -496,7 +496,62 @@ impl BumpLevel {
     }
 }
 
+const NOISE_PATTERNS: &[&str] = &[
+    ".md",
+    ".txt",
+    ".yml",
+    ".yaml",
+    ".toml",
+    "LICENSE",
+    "README",
+    "CHANGELOG",
+    "CONTRIBUTING",
+    ".github/",
+    ".gitignore",
+    ".cargo/config",
+    "rustfmt",
+    "clippy",
+    "deny.toml",
+    ".vscode/",
+    ".idea/",
+    "package-lock.json",
+    "Cargo.lock",
+    ".env",
+    ".env.example",
+    ".editorconfig",
+    ".shellcheckrc",
+];
 
+const VERSION_FILES: &[&str] = &[
+    "Cargo.toml",
+    "package.json",
+    "VERSION",
+    "Cargo.lock",
+];
+
+pub fn deterministic_decide_bump_level(staged_diff: &str) -> BumpLevel {
+    let mut has_meaningful_change = false;
+
+    for line in staged_diff.lines().filter(|l| !l.is_empty()) {
+        let is_version_file = VERSION_FILES.iter().any(|p| line.contains(p));
+        let is_noise = NOISE_PATTERNS.iter().any(|p| line.contains(p));
+
+        if is_version_file {
+            continue;
+        }
+        if is_noise {
+            continue;
+        }
+        has_meaningful_change = true;
+        break;
+    }
+
+    if has_meaningful_change {
+        BumpLevel::Patch
+    } else {
+        BumpLevel::None
+    }
+}
 
 pub fn read_current_version(repo: &Path) -> Option<String> {
     if let Ok(cargo) = std::fs::read_to_string(repo.join("Cargo.toml")) {
