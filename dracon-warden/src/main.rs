@@ -297,7 +297,7 @@ impl WardenPolicy {
 
 fn resolve_policy_path_local() -> Result<PathBuf> {
     let home = dirs::home_dir().context("home not found")?;
-    resolve_policy_path_local(
+    resolve_policy_path(
         &["DRACON_WARDEN_POLICY", "DRACON_SECURITY_POLICY"],
         &[
             home.join(".dracon/utilities/warden/dracon-warden.toml"),
