@@ -2,6 +2,7 @@ use ai_adapters::{GenericOpenAIAdapter, ModalAdapter};
 use ai_router::models::{ChatMessage, ChatRequest, LeaderboardRequest, LeaderboardResponse};
 use ai_router::routing::SelectionConstraints;
 use ai_router::traits::{AiModelStore, AiProvider};
+#[cfg(feature = "ai-bumper")]
 use ai_routing_service::{AiService, ProviderRegistry};
 use anyhow::{Context, Result};
 use futures::Stream;
