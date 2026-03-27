@@ -2,6 +2,7 @@ mod policy;
 mod exclude;
 mod git;
 mod bump;
+#[cfg(feature = "scribe")]
 mod scribe;
 mod report;
 mod daemon;
