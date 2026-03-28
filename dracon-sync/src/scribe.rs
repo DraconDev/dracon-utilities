@@ -1,189 +1,82 @@
-use ai_adapters::GenericOpenAIAdapter;
-use ai_router::models::{ChatMessage, ChatRequest};
-use ai_router::routing::{RoutingTask, SelectionConstraints};
-use ai_router::traits::{AiModelStore, AiProvider};
-use ai_routing_service::{AiService, LaneModelPolicy, ProviderRegistry};
+use ai_adapters::HttpProviderAdapter;
+use ai_lanes::{AiRequest, ChatMessage, Lane};
+use ai_router::AiProvider;
 use anyhow::{Context, Result};
-use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 
-struct RoutingPolicySpec {
-    model_id: String,
-    api_keys: Vec<String>,
-    endpoint: String,
-    payload_model: String,
-    auth_header_name: String,
-    auth_header_prefix: String,
+struct SimpleAiService {
+    providers: Vec<(String, Arc<dyn AiProvider>)>,
 }
 
-struct RoutingPolicyConfig {
-    providers: Vec<RoutingPolicySpec>,
-    active_model_ids: Vec<String>,
-    dev_model_ids: Vec<String>,
-    fallback_chain: LaneModelPolicy,
-}
+impl SimpleAiService {
+    fn new() -> Self {
+        let mut providers = Vec::new();
 
-fn load_routing_policy() -> Result<RoutingPolicyConfig> {
-    let path = dirs::home_dir()
-        .context("no home dir")?
-        .join(".dracon/ai/routing-policy.json");
-    
-    if !path.exists() {
-        anyhow::bail!("routing policy not found at {}", path.display());
-    }
-    
-    let raw = std::fs::read_to_string(&path)
-        .with_context(|| format!("failed to read {}", path.display()))?;
-    
-    let parsed: serde_json::Value = serde_json::from_str(&raw)
-        .with_context(|| "failed to parse routing policy JSON")?;
-    
-    let providers_array = parsed.get("providers")
-        .and_then(|v| v.as_array())
-        .context("providers array not found")?;
-    
-    let mut providers = Vec::new();
-    for provider in providers_array {
-        let model_id = provider.get("model_id")
-            .and_then(|v| v.as_str())
-            .context("model_id missing")?
-            .to_string();
-        
-        let api_key_envs = provider.get("api_key_envs")
-            .and_then(|v| v.as_array())
-            .map(|arr| arr.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>())
-            .unwrap_or_default();
-        
-        if api_key_envs.is_empty() {
-            continue;
+        if let Some(key) = std::env::var("OPENROUTER_API_KEY").ok().filter(|k| !k.is_empty()) {
+            let adapter = Arc::new(HttpProviderAdapter::new_with_auth(
+                key,
+                "https://openrouter.ai/api/v1".to_string(),
+                "google/gemini-2.0-flash-thinking-exp".to_string(),
+                "Authorization",
+                "Bearer ",
+            ));
+            providers.push(("openrouter".to_string(), adapter));
+            eprintln!("📡 AI: OpenRouter ready");
         }
-        
-        let api_keys: Vec<String> = api_key_envs
-            .iter()
-            .filter_map(|k| std::env::var(k).ok())
-            .collect();
 
-        if api_keys.is_empty() {
-            continue;
+        if let Some(key) = std::env::var("GEMINI_API_KEY").ok().filter(|k| !k.is_empty()) {
+            let adapter = Arc::new(HttpProviderAdapter::new_with_auth(
+                key,
+                "https://generativelanguage.googleapis.com/v1beta".to_string(),
+                "gemini-2.0-flash-exp".to_string(),
+                "x-goog-api-key",
+                "",
+            ));
+            providers.push(("gemini".to_string(), adapter));
+            eprintln!("📡 AI: Gemini ready");
         }
-        
-        let endpoint = provider.get("endpoint")
-            .and_then(|v| v.as_str())
-            .unwrap_or("https://openrouter.ai/api/v1")
-            .to_string();
-        
-        let payload_model = provider.get("payload_model")
-            .and_then(|v| v.as_str())
-            .unwrap_or(&model_id)
-            .to_string();
-        
-        let auth_header_name = provider.get("auth_header_name")
-            .and_then(|v| v.as_str())
-            .unwrap_or("Authorization")
-            .to_string();
-        
-        let auth_header_prefix = provider.get("auth_header_prefix")
-            .and_then(|v| v.as_str())
-            .unwrap_or("Bearer ")
-            .to_string();
-        
-        providers.push(RoutingPolicySpec {
-            model_id,
-            api_keys,
-            endpoint,
-            payload_model,
-            auth_header_name,
-            auth_header_prefix,
-        });
-    }
-    
-    let active_model_ids: Vec<String> = parsed.get("active_model_ids")
-        .and_then(|v| v.as_array())
-        .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
-        .unwrap_or_default();
-    
-    let dev_model_ids: Vec<String> = active_model_ids.iter()
-        .filter(|id| id.contains("hunter-alpha"))
-        .cloned()
-        .collect();
-    
-    let fallback_chain = parsed.get("lane_model_policy")
-        .and_then(|v| v.as_object())
-        .map(|obj| {
-            let entries: HashMap<String, Vec<String>> = obj.iter()
-                .filter_map(|(k, v)| {
-                    v.as_array().map(|arr| {
-                        (k.clone(), arr.iter().filter_map(|e| e.as_str().map(String::from)).collect())
-                    })
-                })
-                .collect();
-            LaneModelPolicy::from_entries(entries)
-        })
-        .unwrap_or_else(|| LaneModelPolicy::from_entries(HashMap::new()));
-    
-    Ok(RoutingPolicyConfig {
-        providers,
-        active_model_ids,
-        dev_model_ids,
-        fallback_chain,
-    })
-}
 
-async fn build_ai_service() -> Result<AiService> {
-    let config = load_routing_policy()?;
-    
-    let mut registry: ProviderRegistry<dyn AiProvider> = ProviderRegistry::new();
-    
-    for spec in &config.providers {
-        if !config.active_model_ids.contains(&spec.model_id) {
-            continue;
+        if let Some(key) = std::env::var("NVIDIA_API_KEY").ok().filter(|k| !k.is_empty()) {
+            let adapter = Arc::new(HttpProviderAdapter::new_with_auth(
+                key,
+                "https://integrate.api.nvidia.com/v1".to_string(),
+                "nvidia/llama-3.3-nemotron-70b-instruct".to_string(),
+                "Authorization",
+                "Bearer ",
+            ));
+            providers.push(("nvidia".to_string(), adapter));
+            eprintln!("📡 AI: NVIDIA ready");
         }
-        let adapter = GenericOpenAIAdapter::new_with_auth_keys(
-            spec.api_keys.clone(),
-            spec.endpoint.clone(),
-            spec.model_id.clone(),
-            &spec.auth_header_name,
-            &spec.auth_header_prefix,
-        );
-        registry.register(&spec.model_id, Arc::new(adapter));
-    }
-    
-    let store: Arc<dyn AiModelStore> = Arc::new(NoopModelStore);
-    Ok(AiService::new(
-        registry,
-        store,
-        config.dev_model_ids,
-        config.active_model_ids,
-        config.fallback_chain,
-    ).await?)
-}
 
-struct NoopModelStore;
-
-#[async_trait::async_trait]
-impl AiModelStore for NoopModelStore {
-    async fn get_best_model(
-        &self,
-        _task: &str,
-        _constraints: SelectionConstraints,
-    ) -> Result<(String, bool)> {
-        Err(anyhow::anyhow!("NoopModelStore: no data"))
+        Self { providers }
     }
 
-    async fn get_leaderboard(
-        &self,
-        _req: ai_router::models::LeaderboardRequest,
-    ) -> Result<ai_router::models::LeaderboardResponse> {
-        Ok(ai_router::models::LeaderboardResponse::default())
+    fn is_empty(&self) -> bool {
+        self.providers.is_empty()
     }
 
-    async fn mark_failure(&self, _model_id: &str) -> Result<()> {
-        Ok(())
-    }
+    async fn chat(&self, messages: Vec<ChatMessage>) -> Result<String> {
+        let mut last_error = None;
 
-    async fn update_latency(&self, _model_id: &str, _latency_ms: u64) -> Result<()> {
-        Ok(())
+        for (name, provider) in &self.providers {
+            match provider.ask_and_collect(messages.clone()).await {
+                Ok((content, _)) => return Ok(content),
+                Err(e) => {
+                    let msg = e.to_string().to_lowercase();
+                    if msg.contains("401") || msg.contains("unauthorized") || msg.contains("api key") {
+                        eprintln!("⚠️ AI {}: auth error (key invalid?)", name);
+                    } else if msg.contains("429") || msg.contains("rate limit") {
+                        eprintln!("⚠️ AI {}: rate limited, trying next...", name);
+                    } else {
+                        eprintln!("⚠️ AI {} failed: {}", name, e);
+                    }
+                    last_error = Some(e);
+                }
+            }
+        }
+
+        Err(last_error.unwrap_or_else(|| anyhow::anyhow!("no AI providers available")))
     }
 }
 
@@ -267,53 +160,36 @@ Write ONLY the markdown, nothing else."#
 #[cfg(feature = "scribe")]
 pub(crate) async fn update_project_state_from_ai(repo: &Path, staged_diff: &str) -> anyhow::Result<()> {
     let repo_display = repo.display().to_string();
+
+    let service = SimpleAiService::new();
+    if service.is_empty() {
+        eprintln!("📝 scribe: no AI API keys configured (set OPENROUTER_API_KEY, GEMINI_API_KEY, or NVIDIA_API_KEY)");
+        return Ok(());
+    }
+
     let prompt = build_scribe_prompt(repo, staged_diff);
 
-    let service = match build_ai_service().await {
-        Ok(s) => s,
-        Err(e) => {
-            eprintln!("📝 scribe: failed to build AI service for {}: {}", repo_display, e);
-            return Ok(());
+    let messages = vec![ChatMessage::user(prompt)];
+
+    match service.chat(messages).await {
+        Ok(text) => {
+            let dracon_dir = repo.join(".dracon");
+            std::fs::create_dir_all(&dracon_dir)?;
+            let state_path = dracon_dir.join("project-state.md");
+
+            let markdown = if let Some(start) = text.find("# Project State") {
+                &text[start..]
+            } else {
+                &text
+            };
+
+            std::fs::write(&state_path, markdown.trim())?;
+            eprintln!("📝 scribe: updated {}/.dracon/project-state.md", repo_display);
         }
-    };
-
-    let req = ChatRequest {
-        project_id: "scribe".to_string(),
-        messages: vec![ChatMessage {
-            role: "user".to_string(),
-            content: prompt,
-        }],
-        client_intent: Some(RoutingTask::Free),
-        ..Default::default()
-    };
-
-    let (text, _) = match service.ask_and_collect(req).await {
-        Ok(r) => r,
         Err(e) => {
-            if e.to_string().contains("no AI provider")
-                || e.to_string().contains("401")
-                || e.to_string().contains("Unauthorized")
-            {
-                eprintln!("📝 scribe: skipped (no API key configured)");
-                return Ok(());
-            }
             eprintln!("📝 scribe: AI request failed for {}: {}", repo_display, e);
-            return Ok(());
         }
-    };
-
-    let dracon_dir = repo.join(".dracon");
-    std::fs::create_dir_all(&dracon_dir)?;
-    let state_path = dracon_dir.join("project-state.md");
-
-    let markdown = if let Some(start) = text.find("# Project State") {
-        &text[start..]
-    } else {
-        &text
-    };
-
-    std::fs::write(&state_path, markdown.trim())?;
-    eprintln!("📝 scribe: updated {}/.dracon/project-state.md", repo_display);
+    }
 
     Ok(())
 }
