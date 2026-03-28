@@ -631,8 +631,9 @@ pub async fn ai_decide_bump_level(
     staged_diff: &str,
     project_state: &str,
 ) -> BumpLevel {
-    // First check: if only version-related files changed (Cargo.toml, package.json, VERSION, Cargo.lock)
-    // and no source files, skip the bump - it means we already bumped this version
+    use crate::ai::SimpleAiService;
+    use ai_lanes::ChatMessage;
+
     let version_only_patterns = ["Cargo.toml", "package.json", "VERSION", "Cargo.lock"];
     let has_source_changes = staged_diff.lines()
         .filter(|line| !line.is_empty())
@@ -641,62 +642,44 @@ pub async fn ai_decide_bump_level(
         });
 
     if !has_source_changes {
-        // Only version files changed - likely a duplicate bump, skip
         return BumpLevel::None;
     }
 
-    let prompt = format!(r##"
-You are a version bump advisor for a software project. Analyze the changes and decide if a version bump is warranted.
+    let prompt = format!(r##"You are a version bump advisor. Analyze the changes and decide if a version bump is warranted.
 
-## Current Version
-{current_version}
+Current Version: {current_version}
 
-## Project State
+Project State:
 {project_state}
 
-## Staged Changes
+Staged Changes:
 {staged_diff}
 
-## Decision Criteria
-- "major": BREAKING CHANGE - incompatible API, removed features/options, major restructuring
-- "minor": NEW FEATURE - backwards-compatible additions, new capabilities users would want
-- "patch": BUG FIX - corrections to existing functionality, performance improvements, refactors with user-visible impact
-- "none": NOISY/CHORE - docs, formatting, comments, CI config, version-only changes, dependencies without feature changes
+Respond with ONLY ONE WORD:
+- "major": BREAKING CHANGE
+- "minor": NEW FEATURE  
+- "patch": BUG FIX / improvement
+- "none": NOISY/CHORE (docs, deps, config only)
 
-IMPORTANT: Only bump if there is a MEANINGFUL change to the actual software. If the changes are just:
-- Version/dependency updates without new features
-- Documentation only
-- CI/tooling changes  
-- Small refactors with no user-visible impact
-Then respond "none".
+Respond with ONLY ONE WORD."##);
 
-Respond with ONLY ONE WORD: major, minor, patch, or none. Nothing else."##);
+    let service = SimpleAiService::new();
+    if service.is_empty() {
+        return BumpLevel::None;
+    }
 
-    let service = match build_ai_service().await {
-        Ok(s) => s,
-        Err(_) => return BumpLevel::None,
-    };
+    let messages = vec![ChatMessage::user(prompt)];
 
-    let req = ChatRequest {
-        project_id: "dracon-sync".to_string(),
-        messages: vec![ChatMessage {
-            role: "user".to_string(),
-            content: prompt,
-        }],
-        client_intent: Some(ai_router::routing::RoutingTask::Free),
-        ..Default::default()
-    };
-
-    let (content, _) = match service.ask_and_collect(req).await {
-        Ok(r) => r,
-        Err(_) => return BumpLevel::None,
-    };
-
-    match content.trim().to_lowercase().as_str() {
-        "major" => BumpLevel::Major,
-        "minor" => BumpLevel::Minor,
-        "patch" => BumpLevel::Patch,
-        _ => BumpLevel::None,
+    match service.chat(messages).await {
+        Ok(content) => {
+            match content.trim().to_lowercase().as_str() {
+                "major" => BumpLevel::Major,
+                "minor" => BumpLevel::Minor,
+                "patch" => BumpLevel::Patch,
+                _ => BumpLevel::None,
+            }
+        }
+        Err(_) => BumpLevel::None,
     }
 }
 
