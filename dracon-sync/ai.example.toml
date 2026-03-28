@@ -1,0 +1,24 @@
+# AI Provider Configuration
+# Order matters - providers are tried in order until one succeeds
+# Set the corresponding env vars with your API keys
+
+[[providers]]
+name = "openrouter"
+env = "OPENROUTER_API_KEY"
+endpoint = "https://openrouter.ai/api/v1"
+model = "google/gemini-2.0-flash-thinking-exp"
+
+[[providers]]
+name = "gemini"
+env = "GEMINI_API_KEY"
+endpoint = "https://generativelanguage.googleapis.com/v1beta"
+model = "gemini-2.0-flash-exp"
+adapter = "gemini"
+auth_header = "x-goog-api-key"
+auth_prefix = ""
+
+[[providers]]
+name = "nvidia"
+env = "NVIDIA_API_KEY"
+endpoint = "https://integrate.api.nvidia.com/v1"
+model = "nvidia/llama-3.3-nemotron-70b-instruct"

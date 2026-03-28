@@ -1,4 +1,4 @@
-use ai_adapters::HttpProviderAdapter;
+use ai_adapters::{GeminiAdapter, HttpProviderAdapter};
 use ai_lanes::ChatMessage;
 use ai_router::AiProvider;
 use anyhow::{Context, Result};
@@ -15,6 +15,8 @@ pub struct ProviderConfig {
     pub auth_header: String,
     #[serde(default = "default_auth_prefix")]
     pub auth_prefix: String,
+    #[serde(default = "default_adapter_type")]
+    pub adapter: String,
 }
 
 fn default_auth_header() -> String {
@@ -23,6 +25,10 @@ fn default_auth_header() -> String {
 
 fn default_auth_prefix() -> String {
     "Bearer ".to_string()
+}
+
+fn default_adapter_type() -> String {
+    "http".to_string()
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -55,13 +61,23 @@ impl SimpleAiService {
                 _ => continue,
             };
 
-            let adapter: Arc<dyn AiProvider> = Arc::new(HttpProviderAdapter::new_with_auth(
-                api_key,
-                pc.endpoint,
-                pc.model,
-                &pc.auth_header,
-                &pc.auth_prefix,
-            ));
+            let adapter: Arc<dyn AiProvider> = if pc.adapter == "gemini" {
+                Arc::new(GeminiAdapter::new_with_auth_keys(
+                    vec![api_key],
+                    pc.endpoint,
+                    pc.model,
+                    &pc.auth_header,
+                    &pc.auth_prefix,
+                ))
+            } else {
+                Arc::new(HttpProviderAdapter::new_with_auth(
+                    api_key,
+                    pc.endpoint,
+                    pc.model,
+                    &pc.auth_header,
+                    &pc.auth_prefix,
+                ))
+            };
 
             providers.push((name.clone(), adapter));
             eprintln!("📡 AI: {} ready", name);
