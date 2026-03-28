@@ -15,6 +15,7 @@ async-trait = "0.1"
 tracing = "0.1"
 ai-adapters = { path = "../../dracon-libs/services/ai/ai-adapters", default-features = false, features = ["providers"] }
 ai-router = { path = "../../dracon-libs/services/ai/ai-router" }
+ai-lanes = { path = "../../dracon-libs/services/ai/ai-lanes" }
 toml = "0.8"
 walkdir = "2.5"
 

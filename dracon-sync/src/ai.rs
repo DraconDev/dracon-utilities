@@ -12,7 +12,7 @@ impl SimpleAiService {
         let mut providers = Vec::new();
 
         if let Some(key) = std::env::var("OPENROUTER_API_KEY").ok().filter(|k| !k.is_empty()) {
-            let adapter = Arc::new(HttpProviderAdapter::new_with_auth(
+            let adapter: Arc<dyn AiProvider> = Arc::new(HttpProviderAdapter::new_with_auth(
                 key,
                 "https://openrouter.ai/api/v1".to_string(),
                 "google/gemini-2.0-flash-thinking-exp".to_string(),
@@ -24,7 +24,7 @@ impl SimpleAiService {
         }
 
         if let Some(key) = std::env::var("GEMINI_API_KEY").ok().filter(|k| !k.is_empty()) {
-            let adapter = Arc::new(HttpProviderAdapter::new_with_auth(
+            let adapter: Arc<dyn AiProvider> = Arc::new(HttpProviderAdapter::new_with_auth(
                 key,
                 "https://generativelanguage.googleapis.com/v1beta".to_string(),
                 "gemini-2.0-flash-exp".to_string(),
@@ -36,7 +36,7 @@ impl SimpleAiService {
         }
 
         if let Some(key) = std::env::var("NVIDIA_API_KEY").ok().filter(|k| !k.is_empty()) {
-            let adapter = Arc::new(HttpProviderAdapter::new_with_auth(
+            let adapter: Arc<dyn AiProvider> = Arc::new(HttpProviderAdapter::new_with_auth(
                 key,
                 "https://integrate.api.nvidia.com/v1".to_string(),
                 "nvidia/llama-3.3-nemotron-70b-instruct".to_string(),
