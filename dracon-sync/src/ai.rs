@@ -56,7 +56,7 @@ impl SimpleAiService {
         for pc in config.providers {
             let name = pc.name.clone();
 
-            let api_key = Self::get_api_key(&pc.env, &name);
+            let api_key = Self::get_api_key(&pc.env);
 
             if api_key.is_empty() {
                 continue;
@@ -87,7 +87,7 @@ impl SimpleAiService {
         Self { providers }
     }
 
-    fn get_api_key(env_name: &str, provider_name: &str) -> String {
+    fn get_api_key(env_name: &str) -> String {
         if let Ok(key) = std::env::var(env_name) {
             if !key.is_empty() {
                 return key;
@@ -98,19 +98,24 @@ impl SimpleAiService {
             .unwrap_or_else(|| PathBuf::from("."))
             .join(".dracon/ai/secrets");
 
-        let secret_file = secrets_dir.join(format!("{}.env", provider_name.to_lowercase()));
-
-        if let Ok(content) = std::fs::read_to_string(&secret_file) {
-            for line in content.lines() {
-                let line = line.trim();
-                if line.is_empty() || line.starts_with('#') {
-                    continue;
-                }
-                if let Some((key, value)) = line.split_once('=') {
-                    if key.trim() == env_name {
-                        let value = value.trim();
-                        if !value.is_empty() {
-                            return value.to_string();
+        if let Ok(entries) = std::fs::read_dir(&secrets_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.extension().map_or(false, |e| e == "env") {
+                    if let Ok(content) = std::fs::read_to_string(&path) {
+                        for line in content.lines() {
+                            let line = line.trim();
+                            if line.is_empty() || line.starts_with('#') {
+                                continue;
+                            }
+                            if let Some((key, value)) = line.split_once('=') {
+                                if key.trim() == env_name {
+                                    let value = value.trim();
+                                    if !value.is_empty() {
+                                        return value.to_string();
+                                    }
+                                }
+                            }
                         }
                     }
                 }
