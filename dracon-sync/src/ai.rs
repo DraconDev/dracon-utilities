@@ -38,6 +38,9 @@ impl SimpleAiService {
         let mut providers = Vec::new();
 
         for pc in config.providers {
+            let name = pc.name.clone();
+            let model = pc.model.clone();
+
             let api_key = match std::env::var(&pc.api_key_env) {
                 Ok(k) if !k.is_empty() => k,
                 _ => continue,
@@ -53,8 +56,8 @@ impl SimpleAiService {
                 )
             );
 
-            providers.push((pc.name.clone(), adapter));
-            eprintln!("📡 AI: {} ready ({})", pc.name, pc.model);
+            providers.push((name.clone(), adapter));
+            eprintln!("📡 AI: {} ready ({})", name, model);
         }
 
         Self { providers }
