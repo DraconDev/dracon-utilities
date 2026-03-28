@@ -10,7 +10,7 @@ model = "openrouter/free"
 
 [[providers]]
 name = "gemma"
-env = "GEMINI_API_KEY"
+env = "GOOGLE_API_KEY"
 endpoint = "https://generativelanguage.googleapis.com/v1beta"
 model = "gemma-3-27b-it:free"
 adapter = "gemini"
