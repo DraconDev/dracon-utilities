@@ -56,10 +56,11 @@ impl SimpleAiService {
         for pc in config.providers {
             let name = pc.name.clone();
 
-            let api_key = match std::env::var(&pc.env) {
-                Ok(k) if !k.is_empty() => k,
-                _ => continue,
-            };
+            let api_key = Self::get_api_key(&pc.env, &name);
+
+            if api_key.is_empty() {
+                continue;
+            }
 
             let adapter: Arc<dyn AiProvider> = if pc.adapter == "gemini" {
                 Arc::new(GeminiAdapter::new_with_auth_keys(
@@ -84,6 +85,39 @@ impl SimpleAiService {
         }
 
         Self { providers }
+    }
+
+    fn get_api_key(env_name: &str, provider_name: &str) -> String {
+        if let Ok(key) = std::env::var(env_name) {
+            if !key.is_empty() {
+                return key;
+            }
+        }
+
+        let secrets_dir = dirs::home_dir()
+            .unwrap_or_else(|| PathBuf::from("."))
+            .join(".dracon/ai/secrets");
+
+        let secret_file = secrets_dir.join(format!("{}.env", provider_name.to_lowercase()));
+
+        if let Ok(content) = std::fs::read_to_string(&secret_file) {
+            for line in content.lines() {
+                let line = line.trim();
+                if line.is_empty() || line.starts_with('#') {
+                    continue;
+                }
+                if let Some((key, value)) = line.split_once('=') {
+                    if key.trim() == env_name {
+                        let value = value.trim();
+                        if !value.is_empty() {
+                            return value.to_string();
+                        }
+                    }
+                }
+            }
+        }
+
+        String::new()
     }
 
     fn config_path() -> PathBuf {
