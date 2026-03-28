@@ -10,9 +10,12 @@ model = "openrouter/free"
 
 [[providers]]
 name = "gemma"
-env = "OPENROUTER_API_KEY"
-endpoint = "https://openrouter.ai/api/v1"
-model = "google/gemma-3-27b-it:free"
+env = "GEMINI_API_KEY"
+endpoint = "https://generativelanguage.googleapis.com/v1beta"
+model = "gemma-3-27b-it:free"
+adapter = "gemini"
+auth_header = "x-goog-api-key"
+auth_prefix = ""
 
 [[providers]]
 name = "nvidia"
