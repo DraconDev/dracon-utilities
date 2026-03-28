@@ -1,23 +1,5 @@
-#[cfg(feature = "ai-bumper")]
-use ai_adapters::{GenericOpenAIAdapter, ModalAdapter};
-#[cfg(feature = "ai-bumper")]
-use ai_router::models::{ChatMessage, ChatRequest, LeaderboardRequest, LeaderboardResponse};
-#[cfg(feature = "ai-bumper")]
-use ai_router::routing::SelectionConstraints;
-#[cfg(feature = "ai-bumper")]
-use ai_router::traits::{AiModelStore, AiProvider};
-#[cfg(feature = "ai-bumper")]
-use ai_routing_service::{AiService, ProviderRegistry};
 use anyhow::{Context, Result};
-#[cfg(feature = "ai-bumper")]
-use futures::Stream;
-#[cfg(feature = "ai-bumper")]
-use std::pin::Pin;
-#[cfg(feature = "ai-bumper")]
-use std::sync::Arc;
 use std::path::Path;
-
-#[cfg(feature = "ai-bumper")]
 async fn build_ai_service() -> Result<AiService> {
     let config = ai_adapters::resolve_ai_runtime_config();
     let mut registry: ProviderRegistry<dyn AiProvider> = ProviderRegistry::new();
