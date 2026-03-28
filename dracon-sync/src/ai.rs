@@ -1,24 +1,7 @@
 use ai_adapters::HttpProviderAdapter;
 use ai_lanes::ChatMessage;
 use ai_router::AiProvider;
-use anyhow::{Context, Result};
-use std::path::PathBuf;
 use std::sync::Arc;
-
-#[derive(Debug, Clone, serde::Deserialize)]
-pub struct ProviderConfig {
-    pub name: String,
-    pub endpoint: String,
-    pub model: String,
-    pub api_key_env: String,
-    pub auth_header: String,
-    pub auth_prefix: String,
-}
-
-#[derive(Debug, Clone, serde::Deserialize)]
-pub struct AiProvidersConfig {
-    pub providers: Vec<ProviderConfig>,
-}
 
 pub struct SimpleAiService {
     providers: Vec<(String, Arc<dyn AiProvider>)>,
@@ -26,55 +9,47 @@ pub struct SimpleAiService {
 
 impl SimpleAiService {
     pub fn new() -> Self {
-        let config_path = Self::config_path();
-        let config = match Self::load_config(&config_path) {
-            Ok(c) => c,
-            Err(e) => {
-                eprintln!("📡 AI: no config at {}: {}", config_path.display(), e);
-                return Self { providers: Vec::new() };
-            }
-        };
-
         let mut providers = Vec::new();
 
-        for pc in config.providers {
-            let name = pc.name.clone();
-            let model = pc.model.clone();
+        if let Ok(key) = std::env::var("OPENROUTER_API_KEY") {
+            if !key.is_empty() {
+                let adapter: Arc<dyn AiProvider> = Arc::new(HttpProviderAdapter::new(
+                    key,
+                    "https://openrouter.ai/api/v1".to_string(),
+                    "google/gemini-2.0-flash-thinking-exp".to_string(),
+                ));
+                providers.push(("openrouter".to_string(), adapter));
+                eprintln!("📡 AI: OpenRouter ready");
+            }
+        }
 
-            let api_key = match std::env::var(&pc.api_key_env) {
-                Ok(k) if !k.is_empty() => k,
-                _ => continue,
-            };
+        if let Ok(key) = std::env::var("GEMINI_API_KEY") {
+            if !key.is_empty() {
+                let adapter: Arc<dyn AiProvider> = Arc::new(HttpProviderAdapter::new_with_auth(
+                    key,
+                    "https://generativelanguage.googleapis.com/v1beta".to_string(),
+                    "gemini-2.0-flash-exp".to_string(),
+                    "x-goog-api-key",
+                    "",
+                ));
+                providers.push(("gemini".to_string(), adapter));
+                eprintln!("📡 AI: Gemini ready");
+            }
+        }
 
-            let adapter: Arc<dyn AiProvider> = Arc::new(
-                HttpProviderAdapter::new_with_auth(
-                    api_key,
-                    pc.endpoint,
-                    pc.model,
-                    &pc.auth_header,
-                    &pc.auth_prefix,
-                )
-            );
-
-            providers.push((name.clone(), adapter));
-            eprintln!("📡 AI: {} ready ({})", name, model);
+        if let Ok(key) = std::env::var("NVIDIA_API_KEY") {
+            if !key.is_empty() {
+                let adapter: Arc<dyn AiProvider> = Arc::new(HttpProviderAdapter::new(
+                    key,
+                    "https://integrate.api.nvidia.com/v1".to_string(),
+                    "nvidia/llama-3.3-nemotron-70b-instruct".to_string(),
+                ));
+                providers.push(("nvidia".to_string(), adapter));
+                eprintln!("📡 AI: NVIDIA ready");
+            }
         }
 
         Self { providers }
-    }
-
-    fn config_path() -> PathBuf {
-        dirs::home_dir()
-            .unwrap_or_else(|| PathBuf::from("."))
-            .join(".dracon/ai/providers.json")
-    }
-
-    fn load_config(path: &PathBuf) -> Result<AiProvidersConfig> {
-        let content = std::fs::read_to_string(path)
-            .with_context(|| format!("failed to read {}", path.display()))?;
-        let config: AiProvidersConfig = serde_json::from_str(&content)
-            .with_context(|| "failed to parse providers.json")?;
-        Ok(config)
     }
 
     pub fn is_empty(&self) -> bool {
