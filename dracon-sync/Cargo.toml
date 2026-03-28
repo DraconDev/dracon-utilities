@@ -23,6 +23,6 @@ dracon-git = { path = "../../dracon-libs/tools/sync/dracon-git" }
 fs2 = "0.4"
 
 [features]
-default = ["scribe"]
+default = ["scribe", "ai-bumper"]
 scribe = []
 ai-bumper = []
