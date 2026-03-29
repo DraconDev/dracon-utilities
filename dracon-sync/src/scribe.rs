@@ -60,23 +60,25 @@ CRITICAL: The STAGED CHANGES below are the PRIMARY source of truth. Focus on WHA
 {blueprint}
 
 ## Instructions
-Write a project-state.md with EXACTLY this format (no preamble, no explanation):
+Write a project-state.md with EXACTLY this format (no preamble, no explanation). MUST include newlines between every section:
 
+```
 # Project State
 
 ## Current Focus
-{{one line: specific description of WHAT changed in this commit, e.g. "Remove Azure Tenant ID pattern that caused false positives" NOT generic "integration" or "finalizing"}}
+{{one line: specific description of WHAT changed, e.g. "Remove Azure Tenant ID pattern that caused false positives" NOT generic "integration" or "finalizing"}}
 
 ## Completed
-- [x] {{specific completed work inferrable from recent commits}}
+- [x] {{specific completed work}}
 
 ## In Progress
 - [x] {{what's actively being worked on}}
 
 ## Open Issues
 - {{anything broken or blocked}}
+```
 
-AVOID: generic phrases like "integrating", "finalizing", "AI version", "scribe functionality" - be specific about actual code/logic changes.
+AVOID: generic phrases like "integrating", "finalizing", "AI version", "scribe functionality" - be specific.
 Write ONLY the markdown, nothing else."#
     )
 }
