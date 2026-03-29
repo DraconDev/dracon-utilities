@@ -43,38 +43,40 @@ fn build_scribe_prompt(repo: &Path, staged_diff: &str) -> String {
     let blueprint = collect_blueprint(repo);
 
     format!(
-        r#"You are a scribe for a software project. Analyze the git history, current changes, and project state, then write a concise project-state.md.
+        r#"You are a scribe for a software project. Your job is to write a concise project-state.md.
 
-## Recent Git Log (history context)
-{git_log}
+CRITICAL: The STAGED CHANGES below are the PRIMARY source of truth. Focus on WHAT actually changed, not historical patterns.
 
-## Recent File Changes
+## Current Staged Changes (PRIMARY - what is about to be committed)
+{staged_diff}
+
+## Recent File Changes (secondary context)
 {git_files}
+
+## Recent Git Log (do NOT copy phrasing from these - they may be generic)
+{git_log}
 
 ## Blueprint (goals)
 {blueprint}
 
-## Current Staged Changes (what is about to be committed)
-{staged_diff}
-
 ## Instructions
-Write a project-state.md file with EXACTLY this format (no preamble, no explanation):
+Write a project-state.md with EXACTLY this format (no preamble, no explanation):
 
 # Project State
 
 ## Current Focus
-{{one line: what the project is actively working on NOW, based on the staged changes, recent commits, and blueprint}}
+{{one line: specific description of WHAT changed in this commit, e.g. "Remove Azure Tenant ID pattern that caused false positives" NOT generic "integration" or "finalizing"}}
 
 ## Completed
-- [x] {{recent completed work from the log}}
+- [x] {{specific completed work inferrable from recent commits}}
 
 ## In Progress
-- [x] {{what's actively being worked on based on recent file patterns}}
+- [x] {{what's actively being worked on}}
 
 ## Open Issues
-- {{anything that looks broken or blocked based on the evidence}}
+- {{anything broken or blocked}}
 
-Keep it factual. Infer from the evidence, don't make things up. If unclear, say so.
+AVOID: generic phrases like "integrating", "finalizing", "AI version", "scribe functionality" - be specific about actual code/logic changes.
 Write ONLY the markdown, nothing else."#
     )
 }
