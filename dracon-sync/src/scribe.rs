@@ -40,80 +40,63 @@ fn collect_blueprint(repo: &Path) -> String {
 
 fn cleanup_markdown(input: &str) -> String {
     let mut result: Vec<String> = Vec::new();
-    let mut current_section_content: Option<String> = None;
-
-    fn is_header(line: &str) -> bool {
-        line.trim_start().starts_with("# ")
-            || line.trim_start().starts_with("## ")
-            || line.trim_start().starts_with("### ")
-    }
-
-    fn extract_header_name(line: &str) -> Option<&str> {
-        let trimmed = line.trim();
-        if trimmed.starts_with("# ") {
-            Some(&trimmed[2..])
-        } else if trimmed.starts_with("## ") {
-            Some(&trimmed[3..])
-        } else if trimmed.starts_with("### ") {
-            Some(&trimmed[4..])
-        } else {
-            None
-        }
-    }
-
-    fn header_with_colon(name: &str) -> String {
-        if let Some(colon_pos) = name.find(':') {
-            let header_part = name[..colon_pos].trim();
-            let content = name[colon_pos + 1..].trim();
-            let mut out = format!("## {}", header_part);
-            if !content.is_empty() {
-                out.push_str("\n\n");
-                out.push_str(content);
-            }
-            out
-        } else {
-            format!("## {}", name)
-        }
-    }
+    let mut pending_blank = false;
 
     for line in input.lines() {
         let trimmed = line.trim_end();
+        let ltrimmed = trimmed.trim_start();
 
-        if is_header(trimmed) {
-            if let Some(content) = current_section_content.take() {
-                if !content.is_empty() {
-                    result.push(content);
-                }
-            }
-            if !result.is_empty() && !result.last().map(|l| l.is_empty()).unwrap_or(false) {
-                result.push(String::new());
-            }
-
-            if let Some(name) = extract_header_name(trimmed) {
-                result.push(header_with_colon(name));
+        let header_info: Option<(usize, &str)> = if ltrimmed.starts_with("### ") {
+            Some((3, &ltrimmed[4..]))
+        } else if ltrimmed.starts_with("## ") {
+            Some((2, &ltrimmed[3..]))
+        } else if ltrimmed.starts_with("# ") {
+            Some((1, &ltrimmed[2..]))
+        } else if ltrimmed.starts_with("###") {
+            let rest = if ltrimmed.len() >= 3 { &ltrimmed[3..] } else { "" };
+            Some((3, rest.trim_start()))
+        } else if ltrimmed.starts_with("##") {
+            let rest = if ltrimmed.len() >= 2 { &ltrimmed[2..] } else { "" };
+            if rest.is_empty() || rest.starts_with(' ') || rest.starts_with('-') || rest.starts_with(':') {
+                Some((2, rest.trim_start()))
             } else {
-                result.push(trimmed.to_string());
+                None
             }
-            current_section_content = Some(String::new());
-        } else if trimmed.is_empty() {
-            if let Some(content) = current_section_content.as_mut() {
-                if !content.is_empty() {
-                    content.push_str("\n\n");
-                }
+        } else if ltrimmed.starts_with('#') {
+            let rest = if ltrimmed.len() >= 1 { &ltrimmed[1..] } else { "" };
+            if rest.is_empty() || rest.starts_with(' ') {
+                Some((1, rest.trim_start()))
+            } else {
+                None
             }
         } else {
-            if let Some(content) = current_section_content.as_mut() {
-                if !content.is_empty() && !content.ends_with('\n') {
-                    content.push('\n');
-                }
-                content.push_str(trimmed);
-            }
-        }
-    }
+            None
+        };
 
-    if let Some(content) = current_section_content.take() {
-        if !content.is_empty() {
-            result.push(content);
+        if let Some((level, name)) = header_info {
+            if pending_blank && !result.is_empty() && !result.last().map(|l| l.is_empty()).unwrap_or(false) {
+                result.push(String::new());
+            }
+            pending_blank = true;
+
+            let hashes = "#".repeat(level);
+            if let Some(colon_pos) = name.find(':') {
+                let header_part = name[..colon_pos].trim();
+                let content = name[colon_pos + 1..].trim();
+                let mut out = format!("{} {}", hashes, header_part);
+                if !content.is_empty() {
+                    out.push_str("\n\n");
+                    out.push_str(content);
+                }
+                result.push(out);
+            } else {
+                result.push(format!("{} {}", hashes, name));
+            }
+        } else if trimmed.is_empty() {
+            pending_blank = true;
+        } else {
+            result.push(trimmed.to_string());
+            pending_blank = false;
         }
     }
 
