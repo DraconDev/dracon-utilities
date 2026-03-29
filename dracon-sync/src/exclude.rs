@@ -120,12 +120,15 @@ pub(crate) fn should_stage_entry(
         Ok(meta) if meta.is_dir() => true,
         Ok(_) => true,
         Err(_) => {
-            // File doesn't exist on disk - do NOT stage deletions for missing files.
-            // If a file is deleted in git index but doesn't exist on disk, it means:
-            // - Either it was never there (corrupt clone/partial checkout)
-            // - Or it was deleted externally (not by us)
-            // Either way, we should NOT commit a deletion for something that isn't there.
-            false
+            // File doesn't exist on disk
+            if matches!(entry.status, dracon_git::types::FileStatus::Deleted) {
+                // Deleted files should be staged - they don't exist on disk by definition
+                true
+            } else {
+                // File doesn't exist and isn't a deletion - don't stage
+                // This handles partial checkouts or files that were never there
+                false
+            }
         }
     }
 }
