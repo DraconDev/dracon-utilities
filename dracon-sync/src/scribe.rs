@@ -38,6 +38,45 @@ fn collect_blueprint(repo: &Path) -> String {
         .unwrap_or_default()
 }
 
+fn cleanup_markdown(input: &str) -> String {
+    let mut result: Vec<String> = Vec::new();
+
+    for line in input.lines() {
+        let trimmed = line.trim_end().to_string();
+
+        if trimmed.starts_with("# ") || trimmed.starts_with("## ") || trimmed.starts_with("### ") {
+            if !result.is_empty() {
+                if let Some(last) = result.last() {
+                    if !last.is_empty() {
+                        result.push(String::new());
+                    }
+                }
+            }
+            result.push(trimmed);
+        } else if trimmed.is_empty() {
+            if !result.is_empty() {
+                if let Some(last) = result.last() {
+                    if !last.is_empty() {
+                        result.push(String::new());
+                    }
+                }
+            }
+        } else {
+            result.push(trimmed);
+        }
+    }
+
+    while let Some(last) = result.last() {
+        if last.is_empty() {
+            result.pop();
+        } else {
+            break;
+        }
+    }
+
+    result.join("\n") + "\n"
+}
+
 fn build_scribe_prompt(repo: &Path, staged_diff: &str) -> String {
     let (git_log, git_files) = collect_git_context(repo);
     let blueprint = collect_blueprint(repo);
@@ -98,7 +137,8 @@ pub(crate) async fn update_project_state_from_ai(repo: &Path, staged_diff: &str)
                 &text
             };
 
-            std::fs::write(&state_path, markdown.trim())?;
+            let cleaned = cleanup_markdown(markdown);
+            std::fs::write(&state_path, cleaned)?;
             eprintln!("📝 scribe: updated {}/.dracon/project-state.md", repo_display);
         }
         Err(e) => {

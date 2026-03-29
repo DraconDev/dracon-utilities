@@ -1540,6 +1540,38 @@ fn run_filter(is_clean: bool, path: Option<&str>) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::Mutex;
+
+    static NEXT_ID: AtomicU64 = AtomicU64::new(1);
+
+    struct TestDir {
+        path: std::path::PathBuf,
+        #[allow(dead_code)]
+        guard: Mutex<()>,
+    }
+
+    impl TestDir {
+        fn new(name: &str) -> Self {
+            let id = NEXT_ID.fetch_add(1, Ordering::SeqCst);
+            let tmp = std::env::temp_dir();
+            let path = tmp.join(format!("dracon_warden_test_{}_{}", name, id));
+            fs::create_dir_all(&path).expect("create temp dir");
+            Self {
+                path,
+                guard: Mutex::new(()),
+            }
+        }
+        fn path(&self) -> &std::path::Path {
+            &self.path
+        }
+    }
+
+    impl Drop for TestDir {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.path);
+        }
+    }
 
     fn sample_policy() -> WardenPolicy {
         WardenPolicy {

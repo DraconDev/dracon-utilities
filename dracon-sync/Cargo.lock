@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "ai-adapters"
-version = "7.16.2"
+version = "7.17.2"
 dependencies = [
  "ai-router",
  "anyhow",
@@ -26,14 +26,14 @@ dependencies = [
 
 [[package]]
 name = "ai-lanes"
-version = "7.16.2"
+version = "7.17.2"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "ai-router"
-version = "7.16.2"
+version = "7.17.2"
 dependencies = [
  "ai-lanes",
  "anyhow",
@@ -270,7 +270,7 @@ checksum = "1aaf95b3e5c8f23aa320147307562d361db0ae0d51242340f558153b4eb2439b"
 
 [[package]]
 name = "dracon-git"
-version = "7.16.2"
+version = "7.17.2"
 dependencies = [
  "anyhow",
  "git2",
