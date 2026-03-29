@@ -10,13 +10,29 @@ dracon-utilities/           <- CLI binaries (this repo)
 ├── dracon-system/          -> ~/.local/bin/dracon-system
 └── dracon-warden/          -> ~/.local/bin/dracon-warden
 
-dracon-libs/tools/          <- Shared libraries (not installed)
-├── sync/dracon-git/        <- git operations library
-├── system/dracon-system/   <- system diagnostics library
-└── config/dracon-config/   <- config parsing library
+dracon-libs/                <- Shared libraries (REQUIRED for building)
+├── services/ai/            <- AI adapters, router, lanes
+└── tools/sync/dracon-git/  <- git operations library
 ```
 
 **Key point:** `dracon-utilities` contains the CLI wrappers. `dracon-libs` contains shared library code. Only the CLI binaries get installed.
+
+## Prerequisites
+
+**Required sibling directory:** `dracon-libs` must be checked out as a sibling to `dracon-utilities`:
+
+```
+~/Dev/
+├── dracon-utilities/    <- this repo
+└── dracon-libs/         <- required for building
+    ├── services/ai/
+    └── tools/sync/dracon-git/
+```
+
+Clone if needed:
+```bash
+git clone https://github.com/your-org/dracon-libs.git ../dracon-libs
+```
 
 ## Installation
 

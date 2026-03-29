@@ -5,6 +5,17 @@ cd "$(dirname "$0")"
 
 echo "Installing dracon utilities to ~/.local/bin/"
 
+# Check for required dracon-libs sibling directory
+DRACON_LIBS="../dracon-libs"
+if [ ! -d "$DRACON_LIBS" ]; then
+    echo "ERROR: dracon-libs not found at ../dracon-libs"
+    echo ""
+    echo "This project requires dracon-libs as a sibling directory:"
+    echo "  git clone https://github.com/your-org/dracon-libs.git ../dracon-libs"
+    echo ""
+    exit 1
+fi
+
 restart_service() {
     local service=$1
     if systemctl --user list-unit-files | grep -q "^$service"; then
