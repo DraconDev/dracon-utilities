@@ -283,7 +283,6 @@ async fn main() -> Result<()> {
         }
         Command::TestAi => {
             use ai::SimpleAiService;
-            use ai_lanes::ChatMessage;
             
             let service = SimpleAiService::new();
             if service.is_empty() {
@@ -292,24 +291,54 @@ async fn main() -> Result<()> {
                 return Ok(());
             }
             
-            println!("🧪 Testing AI providers...\n");
+            let providers = service.provider_names();
+            println!("🧪 Testing {} AI provider(s)...\n", providers.len());
             
-            let messages = vec![ChatMessage::user("Say exactly 'OK' if you can hear me.".to_string())];
+            let mut all_ok = true;
+            let mut working_provider = None;
             
-            match service.chat(messages).await {
-                Ok(response) => {
-                    let trimmed = response.trim().to_uppercase();
-                    if trimmed.contains("OK") {
-                        println!("✅ All AI providers working!");
-                        println!("   Response received: {}", response.chars().take(50).collect::<String>());
-                    } else {
-                        println!("⚠️ Provider responded but unexpected content: {}", response.chars().take(50).collect::<String>());
+            for name in &providers {
+                print!("   Testing {}... ", name);
+                match service.test_provider(name).await {
+                    Ok((true, resp)) => {
+                        if resp.trim().to_uppercase().contains("OK") {
+                            println!("✅");
+                            working_provider = Some(name.clone());
+                        } else {
+                            println!("⚠️  (unexpected response: {}...)", resp.chars().take(20).collect::<String>());
+                            working_provider = Some(name.clone());
+                        }
+                    }
+                    Ok((false, err)) => {
+                        let err_lower = err.to_lowercase();
+                        if err_lower.contains("429") || err_lower.contains("rate limit") {
+                            println!("⏳ rate limited");
+                        } else if err_lower.contains("401") || err_lower.contains("unauthorized") || err_lower.contains("api key") {
+                            println!("🔑 auth error (check API key)");
+                            all_ok = false;
+                        } else {
+                            println!("❌ {}", err.chars().take(40).collect::<String>());
+                            all_ok = false;
+                        }
+                    }
+                    Err(e) => {
+                        println!("❌ {}", e.to_string().chars().take(40).collect::<String>());
+                        all_ok = false;
                     }
                 }
-                Err(e) => {
-                    println!("❌ All AI providers failed:");
-                    println!("   {}", e);
-                }
+            }
+            
+            println!("");
+            if all_ok {
+                println!("✅ All AI providers ready");
+            } else if working_provider.is_some() {
+                println!("⚠️  Some providers failed but fallback available");
+            } else {
+                println!("❌ All AI providers failed");
+            }
+            
+            if let Some(ref wp) = working_provider {
+                println!("   Using: {} (fallback order: {:?})", wp, providers);
             }
         }
     }

@@ -143,6 +143,25 @@ impl SimpleAiService {
         self.providers.is_empty()
     }
 
+    pub fn provider_names(&self) -> Vec<String> {
+        self.providers.iter().map(|(n, _)| n.clone()).collect()
+    }
+
+    pub async fn test_provider(&self, name: &str) -> Result<(bool, String)> {
+        let messages = vec![ChatMessage::user("Say exactly 'OK'.".to_string())];
+        
+        for (provider_name, provider) in &self.providers {
+            if provider_name != name {
+                continue;
+            }
+            match provider.ask_and_collect(messages).await {
+                Ok((content, _)) => return Ok((true, content)),
+                Err(e) => return Ok((false, e.to_string())),
+            }
+        }
+        Ok((false, "provider not found".to_string()))
+    }
+
     pub async fn chat(&self, messages: Vec<ChatMessage>) -> anyhow::Result<String> {
         let mut last_error = None;
 
