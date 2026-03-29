@@ -95,6 +95,8 @@ enum Command {
     SyncNow { repo: PathBuf },
     /// Open sync policy in the system editor.
     EditConfig,
+    /// Test AI providers connectivity.
+    TestAi,
 }
 
 #[tokio::main]
@@ -278,6 +280,37 @@ async fn main() -> Result<()> {
         }
         Command::EditConfig => {
             policy::open_policy_in_editor(&policy_path)?;
+        }
+        Command::TestAi => {
+            use ai::SimpleAiService;
+            use ai_lanes::ChatMessage;
+            
+            let service = SimpleAiService::new();
+            if service.is_empty() {
+                println!("❌ No AI providers configured");
+                println!("   Add providers to ~/.dracon/ai.toml");
+                return Ok(());
+            }
+            
+            println!("🧪 Testing AI providers...\n");
+            
+            let messages = vec![ChatMessage::user("Say exactly 'OK' if you can hear me.".to_string())];
+            
+            match service.chat(messages).await {
+                Ok(response) => {
+                    let trimmed = response.trim().to_uppercase();
+                    if trimmed.contains("OK") {
+                        println!("✅ All AI providers working!");
+                        println!("   Response received: {}", response.chars().take(50).collect::<String>());
+                    } else {
+                        println!("⚠️ Provider responded but unexpected content: {}", response.chars().take(50).collect::<String>());
+                    }
+                }
+                Err(e) => {
+                    println!("❌ All AI providers failed:");
+                    println!("   {}", e);
+                }
+            }
         }
     }
 
