@@ -43,43 +43,32 @@ fn build_scribe_prompt(repo: &Path, staged_diff: &str) -> String {
     let blueprint = collect_blueprint(repo);
 
     format!(
-        r#"You are a scribe for a software project. Your job is to write a concise project-state.md.
+        r#"You are a scribe for a software project. Write a concise project-state.md.
 
-CRITICAL: The STAGED CHANGES below are the PRIMARY source of truth. Focus on WHAT actually changed, not historical patterns.
-
-## Current Staged Changes (PRIMARY - what is about to be committed)
+STAGED CHANGES (PRIMARY source):
 {staged_diff}
 
-## Recent File Changes (secondary context)
+CONTEXT (file names changed):
 {git_files}
 
-## Recent Git Log (do NOT copy phrasing from these - they may be generic)
-{git_log}
+GENERATE EXACTLY this markdown structure. Each section header MUST have a blank line after it:
 
-## Blueprint (goals)
-{blueprint}
-
-## Instructions
-Write a project-state.md with EXACTLY this format (no preamble, no explanation). MUST include newlines between every section:
-
-```
 # Project State
 
 ## Current Focus
-{{one line: specific description of WHAT changed, e.g. "Remove Azure Tenant ID pattern that caused false positives" NOT generic "integration" or "finalizing"}}
+ONE LINE describing what changed - be specific like "Fix bug in auth token validation" not generic "Update code"
 
 ## Completed
-- [x] {{specific completed work}}
+- [x] item 1
+- [x] item 2
 
 ## In Progress
-- [x] {{what's actively being worked on}}
+- [x] item 1
 
 ## Open Issues
-- {{anything broken or blocked}}
-```
+- issue 1
 
-AVOID: generic phrases like "integrating", "finalizing", "AI version", "scribe functionality" - be specific.
-Write ONLY the markdown, nothing else."#
+No preamble. Only output the markdown."#
     )
 }
 
