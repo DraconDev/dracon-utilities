@@ -8,8 +8,7 @@ CLI binaries for dracon system services. These install to `~/.local/bin/` and ru
 dracon-utilities/           <- CLI binaries (this repo)
 ├── dracon-sync/            -> ~/.local/bin/dracon-sync
 ├── dracon-system/          -> ~/.local/bin/dracon-system
-├── dracon-warden/          -> ~/.local/bin/dracon-warden
-└── dracon-ai/              -> ~/.local/bin/dracon-ai
+└── dracon-warden/          -> ~/.local/bin/dracon-warden
 
 dracon-libs/tools/          <- Shared libraries (not installed)
 ├── sync/dracon-git/        <- git operations library
@@ -24,14 +23,7 @@ dracon-libs/tools/          <- Shared libraries (not installed)
 All binaries install to `~/.local/bin/`:
 
 ```bash
-# Install all utilities
 ./install.sh
-
-# Or individually:
-cargo install --path dracon-sync --root ~/.local --force
-cargo install --path dracon-system --root ~/.local --force
-cargo install --path dracon-warden --root ~/.local --force
-cargo install --path dracon-ai --root ~/.local --force
 ```
 
 ## Services
@@ -45,7 +37,7 @@ Services are in `~/.config/systemd/user/`:
 | dracon-warden.service | dracon-warden daemon | Security hardening |
 
 ```bash
-# Restart after install
+# Restart after install (install.sh does this automatically)
 systemctl --user restart dracon-sync.service
 systemctl --user restart dracon-system-guard.service
 systemctl --user restart dracon-warden.service
@@ -55,30 +47,53 @@ systemctl --user restart dracon-warden.service
 
 | Utility | Policy Path |
 |---------|-------------|
-| dracon-sync | ~/dracon/utilities/sync/dracon-sync.toml |
-| dracon-system | ~/dracon/utilities/system/dracon-system.toml |
-| dracon-warden | ~/dracon/utilities/warden/dracon-warden.toml |
+| dracon-sync | ~/.dracon/utilities/sync/dracon-sync.toml |
+| dracon-system | ~/.dracon/utilities/system/dracon-system.toml |
+| dracon-warden | ~/.dracon/utilities/warden/dracon-warden.toml |
+
+## AI Configuration
+
+dracon-sync uses AI for commit messages (scribe) and version bumping. Configure providers in `~/.dracon/ai.toml`:
+
+```toml
+[[providers]]
+name = "openrouter"
+env = "OPENROUTER_API_KEY"
+endpoint = "https://openrouter.ai/api/v1"
+model = "openrouter/free"
+
+[[providers]]
+name = "gemma"
+env = "GOOGLE_API_KEY"
+endpoint = "https://generativelanguage.googleapis.com/v1beta"
+model = "gemma-3-27b-it"
+adapter = "gemini"
+auth_header = "x-goog-api-key"
+auth_prefix = ""
+
+[[providers]]
+name = "nvidia"
+env = "NVIDIA_API_KEY"
+endpoint = "https://integrate.api.nvidia.com/v1"
+model = "nvidia/nemotron-3-nano-30b-a3b"
+```
+
+### API Keys
+
+Store keys in `~/.dracon/ai/secrets/*.env`:
+- `openrouter.env` → `OPENROUTER_API_KEY=...`
+- `gemini.env` → `GOOGLE_API_KEY=...`
+- `nvidia.env` → `NVIDIA_API_KEY=...`
+
+### Test AI Providers
+
+```bash
+dracon-sync test-ai
+```
 
 ## The Scribe
 
-The scribe is **you** (AI). You maintain `.dracon/project-state.md` in each repo you work in. The daemon reads this file and includes the "Current Focus" line in every commit message body.
-
-### When to read
-
-**At the start of every session**, read `.dracon/project-state.md` to understand:
-- What's the current focus?
-- What's been completed recently?
-- What's in progress?
-- Any open issues or blockers?
-
-### When to update
-
-Update `.dracon/project-state.md` when you:
-- Start a new task or change focus
-- Complete a task
-- Discover a blocking issue
-- Make an architectural decision
-- Learn something important about the codebase
+The scribe is **you** (AI). The daemon maintains `.dracon/project-state.md` in each repo. AI generates commit messages that include the "Current Focus" line.
 
 ### Format
 
@@ -92,7 +107,7 @@ Update `.dracon/project-state.md` when you:
 - [x] {what you finished, with context}
 
 ## In Progress
-- [ ] {what you're actively working on}
+- [x] {what you're actively working on}
 
 ## Open Issues
 - {blockers, decisions needed, things to investigate}

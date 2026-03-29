@@ -143,3 +143,93 @@ These serve DIFFERENT purposes:
 2. Push limit prevents pushing commits that already contain huge files
 
 They're intentionally both set to 50MB to keep things simple, but could be configured differently if needed.
+
+---
+
+## AI Integration (Scribe + AI Bumper)
+
+### Overview
+dracon-sync has integrated AI for generating commit messages (scribe) and deciding version bumps.
+
+### Features
+- **Scribe:** AI generates `project-state.md` and commit messages with context
+- **AI Bumper:** AI decides semver bump level (major/minor/patch/none) based on changes
+- **Fallback Chain:** Multiple AI providers tried in order until one succeeds
+
+### Configuration
+AI providers are configured in `~/.dracon/ai.toml`:
+
+```toml
+[[providers]]
+name = "openrouter"
+env = "OPENROUTER_API_KEY"
+endpoint = "https://openrouter.ai/api/v1"
+model = "openrouter/free"
+
+[[providers]]
+name = "gemma"
+env = "GOOGLE_API_KEY"
+endpoint = "https://generativelanguage.googleapis.com/v1beta"
+model = "gemma-3-27b-it"
+adapter = "gemini"
+auth_header = "x-goog-api-key"
+auth_prefix = ""
+
+[[providers]]
+name = "nvidia"
+env = "NVIDIA_API_KEY"
+endpoint = "https://integrate.api.nvidia.com/v1"
+model = "nvidia/nemotron-3-nano-30b-a3b"
+```
+
+### Provider Details
+| Provider | API Key Env | Model | Notes |
+|----------|-------------|-------|-------|
+| openrouter | OPENROUTER_API_KEY | openrouter/free | Free tier, auto-selects best model |
+| gemma | GOOGLE_API_KEY | gemma-3-27b-it | Google's Gemma via Gemini API |
+| nvidia | NVIDIA_API_KEY | nvidia/nemotron-3-nano-30b-a3b | NVIDIA's free tier |
+
+### API Keys
+Store keys in `~/.dracon/ai/secrets/*.env`:
+- `~/.dracon/ai/secrets/openrouter.env` → `OPENROUTER_API_KEY=...`
+- `~/.dracon/ai/secrets/gemini.env` → `GOOGLE_API_KEY=...` (note: key name is GOOGLE_API_KEY, file is gemini.env)
+- `~/.dracon/ai/secrets/nvidia.env` → `NVIDIA_API_KEY=...`
+
+### Testing
+```bash
+dracon-sync test-ai   # Test all AI providers
+```
+
+### Features (compile-time)
+- `scribe` (default): Enables AI commit message generation
+- `ai-bumper` (default): Enables AI version bumping
+
+### Commit Message Format
+```
+chore(scope): Commit subject line
+
+# Project State
+
+## Current Focus
+What the project is working on
+
+## Completed
+- [x] Completed work items
+
+## In Progress
+- [x] Items being worked on
+
+## Open Issues
+- Any blockers or issues
+
+---
+category: chore
+scope: scope
+```
+
+### Status
+- [x] AI scribe integrated (calls AI directly, no subprocess)
+- [x] AI bumper integrated (decides major/minor/patch/none)
+- [x] Configurable provider order (fallback chain)
+- [x] API keys loaded from secrets files
+- [x] `test-ai` command for provider verification
