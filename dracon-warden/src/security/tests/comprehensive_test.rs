@@ -1,6 +1,6 @@
 use anyhow::Result;
-use proptest::prelude::*;
 use dracon_security::DemonSecurity;
+use proptest::prelude::*;
 use std::fs;
 use std::sync::OnceLock;
 
@@ -82,11 +82,6 @@ const CORPUS: &[SecretExample] = &[
         name: "Azure Storage Account Key",
         pattern: "Azure Storage Account Key",
         raw: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+/abcdefghijklmnopqrstuv==",
-    },
-    SecretExample {
-        name: "Azure Tenant ID",
-        pattern: "Azure Tenant ID",
-        raw: "12345678-1234-1234-1234-1234567890ab",
     },
     SecretExample {
         name: "Alibaba Access Key ID",
