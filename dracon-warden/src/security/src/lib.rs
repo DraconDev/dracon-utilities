@@ -2061,6 +2061,7 @@ impl DemonSecurity {
             "vault.yml",
             ".terraform.lock.hcl",
             "terraform.tfvars",
+            ".env",
         ];
 
         let sensitive_filenames = [
