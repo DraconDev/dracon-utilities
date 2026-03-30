@@ -119,9 +119,7 @@ impl SimpleAiService {
             }
         }
 
-        let secrets_dir = dirs::home_dir()
-            .unwrap_or_else(|| PathBuf::from("."))
-            .join(".dracon/ai/secrets");
+        let secrets_dir = Self::secrets_path();
 
         if let Ok(entries) = std::fs::read_dir(&secrets_dir) {
             for entry in entries.flatten() {
@@ -153,7 +151,13 @@ impl SimpleAiService {
     fn config_path() -> PathBuf {
         dirs::home_dir()
             .unwrap_or_else(|| PathBuf::from("."))
-            .join(".dracon/ai.toml")
+            .join(".dracon/utilities/sync/ai.toml")
+    }
+
+    fn secrets_path() -> PathBuf {
+        dirs::home_dir()
+            .unwrap_or_else(|| PathBuf::from("."))
+            .join(".dracon/utilities/sync")
     }
 
     fn load_config(path: &PathBuf) -> Result<AiConfig> {

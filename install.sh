@@ -65,7 +65,7 @@ install_binary dracon-system ""
 install_binary dracon-warden ""
 
 mkdir -p ~/.config/systemd/user
-mkdir -p ~/.dracon/ai/secrets
+mkdir -p ~/.dracon/utilities/sync
 
 cp dracon-sync/dracon-sync.service ~/.config/systemd/user/dracon-sync.service 2>/dev/null || true
 cp dracon-system/dracon-system-guard.service ~/.config/systemd/user/dracon-system-guard.service 2>/dev/null || true
@@ -83,13 +83,12 @@ restart_service dracon-system-guard.service
 restart_service dracon-warden.service
 
 echo ""
-echo "AI config: ~/.dracon/ai/"
+echo "AI config: ~/.dracon/utilities/sync/"
 echo "  ai.toml          — provider configuration (copy ai.example.toml if new)"
-echo "  secrets/*.env    — API keys (OPENROUTER_API_KEY, GEMINI_API_KEY, NVIDIA_API_KEY)"
+echo "  *.env            — API keys (OPENROUTER_API_KEY, GEMINI_API_KEY, NVIDIA_API_KEY)"
 
-if [ ! -f ~/.dracon/ai.toml ] && [ -f dracon-sync/ai.example.toml ]; then
-    mkdir -p ~/.dracon
-    cp dracon-sync/ai.example.toml ~/.dracon/ai.toml
+if [ ! -f ~/.dracon/utilities/sync/ai.toml ] && [ -f dracon-sync/ai.example.toml ]; then
+    cp dracon-sync/ai.example.toml ~/.dracon/utilities/sync/ai.toml
     echo ""
-    echo "✅ Copied ai.example.toml → ~/.dracon/ai.toml"
-    echo "   Edit ~/.dracon/ai.toml and set your API keys"
+    echo "✅ Copied ai.example.toml → ~/.dracon/utilities/sync/ai.toml"
+    echo "   Edit ~/.dracon/utilities/sync/ai.toml and set your API keys"
