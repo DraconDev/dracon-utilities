@@ -581,7 +581,7 @@ Respond with ONLY ONE WORD."##);
         return BumpLevel::None;
     }
 
-    let messages = vec![ChatMessage::user(prompt)];
+    let messages = vec![ChatMessage::user(&prompt)];
 
     match service.chat(messages).await {
         Ok(content) => {

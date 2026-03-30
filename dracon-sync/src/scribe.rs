@@ -156,7 +156,7 @@ pub(crate) async fn update_project_state_from_ai(repo: &Path, staged_diff: &str)
 
     let prompt = build_scribe_prompt(repo, staged_diff);
 
-    let messages = vec![ChatMessage::user(prompt)];
+    let messages = vec![ChatMessage::user(&prompt)];
 
     match service.chat(messages).await {
         Ok(text) => {
