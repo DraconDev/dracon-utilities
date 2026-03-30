@@ -2,7 +2,7 @@ mod policy;
 mod exclude;
 mod git;
 mod bump;
-mod ai;
+mod simple_ai;
 #[cfg(feature = "scribe")]
 mod scribe;
 mod report;
@@ -282,7 +282,7 @@ async fn main() -> Result<()> {
             policy::open_policy_in_editor(&policy_path)?;
         }
         Command::TestAi => {
-            use ai::SimpleAiService;
+            use simple_ai::SimpleAiService;
             
             let service = SimpleAiService::new();
             if service.is_empty() {

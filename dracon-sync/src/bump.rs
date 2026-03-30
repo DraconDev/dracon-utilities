@@ -545,8 +545,7 @@ pub async fn ai_decide_bump_level(
     staged_diff: &str,
     project_state: &str,
 ) -> BumpLevel {
-    use crate::ai::SimpleAiService;
-    use ai_lanes::ChatMessage;
+    use crate::simple_ai::{ChatMessage, SimpleAiService};
 
     let version_only_patterns = ["Cargo.toml", "package.json", "VERSION", "Cargo.lock"];
     let has_source_changes = staged_diff.lines()

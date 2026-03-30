@@ -1,5 +1,4 @@
-use crate::ai::SimpleAiService;
-use ai_lanes::ChatMessage;
+use crate::simple_ai::{ChatMessage, SimpleAiService};
 use std::path::Path;
 
 fn collect_git_context(repo: &Path) -> (String, String) {
