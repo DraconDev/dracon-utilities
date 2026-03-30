@@ -2033,7 +2033,8 @@ impl DemonSecurity {
         ];
 
         let sensitive_exts = [
-            ".age", ".key", ".p12", ".pfx", ".pem", ".crt", ".der", ".asc",
+            ".age", ".key", ".p12", ".pfx", ".pem", ".crt", ".der", ".asc", ".zip", ".tar", ".gz",
+            ".bz2", ".7z", ".rar", ".tgz", ".xz", ".tar.gz", ".tar.bz2", ".tar.xz",
         ];
 
         let sensitive_filenames = [
