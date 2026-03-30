@@ -27,6 +27,8 @@ pub struct ProviderConfig {
     pub auth_header: String,
     #[serde(default = "default_auth_prefix")]
     pub auth_prefix: String,
+    #[serde(default)]
+    pub is_google_api: bool,
 }
 
 fn default_auth_header() -> String {
@@ -222,6 +224,10 @@ impl SimpleAiService {
             anyhow::bail!("no API key for {}", provider.env);
         };
 
+        if provider.is_google_api {
+            return self.call_google_api(provider, &api_key, messages).await;
+        }
+
         let request_messages: Vec<RequestMessage> = messages.into_iter().map(|m| m.into()).collect();
         let request = ChatRequest {
             model: provider.model.clone(),
@@ -253,6 +259,88 @@ impl SimpleAiService {
             .first()
             .map(|c| c.message.content.clone())
             .context("no choices in response")
+    }
+
+    async fn call_google_api(&self, provider: &ProviderConfig, api_key: &str, messages: Vec<ChatMessage>) -> Result<String> {
+        #[derive(Serialize)]
+        struct GoogleRequest {
+            contents: Vec<Content>,
+        }
+
+        #[derive(Serialize)]
+        struct Content {
+            role: String,
+            parts: Vec<Part>,
+        }
+
+        #[derive(Serialize)]
+        struct Part {
+            text: String,
+        }
+
+        #[derive(Deserialize)]
+        struct GoogleResponse {
+            candidates: Vec<Candidate>,
+        }
+
+        #[derive(Deserialize)]
+        struct Candidate {
+            content: ContentResponse,
+        }
+
+        #[derive(Deserialize)]
+        struct ContentResponse {
+            parts: Vec<TextPart>,
+        }
+
+        #[derive(Deserialize)]
+        struct TextPart {
+            text: String,
+        }
+
+        let google_messages: Vec<Content> = messages
+            .into_iter()
+            .map(|m| Content {
+                role: if m.role == "user" { "user" } else { "model" }.to_string(),
+                parts: vec![Part { text: m.content }],
+            })
+            .collect();
+
+        let request = GoogleRequest {
+            contents: google_messages,
+        };
+
+        let url = format!(
+            "{}/models/{}:generateContent?key={}",
+            provider.endpoint.trim_end_matches('/'),
+            provider.model,
+            api_key
+        );
+
+        let response = self
+            .client
+            .post(&url)
+            .header("Content-Type", "application/json")
+            .json(&request)
+            .timeout(std::time::Duration::from_secs(60))
+            .send()
+            .await
+            .context("google api request failed")?;
+
+        let status = response.status();
+        if !status.is_success() {
+            let text = response.text().await.unwrap_or_default();
+            anyhow::bail!("Google API {}: {}", status, text.chars().take(200).collect::<String>());
+        }
+
+        let google_resp: GoogleResponse = response.json().await.context("parse google response")?;
+
+        google_resp
+            .candidates
+            .first()
+            .and_then(|c| c.content.parts.first())
+            .map(|p| p.text.clone())
+            .context("no text in google response")
     }
 }
 

@@ -15,6 +15,7 @@ endpoint = "https://generativelanguage.googleapis.com/v1beta"
 model = "gemma-3-27b-it"
 auth_header = "x-goog-api-key"
 auth_prefix = ""
+is_google_api = true
 
 [[providers]]
 name = "nvidia"
