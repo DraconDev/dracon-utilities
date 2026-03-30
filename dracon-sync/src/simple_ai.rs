@@ -204,12 +204,11 @@ impl SimpleAiService {
                 Ok(content) => return Ok(content),
                 Err(e) => {
                     let msg = e.to_string().to_lowercase();
-                    if msg.contains("401") || msg.contains("unauthorized") || msg.contains("api key") {
-                        eprintln!("⚠️ AI {}: auth error", pc.name);
+                    eprintln!("⚠️ AI {} failed: {}", pc.name, e);
+                    if msg.contains("401") || msg.contains("unauthorized") || msg.contains("api key") || msg.contains("auth") {
+                        eprintln!("🔑 {}: auth error (check API key)", pc.name);
                     } else if msg.contains("429") || msg.contains("rate limit") {
-                        eprintln!("⚠️ AI {}: rate limited, trying next...", pc.name);
-                    } else {
-                        eprintln!("⚠️ AI {} failed: {}", pc.name, e);
+                        eprintln!("⏳ {}: rate limited, trying next...", pc.name);
                     }
                     last_error = Some(e);
                 }
