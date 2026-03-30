@@ -84,5 +84,12 @@ restart_service dracon-warden.service
 
 echo ""
 echo "AI config: ~/.dracon/ai/"
-echo "  ai.toml          — provider configuration"
+echo "  ai.toml          — provider configuration (copy ai.example.toml if new)"
 echo "  secrets/*.env    — API keys (OPENROUTER_API_KEY, GEMINI_API_KEY, NVIDIA_API_KEY)"
+
+if [ ! -f ~/.dracon/ai.toml ] && [ -f dracon-sync/ai.example.toml ]; then
+    mkdir -p ~/.dracon
+    cp dracon-sync/ai.example.toml ~/.dracon/ai.toml
+    echo ""
+    echo "✅ Copied ai.example.toml → ~/.dracon/ai.toml"
+    echo "   Edit ~/.dracon/ai.toml and set your API keys"
