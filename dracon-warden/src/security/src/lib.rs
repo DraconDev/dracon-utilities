@@ -2034,7 +2034,10 @@ impl DemonSecurity {
 
         let sensitive_exts = [
             ".age", ".key", ".p12", ".pfx", ".pem", ".crt", ".der", ".asc", ".zip", ".tar", ".gz",
-            ".bz2", ".7z", ".rar", ".tgz", ".xz", ".tar.gz", ".tar.bz2", ".tar.xz",
+            ".bz2", ".7z", ".rar", ".tgz", ".xz", ".tar.gz", ".tar.bz2", ".tar.xz", ".sqlite",
+            ".sqlite3", ".db", ".vmdk", ".img", ".qcow2", ".vdi", ".iso", ".docker", ".oci",
+            ".xlsx", ".csv", ".ods", ".kdbx", ".1pif", ".sql", ".apk", ".aab", ".dmg", ".pcap",
+            ".pcapng", ".ovpn",
         ];
 
         let sensitive_filenames = [
@@ -2049,6 +2052,11 @@ impl DemonSecurity {
             "demon-key",
             "id_rsa.pub",
             "id_ed25519.pub",
+            "credentials",
+            ".bash_history",
+            ".zsh_history",
+            ".sh_history",
+            "core",
         ];
 
         let filename = std::path::Path::new(path_str)
