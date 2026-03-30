@@ -738,7 +738,7 @@ pub(crate) async fn run_repair_concerns(
             }
         };
 
-        let has_origin = has_origin_remote(&repo);
+        let mut has_origin = has_origin_remote(&repo);
         let mut has_upstream = has_tracking_upstream(&repo);
         let is_concern = repo_is_concern(&status, has_origin, has_upstream);
         if !is_concern {
@@ -767,21 +767,45 @@ pub(crate) async fn run_repair_concerns(
         );
 
         if !has_origin {
-            manual_only += 1;
-            out!("   manual: NO_ORIGIN (configure remote before sync can repair)");
-            append_incident_record(
-                policy_path,
-                &IncidentRecord {
-                    ts_unix: timestamp_secs(),
-                    scope: "concern".to_string(),
-                    repo: repo.display().to_string(),
-                    reason: reason.clone(),
-                    action: "manual_no_origin".to_string(),
-                    backup_branch: None,
-                    result: "manual".to_string(),
-                    details: Some("configure origin remote".to_string()),
-                },
-            );
+            attempted_ops += 1;
+            out!("   plan: create private bare repo as origin");
+            if apply {
+                if let Some(private_remote) = create_private_remote(&repo) {
+                    succeeded_ops += 1;
+                    has_origin = true;
+                    has_upstream = true;
+                    out!("   ok: created private remote: {}", private_remote);
+                    append_incident_record(
+                        policy_path,
+                        &IncidentRecord {
+                            ts_unix: timestamp_secs(),
+                            scope: "concern".to_string(),
+                            repo: repo.display().to_string(),
+                            reason: reason.clone(),
+                            action: "create_private_remote".to_string(),
+                            backup_branch: None,
+                            result: "ok".to_string(),
+                            details: Some(format!("created private remote: {}", private_remote)),
+                        },
+                    );
+                } else {
+                    manual_only += 1;
+                    out!("   fail: could not create private remote");
+                    append_incident_record(
+                        policy_path,
+                        &IncidentRecord {
+                            ts_unix: timestamp_secs(),
+                            scope: "concern".to_string(),
+                            repo: repo.display().to_string(),
+                            reason: reason.clone(),
+                            action: "create_private_remote".to_string(),
+                            backup_branch: None,
+                            result: "fail".to_string(),
+                            details: Some("failed to create private remote".to_string()),
+                        },
+                    );
+                }
+            }
             continue;
         }
 
