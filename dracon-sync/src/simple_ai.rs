@@ -43,15 +43,24 @@ pub struct AiConfig {
 }
 
 #[derive(Debug, Serialize)]
-struct ChatMessage {
+struct RequestMessage {
     role: String,
     content: String,
+}
+
+impl From<ChatMessage> for RequestMessage {
+    fn from(msg: ChatMessage) -> Self {
+        RequestMessage {
+            role: msg.role,
+            content: msg.content,
+        }
+    }
 }
 
 #[derive(Debug, Serialize)]
 struct ChatRequest {
     model: String,
-    messages: Vec<ChatMessage>,
+    messages: Vec<RequestMessage>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -209,9 +218,10 @@ impl SimpleAiService {
             anyhow::bail!("no API key for {}", provider.env);
         };
 
+        let request_messages: Vec<RequestMessage> = messages.into_iter().map(|m| m.into()).collect();
         let request = ChatRequest {
             model: provider.model.clone(),
-            messages,
+            messages: request_messages,
         };
 
         let url = format!("{}/chat/completions", provider.endpoint.trim_end_matches('/'));
@@ -245,14 +255,5 @@ impl SimpleAiService {
 impl Default for SimpleAiService {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-impl From<ChatMessage> for super::scribe::ChatMessage {
-    fn from(msg: ChatMessage) -> Self {
-        super::scribe::ChatMessage {
-            role: msg.role,
-            content: msg.content,
-        }
     }
 }
