@@ -139,7 +139,8 @@ pub(crate) async fn run_daemon(policy_path: PathBuf) -> Result<()> {
                 policy.max_stage_file_bytes,
             );
             let has_local_or_pending_work =
-                effective_dirty || status.ahead > 0 || status.behind > 0 || !has_origin_remote(&repo);
+                effective_dirty || status.ahead > 0 || status.behind > 0 
+                || !has_origin_remote(&repo) || !has_tracking_upstream(&repo);
             if !has_local_or_pending_work {
                 activity.remove(&repo);
                 continue;
