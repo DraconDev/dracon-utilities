@@ -29,12 +29,6 @@ pub struct ProviderConfig {
     pub auth_prefix: String,
     #[serde(default)]
     pub is_google_api: bool,
-    #[serde(default = "default_enabled")]
-    pub enabled: bool,
-}
-
-fn default_enabled() -> bool {
-    true
 }
 
 fn default_auth_header() -> String {
@@ -106,10 +100,6 @@ impl SimpleAiService {
         };
 
         for pc in &config.providers {
-            if !pc.enabled {
-                eprintln!("📡 AI: {} disabled", pc.name);
-                continue;
-            }
             let name = &pc.name;
             if let Some(_key) = Self::get_api_key(&pc.env) {
                 eprintln!("📡 AI: {} ready (key found)", name);
@@ -121,7 +111,7 @@ impl SimpleAiService {
         let active_providers: Vec<ProviderConfig> = config
             .providers
             .into_iter()
-            .filter(|p| p.enabled)
+            .filter(|p| Self::get_api_key(&p.env).is_some())
             .collect();
 
         Self {
