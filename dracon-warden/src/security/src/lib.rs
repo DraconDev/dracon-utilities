@@ -2037,7 +2037,30 @@ impl DemonSecurity {
             ".bz2", ".7z", ".rar", ".tgz", ".xz", ".tar.gz", ".tar.bz2", ".tar.xz", ".sqlite",
             ".sqlite3", ".db", ".vmdk", ".img", ".qcow2", ".vdi", ".iso", ".docker", ".oci",
             ".xlsx", ".csv", ".ods", ".kdbx", ".1pif", ".sql", ".apk", ".aab", ".dmg", ".pcap",
-            ".pcapng", ".ovpn",
+            ".pcapng", ".ovpn", ".tfstate", ".tfplan", ".tfvars",
+        ];
+
+        let sensitive_filenames = [
+            "id_rsa",
+            "id_ed25519",
+            "id_ecdsa",
+            "id_dsa",
+            "id_xmss",
+            "master.age",
+            "identity.age",
+            "owner.age",
+            "demon-key",
+            "id_rsa.pub",
+            "id_ed25519.pub",
+            "credentials",
+            ".bash_history",
+            ".zsh_history",
+            ".sh_history",
+            "core",
+            "known_hosts",
+            "vault.yml",
+            ".terraform.lock.hcl",
+            "terraform.tfvars",
         ];
 
         let sensitive_filenames = [
