@@ -1,6 +1,6 @@
 # AI Provider Configuration
-# Providers are tried in order until one succeeds (failover)
-# Copy to ~/.dracon/ai.toml and set your API keys via env vars
+# Order matters - providers are tried in order until one succeeds
+# Copy to ~/.dracon/utilities/sync/ai.toml and set your API keys
 
 [[providers]]
 name = "openrouter"
@@ -9,10 +9,10 @@ endpoint = "https://openrouter.ai/api/v1"
 model = "openrouter/free"
 
 [[providers]]
-name = "gemini"
-env = "GEMINI_API_KEY"
+name = "gemma"
+env = "GOOGLE_API_KEY"
 endpoint = "https://generativelanguage.googleapis.com/v1beta"
-model = "gemini-2.0-flash-exp"
+model = "gemma-3-27b-it"
 auth_header = "x-goog-api-key"
 auth_prefix = ""
 
@@ -20,4 +20,4 @@ auth_prefix = ""
 name = "nvidia"
 env = "NVIDIA_API_KEY"
 endpoint = "https://integrate.api.nvidia.com/v1"
-model = "nvidia/llama-3.3-nemotron-70b-instruct"
+model = "nvidia/nemotron-3-nano-30b-a3b"
