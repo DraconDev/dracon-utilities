@@ -353,6 +353,25 @@ impl SecretScanner {
                 r"AGE-SECRET-KEY-1[QPZRY9X8GF2TVDW0S3JN54KHCE6MUA7L]{58}",
             ),
             // ============================================================
+            // AI / Cloud Provider API Keys
+            // ============================================================
+            ("NVIDIA API Key", r"nvapi-[A-Za-z0-9_-]{20,}"),
+            ("OpenRouter API Key", r"sk-or-v1-[A-Za-z0-9_-]{20,}"),
+            ("MiniMax API Key", r"sk-cp-[A-Za-z0-9_-]{20,}"),
+            ("Modal API Key", r"modalresearch_[A-Za-z0-9_-]{20,}"),
+            ("Resend API Key", r"re_[A-Za-Z0-9_-]{20,}"),
+            ("Together AI API Key", r"tly_[A-Za-Z0-9_-]{20,}"),
+            ("Groq API Key", r"gsk_[A-Za-z0-9_-]{20,}"),
+            ("DeepSeek API Key", r"sk-[A-Za-z0-9]{20,}"),
+            ("Mistral API Key", r"[A-Za-z0-9_-]{20,}"),
+            // Cloudflare R2
+            ("Cloudflare R2 Account ID", r"[0-9a-f]{32}"),
+            ("Cloudflare R2 Access Key", r"[0-9a-f]{20}"),
+            ("Cloudflare R2 Secret Key", r"[a-f0-9]{40}"),
+            // Backblaze B2
+            ("Backblaze B2 Key ID", r"0055[a-f0-9]{16}"),
+            ("Backblaze B2 Application Key", r"K005[a-zA-Z0-9]{20,}"),
+            // ============================================================
             // Generic High-Entropy / Passwords
             // ============================================================
             (
