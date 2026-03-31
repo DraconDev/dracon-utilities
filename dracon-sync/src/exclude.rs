@@ -83,6 +83,37 @@ pub(crate) fn is_excluded_file(file_path: &Path, excluded_patterns: &[String]) -
     false
 }
 
+/// Check if a path is a gitlink (mode 160000) with an unchanged pointer.
+/// Returns true if the entry is a submodule-like directory whose HEAD commit
+/// matches what the parent repo tracks, meaning the "dirty" state is just
+/// the submodule's own working tree being dirty (not a pointer change).
+fn is_gitlink_unchanged(repo: &Path, path: &Path) -> bool {
+    let output = std::process::Command::new("git")
+        .current_dir(repo)
+        .args(["ls-tree", "HEAD", "--"])
+        .arg(path)
+        .output();
+    let Ok(out) = output else { return false };
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    // Format: "160000 commit <sha>\t<path>"
+    if !stdout.starts_with("160000 ") {
+        return false;
+    }
+    let Some(sha) = stdout.split_whitespace().nth(2) else {
+        return false;
+    };
+    // Check if the submodule's current HEAD matches the tracked sha
+    let sub_output = std::process::Command::new("git")
+        .current_dir(repo.join(path))
+        .args(["rev-parse", "HEAD"])
+        .output();
+    let Ok(sub_out) = sub_output else {
+        return false;
+    };
+    let sub_sha = String::from_utf8_lossy(&sub_out.stdout).trim().to_string();
+    sub_sha == sha
+}
+
 pub(crate) fn should_stage_entry(
     repo: &Path,
     entry: &dracon_git::types::DiffFile,
@@ -117,7 +148,14 @@ pub(crate) fn should_stage_entry(
             }
             true
         }
-        Ok(meta) if meta.is_dir() => true,
+        Ok(meta) if meta.is_dir() => {
+            // Skip gitlink entries with unchanged pointers (dirty submodule
+            // working trees that don't represent a pointer change)
+            if is_gitlink_unchanged(repo, &entry.path) {
+                return false;
+            }
+            true
+        }
         Ok(_) => true,
         Err(_) => {
             // File doesn't exist on disk
@@ -282,6 +320,10 @@ pub(crate) fn has_sync_relevant_dirty_entries(
     max_stage_file_bytes: u64,
 ) -> bool {
     entries.iter().any(|entry| {
+        // Skip gitlink entries with unchanged pointers entirely
+        if entry.path.is_dir() && is_gitlink_unchanged(repo, &entry.path) {
+            return false;
+        }
         should_stage_entry(
             repo,
             entry,
