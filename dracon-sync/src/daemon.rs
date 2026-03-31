@@ -11,6 +11,27 @@ use crate::git::{discover_git_repos, repo_diff_entries, has_origin_remote, has_t
 use crate::report::{ConcernRepairFilter, RepairSummary, run_repair_concerns, run_repair_warns};
 use crate::sync::sync_repo;
 
+/// Get the list of files that actually differ from HEAD (filter-aware).
+/// Unlike `git status`, `git diff HEAD` applies clean filters and correctly
+/// ignores files that only differ due to smudge filter decryption.
+async fn git_diff_head_files(repo: &Path) -> Vec<String> {
+    let repo = repo.to_path_buf();
+    tokio::task::spawn_blocking(move || {
+        let output = std::process::Command::new("git")
+            .current_dir(&repo)
+            .args(["diff", "HEAD", "--name-only", "-z"])
+            .output();
+        let Ok(out) = output else { return Vec::new() };
+        String::from_utf8_lossy(&out.stdout)
+            .split('\0')
+            .filter(|s| !s.is_empty())
+            .map(String::from)
+            .collect()
+    })
+    .await
+    .unwrap_or_default()
+}
+
 pub(crate) async fn run_once(policy_path: &Path) -> Result<()> {
     if let Some(reason) = freeze_reason(policy_path) {
         println!("⏸️ sync frozen ({})", reason);
