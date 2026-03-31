@@ -83,6 +83,7 @@ pub(crate) async fn run_daemon(policy_path: PathBuf) -> Result<()> {
 
     let mut activity: HashMap<PathBuf, RepoActivity> = HashMap::new();
     let mut repair_cooldowns: HashMap<PathBuf, Instant> = HashMap::new();
+    let mut filter_cooldowns: HashMap<PathBuf, Instant> = HashMap::new();
 
     loop {
         let policy = match SyncPolicy::load(&policy_path) {
@@ -115,6 +116,12 @@ pub(crate) async fn run_daemon(policy_path: PathBuf) -> Result<()> {
                     continue;
                 }
                 repair_cooldowns.remove(&repo);
+            }
+            if let Some(until) = filter_cooldowns.get(&repo).copied() {
+                if now < until {
+                    continue;
+                }
+                filter_cooldowns.remove(&repo);
             }
             let svc = match GitService::new(&repo) {
                 Ok(svc) => svc,
@@ -265,7 +272,29 @@ pub(crate) async fn run_daemon(policy_path: PathBuf) -> Result<()> {
 
             if sync_success {
                 entry.failure_count = 0;
-                activity.remove(&repo);
+                // Re-check if repo is still dirty (filter-only changes persist).
+                // If so, use a long cooldown instead of removing from activity
+                // to prevent tight triage loops on phantom changes.
+                let entries_after = repo_diff_entries(&repo).await.unwrap_or_default();
+                let still_dirty = has_sync_relevant_dirty_entries(
+                    &repo,
+                    &entries_after,
+                    &excluded_dir_names,
+                    &policy.exclude_file_patterns,
+                    policy.max_stage_file_bytes,
+                );
+                if still_dirty {
+                    // Repo is still dirty after sync - likely filter-only changes.
+                    // Set a long cooldown (5x repair cooldown) to avoid tight loops.
+                    let cooldown_secs = policy.repair_cooldown_secs.max(60) * 5;
+                    entry.changed_at = now + Duration::from_secs(cooldown_secs);
+                    entry.fingerprint = format!("{}:cooldown", entry.fingerprint);
+                    if debug_enabled() {
+                        eprintln!("🐛 {} filter-only dirty, cooldown {}s", repo.display(), cooldown_secs);
+                    }
+                } else {
+                    activity.remove(&repo);
+                }
             } else {
                 entry.failure_count += 1;
             }
