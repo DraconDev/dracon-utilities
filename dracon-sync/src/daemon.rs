@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 use tokio::time::sleep;
 
-use crate::policy::{SyncPolicy, freeze_reason};
+use crate::policy::{SyncPolicy, freeze_reason, debug_enabled};
 use crate::exclude::{excluded_dir_names_set, has_sync_relevant_dirty_entries};
 use crate::git::{discover_git_repos, repo_diff_entries, has_origin_remote, has_tracking_upstream};
 use crate::report::{ConcernRepairFilter, RepairSummary, run_repair_concerns, run_repair_warns};
