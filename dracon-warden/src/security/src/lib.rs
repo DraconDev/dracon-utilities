@@ -2095,6 +2095,7 @@ impl DemonSecurity {
         let is_sensitive_location = sensitive_dirs.iter().any(|dir| path_str.contains(dir))
             || sensitive_exts.iter().any(|ext| path_str.ends_with(ext))
             || sensitive_filenames.contains(&filename)
+            || sensitive_filenames.iter().any(|p| filename.starts_with(p))
             || self
                 .managed_patterns
                 .iter()
