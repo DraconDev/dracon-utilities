@@ -2083,25 +2083,6 @@ impl DemonSecurity {
             ".env",
         ];
 
-        let sensitive_filenames = [
-            "id_rsa",
-            "id_ed25519",
-            "id_ecdsa",
-            "id_dsa",
-            "id_xmss",
-            "master.age",
-            "identity.age",
-            "owner.age",
-            "demon-key",
-            "id_rsa.pub",
-            "id_ed25519.pub",
-            "credentials",
-            ".bash_history",
-            ".zsh_history",
-            ".sh_history",
-            "core",
-        ];
-
         let filename = std::path::Path::new(path_str)
             .file_name()
             .and_then(|s| s.to_str())
