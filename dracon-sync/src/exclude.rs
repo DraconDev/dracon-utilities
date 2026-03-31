@@ -99,13 +99,17 @@ fn is_gitlink_unchanged(repo: &Path, path: &Path) -> bool {
     if !stdout.starts_with("160000 ") {
         return false;
     }
-    let Some(sha) = stdout.split_whitespace().nth(2) else { return false };
+    let Some(sha) = stdout.split_whitespace().nth(2) else {
+        return false;
+    };
     // Check if the submodule's current HEAD matches the tracked sha
     let sub_output = std::process::Command::new("git")
         .current_dir(repo.join(path))
         .args(["rev-parse", "HEAD"])
         .output();
-    let Ok(sub_out) = sub_output else { return false };
+    let Ok(sub_out) = sub_output else {
+        return false;
+    };
     let sub_sha = String::from_utf8_lossy(&sub_out.stdout).trim().to_string();
     sub_sha == sha
 }
@@ -139,20 +143,6 @@ fn is_filter_only_change(repo: &Path, path: &Path) -> bool {
         .output();
     // If nothing in diff output, clean filter matched HEAD
     stdout.is_empty()
-}
-    let Some(sha) = stdout.split_whitespace().nth(2) else {
-        return false;
-    };
-    // Check if the submodule's current HEAD matches the tracked sha
-    let sub_output = std::process::Command::new("git")
-        .current_dir(repo.join(path))
-        .args(["rev-parse", "HEAD"])
-        .output();
-    let Ok(sub_out) = sub_output else {
-        return false;
-    };
-    let sub_sha = String::from_utf8_lossy(&sub_out.stdout).trim().to_string();
-    sub_sha == sha
 }
 
 pub(crate) fn should_stage_entry(
