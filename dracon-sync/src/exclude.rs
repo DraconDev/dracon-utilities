@@ -99,6 +99,47 @@ fn is_gitlink_unchanged(repo: &Path, path: &Path) -> bool {
     if !stdout.starts_with("160000 ") {
         return false;
     }
+    let Some(sha) = stdout.split_whitespace().nth(2) else { return false };
+    // Check if the submodule's current HEAD matches the tracked sha
+    let sub_output = std::process::Command::new("git")
+        .current_dir(repo.join(path))
+        .args(["rev-parse", "HEAD"])
+        .output();
+    let Ok(sub_out) = sub_output else { return false };
+    let sub_sha = String::from_utf8_lossy(&sub_out.stdout).trim().to_string();
+    sub_sha == sha
+}
+
+/// Check if a modified file only differs from HEAD due to clean/smudge filters.
+/// Runs `git add` on the file and checks if `git diff --cached` is empty for it.
+/// If empty, the clean filter made the working tree content match HEAD (filter-only change).
+fn is_filter_only_change(repo: &Path, path: &Path) -> bool {
+    // Stage the file
+    let add_result = std::process::Command::new("git")
+        .current_dir(repo)
+        .args(["add", "--"])
+        .arg(path)
+        .output();
+    if add_result.is_err() {
+        return false;
+    }
+    // Check if anything is staged for this path
+    let diff_result = std::process::Command::new("git")
+        .current_dir(repo)
+        .args(["diff", "--cached", "--name-only", "--"])
+        .arg(path)
+        .output();
+    let Ok(out) = diff_result else { return false };
+    let stdout = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    // Unstage the file to restore index state
+    let _ = std::process::Command::new("git")
+        .current_dir(repo)
+        .args(["reset", "HEAD", "--"])
+        .arg(path)
+        .output();
+    // If nothing in diff output, clean filter matched HEAD
+    stdout.is_empty()
+}
     let Some(sha) = stdout.split_whitespace().nth(2) else {
         return false;
     };
