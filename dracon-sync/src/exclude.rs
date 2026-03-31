@@ -372,7 +372,8 @@ pub(crate) fn has_sync_relevant_dirty_entries(
 ) -> bool {
     entries.iter().any(|entry| {
         // Skip gitlink entries with unchanged pointers entirely
-        if entry.path.is_dir() && is_gitlink_unchanged(repo, &entry.path) {
+        // Use repo.join() because entry.path is relative to repo, not CWD
+        if repo.join(&entry.path).is_dir() && is_gitlink_unchanged(repo, &entry.path) {
             return false;
         }
         should_stage_entry(

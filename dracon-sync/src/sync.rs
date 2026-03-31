@@ -195,7 +195,8 @@ pub(crate) async fn sync_repo(
             .into_iter()
             .filter(|e| {
                 // Skip gitlink entries with unchanged pointers entirely
-                if e.path.is_dir() && crate::exclude::is_gitlink_unchanged(repo, &e.path) {
+                // Use repo.join() because e.path is relative to repo, not CWD
+                if repo.join(&e.path).is_dir() && crate::exclude::is_gitlink_unchanged(repo, &e.path) {
                     return false;
                 }
                 true
@@ -353,7 +354,7 @@ pub(crate) async fn sync_repo(
             // Skip gitlink entries (dirty submodules can't be restored this way)
             let restorable: Vec<_> = to_restore.iter()
                 .filter(|e| can_restore_entry(e))
-                .filter(|e| !e.path.is_dir() || !crate::exclude::is_gitlink_unchanged(repo, &e.path))
+                .filter(|e| !repo.join(&e.path).is_dir() || !crate::exclude::is_gitlink_unchanged(repo, &e.path))
                 .collect();
 
             handle_large_untracked(repo, &to_restore, policy)?;
@@ -424,7 +425,7 @@ pub(crate) async fn sync_repo(
         // Skip gitlink entries (dirty submodules can't be restored this way)
         let restorable: Vec<_> = to_restore.iter()
             .filter(|e| can_restore_entry(e))
-            .filter(|e| !e.path.is_dir() || !crate::exclude::is_gitlink_unchanged(repo, &e.path))
+            .filter(|e| !repo.join(&e.path).is_dir() || !crate::exclude::is_gitlink_unchanged(repo, &e.path))
             .collect();
         let gitignore_updated = handle_large_untracked(repo, &to_restore, policy)?;
 
