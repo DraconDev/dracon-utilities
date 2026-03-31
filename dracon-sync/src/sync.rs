@@ -125,6 +125,42 @@ pub(crate) async fn sync_repo(
 
     let mut status = svc.get_status().await?;
     let mut entries = svc.get_diff_entries().await?;
+
+    // Filter out entries that only differ due to clean/smudge filters.
+    // `git diff HEAD` applies clean filters and correctly ignores filter-only changes.
+    {
+        let diff_output = tokio::task::spawn_blocking({
+            let repo = repo.to_path_buf();
+            move || {
+                std::process::Command::new("git")
+                    .current_dir(&repo)
+                    .args(["diff", "HEAD", "--name-only", "-z"])
+                    .output()
+                    .ok()
+                    .map(|o| {
+                        String::from_utf8_lossy(&o.stdout)
+                            .split('\0')
+                            .filter(|s| !s.is_empty())
+                            .map(String::from)
+                            .collect::<Vec<_>>()
+                    })
+                    .unwrap_or_default()
+            }
+        }).await.unwrap_or_default();
+        if diff_output.is_empty() && !entries.is_empty() {
+            // git diff HEAD returned nothing - all changes are filter-only
+            entries.clear();
+            status.is_clean = true;
+        } else {
+            entries.retain(|e| {
+                if !matches!(e.status, dracon_git::types::FileStatus::Modified) {
+                    return true;
+                }
+                diff_output.contains(&e.path.to_string_lossy().to_string())
+            });
+        }
+    }
+
     if debug_enabled() {
         eprintln!(
             "🐛 {} status: clean={} modified={} staged={} entries(libgit2)={}",
