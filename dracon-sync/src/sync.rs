@@ -189,8 +189,17 @@ pub(crate) async fn sync_repo(
 
     if !status.is_clean && policy.auto_commit {
         let entries_len = entries.len();
+        // Partition into stage/restore/ignore. Gitlinks with unchanged pointers
+        // should be ignored entirely (they appear dirty but can't be staged or restored).
         let (to_stage, to_restore): (Vec<_>, Vec<_>) = entries
             .into_iter()
+            .filter(|e| {
+                // Skip gitlink entries with unchanged pointers entirely
+                if e.path.is_dir() && crate::exclude::is_gitlink_unchanged(repo, &e.path) {
+                    return false;
+                }
+                true
+            })
             .partition(|e| {
                 should_stage_entry(repo, e, excluded_dir_names, &policy.exclude_file_patterns, policy.max_stage_file_bytes)
             });
