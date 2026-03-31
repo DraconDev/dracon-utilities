@@ -93,16 +93,24 @@ pub(crate) fn is_gitlink_unchanged(repo: &Path, path: &Path) -> bool {
         .args(["ls-tree", "HEAD", "--"])
         .arg(path)
         .output();
-    let Ok(out) = output else {
-        eprintln!("🐛 gitlink check: ls-tree failed for {}", path.display());
-        return false;
-    };
+    let Ok(out) = output else { return false };
     let stdout = String::from_utf8_lossy(&out.stdout);
     // Format: "160000 commit <sha>\t<path>"
     if !stdout.starts_with("160000 ") {
-        eprintln!("🐛 gitlink check: not a gitlink: '{}'", stdout.trim());
         return false;
     }
+    let Some(sha) = stdout.split_whitespace().nth(2) else {
+        return false;
+    };
+    // Check if the submodule's current HEAD matches the tracked sha
+    let sub_output = std::process::Command::new("git")
+        .current_dir(repo.join(path))
+        .args(["rev-parse", "HEAD"])
+        .output();
+    let Ok(sub_out) = sub_output else { return false };
+    let sub_sha = String::from_utf8_lossy(&sub_out.stdout).trim().to_string();
+    sub_sha == sha
+}
     let Some(sha) = stdout.split_whitespace().nth(2) else {
         eprintln!(
             "🐛 gitlink check: can't parse sha from: '{}'",

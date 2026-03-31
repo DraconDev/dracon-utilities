@@ -188,10 +188,6 @@ pub(crate) async fn run_daemon(policy_path: PathBuf) -> Result<()> {
                 &policy.exclude_file_patterns,
                 policy.max_stage_file_bytes,
             );
-            if repo.display().to_string().contains("Remi") || repo.display().to_string().contains("extensions") {
-                eprintln!("🐛 {} entries={} effective_dirty={} diff_head={}",
-                    repo.display(), entries.len(), effective_dirty, entries.iter().map(|e| e.path.display().to_string()).collect::<Vec<_>>().join(","));
-            }
             let has_local_or_pending_work =
                 effective_dirty || status.ahead > 0 || status.behind > 0 
                 || !has_origin_remote(&repo) || !has_tracking_upstream(&repo);
