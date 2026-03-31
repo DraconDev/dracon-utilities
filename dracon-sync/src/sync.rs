@@ -412,7 +412,11 @@ pub(crate) async fn sync_repo(
         }
         // All changes were filtered out (excluded dirs, oversized files, etc.)
         // Restore modified files to avoid perpetual dirty state. Untracked files can't be restored.
-        let restorable: Vec<_> = to_restore.iter().filter(|e| can_restore_entry(e)).collect();
+        // Skip gitlink entries (dirty submodules can't be restored this way)
+        let restorable: Vec<_> = to_restore.iter()
+            .filter(|e| can_restore_entry(e))
+            .filter(|e| !e.path.is_dir() || !crate::exclude::is_gitlink_unchanged(repo, &e.path))
+            .collect();
         let gitignore_updated = handle_large_untracked(repo, &to_restore, policy)?;
 
         let other_untracked: Vec<_> = to_restore
