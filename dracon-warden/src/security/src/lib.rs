@@ -2099,8 +2099,23 @@ impl DemonSecurity {
         // 2. Process based on content type
         match std::str::from_utf8(content) {
             Ok(text_content) => {
-                // UTF-8: ALWAYS use targeted replacement (The "Good Logic").
-                // We never nuke the whole file if it's text, to preserve git diffs.
+                // Full encryption for sensitive files that shouldn't leak structure
+                let is_full_encrypt = is_sensitive_location
+                    && (filename == ".env"
+                        || filename == "credentials"
+                        || filename == ".bash_history"
+                        || filename == ".zsh_history"
+                        || filename == ".sh_history"
+                        || filename == "vault.yml");
+                if is_full_encrypt {
+                    // Don't double-encrypt
+                    if content.starts_with(HEADER_V2_MAGIC)
+                        || self.starts_with_any_secret_tag(content)
+                    {
+                        return Ok(content.to_vec());
+                    }
+                    return self.encrypt_v2_to_b64_tag(content);
+                }
                 // For identity files (master.age, identity.age), use a scanner that
                 // skips age key patterns to avoid encrypting the identity itself,
                 // but still catches other embedded secrets like API keys.
