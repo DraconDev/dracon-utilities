@@ -341,7 +341,11 @@ pub(crate) async fn sync_repo(
             eprintln!("📝 committed {} file(s) in {}", committed_entries.len(), repo.display());
 
             // Restore any excluded modified paths that weren't committed
-            let restorable: Vec<_> = to_restore.iter().filter(|e| can_restore_entry(e)).collect();
+            // Skip gitlink entries (dirty submodules can't be restored this way)
+            let restorable: Vec<_> = to_restore.iter()
+                .filter(|e| can_restore_entry(e))
+                .filter(|e| !e.path.is_dir() || !crate::exclude::is_gitlink_unchanged(repo, &e.path))
+                .collect();
 
             handle_large_untracked(repo, &to_restore, policy)?;
 
