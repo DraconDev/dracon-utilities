@@ -2105,11 +2105,11 @@ impl DemonSecurity {
             Ok(text_content) => {
                 // Full encryption for sensitive files that shouldn't leak structure
                 let is_full_encrypt = is_sensitive_location
-                    && (filename == ".env"
+                    && (filename.starts_with(".env")
                         || filename == "credentials"
-                        || filename == ".bash_history"
-                        || filename == ".zsh_history"
-                        || filename == ".sh_history"
+                        || filename.starts_with(".bash_history")
+                        || filename.starts_with(".zsh_history")
+                        || filename.starts_with(".sh_history")
                         || filename == "vault.yml");
                 if is_full_encrypt {
                     // Don't double-encrypt
