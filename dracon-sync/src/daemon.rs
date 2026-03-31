@@ -139,6 +139,27 @@ pub(crate) async fn run_daemon(policy_path: PathBuf) -> Result<()> {
                 }
             };
             let entries = repo_diff_entries(&repo).await.unwrap_or_default();
+            // Filter out entries that only differ due to clean/smudge filters.
+            // `git status` shows filter-processed files as modified, but `git diff HEAD`
+            // correctly applies the clean filter and shows no diff for such files.
+            let diff_head_files = git_diff_head_files(&repo).await;
+            let entries: Vec<_> = if diff_head_files.is_empty() && !entries.is_empty() {
+                // git diff HEAD returned nothing - all changes are filter-only.
+                // Keep only deleted/added entries (git diff HEAD shows these too,
+                // so empty means truly nothing differs)
+                Vec::new()
+            } else {
+                entries.into_iter()
+                    .filter(|e| {
+                        // Always keep non-modified entries (added, deleted, etc.)
+                        // For modified entries, only keep if git diff HEAD shows them
+                        if !matches!(e.status, dracon_git::types::FileStatus::Modified) {
+                            return true;
+                        }
+                        diff_head_files.contains(&e.path.to_string_lossy().to_string())
+                    })
+                    .collect()
+            };
             let effective_dirty = has_sync_relevant_dirty_entries(
                 &repo,
                 &entries,
