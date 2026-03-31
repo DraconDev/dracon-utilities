@@ -753,9 +753,10 @@ impl DemonSecurity {
     }
 
     fn starts_with_any_secret_tag(&self, content: &[u8]) -> bool {
+        let trimmed = content.strip_suffix(b"\n").unwrap_or(content);
         self.secret_tag_prefixes()
             .iter()
-            .any(|prefix| content.starts_with(prefix.as_bytes()) && content.ends_with(b"]"))
+            .any(|prefix| trimmed.starts_with(prefix.as_bytes()) && trimmed.ends_with(b"]"))
     }
 
     pub fn get_identity_path() -> PathBuf {
