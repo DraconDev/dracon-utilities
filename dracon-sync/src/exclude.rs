@@ -87,7 +87,7 @@ pub(crate) fn is_excluded_file(file_path: &Path, excluded_patterns: &[String]) -
 /// Returns true if the entry is a submodule-like directory whose HEAD commit
 /// matches what the parent repo tracks, meaning the "dirty" state is just
 /// the submodule's own working tree being dirty (not a pointer change).
-fn is_gitlink_unchanged(repo: &Path, path: &Path) -> bool {
+pub(crate) fn is_gitlink_unchanged(repo: &Path, path: &Path) -> bool {
     let output = std::process::Command::new("git")
         .current_dir(repo)
         .args(["ls-tree", "HEAD", "--"])
