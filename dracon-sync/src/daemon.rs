@@ -102,6 +102,7 @@ pub(crate) async fn run_daemon(policy_path: PathBuf) -> Result<()> {
         let repo_set: BTreeSet<PathBuf> = repos.iter().cloned().collect();
         activity.retain(|repo, _| repo_set.contains(repo));
         repair_cooldowns.retain(|repo, _| repo_set.contains(repo));
+        filter_cooldowns.retain(|repo, _| repo_set.contains(repo));
 
         if let Some(reason) = freeze_reason(&policy_path) {
             println!("⏸️ sync daemon paused ({})", reason);
@@ -284,17 +285,16 @@ pub(crate) async fn run_daemon(policy_path: PathBuf) -> Result<()> {
                     policy.max_stage_file_bytes,
                 );
                 if still_dirty {
-                    // Repo is still dirty after sync - likely filter-only changes.
-                    // Set a long cooldown (5x repair cooldown) to avoid tight loops.
                     let cooldown_secs = policy.repair_cooldown_secs.max(60) * 5;
-                    entry.changed_at = now + Duration::from_secs(cooldown_secs);
-                    entry.fingerprint = format!("{}:cooldown", entry.fingerprint);
+                    filter_cooldowns.insert(
+                        repo.clone(),
+                        Instant::now() + Duration::from_secs(cooldown_secs),
+                    );
                     if debug_enabled() {
                         eprintln!("🐛 {} filter-only dirty, cooldown {}s", repo.display(), cooldown_secs);
                     }
-                } else {
-                    activity.remove(&repo);
                 }
+                activity.remove(&repo);
             } else {
                 entry.failure_count += 1;
             }
