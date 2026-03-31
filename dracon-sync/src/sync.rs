@@ -274,6 +274,19 @@ pub(crate) async fn sync_repo(
                 .map(|(path, status)| dracon_git::types::DiffFile { path, status })
                 .collect();
 
+            // If nothing is staged (all changes were filter-only, e.g. smudge filter
+            // decrypting encrypted files), skip commit entirely. The working tree will
+            // still appear "dirty" due to the smudge filter, which is harmless.
+            if committed_entries.is_empty() {
+                // Unstage anything that was added (index already matches HEAD for
+                // filter-only changes, but be safe)
+                let _ = run_git_with_timeout(repo, &["reset", "HEAD", "--"], 10, "reset").await;
+                if debug_enabled() {
+                    eprintln!("🐛 {} skipped commit: all changes were filter-only (smudge/clean)", repo.display());
+                }
+                return Ok(true);
+            }
+
             let signals = detect_report_signals(repo, &committed_entries);
             let is_report = !signals.is_empty();
 
