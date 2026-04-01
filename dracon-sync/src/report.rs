@@ -685,16 +685,19 @@ pub(crate) async fn run_repair_concerns(
     let policy = SyncPolicy::load(policy_path)?;
     let roots = policy.watch_root_paths();
     let excluded_dir_names = excluded_dir_names_set(&policy);
-    let mut repos = discover_git_repos(&roots, &excluded_dir_names);
-    if let Some(target_repo) = only_repo {
-        repos.retain(|r| r == &target_repo);
-        if repos.is_empty() {
+    let mut repos = if let Some(target_repo) = &only_repo {
+        vec![target_repo.clone()]
+    } else {
+        discover_git_repos(&roots, &excluded_dir_names)
+    };
+    if repos.is_empty() {
+        if let Some(target_repo) = &only_repo {
             out!(
                 "⚠️ target repo not discovered in policy roots: {}",
                 target_repo.display()
             );
-            return Ok(RepairSummary::default());
         }
+        return Ok(RepairSummary::default());
     }
     let push_timeout_secs = push_timeout_override
         .unwrap_or(policy.push_op_timeout_secs)
@@ -1384,16 +1387,19 @@ pub(crate) async fn run_repair_warns(
     let policy = SyncPolicy::load(policy_path)?;
     let roots = policy.watch_root_paths();
     let excluded_dir_names = excluded_dir_names_set(&policy);
-    let mut repos = discover_git_repos(&roots, &excluded_dir_names);
-    if let Some(target_repo) = only_repo {
-        repos.retain(|r| r == &target_repo);
-        if repos.is_empty() {
+    let mut repos = if let Some(target_repo) = &only_repo {
+        vec![target_repo.clone()]
+    } else {
+        discover_git_repos(&roots, &excluded_dir_names)
+    };
+    if repos.is_empty() {
+        if let Some(target_repo) = &only_repo {
             out!(
                 "⚠️ target repo not discovered in policy roots: {}",
                 target_repo.display()
             );
-            return Ok(RepairSummary::default());
         }
+        return Ok(RepairSummary::default());
     }
 
     let mut warns = 0usize;
