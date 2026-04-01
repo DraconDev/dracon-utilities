@@ -11,6 +11,17 @@ use crate::git::{discover_git_repos, repo_diff_entries, has_origin_remote, has_t
 use crate::report::{ConcernRepairFilter, RepairSummary, run_repair_concerns, run_repair_warns};
 use crate::sync::sync_repo;
 
+/// Send systemd watchdog keepalive ping.
+fn notify_watchdog() {
+    if let Ok(addr) = std::env::var("NOTIFY_SOCKET") {
+        if !addr.is_empty() {
+            let _ = std::process::Command::new("systemd-notify")
+                .arg("WATCHDOG=1")
+                .status();
+        }
+    }
+}
+
 /// Get the list of files that actually differ from HEAD (filter-aware).
 /// Unlike `git status`, `git diff HEAD` applies clean filters and correctly
 /// ignores files that only differ due to smudge filter decryption.
