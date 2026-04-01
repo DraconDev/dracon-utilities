@@ -300,7 +300,7 @@ pub(crate) async fn run_daemon(policy_path: PathBuf) -> Result<()> {
             };
 
             let mut should_cooldown = false;
-            if policy.auto_repair_concerns {
+            if policy.auto_repair_concerns && sync_success {
                 match run_repair_concerns(
                     &policy_path,
                     true,
