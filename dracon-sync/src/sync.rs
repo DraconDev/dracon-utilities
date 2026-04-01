@@ -129,24 +129,30 @@ pub(crate) async fn sync_repo(
     // Filter out entries that only differ due to clean/smudge filters.
     // `git diff HEAD` applies clean filters and correctly ignores filter-only changes.
     {
-        let diff_output = tokio::task::spawn_blocking({
-            let repo = repo.to_path_buf();
-            move || {
-                std::process::Command::new("git")
-                    .current_dir(&repo)
-                    .args(["diff", "HEAD", "--name-only", "-z"])
-                    .output()
-                    .ok()
-                    .map(|o| {
-                        String::from_utf8_lossy(&o.stdout)
-                            .split('\0')
-                            .filter(|s| !s.is_empty())
-                            .map(String::from)
-                            .collect::<Vec<_>>()
-                    })
-                    .unwrap_or_default()
-            }
-        }).await.unwrap_or_default();
+        let diff_output = match tokio::time::timeout(
+            std::time::Duration::from_secs(30),
+            tokio::task::spawn_blocking({
+                let repo = repo.to_path_buf();
+                move || {
+                    std::process::Command::new("git")
+                        .current_dir(&repo)
+                        .args(["diff", "HEAD", "--name-only", "-z"])
+                        .output()
+                        .ok()
+                        .map(|o| {
+                            String::from_utf8_lossy(&o.stdout)
+                                .split('\0')
+                                .filter(|s| !s.is_empty())
+                                .map(String::from)
+                                .collect::<Vec<_>>()
+                        })
+                        .unwrap_or_default()
+                }
+            }),
+        ).await {
+            Ok(Ok(files)) => files,
+            _ => Vec::new(), // timeout - skip filter
+        };
         if diff_output.is_empty() && !entries.is_empty() {
             // git diff HEAD returned nothing - all changes are filter-only
             entries.clear();
