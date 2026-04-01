@@ -135,12 +135,7 @@ pub(crate) async fn run_daemon(policy_path: PathBuf) -> Result<()> {
 
         if let Some(reason) = freeze_reason(&policy_path) {
             println!("⏸️ sync daemon paused ({})", reason);
-        let cycle_ms = cycle_start.elapsed().as_millis();
-        if cycle_ms > 1000 {
-            eprintln!("⏱️ cycle took {}ms ({} repos)", cycle_ms, repo_set.len());
-        }
-
-        sleep(Duration::from_secs(scan_interval)).await;
+            sleep(Duration::from_secs(scan_interval)).await;
             continue;
         }
 
