@@ -139,6 +139,7 @@ pub(crate) async fn run_daemon(policy_path: PathBuf) -> Result<()> {
         }
 
         for repo in repos {
+            let repo_start = Instant::now();
             let now = Instant::now();
             if let Some(until) = repair_cooldowns.get(&repo).copied() {
                 if now < until {
@@ -166,6 +167,10 @@ pub(crate) async fn run_daemon(policy_path: PathBuf) -> Result<()> {
                     continue;
                 }
             };
+            let status_ms = repo_start.elapsed().as_millis();
+            if status_ms > 100 {
+                eprintln!("⏱️ {} status took {}ms (clean={}, ahead={}, behind={})", repo.display(), status_ms, status.is_clean, status.ahead, status.behind);
+            }
 
             // Fast path: skip expensive git diff calls for clean, synced repos.
             // Only do detailed diff analysis when the repo actually has changes.
