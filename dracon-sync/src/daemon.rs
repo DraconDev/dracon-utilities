@@ -358,6 +358,7 @@ pub(crate) async fn run_daemon(policy_path: PathBuf) -> Result<()> {
             }
         }
 
+        notify_watchdog();
         sleep(Duration::from_secs(scan_interval)).await;
     }
 }
