@@ -67,6 +67,12 @@ fn discover_git_repos_recursive(
 }
 
 pub(crate) fn has_origin_remote(repo: &Path) -> bool {
+    // Fast path: check config file directly instead of spawning git subprocess
+    let config_path = repo.join(".git").join("config");
+    if let Ok(config) = std::fs::read_to_string(&config_path) {
+        return config.contains("[remote \"origin\"]");
+    }
+    // Fallback to git subprocess
     std_git_command()
         .arg("remote")
         .arg("get-url")
@@ -78,6 +84,23 @@ pub(crate) fn has_origin_remote(repo: &Path) -> bool {
 }
 
 pub(crate) fn has_tracking_upstream(repo: &Path) -> bool {
+    // Fast path: check config file directly
+    let config_path = repo.join(".git").join("config");
+    if let Ok(config) = std::fs::read_to_string(&config_path) {
+        // Check if current branch has a tracking upstream
+        if let Some(branch) = current_branch(repo) {
+            let section = format!("[branch \"{}\"]", branch);
+            if let Some(pos) = config.find(&section) {
+                let after = &config[pos + section.len()..];
+                // Look for merge config before next section
+                let next_section = after.find('[').unwrap_or(after.len());
+                let branch_config = &after[..next_section];
+                return branch_config.contains("remote = ") && branch_config.contains("merge = ");
+            }
+        }
+        return false;
+    }
+    // Fallback to git subprocess
     std_git_command()
         .args(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"])
         .current_dir(repo)
@@ -532,6 +555,15 @@ pub(crate) async fn unstage_oversized_paths(repo: &Path, max_stage_file_bytes: u
 }
 
 pub(crate) fn current_branch(repo: &Path) -> Option<String> {
+    // Fast path: read .git/HEAD directly
+    let head_path = repo.join(".git").join("HEAD");
+    if let Ok(content) = std::fs::read_to_string(&head_path) {
+        let trimmed = content.trim();
+        if let Some(ref_name) = trimmed.strip_prefix("ref: refs/heads/") {
+            return Some(ref_name.to_string());
+        }
+    }
+    // Fallback to git subprocess
     std_git_command()
         .args(["rev-parse", "--abbrev-ref", "HEAD"])
         .current_dir(repo)
