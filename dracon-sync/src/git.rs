@@ -16,7 +16,7 @@ use crate::policy::{git_binary, std_git_command, tokio_git_command, timestamp_se
 pub(crate) fn discover_git_repos(roots: &[PathBuf], excluded_dir_names: &BTreeSet<String>) -> Vec<PathBuf> {
     let mut repos = Vec::new();
     for root in roots {
-        discover_git_repos_recursive(root, excluded_dir_names, &mut repos, 0, 3);
+        discover_git_repos_recursive(root, excluded_dir_names, &mut repos, 0, 2);
     }
     repos
 }
@@ -38,18 +38,27 @@ fn discover_git_repos_recursive(
                 continue;
             }
             let name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
-            // Skip excluded directories
-            if excluded_dir_names.contains(&name) {
+            // Skip excluded and heavy directories aggressively
+            if excluded_dir_names.contains(&name)
+                || name == "node_modules"
+                || name == "target"
+                || name == ".git"
+                || name == "vendor"
+                || name == ".next"
+                || name == "dist"
+                || name == ".venv"
+                || name == "__pycache__"
+                || name == ".cache"
+                || name == "objects"
+            {
                 continue;
             }
-            // Skip hidden dirs except .git
-            if name.starts_with('.') && name != ".git" {
+            // Skip hidden dirs
+            if name.starts_with('.') {
                 continue;
             }
             if path.join(".git").exists() {
                 repos.push(path.clone());
-                // Don't recurse into git repos
-                continue;
             }
             // Recurse into subdirectories
             discover_git_repos_recursive(&path, excluded_dir_names, repos, depth + 1, max_depth);
