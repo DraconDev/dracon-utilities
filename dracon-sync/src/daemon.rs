@@ -166,51 +166,66 @@ pub(crate) async fn run_daemon(policy_path: PathBuf) -> Result<()> {
                     continue;
                 }
             };
-            let entries = repo_diff_entries(&repo).await.unwrap_or_default();
-            // Filter out entries that only differ due to clean/smudge filters.
-            // `git status` shows filter-processed files as modified, but `git diff HEAD`
-            // correctly applies the clean filter and shows no diff for such files.
-            // Note: untracked files don't appear in `git diff HEAD`, so they always pass.
-            let diff_head_files = git_diff_head_files(&repo).await;
-            let entries: Vec<_> = if diff_head_files.is_empty() && !entries.is_empty() {
-                // git diff HEAD returned nothing. Only clear if ALL entries are Modified
-                // (filter-only). Untracked/Added files don't appear in git diff HEAD.
-                let has_non_modified = entries.iter().any(|e| {
-                    !matches!(e.status, dracon_git::types::FileStatus::Modified)
-                });
-                if has_non_modified {
-                    entries.into_iter()
-                        .filter(|e| !matches!(e.status, dracon_git::types::FileStatus::Modified))
-                        .collect()
-                } else {
-                    Vec::new()
+
+            // Fast path: skip expensive git diff calls for clean, synced repos.
+            // Only do detailed diff analysis when the repo actually has changes.
+            let (effective_dirty, entries) =
+            if status.is_clean && status.ahead == 0 && status.behind == 0 {
+                // Clean and synced — skip all expensive git calls
+                let has_remote_issues = !has_origin_remote(&repo) || !has_tracking_upstream(&repo);
+                if !has_remote_issues {
+                    activity.remove(&repo);
+                    continue;
                 }
+                (false, Vec::new())
             } else {
-                entries.into_iter()
-                    .filter(|e| {
-                        // Always keep non-modified entries (added, deleted, etc.)
-                        // For modified entries, only keep if git diff HEAD shows them
-                        if !matches!(e.status, dracon_git::types::FileStatus::Modified) {
-                            return true;
-                        }
-                        diff_head_files.contains(&e.path.to_string_lossy().to_string())
-                    })
-                    .collect()
+                let raw_entries = repo_diff_entries(&repo).await.unwrap_or_default();
+                // Filter out entries that only differ due to clean/smudge filters.
+                // `git status` shows filter-processed files as modified, but `git diff HEAD`
+                // correctly applies the clean filter and shows no diff for such files.
+                // Note: untracked files don't appear in `git diff HEAD`, so they always pass.
+                let diff_head_files = git_diff_head_files(&repo).await;
+                let filtered: Vec<_> = if diff_head_files.is_empty() && !raw_entries.is_empty() {
+                    // git diff HEAD returned nothing. Only clear if ALL entries are Modified
+                    // (filter-only). Untracked/Added files don't appear in git diff HEAD.
+                    let has_non_modified = raw_entries.iter().any(|e| {
+                        !matches!(e.status, dracon_git::types::FileStatus::Modified)
+                    });
+                    if has_non_modified {
+                        raw_entries.into_iter()
+                            .filter(|e| !matches!(e.status, dracon_git::types::FileStatus::Modified))
+                            .collect()
+                    } else {
+                        Vec::new()
+                    }
+                } else {
+                    raw_entries.into_iter()
+                        .filter(|e| {
+                            // Always keep non-modified entries (added, deleted, etc.)
+                            // For modified entries, only keep if git diff HEAD shows them
+                            if !matches!(e.status, dracon_git::types::FileStatus::Modified) {
+                                return true;
+                            }
+                            diff_head_files.contains(&e.path.to_string_lossy().to_string())
+                        })
+                        .collect()
+                };
+                let dirty = has_sync_relevant_dirty_entries(
+                    &repo,
+                    &filtered,
+                    &excluded_dir_names,
+                    &policy.exclude_file_patterns,
+                    policy.max_stage_file_bytes,
+                );
+                let has_local_or_pending_work =
+                    dirty || status.ahead > 0 || status.behind > 0
+                    || !has_origin_remote(&repo) || !has_tracking_upstream(&repo);
+                if !has_local_or_pending_work {
+                    activity.remove(&repo);
+                    continue;
+                }
+                (dirty, filtered)
             };
-            let effective_dirty = has_sync_relevant_dirty_entries(
-                &repo,
-                &entries,
-                &excluded_dir_names,
-                &policy.exclude_file_patterns,
-                policy.max_stage_file_bytes,
-            );
-            let has_local_or_pending_work =
-                effective_dirty || status.ahead > 0 || status.behind > 0 
-                || !has_origin_remote(&repo) || !has_tracking_upstream(&repo);
-            if !has_local_or_pending_work {
-                activity.remove(&repo);
-                continue;
-            }
 
             let fingerprint = format!(
                 "{}:{}:{}:{}:{}",
