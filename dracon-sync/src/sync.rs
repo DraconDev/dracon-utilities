@@ -426,6 +426,7 @@ pub(crate) async fn sync_repo(
                     Ok(()) => {}
                     Err(e) => {
                         eprintln!("⚠️ push skipped for {}: {}", repo.display(), e);
+                        return Err(anyhow::anyhow!("push failed for {}: {}", repo.display(), e));
                     }
                 }
             } else if policy.auto_push && !has_origin {
@@ -540,7 +541,10 @@ pub(crate) async fn sync_repo(
         .await
         {
             Ok(()) => {}
-            Err(e) => eprintln!("⚠️ push skipped for {}: {}", repo.display(), e),
+            Err(e) => {
+                eprintln!("⚠️ push skipped for {}: {}", repo.display(), e);
+                return Err(anyhow::anyhow!("push failed for {}: {}", repo.display(), e));
+            }
         }
     } else if policy.auto_push && current_status.ahead > 0 && !has_origin {
         eprintln!("ℹ️ skip push for {} (no origin remote)", repo.display());
