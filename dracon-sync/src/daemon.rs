@@ -352,7 +352,7 @@ pub(crate) async fn run_daemon(policy_path: PathBuf) -> Result<()> {
                     policy.max_stage_file_bytes,
                 );
                 if still_dirty {
-                    let cooldown_secs = policy.repair_cooldown_secs.max(60) * 5;
+                    let cooldown_secs = policy.inactivity_push_delay_secs.max(5);
                     filter_cooldowns.insert(
                         repo.clone(),
                         Instant::now() + Duration::from_secs(cooldown_secs),
