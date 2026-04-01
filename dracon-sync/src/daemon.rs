@@ -179,12 +179,21 @@ pub(crate) async fn run_daemon(policy_path: PathBuf) -> Result<()> {
             // Filter out entries that only differ due to clean/smudge filters.
             // `git status` shows filter-processed files as modified, but `git diff HEAD`
             // correctly applies the clean filter and shows no diff for such files.
+            // Note: untracked files don't appear in `git diff HEAD`, so they always pass.
             let diff_head_files = git_diff_head_files(&repo).await;
             let entries: Vec<_> = if diff_head_files.is_empty() && !entries.is_empty() {
-                // git diff HEAD returned nothing - all changes are filter-only.
-                // Keep only deleted/added entries (git diff HEAD shows these too,
-                // so empty means truly nothing differs)
-                Vec::new()
+                // git diff HEAD returned nothing. Only clear if ALL entries are Modified
+                // (filter-only). Untracked/Added files don't appear in git diff HEAD.
+                let has_non_modified = entries.iter().any(|e| {
+                    !matches!(e.status, dracon_git::types::FileStatus::Modified)
+                });
+                if has_non_modified {
+                    entries.into_iter()
+                        .filter(|e| !matches!(e.status, dracon_git::types::FileStatus::Modified))
+                        .collect()
+                } else {
+                    Vec::new()
+                }
             } else {
                 entries.into_iter()
                     .filter(|e| {

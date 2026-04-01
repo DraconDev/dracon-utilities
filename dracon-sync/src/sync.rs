@@ -154,9 +154,16 @@ pub(crate) async fn sync_repo(
             _ => Vec::new(), // timeout - skip filter
         };
         if diff_output.is_empty() && !entries.is_empty() {
-            // git diff HEAD returned nothing - all changes are filter-only
-            entries.clear();
-            status.is_clean = true;
+            // git diff HEAD returned nothing. Only clear if ALL entries are
+            // Modified (filter-only). Untracked/Added files don't appear in
+            // git diff HEAD, so they should still be processed.
+            let has_non_modified = entries.iter().any(|e| {
+                !matches!(e.status, dracon_git::types::FileStatus::Modified)
+            });
+            if !has_non_modified {
+                entries.clear();
+                status.is_clean = true;
+            }
         } else {
             entries.retain(|e| {
                 if !matches!(e.status, dracon_git::types::FileStatus::Modified) {
