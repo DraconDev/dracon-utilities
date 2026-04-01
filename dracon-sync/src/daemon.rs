@@ -125,6 +125,7 @@ pub(crate) async fn run_daemon(policy_path: PathBuf) -> Result<()> {
         let scan_interval = policy.pulse_interval_secs.max(1);
         let inactivity_delay = Duration::from_secs(policy.inactivity_push_delay_secs.max(1));
         let roots = policy.watch_root_paths();
+        let cycle_start = Instant::now();
         let excluded_dir_names = excluded_dir_names_set(&policy);
         let repos = discover_git_repos(&roots, &excluded_dir_names);
         let repo_set: BTreeSet<PathBuf> = repos.iter().cloned().collect();
