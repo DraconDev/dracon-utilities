@@ -13,19 +13,48 @@ use tokio::time::sleep;
 use crate::exclude::{can_restore_entry, is_excluded_change_path, is_large_untracked, should_stage_entry};
 use crate::policy::{git_binary, std_git_command, tokio_git_command, timestamp_secs};
 
-pub(crate) fn discover_git_repos(roots: &[PathBuf], _excluded_dir_names: &BTreeSet<String>) -> Vec<PathBuf> {
+pub(crate) fn discover_git_repos(roots: &[PathBuf], excluded_dir_names: &BTreeSet<String>) -> Vec<PathBuf> {
     let mut repos = Vec::new();
     for root in roots {
-        if let Ok(entries) = std::fs::read_dir(root) {
-            for entry in entries.filter_map(|e| e.ok()) {
-                let path = entry.path();
-                if path.is_dir() && path.join(".git").exists() {
-                    repos.push(path);
-                }
-            }
-        }
+        discover_git_repos_recursive(root, excluded_dir_names, &mut repos, 0, 3);
     }
     repos
+}
+
+fn discover_git_repos_recursive(
+    dir: &Path,
+    excluded_dir_names: &BTreeSet<String>,
+    repos: &mut Vec<PathBuf>,
+    depth: usize,
+    max_depth: usize,
+) {
+    if depth > max_depth {
+        return;
+    }
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for entry in entries.filter_map(|e| e.ok()) {
+            let path = entry.path();
+            if !path.is_dir() {
+                continue;
+            }
+            let name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+            // Skip excluded directories
+            if excluded_dir_names.contains(&name) {
+                continue;
+            }
+            // Skip hidden dirs except .git
+            if name.starts_with('.') && name != ".git" {
+                continue;
+            }
+            if path.join(".git").exists() {
+                repos.push(path.clone());
+                // Don't recurse into git repos
+                continue;
+            }
+            // Recurse into subdirectories
+            discover_git_repos_recursive(&path, excluded_dir_names, repos, depth + 1, max_depth);
+        }
+    }
 }
 
 pub(crate) fn has_origin_remote(repo: &Path) -> bool {
