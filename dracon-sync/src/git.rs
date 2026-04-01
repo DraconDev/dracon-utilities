@@ -18,10 +18,6 @@ pub(crate) fn discover_git_repos(roots: &[PathBuf], excluded_dir_names: &BTreeSe
     for root in roots {
         discover_git_repos_recursive(root, excluded_dir_names, &mut repos, 0, 2);
     }
-    eprintln!("🐛 discovered {} repos", repos.len());
-    for r in &repos {
-        eprintln!("  📂 {}", r.display());
-    }
     repos
 }
 
