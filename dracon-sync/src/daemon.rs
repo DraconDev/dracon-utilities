@@ -12,15 +12,6 @@ use crate::report::{ConcernRepairFilter, RepairSummary, run_repair_concerns, run
 use crate::sync::sync_repo;
 
 /// Send systemd watchdog keepalive ping.
-fn notify_watchdog() {
-    if let Ok(addr) = std::env::var("NOTIFY_SOCKET") {
-        if !addr.is_empty() {
-            let _ = std::process::Command::new("systemd-notify")
-                .arg("WATCHDOG=1")
-                .status();
-        }
-    }
-}
 
 /// Get the list of files that actually differ from HEAD (filter-aware).
 /// Unlike `git status`, `git diff HEAD` applies clean filters and correctly
@@ -367,7 +358,6 @@ pub(crate) async fn run_daemon(policy_path: PathBuf) -> Result<()> {
             }
         }
 
-        notify_watchdog();
         sleep(Duration::from_secs(scan_interval)).await;
     }
 }
