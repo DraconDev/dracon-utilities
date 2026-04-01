@@ -220,17 +220,39 @@ impl SimpleAiService {
 
     pub async fn chat(&self, messages: Vec<ChatMessage>) -> Result<String> {
         let mut last_error = None;
+        let mut health = provider_health().lock().await;
 
         for pc in &self.providers {
+            // Check provider health before calling
+            match health.get(&pc.name) {
+                Some(ProviderStatus::AuthFailed) => {
+                    continue;
+                }
+                Some(ProviderStatus::RateLimited { until }) => {
+                    if Instant::now() < *until {
+                        continue;
+                    }
+                    health.remove(&pc.name);
+                }
+                _ => {}
+            }
+
             match self.call_provider(pc, messages.clone()).await {
-                Ok(content) => return Ok(content),
+                Ok(content) => {
+                    health.insert(pc.name.clone(), ProviderStatus::Healthy);
+                    return Ok(content);
+                }
                 Err(e) => {
                     let msg = e.to_string().to_lowercase();
                     eprintln!("⚠️ AI {} failed: {}", pc.name, e);
-                    if msg.contains("401") || msg.contains("unauthorized") || msg.contains("api key") || msg.contains("auth") {
-                        eprintln!("🔑 {}: auth error (check API key)", pc.name);
+                    if msg.contains("401") || msg.contains("403") || msg.contains("unauthorized") || msg.contains("api key") {
+                        eprintln!("🔑 {}: auth error (skipping for session)", pc.name);
+                        health.insert(pc.name.clone(), ProviderStatus::AuthFailed);
                     } else if msg.contains("429") || msg.contains("rate limit") {
-                        eprintln!("⏳ {}: rate limited, trying next...", pc.name);
+                        eprintln!("⏳ {}: rate limited (skipping 60s)", pc.name);
+                        health.insert(pc.name.clone(), ProviderStatus::RateLimited {
+                            until: Instant::now() + Duration::from_secs(60),
+                        });
                     }
                     last_error = Some(e);
                 }
