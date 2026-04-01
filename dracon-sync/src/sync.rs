@@ -484,13 +484,20 @@ pub(crate) async fn sync_repo(
                                 Ok(()) => {
                                     eprintln!("📝 committed .gitignore update in {}", repo.display());
                                     if policy.auto_push && has_origin {
-                                        let _ = run_git_with_timeout(
+                                        match run_git_with_timeout(
                                             repo,
                                             &["push", "origin", "HEAD"],
                                             policy.push_op_timeout_secs,
                                             "push",
                                         )
-                                        .await;
+                                        .await
+                                        {
+                                            Ok(()) => {}
+                                            Err(e) => {
+                                                eprintln!("⚠️ push skipped for {}: {}", repo.display(), e);
+                                                return Err(anyhow::anyhow!("push failed for {}: {}", repo.display(), e));
+                                            }
+                                        }
                                     }
                                     return Ok(true);
                                 }
