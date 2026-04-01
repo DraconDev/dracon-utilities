@@ -1,6 +1,22 @@
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::OnceLock;
+use std::time::{Duration, Instant};
+use tokio::sync::Mutex;
+
+#[derive(Debug, Clone)]
+enum ProviderStatus {
+    AuthFailed,
+    RateLimited { until: Instant },
+    Healthy,
+}
+
+fn provider_health() -> &'static Mutex<HashMap<String, ProviderStatus>> {
+    static HEALTH: OnceLock<Mutex<HashMap<String, ProviderStatus>>> = OnceLock::new();
+    HEALTH.get_or_init(|| Mutex::new(HashMap::new()))
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatMessage {
