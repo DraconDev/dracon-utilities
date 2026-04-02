@@ -426,6 +426,7 @@ pub(crate) async fn run_daemon(policy_path: PathBuf) -> Result<()> {
                 if !effective_dirty && status.ahead > 0 && entry.failure_count >= 3 {
                     eprintln!("🔒 {} permanently stuck on push (ahead={}, clean), skipping", repo.display(), status.ahead);
                     stuck_push_repos.insert(repo.clone());
+                    save_stuck_push_repos(&stuck_push_repos);
                     activity.remove(&repo);
                 }
             }
