@@ -100,13 +100,32 @@ pub(crate) fn has_tracking_upstream(repo: &Path) -> bool {
         }
         return false;
     }
-    // Fallback to git subprocess
-    std_git_command()
+    // Config file not readable (worktree, symlink, etc.) —
+    // check if git can resolve upstream, then only verify branch config
+    // if we can actually read the config (avoids inconsistency with has_origin_remote).
+    let has_upstream = std_git_command()
         .args(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"])
         .current_dir(repo)
         .output()
         .map(|o| o.status.success())
-        .unwrap_or(false)
+        .unwrap_or(false);
+    if !has_upstream {
+        return false;
+    }
+    // Upstream resolves. Verify branch config exists in config file if readable.
+    if let Ok(config) = std::fs::read_to_string(&config_path) {
+        if let Some(branch) = current_branch(repo) {
+            let section = format!("[branch \"{}\"]", branch);
+            if let Some(pos) = config.find(&section) {
+                let after = &config[pos + section.len()..];
+                let next_section = after.find('[').unwrap_or(after.len());
+                let branch_config = &after[..next_section];
+                return branch_config.contains("remote = ") && branch_config.contains("merge = ");
+            }
+        }
+        return false;
+    }
+    has_upstream
 }
 
 pub(crate) fn is_rebase_in_progress(repo: &Path) -> bool {
