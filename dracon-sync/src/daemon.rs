@@ -1,15 +1,23 @@
 use anyhow::Result;
 use dracon_git::GitService;
-use std::collections::{BTreeSet, HashMap};
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 use tokio::time::sleep;
 
-use crate::policy::{SyncPolicy, freeze_reason, debug_enabled};
+use crate::policy::{SyncPolicy, freeze_reason, debug_enabled, timestamp_secs};
 use crate::exclude::{excluded_dir_names_set, has_sync_relevant_dirty_entries};
 use crate::git::{discover_git_repos, repo_diff_entries, has_origin_remote, has_tracking_upstream};
 use crate::report::{ConcernRepairFilter, RepairSummary, run_repair_concerns, run_repair_warns};
 use crate::sync::sync_repo;
+
+const STUCK_REPO_EXPIRY_SECS: u64 = 24 * 60 * 60; // 24 hours
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+struct StuckRepoEntry {
+    path: PathBuf,
+    stuck_since: u64,
+}
 
 fn stuck_repos_path() -> PathBuf {
     dirs::home_dir()
@@ -19,25 +27,32 @@ fn stuck_repos_path() -> PathBuf {
         .join("dracon-sync-stuck-push-repos.json")
 }
 
-fn load_stuck_push_repos() -> BTreeSet<PathBuf> {
+fn load_stuck_push_repos() -> HashMap<PathBuf, u64> {
     let path = stuck_repos_path();
     if !path.exists() {
-        return BTreeSet::new();
+        return HashMap::new();
     }
     let content = match std::fs::read_to_string(&path) {
         Ok(c) => c,
         Err(e) => {
             eprintln!("⚠️ failed reading stuck repos ({}): {}", path.display(), e);
-            return BTreeSet::new();
+            return HashMap::new();
         }
     };
-    serde_json::from_str(&content).unwrap_or_else(|e| {
+    let entries: Vec<StuckRepoEntry> = serde_json::from_str(&content).unwrap_or_else(|e| {
         eprintln!("⚠️ failed parsing stuck repos ({}): {}", path.display(), e);
-        BTreeSet::new()
-    })
+        Vec::new()
+    });
+    let now = timestamp_secs();
+    let cutoff = now.saturating_sub(STUCK_REPO_EXPIRY_SECS);
+    entries
+        .into_iter()
+        .filter(|e| e.stuck_since > cutoff)
+        .map(|e| (e.path, e.stuck_since))
+        .collect()
 }
 
-fn save_stuck_push_repos(repos: &BTreeSet<PathBuf>) {
+fn save_stuck_push_repos(repos: &HashMap<PathBuf, u64>) {
     let path = stuck_repos_path();
     if let Some(parent) = path.parent() {
         if !parent.exists() {
@@ -47,14 +62,17 @@ fn save_stuck_push_repos(repos: &BTreeSet<PathBuf>) {
             }
         }
     }
-    let content = serde_json::to_string_pretty(repos).unwrap_or_else(|e| {
+    let entries: Vec<StuckRepoEntry> = repos
+        .iter()
+        .map(|(p, t)| StuckRepoEntry { path: p.clone(), stuck_since: *t })
+        .collect();
+    let content = serde_json::to_string_pretty(&entries).unwrap_or_else(|e| {
         eprintln!("⚠️ failed serializing stuck repos: {}", e);
         String::new()
     });
     if content.is_empty() {
         return;
     }
-    // Atomic write: write to temp file then rename
     let tmp_path = path.with_extension("tmp");
     if let Err(e) = std::fs::write(&tmp_path, &content) {
         eprintln!("⚠️ failed writing stuck repos tmp ({}): {}", tmp_path.display(), e);
@@ -64,6 +82,36 @@ fn save_stuck_push_repos(repos: &BTreeSet<PathBuf>) {
     if let Err(e) = std::fs::rename(&tmp_path, &path) {
         eprintln!("⚠️ failed renaming stuck repos ({}): {}", path.display(), e);
         let _ = std::fs::remove_file(&tmp_path);
+    }
+}
+
+pub(crate) fn unstuck_repo(repo: &Path) -> bool {
+    let path = stuck_repos_path();
+    if !path.exists() {
+        return false;
+    }
+    let mut repos = load_stuck_push_repos();
+    if repos.remove(repo).is_some() {
+        save_stuck_push_repos(&repos);
+        println!("🔓 unstuck: {}", repo.display());
+        true
+    } else {
+        println!("ℹ️ {} not in stuck repos", repo.display());
+        false
+    }
+}
+
+pub(crate) fn list_stuck_repos() {
+    let repos = load_stuck_push_repos();
+    if repos.is_empty() {
+        println!("✅ no stuck repos");
+        return;
+    }
+    println!("🔒 stuck repos (expire after 24h):");
+    let now = timestamp_secs();
+    for (path, since) in repos {
+        let age_hrs = (now.saturating_sub(since)) / 3600;
+        println!("   {} ({}h ago)", path.display(), age_hrs);
     }
 }
 
