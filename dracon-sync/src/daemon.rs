@@ -157,9 +157,7 @@ pub(crate) async fn run_daemon(policy_path: PathBuf) -> Result<()> {
     let mut activity: HashMap<PathBuf, RepoActivity> = HashMap::new();
     let mut repair_cooldowns: HashMap<PathBuf, Instant> = HashMap::new();
     let mut filter_cooldowns: HashMap<PathBuf, Instant> = HashMap::new();
-    let mut stuck_push_repos: BTreeSet<PathBuf> = BTreeSet::new();
-    let mut stuck_push_repos: BTreeSet<PathBuf> = BTreeSet::new();
-    let mut stuck_push_repos: BTreeSet<PathBuf> = BTreeSet::new();
+    let mut stuck_push_repos = load_stuck_push_repos();
 
     loop {
         let policy = match SyncPolicy::load(&policy_path) {
