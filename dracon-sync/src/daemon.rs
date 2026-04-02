@@ -236,7 +236,22 @@ pub(crate) async fn run_daemon(policy_path: PathBuf) -> Result<()> {
                     activity.remove(&repo);
                     continue;
                 }
-                (false, Vec::new())
+                // Remote issues but clean — check for dirty files that
+                // has_sync_relevant_dirty_entries would detect (untracked in excluded
+                // dirs, oversized files, etc.) before committing to dirty state.
+                let entries = repo_diff_entries(&repo).await.unwrap_or_default();
+                let dirty = has_sync_relevant_dirty_entries(
+                    &repo,
+                    &entries,
+                    &excluded_dir_names,
+                    &policy.exclude_file_patterns,
+                    policy.max_stage_file_bytes,
+                );
+                if !dirty {
+                    activity.remove(&repo);
+                    continue;
+                }
+                (dirty, entries)
             } else {
                 let raw_entries = repo_diff_entries(&repo).await.unwrap_or_default();
                 // Filter out entries that only differ due to clean/smudge filters.
