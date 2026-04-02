@@ -200,6 +200,10 @@ impl SimpleAiService {
         self.providers.iter().map(|p| p.name.clone()).collect()
     }
 
+    pub async fn reset_health() {
+        provider_health().lock().await.clear();
+    }
+
     pub async fn test_provider(&self, name: &str) -> Result<(bool, String)> {
         let messages = vec![ChatMessage {
             role: "user".to_string(),
