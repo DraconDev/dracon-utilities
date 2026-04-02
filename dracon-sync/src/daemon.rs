@@ -112,6 +112,9 @@ pub(crate) async fn run_daemon(policy_path: PathBuf) -> Result<()> {
     let mut activity: HashMap<PathBuf, RepoActivity> = HashMap::new();
     let mut repair_cooldowns: HashMap<PathBuf, Instant> = HashMap::new();
     let mut filter_cooldowns: HashMap<PathBuf, Instant> = HashMap::new();
+    let mut stuck_push_repos: BTreeSet<PathBuf> = BTreeSet::new();
+    let mut stuck_push_repos: BTreeSet<PathBuf> = BTreeSet::new();
+    let mut stuck_push_repos: BTreeSet<PathBuf> = BTreeSet::new();
 
     loop {
         let policy = match SyncPolicy::load(&policy_path) {
@@ -140,6 +143,10 @@ pub(crate) async fn run_daemon(policy_path: PathBuf) -> Result<()> {
 
         for repo in repos {
             let now = Instant::now();
+            // Skip repos that are permanently stuck (can't push, can't resolve)
+            if stuck_push_repos.contains(&repo) {
+                continue;
+            }
             if let Some(until) = repair_cooldowns.get(&repo).copied() {
                 if now < until {
                     continue;
@@ -370,6 +377,14 @@ pub(crate) async fn run_daemon(policy_path: PathBuf) -> Result<()> {
                 activity.remove(&repo);
             } else {
                 entry.failure_count += 1;
+                // If repo is clean but has ahead commits and push keeps failing,
+                // it's permanently stuck (permission error, deleted remote, etc).
+                // Skip it entirely to unblock other repos.
+                if !effective_dirty && status.ahead > 0 && entry.failure_count >= 3 {
+                    eprintln!("🔒 {} permanently stuck on push (ahead={}, clean), skipping", repo.display(), status.ahead);
+                    stuck_push_repos.insert(repo.clone());
+                    activity.remove(&repo);
+                }
             }
         }
 
