@@ -291,6 +291,9 @@ async fn main() -> Result<()> {
                 return Ok(());
             }
             
+            // Reset health so all providers are tested fresh
+            SimpleAiService::reset_health().await;
+            
             let providers = service.provider_names();
             println!("🧪 Testing {} AI provider(s)...\n", providers.len());
             
