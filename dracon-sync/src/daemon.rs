@@ -11,6 +11,51 @@ use crate::git::{discover_git_repos, repo_diff_entries, has_origin_remote, has_t
 use crate::report::{ConcernRepairFilter, RepairSummary, run_repair_concerns, run_repair_warns};
 use crate::sync::sync_repo;
 
+fn stuck_repos_path() -> PathBuf {
+    dirs::data_local_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join("dracon")
+        .join("state")
+        .join("dracon-sync-stuck-push-repos.json")
+}
+
+fn load_stuck_push_repos() -> BTreeSet<PathBuf> {
+    let path = stuck_repos_path();
+    if !path.exists() {
+        return BTreeSet::new();
+    }
+    let content = match std::fs::read_to_string(&path) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("⚠️ failed reading stuck repos: {}", e);
+            return BTreeSet::new();
+        }
+    };
+    serde_json::from_str(&content).unwrap_or_else(|e| {
+        eprintln!("⚠️ failed parsing stuck repos: {}", e);
+        BTreeSet::new()
+    })
+}
+
+fn save_stuck_push_repos(repos: &BTreeSet<PathBuf>) {
+    let path = stuck_repos_path();
+    if let Some(parent) = path.parent() {
+        if !parent.exists() {
+            if let Err(e) = std::fs::create_dir_all(parent) {
+                eprintln!("⚠️ failed creating stuck repos dir: {}", e);
+                return;
+            }
+        }
+    }
+    let content = serde_json::to_string_pretty(repos).unwrap_or_else(|e| {
+        eprintln!("⚠️ failed serializing stuck repos: {}", e);
+        return;
+    });
+    if let Err(e) = std::fs::write(&path, content) {
+        eprintln!("⚠️ failed writing stuck repos: {}", e);
+    }
+}
+
 /// Send systemd watchdog keepalive ping.
 
 /// Get the list of files that actually differ from HEAD (filter-aware).
