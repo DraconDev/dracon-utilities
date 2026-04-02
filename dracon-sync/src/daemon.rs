@@ -12,9 +12,9 @@ use crate::report::{ConcernRepairFilter, RepairSummary, run_repair_concerns, run
 use crate::sync::sync_repo;
 
 fn stuck_repos_path() -> PathBuf {
-    dirs::data_local_dir()
+    dirs::home_dir()
         .unwrap_or_else(|| PathBuf::from("."))
-        .join("dracon")
+        .join(".dracon")
         .join("state")
         .join("dracon-sync-stuck-push-repos.json")
 }
@@ -27,12 +27,12 @@ fn load_stuck_push_repos() -> BTreeSet<PathBuf> {
     let content = match std::fs::read_to_string(&path) {
         Ok(c) => c,
         Err(e) => {
-            eprintln!("⚠️ failed reading stuck repos: {}", e);
+            eprintln!("⚠️ failed reading stuck repos ({}): {}", path.display(), e);
             return BTreeSet::new();
         }
     };
     serde_json::from_str(&content).unwrap_or_else(|e| {
-        eprintln!("⚠️ failed parsing stuck repos: {}", e);
+        eprintln!("⚠️ failed parsing stuck repos ({}): {}", path.display(), e);
         BTreeSet::new()
     })
 }
@@ -54,8 +54,16 @@ fn save_stuck_push_repos(repos: &BTreeSet<PathBuf>) {
     if content.is_empty() {
         return;
     }
-    if let Err(e) = std::fs::write(&path, content) {
-        eprintln!("⚠️ failed writing stuck repos: {}", e);
+    // Atomic write: write to temp file then rename
+    let tmp_path = path.with_extension("tmp");
+    if let Err(e) = std::fs::write(&tmp_path, &content) {
+        eprintln!("⚠️ failed writing stuck repos tmp ({}): {}", tmp_path.display(), e);
+        let _ = std::fs::remove_file(&tmp_path);
+        return;
+    }
+    if let Err(e) = std::fs::rename(&tmp_path, &path) {
+        eprintln!("⚠️ failed renaming stuck repos ({}): {}", path.display(), e);
+        let _ = std::fs::remove_file(&tmp_path);
     }
 }
 
