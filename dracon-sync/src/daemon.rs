@@ -67,8 +67,6 @@ fn save_stuck_push_repos(repos: &BTreeSet<PathBuf>) {
     }
 }
 
-/// Send systemd watchdog keepalive ping.
-
 /// Get the list of files that actually differ from HEAD (filter-aware).
 /// Unlike `git status`, `git diff HEAD` applies clean filters and correctly
 /// ignores files that only differ due to smudge filter decryption.
