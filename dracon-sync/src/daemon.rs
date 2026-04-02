@@ -49,8 +49,11 @@ fn save_stuck_push_repos(repos: &BTreeSet<PathBuf>) {
     }
     let content = serde_json::to_string_pretty(repos).unwrap_or_else(|e| {
         eprintln!("⚠️ failed serializing stuck repos: {}", e);
-        return;
+        String::new()
     });
+    if content.is_empty() {
+        return;
+    }
     if let Err(e) = std::fs::write(&path, content) {
         eprintln!("⚠️ failed writing stuck repos: {}", e);
     }
