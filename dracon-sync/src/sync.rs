@@ -288,22 +288,6 @@ pub(crate) async fn sync_repo(
                     eprintln!("📝 scribe failed for {}: {}", repo.display(), e);
                 }
             }
-                                }
-                                _ => String::new(),
-                            };
-                            Some(format!("{}\n\n{}", stat, patch_text))
-                        }
-                    }
-                    _ => None,
-                }
-            };
-
-            if cfg!(feature = "scribe") {
-                #[cfg(feature = "scribe")]
-                if let Err(e) = crate::scribe::update_project_state_from_ai(repo, &staged_diff_names, staged_diff_content).await {
-                    eprintln!("📝 scribe failed for {}: {}", repo.display(), e);
-                }
-            }
 
             // Stage project-state.md if scribe updated it
             if repo.join(".dracon/project-state.md").exists() {
