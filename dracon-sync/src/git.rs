@@ -60,12 +60,10 @@ fn discover_git_repos_recursive(
 }
 
 pub(crate) fn has_origin_remote(repo: &Path) -> bool {
-    // Fast path: check config file directly instead of spawning git subprocess
     let config_path = repo.join(".git").join("config");
     if let Ok(config) = std::fs::read_to_string(&config_path) {
-        return config.contains("[remote \"origin\"]");
+        return config.lines().any(|line| line.trim() == "[remote \"origin\"]");
     }
-    // Fallback to git subprocess
     std_git_command()
         .arg("remote")
         .arg("get-url")
