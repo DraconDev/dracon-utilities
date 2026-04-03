@@ -554,6 +554,8 @@ pub(crate) fn current_branch(repo: &Path) -> Option<String> {
     std_git_command()
         .args(["rev-parse", "--abbrev-ref", "HEAD"])
         .current_dir(repo)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
         .output()
         .ok()
         .and_then(|o| {
