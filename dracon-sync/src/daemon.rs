@@ -387,6 +387,11 @@ pub(crate) async fn run_daemon(policy_path: PathBuf) -> Result<()> {
                 continue;
             }
             
+            // MAX_FAILURES: per-cycle retry cap for transient errors.
+            // Stuck repos (line ~505) trigger at failure_count >= 3 when repo is
+            // clean + ahead > 0 — that's a permanent condition. MAX_FAILURES is
+            // a higher bar for repos that might still be recoverable (dirty,
+            // network issues, etc.).
             const MAX_FAILURES: usize = 5;
             if entry.failure_count >= MAX_FAILURES {
                 if entry.failure_count == MAX_FAILURES {
