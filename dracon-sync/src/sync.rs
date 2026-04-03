@@ -272,10 +272,9 @@ pub(crate) async fn sync_repo(
 
             if cfg!(feature = "scribe") {
                 #[cfg(feature = "scribe")]
-                if let Err(e) = crate::scribe::update_project_state_from_ai(repo, &staged_diff_names, staged_diff_content.as_deref()).await {
+                if let Err(e) = crate::scribe::update_project_state_from_ai(repo, &staged_diff_names, staged_diff_content).await {
                     eprintln!("📝 scribe failed for {}: {}", repo.display(), e);
                 }
-            }
             }
 
             // Stage project-state.md if scribe updated it
