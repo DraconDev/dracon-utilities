@@ -917,6 +917,7 @@ pub(crate) async fn run_repair_concerns(
             out!("   plan: push origin HEAD");
             if apply {
                 let mut push_ok = false;
+                #[allow(unused_assignments)]
                 match push_with_retries(&repo, push_timeout_secs, push_retries, "push").await {
                     Ok(()) => {
                         succeeded_ops += 1;
