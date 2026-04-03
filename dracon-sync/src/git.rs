@@ -568,7 +568,32 @@ pub(crate) fn current_branch(repo: &Path) -> Option<String> {
         .filter(|s| !s.is_empty())
 }
 
-pub(crate) fn has_both_main_and_master(repo: &Path) -> bool {
+pub(crate) fn has_only_main_branch(repo: &Path) -> bool {
+    let config_path = repo.join(".git").join("config");
+    if let Ok(config) = std::fs::read_to_string(&config_path) {
+        let has_main = config.lines().any(|l| l.trim() == "[branch \"main\"]");
+        let has_master = config.lines().any(|l| l.trim() == "[branch \"master\"]");
+        return has_main && !has_master;
+    }
+    // Fallback
+    let has_main = std_git_command()
+        .args(["rev-parse", "--verify", "refs/heads/main"])
+        .current_dir(repo)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false);
+    let has_master = std_git_command()
+        .args(["rev-parse", "--verify", "refs/heads/master"])
+        .current_dir(repo)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false);
+    has_main && !has_master
+}
     let config_path = repo.join(".git").join("config");
     let has_local_branches = if let Ok(config) = std::fs::read_to_string(&config_path) {
         config.lines().any(|l| l.trim() == "[branch \"main\"]")
@@ -617,12 +642,43 @@ pub(crate) fn consolidate_to_master(repo: &Path) -> Result<()> {
     let _ = std_git_command()
         .args(["push", "origin", "--delete", "main"])
         .current_dir(repo)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
         .status();
     // Ensure master has upstream tracking
     if has_origin_remote(repo) && !has_tracking_upstream(repo) {
         let _ = std_git_command()
             .args(["push", "-u", "origin", "master"])
             .current_dir(repo)
+            .status();
+    }
+    Ok(())
+}
+
+pub(crate) fn rename_main_to_master(repo: &Path) -> Result<()> {
+    let branch = current_branch(repo).unwrap_or_else(|| "main".to_string());
+    if branch == "main" {
+        // Rename local branch
+        std_git_command()
+            .args(["branch", "-m", "main", "master"])
+            .current_dir(repo)
+            .status()
+            .with_context(|| format!("failed to rename main to master in {}", repo.display()))?;
+    }
+    // Push master to remote and set upstream
+    if has_origin_remote(repo) {
+        let _ = std_git_command()
+            .args(["push", "-u", "origin", "master"])
+            .current_dir(repo)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status();
+        // Delete remote main if it exists
+        let _ = std_git_command()
+            .args(["push", "origin", "--delete", "main"])
+            .current_dir(repo)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
             .status();
     }
     Ok(())
