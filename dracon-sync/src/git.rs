@@ -568,6 +568,61 @@ pub(crate) fn current_branch(repo: &Path) -> Option<String> {
         .filter(|s| !s.is_empty())
 }
 
+pub(crate) fn has_both_main_and_master(repo: &Path) -> bool {
+    let config_path = repo.join(".git").join("config");
+    let has_local_branches = if let Ok(config) = std::fs::read_to_string(&config_path) {
+        config.contains("[branch \"main\"]") && config.contains("[branch \"master\"]")
+    } else {
+        false
+    };
+    if has_local_branches {
+        return true;
+    }
+    // Fallback: check with git
+    let has_main = std_git_command()
+        .args(["rev-parse", "--verify", "refs/heads/main"])
+        .current_dir(repo)
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false);
+    let has_master = std_git_command()
+        .args(["rev-parse", "--verify", "refs/heads/master"])
+        .current_dir(repo)
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false);
+    has_main && has_master
+}
+
+pub(crate) fn consolidate_to_master(repo: &Path) -> Result<()> {
+    let branch = current_branch(repo).unwrap_or_else(|| "master".to_string());
+    if branch != "master" {
+        std_git_command()
+            .args(["checkout", "master"])
+            .current_dir(repo)
+            .status()
+            .with_context(|| format!("failed to checkout master in {}", repo.display()))?;
+    }
+    // Delete local main if it exists
+    let _ = std_git_command()
+        .args(["branch", "-D", "main"])
+        .current_dir(repo)
+        .status();
+    // Delete remote main if it exists
+    let _ = std_git_command()
+        .args(["push", "origin", "--delete", "main"])
+        .current_dir(repo)
+        .status();
+    // Ensure master has upstream tracking
+    if has_origin_remote(repo) && !has_tracking_upstream(repo) {
+        let _ = std_git_command()
+            .args(["push", "-u", "origin", "master"])
+            .current_dir(repo)
+            .status();
+    }
+    Ok(())
+}
+
 pub(crate) fn remote_branch_exists(repo: &Path, branch: &str) -> bool {
     std_git_command()
         .args(["show-ref", "--verify", "--quiet"])
