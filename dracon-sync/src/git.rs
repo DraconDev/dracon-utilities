@@ -34,7 +34,7 @@ fn discover_git_repos_recursive(
     if let Ok(entries) = std::fs::read_dir(dir) {
         for entry in entries.filter_map(|e| e.ok()) {
             let path = entry.path();
-            if !path.is_dir() {
+            if !path.is_dir() || path.is_symlink() {
                 continue;
             }
             let name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
@@ -75,15 +75,12 @@ pub(crate) fn has_origin_remote(repo: &Path) -> bool {
 }
 
 pub(crate) fn has_tracking_upstream(repo: &Path) -> bool {
-    // Fast path: check config file directly
     let config_path = repo.join(".git").join("config");
     if let Ok(config) = std::fs::read_to_string(&config_path) {
-        // Check if current branch has a tracking upstream
         if let Some(branch) = current_branch(repo) {
             let section = format!("[branch \"{}\"]", branch);
             if let Some(pos) = config.find(&section) {
                 let after = &config[pos + section.len()..];
-                // Look for merge config before next section
                 let next_section = after.find('[').unwrap_or(after.len());
                 let branch_config = &after[..next_section];
                 return branch_config.contains("remote = ") && branch_config.contains("merge = ");
@@ -92,31 +89,13 @@ pub(crate) fn has_tracking_upstream(repo: &Path) -> bool {
         return false;
     }
     // Config file not readable (worktree, symlink, etc.) —
-    // check if git can resolve upstream, then only verify branch config
-    // if we can actually read the config (avoids inconsistency with has_origin_remote).
-    let has_upstream = std_git_command()
+    // fall back to git subprocess which handles these cases natively.
+    std_git_command()
         .args(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"])
         .current_dir(repo)
         .output()
         .map(|o| o.status.success())
-        .unwrap_or(false);
-    if !has_upstream {
-        return false;
-    }
-    // Upstream resolves. Verify branch config exists in config file if readable.
-    if let Ok(config) = std::fs::read_to_string(&config_path) {
-        if let Some(branch) = current_branch(repo) {
-            let section = format!("[branch \"{}\"]", branch);
-            if let Some(pos) = config.find(&section) {
-                let after = &config[pos + section.len()..];
-                let next_section = after.find('[').unwrap_or(after.len());
-                let branch_config = &after[..next_section];
-                return branch_config.contains("remote = ") && branch_config.contains("merge = ");
-            }
-        }
-        return false;
-    }
-    has_upstream
+        .unwrap_or(false)
 }
 
 pub(crate) fn is_rebase_in_progress(repo: &Path) -> bool {
