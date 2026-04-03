@@ -212,34 +212,6 @@ pub(crate) async fn update_project_state_from_ai(repo: &Path, staged_diff_names:
     Ok(())
 }
 
-    let prompt = build_scribe_prompt(repo, staged_diff_names, staged_diff_content.as_deref());
-
-    let messages = vec![ChatMessage::user(&prompt)];
-
-    match service.chat(messages).await {
-        Ok(text) => {
-            let dracon_dir = repo.join(".dracon");
-            std::fs::create_dir_all(&dracon_dir)?;
-            let state_path = dracon_dir.join("project-state.md");
-
-            let markdown = if let Some(start) = text.find("# Project State") {
-                &text[start..]
-            } else {
-                &text
-            };
-
-            let cleaned = cleanup_markdown(markdown);
-            std::fs::write(&state_path, cleaned)?;
-            eprintln!("📝 scribe: updated {}/.dracon/project-state.md", repo_display);
-        }
-        Err(e) => {
-            eprintln!("📝 scribe: AI request failed for {}: {}", repo_display, e);
-        }
-    }
-
-    Ok(())
-}
-
 #[cfg(not(feature = "scribe"))]
 pub(crate) async fn update_project_state_from_ai(_repo: &Path, _staged_diff_names: &str, _staged_diff_content: Option<String>) -> anyhow::Result<()> {
     Ok(())
