@@ -257,15 +257,6 @@ pub(crate) async fn run_daemon(policy_path: PathBuf) -> Result<()> {
             if has_both_main_and_master(&repo) {
                 continue;
             }
-            // Auto-rename main → master on first encounter
-            if crate::git::has_only_main_branch(&repo) {
-                eprintln!("🔧 {} has only 'main' branch, renaming to 'master'", repo.display());
-                if let Err(e) = rename_main_to_master(&repo) {
-                    eprintln!("⚠️ failed to rename main→master for {}: {}", repo.display(), e);
-                    continue;
-                }
-                eprintln!("✅ {} renamed main → master", repo.display());
-            }
             if let Some(until) = repair_cooldowns.get(&repo).copied() {
                 if now < until {
                     continue;
