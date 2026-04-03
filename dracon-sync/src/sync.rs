@@ -243,15 +243,39 @@ pub(crate) async fn sync_repo(
 
             // Scribe: update project-state.md via AI BEFORE building commit context
             // so the fresh state is included in the commit body
-            let staged_diff = committed_entries.iter()
+            let staged_diff_names = committed_entries.iter()
                 .map(|e| format!("{:?}: {}", e.status, e.path.display()))
                 .collect::<Vec<_>>()
                 .join("\n");
+
+            // Get actual diff content for the scribe (stat + limited patch)
+            let staged_diff_content = run_git_with_timeout(repo, &["diff", "--cached", "--stat"], 10, "diff-stat").await
+                .ok()
+                .filter(|o| o.status.success())
+                .and_then(|o| String::from_utf8_lossy(&o.stdout).to_string().is_empty().then(|| None).unwrap_or_else(|| {
+                    // Add a short patch summary (first 200 lines max to stay under token limits)
+                    let stat = String::from_utf8_lossy(&o.stdout).to_string();
+                    run_git_with_timeout(repo, &["diff", "--cached", "--unified=3", "--"], 10, "diff-patch").await
+                        .ok()
+                        .filter(|o| o.status.success())
+                        .and_then(|o| {
+                            let patch = String::from_utf8_lossy(&o.stdout).to_string();
+                            let patch_truncated = if patch.lines().count() > 200 {
+                                patch.lines().take(200).collect::<Vec<_>>().join("\n") + "\n... (truncated)"
+                            } else {
+                                patch
+                            };
+                            Some(format!("{}\n\n{}", stat, patch_truncated))
+                        })
+                        .unwrap_or(stat)
+                }));
+
             if cfg!(feature = "scribe") {
                 #[cfg(feature = "scribe")]
-                if let Err(e) = crate::scribe::update_project_state_from_ai(repo, &staged_diff).await {
+                if let Err(e) = crate::scribe::update_project_state_from_ai(repo, &staged_diff_names, staged_diff_content.as_deref()).await {
                     eprintln!("📝 scribe failed for {}: {}", repo.display(), e);
                 }
+            }
             }
 
             // Stage project-state.md if scribe updated it
