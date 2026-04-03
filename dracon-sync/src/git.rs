@@ -544,7 +544,6 @@ pub(crate) async fn unstage_oversized_paths(repo: &Path, max_stage_file_bytes: u
 }
 
 pub(crate) fn current_branch(repo: &Path) -> Option<String> {
-    // Fast path: read .git/HEAD directly
     let head_path = repo.join(".git").join("HEAD");
     if let Ok(content) = std::fs::read_to_string(&head_path) {
         let trimmed = content.trim();
@@ -552,7 +551,6 @@ pub(crate) fn current_branch(repo: &Path) -> Option<String> {
             return Some(ref_name.to_string());
         }
     }
-    // Fallback to git subprocess
     std_git_command()
         .args(["rev-parse", "--abbrev-ref", "HEAD"])
         .current_dir(repo)
