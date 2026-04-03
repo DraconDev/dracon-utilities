@@ -363,6 +363,39 @@ async fn main() -> Result<()> {
         Command::UnstuckRepo { repo } => {
             unstuck_repo(&repo);
         }
+        Command::DualBranchList => {
+            let policy = SyncPolicy::load(&policy_path)?;
+            let roots = policy.watch_root_paths();
+            let excluded_dir_names = excluded_dir_names_set(&policy);
+            let repos = git::discover_git_repos(&roots, &excluded_dir_names);
+            let mut found = 0;
+            for repo in repos {
+                if has_both_main_and_master(&repo) {
+                    let branch = git::current_branch(&repo).unwrap_or_else(|| "unknown".to_string());
+                    println!("   {} (currently on {})", repo.display(), branch);
+                    found += 1;
+                }
+            }
+            if found == 0 {
+                println!("✅ no repos with both main and master");
+            } else {
+                println!("\n🔧 Run 'dracon-sync repair-dual-branches <path>' to consolidate to master");
+            }
+        }
+        Command::RepairDualBranches { repo } => {
+            if !has_both_main_and_master(&repo) {
+                println!("ℹ️ {} does not have both main and master", repo.display());
+                return Ok(());
+            }
+            println!("🔧 Consolidating {} to master...", repo.display());
+            match consolidate_to_master(&repo) {
+                Ok(()) => println!("✅ consolidated to master"),
+                Err(e) => {
+                    eprintln!("❌ failed: {}", e);
+                    return Err(e.into());
+                }
+            }
+        }
     }
 
     Ok(())
