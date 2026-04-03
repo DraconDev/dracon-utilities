@@ -426,7 +426,7 @@ pub(crate) async fn sync_repo(
                     Ok(()) => {}
                     Err(e) => {
                         eprintln!("⚠️ push skipped for {}: {}", repo.display(), e);
-                        return Err(anyhow::anyhow!("push failed for {}: {}", repo.display(), e));
+                        return Ok(true);
                     }
                 }
             } else if policy.auto_push && !has_origin {
