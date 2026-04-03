@@ -274,12 +274,16 @@ pub(crate) async fn run_daemon(policy_path: PathBuf) -> Result<()> {
                 }
             };
 
+            // Cache remote checks — used in both fast and slow paths
+            let has_origin = has_origin_remote(&repo);
+            let has_upstream = has_tracking_upstream(&repo);
+
             // Fast path: skip expensive git diff calls for clean, synced repos.
             // Only do detailed diff analysis when the repo actually has changes.
             let (effective_dirty, entries) =
             if status.is_clean && status.ahead == 0 && status.behind == 0 {
                 // Clean and synced — skip all expensive git calls
-                let has_remote_issues = !has_origin_remote(&repo) || !has_tracking_upstream(&repo);
+                let has_remote_issues = !has_origin || !has_upstream;
                 if !has_remote_issues {
                     activity.remove(&repo);
                     continue;
@@ -341,7 +345,7 @@ pub(crate) async fn run_daemon(policy_path: PathBuf) -> Result<()> {
                 );
                 let has_local_or_pending_work =
                     dirty || status.ahead > 0 || status.behind > 0
-                    || !has_origin_remote(&repo) || !has_tracking_upstream(&repo);
+                    || !has_origin || !has_upstream;
                 if !has_local_or_pending_work {
                     activity.remove(&repo);
                     continue;
