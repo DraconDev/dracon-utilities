@@ -38,22 +38,15 @@ fn discover_git_repos_recursive(
                 continue;
             }
             let name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
-            // Skip excluded and heavy directories aggressively
+            // Skip excluded dirs (from policy) and safety-net heavy directories
+            // not covered by defaults or hidden-dir filtering.
             if excluded_dir_names.contains(&name)
-                || name == "node_modules"
-                || name == "target"
-                || name == ".git"
                 || name == "vendor"
-                || name == ".next"
-                || name == "dist"
-                || name == ".venv"
-                || name == "__pycache__"
-                || name == ".cache"
                 || name == "objects"
             {
                 continue;
             }
-            // Skip hidden dirs
+            // Skip hidden dirs (covers .git, .next, .cache, .venv, __pycache__, etc.)
             if name.starts_with('.') {
                 continue;
             }
