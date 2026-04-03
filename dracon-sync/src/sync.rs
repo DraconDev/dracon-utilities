@@ -363,6 +363,10 @@ pub(crate) async fn sync_repo(
             svc.commit(&msg).await?;
             eprintln!("📝 committed {} file(s) in {}", committed_entries.len(), repo.display());
 
+            // Forbid creation of the "other" default branch (main vs master).
+            // If someone or something created the non-canonical branch, delete it.
+            prune_other_default_branch(repo);
+
             // Restore any excluded modified paths that weren't committed
             // Skip gitlink entries (dirty submodules can't be restored this way)
             let restorable: Vec<_> = to_restore.iter()
