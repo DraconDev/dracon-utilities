@@ -234,6 +234,7 @@ pub(crate) async fn run_daemon(policy_path: PathBuf) -> Result<()> {
         activity.retain(|repo, _| repo_set.contains(repo));
         repair_cooldowns.retain(|repo, _| repo_set.contains(repo));
         filter_cooldowns.retain(|repo, _| repo_set.contains(repo));
+        stuck_push_repos.retain(|repo, _| repo_set.contains(repo));
 
         if let Some(reason) = freeze_reason(&policy_path) {
             println!("⏸️ sync daemon paused ({})", reason);
