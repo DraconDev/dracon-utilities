@@ -17,7 +17,7 @@ use policy::{resolve_policy_path, SyncPolicy};
 use policy::freeze_reason;
 use exclude::excluded_dir_names_set;
 use report::{ConcernRepairFilter, RepoFilter, push_large_blob_threshold_bytes, run_repair_concerns, run_repair_warns, run_repos_report};
-use daemon::{run_once, run_daemon};
+use daemon::{run_once, run_daemon, unstuck_repo, list_stuck_repos};
 use sync::sync_repo;
 
 #[derive(Parser, Debug)]
@@ -347,6 +347,12 @@ async fn main() -> Result<()> {
             if let Some(ref wp) = working_provider {
                 println!("   Using: {} (fallback order: {:?})", wp, providers);
             }
+        }
+        Command::StuckList => {
+            list_stuck_repos();
+        }
+        Command::UnstuckRepo { repo } => {
+            unstuck_repo(&repo);
         }
     }
 
