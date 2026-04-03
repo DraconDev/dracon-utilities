@@ -249,26 +249,54 @@ pub(crate) async fn sync_repo(
                 .join("\n");
 
             // Get actual diff content for the scribe (stat + limited patch)
-            let staged_diff_content = run_git_with_timeout(repo, &["diff", "--cached", "--stat"], 10, "diff-stat").await
-                .ok()
-                .filter(|o| o.status.success())
-                .and_then(|o| String::from_utf8_lossy(&o.stdout).to_string().is_empty().then(|| None).unwrap_or_else(|| {
-                    // Add a short patch summary (first 200 lines max to stay under token limits)
-                    let stat = String::from_utf8_lossy(&o.stdout).to_string();
-                    run_git_with_timeout(repo, &["diff", "--cached", "--unified=3", "--"], 10, "diff-patch").await
-                        .ok()
-                        .filter(|o| o.status.success())
-                        .and_then(|o| {
-                            let patch = String::from_utf8_lossy(&o.stdout).to_string();
-                            let patch_truncated = if patch.lines().count() > 200 {
-                                patch.lines().take(200).collect::<Vec<_>>().join("\n") + "\n... (truncated)"
-                            } else {
-                                patch
+            let staged_diff_content: Option<String> = {
+                let stat_out = std::process::Command::new("git")
+                    .args(["diff", "--cached", "--stat"])
+                    .current_dir(repo)
+                    .output();
+                match stat_out {
+                    Ok(o) if o.status.success() => {
+                        let stat = String::from_utf8_lossy(&o.stdout).to_string();
+                        if stat.is_empty() {
+                            None
+                        } else {
+                            let patch_out = std::process::Command::new("git")
+                                .args(["diff", "--cached", "--unified=3", "--"])
+                                .current_dir(repo)
+                                .output();
+                            let patch_text = match patch_out {
+                                Ok(o) if o.status.success() => {
+                                    let patch = String::from_utf8_lossy(&o.stdout).to_string();
+                                    if patch.lines().count() > 200 {
+                                        patch.lines().take(200).collect::<Vec<_>>().join("\n") + "\n... (truncated)"
+                                    } else {
+                                        patch
+                                    }
+                                }
+                                _ => String::new(),
                             };
-                            Some(format!("{}\n\n{}", stat, patch_truncated))
-                        })
-                        .unwrap_or(stat)
-                }));
+                            Some(format!("{}\n\n{}", stat, patch_text))
+                        }
+                    }
+                    _ => None,
+                }
+            };
+
+            if cfg!(feature = "scribe") {
+                #[cfg(feature = "scribe")]
+                if let Err(e) = crate::scribe::update_project_state_from_ai(repo, &staged_diff_names, staged_diff_content).await {
+                    eprintln!("📝 scribe failed for {}: {}", repo.display(), e);
+                }
+            }
+                                }
+                                _ => String::new(),
+                            };
+                            Some(format!("{}\n\n{}", stat, patch_text))
+                        }
+                    }
+                    _ => None,
+                }
+            };
 
             if cfg!(feature = "scribe") {
                 #[cfg(feature = "scribe")]
