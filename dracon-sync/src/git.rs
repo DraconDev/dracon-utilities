@@ -593,6 +593,8 @@ pub(crate) fn has_only_main_branch(repo: &Path) -> bool {
         .map(|s| s.success())
         .unwrap_or(false);
     has_main && !has_master
+}
+
 pub(crate) fn has_both_main_and_master(repo: &Path) -> bool {
     let config_path = repo.join(".git").join("config");
     let has_local_branches = if let Ok(config) = std::fs::read_to_string(&config_path) {
