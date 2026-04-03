@@ -110,35 +110,65 @@ fn cleanup_markdown(input: &str) -> String {
     result.join("\n") + "\n"
 }
 
-fn build_scribe_prompt(repo: &Path, staged_diff: &str) -> String {
+fn build_scribe_prompt(repo: &Path, staged_diff_names: &str, staged_diff_content: Option<&str>) -> String {
     let (git_log, git_files) = collect_git_context(repo);
     let blueprint = collect_blueprint(repo);
 
+    let diff_section = match staged_diff_content {
+        Some(content) => format!(
+            r#"ACTUAL DIFF (analyze this to understand WHAT changed and WHY):
+{content}
+
+FILE SUMMARY:
+{staged_diff_names}"#
+        ),
+        None => format!(
+            r#"FILE CHANGES (no diff available, use file names only):
+{staged_diff_names}"#
+        ),
+    };
+
+    let blueprint_section = if blueprint.is_empty() {
+        String::new()
+    } else {
+        format!(
+            r#"
+
+PROJECT BLUEPRINT (current goals):
+{}"#,
+            &blueprint[..blueprint.len().min(500)]
+        )
+    };
+
     format!(
-        r#"You are a scribe for a software project. Write a concise project-state.md.
+        r#"You are a scribe for a software project. Analyze the code changes and write a concise project-state.md.
 
-STAGED CHANGES (PRIMARY source):
-{staged_diff}
+{diff_section}{blueprint_section}
 
-CONTEXT (file names changed):
-{git_files}
+RECENT COMMITS (for context, do NOT repeat these):
+{git_log}
+
+RULES:
+- Read the ACTUAL DIFF to understand what changed semantically (function signatures, logic changes, bug fixes)
+- Do NOT just list file names — describe what the code changes DO
+- Be specific: "Add retry logic to HTTP client with exponential backoff" not "Modified http.rs"
+- If diff shows a bug fix, describe the bug and the fix
+- If diff shows a new feature, describe what it does
+- Only list items that are genuinely completed by this change
+- "In Progress" should only contain work that is clearly incomplete from the diff
+- "Open Issues" should only contain real blockers visible in the code, not "None currently"
+- Omit "In Progress" and "Open Issues" sections entirely if there's nothing meaningful to say
 
 GENERATE EXACTLY this markdown structure. Each section header MUST have a blank line after it:
 
 # Project State
 
 ## Current Focus
-ONE LINE describing what changed - be specific like "Fix bug in auth token validation" not generic "Update code"
+ONE LINE: specific description of what this commit does
 
 ## Completed
-- [x] item 1
-- [x] item 2
-
-## In Progress
-- [x] item 1
-
-## Open Issues
-- issue 1
+- [x] specific change 1
+- [x] specific change 2
 
 No preamble. Only output the markdown."#
     )
