@@ -9,7 +9,7 @@ use crate::exclude::{can_restore_entry, excluded_dir_names_set, handle_large_unt
 use crate::git::{
     cli_diff_entries, detect_large_blobs_ahead, git_name_status_entries, has_origin_remote,
     has_tracking_upstream, is_cherry_pick_in_progress, is_merge_in_progress,
-    is_rebase_in_progress, restore_paths, run_cmd_with_timeout, run_git_with_timeout, staged_paths,
+    is_rebase_in_progress, prune_other_default_branch, restore_paths, run_cmd_with_timeout, run_git_with_timeout, staged_paths,
     unstage_excluded_paths, unstage_oversized_paths,
 };
 use crate::policy::{debug_enabled, load_repo_override, SyncPolicy};
