@@ -1623,6 +1623,15 @@ fn create_private_remote(repo: &Path) -> Option<String> {
         .output();
     
     if add_remote_result.is_err() {
+        // Origin already exists — replacing it. Warn about data loss risk.
+        eprintln!(
+            "⚠️ WARNING: replacing origin remote for {} with local bare repo.",
+            repo.display()
+        );
+        eprintln!(
+            "   Original remote URL is lost. Push to {} instead.",
+            remote_url
+        );
         let _ = std::process::Command::new("git")
             .args(["remote", "set-url", "origin", &remote_url])
             .current_dir(repo)
