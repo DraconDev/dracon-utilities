@@ -106,6 +106,10 @@ enum Command {
     DualBranchList,
     /// Consolidate a repo with both main and master to master only.
     RepairDualBranches { repo: PathBuf },
+    /// List repos that only have main branch (will be auto-renamed to master).
+    MainOnlyList,
+    /// Manually rename main → master for a repo.
+    RenameMainToMaster { repo: PathBuf },
 }
 
 #[tokio::main]
