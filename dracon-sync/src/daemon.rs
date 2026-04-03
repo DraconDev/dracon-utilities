@@ -252,6 +252,11 @@ pub(crate) async fn run_daemon(policy_path: PathBuf) -> Result<()> {
             if stuck_push_repos.contains_key(&repo) {
                 continue;
             }
+            // Skip repos with both main and master — ambiguous default branch.
+            // Run 'dracon-sync repair-dual-branches <path>' to consolidate to master.
+            if has_both_main_and_master(&repo) {
+                continue;
+            }
             if let Some(until) = repair_cooldowns.get(&repo).copied() {
                 if now < until {
                     continue;
