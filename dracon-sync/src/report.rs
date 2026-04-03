@@ -1617,25 +1617,35 @@ fn create_private_remote(repo: &Path) -> Option<String> {
     
     let remote_url = format!("file://{}", final_path.display());
     
-    let add_remote_result = std::process::Command::new("git")
+    // Save original origin URL before overwriting
+    let original_origin = origin_url(repo);
+    
+    let add_result = std::process::Command::new("git")
         .args(["remote", "add", "origin", &remote_url])
         .current_dir(repo)
-        .output();
+        .output()
+        .ok()?;
     
-    if add_remote_result.is_err() {
-        // Origin already exists — replacing it. Warn about data loss risk.
-        eprintln!(
-            "⚠️ WARNING: replacing origin remote for {} with local bare repo.",
-            repo.display()
-        );
-        eprintln!(
-            "   Original remote URL is lost. Push to {} instead.",
-            remote_url
-        );
-        let _ = std::process::Command::new("git")
-            .args(["remote", "set-url", "origin", &remote_url])
-            .current_dir(repo)
-            .output();
+    if !add_result.status.success() {
+        let stderr = String::from_utf8_lossy(&add_result.stderr);
+        if stderr.to_lowercase().contains("remote origin already exists") {
+            eprintln!(
+                "⚠️ WARNING: replacing origin remote for {} with local bare repo.",
+                repo.display()
+            );
+            if let Some(ref orig) = original_origin {
+                eprintln!("   Original origin was: {}", orig);
+            }
+            eprintln!(
+                "   Push to {} instead.",
+                remote_url
+            );
+            let _ = std::process::Command::new("git")
+                .args(["remote", "set-url", "origin", &remote_url])
+                .current_dir(repo)
+                .output();
+        }
+        // If error was something other than "already exists", don't overwrite.
     }
     
     Some(remote_url)
