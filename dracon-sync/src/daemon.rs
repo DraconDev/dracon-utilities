@@ -244,7 +244,7 @@ pub(crate) async fn run_daemon(policy_path: PathBuf) -> Result<()> {
         for repo in repos {
             let now = Instant::now();
             // Skip repos that are permanently stuck (can't push, can't resolve)
-            if stuck_push_repos.contains(&repo) {
+            if stuck_push_repos.contains_key(&repo) {
                 continue;
             }
             if let Some(until) = repair_cooldowns.get(&repo).copied() {
