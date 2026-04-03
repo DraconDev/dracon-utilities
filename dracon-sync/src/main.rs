@@ -97,6 +97,10 @@ enum Command {
     EditConfig,
     /// Test AI providers connectivity.
     TestAi,
+    /// List repos that are permanently stuck on push.
+    StuckList,
+    /// Unstuck a repo that was marked as permanently stuck.
+    UnstuckRepo { repo: PathBuf },
 }
 
 #[tokio::main]
