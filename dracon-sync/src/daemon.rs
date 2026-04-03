@@ -8,6 +8,7 @@ use tokio::time::sleep;
 use crate::policy::{SyncPolicy, freeze_reason, debug_enabled, timestamp_secs};
 use crate::exclude::{excluded_dir_names_set, has_sync_relevant_dirty_entries};
 use crate::git::{discover_git_repos, repo_diff_entries, has_origin_remote, has_tracking_upstream, has_both_main_and_master};
+use crate::git::{consolidate_to_master, rename_main_to_master};
 use crate::report::{ConcernRepairFilter, RepairSummary, run_repair_concerns, run_repair_warns};
 use crate::sync::sync_repo;
 
@@ -252,10 +253,21 @@ pub(crate) async fn run_daemon(policy_path: PathBuf) -> Result<()> {
             if stuck_push_repos.contains_key(&repo) {
                 continue;
             }
-            // Skip repos with both main and master — ambiguous default branch.
-            // Run 'dracon-sync repair-dual-branches <path>' to consolidate to master.
+            // Auto-repair branch ambiguity: consolidate to master.
+            // Dual branch (main+master) → merge into master, delete main.
+            // Main-only → rename to master so everything is consistent.
             if has_both_main_and_master(&repo) {
-                continue;
+                eprintln!("🔧 {} has both main+master, consolidating to master", repo.display());
+                if let Err(e) = crate::git::consolidate_to_master(&repo) {
+                    eprintln!("⚠️ failed to consolidate {} to master: {}", repo.display(), e);
+                    continue;
+                }
+            } else if crate::git::has_only_main_branch(&repo) {
+                eprintln!("🔧 {} has only 'main', renaming to 'master'", repo.display());
+                if let Err(e) = crate::git::rename_main_to_master(&repo) {
+                    eprintln!("⚠️ failed to rename {} main→master: {}", repo.display(), e);
+                    continue;
+                }
             }
             if let Some(until) = repair_cooldowns.get(&repo).copied() {
                 if now < until {
