@@ -274,6 +274,10 @@ async fn main() -> Result<()> {
                 println!("⏸️ sync frozen ({})", reason);
                 return Ok(());
             }
+            if daemon::is_repo_stuck(&repo) {
+                println!("🔒 {} is stuck on push. Run 'dracon-sync unstuck-repo {}' first.", repo.display(), repo.display());
+                return Ok(());
+            }
             let policy = SyncPolicy::load(&policy_path)?;
             let excluded_dir_names = excluded_dir_names_set(&policy);
             if sync_repo(&repo, &policy, &excluded_dir_names, 0).await? {
