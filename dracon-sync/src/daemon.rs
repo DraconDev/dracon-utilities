@@ -115,6 +115,10 @@ pub(crate) fn list_stuck_repos() {
     }
 }
 
+pub(crate) fn is_repo_stuck(repo: &Path) -> bool {
+    load_stuck_push_repos().contains_key(repo)
+}
+
 /// Get the list of files that actually differ from HEAD (filter-aware).
 /// Unlike `git status`, `git diff HEAD` applies clean filters and correctly
 /// ignores files that only differ due to smudge filter decryption.
