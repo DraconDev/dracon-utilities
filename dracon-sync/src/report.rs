@@ -1282,10 +1282,12 @@ pub(crate) async fn run_repair_concerns(
 
         if apply {
             if let Ok(next) = svc.get_status().await {
+                let has_origin = has_origin_remote(&repo);
+                let has_upstream = has_tracking_upstream(&repo);
                 let still_concern = next.ahead > 0
                     || next.behind > 0
-                    || !has_origin_remote(&repo)
-                    || (has_origin_remote(&repo) && !has_tracking_upstream(&repo));
+                    || !has_origin
+                    || (has_origin && !has_upstream);
                 if !still_concern {
                     resolved += 1;
                     out!("   resolved: concern cleared");
@@ -1307,8 +1309,8 @@ pub(crate) async fn run_repair_concerns(
                         "   remaining: ahead={} behind={} origin={} upstream={}",
                         next.ahead,
                         next.behind,
-                        has_origin_remote(&repo),
-                        has_tracking_upstream(&repo)
+                        has_origin,
+                        has_upstream
                     );
                     append_incident_record(
                         policy_path,
