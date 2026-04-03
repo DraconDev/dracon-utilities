@@ -571,23 +571,28 @@ pub(crate) fn current_branch(repo: &Path) -> Option<String> {
 pub(crate) fn has_both_main_and_master(repo: &Path) -> bool {
     let config_path = repo.join(".git").join("config");
     let has_local_branches = if let Ok(config) = std::fs::read_to_string(&config_path) {
-        config.contains("[branch \"main\"]") && config.contains("[branch \"master\"]")
+        config.lines().any(|l| l.trim() == "[branch \"main\"]")
+            && config.lines().any(|l| l.trim() == "[branch \"master\"]")
     } else {
         false
     };
     if has_local_branches {
         return true;
     }
-    // Fallback: check with git
+    // Fallback: check with git (suppress stderr for detached HEAD repos)
     let has_main = std_git_command()
         .args(["rev-parse", "--verify", "refs/heads/main"])
         .current_dir(repo)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
         .status()
         .map(|s| s.success())
         .unwrap_or(false);
     let has_master = std_git_command()
         .args(["rev-parse", "--verify", "refs/heads/master"])
         .current_dir(repo)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
         .status()
         .map(|s| s.success())
         .unwrap_or(false);
