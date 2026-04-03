@@ -660,14 +660,12 @@ pub(crate) fn consolidate_to_master(repo: &Path) -> Result<()> {
 pub(crate) fn rename_main_to_master(repo: &Path) -> Result<()> {
     let branch = current_branch(repo).unwrap_or_else(|| "main".to_string());
     if branch == "main" {
-        // Rename local branch
         std_git_command()
             .args(["branch", "-m", "main", "master"])
             .current_dir(repo)
             .status()
             .with_context(|| format!("failed to rename main to master in {}", repo.display()))?;
     }
-    // Push master to remote and set upstream
     if has_origin_remote(repo) {
         let _ = std_git_command()
             .args(["push", "-u", "origin", "master"])
@@ -675,7 +673,6 @@ pub(crate) fn rename_main_to_master(repo: &Path) -> Result<()> {
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
             .status();
-        // Delete remote main if it exists
         let _ = std_git_command()
             .args(["push", "origin", "--delete", "main"])
             .current_dir(repo)
@@ -684,6 +681,33 @@ pub(crate) fn rename_main_to_master(repo: &Path) -> Result<()> {
             .status();
     }
     Ok(())
+}
+
+/// Delete the "other" default branch if it exists, preventing dual-branch drift.
+/// If current branch is master → delete main. If current is main → delete master.
+pub(crate) fn prune_other_default_branch(repo: &Path) {
+    let branch = current_branch(repo);
+    let other = match branch.as_deref() {
+        Some("master") => "main",
+        Some("main") => "master",
+        _ => return,
+    };
+    // Delete local other branch if it exists
+    let _ = std_git_command()
+        .args(["branch", "-D", other])
+        .current_dir(repo)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status();
+    // Delete remote other branch if it exists
+    if has_origin_remote(repo) {
+        let _ = std_git_command()
+            .args(["push", "origin", "--delete", other])
+            .current_dir(repo)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status();
+    }
 }
 
 pub(crate) fn remote_branch_exists(repo: &Path, branch: &str) -> bool {
