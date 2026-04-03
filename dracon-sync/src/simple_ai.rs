@@ -224,31 +224,33 @@ impl SimpleAiService {
 
     pub async fn chat(&self, messages: Vec<ChatMessage>) -> Result<String> {
         let mut last_error = None;
-        let mut health = provider_health().lock().await;
 
         for pc in &self.providers {
             // Check provider health before calling
-            match health.get(&pc.name) {
-                Some(ProviderStatus::AuthFailed) => {
-                    continue;
-                }
-                Some(ProviderStatus::RateLimited { until }) => {
-                    if Instant::now() < *until {
+            {
+                let health = provider_health().lock().await;
+                match health.get(&pc.name) {
+                    Some(ProviderStatus::AuthFailed) => {
                         continue;
                     }
-                    health.remove(&pc.name);
+                    Some(ProviderStatus::RateLimited { until }) => {
+                        if Instant::now() < *until {
+                            continue;
+                        }
+                    }
+                    _ => {}
                 }
-                _ => {}
             }
 
             match self.call_provider(pc, messages.clone()).await {
                 Ok(content) => {
-                    health.insert(pc.name.clone(), ProviderStatus::Healthy);
+                    provider_health().lock().await.insert(pc.name.clone(), ProviderStatus::Healthy);
                     return Ok(content);
                 }
                 Err(e) => {
                     let msg = e.to_string().to_lowercase();
                     eprintln!("⚠️ AI {} failed: {}", pc.name, e);
+                    let mut health = provider_health().lock().await;
                     if msg.contains("401") || msg.contains("403") || msg.contains("unauthorized") || msg.contains("api key") {
                         eprintln!("🔑 {}: auth error (skipping for session)", pc.name);
                         health.insert(pc.name.clone(), ProviderStatus::AuthFailed);
