@@ -241,6 +241,6 @@ pub(crate) async fn update_project_state_from_ai(repo: &Path, staged_diff_names:
 }
 
 #[cfg(not(feature = "scribe"))]
-pub(crate) async fn update_project_state_from_ai(_repo: &Path, _staged_diff: &str) -> anyhow::Result<()> {
+pub(crate) async fn update_project_state_from_ai(_repo: &Path, _staged_diff_names: &str, _staged_diff_content: Option<String>) -> anyhow::Result<()> {
     Ok(())
 }
