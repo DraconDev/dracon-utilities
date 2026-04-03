@@ -710,38 +710,11 @@ pub(crate) fn rewrite_ahead_paths(
         return Ok(Some(backup_branch));
     }
 
-    // Fallback to deprecated git filter-branch
-    eprintln!(
-        "⚠️ git-filter-repo not found, using deprecated filter-branch. Install git-filter-repo for better performance."
-    );
-    let mut index_filter = String::from("git rm -r --cached --ignore-unmatch");
-    for path in paths_to_remove {
-        index_filter.push_str(" '");
-        index_filter.push_str(&path.replace('\'', "'\\''"));
-        index_filter.push('\'');
-    }
-
-    let rewrite = std_git_command()
-        .args([
-            "filter-branch",
-            "--force",
-            "--index-filter",
-            &index_filter,
-            "--prune-empty",
-            "@{u}..HEAD",
-        ])
-        .current_dir(repo)
-        .status()
-        .with_context(|| format!("failed history rewrite in {}", repo.display()))?;
-    if !rewrite.success() {
-        return Err(anyhow::anyhow!(
-            "history rewrite failed in {} (backup: {})",
-            repo.display(),
-            backup_branch
-        ));
-    }
-
-    Ok(Some(backup_branch))
+    Err(anyhow::anyhow!(
+        "git-filter-repo not available in {}. Install git-filter-repo to rewrite history (backup branch: {})",
+        repo.display(),
+        backup_branch
+    ))
 }
 
 pub(crate) async fn restore_paths(repo: &Path, paths: &[String]) -> Result<()> {
