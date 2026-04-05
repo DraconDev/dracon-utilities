@@ -1582,6 +1582,16 @@ pub(crate) async fn run_repair_warns(
 }
 
 fn create_private_remote(repo: &Path) -> Option<String> {
+    // NEVER overwrite an existing origin. Only create a local bare repo
+    // for repos that genuinely have no remote configured.
+    if has_origin_remote(repo) {
+        eprintln!(
+            "⚠️ refusing to create private remote for {} — origin already exists",
+            repo.display()
+        );
+        return None;
+    }
+
     let repo_name = repo.file_name()?.to_str()?.to_string();
     let private_remotes_dir = dirs::home_dir()?.join("dracon/private-remotes");
     
@@ -1619,35 +1629,16 @@ fn create_private_remote(repo: &Path) -> Option<String> {
     
     let remote_url = format!("file://{}", final_path.display());
     
-    // Save original origin URL before overwriting
-    let original_origin = origin_url(repo);
-    
     let add_result = std::process::Command::new("git")
         .args(["remote", "add", "origin", &remote_url])
         .current_dir(repo)
-        .output()
-        .ok()?;
+        .output();
     
-    if !add_result.status.success() {
-        let stderr = String::from_utf8_lossy(&add_result.stderr);
-        if stderr.to_lowercase().contains("remote origin already exists") {
-            eprintln!(
-                "⚠️ WARNING: replacing origin remote for {} with local bare repo.",
-                repo.display()
-            );
-            if let Some(ref orig) = original_origin {
-                eprintln!("   Original origin was: {}", orig);
-            }
-            eprintln!(
-                "   Push to {} instead.",
-                remote_url
-            );
-            let _ = std::process::Command::new("git")
-                .args(["remote", "set-url", "origin", &remote_url])
-                .current_dir(repo)
-                .output();
-        }
-        // If error was something other than "already exists", don't overwrite.
+    if let Err(e) = add_result {
+        eprintln!(
+            "⚠️ failed to add origin for {}: {}",
+            repo.display(), e
+        );
     }
     
     Some(remote_url)
