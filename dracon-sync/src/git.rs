@@ -33,21 +33,6 @@ pub(crate) fn discover_git_repos(roots: &[PathBuf], excluded_dir_names: &BTreeSe
     }
     filtered
 }
-    // Filter out repos that are nested inside another discovered repo.
-    // This prevents the daemon from treating subdirectories of a monorepo
-    // (which have their own .git from prior git init) as independent repos.
-    repos.sort();
-    let mut filtered = Vec::new();
-    for repo in repos {
-        let is_nested = filtered.iter().any(|parent: &PathBuf| {
-            repo.starts_with(parent)
-        });
-        if !is_nested {
-            filtered.push(repo);
-        }
-    }
-    filtered
-}
 
 fn discover_git_repos_recursive(
     dir: &Path,
