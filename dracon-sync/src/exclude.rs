@@ -364,9 +364,10 @@ pub(crate) fn remove_tracked_excluded_paths(
     if !output.status.success() {
         return Ok(None);
     }
-    let files: Vec<&str> = String::from_utf8_lossy(&output.stdout)
+    let files: Vec<String> = String::from_utf8_lossy(&output.stdout)
         .split('\0')
         .filter(|s| !s.is_empty())
+        .map(String::from)
         .collect();
 
     let mut top_level_excluded: BTreeSet<String> = BTreeSet::new();
