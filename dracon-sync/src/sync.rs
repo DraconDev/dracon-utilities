@@ -236,7 +236,10 @@ pub(crate) async fn sync_repo(
             for p in &stage_paths {
                 add_args.push(p);
             }
-            run_git_with_timeout(repo, &add_args, 30, "add").await?;
+            if let Err(e) = run_git_with_timeout(repo, &add_args, 30, "add").await {
+                eprintln!("⚠️ {} git add failed for {} paths: {:?}", repo.display(), stage_paths.len(), stage_paths);
+                return Err(e);
+            }
 
             // Build the payload from what we're actually going to commit (cached diff)
             let staged = git_name_status_entries(repo, &["diff", "--cached", "--name-status"]).await?;
