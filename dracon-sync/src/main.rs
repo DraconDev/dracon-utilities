@@ -129,7 +129,7 @@ async fn main() -> Result<()> {
             let policy = SyncPolicy::load(&policy_path)?;
             let roots = policy.watch_root_paths();
             let excluded_dir_names = excluded_dir_names_set(&policy);
-            let repos = git::discover_git_repos(&roots, &excluded_dir_names);
+            let repos = git::discover_git_repos(&roots, &excluded_dir_names, &policy.exclude_repos);
             let freeze = freeze_reason(&policy_path);
             if json {
                 let payload = report::StatusJson {
@@ -367,7 +367,7 @@ async fn main() -> Result<()> {
             let policy = SyncPolicy::load(&policy_path)?;
             let roots = policy.watch_root_paths();
             let excluded_dir_names = excluded_dir_names_set(&policy);
-            let repos = git::discover_git_repos(&roots, &excluded_dir_names);
+            let repos = git::discover_git_repos(&roots, &excluded_dir_names, &policy.exclude_repos);
             let mut found = 0;
             for repo in repos {
                 if has_both_main_and_master(&repo) {

@@ -13,11 +13,18 @@ use tokio::time::sleep;
 use crate::exclude::{can_restore_entry, is_excluded_change_path, is_large_untracked, should_stage_entry};
 use crate::policy::{git_binary, std_git_command, tokio_git_command, timestamp_secs};
 
-pub(crate) fn discover_git_repos(roots: &[PathBuf], excluded_dir_names: &BTreeSet<String>) -> Vec<PathBuf> {
+pub(crate) fn discover_git_repos(
+    roots: &[PathBuf],
+    excluded_dir_names: &BTreeSet<String>,
+    exclude_repos: &[String],
+) -> Vec<PathBuf> {
+    let exclude_set: std::collections::HashSet<PathBuf> =
+        exclude_repos.iter().map(PathBuf::from).collect();
     let mut repos = Vec::new();
     for root in roots {
         discover_git_repos_recursive(root, excluded_dir_names, &mut repos, 0, 2);
     }
+    repos.retain(|r| !exclude_set.contains(r));
     repos
 }
 

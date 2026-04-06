@@ -104,6 +104,12 @@ pub(crate) struct SyncPolicy {
     pub(crate) incident_ledger_max_age_days: u64,
     #[serde(default = "default_exclude_file_patterns")]
     pub(crate) exclude_file_patterns: Vec<String>,
+    #[serde(default = "default_exclude_repos")]
+    pub(crate) exclude_repos: Vec<String>,
+}
+
+fn default_exclude_repos() -> Vec<String> {
+    Vec::new()
 }
 
 #[derive(Debug, Deserialize, Default, Clone)]
