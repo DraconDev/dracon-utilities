@@ -521,7 +521,7 @@ pub(crate) async fn unstage_excluded_paths(
 
 pub(crate) async fn unstage_oversized_paths(repo: &Path, max_stage_file_bytes: u64) -> Result<usize> {
     let staged = staged_paths(repo).await?;
-    let mut removed = 0usize;
+    let mut to_unstage = Vec::new();
     for path in staged {
         let full = repo.join(&path);
         let meta = match std::fs::metadata(&full) {
@@ -531,26 +531,28 @@ pub(crate) async fn unstage_oversized_paths(repo: &Path, max_stage_file_bytes: u
         if !meta.is_file() || meta.len() <= max_stage_file_bytes {
             continue;
         }
-        let status = tokio_git_command()
-            .args(["reset", "-q", "HEAD", "--"])
-            .arg(&path)
+        to_unstage.push(path);
+    }
+    if to_unstage.is_empty() {
+        return Ok(0);
+    }
+
+    let removed = to_unstage.len();
+    for chunk in to_unstage.chunks(50) {
+        let mut cmd = tokio_git_command();
+        cmd.args(["reset", "-q", "HEAD", "--"])
             .current_dir(repo)
-            .status()
+            .kill_on_drop(true);
+        for path in chunk {
+            cmd.arg(path);
+        }
+        let status = cmd.status()
             .await
             .with_context(|| {
-                format!(
-                    "failed to unstage oversized path {} in {}",
-                    path.display(),
-                    repo.display()
-                )
+                format!("failed to unstage oversized paths in {}", repo.display())
             })?;
-        if status.success() {
-            removed += 1;
-            eprintln!(
-                "🧹 removed oversized staged path {} ({} bytes)",
-                full.display(),
-                meta.len()
-            );
+        if !status.success() {
+            eprintln!("⚠️ failed to unstage a chunk of oversized paths in {}", repo.display());
         }
     }
     Ok(removed)
