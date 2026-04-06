@@ -350,9 +350,22 @@ pub(crate) fn handle_large_untracked(
     Ok(true)
 }
 
-/// Find tracked files that live inside excluded directories.
-/// These should never have been committed (build artifacts, generated files, etc.).
-/// Removes them from git tracking and adds the directory patterns to .gitignore.
+/// Common build / generated output directory names that should never be tracked.
+/// These are checked IN ADDITION to exclude_dir_names to catch directories
+/// that aren't in the standard exclusion list but are clearly build artifacts.
+fn is_build_output_dir_name(name: &str) -> bool {
+    matches!(
+        name,
+        ".output" | ".out" | "output" | "bin" | "obj" | "generated" | "gen" | ".next" | "dist-new"
+    ) || name.ends_with(".output")
+        || name.ends_with("_output")
+        || name.starts_with("output-")
+}
+
+/// Find tracked files that live inside excluded directories or common build
+/// output directories. These should never have been committed (build artifacts,
+/// generated files, etc.). Removes them from git tracking and adds the directory
+/// patterns to .gitignore.
 pub(crate) fn remove_tracked_excluded_paths(
     repo: &Path,
     excluded_dir_names: &BTreeSet<String>,
@@ -375,16 +388,34 @@ pub(crate) fn remove_tracked_excluded_paths(
 
     for file in &files {
         let path = Path::new(file);
+        let mut found_excluded = false;
+
+        // Check standard excluded dir names
         if is_excluded_change_path(path, excluded_dir_names) {
-            to_remove.push(file.to_string());
-            // Find the top-level excluded component
             for component in path.components() {
                 let name = component.as_os_str().to_str().unwrap_or("");
                 if is_excluded_dir_name(name, excluded_dir_names) {
                     top_level_excluded.insert(name.to_string());
+                    found_excluded = true;
                     break;
                 }
             }
+        }
+
+        // Also detect common build output directories
+        if !found_excluded {
+            for component in path.components() {
+                let name = component.as_os_str().to_str().unwrap_or("");
+                if is_build_output_dir_name(name) {
+                    top_level_excluded.insert(name.to_string());
+                    found_excluded = true;
+                    break;
+                }
+            }
+        }
+
+        if found_excluded {
+            to_remove.push(file.to_string());
         }
     }
 
@@ -397,7 +428,7 @@ pub(crate) fn remove_tracked_excluded_paths(
         .map(|d| format!("{}/", d))
         .collect();
     eprintln!(
-        "📝 {} has {} tracked file(s) inside excluded dirs {:?} — removing from git and adding to .gitignore",
+        "📝 {} has {} tracked file(s) inside build-artifact dirs {:?} — removing from git and adding to .gitignore",
         repo.display(),
         to_remove.len(),
         patterns
