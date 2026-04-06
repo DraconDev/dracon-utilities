@@ -143,6 +143,8 @@ pub(crate) fn should_stage_entry(
         return false;
     }
 
+    let full_path = repo.join(&entry.path);
+
     // Skip staging entries that live inside a nested git repo.
     // The nested repo has its own daemon managing it — staging its files from
     // the parent creates a conflict where both daemons fight over the same tree.
@@ -160,7 +162,6 @@ pub(crate) fn should_stage_entry(
         return true;
     }
 
-    let full_path = repo.join(&entry.path);
     match std::fs::metadata(&full_path) {
         Ok(meta) if meta.is_file() => {
             if meta.len() > max_stage_file_bytes {
@@ -346,9 +347,16 @@ pub(crate) fn has_sync_relevant_dirty_entries(
     max_stage_file_bytes: u64,
 ) -> bool {
     entries.iter().any(|entry| {
+        let full_path = repo.join(&entry.path);
+
+        // Skip entries inside nested git repos — managed by their own daemon
+        if is_nested_git_repo_path(&full_path).is_some() {
+            return false;
+        }
+
         // Skip gitlink entries with unchanged pointers entirely
         // Use repo.join() because entry.path is relative to repo, not CWD
-        if repo.join(&entry.path).is_dir() && is_gitlink_unchanged(repo, &entry.path) {
+        if full_path.is_dir() && is_gitlink_unchanged(repo, &entry.path) {
             return false;
         }
         should_stage_entry(
