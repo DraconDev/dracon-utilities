@@ -5,7 +5,7 @@ use std::path::Path;
 use std::time::Duration;
 
 use crate::bump::{bump_node_package_version_in_repo, bump_patch_version_in_repo, bump_version_file_in_repo};
-use crate::exclude::{can_restore_entry, excluded_dir_names_set, handle_large_untracked, is_large_untracked, should_stage_entry};
+use crate::exclude::{can_restore_entry, excluded_dir_names_set, handle_large_untracked, is_large_untracked, remove_tracked_excluded_paths, should_stage_entry};
 use crate::git::{
     cli_diff_entries, detect_large_blobs_ahead, git_name_status_entries, has_origin_remote,
     has_tracking_upstream, is_cherry_pick_in_progress, is_merge_in_progress,
