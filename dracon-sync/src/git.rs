@@ -485,22 +485,35 @@ pub(crate) async fn unstage_excluded_paths(
     excluded_dir_names: &BTreeSet<String>,
 ) -> Result<usize> {
     let staged = staged_paths(repo).await?;
-    let mut removed = 0usize;
+    let mut to_unstage = Vec::new();
     for path in staged {
-        if !is_excluded_change_path(&path, excluded_dir_names) {
-            continue;
+        if is_excluded_change_path(&path, excluded_dir_names) {
+            to_unstage.push(path);
         }
-        let status = tokio_git_command()
-            .args(["reset", "-q", "HEAD", "--"])
-            .arg(&path)
+    }
+    if to_unstage.is_empty() {
+        return Ok(0);
+    }
+
+    let removed = to_unstage.len();
+    // Batch in groups of 50 to avoid too long command lines
+    for chunk in to_unstage.chunks(50) {
+        let mut cmd = tokio_git_command();
+        cmd.args(["reset", "-q", "HEAD", "--"])
             .current_dir(repo)
-            .status()
+            .kill_on_drop(true);
+        for path in chunk {
+            cmd.arg(path);
+        }
+        let status = cmd.status()
             .await
             .with_context(|| {
-                format!("failed to unstage {} in {}", path.display(), repo.display())
+                format!("failed to unstage paths in {}", repo.display())
             })?;
-        if status.success() {
-            removed += 1;
+        if !status.success() {
+            // If one chunk fails, it might be due to a specific path error.
+            // Just log it and continue with other chunks.
+            eprintln!("⚠️ failed to unstage a chunk of paths in {}", repo.display());
         }
     }
     Ok(removed)
