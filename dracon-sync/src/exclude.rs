@@ -19,6 +19,20 @@ pub(crate) fn excluded_dir_names_set(policy: &SyncPolicy) -> BTreeSet<String> {
         .collect()
 }
 
+pub(crate) fn is_nested_git_repo_path(path: &Path) -> Option<PathBuf> {
+    let mut current = path;
+    while let Some(parent) = current.parent() {
+        if parent == current {
+            break;
+        }
+        if parent.join(".git").exists() {
+            return Some(parent.to_path_buf());
+        }
+        current = parent;
+    }
+    None
+}
+
 pub(crate) fn is_excluded_dir_name(name: &str, excluded_dir_names: &BTreeSet<String>) -> bool {
     let normalized = normalized_dir_name(name);
     for pattern in excluded_dir_names {
