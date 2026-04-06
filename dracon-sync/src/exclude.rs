@@ -143,6 +143,18 @@ pub(crate) fn should_stage_entry(
         return false;
     }
 
+    // Skip staging entries that live inside a nested git repo.
+    // The nested repo has its own daemon managing it — staging its files from
+    // the parent creates a conflict where both daemons fight over the same tree.
+    if let Some(nested) = is_nested_git_repo_path(&full_path) {
+        eprintln!(
+            "ℹ️ skip {}: nested git repo detected ({}) — managed by its own daemon",
+            full_path.display(),
+            nested.display()
+        );
+        return false;
+    }
+
     // Submodules and directory type changes
     if matches!(entry.status, dracon_git::types::FileStatus::TypeChange) {
         return true;
