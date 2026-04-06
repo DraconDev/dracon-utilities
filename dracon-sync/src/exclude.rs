@@ -353,7 +353,10 @@ pub(crate) fn handle_large_untracked(
 /// Find tracked files that live inside excluded directories.
 /// These should never have been committed (build artifacts, generated files, etc.).
 /// Removes them from git tracking and adds the directory patterns to .gitignore.
-pub(crate) fn remove_tracked_excluded_paths(repo: &Path, excluded_dir_names: &BTreeSet<String>) -> Result<Option<Vec<String>>> {
+pub(crate) fn remove_tracked_excluded_paths(
+    repo: &Path,
+    excluded_dir_names: &BTreeSet<String>,
+) -> Result<Option<Vec<String>>> {
     let output = std::process::Command::new("git")
         .current_dir(repo)
         .args(["ls-files", "-z"])
@@ -388,63 +391,12 @@ pub(crate) fn remove_tracked_excluded_paths(repo: &Path, excluded_dir_names: &BT
         return Ok(None);
     }
 
-    let patterns: Vec<String> = top_level_excluded.iter().map(|d| format!("{}/", d)).collect();
+    let patterns: Vec<String> = top_level_excluded
+        .iter()
+        .map(|d| format!("{}/", d))
+        .collect();
     eprintln!(
         "📝 {} has {} tracked file(s) inside excluded dirs {:?} — removing from git and adding to .gitignore",
-        repo.display(),
-        to_remove.len(),
-        patterns
-    );
-
-    append_to_gitignore(repo, &patterns)?;
-
-    for chunk in to_remove.chunks(50) {
-        let mut args = vec!["rm", "-q", "--cached", "--"];
-        for f in chunk {
-            args.push(f);
-        }
-        let status = std::process::Command::new("git")
-            .current_dir(repo)
-            .args(&args)
-            .status()?;
-        if !status.success() {
-            eprintln!("⚠️ git rm --cached failed for some files in {}", repo.display());
-        }
-    }
-
-    Ok(Some(top_level_excluded.into_iter().collect()))
-}
-    let files: Vec<&str> = String::from_utf8_lossy(&output.stdout)
-        .split('\0')
-        .filter(|s| !s.is_empty())
-        .collect();
-
-    let mut dirs_to_ignore: BTreeSet<String> = BTreeSet::new();
-    let mut to_remove: Vec<String> = Vec::new();
-
-    for file in &files {
-        let path = Path::new(file);
-        if let Some(dir) = path.parent() {
-            let dir_name = dir.file_name().and_then(|n| n.to_str()).unwrap_or("");
-            if is_excluded_dir_name(dir_name, excluded_dir_names) {
-                if let Some(parent) = dir.parent() {
-                    let parent_name = parent.file_name().and_then(|n| n.to_str()).unwrap_or("");
-                    if !is_excluded_dir_name(parent_name, excluded_dir_names) {
-                        dirs_to_ignore.insert(dir_name.to_string());
-                    }
-                }
-                to_remove.push(file.to_string());
-            }
-        }
-    }
-
-    if to_remove.is_empty() {
-        return Ok(None);
-    }
-
-    let patterns: Vec<String> = dirs_to_ignore.iter().map(|d| format!("{}/", d)).collect();
-    eprintln!(
-        "📝 {} has {} tracked file(s) in excluded dirs {:?} — removing from git and adding to .gitignore",
         repo.display(),
         to_remove.len(),
         patterns
@@ -469,7 +421,7 @@ pub(crate) fn remove_tracked_excluded_paths(repo: &Path, excluded_dir_names: &BT
         }
     }
 
-    Ok(Some(dirs_to_ignore.into_iter().collect()))
+    Ok(Some(top_level_excluded.into_iter().collect()))
 }
 
 pub(crate) fn has_sync_relevant_dirty_entries(
