@@ -232,7 +232,11 @@ pub(crate) async fn sync_repo(
                 .map(|e| e.path.to_string_lossy().to_string())
                 .collect();
 
-            svc.add_paths(&stage_paths).await?;
+            let mut add_args = vec!["add", "-f", "--"];
+            for p in &stage_paths {
+                add_args.push(p);
+            }
+            run_git_with_timeout(repo, &add_args, 30, "add").await?;
 
             // Build the payload from what we're actually going to commit (cached diff)
             let staged = git_name_status_entries(repo, &["diff", "--cached", "--name-status"]).await?;
