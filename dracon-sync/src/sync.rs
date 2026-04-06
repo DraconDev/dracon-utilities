@@ -123,6 +123,20 @@ pub(crate) async fn sync_repo(
         );
     }
 
+    // Remove any tracked files that live inside excluded directories
+    // (e.g. build artifacts that were accidentally committed). This also
+    // adds the directory pattern to .gitignore so it won't be re-tracked.
+    if let Some(removed_dirs) = remove_tracked_excluded_paths(repo, excluded_dir_names)? {
+        if !removed_dirs.is_empty() {
+            eprintln!(
+                "🧹 removed {} tracked excluded dir(s) from {}: {:?}",
+                removed_dirs.len(),
+                repo.display(),
+                removed_dirs
+            );
+        }
+    }
+
     let mut status = svc.get_status().await?;
     let mut entries = svc.get_diff_entries().await?;
 
