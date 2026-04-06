@@ -21,66 +21,6 @@ pub(crate) fn discover_git_repos(roots: &[PathBuf], excluded_dir_names: &BTreeSe
     repos
 }
 
-/// Check if a path is tracked as a gitlink (submodule, mode 160000) in the parent repo.
-fn is_gitlink_in_repo(parent: &Path, name: &str) -> bool {
-    let output = std_git_command()
-        .args(["ls-tree", "HEAD", name])
-        .current_dir(parent)
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::null())
-        .output()
-        .ok();
-    if let Some(output) = output {
-        let line = String::from_utf8_lossy(&output.stdout);
-        line.starts_with("160000")
-    } else {
-        false
-    }
-}
-    // Filter out repos that are nested inside another discovered repo
-    // AND tracked as a regular directory (not a gitlink/submodule).
-    // Gitlinks (mode 160000) have their own independent repos and should be synced.
-    // Regular nested .git dirs from accidental `git init` should be skipped.
-    repos.sort();
-    let mut filtered = Vec::new();
-    for repo in repos {
-        let is_nested = filtered.iter().any(|parent: &PathBuf| {
-            if !repo.starts_with(parent) {
-                return false;
-            }
-            // Check if parent tracks this as a gitlink (submodule)
-            if let Some(rel) = repo.strip_prefix(parent) {
-                let name = rel.components().next().and_then(|c| c.as_os_str().to_str());
-                if let Some(name) = name {
-                    return !is_gitlink_in_repo(parent, name);
-                }
-            }
-            true
-        });
-        if !is_nested {
-            filtered.push(repo);
-        }
-    }
-    filtered
-}
-
-/// Check if a path is tracked as a gitlink (submodule, mode 160000) in the parent repo.
-fn is_gitlink_in_repo(parent: &Path, name: &str) -> bool {
-    let output = std_git_command()
-        .args(["ls-tree", "HEAD", name])
-        .current_dir(parent)
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::null())
-        .output()
-        .ok();
-    if let Some(output) = output {
-        let line = String::from_utf8_lossy(&output.stdout);
-        line.starts_with("160000")
-    } else {
-        false
-    }
-}
-
 fn discover_git_repos_recursive(
     dir: &Path,
     excluded_dir_names: &BTreeSet<String>,
