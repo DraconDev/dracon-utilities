@@ -232,7 +232,7 @@ pub(crate) async fn sync_repo(
                 .map(|e| e.path.to_string_lossy().to_string())
                 .collect();
 
-            let mut add_args = vec!["add", "-f", "--"];
+            let mut add_args = vec!["add", "-A", "-f", "--"];
             for p in &stage_paths {
                 add_args.push(p);
             }
