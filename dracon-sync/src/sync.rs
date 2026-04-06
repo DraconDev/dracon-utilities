@@ -232,13 +232,30 @@ pub(crate) async fn sync_repo(
                 .map(|e| e.path.to_string_lossy().to_string())
                 .collect();
 
-            let mut add_args = vec!["add", "-A", "-f", "--"];
-            for p in &stage_paths {
-                add_args.push(p);
+            let (existing, missing): (Vec<_>, Vec<_>) = stage_paths
+                .into_iter()
+                .partition(|p| repo.join(p).exists());
+
+            if !existing.is_empty() {
+                let mut add_args = vec!["add", "-A", "-f", "--"];
+                for p in &existing {
+                    add_args.push(p);
+                }
+                if let Err(e) = run_git_with_timeout(repo, &add_args, 30, "add").await {
+                    eprintln!("⚠️ {} git add failed for {} paths: {:?}", repo.display(), existing.len(), existing);
+                    return Err(e);
+                }
             }
-            if let Err(e) = run_git_with_timeout(repo, &add_args, 30, "add").await {
-                eprintln!("⚠️ {} git add failed for {} paths: {:?}", repo.display(), stage_paths.len(), stage_paths);
-                return Err(e);
+
+            if !missing.is_empty() {
+                let mut rm_args = vec!["rm", "--ignore-unmatch", "--"];
+                for p in &missing {
+                    rm_args.push(p);
+                }
+                if let Err(e) = run_git_with_timeout(repo, &rm_args, 30, "rm").await {
+                    eprintln!("⚠️ {} git rm failed for {} paths: {:?}", repo.display(), missing.len(), missing);
+                    return Err(e);
+                }
             }
 
             // Build the payload from what we're actually going to commit (cached diff)
