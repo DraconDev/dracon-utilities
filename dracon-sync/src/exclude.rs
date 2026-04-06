@@ -19,13 +19,14 @@ pub(crate) fn excluded_dir_names_set(policy: &SyncPolicy) -> BTreeSet<String> {
         .collect()
 }
 
-pub(crate) fn is_nested_git_repo_path(path: &Path) -> Option<PathBuf> {
+pub(crate) fn is_nested_git_repo_path(path: &Path, current_repo_git: &Path) -> Option<PathBuf> {
     let mut current = path;
     while let Some(parent) = current.parent() {
         if parent == current {
             break;
         }
-        if parent.join(".git").exists() {
+        let candidate = parent.join(".git");
+        if candidate.exists() && candidate != current_repo_git {
             return Some(parent.to_path_buf());
         }
         current = parent;
@@ -148,7 +149,8 @@ pub(crate) fn should_stage_entry(
     // Skip staging entries that live inside a nested git repo.
     // The nested repo has its own daemon managing it — staging its files from
     // the parent creates a conflict where both daemons fight over the same tree.
-    if let Some(nested) = is_nested_git_repo_path(&full_path) {
+    let current_repo_git = repo.join(".git");
+    if let Some(nested) = is_nested_git_repo_path(&full_path, &current_repo_git) {
         eprintln!(
             "ℹ️ skip {}: nested git repo detected ({}) — managed by its own daemon",
             full_path.display(),
@@ -198,12 +200,17 @@ pub(crate) fn should_stage_entry(
     }
 }
 
-pub(crate) fn can_restore_entry(entry: &dracon_git::types::DiffFile) -> bool {
+pub(crate) fn can_restore_entry(repo: &Path, entry: &dracon_git::types::DiffFile) -> bool {
     use dracon_git::types::FileStatus;
-    matches!(
+    if !matches!(
         entry.status,
         FileStatus::Modified | FileStatus::TypeChange | FileStatus::Renamed
-    )
+    ) {
+        return false;
+    }
+    let full_path = repo.join(&entry.path);
+    let current_repo_git = repo.join(".git");
+    is_nested_git_repo_path(&full_path, &current_repo_git).is_none()
 }
 
 pub(crate) fn is_large_untracked(
@@ -216,6 +223,10 @@ pub(crate) fn is_large_untracked(
         return false;
     }
     let full_path = repo.join(&entry.path);
+    let current_repo_git = repo.join(".git");
+    if is_nested_git_repo_path(&full_path, &current_repo_git).is_some() {
+        return false;
+    }
     match std::fs::metadata(&full_path) {
         Ok(meta) if meta.is_file() => meta.len() > threshold,
         _ => false,
@@ -346,11 +357,12 @@ pub(crate) fn has_sync_relevant_dirty_entries(
     excluded_file_patterns: &[String],
     max_stage_file_bytes: u64,
 ) -> bool {
+    let current_repo_git = repo.join(".git");
     entries.iter().any(|entry| {
         let full_path = repo.join(&entry.path);
 
         // Skip entries inside nested git repos — managed by their own daemon
-        if is_nested_git_repo_path(&full_path).is_some() {
+        if is_nested_git_repo_path(&full_path, &current_repo_git).is_some() {
             return false;
         }
 
@@ -365,7 +377,7 @@ pub(crate) fn has_sync_relevant_dirty_entries(
             excluded_dir_names,
             excluded_file_patterns,
             max_stage_file_bytes,
-        ) || can_restore_entry(entry)
+        ) || can_restore_entry(repo, entry)
             || is_large_untracked(entry, repo, max_stage_file_bytes)
     })
 }

@@ -429,7 +429,7 @@ pub(crate) async fn sync_repo(
             // Restore any excluded modified paths that weren't committed
             // Skip gitlink entries (dirty submodules can't be restored this way)
             let restorable: Vec<_> = to_restore.iter()
-                .filter(|e| can_restore_entry(e))
+                .filter(|e| can_restore_entry(repo, e))
                 .filter(|e| !repo.join(&e.path).is_dir() || !crate::exclude::is_gitlink_unchanged(repo, &e.path))
                 .collect();
 
@@ -437,7 +437,7 @@ pub(crate) async fn sync_repo(
 
             let other_untracked: Vec<_> = to_restore
                 .iter()
-                .filter(|e| !can_restore_entry(e) && !is_large_untracked(e, repo, policy.max_stage_file_bytes))
+                .filter(|e| !can_restore_entry(repo, e) && !is_large_untracked(e, repo, policy.max_stage_file_bytes))
                 .collect();
 
             if !other_untracked.is_empty() {
@@ -501,14 +501,14 @@ pub(crate) async fn sync_repo(
         // Restore modified files to avoid perpetual dirty state. Untracked files can't be restored.
         // Skip gitlink entries (dirty submodules can't be restored this way)
         let restorable: Vec<_> = to_restore.iter()
-            .filter(|e| can_restore_entry(e))
+            .filter(|e| can_restore_entry(repo, e))
             .filter(|e| !repo.join(&e.path).is_dir() || !crate::exclude::is_gitlink_unchanged(repo, &e.path))
             .collect();
         let gitignore_updated = handle_large_untracked(repo, &to_restore, policy)?;
 
         let other_untracked: Vec<_> = to_restore
             .iter()
-            .filter(|e| !can_restore_entry(e) && !is_large_untracked(e, repo, policy.max_stage_file_bytes))
+            .filter(|e| !can_restore_entry(repo, e) && !is_large_untracked(e, repo, policy.max_stage_file_bytes))
             .collect();
 
         if !other_untracked.is_empty() {
