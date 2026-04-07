@@ -174,7 +174,7 @@ pub(crate) fn should_stage_entry(
     // The nested repo has its own daemon managing it — staging its files from
     // the parent creates a conflict where both daemons fight over the same tree.
     let current_repo_git = repo.join(".git");
-    if let Some(nested) = is_nested_git_repo_path(&full_path, &current_repo_git) {
+    if let Some(nested) = is_nested_git_repo_path(repo, &full_path, &current_repo_git) {
         eprintln!(
             "ℹ️ skip {}: nested git repo detected ({}) — managed by its own daemon",
             full_path.display(),
@@ -234,7 +234,7 @@ pub(crate) fn can_restore_entry(repo: &Path, entry: &dracon_git::types::DiffFile
     }
     let full_path = repo.join(&entry.path);
     let current_repo_git = repo.join(".git");
-    is_nested_git_repo_path(&full_path, &current_repo_git).is_none()
+    is_nested_git_repo_path(repo, &full_path, &current_repo_git).is_none()
 }
 
 pub(crate) fn is_large_untracked(
