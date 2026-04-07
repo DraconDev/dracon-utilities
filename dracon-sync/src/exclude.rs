@@ -19,7 +19,11 @@ pub(crate) fn excluded_dir_names_set(policy: &SyncPolicy) -> BTreeSet<String> {
         .collect()
 }
 
-pub(crate) fn is_nested_git_repo_path(path: &Path, current_repo_git: &Path) -> Option<PathBuf> {
+pub(crate) fn is_nested_git_repo_path(
+    repo: &Path,
+    path: &Path,
+    current_repo_git: &Path,
+) -> Option<PathBuf> {
     let mut current = path;
     while let Some(parent) = current.parent() {
         if parent == current {
@@ -30,11 +34,28 @@ pub(crate) fn is_nested_git_repo_path(path: &Path, current_repo_git: &Path) -> O
             if candidate == current_repo_git {
                 break;
             }
-            return Some(parent.to_path_buf());
+            if is_tracked_as_gitlink(repo, parent) {
+                return Some(parent.to_path_buf());
+            }
         }
         current = parent;
     }
     None
+}
+
+fn is_tracked_as_gitlink(repo: &Path, path: &Path) -> bool {
+    let output = std::process::Command::new("git")
+        .current_dir(repo)
+        .args(["ls-tree", "HEAD", "--"])
+        .arg(path)
+        .output();
+    match output {
+        Ok(out) if out.status.success() => {
+            let stdout = String::from_utf8_lossy(&out.stdout);
+            stdout.starts_with("160000 ")
+        }
+        _ => false,
+    }
 }
 
 pub(crate) fn is_excluded_dir_name(name: &str, excluded_dir_names: &BTreeSet<String>) -> bool {
