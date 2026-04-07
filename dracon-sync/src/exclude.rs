@@ -26,7 +26,10 @@ pub(crate) fn is_nested_git_repo_path(path: &Path, current_repo_git: &Path) -> O
             break;
         }
         let candidate = parent.join(".git");
-        if candidate.exists() && candidate != current_repo_git {
+        if candidate.exists() {
+            if candidate == current_repo_git {
+                break;
+            }
             return Some(parent.to_path_buf());
         }
         current = parent;
