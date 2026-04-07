@@ -1017,6 +1017,10 @@ fn run_daemon(policy_path: PathBuf) -> Result<()> {
     let sweep_every = Duration::from_secs(300);
     let mut pending_repos = BTreeSet::new();
 
+    if let Err(e) = harden_all(&policy) {
+        eprintln!("⚠️ initial hardening pass failed: {}", e);
+    }
+
     loop {
         match rx.recv_timeout(Duration::from_secs(1)) {
             Ok(Ok(event)) => {
