@@ -1400,6 +1400,86 @@ async fn find_large_log_files(dirs: &[PathBuf], min_size_bytes: u64) -> Result<V
     Ok(logs)
 }
 
+/// Truncate a log file to a maximum size while optionally preserving header lines.
+/// Returns the number of bytes reclaimed, or an error on failure.
+fn truncate_log_file(path: &Path, max_size_bytes: u64, preserve_header_lines: usize) -> Result<u64> {
+    use std::io::{BufRead, BufReader, Seek, SeekFrom, Write};
+
+    let original_size = std::fs::metadata(path)?.len();
+    if original_size <= max_size_bytes {
+        return Ok(0);
+    }
+
+    if preserve_header_lines == 0 {
+        // Simple truncate: open with truncate flag
+        let file = std::fs::OpenOptions::new()
+            .write(true)
+            .open(path)?;
+        file.set_len(max_size_bytes)?;
+        let new_size = file.metadata()?.len();
+        return Ok(original_size.saturating_sub(new_size));
+    }
+
+    // Preserve header lines: read first N lines, write them to temp file,
+    // then rename temp over original
+    let file = std::fs::File::open(path)?;
+    let reader = BufReader::new(file);
+    let mut header_lines: Vec<Vec<u8>> = Vec::new();
+
+    for (i, line_result) in reader.lines().enumerate() {
+        if i >= preserve_header_lines {
+            break;
+        }
+        if let Ok(line) = line_result {
+            header_lines.push(line.into_bytes());
+        } else {
+            break;
+        }
+    }
+
+    // Write header + max content to temp file
+    let temp_path = path.with_extension(format!(
+        "{}.truncated.{}",
+        path.extension().and_then(|e| e.to_str()).unwrap_or("log"),
+        std::process::id()
+    ));
+    {
+        let mut temp_file = std::fs::File::create(&temp_path)?;
+        for line_bytes in &header_lines {
+            temp_file.write_all(line_bytes)?;
+            temp_file.write_all(b"\n")?;
+        }
+        // Append from original, starting from where headers end
+        let mut original = std::fs::File::open(path)?;
+        original.seek(SeekFrom::Start(0))?;
+        let mut reader = BufReader::new(original);
+        let mut bytes_written = 0u64;
+        let mut lines_kept = 0usize;
+
+        for line_result in reader.lines() {
+            if let Ok(line) = line_result {
+                let line_bytes = line.into_bytes();
+                let line_len = line_bytes.len() as u64;
+
+                // Stop if adding this line would exceed max_size
+                if bytes_written + line_len + 1 > max_size_bytes {
+                    break;
+                }
+
+                temp_file.write_all(&line_bytes)?;
+                temp_file.write_all(b"\n")?;
+                bytes_written += line_len + 1;
+                lines_kept += 1;
+            }
+        }
+    }
+
+    // Atomically replace original
+    std::fs::rename(&temp_path, path)?;
+    let new_size = std::fs::metadata(path)?.len();
+    Ok(original_size.saturating_sub(new_size))
+}
+
 /// Predict when disk will fill based on trend
 fn predict_fill_time(history: &[(Instant, u8)], _interval_secs: u64) -> Option<f64> {
     if history.len() < 3 {
