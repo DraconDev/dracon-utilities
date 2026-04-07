@@ -395,6 +395,15 @@ struct GuardPolicy {
     /// Directories to scan for large log files
     #[serde(default = "default_log_dirs")]
     log_dirs: String,
+    /// Automatically truncate large log files when detected (keeps file, shrinks to max_size)
+    #[serde(default)]
+    auto_truncate_logs: bool,
+    /// Max size in MiB to truncate log files to (only applies when auto_truncate_logs is true)
+    #[serde(default = "default_log_max_truncate_mb")]
+    log_max_truncate_mb: u64,
+    /// Number of header lines to preserve when truncating (0 = truncate completely)
+    #[serde(default)]
+    log_preserve_header_lines: usize,
     /// Enable Docker pruning when disk is critical
     #[serde(default = "default_true")]
     docker_prune: bool,
@@ -453,6 +462,9 @@ impl Default for GuardPolicy {
             monitor_logs: default_true(),
             log_size_mb: default_log_size_mb(),
             log_dirs: default_log_dirs(),
+            auto_truncate_logs: false,
+            log_max_truncate_mb: default_log_max_truncate_mb(),
+            log_preserve_header_lines: 0,
             docker_prune: default_true(),
             docker_prune_volumes: false,
             clean_package_caches: default_true(),
