@@ -248,7 +248,7 @@ pub(crate) fn is_large_untracked(
     }
     let full_path = repo.join(&entry.path);
     let current_repo_git = repo.join(".git");
-    if is_nested_git_repo_path(&full_path, &current_repo_git).is_some() {
+    if is_nested_git_repo_path(repo, &full_path, &current_repo_git).is_some() {
         return false;
     }
     match std::fs::metadata(&full_path) {
@@ -492,7 +492,7 @@ pub(crate) fn has_sync_relevant_dirty_entries(
         let full_path = repo.join(&entry.path);
 
         // Skip entries inside nested git repos — managed by their own daemon
-        if is_nested_git_repo_path(&full_path, &current_repo_git).is_some() {
+        if is_nested_git_repo_path(repo, &full_path, &current_repo_git).is_some() {
             return false;
         }
 
