@@ -612,6 +612,10 @@ fn default_log_size_mb() -> u64 {
     100  // Alert on log files > 100 MiB
 }
 
+fn default_log_max_truncate_mb() -> u64 {
+    50  // Truncate logs to 50 MiB by default
+}
+
 fn default_log_dirs() -> String {
     // Empty by default - must be configured
     String::new()
