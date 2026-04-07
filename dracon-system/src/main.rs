@@ -1825,6 +1825,51 @@ async fn run_guard_once(
                         );
                         send_notification(guard, "Dracon System Guard - Large Log Files", &msg).await;
                     }
+
+                    // Auto-truncate if enabled
+                    if guard.auto_truncate_logs {
+                        let max_size = guard.log_max_truncate_mb * 1024 * 1024;
+                        let preserve = guard.log_preserve_header_lines;
+                        let mut total_reclaimed = 0u64;
+                        for (path, original_size) in &logs {
+                            match truncate_log_file(path, max_size, preserve) {
+                                Ok(reclaimed) if reclaimed > 0 => {
+                                    eprintln!(
+                                        "📝 truncated {}: {} -> {} (reclaimed {})",
+                                        path.display(),
+                                        human_bytes(*original_size),
+                                        human_bytes(original_size.saturating_sub(reclaimed)),
+                                        human_bytes(reclaimed)
+                                    );
+                                    total_reclaimed += reclaimed;
+                                }
+                                Ok(_) => {}
+                                Err(e) => {
+                                    eprintln!(
+                                        "⚠️ failed to truncate {}: {}",
+                                        path.display(),
+                                        e
+                                    );
+                                }
+                            }
+                        }
+                        if total_reclaimed > 0 {
+                            let key = "log-truncated".to_string();
+                            if should_notify(state, &key, guard.notify_cooldown_secs.max(3600)) {
+                                send_notification(
+                                    guard,
+                                    "Dracon System Guard - Logs Truncated",
+                                    &format!(
+                                        "Reclaimed {} from {} log file(s) (max now: {} MiB)",
+                                        human_bytes(total_reclaimed),
+                                        logs.len(),
+                                        guard.log_max_truncate_mb
+                                    ),
+                                )
+                                .await;
+                            }
+                        }
+                    }
                 }
                 _ => {}
             }
