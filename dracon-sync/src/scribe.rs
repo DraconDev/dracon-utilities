@@ -148,16 +148,27 @@ PROJECT BLUEPRINT (current goals):
 RECENT COMMITS (for context, do NOT repeat these):
 {git_log}
 
-RULES:
-- Read the ACTUAL DIFF to understand what changed semantically (function signatures, logic changes, bug fixes)
-- Do NOT just list file names — describe what the code changes DO
-- Be specific: "Add retry logic to HTTP client with exponential backoff" not "Modified http.rs"
-- If diff shows a bug fix, describe the bug and the fix
-- If diff shows a new feature, describe what it does
-- Only list items that are genuinely completed by this change
-- "In Progress" should only contain work that is clearly incomplete from the diff
-- "Open Issues" should only contain real blockers visible in the code, not "None currently"
-- Omit "In Progress" and "Open Issues" sections entirely if there's nothing meaningful to say
+CRITICAL RULES:
+- You MUST analyze the ACTUAL DIFF to understand what changed semantically
+- Do NOT write "wip checkpoint" — if work is in progress, describe what IS done
+- Do NOT write "File: <filename>" — describe what the code DOES
+- Do NOT write generic messages like "Updated files" or "Code changes"
+- If diff shows a bug fix, describe: "Fix X by doing Y" (the bug AND the fix)
+- If diff shows new feature, describe what it does and why it matters
+- If diff shows refactoring, describe what changed and why
+- If diff shows docs only, write: "docs(scope): describe what documentation was updated"
+- Only list genuinely completed items
+
+BAD examples (DO NOT USE):
+- "wip checkpoint"
+- "File: src/main.rs"
+- "Updated files"
+- "chore(misc): *   File: `foo.rs`"
+
+GOOD examples:
+- "feat(auth): add JWT validation with 5-minute expiry check"
+- "fix(http): retry failed requests with exponential backoff (max 3 attempts)"
+- "docs(readme): update installation instructions for Ubuntu 24.04"
 
 GENERATE EXACTLY this markdown structure. Each section header MUST have a blank line after it:
 
