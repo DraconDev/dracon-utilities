@@ -2,24 +2,22 @@
 
 CLI binaries for dracon system services.
 
-See [AGENTS.md](AGENTS.md) for installation and usage documentation.
+## Binaries
 
-Test for AI provider comparison
+- **dracon-sync** - Git sync automation daemon
+- **dracon-system** - Disk/process protection daemon  
+- **dracon-warden** - Security hardening daemon
 
-Test for AI provider comparison - mistral
+## Quick Start
 
-<<<<<<< Updated upstream
-Test for AI provider comparison - nvidia
-=======
-Test for AI provider comparison - gemma-4-26b
->>>>>>> Stashed changes
+```bash
+# Install
+./install.sh
 
-Test for AI provider comparison - gemma-4-26b
+# Restart services
+systemctl --user restart dracon-sync.service
+systemctl --user restart dracon-system-guard.service
+systemctl --user restart dracon-warden.service
+```
 
-Test for AI provider comparison - gemini-2.0-flash-exp
-
-Test for AI provider comparison - mistral-verify
-
-Test for AI provider comparison - stepfun-3.5-flash
-
-Test nemotron-3-super-120b
+See [AGENTS.md](AGENTS.md) for full documentation.
