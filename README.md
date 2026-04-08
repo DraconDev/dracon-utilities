@@ -21,3 +21,5 @@ Test for AI provider comparison - gemini-2.0-flash-exp
 Test for AI provider comparison - mistral-verify
 
 Test for AI provider comparison - stepfun-3.5-flash
+
+Test nemotron-3-super-120b
