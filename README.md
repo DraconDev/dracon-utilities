@@ -15,3 +15,5 @@ Test for AI provider comparison - gemma-4-26b
 >>>>>>> Stashed changes
 
 Test for AI provider comparison - gemma-4-26b
+
+Test for AI provider comparison - gemini-2.0-flash-exp
