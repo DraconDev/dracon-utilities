@@ -8,4 +8,8 @@ Test for AI provider comparison
 
 Test for AI provider comparison - mistral
 
+<<<<<<< Updated upstream
 Test for AI provider comparison - nvidia
+=======
+Test for AI provider comparison - gemma-4-26b
+>>>>>>> Stashed changes
