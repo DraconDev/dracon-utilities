@@ -73,33 +73,36 @@ dracon-sync uses AI for commit messages (scribe) and version bumping. Configure 
 
 ```toml
 [[providers]]
-name = "openrouter"
-env = "OPENROUTER_API_KEY"
-endpoint = "https://openrouter.ai/api/v1"
-model = "openrouter/free"
-
-[[providers]]
-name = "gemma"
-env = "GOOGLE_API_KEY"
-endpoint = "https://generativelanguage.googleapis.com/v1beta"
-model = "gemma-3-27b-it"
-adapter = "gemini"
-auth_header = "x-goog-api-key"
-auth_prefix = ""
+name = "mistral"
+env = "MISTRAL_API_KEY"
+endpoint = "https://codestral.mistral.ai/v1"
+model = "codestral-latest"
 
 [[providers]]
 name = "nvidia"
 env = "NVIDIA_API_KEY"
 endpoint = "https://integrate.api.nvidia.com/v1"
-model = "nvidia/nemotron-3-nano-30b-a3b"
+model = "stepfun-ai/step-3.5-flash"
+
+[[providers]]
+name = "openrouter"
+env = "OPENROUTER_API_KEY"
+endpoint = "https://openrouter.ai/api/v1"
+model = "nvidia/nemotron-3-super-120b-a12b:free"
+
+[[providers]]
+name = "openrouter"
+env = "OPENROUTER_API_KEY"
+endpoint = "https://openrouter.ai/api/v1"
+model = "openrouter/free"
 ```
 
 ### API Keys
 
 Store keys in `~/.dracon/ai/secrets/*.env`:
-- `openrouter.env` → `OPENROUTER_API_KEY=...`
-- `gemini.env` → `GOOGLE_API_KEY=...`
+- `mistral.env` → `MISTRAL_API_KEY=...`
 - `nvidia.env` → `NVIDIA_API_KEY=...`
+- `openrouter.env` → `OPENROUTER_API_KEY=...`
 
 ### Test AI Providers
 
