@@ -75,7 +75,39 @@ pub(crate) struct SyncPolicy {
     #[serde(default)]
     pub(crate) exclude_repos: Vec<String>,
     #[serde(default)]
+    pub(crate) exclude_dir_names: Vec<String>,
+    #[serde(default = "default_exclude_file_patterns")]
+    pub(crate) exclude_file_patterns: Vec<String>,
+    #[serde(default = "default_true")]
+    pub(crate) auto_repair_concerns: bool,
+    #[serde(default = "default_true")]
+    pub(crate) auto_repair_warns: bool,
+    #[serde(default = "default_true")]
+    pub(crate) auto_rewrite_large_blobs: bool,
+    #[serde(default)]
+    pub(crate) watch_roots: Vec<String>,
+    #[serde(default)]
+    pub(crate) extra_remotes: Vec<String>,
+    #[serde(default)]
     pub(crate) auto_github_private: bool,
+    #[serde(default = "default_max_stage_file_bytes")]
+    pub(crate) max_stage_file_bytes: u64,
+    #[serde(default = "default_pull_op_timeout_secs")]
+    pub(crate) pull_op_timeout_secs: u64,
+    #[serde(default = "default_push_op_timeout_secs")]
+    pub(crate) push_op_timeout_secs: u64,
+    #[serde(default = "default_repo_sync_timeout_secs")]
+    pub(crate) repo_sync_timeout_secs: u64,
+    #[serde(default = "default_push_retries")]
+    pub(crate) push_retries: u32,
+    #[serde(default = "default_repair_cooldown_secs")]
+    pub(crate) repair_cooldown_secs: u64,
+    #[serde(default = "default_max_push_blob_bytes")]
+    pub(crate) max_push_blob_bytes: u64,
+    #[serde(default = "default_incident_ledger_max_lines")]
+    pub(crate) incident_ledger_max_lines: usize,
+    #[serde(default = "default_incident_ledger_max_age_days")]
+    pub(crate) incident_ledger_max_age_days: u64,
 }
 
 fn default_exclude_repos() -> Vec<String> {
