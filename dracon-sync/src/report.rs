@@ -1591,7 +1591,7 @@ fn create_github_private_remote(repo: &Path) -> Option<String> {
     let repo_name = repo.file_name()?.to_str()?.to_string();
     
     let output = std::process::Command::new("gh")
-        .args(["repo create", &repo_name, "--private", "--clone"])
+        .args(["repo", "create", &repo_name, "--private"])
         .current_dir(repo)
         .output()
         .ok()?;
@@ -1602,7 +1602,21 @@ fn create_github_private_remote(repo: &Path) -> Option<String> {
         return None;
     }
     
-    Some(format!("git@github.com:DraconDev/{}.git", repo_name))
+    let remote_url = format!("git@github.com:DraconDev/{}.git", repo_name);
+    
+    let add_result = std::process::Command::new("git")
+        .args(["remote", "add", "origin", &remote_url])
+        .current_dir(repo)
+        .output();
+    
+    if let Err(e) = add_result {
+        eprintln!(
+            "⚠️ failed to add origin for {}: {}",
+            repo.display(), e
+        );
+    }
+    
+    Some(remote_url)
 }
 
 fn create_private_remote(repo: &Path) -> Option<String> {
