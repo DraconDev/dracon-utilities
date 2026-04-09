@@ -205,6 +205,10 @@ pub(crate) fn default_incident_ledger_max_age_days() -> u64 {
     30
 }
 
+fn default_github_account() -> String {
+    "DraconDev".to_string()
+}
+
 impl SyncPolicy {
     pub(crate) fn load(path: &Path) -> Result<Self> {
         let content = std::fs::read_to_string(path)
