@@ -771,9 +771,15 @@ pub(crate) async fn run_repair_concerns(
 
         if !has_origin {
             attempted_ops += 1;
-            out!("   plan: create private bare repo as origin");
             if apply {
-                if let Some(private_remote) = create_private_remote(&repo) {
+                let private_remote = if policy.auto_github_private {
+                    out!("   plan: create GitHub private repo as origin");
+                    create_github_private_remote(&repo)
+                } else {
+                    out!("   plan: create private bare repo as origin");
+                    create_private_remote(&repo)
+                };
+                if let Some(private_remote) = private_remote {
                     succeeded_ops += 1;
                     has_origin = true;
                     has_upstream = true;
