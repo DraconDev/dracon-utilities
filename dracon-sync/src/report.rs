@@ -1581,6 +1581,24 @@ pub(crate) async fn run_repair_warns(
     Ok(summary)
 }
 
+fn create_github_private_remote(repo: &Path) -> Option<String> {
+    let repo_name = repo.file_name()?.to_str()?.to_string();
+    
+    let output = std::process::Command::new("gh")
+        .args(["repo create", &repo_name, "--private", "--clone"])
+        .current_dir(repo)
+        .output()
+        .ok()?;
+    
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        eprintln!("⚠️ gh repo create failed for {}: {}", repo_name, stderr);
+        return None;
+    }
+    
+    Some(format!("git@github.com:DraconDev/{}.git", repo_name))
+}
+
 fn create_private_remote(repo: &Path) -> Option<String> {
     // NEVER overwrite an existing origin. Only create a local bare repo
     // for repos that genuinely have no remote configured.
