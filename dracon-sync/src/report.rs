@@ -1588,35 +1588,46 @@ pub(crate) async fn run_repair_warns(
 }
 
 fn create_github_private_remote(repo: &Path, account: &str) -> Option<String> {
-    let repo_name = repo.file_name()?.to_str()?.to_string();
+    let base_name = repo.file_name()?.to_str()?.to_string();
     
-    let output = std::process::Command::new("gh")
-        .args(["repo", "create", &repo_name, "--private"])
-        .current_dir(repo)
-        .output()
-        .ok()?;
+    let mut repo_name = base_name.clone();
+    let mut counter = 1;
     
-    if !output.status.success() {
+    loop {
+        let output = std::process::Command::new("gh")
+            .args(["repo", "create", &repo_name, "--private"])
+            .current_dir(repo)
+            .output()
+            .ok()?;
+        
+        if output.status.success() {
+            let remote_url = format!("git@github.com:{}/{}.git", account, repo_name);
+            
+            let add_result = std::process::Command::new("git")
+                .args(["remote", "add", "origin", &remote_url])
+                .current_dir(repo)
+                .output();
+            
+            if let Err(e) = add_result {
+                eprintln!(
+                    "⚠️ failed to add origin for {}: {}",
+                    repo.display(), e
+                );
+            }
+            
+            return Some(remote_url);
+        }
+        
         let stderr = String::from_utf8_lossy(&output.stderr);
+        if stderr.contains("Name already exists") && counter <= 100 {
+            repo_name = format!("{}-{}", base_name, counter);
+            counter += 1;
+            continue;
+        }
+        
         eprintln!("⚠️ gh repo create failed for {}: {}", repo_name, stderr);
         return None;
     }
-    
-    let remote_url = format!("git@github.com:{}/{}.git", account, repo_name);
-    
-    let add_result = std::process::Command::new("git")
-        .args(["remote", "add", "origin", &remote_url])
-        .current_dir(repo)
-        .output();
-    
-    if let Err(e) = add_result {
-        eprintln!(
-            "⚠️ failed to add origin for {}: {}",
-            repo.display(), e
-        );
-    }
-    
-    Some(remote_url)
 }
 
 fn create_private_remote(repo: &Path) -> Option<String> {
