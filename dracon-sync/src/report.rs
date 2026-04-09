@@ -774,7 +774,7 @@ pub(crate) async fn run_repair_concerns(
             if apply {
                 let private_remote = if policy.auto_github_private {
                     out!("   plan: create GitHub private repo as origin");
-                    create_github_private_remote(&repo)
+                    create_github_private_remote(&repo, &policy.auto_github_private_account)
                 } else {
                     out!("   plan: create private bare repo as origin");
                     create_private_remote(&repo)
@@ -1587,7 +1587,7 @@ pub(crate) async fn run_repair_warns(
     Ok(summary)
 }
 
-fn create_github_private_remote(repo: &Path) -> Option<String> {
+fn create_github_private_remote(repo: &Path, account: &str) -> Option<String> {
     let repo_name = repo.file_name()?.to_str()?.to_string();
     
     let output = std::process::Command::new("gh")
@@ -1602,7 +1602,7 @@ fn create_github_private_remote(repo: &Path) -> Option<String> {
         return None;
     }
     
-    let remote_url = format!("git@github.com:DraconDev/{}.git", repo_name);
+    let remote_url = format!("git@github.com:{}/{}.git", account, repo_name);
     
     let add_result = std::process::Command::new("git")
         .args(["remote", "add", "origin", &remote_url])
