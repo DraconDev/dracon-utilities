@@ -90,6 +90,8 @@ pub(crate) struct SyncPolicy {
     pub(crate) extra_remotes: Vec<String>,
     #[serde(default)]
     pub(crate) auto_github_private: bool,
+    #[serde(default = "default_github_account")]
+    pub(crate) auto_github_private_account: String,
     #[serde(default = "default_max_stage_file_bytes")]
     pub(crate) max_stage_file_bytes: u64,
     #[serde(default = "default_pull_op_timeout_secs")]
