@@ -1692,3 +1692,333 @@ fn create_private_remote(repo: &Path) -> Option<String> {
     
     Some(remote_url)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use dracon_git::types::{DiffFile, FileStatus, RepoStatus};
+
+    fn make_status(is_clean: bool, ahead: u32, behind: u32) -> RepoStatus {
+        RepoStatus {
+            is_clean,
+            ahead,
+            behind,
+            modified_files: 0,
+            staged_files: 0,
+            last_commit_hash: None,
+            last_commit_msg: None,
+        }
+    }
+
+    #[test]
+    fn test_truncate_exact_length() {
+        assert_eq!(truncate("hello", 5), "hello");
+    }
+
+    #[test]
+    fn test_truncate_shorter() {
+        assert_eq!(truncate("hello", 10), "hello");
+    }
+
+    #[test]
+    fn test_truncate_longer() {
+        assert_eq!(truncate("hello world", 5), "hel…");
+    }
+
+    #[test]
+    fn test_truncate_empty() {
+        assert_eq!(truncate("", 5), "");
+    }
+
+    #[test]
+    fn test_truncate_unicode_truncation() {
+        let s = "hello 世界";
+        let result = truncate(s, 8);
+        assert!(result.ends_with('…'));
+    }
+
+    #[test]
+    fn test_repo_state_flags_ok() {
+        let status = make_status(true, 0, 0);
+        let flags = repo_state_flags(&status, true, true);
+        assert!(flags.contains(&"OK".to_string()));
+    }
+
+    #[test]
+    fn test_repo_state_flags_dirty() {
+        let mut status = make_status(false, 0, 0);
+        status.modified_files = 2;
+        let flags = repo_state_flags(&status, true, true);
+        assert!(flags.contains(&"DIRTY".to_string()));
+    }
+
+    #[test]
+    fn test_repo_state_flags_ahead() {
+        let status = make_status(true, 3, 0);
+        let flags = repo_state_flags(&status, true, true);
+        assert!(flags.iter().any(|f| f.starts_with("AHEAD:")));
+    }
+
+    #[test]
+    fn test_repo_state_flags_behind() {
+        let status = make_status(true, 0, 2);
+        let flags = repo_state_flags(&status, true, true);
+        assert!(flags.iter().any(|f| f.starts_with("BEHIND:")));
+    }
+
+    #[test]
+    fn test_repo_state_flags_no_origin() {
+        let status = make_status(true, 0, 0);
+        let flags = repo_state_flags(&status, false, false);
+        assert!(flags.contains(&"NO_ORIGIN".to_string()));
+    }
+
+    #[test]
+    fn test_repo_state_flags_no_upstream() {
+        let status = make_status(true, 0, 0);
+        let flags = repo_state_flags(&status, true, false);
+        assert!(flags.contains(&"NO_UPSTREAM".to_string()));
+    }
+
+    #[test]
+    fn test_repo_state_flags_stuck_push() {
+        let status = make_status(false, 5, 0);
+        let flags = repo_state_flags(&status, true, true);
+        assert!(flags.contains(&"STUCK_PUSH".to_string()));
+    }
+
+    #[test]
+    fn test_repo_state_flags_stuck_pull() {
+        let status = make_status(false, 0, 3);
+        let flags = repo_state_flags(&status, true, true);
+        assert!(flags.contains(&"STUCK_PULL".to_string()));
+    }
+
+    #[test]
+    fn test_repo_state_flags_multiple() {
+        let status = make_status(false, 3, 2);
+        let flags = repo_state_flags(&status, true, true);
+        assert!(flags.contains(&"DIRTY".to_string()));
+        assert!(flags.iter().any(|f| f.starts_with("AHEAD:")));
+        assert!(flags.iter().any(|f| f.starts_with("BEHIND:")));
+    }
+
+    #[test]
+    fn test_repo_is_concern_no_origin() {
+        let status = make_status(true, 0, 0);
+        assert!(repo_is_concern(&status, false, false));
+    }
+
+    #[test]
+    fn test_repo_is_concern_no_upstream() {
+        let status = make_status(true, 0, 0);
+        assert!(repo_is_concern(&status, true, false));
+    }
+
+    #[test]
+    fn test_repo_is_concern_ahead() {
+        let status = make_status(false, 5, 0);
+        assert!(repo_is_concern(&status, true, true));
+    }
+
+    #[test]
+    fn test_repo_is_concern_behind() {
+        let status = make_status(false, 0, 3);
+        assert!(repo_is_concern(&status, true, true));
+    }
+
+    #[test]
+    fn test_repo_is_concern_clean_healthy() {
+        let status = make_status(true, 0, 0);
+        assert!(!repo_is_concern(&status, true, true));
+    }
+
+    #[test]
+    fn test_repo_is_warn_dirty() {
+        let status = make_status(false, 0, 0);
+        assert!(repo_is_warn(&status, true, true));
+    }
+
+    #[test]
+    fn test_repo_is_warn_not_concern() {
+        let status = make_status(false, 0, 0);
+        assert!(!repo_is_warn(&status, false, false));
+    }
+
+    #[test]
+    fn test_repo_hint_no_origin() {
+        let hint = repo_hint(&["NO_ORIGIN".into()], false, false);
+        assert_eq!(hint, "set origin remote");
+    }
+
+    #[test]
+    fn test_repo_hint_no_upstream() {
+        let hint = repo_hint(&["NO_UPSTREAM".into()], false, false);
+        assert_eq!(hint, "run repair-concerns --apply (set upstream)");
+    }
+
+    #[test]
+    fn test_repo_hint_ahead() {
+        let hint = repo_hint(&["AHEAD:3".into()], false, false);
+        assert_eq!(hint, "run repair-concerns --apply (push or rewrite)");
+    }
+
+    #[test]
+    fn test_repo_hint_behind() {
+        let hint = repo_hint(&["BEHIND:2".into()], false, false);
+        assert_eq!(hint, "run repair-concerns --apply (pull/rebase)");
+    }
+
+    #[test]
+    fn test_repo_hint_healthy() {
+        let hint = repo_hint(&["OK".into()], false, false);
+        assert_eq!(hint, "healthy");
+    }
+
+    #[test]
+    fn test_repo_hint_warn() {
+        let hint = repo_hint(&["DIRTY".into()], true, false);
+        assert_eq!(hint, "run repair-warns --apply");
+    }
+
+    #[test]
+    fn test_repo_hint_concern() {
+        let hint = repo_hint(&["DIRTY".into()], false, true);
+        assert_eq!(hint, "run repair-concerns --apply");
+    }
+
+    #[test]
+    fn test_push_large_blob_threshold_bytes() {
+        let policy = SyncPolicy {
+            max_stage_file_bytes: 200 * 1024 * 1024,
+            max_push_blob_bytes: 50 * 1024 * 1024,
+            ..Default::default()
+        };
+        let threshold = push_large_blob_threshold_bytes(&policy);
+        assert_eq!(threshold, 50 * 1024 * 1024);
+    }
+
+    #[test]
+    fn test_push_large_blob_threshold_caps_at_git_limit() {
+        let policy = SyncPolicy {
+            max_stage_file_bytes: 200 * 1024 * 1024,
+            max_push_blob_bytes: 200 * 1024 * 1024,
+            ..Default::default()
+        };
+        let threshold = push_large_blob_threshold_bytes(&policy);
+        assert_eq!(threshold, DEFAULT_GIT_HOST_BLOB_LIMIT_BYTES);
+    }
+
+    #[test]
+    fn test_detect_report_signals_active_board() {
+        let files = vec![
+            DiffFile {
+                path: std::path::PathBuf::from("plan/ACTIVE_BOARD.md"),
+                status: FileStatus::Modified,
+                old_path: None,
+            }
+        ];
+        let signals = detect_report_signals(std::path::Path::new("/fake"), &files);
+        assert!(signals.contains(&ReportSignal::ActiveBoardChanged));
+    }
+
+    #[test]
+    fn test_detect_report_signals_index() {
+        let files = vec![
+            DiffFile {
+                path: std::path::PathBuf::from("docs/index.md"),
+                status: FileStatus::Modified,
+                old_path: None,
+            }
+        ];
+        let signals = detect_report_signals(std::path::Path::new("/fake"), &files);
+        assert!(signals.contains(&ReportSignal::IndexChanged));
+    }
+
+    #[test]
+    fn test_detect_report_signals_blueprint_added() {
+        let files = vec![
+            DiffFile {
+                path: std::path::PathBuf::from("docs/blueprint-foo.md"),
+                status: FileStatus::Added,
+                old_path: None,
+            }
+        ];
+        let signals = detect_report_signals(std::path::Path::new("/fake"), &files);
+        assert!(signals.contains(&ReportSignal::BlueprintCreated));
+    }
+
+    #[test]
+    fn test_detect_report_signals_blueprint_modified() {
+        let files = vec![
+            DiffFile {
+                path: std::path::PathBuf::from("docs/blueprint-bar.md"),
+                status: FileStatus::Modified,
+                old_path: None,
+            }
+        ];
+        let signals = detect_report_signals(std::path::Path::new("/fake"), &files);
+        assert!(signals.contains(&ReportSignal::BlueprintModified));
+    }
+
+    #[test]
+    fn test_incident_record_new() {
+        let record = IncidentRecord::new("concern", "/test/repo", "reason", "action", "ok");
+        assert_eq!(record.scope, "concern");
+        assert_eq!(record.repo, "/test/repo");
+        assert_eq!(record.reason, "reason");
+        assert_eq!(record.action, "action");
+        assert_eq!(record.result, "ok");
+        assert!(record.backup_branch.is_none());
+        assert!(record.details.is_none());
+    }
+
+    #[test]
+    fn test_incident_record_with_details() {
+        let record = IncidentRecord::new("test", "repo", "reason", "action", "ok");
+        let record = record.with_details("some details");
+        assert_eq!(record.details, Some("some details".to_string()));
+    }
+
+    #[test]
+    fn test_incident_record_with_backup_branch() {
+        let record = IncidentRecord::new("test", "repo", "reason", "action", "ok");
+        let record = record.with_backup_branch("backup-branch");
+        assert_eq!(record.backup_branch, Some("backup-branch".to_string()));
+    }
+}
+
+impl Default for SyncPolicy {
+    fn default() -> Self {
+        SyncPolicy {
+            system_repo: String::new(),
+            pulse_interval_secs: 1,
+            inactivity_push_delay_secs: 5,
+            auto_commit: true,
+            auto_bump_versions: true,
+            auto_pull: true,
+            auto_push: true,
+            backup_policy: String::new(),
+            backup_dir: String::new(),
+            exclude_repos: vec![],
+            exclude_dir_names: vec![],
+            exclude_file_patterns: vec![],
+            auto_repair_concerns: true,
+            auto_repair_warns: true,
+            auto_rewrite_large_blobs: true,
+            watch_roots: vec![],
+            extra_remotes: vec![],
+            auto_github_private: false,
+            auto_github_private_account: "DraconDev".to_string(),
+            max_stage_file_bytes: 100 * 1024 * 1024,
+            pull_op_timeout_secs: 30,
+            push_op_timeout_secs: 300,
+            repo_sync_timeout_secs: 420,
+            push_retries: 3,
+            repair_cooldown_secs: 60,
+            max_push_blob_bytes: 100 * 1024 * 1024,
+            incident_ledger_max_lines: 10_000,
+            incident_ledger_max_age_days: 30,
+        }
+    }
+}
