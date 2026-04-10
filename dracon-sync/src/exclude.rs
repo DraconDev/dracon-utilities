@@ -180,7 +180,7 @@ mod tests {
     fn test_excluded_dir_names_set_removes_empty() {
         let policy = SyncPolicy {
             exclude_dir_names: vec!["target".to_string(), "".to_string(), "   ".to_string()],
-            ..Default::default()
+            ..test_sync_policy()
         };
 
         let set = excluded_dir_names_set(&policy);
