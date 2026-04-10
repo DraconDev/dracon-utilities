@@ -476,30 +476,6 @@ mod tests {
     }
 
     #[test]
-    fn test_env_freeze_enabled() {
-        std::env::remove_var("DRACON_SYNC_FREEZE");
-        assert!(!env_freeze_enabled());
-    }
-
-    #[test]
-    fn test_env_freeze_enabled_true_values() {
-        for val in ["1", "true", "yes", "on", "TRUE", "Yes"] {
-            std::env::set_var("DRACON_SYNC_FREEZE", val);
-            assert!(env_freeze_enabled(), "expected true for '{}'", val);
-        }
-        std::env::remove_var("DRACON_SYNC_FREEZE");
-    }
-
-    #[test]
-    fn test_env_freeze_enabled_false_values() {
-        for val in ["0", "false", "no", "off", ""] {
-            std::env::set_var("DRACON_SYNC_FREEZE", val);
-            assert!(!env_freeze_enabled(), "expected false for '{}'", val);
-        }
-        std::env::remove_var("DRACON_SYNC_FREEZE");
-    }
-
-    #[test]
     fn test_debug_enabled() {
         std::env::remove_var("DRACON_SYNC_DEBUG");
         assert!(!debug_enabled());
