@@ -187,6 +187,70 @@ mod tests {
         assert!(set.contains("target"));
         assert!(!set.contains(""));
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_normalized_dir_name() {
+        assert_eq!(normalized_dir_name("target"), "target");
+        assert_eq!(normalized_dir_name("/target/"), "target");
+        assert_eq!(normalized_dir_name("Target"), "target");
+        assert_eq!(normalized_dir_name(".tmp-123"), ".tmp-123");
+    }
+
+    #[test]
+    fn test_is_excluded_dir_name_exact() {
+        let excluded: BTreeSet<String> = ["target", "node_modules", ".cache"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+
+        assert!(is_excluded_dir_name("target", &excluded));
+        assert!(is_excluded_dir_name("node_modules", &excluded));
+        assert!(is_excluded_dir_name(".cache", &excluded));
+        assert!(!is_excluded_dir_name("src", &excluded));
+    }
+
+    #[test]
+    fn test_is_excluded_dir_name_pattern() {
+        let excluded: BTreeSet<String> = [".tmp-".to_string()].into_iter().collect();
+
+        assert!(is_excluded_dir_name(".tmp-abc", &excluded));
+        assert!(is_excluded_dir_name(".tmp-123", &excluded));
+    }
+
+    #[test]
+    fn test_excluded_dir_names_set() {
+        let mut policy = test_sync_policy();
+        policy.exclude_dir_names = vec![
+            "target".to_string(),
+            "/node_modules/".to_string(),
+            ".cache".to_string(),
+        ];
+
+        let set = excluded_dir_names_set(&policy);
+        assert!(set.contains("target"));
+        assert!(set.contains("node_modules"));
+        assert!(set.contains(".cache"));
+        assert_eq!(set.len(), 3);
+    }
+
+    #[test]
+    fn test_excluded_dir_names_set_removes_empty() {
+        let mut policy = test_sync_policy();
+        policy.exclude_dir_names = vec![
+            "target".to_string(),
+            "".to_string(),
+            "   ".to_string(),
+        ];
+
+        let set = excluded_dir_names_set(&policy);
+        assert!(set.contains("target"));
+        assert!(!set.contains(""));
+    }
 
     fn test_sync_policy() -> SyncPolicy {
         SyncPolicy {
