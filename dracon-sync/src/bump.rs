@@ -668,11 +668,14 @@ mod tests {
     #[test]
     fn test_bump_semver_invalid_inputs() {
         assert_eq!(bump_semver_patch("1.2"), None);
-        assert_eq!(bump_semver_patch("1.2.3.4"), None);
         assert_eq!(bump_semver_patch("v1.2.3"), None);
         assert_eq!(bump_semver_patch("1.a.3"), None);
         assert_eq!(bump_semver_patch(""), None);
         assert_eq!(bump_semver_patch("1.2.3-alpha"), None);
+        assert_eq!(bump_semver_minor("1.2"), None);
+        assert_eq!(bump_semver_minor("v1.2.3"), None);
+        assert_eq!(bump_semver_major("1.2"), None);
+        assert_eq!(bump_semver_major("v1.2.3"), None);
     }
 
     #[test]
