@@ -1984,6 +1984,32 @@ mod tests {
         assert_eq!(record.backup_branch, Some("backup-branch".to_string()));
     }
 
+    #[test]
+    fn test_timestamp_secs_returns_reasonable_value() {
+        let ts = timestamp_secs();
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        assert!(ts > 0);
+        assert!(ts <= now + 1);
+    }
+
+    #[test]
+    fn test_incident_ledger_path_default() {
+        std::env::remove_var("DRACON_SYNC_LEDGER");
+        let path = incident_ledger_path(std::path::Path::new("/fake/policy.toml"));
+        assert!(path.to_string_lossy().contains("dracon-sync-incidents.jsonl"));
+    }
+
+    #[test]
+    fn test_incident_ledger_path_custom_env() {
+        std::env::set_var("DRACON_SYNC_LEDGER", "/custom/path/ledger.jsonl");
+        let path = incident_ledger_path(std::path::Path::new("/fake/policy.toml"));
+        assert_eq!(path.to_string_lossy(), "/custom/path/ledger.jsonl");
+        std::env::remove_var("DRACON_SYNC_LEDGER");
+    }
+
     fn test_sync_policy() -> SyncPolicy {
         SyncPolicy {
             system_repo: String::new(),
