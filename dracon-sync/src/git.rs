@@ -913,3 +913,57 @@ pub(crate) async fn restore_paths(repo: &Path, paths: &[String]) -> Result<()> {
     let checkout_ref: Vec<&str> = checkout.iter().map(|s| s.as_str()).collect();
     run_git_with_timeout(repo, &checkout_ref, 30, "checkout").await
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_strip_url_credentials_https_with_creds() {
+        let url = "https://user:pass@github.com/owner/repo.git";
+        let result = strip_url_credentials(url);
+        assert_eq!(result, "https://github.com/owner/repo.git");
+    }
+
+    #[test]
+    fn test_strip_url_credentials_https_without_creds() {
+        let url = "https://github.com/owner/repo.git";
+        let result = strip_url_credentials(url);
+        assert_eq!(result, url);
+    }
+
+    #[test]
+    fn test_strip_url_credentials_git_url() {
+        let url = "git@github.com:owner/repo.git";
+        let result = strip_url_credentials(url);
+        assert_eq!(result, url);
+    }
+
+    #[test]
+    fn test_github_https_url_git_ssh() {
+        let url = "git@github.com:owner/repo.git";
+        let result = github_https_url(url);
+        assert_eq!(result, Some("https://github.com/owner/repo.git".to_string()));
+    }
+
+    #[test]
+    fn test_github_https_url_ssh_protocol() {
+        let url = "ssh://git@github.com/owner/repo.git";
+        let result = github_https_url(url);
+        assert_eq!(result, Some("https://github.com/owner/repo.git".to_string()));
+    }
+
+    #[test]
+    fn test_github_https_url_https() {
+        let url = "https://github.com/owner/repo.git";
+        let result = github_https_url(url);
+        assert_eq!(result, Some(url.to_string()));
+    }
+
+    #[test]
+    fn test_github_https_url_non_github() {
+        let url = "https://gitlab.com/owner/repo.git";
+        let result = github_https_url(url);
+        assert_eq!(result, None);
+    }
+}
