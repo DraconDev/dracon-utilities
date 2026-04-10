@@ -1698,8 +1698,9 @@ mod tests {
     use super::*;
     use dracon_git::types::{DiffFile, FileStatus, RepoStatus};
 
-    fn make_status(is_clean: bool, ahead: u32, behind: u32) -> RepoStatus {
+    fn make_status(is_clean: bool, ahead: usize, behind: usize) -> RepoStatus {
         RepoStatus {
+            branch: String::new(),
             is_clean,
             ahead,
             behind,
