@@ -401,3 +401,122 @@ pub(crate) fn open_policy_in_editor(policy_path: &Path) -> Result<()> {
         policy_path.display()
     ))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_default_exclude_dir_names() {
+        let dirs = default_exclude_dir_names();
+        assert!(dirs.contains(&"target".to_string()));
+        assert!(dirs.contains(&"node_modules".to_string()));
+        assert!(dirs.contains(&".cache".to_string()));
+    }
+
+    #[test]
+    fn test_default_exclude_file_patterns() {
+        let patterns = default_exclude_file_patterns();
+        assert!(patterns.contains(&"*.log".to_string()));
+        assert!(patterns.contains(&"nohup.out".to_string()));
+    }
+
+    #[test]
+    fn test_default_max_stage_file_bytes() {
+        let bytes = default_max_stage_file_bytes();
+        assert_eq!(bytes, 100 * 1024 * 1024);
+    }
+
+    #[test]
+    fn test_default_pull_op_timeout_secs() {
+        let secs = default_pull_op_timeout_secs();
+        assert_eq!(secs, 30);
+    }
+
+    #[test]
+    fn test_default_push_op_timeout_secs() {
+        let secs = default_push_op_timeout_secs();
+        assert_eq!(secs, 300);
+    }
+
+    #[test]
+    fn test_default_repo_sync_timeout_secs() {
+        let secs = default_repo_sync_timeout_secs();
+        assert_eq!(secs, 420);
+    }
+
+    #[test]
+    fn test_default_push_retries() {
+        let retries = default_push_retries();
+        assert_eq!(retries, 3);
+    }
+
+    #[test]
+    fn test_default_repair_cooldown_secs() {
+        let secs = default_repair_cooldown_secs();
+        assert_eq!(secs, 60);
+    }
+
+    #[test]
+    fn test_default_max_push_blob_bytes() {
+        let bytes = default_max_push_blob_bytes();
+        assert_eq!(bytes, DEFAULT_GIT_HOST_BLOB_LIMIT_BYTES);
+    }
+
+    #[test]
+    fn test_default_incident_ledger_max_lines() {
+        let lines = default_incident_ledger_max_lines();
+        assert_eq!(lines, 10_000);
+    }
+
+    #[test]
+    fn test_default_incident_ledger_max_age_days() {
+        let days = default_incident_ledger_max_age_days();
+        assert_eq!(days, 30);
+    }
+
+    #[test]
+    fn test_env_freeze_enabled() {
+        std::env::remove_var("DRACON_SYNC_FREEZE");
+        assert!(!env_freeze_enabled());
+    }
+
+    #[test]
+    fn test_env_freeze_enabled_true_values() {
+        for val in ["1", "true", "yes", "on", "TRUE", "Yes"] {
+            std::env::set_var("DRACON_SYNC_FREEZE", val);
+            assert!(env_freeze_enabled(), "expected true for '{}'", val);
+        }
+        std::env::remove_var("DRACON_SYNC_FREEZE");
+    }
+
+    #[test]
+    fn test_env_freeze_enabled_false_values() {
+        for val in ["0", "false", "no", "off", ""] {
+            std::env::set_var("DRACON_SYNC_FREEZE", val);
+            assert!(!env_freeze_enabled(), "expected false for '{}'", val);
+        }
+        std::env::remove_var("DRACON_SYNC_FREEZE");
+    }
+
+    #[test]
+    fn test_debug_enabled() {
+        std::env::remove_var("DRACON_SYNC_DEBUG");
+        assert!(!debug_enabled());
+    }
+
+    #[test]
+    fn test_default_true() {
+        assert!(default_true());
+    }
+
+    #[test]
+    fn test_default_pulse_interval() {
+        assert_eq!(default_pulse_interval(), 1);
+    }
+
+    #[test]
+    fn test_default_inactivity_push_delay_secs() {
+        assert_eq!(default_inactivity_push_delay_secs(), 5);
+    }
+}
