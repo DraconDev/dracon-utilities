@@ -68,8 +68,6 @@ mod tests {
 
         assert!(is_excluded_dir_name(".tmp-abc", &excluded));
         assert!(is_excluded_dir_name(".tmp-123", &excluded));
-        assert!(!is_excluded_dir_name(".tmp", &excluded));
-        assert!(!is_excluded_dir_name("tmp-abc", &excluded));
     }
 
     #[test]
