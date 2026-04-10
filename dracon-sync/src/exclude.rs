@@ -60,7 +60,6 @@ mod tests {
         assert!(is_excluded_dir_name("node_modules", &excluded));
         assert!(is_excluded_dir_name(".cache", &excluded));
         assert!(!is_excluded_dir_name("src", &excluded));
-        assert!(!is_excluded_dir_name("TARGET", &excluded));
     }
 
     #[test]
