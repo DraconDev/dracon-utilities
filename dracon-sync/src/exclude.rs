@@ -187,11 +187,6 @@ mod tests {
         assert!(set.contains("target"));
         assert!(!set.contains(""));
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
 
     #[test]
     fn test_normalized_dir_name() {
