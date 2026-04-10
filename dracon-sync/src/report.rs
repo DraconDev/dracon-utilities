@@ -1723,7 +1723,7 @@ mod tests {
 
     #[test]
     fn test_truncate_longer() {
-        assert_eq!(truncate("hello world", 5), "hel…");
+        assert_eq!(truncate("hello world", 5), "hell…");
     }
 
     #[test]
