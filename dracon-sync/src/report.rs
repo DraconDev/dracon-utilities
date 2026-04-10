@@ -1733,8 +1733,8 @@ mod tests {
 
     #[test]
     fn test_truncate_unicode_truncation() {
-        let s = "hello 世界";
-        let result = truncate(s, 8);
+        let s = "hello 世界 test";
+        let result = truncate(s, 10);
         assert!(result.ends_with('…'));
     }
 
