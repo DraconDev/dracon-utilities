@@ -182,7 +182,7 @@ impl IncidentRecord {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) enum ReportSignal {
     ActiveBoardChanged,
     IndexChanged,
