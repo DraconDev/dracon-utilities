@@ -1986,10 +1986,8 @@ mod tests {
         let record = record.with_backup_branch("backup-branch");
         assert_eq!(record.backup_branch, Some("backup-branch".to_string()));
     }
-}
 
-impl Default for SyncPolicy {
-    fn default() -> Self {
+    fn test_sync_policy() -> SyncPolicy {
         SyncPolicy {
             system_repo: String::new(),
             pulse_interval_secs: 1,
