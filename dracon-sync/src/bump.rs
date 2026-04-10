@@ -657,4 +657,35 @@ mod tests {
         assert_eq!(bump_semver_major("1.2.3"), Some("2.0.0".to_string()));
         assert_eq!(bump_semver_major("0.9.9"), Some("1.0.0".to_string()));
     }
+
+    #[test]
+    fn test_bump_semver_edge_cases() {
+        assert_eq!(bump_semver_patch("10.20.30"), Some("10.20.31".to_string()));
+        assert_eq!(bump_semver_minor("10.20.30"), Some("10.21.0".to_string()));
+        assert_eq!(bump_semver_major("10.20.30"), Some("11.0.0".to_string()));
+    }
+
+    #[test]
+    fn test_bump_semver_invalid_inputs() {
+        assert_eq!(bump_semver_patch("1.2"), None);
+        assert_eq!(bump_semver_patch("1.2.3.4"), None);
+        assert_eq!(bump_semver_patch("v1.2.3"), None);
+        assert_eq!(bump_semver_patch("1.a.3"), None);
+        assert_eq!(bump_semver_patch(""), None);
+        assert_eq!(bump_semver_patch("1.2.3-alpha"), None);
+    }
+
+    #[test]
+    fn test_bump_semver_leading_v_rejected() {
+        assert_eq!(bump_semver_patch("v1.2.3"), None);
+        assert_eq!(bump_semver_minor("v1.2.3"), None);
+        assert_eq!(bump_semver_major("v1.2.3"), None);
+    }
+
+    #[test]
+    fn test_bump_semver_zero_versions() {
+        assert_eq!(bump_semver_patch("0.0.1"), Some("0.0.2".to_string()));
+        assert_eq!(bump_semver_minor("0.0.1"), Some("0.1.0".to_string()));
+        assert_eq!(bump_semver_major("0.0.1"), Some("1.0.0".to_string()));
+    }
 }
