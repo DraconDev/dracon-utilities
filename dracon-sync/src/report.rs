@@ -1893,7 +1893,7 @@ mod tests {
         let policy = SyncPolicy {
             max_stage_file_bytes: 200 * 1024 * 1024,
             max_push_blob_bytes: 50 * 1024 * 1024,
-            ..Default::default()
+            ..test_sync_policy()
         };
         let threshold = push_large_blob_threshold_bytes(&policy);
         assert_eq!(threshold, 50 * 1024 * 1024);
@@ -1904,7 +1904,7 @@ mod tests {
         let policy = SyncPolicy {
             max_stage_file_bytes: 200 * 1024 * 1024,
             max_push_blob_bytes: 200 * 1024 * 1024,
-            ..Default::default()
+            ..test_sync_policy()
         };
         let threshold = push_large_blob_threshold_bytes(&policy);
         assert_eq!(threshold, DEFAULT_GIT_HOST_BLOB_LIMIT_BYTES);
@@ -1916,7 +1916,6 @@ mod tests {
             DiffFile {
                 path: std::path::PathBuf::from("plan/ACTIVE_BOARD.md"),
                 status: FileStatus::Modified,
-                old_path: None,
             }
         ];
         let signals = detect_report_signals(std::path::Path::new("/fake"), &files);
@@ -1929,7 +1928,6 @@ mod tests {
             DiffFile {
                 path: std::path::PathBuf::from("docs/index.md"),
                 status: FileStatus::Modified,
-                old_path: None,
             }
         ];
         let signals = detect_report_signals(std::path::Path::new("/fake"), &files);
@@ -1942,7 +1940,6 @@ mod tests {
             DiffFile {
                 path: std::path::PathBuf::from("docs/blueprint-foo.md"),
                 status: FileStatus::Added,
-                old_path: None,
             }
         ];
         let signals = detect_report_signals(std::path::Path::new("/fake"), &files);
@@ -1955,7 +1952,6 @@ mod tests {
             DiffFile {
                 path: std::path::PathBuf::from("docs/blueprint-bar.md"),
                 status: FileStatus::Modified,
-                old_path: None,
             }
         ];
         let signals = detect_report_signals(std::path::Path::new("/fake"), &files);
