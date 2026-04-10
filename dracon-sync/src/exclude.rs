@@ -37,6 +37,108 @@ pub(crate) fn is_nested_git_repo_path(path: &Path, current_repo_git: &Path) -> O
     None
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_normalized_dir_name() {
+        assert_eq!(normalized_dir_name("target"), "target");
+        assert_eq!(normalized_dir_name("/target/"), "target");
+        assert_eq!(normalized_dir_name("Target"), "target");
+        assert_eq!(normalized_dir_name(".tmp-123"), ".tmp-123");
+    }
+
+    #[test]
+    fn test_is_excluded_dir_name_exact() {
+        let excluded: BTreeSet<String> = ["target", "node_modules", ".cache"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+
+        assert!(is_excluded_dir_name("target", &excluded));
+        assert!(is_excluded_dir_name("node_modules", &excluded));
+        assert!(is_excluded_dir_name(".cache", &excluded));
+        assert!(!is_excluded_dir_name("src", &excluded));
+        assert!(!is_excluded_dir_name("Target", &excluded));
+    }
+
+    #[test]
+    fn test_is_excluded_dir_name_pattern() {
+        let excluded: BTreeSet<String> = [".tmp-".to_string()].into_iter().collect();
+
+        assert!(is_excluded_dir_name(".tmp-abc", &excluded));
+        assert!(is_excluded_dir_name(".tmp-123", &excluded));
+        assert!(!is_excluded_dir_name(".tmp", &excluded));
+        assert!(!is_excluded_dir_name("tmp-abc", &excluded));
+    }
+
+    #[test]
+    fn test_excluded_dir_names_set() {
+        let policy = SyncPolicy {
+            exclude_dir_names: vec![
+                "target".to_string(),
+                "/node_modules/".to_string(),
+                ".cache".to_string(),
+            ],
+            ..Default::default()
+        };
+
+        let set = excluded_dir_names_set(&policy);
+        assert!(set.contains("target"));
+        assert!(set.contains("node_modules"));
+        assert!(set.contains(".cache"));
+        assert_eq!(set.len(), 3);
+    }
+
+    #[test]
+    fn test_excluded_dir_names_set_removes_empty() {
+        let policy = SyncPolicy {
+            exclude_dir_names: vec!["target".to_string(), "".to_string(), "   ".to_string()],
+            ..Default::default()
+        };
+
+        let set = excluded_dir_names_set(&policy);
+        assert!(set.contains("target"));
+        assert!(!set.contains(""));
+    }
+}
+
+impl Default for SyncPolicy {
+    fn default() -> Self {
+        SyncPolicy {
+            system_repo: String::new(),
+            pulse_interval_secs: 1,
+            inactivity_push_delay_secs: 5,
+            auto_commit: true,
+            auto_bump_versions: true,
+            auto_pull: true,
+            auto_push: true,
+            backup_policy: String::new(),
+            backup_dir: String::new(),
+            exclude_repos: vec![],
+            exclude_dir_names: vec![],
+            exclude_file_patterns: vec![],
+            auto_repair_concerns: true,
+            auto_repair_warns: true,
+            auto_rewrite_large_blobs: true,
+            watch_roots: vec![],
+            extra_remotes: vec![],
+            auto_github_private: false,
+            auto_github_private_account: "DraconDev".to_string(),
+            max_stage_file_bytes: 100 * 1024 * 1024,
+            pull_op_timeout_secs: 30,
+            push_op_timeout_secs: 300,
+            repo_sync_timeout_secs: 420,
+            push_retries: 3,
+            repair_cooldown_secs: 60,
+            max_push_blob_bytes: 100 * 1024 * 1024,
+            incident_ledger_max_lines: 10_000,
+            incident_ledger_max_age_days: 30,
+        }
+    }
+}
+
 pub(crate) fn is_excluded_dir_name(name: &str, excluded_dir_names: &BTreeSet<String>) -> bool {
     let normalized = normalized_dir_name(name);
     for pattern in excluded_dir_names {
