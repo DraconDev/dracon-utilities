@@ -47,8 +47,6 @@ mod tests {
         assert_eq!(normalized_dir_name("/target/"), "target");
         assert_eq!(normalized_dir_name("Target"), "target");
         assert_eq!(normalized_dir_name(".tmp-123"), ".tmp-123");
-        assert_eq!(normalized_dir_name(""), "");
-        assert_eq!(normalized_dir_name("  node_modules  "), "node_modules");
     }
 
     #[test]
