@@ -495,4 +495,49 @@ mod tests {
     fn test_default_inactivity_push_delay_secs() {
         assert_eq!(default_inactivity_push_delay_secs(), 5);
     }
+
+    #[test]
+    fn test_git_host_blob_limit() {
+        assert_eq!(DEFAULT_GIT_HOST_BLOB_LIMIT_BYTES, 100 * 1024 * 1024);
+    }
+
+    #[test]
+    fn test_timestamp_secs_returns_reasonable_value() {
+        let ts = timestamp_secs();
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        assert!(ts > 0);
+        assert!(ts <= now + 1);
+    }
+
+    #[test]
+    fn test_sync_policy_defaults_produce_valid_values() {
+        let policy = SyncPolicy::default();
+        assert!(policy.pulse_interval_secs >= 1);
+        assert!(policy.inactivity_push_delay_secs >= 1);
+        assert!(policy.max_stage_file_bytes > 0);
+        assert!(policy.pull_op_timeout_secs >= 5);
+        assert!(policy.push_op_timeout_secs >= 10);
+    }
+
+    #[test]
+    fn test_repo_policy_override_default() {
+        let override_default = crate::policy::RepoPolicyOverride::default();
+        assert!(override_default.auto_bump_versions.is_none());
+    }
+
+    #[test]
+    fn test_freeze_marker_paths() {
+        let paths = freeze_marker_paths(std::path::Path::new("/fake/path.toml"));
+        assert!(paths.len() >= 1);
+    }
+
+    #[test]
+    fn test_load_repo_override_nonexistent() {
+        let repo = std::path::Path::new("/nonexistent/path/for/test");
+        let override_ = load_repo_override(repo);
+        assert!(override_.auto_bump_versions.is_none());
+    }
 }
