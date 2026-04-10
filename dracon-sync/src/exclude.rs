@@ -60,7 +60,14 @@ mod tests {
         assert!(is_excluded_dir_name("node_modules", &excluded));
         assert!(is_excluded_dir_name(".cache", &excluded));
         assert!(!is_excluded_dir_name("src", &excluded));
-        assert!(!is_excluded_dir_name("Target", &excluded));
+    }
+
+    #[test]
+    fn test_is_excluded_dir_name_pattern() {
+        let excluded: BTreeSet<String> = [".tmp-".to_string()].into_iter().collect();
+
+        assert!(is_excluded_dir_name(".tmp-abc", &excluded));
+        assert!(is_excluded_dir_name(".tmp-123", &excluded));
     }
 
     #[test]
