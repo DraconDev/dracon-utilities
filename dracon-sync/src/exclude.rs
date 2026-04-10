@@ -160,14 +160,12 @@ mod tests {
 
     #[test]
     fn test_excluded_dir_names_set() {
-        let policy = SyncPolicy {
-            exclude_dir_names: vec![
-                "target".to_string(),
-                "/node_modules/".to_string(),
-                ".cache".to_string(),
-            ],
-            ..Default::default()
-        };
+        let mut policy = test_sync_policy();
+        policy.exclude_dir_names = vec![
+            "target".to_string(),
+            "/node_modules/".to_string(),
+            ".cache".to_string(),
+        ];
 
         let set = excluded_dir_names_set(&policy);
         assert!(set.contains("target"));
@@ -178,10 +176,12 @@ mod tests {
 
     #[test]
     fn test_excluded_dir_names_set_removes_empty() {
-        let policy = SyncPolicy {
-            exclude_dir_names: vec!["target".to_string(), "".to_string(), "   ".to_string()],
-            ..test_sync_policy()
-        };
+        let mut policy = test_sync_policy();
+        policy.exclude_dir_names = vec![
+            "target".to_string(),
+            "".to_string(),
+            "   ".to_string(),
+        ];
 
         let set = excluded_dir_names_set(&policy);
         assert!(set.contains("target"));
