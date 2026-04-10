@@ -55,7 +55,7 @@ mod tests {
             .iter()
             .map(|s| s.to_string())
             .collect();
-        
+
         assert!(is_excluded_dir_name("target", &excluded));
         assert!(is_excluded_dir_name("node_modules", &excluded));
         assert!(is_excluded_dir_name(".cache", &excluded));
@@ -64,10 +64,8 @@ mod tests {
 
     #[test]
     fn test_is_excluded_dir_name_pattern() {
-        let excluded: BTreeSet<String> = [".tmp-".to_string()]
-            .into_iter()
-            .collect();
-        
+        let excluded: BTreeSet<String> = [".tmp-".to_string()].into_iter().collect();
+
         assert!(is_excluded_dir_name(".tmp-abc", &excluded));
         assert!(is_excluded_dir_name(".tmp-123", &excluded));
     }
@@ -75,7 +73,7 @@ mod tests {
     #[test]
     fn test_excluded_dir_names_set() {
         let policy = test_sync_policy();
-        
+
         let set = excluded_dir_names_set(&policy);
         assert!(set.contains("target"));
         assert!(set.contains("node_modules"));
@@ -86,14 +84,10 @@ mod tests {
     #[test]
     fn test_excluded_dir_names_set_removes_empty() {
         let policy = SyncPolicy {
-            exclude_dir_names: vec![
-                "target".to_string(),
-                "".to_string(),
-                "   ".to_string(),
-            ],
+            exclude_dir_names: vec!["target".to_string(), "".to_string(), "   ".to_string()],
             ..test_sync_policy()
         };
-        
+
         let set = excluded_dir_names_set(&policy);
         assert!(set.contains("target"));
         assert!(!set.contains(""));
@@ -135,7 +129,6 @@ mod tests {
             incident_ledger_max_age_days: 30,
         }
     }
-}
 
     #[test]
     fn test_is_excluded_dir_name_exact() {
@@ -177,11 +170,7 @@ mod tests {
     #[test]
     fn test_excluded_dir_names_set_removes_empty() {
         let mut policy = test_sync_policy();
-        policy.exclude_dir_names = vec![
-            "target".to_string(),
-            "".to_string(),
-            "   ".to_string(),
-        ];
+        policy.exclude_dir_names = vec!["target".to_string(), "".to_string(), "   ".to_string()];
 
         let set = excluded_dir_names_set(&policy);
         assert!(set.contains("target"));
@@ -236,11 +225,7 @@ mod tests {
     #[test]
     fn test_excluded_dir_names_set_removes_empty() {
         let mut policy = test_sync_policy();
-        policy.exclude_dir_names = vec![
-            "target".to_string(),
-            "".to_string(),
-            "   ".to_string(),
-        ];
+        policy.exclude_dir_names = vec!["target".to_string(), "".to_string(), "   ".to_string()];
 
         let set = excluded_dir_names_set(&policy);
         assert!(set.contains("target"));
