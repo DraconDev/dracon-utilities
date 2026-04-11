@@ -362,7 +362,7 @@ pub(crate) fn repo_state_flags(
 }
 
 pub(crate) fn repo_is_concern(status: &dracon_git::types::RepoStatus, has_origin: bool, has_upstream: bool) -> bool {
-    status.ahead > 0 || status.behind > 0 || !has_origin || (has_origin && !has_upstream)
+    status.ahead > 0 || status.behind > 0 || !has_origin || !has_upstream
 }
 
 pub(crate) fn repo_is_warn(status: &dracon_git::types::RepoStatus, has_origin: bool, has_upstream: bool) -> bool {
@@ -633,6 +633,7 @@ pub(crate) async fn run_repos_report(policy_path: &Path, filter: RepoFilter, jso
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) async fn run_repair_concerns(
     policy_path: &Path,
     apply: bool,
@@ -1263,7 +1264,7 @@ pub(crate) async fn run_repair_concerns(
                 let still_concern = next.ahead > 0
                     || next.behind > 0
                     || !has_origin
-                    || (has_origin && !has_upstream);
+                    || !has_upstream;
                 if !still_concern {
                     resolved += 1;
                     out!("   resolved: concern cleared");

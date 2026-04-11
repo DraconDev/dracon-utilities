@@ -259,8 +259,7 @@ impl SyncPolicy {
         }
         policy.max_push_blob_bytes = policy
             .max_push_blob_bytes
-            .min(DEFAULT_GIT_HOST_BLOB_LIMIT_BYTES)
-            .max(1);
+            .clamp(1, DEFAULT_GIT_HOST_BLOB_LIMIT_BYTES);
         policy.repo_sync_timeout_secs = policy.repo_sync_timeout_secs.max(
             policy
                 .push_op_timeout_secs

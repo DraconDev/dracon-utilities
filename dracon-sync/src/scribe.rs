@@ -46,23 +46,23 @@ fn cleanup_markdown(input: &str) -> String {
         let ltrimmed = trimmed.trim_start();
 
         let header_info: Option<(usize, &str)> = if ltrimmed.starts_with("### ") {
-            Some((3, &ltrimmed[4..]))
+            Some((3, ltrimmed.strip_prefix("### ").unwrap_or("")))
         } else if ltrimmed.starts_with("## ") {
-            Some((2, &ltrimmed[3..]))
+            Some((2, ltrimmed.strip_prefix("## ").unwrap_or("")))
         } else if ltrimmed.starts_with("# ") {
-            Some((1, &ltrimmed[2..]))
+            Some((1, ltrimmed.strip_prefix("# ").unwrap_or("")))
         } else if ltrimmed.starts_with("###") {
-            let rest = if ltrimmed.len() >= 3 { &ltrimmed[3..] } else { "" };
+            let rest = ltrimmed.strip_prefix("###").unwrap_or("");
             Some((3, rest.trim_start()))
         } else if ltrimmed.starts_with("##") {
-            let rest = if ltrimmed.len() >= 2 { &ltrimmed[2..] } else { "" };
+            let rest = ltrimmed.strip_prefix("##").unwrap_or("");
             if rest.is_empty() || rest.starts_with(' ') || rest.starts_with('-') || rest.starts_with(':') {
                 Some((2, rest.trim_start()))
             } else {
                 None
             }
         } else if ltrimmed.starts_with('#') {
-            let rest = if !ltrimmed.is_empty() { &ltrimmed[1..] } else { "" };
+            let rest = ltrimmed.strip_prefix('#').unwrap_or("");
             if rest.is_empty() || rest.starts_with(' ') {
                 Some((1, rest.trim_start()))
             } else {

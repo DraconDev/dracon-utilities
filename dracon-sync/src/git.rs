@@ -867,11 +867,7 @@ pub(crate) async fn restore_paths(repo: &Path, paths: &[String]) -> Result<()> {
     }
 
     // Prefer `git restore` (newer git). Fallback to `reset` + `checkout`.
-    let mut args: Vec<String> = Vec::new();
-    args.push("restore".to_string());
-    args.push("--staged".to_string());
-    args.push("--worktree".to_string());
-    args.push("--".to_string());
+    let mut args = vec!["restore".to_string(), "--staged".to_string(), "--worktree".to_string(), "--".to_string()];
     args.extend(paths.iter().cloned());
     let args_ref: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
     if run_git_with_timeout(repo, &args_ref, 30, "restore").await.is_ok() {
