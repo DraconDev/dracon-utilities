@@ -351,10 +351,11 @@ pub(crate) async fn sync_repo(
                             if let Some(new_ver) = bump_semver_patch(&current_ver) {
                                 let bumped = crate::bump::apply_version_bump_to_repo(repo, &current_ver, &new_ver);
                                 if bumped {
-                                    let _ = run_git_with_timeout(repo, &["add", "Cargo.toml"], 30, "add").await;
-                                    let _ = run_git_with_timeout(repo, &["add", "package.json"], 30, "add").await;
-                                    let _ = run_git_with_timeout(repo, &["add", "VERSION"], 30, "add").await;
-                                    let _ = run_git_with_timeout(repo, &["add", "Cargo.lock"], 30, "add").await;
+                                    for file in &["Cargo.toml", "package.json", "VERSION", "Cargo.lock"] {
+                                        if let Err(e) = run_git_with_timeout(repo, &["add", file], 30, "add").await {
+                                            eprintln!("⚠️ failed to stage {}: {}", file, e);
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -389,10 +390,11 @@ pub(crate) async fn sync_repo(
                             if let Some(new_ver) = new_ver {
                                 let bumped = crate::bump::apply_version_bump_to_repo(repo, &current_ver, &new_ver);
                                 if bumped {
-                                    let _ = run_git_with_timeout(repo, &["add", "Cargo.toml"], 30, "add").await;
-                                    let _ = run_git_with_timeout(repo, &["add", "package.json"], 30, "add").await;
-                                    let _ = run_git_with_timeout(repo, &["add", "VERSION"], 30, "add").await;
-                                    let _ = run_git_with_timeout(repo, &["add", "Cargo.lock"], 30, "add").await;
+                                    for file in &["Cargo.toml", "package.json", "VERSION", "Cargo.lock"] {
+                                        if let Err(e) = run_git_with_timeout(repo, &["add", file], 30, "add").await {
+                                            eprintln!("⚠️ failed to stage {}: {}", file, e);
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -411,9 +413,9 @@ pub(crate) async fn sync_repo(
             // decrypting encrypted files), skip commit entirely. The working tree will
             // still appear "dirty" due to the smudge filter, which is harmless.
             if committed_entries.is_empty() {
-                // Unstage anything that was added (index already matches HEAD for
-                // filter-only changes, but be safe)
-                let _ = run_git_with_timeout(repo, &["reset", "HEAD", "--"], 10, "reset").await;
+                if let Err(e) = run_git_with_timeout(repo, &["reset", "HEAD", "--"], 10, "reset").await {
+                    eprintln!("⚠️ failed to reset HEAD: {}", e);
+                }
                 if debug_enabled() {
                     eprintln!("🐛 {} skipped commit: all changes were filter-only (smudge/clean)", repo.display());
                 }

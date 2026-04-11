@@ -638,23 +638,32 @@ pub(crate) fn consolidate_to_master(repo: &Path) -> Result<()> {
             .with_context(|| format!("failed to checkout master in {}", repo.display()))?;
     }
     // Delete local main if it exists
-    let _ = std_git_command()
+    if let Err(e) = std_git_command()
         .args(["branch", "-D", "main"])
         .current_dir(repo)
-        .status();
+        .status()
+    {
+        eprintln!("⚠️ failed to delete local main branch: {}", e);
+    }
     // Delete remote main if it exists
-    let _ = std_git_command()
+    if let Err(e) = std_git_command()
         .args(["push", "origin", "--delete", "main"])
         .current_dir(repo)
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
-        .status();
+        .status()
+    {
+        eprintln!("⚠️ failed to delete remote main branch: {}", e);
+    }
     // Ensure master has upstream tracking
     if has_origin_remote(repo) && !has_tracking_upstream(repo) {
-        let _ = std_git_command()
+        if let Err(e) = std_git_command()
             .args(["push", "-u", "origin", "master"])
             .current_dir(repo)
-            .status();
+            .status()
+        {
+            eprintln!("⚠️ failed to push master with upstream: {}", e);
+        }
     }
     Ok(())
 }
