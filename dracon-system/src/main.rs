@@ -789,10 +789,13 @@ fn sync_freeze_marker_path(guard: &GuardPolicy) -> PathBuf {
 }
 
 async fn renice_process(pid: i32, value: i32) {
-    let _ = Command::new("renice")
+    if let Err(e) = Command::new("renice")
         .args(["-n", &value.to_string(), "-p", &pid.to_string()])
         .output()
-        .await;
+        .await
+    {
+        eprintln!("⚠️ renice failed: {}", e);
+    }
 }
 
 /// Detect active cargo/rustc processes and return their PIDs and working directories
@@ -1250,22 +1253,28 @@ async fn clean_nix_garbage(keep_generations: u32, apply: bool) -> Result<(u64, V
     // First, delete old generations
     if keep_generations > 0 {
         let gen_arg = keep_generations.to_string();
-        let _ = Command::new("nix-env")
+        if let Err(e) = Command::new("nix-env")
             .arg("-d")
             .arg(&gen_arg)
             .arg("--delete-generations")
             .output()
-            .await;
+            .await
+        {
+            eprintln!("⚠️ nix-env delete generations failed: {}", e);
+        }
         
         // Also for user profile
-        let _ = Command::new("nix-env")
+        if let Err(e) = Command::new("nix-env")
             .arg("-d")
             .arg(&gen_arg)
             .arg("--delete-generations")
             .arg("-p")
             .arg("/nix/var/nix/profiles/default")
             .output()
-            .await;
+            .await
+        {
+            eprintln!("⚠️ nix-env delete user profile generations failed: {}", e);
+        }
     }
     
     // Run nix-collect-garbage
@@ -1352,7 +1361,9 @@ async fn clean_old_node_modules(roots: &[PathBuf], max_age_days: u64, apply: boo
                 reclaimed += size;
                 
                 if apply {
-                    let _ = tokio::fs::remove_dir_all(&path).await;
+                    if let Err(e) = tokio::fs::remove_dir_all(&path).await {
+                        eprintln!("⚠️ failed to remove {}: {}", path.display(), e);
+                    }
                 }
             }
         }
