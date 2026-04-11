@@ -1218,8 +1218,11 @@ async fn empty_trash(apply: bool) -> Result<(u64, Vec<String>)> {
                 cleaned.push(format!("trash files ({})", human_bytes(size)));
                 reclaimed += size;
                 if apply {
-                    let _ = tokio::fs::remove_dir_all(&trash_files).await;
-                    let _ = tokio::fs::create_dir_all(&trash_files).await;
+                    if let Err(e) = tokio::fs::remove_dir_all(&trash_files).await {
+                        eprintln!("⚠️ failed to remove trash files: {}", e);
+                    } else if let Err(e) = tokio::fs::create_dir_all(&trash_files).await {
+                        eprintln!("⚠️ failed to recreate trash dir: {}", e);
+                    }
                 }
             }
         }
@@ -1227,8 +1230,11 @@ async fn empty_trash(apply: bool) -> Result<(u64, Vec<String>)> {
         if trash_info.exists() {
             let info_size = get_dir_size(&trash_info).await.unwrap_or(0);
             if info_size > 0 && apply {
-                let _ = tokio::fs::remove_dir_all(&trash_info).await;
-                let _ = tokio::fs::create_dir_all(&trash_info).await;
+                if let Err(e) = tokio::fs::remove_dir_all(&trash_info).await {
+                    eprintln!("⚠️ failed to remove trash info: {}", e);
+                } else if let Err(e) = tokio::fs::create_dir_all(&trash_info).await {
+                    eprintln!("⚠️ failed to recreate trash info dir: {}", e);
+                }
             }
         }
     }
