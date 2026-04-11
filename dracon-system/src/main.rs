@@ -1584,16 +1584,24 @@ async fn run_guard_once(
     if guard.freeze_sync_at_action && (dstate == "action" || dstate == "critical") {
         if !sync_frozen {
             if let Some(parent) = marker.parent() {
-                let _ = fs::create_dir_all(parent);
+                if let Err(e) = fs::create_dir_all(parent).await {
+                    eprintln!("failed to create freeze marker dir: {}", e);
+                }
             }
-            let _ = fs::write(&marker, format!("dracon-system guard freeze: disk={}%\n", used));
-            sync_frozen = true;
-            emit_event(&DraconEvent::new("system", EventSeverity::Warn, "disk/freeze", format!("sync frozen at {}%", used)));
+            if let Err(e) = fs::write(&marker, format!("dracon-system guard freeze: disk={}%\n", used)) {
+                eprintln!("failed to write freeze marker: {}", e);
+            } else {
+                sync_frozen = true;
+                emit_event(&DraconEvent::new("system", EventSeverity::Warn, "disk/freeze", format!("sync frozen at {}%", used)));
             }
+        }
     } else if sync_frozen && used <= guard.unfreeze_below_percent {
-        let _ = fs::remove_file(&marker);
-        sync_frozen = false;
-        emit_event(&DraconEvent::new("system", EventSeverity::Info, "disk/unfreeze", format!("sync unfrozen at {}%", used)));
+        if let Err(e) = fs::remove_file(&marker) {
+            eprintln!("failed to remove freeze marker: {}", e);
+        } else {
+            sync_frozen = false;
+            emit_event(&DraconEvent::new("system", EventSeverity::Info, "disk/unfreeze", format!("sync unfrozen at {}%", used)));
+        }
     }
 
     // Comprehensive auto-cleanup when disk hits action/critical level
