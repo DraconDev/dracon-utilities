@@ -1450,6 +1450,10 @@ fn truncate_log_file(path: &Path, max_size_bytes: u64, preserve_header_lines: us
         }
         let mut bytes_written = 0u64;
 
+        let mut original = std::fs::File::open(path)?;
+        original.seek(SeekFrom::Start(0))?;
+        let reader = BufReader::new(original);
+
         for line in reader.lines().skip(preserve_header_lines).flatten() {
             let line_bytes = line.into_bytes();
             let line_len = line_bytes.len() as u64;
