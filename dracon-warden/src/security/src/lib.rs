@@ -473,7 +473,7 @@ impl SecretScanner {
             .collect::<Vec<_>>()
             .join("|");
         let full_regex = Regex::new(&format!("(?sm){}", combined))
-            .unwrap_or_else(|_| Regex::new("nevermatch").unwrap());
+            .expect("Failed to build combined regex (without age keys) - check patterns for invalid regex syntax");
 
         Self {
             patterns,
