@@ -1455,7 +1455,7 @@ impl DemonSecurity {
 
                             let age_path = path.with_extension("age");
                             if age_path.exists() {
-                                if let Err(e) = fs::remove_file(age_path) {
+                                if let Err(e) = fs::remove_file(&age_path) {
                                     eprintln!("⚠️ failed to remove {}: {}", age_path.display(), e);
                                 }
                             }
