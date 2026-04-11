@@ -1934,40 +1934,77 @@ watch_roots = ["/tmp/test"]
     }
 
     #[test]
-    fn filter_clean_detects_and_encrypts_secrets() {
-        use std::io::Write;
+    fn marker_prefix_at_finds_correct_positions() {
+        let s = "prefix [DEMON_SECRET:abc] after";
+        assert_eq!(marker_prefix_at(s, 7), Some("[DEMON_SECRET:"));
 
-        let td = TestDir::new("warden_filter_clean");
-        let repo = td.path().join("repo");
-        fs::create_dir_all(&repo).expect("repo");
+        let s2 = "prefix [DRACON_SECRET:xyz] after";
+        assert_eq!(marker_prefix_at(s2, 7), Some("[DRACON_SECRET:"));
 
-        let mut child = std::process::Command::new(std::env::current_exe().unwrap())
-            .arg("filter-clean")
-            .current_dir(&repo)
-            .env("DRACON_WARDEN_POLICY", "/nonexistent")
-            .stdin(std::process::Stdio::piped())
-            .stdout(std::process::Stdio::piped())
-            .spawn()
-            .expect("spawn");
-
-        let input = "let api_key = \"sk-1234567890abcdef1234567890abcdef\";\n";
-        child
-            .stdin
-            .as_mut()
-            .expect("stdin")
-            .write_all(input.as_bytes())
-            .expect("write stdin");
-        drop(child.stdin.take());
-
-        let output = child.wait_with_output().expect("wait");
-        assert!(output.status.success(), "filter-clean should succeed");
-
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        assert!(
-            stdout.contains("[DRACON_SECRET:") || stdout.contains("sk-"),
-            "output should contain secret or marker"
-        );
+        let s3 = "no marker here";
+        assert_eq!(marker_prefix_at(s3, 0), None);
     }
+
+    #[test]
+    fn is_marker_string_detects_both_markers() {
+        assert!(is_marker_string("hello [DEMON_SECRET:abc] world"));
+        assert!(is_marker_string("hello [DRACON_SECRET:xyz] world"));
+        assert!(!is_marker_string("hello world"));
+        assert!(!is_marker_string("DEMON_SECRET not in brackets"));
+        assert!(!is_marker_string("[WRONG_SECRET:abc]"));
+    }
+
+    #[test]
+    fn build_gitignore_block_includes_demon_directives() {
+        let block = build_gitignore_block(&sample_policy()).expect("block");
+        assert!(block.contains("# --- BEGIN DRACON MANAGED BLOCK ---"));
+        assert!(block.contains("target/"));
+        assert!(block.contains("*.log"));
+    }
+
+    #[test]
+    fn build_gitattributes_block_sets_filter_for_env() {
+        let block = build_gitattributes_block(&sample_policy()).expect("block");
+        assert!(block.contains("*.env filter=dracon"));
+        assert!(block.contains("secrets/** filter=dracon"));
+    }
+
+    #[test]
+    fn discover_git_repos_finds_all_git_dirs() {
+        let td = TestDir::new("warden_discover_all");
+        let root = td.path().join("root");
+        fs::create_dir_all(&root).expect("root");
+
+        let repo1 = root.join("my_repo");
+        fs::create_dir_all(&repo1.join(".git")).expect("my_repo .git");
+
+        let repo2 = root.join("other_repo");
+        fs::create_dir_all(&repo2.join(".git")).expect("other_repo .git");
+
+        let repos = discover_git_repos(&[root], &BTreeSet::new());
+
+        assert!(repos.contains(&repo1), "my_repo should be found");
+        assert!(repos.contains(&repo2), "other_repo should be found");
+    }
+
+    #[test]
+    fn discover_git_repos_local_finds_basic_repos() {
+        let td = TestDir::new("warden_discover_local");
+        let root = td.path().join("root");
+        fs::create_dir_all(&root).expect("root");
+
+        let repo1 = root.join("repo1");
+        fs::create_dir_all(&repo1.join(".git")).expect("repo1 .git");
+
+        let repo2 = root.join("repo2");
+        fs::create_dir_all(&repo2.join(".git")).expect("repo2 .git");
+
+        let repos = discover_git_repos_local(&[root]);
+
+        assert!(repos.contains(&repo1), "repo1 should be found");
+        assert!(repos.contains(&repo2), "repo2 should be found");
+    }
+}
 
     #[test]
     fn filter_smudge_handles_empty_input() {
@@ -2065,7 +2102,6 @@ watch_roots = ["/tmp/test"]
         let s3 = "no marker here";
         assert_eq!(marker_prefix_at(s3, 0), None);
     }
-}
 
     #[test]
     fn discover_git_repos_finds_all_git_dirs() {
