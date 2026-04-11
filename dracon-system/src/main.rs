@@ -1135,7 +1135,9 @@ async fn clean_package_caches(cargo: bool, npm: bool, pip: bool, go: bool, apply
                 let size = get_dir_size(&cargo_cache).await.unwrap_or(0);
                 if size > 0 {
                     if apply {
-                        let _ = tokio::fs::remove_dir_all(&cargo_cache).await;
+                        if let Err(e) = tokio::fs::remove_dir_all(&cargo_cache).await {
+                            eprintln!("⚠️ failed to remove cargo cache: {}", e);
+                        }
                     }
                     cleaned.push(format!("cargo registry cache ({})", human_bytes(size)));
                     reclaimed += size;
@@ -1151,7 +1153,9 @@ async fn clean_package_caches(cargo: bool, npm: bool, pip: bool, go: bool, apply
                 let size = get_dir_size(&npm_cache).await.unwrap_or(0);
                 if size > 0 {
                     if apply {
-                        let _ = tokio::fs::remove_dir_all(&npm_cache).await;
+                        if let Err(e) = tokio::fs::remove_dir_all(&npm_cache).await {
+                            eprintln!("⚠️ failed to remove npm cache: {}", e);
+                        }
                     }
                     cleaned.push(format!("npm cache ({})", human_bytes(size)));
                     reclaimed += size;
@@ -1167,7 +1171,9 @@ async fn clean_package_caches(cargo: bool, npm: bool, pip: bool, go: bool, apply
                 let size = get_dir_size(&pip_cache).await.unwrap_or(0);
                 if size > 0 {
                     if apply {
-                        let _ = tokio::fs::remove_dir_all(&pip_cache).await;
+                        if let Err(e) = tokio::fs::remove_dir_all(&pip_cache).await {
+                            eprintln!("⚠️ failed to remove pip cache: {}", e);
+                        }
                     }
                     cleaned.push(format!("pip cache ({})", human_bytes(size)));
                     reclaimed += size;
@@ -1183,7 +1189,9 @@ async fn clean_package_caches(cargo: bool, npm: bool, pip: bool, go: bool, apply
                 let size = get_dir_size(&go_cache).await.unwrap_or(0);
                 if size > 0 {
                     if apply {
-                        let _ = tokio::fs::remove_dir_all(&go_cache).await;
+                        if let Err(e) = tokio::fs::remove_dir_all(&go_cache).await {
+                            eprintln!("⚠️ failed to remove go cache: {}", e);
+                        }
                     }
                     cleaned.push(format!("go build cache ({})", human_bytes(size)));
                     reclaimed += size;
