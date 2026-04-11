@@ -134,7 +134,8 @@ mod tests {
 pub(crate) fn is_excluded_dir_name(name: &str, excluded_dir_names: &BTreeSet<String>) -> bool {
     let normalized = normalized_dir_name(name);
     for pattern in excluded_dir_names {
-        if *pattern == normalized {
+        let normalized_pattern = normalized_dir_name(pattern);
+        if normalized_pattern == normalized {
             return true;
         }
         if pattern.ends_with('-')
