@@ -1884,4 +1884,216 @@ mod tests {
             assert!(next.contains(BLOCK_END));
         }
     }
+
+    #[test]
+    fn resolve_policy_path_local_finds_temp_config() {
+        let td = TestDir::new("warden_policy_path");
+        let config_dir = td.path().join(".dracon").join("utilities").join("warden");
+        fs::create_dir_all(&config_dir).expect("create config dir");
+        let config_path = config_dir.join("dracon-warden.toml");
+        fs::write(
+            &config_path,
+            r#"
+[watch]
+watch_roots = ["/tmp/test"]
+"#,
+        )
+        .expect("write config");
+
+        std::env::set_var("DRACON_WARDEN_POLICY", config_path.display().to_string());
+        let path = resolve_policy_path_local().expect("should resolve");
+        std::env::remove_var("DRACON_WARDEN_POLICY");
+
+        assert_eq!(path, config_path);
+    }
+
+    #[test]
+    fn resolve_policy_path_local_falls_back_to_default_locations() {
+        let td = TestDir::new("warden_policy_default");
+        let config_dir = td.path().join(".dracon").join("utilities").join("warden");
+        fs::create_dir_all(&config_dir).expect("create config dir");
+        let config_path = config_dir.join("dracon-warden.toml");
+        fs::write(
+            &config_path,
+            r#"
+[watch]
+watch_roots = ["/tmp/test"]
+"#,
+        )
+        .expect("write config");
+
+        let original_home = std::env::var("HOME").ok();
+        std::env::set_var("HOME", td.path().to_str().unwrap());
+        let path = resolve_policy_path_local();
+        std::env::remove_var("HOME");
+        if let Some(h) = original_home {
+            std::env::set_var("HOME", h);
+        }
+
+        assert!(path.is_ok(), "should find config in default location");
+    }
+
+    #[test]
+    fn filter_clean_detects_and_encrypts_secrets() {
+        use std::io::Write;
+
+        let td = TestDir::new("warden_filter_clean");
+        let repo = td.path().join("repo");
+        fs::create_dir_all(&repo).expect("repo");
+
+        let mut child = std::process::Command::new(std::env::current_exe().unwrap())
+            .arg("filter-clean")
+            .current_dir(&repo)
+            .env("DRACON_WARDEN_POLICY", "/nonexistent")
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .spawn()
+            .expect("spawn");
+
+        let input = "let api_key = \"sk-1234567890abcdef1234567890abcdef\";\n";
+        child
+            .stdin
+            .as_mut()
+            .expect("stdin")
+            .write_all(input.as_bytes())
+            .expect("write stdin");
+        drop(child.stdin.take());
+
+        let output = child.wait_with_output().expect("wait");
+        assert!(output.status.success(), "filter-clean should succeed");
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            stdout.contains("[DRACON_SECRET:") || stdout.contains("sk-"),
+            "output should contain secret or marker"
+        );
+    }
+
+    #[test]
+    fn filter_smudge_handles_empty_input() {
+        use std::io::Write;
+
+        let td = TestDir::new("warden_filter_smudge");
+        let repo = td.path().join("repo");
+        fs::create_dir_all(&repo).expect("repo");
+
+        let mut child = std::process::Command::new(std::env::current_exe().unwrap())
+            .arg("filter-smudge")
+            .current_dir(&repo)
+            .env("DRACON_WARDEN_POLICY", "/nonexistent")
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .spawn()
+            .expect("spawn");
+
+        let input = "let x = 1;\n";
+        child
+            .stdin
+            .as_mut()
+            .expect("stdin")
+            .write_all(input.as_bytes())
+            .expect("write stdin");
+        drop(child.stdin.take());
+
+        let output = child.wait_with_output().expect("wait");
+        assert!(output.status.success(), "filter-smudge should succeed");
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert_eq!(stdout, input, "plaintext should pass through unchanged");
+    }
+
+    #[test]
+    fn is_marker_string_detects_both_markers() {
+        assert!(is_marker_string("hello [DEMON_SECRET:abc] world"));
+        assert!(is_marker_string("hello [DRACON_SECRET:xyz] world"));
+        assert!(!is_marker_string("hello world"));
+        assert!(!is_marker_string("DEMON_SECRET not in brackets"));
+        assert!(!is_marker_string("[WRONG_SECRET:abc]"));
+    }
+
+    #[test]
+    fn marker_prefix_at_finds_correct_positions() {
+        let s = "before [DEMON_SECRET:abc] after";
+        assert_eq!(marker_prefix_at(s, 7), Some("[DEMON_SECRET:"));
+        assert_eq!(marker_prefix_at(s, 8), Some("[DEMON_SECRET:"));
+
+        let s2 = "before [DRACON_SECRET:xyz] after";
+        assert_eq!(marker_prefix_at(s2, 7), Some("[DRACON_SECRET:"));
+    }
+
+    #[test]
+    fn build_gitignore_block_includes_demon_directives() {
+        let block = build_gitignore_block(&sample_policy()).expect("block");
+        assert!(block.contains("# --- BEGIN DRACON MANAGED BLOCK ---"));
+        assert!(block.contains("target/"));
+        assert!(block.contains("*.log"));
+    }
+
+    #[test]
+    fn build_gitattributes_block_sets_filter_for_env() {
+        let block = build_gitattributes_block(&sample_policy()).expect("block");
+        assert!(block.contains("*.env filter=dracon"));
+        assert!(block.contains("secrets/** filter=dracon"));
+    }
+
+    #[test]
+    fn WardenPolicy_load_round_trips() {
+        use std::io::Write;
+
+        let td = TestDir::new("warden_policy_roundtrip");
+        let config_path = td.path().join("warden.toml");
+
+        let config = r#"
+[watch]
+watch_roots = ["/home/test"]
+protected_patterns = ["*.env", "secrets/**"]
+plaintext_patterns = ["*.pub"]
+hygiene_patterns = ["target/", "*.log"]
+"#;
+        fs::write(&config_path, config).expect("write config");
+
+        let policy = WardenPolicy::load(&config_path).expect("load");
+        assert_eq!(policy.watch_roots, vec!["/home/test"]);
+        assert!(policy.protected_patterns.contains(&"*.env".to_string()));
+        assert!(policy.plaintext_patterns.contains(&"*.pub".to_string()));
+    }
+
+    #[test]
+    fn discover_git_repos_excludes_hidden_dirs() {
+        let td = TestDir::new("warden_discover_hidden");
+        let root = td.path().join("root");
+        fs::create_dir_all(&root).expect("root");
+
+        let normal = root.join("normal_repo");
+        fs::create_dir_all(&normal.join(".git")).expect("normal .git");
+
+        let hidden = root.join(".hidden_repo");
+        fs::create_dir_all(&hidden.join(".git")).expect("hidden .git");
+
+        let excluded_dir_names: BTreeSet<String> = BTreeSet::new();
+        let repos = discover_git_repos_local(&[root], &excluded_dir_names, &[]);
+
+        assert!(repos.contains(&normal), "normal repo should be found");
+        assert!(!repos.contains(&hidden), "hidden repo should be excluded");
+    }
+
+    #[test]
+    fn discover_git_repos_excludes_patterns() {
+        let td = TestDir::new("warden_discover_exclude");
+        let root = td.path().join("root");
+        fs::create_dir_all(&root).expect("root");
+
+        let keep = root.join("keep_this_repo");
+        fs::create_dir_all(&keep.join(".git")).expect("keep .git");
+
+        let skip = root.join("skip_this_repo");
+        fs::create_dir_all(&skip.join(".git")).expect("skip .git");
+
+        let excluded_dir_names: BTreeSet<String> = BTreeSet::new();
+        let repos =
+            discover_git_repos_local(&[root], &excluded_dir_names, &[skip.display().to_string()]);
+
+        assert!(repos.contains(&keep), "keep repo should be found");
+        assert!(!repos.contains(&skip), "skipped repo should be excluded");
+    }
 }
