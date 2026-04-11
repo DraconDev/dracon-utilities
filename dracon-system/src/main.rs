@@ -1402,7 +1402,7 @@ async fn find_large_log_files(dirs: &[PathBuf], min_size_bytes: u64) -> Result<V
 /// Truncate a log file to a maximum size while optionally preserving header lines.
 /// Returns the number of bytes reclaimed, or an error on failure.
 fn truncate_log_file(path: &Path, max_size_bytes: u64, preserve_header_lines: usize) -> Result<u64> {
-    use std::io::{BufRead, BufReader, Seek, SeekFrom, Write};
+    use std::io::{BufRead, BufReader, Write};
 
     let original_size = std::fs::metadata(path)?.len();
     if original_size <= max_size_bytes {
@@ -1450,10 +1450,8 @@ fn truncate_log_file(path: &Path, max_size_bytes: u64, preserve_header_lines: us
         }
         let mut bytes_written = 0u64;
 
-        let mut original = std::fs::File::open(path)?;
-        original.seek(SeekFrom::Start(0))?;
-        let reader = BufReader::new(original);
-
+        let file = std::fs::File::open(path)?;
+        let reader = BufReader::new(file);
         for line in reader.lines().skip(preserve_header_lines).flatten() {
             let line_bytes = line.into_bytes();
             let line_len = line_bytes.len() as u64;
