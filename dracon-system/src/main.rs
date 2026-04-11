@@ -539,8 +539,13 @@ fn default_disk_critical_percent() -> u8 {
 }
 
 fn default_sync_freeze_marker() -> String {
-    // Keep freeze markers out of git repos; dracon-sync also checks this location.
-    let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("/home/dracon"));
+    let home = match dirs::home_dir() {
+        Some(h) => h,
+        None => {
+            eprintln!("⚠️ could not determine home directory, using fallback");
+            PathBuf::from("/home/dracon")
+        }
+    };
     home.join(".dracon")
         .join("dracon-sync.freeze")
         .display()
