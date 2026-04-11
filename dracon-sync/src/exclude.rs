@@ -229,6 +229,28 @@ mod tests {
         assert!(!can_restore_entry(repo, &entry));
     }
 
+    #[test]
+    fn test_is_excluded_dir_name_empty_excluded_set() {
+        let excluded: BTreeSet<String> = BTreeSet::new();
+        assert!(!is_excluded_dir_name("target", &excluded));
+        assert!(!is_excluded_dir_name("node_modules", &excluded));
+    }
+
+    #[test]
+    fn test_is_excluded_dir_name_exact_match_case_sensitive() {
+        let excluded: BTreeSet<String> = ["Target".to_string()].into_iter().collect();
+        assert!(!is_excluded_dir_name("target", &excluded));
+        assert!(is_excluded_dir_name("Target", &excluded));
+    }
+
+    #[test]
+    fn test_is_excluded_dir_name_star_prefix() {
+        let excluded: BTreeSet<String> = ["build*".to_string()].into_iter().collect();
+        assert!(is_excluded_dir_name("build", &excluded));
+        assert!(is_excluded_dir_name("build-debug", &excluded));
+        assert!(!is_excluded_dir_name("abuild", &excluded));
+    }
+
     fn sync_policy_default() -> SyncPolicy {
         SyncPolicy {
             system_repo: String::new(),
