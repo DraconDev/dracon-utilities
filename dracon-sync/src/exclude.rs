@@ -2,7 +2,6 @@ use anyhow::Result;
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
-
 use crate::policy::SyncPolicy;
 
 pub(crate) fn normalized_dir_name(value: &str) -> String {
@@ -70,12 +69,46 @@ mod tests {
     }
 
     #[test]
-    fn test_is_excluded_dir_name_star_pattern() {
+    fn test_is_excluded_dir_name_trailing_hyphen() {
+        let excluded: BTreeSet<String> = [".tmp-".to_string()].into_iter().collect();
+        assert!(is_excluded_dir_name(".tmp-file", &excluded));
+        assert!(!is_excluded_dir_name(".tmpfile", &excluded));
+    }
+
+    #[test]
+    fn test_is_excluded_dir_name_star_prefix() {
         let excluded: BTreeSet<String> = ["build*".to_string()].into_iter().collect();
 
         assert!(is_excluded_dir_name("build", &excluded));
         assert!(is_excluded_dir_name("build-debug", &excluded));
         assert!(!is_excluded_dir_name("abuild", &excluded));
+    }
+
+    #[test]
+    fn test_is_nested_git_repo_path_finds_nested() {
+        let current_repo_git = Path::new("/repo/.git");
+        let nested_path = Path::new("/repo/subdir/nested/.git");
+
+        let result = is_nested_git_repo_path(nested_path, current_repo_git);
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn test_is_nested_git_repo_path_same_as_current() {
+        let current_repo_git = Path::new("/repo/.git");
+        let same_path = Path::new("/repo/.git");
+
+        let result = is_nested_git_repo_path(same_path, current_repo_git);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_is_nested_git_repo_path_no_nested() {
+        let current_repo_git = Path::new("/repo/.git");
+        let normal_path = Path::new("/repo/src/file.txt");
+
+        let result = is_nested_git_repo_path(normal_path, current_repo_git);
+        assert!(result.is_none());
     }
 
     #[test]
