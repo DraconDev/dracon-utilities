@@ -952,12 +952,12 @@ async fn auto_cleanup_rust_targets(
         if let Some(cwd) = get_process_cwd(*pid).await {
             // Find the project root (where Cargo.toml is)
             let mut dir = cwd.clone();
-            while dir.parent().is_some() {
+            while let Some(parent) = dir.parent() {
                 if dir.join("Cargo.toml").exists() {
                     protected_project_dirs.push(dir);
                     break;
                 }
-                dir = dir.parent().unwrap().to_path_buf();
+                dir = parent.to_path_buf();
             }
         }
     }
