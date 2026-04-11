@@ -947,7 +947,13 @@ impl DemonSecurity {
         let mut file = fs::File::create(&identity_path)?;
         let mut perms = file.metadata()?.permissions();
         perms.set_mode(0o400); // Read-only for owner
-        let _ = fs::set_permissions(&identity_path, perms);
+        if let Err(e) = fs::set_permissions(&identity_path, perms) {
+            eprintln!(
+                "⚠️ failed to set permissions on {}: {}",
+                identity_path.display(),
+                e
+            );
+        }
         writeln!(file, "{}", key.to_string().expose_secret())?;
 
         // Save Public Key for sharing
@@ -960,13 +966,27 @@ impl DemonSecurity {
             .unwrap_or_default()
             .as_secs();
         let backup_dir = home.join(".demon").join("backups");
-        let _ = fs::create_dir_all(&backup_dir);
+        if let Err(e) = fs::create_dir_all(&backup_dir) {
+            eprintln!(
+                "⚠️ failed to create backup dir {}: {}",
+                backup_dir.display(),
+                e
+            );
+        }
         let backup_path = backup_dir.join(format!("master_{}.age", timestamp));
         if let Ok(mut b_file) = fs::File::create(&backup_path) {
-            let _ = writeln!(b_file, "{}", key.to_string().expose_secret());
+            if let Err(e) = writeln!(b_file, "{}", key.to_string().expose_secret()) {
+                eprintln!("⚠️ failed to write backup {}: {}", backup_path.display(), e);
+            }
             let mut b_perms = b_file.metadata()?.permissions();
             b_perms.set_mode(0o400); // Private
-            let _ = fs::set_permissions(&backup_path, b_perms);
+            if let Err(e) = fs::set_permissions(&backup_path, b_perms) {
+                eprintln!(
+                    "⚠️ failed to set permissions on {}: {}",
+                    backup_path.display(),
+                    e
+                );
+            }
         }
 
         self.master_identities = vec![key];
