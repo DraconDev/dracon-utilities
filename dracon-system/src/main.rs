@@ -1578,7 +1578,7 @@ async fn run_guard_once(
     if guard.freeze_sync_at_action && (dstate == "action" || dstate == "critical") {
         if !sync_frozen {
             if let Some(parent) = marker.parent() {
-                if let Err(e) = fs::create_dir_all(parent).await {
+                if let Err(e) = fs::create_dir_all(parent) {
                     eprintln!("failed to create freeze marker dir: {}", e);
                 }
             }
