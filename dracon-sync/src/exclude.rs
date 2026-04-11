@@ -83,7 +83,7 @@ mod tests {
     }
 
     #[test]
-    fn test_is_excluded_dir_name_exact_match_case_sensitive() {
+    fn test_is_excluded_dir_name_case_insensitive_matching() {
         let excluded: BTreeSet<String> = ["Target".to_string()].into_iter().collect();
         assert!(is_excluded_dir_name("target", &excluded));
         assert!(is_excluded_dir_name("Target", &excluded));
