@@ -85,6 +85,20 @@ mod tests {
     }
 
     #[test]
+    fn test_is_excluded_dir_name_empty_excluded_set() {
+        let excluded: BTreeSet<String> = BTreeSet::new();
+        assert!(!is_excluded_dir_name("target", &excluded));
+        assert!(!is_excluded_dir_name("node_modules", &excluded));
+    }
+
+    #[test]
+    fn test_is_excluded_dir_name_exact_match_case_sensitive() {
+        let excluded: BTreeSet<String> = ["Target".to_string()].into_iter().collect();
+        assert!(!is_excluded_dir_name("target", &excluded));
+        assert!(is_excluded_dir_name("Target", &excluded));
+    }
+
+    #[test]
     fn test_is_nested_git_repo_path_finds_nested() {
         let current_repo_git = Path::new("/repo/.git");
         let nested_path = Path::new("/repo/subdir/nested/.git");
