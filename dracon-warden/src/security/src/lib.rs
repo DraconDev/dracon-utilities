@@ -2375,7 +2375,9 @@ impl DemonSecurity {
 
         for entry in walker.filter_map(|e| e.ok()) {
             if entry.file_type().is_file() {
-                let _ = process_file(entry.path());
+                if let Err(e) = process_file(entry.path()) {
+                    eprintln!("⚠️ failed to process {}: {}", entry.path().display(), e);
+                }
             }
         }
 
