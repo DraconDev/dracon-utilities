@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
-use dracon_security_kit::{DraconWarden, Warden};
+use dracon_security_kit::DraconWarden;
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use notify::{Event, RecursiveMode, Watcher};
 use secrecy::ExposeSecret;
