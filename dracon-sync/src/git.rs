@@ -678,18 +678,24 @@ pub(crate) fn rename_main_to_master(repo: &Path) -> Result<()> {
             .with_context(|| format!("failed to rename main to master in {}", repo.display()))?;
     }
     if has_origin_remote(repo) {
-        let _ = std_git_command()
+        if let Err(e) = std_git_command()
             .args(["push", "-u", "origin", "master"])
             .current_dir(repo)
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
-            .status();
-        let _ = std_git_command()
+            .status()
+        {
+            eprintln!("⚠️ failed to push master to origin: {}", e);
+        }
+        if let Err(e) = std_git_command()
             .args(["push", "origin", "--delete", "main"])
             .current_dir(repo)
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
-            .status();
+            .status()
+        {
+            eprintln!("⚠️ failed to delete remote main: {}", e);
+        }
     }
     Ok(())
 }
@@ -704,20 +710,26 @@ pub(crate) fn prune_other_default_branch(repo: &Path) {
         _ => return,
     };
     // Delete local other branch if it exists
-    let _ = std_git_command()
+    if let Err(e) = std_git_command()
         .args(["branch", "-D", other])
         .current_dir(repo)
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
-        .status();
+        .status()
+    {
+        eprintln!("⚠️ failed to delete local {} branch: {}", other, e);
+    }
     // Delete remote other branch if it exists
     if has_origin_remote(repo) {
-        let _ = std_git_command()
+        if let Err(e) = std_git_command()
             .args(["push", "origin", "--delete", other])
             .current_dir(repo)
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
-            .status();
+            .status()
+        {
+            eprintln!("⚠️ failed to delete remote {} branch: {}", other, e);
+        }
     }
 }
 

@@ -307,7 +307,9 @@ pub(crate) fn append_incident_record(policy_path: &Path, record: &IncidentRecord
     };
     let parent = path.parent().map(Path::to_path_buf);
     if let Some(dir) = parent {
-        let _ = std::fs::create_dir_all(dir);
+        if let Err(e) = std::fs::create_dir_all(&dir) {
+            eprintln!("⚠️ failed to create incident ledger dir: {}", e);
+        }
     }
     match std::fs::OpenOptions::new()
         .create(true)
