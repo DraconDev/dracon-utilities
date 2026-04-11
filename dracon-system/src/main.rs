@@ -1614,11 +1614,15 @@ async fn run_guard_once(
         
         // Trash
         if guard.clean_trash {
-            let (bytes, cleaned) = empty_trash(true).await.unwrap_or((0, vec![]));
-            total_reclaimed += bytes;
-            all_cleaned.extend(cleaned.iter().map(|s| format!("Trash: {}", s)));
-            for c in &cleaned {
-                eprintln!("🗑️ {}", c);
+            match empty_trash(true).await {
+                Ok((bytes, cleaned)) => {
+                    total_reclaimed += bytes;
+                    all_cleaned.extend(cleaned.iter().map(|s| format!("Trash: {}", s)));
+                    for c in &cleaned {
+                        eprintln!("🗑️ {}", c);
+                    }
+                }
+                Err(e) => eprintln!("⚠️ Trash cleanup failed: {}", e),
             }
         }
         
