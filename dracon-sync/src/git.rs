@@ -213,25 +213,6 @@ pub(crate) async fn run_git_with_timeout_env(
     run_child(child, repo, timeout_secs, &label).await
 }
 
-pub(crate) async fn run_cmd_with_timeout(
-    repo: &Path,
-    program: &str,
-    args: &[&str],
-    timeout_secs: u64,
-    op_label: &str,
-) -> Result<()> {
-    let label = format!("{} {}", program, op_label);
-    let child = TokioCommand::new(program)
-        .args(args)
-        .current_dir(repo)
-        .kill_on_drop(true)
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::piped())
-        .spawn()
-        .with_context(|| format!("failed to spawn {} in {}", label, repo.display()))?;
-    run_child(child, repo, timeout_secs, &label).await
-}
-
 pub(crate) fn origin_url(repo: &Path) -> Option<String> {
     let out = std_git_command()
         .args(["remote", "get-url", "origin"])

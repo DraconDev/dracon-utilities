@@ -111,10 +111,6 @@ pub(crate) struct SyncPolicy {
     pub(crate) incident_ledger_max_age_days: u64,
 }
 
-fn default_exclude_repos() -> Vec<String> {
-    Vec::new()
-}
-
 #[derive(Debug, Deserialize, Default, Clone)]
 pub(crate) struct RepoPolicyOverride {
     /// Optional per-repo override for `auto_bump_versions`.
