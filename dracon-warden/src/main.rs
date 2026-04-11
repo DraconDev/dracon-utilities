@@ -2071,10 +2071,29 @@ hygiene_patterns = ["target/", "*.log"]
         fs::create_dir_all(&hidden.join(".git")).expect("hidden .git");
 
         let excluded_dir_names: BTreeSet<String> = BTreeSet::new();
-        let repos = discover_git_repos_local(&[root], &excluded_dir_names, &[]);
+        let repos = discover_git_repos(&[root], &excluded_dir_names, &[]);
 
         assert!(repos.contains(&normal), "normal repo should be found");
         assert!(!repos.contains(&hidden), "hidden repo should be excluded");
+    }
+
+    #[test]
+    fn discover_git_repos_excludes_patterns() {
+        let td = TestDir::new("warden_discover_exclude");
+        let root = td.path().join("root");
+        fs::create_dir_all(&root).expect("root");
+
+        let keep = root.join("keep_this_repo");
+        fs::create_dir_all(&keep.join(".git")).expect("keep .git");
+
+        let skip = root.join("skip_this_repo");
+        fs::create_dir_all(&skip.join(".git")).expect("skip .git");
+
+        let excluded_dir_names: BTreeSet<String> = BTreeSet::new();
+        let repos = discover_git_repos(&[root], &excluded_dir_names, &[skip.display().to_string()]);
+
+        assert!(repos.contains(&keep), "keep repo should be found");
+        assert!(!repos.contains(&skip), "skipped repo should be excluded");
     }
 
     #[test]
