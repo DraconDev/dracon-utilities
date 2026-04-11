@@ -169,7 +169,7 @@ fn extract_version_from_cargo(content: &str) -> Option<String> {
 fn extract_version_from_json(content: &str, key: &str) -> Option<String> {
     let needle = format!("\"{}\"", key);
     let start = 0usize;
-    while let Some(idx) = content[start..].find(&needle) {
+    if let Some(idx) = content[start..].find(&needle) {
         let key_pos = start + idx;
         let after_key = key_pos + needle.len();
         let rest = &content[after_key..];
@@ -181,9 +181,10 @@ fn extract_version_from_json(content: &str, key: &str) -> Option<String> {
         let rest3 = &content[q1..];
         let q2_rel = rest3.find('"')?;
         let q2 = q1 + q2_rel;
-        return Some(content[q1..q2].to_string());
+        Some(content[q1..q2].to_string())
+    } else {
+        None
     }
-    None
 }
 
 
