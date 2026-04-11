@@ -128,6 +128,47 @@ mod tests {
         assert!(!matches_file_pattern("test.txt", "other.*"));
     }
 
+    #[test]
+    fn test_matches_file_pattern_no_wildcard() {
+        assert!(!matches_file_pattern("test.txt", "test"));
+        assert!(matches_file_pattern("test", "test"));
+    }
+
+    #[test]
+    fn test_is_excluded_change_path_simple() {
+        let excluded: BTreeSet<String> = ["target".to_string(), "node_modules".to_string()]
+            .into_iter()
+            .collect();
+
+        let path = std::path::Path::new("/repo/target/file.txt");
+        assert!(is_excluded_change_path(path, &excluded));
+
+        let path2 = std::path::Path::new("/repo/src/file.txt");
+        assert!(!is_excluded_change_path(path2, &excluded));
+    }
+
+    #[test]
+    fn test_can_restore_entry_modified() {
+        use dracon_git::types::{DiffFile, FileStatus};
+        let entry = DiffFile {
+            path: std::path::PathBuf::from("file.txt"),
+            status: FileStatus::Modified,
+        };
+        let repo = std::path::Path::new("/fake/repo");
+        assert!(can_restore_entry(repo, &entry));
+    }
+
+    #[test]
+    fn test_can_restore_entry_added() {
+        use dracon_git::types::{DiffFile, FileStatus};
+        let entry = DiffFile {
+            path: std::path::PathBuf::from("file.txt"),
+            status: FileStatus::Added,
+        };
+        let repo = std::path::Path::new("/fake/repo");
+        assert!(!can_restore_entry(repo, &entry));
+    }
+
     fn sync_policy_default() -> SyncPolicy {
         SyncPolicy {
             system_repo: String::new(),

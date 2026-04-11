@@ -6,7 +6,6 @@ use age::x25519;
 use anyhow::{Context, Result};
 use base64::{engine::general_purpose, Engine as _};
 use cfb_mode::cipher::{AsyncStreamCipher, KeyIvInit};
-use log;
 
 use regex::Regex;
 use secrecy::ExposeSecret;
@@ -82,7 +81,7 @@ impl SecretScanner {
             // ============================================================
             // AWS
             // ============================================================
-            ("AWS Access Key ID", r"AKIA[0-9A-Z]{16}"), // allow-secret
+            ("AWS Access Key ID", r"AKIA[0-9A-Z]{16}"),
             (
                 "AWS Secret Access Key",
                 r#"(?i)aws(.{0,20})?["'][0-9a-zA-Z/+]{40}["']"#,
@@ -109,7 +108,7 @@ impl SecretScanner {
             // ============================================================
             // Google Cloud
             // ============================================================
-            ("Google API Key", r"AIza[0-9A-Za-z\\-_]{35}"), // allow-secret
+            ("Google API Key", r"AIza[0-9A-Za-z\\-_]{35}"),
             (
                 "Google Client ID",
                 r"[0-9]+-[0-9a-z_]{32}\.apps\.googleusercontent\.com",
@@ -138,10 +137,10 @@ impl SecretScanner {
                 "Azure Storage Key",
                 r"DefaultEndpointsProtocol=https;AccountName=[^;]+;AccountKey=[A-Za-z0-9+/=]{88}",
             ),
-            ("Azure SAS Token", r"sig=[A-Za-z0-9%]+&se=[0-9]+"), // allow-secret
+            ("Azure SAS Token", r"sig=[A-Za-z0-9%]+&se=[0-9]+"),
             (
                 "Azure AD Client Secret",
-                r#"(?i)azure.{0,20}client.{0,20}secret.{0,20}["'][A-Za-z0-9~_.-]{34,}["']"#,
+                r#"(?i)azure.{0,20}client.{0,20}secret.{0,20}["'][A-Za-z0-9_.\-~]{34,}["']"#,
             ),
             // ============================================================
             // Alibaba / IBM / Oracle
@@ -162,11 +161,11 @@ impl SecretScanner {
             // ============================================================
             // GitHub / GitLab / Bitbucket
             // ============================================================
-            ("GitHub Token (ghp)", r"ghp_[A-Za-z0-9_]{36}"), // allow-secret
-            ("GitHub Token (gho)", r"gho_[A-Za-z0-9_]{36}"), // allow-secret
-            ("GitHub Token (ghu)", r"ghu_[A-Za-z0-9_]{36}"), // allow-secret
-            ("GitHub Token (ghs)", r"ghs_[A-Za-z0-9_]{36}"), // allow-secret
-            ("GitHub Token (ghr)", r"ghr_[A-Za-z0-9_]{36}"), // allow-secret
+            ("GitHub Token (ghp)", r"ghp_[A-Za-z0-9_]{36}"),
+            ("GitHub Token (gho)", r"gho_[A-Za-z0-9_]{36}"),
+            ("GitHub Token (ghu)", r"ghu_[A-Za-z0-9_]{36}"),
+            ("GitHub Token (ghs)", r"ghs_[A-Za-z0-9_]{36}"),
+            ("GitHub Token (ghr)", r"ghr_[A-Za-z0-9_]{36}"),
             (
                 "GitHub Client Secret",
                 r#"(?i)github.{0,20}client.{0,20}secret.{0,20}["']?[a-f0-9]{40}["']?"#,
@@ -178,14 +177,14 @@ impl SecretScanner {
             ),
             (
                 "Microsoft Client Secret",
-                r#"(?i)microsoft.{0,20}client.{0,20}secret.{0,20}["']?[A-Za-z0-9~_\.\-]{34,}["']?"#,
+                r#"(?i)microsoft.{0,20}client.{0,20}secret.{0,20}["']?[A-Za-z0-9_.\-~]{34,}["']?"#,
             ),
             (
                 "GitHub App Token",
                 r#"(?i)github.{0,20}["'][A-Za-z0-9_]{35,40}["']"#,
             ),
-            ("GitLab Token", r"glpat-[A-Za-z0-9\-_]{20,}"), // allow-secret
-            ("GitLab Runner Token", r"GR1348941[A-Za-z0-9\-_]{20,}"), // allow-secret
+            ("GitLab Token", r"glpat-[A-Za-z0-9\-_]{20,}"),
+            ("GitLab Runner Token", r"GR1348941[A-Za-z0-9\-_]{20,}"),
             (
                 "Bitbucket Token",
                 r#"(?i)bitbucket.{0,20}["'][A-Za-z0-9_]{30,}["']"#,
@@ -193,11 +192,11 @@ impl SecretScanner {
             // ============================================================
             // Stripe (ONLY LIVE KEYS)
             // ============================================================
-            ("Stripe Live Secret Key", r"sk_live_[0-9a-zA-Z]{24,}"), // allow-secret
-            ("Stripe Live Restricted Key", r"rk_live_[0-9a-zA-Z]{24,}"), // allow-secret
-            ("Stripe Test Secret Key", r"sk_test_[0-9a-zA-Z]{24,}"), // allow-secret
-            ("Stripe Test Restricted Key", r"rk_test_[0-9a-zA-Z]{24,}"), // allow-secret
-            ("Stripe Webhook Secret", r"whsec_[0-9a-zA-Z]{24,}"),    // allow-secret
+            ("Stripe Live Secret Key", r"sk_live_[0-9a-zA-Z]{24,}"),
+            ("Stripe Live Restricted Key", r"rk_live_[0-9a-zA-Z]{24,}"),
+            ("Stripe Test Secret Key", r"sk_test_[0-9a-zA-Z]{24,}"),
+            ("Stripe Test Restricted Key", r"rk_test_[0-9a-zA-Z]{24,}"),
+            ("Stripe Webhook Secret", r"whsec_[0-9a-zA-Z]{24,}"),
             // ============================================================
             // Slack
             // ============================================================
@@ -216,30 +215,30 @@ impl SecretScanner {
             // ============================================================
             // Discord
             // ============================================================
-            ("Discord Token", r"[MN][A-Za-z\d]{23,}\.[\w-]{6}\.[\w-]{27}"), // allow-secret
+            ("Discord Token", r"[MN][A-Za-z\d]{23,}\.[\w-]{6}\.[\w-]{27}"),
             (
                 "Discord Webhook",
                 r"https://discord(?:app)?\.com/api/webhooks/[0-9]+/[A-Za-z0-9_-]+",
             ),
-            ("Telegram Bot Token", r"[0-9]{8,10}:[a-zA-Z0-9_-]{35}"), // allow-secret
+            ("Telegram Bot Token", r"[0-9]{8,10}:[a-zA-Z0-9_-]{35}"),
             // ============================================================
             // Twilio / SendGrid / Mailgun
             // ============================================================
-            ("Twilio API Key", r"SK[a-f0-9]{32}"), // allow-secret
-            ("Twilio Account SID", r"AC[a-f0-9]{32}"), // allow-secret
+            ("Twilio API Key", r"SK[a-f0-9]{32}"),
+            ("Twilio Account SID", r"AC[a-f0-9]{32}"),
             (
                 "SendGrid API Key",
                 r"SG\.[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}",
             ),
-            ("Mailgun API Key", r"key-[0-9a-zA-Z]{32}"), // allow-secret
-            ("Mailchimp API Key", r"[0-9a-f]{32}-us[0-9]{1,2}"), // allow-secret
+            ("Mailgun API Key", r"key-[0-9a-zA-Z]{32}"),
+            ("Mailchimp API Key", r"[0-9a-f]{32}-us[0-9]{1,2}"),
             // ============================================================
             // Database / Connection Strings
             // ============================================================
-            ("PostgreSQL URL", r"postgres(?:ql)?://[^:]+:[^@]+@[^/]+"), // allow-secret
-            ("MySQL URL", r"mysql://[^:]+:[^@]+@[^/]+"),                // allow-secret
-            ("MongoDB URL", r"mongodb(?:\+srv)?://[^:]+:[^@]+@[^/]+"),  // allow-secret
-            ("Redis URL", r"redis://[^:]+:[^@]+@[^/]+"),                // allow-secret
+            ("PostgreSQL URL", r"postgres(?:ql)?://[^:]+:[^@]+@[^/]+"),
+            ("MySQL URL", r"mysql://[^:]+:[^@]+@[^/]+"),
+            ("MongoDB URL", r"mongodb(?:\+srv)?://[^:]+:[^@]+@[^/]+"),
+            ("Redis URL", r"redis://[^:]+:[^@]+@[^/]+"),
             (
                 "Database Password",
                 r#"(?i)(?:db|database)(?:_)?(?:pass|password|pwd).{0,10}[=:].{0,5}["'][^"']{8,}["']"#,
@@ -251,8 +250,8 @@ impl SecretScanner {
                 "JWT Token",
                 r"eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}",
             ),
-            ("Bearer Token", r"(?i)bearer\s+[A-Za-z0-9_\-\.=]{20,}"), // allow-secret
-            ("Basic Auth Header", r"(?i)basic\s+[A-Za-z0-9+/=]{20,}"), // allow-secret
+            ("Bearer Token", r"(?i)bearer\s+[A-Za-z0-9_\-\.=]{20,}"),
+            ("Basic Auth Header", r"(?i)basic\s+[A-Za-z0-9+/=]{20,}"),
             (
                 "OAuth Token",
                 r#"(?i)oauth.{0,20}["'][A-Za-z0-9_-]{20,}["']"#,
@@ -291,9 +290,9 @@ impl SecretScanner {
                 "NPM Token",
                 r"//registry\.npmjs\.org/:_authToken=[A-Za-z0-9_-]+",
             ),
-            ("NPM Access Token", r"npm_[A-Za-z0-9]{36}"), // allow-secret
-            ("PyPI Token", r"pypi-AgEIcHlwaS5vcmc[A-Za-z0-9_-]{50,}"), // allow-secret
-            ("NuGet API Key", r"oy2[a-z0-9]{43}"),        // allow-secret
+            ("NPM Access Token", r"npm_[A-Za-z0-9]{36}"),
+            ("PyPI Token", r"pypi-AgEIcHlwaS5vcmc[A-Za-z0-9_-]{50,}"),
+            ("NuGet API Key", r"oy2[a-z0-9]{43}"),
             // ============================================================
             // Heroku / Vercel / Netlify
             // ============================================================
@@ -312,7 +311,7 @@ impl SecretScanner {
             // ============================================================
             // OpenAI / Anthropic / AI APIs
             // ============================================================
-            ("OpenAI API Key", r"sk-[a-zA-Z0-9_\-]{20,}"), // allow-secret
+            ("OpenAI API Key", r"sk-[a-zA-Z0-9_\-]{20,}"),
             (
                 "Cohere API Key",
                 r#"(?i)cohere.{0,20}["'][A-Za-z0-9]{40}["']"#,
@@ -320,7 +319,7 @@ impl SecretScanner {
             // ============================================================
             // DigitalOcean / Linode / Vultr
             // ============================================================
-            ("DigitalOcean Token", r"dop_v1_[a-f0-9]{64}"), // allow-secret
+            ("DigitalOcean Token", r"dop_v1_[a-f0-9]{64}"),
             (
                 "DigitalOcean Spaces Key",
                 r#"(?i)digitalocean.{0,20}spaces.{0,20}["'][A-Z0-9]{20}["']"#,
@@ -329,10 +328,10 @@ impl SecretScanner {
             // ============================================================
             // Shopify / Square / Payment
             // ============================================================
-            ("Shopify Token", r"shpat_[a-fA-F0-9]{32}"), // allow-secret
-            ("Shopify Secret", r"shpss_[a-fA-F0-9]{32}"), // allow-secret
-            ("Square Access Token", r"sq0atp-[A-Za-z0-9_-]{22}"), // allow-secret
-            ("Square OAuth Secret", r"sq0csp-[A-Za-z0-9_-]{43}"), // allow-secret
+            ("Shopify Token", r"shpat_[a-fA-F0-9]{32}"),
+            ("Shopify Secret", r"shpss_[a-fA-F0-9]{32}"),
+            ("Square Access Token", r"sq0atp-[A-Za-z0-9_-]{22}"),
+            ("Square OAuth Secret", r"sq0csp-[A-Za-z0-9_-]{43}"),
             (
                 "PayPal Client ID",
                 r#"(?i)paypal.{0,20}client.{0,20}id.{0,10}["'][A-Za-z0-9_-]{80}["']"#,
@@ -340,7 +339,7 @@ impl SecretScanner {
             // ============================================================
             // HashiCorp / Vault
             // ============================================================
-            ("HashiCorp Vault Token", r"hvs\.[A-Za-z0-9_-]{24,}"), // allow-secret
+            ("HashiCorp Vault Token", r"hvs\.[A-Za-z0-9_-]{24,}"),
             (
                 "HashiCorp Terraform Token",
                 r#"(?i)terraform.{0,20}["'][A-Za-z0-9]{14}\.[A-Za-z0-9]{24}\.[A-Za-z0-9]{67}["']"#,
@@ -433,13 +432,19 @@ impl SecretScanner {
             .collect();
 
         // Build one giant regex for single-pass scan
-        let combined = patterns_raw
+        let combined: String = patterns_raw
             .iter()
             .map(|(_, p)| format!("(?:{})", p))
             .collect::<Vec<_>>()
             .join("|");
+        eprintln!("Combined pattern length: {}", combined.len());
+        eprintln!(
+            "Combined first 200 chars: {}",
+            &combined[..200.min(combined.len())]
+        );
+
         let full_regex = Regex::new(&format!("(?sm){}", combined))
-            .unwrap_or_else(|_| Regex::new("nevermatch").unwrap());
+            .expect("Failed to build combined regex - check patterns for invalid regex syntax");
 
         Self {
             patterns,
@@ -504,18 +509,6 @@ impl SecretScanner {
                         continue;
                     }
 
-                    // Find context lines
-                    let line_start = content[..start_idx].rfind('\n').map(|i| i + 1).unwrap_or(0);
-                    let line_end = content[mat.end()..]
-                        .find('\n')
-                        .map(|i| i + mat.end())
-                        .unwrap_or(content.len());
-                    let line_str = &content[line_start..line_end];
-
-                    if line_str.to_lowercase().contains("allow-secret") {
-                        continue;
-                    }
-
                     let line_num = content[..start_idx].chars().filter(|&c| c == '\n').count() + 1;
                     let matching_str = mat.as_str();
                     let snippet = if matching_str.len() > 60 {
@@ -558,21 +551,6 @@ impl SecretScanner {
 
             // 1. SAFEGUARD: Check if we are inside an existing tag
             if is_inside_secret_tag(content, mat.start()) {
-                continue;
-            }
-
-            // 2. SAFEGUARD: Check for allow-secret in current line
-            let start_line = content[..mat.start()]
-                .rfind('\n')
-                .map(|i| i + 1)
-                .unwrap_or(0);
-            let end_line = content[mat.end()..]
-                .find('\n')
-                .map(|i| i + mat.end())
-                .unwrap_or(content.len());
-            let line_str = &content[start_line..end_line];
-
-            if line_str.to_lowercase().contains("allow-secret") {
                 continue;
             }
 
@@ -852,7 +830,7 @@ impl DemonSecurity {
         // 6. GENERAL SCAN: ~/demon/keys/*.age (and similar dirs)
         // This satisfies "if a user adds their key whatever it is called we can try it"
         let general_keys = vec![
-            home.join(".demon").join("keys"), // allow-secret
+            home.join(".demon").join("keys"), // key storage
         ];
 
         for dir in general_keys {
@@ -2514,7 +2492,7 @@ impl DemonSecurity {
 
         // Check demon key directories
         let keychain_dirs = vec![
-            home.join(".demon").join("keys"), // allow-secret
+            home.join(".demon").join("keys"), // key storage
             home.join(".arcane").join("keys"),
         ];
 
@@ -2771,5 +2749,15 @@ mod tests {
         assert!(migrated.contains("[DRACON_SECRET:abc]"));
         assert!(migrated.contains("[DRACON_SECRET:def]"));
         assert!(!migrated.contains("[DEMON_SECRET:"));
+    }
+
+    #[test]
+    fn test_scanner_creation() {
+        let scanner = SecretScanner::new();
+        let patterns = SecretScanner::get_patterns();
+        eprintln!("Pattern count: {}", patterns.len());
+        eprintln!("Scanner pattern_count: {}", scanner.pattern_count());
+        eprintln!("full_regex: {}", scanner.full_regex.as_str());
+        assert!(scanner.pattern_count() > 50, "Should have many patterns");
     }
 }

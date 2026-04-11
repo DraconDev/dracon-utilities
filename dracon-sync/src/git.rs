@@ -966,4 +966,25 @@ mod tests {
         let result = github_https_url(url);
         assert_eq!(result, None);
     }
+
+    #[test]
+    fn test_top_level_dir_simple() {
+        assert_eq!(top_level_dir("src/main.rs"), Some("src".to_string()));
+        assert_eq!(top_level_dir("docs/readme.md"), Some("docs".to_string()));
+    }
+
+    #[test]
+    fn test_top_level_dir_no_separator() {
+        assert_eq!(top_level_dir("filename.txt"), Some("filename.txt".to_string()));
+    }
+
+    #[test]
+    fn test_top_level_dir_empty() {
+        assert_eq!(top_level_dir(""), Some("".to_string()));
+    }
+
+    #[test]
+    fn test_top_level_dir_only_separator() {
+        assert_eq!(top_level_dir("/"), Some("".to_string()));
+    }
 }

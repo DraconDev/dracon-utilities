@@ -20,6 +20,99 @@ struct StuckRepoEntry {
     stuck_since: u64,
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_stuck_repo_entry_serialization() {
+        let entry = StuckRepoEntry {
+            path: PathBuf::from("/test/repo"),
+            stuck_since: 1000,
+        };
+        let json = serde_json::to_string(&entry).unwrap();
+        assert!(json.contains("\"/test/repo\""));
+        assert!(json.contains("1000"));
+    }
+
+    #[test]
+    fn test_stuck_repo_entry_deserialization() {
+        let json = r#"{"path":"/test/repo","stuck_since":1000}"#;
+        let entry: StuckRepoEntry = serde_json::from_str(json).unwrap();
+        assert_eq!(entry.path, PathBuf::from("/test/repo"));
+        assert_eq!(entry.stuck_since, 1000);
+    }
+
+    #[test]
+    fn test_stuck_repo_expiry_constant() {
+        assert_eq!(STUCK_REPO_EXPIRY_SECS, 24 * 60 * 60);
+    }
+
+    #[test]
+    fn test_stuck_repo_entry_debug() {
+        let entry = StuckRepoEntry {
+            path: PathBuf::from("/test/repo"),
+            stuck_since: 1000,
+        };
+        let debug = format!("{:?}", entry);
+        assert!(debug.contains("/test/repo"));
+        assert!(debug.contains("1000"));
+    }
+
+    #[test]
+    fn test_stuck_repo_entry_clone() {
+        let entry = StuckRepoEntry {
+            path: PathBuf::from("/test/repo"),
+            stuck_since: 1000,
+        };
+        let cloned = entry.clone();
+        assert_eq!(cloned.path, entry.path);
+        assert_eq!(cloned.stuck_since, entry.stuck_since);
+    }
+
+    #[test]
+    fn test_stuck_repo_entry_equality() {
+        let entry1 = StuckRepoEntry {
+            path: PathBuf::from("/test/repo"),
+            stuck_since: 1000,
+        };
+        let entry2 = StuckRepoEntry {
+            path: PathBuf::from("/test/repo"),
+            stuck_since: 1000,
+        };
+        let entry3 = StuckRepoEntry {
+            path: PathBuf::from("/other/repo"),
+            stuck_since: 1000,
+        };
+        assert_eq!(entry1.path, entry2.path);
+        assert_ne!(entry1.path, entry3.path);
+    }
+
+    #[test]
+    fn test_stuck_repo_entry_path_stored_correctly() {
+        let path = PathBuf::from("/home/user/code/my-project");
+        let entry = StuckRepoEntry {
+            path: path.clone(),
+            stuck_since: 12345,
+        };
+        assert_eq!(entry.path, path);
+        assert_eq!(entry.path.to_string_lossy(), "/home/user/code/my-project");
+    }
+
+    #[test]
+    fn test_stuck_repo_entry_timestamp_ordering() {
+        let old = StuckRepoEntry {
+            path: PathBuf::from("/old"),
+            stuck_since: 1000,
+        };
+        let new = StuckRepoEntry {
+            path: PathBuf::from("/new"),
+            stuck_since: 2000,
+        };
+        assert!(old.stuck_since < new.stuck_since);
+    }
+}
+
 fn stuck_repos_path() -> PathBuf {
     dirs::home_dir()
         .unwrap_or_else(|| PathBuf::from("."))

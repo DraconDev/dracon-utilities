@@ -398,3 +398,73 @@ impl Default for SimpleAiService {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_chat_message_user_constructor() {
+        let msg = ChatMessage::user("Hello");
+        assert_eq!(msg.role, "user");
+        assert_eq!(msg.content, "Hello");
+    }
+
+    #[test]
+    fn test_chat_message_user_empty() {
+        let msg = ChatMessage::user("");
+        assert_eq!(msg.role, "user");
+        assert_eq!(msg.content, "");
+    }
+
+    #[test]
+    fn test_chat_message_from_trait() {
+        let msg = ChatMessage::user("test");
+        let req: RequestMessage = msg.into();
+        assert_eq!(req.role, "user");
+        assert_eq!(req.content, "test");
+    }
+
+    #[test]
+    fn test_default_auth_header() {
+        assert_eq!(default_auth_header(), "Authorization");
+    }
+
+    #[test]
+    fn test_default_auth_prefix() {
+        assert_eq!(default_auth_prefix(), "Bearer ");
+    }
+
+    #[test]
+    fn test_provider_status_debug() {
+        let status = ProviderStatus::Healthy;
+        assert_eq!(format!("{:?}", status), "Healthy");
+    }
+
+    #[test]
+    fn test_provider_status_rate_limited() {
+        use std::time::Instant;
+        let until = Instant::now();
+        let status = ProviderStatus::RateLimited { until };
+        assert!(format!("{:?}", status).contains("RateLimited"));
+    }
+
+    #[test]
+    fn test_provider_status_auth_failed() {
+        let status = ProviderStatus::AuthFailed;
+        assert_eq!(format!("{:?}", status), "AuthFailed");
+    }
+
+    #[test]
+    fn test_chat_message_preserves_content() {
+        let long_text = "This is a very long message content that should be preserved exactly as is";
+        let msg = ChatMessage::user(long_text);
+        assert_eq!(msg.content, long_text);
+    }
+
+    #[test]
+    fn test_chat_message_special_characters() {
+        let msg = ChatMessage::user("Hello\nWorld\t!@#$%");
+        assert_eq!(msg.content, "Hello\nWorld\t!@#$%");
+    }
+}

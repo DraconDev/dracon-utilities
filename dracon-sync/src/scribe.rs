@@ -227,3 +227,91 @@ pub(crate) async fn update_project_state_from_ai(repo: &Path, staged_diff_names:
 pub(crate) async fn update_project_state_from_ai(_repo: &Path, _staged_diff_names: &str, _staged_diff_content: Option<String>) -> anyhow::Result<()> {
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_cleanup_markdown_simple_header() {
+        assert_eq!(cleanup_markdown("# Header\n\nSome content"), "# Header\nSome content\n");
+    }
+
+    #[test]
+    fn test_cleanup_markdown_header_levels() {
+        let input = "### Level 3\n## Level 2\n# Level 1";
+        let result = cleanup_markdown(input);
+        assert!(result.contains("### Level 3"));
+        assert!(result.contains("## Level 2"));
+        assert!(result.contains("# Level 1"));
+    }
+
+    #[test]
+    fn test_cleanup_markdown_header_with_colon() {
+        let input = "## Current Focus: Doing things";
+        let result = cleanup_markdown(input);
+        assert!(result.contains("## Current Focus\n\nDoing things"));
+    }
+
+    #[test]
+    fn test_cleanup_markdown_trims_trailing_whitespace() {
+        let input = "Content with trailing   \nMore content";
+        let result = cleanup_markdown(input);
+        assert!(!result.contains("trailing   "));
+        assert!(result.contains("Content with trailing"));
+    }
+
+    #[test]
+    fn test_cleanup_markdown_removes_trailing_blank_lines() {
+        let input = "# Header\n\nContent\n\n\n\n";
+        let result = cleanup_markdown(input);
+        assert_eq!(result, "# Header\nContent\n");
+    }
+
+    #[test]
+    fn test_cleanup_markdown_preserves_blank_line_between_headers() {
+        let input = "# Header\n\n## Section\n\nContent here";
+        let result = cleanup_markdown(input);
+        assert_eq!(result, "# Header\n\n## Section\nContent here\n");
+    }
+
+    #[test]
+    fn test_cleanup_markdown_hash_only_without_space() {
+        let input = "##NoSpace";
+        let result = cleanup_markdown(input);
+        assert!(result.contains("## NoSpace") || result.contains("##NoSpace"));
+    }
+
+    #[test]
+    fn test_cleanup_markdown_header_with_dash_prefix() {
+        let input = "## - Item";
+        let result = cleanup_markdown(input);
+        assert!(result.contains("## - Item"));
+    }
+
+    #[test]
+    fn test_cleanup_markdown_empty_input() {
+        assert_eq!(cleanup_markdown(""), "\n");
+    }
+
+    #[test]
+    fn test_cleanup_markdown_multiple_blank_lines_collapsed() {
+        let input = "Line1\n\n\n\nLine2";
+        let result = cleanup_markdown(input);
+        assert!(result.contains("Line1\nLine2"));
+    }
+
+    #[test]
+    fn test_cleanup_markdown_no_extra_blank_before_non_header() {
+        let input = "Paragraph\n\n\n\nAnother";
+        let result = cleanup_markdown(input);
+        assert_eq!(result, "Paragraph\nAnother\n");
+    }
+
+    #[test]
+    fn test_cleanup_markdown_trailing_whitespace_lines() {
+        let input = "Content   \n   \nMore";
+        let result = cleanup_markdown(input);
+        assert_eq!(result, "Content\nMore\n");
+    }
+}

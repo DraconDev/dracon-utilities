@@ -755,4 +755,154 @@ mod tests {
         assert!(new_content.contains("1.0.1"));
         assert!(new_content.contains("2.0.0"));
     }
+
+    #[test]
+    fn test_bump_level_as_str() {
+        assert_eq!(BumpLevel::Major.as_str(), "major");
+        assert_eq!(BumpLevel::Minor.as_str(), "minor");
+        assert_eq!(BumpLevel::Patch.as_str(), "patch");
+        assert_eq!(BumpLevel::None.as_str(), "none");
+    }
+
+    #[test]
+    fn test_bump_level_debug() {
+        assert_eq!(format!("{:?}", BumpLevel::Major), "Major");
+        assert_eq!(format!("{:?}", BumpLevel::None), "None");
+    }
+
+    #[test]
+    fn test_deterministic_decide_bump_level_meaningful_change() {
+        let diff = "M src/main.rs\nM Cargo.toml";
+        assert_eq!(deterministic_decide_bump_level(diff), BumpLevel::Patch);
+    }
+
+    #[test]
+    fn test_deterministic_decide_bump_level_noise_only() {
+        let diff = "M README.md\nM .gitignore";
+        assert_eq!(deterministic_decide_bump_level(diff), BumpLevel::None);
+    }
+
+    #[test]
+    fn test_deterministic_decide_bump_level_version_file_only() {
+        let diff = "M Cargo.toml\nM package.json";
+        assert_eq!(deterministic_decide_bump_level(diff), BumpLevel::None);
+    }
+
+    #[test]
+    fn test_deterministic_decide_bump_level_mixed() {
+        let diff = "M README.md\nM src/main.rs";
+        assert_eq!(deterministic_decide_bump_level(diff), BumpLevel::Patch);
+    }
+
+    #[test]
+    fn test_deterministic_decide_bump_level_empty() {
+        assert_eq!(deterministic_decide_bump_level(""), BumpLevel::None);
+    }
+
+    #[test]
+    fn test_deterministic_decide_bump_level_changelog() {
+        let diff = "M CHANGELOG.md\nM CONTRIBUTING.md";
+        assert_eq!(deterministic_decide_bump_level(diff), BumpLevel::None);
+    }
+
+    #[test]
+    fn test_deterministic_decide_bump_level_env_file() {
+        let diff = "M .env\nM .env.example";
+        assert_eq!(deterministic_decide_bump_level(diff), BumpLevel::None);
+    }
+
+    #[test]
+    fn test_deterministic_decide_bump_level_lock_files() {
+        let diff = "M Cargo.lock\nM package-lock.json";
+        assert_eq!(deterministic_decide_bump_level(diff), BumpLevel::None);
+    }
+
+    #[test]
+    fn test_bump_version_in_cargo_toml() {
+        let content = r#"version = "1.2.3""#;
+        let result = bump_version_in_cargo_toml(content, "1.2.3", "1.2.4");
+        assert!(result.contains("1.2.4"));
+    }
+
+    #[test]
+    fn test_bump_version_in_cargo_toml_no_space() {
+        let content = r#"version="1.2.3""#;
+        let result = bump_version_in_cargo_toml(content, "1.2.3", "1.2.4");
+        assert!(result.contains("1.2.4"));
+    }
+
+    #[test]
+    fn test_bump_version_in_cargo_toml_not_found() {
+        let content = r#"name = "test""#;
+        let result = bump_version_in_cargo_toml(content, "1.2.3", "1.2.4");
+        assert_eq!(result, content);
+    }
+
+    #[test]
+    fn test_bump_version_in_json() {
+        let content = r#""version": "1.2.3""#;
+        let result = bump_version_in_json(content, "1.2.3", "1.2.4");
+        assert!(result.contains("1.2.4"));
+    }
+
+    #[test]
+    fn test_bump_version_in_json_not_found() {
+        let content = r#""name": "test""#;
+        let result = bump_version_in_json(content, "1.2.3", "1.2.4");
+        assert_eq!(result, content);
+    }
+
+    #[test]
+    fn test_extract_version_from_cargo_package() {
+        let content = r#"[package]
+name = "test"
+version = "1.2.3""#;
+        assert_eq!(extract_version_from_cargo(content), Some("1.2.3".to_string()));
+    }
+
+    #[test]
+    fn test_extract_version_from_cargo_workspace_package() {
+        let content = r#"[workspace.package]
+version = "2.0.0"
+
+[package]
+name = "test""#;
+        assert_eq!(extract_version_from_cargo(content), Some("2.0.0".to_string()));
+    }
+
+    #[test]
+    fn test_extract_version_from_cargo_no_version() {
+        let content = r#"[package]
+name = "test""#;
+        assert_eq!(extract_version_from_cargo(content), None);
+    }
+
+    #[test]
+    fn test_extract_version_from_cargo_ignore_workspace_without_version() {
+        let content = r#"[workspace]
+members = ["crate1", "crate2"]
+
+[package]
+name = "test"
+version = "1.0.0""#;
+        assert_eq!(extract_version_from_cargo(content), Some("1.0.0".to_string()));
+    }
+
+    #[test]
+    fn test_extract_version_from_json() {
+        let content = r#"{"version": "1.2.3"}"#;
+        assert_eq!(extract_version_from_json(content, "version"), Some("1.2.3".to_string()));
+    }
+
+    #[test]
+    fn test_extract_version_from_json_not_found() {
+        let content = r#"{"name": "test"}"#;
+        assert_eq!(extract_version_from_json(content, "version"), None);
+    }
+
+    #[test]
+    fn test_extract_version_from_json_multiple_keys() {
+        let content = r#"{"name": "test", "version": "1.0.0", "other": "value"}"#;
+        assert_eq!(extract_version_from_json(content, "version"), Some("1.0.0".to_string()));
+    }
 }
