@@ -328,7 +328,9 @@ pub(crate) async fn sync_repo(
 
             // Stage project-state.md if scribe updated it
             if repo.join(".dracon/project-state.md").exists() {
-                let _ = run_git_with_timeout(repo, &["add", ".dracon/project-state.md"], 10, "add-project-state").await;
+                if let Err(e) = run_git_with_timeout(repo, &["add", ".dracon/project-state.md"], 10, "add-project-state").await {
+                    eprintln!("⚠️ failed to stage project-state: {}", e);
+                }
             }
 
             // Version bumper: deterministic patch-only (fallback when ai-bumper not enabled)
