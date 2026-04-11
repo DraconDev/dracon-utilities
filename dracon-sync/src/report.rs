@@ -1,31 +1,26 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use dracon_git::{
-    build_commit_message,
-    types::{DiffFile, FileStatus, RepoStatus},
+    types::{DiffFile, RepoStatus},
     CommitContext, extract_intent, GitService,
 };
 use serde::Serialize;
-use std::collections::{BTreeSet, HashMap};
+use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::time::Duration;
 
-use crate::bump::{bump_patch_version_in_repo, bump_node_package_version_in_repo, bump_version_file_in_repo};
 use crate::exclude::{
-    excluded_dir_names_set, should_stage_entry, is_excluded_change_path,
-    has_sync_relevant_dirty_entries, is_large_untracked, can_restore_entry,
-    append_to_gitignore, handle_large_untracked, is_excluded_file,
+    excluded_dir_names_set,
+    has_sync_relevant_dirty_entries,
     is_excluded_dir_name,
 };
 use crate::git::{
-    has_origin_remote, has_tracking_upstream, discover_git_repos, origin_url,
-    strip_url_credentials, push_with_retries, rewrite_ahead_paths, current_branch,
+    has_origin_remote, has_tracking_upstream, discover_git_repos, push_with_retries, rewrite_ahead_paths, current_branch,
     remote_branch_exists, set_upstream_to_branch, detect_large_blobs_ahead,
     top_level_dir, repo_diff_entries, run_git_with_timeout, run_git_capture_output,
-    unstage_excluded_paths, unstage_oversized_paths, staged_paths,
 };
 use crate::policy::{
-    SyncPolicy, resolve_policy_path, freeze_reason, debug_enabled,
+    SyncPolicy,
     DEFAULT_GIT_HOST_BLOB_LIMIT_BYTES, tokio_git_command,
 };
 
@@ -685,7 +680,7 @@ pub(crate) async fn run_repair_concerns(
     let policy = SyncPolicy::load(policy_path)?;
     let roots = policy.watch_root_paths();
     let excluded_dir_names = excluded_dir_names_set(&policy);
-    let mut repos = if let Some(target_repo) = &only_repo {
+    let repos = if let Some(target_repo) = &only_repo {
         vec![target_repo.clone()]
     } else {
         discover_git_repos(&roots, &excluded_dir_names, &policy.exclude_repos)
@@ -1396,7 +1391,7 @@ pub(crate) async fn run_repair_warns(
     let policy = SyncPolicy::load(policy_path)?;
     let roots = policy.watch_root_paths();
     let excluded_dir_names = excluded_dir_names_set(&policy);
-    let mut repos = if let Some(target_repo) = &only_repo {
+    let repos = if let Some(target_repo) = &only_repo {
         vec![target_repo.clone()]
     } else {
         discover_git_repos(&roots, &excluded_dir_names, &policy.exclude_repos)

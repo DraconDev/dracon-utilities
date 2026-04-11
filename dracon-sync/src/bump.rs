@@ -31,7 +31,7 @@ pub(crate) fn bump_semver_minor(ver: &str) -> Option<String> {
     }
     let major: u64 = parts[0].parse().ok()?;
     let minor: u64 = parts[1].parse().ok()?;
-    let patch: u64 = parts[2].parse().ok()?;
+    let _patch: u64 = parts[2].parse().ok()?;
     Some(format!("{}.{}.{}", major, minor + 1, 0))
 }
 
@@ -47,8 +47,8 @@ pub(crate) fn bump_semver_major(ver: &str) -> Option<String> {
         return None;
     }
     let major: u64 = parts[0].parse().ok()?;
-    let minor: u64 = parts[1].parse().ok()?;
-    let patch: u64 = parts[2].parse().ok()?;
+    let _minor: u64 = parts[1].parse().ok()?;
+    let _patch: u64 = parts[2].parse().ok()?;
     Some(format!("{}.{}.{}", major + 1, 0, 0))
 }
 
@@ -519,7 +519,7 @@ fn extract_version_from_cargo(content: &str) -> Option<String> {
 
 fn extract_version_from_json(content: &str, key: &str) -> Option<String> {
     let needle = format!("\"{}\"", key);
-    let mut start = 0usize;
+    let start = 0usize;
     while let Some(idx) = content[start..].find(&needle) {
         let key_pos = start + idx;
         let after_key = key_pos + needle.len();
@@ -600,28 +600,25 @@ pub fn apply_version_bump_to_repo(repo: &Path, old_ver: &str, new_ver: &str) -> 
     if repo.join("Cargo.toml").exists() {
         if let Ok(content) = std::fs::read_to_string(repo.join("Cargo.toml")) {
             let bumped = bump_version_in_cargo_toml(&content, old_ver, new_ver);
-            if bumped != content {
-                if std::fs::write(repo.join("Cargo.toml"), bumped).is_ok() {
+            if bumped != content
+                && std::fs::write(repo.join("Cargo.toml"), bumped).is_ok() {
                     return true;
                 }
-            }
         }
     }
     if repo.join("package.json").exists() {
         if let Ok(content) = std::fs::read_to_string(repo.join("package.json")) {
             let bumped = bump_version_in_json(&content, old_ver, new_ver);
-            if bumped != content {
-                if std::fs::write(repo.join("package.json"), bumped).is_ok() {
+            if bumped != content
+                && std::fs::write(repo.join("package.json"), bumped).is_ok() {
                     return true;
                 }
-            }
         }
     }
-    if repo.join("VERSION").exists() {
-        if std::fs::write(repo.join("VERSION"), format!("{}\n", new_ver)).is_ok() {
+    if repo.join("VERSION").exists()
+        && std::fs::write(repo.join("VERSION"), format!("{}\n", new_ver)).is_ok() {
             return true;
         }
-    }
     false
 }
 

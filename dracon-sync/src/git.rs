@@ -1,17 +1,16 @@
 use anyhow::{Context, Result};
 use dracon_git::{
-    types::{DiffFile, FileStatus, RepoStatus},
+    types::{DiffFile, FileStatus},
     GitService,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
-use std::process::Command as StdCommand;
 use std::time::Duration;
 use tokio::process::Command as TokioCommand;
 use tokio::time::sleep;
 
-use crate::exclude::{can_restore_entry, is_excluded_change_path, is_large_untracked, should_stage_entry};
-use crate::policy::{git_binary, std_git_command, tokio_git_command, timestamp_secs};
+use crate::exclude::is_excluded_change_path;
+use crate::policy::{std_git_command, tokio_git_command, timestamp_secs};
 
 pub(crate) fn discover_git_repos(
     roots: &[PathBuf],
@@ -287,7 +286,7 @@ pub(crate) async fn push_with_transport_fallbacks(
     )
     .await
     {
-        Ok(()) => return Ok(()),
+        Ok(()) => Ok(()),
         Err(e) => {
             let origin = origin_url(repo).unwrap_or_default();
             if let Some(https) = github_https_url(&origin) {

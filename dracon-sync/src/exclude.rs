@@ -2,7 +2,6 @@ use anyhow::Result;
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
-use dracon_git::types::{DiffFile, FileStatus};
 
 use crate::policy::SyncPolicy;
 

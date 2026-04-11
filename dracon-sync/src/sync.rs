@@ -1,15 +1,14 @@
 use anyhow::Result;
-use dracon_git::{build_commit_message, extract_intent, CommitContext, GitService};
+use dracon_git::{build_commit_message, extract_intent, GitService};
 use std::collections::BTreeSet;
 use std::path::Path;
 use std::time::Duration;
 
-use crate::bump::{bump_node_package_version_in_repo, bump_patch_version_in_repo, bump_version_file_in_repo};
-use crate::exclude::{can_restore_entry, excluded_dir_names_set, handle_large_untracked, is_large_untracked, remove_tracked_excluded_paths, should_stage_entry};
+use crate::exclude::{can_restore_entry, handle_large_untracked, is_large_untracked, remove_tracked_excluded_paths, should_stage_entry};
 use crate::git::{
     cli_diff_entries, detect_large_blobs_ahead, git_name_status_entries, has_origin_remote,
     has_tracking_upstream, is_cherry_pick_in_progress, is_merge_in_progress,
-    is_rebase_in_progress, prune_other_default_branch, restore_paths, run_cmd_with_timeout, run_git_with_timeout, staged_paths,
+    is_rebase_in_progress, prune_other_default_branch, restore_paths, run_git_with_timeout, staged_paths,
     unstage_excluded_paths, unstage_oversized_paths,
 };
 use crate::policy::{debug_enabled, load_repo_override, SyncPolicy};

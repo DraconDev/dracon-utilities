@@ -30,7 +30,7 @@ fn collect_blueprint(repo: &Path) -> String {
         .and_then(|entries| {
             entries
                 .filter_map(|e| e.ok())
-                .filter(|e| e.path().extension().map_or(false, |ext| ext == "md"))
+                .filter(|e| e.path().extension().is_some_and(|ext| ext == "md"))
                 .max_by_key(|e| e.metadata().ok().and_then(|m| m.modified().ok()))
         })
         .and_then(|e| std::fs::read_to_string(e.path()).ok())
@@ -62,7 +62,7 @@ fn cleanup_markdown(input: &str) -> String {
                 None
             }
         } else if ltrimmed.starts_with('#') {
-            let rest = if ltrimmed.len() >= 1 { &ltrimmed[1..] } else { "" };
+            let rest = if !ltrimmed.is_empty() { &ltrimmed[1..] } else { "" };
             if rest.is_empty() || rest.starts_with(' ') {
                 Some((1, rest.trim_start()))
             } else {
@@ -111,7 +111,7 @@ fn cleanup_markdown(input: &str) -> String {
 }
 
 fn build_scribe_prompt(repo: &Path, staged_diff_names: &str, staged_diff_content: Option<&str>) -> String {
-    let (git_log, git_files) = collect_git_context(repo);
+    let (git_log, _git_files) = collect_git_context(repo);
     let blueprint = collect_blueprint(repo);
 
     let diff_section = match staged_diff_content {

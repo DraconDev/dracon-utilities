@@ -8,8 +8,7 @@ use tokio::time::sleep;
 use crate::policy::{SyncPolicy, freeze_reason, debug_enabled, timestamp_secs};
 use crate::exclude::{excluded_dir_names_set, has_sync_relevant_dirty_entries};
 use crate::git::{discover_git_repos, repo_diff_entries, has_origin_remote, has_tracking_upstream, has_both_main_and_master};
-use crate::git::{consolidate_to_master, rename_main_to_master};
-use crate::report::{ConcernRepairFilter, RepairSummary, run_repair_concerns, run_repair_warns};
+use crate::report::{ConcernRepairFilter, run_repair_concerns, run_repair_warns};
 use crate::sync::sync_repo;
 
 const STUCK_REPO_EXPIRY_SECS: u64 = 24 * 60 * 60; // 24 hours
@@ -395,7 +394,7 @@ pub(crate) async fn run_daemon(policy_path: PathBuf) -> Result<()> {
 
             // Fast path: skip expensive git diff calls for clean, synced repos.
             // Only do detailed diff analysis when the repo actually has changes.
-            let (effective_dirty, entries) =
+            let (effective_dirty, _entries) =
             if status.is_clean && status.ahead == 0 && status.behind == 0 {
                 // Clean and synced — skip all expensive git calls
                 let has_remote_issues = !has_origin || !has_upstream;

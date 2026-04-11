@@ -148,7 +148,7 @@ impl SimpleAiService {
         if let Ok(entries) = std::fs::read_dir(&secrets_dir) {
             for entry in entries.flatten() {
                 let path = entry.path();
-                if path.extension().map_or(false, |e| e == "env") {
+                if path.extension().is_some_and(|e| e == "env") {
                     if let Ok(content) = std::fs::read_to_string(&path) {
                         for line in content.lines() {
                             let line = line.trim();
