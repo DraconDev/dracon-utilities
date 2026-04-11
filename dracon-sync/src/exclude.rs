@@ -96,7 +96,6 @@ mod tests {
         assert!(is_excluded_dir_name("build-debug", &excluded));
         assert!(!is_excluded_dir_name("abuild", &excluded));
     }
-}
 
     #[test]
     fn test_is_excluded_dir_name_empty_excluded_set() {
