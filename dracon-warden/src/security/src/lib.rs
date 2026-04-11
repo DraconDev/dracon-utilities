@@ -437,12 +437,6 @@ impl SecretScanner {
             .map(|(_, p)| format!("(?:{})", p))
             .collect::<Vec<_>>()
             .join("|");
-        eprintln!("Combined pattern length: {}", combined.len());
-        eprintln!(
-            "Combined first 200 chars: {}",
-            &combined[..200.min(combined.len())]
-        );
-
         let full_regex = Regex::new(&format!("(?sm){}", combined))
             .expect("Failed to build combined regex - check patterns for invalid regex syntax");
 
