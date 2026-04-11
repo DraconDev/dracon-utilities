@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+env:
+  CARGO_TERM_PROGRESS_WIDTH: 80
+
+jobs:
+  test:
+    name: Test Suite
+    strategy:
+      matrix:
+        crate: [dracon-sync, dracon-system, dracon-warden]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+
+      - name: Checkout dracon-libs
+        uses: actions/checkout@v4
+        with:
+          repository: your-org/dracon-libs
+          path: ../dracon-libs
+
+      - name: Install Rust
+        uses: dtolnay/rust-action@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo registry
+        uses: Swatinem/rust-cache@v2
+
+      - name: Check formatting
+        working-directory: ./${{ matrix.crate }}
+        run: cargo fmt --check
+
+      - name: Run clippy
+        working-directory: ./${{ matrix.crate }}
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Run tests
+        working-directory: ./${{ matrix.crate }}
+        run: cargo test --all-targets
+
+  coverage:
+    name: Coverage Report
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+
+      - name: Checkout dracon-libs
+        uses: actions/checkout@v4
+        with:
+          repository: your-org/dracon-libs
+          path: ../dracon-libs
+
+      - name: Install Rust
+        uses: dtolnay/rust-action@stable
+
+      - name: Install cargo-tarpaulin
+        run: cargo install cargo-tarpaulin
+
+      - name: Generate coverage
+        run: cargo tarpaulin --out html --output-dir coverage/
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
