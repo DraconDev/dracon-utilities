@@ -241,7 +241,7 @@ impl WardenPolicy {
             .cloned()
             .collect::<BTreeSet<_>>();
 
-        let mut plaintext = self
+        let plaintext = self
             .plaintext_patterns
             .iter()
             .cloned()
@@ -469,11 +469,6 @@ fn build_gitattributes_block(policy: &WardenPolicy) -> Result<String> {
     }
     lines.push(BLOCK_END.to_string());
     Ok(lines.join("\n"))
-}
-
-fn should_passthrough_filter_path(path: Option<&str>) -> bool {
-    let _ = path;
-    false
 }
 
 #[cfg(test)]
