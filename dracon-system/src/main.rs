@@ -1448,12 +1448,9 @@ fn truncate_log_file(path: &Path, max_size_bytes: u64, preserve_header_lines: us
             temp_file.write_all(line_bytes)?;
             temp_file.write_all(b"\n")?;
         }
-        // Append from original, starting from where headers end
-        let mut original = std::fs::File::open(path)?;
-        original.seek(SeekFrom::Start(0))?;
         let mut bytes_written = 0u64;
 
-        for line in reader.lines().flatten() {
+        for line in reader.lines().skip(preserve_header_lines).flatten() {
             let line_bytes = line.into_bytes();
             let line_len = line_bytes.len() as u64;
 
