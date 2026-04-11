@@ -2218,12 +2218,16 @@ impl DemonSecurity {
         std::io::stdin().read_to_end(&mut buffer)?;
 
         // Auto-add key to avoid lockout (Ensure keys folder exists)
-        let _ = self.ensure_current_user_key();
+        if let Err(e) = self.ensure_current_user_key() {
+            eprintln!("⚠️ failed to ensure user key: {}", e);
+        }
 
         // 3. Backup (Safety Net) - must happen before buffer is potentially moved
         if let Some(path) = file_path {
             if path.contains(".env") {
-                let _ = self.backup_secret(path, &buffer)?;
+                if let Err(e) = self.backup_secret(path, &buffer) {
+                    eprintln!("⚠️ failed to backup .env file: {}", e);
+                }
             }
         }
 
