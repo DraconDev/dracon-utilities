@@ -406,7 +406,7 @@ impl SecretScanner {
             ),
             (
                 "Password Variable (Unquoted)",
-                r#"(?i)[A-Z0-9_]*PASSWORD[A-Z0-9_]*=[a-zA-Z0-9!$%&*+-.=?@^_~]{8,}"#,
+                r#"(?i)[A-Z0-9_]*PASSWORD[A-Z0-9_]*=[a-zA-Z0-9!$%&*+\-.=?@^_~]{8,}"#,
             ),
             (
                 "Generic Assignment (Unquoted)",
