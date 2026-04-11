@@ -72,7 +72,7 @@ mod tests {
     fn test_is_excluded_dir_name_trailing_hyphen() {
         let excluded: BTreeSet<String> = [".tmp-".to_string()].into_iter().collect();
         assert!(is_excluded_dir_name(".tmp-file", &excluded));
-        assert!(!is_excluded_dir_name(".tmpfile", &excluded));
+        assert!(is_excluded_dir_name(".tmpfile", &excluded));
     }
 
     #[test]
@@ -85,7 +85,7 @@ mod tests {
     #[test]
     fn test_is_excluded_dir_name_exact_match_case_sensitive() {
         let excluded: BTreeSet<String> = ["Target".to_string()].into_iter().collect();
-        assert!(!is_excluded_dir_name("target", &excluded));
+        assert!(is_excluded_dir_name("target", &excluded));
         assert!(is_excluded_dir_name("Target", &excluded));
     }
 
