@@ -1449,16 +1449,17 @@ impl DemonSecurity {
                     let path = entry.path();
                     if let Ok(content) = fs::read_to_string(&path) {
                         if content.contains(public_key_str) {
-                            // This is either the .pub file or we found the key in it
-                            let _ = fs::remove_file(&path);
-
-                            // Also try to remove the corresponding .age file
-                            let age_path = path.with_extension("age");
-                            if age_path.exists() {
-                                let _ = fs::remove_file(age_path);
+                            if let Err(e) = fs::remove_file(&path) {
+                                eprintln!("⚠️ failed to remove {}: {}", path.display(), e);
                             }
 
-                            // Handle cases where the age file has a different prefix or naming
+                            let age_path = path.with_extension("age");
+                            if age_path.exists() {
+                                if let Err(e) = fs::remove_file(age_path) {
+                                    eprintln!("⚠️ failed to remove {}: {}", age_path.display(), e);
+                                }
+                            }
+
                             removed_count += 1;
                         }
                     }
