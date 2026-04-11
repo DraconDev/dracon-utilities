@@ -2004,7 +2004,6 @@ watch_roots = ["/tmp/test"]
         assert!(repos.contains(&repo1), "repo1 should be found");
         assert!(repos.contains(&repo2), "repo2 should be found");
     }
-}
 
     #[test]
     fn filter_smudge_handles_empty_input() {
