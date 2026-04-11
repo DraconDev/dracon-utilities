@@ -2007,34 +2007,13 @@ watch_roots = ["/tmp/test"]
 
     #[test]
     fn filter_smudge_handles_empty_input() {
-        use std::io::Write;
-
-        let td = TestDir::new("warden_filter_smudge");
-        let repo = td.path().join("repo");
-        fs::create_dir_all(&repo).expect("repo");
-
-        let mut child = std::process::Command::new(std::env::current_exe().unwrap())
-            .arg("filter-smudge")
-            .current_dir(&repo)
-            .env("DRACON_WARDEN_POLICY", "/nonexistent")
-            .stdin(std::process::Stdio::piped())
-            .stdout(std::process::Stdio::piped())
-            .spawn()
-            .expect("spawn");
-
-        let input = "let x = 1;\n";
-        child
-            .stdin
-            .as_mut()
-            .expect("stdin")
-            .write_all(input.as_bytes())
-            .expect("write stdin");
-        drop(child.stdin.take());
-
-        let output = child.wait_with_output().expect("wait");
-        assert!(output.status.success(), "filter-smudge should succeed");
-
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        assert_eq!(stdout, input, "plaintext should pass through unchanged");
+        let content = "let x = 1;\n";
+        let warden = DraconWarden::new().expect("create warden");
+        let result = warden.smudge(content.as_bytes(), None).expect("smudge");
+        assert_eq!(
+            result,
+            content.as_bytes(),
+            "plaintext should pass through unchanged"
+        );
     }
 }
