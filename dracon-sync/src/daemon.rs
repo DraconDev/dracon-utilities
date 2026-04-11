@@ -112,6 +112,48 @@ mod tests {
     }
 }
 
+#[cfg(test)]
+mod daemon_tests {
+    use super::*;
+
+    #[test]
+    fn test_stuck_repos_path_format() {
+        let path = stuck_repos_path();
+        assert!(path.to_string_lossy().contains(".dracon"));
+        assert!(path.to_string_lossy().contains("dracon-sync-stuck-push-repos.json"));
+    }
+
+    #[test]
+    fn test_load_stuck_push_repos_nonexistent() {
+        let repos = load_stuck_push_repos();
+        assert!(repos.is_empty());
+    }
+
+    #[test]
+    fn test_unstuck_repo_nonexistent() {
+        let result = unstuck_repo(Path::new("/nonexistent/path"));
+        assert!(!result);
+    }
+
+    #[test]
+    fn test_list_stuck_repos_empty() {
+        list_stuck_repos();
+    }
+
+    #[test]
+    fn test_is_repo_stuck_false() {
+        assert!(!is_repo_stuck(Path::new("/nonexistent/path")));
+    }
+
+    #[test]
+    fn test_stuck_repos_path_home() {
+        let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
+        let expected_base = home.join(".dracon").join("state");
+        let path = stuck_repos_path();
+        assert!(path.starts_with(expected_base));
+    }
+}
+
 fn stuck_repos_path() -> PathBuf {
     dirs::home_dir()
         .unwrap_or_else(|| PathBuf::from("."))
