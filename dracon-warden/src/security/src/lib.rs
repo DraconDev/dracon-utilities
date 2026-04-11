@@ -816,9 +816,6 @@ impl DemonSecurity {
             home.join(".demon").join("identity.age"),
             // 3. Fallback/Backups
             home.join(".demon").join("keys").join("identity.age"),
-            // 4. Hardcoded Fallback (Absolute)
-            PathBuf::from("/home/dracon/demon/master.age"),
-            PathBuf::from("/home/dracon/demon/identity.age"),
         ];
 
         // 6. GENERAL SCAN: ~/demon/keys/*.age (and similar dirs)
