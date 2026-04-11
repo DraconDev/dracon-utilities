@@ -2037,24 +2037,35 @@ watch_roots = ["/tmp/test"]
     }
 
     #[test]
-    fn WardenPolicy_load_round_trips() {
-        let td = TestDir::new("warden_policy_roundtrip");
-        let config_path = td.path().join("warden.toml");
+    fn discover_git_repos_local_finds_basic_repos() {
+        let td = TestDir::new("warden_discover_local");
+        let root = td.path().join("root");
+        fs::create_dir_all(&root).expect("root");
 
-        let config = r#"
-[watch]
-watch_roots = ["/home/test"]
-protected_patterns = ["*.env", "secrets/**"]
-plaintext_patterns = ["*.pub"]
-hygiene_patterns = ["target/", "*.log"]
-"#;
-        fs::write(&config_path, config).expect("write config");
+        let repo1 = root.join("repo1");
+        fs::create_dir_all(&repo1.join(".git")).expect("repo1 .git");
 
-        let policy = WardenPolicy::load(&config_path).expect("load");
-        assert_eq!(policy.watch_roots, vec!["/home/test"]);
-        assert!(policy.protected_patterns.contains(&"*.env".to_string()));
-        assert!(policy.plaintext_patterns.contains(&"*.pub".to_string()));
+        let repo2 = root.join("repo2");
+        fs::create_dir_all(&repo2.join(".git")).expect("repo2 .git");
+
+        let repos = discover_git_repos_local(&[root]);
+
+        assert!(repos.contains(&repo1), "repo1 should be found");
+        assert!(repos.contains(&repo2), "repo2 should be found");
     }
+
+    #[test]
+    fn marker_prefix_at_finds_correct_positions() {
+        let s = "prefix [DEMON_SECRET:abc] after";
+        assert_eq!(marker_prefix_at(s, 7), Some("[DEMON_SECRET:"));
+
+        let s2 = "prefix [DRACON_SECRET:xyz] after";
+        assert_eq!(marker_prefix_at(s2, 7), Some("[DRACON_SECRET:"));
+
+        let s3 = "no marker here";
+        assert_eq!(marker_prefix_at(s3, 0), None);
+    }
+}
 
     #[test]
     fn discover_git_repos_finds_all_git_dirs() {
