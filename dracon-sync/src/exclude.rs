@@ -88,6 +88,14 @@ mod tests {
         assert!(!is_excluded_dir_name("target", &excluded));
         assert!(is_excluded_dir_name("Target", &excluded));
     }
+
+    #[test]
+    fn test_is_excluded_dir_name_star_prefix() {
+        let excluded: BTreeSet<String> = ["build*".to_string()].into_iter().collect();
+        assert!(is_excluded_dir_name("build", &excluded));
+        assert!(is_excluded_dir_name("build-debug", &excluded));
+        assert!(!is_excluded_dir_name("abuild", &excluded));
+    }
 }
 
     #[test]
