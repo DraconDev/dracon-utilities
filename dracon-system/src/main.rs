@@ -1628,11 +1628,15 @@ async fn run_guard_once(
         
         // Nix garbage
         if guard.clean_nix_garbage {
-            let (bytes, cleaned) = clean_nix_garbage(guard.nix_keep_generations, true).await.unwrap_or((0, vec![]));
-            total_reclaimed += bytes;
-            all_cleaned.extend(cleaned.iter().map(|s| format!("Nix: {}", s)));
-            for c in &cleaned {
-                eprintln!("📦 {}", c);
+            match clean_nix_garbage(guard.nix_keep_generations, true).await {
+                Ok((bytes, cleaned)) => {
+                    total_reclaimed += bytes;
+                    all_cleaned.extend(cleaned.iter().map(|s| format!("Nix: {}", s)));
+                    for c in &cleaned {
+                        eprintln!("📦 {}", c);
+                    }
+                }
+                Err(e) => eprintln!("⚠️ Nix cleanup failed: {}", e),
             }
         }
         
@@ -1646,7 +1650,13 @@ async fn run_guard_once(
                 if p.exists() { Some(p) } else { None }
             })
             .collect();
-        let (bytes, cleaned) = clean_old_node_modules(&roots, guard.node_modules_max_age_days, true).await.unwrap_or((0, vec![]));
+        let (bytes, cleaned) = match clean_old_node_modules(&roots, guard.node_modules_max_age_days, true).await {
+            Ok(result) => result,
+            Err(e) => {
+                eprintln!("⚠️ Node modules cleanup failed: {}", e);
+                (0, vec![])
+            }
+        };
         total_reclaimed += bytes;
         all_cleaned.extend(cleaned.iter().map(|s| format!("Node: {}", s)));
         for c in &cleaned {
