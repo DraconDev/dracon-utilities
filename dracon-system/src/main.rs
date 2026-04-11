@@ -763,11 +763,14 @@ async fn send_notification(guard: &GuardPolicy, title: &str, body: &str) {
     if !guard.notify || guard.notify_command.trim().is_empty() {
         return;
     }
-    let _ = Command::new(guard.notify_command.trim())
+    if let Err(e) = Command::new(guard.notify_command.trim())
         .arg(title)
         .arg(body)
         .output()
-        .await;
+        .await
+    {
+        eprintln!("⚠️ notification failed: {}", e);
+    }
 }
 
 fn should_notify(state: &mut GuardRuntimeState, key: &str, cooldown_secs: u64) -> bool {
