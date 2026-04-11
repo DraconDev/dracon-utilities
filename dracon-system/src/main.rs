@@ -1665,20 +1665,28 @@ async fn run_guard_once(
         
         // Package caches
         if guard.clean_package_caches {
-            let (bytes, cleaned) = clean_package_caches(true, true, true, true, true).await.unwrap_or((0, vec![]));
-            total_reclaimed += bytes;
-            all_cleaned.extend(cleaned.iter().map(|s| format!("Cache: {}", s)));
-            for c in &cleaned {
-                eprintln!("💾 {}", c);
+            match clean_package_caches(true, true, true, true, true).await {
+                Ok((bytes, cleaned)) => {
+                    total_reclaimed += bytes;
+                    all_cleaned.extend(cleaned.iter().map(|s| format!("Cache: {}", s)));
+                    for c in &cleaned {
+                        eprintln!("💾 {}", c);
+                    }
+                }
+                Err(e) => eprintln!("⚠️ Package cache cleanup failed: {}", e),
             }
         }
         
         // Docker
         if guard.docker_prune {
-            let bytes = docker_prune(true, guard.docker_prune_volumes).await.unwrap_or(0);
-            total_reclaimed += bytes;
-            if bytes > 0 {
-                eprintln!("🐳 Docker prune: {}", human_bytes(bytes));
+            match docker_prune(true, guard.docker_prune_volumes).await {
+                Ok(bytes) => {
+                    total_reclaimed += bytes;
+                    if bytes > 0 {
+                        eprintln!("🐳 Docker prune: {}", human_bytes(bytes));
+                    }
+                }
+                Err(e) => eprintln!("⚠️ Docker prune failed: {}", e),
             }
         }
         
