@@ -2144,7 +2144,7 @@ async fn build_status_report() -> StatusReport {
 
 fn normalize_guard_policy(policy: &mut GuardPolicy) {
     policy.interval_secs = policy.interval_secs.max(5);
-    policy.disk_warn_percent = policy.disk_warn_percent.max(1).min(100);
+    policy.disk_warn_percent = policy.disk_warn_percent.clamp(1, 100);
     policy.disk_action_percent = policy
         .disk_action_percent
         .max(policy.disk_warn_percent)
@@ -2963,9 +2963,9 @@ async fn main() -> Result<()> {
                     .unwrap_or_default();
                 
                 // mm_stat fields are in bytes: orig_size, compr_size, mem_used (and more)
-                let orig = mm_stat.get(0).copied().unwrap_or(0);
-                let compr = mm_stat.get(1).copied().unwrap_or(0);
-                let mem_used = mm_stat.get(2).copied().unwrap_or(0);
+                let orig = *mm_stat.first().unwrap_or(&0);
+                let compr = *mm_stat.get(1).unwrap_or(&0);
+                let mem_used = *mm_stat.get(2).unwrap_or(&0);
                 
                 let orig_gb = orig as f64 / 1024.0 / 1024.0 / 1024.0;
                 let compr_gb = compr as f64 / 1024.0 / 1024.0 / 1024.0;
