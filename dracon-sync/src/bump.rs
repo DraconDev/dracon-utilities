@@ -1,4 +1,3 @@
-use anyhow::{Context, Result};
 use std::path::Path;
 
 pub(crate) fn bump_semver_patch(ver: &str) -> Option<String> {

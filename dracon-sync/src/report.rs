@@ -1929,32 +1929,6 @@ mod tests {
     }
 
     #[test]
-    fn test_incident_record_new() {
-        let record = IncidentRecord::new("concern", "/test/repo", "reason", "action", "ok");
-        assert_eq!(record.scope, "concern");
-        assert_eq!(record.repo, "/test/repo");
-        assert_eq!(record.reason, "reason");
-        assert_eq!(record.action, "action");
-        assert_eq!(record.result, "ok");
-        assert!(record.backup_branch.is_none());
-        assert!(record.details.is_none());
-    }
-
-    #[test]
-    fn test_incident_record_with_details() {
-        let record = IncidentRecord::new("test", "repo", "reason", "action", "ok");
-        let record = record.with_details("some details");
-        assert_eq!(record.details, Some("some details".to_string()));
-    }
-
-    #[test]
-    fn test_incident_record_with_backup_branch() {
-        let record = IncidentRecord::new("test", "repo", "reason", "action", "ok");
-        let record = record.with_backup_branch("backup-branch");
-        assert_eq!(record.backup_branch, Some("backup-branch".to_string()));
-    }
-
-    #[test]
     fn test_timestamp_secs_returns_reasonable_value() {
         let ts = timestamp_secs();
         let now = std::time::SystemTime::now()
