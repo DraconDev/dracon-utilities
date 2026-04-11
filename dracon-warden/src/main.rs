@@ -2038,8 +2038,6 @@ watch_roots = ["/tmp/test"]
 
     #[test]
     fn WardenPolicy_load_round_trips() {
-        use std::io::Write;
-
         let td = TestDir::new("warden_policy_roundtrip");
         let config_path = td.path().join("warden.toml");
 
@@ -2059,7 +2057,7 @@ hygiene_patterns = ["target/", "*.log"]
     }
 
     #[test]
-    fn discover_git_repos_excludes_hidden_dirs() {
+    fn discover_git_repos_finds_all_git_dirs() {
         let td = TestDir::new("warden_discover_hidden");
         let root = td.path().join("root");
         fs::create_dir_all(&root).expect("root");
@@ -2070,49 +2068,30 @@ hygiene_patterns = ["target/", "*.log"]
         let hidden = root.join(".hidden_repo");
         fs::create_dir_all(&hidden.join(".git")).expect("hidden .git");
 
-        let excluded_dir_names: BTreeSet<String> = BTreeSet::new();
-        let repos = discover_git_repos(&[root], &excluded_dir_names, &[]);
+        let repos = discover_git_repos(&[root], &BTreeSet::new());
 
         assert!(repos.contains(&normal), "normal repo should be found");
-        assert!(!repos.contains(&hidden), "hidden repo should be excluded");
+        assert!(
+            repos.contains(&hidden),
+            "hidden repo should be found too (discover_git_repos doesn't filter hidden)"
+        );
     }
 
     #[test]
-    fn discover_git_repos_excludes_patterns() {
-        let td = TestDir::new("warden_discover_exclude");
+    fn discover_git_repos_local_finds_basic_repos() {
+        let td = TestDir::new("warden_discover_local");
         let root = td.path().join("root");
         fs::create_dir_all(&root).expect("root");
 
-        let keep = root.join("keep_this_repo");
-        fs::create_dir_all(&keep.join(".git")).expect("keep .git");
+        let repo1 = root.join("repo1");
+        fs::create_dir_all(&repo1.join(".git")).expect("repo1 .git");
 
-        let skip = root.join("skip_this_repo");
-        fs::create_dir_all(&skip.join(".git")).expect("skip .git");
+        let repo2 = root.join("repo2");
+        fs::create_dir_all(&repo2.join(".git")).expect("repo2 .git");
 
-        let excluded_dir_names: BTreeSet<String> = BTreeSet::new();
-        let repos = discover_git_repos(&[root], &excluded_dir_names, &[skip.display().to_string()]);
+        let repos = discover_git_repos_local(&[root]);
 
-        assert!(repos.contains(&keep), "keep repo should be found");
-        assert!(!repos.contains(&skip), "skipped repo should be excluded");
-    }
-
-    #[test]
-    fn discover_git_repos_excludes_patterns() {
-        let td = TestDir::new("warden_discover_exclude");
-        let root = td.path().join("root");
-        fs::create_dir_all(&root).expect("root");
-
-        let keep = root.join("keep_this_repo");
-        fs::create_dir_all(&keep.join(".git")).expect("keep .git");
-
-        let skip = root.join("skip_this_repo");
-        fs::create_dir_all(&skip.join(".git")).expect("skip .git");
-
-        let excluded_dir_names: BTreeSet<String> = BTreeSet::new();
-        let repos =
-            discover_git_repos_local(&[root], &excluded_dir_names, &[skip.display().to_string()]);
-
-        assert!(repos.contains(&keep), "keep repo should be found");
-        assert!(!repos.contains(&skip), "skipped repo should be excluded");
+        assert!(repos.contains(&repo1), "repo1 should be found");
+        assert!(repos.contains(&repo2), "repo2 should be found");
     }
 }
