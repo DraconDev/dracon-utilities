@@ -1385,7 +1385,10 @@ impl DemonSecurity {
         let team_key_path = team_dir.join(format!("{}.key", team_name));
 
         // Encrypt for local storage (Master Identity)
-        let master = self.master_identities.first().unwrap();
+        let master = self
+            .master_identities
+            .first()
+            .context("Master identity required to accept invite")?;
         let recipient = master.to_public();
 
         let recipients: Vec<Box<dyn age::Recipient + Send>> = vec![Box::new(recipient)];
