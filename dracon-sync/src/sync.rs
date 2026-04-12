@@ -261,6 +261,28 @@ pub(crate) async fn sync_repo(
             }
 
             if !missing.is_empty() {
+                // SAFETY: If ALL files in the index are missing, this is likely a mistake
+                // or destructive operation. Do NOT stage mass deletions without warning.
+                // Get total tracked files count
+                let total_tracked: usize = std::process::Command::new("git")
+                    .args(["ls-files", "--count"])
+                    .current_dir(repo)
+                    .output()
+                    .ok()
+                    .and_then(|o| String::from_utf8_lossy(&o.stdout).trim().parse().ok())
+                    .unwrap_or(0);
+
+                let missing_count = missing.len();
+                let is_mass_deletion = total_tracked > 0 && missing_count >= total_tracked;
+
+                if is_mass_deletion {
+                    eprintln!("⚠️ SAFETY: {} files missing from working tree ({}% of {} tracked)", missing_count, (missing_count * 100) / total_tracked, total_tracked);
+                    eprintln!("⚠️ Refusing to stage mass deletion - this looks like a mistake or destructive operation");
+                    eprintln!("⚠️ If you really want to delete all files, do: git add -A && git commit -m 'delete all'");
+                    // Do NOT stage the deletions - let the user decide
+                    return Ok(true);
+                }
+
                 let mut rm_args = vec!["rm", "--ignore-unmatch", "--"];
                 for p in &missing {
                     rm_args.push(p);
