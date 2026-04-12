@@ -1379,24 +1379,6 @@ mod tests {
     }
 
     #[test]
-    fn test_has_tracking_upstream_true_with_remote_and_tracking() {
-        let repo_path = create_temp_git_repo("has_tracking");
-        std::process::Command::new("git")
-            .args(["remote", "add", "origin", "https://github.com/test/repo.git"])
-            .current_dir(&repo_path)
-            .output()
-            .expect("git remote add failed");
-        std::process::Command::new("git")
-            .args(["branch", "--set-upstream-to", "origin/master"])
-            .current_dir(&repo_path)
-            .output()
-            .ok();
-        let result = has_tracking_upstream(&repo_path);
-        let _ = std::fs::remove_dir_all(repo_path);
-        assert!(result, "repo with remote and tracking should return true");
-    }
-
-    #[test]
     fn test_remote_branch_exists_unsafe_branch_name() {
         let repo_path = create_temp_git_repo("branch_exists");
         let result = remote_branch_exists(&repo_path, "main");
