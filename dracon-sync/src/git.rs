@@ -27,6 +27,61 @@ pub(crate) fn discover_git_repos(
     repos
 }
 
+fn is_git_worktree_file(dot_git: &Path) -> bool {
+    std::fs::read_to_string(dot_git)
+        .map(|content| content.trim().starts_with("gitdir:"))
+        .unwrap_or(false)
+}
+
+fn is_safe_git_path(path: &Path) -> bool {
+    if path.is_absolute() {
+        return false;
+    }
+    let mut components = path.components();
+    if let Some(first) = components.next() {
+        if first.as_os_str() == ".." {
+            return false;
+        }
+    }
+    if let Some(first) = components.next() {
+        if first.as_os_str() == ".." {
+            return false;
+        }
+    }
+    if path.to_string_lossy().starts_with('-') {
+        return false;
+    }
+    true
+}
+
+fn is_safe_branch_name(branch: &str) -> bool {
+    if branch.is_empty() {
+        return false;
+    }
+    if branch.starts_with('-') {
+        return false;
+    }
+    if branch.contains("..") {
+        return false;
+    }
+    if branch.contains('\n') || branch.contains('\r') || branch.contains('\0') {
+        return false;
+    }
+    if branch.ends_with('.') {
+        return false;
+    }
+    if branch.contains('\\') || branch.contains('~') || branch.contains('^') || branch.contains(':') {
+        return false;
+    }
+    if branch.contains('?') || branch.contains('*') || branch.contains('[') {
+        return false;
+    }
+    if branch.contains(' ') {
+        return false;
+    }
+    true
+}
+
 fn discover_git_repos_recursive(
     dir: &Path,
     excluded_dir_names: &BTreeSet<String>,
@@ -56,7 +111,8 @@ fn discover_git_repos_recursive(
             if name.starts_with('.') {
                 continue;
             }
-            if path.join(".git").exists() {
+            let dot_git = path.join(".git");
+            if dot_git.exists() && (dot_git.is_dir() || is_git_worktree_file(&dot_git)) {
                 repos.push(path.clone());
             }
             // Recurse into subdirectories
@@ -272,6 +328,10 @@ pub(crate) async fn push_with_transport_fallbacks(
             let origin = origin_url(repo).unwrap_or_default();
             if let Some(https) = github_https_url(&origin) {
                 let branch = current_branch(repo).unwrap_or_else(|| "master".to_string());
+                if !is_safe_branch_name(&branch) {
+                    eprintln!("⚠️ branch name '{}' is unsafe, skipping https fallback", branch);
+                    return Err(e);
+                }
                 let refspec = format!("HEAD:refs/heads/{branch}");
                 run_git_with_timeout(
                     repo,
@@ -350,6 +410,10 @@ pub(crate) async fn git_list_paths(repo: &Path, args: &[&str]) -> Result<Vec<Pat
         .await
         .with_context(|| format!("failed to run git {:?} in {}", args, repo.display()))?;
     if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if !stderr.trim().is_empty() {
+            eprintln!("⚠️ git {:?} failed in {}: {}", args, repo.display(), stderr.trim());
+        }
         return Ok(Vec::new());
     }
     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -474,6 +538,10 @@ pub(crate) async fn unstage_excluded_paths(
     let staged = staged_paths(repo).await?;
     let mut to_unstage = Vec::new();
     for path in staged {
+        if !is_safe_git_path(&path) {
+            eprintln!("⚠️ skipping unsafe path {} in {}", path.display(), repo.display());
+            continue;
+        }
         if is_excluded_change_path(&path, excluded_dir_names) {
             to_unstage.push(path);
         }
@@ -483,7 +551,6 @@ pub(crate) async fn unstage_excluded_paths(
     }
 
     let removed = to_unstage.len();
-    // Batch in groups of 50 to avoid too long command lines
     for chunk in to_unstage.chunks(50) {
         let mut cmd = tokio_git_command();
         cmd.args(["reset", "-q", "HEAD", "--"])
@@ -510,6 +577,10 @@ pub(crate) async fn unstage_oversized_paths(repo: &Path, max_stage_file_bytes: u
     let staged = staged_paths(repo).await?;
     let mut to_unstage = Vec::new();
     for path in staged {
+        if !is_safe_git_path(&path) {
+            eprintln!("⚠️ skipping unsafe path {} in {}", path.display(), repo.display());
+            continue;
+        }
         let full = repo.join(&path);
         let meta = match std::fs::metadata(&full) {
             Ok(m) => m,
@@ -734,6 +805,10 @@ pub(crate) fn prune_other_default_branch(repo: &Path) {
 }
 
 pub(crate) fn remote_branch_exists(repo: &Path, branch: &str) -> bool {
+    if !is_safe_branch_name(branch) {
+        eprintln!("⚠️ branch name '{}' is unsafe, returning false", branch);
+        return false;
+    }
     std_git_command()
         .args(["show-ref", "--verify", "--quiet"])
         .arg(format!("refs/remotes/origin/{branch}"))
@@ -744,6 +819,9 @@ pub(crate) fn remote_branch_exists(repo: &Path, branch: &str) -> bool {
 }
 
 pub(crate) fn set_upstream_to_branch(repo: &Path, branch: &str) -> Result<()> {
+    if !is_safe_branch_name(branch) {
+        return Err(anyhow::anyhow!("branch name '{}' is unsafe", branch));
+    }
     let target = format!("origin/{branch}");
     let status = std_git_command()
         .args(["branch", "--set-upstream-to"])
@@ -764,7 +842,10 @@ pub(crate) fn set_upstream_to_branch(repo: &Path, branch: &str) -> Result<()> {
 }
 
 pub(crate) fn detect_large_blobs_ahead(repo: &Path, min_bytes: u64) -> Result<Vec<(u64, String)>> {
-    // Step 1: Get object IDs from commits ahead of upstream
+    let timeout_secs = 60;
+    
+    let start = std::time::Instant::now();
+    
     let rev_list = std_git_command()
         .args(["rev-list", "--objects", "@{u}..HEAD"])
         .current_dir(repo)
@@ -773,8 +854,12 @@ pub(crate) fn detect_large_blobs_ahead(repo: &Path, min_bytes: u64) -> Result<Ve
     if !rev_list.status.success() {
         return Ok(Vec::new());
     }
+    
+    if start.elapsed() > Duration::from_secs(timeout_secs) {
+        eprintln!("⚠️ detect_large_blobs_ahead timed out during rev-list for {}", repo.display());
+        return Ok(Vec::new());
+    }
 
-    // Step 2: Batch-check object types and sizes (no shell involved)
     let mut cat_file = std_git_command()
         .args(["cat-file", "--batch-check=%(objectname) %(objecttype) %(objectsize) %(rest)"])
         .current_dir(repo)
@@ -792,7 +877,6 @@ pub(crate) fn detect_large_blobs_ahead(repo: &Path, min_bytes: u64) -> Result<Ve
         return Ok(Vec::new());
     }
 
-    // Step 3: Filter blobs > min_bytes in Rust (no shell, no awk)
     let stdout = String::from_utf8_lossy(&output.stdout);
     let mut out: Vec<(u64, String)> = stdout
         .lines()
