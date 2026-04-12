@@ -642,13 +642,6 @@ pub(crate) fn current_branch(repo: &Path) -> Option<String> {
 }
 
 pub(crate) fn has_only_main_branch(repo: &Path) -> bool {
-    let config_path = repo.join(".git").join("config");
-    if let Ok(config) = std::fs::read_to_string(&config_path) {
-        let has_main = config.lines().any(|l| l.trim() == "[branch \"main\"]");
-        let has_master = config.lines().any(|l| l.trim() == "[branch \"master\"]");
-        return has_main && !has_master;
-    }
-    // Fallback
     let has_main = std_git_command()
         .args(["rev-parse", "--verify", "refs/heads/main"])
         .current_dir(repo)
@@ -657,6 +650,9 @@ pub(crate) fn has_only_main_branch(repo: &Path) -> bool {
         .status()
         .map(|s| s.success())
         .unwrap_or(false);
+    if !has_main {
+        return false;
+    }
     let has_master = std_git_command()
         .args(["rev-parse", "--verify", "refs/heads/master"])
         .current_dir(repo)
@@ -1407,15 +1403,6 @@ mod tests {
             .current_dir(&temp)
             .output()
             .expect("git init failed");
-        for branch in branches {
-            if *branch != "master" {
-                std::process::Command::new("git")
-                    .args(["checkout", "-q", "-b", branch])
-                    .current_dir(&temp)
-                    .output()
-                    .ok();
-            }
-        }
         std::fs::write(temp.join("test.txt"), "test content\n").ok();
         std::process::Command::new("git")
             .args(["add", "."])
@@ -1427,6 +1414,32 @@ mod tests {
             .current_dir(&temp)
             .output()
             .ok();
+        
+        let mut all_branches = vec!["master".to_string()];
+        for branch in branches {
+            if *branch != "master" {
+                all_branches.push(branch.to_string());
+            }
+        }
+        
+        for branch in &all_branches {
+            if branch != "master" {
+                std::process::Command::new("git")
+                    .args(["checkout", "-q", "-b", branch])
+                    .current_dir(&temp)
+                    .output()
+                    .ok();
+            }
+        }
+        
+        if !branches.contains(&"master") && branches.contains(&"main") {
+            std::process::Command::new("git")
+                .args(["branch", "-q", "-d", "master"])
+                .current_dir(&temp)
+                .output()
+                .ok();
+        }
+        
         temp
     }
 
