@@ -579,7 +579,12 @@ pub(crate) async fn run_daemon(policy_path: PathBuf) -> Result<()> {
                     println!("🔁 synced {}", repo.display());
                     true
                 }
-                Ok(Ok(false)) => true,
+                Ok(Ok(false)) => {
+                    if debug_enabled() {
+                        eprintln!("🐛 {} nothing to commit", repo.display());
+                    }
+                    false
+                }
                 Ok(Err(e)) => {
                     eprintln!("⚠️ sync failed for {}: {}", repo.display(), e);
                     false

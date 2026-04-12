@@ -1140,4 +1140,108 @@ mod tests {
         std::fs::remove_dir_all(repo_path).ok();
         assert!(!result);
     }
+
+    #[test]
+    fn test_is_safe_git_path_normal() {
+        assert!(is_safe_git_path(Path::new("src/main.rs")));
+        assert!(is_safe_git_path(Path::new("docs/readme.md")));
+        assert!(is_safe_git_path(Path::new("file.txt")));
+    }
+
+    #[test]
+    fn test_is_safe_git_path_absolute_rejected() {
+        assert!(!is_safe_git_path(Path::new("/etc/passwd")));
+        assert!(!is_safe_git_path(Path::new("/absolute/path")));
+    }
+
+    #[test]
+    fn test_is_safe_git_path_parent_traversal_rejected() {
+        assert!(!is_safe_git_path(Path::new("../etc/passwd")));
+        assert!(!is_safe_git_path(Path::new("foo/../bar")));
+        assert!(!is_safe_git_path(Path::new("../../../etc/passwd")));
+    }
+
+    #[test]
+    fn test_is_safe_git_path_leading_dash_rejected() {
+        assert!(!is_safe_git_path(Path::new("-e")));
+        assert!(!is_safe_git_path(Path::new("-f")));
+    }
+
+    #[test]
+    fn test_is_safe_branch_name_normal() {
+        assert!(is_safe_branch_name("main"));
+        assert!(is_safe_branch_name("master"));
+        assert!(is_safe_branch_name("feature-123"));
+        assert!(is_safe_branch_name("feature/my-feature"));
+        assert!(is_safe_branch_name("release-v1.0.0"));
+    }
+
+    #[test]
+    fn test_is_safe_branch_name_empty_rejected() {
+        assert!(!is_safe_branch_name(""));
+    }
+
+    #[test]
+    fn test_is_safe_branch_name_leading_dash_rejected() {
+        assert!(!is_safe_branch_name("-main"));
+        assert!(!is_safe_branch_name("-feature"));
+    }
+
+    #[test]
+    fn test_is_safe_branch_name_double_dot_rejected() {
+        assert!(!is_safe_branch_name("feature..main"));
+        assert!(!is_safe_branch_name("origin/..main"));
+    }
+
+    #[test]
+    fn test_is_safe_branch_name_newline_rejected() {
+        assert!(!is_safe_branch_name("main\n"));
+        assert!(!is_safe_branch_name("ma\nin"));
+    }
+
+    #[test]
+    fn test_is_safe_branch_name_special_chars_rejected() {
+        assert!(!is_safe_branch_name("feature~1"));
+        assert!(!is_safe_branch_name("feature^"));
+        assert!(!is_safe_branch_name("origin:refs/heads/main"));
+        assert!(!is_safe_branch_name("feat?ue"));
+        assert!(!is_safe_branch_name("feat*ue"));
+        assert!(!is_safe_branch_name("feat[ue]"));
+    }
+
+    #[test]
+    fn test_is_safe_branch_name_space_rejected() {
+        assert!(!is_safe_branch_name("feature branch"));
+        assert!(!is_safe_branch_name("my branch"));
+    }
+
+    #[test]
+    fn test_is_git_worktree_file_true() {
+        let temp = std::env::temp_dir();
+        let dot_git = temp.join("test_is_git_worktree_file");
+        std::fs::write(&dot_git, "gitdir: /some/other/path/.git/worktrees/branch\n").unwrap();
+        let result = is_git_worktree_file(&dot_git);
+        std::fs::remove_file(&dot_git).ok();
+        assert!(result);
+    }
+
+    #[test]
+    fn test_is_git_worktree_file_false_regular_file() {
+        let temp = std::env::temp_dir();
+        let dot_git = temp.join("test_is_git_worktree_file_false");
+        std::fs::write(&dot_git, "regular file content\n").unwrap();
+        let result = is_git_worktree_file(&dot_git);
+        std::fs::remove_file(&dot_git).ok();
+        assert!(!result);
+    }
+
+    #[test]
+    fn test_is_git_worktree_file_false_directory() {
+        let temp = std::env::temp_dir();
+        let dot_git = temp.join("test_is_git_worktree_file_dir");
+        std::fs::create_dir_all(&dot_git).unwrap();
+        let result = is_git_worktree_file(&dot_git);
+        std::fs::remove_dir_all(&dot_git).ok();
+        assert!(!result);
+    }
 }

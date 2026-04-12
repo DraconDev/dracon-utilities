@@ -527,8 +527,8 @@ pub(crate) async fn sync_repo(
                 {
                     Ok(()) => {}
                     Err(e) => {
-                        eprintln!("⚠️ push skipped for {}: {}", repo.display(), e);
-                        return Ok(true);
+                        eprintln!("⚠️ push failed for {}: {}", repo.display(), e);
+                        return Ok(false);
                     }
                 }
             } else if policy.auto_push && !has_origin {
@@ -596,8 +596,8 @@ pub(crate) async fn sync_repo(
                                     {
                                         Ok(()) => {}
                                         Err(e) => {
-                                            eprintln!("⚠️ push skipped for {}: {}", repo.display(), e);
-                                            return Ok(true);
+                                            eprintln!("⚠️ push failed for {}: {}", repo.display(), e);
+                                            return Ok(false);
                                         }
                                     }
                                 }
