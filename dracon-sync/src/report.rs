@@ -1992,4 +1992,70 @@ mod tests {
             incident_ledger_max_age_days: 30,
         }
     }
+
+    #[test]
+    fn test_truncate_unicode_emoji() {
+        let result = truncate("hello 👋 world", 10);
+        assert!(result.ends_with('…'));
+    }
+
+    #[test]
+    fn test_report_signal_active_board_changed_exact_path() {
+        let files = vec![
+            DiffFile {
+                path: std::path::PathBuf::from("plan/ACTIVE_BOARD.md"),
+                status: FileStatus::Modified,
+            }
+        ];
+        let signals = detect_report_signals(std::path::Path::new("/fake"), &files);
+        assert!(signals.contains(&ReportSignal::ActiveBoardChanged));
+    }
+
+    #[test]
+    fn test_report_signal_index_changed_nested() {
+        let files = vec![
+            DiffFile {
+                path: std::path::PathBuf::from("docs/plan/index.md"),
+                status: FileStatus::Modified,
+            }
+        ];
+        let signals = detect_report_signals(std::path::Path::new("/fake"), &files);
+        assert!(signals.contains(&ReportSignal::IndexChanged));
+    }
+
+    #[test]
+    fn test_report_signal_blueprint_created() {
+        let files = vec![
+            DiffFile {
+                path: std::path::PathBuf::from("docs/blueprint-foo.md"),
+                status: FileStatus::Added,
+            }
+        ];
+        let signals = detect_report_signals(std::path::Path::new("/fake"), &files);
+        assert!(signals.contains(&ReportSignal::BlueprintCreated));
+    }
+
+    #[test]
+    fn test_report_signal_multiple() {
+        let files = vec![
+            DiffFile {
+                path: std::path::PathBuf::from("plan/ACTIVE_BOARD.md"),
+                status: FileStatus::Modified,
+            },
+            DiffFile {
+                path: std::path::PathBuf::from("docs/blueprint-bar.md"),
+                status: FileStatus::Modified,
+            }
+        ];
+        let signals = detect_report_signals(std::path::Path::new("/fake"), &files);
+        assert!(signals.contains(&ReportSignal::ActiveBoardChanged));
+        assert!(signals.contains(&ReportSignal::BlueprintModified));
+    }
+
+    #[test]
+    fn test_report_signal_empty() {
+        let files: Vec<DiffFile> = vec![];
+        let signals = detect_report_signals(std::path::Path::new("/fake"), &files);
+        assert!(signals.is_empty());
+    }
 }
