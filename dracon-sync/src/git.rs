@@ -1394,4 +1394,87 @@ mod tests {
         assert!(!remote_branch_exists(&repo_path, "feat..main"), "double dot should be rejected");
         let _ = std::fs::remove_dir_all(repo_path);
     }
+
+    fn create_temp_git_repo_with_branches(name: &str, branches: &[&str]) -> std::path::PathBuf {
+        let rng = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let temp = std::env::temp_dir().join(format!("test_{}_{}", name, rng));
+        std::fs::create_dir_all(&temp).unwrap();
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "master"])
+            .current_dir(&temp)
+            .output()
+            .expect("git init failed");
+        for branch in branches {
+            if *branch != "master" {
+                std::process::Command::new("git")
+                    .args(["checkout", "-q", "-b", branch])
+                    .current_dir(&temp)
+                    .output()
+                    .ok();
+            }
+        }
+        std::fs::write(temp.join("test.txt"), "test content\n").ok();
+        std::process::Command::new("git")
+            .args(["add", "."])
+            .current_dir(&temp)
+            .output()
+            .ok();
+        std::process::Command::new("git")
+            .args(["commit", "-q", "-m", "initial"])
+            .current_dir(&temp)
+            .output()
+            .ok();
+        temp
+    }
+
+    #[test]
+    fn test_has_only_main_branch_true() {
+        let repo_path = create_temp_git_repo_with_branches("only_main", &["main"]);
+        let result = has_only_main_branch(&repo_path);
+        let _ = std::fs::remove_dir_all(repo_path);
+        assert!(result, "repo with only main should return true");
+    }
+
+    #[test]
+    fn test_has_only_main_branch_false_has_master() {
+        let repo_path = create_temp_git_repo_with_branches("has_master", &["main", "master"]);
+        let result = has_only_main_branch(&repo_path);
+        let _ = std::fs::remove_dir_all(repo_path);
+        assert!(!result, "repo with both main and master should return false");
+    }
+
+    #[test]
+    fn test_has_only_main_branch_false_only_master() {
+        let repo_path = create_temp_git_repo_with_branches("only_master", &["master"]);
+        let result = has_only_main_branch(&repo_path);
+        let _ = std::fs::remove_dir_all(repo_path);
+        assert!(!result, "repo with only master should return false");
+    }
+
+    #[test]
+    fn test_has_both_main_and_master_true() {
+        let repo_path = create_temp_git_repo_with_branches("both", &["main", "master"]);
+        let result = has_both_main_and_master(&repo_path);
+        let _ = std::fs::remove_dir_all(repo_path);
+        assert!(result, "repo with both main and master should return true");
+    }
+
+    #[test]
+    fn test_has_both_main_and_master_false_only_master() {
+        let repo_path = create_temp_git_repo_with_branches("master_only", &["master"]);
+        let result = has_both_main_and_master(&repo_path);
+        let _ = std::fs::remove_dir_all(repo_path);
+        assert!(!result, "repo with only master should return false");
+    }
+
+    #[test]
+    fn test_has_both_main_and_master_false_only_main() {
+        let repo_path = create_temp_git_repo_with_branches("main_only", &["main"]);
+        let result = has_both_main_and_master(&repo_path);
+        let _ = std::fs::remove_dir_all(repo_path);
+        assert!(!result, "repo with only main should return false");
+    }
 }
