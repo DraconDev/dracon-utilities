@@ -984,4 +984,76 @@ mod tests {
     fn test_top_level_dir_only_separator() {
         assert_eq!(top_level_dir("/"), Some("".to_string()));
     }
+
+    #[test]
+    fn test_is_rebase_in_progress_true_rebase_merge() {
+        let temp = std::env::temp_dir();
+        let repo_path = temp.join("test_is_rebase_in_progress_true_rebase_merge");
+        std::fs::create_dir_all(repo_path.join(".git/rebase-merge")).unwrap();
+        let result = is_rebase_in_progress(&repo_path);
+        std::fs::remove_dir_all(repo_path).ok();
+        assert!(result);
+    }
+
+    #[test]
+    fn test_is_rebase_in_progress_true_rebase_apply() {
+        let temp = std::env::temp_dir();
+        let repo_path = temp.join("test_is_rebase_in_progress_true_rebase_apply");
+        std::fs::create_dir_all(repo_path.join(".git/rebase-apply")).unwrap();
+        let result = is_rebase_in_progress(&repo_path);
+        std::fs::remove_dir_all(repo_path).ok();
+        assert!(result);
+    }
+
+    #[test]
+    fn test_is_rebase_in_progress_false() {
+        let temp = std::env::temp_dir();
+        let repo_path = temp.join("test_is_rebase_in_progress_false");
+        std::fs::create_dir_all(repo_path.join(".git/objects")).unwrap();
+        let result = is_rebase_in_progress(&repo_path);
+        std::fs::remove_dir_all(repo_path).ok();
+        assert!(!result);
+    }
+
+    #[test]
+    fn test_is_merge_in_progress_true() {
+        let temp = std::env::temp_dir();
+        let repo_path = temp.join("test_is_merge_in_progress_true");
+        std::fs::create_dir_all(repo_path.join(".git")).unwrap();
+        std::fs::write(repo_path.join(".git/MERGE_HEAD"), "abc123").unwrap();
+        let result = is_merge_in_progress(&repo_path);
+        std::fs::remove_dir_all(repo_path).ok();
+        assert!(result);
+    }
+
+    #[test]
+    fn test_is_merge_in_progress_false() {
+        let temp = std::env::temp_dir();
+        let repo_path = temp.join("test_is_merge_in_progress_false");
+        std::fs::create_dir_all(repo_path.join(".git/objects")).unwrap();
+        let result = is_merge_in_progress(&repo_path);
+        std::fs::remove_dir_all(repo_path).ok();
+        assert!(!result);
+    }
+
+    #[test]
+    fn test_is_cherry_pick_in_progress_true() {
+        let temp = std::env::temp_dir();
+        let repo_path = temp.join("test_is_cherry_pick_in_progress_true");
+        std::fs::create_dir_all(repo_path.join(".git")).unwrap();
+        std::fs::write(repo_path.join(".git/CHERRY_PICK_HEAD"), "abc123").unwrap();
+        let result = is_cherry_pick_in_progress(&repo_path);
+        std::fs::remove_dir_all(repo_path).ok();
+        assert!(result);
+    }
+
+    #[test]
+    fn test_is_cherry_pick_in_progress_false() {
+        let temp = std::env::temp_dir();
+        let repo_path = temp.join("test_is_cherry_pick_in_progress_false");
+        std::fs::create_dir_all(repo_path.join(".git/objects")).unwrap();
+        let result = is_cherry_pick_in_progress(&repo_path);
+        std::fs::remove_dir_all(repo_path).ok();
+        assert!(!result);
+    }
 }
