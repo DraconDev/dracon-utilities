@@ -1244,4 +1244,73 @@ mod tests {
         std::fs::remove_dir_all(&dot_git).ok();
         assert!(!result);
     }
+
+    #[test]
+    fn test_parse_name_status_line_modified() {
+        let result = parse_name_status_line("M\tsrc/main.rs");
+        assert!(result.is_some());
+        let (path, status) = result.unwrap();
+        assert_eq!(path, PathBuf::from("src/main.rs"));
+        assert_eq!(status, FileStatus::Modified);
+    }
+
+    #[test]
+    fn test_parse_name_status_line_added() {
+        let result = parse_name_status_line("A\tnewfile.txt");
+        assert!(result.is_some());
+        let (path, status) = result.unwrap();
+        assert_eq!(path, PathBuf::from("newfile.txt"));
+        assert_eq!(status, FileStatus::Added);
+    }
+
+    #[test]
+    fn test_parse_name_status_line_deleted() {
+        let result = parse_name_status_line("D\tdeleted.txt");
+        assert!(result.is_some());
+        let (path, status) = result.unwrap();
+        assert_eq!(path, PathBuf::from("deleted.txt"));
+        assert_eq!(status, FileStatus::Deleted);
+    }
+
+    #[test]
+    fn test_parse_name_status_line_renamed() {
+        let result = parse_name_status_line("R100\told.txt\tnew.txt");
+        assert!(result.is_some());
+        let (path, status) = result.unwrap();
+        assert_eq!(path, PathBuf::from("new.txt"));
+        assert_eq!(status, FileStatus::Renamed);
+    }
+
+    #[test]
+    fn test_parse_name_status_line_invalid() {
+        assert!(parse_name_status_line("").is_none());
+        assert!(parse_name_status_line("X\tsomefile.txt").is_none());
+    }
+
+    #[test]
+    fn test_fallback_status_rank_deleted_highest() {
+        assert!(fallback_status_rank(&FileStatus::Deleted) > fallback_status_rank(&FileStatus::Modified));
+        assert!(fallback_status_rank(&FileStatus::Deleted) > fallback_status_rank(&FileStatus::Added));
+    }
+
+    #[test]
+    fn test_fallback_status_rank_renamed() {
+        assert!(fallback_status_rank(&FileStatus::Renamed) > fallback_status_rank(&FileStatus::Added));
+        assert!(fallback_status_rank(&FileStatus::Renamed) > fallback_status_rank(&FileStatus::Modified));
+    }
+
+    #[test]
+    fn test_fallback_status_rank_type_change() {
+        assert!(fallback_status_rank(&FileStatus::TypeChange) > fallback_status_rank(&FileStatus::Modified));
+    }
+
+    #[test]
+    fn test_fallback_status_rank_added() {
+        assert!(fallback_status_rank(&FileStatus::Added) > fallback_status_rank(&FileStatus::Modified));
+    }
+
+    #[test]
+    fn test_fallback_status_rank_unknown_lowest() {
+        assert_eq!(fallback_status_rank(&FileStatus::Unknown), 0);
+    }
 }
