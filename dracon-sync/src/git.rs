@@ -1313,4 +1313,103 @@ mod tests {
     fn test_fallback_status_rank_unknown_lowest() {
         assert_eq!(fallback_status_rank(&FileStatus::Unknown), 0);
     }
+
+    fn create_temp_git_repo(name: &str) -> std::path::PathBuf {
+        let rng = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let temp = std::env::temp_dir().join(format!("test_{}_{}", name, rng));
+        std::fs::create_dir_all(&temp).unwrap();
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "master"])
+            .current_dir(&temp)
+            .output()
+            .expect("git init failed");
+        std::fs::write(temp.join("test.txt"), "test content\n").ok();
+        std::process::Command::new("git")
+            .args(["add", "."])
+            .current_dir(&temp)
+            .output()
+            .expect("git add failed");
+        std::process::Command::new("git")
+            .args(["commit", "-q", "-m", "initial"])
+            .current_dir(&temp)
+            .output()
+            .expect("git commit failed");
+        temp
+    }
+
+    #[test]
+    fn test_has_origin_remote_false() {
+        let repo_path = create_temp_git_repo("has_origin_false");
+        let result = has_origin_remote(&repo_path);
+        let _ = std::fs::remove_dir_all(repo_path);
+        assert!(!result, "newly init'd repo should not have origin");
+    }
+
+    #[test]
+    fn test_has_origin_remote_true_after_add() {
+        let repo_path = create_temp_git_repo("has_origin_true");
+        std::process::Command::new("git")
+            .args(["remote", "add", "origin", "https://github.com/test/repo.git"])
+            .current_dir(&repo_path)
+            .output()
+            .expect("git remote add failed");
+        let result = has_origin_remote(&repo_path);
+        let _ = std::fs::remove_dir_all(repo_path);
+        assert!(result, "repo with origin should return true");
+    }
+
+    #[test]
+    fn test_current_branch_returns_some() {
+        let repo_path = create_temp_git_repo("current_branch");
+        let result = current_branch(&repo_path);
+        let _ = std::fs::remove_dir_all(repo_path);
+        assert!(result.is_some(), "on a branch should return branch name");
+        assert_eq!(result.unwrap(), "master");
+    }
+
+    #[test]
+    fn test_has_tracking_upstream_false_without_remote() {
+        let repo_path = create_temp_git_repo("no_tracking");
+        let result = has_tracking_upstream(&repo_path);
+        let _ = std::fs::remove_dir_all(repo_path);
+        assert!(!result, "repo without remote should not have tracking upstream");
+    }
+
+    #[test]
+    fn test_has_tracking_upstream_true_with_remote_and_tracking() {
+        let repo_path = create_temp_git_repo("has_tracking");
+        std::process::Command::new("git")
+            .args(["remote", "add", "origin", "https://github.com/test/repo.git"])
+            .current_dir(&repo_path)
+            .output()
+            .expect("git remote add failed");
+        std::process::Command::new("git")
+            .args(["branch", "--set-upstream-to", "origin/master"])
+            .current_dir(&repo_path)
+            .output()
+            .ok();
+        let result = has_tracking_upstream(&repo_path);
+        let _ = std::fs::remove_dir_all(repo_path);
+        assert!(result, "repo with remote and tracking should return true");
+    }
+
+    #[test]
+    fn test_remote_branch_exists_unsafe_branch_name() {
+        let repo_path = create_temp_git_repo("branch_exists");
+        let result = remote_branch_exists(&repo_path, "main");
+        let _ = std::fs::remove_dir_all(repo_path);
+        assert!(!result, "branch that doesn't exist should return false");
+    }
+
+    #[test]
+    fn test_remote_branch_exists_rejects_unsafe_names() {
+        let repo_path = create_temp_git_repo("unsafe_names");
+        assert!(!remote_branch_exists(&repo_path, ""), "empty branch name should be rejected");
+        assert!(!remote_branch_exists(&repo_path, "-main"), "leading dash should be rejected");
+        assert!(!remote_branch_exists(&repo_path, "feat..main"), "double dot should be rejected");
+        let _ = std::fs::remove_dir_all(repo_path);
+    }
 }
