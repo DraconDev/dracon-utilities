@@ -422,6 +422,12 @@ mod tests {
         let patterns = default_exclude_file_patterns();
         assert!(patterns.contains(&"*.log".to_string()));
         assert!(patterns.contains(&"nohup.out".to_string()));
+        assert!(patterns.contains(&"*.sqlite".to_string()));
+        assert!(patterns.contains(&"*.sqlite3".to_string()));
+        assert!(patterns.contains(&"*.db".to_string()));
+        assert!(patterns.contains(&"*.db-journal".to_string()));
+        assert!(patterns.contains(&"*.db-wal".to_string()));
+        assert!(patterns.contains(&"*.db-shm".to_string()));
     }
 
     #[test]
