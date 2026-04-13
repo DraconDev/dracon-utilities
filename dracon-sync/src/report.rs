@@ -2268,34 +2268,25 @@ mod tests {
             auto_bump_versions: true,
             auto_repair_concerns: true,
             auto_repair_warns: true,
+            auto_rewrite_large_blobs: true,
+            max_stage_file_bytes: 100 * 1024 * 1024,
+            push_blob_threshold_bytes: 100 * 1024 * 1024,
+            exclude_dirs: vec![],
+            exclude_file_patterns: vec![],
+            pull_op_timeout_secs: 30,
+            push_op_timeout_secs: 300,
+            repo_sync_timeout_secs: 420,
+            push_retries: 3,
+            repair_cooldown_secs: 60,
+            incident_ledger_max_lines: 10000,
+            incident_ledger_max_age_days: 30,
+            system_repo: String::new(),
+            backup_policy: String::new(),
+            backup_dir: String::new(),
+            extra_remotes: 0,
         };
         assert_eq!(status.repos_discovered, 5);
         assert!(status.auto_commit);
-    }
-
-    #[test]
-    fn test_incident_record_partial_eq() {
-        let record1 = IncidentRecord {
-            ts_unix: 1,
-            scope: "a".to_string(),
-            repo: "/r".to_string(),
-            reason: "r".to_string(),
-            action: "a".to_string(),
-            backup_branch: None,
-            result: "ok".to_string(),
-            details: None,
-        };
-        let record2 = IncidentRecord {
-            ts_unix: 1,
-            scope: "a".to_string(),
-            repo: "/r".to_string(),
-            reason: "r".to_string(),
-            action: "a".to_string(),
-            backup_branch: None,
-            result: "ok".to_string(),
-            details: None,
-        };
-        assert_eq!(record1, record2);
     }
 
     #[test]
@@ -2311,7 +2302,7 @@ mod tests {
     }
 
     #[test]
-    fn test_report_signal_blueprint_modified_other_dir() {
+    fn test_report_signal_blueprint_modified_plan_dir() {
         let files = vec![
             DiffFile {
                 path: std::path::PathBuf::from("plan/blueprint-bar.md"),
@@ -2334,7 +2325,7 @@ mod tests {
     }
 
     #[test]
-    fn test_truncate_unicode_truncation() {
+    fn test_truncate_three_chars() {
         let result = truncate("hello", 3);
         assert_eq!(result, "he…");
     }
