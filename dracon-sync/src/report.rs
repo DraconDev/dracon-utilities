@@ -140,7 +140,7 @@ pub(crate) struct RepairSummary {
     pub(crate) manual_only: usize,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, PartialEq)]
 pub(crate) struct IncidentRecord {
     ts_unix: u64,
     scope: String,
