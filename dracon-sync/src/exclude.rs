@@ -538,7 +538,7 @@ pub(crate) fn handle_large_untracked(
 fn is_build_output_dir_name(name: &str) -> bool {
     matches!(
         name,
-        ".output" | ".out" | "output" | "bin" | "obj" | "generated" | "gen" | ".next" | "dist-new"
+        ".output" | ".out" | "output" | "generated" | "gen" | ".next" | "dist-new"
     ) || name.ends_with(".output")
         || name.ends_with("_output")
         || name.starts_with("output-")
