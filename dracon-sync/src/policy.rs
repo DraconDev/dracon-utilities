@@ -218,11 +218,7 @@ impl SyncPolicy {
         let content = std::fs::read_to_string(path)
             .with_context(|| format!("failed to read policy {}", path.display()))?;
         let mut policy: Self = toml::from_str(&content)
-            .with_context(|| format!("failed to parse policy {}", path.display()))
-            .map_err(|e| {
-                eprintln!("⚠️ policy parse error, using defaults: {}", e);
-                e
-            })?;
+            .with_context(|| format!("failed to parse policy {}", path.display()))?;
         if policy.exclude_dir_names.is_empty() {
             policy.exclude_dir_names = default_exclude_dir_names();
         }
