@@ -84,12 +84,19 @@ fn acquire_daemon_lock(name: &str) -> Result<File> {
         .create(true)
         .write(true)
         .open(&lock_file)?;
-    
+
     if file.lock_exclusive().is_err() {
         return Err(anyhow::anyhow!("lock file is held by another process"));
     }
-    
+
     file.set_len(0)?;
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        file.set_permissions(std::fs::Permissions::from_mode(0o600))?;
+    }
+
     Ok(file)
 }
 
