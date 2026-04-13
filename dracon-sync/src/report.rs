@@ -2173,4 +2173,169 @@ mod tests {
         assert_eq!(ReportSignal::ActiveBoardChanged, ReportSignal::ActiveBoardChanged);
         assert_ne!(ReportSignal::ActiveBoardChanged, ReportSignal::IndexChanged);
     }
+
+    #[test]
+    fn test_ansi_colors() {
+        assert_eq!(ansi("31", "error"), "\x1b[31merror\x1b[0m");
+        assert_eq!(ansi("32", "ok"), "\x1b[32mok\x1b[0m");
+        assert_eq!(ansi("1", "bold"), "\x1b[1mbold\x1b[0m");
+        assert_eq!(ansi("unknown", "default"), "\x1b[0mdefault\x1b[0m");
+    }
+
+    #[test]
+    fn test_repo_filter_variants() {
+        assert_eq!(format!("{:?}", RepoFilter::All), "All");
+        assert_eq!(format!("{:?}", RepoFilter::Concern), "Concern");
+        assert_eq!(format!("{:?}", RepoFilter::Warn), "Warn");
+    }
+
+    #[test]
+    fn test_concern_repair_filter_variants() {
+        assert_eq!(format!("{:?}", ConcernRepairFilter::All), "All");
+        assert_eq!(format!("{:?}", ConcernRepairFilter::StuckPush), "StuckPush");
+        assert_eq!(format!("{:?}", ConcernRepairFilter::StuckPull), "StuckPull");
+    }
+
+    #[test]
+    fn test_incident_record_serialization() {
+        let record = IncidentRecord {
+            ts_unix: 1700000000,
+            scope: "test".to_string(),
+            repo: "/test/repo".to_string(),
+            reason: "test reason".to_string(),
+            action: "test action".to_string(),
+            backup_branch: Some("backup".to_string()),
+            result: "success".to_string(),
+            details: Some("details".to_string()),
+        };
+        let json = serde_json::to_string(&record).unwrap();
+        assert!(json.contains("1700000000"));
+        assert!(json.contains("test reason"));
+    }
+
+    #[test]
+    fn test_repo_report_row_structure() {
+        let row = RepoReportRow {
+            repo: "/test/repo".to_string(),
+            state_flags: vec!["OK".to_string()],
+            branch: "main".to_string(),
+            modified: 0,
+            staged: 0,
+            ahead: 0,
+            behind: 0,
+            last_hash: "abc123".to_string(),
+            last_author: "test".to_string(),
+            last_when: "2024-01-01".to_string(),
+            last_msg: "test commit".to_string(),
+            last_unix: 1700000000,
+            concern: false,
+            warn: false,
+            hint: "healthy".to_string(),
+        };
+        assert_eq!(row.repo, "/test/repo");
+        assert_eq!(row.branch, "main");
+        assert!(!row.concern);
+    }
+
+    #[test]
+    fn test_repo_report_json_structure() {
+        let json = RepoReportJson {
+            policy: "default".to_string(),
+            filter: "all".to_string(),
+            repos: 1,
+            ok: 1,
+            warn: 0,
+            concern: 0,
+            failures: 0,
+            rows: vec![],
+        };
+        assert_eq!(json.repos, 1);
+        assert_eq!(json.ok, 1);
+    }
+
+    #[test]
+    fn test_status_json_structure() {
+        let status = StatusJson {
+            policy: "default".to_string(),
+            roots: vec!["~/code".to_string()],
+            repos_discovered: 5,
+            pulse_interval_secs: 30,
+            inactivity_push_delay_secs: 300,
+            freeze: "none".to_string(),
+            auto_commit: true,
+            auto_pull: true,
+            auto_push: true,
+            auto_bump_versions: true,
+            auto_repair_concerns: true,
+            auto_repair_warns: true,
+        };
+        assert_eq!(status.repos_discovered, 5);
+        assert!(status.auto_commit);
+    }
+
+    #[test]
+    fn test_incident_record_partial_eq() {
+        let record1 = IncidentRecord {
+            ts_unix: 1,
+            scope: "a".to_string(),
+            repo: "/r".to_string(),
+            reason: "r".to_string(),
+            action: "a".to_string(),
+            backup_branch: None,
+            result: "ok".to_string(),
+            details: None,
+        };
+        let record2 = IncidentRecord {
+            ts_unix: 1,
+            scope: "a".to_string(),
+            repo: "/r".to_string(),
+            reason: "r".to_string(),
+            action: "a".to_string(),
+            backup_branch: None,
+            result: "ok".to_string(),
+            details: None,
+        };
+        assert_eq!(record1, record2);
+    }
+
+    #[test]
+    fn test_report_signal_blueprint_modified() {
+        let files = vec![
+            DiffFile {
+                path: std::path::PathBuf::from("docs/blueprint-foo.md"),
+                status: FileStatus::Modified,
+            }
+        ];
+        let signals = detect_report_signals(std::path::Path::new("/fake"), &files);
+        assert!(signals.contains(&ReportSignal::BlueprintModified));
+    }
+
+    #[test]
+    fn test_report_signal_blueprint_modified_other_dir() {
+        let files = vec![
+            DiffFile {
+                path: std::path::PathBuf::from("plan/blueprint-bar.md"),
+                status: FileStatus::Modified,
+            }
+        ];
+        let signals = detect_report_signals(std::path::Path::new("/fake"), &files);
+        assert!(signals.contains(&ReportSignal::BlueprintModified));
+    }
+
+    #[test]
+    fn test_push_large_blob_threshold_min_limit() {
+        let policy = SyncPolicy {
+            max_stage_file_bytes: 10 * 1024 * 1024,
+            max_push_blob_bytes: 5 * 1024 * 1024,
+            ..test_sync_policy()
+        };
+        let threshold = push_large_blob_threshold_bytes(&policy);
+        assert_eq!(threshold, 5 * 1024 * 1024);
+    }
+
+    #[test]
+    fn test_truncate_unicode_truncation() {
+        let result = truncate("hello", 3);
+        assert_eq!(result, "he…");
+    }
 }
