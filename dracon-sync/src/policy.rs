@@ -158,10 +158,19 @@ pub(crate) fn default_exclude_dir_names() -> Vec<String> {
 }
 
 pub(crate) fn default_exclude_file_patterns() -> Vec<String> {
-    ["*.log", "nohup.out"]
-        .into_iter()
-        .map(String::from)
-        .collect()
+    [
+        "*.log",
+        "nohup.out",
+        "*.sqlite",
+        "*.sqlite3",
+        "*.db",
+        "*.db-journal",
+        "*.db-wal",
+        "*.db-shm",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect()
 }
 
 pub(crate) fn default_max_stage_file_bytes() -> u64 {
