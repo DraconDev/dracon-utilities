@@ -82,11 +82,14 @@ fn acquire_daemon_lock(name: &str) -> Result<File> {
     
     let file = std::fs::OpenOptions::new()
         .create(true)
-        .truncate(true)
         .write(true)
         .open(&lock_file)?;
     
-    file.lock_exclusive()?;
+    if file.lock_exclusive().is_err() {
+        return Err(anyhow::anyhow!("lock file is held by another process"));
+    }
+    
+    file.set_len(0)?;
     Ok(file)
 }
 
@@ -1000,15 +1003,15 @@ async fn auto_cleanup_rust_targets(
                 eprintln!("⚠️ failed to remove {}: {}", target.path.display(), e);
                 continue;
             }
+            
+            result.cleaned_count += 1;
+            result.reclaimed_bytes += target.bytes;
+            result.cleaned_paths.push(format!(
+                "{} ({})",
+                target.path.display(),
+                human_bytes(target.bytes)
+            ));
         }
-        
-        result.cleaned_count += 1;
-        result.reclaimed_bytes += target.bytes;
-        result.cleaned_paths.push(format!(
-            "{} ({})",
-            target.path.display(),
-            human_bytes(target.bytes)
-        ));
     }
     
     Ok(result)
