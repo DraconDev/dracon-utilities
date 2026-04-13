@@ -2085,6 +2085,15 @@ impl DemonSecurity {
             ".terraform.lock.hcl",
             "terraform.tfvars",
             ".env",
+            ".env.local",
+            ".env.production",
+            ".env.development",
+            ".env.staging",
+            ".npmrc",
+            ".pypirc",
+            "netrc",
+            ".pgpass",
+            ".my.cnf",
         ];
 
         let filename = std::path::Path::new(path_str)
