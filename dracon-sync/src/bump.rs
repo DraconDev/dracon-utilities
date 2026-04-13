@@ -273,8 +273,8 @@ pub fn apply_version_bump_to_repo(repo: &Path, old_ver: &str, new_ver: &str) -> 
 }
 
 fn bump_version_in_cargo_toml(content: &str, old_ver: &str, new_ver: &str) -> String {
-    content.replace(&format!("version = \"{}\"", old_ver), &format!("version = \"{}\"", new_ver))
-        .replace(&format!("version=\"{}\"", old_ver), &format!("version=\"{}\"", new_ver))
+    content.replacen(&format!("version = \"{}\"", old_ver), &format!("version = \"{}\"", new_ver), 1)
+        .replacen(&format!("version=\"{}\"", old_ver), &format!("version=\"{}\"", new_ver), 1)
 }
 
 fn bump_version_in_json(content: &str, old_ver: &str, new_ver: &str) -> String {
