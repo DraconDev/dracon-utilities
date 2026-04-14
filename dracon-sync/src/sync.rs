@@ -417,8 +417,10 @@ pub(crate) async fn sync_repo(
                                 let bumped = crate::bump::apply_version_bump_to_repo(repo, &current_ver, &new_ver);
                                 if bumped {
                                     for file in &["Cargo.toml", "package.json", "VERSION", "Cargo.lock"] {
-                                        if let Err(e) = run_git_with_timeout(repo, &["add", file], 30, "add").await {
-                                            eprintln!("⚠️ failed to stage {}: {}", file, e);
+                                        if repo.join(file).exists() {
+                                            if let Err(e) = run_git_with_timeout(repo, &["add", file], 30, "add").await {
+                                                eprintln!("⚠️ failed to stage {}: {}", file, e);
+                                            }
                                         }
                                     }
                                 }
