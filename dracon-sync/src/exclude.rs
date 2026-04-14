@@ -605,7 +605,6 @@ pub(crate) fn has_sync_relevant_dirty_entries(
     excluded_file_patterns: &[String],
     max_stage_file_bytes: u64,
 ) -> bool {
-    let current_repo_git = repo.join(".git");
     entries.iter().any(|entry| {
         let full_path = repo.join(&entry.path);
 
