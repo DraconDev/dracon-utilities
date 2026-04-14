@@ -1588,6 +1588,20 @@ fn create_github_private_remote(repo: &Path, account: &str) -> Option<String> {
                 );
             }
             
+            // Push to set upstream and populate the remote
+            let push_output = std::process::Command::new("git")
+                .args(["push", "-u", "origin", "HEAD"])
+                .current_dir(repo)
+                .output();
+            
+            if !push_output.as_ref().map(|o| o.status.success()).unwrap_or(false) {
+                let stderr = String::from_utf8_lossy(&push_output.as_ref().map(|o| o.stderr.clone()).unwrap_or_default());
+                eprintln!(
+                    "⚠️ failed to push initial commit for {}: {}",
+                    repo.display(), stderr
+                );
+            }
+            
             return Some(remote_url);
         }
         
