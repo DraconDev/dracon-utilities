@@ -351,7 +351,7 @@ pub(crate) fn should_stage_entry(
     }
 }
 
-pub(crate) fn can_restore_entry(repo: &Path, entry: &dracon_git::types::DiffFile) -> bool {
+pub(crate) fn can_restore_entry(_repo: &Path, entry: &dracon_git::types::DiffFile) -> bool {
     use dracon_git::types::FileStatus;
     matches!(
         entry.status,
