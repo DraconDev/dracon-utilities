@@ -371,15 +371,10 @@ pub(crate) fn should_stage_entry(
 
 pub(crate) fn can_restore_entry(repo: &Path, entry: &dracon_git::types::DiffFile) -> bool {
     use dracon_git::types::FileStatus;
-    if !matches!(
+    matches!(
         entry.status,
         FileStatus::Modified | FileStatus::TypeChange | FileStatus::Renamed
-    ) {
-        return false;
-    }
-    let full_path = repo.join(&entry.path);
-    let current_repo_git = repo.join(".git");
-    is_nested_git_repo_path(&full_path, &current_repo_git).is_none()
+    )
 }
 
 pub(crate) fn is_large_untracked(
