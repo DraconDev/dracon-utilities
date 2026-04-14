@@ -1,6 +1,6 @@
 use anyhow::Result;
 use std::collections::BTreeSet;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use crate::policy::SyncPolicy;
 
