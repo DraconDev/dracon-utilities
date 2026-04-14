@@ -672,11 +672,20 @@ pub(crate) async fn run_daemon(policy_path: PathBuf) -> Result<()> {
                 activity.remove(&repo);
             } else {
                 entry.failure_count += 1;
+                // If repo has divergence (ahead AND behind), push will always fail
+                // regardless of dirty state - mark as stuck immediately.
+                // This prevents the repo from blocking other syncs.
+                let is_diverged = status.ahead > 0 && status.behind > 0;
                 // If repo is clean but has ahead commits and push keeps failing,
                 // it's permanently stuck (permission error, deleted remote, etc).
                 // Skip it entirely to unblock other repos.
-                if !effective_dirty && status.ahead > 0 && entry.failure_count >= 3 {
-                    eprintln!("🔒 {} permanently stuck on push (ahead={}, clean), skipping", repo.display(), status.ahead);
+                if is_diverged || (!effective_dirty && status.ahead > 0 && entry.failure_count >= 3) {
+                    let reason = if is_diverged {
+                        format!("(diverged: ahead={}, behind={})", status.ahead, status.behind)
+                    } else {
+                        format!("(ahead={}, clean)", status.ahead)
+                    };
+                    eprintln!("🔒 {} permanently stuck on push {} skipping", repo.display(), reason);
                     stuck_push_repos.insert(repo.clone(), timestamp_secs());
                     save_stuck_push_repos(&stuck_push_repos);
                     activity.remove(&repo);
