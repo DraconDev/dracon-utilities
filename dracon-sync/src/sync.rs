@@ -349,11 +349,10 @@ pub(crate) async fn sync_repo(
             }
 
             // Stage project-state.md if scribe updated it
-            // Note: git add (without -u) handles both new and modified files,
-            // but may warn "already staged" if the file was staged earlier.
-            // This is harmless - the file remains staged with the updated content.
+            // Use -f (force) because project-state.md is in .dracon/ which is
+            // typically gitignored, so we need to override that.
             if repo.join(".dracon/project-state.md").exists() {
-                if let Err(e) = run_git_with_timeout(repo, &["add", ".dracon/project-state.md"], 10, "add-project-state").await {
+                if let Err(e) = run_git_with_timeout(repo, &["add", "-f", ".dracon/project-state.md"], 10, "add-project-state").await {
                     eprintln!("⚠️ failed to stage project-state: {}", e);
                 }
             }
