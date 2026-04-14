@@ -632,11 +632,6 @@ pub(crate) fn has_sync_relevant_dirty_entries(
     entries.iter().any(|entry| {
         let full_path = repo.join(&entry.path);
 
-        // Skip entries inside nested git repos — managed by their own daemon
-        if is_nested_git_repo_path(&full_path, &current_repo_git).is_some() {
-            return false;
-        }
-
         // Skip gitlink entries with unchanged pointers entirely
         // Use repo.join() because entry.path is relative to repo, not CWD
         if full_path.is_dir() && is_gitlink_unchanged(repo, &entry.path) {
