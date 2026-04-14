@@ -1595,7 +1595,7 @@ fn create_github_private_remote(repo: &Path, account: &str) -> Option<String> {
                 .output();
             
             if !push_output.as_ref().map(|o| o.status.success()).unwrap_or(false) {
-                let stderr = String::from_utf8_lossy(&push_output.as_ref().map(|o| o.stderr.clone()).unwrap_or_default());
+                let stderr = String::from_utf8_lossy(&push_output.as_ref().map(|o| &o.stderr).unwrap_or(&[]));
                 eprintln!(
                     "⚠️ failed to push initial commit for {}: {}",
                     repo.display(), stderr
