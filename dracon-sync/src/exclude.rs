@@ -392,10 +392,6 @@ pub(crate) fn is_large_untracked(
         return false;
     }
     let full_path = repo.join(&entry.path);
-    let current_repo_git = repo.join(".git");
-    if is_nested_git_repo_path(&full_path, &current_repo_git).is_some() {
-        return false;
-    }
     match std::fs::metadata(&full_path) {
         Ok(meta) if meta.is_file() => meta.len() > threshold,
         _ => false,
