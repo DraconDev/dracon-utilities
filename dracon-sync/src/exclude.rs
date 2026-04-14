@@ -17,24 +17,6 @@ pub(crate) fn excluded_dir_names_set(policy: &SyncPolicy) -> BTreeSet<String> {
         .collect()
 }
 
-pub(crate) fn is_nested_git_repo_path(path: &Path, current_repo_git: &Path) -> Option<PathBuf> {
-    let mut current = path;
-    while let Some(parent) = current.parent() {
-        if parent == current {
-            break;
-        }
-        let candidate = parent.join(".git");
-        if candidate.exists() {
-            if candidate == current_repo_git {
-                break;
-            }
-            return Some(parent.to_path_buf());
-        }
-        current = parent;
-    }
-    None
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
