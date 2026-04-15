@@ -1,9 +1,10 @@
 # Project State
 
 ## Current Focus
-Added debug logging to the master.age encryption test to help diagnose accidental encryption issues
+Enhanced secret scanning and test diagnostics in the security module
 
 ## Completed
-- [x] Added debug logging of encrypted result length and preview
-- [x] Enhanced assertion message to include partial encrypted result for debugging
-- [x] Improved test failure diagnostics for accidental encryption of master.age files
+- [x] Refactored secret scanning to use `SecretScanner` with explicit age key exclusion
+- [x] Added debug logging for secret pattern matching and replacement
+- [x] Improved test assertions with more detailed failure messages
+- [x] Enhanced test output to show scanner patterns and match results
