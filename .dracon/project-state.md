@@ -1,10 +1,9 @@
 # Project State
 
 ## Current Focus
-Enhanced version tracking for encrypted .env files by adding/incrementing version headers during encryption
+Added environment file version header stripping functionality to handle encrypted .env files
 
 ## Completed
-- [x] Added version header handling for .env files during encryption
-- [x] Implemented version incrementing for already managed files
-- [x] Added initial version header for new .env files
-- [x] Maintained backward compatibility with existing unversioned files
+- [x] Implemented `strip_env_version_header` function to remove Dracon Warden version headers from encrypted environment files
+- [x] Added support for both Unix and Windows line endings in header detection
+- [x] Maintained original content when no version header is present

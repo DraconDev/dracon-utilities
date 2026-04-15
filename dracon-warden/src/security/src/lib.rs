@@ -53,6 +53,18 @@ fn make_env_version_header(content: &str) -> String {
     format!(ENV_VERSION_HEADER_TEMPLATE, next_version)
 }
 
+fn strip_env_version_header(content: &str) -> &str {
+    if content.contains("Dracon Warden Encrypted Environment File") {
+        if let Some(pos) = content.find("# =============================================================================\n# Dracon Warden") {
+            return content[pos + 70..].trim_start_matches('#').trim_start_matches('\n').trim_start_matches('\r').trim_start()
+        }
+        if let Some(pos) = content.find("# =============================================================================\r\n# Dracon Warden") {
+            return content[pos + 71..].trim_start_matches('#').trim_start_matches('\n').trim_start_matches('\r').trim_start()
+        }
+    }
+    content
+}
+
 const REPO_KEY_LEN: usize = 32;
 
 fn normalize_secret_marker(raw: &str) -> Option<String> {
