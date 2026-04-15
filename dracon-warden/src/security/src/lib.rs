@@ -492,41 +492,6 @@ impl SecretScanner {
         }
     }
 
-    /// Create a scanner that excludes age identity key patterns.
-    /// Used for master.age and identity.age files to prevent encrypting
-    /// the age key itself while still scanning for other secrets.
-    pub fn new_without_age_keys() -> Self {
-        let patterns_raw = Self::get_patterns();
-
-        let patterns: Vec<(String, Regex)> = patterns_raw
-            .iter()
-            .filter(|(name, _)| *name != "Age Secret Key") // Skip age identity keys
-            .filter_map(|(name, pattern)| {
-                let p = if pattern.starts_with("(?") {
-                    pattern.to_string()
-                } else {
-                    format!("(?sm){}", pattern)
-                };
-                Regex::new(&p).ok().map(|re| (name.to_string(), re))
-            })
-            .collect();
-
-        // Build combined regex without age key pattern
-        let combined = patterns_raw
-            .iter()
-            .filter(|(name, _)| *name != "Age Secret Key")
-            .map(|(_, p)| format!("(?:{})", p))
-            .collect::<Vec<_>>()
-            .join("|");
-        let full_regex = Regex::new(&format!("(?sm){}", combined))
-            .expect("Failed to build combined regex (without age keys) - check patterns for invalid regex syntax");
-
-        Self {
-            patterns,
-            full_regex,
-        }
-    }
-
     pub fn scan(&self, content: &str) -> Vec<SecretFinding> {
         use rayon::prelude::*;
 
@@ -2198,16 +2163,9 @@ impl DemonSecurity {
                     };
                     return self.encrypt_v2_to_b64_tag(content_to_encrypt.as_bytes());
                 }
-                // For identity files (master.age, identity.age), use a scanner that
-                // skips age key patterns to avoid encrypting the identity itself,
-                // but still catches other embedded secrets like API keys.
-                let is_identity_file = filename == "master.age" || filename == "identity.age";
-                let cleaned = if is_identity_file {
-                    let scanner = SecretScanner::new_without_age_keys();
-                    self.smart_clean_with_scanner(text_content, &scanner)?
-                } else {
-                    self.smart_clean(text_content)?
-                };
+                // Eager encryption: scan for and encrypt all detected secrets.
+                // This means we may encrypt non-secret content, but we won't miss secrets.
+                let cleaned = self.smart_clean(text_content)?;
                 Ok(cleaned.into_bytes())
             }
             Err(_) => {
@@ -2800,28 +2758,6 @@ mod tests {
         let input = format!("before {} after", tag);
         let output = security.smart_smudge(&input).unwrap();
         assert_eq!(output, input);
-    }
-
-    #[test]
-    fn test_protection_exemptions() {
-        let security = DemonSecurity::new(None).unwrap();
-        let content = b"AGE-SECRET-KEY-142MYS9ZZPE0Q0CFSU4D3WTMMXRN5EN89U83TUSKGZVACLCE0A37SN5NENW";
-        let result = security
-            .smart_clean_with_path(content, "master.age")
-            .unwrap();
-        let result_str = String::from_utf8_lossy(&result);
-        assert!(
-            !result_str.contains("_SECRET"),
-            "master.age was accidentally encrypted!"
-        );
-        let result = security
-            .smart_clean_with_path(content, "identity.age")
-            .unwrap();
-        let result_str = String::from_utf8_lossy(&result);
-        assert!(
-            !result_str.contains("_SECRET"),
-            "identity.age was accidentally encrypted!"
-        );
     }
 
     #[test]
