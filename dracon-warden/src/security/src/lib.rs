@@ -23,6 +23,14 @@ const HEADER_V2_MAGIC: &[u8] = b"age-encryption.org/v1";
 const DEFAULT_SECRET_MARKER: &str = "DRACON_SECRET";
 const LEGACY_SECRET_MARKER: &str = "DEMON_SECRET";
 
+const ENV_VERSION_HEADER: &str = r#"# =============================================================================
+# Dracon Warden Encrypted Environment File
+# This file is encrypted by dracon-warden for secure team collaboration.
+# Version: 1.0
+# DO NOT EDIT THE ENCRYPTED CONTENT MANUALLY - Use `dracon-warden smudge` to decrypt.
+# =============================================================================
+"#;
+
 const REPO_KEY_LEN: usize = 32;
 
 fn normalize_secret_marker(raw: &str) -> Option<String> {
