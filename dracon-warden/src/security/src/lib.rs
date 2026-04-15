@@ -2136,7 +2136,15 @@ impl DemonSecurity {
                     {
                         return Ok(content.to_vec());
                     }
-                    return self.encrypt_v2_to_b64_tag(content);
+                    // Add version header for .env files to track warden management
+                    let content_to_encrypt = if filename.starts_with(".env")
+                        && !text_content.contains("Dracon Warden")
+                    {
+                        format!("{}\n{}", ENV_VERSION_HEADER, text_content)
+                    } else {
+                        text_content.to_string()
+                    };
+                    return self.encrypt_v2_to_b64_tag(content_to_encrypt.as_bytes());
                 }
                 // For identity files (master.age, identity.age), use a scanner that
                 // skips age key patterns to avoid encrypting the identity itself,
