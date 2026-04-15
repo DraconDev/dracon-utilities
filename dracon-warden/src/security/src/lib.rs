@@ -2780,6 +2780,34 @@ mod tests {
     }
 
     #[test]
+    fn test_protection_exemptions() {
+        let security = DemonSecurity::new(None).unwrap();
+        let content = b"AGE-SECRET-KEY-142MYS9ZZPE0Q0CFSU4D3WTMMXRN5EN89U83TUSKGZVACLCE0A37SN5NENW";
+        let result = security
+            .smart_clean_with_path(content, "master.age")
+            .unwrap();
+        let result_str = String::from_utf8_lossy(&result);
+        eprintln!("Result length: {}", result_str.len());
+        eprintln!(
+            "Result preview: {}",
+            &result_str[..result_str.len().min(200)]
+        );
+        assert!(
+            !result_str.contains("_SECRET"),
+            "master.age was accidentally encrypted! Result: {}",
+            &result_str[..result_str.len().min(500)]
+        );
+        let result = security
+            .smart_clean_with_path(content, "identity.age")
+            .unwrap();
+        let result_str = String::from_utf8_lossy(&result);
+        assert!(
+            !result_str.contains("_SECRET"),
+            "identity.age was accidentally encrypted!"
+        );
+    }
+
+    #[test]
     fn test_legacy_marker_compatibility() {
         let security = DemonSecurity::new(None).unwrap();
         let input = "prefix [DEMON_SECRET:not-base64] suffix";

@@ -3,9 +3,9 @@
 <!-- dracon-code:runtime-progress:start -->
 ## Runtime Progress (auto)
 
-- phase: `planning`
+- phase: ``
 - execution_enabled: `false`
-- trigger: `none`
+- trigger: `BLOCKED`
 - active_slice: `(none)`
 - completed: `0/1`
 
