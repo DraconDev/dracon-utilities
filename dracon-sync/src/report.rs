@@ -9,6 +9,27 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::time::Duration;
 
+fn send_sync_conflict_notification(repo_path: &Path, reason: &str, details: &str) {
+    let repo_name = repo_path
+        .file_name()
+        .map(|s| s.to_string_lossy().to_string())
+        .unwrap_or_else(|| repo_path.display().to_string());
+    
+    let title = "Dracon Sync: Manual Action Required";
+    let body = format!(
+        "Repository '{}' needs manual resolution.\nReason: {}\nDetails: {}",
+        repo_name, reason, details
+    );
+    
+    if let Err(e) = notify_rust::Notification::new()
+        .summary(title)
+        .body(&body)
+        .show() 
+    {
+        eprintln!("⚠️ failed to send desktop notification: {}", e);
+    }
+}
+
 use crate::exclude::{
     excluded_dir_names_set,
     has_sync_relevant_dirty_entries,
@@ -1291,6 +1312,13 @@ pub(crate) async fn run_repair_concerns(
                         has_origin,
                         has_upstream
                     );
+                    // Only notify on true divergence (both ahead AND behind) - that's
+                    // the only case where we have no automatic resolution.
+                    // If just ahead > 0, we can push. If just behind > 0, we can pull.
+                    if next.ahead > 0 && next.behind > 0 {
+                        let details = format!("ahead={} behind={}", next.ahead, next.behind);
+                        send_sync_conflict_notification(&repo, &reason, &details);
+                    }
                     append_incident_record(
                         policy_path,
                         &IncidentRecord {
@@ -1301,10 +1329,7 @@ pub(crate) async fn run_repair_concerns(
                             action: "verify_resolved".to_string(),
                             backup_branch: None,
                             result: "remaining".to_string(),
-                            details: Some(format!(
-                                "ahead={} behind={}",
-                                next.ahead, next.behind
-                            )),
+                            details: Some(format!("ahead={} behind={}", next.ahead, next.behind)),
                         },
                     );
                 }
