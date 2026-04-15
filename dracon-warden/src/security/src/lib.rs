@@ -2864,4 +2864,78 @@ mod tests {
         eprintln!("full_regex: {}", scanner.full_regex.as_str());
         assert!(scanner.pattern_count() > 50, "Should have many patterns");
     }
+
+    #[test]
+    fn test_get_env_version_extracts_version() {
+        let v1_content = r#"# =============================================================================
+# Dracon Warden Encrypted Environment File
+# Version: 1
+# =============================================================================
+API_KEY=secret"#;
+        assert_eq!(get_env_version(v1_content), 1);
+
+        let v5_content = r#"# =============================================================================
+# Dracon Warden Encrypted Environment File
+# Version: 5
+# =============================================================================
+API_KEY=secret"#;
+        assert_eq!(get_env_version(v5_content), 5);
+
+        let no_version = r#"API_KEY=secret"#;
+        assert_eq!(get_env_version(no_version), 0);
+    }
+
+    #[test]
+    fn test_make_env_version_header_increments_version() {
+        let v1_content = r#"# Version: 1
+API_KEY=secret"#;
+        let header = make_env_version_header(v1_content);
+        assert!(header.contains("Version: 2"));
+
+        let v0_content = r#"API_KEY=secret"#;
+        let header = make_env_version_header(v0_content);
+        assert!(header.contains("Version: 1"));
+    }
+
+    #[test]
+    fn test_strip_env_version_header_removes_header() {
+        let with_header = r#"# =============================================================================
+# Dracon Warden Encrypted Environment File
+# Version: 1
+# =============================================================================
+API_KEY=secret"#;
+        let stripped = strip_env_version_header(with_header);
+        assert!(!stripped.contains("Dracon Warden"));
+        assert!(stripped.contains("API_KEY=secret"));
+        assert!(stripped.starts_with("API_KEY=secret"));
+    }
+
+    #[test]
+    fn test_strip_env_version_header_passthrough_when_no_header() {
+        let no_header = "API_KEY=secret";
+        let stripped = strip_env_version_header(no_header);
+        assert_eq!(stripped, no_header);
+    }
+
+    #[test]
+    fn test_env_versioning_increment_flow() {
+        let security = DemonSecurity::new(None).unwrap();
+
+        let v1_content = r#"# =============================================================================
+# Dracon Warden Encrypted Environment File
+# Version: 1
+# =============================================================================
+API_KEY=original"#;
+
+        let result = security
+            .smart_clean_with_path(v1_content.as_bytes(), ".env.local")
+            .unwrap();
+        let result_str = String::from_utf8_lossy(&result);
+
+        assert!(
+            result_str.contains("Version: 2"),
+            "Version should increment to 2, got: {}",
+            result_str
+        );
+    }
 }
