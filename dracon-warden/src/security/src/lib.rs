@@ -54,12 +54,17 @@ fn make_env_version_header(content: &str) -> String {
 }
 
 fn strip_env_version_header(content: &str) -> &str {
-    if content.contains("Dracon Warden Encrypted Environment File") {
-        if let Some(pos) = content.find("# =============================================================================\n# Dracon Warden") {
-            return content[pos + 70..].trim_start_matches('#').trim_start_matches('\n').trim_start_matches('\r').trim_start()
-        }
-        if let Some(pos) = content.find("# =============================================================================\r\n# Dracon Warden") {
-            return content[pos + 71..].trim_start_matches('#').trim_start_matches('\n').trim_start_matches('\r').trim_start()
+    let marker = "Dracon Warden Encrypted Environment File";
+    if let Some(pos) = content.find(marker) {
+        let after_marker = &content[pos..];
+        if let Some(end_pos) = after_marker
+            .find("===============\n")
+            .or_else(|| after_marker.find("===============\r\n"))
+        {
+            return after_marker[end_pos + 15..]
+                .trim_start_matches('\n')
+                .trim_start_matches('\r')
+                .trim_start();
         }
     }
     content
