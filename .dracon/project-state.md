@@ -4,7 +4,7 @@
 Enhanced secret scanning and test diagnostics in the security module
 
 ## Completed
-- [x] Refactored secret scanning to use `SecretScanner` with explicit age key exclusion
-- [x] Added debug logging for secret pattern matching and replacement
-- [x] Improved test assertions with more detailed failure messages
-- [x] Enhanced test output to show scanner patterns and match results
+- [x] Added test for protection exemptions to verify age keys are excluded from scanning
+- [x] Implemented debug logging for secret scanning matches
+- [x] Added verification that master.age files are not accidentally encrypted
+```
