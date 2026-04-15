@@ -2927,15 +2927,20 @@ API_KEY=secret"#;
 # =============================================================================
 API_KEY=original"#;
 
-        let result = security
+        let encrypted = security
             .smart_clean_with_path(v1_content.as_bytes(), ".env.local")
             .unwrap();
-        let result_str = String::from_utf8_lossy(&result);
+        let encrypted_str = String::from_utf8_lossy(&encrypted);
 
+        let decrypted = security.smart_smudge(&encrypted_str).unwrap();
         assert!(
-            result_str.contains("Version: 2"),
-            "Version should increment to 2, got: {}",
-            result_str
+            decrypted.contains("Version: 2"),
+            "Version should increment to 2, got:\n{}",
+            decrypted
+        );
+        assert!(
+            decrypted.contains("API_KEY=original"),
+            "Content should be preserved"
         );
     }
 }
