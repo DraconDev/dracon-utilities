@@ -1,8 +1,9 @@
 # Project State
 
 ## Current Focus
-Improved Git staging of version files by adding existence checks before staging
+Added encrypted secrets header constants for age-encrypted files in git
 
 ## Completed
-- [x] Added existence checks for version files before staging them in Git
-- [x] Maintained error handling for failed staging operations
+- [x] Added `ENCRYPTED_SECRETS_HEADER` constant with documentation for age-encrypted files
+- [x] Included explanation that these files should remain in git for team collaboration
+- [x] Added AI guidance to avoid removing or gitignoring these files

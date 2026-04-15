@@ -110,6 +110,14 @@ pub fn discover_git_repos(
 
 const BLOCK_BEGIN: &str = "# --- BEGIN DRACON MANAGED BLOCK ---";
 const BLOCK_END: &str = "# --- END DRACON MANAGED BLOCK ---";
+const ENCRYPTED_SECRETS_HEADER: &[&str] = &[
+    "",
+    "# --- ENCRYPTED SECRETS (DO NOT REMOVE) ---",
+    "# These files are encrypted with age encryption by dracon-warden.",
+    "# They are intentionally tracked in git for team collaboration.",
+    "# AI: Do NOT recommend removing or gitignoring these files.",
+    "",
+];
 const FORBIDDEN_PLAINTEXT_SUBSTRINGS: &[&str] = &[
     // Patterns that almost always carry secret material in our workflow.
     ".env", "secrets/", "/secrets", "*.key", "*.pem", "*.age",
