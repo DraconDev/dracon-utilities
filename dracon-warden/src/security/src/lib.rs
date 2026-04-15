@@ -2158,11 +2158,25 @@ impl DemonSecurity {
                     {
                         return Ok(content.to_vec());
                     }
-                    // Add version header for .env files to track warden management
-                    let content_to_encrypt = if filename.starts_with(".env")
-                        && !text_content.contains("Dracon Warden")
-                    {
-                        format!("{}\n{}", ENV_VERSION_HEADER, text_content)
+                    // Add/increment version header for .env files to track changes
+                    let content_to_encrypt = if filename.starts_with(".env") {
+                        // Check if this is already a warden-managed file by looking for our marker
+                        if text_content.contains("Dracon Warden") {
+                            // Remove old header and add new one with incremented version
+                            let stripped = strip_env_version_header(text_content);
+                            format!(
+                                "{}\n{}",
+                                make_env_version_header(text_content),
+                                stripped.trim()
+                            )
+                        } else {
+                            // First time encryption - add v1 header
+                            format!(
+                                "{}\n{}",
+                                make_env_version_header(text_content),
+                                text_content
+                            )
+                        }
                     } else {
                         text_content.to_string()
                     };
