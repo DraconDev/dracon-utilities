@@ -1,10 +1,9 @@
 # Project State
 
 ## Current Focus
-Improved environment file version header stripping with more robust pattern matching
+Added robust environment file version header stripping functionality to handle encrypted .env files
 
 ## Completed
-- [x] Refactored version header stripping to use a single marker constant
-- [x] Added support for both LF and CRLF line endings in header detection
-- [x] Improved header boundary detection with more precise string matching
-```
+- [x] Implemented `strip_env_version_header` function to remove version headers from encrypted environment files
+- [x] Added detection for both header marker and closing marker to properly isolate encrypted content
+- [x] Included handling for different line endings (LF and CRLF) in the stripped output
