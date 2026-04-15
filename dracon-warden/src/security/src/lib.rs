@@ -492,6 +492,41 @@ impl SecretScanner {
         }
     }
 
+    /// Create a scanner that excludes age identity key patterns.
+    /// Used for master.age and identity.age files to prevent encrypting
+    /// the age key itself while still scanning for other secrets.
+    pub fn new_without_age_keys() -> Self {
+        let patterns_raw = Self::get_patterns();
+
+        let patterns: Vec<(String, Regex)> = patterns_raw
+            .iter()
+            .filter(|(name, _)| *name != "Age Secret Key") // Skip age identity keys
+            .filter_map(|(name, pattern)| {
+                let p = if pattern.starts_with("(?") {
+                    pattern.to_string()
+                } else {
+                    format!("(?sm){}", pattern)
+                };
+                Regex::new(&p).ok().map(|re| (name.to_string(), re))
+            })
+            .collect();
+
+        // Build combined regex without age key pattern
+        let combined = patterns_raw
+            .iter()
+            .filter(|(name, _)| *name != "Age Secret Key")
+            .map(|(_, p)| format!("(?:{})", p))
+            .collect::<Vec<_>>()
+            .join("|");
+        let full_regex = Regex::new(&format!("(?sm){}", combined))
+            .expect("Failed to build combined regex (without age keys) - check patterns for invalid regex syntax");
+
+        Self {
+            patterns,
+            full_regex,
+        }
+    }
+
     pub fn scan(&self, content: &str) -> Vec<SecretFinding> {
         use rayon::prelude::*;
 
@@ -2124,14 +2159,14 @@ impl DemonSecurity {
         // 2. Process based on content type
         match std::str::from_utf8(content) {
             Ok(text_content) => {
-                // Full encryption for .env files and other sensitive files that shouldn't leak structure
-                let is_full_encrypt = is_env_file(filename)
-                    || (is_sensitive_location
-                        && (filename == "credentials"
-                            || filename.starts_with(".bash_history")
-                            || filename.starts_with(".zsh_history")
-                            || filename.starts_with(".sh_history")
-                            || filename == "vault.yml"));
+                // Full encryption for sensitive files that shouldn't leak structure
+                let is_full_encrypt = is_sensitive_location
+                    && (filename.starts_with(".env")
+                        || filename == "credentials"
+                        || filename.starts_with(".bash_history")
+                        || filename.starts_with(".zsh_history")
+                        || filename.starts_with(".sh_history")
+                        || filename == "vault.yml");
                 if is_full_encrypt {
                     // Don't double-encrypt
                     if content.starts_with(HEADER_V2_MAGIC)
@@ -2140,7 +2175,7 @@ impl DemonSecurity {
                         return Ok(content.to_vec());
                     }
                     // Add/increment version header for .env files to track changes
-                    let content_to_encrypt = if is_env_file(filename) {
+                    let content_to_encrypt = if filename.starts_with(".env") {
                         // Check if this is already a warden-managed file by looking for our marker
                         if text_content.contains("Dracon Warden") {
                             // Remove old header and add new one with incremented version
@@ -2163,9 +2198,16 @@ impl DemonSecurity {
                     };
                     return self.encrypt_v2_to_b64_tag(content_to_encrypt.as_bytes());
                 }
-                // Eager encryption: scan for and encrypt all detected secrets.
-                // This means we may encrypt non-secret content, but we won't miss secrets.
-                let cleaned = self.smart_clean(text_content)?;
+                // For identity files (master.age, identity.age), use a scanner that
+                // skips age key patterns to avoid encrypting the identity itself,
+                // but still catches other embedded secrets like API keys.
+                let is_identity_file = filename == "master.age" || filename == "identity.age";
+                let cleaned = if is_identity_file {
+                    let scanner = SecretScanner::new_without_age_keys();
+                    self.smart_clean_with_scanner(text_content, &scanner)?
+                } else {
+                    self.smart_clean(text_content)?
+                };
                 Ok(cleaned.into_bytes())
             }
             Err(_) => {
@@ -2730,35 +2772,16 @@ impl DraconWarden {
         Ok(DraconWarden)
     }
 
-    pub fn smudge(&self, bytes: &[u8], path: Option<&str>) -> Result<Vec<u8>> {
-        let path_str = path.unwrap_or("");
-        let filename = std::path::Path::new(path_str)
-            .file_name()
-            .and_then(|s| s.to_str())
-            .unwrap_or("");
+    pub fn smudge(&self, bytes: &[u8], _path: Option<&str>) -> Result<Vec<u8>> {
         let content = String::from_utf8_lossy(bytes);
         let smudged = DemonSecurity::new(None)?.smart_smudge(&content)?;
-        let final_content = if is_env_file(filename) && !smudged.contains("Dracon Warden") {
-            format!("{}\n{}", make_env_version_header(&smudged), smudged)
-        } else {
-            smudged
-        };
-        Ok(final_content.into_bytes())
+        Ok(smudged.into_bytes())
     }
 
     pub fn clean(&self, bytes: &[u8], path: Option<&str>) -> Result<Vec<u8>> {
         let cleaned = DemonSecurity::new(None)?.smart_clean_with_path(bytes, path.unwrap_or(""))?;
         Ok(cleaned)
     }
-}
-
-fn is_env_file(path: &str) -> bool {
-    let path_lower = path.to_lowercase();
-    path_lower.ends_with(".env")
-        || path_lower.contains(".env.")
-        || path_lower.ends_with(".envrc")
-        || path_lower.ends_with("/.env")
-        || path_lower.ends_with("/.envrc")
 }
 
 #[cfg(test)]
@@ -2777,6 +2800,38 @@ mod tests {
         let input = format!("before {} after", tag);
         let output = security.smart_smudge(&input).unwrap();
         assert_eq!(output, input);
+    }
+
+    #[test]
+    fn test_protection_exemptions() {
+        let scanner = SecretScanner::new_without_age_keys();
+        let patterns = scanner.patterns.iter().map(|(n, _)| *n).collect::<Vec<_>>();
+        eprintln!(
+            "Patterns in scanner (excluding age keys): {}",
+            patterns.len()
+        );
+        eprintln!(
+            "Age Secret Key in patterns: {}",
+            patterns.contains(&"Age Secret Key")
+        );
+
+        let content = "AGE-SECRET-KEY-142MYS9ZZPE0Q0CFSU4D3WTMMXRN5EN89U83TUSKGZVACLCE0A37SN5NENW";
+        let scanned = scanner.scan_and_replace(content, |name, secret| {
+            eprintln!("Match found: {} -> {}", name, secret);
+            format!("[MATCHED:{}]", name)
+        });
+        eprintln!("Scanned result: {}", scanned);
+
+        let security = DemonSecurity::new(None).unwrap();
+        let result = security
+            .smart_clean_with_path(content.as_bytes(), "master.age")
+            .unwrap();
+        let result_str = String::from_utf8_lossy(&result);
+        assert!(
+            !result_str.contains("_SECRET"),
+            "master.age was accidentally encrypted! Result: {}",
+            &result_str[..result_str.len().min(500)]
+        );
     }
 
     #[test]
@@ -2811,13 +2866,39 @@ mod tests {
     }
 
     #[test]
-    fn test_scanner_creation() {
-        let scanner = SecretScanner::new();
-        let patterns = SecretScanner::get_patterns();
-        eprintln!("Pattern count: {}", patterns.len());
-        eprintln!("Scanner pattern_count: {}", scanner.pattern_count());
-        eprintln!("full_regex: {}", scanner.full_regex.as_str());
-        assert!(scanner.pattern_count() > 50, "Should have many patterns");
+    fn test_protection_exemptions() {
+        let scanner = SecretScanner::new_without_age_keys();
+        let patterns = scanner
+            .patterns
+            .iter()
+            .map(|(n, _)| n.clone())
+            .collect::<Vec<_>>();
+        eprintln!(
+            "Patterns in scanner (excluding age keys): {}",
+            patterns.len()
+        );
+        eprintln!(
+            "Age Secret Key in patterns: {}",
+            patterns.contains(&"Age Secret Key".to_string())
+        );
+
+        let content = "AGE-SECRET-KEY-142MYS9ZZPE0Q0CFSU4D3WTMMXRN5EN89U83TUSKGZVACLCE0A37SN5NENW";
+        let scanned = scanner.scan_and_replace(content, |name, secret| {
+            eprintln!("Match found: {} -> {}", name, secret);
+            format!("[MATCHED:{}]", name)
+        });
+        eprintln!("Scanned result: {}", scanned);
+
+        let security = DemonSecurity::new(None).unwrap();
+        let result = security
+            .smart_clean_with_path(content.as_bytes(), "master.age")
+            .unwrap();
+        let result_str = String::from_utf8_lossy(&result);
+        assert!(
+            !result_str.contains("_SECRET"),
+            "master.age was accidentally encrypted! Result: {}",
+            &result_str[..result_str.len().min(500)]
+        );
     }
 
     #[test]
