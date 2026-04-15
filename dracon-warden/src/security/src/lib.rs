@@ -2810,9 +2810,15 @@ mod tests {
             .smart_clean_with_path(content, "master.age")
             .unwrap();
         let result_str = String::from_utf8_lossy(&result);
+        eprintln!("Result length: {}", result_str.len());
+        eprintln!(
+            "Result preview: {}",
+            &result_str[..result_str.len().min(200)]
+        );
         assert!(
             !result_str.contains("_SECRET"),
-            "master.age was accidentally encrypted!"
+            "master.age was accidentally encrypted! Result: {}",
+            &result_str[..result_str.len().min(500)]
         );
         let result = security
             .smart_clean_with_path(content, "identity.age")
