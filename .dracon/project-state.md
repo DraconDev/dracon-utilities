@@ -1,8 +1,8 @@
 # Project State
 
 ## Current Focus
-Added encryption header comments to help AI understand age-encrypted files in gitignore blocks
+Added documentation headers to clarify that encrypted secrets files should remain in Git
 
 ## Completed
-- [x] Added ENCRYPTED_SECRETS_HEADER comments to gitignore blocks to clarify encrypted file handling
-- [x] Improved documentation of intentional encrypted files in version control
+- [x] Added explicit header comments in `.gitignore` explaining that encrypted secrets files are intentionally tracked in Git
+- [x] Included AI guidance to avoid removing these files from version control
