@@ -1,9 +1,8 @@
 # Project State
 
 ## Current Focus
-Added encrypted secrets header constants for age-encrypted files in git
+Added encryption header comments to help AI understand age-encrypted files in gitignore blocks
 
 ## Completed
-- [x] Added `ENCRYPTED_SECRETS_HEADER` constant with documentation for age-encrypted files
-- [x] Included explanation that these files should remain in git for team collaboration
-- [x] Added AI guidance to avoid removing or gitignoring these files
+- [x] Added ENCRYPTED_SECRETS_HEADER comments to gitignore blocks to clarify encrypted file handling
+- [x] Improved documentation of intentional encrypted files in version control

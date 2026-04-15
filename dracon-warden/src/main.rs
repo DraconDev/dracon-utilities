@@ -430,6 +430,9 @@ fn build_gitignore_block_with_existing(
     lines.push(BLOCK_BEGIN.to_string());
     lines.push("# managed by dracon-warden".to_string());
 
+    // Add encryption header comment to help AI understand these files are intentional
+    lines.extend(ENCRYPTED_SECRETS_HEADER.iter().map(|s| s.to_string()));
+
     // Output merged hygiene patterns (sorted for stability)
     for p in all_hygiene {
         lines.push(p);
