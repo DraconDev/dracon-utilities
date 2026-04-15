@@ -23,13 +23,35 @@ const HEADER_V2_MAGIC: &[u8] = b"age-encryption.org/v1";
 const DEFAULT_SECRET_MARKER: &str = "DRACON_SECRET";
 const LEGACY_SECRET_MARKER: &str = "DEMON_SECRET";
 
-const ENV_VERSION_HEADER: &str = r#"# =============================================================================
+const ENV_VERSION_HEADER_TEMPLATE: &str = r#"# =============================================================================
 # Dracon Warden Encrypted Environment File
 # This file is encrypted by dracon-warden for secure team collaboration.
-# Version: 1.0
+# Version: {}
 # DO NOT EDIT THE ENCRYPTED CONTENT MANUALLY - Use `dracon-warden smudge` to decrypt.
 # =============================================================================
 "#;
+
+fn get_env_version(content: &str) -> u32 {
+    if let Some(pos) = content.find("Version: ") {
+        let after = &content[pos + 9..];
+        if let Some(end) = after.find('\n').or_else(|| after.find('\r')) {
+            if let Ok(v) = after[..end].trim().parse::<u32>() {
+                return v;
+            }
+        }
+    }
+    0
+}
+
+fn make_env_version_header(content: &str) -> String {
+    let current_version = get_env_version(content);
+    let next_version = if current_version == 0 {
+        1
+    } else {
+        current_version + 1
+    };
+    format!(ENV_VERSION_HEADER_TEMPLATE, next_version)
+}
 
 const REPO_KEY_LEN: usize = 32;
 
