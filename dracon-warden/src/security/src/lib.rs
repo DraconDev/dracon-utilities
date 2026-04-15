@@ -69,23 +69,6 @@ fn strip_env_version_header(content: &str) -> &str {
     content
 }
 
-fn strip_env_version_header(content: &str) -> &str {
-    let marker = "Dracon Warden Encrypted Environment File";
-    if let Some(pos) = content.find(marker) {
-        let after_marker = &content[pos..];
-        if let Some(end_pos) = after_marker
-            .find("===============\n")
-            .or_else(|| after_marker.find("===============\r\n"))
-        {
-            return after_marker[end_pos + 15..]
-                .trim_start_matches('\n')
-                .trim_start_matches('\r')
-                .trim_start();
-        }
-    }
-    content
-}
-
 const REPO_KEY_LEN: usize = 32;
 
 fn normalize_secret_marker(raw: &str) -> Option<String> {
