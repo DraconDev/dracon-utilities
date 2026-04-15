@@ -216,7 +216,7 @@ pub(crate) async fn update_project_state_from_ai(repo: &Path, staged_diff_names:
             eprintln!("📝 scribe: updated {}/.dracon/project-state.md", repo_display);
         }
         Err(e) => {
-            eprintln!("📝 scribe: AI request failed for {}: {}", repo_display, e);
+            eprintln!("📝 scribe: AI request failed for {}: {} - committing anyway with fallback", repo_display, e);
         }
     }
 

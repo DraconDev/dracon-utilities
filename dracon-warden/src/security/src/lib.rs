@@ -2124,14 +2124,14 @@ impl DemonSecurity {
         // 2. Process based on content type
         match std::str::from_utf8(content) {
             Ok(text_content) => {
-                // Full encryption for sensitive files that shouldn't leak structure
-                let is_full_encrypt = is_sensitive_location
-                    && (filename.starts_with(".env")
-                        || filename == "credentials"
-                        || filename.starts_with(".bash_history")
-                        || filename.starts_with(".zsh_history")
-                        || filename.starts_with(".sh_history")
-                        || filename == "vault.yml");
+                // Full encryption for .env files and other sensitive files that shouldn't leak structure
+                let is_full_encrypt = is_env_file(filename)
+                    || (is_sensitive_location
+                        && (filename == "credentials"
+                            || filename.starts_with(".bash_history")
+                            || filename.starts_with(".zsh_history")
+                            || filename.starts_with(".sh_history")
+                            || filename == "vault.yml"));
                 if is_full_encrypt {
                     // Don't double-encrypt
                     if content.starts_with(HEADER_V2_MAGIC)
@@ -2140,7 +2140,7 @@ impl DemonSecurity {
                         return Ok(content.to_vec());
                     }
                     // Add/increment version header for .env files to track changes
-                    let content_to_encrypt = if filename.starts_with(".env") {
+                    let content_to_encrypt = if is_env_file(filename) {
                         // Check if this is already a warden-managed file by looking for our marker
                         if text_content.contains("Dracon Warden") {
                             // Remove old header and add new one with incremented version
@@ -2730,16 +2730,35 @@ impl DraconWarden {
         Ok(DraconWarden)
     }
 
-    pub fn smudge(&self, bytes: &[u8], _path: Option<&str>) -> Result<Vec<u8>> {
+    pub fn smudge(&self, bytes: &[u8], path: Option<&str>) -> Result<Vec<u8>> {
+        let path_str = path.unwrap_or("");
+        let filename = std::path::Path::new(path_str)
+            .file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or("");
         let content = String::from_utf8_lossy(bytes);
         let smudged = DemonSecurity::new(None)?.smart_smudge(&content)?;
-        Ok(smudged.into_bytes())
+        let final_content = if is_env_file(filename) && !smudged.contains("Dracon Warden") {
+            format!("{}\n{}", make_env_version_header(&smudged), smudged)
+        } else {
+            smudged
+        };
+        Ok(final_content.into_bytes())
     }
 
     pub fn clean(&self, bytes: &[u8], path: Option<&str>) -> Result<Vec<u8>> {
         let cleaned = DemonSecurity::new(None)?.smart_clean_with_path(bytes, path.unwrap_or(""))?;
         Ok(cleaned)
     }
+}
+
+fn is_env_file(path: &str) -> bool {
+    let path_lower = path.to_lowercase();
+    path_lower.ends_with(".env")
+        || path_lower.contains(".env.")
+        || path_lower.ends_with(".envrc")
+        || path_lower.ends_with("/.env")
+        || path_lower.ends_with("/.envrc")
 }
 
 #[cfg(test)]

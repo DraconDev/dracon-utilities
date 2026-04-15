@@ -436,7 +436,7 @@ pub(crate) async fn run_repos_report(policy_path: &Path, filter: RepoFilter, jso
     let policy = SyncPolicy::load(policy_path)?;
     let roots = policy.watch_root_paths();
     let excluded_dir_names = excluded_dir_names_set(&policy);
-    let repos = discover_git_repos(&roots, &excluded_dir_names, &policy.exclude_repos);
+    let repos = discover_git_repos(&roots, &excluded_dir_names, &policy.exclude_repos, Some(&policy.system_repo));
     let mut rows: Vec<RepoReportRow> = Vec::new();
     let mut init_or_status_failures = 0usize;
 
@@ -661,7 +661,7 @@ pub(crate) async fn run_repair_concerns(
     let repos = if let Some(target_repo) = &only_repo {
         vec![target_repo.clone()]
     } else {
-        discover_git_repos(&roots, &excluded_dir_names, &policy.exclude_repos)
+        discover_git_repos(&roots, &excluded_dir_names, &policy.exclude_repos, Some(&policy.system_repo))
     };
     if repos.is_empty() {
         if let Some(target_repo) = &only_repo {
@@ -1372,7 +1372,7 @@ pub(crate) async fn run_repair_warns(
     let repos = if let Some(target_repo) = &only_repo {
         vec![target_repo.clone()]
     } else {
-        discover_git_repos(&roots, &excluded_dir_names, &policy.exclude_repos)
+        discover_git_repos(&roots, &excluded_dir_names, &policy.exclude_repos, Some(&policy.system_repo))
     };
     if repos.is_empty() {
         if let Some(target_repo) = &only_repo {

@@ -1027,6 +1027,13 @@ fn run_daemon(policy_path: PathBuf) -> Result<()> {
         eprintln!("⚠️ initial hardening pass failed: {}", e);
     }
 
+    // Initial backfill sweep to add headers to .env files missing them.
+    let roots = effective_discovery_roots(&policy);
+    let discovered_repos = discover_git_repos_local(&roots);
+    if let Err(e) = backfill_env_headers_repos(&discovered_repos, true) {
+        eprintln!("⚠️ initial backfill sweep failed: {}", e);
+    }
+
     loop {
         match rx.recv_timeout(Duration::from_secs(1)) {
             Ok(Ok(event)) => {
@@ -1080,6 +1087,11 @@ fn run_daemon(policy_path: PathBuf) -> Result<()> {
             let policy = WardenPolicy::load(&policy_path)?;
             policy.validate()?;
             harden_all(&policy)?;
+            let roots = effective_discovery_roots(&policy);
+            let discovered_repos = discover_git_repos_local(&roots);
+            if let Err(e) = backfill_env_headers_repos(&discovered_repos, true) {
+                eprintln!("warden: backfill sweep failed: {}", e);
+            }
             last_sweep = Instant::now();
         }
     }
@@ -1174,10 +1186,14 @@ fn main() -> Result<()> {
                 harden_repos(&policy, repos.clone())?;
                 // Fix ciphertext stuck in worktree (if identities allow).
                 resmudge_repos(&policy, &repos, true)?;
+                // Backfill .env files with Dracon Warden headers if missing.
+                backfill_env_headers_repos(&repos, true)?;
             }
 
             // Always report remaining ciphertext markers.
             let (found, _changed) = resmudge_repos(&policy, &repos, false)?;
+            // Always report .env files missing headers (even in dry_run).
+            let (_, _) = backfill_env_headers_repos(&repos, false)?;
             if strict && found > 0 {
                 return Err(anyhow::anyhow!(
                     "ciphertext markers remain in working tree (count={})",
@@ -1529,6 +1545,92 @@ fn resmudge_repos(policy: &WardenPolicy, repos: &[PathBuf], apply: bool) -> Resu
         );
     } else {
         println!("✅ resmudge report complete (found: {})", total_found);
+    }
+
+    Ok((total_found, total_changed))
+}
+
+fn is_env_file_name(path: &str) -> bool {
+    let path_lower = path.to_lowercase();
+    path_lower.ends_with(".env")
+        || path_lower.contains(".env.")
+        || path_lower.ends_with(".envrc")
+        || path_lower.ends_with("/.env")
+        || path_lower.ends_with("/.envrc")
+}
+
+fn backfill_env_headers_repo(repo: &Path, apply: bool) -> Result<(usize, usize)> {
+    let files = git_ls_files(repo)?;
+    let warden = DraconWarden::new()?;
+
+    let mut found = 0usize;
+    let mut changed = 0usize;
+
+    for rel in files {
+        let rel_norm = rel.replace("\\", "/");
+        if !is_env_file_name(&rel_norm) {
+            continue;
+        }
+
+        let full = repo.join(&rel);
+        let bytes = match fs::read(&full) {
+            Ok(b) => b,
+            Err(_) => continue,
+        };
+
+        let content = String::from_utf8_lossy(&bytes);
+        if content.contains("Dracon Warden") {
+            continue;
+        }
+
+        found += 1;
+
+        if !apply {
+            println!("🔎 .env without header: {}", full.display());
+            continue;
+        }
+
+        match warden.smudge(&bytes, Some(&rel_norm)) {
+            Ok(out) => {
+                if out != bytes {
+                    if let Err(e) = fs::write(&full, &out) {
+                        eprintln!("⚠️ backfill write failed {}: {}", full.display(), e);
+                        continue;
+                    }
+                    changed += 1;
+                    println!("✅ header added: {}", full.display());
+                }
+            }
+            Err(e) => {
+                eprintln!("⚠️ backfill failed {}: {}", full.display(), e);
+            }
+        }
+    }
+
+    Ok((found, changed))
+}
+
+fn backfill_env_headers_repos(repos: &[PathBuf], apply: bool) -> Result<(usize, usize)> {
+    let mut total_found = 0usize;
+    let mut total_changed = 0usize;
+
+    for repo in repos {
+        match backfill_env_headers_repo(repo, apply) {
+            Ok((found, changed)) => {
+                total_found += found;
+                total_changed += changed;
+            }
+            Err(e) => eprintln!("⚠️ backfill failed for {}: {}", repo.display(), e),
+        }
+    }
+
+    if apply {
+        println!(
+            "✅ backfill complete (found: {}, changed: {})",
+            total_found, total_changed
+        );
+    } else {
+        println!("✅ backfill report complete (found: {})", total_found);
     }
 
     Ok((total_found, total_changed))

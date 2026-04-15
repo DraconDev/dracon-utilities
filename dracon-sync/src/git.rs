@@ -16,6 +16,7 @@ pub(crate) fn discover_git_repos(
     roots: &[PathBuf],
     excluded_dir_names: &BTreeSet<String>,
     exclude_repos: &[String],
+    system_repo: Option<&str>,
 ) -> Vec<PathBuf> {
     let exclude_set: std::collections::HashSet<PathBuf> =
         exclude_repos.iter().map(PathBuf::from).collect();
@@ -24,6 +25,17 @@ pub(crate) fn discover_git_repos(
         discover_git_repos_recursive(root, excluded_dir_names, &mut repos, 0, 2);
     }
     repos.retain(|r| !exclude_set.contains(r));
+
+    // Always include system_repo if it exists and is a git repo
+    if let Some(system) = system_repo {
+        let system_path = PathBuf::from(system);
+        if system_path.exists() && system_path.join(".git").exists() {
+            if !repos.contains(&system_path) && !exclude_set.contains(&system_path) {
+                repos.push(system_path);
+            }
+        }
+    }
+
     repos
 }
 
