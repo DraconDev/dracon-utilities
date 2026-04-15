@@ -50,7 +50,7 @@ fn make_env_version_header(content: &str) -> String {
     } else {
         current_version + 1
     };
-    format!(ENV_VERSION_HEADER_TEMPLATE, next_version)
+    ENV_VERSION_HEADER_TEMPLATE.replace("{}", &next_version.to_string())
 }
 
 fn strip_env_version_header(content: &str) -> &str {
