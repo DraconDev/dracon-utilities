@@ -1,8 +1,7 @@
 # Project State
 
 ## Current Focus
-Refactored environment version header generation to use string replacement instead of formatting
+Updated API key regex patterns for Resend and Together AI in the secret scanner
 
 ## Completed
-- [x] Changed `format!` macro to `replace()` method for environment version header generation
-- [x] Improved string handling for version number insertion in header template
+- [x] Updated regex patterns for Resend and Together AI API keys in the security library to ensure proper detection of these service credentials
