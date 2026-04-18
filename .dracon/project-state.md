@@ -1,11 +1,9 @@
 # Project State
 
 ## Current Focus
-Improved commit message parsing with better category and scope extraction
+Improved scope extraction in commit message parsing to allow longer 2-word scopes
 
 ## Completed
-- [x] Added support for scribe format "prefix(category): focus" (e.g., "docs(security): updated session cleanup")
-- [x] Enhanced category detection with more precise keyword matching
-- [x] Improved scope extraction by better handling action words and punctuation
-- [x] Refactored scope extraction into separate function for cleaner code organization
-```
+- [x] Increased maximum scope length from 15 to 25 characters
+- [x] Improved scope extraction by using trimmed focus string
+- [x] Maintained fallback to first two words when scope is too long

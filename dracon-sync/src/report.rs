@@ -335,8 +335,9 @@ fn extract_scope_from_focus(focus: &str) -> String {
         .trim_end_matches(|c| c == '.' || c == ',' || c == ')')
         .to_lowercase();
 
-    if scope.is_empty() || scope.len() > 15 {
-        focus.split_whitespace().take(2).collect::<Vec<_>>().join(" ").to_lowercase()
+    // Allow 2-word scopes up to ~25 chars (e.g., "comprehensive test" = 20)
+    if scope.is_empty() || scope.len() > 25 {
+        focus_trimmed.split_whitespace().take(2).collect::<Vec<_>>().join(" ").to_lowercase()
     } else {
         scope
     }
