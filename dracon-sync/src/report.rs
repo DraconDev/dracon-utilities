@@ -272,14 +272,26 @@ fn extract_category_scope_from_focus(content: &str) -> Option<(String, String)> 
         .nth(1)?
         .trim();
 
+    // Handle scribe format: "prefix(category): focus" where prefix might be "updated", "added", etc.
+    // e.g., "docs(security): updated session cleanup" or "fix(auth): added JWT validation"
+    if let Some(paren_start) = focus_line.find('(') {
+        if let Some(paren_end) = focus_line[paren_start..].find(')') {
+            let cat = &focus_line[paren_start+1..paren_start+paren_end];
+            if !cat.is_empty() && cat.len() <= 20 {
+                // Valid category in parentheses - extract focus after the closing paren
+                let focus_start = paren_start + paren_end + 1;
+                if focus_start < focus_line.len() {
+                    let after_cat = focus_line[focus_start..].trim_start_matches(|c| c == ' ' || c == ':' || c == '-');
+                    return Some((cat.to_string(), extract_scope_from_focus(after_cat)));
+                }
+            }
+        }
+    }
+
+    // No valid format - derive from entire line
     let focus_lower = focus_line.to_lowercase();
 
-    // Derive category from keywords in the focus line
-    let category = if focus_lower.contains("fix")
-        || focus_lower.contains("bug")
-        || focus_lower.contains("error")
-        || focus_lower.contains("issue")
-        || focus_lower.contains("patch") {
+    let category = if focus_lower.contains("fix") || focus_lower.contains("bug") || focus_lower.contains("error") || focus_lower.contains("issue") || focus_lower.contains("patch") {
         "fix".to_string()
     } else if focus_lower.contains("add") || focus_lower.contains("new") || focus_lower.contains("implement") || focus_lower.contains("create") || focus_lower.contains("support for") {
         "feat".to_string()
@@ -292,28 +304,29 @@ fn extract_category_scope_from_focus(content: &str) -> Option<(String, String)> 
     } else if focus_lower.contains("test") || focus_lower.contains("testing") || focus_lower.contains("verify") {
         "test".to_string()
     } else {
-        return None; // Keep default detection
+        return None;
     };
 
-    // Derive scope from the focus line content - skip leading action words
-    let focus_trimmed = focus_line
-        .trim_start_matches(|c: char| c.is_ascii_lowercase() && c != '(');
+    Some((category, extract_scope_from_focus(focus_line)))
+}
 
+fn extract_scope_from_focus(focus: &str) -> String {
     // Skip common action words at the start
     let action_words = ["updated", "added", "created", "fixed", "implemented",
-                        "removed", "deleted", "refactored", "improved", "changed"];
-    let mut scope_start = focus_trimmed;
+                        "removed", "deleted", "refactored", "improved", "changed",
+                        "enhanced", "refined", "cleaned", "cleaned up"];
+    let mut focus_trimmed = focus;
     for action in &action_words {
-        if scope_start.to_lowercase().starts_with(action) {
-            if let Some(rest) = scope_start[action.len()..].trim_start().strip_prefix('-').or_else(|| Some(scope_start[action.len()..].trim_start())) {
-                scope_start = rest;
+        if focus_trimmed.to_lowercase().starts_with(action) {
+            if let Some(rest) = focus_trimmed[action.len()..].trim_start().strip_prefix('-').or_else(|| Some(focus_trimmed[action.len()..].trim_start())) {
+                focus_trimmed = rest;
             }
             break;
         }
     }
 
     // Take only 1-2 meaningful words for scope
-    let scope = scope_start
+    let scope = focus_trimmed
         .split_whitespace()
         .filter(|w| !w.chars().all(|c| c == '.' || c == ',' || c == ')'))
         .take(2)
@@ -322,13 +335,11 @@ fn extract_category_scope_from_focus(content: &str) -> Option<(String, String)> 
         .trim_end_matches(|c| c == '.' || c == ',' || c == ')')
         .to_lowercase();
 
-    let scope = if scope.is_empty() || scope.len() > 15 {
-        focus_line.split_whitespace().take(2).collect::<Vec<_>>().join(" ").to_lowercase()
+    if scope.is_empty() || scope.len() > 15 {
+        focus.split_whitespace().take(2).collect::<Vec<_>>().join(" ").to_lowercase()
     } else {
         scope
-    };
-
-    Some((category, scope))
+    }
 }
 
 pub(crate) fn timestamp_secs() -> u64 {
