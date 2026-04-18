@@ -233,15 +233,21 @@ pub(crate) fn build_commit_context(
 ) -> CommitContext {
     let changed_paths: Vec<PathBuf> = entries.iter().map(|e| e.path.clone()).collect();
     let intent_info = extract_intent(repo, &changed_paths, Some(&status.branch));
-    
+
     let refs = intent_info.blueprint.as_ref().map(|p| {
         let rel = p.strip_prefix(repo).unwrap_or(p);
         rel.to_string_lossy().to_string()
     });
-    
+
     // Read project state for commit body (scribe)
     let description = read_project_focus(repo);
-    
+
+    // Extract category/scope from scribe's "Current Focus" line for better commit messages
+    let (scribe_category, scribe_scope) = description
+        .as_ref()
+        .and_then(|d| extract_category_scope_from_focus(d))
+        .unwrap_or((String::new(), String::new()));
+
     CommitContext {
         intent: intent_info.intent,
         track: intent_info.track,
@@ -250,12 +256,62 @@ pub(crate) fn build_commit_context(
         task_progress: intent_info.task_progress,
         refs,
         idle_seconds,
-        category: None,
-        scope: None,
+        category: if scribe_category.is_empty() { None } else { Some(scribe_category) },
+        scope: if scribe_scope.is_empty() { None } else { Some(scribe_scope) },
         severity: None,
         description,
         semantic_summary: None,
     }
+}
+
+fn extract_category_scope_from_focus(content: &str) -> Option<(String, String)> {
+    // Extract "Current Focus" line from project-state.md content
+    let focus_line = content
+        .lines()
+        .skip_while(|l| !l.starts_with("## Current Focus"))
+        .nth(1)?
+        .trim();
+
+    let focus_lower = focus_line.to_lowercase();
+
+    // Derive category from keywords in the focus line
+    let category = if focus_lower.contains("fix")
+        || focus_lower.contains("bug")
+        || focus_lower.contains("error")
+        || focus_lower.contains("issue")
+        || focus_lower.contains("patch") {
+        "fix".to_string()
+    } else if focus_lower.contains("add") || focus_lower.contains("new") || focus_lower.contains("implement") || focus_lower.contains("create") || focus_lower.contains("support for") {
+        "feat".to_string()
+    } else if focus_lower.contains("remove") || focus_lower.contains("delete") || focus_lower.contains("clean up") || focus_lower.contains("refactor") {
+        "refactor".to_string()
+    } else if focus_lower.contains("security") || focus_lower.contains("encrypt") || focus_lower.contains("protect") || focus_lower.contains("auth") {
+        "security".to_string()
+    } else if focus_lower.contains("docs") || focus_lower.contains("documentation") || focus_lower.contains("readme") || focus_lower.contains("comment") {
+        "docs".to_string()
+    } else if focus_lower.contains("test") || focus_lower.contains("testing") || focus_lower.contains("verify") {
+        "test".to_string()
+    } else {
+        return None; // Keep default detection
+    };
+
+    // Derive scope from the focus line content
+    let scope = focus_line
+        .split_whitespace()
+        .skip_while(|w| w.chars().next().map_or(false, |c| c.is_ascii_punctuation() || c == '('))
+        .take(3)
+        .collect::<Vec<_>>()
+        .join(" ")
+        .trim_end_matches(|c| c == '.' || c == ',' || c == ')')
+        .to_lowercase();
+
+    let scope = if scope.len() > 20 {
+        scope.split_whitespace().take(2).collect::<Vec<_>>().join(" ")
+    } else {
+        scope
+    };
+
+    Some((category, scope))
 }
 
 pub(crate) fn timestamp_secs() -> u64 {

@@ -393,9 +393,18 @@ pub(crate) async fn run_daemon(policy_path: PathBuf) -> Result<()> {
 
         for repo in repos {
             let now = Instant::now();
-            // Skip repos that are permanently stuck (can't push, can't resolve)
+            // Skip repos that are stuck on push, but retry them every 5 minutes
+            // to see if the issue resolved (e.g., remote was recreated, permissions fixed, etc.)
             if stuck_push_repos.contains_key(&repo) {
-                continue;
+                let stuck_age_secs = now.elapsed().as_secs();
+                if stuck_age_secs < 300 {
+                    // Less than 5 minutes since last attempt - skip
+                    continue;
+                }
+                // 5+ minutes since last attempt - retry once
+                eprintln!("🔄 {} was stuck, retrying push after {}s", repo.display(), stuck_age_secs);
+                stuck_push_repos.remove(&repo);
+                save_stuck_push_repos(&stuck_push_repos);
             }
             // Auto-repair branch ambiguity: consolidate to master.
             // Dual branch (main+master) → merge into master, delete main.
