@@ -295,18 +295,35 @@ fn extract_category_scope_from_focus(content: &str) -> Option<(String, String)> 
         return None; // Keep default detection
     };
 
-    // Derive scope from the focus line content
-    let scope = focus_line
+    // Derive scope from the focus line content - skip leading action words
+    let focus_trimmed = focus_line
+        .trim_start_matches(|c: char| c.is_ascii_lowercase() && c != '(');
+
+    // Skip common action words at the start
+    let action_words = ["updated", "added", "created", "fixed", "implemented",
+                        "removed", "deleted", "refactored", "improved", "changed"];
+    let mut scope_start = focus_trimmed;
+    for action in &action_words {
+        if scope_start.to_lowercase().starts_with(action) {
+            if let Some(rest) = scope_start[action.len()..].trim_start().strip_prefix('-').or_else(|| Some(scope_start[action.len()..].trim_start())) {
+                scope_start = rest;
+            }
+            break;
+        }
+    }
+
+    // Take only 1-2 meaningful words for scope
+    let scope = scope_start
         .split_whitespace()
-        .skip_while(|w| w.chars().next().map_or(false, |c| c.is_ascii_punctuation() || c == '('))
-        .take(3)
+        .filter(|w| !w.chars().all(|c| c == '.' || c == ',' || c == ')'))
+        .take(2)
         .collect::<Vec<_>>()
         .join(" ")
         .trim_end_matches(|c| c == '.' || c == ',' || c == ')')
         .to_lowercase();
 
-    let scope = if scope.len() > 20 {
-        scope.split_whitespace().take(2).collect::<Vec<_>>().join(" ")
+    let scope = if scope.is_empty() || scope.len() > 15 {
+        focus_line.split_whitespace().take(2).collect::<Vec<_>>().join(" ").to_lowercase()
     } else {
         scope
     };
