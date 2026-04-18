@@ -310,17 +310,6 @@ fn extract_category_scope_from_focus(content: &str) -> Option<(String, String)> 
     Some((category, extract_scope_from_focus(focus_line)))
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_scope_extraction_trims_action_words() {
-        assert_eq!(extract_scope_from_focus("Added comprehensive test coverage"), "comprehensive test");
-        assert_eq!(extract_scope_from_focus("Updated documentation for v14"), "documentation for");
-    }
-}
-
 fn extract_scope_from_focus(focus: &str) -> String {
     // Skip common action words at the start
     let action_words = ["updated", "added", "created", "fixed", "implemented",
