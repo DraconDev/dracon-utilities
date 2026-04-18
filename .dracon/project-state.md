@@ -1,10 +1,11 @@
 # Project State
 
 ## Current Focus
-Improved commit message parsing by better handling action words and scope derivation
+Improved commit message parsing with better category and scope extraction
 
 ## Completed
-- [x] Enhanced scope extraction by skipping common action words (updated, added, etc.)
-- [x] Improved scope derivation by taking only 1-2 meaningful words
-- [x] Added fallback to first two words of focus line when scope is empty or too long
-- [x] Refined punctuation handling in scope extraction
+- [x] Added support for scribe format "prefix(category): focus" (e.g., "docs(security): updated session cleanup")
+- [x] Enhanced category detection with more precise keyword matching
+- [x] Improved scope extraction by better handling action words and punctuation
+- [x] Refactored scope extraction into separate function for cleaner code organization
+```
