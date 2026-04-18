@@ -1,10 +1,9 @@
 # Project State
 
 ## Current Focus
-Enhanced secret scanning and test diagnostics in the security module
+Fix stuck repository retry logic by improving time tracking and error messaging
 
 ## Completed
-- [x] Added test for protection exemptions to verify age keys are excluded from scanning
-- [x] Implemented debug logging for secret scanning matches
-- [x] Added verification that master.age files are not accidentally encrypted
-```
+- [x] Replace `Instant` with timestamp-based tracking for stuck repositories
+- [x] Improve error message clarity when retrying stuck repositories
+- [x] Maintain consistent retry logic for repositories stuck on push operations

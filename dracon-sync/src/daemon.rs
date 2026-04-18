@@ -395,13 +395,13 @@ pub(crate) async fn run_daemon(policy_path: PathBuf) -> Result<()> {
             let now = Instant::now();
             // Skip repos that are stuck on push, but retry them every 5 minutes
             // to see if the issue resolved (e.g., remote was recreated, permissions fixed, etc.)
-            if stuck_push_repos.contains_key(&repo) {
-                let stuck_age_secs = now.elapsed().as_secs();
+            if let Some(stuck_since) = stuck_push_repos.get(&repo).copied() {
+                let stuck_age_secs = timestamp_secs().saturating_sub(stuck_since);
                 if stuck_age_secs < 300 {
-                    // Less than 5 minutes since last attempt - skip
+                    // Less than 5 minutes since stuck was recorded - skip
                     continue;
                 }
-                // 5+ minutes since last attempt - retry once
+                // 5+ minutes since stuck was recorded - retry once
                 eprintln!("🔄 {} was stuck, retrying push after {}s", repo.display(), stuck_age_secs);
                 stuck_push_repos.remove(&repo);
                 save_stuck_push_repos(&stuck_push_repos);
