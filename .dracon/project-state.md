@@ -1,9 +1,10 @@
 # Project State
 
 ## Current Focus
-Fix stuck repository retry logic by improving time tracking and error messaging
+Improved commit message parsing by better handling action words and scope derivation
 
 ## Completed
-- [x] Replace `Instant` with timestamp-based tracking for stuck repositories
-- [x] Improve error message clarity when retrying stuck repositories
-- [x] Maintain consistent retry logic for repositories stuck on push operations
+- [x] Enhanced scope extraction by skipping common action words (updated, added, etc.)
+- [x] Improved scope derivation by taking only 1-2 meaningful words
+- [x] Added fallback to first two words of focus line when scope is empty or too long
+- [x] Refined punctuation handling in scope extraction
