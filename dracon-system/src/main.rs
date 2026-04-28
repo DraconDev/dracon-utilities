@@ -1133,7 +1133,13 @@ fn parse_docker_size(s: &str) -> u64 {
     let num: String = s.chars().take_while(|c| c.is_numeric() || *c == '.').collect();
     let unit: String = s.chars().skip_while(|c| c.is_numeric() || *c == '.' || *c == ' ').collect();
     
-    let value: f64 = num.parse().unwrap_or(0.0);
+    let value: f64 = match num.parse() {
+        Ok(v) => v,
+        Err(_) => {
+            eprintln!("⚠️ parse_docker_size: failed to parse number from '{}'", s);
+            0.0
+        }
+    };
     let multiplier = match unit.to_uppercase().as_str() {
         "B" => 1.0,
         "KB" | "KIB" => 1024.0,
@@ -2735,12 +2741,17 @@ async fn main() -> Result<()> {
                     });
 
                     println!("guard daemon started (interval={}s)", guard.interval_secs);
+                    let mut remaining = guard.interval_secs;
                     while !shutdown.load(Ordering::SeqCst) {
                         if let Err(e) = run_guard_once(&guard, &mut runtime).await {
                             eprintln!("guard pass failed: {}", e);
                             emit_event(&DraconEvent::new("system", EventSeverity::Error, "guard", format!("pass failed: {e}")));
                         }
-                        sleep(Duration::from_secs(guard.interval_secs)).await;
+                        if shutdown.load(Ordering::SeqCst) {
+                            break;
+                        }
+                        sleep(Duration::from_secs(remaining.max(1))).await;
+                        remaining = guard.interval_secs;
                     }
                     eprintln!("system: guard daemon shutdown complete");
                 }

@@ -1,9 +1,9 @@
 # Project State
 
 ## Current Focus
-Refactored disk trend prediction to remove unused interval parameter
+Improved error handling in Docker size parsing and guard daemon shutdown logic
 
 ## Completed
-- [x] Removed unused `_interval_secs` parameter from `predict_fill_time` function
-- [x] Simplified disk trend prediction logic by removing redundant parameter
+- [x] Added error handling for failed Docker size number parsing
+- [x] Enhanced guard daemon shutdown with proper interval tracking
 ```
