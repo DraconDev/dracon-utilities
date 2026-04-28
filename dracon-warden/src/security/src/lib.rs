@@ -1124,10 +1124,9 @@ impl DemonSecurity {
         let output_path = keys_dir.join(format!("{}.age", recipient));
 
         // Encrypt the repo key for the recipient
-        // Fix: Properly collect the recipient into a Box<dyn Recipient> typed Vec
         let recipients: Vec<Box<dyn age::Recipient + Send>> = vec![Box::new(recipient.clone())];
-        let encryptor =
-            age::Encryptor::with_recipients(recipients).expect("Failed to create encryptor");
+        let encryptor = age::Encryptor::with_recipients(recipients)
+            .context("failed to create encryptor")?;
 
         let mut encrypted = vec![];
         let mut writer = encryptor.wrap_output(&mut encrypted)?;
