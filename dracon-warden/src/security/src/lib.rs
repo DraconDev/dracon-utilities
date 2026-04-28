@@ -2029,6 +2029,8 @@ impl DemonSecurity {
 
     /// In-situ Clean with a specific scanner (allows filtering patterns)
     fn smart_clean_with_scanner(&self, content: &str, scanner: &SecretScanner) -> Result<String> {
+        let mut had_error = false;
+        let mut last_err: String = String::new();
         let cleaned = scanner.scan_and_replace(content, |_, secret| {
             match self.encrypt_v2_for_all(secret.as_bytes()) {
                 Ok(encrypted) => {
@@ -2036,12 +2038,17 @@ impl DemonSecurity {
                     format!("[{}:{}]", self.secret_marker, b64)
                 }
                 Err(e) => {
-                    eprintln!("⚠️ Smart Clean: Failed to encrypt secret: {}", e);
+                    last_err = e.to_string();
+                    had_error = true;
                     secret.to_string()
                 }
             }
         });
-        Ok(cleaned)
+        if had_error {
+            Err(anyhow::anyhow!("smart_clean: encryption failed for one or more secrets: {}", last_err))
+        } else {
+            Ok(cleaned)
+        }
     }
 
     /// Smart Clean with Path Context:
