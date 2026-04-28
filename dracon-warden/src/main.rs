@@ -730,12 +730,35 @@ fn ensure_repo_filter_config(repo: &Path) -> Result<bool> {
     Ok(changed)
 }
 
+fn is_repo_checked_out(repo: &Path) -> bool {
+    let git_dir = repo.join(".git");
+    let head = git_dir.join("HEAD");
+    let index = git_dir.join("index");
+
+    if !head.exists() || !index.exists() {
+        return false;
+    }
+
+    let head_content = match fs::read_to_string(&head) {
+        Ok(c) => c,
+        Err(_) => return false,
+    };
+
+    let head_content = head_content.trim();
+    head_content.starts_with("ref: refs/heads/")
+}
+
 fn harden_repo(
     repo: &Path,
     policy: &WardenPolicy,
     pubkey_path: Option<&Path>,
 ) -> Result<(bool, bool, bool)> {
     policy.validate()?;
+
+    if !is_repo_checked_out(repo) {
+        return Ok((false, false, false));
+    }
+
     let gitignore_path = repo.join(".gitignore");
     let gitattributes_path = repo.join(".gitattributes");
 
