@@ -1877,10 +1877,17 @@ mod tests {
         let key = td.path().join("owner_test.pub");
         fs::write(&key, "age1yyy").expect("key");
 
+        let status = ProcessCommand::new("git")
+            .arg("init")
+            .arg(&repo)
+            .status()
+            .expect("git init");
+        assert!(status.success(), "git init should succeed");
+
         let (a, b, c) = harden_repo(&repo, &sample_policy(), Some(&key)).expect("harden");
-        assert!(a);
-        assert!(b);
-        assert!(c);
+        assert!(a, "gitignore should be written");
+        assert!(b, ".gitattributes should be written");
+        assert!(c, "pubkey should be published");
         assert!(repo.join(".gitignore").exists());
         assert!(repo.join(".gitattributes").exists());
         assert!(repo.join(".dracon/data/keys/owner_test.pub").exists());
