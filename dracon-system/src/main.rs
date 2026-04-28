@@ -1268,8 +1268,8 @@ async fn clean_nix_garbage(keep_generations: u32, apply: bool) -> Result<(u64, V
     let mut reclaimed = 0u64;
     let mut cleaned = Vec::new();
     
-    // First, delete old generations
-    if keep_generations > 0 {
+    // First, delete old generations (only if apply is true)
+    if apply && keep_generations > 0 {
         let gen_arg = keep_generations.to_string();
         if let Err(e) = Command::new("nix-env")
             .arg("-d")
@@ -1280,7 +1280,7 @@ async fn clean_nix_garbage(keep_generations: u32, apply: bool) -> Result<(u64, V
         {
             eprintln!("⚠️ nix-env delete generations failed: {}", e);
         }
-        
+
         // Also for user profile
         if let Err(e) = Command::new("nix-env")
             .arg("-d")
