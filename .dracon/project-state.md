@@ -1,10 +1,8 @@
 # Project State
 
 ## Current Focus
-Improved sorting logic, JSON scrubbing, and test setup for Git repository discovery
+Improved string handling in secret scanner pattern matching for consistent comparison
 
 ## Completed
-- [x] Refactored file sorting to use `sort_by_key` with `Reverse` for better performance
-- [x] Simplified JSON scrubbing by using pattern matching for marker strings
-- [x] Removed redundant path references in test directory creation
-- [x] Standardized test repository setup with consistent naming patterns
+- [x] Updated pattern matching to use cloned strings instead of references for consistent comparison
+- [x] Modified age secret key check to use string comparison with proper string allocation
