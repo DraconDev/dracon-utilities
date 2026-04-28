@@ -1,9 +1,10 @@
 # Project State
 
 ## Current Focus
-Security: Marked legacy Git Seal V1 decryption as insecure with migration guidance
+Added encrypted file detection and handling during .env header backfill
 
 ## Completed
-- [x] Added security warning for deterministic IV in Git Seal V1 decryption
-- [x] Documented migration path to modern AEAD encryption
-- [x] Added security event logging for legacy decryption calls
+- [x] Added detection for encrypted .env files using `[DRACON_SECRET:` and `[DEMON_SECRET:` markers
+- [x] Modified output to indicate encrypted files during dry-run mode
+- [x] Added explicit refusal to process encrypted files during header backfill
+```
