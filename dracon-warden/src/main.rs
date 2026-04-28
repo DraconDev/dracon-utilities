@@ -1116,6 +1116,28 @@ fn run_daemon(policy_path: PathBuf) -> Result<()> {
     }
 
     while !shutdown.load(Ordering::SeqCst) {
+        if reload.load(Ordering::SeqCst) {
+            reload.store(false, Ordering::SeqCst);
+            eprintln!("warden: reloading policy on SIGHUP...");
+            match WardenPolicy::load(&policy_path) {
+                Ok(p) => {
+                    if let Err(e) = p.validate() {
+                        eprintln!("warden: policy invalid on reload: {}", e);
+                    } else {
+                        let roots = effective_discovery_roots(&p);
+                        let discovered_repos = discover_git_repos_local(&roots);
+                        if let Err(e) = backfill_env_headers_repos(&discovered_repos, true) {
+                            eprintln!("warden: SIGHUP backfill failed: {}", e);
+                        }
+                        if let Err(e) = harden_all(&p) {
+                            eprintln!("warden: SIGHUP harden failed: {}", e);
+                        }
+                    }
+                }
+                Err(e) => eprintln!("warden: SIGHUP policy reload failed: {}", e),
+            }
+        }
+
         match rx.recv_timeout(Duration::from_secs(1)) {
             Ok(Ok(event)) => {
                 pending_repos.extend(repos_for_event(&event, &roots));
