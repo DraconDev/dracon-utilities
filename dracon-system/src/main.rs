@@ -2741,17 +2741,18 @@ async fn main() -> Result<()> {
                     });
 
                     println!("guard daemon started (interval={}s)", guard.interval_secs);
-                    let mut remaining = guard.interval_secs;
+                    let interval = guard.interval_secs;
+                    let mut elapsed = 0u64;
                     while !shutdown.load(Ordering::SeqCst) {
                         if let Err(e) = run_guard_once(&guard, &mut runtime).await {
                             eprintln!("guard pass failed: {}", e);
                             emit_event(&DraconEvent::new("system", EventSeverity::Error, "guard", format!("pass failed: {e}")));
                         }
-                        if shutdown.load(Ordering::SeqCst) {
-                            break;
+                        elapsed = 0;
+                        while !shutdown.load(Ordering::SeqCst) && elapsed < interval {
+                            sleep(Duration::from_secs(1)).await;
+                            elapsed += 1;
                         }
-                        sleep(Duration::from_secs(remaining.max(1))).await;
-                        remaining = guard.interval_secs;
                     }
                     eprintln!("system: guard daemon shutdown complete");
                 }
