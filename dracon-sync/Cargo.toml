@@ -10,14 +10,9 @@ dirs = "6.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tokio = { version = "1", features = ["macros", "process", "rt-multi-thread", "time", "signal"] }
-futures = "0.3"
-async-trait = "0.1"
-tracing = "0.1"
 reqwest = { version = "0.12", features = ["json"] }
 toml = "0.8"
-walkdir = "2.5"
 dracon-git = { path = "../../dracon-libs/tools/sync/dracon-git" }
-fs2 = "0.4"
 notify-rust = "4"
 
 [features]
