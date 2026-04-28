@@ -42,7 +42,7 @@ use crate::git::{
 };
 use crate::policy::{
     SyncPolicy,
-    DEFAULT_GIT_HOST_BLOB_LIMIT_BYTES, tokio_git_command,
+    DEFAULT_GIT_HOST_BLOB_LIMIT_BYTES, tokio_git_command, timestamp_secs,
 };
 
 fn ansi(color: &str, text: &str) -> String {
