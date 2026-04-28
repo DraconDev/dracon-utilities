@@ -1073,21 +1073,23 @@ fn run_daemon(policy_path: PathBuf) -> Result<()> {
     let shutdown_sigint = shutdown.clone();
 
     tokio::spawn(async move {
-        let _ = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
-            .unwrap()
-            .recv()
-            .await;
-        eprintln!("warden: received SIGTERM, shutting down gracefully...");
-        shutdown_sigterm.store(true, Ordering::SeqCst);
+        if let Ok(mut sig) = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+            sig.recv().await;
+            eprintln!("warden: received SIGTERM, shutting down gracefully...");
+            shutdown_sigterm.store(true, Ordering::SeqCst);
+        } else {
+            eprintln!("warden: failed to set up SIGTERM handler");
+        }
     });
 
     tokio::spawn(async move {
-        let _ = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::interrupt())
-            .unwrap()
-            .recv()
-            .await;
-        eprintln!("warden: received SIGINT, shutting down gracefully...");
-        shutdown_sigint.store(true, Ordering::SeqCst);
+        if let Ok(mut sig) = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::interrupt()) {
+            sig.recv().await;
+            eprintln!("warden: received SIGINT, shutting down gracefully...");
+            shutdown_sigint.store(true, Ordering::SeqCst);
+        } else {
+            eprintln!("warden: failed to set up SIGINT handler");
+        }
     });
 
     if let Err(e) = harden_all(&policy) {
