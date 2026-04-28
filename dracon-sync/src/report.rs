@@ -280,7 +280,7 @@ fn extract_category_scope_from_focus(content: &str) -> Option<(String, String)> 
                 // Valid category in parentheses - extract focus after the closing paren
                 let focus_start = paren_start + paren_end + 1;
                 if focus_start < focus_line.len() {
-                    let after_cat = focus_line[focus_start..].trim_start_matches(|c| matches!(c, ' ' | ':' | '-'));
+                    let after_cat = focus_line[focus_start..].trim_start_matches([' ', ':', '-']);
                     return Some((cat.to_string(), extract_scope_from_focus(after_cat)));
                 }
             }
@@ -331,7 +331,7 @@ fn extract_scope_from_focus(focus: &str) -> String {
         .take(2)
         .collect::<Vec<_>>()
         .join(" ")
-        .trim_end_matches(|c| matches!(c, '.' | ',' | ')'))
+        .trim_end_matches(['.', ',', ')'])
         .to_lowercase();
 
     // Allow 2-word scopes up to ~25 chars (e.g., "comprehensive test" = 20)
