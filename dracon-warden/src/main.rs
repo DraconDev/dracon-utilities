@@ -500,13 +500,28 @@ fn apply_overwrite_file(path: &Path, content: &str) -> Result<bool> {
         next.push('\n');
     }
     if next != current {
-        // Write to temp file in same dir, then atomically rename to avoid TOCTOU
         let parent = path.parent().unwrap_or_else(|| Path::new("."));
+        let random_suffix: u64 = rand::random();
         let tmp = parent.join(format!(
-            ".dracon_tmp_{}",
-            path.file_name().unwrap_or_default().to_string_lossy()
+            ".dracon_tmp_{}_{:016x}",
+            path.file_name().unwrap_or_default().to_string_lossy(),
+            random_suffix
         ));
-        fs::write(&tmp, &next).with_context(|| format!("failed writing temp {}", tmp.display()))?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&tmp)
+                .with_context(|| format!("failed to create temp {}", tmp.display()))?
+                .write_all(next.as_bytes())
+                .with_context(|| format!("failed writing temp {}", tmp.display()))?;
+        }
+        #[cfg(not(unix))]
+        {
+            fs::write(&tmp, &next).with_context(|| format!("failed writing temp {}", tmp.display()))?;
+        }
         fs::rename(&tmp, path)
             .with_context(|| format!("failed renaming {} -> {}", tmp.display(), path.display()))?;
         return Ok(true);
