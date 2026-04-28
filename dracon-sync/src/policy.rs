@@ -573,7 +573,7 @@ mod tests {
     #[test]
     fn test_freeze_marker_paths() {
         let paths = freeze_marker_paths(std::path::Path::new("/fake/path.toml"));
-        assert!(paths.len() >= 1);
+        assert!(!paths.is_empty());
     }
 
     #[test]
