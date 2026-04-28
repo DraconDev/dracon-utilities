@@ -748,9 +748,8 @@ fn ensure_repo_filter_config(repo: &Path) -> Result<bool> {
 fn is_repo_checked_out(repo: &Path) -> bool {
     let git_dir = repo.join(".git");
     let head = git_dir.join("HEAD");
-    let index = git_dir.join("index");
 
-    if !head.exists() || !index.exists() {
+    if !head.exists() {
         return false;
     }
 
