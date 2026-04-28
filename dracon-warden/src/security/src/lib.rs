@@ -745,6 +745,18 @@ impl DemonSecurity {
         &self.secret_marker
     }
 
+    pub fn get_or_init() -> Result<&'static DemonSecurity> {
+        DEFAULT_SECURITY_CACHE.get_or_try_init(|| {
+            let home = dirs::home_dir().context("home directory not found")?;
+            let keys_dir = home.join(".demon").join("keys");
+            let mut security = DemonSecurity::new(None)?;
+            if keys_dir.exists() {
+                security = security.with_keys_from_directory(&keys_dir)?;
+            }
+            Ok(security)
+        })
+    }
+
     fn supported_secret_markers(&self) -> Vec<String> {
         vec![self.secret_marker.clone()]
     }
@@ -2777,12 +2789,14 @@ impl DraconWarden {
 
     pub fn smudge(&self, bytes: &[u8], _path: Option<&str>) -> Result<Vec<u8>> {
         let content = String::from_utf8_lossy(bytes);
-        let smudged = DemonSecurity::new(None)?.smart_smudge(&content)?;
+        let security = DemonSecurity::get_or_init()?;
+        let smudged = security.smart_smudge(&content)?;
         Ok(smudged.into_bytes())
     }
 
     pub fn clean(&self, bytes: &[u8], path: Option<&str>) -> Result<Vec<u8>> {
-        let cleaned = DemonSecurity::new(None)?.smart_clean_with_path(bytes, path.unwrap_or(""))?;
+        let security = DemonSecurity::get_or_init()?;
+        let cleaned = security.smart_clean_with_path(bytes, path.unwrap_or(""))?;
         Ok(cleaned)
     }
 }
