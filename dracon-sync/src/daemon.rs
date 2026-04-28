@@ -345,6 +345,8 @@ pub(crate) async fn run_daemon(policy_path: PathBuf) -> Result<()> {
     let shutdown = Arc::new(AtomicBool::new(false));
     let shutdown_sigterm = shutdown.clone();
     let shutdown_sigint = shutdown.clone();
+    let reload = Arc::new(AtomicBool::new(false));
+    let reload_sighup = reload.clone();
 
     tokio::spawn(async move {
         if let Ok(mut sig) = tokio::signal::unix::signal(SignalKind::terminate()) {
@@ -366,7 +368,30 @@ pub(crate) async fn run_daemon(policy_path: PathBuf) -> Result<()> {
         }
     });
 
+    tokio::spawn(async move {
+        if let Ok(mut sig) = tokio::signal::unix::signal(SignalKind::hangup()) {
+            sig.recv().await;
+            eprintln!("sync: received SIGHUP, will reload policy...");
+            reload_sighup.store(true, Ordering::SeqCst);
+        } else {
+            eprintln!("sync: failed to set up SIGHUP handler");
+        }
+    });
+
     while !shutdown.load(Ordering::SeqCst) {
+        if reload.load(Ordering::SeqCst) {
+            reload.store(false, Ordering::SeqCst);
+            match SyncPolicy::load(&policy_path) {
+                Ok(p) => {
+                    eprintln!("sync: policy reloaded on SIGHUP (watch_root={} repos, excluded={})",
+                        p.watch_root_paths().len(), p.exclude_repos.len());
+                    activity.clear();
+                    repair_cooldowns.clear();
+                    filter_cooldowns.clear();
+                }
+                Err(e) => eprintln!("sync: SIGHUP policy reload failed: {}", e),
+            }
+        }
         let policy = match SyncPolicy::load(&policy_path) {
             Ok(p) => p,
             Err(e) => {
