@@ -1,8 +1,9 @@
 # Project State
 
 ## Current Focus
-Optimized binary dependency management in Cargo.lock for the security module
+Refactored secret marker migration to use standardized `DRACON_SECRET` format instead of legacy markers
 
 ## Completed
-- [x] Updated Cargo.lock to reduce binary size from 50324 to 48783 bytes
+- [x] Updated test cases to verify migration from `OLD_SECRET` to `DRACON_SECRET` markers
+- [x] Modified migration logic to handle the new marker format consistently
 ```
