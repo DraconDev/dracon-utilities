@@ -53,12 +53,6 @@ mod tests {
             incident_ledger_max_age_days: 30,
         }
     }
-    fn test_normalized_dir_name() {
-        assert_eq!(normalized_dir_name("target"), "target");
-        assert_eq!(normalized_dir_name("/target/"), "target");
-        assert_eq!(normalized_dir_name("Target"), "target");
-        assert_eq!(normalized_dir_name(".tmp-123"), ".tmp-123");
-    }
 
     #[test]
     fn test_is_excluded_dir_name_exact() {

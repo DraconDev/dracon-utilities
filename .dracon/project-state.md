@@ -1,8 +1,7 @@
 # Project State
 
 ## Current Focus
-Added `#[allow(clippy::items_after_test_module)]` to fix test module ordering warning
+Removed test for directory name normalization in exclude.rs
 
 ## Completed
-- [x] Fixed Clippy warning about test module ordering
-```
+- [x] Removed redundant test for `normalized_dir_name` function in exclude.rs
