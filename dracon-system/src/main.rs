@@ -2740,6 +2740,18 @@ async fn main() -> Result<()> {
                         }
                     });
 
+                    tokio::spawn(async move {
+                        if let Ok(mut sig) = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::hangup()) {
+                            sig.recv().await;
+                            eprintln!("system: received SIGHUP, reloading policy...");
+                            reload.store(true, Ordering::SeqCst);
+                        } else {
+                            eprintln!("system: failed to set up SIGHUP handler");
+                        }
+                    });
+
+                    let reload = Arc::new(AtomicBool::new(false));
+
                     println!("guard daemon started (interval={}s)", guard.interval_secs);
                     let interval = guard.interval_secs;
                     let mut elapsed = 0u64;

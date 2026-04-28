@@ -1,10 +1,8 @@
 # Project State
 
 ## Current Focus
-Added SIGHUP signal handling for policy reload in both sync and warden daemons
+Added SIGHUP signal handling for policy reload in the guard daemon
 
 ## Completed
-- [x] Added SIGHUP signal handler to reload sync policy on demand
-- [x] Added SIGHUP signal handler to reload warden policy on demand
-- [x] Implemented policy validation and repository discovery on SIGHUP reload
-- [x] Added error handling for failed policy reloads in both components
+- [x] feat(sighup signal): Added SIGHUP signal handler to reload policy configuration
+- [x] refactor(guard daemon): Added atomic boolean flag for tracking reload requests
