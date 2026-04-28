@@ -1,10 +1,8 @@
 # Project State
 
 ## Current Focus
-Refactored security module to standardize configuration paths and introduce a global security cache
+Improved error handling for encryptor creation in security module
 
 ## Completed
-- [x] Updated AI configuration path from `.dracon/utilities/sync/ai.toml` to `.dracon/ai.toml`
-- [x] Added global `DemonSecurity` cache using `OnceCell` for optimized security operations
-- [x] Updated `smudge` and `clean` methods to use the global security instance
-- [x] Enhanced security initialization with automatic key directory detection
+- [x] Fixed error handling for `age::Encryptor` creation by using `.context()` instead of `.expect()`
+- [x] Removed commented-out code related to recipient collection
