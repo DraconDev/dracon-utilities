@@ -2505,9 +2505,12 @@ impl DemonSecurity {
         Ok(plaintext)
     }
 
-    /// Decrypt data using the Git Seal way (AES-256-CFB with hashed key)
+    /// Decrypt data using the legacy Git Seal V1 format (AES-256-CFB with derived IV).
+    /// WARNING: This format uses a deterministic IV derived from the key, which violates
+    /// AES-CFB security requirements. Calls to this function are logged as security events.
+    /// If you have ciphertexts created with this format, consider re-encrypting with a
+    /// modern AEAD (AES-256-GCM with random nonce) when possible.
     pub fn decrypt_git_seal(&self, repo_key: &RepoKey, ciphertext: &[u8]) -> Result<Vec<u8>> {
-        // Git Seal key derivation: sha256 of the repo key
         let mut hasher = Sha256::new();
         hasher.update(&repo_key.0);
         let key_hash = hasher.finalize();
