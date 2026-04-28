@@ -1,9 +1,7 @@
 # Project State
 
 ## Current Focus
-Refactored Git repository discovery logic and improved SIGHUP signal handling for policy reloads
+Refactored SIGHUP signal handling in the guard daemon by renaming the reload handler variable for clarity
 
 ## Completed
-- [x] Refactored Git repository discovery in `dracon-sync/src/git.rs` to simplify conditional logic
-- [x] Improved SIGHUP signal handling in `dracon-system/src/main.rs` by removing unused return value from policy reload
-```
+- [x] Renamed `reload_sighup` to `reload_sighup_handler` in the SIGHUP signal handler to improve code readability and maintain consistency with other signal handlers
