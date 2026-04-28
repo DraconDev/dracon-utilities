@@ -343,13 +343,6 @@ fn extract_scope_from_focus(focus: &str) -> String {
     }
 }
 
-pub(crate) fn timestamp_secs() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0)
-}
-
 pub(crate) fn incident_ledger_path(_policy_path: &Path) -> PathBuf {
     // IMPORTANT: Keep this ledger OUT of git repositories by default.
     // The policy file typically lives inside the system repo; writing next to it
