@@ -1,8 +1,8 @@
 # Project State
 
 ## Current Focus
-Improved error handling for encryptor creation in security module
+Improved error handling for encryptor creation in the security module
 
 ## Completed
-- [x] Fixed error handling for `age::Encryptor` creation by using `.context()` instead of `.expect()`
-- [x] Removed commented-out code related to recipient collection
+- [x] Replaced `.expect()` with `.context()` for better error handling when creating encryptors
+- [x] Standardized recipient handling in security encryption functions
