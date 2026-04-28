@@ -2767,7 +2767,6 @@ async fn main() -> Result<()> {
                             eprintln!("guard pass failed: {}", e);
                             emit_event(&DraconEvent::new("system", EventSeverity::Error, "guard", format!("pass failed: {e}")));
                         }
-                        elapsed = 0;
                         while !shutdown.load(Ordering::SeqCst) && elapsed < interval {
                             sleep(Duration::from_secs(1)).await;
                             elapsed += 1;
