@@ -1,8 +1,9 @@
 # Project State
 
 ## Current Focus
-Improved signal handling for graceful shutdown with error recovery
+Added Rust toolchain configuration files for consistent development environment
 
 ## Completed
-- [x] feat(graceful shutdown): Enhanced SIGTERM and SIGINT handling with error recovery for signal setup failures
-- [x] refactor(daemon): Simplified signal handling code by replacing direct SignalKind usage with tokio::signal::unix::signal() pattern
+- [x] Added `clippy.toml` for linting configuration
+- [x] Added `rust-toolchain.toml` to pin Rust version
+- [x] Added `rustfmt.toml` for consistent code formatting
