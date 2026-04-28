@@ -1,8 +1,9 @@
 # Project State
 
 ## Current Focus
-Removed default `SyncPolicy` configuration from `exclude.rs` to reduce code duplication
+Added system path protection to prevent accidental deletion of critical system directories
 
 ## Completed
-- [x] Removed redundant `sync_policy_default()` function from `exclude.rs`
-- [x] Reduced code duplication by moving default `SyncPolicy` configuration to a dedicated test utility
+- [x] Added `SYSTEM_PROTECTED` constant listing critical system paths
+- [x] Implemented `check_safe_to_delete` function to validate deletion targets
+- [x] Added canonicalization and path safety verification logic

@@ -16,6 +16,29 @@ use tokio::time::sleep;
 
 use dracon_system_lib::analyze_workspace_storage;
 
+const SYSTEM_PROTECTED: &[&str] = &[
+    "/", "/home", "/etc", "/usr", "/var", "/boot",
+    "/nix", "/run", "/sys", "/dev", "/proc"
+];
+
+fn check_safe_to_delete(path: &Path) -> Result<()> {
+    let canon = match path.canonicalize() {
+        Ok(p) => p,
+        Err(_) => path.to_path_buf(),
+    };
+    let canon_str = canon.display().to_string();
+    for sys_prot in SYSTEM_PROTECTED {
+        if canon_str.starts_with(*sys_prot) {
+            anyhow::bail!(
+                "refusing to delete protected path {} (matches system root {})",
+                canon.display(),
+                sys_prot
+            );
+        }
+    }
+    Ok(())
+}
+
 static ROLLING_LOG: std::sync::OnceLock<Mutex<Vec<String>>> = std::sync::OnceLock::new();
 
 fn get_log() -> &'static Mutex<Vec<String>> {
