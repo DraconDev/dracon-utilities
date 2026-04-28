@@ -187,15 +187,26 @@ pub(crate) fn is_cherry_pick_in_progress(repo: &Path) -> bool {
 
 pub(crate) async fn kill_descendants(pid: u32) {
     let pid_s = pid.to_string();
-    let _ = TokioCommand::new("pkill")
-        .args(["-TERM", "-P", &pid_s])
-        .output()
-        .await;
+
+    async fn kill_group(pid_s: &str, signal: &str) {
+        if let Ok(output) = TokioCommand::new("pkill")
+            .args([signal, "-P", pid_s])
+            .output()
+            .await
+        {
+            if output.status.success() {
+                return;
+            }
+        }
+        let _ = TokioCommand::new("kill")
+            .args(["-".to_string() + signal, "--", "-"+pid_s])
+            .output()
+            .await;
+    }
+
+    kill_group(&pid_s, "TERM").await;
     tokio::time::sleep(Duration::from_millis(200)).await;
-    let _ = TokioCommand::new("pkill")
-        .args(["-KILL", "-P", &pid_s])
-        .output()
-        .await;
+    kill_group(&pid_s, "KILL").await;
 }
 
 pub(crate) async fn run_child(

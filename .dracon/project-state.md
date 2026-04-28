@@ -1,8 +1,10 @@
 # Project State
 
 ## Current Focus
-Added a regression test file to track and repro secret scanner false positives
+Refactored process killing logic in Git operations to handle both process group termination and fallback to direct PID killing
 
 ## Completed
-- [x] Added `leak_prevention_test.txt` to track and repro secret scanner false positives
+- [x] Refactored `kill_descendants` to use a helper function `kill_group` for both TERM and KILL signals
+- [x] Improved reliability by adding fallback to direct PID killing when process group termination fails
+- [x] Maintained same 200ms delay between signals for graceful termination
 ```
