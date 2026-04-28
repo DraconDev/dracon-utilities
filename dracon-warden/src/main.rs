@@ -1096,84 +1096,8 @@ fn run_daemon(policy_path: PathBuf) -> Result<()> {
     }
 
     while !shutdown.load(Ordering::SeqCst) {
-            match rx.recv_timeout(Duration::from_secs(1)) {
-            Ok(Ok(event)) => {
-                pending_repos.extend(repos_for_event(&event, &roots));
-            }
-            Ok(Err(e)) => {
-                eprintln!("⚠️ watch error: {}", e);
-                emit_event(&DraconEvent::new(
-                    "warden",
-                    EventSeverity::Warn,
-                    "watch",
-                    format!("error: {e}"),
-                ));
-            }
-            Err(mpsc::RecvTimeoutError::Timeout) => {}
-            Err(mpsc::RecvTimeoutError::Disconnected) => {
-                return Err(anyhow::anyhow!("watch channel disconnected"));
-            }
-        }
-
-        if !pending_repos.is_empty() && last_run.elapsed() >= debounce {
-            let policy = match WardenPolicy::load(&policy_path) {
-                Ok(p) => p,
-                Err(e) => {
-                    eprintln!("warden: policy load failed: {}", e);
-                    emit_event(&DraconEvent::new(
-                        "warden",
-                        EventSeverity::Error,
-                        "policy",
-                        format!("load failed: {e}"),
-                    ));
-                    continue;
-                }
-            };
-            if let Err(e) = policy.validate() {
-                eprintln!("warden: policy invalid: {}", e);
-                continue;
-            }
-            let repos = std::mem::take(&mut pending_repos);
-            let repos_vec = repos.into_iter().collect::<Vec<_>>();
-            if let Err(e) = scrub_markers(&policy, &repos_vec, true) {
-                eprintln!("warden: scrub_markers failed: {}", e);
-            }
-            if let Err(e) = harden_repos(&policy, repos_vec) {
-                eprintln!("warden: harden_repos failed: {}", e);
-            }
-            last_run = Instant::now();
-        }
-
-        if last_sweep.elapsed() >= sweep_every {
-            let policy = match WardenPolicy::load(&policy_path) {
-                Ok(p) => p,
-                Err(e) => {
-                    eprintln!("⚠️ policy load failed in sweep: {}", e);
-                    emit_event(&DraconEvent::new(
-                        "warden",
-                        EventSeverity::Warn,
-                        "policy",
-                        format!("sweep load failed: {e}"),
-                    ));
-                    last_sweep = Instant::now();
-                    continue;
-                }
-            };
-            if let Err(e) = policy.validate() {
-                eprintln!("warden: policy invalid in sweep: {}", e);
-                last_sweep = Instant::now();
-                continue;
-            }
-            if let Err(e) = harden_all(&policy) {
-                eprintln!("warden: harden_all failed in sweep: {}", e);
-            }
-            let roots = effective_discovery_roots(&policy);
-            let discovered_repos = discover_git_repos_local(&roots);
-            if let Err(e) = backfill_env_headers_repos(&discovered_repos, true) {
-                eprintln!("warden: backfill sweep failed: {}", e);
-            }
-            last_sweep = Instant::now();
-        }
+            let _ = rx.recv_timeout(Duration::from_secs(1));
+        Ok(())
     }
 }
 
