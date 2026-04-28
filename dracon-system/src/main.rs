@@ -10,6 +10,8 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::process::Command;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use tokio::time::sleep;
 
 use dracon_system_lib::analyze_workspace_storage;
@@ -2705,14 +2707,37 @@ async fn main() -> Result<()> {
                     }
                     let _lock = acquire_daemon_lock("dracon-system-guard")
                         .with_context(|| "failed to acquire guard daemon lock")?;
+                    let shutdown = Arc::new(AtomicBool::new(false));
+                    let shutdown_sigterm = shutdown.clone();
+                    let shutdown_sigint = shutdown.clone();
+
+                    tokio::spawn(async move {
+                        let _ = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+                            .unwrap()
+                            .recv()
+                            .await;
+                        eprintln!("system: received SIGTERM, shutting down gracefully...");
+                        shutdown_sigterm.store(true, Ordering::SeqCst);
+                    });
+
+                    tokio::spawn(async move {
+                        let _ = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::interrupt())
+                            .unwrap()
+                            .recv()
+                            .await;
+                        eprintln!("system: received SIGINT, shutting down gracefully...");
+                        shutdown_sigint.store(true, Ordering::SeqCst);
+                    });
+
                     println!("guard daemon started (interval={}s)", guard.interval_secs);
-                    loop {
+                    while !shutdown.load(Ordering::SeqCst) {
                         if let Err(e) = run_guard_once(&guard, &mut runtime).await {
                             eprintln!("guard pass failed: {}", e);
                             emit_event(&DraconEvent::new("system", EventSeverity::Error, "guard", format!("pass failed: {e}")));
                         }
                         sleep(Duration::from_secs(guard.interval_secs)).await;
                     }
+                    eprintln!("system: guard daemon shutdown complete");
                 }
                 GuardCommands::Prune { json, docker, docker_volumes, package_caches, apply } => {
                     let mut reclaimed_total = 0u64;
