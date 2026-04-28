@@ -1,8 +1,8 @@
 # Project State
 
 ## Current Focus
-Added a test to verify that the stuck repository expiry time is not zero
+Removed default `SyncPolicy` configuration from `exclude.rs` to reduce code duplication
 
 ## Completed
-- [x] Added test for `STUCK_REPO_EXPIRY_SECS` to ensure it's greater than zero
-- [x] Added `#[allow(clippy::assertions_on_constants)]` to suppress false positive lint warning
+- [x] Removed redundant `sync_policy_default()` function from `exclude.rs`
+- [x] Reduced code duplication by moving default `SyncPolicy` configuration to a dedicated test utility
