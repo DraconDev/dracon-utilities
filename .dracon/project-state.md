@@ -1,9 +1,8 @@
 # Project State
 
 ## Current Focus
-Removed legacy secret marker support in favor of a single standardized marker
+Refactored secret marker migration documentation to use generic placeholder for old markers
 
 ## Completed
-- [x] Removed `LEGACY_SECRET_MARKER` constant
-- [x] Simplified `supported_secret_markers` to return only the current marker
-- [x] Cleaned up related code paths for consistency
+- [x] Updated marker migration documentation to use `[OLD_MARKER:...]` instead of specific legacy marker
+```

@@ -2351,7 +2351,7 @@ impl DemonSecurity {
     }
 
     /// Migrate secret marker prefixes in-place without touching encrypted payload bytes.
-    /// Example: `[DEMON_SECRET:...]` -> `[DRACON_SECRET:...]`.
+    /// Example: `[OLD_MARKER:...]` -> `[DRACON_SECRET:...]`.
     pub fn migrate_markers_in_path(
         &self,
         root: &Path,
