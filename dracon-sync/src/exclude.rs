@@ -37,16 +37,22 @@ mod tests {
             exclude_file_patterns: vec![],
             auto_repair_concerns: true,
             auto_repair_warns: true,
-            filter_cooldown_secs: 0,
-            repair_cooldown_secs: 0,
-            max_repo_size_mb: 0,
-            max_stage_file_bytes: 0,
-            concern_resolve_thresh: 0,
-            warn_resolve_thresh: 0,
+            auto_rewrite_large_blobs: true,
+            watch_roots: vec![],
+            extra_remotes: vec![],
+            auto_github_private: false,
+            auto_github_private_account: "DraconDev".to_string(),
+            max_stage_file_bytes: 100 * 1024 * 1024,
+            pull_op_timeout_secs: 30,
+            push_op_timeout_secs: 300,
+            repo_sync_timeout_secs: 420,
+            push_retries: 3,
+            repair_cooldown_secs: 60,
+            max_push_blob_bytes: 100 * 1024 * 1024,
+            incident_ledger_max_lines: 10_000,
+            incident_ledger_max_age_days: 30,
         }
     }
-
-    #[test]
     fn test_normalized_dir_name() {
         assert_eq!(normalized_dir_name("target"), "target");
         assert_eq!(normalized_dir_name("/target/"), "target");
