@@ -1,9 +1,8 @@
 # Project State
 
 ## Current Focus
-Fixed notify cooldown logic and removed redundant secret scanning tests
+Fix Nix garbage collection to only delete old generations when `apply` is true
 
 ## Completed
-- [x] Fixed notify cooldown logic by inverting the comparison operator in `main.rs`
-- [x] Removed redundant secret scanning tests from `security/lib.rs`
-```
+- [x] Modified Nix garbage collection logic to conditionally delete old generations based on `apply` flag
+- [x] Added conditional check for `apply` parameter in garbage collection function
