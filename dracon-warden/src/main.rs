@@ -11,6 +11,7 @@ use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command as ProcessCommand;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::sync::mpsc;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
@@ -1095,7 +1096,7 @@ fn run_daemon(policy_path: PathBuf) -> Result<()> {
     }
 
     while !shutdown.load(Ordering::SeqCst) {
-        match rx.recv_timeout(Duration::from_secs(1)) {
+            match rx.recv_timeout(Duration::from_secs(1)) {
             Ok(Ok(event)) => {
                 pending_repos.extend(repos_for_event(&event, &roots));
             }
