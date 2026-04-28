@@ -1,11 +1,10 @@
 # Project State
 
 ## Current Focus
-Enhanced daemon event handling with debounced repository processing and periodic sweeps
+Added graceful shutdown handling for SIGTERM and SIGINT signals in daemon process
 
 ## Completed
-- [x] Improved event handling with proper error propagation and logging
-- [x] Added debounced repository processing with policy validation
-- [x] Implemented periodic sweep functionality for repository hardening
-- [x] Enhanced shutdown handling with proper cleanup messages
+- [x] Added signal handling for SIGTERM and SIGINT to enable graceful shutdown
+- [x] Implemented atomic boolean flag to track shutdown state across threads
+- [x] Added separate signal handlers for each termination signal type
 ```

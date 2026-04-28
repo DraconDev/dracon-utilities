@@ -9,7 +9,7 @@ clap = { version = "4.5", features = ["derive"] }
 dirs = "6.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-tokio = { version = "1", features = ["macros", "process", "rt-multi-thread", "time"] }
+tokio = { version = "1", features = ["macros", "process", "rt-multi-thread", "time", "signal"] }
 futures = "0.3"
 async-trait = "0.1"
 tracing = "0.1"
