@@ -1,9 +1,9 @@
 # Project State
 
 ## Current Focus
-Improved error handling in Docker size parsing and guard daemon shutdown logic
+Refactored guard daemon timing to use elapsed time tracking instead of remaining time calculation
 
 ## Completed
-- [x] Added error handling for failed Docker size number parsing
-- [x] Enhanced guard daemon shutdown with proper interval tracking
-```
+- [x] Replaced remaining time tracking with elapsed time counter
+- [x] Simplified shutdown check by resetting elapsed counter on each iteration
+- [x] Improved precision by counting seconds individually rather than bulk sleep durations
