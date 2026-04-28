@@ -2655,6 +2655,7 @@ async fn main() -> Result<()> {
 
                 if cfg.apply {
                     for path in actionable {
+                        check_safe_to_delete(&path)?;
                         if path.exists() {
                             println!("Deleting {}", path.display());
                             tokio::fs::remove_dir_all(path).await?;
