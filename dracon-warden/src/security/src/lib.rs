@@ -712,11 +712,14 @@ impl DemonSecurity {
 
     pub fn get_or_init() -> Result<&'static DemonSecurity> {
         DEFAULT_SECURITY_CACHE.get_or_try_init(|| {
-            let home = dirs::home_dir().context("home directory not found")?;
-            let keys_dir = home.join(".demon").join("keys");
             let mut security = DemonSecurity::new(None)?;
-            if keys_dir.exists() {
-                security = security.with_keys_from_directory(&keys_dir)?;
+            if let Ok(ids) = security.load_master_identities() {
+                security.master_identities = ids;
+            }
+            if let Ok(imported) = security.load_imported_identities() {
+                if !imported.is_empty() {
+                    security.imported_identities = imported;
+                }
             }
             Ok(security)
         })
