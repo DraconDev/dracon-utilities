@@ -31,5 +31,4 @@ dracon-warden daemon
 dracon-warden scrub-markers --apply
 ```
 
-`scrub-markers` is a recovery tool for cases where marker tokens (ex: `DEMON_SECRET` /
-`DRACON_SECRET`) accidentally land inside plaintext JSON (usually from copy/paste or bad tooling).
+`scrub-markers` is a recovery tool for cases where marker tokens (ex: `DRACON_SECRET`) accidentally land inside plaintext JSON (usually from copy/paste or bad tooling).
