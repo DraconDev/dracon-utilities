@@ -55,10 +55,10 @@ pub(crate) fn discover_git_repos(
     // Always include system_repo if it exists and is a git repo
     if let Some(system) = system_repo {
         let system_path = PathBuf::from(system);
-        if system_path.exists() && system_path.join(".git").exists() {
-            if !repos.contains(&system_path) && !exclude_set.contains(&system_path) {
-                repos.push(system_path);
-            }
+        if system_path.exists() && system_path.join(".git").exists()
+            && !repos.contains(&system_path) && !exclude_set.contains(&system_path)
+        {
+            repos.push(system_path);
         }
     }
 

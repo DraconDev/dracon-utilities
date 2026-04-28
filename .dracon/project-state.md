@@ -1,8 +1,9 @@
 # Project State
 
 ## Current Focus
-Removed default `SyncPolicy` configuration from `exclude.rs` to reduce code duplication
+Refactored Git repository discovery logic and improved SIGHUP signal handling for policy reloads
 
 ## Completed
-- [x] Removed redundant `sync_policy_default()` function that was duplicated in multiple test cases
-- [x] Simplified test setup by removing the need for default policy initialization in test cases
+- [x] Refactored Git repository discovery in `dracon-sync/src/git.rs` to simplify conditional logic
+- [x] Improved SIGHUP signal handling in `dracon-system/src/main.rs` by removing unused return value from policy reload
+```
