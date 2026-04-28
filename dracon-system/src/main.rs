@@ -554,8 +554,8 @@ fn default_sync_freeze_marker() -> String {
     let home = match dirs::home_dir() {
         Some(h) => h,
         None => {
-            eprintln!("⚠️ could not determine home directory, using fallback");
-            PathBuf::from("/home/dracon")
+            eprintln!("⚠️ could not determine home directory, using /var/tmp fallback");
+            PathBuf::from("/var/tmp")
         }
     };
     home.join(".dracon")
@@ -2143,7 +2143,10 @@ fn load_system_policy() -> (Option<PathBuf>, SystemPolicy) {
     };
     let content = match std::fs::read_to_string(&path) {
         Ok(c) => c,
-        Err(_) => return (Some(path), SystemPolicy::default()),
+        Err(e) => {
+            eprintln!("⚠️ failed to read {}: {}, using defaults", path.display(), e);
+            return (Some(path), SystemPolicy::default());
+        }
     };
     let parsed: SystemPolicy = toml::from_str(&content).unwrap_or_else(|e| {
         eprintln!("⚠️ failed to parse {}: {}", path.display(), e);
