@@ -142,7 +142,7 @@ pub(crate) async fn sync_repo(
     // Filter out entries that only differ due to clean/smudge filters.
     // `git diff HEAD` applies clean filters and correctly ignores filter-only changes.
     {
-        let diff_output = crate::git::git_diff_head_files(&repo).await;
+        let diff_output = crate::git::git_diff_head_files(repo).await;
         if diff_output.is_empty() && !entries.is_empty() {
             // git diff HEAD returned nothing. Only clear if ALL entries are
             // Modified (filter-only). Untracked/Added files don't appear in

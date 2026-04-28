@@ -226,20 +226,10 @@ impl SimpleAiService {
         let mut last_error = None;
 
         for pc in &self.providers {
-            // Check provider health before calling
-            {
-                let health = provider_health().lock().await;
-                match health.get(&pc.name) {
-                    Some(ProviderStatus::AuthFailed) => {
-                        continue;
-                    }
-                    Some(ProviderStatus::RateLimited { until }) => {
-                        if Instant::now() < *until {
-                            continue;
-                        }
-                    }
-                    _ => {}
-                }
+            match provider_health().lock().await.get(&pc.name) {
+                Some(ProviderStatus::AuthFailed) => continue,
+                Some(ProviderStatus::RateLimited { until }) if Instant::now() < *until => continue,
+                _ => {}
             }
 
             match self.call_provider(pc, messages.clone()).await {
