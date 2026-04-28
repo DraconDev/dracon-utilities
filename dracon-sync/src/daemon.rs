@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+use tokio::signal::unix::SignalKind;
 use tokio::time::sleep;
 
 use crate::policy::{SyncPolicy, freeze_reason, debug_enabled, timestamp_secs};
