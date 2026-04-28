@@ -17,7 +17,7 @@ use policy::{resolve_policy_path, SyncPolicy};
 use policy::freeze_reason;
 use exclude::excluded_dir_names_set;
 use report::{ConcernRepairFilter, RepoFilter, push_large_blob_threshold_bytes, run_repair_concerns, run_repair_warns, run_repos_report};
-use daemon::{git_diff_head_files, run_once, run_daemon, unstuck_repo, list_stuck_repos};
+use daemon::{run_once, run_daemon, unstuck_repo, list_stuck_repos};
 use git::{has_both_main_and_master, consolidate_to_master};
 use sync::sync_repo;
 
