@@ -154,7 +154,7 @@ enum Command {
         /// Optional path from git filter (%f)
         path: Option<String>,
     },
-    /// Scan plaintext JSON files for DEMON_SECRET/DRACON_SECRET markers and optionally scrub them.
+    /// Scan plaintext JSON files for DRACON_SECRET markers and optionally scrub them.
     ScrubMarkers {
         /// Apply edits in-place. Without this flag, the command is a dry-run report.
         #[arg(long)]
@@ -162,7 +162,7 @@ enum Command {
         /// Optional repo path to scan. If omitted, scans repos in warden discovery scope.
         repo: Option<PathBuf>,
     },
-    /// Fix working-tree files that are still ciphertext (contain DRACON_SECRET/DEMON_SECRET markers).
+    /// Fix working-tree files that are still ciphertext (contain DRACON_SECRET markers).
     ///
     /// This can happen if filters were misconfigured at checkout time, or after branch switching.
     Resmudge {

@@ -29,7 +29,7 @@ Canonical library ownership is defined in `dracon-libs/docs/capability-boundarie
   - Policy path: `/home/dracon/dracon/utilities/warden/dracon-warden.toml`.
   - Secret invariants:
     - Files on `protected_patterns` are encrypted-at-rest in git (via filter), but plaintext on disk via smudge.
-    - Tracked plaintext JSON must never contain `[DEMON_SECRET:...]` / `[DRACON_SECRET:...]` markers (they indicate a secret leak path).
+    - Tracked plaintext JSON must never contain `[DRACON_SECRET:...]` markers (they indicate a secret leak path).
   - Auto-repair:
     - `dracon-warden once` and `dracon-warden daemon` automatically run the marker scrub pass before hardening.
     - Manual command: `dracon-warden scrub-markers --apply`.
