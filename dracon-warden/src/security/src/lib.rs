@@ -23,7 +23,7 @@ use zeroize::{Zeroize, ZeroizeOnDrop};
 const HEADER_V2_MAGIC: &[u8] = b"age-encryption.org/v1";
 const DEFAULT_SECRET_MARKER: &str = "DRACON_SECRET";
 
-static DEFAULT_SECURITY_CACHE: OnceCell< DemonSecurity> = OnceCell::new();
+static DEFAULT_SECURITY_CACHE: OnceCell<DemonSecurity> = OnceCell::new();
 
 const ENV_VERSION_HEADER_TEMPLATE: &str = r#"# =============================================================================
 # Dracon Warden Encrypted Environment File
