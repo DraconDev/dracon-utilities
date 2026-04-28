@@ -1,9 +1,8 @@
 # Project State
 
 ## Current Focus
-Added `git_diff_head_files` function to the daemon module for file change detection
+Removed Git-related functionality from the daemon module
 
 ## Completed
-- [x] Added `git_diff_head_files` to daemon module imports
-- [x] Removed unused `run_once` import (cleanup)
-```
+- [x] Removed Git-related code including file diff detection and repository discovery
+- [x] Cleaned up unused imports and dependencies related to Git operations
