@@ -1,9 +1,10 @@
 # Project State
 
 ## Current Focus
-Refactored guard daemon timing to use elapsed time tracking instead of remaining time calculation
+Refactored Git diff handling to use async/await and improved error handling
 
 ## Completed
-- [x] Replaced remaining time tracking with elapsed time counter
-- [x] Simplified shutdown check by resetting elapsed counter on each iteration
-- [x] Improved precision by counting seconds individually rather than bulk sleep durations
+- [x] Made `git_diff_head_files` async to avoid blocking the runtime
+- [x] Added 30-second timeout for Git operations
+- [x] Simplified error handling in `sync_repo` by removing nested timeouts
+- [x] Improved error handling by returning empty Vec on failure instead of panicking
