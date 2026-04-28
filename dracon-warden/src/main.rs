@@ -1311,13 +1311,11 @@ fn build_globset(patterns: &[String]) -> Result<GlobSet> {
 }
 
 fn is_marker_string(s: &str) -> bool {
-    s.contains("[DEMON_SECRET:") || s.contains("[DRACON_SECRET:")
+    s.contains("[DRACON_SECRET:")
 }
 
 fn marker_prefix_at(s: &str, idx: usize) -> Option<&'static str> {
-    if s[idx..].starts_with("[DEMON_SECRET:") {
-        Some("[DEMON_SECRET:")
-    } else if s[idx..].starts_with("[DRACON_SECRET:") {
+    if s[idx..].starts_with("[DRACON_SECRET:") {
         Some("[DRACON_SECRET:")
     } else {
         None
@@ -1649,8 +1647,7 @@ fn is_env_file_name(path: &str) -> bool {
 
 fn is_encrypted_env_content(content: &str) -> bool {
     let trimmed = content.trim_end_matches('\n');
-    (trimmed.starts_with("[DRACON_SECRET:") || trimmed.starts_with("[DEMON_SECRET:"))
-        && trimmed.ends_with(']')
+    trimmed.starts_with("[DRACON_SECRET:") && trimmed.ends_with(']')
 }
 
 fn backfill_env_headers_repo(repo: &Path, apply: bool) -> Result<(usize, usize)> {
