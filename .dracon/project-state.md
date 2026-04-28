@@ -1,8 +1,9 @@
 # Project State
 
 ## Current Focus
-Refactored Git path removal command to use proper argument passing instead of string concatenation
+Added SIGHUP signal handling for policy reload in the daemon
 
 ## Completed
-- [x] Refactored `rewrite_ahead_paths` to properly pass paths as separate arguments to `git rm` instead of concatenating them into a single string
-- [x] Improved command construction by using `args.extend()` for path arguments rather than string formatting
+- [x] Added `reload` atomic flag to track SIGHUP signals
+- [x] Implemented SIGHUP signal handler to trigger policy reload
+```

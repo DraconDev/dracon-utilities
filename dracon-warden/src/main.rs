@@ -1071,6 +1071,8 @@ fn run_daemon(policy_path: PathBuf) -> Result<()> {
     let shutdown = Arc::new(AtomicBool::new(false));
     let shutdown_sigterm = shutdown.clone();
     let shutdown_sigint = shutdown.clone();
+    let reload = Arc::new(AtomicBool::new(false));
+    let reload_sighup = reload.clone();
 
     tokio::spawn(async move {
         if let Ok(mut sig) = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
@@ -1089,6 +1091,16 @@ fn run_daemon(policy_path: PathBuf) -> Result<()> {
             shutdown_sigint.store(true, Ordering::SeqCst);
         } else {
             eprintln!("warden: failed to set up SIGINT handler");
+        }
+    });
+
+    tokio::spawn(async move {
+        if let Ok(mut sig) = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::hangup()) {
+            sig.recv().await;
+            eprintln!("warden: received SIGHUP, reloading policy...");
+            reload_sighup.store(true, Ordering::SeqCst);
+        } else {
+            eprintln!("warden: failed to set up SIGHUP handler");
         }
     });
 
