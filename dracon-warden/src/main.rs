@@ -1645,6 +1645,12 @@ fn is_env_file_name(path: &str) -> bool {
         || path_lower.ends_with("/.envrc")
 }
 
+fn is_encrypted_env_content(content: &str) -> bool {
+    let trimmed = content.trim_end_matches('\n');
+    (trimmed.starts_with("[DRACON_SECRET:") || trimmed.starts_with("[DEMON_SECRET:"))
+        && trimmed.ends_with(']')
+}
+
 fn backfill_env_headers_repo(repo: &Path, apply: bool) -> Result<(usize, usize)> {
     let files = git_ls_files(repo)?;
     let warden = DraconWarden::new()?;
@@ -1669,7 +1675,7 @@ fn backfill_env_headers_repo(repo: &Path, apply: bool) -> Result<(usize, usize)>
             continue;
         }
 
-        let is_encrypted = content.contains("[DRACON_SECRET:") || content.contains("[DEMON_SECRET:");
+        let is_encrypted = is_encrypted_env_content(&content);
         found += 1;
 
         if !apply {
