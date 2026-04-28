@@ -2,7 +2,10 @@ use anyhow::Result;
 use dracon_git::GitService;
 use std::collections::{BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
+use tokio::signal::unix::{Signal, SignalKind};
 use tokio::time::sleep;
 
 use crate::policy::{SyncPolicy, freeze_reason, debug_enabled, timestamp_secs};
@@ -365,7 +368,23 @@ pub(crate) async fn run_daemon(policy_path: PathBuf) -> Result<()> {
     let mut filter_cooldowns: HashMap<PathBuf, Instant> = HashMap::new();
     let mut stuck_push_repos = load_stuck_push_repos();
 
-    loop {
+    let shutdown = Arc::new(AtomicBool::new(false));
+    let shutdown_sigterm = shutdown.clone();
+    let shutdown_sigint = shutdown.clone();
+
+    tokio::spawn(async move {
+        let _ = Signal::new(SignalKind::terminate()).unwrap().recv().await;
+        eprintln!("sync: received SIGTERM, shutting down gracefully...");
+        shutdown_sigterm.store(true, Ordering::SeqCst);
+    });
+
+    tokio::spawn(async move {
+        let _ = Signal::new(SignalKind::interrupt()).unwrap().recv().await;
+        eprintln!("sync: received SIGINT, shutting down gracefully...");
+        shutdown_sigint.store(true, Ordering::SeqCst);
+    });
+
+    while !shutdown.load(Ordering::SeqCst) {
         let policy = match SyncPolicy::load(&policy_path) {
             Ok(p) => p,
             Err(e) => {
