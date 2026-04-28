@@ -1,10 +1,8 @@
 # Project State
 
 ## Current Focus
-Added graceful shutdown handling for SIGTERM and SIGINT signals in daemon process
+Improved signal handling for graceful shutdown with error recovery
 
 ## Completed
-- [x] Added signal handling for SIGTERM and SIGINT to enable graceful shutdown
-- [x] Implemented atomic boolean flag to track shutdown state across threads
-- [x] Added separate signal handlers for each termination signal type
-```
+- [x] feat(graceful shutdown): Enhanced SIGTERM and SIGINT handling with error recovery for signal setup failures
+- [x] refactor(daemon): Simplified signal handling code by replacing direct SignalKind usage with tokio::signal::unix::signal() pattern
