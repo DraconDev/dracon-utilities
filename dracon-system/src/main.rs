@@ -105,7 +105,7 @@ fn acquire_daemon_lock(name: &str) -> Result<File> {
 fn events_path() -> PathBuf {
     dirs::home_dir()
         .map(|h| h.join(".dracon/events.jsonl"))
-        .unwrap_or_else(|| PathBuf::from(".dracon/events.jsonl"))
+        .unwrap_or_else(|| PathBuf::from("/tmp/dracon-events.jsonl"))
 }
 
 #[derive(Parser, Debug)]
