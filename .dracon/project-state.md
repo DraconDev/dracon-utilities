@@ -1,8 +1,8 @@
 # Project State
 
 ## Current Focus
-Refactored stuck repository expiry test to be properly structured as a test function
+Added a test to verify that the stuck repository expiry time is not zero
 
 ## Completed
-- [x] Refactored `STUCK_REPO_EXPIRY_SECS` validation from const assertion to proper test function
-- [x] Improved test organization by converting inline assertion to dedicated test case
+- [x] Added test for `STUCK_REPO_EXPIRY_SECS` to ensure it's greater than zero
+- [x] Added `#[allow(clippy::assertions_on_constants)]` to suppress false positive lint warning
