@@ -1,9 +1,9 @@
 # Project State
 
 ## Current Focus
-Added encrypted environment file detection with standardized format validation
+Added fallback support for `git filter-branch` when `git-filter-repo` is unavailable
 
 ## Completed
-- [x] feat(encrypted file): Added `is_encrypted_env_content` function to validate encrypted environment file format
-- [x] feat(encrypted file): Refactored encrypted file detection to use new validation function
-```
+- [x] feat(git): implemented fallback to `git filter-branch` when `git-filter-repo` is not available
+- [x] feat(git): improved error handling with more specific error messages when neither tool is available
+- [x] refactor(git): restructured history rewriting logic to support multiple Git tools

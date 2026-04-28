@@ -998,8 +998,44 @@ pub(crate) fn rewrite_ahead_paths(
         return Ok(Some(backup_branch));
     }
 
+    let filter_branch_available = std_git_command()
+        .args(["filter-branch", "--version"])
+        .current_dir(repo)
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false);
+
+    if filter_branch_available {
+        let mut args: Vec<String> = vec![
+            "filter-branch".to_string(),
+            "--force".to_string(),
+            "--index-filter".to_string(),
+        ];
+        let quoted_paths: Vec<String> = paths_to_remove.iter().map(|p| format!("'{}'", p)).collect();
+        let filter_expr = format!(
+            "git rm -r --cached --ignore-unmatch {}",
+            quoted_paths.join(" ")
+        );
+        args.push(filter_expr);
+        args.push("--".to_string());
+        let args_ref: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+        let rewrite = std_git_command()
+            .args(&args_ref)
+            .current_dir(repo)
+            .status()
+            .with_context(|| format!("failed filter-branch in {}", repo.display()))?;
+        if !rewrite.success() {
+            return Err(anyhow::anyhow!(
+                "filter-branch failed in {} (backup: {})",
+                repo.display(),
+                backup_branch
+            ));
+        }
+        return Ok(Some(backup_branch));
+    }
+
     Err(anyhow::anyhow!(
-        "git-filter-repo not available in {}. Install git-filter-repo to rewrite history (backup branch: {})",
+        "Neither git-filter-repo nor git-filter-branch available in {}. Install git-filter-repo (pip install git-filter-repo) or git-filter-branch to rewrite history (backup branch: {})",
         repo.display(),
         backup_branch
     ))
