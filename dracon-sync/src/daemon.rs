@@ -55,7 +55,10 @@ mod tests {
         assert_eq!(STUCK_REPO_EXPIRY_SECS, 86400);
     }
 
-    const { assert!(STUCK_REPO_EXPIRY_SECS > 0) }
+    #[test]
+    fn test_stuck_repo_expiry_not_zero() {
+        assert!(STUCK_REPO_EXPIRY_SECS > 0);
+    }
 
     #[test]
     fn test_stuck_repo_entry_debug() {
