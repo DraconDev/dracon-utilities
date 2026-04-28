@@ -1,7 +1,9 @@
 # Project State
 
 ## Current Focus
-Changed the default events file path from `.dracon/events.jsonl` to `/tmp/dracon-events.jsonl`
+Refactored disk trend prediction to remove unused interval parameter
 
 ## Completed
-- [x] Refactored events file path to use `/tmp` as fallback directory for better system compatibility
+- [x] Removed unused `_interval_secs` parameter from `predict_fill_time` function
+- [x] Simplified disk trend prediction logic by removing redundant parameter
+```
