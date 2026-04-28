@@ -331,7 +331,7 @@ fn extract_scope_from_focus(focus: &str) -> String {
         .take(2)
         .collect::<Vec<_>>()
         .join(" ")
-        .trim_end_matches(|c| c == '.' || c == ',' || c == ')')
+        .trim_end_matches(|c| matches!(c, '.' | ',' | ')'))
         .to_lowercase();
 
     // Allow 2-word scopes up to ~25 chars (e.g., "comprehensive test" = 20)
@@ -626,7 +626,7 @@ pub(crate) async fn run_repos_report(policy_path: &Path, filter: RepoFilter, jso
         });
     }
 
-    rows.sort_by(|a, b| b.last_unix.cmp(&a.last_unix));
+    rows.sort_by_key(|a| a.last_unix);
 
     let concern_count_all = rows.iter().filter(|r| r.concern).count();
     let warn_count_all = rows.iter().filter(|r| r.warn).count();
