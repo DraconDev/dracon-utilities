@@ -2776,14 +2776,14 @@ mod tests {
     #[test]
     fn test_protection_exemptions() {
         let scanner = SecretScanner::new_without_age_keys();
-        let patterns = scanner.patterns.iter().map(|(n, _)| *n).collect::<Vec<_>>();
+        let patterns = scanner.patterns.iter().map(|(n, _)| n.clone()).collect::<Vec<_>>();
         eprintln!(
             "Patterns in scanner (excluding age keys): {}",
             patterns.len()
         );
         eprintln!(
             "Age Secret Key in patterns: {}",
-            patterns.contains(&"Age Secret Key")
+            patterns.contains(&"Age Secret Key".to_string())
         );
 
         let content = "AGE-SECRET-KEY-142MYS9ZZPE0Q0CFSU4D3WTMMXRN5EN89U83TUSKGZVACLCE0A37SN5NENW";
