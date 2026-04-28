@@ -280,7 +280,7 @@ fn extract_category_scope_from_focus(content: &str) -> Option<(String, String)> 
                 // Valid category in parentheses - extract focus after the closing paren
                 let focus_start = paren_start + paren_end + 1;
                 if focus_start < focus_line.len() {
-                    let after_cat = focus_line[focus_start..].trim_start_matches(|c| c == ' ' || c == ':' || c == '-');
+                    let after_cat = focus_line[focus_start..].trim_start_matches(|c| matches!(c, ' ' | ':' | '-'));
                     return Some((cat.to_string(), extract_scope_from_focus(after_cat)));
                 }
             }

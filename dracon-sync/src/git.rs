@@ -940,7 +940,7 @@ pub(crate) fn detect_large_blobs_ahead(repo: &Path, min_bytes: u64) -> Result<Ve
             None
         })
         .collect();
-    out.sort_by(|a, b| b.0.cmp(&a.0));
+    out.sort_by_key(|a| a.0);
     Ok(out)
 }
 
