@@ -15,12 +15,15 @@ use std::fs;
 use std::io::{Read, Write};
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
+use once_cell::sync::OnceCell;
 
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 // V2 Encryption Constants
 const HEADER_V2_MAGIC: &[u8] = b"age-encryption.org/v1";
 const DEFAULT_SECRET_MARKER: &str = "DRACON_SECRET";
+
+static DEFAULT_SECURITY_CACHE: OnceCell< DemonSecurity> = OnceCell::new();
 
 const ENV_VERSION_HEADER_TEMPLATE: &str = r#"# =============================================================================
 # Dracon Warden Encrypted Environment File
