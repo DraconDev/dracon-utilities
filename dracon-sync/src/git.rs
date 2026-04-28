@@ -225,7 +225,7 @@ pub(crate) async fn kill_descendants(pid: u32) {
             }
         }
         let _ = TokioCommand::new("kill")
-            .args(["-".to_string() + signal, "--", "-"+pid_s])
+            .args(["-".to_string() + signal, "--", "-".to_string() + pid_s])
             .output()
             .await;
     }
