@@ -10,7 +10,7 @@ use tokio::time::sleep;
 
 use crate::policy::{SyncPolicy, freeze_reason, debug_enabled, timestamp_secs};
 use crate::exclude::{excluded_dir_names_set, has_sync_relevant_dirty_entries};
-use crate::git::{discover_git_repos, repo_diff_entries, has_origin_remote, has_tracking_upstream, has_both_main_and_master};
+use crate::git::{discover_git_repos, repo_diff_entries, has_origin_remote, has_tracking_upstream, has_both_main_and_master, git_diff_head_files};
 use crate::report::{ConcernRepairFilter, run_repair_concerns, run_repair_warns};
 use crate::sync::sync_repo;
 
@@ -730,4 +730,5 @@ pub(crate) async fn run_daemon(policy_path: PathBuf) -> Result<()> {
 
         sleep(Duration::from_secs(scan_interval)).await;
     }
+    Ok(())
 }

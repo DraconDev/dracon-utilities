@@ -6,7 +6,6 @@ use dracon_git::{
 use serde::Serialize;
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::time::Duration;
 
 fn send_sync_conflict_notification(repo_path: &Path, reason: &str, details: &str) {
