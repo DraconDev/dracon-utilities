@@ -522,7 +522,13 @@ fn apply_overwrite_file(path: &Path, content: &str) -> Result<bool> {
         }
         #[cfg(not(unix))]
         {
-            fs::write(&tmp, &next).with_context(|| format!("failed writing temp {}", tmp.display()))?;
+            fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&tmp)
+                .with_context(|| format!("failed to create temp {}", tmp.display()))?
+                .write_all(next.as_bytes())
+                .with_context(|| format!("failed writing temp {}", tmp.display()))?;
         }
         fs::rename(&tmp, path)
             .with_context(|| format!("failed renaming {} -> {}", tmp.display(), path.display()))?;
