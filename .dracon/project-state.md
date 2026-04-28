@@ -1,8 +1,9 @@
 # Project State
 
 ## Current Focus
-Removed unused `reload` atomic boolean from guard daemon initialization
+Added SIGHUP signal handling for policy reload in the guard daemon
 
 ## Completed
-- [x] Removed unused `Arc<AtomicBool>` initialization in guard daemon setup
-```
+- [x] feat(sighup): Added SIGHUP signal handling to reload system policy on-the-fly
+- [x] feat(sighup): Added policy normalization and logging during reload
+- [x] feat(sighup): Implemented atomic flag check for reload requests

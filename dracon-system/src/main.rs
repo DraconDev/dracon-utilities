@@ -2754,6 +2754,13 @@ async fn main() -> Result<()> {
                     let interval = guard.interval_secs;
                     let mut elapsed = 0u64;
                     while !shutdown.load(Ordering::SeqCst) {
+                        if reload.load(Ordering::SeqCst) {
+                            reload.store(false, Ordering::SeqCst);
+                            let (_, new_policy) = load_system_policy();
+                            normalize_guard_policy(&mut guard);
+                            eprintln!("system: policy reloaded on SIGHUP (disk_warn={}%, disk_critical={}%)",
+                                guard.disk_warn_percent, guard.disk_critical_percent);
+                        }
                         if let Err(e) = run_guard_once(&guard, &mut runtime).await {
                             eprintln!("guard pass failed: {}", e);
                             emit_event(&DraconEvent::new("system", EventSeverity::Error, "guard", format!("pass failed: {e}")));
