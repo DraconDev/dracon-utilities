@@ -21,7 +21,6 @@ use zeroize::{Zeroize, ZeroizeOnDrop};
 // V2 Encryption Constants
 const HEADER_V2_MAGIC: &[u8] = b"age-encryption.org/v1";
 const DEFAULT_SECRET_MARKER: &str = "DRACON_SECRET";
-const LEGACY_SECRET_MARKER: &str = "DEMON_SECRET";
 
 const ENV_VERSION_HEADER_TEMPLATE: &str = r#"# =============================================================================
 # Dracon Warden Encrypted Environment File
@@ -709,10 +708,7 @@ impl DemonSecurity {
     }
 
     fn supported_secret_markers(&self) -> Vec<String> {
-        let mut markers = vec![self.secret_marker.clone(), LEGACY_SECRET_MARKER.to_string()];
-        markers.sort();
-        markers.dedup();
-        markers
+        vec![self.secret_marker.clone()]
     }
 
     fn secret_tag_prefixes(&self) -> Vec<String> {
