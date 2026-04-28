@@ -21,6 +21,31 @@ pub(crate) fn excluded_dir_names_set(policy: &SyncPolicy) -> BTreeSet<String> {
 mod tests {
     use super::*;
 
+    fn sync_policy_default() -> SyncPolicy {
+        SyncPolicy {
+            system_repo: String::new(),
+            pulse_interval_secs: 1,
+            inactivity_push_delay_secs: 5,
+            auto_commit: true,
+            auto_bump_versions: true,
+            auto_pull: true,
+            auto_push: true,
+            backup_policy: String::new(),
+            backup_dir: String::new(),
+            exclude_repos: vec![],
+            exclude_dir_names: vec![],
+            exclude_file_patterns: vec![],
+            auto_repair_concerns: true,
+            auto_repair_warns: true,
+            filter_cooldown_secs: 0,
+            repair_cooldown_secs: 0,
+            max_repo_size_mb: 0,
+            max_stage_file_bytes: 0,
+            concern_resolve_thresh: 0,
+            warn_resolve_thresh: 0,
+        }
+    }
+
     #[test]
     fn test_normalized_dir_name() {
         assert_eq!(normalized_dir_name("target"), "target");
