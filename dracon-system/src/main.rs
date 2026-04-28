@@ -1818,7 +1818,7 @@ async fn run_guard_once(
     
     // Clean up stale notify_cooldowns entries (older than 2x cooldown period)
     let cooldown_cutoff = Instant::now() - Duration::from_secs(guard.notify_cooldown_secs.saturating_mul(2));
-    state.notify_cooldowns.retain(|_, &mut since| since < cooldown_cutoff);
+    state.notify_cooldowns.retain(|_, &mut since| since > cooldown_cutoff);
 
     // Inode monitoring
     if guard.monitor_inodes {
