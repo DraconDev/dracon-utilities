@@ -2799,8 +2799,8 @@ mod tests {
             .unwrap();
         let result_str = String::from_utf8_lossy(&result);
         assert!(
-            !result_str.contains("_SECRET"),
-            "master.age was accidentally encrypted! Result: {}",
+            !result_str.contains("AGE-SECRET-KEY"),
+            "Age Secret Key pattern was not excluded from scanning! Result: {}",
             &result_str[..result_str.len().min(500)]
         );
     }
