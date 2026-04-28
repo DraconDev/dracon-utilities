@@ -1663,10 +1663,20 @@ fn backfill_env_headers_repo(repo: &Path, apply: bool) -> Result<(usize, usize)>
             continue;
         }
 
+        let is_encrypted = content.contains("[DRACON_SECRET:") || content.contains("[DEMON_SECRET:");
         found += 1;
 
         if !apply {
-            println!("🔎 .env without header: {}", full.display());
+            if is_encrypted {
+                println!("🔎 .env without header (encrypted, skipping): {}", full.display());
+            } else {
+                println!("🔎 .env without header: {}", full.display());
+            }
+            continue;
+        }
+
+        if is_encrypted {
+            eprintln!("⚠️ refusing to decrypt encrypted file during header backfill: {}", full.display());
             continue;
         }
 
