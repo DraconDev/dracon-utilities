@@ -547,7 +547,7 @@ fn newest_file(paths: Vec<PathBuf>) -> Option<PathBuf> {
             }
         })
         .collect::<Vec<_>>();
-    with_mtime.sort_by(|a, b| b.0.cmp(&a.0));
+    with_mtime.sort_by_key(|b| std::cmp::Reverse(b.0));
     with_mtime.into_iter().next().map(|(_, p)| p)
 }
 
@@ -1339,11 +1339,8 @@ fn salvage_invalid_json_markers(content: &str) -> Option<String> {
 
 fn scrub_json_value(v: &mut serde_json::Value) {
     match v {
-        serde_json::Value::String(s) => {
-            if is_marker_string(s) {
-                // Default: remove marker payloads in plaintext JSON.
-                *v = serde_json::Value::Null;
-            }
+        serde_json::Value::String(s) if is_marker_string(s) => {
+            *v = serde_json::Value::Null;
         }
         serde_json::Value::Array(a) => {
             for it in a {
@@ -2147,10 +2144,10 @@ watch_roots = ["/tmp/test"]
         fs::create_dir_all(&root).expect("root");
 
         let repo1 = root.join("my_repo");
-        fs::create_dir_all(&repo1.join(".git")).expect("my_repo .git");
+        fs::create_dir_all(repo1.join(".git")).expect("my_repo .git");
 
         let repo2 = root.join("other_repo");
-        fs::create_dir_all(&repo2.join(".git")).expect("other_repo .git");
+        fs::create_dir_all(repo2.join(".git")).expect("other_repo .git");
 
         let repos = discover_git_repos(&[root], &BTreeSet::new());
 
@@ -2165,10 +2162,10 @@ watch_roots = ["/tmp/test"]
         fs::create_dir_all(&root).expect("root");
 
         let repo1 = root.join("repo1");
-        fs::create_dir_all(&repo1.join(".git")).expect("repo1 .git");
+        fs::create_dir_all(repo1.join(".git")).expect("repo1 .git");
 
         let repo2 = root.join("repo2");
-        fs::create_dir_all(&repo2.join(".git")).expect("repo2 .git");
+        fs::create_dir_all(repo2.join(".git")).expect("repo2 .git");
 
         let repos = discover_git_repos_local(&[root]);
 
