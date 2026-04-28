@@ -1,9 +1,8 @@
 # Project State
 
 ## Current Focus
-Refactored secret marker migration to use standardized `DRACON_SECRET` format instead of legacy markers
+Added Unix-specific file permission handling to the security module
 
 ## Completed
-- [x] Updated test cases to verify migration from `OLD_SECRET` to `DRACON_SECRET` markers
-- [x] Modified migration logic to handle the new marker format consistently
-```
+- [x] Added `#[cfg(unix)]` attribute to Unix-specific file permission imports
+- [x] Enabled Unix-specific file permission functionality for the security module
