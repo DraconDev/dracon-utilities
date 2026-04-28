@@ -1,9 +1,10 @@
 # Project State
 
 ## Current Focus
-Standardized secret marker handling to use only `DRACON_SECRET` format across all code and documentation
+Standardized secret marker handling to use only `DRACON_SECRET` format across all components
 
 ## Completed
-- [x] Updated documentation to remove references to legacy `DEMON_SECRET` marker
-- [x] Refactored code to use only `DRACON_SECRET` format in marker detection tests
-- [x] Removed all references to legacy `DEMON_SECRET` marker from the codebase
+- [x] Updated secret marker documentation to use only `DRACON_SECRET` format
+- [x] Refactored AI command examples to use standardized `DRACON_SECRET` marker
+- [x] Updated warden scrub markers command to only check for `DRACON_SECRET` markers
+- [x] Updated resmudge command documentation to reference only `DRACON_SECRET` markers

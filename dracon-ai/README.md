@@ -75,7 +75,7 @@ Examples:
 
 ```sh
 dracon-ai cmd "journalctl --user -u dracon-sync.service -n 200"
-dracon-ai cmd --timeout-secs 20 --max-bytes 200000 "rg -n \"DEMON_SECRET\" -S ."
+dracon-ai cmd --timeout-secs 20 --max-bytes 200000 "rg -n \"DRACON_SECRET\" -S ."
 ```
 
 ## Routing Model
