@@ -2750,8 +2750,6 @@ async fn main() -> Result<()> {
                         }
                     });
 
-                    let reload = Arc::new(AtomicBool::new(false));
-
                     println!("guard daemon started (interval={}s)", guard.interval_secs);
                     let interval = guard.interval_secs;
                     let mut elapsed = 0u64;
