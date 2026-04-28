@@ -4,5 +4,7 @@
 Added Unix-specific file permission handling to the security module
 
 ## Completed
-- [x] Added `#[cfg(unix)]` attribute to Unix-specific file permission imports
-- [x] Enabled Unix-specific file permission functionality for the security module
+- [x] Refactored file permission setting to be Unix-specific only
+- [x] Standardized permission setting for both identity and backup files
+- [x] Maintained same 0o400 read-only permissions for owner
+- [x] Kept error handling for permission setting failures
