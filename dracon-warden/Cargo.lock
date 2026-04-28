@@ -577,6 +577,7 @@ dependencies = [
  "globset",
  "hostname",
  "notify",
+ "rand",
  "secrecy",
  "serde",
  "serde_json",

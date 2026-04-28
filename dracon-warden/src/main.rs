@@ -1122,9 +1122,28 @@ fn run_daemon(policy_path: PathBuf) -> Result<()> {
         }
 
         if last_sweep.elapsed() >= sweep_every {
-            let policy = WardenPolicy::load(&policy_path)?;
-            policy.validate()?;
-            harden_all(&policy)?;
+            let policy = match WardenPolicy::load(&policy_path) {
+                Ok(p) => p,
+                Err(e) => {
+                    eprintln!("⚠️ policy load failed in sweep: {}", e);
+                    emit_event(&DraconEvent::new(
+                        "warden",
+                        EventSeverity::Warn,
+                        "policy",
+                        format!("sweep load failed: {e}"),
+                    ));
+                    last_sweep = Instant::now();
+                    continue;
+                }
+            };
+            if let Err(e) = policy.validate() {
+                eprintln!("warden: policy invalid in sweep: {}", e);
+                last_sweep = Instant::now();
+                continue;
+            }
+            if let Err(e) = harden_all(&policy) {
+                eprintln!("warden: harden_all failed in sweep: {}", e);
+            }
             let roots = effective_discovery_roots(&policy);
             let discovered_repos = discover_git_repos_local(&roots);
             if let Err(e) = backfill_env_headers_repos(&discovered_repos, true) {
