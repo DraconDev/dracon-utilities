@@ -5,7 +5,6 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use tokio::signal::unix::{Signal, SignalKind};
 use tokio::time::sleep;
 
 use crate::policy::{SyncPolicy, freeze_reason, debug_enabled, timestamp_secs};
@@ -373,15 +372,23 @@ pub(crate) async fn run_daemon(policy_path: PathBuf) -> Result<()> {
     let shutdown_sigint = shutdown.clone();
 
     tokio::spawn(async move {
-        let _ = Signal::new(SignalKind::terminate()).unwrap().recv().await;
-        eprintln!("sync: received SIGTERM, shutting down gracefully...");
-        shutdown_sigterm.store(true, Ordering::SeqCst);
+        if let Ok(mut sig) = tokio::signal::unix::signal(SignalKind::terminate()) {
+            sig.recv().await;
+            eprintln!("sync: received SIGTERM, shutting down gracefully...");
+            shutdown_sigterm.store(true, Ordering::SeqCst);
+        } else {
+            eprintln!("sync: failed to set up SIGTERM handler");
+        }
     });
 
     tokio::spawn(async move {
-        let _ = Signal::new(SignalKind::interrupt()).unwrap().recv().await;
-        eprintln!("sync: received SIGINT, shutting down gracefully...");
-        shutdown_sigint.store(true, Ordering::SeqCst);
+        if let Ok(mut sig) = tokio::signal::unix::signal(SignalKind::interrupt()) {
+            sig.recv().await;
+            eprintln!("sync: received SIGINT, shutting down gracefully...");
+            shutdown_sigint.store(true, Ordering::SeqCst);
+        } else {
+            eprintln!("sync: failed to set up SIGINT handler");
+        }
     });
 
     while !shutdown.load(Ordering::SeqCst) {
