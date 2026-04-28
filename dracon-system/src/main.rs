@@ -1207,6 +1207,7 @@ async fn clean_package_caches(cargo: bool, npm: bool, pip: bool, go: bool, apply
                 let size = get_dir_size(&npm_cache).await.unwrap_or(0);
                 if size > 0 {
                     if apply {
+                        check_safe_to_delete(&npm_cache)?;
                         if let Err(e) = tokio::fs::remove_dir_all(&npm_cache).await {
                             eprintln!("⚠️ failed to remove npm cache: {}", e);
                         }
@@ -1225,6 +1226,7 @@ async fn clean_package_caches(cargo: bool, npm: bool, pip: bool, go: bool, apply
                 let size = get_dir_size(&pip_cache).await.unwrap_or(0);
                 if size > 0 {
                     if apply {
+                        check_safe_to_delete(&pip_cache)?;
                         if let Err(e) = tokio::fs::remove_dir_all(&pip_cache).await {
                             eprintln!("⚠️ failed to remove pip cache: {}", e);
                         }
@@ -1243,6 +1245,7 @@ async fn clean_package_caches(cargo: bool, npm: bool, pip: bool, go: bool, apply
                 let size = get_dir_size(&go_cache).await.unwrap_or(0);
                 if size > 0 {
                     if apply {
+                        check_safe_to_delete(&go_cache)?;
                         if let Err(e) = tokio::fs::remove_dir_all(&go_cache).await {
                             eprintln!("⚠️ failed to remove go cache: {}", e);
                         }
