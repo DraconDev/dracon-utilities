@@ -1,3 +1,37 @@
+use anyhow::{Context, Result};
+use dracon_git::{
+    types::{DiffFile, FileStatus},
+    GitService,
+};
+use std::collections::{BTreeMap, BTreeSet};
+use std::path::{Path, PathBuf};
+use std::time::Duration;
+use tokio::process::Command as TokioCommand;
+use tokio::time::sleep;
+
+use crate::exclude::is_excluded_change_path;
+use crate::policy::{std_git_command, tokio_git_command, timestamp_secs};
+
+/// Get the list of files that actually differ from HEAD (filter-aware).
+/// Unlike `git status`, `git diff HEAD` applies clean filters and correctly
+/// ignores files that only differ due to smudge filter decryption.
+pub(crate) fn git_diff_head_files(repo: &Path) -> Vec<String> {
+    let output = std::process::Command::new("git")
+        .current_dir(repo)
+        .args(["diff", "HEAD", "--name-only", "-z"])
+        .output();
+    match output {
+        Ok(out) if out.status.success() => {
+            String::from_utf8_lossy(&out.stdout)
+                .split('\0')
+                .filter(|s| !s.is_empty())
+                .map(String::from)
+                .collect()
+        }
+        _ => Vec::new(),
+    }
+}
+
 pub(crate) fn discover_git_repos(
     roots: &[PathBuf],
     excluded_dir_names: &BTreeSet<String>,
