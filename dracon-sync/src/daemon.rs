@@ -56,6 +56,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::assertions_on_constants)]
     fn test_stuck_repo_expiry_not_zero() {
         assert!(STUCK_REPO_EXPIRY_SECS > 0);
     }
