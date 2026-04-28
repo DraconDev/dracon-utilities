@@ -2151,8 +2151,8 @@ watch_roots = ["/tmp/test"]
 
     #[test]
     fn marker_prefix_at_finds_correct_positions() {
-        let s = "prefix [DEMON_SECRET:abc] after";
-        assert_eq!(marker_prefix_at(s, 7), Some("[DEMON_SECRET:"));
+        let s = "prefix [DRACON_SECRET:abc] after";
+        assert_eq!(marker_prefix_at(s, 7), Some("[DRACON_SECRET:"));
 
         let s2 = "prefix [DRACON_SECRET:xyz] after";
         assert_eq!(marker_prefix_at(s2, 7), Some("[DRACON_SECRET:"));
@@ -2163,10 +2163,9 @@ watch_roots = ["/tmp/test"]
 
     #[test]
     fn is_marker_string_detects_both_markers() {
-        assert!(is_marker_string("hello [DEMON_SECRET:abc] world"));
         assert!(is_marker_string("hello [DRACON_SECRET:xyz] world"));
         assert!(!is_marker_string("hello world"));
-        assert!(!is_marker_string("DEMON_SECRET not in brackets"));
+        assert!(!is_marker_string("DRACON_SECRET not in brackets"));
         assert!(!is_marker_string("[WRONG_SECRET:abc]"));
     }
 
