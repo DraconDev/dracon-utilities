@@ -1,8 +1,9 @@
 # Project State
 
 ## Current Focus
-Refactored secret marker migration documentation to use generic placeholder for old markers
+Removed legacy secret marker support and updated migration tests to use new marker format
 
 ## Completed
-- [x] Updated marker migration documentation to use `[OLD_MARKER:...]` instead of specific legacy marker
-```
+- [x] Removed `test_legacy_marker_compatibility` test case
+- [x] Updated migration tests to use `LEGACY_MARKER` instead of `DEMON_SECRET` in test files
+- [x] Updated assertions to verify migration from `LEGACY_MARKER` to `DRACON_SECRET`

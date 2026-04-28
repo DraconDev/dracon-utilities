@@ -2812,26 +2812,18 @@ mod tests {
     }
 
     #[test]
-    fn test_legacy_marker_compatibility() {
-        let security = DemonSecurity::new(None).unwrap();
-        let input = "prefix [DEMON_SECRET:not-base64] suffix";
-        let output = security.smart_smudge(input).unwrap();
-        assert_eq!(output, input);
-    }
-
-    #[test]
     fn test_marker_migration_in_place() {
         let security = DemonSecurity::new(None).unwrap();
         let dir = tempfile::tempdir().unwrap();
         let file = dir.path().join("sample.env");
         std::fs::write(
             &file,
-            "A=[DEMON_SECRET:abc]\nB=[DEMON_SECRET:def]\nC=plain\n",
+            "A=[LEGACY_MARKER:abc]\nB=[LEGACY_MARKER:def]\nC=plain\n",
         )
         .unwrap();
 
         let stats = security
-            .migrate_markers_in_path(dir.path(), true, false, "DEMON_SECRET", "DRACON_SECRET")
+            .migrate_markers_in_path(dir.path(), true, false, "LEGACY_MARKER", "DRACON_SECRET")
             .unwrap();
         assert_eq!(stats.files_changed, 1);
         assert_eq!(stats.markers_changed, 2);
@@ -2839,7 +2831,7 @@ mod tests {
         let migrated = std::fs::read_to_string(file).unwrap();
         assert!(migrated.contains("[DRACON_SECRET:abc]"));
         assert!(migrated.contains("[DRACON_SECRET:def]"));
-        assert!(!migrated.contains("[DEMON_SECRET:"));
+        assert!(!migrated.contains("[LEGACY_MARKER:"));
     }
 
     #[test]
