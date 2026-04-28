@@ -1,9 +1,10 @@
 # Project State
 
 ## Current Focus
-Improved repository hardening test assertions with more descriptive messages
+Improved sorting logic, JSON scrubbing, and test setup for Git repository discovery
 
 ## Completed
-- [x] Added git repository initialization in test setup
-- [x] Enhanced test assertions with specific failure messages
-- [x] Maintained existing verification of file existence checks
+- [x] Refactored file sorting to use `sort_by_key` with `Reverse` for better performance
+- [x] Simplified JSON scrubbing by using pattern matching for marker strings
+- [x] Removed redundant path references in test directory creation
+- [x] Standardized test repository setup with consistent naming patterns
