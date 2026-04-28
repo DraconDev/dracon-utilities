@@ -10,6 +10,7 @@ use std::fs;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command as ProcessCommand;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
@@ -1060,6 +1061,28 @@ fn run_daemon(policy_path: PathBuf) -> Result<()> {
     let sweep_every = Duration::from_secs(300);
     let mut pending_repos = BTreeSet::new();
 
+    let shutdown = Arc::new(AtomicBool::new(false));
+    let shutdown_sigterm = shutdown.clone();
+    let shutdown_sigint = shutdown.clone();
+
+    tokio::spawn(async move {
+        let _ = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+            .unwrap()
+            .recv()
+            .await;
+        eprintln!("warden: received SIGTERM, shutting down gracefully...");
+        shutdown_sigterm.store(true, Ordering::SeqCst);
+    });
+
+    tokio::spawn(async move {
+        let _ = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::interrupt())
+            .unwrap()
+            .recv()
+            .await;
+        eprintln!("warden: received SIGINT, shutting down gracefully...");
+        shutdown_sigint.store(true, Ordering::SeqCst);
+    });
+
     if let Err(e) = harden_all(&policy) {
         eprintln!("⚠️ initial hardening pass failed: {}", e);
     }
@@ -1071,7 +1094,7 @@ fn run_daemon(policy_path: PathBuf) -> Result<()> {
         eprintln!("⚠️ initial backfill sweep failed: {}", e);
     }
 
-    loop {
+    while !shutdown.load(Ordering::SeqCst) {
         match rx.recv_timeout(Duration::from_secs(1)) {
             Ok(Ok(event)) => {
                 pending_repos.extend(repos_for_event(&event, &roots));
