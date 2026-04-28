@@ -1,8 +1,9 @@
 # Project State
 
 ## Current Focus
-Fix Nix garbage collection to only delete old generations when `apply` is true
+Improved error handling for home directory resolution in master identity loading
 
 ## Completed
-- [x] Modified Nix garbage collection logic to conditionally delete old generations based on `apply` flag
-- [x] Added conditional check for `apply` parameter in garbage collection function
+- [x] Fixed home directory resolution by using `context` for proper error propagation
+- [x] Removed fallback path logic which was using a hardcoded `/home/dracon` path
+- [x] Enhanced error reporting for home directory resolution failures

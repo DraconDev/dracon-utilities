@@ -816,13 +816,7 @@ impl DemonSecurity {
     /// Load ALL Master Identities from all known paths (Multi-Key Ring)
     /// Returns a vector of identities, prioritized by path.
     pub fn load_master_identities(&self) -> Result<Vec<x25519::Identity>> {
-        let home = match dirs::home_dir() {
-            Some(h) => h,
-            None => {
-                eprintln!("⚠️ could not determine home directory, using fallback");
-                PathBuf::from("/home/dracon")
-            }
-        };
+        let home = dirs::home_dir().context("cannot determine home directory")?;
         let mut identities = Vec::new();
 
         // Path Priority List
