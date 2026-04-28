@@ -2013,7 +2013,7 @@ mod tests {
 
     #[test]
     fn salvage_invalid_json_replaces_marker_tokens_and_parses() {
-        let a = "{[DEMON_SECRET:abc]: \"x\"}";
+        let a = "{[DRACON_SECRET:abc]: \"x\"}";
         let salvaged = salvage_invalid_json_markers(a).expect("salvaged");
         let v: serde_json::Value = serde_json::from_str(&salvaged).expect("parse");
         assert_eq!(
@@ -2021,7 +2021,7 @@ mod tests {
             serde_json::Value::String("x".to_string())
         );
 
-        let b = "{ \"track_id\": [DEMON_SECRET:abc], \"x\": 1 }";
+        let b = "{ \"track_id\": [DRACON_SECRET:abc], \"x\": 1 }";
         let salvaged = salvage_invalid_json_markers(b).expect("salvaged");
         let v: serde_json::Value = serde_json::from_str(&salvaged).expect("parse");
         assert!(v["track_id"].is_null());

@@ -1,9 +1,8 @@
 # Project State
 
 ## Current Focus
-Removed legacy secret marker support in favor of a single standardized format
+Refactored secret marker migration to use standardized `DRACON_SECRET` format instead of legacy `DEMON_SECRET`
 
 ## Completed
-- [x] Removed `[DEMON_SECRET:` marker support from all detection functions
-- [x] Standardized secret detection to only use `[DRACON_SECRET:` format
-- [x] Updated encrypted environment content validation to only check for `[DRACON_SECRET:` prefix
+- [x] Updated test cases to use new `DRACON_SECRET` marker format
+- [x] Maintained same functionality while standardizing secret marker syntax
