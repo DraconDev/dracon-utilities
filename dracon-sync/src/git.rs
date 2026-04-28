@@ -1017,12 +1017,9 @@ pub(crate) fn rewrite_ahead_paths(
             "--force".to_string(),
             "--index-filter".to_string(),
         ];
-        let quoted_paths: Vec<String> = paths_to_remove.iter().map(|p| format!("'{}'", p)).collect();
-        let filter_expr = format!(
-            "git rm -r --cached --ignore-unmatch {}",
-            quoted_paths.join(" ")
-        );
+        let filter_expr = "git rm -r --cached --ignore-unmatch".to_string();
         args.push(filter_expr);
+        args.extend(paths_to_remove.iter().cloned());
         args.push("--".to_string());
         let args_ref: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
         let rewrite = std_git_command()
