@@ -1,8 +1,9 @@
 # Project State
 
 ## Current Focus
-Improved string handling in secret scanner pattern matching for consistent comparison
+Improved secret scanner pattern matching to exclude Age Secret Key patterns
 
 ## Completed
-- [x] Updated pattern matching to use cloned strings instead of references for consistent comparison
-- [x] Modified age secret key check to use string comparison with proper string allocation
+- [x] Updated secret scanner to exclude "AGE-SECRET-KEY" pattern from scanning
+- [x] Improved error message to clarify when Age Secret Key patterns are not properly excluded
+```
