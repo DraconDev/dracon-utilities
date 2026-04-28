@@ -2832,12 +2832,12 @@ mod tests {
         let file = dir.path().join("sample.env");
         std::fs::write(
             &file,
-            "A=[LEGACY_MARKER:abc]\nB=[LEGACY_MARKER:def]\nC=plain\n",
+            "A=[OLD_SECRET:abc]\nB=[OLD_SECRET:def]\nC=plain\n",
         )
         .unwrap();
 
         let stats = security
-            .migrate_markers_in_path(dir.path(), true, false, "LEGACY_MARKER", "DRACON_SECRET")
+            .migrate_markers_in_path(dir.path(), true, false, "OLD_SECRET", "DRACON_SECRET")
             .unwrap();
         assert_eq!(stats.files_changed, 1);
         assert_eq!(stats.markers_changed, 2);
@@ -2845,7 +2845,7 @@ mod tests {
         let migrated = std::fs::read_to_string(file).unwrap();
         assert!(migrated.contains("[DRACON_SECRET:abc]"));
         assert!(migrated.contains("[DRACON_SECRET:def]"));
-        assert!(!migrated.contains("[LEGACY_MARKER:"));
+        assert!(!migrated.contains("[OLD_SECRET:"));
     }
 
     #[test]
