@@ -1,10 +1,9 @@
 # Project State
 
 ## Current Focus
-Refactored Git diff handling and improved daemon error handling
+Added SIGHUP signal handling for policy reload in the guard daemon and fixed Git command argument formatting
 
 ## Completed
-- [x] Added proper argument passing in Git path removal command
-- [x] Removed unused timestamp utility function from report module
-- [x] Added explicit Ok(()) return in daemon execution flow
-- [x] Refactored Git diff handling to use async/await and improved error handling
+- [x] Added SIGHUP signal handling to reload system policy when received
+- [x] Fixed Git command argument formatting in process killing
+```

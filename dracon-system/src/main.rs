@@ -2719,6 +2719,8 @@ async fn main() -> Result<()> {
                     let shutdown = Arc::new(AtomicBool::new(false));
                     let shutdown_sigterm = shutdown.clone();
                     let shutdown_sigint = shutdown.clone();
+                    let reload = Arc::new(AtomicBool::new(false));
+                    let reload_sighup = reload.clone();
 
                     tokio::spawn(async move {
                         if let Ok(mut sig) = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
@@ -2744,7 +2746,7 @@ async fn main() -> Result<()> {
                         if let Ok(mut sig) = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::hangup()) {
                             sig.recv().await;
                             eprintln!("system: received SIGHUP, reloading policy...");
-                            reload.store(true, Ordering::SeqCst);
+                            reload_sighup.store(true, Ordering::SeqCst);
                         } else {
                             eprintln!("system: failed to set up SIGHUP handler");
                         }
@@ -2754,8 +2756,8 @@ async fn main() -> Result<()> {
                     let interval = guard.interval_secs;
                     let mut elapsed = 0u64;
                     while !shutdown.load(Ordering::SeqCst) {
-                        if reload.load(Ordering::SeqCst) {
-                            reload.store(false, Ordering::SeqCst);
+                        if reload_sighup.load(Ordering::SeqCst) {
+                            reload_sighup.store(false, Ordering::SeqCst);
                             let (_, new_policy) = load_system_policy();
                             normalize_guard_policy(&mut guard);
                             eprintln!("system: policy reloaded on SIGHUP (disk_warn={}%, disk_critical={}%)",
