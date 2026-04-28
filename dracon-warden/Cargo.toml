@@ -19,4 +19,5 @@ serde_json = "1.0"
 toml = "0.8"
 walkdir = "2.5"
 dirs = "6.0"
+tokio = { version = "1", features = ["rt-multi-thread", "signal"] }
 dracon-security-kit = { package = "dracon-security", path = "src/security" }
