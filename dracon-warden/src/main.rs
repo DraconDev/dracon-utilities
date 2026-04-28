@@ -509,7 +509,7 @@ fn apply_overwrite_file(path: &Path, content: &str) -> Result<bool> {
         ));
         #[cfg(unix)]
         {
-            use std::os::unix::fs::OpenOptionsExt;
+            
             fs::OpenOptions::new()
                 .write(true)
                 .create_new(true)

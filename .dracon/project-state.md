@@ -1,11 +1,8 @@
 # Project State
 
 ## Current Focus
-Improved error handling for policy loading and validation during sweeps
+Removed Unix-specific file open options for atomic file overwrites
 
 ## Completed
-- [x] Added error handling for policy loading failures during sweeps
-- [x] Added error handling for policy validation failures during sweeps
-- [x] Added error logging for harden_all failures during sweeps
-- [x] Added event emission for policy load failures
-- [x] Improved sweep continuation logic after errors
+- [x] Removed Unix-specific file open options in `apply_overwrite_file` function
+- [x] Simplified file overwrite handling by removing platform-specific code
