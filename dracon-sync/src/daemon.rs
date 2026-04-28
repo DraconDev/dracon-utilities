@@ -262,17 +262,6 @@ pub(crate) fn list_stuck_repos() {
     }
 }
 
-/// Filter-aware dirty detection: uses `git diff HEAD --name-only -z` to identify
-/// files that actually changed, bypassing filter-only modifications.
-fn filter_aware_dirty(repo: &Path) -> Vec<crate::git::DiffFile> {
-    let diff_files = crate::git::git_diff_head_files(repo);
-    // This returns file names, but daemon.rs uses DiffFile from libgit.
-    // Return empty and let the caller handle it. The deduplication is now
-    // handled by checking entries against diff head names at the callsite.
-    // This is kept as a marker for future extraction.
-    Vec::new()
-}
-
 pub(crate) fn is_repo_stuck(repo: &Path) -> bool {
     load_stuck_push_repos().contains_key(repo)
 }
