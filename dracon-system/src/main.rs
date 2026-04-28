@@ -2721,6 +2721,7 @@ async fn main() -> Result<()> {
                     let shutdown_sigint = shutdown.clone();
                     let reload = Arc::new(AtomicBool::new(false));
                     let reload_sighup = reload.clone();
+                    let reload_sighup_handler = reload.clone();
 
                     tokio::spawn(async move {
                         if let Ok(mut sig) = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
@@ -2746,7 +2747,7 @@ async fn main() -> Result<()> {
                         if let Ok(mut sig) = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::hangup()) {
                             sig.recv().await;
                             eprintln!("system: received SIGHUP, reloading policy...");
-                            reload_sighup.store(true, Ordering::SeqCst);
+                            reload_sighup_handler.store(true, Ordering::SeqCst);
                         } else {
                             eprintln!("system: failed to set up SIGHUP handler");
                         }
