@@ -971,14 +971,17 @@ impl DemonSecurity {
 
         // Save Private Identity
         let mut file = fs::File::create(&identity_path)?;
-        let mut perms = file.metadata()?.permissions();
-        perms.set_mode(0o400); // Read-only for owner
-        if let Err(e) = fs::set_permissions(&identity_path, perms) {
-            eprintln!(
-                "⚠️ failed to set permissions on {}: {}",
-                identity_path.display(),
-                e
-            );
+        #[cfg(unix)]
+        {
+            let mut perms = file.metadata()?.permissions();
+            perms.set_mode(0o400);
+            if let Err(e) = fs::set_permissions(&identity_path, perms) {
+                eprintln!(
+                    "⚠️ failed to set permissions on {}: {}",
+                    identity_path.display(),
+                    e
+                );
+            }
         }
         writeln!(file, "{}", key.to_string().expose_secret())?;
 
@@ -1004,14 +1007,17 @@ impl DemonSecurity {
             if let Err(e) = writeln!(b_file, "{}", key.to_string().expose_secret()) {
                 eprintln!("⚠️ failed to write backup {}: {}", backup_path.display(), e);
             }
-            let mut b_perms = b_file.metadata()?.permissions();
-            b_perms.set_mode(0o400); // Private
-            if let Err(e) = fs::set_permissions(&backup_path, b_perms) {
-                eprintln!(
-                    "⚠️ failed to set permissions on {}: {}",
-                    backup_path.display(),
-                    e
-                );
+            #[cfg(unix)]
+            {
+                let mut b_perms = b_file.metadata()?.permissions();
+                b_perms.set_mode(0o400);
+                if let Err(e) = fs::set_permissions(&backup_path, b_perms) {
+                    eprintln!(
+                        "⚠️ failed to set permissions on {}: {}",
+                        backup_path.display(),
+                        e
+                    );
+                }
             }
         }
 
