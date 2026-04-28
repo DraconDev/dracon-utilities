@@ -1187,14 +1187,11 @@ async fn clean_package_caches(cargo: bool, npm: bool, pip: bool, go: bool, apply
             if cargo_cache.exists() {
                 let size = get_dir_size(&cargo_cache).await.unwrap_or(0);
                 if size > 0 {
-                if apply {
-                    check_safe_to_delete(&trash_info)?;
-                    if let Err(e) = tokio::fs::remove_dir_all(&trash_info).await {
-                        eprintln!("⚠️ failed to remove trash info: {}", e);
-                    } else if let Err(e) = tokio::fs::create_dir_all(&trash_info).await {
-                        eprintln!("⚠️ failed to recreate trash info dir: {}", e);
-                    }
-                }
+                    if apply {
+                        check_safe_to_delete(&cargo_cache)?;
+                        if let Err(e) = tokio::fs::remove_dir_all(&cargo_cache).await {
+                            eprintln!("⚠️ failed to remove cargo cache: {}", e);
+                        }
                     }
                     cleaned.push(format!("cargo registry cache ({})", human_bytes(size)));
                     reclaimed += size;
