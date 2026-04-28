@@ -1,9 +1,8 @@
 # Project State
 
 ## Current Focus
-Improved secret scanner pattern matching to exclude Age Secret Key patterns
+Added a regression test file to track and repro secret scanner false positives
 
 ## Completed
-- [x] Updated secret scanner to exclude "AGE-SECRET-KEY" pattern from scanning
-- [x] Improved error message to clarify when Age Secret Key patterns are not properly excluded
+- [x] Added `leak_prevention_test.txt` to track and repro secret scanner false positives
 ```
