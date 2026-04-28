@@ -2823,7 +2823,7 @@ async fn main() -> Result<()> {
                         
                         // Show inode info
                         if let Ok((total, used, _free)) = get_inode_info().await {
-                            let pct = if total > 0 { (used * 100 / total) as u8 } else { 0 };
+                            let pct = total.checked_div(used.saturating_mul(100)).unwrap_or(0) as u8;
                             println!("Inode usage: {}% ({}/{} inodes used)", pct, used, total);
                         }
                         
