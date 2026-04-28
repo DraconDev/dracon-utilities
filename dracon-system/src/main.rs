@@ -1518,7 +1518,7 @@ fn truncate_log_file(path: &Path, max_size_bytes: u64, preserve_header_lines: us
 }
 
 /// Predict when disk will fill based on trend
-fn predict_fill_time(history: &[(Instant, u8)], _interval_secs: u64) -> Option<f64> {
+fn predict_fill_time(history: &[(Instant, u8)]) -> Option<f64> {
     if history.len() < 3 {
         return None;
     }
@@ -1585,7 +1585,7 @@ async fn run_guard_once(
         }
         
         // Check for trend prediction warning
-        if let Some(hours_until_full) = predict_fill_time(&state.disk_history, guard.interval_secs) {
+        if let Some(hours_until_full) = predict_fill_time(&state.disk_history) {
             if hours_until_full > 0.0 && hours_until_full <= guard.trend_warn_hours as f64 {
                 let key = "disk-trend-warning".to_string();
                 if should_notify(state, &key, guard.notify_cooldown_secs.max(3600)) {
