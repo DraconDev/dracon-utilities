@@ -15,19 +15,25 @@ use crate::policy::{std_git_command, tokio_git_command, timestamp_secs};
 /// Get the list of files that actually differ from HEAD (filter-aware).
 /// Unlike `git status`, `git diff HEAD` applies clean filters and correctly
 /// ignores files that only differ due to smudge filter decryption.
-pub(crate) fn git_diff_head_files(repo: &Path) -> Vec<String> {
-    let output = std::process::Command::new("git")
-        .current_dir(repo)
-        .args(["diff", "HEAD", "--name-only", "-z"])
-        .output();
-    match output {
-        Ok(out) if out.status.success() => {
+pub(crate) async fn git_diff_head_files(repo: &Path) -> Vec<String> {
+    let repo = repo.to_path_buf();
+    let result = tokio::time::timeout(
+        Duration::from_secs(30),
+        tokio::task::spawn_blocking(move || {
+            let output = std::process::Command::new("git")
+                .current_dir(&repo)
+                .args(["diff", "HEAD", "--name-only", "-z"])
+                .output();
+            let Ok(out) = output else { return Vec::new() };
             String::from_utf8_lossy(&out.stdout)
                 .split('\0')
                 .filter(|s| !s.is_empty())
                 .map(String::from)
                 .collect()
-        }
+        }),
+    ).await;
+    match result {
+        Ok(Ok(files)) => files,
         _ => Vec::new(),
     }
 }
