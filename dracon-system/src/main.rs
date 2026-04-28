@@ -1416,6 +1416,7 @@ async fn clean_old_node_modules(roots: &[PathBuf], max_age_days: u64, apply: boo
                 reclaimed += size;
                 
                 if apply {
+                    check_safe_to_delete(&path)?;
                     if let Err(e) = tokio::fs::remove_dir_all(&path).await {
                         eprintln!("⚠️ failed to remove {}: {}", path.display(), e);
                     }
