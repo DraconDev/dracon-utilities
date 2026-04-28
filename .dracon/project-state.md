@@ -1,9 +1,8 @@
 # Project State
 
 ## Current Focus
-Added SIGHUP signal handling for policy reload in the guard daemon and fixed Git command argument formatting
+Refactored guard daemon timing to use elapsed time tracking instead of resetting elapsed counter
 
 ## Completed
-- [x] Added SIGHUP signal handling to reload system policy when received
-- [x] Fixed Git command argument formatting in process killing
-```
+- [x] Removed unused `elapsed = 0` reset in guard daemon loop
+- [x] Improved timing accuracy by maintaining elapsed time across iterations
