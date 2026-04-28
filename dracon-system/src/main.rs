@@ -2758,7 +2758,7 @@ async fn main() -> Result<()> {
                     while !shutdown.load(Ordering::SeqCst) {
                         if reload_sighup.load(Ordering::SeqCst) {
                             reload_sighup.store(false, Ordering::SeqCst);
-                            let (_, new_policy) = load_system_policy();
+                            let _ = load_system_policy();
                             normalize_guard_policy(&mut guard);
                             eprintln!("system: policy reloaded on SIGHUP (disk_warn={}%, disk_critical={}%)",
                                 guard.disk_warn_percent, guard.disk_critical_percent);
