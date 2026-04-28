@@ -4,5 +4,5 @@
 Refactored inode usage calculation to use safe arithmetic operations
 
 ## Completed
-- [x] Replaced potential division-by-zero with `checked_div` and `saturating_mul` for safer inode percentage calculation
-```
+- [x] Fixed potential division by zero in inode usage calculation by reversing the order of operations
+- [x] Improved arithmetic safety by using saturating operations for percentage calculation
