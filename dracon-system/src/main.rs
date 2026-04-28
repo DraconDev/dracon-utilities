@@ -2712,21 +2712,23 @@ async fn main() -> Result<()> {
                     let shutdown_sigint = shutdown.clone();
 
                     tokio::spawn(async move {
-                        let _ = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
-                            .unwrap()
-                            .recv()
-                            .await;
-                        eprintln!("system: received SIGTERM, shutting down gracefully...");
-                        shutdown_sigterm.store(true, Ordering::SeqCst);
+                        if let Ok(mut sig) = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+                            sig.recv().await;
+                            eprintln!("system: received SIGTERM, shutting down gracefully...");
+                            shutdown_sigterm.store(true, Ordering::SeqCst);
+                        } else {
+                            eprintln!("system: failed to set up SIGTERM handler");
+                        }
                     });
 
                     tokio::spawn(async move {
-                        let _ = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::interrupt())
-                            .unwrap()
-                            .recv()
-                            .await;
-                        eprintln!("system: received SIGINT, shutting down gracefully...");
-                        shutdown_sigint.store(true, Ordering::SeqCst);
+                        if let Ok(mut sig) = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::interrupt()) {
+                            sig.recv().await;
+                            eprintln!("system: received SIGINT, shutting down gracefully...");
+                            shutdown_sigint.store(true, Ordering::SeqCst);
+                        } else {
+                            eprintln!("system: failed to set up SIGINT handler");
+                        }
                     });
 
                     println!("guard daemon started (interval={}s)", guard.interval_secs);
