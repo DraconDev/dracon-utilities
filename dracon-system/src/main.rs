@@ -84,6 +84,7 @@ fn acquire_daemon_lock(name: &str) -> Result<File> {
     
     let file = std::fs::OpenOptions::new()
         .create(true)
+        .truncate(true)
         .write(true)
         .open(&lock_file)?;
 
@@ -904,7 +905,7 @@ async fn find_rust_target_dirs(roots: &[PathBuf]) -> Result<Vec<TargetDirInfo>> 
     }
     
     // Sort by size descending (clean largest first)
-    targets.sort_by(|a, b| b.bytes.cmp(&a.bytes));
+    targets.sort_by_key(|a| a.bytes);
     
     Ok(targets)
 }
@@ -1445,7 +1446,7 @@ async fn find_large_log_files(dirs: &[PathBuf], min_size_bytes: u64) -> Result<V
     }
     
     // Sort by size descending
-    logs.sort_by(|a, b| b.1.cmp(&a.1));
+    logs.sort_by_key(|a| a.1);
     
     Ok(logs)
 }
@@ -2449,18 +2450,21 @@ mod tests {
 
     #[test]
     fn guard_policy_normalization_is_safe() {
-        let mut p = GuardPolicy::default();
-        p.interval_secs = 0;
-        p.disk_warn_percent = 99;
-        p.disk_action_percent = 10;
-        p.disk_critical_percent = 20;
-        p.unfreeze_below_percent = 255;
-        p.process_cpu_percent = 0.0;
-        p.process_rss_mb = 0;
-        p.process_sustain_secs = 0;
-        p.notify_cooldown_secs = 0;
-        p.sync_freeze_marker = String::new();
-        p.notify_command = String::new();
+        let p = GuardPolicy {
+            interval_secs: 0,
+            disk_warn_percent: 99,
+            disk_action_percent: 10,
+            disk_critical_percent: 20,
+            unfreeze_below_percent: 255,
+            process_cpu_percent: 0.0,
+            process_rss_mb: 0,
+            process_sustain_secs: 0,
+            notify_cooldown_secs: 0,
+            sync_freeze_marker: String::new(),
+            notify_command: String::new(),
+            ..Default::default()
+        };
+        let mut p = p;
         normalize_guard_policy(&mut p);
         assert!(p.interval_secs >= 5);
         assert!(p.disk_action_percent >= p.disk_warn_percent);
