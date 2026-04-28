@@ -18,6 +18,7 @@ pub(crate) fn excluded_dir_names_set(policy: &SyncPolicy) -> BTreeSet<String> {
 }
 
 #[cfg(test)]
+#[allow(clippy::items_after_test_module)]
 mod tests {
     use super::*;
 
