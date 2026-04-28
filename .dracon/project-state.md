@@ -1,9 +1,8 @@
 # Project State
 
 ## Current Focus
-Refactored test organization and improved stuck repository expiry validation
+Refactored stuck repository expiry test to be properly structured as a test function
 
 ## Completed
-- [x] Removed redundant test for stuck repository expiry being non-zero
-- [x] Added `#[allow(clippy::items_after_test_module)]` to fix test module organization
-```
+- [x] Refactored `STUCK_REPO_EXPIRY_SECS` validation from const assertion to proper test function
+- [x] Improved test organization by converting inline assertion to dedicated test case
