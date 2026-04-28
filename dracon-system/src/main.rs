@@ -1031,20 +1031,20 @@ async fn auto_cleanup_rust_targets(
         }
         
         if apply {
-            // Delete the target directory
+            check_safe_to_delete(&target.path)?;
             if let Err(e) = tokio::fs::remove_dir_all(&target.path).await {
                 eprintln!("⚠️ failed to remove {}: {}", target.path.display(), e);
                 continue;
             }
-            
-            result.cleaned_count += 1;
-            result.reclaimed_bytes += target.bytes;
-            result.cleaned_paths.push(format!(
-                "{} ({})",
-                target.path.display(),
-                human_bytes(target.bytes)
-            ));
         }
+
+        result.cleaned_count += 1;
+        result.reclaimed_bytes += target.bytes;
+        result.cleaned_paths.push(format!(
+            "{} ({})",
+            target.path.display(),
+            human_bytes(target.bytes)
+        ));
     }
     
     Ok(result)
