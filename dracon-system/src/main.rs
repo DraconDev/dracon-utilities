@@ -2287,6 +2287,7 @@ async fn is_git_tracked_dir(path: &Path) -> Result<bool> {
 }
 
 #[cfg(test)]
+#[allow(clippy::items_after_test_module)]
 mod tests {
     use super::*;
     use std::sync::{Mutex, OnceLock};
