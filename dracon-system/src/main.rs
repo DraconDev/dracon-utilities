@@ -2695,6 +2695,8 @@ interval_secs = 30
         assert!(result.is_err(), "go cache when itself is protected should be rejected");
     }
 }
+
+#[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
 
