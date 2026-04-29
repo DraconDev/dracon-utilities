@@ -1,13 +1,10 @@
 # Project State
 
 ## Current Focus
-Clean up obsolete file pattern matching tests in exclude.rs
+Rename and adjust test for excluded directory handling
 
 ## Completed
-- [x] Removed test_matches_file_pattern_exact unit test
-- [x] Removed test_matches_file_pattern_extension unit test
-- [x] Removed test_matches_file_pattern_prefix unit test
-- [x] Removed test_matches_file_pattern_glob unit test
-- [x] Removed test_is_excluded_file_simple unit test
-- [x] Removed test_is_excluded_file_no_match unit test
-- [x] Removed test_is_excluded_file_empty_path unit test
+- [x] Rename test function from `test_has_sync_relevant_dirty_entries_excluded_dir` to `test_has_sync_relevant_dirty_entries_excluded_dir_ignored`
+- [x] Add creation of `target` directory and a file `target/file.txt` inside the temporary repo
+- [x] Change the `DiffFile` status from `Modified` to `Added` for the test entry
+- [x] Update the assertion to expect a positive result and include a descriptive error message
