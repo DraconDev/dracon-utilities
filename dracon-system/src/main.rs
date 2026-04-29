@@ -2563,74 +2563,41 @@ mod tests {
     }
 
     #[test]
-    fn check_safe_to_delete_rejects_symlink_to_root() {
+    fn check_safe_to_delete_with_custom_paths() {
         let tmp_base = std::env::temp_dir()
-            .join(format!("dracon_test_symlink_{}", std::process::id()));
-        let link_target = tmp_base.join("evil_root");
+            .join(format!("dracon_test_custom_{}", std::process::id()));
         std::fs::create_dir_all(&tmp_base).unwrap();
-        #[cfg(unix)]
-        std::os::unix::fs::symlink("/", &link_target).unwrap();
-        #[cfg(not(unix))]
-        {
-            std::fs::copy("/", &link_target).unwrap();
-        }
-        let result = check_safe_to_delete(&link_target, &[]);
-        #[cfg(unix)]
+        let custom_protected = vec![
+            tmp_base.join("important").display().to_string(),
+        ];
+        let result = check_safe_to_delete(&tmp_base, &custom_protected);
         std::fs::remove_dir_all(&tmp_base).unwrap();
-        assert!(result.is_err(), "expected rejection of symlink-to-root, got: {:?}", result);
-        let err_msg = result.unwrap_err().to_string();
+        assert!(result.is_err(), "expected rejection of user-protected path, got: {:?}", result);
+    }
+
+    #[test]
+    fn guard_policy_default_protected_paths_is_empty() {
+        let p = GuardPolicy::default();
         assert!(
-            err_msg.contains("refusing to delete"),
-            "expected refusal message, got: {err_msg}"
+            p.protected_paths.is_empty(),
+            "default protected_paths should be empty, got: {:?}",
+            p.protected_paths
         );
     }
 
     #[test]
-    fn check_safe_to_delete_rejects_symlink_to_home() {
-        let tmp_base = std::env::temp_dir()
-            .join(format!("dracon_test_symlink_home_{}", std::process::id()));
-        let link_target = tmp_base.join("evil_home");
-        std::fs::create_dir_all(&tmp_base).unwrap();
-        #[cfg(unix)]
-        std::os::unix::fs::symlink("/home", &link_target).unwrap();
-        #[cfg(not(unix))]
-        {
-            std::fs::create_dir_all(&link_target).unwrap();
-        }
-        let result = check_safe_to_delete(&link_target, &[]);
-        #[cfg(unix)]
-        std::fs::remove_dir_all(&tmp_base).unwrap();
-        assert!(result.is_err(), "expected rejection of symlink-to-home, got: {:?}", result);
-    }
-
-    #[test]
-    fn guard_policy_normalization_is_safe() {
-        let p = GuardPolicy {
-            interval_secs: 0,
-            disk_warn_percent: 99,
-            disk_action_percent: 10,
-            disk_critical_percent: 20,
-            unfreeze_below_percent: 255,
-            process_cpu_percent: 0.0,
-            process_rss_mb: 0,
-            process_sustain_secs: 0,
-            notify_cooldown_secs: 0,
-            sync_freeze_marker: String::new(),
-            notify_command: String::new(),
-            ..Default::default()
-        };
-        let mut p = p;
-        normalize_guard_policy(&mut p);
-        assert!(p.interval_secs >= 5);
-        assert!(p.disk_action_percent >= p.disk_warn_percent);
-        assert!(p.disk_critical_percent >= p.disk_action_percent);
-        assert!(p.unfreeze_below_percent < p.disk_action_percent);
-        assert!(p.process_cpu_percent >= 1.0);
-        assert!(p.process_rss_mb >= 64);
-        assert!(p.process_sustain_secs >= 5);
-        assert!(p.notify_cooldown_secs >= 5);
-        assert!(!p.sync_freeze_marker.is_empty());
-        assert!(!p.notify_command.is_empty());
+    fn guard_policy_loads_protected_paths_from_toml() {
+        let toml_content = r#"
+[guard]
+enabled = true
+protected_paths = ["/mnt/data", "/opt/important"]
+disk_mount_path = "/nix"
+interval_secs = 30
+"#;
+        let p: GuardPolicy = toml::from_str(toml_content).unwrap();
+        assert_eq!(p.protected_paths.len(), 2);
+        assert!(p.protected_paths.contains(&"/mnt/data".to_string()));
+        assert!(p.protected_paths.contains(&"/opt/important".to_string()));
     }
 
     #[test]

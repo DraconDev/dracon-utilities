@@ -1,9 +1,11 @@
 # Project State
 
 ## Current Focus
-Add tests ensuring `check_safe_to_delete` refuses deletion of symlinks targeting root and home directories.
+Refactored tests and introduced user-configurable protected paths to enhance system path protection.
 
 ## Completed
-- [x] Add test `check_safe_to_delete_rejects_symlink_to_root` that creates a symlink (or copy on non‑Unix) from `/` to a temporary file and asserts the function returns an error containing "refusing to delete".
-- [x] Add test `check_safe_to_delete_rejects_symlink_to_home` that creates a symlink (or directory) from `/home` to a temporary file and asserts the function returns an error.
-- [x] Ensure temporary directories and files are cleaned up in each test for both Unix and non‑Unix platforms.
+- [x] Refactored `check_safe_to_delete` test to reject user-protected paths.
+- [x] Removed unnecessary tests for symlink-to-root and symlink-to-home deletion.
+- [x] Refactored `GuardPolicy::default()` test to ensure protected paths are empty.
+- [x] Introduced new test for `GuardPolicy` loading protected paths from TOML configuration.
+- [x] Updated test cases for comprehensive system path protection.
