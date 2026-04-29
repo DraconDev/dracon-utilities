@@ -1,7 +1,9 @@
 # Project State
 
 ## Current Focus
-test(check_safe_to_delete): remove redundant `check_safe_to_delete_with_custom_paths` test case
+Refactor path protection tests to use the new `SystemPolicy` struct and simplified custom protected path handling
 
 ## Completed
-- [x] Remove test that validated `check_safe_to_delete` returns an error containing "user-protected" for paths in custom protectedlists
+- [x] Replaced temporary directory protection path construction with direct `display()` string
+- [x] Updated test assertions to reference `SystemPolicy.guard.protected_paths` instead of top‑level fields
+- [x] Adjusted test expectations to match the new API structure and simplified the custom protected path list

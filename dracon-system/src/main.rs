@@ -2567,9 +2567,7 @@ mod tests {
         let tmp_base = std::env::temp_dir()
             .join(format!("dracon_test_custom_{}", std::process::id()));
         std::fs::create_dir_all(&tmp_base).unwrap();
-        let custom_protected = vec![
-            tmp_base.join("important").display().to_string(),
-        ];
+        let custom_protected = vec![tmp_base.display().to_string()];
         let result = check_safe_to_delete(&tmp_base, &custom_protected);
         std::fs::remove_dir_all(&tmp_base).unwrap();
         assert!(result.is_err(), "expected rejection of user-protected path, got: {:?}", result);
@@ -2594,10 +2592,10 @@ protected_paths = ["/mnt/data", "/opt/important"]
 disk_mount_path = "/nix"
 interval_secs = 30
 "#;
-        let p: GuardPolicy = toml::from_str(toml_content).unwrap();
-        assert_eq!(p.protected_paths.len(), 2);
-        assert!(p.protected_paths.contains(&"/mnt/data".to_string()));
-        assert!(p.protected_paths.contains(&"/opt/important".to_string()));
+        let p: SystemPolicy = toml::from_str(toml_content).unwrap();
+        assert_eq!(p.guard.protected_paths.len(), 2);
+        assert!(p.guard.protected_paths.contains(&"/mnt/data".to_string()));
+        assert!(p.guard.protected_paths.contains(&"/opt/important".to_string()));
     }
 
     #[test]
