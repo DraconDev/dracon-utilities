@@ -2370,21 +2370,22 @@ watch_roots = ["/tmp/test"]
     }
 
     #[test]
-    #[ignore = "is_marker_string behavior differs from expected"]
     fn is_marker_string_edge_cases() {
         assert!(!is_marker_string(""), "empty string should not match");
         assert!(!is_marker_string("[DRACON_SECRET]"), "no colon");
-        assert!(!is_marker_string("[DRACON_SECRET:]"), "empty key");
-        assert!(!is_marker_string("[DRACON_SECRET: ]"), "space key");
+        assert!(!is_marker_string("DRACON_SECRET not in brackets"), "not in brackets");
+        assert!(!is_marker_string("[WRONG_SECRET:abc]"), "wrong prefix");
+        assert!(is_marker_string("[DRACON_SECRET:]"), "empty key is still a marker");
+        assert!(is_marker_string("[DRACON_SECRET: ]"), "space key is still a marker");
         assert!(is_marker_string("[DRACON_SECRET:abc123]"), "basic key");
         assert!(is_marker_string("[DRACON_SECRET:abc-123_456]"), "key with dash underscore");
     }
 
     #[test]
-    #[ignore = "marker_prefix_at behavior differs from expected"]
     fn marker_prefix_at_edge_cases() {
         assert_eq!(marker_prefix_at("no bracket here", 0), None);
-        assert_eq!(marker_prefix_at("[DRACON_SECRET:abc]", 0), None, "wrong position");
+        assert_eq!(marker_prefix_at("[DRACON_SECRET:abc]", 0), Some("[DRACON_SECRET:"), "starts at position 0");
+        assert_eq!(marker_prefix_at("[DRACON_SECRET:abc]", 1), None, "starts at position 1");
         assert_eq!(marker_prefix_at("prefix [DRACON_SECRET", 8), None, "incomplete bracket");
     }
 

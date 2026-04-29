@@ -1,8 +1,9 @@
 # Project State
 
 ## Current Focus
-Added automatic parent‑directory creation in `apply_managed_file` to ensure managed files can be written to nested paths.
+refine marker string handling tests to align with updated parsing behavior
 
 ## Completed
-- [x] Introduced `create_dir_all` call with context handling for missing parent directories.
-- [x] Removed the `#[ignore = "apply_managed_file may not create parent dirs"]` attribute from the `apply_managed_file_creates_parent_dirs` unit test.
+- [x] Updated `is_marker_string_edge_cases` to remove ignore and assert that empty key and space‑key markers are recognized
+- [x] Added assertions for strings not in brackets and wrong prefix, and confirmed basic and dash‑underscore keys match
+- [x] Updated `marker_prefix_at_edge_cases` to remove ignore and assert correct prefix extraction at position 0 and rejection at position 1
