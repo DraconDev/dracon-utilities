@@ -1,9 +1,11 @@
 # Project State
 
 ## Current Focus
-Refactor path protection tests to use the new `SystemPolicy` struct and simplified custom protected path handling
+Add tests for git diff head file detection and nested repo discovery.
 
-## Completed
-- [x] Replaced temporary directory protection path construction with direct `display()` string
-- [x] Updated test assertions to reference `SystemPolicy.guard.protected_paths` instead of top‑level fields
-- [x] Adjusted test expectations to match the new API structure and simplified the custom protected path list
+## Completed - [x] specific change 1 - [x] specific change 2 - [x] specific change 3 - [x] specific change 4 - [x] specific change 5
+- [x] Added async test `test_git_diff_head_files_returns_staged_files` that creates a repo with a staged file and asserts it appears in the diff.
+- [x] Added async test `test_git_diff_head_files_returns_modified_files` that modifies a file after initial commit and verifies the change is detected.
+- [x] Added async test `test_git_diff_head_files_empty_on_clean` that ensures an empty repository returns an empty diff.
+- [x] Added test `test_discover_git_repos_finds_nested_repos` that verifies the discover function finds a nested Git repository.
+- [x] Added helper function `create_temp_git_repo_with_branches` for creating temporary repos with specified branches.
