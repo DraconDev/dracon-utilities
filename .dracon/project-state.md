@@ -1,8 +1,7 @@
 # Project State
 
 ## Current Focus
-refactor: simplify early‑return assertions in sync_repo tests
+Update dependency lock files for dracon-sync and dracon-system crates
 
 ## Completed
-- [x] Replace `assert_eq!(result.unwrap(), false)` with `assert!(!result.unwrap())` for rebase, merge, and cherry‑pick scenarios
-- [x] Update the three corresponding test cases in `dracon-sync/src/sync.rs` accordingly
+- [x] chore: update Cargo.lock with new dependency versions for dracon-sync and dracon-system
