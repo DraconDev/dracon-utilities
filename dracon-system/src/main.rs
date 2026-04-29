@@ -1064,7 +1064,7 @@ async fn auto_cleanup_rust_targets(
         }
         
         if apply {
-            check_safe_to_delete(&target.path)?;
+            check_safe_to_delete(&target.path, &guard.protected_paths)?;
             if let Err(e) = tokio::fs::remove_dir_all(&target.path).await {
                 eprintln!("⚠️ failed to remove {}: {}", target.path.display(), e);
                 continue;
