@@ -2533,7 +2533,7 @@ mod tests {
 
     #[test]
     fn check_safe_to_delete_rejects_home() {
-        let result = check_safe_to_delete(Path::new("/home"));
+        let result = check_safe_to_delete(Path::new("/home"), &[]);
         assert!(result.is_err());
         let err_msg = result.unwrap_err().to_string();
         assert!(err_msg.contains("refusing to delete"), "expected refusal, got: {err_msg}");
@@ -2541,14 +2541,14 @@ mod tests {
 
     #[test]
     fn check_safe_to_delete_rejects_etc() {
-        let result = check_safe_to_delete(Path::new("/etc"));
+        let result = check_safe_to_delete(Path::new("/etc"), &[]);
         assert!(result.is_err());
     }
 
     #[test]
     fn check_safe_to_delete_allows_tmp_subdir() {
         let tmp_dir = std::env::temp_dir().join(format!("dracon_test_{}", std::process::id()));
-        let result = check_safe_to_delete(&tmp_dir);
+        let result = check_safe_to_delete(&tmp_dir, &[]);
         assert!(result.is_ok(), "expected ok, got: {:?}", result);
     }
 
@@ -2557,7 +2557,7 @@ mod tests {
         let tmp_dir = std::env::temp_dir()
             .join(format!("dracon_test_{}", std::process::id()))
             .join("nested/deep");
-        let result = check_safe_to_delete(&tmp_dir);
+        let result = check_safe_to_delete(&tmp_dir, &[]);
         assert!(result.is_ok(), "expected ok, got: {:?}", result);
     }
 
@@ -2589,6 +2589,56 @@ mod tests {
         assert!(p.notify_cooldown_secs >= 5);
         assert!(!p.sync_freeze_marker.is_empty());
         assert!(!p.notify_command.is_empty());
+    }
+
+    #[test]
+    fn check_path_str_rejects_root() {
+        assert!(!check_path_str("/", &[]));
+    }
+
+    #[test]
+    fn check_path_str_rejects_home() {
+        assert!(!check_path_str("/home", &[]));
+    }
+
+    #[test]
+    fn check_path_str_rejects_etc() {
+        assert!(!check_path_str("/etc", &[]));
+    }
+
+    #[test]
+    fn check_path_str_rejects_custom() {
+        let user_protected = &["/fake/videos", "/fake/tax"];
+        assert!(!check_path_str("/fake/videos", user_protected));
+        assert!(!check_path_str("/fake/tax", user_protected));
+    }
+
+    #[test]
+    fn check_path_str_allows_subdir() {
+        assert!(check_path_str("/home/user/cache", &[]));
+        assert!(check_path_str("/etc/config.d", &[]));
+    }
+
+    #[test]
+    fn check_path_str_allows_tmp() {
+        assert!(check_path_str("/tmp/something", &[]));
+        assert!(check_path_str("/var/tmp/app", &[]));
+    }
+
+    #[test]
+    fn check_path_str_allows_custom_subdir() {
+        let user_protected = &["/fake/videos"];
+        assert!(check_path_str("/fake/videos/my-project", user_protected));
+    }
+
+    #[test]
+    fn check_safe_to_delete_with_custom_paths() {
+        let tmp_base = std::env::temp_dir().join(format!("dracon_test_{}", std::process::id()));
+        let custom_protected = vec![tmp_base.display().to_string()];
+        let result = check_safe_to_delete(&tmp_base, &custom_protected);
+        assert!(result.is_err(), "expected err for custom-protected path, got {:?}", result);
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("user-protected"), "expected user-protected hint, got: {err_msg}");
     }
 }
 
