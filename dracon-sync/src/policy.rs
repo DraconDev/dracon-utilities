@@ -582,4 +582,100 @@ mod tests {
         let override_ = load_repo_override(repo);
         assert!(override_.auto_bump_versions.is_none());
     }
+
+    #[test]
+    fn test_env_freeze_enabled_ignores_case() {
+        std::env::set_var("DRACON_SYNC_FREEZE", "TRUE");
+        assert!(env_freeze_enabled());
+        std::env::remove_var("DRACON_SYNC_FREEZE");
+    }
+
+    #[test]
+    fn test_env_freeze_enabled_accepts_yes() {
+        std::env::set_var("DRACON_SYNC_FREEZE", "yes");
+        assert!(env_freeze_enabled());
+        std::env::remove_var("DRACON_SYNC_FREEZE");
+    }
+
+    #[test]
+    fn test_env_freeze_enabled_accepts_on() {
+        std::env::set_var("DRACON_SYNC_FREEZE", "on");
+        assert!(env_freeze_enabled());
+        std::env::remove_var("DRACON_SYNC_FREEZE");
+    }
+
+    #[test]
+    fn test_env_freeze_enabled_rejects_false() {
+        std::env::set_var("DRACON_SYNC_FREEZE", "false");
+        assert!(!env_freeze_enabled());
+        std::env::remove_var("DRACON_SYNC_FREEZE");
+    }
+
+    #[test]
+    fn test_env_freeze_enabled_rejects_empty() {
+        std::env::remove_var("DRACON_SYNC_FREEZE");
+        assert!(!env_freeze_enabled());
+    }
+
+    #[test]
+    fn test_debug_enabled_accepts_1() {
+        std::env::set_var("DRACON_SYNC_DEBUG", "1");
+        assert!(debug_enabled());
+        std::env::remove_var("DRACON_SYNC_DEBUG");
+    }
+
+    #[test]
+    fn test_debug_enabled_rejects_empty() {
+        std::env::remove_var("DRACON_SYNC_DEBUG");
+        assert!(!debug_enabled());
+    }
+
+    #[test]
+    fn test_freeze_reason_env_takes_precedence() {
+        std::env::set_var("DRACON_SYNC_FREEZE", "1");
+        let reason = freeze_reason(std::path::Path::new("/fake/policy.toml"));
+        std::env::remove_var("DRACON_SYNC_FREEZE");
+        assert_eq!(reason, Some("env DRACON_SYNC_FREEZE".to_string()));
+    }
+
+    #[test]
+    fn test_freeze_reason_none_when_not_frozen() {
+        std::env::remove_var("DRACON_SYNC_FREEZE");
+        let reason = freeze_reason(std::path::Path::new("/fake/policy.toml"));
+        assert!(reason.is_none());
+    }
+
+    #[test]
+    fn test_freeze_marker_paths_includes_dracondir() {
+        let paths = freeze_marker_paths(std::path::Path::new("/fake.toml"));
+        assert!(paths.iter().any(|p| p.to_string_lossy().contains(".dracon")));
+        assert!(paths.iter().any(|p| p.to_string_lossy().contains("freeze")));
+    }
+
+    #[test]
+    fn test_resolve_policy_path_env_override() {
+        std::env::set_var("DRACON_SYNC_POLICY", "/custom/policy.toml");
+        let path = resolve_policy_path();
+        std::env::remove_var("DRACON_SYNC_POLICY");
+        assert!(path.is_ok());
+        assert_eq!(path.unwrap(), PathBuf::from("/custom/policy.toml"));
+    }
+
+    #[test]
+    fn test_sync_policy_watch_roots_filters_nonexistent() {
+        let policy = SyncPolicy {
+            watch_roots: vec!["/nonexistent/path/one".to_string(), "/nonexistent/path/two".to_string()],
+            ..test_sync_policy()
+        };
+        let roots = policy.watch_root_paths();
+        assert!(roots.is_empty());
+    }
+
+    #[test]
+    fn test_timestamp_secs_returns_increasing_values() {
+        let ts1 = timestamp_secs();
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        let ts2 = timestamp_secs();
+        assert!(ts2 >= ts1);
+    }
 }
