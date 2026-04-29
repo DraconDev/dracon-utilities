@@ -2563,6 +2563,47 @@ mod tests {
     }
 
     #[test]
+    fn check_safe_to_delete_rejects_symlink_to_root() {
+        let tmp_base = std::env::temp_dir()
+            .join(format!("dracon_test_symlink_{}", std::process::id()));
+        let link_target = tmp_base.join("evil_root");
+        std::fs::create_dir_all(&tmp_base).unwrap();
+        #[cfg(unix)]
+        std::os::unix::fs::symlink("/", &link_target).unwrap();
+        #[cfg(not(unix))]
+        {
+            std::fs::copy("/", &link_target).unwrap();
+        }
+        let result = check_safe_to_delete(&link_target, &[]);
+        #[cfg(unix)]
+        std::fs::remove_dir_all(&tmp_base).unwrap();
+        assert!(result.is_err(), "expected rejection of symlink-to-root, got: {:?}", result);
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("refusing to delete"),
+            "expected refusal message, got: {err_msg}"
+        );
+    }
+
+    #[test]
+    fn check_safe_to_delete_rejects_symlink_to_home() {
+        let tmp_base = std::env::temp_dir()
+            .join(format!("dracon_test_symlink_home_{}", std::process::id()));
+        let link_target = tmp_base.join("evil_home");
+        std::fs::create_dir_all(&tmp_base).unwrap();
+        #[cfg(unix)]
+        std::os::unix::fs::symlink("/home", &link_target).unwrap();
+        #[cfg(not(unix))]
+        {
+            std::fs::create_dir_all(&link_target).unwrap();
+        }
+        let result = check_safe_to_delete(&link_target, &[]);
+        #[cfg(unix)]
+        std::fs::remove_dir_all(&tmp_base).unwrap();
+        assert!(result.is_err(), "expected rejection of symlink-to-home, got: {:?}", result);
+    }
+
+    #[test]
     fn guard_policy_normalization_is_safe() {
         let p = GuardPolicy {
             interval_secs: 0,
