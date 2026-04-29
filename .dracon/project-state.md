@@ -1,7 +1,7 @@
 # Project State
 
 ## Current Focus
-Remove unused `std::time::Instant` import in `test_should_notify_blocks_during_cooldown`.
+chore: update dependency lock files for dracon-sync and dracon-system crates
 
 ## Completed
-- [x] Dropped the unnecessary `use std::time::Instant;` line from the test.
+- [x] chore(multi): update dependency lock files for dracon-sync and dracon-system crates
