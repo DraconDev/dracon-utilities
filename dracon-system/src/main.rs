@@ -21,12 +21,13 @@ const SYSTEM_PROTECTED: &[&str] = &[
     "/nix", "/run", "/sys", "/dev", "/proc"
 ];
 
-fn check_safe_to_delete(path: &Path) -> Result<()> {
+fn check_safe_to_delete(path: &Path, user_protected: &[String]) -> Result<()> {
     let canon = match path.canonicalize() {
         Ok(p) => p,
         Err(_) => path.to_path_buf(),
     };
     let canon_str = canon.display().to_string();
+
     for sys_prot in SYSTEM_PROTECTED {
         if canon_str == *sys_prot {
             anyhow::bail!(
@@ -36,7 +37,35 @@ fn check_safe_to_delete(path: &Path) -> Result<()> {
             );
         }
     }
+
+    for user_prot in user_protected {
+        let prot_canon = match Path::new(user_prot).canonicalize() {
+            Ok(p) => p.display().to_string(),
+            Err(_) => user_prot.clone(),
+        };
+        if canon_str == prot_canon {
+            anyhow::bail!(
+                "refusing to delete protected path {} (matches user-protected path {})",
+                canon.display(),
+                user_prot
+            );
+        }
+    }
+
     Ok(())
+}
+
+#[cfg(test)]
+const TEST_PROTECTED: &[&str] = &[
+    "/", "/home", "/etc", "/usr", "/var", "/boot",
+    "/nix", "/run", "/sys", "/dev", "/proc"
+];
+
+#[cfg(test)]
+fn check_path_str(path: &str, user_protected: &[&str]) -> bool {
+    let normalized = path.trim_end_matches('/');
+    !TEST_PROTECTED.iter().any(|p| normalized == *p)
+        && !user_protected.iter().any(|p| normalized == *p)
 }
 
 static ROLLING_LOG: std::sync::OnceLock<Mutex<Vec<String>>> = std::sync::OnceLock::new();
