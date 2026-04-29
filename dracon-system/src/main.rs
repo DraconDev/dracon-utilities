@@ -2927,17 +2927,14 @@ interval_secs = 30
         let tmp = std::env::temp_dir().join(format!("dracon_log_test_{}", id));
         std::fs::create_dir_all(&tmp).unwrap();
         let log_file = tmp.join("test.log");
-        let content = "HEADER_LINE_1\nHEADER_LINE_2\ndata line 1\ndata line 2\ndata line 3\n";
-        std::fs::write(&log_file, content.as_bytes()).unwrap();
-        let original_size = std::fs::metadata(&log_file).unwrap().len();
-        assert_eq!(original_size, 64, "content should be 64 bytes");
+        std::fs::write(&log_file, "AAA\nBBB\nCCCCCCCC\n").unwrap();
 
-        let result = truncate_log_file(&log_file, 50, 2);
+        let result = truncate_log_file(&log_file, 10, 2);
         assert!(result.is_ok());
         let new_size = std::fs::metadata(&log_file).unwrap().len();
-        assert!(new_size <= 50, "should respect max_size_bytes but was {}", new_size);
+        assert!(new_size <= 10, "should be <= 10 but was {}", new_size);
         let new_content = std::fs::read_to_string(&log_file).unwrap();
-        assert!(new_content.starts_with("HEADER_LINE_1\nHEADER_LINE_2\n"), "headers should be preserved: {:?}", new_content);
+        assert!(new_content.starts_with("AAA\nBBB\n"), "headers should be preserved: {:?}", new_content);
 
         std::fs::remove_dir_all(&tmp).unwrap();
     }

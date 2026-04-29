@@ -436,7 +436,7 @@ dependencies = [
  "chrono",
  "clap",
  "dirs",
- "dracon-system 44.6.2",
+ "dracon-system 44.6.6",
  "fs2",
  "serde",
  "serde_json",
@@ -447,7 +447,7 @@ dependencies = [
 
 [[package]]
 name = "dracon-system"
-version = "44.6.2"
+version = "44.6.6"
 dependencies = [
  "anyhow",
  "dirs",
