@@ -696,4 +696,68 @@ auto_github_private_account = "TestAccount"
             "no remote should exist when gh is unavailable"
         );
     }
+
+    #[tokio::test]
+    async fn test_sync_repo_auto_commit_creates_commit() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", &repo.to_string_lossy(), "config", "user.email", "test@test"])
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", &repo.to_string_lossy(), "commit", "--allow-empty", "-m", "init"])
+            .status()
+            .unwrap();
+
+        // Create and stage a modified file
+        let file_path = repo.join("test.txt");
+        std::fs::write(&file_path, "hello world").unwrap();
+        std::process::Command::new("git")
+            .args(["-C", &repo.to_string_lossy(), "add", "test.txt"])
+            .status()
+            .unwrap();
+
+        // Count commits before sync
+        let commits_before = std::process::Command::new("git")
+            .args(["-C", &repo.to_string_lossy(), "rev-list", "--count", "HEAD"])
+            .output()
+            .unwrap()
+            .stdout;
+        let count_before: usize = String::from_utf8_lossy(&commits_before).trim().parse().unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = true
+auto_pull = false
+auto_push = false
+auto_bump_versions = false
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0).await;
+        assert!(result.is_ok(), "sync_repo should succeed: {:?}", result);
+
+        // Verify a commit was created
+        let commits_after = std::process::Command::new("git")
+            .args(["-C", &repo.to_string_lossy(), "rev-list", "--count", "HEAD"])
+            .output()
+            .unwrap()
+            .stdout;
+        let count_after: usize = String::from_utf8_lossy(&commits_after).trim().parse().unwrap();
+        assert_eq!(
+            count_after, count_before + 1,
+            "sync_repo should have created one new commit (before={}, after={})",
+            count_before, count_after
+        );
+    }
 }
