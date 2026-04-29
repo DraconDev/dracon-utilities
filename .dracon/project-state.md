@@ -1,8 +1,8 @@
 # Project State
 
 ## Current Focus
-Updated Cargo.lock to reflect dependency changes
+Added protected paths configuration to prevent accidental deletion of critical directories
 
 ## Completed
-- [x] Updated Cargo.lock to reflect dependency changes
-```
+- [x] Added `protected_paths` field to `GuardPolicy` to specify directories that should never be deleted
+- [x] Implemented default empty vector for `protected_paths` in `GuardPolicy` implementation
