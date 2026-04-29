@@ -1,8 +1,10 @@
 # Project State
 
 ## Current Focus
-Updated Cargo.toml files across dracon-sync, dracon-system, and dracon-warden crates
+Added user-configurable protected paths to prevent accidental deletion of critical system directories
 
 ## Completed
-- [x] Updated Cargo.toml files in all three crates (likely dependency version changes or metadata updates)
-- [x] No functional changes detected in the diff (only binary file modifications)
+- [x] Added system-wide protected paths (`/`, `/home`, `/etc`, etc.)
+- [x] Added configuration option for custom protected paths in `dracon-system.toml`
+- [x] Implemented safety checks for all `remove_dir_all` operations
+- [x] Required `--apply` flag for destructive operations
