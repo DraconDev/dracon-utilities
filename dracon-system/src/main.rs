@@ -1328,6 +1328,7 @@ async fn empty_trash(apply: bool, protected_paths: &[String]) -> Result<(u64, Ve
         if trash_info.exists() {
             let info_size = get_dir_size(&trash_info).await.unwrap_or(0);
             if info_size > 0 && apply {
+                check_safe_to_delete(&trash_info, protected_paths)?;
                 if let Err(e) = tokio::fs::remove_dir_all(&trash_info).await {
                     eprintln!("⚠️ failed to remove trash info: {}", e);
                 } else if let Err(e) = tokio::fs::create_dir_all(&trash_info).await {
