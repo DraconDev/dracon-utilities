@@ -1,10 +1,8 @@
 # Project State
 
 ## Current Focus
-Replace all managed blocks in file content rather than only the first occurrence.
+Added automatic parent‑directory creation in `apply_managed_file` to ensure managed files can be written to nested paths.
 
 ## Completed
-- [x] Refactored `replace_managed_block` to iteratively replace every managed block in the input string.
-- [x] Updated `effective_discovery_roots` to utilize the new replacement logic.
-- [x] Removed the `#[ignore]` attribute from the test that verifies multiple‑block replacement.
-- [x] Test `replace_managed_block_multiple_blocks_replaces_all` now passes, confirming full block replacement handling.
+- [x] Introduced `create_dir_all` call with context handling for missing parent directories.
+- [x] Removed the `#[ignore = "apply_managed_file may not create parent dirs"]` attribute from the `apply_managed_file_creates_parent_dirs` unit test.

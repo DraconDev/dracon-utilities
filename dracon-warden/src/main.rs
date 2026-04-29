@@ -519,6 +519,10 @@ fn apply_managed_file(path: &Path, block: &str) -> Result<bool> {
     let current = fs::read_to_string(path).unwrap_or_default();
     let next = replace_managed_block(&current, block);
     if next != current {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)
+                .with_context(|| format!("failed creating parent dirs for {}", path.display()))?;
+        }
         fs::write(path, next).with_context(|| format!("failed writing {}", path.display()))?;
         return Ok(true);
     }
@@ -2332,7 +2336,6 @@ watch_roots = ["/tmp/test"]
     }
 
     #[test]
-    #[ignore = "apply_managed_file may not create parent dirs"]
     fn apply_managed_file_creates_parent_dirs() {
         let td = TestDir::new("warden_apply_creates_dirs");
         let nested = td.path().join("a/b/c/managed.txt");
