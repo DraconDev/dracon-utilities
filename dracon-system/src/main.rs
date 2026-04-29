@@ -2884,6 +2884,65 @@ interval_secs = 30
         std::fs::remove_dir_all(&tmp).unwrap();
     }
 
+    #[test]
+    fn test_truncate_log_file_noop_when_under_limit() {
+        let tmp = std::env::temp_dir().join(format!("dracon_log_test_{}", std::process::id()));
+        std::fs::create_dir_all(&tmp).unwrap();
+        let log_file = tmp.join("test.log");
+        std::fs::write(&log_file, b"small content\n").unwrap();
+
+        let result = truncate_log_file(&log_file, 1024, 0);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), 0, "no bytes reclaimed when under limit");
+        assert_eq!(std::fs::read_to_string(&log_file).unwrap(), "small content\n");
+
+        std::fs::remove_dir_all(&tmp).unwrap();
+    }
+
+    #[test]
+    fn test_truncate_log_file_simple_truncate() {
+        let tmp = std::env::temp_dir().join(format!("dracon_log_test_{}", std::process::id()));
+        std::fs::create_dir_all(&tmp).unwrap();
+        let log_file = tmp.join("test.log");
+        let large_content = "x\n".repeat(1000);
+        std::fs::write(&log_file, large_content.as_bytes()).unwrap();
+        let original_size = std::fs::metadata(&log_file).unwrap().len();
+        assert!(original_size > 100, "sanity check: file should be large");
+
+        let result = truncate_log_file(&log_file, 100, 0);
+        assert!(result.is_ok());
+        let reclaimed = result.unwrap();
+        assert!(reclaimed > 0, "should have reclaimed some bytes");
+        let new_size = std::fs::metadata(&log_file).unwrap().len();
+        assert_eq!(new_size, 100, "file should be truncated to max_size_bytes");
+
+        std::fs::remove_dir_all(&tmp).unwrap();
+    }
+
+    #[test]
+    fn test_truncate_log_file_preserves_headers() {
+        let tmp = std::env::temp_dir().join(format!("dracon_log_test_{}", std::process::id()));
+        std::fs::create_dir_all(&tmp).unwrap();
+        let log_file = tmp.join("test.log");
+        let content = "HEADER_LINE_1\nHEADER_LINE_2\ndata line 1\ndata line 2\ndata line 3\n";
+        std::fs::write(&log_file, content.as_bytes()).unwrap();
+        let original_size = std::fs::metadata(&log_file).unwrap().len();
+
+        let result = truncate_log_file(&log_file, 50, 2);
+        assert!(result.is_ok());
+        let new_content = std::fs::read_to_string(&log_file).unwrap();
+        assert!(new_content.starts_with("HEADER_LINE_1\nHEADER_LINE_2\n"), "headers should be preserved");
+        assert!(new_content.len() <= 50, "should respect max_size_bytes");
+
+        std::fs::remove_dir_all(&tmp).unwrap();
+    }
+
+    #[test]
+    fn test_truncate_log_file_nonexistent_returns_err() {
+        let result = truncate_log_file(std::path::Path::new("/nonexistent/path.log"), 100, 0);
+        assert!(result.is_err(), "nonexistent file should return error");
+    }
+
 }
 
 #[tokio::main]
