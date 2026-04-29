@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use clap::{Parser, Subcommand};
+use clap::{ArgAction, Parser, Subcommand};
 use fs2::FileExt;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -166,6 +166,9 @@ fn events_path() -> PathBuf {
 #[command(about = "Deterministic system utility (no AI)")]
 #[command(version)]
 struct Cli {
+    /// Increase output verbosity. Can be repeated up to 2 times (-v, -vv).
+    #[arg(global = true, short, long, action = ArgAction::Count)]
+    verbose: u8,
     #[command(subcommand)]
     cmd: Commands,
 }
