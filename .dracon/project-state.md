@@ -1,9 +1,10 @@
 # Project State
 
 ## Current Focus
-Fix truncate_log_file to correctly respect max_size_bytes when preserving header lines and promote the previously ignored header‑preservation test.
+Replace all managed blocks in file content rather than only the first occurrence.
 
 ## Completed
-- [x] Replace `bytes_written` tracking with `total_written` that accumulates header line lengths, enabling proper size‑limit checks when preserving header lines.
-- [x] Rename and un‑ignore the test `test_truncate_log_file_preserves_headers_buggy` to `test_truncate_log_file_preserves_headers`.
-- [x] Update truncation logic to use `total_written` instead of `bytes_written`, fixing the bug where the function would prematurely stop truncation when preserving headers.
+- [x] Refactored `replace_managed_block` to iteratively replace every managed block in the input string.
+- [x] Updated `effective_discovery_roots` to utilize the new replacement logic.
+- [x] Removed the `#[ignore]` attribute from the test that verifies multiple‑block replacement.
+- [x] Test `replace_managed_block_multiple_blocks_replaces_all` now passes, confirming full block replacement handling.
