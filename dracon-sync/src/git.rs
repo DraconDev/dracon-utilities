@@ -1473,6 +1473,77 @@ mod tests {
         let _ = std::fs::remove_dir_all(repo_path);
     }
 
+    #[tokio::test]
+    async fn test_git_diff_head_files_returns_staged_files() {
+        let repo_path = create_temp_git_repo("diff_head");
+        std::fs::write(repo_path.join("new.txt"), "content\n").ok();
+        std::process::Command::new("git")
+            .args(["add", "new.txt"])
+            .current_dir(&repo_path)
+            .output()
+            .expect("git add failed");
+        let files = git_diff_head_files(&repo_path).await;
+        let _ = std::fs::remove_dir_all(&repo_path);
+        assert!(files.contains(&"new.txt".to_string()), "staged file should appear in diff: {:?}", files);
+    }
+
+    #[tokio::test]
+    async fn test_git_diff_head_files_returns_modified_files() {
+        let repo_path = create_temp_git_repo("diff_modified");
+        std::fs::write(repo_path.join("test.txt"), "modified\n").ok();
+        std::process::Command::new("git")
+            .args(["commit", "-q", "-m", "initial"])
+            .current_dir(&repo_path)
+            .output()
+            .expect("git commit failed");
+        std::fs::write(repo_path.join("test.txt"), "changed\n").ok();
+        let files = git_diff_head_files(&repo_path).await;
+        let _ = std::fs::remove_dir_all(&repo_path);
+        assert!(files.contains(&"test.txt".to_string()), "modified file should appear in diff: {:?}", files);
+    }
+
+    #[tokio::test]
+    async fn test_git_diff_head_files_empty_on_clean() {
+        let repo_path = create_temp_git_repo("diff_clean");
+        std::process::Command::new("git")
+            .args(["commit", "-q", "-m", "initial"])
+            .current_dir(&repo_path)
+            .output()
+            .expect("git commit failed");
+        let files = git_diff_head_files(&repo_path).await;
+        let _ = std::fs::remove_dir_all(&repo_path);
+        assert!(files.is_empty(), "clean repo should return empty diff: {:?}", files);
+    }
+
+    #[test]
+    fn test_discover_git_repos_finds_nested_repos() {
+        let temp = std::env::temp_dir().join(format!("dracon_test_discover_{}", std::process::id()));
+        std::fs::create_dir_all(&temp).ok();
+        std::fs::create_dir_all(temp.join("project/repos/nested")).ok();
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "master"])
+            .current_dir(temp.join("project/repos/nested"))
+            .output()
+            .expect("git init failed");
+        std::fs::write(temp.join("project/repos/nested/file.txt"), "x\n").ok();
+        std::process::Command::new("git")
+            .args(["add", "."])
+            .current_dir(temp.join("project/repos/nested"))
+            .output()
+            .ok();
+        std::process::Command::new("git")
+            .args(["commit", "-q", "-m", "init"])
+            .current_dir(temp.join("project/repos/nested"))
+            .output()
+            .ok();
+        let roots = vec![temp.join("project")];
+        let excluded = BTreeSet::new();
+        let repos = discover_git_repos(&roots, &excluded, &[], None);
+        let _ = std::fs::remove_dir_all(&temp);
+        assert_eq!(repos.len(), 1, "should find the nested repo: {:?}", repos);
+        assert!(repos[0].ends_with("nested"), "repo path should end with nested");
+    }
+
     fn create_temp_git_repo_with_branches(name: &str, branches: &[&str]) -> std::path::PathBuf {
         let rng = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
