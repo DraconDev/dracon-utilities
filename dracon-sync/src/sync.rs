@@ -655,3 +655,45 @@ pub(crate) async fn sync_repo(
 
     Ok(false)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_sync_repo_auto_github_private_graceful_on_no_gh() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", &repo.to_string_lossy(), "config", "user.email", "test@test"])
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", &repo.to_string_lossy(), "commit", "--allow-empty", "-m", "init"])
+            .status()
+            .unwrap();
+
+        let toml_str = r#"
+auto_github_private = true
+auto_github_private_account = "TestAccount"
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0).await;
+        assert!(result.is_ok(), "sync_repo should handle missing gh gracefully: {:?}", result);
+
+        assert!(
+            !has_origin_remote(&repo),
+            "no remote should exist when gh is unavailable"
+        );
+    }
+}
