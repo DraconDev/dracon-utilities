@@ -28,14 +28,11 @@ fn check_safe_to_delete(path: &Path, user_protected: &[String]) -> Result<()> {
     };
     let canon_str = canon.display().to_string();
 
-    for sys_prot in SYSTEM_PROTECTED {
-        if canon_str == *sys_prot {
-            anyhow::bail!(
-                "refusing to delete protected path {} (matches system root {})",
-                canon.display(),
-                sys_prot
-            );
-        }
+    if SYSTEM_PROTECTED.contains(&canon_str.as_str()) {
+        anyhow::bail!(
+            "refusing to delete protected path {} (matches system root)",
+            canon.display()
+        );
     }
 
     for user_prot in user_protected {
