@@ -2070,7 +2070,7 @@ mod tests {
     }
     impl VarGuard {
         fn set_temp(var: &str, value: &str) -> Self {
-            let original = std::env::var(var).ok();
+            let _original = std::env::var(var).ok();
             if value.is_empty() {
                 std::env::remove_var(var);
             } else {
