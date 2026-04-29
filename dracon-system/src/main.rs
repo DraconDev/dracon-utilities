@@ -1210,7 +1210,14 @@ fn parse_docker_size(s: &str) -> u64 {
 }
 
 /// Clean package manager caches
-async fn clean_package_caches(cargo: bool, npm: bool, pip: bool, go: bool, apply: bool) -> Result<(u64, Vec<String>)> {
+async fn clean_package_caches(
+    cargo: bool,
+    npm: bool,
+    pip: bool,
+    go: bool,
+    apply: bool,
+    protected_paths: &[String],
+) -> Result<(u64, Vec<String>)> {
     let mut reclaimed = 0u64;
     let mut cleaned = Vec::new();
     
@@ -1221,7 +1228,7 @@ async fn clean_package_caches(cargo: bool, npm: bool, pip: bool, go: bool, apply
                 let size = get_dir_size(&cargo_cache).await.unwrap_or(0);
                 if size > 0 {
                     if apply {
-                        check_safe_to_delete(&cargo_cache)?;
+                        check_safe_to_delete(&cargo_cache, protected_paths)?;
                         if let Err(e) = tokio::fs::remove_dir_all(&cargo_cache).await {
                             eprintln!("⚠️ failed to remove cargo cache: {}", e);
                         }
@@ -1240,7 +1247,7 @@ async fn clean_package_caches(cargo: bool, npm: bool, pip: bool, go: bool, apply
                 let size = get_dir_size(&npm_cache).await.unwrap_or(0);
                 if size > 0 {
                     if apply {
-                        check_safe_to_delete(&npm_cache)?;
+                        check_safe_to_delete(&npm_cache, protected_paths)?;
                         if let Err(e) = tokio::fs::remove_dir_all(&npm_cache).await {
                             eprintln!("⚠️ failed to remove npm cache: {}", e);
                         }
@@ -1259,7 +1266,7 @@ async fn clean_package_caches(cargo: bool, npm: bool, pip: bool, go: bool, apply
                 let size = get_dir_size(&pip_cache).await.unwrap_or(0);
                 if size > 0 {
                     if apply {
-                        check_safe_to_delete(&pip_cache)?;
+                        check_safe_to_delete(&pip_cache, protected_paths)?;
                         if let Err(e) = tokio::fs::remove_dir_all(&pip_cache).await {
                             eprintln!("⚠️ failed to remove pip cache: {}", e);
                         }
@@ -1278,7 +1285,7 @@ async fn clean_package_caches(cargo: bool, npm: bool, pip: bool, go: bool, apply
                 let size = get_dir_size(&go_cache).await.unwrap_or(0);
                 if size > 0 {
                     if apply {
-                        check_safe_to_delete(&go_cache)?;
+                        check_safe_to_delete(&go_cache, protected_paths)?;
                         if let Err(e) = tokio::fs::remove_dir_all(&go_cache).await {
                             eprintln!("⚠️ failed to remove go cache: {}", e);
                         }
@@ -1395,7 +1402,12 @@ async fn clean_nix_garbage(keep_generations: u32, apply: bool) -> Result<(u64, V
 }
 
 /// Clean old node_modules directories
-async fn clean_old_node_modules(roots: &[PathBuf], max_age_days: u64, apply: bool) -> Result<(u64, Vec<String>)> {
+async fn clean_old_node_modules(
+    roots: &[PathBuf],
+    max_age_days: u64,
+    apply: bool,
+    protected_paths: &[String],
+) -> Result<(u64, Vec<String>)> {
     use walkdir::WalkDir;
     
     let mut reclaimed = 0u64;
@@ -1449,7 +1461,7 @@ async fn clean_old_node_modules(roots: &[PathBuf], max_age_days: u64, apply: boo
                 reclaimed += size;
                 
                 if apply {
-                    check_safe_to_delete(&path)?;
+                    check_safe_to_delete(&path, protected_paths)?;
                     if let Err(e) = tokio::fs::remove_dir_all(&path).await {
                         eprintln!("⚠️ failed to remove {}: {}", path.display(), e);
                     }
