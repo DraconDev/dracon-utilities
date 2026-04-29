@@ -2739,6 +2739,152 @@ interval_secs = 30
 
         std::fs::remove_dir_all(&tmp).unwrap();
     }
+
+    #[test]
+    fn test_disk_state_ok() {
+        let guard = GuardPolicy {
+            disk_warn_percent: 70,
+            disk_action_percent: 85,
+            disk_critical_percent: 95,
+            ..Default::default()
+        };
+        assert_eq!(disk_state(50, &guard), "ok");
+        assert_eq!(disk_state(69, &guard), "ok");
+    }
+
+    #[test]
+    fn test_disk_state_warn() {
+        let guard = GuardPolicy {
+            disk_warn_percent: 70,
+            disk_action_percent: 85,
+            disk_critical_percent: 95,
+            ..Default::default()
+        };
+        assert_eq!(disk_state(70, &guard), "warn");
+        assert_eq!(disk_state(84, &guard), "warn");
+    }
+
+    #[test]
+    fn test_disk_state_action() {
+        let guard = GuardPolicy {
+            disk_warn_percent: 70,
+            disk_action_percent: 85,
+            disk_critical_percent: 95,
+            ..Default::default()
+        };
+        assert_eq!(disk_state(85, &guard), "action");
+        assert_eq!(disk_state(94, &guard), "action");
+    }
+
+    #[test]
+    fn test_disk_state_critical() {
+        let guard = GuardPolicy {
+            disk_warn_percent: 70,
+            disk_action_percent: 85,
+            disk_critical_percent: 95,
+            ..Default::default()
+        };
+        assert_eq!(disk_state(95, &guard), "critical");
+        assert_eq!(disk_state(100, &guard), "critical");
+    }
+
+    #[test]
+    fn test_predict_fill_time_insufficient_data() {
+        use std::time::Instant;
+        let history: Vec<(Instant, u8)> = vec![];
+        assert!(predict_fill_time(&history).is_none());
+
+        let history = vec![(Instant::now(), 50u8)];
+        assert!(predict_fill_time(&history).is_none());
+
+        let history = vec![(Instant::now(), 50u8), (Instant::now(), 51u8)];
+        assert!(predict_fill_time(&history).is_none());
+    }
+
+    #[test]
+    fn test_predict_fill_time_stable_disk() {
+        use std::time::{Duration, Instant};
+        let now = Instant::now();
+        let history = vec![
+            (now, 50u8),
+            (now + Duration::from_secs(60), 50u8),
+            (now + Duration::from_secs(120), 50u8),
+        ];
+        assert!(predict_fill_time(&history).is_none(), "stable disk should return None");
+    }
+
+    #[test]
+    fn test_predict_fill_time_declining() {
+        use std::time::{Duration, Instant};
+        let now = Instant::now();
+        let history = vec![
+            (now, 50u8),
+            (now + Duration::from_secs(60), 49u8),
+            (now + Duration::from_secs(120), 48u8),
+        ];
+        assert!(predict_fill_time(&history).is_none(), "declining disk should return None");
+    }
+
+    #[test]
+    fn test_should_notify_allows_first_notification() {
+        let mut state = GuardRuntimeState::default();
+        let result = should_notify(&mut state, "test-key", 3600);
+        assert!(result, "first notification should be allowed");
+    }
+
+    #[test]
+    fn test_should_notify_blocks_during_cooldown() {
+        use std::time::Instant;
+        let mut state = GuardRuntimeState::default();
+        let key = "test-cooldown";
+        should_notify(&mut state, key, 3600);
+        let result = should_notify(&mut state, key, 3600);
+        assert!(!result, "second notification should be blocked during cooldown");
+    }
+
+    #[test]
+    fn test_should_notify_allows_different_keys() {
+        let mut state = GuardRuntimeState::default();
+        let result1 = should_notify(&mut state, "key-a", 3600);
+        let result2 = should_notify(&mut state, "key-b", 3600);
+        assert!(result1, "first key should be allowed");
+        assert!(result2, "different key should always be allowed");
+    }
+
+    #[tokio::test]
+    async fn test_auto_cleanup_rust_targets_with_apply_actually_deletes() {
+        let tmp = std::env::temp_dir().join(format!("dracon_rust_apply_{}", std::process::id()));
+        let project_dir = tmp.join("my-project");
+        let target_dir = project_dir.join("target/debug");
+        std::fs::create_dir_all(&target_dir).unwrap();
+        std::fs::write(target_dir.join("libtest.rlib"), vec![0u8; 1024]).unwrap();
+        std::fs::write(project_dir.join("Cargo.toml"), "version = '0.1.0'\n").unwrap();
+
+        let guard = GuardPolicy {
+            rust_search_roots: tmp.display().to_string(),
+            cleanup_min_size_mb: 0,
+            ..Default::default()
+        };
+        let mut state = GuardRuntimeState::default();
+
+        let result = auto_cleanup_rust_targets(&guard, &mut state, true).await;
+        assert!(result.is_ok(), "apply=true should not fail: {:?}", result);
+        let report = result.unwrap();
+        assert_eq!(
+            report.cleaned_count, 1,
+            "apply=true should clean exactly 1 target directory"
+        );
+        assert!(
+            !target_dir.exists(),
+            "target dir should be deleted when apply=true"
+        );
+        assert!(
+            report.cleaned_paths.len() == 1,
+            "should report the cleaned path"
+        );
+        std::fs::remove_dir_all(&tmp).unwrap();
+    }
+
 }
 
 #[tokio::main]
