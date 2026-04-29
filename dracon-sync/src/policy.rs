@@ -676,11 +676,9 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "env var tests interfere with each other in parallel - needs VarGuard with Mutex"]
     fn test_resolve_policy_path_env_override() {
-        std::env::set_var("DRACON_SYNC_POLICY", "/custom/policy.toml");
+        let _guard = VarGuard::set_temp("DRACON_SYNC_POLICY", "/custom/policy.toml");
         let path = resolve_policy_path();
-        std::env::remove_var("DRACON_SYNC_POLICY");
         assert!(path.is_ok());
         assert_eq!(path.unwrap(), PathBuf::from("/custom/policy.toml"));
     }
