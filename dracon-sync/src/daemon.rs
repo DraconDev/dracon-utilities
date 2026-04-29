@@ -405,7 +405,7 @@ pub(crate) async fn run_daemon(policy_path: PathBuf) -> Result<()> {
         let inactivity_delay = Duration::from_secs(policy.inactivity_push_delay_secs.max(1));
         let roots = policy.watch_root_paths();
         let excluded_dir_names = excluded_dir_names_set(&policy);
-    let repos = discover_git_repos(&roots, &excluded_dir_names, &policy.exclude_repos, Some(&policy.system_repo));
+        let repos = discover_git_repos(&roots, &excluded_dir_names, &policy.exclude_repos, Some(&policy.system_repo));
         let repo_set: BTreeSet<PathBuf> = repos.iter().cloned().collect();
         activity.retain(|repo, _| repo_set.contains(repo));
         repair_cooldowns.retain(|repo, _| repo_set.contains(repo));
