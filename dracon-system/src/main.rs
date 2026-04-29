@@ -2598,7 +2598,15 @@ mod tests {
     #[test]
     fn check_path_str_rejects_root() {
         assert!(!check_path_str("/", &[]));
+    }
+
+    #[test]
+    fn check_path_str_rejects_home() {
         assert!(!check_path_str("/home", &[]));
+    }
+
+    #[test]
+    fn check_path_str_rejects_etc() {
         assert!(!check_path_str("/etc", &[]));
     }
 
