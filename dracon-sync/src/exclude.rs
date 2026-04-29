@@ -21,6 +21,7 @@ pub(crate) fn excluded_dir_names_set(policy: &SyncPolicy) -> BTreeSet<String> {
 #[allow(clippy::items_after_test_module)]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
 
     #[test]
     fn test_is_excluded_dir_name_exact() {
