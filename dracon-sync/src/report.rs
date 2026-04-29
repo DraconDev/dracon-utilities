@@ -2065,21 +2065,38 @@ mod tests {
         assert!(ts <= now + 1);
     }
 
+    struct VarGuard {
+        var: String,
+    }
+    impl VarGuard {
+        fn set_temp(var: &str, value: &str) -> Self {
+            let original = std::env::var(var).ok();
+            if value.is_empty() {
+                std::env::remove_var(var);
+            } else {
+                std::env::set_var(var, value);
+            }
+            Self { var: var.to_string() }
+        }
+    }
+    impl Drop for VarGuard {
+        fn drop(&mut self) {
+            std::env::remove_var(&self.var);
+        }
+    }
+
     #[test]
-    #[ignore]
     fn test_incident_ledger_path_default() {
-        std::env::remove_var("DRACON_SYNC_LEDGER");
+        let _guard = VarGuard::set_temp("DRACON_SYNC_LEDGER", "");
         let path = incident_ledger_path(std::path::Path::new("/fake/policy.toml"));
         assert!(path.to_string_lossy().contains("dracon-sync-incidents.jsonl"));
     }
 
     #[test]
-    #[ignore]
     fn test_incident_ledger_path_custom_env() {
-        std::env::set_var("DRACON_SYNC_LEDGER", "/custom/path/ledger.jsonl");
+        let _guard = VarGuard::set_temp("DRACON_SYNC_LEDGER", "/custom/path/ledger.jsonl");
         let path = incident_ledger_path(std::path::Path::new("/fake/policy.toml"));
         let result = path.to_string_lossy();
-        std::env::remove_var("DRACON_SYNC_LEDGER");
         assert_eq!(result, "/custom/path/ledger.jsonl");
     }
 
