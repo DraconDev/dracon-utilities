@@ -460,6 +460,9 @@ struct GuardPolicy {
     /// Clean old node_modules (older than N days)
     #[serde(default = "default_node_modules_max_age_days")]
     node_modules_max_age_days: u64,
+    /// Paths that should never be deleted (e.g. ~/Videos, ~/Documents/tax)
+    #[serde(default)]
+    protected_paths: Vec<String>,
 }
 
 impl Default for GuardPolicy {
@@ -507,6 +510,7 @@ impl Default for GuardPolicy {
             clean_nix_garbage: default_true(),
             nix_keep_generations: 5,
             node_modules_max_age_days: default_node_modules_max_age_days(),
+            protected_paths: Vec::new(),
         }
     }
 }
