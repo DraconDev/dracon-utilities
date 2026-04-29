@@ -526,7 +526,6 @@ impl SecretScanner {
             full_regex,
         })
     }
-    }
 
     pub fn scan(&self, content: &str) -> Vec<SecretFinding> {
         use rayon::prelude::*;
