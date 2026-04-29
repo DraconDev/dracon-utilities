@@ -1,7 +1,8 @@
 # Project State
 
 ## Current Focus
-chore: regenerated Cargo.lock for dracon-sync
+chore(deps): update dependency lock files for dracon-sync and dracon-system
 
 ## Completed
-- [x] Regenerated Cargo.lock for dracon-sync
+- [x] Regenerated dracon-sync/Cargo.lock
+- [x] Regenerated dracon-system/Cargo.lock
