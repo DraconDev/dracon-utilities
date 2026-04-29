@@ -248,13 +248,15 @@ mod tests {
     }
 
     #[test]
-    fn test_has_sync_relevant_dirty_entries_excluded_dir() {
+    fn test_has_sync_relevant_dirty_entries_excluded_dir_ignored() {
         use dracon_git::types::{DiffFile, FileStatus};
         let tmp = tempfile::tempdir().unwrap();
         let repo = tmp.path();
+        std::fs::create_dir_all(repo.join("target")).unwrap();
+        std::fs::write(repo.join("target").join("file.txt"), "content").unwrap();
         let entries = vec![DiffFile {
             path: PathBuf::from("target/file.txt"),
-            status: FileStatus::Modified,
+            status: FileStatus::Added,
         }];
         let excluded: BTreeSet<String> = ["target".to_string()].into_iter().collect();
         assert!(!has_sync_relevant_dirty_entries(
@@ -263,7 +265,7 @@ mod tests {
             &excluded,
             &[],
             100 * 1024 * 1024
-        ));
+        ), "untracked file in excluded dir should be ignored (not large, not restorable)");
     }
 
     #[test]
