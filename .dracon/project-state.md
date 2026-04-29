@@ -1,7 +1,9 @@
 # Project State
 
 ## Current Focus
-chore: regenerate Cargo.lock for dracon-sync, updating dependency versions
+Replace VarGuard temporary environment variable usage with std::env::set_var and remove_var in `test_incident_ledger_path_custom_env`.
 
 ## Completed
-- [x] Updated dracon-sync/Cargo.lock with newly resolved dependency versions
+- [x] Switched from `VarGuard::set_temp` to `std::env::set_var` to set the environment variable.
+- [x] Added explicit `std::env::remove_var` after the test to clean up the variable.
+- [x] Removed the `VarGuard` guard variable that was previously used for cleanup.
