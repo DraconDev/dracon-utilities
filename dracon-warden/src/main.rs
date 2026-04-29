@@ -2395,7 +2395,6 @@ watch_roots = ["/tmp/test"]
         let salvaged = salvage_invalid_json_markers(input).expect("should salvage");
         let v: serde_json::Value = serde_json::from_str(&salvaged).expect("should parse");
         assert!(v["key"].is_null() || v["key"].is_string());
-        std::env::set_var("HOME", "/tmp");
     }
 
     #[test]
