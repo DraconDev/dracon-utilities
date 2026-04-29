@@ -1662,7 +1662,7 @@ pub(crate) async fn run_repair_warns(
     Ok(summary)
 }
 
-fn create_github_private_remote(repo: &Path, account: &str) -> Option<String> {
+pub(crate) fn create_github_private_remote(repo: &Path, account: &str) -> Option<String> {
     let base_name = repo.file_name()?.to_str()?.to_string();
     
     let mut repo_name = base_name.clone();

@@ -43,6 +43,17 @@ pub(crate) async fn sync_repo(
     }
 
     let has_origin = has_origin_remote(repo);
+    let has_origin = if !has_origin && policy.auto_github_private {
+        if let Some(url) = crate::report::create_github_private_remote(repo, &policy.auto_github_private_account) {
+            println!("🔗 created remote for {}: {}", repo.display(), url);
+            true
+        } else {
+            eprintln!("⚠️ failed to create GitHub remote for {}", repo.display());
+            false
+        }
+    } else {
+        has_origin
+    };
     let has_upstream = has_tracking_upstream(repo);
     let blob_threshold = push_large_blob_threshold_bytes(policy);
     let initial_status = svc.get_status().await?;
