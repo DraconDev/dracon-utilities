@@ -1,7 +1,7 @@
 # Project State
 
 ## Current Focus
-Updated dependencies in Cargo.lock for signal handling infrastructure across dracon-sync and dracon-system components
+Update the `dracon-sync` crate manifest to reflect recent metadata changes.
 
 ## Completed
-- [x] feat(dependencies): Updated dependencies in Cargo.lock for signal handling infrastructure in dracon-sync and dracon-system
+- [x] cargo(manifest): adjust `dracon-sync/Cargo.toml` (e.g., version/metadata) to align with recent dependency and build configuration updates.
