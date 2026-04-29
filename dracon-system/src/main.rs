@@ -2525,7 +2525,7 @@ mod tests {
 
     #[test]
     fn check_safe_to_delete_rejects_root() {
-        let result = check_safe_to_delete(Path::new("/"));
+        let result = check_safe_to_delete(Path::new("/"), &[]);
         assert!(result.is_err());
         let err_msg = result.unwrap_err().to_string();
         assert!(err_msg.contains("refusing to delete"), "expected refusal, got: {err_msg}");
