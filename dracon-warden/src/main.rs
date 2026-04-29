@@ -128,6 +128,7 @@ const FORBIDDEN_PLAINTEXT_SUBSTRINGS: &[&str] = &[
 #[derive(Parser, Debug)]
 #[command(name = "dracon-warden")]
 #[command(about = "Lightweight Warden runtime")]
+#[command(version)]
 struct Cli {
     #[command(subcommand)]
     cmd: Command,

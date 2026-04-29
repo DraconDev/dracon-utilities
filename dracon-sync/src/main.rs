@@ -24,6 +24,7 @@ use sync::sync_repo;
 #[derive(Parser, Debug)]
 #[command(name = "dracon-sync")]
 #[command(about = "Dracon sync runtime")]
+#[command(version)]
 struct Cli {
     #[command(subcommand)]
     cmd: Command,

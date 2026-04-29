@@ -1,7 +1,7 @@
 # Project State
 
 ## Current Focus
-Promote the binary entry point to an async runtime by annotating `main` with `#[tokio::main]`.
+Add `--version` support to the three Dracon binaries by annotating their clap command structs.
 
 ## Completed
-- [x] Enable Tokio async runtime for the system binary via `#[tokio::main]` on `main`.
+- [x] feat(multi): add `#[command(version)]` to dracon‑sync, dracon‑system, and dracon‑warden main entry points to expose a built‑in version flag.
