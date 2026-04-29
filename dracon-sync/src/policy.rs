@@ -583,66 +583,81 @@ mod tests {
         assert!(override_.auto_bump_versions.is_none());
     }
 
+    static POLICY_ENV_GUARD: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    struct VarGuard {
+        var: String,
+        original: Option<String>,
+        _lock: std::sync::MutexGuard<'static, ()>,
+    }
+    impl VarGuard {
+        fn set_temp(var: &str, value: &str) -> Self {
+            let lock = POLICY_ENV_GUARD.lock().unwrap();
+            let original = std::env::var(var).ok();
+            if value.is_empty() {
+                std::env::remove_var(var);
+            } else {
+                std::env::set_var(var, value);
+            }
+            Self { var: var.to_string(), original, _lock: lock }
+        }
+    }
+    impl Drop for VarGuard {
+        fn drop(&mut self) {
+            if let Some(orig) = self.original.take() {
+                std::env::set_var(&self.var, orig);
+            } else {
+                std::env::remove_var(&self.var);
+            }
+        }
+    }
+
     #[test]
-    #[ignore = "env var tests interfere with each other in parallel - needs VarGuard with Mutex"]
     fn test_env_freeze_enabled_ignores_case() {
-        std::env::set_var("DRACON_SYNC_FREEZE", "TRUE");
+        let _guard = VarGuard::set_temp("DRACON_SYNC_FREEZE", "TRUE");
         assert!(env_freeze_enabled());
-        std::env::remove_var("DRACON_SYNC_FREEZE");
     }
 
     #[test]
-    #[ignore = "env var tests interfere with each other in parallel - needs VarGuard with Mutex"]
     fn test_env_freeze_enabled_accepts_yes() {
-        std::env::set_var("DRACON_SYNC_FREEZE", "yes");
+        let _guard = VarGuard::set_temp("DRACON_SYNC_FREEZE", "yes");
         assert!(env_freeze_enabled());
-        std::env::remove_var("DRACON_SYNC_FREEZE");
     }
 
     #[test]
-    #[ignore = "env var tests interfere with each other in parallel - needs VarGuard with Mutex"]
     fn test_env_freeze_enabled_accepts_on() {
-        std::env::set_var("DRACON_SYNC_FREEZE", "on");
+        let _guard = VarGuard::set_temp("DRACON_SYNC_FREEZE", "on");
         assert!(env_freeze_enabled());
-        std::env::remove_var("DRACON_SYNC_FREEZE");
     }
 
     #[test]
-    #[ignore = "env var tests interfere with each other in parallel - needs VarGuard with Mutex"]
     fn test_env_freeze_enabled_rejects_false() {
-        std::env::set_var("DRACON_SYNC_FREEZE", "false");
+        let _guard = VarGuard::set_temp("DRACON_SYNC_FREEZE", "false");
         assert!(!env_freeze_enabled());
-        std::env::remove_var("DRACON_SYNC_FREEZE");
     }
 
     #[test]
-    #[ignore = "env var tests interfere with each other in parallel - needs VarGuard with Mutex"]
     fn test_env_freeze_enabled_rejects_empty() {
-        std::env::remove_var("DRACON_SYNC_FREEZE");
+        let _guard = VarGuard::set_temp("DRACON_SYNC_FREEZE", "");
         assert!(!env_freeze_enabled());
     }
 
     #[test]
-    #[ignore = "env var tests interfere with each other in parallel - needs VarGuard with Mutex"]
     fn test_debug_enabled_accepts_1() {
-        std::env::set_var("DRACON_SYNC_DEBUG", "1");
+        let _guard = VarGuard::set_temp("DRACON_SYNC_DEBUG", "1");
         assert!(debug_enabled());
-        std::env::remove_var("DRACON_SYNC_DEBUG");
     }
 
     #[test]
-    #[ignore = "env var tests interfere with each other in parallel - needs VarGuard with Mutex"]
     fn test_debug_enabled_rejects_empty() {
-        std::env::remove_var("DRACON_SYNC_DEBUG");
+        let _guard = VarGuard::set_temp("DRACON_SYNC_DEBUG", "");
         assert!(!debug_enabled());
     }
 
     #[test]
-    #[ignore = "env var tests interfere with each other in parallel - needs VarGuard with Mutex"]
     fn test_freeze_reason_env_takes_precedence() {
-        std::env::set_var("DRACON_SYNC_FREEZE", "1");
+        let _guard = VarGuard::set_temp("DRACON_SYNC_FREEZE", "1");
         let reason = freeze_reason(std::path::Path::new("/fake/policy.toml"));
-        std::env::remove_var("DRACON_SYNC_FREEZE");
         assert_eq!(reason, Some("env DRACON_SYNC_FREEZE".to_string()));
     }
 
