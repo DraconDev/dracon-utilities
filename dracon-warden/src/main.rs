@@ -1222,7 +1222,8 @@ fn run_daemon(policy_path: PathBuf) -> Result<()> {
     Ok(())
 }
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.cmd {
