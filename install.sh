@@ -30,25 +30,22 @@ restart_service() {
 install_binary() {
     local package=$1
     local features=$2
-    local binary=$package
+    local subdir=$3
+    local binary=${package%%@*}  # strip version suffix if present
 
     echo "Building $package..."
-    if [ -n "$features" ]; then
-        cargo build --release --package $package --features "$features" 2>/dev/null || \
-        cargo build --release -p $package 2>/dev/null || \
-        cargo build --release -p $package
-    else
-        cargo build --release -p $package
-    fi
-
-    # Find the binary in target/release
     local bin_path="target/release/$binary"
-    if [ ! -f "$bin_path" ]; then
-        bin_path=$(find target/release -name "$binary" -type f 2>/dev/null | head -1)
+
+    if [ -n "$features" ]; then
+        (cd "$subdir" && cargo build --release --package "$package" --features "$features" 2>/dev/null) || \
+        (cd "$subdir" && cargo build --release -p "$package" 2>/dev/null) || \
+        (cd "$subdir" && cargo build --release -p "$package")
+    else
+        (cd "$subdir" && cargo build --release -p "$package")
     fi
 
-    if [ -n "$bin_path" ] && [ -f "$bin_path" ]; then
-        cp "$bin_path" ~/.local/bin/$binary
+    if [ -f "$subdir/$bin_path" ]; then
+        cp "$subdir/$bin_path" ~/.local/bin/$binary
         chmod +x ~/.local/bin/$binary
         echo "  Installed ~/.local/bin/$binary"
     else
@@ -58,11 +55,9 @@ install_binary() {
 }
 
 # dracon-sync with scribe and ai-bumper (both on by default)
-install_binary dracon-sync "scribe,ai-bumper"
-
-# dracon-system and dracon-warden
-install_binary dracon-system ""
-install_binary dracon-warden ""
+install_binary dracon-sync "scribe,ai-bumper" "dracon-sync"
+install_binary "dracon-system@0.2.0" "" "dracon-system"
+install_binary dracon-warden "" "dracon-warden"
 
 mkdir -p ~/.config/systemd/user
 mkdir -p ~/.dracon/utilities/sync
@@ -92,3 +87,4 @@ if [ ! -f ~/.dracon/utilities/sync/ai.toml ] && [ -f dracon-sync/ai.example.toml
     echo ""
     echo "✅ Copied ai.example.toml → ~/.dracon/utilities/sync/ai.toml"
     echo "   Edit ~/.dracon/utilities/sync/ai.toml and set your API keys"
+fi
