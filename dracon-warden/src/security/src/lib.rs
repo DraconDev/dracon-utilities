@@ -2933,4 +2933,15 @@ API_KEY=original"#;
             "Content should be preserved"
         );
     }
+
+    #[test]
+    fn test_demon_security_once_cell_caching() {
+        let s1 = DemonSecurity::get_or_init().unwrap();
+        let s2 = DemonSecurity::get_or_init().unwrap();
+        assert_eq!(
+            std::ptr::addr_of!(s1) as usize,
+            std::ptr::addr_of!(s2) as usize,
+            "get_or_init should return the same cached instance"
+        );
+    }
 }
