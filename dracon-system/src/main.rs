@@ -1587,11 +1587,12 @@ fn truncate_log_file(path: &Path, max_size_bytes: u64, preserve_header_lines: us
     ));
     {
         let mut temp_file = std::fs::File::create(&temp_path)?;
+        let mut total_written = 0u64;
         for line_bytes in &header_lines {
             temp_file.write_all(line_bytes)?;
             temp_file.write_all(b"\n")?;
+            total_written += line_bytes.len() as u64 + 1;
         }
-        let mut bytes_written = 0u64;
 
         let file = std::fs::File::open(path)?;
         let reader = BufReader::new(file);
@@ -1599,13 +1600,13 @@ fn truncate_log_file(path: &Path, max_size_bytes: u64, preserve_header_lines: us
             let line_bytes = line.into_bytes();
             let line_len = line_bytes.len() as u64;
 
-            if bytes_written + line_len + 1 > max_size_bytes {
+            if total_written + line_len + 1 > max_size_bytes {
                 break;
             }
 
             temp_file.write_all(&line_bytes)?;
             temp_file.write_all(b"\n")?;
-            bytes_written += line_len + 1;
+            total_written += line_len + 1;
         }
     }
 
@@ -2922,8 +2923,7 @@ interval_secs = 30
     }
 
     #[test]
-    #[ignore = "truncate_log_file has a bug with preserve_header_lines > 0 - returns full file instead of truncating"]
-    fn test_truncate_log_file_preserves_headers_buggy() {
+    fn test_truncate_log_file_preserves_headers() {
         let id = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
         let tmp = std::env::temp_dir().join(format!("dracon_log_test_{}", id));
         std::fs::create_dir_all(&tmp).unwrap();
