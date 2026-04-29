@@ -2934,8 +2934,8 @@ interval_secs = 30
         let result = truncate_log_file(&log_file, 50, 2);
         assert!(result.is_ok());
         let new_content = std::fs::read_to_string(&log_file).unwrap();
-        assert!(new_content.starts_with("HEADER_LINE_1\nHEADER_LINE_2\n"), "headers should be preserved");
-        assert!(new_content.len() <= 50, "should respect max_size_bytes");
+        assert!(new_content.starts_with("HEADER_LINE_1\nHEADER_LINE_2\n"), "headers should be preserved: {:?}", new_content);
+        assert!(new_content.len() <= 50, "should respect max_size_bytes but was {}: {:?}", new_content.len(), new_content);
 
         std::fs::remove_dir_all(&tmp).unwrap();
     }
