@@ -330,7 +330,7 @@ pub(crate) async fn run_once(policy_path: &Path) -> Result<()> {
     Ok(())
 }
 
-pub(crate) async fn run_daemon(policy_path: PathBuf) -> Result<()> {
+pub(crate) async fn run_daemon(policy_path: PathBuf, override_interval_secs: Option<u64>) -> Result<()> {
     #[derive(Debug, Clone)]
     struct RepoActivity {
         fingerprint: String,
@@ -401,7 +401,7 @@ pub(crate) async fn run_daemon(policy_path: PathBuf) -> Result<()> {
                 continue;
             }
         };
-        let scan_interval = policy.pulse_interval_secs.max(1);
+        let scan_interval = override_interval_secs.unwrap_or(policy.pulse_interval_secs).max(1);
         let inactivity_delay = Duration::from_secs(policy.inactivity_push_delay_secs.max(1));
         let roots = policy.watch_root_paths();
         let excluded_dir_names = excluded_dir_names_set(&policy);

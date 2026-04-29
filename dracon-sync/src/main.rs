@@ -10,7 +10,7 @@ mod daemon;
 mod sync;
 
 use anyhow::Result;
-use clap::{Parser, Subcommand};
+use clap::{ArgAction, Parser, Subcommand};
 use std::path::PathBuf;
 
 use policy::{resolve_policy_path, SyncPolicy};
@@ -26,6 +26,9 @@ use sync::sync_repo;
 #[command(about = "Dracon sync runtime")]
 #[command(version)]
 struct Cli {
+    /// Increase output verbosity. Can be repeated up to 2 times (-v, -vv).
+    #[arg(global = true, short, long, action = ArgAction::Count)]
+    verbose: u8,
     #[command(subcommand)]
     cmd: Command,
 }
@@ -92,21 +95,52 @@ enum Command {
     /// Run one sync pass.
     Once,
     /// Run continuous sync loop.
-    Daemon,
+    Daemon {
+        /// Override the policy scan interval (seconds). Defaults to policy value.
+        #[arg(long)]
+        interval_secs: Option<u64>,
+    },
     /// Sync a specific repository now.
-    SyncNow { repo: PathBuf },
+    SyncNow {
+        /// The repository path to sync immediately.
+        repo: PathBuf,
+    },
     /// Open sync policy in the system editor.
     EditConfig,
     /// Test AI providers connectivity.
     TestAi,
+    /// Manage repos permanently stuck on push.
+    Stuck {
+        #[command(subcommand)]
+        cmd: StuckCommands,
+    },
+    /// Manage repos that have both main and master branches.
+    DualBranch {
+        #[command(subcommand)]
+        cmd: DualBranchCommands,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum StuckCommands {
     /// List repos that are permanently stuck on push.
-    StuckList,
+    List,
     /// Unstuck a repo that was marked as permanently stuck.
-    UnstuckRepo { repo: PathBuf },
+    Unstuck {
+        /// The repository path to unstuck.
+        repo: PathBuf,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum DualBranchCommands {
     /// List repos that have both main and master branches.
-    DualBranchList,
+    List,
     /// Consolidate a repo with both main and master to master only.
-    RepairDualBranches { repo: PathBuf },
+    Repair {
+        /// The repository path to consolidate.
+        repo: PathBuf,
+    },
 }
 
 #[tokio::main]
@@ -272,8 +306,8 @@ async fn main() -> Result<()> {
         Command::Once => {
             run_once(&policy_path).await?;
         }
-        Command::Daemon => {
-            run_daemon(policy_path).await?;
+        Command::Daemon { interval_secs } => {
+            run_daemon(policy_path, interval_secs).await?;
         }
         Command::SyncNow { repo } => {
             if let Some(reason) = freeze_reason(&policy_path) {
@@ -281,7 +315,7 @@ async fn main() -> Result<()> {
                 return Ok(());
             }
             if daemon::is_repo_stuck(&repo) {
-                println!("🔒 {} is stuck on push. Run 'dracon-sync unstuck-repo {}' first.", repo.display(), repo.display());
+                println!("🔒 {} is stuck on push. Run 'dracon-sync stuck unstuck {}' first.", repo.display(), repo.display());
                 return Ok(());
             }
             let policy = SyncPolicy::load(&policy_path)?;
@@ -297,23 +331,22 @@ async fn main() -> Result<()> {
         }
         Command::TestAi => {
             use simple_ai::SimpleAiService;
-            
+
             let service = SimpleAiService::new();
             if service.is_empty() {
                 println!("❌ No AI providers configured");
                 println!("   Add providers to ~/.dracon/ai.toml");
                 return Ok(());
             }
-            
-            // Reset health so all providers are tested fresh
+
             SimpleAiService::reset_health().await;
-            
+
             let providers = service.provider_names();
             println!("🧪 Testing {} AI provider(s)...\n", providers.len());
-            
+
             let mut all_ok = true;
             let mut working_provider = None;
-            
+
             for name in &providers {
                 print!("   Testing {}... ", name);
                 match service.test_provider(name).await {
@@ -344,7 +377,7 @@ async fn main() -> Result<()> {
                     }
                 }
             }
-            
+
             println!();
             if all_ok {
                 println!("✅ All AI providers ready");
@@ -353,50 +386,54 @@ async fn main() -> Result<()> {
             } else {
                 println!("❌ All AI providers failed");
             }
-            
+
             if let Some(ref wp) = working_provider {
                 println!("   Using: {} (fallback order: {:?})", wp, providers);
             }
         }
-        Command::StuckList => {
-            list_stuck_repos();
-        }
-        Command::UnstuckRepo { repo } => {
-            unstuck_repo(&repo);
-        }
-        Command::DualBranchList => {
-            let policy = SyncPolicy::load(&policy_path)?;
-            let roots = policy.watch_root_paths();
-            let excluded_dir_names = excluded_dir_names_set(&policy);
-            let repos = git::discover_git_repos(&roots, &excluded_dir_names, &policy.exclude_repos, Some(&policy.system_repo));
-            let mut found = 0;
-            for repo in repos {
-                if has_both_main_and_master(&repo) {
-                    let branch = git::current_branch(&repo).unwrap_or_else(|| "unknown".to_string());
-                    println!("   {} (currently on {})", repo.display(), branch);
-                    found += 1;
+        Command::Stuck { cmd } => match cmd {
+            StuckCommands::List => {
+                list_stuck_repos();
+            }
+            StuckCommands::Unstuck { repo } => {
+                unstuck_repo(&repo);
+            }
+        },
+        Command::DualBranch { cmd } => match cmd {
+            DualBranchCommands::List => {
+                let policy = SyncPolicy::load(&policy_path)?;
+                let roots = policy.watch_root_paths();
+                let excluded_dir_names = excluded_dir_names_set(&policy);
+                let repos = git::discover_git_repos(&roots, &excluded_dir_names, &policy.exclude_repos, Some(&policy.system_repo));
+                let mut found = 0;
+                for repo in repos {
+                    if has_both_main_and_master(&repo) {
+                        let branch = git::current_branch(&repo).unwrap_or_else(|| "unknown".to_string());
+                        println!("   {} (currently on {})", repo.display(), branch);
+                        found += 1;
+                    }
+                }
+                if found == 0 {
+                    println!("✅ no repos with both main and master");
+                } else {
+                    println!("\n🔧 Run 'dracon-sync dual-branch repair <path>' to consolidate to master");
                 }
             }
-            if found == 0 {
-                println!("✅ no repos with both main and master");
-            } else {
-                println!("\n🔧 Run 'dracon-sync repair-dual-branches <path>' to consolidate to master");
-            }
-        }
-        Command::RepairDualBranches { repo } => {
-            if !has_both_main_and_master(&repo) {
-                println!("ℹ️ {} does not have both main and master", repo.display());
-                return Ok(());
-            }
-            println!("🔧 Consolidating {} to master...", repo.display());
-            match consolidate_to_master(&repo) {
-                Ok(()) => println!("✅ consolidated to master"),
-                Err(e) => {
-                    eprintln!("❌ failed: {}", e);
-                    return Err(e);
+            DualBranchCommands::Repair { repo } => {
+                if !has_both_main_and_master(&repo) {
+                    println!("ℹ️ {} does not have both main and master", repo.display());
+                    return Ok(());
+                }
+                println!("🔧 Consolidating {} to master...", repo.display());
+                match consolidate_to_master(&repo) {
+                    Ok(()) => println!("✅ consolidated to master"),
+                    Err(e) => {
+                        eprintln!("❌ failed: {}", e);
+                        return Err(e);
+                    }
                 }
             }
-        }
+        },
     }
 
     Ok(())
