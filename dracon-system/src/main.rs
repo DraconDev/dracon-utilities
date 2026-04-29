@@ -1301,7 +1301,7 @@ async fn clean_package_caches(
 }
 
 /// Empty trash
-async fn empty_trash(apply: bool) -> Result<(u64, Vec<String>)> {
+async fn empty_trash(apply: bool, protected_paths: &[String]) -> Result<(u64, Vec<String>)> {
     let mut reclaimed = 0u64;
     let mut cleaned = Vec::new();
     
@@ -1776,7 +1776,7 @@ async fn run_guard_once(
                 if p.exists() { Some(p) } else { None }
             })
             .collect();
-        let (bytes, cleaned) = match clean_old_node_modules(&roots, guard.node_modules_max_age_days, true).await {
+        let (bytes, cleaned) = match clean_old_node_modules(&roots, guard.node_modules_max_age_days, true, &guard.protected_paths).await {
             Ok(result) => result,
             Err(e) => {
                 eprintln!("⚠️ Node modules cleanup failed: {}", e);
@@ -1791,7 +1791,7 @@ async fn run_guard_once(
         
         // Package caches
         if guard.clean_package_caches {
-            match clean_package_caches(true, true, true, true, true).await {
+            match clean_package_caches(true, true, true, true, true, &guard.protected_paths).await {
                 Ok((bytes, cleaned)) => {
                     total_reclaimed += bytes;
                     all_cleaned.extend(cleaned.iter().map(|s| format!("Cache: {}", s)));
@@ -2916,7 +2916,7 @@ async fn main() -> Result<()> {
                     
                     // Package cache cleanup
                     if package_caches {
-                        match clean_package_caches(true, true, true, true, apply).await {
+                        match clean_package_caches(true, true, true, true, apply, &guard_clone.protected_paths).await {
                             Ok((bytes, cleaned)) => {
                                 for c in cleaned {
                                     actions.push(format!("Package cache: {}", c));
@@ -3037,7 +3037,7 @@ async fn main() -> Result<()> {
                                 if p.exists() { Some(p) } else { None }
                             })
                             .collect();
-                        let (bytes, cleaned) = clean_old_node_modules(&roots, guard_clone.node_modules_max_age_days, apply).await.unwrap_or((0, vec![]));
+                        let (bytes, cleaned) = clean_old_node_modules(&roots, guard_clone.node_modules_max_age_days, apply, &guard_clone.protected_paths).await.unwrap_or((0, vec![]));
                         total_reclaimed += bytes;
                         for c in cleaned {
                             actions.push(format!("Node: {}", c));
@@ -3046,7 +3046,7 @@ async fn main() -> Result<()> {
                     
                     // Package caches
                     if do_caches {
-                        let (bytes, cleaned) = clean_package_caches(true, true, true, true, apply).await.unwrap_or((0, vec![]));
+                        let (bytes, cleaned) = clean_package_caches(true, true, true, true, apply, &guard_clone.protected_paths).await.unwrap_or((0, vec![]));
                         total_reclaimed += bytes;
                         for c in cleaned {
                             actions.push(format!("Cache: {}", c));
