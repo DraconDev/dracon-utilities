@@ -189,6 +189,7 @@ enum Commands {
     },
     /// Analyze storage hotspots and optionally clean safe build/cache dirs.
     Storage {
+        /// Optional root path to analyze. Defaults to policy or ~/Dev.
         root: Option<PathBuf>,
         #[arg(long)]
         json: bool,

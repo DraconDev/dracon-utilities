@@ -84,6 +84,66 @@ You can add custom protected paths in `dracon-system.toml`:
 
 Safety: every `remove_dir_all` call site in `dracon-system` checks the path against both system and user-protected paths before executing. The `--apply` flag is required for destructive operations.
 
+## CLI Reference
+
+All binaries support `-V, --version` and `-v, --verbose` (repeatable up to 2x for `-vv`).
+
+### dracon-sync
+
+```
+dracon-sync [OPTIONS] <COMMAND>
+Commands:
+  status           Show resolved policy path and sync scope
+  repos            One-off report across discovered repositories
+  repair-concerns  Repair concern repos (dry-run by default; use --apply to execute)
+  repair-warns     Repair warn repos (dirty-only triage; dry-run by default)
+  once             Run one sync pass
+  daemon           Run continuous sync loop [--interval-secs override]
+  sync-now         Sync a specific repository now
+  edit-config      Open sync policy in the system editor
+  test-ai          Test AI providers connectivity
+  stuck            Manage repos permanently stuck on push
+  dual-branch      Manage repos with both main and master branches
+```
+
+**Nested subcommands:**
+- `dracon-sync stuck list` — list stuck repos
+- `dracon-sync stuck unstuck <repo>` — unstuck a specific repo
+- `dracon-sync dual-branch list` — list repos with dual main/master
+- `dracon-sync dual-branch repair <repo>` — consolidate to master
+
+**Global flags:** `-v` / `-vv` increase verbosity; `-V` prints version.
+
+### dracon-system
+
+```
+dracon-system [OPTIONS] <COMMAND>
+Commands:
+  status   Show core path and service status
+  doctor   Run deterministic diagnostics
+  storage  Analyze storage hotspots [--cleanup] [--apply]
+  link     Manage symlink ownership (status | doctor | apply)
+  guard    Guard runtime (once | daemon | prune | clean)
+  events   Show recent events [-t N] [-s source] [-s severity]
+  zram     Zram stats [--status] [--gen-config]
+```
+
+### dracon-warden
+
+```
+dracon-warden [OPTIONS] <COMMAND>
+Commands:
+  daemon         Run forever with filesystem event debounce
+  once           Run one hardening pass [repo]
+  status         Show resolved policy path and watch roots
+  filter-clean   Git filter clean (stdin -> stdout)
+  filter-smudge  Git filter smudge (stdin -> stdout)
+  scrub-markers   Scan DRACON_SECRET markers [--apply] [repo]
+  resmudge       Fix ciphertext stuck in working tree [--apply] [repo]
+  repair         System-wide repair pass [--dry-run] [--strict] [repo]
+  keygen         Generate new age keypair
+```
+
 ## AI Configuration
 
 dracon-sync uses AI for commit messages (scribe) and version bumping. Configure providers in `~/.dracon/ai.toml`:
