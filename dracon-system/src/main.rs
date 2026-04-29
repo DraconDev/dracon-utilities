@@ -63,7 +63,11 @@ const TEST_PROTECTED: &[&str] = &[
 
 #[cfg(test)]
 fn check_path_str(path: &str, user_protected: &[&str]) -> bool {
-    let normalized = path.trim_end_matches('/');
+    let normalized = if path.ends_with('/') && path != "/" {
+        path.trim_end_matches('/')
+    } else {
+        path
+    };
     !TEST_PROTECTED.iter().any(|p| normalized == *p)
         && !user_protected.iter().any(|p| normalized == *p)
 }
@@ -2594,6 +2598,8 @@ mod tests {
     #[test]
     fn check_path_str_rejects_root() {
         assert!(!check_path_str("/", &[]));
+        assert!(!check_path_str("/home", &[]));
+        assert!(!check_path_str("/etc", &[]));
     }
 
     #[test]
