@@ -2965,4 +2965,128 @@ API_KEY=original"#;
             "get_or_init should return the same cached instance"
         );
     }
+
+    fn test_security_with_identity() -> DemonSecurity {
+        let mut security = DemonSecurity::new(None).unwrap();
+        let key = x25519::Identity::generate();
+        security.master_identities.push(key);
+        security
+    }
+
+    #[test]
+    fn test_encrypt_v2_decrypt_v2_roundtrip() {
+        let security = test_security_with_identity();
+        let plaintext = b"hello world, this is a secret message";
+
+        let recipient = security.master_identities()[0].to_public();
+        let encrypted = security.encrypt_v2(plaintext, vec![Box::new(recipient)]).unwrap();
+        assert!(!encrypted.is_empty());
+        assert_ne!(encrypted, plaintext.to_vec(), "encrypted should differ from plaintext");
+
+        let decrypted = security.decrypt_v2(&encrypted).unwrap();
+        assert_eq!(decrypted, plaintext, "decrypted should match original");
+    }
+
+    #[test]
+    fn test_encrypt_v2_empty_data() {
+        let security = test_security_with_identity();
+        let recipient = security.master_identities()[0].to_public();
+        let encrypted = security.encrypt_v2(b"", vec![Box::new(recipient)]).unwrap();
+        let decrypted = security.decrypt_v2(&encrypted).unwrap();
+        assert_eq!(decrypted, b"", "empty data should roundtrip");
+    }
+
+    #[test]
+    fn test_encrypt_v2_binary_data() {
+        let security = test_security_with_identity();
+        let plaintext: Vec<u8> = (0..256).map(|i| i as u8).collect();
+        let recipient = security.master_identities()[0].to_public();
+        let encrypted = security.encrypt_v2(&plaintext, vec![Box::new(recipient)]).unwrap();
+        let decrypted = security.decrypt_v2(&encrypted).unwrap();
+        assert_eq!(decrypted, plaintext, "binary data should roundtrip");
+    }
+
+    #[test]
+    fn test_unlock_payload_v2_roundtrip() {
+        let security = test_security_with_identity();
+        let plaintext = b"secret data for unlock_payload test";
+        let recipient = security.master_identities()[0].to_public();
+        let encrypted = security.encrypt_v2(plaintext, vec![Box::new(recipient)]).unwrap();
+
+        let unlocked = security.unlock_payload(&encrypted).unwrap();
+        assert_eq!(unlocked, plaintext, "unlock_payload should decrypt v2");
+    }
+
+    #[test]
+    fn test_decrypt_v2_fails_with_wrong_identity() {
+        let mut security1 = DemonSecurity::new(None).unwrap();
+        let key1 = x25519::Identity::generate();
+        security1.master_identities.push(key1);
+
+        let mut security2 = DemonSecurity::new(None).unwrap();
+        let key2 = x25519::Identity::generate();
+        security2.master_identities.push(key2);
+
+        let plaintext = b"data encrypted to key1";
+        let recipient = security1.master_identities()[0].to_public();
+        let encrypted = security1.encrypt_v2(plaintext, vec![Box::new(recipient)]).unwrap();
+
+        let result = security2.decrypt_v2(&encrypted);
+        assert!(result.is_err(), "decrypt with wrong identity should fail");
+    }
+
+    #[test]
+    fn test_decrypt_v2_requires_master_identity() {
+        let security = DemonSecurity::new(None).unwrap();
+        let result = security.decrypt_v2(b"some encrypted data");
+        assert!(result.is_err(), "decrypt_v2 should fail without master identities");
+    }
+
+    #[test]
+    fn test_encrypt_with_repo_key_roundtrip() {
+        let security = test_security_with_identity();
+        let plaintext = b"repo key encrypted data";
+        let encrypted = security.encrypt_with_repo_key(plaintext).unwrap();
+        let decrypted = security.decrypt_with_repo_key(&encrypted).unwrap();
+        assert_eq!(decrypted, plaintext, "repo key roundtrip should work");
+    }
+
+    #[test]
+    fn test_encrypt_decrypt_with_repo_key_empty() {
+        let security = test_security_with_identity();
+        let encrypted = security.encrypt_with_repo_key(b"").unwrap();
+        let decrypted = security.decrypt_with_repo_key(&encrypted).unwrap();
+        assert_eq!(decrypted, b"", "empty data roundtrip");
+    }
+
+    #[test]
+    fn test_normalize_secret_marker_valid() {
+        assert_eq!(normalize_secret_marker("API_SECRET"), Some("API_SECRET".to_string()));
+        assert_eq!(normalize_secret_marker("DB_SECRET"), Some("DB_SECRET".to_string()));
+        assert_eq!(normalize_secret_marker("  api_secret  "), Some("API_SECRET".to_string()));
+    }
+
+    #[test]
+    fn test_normalize_secret_marker_invalid() {
+        assert_eq!(normalize_secret_marker("no_suffix"), None);
+        assert_eq!(normalize_secret_marker(""), None);
+        assert_eq!(normalize_secret_marker("API-SECRET"), None);
+        assert_eq!(normalize_secret_marker("API SECRET"), None);
+    }
+
+    #[test]
+    fn test_is_inside_secret_tag_detection() {
+        let content = "prefix [API_SECRET:abc] suffix";
+        assert!(is_inside_secret_tag(content, 20), "inside tag");
+        assert!(!is_inside_secret_tag(content, 5), "before tag");
+        assert!(!is_inside_secret_tag(content, 30), "after tag");
+    }
+
+    #[test]
+    fn test_get_env_version_edge_cases() {
+        assert_eq!(get_env_version(""), 0);
+        assert_eq!(get_env_version("no version here"), 0);
+        assert_eq!(get_env_version("Version: abc\n"), 0);
+        assert_eq!(get_env_version("Version: 42\n"), 42);
+    }
 }
