@@ -2824,7 +2824,7 @@ mod tests {
 
     #[test]
     fn test_protection_exemptions() {
-        let scanner = SecretScanner::new_without_age_keys();
+        let scanner = SecretScanner::new_without_age_keys().unwrap();
         let patterns = scanner.patterns.iter().map(|(n, _)| n.clone()).collect::<Vec<_>>();
         eprintln!(
             "Patterns in scanner (excluding age keys): {}",
