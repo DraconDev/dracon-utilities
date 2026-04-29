@@ -10,7 +10,7 @@ use std::fs;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command as ProcessCommand;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::Arc;
 use std::sync::mpsc;
 use std::sync::Mutex;
@@ -21,6 +21,17 @@ static ROLLING_LOG: std::sync::OnceLock<Mutex<Vec<String>>> = std::sync::OnceLoc
 
 fn get_log() -> &'static Mutex<Vec<String>> {
     ROLLING_LOG.get_or_init(|| Mutex::new(Vec::new()))
+}
+
+static VERBOSITY: AtomicU8 = AtomicU8::new(0);
+
+#[macro_export]
+macro_rules! veprintln {
+    ($lvl:expr, $($arg:tt)*) => {
+        if $lvl <= VERBOSITY.load(Ordering::SeqCst) {
+            eprintln!($($arg)*);
+        }
+    };
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1229,6 +1240,7 @@ fn run_daemon(policy_path: PathBuf) -> Result<()> {
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
+    VERBOSITY.store(cli.verbose, Ordering::SeqCst);
 
     match cli.cmd {
         Command::FilterClean { path } => {

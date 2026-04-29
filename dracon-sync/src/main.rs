@@ -12,12 +12,14 @@ mod sync;
 use anyhow::Result;
 use clap::{ArgAction, Parser, Subcommand};
 use std::path::PathBuf;
+use std::sync::atomic::Ordering;
 
 use policy::{resolve_policy_path, SyncPolicy};
 use policy::freeze_reason;
 use exclude::excluded_dir_names_set;
 use report::{ConcernRepairFilter, RepoFilter, push_large_blob_threshold_bytes, run_repair_concerns, run_repair_warns, run_repos_report};
 use daemon::{run_once, run_daemon, unstuck_repo, list_stuck_repos};
+use daemon::veprintln;
 use git::{has_both_main_and_master, consolidate_to_master};
 use sync::sync_repo;
 
@@ -157,6 +159,7 @@ async fn main() -> Result<()> {
     }));
 
     let cli = Cli::parse();
+    daemon::VERBOSITY.store(cli.verbose, Ordering::SeqCst);
     let policy_path = resolve_policy_path()?;
 
     match cli.cmd {
