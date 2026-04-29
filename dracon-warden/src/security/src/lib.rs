@@ -464,13 +464,12 @@ impl SecretScanner {
         ]
     }
 
-    pub fn new() -> Self {
+    pub fn new() -> Result<Self> {
         let patterns_raw = Self::get_patterns();
 
         let patterns: Vec<(String, Regex)> = patterns_raw
             .iter()
             .filter_map(|(name, pattern)| {
-                // Ensure individual patterns also support multiline/dotall for the name-matching loop
                 let p = if pattern.starts_with("(?") {
                     pattern.to_string()
                 } else {
@@ -480,30 +479,29 @@ impl SecretScanner {
             })
             .collect();
 
-        // Build one giant regex for single-pass scan
         let combined: String = patterns_raw
             .iter()
             .map(|(_, p)| format!("(?:{})", p))
             .collect::<Vec<_>>()
             .join("|");
         let full_regex = Regex::new(&format!("(?sm){}", combined))
-            .expect("Failed to build combined regex - check patterns for invalid regex syntax");
+            .map_err(|e| anyhow::anyhow!("invalid regex pattern in SecretScanner::new: {}", e))?;
 
-        Self {
+        Ok(Self {
             patterns,
             full_regex,
-        }
+        })
     }
 
     /// Create a scanner that excludes age identity key patterns.
     /// Used for master.age and identity.age files to prevent encrypting
     /// the age key itself while still scanning for other secrets.
-    pub fn new_without_age_keys() -> Self {
+    pub fn new_without_age_keys() -> Result<Self> {
         let patterns_raw = Self::get_patterns();
 
         let patterns: Vec<(String, Regex)> = patterns_raw
             .iter()
-            .filter(|(name, _)| *name != "Age Secret Key") // Skip age identity keys
+            .filter(|(name, _)| *name != "Age Secret Key")
             .filter_map(|(name, pattern)| {
                 let p = if pattern.starts_with("(?") {
                     pattern.to_string()
@@ -514,20 +512,20 @@ impl SecretScanner {
             })
             .collect();
 
-        // Build combined regex without age key pattern
-        let combined = patterns_raw
+        let combined: String = patterns_raw
             .iter()
             .filter(|(name, _)| *name != "Age Secret Key")
             .map(|(_, p)| format!("(?:{})", p))
             .collect::<Vec<_>>()
             .join("|");
         let full_regex = Regex::new(&format!("(?sm){}", combined))
-            .expect("Failed to build combined regex (without age keys) - check patterns for invalid regex syntax");
+            .map_err(|e| anyhow::anyhow!("invalid regex pattern in SecretScanner::new_without_age_keys: {}", e))?;
 
-        Self {
+        Ok(Self {
             patterns,
             full_regex,
-        }
+        })
+    }
     }
 
     pub fn scan(&self, content: &str) -> Vec<SecretFinding> {
@@ -2074,7 +2072,7 @@ impl DemonSecurity {
 
     /// In-situ Clean: Scan for secrets and replace with REDACTED_REGEX tags.
     pub fn smart_clean(&self, content: &str) -> Result<String> {
-        let scanner = SecretScanner::new();
+        let scanner = SecretScanner::new()?;
         self.smart_clean_with_scanner(content, &scanner)
     }
 
@@ -2220,7 +2218,7 @@ impl DemonSecurity {
                 // but still catches other embedded secrets like API keys.
                 let is_identity_file = filename == "master.age" || filename == "identity.age";
                 let cleaned = if is_identity_file {
-                    let scanner = SecretScanner::new_without_age_keys();
+                    let scanner = SecretScanner::new_without_age_keys()?;
                     self.smart_clean_with_scanner(text_content, &scanner)?
                 } else {
                     self.smart_clean(text_content)?
