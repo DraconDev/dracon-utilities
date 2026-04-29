@@ -2654,41 +2654,45 @@ interval_secs = 30
     #[tokio::test]
     async fn test_clean_package_caches_calls_check_safe_delete_for_cargo() {
         let tmp = std::env::temp_dir().join(format!("dracon_cargo_protect_{}", std::process::id()));
-        std::fs::create_dir_all(&tmp).unwrap();
-        let protected = vec![tmp.display().to_string()];
-        let result = check_safe_to_delete(&tmp.join(".cargo/registry/cache"), &protected);
+        let cache_dir = tmp.join(".cargo/registry/cache");
+        std::fs::create_dir_all(&cache_dir).unwrap();
+        let protected = vec![cache_dir.display().to_string()];
+        let result = check_safe_to_delete(&cache_dir, &protected);
         std::fs::remove_dir_all(&tmp).unwrap();
-        assert!(result.is_err(), "cargo cache under protected parent should be rejected");
+        assert!(result.is_err(), "cargo cache when itself is protected should be rejected");
     }
 
     #[tokio::test]
     async fn test_clean_package_caches_calls_check_safe_delete_for_npm() {
         let tmp = std::env::temp_dir().join(format!("dracon_npm_protect_{}", std::process::id()));
-        std::fs::create_dir_all(&tmp).unwrap();
-        let protected = vec![tmp.display().to_string()];
-        let result = check_safe_to_delete(&tmp.join(".npm"), &protected);
+        let npm_dir = tmp.join(".npm");
+        std::fs::create_dir_all(&npm_dir).unwrap();
+        let protected = vec![npm_dir.display().to_string()];
+        let result = check_safe_to_delete(&npm_dir, &protected);
         std::fs::remove_dir_all(&tmp).unwrap();
-        assert!(result.is_err(), "npm cache under protected parent should be rejected");
+        assert!(result.is_err(), "npm cache when itself is protected should be rejected");
     }
 
     #[tokio::test]
     async fn test_clean_package_caches_calls_check_safe_delete_for_pip() {
         let tmp = std::env::temp_dir().join(format!("dracon_pip_protect_{}", std::process::id()));
-        std::fs::create_dir_all(&tmp).unwrap();
-        let protected = vec![tmp.display().to_string()];
-        let result = check_safe_to_delete(&tmp.join(".cache/pip"), &protected);
+        let pip_dir = tmp.join(".cache/pip");
+        std::fs::create_dir_all(&pip_dir).unwrap();
+        let protected = vec![pip_dir.display().to_string()];
+        let result = check_safe_to_delete(&pip_dir, &protected);
         std::fs::remove_dir_all(&tmp).unwrap();
-        assert!(result.is_err(), "pip cache under protected parent should be rejected");
+        assert!(result.is_err(), "pip cache when itself is protected should be rejected");
     }
 
     #[tokio::test]
     async fn test_clean_package_caches_calls_check_safe_delete_for_go() {
         let tmp = std::env::temp_dir().join(format!("dracon_go_protect_{}", std::process::id()));
-        std::fs::create_dir_all(&tmp).unwrap();
-        let protected = vec![tmp.display().to_string()];
-        let result = check_safe_to_delete(&tmp.join(".cache/go-build"), &protected);
+        let go_dir = tmp.join(".cache/go-build");
+        std::fs::create_dir_all(&go_dir).unwrap();
+        let protected = vec![go_dir.display().to_string()];
+        let result = check_safe_to_delete(&go_dir, &protected);
         std::fs::remove_dir_all(&tmp).unwrap();
-        assert!(result.is_err(), "go cache under protected parent should be rejected");
+        assert!(result.is_err(), "go cache when itself is protected should be rejected");
     }
 }
 async fn main() -> Result<()> {
