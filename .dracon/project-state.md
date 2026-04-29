@@ -1,7 +1,8 @@
 # Project State
 
 ## Current Focus
-Test modifies SecretScanner test to unwrap the constructor result.
+adjust test code to handle SecretScanner::new returning Result by unwrapping
 
 ## Completed
-- [x] Added .unwrap() to SecretScanner::new_without_age_keys() call in test_protection_exemptions
+- [x] Updated massive_secret_scan.rs to unwrap SecretScanner::new()
+- [x] Updated scanner_stress.rs to unwrap SecretScanner::new()

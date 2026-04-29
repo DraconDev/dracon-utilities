@@ -3,7 +3,7 @@ use proptest::prelude::*;
 
 #[test]
 fn test_massive_dataset_permutations() {
-    let scanner = SecretScanner::new();
+    let scanner = SecretScanner::new().unwrap();
     let patterns = vec![
         "f3ac609ec3C5E026712c9dBc3Bf47FEF",
         "EF16f6DE8b2bCafD7A4aFCcEC22579EDb380D1fe",
