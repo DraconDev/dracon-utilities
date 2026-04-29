@@ -757,9 +757,9 @@ impl DemonSecurity {
             .any(|prefix| trimmed.starts_with(prefix.as_bytes()) && trimmed.ends_with(b"]"))
     }
 
-    pub fn get_identity_path() -> PathBuf {
-        let home = dirs::home_dir().expect("Could not find home directory");
-        home.join(".demon").join("identity.age")
+    pub fn get_identity_path() -> Result<PathBuf> {
+        let home = dirs::home_dir().context("Could not find home directory")?;
+        Ok(home.join(".demon").join("identity.age"))
     }
 
     pub fn new(repo_path: Option<&Path>) -> Result<Self> {
