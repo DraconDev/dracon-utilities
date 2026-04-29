@@ -1,7 +1,7 @@
 # Project State
 
 ## Current Focus
-Regenerate Cargo.lock dependency lock file for dracon-sync
+Regenerated Cargo.lock dependency lock file for dracon-system crate (binary unchanged)
 
 ## Completed
-- [x] Regenerate Cargo.lock for dracon-sync (dependency lock update)
+- [x] Regenerated Cargo.lock for dracon-system crate
