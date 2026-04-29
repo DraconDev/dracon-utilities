@@ -1092,7 +1092,7 @@ fn run_daemon(policy_path: PathBuf) -> Result<()> {
     tokio::spawn(async move {
         if let Ok(mut sig) = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
             sig.recv().await;
-            eprintln!("warden: received SIGTERM, shutting down gracefully...");
+            veprintln!(1, "warden: received SIGTERM, shutting down gracefully...");
             shutdown_sigterm.store(true, Ordering::SeqCst);
         } else {
             eprintln!("warden: failed to set up SIGTERM handler");
@@ -1102,7 +1102,7 @@ fn run_daemon(policy_path: PathBuf) -> Result<()> {
     tokio::spawn(async move {
         if let Ok(mut sig) = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::interrupt()) {
             sig.recv().await;
-            eprintln!("warden: received SIGINT, shutting down gracefully...");
+            veprintln!(1, "warden: received SIGINT, shutting down gracefully...");
             shutdown_sigint.store(true, Ordering::SeqCst);
         } else {
             eprintln!("warden: failed to set up SIGINT handler");
@@ -1112,7 +1112,7 @@ fn run_daemon(policy_path: PathBuf) -> Result<()> {
     tokio::spawn(async move {
         if let Ok(mut sig) = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::hangup()) {
             sig.recv().await;
-            eprintln!("warden: received SIGHUP, reloading policy...");
+            veprintln!(1, "warden: received SIGHUP, reloading policy...");
             reload_sighup.store(true, Ordering::SeqCst);
         } else {
             eprintln!("warden: failed to set up SIGHUP handler");
@@ -1133,7 +1133,7 @@ fn run_daemon(policy_path: PathBuf) -> Result<()> {
     while !shutdown.load(Ordering::SeqCst) {
         if reload.load(Ordering::SeqCst) {
             reload.store(false, Ordering::SeqCst);
-            eprintln!("warden: reloading policy on SIGHUP...");
+            veprintln!(1, "warden: reloading policy on SIGHUP...");
             match WardenPolicy::load(&policy_path) {
                 Ok(p) => {
                     if let Err(e) = p.validate() {
@@ -1233,7 +1233,7 @@ fn run_daemon(policy_path: PathBuf) -> Result<()> {
         }
     }
 
-    eprintln!("warden: shutdown complete");
+    veprintln!(1, "warden: shutdown complete");
     Ok(())
 }
 
