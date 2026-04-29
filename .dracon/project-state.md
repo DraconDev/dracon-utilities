@@ -1,8 +1,8 @@
 # Project State
 
 ## Current Focus
-chore(deps): update dependency lock files for dracon-sync and dracon-system
+Regenerate dependency lock files for dracon-sync and dracon-system crates to incorporate updated versions
 
 ## Completed
-- [x] Regenerated dracon-sync/Cargo.lock
-- [x] Regenerated dracon-system/Cargo.lock
+- [x] Updated dependency lock file for dracon-sync
+- [x] Updated dependency lock file for dracon-system
