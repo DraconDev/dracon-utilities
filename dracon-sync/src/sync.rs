@@ -797,7 +797,7 @@ auto_bump_versions = false
 
         let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0).await;
         assert!(result.is_ok(), "sync_repo should succeed even during rebase");
-        assert_eq!(result.unwrap(), false, "rebase should cause early return (nothing synced)");
+        assert!(!result.unwrap(), "rebase should cause early return (nothing synced)");
     }
 
     #[tokio::test]
@@ -836,7 +836,7 @@ auto_bump_versions = false
 
         let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0).await;
         assert!(result.is_ok(), "sync_repo should succeed even during merge");
-        assert_eq!(result.unwrap(), false, "merge should cause early return (nothing synced)");
+        assert!(!result.unwrap(), "merge should cause early return (nothing synced)");
     }
 
     #[tokio::test]
@@ -875,6 +875,6 @@ auto_bump_versions = false
 
         let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0).await;
         assert!(result.is_ok(), "sync_repo should succeed even during cherry-pick");
-        assert_eq!(result.unwrap(), false, "cherry-pick should cause early return (nothing synced)");
+        assert!(!result.unwrap(), "cherry-pick should cause early return (nothing synced)");
     }
 }
