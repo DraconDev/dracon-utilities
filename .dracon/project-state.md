@@ -1,8 +1,8 @@
 # Project State
 
 ## Current Focus
-simplify parsing logic by inlining duplicate detection checks
+Update dependency lock files for dracon-sync and dracon-system
 
 ## Completed
-- [x] Merge duplicate line detection into a single condition for recipient parsing
-- [x] Merge duplicate line detection into a single condition for key parsing
+- [x] chore(multi): regenerate dependency lock files for dracon-sync
+- [x] chore(multi): regenerated Cargo.lock for dracon-sync
