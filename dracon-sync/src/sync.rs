@@ -1,7 +1,7 @@
 use anyhow::Result;
 use dracon_git::{build_commit_message, extract_intent, GitService};
 use std::collections::BTreeSet;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use crate::exclude::{can_restore_entry, handle_large_untracked, is_large_untracked, remove_tracked_excluded_paths, should_stage_entry};

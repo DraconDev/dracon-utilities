@@ -1,9 +1,12 @@
 # Project State
 
 ## Current Focus
-Add tests ensuring `sync_repo` early‑returns when a rebase, merge, or cherry‑pick is in progress.
+Add comprehensive unit tests for file pattern matching, exclusion logic, and sync‑relevant dirty entry handling.
 
 ## Completed
-- [x] Add `test_sync_repo_skips_rebase_in_progress` verifying early return during rebase
-- [x] Add `test_sync_repo_skips_merge_in_progress` verifying early return during merge
-- [x] Add `test_sync_repo_skips_cherry_pick_in_progress` verifying early return during cherry‑pick
+- [x] Added unit tests for `matches_file_pattern` covering exact, extension, prefix, and glob matching.
+- [x] Added tests for `is_excluded_file` with various pattern combinations and edge cases (empty patterns, empty paths).
+- [x] Added tests for `can_restore_entry` behavior across Modified, Deleted, and Added file statuses.
+- [x] Added tests for `is_large_untracked` detecting large untracked files based on size thresholds.
+- [x] Added tests for `has_sync_relevant_dirty_entries` covering modified entries, excluded directories, and empty entry sets.
+- [x] Updated `sync.rs` to incorporate the new early‑return logic for rebase/merge/cherry‑pick scenarios.

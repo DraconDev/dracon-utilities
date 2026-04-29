@@ -155,6 +155,242 @@ mod tests {
         assert_eq!(normalized_dir_name("//node_modules//"), "node_modules");
         assert_eq!(normalized_dir_name(".Git"), ".git");
     }
+
+    #[test]
+    fn test_matches_file_pattern_exact() {
+        assert!(matches_file_pattern("test.txt", "test.txt"));
+        assert!(!matches_file_pattern("test.txt", "Test.txt"));
+    }
+
+    #[test]
+    fn test_matches_file_pattern_extension() {
+        assert!(matches_file_pattern("test.txt", "*.txt"));
+        assert!(matches_file_pattern("test.md", "*.md"));
+        assert!(!matches_file_pattern("test.txt", "*.md"));
+    }
+
+    #[test]
+    fn test_matches_file_pattern_prefix() {
+        assert!(matches_file_pattern("test.output", "test.*"));
+        assert!(matches_file_pattern("test.txt", "test.*"));
+        assert!(!matches_file_pattern("other.output", "test.*"));
+    }
+
+    #[test]
+    fn test_matches_file_pattern_glob() {
+        assert!(matches_file_pattern("build-debug", "build*"));
+        assert!(matches_file_pattern("build-release", "build*"));
+        assert!(matches_file_pattern("build", "build*"));
+        assert!(!matches_file_pattern("abuild", "build*"));
+    }
+
+    #[test]
+    fn test_is_excluded_file_simple() {
+        let patterns = vec!["*.log".to_string(), "*.tmp".to_string()];
+        assert!(is_excluded_file(Path::new("error.log"), &patterns));
+        assert!(is_excluded_file(Path::new("temp.tmp"), &patterns));
+        assert!(!is_excluded_file(Path::new("file.txt"), &patterns));
+        assert!(!is_excluded_file(Path::new("error.log.bak"), &patterns));
+    }
+
+    #[test]
+    fn test_is_excluded_file_no_match() {
+        let patterns: Vec<String> = vec![];
+        assert!(!is_excluded_file(Path::new("file.txt"), &patterns));
+    }
+
+    #[test]
+    fn test_is_excluded_file_empty_path() {
+        let patterns = vec!["*.txt".to_string()];
+        assert!(!is_excluded_file(Path::new(""), &patterns));
+    }
+
+    #[test]
+    fn test_can_restore_entry_modified() {
+        use dracon_git::types::{DiffFile, FileStatus};
+        let entry = DiffFile {
+            path: PathBuf::from("src/main.rs"),
+            status: FileStatus::Modified,
+        };
+        assert!(can_restore_entry(Path::new("/repo"), &entry));
+    }
+
+    #[test]
+    fn test_can_restore_entry_deleted() {
+        use dracon_git::types::{DiffFile, FileStatus};
+        let entry = DiffFile {
+            path: PathBuf::from("src/main.rs"),
+            status: FileStatus::Deleted,
+        };
+        assert!(!can_restore_entry(Path::new("/repo"), &entry));
+    }
+
+    #[test]
+    fn test_can_restore_entry_added() {
+        use dracon_git::types::{DiffFile, FileStatus};
+        let entry = DiffFile {
+            path: PathBuf::from("newfile.txt"),
+            status: FileStatus::Added,
+        };
+        assert!(!can_restore_entry(Path::new("/repo"), &entry));
+    }
+
+    #[test]
+    fn test_is_large_untracked_added_file() {
+        use dracon_git::types::{DiffFile, FileStatus};
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path();
+        let large_file = repo.join("large.bin");
+        std::fs::write(&large_file, vec![0u8; 200]).unwrap();
+        let entry = DiffFile {
+            path: PathBuf::from("large.bin"),
+            status: FileStatus::Added,
+        };
+        // 200 bytes > 100 bytes threshold
+        assert!(is_large_untracked(&entry, repo, 100));
+    }
+
+    #[test]
+    fn test_is_large_untracked_modified_file() {
+        use dracon_git::types::{DiffFile, FileStatus};
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path();
+        let file = repo.join("small.txt");
+        std::fs::write(&file, vec![0u8; 50]).unwrap();
+        let entry = DiffFile {
+            path: PathBuf::from("small.txt"),
+            status: FileStatus::Modified,
+        };
+        // 50 bytes < 100 bytes threshold
+        assert!(!is_large_untracked(&entry, repo, 100));
+    }
+
+    #[test]
+    fn test_is_large_untracked_nonexistent_file() {
+        use dracon_git::types::{DiffFile, FileStatus};
+        let entry = DiffFile {
+            path: PathBuf::from("nonexistent.txt"),
+            status: FileStatus::Added,
+        };
+        assert!(!is_large_untracked(&entry, Path::new("/nonexistent"), 100));
+    }
+
+    #[test]
+    fn test_has_sync_relevant_dirty_entries_modified() {
+        use dracon_git::types::{DiffFile, FileStatus};
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path();
+        std::fs::write(repo.join("test.txt"), "content").unwrap();
+        let entries = vec![DiffFile {
+            path: PathBuf::from("test.txt"),
+            status: FileStatus::Modified,
+        }];
+        let excluded: BTreeSet<String> = BTreeSet::new();
+        assert!(has_sync_relevant_dirty_entries(
+            repo,
+            &entries,
+            &excluded,
+            &[],
+            100 * 1024 * 1024
+        ));
+    }
+
+    #[test]
+    fn test_has_sync_relevant_dirty_entries_excluded_dir() {
+        use dracon_git::types::{DiffFile, FileStatus};
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path();
+        let entries = vec![DiffFile {
+            path: PathBuf::from("target/file.txt"),
+            status: FileStatus::Modified,
+        }];
+        let excluded: BTreeSet<String> = ["target".to_string()].into_iter().collect();
+        assert!(!has_sync_relevant_dirty_entries(
+            repo,
+            &entries,
+            &excluded,
+            &[],
+            100 * 1024 * 1024
+        ));
+    }
+
+    #[test]
+    fn test_has_sync_relevant_dirty_entries_empty() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path();
+        let entries: Vec<dracon_git::types::DiffFile> = vec![];
+        let excluded: BTreeSet<String> = BTreeSet::new();
+        assert!(!has_sync_relevant_dirty_entries(
+            repo,
+            &entries,
+            &excluded,
+            &[],
+            100 * 1024 * 1024
+        ));
+    }
+
+    #[test]
+    fn test_remove_tracked_excluded_paths_none_found() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path();
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "master"])
+            .current_dir(repo)
+            .output()
+            .unwrap();
+        std::fs::write(repo.join("test.txt"), "content\n").unwrap();
+        std::process::Command::new("git")
+            .args(["add", "."])
+            .current_dir(repo)
+            .output()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["commit", "-q", "-m", "init"])
+            .current_dir(repo)
+            .output()
+            .unwrap();
+
+        let excluded: BTreeSet<String> = ["nonexistent".to_string()].into_iter().collect();
+        let result = remove_tracked_excluded_paths(repo, &excluded).unwrap();
+        assert_eq!(result, None, "should return None when no tracked excluded paths found");
+    }
+
+    #[test]
+    fn test_append_to_gitignore_creates_new_file() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path();
+        assert!(!repo.join(".gitignore").exists());
+        let patterns = vec!["target/".to_string(), "*.log".to_string()];
+        let result = append_to_gitignore(repo, &patterns);
+        assert!(result.is_ok());
+        assert!(repo.join(".gitignore").exists());
+        let content = std::fs::read_to_string(repo.join(".gitignore")).unwrap();
+        assert!(content.contains("target/"));
+        assert!(content.contains("*.log"));
+    }
+
+    #[test]
+    fn test_append_to_gitignore_deduplicates() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path();
+        std::fs::write(repo.join(".gitignore"), "target/\n").unwrap();
+        let patterns = vec!["target/".to_string()];
+        let result = append_to_gitignore(repo, &patterns);
+        assert!(result.is_ok());
+        let content = std::fs::read_to_string(repo.join(".gitignore")).unwrap();
+        let count = content.lines().filter(|l| *l == "target/").count();
+        assert_eq!(count, 1, "should not duplicate existing pattern");
+    }
+
+    #[test]
+    fn test_append_to_gitignore_empty_patterns() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path();
+        let patterns: Vec<String> = vec![];
+        let result = append_to_gitignore(repo, &patterns);
+        assert!(result.is_ok());
+        assert!(!repo.join(".gitignore").exists(), "should not create .gitignore for empty patterns");
+    }
 }
 
 pub(crate) fn is_excluded_dir_name(name: &str, excluded_dir_names: &BTreeSet<String>) -> bool {
