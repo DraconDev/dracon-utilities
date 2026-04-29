@@ -67,6 +67,23 @@ systemctl --user restart dracon-warden.service
 | dracon-system | ~/.dracon/utilities/system/dracon-system.toml |
 | dracon-warden | ~/.dracon/utilities/warden/dracon-warden.toml |
 
+### dracon-system Protected Paths
+
+`dracon-system` protects critical system directories from accidental deletion. The following are always protected (exact match):
+
+`/`, `/home`, `/etc`, `/usr`, `/var`, `/boot`, `/nix`, `/run`, `/sys`, `/dev`, `/proc`
+
+You can add custom protected paths in `dracon-system.toml`:
+
+```toml
+[guard]
+# Additional directories to protect from cleanup operations (storage --cleanup, empty_trash, etc.)
+# Use absolute paths. Paths are canonicalized before comparison.
+# protected_paths = ["/mnt/data", "/opt/important"]
+```
+
+Safety: every `remove_dir_all` call site in `dracon-system` checks the path against both system and user-protected paths before executing. The `--apply` flag is required for destructive operations.
+
 ## AI Configuration
 
 dracon-sync uses AI for commit messages (scribe) and version bumping. Configure providers in `~/.dracon/ai.toml`:
