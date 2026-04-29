@@ -2282,4 +2282,123 @@ watch_roots = ["/tmp/test"]
             "plaintext should pass through unchanged"
         );
     }
+
+    #[test]
+    fn replace_managed_block_empty_current_string() {
+        let current = "";
+        let block = format!("{BLOCK_BEGIN}\nnewcontent\n{BLOCK_END}");
+        let next = replace_managed_block(current, &block);
+        assert!(next.contains("newcontent"));
+        assert!(next.contains(BLOCK_BEGIN));
+        assert!(next.contains(BLOCK_END));
+    }
+
+    #[test]
+    fn replace_managed_block_multiple_blocks_replaces_all() {
+        let current = format!(
+            "prefix\n{BLOCK_BEGIN}\nfirst\n{BLOCK_END}\nmid\n{BLOCK_BEGIN}\nsecond\n{BLOCK_END}\n suffix\n"
+        );
+        let block = format!("{BLOCK_BEGIN}\nnew\n{BLOCK_END}");
+        let next = replace_managed_block(&current, &block);
+        assert!(next.contains("prefix"));
+        assert!(next.contains("new"));
+        assert!(!next.contains("first"), "first block content should be replaced");
+        assert!(!next.contains("second"), "second block content should be replaced");
+        assert!(next.contains("mid"));
+        assert!(next.contains(" suffix"));
+    }
+
+    #[test]
+    fn replace_managed_block_preserves_leading_whitespace() {
+        let current = "  prefix\n";
+        let block = format!("{BLOCK_BEGIN}\nmanaged\n{BLOCK_END}");
+        let next = replace_managed_block(current, &block);
+        assert!(next.starts_with("  prefix\n"), "leading content should be preserved");
+    }
+
+    #[test]
+    fn apply_managed_file_creates_parent_dirs() {
+        let td = TestDir::new("warden_apply_creates_dirs");
+        let nested = td.path().join("a/b/c/managed.txt");
+        let block = format!("{BLOCK_BEGIN}\ncontent\n{BLOCK_END}");
+        let result = apply_managed_file(&nested, &block);
+        assert!(result.is_ok(), "should create parent dirs");
+        assert!(nested.exists(), "file should exist");
+        std::fs::remove_dir_all(&td.path()).ok();
+    }
+
+    #[test]
+    fn apply_overwrite_file_creates_new_file() {
+        let td = TestDir::new("warden_overwrite_new");
+        let file = td.path().join("newfile.txt");
+        let result = apply_overwrite_file(&file, "hello world");
+        assert!(result.is_ok(), "should create new file");
+        let content = std::fs::read_to_string(&file).unwrap();
+        assert!(content.starts_with("hello world"), "should contain content: {:?}", content);
+        std::fs::remove_dir_all(&td.path()).ok();
+    }
+
+    #[test]
+    fn apply_overwrite_file_overwrites_existing() {
+        let td = TestDir::new("warden_overwrite_existing");
+        let file = td.path().join("existing.txt");
+        std::fs::write(&file, "old content").unwrap();
+        let result = apply_overwrite_file(&file, "new content");
+        assert!(result.is_ok(), "should overwrite");
+        let content = std::fs::read_to_string(&file).unwrap();
+        assert!(content.starts_with("new content"), "should contain new content: {:?}", content);
+        std::fs::remove_dir_all(&td.path()).ok();
+    }
+
+    #[test]
+    fn is_marker_string_edge_cases() {
+        assert!(!is_marker_string(""), "empty string should not match");
+        assert!(!is_marker_string("[DRACON_SECRET]"), "no colon");
+        assert!(!is_marker_string("[DRACON_SECRET:]"), "empty key");
+        assert!(!is_marker_string("[DRACON_SECRET: ]"), "space key");
+        assert!(is_marker_string("[DRACON_SECRET:abc123]"), "basic key");
+        assert!(is_marker_string("[DRACON_SECRET:abc-123_456]"), "key with dash underscore");
+    }
+
+    #[test]
+    fn marker_prefix_at_edge_cases() {
+        assert_eq!(marker_prefix_at("no bracket here", 0), None);
+        assert_eq!(marker_prefix_at("[DRACON_SECRET:abc]", 0), None, "wrong position");
+        assert_eq!(marker_prefix_at("prefix [DRACON_SECRET", 8), None, "incomplete bracket");
+    }
+
+    #[test]
+    fn salvage_invalid_json_handles_nested_markers() {
+        let input = r#"{"key": "[DRACON_SECRET:abc]", "nested": {"key": "[DRACON_SECRET:xyz]"}}"#;
+        let salvaged = salvage_invalid_json_markers(input).expect("should salvage");
+        let v: serde_json::Value = serde_json::from_str(&salvaged).expect("should parse");
+        assert!(v["key"].is_null() || v["key"].is_string());
+        std::env::set_var("HOME", "/tmp");
+    }
+
+    #[test]
+    fn effective_watch_roots_handles_empty_policy() {
+        let policy = WardenPolicy {
+            protected_patterns: vec![],
+            plaintext_patterns: vec![],
+            hygiene_patterns: vec![],
+            watch_roots: vec![],
+            discover_roots: vec![],
+        };
+        let roots = effective_watch_roots(&policy);
+        assert!(roots.is_empty());
+    }
+
+    #[test]
+    fn effective_discovery_roots_handles_empty_policy() {
+        let policy = WardenPolicy {
+            protected_patterns: vec![],
+            plaintext_patterns: vec![],
+            hygiene_patterns: vec![],
+            watch_roots: vec![],
+            discover_roots: vec![],
+        };
+        let roots = effective_discovery_roots(&policy);
+        assert!(roots.is_empty());
+    }
 }

@@ -1,15 +1,17 @@
 # Project State
 
 ## Current Focus
-Add unit tests for env var handling of freeze and debug settings, marked with ignore attributes to safely run in parallel.
+Adds extensive unit tests covering managed block replacement, file creation/overwrite, marker parsing edge cases, and policy evaluation edge cases.
 
 ## Completed
-- [x] Added `test_env_freeze_enabled_ignores_case` test
-- [x] Added `test_env_freeze_enabled_accepts_yes` test
-- [x] Added `test_env_freeze_enabled_accepts_on` test
-- [x] Added `test_env_freeze_enabled_rejects_false` test
-- [x] Added `test_env_freeze_enabled_rejects_empty` test
-- [x] Added `test_debug_enabled_accepts_1` test
-- [x] Added `test_debug_enabled_rejects_empty` test
-- [x] Added `test_freeze_reason_env_takes_precedence` test
-- [x] Added `test_resolve_policy_path_env_override` test
+- [x] Test replace_managed_block with empty current string
+- [x] Test replace_managed_block with multiple blocks
+- [x] Test replace_managed_block preserves leading whitespace
+- [x] Test apply_managed_file creates parent directories
+- [x] Test apply_overwrite_file creates new file
+- [x] Test apply_overwrite_file overwrites existing file
+- [x] Test is_marker_string edge cases
+- [x] Test marker_prefix_at edge cases
+- [x] Test salvage_invalid_json_handles_nested_markers
+- [x] Test effective_watch_roots with empty policy
+- [x] Test effective_discovery_roots with empty policy
