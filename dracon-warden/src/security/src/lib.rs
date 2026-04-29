@@ -632,7 +632,7 @@ impl EnvironmentManager {
     pub fn add_secret(&mut self, group: String, key: String, value: String) {
         self.secrets
             .entry(group)
-            .or_insert_with(std::collections::HashMap::new)
+            .or_default()
             .insert(key, value);
     }
 
