@@ -68,8 +68,7 @@ fn check_path_str(path: &str, user_protected: &[&str]) -> bool {
     } else {
         path
     };
-    !TEST_PROTECTED.iter().any(|p| normalized == *p)
-        && !user_protected.iter().any(|p| normalized == *p)
+    !TEST_PROTECTED.contains(&normalized) && !user_protected.contains(&normalized)
 }
 
 static ROLLING_LOG: std::sync::OnceLock<Mutex<Vec<String>>> = std::sync::OnceLock::new();

@@ -1,8 +1,8 @@
 # Project State
 
 ## Current Focus
-Removed redundant path protection tests for `/home` and `/etc` that were already covered by existing tests
+Refactored path protection checks to use `contains()` instead of `iter().any()` for cleaner code
 
 ## Completed
-- [x] Removed duplicate test cases for path protection of `/home` and `/etc` paths
-- [x] Simplified test suite by consolidating redundant assertions
+- [x] refactored path protection checks to use `contains()` for cleaner and more idiomatic Rust code
+- [x] maintained identical functionality while improving code readability
