@@ -1,7 +1,7 @@
 # Project State
 
 ## Current Focus
-chore: update dependency lock files for dracon-sync and dracon-system crates
+chore(deps): update dependency lock file for dracon-sync and dracon-system crates
 
 ## Completed
-- [x] chore(multi): update dependency lock files for dracon-sync and dracon-system crates
+- [x] update Cargo.lock with latest versions of dracon-sync and dracon-system dependencies
