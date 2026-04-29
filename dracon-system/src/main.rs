@@ -2611,16 +2611,6 @@ mod tests {
     }
 
     #[test]
-    fn check_path_str_rejects_home() {
-        assert!(!check_path_str("/home", &[]));
-    }
-
-    #[test]
-    fn check_path_str_rejects_etc() {
-        assert!(!check_path_str("/etc", &[]));
-    }
-
-    #[test]
     fn check_path_str_rejects_custom() {
         let user_protected = &["/fake/videos", "/fake/tax"];
         assert!(!check_path_str("/fake/videos", user_protected));

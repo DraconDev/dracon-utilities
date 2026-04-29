@@ -1,9 +1,8 @@
 # Project State
 
 ## Current Focus
-Added comprehensive system path protection tests for critical directories
+Removed redundant path protection tests for `/home` and `/etc` that were already covered by existing tests
 
 ## Completed
-- [x] Added test to reject root directory access
-- [x] Added test to reject home directory access
-- [x] Added test to reject /etc directory access
+- [x] Removed duplicate test cases for path protection of `/home` and `/etc` paths
+- [x] Simplified test suite by consolidating redundant assertions
