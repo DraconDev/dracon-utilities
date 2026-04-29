@@ -9,7 +9,7 @@ use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::Arc;
 use tokio::process::Command;
 use tokio::time::sleep;
@@ -72,6 +72,17 @@ static ROLLING_LOG: std::sync::OnceLock<Mutex<Vec<String>>> = std::sync::OnceLoc
 
 fn get_log() -> &'static Mutex<Vec<String>> {
     ROLLING_LOG.get_or_init(|| Mutex::new(Vec::new()))
+}
+
+static VERBOSITY: AtomicU8 = AtomicU8::new(0);
+
+#[macro_export]
+macro_rules! veprintln {
+    ($lvl:expr, $($arg:tt)*) => {
+        if $lvl <= VERBOSITY.load(Ordering::SeqCst) {
+            eprintln!($($arg)*);
+        }
+    };
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -2704,6 +2715,7 @@ interval_secs = 30
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
+    VERBOSITY.store(cli.verbose, Ordering::SeqCst);
 
     match cli.cmd {
         Commands::Status { json } => {
@@ -2954,7 +2966,7 @@ async fn main() -> Result<()> {
                     tokio::spawn(async move {
                         if let Ok(mut sig) = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
                             sig.recv().await;
-                            eprintln!("system: received SIGTERM, shutting down gracefully...");
+                            veprintln!(1, "system: received SIGTERM, shutting down gracefully...");
                             shutdown_sigterm.store(true, Ordering::SeqCst);
                         } else {
                             eprintln!("system: failed to set up SIGTERM handler");
@@ -2964,7 +2976,7 @@ async fn main() -> Result<()> {
                     tokio::spawn(async move {
                         if let Ok(mut sig) = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::interrupt()) {
                             sig.recv().await;
-                            eprintln!("system: received SIGINT, shutting down gracefully...");
+                            veprintln!(1, "system: received SIGINT, shutting down gracefully...");
                             shutdown_sigint.store(true, Ordering::SeqCst);
                         } else {
                             eprintln!("system: failed to set up SIGINT handler");
@@ -2974,14 +2986,14 @@ async fn main() -> Result<()> {
                     tokio::spawn(async move {
                         if let Ok(mut sig) = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::hangup()) {
                             sig.recv().await;
-                            eprintln!("system: received SIGHUP, reloading policy...");
+                            veprintln!(1, "system: received SIGHUP, reloading policy...");
                             reload_sighup_handler.store(true, Ordering::SeqCst);
                         } else {
                             eprintln!("system: failed to set up SIGHUP handler");
                         }
                     });
 
-                    println!("guard daemon started (interval={}s)", guard.interval_secs);
+                    veprintln!(1, "guard daemon started (interval={}s)", guard.interval_secs);
                     let interval = guard.interval_secs;
                     let mut elapsed = 0u64;
                     while !shutdown.load(Ordering::SeqCst) {
@@ -2989,7 +3001,7 @@ async fn main() -> Result<()> {
                             reload_sighup.store(false, Ordering::SeqCst);
                             let _ = load_system_policy();
                             normalize_guard_policy(&mut guard);
-                            eprintln!("system: policy reloaded on SIGHUP (disk_warn={}%, disk_critical={}%)",
+                            veprintln!(2, "system: policy reloaded on SIGHUP (disk_warn={}%, disk_critical={}%)",
                                 guard.disk_warn_percent, guard.disk_critical_percent);
                         }
                         if let Err(e) = run_guard_once(&guard, &mut runtime).await {
@@ -3001,7 +3013,7 @@ async fn main() -> Result<()> {
                             elapsed += 1;
                         }
                     }
-                    eprintln!("system: guard daemon shutdown complete");
+                    veprintln!(1, "system: guard daemon shutdown complete");
                 }
                 GuardCommands::Prune { json, docker, docker_volumes, package_caches, apply } => {
                     let mut reclaimed_total = 0u64;

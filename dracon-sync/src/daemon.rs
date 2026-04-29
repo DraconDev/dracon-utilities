@@ -2,11 +2,22 @@ use anyhow::Result;
 use dracon_git::GitService;
 use std::collections::{BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::signal::unix::SignalKind;
 use tokio::time::sleep;
+
+pub(crate) static VERBOSITY: AtomicU8 = AtomicU8::new(0);
+
+#[macro_export]
+macro_rules! veprintln {
+    ($lvl:expr, $($arg:tt)*) => {
+        if $lvl <= VERBOSITY.load(Ordering::SeqCst) {
+            eprintln!($($arg)*);
+        }
+    };
+}
 
 use crate::policy::{SyncPolicy, freeze_reason, debug_enabled, timestamp_secs};
 use crate::exclude::{excluded_dir_names_set, has_sync_relevant_dirty_entries};
@@ -352,7 +363,7 @@ pub(crate) async fn run_daemon(policy_path: PathBuf, override_interval_secs: Opt
     tokio::spawn(async move {
         if let Ok(mut sig) = tokio::signal::unix::signal(SignalKind::terminate()) {
             sig.recv().await;
-            eprintln!("sync: received SIGTERM, shutting down gracefully...");
+            veprintln!(1, "sync: received SIGTERM, shutting down gracefully...");
             shutdown_sigterm.store(true, Ordering::SeqCst);
         } else {
             eprintln!("sync: failed to set up SIGTERM handler");
@@ -362,7 +373,7 @@ pub(crate) async fn run_daemon(policy_path: PathBuf, override_interval_secs: Opt
     tokio::spawn(async move {
         if let Ok(mut sig) = tokio::signal::unix::signal(SignalKind::interrupt()) {
             sig.recv().await;
-            eprintln!("sync: received SIGINT, shutting down gracefully...");
+            veprintln!(1, "sync: received SIGINT, shutting down gracefully...");
             shutdown_sigint.store(true, Ordering::SeqCst);
         } else {
             eprintln!("sync: failed to set up SIGINT handler");
@@ -372,7 +383,7 @@ pub(crate) async fn run_daemon(policy_path: PathBuf, override_interval_secs: Opt
     tokio::spawn(async move {
         if let Ok(mut sig) = tokio::signal::unix::signal(SignalKind::hangup()) {
             sig.recv().await;
-            eprintln!("sync: received SIGHUP, will reload policy...");
+            veprintln!(1, "sync: received SIGHUP, will reload policy...");
             reload_sighup.store(true, Ordering::SeqCst);
         } else {
             eprintln!("sync: failed to set up SIGHUP handler");
@@ -384,7 +395,7 @@ pub(crate) async fn run_daemon(policy_path: PathBuf, override_interval_secs: Opt
             reload.store(false, Ordering::SeqCst);
             match SyncPolicy::load(&policy_path) {
                 Ok(p) => {
-                    eprintln!("sync: policy reloaded on SIGHUP (watch_root={} repos, excluded={})",
+                    veprintln!(2, "sync: policy reloaded on SIGHUP (watch_root={} repos, excluded={})",
                         p.watch_root_paths().len(), p.exclude_repos.len());
                     activity.clear();
                     repair_cooldowns.clear();
