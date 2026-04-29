@@ -360,26 +360,41 @@ fn effective_discovery_roots(policy: &WardenPolicy) -> Vec<PathBuf> {
 
 #[cfg(test)]
 fn replace_managed_block(current: &str, managed_block: &str) -> String {
-    if let Some(start) = current.find(BLOCK_BEGIN) {
-        if let Some(end_rel) = current[start..].find(BLOCK_END) {
+    // Replace ALL existing managed blocks, then append if none existed
+    let mut out = String::new();
+    let mut rest = current;
+    let mut found_any = false;
+
+    while let Some(start) = rest.find(BLOCK_BEGIN) {
+        found_any = true;
+        out.push_str(&rest[..start]);
+        if let Some(end_rel) = rest[start..].find(BLOCK_END) {
             let end = start + end_rel + BLOCK_END.len();
-            let tail = current[end..].trim_start_matches(&['\r', '\n'][..]);
-            let mut out = String::new();
-            out.push_str(&current[..start]);
-            if !out.ends_with('\n') && !out.is_empty() {
-                out.push('\n');
-            }
-            out.push_str(managed_block);
-            if !tail.is_empty() {
-                out.push('\n');
-                out.push_str(tail);
-            } else if !managed_block.ends_with('\n') {
-                out.push('\n');
-            }
-            return out;
+            rest = &rest[end..];
+        } else {
+            // Malformed: begin without end — consume rest
+            rest = &rest[start + BLOCK_BEGIN.len()..];
+            break;
         }
     }
 
+    if found_any {
+        // Append the remaining tail (if any) after trimming leading newlines
+        let tail = rest.trim_start_matches(&['\r', '\n'][..]);
+        if !out.ends_with('\n') && !out.is_empty() {
+            out.push('\n');
+        }
+        out.push_str(managed_block);
+        if !tail.is_empty() {
+            out.push('\n');
+            out.push_str(tail);
+        } else if !managed_block.ends_with('\n') {
+            out.push('\n');
+        }
+        return out;
+    }
+
+    // No existing block — append
     let mut out = current.to_string();
     if !out.is_empty() && !out.ends_with('\n') {
         out.push('\n');
@@ -2294,7 +2309,6 @@ watch_roots = ["/tmp/test"]
     }
 
     #[test]
-    #[ignore = "replace_managed_block only replaces first block"]
     fn replace_managed_block_multiple_blocks_replaces_all() {
         let current = format!(
             "prefix\n{BLOCK_BEGIN}\nfirst\n{BLOCK_END}\nmid\n{BLOCK_BEGIN}\nsecond\n{BLOCK_END}\n suffix\n"
