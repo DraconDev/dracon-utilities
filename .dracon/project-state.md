@@ -1,10 +1,12 @@
 # Project State
 
 ## Current Focus
-Added user-configurable protected paths to prevent accidental deletion of critical system directories
+Refactor install.sh script to improve binary installation process
 
 ## Completed
-- [x] Added system-wide protected paths (`/`, `/home`, `/etc`, etc.)
-- [x] Added configuration option for custom protected paths in `dracon-system.toml`
-- [x] Implemented safety checks for all `remove_dir_all` operations
-- [x] Required `--apply` flag for destructive operations
+- [x] Modified install_binary function to take a subdir parameter indicating the subdirectory to build the binary in
+- [x] Changed how the binary name is determined by stripping any version suffix
+- [x] Moved cargo build commands into the specified subdirectory
+- [x] Simplified logic for finding the built binary path
+- [x] Updated calls to install_binary to pass the appropriate subdirectory for each package
+- [x] Removed redundant logic for finding binary path if not in default location
