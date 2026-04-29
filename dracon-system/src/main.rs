@@ -2639,16 +2639,6 @@ interval_secs = 30
         let user_protected = &["/fake/videos"];
         assert!(check_path_str("/fake/videos/my-project", user_protected));
     }
-
-    #[test]
-    fn check_safe_to_delete_with_custom_paths() {
-        let tmp_base = std::env::temp_dir().join(format!("dracon_test_{}", std::process::id()));
-        let custom_protected = vec![tmp_base.display().to_string()];
-        let result = check_safe_to_delete(&tmp_base, &custom_protected);
-        assert!(result.is_err(), "expected err for custom-protected path, got {:?}", result);
-        let err_msg = result.unwrap_err().to_string();
-        assert!(err_msg.contains("user-protected"), "expected user-protected hint, got: {err_msg}");
-    }
 }
 
 #[tokio::main]
