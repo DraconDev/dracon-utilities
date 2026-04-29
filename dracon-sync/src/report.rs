@@ -2067,21 +2067,26 @@ mod tests {
 
     struct VarGuard {
         var: String,
+        original: Option<String>,
     }
     impl VarGuard {
         fn set_temp(var: &str, value: &str) -> Self {
-            let _original = std::env::var(var).ok();
+            let original = std::env::var(var).ok();
             if value.is_empty() {
                 std::env::remove_var(var);
             } else {
                 std::env::set_var(var, value);
             }
-            Self { var: var.to_string() }
+            Self { var: var.to_string(), original }
         }
     }
     impl Drop for VarGuard {
         fn drop(&mut self) {
-            std::env::remove_var(&self.var);
+            if let Some(orig) = self.original.take() {
+                std::env::set_var(&self.var, orig);
+            } else {
+                std::env::remove_var(&self.var);
+            }
         }
     }
 

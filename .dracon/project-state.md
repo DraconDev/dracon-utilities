@@ -1,7 +1,7 @@
 # Project State
 
 ## Current Focus
-Add test verifying `DemonSecurity::get_or_init()` returns the same cached instance via once-cell pattern
+fix(VarGuard): Restore original environment variable values on RAII guard drop instead of unconditionally removing variables
 
 ## Completed
-- [x] Test that validates singleton caching behavior for `DemonSecurity` using pointer address comparison to confirm identical instances
+- [x] fix(VarGuard): Capture pre-existing environment variable value when initializing temporary variable, restore it on drop to preserve original environment state
