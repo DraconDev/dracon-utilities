@@ -2930,12 +2930,14 @@ interval_secs = 30
         let content = "HEADER_LINE_1\nHEADER_LINE_2\ndata line 1\ndata line 2\ndata line 3\n";
         std::fs::write(&log_file, content.as_bytes()).unwrap();
         let original_size = std::fs::metadata(&log_file).unwrap().len();
+        assert_eq!(original_size, 64, "content should be 64 bytes");
 
         let result = truncate_log_file(&log_file, 50, 2);
         assert!(result.is_ok());
+        let new_size = std::fs::metadata(&log_file).unwrap().len();
+        assert!(new_size <= 50, "should respect max_size_bytes but was {}", new_size);
         let new_content = std::fs::read_to_string(&log_file).unwrap();
         assert!(new_content.starts_with("HEADER_LINE_1\nHEADER_LINE_2\n"), "headers should be preserved: {:?}", new_content);
-        assert!(new_content.len() <= 50, "should respect max_size_bytes but was {}: {:?}", new_content.len(), new_content);
 
         std::fs::remove_dir_all(&tmp).unwrap();
     }
