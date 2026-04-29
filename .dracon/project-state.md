@@ -1,7 +1,8 @@
 # Project State
 
 ## Current Focus
-Updated dependencies in Cargo.lock for signal handling infrastructure implementation.
+Enable automatic creation of GitHub private remotes when `policy.auto_github_private` is set and no origin remote exists.
 
 ## Completed
-- [x] Dependency update in Cargo.lock to support signal handling safety mechanisms.
+- [x] Expose `create_github_private_remote` in `report.rs` so sync logic can invoke it.
+- [x] Extend `sync_repo` to create a GitHub private remote on demand and gate further sync steps on its success.
