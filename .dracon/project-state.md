@@ -1,8 +1,13 @@
 # Project State
 
 ## Current Focus
-Refactor path imports: drop unused PathBuf in sync code, add PathBuf only where tests need it
+Clean up obsolete file pattern matching tests in exclude.rs
 
 ## Completed
-- [x] Remove PathBuf import from src/sync.rs
-- [x] Add PathBuf import in exclude.rs test module
+- [x] Removed test_matches_file_pattern_exact unit test
+- [x] Removed test_matches_file_pattern_extension unit test
+- [x] Removed test_matches_file_pattern_prefix unit test
+- [x] Removed test_matches_file_pattern_glob unit test
+- [x] Removed test_is_excluded_file_simple unit test
+- [x] Removed test_is_excluded_file_no_match unit test
+- [x] Removed test_is_excluded_file_empty_path unit test

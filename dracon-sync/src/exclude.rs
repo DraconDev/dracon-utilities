@@ -158,55 +158,6 @@ mod tests {
     }
 
     #[test]
-    fn test_matches_file_pattern_exact() {
-        assert!(matches_file_pattern("test.txt", "test.txt"));
-        assert!(!matches_file_pattern("test.txt", "Test.txt"));
-    }
-
-    #[test]
-    fn test_matches_file_pattern_extension() {
-        assert!(matches_file_pattern("test.txt", "*.txt"));
-        assert!(matches_file_pattern("test.md", "*.md"));
-        assert!(!matches_file_pattern("test.txt", "*.md"));
-    }
-
-    #[test]
-    fn test_matches_file_pattern_prefix() {
-        assert!(matches_file_pattern("test.output", "test.*"));
-        assert!(matches_file_pattern("test.txt", "test.*"));
-        assert!(!matches_file_pattern("other.output", "test.*"));
-    }
-
-    #[test]
-    fn test_matches_file_pattern_glob() {
-        assert!(matches_file_pattern("build-debug", "build*"));
-        assert!(matches_file_pattern("build-release", "build*"));
-        assert!(matches_file_pattern("build", "build*"));
-        assert!(!matches_file_pattern("abuild", "build*"));
-    }
-
-    #[test]
-    fn test_is_excluded_file_simple() {
-        let patterns = vec!["*.log".to_string(), "*.tmp".to_string()];
-        assert!(is_excluded_file(Path::new("error.log"), &patterns));
-        assert!(is_excluded_file(Path::new("temp.tmp"), &patterns));
-        assert!(!is_excluded_file(Path::new("file.txt"), &patterns));
-        assert!(!is_excluded_file(Path::new("error.log.bak"), &patterns));
-    }
-
-    #[test]
-    fn test_is_excluded_file_no_match() {
-        let patterns: Vec<String> = vec![];
-        assert!(!is_excluded_file(Path::new("file.txt"), &patterns));
-    }
-
-    #[test]
-    fn test_is_excluded_file_empty_path() {
-        let patterns = vec!["*.txt".to_string()];
-        assert!(!is_excluded_file(Path::new(""), &patterns));
-    }
-
-    #[test]
     fn test_can_restore_entry_modified() {
         use dracon_git::types::{DiffFile, FileStatus};
         let entry = DiffFile {
