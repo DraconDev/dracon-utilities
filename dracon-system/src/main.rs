@@ -2710,6 +2710,35 @@ interval_secs = 30
         std::fs::remove_dir_all(&tmp).unwrap();
         assert!(result.is_err(), "go cache when itself is protected should be rejected");
     }
+
+    #[tokio::test]
+    async fn test_auto_cleanup_rust_targets_dry_run_does_not_delete() {
+        let tmp = std::env::temp_dir().join(format!("dracon_rust_cleanup_{}", std::process::id()));
+        let target_dir = tmp.join("my-project/target/debug");
+        std::fs::create_dir_all(&target_dir).unwrap();
+        // Put a file inside so it has non-zero size
+        std::fs::write(target_dir.join("libtest.rlib"), vec![0u8; 1024]).unwrap();
+
+        let guard = GuardPolicy {
+            rust_search_roots: tmp.display().to_string(),
+            cleanup_min_size_mb: 0,
+            ..Default::default()
+        };
+        let mut state = GuardRuntimeState::default();
+
+        let result = auto_cleanup_rust_targets(&guard, &mut state, false).await;
+        assert!(result.is_ok(), "dry-run should not fail: {:?}", result);
+        assert_eq!(
+            result.unwrap().cleaned_count, 0,
+            "apply=false should not clean anything (dry-run)"
+        );
+        assert!(
+            target_dir.exists(),
+            "target dir should still exist when apply=false (dry-run)"
+        );
+
+        std::fs::remove_dir_all(&tmp).unwrap();
+    }
 }
 
 #[tokio::main]
