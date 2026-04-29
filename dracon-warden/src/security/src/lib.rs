@@ -1561,10 +1561,8 @@ impl DemonSecurity {
                                     .to_string();
                                 for line in content.lines() {
                                     let line = line.trim();
-                                    if !line.is_empty() && !line.starts_with('#') {
-                                        if seen.insert(line.to_string()) {
-                                            recipients.push((name.clone(), line.to_string()));
-                                        }
+                                    if !line.is_empty() && !line.starts_with('#') && seen.insert(line.to_string()) {
+                                        recipients.push((name.clone(), line.to_string()));
                                     }
                                 }
                             }
@@ -1793,13 +1791,9 @@ impl DemonSecurity {
                                     // Parse potential multiple keys per file or single key
                                     for line in pub_str.lines() {
                                         let line = line.trim();
-                                        if !line.is_empty() && !line.starts_with('#') {
-                                            if seen_keys.insert(line.to_string()) {
-                                                if let Ok(recipient) =
-                                                    line.parse::<x25519::Recipient>()
-                                                {
-                                                    recipients.push(recipient);
-                                                }
+                                        if !line.is_empty() && !line.starts_with('#') && seen_keys.insert(line.to_string()) {
+                                            if let Ok(recipient) = line.parse::<x25519::Recipient>() {
+                                                recipients.push(recipient);
                                             }
                                         }
                                     }
