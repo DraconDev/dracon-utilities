@@ -1315,7 +1315,7 @@ async fn empty_trash(apply: bool, protected_paths: &[String]) -> Result<(u64, Ve
                 cleaned.push(format!("trash files ({})", human_bytes(size)));
                 reclaimed += size;
                 if apply {
-                    check_safe_to_delete(&trash_files)?;
+                    check_safe_to_delete(&trash_files, protected_paths)?;
                     if let Err(e) = tokio::fs::remove_dir_all(&trash_files).await {
                         eprintln!("⚠️ failed to remove trash files: {}", e);
                     } else if let Err(e) = tokio::fs::create_dir_all(&trash_files).await {
