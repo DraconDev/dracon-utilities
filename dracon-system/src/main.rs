@@ -2834,7 +2834,6 @@ interval_secs = 30
 
     #[test]
     fn test_should_notify_blocks_during_cooldown() {
-        use std::time::Instant;
         let mut state = GuardRuntimeState::default();
         let key = "test-cooldown";
         should_notify(&mut state, key, 3600);
