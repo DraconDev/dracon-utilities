@@ -2637,6 +2637,58 @@ interval_secs = 30
         let user_protected = &["/fake/videos"];
         assert!(check_path_str("/fake/videos/my-project", user_protected));
     }
+
+    #[tokio::test]
+    async fn test_empty_trash_respects_protected_paths() {
+        let tmp = std::env::temp_dir().join(format!("dracon_trash_test_{}", std::process::id()));
+        let trash_info = tmp.join("info");
+        std::fs::create_dir_all(&trash_info).unwrap();
+        std::fs::write(trash_info.join("a.trashinfo"), "x\n").unwrap();
+        let protected = vec![tmp.display().to_string()];
+        let (bytes, cleaned) = empty_trash(true, &protected).await.unwrap();
+        std::fs::remove_dir_all(&tmp).unwrap();
+        assert_eq!(bytes, 0, "protected trash dir should not be deleted, got {}", bytes);
+        assert!(cleaned.is_empty(), "nothing should be cleaned when protected: {:?}", cleaned);
+    }
+
+    #[tokio::test]
+    async fn test_empty_trash_allows_unprotected_trash() {
+        let tmp = std::env::temp_dir().join(format!("dracon_trash_ok_{}", std::process::id()));
+        let trash_info = tmp.join("info");
+        std::fs::create_dir_all(&trash_info).unwrap();
+        std::fs::write(trash_info.join("a.trashinfo"), "x\n").unwrap();
+        let (bytes, cleaned) = empty_trash(true, &[]).await.unwrap();
+        std::fs::remove_dir_all(&tmp).ok();
+        assert!(bytes > 0 || !cleaned.is_empty(), "unprotected trash should be cleaned");
+    }
+
+    #[tokio::test]
+    async fn test_clean_package_caches_respects_protected_paths() {
+        let tmp = std::env::temp_dir().join(format!("dracon_pkgcache_test_{}", std::process::id()));
+        let cargo_dir = tmp.join(".cargo/registry/cache");
+        std::fs::create_dir_all(&cargo_dir).unwrap();
+        let protected = vec![tmp.display().to_string()];
+        let (bytes, cleaned) = clean_package_caches(true, false, false, false, true, &protected)
+            .await
+            .unwrap();
+        std::fs::remove_dir_all(&tmp).unwrap();
+        assert_eq!(bytes, 0, "protected cargo cache should not be deleted, got {}", bytes);
+        assert!(cleaned.is_empty(), "nothing should be cleaned when protected: {:?}", cleaned);
+    }
+
+    #[tokio::test]
+    async fn test_clean_package_caches_npm_respects_protected_paths() {
+        let tmp = std::env::temp_dir().join(format!("dracon_npms_test_{}", std::process::id()));
+        let npm_dir = tmp.join(".npm");
+        std::fs::create_dir_all(&npm_dir).unwrap();
+        let protected = vec![tmp.display().to_string()];
+        let (bytes, cleaned) = clean_package_caches(false, true, false, false, true, &protected)
+            .await
+            .unwrap();
+        std::fs::remove_dir_all(&tmp).unwrap();
+        assert_eq!(bytes, 0, "protected npm cache should not be deleted, got {}", bytes);
+        assert!(cleaned.is_empty(), "nothing should be cleaned when protected: {:?}", cleaned);
+    }
 }
 
 #[tokio::main]
