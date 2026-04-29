@@ -1,7 +1,8 @@
 # Project State
 
 ## Current Focus
-Add an ignored unit test that checks whether `apply_managed_file` creates parent directories.
+Add ignored unit tests for edge cases in marker string handling
 
 ## Completed
-- [x] Added test `apply_managed_file_creates_parent_dirs` with `#[ignore = "apply_managed_file may not create parent dirs"]` attribute.
+- [x] Add ignored test `is_marker_string_edge_cases` to verify empty string and no‑colon behavior
+- [x] Add ignored test `marker_prefix_at_edge_cases` to verify position and `None` handling
