@@ -3043,19 +3043,19 @@ API_KEY=original"#;
     }
 
     #[test]
-    fn test_encrypt_with_repo_key_roundtrip() {
+    fn test_encrypt_v2_for_all_roundtrip() {
         let security = test_security_with_identity();
-        let plaintext = b"repo key encrypted data";
-        let encrypted = security.encrypt_with_repo_key(plaintext).unwrap();
-        let decrypted = security.decrypt_with_repo_key(&encrypted).unwrap();
-        assert_eq!(decrypted, plaintext, "repo key roundtrip should work");
+        let plaintext = b"encrypt to all recipients test";
+        let encrypted = security.encrypt_v2_for_all(plaintext).unwrap();
+        let decrypted = security.decrypt_v2(&encrypted).unwrap();
+        assert_eq!(decrypted, plaintext, "encrypt_v2_for_all should roundtrip");
     }
 
     #[test]
-    fn test_encrypt_decrypt_with_repo_key_empty() {
+    fn test_encrypt_v2_for_all_empty_data() {
         let security = test_security_with_identity();
-        let encrypted = security.encrypt_with_repo_key(b"").unwrap();
-        let decrypted = security.decrypt_with_repo_key(&encrypted).unwrap();
+        let encrypted = security.encrypt_v2_for_all(b"").unwrap();
+        let decrypted = security.decrypt_v2(&encrypted).unwrap();
         assert_eq!(decrypted, b"", "empty data roundtrip");
     }
 
