@@ -1,19 +1,11 @@
 # Project State
 
 ## Current Focus
-Add comprehensive unit tests for v2 encryption/decryption, unlock_payload, repo key handling, and secret marker normalization
+Rename repo-key specific encryption tests to v2 generic tests and update test logic to use new API functions
 
 ## Completed
-- [x] test_security_with_identity
-- [x] test_encrypt_v2_decrypt_v2_roundtrip
-- [x] test_encrypt_v2_empty_data
-- [x] test_encrypt_v2_binary_data
-- [x] test_unlock_payload_v2_roundtrip
-- [x] test_decrypt_v2_fails_with_wrong_identity
-- [x] test_decrypt_v2_requires_master_identity
-- [x] test_encrypt_with_repo_key_roundtrip
-- [x] test_encrypt_decrypt_with_repo_key_empty
-- [x] test_normalize_secret_marker_valid
-- [x] test_normalize_secret_marker_invalid
-- [x] test_is_inside_secret_tag_detection
-- [x] test_get_env_version_edge_cases
+- [x] Rename `test_encrypt_with_repo_key_roundtrip` to `test_encrypt_v2_for_all_roundtrip` and adjust test logic
+- [x] Rename `test_encrypt_decrypt_with_repo_key_empty` to `test_encrypt_v2_for_all_empty_data` and adjust test logic
+- [x] Replace calls to `encrypt_with_repo_key` with `encrypt_v2_for_all`
+- [x] Replace calls to `decrypt_with_repo_key` with `decrypt_v2`
+- [x] Update plaintext and assertion messages to reflect v2 behavior
