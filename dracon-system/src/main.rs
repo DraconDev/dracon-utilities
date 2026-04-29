@@ -1740,7 +1740,7 @@ async fn run_guard_once(
         
         // Trash
         if guard.clean_trash {
-            match empty_trash(true).await {
+            match empty_trash(true, &guard.protected_paths).await {
                 Ok((bytes, cleaned)) => {
                     total_reclaimed += bytes;
                     all_cleaned.extend(cleaned.iter().map(|s| format!("Trash: {}", s)));
@@ -2742,9 +2742,10 @@ async fn main() -> Result<()> {
                 }
                 println!("Estimated reclaimed: {}", human_bytes(total));
 
+                let user_protected = policy.guard.protected_paths.clone();
                 if cfg.apply {
                     for path in actionable {
-                        check_safe_to_delete(&path)?;
+                        check_safe_to_delete(&path, &user_protected)?;
                         if path.exists() {
                             println!("Deleting {}", path.display());
                             tokio::fs::remove_dir_all(path).await?;
@@ -3010,7 +3011,7 @@ async fn main() -> Result<()> {
                     
                     // Trash
                     if do_trash {
-                        let (bytes, cleaned) = empty_trash(apply).await.unwrap_or((0, vec![]));
+                        let (bytes, cleaned) = empty_trash(apply, &guard_clone.protected_paths).await.unwrap_or((0, vec![]));
                         total_reclaimed += bytes;
                         for c in cleaned {
                             actions.push(format!("Trash: {}", c));
