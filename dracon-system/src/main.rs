@@ -2886,7 +2886,8 @@ interval_secs = 30
 
     #[test]
     fn test_truncate_log_file_noop_when_under_limit() {
-        let tmp = std::env::temp_dir().join(format!("dracon_log_test_{}", std::process::id()));
+        let id = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
+        let tmp = std::env::temp_dir().join(format!("dracon_log_test_{}", id));
         std::fs::create_dir_all(&tmp).unwrap();
         let log_file = tmp.join("test.log");
         std::fs::write(&log_file, b"small content\n").unwrap();
@@ -2901,7 +2902,8 @@ interval_secs = 30
 
     #[test]
     fn test_truncate_log_file_simple_truncate() {
-        let tmp = std::env::temp_dir().join(format!("dracon_log_test_{}", std::process::id()));
+        let id = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
+        let tmp = std::env::temp_dir().join(format!("dracon_log_test_{}", id));
         std::fs::create_dir_all(&tmp).unwrap();
         let log_file = tmp.join("test.log");
         let large_content = "x\n".repeat(1000);
@@ -2921,7 +2923,8 @@ interval_secs = 30
 
     #[test]
     fn test_truncate_log_file_preserves_headers() {
-        let tmp = std::env::temp_dir().join(format!("dracon_log_test_{}", std::process::id()));
+        let id = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
+        let tmp = std::env::temp_dir().join(format!("dracon_log_test_{}", id));
         std::fs::create_dir_all(&tmp).unwrap();
         let log_file = tmp.join("test.log");
         let content = "HEADER_LINE_1\nHEADER_LINE_2\ndata line 1\ndata line 2\ndata line 3\n";
@@ -2939,7 +2942,8 @@ interval_secs = 30
 
     #[test]
     fn test_truncate_log_file_nonexistent_returns_err() {
-        let result = truncate_log_file(std::path::Path::new("/nonexistent/path.log"), 100, 0);
+        let id = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
+        let result = truncate_log_file(std::path::Path::new(&format!("/nonexistent/dracon_log_test_{}/path.log", id)), 100, 0);
         assert!(result.is_err(), "nonexistent file should return error");
     }
 
