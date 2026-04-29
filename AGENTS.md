@@ -84,6 +84,22 @@ You can add custom protected paths in `dracon-system.toml`:
 
 Safety: every `remove_dir_all` call site in `dracon-system` checks the path against both system and user-protected paths before executing. The `--apply` flag is required for destructive operations.
 
+### dracon-sync Automatic Remote Creation
+
+When `auto_github_private = true` in `dracon-sync.toml`, any repo in a watched root without an origin remote will automatically get:
+
+1. A private GitHub repo created via `gh repo create --private`
+2. SSH remote added: `git@github.com:<account>/<repo>.git`
+3. Initial commit pushed: `git push -u origin HEAD`
+
+Requirements: `gh` CLI installed and authenticated (`gh auth status`).
+
+```toml
+[sync]
+auto_github_private = true
+auto_github_private_account = "YourOrgOrUsername"
+```
+
 ## CLI Reference
 
 All binaries support `-V, --version` and `-v, --verbose` (repeatable up to 2x for `-vv`).
