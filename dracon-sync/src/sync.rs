@@ -760,4 +760,121 @@ auto_bump_versions = false
             count_before, count_after
         );
     }
+
+    #[tokio::test]
+    async fn test_sync_repo_skips_rebase_in_progress() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", &repo.to_string_lossy(), "config", "user.email", "test@test"])
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", &repo.to_string_lossy(), "commit", "--allow-empty", "-m", "init"])
+            .status()
+            .unwrap();
+
+        // Simulate rebase in progress
+        std::fs::create_dir_all(repo.join(".git/rebase-merge")).unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = true
+auto_pull = false
+auto_push = false
+auto_bump_versions = false
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0).await;
+        assert!(result.is_ok(), "sync_repo should succeed even during rebase");
+        assert_eq!(result.unwrap(), false, "rebase should cause early return (nothing synced)");
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_skips_merge_in_progress() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", &repo.to_string_lossy(), "config", "user.email", "test@test"])
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", &repo.to_string_lossy(), "commit", "--allow-empty", "-m", "init"])
+            .status()
+            .unwrap();
+
+        // Simulate merge in progress
+        std::fs::write(repo.join(".git/MERGE_HEAD"), "abc123\n").unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = true
+auto_pull = false
+auto_push = false
+auto_bump_versions = false
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0).await;
+        assert!(result.is_ok(), "sync_repo should succeed even during merge");
+        assert_eq!(result.unwrap(), false, "merge should cause early return (nothing synced)");
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_skips_cherry_pick_in_progress() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", &repo.to_string_lossy(), "config", "user.email", "test@test"])
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", &repo.to_string_lossy(), "commit", "--allow-empty", "-m", "init"])
+            .status()
+            .unwrap();
+
+        // Simulate cherry-pick in progress
+        std::fs::write(repo.join(".git/CHERRY_PICK_HEAD"), "abc123\n").unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = true
+auto_pull = false
+auto_push = false
+auto_bump_versions = false
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0).await;
+        assert!(result.is_ok(), "sync_repo should succeed even during cherry-pick");
+        assert_eq!(result.unwrap(), false, "cherry-pick should cause early return (nothing synced)");
+    }
 }
