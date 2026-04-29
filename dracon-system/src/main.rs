@@ -164,6 +164,7 @@ fn events_path() -> PathBuf {
 #[derive(Parser, Debug)]
 #[command(name = "dracon-system")]
 #[command(about = "Deterministic system utility (no AI)")]
+#[command(version)]
 struct Cli {
     #[command(subcommand)]
     cmd: Commands,
