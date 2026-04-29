@@ -405,7 +405,7 @@ dependencies = [
 
 [[package]]
 name = "dracon-git"
-version = "14.0.1"
+version = "16.2.3"
 dependencies = [
  "anyhow",
  "git2",
@@ -426,6 +426,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "tempfile",
  "tokio",
  "toml",
 ]
