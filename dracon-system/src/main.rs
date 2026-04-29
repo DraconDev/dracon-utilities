@@ -28,7 +28,7 @@ fn check_safe_to_delete(path: &Path) -> Result<()> {
     };
     let canon_str = canon.display().to_string();
     for sys_prot in SYSTEM_PROTECTED {
-        if canon_str.starts_with(*sys_prot) {
+        if canon_str == *sys_prot {
             anyhow::bail!(
                 "refusing to delete protected path {} (matches system root {})",
                 canon.display(),
@@ -2476,6 +2476,44 @@ mod tests {
         assert_eq!(rows[0].pid, 123);
         assert_eq!(rows[0].command, "git");
         assert_eq!(rows[0].rss_mb, 4096);
+    }
+
+    #[test]
+    fn check_safe_to_delete_rejects_root() {
+        let result = check_safe_to_delete(Path::new("/"));
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("refusing to delete"), "expected refusal, got: {err_msg}");
+    }
+
+    #[test]
+    fn check_safe_to_delete_rejects_home() {
+        let result = check_safe_to_delete(Path::new("/home"));
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("refusing to delete"), "expected refusal, got: {err_msg}");
+    }
+
+    #[test]
+    fn check_safe_to_delete_rejects_etc() {
+        let result = check_safe_to_delete(Path::new("/etc"));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn check_safe_to_delete_allows_tmp_subdir() {
+        let tmp_dir = std::env::temp_dir().join(format!("dracon_test_{}", std::process::id()));
+        let result = check_safe_to_delete(&tmp_dir);
+        assert!(result.is_ok(), "expected ok, got: {:?}", result);
+    }
+
+    #[test]
+    fn check_safe_to_delete_allows_tmp_nested() {
+        let tmp_dir = std::env::temp_dir()
+            .join(format!("dracon_test_{}", std::process::id()))
+            .join("nested/deep");
+        let result = check_safe_to_delete(&tmp_dir);
+        assert!(result.is_ok(), "expected ok, got: {:?}", result);
     }
 
     #[test]
