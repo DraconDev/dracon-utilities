@@ -1,8 +1,7 @@
 # Project State
 
 ## Current Focus
-Removed stray closing brace in SecretScanner::scan to fix compile error
+Updated Cargo.lock dependency lockfile for dracon-sync and dracon-system crates
 
 ## Completed
-- [x] Removed extraneous `}` after the `scan` method definition
-- [x] Resolved compile error caused by mismatched brace count
+- [x] Updated Cargo.lock with new dependency versions for dracon-sync and dracon-system crates
