@@ -2099,9 +2099,10 @@ mod tests {
 
     #[test]
     fn test_incident_ledger_path_custom_env() {
-        let _guard = VarGuard::set_temp("DRACON_SYNC_LEDGER", "/custom/path/ledger.jsonl");
+        std::env::set_var("DRACON_SYNC_LEDGER", "/custom/path/ledger.jsonl");
         let path = incident_ledger_path(std::path::Path::new("/fake/policy.toml"));
         let result = path.to_string_lossy();
+        std::env::remove_var("DRACON_SYNC_LEDGER");
         assert_eq!(result, "/custom/path/ledger.jsonl");
     }
 
