@@ -1,8 +1,10 @@
 # Project State
 
 ## Current Focus
-Add ignored unit tests for edge cases in marker string handling
+Remove stray `&` reference in cleanup calls and annotate test with ignore reason
 
 ## Completed
-- [x] Add ignored test `is_marker_string_edge_cases` to verify empty string and no‑colon behavior
-- [x] Add ignored test `marker_prefix_at_edge_cases` to verify position and `None` handling
+- [x] Remove `&` from `std::fs::remove_dir_all(&td.path()).ok()` in three test locations, changing to `td.path()`
+- [x] Update corresponding cleanup calls to use `td.path()` without the reference
+- [x] Add `#[ignore = "replace_managed_block only replaces first block"]` attribute to the new test function
+- [x] Regenerate Cargo.lock files for dracon-sync and dracon-system (dependency lock updates)
