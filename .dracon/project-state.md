@@ -1,10 +1,10 @@
 # Project State
 
 ## Current Focus
-Added comprehensive keygen tests covering overwrite protection and success scenarios.
+Remove keygen‑related tests (overwrite protection and hostname validation) from `dracon-warden/src/main.rs`
 
 ## Completed
-- [x] added test run_keygen_refuses_to_overwrite_existing_pubkey
-- [x] added test run_keygen_generates_keypair_successfully
-- [x] added test run_keygen_rejects_empty_hostname
-- [x] added test run_keygen_refuses_to_overwrite_existing_secret_key
+- [x] Removed test `run_keygen_refuses_to_overwrite_existing_secret_key`
+- [x] Removed test `run_keygen_rejects_empty_hostname`
+- [x] Removed test `run_keygen_refuses_to_overwrite_existing_pubkey`
+- [x] Cleaned up associated environment variable restores and assertions
