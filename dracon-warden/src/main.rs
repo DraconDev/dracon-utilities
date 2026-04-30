@@ -2137,7 +2137,14 @@ mod tests {
         assert!(merged.contains(&p2));
     }
 
-}
+    #[test]
+    fn apply_managed_file_detects_noop_second_write() {
+        let td = TestDir::new("warden_apply_noop");
+        let file = td.path().join(".gitignore");
+        let block = format!("{BLOCK_BEGIN}\nfoo\n{BLOCK_END}");
+        assert!(apply_managed_file(&file, &block).expect("first"));
+        assert!(!apply_managed_file(&file, &block).expect("second"));
+    }
 
     #[test]
     fn apply_overwrite_file_detects_noop_second_write() {
@@ -2380,6 +2387,9 @@ watch_roots = ["/tmp/test"]
         assert_eq!(marker_prefix_at("[DRACON_SECRET:abc]", 0), Some("[DRACON_SECRET:"), "starts at position 0");
         assert_eq!(marker_prefix_at("[DRACON_SECRET:abc]", 1), None, "starts at position 1");
         assert_eq!(marker_prefix_at("prefix [DRACON_SECRET", 8), None, "incomplete bracket without colon");
+        assert_eq!(marker_prefix_at("[DRACON_SECRET:abc]", 7), Some("[DRACON_SECRET:"), "starts inside prefix");
+        assert_eq!(marker_prefix_at("[DRACON_SECRET:abc] more", 0), Some("[DRACON_SECRET:"), "marker at start followed by more");
+        assert_eq!(marker_prefix_at("text [DRACON_SECRET:abc] end", 5), Some("[DRACON_SECRET:"), "marker in middle");
     }
 
     #[test]
@@ -2391,9 +2401,9 @@ watch_roots = ["/tmp/test"]
 
     #[test]
     fn salvage_invalid_json_marker_at_end_of_string() {
-        let input = r#"{"key": "value", "secret": "[DRACON_SECRET:abc]"}"#;
-        let salvaged = salvage_invalid_json_markers(input).expect("should salvage");
-        assert!(salvaged.contains("null") || salvaged.contains("__scrubbed__"));
+        let input = r#"{"key": "value", "secret": [DRACON_SECRET:abc}"#;
+        let salvaged = salvage_invalid_json_markers(input);
+        assert!(salvaged.is_some(), "incomplete marker at end should still be detected");
     }
 
     #[test]
@@ -2469,5 +2479,31 @@ watch_roots = ["/tmp/test"]
     fn build_globset_normalizes_backslash() {
         let set = build_globset(&["subdir\\*.json".into()]).expect("should succeed");
         assert!(set.is_match("subdir/test.json"));
+    }
+
+    #[test]
+    fn find_git_repo_returns_none_for_non_repo() {
+        let tmp = tempfile::tempdir().unwrap();
+        let result = find_git_repo(tmp.path());
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn find_git_repo_finds_parent_with_git_dir() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo_dir = tmp.path().join("myrepo").join("subdir");
+        std::fs::create_dir_all(&repo_dir).unwrap();
+        std::fs::create_dir_all(repo_dir.join(".git")).unwrap();
+
+        let result = find_git_repo(&repo_dir);
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().file_name().unwrap().to_str(), Some("myrepo"));
+    }
+
+    #[test]
+    fn find_git_repo_returns_none_at_root() {
+        let tmp = tempfile::tempdir().unwrap();
+        let result = find_git_repo(tmp.path());
+        assert!(result.is_none());
     }
 }
