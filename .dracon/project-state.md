@@ -1,7 +1,7 @@
 # Project State
 
 ## Current Focus
-Update dependency lock file for dracon-system crate
+Update dracon-sync Cargo.lock to latest dependency versions
 
 ## Completed
-- [x] Update Cargo.lock for the dracon-system crate
+- [x] Update dracon-sync Cargo.lock with new dependency resolutions
