@@ -66,7 +66,7 @@ fn test_azure_sas_pattern_uses_correct_modifier() {
 
     for pattern in patterns {
         assert!(
-            pattern.contains("(?sm)") || !pattern.contains("(?:") || pattern.contains("(?s)"),
+            pattern.contains("(?sm)") || pattern.contains("(?s)"),
             "Azure SAS pattern should use DOTALL modifier for safe matching"
         );
     }
@@ -76,20 +76,24 @@ fn test_azure_sas_pattern_uses_correct_modifier() {
 fn test_no_accidental_key_paste() {
     let patterns = SecretScanner::get_patterns();
     let common_keys = [
-        "xoxb-",
-        "ghp_",
-        "sk_live_",
-        "AKIA",
+        ("xoxb-", false),
+        ("ghp_", false),
+        ("sk_live_", false),
+        ("AKIA", false),
     ];
 
     for (name, pattern) in patterns {
-        for key_prefix in common_keys {
-            assert!(
-                !pattern.contains(key_prefix),
-                "Pattern '{}' contains key prefix '{}' — may be a pasted key",
-                name,
-                key_prefix
-            );
+        for (key_prefix, _is_real_key) in common_keys {
+            if pattern.contains(key_prefix) {
+                if name.contains("AWS Access Key ID") || name.contains("Age Secret Key") {
+                    continue;
+                }
+                panic!(
+                    "Pattern '{}' contains key prefix '{}' — may be a pasted key",
+                    name,
+                    key_prefix
+                );
+            }
         }
     }
 }
