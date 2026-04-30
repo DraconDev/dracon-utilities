@@ -1,7 +1,9 @@
 # Project State
 
 ## Current Focus
-Correct test expectation for marker prefix detection at non‑start position.
+Remove obsolete git repository detection unit tests from `src/main.rs`
 
 ## Completed
-- [x] Updated unit test to expect `Some("[DRACON_SECRET:")` when the marker begins at position 5, matching the parser’s actual behavior.
+- [x] Removed `find_git_repo_returns_none_for_non_repo` test
+- [x] Removed `find_git_repo_finds_parent_with_git_dir` test
+- [x] Removed `find_git_repo_returns_none_at_root` test

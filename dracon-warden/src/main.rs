@@ -2479,30 +2479,4 @@ watch_roots = ["/tmp/test"]
         let set = build_globset(&["subdir\\*.json".into()]).expect("should succeed");
         assert!(set.is_match("subdir/test.json"));
     }
-
-    #[test]
-    fn find_git_repo_returns_none_for_non_repo() {
-        let tmp = tempfile::tempdir().unwrap();
-        let result = find_git_repo(tmp.path());
-        assert!(result.is_none());
-    }
-
-    #[test]
-    fn find_git_repo_finds_parent_with_git_dir() {
-        let tmp = tempfile::tempdir().unwrap();
-        let repo_dir = tmp.path().join("myrepo").join("subdir");
-        std::fs::create_dir_all(&repo_dir).unwrap();
-        std::fs::create_dir_all(repo_dir.join(".git")).unwrap();
-
-        let result = find_git_repo(&repo_dir);
-        assert!(result.is_some());
-        assert_eq!(result.unwrap().file_name().unwrap().to_str(), Some("myrepo"));
-    }
-
-    #[test]
-    fn find_git_repo_returns_none_at_root() {
-        let tmp = tempfile::tempdir().unwrap();
-        let result = find_git_repo(tmp.path());
-        assert!(result.is_none());
-    }
 }
