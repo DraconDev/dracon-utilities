@@ -486,7 +486,7 @@ mod tests {
 
     #[test]
     fn test_debug_enabled() {
-        std::env::remove_var("DRACON_SYNC_DEBUG");
+        let _guard = VarGuard::set_temp("DRACON_SYNC_DEBUG", "");
         assert!(!debug_enabled());
     }
 
