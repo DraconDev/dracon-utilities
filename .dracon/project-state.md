@@ -1,7 +1,9 @@
 # Project State
 
 ## Current Focus
-Update the project‑state template to use a proper descriptive placeholder instead of the generic “ONE LINE:” marker.
+ONE LINE: Clean up debug logging from ReDoS stress test and update Cargo lockfiles
 
 ## Completed
-- [x] Replace placeholder “ONE LINE: specific description of what this commit does” with “specific description of what this commit does” in `dracon-sync/src/scribe.rs`
+- [x] Remove debug eprintln statements from redos_stress_test.rs that were added for diagnosing pattern matching issues
+- [x] Simplify callback closure by prefixing unused parameters with underscore
+- [x] Update Cargo.lock files for dracon-sync and dracon-system projects (binary changes)
