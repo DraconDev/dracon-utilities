@@ -1,12 +1,8 @@
 # Project State
 
 ## Current Focus
-Securing key generation process through comprehensive testing and code simplification
+Update freeze_reason test to use temporary environment variable guard and refresh Cargo.lock files for sync and system crates.
 
 ## Completed
-- [x] Enhanced keygen security with tests verifying proper key creation and overwrite protection
-- [x] Simplified keygen command output by removing unnecessary overwrite protection tests
-- [x] Converted hostname handling from `OsString` to `String` for safer downstream processing
-- [x] Updated dependency versions in `Cargo.lock` for both `dracon-sync` and `dracon-system` crates
-- [x] Removed deprecated unit tests for `repo_state_flags` and replaced with comprehensive new tests
-- [x] Refactored keygen test suite to enforce hostname validation requirements in key generation
+- [x] refactor(test): replace `std::env::remove_var("DRACON_SYNC_FREEZE")` with `VarGuard::set_temp("DRACON_SYNC_FREEZE", "")` in the `test_freeze_reason_none_when_not_frozen` unit test for better isolation.
+- [x] chore(deps): regenerate Cargo.lock for `dracon-sync` and `dracon-system` to reflect updated dependencies.
