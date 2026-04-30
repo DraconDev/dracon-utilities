@@ -1,14 +1,10 @@
 # Project State
 
 ## Current Focus
-Add unit tests for globset building and git repo detection
+Refactor and enhance unit tests for marker parsing, JSON salvage, and git repository detection using TestDir utilities.
 
 ## Completed
-- [x] build_globset_empty_patterns_returns_empty_set
-- [x] build_globset_single_pattern_matches
-- [x] build_globset_multiple_patterns
-- [x] build_globset_invalid_pattern_returns_error
-- [x] build_globset_normalizes_backslash
-- [x] find_git_repo_returns_none_for_non_repo
-- [x] find_git_repo_finds_parent_with_git_dir
-- [x] find_git_repo_returns_none_at_root
+- [x] Removed obsolete assertions in `marker_prefix_at` test cases.
+- [x] Updated `salvage_invalid_json_marker_at_end_of_string` test to verify proper handling of JSON containing a marker.
+- [x] Refactored `find_git_repo` tests to use `TestDir` fixtures instead of raw `tempfile`.
+- [x] Updated test setup and assertions to employ the new `TestDir` utilities.
