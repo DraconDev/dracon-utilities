@@ -2388,7 +2388,7 @@ watch_roots = ["/tmp/test"]
         assert_eq!(marker_prefix_at("[DRACON_SECRET:abc]", 1), None, "starts at position 1");
         assert_eq!(marker_prefix_at("prefix [DRACON_SECRET", 8), None, "incomplete bracket without colon");
         assert_eq!(marker_prefix_at("[DRACON_SECRET:abc] more", 0), Some("[DRACON_SECRET:"), "marker at start followed by more");
-        assert_eq!(marker_prefix_at("text [DRACON_SECRET:abc] end", 5), None, "marker not at start position");
+        assert_eq!(marker_prefix_at("text [DRACON_SECRET:abc] end", 5), Some("[DRACON_SECRET:"), "at position 5 [ bracket is at position 5");
     }
 
     #[test]
