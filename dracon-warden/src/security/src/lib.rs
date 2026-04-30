@@ -1662,7 +1662,20 @@ impl DemonSecurity {
         writer.write_all(&repo_key.0)?;
         writer.finish()?;
 
-        std::fs::write(output_path, encrypted)?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .mode(0o600)
+                .open(output_path)?
+                .write_all(&encrypted)?;
+        }
+        #[cfg(not(unix))]
+        {
+            fs::write(output_path, &encrypted)?;
+        }
         Ok(())
     }
 
@@ -1691,10 +1704,28 @@ impl DemonSecurity {
         let encryptor = age::Encryptor::with_recipients(recipients)
             .context("Failed to create encryptor for backup")?;
 
-        let mut file = fs::File::create(&backup_path)?;
-        let mut writer = encryptor.wrap_output(&mut file)?;
-        writer.write_all(content)?;
-        writer.finish()?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            let mut file = fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .mode(0o400)
+                .open(&backup_path)?;
+            let mut writer = encryptor.wrap_output(&mut file)?;
+            writer.write_all(content)?;
+            writer.finish()?;
+        }
+        #[cfg(not(unix))]
+        {
+            let mut file = fs::File::create(&backup_path)?;
+            let mut perms = file.metadata()?.permissions();
+            perms.set_mode(0o400);
+            fs::set_permissions(&backup_path, perms)?;
+            let mut writer = encryptor.wrap_output(&mut file)?;
+            writer.write_all(content)?;
+            writer.finish()?;
+        }
 
         Ok(())
     }
