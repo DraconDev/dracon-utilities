@@ -112,9 +112,14 @@ proptest! {
         }
 
         if !is_binary && !has_secret {
-             // Normal text with no secrets in sensitive path (like .ssh/config)
-             // Should remain readable (Targeted policy)
-             if is_sensitive_path {
+             let filename = std::path::Path::new(&path).file_name().and_then(|s| s.to_str()).unwrap_or("");
+             let always_full_encrypt = filename == "credentials"
+                 || filename.starts_with(".env")
+                 || filename.starts_with(".bash_history")
+                 || filename.starts_with(".zsh_history")
+                 || filename.starts_with(".sh_history")
+                 || filename == "vault.yml";
+             if is_sensitive_path && !always_full_encrypt {
                  prop_assert_eq!(&cleaned, &content,
                     "Normal text in sensitive path was incorrectly nuked: {}", path);
              }

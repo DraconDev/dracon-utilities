@@ -430,7 +430,7 @@ pub(crate) async fn sync_repo(
             // still appear "dirty" due to the smudge filter, which is harmless.
             if committed_entries.is_empty() {
                 if let Err(e) = run_git_with_timeout(repo, &["reset", "HEAD", "--"], 10, "reset").await {
-                    eprintln!("⚠️ failed to reset HEAD: {}", e);
+                    return Err(anyhow::anyhow!("sync_repo: failed to reset HEAD after filter-only commit: {}", e));
                 }
                 if debug_enabled() {
                     eprintln!("🐛 {} skipped commit: all changes were filter-only (smudge/clean)", repo.display());
