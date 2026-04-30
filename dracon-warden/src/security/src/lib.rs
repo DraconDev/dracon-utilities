@@ -2681,6 +2681,9 @@ pub fn encrypt_with_repo_key(&self, repo_key: &RepoKey, plaintext: &[u8]) -> Res
 
                         // Try AES-GCM
                         if let Ok(plaintext) = self.decrypt_with_repo_key(&repo_key, ciphertext) {
+                            // SECURITY: Only log in debug mode - attacker gaining access to stderr
+                            // would learn which key format succeeded, reducing bruteforce cost.
+                            #[cfg(debug_assertions)]
                             eprintln!(
                                 "🔓 Decrypted with keychain key (AES-GCM): {:?}",
                                 path.file_name()
@@ -2690,6 +2693,7 @@ pub fn encrypt_with_repo_key(&self, repo_key: &RepoKey, plaintext: &[u8]) -> Res
 
                         // Try AES-CFB (git-seal style)
                         if let Ok(plaintext) = self.decrypt_git_seal(&repo_key, ciphertext) {
+                            #[cfg(debug_assertions)]
                             eprintln!(
                                 "🔓 Decrypted with keychain key (AES-CFB): {:?}",
                                 path.file_name()
