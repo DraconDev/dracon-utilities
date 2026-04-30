@@ -1296,10 +1296,8 @@ impl DemonSecurity {
     fn decrypt_repo_key_with_team_key(&self, path: &Path, team_key: &TeamKey) -> Result<RepoKey> {
         let encrypted_bytes = fs::read(path)?;
 
-        let key_str = std::str::from_utf8(&team_key.0)?;
-        use std::str::FromStr;
-        let team_identity = x25519::Identity::from_str(key_str)
-            .map_err(|_| anyhow::anyhow!("Invalid team identity format"))?;
+        let team_identity = x25519::Identity::from_slice(&team_key.0)
+            .map_err(|_| anyhow::anyhow!("Invalid team identity bytes"))?;
 
         // Fix: Wrap input in Cursor for Decryptor
         let decryptor = age::Decryptor::new(std::io::Cursor::new(&encrypted_bytes))?;
@@ -1483,10 +1481,29 @@ impl DemonSecurity {
         let encryptor =
             age::Encryptor::with_recipients(recipients).context("Failed to create encryptor")?;
 
-        let mut file = fs::File::create(&team_key_path)?;
-        let mut writer = encryptor.wrap_output(&mut file)?;
+        let mut encrypted = vec![];
+        let mut writer = encryptor.wrap_output(&mut encrypted)?;
         writer.write_all(&key_bytes)?;
         writer.finish()?;
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            let mut file = fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .mode(0o600)
+                .open(&team_key_path)?;
+            file.write_all(&encrypted)?;
+        }
+        #[cfg(not(unix))]
+        {
+            fs::write(&team_key_path, &encrypted)?;
+            let metadata = fs::metadata(&team_key_path)?;
+            let mut perms = metadata.permissions();
+            perms.set_mode(0o600);
+            fs::set_permissions(&team_key_path, perms)?;
+        }
 
         Ok(team_name.to_string())
     }
