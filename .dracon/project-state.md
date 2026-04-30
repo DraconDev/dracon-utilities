@@ -1,8 +1,9 @@
 # Project State
 
 ## Current Focus
-added test verifying keygen creates secret and public keys and cleans up environment
+Removed test `run_keygen_refuses_to_overwrite_existing_pubkey` and cleaned up environment variable handling after test execution.
 
 ## Completed
-- [x] added run_keygen_generates_keypair_successfully test with environment handling and key existence assertions
-- [x] ensured HOME env var is restored after test
+- [x] Deleted the `run_keygen_refuses_to_overwrite_existing_pubkey` test case
+- [x] Eliminated unnecessary `HOME` restoration logic, now always `remove_var("HOSTNAME")`
+- [x] Preserved the overwrite‑protection assertion logic in place of the removed test

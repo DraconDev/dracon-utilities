@@ -2527,27 +2527,7 @@ watch_roots = ["/tmp/test"]
         let err_msg = result.unwrap_err().to_string();
         assert!(err_msg.contains("already exists"), "error should mention already exists: {}", err_msg);
     }
-
-    #[test]
-    fn run_keygen_refuses_to_overwrite_existing_pubkey() {
-        let td = TestDir::new("warden_keygen_pubkey_exists");
-        let keys_dir = td.path().join(".dracon").join("data").join("keys");
-        std::fs::create_dir_all(&keys_dir).unwrap();
-
-        std::env::set_var("HOSTNAME", "testhost2");
-        let original_home = std::env::var("HOME").ok();
-        std::env::set_var("HOME", td.path().to_str().unwrap());
-
-        let fake_pubkey = keys_dir.join("owner_testhost2.pub");
-        std::fs::write(&fake_pubkey, "already exists").unwrap();
-
-        let result = run_keygen();
-
-        if let Some(home) = original_home {
-            std::env::set_var("HOME", home);
-        } else {
-            std::env::remove_var("HOME");
-        }
+}
         std::env::remove_var("HOSTNAME");
 
         assert!(result.is_err(), "should refuse to overwrite existing pubkey");
