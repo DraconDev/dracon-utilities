@@ -707,6 +707,13 @@ impl TeamKey {
     }
 }
 
+#[cfg(test)]
+impl TeamKey {
+    pub fn from_identity_string(s: String) -> Self {
+        TeamKey(s.into_bytes())
+    }
+}
+
 #[derive(Debug, Default, Clone, Copy)]
 pub struct MarkerMigrationStats {
     pub files_scanned: usize,
@@ -718,7 +725,7 @@ pub struct MarkerMigrationStats {
 #[cfg(test)]
 impl RepoKey {
     pub fn from_secret_bytes(bytes: [u8; 32]) -> Self {
-        RepoKey(bytes)
+        RepoKey(bytes.to_vec())
     }
     pub fn from_vec(bytes: Vec<u8>) -> Option<Self> {
         if bytes.len() == 32 {
@@ -728,13 +735,13 @@ impl RepoKey {
         }
     }
 }
-
-#[cfg(test)]
-impl TeamKey {
-    pub fn from_identity_string(s: String) -> Self {
-        TeamKey(s.into_bytes())
+    pub fn from_vec(bytes: Vec<u8>) -> Option<Self> {
+        if bytes.len() == 32 {
+            Some(RepoKey(bytes))
+        } else {
+            None
+        }
     }
-}
 }
 
 impl RepoKey {
@@ -748,13 +755,6 @@ impl RepoKey {
 
     pub fn get_key(&self) -> &[u8] {
         &self.0
-    }
-}
-
-#[cfg(test)]
-impl TeamKey {
-    pub fn from_identity_string(s: String) -> Self {
-        TeamKey(s.into_bytes())
     }
 }
 
