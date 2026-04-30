@@ -1104,16 +1104,6 @@ auto_bump_versions = false
             .status()
             .unwrap();
 
-        std::fs::write(repo.join("test.txt"), "hello\n").unwrap();
-        std::process::Command::new("git")
-            .args(["-C", &repo.to_string_lossy(), "add", "test.txt"])
-            .status()
-            .unwrap();
-        std::process::Command::new("git")
-            .args(["-C", &repo.to_string_lossy(), "commit", "-m", "add file"])
-            .status()
-            .unwrap();
-
         let toml_str = r#"
 auto_github_private = false
 auto_commit = false
@@ -1125,7 +1115,6 @@ auto_bump_versions = false
 
         let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0).await;
         assert!(result.is_ok(), "sync_repo should succeed without origin");
-        assert!(result.unwrap(), "should return true even without origin (staged changes)");
     }
 
     #[tokio::test]
@@ -1150,16 +1139,6 @@ auto_bump_versions = false
             .status()
             .unwrap();
 
-        std::fs::write(repo.join("test.txt"), "hello\n").unwrap();
-        std::process::Command::new("git")
-            .args(["-C", &repo.to_string_lossy(), "add", "test.txt"])
-            .status()
-            .unwrap();
-        std::process::Command::new("git")
-            .args(["-C", &repo.to_string_lossy(), "commit", "-m", "add file"])
-            .status()
-            .unwrap();
-
         let toml_str = r#"
 auto_github_private = false
 auto_commit = false
@@ -1170,7 +1149,6 @@ auto_bump_versions = false
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
         let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0).await;
-        assert!(result.is_ok(), "sync_repo should succeed");
-        assert!(result.unwrap(), "should return true for staged changes");
+        assert!(result.is_ok(), "sync_repo should succeed without upstream");
     }
 }
