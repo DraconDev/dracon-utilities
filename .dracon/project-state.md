@@ -1,9 +1,7 @@
 # Project State
 
 ## Current Focus
-Refactor security constructors and remove unused test helper
+Remove unused RepoKey::from_vec constructor method
 
 ## Completed
-- [x] Convert `RepoKey::from_secret_bytes` to use `.to_vec()` for Vec<u8> conversion
-- [x] Remove redundant `TeamKey::from_identity_string` test constructor
-- [x] Adjust `RepoKey::from_vec` to explicitly validate 32‑byte length and return `Option<Self>`
+- [x] Removed the `from_vec` method that accepted a `Vec<u8>` and only handled 32‑byte inputs.

@@ -735,14 +735,6 @@ impl RepoKey {
         }
     }
 }
-    pub fn from_vec(bytes: Vec<u8>) -> Option<Self> {
-        if bytes.len() == 32 {
-            Some(RepoKey(bytes))
-        } else {
-            None
-        }
-    }
-}
 
 impl RepoKey {
     pub fn from_file(path: &Path) -> Result<Self> {
