@@ -45,7 +45,6 @@ fn test_backup_and_restore() {
     fs::remove_file(&original_path).expect("Failed to delete original file");
     assert!(!original_path.exists());
 
-    println!("Restoring file...");
     let restored_backup_source = security
         .restore_file(&original_path)
         .expect("Restore failed");

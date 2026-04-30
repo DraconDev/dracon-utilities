@@ -1,7 +1,7 @@
 # Project State
 
 ## Current Focus
-refactor(test): clean up noisy debug output in the backup/restore security test
+ONE LINE: Remove noisy debug output from the backup/restore security test
 
 ## Completed
-- [x] remove unnecessary `println!` statements from `backup_test.rs` to keep test output clean and focused on assertions.
+- [x] fix(test): eliminate extraneous `println!` in `backup_test.rs` to keep test output clean.
