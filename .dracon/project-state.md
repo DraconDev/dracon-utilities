@@ -1,7 +1,10 @@
 # Project State
 
 ## Current Focus
-chore(deps): update dracon-system Cargo.lock with latest dependency versions
+Implement atomic public key write using OpenOptions::create_new to prevent overwriting existing files
 
 ## Completed
-- [x] update dracon-system Cargo.lock with new dependency versions
+- [x] Switch to atomic file creation via OpenOptions::create_new(true) on Unix, ensuring failure if file already exists
+- [x] Add corresponding Windows-compatible implementation using OpenOptions and create_new
+- [x] Include detailed error context messages describing failure to create the public key file
+- [x] Remove previous unsafe overwrite of the public key file
