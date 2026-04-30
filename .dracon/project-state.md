@@ -1,8 +1,8 @@
 # Project State
 
 ## Current Focus
-Remove aging or redundant security tests for atomic write backups and v2 decryption with wrong identity to streamline test suite.
+refactor(security): improve pattern integrity tests to allow AWS and Age key patterns while simplifying Azure SAS modifier validation
 
 ## Completed
-- [x] Drop atomic write test that verifies encrypted backup creation (backup_file with age encryption) and related fs import.
-- [x] Drop comprehensive test that validates decryption failure when using a wrong identity (decrypt_v2 wrong identity).
+- [x] refactor(pattern): simplify Azure SAS pattern check by removing negative `(?:` constraint, now only requiring `(?sm)` or `(?s)` modifiers
+- [x] refactor(key-detection): enhance secret pattern validation to permit AWS Access Key ID and Age Secret Key patterns containing common key prefixes while still blocking accidental key pastes in other patterns
