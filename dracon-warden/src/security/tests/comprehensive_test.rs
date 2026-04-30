@@ -303,3 +303,109 @@ impl Drop for CleanDir {
         let _ = std::env::set_current_dir(&self.original);
     }
 }
+
+#[test]
+fn test_backup_file_recursion_guard() -> Result<()> {
+    let mut demon = DemonSecurity::new(None)?;
+    let key = age::x25519::Identity::generate();
+    demon.add_memory_identity(key);
+
+    let temp_home = tempfile::tempdir()?;
+    std::env::set_var("HOME", temp_home.path());
+    demon.set_mock_home(temp_home.path().to_path_buf());
+
+    let backup_in_backup = temp_home.path().join(".demon").join("backups").join("test.bak.age");
+    let result = demon.backup_file(&backup_in_backup, b"sensitive");
+    assert!(
+        result.is_err(),
+        "backing up a file inside demon/backups should be rejected"
+    );
+    Ok(())
+}
+
+#[test]
+fn test_scan_and_replace_empty_input() -> Result<()> {
+    let scanner = SecretScanner::new()?;
+    let result = scanner.scan_and_replace("", |_,_| "[REDACTED]".to_string());
+    assert_eq!(result, "", "empty input should return empty");
+    Ok(())
+}
+
+#[test]
+fn test_scan_and_replace_no_findings() -> Result<()> {
+    let scanner = SecretScanner::new()?;
+    let clean = "this is just regular text with no secrets in it at all!!!";
+    let count = std::cell::Cell::new(0);
+    let result = scanner.scan_and_replace(clean, |_,_| {
+        count.set(count.get() + 1);
+        "[REDACTED]".to_string()
+    });
+    assert_eq!(result, clean, "clean text should pass through unchanged");
+    assert_eq!(count.get(), 0, "no findings on clean text");
+    Ok(())
+}
+
+#[test]
+fn test_encrypt_decrypt_multiple_recipients() -> Result<()> {
+    let mut demon = DemonSecurity::new(None)?;
+    let key = age::x25519::Identity::generate();
+    demon.add_memory_identity(key.clone());
+
+    let plaintext = b"multi-recipient secret data";
+
+    let recipient1 = key.to_public();
+    let recipient2 = age::x25519::Identity::generate().to_public();
+
+    let encrypted = demon.encrypt_v2(plaintext, vec![
+        Box::new(recipient1.clone()),
+        Box::new(recipient2.clone()),
+    ])?;
+
+    let decrypted = demon.decrypt_v2(&encrypted)?;
+    assert_eq!(&decrypted[..], plaintext, "multi-recipient should roundtrip");
+
+    Ok(())
+}
+
+#[test]
+fn test_decrypt_v2_with_wrong_identity_fails() -> Result<()> {
+    let mut demon1 = DemonSecurity::new(None)?;
+    let key1 = age::x25519::Identity::generate();
+    demon1.add_memory_identity(key1);
+
+    let mut demon2 = DemonSecurity::new(None)?;
+    let key2 = age::x25519::Identity::generate();
+    demon2.add_memory_identity(key2);
+
+    let plaintext = b"secret for demon1 only";
+    let recipient = demon1.master_identities()[0].to_public();
+    let encrypted = demon1.encrypt_v2(plaintext, vec![Box::new(recipient)])?;
+
+    let result = demon2.decrypt_v2(&encrypted);
+    assert!(result.is_err(), "wrong identity should not decrypt");
+    Ok(())
+}
+
+#[test]
+fn test_smart_clean_with_scanner_error_handling() -> Result<()> {
+    let mut demon = DemonSecurity::new(None)?;
+    let key = age::x25519::Identity::generate();
+    demon.add_memory_identity(key);
+
+    let content = "API_KEY=abcdefghij1234567890abcdef";
+    let result = demon.smart_clean_with_scanner(content.as_bytes(), "test.env", &SecretScanner::new()?);
+    assert!(result.is_ok(), "smart_clean_with_scanner should succeed");
+    Ok(())
+}
+
+#[test]
+fn test_dracon_security_singleton_same_instance() -> Result<()> {
+    let s1 = DemonSecurity::get_or_init()?;
+    let s2 = DemonSecurity::get_or_init()?;
+    assert_eq!(
+        s1 as *const _ as usize,
+        s2 as *const _ as usize,
+        "get_or_init should return the same instance"
+    );
+    Ok(())
+}
