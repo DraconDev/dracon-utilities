@@ -1,10 +1,10 @@
 # Project State
 
-## Current Focus
-Enhancing error resilience and adding failure metrics across directory traversal, key management, and recursive operations
+## CurrentFocus
+Improved error handling in cleanup operations by replacing `unwrap_or` with `match` to capture and report failures.
 
 ## Completed
-- [x] Improved directory traversal error handling in dracon-sync to log failures and continue recursion instead of early returning
-- [x] Added failures vector in dracon-system's main function to track operational errors
-- [x] Enhanced error reporting in dracon-warden's pubkey directory scanning with per-entry error logging
-- [x] Introduced walk_errors counter in security module to track and report recursive operation failures during decryption/marker migration
+- [x] Replaced `unwrap_or` with `match` for `empty_trash` to handle errors and record failures in the `failures` vector.
+- [x] Replaced `unwrap_or` with `match` for `clean_nix_garbage` to handle errors and record failures.
+- [x] Replaced `unwrap_or` with `match` for `clean_old_node_modules` to handle errors and record failures.
+- [x] Replaced `unwrap_or` with `match` for `clean_package_caches` to handle errors and record failures.

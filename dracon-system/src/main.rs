@@ -3408,19 +3408,27 @@ async fn main() -> Result<()> {
                     
                     // Trash
                     if do_trash {
-                        let (bytes, cleaned) = empty_trash(apply, &guard_clone.protected_paths).await.unwrap_or((0, vec![]));
-                        total_reclaimed += bytes;
-                        for c in cleaned {
-                            actions.push(format!("Trash: {}", c));
+                        match empty_trash(apply, &guard_clone.protected_paths).await {
+                            Ok((bytes, cleaned)) => {
+                                total_reclaimed += bytes;
+                                for c in cleaned {
+                                    actions.push(format!("Trash: {}", c));
+                                }
+                            }
+                            Err(e) => failures.push(format!("Trash: {}", e)),
                         }
                     }
                     
                     // Nix garbage
                     if do_nix {
-                        let (bytes, cleaned) = clean_nix_garbage(guard_clone.nix_keep_generations, apply).await.unwrap_or((0, vec![]));
-                        total_reclaimed += bytes;
-                        for c in cleaned {
-                            actions.push(format!("Nix: {}", c));
+                        match clean_nix_garbage(guard_clone.nix_keep_generations, apply).await {
+                            Ok((bytes, cleaned)) => {
+                                total_reclaimed += bytes;
+                                for c in cleaned {
+                                    actions.push(format!("Nix: {}", c));
+                                }
+                            }
+                            Err(e) => failures.push(format!("Nix: {}", e)),
                         }
                     }
                     
@@ -3435,19 +3443,27 @@ async fn main() -> Result<()> {
                                 if p.exists() { Some(p) } else { None }
                             })
                             .collect();
-                        let (bytes, cleaned) = clean_old_node_modules(&roots, guard_clone.node_modules_max_age_days, apply, &guard_clone.protected_paths).await.unwrap_or((0, vec![]));
-                        total_reclaimed += bytes;
-                        for c in cleaned {
-                            actions.push(format!("Node: {}", c));
+                        match clean_old_node_modules(&roots, guard_clone.node_modules_max_age_days, apply, &guard_clone.protected_paths).await {
+                            Ok((bytes, cleaned)) => {
+                                total_reclaimed += bytes;
+                                for c in cleaned {
+                                    actions.push(format!("Node: {}", c));
+                                }
+                            }
+                            Err(e) => failures.push(format!("Node: {}", e)),
                         }
                     }
                     
                     // Package caches
                     if do_caches {
-                        let (bytes, cleaned) = clean_package_caches(true, true, true, true, apply, &guard_clone.protected_paths).await.unwrap_or((0, vec![]));
-                        total_reclaimed += bytes;
-                        for c in cleaned {
-                            actions.push(format!("Cache: {}", c));
+                        match clean_package_caches(true, true, true, true, apply, &guard_clone.protected_paths).await {
+                            Ok((bytes, cleaned)) => {
+                                total_reclaimed += bytes;
+                                for c in cleaned {
+                                    actions.push(format!("Cache: {}", c));
+                                }
+                            }
+                            Err(e) => failures.push(format!("Cache: {}", e)),
                         }
                     }
                     
