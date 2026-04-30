@@ -1,8 +1,7 @@
 # Project State
 
 ## Current Focus
-fix(security-tests): properly restore original HOME environment variable in HomeGuard cleanup
+ONE LINE: Serialize modifications to the `HOME` environment variable in tests to prevent race conditions.
 
 ## Completed
-- [x] fix(security-tests): capture and restore original HOME environment variable in HomeGuard RAII guard
-- [x] fix(security-tests): replace redundant conditional with unconditional HOME assignment logic
+- [x] feat(tests): introduced a global `HOME_MUTEX` and acquire its lock in tests that temporarily modify `HOME`, ensuring safe concurrent execution.
