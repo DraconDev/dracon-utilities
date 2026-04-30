@@ -1,6 +1,7 @@
 mod common;
 
 use common::HomeGuard;
+use secrecy::ExposeSecret;
 use std::fs;
 
 fn init_security() -> (dracon_security::DemonSecurity, HomeGuard) {
@@ -21,6 +22,16 @@ fn init_security_with_repo(repo_root: &std::path::Path) -> (dracon_security::Dem
 
 fn make_keys_dir(repo_root: &std::path::Path) -> std::path::PathBuf {
     repo_root.join(".git").join("arcane").join("keys")
+}
+
+fn encrypt_for_recipient(recipient: &age::x25519::Recipient, plaintext: &[u8]) -> Vec<u8> {
+    let recipients: Vec<Box<dyn age::Recipient + Send>> = vec![Box::new(recipient.clone())];
+    let encryptor = age::Encryptor::with_recipients(recipients).expect("encryptor");
+    let mut encrypted = vec![];
+    let mut writer = encryptor.wrap_output(&mut encrypted).expect("wrap");
+    writer.write_all(plaintext).expect("write");
+    writer.finish().expect("finish");
+    encrypted
 }
 
 fn write_age_key(keys_dir: &std::path::Path, identity: &age::x25519::Identity, filename: &str) {
@@ -281,21 +292,11 @@ fn test_load_repo_key_team_key() {
     let team_dir = home.join(".demon").join("teams");
     fs::create_dir_all(&team_dir).expect("create team dir");
 
-    let recipients: Vec<Box<dyn age::Recipient + Send>> = vec![Box::new(master_identity.to_public())];
-    let encryptor = age::Encryptor::with_recipients(recipients).expect("encryptor");
-    let mut encrypted_team = vec![];
-    let mut writer = encryptor.wrap_output(&mut encrypted_team).expect("wrap");
-    writer.write_all(team_identity.to_string().as_bytes()).expect("write team key");
-    writer.finish().expect("finish");
+    let encrypted_team = encrypt_for_recipient(&master_identity.to_public(), team_identity.to_string().expose_secret().as_bytes());
     fs::write(team_dir.join("my-team.key"), encrypted_team).expect("write team key file");
 
     let repo_key_bytes: [u8; 32] = rand::random();
-    let recipients2: Vec<Box<dyn age::Recipient + Send>> = vec![Box::new(team_identity.to_public())];
-    let encryptor2 = age::Encryptor::with_recipients(recipients2).expect("encryptor");
-    let mut encrypted = vec![];
-    let mut writer = encryptor2.wrap_output(&mut encrypted).expect("wrap");
-    writer.write_all(&repo_key_bytes).expect("write repo key");
-    writer.finish().expect("finish");
+    let encrypted = encrypt_for_recipient(&team_identity.to_public(), &repo_key_bytes);
     fs::write(keys_dir.join("team:my-team.age"), encrypted).expect("write team-encrypted repo key");
 
     let (mut security, _guard2) = init_security_with_repo(repo_root);
@@ -479,7 +480,7 @@ fn test_encrypt_for_node_uses_disk_master_identities() {
     let home = std::env::var("HOME").map(std::path::PathBuf::from).unwrap();
     let demon_dir = home.join(".demon");
     fs::create_dir_all(&demon_dir).expect("create .demon dir");
-    fs::write(demon_dir.join("identity.age"), disk_identity.to_string()).expect("write disk identity");
+    fs::write(demon_dir.join("identity.age"), disk_identity.to_string().expose_secret().as_bytes()).expect("write disk identity");
 
     let node_identity = age::x25519::Identity::generate();
     let node_recipient_str = node_identity.to_public().to_string();
