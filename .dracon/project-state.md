@@ -1,12 +1,11 @@
 # Project State
 
 ## Current Focus
-Rename keygen tests to enforce hostname validation and remove overwrite‑protection checks
+Added comprehensive keygen tests verifying key generation creates proper keys and enforces overwrite protection and hostname validation.
 
 ## Completed
-- [x] Added `std::env::set_var("HOSTNAME", "testhost3")` before key generation
-- [x] Modified secret and public key file names to include hostname (`machine_testhost3.age`, `owner_testhost3.pub`)
-- [x] Replaced `run_keygen_refuses_to_overwrite_existing_pubkey` and `run_keygen_refuses_to_overwrite_existing_secret_key` with `run_keygen_rejects_empty_hostname`
-- [x] Updated test logic to clear `HOSTNAME` after execution
-- [x] Changed assertion to verify error message contains "hostname"
-- [x] Removed outdated overwrite‑protection assertions and related setup code
+- [x] Added `run_keygen_creates_secret_and_pubkey_and_cleans_up` to assert successful keygen creates secret and public keys and cleans up.
+- [x] Added `run_keygen_refuses_to_overwrite_existing_secret_key` to ensure keygen fails when secret key already exists.
+- [x] Added `run_keygen_refuses_to_overwrite_existing_pubkey` to ensure keygen fails when public key already exists.
+- [x] Added `run_keygen_rejects_empty_hostname` that checks error handling for empty hostname scenarios.
+- [x] Removed obsolete `std::env::set_var("HOSTNAME", "testhost3");` line from the test setup.
