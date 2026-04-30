@@ -1007,4 +1007,170 @@ auto_bump_versions = false
         let tracked = String::from_utf8_lossy(&output.stdout);
         assert!(tracked.contains("newfile.txt"), "newfile.txt should be tracked");
     }
+
+    #[tokio::test]
+    async fn test_sync_repo_skip_pull_when_not_behind() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", &repo.to_string_lossy(), "config", "user.email", "test@test"])
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", &repo.to_string_lossy(), "commit", "--allow-empty", "-m", "init"])
+            .status()
+            .unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = false
+auto_pull = true
+auto_push = false
+auto_bump_versions = false
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0).await;
+        assert!(result.is_ok(), "sync_repo should succeed");
+        assert!(!result.unwrap(), "not behind should return false (nothing to pull)");
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_skip_pull_when_dirty() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", &repo.to_string_lossy(), "config", "user.email", "test@test"])
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", &repo.to_string_lossy(), "commit", "--allow-empty", "-m", "init"])
+            .status()
+            .unwrap();
+
+        std::fs::write(repo.join("dirty.txt"), "modified\n").unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = false
+auto_pull = true
+auto_push = false
+auto_bump_versions = false
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0).await;
+        assert!(result.is_ok(), "sync_repo should succeed with dirty repo");
+        assert!(!result.unwrap(), "dirty repo should skip pull and return false");
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_skip_push_when_no_origin() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", &repo.to_string_lossy(), "config", "user.email", "test@test"])
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", &repo.to_string_lossy(), "commit", "--allow-empty", "-m", "init"])
+            .status()
+            .unwrap();
+
+        std::fs::write(repo.join("test.txt"), "hello\n").unwrap();
+        std::process::Command::new("git")
+            .args(["-C", &repo.to_string_lossy(), "add", "test.txt"])
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", &repo.to_string_lossy(), "commit", "-m", "add file"])
+            .status()
+            .unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = false
+auto_pull = false
+auto_push = true
+auto_bump_versions = false
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0).await;
+        assert!(result.is_ok(), "sync_repo should succeed without origin");
+        assert!(result.unwrap(), "should return true even without origin (staged changes)");
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_skip_push_when_no_upstream() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", &repo.to_string_lossy(), "config", "user.email", "test@test"])
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", &repo.to_string_lossy(), "commit", "--allow-empty", "-m", "init"])
+            .status()
+            .unwrap();
+
+        std::fs::write(repo.join("test.txt"), "hello\n").unwrap();
+        std::process::Command::new("git")
+            .args(["-C", &repo.to_string_lossy(), "add", "test.txt"])
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", &repo.to_string_lossy(), "commit", "-m", "add file"])
+            .status()
+            .unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = false
+auto_pull = false
+auto_push = true
+auto_bump_versions = false
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0).await;
+        assert!(result.is_ok(), "sync_repo should succeed");
+        assert!(result.unwrap(), "should return true for staged changes");
+    }
 }
