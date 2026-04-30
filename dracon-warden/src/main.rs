@@ -2517,7 +2517,7 @@ watch_roots = ["/tmp/test"]
         }
 
         assert!(result.is_ok(), "keygen should succeed: {:?}", result);
-        let hostname_raw = hostname::get().expect("hostname");
+        let hostname_raw = hostname::get().expect("hostname").to_string_lossy().to_string();
         let hostname: String = hostname_raw.chars()
             .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
             .collect();
