@@ -15,6 +15,16 @@ use crate::policy::{std_git_command, tokio_git_command, timestamp_secs};
 /// Get the list of files that actually differ from HEAD (filter-aware).
 /// Unlike `git status`, `git diff HEAD` applies clean filters and correctly
 /// ignores files that only differ due to smudge filter decryption.
+fn convert_diff_result(
+    result: std::result::Result<std::result::Result<Vec<String>, anyhow::Error>, tokio::task::JoinError>,
+) -> Result<Vec<String>> {
+    match result {
+        Ok(Ok(files)) => Ok(files),
+        Ok(Err(e)) => Err(anyhow::anyhow!("git diff HEAD task failed: {}", e)),
+        Err(_) => Err(anyhow::anyhow!("git diff HEAD timed out")),
+    }
+}
+
 pub(crate) async fn git_diff_head_files(repo: &Path) -> Result<Vec<String>> {
     let repo = repo.to_path_buf();
     let outcome = tokio::time::timeout(
@@ -35,14 +45,7 @@ pub(crate) async fn git_diff_head_files(repo: &Path) -> Result<Vec<String>> {
             Ok(files)
         }),
     ).await;
-    match outcome {
-        Ok(Ok(files)) => {
-            let v: Vec<String> = files;
-            Ok(v)
-        }
-        Ok(Err(e)) => Err(anyhow::anyhow!("git diff HEAD task failed: {}", e)),
-        Err(_) => Err(anyhow::anyhow!("git diff HEAD timed out")),
-    }
+    convert_diff_result(outcome)
 }
 
 pub(crate) fn discover_git_repos(

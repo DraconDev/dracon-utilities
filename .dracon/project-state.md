@@ -1,7 +1,7 @@
 # Project State
 
 ## Current Focus
-Refactor `git_diff_head_files` to explicitly type the returned `Vec<String>` for clarity while preserving existing error semantics.
+Refactor `git_diff_head_files` to centralize and simplify error handling for the async git diff operation.
 
 ## Completed
-- [x] Refactor result mapping to clarify ownership and type of returned file list without changing behavior.
+- [x] Extracted error‑handling logic into `convert_diff_result` function, reducing duplication and clarifying timeout vs. task errors.
