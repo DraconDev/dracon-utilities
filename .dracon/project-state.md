@@ -1,10 +1,10 @@
 # Project State
 
 ## Current Focus
-Implement atomic public key write using OpenOptions::create_new to prevent overwriting existing files
+Add tests ensuring keygen respects existing key protection, successful keypair creation, and hostname validation.
 
 ## Completed
-- [x] Switch to atomic file creation via OpenOptions::create_new(true) on Unix, ensuring failure if file already exists
-- [x] Add corresponding Windows-compatible implementation using OpenOptions and create_new
-- [x] Include detailed error context messages describing failure to create the public key file
-- [x] Remove previous unsafe overwrite of the public key file
+- [x] Added test that keygen refuses to overwrite an existing secret key
+- [x] Added test that keygen refuses to overwrite an existing public key
+- [x] Added test that keygen successfully creates a keypair
+- [x] Added test that keygen rejects empty HOSTNAME
