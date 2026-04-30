@@ -1,8 +1,8 @@
-#Project State
+# Project State
 
 ## Current Focus
-Enhance security test coverage by adding validation for invalid public keys and verifying age encryption in team invites.
+ONE LINE: Replace low-value age-encryption test with a guardrail that prevents creating team invites for nonexistent teams.
 
 ## Completed
-- [x] Added `test_add_team_member_rejects_invalid_key()` to ensure security rejects invalid public keys during team member addition
-- [x] Added `test_team_invite_file_is_age_encrypted()` to validate age encryption of team invite files
+- [x] Remove brittle, high-maintenance age-encryption file test and its manual file I/O, identity exposure, and encryption logic.
+- [x] Add validation test ensuring `create_team_invite` fails early when the target team does not exist.
