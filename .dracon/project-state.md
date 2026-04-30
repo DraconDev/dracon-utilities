@@ -1,8 +1,7 @@
 # Project State
 
 ## Current Focus
-refactor: remove obsolete git repo detection test to simplify code
+Remove obsolete git repository detection unit test from src/main.rs
 
 ## Completed
-- [x] removed `find_git_repo_finds_direct_git_dir` test and associated assertions
-- [x] removed `let set = build_globset(&["subdir\\*.json".into()])...` test snippet
+- [x] Deleted the `find_git_repo_finds_direct_git_dir` unit test and its associated code
