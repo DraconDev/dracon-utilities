@@ -1,8 +1,9 @@
 # Project State
 
 ## Current Focus
-Update dependency lockfiles with new package versions to ensure consistency.
+Refactor team key handling to use direct byte slice conversion and implement platform-specific secure file creation with restrictive permissions for sensitive key material.
 
 ## Completed
-- [x] Dependency lockfile updated with new package versions
-- [x] Dependency lockfile updated with new package versions
+- [x] Refactor `decrypt_repo_key_with_team_key` to use `x25519::Identity::from_slice` instead of string parsing for team identity
+- [x] Replace direct file writing with in-memory encryption buffer before secure file creation
+- [x] Implement platform-specific secure file creation: Unix uses `OpenOptionsExt` with mode 0o600, non-Unix uses permission setting after write
