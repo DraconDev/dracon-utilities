@@ -1,8 +1,12 @@
+mod common;
+
 use anyhow::Result;
 use dracon_security::DemonSecurity;
 use proptest::prelude::*;
 use std::fs;
 use std::sync::OnceLock;
+
+use common::HomeGuard;
 
 #[allow(dead_code)]
 static TEST_SECURITY: OnceLock<DemonSecurity> = OnceLock::new();
@@ -237,14 +241,14 @@ proptest! {
 }
 #[test]
 fn test_backup_functionality() -> Result<()> {
-    let temp_home = tempfile::tempdir()?;
-    std::env::set_var("HOME", temp_home.path());
+    let _guard = HomeGuard::new();
 
     let mut demon = DemonSecurity::new(None)?;
     let key = age::x25519::Identity::generate();
     demon.add_memory_identity(key);
 
-    let file_path = temp_home.path().join("secret.env");
+    let temp_home = std::env::var("HOME").map(std::path::PathBuf::from).unwrap();
+    let file_path = temp_home.join("secret.env");
     let content = b"SECRET_API_KEY=12345";
 
     fs::write(&file_path, content)?;
