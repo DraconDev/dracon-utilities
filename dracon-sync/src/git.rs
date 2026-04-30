@@ -24,15 +24,16 @@ pub(crate) async fn git_diff_head_files(repo: &Path) -> Result<Vec<String>> {
                 .current_dir(&repo)
                 .args(["diff", "HEAD", "--name-only", "-z"])
                 .output()
-                .map_err(|e| anyhow::anyhow!("git diff HEAD failed: {}", e))?;
+                .map_err(|e| format!("git diff HEAD failed: {}", e))?;
             if !output.status.success() {
                 anyhow::bail!("git diff HEAD exited with {}", output.status);
             }
-            Ok(String::from_utf8_lossy(&output.stdout)
+            let files: Vec<String> = String::from_utf8_lossy(&output.stdout)
                 .split('\0')
                 .filter(|s| !s.is_empty())
                 .map(String::from)
-                .collect())
+                .collect();
+            Ok(files)
         }),
     ).await;
     match result {
