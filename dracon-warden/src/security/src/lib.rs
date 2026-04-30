@@ -2363,7 +2363,14 @@ impl DemonSecurity {
                 !name.starts_with('.') || name == ".env"
             });
 
-        for entry in walker.filter_map(|e| e.ok()) {
+        for entry in walker {
+            let entry = match entry {
+                Ok(e) => e,
+                Err(e) => {
+                    eprintln!("⚠️ walk error during secret restore at {}: {}", root.display(), e);
+                    continue;
+                }
+            };
             if entry.file_type().is_file() {
                 if let Ok(count) = self.decrypt_file(entry.path(), dry_run) {
                     total_restored += count;
@@ -2464,7 +2471,14 @@ impl DemonSecurity {
                 !name.starts_with('.') || name == ".env"
             });
 
-        for entry in walker.filter_map(|e| e.ok()) {
+        for entry in walker {
+            let entry = match entry {
+                Ok(e) => e,
+                Err(e) => {
+                    eprintln!("⚠️ walk error during marker scan at {}: {}", root.display(), e);
+                    continue;
+                }
+            };
             if entry.file_type().is_file() {
                 if let Err(e) = process_file(entry.path()) {
                     eprintln!("⚠️ failed to process {}: {}", entry.path().display(), e);
