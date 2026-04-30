@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs::{self, File};
 #[cfg(unix)]
-use std::os::unix::fs::symlink;
+use std::os::unix::fs::{symlink, OpenOptionsExt};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -42,6 +42,7 @@ fn check_safe_to_delete(path: &Path, user_protected: &[String]) -> Result<()> {
     for user_prot in user_protected {
         let prot_canon = match Path::new(user_prot).canonicalize() {
             Ok(p) => p.display().to_string(),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
             Err(e) => anyhow::bail!("cannot canonicalize user-protected path {}: {} — refusing", user_prot, e),
         };
         if canon_str == prot_canon {
@@ -165,6 +166,7 @@ fn acquire_daemon_lock(name: &str) -> Result<File> {
         .create(true)
         .truncate(true)
         .write(true)
+        .mode(0o600)
         .open(&lock_file)?;
 
     if file.lock_exclusive().is_err() {

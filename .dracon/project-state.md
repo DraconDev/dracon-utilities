@@ -1,9 +1,7 @@
 # Project State
 
-## CurrentFocus
-Implement platform‑specific secure file creation with Unix permissions and fallback for other OSes
+## Current Focus
+Secure daemon lock file creation with restrictive Unix permissions and improved error handling for protected path canonicalization
 
-## Completed
-- [x] Added Unix‑specific secure file creation using OpenOptions with mode 0o644 and write_all
-- [x] Added cfg(not_unix) fallback using standard fs::write
-- [x] Initiated timestamp generation for auto‑backup of master identity
+## Completed- [x] Skip NotFound errors in `check_safe_to_delete` when canonicalizing user‑protected paths
+- [x] Set file mode to `0o600` when opening the daemon lock file using `OpenOptionsExt` for restrictive permissions
