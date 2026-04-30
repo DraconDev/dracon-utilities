@@ -36,7 +36,7 @@ pub(crate) async fn git_diff_head_files(repo: &Path) -> Result<Vec<String>> {
         }),
     ).await;
     match outcome {
-        Ok(Ok(files)) => Ok(files),
+        Ok(Ok(files)) => Ok::<Vec<String>, anyhow::Error>(files),
         Ok(Err(e)) => Err(anyhow::anyhow!("git diff HEAD task failed: {}", e)),
         Err(_) => Err(anyhow::anyhow!("git diff HEAD timed out")),
     }
