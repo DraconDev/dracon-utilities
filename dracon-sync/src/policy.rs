@@ -663,7 +663,7 @@ mod tests {
 
     #[test]
     fn test_freeze_reason_none_when_not_frozen() {
-        std::env::remove_var("DRACON_SYNC_FREEZE");
+        let _guard = VarGuard::set_temp("DRACON_SYNC_FREEZE", "");
         let reason = freeze_reason(std::path::Path::new("/fake/policy.toml"));
         assert!(reason.is_none());
     }
