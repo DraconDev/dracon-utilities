@@ -2478,4 +2478,60 @@ mod tests {
         let result = truncate("hello", 3);
         assert_eq!(result, "he…");
     }
+
+    #[test]
+    fn test_truncate_exact_length_no_ellipsis() {
+        let result = truncate("hello", 5);
+        assert_eq!(result, "hello");
+    }
+
+    #[test]
+    fn test_truncate_empty_string() {
+        let result = truncate("", 5);
+        assert_eq!(result, "");
+    }
+
+    #[test]
+    fn test_push_large_blob_threshold_bytes_default() {
+        let policy = SyncPolicy {
+            max_push_blob_bytes: 0,
+            ..test_sync_policy()
+        };
+        let threshold = push_large_blob_threshold_bytes(&policy);
+        assert_eq!(threshold, 100 * 1024 * 1024);
+    }
+
+    #[test]
+    fn test_push_large_blob_threshold_bytes_custom() {
+        let policy = SyncPolicy {
+            max_push_blob_bytes: 50 * 1024 * 1024,
+            ..test_sync_policy()
+        };
+        let threshold = push_large_blob_threshold_bytes(&policy);
+        assert_eq!(threshold, 50 * 1024 * 1024);
+    }
+
+    #[test]
+    fn test_detect_report_signals_blueprint_deleted() {
+        let files = vec![
+            DiffFile {
+                path: std::path::PathBuf::from("docs/blueprint-foo.md"),
+                status: FileStatus::Deleted,
+            }
+        ];
+        let signals = detect_report_signals(std::path::Path::new("/fake"), &files);
+        assert!(signals.contains(&ReportSignal::BlueprintModified));
+    }
+
+    #[test]
+    fn test_detect_report_signals_index_nested_dir() {
+        let files = vec![
+            DiffFile {
+                path: std::path::PathBuf::from("project/plan/index.md"),
+                status: FileStatus::Modified,
+            }
+        ];
+        let signals = detect_report_signals(std::path::Path::new("/fake"), &files);
+        assert!(signals.contains(&ReportSignal::IndexChanged));
+    }
 }
