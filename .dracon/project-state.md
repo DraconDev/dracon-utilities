@@ -1,8 +1,7 @@
 # Project State
 
-# Current Focus
-Update Cargo.lock values to align system references.
+## Current Focus
+Refactor git diff execution to return `anyhow::Result` for consistent error handling.
 
-# Completed
-- [x] Align reference consistency.
-- [x] Validate lock integrity.
+## Completed
+- [x] Updated `git_diff_head_files` to return `anyhow::Result<Vec<String>>` instead of `Result<Vec<String>>` for better error compatibility.
