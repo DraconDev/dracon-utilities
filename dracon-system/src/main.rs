@@ -2241,8 +2241,10 @@ fn apply_link_policy(policy: &SystemPolicy, force_replace: bool) -> Result<LinkS
         let meta = fs::symlink_metadata(&link).ok();
         if let Some(meta) = meta {
             if meta.file_type().is_symlink() {
+                check_safe_to_delete(&link, &[])?;
                 fs::remove_file(&link)?;
             } else if force_replace {
+                check_safe_to_delete(&link, &[])?;
                 let backup = backup_path_for(&link);
                 fs::rename(&link, backup)?;
             } else {
@@ -3580,6 +3582,12 @@ async fn main() -> Result<()> {
                 if !valid_algos.contains(&algo.as_str()) {
                     return Err(anyhow::anyhow!("Invalid algorithm. Valid: {}", valid_algos.join(", ")));
                 }
+                let total_ram_kb: u64 = std::fs::read_to_string("/proc/meminfo")
+                    .ok()
+                    .and_then(|s| s.lines().find(|l| l.starts_with("MemTotal:")).map(|l| l.split_whitespace().nth(1).unwrap_or("0").to_string()))
+                    .and_then(|s| s.parse().ok())
+                    .unwrap_or(0);
+                let total_ram_gb = total_ram_kb as f64 / 1024.0 / 1024.0;
                 println!("# Zram configuration for NixOS");
                 println!("# Add this to your ~/.dracon/nixos/configuration.nix");
                 println!();
@@ -3587,7 +3595,7 @@ async fn main() -> Result<()> {
                 println!("  zramSwap = {{");
                 println!("    enable = true;");
                 println!("    algorithm = \"{}\";", algo);
-                println!("    # {}% of RAM = {}GB virtual swap with current RAM", mem_pct, (mem_pct as f64 / 100.0 * 30.0) as u32);
+                println!("    # {}% of RAM = {}GB virtual swap (based on detected {} GB RAM)", mem_pct, (mem_pct as f64 / 100.0 * total_ram_gb), total_ram_gb);
                 println!("    memoryPercent = {};", mem_pct);
                 println!("  }};");
                 println!();
