@@ -1016,8 +1016,29 @@ fn run_keygen() -> Result<()> {
             .with_context(|| format!("failed to write {}", secret_path.display()))?;
     }
 
-    fs::write(&pubkey_path, format!("{}\n", recipient))
-        .with_context(|| format!("failed to write {}", pubkey_path.display()))?;
+    // Write public key atomically - create_new fails if file already exists
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&pubkey_path)
+            .with_context(|| format!("failed to create {}, file may already exist", pubkey_path.display()))?
+            .write_all(format!("{}\n", recipient).as_bytes())
+            .with_context(|| format!("failed to write {}", pubkey_path.display()))?;
+    }
+    #[cfg(not(unix))]
+    {
+        use std::fs::OpenOptions;
+        let mut f = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&pubkey_path)
+            .with_context(|| format!("failed to create {}, file may already exist", pubkey_path.display()))?;
+        f.write_all(format!("{}\n", recipient).as_bytes())
+            .with_context(|| format!("failed to write {}", pubkey_path.display()))?;
+    }
 
     let manifest_path = keys_dir.join("manifest.toml");
     let manifest_entry = format!(
