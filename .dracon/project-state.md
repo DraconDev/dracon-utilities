@@ -1,7 +1,7 @@
 # Project State
 
 ## Current Focus
-Enhanced error handling in `git_diff_head_files` to match `anyhow::Result` consistency.
+Simplify error handling in git diff HEAD by flattening nested Result and preserving anyhow context.
 
 ## Completed
-- [x] Simplified and streamlined error handling for the asynchronous `git_diff_head_files` function by implementing a match construct to directly map the result to `anyhow::Result`. This includes handling timeouts and other errors more gracefully, ensuring the function returns a consistent error type for easier error handling throughout the codebase.
+- [x] Flatten nested `Result<Result<T, E>, E>` to `Result<T, E>` in `git_diff_head_files` for concise propagation of `anyhow` errors.
