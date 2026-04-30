@@ -1,8 +1,8 @@
 # Project State
 
 ## Current Focus
-Implemented atomic public key write to prevent overwriting existing public keys
+Remove unused import and allow attribute in run_keygen function
 
 ## Completed
-- [x] Implemented atomic public key write using OpenOptions::create_new in run_keygen()
-- [x] Trimmed Cargo.toml by removing unused dependency declarations
+- [x] Remove `#[allow(unused_imports)]` attribute
+- [x] Drop `use std::os::unix::fs::OpenOptionsExt;` line

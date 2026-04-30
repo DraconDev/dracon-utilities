@@ -1019,8 +1019,6 @@ fn run_keygen() -> Result<()> {
     // Write public key atomically - create_new fails if file already exists
     #[cfg(unix)]
     {
-        #[allow(unused_imports)]
-        use std::os::unix::fs::OpenOptionsExt;
         std::fs::OpenOptions::new()
             .write(true)
             .create_new(true)
