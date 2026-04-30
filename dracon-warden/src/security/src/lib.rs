@@ -1053,19 +1053,6 @@ impl DemonSecurity {
                 eprintln!("⚠️ failed to write backup {}: {}", backup_path.display(), e);
             }
         }
-            #[cfg(unix)]
-            {
-                let mut b_perms = b_file.metadata()?.permissions();
-                b_perms.set_mode(0o400);
-                if let Err(e) = fs::set_permissions(&backup_path, b_perms) {
-                    eprintln!(
-                        "⚠️ failed to set permissions on {}: {}",
-                        backup_path.display(),
-                        e
-                    );
-                }
-            }
-        }
 
         self.master_identities = vec![key];
         Ok(())
