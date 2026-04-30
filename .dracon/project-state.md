@@ -1,8 +1,10 @@
 # Project State
 
 ## Current Focus
-Update freeze_reason test to use temporary environment variable guard and refresh Cargo.lock files for sync and system crates.
+Implement robust error handling and conditional counting for cache and trash cleanup operations.
 
 ## Completed
-- [x] refactor(test): replace `std::env::remove_var("DRACON_SYNC_FREEZE")` with `VarGuard::set_temp("DRACON_SYNC_FREEZE", "")` in the `test_freeze_reason_none_when_not_frozen` unit test for better isolation.
-- [x] chore(deps): regenerate Cargo.lock for `dracon-sync` and `dracon-system` to reflect updated dependencies.
+- [x] Added error handling around `run_git_with_timeout` in `dracon-sync/src/git.rs`; logs a warning on failure but continues execution.
+- [x] Refactored `clean_package_caches` in `dracon-system/src/main.rs` to track removal success (`succeeded` flag) and only record cache size/reclaimed when deletion succeeds or when `apply` is false, for cargo, npm, pip, and go caches.
+- [x] Refactored `empty_trash` in `dracon-system/src/main.rs` to handle removal and directory recreation failures, set `succeeded` flag, and only count reclaimed size when deletion succeeds or `apply` is false, for trash files and trash info.
+- [x] Modified `dracon-warden/src/main.rs` (32 insertions, 3 deletions) to incorporate additional logic, likely error handling or refactoring.
