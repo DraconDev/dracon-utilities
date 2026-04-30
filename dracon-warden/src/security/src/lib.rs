@@ -689,6 +689,37 @@ pub struct SecretFinding {
 pub struct RepoKey(Vec<u8>);
 
 #[derive(Zeroize, ZeroizeOnDrop)]
+pub struct RepoKey(Vec<u8>);
+
+impl RepoKey {
+    pub fn from_file(path: &Path) -> Result<Self> {
+        let bytes = fs::read(path)?;
+        if bytes.len() != REPO_KEY_LEN {
+            return Err(anyhow::anyhow!("Invalid key length"));
+        }
+        Ok(RepoKey(bytes))
+    }
+
+    pub fn get_key(&self) -> &[u8] {
+        &self.0
+    }
+
+    #[cfg(test)]
+    pub fn from_vec(bytes: Vec<u8>) -> Option<Self> {
+        if bytes.len() == 32 {
+            Some(RepoKey(bytes))
+        } else {
+            None
+        }
+    }
+
+    #[cfg(test)]
+    pub fn from_secret_bytes(bytes: [u8; 32]) -> Self {
+        RepoKey(bytes.to_vec())
+    }
+}
+
+#[derive(Zeroize, ZeroizeOnDrop)]
 pub struct TeamKey(Vec<u8>);
 
 impl TeamKey {
@@ -705,10 +736,8 @@ impl TeamKey {
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
-}
 
-#[cfg(test)]
-impl TeamKey {
+    #[cfg(test)]
     pub fn from_identity_string(s: String) -> Self {
         TeamKey(s.into_bytes())
     }
@@ -720,20 +749,6 @@ pub struct MarkerMigrationStats {
     pub files_changed: usize,
     pub markers_changed: usize,
     pub walk_errors: usize,
-}
-
-#[cfg(test)]
-impl RepoKey {
-    pub fn from_secret_bytes(bytes: [u8; 32]) -> Self {
-        RepoKey(bytes.to_vec())
-    }
-    pub fn from_vec(bytes: Vec<u8>) -> Option<Self> {
-        if bytes.len() == 32 {
-            Some(RepoKey(bytes))
-        } else {
-            None
-        }
-    }
 }
 
 impl RepoKey {
