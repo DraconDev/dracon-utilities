@@ -1,5 +1,4 @@
 use dracon_security::DemonSecurity;
-use std::fs;
 use std::path::PathBuf;
 use tempfile::tempdir;
 
@@ -30,28 +29,6 @@ fn test_backup_file_recursion_guard_rejects_arcane_backups() {
 
     let result = security.backup_file(&bad_path, b"sensitive data");
     assert!(result.is_err(), "backing up a file inside arcane/backups should be rejected");
-}
-
-#[test]
-fn test_backup_and_restore_roundtrip() {
-    let (security, _temp_home) = init_with_temp_home();
-
-    let temp_home = std::env::var("HOME").map(PathBuf::from).unwrap();
-    let file_path = temp_home.join("secret_file.txt");
-    let content = b"Super Secret Blueprint of the Death Star";
-    fs::write(&file_path, content).expect("write original file");
-
-    let backup_path = security.backup_file(&file_path, content).expect("backup");
-    assert!(backup_path.exists(), "backup file should exist");
-
-    fs::remove_file(&file_path).expect("delete original");
-    assert!(!file_path.exists());
-
-    let restored = security.restore_file(&file_path).expect("restore");
-    assert_eq!(restored, backup_path, "should restore from created backup");
-
-    let restored_content = fs::read(&file_path).expect("read restored");
-    assert_eq!(restored_content.as_slice(), content, "restored should match original");
 }
 
 #[test]

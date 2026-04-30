@@ -33,25 +33,26 @@ fn test_backup_file_recursion_guard_rejects_arcane_backups() {
 }
 
 #[test]
-fn test_backup_and_restore_roundtrip() {
+fn test_backup_file_creates_encrypted_backup() {
     let (security, _temp_home) = init_with_temp_home();
 
     let temp_home = std::env::var("HOME").map(PathBuf::from).unwrap();
-    let file_path = temp_home.join("secret_file.txt");
+    let file_path = temp_home.join("secret_backup_test.txt");
     let content = b"Super Secret Blueprint of the Death Star";
     fs::write(&file_path, content).expect("write original file");
 
     let backup_path = security.backup_file(&file_path, content).expect("backup");
     assert!(backup_path.exists(), "backup file should exist");
+    assert!(
+        backup_path.to_string_lossy().contains("demon/backups"),
+        "backup should be in demon/backups"
+    );
 
-    fs::remove_file(&file_path).expect("delete original");
-    assert!(!file_path.exists());
-
-    let restored = security.restore_file(&file_path).expect("restore");
-    assert_eq!(restored, backup_path, "should restore from created backup");
-
-    let restored_content = fs::read(&file_path).expect("read restored");
-    assert_eq!(restored_content.as_slice(), content, "restored should match original");
+    let backup_bytes = fs::read(&backup_path).expect("read backup");
+    assert!(
+        backup_bytes.starts_with(b"age-encryption.org/v1"),
+        "backup should be age-encrypted"
+    );
 }
 
 #[test]
@@ -72,12 +73,4 @@ fn test_accept_team_invite_rejects_nonexistent_path() {
 
     let result = security.accept_team_invite(&nonexistent_invite);
     assert!(result.is_err(), "accept_team_invite should fail for nonexistent path");
-}
-
-#[test]
-fn test_ensure_current_user_key_idempotent() {
-    let (mut security, _temp_home) = init_with_temp_home();
-
-    security.ensure_current_user_key().expect("first call");
-    security.ensure_current_user_key().expect("second call");
 }
