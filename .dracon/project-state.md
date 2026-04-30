@@ -1,13 +1,10 @@
 # Project State
 
-## Current Focus
-Add TeamKey length accessor, fix nested quantifier detection in pattern integrity tests, update Azure SAS modifier checks, and add owner public key
+## Current FocusONE LINE
+
+Refactor backup test to verify encrypted backup file creation and proper location, removing redundant roundtrip and key idempotent tests.
 
 ## Completed
-- [x] Add public `len()` method to `TeamKey` to return inner key byte length
-- [x] Add new owner Age public key file at `.demon/data/keys/owner_age1wz5p.pub`
-- [x] Fix `has_nested_quantifier` to return `&'static str` and correct check patterns to use literal nested quantifier strings instead of malformed regex escapes
-- [x] Refactor pattern integrity tests to use string references instead of cloned values to reduce unnecessary allocations
-- [x] Update Azure SAS pattern test to validate `(?sm)` or `(?s)` DOTALL modifiers, rename test to reflect updated validation logic
-- [x] Update team key test to use `TeamKey::len()` instead of directly accessing internal tuple field
-- [x] Remove redundant inline comments from common key prefixes in accidental key paste test
+- [x] Renamed and rewrote test_backup_and_restore_roundtrip to test_backup_file_creates_encrypted_backup, asserting backup exists in demon/backups and starts with age-encryption.org/v1 header.
+- [x] Removed test_ensure_current_user_key_idempotent test from atomic_write_test.rs.
+- [x] Deleted test_backup_and_restore_roundtrip from backup_edge_cases_test.rs.
