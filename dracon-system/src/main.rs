@@ -2276,7 +2276,7 @@ fn load_system_policy() -> Result<(Option<PathBuf>, SystemPolicy)> {
     };
     let content = match std::fs::read_to_string(&path) {
         Ok(c) => c,
-        Err(e) => {
+        Err(_e) => {
             return Ok((Some(path), SystemPolicy::default()));
         }
     };

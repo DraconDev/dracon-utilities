@@ -1,8 +1,8 @@
 # Project State
 
 ## Current Focus
-Test improvement: Replace environment variable removal with RAII guard pattern for cleaner test isolation
+Refines error handling in policy loading to suppress specific error types during file read failures
 
 ## Completed
-- [x] test(policy): Use VarGuard to set temporary environment variable in `test_debug_enabled` instead of removing the variable, ensuring proper cleanup via RAII pattern
-- [x] chore(deps): Update Cargo.lock (dependency resolution)
+- [x] Renamed error variable `_e` in `load_system_policy` to handle file read errors generically, avoiding propagation of specific error details
+- [x] Updated dependencies as reflected by modified `Cargo.lock` (specific changes not visible in binary diff)
