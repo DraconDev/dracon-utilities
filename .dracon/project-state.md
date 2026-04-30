@@ -1,7 +1,7 @@
 # Project State
 
 ## Current Focus
-Convert hostname retrieval from `OsString` to `String` using `.to_string_lossy().to_string()` to enable proper ASCII alphanumeric filtering.
+Converts hostname retrieval to a UTF‑8 `String` to ensure downstream filtering works correctly.
 
 ## Completed
-- [x] Modify `hostname_raw` assignment to call `.to_string_lossy().to_string()` for correct string handling and filtering.
+- [x] Convert hostname::get() result from `OsString` to a lossily converted `String` before filtering.

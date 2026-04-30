@@ -2536,7 +2536,7 @@ watch_roots = ["/tmp/test"]
         let original_home = std::env::var("HOME").ok();
         std::env::set_var("HOME", td.path().to_str().unwrap());
 
-        let hostname_raw = hostname::get().expect("hostname");
+        let hostname_raw = hostname::get().expect("hostname").to_string_lossy().to_string();
         let hostname: String = hostname_raw.chars()
             .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
             .collect();
@@ -2565,7 +2565,7 @@ watch_roots = ["/tmp/test"]
         let original_home = std::env::var("HOME").ok();
         std::env::set_var("HOME", td.path().to_str().unwrap());
 
-        let hostname_raw = hostname::get().expect("hostname");
+        let hostname_raw = hostname::get().expect("hostname").to_string_lossy().to_string();
         let hostname: String = hostname_raw.chars()
             .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
             .collect();
