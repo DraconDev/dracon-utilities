@@ -1,9 +1,12 @@
 # Project State
 
 ## Current Focus
-Add extensive edge‑case test coverage for security‑related functionality (backup handling, registry credentials, and scanner behavior).
+Add comprehensive, edge‑case test coverage for security features such as atomic writes, key generation guardrails, permission checks, backup recursion protection, and secret scanning behaviours.
 
 ## Completed
-- [x] Implement tests verifying backup operations reject self‑referencing or unexpected backup paths and correctly select the newest file.
-- [x] Implement tests for registry credential storage, ensuring passwords are encrypted, upsert behavior works, and missing files return empty results.
-- [x] Implement tests covering scanner edge cases such as handling empty input, malformed data, and error propagation.
+- [x] Implement atomic write tests ensuring key files are written safely and idempotently
+- [x] Add tests for refusing to overwrite existing secret or team keys
+- [x] Add tests for correct permission handling when accepting team invites
+- [x] Augment comprehensive test suite with backup recursion guard, empty input handling, no‑finding scan, and multi‑recipient encryption
+- [x] Add additional pattern integrity and RE‑DOS stress tests for secret scanning module
+- [x] Update auxiliary test files to support new security edge‑case checks
