@@ -105,6 +105,7 @@ fn is_inside_secret_tag(content: &str, start_idx: usize) -> bool {
 pub struct RegistryCredential {
     pub registry: String, // e.g. "ghcr.io"
     pub username: String,
+    #[zeroize(skip)]
     pub password: String, // Token or Password
 }
 
@@ -2853,7 +2854,11 @@ pub fn encrypt_with_repo_key(&self, repo_key: &RepoKey, plaintext: &[u8]) -> Res
         let encryptor = age::Encryptor::with_recipients(recipients)
             .context("Failed to create encryptor for registry credentials")?;
 
-        let mut file = fs::File::create(&path)?;
+        let mut file = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o600)
+            .open(&path)?;
         let mut writer = encryptor.wrap_output(&mut file)?;
         writer.write_all(&json_bytes)?;
         writer.finish()?;
