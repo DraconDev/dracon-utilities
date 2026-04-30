@@ -688,9 +688,6 @@ pub struct SecretFinding {
 #[derive(Zeroize, ZeroizeOnDrop, Clone)]
 pub struct RepoKey(Vec<u8>);
 
-#[derive(Zeroize, ZeroizeOnDrop)]
-pub struct RepoKey(Vec<u8>);
-
 impl RepoKey {
     pub fn from_file(path: &Path) -> Result<Self> {
         let bytes = fs::read(path)?;
@@ -749,20 +746,6 @@ pub struct MarkerMigrationStats {
     pub files_changed: usize,
     pub markers_changed: usize,
     pub walk_errors: usize,
-}
-
-impl RepoKey {
-    pub fn from_file(path: &Path) -> Result<Self> {
-        let bytes = fs::read(path)?;
-        if bytes.len() != REPO_KEY_LEN {
-            return Err(anyhow::anyhow!("Invalid key length"));
-        }
-        Ok(RepoKey(bytes))
-    }
-
-    pub fn get_key(&self) -> &[u8] {
-        &self.0
-    }
 }
 
 #[derive(Clone)]
