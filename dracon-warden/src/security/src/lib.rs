@@ -412,11 +412,11 @@ impl SecretScanner {
             ("Together AI API Key", r"tly_[A-Za-z0-9_-]{20,}"),
             ("Groq API Key", r"gsk_[A-Za-z0-9_-]{20,}"),
             ("DeepSeek API Key", r"sk-[A-Za-z0-9]{20,}"),
-            ("Mistral API Key", r"[A-Za-z0-9_-]{20,}"),
+            ("Mistral API Key", r"mistral-[A-Za-z0-9_-]{20,}"),
             // Cloudflare R2
-            ("Cloudflare R2 Account ID", r"[0-9a-f]{32}"),
-            ("Cloudflare R2 Access Key", r"[0-9a-f]{20}"),
-            ("Cloudflare R2 Secret Key", r"[a-f0-9]{40}"),
+            ("Cloudflare R2 Account ID", r"(?:account[_-]?id|cf[_-]?account[_-]?id).{0,10}[0-9a-f]{32}"),
+            ("Cloudflare R2 Access Key", r"(?:access[_-]?key[_-]?id|cf[_-]?access[_-]?key[_-]?id).{0,10}[0-9a-f]{20}"),
+            ("Cloudflare R2 Secret Key", r"(?:secret[_-]?key|cf[_-]?secret[_-]?key).{0,10}[a-f0-9]{40}"),
             // Backblaze B2
             ("Backblaze B2 Key ID", r"0055[a-f0-9]{16}"),
             ("Backblaze B2 Application Key", r"K005[a-zA-Z0-9]{20,}"),
