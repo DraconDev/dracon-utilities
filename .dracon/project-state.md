@@ -1,9 +1,8 @@
 # Project State
 
 ## Current Focus
-Remove keygen success and empty hostname tests
+added test verifying keygen creates secret and public keys and cleans up environment
 
 ## Completed
-- [x] Removed test verifying key generation error mentions "already exists"
-- [x] Removed test confirming successful key generation creates secret and pubkey files
-- [x] Removed test that rejects empty HOSTNAME during key generation
+- [x] added run_keygen_generates_keypair_successfully test with environment handling and key existence assertions
+- [x] ensured HOME env var is restored after test

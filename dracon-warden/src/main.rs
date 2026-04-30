@@ -2630,4 +2630,27 @@ watch_roots = ["/tmp/test"]
         let err_msg = result.unwrap_err().to_string();
         assert!(err_msg.contains("already exists"), "error should mention already exists: {}", err_msg);
     }
+
+    #[test]
+    fn run_keygen_generates_keypair_successfully() {
+        let td = TestDir::new("warden_keygen_success");
+        let keys_dir = td.path().join(".dracon").join("data").join("keys");
+
+        let original_home = std::env::var("HOME").ok();
+        std::env::set_var("HOME", td.path().to_str().unwrap());
+
+        let result = run_keygen();
+
+        if let Some(home) = original_home {
+            std::env::set_var("HOME", home);
+        } else {
+            std::env::remove_var("HOME");
+        }
+
+        assert!(result.is_ok(), "keygen should succeed: {:?}", result);
+        let secret_path = keys_dir.join("machine_nixos.age");
+        let pubkey_path = keys_dir.join("owner_nixos.pub");
+        assert!(secret_path.exists(), "secret key should be created");
+        assert!(pubkey_path.exists(), "pubkey should be created");
+    }
 }
