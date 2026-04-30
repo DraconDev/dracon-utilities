@@ -48,7 +48,7 @@ fn test_scanner_performance_under_large_evil_input() {
         elapsed
     );
     assert!(
-        result.len() < evil.len() * 3,
+        result.len() == evil.len(),
         "output should not explode on non-matching evil input"
     );
 }
@@ -90,7 +90,7 @@ fn test_nested_quantifier_patterns_do_not_cause_exponential_blowup() {
         elapsed
     );
     assert!(
-        result.len() < input.len() * 4,
+        result.len() == input.len(),
         "output should not explode"
     );
 }
