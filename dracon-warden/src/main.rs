@@ -2481,14 +2481,16 @@ watch_roots = ["/tmp/test"]
     #[test]
     fn find_git_repo_returns_none_for_non_repo() {
         let td = TestDir::new("warden_find_git_none");
-        let result = find_git_repo(td.path());
+        let subdir = td.path().join("subdir");
+        std::fs::create_dir_all(&subdir).unwrap();
+        let result = find_git_repo(&subdir);
         assert!(result.is_none());
     }
 
     #[test]
     fn find_git_repo_finds_parent_with_git_dir() {
         let td = TestDir::new("warden_find_git_parent");
-        let repo_dir = td.path().join("myrepo").join("subdir");
+        let repo_dir = td.path().join("myrepo");
         std::fs::create_dir_all(&repo_dir).unwrap();
         std::fs::create_dir_all(repo_dir.join(".git")).unwrap();
 
