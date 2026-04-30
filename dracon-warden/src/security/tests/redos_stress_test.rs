@@ -39,8 +39,13 @@ fn test_scanner_performance_under_large_evil_input() {
     let evil = "x".repeat(10_000);
 
     let now = std::time::Instant::now();
-    let result = scanner.scan_and_replace(&evil, |_,_| "[REDACTED]".to_string());
+    let result = scanner.scan_and_replace(&evil, |name, found| {
+        eprintln!("DEBUG MATCH: name={}, found_len={}", name, found.len());
+        "[REDACTED]".to_string()
+    });
     let elapsed = now.elapsed();
+
+    eprintln!("DEBUG: evil.len() = {}, result.len() = {}", evil.len(), result.len());
 
     assert!(
         elapsed < Duration::from_secs(5),
@@ -49,7 +54,9 @@ fn test_scanner_performance_under_large_evil_input() {
     );
     assert!(
         result.len() == evil.len(),
-        "output should not explode on non-matching evil input"
+        "output should not explode on non-matching evil input: input_len={}, result_len={}",
+        evil.len(),
+        result.len()
     );
 }
 
