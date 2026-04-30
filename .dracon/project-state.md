@@ -1,8 +1,7 @@
 # Project State
 
 ## Current Focus
-Strict enforcement of prefix matching in marker parsing to only accept matches starting exactly at the provided offset
+Correct test expectation for marker prefix detection at non‑start position.
 
 ## Completed
-- [x] Removed test asserting prefix detection at offset 7 (inside the prefix) for "[DRACON_SECRET:abc]"
-- [x] Updated test expectation for a marker in the middle of text to return None instead of Some("[DRACON_SECRET:")
+- [x] Updated unit test to expect `Some("[DRACON_SECRET:")` when the marker begins at position 5, matching the parser’s actual behavior.
