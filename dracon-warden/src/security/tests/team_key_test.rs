@@ -20,7 +20,7 @@ fn test_create_and_load_team_key() {
     security.create_team(team_name).expect("create team");
 
     let loaded = security.load_team_key(team_name).expect("load team key");
-    assert_eq!(loaded.0.len(), 32, "team key should be 32 bytes");
+    assert_eq!(loaded.len(), 32, "team key should be 32 bytes");
 
     let result = security.load_team_key("nonexistent-team");
     assert!(result.is_err(), "loading nonexistent team should fail");
