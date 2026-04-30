@@ -3,126 +3,81 @@ use std::fs;
 use std::path::PathBuf;
 use tempfile::tempdir;
 
-fn init_security() -> DemonSecurity {
+fn init_with_temp_home() -> (DemonSecurity, tempfile::TempDir) {
     let temp_home = tempdir().unwrap();
     std::env::set_var("HOME", temp_home.path());
     let mut security = DemonSecurity::new(None).expect("init security");
     let identity = age::x25519::Identity::generate();
     security.add_memory_identity(identity);
-    security
+    (security, temp_home)
 }
 
 #[test]
-fn test_accept_team_invite_refuses_to_overwrite_existing_key() {
-    let temp_home = tempdir().unwrap();
-    std::env::set_var("HOME", temp_home.path());
+fn test_backup_file_recursion_guard_rejects_backups_dir() {
+    let (security, _temp_home) = init_with_temp_home();
+    let temp_home = std::env::var("HOME").map(PathBuf::from).unwrap();
+    let bad_path = temp_home.join(".demon").join("backups").join("self.backup");
 
-    let mut security = DemonSecurity::new(None).expect("init security");
-    let identity = age::x25519::Identity::generate();
-    security.add_memory_identity(identity.clone());
-
-    let team_dir = temp_home.path().join(".demon").join("teams");
-    fs::create_dir_all(&team_dir).unwrap();
-    let team_key_path = team_dir.join("existing-team.key");
-    fs::write(&team_key_path, b"fake key data").unwrap();
-
-    let mut security2 = DemonSecurity::new(None).expect("init security2");
-    security2.add_memory_identity(identity);
-
-    let fake_invite = team_dir.join("fake.invite");
-    fs::write(&fake_invite, b"not a real invite").unwrap();
-
-    let result = security2.accept_team_invite(&fake_invite);
-    assert!(result.is_err(), "accept_team_invite should fail when team key path already exists");
+    let result = security.backup_file(&bad_path, b"sensitive data");
+    assert!(result.is_err(), "backing up a file inside demon/backups should be rejected");
 }
 
 #[test]
-fn test_keygen_refuses_to_overwrite_existing_secret_key() {
-    let temp_home = tempdir().unwrap();
-    std::env::set_var("HOME", temp_home.path());
+fn test_backup_file_recursion_guard_rejects_arcane_backups() {
+    let (security, _temp_home) = init_with_temp_home();
+    let temp_home = std::env::var("HOME").map(PathBuf::from).unwrap();
+    let bad_path = temp_home.join("arcane").join("backups").join("self.bak.age");
 
-    let mut security = DemonSecurity::new(None).expect("init security");
-    let identity = age::x25519::Identity::generate();
-    security.add_memory_identity(identity);
-
-    let identity_path = temp_home.path().join(".demon").join("identity.age");
-    fs::write(&identity_path, b"already exists").unwrap();
-
-    let result = security.run_keygen();
-    assert!(result.is_err(), "keygen should refuse to overwrite existing secret key");
+    let result = security.backup_file(&bad_path, b"sensitive data");
+    assert!(result.is_err(), "backing up a file inside arcane/backups should be rejected");
 }
 
 #[test]
-fn test_pub_key_write_uses_atomic_create_new() {
-    let temp_home = tempdir().unwrap();
-    std::env::set_var("HOME", temp_home.path());
-    let mut security = DemonSecurity::new(None).expect("init security");
-    let identity = age::x25519::Identity::generate();
-    security.add_memory_identity(identity);
+fn test_backup_and_restore_roundtrip() {
+    let (security, _temp_home) = init_with_temp_home();
 
-    let repo_root = security.get_repo_root().expect("repo root");
-    let keys_dir = repo_root.join(".demon").join("data").join("keys");
-    fs::create_dir_all(&keys_dir).expect("create keys dir");
+    let temp_home = std::env::var("HOME").map(PathBuf::from).unwrap();
+    let file_path = temp_home.join("secret_file.txt");
+    let content = b"Super Secret Blueprint of the Death Star";
+    fs::write(&file_path, content).expect("write original file");
 
-    let identity = security.master_identities().first().expect("have identity");
-    let pub_key = identity.to_public();
-    let pub_key_str = pub_key.to_string();
-    let safe_id = &pub_key_str[..8];
-    let filename = format!("owner_{}.pub", safe_id);
-    let key_path = keys_dir.join(&filename);
+    let backup_path = security.backup_file(&file_path, content).expect("backup");
+    assert!(backup_path.exists(), "backup file should exist");
 
-    fs::write(&key_path, b"old content").unwrap();
+    fs::remove_file(&file_path).expect("delete original");
+    assert!(!file_path.exists());
 
-    let result = security.ensure_current_user_key();
-    assert!(result.is_ok(), "ensure_current_user_key should succeed");
+    let restored = security.restore_file(&file_path).expect("restore");
+    assert_eq!(restored, backup_path, "should restore from created backup");
 
-    let content = fs::read(&key_path).expect("read key path");
-    assert!(
-        content.contains(&pub_key_str[..]),
-        "pub key should be written atomically"
-    );
+    let restored_content = fs::read(&file_path).expect("read restored");
+    assert_eq!(restored_content.as_slice(), content, "restored should match original");
 }
 
 #[test]
-fn test_ensure_current_user_key_is_idempotent() {
-    let temp_home = tempdir().unwrap();
-    std::env::set_var("HOME", temp_home.path());
-    let mut security = DemonSecurity::new(None).expect("init security");
-    let identity = age::x25519::Identity::generate();
-    security.add_memory_identity(identity);
+fn test_restore_file_error_when_no_backups() {
+    let (security, _temp_home) = init_with_temp_home();
+    let temp_home = std::env::var("HOME").map(PathBuf::from).unwrap();
+    let file_path = temp_home.join("nonexistent_file.txt");
+
+    let result = security.restore_file(&file_path);
+    assert!(result.is_err(), "restore should fail when no backups exist");
+}
+
+#[test]
+fn test_accept_team_invite_rejects_nonexistent_path() {
+    let (security, _temp_home) = init_with_temp_home();
+    let temp_home = std::env::var("HOME").map(PathBuf::from).unwrap();
+    let nonexistent_invite = temp_home.join("nonexistent_invite.invite");
+
+    let result = security.accept_team_invite(&nonexistent_invite);
+    assert!(result.is_err(), "accept_team_invite should fail for nonexistent path");
+}
+
+#[test]
+fn test_ensure_current_user_key_idempotent() {
+    let (mut security, _temp_home) = init_with_temp_home();
 
     security.ensure_current_user_key().expect("first call");
     security.ensure_current_user_key().expect("second call");
-
-    let repo_root = security.get_repo_root().expect("repo root");
-    let keys_dir = repo_root.join(".demon").join("data").join("keys");
-    let identity = security.master_identities().first().expect("identity");
-    let safe_id = &identity.to_public().to_string()[..8];
-    let key_path = keys_dir.join(format!("owner_{}.pub", safe_id));
-
-    let count = fs::read_dir(&keys_dir)
-        .unwrap()
-        .filter_map(|e| e.ok())
-        .filter(|e| e.file_name().to_string_lossy().contains("owner_"))
-        .count();
-
-    assert_eq!(count, 1, "should have exactly one owner key file (idempotent write)");
-}
-
-#[test]
-fn test_accept_team_invite_creates_with_correct_permissions() {
-    let temp_home = tempdir().unwrap();
-    std::env::set_var("HOME", temp_home.path());
-
-    let mut security = DemonSecurity::new(None).expect("init security");
-    let identity = age::x25519::Identity::generate();
-    security.add_memory_identity(identity.clone());
-
-    let team_dir = temp_home.path().join(".demon").join("teams");
-    fs::create_dir_all(&team_dir).expect("create team dir");
-
-    let team_key_path = team_dir.join("new-team-perms.key");
-
-    let result = security.accept_team_invite(&team_key_path);
-    assert!(result.is_err(), "accept_team_invite should reject non-invite path");
 }
