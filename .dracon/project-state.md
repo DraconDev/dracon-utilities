@@ -1,8 +1,8 @@
-# Project State
+# ProjectState
 
 ## Current Focus
-Improve error handling for generating the system status report by returning a `Result` instead of unwrapped values.
+Simplify git repository discovery logic and enhance error handling for policy loading
 
 ## Completed
-- [x] Change `build_status_report` to return `Result<StatusReport>` and wrap the constructed report in `Ok`.
-- [x] Refactor variable handling in `build_status_report` to capture `system_policy_path` while preserving default fallback.
+- [x] Refactored `discover_git_repos_recursive` to remove redundant directory exclusion checks, reducing complexity while maintaining functionality
+- [x] Updated policy loading in `main.rs` to enforce explicit error handling via `?` operator, improving error propagation reliability

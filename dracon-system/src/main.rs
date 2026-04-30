@@ -2987,7 +2987,7 @@ async fn main() -> Result<()> {
 
     match cli.cmd {
         Commands::Status { json } => {
-            let report = build_status_report().await;
+            let report = build_status_report().await?;
             if json {
                 println!("{}", serde_json::to_string_pretty(&report)?);
             } else {
@@ -3038,7 +3038,7 @@ async fn main() -> Result<()> {
             min_size_mb,
             kinds,
         } => {
-            let (_, policy) = load_system_policy();
+            let (_, policy) = load_system_policy()?;
             let root = root.unwrap_or_else(|| {
                 if !policy.storage.default_root.trim().is_empty() {
                     return PathBuf::from(policy.storage.default_root.clone());
@@ -3146,7 +3146,7 @@ async fn main() -> Result<()> {
             }
         }
         Commands::Link { cmd } => {
-            let (_, policy) = load_system_policy();
+            let (_, policy) = load_system_policy()?;
             match cmd {
                 LinkCommands::Status { json } | LinkCommands::Doctor { json } => {
                     let report = build_link_report(&policy);
@@ -3189,7 +3189,7 @@ async fn main() -> Result<()> {
             }
         }
         Commands::Guard { cmd } => {
-            let (_, policy) = load_system_policy();
+            let (_, policy) = load_system_policy()?;
             let mut guard = policy.guard;
             normalize_guard_policy(&mut guard);
             let mut runtime = GuardRuntimeState::default();
