@@ -1,7 +1,9 @@
 # Project State
 
 ## Current Focus
-Remove Unix-specific backup file permission setting from DemonSecurity
+Refactor team key handling and simplify the `decrypt_repo_key_with_team_key` method
 
 ## Completed
-- [x] Remove platform-specific backup file permission restriction (0o400) that was setting read-only owner permissions on Unix systems
+- [x] Remove Unix-specific permission handling from `DemonSecurity`
+- [x] Refactor team identity derivation to use `expose_secret()` and `FromStr` for clearer error messaging
+- [x] Wrap encrypted input in `Cursor` when initializing `age::Decryptor`
