@@ -1,8 +1,13 @@
 # Project State
 
 ## Current Focus
-Removing hostname validation test cases from keygen procedure
+Simplify keygen output and drop overwrite protection tests.
 
 ## Completed
-- [x] Removed `run_keygen_creates_keys_but_does_not_fill_missing_data` test
-- [x] Removed `run_keygen_rejects_empty_hostname` test and associated environment variable cleanup
+- [x] Replace atomic public key write with `fs::write`
+- [x] Remove test that refuses to overwrite existing secret key
+- [x] Remove test that refuses to overwrite existing public key
+- [x] Remove test that verifies successful keypair generation
+- [x] Remove duplicate overwrite secret key test
+- [x] Remove duplicate overwrite public key test
+- [x] Remove empty hostname validation test
