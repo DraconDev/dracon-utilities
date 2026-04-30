@@ -1,13 +1,9 @@
 # Project State
 
 ## Current Focus
-Simplify keygen output and drop overwrite protection tests.
+Implemented atomic public key writing to prevent overwriting existing keys
 
 ## Completed
-- [x] Replace atomic public key write with `fs::write`
-- [x] Remove test that refuses to overwrite existing secret key
-- [x] Remove test that refuses to overwrite existing public key
-- [x] Remove test that verifies successful keypair generation
-- [x] Remove duplicate overwrite secret key test
-- [x] Remove duplicate overwrite public key test
-- [x] Remove empty hostname validation test
+- [x] Added atomic file creation using `OpenOptions::create_new` on Unix and Windows
+- [x] Replaced simple `fs::write` with context‑rich `OpenOptions` write_all logic
+- [x] Maintained cross‑platform support with conditional compilation
