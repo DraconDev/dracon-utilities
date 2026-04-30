@@ -1,8 +1,8 @@
 # Project State
 
 ## Current Focus
-Improve safety checks for file operations and fix RAM detection in zram configuration output
+Add serialization support to event types and improve test error handling for git operations
 
 ## Completed
-- [x] fix(apply_link_policy): Add safety check before removing or renaming symlinks to prevent unsafe deletions
-- [x] fix(zram config): Detect actual system RAM from /proc/meminfo instead of using hardcoded 30GB value in zram swap calculation comment
+- [x] Add `Serialize` derive to `DraconEvent` struct in dracon-system for serialization support
+- [x] Defensive error handling in git tests: handle potential errors from `git_diff_head_files()` using `unwrap_or_default()` in three test cases

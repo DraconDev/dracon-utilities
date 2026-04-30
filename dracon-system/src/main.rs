@@ -94,7 +94,7 @@ pub enum EventSeverity {
     Critical,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct DraconEvent {
     pub domain: String,
     pub severity: EventSeverity,

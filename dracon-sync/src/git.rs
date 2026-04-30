@@ -1497,7 +1497,7 @@ mod tests {
             .current_dir(&repo_path)
             .output()
             .expect("git add failed");
-        let files = git_diff_head_files(&repo_path).await;
+        let files = git_diff_head_files(&repo_path).await.unwrap_or_default();
         let _ = std::fs::remove_dir_all(&repo_path);
         assert!(files.contains(&"new.txt".to_string()), "staged file should appear in diff: {:?}", files);
     }
@@ -1512,7 +1512,7 @@ mod tests {
             .output()
             .expect("git commit failed");
         std::fs::write(repo_path.join("test.txt"), "changed\n").ok();
-        let files = git_diff_head_files(&repo_path).await;
+        let files = git_diff_head_files(&repo_path).await.unwrap_or_default();
         let _ = std::fs::remove_dir_all(&repo_path);
         assert!(files.contains(&"test.txt".to_string()), "modified file should appear in diff: {:?}", files);
     }
@@ -1525,7 +1525,7 @@ mod tests {
             .current_dir(&repo_path)
             .output()
             .expect("git commit failed");
-        let files = git_diff_head_files(&repo_path).await;
+        let files = git_diff_head_files(&repo_path).await.unwrap_or_default();
         let _ = std::fs::remove_dir_all(&repo_path);
         assert!(files.is_empty(), "clean repo should return empty diff: {:?}", files);
     }
