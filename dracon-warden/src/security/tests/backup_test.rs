@@ -11,7 +11,6 @@ fn test_backup_and_restore() {
     let _guard = HomeGuard::new();
 
     let home_path = std::env::var("HOME").map(std::path::PathBuf::from).unwrap();
-    println!("Temporary HOME: {:?}", home_path);
 
     let mut security = DemonSecurity::new(None).expect("Failed to init DemonSecurity");
 
@@ -22,12 +21,10 @@ fn test_backup_and_restore() {
     let content = b"Super Secret Blueprint of the Death Star";
     fs::write(&original_path, content).expect("Failed to write original file");
 
-    println!("Backing up file...");
     let backup_path = security
         .backup_file(&original_path, content)
         .expect("Backup failed");
 
-    println!("Backup created at: {:?}", backup_path);
     assert!(backup_path.exists(), "Backup file should exist");
     assert!(
         backup_path.to_string_lossy().contains("demon/backups"),
