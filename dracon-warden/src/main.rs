@@ -1877,6 +1877,7 @@ mod tests {
     use std::sync::Mutex;
 
     static NEXT_ID: AtomicU64 = AtomicU64::new(1);
+    static HOME_MUTEX: Mutex<()> = Mutex::new(());
 
     struct TestDir {
         path: std::path::PathBuf,
@@ -2258,6 +2259,7 @@ watch_roots = ["/tmp/test"]
         )
         .expect("write config");
 
+        let _lock = HOME_MUTEX.lock().expect("home mutex poisoned");
         let original_home = std::env::var("HOME").ok();
         std::env::set_var("HOME", td.path().to_str().unwrap());
         let path = resolve_policy_path_local();
@@ -2535,6 +2537,7 @@ watch_roots = ["/tmp/test"]
         let td = TestDir::new("warden_keygen_success");
         let keys_dir = td.path().join(".dracon").join("data").join("keys");
 
+        let _lock = HOME_MUTEX.lock().expect("home mutex poisoned");
         let original_home = std::env::var("HOME").ok();
         std::env::set_var("HOME", td.path().to_str().unwrap());
 
@@ -2563,6 +2566,7 @@ watch_roots = ["/tmp/test"]
         let keys_dir = td.path().join(".dracon").join("data").join("keys");
         std::fs::create_dir_all(&keys_dir).unwrap();
 
+        let _lock = HOME_MUTEX.lock().expect("home mutex poisoned");
         let original_home = std::env::var("HOME").ok();
         std::env::set_var("HOME", td.path().to_str().unwrap());
 
@@ -2592,6 +2596,7 @@ watch_roots = ["/tmp/test"]
         let keys_dir = td.path().join(".dracon").join("data").join("keys");
         std::fs::create_dir_all(&keys_dir).unwrap();
 
+        let _lock = HOME_MUTEX.lock().expect("home mutex poisoned");
         let original_home = std::env::var("HOME").ok();
         std::env::set_var("HOME", td.path().to_str().unwrap());
 
