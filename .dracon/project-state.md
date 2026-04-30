@@ -1,7 +1,8 @@
 # Project State
 
 ## Current Focus
-ONE LINE: Remove noisy debug output from the backup/restore security test
+ONE LINE: Update dependency lockfiles for dracon-sync and dracon-system to reflect recent dependency changes.
 
 ## Completed
-- [x] fix(test): eliminate extraneous `println!` in `backup_test.rs` to keep test output clean.
+- [x] lockfile(sync): refreshed `dracon-sync/Cargo.lock` to capture updated crate versions.
+- [x] lockfile(system): refreshed `dracon-system/Cargo.lock` to capture updated crate versions.
