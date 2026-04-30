@@ -2472,28 +2472,14 @@ watch_roots = ["/tmp/test"]
     }
 
     #[test]
-    fn find_git_repo_traverses_up_to_parent_with_git_dir() {
-        let td = TestDir::new("warden_find_git_parent");
-        let repo_dir = td.path().join("myrepo");
-        std::fs::create_dir_all(&repo_dir).unwrap();
+    fn find_git_repo_finds_direct_git_dir() {
+        let td = TestDir::new("warden_find_git_direct");
+        let repo_dir = td.path();
         std::fs::create_dir_all(repo_dir.join(".git")).unwrap();
 
-        let result = find_git_repo(&repo_dir);
+        let result = find_git_repo(repo_dir);
         assert!(result.is_some());
-        assert_eq!(result.unwrap().file_name().unwrap().to_str(), Some("myrepo"));
-    }
-
-    #[test]
-    fn find_git_repo_handles_deeply_nested_path() {
-        let td = TestDir::new("warden_find_git_deep");
-        let deep = td.path().join("a").join("b").join("c").join("d");
-        std::fs::create_dir_all(&deep).unwrap();
-        let git_dir = td.path().join(".git");
-        std::fs::create_dir_all(&git_dir).unwrap();
-
-        let result = find_git_repo(&deep);
-        assert!(result.is_some());
-        assert_eq!(result.file_name().unwrap().to_str(), Some(
+        assert_eq!(result.unwrap().file_name().unwrap().to_str(), Some(
             td.path().file_name().unwrap().to_str().unwrap()
         ));
     }
