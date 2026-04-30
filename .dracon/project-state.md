@@ -1,8 +1,8 @@
-# ProjectState
+# Project State
 
 ## Current Focus
-Simplify git repository discovery logic and enhance error handling for policy loading
+Test improvement: Replace environment variable removal with RAII guard pattern for cleaner test isolation
 
 ## Completed
-- [x] Refactored `discover_git_repos_recursive` to remove redundant directory exclusion checks, reducing complexity while maintaining functionality
-- [x] Updated policy loading in `main.rs` to enforce explicit error handling via `?` operator, improving error propagation reliability
+- [x] test(policy): Use VarGuard to set temporary environment variable in `test_debug_enabled` instead of removing the variable, ensuring proper cleanup via RAII pattern
+- [x] chore(deps): Update Cargo.lock (dependency resolution)
