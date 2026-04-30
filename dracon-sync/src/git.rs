@@ -17,18 +17,18 @@ use crate::policy::{std_git_command, tokio_git_command, timestamp_secs};
 /// ignores files that only differ due to smudge filter decryption.
 pub(crate) async fn git_diff_head_files(repo: &Path) -> Result<Vec<String>> {
     let repo = repo.to_path_buf();
-    let result = tokio::time::timeout(
+    let result: Result<Vec<String>, Box<dyn std::error::Error + Send + Sync>> = tokio::time::timeout(
         Duration::from_secs(30),
         tokio::task::spawn_blocking(move || {
             let output = std::process::Command::new("git")
                 .current_dir(&repo)
                 .args(["diff", "HEAD", "--name-only", "-z"])
-                .output();
-            let Ok(out) = output else { return Err(anyhow::anyhow!("git diff HEAD failed")) };
-            if !out.status.success() {
-                return Err(anyhow::anyhow!("git diff HEAD exited with {}", out.status));
+                .output()
+                .map_err(|e| anyhow::anyhow!("git diff HEAD failed: {}", e))?;
+            if !output.status.success() {
+                return Err(anyhow::anyhow!("git diff HEAD exited with {}", output.status));
             }
-            Ok(String::from_utf8_lossy(&out.stdout)
+            Ok(String::from_utf8_lossy(&output.stdout)
                 .split('\0')
                 .filter(|s| !s.is_empty())
                 .map(String::from)
@@ -37,7 +37,7 @@ pub(crate) async fn git_diff_head_files(repo: &Path) -> Result<Vec<String>> {
     ).await;
     match result {
         Ok(Ok(files)) => Ok(files),
-        Ok(Err(e)) => Err(e),
+        Ok(Err(e)) => Err(anyhow::anyhow!("git diff HEAD task failed: {}", e)),
         Err(_) => Err(anyhow::anyhow!("git diff HEAD timed out")),
     }
 }
