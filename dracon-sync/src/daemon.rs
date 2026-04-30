@@ -382,9 +382,10 @@ pub(crate) async fn run_daemon(policy_path: PathBuf, override_interval_secs: Opt
 
     tokio::spawn(async move {
         if let Ok(mut sig) = tokio::signal::unix::signal(SignalKind::hangup()) {
-            sig.recv().await;
-            veprintln!(1, "sync: received SIGHUP, will reload policy...");
-            reload_sighup.store(true, Ordering::SeqCst);
+            while sig.recv().await.is_some() {
+                veprintln!(1, "sync: received SIGHUP, will reload policy...");
+                reload_sighup.store(true, Ordering::SeqCst);
+            }
         } else {
             eprintln!("sync: failed to set up SIGHUP handler");
         }
@@ -523,7 +524,7 @@ pub(crate) async fn run_daemon(policy_path: PathBuf, override_interval_secs: Opt
                 // `git status` shows filter-processed files as modified, but `git diff HEAD`
                 // correctly applies the clean filter and shows no diff for such files.
                 // Note: untracked files don't appear in `git diff HEAD`, so they always pass.
-                let diff_head_files = git_diff_head_files(&repo).await;
+                let diff_head_files = git_diff_head_files(&repo).await.unwrap_or_default();
                 let filtered: Vec<_> = if diff_head_files.is_empty() && !raw_entries.is_empty() {
                     // git diff HEAD returned nothing. Only clear if ALL entries are Modified
                     // (filter-only). Untracked/Added files don't appear in git diff HEAD.

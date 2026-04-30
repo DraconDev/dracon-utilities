@@ -1003,10 +1003,15 @@ impl DemonSecurity {
         }
 
         // Save Private Identity
-        let mut file = fs::File::create(&identity_path)?;
-        #[cfg(unix)]
+        let file = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o400)
+            .open(&identity_path)?;
+        let mut writer = file;
+        #[cfg(not(unix))]
         {
-            let mut perms = file.metadata()?.permissions();
+            let mut perms = writer.metadata()?.permissions();
             perms.set_mode(0o400);
             if let Err(e) = fs::set_permissions(&identity_path, perms) {
                 eprintln!(
@@ -1016,7 +1021,7 @@ impl DemonSecurity {
                 );
             }
         }
-        writeln!(file, "{}", key.to_string().expose_secret())?;
+        writeln!(writer, "{}", key.to_string().expose_secret())?;
 
         // Save Public Key for sharing
         let pub_path = home.join(".demon").join("identity.pub");
@@ -2545,7 +2550,13 @@ impl DemonSecurity {
         Ok(())
     }
 
-    pub fn encrypt_with_repo_key(&self, repo_key: &RepoKey, plaintext: &[u8]) -> Result<Vec<u8>> {
+    /// Encrypt data using the repo key with AES-256-GCM.
+///
+/// SECURITY NOTE: Uses a random 12-byte nonce per encryption. For very high-volume
+/// repositories (2^48+ encrypted files with the same repo key), nonce collision
+/// becomes a meaningful risk for GCM mode. For typical use, the random nonce
+/// per-file is sufficient. Consider key rotation if your repo will exceed this scale.
+pub fn encrypt_with_repo_key(&self, repo_key: &RepoKey, plaintext: &[u8]) -> Result<Vec<u8>> {
         let key = Key::<Aes256Gcm>::from_slice(&repo_key.0);
         let cipher = Aes256Gcm::new(key);
 
@@ -2590,10 +2601,7 @@ impl DemonSecurity {
     }
 
     /// Decrypt data using the legacy Git Seal V1 format (AES-256-CFB with derived IV).
-    /// WARNING: This format uses a deterministic IV derived from the key, which violates
-    /// AES-CFB security requirements. Calls to this function are logged as security events.
-    /// If you have ciphertexts created with this format, consider re-encrypting with a
-    /// modern AEAD (AES-256-GCM with random nonce) when possible.
+    /// WARNING: This format uses a deterministic IV derived from the key (SHA-256 hash → first 16 bytes), which violates AES-CFB security requirements. Using the same IV for multiple encryptions leaks information about plaintext relationships. This format exists for backward compatibility with legacy git-seal ciphertexts. DO NOT use this for new encryptions. If you have ciphertexts created with this format, consider migrating to AES-256-GCM (encrypt_with_repo_key) with random nonces.
     pub fn decrypt_git_seal(&self, repo_key: &RepoKey, ciphertext: &[u8]) -> Result<Vec<u8>> {
         let mut hasher = Sha256::new();
         hasher.update(&repo_key.0);
