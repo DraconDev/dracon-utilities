@@ -1,8 +1,7 @@
 # Project State
 
 ## Current Focus
-Simplify integration tests by removing git add/commit steps and related assertions
+Update dependency lock file for dracon-system crate
 
 ## Completed
-- [x] Remove `std::fs::write` and `git add/commit` calls from test fixtures
-- [x] Drop assertions checking return value for staged changes and origin handling
+- [x] Update Cargo.lock for the dracon-system crate
