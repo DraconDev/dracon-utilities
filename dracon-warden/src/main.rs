@@ -105,16 +105,36 @@ pub fn resolve_policy_path(
 
 pub fn discover_git_repos(
     roots: &[PathBuf],
-    _excluded_dir_names: &BTreeSet<String>,
+    excluded_dir_names: &BTreeSet<String>,
 ) -> Vec<PathBuf> {
     let mut repos = Vec::new();
     for root in roots {
-        if let Ok(entries) = std::fs::read_dir(root) {
-            for entry in entries.filter_map(|e| e.ok()) {
-                let path = entry.path();
-                if path.is_dir() && path.join(".git").exists() {
-                    repos.push(path);
+        let entries = match std::fs::read_dir(root) {
+            Ok(e) => e,
+            Err(e) => {
+                eprintln!("⚠️ failed to read watch root {}: {}", root.display(), e);
+                continue;
+            }
+        };
+        for entry in entries {
+            let entry = match entry {
+                Ok(e) => e,
+                Err(e) => {
+                    eprintln!("⚠️ failed to read entry in {}: {}", root.display(), e);
+                    continue;
                 }
+            };
+            let path = entry.path();
+            if !path.is_dir() {
+                continue;
+            }
+            let file_name = entry.file_name();
+            let name = file_name.to_string_lossy();
+            if excluded_dir_names.contains(name.as_ref()) {
+                continue;
+            }
+            if path.join(".git").exists() {
+                repos.push(path);
             }
         }
     }

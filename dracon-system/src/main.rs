@@ -1243,14 +1243,18 @@ async fn clean_package_caches(
             if cargo_cache.exists() {
                 let size = get_dir_size(&cargo_cache).await.unwrap_or(0);
                 if size > 0 {
+                    let mut succeeded = true;
                     if apply {
                         check_safe_to_delete(&cargo_cache, protected_paths)?;
                         if let Err(e) = tokio::fs::remove_dir_all(&cargo_cache).await {
                             eprintln!("⚠️ failed to remove cargo cache: {}", e);
+                            succeeded = false;
                         }
                     }
-                    cleaned.push(format!("cargo registry cache ({})", human_bytes(size)));
-                    reclaimed += size;
+                    if !apply || succeeded {
+                        cleaned.push(format!("cargo registry cache ({})", human_bytes(size)));
+                        reclaimed += size;
+                    }
                 }
             }
         }
@@ -1262,14 +1266,18 @@ async fn clean_package_caches(
             if npm_cache.exists() {
                 let size = get_dir_size(&npm_cache).await.unwrap_or(0);
                 if size > 0 {
+                    let mut succeeded = true;
                     if apply {
                         check_safe_to_delete(&npm_cache, protected_paths)?;
                         if let Err(e) = tokio::fs::remove_dir_all(&npm_cache).await {
                             eprintln!("⚠️ failed to remove npm cache: {}", e);
+                            succeeded = false;
                         }
                     }
-                    cleaned.push(format!("npm cache ({})", human_bytes(size)));
-                    reclaimed += size;
+                    if !apply || succeeded {
+                        cleaned.push(format!("npm cache ({})", human_bytes(size)));
+                        reclaimed += size;
+                    }
                 }
             }
         }
@@ -1281,14 +1289,18 @@ async fn clean_package_caches(
             if pip_cache.exists() {
                 let size = get_dir_size(&pip_cache).await.unwrap_or(0);
                 if size > 0 {
+                    let mut succeeded = true;
                     if apply {
                         check_safe_to_delete(&pip_cache, protected_paths)?;
                         if let Err(e) = tokio::fs::remove_dir_all(&pip_cache).await {
                             eprintln!("⚠️ failed to remove pip cache: {}", e);
+                            succeeded = false;
                         }
                     }
-                    cleaned.push(format!("pip cache ({})", human_bytes(size)));
-                    reclaimed += size;
+                    if !apply || succeeded {
+                        cleaned.push(format!("pip cache ({})", human_bytes(size)));
+                        reclaimed += size;
+                    }
                 }
             }
         }
@@ -1300,14 +1312,18 @@ async fn clean_package_caches(
             if go_cache.exists() {
                 let size = get_dir_size(&go_cache).await.unwrap_or(0);
                 if size > 0 {
+                    let mut succeeded = true;
                     if apply {
                         check_safe_to_delete(&go_cache, protected_paths)?;
                         if let Err(e) = tokio::fs::remove_dir_all(&go_cache).await {
                             eprintln!("⚠️ failed to remove go cache: {}", e);
+                            succeeded = false;
                         }
                     }
-                    cleaned.push(format!("go build cache ({})", human_bytes(size)));
-                    reclaimed += size;
+                    if !apply || succeeded {
+                        cleaned.push(format!("go build cache ({})", human_bytes(size)));
+                        reclaimed += size;
+                    }
                 }
             }
         }
@@ -1328,27 +1344,41 @@ async fn empty_trash(apply: bool, protected_paths: &[String]) -> Result<(u64, Ve
         if trash_files.exists() {
             let size = get_dir_size(&trash_files).await.unwrap_or(0);
             if size > 0 {
-                cleaned.push(format!("trash files ({})", human_bytes(size)));
-                reclaimed += size;
+                let mut succeeded = true;
                 if apply {
                     check_safe_to_delete(&trash_files, protected_paths)?;
                     if let Err(e) = tokio::fs::remove_dir_all(&trash_files).await {
                         eprintln!("⚠️ failed to remove trash files: {}", e);
+                        succeeded = false;
                     } else if let Err(e) = tokio::fs::create_dir_all(&trash_files).await {
                         eprintln!("⚠️ failed to recreate trash dir: {}", e);
+                        // Note: we still count this as success since the files were removed
                     }
+                }
+                if !apply || succeeded {
+                    cleaned.push(format!("trash files ({})", human_bytes(size)));
+                    reclaimed += size;
                 }
             }
         }
         
         if trash_info.exists() {
             let info_size = get_dir_size(&trash_info).await.unwrap_or(0);
-            if info_size > 0 && apply {
-                check_safe_to_delete(&trash_info, protected_paths)?;
-                if let Err(e) = tokio::fs::remove_dir_all(&trash_info).await {
-                    eprintln!("⚠️ failed to remove trash info: {}", e);
-                } else if let Err(e) = tokio::fs::create_dir_all(&trash_info).await {
-                    eprintln!("⚠️ failed to recreate trash info dir: {}", e);
+            if info_size > 0 {
+                let mut succeeded = true;
+                if apply {
+                    check_safe_to_delete(&trash_info, protected_paths)?;
+                    if let Err(e) = tokio::fs::remove_dir_all(&trash_info).await {
+                        eprintln!("⚠️ failed to remove trash info: {}", e);
+                        succeeded = false;
+                    } else if let Err(e) = tokio::fs::create_dir_all(&trash_info).await {
+                        eprintln!("⚠️ failed to recreate trash info dir: {}", e);
+                        // Note: we still count this as success since the files were removed
+                    }
+                }
+                if !apply || succeeded {
+                    cleaned.push(format!("trash info ({})", human_bytes(info_size)));
+                    reclaimed += info_size;
                 }
             }
         }
@@ -1469,19 +1499,22 @@ async fn clean_old_node_modules(
             };
             
             if size > 0 {
-                cleaned.push(format!(
-                    "{} ({} days old, {})",
-                    path.display(),
-                    modified_secs_ago / 86400,
-                    human_bytes(size)
-                ));
-                reclaimed += size;
-                
+                let mut succeeded = true;
                 if apply {
                     check_safe_to_delete(&path, protected_paths)?;
                     if let Err(e) = tokio::fs::remove_dir_all(&path).await {
                         eprintln!("⚠️ failed to remove {}: {}", path.display(), e);
+                        succeeded = false;
                     }
+                }
+                if !apply || succeeded {
+                    cleaned.push(format!(
+                        "{} ({} days old, {})",
+                        path.display(),
+                        modified_secs_ago / 86400,
+                        human_bytes(size)
+                    ));
+                    reclaimed += size;
                 }
             }
         }
@@ -3236,10 +3269,18 @@ async fn main() -> Result<()> {
                     while !shutdown.load(Ordering::SeqCst) {
                         if reload_sighup.load(Ordering::SeqCst) {
                             reload_sighup.store(false, Ordering::SeqCst);
-                            let _ = load_system_policy();
-                            normalize_guard_policy(&mut guard);
-                            veprintln!(2, "system: policy reloaded on SIGHUP (disk_warn={}%, disk_critical={}%)",
-                                guard.disk_warn_percent, guard.disk_critical_percent);
+                            match load_system_policy() {
+                                Ok((_, new_guard)) => {
+                                    *guard = new_guard;
+                                    normalize_guard_policy(&mut guard);
+                                    veprintln!(2, "system: policy reloaded on SIGHUP (disk_warn={}%, disk_critical={}%)",
+                                        guard.disk_warn_percent, guard.disk_critical_percent);
+                                }
+                                Err(e) => {
+                                    eprintln!("system: SIGHUP policy reload failed: {}", e);
+                                    emit_event(&DraconEvent::new("system", EventSeverity::Error, "guard/policy-reload", format!("SIGHUP reload failed: {e}")));
+                                }
+                            }
                         }
                         if let Err(e) = run_guard_once(&guard, &mut runtime).await {
                             eprintln!("guard pass failed: {}", e);

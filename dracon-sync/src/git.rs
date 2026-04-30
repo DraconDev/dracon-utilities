@@ -1063,7 +1063,9 @@ pub(crate) async fn restore_paths(repo: &Path, paths: &[String]) -> Result<()> {
     reset.push("--".to_string());
     reset.extend(paths.iter().cloned());
     let reset_ref: Vec<&str> = reset.iter().map(|s| s.as_str()).collect();
-    let _ = run_git_with_timeout(repo, &reset_ref, 30, "reset").await;
+    if let Err(e) = run_git_with_timeout(repo, &reset_ref, 30, "reset").await {
+        eprintln!("⚠️ git reset fallback failed for {}: {}", repo.display(), e);
+    }
 
     let mut checkout: Vec<String> = Vec::new();
     checkout.push("checkout".to_string());
