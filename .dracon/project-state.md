@@ -1,7 +1,8 @@
 # Project State
 
 ## Current Focus
-Simplify error handling in `git_diff_head_files` by flattening nested `Result` and clarifying timeout vs. execution failures.
+Refactor error handling in `git_diff_head_files` to simplify flow and improve timeout/error messages
 
-## Completed
-- [x] Replace nested `match` with early `if let` returns to cleanly separate successful file lists, git execution errors, and timeout cases.
+## Completed- [x] Renamed `result` to `outcome` and simplified timeout wrapper
+- [x] Replaced nested `if let` Result handling with a `match` expression
+- [x] Unified error messages for task failure and timeout
