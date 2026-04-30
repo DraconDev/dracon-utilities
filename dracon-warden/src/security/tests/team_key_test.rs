@@ -1,6 +1,5 @@
 use age::x25519::Identity;
 use dracon_security::DemonSecurity;
-use std::path::PathBuf;
 use tempfile::tempdir;
 
 fn init_with_temp_home() -> (DemonSecurity, tempfile::TempDir) {
