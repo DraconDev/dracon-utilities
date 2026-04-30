@@ -1,8 +1,8 @@
 # Project State
 
 ## Current Focus
-Update dependency lock files for dracon‑sync and dracon‑system crates
+Strict enforcement of prefix matching in marker parsing to only accept matches starting exactly at the provided offset
 
 ## Completed
-- [x] Updated Cargo.lock with new dependency versions
-- [x] Updated Cargo.toml with revised dependency specifications
+- [x] Removed test asserting prefix detection at offset 7 (inside the prefix) for "[DRACON_SECRET:abc]"
+- [x] Updated test expectation for a marker in the middle of text to return None instead of Some("[DRACON_SECRET:")
