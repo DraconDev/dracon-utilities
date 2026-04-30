@@ -15,7 +15,7 @@ use crate::policy::{std_git_command, tokio_git_command, timestamp_secs};
 /// Get the list of files that actually differ from HEAD (filter-aware).
 /// Unlike `git status`, `git diff HEAD` applies clean filters and correctly
 /// ignores files that only differ due to smudge filter decryption.
-pub(crate) async fn git_diff_head_files(repo: &Path) -> Vec<String> {
+pub(crate) async fn git_diff_head_files(repo: &Path) -> Result<Vec<String>> {
     let repo = repo.to_path_buf();
     let result = tokio::time::timeout(
         Duration::from_secs(30),
@@ -24,17 +24,21 @@ pub(crate) async fn git_diff_head_files(repo: &Path) -> Vec<String> {
                 .current_dir(&repo)
                 .args(["diff", "HEAD", "--name-only", "-z"])
                 .output();
-            let Ok(out) = output else { return Vec::new() };
-            String::from_utf8_lossy(&out.stdout)
+            let Ok(out) = output else { return Err(anyhow::anyhow!("git diff HEAD failed")) };
+            if !out.status.success() {
+                return Err(anyhow::anyhow!("git diff HEAD exited with {}", out.status));
+            }
+            Ok(String::from_utf8_lossy(&out.stdout)
                 .split('\0')
                 .filter(|s| !s.is_empty())
                 .map(String::from)
-                .collect()
+                .collect())
         }),
     ).await;
     match result {
-        Ok(Ok(files)) => files,
-        _ => Vec::new(),
+        Ok(Ok(files)) => Ok(files),
+        Ok(Err(e)) => Err(e),
+        Err(_) => Err(anyhow::anyhow!("git diff HEAD timed out")),
     }
 }
 

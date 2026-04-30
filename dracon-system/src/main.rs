@@ -24,7 +24,7 @@ const SYSTEM_PROTECTED: &[&str] = &[
 fn check_safe_to_delete(path: &Path, user_protected: &[String]) -> Result<()> {
     let canon = match path.canonicalize() {
         Ok(p) => p,
-        Err(_) => path.to_path_buf(),
+        Err(e) => anyhow::bail!("cannot canonicalize {}: {} — refusing to delete", path.display(), e),
     };
     let canon_str = canon.display().to_string();
 
@@ -38,7 +38,7 @@ fn check_safe_to_delete(path: &Path, user_protected: &[String]) -> Result<()> {
     for user_prot in user_protected {
         let prot_canon = match Path::new(user_prot).canonicalize() {
             Ok(p) => p.display().to_string(),
-            Err(_) => user_prot.clone(),
+            Err(e) => anyhow::bail!("cannot canonicalize user-protected path {}: {} — refusing", user_prot, e),
         };
         if canon_str == prot_canon {
             anyhow::bail!(
@@ -134,6 +134,18 @@ pub fn emit_event(event: &DraconEvent) {
         "[{}] {:?}: {} - {}",
         event.timestamp, event.severity, event.path, event.message
     );
+    if let Some(events_path) = dirs::home_dir().map(|h| h.join(".dracon/events.jsonl")) {
+        if let Ok(mut file) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&events_path)
+        {
+            use std::io::Write;
+            if let Ok(json) = serde_json::to_string(event) {
+                let _ = writeln!(file, "{}", json);
+            }
+        }
+    }
 }
 
 fn acquire_daemon_lock(name: &str) -> Result<File> {
@@ -3109,7 +3121,7 @@ async fn main() -> Result<()> {
                 let mut total = 0u64;
                 let mut actionable = Vec::new();
                 for item in selected {
-                    let tracked = is_git_tracked_dir(&item.path).await.unwrap_or(false);
+                    let tracked = is_git_tracked_dir(&item.path).await.unwrap_or(true);
                     if tracked && !cfg.allow_tracked {
                         println!(
                             "  {:>10}  {:<12} {}  [SKIP tracked]",
@@ -3253,9 +3265,10 @@ async fn main() -> Result<()> {
 
                     tokio::spawn(async move {
                         if let Ok(mut sig) = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::hangup()) {
-                            sig.recv().await;
-                            veprintln!(1, "system: received SIGHUP, reloading policy...");
-                            reload_sighup_handler.store(true, Ordering::SeqCst);
+                            while sig.recv().await.is_some() {
+                                veprintln!(1, "system: received SIGHUP, reloading policy...");
+                                reload_sighup_handler.store(true, Ordering::SeqCst);
+                            }
                         } else {
                             eprintln!("system: failed to set up SIGHUP handler");
                         }

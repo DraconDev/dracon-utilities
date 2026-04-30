@@ -181,7 +181,7 @@ impl SimpleAiService {
     fn secrets_path() -> PathBuf {
         dirs::home_dir()
             .unwrap_or_else(|| PathBuf::from("."))
-            .join(".dracon/utilities/sync")
+            .join(".dracon/ai/secrets")
     }
 
     fn load_config(path: &PathBuf) -> Result<AiConfig> {
