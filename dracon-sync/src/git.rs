@@ -17,7 +17,7 @@ use crate::policy::{std_git_command, tokio_git_command, timestamp_secs};
 /// ignores files that only differ due to smudge filter decryption.
 pub(crate) async fn git_diff_head_files(repo: &Path) -> Result<Vec<String>> {
     let repo = repo.to_path_buf();
-    let result = tokio::time::timeout(
+    let outcome = tokio::time::timeout(
         Duration::from_secs(30),
         tokio::task::spawn_blocking(move || -> anyhow::Result<Vec<String>> {
             let output = std::process::Command::new("git")
@@ -35,13 +35,11 @@ pub(crate) async fn git_diff_head_files(repo: &Path) -> Result<Vec<String>> {
             Ok(files)
         }),
     ).await;
-    if let Ok(Ok(files)) = result {
-        return Ok(files);
+    match outcome {
+        Ok(Ok(files)) => Ok(files),
+        Ok(Err(e)) => Err(anyhow::anyhow!("git diff HEAD task failed: {}", e)),
+        Err(_) => Err(anyhow::anyhow!("git diff HEAD timed out")),
     }
-    if let Ok(Err(e)) = result {
-        return Err(anyhow::anyhow!("git diff HEAD task failed: {}", e));
-    }
-    Err(anyhow::anyhow!("git diff HEAD timed out"))
 }
 
 pub(crate) fn discover_git_repos(
