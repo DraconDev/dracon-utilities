@@ -2492,16 +2492,6 @@ mod tests {
     }
 
     #[test]
-    fn test_push_large_blob_threshold_bytes_default() {
-        let policy = SyncPolicy {
-            max_push_blob_bytes: 0,
-            ..test_sync_policy()
-        };
-        let threshold = push_large_blob_threshold_bytes(&policy);
-        assert_eq!(threshold, 100 * 1024 * 1024);
-    }
-
-    #[test]
     fn test_push_large_blob_threshold_bytes_custom() {
         let policy = SyncPolicy {
             max_push_blob_bytes: 50 * 1024 * 1024,
@@ -2509,6 +2499,17 @@ mod tests {
         };
         let threshold = push_large_blob_threshold_bytes(&policy);
         assert_eq!(threshold, 50 * 1024 * 1024);
+    }
+
+    #[test]
+    fn test_push_large_blob_threshold_bytes_uses_min_of_all() {
+        let policy = SyncPolicy {
+            max_stage_file_bytes: 10 * 1024 * 1024,
+            max_push_blob_bytes: 50 * 1024 * 1024,
+            ..test_sync_policy()
+        };
+        let threshold = push_large_blob_threshold_bytes(&policy);
+        assert_eq!(threshold, 10 * 1024 * 1024, "should use smaller of stage and push limit");
     }
 
     #[test]
