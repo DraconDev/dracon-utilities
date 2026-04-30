@@ -237,23 +237,18 @@ proptest! {
 }
 #[test]
 fn test_backup_functionality() -> Result<()> {
+    let temp_home = tempfile::tempdir()?;
+    std::env::set_var("HOME", temp_home.path());
+
     let mut demon = DemonSecurity::new(None)?;
     let key = age::x25519::Identity::generate();
     demon.add_memory_identity(key);
 
-    // Mock functionality test
-    // We just ensure calling it doesn't crash.
-    // Ideally we would inspect the file system but we can't easily mock dirs::home_dir
-    let temp_dir = tempfile::tempdir()?;
-    let file_path = temp_dir.path().join("secret.env");
+    let file_path = temp_home.path().join("secret.env");
     let content = b"SECRET_API_KEY=12345";
 
-    // Create dummy file
     fs::write(&file_path, content)?;
 
-    // We expect this to execute. It might write to real home dir ~/demon/backups
-    // checking logic: `backup_file` uses `dirs::home_dir()`.
-    // Validating it runs is better than nothing.
     let res = demon.backup_file(&file_path, content);
     assert!(res.is_ok());
 
