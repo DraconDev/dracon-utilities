@@ -1,8 +1,9 @@
 # Project State
 
-## Current Focus
-Implement platform‑specific secure file creation with restrictive permissions for encrypted keys and backups.
+## CurrentFocus
+Implement platform‑specific secure file creation with Unix permissions and fallback for other OSes
 
 ## Completed
-- [x] fix(security): enforce 0o600 permission on newly written encrypted key files on Unix and fallback to default write on non‑Unix platforms.
-- [x] fix(security): enforce 0o400 permission on backup files during encryption, using Unix `OpenOptionsExt` for Unix and explicit permission setting for other platforms.
+- [x] Added Unix‑specific secure file creation using OpenOptions with mode 0o644 and write_all
+- [x] Added cfg(not_unix) fallback using standard fs::write
+- [x] Initiated timestamp generation for auto‑backup of master identity
