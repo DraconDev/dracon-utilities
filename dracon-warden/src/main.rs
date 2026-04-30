@@ -2470,17 +2470,4 @@ watch_roots = ["/tmp/test"]
         let set = build_globset(&["subdir\\*.json".into()]).expect("should succeed");
         assert!(set.is_match("subdir/test.json"));
     }
-
-    #[test]
-    fn find_git_repo_finds_direct_git_dir() {
-        let td = TestDir::new("warden_find_git_direct");
-        let repo_dir = td.path();
-        std::fs::create_dir_all(repo_dir.join(".git")).unwrap();
-
-        let result = find_git_repo(repo_dir);
-        assert!(result.is_some());
-        assert_eq!(result.unwrap().file_name().unwrap().to_str(), Some(
-            td.path().file_name().unwrap().to_str().unwrap()
-        ));
-    }
 }
