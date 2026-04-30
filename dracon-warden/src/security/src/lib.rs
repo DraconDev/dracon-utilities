@@ -2055,7 +2055,8 @@ impl DemonSecurity {
 
         // Sort to get the latest
         backups.sort();
-        let latest_backup = backups.last().expect("List should not be empty");
+        let latest_backup = backups.last()
+            .ok_or_else(|| anyhow::anyhow!("No backups found for file: {:?}", file_path))?;
 
         // Decrypt
         let encrypted_content = fs::read(latest_backup)?;
