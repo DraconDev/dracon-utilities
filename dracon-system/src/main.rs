@@ -1391,8 +1391,8 @@ async fn empty_trash(apply: bool, protected_paths: &[String]) -> Result<(u64, Ve
 async fn clean_nix_garbage(keep_generations: u32, apply: bool) -> Result<(u64, Vec<String>)> {
     let mut reclaimed = 0u64;
     let mut cleaned = Vec::new();
-    
-    // First, delete old generations (only if apply is true)
+    let mut errs = Vec::new();
+
     if apply && keep_generations > 0 {
         let gen_arg = keep_generations.to_string();
         if let Err(e) = Command::new("nix-env")
@@ -1402,10 +1402,9 @@ async fn clean_nix_garbage(keep_generations: u32, apply: bool) -> Result<(u64, V
             .output()
             .await
         {
-            eprintln!("⚠️ nix-env delete generations failed: {}", e);
+            errs.push(format!("nix-env delete generations: {}", e));
         }
 
-        // Also for user profile
         if let Err(e) = Command::new("nix-env")
             .arg("-d")
             .arg(&gen_arg)
@@ -1415,36 +1414,38 @@ async fn clean_nix_garbage(keep_generations: u32, apply: bool) -> Result<(u64, V
             .output()
             .await
         {
-            eprintln!("⚠️ nix-env delete user profile generations failed: {}", e);
+            errs.push(format!("nix-env delete user profile generations: {}", e));
         }
     }
-    
-    // Run nix-collect-garbage
+
     let mut args = vec!["collect-garbage"];
     if apply {
         args.push("-d");
     } else {
         args.push("--dry-run");
     }
-    
+
     let out = Command::new("nix-store")
         .args(&args)
         .output()
-        .await;
-    
-    if let Ok(out) = out {
-        if out.status.success() {
-            let text = String::from_utf8_lossy(&out.stdout);
-            // Parse lines like "deleting '/nix/store/xxxxx...'"
-            let delete_count = text.lines().filter(|l| l.contains("deleting")).count();
-            if delete_count > 0 {
-                cleaned.push(format!("nix store garbage ({} paths)", delete_count));
-                // Estimate ~1MB per path on average (rough)
-                reclaimed = delete_count as u64 * 1024 * 1024;
-            }
-        }
+        .await
+        .map_err(|e| anyhow::anyhow!("failed to run nix-store: {}", e))?;
+
+    if !out.status.success() {
+        return Err(anyhow::anyhow!("nix-store collect-garbage failed: {}", String::from_utf8_lossy(&out.stderr)));
     }
-    
+
+    let text = String::from_utf8_lossy(&out.stdout);
+    let delete_count = text.lines().filter(|l| l.contains("deleting")).count();
+    if delete_count > 0 {
+        cleaned.push(format!("nix store garbage ({} paths)", delete_count));
+        reclaimed = delete_count as u64 * 1024 * 1024;
+    }
+
+    if !errs.is_empty() && reclaimed == 0 {
+        return Err(anyhow::anyhow!("nix cleanup had {} error(s): {}", errs.len(), errs.join("; ")));
+    }
+
     Ok((reclaimed, cleaned))
 }
 
@@ -2269,22 +2270,19 @@ fn resolve_system_policy_path() -> Option<PathBuf> {
     candidates.into_iter().find(|p| p.exists())
 }
 
-fn load_system_policy() -> (Option<PathBuf>, SystemPolicy) {
+fn load_system_policy() -> Result<(Option<PathBuf>, SystemPolicy)> {
     let Some(path) = resolve_system_policy_path() else {
-        return (None, SystemPolicy::default());
+        return Ok((None, SystemPolicy::default()));
     };
     let content = match std::fs::read_to_string(&path) {
         Ok(c) => c,
         Err(e) => {
-            eprintln!("⚠️ failed to read {}: {}, using defaults", path.display(), e);
-            return (Some(path), SystemPolicy::default());
+            return Ok((Some(path), SystemPolicy::default()));
         }
     };
-    let parsed: SystemPolicy = toml::from_str(&content).unwrap_or_else(|e| {
-        eprintln!("⚠️ failed to parse {}: {}", path.display(), e);
-        SystemPolicy::default()
-    });
-    (Some(path), parsed)
+    let parsed: SystemPolicy = toml::from_str(&content)
+        .map_err(|e| anyhow::anyhow!("failed to parse {}: {}", path.display(), e))?;
+    Ok((Some(path), parsed))
 }
 
 async fn is_user_service_active(service: &str) -> bool {
@@ -2305,7 +2303,7 @@ async fn is_user_service_active(service: &str) -> bool {
 
 async fn build_status_report() -> StatusReport {
     let root = canonical_system_root();
-    let (system_policy_path, _) = load_system_policy();
+    let (_, policy) = load_system_policy().unwrap_or_else(|_| (None, SystemPolicy::default()));
     StatusReport {
         system_root: root.display().to_string(),
         nixos_root: root.join("nixos").display().to_string(),
@@ -3269,15 +3267,23 @@ async fn main() -> Result<()> {
                     while !shutdown.load(Ordering::SeqCst) {
                         if reload_sighup.load(Ordering::SeqCst) {
                             reload_sighup.store(false, Ordering::SeqCst);
-                            let (policy_path, new_policy) = load_system_policy();
-                            if policy_path.is_none() {
-                                eprintln!("system: SIGHUP reload warning: no policy file found, using defaults");
-                                emit_event(&DraconEvent::new("system", EventSeverity::Warn, "guard/policy-reload", "SIGHUP reload: no policy file found, using defaults".to_string()));
+                            let result = load_system_policy();
+                            match result {
+                                Ok((policy_path, new_policy)) => {
+                                    if policy_path.is_none() {
+                                        eprintln!("system: SIGHUP reload warning: no policy file found, using defaults");
+                                        emit_event(&DraconEvent::new("system", EventSeverity::Warn, "guard/policy-reload", "SIGHUP reload: no policy file found, using defaults".to_string()));
+                                    }
+                                    guard = new_policy.guard;
+                                    normalize_guard_policy(&mut guard);
+                                    veprintln!(2, "system: policy reloaded on SIGHUP (disk_warn={}%, disk_critical={}%)",
+                                        guard.disk_warn_percent, guard.disk_critical_percent);
+                                }
+                                Err(e) => {
+                                    eprintln!("system: SIGHUP reload warning: corrupted policy file, using defaults: {}", e);
+                                    emit_event(&DraconEvent::new("system", EventSeverity::Error, "guard/policy-reload", format!("SIGHUP reload: policy corrupted, using defaults: {}", e)));
+                                }
                             }
-                            guard = new_policy.guard;
-                            normalize_guard_policy(&mut guard);
-                            veprintln!(2, "system: policy reloaded on SIGHUP (disk_warn={}%, disk_critical={}%)",
-                                guard.disk_warn_percent, guard.disk_critical_percent);
                         }
                         if let Err(e) = run_guard_once(&guard, &mut runtime).await {
                             eprintln!("guard pass failed: {}", e);
@@ -3469,10 +3475,14 @@ async fn main() -> Result<()> {
                     
                     // Docker
                     if do_docker {
-                        let bytes = docker_prune(true, guard_clone.docker_prune_volumes).await.unwrap_or(0);
-                        total_reclaimed += bytes;
-                        if bytes > 0 {
-                            actions.push(format!("Docker: {}", human_bytes(bytes)));
+                        match docker_prune(true, guard_clone.docker_prune_volumes).await {
+                            Ok(bytes) => {
+                                total_reclaimed += bytes;
+                                if bytes > 0 {
+                                    actions.push(format!("Docker: {}", human_bytes(bytes)));
+                                }
+                            }
+                            Err(e) => failures.push(format!("Docker: {}", e)),
                         }
                     }
                     
@@ -3482,19 +3492,28 @@ async fn main() -> Result<()> {
                             reclaimed_bytes: u64,
                             reclaimed_human: String,
                             actions: Vec<String>,
+                            failures: Vec<String>,
                             apply: bool,
                         }
                         let report = CleanReport {
                             reclaimed_bytes: total_reclaimed,
                             reclaimed_human: human_bytes(total_reclaimed),
                             actions,
+                            failures,
                             apply,
                         };
                         println!("{}", serde_json::to_string_pretty(&report)?);
                     } else {
-                        if actions.is_empty() {
+                        if actions.is_empty() && failures.is_empty() {
                             println!("Nothing to clean.");
                         } else {
+                            if !failures.is_empty() {
+                                eprintln!("⚠️ {} cleanup step(s) failed:", failures.len());
+                                for f in &failures {
+                                    eprintln!("  • {}", f);
+                                }
+                                println!();
+                            }
                             println!("Cleanup {}:", if apply { "results" } else { "preview (dry-run)" });
                             for a in &actions {
                                 println!("  • {}", a);
