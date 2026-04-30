@@ -1,8 +1,11 @@
 # Project State
 
 ## Current Focus
-ONE LINE: Update dependency lockfiles for dracon-sync and dracon-system to reflect recent dependency changes.
+test(security): add comprehensive test suites for RepoKey operations and unlock payload functionality
 
 ## Completed
-- [x] lockfile(sync): refreshed `dracon-sync/Cargo.lock` to capture updated crate versions.
-- [x] lockfile(system): refreshed `dracon-system/Cargo.lock` to capture updated crate versions.
+- [x] Validate RepoKey file loading accepts exact-length keys and rejects truncated, overlength, empty, or nonexistent key files
+- [x] Verify RepoKey encryption/decryption roundtrip works for standard and empty plaintext
+- [x] Confirm RepoKey decryption fails for wrong keys, empty ciphertext, or ciphertext shorter than the 12-byte nonce
+- [x] Ensure different RepoKeys produce unique ciphertext for identical plaintext
+- [x] Add unlock payload test suite covering security initialization with custom repo roots and TeamKey/RepoKey integration
