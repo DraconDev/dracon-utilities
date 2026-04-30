@@ -4,4 +4,4 @@
 Update dracon-sync Cargo.lock to latest dependency versions
 
 ## Completed
-- [x] Update dracon-sync Cargo.lock with new dependency versions
+- [x] Updated dracon-sync Cargo.lock with latest dependency lock file
