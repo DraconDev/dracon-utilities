@@ -3391,6 +3391,7 @@ async fn main() -> Result<()> {
                     
                     let mut total_reclaimed = 0u64;
                     let mut actions: Vec<String> = Vec::new();
+                    let mut failures: Vec<String> = Vec::new();
                     
                     // Rust targets
                     if do_rust {

@@ -617,10 +617,20 @@ fn owner_pubkeys_in(dir: &Path) -> Vec<PathBuf> {
     let mut out = Vec::new();
     let read_dir = match fs::read_dir(dir) {
         Ok(rd) => rd,
-        Err(_) => return out,
+        Err(e) => {
+            eprintln!("⚠️ cannot read owner pubkeys directory {}: {}", dir.display(), e);
+            return out;
+        }
     };
 
-    for entry in read_dir.flatten() {
+    for entry in read_dir {
+        let entry = match entry {
+            Ok(e) => e,
+            Err(e) => {
+                eprintln!("⚠️ cannot read entry in {}: {}", dir.display(), e);
+                continue;
+            }
+        };
         let path = entry.path();
         let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
             continue;
