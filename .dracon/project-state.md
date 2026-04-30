@@ -1,8 +1,10 @@
 # Project State
 
 ## Current Focus
-Update dependency lock files for dracon-sync and dracon-system crates
+Added integration tests verifying sync_repo behavior for pull-skipping, dirty repo handling, push without origin, and push without upstream.
 
 ## Completed
-- [x] Update dependency lock file for dracon-sync crate
-- [x] Update dependency lock file for dracon-system crate
+- [x] Added test_sync_repo_skip_pull_when_not_behind
+- [x] Added test_sync_repo_skip_pull_when_dirty
+- [x] Added test_sync_repo_skip_push_when_no_origin
+- [x] Added test_sync_repo_skip_push_when_no_upstream
