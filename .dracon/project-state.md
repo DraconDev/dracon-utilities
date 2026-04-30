@@ -1,9 +1,8 @@
 # Project State
 
 ## Current Focus
-Remove obsolete git repository detection unit tests from `src/main.rs`
+Updated test input and assertion for `salvage_invalid_json_markers` to verify that a valid DRACON_SECRET marker within a JSON value is properly salvaged and yields "null" or "__scrubbed__".
 
 ## Completed
-- [x] Removed `find_git_repo_returns_none_for_non_repo` test
-- [x] Removed `find_git_repo_finds_parent_with_git_dir` test
-- [x] Removed `find_git_repo_returns_none_at_root` test
+- [x] Changed test input from `r#"{"key": "value", "secret": [DRACON_SECRET:abc}"# to `r#"{"key": "value", "secret": "[DRACON_SECRET:abc]"}"#`
+- [x] Modified the test to unwrap the salvage result with `expect` and assert that the output contains "null" or "__scrubbed__"
