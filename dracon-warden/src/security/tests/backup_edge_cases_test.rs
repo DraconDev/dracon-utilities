@@ -1,77 +1,65 @@
 use dracon_security::DemonSecurity;
 use std::fs;
-use std::io::Write;
+use std::path::PathBuf;
 use tempfile::tempdir;
 
-fn init_security() -> DemonSecurity {
+fn init_with_temp_home() -> (DemonSecurity, tempfile::TempDir) {
     let temp_home = tempdir().unwrap();
     std::env::set_var("HOME", temp_home.path());
-    DemonSecurity::new(None).expect("init security")
+    let mut security = DemonSecurity::new(None).expect("init security");
+    let identity = age::x25519::Identity::generate();
+    security.add_memory_identity(identity);
+    (security, temp_home)
 }
 
 #[test]
-fn test_backup_file_rejects_self() {
-    let security = init_security();
-    let temp_home = std::env::var("HOME").map(PathBuf::from).unwrap_or_default();
-    let backup_path = temp_home.join(".demon").join("backups").join("self.backup");
+fn test_backup_file_recursion_guard_rejects_backups_dir() {
+    let (security, _temp_home) = init_with_temp_home();
+    let temp_home = std::env::var("HOME").map(PathBuf::from).unwrap();
+    let bad_path = temp_home.join(".demon").join("backups").join("self.backup");
 
-    let result = security.backup_file(&backup_path, b"some data");
-    assert!(result.is_err(), "backing up a backup file should be rejected");
+    let result = security.backup_file(&bad_path, b"sensitive data");
+    assert!(result.is_err(), "backing up a file inside demon/backups should be rejected");
 }
 
 #[test]
-fn test_backup_file_rejects_arcane_backup_path() {
-    let security = init_security();
-    let temp_home = std::env::var("HOME").map(PathBuf::from).unwrap_or_default();
-    let backup_path = temp_home.join("arcane").join("backups").join("self.backup");
+fn test_backup_file_recursion_guard_rejects_arcane_backups() {
+    let (security, _temp_home) = init_with_temp_home();
+    let temp_home = std::env::var("HOME").map(PathBuf::from).unwrap();
+    let bad_path = temp_home.join("arcane").join("backups").join("self.bak.age");
 
-    let result = security.backup_file(&backup_path, b"some data");
-    assert!(result.is_err(), "backing up an arcane/backups path should be rejected");
+    let result = security.backup_file(&bad_path, b"sensitive data");
+    assert!(result.is_err(), "backing up a file inside arcane/backups should be rejected");
 }
 
 #[test]
-fn test_newest_file_picks_latest() {
-    use std::path::PathBuf;
-    use std::time::SystemTime;
+fn test_backup_and_restore_roundtrip() {
+    let (security, _temp_home) = init_with_temp_home();
 
-    let temp_dir = tempfile::tempdir().unwrap();
-    let older = temp_dir.path().join("file_old.txt");
-    let newer = temp_dir.path().join("file_new.txt");
+    let temp_home = std::env::var("HOME").map(PathBuf::from).unwrap();
+    let file_path = temp_home.join("secret_file.txt");
+    let content = b"Super Secret Blueprint of the Death Star";
+    fs::write(&file_path, content).expect("write original file");
 
-    fs::write(&older, b"old").unwrap();
-    fs::write(&newer, b"new").unwrap();
+    let backup_path = security.backup_file(&file_path, content).expect("backup");
+    assert!(backup_path.exists(), "backup file should exist");
 
-    std::thread::sleep(std::time::Duration::from_millis(10));
-    let newer_modified = fs::metadata(&newer)
-        .unwrap()
-        .modified()
-        .unwrap();
+    fs::remove_file(&file_path).expect("delete original");
+    assert!(!file_path.exists());
 
-    let older_file = fs::File::create(&older).unwrap();
-    let newer_file = fs::File::create(&newer).unwrap();
+    let restored = security.restore_file(&file_path).expect("restore");
+    assert_eq!(restored, backup_path, "should restore from created backup");
 
-    drop(older_file);
-    drop(newer_file);
-
-    let security = init_security();
-    let files = vec![PathBuf::from(&older), PathBuf::from(&newer)];
-    let result = security.newest_file(&files);
-    assert!(result.is_ok());
+    let restored_content = fs::read(&file_path).expect("read restored");
+    assert_eq!(restored_content.as_slice(), content, "restored should match original");
 }
 
 #[test]
-fn test_newest_file_empty_list_fails() {
-    let security = init_security();
-    let result = security.newest_file(&[]);
-    assert!(result.is_err(), "newest_file on empty list should fail");
-}
+fn test_restore_file_error_when_no_backups() {
+    let (security, _temp_home) = init_with_temp_home();
+    let temp_home = std::env::var("HOME").map(PathBuf::from).unwrap();
+    let file_path = temp_home.join("nonexistent_file.txt");
 
-#[test]
-fn test_newest_file_nonexistent_paths() {
-    let security = init_security();
-    let nonexistent = tempfile::tempdir().unwrap().path().join("nonexistent.txt");
-    let result = security.newest_file(&[nonexistent]);
-    assert!(result.is_err(), "newest_file on nonexistent paths should fail");
+    let result = security.restore_file(&file_path);
+    assert!(result.is_err(), "restore should fail when no backups exist");
 }
-
-use std::path::PathBuf;
