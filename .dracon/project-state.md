@@ -1,7 +1,12 @@
 # Project State
 
 ## Current Focus
-Converts hostname retrieval to a UTF‑8 `String` to ensure downstream filtering works correctly.
+Add comprehensive unit tests for repo_state_flags covering various status scenarios
 
 ## Completed
-- [x] Convert hostname::get() result from `OsString` to a lossily converted `String` before filtering.
+- [x] Add test_repo_state_flags_all_clean
+- [x] Add test_repo_state_flags_dirty- [x] Add test_repo_state_flags_ahead
+- [x] Add test_repo_state_flags_behind
+- [x] Add test_repo_state_flags_no_origin- [x] Add test_repo_state_flags_no_upstream
+- [x] Add test_repo_state_flags_stuck_push_requires_upstream
+- [x] Add test_repo_state_flags_combined
