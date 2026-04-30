@@ -19,7 +19,7 @@ pub(crate) async fn git_diff_head_files(repo: &Path) -> Result<Vec<String>> {
     let repo = repo.to_path_buf();
     let result = tokio::time::timeout(
         Duration::from_secs(30),
-        tokio::task::spawn_blocking(move || -> anyhow::Result<Vec<String>> {
+        tokio::task::spawn_blocking(move || {
             let output = std::process::Command::new("git")
                 .current_dir(&repo)
                 .args(["diff", "HEAD", "--name-only", "-z"])
@@ -36,8 +36,7 @@ pub(crate) async fn git_diff_head_files(repo: &Path) -> Result<Vec<String>> {
         }),
     ).await;
     match result {
-        Ok(Ok(files)) => Ok(files),
-        Ok(Err(e)) => Err(anyhow::anyhow!("git diff HEAD task failed: {}", e)),
+        Ok(inner) => inner,
         Err(_) => Err(anyhow::anyhow!("git diff HEAD timed out")),
     }
 }
