@@ -104,7 +104,7 @@ fn is_inside_secret_tag(content: &str, start_idx: usize) -> bool {
 pub struct RegistryCredential {
     pub registry: String, // e.g. "ghcr.io"
     pub username: String,
-    #[zeroize(skip)]
+    #[serde(skip)]
     pub password: String, // Token or Password
 }
 
@@ -1289,9 +1289,11 @@ impl DemonSecurity {
     fn decrypt_repo_key_with_team_key(&self, path: &Path, team_key: &TeamKey) -> Result<RepoKey> {
         let encrypted_bytes = fs::read(path)?;
 
-        let team_identity_bytes = team_key.0.expose_secret();
-        let team_identity = x25519::Identity::from_str(team_identity_bytes)
-            .map_err(|_| anyhow::anyhow!("Invalid team identity format"))?;
+        let team_identity_bytes = team_key.0;
+        let team_identity_str = String::from_utf8(team_identity_bytes)
+            .map_err(|_| anyhow::anyhow!("Invalid team identity bytes"))?;
+        let team_identity = x25519::Identity::from_str(&team_identity_str)
+            .map_err(|e| anyhow::anyhow!("Invalid team identity format: {}", e))?;
 
         // Fix: Wrap input in Cursor for Decryptor
         let decryptor = age::Decryptor::new(std::io::Cursor::new(&encrypted_bytes))?;

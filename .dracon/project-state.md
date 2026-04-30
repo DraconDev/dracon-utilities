@@ -1,9 +1,8 @@
 # Project State
 
 ## Current Focus
-Refactor team key handling and simplify the `decrypt_repo_key_with_team_key` method
+Harden secret serialization and simplify team key decryption by replacing zeroize skip with serde skip and streamlining x25519 identity parsing with proper UTF-8 handling.
 
 ## Completed
-- [x] Remove Unix-specific permission handling from `DemonSecurity`
-- [x] Refactor team identity derivation to use `expose_secret()` and `FromStr` for clearer error messaging
-- [x] Wrap encrypted input in `Cursor` when initializing `age::Decryptor`
+- [x] RegistryCredential password excluded from serialization via serde(skip) to avoid accidental persistence of secrets.
+- [x] Decryption path now decodes team identity bytes as UTF-8 before x25519 parsing, improving portability and error clarity while adding Cursor wrapping for age decryptor compatibility.
