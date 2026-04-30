@@ -1,10 +1,8 @@
 # Project State
 
 ## Current Focus
-Refactor and enhance unit tests for marker parsing, JSON salvage, and git repository detection using TestDir utilities.
+Updated unit tests for git repository detection by adjusting subdirectory handling.
 
 ## Completed
-- [x] Removed obsolete assertions in `marker_prefix_at` test cases.
-- [x] Updated `salvage_invalid_json_marker_at_end_of_string` test to verify proper handling of JSON containing a marker.
-- [x] Refactored `find_git_repo` tests to use `TestDir` fixtures instead of raw `tempfile`.
-- [x] Updated test setup and assertions to employ the new `TestDir` utilities.
+- [x] Modified `find_git_repo_returns_none_for_non_repo` to test within a created subdirectory.
+- [x] Adjusted `find_git_repo_finds_parent_with_git_dir` to set up repository directly without extra nesting.
