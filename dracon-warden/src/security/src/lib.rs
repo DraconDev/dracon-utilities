@@ -2619,10 +2619,20 @@ impl DemonSecurity {
             // Collect all key files
             let entries = match fs::read_dir(keys_dir) {
                 Ok(e) => e,
-                Err(_) => continue,
+                Err(e) => {
+                    eprintln!("⚠️ failed to read keychain directory {}: {}", keys_dir.display(), e);
+                    continue;
+                }
             };
 
-            for entry in entries.filter_map(|e| e.ok()) {
+            for entry in entries {
+                let entry = match entry {
+                    Ok(e) => e,
+                    Err(e) => {
+                        eprintln!("⚠️ failed to read keychain entry in {}: {}", keys_dir.display(), e);
+                        continue;
+                    }
+                };
                 let path = entry.path();
                 if !path.is_file() {
                     continue;
