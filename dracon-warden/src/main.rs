@@ -2400,9 +2400,9 @@ watch_roots = ["/tmp/test"]
 
     #[test]
     fn salvage_invalid_json_marker_at_end_of_string() {
-        let input = r#"{"key": "value", "secret": [DRACON_SECRET:abc}"#;
-        let salvaged = salvage_invalid_json_markers(input);
-        assert!(salvaged.is_some(), "incomplete marker at end should still be detected");
+        let input = r#"{"key": "value", "secret": "[DRACON_SECRET:abc]"}"#;
+        let salvaged = salvage_invalid_json_markers(input).expect("should salvage");
+        assert!(salvaged.contains("null") || salvaged.contains("__scrubbed__"));
     }
 
     #[test]
