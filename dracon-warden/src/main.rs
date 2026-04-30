@@ -2668,33 +2668,3 @@ watch_roots = ["/tmp/test"]
         }
     }
 }
-        std::env::remove_var("HOSTNAME");
-
-        assert!(result.is_ok(), "keygen should succeed: {:?}", result);
-        let secret_path = keys_dir.join("machine_testhost3.age");
-        let pubkey_path = keys_dir.join("owner_testhost3.pub");
-        assert!(secret_path.exists(), "secret key should be created");
-        assert!(pubkey_path.exists(), "pubkey should be created");
-    }
-
-    #[test]
-    fn run_keygen_rejects_empty_hostname() {
-        let td = TestDir::new("warden_keygen_empty_host");
-        std::env::set_var("HOSTNAME", "");
-        let original_home = std::env::var("HOME").ok();
-        std::env::set_var("HOME", td.path().to_str().unwrap());
-
-        let result = run_keygen();
-
-        if let Some(home) = original_home {
-            std::env::set_var("HOME", home);
-        } else {
-            std::env::remove_var("HOME");
-        }
-        std::env::remove_var("HOSTNAME");
-
-        assert!(result.is_err(), "should reject empty hostname");
-        let err_msg = result.unwrap_err().to_string();
-        assert!(err_msg.contains("hostname"), "error should mention hostname: {}", err_msg);
-    }
-}
