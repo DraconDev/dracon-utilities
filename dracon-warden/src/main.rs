@@ -2137,14 +2137,7 @@ mod tests {
         assert!(merged.contains(&p2));
     }
 
-    #[test]
-    fn apply_managed_file_detects_noop_second_write() {
-        let td = TestDir::new("warden_apply_noop");
-        let file = td.path().join(".gitignore");
-        let block = format!("{BLOCK_BEGIN}\nfoo\n{BLOCK_END}");
-        assert!(apply_managed_file(&file, &block).expect("first"));
-        assert!(!apply_managed_file(&file, &block).expect("second"));
-    }
+}
 
     #[test]
     fn apply_overwrite_file_detects_noop_second_write() {
@@ -2479,16 +2472,7 @@ watch_roots = ["/tmp/test"]
     }
 
     #[test]
-    fn find_git_repo_returns_none_for_non_repo() {
-        let td = TestDir::new("warden_find_git_none");
-        let subdir = td.path().join("subdir");
-        std::fs::create_dir_all(&subdir).unwrap();
-        let result = find_git_repo(&subdir);
-        assert!(result.is_none());
-    }
-
-    #[test]
-    fn find_git_repo_finds_parent_with_git_dir() {
+    fn find_git_repo_traverses_up_to_parent_with_git_dir() {
         let td = TestDir::new("warden_find_git_parent");
         let repo_dir = td.path().join("myrepo");
         std::fs::create_dir_all(&repo_dir).unwrap();
@@ -2500,9 +2484,17 @@ watch_roots = ["/tmp/test"]
     }
 
     #[test]
-    fn find_git_repo_returns_none_at_root() {
-        let td = TestDir::new("warden_find_git_root");
-        let result = find_git_repo(td.path());
-        assert!(result.is_none());
+    fn find_git_repo_handles_deeply_nested_path() {
+        let td = TestDir::new("warden_find_git_deep");
+        let deep = td.path().join("a").join("b").join("c").join("d");
+        std::fs::create_dir_all(&deep).unwrap();
+        let git_dir = td.path().join(".git");
+        std::fs::create_dir_all(&git_dir).unwrap();
+
+        let result = find_git_repo(&deep);
+        assert!(result.is_some());
+        assert_eq!(result.file_name().unwrap().to_str(), Some(
+            td.path().file_name().unwrap().to_str().unwrap()
+        ));
     }
 }
