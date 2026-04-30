@@ -715,8 +715,19 @@ pub struct MarkerMigrationStats {
     pub walk_errors: usize,
 }
 
+#[cfg(test)]
 impl RepoKey {
-    pub fn from_file(path: &Path) -> Result<Self> {
+    pub fn from_secret_bytes(bytes: [u8; 32]) -> Self {
+        RepoKey(bytes)
+    }
+}
+
+#[cfg(test)]
+impl TeamKey {
+    pub fn from_identity_string(s: String) -> Self {
+        TeamKey(s.into_bytes())
+    }
+}
         let bytes = fs::read(path)?;
         if bytes.len() != REPO_KEY_LEN {
             return Err(anyhow::anyhow!("Invalid key length"));
