@@ -175,7 +175,7 @@ GENERATE EXACTLY this markdown structure. Each section header MUST have a blank 
 # Project State
 
 ## Current Focus
-ONE LINE: specific description of what this commit does
+specific description of what this commit does
 
 ## Completed
 - [x] specific change 1

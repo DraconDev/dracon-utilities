@@ -1,7 +1,7 @@
 # Project State
 
 ## Current Focus
-ONE LINE: Serialize modifications to the `HOME` environment variable in tests to prevent race conditions.
+Update the project‑state template to use a proper descriptive placeholder instead of the generic “ONE LINE:” marker.
 
 ## Completed
-- [x] feat(tests): introduced a global `HOME_MUTEX` and acquire its lock in tests that temporarily modify `HOME`, ensuring safe concurrent execution.
+- [x] Replace placeholder “ONE LINE: specific description of what this commit does” with “specific description of what this commit does” in `dracon-sync/src/scribe.rs`
