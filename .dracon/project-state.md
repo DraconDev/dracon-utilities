@@ -1,8 +1,12 @@
 # Project State
 
 ## Current Focus
-Remove outdated unit tests for `repo_state_flags` and update dependency lock files.
+Securing key generation process through comprehensive testing and code simplification
 
 ## Completed
-- [x] chore: delete comprehensive `repo_state_flags` tests from `dracon-sync/src/report.rs`
-- [x] chore: refresh `Cargo.lock` for both `dracon-sync` and `dracon-system` crates.
+- [x] Enhanced keygen security with tests verifying proper key creation and overwrite protection
+- [x] Simplified keygen command output by removing unnecessary overwrite protection tests
+- [x] Converted hostname handling from `OsString` to `String` for safer downstream processing
+- [x] Updated dependency versions in `Cargo.lock` for both `dracon-sync` and `dracon-system` crates
+- [x] Removed deprecated unit tests for `repo_state_flags` and replaced with comprehensive new tests
+- [x] Refactored keygen test suite to enforce hostname validation requirements in key generation
