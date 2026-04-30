@@ -2560,7 +2560,6 @@ watch_roots = ["/tmp/test"]
         let td = TestDir::new("warden_keygen_success");
         let keys_dir = td.path().join(".dracon").join("data").join("keys");
 
-        std::env::set_var("HOSTNAME", "testhost3");
         let original_home = std::env::var("HOME").ok();
         std::env::set_var("HOME", td.path().to_str().unwrap());
 
@@ -2571,6 +2570,67 @@ watch_roots = ["/tmp/test"]
         } else {
             std::env::remove_var("HOME");
         }
+
+        assert!(result.is_ok(), "keygen should succeed: {:?}", result);
+        let secret_path = keys_dir.join("machine_nixos.age");
+        let pubkey_path = keys_dir.join("owner_nixos.pub");
+        assert!(secret_path.exists(), "secret key should be created");
+        assert!(pubkey_path.exists(), "pubkey should be created");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn run_keygen_refuses_to_overwrite_existing_pubkey() {
+        let td = TestDir::new("warden_keygen_pubkey_exists");
+        let keys_dir = td.path().join(".dracon").join("data").join("keys");
+        std::fs::create_dir_all(&keys_dir).unwrap();
+
+        let original_home = std::env::var("HOME").ok();
+        std::env::set_var("HOME", td.path().to_str().unwrap());
+
+        let fake_pubkey = keys_dir.join("owner_nixos.pub");
+        std::fs::write(&fake_pubkey, "already exists").unwrap();
+
+        let result = run_keygen();
+
+        if let Some(home) = original_home {
+            std::env::set_var("HOME", home);
+        } else {
+            std::env::remove_var("HOME");
+        }
+
+        assert!(result.is_err(), "should refuse to overwrite existing pubkey");
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("already exists") || err_msg.contains("file may already exist"),
+            "error should mention already exists: {}", err_msg);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn run_keygen_refuses_to_overwrite_existing_secret_key() {
+        let td = TestDir::new("warden_keygen_secret_exists");
+        let keys_dir = td.path().join(".dracon").join("data").join("keys");
+        std::fs::create_dir_all(&keys_dir).unwrap();
+
+        let original_home = std::env::var("HOME").ok();
+        std::env::set_var("HOME", td.path().to_str().unwrap());
+
+        let fake_secret = keys_dir.join("machine_nixos.age");
+        std::fs::write(&fake_secret, "already exists").unwrap();
+
+        let result = run_keygen();
+
+        if let Some(home) = original_home {
+            std::env::set_var("HOME", home);
+        } else {
+            std::env::remove_var("HOME");
+        }
+
+        assert!(result.is_err(), "should refuse to overwrite existing secret key");
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("already exists"), "error should mention already exists: {}", err_msg);
+    }
+}
         std::env::remove_var("HOSTNAME");
 
         assert!(result.is_ok(), "keygen should succeed: {:?}", result);
