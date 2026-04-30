@@ -1,5 +1,4 @@
 use dracon_security::SecretScanner;
-use proptest::prelude::*;
 
 #[test]
 fn test_massive_dataset_permutations() {

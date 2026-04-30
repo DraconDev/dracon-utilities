@@ -45,7 +45,7 @@ fn test_backup_and_restore() {
         backup_content, content,
         "Backup content should be encrypted"
     );
-    assert!(backup_content.len() > 0);
+    assert!(!backup_content.is_empty());
     // V2 header check - "age-encryption.org/v1"
     assert!(
         backup_content.starts_with(b"age-encryption.org/v1"),
