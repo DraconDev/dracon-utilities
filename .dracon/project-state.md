@@ -1,7 +1,8 @@
 # Project State
 
 ## Current Focus
-Add test utility to isolate HOME environment per test via temporary directory and mutex-guarded setup/teardown.
+This commit adjusts the initialization logic for the security framework by integrating a custom home guard and updating test conditions to ensure correct behavior around backups and file restrictions.
 
 ## Completed
-- [x] Introduce HomeGuard that creates a temp HOME, locks concurrent env changes, and cleans HOME on drop.
+- Added `HomeGuard` to ensure secure file handling during initialization.
+- Replaced the test configuration using hardcoded paths with temporary directories for consistency.
