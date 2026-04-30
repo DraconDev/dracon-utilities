@@ -81,8 +81,13 @@ fn test_nested_quantifier_patterns_do_not_cause_exponential_blowup() {
     let input = "password=".to_string() + &"a".repeat(50);
 
     let now = std::time::Instant::now();
-    let result = scanner.scan_and_replace(&input, |_,_| "[REDACTED]".to_string());
+    let result = scanner.scan_and_replace(&input, |name, found| {
+        eprintln!("DEBUG MATCH: name={}, found_len={}", name, found.len());
+        "[REDACTED]".to_string()
+    });
     let elapsed = now.elapsed();
+
+    eprintln!("DEBUG: input.len() = {}, result.len() = {}", input.len(), result.len());
 
     assert!(
         elapsed < Duration::from_secs(2),
