@@ -14,9 +14,8 @@ use sha2::{Digest, Sha256};
 use std::fs;
 use std::io::{Read, Write};
 use std::os::unix::fs::OpenOptionsExt;
-#[cfg(unix)]
-use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use once_cell::sync::OnceCell;
 
 use zeroize::{Zeroize, ZeroizeOnDrop};
@@ -1290,8 +1289,9 @@ impl DemonSecurity {
     fn decrypt_repo_key_with_team_key(&self, path: &Path, team_key: &TeamKey) -> Result<RepoKey> {
         let encrypted_bytes = fs::read(path)?;
 
-        let team_identity = x25519::Identity::from_slice(&team_key.0)
-            .map_err(|_| anyhow::anyhow!("Invalid team identity bytes"))?;
+        let team_identity_bytes = team_key.0.expose_secret();
+        let team_identity = x25519::Identity::from_str(team_identity_bytes)
+            .map_err(|_| anyhow::anyhow!("Invalid team identity format"))?;
 
         // Fix: Wrap input in Cursor for Decryptor
         let decryptor = age::Decryptor::new(std::io::Cursor::new(&encrypted_bytes))?;
