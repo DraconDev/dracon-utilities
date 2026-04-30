@@ -1,8 +1,10 @@
 # Project State
 
 ## Current Focus
-Re-enable and fix the DemonSecurity singleton caching test by using stable pointer casts instead of address-of references.
+Re-enable test_decrypt_v2_fails_with_wrong_identity by adding proper test isolation via temporary directories
 
 ## Completed
-- [x] Remove `#[ignore]` from `test_demon_security_once_cell_caching` to re-enable validation of singleton identity.
-- [x] Replace `std::ptr::addr_of!(s1/2)` with `s1/2 as *const _ as usize` to obtain stable pointer values for cached instance comparison.
+- [x] Remove `#[ignore]` attribute from test_decrypt_v2_fails_with_wrong_identity test
+- [x] Add temporary directory isolation for both security instances using `tempfile::tempdir()`
+- [x] Configure each security instance with separate mock home directories via `set_mock_home()`
+- [x] Clear master_identities for each instance to ensure independent test state

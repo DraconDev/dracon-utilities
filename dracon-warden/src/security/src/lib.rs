@@ -3036,13 +3036,17 @@ API_KEY=original"#;
     }
 
     #[test]
-    #[ignore = "age decryptor may use internal state that causes cross-instance decryption in tests"]
     fn test_decrypt_v2_fails_with_wrong_identity() {
+        let tempdir = tempfile::tempdir().unwrap();
         let mut security1 = DemonSecurity::new(None).unwrap();
+        security1.set_mock_home(tempdir.path().to_path_buf());
+        security1.master_identities.clear();
         let key1 = x25519::Identity::generate();
         security1.master_identities.push(key1);
 
         let mut security2 = DemonSecurity::new(None).unwrap();
+        security2.set_mock_home(tempdir.path().to_path_buf());
+        security2.master_identities.clear();
         let key2 = x25519::Identity::generate();
         security2.master_identities.push(key2);
 
