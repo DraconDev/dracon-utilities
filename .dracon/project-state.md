@@ -1,9 +1,7 @@
 # Project State
 
 ## Current Focus
-fix(git): improve error handling in `git_diff_head_files` to distinguish timeout errors from task failures
+Simplify error handling in `git_diff_head_files` by flattening nested `Result` and clarifying timeout vs. execution failures.
 
 ## Completed
-- [x] Refactor error handling in git diff HEAD function to explicitly match on result types
-- [x] Add specific error message "git diff HEAD timed out" for timeout scenarios
-- [x] Maintain "git diff HEAD task failed" error message for inner task errors
+- [x] Replace nested `match` with early `if let` returns to cleanly separate successful file lists, git execution errors, and timeout cases.

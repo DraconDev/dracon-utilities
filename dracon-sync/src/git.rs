@@ -35,11 +35,13 @@ pub(crate) async fn git_diff_head_files(repo: &Path) -> Result<Vec<String>> {
             Ok(files)
         }),
     ).await;
-    match result {
-        Ok(Ok(files)) => Ok(files),
-        Ok(Err(e)) => Err(anyhow::anyhow!("git diff HEAD task failed: {}", e)),
-        Err(_) => Err(anyhow::anyhow!("git diff HEAD timed out")),
+    if let Ok(Ok(files)) = result {
+        return Ok(files);
     }
+    if let Ok(Err(e)) = result {
+        return Err(anyhow::anyhow!("git diff HEAD task failed: {}", e));
+    }
+    Err(anyhow::anyhow!("git diff HEAD timed out"))
 }
 
 pub(crate) fn discover_git_repos(
