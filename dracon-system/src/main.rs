@@ -3269,18 +3269,15 @@ async fn main() -> Result<()> {
                     while !shutdown.load(Ordering::SeqCst) {
                         if reload_sighup.load(Ordering::SeqCst) {
                             reload_sighup.store(false, Ordering::SeqCst);
-                            match load_system_policy() {
-                                Ok((_, new_guard)) => {
-                                    *guard = new_guard;
-                                    normalize_guard_policy(&mut guard);
-                                    veprintln!(2, "system: policy reloaded on SIGHUP (disk_warn={}%, disk_critical={}%)",
-                                        guard.disk_warn_percent, guard.disk_critical_percent);
-                                }
-                                Err(e) => {
-                                    eprintln!("system: SIGHUP policy reload failed: {}", e);
-                                    emit_event(&DraconEvent::new("system", EventSeverity::Error, "guard/policy-reload", format!("SIGHUP reload failed: {e}")));
-                                }
+                            let (policy_path, new_policy) = load_system_policy();
+                            if policy_path.is_none() {
+                                eprintln!("system: SIGHUP reload warning: no policy file found, using defaults");
+                                emit_event(&DraconEvent::new("system", EventSeverity::Warn, "guard/policy-reload", "SIGHUP reload: no policy file found, using defaults".to_string()));
                             }
+                            guard = new_policy.guard;
+                            normalize_guard_policy(&mut guard);
+                            veprintln!(2, "system: policy reloaded on SIGHUP (disk_warn={}%, disk_critical={}%)",
+                                guard.disk_warn_percent, guard.disk_critical_percent);
                         }
                         if let Err(e) = run_guard_once(&guard, &mut runtime).await {
                             eprintln!("guard pass failed: {}", e);
