@@ -1289,8 +1289,8 @@ impl DemonSecurity {
     fn decrypt_repo_key_with_team_key(&self, path: &Path, team_key: &TeamKey) -> Result<RepoKey> {
         let encrypted_bytes = fs::read(path)?;
 
-        let team_identity_bytes = team_key.0;
-        let team_identity_str = String::from_utf8(team_identity_bytes)
+        let team_identity_bytes = &team_key.0;
+        let team_identity_str = String::from_utf8(team_identity_bytes.clone())
             .map_err(|_| anyhow::anyhow!("Invalid team identity bytes"))?;
         let team_identity = x25519::Identity::from_str(&team_identity_str)
             .map_err(|e| anyhow::anyhow!("Invalid team identity format: {}", e))?;
