@@ -2974,13 +2974,12 @@ API_KEY=original"#;
     }
 
     #[test]
-    #[ignore = "pre-existing failure: get_or_init returns different addresses"]
     fn test_demon_security_once_cell_caching() {
         let s1 = DemonSecurity::get_or_init().unwrap();
         let s2 = DemonSecurity::get_or_init().unwrap();
         assert_eq!(
-            std::ptr::addr_of!(s1) as usize,
-            std::ptr::addr_of!(s2) as usize,
+            s1 as *const _ as usize,
+            s2 as *const _ as usize,
             "get_or_init should return the same cached instance"
         );
     }

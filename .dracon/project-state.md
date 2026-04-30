@@ -1,8 +1,8 @@
 # Project State
 
 ## Current Focus
-Fixed error handling in policy reloading and improved error resilience during directory traversal
+Re-enable and fix the DemonSecurity singleton caching test by using stable pointer casts instead of address-of references.
 
 ## Completed
-- [x] Restructured SIGHUP policy reload logic in dracon-system to handle missing policy files with explicit warnings
-- [x] Enhanced error handling in dracon-warden's security traversal to continue processing on walk errors instead of stopping iteration
+- [x] Remove `#[ignore]` from `test_demon_security_once_cell_caching` to re-enable validation of singleton identity.
+- [x] Replace `std::ptr::addr_of!(s1/2)` with `s1/2 as *const _ as usize` to obtain stable pointer values for cached instance comparison.
