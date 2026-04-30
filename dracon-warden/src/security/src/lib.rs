@@ -692,11 +692,12 @@ pub struct RepoKey(Vec<u8>);
 pub struct TeamKey(Vec<u8>);
 
 impl TeamKey {
-    pub fn to_public(&self) -> age::x25519::Recipient {
-        use std::str::FromStr;
-        let identity = x25519::Identity::from_str(&String::from_utf8(self.0.clone()).unwrap())
-            .expect("valid identity bytes");
-        identity.to_public()
+    pub fn to_public(&self) -> Result<age::x25519::Recipient> {
+        let key_str = String::from_utf8(self.0.clone())
+            .map_err(|_| anyhow::anyhow!("TeamKey contains invalid UTF-8"))?;
+        let identity = x25519::Identity::from_str(&key_str)
+            .map_err(|_| anyhow::anyhow!("TeamKey is not a valid x25519 identity"))?;
+        Ok(identity.to_public())
     }
     pub fn len(&self) -> usize {
         self.0.len()
