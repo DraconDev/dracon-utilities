@@ -698,6 +698,9 @@ impl TeamKey {
             .expect("valid identity bytes");
         identity.to_public()
     }
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
 }
 
 #[derive(Debug, Default, Clone, Copy)]

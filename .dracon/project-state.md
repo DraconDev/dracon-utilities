@@ -1,9 +1,13 @@
 # Project State
 
 ## Current Focus
-Refactor team key handling to use X25519 identity conversion with direct byte slice operations
+Add TeamKey length accessor, fix nested quantifier detection in pattern integrity tests, update Azure SAS modifier checks, and add owner public key
 
 ## Completed
-- [x] Updated team key conversion to use `x25519::Identity` instead of plain `Identity` type, implementing direct byte slice conversion from the stored byte vector using `String::from_utf8` and `.expect("valid identity bytes")` error handling
-- [x] Enhanced security validation by adding explicit error expectation for identity byte conversion, preventing cryptographic vulnerabilities from invalid byte patterns
-This change improves cryptographic security by properly validating identity byte sequences during conversion operations and aligns with the recent refactoring efforts in team key handling documented in commit `feat(refactor team)`.
+- [x] Add public `len()` method to `TeamKey` to return inner key byte length
+- [x] Add new owner Age public key file at `.demon/data/keys/owner_age1wz5p.pub`
+- [x] Fix `has_nested_quantifier` to return `&'static str` and correct check patterns to use literal nested quantifier strings instead of malformed regex escapes
+- [x] Refactor pattern integrity tests to use string references instead of cloned values to reduce unnecessary allocations
+- [x] Update Azure SAS pattern test to validate `(?sm)` or `(?s)` DOTALL modifiers, rename test to reflect updated validation logic
+- [x] Update team key test to use `TeamKey::len()` instead of directly accessing internal tuple field
+- [x] Remove redundant inline comments from common key prefixes in accidental key paste test
