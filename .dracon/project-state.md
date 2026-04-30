@@ -1,11 +1,11 @@
 # Project State
 
 ## Current Focus
-Refactor security test encryption logic to reduce duplication and fix secret exposure handling for age identities
+Replace `write_all` calls with `write` in encryption test helpers and add `std::io::Write` import.
 
 ## Completed
-- [x] Extract common age encryption logic into encrypt_for_recipient helper function
-- [x] Add secrecy::ExposeSecret import to properly access secret age identity string contents
-- [x] Replace duplicated inline encryption code in team key repository test with helper function calls
-- [x] Fix disk identity write in node encryption test to expose secret string before serializing to bytes
-- [x] Expose team identity secret string when preparing it as plaintext for encryption
+- [x ] Add `use std::io::Write;` import
+- [x ] Replace `writer.write_all(plaintext)` with `writer.write(plaintext)` in `encrypt_for_recipient` test function
+- [x ] Replace `writer.write_all(&repo_key_bytes)` with `writer.write(&repo_key_bytes)` in `setup_repo_with_age_key` test function
+- [x ] Replace `writer.write_all(&repo_key_bytes)` with `writer.write(&repo_key_bytes)` in `test_load_repo_key_machine_key_env_var` test function
+- [x ] Replace `writer.write_all(b"secret")` with `writer.write(b"secret")` in `test_unlock_payload_wrong_key` test function

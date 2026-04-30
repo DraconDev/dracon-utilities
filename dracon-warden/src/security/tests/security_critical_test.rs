@@ -3,6 +3,7 @@ mod common;
 use common::HomeGuard;
 use secrecy::ExposeSecret;
 use std::fs;
+use std::io::Write;
 
 fn init_security() -> (dracon_security::DemonSecurity, HomeGuard) {
     let _guard = HomeGuard::new();
@@ -29,7 +30,7 @@ fn encrypt_for_recipient(recipient: &age::x25519::Recipient, plaintext: &[u8]) -
     let encryptor = age::Encryptor::with_recipients(recipients).expect("encryptor");
     let mut encrypted = vec![];
     let mut writer = encryptor.wrap_output(&mut encrypted).expect("wrap");
-    writer.write_all(plaintext).expect("write");
+    writer.write(plaintext).expect("write");
     writer.finish().expect("finish");
     encrypted
 }
@@ -205,7 +206,7 @@ fn setup_repo_with_age_key(repo_root: &std::path::Path, master_identity: &age::x
     let encryptor = age::Encryptor::with_recipients(recipients).expect("encryptor");
     let mut encrypted = vec![];
     let mut writer = encryptor.wrap_output(&mut encrypted).expect("wrap");
-    writer.write_all(&repo_key_bytes).expect("write repo key");
+    writer.write(&repo_key_bytes).expect("write repo key");
     writer.finish().expect("finish");
 
     fs::write(keys_dir.join("repo.key.age"), encrypted).expect("write repo key");
@@ -263,7 +264,7 @@ fn test_load_repo_key_machine_key_env_var() {
     let encryptor = age::Encryptor::with_recipients(recipients).expect("encryptor");
     let mut encrypted = vec![];
     let mut writer = encryptor.wrap_output(&mut encrypted).expect("wrap");
-    writer.write_all(&repo_key_bytes).expect("write");
+    writer.write(&repo_key_bytes).expect("write");
     writer.finish().expect("finish");
     fs::write(keys_dir.join("machine.runner.age"), encrypted).expect("write machine key");
 
@@ -380,7 +381,7 @@ fn test_unlock_payload_wrong_key() {
     let encryptor = age::Encryptor::with_recipients(wrong_recipients).expect("encryptor");
     let mut encrypted = vec![];
     let mut writer = encryptor.wrap_output(&mut encrypted).expect("wrap");
-    writer.write_all(b"secret").expect("write");
+    writer.write(b"secret").expect("write");
     writer.finish().expect("finish");
 
     let result = security.unlock_payload(&encrypted);
