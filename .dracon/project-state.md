@@ -1,9 +1,8 @@
 # Project State
 
 ## Current Focus
-Implemented atomic public key writing to prevent overwriting existing keys
+Update dependency lock files for dracon-sync and dracon-system crates
 
 ## Completed
-- [x] Added atomic file creation using `OpenOptions::create_new` on Unix and Windows
-- [x] Replaced simple `fs::write` with context‑rich `OpenOptions` write_all logic
-- [x] Maintained cross‑platform support with conditional compilation
+- [x] Updated dracon-sync/Cargo.lock lock file with latest dependency versions
+- [x] Updated dracon-system/Cargo.lock lock file with latest dependency versions
