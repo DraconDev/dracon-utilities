@@ -2386,7 +2386,32 @@ watch_roots = ["/tmp/test"]
         assert_eq!(marker_prefix_at("no bracket here", 0), None);
         assert_eq!(marker_prefix_at("[DRACON_SECRET:abc]", 0), Some("[DRACON_SECRET:"), "starts at position 0");
         assert_eq!(marker_prefix_at("[DRACON_SECRET:abc]", 1), None, "starts at position 1");
-        assert_eq!(marker_prefix_at("prefix [DRACON_SECRET", 8), None, "incomplete bracket");
+        assert_eq!(marker_prefix_at("prefix [DRACON_SECRET", 8), None, "incomplete bracket without colon");
+        assert_eq!(marker_prefix_at("[DRACON_SECRET:abc]", 7), Some("[DRACON_SECRET:"), "starts inside prefix");
+        assert_eq!(marker_prefix_at("[DRACON_SECRET:abc] more", 0), Some("[DRACON_SECRET:"), "marker at start followed by more");
+        assert_eq!(marker_prefix_at("text [DRACON_SECRET:abc] end", 5), Some("[DRACON_SECRET:"), "marker in middle");
+    }
+
+    #[test]
+    fn salvage_invalid_json_no_marker_returns_none() {
+        assert!(salvage_invalid_json_markers("just normal json").is_none());
+        assert!(salvage_invalid_json_markers("").is_none());
+        assert!(salvage_invalid_json_markers("[DRACON_SECRE").is_none(), "incomplete marker should return None");
+    }
+
+    #[test]
+    fn salvage_invalid_json_marker_at_end_of_string() {
+        let input = r#"{"key": "value", "secret": [DRACON_SECRET:abc}"#;
+        let salvaged = salvage_invalid_json_markers(input);
+        assert!(salvaged.is_some(), "incomplete marker at end should still be detected");
+    }
+
+    #[test]
+    fn salvage_invalid_json_markers_multiple_in_sequence() {
+        let input = r#"{"a": [DRACON_SECRET:x], "b": [DRACON_SECRET:y], "c": "normal"}"#;
+        let salvaged = salvage_invalid_json_markers(input).expect("should salvage");
+        assert!(salvaged.contains("null") || salvaged.contains("__scrubbed__"));
+        assert!(salvaged.contains("normal"));
     }
 
     #[test]
