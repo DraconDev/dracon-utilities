@@ -1,8 +1,9 @@
 # Project State
 
 ## Current Focus
-Update dependency lock files for dracon-sync and dracon-system
+Adds three unit tests that verify `sync_repo` correctly creates commits for dirty repositories, returns `false` for clean repositories, and stages and commits untracked files.
 
 ## Completed
-- [x] chore(multi): regenerate dependency lock files for dracon-sync
-- [x] chore(multi): regenerated Cargo.lock for dracon-sync
+- [x] added test `test_sync_repo_auto_commit_creates_commit_for_dirty_repo`
+- [x] added test `test_sync_repo_clean_repo_returns_false`
+- [x] added test `test_sync_repo_stages_and_commits_untracked_file`
