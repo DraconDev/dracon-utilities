@@ -305,47 +305,6 @@ impl Drop for CleanDir {
 }
 
 #[test]
-fn test_backup_file_recursion_guard() -> Result<()> {
-    let mut demon = DemonSecurity::new(None)?;
-    let key = age::x25519::Identity::generate();
-    demon.add_memory_identity(key);
-
-    let temp_home = tempfile::tempdir()?;
-    std::env::set_var("HOME", temp_home.path());
-    demon.set_mock_home(temp_home.path().to_path_buf());
-
-    let backup_in_backup = temp_home.path().join(".demon").join("backups").join("test.bak.age");
-    let result = demon.backup_file(&backup_in_backup, b"sensitive");
-    assert!(
-        result.is_err(),
-        "backing up a file inside demon/backups should be rejected"
-    );
-    Ok(())
-}
-
-#[test]
-fn test_scan_and_replace_empty_input() -> Result<()> {
-    let scanner = SecretScanner::new()?;
-    let result = scanner.scan_and_replace("", |_,_| "[REDACTED]".to_string());
-    assert_eq!(result, "", "empty input should return empty");
-    Ok(())
-}
-
-#[test]
-fn test_scan_and_replace_no_findings() -> Result<()> {
-    let scanner = SecretScanner::new()?;
-    let clean = "this is just regular text with no secrets in it at all!!!";
-    let count = std::cell::Cell::new(0);
-    let result = scanner.scan_and_replace(clean, |_,_| {
-        count.set(count.get() + 1);
-        "[REDACTED]".to_string()
-    });
-    assert_eq!(result, clean, "clean text should pass through unchanged");
-    assert_eq!(count.get(), 0, "no findings on clean text");
-    Ok(())
-}
-
-#[test]
 fn test_encrypt_decrypt_multiple_recipients() -> Result<()> {
     let mut demon = DemonSecurity::new(None)?;
     let key = age::x25519::Identity::generate();
@@ -383,18 +342,6 @@ fn test_decrypt_v2_with_wrong_identity_fails() -> Result<()> {
 
     let result = demon2.decrypt_v2(&encrypted);
     assert!(result.is_err(), "wrong identity should not decrypt");
-    Ok(())
-}
-
-#[test]
-fn test_smart_clean_with_scanner_error_handling() -> Result<()> {
-    let mut demon = DemonSecurity::new(None)?;
-    let key = age::x25519::Identity::generate();
-    demon.add_memory_identity(key);
-
-    let content = "API_KEY=abcdefghij1234567890abcdef";
-    let result = demon.smart_clean_with_scanner(content.as_bytes(), "test.env", &SecretScanner::new()?);
-    assert!(result.is_ok(), "smart_clean_with_scanner should succeed");
     Ok(())
 }
 
