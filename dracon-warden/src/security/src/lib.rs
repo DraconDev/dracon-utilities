@@ -72,7 +72,7 @@ fn strip_env_version_header(content: &str) -> &str {
     content
 }
 
-const REPO_KEY_LEN: usize = 32;
+pub const REPO_KEY_LEN: usize = 32;
 
 fn normalize_secret_marker(raw: &str) -> Option<String> {
     let marker = raw.trim().to_ascii_uppercase();
