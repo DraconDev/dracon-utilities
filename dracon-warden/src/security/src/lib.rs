@@ -720,6 +720,13 @@ impl RepoKey {
     pub fn from_secret_bytes(bytes: [u8; 32]) -> Self {
         RepoKey(bytes)
     }
+    pub fn from_vec(bytes: Vec<u8>) -> Option<Self> {
+        if bytes.len() == 32 {
+            Some(RepoKey(bytes))
+        } else {
+            None
+        }
+    }
 }
 
 #[cfg(test)]
@@ -728,6 +735,10 @@ impl TeamKey {
         TeamKey(s.into_bytes())
     }
 }
+}
+
+impl RepoKey {
+    pub fn from_file(path: &Path) -> Result<Self> {
         let bytes = fs::read(path)?;
         if bytes.len() != REPO_KEY_LEN {
             return Err(anyhow::anyhow!("Invalid key length"));
@@ -737,6 +748,13 @@ impl TeamKey {
 
     pub fn get_key(&self) -> &[u8] {
         &self.0
+    }
+}
+
+#[cfg(test)]
+impl TeamKey {
+    pub fn from_identity_string(s: String) -> Self {
+        TeamKey(s.into_bytes())
     }
 }
 
