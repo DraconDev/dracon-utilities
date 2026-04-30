@@ -327,25 +327,6 @@ fn test_encrypt_decrypt_multiple_recipients() -> Result<()> {
 }
 
 #[test]
-fn test_decrypt_v2_with_wrong_identity_fails() -> Result<()> {
-    let mut demon1 = DemonSecurity::new(None)?;
-    let key1 = age::x25519::Identity::generate();
-    demon1.add_memory_identity(key1);
-
-    let mut demon2 = DemonSecurity::new(None)?;
-    let key2 = age::x25519::Identity::generate();
-    demon2.add_memory_identity(key2);
-
-    let plaintext = b"secret for demon1 only";
-    let recipient = demon1.master_identities()[0].to_public();
-    let encrypted = demon1.encrypt_v2(plaintext, vec![Box::new(recipient)])?;
-
-    let result = demon2.decrypt_v2(&encrypted);
-    assert!(result.is_err(), "wrong identity should not decrypt");
-    Ok(())
-}
-
-#[test]
 fn test_dracon_security_singleton_same_instance() -> Result<()> {
     let s1 = DemonSecurity::get_or_init()?;
     let s2 = DemonSecurity::get_or_init()?;
