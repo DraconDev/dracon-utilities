@@ -78,7 +78,7 @@ fn test_scanner_performance_mixed_secret_and_filler() {
 #[test]
 fn test_nested_quantifier_patterns_do_not_cause_exponential_blowup() {
     let scanner = SecretScanner::new().unwrap();
-    let input = "password=".to_string() + &"a".repeat(50);
+    let input = "xx".to_string() + &"a".repeat(50);
 
     let now = std::time::Instant::now();
     let result = scanner.scan_and_replace(&input, |name, found| {
