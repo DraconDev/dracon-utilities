@@ -1026,7 +1026,20 @@ impl DemonSecurity {
 
         // Save Public Key for sharing
         let pub_path = home.join(".demon").join("identity.pub");
-        fs::write(&pub_path, key.to_public().to_string())?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .mode(0o644)
+                .open(&pub_path)?
+                .write_all(key.to_public().to_string().as_bytes())?;
+        }
+        #[cfg(not(unix))]
+        {
+            fs::write(&pub_path, key.to_public().to_string())?;
+        }
 
         // Auto-Backup Master Identity
         let timestamp = std::time::SystemTime::now()
