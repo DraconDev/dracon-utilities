@@ -2083,12 +2083,17 @@ impl DemonSecurity {
                 Err(e) => {
                     last_err = e.to_string();
                     had_error = true;
-                    secret.to_string()
+                    // MUST NOT return raw secret - encryption failed, so signal error
+                    // to prevent plaintext secret from being committed to git.
+                    // The closure returns a String, but the outer function returns Err
+                    // when had_error is true. Using empty string as sentinel since
+                    // had_error=true will cause the function to return Err regardless.
+                    String::new()
                 }
             }
         });
         if had_error {
-            Err(anyhow::anyhow!("smart_clean: encryption failed for one or more secrets: {}", last_err))
+            Err(anyhow::anyhow!("smart_clean: encryption failed for one or more secrets: {}. NOT committing plaintext.", last_err))
         } else {
             Ok(cleaned)
         }
