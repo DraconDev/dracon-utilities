@@ -2301,10 +2301,10 @@ async fn is_user_service_active(service: &str) -> bool {
 
 
 
-async fn build_status_report() -> StatusReport {
+async fn build_status_report() -> Result<StatusReport> {
     let root = canonical_system_root();
-    let (_, policy) = load_system_policy().unwrap_or_else(|_| (None, SystemPolicy::default()));
-    StatusReport {
+    let (system_policy_path, _) = load_system_policy().unwrap_or_else(|_| (None, SystemPolicy::default()));
+    Ok(StatusReport {
         system_root: root.display().to_string(),
         nixos_root: root.join("nixos").display().to_string(),
         sync_policy: root
@@ -2316,7 +2316,7 @@ async fn build_status_report() -> StatusReport {
             .unwrap_or_else(|| "<default>".to_string()),
         sync_service_active: is_user_service_active("dracon-sync.service").await,
         warden_service_active: is_user_service_active("dracon-warden.service").await,
-    }
+    })
 }
 
 fn normalize_guard_policy(policy: &mut GuardPolicy) {
