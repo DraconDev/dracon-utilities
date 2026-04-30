@@ -1043,10 +1043,16 @@ impl DemonSecurity {
             );
         }
         let backup_path = backup_dir.join(format!("master_{}.age", timestamp));
-        if let Ok(mut b_file) = fs::File::create(&backup_path) {
+        if let Ok(mut b_file) = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o400)
+            .open(&backup_path)
+        {
             if let Err(e) = writeln!(b_file, "{}", key.to_string().expose_secret()) {
                 eprintln!("⚠️ failed to write backup {}: {}", backup_path.display(), e);
             }
+        }
             #[cfg(unix)]
             {
                 let mut b_perms = b_file.metadata()?.permissions();
@@ -1183,7 +1189,7 @@ impl DemonSecurity {
         writer.write_all(&repo_key.0)?;
         writer.finish()?;
 
-        std::fs::write(&output_path, encrypted)?;
+        std::fs::write(&output_path, &encrypted)?;
         Ok(())
     }
 
@@ -1981,11 +1987,19 @@ impl DemonSecurity {
         fs::create_dir_all(&keys_dir)?;
 
         let key_path = keys_dir.join(&filename);
-        if !key_path.exists() {
-            // also check if we are already in there under a different name?
-            // actually, writing it again is cheap and safe.
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            let mut file = fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .mode(0o644)
+                .open(&key_path)?;
+            file.write_all(pub_key_str.as_bytes())?;
+        }
+        #[cfg(not(unix))]
+        {
             fs::write(&key_path, &pub_key_str)?;
-            // eprintln!("🔑 Auto-added public key to repo: {}", filename);
         }
         Ok(())
     }
