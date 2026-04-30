@@ -1,7 +1,8 @@
 # Project State
 
 ## Current Focus
-ONE LINE: Add debug logging to ReDoS stress test to diagnose pattern matching behavior
+ONE LINE: Adjust ReDoS stress test input pattern to better validate nested quantifier handling
 
 ## Completed
-- [x] Add debug output in nested quantifier test to log match name, found length, input length, and result length
+- [x] security(test): change ReDoS test input from "password=" prefix to "xx" to better isolate nested quantifier behavior
+- [x] chore: update Cargo.lock for dracon-sync dependency
