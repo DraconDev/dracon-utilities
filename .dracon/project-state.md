@@ -1,12 +1,8 @@
 # Project State
 
 ## Current Focus
-Add comprehensive unit tests for repo_state_flags covering various status scenarios
+Remove outdated unit tests for `repo_state_flags` and update dependency lock files.
 
 ## Completed
-- [x] Add test_repo_state_flags_all_clean
-- [x] Add test_repo_state_flags_dirty- [x] Add test_repo_state_flags_ahead
-- [x] Add test_repo_state_flags_behind
-- [x] Add test_repo_state_flags_no_origin- [x] Add test_repo_state_flags_no_upstream
-- [x] Add test_repo_state_flags_stuck_push_requires_upstream
-- [x] Add test_repo_state_flags_combined
+- [x] chore: delete comprehensive `repo_state_flags` tests from `dracon-sync/src/report.rs`
+- [x] chore: refresh `Cargo.lock` for both `dracon-sync` and `dracon-system` crates.
