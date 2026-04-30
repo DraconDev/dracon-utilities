@@ -24,6 +24,10 @@ const SYSTEM_PROTECTED: &[&str] = &[
 fn check_safe_to_delete(path: &Path, user_protected: &[String]) -> Result<()> {
     let canon = match path.canonicalize() {
         Ok(p) => p,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            // Path doesn't exist — nothing to delete, nothing to protect
+            return Ok(());
+        }
         Err(e) => anyhow::bail!("cannot canonicalize {}: {} — refusing to delete", path.display(), e),
     };
     let canon_str = canon.display().to_string();
