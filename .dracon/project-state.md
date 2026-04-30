@@ -1,9 +1,10 @@
 # Project State
 
 ## Current Focus
-Hardening failure reporting in git restore/sync and tightening leak-prevention policy for sensitive history/credential files.
+Enhancing error resilience and adding failure metrics across directory traversal, key management, and recursive operations
 
 ## Completed
-- [x] Make restore_paths fail explicitly when both restore and reset fallback fail, replacing a silent warning with a descriptive error.
-- [x] Promote reset-HEAD failures after filter-only commits to fatal errors in sync_repo to prevent proceeding in an ambiguous state.
-- [x] Refine leak-prevention tests to treat sensitive-path text files as readable unless they are high-risk histories or credential files (credentials, .env*, *history, vault.yml).
+- [x] Improved directory traversal error handling in dracon-sync to log failures and continue recursion instead of early returning
+- [x] Added failures vector in dracon-system's main function to track operational errors
+- [x] Enhanced error reporting in dracon-warden's pubkey directory scanning with per-entry error logging
+- [x] Introduced walk_errors counter in security module to track and report recursive operation failures during decryption/marker migration

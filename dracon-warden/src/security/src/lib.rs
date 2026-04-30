@@ -695,6 +695,7 @@ pub struct MarkerMigrationStats {
     pub files_scanned: usize,
     pub files_changed: usize,
     pub markers_changed: usize,
+    pub walk_errors: usize,
 }
 
 impl RepoKey {
@@ -2340,6 +2341,7 @@ impl DemonSecurity {
     /// Recursive disk-wide decryption: Replaces all [*_SECRET:...] tags with plaintext in-place.
     pub fn decrypt_path(&self, root: &Path, recursive: bool, dry_run: bool) -> Result<usize> {
         let mut total_restored = 0;
+        let mut walk_errors = 0;
 
         if !root.exists() {
             return Err(anyhow::anyhow!("Path does not exist: {:?}", root));
@@ -2349,17 +2351,14 @@ impl DemonSecurity {
             return self.decrypt_file(root, dry_run);
         }
 
-        // Use WalkDir for efficient recursion
         let walker = walkdir::WalkDir::new(root)
             .max_depth(if recursive { usize::MAX } else { 1 })
             .into_iter()
             .filter_entry(|e| {
                 let name = e.file_name().to_string_lossy();
-                // Allow the root even if it starts with a dot
                 if e.path() == root {
                     return true;
                 }
-                // Skip common noise and git internals unless explicit
                 !name.starts_with('.') || name == ".env"
             });
 
@@ -2368,6 +2367,7 @@ impl DemonSecurity {
                 Ok(e) => e,
                 Err(e) => {
                     eprintln!("⚠️ walk error during secret restore at {}: {}", root.display(), e);
+                    walk_errors += 1;
                     continue;
                 }
             };
@@ -2376,6 +2376,10 @@ impl DemonSecurity {
                     total_restored += count;
                 }
             }
+        }
+
+        if walk_errors > 0 {
+            return Err(anyhow::anyhow!("decrypt_path completed with {} walk error(s)", walk_errors));
         }
 
         Ok(total_restored)
@@ -2476,6 +2480,7 @@ impl DemonSecurity {
                 Ok(e) => e,
                 Err(e) => {
                     eprintln!("⚠️ walk error during marker scan at {}: {}", root.display(), e);
+                    stats.walk_errors += 1;
                     continue;
                 }
             };
@@ -2484,6 +2489,10 @@ impl DemonSecurity {
                     eprintln!("⚠️ failed to process {}: {}", entry.path().display(), e);
                 }
             }
+        }
+
+        if stats.walk_errors > 0 {
+            return Err(anyhow::anyhow!("migrate_markers_in_path completed with {} walk error(s)", stats.walk_errors));
         }
 
         Ok(stats)

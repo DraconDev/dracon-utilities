@@ -130,6 +130,42 @@ fn discover_git_repos_recursive(
     if depth > max_depth {
         return;
     }
+    let entries = match std::fs::read_dir(dir) {
+        Ok(e) => e,
+        Err(e) => {
+            eprintln!("⚠️ cannot read directory {}: {}", dir.display(), e);
+            return;
+        }
+    };
+    for entry in entries {
+        let entry = match entry {
+            Ok(e) => e,
+            Err(e) => {
+                eprintln!("⚠️ cannot read entry in {}: {}", dir.display(), e);
+                continue;
+            }
+        };
+        let path = entry.path();
+        if !path.is_dir() || path.is_symlink() {
+            continue;
+        }
+        let name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+        if excluded_dir_names.contains(&name)
+            || name == "vendor"
+            || name == "objects"
+        {
+            continue;
+        }
+        if name.starts_with('.') {
+            continue;
+        }
+        let dot_git = path.join(".git");
+        if dot_git.exists() && (dot_git.is_dir() || is_git_worktree_file(&dot_git)) {
+            repos.push(path.clone());
+        }
+        discover_git_repos_recursive(&path, excluded_dir_names, repos, depth + 1, max_depth);
+    }
+}
     if let Ok(entries) = std::fs::read_dir(dir) {
         for entry in entries.filter_map(|e| e.ok()) {
             let path = entry.path();
