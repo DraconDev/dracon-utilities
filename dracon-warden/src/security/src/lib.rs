@@ -691,6 +691,15 @@ pub struct RepoKey(Vec<u8>);
 #[derive(Zeroize, ZeroizeOnDrop)]
 pub struct TeamKey(Vec<u8>);
 
+impl TeamKey {
+    pub fn to_public(&self) -> age::x25519::Recipient {
+        use std::str::FromStr;
+        let identity = Identity::from_str(&String::from_utf8(self.0.clone()).unwrap())
+            .expect("valid identity bytes");
+        identity.to_public()
+    }
+}
+
 #[derive(Debug, Default, Clone, Copy)]
 pub struct MarkerMigrationStats {
     pub files_scanned: usize,
