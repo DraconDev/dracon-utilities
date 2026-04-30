@@ -24,6 +24,3 @@ dracon-security-kit = { package = "dracon-security", path = "src/security" }
 
 [dev-dependencies]
 tempfile = "3"
-
-[dev-dependencies]
-tempfile = "3"

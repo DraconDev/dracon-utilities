@@ -1,8 +1,8 @@
 # Project State
 
 ## Current Focus
-Update dependency lock files for dracon‑sync and dracon‑system crates
+Implemented atomic public key write to prevent overwriting existing public keys
 
 ## Completed
-- [x] Bump dracon‑sync crate version
-- [x] Bump dracon‑system crate version
+- [x] Implemented atomic public key write using OpenOptions::create_new in run_keygen()
+- [x] Trimmed Cargo.toml by removing unused dependency declarations
