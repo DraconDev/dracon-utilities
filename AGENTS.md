@@ -42,6 +42,28 @@ All binaries install to `~/.local/bin/`:
 ./install.sh
 ```
 
+## Design Philosophy: Sync is Invisible Infrastructure
+
+dracon-sync is designed to be **invisible infrastructure** for an AI coder. The AI works on one repo at a time, makes changes, and sync handles the rest — the AI never needs to think about commits, pushes, or cross-repo coordination.
+
+**The AI workflow:**
+1. User says "work on dracon-utilities"
+2. AI reads `dracon-utilities/.dracon/project-state.md`
+3. AI makes changes
+4. Sync daemon auto-commits and pushes
+5. Done
+
+**What sync provides:**
+- Auto-commit on every change (AI doesn't need to think about git)
+- project-state.md as the AI's working memory (context survives sessions)
+- Incident ledger for debugging (AI can read what went wrong)
+- Freezing for pause (AI can pause sync during delicate operations)
+
+**What sync doesn't need:**
+- Global workspace state (AI works on one repo at a time)
+- Session logging (AI doesn't "resume" — each session is fresh)
+- Interactive features (AI runs non-interactively)
+
 ## Services
 
 Services are in `~/.config/systemd/user/`:
