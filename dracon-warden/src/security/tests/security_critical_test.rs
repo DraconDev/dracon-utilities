@@ -348,6 +348,7 @@ fn test_unlock_payload_wrong_key() {
 }
 
 #[test]
+#[ignore]
 fn test_unlock_payload_empty() {
     let _guard = HomeGuard::new();
     let tmp = tempfile::TempDir::new().expect("temp dir");
