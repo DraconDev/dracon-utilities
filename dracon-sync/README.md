@@ -185,9 +185,11 @@ Store API keys in `~/.dracon/utilities/sync/ai/secrets/`:
 - `mistral.env` → `MISTRAL_API_KEY=...`
 - `nvidia.env` → `NVIDIA_API_KEY=...`
 
-## The Scribe
+## The Scribe: AI Working Memory
 
-The daemon maintains `.dracon/project-state.md` in each repo. AI generates commit messages that include the "Current Focus" line.
+The daemon maintains `.dracon/project-state.md` in each repo. This is the AI's **working memory** — the primary interface between sync and the AI coder.
+
+The AI reads this file on session start to understand past work. Sync commits every change so the AI can recover from any point in history.
 
 ```markdown
 # Project State
@@ -195,20 +197,29 @@ The daemon maintains `.dracon/project-state.md` in each repo. AI generates commi
 ## Current Focus
 {one line: what you're working on right now}
 
+## Context
+{why: what problem are you solving? what prompted this change?}
+
 ## Completed
 - [x] {what you finished, with context}
 
 ## In Progress
 - [x] {what you're actively working on}
 
-## Open Issues
-- {blockers, decisions needed, things to investigate}
+## Blockers
+- {what's stopping progress: missing info, user decision needed, dependency}
+
+## Next Steps
+1. {immediate next action}
+2. {what comes after}
 ```
 
 **Rules:**
 - **Current Focus** must be one line — it becomes the commit body
+- **Context** helps the AI recover understanding after time away
+- **Blockers** tell the AI what it can't proceed on
+- **Next Steps** give the AI a clear path forward
 - Be specific: "Fix TOCTOU race in warden keygen" not "fix bugs"
-- Include context: "Binary files bypass encryption — needs user decision on approach"
 - Don't document mechanical changes — only semantic state
 
 ## Version
