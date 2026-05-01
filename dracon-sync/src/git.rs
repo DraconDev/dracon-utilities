@@ -1093,6 +1093,229 @@ pub(crate) async fn restore_paths(repo: &Path, paths: &[String]) -> Result<()> {
     run_git_with_timeout(repo, &checkout_ref, 30, "checkout").await
 }
 
+pub(crate) fn ensure_remote(repo: &Path, name: &str, url: &str) -> Result<()> {
+    let existing = get_remote_url(repo, name);
+    match existing {
+        Some(cur) if cur == url => Ok(()),
+        Some(_) => {
+            std_git_command()
+                .args(["remote", "set-url", name, url])
+                .current_dir(repo)
+                .status()
+                .with_context(|| format!("git remote set-url {} in {}", name, repo.display()))?;
+            Ok(())
+        }
+        None => {
+            std_git_command()
+                .args(["remote", "add", name, url])
+                .current_dir(repo)
+                .status()
+                .with_context(|| format!("git remote add {} in {}", name, repo.display()))?;
+            Ok(())
+        }
+    }
+}
+
+pub(crate) fn get_remote_url(repo: &Path, name: &str) -> Option<String> {
+    let output = std_git_command()
+        .args(["remote", "get-url", name])
+        .current_dir(repo)
+        .output()
+        .ok()?;
+    if output.status.success() {
+        Some(String::from_utf8_lossy(&output.stdout).trim().to_string())
+    } else {
+        None
+    }
+}
+
+pub(crate) fn list_remotes(repo: &Path) -> Vec<String> {
+    let output = std_git_command()
+        .args(["remote"])
+        .current_dir(repo)
+        .output()
+        .ok();
+    match output {
+        Some(o) if o.status.success() => String::from_utf8_lossy(&o.stdout)
+            .lines()
+            .map(String::from)
+            .filter(|s| !s.is_empty())
+            .collect(),
+        _ => Vec::new(),
+    }
+}
+
+pub(crate) fn remove_stale_remotes(repo: &Path, keep: &[&str]) -> Result<()> {
+    let current = list_remotes(repo);
+    let keep_set: std::collections::HashSet<_> = keep.iter().collect();
+    for remote in current {
+        if !keep_set.contains(&remote.as_str()) {
+            std_git_command()
+                .args(["remote", "remove", &remote])
+                .current_dir(repo)
+                .status()
+                .with_context(|| format!("git remote remove {} in {}", remote, repo.display()))?;
+        }
+    }
+    Ok(())
+}
+
+pub(crate) async fn push_to_named_remote(
+    repo: &Path,
+    remote_name: &str,
+    timeout_secs: u64,
+    retries: u32,
+) -> Result<()> {
+    let branch = current_branch(repo).unwrap_or_else(|| "master".to_string());
+    let refspec = format!("HEAD:refs/heads/{}", branch);
+    let ssh_hardening = "ssh -o ConnectTimeout=10 -o ConnectionAttempts=1 -o ServerAliveInterval=5 -o ServerAliveCountMax=2";
+
+    let attempt_ssh = run_git_with_timeout_env(
+        repo,
+        &["push", remote_name, "HEAD"],
+        timeout_secs,
+        &format!("push-to-{}", remote_name),
+        &[("GIT_SSH_COMMAND", ssh_hardening)],
+    ).await;
+
+    if attempt_ssh.is_ok() {
+        return Ok(());
+    }
+
+    let remote_url = get_remote_url(repo, remote_name)?;
+    if let Some(https) = github_https_url(&remote_url) {
+        if is_safe_branch_name(&branch) {
+            let https_push = run_git_with_timeout(
+                repo,
+                &["push", &https, &refspec],
+                timeout_secs,
+                &format!("push-to-{}https", remote_name),
+            ).await;
+            if https_push.is_ok() {
+                return Ok(());
+            }
+        }
+    }
+
+    let mut last_err = None;
+    for attempt in 1..=retries.max(1) {
+        match run_git_with_timeout(repo, &["push", remote_name, "HEAD"], timeout_secs, &format!("push-to-{}", remote_name)).await {
+            Ok(()) => return Ok(()),
+            Err(e) => {
+                last_err = Some(e);
+                if attempt < retries.max(1) {
+                    sleep(Duration::from_secs(attempt as u64)).await;
+                }
+            }
+        }
+    }
+    Err(last_err.unwrap_or_else(|| anyhow::anyhow!("push to {} failed", remote_name)))
+}
+
+pub(crate) async fn push_to_all_remotes(
+    repo: &Path,
+    remotes: &[RemoteConfig],
+    timeout_secs: u64,
+    retries: u32,
+) -> Vec<(String, Result<()>)> {
+    let mut sorted = remotes.to_vec();
+    sorted.sort_by_key(|r| r.priority);
+
+    let mut results = Vec::new();
+    for remote in sorted {
+        let result = push_to_named_remote(repo, &remote.name, timeout_secs, retries).await;
+        results.push((remote.name.clone(), result));
+    }
+    results
+}
+
+pub(crate) fn create_repo_on_github(account: &str, repo_name: &str) -> Result<String> {
+    let output = std::process::Command::new("gh")
+        .args(["repo", "create", repo_name, "--private"])
+        .output()
+        .with_context(|| "gh repo create failed")?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if stderr.contains("Name already exists") || stderr.contains("already exists") {
+            return Ok(format!("git@github.com:{}/{}.git", account, repo_name));
+        }
+        anyhow::bail!("gh repo create failed: {}", stderr.trim());
+    }
+
+    Ok(format!("git@github.com:{}/{}.git", account, repo_name))
+}
+
+pub(crate) fn create_repo_on_gitlab(account: &str, repo_name: &str) -> Result<String> {
+    let output = std::process::Command::new("glab")
+        .args(["repo", "create", repo_name, "--private"])
+        .output()
+        .with_context(|| "glab repo create failed")?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if stderr.contains("already exists") || stderr.contains("Name already exists") {
+            return Ok(format!("git@gitlab.com:{}/{}.git", account, repo_name));
+        }
+        anyhow::bail!("glab repo create failed: {}", stderr.trim());
+    }
+
+    Ok(format!("git@gitlab.com:{}/{}.git", account, repo_name))
+}
+
+pub(crate) fn create_repo_on_codeberg(token: &str, account: &str, repo_name: &str, api_endpoint: &str) -> Result<String> {
+    let client = reqwest::blocking::Client::new();
+    let payload = serde_json::json!({
+        "name": repo_name,
+        "private": true,
+        "default_branch": "master"
+    });
+
+    let response = client
+        .post(api_endpoint)
+        .header("Authorization", format!("Bearer {}", token))
+        .header("Content-Type", "application/json")
+        .json(&payload)
+        .send()
+        .with_context(|| "codeberg repo create request failed")?;
+
+    if response.status() == 409 || response.status() == 422 {
+        return Ok(format!("git@codeberg.org:{}/{}.git", account, repo_name));
+    }
+
+    if !response.status().is_success() {
+        let body = response.text().unwrap_or_default();
+        anyhow::bail!("codeberg repo create failed ({}): {}", response.status(), body);
+    }
+
+    Ok(format!("git@codeberg.org:{}/{}.git", account, repo_name))
+}
+
+pub(crate) fn auto_create_repo(config: &RemoteConfig, repo_name: &str) -> Result<String> {
+    match config.auth_type {
+        AuthType::GitHub => create_repo_on_github(&config.auto_create_account, repo_name),
+        AuthType::GitLab => create_repo_on_gitlab(&config.auto_create_account, repo_name),
+        AuthType::Codeberg => {
+            let token = std::env::var(config.auto_create_token_var.as_deref().unwrap_or("CODEBERG_TOKEN"))
+                .with_context(|| format!("missing env var {}", config.auto_create_token_var.as_deref().unwrap_or("CODEBERG_TOKEN")))?;
+            let endpoint = config.api_endpoint.as_deref().unwrap_or("https://codeberg.org/api/v1/repos");
+            create_repo_on_codeberg(&token, &config.auto_create_account, repo_name, endpoint)
+        }
+        AuthType::Generic => anyhow::bail!("Generic auth cannot auto-create repos"),
+    }
+}
+
+pub(crate) fn auto_create_all_remotes(remotes: &[RemoteConfig], repo_name: &str) -> Vec<(String, Result<String>)> {
+    let mut results = Vec::new();
+    for remote in remotes {
+        if remote.auto_create {
+            let result = auto_create_repo(remote, repo_name);
+            results.push((remote.name.clone(), result));
+        }
+    }
+    results
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
