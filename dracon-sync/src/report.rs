@@ -2577,7 +2577,7 @@ added JWT validation
     }
 
     #[test]
-    fn test_extract_category_scope_from_focus_no_match() {
+    fn test_extract_category_scope_from_focus_no_valid_category_format() {
         let content = r#"# Project State
 
 ## Current Focus
@@ -2590,14 +2590,14 @@ some arbitrary text without clear intent
     }
 
     #[test]
-    fn test_extract_category_scope_from_focus_no_current_focus() {
+    fn test_extract_category_scope_from_focus_no_current_focus_section() {
         let content = r#"# Project State
 
 ## Completed
 - did stuff
 "#;
         let result = extract_category_scope_from_focus(content);
-        assert!(result.is_none());
+        assert!(result.is_none(), "should return None when no Current Focus section");
     }
 
     #[test]
