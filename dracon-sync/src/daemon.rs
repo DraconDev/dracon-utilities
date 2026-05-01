@@ -742,9 +742,6 @@ pub(crate) async fn run_daemon(policy_path: PathBuf, override_interval_secs: Opt
                             }
                         }
                         if !remote_notify_cooldowns.contains_key(&notify_key) {
-                            let repo_name = repo.file_name()
-                                .map(|s| s.to_string_lossy().to_string())
-                                .unwrap_or_else(|| repo.display().to_string());
                             let failed_list: Vec<_> = entry.remote_failures.keys().cloned().collect();
                             let msg = format!("All remotes failing: {}. Failures: {:?}", failed_list.join(", "), entry.remote_failures);
                             crate::report::send_sync_conflict_notification(
