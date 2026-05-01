@@ -738,7 +738,7 @@ auto_github_private_account = "TestAccount"
 "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0).await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None).await;
         assert!(result.is_ok(), "sync_repo should handle missing gh gracefully: {:?}", result);
 
         assert!(
@@ -794,7 +794,7 @@ auto_bump_versions = false
 "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0).await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None).await;
         assert!(result.is_ok(), "sync_repo should succeed: {:?}", result);
 
         // Verify a commit was created
@@ -845,7 +845,7 @@ auto_bump_versions = false
 "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0).await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None).await;
         assert!(result.is_ok(), "sync_repo should succeed even during rebase");
         assert!(!result.unwrap(), "rebase should cause early return (nothing synced)");
     }
@@ -884,7 +884,7 @@ auto_bump_versions = false
 "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0).await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None).await;
         assert!(result.is_ok(), "sync_repo should succeed even during merge");
         assert!(!result.unwrap(), "merge should cause early return (nothing synced)");
     }
@@ -923,7 +923,7 @@ auto_bump_versions = false
 "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0).await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None).await;
         assert!(result.is_ok(), "sync_repo should succeed even during cherry-pick");
         assert!(!result.unwrap(), "cherry-pick should cause early return (nothing synced)");
     }
@@ -962,7 +962,7 @@ auto_bump_versions = false
 "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0).await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None).await;
         assert!(result.is_ok(), "sync_repo should succeed: {:?}", result);
         assert!(result.unwrap(), "dirty repo with auto_commit should sync");
 
@@ -1006,7 +1006,7 @@ auto_bump_versions = false
 "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0).await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None).await;
         assert!(result.is_ok(), "sync_repo should succeed");
         assert!(!result.unwrap(), "clean repo should return false (nothing to sync)");
     }
@@ -1045,7 +1045,7 @@ auto_bump_versions = false
 "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0).await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None).await;
         assert!(result.is_ok(), "sync_repo should succeed: {:?}", result);
         assert!(result.unwrap(), "untracked file should be staged and committed");
 
@@ -1089,7 +1089,7 @@ auto_bump_versions = false
 "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0).await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None).await;
         assert!(result.is_ok(), "sync_repo should succeed");
         assert!(!result.unwrap(), "not behind should return false (nothing to pull)");
     }
@@ -1127,7 +1127,7 @@ auto_bump_versions = false
 "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0).await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None).await;
         assert!(result.is_ok(), "sync_repo should succeed with dirty repo");
         assert!(!result.unwrap(), "dirty repo should skip pull and return false");
     }
@@ -1163,7 +1163,7 @@ auto_bump_versions = false
 "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0).await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None).await;
         assert!(result.is_ok(), "sync_repo should succeed without origin");
     }
 
@@ -1198,7 +1198,7 @@ auto_bump_versions = false
 "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0).await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None).await;
         assert!(result.is_ok(), "sync_repo should succeed without upstream");
     }
 }
