@@ -1181,4 +1181,25 @@ mod tests {
         assert!(parse_name_status_line("",).is_none());
     }
 
+    #[test]
+    fn test_top_level_dir_simple() {
+        assert_eq!(top_level_dir("src/main.rs"), Some("src".to_string()));
+        assert_eq!(top_level_dir("docs/readme.md"), Some("docs".to_string()));
+    }
+
+    #[test]
+    fn test_top_level_dir_single_component() {
+        assert_eq!(top_level_dir("main.rs"), Some("main.rs".to_string()));
+    }
+
+    #[test]
+    fn test_top_level_dir_empty() {
+        assert_eq!(top_level_dir(""), None);
+    }
+
+    #[test]
+    fn test_top_level_dir_path_with_multiple_slashes() {
+        assert_eq!(top_level_dir("src///nested/main.rs"), Some("src".to_string()));
+    }
+
 }
