@@ -2998,6 +2998,71 @@ interval_secs = 30
         assert!(result.is_err(), "nonexistent file should return error");
     }
 
+    #[test]
+    fn disk_state_returns_ok_when_under_warn() {
+        let guard = GuardPolicy {
+            disk_warn_percent: 70,
+            disk_action_percent: 85,
+            disk_critical_percent: 95,
+            ..Default::default()
+        };
+        assert_eq!(disk_state(50, &guard), "ok");
+        assert_eq!(disk_state(69, &guard), "ok");
+    }
+
+    #[test]
+    fn disk_state_returns_warn_when_at_or_above_warn() {
+        let guard = GuardPolicy {
+            disk_warn_percent: 70,
+            disk_action_percent: 85,
+            disk_critical_percent: 95,
+            ..Default::default()
+        };
+        assert_eq!(disk_state(70, &guard), "warn");
+        assert_eq!(disk_state(84, &guard), "warn");
+    }
+
+    #[test]
+    fn disk_state_returns_action_when_at_or_above_action() {
+        let guard = GuardPolicy {
+            disk_warn_percent: 70,
+            disk_action_percent: 85,
+            disk_critical_percent: 95,
+            ..Default::default()
+        };
+        assert_eq!(disk_state(85, &guard), "action");
+        assert_eq!(disk_state(94, &guard), "action");
+    }
+
+    #[test]
+    fn disk_state_returns_critical_when_at_or_above_critical() {
+        let guard = GuardPolicy {
+            disk_warn_percent: 70,
+            disk_action_percent: 85,
+            disk_critical_percent: 95,
+            ..Default::default()
+        };
+        assert_eq!(disk_state(95, &guard), "critical");
+        assert_eq!(disk_state(100, &guard), "critical");
+    }
+
+    #[test]
+    fn human_bytes_formats_large_values() {
+        assert_eq!(human_bytes(1024 * 1024 * 1024), "1.0 GiB");
+        assert_eq!(human_bytes(1024 * 1024 * 1024 * 50), "50.0 GiB");
+    }
+
+    #[test]
+    fn expand_tilde_handles_no_home() {
+        let _lock = env_lock().lock().expect("lock");
+        let old_home = std::env::var("HOME").ok();
+        std::env::remove_var("HOME");
+        let result = expand_tilde("~/something");
+        assert!(result.to_string_lossy().contains("something"));
+        if let Some(h) = old_home {
+            std::env::set_var("HOME", h);
+        }
+    }
 }
 
 #[tokio::main]
