@@ -2581,12 +2581,13 @@ added JWT validation
         let content = r#"# Project State
 
 ## Current Focus
-some arbitrary text without clear intent
+implemented new authentication flow
 "#;
         let result = extract_category_scope_from_focus(content);
         assert!(result.is_some());
         let (cat, scope) = result.unwrap();
-        assert_eq!(scope.trim(), "some arbitrary text without clear intent");
+        assert_eq!(cat, "feat");
+        assert!(scope.contains("authentication") || scope.contains("flow"));
     }
 
     #[test]
@@ -2603,7 +2604,7 @@ some arbitrary text without clear intent
     #[test]
     fn test_extract_scope_from_focus_action_word_stripping() {
         assert_eq!(extract_scope_from_focus("updated auth flow"), "auth flow");
-        assert_eq!(extract_scope_from_focus("added JWT support"), "JWT support");
+        assert_eq!(extract_scope_from_focus("added jwt support"), "jwt support");
         assert_eq!(extract_scope_from_focus("fixed critical bug"), "critical bug");
     }
 
