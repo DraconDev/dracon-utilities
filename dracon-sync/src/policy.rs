@@ -26,6 +26,7 @@ pub(crate) struct RemoteConfig {
     pub(crate) auto_create_token_var: Option<String>,
 }
 
+#[allow(dead_code)]
 impl RemoteConfig {
     pub(crate) fn resolve_push_url(&self, repo_name: &str) -> String {
         let url = self.push_url.replace("{repo}", repo_name);
