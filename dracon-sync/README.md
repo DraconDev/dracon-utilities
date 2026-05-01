@@ -165,7 +165,7 @@ Requirements:
 
 ### AI Providers
 
-dracon-sync uses AI for commit messages and version bumping. Configure in `~/.dracon/ai.toml`:
+dracon-sync uses AI for commit messages and version bumping. Configure in `~/.dracon/utilities/sync/ai.toml`:
 
 ```toml
 [[providers]]
@@ -181,7 +181,7 @@ endpoint = "https://integrate.api.nvidia.com/v1"
 model = "stepfun-ai/step-3.5-flash"
 ```
 
-Store API keys in `~/.dracon/ai/secrets/`:
+Store API keys in `~/.dracon/utilities/sync/ai/secrets/`:
 - `mistral.env` → `MISTRAL_API_KEY=...`
 - `nvidia.env` → `NVIDIA_API_KEY=...`
 
