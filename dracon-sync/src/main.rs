@@ -204,6 +204,12 @@ async fn main() -> Result<()> {
                     backup_policy: policy.backup_policy.clone(),
                     backup_dir: policy.backup_dir.clone(),
                     remotes: policy.remotes.len(),
+                    remote_configs: policy.remotes.iter().map(|r| report::RemoteStatus {
+                        name: r.name.clone(),
+                        auth_type: format!("{:?}", r.auth_type).to_lowercase(),
+                        auto_create: r.auto_create,
+                        priority: r.priority,
+                    }).collect(),
                 };
                 println!("{}", serde_json::to_string_pretty(&payload)?);
             } else {
