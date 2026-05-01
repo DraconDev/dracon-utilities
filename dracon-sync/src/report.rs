@@ -8,7 +8,7 @@ use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use tokio::time::Duration;
 
-fn send_sync_conflict_notification(repo_path: &Path, reason: &str, details: &str) {
+pub(crate) fn send_sync_conflict_notification(repo_path: &Path, reason: &str, details: &str) {
     let repo_name = repo_path
         .file_name()
         .map(|s| s.to_string_lossy().to_string())
