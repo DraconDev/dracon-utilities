@@ -203,7 +203,7 @@ async fn main() -> Result<()> {
                     system_repo: policy.system_repo.clone(),
                     backup_policy: policy.backup_policy.clone(),
                     backup_dir: policy.backup_dir.clone(),
-                    extra_remotes: policy.extra_remotes.len(),
+                    remotes: policy.remotes.len(),
                 };
                 println!("{}", serde_json::to_string_pretty(&payload)?);
             } else {
@@ -260,7 +260,7 @@ async fn main() -> Result<()> {
                         policy.backup_policy, policy.backup_dir
                     );
                 }
-                println!("🌐 EXTRA_REMOTES: {}", policy.extra_remotes.len());
+                println!("🌐 REMOTES: {}", policy.remotes.len());
             }
         }
         Command::Repos {
