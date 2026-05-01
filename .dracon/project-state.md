@@ -1,7 +1,9 @@
 # Project State
-##Current Focus
-The commit refactors the configuration and secrets file locations in `SimpleAiService`, moving them from top‑level `.dracon` directories to the nested `utilities/sync` subdirectory, aligning with the project's XDG‑compliant state directory layout.
+
+## Current Focus
+docs(multi): Refactored AI configuration and secrets file paths to follow XDG-compliant directory structure
 
 ## Completed
-- [x] Updated `config_path` to return `dirs::home_dir().unwrap_or_else(|| PathBuf::from(".")).join(".dracon/utilities/sync/ai.toml")`.
-- [x] Updated `secrets_path` to return `dirs::home_dir().unwrap_or_else(|| PathBuf::from(".")).join(".dracon/utilities/sync/ai/secrets")`.
+- [x] Updated AGENTS.md to reflect new AI configuration path (`~/.dracon/utilities/sync/ai.toml`)
+- [x] Updated AGENTS.md to reflect new secrets path (`~/.dracon/utilities/sync/ai/secrets/*.env`)
+- [x] Synchronized Cargo.lock for dracon-sync to reflect dependency changes

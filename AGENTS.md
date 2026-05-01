@@ -183,7 +183,7 @@ Commands:
 
 ## AI Configuration
 
-dracon-sync uses AI for commit messages (scribe) and version bumping. Configure providers in `~/.dracon/ai.toml`:
+dracon-sync uses AI for commit messages (scribe) and version bumping. Configure providers in `~/.dracon/utilities/sync/ai.toml`:
 
 ```toml
 [[providers]]
@@ -213,7 +213,7 @@ model = "openrouter/free"
 
 ### API Keys
 
-Store keys in `~/.dracon/ai/secrets/*.env`:
+Store keys in `~/.dracon/utilities/sync/ai/secrets/*.env`:
 - `mistral.env` → `MISTRAL_API_KEY=...`
 - `nvidia.env` → `NVIDIA_API_KEY=...`
 - `openrouter.env` → `OPENROUTER_API_KEY=...`
