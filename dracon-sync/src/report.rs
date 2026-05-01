@@ -133,7 +133,7 @@ pub(crate) struct StatusJson {
     pub(crate) system_repo: String,
     pub(crate) backup_policy: String,
     pub(crate) backup_dir: String,
-    pub(crate) extra_remotes: usize,
+    pub(crate) remotes: usize,
 }
 
 #[derive(Debug, Serialize)]
