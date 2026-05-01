@@ -1,11 +1,120 @@
 use anyhow::{Context, Result};
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 use std::path::{Path, PathBuf};
 use std::process::Command as StdCommand;
 use std::sync::OnceLock;
 use tokio::process::Command as TokioCommand;
 
 pub(crate) const DEFAULT_GIT_HOST_BLOB_LIMIT_BYTES: u64 = 100 * 1024 * 1024;
+
+#[derive(Debug, Clone, Deserialize)]
+pub(crate) struct RemoteConfig {
+    pub(crate) name: String,
+    pub(crate) push_url: String,
+    #[serde(default)]
+    pub(crate) auto_create: bool,
+    #[serde(default)]
+    pub(crate) auto_create_account: String,
+    #[serde(default = "default_auth_type")]
+    pub(crate) auth_type: AuthType,
+    #[serde(default = "default_priority")]
+    pub(crate) priority: u32,
+    #[serde(default)]
+    pub(crate) api_endpoint: Option<String>,
+    #[serde(default)]
+    pub(crate) auto_create_token_var: Option<String>,
+}
+
+fn default_auth_type() -> AuthType {
+    AuthType::GitHub
+}
+
+fn default_priority() -> u32 {
+    50
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub(crate) enum AuthType {
+    GitHub,
+    GitLab,
+    Codeberg,
+    Generic,
+}
+
+impl Default for AuthType {
+    fn default() -> Self {
+        AuthType::GitHub
+    }
+}
+
+impl RemoteConfig {
+    pub(crate) fn resolve_push_url(&self, repo_name: &str) -> String {
+        let url = self.push_url.replace("{repo}", repo_name);
+        url.replace("{account}", &self.auto_create_account)
+    }
+}
+
+fn deserialize_remotes_or_extra<'de, D>(deserializer: D) -> Result<Vec<RemoteConfig>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum RemotesOrExtra {
+        New(Vec<RemoteConfig>),
+        Legacy(Vec<String>),
+    }
+
+    let raw = RemotesOrExtra::deserialize(deserializer)?;
+    match raw {
+        RemotesOrExtra::New(configs) => Ok(configs),
+        RemotesOrExtra::Legacy(names) => {
+            let defaults = vec![
+                RemoteConfig {
+                    name: "github".to_string(),
+                    push_url: "git@github.com:{account}/{repo}.git".to_string(),
+                    auto_create: false,
+                    auto_create_account: "DraconDev".to_string(),
+                    auth_type: AuthType::GitHub,
+                    priority: 50,
+                    api_endpoint: None,
+                    auto_create_token_var: None,
+                },
+                RemoteConfig {
+                    name: "gitlab".to_string(),
+                    push_url: "git@gitlab.com:{account}/{repo}.git".to_string(),
+                    auto_create: false,
+                    auto_create_account: "DraconDev".to_string(),
+                    auth_type: AuthType::GitLab,
+                    priority: 50,
+                    api_endpoint: None,
+                    auto_create_token_var: None,
+                },
+                RemoteConfig {
+                    name: "codeberg".to_string(),
+                    push_url: "git@codeberg.org:{account}/{repo}.git".to_string(),
+                    auto_create: false,
+                    auto_create_account: "dracondev".to_string(),
+                    auth_type: AuthType::Codeberg,
+                    priority: 50,
+                    api_endpoint: Some("https://codeberg.org/api/v1/repos".to_string()),
+                    auto_create_token_var: None,
+                },
+            ];
+
+            let filtered: Vec<RemoteConfig> = defaults
+                .into_iter()
+                .filter(|d| names.contains(&d.name))
+                .map(|mut d| {
+                    d.auto_create = true;
+                    d
+                })
+                .collect();
+            Ok(filtered)
+        }
+    }
+}
 
 pub(crate) fn git_binary() -> &'static Path {
     static GIT_BIN: OnceLock<PathBuf> = OnceLock::new();
@@ -85,8 +194,8 @@ pub(crate) struct SyncPolicy {
     pub(crate) auto_rewrite_large_blobs: bool,
     #[serde(default)]
     pub(crate) watch_roots: Vec<String>,
-    #[serde(default)]
-    pub(crate) extra_remotes: Vec<String>,
+    #[serde(default, deserialize_with = "deserialize_remotes_or_extra")]
+    pub(crate) remotes: Vec<RemoteConfig>,
     #[serde(default)]
     pub(crate) auto_github_private: bool,
     #[serde(default = "default_github_account")]
