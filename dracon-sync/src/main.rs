@@ -335,66 +335,158 @@ async fn main() -> Result<()> {
         Command::EditConfig => {
             policy::open_policy_in_editor(&policy_path)?;
         }
-        Command::TestAi => {
+        Command::TestAi { json } => {
             use simple_ai::SimpleAiService;
 
             let service = SimpleAiService::new();
             if service.is_empty() {
-                println!("❌ No AI providers configured");
-                println!("   Add providers to ~/.dracon/utilities/sync/ai.toml");
+                if json {
+                    println!(r#"{{"providers":[],"all_ok":false,"error":"no providers configured"}}"#);
+                } else {
+                    println!("❌ No AI providers configured");
+                    println!("   Add providers to ~/.dracon/utilities/sync/ai.toml");
+                }
                 return Ok(());
             }
 
             SimpleAiService::reset_health().await;
 
             let providers = service.provider_names();
-            println!("🧪 Testing {} AI provider(s)...\n", providers.len());
 
+            #[derive(serde::Serialize)]
+            struct ProviderResult {
+                name: String,
+                status: String,
+                latency_ms: Option<u64>,
+                error: Option<String>,
+            }
+
+            let mut results: Vec<ProviderResult> = Vec::new();
             let mut all_ok = true;
             let mut working_provider = None;
 
             for name in &providers {
-                print!("   Testing {}... ", name);
+                if json {
+                    print!("Testing {}... ", name);
+                } else {
+                    print!("   Testing {}... ", name);
+                }
                 match service.test_provider(name).await {
                     Ok((true, resp)) => {
                         if resp.trim().to_uppercase().contains("OK") {
-                            println!("✅");
+                            if json {
+                                println!("ok");
+                            } else {
+                                println!("✅");
+                            }
                             working_provider = Some(name.clone());
+                            results.push(ProviderResult {
+                                name: name.clone(),
+                                status: "ok".to_string(),
+                                latency_ms: None,
+                                error: None,
+                            });
                         } else {
-                            println!("⚠️  (unexpected response: {}...)", resp.chars().take(20).collect::<String>());
+                            if json {
+                                println!("warn");
+                            } else {
+                                println!("⚠️  (unexpected response: {}...)", resp.chars().take(20).collect::<String>());
+                            }
                             working_provider = Some(name.clone());
+                            results.push(ProviderResult {
+                                name: name.clone(),
+                                status: "warn".to_string(),
+                                latency_ms: None,
+                                error: Some(resp.chars().take(50).collect()),
+                            });
                         }
                     }
                     Ok((false, err)) => {
                         let err_lower = err.to_lowercase();
                         if err_lower.contains("429") || err_lower.contains("rate limit") {
-                            println!("⏳ rate limited");
+                            if json {
+                                println!("rate_limited");
+                            } else {
+                                println!("⏳ rate limited");
+                            }
+                            all_ok = false;
+                            results.push(ProviderResult {
+                                name: name.clone(),
+                                status: "rate_limited".to_string(),
+                                latency_ms: None,
+                                error: Some(err.to_string()),
+                            });
                         } else if err_lower.contains("401") || err_lower.contains("unauthorized") || err_lower.contains("api key") {
-                            println!("🔑 auth error (check API key)");
+                            if json {
+                                println!("auth_error");
+                            } else {
+                                println!("🔑 auth error (check API key)");
+                            }
                             all_ok = false;
+                            results.push(ProviderResult {
+                                name: name.clone(),
+                                status: "auth_error".to_string(),
+                                latency_ms: None,
+                                error: Some(err.to_string()),
+                            });
                         } else {
-                            println!("❌ {}", err.chars().take(40).collect::<String>());
+                            if json {
+                                println!("error");
+                            } else {
+                                println!("❌ {}", err.chars().take(40).collect::<String>());
+                            }
                             all_ok = false;
+                            results.push(ProviderResult {
+                                name: name.clone(),
+                                status: "error".to_string(),
+                                latency_ms: None,
+                                error: Some(err.to_string()),
+                            });
                         }
                     }
                     Err(e) => {
-                        println!("❌ {}", e.to_string().chars().take(40).collect::<String>());
+                        if json {
+                            println!("error");
+                        } else {
+                            println!("❌ {}", e.to_string().chars().take(40).collect::<String>());
+                        }
                         all_ok = false;
+                        results.push(ProviderResult {
+                            name: name.clone(),
+                            status: "error".to_string(),
+                            latency_ms: None,
+                            error: Some(e.to_string()),
+                        });
                     }
                 }
             }
 
-            println!();
-            if all_ok {
-                println!("✅ All AI providers ready");
-            } else if working_provider.is_some() {
-                println!("⚠️  Some providers failed but fallback available");
+            if json {
+                #[derive(serde::Serialize)]
+                struct JsonOutput<'a> {
+                    providers: Vec<ProviderResult>,
+                    all_ok: bool,
+                    working_provider: Option<&'a String>,
+                }
+                let output = JsonOutput {
+                    providers: results,
+                    all_ok,
+                    working_provider,
+                };
+                println!("{}", serde_json::to_string_pretty(&output).unwrap());
             } else {
-                println!("❌ All AI providers failed");
-            }
+                println!();
+                if all_ok {
+                    println!("✅ All AI providers ready");
+                } else if working_provider.is_some() {
+                    println!("⚠️  Some providers failed but fallback available");
+                } else {
+                    println!("❌ All AI providers failed");
+                }
 
-            if let Some(ref wp) = working_provider {
-                println!("   Using: {} (fallback order: {:?})", wp, providers);
+                if let Some(ref wp) = working_provider {
+                    println!("   Using: {} (fallback order: {:?})", wp, providers);
+                }
             }
         }
         Command::Stuck { cmd } => match cmd {
