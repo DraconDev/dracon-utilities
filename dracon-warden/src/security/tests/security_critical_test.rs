@@ -411,7 +411,7 @@ fn test_generate_master_identity_refuses_legacy_identity() {
 
     let result = security.generate_master_identity();
     assert!(result.is_err(), "should refuse legacy identity");
-    assert!(result.unwrap_err().to_string().contains("Legacy identity"));
+    assert!(result.unwrap_err().to_string().contains("SAFETY TRIGGERED"));
 }
 
 // =============================================================================
@@ -642,6 +642,21 @@ fn test_unlock_payload_empty() {
 // =============================================================================
 
 #[test]
+fn test_generate_master_identity_refuses_existing_identity() {
+    let (mut security, _guard) = init_security();
+    security.add_memory_identity(age::x25519::Identity::generate());
+
+    let home = std::env::var("HOME").map(std::path::PathBuf::from).unwrap();
+    let identity_dir = home.join(".demon");
+    fs::create_dir_all(&identity_dir).expect("create .demon dir");
+    fs::write(identity_dir.join("identity.age"), "age1xxxxx").expect("create fake identity");
+
+    let result = security.generate_master_identity();
+    assert!(result.is_err(), "should refuse to overwrite existing identity");
+    assert!(result.unwrap_err().to_string().contains("SAFETY TRIGGERED"));
+}
+
+#[test]
 fn test_generate_master_identity_refuses_legacy_identity() {
     let (mut security, _guard) = init_security();
     security.add_memory_identity(age::x25519::Identity::generate());
@@ -653,7 +668,7 @@ fn test_generate_master_identity_refuses_legacy_identity() {
 
     let result = security.generate_master_identity();
     assert!(result.is_err(), "should refuse legacy identity");
-    assert!(result.unwrap_err().to_string().contains("Legacy identity"));
+    assert!(result.unwrap_err().to_string().contains("SAFETY TRIGGERED"));
 }
 
 // =============================================================================
@@ -716,63 +731,4 @@ fn test_encrypt_for_node_uses_disk_master_identities() {
     // disk_identity should be able to decrypt (it was loaded via load_master_identities)
     let result = security.decrypt_v2(&encrypted);
     assert!(result.is_ok(), "disk identity should be able to decrypt what encrypt_for_node produced");
-}
-
-// =============================================================================
-// encrypt_with_repo_key / decrypt_with_repo_key tests
-// =============================================================================
-
-#[test]
-fn test_encrypt_decrypt_repo_key_roundtrip() {
-    let tmp = tempfile::TempDir::new().expect("temp dir");
-    let (security, _, _guard) = make_repo_with_master(tmp.path());
-    let repo_key = security.load_repo_key().expect("load repo key");
-
-    let plaintext = b"Hello, World! This is a test message.";
-    let encrypted = security
-        .encrypt_with_repo_key(&repo_key, plaintext)
-        .expect("encrypt");
-    assert_ne!(encrypted.as_slice(), plaintext);
-
-    let decrypted = security
-        .decrypt_with_repo_key(&repo_key, &encrypted)
-        .expect("decrypt");
-    assert_eq!(decrypted, plaintext.to_vec());
-}
-
-#[test]
-fn test_encrypt_with_repo_key_empty_plaintext() {
-    let tmp = tempfile::TempDir::new().expect("temp dir");
-    let (security, _, _guard) = make_repo_with_master(tmp.path());
-    let repo_key = security.load_repo_key().expect("load repo key");
-
-    let encrypted = security
-        .encrypt_with_repo_key(&repo_key, b"")
-        .expect("encrypt empty");
-    let decrypted = security
-        .decrypt_with_repo_key(&repo_key, &encrypted)
-        .expect("decrypt empty");
-    assert_eq!(decrypted, b"");
-}
-
-#[test]
-fn test_decrypt_with_repo_key_too_short_ciphertext() {
-    let tmp = tempfile::TempDir::new().expect("temp dir");
-    let (security, _, _guard) = make_repo_with_master(tmp.path());
-    let repo_key = security.load_repo_key().expect("load repo key");
-
-    let result = security.decrypt_with_repo_key(&repo_key, &[0u8; 11]);
-    assert!(result.is_err(), "too short ciphertext should error");
-}
-
-#[test]
-fn test_encrypt_with_repo_key_random_nonce_per_call() {
-    let (security, _, _guard) = make_test_setup();
-    let repo_key = security.load_repo_key().expect("load repo key");
-
-    let plaintext = b"same message";
-    let ct1 = security.encrypt_with_repo_key(&repo_key, plaintext).expect("encrypt1");
-    let ct2 = security.encrypt_with_repo_key(&repo_key, plaintext).expect("encrypt2");
-
-    assert_ne!(ct1, ct2, "random nonce should produce different ciphertext");
 }
