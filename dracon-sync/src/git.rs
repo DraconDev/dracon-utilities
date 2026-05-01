@@ -1180,7 +1180,6 @@ mod tests {
         assert!(parse_name_status_line("X\tfile.rs").is_none());
         assert!(parse_name_status_line("",).is_none());
     }
-}
 
     #[test]
     fn test_github_https_url_ssh_protocol() {
