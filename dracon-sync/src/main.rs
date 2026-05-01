@@ -109,7 +109,11 @@ enum Command {
     /// Open sync policy in the system editor.
     EditConfig,
     /// Test AI providers connectivity.
-    TestAi,
+    TestAi {
+        /// Emit machine-readable JSON.
+        #[arg(long)]
+        json: bool,
+    },
     /// Manage repos permanently stuck on push.
     Stuck {
         #[command(subcommand)]
