@@ -2127,7 +2127,7 @@ mod tests {
             auto_repair_warns: true,
             auto_rewrite_large_blobs: true,
             watch_roots: vec![],
-            extra_remotes: vec![],
+            remotes: vec![],
             auto_github_private: false,
             auto_github_private_account: "DraconDev".to_string(),
             max_stage_file_bytes: 100 * 1024 * 1024,
