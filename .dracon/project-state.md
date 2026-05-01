@@ -1,10 +1,19 @@
 # Project State
 
 ## Current Focus
-Added documentation for dracon-sync's design philosophy and workflow, clarifying its role as invisible infrastructure for AI coders.
+Enhance project-state.md documentation to better support AI working memory and context
 
 ## Completed
-- [x] Defined dracon-sync as "invisible infrastructure" for AI coders
-- [x] Documented core principles: automatic sync, project-state.md as primary interface, frequent commits as feature
-- [x] Specified what sync handles: auto-commit, auto-push, freeze toggle, incident ledger
-- [x] Clarified what sync doesn't need: global dashboards, session logging, interactive prompts
+- [x] Added detailed format specification for project-state.md
+- [x] Documented the AI's role as working memory
+- [x] Explained why frequent commits are valuable for AI context
+- [x] Standardized the structure for Current Focus, Context, Blockers, and Next Steps
+- [x] Updated example project-state.md with complete format
+
+## Blockers
+- None
+
+## Next Steps
+1. Implement automated generation of project-state.md
+2. Integrate with commit message generation
+```
