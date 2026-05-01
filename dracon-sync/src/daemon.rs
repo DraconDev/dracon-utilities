@@ -725,6 +725,38 @@ pub(crate) async fn run_daemon(policy_path: PathBuf, override_interval_secs: Opt
                 activity.remove(&repo);
             } else {
                 entry.failure_count += 1;
+
+                // Check if ALL configured remotes are failing — desktop notification
+                if !entry.remote_failures.is_empty() {
+                    let all_failed = policy.remotes.iter()
+                        .all(|r| entry.remote_failures.get(&r.name).copied().unwrap_or(0) > 0);
+                    if all_failed {
+                        let notify_key = format!("{}-all", repo.display());
+                        let now = Instant::now();
+                        if let Some(cooldown_until) = remote_notify_cooldowns.get(&notify_key) {
+                            if now < *cooldown_until {
+                                // still in cooldown, skip notification
+                            } else {
+                                remote_notify_cooldowns.remove(&notify_key);
+                            }
+                        }
+                        if !remote_notify_cooldowns.contains_key(&notify_key) {
+                            let repo_name = repo.file_name()
+                                .map(|s| s.to_string_lossy().to_string())
+                                .unwrap_or_else(|| repo.display().to_string());
+                            let failed_list: Vec<_> = entry.remote_failures.keys().cloned().collect();
+                            let msg = format!("All remotes failing: {}. Failures: {:?}", failed_list.join(", "), entry.remote_failures);
+                            crate::report::send_sync_conflict_notification(
+                                &repo,
+                                "All Remotes Failing",
+                                &msg,
+                            );
+                            // 30 minute cooldown per repo
+                            remote_notify_cooldowns.insert(notify_key, now + Duration::from_secs(1800));
+                        }
+                    }
+                }
+
                 // If repo has divergence (ahead AND behind), push will always fail
                 // regardless of dirty state - mark as stuck immediately.
                 // This prevents the repo from blocking other syncs.
