@@ -1003,7 +1003,7 @@ fn run_setup(refresh: bool) -> Result<()> {
     if all_keys.is_empty() {
         println!();
         println!("No API keys found. Add one:");
-        println!("  echo 'OPENROUTER_API_KEY=sk-or-...' > ~/.dracon/ai/secrets/openrouter.env");
+        println!("  echo 'OPENROUTER_API_KEY=sk-or-...' > ~/.dracon/utilities/sync/ai/secrets/openrouter.env");
         println!("  dracon-ai setup --refresh");
         return Ok(());
     }
