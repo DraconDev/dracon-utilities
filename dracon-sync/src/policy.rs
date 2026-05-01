@@ -42,19 +42,14 @@ fn default_priority() -> u32 {
     50
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub(crate) enum AuthType {
+    #[default]
     GitHub,
     GitLab,
     Codeberg,
     Generic,
-}
-
-impl Default for AuthType {
-    fn default() -> Self {
-        AuthType::GitHub
-    }
 }
 
 fn deserialize_remotes_or_extra<'de, D>(deserializer: D) -> Result<Vec<RemoteConfig>, D::Error>
