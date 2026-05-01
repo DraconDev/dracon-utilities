@@ -2535,4 +2535,88 @@ mod tests {
         let signals = detect_report_signals(std::path::Path::new("/fake"), &files);
         assert!(signals.contains(&ReportSignal::IndexChanged));
     }
+
+    #[test]
+    fn test_extract_category_scope_from_focus_with_parens_format() {
+        let content = r#"# Project State
+
+## Current Focus
+docs(security): updated session cleanup
+"#;
+        let result = extract_category_scope_from_focus(content);
+        assert!(result.is_some());
+        let (cat, scope) = result.unwrap();
+        assert_eq!(cat, "security");
+        assert!(scope.contains("session") || scope.contains("cleanup"));
+    }
+
+    #[test]
+    fn test_extract_category_scope_from_focus_fix_derivation() {
+        let content = r#"# Project State
+
+## Current Focus
+fixed auth bug
+"#;
+        let result = extract_category_scope_from_focus(content);
+        assert!(result.is_some());
+        let (cat, _scope) = result.unwrap();
+        assert_eq!(cat, "fix");
+    }
+
+    #[test]
+    fn test_extract_category_scope_from_focus_add_derivation() {
+        let content = r#"# Project State
+
+## Current Focus
+added JWT validation
+"#;
+        let result = extract_category_scope_from_focus(content);
+        assert!(result.is_some());
+        let (cat, _scope) = result.unwrap();
+        assert_eq!(cat, "feat");
+    }
+
+    #[test]
+    fn test_extract_category_scope_from_focus_no_match() {
+        let content = r#"# Project State
+
+## Current Focus
+some arbitrary text without clear intent
+"#;
+        let result = extract_category_scope_from_focus(content);
+        assert!(result.is_some());
+        let (cat, scope) = result.unwrap();
+        assert_eq!(scope.trim(), "some arbitrary text without clear intent");
+    }
+
+    #[test]
+    fn test_extract_category_scope_from_focus_no_current_focus() {
+        let content = r#"# Project State
+
+## Completed
+- did stuff
+"#;
+        let result = extract_category_scope_from_focus(content);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_extract_scope_from_focus_action_word_stripping() {
+        assert_eq!(extract_scope_from_focus("updated auth flow"), "auth flow");
+        assert_eq!(extract_scope_from_focus("added JWT support"), "JWT support");
+        assert_eq!(extract_scope_from_focus("fixed critical bug"), "critical bug");
+    }
+
+    #[test]
+    fn test_extract_scope_from_focus_takes_two_words() {
+        let scope = extract_scope_from_focus("implemented new user authentication system");
+        let words: Vec<_> = scope.split_whitespace().collect();
+        assert!(words.len() <= 3, "scope should be 1-2 meaningful words, got: {}", scope);
+    }
+
+    #[test]
+    fn test_extract_scope_from_focus_handles_punctuation() {
+        let scope = extract_scope_from_focus("cleaned up, refactored.");
+        assert!(!scope.ends_with(',') && !scope.ends_with('.'));
+    }
 }
