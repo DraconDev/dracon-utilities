@@ -2620,4 +2620,69 @@ watch_roots = ["/tmp/test"]
         assert!(err_msg.contains("already exists") || err_msg.contains("file may already exist"),
             "error should mention already exists: {}", err_msg);
     }
+
+    #[test]
+    fn warden_policy_validate_accepts_valid_policy() {
+        let policy = WardenPolicy {
+            protected_patterns: vec!["*.env".into(), "secrets/**".into()],
+            plaintext_patterns: vec!["*.pub".into()],
+            hygiene_patterns: vec![],
+            watch_roots: vec![],
+            discover_roots: vec![],
+        };
+        assert!(policy.validate().is_ok());
+    }
+
+    #[test]
+    fn warden_policy_validate_rejects_overlapping_patterns() {
+        let policy = WardenPolicy {
+            protected_patterns: vec!["config/envs/*.env".into()],
+            plaintext_patterns: vec!["config/envs/*.env".into()],
+            hygiene_patterns: vec![],
+            watch_roots: vec![],
+            discover_roots: vec![],
+        };
+        let result = policy.validate();
+        assert!(result.is_err(), "should reject overlapping patterns");
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("cannot be both protected and plaintext"));
+    }
+
+    #[test]
+    fn warden_policy_validate_rejects_non_allowlisted_plaintext() {
+        let policy = WardenPolicy {
+            protected_patterns: vec![],
+            plaintext_patterns: vec!["mysecret.txt".into()],
+            hygiene_patterns: vec![],
+            watch_roots: vec![],
+            discover_roots: vec![],
+        };
+        let result = policy.validate();
+        assert!(result.is_err(), "should reject non-allowlisted plaintext pattern");
+    }
+
+    #[test]
+    fn warden_policy_validate_accepts_allowlisted_plaintext() {
+        let policy = WardenPolicy {
+            protected_patterns: vec![],
+            plaintext_patterns: vec!["Cargo.lock".into(), "*.pub".into()],
+            hygiene_patterns: vec![],
+            watch_roots: vec![],
+            discover_roots: vec![],
+        };
+        assert!(policy.validate().is_ok());
+    }
+
+    #[test]
+    fn warden_policy_validate_rejects_secretish_plaintext() {
+        let policy = WardenPolicy {
+            protected_patterns: vec![],
+            plaintext_patterns: vec!["passwords.txt".into()],
+            hygiene_patterns: vec![],
+            watch_roots: vec![],
+            discover_roots: vec![],
+        };
+        let result = policy.validate();
+        assert!(result.is_err(), "should reject plaintext pattern with 'password'");
+    }
 }
