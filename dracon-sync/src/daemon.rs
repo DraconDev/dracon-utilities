@@ -144,7 +144,7 @@ mod daemon_tests {
     #[test]
     fn test_stuck_repos_path_format() {
         let path = stuck_repos_path();
-        assert!(path.to_string_lossy().contains(".dracon"));
+        assert!(path.to_string_lossy().contains(".local"));
         assert!(path.to_string_lossy().contains("dracon-sync-stuck-push-repos.json"));
     }
 
