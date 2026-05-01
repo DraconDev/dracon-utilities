@@ -1,7 +1,9 @@
 # Project State
 
 ## Current Focus
-Adjust the daemon’s shared state path to conform with XDG base directories by moving from the legacy “.dracon” folder to “$HOME/.local/state/dracon”.
+Refactor `consolidate_to_master` function to async with retry logic for git push operations.
 
 ## Completed
-- [x] Update `stuck_repos_path` base directory to `$HOME/.local/state/dracon` for XDG compliance.
+- [x] Refactor `consolidate_to_master` function to async and replace direct git push with `push_with_retries` helper
+- [x] Update callers in `daemon.rs` and `main.rs` to await the async `consolidate_to_master` function
+- [x] Synchronize `Cargo.lock` for dracon-sync

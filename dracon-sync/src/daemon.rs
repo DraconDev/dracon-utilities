@@ -451,7 +451,7 @@ pub(crate) async fn run_daemon(policy_path: PathBuf, override_interval_secs: Opt
             // Main-only → rename to master so everything is consistent.
             if has_both_main_and_master(&repo) {
                 eprintln!("🔧 {} has both main+master, consolidating to master", repo.display());
-                if let Err(e) = crate::git::consolidate_to_master(&repo) {
+                if let Err(e) = crate::git::consolidate_to_master(&repo).await {
                     eprintln!("⚠️ failed to consolidate {} to master: {}", repo.display(), e);
                     continue;
                 }
