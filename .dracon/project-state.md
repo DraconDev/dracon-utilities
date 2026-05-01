@@ -1,6 +1,7 @@
 # Project State
-This commit updates the `Cargo.lock` file in the dracon-system project. The file size has increased slightly, indicating minor revisions to dependencies or lockfile entries. No new files were added or deleted; only a minor adjustment to file patterns was made.
+
+## Current Focus
+One line: removed `#[ignore]` attribute from `test_unlock_payload_empty` to enable the test execution.
 
 ## Completed
-- Analyzed change: Added a backup of the existing Cargo.lock file for versioning consistency.
-- Documented: The update ensures that dependency locking behavior remains predictable during development and CI processes.
+- [x] Removed `#[ignore]` attribute from `test_unlock_payload_empty` to enable its execution.
