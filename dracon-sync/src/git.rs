@@ -1314,6 +1314,17 @@ pub(crate) fn auto_create_repo(config: &RemoteConfig, repo_name: &str) -> Result
         }
         AuthType::Generic => anyhow::bail!("Generic auth cannot auto-create repos"),
     }
+
+    pub(crate) fn auto_create_all_remotes(remotes: &[RemoteConfig], repo_name: &str) -> Vec<(String, Result<String>)> {
+        let mut results = Vec::new();
+        for remote in remotes {
+            if remote.auto_create {
+                let result = auto_create_repo(remote, repo_name);
+                results.push((remote.name.clone(), result));
+            }
+        }
+        results
+    }
 }
 
 #[allow(dead_code)]
