@@ -1182,7 +1182,8 @@ pub(crate) async fn push_to_named_remote(
         return Ok(());
     }
 
-    let remote_url = get_remote_url(repo, remote_name)?;
+    let remote_url = get_remote_url(repo, remote_name)
+        .ok_or_else(|| anyhow::anyhow!("remote {} not found", remote_name))?;
     if let Some(https) = github_https_url(&remote_url) {
         if is_safe_branch_name(&branch) {
             let https_push = run_git_with_timeout(
