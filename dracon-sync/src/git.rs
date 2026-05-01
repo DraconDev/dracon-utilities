@@ -56,7 +56,7 @@ pub(crate) fn discover_git_repos(
         exclude_repos.iter().map(PathBuf::from).collect();
     let mut repos = Vec::new();
     for root in roots {
-        discover_git_repos_recursive(root, excluded_dir_names, &mut repos, 0, 2);
+        discover_git_repos_recursive(root, excluded_dir_names, &mut repos, 0, 4);
     }
     repos.retain(|r| !exclude_set.contains(r));
 
@@ -158,18 +158,15 @@ fn discover_git_repos_recursive(
             continue;
         }
         let name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
-        if excluded_dir_names.contains(&name)
-            || name == "vendor"
-            || name == "objects"
-        {
-            continue;
-        }
-        if name.starts_with('.') {
+        if excluded_dir_names.contains(&name) || name == "objects" {
             continue;
         }
         let dot_git = path.join(".git");
         if dot_git.exists() && (dot_git.is_dir() || is_git_worktree_file(&dot_git)) {
             repos.push(path.clone());
+        }
+        if name.starts_with('.') {
+            continue;
         }
         discover_git_repos_recursive(&path, excluded_dir_names, repos, depth + 1, max_depth);
     }
