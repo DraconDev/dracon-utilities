@@ -345,6 +345,44 @@ mod tests {
         assert!(result.is_ok());
         assert!(!repo.join(".gitignore").exists(), "should not create .gitignore for empty patterns");
     }
+
+    #[test]
+    fn test_matches_file_pattern_exact_match() {
+        assert!(matches_file_pattern("Cargo.lock", "Cargo.lock"));
+        assert!(!matches_file_pattern("Cargo.toml", "Cargo.lock"));
+    }
+
+    #[test]
+    fn test_matches_file_pattern_extension_wildcard() {
+        assert!(matches_file_pattern("test.rs", "*.rs"));
+        assert!(matches_file_pattern("lib.rs", "*.rs"));
+        assert!(!matches_file_pattern("test.txt", "*.rs"));
+    }
+
+    #[test]
+    fn test_matches_file_pattern_prefix_wildcard() {
+        assert!(matches_file_pattern("test.log", "test.*"));
+        assert!(matches_file_pattern("test.log.bak", "test.*"));
+        assert!(!matches_file_pattern("other.log", "test.*"));
+    }
+
+    #[test]
+    fn test_matches_file_pattern_middle_wildcard() {
+        assert!(matches_file_pattern("data.json.gz", "*.json.gz"));
+        assert!(matches_file_pattern("test.backup.json.gz", "*.backup.json.gz"));
+        assert!(!matches_file_pattern("data.json", "*.json.gz"));
+    }
+
+    #[test]
+    fn test_is_excluded_file_pattern_matching() {
+        let patterns = vec!["*.log".to_string(), "*.tmp".to_string()];
+        let path = std::path::Path::new("debug.log");
+        assert!(is_excluded_file(path, &patterns));
+        let path2 = std::path::Path::new("data.tmp");
+        assert!(is_excluded_file(path2, &patterns));
+        let path3 = std::path::Path::new("data.rs");
+        assert!(!is_excluded_file(path3, &patterns));
+    }
 }
 
 pub(crate) fn is_excluded_dir_name(name: &str, excluded_dir_names: &BTreeSet<String>) -> bool {
