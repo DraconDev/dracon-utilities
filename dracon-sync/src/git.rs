@@ -1264,28 +1264,33 @@ pub(crate) fn create_repo_on_gitlab(account: &str, repo_name: &str) -> Result<St
 }
 
 pub(crate) fn create_repo_on_codeberg(token: &str, account: &str, repo_name: &str, api_endpoint: &str) -> Result<String> {
-    let client = reqwest::blocking::Client::new();
-    let payload = serde_json::json!({
-        "name": repo_name,
-        "private": true,
-        "default_branch": "master"
-    });
+    let output = std::process::Command::new("curl")
+        .args([
+            "-s", "-w", "%{http_code}",
+            "-X", "POST",
+            api_endpoint,
+            "-H", &format!("Authorization: Bearer {}", token),
+            "-H", "Content-Type: application/json",
+            "-d", &serde_json::json!({
+                "name": repo_name,
+                "private": true,
+                "default_branch": "master"
+            }).to_string(),
+        ])
+        .output()
+        .with_context(|| "curl codeberg repo create failed")?;
 
-    let response = client
-        .post(api_endpoint)
-        .header("Authorization", format!("Bearer {}", token))
-        .header("Content-Type", "application/json")
-        .json(&payload)
-        .send()
-        .with_context(|| "codeberg repo create request failed")?;
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let status_code = stdout.trim_end_matches(|c: char| !c.is_ascii_digit()).parse::<u16>().unwrap_or(0);
+    let response_body = stdout.trim_end_matches(|c: char| c.is_ascii_digit());
 
-    if response.status() == 409 || response.status() == 422 {
+    if status_code == 409 || status_code == 422 {
         return Ok(format!("git@codeberg.org:{}/{}.git", account, repo_name));
     }
 
-    if !response.status().is_success() {
-        let body = response.text().unwrap_or_default();
-        anyhow::bail!("codeberg repo create failed ({}): {}", response.status(), body);
+    if !output.status.success() || !(200..=299).contains(&status_code) {
+        anyhow::bail!("codeberg repo create failed ({}): {} {}", status_code, stderr.trim(), response_body);
     }
 
     Ok(format!("git@codeberg.org:{}/{}.git", account, repo_name))
