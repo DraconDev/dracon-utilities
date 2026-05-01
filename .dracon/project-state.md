@@ -1,8 +1,12 @@
-# Project State
+#Project State
 
 ## Current Focus
-Enhanced environmental file handling in WardenPolicy with validation tests for detecting common variants and encryption markers.
+Added unit tests for `disk_state` thresholds and utility functions `human_bytes` and `expand_tilde`.
 
 ## Completed
-- [x] Added validation tests to WardenPolicy for detecting common environmental file variants and encryption markers.
-- [x] Modified dracon-sync and dracon-system Cargo.lock files to reflect recent changes.
+- [x] Test that `disk_state` returns `"ok"` when usage is below warning threshold
+- [x] Test that `disk_state` returns `"warn"` when usage is at or above warning percentage
+- [x] Test that `disk_state` returns `"action"` when usage is at or above action percentage
+- [x] Test that `disk_state` returns `"critical"` when usage is at or above critical percentage
+- [x] Test that `human_bytes` correctly formats large byte values as GiB strings
+- [x] Test that `expand_tilde` handles absence of `HOME` gracefully
