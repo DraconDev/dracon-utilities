@@ -1,7 +1,8 @@
 # Project State
 
 ## Current Focus
-Updated AI configuration paths to follow XDG-compliant directory structure by changing the secrets file location from `~/.dracon/ai/secrets/openrouter.env` to `~/.dracon/utilities/sync/ai/secrets/openrouter.env`
+Synchronized dependency metadata in Cargo.lock for dracon-sync to reflect updated dependencies after recent refactoring work.
 
 ## Completed
-- [x] Refactored AI secrets file path to follow XDG-compliant directory structure
+- [x] chore(dependencies): Updated Cargo.lock to reflect current dependency versions after refactoring changes
+```
