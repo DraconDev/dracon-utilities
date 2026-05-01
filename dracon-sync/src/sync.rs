@@ -6,12 +6,15 @@ use std::time::Duration;
 
 use crate::exclude::{can_restore_entry, handle_large_untracked, is_large_untracked, remove_tracked_excluded_paths, should_stage_entry};
 use crate::git::{
-    auto_create_all_remotes, cli_diff_entries, detect_large_blobs_ahead, ensure_remote,
-    git_name_status_entries, has_origin_remote, list_remotes,
+    cli_diff_entries, detect_large_blobs_ahead, git_name_status_entries, has_origin_remote,
     has_tracking_upstream, is_cherry_pick_in_progress, is_merge_in_progress,
-    is_rebase_in_progress, prune_other_default_branch, push_to_all_remotes, push_with_retries,
-    remove_stale_remotes, restore_paths, run_git_with_timeout, staged_paths,
+    is_rebase_in_progress, prune_other_default_branch, push_with_retries,
+    restore_paths, run_git_with_timeout, staged_paths,
     unstage_excluded_paths, unstage_oversized_paths,
+};
+use crate::git::multi_remote::{
+    auto_create_all_remotes, ensure_remote, list_remotes,
+    push_to_all_remotes, remove_stale_remotes,
 };
 use crate::policy::{debug_enabled, load_repo_override, SyncPolicy};
 use crate::report::{build_commit_context, detect_report_signals, push_large_blob_threshold_bytes};
