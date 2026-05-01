@@ -21,6 +21,12 @@ impl HomeGuard {
     }
 }
 
+impl Default for HomeGuard {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Drop for HomeGuard {
     fn drop(&mut self) {
         std::env::remove_var("HOME");
