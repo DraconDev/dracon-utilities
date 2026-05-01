@@ -463,10 +463,10 @@ async fn main() -> Result<()> {
 
             if json {
                 #[derive(serde::Serialize)]
-                struct JsonOutput<'a> {
+                struct JsonOutput {
                     providers: Vec<ProviderResult>,
                     all_ok: bool,
-                    working_provider: Option<&'a String>,
+                    working_provider: Option<String>,
                 }
                 let output = JsonOutput {
                     providers: results,
