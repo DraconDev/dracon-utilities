@@ -157,43 +157,40 @@ dracon-sync has integrated AI for generating commit messages (scribe) and decidi
 - **Fallback Chain:** Multiple AI providers tried in order until one succeeds
 
 ### Configuration
-AI providers are configured in `~/.dracon/ai.toml`:
+AI providers are configured in `~/.dracon/utilities/sync/ai.toml`:
 
 ```toml
 [[providers]]
-name = "openrouter"
-env = "OPENROUTER_API_KEY"
-endpoint = "https://openrouter.ai/api/v1"
-model = "openrouter/free"
-
-[[providers]]
-name = "gemma"
-env = "GOOGLE_API_KEY"
-endpoint = "https://generativelanguage.googleapis.com/v1beta"
-model = "gemma-3-27b-it"
-adapter = "gemini"
-auth_header = "x-goog-api-key"
-auth_prefix = ""
+name = "mistral"
+env = "MISTRAL_API_KEY"
+endpoint = "https://codestral.mistral.ai/v1"
+model = "codestral-latest"
 
 [[providers]]
 name = "nvidia"
 env = "NVIDIA_API_KEY"
 endpoint = "https://integrate.api.nvidia.com/v1"
-model = "nvidia/nemotron-3-nano-30b-a3b"
+model = "stepfun-ai/step-3.5-flash"
+
+[[providers]]
+name = "openrouter"
+env = "OPENROUTER_API_KEY"
+endpoint = "https://openrouter.ai/api/v1"
+model = "nvidia/nemotron-3-super-120b-a12b:free"
 ```
 
 ### Provider Details
 | Provider | API Key Env | Model | Notes |
 |----------|-------------|-------|-------|
-| openrouter | OPENROUTER_API_KEY | openrouter/free | Free tier, auto-selects best model |
-| gemma | GOOGLE_API_KEY | gemma-3-27b-it | Google's Gemma via Gemini API |
-| nvidia | NVIDIA_API_KEY | nvidia/nemotron-3-nano-30b-a3b | NVIDIA's free tier |
+| mistral | MISTRAL_API_KEY | codestral-latest | Fast code generation model |
+| nvidia | NVIDIA_API_KEY | stepfun-ai/step-3.5-flash | NVIDIA's flash model |
+| openrouter | OPENROUTER_API_KEY | nvidia/nemotron-3-super-120b-a12b:free | Free tier via OpenRouter |
 
 ### API Keys
-Store keys in `~/.dracon/ai/secrets/*.env`:
-- `~/.dracon/ai/secrets/openrouter.env` → `OPENROUTER_API_KEY=...`
-- `~/.dracon/ai/secrets/gemini.env` → `GOOGLE_API_KEY=...` (note: key name is GOOGLE_API_KEY, file is gemini.env)
-- `~/.dracon/ai/secrets/nvidia.env` → `NVIDIA_API_KEY=...`
+Store keys in `~/.dracon/utilities/sync/ai/secrets/*.env`:
+- `~/.dracon/utilities/sync/ai/secrets/mistral.env` → `MISTRAL_API_KEY=...`
+- `~/.dracon/utilities/sync/ai/secrets/nvidia.env` → `NVIDIA_API_KEY=...`
+- `~/.dracon/utilities/sync/ai/secrets/openrouter.env` → `OPENROUTER_API_KEY=...`
 
 ### Testing
 ```bash
