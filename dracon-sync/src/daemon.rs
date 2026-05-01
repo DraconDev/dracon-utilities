@@ -348,12 +348,14 @@ pub(crate) async fn run_daemon(policy_path: PathBuf, override_interval_secs: Opt
         fingerprint: String,
         changed_at: Instant,
         failure_count: usize,
+        remote_failures: HashMap<String, usize>,
     }
 
     let mut activity: HashMap<PathBuf, RepoActivity> = HashMap::new();
     let mut repair_cooldowns: HashMap<PathBuf, Instant> = HashMap::new();
     let mut filter_cooldowns: HashMap<PathBuf, Instant> = HashMap::new();
     let mut stuck_push_repos = load_stuck_push_repos();
+    let mut remote_notify_cooldowns: HashMap<String, Instant> = HashMap::new();
 
     let shutdown = Arc::new(AtomicBool::new(false));
     let shutdown_sigterm = shutdown.clone();
