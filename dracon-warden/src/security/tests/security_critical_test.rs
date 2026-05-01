@@ -25,6 +25,19 @@ fn make_keys_dir(repo_root: &std::path::Path) -> std::path::PathBuf {
     repo_root.join(".git").join("arcane").join("keys")
 }
 
+fn setup_repo_with_age_key(repo_root: &std::path::Path, master_identity: &age::x25519::Identity) -> Vec<u8> {
+    let keys_dir = make_keys_dir(repo_root);
+    fs::create_dir_all(&keys_dir).expect("create keys dir");
+
+    write_age_key(&keys_dir, master_identity, "identity.age");
+
+    let repo_key_bytes: Vec<u8> = rand::random::<[u8; 32]>().to_vec();
+    let encrypted = encrypt_for_recipient(&master_identity.to_public(), &repo_key_bytes);
+    fs::write(keys_dir.join("repo.key.age"), encrypted).expect("write repo key");
+
+    repo_key_bytes
+}
+
 fn encrypt_for_recipient(recipient: &age::x25519::Recipient, plaintext: &[u8]) -> Vec<u8> {
     let recipients: Vec<Box<dyn age::Recipient + Send>> = vec![Box::new(recipient.clone())];
     let encryptor = age::Encryptor::with_recipients(recipients).expect("encryptor");
@@ -320,10 +333,15 @@ fn test_encrypt_with_repo_key_random_nonce_per_call() {
 fn test_unlock_payload_wrong_key() {
     let tmp = tempfile::TempDir::new().expect("temp dir");
     let (security, _, _guard) = make_repo_with_master(tmp.path());
-    let wrong_key = dracon_security::RepoKey::from_secret_bytes(rand::random());
-    let encrypted = security
-        .encrypt_with_repo_key(&wrong_key, b"test data")
-        .expect("encrypt with wrong key");
+
+    let other_identity = age::x25519::Identity::generate();
+    let other_recipient = other_identity.to_public();
+    let wrong_recipients: Vec<Box<dyn age::Recipient + Send>> = vec![Box::new(other_recipient)];
+    let encryptor = age::Encryptor::with_recipients(wrong_recipients).expect("encryptor");
+    let mut encrypted = vec![];
+    let mut writer = encryptor.wrap_output(&mut encrypted).expect("wrap");
+    writer.write(b"secret").expect("write");
+    writer.finish().expect("finish");
 
     let result = security.unlock_payload(&encrypted);
     assert!(result.is_err(), "unlock with wrong key should fail");
@@ -569,17 +587,6 @@ fn make_test_setup() -> (dracon_security::DemonSecurity, Vec<u8>, HomeGuard) {
     (security, repo_key_bytes, guard)
 }
 
-fn repo_key_from_bytes(bytes: &[u8]) -> dracon_security::RepoKey {
-    // Use from_file with a temp file since we can't construct RepoKey directly
-    // But we need 32 bytes - use the first 32 of the input
-    let mut key_bytes = vec![0u8; 32];
-    key_bytes.copy_from_slice(&bytes[..32.min(bytes.len())]);
-    // This won't work directly - we need a different approach
-    // Use encrypt_with_repo_key which internally uses the repo key from load_repo_key
-    // For testing, we use load_repo_key to get a real repo key
-    panic!("use load_repo_key instead");
-}
-
 #[test]
 fn test_unlock_payload_v1_format() {
     let (security, repo_key_bytes, _guard) = make_test_setup();
@@ -732,7 +739,8 @@ fn test_encrypt_for_node_uses_disk_master_identities() {
 
 #[test]
 fn test_encrypt_decrypt_repo_key_roundtrip() {
-    let (security, _, _guard) = make_test_setup();
+    let tmp = tempfile::TempDir::new().expect("temp dir");
+    let (security, _, _guard) = make_repo_with_master(tmp.path());
     let repo_key = security.load_repo_key().expect("load repo key");
 
     let plaintext = b"Hello, World! This is a test message.";
@@ -749,7 +757,8 @@ fn test_encrypt_decrypt_repo_key_roundtrip() {
 
 #[test]
 fn test_encrypt_with_repo_key_empty_plaintext() {
-    let (security, _, _guard) = make_test_setup();
+    let tmp = tempfile::TempDir::new().expect("temp dir");
+    let (security, _, _guard) = make_repo_with_master(tmp.path());
     let repo_key = security.load_repo_key().expect("load repo key");
 
     let encrypted = security
@@ -763,7 +772,8 @@ fn test_encrypt_with_repo_key_empty_plaintext() {
 
 #[test]
 fn test_decrypt_with_repo_key_too_short_ciphertext() {
-    let (security, _, _guard) = make_test_setup();
+    let tmp = tempfile::TempDir::new().expect("temp dir");
+    let (security, _, _guard) = make_repo_with_master(tmp.path());
     let repo_key = security.load_repo_key().expect("load repo key");
 
     let result = security.decrypt_with_repo_key(&repo_key, &[0u8; 11]);
