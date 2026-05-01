@@ -1,8 +1,8 @@
 # Project State
 
 ## Current Focus
-Synchronized dependency metadata in Cargo.lock for dracon-sync to reflect updated dependencies.
+docs(multi): Updated AI configuration and secrets file paths in documentation to reflect XDG-compliant directory structure
 
 ## Completed
-- [x] chore(multi): Updated Cargo.lock to ensure all dependencies are properly resolved and locked
-```
+- [x] Updated AI configuration file path from `~/.dracon/ai.toml` to `~/.dracon/utilities/sync/ai.toml`
+- [x] Updated API key storage location from `~/.dracon/ai/secrets/` to `~/.dracon/utilities/sync/ai/secrets/`
