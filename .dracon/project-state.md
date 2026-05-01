@@ -1,8 +1,10 @@
 # Project State
 
 ## Current Focus
-ONE LINE: Update Cargo.lock files for dracon-sync and dracon-system to match latest upstream dependencies.
+Add unit tests for is_git_worktree_file covering gitdir prefix, regular Git directory, nonexistent path, and whitespace handling
 
 ## Completed
-- [x] chore(deps): synchronize dracon-sync Cargo.lock with updated dependency versions
-- [x] chore(deps): synchronize dracon-system Cargo.lock with updated dependency versions
+- [x] Added test verifying detection of a gitdir prefix in .git file
+- [x] Added test verifying that a regular Git dir reference is not detected as a worktree file
+- [x] Added test verifying that a nonexistent .git path is not detected as a worktree file
+- [x] Added test verifying that a .git file with trailing whitespace is still detected as a worktree file
