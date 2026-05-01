@@ -1564,7 +1564,7 @@ pub(crate) async fn run_repair_warns(
         attempted += 1;
         match tokio::time::timeout(
             Duration::from_secs(policy.repo_sync_timeout_secs),
-            crate::sync::sync_repo(&repo, &policy, &excluded_dir_names, 0),
+            crate::sync::sync_repo(&repo, &policy, &excluded_dir_names, 0, None),
         )
         .await
         {
