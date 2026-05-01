@@ -1329,7 +1329,6 @@ pub(crate) fn auto_create_repo(config: &RemoteConfig, repo_name: &str) -> Result
 
 #[allow(dead_code)]
 mod tests {
-    use super::*;
 
     #[test]
     fn test_strip_url_credentials_https_with_creds() {
