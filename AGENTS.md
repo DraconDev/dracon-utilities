@@ -96,8 +96,7 @@ Operational state (mutable files written at runtime) lives **outside the `.draco
 ```
 ~/.local/state/dracon/
 ├── dracon-sync-incidents.jsonl   # Append-only incident ledger (2MB, 10k+ lines)
-├── dracon-sync-stuck-push-repos.json  # Stuck push tracking
-└── fleet.db                     # System daemon state
+└── dracon-sync-stuck-push-repos.json  # Stuck push tracking
 ```
 
 The incident ledger is appended every sync cycle. Keeping it at `~/.local/state/dracon/` instead of inside `.dracon` prevents the sync daemon from auto-committing its own operational data.
