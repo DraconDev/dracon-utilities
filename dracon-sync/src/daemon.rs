@@ -457,7 +457,7 @@ pub(crate) async fn run_daemon(policy_path: PathBuf, override_interval_secs: Opt
                 }
             } else if crate::git::has_only_main_branch(&repo) {
                 eprintln!("🔧 {} has only 'main', renaming to 'master'", repo.display());
-                if let Err(e) = crate::git::rename_main_to_master(&repo) {
+                if let Err(e) = crate::git::rename_main_to_master(&repo).await {
                     eprintln!("⚠️ failed to rename {} main→master: {}", repo.display(), e);
                     continue;
                 }

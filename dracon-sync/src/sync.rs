@@ -457,7 +457,7 @@ pub(crate) async fn sync_repo(
 
             // Forbid creation of the "other" default branch (main vs master).
             // If someone or something created the non-canonical branch, delete it.
-            prune_other_default_branch(repo);
+            prune_other_default_branch(repo).await;
 
             // Restore any excluded modified paths that weren't committed
             // Skip gitlink entries (dirty submodules can't be restored this way)
