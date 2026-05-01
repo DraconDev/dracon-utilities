@@ -585,6 +585,7 @@ pub(crate) async fn run_daemon(policy_path: PathBuf, override_interval_secs: Opt
                         fingerprint,
                         changed_at: now,
                         failure_count: 0,
+                        remote_failures: HashMap::new(),
                     },
                 );
                 continue;
