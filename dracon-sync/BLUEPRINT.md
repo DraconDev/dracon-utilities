@@ -174,10 +174,49 @@ They're intentionally both set to 50MB to keep things simple, but could be confi
 ### Overview
 dracon-sync has integrated AI for generating commit messages (scribe) and deciding version bumps.
 
+**The scribe is the AI's working memory.** The daemon maintains `.dracon/project-state.md` in each repo. The AI reads this file on session start to understand past work. Frequent commits ensure the AI can recover from any point in history.
+
 ### Features
 - **Scribe:** AI generates `project-state.md` and commit messages with context
 - **AI Bumper:** AI decides semver bump level (major/minor/patch/none) based on changes
 - **Fallback Chain:** Multiple AI providers tried in order until one succeeds
+
+### Why Frequent Commits?
+- The AI reads git history to understand past work
+- Every commit is a checkpoint the AI can recover to
+- More commits = better context for the AI's "what was I doing?"
+- Commits are cheap; context is valuable
+
+### project-state.md Format
+
+```markdown
+# Project State
+
+## Current Focus
+(one line: what you're working on right now)
+
+## Context
+(why: what problem are you solving? what prompted this change?)
+
+## Completed
+- [x] (what you finished, with context)
+
+## In Progress
+- [x] (what you're actively working on)
+
+## Blockers
+- (what's stopping progress: missing info, user decision needed, dependency)
+
+## Next Steps
+1. (immediate next action)
+2. (what comes after)
+```
+
+**Rules:**
+- **Current Focus** must be one line — it becomes the commit body
+- **Context** helps the AI recover understanding after time away
+- **Blockers** tell the AI what it can't proceed on
+- **Next Steps** give the AI a clear path forward
 
 ### Configuration
 AI providers are configured in `~/.dracon/utilities/sync/ai.toml`:
@@ -233,14 +272,21 @@ chore(scope): Commit subject line
 ## Current Focus
 What the project is working on
 
+## Context
+Why this change is being made
+
 ## Completed
 - [x] Completed work items
 
 ## In Progress
 - [x] Items being worked on
 
-## Open Issues
-- Any blockers or issues
+## Blockers
+- What's stopping progress
+
+## Next Steps
+1. Immediate next action
+2. What comes after
 
 ---
 category: chore
