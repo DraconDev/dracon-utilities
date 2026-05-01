@@ -1,9 +1,11 @@
 # Project State
 
 ## Current Focus
-refactor(security): simplify test setup and fix typo in environment manager tests
+Added comprehensive test suite for repo key loading, encryption/decryption, unlock payload handling, and master identity generation, while refactoring and simplifying related test setup.
 
 ## Completed
-- [x] Fix typo in environment manager test assertion: "credds" → "creds"
-- [x] Simplify ARCANE_MACHINE_KEY environment variable setup by replacing iterator chain with direct `.to_string()` call
-- [x] Refactor `test_generate_master_identity_refuses_existing_identity` and `test_generate_master_identity_refuses_legacy_identity` to eliminate duplicate security initialization and HomeGuard usage
+- [x] Added tests for `load_repo_key` with no keys directory, empty keys directory, and with stored key encrypted for a master identity
+- [x] Implemented encrypt/decrypt round‑trip tests using the repo key, including edge‑case scenarios (empty plaintext, too‑short ciphertext, random nonce variations)
+- [x] Added unlock payload tests covering format validation (version 1 round‑trip, too‑short and empty payload failures)
+- [x] Added tests verifying that `generate_master_identity` refuses to overwrite an existing or legacy identity
+- [x] Refactored test helper functions and removed obsolete test scaffolding to simplify the test suite
