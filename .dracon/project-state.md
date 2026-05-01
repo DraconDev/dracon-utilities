@@ -1,7 +1,5 @@
-# Project State
-
-## Current Focus
-ONE LINE: Update the dracon-sync Cargo.lock to reflect upstream dependency changes.
+# Project State## Current Focus
+Add unit tests for `read_project_focus` to validate parsing of `project-state.md` under various conditions (content, empty, missing, whitespace-only).
 
 ## Completed
-- [x] chore(sync): synchronize dracon-sync Cargo.lock with updated dependency versions.
+- [x] Implemented four unit tests for `read_project_focus` covering content presence, missing files, empty files, and whitespace-only cases
