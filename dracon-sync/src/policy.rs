@@ -8,6 +8,7 @@ use tokio::process::Command as TokioCommand;
 pub(crate) const DEFAULT_GIT_HOST_BLOB_LIMIT_BYTES: u64 = 100 * 1024 * 1024;
 
 #[derive(Debug, Clone, Deserialize)]
+#[allow(dead_code)]
 pub(crate) struct RemoteConfig {
     pub(crate) name: String,
     pub(crate) push_url: String,
@@ -23,29 +24,6 @@ pub(crate) struct RemoteConfig {
     pub(crate) api_endpoint: Option<String>,
     #[serde(default)]
     pub(crate) auto_create_token_var: Option<String>,
-}
-
-fn default_auth_type() -> AuthType {
-    AuthType::GitHub
-}
-
-fn default_priority() -> u32 {
-    50
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub(crate) enum AuthType {
-    GitHub,
-    GitLab,
-    Codeberg,
-    Generic,
-}
-
-impl Default for AuthType {
-    fn default() -> Self {
-        AuthType::GitHub
-    }
 }
 
 impl RemoteConfig {

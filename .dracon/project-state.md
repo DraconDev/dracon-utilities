@@ -1,20 +1,23 @@
 # Project State
 
 ## Current Focus
-Synchronized dependency metadata in Cargo.lock for dracon-sync
+Removed default auth type and priority constants from remote repository configuration
 
 ## Context
-This change was triggered by recent refactoring of the remote repository configuration system, which required updates to the dependency metadata. The synchronization ensures the project's build environment remains consistent with the current codebase.
+The refactoring of the remote repository configuration system removed several default values that were previously hardcoded in the `policy.rs` module. This change aligns with the ongoing work to make the remote repository configuration more flexible and configurable.
 
 ## Completed
-- [x] Updated Cargo.lock to reflect current dependency versions and configurations
+- [x] Removed `default_auth_type()` function
+- [x] Removed `default_priority()` function
+- [x] Removed `AuthType` enum and its associated implementation
+- [x] Added `#[allow(dead_code)]` attribute to `RemoteConfig` struct
 
 ## In Progress
-- [ ] None (dependency synchronization is complete)
+- [ ] None
 
 ## Blockers
-- None (this was a maintenance task)
+- None
 
 ## Next Steps
-1. Verify that the updated dependencies do not introduce breaking changes
-2. Continue with the planned documentation discovery phase (`docs-discovery-01`)
+1. Update configuration documentation to reflect the removal of default values
+2. Ensure all remote repository configurations are properly initialized with explicit values
