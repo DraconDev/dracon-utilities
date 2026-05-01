@@ -173,7 +173,7 @@ mod daemon_tests {
     #[test]
     fn test_stuck_repos_path_home() {
         let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
-        let expected_base = home.join(".dracon").join("state");
+        let expected_base = home.join(".local").join("state").join("dracon");
         let path = stuck_repos_path();
         assert!(path.starts_with(expected_base));
     }
