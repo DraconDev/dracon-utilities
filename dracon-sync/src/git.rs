@@ -1329,7 +1329,9 @@ pub(crate) fn auto_create_all_remotes(remotes: &[RemoteConfig], repo_name: &str)
 }
 
 #[allow(dead_code)]
+#[allow(unused_imports)]
 mod tests {
+    use super::*;
 
     #[test]
     fn test_strip_url_credentials_https_with_creds() {
