@@ -1096,7 +1096,6 @@ pub(crate) async fn restore_paths(repo: &Path, paths: &[String]) -> Result<()> {
 
 #[allow(dead_code)]
 mod multi_remote {
-    use super::*;
 
     pub(crate) fn ensure_remote(repo: &Path, name: &str, url: &str) -> Result<()> {
     let existing = get_remote_url(repo, name);
