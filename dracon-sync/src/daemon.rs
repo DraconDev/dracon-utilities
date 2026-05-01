@@ -295,7 +295,7 @@ pub(crate) async fn run_once(policy_path: &Path) -> Result<()> {
     for repo in repos {
         match tokio::time::timeout(
             Duration::from_secs(policy.repo_sync_timeout_secs),
-            sync_repo(&repo, &policy, &excluded_dir_names, 0),
+            sync_repo(&repo, &policy, &excluded_dir_names, 0, None),
         )
         .await
         {

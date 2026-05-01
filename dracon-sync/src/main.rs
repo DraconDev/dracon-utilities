@@ -326,7 +326,7 @@ async fn main() -> Result<()> {
             }
             let policy = SyncPolicy::load(&policy_path)?;
             let excluded_dir_names = excluded_dir_names_set(&policy);
-            if sync_repo(&repo, &policy, &excluded_dir_names, 0).await? {
+            if sync_repo(&repo, &policy, &excluded_dir_names, 0, None).await? {
                 println!("🔁 synced {}", repo.display());
             } else {
                 println!("✅ no sync changes {}", repo.display());
