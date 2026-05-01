@@ -1,10 +1,8 @@
 # Project State
 
 ## Current Focus
-Add validation tests to WardenPolicy ensuring plaintext patterns are allowlisted and do not overlap with protected patterns or contain sensitive keywords.
+Enhanced environmental file handling in WardenPolicy with validation tests for detecting common variants and encryption markers.
 
 ## Completed
-- [x] Add unit tests for valid policy acceptance and overlapping pattern rejection.
-- [x] Enforce allowlist for plaintext patterns (e.g., only *.pub and Cargo.lock permitted).
-- [x] Reject plaintext patterns containing sensitive keywords (e.g., "password").
-- [x] Update dependency lockfiles for dracon-sync and dracon-system.
+- [x] Added validation tests to WardenPolicy for detecting common environmental file variants and encryption markers.
+- [x] Modified dracon-sync and dracon-system Cargo.lock files to reflect recent changes.
