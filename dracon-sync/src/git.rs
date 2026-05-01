@@ -1094,7 +1094,11 @@ pub(crate) async fn restore_paths(repo: &Path, paths: &[String]) -> Result<()> {
     run_git_with_timeout(repo, &checkout_ref, 30, "checkout").await
 }
 
-pub(crate) fn ensure_remote(repo: &Path, name: &str, url: &str) -> Result<()> {
+#[allow(dead_code)]
+mod multi_remote {
+    use super::*;
+
+    pub(crate) fn ensure_remote(repo: &Path, name: &str, url: &str) -> Result<()> {
     let existing = get_remote_url(repo, name);
     match existing {
         Some(cur) if cur == url => Ok(()),
