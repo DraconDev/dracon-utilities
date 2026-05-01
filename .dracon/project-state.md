@@ -1,8 +1,7 @@
 # Project State
 
 ## Current Focus
-ONE LINE: Fix test assertion to expect newline preservation in GitHub HTTPS URL conversion
+chore(deps): synchronize dracon-system Cargo.lock with dependency changes
 
 ## Completed
-- [x] fix(git): correct test expectation for `github_https_url` to preserve embedded newline in SSH-style URLs
-- [x] docs(note): record decision to not update terminal engine repo to GitHub
+- [x] Update dracon-system Cargo.lock lockfile to reflect dependency changes
