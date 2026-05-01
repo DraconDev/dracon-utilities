@@ -175,11 +175,24 @@ GENERATE EXACTLY this markdown structure. Each section header MUST have a blank 
 # Project State
 
 ## Current Focus
-specific description of what this commit does
+(one line: specific description of what this commit does)
+
+## Context
+(why: what problem are you solving? what prompted this change?)
 
 ## Completed
 - [x] specific change 1
 - [x] specific change 2
+
+## In Progress
+- [x] what you're actively working on
+
+## Blockers
+- what's stopping progress: missing info, user decision needed, dependency
+
+## Next Steps
+1. immediate next action
+2. what comes after
 
 No preamble. Only output the markdown."#
     )
