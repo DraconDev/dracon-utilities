@@ -2442,6 +2442,7 @@ mod tests {
             backup_policy: String::new(),
             backup_dir: String::new(),
             remotes: 0,
+            remote_configs: vec![],
         };
         assert_eq!(status.repos_discovered, 5);
         assert!(status.auto_commit);
