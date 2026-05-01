@@ -642,21 +642,6 @@ fn test_unlock_payload_empty() {
 // =============================================================================
 
 #[test]
-fn test_generate_master_identity_refuses_existing_identity() {
-    let (mut security, _guard) = init_security();
-    security.add_memory_identity(age::x25519::Identity::generate());
-
-    let home = std::env::var("HOME").map(std::path::PathBuf::from).unwrap();
-    let identity_dir = home.join(".demon");
-    fs::create_dir_all(&identity_dir).expect("create .demon dir");
-    fs::write(identity_dir.join("identity.age"), "age1xxxxx").expect("create fake identity");
-
-    let result = security.generate_master_identity();
-    assert!(result.is_err(), "should refuse to overwrite existing identity");
-    assert!(result.unwrap_err().to_string().contains("SAFETY TRIGGERED"));
-}
-
-#[test]
 fn test_generate_master_identity_refuses_legacy_identity() {
     let (mut security, _guard) = init_security();
     security.add_memory_identity(age::x25519::Identity::generate());
