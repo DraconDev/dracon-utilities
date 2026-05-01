@@ -105,6 +105,14 @@ pub(crate) struct RepoReportJson {
 }
 
 #[derive(Debug, Serialize)]
+pub(crate) struct RemoteStatus {
+    pub(crate) name: String,
+    pub(crate) auth_type: String,
+    pub(crate) auto_create: bool,
+    pub(crate) priority: u32,
+}
+
+#[derive(Debug, Serialize)]
 pub(crate) struct StatusJson {
     pub(crate) policy: String,
     pub(crate) roots: Vec<String>,
@@ -134,6 +142,7 @@ pub(crate) struct StatusJson {
     pub(crate) backup_policy: String,
     pub(crate) backup_dir: String,
     pub(crate) remotes: usize,
+    pub(crate) remote_configs: Vec<RemoteStatus>,
 }
 
 #[derive(Debug, Serialize)]
