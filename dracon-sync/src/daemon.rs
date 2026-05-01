@@ -625,6 +625,7 @@ pub(crate) async fn run_daemon(policy_path: PathBuf, override_interval_secs: Opt
                     &policy,
                     &excluded_dir_names,
                     now.duration_since(entry.changed_at).as_secs(),
+                    Some(&mut entry.remote_failures),
                 ),
             )
             .await
