@@ -1,27 +1,21 @@
 # Project State
 
 ## Current Focus
-Enhanced remote repository configuration system with flexible authentication support
+Refactored remote repository configuration system in `policy.rs`
 
 ## Context
-The changes introduce a more sophisticated remote configuration system that replaces the previous simple string-based approach with a structured configuration format. This allows for better control over repository creation, authentication methods, and priority handling across different hosting platforms.
+This change aligns with recent work on enhancing the remote repository configuration system, which was previously mentioned in the security commit about flexible authentication.
 
 ## Completed
-- [x] Added comprehensive `RemoteConfig` struct with configurable parameters
-- [x] Implemented flexible authentication type support (GitHub, GitLab, Codeberg, Generic)
-- [x] Created backward-compatible deserialization for legacy string-based configurations
-- [x] Added URL template resolution with account and repository substitution
-- [x] Implemented priority-based remote selection system
-- [x] Added API endpoint configuration for platform-specific operations
+- [x] Renamed `extra_remotes` to `remotes` in the policy configuration
+- [x] Maintained all existing functionality while improving naming consistency
 
 ## In Progress
-- [ ] Integration testing of the new remote configuration system
+- [ ] No active work in progress related to this change
 
 ## Blockers
-- Need to verify compatibility with existing configuration files
-- Requires update to documentation for the new configuration format
+- None identified for this specific change
 
 ## Next Steps
-1. Update documentation to reflect the new configuration format
-2. Implement integration tests for the remote configuration system
-3. Add validation for remote configuration parameters
+1. Verify no downstream dependencies are affected by this naming change
+2. Update any related documentation or examples that might reference the old field name
