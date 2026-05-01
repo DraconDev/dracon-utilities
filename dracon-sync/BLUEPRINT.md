@@ -7,6 +7,29 @@
 
 ---
 
+## Design Philosophy
+
+dracon-sync is **invisible infrastructure** for an AI coder. The AI works on one repo at a time, makes changes, and sync handles the rest.
+
+**Core principles:**
+- Sync is automatic and invisible — the AI never thinks about commits or pushes
+- `project-state.md` is the primary interface — it serves as AI working memory
+- Frequent commits are a feature, not a bug — more checkpoints = better recovery
+- Structured output for machines (--json) > pretty text for humans
+
+**What sync handles:**
+- Auto-commit on every change
+- Auto-push with retries and SSH hardening
+- Freeze toggle for pausing sync during delicate operations
+- Incident ledger for debugging
+
+**What sync doesn't need:**
+- Global workspace dashboards
+- Session logging (AI sessions are independent)
+- Interactive prompts (AI runs non-interactively)
+
+---
+
 ## Critical Bugs (All Fixed)
 
 ### 1. Stale `status.ahead` check after commit
