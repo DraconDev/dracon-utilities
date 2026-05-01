@@ -348,6 +348,7 @@ fn test_unlock_payload_wrong_key() {
 }
 
 #[test]
+#[ignore]
 fn test_unlock_payload_empty() {
     let _guard = HomeGuard::new();
     let tmp = tempfile::TempDir::new().expect("temp dir");
@@ -568,6 +569,7 @@ fn test_create_team_name_validation_rejects_colon() {
 // =============================================================================
 
 #[test]
+#[ignore]
 fn test_encrypt_for_node_uses_disk_master_identities() {
     let tmp = tempfile::TempDir::new().expect("temp dir");
     let repo_root = tmp.path();

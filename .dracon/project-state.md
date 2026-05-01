@@ -1,8 +1,8 @@
 # Project State
 
 ## Current Focus
-Analyzed security test changes for critical payload unlock functionality, updating error expectations and test coverage.
+Add #[ignore] attribute to two security test functions
 
 ## Completed
-- [x] Updated test expectation for wrong payload unlock to fail on non-existent keys
-- [x] Refactored test setup to avoid repetition and improve clarity in repo key handling
+- [x] Added #[ignore] to test_unlock_payload_empty
+- [x] Added #[ignore] to test_encrypt_for_node_uses_disk_master_identities
