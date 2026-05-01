@@ -357,15 +357,6 @@ fn test_unlock_payload_empty() {
 }
 
 #[test]
-fn test_unlock_payload_empty() {
-    let tmp = tempfile::TempDir::new().expect("temp dir");
-    let (security, _, _guard) = make_repo_with_master(tmp.path());
-
-    let result = security.unlock_payload(b"");
-    assert!(result.is_err(), "empty payload should fail");
-}
-
-#[test]
 fn test_unlock_payload_v1_format_roundtrip() {
     let tmp = tempfile::TempDir::new().expect("temp dir");
     let (security, _, _guard) = make_repo_with_master(tmp.path());
