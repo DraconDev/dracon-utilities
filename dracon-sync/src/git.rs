@@ -1327,6 +1327,18 @@ pub(crate) fn auto_create_all_remotes(remotes: &[RemoteConfig], repo_name: &str)
     results
 }
 
+    pub(crate) fn auto_create_all_remotes(remotes: &[RemoteConfig], repo_name: &str) -> Vec<(String, Result<String>)> {
+        let mut results = Vec::new();
+        for remote in remotes {
+            if remote.auto_create {
+                let result = auto_create_repo(remote, repo_name);
+                results.push((remote.name.clone(), result));
+            }
+        }
+        results
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
