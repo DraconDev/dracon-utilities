@@ -835,6 +835,7 @@ pub(crate) async fn prune_other_default_branch(repo: &Path) {
     let other_str = other.to_string();
     let repo_has_origin = has_origin_remote(repo);
     let repo = repo.to_path_buf();
+    let repo_for_second = repo.clone();
     let other_str_inner = other_str.clone();
     if let Err(e) = tokio::task::spawn_blocking(move || {
         std_git_command()
@@ -850,11 +851,10 @@ pub(crate) async fn prune_other_default_branch(repo: &Path) {
     }
     if repo_has_origin {
         let other_str_inner = other_str.clone();
-        let repo_inner = repo.clone();
         if let Err(e) = tokio::task::spawn_blocking(move || {
             std_git_command()
                 .args(["push", "origin", "--delete", &other_str_inner])
-                .current_dir(&repo_inner)
+                .current_dir(&repo_for_second)
                 .stdout(std::process::Stdio::null())
                 .stderr(std::process::Stdio::null())
                 .status()
