@@ -1202,4 +1202,34 @@ mod tests {
         assert_eq!(top_level_dir("src///nested/main.rs"), Some("src".to_string()));
     }
 
+    #[test]
+    fn test_is_git_worktree_file_gitdir_prefix() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let dot_git = tmp.path().join(".git");
+        std::fs::write(&dot_git, "gitdir: /path/to/worktree").expect("write .git file");
+        assert!(is_git_worktree_file(&dot_git));
+    }
+
+    #[test]
+    fn test_is_git_worktree_file_regular_git_dir() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let dot_git = tmp.path().join(".git");
+        std::fs::write(&dot_git, "ref: refs/heads/main").expect("write .git file");
+        assert!(!is_git_worktree_file(&dot_git));
+    }
+
+    #[test]
+    fn test_is_git_worktree_file_nonexistent() {
+        let dot_git = std::path::Path::new("/nonexistent/.git");
+        assert!(!is_git_worktree_file(dot_git));
+    }
+
+    #[test]
+    fn test_is_git_worktree_file_with_whitespace() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let dot_git = tmp.path().join(".git");
+        std::fs::write(&dot_git, "gitdir: /path/to/worktree\n").expect("write .git file");
+        assert!(is_git_worktree_file(&dot_git));
+    }
+
 }
