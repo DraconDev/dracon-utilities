@@ -1,7 +1,7 @@
 # Project State
-
-## Current Focus
-deps: synchronize dracon-sync Cargo.lock with dependency changes
+##Current Focus
+Update dracon-sync Cargo.lock to reflect upstream dependency changes
 
 ## Completed
-- [x] deps: updated Cargo.lock lockfile to reflect current dependency resolutions
+- [x] Update dracon-sync Cargo.lock to reflect upstream dependency changes
+- [x] Update dracon-system Cargo.lock to reflect upstream dependency changes
