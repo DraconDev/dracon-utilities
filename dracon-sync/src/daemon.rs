@@ -701,6 +701,7 @@ pub(crate) async fn run_daemon(policy_path: PathBuf, override_interval_secs: Opt
 
             if sync_success {
                 entry.failure_count = 0;
+                entry.remote_failures.clear();
                 // Re-check if repo is still dirty (filter-only changes persist).
                 // If so, use a long cooldown instead of removing from activity
                 // to prevent tight triage loops on phantom changes.
