@@ -337,7 +337,7 @@ async fn main() -> Result<()> {
             let service = SimpleAiService::new();
             if service.is_empty() {
                 println!("❌ No AI providers configured");
-                println!("   Add providers to ~/.dracon/ai.toml");
+                println!("   Add providers to ~/.dracon/utilities/sync/ai.toml");
                 return Ok(());
             }
 
