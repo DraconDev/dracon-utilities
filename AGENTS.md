@@ -84,6 +84,14 @@ You can add custom protected paths in `dracon-system.toml`:
 
 Safety: every `remove_dir_all` call site in `dracon-system` checks the path against both system and user-protected paths before executing. The `--apply` flag is required for destructive operations.
 
+### dracon-sync Repo Discovery
+
+Repo discovery searches up to **4 levels deep** from each watch root. Dot-prefixed directories (e.g. `.config/`, `.dracon/`) are descended into if they contain a `.git` directory — only skipped after the `.git` check fails. The hardcoded exclusions are `objects` and whatever is in `exclude_dir_names` from policy.
+
+### dracon-sync Push Behavior
+
+Push operations use `push_with_retries` with SSH hardening (`ConnectTimeout`, `ConnectionAttempts`) and automatic HTTPS fallback on persistent timeout. The `push_retries` policy setting is respected. All transient network failures should now trigger retries rather than failing immediately.
+
 ### dracon-sync Automatic Remote Creation
 
 When `auto_github_private = true` in `dracon-sync.toml`, any repo in a watched root without an origin remote will automatically get:
