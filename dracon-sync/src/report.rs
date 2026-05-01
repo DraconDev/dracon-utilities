@@ -2432,7 +2432,7 @@ mod tests {
             system_repo: String::new(),
             backup_policy: String::new(),
             backup_dir: String::new(),
-            extra_remotes: 0,
+            remotes: 0,
         };
         assert_eq!(status.repos_discovered, 5);
         assert!(status.auto_commit);
