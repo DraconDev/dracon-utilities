@@ -312,9 +312,9 @@ the ledger to ~/.local/state/dracon/ to break the cycle.
 - [x] 248 tests passing after path changes
 
 ## Blockers
-- fleet.db still in .dracon/state/ (needs dracon-system change, out of scope)
+- None
 
 ## Next Steps
 1. Monitor for 24h to confirm no self-referential churn
-2. Update AGENTS.md with new operational state location
+2. Continue reviewing dracon-system for any orphaned state files
 ```
