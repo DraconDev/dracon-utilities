@@ -8,7 +8,7 @@ use crate::exclude::{can_restore_entry, handle_large_untracked, is_large_untrack
 use crate::git::{
     cli_diff_entries, detect_large_blobs_ahead, git_name_status_entries, has_origin_remote,
     has_tracking_upstream, is_cherry_pick_in_progress, is_merge_in_progress,
-    is_rebase_in_progress, prune_other_default_branch, restore_paths, run_git_with_timeout, staged_paths,
+    is_rebase_in_progress, prune_other_default_branch, push_with_retries, restore_paths, run_git_with_timeout, staged_paths,
     unstage_excluded_paths, unstage_oversized_paths,
 };
 use crate::policy::{debug_enabled, load_repo_override, SyncPolicy};
@@ -511,10 +511,10 @@ pub(crate) async fn sync_repo(
                     );
                     return Ok(false);
                 }
-                match run_git_with_timeout(
+                match push_with_retries(
                     repo,
-                    &["push", "origin", "HEAD"],
                     policy.push_op_timeout_secs,
+                    policy.push_retries,
                     "push",
                 )
                 .await
@@ -580,22 +580,22 @@ pub(crate) async fn sync_repo(
                                 Ok(()) => {
                                     eprintln!("📝 committed .gitignore update in {}", repo.display());
                                     if policy.auto_push && has_origin {
-                                    match run_git_with_timeout(
-                                        repo,
-                                        &["push", "origin", "HEAD"],
-                                        policy.push_op_timeout_secs,
-                                        "push",
-                                    )
-                                    .await
-                                    {
-                                        Ok(()) => {}
-                                        Err(e) => {
-                                            eprintln!("⚠️ push failed for {}: {}", repo.display(), e);
-                                            return Ok(false);
+                                        match push_with_retries(
+                                            repo,
+                                            policy.push_op_timeout_secs,
+                                            policy.push_retries,
+                                            "push",
+                                        )
+                                        .await
+                                        {
+                                            Ok(()) => {}
+                                            Err(e) => {
+                                                eprintln!("⚠️ push failed for {}: {}", repo.display(), e);
+                                                return Ok(false);
+                                            }
                                         }
                                     }
-                                }
-                                return Ok(true);
+                                    return Ok(true);
                                 }
                                 Err(e) => eprintln!("⚠️ failed to commit .gitignore in {}: {}", repo.display(), e),
                             }
@@ -635,17 +635,17 @@ pub(crate) async fn sync_repo(
             );
             return Ok(false);
         }
-        match run_git_with_timeout(
+        match push_with_retries(
             repo,
-            &["push", "origin", "HEAD"],
             policy.push_op_timeout_secs,
+            policy.push_retries,
             "push",
         )
         .await
         {
             Ok(()) => {}
             Err(e) => {
-                eprintln!("⚠️ push skipped for {}: {}", repo.display(), e);
+                eprintln!("⚠️ push failed for {}: {}", repo.display(), e);
                 return Ok(false);
             }
         }
