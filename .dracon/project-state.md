@@ -1,7 +1,7 @@
 # Project State
-
-## Current Focus
-Synchronize dependency metadata in Cargo.lock for dracon-sync to reflect current dependency versions.
+##Current Focus
+The commit refactors the configuration and secrets file locations in `SimpleAiService`, moving them from top‑level `.dracon` directories to the nested `utilities/sync` subdirectory, aligning with the project's XDG‑compliant state directory layout.
 
 ## Completed
-- [x] chore(deps): update dracon-sync Cargo.lock to reflect upstream dependency versions
+- [x] Updated `config_path` to return `dirs::home_dir().unwrap_or_else(|| PathBuf::from(".")).join(".dracon/utilities/sync/ai.toml")`.
+- [x] Updated `secrets_path` to return `dirs::home_dir().unwrap_or_else(|| PathBuf::from(".")).join(".dracon/utilities/sync/ai/secrets")`.
