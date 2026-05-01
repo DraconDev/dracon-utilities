@@ -2620,4 +2620,50 @@ implemented new authentication flow
         let scope = extract_scope_from_focus("cleaned up, refactored.");
         assert!(!scope.ends_with(',') && !scope.ends_with('.'));
     }
+
+    #[test]
+    fn test_read_project_focus_returns_content() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path();
+        let dracon_dir = repo.join(".dracon");
+        std::fs::create_dir_all(&dracon_dir).expect("create .dracon dir");
+        std::fs::write(
+            dracon_dir.join("project-state.md"),
+            "# Project State\n\n## Current Focus\nTest focus\n",
+        )
+        .expect("write project-state.md");
+        let result = read_project_focus(repo);
+        assert!(result.is_some());
+        assert!(result.unwrap().contains("Current Focus"));
+    }
+
+    #[test]
+    fn test_read_project_focus_missing_file() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path();
+        let result = read_project_focus(repo);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_read_project_focus_empty_file() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path();
+        let dracon_dir = repo.join(".dracon");
+        std::fs::create_dir_all(&dracon_dir).expect("create .dracon dir");
+        std::fs::write(dracon_dir.join("project-state.md"), "").expect("write empty project-state.md");
+        let result = read_project_focus(repo);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_read_project_focus_whitespace_only() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path();
+        let dracon_dir = repo.join(".dracon");
+        std::fs::create_dir_all(&dracon_dir).expect("create .dracon dir");
+        std::fs::write(dracon_dir.join("project-state.md"), "   \n\n  ").expect("write whitespace project-state.md");
+        let result = read_project_focus(repo);
+        assert!(result.is_none());
+    }
 }
