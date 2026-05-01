@@ -354,7 +354,7 @@ pub(crate) fn incident_ledger_path(_policy_path: &Path) -> PathBuf {
     }
 
     if let Some(home) = dirs::home_dir() {
-        return home.join(".dracon").join("dracon-sync-incidents.jsonl");
+        return home.join(".local").join("state").join("dracon").join("dracon-sync-incidents.jsonl");
     }
 
     PathBuf::from("/tmp/dracon-sync-incidents.jsonl")

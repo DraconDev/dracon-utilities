@@ -182,8 +182,9 @@ mod daemon_tests {
 fn stuck_repos_path() -> PathBuf {
     dirs::home_dir()
         .unwrap_or_else(|| PathBuf::from("."))
-        .join(".dracon")
+        .join(".local")
         .join("state")
+        .join("dracon")
         .join("dracon-sync-stuck-push-repos.json")
 }
 
