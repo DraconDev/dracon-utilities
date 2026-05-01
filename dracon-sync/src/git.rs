@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+#[allow(dead_code)]
 use dracon_git::{
     types::{DiffFile, FileStatus},
     GitService,

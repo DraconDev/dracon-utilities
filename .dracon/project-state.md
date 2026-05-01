@@ -1,22 +1,20 @@
 # Project State
 
 ## Current Focus
-Improved error handling for missing remote repositories in Git operations
+Added `#[allow(dead_code)]` to suppress warnings for unused Git-related types in `dracon-sync`.
 
 ## Context
-The previous implementation silently ignored missing remote repositories, which could lead to unexpected behavior. This change makes the error explicit to help with debugging and error handling.
+This change was made to address compiler warnings about unused imports in the Git module, which were causing noise in the build output. The `dracon_git` types are imported but not all are currently used in `dracon-sync`.
 
 ## Completed
-- [x] Added explicit error when remote repository is not found
-- [x] Maintained backward compatibility for existing code paths
+- [x] Added `#[allow(dead_code)]` to suppress unused code warnings for Git-related imports
 
 ## In Progress
-- [ ] None
+- [ ] None (this was a quick fix)
 
 ## Blockers
-- None
+- None (this was a simple warning suppression)
 
 ## Next Steps
-1. Verify the new error handling works as expected in integration tests
-2. Update documentation to reflect the new error behavior
-```
+1. Review if any of the unused Git types will be needed in future `dracon-sync` features
+2. Consider removing unused imports if they're confirmed unnecessary
