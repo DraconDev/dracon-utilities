@@ -1,7 +1,7 @@
 # Project State
 
 ## Current Focus
-chore(deps): synchronize dracon-system Cargo.lock with dependency changes
+deps: synchronize dracon-sync Cargo.lock with dependency changes
 
 ## Completed
-- [x] Update dracon-system Cargo.lock lockfile to reflect dependency changes
+- [x] deps: updated Cargo.lock lockfile to reflect current dependency resolutions
