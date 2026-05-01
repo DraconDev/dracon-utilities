@@ -1,7 +1,8 @@
 # Project State
 
 ## Current Focus
-Adjust test expectations to match XDG-compliant state directory layout by verifying that the daemon’s stuck-repos path now resides under `.local` instead of `.dracon`.
+Configure operational state files to reside outside the `.dracon` repository root to avoid versioning runtime data
 
 ## Completed
-- [x] Update test assertion in `daemon.rs` to validate `.local` base directory for stuck-push-repos JSON file.
+- [x] datadir: Relocate dracon-sync-incidents.jsonl, dracon-sync-stuck-push-repos.json, and fleet.db to `~/.local/state/dracon/` to prevent self-referential commits
+- [x] deps: Update dracon-system dependency resolver with latest upstream platform requirements
