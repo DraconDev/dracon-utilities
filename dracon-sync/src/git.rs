@@ -795,7 +795,7 @@ pub(crate) async fn consolidate_to_master(repo: &Path) -> Result<()> {
     Ok(())
 }
 
-pub(crate) fn rename_main_to_master(repo: &Path) -> Result<()> {
+pub(crate) async fn rename_main_to_master(repo: &Path) -> Result<()> {
     let branch = current_branch(repo).unwrap_or_else(|| "main".to_string());
     if branch == "main" {
         std_git_command()
@@ -805,12 +805,8 @@ pub(crate) fn rename_main_to_master(repo: &Path) -> Result<()> {
             .with_context(|| format!("failed to rename main to master in {}", repo.display()))?;
     }
     if has_origin_remote(repo) {
-        if let Err(e) = std_git_command()
-            .args(["push", "-u", "origin", "master"])
-            .current_dir(repo)
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .status()
+        if let Err(e) =
+            push_with_retries(repo, 60, 3, "rename-main-to-master").await
         {
             eprintln!("⚠️ failed to push master to origin: {}", e);
         }
@@ -829,33 +825,43 @@ pub(crate) fn rename_main_to_master(repo: &Path) -> Result<()> {
 
 /// Delete the "other" default branch if it exists, preventing dual-branch drift.
 /// If current branch is master → delete main. If current is main → delete master.
-pub(crate) fn prune_other_default_branch(repo: &Path) {
+pub(crate) async fn prune_other_default_branch(repo: &Path) {
     let branch = current_branch(repo);
     let other = match branch.as_deref() {
         Some("master") => "main",
         Some("main") => "master",
         _ => return,
     };
-    // Delete local other branch if it exists
-    if let Err(e) = std_git_command()
-        .args(["branch", "-D", other])
-        .current_dir(repo)
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .status()
-    {
-        eprintln!("⚠️ failed to delete local {} branch: {}", other, e);
-    }
-    // Delete remote other branch if it exists
-    if has_origin_remote(repo) {
-        if let Err(e) = std_git_command()
-            .args(["push", "origin", "--delete", other])
-            .current_dir(repo)
+    let other_str = other.to_string();
+    let repo_has_origin = has_origin_remote(repo);
+    let repo = repo.to_path_buf();
+    let other_str_inner = other_str.clone();
+    if let Err(e) = tokio::task::spawn_blocking(move || {
+        std_git_command()
+            .args(["branch", "-D", &other_str_inner])
+            .current_dir(&repo)
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
             .status()
+    })
+    .await
+    {
+        eprintln!("⚠️ failed to delete local {} branch: {}", other_str, e);
+    }
+    if repo_has_origin {
+        let other_str_inner = other_str.clone();
+        let repo_inner = repo.clone();
+        if let Err(e) = tokio::task::spawn_blocking(move || {
+            std_git_command()
+                .args(["push", "origin", "--delete", &other_str_inner])
+                .current_dir(&repo_inner)
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .status()
+        })
+        .await
         {
-            eprintln!("⚠️ failed to delete remote {} branch: {}", other, e);
+            eprintln!("⚠️ failed to delete remote {} branch: {}", other_str, e);
         }
     }
 }

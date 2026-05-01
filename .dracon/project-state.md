@@ -1,8 +1,9 @@
 # Project State
 
 ## Current Focus
-Configure operational state files to reside outside the `.dracon` repository root to avoid versioning runtime data
+Refactor synchronous git branch management functions to be async to avoid blocking the async runtime, improve reliability of remote branch pushes with retry logic, and wrap remaining blocking git subprocess calls in `tokio::task::spawn_blocking`.
 
 ## Completed
-- [x] datadir: Relocate dracon-sync-incidents.jsonl, dracon-sync-stuck-push-repos.json, and fleet.db to `~/.local/state/dracon/` to prevent self-referential commits
-- [x] deps: Update dracon-system dependency resolver with latest upstream platform requirements
+- [x] Convert `rename_main_to_master` to async function, replace unretried origin push with `push_with_retries` for reliable branch rename propagation
+- [x] Convert `prune_other_default_branch` to async function, wrap blocking git branch deletion commands in `tokio::task::spawn_blocking` to prevent async runtime stall
+- [x] Update all call sites to await the now-async git branch management functions
