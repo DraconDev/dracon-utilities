@@ -465,7 +465,7 @@ fn make_test_setup() -> (dracon_security::DemonSecurity, Vec<u8>, HomeGuard) {
 #[test]
 fn test_unlock_payload_v1_format() {
     let _guard = HomeGuard::new();
-    let tmp = tempfile::TempDir::expect("temp dir");
+    let tmp = tempfile::TempDir::new().expect("temp dir");
     let repo_root = tmp.path();
     let keys_dir = repo_root.join(".git").join("arcane").join("keys");
     eprintln!("DEBUG: keys_dir exists = {}", keys_dir.exists());
@@ -477,6 +477,7 @@ fn test_unlock_payload_v1_format() {
     security.add_memory_identity(master_identity);
 
     let loaded_key = security.load_repo_key().expect("load repo key");
+    eprintln!("DEBUG: loaded_key {:?}", loaded_key.get_key());
 
     let plaintext = b"V1 format payload";
     let encrypted = security
