@@ -2685,4 +2685,29 @@ watch_roots = ["/tmp/test"]
         let result = policy.validate();
         assert!(result.is_err(), "should reject plaintext pattern with 'password'");
     }
+
+    #[test]
+    fn is_env_file_name_detects_common_variants() {
+        assert!(is_env_file_name(".env"));
+        assert!(is_env_file_name(".envrc"));
+        assert!(is_env_file_name(".env.local"));
+        assert!(is_env_file_name(".env.production"));
+        assert!(is_env_file_name("config.env"));
+        assert!(is_env_file_name("/path/to/.env"));
+        assert!(is_env_file_name("/path/to/.envrc"));
+        assert!(!is_env_file_name("env.txt"));
+        assert!(!is_env_file_name(".envbackup"));
+        assert!(is_env_file_name("my.env"), ".env suffix should match");
+    }
+
+    #[test]
+    fn is_encrypted_env_content_detects_markers() {
+        assert!(is_encrypted_env_content("[DRACON_SECRET:key]"));
+        assert!(is_encrypted_env_content("[DRACON_SECRET:key]\n"));
+        assert!(!is_encrypted_env_content("[DRACON_SECRET]"));
+        assert!(!is_encrypted_env_content("DRACON_SECRET:key"));
+        assert!(!is_encrypted_env_content("[OTHER_SECRET:key]"));
+        assert!(!is_encrypted_env_content("plain text"));
+        assert!(!is_encrypted_env_content("  [DRACON_SECRET:key]  "), "leading whitespace not trimmed");
+    }
 }
