@@ -140,7 +140,7 @@ fn test_env_manager_combined() {
     let output = em.to_env_file();
     assert!(output.contains("FROM_CODE=\"code_val\""));
     assert!(output.contains("VAR=\"value\""));
-    assert!(output.contains("# Group: credds"));
+    assert!(output.contains("# Group: creds"));
     assert!(output.contains("API_KEY=\"key\""));
 }
 
@@ -270,7 +270,7 @@ fn test_load_repo_key_machine_key_env_var() {
 
     let (security, _guard) = init_security_with_repo(repo_root);
 
-    std::env::set_var("ARCANE_MACHINE_KEY", machine_identity.to_string().expose_secret().as_bytes().iter().map(|&b| char::from(b)).collect::<String>());
+    std::env::set_var("ARCANE_MACHINE_KEY", machine_identity.to_string().expose_secret().to_string());
     let loaded = security.load_repo_key().expect("load repo key via machine key");
     assert_eq!(loaded.get_key(), repo_key_bytes.as_slice());
     std::env::remove_var("ARCANE_MACHINE_KEY");
@@ -402,15 +402,13 @@ fn test_unlock_payload_empty() {
 
 #[test]
 fn test_generate_master_identity_refuses_existing_identity() {
-    let home_guard = HomeGuard::new();
-    let home = std::env::var("HOME").map(std::path::PathBuf::from).unwrap();
+    let (mut security, _guard) = init_security();
+    security.add_memory_identity(age::x25519::Identity::generate());
 
+    let home = std::env::var("HOME").map(std::path::PathBuf::from).unwrap();
     let identity_dir = home.join(".demon");
     fs::create_dir_all(&identity_dir).expect("create .demon dir");
     fs::write(identity_dir.join("identity.age"), "age1xxxxx").expect("create fake identity");
-
-    let (mut security, _guard2) = init_security();
-    security.add_memory_identity(age::x25519::Identity::generate());
 
     let result = security.generate_master_identity();
     assert!(result.is_err(), "should refuse to overwrite existing identity");
@@ -419,15 +417,13 @@ fn test_generate_master_identity_refuses_existing_identity() {
 
 #[test]
 fn test_generate_master_identity_refuses_legacy_identity() {
-    let home_guard = HomeGuard::new();
-    let home = std::env::var("HOME").map(std::path::PathBuf::from).unwrap();
+    let (mut security, _guard) = init_security();
+    security.add_memory_identity(age::x25519::Identity::generate());
 
+    let home = std::env::var("HOME").map(std::path::PathBuf::from).unwrap();
     let identity_dir = home.join(".demon");
     fs::create_dir_all(&identity_dir).expect("create .demon dir");
     fs::write(identity_dir.join("identity.txt"), "age1xxxxx").expect("create legacy identity");
-
-    let (mut security, _guard2) = init_security();
-    security.add_memory_identity(age::x25519::Identity::generate());
 
     let result = security.generate_master_identity();
     assert!(result.is_err(), "should refuse legacy identity");
