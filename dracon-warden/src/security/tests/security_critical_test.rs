@@ -449,21 +449,33 @@ fn test_load_repo_key_team_key() {
 // =============================================================================
 
 fn make_test_setup() -> (dracon_security::DemonSecurity, Vec<u8>, HomeGuard) {
+    let _guard = HomeGuard::new();
     let tmp = tempfile::TempDir::new().expect("temp dir");
     let repo_root = tmp.path();
 
     let master_identity = age::x25519::Identity::generate();
     let repo_key_bytes = setup_repo_with_age_key(repo_root, &master_identity);
 
-    let (mut security, guard) = init_security_with_repo(repo_root);
+    let mut security = dracon_security::DemonSecurity::new(Some(repo_root.as_ref())).expect("init security");
     security.add_memory_identity(master_identity);
 
-    (security, repo_key_bytes, guard)
+    (security, repo_key_bytes, _guard)
 }
 
 #[test]
 fn test_unlock_payload_v1_format() {
-    let (security, repo_key_bytes, _guard) = make_test_setup();
+    let _guard = HomeGuard::new();
+    let tmp = tempfile::TempDir::expect("temp dir");
+    let repo_root = tmp.path();
+    let keys_dir = repo_root.join(".git").join("arcane").join("keys");
+    eprintln!("DEBUG: keys_dir exists = {}", keys_dir.exists());
+
+    let master_identity = age::x25519::Identity::generate();
+    let repo_key_bytes = setup_repo_with_age_key(repo_root, &master_identity);
+
+    let mut security = dracon_security::DemonSecurity::new(Some(repo_root)).expect("init security");
+    security.add_memory_identity(master_identity);
+
     let loaded_key = security.load_repo_key().expect("load repo key");
 
     let plaintext = b"V1 format payload";
