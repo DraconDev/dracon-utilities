@@ -317,12 +317,25 @@ fn test_encrypt_with_repo_key_random_nonce_per_call() {
 // =============================================================================
 
 #[test]
-fn test_unlock_payload_too_short() {
+fn test_unlock_payload_wrong_key() {
+    let tmp = tempfile::TempDir::new().expect("temp dir");
+    let (security, _, _guard) = make_repo_with_master(tmp.path());
+    let wrong_key = dracon_security::RepoKey::from_secret_bytes(rand::random());
+    let encrypted = security
+        .encrypt_with_repo_key(&wrong_key, b"test data")
+        .expect("encrypt with wrong key");
+
+    let result = security.unlock_payload(&encrypted);
+    assert!(result.is_err(), "unlock with wrong key should fail");
+}
+
+#[test]
+fn test_unlock_payload_empty() {
     let tmp = tempfile::TempDir::new().expect("temp dir");
     let (security, _, _guard) = make_repo_with_master(tmp.path());
 
-    let result = security.unlock_payload(&[0u8; 11]);
-    assert!(result.is_err(), "too short payload should fail");
+    let result = security.unlock_payload(b"");
+    assert!(result.is_err(), "empty payload should fail");
 }
 
 #[test]
@@ -583,7 +596,8 @@ fn test_unlock_payload_v1_format() {
 
 #[test]
 fn test_unlock_payload_too_short() {
-    let (security, _, _guard) = make_test_setup();
+    let tmp = tempfile::TempDir::new().expect("temp dir");
+    let (security, _, _guard) = make_repo_with_master(tmp.path());
 
     let result = security.unlock_payload(&[0u8; 11]);
     assert!(result.is_err(), "too short payload should fail");
@@ -592,21 +606,8 @@ fn test_unlock_payload_too_short() {
 #[test]
 fn test_unlock_payload_wrong_key() {
     let tmp = tempfile::TempDir::new().expect("temp dir");
-    let repo_root = tmp.path();
+    let (security, _, _guard) = make_repo_with_master(tmp.path());
 
-    let master_identity = age::x25519::Identity::generate();
-    let _ = setup_repo_with_age_key(repo_root, &master_identity);
-
-    let (mut security, _guard) = init_security_with_repo(repo_root);
-    security.add_memory_identity(master_identity);
-
-    // Create a repo key manually via from_file workaround: use generate_machine_identity
-    let (_priv, pub_key) = dracon_security::DemonSecurity::generate_machine_identity();
-    // We can't construct RepoKey directly from bytes in integration tests
-    // Instead test that unlock_payload with a key we don't have fails
-    // Use the team key scenario where we have master but not the right recipient
-
-    // Create encrypted data with a key that security doesn't have
     let other_identity = age::x25519::Identity::generate();
     let other_recipient = other_identity.to_public();
     let wrong_recipients: Vec<Box<dyn age::Recipient + Send>> = vec![Box::new(other_recipient)];
@@ -622,7 +623,8 @@ fn test_unlock_payload_wrong_key() {
 
 #[test]
 fn test_unlock_payload_empty() {
-    let (security, _, _guard) = make_test_setup();
+    let tmp = tempfile::TempDir::new().expect("temp dir");
+    let (security, _, _guard) = make_repo_with_master(tmp.path());
 
     let result = security.unlock_payload(b"");
     assert!(result.is_err(), "empty payload should fail");
