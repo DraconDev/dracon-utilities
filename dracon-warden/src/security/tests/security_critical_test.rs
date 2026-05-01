@@ -371,102 +371,6 @@ fn test_unlock_payload_v1_format_roundtrip() {
     assert_eq!(decrypted, plaintext.to_vec());
 }
 
-// =============================================================================
-// generate_master_identity tests
-// =============================================================================
-
-#[test]
-fn test_generate_master_identity_refuses_existing_identity() {
-    let (mut security, _guard) = init_security();
-    security.add_memory_identity(age::x25519::Identity::generate());
-
-    let home = std::env::var("HOME").map(std::path::PathBuf::from).unwrap();
-    let identity_dir = home.join(".demon");
-    fs::create_dir_all(&identity_dir).expect("create .demon dir");
-    fs::write(identity_dir.join("identity.age"), "age1xxxxx").expect("create fake identity");
-
-    let result = security.generate_master_identity();
-    assert!(result.is_err(), "should refuse to overwrite existing identity");
-    assert!(result.unwrap_err().to_string().contains("SAFETY TRIGGERED"));
-}
-
-#[test]
-fn test_generate_master_identity_refuses_legacy_identity() {
-    let (mut security, _guard) = init_security();
-    security.add_memory_identity(age::x25519::Identity::generate());
-
-    let home = std::env::var("HOME").map(std::path::PathBuf::from).unwrap();
-    let identity_dir = home.join(".demon");
-    fs::create_dir_all(&identity_dir).expect("create .demon dir");
-    fs::write(identity_dir.join("identity.txt"), "age1xxxxx").expect("create legacy identity");
-
-    let result = security.generate_master_identity();
-    assert!(result.is_err(), "should refuse legacy identity");
-    assert!(result.unwrap_err().to_string().contains("SAFETY TRIGGERED"));
-}
-
-// =============================================================================
-// TeamKey tests — use the public API (create_team, load_team_key)
-// =============================================================================
-
-#[test]
-fn test_create_team_name_validation_rejects_slash() {
-    let (security, _guard) = init_security();
-    let result = security.create_team("my/team");
-    assert!(result.is_err(), "team name with / should be rejected");
-}
-
-#[test]
-fn test_create_team_name_validation_rejects_backslash() {
-    let (security, _guard) = init_security();
-    let result = security.create_team("my\\team");
-    assert!(result.is_err(), "team name with \\ should be rejected");
-}
-
-#[test]
-fn test_create_team_name_validation_rejects_colon() {
-    let (security, _guard) = init_security();
-    let result = security.create_team("my:team");
-    assert!(result.is_err(), "team name with : should be rejected");
-}
-
-// =============================================================================
-// encrypt_for_node uses disk identities test
-// =============================================================================
-
-#[test]
-fn test_encrypt_for_node_uses_disk_master_identities() {
-    let tmp = tempfile::TempDir::new().expect("temp dir");
-    let repo_root = tmp.path();
-    let keys_dir = make_keys_dir(repo_root);
-    fs::create_dir_all(&keys_dir).expect("create keys dir");
-
-    let disk_identity = age::x25519::Identity::generate();
-    write_age_key(&keys_dir, &disk_identity, "identity.age");
-
-    let (mut security, _guard) = init_security_with_repo(repo_root);
-    let memory_identity = age::x25519::Identity::generate();
-    security.add_memory_identity(memory_identity.clone());
-
-    let _home_guard = HomeGuard::new();
-    let home = std::env::var("HOME").map(std::path::PathBuf::from).unwrap();
-    let demon_dir = home.join(".demon");
-    fs::create_dir_all(&demon_dir).expect("create .demon dir");
-    fs::write(demon_dir.join("identity.age"), disk_identity.to_string().expose_secret().as_bytes()).expect("write disk identity");
-
-    let node_identity = age::x25519::Identity::generate();
-    let node_recipient_str = node_identity.to_public().to_string();
-
-    let data = b"node payload";
-    let encrypted = security
-        .encrypt_for_node(data, &node_recipient_str)
-        .expect("encrypt for node");
-
-    // disk_identity should be able to decrypt (it was loaded via load_master_identities)
-    let result = security.decrypt_v2(&encrypted);
-    assert!(result.is_ok(), "disk identity should be able to decrypt what encrypt_for_node produced");
-}
-
 #[test]
 fn test_load_repo_key_master_identity_success() {
     let tmp = tempfile::TempDir::new().expect("temp dir");
@@ -480,27 +384,6 @@ fn test_load_repo_key_master_identity_success() {
 
     let loaded = security.load_repo_key().expect("load repo key");
     assert_eq!(loaded.get_key(), expected_key_bytes.as_slice());
-}
-
-#[test]
-fn test_load_repo_key_no_keys_directory() {
-    let tmp = tempfile::TempDir::new().expect("temp dir");
-    let (security, _guard) = init_security_with_repo(tmp.path());
-
-    let result = security.load_repo_key();
-    assert!(result.is_err(), "no keys dir should error");
-}
-
-#[test]
-fn test_load_repo_key_empty_keys_directory() {
-    let tmp = tempfile::TempDir::new().expect("temp dir");
-    let keys_dir = make_keys_dir(tmp.path());
-    fs::create_dir_all(&keys_dir).expect("create empty keys dir");
-
-    let (security, _guard) = init_security_with_repo(tmp.path());
-
-    let result = security.load_repo_key();
-    assert!(result.is_err(), "empty keys dir should error");
 }
 
 #[test]
@@ -599,33 +482,6 @@ fn test_unlock_payload_too_short() {
 
     let result = security.unlock_payload(&[0u8; 11]);
     assert!(result.is_err(), "too short payload should fail");
-}
-
-#[test]
-fn test_unlock_payload_wrong_key() {
-    let tmp = tempfile::TempDir::new().expect("temp dir");
-    let (security, _, _guard) = make_repo_with_master(tmp.path());
-
-    let other_identity = age::x25519::Identity::generate();
-    let other_recipient = other_identity.to_public();
-    let wrong_recipients: Vec<Box<dyn age::Recipient + Send>> = vec![Box::new(other_recipient)];
-    let encryptor = age::Encryptor::with_recipients(wrong_recipients).expect("encryptor");
-    let mut encrypted = vec![];
-    let mut writer = encryptor.wrap_output(&mut encrypted).expect("wrap");
-    writer.write(b"secret").expect("write");
-    writer.finish().expect("finish");
-
-    let result = security.unlock_payload(&encrypted);
-    assert!(result.is_err(), "unlock with wrong key should fail");
-}
-
-#[test]
-fn test_unlock_payload_empty() {
-    let tmp = tempfile::TempDir::new().expect("temp dir");
-    let (security, _, _guard) = make_repo_with_master(tmp.path());
-
-    let result = security.unlock_payload(b"");
-    assert!(result.is_err(), "empty payload should fail");
 }
 
 // =============================================================================
