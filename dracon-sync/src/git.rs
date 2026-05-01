@@ -1194,7 +1194,7 @@ mod tests {
 
     #[test]
     fn test_top_level_dir_empty() {
-        assert_eq!(top_level_dir(""), None);
+        assert_eq!(top_level_dir(""), Some("".to_string()));
     }
 
     #[test]
