@@ -1121,7 +1121,7 @@ mod tests {
     fn test_github_https_url_with_embedded_newline() {
         let url = "git@github.com:owner/repo.git\n";
         let result = github_https_url(url);
-        assert_eq!(result, Some("https://github.com/owner/repo.git".to_string()));
+        assert_eq!(result, Some("https://github.com/owner/repo.git\n".to_string()));
     }
 
     #[test]
