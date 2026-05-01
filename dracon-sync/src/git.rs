@@ -1118,11 +1118,69 @@ mod tests {
     }
 
     #[test]
-    fn test_github_https_url_git_ssh() {
-        let url = "git@github.com:owner/repo.git";
+    fn test_github_https_url_with_embedded_newline() {
+        let url = "git@github.com:owner/repo.git\n";
         let result = github_https_url(url);
         assert_eq!(result, Some("https://github.com/owner/repo.git".to_string()));
     }
+
+    #[test]
+    fn test_github_https_url_ssh_with_colon_path() {
+        let url = "git@github.com:owner/repo";
+        let result = github_https_url(url);
+        assert_eq!(result, Some("https://github.com/owner/repo".to_string()));
+    }
+
+    #[test]
+    fn test_github_https_url_non_github_returns_none() {
+        let url = "https://gitlab.com/owner/repo.git";
+        let result = github_https_url(url);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_strip_url_credentials_with_at_sign() {
+        let url = "https://user:token@github.com/owner/repo.git";
+        let result = strip_url_credentials(url);
+        assert_eq!(result, "https://github.com/owner/repo.git");
+    }
+
+    #[test]
+    fn test_strip_url_credentials_no_credentials() {
+        let url = "https://github.com/owner/repo.git";
+        let result = strip_url_credentials(url);
+        assert_eq!(result, url);
+    }
+
+    #[test]
+    fn test_fallback_status_rank_ordering() {
+        assert!(fallback_status_rank(&FileStatus::Deleted) > fallback_status_rank(&FileStatus::Modified));
+        assert!(fallback_status_rank(&FileStatus::Renamed) > fallback_status_rank(&FileStatus::Added));
+        assert!(fallback_status_rank(&FileStatus::TypeChange) > fallback_status_rank(&FileStatus::Unknown));
+    }
+
+    #[test]
+    fn test_parse_name_status_line_valid_lines() {
+        assert_eq!(parse_name_status_line("M\tfile.rs"), Some((PathBuf::from("file.rs"), FileStatus::Modified)));
+        assert_eq!(parse_name_status_line("A\tnew.rs"), Some((PathBuf::from("new.rs"), FileStatus::Added)));
+        assert_eq!(parse_name_status_line("D\tdeleted.rs"), Some((PathBuf::from("deleted.rs"), FileStatus::Deleted)));
+    }
+
+    #[test]
+    fn test_parse_name_status_line_renamed() {
+        let result = parse_name_status_line("R\told.rs\tnew.rs");
+        assert!(result.is_some());
+        let (path, status) = result.unwrap();
+        assert_eq!(path, PathBuf::from("new.rs"));
+        assert_eq!(status, FileStatus::Renamed);
+    }
+
+    #[test]
+    fn test_parse_name_status_line_invalid_status() {
+        assert!(parse_name_status_line("X\tfile.rs").is_none());
+        assert!(parse_name_status_line("",).is_none());
+    }
+}
 
     #[test]
     fn test_github_https_url_ssh_protocol() {
