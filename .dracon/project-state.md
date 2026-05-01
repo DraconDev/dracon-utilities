@@ -1,11 +1,7 @@
 # Project State
 
 ## Current Focus
-Updated AI configuration paths to follow XDG-compliant directory structure and refactored provider configurations for `dracon-sync`
+Updated AI configuration paths to follow XDG-compliant directory structure by changing the secrets file location from `~/.dracon/ai/secrets/openrouter.env` to `~/.dracon/utilities/sync/ai/secrets/openrouter.env`
 
 ## Completed
-- [x] Moved incident ledger to `~/.local/state/dracon/` for XDG compliance
-- [x] Updated AI provider configuration to use Mistral's Codestral model
-- [x] Refactored AI provider list with new models (NVIDIA Step, OpenRouter Nemotron)
-- [x] Updated secrets file paths to `~/.dracon/utilities/sync/ai/secrets/`
-```
+- [x] Refactored AI secrets file path to follow XDG-compliant directory structure
