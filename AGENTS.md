@@ -246,9 +246,17 @@ Store keys in `~/.dracon/utilities/sync/ai/secrets/*.env`:
 dracon-sync test-ai
 ```
 
-## The Scribe
+## The Scribe: AI Working Memory
 
-The scribe is **you** (AI). The daemon maintains `.dracon/project-state.md` in each repo. AI generates commit messages that include the "Current Focus" line.
+The scribe is **you** (AI). The daemon maintains `.dracon/project-state.md` in each repo. This file is the **primary interface** between sync and the AI coder.
+
+### Why Frequent Commits?
+
+Sync commits every change because:
+- The AI reads git history to understand past work
+- Every commit is a checkpoint the AI can recover to
+- More commits = better context for the AI's "what was I doing?"
+- Commits are cheap; context is valuable
 
 ### Format
 
@@ -258,20 +266,56 @@ The scribe is **you** (AI). The daemon maintains `.dracon/project-state.md` in e
 ## Current Focus
 {one line: what you're working on right now}
 
+## Context
+{why: what problem are you solving? what prompted this change?}
+
 ## Completed
 - [x] {what you finished, with context}
 
 ## In Progress
 - [x] {what you're actively working on}
 
-## Open Issues
-- {blockers, decisions needed, things to investigate}
+## Blockers
+- {what's stopping progress: missing info, user decision needed, dependency}
+
+## Next Steps
+1. {immediate next action}
+2. {what comes after}
 ```
 
 ### Rules
 
 - **Current Focus** must be one line — it becomes the commit body
+- **Context** helps the AI recover understanding after time away
+- **Blockers** tell the AI what it can't proceed on
+- **Next Steps** give the AI a clear path forward
 - Be specific: "Fix TOCTOU race in warden keygen" not "fix bugs"
-- Include context: "Binary files bypass encryption — needs user decision on approach"
 - Don't document mechanical changes — only semantic state
 - If the file doesn't exist, create it when you have something meaningful to say
+
+### Example
+
+```markdown
+# Project State
+
+## Current Focus
+Refactor incident ledger to XDG state directory
+
+## Context
+The 2MB incident ledger was inside the .dracon git repo, causing
+self-referential churn. Every sync cycle added to the ledger,
+which dirtied the repo, which triggered another commit. Moved
+the ledger to ~/.local/state/dracon/ to break the cycle.
+
+## Completed
+- [x] Moved incident_ledger_path() from ~/.dracon/ to ~/.local/state/dracon/
+- [x] Moved stuck_repos_path() to XDG-compliant location
+- [x] 248 tests passing after path changes
+
+## Blockers
+- fleet.db still in .dracon/state/ (needs dracon-system change, out of scope)
+
+## Next Steps
+1. Monitor for 24h to confirm no self-referential churn
+2. Update AGENTS.md with new operational state location
+```
