@@ -427,7 +427,7 @@ async fn main() -> Result<()> {
                     return Ok(());
                 }
                 println!("🔧 Consolidating {} to master...", repo.display());
-                match consolidate_to_master(&repo) {
+                match consolidate_to_master(&repo).await {
                     Ok(()) => println!("✅ consolidated to master"),
                     Err(e) => {
                         eprintln!("❌ failed: {}", e);

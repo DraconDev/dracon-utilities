@@ -757,7 +757,7 @@ pub(crate) fn has_both_main_and_master(repo: &Path) -> bool {
     has_main && has_master
 }
 
-pub(crate) fn consolidate_to_master(repo: &Path) -> Result<()> {
+pub(crate) async fn consolidate_to_master(repo: &Path) -> Result<()> {
     let branch = current_branch(repo).unwrap_or_else(|| "master".to_string());
     if branch != "master" {
         std_git_command()
@@ -786,10 +786,8 @@ pub(crate) fn consolidate_to_master(repo: &Path) -> Result<()> {
     }
     // Ensure master has upstream tracking
     if has_origin_remote(repo) && !has_tracking_upstream(repo) {
-        if let Err(e) = std_git_command()
-            .args(["push", "-u", "origin", "master"])
-            .current_dir(repo)
-            .status()
+        if let Err(e) =
+            push_with_retries(repo, 60, 3, "consolidate-to-master").await
         {
             eprintln!("⚠️ failed to push master with upstream: {}", e);
         }
