@@ -563,7 +563,14 @@ pub(crate) async fn sync_repo(
                         for (name, result) in &push_results {
                             if let Err(e) = result {
                                 eprintln!("⚠️ push to {} failed for {}: {}", name, repo.display(), e);
+                                if let Some(ref mut rf) = remote_failures {
+                                    *rf.entry(name.clone()).or_insert(0) += 1;
+                                }
                             }
+                        }
+                    } else if let Some(ref mut rf) = remote_failures {
+                        for name in policy.remotes.iter().map(|r| r.name.clone()) {
+                            rf.remove(&name);
                         }
                     }
                 }
