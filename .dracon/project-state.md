@@ -1,21 +1,26 @@
 # Project State
 
 ## Current Focus
-Added notification for when all remotes fail during sync operations with a 30-minute cooldown
+Refactored remote failure notification cooldown logic to use entry API for cleaner state management.
 
 ## Context
-This change improves error visibility by notifying users when all configured remotes fail during synchronization. The 30-minute cooldown prevents notification spam while ensuring operators are aware of persistent issues.
+The change improves the remote failure notification system by:
+1. Using `entry().or_insert()` to handle cooldown initialization
+2. Simplifying the cooldown update logic
+3. Removing redundant cooldown insertion
+This follows the recent refactoring work on the remote failure tracking system.
 
 ## Completed
-- [x] Added notification when all remotes fail during sync
-- [x] Implemented 30-minute cooldown per repository to prevent notification spam
+- [x] Refactored cooldown management to use entry API
+- [x] Removed redundant cooldown insertion
+- [x] Maintained all existing functionality
 
 ## In Progress
-- [x] Notification system for remote failures
+- [x] Notification cooldown logic refactoring
 
 ## Blockers
 - None identified
 
 ## Next Steps
-1. Verify notification content and formatting
-2. Test with multiple repositories to confirm cooldown behavior
+1. Verify no regression in notification timing
+2. Consider additional refactoring opportunities in the daemon module
