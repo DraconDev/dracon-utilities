@@ -2720,11 +2720,10 @@ implemented new authentication flow
         std::env::set_var("PATH", &new_path);
 
         let test_gh = std::process::Command::new("gh").args(["repo", "create", "test", "--private"]).output();
-        eprintln!("DEBUG: test gh command result: success={}, stdout={:?}, stderr={:?}",
-            test_gh.as_ref().map(|o| o.status.success()).unwrap_or(false),
-            test_gh.as_ref().ok().map(|o| String::from_utf8_lossy(&o.stdout).to_string()),
-            test_gh.as_ref().ok().map(|o| String::from_utf8_lossy(&o.stderr).to_string())
-        );
+        eprintln!("DEBUG: test gh command: {:?}", test_gh);
+        if let Err(e) = &test_gh {
+            eprintln!("DEBUG: gh command error: {:?}", e);
+        }
 
         let result = create_github_private_remote(&repo, "testaccount");
         eprintln!("DEBUG: result: {:?}", result);
