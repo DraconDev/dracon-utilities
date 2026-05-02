@@ -1688,7 +1688,7 @@ mod tests {
 
         let remotes = multi_remote::list_remotes(&repo);
         assert!(remotes.contains(&"origin".to_string()), "origin must be preserved");
-        assert!(remotes.contains(&"stale".to_string()), "stale should be removed");
+        assert!(!remotes.contains(&"stale".to_string()), "stale not in keep list, should be removed");
     }
 
     #[test]
