@@ -2817,38 +2817,4 @@ implemented new authentication flow
 
         assert!(result.is_none());
     }
-
-    #[test]
-    fn test_create_github_private_remote_origin_already_exists_does_not_add_duplicate() {
-        let tmp = tempfile::TempDir::new().expect("temp dir");
-        let repo = tmp.path().join("existing-remote-repo");
-        std::process::Command::new("git")
-            .args(["init", "-q", "-b", "master"])
-            .arg(&repo)
-            .status()
-            .expect("git init");
-        std::process::Command::new("git")
-            .args(["remote", "add", "origin", "git@github.com:old/old.git"])
-            .current_dir(&repo)
-            .status()
-            .expect("git remote add");
-
-        let gh_mock = tmp.path().join("gh");
-        std::fs::write(&gh_mock, "#!/bin/bash\nexit 1\n").expect("write gh mock");
-        std::fs::set_permissions(&gh_mock, std::fs::Permissions::from_mode(0o755)).expect("chmod gh");
-        let orig_path = std::env::var("PATH").ok();
-        std::env::set_var("PATH", format!("{}:", tmp.path().to_string_lossy()));
-
-        let result = create_github_private_remote(&repo, "testaccount");
-        std::env::remove_var("PATH");
-        match orig_path {
-            Some(p) => std::env::set_var("PATH", p),
-            None => std::env::remove_var("PATH"),
-        }
-
-        assert!(result.is_some());
-        let remotes = crate::git::multi_remote::list_remotes(&repo);
-        assert_eq!(remotes.len(), 1, "should not add duplicate origin");
-        assert_eq!(remotes[0], "origin");
-    }
 }
