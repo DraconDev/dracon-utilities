@@ -1329,9 +1329,15 @@ pub(crate) fn create_repo_on_github(account: &str, repo_name: &str) -> Result<St
 }
 
 pub(crate) fn create_repo_on_gitlab(account: &str, repo_name: &str) -> Result<String> {
-    let output = std::process::Command::new("glab")
-        .args(["repo", "create", repo_name, "--visibility", "private"])
-        .output()
+    let mut cmd = std::process::Command::new("glab");
+    cmd.args(["repo", "create", repo_name, "--visibility", "private"]);
+    
+    // Load token from ~/.dracon/utilities/sync/secrets/*.env or env var
+    if let Some(token) = load_secret("GITLAB_TOKEN") {
+        cmd.env("GITLAB_TOKEN", token);
+    }
+    
+    let output = cmd.output()
         .with_context(|| "glab repo create failed")?;
 
     if !output.status.success() {
