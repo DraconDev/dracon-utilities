@@ -1,22 +1,23 @@
 # Project State
 
 ## Current Focus
-Refactored remote failure notification cooldown logic to prevent duplicate notifications.
+Added comprehensive secret loading functionality for environment variables
 
 ## Context
-The previous implementation had a logical flaw where cooldowns were being set but not properly checked before firing notifications. This could lead to duplicate notifications during cooldown periods.
+The project needs a reliable way to load secrets from both environment variables and local secret files, supporting multiple credential management approaches.
 
 ## Completed
-- [x] Added explicit cooldown check before firing notifications
-- [x] Improved cooldown handling by removing entries when expired
-- [x] Ensured notifications only fire when not in cooldown
+- [x] Added `load_secret` function that checks environment variables first
+- [x] Implements fallback to reading from `.env` files in the secrets directory
+- [x] Handles file parsing with proper line trimming and comment skipping
+- [x] Returns `None` when no valid secret is found
 
 ## In Progress
-- [x] Refactored cooldown logic to be more explicit and reliable
+- [ ] None (this is a complete feature addition)
 
 ## Blockers
-- None identified
+- None (this is a standalone feature)
 
 ## Next Steps
-1. Verify no duplicate notifications are being sent during cooldown periods
-2. Consider adding unit tests for the cooldown logic
+1. Update documentation to reference the new secret loading mechanism
+2. Add unit tests for the secret loading functionality
