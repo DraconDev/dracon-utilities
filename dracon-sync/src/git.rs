@@ -2315,30 +2315,3 @@ mod tests {
         assert!(result.is_ok());
     }
 }
-
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_create_repo_on_gitlab_token_passed_as_env_var() {
-        let tmp = tempfile::TempDir::new().expect("temp dir");
-        let glab_mock = tmp.path().join("glab");
-        std::fs::write(&glab_mock, "#!/bin/bash\nif [ -n \"$GITLAB_TOKEN\" ]; then echo 'Token received'; fi\nexit 0\n").expect("write glab mock");
-        std::fs::set_permissions(&glab_mock, std::fs::Permissions::from_mode(0o755)).expect("chmod");
-
-        std::env::set_var("GITLAB_TOKEN", "test_gitlab_token");
-        let orig_path = std::env::var("PATH").ok();
-        std::env::set_var("PATH", format!("{}:", tmp.path().to_string_lossy()));
-
-        let result = multi_remote::create_repo_on_gitlab("testuser", "test-repo");
-        std::env::remove_var("PATH");
-        std::env::remove_var("GITLAB_TOKEN");
-        match orig_path {
-            Some(p) => std::env::set_var("PATH", p),
-            None => std::env::remove_var("PATH"),
-        }
-
-        assert!(result.is_ok());
-    }
-
-}
