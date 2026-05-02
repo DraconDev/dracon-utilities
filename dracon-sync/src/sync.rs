@@ -536,10 +536,10 @@ pub(crate) async fn sync_repo(
                 // Push to additional named remotes after origin push succeeds
                 if !policy.remotes.is_empty() {
                     let repo_name = repo.file_name()
-                .map(|n| n.to_string_lossy().to_string())
-                .unwrap_or_default();
+                        .map(|n| n.to_string_lossy().to_string())
+                        .unwrap_or_default();
 
-            for (remote_name, create_result) in auto_create_all_remotes(&policy.remotes, &repo_name) {
+                    for (remote_name, create_result) in auto_create_all_remotes(&policy.remotes, &repo_name) {
                 match create_result {
                     Ok(url) => {
                         if let Err(e) = ensure_remote(repo, &remote_name, &url) {
