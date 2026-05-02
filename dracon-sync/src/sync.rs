@@ -582,8 +582,10 @@ pub(crate) async fn sync_repo(
         }
 
         return Ok(true);
-        #[allow(unreachable_code)]
-        {
+    }
+
+    #[allow(unreachable_code)]
+    {
         // All changes were filtered out (excluded dirs, oversized files, etc.)
         // Restore modified files to avoid perpetual dirty state. Untracked files can't be restored.
         // Skip gitlink entries (dirty submodules can't be restored this way)
@@ -661,7 +663,8 @@ pub(crate) async fn sync_repo(
         }
 
         // Dirty repo with entries but none passed filters and none restorable
-        if entries_len > 0 && !gitignore_updated {
+        let _entries_len = entries_len;
+        if _entries_len > 0 && !gitignore_updated {
             eprintln!(
                 "ℹ️ {} has {} dirty entries but none restorable (all untracked or excluded)",
                 repo.display(),
