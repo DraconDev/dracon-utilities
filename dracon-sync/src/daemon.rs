@@ -180,6 +180,11 @@ mod daemon_tests {
 }
 
 fn stuck_repos_path() -> PathBuf {
+    if let Ok(state_dir) = std::env::var("DRACON_SYNC_STATE_DIR") {
+        if !state_dir.is_empty() {
+            return PathBuf::from(state_dir).join("dracon-sync-stuck-push-repos.json");
+        }
+    }
     dirs::home_dir()
         .unwrap_or_else(|| PathBuf::from("."))
         .join(".local")

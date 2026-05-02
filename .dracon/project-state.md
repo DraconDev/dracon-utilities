@@ -1,21 +1,21 @@
 # Project State
 
 ## Current Focus
-Refactored multi-remote Git synchronization logic to remove redundant imports and simplify remote handling.
+Added configurable state directory path for stuck repository tracking
 
 ## Context
-The changes address technical debt in the multi-remote Git synchronization code by removing unnecessary dependencies and streamlining remote configuration.
+The change allows users to specify a custom directory for storing stuck repository information through the `DRACON_SYNC_STATE_DIR` environment variable, improving flexibility in deployment environments.
 
 ## Completed
-- [x] Removed redundant `HashMap` import from `git.rs`
-- [x] Simplified remote configuration in `sync.rs` by removing unused functions
+- [x] Added environment variable check for custom state directory path
+- [x] Implemented fallback to home directory when environment variable is not set
 
 ## In Progress
-- [ ] None (changes are complete)
+- [x] Environment variable configuration support
 
 ## Blockers
-- None (cleanup is complete)
+- None identified
 
 ## Next Steps
-1. Verify the refactored code maintains all existing functionality
-2. Prepare for upcoming multi-remote synchronization improvements
+1. Verify environment variable handling works across different operating systems
+2. Document the new configuration option in project documentation
