@@ -14,7 +14,7 @@ use crate::git::{
     unstage_excluded_paths, unstage_oversized_paths,
 };
 use crate::git::multi_remote::{
-    auto_create_all_remotes, configure_all_remotes, ensure_remote,
+    auto_create_all_remotes, configure_all_remotes,
     push_to_all_remotes, remove_stale_remotes,
 };
 use crate::policy::{debug_enabled, load_repo_override, SyncPolicy};
