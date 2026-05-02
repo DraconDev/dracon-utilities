@@ -2715,9 +2715,14 @@ implemented new authentication flow
         std::fs::write(&gh_mock, "#!/bin/bash\nexit 0\n").expect("write gh mock");
         std::fs::set_permissions(&gh_mock, std::fs::Permissions::from_mode(0o755)).expect("chmod gh");
         let orig_path = std::env::var("PATH").ok();
-        std::env::set_var("PATH", format!("{}:", tmp.path().to_string_lossy()));
+        let new_path = format!("{}:", tmp.path().to_string_lossy());
+        eprintln!("DEBUG: setting PATH to: {:?}", new_path);
+        std::env::set_var("PATH", &new_path);
+        eprintln!("DEBUG: gh found at: {:?}", std::process::Command::new("which").arg("gh").output().ok().map(|o| String::from_utf8_lossy(&o.stdout).to_string()));
+        eprintln!("DEBUG: ls tmp: {:?}", std::fs::read_dir(tmp.path()).map(|mut d| d.filter_map(|e| e.ok().map(|e| e.path().to_string_lossy().to_string())).collect::<Vec<_>>()));
 
         let result = create_github_private_remote(&repo, "testaccount");
+        eprintln!("DEBUG: result: {:?}", result);
         std::env::remove_var("PATH");
         match orig_path {
             Some(p) => std::env::set_var("PATH", p),
