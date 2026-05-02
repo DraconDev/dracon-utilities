@@ -1,20 +1,22 @@
 # Project State
 
 ## Current Focus
-Updated Codeberg API endpoint for repository creation to use the user-specific endpoint.
+Added GitLab token support for repository creation in `dracon-sync`
 
 ## Context
-The change modifies the default API endpoint used when auto-creating repositories on Codeberg. This aligns with the project's focus on comprehensive Git repository management and synchronization.
+The change enables secure GitLab repository creation by loading authentication tokens from environment variables or secret files, improving security and reliability.
 
 ## Completed
-- [x] Changed default Codeberg API endpoint from `/api/v1/repos` to `/api/v1/user/repos` for repository creation
+- [x] Added token loading for GitLab repository creation
+- [x] Integrated token into `glab` command execution
+- [x] Maintained backward compatibility with existing functionality
 
 ## In Progress
-- [x] No active work in progress related to this change
+- [ ] None (change is complete)
 
 ## Blockers
-- None identified for this specific change
+- None (change is self-contained)
 
 ## Next Steps
-1. Verify the new endpoint works correctly with existing authentication flows
-2. Ensure backward compatibility with existing repository creation logic
+1. Verify token loading works in all supported environments
+2. Add comprehensive tests for token handling scenarios
