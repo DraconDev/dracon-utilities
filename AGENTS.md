@@ -142,6 +142,9 @@ auto_github_private = true
 auto_github_private_account = "YourOrgOrUsername"
 ```
 
+**⚠️ CRITICAL: NEVER create suffixed repos (repo-1, repo-2, repo-N).**
+If the GitHub repo already exists, reuse it. A previous suffix loop in `create_github_private_remote` created 15+ orphan repos (`dracon-demons-1` through `-9`). This happens when `gh repo create` fails with "Name already exists" and the code appends `-1`, `-2` instead of just reusing the existing repo. This pattern is explicitly banned in all repo creation functions.
+
 ## CLI Reference
 
 All binaries support `-V, --version` and `-v, --verbose` (repeatable up to 2x for `-vv`).
