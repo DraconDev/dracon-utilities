@@ -303,24 +303,15 @@ Add test:
 
 | Risk | Likelihood | Impact | Mitigation |
 |------|-----------|--------|------------|
-| `auto_create_repo` async refactor breaks callers | Medium | High | Check all call sites, compile after each change |
-| Wiremock tests flaky in CI | Low | Medium | Use fixed ports, add retries |
+| `reqwest::blocking` adds thread overhead | Low | Low | Only used in one function; daemon has threads to spare |
 | Git push tests require SSH keys | Medium | Medium | Use `file://` protocol for local remotes |
 | External CLI tests fail in CI | Medium | Low | Mark with `#[ignore]` or skip conditionally |
 | Scope creep (testing unrelated code) | Medium | Medium | Strict function list, stop at 5 phases |
 
-## Decision Log
-
-1. **No mockall**: Stick with integration-test pattern. Adding mockall is scope creep.
-2. **No CLI mocking**: Test error paths only. Mocking `Command::new` is too invasive.
-3. **No wiremock**: Use `reqwest::blocking::Client` + local TCP mock server. Avoids new dependency and async refactor.
-4. **Use `reqwest::blocking`**: Replace `tokio::runtime::Handle::current().block_on()` with `reqwest::blocking::Client`. Cleaner, testable without runtime.
-5. **Use `file://` protocol for git push tests**: Avoids SSH key requirements in CI.
-
 ## Files to Modify
 
-1. `dracon-sync/Cargo.toml` - add wiremock
-2. `dracon-sync/src/git.rs` - refactor + add tests
+1. `dracon-sync/Cargo.toml` - add `blocking` feature to reqwest
+2. `dracon-sync/src/git.rs` - refactor Codeberg + add tests
 3. `dracon-sync/src/policy.rs` - add tests for `resolve_push_url`
 4. `dracon-sync/src/sync.rs` - add integration tests
 5. `dracon-sync/src/daemon.rs` - add remote failure tests
@@ -328,11 +319,11 @@ Add test:
 ## Total Estimated Time
 
 - Phase 1: 50 min
-- Phase 2: 47 min
+- Phase 2: 30 min (simplified: no wiremock, no async refactor)
 - Phase 3: 55 min
 - Phase 4: 30 min
 - Phase 5: 35 min
-- **Total**: ~3.5 hours
+- **Total**: ~3 hours
 
 ## Next Steps
 
