@@ -535,7 +535,7 @@ pub(crate) async fn sync_repo(
 
                 // Push to additional named remotes after origin push succeeds
                 if !policy.remotes.is_empty() {
-            let repo_name = repo.file_name()
+                    let repo_name = repo.file_name()
                 .map(|n| n.to_string_lossy().to_string())
                 .unwrap_or_default();
 
