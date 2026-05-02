@@ -1825,6 +1825,7 @@ fn create_private_remote(repo: &Path) -> Option<String> {
 mod tests {
     use super::*;
     use dracon_git::types::{DiffFile, FileStatus, RepoStatus};
+    use std::os::unix::fs::PermissionsExt;
 
     fn make_status(is_clean: bool, ahead: usize, behind: usize) -> RepoStatus {
         RepoStatus {
@@ -2806,7 +2807,7 @@ implemented new authentication flow
             .expect("git init");
 
         let orig_path = std::env::var("PATH").ok();
-        std::env::set_var("PATH", tmp.path().to_string_lossy());
+        std::env::set_var("PATH", tmp.path());
 
         let result = create_github_private_remote(&repo, "testaccount");
         std::env::remove_var("PATH");
