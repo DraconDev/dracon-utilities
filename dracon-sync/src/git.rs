@@ -2792,4 +2792,49 @@ mod tests {
         let err = format!("{}", result.unwrap_err());
         assert!(err.contains("unsafe"), "error should mention unsafe branch: {}", err);
     }
+
+    #[tokio::test]
+    async fn test_run_git_with_timeout_succeeds() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path().join("test-repo");
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .expect("git init");
+        std::fs::write(repo.join("file.txt"), "content").expect("write file");
+        std::process::Command::new("git")
+            .args(["add", "."])
+            .current_dir(&repo)
+            .status()
+            .expect("git add");
+        std::process::Command::new("git")
+            .args(["commit", "-m", "init"])
+            .current_dir(&repo)
+            .status()
+            .expect("git commit");
+
+        let result = run_git_with_timeout(&repo, &["status"], 10, "status").await;
+        assert!(result.is_ok(), "git status should succeed: {:?}", result);
+    }
+
+    #[tokio::test]
+    async fn test_run_git_with_timeout_env_injects_env_vars() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path().join("test-repo");
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .expect("git init");
+
+        let result = run_git_with_timeout_env(
+            &repo,
+            &["log", "--format=%s"],
+            10,
+            "log",
+            &[("GIT_AUTHOR_NAME", "Test Author"), ("GIT_COMMITTER_NAME", "Test Committer")],
+        ).await;
+        assert!(result.is_ok(), "git log with env vars should work: {:?}", result);
+    }
 }
