@@ -580,6 +580,8 @@ pub(crate) async fn sync_repo(
         } else if policy.auto_push && !has_origin {
             eprintln!("ℹ️ skip push for {} (no origin remote)", repo.display());
         }
+
+        return Ok(true);
         // All changes were filtered out (excluded dirs, oversized files, etc.)
         // Restore modified files to avoid perpetual dirty state. Untracked files can't be restored.
         // Skip gitlink entries (dirty submodules can't be restored this way)
