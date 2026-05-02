@@ -1,22 +1,22 @@
 # Project State
 
 ## Current Focus
-Refactored environment variable isolation for GitHub private remote tests
+Refactored environment variable isolation in Git remote tests
 
 ## Context
-The change improves test reliability by properly isolating environment variables during GitHub private remote operations. The previous implementation manually managed PATH modifications, which could lead to state leakage between tests. The new approach uses a RAII-style guard pattern to ensure clean environment restoration.
+The changes improve test reliability by properly isolating environment variables during Git remote operations, particularly for GitHub private repository creation.
 
 ## Completed
-- [x] Replaced manual PATH management with EnvRestorer guard pattern
-- [x] Simplified test setup/teardown logic
-- [x] Changed shebang from bash to sh for broader compatibility
+- [x] Replaced manual PATH manipulation with `EnvRestorer` utility
+- [x] Simplified shell script shebang from `/bin/bash` to `/bin/sh`
+- [x] Removed redundant environment variable cleanup code
 
 ## In Progress
-- [ ] None
+- [ ] No active work in progress
 
 ## Blockers
-- None
+- None identified
 
 ## Next Steps
-1. Verify test stability across different environments
-2. Consider adding more environment variable isolation cases
+1. Verify test coverage for GitLab private repository creation
+2. Review other test cases for similar environment isolation needs
