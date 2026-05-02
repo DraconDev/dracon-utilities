@@ -2366,7 +2366,7 @@ mod tests {
                 echo $((count+1)) > {counter}\n\
                 exit 1\n\
             fi\n\
-            exec /usr/bin/git \"$@\"\n",
+            exec git \"$@\"\n",
             counter = counter.display()
         )).expect("write fail script");
         std::fs::set_permissions(&fail_script, std::fs::Permissions::from_mode(0o755)).expect("chmod");
@@ -2376,27 +2376,27 @@ mod tests {
         let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
 
         let bare = tmp.path().join("bare.git");
-        std::process::Command::new("/usr/bin/git")
+        std::process::Command::new("git")
             .args(["init", "--bare", &bare.to_string_lossy()])
             .output()
             .expect("git init --bare");
         let repo = tmp.path().join("repo");
-        std::process::Command::new("/usr/bin/git")
+        std::process::Command::new("git")
             .args(["init", "-q", &repo.to_string_lossy()])
             .output()
             .expect("git init");
-        std::process::Command::new("/usr/bin/git")
+        std::process::Command::new("git")
             .args(["remote", "add", "origin", &bare.to_string_lossy()])
             .current_dir(&repo)
             .output()
             .expect("git remote add");
         std::fs::write(repo.join("f"), "content").expect("write file");
-        std::process::Command::new("/usr/bin/git")
+        std::process::Command::new("git")
             .args(["add", "f"])
             .current_dir(&repo)
             .output()
             .expect("git add");
-        std::process::Command::new("/usr/bin/git")
+        std::process::Command::new("git")
             .args(["commit", "-m", "init"])
             .current_dir(&repo)
             .output()
@@ -2419,27 +2419,27 @@ mod tests {
         let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
 
         let bare = tmp.path().join("bare.git");
-        std::process::Command::new("/usr/bin/git")
+        std::process::Command::new("git")
             .args(["init", "--bare", &bare.to_string_lossy()])
             .output()
             .expect("git init --bare");
         let repo = tmp.path().join("repo");
-        std::process::Command::new("/usr/bin/git")
+        std::process::Command::new("git")
             .args(["init", "-q", &repo.to_string_lossy()])
             .output()
             .expect("git init");
-        std::process::Command::new("/usr/bin/git")
+        std::process::Command::new("git")
             .args(["remote", "add", "origin", &bare.to_string_lossy()])
             .current_dir(&repo)
             .output()
             .expect("git remote add");
         std::fs::write(repo.join("f"), "content").expect("write file");
-        std::process::Command::new("/usr/bin/git")
+        std::process::Command::new("git")
             .args(["add", "f"])
             .current_dir(&repo)
             .output()
             .expect("git add");
-        std::process::Command::new("/usr/bin/git")
+        std::process::Command::new("git")
             .args(["commit", "-m", "init"])
             .current_dir(&repo)
             .output()
@@ -2492,7 +2492,7 @@ mod tests {
                 echo 'SSH failure' >&2\n\
                 exit 128\n\
             fi\n\
-            exec /usr/bin/git \"$@\"\n\
+            exec git \"$@\"\n\
         ").expect("write fail git");
         std::fs::set_permissions(&fail_git, std::fs::Permissions::from_mode(0o755)).expect("chmod");
 
@@ -2501,28 +2501,28 @@ mod tests {
         let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
 
         let bare = tmp.path().join("bare.git");
-        std::process::Command::new("/usr/bin/git")
+        std::process::Command::new("git")
             .args(["init", "--bare", &bare.to_string_lossy()])
             .output()
             .expect("git init --bare");
         let bare_url = format!("file://{}", bare.to_string_lossy());
         let repo = tmp.path().join("repo");
-        std::process::Command::new("/usr/bin/git")
+        std::process::Command::new("git")
             .args(["init", "-q", &repo.to_string_lossy()])
             .output()
             .expect("git init");
-        std::process::Command::new("/usr/bin/git")
+        std::process::Command::new("git")
             .args(["remote", "add", "origin", &bare_url])
             .current_dir(&repo)
             .output()
             .expect("git remote add");
         std::fs::write(repo.join("f"), "content").expect("write file");
-        std::process::Command::new("/usr/bin/git")
+        std::process::Command::new("git")
             .args(["add", "f"])
             .current_dir(&repo)
             .output()
             .expect("git add");
-        std::process::Command::new("/usr/bin/git")
+        std::process::Command::new("git")
             .args(["commit", "-m", "init"])
             .current_dir(&repo)
             .output()
@@ -2545,28 +2545,28 @@ mod tests {
         let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
 
         let bare = tmp.path().join("bare.git");
-        std::process::Command::new("/usr/bin/git")
+        std::process::Command::new("git")
             .args(["init", "--bare", &bare.to_string_lossy()])
             .output()
             .expect("git init --bare");
         let bare_url = format!("file://{}", bare.to_string_lossy());
         let repo = tmp.path().join("repo");
-        std::process::Command::new("/usr/bin/git")
+        std::process::Command::new("git")
             .args(["init", "-q", &repo.to_string_lossy()])
             .output()
             .expect("git init");
-        std::process::Command::new("/usr/bin/git")
+        std::process::Command::new("git")
             .args(["remote", "add", "origin", &bare_url])
             .current_dir(&repo)
             .output()
             .expect("git remote add");
         std::fs::write(repo.join("f"), "content").expect("write file");
-        std::process::Command::new("/usr/bin/git")
+        std::process::Command::new("git")
             .args(["add", "f"])
             .current_dir(&repo)
             .output()
             .expect("git add");
-        std::process::Command::new("/usr/bin/git")
+        std::process::Command::new("git")
             .args(["commit", "-m", "init"])
             .current_dir(&repo)
             .output()
@@ -2619,7 +2619,7 @@ mod tests {
                 echo 'SSH failure' >&2\n\
                 exit 128\n\
             fi\n\
-            exec /usr/bin/git \"$@\"\n\
+            exec git \"$@\"\n\
         ").expect("write fail git");
         std::fs::set_permissions(&fail_git, std::fs::Permissions::from_mode(0o755)).expect("chmod");
 
@@ -2628,28 +2628,28 @@ mod tests {
         let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
 
         let bare = tmp.path().join("bare.git");
-        std::process::Command::new("/usr/bin/git")
+        std::process::Command::new("git")
             .args(["init", "--bare", &bare.to_string_lossy()])
             .output()
             .expect("git init --bare");
         let bare_url = format!("file://{}", bare.to_string_lossy());
         let repo = tmp.path().join("repo");
-        std::process::Command::new("/usr/bin/git")
+        std::process::Command::new("git")
             .args(["init", "-q", "-b", "master", &repo.to_string_lossy()])
             .output()
             .expect("git init");
-        std::process::Command::new("/usr/bin/git")
+        std::process::Command::new("git")
             .args(["remote", "add", "mirror", &bare_url])
             .current_dir(&repo)
             .output()
             .expect("git remote add");
         std::fs::write(repo.join("f"), "content").expect("write file");
-        std::process::Command::new("/usr/bin/git")
+        std::process::Command::new("git")
             .args(["add", "f"])
             .current_dir(&repo)
             .output()
             .expect("git add");
-        std::process::Command::new("/usr/bin/git")
+        std::process::Command::new("git")
             .args(["commit", "-m", "init"])
             .current_dir(&repo)
             .output()
@@ -2672,33 +2672,33 @@ mod tests {
         let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
 
         let bare = tmp.path().join("bare.git");
-        std::process::Command::new("/usr/bin/git")
+        std::process::Command::new("git")
             .args(["init", "--bare", &bare.to_string_lossy()])
             .output()
             .expect("git init --bare");
         let bare_url = format!("file://{}", bare.to_string_lossy());
         let repo = tmp.path().join("repo");
-        std::process::Command::new("/usr/bin/git")
+        std::process::Command::new("git")
             .args(["init", "-q", &repo.to_string_lossy()])
             .output()
             .expect("git init");
-        std::process::Command::new("/usr/bin/git")
+        std::process::Command::new("git")
             .args(["checkout", "-b", "--orphan", "deploy/prod"])
             .current_dir(&repo)
             .output()
             .expect("git checkout -b deploy/prod");
-        std::process::Command::new("/usr/bin/git")
+        std::process::Command::new("git")
             .args(["remote", "add", "mirror", &bare_url])
             .current_dir(&repo)
             .output()
             .expect("git remote add");
         std::fs::write(repo.join("f"), "content").expect("write file");
-        std::process::Command::new("/usr/bin/git")
+        std::process::Command::new("git")
             .args(["add", "f"])
             .current_dir(&repo)
             .output()
             .expect("git add");
-        std::process::Command::new("/usr/bin/git")
+        std::process::Command::new("git")
             .args(["commit", "-m", "init"])
             .current_dir(&repo)
             .output()
