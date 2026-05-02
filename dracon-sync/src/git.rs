@@ -13,6 +13,9 @@ use tokio::time::sleep;
 use crate::exclude::is_excluded_change_path;
 use crate::policy::{std_git_command, tokio_git_command, timestamp_secs, AuthType, RemoteConfig};
 
+#[cfg(test)]
+pub(crate) static PATH_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 /// Get the list of files that actually differ from HEAD (filter-aware).
 /// Unlike `git status`, `git diff HEAD` applies clean filters and correctly
 /// ignores files that only differ due to smudge filter decryption.
