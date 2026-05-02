@@ -2716,12 +2716,12 @@ implemented new authentication flow
         std::fs::set_permissions(&gh_mock, std::fs::Permissions::from_mode(0o755)).expect("chmod gh");
         let orig_path = std::env::var("PATH").ok();
         let new_path = format!("{}:", tmp.path().to_string_lossy());
+        eprintln!("DEBUG: original PATH: {:?}", orig_path);
         eprintln!("DEBUG: setting PATH to: {:?}", new_path);
         std::env::set_var("PATH", &new_path);
-        let gh_check = std::process::Command::new("sh").arg("-c").arg("echo found: $(which gh || echo not found)").output();
-        eprintln!("DEBUG: which gh via sh: {:?}", gh_check.map(|o| String::from_utf8_lossy(&o.stdout).to_string()));
-        let gh_output = std::process::Command::new("gh").arg("--version").output();
-        eprintln!("DEBUG: gh --version output: {:?}", gh_output.map(|o| String::from_utf8_lossy(&o.stdout).to_string()));
+
+        let gh_output = std::process::Command::new("/bin/sh").arg("-c").arg("echo PATH=$PATH && which gh || echo gh not found in PATH").output();
+        eprintln!("DEBUG: sh -c output: {:?}", gh_output.map(|o| String::from_utf8_lossy(&o.stdout).to_string()));
 
         let result = create_github_private_remote(&repo, "testaccount");
         eprintln!("DEBUG: result: {:?}", result);
