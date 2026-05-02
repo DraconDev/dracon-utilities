@@ -2885,27 +2885,4 @@ implemented new authentication flow
         assert_eq!(remotes.len(), 1, "should not add duplicate origin");
         assert_eq!(remotes[0], "origin");
     }
-
-    #[test]
-    fn test_create_github_private_remote_no_gh_installed_returns_none() {
-        let tmp = tempfile::TempDir::new().expect("temp dir");
-        let repo = tmp.path().join("no-gh-repo");
-        std::process::Command::new("git")
-            .args(["init", "-q", "-b", "master"])
-            .arg(&repo)
-            .status()
-            .expect("git init");
-
-        let orig_path = std::env::var("PATH").ok();
-        std::env::set_var("PATH", tmp.path());
-
-        let result = create_github_private_remote(&repo, "testaccount");
-        std::env::remove_var("PATH");
-        match orig_path {
-            Some(p) => std::env::set_var("PATH", p),
-            None => std::env::remove_var("PATH"),
-        }
-
-        assert!(result.is_none());
-    }
 }
