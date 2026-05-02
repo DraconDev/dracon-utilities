@@ -1,21 +1,22 @@
 # Project State
 
 ## Current Focus
-Removed debug assertions from GitHub private remote test cases
+Added environment variable isolation utility for testing
 
 ## Context
-The test cases for GitHub private remote creation were previously using debug assertions that were not appropriate for production code. These assertions were removed to ensure the codebase remains clean and production-ready.
+To improve test reliability, we need a way to safely modify and restore environment variables during test execution. This is particularly important for Git remote tests that rely on specific environment configurations.
 
 ## Completed
-- [x] Removed debug assertions from GitHub private remote test cases
-- [x] Synchronized dependency metadata in Cargo.lock
+- [x] Added `EnvRestorer` struct to manage environment variable state
+- [x] Implemented automatic restoration of original values when dropped
+- [x] Created constructor that captures current state before modification
 
 ## In Progress
-- [ ] None
+- [ ] Integration with Git remote tests
 
 ## Blockers
-- None
+- Need to identify which tests require environment isolation
 
 ## Next Steps
-1. Review the remaining test cases for any remaining debug assertions
-2. Ensure all test cases properly validate the GitHub private remote creation functionality
+1. Integrate `EnvRestorer` with Git remote test cases
+2. Add comprehensive test coverage for environment isolation scenarios

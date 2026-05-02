@@ -1827,6 +1827,31 @@ mod tests {
     use dracon_git::types::{DiffFile, FileStatus, RepoStatus};
     use std::os::unix::fs::PermissionsExt;
 
+    struct EnvRestorer {
+        key: String,
+        old_value: Option<String>,
+    }
+
+    impl EnvRestorer {
+        fn new(key: &str, new_value: &str) -> Self {
+            let old_value = std::env::var(key).ok();
+            std::env::set_var(key, new_value);
+            EnvRestorer {
+                key: key.to_string(),
+                old_value,
+            }
+        }
+    }
+
+    impl Drop for EnvRestorer {
+        fn drop(&mut self) {
+            std::env::remove_var(&self.key);
+            if let Some(ref v) = self.old_value {
+                std::env::set_var(&self.key, v);
+            }
+        }
+    }
+
     fn make_status(is_clean: bool, ahead: usize, behind: usize) -> RepoStatus {
         RepoStatus {
             branch: String::new(),
