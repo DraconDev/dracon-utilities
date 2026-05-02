@@ -1312,9 +1312,17 @@ pub(crate) async fn push_to_all_remotes(
 }
 
 pub(crate) fn create_repo_on_github(account: &str, repo_name: &str) -> Result<String> {
-    let output = std::process::Command::new("gh")
-        .args(["repo", "create", repo_name, "--private"])
-        .output()
+    let mut cmd = std::process::Command::new("gh");
+    cmd.args(["repo", "create", repo_name, "--private"]);
+
+    // PAT from ~/.dracon/utilities/sync/secrets/github.env
+    // Falls back to gh's stored auth (gh auth login) if PAT is not found.
+    // TODO: Consider making PAT mandatory if it proves reliable over time.
+    if let Some(token) = load_secret("GH_TOKEN") {
+        cmd.env("GH_TOKEN", token);
+    }
+
+    let output = cmd.output()
         .with_context(|| "gh repo create failed")?;
 
     if !output.status.success() {
