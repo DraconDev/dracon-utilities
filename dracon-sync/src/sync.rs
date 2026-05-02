@@ -668,7 +668,7 @@ pub(crate) async fn sync_repo(
             eprintln!(
                 "ℹ️ {} has {} dirty entries but none restorable (all untracked or excluded)",
                 repo.display(),
-                entries_len
+                _entries_len
             );
         }
         }
