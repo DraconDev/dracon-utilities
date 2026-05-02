@@ -1128,14 +1128,6 @@ pub(crate) fn load_secret(env_name: &str) -> Option<String> {
     }
     None
 }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    None
-}
 
 pub(crate) mod multi_remote {
     use super::*;
