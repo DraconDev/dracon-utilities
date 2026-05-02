@@ -1833,8 +1833,6 @@ mod tests {
     use dracon_git::types::{DiffFile, FileStatus, RepoStatus};
     use std::os::unix::fs::PermissionsExt;
 
-    static PATH_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
-
     struct EnvRestorer {
         key: String,
         old_value: Option<String>,
