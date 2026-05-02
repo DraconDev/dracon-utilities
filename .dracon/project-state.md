@@ -4,20 +4,19 @@
 Refactored environment variable isolation for GitHub private remote tests
 
 ## Context
-The previous implementation had manual environment variable management which could lead to leaks or incorrect state restoration. This change introduces a reusable `EnvRestorer` utility to properly manage environment variables during tests.
+The change improves test reliability by properly isolating environment variables during GitHub private remote operations. The previous implementation manually managed PATH modifications, which could lead to state leakage between tests. The new approach uses a RAII-style guard pattern to ensure clean environment restoration.
 
 ## Completed
-- [x] Created `EnvRestorer` struct to handle environment variable isolation
-- [x] Implemented proper cleanup in `Drop` trait
-- [x] Replaced manual environment variable management with `EnvRestorer`
-- [x] Simplified test setup code by 6 lines
+- [x] Replaced manual PATH management with EnvRestorer guard pattern
+- [x] Simplified test setup/teardown logic
+- [x] Changed shebang from bash to sh for broader compatibility
 
 ## In Progress
-- [ ] No active work in progress
+- [ ] None
 
 ## Blockers
-- None identified
+- None
 
 ## Next Steps
-1. Verify all test cases still pass with the new implementation
-2. Consider adding more environment variable test cases if needed
+1. Verify test stability across different environments
+2. Consider adding more environment variable isolation cases
