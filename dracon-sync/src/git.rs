@@ -2316,4 +2316,397 @@ mod tests {
 
         assert!(result.is_ok());
     }
+
+    #[tokio::test]
+    async fn test_push_with_retries_succeeds_first_attempt() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let bare = tmp.path().join("bare.git");
+        std::process::Command::new("git")
+            .args(["init", "--bare", &bare.to_string_lossy()])
+            .output()
+            .expect("git init --bare");
+        let repo = tmp.path().join("repo");
+        std::process::Command::new("git")
+            .args(["init", "-q", &repo.to_string_lossy()])
+            .output()
+            .expect("git init");
+        std::process::Command::new("git")
+            .args(["remote", "add", "origin", &bare.to_string_lossy()])
+            .current_dir(&repo)
+            .output()
+            .expect("git remote add");
+        std::fs::write(repo.join("f"), "content").expect("write file");
+        std::process::Command::new("git")
+            .args(["add", "f"])
+            .current_dir(&repo)
+            .output()
+            .expect("git add");
+        std::process::Command::new("git")
+            .args(["commit", "-m", "init"])
+            .current_dir(&repo)
+            .output()
+            .expect("git commit");
+
+        let result = crate::git::push_with_retries(&repo, 5, 3, "test-push").await;
+        assert!(result.is_ok(), "push should succeed on first attempt: {:?}", result);
+    }
+
+    #[tokio::test]
+    async fn test_push_with_retries_retries_then_succeeds() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let counter = tmp.path().join("call_counter");
+        std::fs::write(&counter, "0").expect("write counter");
+
+        let fail_script = tmp.path().join("git");
+        std::fs::write(&fail_script, &format!(
+            "#!/bin/sh\n\
+            count=$(cat {counter})\n\
+            if [ \"$count\" -lt 1 ]; then\n\
+                echo \"simulated failure\" >&2\n\
+                echo $((count+1)) > {counter}\n\
+                exit 1\n\
+            fi\n\
+            exec /usr/bin/git \"$@\"\n",
+            counter = counter.display()
+        )).expect("write fail script");
+        std::fs::set_permissions(&fail_script, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+
+        let _lock = PATH_LOCK.lock().unwrap();
+        let orig_path = std::env::var("PATH").unwrap_or_default();
+        let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
+
+        let bare = tmp.path().join("bare.git");
+        std::process::Command::new("/usr/bin/git")
+            .args(["init", "--bare", &bare.to_string_lossy()])
+            .output()
+            .expect("git init --bare");
+        let repo = tmp.path().join("repo");
+        std::process::Command::new("/usr/bin/git")
+            .args(["init", "-q", &repo.to_string_lossy()])
+            .output()
+            .expect("git init");
+        std::process::Command::new("/usr/bin/git")
+            .args(["remote", "add", "origin", &bare.to_string_lossy()])
+            .current_dir(&repo)
+            .output()
+            .expect("git remote add");
+        std::fs::write(repo.join("f"), "content").expect("write file");
+        std::process::Command::new("/usr/bin/git")
+            .args(["add", "f"])
+            .current_dir(&repo)
+            .output()
+            .expect("git add");
+        std::process::Command::new("/usr/bin/git")
+            .args(["commit", "-m", "init"])
+            .current_dir(&repo)
+            .output()
+            .expect("git commit");
+
+        let result = crate::git::push_with_retries(&repo, 5, 3, "test-push-retry").await;
+        assert!(result.is_ok(), "push should eventually succeed after retry: {:?}", result);
+    }
+
+    #[tokio::test]
+    async fn test_push_with_retries_exhausts_retries_and_fails() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let always_fail = tmp.path().join("git");
+        std::fs::write(&always_fail, "#!/bin/sh\necho 'always fail' >&2\nexit 1\n")
+            .expect("write fail git");
+        std::fs::set_permissions(&always_fail, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+
+        let _lock = PATH_LOCK.lock().unwrap();
+        let orig_path = std::env::var("PATH").unwrap_or_default();
+        let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
+
+        let bare = tmp.path().join("bare.git");
+        std::process::Command::new("/usr/bin/git")
+            .args(["init", "--bare", &bare.to_string_lossy()])
+            .output()
+            .expect("git init --bare");
+        let repo = tmp.path().join("repo");
+        std::process::Command::new("/usr/bin/git")
+            .args(["init", "-q", &repo.to_string_lossy()])
+            .output()
+            .expect("git init");
+        std::process::Command::new("/usr/bin/git")
+            .args(["remote", "add", "origin", &bare.to_string_lossy()])
+            .current_dir(&repo)
+            .output()
+            .expect("git remote add");
+        std::fs::write(repo.join("f"), "content").expect("write file");
+        std::process::Command::new("/usr/bin/git")
+            .args(["add", "f"])
+            .current_dir(&repo)
+            .output()
+            .expect("git add");
+        std::process::Command::new("/usr/bin/git")
+            .args(["commit", "-m", "init"])
+            .current_dir(&repo)
+            .output()
+            .expect("git commit");
+
+        let result = crate::git::push_with_retries(&repo, 1, 2, "test-push-fail").await;
+        assert!(result.is_err(), "push should fail after exhausting retries");
+    }
+
+    #[tokio::test]
+    async fn test_push_with_transport_fallbacks_ssh_succeeds_no_fallback() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let bare = tmp.path().join("bare.git");
+        std::process::Command::new("git")
+            .args(["init", "--bare", &bare.to_string_lossy()])
+            .output()
+            .expect("git init --bare");
+        let repo = tmp.path().join("repo");
+        std::process::Command::new("git")
+            .args(["init", "-q", &repo.to_string_lossy()])
+            .output()
+            .expect("git init");
+        std::process::Command::new("git")
+            .args(["remote", "add", "origin", &bare.to_string_lossy()])
+            .current_dir(&repo)
+            .output()
+            .expect("git remote add");
+        std::fs::write(repo.join("f"), "content").expect("write file");
+        std::process::Command::new("git")
+            .args(["add", "f"])
+            .current_dir(&repo)
+            .output()
+            .expect("git add");
+        std::process::Command::new("git")
+            .args(["commit", "-m", "init"])
+            .current_dir(&repo)
+            .output()
+            .expect("git commit");
+
+        let result = crate::git::push_with_transport_fallbacks(&repo, 5, "test-push").await;
+        assert!(result.is_ok(), "SSH push should succeed: {:?}", result);
+    }
+
+    #[tokio::test]
+    async fn test_push_with_transport_fallbacks_ssh_fails_https_fallback_succeeds() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let fail_git = tmp.path().join("git");
+        std::fs::write(&fail_git, "#!/bin/sh\n\
+            if echo \"$@\" | grep -q 'GIT_SSH_COMMAND'; then\n\
+                echo 'SSH failure' >&2\n\
+                exit 128\n\
+            fi\n\
+            exec /usr/bin/git \"$@\"\n\
+        ").expect("write fail git");
+        std::fs::set_permissions(&fail_git, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+
+        let _lock = PATH_LOCK.lock().unwrap();
+        let orig_path = std::env::var("PATH").unwrap_or_default();
+        let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
+
+        let bare = tmp.path().join("bare.git");
+        std::process::Command::new("/usr/bin/git")
+            .args(["init", "--bare", &bare.to_string_lossy()])
+            .output()
+            .expect("git init --bare");
+        let bare_url = format!("file://{}", bare.to_string_lossy());
+        let repo = tmp.path().join("repo");
+        std::process::Command::new("/usr/bin/git")
+            .args(["init", "-q", &repo.to_string_lossy()])
+            .output()
+            .expect("git init");
+        std::process::Command::new("/usr/bin/git")
+            .args(["remote", "add", "origin", &bare_url])
+            .current_dir(&repo)
+            .output()
+            .expect("git remote add");
+        std::fs::write(repo.join("f"), "content").expect("write file");
+        std::process::Command::new("/usr/bin/git")
+            .args(["add", "f"])
+            .current_dir(&repo)
+            .output()
+            .expect("git add");
+        std::process::Command::new("/usr/bin/git")
+            .args(["commit", "-m", "init"])
+            .current_dir(&repo)
+            .output()
+            .expect("git commit");
+
+        let result = crate::git::push_with_transport_fallbacks(&repo, 5, "test-push-fb").await;
+        assert!(result.is_ok(), "HTTPS fallback should succeed after SSH failure: {:?}", result);
+    }
+
+    #[tokio::test]
+    async fn test_push_with_transport_fallbacks_both_fail() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let fail_git = tmp.path().join("git");
+        std::fs::write(&fail_git, "#!/bin/sh\necho 'always fail' >&2\nexit 1\n")
+            .expect("write fail git");
+        std::fs::set_permissions(&fail_git, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+
+        let _lock = PATH_LOCK.lock().unwrap();
+        let orig_path = std::env::var("PATH").unwrap_or_default();
+        let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
+
+        let bare = tmp.path().join("bare.git");
+        std::process::Command::new("/usr/bin/git")
+            .args(["init", "--bare", &bare.to_string_lossy()])
+            .output()
+            .expect("git init --bare");
+        let bare_url = format!("file://{}", bare.to_string_lossy());
+        let repo = tmp.path().join("repo");
+        std::process::Command::new("/usr/bin/git")
+            .args(["init", "-q", &repo.to_string_lossy()])
+            .output()
+            .expect("git init");
+        std::process::Command::new("/usr/bin/git")
+            .args(["remote", "add", "origin", &bare_url])
+            .current_dir(&repo)
+            .output()
+            .expect("git remote add");
+        std::fs::write(repo.join("f"), "content").expect("write file");
+        std::process::Command::new("/usr/bin/git")
+            .args(["add", "f"])
+            .current_dir(&repo)
+            .output()
+            .expect("git add");
+        std::process::Command::new("/usr/bin/git")
+            .args(["commit", "-m", "init"])
+            .current_dir(&repo)
+            .output()
+            .expect("git commit");
+
+        let result = crate::git::push_with_transport_fallbacks(&repo, 1, "test-push-both-fail").await;
+        assert!(result.is_err(), "both SSH and HTTPS should fail");
+    }
+
+    #[tokio::test]
+    async fn test_push_to_named_remote_ssh_success() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let bare = tmp.path().join("bare.git");
+        std::process::Command::new("git")
+            .args(["init", "--bare", &bare.to_string_lossy()])
+            .output()
+            .expect("git init --bare");
+        let repo = tmp.path().join("repo");
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "master", &repo.to_string_lossy()])
+            .output()
+            .expect("git init");
+        std::process::Command::new("git")
+            .args(["remote", "add", "mirror", &bare.to_string_lossy()])
+            .current_dir(&repo)
+            .output()
+            .expect("git remote add");
+        std::fs::write(repo.join("f"), "content").expect("write file");
+        std::process::Command::new("git")
+            .args(["add", "f"])
+            .current_dir(&repo)
+            .output()
+            .expect("git add");
+        std::process::Command::new("git")
+            .args(["commit", "-m", "init"])
+            .current_dir(&repo)
+            .output()
+            .expect("git commit");
+
+        let result = multi_remote::push_to_named_remote(&repo, "mirror", 5, 0).await;
+        assert!(result.is_ok(), "SSH push to named remote should succeed: {:?}", result);
+    }
+
+    #[tokio::test]
+    async fn test_push_to_named_remote_ssh_fails_https_fallback() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let fail_git = tmp.path().join("git");
+        std::fs::write(&fail_git, "#!/bin/sh\n\
+            if echo \"$@\" | grep -q 'GIT_SSH_COMMAND'; then\n\
+                echo 'SSH failure' >&2\n\
+                exit 128\n\
+            fi\n\
+            exec /usr/bin/git \"$@\"\n\
+        ").expect("write fail git");
+        std::fs::set_permissions(&fail_git, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+
+        let _lock = PATH_LOCK.lock().unwrap();
+        let orig_path = std::env::var("PATH").unwrap_or_default();
+        let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
+
+        let bare = tmp.path().join("bare.git");
+        std::process::Command::new("/usr/bin/git")
+            .args(["init", "--bare", &bare.to_string_lossy()])
+            .output()
+            .expect("git init --bare");
+        let bare_url = format!("file://{}", bare.to_string_lossy());
+        let repo = tmp.path().join("repo");
+        std::process::Command::new("/usr/bin/git")
+            .args(["init", "-q", "-b", "master", &repo.to_string_lossy()])
+            .output()
+            .expect("git init");
+        std::process::Command::new("/usr/bin/git")
+            .args(["remote", "add", "mirror", &bare_url])
+            .current_dir(&repo)
+            .output()
+            .expect("git remote add");
+        std::fs::write(repo.join("f"), "content").expect("write file");
+        std::process::Command::new("/usr/bin/git")
+            .args(["add", "f"])
+            .current_dir(&repo)
+            .output()
+            .expect("git add");
+        std::process::Command::new("/usr/bin/git")
+            .args(["commit", "-m", "init"])
+            .current_dir(&repo)
+            .output()
+            .expect("git commit");
+
+        let result = multi_remote::push_to_named_remote(&repo, "mirror", 5, 0).await;
+        assert!(result.is_ok(), "HTTPS fallback should succeed after SSH failure: {:?}", result);
+    }
+
+    #[tokio::test]
+    async fn test_push_to_named_remote_unsafe_branch_skips_https_fallback() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let fail_git = tmp.path().join("git");
+        std::fs::write(&fail_git, "#!/bin/sh\necho 'SSH failure' >&2\nexit 128\n")
+            .expect("write fail git");
+        std::fs::set_permissions(&fail_git, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+
+        let _lock = PATH_LOCK.lock().unwrap();
+        let orig_path = std::env::var("PATH").unwrap_or_default();
+        let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
+
+        let bare = tmp.path().join("bare.git");
+        std::process::Command::new("/usr/bin/git")
+            .args(["init", "--bare", &bare.to_string_lossy()])
+            .output()
+            .expect("git init --bare");
+        let bare_url = format!("file://{}", bare.to_string_lossy());
+        let repo = tmp.path().join("repo");
+        std::process::Command::new("/usr/bin/git")
+            .args(["init", "-q", &repo.to_string_lossy()])
+            .output()
+            .expect("git init");
+        std::process::Command::new("/usr/bin/git")
+            .args(["checkout", "-b", "--orphan", "deploy/prod"])
+            .current_dir(&repo)
+            .output()
+            .expect("git checkout -b deploy/prod");
+        std::process::Command::new("/usr/bin/git")
+            .args(["remote", "add", "mirror", &bare_url])
+            .current_dir(&repo)
+            .output()
+            .expect("git remote add");
+        std::fs::write(repo.join("f"), "content").expect("write file");
+        std::process::Command::new("/usr/bin/git")
+            .args(["add", "f"])
+            .current_dir(&repo)
+            .output()
+            .expect("git add");
+        std::process::Command::new("/usr/bin/git")
+            .args(["commit", "-m", "init"])
+            .current_dir(&repo)
+            .output()
+            .expect("git commit");
+
+        let result = multi_remote::push_to_named_remote(&repo, "mirror", 1, 0).await;
+        assert!(result.is_err(), "unsafe branch '/' should skip HTTPS fallback and fail");
+        let err = format!("{}", result.unwrap_err());
+        assert!(err.contains("unsafe"), "error should mention unsafe branch: {}", err);
+    }
 }
