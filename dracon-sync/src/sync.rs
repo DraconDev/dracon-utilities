@@ -601,12 +601,28 @@ pub(crate) async fn sync_repo(
 
         // Push to additional named remotes after origin push succeeds
         if !policy.remotes.is_empty() {
-            let _push_results = push_mirror_remotes(
+            let push_results = push_mirror_remotes(
                 repo,
                 &policy.remotes,
                 policy.push_op_timeout_secs,
                 policy.push_retries,
             ).await;
+            let all_ok = push_results.iter().all(|(_, r)| r.is_ok());
+            if !all_ok {
+                for (name, result) in &push_results {
+                    if let Err(e) = result {
+                        eprintln!("⚠️ push to {} failed for {}: {}", name, repo.display(), e);
+                        if let Some(ref mut rf) = remote_failures {
+                            *rf.entry(name.clone()).or_insert(0) += 1;
+                        }
+                    }
+                }
+                return Ok(false);
+            } else if let Some(ref mut rf) = remote_failures {
+                for name in policy.remotes.iter().map(|r| r.name.clone()) {
+                    rf.remove(&name);
+                }
+            }
         }
     } else if policy.auto_push && current_status.ahead > 0 && !has_origin {
         eprintln!("ℹ️ skip push for {} (no origin remote)", repo.display());
