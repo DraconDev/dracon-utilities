@@ -148,8 +148,8 @@ mod daemon_tests {
         assert!(path.to_string_lossy().contains("dracon-sync-stuck-push-repos.json"));
     }
 
-    #[tokio::test]
-    async fn test_load_stuck_push_repos_nonexistent() {
+    #[test]
+    fn test_load_stuck_push_repos_nonexistent() {
         let temp_dir = tempfile::tempdir().unwrap();
         std::env::set_var("DRACON_SYNC_STATE_DIR", temp_dir.path().to_string_lossy().as_ref());
         let repos = load_stuck_push_repos();

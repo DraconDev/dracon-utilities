@@ -1,22 +1,21 @@
 # Project State
 
 ## Current Focus
-Added configurable state directory path for stuck repository tracking
+Removed async test attribute from `test_load_stuck_push_repos_nonexistent` to simplify test setup
 
 ## Context
-This change enables the stuck repository tracking functionality to use a configurable state directory path, making the system more flexible in different deployment environments.
+The test was previously marked as async but didn't actually need async runtime capabilities, making it simpler and more maintainable without async overhead.
 
 ## Completed
-- [x] Made `load_stuck_push_repos` test async using `tokio::test`
-- [x] Added temporary directory setup for testing
-- [x] Added environment variable cleanup in tests
+- [x] Removed `#[tokio::test]` attribute from test function
+- [x] Changed test signature to synchronous `fn` instead of `async fn`
 
 ## In Progress
-- [x] Configurable state directory implementation
+- [ ] None
 
 ## Blockers
-- None identified
+- None
 
 ## Next Steps
-1. Verify the configurable state directory works in production environments
-2. Update documentation to reflect the new configuration option
+1. Verify test still passes with synchronous implementation
+2. Check if other tests in the module can be similarly simplified
