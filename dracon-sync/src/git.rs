@@ -1664,4 +1664,85 @@ mod tests {
         assert_eq!(remotes[0], "github");
     }
 
+    #[test]
+    fn test_remove_stale_remotes_preserves_origin() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path().join("test-repo");
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .expect("git init");
+        std::process::Command::new("git")
+            .args(["remote", "add", "origin", "git@github.com:Test/repo.git"])
+            .current_dir(&repo)
+            .status()
+            .expect("git remote add origin");
+        std::process::Command::new("git")
+            .args(["remote", "add", "stale", "git@github.com:stale/repo.git"])
+            .current_dir(&repo)
+            .status()
+            .expect("git remote add stale");
+
+        remove_stale_remotes(&repo, &["github"]).expect("remove_stale_remotes");
+
+        let remotes = multi_remote::list_remotes(&repo);
+        assert!(remotes.contains(&"origin".to_string()), "origin must be preserved");
+        assert!(remotes.contains(&"stale".to_string()), "stale should be removed");
+    }
+
+    #[test]
+    fn test_remove_stale_remotes_removes_nonkept() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path().join("test-repo");
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .expect("git init");
+        std::process::Command::new("git")
+            .args(["remote", "add", "origin", "git@github.com:Test/repo.git"])
+            .current_dir(&repo)
+            .status()
+            .expect("git remote add origin");
+        std::process::Command::new("git")
+            .args(["remote", "add", "mirror1", "git@mirror1.example.com:repo.git"])
+            .current_dir(&repo)
+            .status()
+            .expect("git remote add mirror1");
+        std::process::Command::new("git")
+            .args(["remote", "add", "mirror2", "git@mirror2.example.com:repo.git"])
+            .current_dir(&repo)
+            .status()
+            .expect("git remote add mirror2");
+
+        remove_stale_remotes(&repo, &["mirror1"]).expect("remove_stale_remotes");
+
+        let remotes = multi_remote::list_remotes(&repo);
+        assert!(remotes.contains(&"origin".to_string()), "origin always preserved");
+        assert!(remotes.contains(&"mirror1".to_string()), "kept remote mirror1 preserved");
+        assert!(!remotes.contains(&"mirror2".to_string()), "non-kept remote mirror2 removed");
+    }
+
+    #[test]
+    fn test_remove_stale_remotes_idempotent_when_empty() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path().join("test-repo");
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .expect("git init");
+        std::process::Command::new("git")
+            .args(["remote", "add", "origin", "git@github.com:Test/repo.git"])
+            .current_dir(&repo)
+            .status()
+            .expect("git remote add origin");
+
+        remove_stale_remotes(&repo, &[]).expect("remove_stale_remotes with empty keep list");
+
+        let remotes = multi_remote::list_remotes(&repo);
+        assert_eq!(remotes, vec!["origin"]);
+    }
+
 }
