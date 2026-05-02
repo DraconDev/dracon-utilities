@@ -540,15 +540,11 @@ pub(crate) async fn sync_repo(
                     .map(|n| n.to_string_lossy().to_string())
                     .unwrap_or_default();
 
+                configure_all_remotes(repo, &policy.remotes, &repo_name);
+
                 for (remote_name, create_result) in auto_create_all_remotes(&policy.remotes, &repo_name) {
                     match create_result {
-                        Ok(url) => {
-                            if let Err(e) = ensure_remote(repo, &remote_name, &url) {
-                                eprintln!("⚠️ failed to configure remote {} for {}: {}", remote_name, repo.display(), e);
-                            } else {
-                                eprintln!("🔗 remote {} configured for {}", remote_name, repo.display());
-                            }
-                        }
+                        Ok(_) => {}
                         Err(e) => {
                             eprintln!("⚠️ auto-create failed for {} on {}: {}", repo_name, remote_name, e);
                         }
