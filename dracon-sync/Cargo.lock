@@ -405,7 +405,7 @@ dependencies = [
 
 [[package]]
 name = "dracon-git"
-version = "93.80.56"
+version = "93.80.58"
 dependencies = [
  "anyhow",
  "git2",
