@@ -4,19 +4,18 @@
 Refactored environment variable isolation in GitHub private remote tests
 
 ## Context
-The previous implementation manually managed PATH environment variables, which could lead to state leakage between tests. This change introduces a more robust EnvRestorer utility to ensure proper cleanup.
+The previous implementation manually managed environment variable changes, which could lead to state leakage. The new approach uses a dedicated `EnvRestorer` utility to ensure proper cleanup.
 
 ## Completed
-- [x] Replaced manual PATH management with EnvRestorer utility
-- [x] Eliminated potential environment variable leakage
-- [x] Maintained same test functionality while improving reliability
+- [x] Replaced manual PATH variable management with `EnvRestorer`
+- [x] Eliminated potential state leakage in test cases
 
 ## In Progress
-- [x] Environment variable isolation refactoring
+- [ ] No active work in progress
 
 ## Blockers
 - None identified
 
 ## Next Steps
-1. Verify test stability with the new isolation approach
-2. Consider expanding EnvRestorer to other environment variables if needed
+1. Verify test coverage for environment isolation
+2. Review related test cases for consistency
