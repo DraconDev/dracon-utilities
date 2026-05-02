@@ -577,7 +577,7 @@ pub(crate) async fn sync_repo(
                     }
                 }
             }
-        } else if policy.auto_push && current_status.ahead > 0 && !has_origin {
+        } else if policy.auto_push && !has_origin {
             eprintln!("ℹ️ skip push for {} (no origin remote)", repo.display());
         }
         // All changes were filtered out (excluded dirs, oversized files, etc.)
