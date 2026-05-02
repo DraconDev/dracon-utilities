@@ -1742,11 +1742,17 @@ pub(crate) fn create_github_private_remote(repo: &Path, account: &str) -> Option
         .unwrap_or(false);
 
     if !has_origin {
-        std::process::Command::new("git")
+        let add_result = std::process::Command::new("git")
             .args(["remote", "add", "origin", &remote_url])
             .current_dir(repo)
-            .output()
-            .ok()?;
+            .output();
+
+        if let Err(e) = add_result {
+            eprintln!(
+                "⚠️ failed to add origin for {}: {}",
+                repo.display(), e
+            );
+        }
     }
 
     // Always push to ensure latest commits are on GitHub
