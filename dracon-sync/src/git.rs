@@ -1096,25 +1096,18 @@ pub(crate) async fn restore_paths(repo: &Path, paths: &[String]) -> Result<()> {
 
 #[allow(dead_code)]
 pub(crate) fn load_secret(env_name: &str) -> Option<String> {
-    eprintln!("DEBUG: load_secret called for {}", env_name);
     if let Ok(val) = std::env::var(env_name) {
         if !val.is_empty() {
-            eprintln!("DEBUG: found {} in env", env_name);
             return Some(val);
         }
     }
-    let home = dirs::home_dir();
-    eprintln!("DEBUG: dirs::home_dir() = {:?}", home);
-    let secrets_dir = home
+    let secrets_dir = dirs::home_dir()
         .unwrap_or_else(|| PathBuf::from("."))
         .join(".dracon/utilities/sync/secrets");
-    eprintln!("DEBUG: secrets_dir = {}", secrets_dir.display());
     if let Ok(entries) = std::fs::read_dir(&secrets_dir) {
         for entry in entries.flatten() {
             let path = entry.path();
-            eprintln!("DEBUG: checking file {}", path.display());
             if path.extension().is_some_and(|e| e == "env") {
-                eprintln!("DEBUG: reading .env file {}", path.display());
                 if let Ok(content) = std::fs::read_to_string(&path) {
                     for line in content.lines() {
                         let line = line.trim();
@@ -1125,7 +1118,6 @@ pub(crate) fn load_secret(env_name: &str) -> Option<String> {
                             if key.trim() == env_name {
                                 let value = value.trim();
                                 if !value.is_empty() {
-                                    eprintln!("DEBUG: found {} in file", env_name);
                                     return Some(value.to_string());
                                 }
                             }
@@ -1135,7 +1127,6 @@ pub(crate) fn load_secret(env_name: &str) -> Option<String> {
             }
         }
     }
-    eprintln!("DEBUG: {} not found anywhere", env_name);
     None
 }
 
