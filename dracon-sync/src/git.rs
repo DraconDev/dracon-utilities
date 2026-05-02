@@ -1380,7 +1380,7 @@ pub(crate) fn auto_create_repo(config: &RemoteConfig, repo_name: &str) -> Result
             let token_var = config.auto_create_token_var.as_deref().unwrap_or("CODEBERG_TOKEN");
             let token = load_secret(token_var)
                 .with_context(|| format!("missing token for Codeberg (set {} env var or ~/.dracon/utilities/sync/secrets/*.env file)", token_var))?;
-            let endpoint = config.api_endpoint.as_deref().unwrap_or("https://codeberg.org/api/v1/repos");
+            let endpoint = config.api_endpoint.as_deref().unwrap_or("https://codeberg.org/api/v1/user/repos");
             create_repo_on_codeberg(&token, &config.auto_create_account, repo_name, endpoint)
         }
         AuthType::Generic => anyhow::bail!("Generic auth cannot auto-create repos"),
