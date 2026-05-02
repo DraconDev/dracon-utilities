@@ -2817,12 +2817,6 @@ implemented new authentication flow
 
         assert!(result.is_none());
     }
-}
-        PATH_WAS_SET.store(false, Ordering::SeqCst);
-
-        assert!(result.is_some());
-        assert_eq!(result.unwrap(), "git@github.com:testaccount/my-repo.git");
-    }
 
     #[test]
     fn test_create_github_private_remote_already_exists_reuses_without_suffix() {
