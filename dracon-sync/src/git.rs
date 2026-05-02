@@ -2827,6 +2827,17 @@ mod tests {
             .arg(&repo)
             .status()
             .expect("git init");
+        std::fs::write(repo.join("file.txt"), "content").expect("write file");
+        std::process::Command::new("git")
+            .args(["add", "."])
+            .current_dir(&repo)
+            .status()
+            .expect("git add");
+        std::process::Command::new("git")
+            .args(["commit", "-m", "init"])
+            .current_dir(&repo)
+            .status()
+            .expect("git commit");
 
         let result = run_git_with_timeout_env(
             &repo,
