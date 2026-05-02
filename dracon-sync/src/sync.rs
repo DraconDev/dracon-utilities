@@ -1181,7 +1181,64 @@ push_url = "git@nonexistent.example.com:repo.git"
     }
 
     #[tokio::test]
-    async fn test_sync_repo_mirror_push_success_returns_true() {
+    async fn test_sync_repo_mirror_failure_tracks_remote_failures() {
+        let tmp = tempfile::tempdir().unwrap();
+        let origin_bare = tmp.path().join("origin.git");
+        std::process::Command::new("git")
+            .args(["init", "--bare", "-q", "-b", "master"])
+            .arg(&origin_bare)
+            .status()
+            .unwrap();
+
+        let repo = tmp.path().join("test-repo");
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", &repo.to_string_lossy(), "config", "user.email", "test@test"])
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", &repo.to_string_lossy(), "commit", "--allow-empty", "-m", "init"])
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", &repo.to_string_lossy(), "remote", "add", "origin", &origin_bare.to_string_lossy()])
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", &repo.to_string_lossy(), "push", "-u", "origin", "master"])
+            .status()
+            .unwrap();
+
+        std::fs::write(repo.join("change.txt"), "changed\n").unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = true
+auto_pull = false
+auto_push = true
+auto_bump_versions = false
+
+[[remotes]]
+name = "bad-mirror"
+push_url = "git@nonexistent.example.com:repo.git"
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let mut remote_failures = HashMap::new();
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, Some(&mut remote_failures)).await;
+        assert!(result.is_ok());
+        assert!(!result.unwrap(), "mirror push failure should return false");
+        assert_eq!(remote_failures.get("bad-mirror"), Some(&1), "bad-mirror failure should be tracked");
+    }
+}
         let tmp = tempfile::tempdir().unwrap();
         let origin_bare = tmp.path().join("origin.git");
         let mirror_bare = tmp.path().join("mirror.git");
