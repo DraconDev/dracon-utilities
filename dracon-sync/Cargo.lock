@@ -423,6 +423,7 @@ dependencies = [
  "dirs",
  "dracon-git",
  "notify-rust",
+ "parking_lot",
  "reqwest",
  "serde",
  "serde_json",
