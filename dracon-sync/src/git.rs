@@ -1605,8 +1605,7 @@ mod tests {
     #[test]
     fn test_load_secret_from_file() {
         let tmp_home = tempfile::TempDir::new().expect("temp dir");
-        let orig_home = std::env::var("HOME").ok();
-        std::env::set_var("HOME", tmp_home.path());
+        let _guard = EnvRestorer::new("HOME", &tmp_home.path().to_string_lossy());
         std::env::remove_var("TEST_FILE_SECRET_TOKEN");
 
         let secrets_dir = tmp_home.path().join(".dracon/utilities/sync/secrets");
@@ -1614,11 +1613,6 @@ mod tests {
         std::fs::write(secrets_dir.join("test.env"), "TEST_FILE_SECRET_TOKEN=file_token_abc123\n").expect("write env file");
 
         let result = load_secret("TEST_FILE_SECRET_TOKEN");
-        std::env::remove_var("HOME");
-        match orig_home {
-            Some(h) => std::env::set_var("HOME", h),
-            None => std::env::remove_var("HOME"),
-        }
 
         assert_eq!(result, Some("file_token_abc123".to_string()));
     }
@@ -1626,8 +1620,7 @@ mod tests {
     #[test]
     fn test_load_secret_file_with_comments_and_blank_lines() {
         let tmp_home = tempfile::TempDir::new().expect("temp dir");
-        let orig_home = std::env::var("HOME").ok();
-        std::env::set_var("HOME", tmp_home.path());
+        let _guard = EnvRestorer::new("HOME", &tmp_home.path().to_string_lossy());
         std::env::remove_var("COMMENTED_SECRET_TOKEN");
 
         let secrets_dir = tmp_home.path().join(".dracon/utilities/sync/secrets");
@@ -1639,11 +1632,6 @@ mod tests {
         .expect("write env file");
 
         let result = load_secret("COMMENTED_SECRET_TOKEN");
-        std::env::remove_var("HOME");
-        match orig_home {
-            Some(h) => std::env::set_var("HOME", h),
-            None => std::env::remove_var("HOME"),
-        }
 
         assert_eq!(result, Some("commented_token_xyz".to_string()));
     }
@@ -1651,8 +1639,7 @@ mod tests {
     #[test]
     fn test_load_secret_env_takes_precedence_over_file() {
         let tmp_home = tempfile::TempDir::new().expect("temp dir");
-        let orig_home = std::env::var("HOME").ok();
-        std::env::set_var("HOME", tmp_home.path());
+        let _guard = EnvRestorer::new("HOME", &tmp_home.path().to_string_lossy());
         std::env::set_var("PRECEDENCE_SECRET", "env_value");
 
         let secrets_dir = tmp_home.path().join(".dracon/utilities/sync/secrets");
@@ -1660,12 +1647,7 @@ mod tests {
         std::fs::write(secrets_dir.join("another.env"), "PRECEDENCE_SECRET=file_value\n").expect("write env file");
 
         let result = load_secret("PRECEDENCE_SECRET");
-        std::env::remove_var("HOME");
         std::env::remove_var("PRECEDENCE_SECRET");
-        match orig_home {
-            Some(h) => std::env::set_var("HOME", h),
-            None => std::env::remove_var("HOME"),
-        }
 
         assert_eq!(result, Some("env_value".to_string()));
     }
