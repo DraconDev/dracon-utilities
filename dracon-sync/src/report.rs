@@ -1724,10 +1724,21 @@ pub(crate) fn create_github_private_remote(repo: &Path, account: &str) -> Option
         }
         
         let stderr = String::from_utf8_lossy(&output.stderr);
-        if stderr.contains("Name already exists") && counter <= 100 {
-            repo_name = format!("{}-{}", base_name, counter);
-            counter += 1;
-            continue;
+        // Repo already exists — reuse it instead of creating a new one with a suffix
+        if stderr.contains("Name already exists") || stderr.contains("already exists") {
+            let remote_url = format!("git@github.com:{}/{}.git", account, base_name);
+            let add_result = std::process::Command::new("git")
+                .args(["remote", "add", "origin", &remote_url])
+                .current_dir(repo)
+                .output();
+            if let Err(e) = add_result {
+                eprintln!("⚠️ failed to add origin for {}: {}", repo.display(), e);
+            }
+            let _ = std::process::Command::new("git")
+                .args(["push", "-u", "origin", "HEAD"])
+                .current_dir(repo)
+                .output();
+            return Some(remote_url);
         }
         
         eprintln!("⚠️ gh repo create failed for {}: {}", repo_name, stderr);
