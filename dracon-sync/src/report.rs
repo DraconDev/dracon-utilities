@@ -1672,16 +1672,27 @@ pub(crate) async fn run_repair_warns(
 }
 
 pub(crate) fn create_github_private_remote(repo: &Path, account: &str) -> Option<String> {
-    let base_name = repo.file_name()?.to_str()?.to_string();
+    let repo_name = repo.file_name()?.to_str()?.to_string();
 
+    // FIRST REPO CREATE ATTEMPT:
+    // Try to create a private GitHub repo matching the local directory name.
+    // If it already exists, we reuse it below — we NEVER append a suffix.
+    //   ⚠️  HISTORY: A previous version had a loop that appended -1, -2, -N to
+    //   repo names when the base name was taken. This created 15+ orphan repos
+    //   (dracon-demons-1..-9, browser-extensions-shared-1..-6).
+    //   The suffix approach is DANGEROUS because:
+    //   1. Every daemon cycle creates a new orphan repo
+    //   2. GitHub counts orphan repos against quotas
+    //   3. No cleanup mechanism existed
+    //   NEVER reintroduce a suffix loop here or in any repo creation function.
     let output = std::process::Command::new("gh")
-        .args(["repo", "create", &base_name, "--private"])
+        .args(["repo", "create", &repo_name, "--private"])
         .current_dir(repo)
         .output()
         .ok()?;
 
     if output.status.success() {
-        let remote_url = format!("git@github.com:{}/{}.git", account, base_name);
+        let remote_url = format!("git@github.com:{}/{}.git", account, repo_name);
 
         let add_result = std::process::Command::new("git")
             .args(["remote", "add", "origin", &remote_url])
@@ -1720,7 +1731,7 @@ pub(crate) fn create_github_private_remote(repo: &Path, account: &str) -> Option
     }
 
     // Repo already exists — reuse it instead of creating a new one with a suffix
-    let remote_url = format!("git@github.com:{}/{}.git", account, base_name);
+    let remote_url = format!("git@github.com:{}/{}.git", account, repo_name);
 
     // Check if origin already exists locally before adding
     let has_origin = std::process::Command::new("git")
