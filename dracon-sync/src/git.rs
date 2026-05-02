@@ -1189,6 +1189,9 @@ pub(crate) fn remove_stale_remotes(repo: &Path, keep: &[&str]) -> Result<()> {
     let current = list_remotes(repo);
     let keep_set: std::collections::HashSet<_> = keep.iter().collect();
     for remote in current {
+        if remote == "origin" {
+            continue;
+        }
         if !keep_set.contains(&remote.as_str()) {
             std_git_command()
                 .args(["remote", "remove", &remote])
