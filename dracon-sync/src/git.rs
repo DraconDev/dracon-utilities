@@ -1419,6 +1419,8 @@ mod tests {
     use super::*;
     use std::os::unix::fs::PermissionsExt;
 
+    static PATH_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     struct EnvRestorer {
         key: String,
         old_value: Option<String>,
