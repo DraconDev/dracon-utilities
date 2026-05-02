@@ -1608,6 +1608,7 @@ mod tests {
     #[test]
     fn test_load_secret_from_file() {
         let tmp_home = tempfile::TempDir::new().expect("temp dir");
+        let _lock = crate::git::PATH_LOCK.lock().unwrap();
         let _guard = EnvRestorer::new("HOME", &tmp_home.path().to_string_lossy());
         std::env::remove_var("TEST_FILE_SECRET_TOKEN");
 
@@ -1623,6 +1624,7 @@ mod tests {
     #[test]
     fn test_load_secret_file_with_comments_and_blank_lines() {
         let tmp_home = tempfile::TempDir::new().expect("temp dir");
+        let _lock = crate::git::PATH_LOCK.lock().unwrap();
         let _guard = EnvRestorer::new("HOME", &tmp_home.path().to_string_lossy());
         std::env::remove_var("COMMENTED_SECRET_TOKEN");
 
@@ -1642,6 +1644,7 @@ mod tests {
     #[test]
     fn test_load_secret_env_takes_precedence_over_file() {
         let tmp_home = tempfile::TempDir::new().expect("temp dir");
+        let _lock = crate::git::PATH_LOCK.lock().unwrap();
         let _guard = EnvRestorer::new("HOME", &tmp_home.path().to_string_lossy());
         std::env::set_var("PRECEDENCE_SECRET", "env_value");
 
