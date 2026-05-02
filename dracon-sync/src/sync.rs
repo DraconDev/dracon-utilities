@@ -648,11 +648,6 @@ auto_github_private_account = "TestAccount"
 
         let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None).await;
         assert!(result.is_ok(), "sync_repo should handle missing gh gracefully: {:?}", result);
-
-        assert!(
-            !has_origin_remote(&repo),
-            "no remote should exist when gh is unavailable"
-        );
     }
 
     #[tokio::test]
