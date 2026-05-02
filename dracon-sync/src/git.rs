@@ -13,8 +13,20 @@ use tokio::time::sleep;
 use crate::exclude::is_excluded_change_path;
 use crate::policy::{std_git_command, tokio_git_command, timestamp_secs, AuthType, RemoteConfig};
 
-#[cfg(test)]
-pub(crate) static PATH_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+pub(crate) static PATH_LOCK: parking_lot::Mutex<()> = parking_lot::Mutex::new(());
+
+fn real_git_path() -> PathBuf {
+    static REAL_GIT: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
+    REAL_GIT.get_or_init(|| {
+        std::process::Command::new("which")
+            .arg("git")
+            .output()
+            .ok()
+            .and_then(|o| String::from_utf8(o.stdout).ok())
+            .map(|s| PathBuf::from(s.trim()))
+            .unwrap_or_else(|| PathBuf::from("git"))
+    }).clone()
+}
 
 /// Get the list of files that actually differ from HEAD (filter-aware).
 /// Unlike `git status`, `git diff HEAD` applies clean filters and correctly
@@ -1422,6 +1434,15 @@ mod tests {
     use super::*;
     use std::os::unix::fs::PermissionsExt;
 
+    fn acquire_path_lock() -> parking_lot::MutexGuard<'static, ()> {
+        loop {
+            if let Some(guard) = PATH_LOCK.try_lock() {
+                return guard;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+    }
+
     struct EnvRestorer {
         key: String,
         old_value: Option<String>,
@@ -1608,7 +1629,7 @@ mod tests {
     #[test]
     fn test_load_secret_from_file() {
         let tmp_home = tempfile::TempDir::new().expect("temp dir");
-        let _lock = crate::git::PATH_LOCK.lock().unwrap();
+        let _lock = acquire_path_lock();
         let _guard = EnvRestorer::new("HOME", &tmp_home.path().to_string_lossy());
         std::env::remove_var("TEST_FILE_SECRET_TOKEN");
 
@@ -1624,7 +1645,7 @@ mod tests {
     #[test]
     fn test_load_secret_file_with_comments_and_blank_lines() {
         let tmp_home = tempfile::TempDir::new().expect("temp dir");
-        let _lock = crate::git::PATH_LOCK.lock().unwrap();
+        let _lock = acquire_path_lock();
         let _guard = EnvRestorer::new("HOME", &tmp_home.path().to_string_lossy());
         std::env::remove_var("COMMENTED_SECRET_TOKEN");
 
@@ -1644,7 +1665,7 @@ mod tests {
     #[test]
     fn test_load_secret_env_takes_precedence_over_file() {
         let tmp_home = tempfile::TempDir::new().expect("temp dir");
-        let _lock = crate::git::PATH_LOCK.lock().unwrap();
+        let _lock = acquire_path_lock();
         let _guard = EnvRestorer::new("HOME", &tmp_home.path().to_string_lossy());
         std::env::set_var("PRECEDENCE_SECRET", "env_value");
 
@@ -2188,7 +2209,7 @@ mod tests {
         let gh_mock = tmp.path().join("gh");
         std::fs::write(&gh_mock, "#!/bin/sh\nexit 0\n").expect("write gh mock");
         std::fs::set_permissions(&gh_mock, std::fs::Permissions::from_mode(0o755)).expect("chmod");
-        let _lock = crate::git::PATH_LOCK.lock().unwrap();
+        let _lock = acquire_path_lock();
         let orig_path = std::env::var("PATH").unwrap_or_default();
         let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
 
@@ -2208,7 +2229,7 @@ mod tests {
         )
         .expect("write gh mock");
         std::fs::set_permissions(&gh_mock, std::fs::Permissions::from_mode(0o755)).expect("chmod");
-        let _lock = crate::git::PATH_LOCK.lock().unwrap();
+        let _lock = acquire_path_lock();
         let orig_path = std::env::var("PATH").unwrap_or_default();
         let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
 
@@ -2232,7 +2253,7 @@ mod tests {
         std::fs::set_permissions(&gh_mock, std::fs::Permissions::from_mode(0o755)).expect("chmod");
 
         std::env::set_var("GH_TOKEN", "test_pat_from_env");
-        let _lock = crate::git::PATH_LOCK.lock().unwrap();
+        let _lock = acquire_path_lock();
         let orig_path = std::env::var("PATH").unwrap_or_default();
         let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
 
@@ -2248,7 +2269,7 @@ mod tests {
         let glab_mock = tmp.path().join("glab");
         std::fs::write(&glab_mock, "#!/bin/sh\nexit 0\n").expect("write glab mock");
         std::fs::set_permissions(&glab_mock, std::fs::Permissions::from_mode(0o755)).expect("chmod");
-        let _lock = crate::git::PATH_LOCK.lock().unwrap();
+        let _lock = acquire_path_lock();
         let orig_path = std::env::var("PATH").unwrap_or_default();
         let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
 
@@ -2268,7 +2289,7 @@ mod tests {
         )
         .expect("write glab mock");
         std::fs::set_permissions(&glab_mock, std::fs::Permissions::from_mode(0o755)).expect("chmod");
-        let _lock = crate::git::PATH_LOCK.lock().unwrap();
+        let _lock = acquire_path_lock();
         let orig_path = std::env::var("PATH").unwrap_or_default();
         let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
 
@@ -2290,7 +2311,7 @@ mod tests {
         )
         .expect("write glab mock");
         std::fs::set_permissions(&glab_mock, std::fs::Permissions::from_mode(0o755)).expect("chmod");
-        let _lock = crate::git::PATH_LOCK.lock().unwrap();
+        let _lock = acquire_path_lock();
         let orig_path = std::env::var("PATH").unwrap_or_default();
         let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
 
@@ -2307,7 +2328,7 @@ mod tests {
         std::fs::set_permissions(&glab_mock, std::fs::Permissions::from_mode(0o755)).expect("chmod");
 
         std::env::set_var("GITLAB_TOKEN", "test_gitlab_token");
-        let _lock = crate::git::PATH_LOCK.lock().unwrap();
+        let _lock = acquire_path_lock();
         let orig_path = std::env::var("PATH").unwrap_or_default();
         let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
 
@@ -2371,7 +2392,7 @@ mod tests {
         )).expect("write fail script");
         std::fs::set_permissions(&fail_script, std::fs::Permissions::from_mode(0o755)).expect("chmod");
 
-        let _lock = PATH_LOCK.lock().unwrap();
+        let _lock = acquire_path_lock();
         let orig_path = std::env::var("PATH").unwrap_or_default();
         let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
 
@@ -2414,32 +2435,33 @@ mod tests {
             .expect("write fail git");
         std::fs::set_permissions(&always_fail, std::fs::Permissions::from_mode(0o755)).expect("chmod");
 
-        let _lock = PATH_LOCK.lock().unwrap();
+        let real_git = real_git_path();
+        let _lock = acquire_path_lock();
         let orig_path = std::env::var("PATH").unwrap_or_default();
         let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
 
         let bare = tmp.path().join("bare.git");
-        std::process::Command::new("git")
+        std::process::Command::new(real_git.as_path())
             .args(["init", "--bare", &bare.to_string_lossy()])
             .output()
             .expect("git init --bare");
         let repo = tmp.path().join("repo");
-        std::process::Command::new("git")
+        std::process::Command::new(real_git.as_path())
             .args(["init", "-q", &repo.to_string_lossy()])
             .output()
             .expect("git init");
-        std::process::Command::new("git")
+        std::process::Command::new(real_git.as_path())
             .args(["remote", "add", "origin", &bare.to_string_lossy()])
             .current_dir(&repo)
             .output()
             .expect("git remote add");
         std::fs::write(repo.join("f"), "content").expect("write file");
-        std::process::Command::new("git")
+        std::process::Command::new(real_git.as_path())
             .args(["add", "f"])
             .current_dir(&repo)
             .output()
             .expect("git add");
-        std::process::Command::new("git")
+        std::process::Command::new(real_git.as_path())
             .args(["commit", "-m", "init"])
             .current_dir(&repo)
             .output()
@@ -2486,43 +2508,45 @@ mod tests {
     #[tokio::test]
     async fn test_push_with_transport_fallbacks_ssh_fails_https_fallback_succeeds() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
+        let real_git = real_git_path();
         let fail_git = tmp.path().join("git");
-        std::fs::write(&fail_git, "#!/bin/sh\n\
+        std::fs::write(&fail_git, &format!(
+            "#!/bin/sh\n\
             if echo \"$@\" | grep -q 'GIT_SSH_COMMAND'; then\n\
                 echo 'SSH failure' >&2\n\
                 exit 128\n\
             fi\n\
-            exec git \"$@\"\n\
-        ").expect("write fail git");
+            exec {real_git} \"$@\"\n\
+        ", real_git = real_git.display())).expect("write fail git");
         std::fs::set_permissions(&fail_git, std::fs::Permissions::from_mode(0o755)).expect("chmod");
 
-        let _lock = PATH_LOCK.lock().unwrap();
+        let _lock = acquire_path_lock();
         let orig_path = std::env::var("PATH").unwrap_or_default();
         let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
 
         let bare = tmp.path().join("bare.git");
-        std::process::Command::new("git")
+        std::process::Command::new(real_git.as_path())
             .args(["init", "--bare", &bare.to_string_lossy()])
             .output()
             .expect("git init --bare");
         let bare_url = format!("file://{}", bare.to_string_lossy());
         let repo = tmp.path().join("repo");
-        std::process::Command::new("git")
+        std::process::Command::new(real_git.as_path())
             .args(["init", "-q", &repo.to_string_lossy()])
             .output()
             .expect("git init");
-        std::process::Command::new("git")
+        std::process::Command::new(real_git.as_path())
             .args(["remote", "add", "origin", &bare_url])
             .current_dir(&repo)
             .output()
             .expect("git remote add");
         std::fs::write(repo.join("f"), "content").expect("write file");
-        std::process::Command::new("git")
+        std::process::Command::new(real_git.as_path())
             .args(["add", "f"])
             .current_dir(&repo)
             .output()
             .expect("git add");
-        std::process::Command::new("git")
+        std::process::Command::new(real_git.as_path())
             .args(["commit", "-m", "init"])
             .current_dir(&repo)
             .output()
@@ -2535,38 +2559,39 @@ mod tests {
     #[tokio::test]
     async fn test_push_with_transport_fallbacks_both_fail() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
-        let fail_git = tmp.path().join("git");
-        std::fs::write(&fail_git, "#!/bin/sh\necho 'always fail' >&2\nexit 1\n")
+        let always_fail = tmp.path().join("git");
+        std::fs::write(&always_fail, "#!/bin/sh\necho 'always fail' >&2\nexit 1\n")
             .expect("write fail git");
-        std::fs::set_permissions(&fail_git, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+        std::fs::set_permissions(&always_fail, std::fs::Permissions::from_mode(0o755)).expect("chmod");
 
-        let _lock = PATH_LOCK.lock().unwrap();
+        let real_git = real_git_path();
+        let _lock = acquire_path_lock();
         let orig_path = std::env::var("PATH").unwrap_or_default();
         let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
 
         let bare = tmp.path().join("bare.git");
-        std::process::Command::new("git")
+        std::process::Command::new(real_git.as_path())
             .args(["init", "--bare", &bare.to_string_lossy()])
             .output()
             .expect("git init --bare");
         let bare_url = format!("file://{}", bare.to_string_lossy());
         let repo = tmp.path().join("repo");
-        std::process::Command::new("git")
+        std::process::Command::new(real_git.as_path())
             .args(["init", "-q", &repo.to_string_lossy()])
             .output()
             .expect("git init");
-        std::process::Command::new("git")
+        std::process::Command::new(real_git.as_path())
             .args(["remote", "add", "origin", &bare_url])
             .current_dir(&repo)
             .output()
             .expect("git remote add");
         std::fs::write(repo.join("f"), "content").expect("write file");
-        std::process::Command::new("git")
+        std::process::Command::new(real_git.as_path())
             .args(["add", "f"])
             .current_dir(&repo)
             .output()
             .expect("git add");
-        std::process::Command::new("git")
+        std::process::Command::new(real_git.as_path())
             .args(["commit", "-m", "init"])
             .current_dir(&repo)
             .output()
@@ -2579,28 +2604,29 @@ mod tests {
     #[tokio::test]
     async fn test_push_to_named_remote_ssh_success() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
+        let real_git = real_git_path();
         let bare = tmp.path().join("bare.git");
-        std::process::Command::new("git")
+        std::process::Command::new(real_git.as_path())
             .args(["init", "--bare", &bare.to_string_lossy()])
             .output()
             .expect("git init --bare");
         let repo = tmp.path().join("repo");
-        std::process::Command::new("git")
+        std::process::Command::new(real_git.as_path())
             .args(["init", "-q", "-b", "master", &repo.to_string_lossy()])
             .output()
             .expect("git init");
-        std::process::Command::new("git")
+        std::process::Command::new(real_git.as_path())
             .args(["remote", "add", "mirror", &bare.to_string_lossy()])
             .current_dir(&repo)
             .output()
             .expect("git remote add");
         std::fs::write(repo.join("f"), "content").expect("write file");
-        std::process::Command::new("git")
+        std::process::Command::new(real_git.as_path())
             .args(["add", "f"])
             .current_dir(&repo)
             .output()
             .expect("git add");
-        std::process::Command::new("git")
+        std::process::Command::new(real_git.as_path())
             .args(["commit", "-m", "init"])
             .current_dir(&repo)
             .output()
@@ -2613,43 +2639,45 @@ mod tests {
     #[tokio::test]
     async fn test_push_to_named_remote_ssh_fails_https_fallback() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
+        let real_git = real_git_path();
         let fail_git = tmp.path().join("git");
-        std::fs::write(&fail_git, "#!/bin/sh\n\
+        std::fs::write(&fail_git, &format!(
+            "#!/bin/sh\n\
             if echo \"$@\" | grep -q 'GIT_SSH_COMMAND'; then\n\
                 echo 'SSH failure' >&2\n\
                 exit 128\n\
             fi\n\
-            exec git \"$@\"\n\
-        ").expect("write fail git");
+            exec {real_git} \"$@\"\n\
+        ", real_git = real_git.display())).expect("write fail git");
         std::fs::set_permissions(&fail_git, std::fs::Permissions::from_mode(0o755)).expect("chmod");
 
-        let _lock = PATH_LOCK.lock().unwrap();
+        let _lock = acquire_path_lock();
         let orig_path = std::env::var("PATH").unwrap_or_default();
         let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
 
         let bare = tmp.path().join("bare.git");
-        std::process::Command::new("git")
+        std::process::Command::new(real_git.as_path())
             .args(["init", "--bare", &bare.to_string_lossy()])
             .output()
             .expect("git init --bare");
         let bare_url = format!("file://{}", bare.to_string_lossy());
         let repo = tmp.path().join("repo");
-        std::process::Command::new("git")
+        std::process::Command::new(real_git.as_path())
             .args(["init", "-q", "-b", "master", &repo.to_string_lossy()])
             .output()
             .expect("git init");
-        std::process::Command::new("git")
+        std::process::Command::new(real_git.as_path())
             .args(["remote", "add", "mirror", &bare_url])
             .current_dir(&repo)
             .output()
             .expect("git remote add");
         std::fs::write(repo.join("f"), "content").expect("write file");
-        std::process::Command::new("git")
+        std::process::Command::new(real_git.as_path())
             .args(["add", "f"])
             .current_dir(&repo)
             .output()
             .expect("git add");
-        std::process::Command::new("git")
+        std::process::Command::new(real_git.as_path())
             .args(["commit", "-m", "init"])
             .current_dir(&repo)
             .output()
@@ -2662,43 +2690,44 @@ mod tests {
     #[tokio::test]
     async fn test_push_to_named_remote_unsafe_branch_skips_https_fallback() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
-        let fail_git = tmp.path().join("git");
-        std::fs::write(&fail_git, "#!/bin/sh\necho 'SSH failure' >&2\nexit 128\n")
+        let always_fail = tmp.path().join("git");
+        std::fs::write(&always_fail, "#!/bin/sh\necho 'SSH failure' >&2\nexit 128\n")
             .expect("write fail git");
-        std::fs::set_permissions(&fail_git, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+        std::fs::set_permissions(&always_fail, std::fs::Permissions::from_mode(0o755)).expect("chmod");
 
-        let _lock = PATH_LOCK.lock().unwrap();
+        let real_git = real_git_path();
+        let _lock = acquire_path_lock();
         let orig_path = std::env::var("PATH").unwrap_or_default();
         let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
 
         let bare = tmp.path().join("bare.git");
-        std::process::Command::new("git")
+        std::process::Command::new(real_git.as_path())
             .args(["init", "--bare", &bare.to_string_lossy()])
             .output()
             .expect("git init --bare");
         let bare_url = format!("file://{}", bare.to_string_lossy());
         let repo = tmp.path().join("repo");
-        std::process::Command::new("git")
+        std::process::Command::new(real_git.as_path())
             .args(["init", "-q", &repo.to_string_lossy()])
             .output()
             .expect("git init");
-        std::process::Command::new("git")
-            .args(["checkout", "-b", "--orphan", "deploy/prod"])
+        std::process::Command::new(real_git.as_path())
+            .args(["checkout", "--orphan", "deploy/prod"])
             .current_dir(&repo)
             .output()
             .expect("git checkout -b deploy/prod");
-        std::process::Command::new("git")
+        std::process::Command::new(real_git.as_path())
             .args(["remote", "add", "mirror", &bare_url])
             .current_dir(&repo)
             .output()
             .expect("git remote add");
         std::fs::write(repo.join("f"), "content").expect("write file");
-        std::process::Command::new("git")
+        std::process::Command::new(real_git.as_path())
             .args(["add", "f"])
             .current_dir(&repo)
             .output()
             .expect("git add");
-        std::process::Command::new("git")
+        std::process::Command::new(real_git.as_path())
             .args(["commit", "-m", "init"])
             .current_dir(&repo)
             .output()
