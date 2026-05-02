@@ -1409,6 +1409,10 @@ pub(crate) fn auto_create_all_remotes(remotes: &[RemoteConfig], repo_name: &str)
 mod tests {
     use super::*;
 
+    fn remove_stale_remotes(repo: &std::path::Path, keep: &[&str]) -> anyhow::Result<()> {
+        super::remove_stale_remotes(repo, keep)
+    }
+
     #[test]
     fn test_strip_url_credentials_https_with_creds() {
         let url = "https://user:pass@github.com/owner/repo.git";
