@@ -1171,8 +1171,7 @@ pub(crate) async fn push_mirror_remotes(
     remotes: &[RemoteConfig],
     timeout_secs: u64,
     retries: u32,
-    remote_failures: &mut Option<&mut HashMap<String, u64>>,
-) {
+) -> Vec<(String, Result<()>)> {
     let repo_name = repo.file_name()
         .map(|n| n.to_string_lossy().to_string())
         .unwrap_or_default();
@@ -1193,22 +1192,7 @@ pub(crate) async fn push_mirror_remotes(
         eprintln!("⚠️ failed to clean stale remotes for {}: {}", repo.display(), e);
     }
 
-    let push_results = push_to_all_remotes(repo, remotes, timeout_secs, retries).await;
-    let all_ok = push_results.iter().all(|(_, r)| r.is_ok());
-    if !all_ok {
-        for (name, result) in &push_results {
-            if let Err(e) = result {
-                eprintln!("⚠️ push to {} failed for {}: {}", name, repo.display(), e);
-                if let Some(ref mut rf) = remote_failures {
-                    *rf.entry(name.clone()).or_insert(0) += 1;
-                }
-            }
-        }
-    } else if let Some(ref mut rf) = remote_failures {
-        for name in remotes.iter().map(|r| r.name.clone()) {
-            rf.remove(&name);
-        }
-    }
+    push_to_all_remotes(repo, remotes, timeout_secs, retries).await
 }
 
 pub(crate) fn get_remote_url(repo: &Path, name: &str) -> Option<String> {
