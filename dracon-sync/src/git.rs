@@ -1128,7 +1128,7 @@ pub(crate) fn load_secret(env_name: &str) -> Option<String> {
             let mut buf = [0u8; 1024];
             let _ = stream.read(&mut buf);
             let response = "HTTP/1.1 201 Created\r\nContent-Length: 0\r\n\r\n";
-            stream.write_all(response.as_bytes()).expect("write");
+            std::io::Write::write_all(&mut stream, response.as_bytes()).expect("write");
         });
 
         let url = format!("http://127.0.0.1:{}/api/v1/repos", port);
@@ -1147,7 +1147,7 @@ pub(crate) fn load_secret(env_name: &str) -> Option<String> {
             let mut buf = [0u8; 1024];
             let _ = stream.read(&mut buf);
             let response = "HTTP/1.1 409 Conflict\r\nContent-Length: 0\r\n\r\n";
-            stream.write_all(response.as_bytes()).expect("write");
+            std::io::Write::write_all(&mut stream, response.as_bytes()).expect("write");
         });
 
         let url = format!("http://127.0.0.1:{}/api/v1/repos", port);
@@ -1166,7 +1166,7 @@ pub(crate) fn load_secret(env_name: &str) -> Option<String> {
             let mut buf = [0u8; 1024];
             let _ = stream.read(&mut buf);
             let response = "HTTP/1.1 422 Unprocessable Entity\r\nContent-Length: 0\r\n\r\n";
-            stream.write_all(response.as_bytes()).expect("write");
+            std::io::Write::write_all(&mut stream, response.as_bytes()).expect("write");
         });
 
         let url = format!("http://127.0.0.1:{}/api/v1/repos", port);
@@ -1190,7 +1190,7 @@ pub(crate) fn load_secret(env_name: &str) -> Option<String> {
                 body.len(),
                 body
             );
-            stream.write_all(response.as_bytes()).expect("write");
+            std::io::Write::write_all(&mut stream, response.as_bytes()).expect("write");
         });
 
         let url = format!("http://127.0.0.1:{}/api/v1/repos", port);
