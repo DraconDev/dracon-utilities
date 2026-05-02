@@ -526,16 +526,17 @@ pub(crate) async fn sync_repo(
                 )
                 .await
                 {
-                    Ok(()) => {}
+Ok(()) => {}
                     Err(e) => {
                         eprintln!("⚠️ push failed for {}: {}", repo.display(), e);
                         return Ok(false);
-}
+                    }
+                }
 
-        // All changes were filtered out (excluded dirs, oversized files, etc.)
-        // Restore modified files to avoid perpetual dirty state. Untracked files can't be restored.
-        // Skip gitlink entries (dirty submodules can't be restored this way)
-        let restorable: Vec<_> = to_restore.iter()
+                // All changes were filtered out (excluded dirs, oversized files, etc.)
+                // Restore modified files to avoid perpetual dirty state. Untracked files can't be restored.
+                // Skip gitlink entries (dirty submodules can't be restored this way)
+                let restorable: Vec<_> = to_restore.iter()
             .filter(|e| can_restore_entry(repo, e))
             .filter(|e| !repo.join(&e.path).is_dir() || !crate::exclude::is_gitlink_unchanged(repo, &e.path))
             .collect();
