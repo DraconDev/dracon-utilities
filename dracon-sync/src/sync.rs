@@ -671,7 +671,6 @@ pub(crate) async fn sync_repo(
                 _entries_len
             );
         }
-        }
     }
 
     // Re-fetch status for push decision (may have changed after pull/commit)
