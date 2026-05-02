@@ -37,15 +37,15 @@ pub(crate) async fn sync_repo(
 
     // Bail out early if repo is in a conflict state - manual intervention required
     if is_rebase_in_progress(repo) {
-        eprintln!("[CAUTION]️ {} has rebase in progress, skipping (manual intervention required)", repo.display());
+        eprintln!("[CAUTION]? {} has rebase in progress, skipping (manual intervention required)", repo.display());
         return Ok(false);
     }
     if is_merge_in_progress(repo) {
-        eprintln!("[CAUTION]️ {} has merge in progress, skipping (manual intervention required)", repo.display());
+        eprintln!("[CAUTION]? {} has merge in progress, skipping (manual intervention required)", repo.display());
         return Ok(false);
     }
     if is_cherry_pick_in_progress(repo) {
-        eprintln!("[CAUTION]️ {} has cherry-pick in progress, skipping (manual intervention required)", repo.display());
+        eprintln!("[CAUTION]? {} has cherry-pick in progress, skipping (manual intervention required)", repo.display());
         return Ok(false);
     }
 
@@ -55,7 +55,7 @@ pub(crate) async fn sync_repo(
             println!("[LINK] created remote for {}: {}", repo.display(), url);
             true
         } else {
-            eprintln!("[CAUTION]️ failed to create GitHub remote for {}", repo.display());
+            eprintln!("[CAUTION]? failed to create GitHub remote for {}", repo.display());
             false
         }
     } else {
@@ -81,16 +81,16 @@ pub(crate) async fn sync_repo(
         {
             Ok(Ok(())) => {}
             Ok(Err(dracon_git::error::GitError::MergeConflict)) => {
-                eprintln!("[CAUTION]️ pull/rebase conflict in {} (manual intervention required)", repo.display());
+                eprintln!("[CAUTION]? pull/rebase conflict in {} (manual intervention required)", repo.display());
                 return Ok(false);
             }
             Ok(Err(e)) => {
-                eprintln!("[CAUTION]️ pull/rebase failed for {}: {} - aborting sync pass", repo.display(), e);
+                eprintln!("[CAUTION]? pull/rebase failed for {}: {} - aborting sync pass", repo.display(), e);
                 return Ok(false);
             }
             Err(_) => {
                 eprintln!(
-                    "[CAUTION]️ pull/rebase timeout for {} after {}s - aborting sync pass",
+                    "[CAUTION]? pull/rebase timeout for {} after {}s - aborting sync pass",
                     repo.display(),
                     policy.pull_op_timeout_secs
                 );
@@ -113,12 +113,12 @@ pub(crate) async fn sync_repo(
         }
     } else if policy.auto_pull && !has_origin {
         eprintln!(
-            "ℹ️ skip pull/rebase for {} (no origin remote)",
+            "?? skip pull/rebase for {} (no origin remote)",
             repo.display()
         );
     } else if policy.auto_pull && has_origin && !has_upstream {
         eprintln!(
-            "ℹ️ skip pull/rebase for {} (no tracking upstream on current branch)",
+            "?? skip pull/rebase for {} (no tracking upstream on current branch)",
             repo.display()
         );
     }
@@ -250,7 +250,7 @@ pub(crate) async fn sync_repo(
                     add_args.push(p);
                 }
                 if let Err(e) = run_git_with_timeout(repo, &add_args, 30, "add").await {
-                    eprintln!("[CAUTION]️ {} git add failed for {} paths: {:?}", repo.display(), existing.len(), existing);
+                    eprintln!("[CAUTION]? {} git add failed for {} paths: {:?}", repo.display(), existing.len(), existing);
                     return Err(e);
                 }
             }
@@ -271,9 +271,9 @@ pub(crate) async fn sync_repo(
                 let is_mass_deletion = total_tracked > 0 && missing_count >= total_tracked;
 
                 if is_mass_deletion {
-                    eprintln!("[CAUTION]️ SAFETY: {} files missing from working tree ({}% of {} tracked)", missing_count, (missing_count * 100) / total_tracked, total_tracked);
-                    eprintln!("[CAUTION]️ Refusing to stage mass deletion - this looks like a mistake or destructive operation");
-                    eprintln!("[CAUTION]️ If you really want to delete all files, do: git add -A && git commit -m 'delete all'");
+                    eprintln!("[CAUTION]? SAFETY: {} files missing from working tree ({}% of {} tracked)", missing_count, (missing_count * 100) / total_tracked, total_tracked);
+                    eprintln!("[CAUTION]? Refusing to stage mass deletion - this looks like a mistake or destructive operation");
+                    eprintln!("[CAUTION]? If you really want to delete all files, do: git add -A && git commit -m 'delete all'");
                     // Do NOT stage the deletions - let the user decide
                     return Ok(true);
                 }
@@ -283,7 +283,7 @@ pub(crate) async fn sync_repo(
                     rm_args.push(p);
                 }
                 if let Err(e) = run_git_with_timeout(repo, &rm_args, 30, "rm").await {
-                    eprintln!("[CAUTION]️ {} git rm failed for {} paths: {:?}", repo.display(), missing.len(), missing);
+                    eprintln!("[CAUTION]? {} git rm failed for {} paths: {:?}", repo.display(), missing.len(), missing);
                     return Err(e);
                 }
             }
@@ -348,7 +348,7 @@ pub(crate) async fn sync_repo(
             // typically gitignored, so we need to override that.
             if repo.join(".dracon/project-state.md").exists() {
                 if let Err(e) = run_git_with_timeout(repo, &["add", "-f", ".dracon/project-state.md"], 10, "add-project-state").await {
-                    eprintln!("[CAUTION]️ failed to stage project-state: {}", e);
+                    eprintln!("[CAUTION]? failed to stage project-state: {}", e);
                 }
             }
 
@@ -366,14 +366,14 @@ pub(crate) async fn sync_repo(
                     if let Some(current_ver) = read_current_version(repo) {
                         let level = deterministic_decide_bump_level(&staged_diff);
                         if level != BumpLevel::None {
-                            eprintln!("📦 bump: {} -> patch", current_ver);
+                            eprintln!("? bump: {} -> patch", current_ver);
                             if let Some(new_ver) = bump_semver_patch(&current_ver) {
                                 let bumped = crate::bump::apply_version_bump_to_repo(repo, &current_ver, &new_ver);
                                 if bumped {
                                     for file in &["Cargo.toml", "package.json", "VERSION", "Cargo.lock"] {
                                         if repo.join(file).exists() {
                                             if let Err(e) = run_git_with_timeout(repo, &["add", file], 30, "add").await {
-                                                eprintln!("[CAUTION]️ failed to stage {}: {}", file, e);
+                                                eprintln!("[CAUTION]? failed to stage {}: {}", file, e);
                                             }
                                         }
                                     }
@@ -414,7 +414,7 @@ pub(crate) async fn sync_repo(
                                     for file in &["Cargo.toml", "package.json", "VERSION", "Cargo.lock"] {
                                         if repo.join(file).exists() {
                                             if let Err(e) = run_git_with_timeout(repo, &["add", file], 30, "add").await {
-                                                eprintln!("[CAUTION]️ failed to stage {}: {}", file, e);
+                                                eprintln!("[CAUTION]? failed to stage {}: {}", file, e);
                                             }
                                         }
                                     }
@@ -482,7 +482,7 @@ pub(crate) async fn sync_repo(
 
             if !other_untracked.is_empty() {
                 eprintln!(
-                    "ℹ️ {} has {} small untracked excluded file(s)",
+                    "?? {} has {} small untracked excluded file(s)",
                     repo.display(),
                     other_untracked.len()
                 );
@@ -505,13 +505,13 @@ pub(crate) async fn sync_repo(
                 let ahead_large = match detect_large_blobs_ahead(repo, blob_threshold) {
                     Ok(v) => v,
                     Err(e) => {
-                        eprintln!("[CAUTION]️ large blob detection failed for {}: {} - skipping push", repo.display(), e);
+                        eprintln!("[CAUTION]? large blob detection failed for {}: {} - skipping push", repo.display(), e);
                         return Ok(false);
                     }
                 };
                 if !ahead_large.is_empty() {
                     eprintln!(
-                        "[CAUTION]️ skip push for {}: large blob(s) above {} bytes in ahead range ({} found)",
+                        "[CAUTION]? skip push for {}: large blob(s) above {} bytes in ahead range ({} found)",
                         repo.display(),
                         blob_threshold,
                         ahead_large.len()
@@ -528,7 +528,7 @@ pub(crate) async fn sync_repo(
                 {
                     Ok(()) => {}
                     Err(e) => {
-                        eprintln!("[CAUTION]️ push failed for {}: {}", repo.display(), e);
+                        eprintln!("[CAUTION]? push failed for {}: {}", repo.display(), e);
                         return Ok(false);
                     }
                 }
@@ -543,20 +543,20 @@ pub(crate) async fn sync_repo(
                 match create_result {
                     Ok(url) => {
                         if let Err(e) = ensure_remote(repo, &remote_name, &url) {
-                            eprintln!("[CAUTION]️ failed to configure remote {} for {}: {}", remote_name, repo.display(), e);
+                            eprintln!("[CAUTION]? failed to configure remote {} for {}: {}", remote_name, repo.display(), e);
                         } else {
                             eprintln!("[LINK] remote {} configured for {}", remote_name, repo.display());
                         }
                     }
                     Err(e) => {
-                        eprintln!("[CAUTION]️ auto-create failed for {} on {}: {}", repo_name, remote_name, e);
+                        eprintln!("[CAUTION]? auto-create failed for {} on {}: {}", repo_name, remote_name, e);
                     }
                 }
             }
 
             let all_remote_names: Vec<_> = policy.remotes.iter().map(|r| r.name.as_str()).collect();
             if let Err(e) = remove_stale_remotes(repo, &all_remote_names) {
-                eprintln!("[CAUTION]️ failed to clean stale remotes for {}: {}", repo.display(), e);
+                eprintln!("[CAUTION]? failed to clean stale remotes for {}: {}", repo.display(), e);
             }
 
             let push_results = push_to_all_remotes(repo, &policy.remotes, policy.push_op_timeout_secs, policy.push_retries).await;
@@ -564,7 +564,7 @@ pub(crate) async fn sync_repo(
             if !all_ok {
                 for (name, result) in &push_results {
                     if let Err(e) = result {
-                        eprintln!("[CAUTION]️ push to {} failed for {}: {}", name, repo.display(), e);
+                        eprintln!("[CAUTION]? push to {} failed for {}: {}", name, repo.display(), e);
                         if let Some(ref mut rf) = remote_failures {
                             *rf.entry(name.clone()).or_insert(0) += 1;
                         }
@@ -577,7 +577,7 @@ pub(crate) async fn sync_repo(
             }
         }
 } else if policy.auto_push && current_status.ahead > 0 && !has_origin {
-        eprintln!("ℹ️ skip push for {} (no origin remote)", repo.display());
+        eprintln!("?? skip push for {} (no origin remote)", repo.display());
     }
 
     // Re-fetch status for push decision (may have changed after pull/commit)
@@ -586,13 +586,13 @@ pub(crate) async fn sync_repo(
         let ahead_large = match detect_large_blobs_ahead(repo, blob_threshold) {
             Ok(v) => v,
             Err(e) => {
-                eprintln!("[CAUTION]️ large blob detection failed for {}: {} - skipping push", repo.display(), e);
+                eprintln!("[CAUTION]? large blob detection failed for {}: {} - skipping push", repo.display(), e);
                 return Ok(false);
             }
         };
         if !ahead_large.is_empty() {
             eprintln!(
-                "[CAUTION]️ skip push for {}: large blob(s) above {} bytes in ahead range ({} found)",
+                "[CAUTION]? skip push for {}: large blob(s) above {} bytes in ahead range ({} found)",
                 repo.display(),
                 blob_threshold,
                 ahead_large.len()
@@ -609,12 +609,12 @@ pub(crate) async fn sync_repo(
         {
             Ok(()) => {}
             Err(e) => {
-                eprintln!("[CAUTION]️ push failed for {}: {}", repo.display(), e);
+                eprintln!("[CAUTION]? push failed for {}: {}", repo.display(), e);
                 return Ok(false);
             }
         }
     } else if policy.auto_push && current_status.ahead > 0 && !has_origin {
-        eprintln!("ℹ️ skip push for {} (no origin remote)", repo.display());
+        eprintln!("?? skip push for {} (no origin remote)", repo.display());
     }
 
     Ok(false)
