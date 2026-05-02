@@ -1889,6 +1889,10 @@ mod tests {
 
     #[test]
     fn test_auto_create_all_remotes_codeberg_missing_token() {
+        // Make load_secret look in a temp dir so real secrets file isn't found
+        let tmp_home = tempfile::TempDir::new().expect("temp dir");
+        let orig_home = std::env::var("HOME").ok();
+        std::env::set_var("HOME", tmp_home.path());
         std::env::remove_var("CODEBERG_TOKEN");
 
         let remotes = vec![RemoteConfig {
@@ -1903,6 +1907,13 @@ mod tests {
         }];
 
         let results = crate::git::multi_remote::auto_create_all_remotes(&remotes, "test-repo");
+
+        // Restore HOME
+        match orig_home {
+            Some(h) => std::env::set_var("HOME", h),
+            None => std::env::remove_var("HOME"),
+        }
+
         assert_eq!(results.len(), 1);
         assert!(results[0].1.is_err(), "Codeberg without token should return error");
         let err_msg = format!("{}", results[0].1.as_ref().unwrap_err());

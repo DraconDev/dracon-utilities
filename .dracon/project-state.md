@@ -1,21 +1,25 @@
 # Project State
 
 ## Current Focus
-Synchronized dependency metadata in Cargo.lock for dracon-sync
+Added environment isolation for Git remote tests to prevent accidental secret file access
 
 ## Context
-This change was triggered by recent comprehensive test additions for Git multi-remote operations, which required dependency updates to ensure consistent test environments.
+The test for Codeberg remote creation needed to verify error handling when no token is present. The original implementation might have accidentally accessed real secrets files, so we isolated the test environment by:
+1. Creating a temporary directory
+2. Setting HOME to this temp dir
+3. Restoring the original HOME afterward
 
 ## Completed
-- [x] Updated Cargo.lock to reflect current dependency versions
-- [x] Maintained consistency between development and test environments
+- [x] Added environment isolation for Git remote tests
+- [x] Implemented proper cleanup of environment variables
+- [x] Ensured test remains hermetic (no external dependencies)
 
 ## In Progress
-- [ ] None (dependency synchronization is complete)
+- [ ] None (test is complete)
 
 ## Blockers
-- None (dependency synchronization is a maintenance task with no dependencies)
+- None
 
 ## Next Steps
-1. Verify that all tests pass with the updated dependencies
-2. Prepare for the next phase of documentation discovery (`docs-discovery-01`)
+1. Verify test behavior with actual Codeberg API calls
+2. Add similar isolation for other remote tests if needed
