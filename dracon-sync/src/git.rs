@@ -1648,6 +1648,21 @@ mod tests {
 
     #[test]
     fn test_ensure_remote_idempotent() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path().join("test-repo");
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .expect("git init");
+
+        multi_remote::ensure_remote(&repo, "github", "git@github.com:Test/repo.git").expect("ensure_remote 1");
+        multi_remote::ensure_remote(&repo, "github", "git@github.com:Test/repo.git").expect("ensure_remote 2");
+
+        let remotes = multi_remote::list_remotes(&repo);
+        assert_eq!(remotes.len(), 1);
+        assert_eq!(remotes[0], "github");
+    }
 
     #[test]
     fn test_remove_stale_remotes_preserves_origin() {
