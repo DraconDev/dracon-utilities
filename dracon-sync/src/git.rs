@@ -1716,7 +1716,7 @@ mod tests {
             .status()
             .expect("git remote add mirror2");
 
-        super::remove_stale_remotes(&repo, &["mirror1"]).expect("remove_stale_remotes");
+        crate::git::remove_stale_remotes(&repo, &["mirror1"]).expect("remove_stale_remotes");
 
         let remotes = multi_remote::list_remotes(&repo);
         assert!(remotes.contains(&"origin".to_string()), "origin always preserved");
