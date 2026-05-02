@@ -1505,4 +1505,123 @@ mod tests {
         assert!(is_git_worktree_file(&dot_git));
     }
 
+    #[test]
+    fn test_load_secret_from_env() {
+        let tmp_val = "test_token_abc123";
+        std::env::set_var("TEST_LOAD_SECRET_TOKEN", tmp_val);
+        let result = load_secret("TEST_LOAD_SECRET_TOKEN");
+        std::env::remove_var("TEST_LOAD_SECRET_TOKEN");
+        assert_eq!(result, Some(tmp_val.to_string()));
+    }
+
+    #[test]
+    fn test_load_secret_empty_env_var() {
+        std::env::set_var("TEST_LOAD_SECRET_EMPTY", "");
+        let result = load_secret("TEST_LOAD_SECRET_EMPTY");
+        std::env::remove_var("TEST_LOAD_SECRET_EMPTY");
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_load_secret_missing() {
+        assert_eq!(load_secret("TEST_NONEXISTENT_SECRET_VAR_XYZ"), None);
+    }
+
+    #[test]
+    fn test_get_remote_url_nonexistent_remote() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path().join("test-repo");
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .expect("git init");
+        assert_eq!(multi_remote::get_remote_url(&repo, "origin"), None);
+    }
+
+    #[test]
+    fn test_list_remotes_empty() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path().join("test-repo");
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .expect("git init");
+        assert!(multi_remote::list_remotes(&repo).is_empty());
+    }
+
+    #[test]
+    fn test_list_remotes_one_remote() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path().join("test-repo");
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .expect("git init");
+        std::process::Command::new("git")
+            .args(["remote", "add", "origin", "git@github.com:Test/repo.git"])
+            .current_dir(&repo)
+            .status()
+            .expect("git remote add");
+        let remotes = multi_remote::list_remotes(&repo);
+        assert_eq!(remotes, vec!["origin"]);
+    }
+
+    #[test]
+    fn test_ensure_remote_adds_new() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path().join("test-repo");
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .expect("git init");
+
+        multi_remote::ensure_remote(&repo, "github", "git@github.com:Test/repo.git").expect("ensure_remote");
+
+        let url = multi_remote::get_remote_url(&repo, "github");
+        assert_eq!(url, Some("git@github.com:Test/repo.git".to_string()));
+    }
+
+    #[test]
+    fn test_ensure_remote_updates_existing() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path().join("test-repo");
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .expect("git init");
+        std::process::Command::new("git")
+            .args(["remote", "add", "github", "git@github.com:Old/repo.git"])
+            .current_dir(&repo)
+            .status()
+            .expect("git remote add");
+
+        multi_remote::ensure_remote(&repo, "github", "git@github.com:New/repo.git").expect("ensure_remote");
+
+        let url = multi_remote::get_remote_url(&repo, "github");
+        assert_eq!(url, Some("git@github.com:New/repo.git".to_string()));
+    }
+
+    #[test]
+    fn test_ensure_remote_idempotent() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path().join("test-repo");
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .expect("git init");
+
+        multi_remote::ensure_remote(&repo, "github", "git@github.com:Test/repo.git").expect("ensure_remote 1");
+        multi_remote::ensure_remote(&repo, "github", "git@github.com:Test/repo.git").expect("ensure_remote 2");
+
+        let remotes = multi_remote::list_remotes(&repo);
+        assert_eq!(remotes.len(), 1);
+        assert_eq!(remotes[0], "github");
+    }
+
 }
