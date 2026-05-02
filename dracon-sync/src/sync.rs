@@ -526,12 +526,12 @@ pub(crate) async fn sync_repo(
                 )
                 .await
                 {
-                    Ok(()) => {}
-                    Err(e) => {
-                        eprintln!("⚠️ push failed for {}: {}", repo.display(), e);
-                        return Ok(false);
-                    }
-                }
+Ok(()) => {}
+            Err(e) => {
+                eprintln!("⚠️ push failed for {}: {}", repo.display(), e);
+                return Ok(false);
+            }
+        }
 
         // Push to additional named remotes after origin push succeeds
         if !policy.remotes.is_empty() {
@@ -579,6 +579,7 @@ pub(crate) async fn sync_repo(
     } else if policy.auto_push && current_status.ahead > 0 && !has_origin {
         eprintln!("ℹ️ skip push for {} (no origin remote)", repo.display());
     }
+                }
 
                 if !policy.remotes.is_empty() {
                     let repo_name = repo.file_name()
