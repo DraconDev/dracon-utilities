@@ -3,14 +3,14 @@ use std::path::Path;
 use std::time::Duration;
 
 use anyhow::Result;
-use dracon_git::{build_commit_message, extract_intent, GitService};
+use dracon_git::{build_commit_message, GitService};
 
 use crate::exclude::{can_restore_entry, handle_large_untracked, is_large_untracked, remove_tracked_excluded_paths, should_stage_entry};
 use crate::git::{
     cli_diff_entries, detect_large_blobs_ahead, git_name_status_entries, has_origin_remote,
     has_tracking_upstream, is_cherry_pick_in_progress, is_merge_in_progress,
     is_rebase_in_progress, prune_other_default_branch, push_with_retries,
-    restore_paths, run_git_with_timeout, staged_paths,
+    restore_paths, run_git_with_timeout,
     unstage_excluded_paths, unstage_oversized_paths,
 };
 use crate::git::multi_remote::{
@@ -209,7 +209,7 @@ pub(crate) async fn sync_repo(
     }
 
     if !status.is_clean && policy.auto_commit {
-        let entries_len = entries.len();
+        let _entries_len = entries.len();
         // Partition into stage/restore/ignore. Gitlinks with unchanged pointers
         // should be ignored entirely (they appear dirty but can't be staged or restored).
         let (to_stage, to_restore): (Vec<_>, Vec<_>) = entries
