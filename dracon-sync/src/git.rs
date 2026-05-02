@@ -1330,7 +1330,7 @@ pub(crate) fn create_repo_on_github(account: &str, repo_name: &str) -> Result<St
 
 pub(crate) fn create_repo_on_gitlab(account: &str, repo_name: &str) -> Result<String> {
     let output = std::process::Command::new("glab")
-        .args(["repo", "create", repo_name, "--private"])
+        .args(["repo", "create", repo_name, "--visibility", "private"])
         .output()
         .with_context(|| "glab repo create failed")?;
 
