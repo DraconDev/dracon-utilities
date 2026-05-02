@@ -8,7 +8,7 @@ use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use tokio::time::Duration;
 
-fn send_sync_conflict_notification(repo_path: &Path, reason: &str, details: &str) {
+pub(crate) fn send_sync_conflict_notification(repo_path: &Path, reason: &str, details: &str) {
     let repo_name = repo_path
         .file_name()
         .map(|s| s.to_string_lossy().to_string())
@@ -105,6 +105,14 @@ pub(crate) struct RepoReportJson {
 }
 
 #[derive(Debug, Serialize)]
+pub(crate) struct RemoteStatus {
+    pub(crate) name: String,
+    pub(crate) auth_type: String,
+    pub(crate) auto_create: bool,
+    pub(crate) priority: u32,
+}
+
+#[derive(Debug, Serialize)]
 pub(crate) struct StatusJson {
     pub(crate) policy: String,
     pub(crate) roots: Vec<String>,
@@ -133,7 +141,8 @@ pub(crate) struct StatusJson {
     pub(crate) system_repo: String,
     pub(crate) backup_policy: String,
     pub(crate) backup_dir: String,
-    pub(crate) extra_remotes: usize,
+    pub(crate) remotes: usize,
+    pub(crate) remote_configs: Vec<RemoteStatus>,
 }
 
 #[derive(Debug, Serialize)]
@@ -354,7 +363,7 @@ pub(crate) fn incident_ledger_path(_policy_path: &Path) -> PathBuf {
     }
 
     if let Some(home) = dirs::home_dir() {
-        return home.join(".dracon").join("dracon-sync-incidents.jsonl");
+        return home.join(".local").join("state").join("dracon").join("dracon-sync-incidents.jsonl");
     }
 
     PathBuf::from("/tmp/dracon-sync-incidents.jsonl")
@@ -1564,7 +1573,7 @@ pub(crate) async fn run_repair_warns(
         attempted += 1;
         match tokio::time::timeout(
             Duration::from_secs(policy.repo_sync_timeout_secs),
-            crate::sync::sync_repo(&repo, &policy, &excluded_dir_names, 0),
+            crate::sync::sync_repo(&repo, &policy, &excluded_dir_names, 0, None),
         )
         .await
         {
@@ -2127,7 +2136,7 @@ mod tests {
             auto_repair_warns: true,
             auto_rewrite_large_blobs: true,
             watch_roots: vec![],
-            extra_remotes: vec![],
+            remotes: vec![],
             auto_github_private: false,
             auto_github_private_account: "DraconDev".to_string(),
             max_stage_file_bytes: 100 * 1024 * 1024,
@@ -2432,7 +2441,8 @@ mod tests {
             system_repo: String::new(),
             backup_policy: String::new(),
             backup_dir: String::new(),
-            extra_remotes: 0,
+            remotes: 0,
+            remote_configs: vec![],
         };
         assert_eq!(status.repos_discovered, 5);
         assert!(status.auto_commit);
@@ -2534,5 +2544,136 @@ mod tests {
         ];
         let signals = detect_report_signals(std::path::Path::new("/fake"), &files);
         assert!(signals.contains(&ReportSignal::IndexChanged));
+    }
+
+    #[test]
+    fn test_extract_category_scope_from_focus_with_parens_format() {
+        let content = r#"# Project State
+
+## Current Focus
+docs(security): updated session cleanup
+"#;
+        let result = extract_category_scope_from_focus(content);
+        assert!(result.is_some());
+        let (cat, scope) = result.unwrap();
+        assert_eq!(cat, "security");
+        assert!(scope.contains("session") || scope.contains("cleanup"));
+    }
+
+    #[test]
+    fn test_extract_category_scope_from_focus_fix_derivation() {
+        let content = r#"# Project State
+
+## Current Focus
+fixed auth bug
+"#;
+        let result = extract_category_scope_from_focus(content);
+        assert!(result.is_some());
+        let (cat, _scope) = result.unwrap();
+        assert_eq!(cat, "fix");
+    }
+
+    #[test]
+    fn test_extract_category_scope_from_focus_add_derivation() {
+        let content = r#"# Project State
+
+## Current Focus
+added JWT validation
+"#;
+        let result = extract_category_scope_from_focus(content);
+        assert!(result.is_some());
+        let (cat, _scope) = result.unwrap();
+        assert_eq!(cat, "feat");
+    }
+
+    #[test]
+    fn test_extract_category_scope_from_focus_no_valid_category_format() {
+        let content = r#"# Project State
+
+## Current Focus
+implemented new authentication flow
+"#;
+        let result = extract_category_scope_from_focus(content);
+        assert!(result.is_some());
+        let (cat, scope) = result.unwrap();
+        assert_eq!(cat, "feat");
+        assert!(scope.contains("authentication") || scope.contains("flow"));
+    }
+
+    #[test]
+    fn test_extract_category_scope_from_focus_no_current_focus_section() {
+        let content = r#"# Project State
+
+## Completed
+- did stuff
+"#;
+        let result = extract_category_scope_from_focus(content);
+        assert!(result.is_none(), "should return None when no Current Focus section");
+    }
+
+    #[test]
+    fn test_extract_scope_from_focus_action_word_stripping() {
+        assert_eq!(extract_scope_from_focus("updated auth flow"), "auth flow");
+        assert_eq!(extract_scope_from_focus("added jwt support"), "jwt support");
+        assert_eq!(extract_scope_from_focus("fixed critical bug"), "critical bug");
+    }
+
+    #[test]
+    fn test_extract_scope_from_focus_takes_two_words() {
+        let scope = extract_scope_from_focus("implemented new user authentication system");
+        let words: Vec<_> = scope.split_whitespace().collect();
+        assert!(words.len() <= 3, "scope should be 1-2 meaningful words, got: {}", scope);
+    }
+
+    #[test]
+    fn test_extract_scope_from_focus_handles_punctuation() {
+        let scope = extract_scope_from_focus("cleaned up, refactored.");
+        assert!(!scope.ends_with(',') && !scope.ends_with('.'));
+    }
+
+    #[test]
+    fn test_read_project_focus_returns_content() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path();
+        let dracon_dir = repo.join(".dracon");
+        std::fs::create_dir_all(&dracon_dir).expect("create .dracon dir");
+        std::fs::write(
+            dracon_dir.join("project-state.md"),
+            "# Project State\n\n## Current Focus\nTest focus\n",
+        )
+        .expect("write project-state.md");
+        let result = read_project_focus(repo);
+        assert!(result.is_some());
+        assert!(result.unwrap().contains("Current Focus"));
+    }
+
+    #[test]
+    fn test_read_project_focus_missing_file() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path();
+        let result = read_project_focus(repo);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_read_project_focus_empty_file() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path();
+        let dracon_dir = repo.join(".dracon");
+        std::fs::create_dir_all(&dracon_dir).expect("create .dracon dir");
+        std::fs::write(dracon_dir.join("project-state.md"), "").expect("write empty project-state.md");
+        let result = read_project_focus(repo);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_read_project_focus_whitespace_only() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path();
+        let dracon_dir = repo.join(".dracon");
+        std::fs::create_dir_all(&dracon_dir).expect("create .dracon dir");
+        std::fs::write(dracon_dir.join("project-state.md"), "   \n\n  ").expect("write whitespace project-state.md");
+        let result = read_project_focus(repo);
+        assert!(result.is_none());
     }
 }

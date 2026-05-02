@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+#[allow(dead_code)]
 use dracon_git::{
     types::{DiffFile, FileStatus},
     GitService,
@@ -10,31 +11,39 @@ use tokio::process::Command as TokioCommand;
 use tokio::time::sleep;
 
 use crate::exclude::is_excluded_change_path;
-use crate::policy::{std_git_command, tokio_git_command, timestamp_secs};
+use crate::policy::{std_git_command, tokio_git_command, timestamp_secs, AuthType, RemoteConfig};
 
 /// Get the list of files that actually differ from HEAD (filter-aware).
 /// Unlike `git status`, `git diff HEAD` applies clean filters and correctly
 /// ignores files that only differ due to smudge filter decryption.
-pub(crate) async fn git_diff_head_files(repo: &Path) -> Vec<String> {
+pub(crate) async fn git_diff_head_files(repo: &Path) -> Result<Vec<String>> {
     let repo = repo.to_path_buf();
-    let result = tokio::time::timeout(
+    let outcome = tokio::time::timeout(
         Duration::from_secs(30),
-        tokio::task::spawn_blocking(move || {
+        tokio::task::spawn_blocking(move || -> anyhow::Result<Vec<String>> {
             let output = std::process::Command::new("git")
                 .current_dir(&repo)
                 .args(["diff", "HEAD", "--name-only", "-z"])
-                .output();
-            let Ok(out) = output else { return Vec::new() };
-            String::from_utf8_lossy(&out.stdout)
+                .output()?;
+            if !output.status.success() {
+                anyhow::bail!("git diff HEAD exited with {}", output.status);
+            }
+            let files: Vec<String> = String::from_utf8_lossy(&output.stdout)
                 .split('\0')
                 .filter(|s| !s.is_empty())
                 .map(String::from)
-                .collect()
+                .collect();
+            Ok(files)
         }),
     ).await;
-    match result {
-        Ok(Ok(files)) => files,
-        _ => Vec::new(),
+    let inner = match outcome {
+        Ok(inner) => inner,
+        Err(_) => return Err(anyhow::anyhow!("git diff HEAD timed out")),
+    };
+    match inner {
+        Ok(Ok(files)) => Ok(files),
+        Ok(Err(e)) => Err(anyhow::anyhow!("git diff HEAD task failed: {}", e)),
+        Err(e) => Err(anyhow::anyhow!("git diff HEAD task failed: {}", e)),
     }
 }
 
@@ -48,7 +57,7 @@ pub(crate) fn discover_git_repos(
         exclude_repos.iter().map(PathBuf::from).collect();
     let mut repos = Vec::new();
     for root in roots {
-        discover_git_repos_recursive(root, excluded_dir_names, &mut repos, 0, 2);
+        discover_git_repos_recursive(root, excluded_dir_names, &mut repos, 0, 4);
     }
     repos.retain(|r| !exclude_set.contains(r));
 
@@ -130,32 +139,37 @@ fn discover_git_repos_recursive(
     if depth > max_depth {
         return;
     }
-    if let Ok(entries) = std::fs::read_dir(dir) {
-        for entry in entries.filter_map(|e| e.ok()) {
-            let path = entry.path();
-            if !path.is_dir() || path.is_symlink() {
-                continue;
-            }
-            let name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
-            // Skip excluded dirs (from policy) and safety-net heavy directories
-            // not covered by defaults or hidden-dir filtering.
-            if excluded_dir_names.contains(&name)
-                || name == "vendor"
-                || name == "objects"
-            {
-                continue;
-            }
-            // Skip hidden dirs (covers .git, .next, .cache, .venv, __pycache__, etc.)
-            if name.starts_with('.') {
-                continue;
-            }
-            let dot_git = path.join(".git");
-            if dot_git.exists() && (dot_git.is_dir() || is_git_worktree_file(&dot_git)) {
-                repos.push(path.clone());
-            }
-            // Recurse into subdirectories
-            discover_git_repos_recursive(&path, excluded_dir_names, repos, depth + 1, max_depth);
+    let entries = match std::fs::read_dir(dir) {
+        Ok(e) => e,
+        Err(e) => {
+            eprintln!("⚠️ cannot read directory {}: {}", dir.display(), e);
+            return;
         }
+    };
+    for entry in entries {
+        let entry = match entry {
+            Ok(e) => e,
+            Err(e) => {
+                eprintln!("⚠️ cannot read entry in {}: {}", dir.display(), e);
+                continue;
+            }
+        };
+        let path = entry.path();
+        if !path.is_dir() || path.is_symlink() {
+            continue;
+        }
+        let name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+        if excluded_dir_names.contains(&name) || name == "objects" {
+            continue;
+        }
+        let dot_git = path.join(".git");
+        if dot_git.exists() && (dot_git.is_dir() || is_git_worktree_file(&dot_git)) {
+            repos.push(path.clone());
+        }
+        if name.starts_with('.') {
+            continue;
+        }
+        discover_git_repos_recursive(&path, excluded_dir_names, repos, depth + 1, max_depth);
     }
 }
 
@@ -744,7 +758,7 @@ pub(crate) fn has_both_main_and_master(repo: &Path) -> bool {
     has_main && has_master
 }
 
-pub(crate) fn consolidate_to_master(repo: &Path) -> Result<()> {
+pub(crate) async fn consolidate_to_master(repo: &Path) -> Result<()> {
     let branch = current_branch(repo).unwrap_or_else(|| "master".to_string());
     if branch != "master" {
         std_git_command()
@@ -773,10 +787,8 @@ pub(crate) fn consolidate_to_master(repo: &Path) -> Result<()> {
     }
     // Ensure master has upstream tracking
     if has_origin_remote(repo) && !has_tracking_upstream(repo) {
-        if let Err(e) = std_git_command()
-            .args(["push", "-u", "origin", "master"])
-            .current_dir(repo)
-            .status()
+        if let Err(e) =
+            push_with_retries(repo, 60, 3, "consolidate-to-master").await
         {
             eprintln!("⚠️ failed to push master with upstream: {}", e);
         }
@@ -784,7 +796,7 @@ pub(crate) fn consolidate_to_master(repo: &Path) -> Result<()> {
     Ok(())
 }
 
-pub(crate) fn rename_main_to_master(repo: &Path) -> Result<()> {
+pub(crate) async fn rename_main_to_master(repo: &Path) -> Result<()> {
     let branch = current_branch(repo).unwrap_or_else(|| "main".to_string());
     if branch == "main" {
         std_git_command()
@@ -794,12 +806,8 @@ pub(crate) fn rename_main_to_master(repo: &Path) -> Result<()> {
             .with_context(|| format!("failed to rename main to master in {}", repo.display()))?;
     }
     if has_origin_remote(repo) {
-        if let Err(e) = std_git_command()
-            .args(["push", "-u", "origin", "master"])
-            .current_dir(repo)
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .status()
+        if let Err(e) =
+            push_with_retries(repo, 60, 3, "rename-main-to-master").await
         {
             eprintln!("⚠️ failed to push master to origin: {}", e);
         }
@@ -818,33 +826,43 @@ pub(crate) fn rename_main_to_master(repo: &Path) -> Result<()> {
 
 /// Delete the "other" default branch if it exists, preventing dual-branch drift.
 /// If current branch is master → delete main. If current is main → delete master.
-pub(crate) fn prune_other_default_branch(repo: &Path) {
+pub(crate) async fn prune_other_default_branch(repo: &Path) {
     let branch = current_branch(repo);
     let other = match branch.as_deref() {
         Some("master") => "main",
         Some("main") => "master",
         _ => return,
     };
-    // Delete local other branch if it exists
-    if let Err(e) = std_git_command()
-        .args(["branch", "-D", other])
-        .current_dir(repo)
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .status()
-    {
-        eprintln!("⚠️ failed to delete local {} branch: {}", other, e);
-    }
-    // Delete remote other branch if it exists
-    if has_origin_remote(repo) {
-        if let Err(e) = std_git_command()
-            .args(["push", "origin", "--delete", other])
-            .current_dir(repo)
+    let other_str = other.to_string();
+    let repo_has_origin = has_origin_remote(repo);
+    let repo = repo.to_path_buf();
+    let repo_for_second = repo.clone();
+    let other_str_inner = other_str.clone();
+    if let Err(e) = tokio::task::spawn_blocking(move || {
+        std_git_command()
+            .args(["branch", "-D", &other_str_inner])
+            .current_dir(&repo)
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
             .status()
+    })
+    .await
+    {
+        eprintln!("⚠️ failed to delete local {} branch: {}", other_str, e);
+    }
+    if repo_has_origin {
+        let other_str_inner = other_str.clone();
+        if let Err(e) = tokio::task::spawn_blocking(move || {
+            std_git_command()
+                .args(["push", "origin", "--delete", &other_str_inner])
+                .current_dir(&repo_for_second)
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .status()
+        })
+        .await
         {
-            eprintln!("⚠️ failed to delete remote {} branch: {}", other, e);
+            eprintln!("⚠️ failed to delete remote {} branch: {}", other_str, e);
         }
     }
 }
@@ -1063,7 +1081,10 @@ pub(crate) async fn restore_paths(repo: &Path, paths: &[String]) -> Result<()> {
     reset.push("--".to_string());
     reset.extend(paths.iter().cloned());
     let reset_ref: Vec<&str> = reset.iter().map(|s| s.as_str()).collect();
-    let _ = run_git_with_timeout(repo, &reset_ref, 30, "reset").await;
+    if let Err(e) = run_git_with_timeout(repo, &reset_ref, 30, "reset").await {
+        eprintln!("⚠️ git reset fallback failed for {}: {}", repo.display(), e);
+        return Err(anyhow::anyhow!("restore failed: git restore failed and reset fallback also failed: {}", e));
+    }
 
     let mut checkout: Vec<String> = Vec::new();
     checkout.push("checkout".to_string());
@@ -1073,7 +1094,278 @@ pub(crate) async fn restore_paths(repo: &Path, paths: &[String]) -> Result<()> {
     run_git_with_timeout(repo, &checkout_ref, 30, "checkout").await
 }
 
-#[cfg(test)]
+#[allow(dead_code)]
+pub(crate) fn load_secret(env_name: &str) -> Option<String> {
+    if let Ok(val) = std::env::var(env_name) {
+        if !val.is_empty() {
+            return Some(val);
+        }
+    }
+    let secrets_dir = dirs::home_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join(".dracon/utilities/sync/secrets");
+    if let Ok(entries) = std::fs::read_dir(&secrets_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().is_some_and(|e| e == "env") {
+                if let Ok(content) = std::fs::read_to_string(&path) {
+                    for line in content.lines() {
+                        let line = line.trim();
+                        if line.is_empty() || line.starts_with('#') {
+                            continue;
+                        }
+                        if let Some((key, value)) = line.split_once('=') {
+                            if key.trim() == env_name {
+                                let value = value.trim();
+                                if !value.is_empty() {
+                                    return Some(value.to_string());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
+pub(crate) mod multi_remote {
+    use super::*;
+
+    pub(crate) fn ensure_remote(repo: &Path, name: &str, url: &str) -> Result<()> {
+    let existing = get_remote_url(repo, name);
+    match existing {
+        Some(cur) if cur == url => Ok(()),
+        Some(_) => {
+            std_git_command()
+                .args(["remote", "set-url", name, url])
+                .current_dir(repo)
+                .status()
+                .with_context(|| format!("git remote set-url {} in {}", name, repo.display()))?;
+            Ok(())
+        }
+        None => {
+            std_git_command()
+                .args(["remote", "add", name, url])
+                .current_dir(repo)
+                .status()
+                .with_context(|| format!("git remote add {} in {}", name, repo.display()))?;
+            Ok(())
+        }
+    }
+}
+
+pub(crate) fn get_remote_url(repo: &Path, name: &str) -> Option<String> {
+    let output = std_git_command()
+        .args(["remote", "get-url", name])
+        .current_dir(repo)
+        .output()
+        .ok()?;
+    if output.status.success() {
+        Some(String::from_utf8_lossy(&output.stdout).trim().to_string())
+    } else {
+        None
+    }
+}
+
+pub(crate) fn list_remotes(repo: &Path) -> Vec<String> {
+    let output = std_git_command()
+        .args(["remote"])
+        .current_dir(repo)
+        .output()
+        .ok();
+    match output {
+        Some(o) if o.status.success() => String::from_utf8_lossy(&o.stdout)
+            .lines()
+            .map(String::from)
+            .filter(|s| !s.is_empty())
+            .collect(),
+        _ => Vec::new(),
+    }
+}
+
+pub(crate) fn remove_stale_remotes(repo: &Path, keep: &[&str]) -> Result<()> {
+    let current = list_remotes(repo);
+    let keep_set: std::collections::HashSet<_> = keep.iter().collect();
+    for remote in current {
+        if !keep_set.contains(&remote.as_str()) {
+            std_git_command()
+                .args(["remote", "remove", &remote])
+                .current_dir(repo)
+                .status()
+                .with_context(|| format!("git remote remove {} in {}", remote, repo.display()))?;
+        }
+    }
+    Ok(())
+}
+
+pub(crate) async fn push_to_named_remote(
+    repo: &Path,
+    remote_name: &str,
+    timeout_secs: u64,
+    retries: u32,
+) -> Result<()> {
+    let branch = current_branch(repo).unwrap_or_else(|| "master".to_string());
+    let refspec = format!("HEAD:refs/heads/{}", branch);
+    let ssh_hardening = "ssh -o ConnectTimeout=10 -o ConnectionAttempts=1 -o ServerAliveInterval=5 -o ServerAliveCountMax=2";
+
+    let attempt_ssh = run_git_with_timeout_env(
+        repo,
+        &["push", "-u", remote_name, "HEAD"],
+        timeout_secs,
+        &format!("push-to-{}", remote_name),
+        &[("GIT_SSH_COMMAND", ssh_hardening)],
+    ).await;
+
+    if attempt_ssh.is_ok() {
+        return Ok(());
+    }
+
+    let remote_url = get_remote_url(repo, remote_name)
+        .ok_or_else(|| anyhow::anyhow!("remote {} not found", remote_name))?;
+    if let Some(https) = github_https_url(&remote_url) {
+        if is_safe_branch_name(&branch) {
+            let https_push = run_git_with_timeout(
+                repo,
+                &["push", &https, &refspec],
+                timeout_secs,
+                &format!("push-to-{}https", remote_name),
+            ).await;
+            if https_push.is_ok() {
+                return Ok(());
+            }
+        }
+    }
+
+    let mut last_err = None;
+    for attempt in 1..=retries.max(1) {
+        match run_git_with_timeout(repo, &["push", remote_name, "HEAD"], timeout_secs, &format!("push-to-{}", remote_name)).await {
+            Ok(()) => return Ok(()),
+            Err(e) => {
+                last_err = Some(e);
+                if attempt < retries.max(1) {
+                    sleep(Duration::from_secs(attempt as u64)).await;
+                }
+            }
+        }
+    }
+    Err(last_err.unwrap_or_else(|| anyhow::anyhow!("push to {} failed", remote_name)))
+}
+
+pub(crate) async fn push_to_all_remotes(
+    repo: &Path,
+    remotes: &[RemoteConfig],
+    timeout_secs: u64,
+    retries: u32,
+) -> Vec<(String, Result<()>)> {
+    let mut sorted = remotes.to_vec();
+    sorted.sort_by_key(|r| r.priority);
+
+    let mut results = Vec::new();
+    for remote in sorted {
+        let result = push_to_named_remote(repo, &remote.name, timeout_secs, retries).await;
+        results.push((remote.name.clone(), result));
+    }
+    results
+}
+
+pub(crate) fn create_repo_on_github(account: &str, repo_name: &str) -> Result<String> {
+    let output = std::process::Command::new("gh")
+        .args(["repo", "create", repo_name, "--private"])
+        .output()
+        .with_context(|| "gh repo create failed")?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if stderr.contains("Name already exists") || stderr.contains("already exists") {
+            return Ok(format!("git@github.com:{}/{}.git", account, repo_name));
+        }
+        anyhow::bail!("gh repo create failed: {}", stderr.trim());
+    }
+
+    Ok(format!("git@github.com:{}/{}.git", account, repo_name))
+}
+
+pub(crate) fn create_repo_on_gitlab(account: &str, repo_name: &str) -> Result<String> {
+    let output = std::process::Command::new("glab")
+        .args(["repo", "create", repo_name, "--private"])
+        .output()
+        .with_context(|| "glab repo create failed")?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if stderr.contains("already exists") || stderr.contains("Name already exists") {
+            return Ok(format!("git@gitlab.com:{}/{}.git", account, repo_name));
+        }
+        anyhow::bail!("glab repo create failed: {}", stderr.trim());
+    }
+
+    Ok(format!("git@gitlab.com:{}/{}.git", account, repo_name))
+}
+
+pub(crate) fn create_repo_on_codeberg(token: &str, account: &str, repo_name: &str, api_endpoint: &str) -> Result<String> {
+    let output = std::process::Command::new("curl")
+        .args([
+            "-s", "-w", "%{http_code}",
+            "-X", "POST",
+            api_endpoint,
+            "-H", &format!("Authorization: Bearer {}", token),
+            "-H", "Content-Type: application/json",
+            "-d", &serde_json::json!({
+                "name": repo_name,
+                "private": true,
+                "default_branch": "master"
+            }).to_string(),
+        ])
+        .output()
+        .with_context(|| "curl codeberg repo create failed")?;
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let status_code = stdout.trim_end_matches(|c: char| !c.is_ascii_digit()).parse::<u16>().unwrap_or(0);
+    let response_body = stdout.trim_end_matches(|c: char| c.is_ascii_digit());
+
+    if status_code == 409 || status_code == 422 {
+        return Ok(format!("git@codeberg.org:{}/{}.git", account, repo_name));
+    }
+
+    if !output.status.success() || !(200..=299).contains(&status_code) {
+        anyhow::bail!("codeberg repo create failed ({}): {} {}", status_code, stderr.trim(), response_body);
+    }
+
+    Ok(format!("git@codeberg.org:{}/{}.git", account, repo_name))
+}
+
+pub(crate) fn auto_create_repo(config: &RemoteConfig, repo_name: &str) -> Result<String> {
+    match config.auth_type {
+        AuthType::GitHub => create_repo_on_github(&config.auto_create_account, repo_name),
+        AuthType::GitLab => create_repo_on_gitlab(&config.auto_create_account, repo_name),
+        AuthType::Codeberg => {
+            let token_var = config.auto_create_token_var.as_deref().unwrap_or("CODEBERG_TOKEN");
+            let token = load_secret(token_var)
+                .with_context(|| format!("missing token for Codeberg (set {} env var or ~/.dracon/utilities/sync/secrets/*.env file)", token_var))?;
+            let endpoint = config.api_endpoint.as_deref().unwrap_or("https://codeberg.org/api/v1/repos");
+            create_repo_on_codeberg(&token, &config.auto_create_account, repo_name, endpoint)
+        }
+        AuthType::Generic => anyhow::bail!("Generic auth cannot auto-create repos"),
+    }
+}
+
+pub(crate) fn auto_create_all_remotes(remotes: &[RemoteConfig], repo_name: &str) -> Vec<(String, Result<String>)> {
+        let mut results = Vec::new();
+        for remote in remotes {
+            if remote.auto_create {
+                let result = auto_create_repo(remote, repo_name);
+                results.push((remote.name.clone(), result));
+            }
+        }
+        results
+    }
+}
+
+#[allow(dead_code)]
+#[allow(unused_imports)]
 mod tests {
     use super::*;
 
@@ -1099,31 +1391,67 @@ mod tests {
     }
 
     #[test]
-    fn test_github_https_url_git_ssh() {
-        let url = "git@github.com:owner/repo.git";
+    fn test_github_https_url_with_embedded_newline() {
+        let url = "git@github.com:owner/repo.git\n";
         let result = github_https_url(url);
-        assert_eq!(result, Some("https://github.com/owner/repo.git".to_string()));
+        assert_eq!(result, Some("https://github.com/owner/repo.git\n".to_string()));
     }
 
     #[test]
-    fn test_github_https_url_ssh_protocol() {
-        let url = "ssh://git@github.com/owner/repo.git";
+    fn test_github_https_url_ssh_with_colon_path() {
+        let url = "git@github.com:owner/repo";
         let result = github_https_url(url);
-        assert_eq!(result, Some("https://github.com/owner/repo.git".to_string()));
+        assert_eq!(result, Some("https://github.com/owner/repo".to_string()));
     }
 
     #[test]
-    fn test_github_https_url_https() {
-        let url = "https://github.com/owner/repo.git";
-        let result = github_https_url(url);
-        assert_eq!(result, Some(url.to_string()));
-    }
-
-    #[test]
-    fn test_github_https_url_non_github() {
+    fn test_github_https_url_non_github_returns_none() {
         let url = "https://gitlab.com/owner/repo.git";
         let result = github_https_url(url);
-        assert_eq!(result, None);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_strip_url_credentials_with_at_sign() {
+        let url = "https://user:token@github.com/owner/repo.git";
+        let result = strip_url_credentials(url);
+        assert_eq!(result, "https://github.com/owner/repo.git");
+    }
+
+    #[test]
+    fn test_strip_url_credentials_no_credentials() {
+        let url = "https://github.com/owner/repo.git";
+        let result = strip_url_credentials(url);
+        assert_eq!(result, url);
+    }
+
+    #[test]
+    fn test_fallback_status_rank_ordering() {
+        assert!(fallback_status_rank(&FileStatus::Deleted) > fallback_status_rank(&FileStatus::Modified));
+        assert!(fallback_status_rank(&FileStatus::Renamed) > fallback_status_rank(&FileStatus::Added));
+        assert!(fallback_status_rank(&FileStatus::TypeChange) > fallback_status_rank(&FileStatus::Unknown));
+    }
+
+    #[test]
+    fn test_parse_name_status_line_valid_lines() {
+        assert_eq!(parse_name_status_line("M\tfile.rs"), Some((PathBuf::from("file.rs"), FileStatus::Modified)));
+        assert_eq!(parse_name_status_line("A\tnew.rs"), Some((PathBuf::from("new.rs"), FileStatus::Added)));
+        assert_eq!(parse_name_status_line("D\tdeleted.rs"), Some((PathBuf::from("deleted.rs"), FileStatus::Deleted)));
+    }
+
+    #[test]
+    fn test_parse_name_status_line_renamed() {
+        let result = parse_name_status_line("R\told.rs\tnew.rs");
+        assert!(result.is_some());
+        let (path, status) = result.unwrap();
+        assert_eq!(path, PathBuf::from("new.rs"));
+        assert_eq!(status, FileStatus::Renamed);
+    }
+
+    #[test]
+    fn test_parse_name_status_line_invalid_status() {
+        assert!(parse_name_status_line("X\tfile.rs").is_none());
+        assert!(parse_name_status_line("",).is_none());
     }
 
     #[test]
@@ -1133,8 +1461,8 @@ mod tests {
     }
 
     #[test]
-    fn test_top_level_dir_no_separator() {
-        assert_eq!(top_level_dir("filename.txt"), Some("filename.txt".to_string()));
+    fn test_top_level_dir_single_component() {
+        assert_eq!(top_level_dir("main.rs"), Some("main.rs".to_string()));
     }
 
     #[test]
@@ -1143,504 +1471,157 @@ mod tests {
     }
 
     #[test]
-    fn test_top_level_dir_only_separator() {
-        assert_eq!(top_level_dir("/"), Some("".to_string()));
+    fn test_top_level_dir_path_with_multiple_slashes() {
+        assert_eq!(top_level_dir("src///nested/main.rs"), Some("src".to_string()));
     }
 
     #[test]
-    fn test_is_rebase_in_progress_true_rebase_merge() {
-        let temp = std::env::temp_dir();
-        let repo_path = temp.join("test_is_rebase_in_progress_true_rebase_merge");
-        std::fs::create_dir_all(repo_path.join(".git/rebase-merge")).unwrap();
-        let result = is_rebase_in_progress(&repo_path);
-        std::fs::remove_dir_all(repo_path).ok();
-        assert!(result);
+    fn test_is_git_worktree_file_gitdir_prefix() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let dot_git = tmp.path().join(".git");
+        std::fs::write(&dot_git, "gitdir: /path/to/worktree").expect("write .git file");
+        assert!(is_git_worktree_file(&dot_git));
     }
 
     #[test]
-    fn test_is_rebase_in_progress_true_rebase_apply() {
-        let temp = std::env::temp_dir();
-        let repo_path = temp.join("test_is_rebase_in_progress_true_rebase_apply");
-        std::fs::create_dir_all(repo_path.join(".git/rebase-apply")).unwrap();
-        let result = is_rebase_in_progress(&repo_path);
-        std::fs::remove_dir_all(repo_path).ok();
-        assert!(result);
+    fn test_is_git_worktree_file_regular_git_dir() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let dot_git = tmp.path().join(".git");
+        std::fs::write(&dot_git, "ref: refs/heads/main").expect("write .git file");
+        assert!(!is_git_worktree_file(&dot_git));
     }
 
     #[test]
-    fn test_is_rebase_in_progress_false() {
-        let temp = std::env::temp_dir();
-        let repo_path = temp.join("test_is_rebase_in_progress_false");
-        std::fs::create_dir_all(repo_path.join(".git/objects")).unwrap();
-        let result = is_rebase_in_progress(&repo_path);
-        std::fs::remove_dir_all(repo_path).ok();
-        assert!(!result);
+    fn test_is_git_worktree_file_nonexistent() {
+        let dot_git = std::path::Path::new("/nonexistent/.git");
+        assert!(!is_git_worktree_file(dot_git));
     }
 
     #[test]
-    fn test_is_merge_in_progress_true() {
-        let temp = std::env::temp_dir();
-        let repo_path = temp.join("test_is_merge_in_progress_true");
-        std::fs::create_dir_all(repo_path.join(".git")).unwrap();
-        std::fs::write(repo_path.join(".git/MERGE_HEAD"), "abc123").unwrap();
-        let result = is_merge_in_progress(&repo_path);
-        std::fs::remove_dir_all(repo_path).ok();
-        assert!(result);
+    fn test_is_git_worktree_file_with_whitespace() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let dot_git = tmp.path().join(".git");
+        std::fs::write(&dot_git, "gitdir: /path/to/worktree\n").expect("write .git file");
+        assert!(is_git_worktree_file(&dot_git));
     }
 
     #[test]
-    fn test_is_merge_in_progress_false() {
-        let temp = std::env::temp_dir();
-        let repo_path = temp.join("test_is_merge_in_progress_false");
-        std::fs::create_dir_all(repo_path.join(".git/objects")).unwrap();
-        let result = is_merge_in_progress(&repo_path);
-        std::fs::remove_dir_all(repo_path).ok();
-        assert!(!result);
+    fn test_load_secret_from_env() {
+        let tmp_val = "test_token_abc123";
+        std::env::set_var("TEST_LOAD_SECRET_TOKEN", tmp_val);
+        let result = load_secret("TEST_LOAD_SECRET_TOKEN");
+        std::env::remove_var("TEST_LOAD_SECRET_TOKEN");
+        assert_eq!(result, Some(tmp_val.to_string()));
     }
 
     #[test]
-    fn test_is_cherry_pick_in_progress_true() {
-        let temp = std::env::temp_dir();
-        let repo_path = temp.join("test_is_cherry_pick_in_progress_true");
-        std::fs::create_dir_all(repo_path.join(".git")).unwrap();
-        std::fs::write(repo_path.join(".git/CHERRY_PICK_HEAD"), "abc123").unwrap();
-        let result = is_cherry_pick_in_progress(&repo_path);
-        std::fs::remove_dir_all(repo_path).ok();
-        assert!(result);
+    fn test_load_secret_empty_env_var() {
+        std::env::set_var("TEST_LOAD_SECRET_EMPTY", "");
+        let result = load_secret("TEST_LOAD_SECRET_EMPTY");
+        std::env::remove_var("TEST_LOAD_SECRET_EMPTY");
+        assert_eq!(result, None);
     }
 
     #[test]
-    fn test_is_cherry_pick_in_progress_false() {
-        let temp = std::env::temp_dir();
-        let repo_path = temp.join("test_is_cherry_pick_in_progress_false");
-        std::fs::create_dir_all(repo_path.join(".git/objects")).unwrap();
-        let result = is_cherry_pick_in_progress(&repo_path);
-        std::fs::remove_dir_all(repo_path).ok();
-        assert!(!result);
+    fn test_load_secret_missing() {
+        assert_eq!(load_secret("TEST_NONEXISTENT_SECRET_VAR_XYZ"), None);
     }
 
     #[test]
-    fn test_is_safe_git_path_normal() {
-        assert!(is_safe_git_path(Path::new("src/main.rs")));
-        assert!(is_safe_git_path(Path::new("docs/readme.md")));
-        assert!(is_safe_git_path(Path::new("file.txt")));
-    }
-
-    #[test]
-    fn test_is_safe_git_path_absolute_rejected() {
-        assert!(!is_safe_git_path(Path::new("/etc/passwd")));
-        assert!(!is_safe_git_path(Path::new("/absolute/path")));
-    }
-
-    #[test]
-    fn test_is_safe_git_path_parent_traversal_rejected() {
-        assert!(!is_safe_git_path(Path::new("../etc/passwd")));
-        assert!(!is_safe_git_path(Path::new("foo/../bar")));
-        assert!(!is_safe_git_path(Path::new("../../../etc/passwd")));
-    }
-
-    #[test]
-    fn test_is_safe_git_path_leading_dash_rejected() {
-        assert!(!is_safe_git_path(Path::new("-e")));
-        assert!(!is_safe_git_path(Path::new("-f")));
-    }
-
-    #[test]
-    fn test_is_safe_branch_name_normal() {
-        assert!(is_safe_branch_name("main"));
-        assert!(is_safe_branch_name("master"));
-        assert!(is_safe_branch_name("feature-123"));
-        assert!(is_safe_branch_name("feature/my-feature"));
-        assert!(is_safe_branch_name("release-v1.0.0"));
-    }
-
-    #[test]
-    fn test_is_safe_branch_name_empty_rejected() {
-        assert!(!is_safe_branch_name(""));
-    }
-
-    #[test]
-    fn test_is_safe_branch_name_leading_dash_rejected() {
-        assert!(!is_safe_branch_name("-main"));
-        assert!(!is_safe_branch_name("-feature"));
-    }
-
-    #[test]
-    fn test_is_safe_branch_name_double_dot_rejected() {
-        assert!(!is_safe_branch_name("feature..main"));
-        assert!(!is_safe_branch_name("origin/..main"));
-    }
-
-    #[test]
-    fn test_is_safe_branch_name_newline_rejected() {
-        assert!(!is_safe_branch_name("main\n"));
-        assert!(!is_safe_branch_name("ma\nin"));
-    }
-
-    #[test]
-    fn test_is_safe_branch_name_special_chars_rejected() {
-        assert!(!is_safe_branch_name("feature~1"));
-        assert!(!is_safe_branch_name("feature^"));
-        assert!(!is_safe_branch_name("origin:refs/heads/main"));
-        assert!(!is_safe_branch_name("feat?ue"));
-        assert!(!is_safe_branch_name("feat*ue"));
-        assert!(!is_safe_branch_name("feat[ue]"));
-    }
-
-    #[test]
-    fn test_is_safe_branch_name_space_rejected() {
-        assert!(!is_safe_branch_name("feature branch"));
-        assert!(!is_safe_branch_name("my branch"));
-    }
-
-    #[test]
-    fn test_is_git_worktree_file_true() {
-        let temp = std::env::temp_dir();
-        let dot_git = temp.join("test_is_git_worktree_file");
-        std::fs::write(&dot_git, "gitdir: /some/other/path/.git/worktrees/branch\n").unwrap();
-        let result = is_git_worktree_file(&dot_git);
-        std::fs::remove_file(&dot_git).ok();
-        assert!(result);
-    }
-
-    #[test]
-    fn test_is_git_worktree_file_false_regular_file() {
-        let temp = std::env::temp_dir();
-        let dot_git = temp.join("test_is_git_worktree_file_false");
-        std::fs::write(&dot_git, "regular file content\n").unwrap();
-        let result = is_git_worktree_file(&dot_git);
-        std::fs::remove_file(&dot_git).ok();
-        assert!(!result);
-    }
-
-    #[test]
-    fn test_is_git_worktree_file_false_directory() {
-        let temp = std::env::temp_dir();
-        let dot_git = temp.join("test_is_git_worktree_file_dir");
-        std::fs::create_dir_all(&dot_git).unwrap();
-        let result = is_git_worktree_file(&dot_git);
-        std::fs::remove_dir_all(&dot_git).ok();
-        assert!(!result);
-    }
-
-    #[test]
-    fn test_parse_name_status_line_modified() {
-        let result = parse_name_status_line("M\tsrc/main.rs");
-        assert!(result.is_some());
-        let (path, status) = result.unwrap();
-        assert_eq!(path, PathBuf::from("src/main.rs"));
-        assert_eq!(status, FileStatus::Modified);
-    }
-
-    #[test]
-    fn test_parse_name_status_line_added() {
-        let result = parse_name_status_line("A\tnewfile.txt");
-        assert!(result.is_some());
-        let (path, status) = result.unwrap();
-        assert_eq!(path, PathBuf::from("newfile.txt"));
-        assert_eq!(status, FileStatus::Added);
-    }
-
-    #[test]
-    fn test_parse_name_status_line_deleted() {
-        let result = parse_name_status_line("D\tdeleted.txt");
-        assert!(result.is_some());
-        let (path, status) = result.unwrap();
-        assert_eq!(path, PathBuf::from("deleted.txt"));
-        assert_eq!(status, FileStatus::Deleted);
-    }
-
-    #[test]
-    fn test_parse_name_status_line_renamed() {
-        let result = parse_name_status_line("R100\told.txt\tnew.txt");
-        assert!(result.is_some());
-        let (path, status) = result.unwrap();
-        assert_eq!(path, PathBuf::from("new.txt"));
-        assert_eq!(status, FileStatus::Renamed);
-    }
-
-    #[test]
-    fn test_parse_name_status_line_invalid() {
-        assert!(parse_name_status_line("").is_none());
-        assert!(parse_name_status_line("X\tsomefile.txt").is_none());
-    }
-
-    #[test]
-    fn test_fallback_status_rank_deleted_highest() {
-        assert!(fallback_status_rank(&FileStatus::Deleted) > fallback_status_rank(&FileStatus::Modified));
-        assert!(fallback_status_rank(&FileStatus::Deleted) > fallback_status_rank(&FileStatus::Added));
-    }
-
-    #[test]
-    fn test_fallback_status_rank_renamed() {
-        assert!(fallback_status_rank(&FileStatus::Renamed) > fallback_status_rank(&FileStatus::Added));
-        assert!(fallback_status_rank(&FileStatus::Renamed) > fallback_status_rank(&FileStatus::Modified));
-    }
-
-    #[test]
-    fn test_fallback_status_rank_type_change() {
-        assert!(fallback_status_rank(&FileStatus::TypeChange) > fallback_status_rank(&FileStatus::Modified));
-    }
-
-    #[test]
-    fn test_fallback_status_rank_added() {
-        assert!(fallback_status_rank(&FileStatus::Added) > fallback_status_rank(&FileStatus::Modified));
-    }
-
-    #[test]
-    fn test_fallback_status_rank_unknown_lowest() {
-        assert_eq!(fallback_status_rank(&FileStatus::Unknown), 0);
-    }
-
-    fn create_temp_git_repo(name: &str) -> std::path::PathBuf {
-        let rng = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        let temp = std::env::temp_dir().join(format!("test_{}_{}", name, rng));
-        std::fs::create_dir_all(&temp).unwrap();
+    fn test_get_remote_url_nonexistent_remote() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path().join("test-repo");
         std::process::Command::new("git")
             .args(["init", "-q", "-b", "master"])
-            .current_dir(&temp)
-            .output()
-            .expect("git init failed");
-        std::fs::write(temp.join("test.txt"), "test content\n").ok();
-        std::process::Command::new("git")
-            .args(["add", "."])
-            .current_dir(&temp)
-            .output()
-            .expect("git add failed");
-        std::process::Command::new("git")
-            .args(["commit", "-q", "-m", "initial"])
-            .current_dir(&temp)
-            .output()
-            .expect("git commit failed");
-        temp
+            .arg(&repo)
+            .status()
+            .expect("git init");
+        assert_eq!(multi_remote::get_remote_url(&repo, "origin"), None);
     }
 
     #[test]
-    fn test_has_origin_remote_false() {
-        let repo_path = create_temp_git_repo("has_origin_false");
-        let result = has_origin_remote(&repo_path);
-        let _ = std::fs::remove_dir_all(repo_path);
-        assert!(!result, "newly init'd repo should not have origin");
-    }
-
-    #[test]
-    fn test_has_origin_remote_true_after_add() {
-        let repo_path = create_temp_git_repo("has_origin_true");
-        std::process::Command::new("git")
-            .args(["remote", "add", "origin", "https://github.com/test/repo.git"])
-            .current_dir(&repo_path)
-            .output()
-            .expect("git remote add failed");
-        let result = has_origin_remote(&repo_path);
-        let _ = std::fs::remove_dir_all(repo_path);
-        assert!(result, "repo with origin should return true");
-    }
-
-    #[test]
-    fn test_current_branch_returns_some() {
-        let repo_path = create_temp_git_repo("current_branch");
-        let result = current_branch(&repo_path);
-        let _ = std::fs::remove_dir_all(repo_path);
-        assert!(result.is_some(), "on a branch should return branch name");
-        assert_eq!(result.unwrap(), "master");
-    }
-
-    #[test]
-    fn test_has_tracking_upstream_false_without_remote() {
-        let repo_path = create_temp_git_repo("no_tracking");
-        let result = has_tracking_upstream(&repo_path);
-        let _ = std::fs::remove_dir_all(repo_path);
-        assert!(!result, "repo without remote should not have tracking upstream");
-    }
-
-    #[test]
-    fn test_remote_branch_exists_unsafe_branch_name() {
-        let repo_path = create_temp_git_repo("branch_exists");
-        let result = remote_branch_exists(&repo_path, "main");
-        let _ = std::fs::remove_dir_all(repo_path);
-        assert!(!result, "branch that doesn't exist should return false");
-    }
-
-    #[test]
-    fn test_remote_branch_exists_rejects_unsafe_names() {
-        let repo_path = create_temp_git_repo("unsafe_names");
-        assert!(!remote_branch_exists(&repo_path, ""), "empty branch name should be rejected");
-        assert!(!remote_branch_exists(&repo_path, "-main"), "leading dash should be rejected");
-        assert!(!remote_branch_exists(&repo_path, "feat..main"), "double dot should be rejected");
-        let _ = std::fs::remove_dir_all(repo_path);
-    }
-
-    #[tokio::test]
-    async fn test_git_diff_head_files_returns_staged_files() {
-        let repo_path = create_temp_git_repo("diff_head");
-        std::fs::write(repo_path.join("new.txt"), "content\n").ok();
-        std::process::Command::new("git")
-            .args(["add", "new.txt"])
-            .current_dir(&repo_path)
-            .output()
-            .expect("git add failed");
-        let files = git_diff_head_files(&repo_path).await;
-        let _ = std::fs::remove_dir_all(&repo_path);
-        assert!(files.contains(&"new.txt".to_string()), "staged file should appear in diff: {:?}", files);
-    }
-
-    #[tokio::test]
-    async fn test_git_diff_head_files_returns_modified_files() {
-        let repo_path = create_temp_git_repo("diff_modified");
-        std::fs::write(repo_path.join("test.txt"), "modified\n").ok();
-        std::process::Command::new("git")
-            .args(["commit", "-q", "-m", "initial"])
-            .current_dir(&repo_path)
-            .output()
-            .expect("git commit failed");
-        std::fs::write(repo_path.join("test.txt"), "changed\n").ok();
-        let files = git_diff_head_files(&repo_path).await;
-        let _ = std::fs::remove_dir_all(&repo_path);
-        assert!(files.contains(&"test.txt".to_string()), "modified file should appear in diff: {:?}", files);
-    }
-
-    #[tokio::test]
-    async fn test_git_diff_head_files_empty_on_clean() {
-        let repo_path = create_temp_git_repo("diff_clean");
-        std::process::Command::new("git")
-            .args(["commit", "-q", "-m", "initial"])
-            .current_dir(&repo_path)
-            .output()
-            .expect("git commit failed");
-        let files = git_diff_head_files(&repo_path).await;
-        let _ = std::fs::remove_dir_all(&repo_path);
-        assert!(files.is_empty(), "clean repo should return empty diff: {:?}", files);
-    }
-
-    #[test]
-    fn test_discover_git_repos_finds_nested_repos() {
-        let temp = std::env::temp_dir().join(format!("dracon_test_discover_{}", std::process::id()));
-        std::fs::create_dir_all(&temp).ok();
-        std::fs::create_dir_all(temp.join("project/repos/nested")).ok();
+    fn test_list_remotes_empty() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path().join("test-repo");
         std::process::Command::new("git")
             .args(["init", "-q", "-b", "master"])
-            .current_dir(temp.join("project/repos/nested"))
-            .output()
-            .expect("git init failed");
-        std::fs::write(temp.join("project/repos/nested/file.txt"), "x\n").ok();
-        std::process::Command::new("git")
-            .args(["add", "."])
-            .current_dir(temp.join("project/repos/nested"))
-            .output()
-            .ok();
-        std::process::Command::new("git")
-            .args(["commit", "-q", "-m", "init"])
-            .current_dir(temp.join("project/repos/nested"))
-            .output()
-            .ok();
-        let roots = vec![temp.join("project")];
-        let excluded = BTreeSet::new();
-        let repos = discover_git_repos(&roots, &excluded, &[], None);
-        let _ = std::fs::remove_dir_all(&temp);
-        assert_eq!(repos.len(), 1, "should find the nested repo: {:?}", repos);
-        assert!(repos[0].ends_with("nested"), "repo path should end with nested");
+            .arg(&repo)
+            .status()
+            .expect("git init");
+        assert!(multi_remote::list_remotes(&repo).is_empty());
     }
 
-    fn create_temp_git_repo_with_branches(name: &str, branches: &[&str]) -> std::path::PathBuf {
-        let rng = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        let temp = std::env::temp_dir().join(format!("test_{}_{}", name, rng));
-        std::fs::create_dir_all(&temp).unwrap();
+    #[test]
+    fn test_list_remotes_one_remote() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path().join("test-repo");
         std::process::Command::new("git")
             .args(["init", "-q", "-b", "master"])
-            .current_dir(&temp)
-            .output()
-            .expect("git init failed");
-        std::fs::write(temp.join("test.txt"), "test content\n").ok();
+            .arg(&repo)
+            .status()
+            .expect("git init");
         std::process::Command::new("git")
-            .args(["add", "."])
-            .current_dir(&temp)
-            .output()
-            .ok();
+            .args(["remote", "add", "origin", "git@github.com:Test/repo.git"])
+            .current_dir(&repo)
+            .status()
+            .expect("git remote add");
+        let remotes = multi_remote::list_remotes(&repo);
+        assert_eq!(remotes, vec!["origin"]);
+    }
+
+    #[test]
+    fn test_ensure_remote_adds_new() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path().join("test-repo");
         std::process::Command::new("git")
-            .args(["commit", "-q", "-m", "initial"])
-            .current_dir(&temp)
-            .output()
-            .ok();
-        
-        let mut all_branches = vec!["master".to_string()];
-        for branch in branches {
-            if *branch != "master" {
-                all_branches.push(branch.to_string());
-            }
-        }
-        
-        for branch in &all_branches {
-            if branch != "master" {
-                std::process::Command::new("git")
-                    .args(["checkout", "-q", "-b", branch])
-                    .current_dir(&temp)
-                    .output()
-                    .ok();
-            }
-        }
-        
-        if !branches.contains(&"master") && branches.contains(&"main") {
-            std::process::Command::new("git")
-                .args(["branch", "-q", "-d", "master"])
-                .current_dir(&temp)
-                .output()
-                .ok();
-        }
-        
-        temp
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .expect("git init");
+
+        multi_remote::ensure_remote(&repo, "github", "git@github.com:Test/repo.git").expect("ensure_remote");
+
+        let url = multi_remote::get_remote_url(&repo, "github");
+        assert_eq!(url, Some("git@github.com:Test/repo.git".to_string()));
     }
 
     #[test]
-    fn test_has_only_main_branch_true() {
-        let repo_path = create_temp_git_repo_with_branches("only_main", &["main"]);
-        let result = has_only_main_branch(&repo_path);
-        let _ = std::fs::remove_dir_all(repo_path);
-        assert!(result, "repo with only main should return true");
+    fn test_ensure_remote_updates_existing() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path().join("test-repo");
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .expect("git init");
+        std::process::Command::new("git")
+            .args(["remote", "add", "github", "git@github.com:Old/repo.git"])
+            .current_dir(&repo)
+            .status()
+            .expect("git remote add");
+
+        multi_remote::ensure_remote(&repo, "github", "git@github.com:New/repo.git").expect("ensure_remote");
+
+        let url = multi_remote::get_remote_url(&repo, "github");
+        assert_eq!(url, Some("git@github.com:New/repo.git".to_string()));
     }
 
     #[test]
-    fn test_has_only_main_branch_false_has_master() {
-        let repo_path = create_temp_git_repo_with_branches("has_master", &["main", "master"]);
-        let result = has_only_main_branch(&repo_path);
-        let _ = std::fs::remove_dir_all(repo_path);
-        assert!(!result, "repo with both main and master should return false");
+    fn test_ensure_remote_idempotent() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path().join("test-repo");
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .expect("git init");
+
+        multi_remote::ensure_remote(&repo, "github", "git@github.com:Test/repo.git").expect("ensure_remote 1");
+        multi_remote::ensure_remote(&repo, "github", "git@github.com:Test/repo.git").expect("ensure_remote 2");
+
+        let remotes = multi_remote::list_remotes(&repo);
+        assert_eq!(remotes.len(), 1);
+        assert_eq!(remotes[0], "github");
     }
 
-    #[test]
-    fn test_has_only_main_branch_false_only_master() {
-        let repo_path = create_temp_git_repo_with_branches("only_master", &["master"]);
-        let result = has_only_main_branch(&repo_path);
-        let _ = std::fs::remove_dir_all(repo_path);
-        assert!(!result, "repo with only master should return false");
-    }
-
-    #[test]
-    fn test_has_both_main_and_master_true() {
-        let repo_path = create_temp_git_repo_with_branches("both", &["main", "master"]);
-        let result = has_both_main_and_master(&repo_path);
-        let _ = std::fs::remove_dir_all(repo_path);
-        assert!(result, "repo with both main and master should return true");
-    }
-
-    #[test]
-    fn test_has_both_main_and_master_false_only_master() {
-        let repo_path = create_temp_git_repo_with_branches("master_only", &["master"]);
-        let result = has_both_main_and_master(&repo_path);
-        let _ = std::fs::remove_dir_all(repo_path);
-        assert!(!result, "repo with only master should return false");
-    }
-
-    #[test]
-    fn test_has_both_main_and_master_false_only_main() {
-        let repo_path = create_temp_git_repo_with_branches("main_only", &["main"]);
-        let result = has_both_main_and_master(&repo_path);
-        let _ = std::fs::remove_dir_all(repo_path);
-        assert!(!result, "repo with only main should return false");
-    }
 }

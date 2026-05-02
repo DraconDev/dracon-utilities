@@ -144,7 +144,7 @@ mod daemon_tests {
     #[test]
     fn test_stuck_repos_path_format() {
         let path = stuck_repos_path();
-        assert!(path.to_string_lossy().contains(".dracon"));
+        assert!(path.to_string_lossy().contains(".local"));
         assert!(path.to_string_lossy().contains("dracon-sync-stuck-push-repos.json"));
     }
 
@@ -173,7 +173,7 @@ mod daemon_tests {
     #[test]
     fn test_stuck_repos_path_home() {
         let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
-        let expected_base = home.join(".dracon").join("state");
+        let expected_base = home.join(".local").join("state").join("dracon");
         let path = stuck_repos_path();
         assert!(path.starts_with(expected_base));
     }
@@ -182,8 +182,9 @@ mod daemon_tests {
 fn stuck_repos_path() -> PathBuf {
     dirs::home_dir()
         .unwrap_or_else(|| PathBuf::from("."))
-        .join(".dracon")
+        .join(".local")
         .join("state")
+        .join("dracon")
         .join("dracon-sync-stuck-push-repos.json")
 }
 
@@ -294,7 +295,7 @@ pub(crate) async fn run_once(policy_path: &Path) -> Result<()> {
     for repo in repos {
         match tokio::time::timeout(
             Duration::from_secs(policy.repo_sync_timeout_secs),
-            sync_repo(&repo, &policy, &excluded_dir_names, 0),
+            sync_repo(&repo, &policy, &excluded_dir_names, 0, None),
         )
         .await
         {
@@ -347,12 +348,14 @@ pub(crate) async fn run_daemon(policy_path: PathBuf, override_interval_secs: Opt
         fingerprint: String,
         changed_at: Instant,
         failure_count: usize,
+        remote_failures: HashMap<String, usize>,
     }
 
     let mut activity: HashMap<PathBuf, RepoActivity> = HashMap::new();
     let mut repair_cooldowns: HashMap<PathBuf, Instant> = HashMap::new();
     let mut filter_cooldowns: HashMap<PathBuf, Instant> = HashMap::new();
     let mut stuck_push_repos = load_stuck_push_repos();
+    let mut remote_notify_cooldowns: HashMap<String, Instant> = HashMap::new();
 
     let shutdown = Arc::new(AtomicBool::new(false));
     let shutdown_sigterm = shutdown.clone();
@@ -382,9 +385,10 @@ pub(crate) async fn run_daemon(policy_path: PathBuf, override_interval_secs: Opt
 
     tokio::spawn(async move {
         if let Ok(mut sig) = tokio::signal::unix::signal(SignalKind::hangup()) {
-            sig.recv().await;
-            veprintln!(1, "sync: received SIGHUP, will reload policy...");
-            reload_sighup.store(true, Ordering::SeqCst);
+            while sig.recv().await.is_some() {
+                veprintln!(1, "sync: received SIGHUP, will reload policy...");
+                reload_sighup.store(true, Ordering::SeqCst);
+            }
         } else {
             eprintln!("sync: failed to set up SIGHUP handler");
         }
@@ -449,13 +453,13 @@ pub(crate) async fn run_daemon(policy_path: PathBuf, override_interval_secs: Opt
             // Main-only → rename to master so everything is consistent.
             if has_both_main_and_master(&repo) {
                 eprintln!("🔧 {} has both main+master, consolidating to master", repo.display());
-                if let Err(e) = crate::git::consolidate_to_master(&repo) {
+                if let Err(e) = crate::git::consolidate_to_master(&repo).await {
                     eprintln!("⚠️ failed to consolidate {} to master: {}", repo.display(), e);
                     continue;
                 }
             } else if crate::git::has_only_main_branch(&repo) {
                 eprintln!("🔧 {} has only 'main', renaming to 'master'", repo.display());
-                if let Err(e) = crate::git::rename_main_to_master(&repo) {
+                if let Err(e) = crate::git::rename_main_to_master(&repo).await {
                     eprintln!("⚠️ failed to rename {} main→master: {}", repo.display(), e);
                     continue;
                 }
@@ -523,7 +527,7 @@ pub(crate) async fn run_daemon(policy_path: PathBuf, override_interval_secs: Opt
                 // `git status` shows filter-processed files as modified, but `git diff HEAD`
                 // correctly applies the clean filter and shows no diff for such files.
                 // Note: untracked files don't appear in `git diff HEAD`, so they always pass.
-                let diff_head_files = git_diff_head_files(&repo).await;
+                let diff_head_files = git_diff_head_files(&repo).await.unwrap_or_default();
                 let filtered: Vec<_> = if diff_head_files.is_empty() && !raw_entries.is_empty() {
                     // git diff HEAD returned nothing. Only clear if ALL entries are Modified
                     // (filter-only). Untracked/Added files don't appear in git diff HEAD.
@@ -581,6 +585,7 @@ pub(crate) async fn run_daemon(policy_path: PathBuf, override_interval_secs: Opt
                         fingerprint,
                         changed_at: now,
                         failure_count: 0,
+                        remote_failures: HashMap::new(),
                     },
                 );
                 continue;
@@ -620,6 +625,7 @@ pub(crate) async fn run_daemon(policy_path: PathBuf, override_interval_secs: Opt
                     &policy,
                     &excluded_dir_names,
                     now.duration_since(entry.changed_at).as_secs(),
+                    Some(&mut entry.remote_failures),
                 ),
             )
             .await
@@ -695,6 +701,7 @@ pub(crate) async fn run_daemon(policy_path: PathBuf, override_interval_secs: Opt
 
             if sync_success {
                 entry.failure_count = 0;
+                entry.remote_failures.clear();
                 // Re-check if repo is still dirty (filter-only changes persist).
                 // If so, use a long cooldown instead of removing from activity
                 // to prevent tight triage loops on phantom changes.
@@ -719,6 +726,39 @@ pub(crate) async fn run_daemon(policy_path: PathBuf, override_interval_secs: Opt
                 activity.remove(&repo);
             } else {
                 entry.failure_count += 1;
+
+                // Check if ALL configured remotes are failing — desktop notification
+                if !entry.remote_failures.is_empty() {
+                    let all_failed = policy.remotes.iter()
+                        .all(|r| entry.remote_failures.get(&r.name).copied().unwrap_or(0) > 0);
+                    if all_failed {
+                        let notify_key = format!("{}-all", repo.display());
+                        let now = Instant::now();
+
+                        // Check cooldown BEFORE firing notification
+                        if let Some(cooldown_until) = remote_notify_cooldowns.get(&notify_key) {
+                            if now < *cooldown_until {
+                                // still in cooldown, skip notification entirely
+                            } else {
+                                // cooldown expired, fire and reset
+                                remote_notify_cooldowns.remove(&notify_key);
+                            }
+                        }
+
+                        // Fire only if not in cooldown (cooldown entry was removed above)
+                        if !remote_notify_cooldowns.contains_key(&notify_key) {
+                            let failed_list: Vec<_> = entry.remote_failures.keys().cloned().collect();
+                            let msg = format!("All remotes failing: {}. Failures: {:?}", failed_list.join(", "), entry.remote_failures);
+                            crate::report::send_sync_conflict_notification(
+                                &repo,
+                                "All Remotes Failing",
+                                &msg,
+                            );
+                            remote_notify_cooldowns.insert(notify_key, now + Duration::from_secs(1800));
+                        }
+                    }
+                }
+
                 // If repo has divergence (ahead AND behind), push will always fail
                 // regardless of dirty state - mark as stuck immediately.
                 // This prevents the repo from blocking other syncs.
