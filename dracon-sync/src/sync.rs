@@ -1218,11 +1218,19 @@ push_url = "git@nonexistent.example.com:repo.git"
             .args(["-C", &repo.to_string_lossy(), "remote", "add", "origin", &origin_bare.to_string_lossy()])
             .status()
             .unwrap();
+        // Push initial commit to origin so upstream is set
+        std::process::Command::new("git")
+            .args(["-C", &repo.to_string_lossy(), "push", "-u", "origin", "master"])
+            .status()
+            .unwrap();
+
+        // Make repo dirty so sync creates a commit and pushes
+        std::fs::write(repo.join("change.txt"), "changed\n").unwrap();
 
         let toml_str = format!(
             r#"
 auto_github_private = false
-auto_commit = false
+auto_commit = true
 auto_pull = false
 auto_push = true
 auto_bump_versions = false
@@ -1236,7 +1244,7 @@ push_url = "{}"
         let policy: SyncPolicy = toml::from_str(&toml_str).unwrap();
 
         let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None).await;
-        assert!(result.is_ok(), "sync_repo should not error");
+        assert!(result.is_ok(), "sync_repo should not error: {:?}", result);
         assert!(result.unwrap(), "mirror push success should return true");
     }
 }
