@@ -1156,6 +1156,15 @@ pub(crate) mod multi_remote {
     }
 }
 
+pub(crate) fn configure_all_remotes(repo: &Path, remotes: &[RemoteConfig], repo_name: &str) {
+    for remote in remotes {
+        let url = remote.resolve_push_url(repo_name);
+        if let Err(e) = ensure_remote(repo, &remote.name, &url) {
+            eprintln!("⚠️ failed to configure remote {} for {}: {}", remote.name, repo.display(), e);
+        }
+    }
+}
+
 pub(crate) fn get_remote_url(repo: &Path, name: &str) -> Option<String> {
     let output = std_git_command()
         .args(["remote", "get-url", name])
