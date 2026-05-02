@@ -1909,4 +1909,86 @@ mod tests {
         assert!(err_msg.contains("missing token") || err_msg.contains("CODEBERG_TOKEN"), "error should mention missing token");
     }
 
+    #[test]
+    fn test_create_repo_on_codeberg_success_201() {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
+        let port = listener.local_addr().unwrap().port();
+
+        std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().expect("accept");
+            let mut buf = [0u8; 1024];
+            let _ = std::io::Read::read(&mut stream, &mut buf);
+            let response = "HTTP/1.1 201 Created\r\nContent-Length: 0\r\n\r\n";
+            std::io::Write::write_all(&mut stream, response.as_bytes()).expect("write");
+        });
+
+        let url = format!("http://127.0.0.1:{}/api/v1/repos", port);
+        let result = crate::git::multi_remote::create_repo_on_codeberg("test_token", "testuser", "myrepo", &url);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "git@codeberg.org:testuser/myrepo.git");
+    }
+
+    #[test]
+    fn test_create_repo_on_codeberg_conflict_409() {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
+        let port = listener.local_addr().unwrap().port();
+
+        std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().expect("accept");
+            let mut buf = [0u8; 1024];
+            let _ = std::io::Read::read(&mut stream, &mut buf);
+            let response = "HTTP/1.1 409 Conflict\r\nContent-Length: 0\r\n\r\n";
+            std::io::Write::write_all(&mut stream, response.as_bytes()).expect("write");
+        });
+
+        let url = format!("http://127.0.0.1:{}/api/v1/repos", port);
+        let result = crate::git::multi_remote::create_repo_on_codeberg("test_token", "testuser", "myrepo", &url);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "git@codeberg.org:testuser/myrepo.git");
+    }
+
+    #[test]
+    fn test_create_repo_on_codeberg_unprocessable_422() {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
+        let port = listener.local_addr().unwrap().port();
+
+        std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().expect("accept");
+            let mut buf = [0u8; 1024];
+            let _ = std::io::Read::read(&mut stream, &mut buf);
+            let response = "HTTP/1.1 422 Unprocessable Entity\r\nContent-Length: 0\r\n\r\n";
+            std::io::Write::write_all(&mut stream, response.as_bytes()).expect("write");
+        });
+
+        let url = format!("http://127.0.0.1:{}/api/v1/repos", port);
+        let result = crate::git::multi_remote::create_repo_on_codeberg("test_token", "testuser", "myrepo", &url);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "git@codeberg.org:testuser/myrepo.git");
+    }
+
+    #[test]
+    fn test_create_repo_on_codeberg_unauthorized_401() {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
+        let port = listener.local_addr().unwrap().port();
+
+        std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().expect("accept");
+            let mut buf = [0u8; 1024];
+            let _ = std::io::Read::read(&mut stream, &mut buf);
+            let body = r#"{"message": "Unauthorized"}"#;
+            let response = format!(
+                "HTTP/1.1 401 Unauthorized\r\nContent-Length: {}\r\n\r\n{}",
+                body.len(),
+                body
+            );
+            std::io::Write::write_all(&mut stream, response.as_bytes()).expect("write");
+        });
+
+        let url = format!("http://127.0.0.1:{}/api/v1/repos", port);
+        let result = crate::git::multi_remote::create_repo_on_codeberg("bad_token", "testuser", "myrepo", &url);
+        assert!(result.is_err());
+        let err_msg = format!("{}", result.unwrap_err());
+        assert!(err_msg.contains("401") || err_msg.contains("Unauthorized"), "error should mention 401: {}", err_msg);
+    }
+
 }
