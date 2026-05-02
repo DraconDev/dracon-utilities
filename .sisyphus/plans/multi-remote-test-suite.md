@@ -93,64 +93,95 @@ Add tests for:
 
 ---
 
-## Phase 2: HTTP Testing (Codeberg)
+## Phase 2: HTTP Testing (Codeberg) — REVISED
 
-### 2.1 Add wiremock dev-dependency
-**Estimated**: 2 min  
-**File**: `Cargo.toml`
-
-```toml
-[dev-dependencies]
-tempfile = "3"
-wiremock = "0.6"
-```
-
-### 2.2 Refactor `create_repo_on_codeberg` for testability
-**Estimated**: 10 min  
+### 2.1 Refactor `create_repo_on_codeberg` to use blocking client
+**Estimated**: 5 min  
 **File**: `git.rs`
 
-Current signature:
-```rust
-pub(crate) fn create_repo_on_codeberg(token: &str, account: &str, repo_name: &str, api_endpoint: &str) -> Result<String>
-```
+Current code uses `tokio::runtime::Handle::current().block_on()` inside a sync function — fragile.
 
-Refactor to accept client:
+Refactor to use `reqwest::blocking::Client`:
+
 ```rust
-pub(crate) async fn create_repo_on_codeberg(
-    client: &reqwest::Client,
+pub(crate) fn create_repo_on_codeberg(
     token: &str,
     account: &str,
     repo_name: &str,
     api_endpoint: &str,
-) -> Result<String>
+) -> Result<String> {
+    let client = reqwest::blocking::Client::new();
+    let response = client
+        .post(api_endpoint)
+        .header("Authorization", format!("Bearer {}", token))
+        .header("Content-Type", "application/json")
+        .json(&serde_json::json!({
+            "name": repo_name,
+            "private": true,
+            "default_branch": "master"
+        }))
+        .send()
+        .with_context(|| "codeberg repo create failed")?;
+
+    let status = response.status();
+    if status.as_u16() == 409 || status.as_u16() == 422 {
+        return Ok(format!("git@codeberg.org:{}/{}.git", account, repo_name));
+    }
+
+    if !status.is_success() {
+        let body = response.text().unwrap_or_default();
+        anyhow::bail!("codeberg repo create failed ({}): {}", status, body);
+    }
+
+    Ok(format!("git@codeberg.org:{}/{}.git", account, repo_name))
+}
 ```
 
-Update call sites in `auto_create_repo` to pass `&reqwest::Client::new()`.
+**Dependency change**: Add `blocking` feature to existing reqwest:
+```toml
+reqwest = { version = "0.12", features = ["json", "blocking"] }
+```
 
-### 2.3 Test `create_repo_on_codeberg`
-**Estimated**: 20 min  
+### 2.2 Test `create_repo_on_codeberg` with local TCP mock
+**Estimated**: 15 min  
 **File**: `git.rs` tests
 
-Add tests using wiremock:
+**No wiremock needed.** Use `std::net::TcpListener` to create a minimal mock HTTP server:
+
+```rust
+#[test]
+fn test_create_repo_on_codeberg_success() {
+    // Start a thread that listens on a random port and returns HTTP 201
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+    
+    std::thread::spawn(move || {
+        let (mut stream, _) = listener.accept().unwrap();
+        let response = "HTTP/1.1 201 Created\r\nContent-Length: 0\r\n\r\n";
+        stream.write_all(response.as_bytes()).unwrap();
+    });
+    
+    let url = format!("http://127.0.0.1:{}/api/v1/repos", port);
+    let result = create_repo_on_codeberg("token", "account", "repo", &url);
+    assert!(result.is_ok());
+    assert!(result.unwrap().contains("git@codeberg.org"));
+}
+```
+
+Add tests for:
 - **Success (201)**: Returns correct SSH URL
 - **Already exists (409)**: Returns SSH URL without error
 - **Already exists (422)**: Returns SSH URL without error
 - **Auth failure (401)**: Returns error with status
-- **Server error (500)**: Returns error with body
-- **Network failure**: Returns error
 
-### 2.4 Test `auto_create_repo` for Codeberg routing
-**Estimated**: 15 min  
+### 2.3 Test `auto_create_repo` platform routing
+**Estimated**: 10 min  
 **File**: `git.rs` tests
 
-Since `auto_create_repo` calls `create_repo_on_codeberg`, we need:
-- Test with `AuthType::Codeberg` and mock client
-- Test `AuthType::Generic` returns error
-- Test missing token returns error
-
-**Challenge**: `auto_create_repo` is sync, but `create_repo_on_codeberg` becomes async. Need to `block_on` in the sync context or make `auto_create_repo` async.
-
-**Decision**: Make `auto_create_repo` async (it's only called from `auto_create_all_remotes` which is already async-adjacent).
+Test without external tools:
+- `AuthType::Generic` returns error
+- `AuthType::Codeberg` with missing token returns error (no env, no secrets file)
+- `AuthType::GitHub` when `gh` unavailable returns error (check via `which gh` or skip)
 
 ---
 
