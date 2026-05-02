@@ -1745,4 +1745,102 @@ mod tests {
         assert_eq!(remotes, vec!["origin"]);
     }
 
+    #[test]
+    fn test_configure_all_remotes_single_remote() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path().join("test-repo");
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .expect("git init");
+
+        let remotes = vec![RemoteConfig {
+            name: "mirror".to_string(),
+            push_url: "git@mirror.example.com:{account}/{repo}.git".to_string(),
+            auto_create: false,
+            auto_create_account: "myorg".to_string(),
+            auth_type: AuthType::GitHub,
+            priority: 50,
+            api_endpoint: None,
+            auto_create_token_var: None,
+        }];
+
+        crate::git::multi_remote::configure_all_remotes(&repo, &remotes, "my-repo");
+
+        let url = multi_remote::get_remote_url(&repo, "mirror");
+        assert_eq!(url, Some("git@mirror.example.com:myorg/my-repo.git".to_string()));
+    }
+
+    #[test]
+    fn test_configure_all_remotes_multiple_remotes() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path().join("test-repo");
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .expect("git init");
+
+        let remotes = vec![
+            RemoteConfig {
+                name: "github".to_string(),
+                push_url: "git@github.com:{account}/{repo}.git".to_string(),
+                auto_create: false,
+                auto_create_account: "testuser".to_string(),
+                auth_type: AuthType::GitHub,
+                priority: 50,
+                api_endpoint: None,
+                auto_create_token_var: None,
+            },
+            RemoteConfig {
+                name: "gitlab".to_string(),
+                push_url: "git@gitlab.com:{account}/{repo}.git".to_string(),
+                auto_create: false,
+                auto_create_account: "testuser".to_string(),
+                auth_type: AuthType::GitLab,
+                priority: 50,
+                api_endpoint: None,
+                auto_create_token_var: None,
+            },
+        ];
+
+        crate::git::multi_remote::configure_all_remotes(&repo, &remotes, "multi-repo");
+
+        let github_url = multi_remote::get_remote_url(&repo, "github");
+        assert_eq!(github_url, Some("git@github.com:testuser/multi-repo.git".to_string()));
+
+        let gitlab_url = multi_remote::get_remote_url(&repo, "gitlab");
+        assert_eq!(gitlab_url, Some("git@gitlab.com:testuser/multi-repo.git".to_string()));
+    }
+
+    #[test]
+    fn test_configure_all_remotes_idempotent() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path().join("test-repo");
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .expect("git init");
+
+        let remotes = vec![RemoteConfig {
+            name: "origin".to_string(),
+            push_url: "git@github.com:user/repo.git".to_string(),
+            auto_create: false,
+            auto_create_account: "user".to_string(),
+            auth_type: AuthType::GitHub,
+            priority: 50,
+            api_endpoint: None,
+            auto_create_token_var: None,
+        }];
+
+        crate::git::multi_remote::configure_all_remotes(&repo, &remotes, "repo");
+        crate::git::multi_remote::configure_all_remotes(&repo, &remotes, "repo");
+
+        let remotes_list = multi_remote::list_remotes(&repo);
+        assert_eq!(remotes_list.len(), 1);
+        assert_eq!(remotes_list[0], "origin");
+    }
+
 }
