@@ -109,11 +109,7 @@ enum Command {
     /// Open sync policy in the system editor.
     EditConfig,
     /// Test AI providers connectivity.
-    TestAi {
-        /// Emit machine-readable JSON.
-        #[arg(long)]
-        json: bool,
-    },
+    TestAi,
     /// Manage repos permanently stuck on push.
     Stuck {
         #[command(subcommand)]
@@ -203,13 +199,7 @@ async fn main() -> Result<()> {
                     system_repo: policy.system_repo.clone(),
                     backup_policy: policy.backup_policy.clone(),
                     backup_dir: policy.backup_dir.clone(),
-                    remotes: policy.remotes.len(),
-                    remote_configs: policy.remotes.iter().map(|r| report::RemoteStatus {
-                        name: r.name.clone(),
-                        auth_type: format!("{:?}", r.auth_type).to_lowercase(),
-                        auto_create: r.auto_create,
-                        priority: r.priority,
-                    }).collect(),
+                    extra_remotes: policy.extra_remotes.len(),
                 };
                 println!("{}", serde_json::to_string_pretty(&payload)?);
             } else {
@@ -266,7 +256,7 @@ async fn main() -> Result<()> {
                         policy.backup_policy, policy.backup_dir
                     );
                 }
-                println!("🌐 REMOTES: {}", policy.remotes.len());
+                println!("🌐 EXTRA_REMOTES: {}", policy.extra_remotes.len());
             }
         }
         Command::Repos {
@@ -332,7 +322,7 @@ async fn main() -> Result<()> {
             }
             let policy = SyncPolicy::load(&policy_path)?;
             let excluded_dir_names = excluded_dir_names_set(&policy);
-            if sync_repo(&repo, &policy, &excluded_dir_names, 0, None).await? {
+            if sync_repo(&repo, &policy, &excluded_dir_names, 0).await? {
                 println!("🔁 synced {}", repo.display());
             } else {
                 println!("✅ no sync changes {}", repo.display());
@@ -341,158 +331,66 @@ async fn main() -> Result<()> {
         Command::EditConfig => {
             policy::open_policy_in_editor(&policy_path)?;
         }
-        Command::TestAi { json } => {
+        Command::TestAi => {
             use simple_ai::SimpleAiService;
 
             let service = SimpleAiService::new();
             if service.is_empty() {
-                if json {
-                    println!(r#"{{"providers":[],"all_ok":false,"error":"no providers configured"}}"#);
-                } else {
-                    println!("❌ No AI providers configured");
-                    println!("   Add providers to ~/.dracon/utilities/sync/ai.toml");
-                }
+                println!("❌ No AI providers configured");
+                println!("   Add providers to ~/.dracon/ai.toml");
                 return Ok(());
             }
 
             SimpleAiService::reset_health().await;
 
             let providers = service.provider_names();
+            println!("🧪 Testing {} AI provider(s)...\n", providers.len());
 
-            #[derive(serde::Serialize)]
-            struct ProviderResult {
-                name: String,
-                status: String,
-                latency_ms: Option<u64>,
-                error: Option<String>,
-            }
-
-            let mut results: Vec<ProviderResult> = Vec::new();
             let mut all_ok = true;
             let mut working_provider = None;
 
             for name in &providers {
-                if json {
-                    print!("Testing {}... ", name);
-                } else {
-                    print!("   Testing {}... ", name);
-                }
+                print!("   Testing {}... ", name);
                 match service.test_provider(name).await {
                     Ok((true, resp)) => {
                         if resp.trim().to_uppercase().contains("OK") {
-                            if json {
-                                println!("ok");
-                            } else {
-                                println!("✅");
-                            }
+                            println!("✅");
                             working_provider = Some(name.clone());
-                            results.push(ProviderResult {
-                                name: name.clone(),
-                                status: "ok".to_string(),
-                                latency_ms: None,
-                                error: None,
-                            });
                         } else {
-                            if json {
-                                println!("warn");
-                            } else {
-                                println!("⚠️  (unexpected response: {}...)", resp.chars().take(20).collect::<String>());
-                            }
+                            println!("⚠️  (unexpected response: {}...)", resp.chars().take(20).collect::<String>());
                             working_provider = Some(name.clone());
-                            results.push(ProviderResult {
-                                name: name.clone(),
-                                status: "warn".to_string(),
-                                latency_ms: None,
-                                error: Some(resp.chars().take(50).collect()),
-                            });
                         }
                     }
                     Ok((false, err)) => {
                         let err_lower = err.to_lowercase();
                         if err_lower.contains("429") || err_lower.contains("rate limit") {
-                            if json {
-                                println!("rate_limited");
-                            } else {
-                                println!("⏳ rate limited");
-                            }
-                            all_ok = false;
-                            results.push(ProviderResult {
-                                name: name.clone(),
-                                status: "rate_limited".to_string(),
-                                latency_ms: None,
-                                error: Some(err.to_string()),
-                            });
+                            println!("⏳ rate limited");
                         } else if err_lower.contains("401") || err_lower.contains("unauthorized") || err_lower.contains("api key") {
-                            if json {
-                                println!("auth_error");
-                            } else {
-                                println!("🔑 auth error (check API key)");
-                            }
+                            println!("🔑 auth error (check API key)");
                             all_ok = false;
-                            results.push(ProviderResult {
-                                name: name.clone(),
-                                status: "auth_error".to_string(),
-                                latency_ms: None,
-                                error: Some(err.to_string()),
-                            });
                         } else {
-                            if json {
-                                println!("error");
-                            } else {
-                                println!("❌ {}", err.chars().take(40).collect::<String>());
-                            }
+                            println!("❌ {}", err.chars().take(40).collect::<String>());
                             all_ok = false;
-                            results.push(ProviderResult {
-                                name: name.clone(),
-                                status: "error".to_string(),
-                                latency_ms: None,
-                                error: Some(err.to_string()),
-                            });
                         }
                     }
                     Err(e) => {
-                        if json {
-                            println!("error");
-                        } else {
-                            println!("❌ {}", e.to_string().chars().take(40).collect::<String>());
-                        }
+                        println!("❌ {}", e.to_string().chars().take(40).collect::<String>());
                         all_ok = false;
-                        results.push(ProviderResult {
-                            name: name.clone(),
-                            status: "error".to_string(),
-                            latency_ms: None,
-                            error: Some(e.to_string()),
-                        });
                     }
                 }
             }
 
-            if json {
-                #[derive(serde::Serialize)]
-                struct JsonOutput {
-                    providers: Vec<ProviderResult>,
-                    all_ok: bool,
-                    working_provider: Option<String>,
-                }
-                let output = JsonOutput {
-                    providers: results,
-                    all_ok,
-                    working_provider,
-                };
-                println!("{}", serde_json::to_string_pretty(&output).unwrap());
+            println!();
+            if all_ok {
+                println!("✅ All AI providers ready");
+            } else if working_provider.is_some() {
+                println!("⚠️  Some providers failed but fallback available");
             } else {
-                println!();
-                if all_ok {
-                    println!("✅ All AI providers ready");
-                } else if working_provider.is_some() {
-                    println!("⚠️  Some providers failed but fallback available");
-                } else {
-                    println!("❌ All AI providers failed");
-                }
+                println!("❌ All AI providers failed");
+            }
 
-                if let Some(ref wp) = working_provider {
-                    println!("   Using: {} (fallback order: {:?})", wp, providers);
-                }
+            if let Some(ref wp) = working_provider {
+                println!("   Using: {} (fallback order: {:?})", wp, providers);
             }
         }
         Command::Stuck { cmd } => match cmd {
@@ -529,7 +427,7 @@ async fn main() -> Result<()> {
                     return Ok(());
                 }
                 println!("🔧 Consolidating {} to master...", repo.display());
-                match consolidate_to_master(&repo).await {
+                match consolidate_to_master(&repo) {
                     Ok(()) => println!("✅ consolidated to master"),
                     Err(e) => {
                         eprintln!("❌ failed: {}", e);
