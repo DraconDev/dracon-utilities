@@ -1121,4 +1121,122 @@ auto_bump_versions = false
         let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None).await;
         assert!(result.is_ok(), "sync_repo should succeed without upstream");
     }
+
+    #[tokio::test]
+    async fn test_sync_repo_mirror_push_failure_returns_false() {
+        let tmp = tempfile::tempdir().unwrap();
+        let origin_bare = tmp.path().join("origin.git");
+        std::process::Command::new("git")
+            .args(["init", "--bare", "-q", "-b", "master"])
+            .arg(&origin_bare)
+            .status()
+            .unwrap();
+
+        let repo = tmp.path().join("test-repo");
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", &repo.to_string_lossy(), "config", "user.email", "test@test"])
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", &repo.to_string_lossy(), "commit", "--allow-empty", "-m", "init"])
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", &repo.to_string_lossy(), "remote", "add", "origin", &origin_bare.to_string_lossy()])
+            .status()
+            .unwrap();
+
+        // Point mirror to non-existent path so push fails
+        let bad_mirror = tmp.path().join("nonexistent-mirror.git");
+        std::process::Command::new("git")
+            .args(["-C", &repo.to_string_lossy(), "remote", "add", "mirror", &bad_mirror.to_string_lossy()])
+            .status()
+            .unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = false
+auto_pull = false
+auto_push = true
+auto_bump_versions = false
+
+[[remotes]]
+name = "mirror"
+push_url = "git@nonexistent.example.com:repo.git"
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None).await;
+        assert!(result.is_ok(), "sync_repo should not error");
+        assert!(!result.unwrap(), "mirror push failure should return false (hard fail)");
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_mirror_push_success_returns_true() {
+        let tmp = tempfile::tempdir().unwrap();
+        let origin_bare = tmp.path().join("origin.git");
+        let mirror_bare = tmp.path().join("mirror.git");
+        std::process::Command::new("git")
+            .args(["init", "--bare", "-q", "-b", "master"])
+            .arg(&origin_bare)
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["init", "--bare", "-q", "-b", "master"])
+            .arg(&mirror_bare)
+            .status()
+            .unwrap();
+
+        let repo = tmp.path().join("test-repo");
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", &repo.to_string_lossy(), "config", "user.email", "test@test"])
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", &repo.to_string_lossy(), "commit", "--allow-empty", "-m", "init"])
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", &repo.to_string_lossy(), "remote", "add", "origin", &origin_bare.to_string_lossy()])
+            .status()
+            .unwrap();
+
+        let toml_str = format!(
+            r#"
+auto_github_private = false
+auto_commit = false
+auto_pull = false
+auto_push = true
+auto_bump_versions = false
+
+[[remotes]]
+name = "mirror"
+push_url = "{}"
+"#,
+            mirror_bare.to_string_lossy().replace("\\", "/")
+        );
+        let policy: SyncPolicy = toml::from_str(&toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None).await;
+        assert!(result.is_ok(), "sync_repo should not error");
+        assert!(result.unwrap(), "mirror push success should return true");
+    }
 }
