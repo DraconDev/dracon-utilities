@@ -806,4 +806,58 @@ auto_repair_warns: true,
         let ts2 = timestamp_secs();
         assert!(ts2 >= ts1);
     }
+
+    #[test]
+    fn test_resolve_push_url_template_substitution() {
+        let config = RemoteConfig {
+            name: "github".to_string(),
+            push_url: "git@github.com:{account}/{repo}.git".to_string(),
+            auto_create: false,
+            auto_create_account: "myorg".to_string(),
+            auth_type: AuthType::GitHub,
+            priority: 50,
+            api_endpoint: None,
+            auto_create_token_var: None,
+        };
+        assert_eq!(
+            config.resolve_push_url("my-repo"),
+            "git@github.com:myorg/my-repo.git"
+        );
+    }
+
+    #[test]
+    fn test_resolve_push_url_no_template() {
+        let config = RemoteConfig {
+            name: "mirror".to_string(),
+            push_url: "git@mirror.example.com:fixed/path.git".to_string(),
+            auto_create: false,
+            auto_create_account: "".to_string(),
+            auth_type: AuthType::GitHub,
+            priority: 50,
+            api_endpoint: None,
+            auto_create_token_var: None,
+        };
+        assert_eq!(
+            config.resolve_push_url("any-repo"),
+            "git@mirror.example.com:fixed/path.git"
+        );
+    }
+
+    #[test]
+    fn test_resolve_push_url_account_only() {
+        let config = RemoteConfig {
+            name: "gitlab".to_string(),
+            push_url: "git@gitlab.com:{account}/".to_string(),
+            auto_create: false,
+            auto_create_account: "testuser".to_string(),
+            auth_type: AuthType::GitLab,
+            priority: 50,
+            api_endpoint: None,
+            auto_create_token_var: None,
+        };
+        assert_eq!(
+            config.resolve_push_url("repo"),
+            "git@gitlab.com:testuser/"
+        );
+    }
 }
