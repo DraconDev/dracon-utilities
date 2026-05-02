@@ -1126,7 +1126,7 @@ pub(crate) fn load_secret(env_name: &str) -> Option<String> {
         std::thread::spawn(move || {
             let (mut stream, _) = listener.accept().expect("accept");
             let mut buf = [0u8; 1024];
-            let _ = stream.read(&mut buf);
+            let _ = std::io::Read::read(&mut stream, &mut buf);
             let response = "HTTP/1.1 201 Created\r\nContent-Length: 0\r\n\r\n";
             std::io::Write::write_all(&mut stream, response.as_bytes()).expect("write");
         });
@@ -1145,7 +1145,7 @@ pub(crate) fn load_secret(env_name: &str) -> Option<String> {
         std::thread::spawn(move || {
             let (mut stream, _) = listener.accept().expect("accept");
             let mut buf = [0u8; 1024];
-            let _ = stream.read(&mut buf);
+            let _ = std::io::Read::read(&mut stream, &mut buf);
             let response = "HTTP/1.1 409 Conflict\r\nContent-Length: 0\r\n\r\n";
             std::io::Write::write_all(&mut stream, response.as_bytes()).expect("write");
         });
@@ -1164,7 +1164,7 @@ pub(crate) fn load_secret(env_name: &str) -> Option<String> {
         std::thread::spawn(move || {
             let (mut stream, _) = listener.accept().expect("accept");
             let mut buf = [0u8; 1024];
-            let _ = stream.read(&mut buf);
+            let _ = std::io::Read::read(&mut stream, &mut buf);
             let response = "HTTP/1.1 422 Unprocessable Entity\r\nContent-Length: 0\r\n\r\n";
             std::io::Write::write_all(&mut stream, response.as_bytes()).expect("write");
         });
@@ -1183,7 +1183,7 @@ pub(crate) fn load_secret(env_name: &str) -> Option<String> {
         std::thread::spawn(move || {
             let (mut stream, _) = listener.accept().expect("accept");
             let mut buf = [0u8; 1024];
-            let _ = stream.read(&mut buf);
+            let _ = std::io::Read::read(&mut stream, &mut buf);
             let body = r#"{"message": "Unauthorized"}"#;
             let response = format!(
                 "HTTP/1.1 401 Unauthorized\r\nContent-Length: {}\r\n\r\n{}",
