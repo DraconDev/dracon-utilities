@@ -1673,77 +1673,78 @@ pub(crate) async fn run_repair_warns(
 
 pub(crate) fn create_github_private_remote(repo: &Path, account: &str) -> Option<String> {
     let base_name = repo.file_name()?.to_str()?.to_string();
-    
-    let mut repo_name = base_name.clone();
-    let mut counter = 1;
-    
-    loop {
-        let output = std::process::Command::new("gh")
-            .args(["repo", "create", &repo_name, "--private"])
+
+    let output = std::process::Command::new("gh")
+        .args(["repo", "create", &base_name, "--private"])
+        .current_dir(repo)
+        .output()
+        .ok()?;
+
+    if output.status.success() {
+        let remote_url = format!("git@github.com:{}/{}.git", account, base_name);
+
+        let add_result = std::process::Command::new("git")
+            .args(["remote", "add", "origin", &remote_url])
+            .current_dir(repo)
+            .output();
+
+        if let Err(e) = add_result {
+            eprintln!(
+                "⚠️ failed to add origin for {}: {}",
+                repo.display(), e
+            );
+        }
+
+        // Push to set upstream and populate the remote
+        let push_result = std::process::Command::new("git")
+            .args(["push", "-u", "origin", "HEAD"])
+            .current_dir(repo)
+            .output();
+
+        if let Ok(push_output) = push_result {
+            if !push_output.status.success() {
+                let stderr = String::from_utf8_lossy(&push_output.stderr);
+                eprintln!(
+                    "⚠️ failed to push initial commit for {}: {}",
+                    repo.display(), stderr
+                );
+            }
+        } else {
+            eprintln!(
+                "⚠️ failed to push initial commit for {}: could not execute",
+                repo.display()
+            );
+        }
+
+        return Some(remote_url);
+    }
+
+    // Repo already exists — reuse it instead of creating a new one with a suffix
+    let remote_url = format!("git@github.com:{}/{}.git", account, base_name);
+
+    // Check if origin already exists locally before adding
+    let has_origin = std::process::Command::new("git")
+        .args(["remote", "get-url", "origin"])
+        .current_dir(repo)
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false);
+
+    if !has_origin {
+        std::process::Command::new("git")
+            .args(["remote", "add", "origin", &remote_url])
             .current_dir(repo)
             .output()
             .ok()?;
-        
-        if output.status.success() {
-            let remote_url = format!("git@github.com:{}/{}.git", account, repo_name);
-            
-            let add_result = std::process::Command::new("git")
-                .args(["remote", "add", "origin", &remote_url])
-                .current_dir(repo)
-                .output();
-            
-            if let Err(e) = add_result {
-                eprintln!(
-                    "⚠️ failed to add origin for {}: {}",
-                    repo.display(), e
-                );
-            }
-            
-            // Push to set upstream and populate the remote
-            let push_result = std::process::Command::new("git")
-                .args(["push", "-u", "origin", "HEAD"])
-                .current_dir(repo)
-                .output();
-            
-            if let Ok(push_output) = push_result {
-                if !push_output.status.success() {
-                    let stderr = String::from_utf8_lossy(&push_output.stderr);
-                    eprintln!(
-                        "⚠️ failed to push initial commit for {}: {}",
-                        repo.display(), stderr
-                    );
-                }
-            } else {
-                eprintln!(
-                    "⚠️ failed to push initial commit for {}: could not execute",
-                    repo.display()
-                );
-            }
-            
-            return Some(remote_url);
-        }
-        
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        // Repo already exists — reuse it instead of creating a new one with a suffix
-        if stderr.contains("Name already exists") || stderr.contains("already exists") {
-            let remote_url = format!("git@github.com:{}/{}.git", account, base_name);
-            let add_result = std::process::Command::new("git")
-                .args(["remote", "add", "origin", &remote_url])
-                .current_dir(repo)
-                .output();
-            if let Err(e) = add_result {
-                eprintln!("⚠️ failed to add origin for {}: {}", repo.display(), e);
-            }
-            let _ = std::process::Command::new("git")
-                .args(["push", "-u", "origin", "HEAD"])
-                .current_dir(repo)
-                .output();
-            return Some(remote_url);
-        }
-        
-        eprintln!("⚠️ gh repo create failed for {}: {}", repo_name, stderr);
-        return None;
     }
+
+    // Always push to ensure latest commits are on GitHub
+    let _ = std::process::Command::new("git")
+        .args(["push", "-u", "origin", "HEAD"])
+        .current_dir(repo)
+        .output();
+
+    Some(remote_url)
 }
 
 fn create_private_remote(repo: &Path) -> Option<String> {
