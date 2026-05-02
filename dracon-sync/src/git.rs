@@ -2185,6 +2185,7 @@ mod tests {
         let gh_mock = tmp.path().join("gh");
         std::fs::write(&gh_mock, "#!/bin/sh\nexit 0\n").expect("write gh mock");
         std::fs::set_permissions(&gh_mock, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+        let _lock = crate::git::PATH_LOCK.lock().unwrap();
         let orig_path = std::env::var("PATH").unwrap_or_default();
         let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
 
@@ -2204,6 +2205,7 @@ mod tests {
         )
         .expect("write gh mock");
         std::fs::set_permissions(&gh_mock, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+        let _lock = crate::git::PATH_LOCK.lock().unwrap();
         let orig_path = std::env::var("PATH").unwrap_or_default();
         let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
 
@@ -2227,6 +2229,7 @@ mod tests {
         std::fs::set_permissions(&gh_mock, std::fs::Permissions::from_mode(0o755)).expect("chmod");
 
         std::env::set_var("GH_TOKEN", "test_pat_from_env");
+        let _lock = crate::git::PATH_LOCK.lock().unwrap();
         let orig_path = std::env::var("PATH").unwrap_or_default();
         let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
 
@@ -2242,6 +2245,7 @@ mod tests {
         let glab_mock = tmp.path().join("glab");
         std::fs::write(&glab_mock, "#!/bin/sh\nexit 0\n").expect("write glab mock");
         std::fs::set_permissions(&glab_mock, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+        let _lock = crate::git::PATH_LOCK.lock().unwrap();
         let orig_path = std::env::var("PATH").unwrap_or_default();
         let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
 
@@ -2261,6 +2265,7 @@ mod tests {
         )
         .expect("write glab mock");
         std::fs::set_permissions(&glab_mock, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+        let _lock = crate::git::PATH_LOCK.lock().unwrap();
         let orig_path = std::env::var("PATH").unwrap_or_default();
         let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
 
@@ -2282,6 +2287,7 @@ mod tests {
         )
         .expect("write glab mock");
         std::fs::set_permissions(&glab_mock, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+        let _lock = crate::git::PATH_LOCK.lock().unwrap();
         let orig_path = std::env::var("PATH").unwrap_or_default();
         let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
 
@@ -2298,6 +2304,7 @@ mod tests {
         std::fs::set_permissions(&glab_mock, std::fs::Permissions::from_mode(0o755)).expect("chmod");
 
         std::env::set_var("GITLAB_TOKEN", "test_gitlab_token");
+        let _lock = crate::git::PATH_LOCK.lock().unwrap();
         let orig_path = std::env::var("PATH").unwrap_or_default();
         let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
 
