@@ -1215,7 +1215,7 @@ pub(crate) async fn push_to_named_remote(
 
     let attempt_ssh = run_git_with_timeout_env(
         repo,
-        &["push", "-u", remote_name, "HEAD"],
+        &["push", remote_name, &refspec],
         timeout_secs,
         &format!("push-to-{}", remote_name),
         &[("GIT_SSH_COMMAND", ssh_hardening)],
