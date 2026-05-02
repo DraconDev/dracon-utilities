@@ -587,35 +587,13 @@ pub(crate) async fn sync_repo(
 
         // Push to additional named remotes after origin push succeeds
         if !policy.remotes.is_empty() {
-            let repo_name = repo.file_name()
-                .map(|n| n.to_string_lossy().to_string())
-                .unwrap_or_default();
-
-            configure_all_remotes(repo, &policy.remotes, &repo_name);
-
-            for (remote_name, create_result) in auto_create_all_remotes(&policy.remotes, &repo_name) {
-                match create_result {
-                    Ok(_) => {}
-                    Err(e) => {
-                        eprintln!("⚠️ auto-create failed for {} on {}: {}", repo_name, remote_name, e);
-                    }
-                }
-            }
-
-            let all_remote_names: Vec<_> = policy.remotes.iter().map(|r| r.name.as_str()).collect();
-            if let Err(e) = remove_stale_remotes(repo, &all_remote_names) {
-                eprintln!("⚠️ failed to clean stale remotes for {}: {}", repo.display(), e);
-            }
-
-            let push_results = push_to_all_remotes(repo, &policy.remotes, policy.push_op_timeout_secs, policy.push_retries).await;
-            let all_ok = push_results.iter().all(|(_, r)| r.is_ok());
-            if !all_ok {
-                for (name, result) in &push_results {
-                    if let Err(e) = result {
-                        eprintln!("⚠️ push to {} failed for {}: {}", name, repo.display(), e);
-                    }
-                }
-            }
+            push_mirror_remotes(
+                repo,
+                &policy.remotes,
+                policy.push_op_timeout_secs,
+                policy.push_retries,
+                &mut None,
+            ).await;
         }
     } else if policy.auto_push && current_status.ahead > 0 && !has_origin {
         eprintln!("ℹ️ skip push for {} (no origin remote)", repo.display());
