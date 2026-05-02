@@ -578,10 +578,9 @@ pub(crate) async fn sync_repo(
         }
     } else if policy.auto_push && current_status.ahead > 0 && !has_origin {
         eprintln!("ℹ️ skip push for {} (no origin remote)", repo.display());
-    }
-                }
+}
 
-                if !policy.remotes.is_empty() {
+    if !policy.remotes.is_empty() {
                     let repo_name = repo.file_name()
                         .map(|n| n.to_string_lossy().to_string())
                         .unwrap_or_default();
