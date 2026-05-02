@@ -4,10 +4,11 @@
 Refactored Git remote management test to use proper module path resolution.
 
 ## Context
-The change simplifies the test module path by removing an unnecessary `super::super` reference, making the code more maintainable and consistent with other tests.
+The test was previously using a relative module path (`super::`) which could lead to path resolution issues. The change ensures consistent module path resolution across the codebase.
 
 ## Completed
-- [x] Updated test module path to use `super::remove_stale_remotes` instead of `super::super::remove_stale_remotes`
+- [x] Updated test to use `crate::git::` module path instead of `super::`
+- [x] Maintained test functionality while improving path resolution
 
 ## In Progress
 - [ ] None
@@ -16,5 +17,5 @@ The change simplifies the test module path by removing an unnecessary `super::su
 - None
 
 ## Next Steps
-1. Verify test suite passes with the new module path
-2. Review other test files for similar path optimizations
+1. Verify no other tests are affected by this change
+2. Ensure consistent module path usage across all Git-related tests
