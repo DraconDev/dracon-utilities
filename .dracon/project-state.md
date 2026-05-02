@@ -4,18 +4,19 @@
 Refactored environment variable isolation in GitHub private remote tests
 
 ## Context
-The change improves test reliability by using a proper environment variable guard pattern instead of manual cleanup. This addresses issues with PATH variable state management in test cases.
+The previous implementation manually managed PATH environment variables, which could lead to state leakage between tests. This change introduces a more robust EnvRestorer utility to ensure proper cleanup.
 
 ## Completed
-- [x] Replaced manual PATH variable cleanup with `EnvRestorer` guard pattern
-- [x] Reduced test code complexity by eliminating redundant PATH variable handling
+- [x] Replaced manual PATH management with EnvRestorer utility
+- [x] Eliminated potential environment variable leakage
+- [x] Maintained same test functionality while improving reliability
 
 ## In Progress
-- [ ] None (this is a complete refactoring)
+- [x] Environment variable isolation refactoring
 
 ## Blockers
-- None (this is a completed refactoring)
+- None identified
 
 ## Next Steps
-1. Verify test stability with the new guard pattern
-2. Consider adding similar guards for other environment variables if needed
+1. Verify test stability with the new isolation approach
+2. Consider expanding EnvRestorer to other environment variables if needed
