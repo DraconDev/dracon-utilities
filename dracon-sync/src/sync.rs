@@ -523,14 +523,14 @@ pub(crate) async fn sync_repo(
                     Err(e) => {
                         eprintln!("⚠️ push failed for {}: {}", repo.display(), e);
                         return Ok(false);
-                    }
-                }
-            } else if policy.auto_push && !has_origin {
-                eprintln!("ℹ️ skip push for {} (no origin remote)", repo.display());
-            }
-            return Ok(true);
+}
         }
-        // All changes were filtered out (excluded dirs, oversized files, etc.)
+    } else if policy.auto_push && current_status.ahead > 0 && !has_origin {
+        eprintln!("ℹ️ skip push for {} (no origin remote)", repo.display());
+    }
+
+    Ok(false)
+}
         // Restore modified files to avoid perpetual dirty state. Untracked files can't be restored.
         // Skip gitlink entries (dirty submodules can't be restored this way)
         let restorable: Vec<_> = to_restore.iter()
