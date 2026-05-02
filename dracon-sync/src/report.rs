@@ -2745,9 +2745,8 @@ implemented new authentication flow
         let gh_mock = tmp.path().join("gh");
         std::fs::write(&gh_mock, "#!/bin/sh\necho \"mock gh called\" >&2\nexit 0\n").expect("write gh mock");
         std::fs::set_permissions(&gh_mock, std::fs::Permissions::from_mode(0o755)).expect("chmod gh");
-        let new_path = format!("{}:", tmp.path().to_string_lossy());
-        let _lock = PATH_LOCK.lock().unwrap();
-        let _guard = EnvRestorer::new("PATH", &new_path);
+        let orig_path = std::env::var("PATH").unwrap_or_default();
+        let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
 
         let result = create_github_private_remote(&repo, "testaccount");
 
@@ -2772,9 +2771,8 @@ implemented new authentication flow
         )
         .expect("write gh mock");
         std::fs::set_permissions(&gh_mock, std::fs::Permissions::from_mode(0o755)).expect("chmod gh");
-        let new_path = format!("{}:", tmp.path().to_string_lossy());
-        let _lock = PATH_LOCK.lock().unwrap();
-        let _guard = EnvRestorer::new("PATH", &new_path);
+        let orig_path = std::env::var("PATH").unwrap_or_default();
+        let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
 
         let result = create_github_private_remote(&repo, "testaccount");
 
@@ -2803,9 +2801,8 @@ implemented new authentication flow
         let gh_mock = tmp.path().join("gh");
         std::fs::write(&gh_mock, "#!/bin/sh\nexit 1\n").expect("write gh mock");
         std::fs::set_permissions(&gh_mock, std::fs::Permissions::from_mode(0o755)).expect("chmod gh");
-        let new_path = format!("{}:", tmp.path().to_string_lossy());
-        let _lock = PATH_LOCK.lock().unwrap();
-        let _guard = EnvRestorer::new("PATH", &new_path);
+        let orig_path = std::env::var("PATH").unwrap_or_default();
+        let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
 
         let result = create_github_private_remote(&repo, "testaccount");
 
