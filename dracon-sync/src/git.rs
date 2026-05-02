@@ -1165,6 +1165,51 @@ pub(crate) fn configure_all_remotes(repo: &Path, remotes: &[RemoteConfig], repo_
     }
 }
 
+pub(crate) async fn push_mirror_remotes(
+    repo: &Path,
+    remotes: &[RemoteConfig],
+    timeout_secs: u64,
+    retries: u32,
+    remote_failures: &mut Option<&mut HashMap<String, u64>>,
+) {
+    let repo_name = repo.file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_default();
+
+    configure_all_remotes(repo, remotes, &repo_name);
+
+    for (remote_name, create_result) in auto_create_all_remotes(remotes, &repo_name) {
+        match create_result {
+            Ok(_) => {}
+            Err(e) => {
+                eprintln!("⚠️ auto-create failed for {} on {}: {}", repo_name, remote_name, e);
+            }
+        }
+    }
+
+    let all_remote_names: Vec<_> = remotes.iter().map(|r| r.name.as_str()).collect();
+    if let Err(e) = remove_stale_remotes(repo, &all_remote_names) {
+        eprintln!("⚠️ failed to clean stale remotes for {}: {}", repo.display(), e);
+    }
+
+    let push_results = push_to_all_remotes(repo, remotes, timeout_secs, retries).await;
+    let all_ok = push_results.iter().all(|(_, r)| r.is_ok());
+    if !all_ok {
+        for (name, result) in &push_results {
+            if let Err(e) = result {
+                eprintln!("⚠️ push to {} failed for {}: {}", name, repo.display(), e);
+                if let Some(ref mut rf) = remote_failures {
+                    *rf.entry(name.clone()).or_insert(0) += 1;
+                }
+            }
+        }
+    } else if let Some(ref mut rf) = remote_failures {
+        for name in remotes.iter().map(|r| r.name.clone()) {
+            rf.remove(&name);
+        }
+    }
+}
+
 pub(crate) fn get_remote_url(repo: &Path, name: &str) -> Option<String> {
     let output = std_git_command()
         .args(["remote", "get-url", name])
