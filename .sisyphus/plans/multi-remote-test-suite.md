@@ -313,8 +313,8 @@ Add test:
 
 1. **No mockall**: Stick with integration-test pattern. Adding mockall is scope creep.
 2. **No CLI mocking**: Test error paths only. Mocking `Command::new` is too invasive.
-3. **Wiremock for Codeberg**: Only external dependency added. Justified because HTTP is deterministic.
-4. **Make `create_repo_on_codeberg` async**: Required for wiremock testing. Propagates to `auto_create_repo`.
+3. **No wiremock**: Use `reqwest::blocking::Client` + local TCP mock server. Avoids new dependency and async refactor.
+4. **Use `reqwest::blocking`**: Replace `tokio::runtime::Handle::current().block_on()` with `reqwest::blocking::Client`. Cleaner, testable without runtime.
 5. **Use `file://` protocol for git push tests**: Avoids SSH key requirements in CI.
 
 ## Files to Modify
