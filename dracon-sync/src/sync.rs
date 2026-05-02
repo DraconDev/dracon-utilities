@@ -1,15 +1,21 @@
-use anyhow::Result;
-use dracon_git::{build_commit_message, extract_intent, GitService};
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 use std::path::Path;
 use std::time::Duration;
+
+use anyhow::Result;
+use dracon_git::{build_commit_message, extract_intent, GitService};
 
 use crate::exclude::{can_restore_entry, handle_large_untracked, is_large_untracked, remove_tracked_excluded_paths, should_stage_entry};
 use crate::git::{
     cli_diff_entries, detect_large_blobs_ahead, git_name_status_entries, has_origin_remote,
     has_tracking_upstream, is_cherry_pick_in_progress, is_merge_in_progress,
-    is_rebase_in_progress, prune_other_default_branch, restore_paths, run_git_with_timeout, staged_paths,
+    is_rebase_in_progress, prune_other_default_branch, push_with_retries,
+    restore_paths, run_git_with_timeout, staged_paths,
     unstage_excluded_paths, unstage_oversized_paths,
+};
+use crate::git::multi_remote::{
+    auto_create_all_remotes, ensure_remote,
+    push_to_all_remotes, remove_stale_remotes,
 };
 use crate::policy::{debug_enabled, load_repo_override, SyncPolicy};
 use crate::report::{build_commit_context, detect_report_signals, push_large_blob_threshold_bytes};
@@ -19,6 +25,7 @@ pub(crate) async fn sync_repo(
     policy: &SyncPolicy,
     excluded_dir_names: &BTreeSet<String>,
     idle_seconds: u64,
+    mut remote_failures: Option<&mut HashMap<String, usize>>,
 ) -> Result<bool> {
     let svc = GitService::new(repo)?;
     if !svc.is_git_repo().await? {
@@ -153,7 +160,7 @@ pub(crate) async fn sync_repo(
     // Filter out entries that only differ due to clean/smudge filters.
     // `git diff HEAD` applies clean filters and correctly ignores filter-only changes.
     {
-        let diff_output = crate::git::git_diff_head_files(repo).await;
+        let diff_output = crate::git::git_diff_head_files(repo).await.unwrap_or_default();
         if diff_output.is_empty() && !entries.is_empty() {
             // git diff HEAD returned nothing. Only clear if ALL entries are
             // Modified (filter-only). Untracked/Added files don't appear in
@@ -430,7 +437,7 @@ pub(crate) async fn sync_repo(
             // still appear "dirty" due to the smudge filter, which is harmless.
             if committed_entries.is_empty() {
                 if let Err(e) = run_git_with_timeout(repo, &["reset", "HEAD", "--"], 10, "reset").await {
-                    eprintln!("⚠️ failed to reset HEAD: {}", e);
+                    return Err(anyhow::anyhow!("sync_repo: failed to reset HEAD after filter-only commit: {}", e));
                 }
                 if debug_enabled() {
                     eprintln!("🐛 {} skipped commit: all changes were filter-only (smudge/clean)", repo.display());
@@ -457,7 +464,7 @@ pub(crate) async fn sync_repo(
 
             // Forbid creation of the "other" default branch (main vs master).
             // If someone or something created the non-canonical branch, delete it.
-            prune_other_default_branch(repo);
+            prune_other_default_branch(repo).await;
 
             // Restore any excluded modified paths that weren't committed
             // Skip gitlink entries (dirty submodules can't be restored this way)
@@ -511,18 +518,109 @@ pub(crate) async fn sync_repo(
                     );
                     return Ok(false);
                 }
-                match run_git_with_timeout(
+                match push_with_retries(
                     repo,
-                    &["push", "origin", "HEAD"],
                     policy.push_op_timeout_secs,
+                    policy.push_retries,
                     "push",
                 )
                 .await
                 {
-                    Ok(()) => {}
+Ok(()) => {}
+            Err(e) => {
+                eprintln!("⚠️ push failed for {}: {}", repo.display(), e);
+                return Ok(false);
+            }
+        }
+
+        // Push to additional named remotes after origin push succeeds
+        if !policy.remotes.is_empty() {
+            let repo_name = repo.file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_default();
+
+            for (remote_name, create_result) in auto_create_all_remotes(&policy.remotes, &repo_name) {
+                match create_result {
+                    Ok(url) => {
+                        if let Err(e) = ensure_remote(repo, &remote_name, &url) {
+                            eprintln!("⚠️ failed to configure remote {} for {}: {}", remote_name, repo.display(), e);
+                        } else {
+                            eprintln!("🔗 remote {} configured for {}", remote_name, repo.display());
+                        }
+                    }
                     Err(e) => {
-                        eprintln!("⚠️ push failed for {}: {}", repo.display(), e);
-                        return Ok(false);
+                        eprintln!("⚠️ auto-create failed for {} on {}: {}", repo_name, remote_name, e);
+                    }
+                }
+            }
+
+            let all_remote_names: Vec<_> = policy.remotes.iter().map(|r| r.name.as_str()).collect();
+            if let Err(e) = remove_stale_remotes(repo, &all_remote_names) {
+                eprintln!("⚠️ failed to clean stale remotes for {}: {}", repo.display(), e);
+            }
+
+            let push_results = push_to_all_remotes(repo, &policy.remotes, policy.push_op_timeout_secs, policy.push_retries).await;
+            let all_ok = push_results.iter().all(|(_, r)| r.is_ok());
+            if !all_ok {
+                for (name, result) in &push_results {
+                    if let Err(e) = result {
+                        eprintln!("⚠️ push to {} failed for {}: {}", name, repo.display(), e);
+                        if let Some(ref mut rf) = remote_failures {
+                            *rf.entry(name.clone()).or_insert(0) += 1;
+                        }
+                    }
+                }
+            } else if let Some(ref mut rf) = remote_failures {
+                for name in policy.remotes.iter().map(|r| r.name.clone()) {
+                    rf.remove(&name);
+                }
+            }
+        }
+    } else if policy.auto_push && current_status.ahead > 0 && !has_origin {
+        eprintln!("ℹ️ skip push for {} (no origin remote)", repo.display());
+    }
+                }
+
+                if !policy.remotes.is_empty() {
+                    let repo_name = repo.file_name()
+                        .map(|n| n.to_string_lossy().to_string())
+                        .unwrap_or_default();
+
+                    for (remote_name, create_result) in auto_create_all_remotes(&policy.remotes, &repo_name) {
+                        match create_result {
+                            Ok(url) => {
+                                if let Err(e) = ensure_remote(repo, &remote_name, &url) {
+                                    eprintln!("⚠️ failed to configure remote {} for {}: {}", remote_name, repo.display(), e);
+                                } else {
+                                    eprintln!("🔗 remote {} configured for {}", remote_name, repo.display());
+                                }
+                            }
+                            Err(e) => {
+                                eprintln!("⚠️ auto-create failed for {} on {}: {}", repo_name, remote_name, e);
+                            }
+                        }
+                    }
+
+                    let all_remote_names: Vec<_> = policy.remotes.iter().map(|r| r.name.as_str()).collect();
+                    if let Err(e) = remove_stale_remotes(repo, &all_remote_names) {
+                        eprintln!("⚠️ failed to clean stale remotes for {}: {}", repo.display(), e);
+                    }
+
+                    let push_results = push_to_all_remotes(repo, &policy.remotes, policy.push_op_timeout_secs, policy.push_retries).await;
+                    let all_ok = push_results.iter().all(|(_, r)| r.is_ok());
+                    if !all_ok {
+                        for (name, result) in &push_results {
+                            if let Err(e) = result {
+                                eprintln!("⚠️ push to {} failed for {}: {}", name, repo.display(), e);
+                                if let Some(ref mut rf) = remote_failures {
+                                    *rf.entry(name.clone()).or_insert(0) += 1;
+                                }
+                            }
+                        }
+                    } else if let Some(ref mut rf) = remote_failures {
+                        for name in policy.remotes.iter().map(|r| r.name.clone()) {
+                            rf.remove(&name);
+                        }
                     }
                 }
             } else if policy.auto_push && !has_origin {
@@ -580,22 +678,22 @@ pub(crate) async fn sync_repo(
                                 Ok(()) => {
                                     eprintln!("📝 committed .gitignore update in {}", repo.display());
                                     if policy.auto_push && has_origin {
-                                    match run_git_with_timeout(
-                                        repo,
-                                        &["push", "origin", "HEAD"],
-                                        policy.push_op_timeout_secs,
-                                        "push",
-                                    )
-                                    .await
-                                    {
-                                        Ok(()) => {}
-                                        Err(e) => {
-                                            eprintln!("⚠️ push failed for {}: {}", repo.display(), e);
-                                            return Ok(false);
+                                        match push_with_retries(
+                                            repo,
+                                            policy.push_op_timeout_secs,
+                                            policy.push_retries,
+                                            "push",
+                                        )
+                                        .await
+                                        {
+                                            Ok(()) => {}
+                                            Err(e) => {
+                                                eprintln!("⚠️ push failed for {}: {}", repo.display(), e);
+                                                return Ok(false);
+                                            }
                                         }
                                     }
-                                }
-                                return Ok(true);
+                                    return Ok(true);
                                 }
                                 Err(e) => eprintln!("⚠️ failed to commit .gitignore in {}: {}", repo.display(), e),
                             }
@@ -635,17 +733,17 @@ pub(crate) async fn sync_repo(
             );
             return Ok(false);
         }
-        match run_git_with_timeout(
+        match push_with_retries(
             repo,
-            &["push", "origin", "HEAD"],
             policy.push_op_timeout_secs,
+            policy.push_retries,
             "push",
         )
         .await
         {
             Ok(()) => {}
             Err(e) => {
-                eprintln!("⚠️ push skipped for {}: {}", repo.display(), e);
+                eprintln!("⚠️ push failed for {}: {}", repo.display(), e);
                 return Ok(false);
             }
         }
@@ -688,7 +786,7 @@ auto_github_private_account = "TestAccount"
 "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0).await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None).await;
         assert!(result.is_ok(), "sync_repo should handle missing gh gracefully: {:?}", result);
 
         assert!(
@@ -744,7 +842,7 @@ auto_bump_versions = false
 "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0).await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None).await;
         assert!(result.is_ok(), "sync_repo should succeed: {:?}", result);
 
         // Verify a commit was created
@@ -795,7 +893,7 @@ auto_bump_versions = false
 "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0).await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None).await;
         assert!(result.is_ok(), "sync_repo should succeed even during rebase");
         assert!(!result.unwrap(), "rebase should cause early return (nothing synced)");
     }
@@ -834,7 +932,7 @@ auto_bump_versions = false
 "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0).await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None).await;
         assert!(result.is_ok(), "sync_repo should succeed even during merge");
         assert!(!result.unwrap(), "merge should cause early return (nothing synced)");
     }
@@ -873,7 +971,7 @@ auto_bump_versions = false
 "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0).await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None).await;
         assert!(result.is_ok(), "sync_repo should succeed even during cherry-pick");
         assert!(!result.unwrap(), "cherry-pick should cause early return (nothing synced)");
     }
@@ -912,7 +1010,7 @@ auto_bump_versions = false
 "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0).await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None).await;
         assert!(result.is_ok(), "sync_repo should succeed: {:?}", result);
         assert!(result.unwrap(), "dirty repo with auto_commit should sync");
 
@@ -956,7 +1054,7 @@ auto_bump_versions = false
 "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0).await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None).await;
         assert!(result.is_ok(), "sync_repo should succeed");
         assert!(!result.unwrap(), "clean repo should return false (nothing to sync)");
     }
@@ -995,7 +1093,7 @@ auto_bump_versions = false
 "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0).await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None).await;
         assert!(result.is_ok(), "sync_repo should succeed: {:?}", result);
         assert!(result.unwrap(), "untracked file should be staged and committed");
 
@@ -1039,7 +1137,7 @@ auto_bump_versions = false
 "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0).await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None).await;
         assert!(result.is_ok(), "sync_repo should succeed");
         assert!(!result.unwrap(), "not behind should return false (nothing to pull)");
     }
@@ -1077,7 +1175,7 @@ auto_bump_versions = false
 "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0).await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None).await;
         assert!(result.is_ok(), "sync_repo should succeed with dirty repo");
         assert!(!result.unwrap(), "dirty repo should skip pull and return false");
     }
@@ -1113,7 +1211,7 @@ auto_bump_versions = false
 "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0).await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None).await;
         assert!(result.is_ok(), "sync_repo should succeed without origin");
     }
 
@@ -1148,7 +1246,7 @@ auto_bump_versions = false
 "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0).await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None).await;
         assert!(result.is_ok(), "sync_repo should succeed without upstream");
     }
 }
