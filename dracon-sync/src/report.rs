@@ -2712,16 +2712,19 @@ implemented new authentication flow
             .expect("git init");
 
         let gh_mock = tmp.path().join("gh");
-        std::fs::write(&gh_mock, "#!/bin/bash\nexit 0\n").expect("write gh mock");
+        std::fs::write(&gh_mock, "#!/bin/bash\necho \"mock gh called with args: $@\" >&2\nexit 0\n").expect("write gh mock");
         std::fs::set_permissions(&gh_mock, std::fs::Permissions::from_mode(0o755)).expect("chmod gh");
         let orig_path = std::env::var("PATH").ok();
         let new_path = format!("{}:", tmp.path().to_string_lossy());
-        eprintln!("DEBUG: original PATH: {:?}", orig_path);
         eprintln!("DEBUG: setting PATH to: {:?}", new_path);
         std::env::set_var("PATH", &new_path);
 
-        let gh_output = std::process::Command::new("/bin/sh").arg("-c").arg("echo PATH=$PATH && which gh || echo gh not found in PATH").output();
-        eprintln!("DEBUG: sh -c output: {:?}", gh_output.map(|o| String::from_utf8_lossy(&o.stdout).to_string()));
+        let test_gh = std::process::Command::new("gh").args(["repo", "create", "test", "--private"]).output();
+        eprintln!("DEBUG: test gh command result: success={}, stdout={:?}, stderr={:?}",
+            test_gh.as_ref().map(|o| o.status.success()).unwrap_or(false),
+            test_gh.as_ref().ok().map(|o| String::from_utf8_lossy(&o.stdout).to_string()),
+            test_gh.as_ref().ok().map(|o| String::from_utf8_lossy(&o.stderr).to_string())
+        );
 
         let result = create_github_private_remote(&repo, "testaccount");
         eprintln!("DEBUG: result: {:?}", result);
