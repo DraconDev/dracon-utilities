@@ -1419,6 +1419,31 @@ mod tests {
     use super::*;
     use std::os::unix::fs::PermissionsExt;
 
+    struct EnvRestorer {
+        key: String,
+        old_value: Option<String>,
+    }
+
+    impl EnvRestorer {
+        fn new(key: &str, new_value: &str) -> Self {
+            let old_value = std::env::var(key).ok();
+            std::env::set_var(key, new_value);
+            EnvRestorer {
+                key: key.to_string(),
+                old_value,
+            }
+        }
+    }
+
+    impl Drop for EnvRestorer {
+        fn drop(&mut self) {
+            std::env::remove_var(&self.key);
+            if let Some(ref v) = self.old_value {
+                std::env::set_var(&self.key, v);
+            }
+        }
+    }
+
     #[test]
     fn test_strip_url_credentials_https_with_creds() {
         let url = "https://user:pass@github.com/owner/repo.git";
@@ -2173,17 +2198,11 @@ mod tests {
     fn test_create_repo_on_github_success() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let gh_mock = tmp.path().join("gh");
-        std::fs::write(&gh_mock, "#!/bin/bash\nexit 0\n").expect("write gh mock");
+        std::fs::write(&gh_mock, "#!/bin/sh\nexit 0\n").expect("write gh mock");
         std::fs::set_permissions(&gh_mock, std::fs::Permissions::from_mode(0o755)).expect("chmod");
-        let orig_path = std::env::var("PATH").ok();
-        std::env::set_var("PATH", format!("{}:", tmp.path().to_string_lossy()));
+        let _guard = EnvRestorer::new("PATH", &format!("{}:", tmp.path().to_string_lossy()));
 
         let result = multi_remote::create_repo_on_github("testuser", "my-repo");
-        std::env::remove_var("PATH");
-        match orig_path {
-            Some(p) => std::env::set_var("PATH", p),
-            None => std::env::remove_var("PATH"),
-        }
 
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "git@github.com:testuser/my-repo.git");
