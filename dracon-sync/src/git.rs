@@ -1132,6 +1132,7 @@ pub(crate) fn load_secret(env_name: &str) -> Option<String> {
 
 pub(crate) mod multi_remote {
     use super::*;
+    use std::collections::HashMap;
 
     pub(crate) fn ensure_remote(repo: &Path, name: &str, url: &str) -> Result<()> {
     let existing = get_remote_url(repo, name);
