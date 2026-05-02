@@ -601,12 +601,11 @@ pub(crate) async fn sync_repo(
 
         // Push to additional named remotes after origin push succeeds
         if !policy.remotes.is_empty() {
-            push_mirror_remotes(
+            let _push_results = push_mirror_remotes(
                 repo,
                 &policy.remotes,
                 policy.push_op_timeout_secs,
                 policy.push_retries,
-                &mut None,
             ).await;
         }
     } else if policy.auto_push && current_status.ahead > 0 && !has_origin {
