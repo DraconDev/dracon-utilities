@@ -1350,7 +1350,7 @@ pub(crate) fn create_repo_on_gitlab(account: &str, repo_name: &str) -> Result<St
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        if stderr.contains("already exists") || stderr.contains("Name already exists") {
+        if stderr.contains("already exists") || stderr.contains("Name already exists") || stderr.contains("has already been taken") {
             return Ok(format!("git@gitlab.com:{}/{}.git", account, repo_name));
         }
         anyhow::bail!("glab repo create failed: {}", stderr.trim());
