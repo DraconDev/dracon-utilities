@@ -1739,7 +1739,7 @@ mod tests {
             .status()
             .expect("git remote add origin");
 
-        super::super::remove_stale_remotes(&repo, &[]).expect("remove_stale_remotes with empty keep list");
+        super::remove_stale_remotes(&repo, &[]).expect("remove_stale_remotes with empty keep list");
 
         let remotes = multi_remote::list_remotes(&repo);
         assert_eq!(remotes, vec!["origin"]);
