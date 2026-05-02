@@ -734,16 +734,19 @@ pub(crate) async fn run_daemon(policy_path: PathBuf, override_interval_secs: Opt
                     if all_failed {
                         let notify_key = format!("{}-all", repo.display());
                         let now = Instant::now();
+
+                        // Check cooldown BEFORE firing notification
                         if let Some(cooldown_until) = remote_notify_cooldowns.get(&notify_key) {
                             if now < *cooldown_until {
-                                // still in cooldown, skip notification
+                                // still in cooldown, skip notification entirely
                             } else {
+                                // cooldown expired, fire and reset
                                 remote_notify_cooldowns.remove(&notify_key);
                             }
                         }
-                        let notify_entry = remote_notify_cooldowns.entry(notify_key).or_insert(now + Duration::from_secs(1800));
-                        if *notify_entry <= now {
-                            *notify_entry = now + Duration::from_secs(1800);
+
+                        // Fire only if not in cooldown (cooldown entry was removed above)
+                        if !remote_notify_cooldowns.contains_key(&notify_key) {
                             let failed_list: Vec<_> = entry.remote_failures.keys().cloned().collect();
                             let msg = format!("All remotes failing: {}. Failures: {:?}", failed_list.join(", "), entry.remote_failures);
                             crate::report::send_sync_conflict_notification(
@@ -751,6 +754,7 @@ pub(crate) async fn run_daemon(policy_path: PathBuf, override_interval_secs: Opt
                                 "All Remotes Failing",
                                 &msg,
                             );
+                            remote_notify_cooldowns.insert(notify_key, now + Duration::from_secs(1800));
                         }
                     }
                 }
