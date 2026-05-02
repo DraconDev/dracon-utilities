@@ -2703,9 +2703,6 @@ implemented new authentication flow
 
     #[test]
     fn test_create_github_private_remote_success() {
-        use std::sync::atomic::{AtomicBool, Ordering};
-        static PATH_WAS_SET: AtomicBool = AtomicBool::new(false);
-
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("my-repo");
         std::process::Command::new("git")
@@ -2715,29 +2712,112 @@ implemented new authentication flow
             .expect("git init");
 
         let gh_mock = tmp.path().join("gh");
-        std::fs::write(&gh_mock, "#!/bin/bash\necho \"mock gh called with args: $@\" >&2\nexit 0\n").expect("write gh mock");
+        std::fs::write(&gh_mock, "#!/bin/sh\necho \"mock gh called\" >&2\nexit 0\n").expect("write gh mock");
         std::fs::set_permissions(&gh_mock, std::fs::Permissions::from_mode(0o755)).expect("chmod gh");
-
         let orig_path = std::env::var("PATH").ok();
-        let gh_path = gh_mock.to_string_lossy().to_string();
-        let new_path = format!("{}:", gh_path);
+        let new_path = format!("{}:", tmp.path().to_string_lossy());
         std::env::set_var("PATH", &new_path);
-        PATH_WAS_SET.store(true, Ordering::SeqCst);
-
-        eprintln!("DEBUG: PATH set to: {:?}", new_path);
-        eprintln!("DEBUG: gh_mock path: {:?}", gh_path);
-        eprintln!("DEBUG: gh_mock exists: {:?}", std::path::Path::new(&gh_path).exists());
-
-        let test_gh = std::process::Command::new(&gh_path).args(["repo", "create", "test", "--private"]).output();
-        eprintln!("DEBUG: direct gh path command: {:?}", test_gh);
 
         let result = create_github_private_remote(&repo, "testaccount");
-        eprintln!("DEBUG: result: {:?}", result);
-
         std::env::remove_var("PATH");
         if let Some(p) = orig_path {
             std::env::set_var("PATH", p);
         }
+
+        assert!(result.is_some());
+        assert_eq!(result.unwrap(), "git@github.com:testaccount/my-repo.git");
+    }
+
+    #[test]
+    fn test_create_github_private_remote_already_exists_reuses_without_suffix() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path().join("dracon-demons");
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .expect("git init");
+
+        let gh_mock = tmp.path().join("gh");
+        std::fs::write(
+            &gh_mock,
+            "#!/bin/sh\necho ' Name already exists' >&2\nexit 1\n",
+        )
+        .expect("write gh mock");
+        std::fs::set_permissions(&gh_mock, std::fs::Permissions::from_mode(0o755)).expect("chmod gh");
+        let orig_path = std::env::var("PATH").ok();
+        let new_path = format!("{}:", tmp.path().to_string_lossy());
+        std::env::set_var("PATH", &new_path);
+
+        let result = create_github_private_remote(&repo, "testaccount");
+        std::env::remove_var("PATH");
+        if let Some(p) = orig_path {
+            std::env::set_var("PATH", p);
+        }
+
+        assert!(result.is_some());
+        let url = result.unwrap();
+        assert!(!url.contains("-1"), "should NOT contain suffix -1: {}", url);
+        assert!(!url.contains("-2"), "should NOT contain suffix -2: {}", url);
+        assert_eq!(url, "git@github.com:testaccount/dracon-demons.git");
+    }
+
+    #[test]
+    fn test_create_github_private_remote_origin_already_exists_does_not_add_duplicate() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path().join("existing-remote-repo");
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .expect("git init");
+        std::process::Command::new("git")
+            .args(["remote", "add", "origin", "git@github.com:old/old.git"])
+            .current_dir(&repo)
+            .status()
+            .expect("git remote add");
+
+        let gh_mock = tmp.path().join("gh");
+        std::fs::write(&gh_mock, "#!/bin/sh\nexit 1\n").expect("write gh mock");
+        std::fs::set_permissions(&gh_mock, std::fs::Permissions::from_mode(0o755)).expect("chmod gh");
+        let orig_path = std::env::var("PATH").ok();
+        let new_path = format!("{}:", tmp.path().to_string_lossy());
+        std::env::set_var("PATH", &new_path);
+
+        let result = create_github_private_remote(&repo, "testaccount");
+        std::env::remove_var("PATH");
+        if let Some(p) = orig_path {
+            std::env::set_var("PATH", p);
+        }
+
+        assert!(result.is_some());
+        let remotes = crate::git::multi_remote::list_remotes(&repo);
+        assert_eq!(remotes.len(), 1, "should not add duplicate origin");
+        assert_eq!(remotes[0], "origin");
+    }
+
+    #[test]
+    fn test_create_github_private_remote_no_gh_installed_returns_none() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path().join("no-gh-repo");
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .expect("git init");
+
+        let orig_path = std::env::var("PATH").ok();
+        std::env::set_var("PATH", tmp.path());
+
+        let result = create_github_private_remote(&repo, "testaccount");
+        std::env::remove_var("PATH");
+        if let Some(p) = orig_path {
+            std::env::set_var("PATH", p);
+        }
+
+        assert!(result.is_none());
+    }
+}
         PATH_WAS_SET.store(false, Ordering::SeqCst);
 
         assert!(result.is_some());
