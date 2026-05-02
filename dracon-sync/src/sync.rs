@@ -582,6 +582,8 @@ pub(crate) async fn sync_repo(
         }
 
         return Ok(true);
+        #[allow(unreachable_code)]
+        {
         // All changes were filtered out (excluded dirs, oversized files, etc.)
         // Restore modified files to avoid perpetual dirty state. Untracked files can't be restored.
         // Skip gitlink entries (dirty submodules can't be restored this way)
@@ -665,6 +667,7 @@ pub(crate) async fn sync_repo(
                 repo.display(),
                 entries_len
             );
+        }
         }
     }
 
