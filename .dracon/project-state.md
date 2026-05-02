@@ -1,23 +1,25 @@
 # Project State
 
 ## Current Focus
-Added comprehensive secret loading functionality for environment variables
+Improved error handling for Codeberg repository creation by enhancing secret loading and error messages.
 
 ## Context
-The project needs a reliable way to load secrets from both environment variables and local secret files, supporting multiple credential management approaches.
+The change improves the user experience when creating repositories on Codeberg by:
+1. Making the error message more specific about where to set the token
+2. Using the more comprehensive `load_secret` function instead of direct environment variable access
+3. Providing clearer guidance about alternative secret locations
 
 ## Completed
-- [x] Added `load_secret` function that checks environment variables first
-- [x] Implements fallback to reading from `.env` files in the secrets directory
-- [x] Handles file parsing with proper line trimming and comment skipping
-- [x] Returns `None` when no valid secret is found
+- [x] Refactored Codeberg token loading to use comprehensive secret loading
+- [x] Enhanced error message to include both environment variable and file locations
+- [x] Maintained backward compatibility with existing token variable names
 
 ## In Progress
-- [ ] None (this is a complete feature addition)
+- [ ] None (this is a focused bug fix)
 
 ## Blockers
-- None (this is a standalone feature)
+- None (this is a self-contained improvement)
 
 ## Next Steps
-1. Update documentation to reference the new secret loading mechanism
-2. Add unit tests for the secret loading functionality
+1. Verify the new error messages appear correctly in all supported environments
+2. Test with both environment variables and secrets files to ensure consistent behavior

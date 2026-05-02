@@ -1342,8 +1342,9 @@ pub(crate) fn auto_create_repo(config: &RemoteConfig, repo_name: &str) -> Result
         AuthType::GitHub => create_repo_on_github(&config.auto_create_account, repo_name),
         AuthType::GitLab => create_repo_on_gitlab(&config.auto_create_account, repo_name),
         AuthType::Codeberg => {
-            let token = std::env::var(config.auto_create_token_var.as_deref().unwrap_or("CODEBERG_TOKEN"))
-                .with_context(|| format!("missing env var {}", config.auto_create_token_var.as_deref().unwrap_or("CODEBERG_TOKEN")))?;
+            let token_var = config.auto_create_token_var.as_deref().unwrap_or("CODEBERG_TOKEN");
+            let token = load_secret(token_var)
+                .with_context(|| format!("missing token for Codeberg (set {} env var or ~/.dracon/utilities/sync/secrets/*.env file)", token_var))?;
             let endpoint = config.api_endpoint.as_deref().unwrap_or("https://codeberg.org/api/v1/repos");
             create_repo_on_codeberg(&token, &config.auto_create_account, repo_name, endpoint)
         }
