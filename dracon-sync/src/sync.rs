@@ -579,7 +579,6 @@ Ok(()) => {}
     } else if policy.auto_push && current_status.ahead > 0 && !has_origin {
         eprintln!("ℹ️ skip push for {} (no origin remote)", repo.display());
     }
-                }
 
                 if !policy.remotes.is_empty() {
                     let repo_name = repo.file_name()
