@@ -2038,6 +2038,33 @@ mod tests {
     }
 
     #[test]
+    fn test_auto_create_all_remotes_github_success() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let gh_mock = tmp.path().join("gh");
+        std::fs::write(&gh_mock, "#!/bin/sh\nexit 0\n").expect("write gh mock");
+        std::fs::set_permissions(&gh_mock, std::fs::Permissions::from_mode(0o755)).expect("chmod gh");
+        let _lock = acquire_path_lock();
+        let orig_path = std::env::var("PATH").unwrap_or_default();
+        let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
+
+        let remotes = vec![RemoteConfig {
+            name: "origin".to_string(),
+            push_url: "git@github.com:{account}/{repo}.git".to_string(),
+            auto_create: true,
+            auto_create_account: "testaccount".to_string(),
+            auth_type: AuthType::GitHub,
+            priority: 1,
+            api_endpoint: None,
+            auto_create_token_var: None,
+        }];
+
+        let results = crate::git::multi_remote::auto_create_all_remotes(&remotes, "test-repo");
+        assert_eq!(results.len(), 1);
+        let url = results[0].1.as_ref().unwrap();
+        assert_eq!(url, "git@github.com:testaccount/test-repo.git");
+    }
+
+    #[test]
     fn test_create_repo_on_codeberg_success_201() {
         let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
         let port = listener.local_addr().unwrap().port();
