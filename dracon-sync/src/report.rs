@@ -2822,8 +2822,8 @@ implemented new authentication flow
             .status()
             .expect("git init");
 
-        let _lock = PATH_LOCK.lock().unwrap();
-        let _guard = EnvRestorer::new("PATH", &tmp.path().to_string_lossy());
+        let orig_path = std::env::var("PATH").unwrap_or_default();
+        let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
 
         let result = create_github_private_remote(&repo, "testaccount");
 
