@@ -1,25 +1,20 @@
 # Project State
 
 ## Current Focus
-Added environment isolation for Git remote tests to prevent accidental secret file access
+Updated Codeberg API endpoint for repository creation to use the user-specific endpoint.
 
 ## Context
-The test for Codeberg remote creation needed to verify error handling when no token is present. The original implementation might have accidentally accessed real secrets files, so we isolated the test environment by:
-1. Creating a temporary directory
-2. Setting HOME to this temp dir
-3. Restoring the original HOME afterward
+The change modifies the default API endpoint used when auto-creating repositories on Codeberg. This aligns with the project's focus on comprehensive Git repository management and synchronization.
 
 ## Completed
-- [x] Added environment isolation for Git remote tests
-- [x] Implemented proper cleanup of environment variables
-- [x] Ensured test remains hermetic (no external dependencies)
+- [x] Changed default Codeberg API endpoint from `/api/v1/repos` to `/api/v1/user/repos` for repository creation
 
 ## In Progress
-- [ ] None (test is complete)
+- [x] No active work in progress related to this change
 
 ## Blockers
-- None
+- None identified for this specific change
 
 ## Next Steps
-1. Verify test behavior with actual Codeberg API calls
-2. Add similar isolation for other remote tests if needed
+1. Verify the new endpoint works correctly with existing authentication flows
+2. Ensure backward compatibility with existing repository creation logic
