@@ -1118,82 +1118,16 @@ pub(crate) fn load_secret(env_name: &str) -> Option<String> {
                             if key.trim() == env_name {
                                 let value = value.trim();
                                 if !value.is_empty() {
-                                    return Some(value.to_string());
-    #[test]
-    fn test_auto_create_all_remotes_empty_when_no_auto_create() {
-        let remotes = vec![
-            RemoteConfig {
-                name: "mirror1".to_string(),
-                push_url: "git@mirror1.example.com:repo.git".to_string(),
-                auto_create: false,
-                auto_create_account: "".to_string(),
-                auth_type: AuthType::GitHub,
-                priority: 50,
-                api_endpoint: None,
-                auto_create_token_var: None,
-            },
-            RemoteConfig {
-                name: "mirror2".to_string(),
-                push_url: "git@mirror2.example.com:repo.git".to_string(),
-                auto_create: false,
-                auto_create_account: "".to_string(),
-                auth_type: AuthType::GitLab,
-                priority: 50,
-                api_endpoint: None,
-                auto_create_token_var: None,
-            },
-        ];
-
-        let results = crate::git::multi_remote::auto_create_all_remotes(&remotes, "test-repo");
-        assert!(results.is_empty(), "should return empty vec when no remotes have auto_create=true");
-    }
-
-    #[test]
-    fn test_auto_create_all_remotes_generic_error() {
-        let remotes = vec![RemoteConfig {
-            name: "generic".to_string(),
-            push_url: "git@generic.example.com:repo.git".to_string(),
-            auto_create: true,
-            auto_create_account: "testuser".to_string(),
-            auth_type: AuthType::Generic,
-            priority: 50,
-            api_endpoint: None,
-            auto_create_token_var: None,
-        }];
-
-        let results = crate::git::multi_remote::auto_create_all_remotes(&remotes, "test-repo");
-        assert_eq!(results.len(), 1);
-        assert!(results[0].1.is_err(), "Generic auth should return error");
-        let err_msg = format!("{}", results[0].1.as_ref().unwrap_err());
-        assert!(err_msg.contains("cannot auto-create"), "error should mention auto-create not supported");
-    }
-
-    #[test]
-    fn test_auto_create_all_remotes_codeberg_missing_token() {
-        // Ensure CODEBERG_TOKEN is not set
-        std::env::remove_var("CODEBERG_TOKEN");
-
-        let remotes = vec![RemoteConfig {
-            name: "codeberg".to_string(),
-            push_url: "git@codeberg.org:{account}/{repo}.git".to_string(),
-            auto_create: true,
-            auto_create_account: "testuser".to_string(),
-            auth_type: AuthType::Codeberg,
-            priority: 50,
-            api_endpoint: None,
-            auto_create_token_var: None,
-        }];
-
-        let results = crate::git::multi_remote::auto_create_all_remotes(&remotes, "test-repo");
-        assert_eq!(results.len(), 1);
-        assert!(results[0].1.is_err(), "Codeberg without token should return error");
-        let err_msg = format!("{}", results[0].1.as_ref().unwrap_err());
-        assert!(err_msg.contains("missing token") || err_msg.contains("CODEBERG_TOKEN"), "error should mention missing token");
-    }
-
-}
-
+                                }
                             }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    None
+}
                         }
                     }
                 }
