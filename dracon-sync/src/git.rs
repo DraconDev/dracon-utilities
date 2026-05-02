@@ -1991,4 +1991,88 @@ mod tests {
         assert!(err_msg.contains("401") || err_msg.contains("Unauthorized"), "error should mention 401: {}", err_msg);
     }
 
+    #[tokio::test]
+    async fn test_push_to_named_remote_fails_on_invalid_remote() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path().join("test-repo");
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .expect("git init");
+        std::process::Command::new("git")
+            .args(["remote", "add", "origin", "git@invalid.example.com:repo.git"])
+            .current_dir(&repo)
+            .status()
+            .expect("git remote add");
+
+        let result = crate::git::multi_remote::push_to_named_remote(&repo, "origin", 1, 0).await;
+        assert!(result.is_err(), "push to invalid remote should fail");
+    }
+
+    #[tokio::test]
+    async fn test_push_to_all_remotes_returns_all_results() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path().join("test-repo");
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .expect("git init");
+        std::process::Command::new("git")
+            .args(["remote", "add", "mirror1", "git@invalid1.example.com:repo.git"])
+            .current_dir(&repo)
+            .status()
+            .expect("git remote add mirror1");
+        std::process::Command::new("git")
+            .args(["remote", "add", "mirror2", "git@invalid2.example.com:repo.git"])
+            .current_dir(&repo)
+            .status()
+            .expect("git remote add mirror2");
+
+        let remotes = vec![
+            RemoteConfig {
+                name: "mirror1".to_string(),
+                push_url: "git@invalid1.example.com:repo.git".to_string(),
+                auto_create: false,
+                auto_create_account: "".to_string(),
+                auth_type: AuthType::GitHub,
+                priority: 10,
+                api_endpoint: None,
+                auto_create_token_var: None,
+            },
+            RemoteConfig {
+                name: "mirror2".to_string(),
+                push_url: "git@invalid2.example.com:repo.git".to_string(),
+                auto_create: false,
+                auto_create_account: "".to_string(),
+                auth_type: AuthType::GitHub,
+                priority: 20,
+                api_endpoint: None,
+                auto_create_token_var: None,
+            },
+        ];
+
+        let results = crate::git::multi_remote::push_to_all_remotes(&repo, &remotes, 1, 0).await;
+        assert_eq!(results.len(), 2, "should return results for both remotes");
+        assert_eq!(results[0].0, "mirror1", "lower priority should be first");
+        assert_eq!(results[1].0, "mirror2", "higher priority should be second");
+        assert!(results[0].1.is_err(), "mirror1 push should fail");
+        assert!(results[1].1.is_err(), "mirror2 push should fail");
+    }
+
+    #[tokio::test]
+    async fn test_push_mirror_remotes_empty_when_no_remotes() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path().join("test-repo");
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .expect("git init");
+
+        let results = crate::git::multi_remote::push_mirror_remotes(&repo, &[], 1, 0).await;
+        assert!(results.is_empty(), "should return empty results for empty remotes");
+    }
+
 }
