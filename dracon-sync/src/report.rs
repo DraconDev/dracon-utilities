@@ -2703,6 +2703,9 @@ implemented new authentication flow
 
     #[test]
     fn test_create_github_private_remote_success() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        static PATH_WAS_SET: AtomicBool = AtomicBool::new(false);
+
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("my-repo");
         std::process::Command::new("git")
@@ -2714,24 +2717,28 @@ implemented new authentication flow
         let gh_mock = tmp.path().join("gh");
         std::fs::write(&gh_mock, "#!/bin/bash\necho \"mock gh called with args: $@\" >&2\nexit 0\n").expect("write gh mock");
         std::fs::set_permissions(&gh_mock, std::fs::Permissions::from_mode(0o755)).expect("chmod gh");
-        let orig_path = std::env::var("PATH").ok();
-        let new_path = format!("{}:", tmp.path().to_string_lossy());
-        eprintln!("DEBUG: setting PATH to: {:?}", new_path);
-        std::env::set_var("PATH", &new_path);
 
-        let test_gh = std::process::Command::new("gh").args(["repo", "create", "test", "--private"]).output();
-        eprintln!("DEBUG: test gh command: {:?}", test_gh);
-        if let Err(e) = &test_gh {
-            eprintln!("DEBUG: gh command error: {:?}", e);
-        }
+        let orig_path = std::env::var("PATH").ok();
+        let gh_path = gh_mock.to_string_lossy().to_string();
+        let new_path = format!("{}:", gh_path);
+        std::env::set_var("PATH", &new_path);
+        PATH_WAS_SET.store(true, Ordering::SeqCst);
+
+        eprintln!("DEBUG: PATH set to: {:?}", new_path);
+        eprintln!("DEBUG: gh_mock path: {:?}", gh_path);
+        eprintln!("DEBUG: gh_mock exists: {:?}", std::path::Path::new(&gh_path).exists());
+
+        let test_gh = std::process::Command::new(&gh_path).args(["repo", "create", "test", "--private"]).output();
+        eprintln!("DEBUG: direct gh path command: {:?}", test_gh);
 
         let result = create_github_private_remote(&repo, "testaccount");
         eprintln!("DEBUG: result: {:?}", result);
+
         std::env::remove_var("PATH");
-        match orig_path {
-            Some(p) => std::env::set_var("PATH", p),
-            None => std::env::remove_var("PATH"),
+        if let Some(p) = orig_path {
+            std::env::set_var("PATH", p);
         }
+        PATH_WAS_SET.store(false, Ordering::SeqCst);
 
         assert!(result.is_some());
         assert_eq!(result.unwrap(), "git@github.com:testaccount/my-repo.git");
