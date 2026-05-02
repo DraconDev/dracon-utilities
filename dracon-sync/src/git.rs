@@ -1485,6 +1485,7 @@ pub(crate) fn auto_create_all_remotes(remotes: &[RemoteConfig], repo_name: &str)
 #[allow(unused_imports)]
 mod tests {
     use super::*;
+    use std::io::{Read, Write};
 
     #[test]
     fn test_strip_url_credentials_https_with_creds() {
