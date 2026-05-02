@@ -2848,4 +2848,33 @@ mod tests {
         ).await;
         assert!(result.is_ok(), "git log with env vars should work: {:?}", result);
     }
+
+    #[tokio::test]
+    async fn test_restore_paths_uses_git_restore_fallback_chain() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path().join("test-repo");
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .expect("git init");
+        std::fs::write(repo.join("file.txt"), "original content").expect("write file");
+        std::process::Command::new("git")
+            .args(["add", "."])
+            .current_dir(&repo)
+            .status()
+            .expect("git add");
+        std::process::Command::new("git")
+            .args(["commit", "-m", "init"])
+            .current_dir(&repo)
+            .status()
+            .expect("git commit");
+
+        std::fs::write(repo.join("file.txt"), "modified content").expect("write modified");
+
+        let result = restore_paths(&repo, &["file.txt".to_string()]).await;
+        assert!(result.is_ok(), "restore_paths should succeed: {:?}", result);
+        let content = std::fs::read_to_string(repo.join("file.txt")).expect("read file");
+        assert_eq!(content, "original content", "file should be restored to original content");
+    }
 }
