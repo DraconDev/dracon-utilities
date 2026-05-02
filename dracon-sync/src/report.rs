@@ -2795,15 +2795,10 @@ implemented new authentication flow
         let gh_mock = tmp.path().join("gh");
         std::fs::write(&gh_mock, "#!/bin/sh\nexit 1\n").expect("write gh mock");
         std::fs::set_permissions(&gh_mock, std::fs::Permissions::from_mode(0o755)).expect("chmod gh");
-        let orig_path = std::env::var("PATH").ok();
         let new_path = format!("{}:", tmp.path().to_string_lossy());
-        std::env::set_var("PATH", &new_path);
+        let _guard = EnvRestorer::new("PATH", &new_path);
 
         let result = create_github_private_remote(&repo, "testaccount");
-        std::env::remove_var("PATH");
-        if let Some(p) = orig_path {
-            std::env::set_var("PATH", p);
-        }
 
         assert!(result.is_some());
         let remotes = crate::git::multi_remote::list_remotes(&repo);
