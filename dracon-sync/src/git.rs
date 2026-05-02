@@ -2168,4 +2168,167 @@ mod tests {
         assert!(results.is_empty(), "should return empty results for empty remotes");
     }
 
+    #[test]
+    fn test_create_repo_on_github_success() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let gh_mock = tmp.path().join("gh");
+        std::fs::write(&gh_mock, "#!/bin/bash\nexit 0\n").expect("write gh mock");
+        std::fs::set_permissions(&gh_mock, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+        let orig_path = std::env::var("PATH").ok();
+        std::env::set_var("PATH", format!("{}:", tmp.path().to_string_lossy()));
+
+        let result = multi_remote::create_repo_on_github("testuser", "my-repo");
+        std::env::remove_var("PATH");
+        match orig_path {
+            Some(p) => std::env::set_var("PATH", p),
+            None => std::env::remove_var("PATH"),
+        }
+
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "git@github.com:testuser/my-repo.git");
+    }
+
+    #[test]
+    fn test_create_repo_on_github_already_exists_returns_url_without_suffix() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let gh_mock = tmp.path().join("gh");
+        std::fs::write(
+            &gh_mock,
+            "#!/bin/bash\necho 'Name already exists' >&2\nexit 1\n",
+        )
+        .expect("write gh mock");
+        std::fs::set_permissions(&gh_mock, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+        let orig_path = std::env::var("PATH").ok();
+        std::env::set_var("PATH", format!("{}:", tmp.path().to_string_lossy()));
+
+        let result = multi_remote::create_repo_on_github("testuser", "dracon-demons");
+        std::env::remove_var("PATH");
+        match orig_path {
+            Some(p) => std::env::set_var("PATH", p),
+            None => std::env::remove_var("PATH"),
+        }
+
+        assert!(result.is_ok());
+        let url = result.unwrap();
+        assert!(!url.contains("-1"), "should NOT have suffix -1: {}", url);
+        assert_eq!(url, "git@github.com:testuser/dracon-demons.git");
+    }
+
+    #[test]
+    fn test_create_repo_on_github_pat_passed_as_env_var() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let gh_mock = tmp.path().join("gh");
+        std::fs::write(
+            &gh_mock,
+            "#!/bin/bash\nif [ -n \"$GH_TOKEN\" ]; then echo 'PAT received' >&2; fi\nexit 0\n",
+        )
+        .expect("write gh mock");
+        std::fs::set_permissions(&gh_mock, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+
+        std::env::set_var("GH_TOKEN", "test_pat_from_env");
+        let orig_path = std::env::var("PATH").ok();
+        std::env::set_var("PATH", format!("{}:", tmp.path().to_string_lossy()));
+
+        let result = multi_remote::create_repo_on_github("testuser", "test-repo");
+        std::env::remove_var("PATH");
+        std::env::remove_var("GH_TOKEN");
+        match orig_path {
+            Some(p) => std::env::set_var("PATH", p),
+            None => std::env::remove_var("PATH"),
+        }
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_create_repo_on_gitlab_success() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let glab_mock = tmp.path().join("glab");
+        std::fs::write(&glab_mock, "#!/bin/bash\nexit 0\n").expect("write glab mock");
+        std::fs::set_permissions(&glab_mock, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+        let orig_path = std::env::var("PATH").ok();
+        std::env::set_var("PATH", format!("{}:", tmp.path().to_string_lossy()));
+
+        let result = multi_remote::create_repo_on_gitlab("testuser", "my-repo");
+        std::env::remove_var("PATH");
+        match orig_path {
+            Some(p) => std::env::set_var("PATH", p),
+            None => std::env::remove_var("PATH"),
+        }
+
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "git@gitlab.com:testuser/my-repo.git");
+    }
+
+    #[test]
+    fn test_create_repo_on_gitlab_already_exists_returns_url_without_suffix() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let glab_mock = tmp.path().join("glab");
+        std::fs::write(
+            &glab_mock,
+            "#!/bin/bash\necho 'Repository has already been taken' >&2\nexit 1\n",
+        )
+        .expect("write glab mock");
+        std::fs::set_permissions(&glab_mock, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+        let orig_path = std::env::var("PATH").ok();
+        std::env::set_var("PATH", format!("{}:", tmp.path().to_string_lossy()));
+
+        let result = multi_remote::create_repo_on_gitlab("testuser", "dracon-demons");
+        std::env::remove_var("PATH");
+        match orig_path {
+            Some(p) => std::env::set_var("PATH", p),
+            None => std::env::remove_var("PATH"),
+        }
+
+        assert!(result.is_ok());
+        let url = result.unwrap();
+        assert!(!url.contains("-1"), "should NOT have suffix -1: {}", url);
+        assert_eq!(url, "git@gitlab.com:testuser/dracon-demons.git");
+    }
+
+    #[test]
+    fn test_create_repo_on_gitlab_network_error() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let glab_mock = tmp.path().join("glab");
+        std::fs::write(
+            &glab_mock,
+            "#!/bin/bash\necho 'Connection timeout' >&2\nexit 128\n",
+        )
+        .expect("write glab mock");
+        std::fs::set_permissions(&glab_mock, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+        let orig_path = std::env::var("PATH").ok();
+        std::env::set_var("PATH", format!("{}:", tmp.path().to_string_lossy()));
+
+        let result = multi_remote::create_repo_on_gitlab("testuser", "test-repo");
+        std::env::remove_var("PATH");
+        match orig_path {
+            Some(p) => std::env::set_var("PATH", p),
+            None => std::env::remove_var("PATH"),
+        }
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_create_repo_on_gitlab_token_passed_as_env_var() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let glab_mock = tmp.path().join("glab");
+        std::fs::write(&glab_mock, "#!/bin/bash\nif [ -n \"$GITLAB_TOKEN\" ]; then echo 'Token received'; fi\nexit 0\n").expect("write glab mock");
+        std::fs::set_permissions(&glab_mock, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+
+        std::env::set_var("GITLAB_TOKEN", "test_gitlab_token");
+        let orig_path = std::env::var("PATH").ok();
+        std::env::set_var("PATH", format!("{}:", tmp.path().to_string_lossy()));
+
+        let result = multi_remote::create_repo_on_gitlab("testuser", "test-repo");
+        std::env::remove_var("PATH");
+        std::env::remove_var("GITLAB_TOKEN");
+        match orig_path {
+            Some(p) => std::env::set_var("PATH", p),
+            None => std::env::remove_var("PATH"),
+        }
+
+        assert!(result.is_ok());
+    }
+
 }
