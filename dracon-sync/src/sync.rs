@@ -551,6 +551,7 @@ pub(crate) async fn sync_repo(
                             }
                         }
                     }
+                    return Ok(false);
                 } else if let Some(ref mut rf) = remote_failures {
                     for name in policy.remotes.iter().map(|r| r.name.clone()) {
                         rf.remove(&name);
