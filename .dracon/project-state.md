@@ -1,31 +1,21 @@
 # Project State
 
 ## Current Focus
-Added robust Git push functionality with retry and transport fallback mechanisms
+Refactored Git command invocations to use `git` instead of `/usr/bin/git` for better portability
 
 ## Context
-The changes implement reliable Git push operations with:
-1. Automatic retry logic for transient failures
-2. Transport protocol fallback (SSH → HTTPS)
-3. Comprehensive test coverage for all scenarios
-This addresses common Git operation failures in distributed systems where network conditions may vary.
+The change removes hardcoded paths to `/usr/bin/git` in favor of just using `git`, which will work better across different systems where Git might be installed in different locations.
 
 ## Completed
-- [x] Implemented `push_with_retries` with configurable attempts and delays
-- [x] Added `push_with_transport_fallbacks` for SSH → HTTPS fallback
-- [x] Created comprehensive test suite covering:
-  - Immediate success
-  - Retry success after failures
-  - Exhausted retry failure cases
-  - Transport fallback scenarios
+- [x] Updated all Git command invocations in test cases to use `git` instead of `/usr/bin/git`
+- [x] Maintained all existing functionality while improving portability
 
 ## In Progress
-- [ ] None (all planned work is complete)
+- [ ] None
 
 ## Blockers
-- None (all functionality is implemented and tested)
+- None
 
 ## Next Steps
-1. Integrate these push methods into the main sync workflow
-2. Add monitoring for push operation metrics
-3. Document the new Git operation patterns for team reference
+1. Verify cross-platform compatibility with the new changes
+2. Consider adding additional Git command wrappers if needed for other operations
