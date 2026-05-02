@@ -1238,7 +1238,9 @@ push_url = "git@nonexistent.example.com:repo.git"
         assert!(!result.unwrap(), "mirror push failure should return false");
         assert_eq!(remote_failures.get("bad-mirror"), Some(&1), "bad-mirror failure should be tracked");
     }
-}
+
+    #[tokio::test]
+    async fn test_sync_repo_mirror_push_success_returns_true() {
         let tmp = tempfile::tempdir().unwrap();
         let origin_bare = tmp.path().join("origin.git");
         let mirror_bare = tmp.path().join("mirror.git");
