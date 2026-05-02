@@ -1428,20 +1428,20 @@ pub(crate) fn auto_create_all_remotes(remotes: &[RemoteConfig], repo_name: &str)
     }
 }
 
+pub(crate) fn acquire_path_lock() -> parking_lot::MutexGuard<'static, ()> {
+    loop {
+        if let Some(guard) = PATH_LOCK.try_lock() {
+            return guard;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+}
+
 #[allow(dead_code)]
 #[allow(unused_imports)]
 mod tests {
     use super::*;
     use std::os::unix::fs::PermissionsExt;
-
-    fn acquire_path_lock() -> parking_lot::MutexGuard<'static, ()> {
-        loop {
-            if let Some(guard) = PATH_LOCK.try_lock() {
-                return guard;
-            }
-            std::thread::sleep(std::time::Duration::from_millis(10));
-        }
-    }
 
     struct EnvRestorer {
         key: String,
