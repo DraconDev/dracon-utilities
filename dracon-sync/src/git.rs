@@ -1684,7 +1684,7 @@ mod tests {
             .status()
             .expect("git remote add stale");
 
-        crate::git::remove_stale_remotes(&repo, &["github"]).expect("remove_stale_remotes");
+        crate::git::multi_remote::remove_stale_remotes(&repo, &["github"]).expect("remove_stale_remotes");
 
         let remotes = multi_remote::list_remotes(&repo);
         assert!(remotes.contains(&"origin".to_string()), "origin must be preserved");
