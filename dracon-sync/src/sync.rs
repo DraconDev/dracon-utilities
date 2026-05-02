@@ -526,14 +526,14 @@ pub(crate) async fn sync_repo(
                 )
                 .await
                 {
-                    Ok(()) => {}
-                    Err(e) => {
-                        eprintln!("⚠️ push failed for {}: {}", repo.display(), e);
-                        return Ok(false);
-                    }
-                }
+Ok(()) => {}
+            Err(e) => {
+                eprintln!("⚠️ push failed for {}: {}", repo.display(), e);
+                return Ok(false);
+            }
+        }
 
-                // Push to additional named remotes after origin push succeeds
+        // Push to additional named remotes after origin push succeeds
         if !policy.remotes.is_empty() {
             let repo_name = repo.file_name()
                 .map(|n| n.to_string_lossy().to_string())
