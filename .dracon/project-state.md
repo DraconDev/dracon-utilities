@@ -1,23 +1,22 @@
 # Project State
 
 ## Current Focus
-Added debug logging to improve environment isolation and Git remote test reliability
+Improved GitHub CLI (`gh`) environment debugging with more detailed version checks
 
 ## Context
-The changes enhance environment isolation for Git remote tests by adding debug logging to track PATH modifications, gh command availability, and test results. This improves test reliability and debugging capabilities.
+To ensure proper environment isolation during Git remote tests, we need reliable debugging of the GitHub CLI (`gh`) toolchain. The previous implementation had limited checks, which could lead to false positives in environment validation.
 
 ## Completed
-- [x] Added debug logging for PATH environment variable modifications
-- [x] Added debug logging for gh command availability verification
-- [x] Added debug logging for temporary directory contents
-- [x] Added debug logging for GitHub private remote creation results
+- [x] Added shell-based `which gh` check for more reliable path detection
+- [x] Implemented direct `gh --version` command execution to verify CLI availability
+- [x] Enhanced debug output for environment validation
 
 ## In Progress
-- [ ] None (changes are complete)
+- [x] Comprehensive GitHub CLI environment verification
 
 ## Blockers
-- None (changes are complete)
+- None identified in this change
 
 ## Next Steps
-1. Verify test stability with the new debug logging
-2. Consider adding more detailed logging for other Git operations if needed
+1. Verify the new debug output provides sufficient information for environment validation
+2. Integrate these checks into the broader Git remote test suite

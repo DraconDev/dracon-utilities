@@ -2718,8 +2718,10 @@ implemented new authentication flow
         let new_path = format!("{}:", tmp.path().to_string_lossy());
         eprintln!("DEBUG: setting PATH to: {:?}", new_path);
         std::env::set_var("PATH", &new_path);
-        eprintln!("DEBUG: gh found at: {:?}", std::process::Command::new("which").arg("gh").output().ok().map(|o| String::from_utf8_lossy(&o.stdout).to_string()));
-        eprintln!("DEBUG: ls tmp: {:?}", std::fs::read_dir(tmp.path()).map(|mut d| d.filter_map(|e| e.ok().map(|e| e.path().to_string_lossy().to_string())).collect::<Vec<_>>()));
+        let gh_check = std::process::Command::new("sh").arg("-c").arg("echo found: $(which gh || echo not found)").output();
+        eprintln!("DEBUG: which gh via sh: {:?}", gh_check.map(|o| String::from_utf8_lossy(&o.stdout).to_string()));
+        let gh_output = std::process::Command::new("gh").arg("--version").output();
+        eprintln!("DEBUG: gh --version output: {:?}", gh_output.map(|o| String::from_utf8_lossy(&o.stdout).to_string()));
 
         let result = create_github_private_remote(&repo, "testaccount");
         eprintln!("DEBUG: result: {:?}", result);
