@@ -1,22 +1,24 @@
 # Project State
 
 ## Current Focus
-Improved GitHub CLI (`gh`) environment debugging with more detailed version checks
+Improved GitHub CLI (`gh`) environment debugging with more detailed PATH verification
 
 ## Context
-To ensure proper environment isolation during Git remote tests, we need reliable debugging of the GitHub CLI (`gh`) toolchain. The previous implementation had limited checks, which could lead to false positives in environment validation.
+The change enhances environment isolation testing by providing clearer debug output about the `gh` command's availability and PATH configuration during Git remote tests.
 
 ## Completed
-- [x] Added shell-based `which gh` check for more reliable path detection
-- [x] Implemented direct `gh --version` command execution to verify CLI availability
-- [x] Enhanced debug output for environment validation
+- [x] Replaced direct `gh` command checks with a more comprehensive shell command that:
+  - Explicitly uses `/bin/sh`
+  - Shows the full PATH being used
+  - Clearly indicates if `gh` is found or not
+- [x] Maintained debug output while improving its clarity and reliability
 
 ## In Progress
-- [x] Comprehensive GitHub CLI environment verification
+- [ ] None - this is a complete change
 
 ## Blockers
-- None identified in this change
+- None - this is a debugging improvement
 
 ## Next Steps
-1. Verify the new debug output provides sufficient information for environment validation
-2. Integrate these checks into the broader Git remote test suite
+1. Verify the new debug output provides sufficient information for environment isolation testing
+2. Ensure the change doesn't interfere with existing Git remote test functionality
