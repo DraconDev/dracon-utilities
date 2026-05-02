@@ -2214,19 +2214,13 @@ mod tests {
         let gh_mock = tmp.path().join("gh");
         std::fs::write(
             &gh_mock,
-            "#!/bin/bash\necho 'Name already exists' >&2\nexit 1\n",
+            "#!/bin/sh\necho 'Name already exists' >&2\nexit 1\n",
         )
         .expect("write gh mock");
         std::fs::set_permissions(&gh_mock, std::fs::Permissions::from_mode(0o755)).expect("chmod");
-        let orig_path = std::env::var("PATH").ok();
-        std::env::set_var("PATH", format!("{}:", tmp.path().to_string_lossy()));
+        let _guard = EnvRestorer::new("PATH", &format!("{}:", tmp.path().to_string_lossy()));
 
         let result = multi_remote::create_repo_on_github("testuser", "dracon-demons");
-        std::env::remove_var("PATH");
-        match orig_path {
-            Some(p) => std::env::set_var("PATH", p),
-            None => std::env::remove_var("PATH"),
-        }
 
         assert!(result.is_ok());
         let url = result.unwrap();
