@@ -1345,35 +1345,30 @@ pub(crate) fn create_repo_on_gitlab(account: &str, repo_name: &str) -> Result<St
 }
 
 pub(crate) fn create_repo_on_codeberg(token: &str, account: &str, repo_name: &str, api_endpoint: &str) -> Result<String> {
-    let runtime = tokio::runtime::Handle::current();
-    let result = runtime.block_on(async {
-        let client = reqwest::Client::new();
-        let response = client
-            .post(api_endpoint)
-            .header("Authorization", format!("Bearer {}", token))
-            .header("Content-Type", "application/json")
-            .json(&serde_json::json!({
-                "name": repo_name,
-                "private": true,
-                "default_branch": "master"
-            }))
-            .send()
-            .await
-            .with_context(|| "reqwest codeberg repo create failed")?;
+    let client = reqwest::blocking::Client::new();
+    let response = client
+        .post(api_endpoint)
+        .header("Authorization", format!("Bearer {}", token))
+        .header("Content-Type", "application/json")
+        .json(&serde_json::json!({
+            "name": repo_name,
+            "private": true,
+            "default_branch": "master"
+        }))
+        .send()
+        .with_context(|| "reqwest codeberg repo create failed")?;
 
-        let status = response.status();
-        if status.as_u16() == 409 || status.as_u16() == 422 {
-            return Ok(format!("git@codeberg.org:{}/{}.git", account, repo_name));
-        }
+    let status = response.status();
+    if status.as_u16() == 409 || status.as_u16() == 422 {
+        return Ok(format!("git@codeberg.org:{}/{}.git", account, repo_name));
+    }
 
-        if !status.is_success() {
-            let body = response.text().await.unwrap_or_default();
-            anyhow::bail!("codeberg repo create failed ({}): {}", status, body);
-        }
+    if !status.is_success() {
+        let body = response.text().unwrap_or_default();
+        anyhow::bail!("codeberg repo create failed ({}): {}", status, body);
+    }
 
-        Ok(format!("git@codeberg.org:{}/{}.git", account, repo_name))
-    });
-    result
+    Ok(format!("git@codeberg.org:{}/{}.git", account, repo_name))
 }
 
 pub(crate) fn auto_create_repo(config: &RemoteConfig, repo_name: &str) -> Result<String> {
