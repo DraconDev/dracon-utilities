@@ -1684,7 +1684,7 @@ mod tests {
             .status()
             .expect("git remote add stale");
 
-        remove_stale_remotes(&repo, &["github"]).expect("remove_stale_remotes");
+        super::super::remove_stale_remotes(&repo, &["github"]).expect("remove_stale_remotes");
 
         let remotes = multi_remote::list_remotes(&repo);
         assert!(remotes.contains(&"origin".to_string()), "origin must be preserved");
@@ -1716,7 +1716,7 @@ mod tests {
             .status()
             .expect("git remote add mirror2");
 
-        remove_stale_remotes(&repo, &["mirror1"]).expect("remove_stale_remotes");
+        super::super::remove_stale_remotes(&repo, &["mirror1"]).expect("remove_stale_remotes");
 
         let remotes = multi_remote::list_remotes(&repo);
         assert!(remotes.contains(&"origin".to_string()), "origin always preserved");
@@ -1739,7 +1739,7 @@ mod tests {
             .status()
             .expect("git remote add origin");
 
-        remove_stale_remotes(&repo, &[]).expect("remove_stale_remotes with empty keep list");
+        super::super::remove_stale_remotes(&repo, &[]).expect("remove_stale_remotes with empty keep list");
 
         let remotes = multi_remote::list_remotes(&repo);
         assert_eq!(remotes, vec!["origin"]);
