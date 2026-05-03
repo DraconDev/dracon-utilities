@@ -1,21 +1,22 @@
 # Project State
 
 ## Current Focus
-Added default repository name mapping configuration for multi-remote synchronization
+Added support for custom repository name mapping in remote configurations.
 
 ## Context
-This change enables custom repository name mapping in remote configurations, which is necessary for handling different naming conventions across remote repositories during synchronization.
+To handle platform-specific naming restrictions (e.g., GitLab rejecting dots in project names) and prevent orphaned repositories from failed creation attempts.
 
 ## Completed
-- [x] Added `repo_name_map` field to `RemoteConfig` with default value
-- [x] Updated test cases to include the new configuration field
+- [x] Added `repo_name_map` configuration for per-remote repository naming
+- [x] Documented platform limitations (Codeberg/Forgejo push-to-create restrictions)
+- [x] Clarified repository naming conventions and safety rules
 
 ## In Progress
-- [ ] None (this is a complete feature addition)
+- [ ] None (documentation-only change)
 
 ## Blockers
-- None (this is a standalone configuration addition)
+- None (documentation update only)
 
 ## Next Steps
-1. Verify the new configuration works with existing synchronization logic
-2. Document the new configuration option in project documentation
+1. Verify `repo_name_map` works across all supported platforms
+2. Update user documentation with examples of multi-remote configurations

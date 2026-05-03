@@ -145,6 +145,25 @@ auto_github_private_account = "YourOrgOrUsername"
 **⚠️ CRITICAL: NEVER create suffixed repos (repo-1, repo-2, repo-N).**
 If the GitHub repo already exists, reuse it. A previous suffix loop in `create_github_private_remote` created 15+ orphan repos (`dracon-demons-1` through `-9`). This happens when `gh repo create` fails with "Name already exists" and the code appends `-1`, `-2` instead of just reusing the existing repo. This pattern is explicitly banned in all repo creation functions.
 
+### Per-Remote Repo Name Mapping
+
+Some platforms (GitLab, Forgejo) reject dots in project names. The `.dracon` repo (dot-prefixed) would fail on GitLab. Use `repo_name_map` to map local directory names to remote project names:
+
+```toml
+[[remotes]]
+name = "gitlab"
+push_url = "git@gitlab.com:myorg/{repo}.git"
+auto_create = true
+[remotes.repo_name_map]
+".dracon" = "dracon-home"
+```
+
+This maps local `.dracon` → `dracon-home` on GitLab while keeping `.dracon` on GitHub/Codeberg.
+
+### Codeberg/Forgejo Limitation
+
+**Push-to-create is disabled** for Codeberg because Forgejo (the underlying software on Codeberg.org) does not allow `git push` to create new repos. You must manually create repos on Codeberg first, or enable push-to-create in Forgejo settings. Set `auto_create = false` for the Codeberg remote (the default).
+
 ## CLI Reference
 
 All binaries support `-V, --version` and `-v, --verbose` (repeatable up to 2x for `-vv`).
