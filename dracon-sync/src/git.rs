@@ -2654,6 +2654,7 @@ mod tests {
             .output()
             .expect("git commit");
 
+        drop(_lock);
         let result = crate::git::push_with_transport_fallbacks(&repo, 1, "test-push-both-fail").await;
         assert!(result.is_err(), "both SSH and HTTPS should fail");
     }
