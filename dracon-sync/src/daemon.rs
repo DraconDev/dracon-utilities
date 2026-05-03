@@ -456,19 +456,16 @@ pub(crate) async fn run_daemon(policy_path: PathBuf, override_interval_secs: Opt
                 stuck_push_repos.remove(&repo);
                 save_stuck_push_repos(&stuck_push_repos);
             }
-            // Auto-repair branch ambiguity: consolidate to master.
-            // Dual branch (main+master) → merge into master, delete main.
-            // Main-only → rename to master so everything is consistent.
             if has_both_main_and_master(&repo) {
-                eprintln!("🔧 {} has both main+master, consolidating to master", repo.display());
-                if let Err(e) = crate::git::consolidate_to_master(&repo).await {
-                    eprintln!("⚠️ failed to consolidate {} to master: {}", repo.display(), e);
+                eprintln!("🔧 {} has both main+master, consolidating to main", repo.display());
+                if let Err(e) = crate::git::consolidate_to_main(&repo).await {
+                    eprintln!("⚠️ failed to consolidate {} to main: {}", repo.display(), e);
                     continue;
                 }
-            } else if crate::git::has_only_main_branch(&repo) {
-                eprintln!("🔧 {} has only 'main', renaming to 'master'", repo.display());
-                if let Err(e) = crate::git::rename_main_to_master(&repo).await {
-                    eprintln!("⚠️ failed to rename {} main→master: {}", repo.display(), e);
+            } else if crate::git::has_only_master_branch(&repo) {
+                eprintln!("🔧 {} has only 'master', renaming to 'main'", repo.display());
+                if let Err(e) = crate::git::rename_master_to_main(&repo).await {
+                    eprintln!("⚠️ failed to rename {} master→main: {}", repo.display(), e);
                     continue;
                 }
             }
