@@ -841,29 +841,29 @@ pub(crate) async fn consolidate_to_main(repo: &Path) -> Result<()> {
     Ok(())
 }
 
-pub(crate) async fn rename_main_to_master(repo: &Path) -> Result<()> {
+pub(crate) async fn rename_master_to_main(repo: &Path) -> Result<()> {
     let branch = current_branch(repo).unwrap_or_else(|| "main".to_string());
-    if branch == "main" {
+    if branch == "master" {
         std_git_command()
-            .args(["branch", "-m", "main", "master"])
+            .args(["branch", "-m", "master", "main"])
             .current_dir(repo)
             .status()
-            .with_context(|| format!("failed to rename main to master in {}", repo.display()))?;
+            .with_context(|| format!("failed to rename master to main in {}", repo.display()))?;
     }
     if has_origin_remote(repo) {
         if let Err(e) =
-            push_with_retries(repo, 60, 3, "rename-main-to-master").await
+            push_with_retries(repo, 60, 3, "rename-master-to-main").await
         {
-            eprintln!("⚠️ failed to push master to origin: {}", e);
+            eprintln!("⚠️ failed to push main to origin: {}", e);
         }
         if let Err(e) = std_git_command()
-            .args(["push", "origin", "--delete", "main"])
+            .args(["push", "origin", "--delete", "master"])
             .current_dir(repo)
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
             .status()
         {
-            eprintln!("⚠️ failed to delete remote main: {}", e);
+            eprintln!("⚠️ failed to delete remote master: {}", e);
         }
     }
     Ok(())
