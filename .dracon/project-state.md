@@ -1,15 +1,14 @@
 # Project State
 
 ## Current Focus
-Improved Git binary detection with more robust PATH environment handling
+Removed redundant Git binary detection logic in policy module
 
 ## Context
-The previous implementation used `which` command which may not be available on all systems. This change replaces it with direct PATH environment scanning for better reliability.
+The change eliminates duplicate code that previously searched the PATH environment for Git binaries, as this functionality was already implemented in the subsequent code block.
 
 ## Completed
-- [x] Replaced `which` command with PATH environment scanning
-- [x] Added proper error handling for PATH parsing
-- [x] Improved path validation with existence checks
+- [x] Removed redundant PATH environment search for Git binary
+- [x] Maintained existing hardcoded paths for Git binary locations
 
 ## In Progress
 - [ ] None
@@ -18,5 +17,5 @@ The previous implementation used `which` command which may not be available on a
 - None
 
 ## Next Steps
-1. Verify cross-platform compatibility
-2. Add unit tests for the new detection logic
+1. Verify no regression in Git binary detection
+2. Review test coverage for Git binary resolution
