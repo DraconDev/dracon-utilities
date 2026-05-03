@@ -880,12 +880,13 @@ repo_name_map: Default::default(),
             priority: 50,
             api_endpoint: None,
             auto_create_token_var: None,
-            repo_name_map: Default::default(),
-        };
-        assert_eq!(
-            config.resolve_push_url("repo"),
-            "git@gitlab.com:testuser/"
-        );
+repo_name_map: Default::default(),
+        force_push_when_behind: false,
+    };
+    assert_eq!(
+        config.resolve_push_url("repo"),
+        "git@gitlab.com:testuser/"
+    );
     }
 
     #[test]
