@@ -146,15 +146,6 @@ pub(crate) fn git_binary() -> &'static Path {
                 }
             }
 
-            if let Ok(path_var) = std::env::var("PATH") {
-                for dir in path_var.split(':') {
-                    let candidate = PathBuf::from(dir).join("git");
-                    if candidate.exists() {
-                        return candidate;
-                    }
-                }
-            }
-
             for candidate in ["/run/current-system/sw/bin/git", "/usr/bin/git", "/bin/git"] {
                 let path = PathBuf::from(candidate);
                 if path.exists() {
