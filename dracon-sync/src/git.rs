@@ -3157,9 +3157,9 @@ std::process::Command::new(real_git.as_path())
         let result = push_to_named_remote(&repo, "mirror", 5, 0, false).await;
         assert!(result.is_err(), "push with force_when_behind=false should fail with rejected error");
     }
-}
-}
 
+    #[tokio::test]
+    async fn test_push_to_named_remote_auto_force_when_behind() {
     #[tokio::test]
     async fn test_push_to_named_remote_auto_force_when_behind() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
