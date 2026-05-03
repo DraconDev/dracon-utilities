@@ -1,21 +1,21 @@
 # Project State
 
 ## Current Focus
-Added more robust Git binary detection in policy module
+Removed redundant Git binary detection logic in policy module
 
 ## Context
-The change improves Git binary detection by adding a fallback mechanism using the `which` command, which is more reliable than hardcoded paths on some systems.
+The change eliminates duplicate Git binary detection code that was previously implemented using both `which` command and hardcoded paths. This was part of ongoing work to improve Git handling robustness.
 
 ## Completed
-- [x] Added `which` command fallback for Git binary detection
-- [x] Maintained existing hardcoded path fallback as secondary option
+- [x] Removed duplicate Git binary detection using `which` command
+- [x] Kept only the more reliable hardcoded path detection
 
 ## In Progress
-- [ ] None
+- [ ] None (this was a cleanup change)
 
 ## Blockers
 - None
 
 ## Next Steps
-1. Verify the new detection works across different Linux distributions
-2. Consider adding Windows detection if needed for future cross-platform support
+1. Verify no regression in Git binary detection
+2. Continue Git-related test improvements
