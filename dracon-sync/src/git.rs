@@ -1911,6 +1911,7 @@ mod tests {
                 api_endpoint: None,
                 auto_create_token_var: None,
                 repo_name_map: Default::default(),
+                force_push_when_behind: false,
             },
             RemoteConfig {
                 name: "gitlab".to_string(),
@@ -1922,6 +1923,7 @@ mod tests {
                 api_endpoint: None,
                 auto_create_token_var: None,
                 repo_name_map: Default::default(),
+                force_push_when_behind: false,
             },
         ];
 
@@ -1954,6 +1956,7 @@ mod tests {
             api_endpoint: None,
             auto_create_token_var: None,
             repo_name_map: Default::default(),
+            force_push_when_behind: false,
         }];
 
         crate::git::multi_remote::configure_all_remotes(&repo, &remotes, "repo");
@@ -1977,6 +1980,7 @@ mod tests {
                 api_endpoint: None,
                 auto_create_token_var: None,
                 repo_name_map: Default::default(),
+                force_push_when_behind: false,
             },
             RemoteConfig {
                 name: "mirror2".to_string(),
@@ -1988,6 +1992,7 @@ mod tests {
                 api_endpoint: None,
                 auto_create_token_var: None,
                 repo_name_map: Default::default(),
+                force_push_when_behind: false,
             },
         ];
 
@@ -2007,6 +2012,7 @@ mod tests {
             api_endpoint: None,
             auto_create_token_var: None,
             repo_name_map: Default::default(),
+            force_push_when_behind: false,
         }];
 
         let results = crate::git::multi_remote::auto_create_all_remotes(&remotes, "test-repo");
@@ -2034,6 +2040,7 @@ mod tests {
             api_endpoint: None,
             auto_create_token_var: None,
             repo_name_map: Default::default(),
+            force_push_when_behind: false,
         }];
 
         let results = crate::git::multi_remote::auto_create_all_remotes(&remotes, "test-repo");
