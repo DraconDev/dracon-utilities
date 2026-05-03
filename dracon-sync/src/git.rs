@@ -1909,6 +1909,7 @@ mod tests {
                 priority: 50,
                 api_endpoint: None,
                 auto_create_token_var: None,
+                repo_name_map: Default::default(),
             },
             RemoteConfig {
                 name: "gitlab".to_string(),
@@ -1919,6 +1920,7 @@ mod tests {
                 priority: 50,
                 api_endpoint: None,
                 auto_create_token_var: None,
+                repo_name_map: Default::default(),
             },
         ];
 
@@ -1950,6 +1952,7 @@ mod tests {
             priority: 50,
             api_endpoint: None,
             auto_create_token_var: None,
+            repo_name_map: Default::default(),
         }];
 
         crate::git::multi_remote::configure_all_remotes(&repo, &remotes, "repo");
@@ -1972,6 +1975,7 @@ mod tests {
                 priority: 50,
                 api_endpoint: None,
                 auto_create_token_var: None,
+                repo_name_map: Default::default(),
             },
             RemoteConfig {
                 name: "mirror2".to_string(),
@@ -1982,6 +1986,7 @@ mod tests {
                 priority: 50,
                 api_endpoint: None,
                 auto_create_token_var: None,
+                repo_name_map: Default::default(),
             },
         ];
 
