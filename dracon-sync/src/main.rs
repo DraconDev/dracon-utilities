@@ -124,6 +124,12 @@ enum Command {
         #[command(subcommand)]
         cmd: DualBranchCommands,
     },
+    /// Detect and repair origin URLs pointing to orphan -N suffixed repos.
+    RepairOrigins {
+        /// Execute git operations to repair origins.
+        #[arg(long)]
+        apply: bool,
+    },
 }
 
 #[derive(Subcommand, Debug)]
