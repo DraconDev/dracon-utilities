@@ -1,23 +1,20 @@
 # Project State
 
 ## Current Focus
-Refactored Git test setup to use real Git commands with explicit paths and bare repositories
+Refined Git push error handling message for clarity in test assertions
 
 ## Context
-The test cases were updated to use the actual Git executable path and create proper bare repositories for testing mirror operations. This makes the tests more realistic and reliable.
+The change improves test assertion clarity by updating the error message to better reflect the actual behavior of the push operation when `force_when_behind` is false.
 
 ## Completed
-- [x] Replaced hardcoded "git" commands with explicit path resolution
-- [x] Added proper bare repository creation for mirror testing
-- [x] Standardized Git command execution with consistent output handling
-- [x] Improved test setup by adding explicit remote configuration
+- [x] Updated test assertion message to clarify that the push should return an error (not auto-forced) when `force_when_behind` is false
 
 ## In Progress
-- [ ] None (changes are complete)
+- [ ] None
 
 ## Blockers
-- None (test refactoring is complete)
+- None
 
 ## Next Steps
-1. Verify all Git operations in tests work with the new setup
-2. Ensure test coverage remains equivalent to previous implementation
+1. Verify the updated message properly reflects the actual behavior in all test scenarios
+2. Ensure the change doesn't affect any other test cases or functionality
