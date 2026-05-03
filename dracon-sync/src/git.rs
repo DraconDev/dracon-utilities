@@ -2255,7 +2255,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_push_to_named_remote_fails_on_invalid_remote() {
+    async fn test_push_to_named_remote_truly_unreachable_blocks_auto_force() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("test-repo");
         std::process::Command::new("git")
@@ -3235,7 +3235,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_push_to_named_remote_no_auto_force_when_divergent() {
+    async fn test_push_to_named_remote_truly_divergent_blocks_auto_force() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("test-repo");
         std::process::Command::new("git")
