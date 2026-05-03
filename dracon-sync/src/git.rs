@@ -13,8 +13,10 @@ use tokio::time::sleep;
 use crate::exclude::is_excluded_change_path;
 use crate::policy::{std_git_command, tokio_git_command, timestamp_secs, AuthType, RemoteConfig};
 
+#[allow(dead_code)]
 pub(crate) static PATH_LOCK: parking_lot::Mutex<()> = parking_lot::Mutex::new(());
 
+#[allow(dead_code)]
 fn real_git_path() -> PathBuf {
     static REAL_GIT: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
     REAL_GIT.get_or_init(|| {
@@ -1428,6 +1430,7 @@ pub(crate) fn auto_create_all_remotes(remotes: &[RemoteConfig], repo_name: &str)
     }
 }
 
+#[allow(dead_code)]
 pub(crate) fn acquire_path_lock() -> parking_lot::MutexGuard<'static, ()> {
     loop {
         if let Some(guard) = PATH_LOCK.try_lock() {
