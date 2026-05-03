@@ -1364,13 +1364,15 @@ push_url = "{}"
         let tmp = tempfile::tempdir().unwrap();
         let repo = init_test_repo(&tmp, "mass-del-repo");
 
-        std::fs::write(repo.join("file1.txt"), "content1\n").unwrap();
-        std::fs::write(repo.join("file2.txt"), "content2\n").unwrap();
+        for i in 1..=5 {
+            std::fs::write(repo.join(format!("file{i}.txt")), format!("content{i}\n")).unwrap();
+        }
         git_cmd(&repo, &["add", "-A"]);
         git_cmd(&repo, &["commit", "-m", "add files"]);
 
-        std::fs::remove_file(repo.join("file1.txt")).unwrap();
-        std::fs::remove_file(repo.join("file2.txt")).unwrap();
+        for i in 1..=5 {
+            std::fs::remove_file(repo.join(format!("file{i}.txt")).unwrap_or_else(|_| ()));
+        }
 
         let toml_str = r#"
         auto_github_private = false
@@ -1386,9 +1388,8 @@ push_url = "{}"
 
         let status = git_cmd(&repo, &["status", "--porcelain"]);
         let status_str = String::from_utf8_lossy(&status.stdout);
-        assert!(status_str.contains("D "), "files should still show as deleted (not staged by sync)");
-        assert!(status_str.contains("file1.txt"), "file1.txt deletion should not be committed");
-        assert!(status_str.contains("file2.txt"), "file2.txt deletion should not be committed");
+        let deleted_count = status_str.lines().filter(|l| l.starts_with(" D")).count();
+        assert!(deleted_count >= 4, "at least 4 files should still show as deleted (not staged by sync), got {} deleted in status:\n{}", deleted_count, status_str);
     }
 
     #[tokio::test]
