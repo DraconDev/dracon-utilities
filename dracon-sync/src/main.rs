@@ -19,7 +19,7 @@ use policy::freeze_reason;
 use exclude::excluded_dir_names_set;
 use report::{ConcernRepairFilter, RepoFilter, push_large_blob_threshold_bytes, run_repair_concerns, run_repair_warns, run_repos_report};
 use daemon::{run_once, run_daemon, unstuck_repo, list_stuck_repos};
-use git::{has_both_main_and_master, consolidate_to_master};
+use git::{has_both_main_and_master, consolidate_to_main};
 use sync::sync_repo;
 
 #[derive(Parser, Debug)]
@@ -520,7 +520,7 @@ async fn main() -> Result<()> {
                 if found == 0 {
                     println!("✅ no repos with both main and master");
                 } else {
-                    println!("\n🔧 Run 'dracon-sync dual-branch repair <path>' to consolidate to master");
+                    println!("\n🔧 Run 'dracon-sync dual-branch repair <path>' to consolidate to main");
                 }
             }
             DualBranchCommands::Repair { repo } => {
@@ -528,9 +528,9 @@ async fn main() -> Result<()> {
                     println!("ℹ️ {} does not have both main and master", repo.display());
                     return Ok(());
                 }
-                println!("🔧 Consolidating {} to master...", repo.display());
-                match consolidate_to_master(&repo).await {
-                    Ok(()) => println!("✅ consolidated to master"),
+                println!("🔧 Consolidating {} to main...", repo.display());
+                match consolidate_to_main(&repo).await {
+                    Ok(()) => println!("✅ consolidated to main"),
                     Err(e) => {
                         eprintln!("❌ failed: {}", e);
                         return Err(e);
