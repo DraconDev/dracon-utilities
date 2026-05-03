@@ -3258,7 +3258,7 @@ mod tests {
             .expect("git reset");
 
         let _lock = acquire_path_lock();
-        let result = push_to_named_remote(&repo, "mirror", 5, 0, false).await;
+        let result = super::super::push_to_named_remote(&repo, "mirror", 5, 0, false).await;
         assert!(result.is_err(), "push with force_when_behind=false should fail with rejected error");
     }
 }
