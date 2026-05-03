@@ -3282,11 +3282,6 @@ mod tests {
 
         let _lock = acquire_path_lock();
         let result = push_to_named_remote(&repo, "mirror", 5, 0, false).await;
-        let err_str = if result.is_ok() {
-            "push succeeded unexpectedly".to_string()
-        } else {
-            format!("{}", result.as_ref().err().unwrap())
-        };
-        assert!(result.is_err(), "{}", err_str);
+        assert!(result.is_err(), "push to invalid remote should fail");
     }
 }
