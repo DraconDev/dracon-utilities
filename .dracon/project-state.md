@@ -1,21 +1,21 @@
 # Project State
 
 ## Current Focus
-Removed test case for mass deletion safety abort in Git repository synchronization
+Added explicit path lock drops in Git test cases to ensure proper resource cleanup
 
 ## Context
-The test case was removed as part of refactoring file deletion handling in the Git synchronization logic. This change was motivated by the need to simplify test coverage while maintaining the core functionality of handling file deletions.
+The changes address potential resource leaks in Git test cases by explicitly dropping path locks after test operations. This prevents test isolation issues where locks might persist between test runs.
 
 ## Completed
-- [x] Removed redundant test case for mass deletion safety abort
-- [x] Cleaned up associated test infrastructure
+- [x] Added `drop(_lock)` calls in all Git test cases to ensure proper path lock cleanup
+- [x] Maintained existing test functionality while adding resource management
 
 ## In Progress
-- [ ] None
+- [x] No active work in progress beyond the current changes
 
 ## Blockers
-- None
+- None identified
 
 ## Next Steps
-1. Verify that core file deletion handling remains robust without the removed test
-2. Ensure other test cases cover the same functionality adequately
+1. Verify test isolation improvements in CI
+2. Consider adding similar cleanup patterns to other test modules if needed
