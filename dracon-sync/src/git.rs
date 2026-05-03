@@ -2973,4 +2973,292 @@ mod tests {
         let content = std::fs::read_to_string(repo.join("file.txt")).expect("read file");
         assert_eq!(content, "original content", "file should be restored to original content");
     }
+
+    #[tokio::test]
+    async fn test_diagnose_divergence_remote_purely_behind() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path().join("test-repo");
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .expect("git init");
+        std::fs::write(repo.join("file.txt"), "content").expect("write");
+        std::process::Command::new("git")
+            .args(["add", "."])
+            .current_dir(&repo)
+            .status()
+            .expect("git add");
+        std::process::Command::new("git")
+            .args(["commit", "-m", "init"])
+            .current_dir(&repo)
+            .status()
+            .expect("git commit");
+
+        std::process::Command::new("git")
+            .args(["remote", "add", "mirror", "git@mirror.example.com:repo.git"])
+            .current_dir(&repo)
+            .status()
+            .expect("git remote add");
+        std::process::Command::new("git")
+            .args(["fetch", "mirror", "master"])
+            .current_dir(&repo)
+            .output()
+            .expect("git fetch");
+
+        let result = diagnose_divergence(&repo, "mirror", "master").await;
+        assert!(result.is_ok(), "diagnose_divergence should succeed");
+        assert_eq!(result.unwrap(), Divergence::RemotePurelyBehind, "remote with no extra commits should be purely behind");
+    }
+
+    #[tokio::test]
+    async fn test_diagnose_divergence_divergent() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path().join("test-repo");
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .expect("git init");
+        std::fs::write(repo.join("file.txt"), "content").expect("write");
+        std::process::Command::new("git")
+            .args(["add", "."])
+            .current_dir(&repo)
+            .status()
+            .expect("git add");
+        std::process::Command::new("git")
+            .args(["commit", "-m", "init"])
+            .current_dir(&repo)
+            .status()
+            .expect("git commit");
+
+        std::process::Command::new("git")
+            .args(["remote", "add", "mirror", "git@mirror.example.com:repo.git"])
+            .current_dir(&repo)
+            .status()
+            .expect("git remote add");
+
+        let (local_commit, remote_commit) = {
+            let local = std::process::Command::new("git")
+                .args(["rev-parse", "HEAD"])
+                .current_dir(&repo)
+                .output()
+                .expect("git rev-parse")
+                .stdout;
+            let local = String::from_utf8_lossy(&local).trim().to_string();
+
+            std::process::Command::new("git")
+                .args(["commit", "--allow-empty", "-m", "other commit"])
+                .current_dir(&repo)
+                .status()
+                .expect("git commit --allow-empty");
+            let remote = std::process::Command::new("git")
+                .args(["rev-parse", "HEAD"])
+                .current_dir(&repo)
+                .output()
+                .expect("git rev-parse")
+                .stdout;
+            let remote = String::from_utf8_lossy(&remote).trim().to_string();
+            (local, remote)
+        };
+
+        std::process::Command::new("git")
+            .args(["update-ref", &format!("refs/remotes/mirror/master"), &remote_commit])
+            .current_dir(&repo)
+            .status()
+            .expect("git update-ref");
+
+        std::process::Command::new("git")
+            .args(["reset", "--hard", &local_commit])
+            .current_dir(&repo)
+            .status()
+            .expect("git reset");
+
+        let result = diagnose_divergence(&repo, "mirror", "master").await;
+        assert!(result.is_ok(), "diagnose_divergence should succeed");
+        assert_eq!(result.unwrap(), Divergence::Divergent, "remote with commits local lacks should be divergent");
+    }
+
+    #[tokio::test]
+    async fn test_push_to_named_remote_auto_force_when_behind() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path().join("test-repo");
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .expect("git init");
+        std::fs::write(repo.join("file.txt"), "content").expect("write");
+        std::process::Command::new("git")
+            .args(["add", "."])
+            .current_dir(&repo)
+            .status()
+            .expect("git add");
+        std::process::Command::new("git")
+            .args(["commit", "-m", "init"])
+            .current_dir(&repo)
+            .status()
+            .expect("git commit");
+
+        std::process::Command::new("git")
+            .args(["remote", "add", "mirror", "git@mirror.example.com:repo.git"])
+            .current_dir(&repo)
+            .status()
+            .expect("git remote add");
+
+        std::process::Command::new("git")
+            .args(["commit", "--allow-empty", "-m", "other commit"])
+            .current_dir(&repo)
+            .status()
+            .expect("git commit");
+
+        let remote_commit = {
+            let output = std::process::Command::new("git")
+                .args(["rev-parse", "HEAD"])
+                .current_dir(&repo)
+                .output()
+                .expect("git rev-parse");
+            String::from_utf8_lossy(&output.stdout).trim().to_string()
+        };
+
+        std::process::Command::new("git")
+            .args(["update-ref", &format!("refs/remotes/mirror/master"), &remote_commit])
+            .current_dir(&repo)
+            .status()
+            .expect("git update-ref");
+
+        std::process::Command::new("git")
+            .args(["reset", "--hard", "HEAD^"])
+            .current_dir(&repo)
+            .status()
+            .expect("git reset");
+
+        let _lock = acquire_path_lock();
+        let result = push_to_named_remote(&repo, "mirror", 5, 0, true).await;
+        assert!(result.is_ok(), "push with force_when_behind=true should succeed when remote is purely behind: {:?}", result);
+    }
+
+    #[tokio::test]
+    async fn test_push_to_named_remote_no_auto_force_when_divergent() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path().join("test-repo");
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .expect("git init");
+        std::fs::write(repo.join("file.txt"), "content").expect("write");
+        std::process::Command::new("git")
+            .args(["add", "."])
+            .current_dir(&repo)
+            .status()
+            .expect("git add");
+        std::process::Command::new("git")
+            .args(["commit", "-m", "init"])
+            .current_dir(&repo)
+            .status()
+            .expect("git commit");
+
+        std::process::Command::new("git")
+            .args(["remote", "add", "mirror", "git@mirror.example.com:repo.git"])
+            .current_dir(&repo)
+            .status()
+            .expect("git remote add");
+
+        let (local_commit, remote_commit) = {
+            let local = std::process::Command::new("git")
+                .args(["rev-parse", "HEAD"])
+                .current_dir(&repo)
+                .output()
+                .expect("git rev-parse");
+            let local = String::from_utf8_lossy(&local.stdout).trim().to_string();
+            std::process::Command::new("git")
+                .args(["commit", "--allow-empty", "-m", "other commit"])
+                .current_dir(&repo)
+                .status()
+                .expect("git commit");
+            let output = std::process::Command::new("git")
+                .args(["rev-parse", "HEAD"])
+                .current_dir(&repo)
+                .output()
+                .expect("git rev-parse");
+            let remote = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            (local, remote)
+        };
+
+        std::process::Command::new("git")
+            .args(["update-ref", &format!("refs/remotes/mirror/master"), &remote_commit])
+            .current_dir(&repo)
+            .status()
+            .expect("git update-ref");
+
+        std::process::Command::new("git")
+            .args(["reset", "--hard", &local_commit])
+            .current_dir(&repo)
+            .status()
+            .expect("git reset");
+
+        let _lock = acquire_path_lock();
+        let result = push_to_named_remote(&repo, "mirror", 5, 0, true).await;
+        assert!(result.is_err(), "push with force_when_behind=true should fail when remote is divergent: {:?}", result);
+    }
+
+    #[tokio::test]
+    async fn test_push_to_named_remote_no_auto_force_when_disabled() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path().join("test-repo");
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .expect("git init");
+        std::fs::write(repo.join("file.txt"), "content").expect("write");
+        std::process::Command::new("git")
+            .args(["add", "."])
+            .current_dir(&repo)
+            .status()
+            .expect("git add");
+        std::process::Command::new("git")
+            .args(["commit", "-m", "init"])
+            .current_dir(&repo)
+            .status()
+            .expect("git commit");
+
+        std::process::Command::new("git")
+            .args(["remote", "add", "mirror", "git@mirror.example.com:repo.git"])
+            .current_dir(&repo)
+            .status()
+            .expect("git remote add");
+
+        std::process::Command::new("git")
+            .args(["commit", "--allow-empty", "-m", "other commit"])
+            .current_dir(&repo)
+            .status()
+            .expect("git commit");
+
+        let remote_commit = {
+            let output = std::process::Command::new("git")
+                .args(["rev-parse", "HEAD"])
+                .current_dir(&repo)
+                .output()
+                .expect("git rev-parse");
+            String::from_utf8_lossy(&output.stdout).trim().to_string()
+        };
+
+        std::process::Command::new("git")
+            .args(["update-ref", &format!("refs/remotes/mirror/master"), &remote_commit])
+            .current_dir(&repo)
+            .status()
+            .expect("git update-ref");
+
+        std::process::Command::new("git")
+            .args(["reset", "--hard", "HEAD^"])
+            .current_dir(&repo)
+            .status()
+            .expect("git reset");
+
+        let _lock = acquire_path_lock();
+        let result = push_to_named_remote(&repo, "mirror", 5, 0, false).await;
+        assert!(result.is_err(), "push with force_when_behind=false should fail with rejected error");
+    }
 }
