@@ -24,13 +24,23 @@ pub(crate) struct RemoteConfig {
     pub(crate) api_endpoint: Option<String>,
     #[serde(default)]
     pub(crate) auto_create_token_var: Option<String>,
+    /// Optional per-remote name mapping for repos that need sanitization.
+    /// Key = local repo basename, Value = remote project name.
+    /// Example: { ".dracon" = "dracon-home" } maps .dracon → dracon-home on this remote.
+    #[serde(default)]
+    pub(crate) repo_name_map: std::collections::HashMap<String, String>,
 }
 
 #[allow(dead_code)]
 impl RemoteConfig {
     pub(crate) fn resolve_push_url(&self, repo_name: &str) -> String {
-        let url = self.push_url.replace("{repo}", repo_name);
+        let resolved_name = self.repo_name_map.get(repo_name).map(|s| s.as_str()).unwrap_or(repo_name);
+        let url = self.push_url.replace("{repo}", resolved_name);
         url.replace("{account}", &self.auto_create_account)
+    }
+
+    pub(crate) fn resolve_repo_name(&self, repo_name: &str) -> String {
+        self.repo_name_map.get(repo_name).cloned().unwrap_or_else(|| repo_name.to_string())
     }
 }
 
@@ -77,6 +87,7 @@ where
                     priority: 50,
                     api_endpoint: None,
                     auto_create_token_var: None,
+                    repo_name_map: Default::default(),
                 },
                 RemoteConfig {
                     name: "gitlab".to_string(),
@@ -87,6 +98,7 @@ where
                     priority: 50,
                     api_endpoint: None,
                     auto_create_token_var: None,
+                    repo_name_map: Default::default(),
                 },
                 RemoteConfig {
                     name: "codeberg".to_string(),
@@ -97,6 +109,7 @@ where
                     priority: 50,
                     api_endpoint: Some("https://codeberg.org/api/v1/repos".to_string()),
                     auto_create_token_var: None,
+                    repo_name_map: Default::default(),
                 },
             ];
 
