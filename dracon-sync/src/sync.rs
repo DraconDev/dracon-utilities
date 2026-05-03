@@ -1330,11 +1330,13 @@ push_url = "{}"
     }
 
     fn git_cmd(repo: &Path, args: &[&str]) -> std::process::Output {
-        std::process::Command::new("git")
-            .args(args)
-            .arg("-C").arg(&repo.to_string_lossy())
-            .output()
-            .unwrap()
+        let repo_str = repo.to_string_lossy().to_string();
+        let mut cmd = std::process::Command::new("git");
+        cmd.arg("-C").arg(&repo_str);
+        for a in args {
+            cmd.arg(a);
+        }
+        cmd.output().unwrap()
     }
 
     #[tokio::test]
