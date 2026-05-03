@@ -20,13 +20,18 @@ pub(crate) static PATH_LOCK: parking_lot::Mutex<()> = parking_lot::Mutex::new(()
 fn real_git_path() -> PathBuf {
     static REAL_GIT: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
     REAL_GIT.get_or_init(|| {
-        std::process::Command::new("which")
+        if let Ok(which) = std::process::Command::new("which")
             .arg("git")
             .output()
-            .ok()
-            .and_then(|o| String::from_utf8(o.stdout).ok())
-            .map(|s| PathBuf::from(s.trim()))
-            .unwrap_or_else(|| PathBuf::from("git"))
+        {
+            if which.status.success() {
+                let path = String::from_utf8_lossy(&which.stdout).trim().to_string();
+                if !path.is_empty() {
+                    return PathBuf::from(path);
+                }
+            }
+        }
+        PathBuf::from("git")
     }).clone()
 }
 
