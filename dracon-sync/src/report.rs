@@ -1706,11 +1706,21 @@ pub(crate) fn create_github_private_remote(repo: &Path, account: &str) -> Option
             );
         }
 
-        // Get current branch name for setting upstream
-        let current_branch = crate::git::current_branch(repo)
-            .unwrap_or_else(|| "master".to_string());
+        let mut current_branch = crate::git::current_branch(repo)
+            .unwrap_or_else(|| "main".to_string());
 
-        // Push to set upstream and populate the remote
+        if current_branch == "master" {
+            if let Err(e) = std::process::Command::new("git")
+                .args(["branch", "-m", "master", "main"])
+                .current_dir(repo)
+                .output()
+            {
+                eprintln!("⚠️ failed to rename master to main in {}: {}", repo.display(), e);
+            } else {
+                current_branch = "main".to_string();
+            }
+        }
+
         let push_result = std::process::Command::new("git")
             .args(["push", "-u", "origin", &format!("HEAD:refs/heads/{}", current_branch)])
             .current_dir(repo)
@@ -1731,10 +1741,9 @@ pub(crate) fn create_github_private_remote(repo: &Path, account: &str) -> Option
             );
         }
 
-        // Verify upstream was set; if not, try to set it explicitly
         if !crate::git::has_tracking_upstream(repo) {
             let _ = std::process::Command::new("git")
-                .args(["branch", "--set-upstream-to=origin/master", &current_branch])
+                .args(["branch", "--set-upstream-to=origin/main", &current_branch])
                 .current_dir(repo)
                 .output();
         }
@@ -1767,20 +1776,29 @@ pub(crate) fn create_github_private_remote(repo: &Path, account: &str) -> Option
         }
     }
 
-    // Get current branch name for setting upstream
-    let current_branch = crate::git::current_branch(repo)
-        .unwrap_or_else(|| "master".to_string());
+    let mut current_branch = crate::git::current_branch(repo)
+        .unwrap_or_else(|| "main".to_string());
 
-    // Always push to ensure latest commits are on GitHub
+    if current_branch == "master" {
+        if let Err(e) = std::process::Command::new("git")
+            .args(["branch", "-m", "master", "main"])
+            .current_dir(repo)
+            .output()
+        {
+            eprintln!("⚠️ failed to rename master to main in {}: {}", repo.display(), e);
+        } else {
+            current_branch = "main".to_string();
+        }
+    }
+
     let _ = std::process::Command::new("git")
         .args(["push", "-u", "origin", &format!("HEAD:refs/heads/{}", current_branch)])
         .current_dir(repo)
         .output();
 
-    // Verify upstream was set; if not, try to set it explicitly
     if !crate::git::has_tracking_upstream(repo) {
         let _ = std::process::Command::new("git")
-            .args(["branch", "--set-upstream-to=origin/master", &current_branch])
+            .args(["branch", "--set-upstream-to=origin/main", &current_branch])
             .current_dir(repo)
             .output();
     }
