@@ -1,23 +1,21 @@
 # Project State
 
 ## Current Focus
-Added support for automatic force-push when remote is behind local
+Added `force_push_when_behind` flag to remote configurations to enable automatic force-push when remote is behind local
 
 ## Context
-This change enables the daemon to automatically resolve non-fast-forward push failures when the remote repository is purely behind the local repository (0 commits ahead). This prevents unnecessary manual intervention for common synchronization scenarios.
+This change supports the recent feature for automatic force-push when the remote repository is behind the local repository. The flag is added to all default remote configurations to maintain consistency.
 
 ## Completed
-- [x] Added `force_push_when_behind` boolean field to `RemoteConfig`
-- [x] Implemented automatic force-push with `--force-with-lease` when remote is behind
-- [x] Added divergent repository detection (marks CONCERN when remote has commits local lacks)
+- [x] Added `force_push_when_behind: false` to all default remote configurations
+- [x] Maintained backward compatibility with existing configuration structure
 
 ## In Progress
-- [ ] Implementation of actual push logic using this configuration
+- [ ] Testing the new behavior with various remote scenarios
 
 ## Blockers
-- Need to implement the actual push logic that will use this configuration
+- Need to verify the new behavior doesn't introduce unintended side effects
 
 ## Next Steps
-1. Implement the push logic that will use `force_push_when_behind`
-2. Add integration tests for the new behavior
-3. Document the new configuration option in the remote configuration schema
+1. Write integration tests for the new force-push behavior
+2. Document the new configuration option in the project documentation
