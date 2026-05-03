@@ -2096,6 +2096,7 @@ mod tests {
             priority: 1,
             api_endpoint: None,
             auto_create_token_var: None,
+            repo_name_map: Default::default(),
         }];
 
         let results = crate::git::multi_remote::auto_create_all_remotes(&remotes, "test-repo");
@@ -2235,6 +2236,7 @@ mod tests {
                 priority: 10,
                 api_endpoint: None,
                 auto_create_token_var: None,
+                repo_name_map: Default::default(),
             },
             RemoteConfig {
                 name: "mirror2".to_string(),
@@ -2245,6 +2247,7 @@ mod tests {
                 priority: 20,
                 api_endpoint: None,
                 auto_create_token_var: None,
+                repo_name_map: Default::default(),
             },
         ];
 
