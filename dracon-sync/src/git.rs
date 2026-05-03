@@ -2433,7 +2433,8 @@ mod tests {
         std::fs::write(&counter, "0").expect("write counter");
 
         let fail_script = tmp.path().join("git");
-        std::fs::write(&fail_script, &format!(
+        let counter_path = counter.display().to_string();
+        std::fs::write(&fail_script, format!(
             "#!/bin/sh\n\
             count=$(cat {counter})\n\
             if [ \"$count\" -lt 1 ]; then\n\
@@ -2441,8 +2442,9 @@ mod tests {
                 echo $((count+1)) > {counter}\n\
                 exit 1\n\
             fi\n\
-            exec git \"$@\"\n",
-            counter = counter.display()
+            exec git \"$@\"\n\
+            ",
+            counter = counter_path
         )).expect("write fail script");
         std::fs::set_permissions(&fail_script, std::fs::Permissions::from_mode(0o755)).expect("chmod");
 
@@ -2566,14 +2568,16 @@ mod tests {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let real_git = real_git_path();
         let fail_git = tmp.path().join("git");
-        std::fs::write(&fail_git, &format!(
+        let real_git_path_str = real_git.display().to_string();
+        std::fs::write(&fail_git, format!(
             "#!/bin/sh\n\
             if echo \"$@\" | grep -q 'GIT_SSH_COMMAND'; then\n\
                 echo 'SSH failure' >&2\n\
                 exit 128\n\
             fi\n\
-            exec {real_git} \"$@\"\n\
-        ", real_git = real_git.display())).expect("write fail git");
+            exec {real_git_path_str} \"$@\"\n\
+            "
+        )).expect("write fail git");
         std::fs::set_permissions(&fail_git, std::fs::Permissions::from_mode(0o755)).expect("chmod");
 
         let _lock = acquire_path_lock();
@@ -2699,14 +2703,16 @@ mod tests {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let real_git = real_git_path();
         let fail_git = tmp.path().join("git");
-        std::fs::write(&fail_git, &format!(
+        let real_git_path_str = real_git.display().to_string();
+        std::fs::write(&fail_git, format!(
             "#!/bin/sh\n\
             if echo \"$@\" | grep -q 'GIT_SSH_COMMAND'; then\n\
                 echo 'SSH failure' >&2\n\
                 exit 128\n\
             fi\n\
-            exec {real_git} \"$@\"\n\
-        ", real_git = real_git.display())).expect("write fail git");
+            exec {real_git_path_str} \"$@\"\n\
+            "
+        )).expect("write fail git");
         std::fs::set_permissions(&fail_git, std::fs::Permissions::from_mode(0o755)).expect("chmod");
 
         let _lock = acquire_path_lock();
