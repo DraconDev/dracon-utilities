@@ -415,7 +415,7 @@ pub(crate) async fn push_with_transport_fallbacks(
         Err(e) => {
             let origin = origin_url(repo).unwrap_or_default();
             if let Some(https) = github_https_url(&origin) {
-                let branch = current_branch(repo).unwrap_or_else(|| "master".to_string());
+                let branch = current_branch(repo).unwrap_or_else(|| "main".to_string());
                 if !is_safe_branch_name(&branch) {
                     eprintln!("⚠️ branch name '{}' is unsafe, skipping https fallback", branch);
                     return Err(e);
@@ -729,6 +729,7 @@ pub(crate) fn current_branch(repo: &Path) -> Option<String> {
         .filter(|s| !s.is_empty())
 }
 
+#[allow(dead_code)]
 pub(crate) fn has_only_main_branch(repo: &Path) -> bool {
     let has_main = std_git_command()
         .args(["rev-parse", "--verify", "refs/heads/main"])
@@ -1293,7 +1294,7 @@ pub(crate) async fn push_to_named_remote(
     retries: u32,
     force_when_behind: bool,
 ) -> Result<()> {
-    let branch = current_branch(repo).unwrap_or_else(|| "master".to_string());
+    let branch = current_branch(repo).unwrap_or_else(|| "main".to_string());
     let refspec = format!("HEAD:refs/heads/{}", branch);
     let ssh_hardening = "ssh -o ConnectTimeout=10 -o ConnectionAttempts=1 -o ServerAliveInterval=5 -o ServerAliveCountMax=2";
 
