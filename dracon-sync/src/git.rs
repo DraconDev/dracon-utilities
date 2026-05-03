@@ -1357,7 +1357,7 @@ pub(crate) async fn diagnose_divergence(repo: &Path, remote_name: &str, branch: 
         return Ok(Divergence::Divergent);
     }
 
-    let local_ahead: u32 = counts[0].parse().unwrap_or(0);
+    let _local_ahead: u32 = counts[0].parse().unwrap_or(0);
     let remote_ahead: u32 = counts[1].parse().unwrap_or(0);
 
     if remote_ahead == 0 {
