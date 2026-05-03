@@ -2268,7 +2268,7 @@ mod tests {
             .status()
             .expect("git remote add");
 
-        let result = crate::git::multi_remote::push_to_named_remote(&repo, "origin", 1, 0).await;
+        let result = crate::git::multi_remote::push_to_named_remote(&repo, "origin", 1, 0, false).await;
         assert!(result.is_err(), "push to invalid remote should fail");
     }
 
@@ -2778,7 +2778,7 @@ mod tests {
             .output()
             .expect("git commit");
 
-        let result = multi_remote::push_to_named_remote(&repo, "mirror", 5, 0).await;
+        let result = multi_remote::push_to_named_remote(&repo, "mirror", 5, 0, false).await;
         assert!(result.is_ok(), "SSH push to named remote should succeed: {:?}", result);
     }
 
@@ -2832,7 +2832,7 @@ mod tests {
             .expect("git commit");
 
         drop(_lock);
-        let result = multi_remote::push_to_named_remote(&repo, "mirror", 5, 0).await;
+        let result = multi_remote::push_to_named_remote(&repo, "mirror", 5, 0, false).await;
         assert!(result.is_ok(), "HTTPS fallback should succeed after SSH failure: {:?}", result);
     }
 
@@ -2883,7 +2883,7 @@ mod tests {
             .expect("git commit");
 
         drop(_lock);
-        let result = multi_remote::push_to_named_remote(&repo, "mirror", 1, 0).await;
+        let result = multi_remote::push_to_named_remote(&repo, "mirror", 1, 0, false).await;
         assert!(result.is_err(), "unsafe branch '/' should skip HTTPS fallback and fail");
         let err = format!("{}", result.unwrap_err());
         assert!(err.contains("unsafe"), "error should mention unsafe branch: {}", err);
