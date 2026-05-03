@@ -3006,7 +3006,7 @@ mod tests {
             .output()
             .expect("git fetch");
 
-        let result = diagnose_divergence(&repo, "mirror", "master").await;
+        let result = crate::git::multi_remote::diagnose_divergence(&repo, "mirror", "master").await;
         assert!(result.is_ok(), "diagnose_divergence should succeed");
         assert_eq!(result.unwrap(), Divergence::RemotePurelyBehind, "remote with no extra commits should be purely behind");
     }
@@ -3074,7 +3074,7 @@ mod tests {
             .status()
             .expect("git reset");
 
-        let result = diagnose_divergence(&repo, "mirror", "master").await;
+        let result = crate::git::multi_remote::diagnose_divergence(&repo, "mirror", "master").await;
         assert!(result.is_ok(), "diagnose_divergence should succeed");
         assert_eq!(result.unwrap(), Divergence::Divergent, "remote with commits local lacks should be divergent");
     }
