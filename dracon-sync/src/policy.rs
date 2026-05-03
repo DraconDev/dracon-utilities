@@ -153,7 +153,10 @@ pub(crate) fn git_binary() -> &'static Path {
                 if which.status.success() {
                     let path = String::from_utf8_lossy(&which.stdout).trim().to_string();
                     if !path.is_empty() {
-                        return PathBuf::from(path);
+                        let p = PathBuf::from(&path);
+                        if p.exists() {
+                            return p;
+                        }
                     }
                 }
             }
