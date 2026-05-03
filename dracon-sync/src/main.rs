@@ -544,6 +544,31 @@ async fn main() -> Result<()> {
                 }
             }
         },
+        Command::RepairOrigins { apply } => {
+            let policy = SyncPolicy::load(&policy_path)?;
+            let roots = policy.watch_root_paths();
+            let excluded_dir_names = excluded_dir_names_set(&policy);
+            let repos = git::discover_git_repos(&roots, &excluded_dir_names, &policy.exclude_repos, Some(&policy.system_repo));
+            let mut found = 0;
+            for repo in repos {
+                if let Some((current, canonical)) = git::detect_orphan_origin(&repo) {
+                    println!("   {}: {} -> {}", repo.display(), current, canonical);
+                    found += 1;
+                    if apply {
+                        if let Err(e) = git::fix_orphan_origin(&repo, &canonical) {
+                            eprintln!("❌ failed to fix origin for {}: {}", repo.display(), e);
+                        } else {
+                            println!("✅ fixed origin for {}", repo.display());
+                        }
+                    }
+                }
+            }
+            if found == 0 {
+                println!("✅ no orphan origins found");
+            } else if !apply {
+                println!("\n🔧 Run 'dracon-sync repair-origins --apply' to fix them");
+            }
+        }
     }
 
     Ok(())
