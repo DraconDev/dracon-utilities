@@ -2477,6 +2477,7 @@ mod tests {
             .output()
             .expect("git commit");
 
+        drop(_lock);
         let result = crate::git::push_with_retries(&repo, 5, 3, "test-push-retry").await;
         assert!(result.is_ok(), "push should eventually succeed after retry: {:?}", result);
     }
@@ -2521,6 +2522,7 @@ mod tests {
             .output()
             .expect("git commit");
 
+        drop(_lock);
         let result = crate::git::push_with_retries(&repo, 1, 2, "test-push-fail").await;
         assert!(result.is_err(), "push should fail after exhausting retries");
     }
@@ -2606,6 +2608,7 @@ mod tests {
             .output()
             .expect("git commit");
 
+        drop(_lock);
         let result = crate::git::push_with_transport_fallbacks(&repo, 5, "test-push-fb").await;
         assert!(result.is_ok(), "HTTPS fallback should succeed after SSH failure: {:?}", result);
     }
@@ -2737,6 +2740,7 @@ mod tests {
             .output()
             .expect("git commit");
 
+        drop(_lock);
         let result = multi_remote::push_to_named_remote(&repo, "mirror", 5, 0).await;
         assert!(result.is_ok(), "HTTPS fallback should succeed after SSH failure: {:?}", result);
     }
@@ -2787,6 +2791,7 @@ mod tests {
             .output()
             .expect("git commit");
 
+        drop(_lock);
         let result = multi_remote::push_to_named_remote(&repo, "mirror", 1, 0).await;
         assert!(result.is_err(), "unsafe branch '/' should skip HTTPS fallback and fail");
         let err = format!("{}", result.unwrap_err());
