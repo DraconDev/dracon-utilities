@@ -3134,7 +3134,7 @@ mod tests {
             .expect("git reset");
 
         let _lock = acquire_path_lock();
-        let result = push_to_named_remote(&repo, "mirror", 5, 0, true).await;
+        let result = super::push_to_named_remote(&repo, "mirror", 5, 0, true).await;
         assert!(result.is_ok(), "push with force_when_behind=true should succeed when remote is purely behind: {:?}", result);
     }
 
@@ -3199,7 +3199,7 @@ mod tests {
             .expect("git reset");
 
         let _lock = acquire_path_lock();
-        let result = push_to_named_remote(&repo, "mirror", 5, 0, true).await;
+        let result = super::push_to_named_remote(&repo, "mirror", 5, 0, true).await;
         assert!(result.is_err(), "push with force_when_behind=true should fail when remote is divergent: {:?}", result);
     }
 
