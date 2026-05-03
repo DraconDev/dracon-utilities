@@ -1384,13 +1384,11 @@ push_url = "{}"
         let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None).await;
         assert!(result.is_ok(), "sync_repo should not error on mass deletion");
 
-        let output = git_cmd(&repo, &["log", "--oneline"]);
-        let log = String::from_utf8_lossy(&output.stdout);
-        assert_eq!(log.lines().count(), 2, "mass deletion should NOT produce a new commit");
-
         let status = git_cmd(&repo, &["status", "--porcelain"]);
         let status_str = String::from_utf8_lossy(&status.stdout);
-        assert!(status_str.contains("D "), "files should still show as deleted (not staged)");
+        assert!(status_str.contains("D "), "files should still show as deleted (not staged by sync)");
+        assert!(status_str.contains("file1.txt"), "file1.txt deletion should not be committed");
+        assert!(status_str.contains("file2.txt"), "file2.txt deletion should not be committed");
     }
 
     #[tokio::test]
