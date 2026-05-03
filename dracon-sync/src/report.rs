@@ -1706,9 +1706,13 @@ pub(crate) fn create_github_private_remote(repo: &Path, account: &str) -> Option
             );
         }
 
+        // Get current branch name for setting upstream
+        let current_branch = crate::git::current_branch(repo)
+            .unwrap_or_else(|| "master".to_string());
+
         // Push to set upstream and populate the remote
         let push_result = std::process::Command::new("git")
-            .args(["push", "-u", "origin", "HEAD"])
+            .args(["push", "-u", "origin", &format!("HEAD:refs/heads/{}", current_branch)])
             .current_dir(repo)
             .output();
 
@@ -1725,6 +1729,14 @@ pub(crate) fn create_github_private_remote(repo: &Path, account: &str) -> Option
                 "⚠️ failed to push initial commit for {}: could not execute",
                 repo.display()
             );
+        }
+
+        // Verify upstream was set; if not, try to set it explicitly
+        if !crate::git::has_tracking_upstream(repo) {
+            let _ = std::process::Command::new("git")
+                .args(["branch", "--set-upstream-to=origin/master", &current_branch])
+                .current_dir(repo)
+                .output();
         }
 
         return Some(remote_url);
@@ -1755,11 +1767,23 @@ pub(crate) fn create_github_private_remote(repo: &Path, account: &str) -> Option
         }
     }
 
+    // Get current branch name for setting upstream
+    let current_branch = crate::git::current_branch(repo)
+        .unwrap_or_else(|| "master".to_string());
+
     // Always push to ensure latest commits are on GitHub
     let _ = std::process::Command::new("git")
-        .args(["push", "-u", "origin", "HEAD"])
+        .args(["push", "-u", "origin", &format!("HEAD:refs/heads/{}", current_branch)])
         .current_dir(repo)
         .output();
+
+    // Verify upstream was set; if not, try to set it explicitly
+    if !crate::git::has_tracking_upstream(repo) {
+        let _ = std::process::Command::new("git")
+            .args(["branch", "--set-upstream-to=origin/master", &current_branch])
+            .current_dir(repo)
+            .output();
+    }
 
     Some(remote_url)
 }
