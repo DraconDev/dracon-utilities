@@ -1306,4 +1306,264 @@ push_url = "{}"
         assert!(result.is_ok(), "sync_repo should not error: {:?}", result);
         assert!(result.unwrap(), "mirror push success should return true");
     }
+
+    fn init_test_repo(tmp: &tempfile::TempDir, name: &str) -> PathBuf {
+        let repo = tmp.path().join(name);
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", &repo.to_string_lossy(), "config", "user.email", "test@test"])
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", &repo.to_string_lossy(), "commit", "--allow-empty", "-m", "init"])
+            .status()
+            .unwrap();
+        repo
+    }
+
+    fn git_cmd(repo: &Path, args: &[&str]) -> std::process::Output {
+        std::process::Command::new("git")
+            .args(args)
+            .arg("-C").arg(&repo.to_string_lossy())
+            .output()
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_not_git_repo_returns_false() {
+        let tmp = tempfile::tempdir().unwrap();
+        let not_repo = tmp.path().join("not-a-repo");
+        std::fs::create_dir_all(&not_repo).unwrap();
+
+        let toml_str = r#"
+        auto_github_private = false
+        auto_commit = true
+        auto_pull = false
+        auto_push = false
+        auto_bump_versions = false
+        "#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&not_repo, &policy, &BTreeSet::new(), 0, None).await;
+        assert!(result.is_ok(), "sync_repo should not error on non-git dir");
+        assert!(!result.unwrap(), "non-git dir should return false");
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_mass_deletion_safety_abort() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "mass-del-repo");
+
+        std::fs::write(repo.join("file1.txt"), "content1\n").unwrap();
+        std::fs::write(repo.join("file2.txt"), "content2\n").unwrap();
+        git_cmd(&repo, &["add", "-A"]);
+        git_cmd(&repo, &["commit", "-m", "add files"]);
+
+        std::fs::remove_file(repo.join("file1.txt")).unwrap();
+        std::fs::remove_file(repo.join("file2.txt")).unwrap();
+
+        let toml_str = r#"
+        auto_github_private = false
+        auto_commit = true
+        auto_pull = false
+        auto_push = false
+        auto_bump_versions = false
+        "#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None).await;
+        assert!(result.is_ok(), "sync_repo should not error on mass deletion");
+
+        let output = git_cmd(&repo, &["log", "--oneline"]);
+        let log = String::from_utf8_lossy(&output.stdout);
+        assert_eq!(log.lines().count(), 2, "mass deletion should NOT produce a new commit");
+
+        let status = git_cmd(&repo, &["status", "--porcelain"]);
+        let status_str = String::from_utf8_lossy(&status.stdout);
+        assert!(status_str.contains("D "), "files should still show as deleted (not staged)");
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_single_deleted_file_committed() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "single-del-repo");
+
+        std::fs::write(repo.join("keep.txt"), "keep\n").unwrap();
+        std::fs::write(repo.join("remove.txt"), "remove\n").unwrap();
+        git_cmd(&repo, &["add", "-A"]);
+        git_cmd(&repo, &["commit", "-m", "add files"]);
+
+        std::fs::remove_file(repo.join("remove.txt")).unwrap();
+
+        let toml_str = r#"
+        auto_github_private = false
+        auto_commit = true
+        auto_pull = false
+        auto_push = false
+        auto_bump_versions = false
+        "#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None).await;
+        assert!(result.is_ok(), "sync_repo should succeed");
+        assert!(result.unwrap(), "single deletion should be committed");
+
+        let output = git_cmd(&repo, &["ls-files"]);
+        let tracked = String::from_utf8_lossy(&output.stdout);
+        assert!(tracked.contains("keep.txt"), "keep.txt should still be tracked");
+        assert!(!tracked.contains("remove.txt"), "remove.txt should be removed from index");
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_unstages_excluded_dir_paths() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "exclude-dir-repo");
+
+        std::fs::create_dir_all(repo.join("node_modules/pkg")).unwrap();
+        std::fs::write(repo.join("node_modules/pkg/index.js"), "module.exports = {};\n").unwrap();
+        std::fs::write(repo.join("src/main.rs"), "fn main() {}\n").unwrap();
+        git_cmd(&repo, &["add", "-A"]);
+        git_cmd(&repo, &["commit", "-m", "initial"]);
+
+        std::fs::write(repo.join("node_modules/pkg/index.js"), "updated\n").unwrap();
+        std::fs::write(repo.join("src/main.rs"), "fn main() { println!(\"hello\"); }\n").unwrap();
+        git_cmd(&repo, &["add", "-A"]);
+
+        let mut excluded = BTreeSet::new();
+        excluded.insert("node_modules".to_string());
+
+        let toml_str = r#"
+        auto_github_private = false
+        auto_commit = true
+        auto_pull = false
+        auto_push = false
+        auto_bump_versions = false
+        "#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &excluded, 0, None).await;
+        assert!(result.is_ok(), "sync_repo should succeed");
+
+        let output = git_cmd(&repo, &["log", "--oneline", "-1"]);
+        let last_commit = String::from_utf8_lossy(&output.stdout);
+        assert!(!last_commit.is_empty(), "should have committed the non-excluded change");
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_unstages_oversized_file() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "oversized-repo");
+
+        std::fs::write(repo.join("small.txt"), "small content\n").unwrap();
+        git_cmd(&repo, &["add", "-A"]);
+        git_cmd(&repo, &["commit", "-m", "initial"]);
+
+        let big_content = vec![b'X'; 1024];
+        std::fs::write(repo.join("bigfile.bin"), &big_content).unwrap();
+        std::fs::write(repo.join("small2.txt"), "another small\n").unwrap();
+        git_cmd(&repo, &["add", "-A"]);
+
+        let toml_str = r#"
+        auto_github_private = false
+        auto_commit = true
+        auto_pull = false
+        auto_push = false
+        auto_bump_versions = false
+        max_stage_file_bytes = 512
+        "#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None).await;
+        assert!(result.is_ok(), "sync_repo should succeed with oversized file");
+
+        let output = git_cmd(&repo, &["ls-files"]);
+        let tracked = String::from_utf8_lossy(&output.stdout);
+        assert!(tracked.contains("small2.txt"), "small file should be tracked");
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_mixed_tracked_and_untracked() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "mixed-repo");
+
+        std::fs::write(repo.join("existing.txt"), "original\n").unwrap();
+        git_cmd(&repo, &["add", "-A"]);
+        git_cmd(&repo, &["commit", "-m", "initial"]);
+
+        std::fs::write(repo.join("existing.txt"), "modified\n").unwrap();
+        std::fs::write(repo.join("brand_new.txt"), "new file\n").unwrap();
+
+        let toml_str = r#"
+        auto_github_private = false
+        auto_commit = true
+        auto_pull = false
+        auto_push = false
+        auto_bump_versions = false
+        "#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None).await;
+        assert!(result.is_ok(), "sync_repo should succeed");
+        assert!(result.unwrap(), "mixed changes should be committed");
+
+        let output = git_cmd(&repo, &["ls-files"]);
+        let tracked = String::from_utf8_lossy(&output.stdout);
+        assert!(tracked.contains("existing.txt"), "existing.txt should be tracked");
+        assert!(tracked.contains("brand_new.txt"), "brand_new.txt should be tracked");
+
+        let show = git_cmd(&repo, &["show", "HEAD:existing.txt"]);
+        assert_eq!(String::from_utf8_lossy(&show.stdout), "modified\n");
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_pull_skip_when_no_origin() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "no-origin-pull-repo");
+
+        let toml_str = r#"
+        auto_github_private = false
+        auto_commit = false
+        auto_pull = true
+        auto_push = false
+        auto_bump_versions = false
+        "#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None).await;
+        assert!(result.is_ok(), "sync_repo should succeed without origin");
+        assert!(!result.unwrap(), "no origin should skip pull and return false");
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_auto_commit_disabled_skips_commit() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "no-autocommit-repo");
+
+        std::fs::write(repo.join("dirty.txt"), "dirty content\n").unwrap();
+
+        let toml_str = r#"
+        auto_github_private = false
+        auto_commit = false
+        auto_pull = false
+        auto_push = false
+        auto_bump_versions = false
+        "#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None).await;
+        assert!(result.is_ok(), "sync_repo should succeed");
+        assert!(!result.unwrap(), "auto_commit=false should not commit dirty files");
+
+        let output = git_cmd(&repo, &["status", "--porcelain"]);
+        let status = String::from_utf8_lossy(&output.stdout);
+        assert!(status.contains("dirty.txt"), "file should still be untracked/unstaged");
+    }
 }
