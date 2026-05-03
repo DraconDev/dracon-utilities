@@ -27,7 +27,10 @@ fn real_git_path() -> PathBuf {
             if which.status.success() {
                 let path = String::from_utf8_lossy(&which.stdout).trim().to_string();
                 if !path.is_empty() {
-                    return PathBuf::from(path);
+                    let p = PathBuf::from(&path);
+                    if p.exists() {
+                        return p;
+                    }
                 }
             }
         }
