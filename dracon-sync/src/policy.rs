@@ -146,17 +146,11 @@ pub(crate) fn git_binary() -> &'static Path {
                 }
             }
 
-            if let Ok(which) = std::process::Command::new("which")
-                .arg("git")
-                .output()
-            {
-                if which.status.success() {
-                    let path = String::from_utf8_lossy(&which.stdout).trim().to_string();
-                    if !path.is_empty() {
-                        let p = PathBuf::from(&path);
-                        if p.exists() {
-                            return p;
-                        }
+            if let Ok(path_var) = std::env::var("PATH") {
+                for dir in path_var.split(':') {
+                    let candidate = PathBuf::from(dir).join("git");
+                    if candidate.exists() {
+                        return candidate;
                     }
                 }
             }
