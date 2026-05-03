@@ -1253,6 +1253,42 @@ pub(crate) fn get_remote_url(repo: &Path, name: &str) -> Option<String> {
     }
 }
 
+/// Detect if origin URL points to an orphan -N suffixed repo.
+/// Returns Some((current_url, canonical_url)) if orphan detected, None otherwise.
+pub(crate) fn detect_orphan_origin(repo: &Path) -> Option<(String, String)> {
+    let current = get_remote_url(repo, "origin")?;
+    // Pattern: .../repo-name-N.git or .../repo-name-N (where N is one or more digits)
+    // Examples: git@github.com:DraconDev/dracon-demons-9.git
+    //           git@github.com:DraconDev/dracon-libs-4.git
+    let path_part = current.rsplit('/').next()?;
+    let (repo_part, suffix) = if let Some(dot) = path_part.rfind(".") {
+        (&path_part[..dot], &path_part[dot..])
+    } else {
+        (path_part, "")
+    };
+    // Check for -N at the end
+    if let Some(dash) = repo_part.rfind("-") {
+        let suffix_num = &repo_part[dash + 1..];
+        if !suffix_num.is_empty() && suffix_num.chars().all(|c| c.is_ascii_digit()) {
+            let prefix = &current[..current.len() - path_part.len()];
+            let canonical_repo = &repo_part[..dash];
+            let canonical = format!("{}{}{}", prefix, canonical_repo, suffix);
+            return Some((current, canonical));
+        }
+    }
+    None
+}
+
+/// Fix origin URL by setting it to the canonical (non-orphan) URL.
+pub(crate) fn fix_orphan_origin(repo: &Path, canonical_url: &str) -> Result<()> {
+    std_git_command()
+        .args(["remote", "set-url", "origin", canonical_url])
+        .current_dir(repo)
+        .status()
+        .with_context(|| format!("git remote set-url origin {} in {}", canonical_url, repo.display()))?;
+    Ok(())
+}
+
 pub(crate) fn list_remotes(repo: &Path) -> Vec<String> {
     let output = std_git_command()
         .args(["remote"])

@@ -1,25 +1,21 @@
 # Project State
 
 ## Current Focus
-Added a new `RepairOrigins` command to detect and repair orphaned repository origins
+Added orphan repository detection and repair functionality for Git remotes
 
 ## Context
-The change addresses the need to identify and fix repositories with incorrect or orphaned Git origins. This is part of ongoing Git repository management improvements in the dracon-sync tool.
+The project needs to handle Git repositories that have been forked with numeric suffixes (e.g., `repo-4.git`) which are considered "orphans" of the canonical repository. This change enables detecting these orphaned repositories and repairing them by setting the remote URL to the canonical form.
 
 ## Completed
-- [x] Added new `RepairOrigins` command with `--apply` flag
-- [x] Implemented orphan origin detection logic
-- [x] Added origin repair functionality
-- [x] Included user feedback for detected issues
-- [x] Added clear output formatting for results
+- [x] Added `detect_orphan_origin` function to identify orphan repositories by checking for numeric suffixes in the remote URL
+- [x] Added `fix_orphan_origin` function to repair orphan repositories by setting the remote URL to the canonical form
 
 ## In Progress
-- [x] Command implementation is complete
+- [ ] Integration with the `RepairOrigins` command that was recently added
 
 ## Blockers
-- None identified for this specific change
+- Need to verify the new functions work correctly with various Git URL formats (SSH, HTTPS, etc.)
 
 ## Next Steps
-1. Test the new command across different repository configurations
-2. Document the new command in project documentation
-3. Consider adding additional origin validation checks
+1. Complete integration with the `RepairOrigins` command
+2. Add unit tests for the new orphan detection and repair functions
