@@ -1,22 +1,23 @@
 # Project State
 
 ## Current Focus
-Added support for custom repository name mapping in remote configurations.
+Added support for automatic force-push when remote is behind local
 
 ## Context
-To handle platform-specific naming restrictions (e.g., GitLab rejecting dots in project names) and prevent orphaned repositories from failed creation attempts.
+This change enables the daemon to automatically resolve non-fast-forward push failures when the remote repository is purely behind the local repository (0 commits ahead). This prevents unnecessary manual intervention for common synchronization scenarios.
 
 ## Completed
-- [x] Added `repo_name_map` configuration for per-remote repository naming
-- [x] Documented platform limitations (Codeberg/Forgejo push-to-create restrictions)
-- [x] Clarified repository naming conventions and safety rules
+- [x] Added `force_push_when_behind` boolean field to `RemoteConfig`
+- [x] Implemented automatic force-push with `--force-with-lease` when remote is behind
+- [x] Added divergent repository detection (marks CONCERN when remote has commits local lacks)
 
 ## In Progress
-- [ ] None (documentation-only change)
+- [ ] Implementation of actual push logic using this configuration
 
 ## Blockers
-- None (documentation update only)
+- Need to implement the actual push logic that will use this configuration
 
 ## Next Steps
-1. Verify `repo_name_map` works across all supported platforms
-2. Update user documentation with examples of multi-remote configurations
+1. Implement the push logic that will use `force_push_when_behind`
+2. Add integration tests for the new behavior
+3. Document the new configuration option in the remote configuration schema

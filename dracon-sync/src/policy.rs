@@ -29,6 +29,12 @@ pub(crate) struct RemoteConfig {
     /// Example: { ".dracon" = "dracon-home" } maps .dracon → dracon-home on this remote.
     #[serde(default)]
     pub(crate) repo_name_map: std::collections::HashMap<String, String>,
+    /// If true, when a push to this remote fails with non-fast-forward, the daemon
+    /// will diagnose divergence. If the remote is purely behind (0 commits ahead
+    /// of local), it force-pushes with --force-with-lease. If the remote has
+    /// commits local lacks (divergent), the repo is marked CONCERN instead.
+    #[serde(default)]
+    pub(crate) force_push_when_behind: bool,
 }
 
 #[allow(dead_code)]
