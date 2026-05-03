@@ -1307,7 +1307,7 @@ push_url = "{}"
         assert!(result.unwrap(), "mirror push success should return true");
     }
 
-    fn init_test_repo(tmp: &tempfile::TempDir, name: &str) -> PathBuf {
+    fn init_test_repo(tmp: &tempfile::TempDir, name: &str) -> std::path::PathBuf {
         let repo = tmp.path().join(name);
         std::process::Command::new("git")
             .args(["init", "-q", "-b", "master"])
