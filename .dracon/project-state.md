@@ -1,26 +1,22 @@
 # Project State
 
 ## Current Focus
-Improved Git binary detection with more robust error handling and fallback
+Improved Git binary detection with more robust error handling and fallback paths
 
 ## Context
-The previous Git binary detection logic had redundant checks and didn't properly handle error cases. This change makes the detection more reliable by:
-1. Properly checking command execution status
-2. Handling UTF-8 conversion more safely
-3. Providing a clear fallback path
+The change enhances the Git binary detection mechanism to handle edge cases better, particularly in environments where Git might not be in the standard system paths.
 
 ## Completed
-- [x] Refactored Git binary detection to use proper command status checking
-- [x] Added UTF-8 lossy conversion for safer path handling
-- [x] Implemented proper empty path fallback
-- [x] Simplified the code structure while maintaining all functionality
+- [x] Added `which` command fallback for Git binary detection
+- [x] Implemented path validation for detected Git binary
+- [x] Maintained existing hardcoded path fallbacks as secondary options
 
 ## In Progress
-- [ ] No active work in progress
+- [ ] None (this is a complete feature addition)
 
 ## Blockers
-- None identified
+- None (this is a self-contained improvement)
 
 ## Next Steps
-1. Verify the new detection logic works across different environments
-2. Update related test cases to cover the new behavior
+1. Verify the new detection works across different operating systems
+2. Consider adding more fallback paths if needed based on user feedback
