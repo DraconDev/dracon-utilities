@@ -3282,6 +3282,11 @@ mod tests {
 
         let _lock = acquire_path_lock();
         let result = push_to_named_remote(&repo, "mirror", 5, 0, false).await;
-        assert!(result.is_err(), "push with force_when_behind=false should return error (not auto-forced)");
+        if let Ok(()) = result {
+            panic!("push with force_when_behind=false should NOT succeed, but it did");
+        }
+        let err = format!("{:?}", result);
+        assert!(err.contains("rejected") || err.contains("non-fast-forward") || err.contains("failed to push"),
+            "expected rejected/non-fast-forward error, got: {}", err);
     }
 }
