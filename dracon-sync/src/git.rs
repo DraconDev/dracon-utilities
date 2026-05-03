@@ -806,39 +806,36 @@ pub(crate) fn has_both_main_and_master(repo: &Path) -> bool {
     has_main && has_master
 }
 
-pub(crate) async fn consolidate_to_master(repo: &Path) -> Result<()> {
-    let branch = current_branch(repo).unwrap_or_else(|| "master".to_string());
-    if branch != "master" {
+pub(crate) async fn consolidate_to_main(repo: &Path) -> Result<()> {
+    let branch = current_branch(repo).unwrap_or_else(|| "main".to_string());
+    if branch != "main" {
         std_git_command()
-            .args(["checkout", "master"])
+            .args(["checkout", "main"])
             .current_dir(repo)
             .status()
-            .with_context(|| format!("failed to checkout master in {}", repo.display()))?;
+            .with_context(|| format!("failed to checkout main in {}", repo.display()))?;
     }
-    // Delete local main if it exists
     if let Err(e) = std_git_command()
-        .args(["branch", "-D", "main"])
+        .args(["branch", "-D", "master"])
         .current_dir(repo)
         .status()
     {
-        eprintln!("⚠️ failed to delete local main branch: {}", e);
+        eprintln!("⚠️ failed to delete local master branch: {}", e);
     }
-    // Delete remote main if it exists
     if let Err(e) = std_git_command()
-        .args(["push", "origin", "--delete", "main"])
+        .args(["push", "origin", "--delete", "master"])
         .current_dir(repo)
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
         .status()
     {
-        eprintln!("⚠️ failed to delete remote main branch: {}", e);
+        eprintln!("⚠️ failed to delete remote master branch: {}", e);
     }
-    // Ensure master has upstream tracking
     if has_origin_remote(repo) && !has_tracking_upstream(repo) {
         if let Err(e) =
-            push_with_retries(repo, 60, 3, "consolidate-to-master").await
+            push_with_retries(repo, 60, 3, "consolidate-to-main").await
         {
-            eprintln!("⚠️ failed to push master with upstream: {}", e);
+            eprintln!("⚠️ failed to push main with upstream: {}", e);
         }
     }
     Ok(())
