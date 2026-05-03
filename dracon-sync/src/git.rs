@@ -1307,7 +1307,6 @@ pub(crate) async fn push_to_named_remote(
                     || e.to_string().contains("[rejected]")
                     || e.to_string().contains("Updates were rejected");
                 if is_rejected && force_when_behind {
-                    drop(_lock);
                     match diagnose_divergence(repo, remote_name, &branch).await {
                         Ok(Divergence::RemotePurelyBehind) => {
                             let force_result = run_git_with_timeout(
@@ -1320,15 +1319,13 @@ pub(crate) async fn push_to_named_remote(
                                 return Ok(());
                             }
                         }
-                        Ok(Divergence::Divergent) => {
-                            last_err = Some(e);
-                        }
-                        Err(_) => {
+                        Ok(Divergence::Divergent) | Err(_) => {
                             last_err = Some(e);
                         }
                     }
+                } else {
+                    last_err = Some(e);
                 }
-                last_err = Some(e);
                 if attempt < retries.max(1) {
                     sleep(Duration::from_secs(attempt as u64)).await;
                 }
@@ -1336,6 +1333,38 @@ pub(crate) async fn push_to_named_remote(
         }
     }
     Err(last_err.unwrap_or_else(|| anyhow::anyhow!("push to {} failed", remote_name)))
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Divergence {
+    RemotePurelyBehind,
+    Divergent,
+}
+
+pub(crate) async fn diagnose_divergence(repo: &Path, remote_name: &str, branch: &str) -> Result<Divergence> {
+    let local_head = run_git_capture_output(repo, &["rev-parse", "HEAD"], "rev-parse")?;
+    let local_head = local_head.trim();
+    let remote_ref = format!("refs/remotes/{}/{}", remote_name, branch);
+
+    let rev_list_output = run_git_capture_output(
+        repo,
+        &["rev-list", "--left-right", "--count", &format!("{}...{}", local_head, remote_ref)],
+        "rev-list",
+    )?;
+
+    let counts: Vec<&str> = rev_list_output.trim().split('\t').collect();
+    if counts.len() != 2 {
+        return Ok(Divergence::Divergent);
+    }
+
+    let local_ahead: u32 = counts[0].parse().unwrap_or(0);
+    let remote_ahead: u32 = counts[1].parse().unwrap_or(0);
+
+    if remote_ahead == 0 {
+        Ok(Divergence::RemotePurelyBehind)
+    } else {
+        Ok(Divergence::Divergent)
+    }
 }
 
 pub(crate) async fn push_to_all_remotes(
@@ -1349,7 +1378,7 @@ pub(crate) async fn push_to_all_remotes(
 
     let mut results = Vec::new();
     for remote in sorted {
-        let result = push_to_named_remote(repo, &remote.name, timeout_secs, retries).await;
+        let result = push_to_named_remote(repo, &remote.name, timeout_secs, retries, remote.force_push_when_behind).await;
         results.push((remote.name.clone(), result));
     }
     results
