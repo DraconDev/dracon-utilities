@@ -1263,6 +1263,7 @@ pub(crate) async fn push_to_named_remote(
     remote_name: &str,
     timeout_secs: u64,
     retries: u32,
+    force_when_behind: bool,
 ) -> Result<()> {
     let branch = current_branch(repo).unwrap_or_else(|| "master".to_string());
     let refspec = format!("HEAD:refs/heads/{}", branch);
@@ -1301,6 +1302,32 @@ pub(crate) async fn push_to_named_remote(
         match run_git_with_timeout(repo, &["push", remote_name, "HEAD"], timeout_secs, &format!("push-to-{}", remote_name)).await {
             Ok(()) => return Ok(()),
             Err(e) => {
+                let is_rejected = e.to_string().contains("non-fast-forward")
+                    || e.to_string().contains("failed to push some refs")
+                    || e.to_string().contains("[rejected]")
+                    || e.to_string().contains("Updates were rejected");
+                if is_rejected && force_when_behind {
+                    drop(_lock);
+                    match diagnose_divergence(repo, remote_name, &branch).await {
+                        Ok(Divergence::RemotePurelyBehind) => {
+                            let force_result = run_git_with_timeout(
+                                repo,
+                                &["push", "--force-with-lease", remote_name, &format!("HEAD:refs/heads/{}", branch)],
+                                timeout_secs,
+                                &format!("force-push-to-{}", remote_name),
+                            ).await;
+                            if force_result.is_ok() {
+                                return Ok(());
+                            }
+                        }
+                        Ok(Divergence::Divergent) => {
+                            last_err = Some(e);
+                        }
+                        Err(_) => {
+                            last_err = Some(e);
+                        }
+                    }
+                }
                 last_err = Some(e);
                 if attempt < retries.max(1) {
                     sleep(Duration::from_secs(attempt as u64)).await;
