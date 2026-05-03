@@ -1431,6 +1431,7 @@ push_url = "{}"
 
         std::fs::create_dir_all(repo.join("node_modules/pkg")).unwrap();
         std::fs::write(repo.join("node_modules/pkg/index.js"), "module.exports = {};\n").unwrap();
+        std::fs::create_dir_all(repo.join("src")).unwrap();
         std::fs::write(repo.join("src/main.rs"), "fn main() {}\n").unwrap();
         git_cmd(&repo, &["add", "-A"]);
         git_cmd(&repo, &["commit", "-m", "initial"]);
