@@ -141,7 +141,7 @@ enum StuckCommands {
 enum DualBranchCommands {
     /// List repos that have both main and master branches.
     List,
-    /// Consolidate a repo with both main and master to master only.
+    /// Consolidate a repo with both main and master to main only.
     Repair {
         /// The repository path to consolidate.
         repo: PathBuf,
