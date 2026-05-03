@@ -1,21 +1,21 @@
 # Project State
 
 ## Current Focus
-Added `force_push_when_behind` flag to remote configurations for controlled force-push behavior
+Added `force_push_when_behind` flag to remote configurations to enable automatic force-push when remote is behind local.
 
 ## Context
-This change enables explicit control over whether force-push operations should occur when the remote is behind the local repository. This addresses scenarios where users need to ensure synchronization without automatic force-pushes.
+This change supports scenarios where users need to overwrite remote branches when they are behind local changes, which is useful for development workflows where force-pushing is acceptable.
 
 ## Completed
-- [x] Added `force_push_when_behind` flag to remote configuration struct
-- [x] Updated test cases to verify repository name resolution remains consistent
+- [x] Added `force_push_when_behind` boolean flag to remote configuration struct
+- [x] Initialized flag to `false` by default in test configurations
 
 ## In Progress
-- [x] Implementation of force-push behavior when flag is enabled
+- [x] Implementation of actual force-push logic (not yet implemented in this commit)
 
 ## Blockers
-- None identified for this specific change
+- Need to implement the actual force-push behavior when the flag is true
 
 ## Next Steps
 1. Implement force-push logic when `force_push_when_behind` is true
-2. Add integration tests for force-push scenarios
+2. Add unit tests for the new behavior

@@ -1881,6 +1881,7 @@ mod tests {
             api_endpoint: None,
             auto_create_token_var: None,
             repo_name_map: Default::default(),
+            force_push_when_behind: false,
         }];
 
         crate::git::multi_remote::configure_all_remotes(&repo, &remotes, "my-repo");
