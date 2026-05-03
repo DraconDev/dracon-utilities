@@ -1,21 +1,21 @@
 # Project State
 
 ## Current Focus
-Added default repository name mapping configuration for multi-remote synchronization
+Added `force_push_when_behind` flag to remote configurations for controlled force-push behavior
 
 ## Context
-This change implements a default repository name mapping system to handle cases where the local repository name differs from the remote name. It was prompted by the need for consistent repository identification across multiple remote configurations.
+This change enables explicit control over whether force-push operations should occur when the remote is behind the local repository. This addresses scenarios where users need to ensure synchronization without automatic force-pushes.
 
 ## Completed
-- [x] Added default repository name mapping configuration
-- [x] Implemented resolution of repository names through the mapping system
+- [x] Added `force_push_when_behind` flag to remote configuration struct
+- [x] Updated test cases to verify repository name resolution remains consistent
 
 ## In Progress
-- [x] Repository name mapping functionality
+- [x] Implementation of force-push behavior when flag is enabled
 
 ## Blockers
 - None identified for this specific change
 
 ## Next Steps
-1. Verify the repository name mapping works correctly in multi-remote scenarios
-2. Document the repository name mapping configuration options
+1. Implement force-push logic when `force_push_when_behind` is true
+2. Add integration tests for force-push scenarios

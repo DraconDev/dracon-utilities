@@ -946,10 +946,11 @@ repo_name_map: Default::default(),
             priority: 50,
             api_endpoint: None,
             auto_create_token_var: None,
-            repo_name_map: Default::default(),
-        };
+    repo_name_map: Default::default(),
+        force_push_when_behind: false,
+    };
 
-        assert_eq!(config.resolve_repo_name(".dracon"), ".dracon");
+    assert_eq!(config.resolve_repo_name(".dracon"), ".dracon");
         assert_eq!(config.resolve_repo_name("my-repo"), "my-repo");
     }
 }
