@@ -926,11 +926,12 @@ repo_name_map: Default::default(),
             priority: 50,
             api_endpoint: None,
             auto_create_token_var: None,
-            repo_name_map: Default::default(),
-        };
-        config.repo_name_map.insert(".dracon".to_string(), "dracon-home".to_string());
+    repo_name_map: Default::default(),
+        force_push_when_behind: false,
+    };
+    config.repo_name_map.insert(".dracon".to_string(), "dracon-home".to_string());
 
-        assert_eq!(config.resolve_repo_name(".dracon"), "dracon-home");
+    assert_eq!(config.resolve_repo_name(".dracon"), "dracon-home");
         assert_eq!(config.resolve_repo_name("other-repo"), "other-repo");
     }
 
