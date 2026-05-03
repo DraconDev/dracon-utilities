@@ -3282,9 +3282,6 @@ mod tests {
 
         let _lock = acquire_path_lock();
         let result = push_to_named_remote(&repo, "mirror", 5, 0, false).await;
-        if result.is_ok() {
-            eprintln!("WARNING: push unexpectedly succeeded with force_when_behind=false");
-        }
-        assert!(result.is_err(), "push with force_when_behind=false should fail when remote has extra commits: {:?}", result);
+        assert!(result.is_err(), "push with force_when_behind=false should fail when remote is unreachable (no auto-force)");
     }
 }
