@@ -1371,7 +1371,7 @@ push_url = "{}"
         git_cmd(&repo, &["commit", "-m", "add files"]);
 
         for i in 1..=5 {
-            std::fs::remove_file(repo.join(format!("file{i}.txt")).unwrap_or_else(|_| ()));
+            let _ = std::fs::remove_file(repo.join(format!("file{i}.txt")));
         }
 
         let toml_str = r#"
