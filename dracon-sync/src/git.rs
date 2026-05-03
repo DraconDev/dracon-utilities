@@ -1470,7 +1470,7 @@ pub(crate) fn create_repo_on_codeberg(token: &str, account: &str, repo_name: &st
         .json(&serde_json::json!({
             "name": repo_name,
             "private": true,
-            "default_branch": "master"
+            "default_branch": "main"
         }))
         .send()
         .with_context(|| "reqwest codeberg repo create failed")?;
