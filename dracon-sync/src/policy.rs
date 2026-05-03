@@ -831,6 +831,7 @@ auto_repair_warns: true,
             priority: 50,
             api_endpoint: None,
             auto_create_token_var: None,
+            repo_name_map: Default::default(),
         };
         assert_eq!(
             config.resolve_push_url("my-repo"),
@@ -849,6 +850,7 @@ auto_repair_warns: true,
             priority: 50,
             api_endpoint: None,
             auto_create_token_var: None,
+            repo_name_map: Default::default(),
         };
         assert_eq!(
             config.resolve_push_url("any-repo"),
@@ -867,10 +869,73 @@ auto_repair_warns: true,
             priority: 50,
             api_endpoint: None,
             auto_create_token_var: None,
+            repo_name_map: Default::default(),
         };
         assert_eq!(
             config.resolve_push_url("repo"),
             "git@gitlab.com:testuser/"
         );
+    }
+
+    #[test]
+    fn test_resolve_push_url_with_name_mapping() {
+        let mut config = RemoteConfig {
+            name: "gitlab".to_string(),
+            push_url: "git@gitlab.com:{account}/{repo}.git".to_string(),
+            auto_create: false,
+            auto_create_account: "myorg".to_string(),
+            auth_type: AuthType::GitLab,
+            priority: 50,
+            api_endpoint: None,
+            auto_create_token_var: None,
+            repo_name_map: Default::default(),
+        };
+        config.repo_name_map.insert(".dracon".to_string(), "dracon-home".to_string());
+
+        assert_eq!(
+            config.resolve_push_url(".dracon"),
+            "git@gitlab.com:myorg/dracon-home.git"
+        );
+        assert_eq!(
+            config.resolve_push_url("other-repo"),
+            "git@gitlab.com:myorg/other-repo.git"
+        );
+    }
+
+    #[test]
+    fn test_resolve_repo_name_with_mapping() {
+        let mut config = RemoteConfig {
+            name: "gitlab".to_string(),
+            push_url: "git@gitlab.com:{account}/{repo}.git".to_string(),
+            auto_create: false,
+            auto_create_account: "myorg".to_string(),
+            auth_type: AuthType::GitLab,
+            priority: 50,
+            api_endpoint: None,
+            auto_create_token_var: None,
+            repo_name_map: Default::default(),
+        };
+        config.repo_name_map.insert(".dracon".to_string(), "dracon-home".to_string());
+
+        assert_eq!(config.resolve_repo_name(".dracon"), "dracon-home");
+        assert_eq!(config.resolve_repo_name("other-repo"), "other-repo");
+    }
+
+    #[test]
+    fn test_resolve_repo_name_without_mapping() {
+        let config = RemoteConfig {
+            name: "github".to_string(),
+            push_url: "git@github.com:{account}/{repo}.git".to_string(),
+            auto_create: false,
+            auto_create_account: "myorg".to_string(),
+            auth_type: AuthType::GitHub,
+            priority: 50,
+            api_endpoint: None,
+            auto_create_token_var: None,
+            repo_name_map: Default::default(),
+        };
+
+        assert_eq!(config.resolve_repo_name(".dracon"), ".dracon");
+        assert_eq!(config.resolve_repo_name("my-repo"), "my-repo");
     }
 }
