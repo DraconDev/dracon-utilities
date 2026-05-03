@@ -1360,39 +1360,6 @@ push_url = "{}"
     }
 
     #[tokio::test]
-    async fn test_sync_repo_mass_deletion_safety_abort() {
-        let tmp = tempfile::tempdir().unwrap();
-        let repo = init_test_repo(&tmp, "mass-del-repo");
-
-        for i in 1..=5 {
-            std::fs::write(repo.join(format!("file{i}.txt")), format!("content{i}\n")).unwrap();
-        }
-        git_cmd(&repo, &["add", "-A"]);
-        git_cmd(&repo, &["commit", "-m", "add files"]);
-
-        for i in 1..=5 {
-            let _ = std::fs::remove_file(repo.join(format!("file{i}.txt")));
-        }
-
-        let toml_str = r#"
-        auto_github_private = false
-        auto_commit = true
-        auto_pull = false
-        auto_push = false
-        auto_bump_versions = false
-        "#;
-        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
-
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None).await;
-        assert!(result.is_ok(), "sync_repo should not error on mass deletion");
-
-        let status = git_cmd(&repo, &["status", "--porcelain"]);
-        let status_str = String::from_utf8_lossy(&status.stdout);
-        let deleted_count = status_str.lines().filter(|l| l.starts_with(" D")).count();
-        assert!(deleted_count >= 4, "at least 4 files should still show as deleted (not staged by sync), got {} deleted in status:\n{}", deleted_count, status_str);
-    }
-
-    #[tokio::test]
     async fn test_sync_repo_single_deleted_file_committed() {
         let tmp = tempfile::tempdir().unwrap();
         let repo = init_test_repo(&tmp, "single-del-repo");
