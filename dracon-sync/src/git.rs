@@ -2077,6 +2077,7 @@ mod tests {
             api_endpoint: None,
             auto_create_token_var: None,
             repo_name_map: Default::default(),
+            force_push_when_behind: false,
         }];
 
         let results = crate::git::multi_remote::auto_create_all_remotes(&remotes, "test-repo");
@@ -2105,6 +2106,7 @@ mod tests {
             api_endpoint: None,
             auto_create_token_var: None,
             repo_name_map: Default::default(),
+            force_push_when_behind: false,
         }];
 
         let results = crate::git::multi_remote::auto_create_all_remotes(&remotes, "test-repo");
