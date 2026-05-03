@@ -3223,38 +3223,44 @@ mod tests {
     #[tokio::test]
     async fn test_push_to_named_remote_no_auto_force_when_disabled() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
-        let repo = tmp.path().join("test-repo");
-        std::process::Command::new("git")
-            .args(["init", "-q", "-b", "master"])
-            .arg(&repo)
-            .status()
+        let real_git = real_git_path();
+
+        let bare = tmp.path().join("bare.git");
+        std::process::Command::new(real_git.as_path())
+            .args(["init", "--bare", &bare.to_string_lossy()])
+            .output()
+            .expect("git init --bare");
+
+        let repo = tmp.path().join("repo");
+        std::process::Command::new(real_git.as_path())
+            .args(["init", "-q", "-b", "master", &repo.to_string_lossy()])
+            .output()
             .expect("git init");
+        std::process::Command::new(real_git.as_path())
+            .args(["remote", "add", "mirror", &bare.to_string_lossy()])
+            .current_dir(&repo)
+            .output()
+            .expect("git remote add");
         std::fs::write(repo.join("file.txt"), "content").expect("write");
-        std::process::Command::new("git")
+        std::process::Command::new(real_git.as_path())
             .args(["add", "."])
             .current_dir(&repo)
-            .status()
+            .output()
             .expect("git add");
-        std::process::Command::new("git")
+        std::process::Command::new(real_git.as_path())
             .args(["commit", "-m", "init"])
             .current_dir(&repo)
-            .status()
+            .output()
             .expect("git commit");
 
-        std::process::Command::new("git")
-            .args(["remote", "add", "mirror", "git@mirror.example.com:repo.git"])
-            .current_dir(&repo)
-            .status()
-            .expect("git remote add");
-
-        std::process::Command::new("git")
+        std::process::Command::new(real_git.as_path())
             .args(["commit", "--allow-empty", "-m", "other commit"])
             .current_dir(&repo)
-            .status()
+            .output()
             .expect("git commit");
 
         let remote_commit = {
-            let output = std::process::Command::new("git")
+            let output = std::process::Command::new(real_git.as_path())
                 .args(["rev-parse", "HEAD"])
                 .current_dir(&repo)
                 .output()
@@ -3262,16 +3268,16 @@ mod tests {
             String::from_utf8_lossy(&output.stdout).trim().to_string()
         };
 
-        std::process::Command::new("git")
+        std::process::Command::new(real_git.as_path())
             .args(["update-ref", &format!("refs/remotes/mirror/master"), &remote_commit])
             .current_dir(&repo)
-            .status()
+            .output()
             .expect("git update-ref");
 
-        std::process::Command::new("git")
+        std::process::Command::new(real_git.as_path())
             .args(["reset", "--hard", "HEAD^"])
             .current_dir(&repo)
-            .status()
+            .output()
             .expect("git reset");
 
         let _lock = acquire_path_lock();
