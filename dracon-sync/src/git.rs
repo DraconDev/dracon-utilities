@@ -2996,16 +2996,26 @@ mod tests {
             .status()
             .expect("git commit");
 
+        let local_commit = {
+            let output = std::process::Command::new("git")
+                .args(["rev-parse", "HEAD"])
+                .current_dir(&repo)
+                .output()
+                .expect("git rev-parse");
+            String::from_utf8_lossy(&output.stdout).trim().to_string()
+        };
+
         std::process::Command::new("git")
             .args(["remote", "add", "mirror", "git@mirror.example.com:repo.git"])
             .current_dir(&repo)
             .status()
             .expect("git remote add");
+
         std::process::Command::new("git")
-            .args(["fetch", "mirror", "master"])
+            .args(["update-ref", &format!("refs/remotes/mirror/master"), &local_commit])
             .current_dir(&repo)
-            .output()
-            .expect("git fetch");
+            .status()
+            .expect("git update-ref");
 
         let result = diagnose_divergence(&repo, "mirror", "master").await;
         assert!(result.is_ok(), "diagnose_divergence should succeed");
