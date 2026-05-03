@@ -1422,7 +1422,8 @@ pub(crate) fn auto_create_all_remotes(remotes: &[RemoteConfig], repo_name: &str)
         let mut results = Vec::new();
         for remote in remotes {
             if remote.auto_create {
-                let result = auto_create_repo(remote, repo_name);
+                let resolved_name = remote.resolve_repo_name(repo_name);
+                let result = auto_create_repo(remote, &resolved_name);
                 results.push((remote.name.clone(), result));
             }
         }
