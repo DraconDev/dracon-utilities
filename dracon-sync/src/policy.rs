@@ -860,12 +860,13 @@ repo_name_map: Default::default(),
             priority: 50,
             api_endpoint: None,
             auto_create_token_var: None,
-            repo_name_map: Default::default(),
-        };
-        assert_eq!(
-            config.resolve_push_url("any-repo"),
-            "git@mirror.example.com:fixed/path.git"
-        );
+repo_name_map: Default::default(),
+        force_push_when_behind: false,
+    };
+    assert_eq!(
+        config.resolve_push_url("any-repo"),
+        "git@mirror.example.com:fixed/path.git"
+    );
     }
 
     #[test]
