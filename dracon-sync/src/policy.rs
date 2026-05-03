@@ -840,12 +840,13 @@ auto_repair_warns: true,
             priority: 50,
             api_endpoint: None,
             auto_create_token_var: None,
-            repo_name_map: Default::default(),
-        };
-        assert_eq!(
-            config.resolve_push_url("my-repo"),
-            "git@github.com:myorg/my-repo.git"
-        );
+repo_name_map: Default::default(),
+        force_push_when_behind: false,
+    };
+    assert_eq!(
+        config.resolve_push_url("my-repo"),
+        "git@github.com:myorg/my-repo.git"
+    );
     }
 
     #[test]
