@@ -1501,6 +1501,7 @@ pub(crate) fn acquire_path_lock() -> parking_lot::MutexGuard<'static, ()> {
 #[allow(unused_imports)]
 mod tests {
     use super::*;
+    use super::super::multi_remote::{diagnose_divergence, push_to_named_remote, Divergence};
     use std::os::unix::fs::PermissionsExt;
 
     struct EnvRestorer {
