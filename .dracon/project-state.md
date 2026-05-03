@@ -4,18 +4,17 @@
 Improved Git push error handling with more specific test assertions
 
 ## Context
-The change refines error handling in Git push operations by making test assertions more specific and clear. This makes debugging easier and ensures consistent error messages.
+The change enhances test assertions for Git push operations to provide clearer error messages when pushes fail due to remote divergence, making debugging easier.
 
 ## Completed
-- [x] Refined Git push error handling message for clarity in test assertions
-- [x] Simplified test assertion logic by removing redundant error string formatting
+- [x] Updated test assertion to include detailed error information when push fails due to remote having extra commits
 
 ## In Progress
-- [x] No active work in progress beyond this commit
+- [x] Refining Git push behavior and error handling
 
 ## Blockers
 - None identified
 
 ## Next Steps
-1. Verify the new test assertions catch all expected failure cases
-2. Consider adding more specific error types for different push failure scenarios
+1. Verify the enhanced assertions catch all expected failure cases
+2. Expand test coverage for other Git operation scenarios
