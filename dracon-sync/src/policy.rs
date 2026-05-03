@@ -146,6 +146,18 @@ pub(crate) fn git_binary() -> &'static Path {
                 }
             }
 
+            if let Ok(which) = std::process::Command::new("which")
+                .arg("git")
+                .output()
+            {
+                if which.status.success() {
+                    let path = String::from_utf8_lossy(&which.stdout).trim().to_string();
+                    if !path.is_empty() {
+                        return PathBuf::from(path);
+                    }
+                }
+            }
+
             for candidate in ["/run/current-system/sw/bin/git", "/usr/bin/git", "/bin/git"] {
                 let path = PathBuf::from(candidate);
                 if path.exists() {

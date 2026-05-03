@@ -1,26 +1,21 @@
 # Project State
 
 ## Current Focus
-Refactored Git divergence diagnosis tests to focus on divergence detection and simplify test setup
+Added more robust Git binary detection in policy module
 
 ## Context
-The previous Git push test cases were overly complex with redundant test setups. This change simplifies the test infrastructure by:
-1. Using real Git commands directly
-2. Focusing on divergence detection
-3. Reducing test duplication
+The change improves Git binary detection by adding a fallback mechanism using the `which` command, which is more reliable than hardcoded paths on some systems.
 
 ## Completed
-- [x] Refactored divergence diagnosis test to use direct Git commands
-- [x] Simplified test setup by removing redundant bare repository creation
-- [x] Focused test on verifying divergence detection logic
-- [x] Improved test naming to clearly indicate divergence scenario
+- [x] Added `which` command fallback for Git binary detection
+- [x] Maintained existing hardcoded path fallback as secondary option
 
 ## In Progress
-- [ ] No active work in progress
+- [ ] None
 
 ## Blockers
-- None identified
+- None
 
 ## Next Steps
-1. Review test coverage for additional divergence scenarios
-2. Consider adding more edge cases for divergence detection
+1. Verify the new detection works across different Linux distributions
+2. Consider adding Windows detection if needed for future cross-platform support
