@@ -1519,7 +1519,7 @@ pub(crate) fn auto_create_all_remotes(remotes: &[RemoteConfig], repo_name: &str)
 /// Detect if origin URL points to an orphan -N suffixed repo.
 /// Returns Some((current_url, canonical_url)) if orphan detected, None otherwise.
 pub(crate) fn detect_orphan_origin(repo: &Path) -> Option<(String, String)> {
-    let current = get_remote_url(repo, "origin")?;
+    let current = multi_remote::get_remote_url(repo, "origin")?;
     // Pattern: .../repo-name-N.git or .../repo-name-N (where N is one or more digits)
     // Examples: git@github.com:DraconDev/dracon-demons-9.git
     //           git@github.com:DraconDev/dracon-libs-4.git
