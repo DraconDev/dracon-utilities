@@ -3504,4 +3504,154 @@ mod tests {
         };
         assert!(upstream_info.contains("origin/main"), "branch should track origin/main after fix");
     }
+
+    #[tokio::test]
+    async fn test_consolidate_to_main_deletes_master_and_keeps_main() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path();
+        let bare = tmp.path().join("bare.git");
+        std::process::Command::new("git")
+            .args(["init", "-q", "--bare", bare.to_str().unwrap()])
+            .status()
+            .expect("git init bare");
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "master"])
+            .current_dir(repo)
+            .status()
+            .expect("git init");
+        std::fs::write(repo.join("file.txt"), "content").expect("write");
+        std::process::Command::new("git")
+            .args(["add", "."])
+            .current_dir(repo)
+            .status()
+            .expect("git add");
+        std::process::Command::new("git")
+            .args(["commit", "-m", "init"])
+            .current_dir(repo)
+            .status()
+            .expect("git commit");
+        std::process::Command::new("git")
+            .args(["remote", "add", "origin", bare.to_str().unwrap()])
+            .current_dir(repo)
+            .status()
+            .expect("git remote add");
+        std::process::Command::new("git")
+            .args(["push", "-u", "origin", "master"])
+            .current_dir(repo)
+            .status()
+            .expect("git push");
+
+        std::process::Command::new("git")
+            .args(["checkout", "-b", "main"])
+            .current_dir(repo)
+            .status()
+            .expect("git checkout main");
+        std::process::Command::new("git")
+            .args(["commit", "--allow-empty", "-m", "main commit"])
+            .current_dir(repo)
+            .status()
+            .expect("git commit main");
+        std::process::Command::new("git")
+            .args(["push", "-u", "origin", "main"])
+            .current_dir(repo)
+            .status()
+            .expect("git push main");
+
+        let result = consolidate_to_main(repo).await;
+        assert!(result.is_ok(), "consolidate_to_main should succeed");
+
+        let branches = {
+            let output = std::process::Command::new("git")
+                .args(["branch", "-a"])
+                .current_dir(repo)
+                .output()
+                .expect("git branch -a");
+            String::from_utf8_lossy(&output.stdout).to_string()
+        };
+        assert!(branches.contains("main"), "main branch should exist");
+        assert!(!branches.contains("master"), "master branch should be deleted");
+    }
+
+    #[tokio::test]
+    async fn test_rename_master_to_main_renames_and_deletes_remote_master() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path();
+        let bare = tmp.path().join("bare.git");
+        std::process::Command::new("git")
+            .args(["init", "-q", "--bare", bare.to_str().unwrap()])
+            .status()
+            .expect("git init bare");
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "master"])
+            .current_dir(repo)
+            .status()
+            .expect("git init");
+        std::fs::write(repo.join("file.txt"), "content").expect("write");
+        std::process::Command::new("git")
+            .args(["add", "."])
+            .current_dir(repo)
+            .status()
+            .expect("git add");
+        std::process::Command::new("git")
+            .args(["commit", "-m", "init"])
+            .current_dir(repo)
+            .status()
+            .expect("git commit");
+        std::process::Command::new("git")
+            .args(["remote", "add", "origin", bare.to_str().unwrap()])
+            .current_dir(repo)
+            .status()
+            .expect("git remote add");
+        std::process::Command::new("git")
+            .args(["push", "-u", "origin", "master"])
+            .current_dir(repo)
+            .status()
+            .expect("git push");
+
+        let result = rename_master_to_main(repo).await;
+        assert!(result.is_ok(), "rename_master_to_main should succeed");
+
+        let current = {
+            let output = std::process::Command::new("git")
+                .args(["rev-parse", "--abbrev-ref", "HEAD"])
+                .current_dir(repo)
+                .output()
+                .expect("git rev-parse");
+            String::from_utf8_lossy(&output.stdout).trim().to_string()
+        };
+        assert_eq!(current, "main", "should be on main branch after rename");
+    }
+
+    #[test]
+    fn test_has_only_master_branch_detects_master_only() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path();
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "master"])
+            .current_dir(repo)
+            .status()
+            .expect("git init");
+
+        let result = has_only_master_branch(repo);
+        assert!(result, "should detect master-only repo");
+    }
+
+    #[test]
+    fn test_has_only_master_branch_ignores_main_and_master() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path();
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "master"])
+            .current_dir(repo)
+            .status()
+            .expect("git init");
+        std::process::Command::new("git")
+            .args(["branch", "main"])
+            .current_dir(repo)
+            .status()
+            .expect("git branch main");
+
+        let result = has_only_master_branch(repo);
+        assert!(!result, "should not detect when both main and master exist");
+    }
 }
