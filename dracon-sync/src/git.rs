@@ -3357,4 +3357,186 @@ mod tests {
         let result = push_to_named_remote(&repo, "mirror", 5, 0, false).await;
         assert!(result.is_err(), "push with force_when_behind=false should fail with rejected error");
     }
+
+    #[test]
+    fn test_detect_orphan_origin_detects_single_digit_suffix() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path();
+        std::process::Command::new("git")
+            .args(["init", "-q"])
+            .current_dir(repo)
+            .status()
+            .expect("git init");
+        std::process::Command::new("git")
+            .args(["remote", "add", "origin", "git@github.com:DraconDev/dracon-demons-9.git"])
+            .current_dir(repo)
+            .status()
+            .expect("git remote add");
+
+        let result = detect_orphan_origin(repo);
+        assert!(result.is_some(), "should detect -9 suffix");
+        let (current, canonical) = result.unwrap();
+        assert_eq!(current, "git@github.com:DraconDev/dracon-demons-9.git");
+        assert_eq!(canonical, "git@github.com:DraconDev/dracon-demons.git");
+    }
+
+    #[test]
+    fn test_detect_orphan_origin_ignores_multi_digit_suffix() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path();
+        std::process::Command::new("git")
+            .args(["init", "-q"])
+            .current_dir(repo)
+            .status()
+            .expect("git init");
+        std::process::Command::new("git")
+            .args(["remote", "add", "origin", "git@github.com:DraconDev/project-2024.git"])
+            .current_dir(repo)
+            .status()
+            .expect("git remote add");
+
+        let result = detect_orphan_origin(repo);
+        assert!(result.is_none(), "should NOT detect -2024 as orphan (multi-digit)");
+    }
+
+    #[test]
+    fn test_detect_orphan_origin_ignores_legitimate_version() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path();
+        std::process::Command::new("git")
+            .args(["init", "-q"])
+            .current_dir(repo)
+            .status()
+            .expect("git init");
+        std::process::Command::new("git")
+            .args(["remote", "add", "origin", "git@github.com:DraconDev/api-v2.git"])
+            .current_dir(repo)
+            .status()
+            .expect("git remote add");
+
+        let result = detect_orphan_origin(repo);
+        assert!(result.is_none(), "should NOT detect -v2 as orphan (not pure digits)");
+    }
+
+    #[test]
+    fn test_detect_orphan_origin_no_suffix() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path();
+        std::process::Command::new("git")
+            .args(["init", "-q"])
+            .current_dir(repo)
+            .status()
+            .expect("git init");
+        std::process::Command::new("git")
+            .args(["remote", "add", "origin", "git@github.com:DraconDev/dracon-demons.git"])
+            .current_dir(repo)
+            .status()
+            .expect("git remote add");
+
+        let result = detect_orphan_origin(repo);
+        assert!(result.is_none(), "should NOT detect normal repo name as orphan");
+    }
+
+    #[test]
+    fn test_detect_orphan_origin_no_origin() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path();
+        std::process::Command::new("git")
+            .args(["init", "-q"])
+            .current_dir(repo)
+            .status()
+            .expect("git init");
+
+        let result = detect_orphan_origin(repo);
+        assert!(result.is_none(), "should return None when no origin remote");
+    }
+
+    #[test]
+    fn test_fix_orphan_origin_updates_remote_url() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path();
+        std::process::Command::new("git")
+            .args(["init", "-q"])
+            .current_dir(repo)
+            .status()
+            .expect("git init");
+        std::fs::write(repo.join("file.txt"), "content").expect("write");
+        std::process::Command::new("git")
+            .args(["add", "."])
+            .current_dir(repo)
+            .status()
+            .expect("git add");
+        std::process::Command::new("git")
+            .args(["commit", "-m", "init"])
+            .current_dir(repo)
+            .status()
+            .expect("git commit");
+        std::process::Command::new("git")
+            .args(["remote", "add", "origin", "git@github.com:DraconDev/dracon-demons-9.git"])
+            .current_dir(repo)
+            .status()
+            .expect("git remote add");
+
+        let result = fix_orphan_origin(repo, "git@github.com:DraconDev/dracon-demons.git");
+        assert!(result.is_ok(), "fix_orphan_origin should succeed");
+
+        let url = multi_remote::get_remote_url(repo, "origin").unwrap();
+        assert_eq!(url, "git@github.com:DraconDev/dracon-demons.git");
+    }
+
+    #[test]
+    fn test_fix_orphan_origin_updates_upstream_tracking() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path();
+        let bare = tmp.path().join("bare.git");
+        std::process::Command::new("git")
+            .args(["init", "-q", "--bare", bare.to_str().unwrap()])
+            .status()
+            .expect("git init bare");
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "main"])
+            .current_dir(repo)
+            .status()
+            .expect("git init");
+        std::fs::write(repo.join("file.txt"), "content").expect("write");
+        std::process::Command::new("git")
+            .args(["add", "."])
+            .current_dir(repo)
+            .status()
+            .expect("git add");
+        std::process::Command::new("git")
+            .args(["commit", "-m", "init"])
+            .current_dir(repo)
+            .status()
+            .expect("git commit");
+        std::process::Command::new("git")
+            .args(["remote", "add", "origin", bare.to_str().unwrap()])
+            .current_dir(repo)
+            .status()
+            .expect("git remote add");
+        std::process::Command::new("git")
+            .args(["push", "-u", "origin", "main"])
+            .current_dir(repo)
+            .status()
+            .expect("git push");
+
+        std::process::Command::new("git")
+            .args(["remote", "set-url", "origin", "git@github.com:DraconDev/dracon-demons-9.git"])
+            .current_dir(repo)
+            .status()
+            .expect("git remote set-url");
+
+        let result = fix_orphan_origin(repo, "git@github.com:DraconDev/dracon-demons.git");
+        assert!(result.is_ok(), "fix_orphan_origin should succeed");
+
+        let upstream = {
+            let output = std::process::Command::new("git")
+                .args(["rev-parse", "--abbrev-ref", "main@{upstream}"])
+                .current_dir(repo)
+                .output()
+                .expect("git rev-parse upstream");
+            String::from_utf8_lossy(&output.stdout).trim().to_string()
+        };
+        assert!(upstream.contains("dracon-demons"), "upstream should reference new canonical name");
+    }
 }
