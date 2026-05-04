@@ -1556,31 +1556,7 @@ mod tests {
     use super::*;
     use crate::git::multi_remote::{diagnose_divergence, push_to_named_remote, Divergence};
     use std::os::unix::fs::PermissionsExt;
-
-    struct EnvRestorer {
-        key: String,
-        old_value: Option<String>,
-    }
-
-    impl EnvRestorer {
-        fn new(key: &str, new_value: &str) -> Self {
-            let old_value = std::env::var(key).ok();
-            std::env::set_var(key, new_value);
-            EnvRestorer {
-                key: key.to_string(),
-                old_value,
-            }
-        }
-    }
-
-    impl Drop for EnvRestorer {
-        fn drop(&mut self) {
-            std::env::remove_var(&self.key);
-            if let Some(ref v) = self.old_value {
-                std::env::set_var(&self.key, v);
-            }
-        }
-    }
+    use crate::test_helpers::EnvRestorer;
 
     #[test]
     fn test_strip_url_credentials_https_with_creds() {
@@ -1721,17 +1697,15 @@ mod tests {
     #[test]
     fn test_load_secret_from_env() {
         let tmp_val = "test_token_abc123";
-        std::env::set_var("TEST_LOAD_SECRET_TOKEN", tmp_val);
+        let _guard = EnvRestorer::new("TEST_LOAD_SECRET_TOKEN", tmp_val);
         let result = load_secret("TEST_LOAD_SECRET_TOKEN");
-        std::env::remove_var("TEST_LOAD_SECRET_TOKEN");
         assert_eq!(result, Some(tmp_val.to_string()));
     }
 
     #[test]
     fn test_load_secret_empty_env_var() {
-        std::env::set_var("TEST_LOAD_SECRET_EMPTY", "");
+        let _guard = EnvRestorer::new("TEST_LOAD_SECRET_EMPTY", "");
         let result = load_secret("TEST_LOAD_SECRET_EMPTY");
-        std::env::remove_var("TEST_LOAD_SECRET_EMPTY");
         assert_eq!(result, None);
     }
 
@@ -1745,7 +1719,7 @@ mod tests {
         let tmp_home = tempfile::TempDir::new().expect("temp dir");
         let _lock = acquire_path_lock();
         let _guard = EnvRestorer::new("HOME", &tmp_home.path().to_string_lossy());
-        std::env::remove_var("TEST_FILE_SECRET_TOKEN");
+        let _token_guard = EnvRestorer::remove("TEST_FILE_SECRET_TOKEN");
 
         let secrets_dir = tmp_home.path().join(".dracon/utilities/sync/secrets");
         std::fs::create_dir_all(&secrets_dir).expect("create secrets dir");
@@ -1761,7 +1735,7 @@ mod tests {
         let tmp_home = tempfile::TempDir::new().expect("temp dir");
         let _lock = acquire_path_lock();
         let _guard = EnvRestorer::new("HOME", &tmp_home.path().to_string_lossy());
-        std::env::remove_var("COMMENTED_SECRET_TOKEN");
+        let _comments_guard = EnvRestorer::remove("COMMENTED_SECRET_TOKEN");
 
         let secrets_dir = tmp_home.path().join(".dracon/utilities/sync/secrets");
         std::fs::create_dir_all(&secrets_dir).expect("create secrets dir");
@@ -1781,14 +1755,13 @@ mod tests {
         let tmp_home = tempfile::TempDir::new().expect("temp dir");
         let _lock = acquire_path_lock();
         let _guard = EnvRestorer::new("HOME", &tmp_home.path().to_string_lossy());
-        std::env::set_var("PRECEDENCE_SECRET", "env_value");
+        let _prec_guard = EnvRestorer::new("PRECEDENCE_SECRET", "env_value");
 
         let secrets_dir = tmp_home.path().join(".dracon/utilities/sync/secrets");
         std::fs::create_dir_all(&secrets_dir).expect("create secrets dir");
         std::fs::write(secrets_dir.join("another.env"), "PRECEDENCE_SECRET=file_value\n").expect("write env file");
 
         let result = load_secret("PRECEDENCE_SECRET");
-        std::env::remove_var("PRECEDENCE_SECRET");
 
         assert_eq!(result, Some("env_value".to_string()));
     }
@@ -2136,9 +2109,8 @@ mod tests {
     fn test_auto_create_all_remotes_codeberg_missing_token() {
         // Make load_secret look in a temp dir so real secrets file isn't found
         let tmp_home = tempfile::TempDir::new().expect("temp dir");
-        let orig_home = std::env::var("HOME").ok();
-        std::env::set_var("HOME", tmp_home.path());
-        std::env::remove_var("CODEBERG_TOKEN");
+        let _home_guard = EnvRestorer::new("HOME", &tmp_home.path().to_string_lossy());
+        let _codeberg_guard = EnvRestorer::remove("CODEBERG_TOKEN");
 
         let remotes = vec![RemoteConfig {
             name: "codeberg".to_string(),
@@ -2155,11 +2127,6 @@ mod tests {
 
         let results = crate::git::multi_remote::auto_create_all_remotes(&remotes, "test-repo");
 
-        // Restore HOME
-        match orig_home {
-            Some(h) => std::env::set_var("HOME", h),
-            None => std::env::remove_var("HOME"),
-        }
 
         assert_eq!(results.len(), 1);
         assert!(results[0].1.is_err(), "Codeberg without token should return error");
