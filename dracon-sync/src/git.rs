@@ -3631,6 +3631,17 @@ mod tests {
             .current_dir(repo)
             .status()
             .expect("git init");
+        std::fs::write(repo.join("file.txt"), "content").expect("write");
+        std::process::Command::new("git")
+            .args(["add", "."])
+            .current_dir(repo)
+            .status()
+            .expect("git add");
+        std::process::Command::new("git")
+            .args(["commit", "-m", "init"])
+            .current_dir(repo)
+            .status()
+            .expect("git commit");
         std::process::Command::new("git")
             .args(["checkout", "-b", "master"])
             .current_dir(repo)
