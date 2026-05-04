@@ -1,16 +1,14 @@
 # Project State
 
 ## Current Focus
-Added comprehensive testing documentation for `dracon-sync`, including test isolation strategies and environment variable hygiene.
+Refactored Git test isolation by adding proper test configuration attributes
 
 ## Context
-The changes document the test infrastructure for `dracon-sync`, addressing reliability issues in parallel test execution and environment variable management.
+This change improves test reliability by properly scoping the `PATH_LOCK` mutex to test environments only, preventing accidental usage in production code.
 
 ## Completed
-- [x] Documented test isolation strategies for `dracon-sync`
-- [x] Added guidance for handling parallel test execution
-- [x] Documented environment variable hygiene requirements
-- [x] Provided specific test execution commands
+- [x] Added `#[cfg(test)]` attribute to `PATH_LOCK` to restrict it to test scope
+- [x] Added `#[cfg(test)]` attribute to `real_git_path()` test helper function
 
 ## In Progress
 - [ ] No active work in progress
@@ -19,5 +17,5 @@ The changes document the test infrastructure for `dracon-sync`, addressing relia
 - None identified
 
 ## Next Steps
-1. Implement additional test cases for edge cases
-2. Review and update test documentation for other components
+1. Verify test isolation improvements in CI pipeline
+2. Consider adding more test-specific utilities for Git operations

@@ -13,9 +13,10 @@ use tokio::time::sleep;
 use crate::exclude::is_excluded_change_path;
 use crate::policy::{std_git_command, tokio_git_command, timestamp_secs, AuthType, RemoteConfig};
 
-#[allow(dead_code)]
+#[cfg(test)]
 pub(crate) static PATH_LOCK: parking_lot::Mutex<()> = parking_lot::Mutex::new(());
 
+#[cfg(test)]
 #[allow(dead_code)]
 fn real_git_path() -> PathBuf {
     if let Ok(custom) = std::env::var("DRACON_SYNC_GIT_BIN") {
