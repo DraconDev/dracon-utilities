@@ -3697,4 +3697,92 @@ mod tests {
         let result = has_only_master_branch(repo);
         assert!(!result, "should not detect when both main and master exist");
     }
+
+    #[tokio::test]
+    async fn test_prune_other_default_branch_deletes_main_when_on_master() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path();
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "master"])
+            .current_dir(repo)
+            .status()
+            .expect("git init");
+        std::fs::write(repo.join("file.txt"), "content").expect("write");
+        std::process::Command::new("git")
+            .args(["add", "."])
+            .current_dir(repo)
+            .status()
+            .expect("git add");
+        std::process::Command::new("git")
+            .args(["commit", "-m", "init"])
+            .current_dir(repo)
+            .status()
+            .expect("git commit");
+        std::process::Command::new("git")
+            .args(["checkout", "-b", "main"])
+            .current_dir(repo)
+            .status()
+            .expect("git checkout main");
+
+        prune_other_default_branch(repo).await;
+
+        let local_branches = {
+            let output = std::process::Command::new("git")
+                .args(["branch"])
+                .current_dir(repo)
+                .output()
+                .expect("git branch");
+            String::from_utf8_lossy(&output.stdout)
+                .lines()
+                .map(|s| s.trim_start_matches('*').trim())
+                .filter(|s| !s.is_empty())
+                .collect::<Vec<_>>()
+        };
+        assert!(local_branches.contains(&"master"), "master should still exist: {:?}", local_branches);
+        assert!(!local_branches.contains(&"main"), "main should be deleted: {:?}", local_branches);
+    }
+
+    #[tokio::test]
+    async fn test_prune_other_default_branch_deletes_master_when_on_main() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path();
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "main"])
+            .current_dir(repo)
+            .status()
+            .expect("git init");
+        std::fs::write(repo.join("file.txt"), "content").expect("write");
+        std::process::Command::new("git")
+            .args(["add", "."])
+            .current_dir(repo)
+            .status()
+            .expect("git add");
+        std::process::Command::new("git")
+            .args(["commit", "-m", "init"])
+            .current_dir(repo)
+            .status()
+            .expect("git commit");
+        std::process::Command::new("git")
+            .args(["checkout", "-b", "master"])
+            .current_dir(repo)
+            .status()
+            .expect("git checkout master");
+
+        prune_other_default_branch(repo).await;
+
+        let local_branches = {
+            let output = std::process::Command::new("git")
+                .args(["branch"])
+                .current_dir(repo)
+                .output()
+                .expect("git branch");
+            String::from_utf8_lossy(&output.stdout)
+                .lines()
+                .map(|s| s.trim_start_matches('*').trim())
+                .filter(|s| !s.is_empty())
+                .collect::<Vec<_>>()
+        };
+        assert!(local_branches.contains(&"main"), "main should still exist: {:?}", local_branches);
+        assert!(!local_branches.contains(&"master"), "master should be deleted: {:?}", local_branches);
+    }
 }
