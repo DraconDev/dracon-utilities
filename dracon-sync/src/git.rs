@@ -2632,11 +2632,11 @@ mod tests {
             .expect("write fail git");
         std::fs::set_permissions(&always_fail, std::fs::Permissions::from_mode(0o755)).expect("chmod");
 
-        let real_git = real_git_path();
         let _lock = acquire_path_lock();
         let orig_path = std::env::var("PATH").unwrap_or_default();
         let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
 
+        let real_git = real_git_path();
         let bare = tmp.path().join("bare.git");
         std::process::Command::new(real_git.as_path())
             .args(["init", "--bare", &bare.to_string_lossy()])
@@ -2900,11 +2900,11 @@ mod tests {
             .expect("write fail git");
         std::fs::set_permissions(&always_fail, std::fs::Permissions::from_mode(0o755)).expect("chmod");
 
-        let real_git = real_git_path();
         let _lock = acquire_path_lock();
         let orig_path = std::env::var("PATH").unwrap_or_default();
         let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
 
+        let real_git = real_git_path();
         let bare = tmp.path().join("bare.git");
         std::process::Command::new(real_git.as_path())
             .args(["init", "--bare", &bare.to_string_lossy()])
