@@ -1557,7 +1557,7 @@ pub(crate) fn fix_orphan_origin(repo: &Path, canonical_url: &str) -> Result<()> 
     if let Some(branch) = current_branch(repo) {
         if has_tracking_upstream(repo) {
             let _ = std_git_command()
-                .args(["branch", "--set-upstream-to=origin/main", &branch])
+                .args(["branch", "--set-upstream-to", &format!("origin/{}", branch), &branch])
                 .current_dir(repo)
                 .output();
         }
