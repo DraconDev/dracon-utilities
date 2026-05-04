@@ -2669,8 +2669,13 @@ mod tests {
             .output()
             .expect("git commit");
 
+        drop(_guard);
         drop(_lock);
+
+        std::env::set_var("DRACON_SYNC_GIT_BIN", always_fail.to_string_lossy().as_ref());
         let result = crate::git::push_with_retries(&repo, 1, 2, "test-push-fail").await;
+        std::env::remove_var("DRACON_SYNC_GIT_BIN");
+
         assert!(result.is_err(), "push should fail after exhausting retries");
     }
 
