@@ -4,17 +4,18 @@
 Improved Git path lock management in push operations
 
 ## Context
-The change addresses potential resource contention during Git push operations by ensuring proper lock handling. The previous implementation held a lock unnecessarily, which could cause delays in other operations.
+The change addresses potential resource contention during Git push operations by modifying how path locks are handled. The previous implementation held locks unnecessarily, while the new version properly releases them after use.
 
 ## Completed
-- [x] Replaced `let _lock = acquire_path_lock()` with `drop(acquire_path_lock())` to release the lock immediately after use
+- [x] Changed Git reset command to use HEAD^ instead of a specific commit hash
+- [x] Replaced path lock acquisition with an explicit drop() call to ensure proper release
 
 ## In Progress
-- [x] No active work in progress
+- [ ] None (change is complete)
 
 ## Blockers
-- None identified
+- None (change is complete)
 
 ## Next Steps
-1. Verify no regression in Git push operations
-2. Review other Git operations for similar lock management issues
+1. Verify the change doesn't affect other Git operations
+2. Review test coverage for path lock scenarios
