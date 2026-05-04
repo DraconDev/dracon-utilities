@@ -2770,6 +2770,8 @@ mod tests {
     #[tokio::test]
     async fn test_push_with_transport_fallbacks_both_fail() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
+
+        let real_git = real_git_path();
         let always_fail = tmp.path().join("git");
         std::fs::write(&always_fail, "#!/bin/sh\necho 'always fail' >&2\nexit 1\n")
             .expect("write fail git");
@@ -2779,7 +2781,6 @@ mod tests {
         let orig_path = std::env::var("PATH").unwrap_or_default();
         let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
 
-        let real_git = real_git_path();
         let bare = tmp.path().join("bare.git");
         std::process::Command::new(real_git.as_path())
             .args(["init", "--bare", &bare.to_string_lossy()])
@@ -2808,8 +2809,13 @@ mod tests {
             .output()
             .expect("git commit");
 
+        drop(_guard);
         drop(_lock);
+
+        std::env::set_var("DRACON_SYNC_GIT_BIN", always_fail.to_string_lossy().as_ref());
         let result = crate::git::push_with_transport_fallbacks(&repo, 1, "test-push-both-fail").await;
+        std::env::remove_var("DRACON_SYNC_GIT_BIN");
+
         assert!(result.is_err(), "both SSH and HTTPS should fail");
     }
 
