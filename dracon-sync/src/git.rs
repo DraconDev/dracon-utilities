@@ -2781,9 +2781,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_push_to_named_remote_unsafe_branch_skips_https_fallback() {
-
-    #[tokio::test]
     async fn test_push_to_named_remote_ssh_success() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let real_git = real_git_path();
