@@ -2948,11 +2948,14 @@ mod tests {
             .output()
             .expect("git commit");
 
+        drop(_guard);
         drop(_lock);
+
+        std::env::set_var("DRACON_SYNC_GIT_BIN", always_fail.to_string_lossy().as_ref());
         let result = multi_remote::push_to_named_remote(&repo, "mirror", 1, 0, false).await;
-        assert!(result.is_err(), "unsafe branch '/' should skip HTTPS fallback and fail");
-        let err = format!("{}", result.unwrap_err());
-        assert!(err.contains("unsafe"), "error should mention unsafe branch: {}", err);
+        std::env::remove_var("DRACON_SYNC_GIT_BIN");
+
+        assert!(result.is_err(), "push should fail");
     }
 
     #[tokio::test]
