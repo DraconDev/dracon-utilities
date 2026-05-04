@@ -2627,10 +2627,17 @@ mod tests {
     #[tokio::test]
     async fn test_push_with_retries_exhausts_retries_and_fails() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
-        let always_fail = tmp.path().join("git");
-        std::fs::write(&always_fail, "#!/bin/sh\necho 'always fail' >&2\nexit 1\n")
-            .expect("write fail git");
-        std::fs::set_permissions(&always_fail, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+
+        let real_git = real_git_path();
+        let real_git_path_str = real_git.display().to_string();
+        let fail_git = tmp.path().join("git");
+        std::fs::write(&fail_git, format!(
+            "#!/bin/sh\n\
+            echo 'always fail' >&2\n\
+            exit 1\n\
+            "
+        )).expect("write fail git");
+        std::fs::set_permissions(&fail_git, std::fs::Permissions::from_mode(0o755)).expect("chmod");
 
         let _lock = acquire_path_lock();
         let orig_path = std::env::var("PATH").unwrap_or_default();
