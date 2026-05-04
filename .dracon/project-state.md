@@ -1,14 +1,15 @@
 # Project State
 
 ## Current Focus
-Refactored environment variable management in Git tests for better test isolation.
+Refactored environment variable management in Git tests and removed duplicate utility code
 
 ## Context
-The change improves test reliability by using `EnvRestorer` to manage environment variables more cleanly, replacing manual `set_var`/`remove_var` calls.
+The changes improve test isolation and reliability by consolidating environment variable management into shared utilities, eliminating redundant code in both `git.rs` and `report.rs`.
 
 ## Completed
-- [x] Refactored Git test environment variable handling to use `EnvRestorer`
-- [x] Removed manual `GH_TOKEN` cleanup in favor of scoped restoration
+- [x] Refactored environment variable management in Git tests to use shared `EnvRestorer` utility
+- [x] Removed duplicate `EnvRestorer` implementation from `report.rs`
+- [x] Improved test reliability by using proper RAII pattern for environment variables
 
 ## In Progress
 - [ ] No active work in progress
@@ -17,5 +18,5 @@ The change improves test reliability by using `EnvRestorer` to manage environmen
 - None identified
 
 ## Next Steps
-1. Verify test isolation improvements in CI
-2. Consider similar refactoring for other test environments
+1. Verify all Git tests still pass with the refactored environment management
+2. Consider adding more comprehensive test cases for edge cases in environment handling
