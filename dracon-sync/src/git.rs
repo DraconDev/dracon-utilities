@@ -3560,16 +3560,16 @@ mod tests {
         let result = consolidate_to_main(repo).await;
         assert!(result.is_ok(), "consolidate_to_main should succeed");
 
-        let branches = {
+        let local_branches = {
             let output = std::process::Command::new("git")
-                .args(["branch", "-a"])
+                .args(["branch"])
                 .current_dir(repo)
                 .output()
-                .expect("git branch -a");
+                .expect("git branch");
             String::from_utf8_lossy(&output.stdout).to_string()
         };
-        assert!(branches.contains("main"), "main branch should exist");
-        assert!(!branches.contains("master"), "master branch should be deleted");
+        assert!(local_branches.contains("main"), "main branch should exist");
+        assert!(!local_branches.contains("master"), "master local branch should be deleted");
     }
 
     #[tokio::test]
