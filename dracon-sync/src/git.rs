@@ -3283,12 +3283,12 @@ mod tests {
             .expect("git update-ref");
 
         std::process::Command::new("git")
-            .args(["reset", "--hard", &local_commit])
+            .args(["reset", "--hard", "HEAD^"])
             .current_dir(&repo)
             .status()
             .expect("git reset");
 
-        let _lock = acquire_path_lock();
+        drop(acquire_path_lock());
         let result = push_to_named_remote(&repo, "mirror", 5, 0, true).await;
         assert!(result.is_err(), "push with force_when_behind=true should fail when remote is divergent: {:?}", result);
     }
