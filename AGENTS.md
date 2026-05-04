@@ -340,3 +340,37 @@ the ledger to ~/.local/state/dracon/ to break the cycle.
 1. Monitor for 24h to confirm no self-referential churn
 2. Continue reviewing dracon-system for any orphaned state files
 ```
+
+## Testing
+
+### dracon-sync
+
+**334 tests** in `src/` (git.rs, sync.rs, report.rs, policy.rs). Tests use `tempfile::TempDir` for isolation.
+
+```bash
+export DRACON_SYNC_GIT_BIN=/run/current-system/sw/bin/git
+
+# Reliable (serial execution — no flaky race conditions):
+cargo test -- --test-threads=1
+
+# Fast but may have ~10-20 flaky failures from shared global state:
+cargo test
+```
+
+**Known parallel-test issues:** ~10-20 tests fail unpredictably when running with default parallelism. Root causes:
+1. `std::process::Command::new("git")` resolves from `PATH`, which concurrent tests modify for mock binaries
+2. `acquire_path_lock()` only serializes the subset of tests that explicitly acquire it
+3. Some sync tests start TCP listeners on fixed ports for mock registries
+
+**Env var hygiene:** All env var mutations in tests should use `EnvRestorer` (from `crate::test_helpers::EnvRestorer`) to prevent leakage between tests. Use `EnvRestorer::new("VAR", "value")` to set, or `EnvRestorer::remove("VAR")` to clear. The guard restores on drop.
+
+**Key env vars:**
+- `DRACON_SYNC_GIT_BIN` — overrides git binary path (checked every call, not cached)
+- `PATH` — mutations require `acquire_path_lock()` first
+
+### dracon-system & dracon-warden
+
+```bash
+cargo test -p dracon-system
+cargo test -p dracon-warden
+```
