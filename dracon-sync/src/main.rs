@@ -551,11 +551,11 @@ async fn main() -> Result<()> {
             let repos = git::discover_git_repos(&roots, &excluded_dir_names, &policy.exclude_repos, Some(&policy.system_repo));
             let mut found = 0;
             for repo in repos {
-                if let Some((current, canonical)) = git::detect_orphan_origin(&repo) {
+                if let Some((current, canonical)) = detect_orphan_origin(&repo) {
                     println!("   {}: {} -> {}", repo.display(), current, canonical);
                     found += 1;
                     if apply {
-                        if let Err(e) = git::fix_orphan_origin(&repo, &canonical) {
+                        if let Err(e) = fix_orphan_origin(&repo, &canonical) {
                             eprintln!("❌ failed to fix origin for {}: {}", repo.display(), e);
                         } else {
                             println!("✅ fixed origin for {}", repo.display());
