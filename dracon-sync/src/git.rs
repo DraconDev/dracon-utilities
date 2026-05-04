@@ -2905,6 +2905,8 @@ mod tests {
     #[tokio::test]
     async fn test_push_to_named_remote_unsafe_branch_skips_https_fallback() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
+
+        let real_git = real_git_path();
         let always_fail = tmp.path().join("git");
         std::fs::write(&always_fail, "#!/bin/sh\necho 'SSH failure' >&2\nexit 128\n")
             .expect("write fail git");
@@ -2914,7 +2916,6 @@ mod tests {
         let orig_path = std::env::var("PATH").unwrap_or_default();
         let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
 
-        let real_git = real_git_path();
         let bare = tmp.path().join("bare.git");
         std::process::Command::new(real_git.as_path())
             .args(["init", "--bare", &bare.to_string_lossy()])
