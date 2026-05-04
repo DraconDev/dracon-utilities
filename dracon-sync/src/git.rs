@@ -729,30 +729,6 @@ pub(crate) fn current_branch(repo: &Path) -> Option<String> {
         .filter(|s| !s.is_empty())
 }
 
-#[allow(dead_code)]
-pub(crate) fn has_only_main_branch(repo: &Path) -> bool {
-    let has_main = std_git_command()
-        .args(["rev-parse", "--verify", "refs/heads/main"])
-        .current_dir(repo)
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .status()
-        .map(|s| s.success())
-        .unwrap_or(false);
-    if !has_main {
-        return false;
-    }
-    let has_master = std_git_command()
-        .args(["rev-parse", "--verify", "refs/heads/master"])
-        .current_dir(repo)
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .status()
-        .map(|s| s.success())
-        .unwrap_or(false);
-    has_main && !has_master
-}
-
 pub(crate) fn has_only_master_branch(repo: &Path) -> bool {
     let has_master = std_git_command()
         .args(["rev-parse", "--verify", "refs/heads/master"])
