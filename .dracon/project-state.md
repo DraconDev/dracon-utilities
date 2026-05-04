@@ -1,20 +1,26 @@
 # Project State
 
 ## Current Focus
-Removed test configuration attribute from main.rs
+Improved test isolation and reliability by enhancing environment variable management and documenting parallel test constraints.
 
 ## Context
-The test configuration attribute was removed to simplify the module structure and reduce unnecessary compilation of test code in non-test builds.
+The changes address unpredictable test failures when running in parallel by:
+1) Making environment variable management more explicit and safe
+2) Documenting shared global states that cause race conditions
+3) Providing clear usage patterns for test isolation
 
 ## Completed
-- [x] Removed `#[cfg(test)]` attribute from test_helpers module
+- [x] Enhanced `EnvRestorer` to handle both setting and removing environment variables
+- [x] Added clear documentation for parallel test constraints
+- [x] Documented mitigations already in place for PATH and git binary issues
+- [x] Provided reliable test execution instructions
 
 ## In Progress
-- [ ] None
+- [ ] No active work in progress beyond these changes
 
 ## Blockers
-- None
+- No blockers identified - this is a documentation and refactoring improvement
 
 ## Next Steps
-1. Verify no test functionality is affected by this change
-2. Ensure test helpers are still accessible when needed
+1. Verify test reliability with `--test-threads=1` remains stable
+2. Monitor if parallel test execution becomes reliable without the documented constraints
