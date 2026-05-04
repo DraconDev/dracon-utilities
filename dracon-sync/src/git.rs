@@ -3223,7 +3223,7 @@ mod tests {
             .output()
             .expect("git reset");
 
-        let _lock = acquire_path_lock();
+        drop(acquire_path_lock());
         let result = push_to_named_remote(&repo, "mirror", 5, 0, true).await;
         assert!(result.is_ok(), "push with force_when_behind=true should succeed when remote is purely behind: {:?}", result);
     }
