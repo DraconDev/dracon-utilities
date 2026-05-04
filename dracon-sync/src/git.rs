@@ -1541,7 +1541,7 @@ pub(crate) fn fix_orphan_origin(repo: &Path, canonical_url: &str) -> Result<()> 
     Ok(())
 }
 
-#[allow(dead_code)]
+#[cfg(test)]
 pub(crate) fn acquire_path_lock() -> parking_lot::MutexGuard<'static, ()> {
     loop {
         if let Some(guard) = PATH_LOCK.try_lock() {
