@@ -1529,10 +1529,12 @@ pub(crate) fn detect_orphan_origin(repo: &Path) -> Option<(String, String)> {
     } else {
         (path_part, "")
     };
-    // Check for -N at the end
+    // Check for -N at the end (only single-digit: -1 through -9)
+    // The suffix bug only created -1 through -9, so higher numbers are likely
+    // legitimate version suffixes (e.g., api-v2, project-2024)
     if let Some(dash) = repo_part.rfind("-") {
         let suffix_num = &repo_part[dash + 1..];
-        if !suffix_num.is_empty() && suffix_num.chars().all(|c| c.is_ascii_digit()) {
+        if suffix_num.len() == 1 && suffix_num.chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false) {
             let prefix = &current[..current.len() - path_part.len()];
             let canonical_repo = &repo_part[..dash];
             let canonical = format!("{}{}{}", prefix, canonical_repo, suffix);
