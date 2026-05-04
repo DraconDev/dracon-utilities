@@ -2633,7 +2633,7 @@ mod tests {
         std::fs::write(&always_fail, "#!/bin/sh\n\
             echo 'always fail' >&2\n\
             exit 1\n\
-            ".to_string()).expect("write fail git");
+            ").expect("write fail git");
         std::fs::set_permissions(&always_fail, std::fs::Permissions::from_mode(0o755)).expect("chmod");
 
         let _lock = acquire_path_lock();
@@ -3085,7 +3085,7 @@ mod tests {
             .expect("git remote add");
 
         std::process::Command::new("git")
-            .args(["update-ref", &"refs/remotes/mirror/master".to_string(), &local_commit])
+            .args(["update-ref", "refs/remotes/mirror/master", &local_commit])
             .current_dir(&repo)
             .status()
             .expect("git update-ref");
@@ -3147,7 +3147,7 @@ mod tests {
         };
 
         std::process::Command::new("git")
-            .args(["update-ref", &"refs/remotes/mirror/master".to_string(), &remote_commit])
+            .args(["update-ref", "refs/remotes/mirror/master", &remote_commit])
             .current_dir(&repo)
             .status()
             .expect("git update-ref");
@@ -3212,7 +3212,7 @@ mod tests {
         };
 
         std::process::Command::new(real_git.as_path())
-            .args(["update-ref", &"refs/remotes/mirror/master".to_string(), &remote_commit])
+            .args(["update-ref", "refs/remotes/mirror/master", &remote_commit])
             .current_dir(&repo)
             .output()
             .expect("git update-ref");
@@ -3277,7 +3277,7 @@ mod tests {
         };
 
         std::process::Command::new("git")
-            .args(["update-ref", &"refs/remotes/mirror/master".to_string(), &remote_commit])
+            .args(["update-ref", "refs/remotes/mirror/master", &remote_commit])
             .current_dir(&repo)
             .status()
             .expect("git update-ref");
