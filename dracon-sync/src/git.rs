@@ -3627,10 +3627,15 @@ mod tests {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path();
         std::process::Command::new("git")
-            .args(["init", "-q", "-b", "master"])
+            .args(["init", "-q"])
             .current_dir(repo)
             .status()
             .expect("git init");
+        std::process::Command::new("git")
+            .args(["checkout", "-b", "master"])
+            .current_dir(repo)
+            .status()
+            .expect("git checkout master");
 
         let result = has_only_master_branch(repo);
         assert!(result, "should detect master-only repo");
