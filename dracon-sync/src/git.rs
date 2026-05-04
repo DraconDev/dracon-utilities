@@ -18,20 +18,18 @@ pub(crate) static PATH_LOCK: parking_lot::Mutex<()> = parking_lot::Mutex::new(()
 
 #[allow(dead_code)]
 fn real_git_path() -> PathBuf {
+    if let Ok(custom) = std::env::var("DRACON_SYNC_GIT_BIN") {
+        let trimmed = custom.trim();
+        if !trimmed.is_empty() {
+            return PathBuf::from(trimmed);
+        }
+    }
     static REAL_GIT: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
     REAL_GIT.get_or_init(|| {
-        if let Ok(which) = std::process::Command::new("which")
-            .arg("git")
-            .output()
-        {
-            if which.status.success() {
-                let path = String::from_utf8_lossy(&which.stdout).trim().to_string();
-                if !path.is_empty() {
-                    let p = PathBuf::from(&path);
-                    if p.exists() {
-                        return p;
-                    }
-                }
+        for candidate in ["/run/current-system/sw/bin/git", "/usr/bin/git", "/bin/git"] {
+            let path = PathBuf::from(candidate);
+            if path.exists() {
+                return path;
             }
         }
         PathBuf::from("git")
@@ -2572,6 +2570,7 @@ mod tests {
         let counter = tmp.path().join("call_counter");
         std::fs::write(&counter, "0").expect("write counter");
 
+        let real_git = real_git_path();
         let fail_script = tmp.path().join("git");
         let counter_path = counter.display().to_string();
         std::fs::write(&fail_script, format!(
@@ -2582,9 +2581,10 @@ mod tests {
                 echo $((count+1)) > {counter}\n\
                 exit 1\n\
             fi\n\
-            exec git \"$@\"\n\
+            exec {real_git} \"$@\"\n\
             ",
-            counter = counter_path
+            counter = counter_path,
+            real_git = real_git.display()
         )).expect("write fail script");
         std::fs::set_permissions(&fail_script, std::fs::Permissions::from_mode(0o755)).expect("chmod");
 
@@ -2593,27 +2593,27 @@ mod tests {
         let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
 
         let bare = tmp.path().join("bare.git");
-        std::process::Command::new("git")
+        std::process::Command::new(real_git.as_path())
             .args(["init", "--bare", &bare.to_string_lossy()])
             .output()
             .expect("git init --bare");
         let repo = tmp.path().join("repo");
-        std::process::Command::new("git")
+        std::process::Command::new(real_git.as_path())
             .args(["init", "-q", &repo.to_string_lossy()])
             .output()
             .expect("git init");
-        std::process::Command::new("git")
+        std::process::Command::new(real_git.as_path())
             .args(["remote", "add", "origin", &bare.to_string_lossy()])
             .current_dir(&repo)
             .output()
             .expect("git remote add");
         std::fs::write(repo.join("f"), "content").expect("write file");
-        std::process::Command::new("git")
+        std::process::Command::new(real_git.as_path())
             .args(["add", "f"])
             .current_dir(&repo)
             .output()
             .expect("git add");
-        std::process::Command::new("git")
+        std::process::Command::new(real_git.as_path())
             .args(["commit", "-m", "init"])
             .current_dir(&repo)
             .output()
@@ -3255,13 +3255,13 @@ mod tests {
             .status()
             .expect("git remote add");
 
-        let (local_commit, remote_commit) = {
+        let (_local_commit, remote_commit) = {
             let local = std::process::Command::new("git")
                 .args(["rev-parse", "HEAD"])
                 .current_dir(&repo)
                 .output()
                 .expect("git rev-parse");
-            let local = String::from_utf8_lossy(&local.stdout).trim().to_string();
+            let _local = String::from_utf8_lossy(&local.stdout).trim().to_string();
             std::process::Command::new("git")
                 .args(["commit", "--allow-empty", "-m", "other commit"])
                 .current_dir(&repo)
