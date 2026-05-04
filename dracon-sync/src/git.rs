@@ -2485,13 +2485,12 @@ mod tests {
         std::fs::write(&glab_mock, "#!/bin/sh\nif [ -n \"$GITLAB_TOKEN\" ]; then echo 'Token received'; fi\nexit 0\n").expect("write glab mock");
         std::fs::set_permissions(&glab_mock, std::fs::Permissions::from_mode(0o755)).expect("chmod");
 
-        std::env::set_var("GITLAB_TOKEN", "test_gitlab_token");
         let _lock = acquire_path_lock();
         let orig_path = std::env::var("PATH").unwrap_or_default();
         let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
+        let _glab_guard = EnvRestorer::new("GITLAB_TOKEN", "test_gitlab_token");
 
         let result = multi_remote::create_repo_on_gitlab("testuser", "test-repo");
-        std::env::remove_var("GITLAB_TOKEN");
 
         assert!(result.is_ok());
     }
@@ -2636,9 +2635,8 @@ mod tests {
         drop(_guard);
         drop(_lock);
 
-        std::env::set_var("DRACON_SYNC_GIT_BIN", always_fail.to_string_lossy().as_ref());
+        let _git_bin_guard = EnvRestorer::new("DRACON_SYNC_GIT_BIN", &always_fail.to_string_lossy());
         let result = crate::git::push_with_retries(&repo, 1, 2, "test-push-fail").await;
-        std::env::remove_var("DRACON_SYNC_GIT_BIN");
 
         assert!(result.is_err(), "push should fail after exhausting retries");
     }
@@ -2776,12 +2774,14 @@ mod tests {
         drop(_guard);
         drop(_lock);
 
-        std::env::set_var("DRACON_SYNC_GIT_BIN", always_fail.to_string_lossy().as_ref());
+        let _git_bin_guard = EnvRestorer::new("DRACON_SYNC_GIT_BIN", &always_fail.to_string_lossy());
         let result = crate::git::push_with_transport_fallbacks(&repo, 1, "test-push-both-fail").await;
-        std::env::remove_var("DRACON_SYNC_GIT_BIN");
 
         assert!(result.is_err(), "both SSH and HTTPS should fail");
     }
+
+    #[tokio::test]
+    async fn test_push_to_named_remote_unsafe_branch_skips_https_fallback() {
 
     #[tokio::test]
     async fn test_push_to_named_remote_ssh_success() {
@@ -2922,9 +2922,8 @@ mod tests {
         drop(_guard);
         drop(_lock);
 
-        std::env::set_var("DRACON_SYNC_GIT_BIN", always_fail.to_string_lossy().as_ref());
+        let _git_bin_guard = EnvRestorer::new("DRACON_SYNC_GIT_BIN", &always_fail.to_string_lossy());
         let result = multi_remote::push_to_named_remote(&repo, "mirror", 1, 0, false).await;
-        std::env::remove_var("DRACON_SYNC_GIT_BIN");
 
         assert!(result.is_err(), "push should fail");
     }
