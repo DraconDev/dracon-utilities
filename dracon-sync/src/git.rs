@@ -2636,29 +2636,28 @@ mod tests {
         let orig_path = std::env::var("PATH").unwrap_or_default();
         let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
 
-        let real_git = real_git_path();
         let bare = tmp.path().join("bare.git");
-        std::process::Command::new(real_git.as_path())
+        std::process::Command::new("git")
             .args(["init", "--bare", &bare.to_string_lossy()])
             .output()
             .expect("git init --bare");
         let repo = tmp.path().join("repo");
-        std::process::Command::new(real_git.as_path())
+        std::process::Command::new("git")
             .args(["init", "-q", &repo.to_string_lossy()])
             .output()
             .expect("git init");
-        std::process::Command::new(real_git.as_path())
+        std::process::Command::new("git")
             .args(["remote", "add", "origin", &bare.to_string_lossy()])
             .current_dir(&repo)
             .output()
             .expect("git remote add");
         std::fs::write(repo.join("f"), "content").expect("write file");
-        std::process::Command::new(real_git.as_path())
+        std::process::Command::new("git")
             .args(["add", "f"])
             .current_dir(&repo)
             .output()
             .expect("git add");
-        std::process::Command::new(real_git.as_path())
+        std::process::Command::new("git")
             .args(["commit", "-m", "init"])
             .current_dir(&repo)
             .output()
