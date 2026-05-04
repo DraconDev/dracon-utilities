@@ -3338,7 +3338,7 @@ mod tests {
         };
 
         std::process::Command::new("git")
-            .args(["update-ref", &format!("refs/remotes/mirror/master"), &remote_commit])
+            .args(["update-ref", "refs/remotes/mirror/master", &remote_commit])
             .current_dir(&repo)
             .status()
             .expect("git update-ref");
@@ -3349,9 +3349,11 @@ mod tests {
             .status()
             .expect("git reset");
 
-        let _lock = acquire_path_lock();
-        let result = push_to_named_remote(&repo, "mirror", 5, 0, false).await;
-        assert!(result.is_err(), "push with force_when_behind=false should fail with rejected error");
+        {
+            let _lock = acquire_path_lock();
+            let result = push_to_named_remote(&repo, "mirror", 5, 0, false).await;
+            assert!(result.is_err(), "push with force_when_behind=false should fail with rejected error");
+        }
     }
 
     #[test]
