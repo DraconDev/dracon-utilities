@@ -8,6 +8,8 @@ mod scribe;
 mod report;
 mod daemon;
 mod sync;
+#[cfg(test)]
+mod test_helpers;
 
 use anyhow::Result;
 use clap::{ArgAction, Parser, Subcommand};
