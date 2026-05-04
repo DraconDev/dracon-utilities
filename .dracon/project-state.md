@@ -1,22 +1,22 @@
 # Project State
 
 ## Current Focus
-Added environment variable management utilities for test isolation
+Refactored environment variable management in Git tests to use a shared `EnvRestorer` utility
 
 ## Context
-To prevent environment variable leaks between parallel test executions, we need a way to temporarily set and restore environment variables during tests.
+The changes improve test isolation and reduce boilerplate by consolidating environment variable management into a reusable utility. This was prompted by repeated manual environment variable handling in test cases.
 
 ## Completed
-- [x] Added `EnvRestorer` utility for test isolation
-- [x] Implemented scoped environment variable management
-- [x] Added documentation for usage patterns
+- [x] Removed duplicate `EnvRestorer` implementation from git.rs
+- [x] Updated all test cases to use the shared `EnvRestorer` from test_helpers
+- [x] Simplified test cleanup by using RAII pattern with `_guard` variables
 
 ## In Progress
-- [ ] None (all changes are complete)
+- [ ] No active work in progress
 
 ## Blockers
-- None (this is a utility implementation)
+- None identified
 
 ## Next Steps
-1. Use `EnvRestorer` in existing tests that need environment isolation
-2. Consider adding more test utilities as needed
+1. Verify all test cases still pass with the new implementation
+2. Consider adding more environment variable management utilities if needed
