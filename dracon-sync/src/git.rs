@@ -3723,6 +3723,11 @@ mod tests {
             .current_dir(repo)
             .status()
             .expect("git checkout main");
+        std::process::Command::new("git")
+            .args(["checkout", "master"])
+            .current_dir(repo)
+            .status()
+            .expect("git checkout master");
 
         prune_other_default_branch(repo).await;
 
@@ -3767,6 +3772,11 @@ mod tests {
             .current_dir(repo)
             .status()
             .expect("git checkout master");
+        std::process::Command::new("git")
+            .args(["checkout", "main"])
+            .current_dir(repo)
+            .status()
+            .expect("git checkout main");
 
         prune_other_default_branch(repo).await;
 
