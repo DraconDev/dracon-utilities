@@ -3734,12 +3734,12 @@ mod tests {
                 .expect("git branch");
             String::from_utf8_lossy(&output.stdout)
                 .lines()
-                .map(|s| s.trim_start_matches('*').trim())
+                .map(|s| s.trim_start_matches('*').trim().to_string())
                 .filter(|s| !s.is_empty())
-                .collect::<Vec<_>>()
+                .collect::<Vec<String>>()
         };
-        assert!(local_branches.contains(&"master"), "master should still exist: {:?}", local_branches);
-        assert!(!local_branches.contains(&"main"), "main should be deleted: {:?}", local_branches);
+        assert!(local_branches.contains(&"master".to_string()), "master should still exist: {:?}", local_branches);
+        assert!(!local_branches.contains(&"main".to_string()), "main should be deleted: {:?}", local_branches);
     }
 
     #[tokio::test]
@@ -3778,11 +3778,11 @@ mod tests {
                 .expect("git branch");
             String::from_utf8_lossy(&output.stdout)
                 .lines()
-                .map(|s| s.trim_start_matches('*').trim())
+                .map(|s| s.trim_start_matches('*').trim().to_string())
                 .filter(|s| !s.is_empty())
-                .collect::<Vec<_>>()
+                .collect::<Vec<String>>()
         };
-        assert!(local_branches.contains(&"main"), "main should still exist: {:?}", local_branches);
-        assert!(!local_branches.contains(&"master"), "master should be deleted: {:?}", local_branches);
+        assert!(local_branches.contains(&"main".to_string()), "main should still exist: {:?}", local_branches);
+        assert!(!local_branches.contains(&"master".to_string()), "master should be deleted: {:?}", local_branches);
     }
 }
