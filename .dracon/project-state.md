@@ -1,23 +1,21 @@
 # Project State
 
 ## Current Focus
-Added a Git command helper for test isolation to prevent PATH resolution races in parallel test runs.
+Improved Git test isolation by standardizing Git command execution in tests
 
 ## Context
-To improve test reliability, we need consistent Git command execution across parallel test runs. The previous approach relied on PATH resolution which could cause races when multiple tests ran simultaneously.
+The change standardizes how Git commands are executed in tests to ensure consistent behavior across all test cases, particularly around environment variable handling and binary resolution.
 
 ## Completed
-- [x] Added `test_git_cmd()` helper function that respects `DRACON_SYNC_GIT_BIN` environment variable
-- [x] Documented the helper function with usage examples
-- [x] Ensured the helper maintains the same interface as `std::process::Command`
+- [x] Added `test_git_cmd()` helper function to replace direct `std::process::Command::new("git")` calls
+- [x] Updated documentation to clarify test isolation requirements
 
 ## In Progress
-- [ ] No active work in progress
+- [x] Refactoring of Git test infrastructure
 
 ## Blockers
-- None identified
+- None identified in this change
 
 ## Next Steps
-1. Update existing tests to use the new helper function
-2. Verify no test failures occur due to the change
-3. Consider adding more test isolation utilities if needed
+1. Update remaining test cases to use the new `test_git_cmd()` helper
+2. Verify all Git-related tests maintain consistent behavior after this change
