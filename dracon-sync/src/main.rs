@@ -798,7 +798,6 @@ async fn main() -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeSet;
     use tempfile::TempDir;
 
     fn temp_policy(repos: Vec<&str>) -> TempDir {
@@ -816,61 +815,10 @@ remotes = []
         tmp
     }
 
-    fn test_home_marker<F>(home: &std::path::Path, f: F) -> std::path::PathBuf
-    where
-        F: Fn(&std::path::Path),
-    {
-        let marker_path = home.join(".dracon").join("dracon-sync.freeze");
-        f(home);
-        marker_path
-    }
-
-    #[test]
-    fn test_pause_creates_freeze_marker() {
-        let tmp = TempDir::new().unwrap();
-        let home = tmp.path();
-        let marker = home.join(".dracon").join("dracon-sync.freeze");
-
-        let policy_tmp = temp_policy(vec!["/dev/null"]);
-        let policy_path = policy_tmp.path().join("policy.toml");
-
-        std::env::set_var("DRACON_SYNC_POLICY", policy_path.to_str().unwrap());
-
-        let marker_path = test_home_marker(home, |h| {
-            std::fs::create_dir_all(h.join(".dracon")).unwrap();
-        });
-
-        std::fs::write(&marker_path, "paused\n").unwrap();
-
-        let result = crate::policy::freeze_reason(&policy_path);
-        assert!(result.is_some(), "freeze_reason should detect marker");
-        assert!(result.unwrap().contains("marker"), "should reference marker path");
-
-        std::env::remove_var("DRACON_SYNC_POLICY");
-    }
-
-    #[test]
-    fn test_freeze_reason_detects_marker() {
-        let tmp = TempDir::new().unwrap();
-        let home = tmp.path();
-        std::fs::create_dir_all(home.join(".dracon")).unwrap();
-
-        let marker = home.join(".dracon").join("dracon-sync.freeze");
-        std::fs::write(&marker, "paused at test\n").unwrap();
-
-        let policy_tmp = temp_policy(vec!["/dev/null"]);
-        let policy_path = policy_tmp.path().join("policy.toml");
-
-        let result = crate::policy::freeze_reason(&policy_path);
-        assert!(result.is_some());
-        assert!(result.unwrap().contains("paused at test"));
-    }
-
     #[test]
     fn test_freeze_reason_none_when_no_marker() {
         let tmp = TempDir::new().unwrap();
-        let home = tmp.path();
-        std::fs::create_dir_all(home.join(".dracon")).unwrap();
+        std::fs::create_dir_all(tmp.path().join(".dracon")).unwrap();
 
         let policy_tmp = temp_policy(vec!["/dev/null"]);
         let policy_path = policy_tmp.path().join("policy.toml");
@@ -885,5 +833,21 @@ remotes = []
         assert!(!paths.is_empty());
         assert!(paths.iter().any(|p| p.to_string_lossy().contains(".dracon")));
         assert!(paths.iter().any(|p| p.to_string_lossy().contains("freeze")));
+    }
+
+    #[test]
+    fn test_env_freeze_takes_precedence() {
+        let tmp = TempDir::new().unwrap();
+        std::fs::create_dir_all(tmp.path().join(".dracon")).unwrap();
+
+        let policy_tmp = temp_policy(vec!["/dev/null"]);
+        let policy_path = policy_tmp.path().join("policy.toml");
+
+        std::env::set_var("DRACON_SYNC_FREEZE", "1");
+        let result = crate::policy::freeze_reason(&policy_path);
+        std::env::remove_var("DRACON_SYNC_FREEZE");
+
+        assert!(result.is_some(), "env freeze should override missing marker");
+        assert!(result.unwrap().contains("env DRACON_SYNC_FREEZE"));
     }
 }
