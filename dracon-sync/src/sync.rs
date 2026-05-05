@@ -541,7 +541,7 @@ pub(crate) async fn sync_repo(
             }
 
             if policy.auto_push && has_origin
-                && !push_with_blob_check(repo, policy, blob_threshold, has_origin, 1, remote_failures).await? {
+                && !push_with_blob_check(repo, policy, blob_threshold, has_origin, 1, remote_failures, dry_run).await? {
                     return Ok(false);
                 }
         } else if policy.auto_push && !has_origin {
