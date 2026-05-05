@@ -19,6 +19,28 @@ use crate::git::multi_remote::{
 use crate::policy::{debug_enabled, load_repo_override, SyncPolicy};
 use crate::report::{build_commit_context, detect_report_signals, push_large_blob_threshold_bytes};
 
+fn notify_webhook_failure(webhook_url: &str, repo: &Path, remote: &str, error: &str) {
+    let payload = serde_json::json!({
+        "event": "push_failure",
+        "repo": repo.display().to_string(),
+        "remote": remote,
+        "error": error,
+        "timestamp": crate::policy::timestamp_secs(),
+    });
+    let url = webhook_url.to_string();
+    let payload_str = payload.to_string();
+    std::thread::spawn(move || {
+        if let Ok(client) = reqwest::blocking::Client::builder()
+            .timeout(Duration::from_secs(5))
+            .build()
+        {
+            if let Err(e) = client.post(&url).json(&payload_str).send() {
+                eprintln!("⚠️ webhook notification failed: {}", e);
+            }
+        }
+    });
+}
+
 pub(crate) async fn sync_repo(
     repo: &Path,
     policy: &SyncPolicy,
