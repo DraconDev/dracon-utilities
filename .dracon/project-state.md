@@ -1,15 +1,15 @@
 # Project State
 
 ## Current Focus
-Added dry-run support for file deletion operations during repository synchronization
+Added dry-run support for commit operations in repository synchronization
 
 ## Context
-This change implements dry-run capability for the `git rm` operations in the sync process, allowing users to preview what would be deleted without actually performing the deletion.
+This change extends the existing dry-run capability to include commit operations, allowing users to preview changes before they are actually committed to the repository.
 
 ## Completed
-- [x] Added dry-run mode for `git rm` operations
-- [x] Improved logging for dry-run operations to show what would be deleted
-- [x] Maintained existing functionality when dry-run is disabled
+- [x] Added dry-run mode for commit operations
+- [x] Enhanced commit preview with file status and message display
+- [x] Maintained existing commit functionality when dry-run is disabled
 
 ## In Progress
 - [ ] None
@@ -18,6 +18,5 @@ This change implements dry-run capability for the `git rm` operations in the syn
 - None
 
 ## Next Steps
-1. Verify dry-run output formatting and completeness
-2. Ensure dry-run mode doesn't affect actual repository state
-3. Document the new dry-run capability in user documentation
+1. Verify dry-run output formatting and content accuracy
+2. Test dry-run mode with various commit scenarios

@@ -485,8 +485,19 @@ pub(crate) async fn sync_repo(
             // Stable identity subject with rich JSON body.
             let msg = build_commit_message(&ctx);
 
-            svc.commit(&msg).await?;
-            eprintln!("📝 committed {} file(s) in {}", committed_entries.len(), repo.display());
+            if dry_run {
+                println!("📝 Would commit {} file(s) in {}:", committed_entries.len(), repo.display());
+                for entry in committed_entries.iter().take(10) {
+                    println!("  {:?}: {}", entry.status, entry.path.display());
+                }
+                if committed_entries.len() > 10 {
+                    println!("  ... and {} more", committed_entries.len() - 10);
+                }
+                println!("  message: {}", msg.lines().next().unwrap_or("(empty)"));
+            } else {
+                svc.commit(&msg).await?;
+                eprintln!("📝 committed {} file(s) in {}", committed_entries.len(), repo.display());
+            }
 
             // Forbid creation of the "other" default branch (main vs master).
             // If someone or something created the non-canonical branch, delete it.
