@@ -1,20 +1,21 @@
 # Project State
 
 ## Current Focus
-Added dead code suppression for Git command helper in test helpers
+Added test-specific attribute to Git command helper to ensure proper test isolation
 
 ## Context
-This change was made to address compiler warnings about unused code in the test helper function `test_git_cmd()`, which was recently added for improved Git test isolation.
+This change ensures the Git command helper is only available during tests, preventing accidental use in production code while maintaining test reliability.
 
 ## Completed
-- [x] Added `#[allow(dead_code)]` attribute to suppress compiler warnings for the unused Git command helper
+- [x] Added `#[cfg(test)]` attribute to `test_git_cmd()` to restrict its use to test contexts
+- [x] Maintained existing functionality while adding proper test isolation
 
 ## In Progress
-- [x] No active work in progress related to this change
+- [ ] None
 
 ## Blockers
 - None
 
 ## Next Steps
-1. Verify the test helper continues to function correctly with the new attribute
-2. Review other test helpers for similar dead code warnings that may need suppression
+1. Verify test isolation improvements in CI pipeline
+2. Consider adding more test-specific utilities if needed
