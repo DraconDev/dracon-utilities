@@ -659,6 +659,9 @@ async fn push_with_blob_check(
             for (name, result) in &push_results {
                 if let Err(e) = result {
                     eprintln!("⚠️ push to {} failed for {}: {}", name, repo.display(), e);
+                    if let Some(ref url) = policy.webhook_url {
+                        notify_webhook_failure(url, repo, name, &e.to_string());
+                    }
                     if let Some(ref mut rf) = remote_failures {
                         *rf.entry(name.clone()).or_insert(0) += 1;
                     }
