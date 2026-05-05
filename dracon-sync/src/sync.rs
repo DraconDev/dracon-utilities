@@ -515,61 +515,8 @@ pub(crate) async fn sync_repo(
     // Re-fetch status for push decision (may have changed after pull/commit)
     let current_status = svc.get_status().await?;
     if policy.auto_push && current_status.ahead > 0 && has_origin {
-        let ahead_large = match detect_large_blobs_ahead(repo, blob_threshold) {
-            Ok(v) => v,
-            Err(e) => {
-                eprintln!("⚠️ large blob detection failed for {}: {} - skipping push", repo.display(), e);
-                return Ok(false);
-            }
-        };
-        if !ahead_large.is_empty() {
-            eprintln!(
-                "⚠️ skip push for {}: large blob(s) above {} bytes in ahead range ({} found)",
-                repo.display(),
-                blob_threshold,
-                ahead_large.len()
-            );
+        if !push_with_blob_check(repo, policy, blob_threshold, has_origin, current_status.ahead, remote_failures.as_mut()).await? {
             return Ok(false);
-        }
-        match push_with_retries(
-            repo,
-            policy.push_op_timeout_secs,
-            policy.push_retries,
-            "push",
-        )
-        .await
-        {
-            Ok(()) => {}
-            Err(e) => {
-                eprintln!("⚠️ push failed for {}: {}", repo.display(), e);
-                return Ok(false);
-            }
-        }
-
-        // Push to additional named remotes after origin push succeeds
-        if !policy.remotes.is_empty() {
-            let push_results = push_mirror_remotes(
-                repo,
-                &policy.remotes,
-                policy.push_op_timeout_secs,
-                policy.push_retries,
-            ).await;
-            let all_ok = push_results.iter().all(|(_, r)| r.is_ok());
-            if !all_ok {
-                for (name, result) in &push_results {
-                    if let Err(e) = result {
-                        eprintln!("⚠️ push to {} failed for {}: {}", name, repo.display(), e);
-                        if let Some(ref mut rf) = remote_failures {
-                            *rf.entry(name.clone()).or_insert(0) += 1;
-                        }
-                    }
-                }
-                return Ok(false);
-            } else if let Some(ref mut rf) = remote_failures {
-                for name in policy.remotes.iter().map(|r| r.name.clone()) {
-                    rf.remove(&name);
-                }
-            }
         }
     } else if policy.auto_push && current_status.ahead > 0 && !has_origin {
         eprintln!("ℹ️ skip push for {} (no origin remote)", repo.display());
