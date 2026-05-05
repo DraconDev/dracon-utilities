@@ -602,6 +602,12 @@ pub(crate) fn validate_config(policy_path: &Path) -> ValidateResult {
         result.error("max_stage_file_bytes must be > 0".to_string());
     }
 
+    if let Some(ref url) = policy.webhook_url {
+        if !url.starts_with("http://") && !url.starts_with("https://") {
+            result.error(format!("webhook_url '{}' is not a valid http/https URL", url));
+        }
+    }
+
     result
 }
 

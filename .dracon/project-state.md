@@ -1,21 +1,21 @@
 # Project State
 
 ## Current Focus
-Added webhook notification for failed push operations in repository synchronization.
+Added webhook URL validation for SyncPolicy configuration
 
 ## Context
-This change enhances error reporting by notifying an external webhook when a repository push operation fails. This provides immediate visibility into synchronization issues for monitoring systems.
+To ensure webhook notifications are properly configured, we need to validate that the webhook_url (if provided) is a valid HTTP/HTTPS URL. This prevents misconfigured webhooks from causing silent failures in notification delivery.
 
 ## Completed
-- [x] Added webhook notification for failed push operations
-- [x] Integrated with existing SyncPolicy configuration
+- [x] Added URL validation for webhook_url in SyncPolicy configuration
+- [x] Added error message for invalid URLs (non-http/https schemes)
 
 ## In Progress
-- [ ] None (this is a complete feature addition)
+- [ ] Testing webhook notification delivery with valid/invalid URLs
 
 ## Blockers
-- None (this is a standalone feature)
+- Need to verify webhook endpoint behavior with various URL formats
 
 ## Next Steps
-1. Verify webhook notification reliability in production environments
-2. Document the webhook payload format for external consumers
+1. Implement webhook notification delivery logic
+2. Add integration tests for webhook functionality
