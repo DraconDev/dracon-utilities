@@ -16,7 +16,7 @@ use clap::{ArgAction, Parser, Subcommand};
 use std::path::PathBuf;
 use std::sync::atomic::Ordering;
 
-use policy::{resolve_policy_path, SyncPolicy};
+use policy::{resolve_policy_path, SyncPolicy, timestamp_secs};
 use policy::freeze_reason;
 use exclude::excluded_dir_names_set;
 use report::{ConcernRepairFilter, RepoFilter, push_large_blob_threshold_bytes, run_repair_concerns, run_repair_warns, run_repos_report};
@@ -310,7 +310,7 @@ async fn main() -> Result<()> {
         Command::Pause => {
             if let Some(home) = dirs::home_dir() {
                 let marker = home.join(".dracon").join("dracon-sync.freeze");
-                std::fs::write(&marker, format!("paused at {}\n", chrono_lite_timestamp()))?;
+                std::fs::write(&marker, format!("paused at {}\n", timestamp_secs()))?;
                 println!("⏸️  Sync paused (freeze marker: {})", marker.display());
             } else {
                 anyhow::bail!("cannot determine home directory");
