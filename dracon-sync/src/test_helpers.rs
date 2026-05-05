@@ -69,7 +69,6 @@ pub(crate) fn test_git_cmd() -> std::process::Command {
     std::process::Command::new(git_path)
 }
 
-#[cfg(test)]
 pub(crate) struct EnvRestorer {
     key: String,
     old_value: Option<String>,

@@ -1,20 +1,21 @@
 # Project State
 
 ## Current Focus
-Added test-specific attribute to Git command helper to ensure proper test isolation.
+Removed test-specific attribute from Git command helper to simplify test environment management.
 
 ## Context
-This change was prompted by the need to improve test reliability by ensuring the Git command helper is only available in test contexts. This prevents accidental use in production code while maintaining test isolation.
+The test-specific attribute (`#[cfg(test)]`) was previously used to mark the `EnvRestorer` struct as test-only. This change removes that restriction, making the environment variable management utilities more widely usable across the codebase.
 
 ## Completed
-- [x] Added `#[cfg(test)]` attribute to `EnvRestorer` struct to restrict its use to test code only
+- [x] Removed `#[cfg(test)]` attribute from `EnvRestorer` struct to make it available in non-test contexts
+- [x] Maintained all existing functionality while improving code reusability
 
 ## In Progress
-- [x] No active work in progress beyond this change
+- [ ] None
 
 ## Blockers
-- None identified for this specific change
+- None
 
 ## Next Steps
-1. Verify the change doesn't break existing tests
-2. Consider adding more test-specific utilities if needed
+1. Review any dependent code that might need adjustments due to the broader visibility of `EnvRestorer`
+2. Consider adding integration tests to verify the utility's behavior in non-test scenarios
