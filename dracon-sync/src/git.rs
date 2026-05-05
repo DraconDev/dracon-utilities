@@ -1172,7 +1172,7 @@ pub(crate) async fn push_mirror_remotes(
 
     configure_all_remotes(repo, remotes, &repo_name);
 
-    for (remote_name, create_result) in auto_create_all_remotes(remotes, &repo_name) {
+    for (remote_name, create_result) in auto_create_all_remotes(remotes, &repo_name).await {
         match create_result {
             Ok(_) => {}
             Err(e) => {
@@ -1458,7 +1458,7 @@ pub(crate) async fn auto_create_all_remotes(remotes: &[RemoteConfig], repo_name:
         for remote in remotes {
             if remote.auto_create {
                 let resolved_name = remote.resolve_repo_name(repo_name);
-                let result = auto_create_repo(remote, &resolved_name);
+                let result = auto_create_repo(remote, &resolved_name).await;
                 results.push((remote.name.clone(), result));
             }
         }
