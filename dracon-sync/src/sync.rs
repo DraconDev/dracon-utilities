@@ -28,13 +28,12 @@ fn notify_webhook_failure(webhook_url: &str, repo: &Path, remote: &str, error: &
         "timestamp": crate::policy::timestamp_secs(),
     });
     let url = webhook_url.to_string();
-    let payload_str = payload.to_string();
     std::thread::spawn(move || {
         if let Ok(client) = reqwest::blocking::Client::builder()
             .timeout(Duration::from_secs(5))
             .build()
         {
-            if let Err(e) = client.post(&url).json(&payload_str).send() {
+            if let Err(e) = client.post(&url).json(&payload).send() {
                 eprintln!("⚠️ webhook notification failed: {}", e);
             }
         }
@@ -633,6 +632,9 @@ async fn push_with_blob_check(
         Ok(()) => {}
         Err(e) => {
             eprintln!("⚠️ push failed for {}: {}", repo.display(), e);
+            if let Some(ref url) = policy.webhook_url {
+                notify_webhook_failure(url, repo, "origin", &e.to_string());
+            }
             return Ok(false);
         }
     }
