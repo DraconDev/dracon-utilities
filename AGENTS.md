@@ -2,6 +2,19 @@
 
 CLI binaries for dracon system services. These install to `~/.local/bin/` and run as systemd user services.
 
+## Table of Contents
+1. [Architecture](#architecture)
+2. [Prerequisites](#prerequisites)
+3. [Installation](#installation)
+4. [Design Philosophy](#design-philosophy-sync-is-invisible-infrastructure)
+5. [Operational State](#operational-state)
+6. [Services](#services)
+7. [Policy Files](#policy-files)
+8. [AI Configuration](#ai-configuration)
+9. [CLI Reference](#cli-reference)
+10. [The Scribe](#the-scribe-ai-working-memory)
+11. [Testing](#testing)
+
 ## Architecture
 
 ```
