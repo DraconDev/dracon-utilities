@@ -965,13 +965,13 @@ pub(crate) async fn run_repair_concerns(
 
         if status.behind > 0 && has_upstream {
             attempted_ops += 1;
-            out!("   plan: pull --rebase --autostash");
+            out!("   plan: pull --no-rebase (merge)");
             if apply {
                 match run_git_with_timeout(
                     &repo,
-                    &["pull", "--rebase", "--autostash"],
+                    &["pull", "--no-rebase"],
                     policy.pull_op_timeout_secs,
-                    "pull/rebase",
+                    "pull/merge",
                 )
                 .await
                 {
@@ -985,7 +985,7 @@ pub(crate) async fn run_repair_concerns(
                                 scope: "concern".to_string(),
                                 repo: repo.display().to_string(),
                                 reason: reason.clone(),
-                                action: "pull_rebase_autostash".to_string(),
+                                action: "pull_merge".to_string(),
                                 backup_branch: None,
                                 result: "ok".to_string(),
                                 details: None,
@@ -1001,7 +1001,7 @@ pub(crate) async fn run_repair_concerns(
                                 scope: "concern".to_string(),
                                 repo: repo.display().to_string(),
                                 reason: reason.clone(),
-                                action: "pull_rebase_autostash".to_string(),
+                                action: "pull_merge".to_string(),
                                 backup_branch: None,
                                 result: "fail".to_string(),
                                 details: Some(e.to_string()),
