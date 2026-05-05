@@ -1,27 +1,21 @@
 # Project State
 
 ## Current Focus
-Added comprehensive configuration validation for sync policies
+Added a new `ValidateConfig` command to check sync policy configurations for errors and warnings.
 
 ## Context
-The project needed robust validation of sync policy configurations to prevent runtime errors and ensure proper operation of the synchronization system.
+This change supports the comprehensive configuration validation work that was recently completed. It provides a way to verify sync policies before execution, improving reliability.
 
 ## Completed
-- [x] Added `ValidateResult` struct to track validation errors and warnings
-- [x] Implemented comprehensive validation of watch roots (existence and directory checks)
-- [x] Validated remote configurations including URL patterns and authentication settings
-- [x] Added checks for repository name mappings and exclusion patterns
-- [x] Implemented validation of numeric configuration values (intervals, retries, etc.)
-- [x] Added warning system for potential configuration issues
-- [x] Created comprehensive error reporting for all validation failures
+- [x] Added `ValidateConfig` command variant to the `Command` enum
+- [x] Documented the new command with a description
 
 ## In Progress
-- [ ] None (validation system is complete)
+- [ ] Implement the actual validation logic for sync policies
 
 ## Blockers
-- None (validation system is complete)
+- Need to define specific validation rules and error handling for sync policies
 
 ## Next Steps
-1. Integrate validation into the main configuration loading process
-2. Add unit tests for the validation logic
-3. Document the validation rules in the project documentation
+1. Implement validation logic for sync policies
+2. Add integration tests for the validation command

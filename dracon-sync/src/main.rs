@@ -44,6 +44,8 @@ enum Command {
         #[arg(long)]
         json: bool,
     },
+    /// Validate the sync policy for errors and warnings.
+    ValidateConfig,
     /// One-off report across discovered repositories.
     Repos {
         /// Show only concern repos.
