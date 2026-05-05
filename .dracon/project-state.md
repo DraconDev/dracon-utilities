@@ -1,20 +1,24 @@
 # Project State
 
 ## Current Focus
-Updated test count in AGENTS.md for dracon-sync module.
+Added webhook notifications for failed push operations in repository synchronization.
 
 ## Context
-The dracon-sync module's test count was incremented to reflect new tests added to main.rs.
+To improve observability and incident response, the system now sends HTTP POST notifications when push operations fail, including details like the repository path, remote name, error message, and timestamp.
 
 ## Completed
-- [x] Updated test count from 334 to 349 in AGENTS.md
+- [x] Added optional `webhook_url` configuration in SyncPolicy
+- [x] Implemented fire-and-forget HTTP POST for push failures
+- [x] Included structured JSON payload with failure details
+- [x] Background execution with 5s timeout to avoid blocking sync operations
 
 ## In Progress
-- [ ] None
+- [ ] None (feature complete)
 
 ## Blockers
-- None
+- None (feature is optional and non-blocking)
 
 ## Next Steps
-1. Verify the test count matches the actual number in the codebase
-2. Ensure the documentation remains accurate as more tests are added
+1. Document webhook payload structure in AGENTS.md
+2. Add integration tests for webhook notifications
+3. Consider adding retry logic for webhook failures

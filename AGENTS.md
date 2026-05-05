@@ -164,6 +164,27 @@ This maps local `.dracon` → `dracon-home` on GitLab while keeping `.dracon` on
 
 **Push-to-create is disabled** for Codeberg because Forgejo (the underlying software on Codeberg.org) does not allow `git push` to create new repos. You must manually create repos on Codeberg first, or enable push-to-create in Forgejo settings. Set `auto_create = false` for the Codeberg remote (the default).
 
+### Webhook Notifications
+
+On push failures (origin or mirror remotes), `dracon-sync` can send a fire-and-forget HTTP POST to a configured webhook URL:
+
+```toml
+webhook_url = "https://your-webhook-endpoint.example/notify"
+```
+
+Payload:
+```json
+{
+  "event": "push_failure",
+  "repo": "/path/to/repo",
+  "remote": "origin",
+  "error": "connection timeout after 300s",
+  "timestamp": 1714896000
+}
+```
+
+The request runs in a background thread with a 5s timeout — webhook failures do not block sync operations.
+
 ## CLI Reference
 
 All binaries support `-V, --version` and `-v, --verbose` (repeatable up to 2x for `-vv`).
