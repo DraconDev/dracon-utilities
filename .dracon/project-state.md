@@ -1,21 +1,21 @@
 # Project State
 
 ## Current Focus
-Added dry-run support to the push operation in repository synchronization
+Added dry-run support to the `SyncNow` command to preview changes without making them.
 
 ## Context
-This change enables dry-run mode for push operations, allowing users to simulate synchronization without making actual changes to the remote repository. This was prompted by the need to add comprehensive dry-run capabilities across all synchronization operations.
+This change enables users to test synchronization operations before actually executing them, reducing the risk of unintended changes.
 
 ## Completed
-- [x] Added dry-run parameter to `push_with_blob_check` function call in `sync_repo`
-- [x] Integrated dry-run support with existing push operation logic
+- [x] Added `dry_run` boolean flag to `SyncNow` command
+- [x] Marked flag as optional with `--dry-run` syntax
 
 ## In Progress
-- [x] Dry-run support is now available for push operations
+- [ ] Integration with actual sync operations to respect the dry-run flag
 
 ## Blockers
-- None identified for this specific change
+- Need to implement dry-run behavior across all sync operations
 
 ## Next Steps
-1. Verify dry-run behavior across all test cases
-2. Document the new dry-run functionality in user documentation
+1. Propagate dry-run flag through sync operations
+2. Add user feedback for dry-run mode (e.g., "Would sync X files")
