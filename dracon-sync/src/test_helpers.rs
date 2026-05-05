@@ -52,6 +52,8 @@
 ///
 /// # Fast but may have flaky failures:
 /// cargo test
+/// ```
+///
 /// # Git Command Helper
 ///
 /// Use `test_git_cmd()` instead of `std::process::Command::new("git")` in tests.
