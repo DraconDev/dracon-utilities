@@ -1250,7 +1250,7 @@ push_url = "git@nonexistent.example.com:repo.git"
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
         let mut remote_failures = HashMap::new();
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, Some(&mut remote_failures)).await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, Some(&mut remote_failures), false).await;
         assert!(result.is_ok());
         assert!(!result.unwrap(), "mirror push failure should return false");
         assert_eq!(remote_failures.get("bad-mirror"), Some(&1), "bad-mirror failure should be tracked");
