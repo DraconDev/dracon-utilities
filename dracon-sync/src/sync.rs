@@ -573,6 +573,7 @@ async fn push_with_blob_check(
     has_origin: bool,
     ahead: usize,
     mut remote_failures: Option<&mut HashMap<String, usize>>,
+    dry_run: bool,
 ) -> Result<bool> {
     if !policy.auto_push || !has_origin || ahead == 0 {
         return Ok(true);
