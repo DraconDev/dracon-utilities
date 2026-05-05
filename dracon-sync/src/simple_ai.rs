@@ -137,51 +137,13 @@ impl SimpleAiService {
     }
 
     fn get_api_key(env_name: &str) -> Option<String> {
-        if let Ok(key) = std::env::var(env_name) {
-            if !key.is_empty() {
-                return Some(key);
-            }
-        }
-
-        let secrets_dir = Self::secrets_path();
-
-        if let Ok(entries) = std::fs::read_dir(&secrets_dir) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if path.extension().is_some_and(|e| e == "env") {
-                    if let Ok(content) = std::fs::read_to_string(&path) {
-                        for line in content.lines() {
-                            let line = line.trim();
-                            if line.is_empty() || line.starts_with('#') {
-                                continue;
-                            }
-                            if let Some((key, value)) = line.split_once('=') {
-                                if key.trim() == env_name {
-                                    let value = value.trim();
-                                    if !value.is_empty() {
-                                        return Some(value.to_string());
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        None
+        crate::secrets::load_secret(env_name, &crate::secrets::ai_secrets_dir())
     }
 
     fn config_path() -> PathBuf {
         dirs::home_dir()
             .unwrap_or_else(|| PathBuf::from("."))
             .join(".dracon/utilities/sync/ai.toml")
-    }
-
-    fn secrets_path() -> PathBuf {
-        dirs::home_dir()
-            .unwrap_or_else(|| PathBuf::from("."))
-            .join(".dracon/utilities/sync/ai/secrets")
     }
 
     fn load_config(path: &PathBuf) -> Result<AiConfig> {
