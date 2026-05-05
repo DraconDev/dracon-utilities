@@ -47,7 +47,11 @@ mod tests {
     #[test]
     fn test_is_excluded_dir_name_trailing_hyphen() {
         let excluded: BTreeSet<String> = [".tmp-".to_string()].into_iter().collect();
+        // .tmp- matches .tmp-* (the hyphen is part of the prefix)
         assert!(is_excluded_dir_name(".tmp-file", &excluded));
+        assert!(is_excluded_dir_name(".tmp-abc", &excluded));
+        assert!(is_excluded_dir_name(".tmp-123", &excluded));
+        // .tmpfile does NOT start with .tmp- (no hyphen), so NOT excluded
         assert!(!is_excluded_dir_name(".tmpfile", &excluded));
     }
 

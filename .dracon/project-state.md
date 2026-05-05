@@ -1,22 +1,21 @@
 # Project State
 
 ## Current Focus
-Refined directory exclusion patterns to improve precision in file synchronization.
+Improved directory exclusion pattern matching for `.tmp-*` style patterns
 
 ## Context
-The previous implementation had an edge case where patterns ending with `-` (like `.tmp-`) incorrectly matched names without trailing hyphens (like `.tmpfile`). This could lead to unintended exclusions.
+The change enhances the precision of directory exclusion by properly handling hyphen-prefixed patterns like `.tmp-*`, which were previously not fully supported in the exclusion logic.
 
 ## Completed
-- [x] Fixed `.tmp-` pattern to only match names ending with `-` (e.g., `.tmp-` matches `.tmp-foo` but not `.tmpfile`)
-- [x] Added explicit comment explaining the `.tmp-` prefix matching behavior
-- [x] Added support for glob-style `*` suffix patterns (e.g., `.build*` matches `.build-debug`)
+- [x] Added test cases for `.tmp-*` pattern matching
+- [x] Fixed exclusion logic to properly match hyphen-prefixed patterns
 
 ## In Progress
-- [ ] No active work in progress
+- [ ] None (this is a focused bug fix)
 
 ## Blockers
-- None identified
+- None (this is a complete, targeted improvement)
 
 ## Next Steps
-1. Verify the new patterns work as expected in integration tests
-2. Document the updated exclusion pattern syntax in user documentation
+1. Verify the new exclusion patterns work in integration tests
+2. Document the new exclusion pattern syntax in user documentation
