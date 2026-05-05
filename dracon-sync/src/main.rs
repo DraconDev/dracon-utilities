@@ -147,6 +147,8 @@ enum Command {
         #[arg(long)]
         json: bool,
     },
+    /// Print Prometheus-style metrics.
+    Metrics,
 }
 
 #[derive(Subcommand, Debug)]

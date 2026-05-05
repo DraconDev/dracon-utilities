@@ -1,23 +1,21 @@
 # Project State
 
 ## Current Focus
-Enhanced the `SyncNow` command to support multiple repository paths and improved error handling.
+Added a new `Metrics` command to support Prometheus-style metrics output.
 
 ## Context
-This change was prompted by the need to handle multiple repositories in a single sync operation, which was previously limited to one repository at a time. The update also improves error handling by properly reporting sync failures for individual repositories.
+This change extends the CLI interface to include a metrics endpoint, which is crucial for monitoring and observability in production environments.
 
 ## Completed
-- [x] Added support for multiple repository paths in `SyncNow` command
-- [x] Improved error handling with proper error reporting for failed syncs
-- [x] Maintained dry-run functionality for each repository
-- [x] Preserved existing stuck repository detection
+- [x] Added `Metrics` command variant to the `Command` enum
+- [x] Documented the new command with a descriptive docstring
 
 ## In Progress
-- [ ] None (this change is complete)
+- [ ] Implementation of actual metrics collection and formatting
 
 ## Blockers
-- None (this change is complete)
+- Need to define which metrics to expose and their format
 
 ## Next Steps
-1. Update documentation to reflect the new multi-repository support
-2. Add integration tests for the multi-repository sync functionality
+1. Implement metrics collection logic
+2. Add integration tests for the metrics endpoint
