@@ -1,22 +1,21 @@
 # Project State
 
 ## Current Focus
-Refactored private remote directory handling to use platform-appropriate data directories.
+Refactored version parsing and notification handling for better reliability
 
 ## Context
-The previous implementation used a hardcoded home directory path, which isn't portable across platforms. This change uses `dirs::data_dir()` as the primary location, falling back to home directory if needed, and ensures the directory structure is created properly.
+The changes improve version parsing reliability and make desktop notifications non-blocking to prevent daemon delays
 
 ## Completed
-- [x] Changed private remotes directory path to use platform-appropriate data directory
-- [x] Added fallback to home directory if data directory isn't available
-- [x] Maintained existing directory creation logic
+- [x] Refactored version parsing in bump.rs to use serde_json for more robust JSON handling
+- [x] Made desktop notifications run in background using tokio::spawn to prevent blocking
 
 ## In Progress
-- [ ] None
+- [ ] No active work in progress
 
 ## Blockers
-- None
+- None identified
 
 ## Next Steps
-1. Verify cross-platform behavior on Windows and macOS
-2. Ensure existing functionality remains unchanged for users with existing configurations
+1. Verify the new version parsing works with all supported version file formats
+2. Test notification behavior under high daemon load conditions

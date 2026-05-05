@@ -167,24 +167,8 @@ fn extract_version_from_cargo(content: &str) -> Option<String> {
 }
 
 fn extract_version_from_json(content: &str, key: &str) -> Option<String> {
-    let needle = format!("\"{}\"", key);
-    let start = 0usize;
-    if let Some(idx) = content[start..].find(&needle) {
-        let key_pos = start + idx;
-        let after_key = key_pos + needle.len();
-        let rest = &content[after_key..];
-        let colon_rel = rest.find(':')?;
-        let after_colon = after_key + colon_rel + 1;
-        let rest2 = &content[after_colon..];
-        let q1_rel = rest2.find('"')?;
-        let q1 = after_colon + q1_rel + 1;
-        let rest3 = &content[q1..];
-        let q2_rel = rest3.find('"')?;
-        let q2 = q1 + q2_rel;
-        Some(content[q1..q2].to_string())
-    } else {
-        None
-    }
+    let value: serde_json::Value = content.parse().ok()?;
+    value.get(key)?.as_str().map(|s| s.to_string())
 }
 
 
