@@ -2081,8 +2081,8 @@ mod tests {
         assert!(err_msg.contains("cannot auto-create"), "error should mention auto-create not supported");
     }
 
-    #[test]
-    fn test_auto_create_all_remotes_codeberg_missing_token() {
+    #[tokio::test]
+    async fn test_auto_create_all_remotes_codeberg_missing_token() {
         // Make load_secret look in a temp dir so real secrets file isn't found
         let tmp_home = tempfile::TempDir::new().expect("temp dir");
         let _home_guard = EnvRestorer::new("HOME", &tmp_home.path().to_string_lossy());
@@ -2101,8 +2101,7 @@ mod tests {
             force_push_when_behind: false,
         }];
 
-        let results = crate::git::multi_remote::auto_create_all_remotes(&remotes, "test-repo");
-
+        let results = crate::git::multi_remote::auto_create_all_remotes(&remotes, "test-repo").await;
 
         assert_eq!(results.len(), 1);
         assert!(results[0].1.is_err(), "Codeberg without token should return error");
