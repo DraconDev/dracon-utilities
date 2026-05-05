@@ -396,12 +396,17 @@ pub(crate) fn is_excluded_dir_name(name: &str, excluded_dir_names: &BTreeSet<Str
         if normalized_pattern == normalized {
             return true;
         }
-        // .tmp- prefix pattern: only matches .tmp-* (not .tmpfile)
+        // .tmp- prefix pattern: matches .tmp-* only (e.g., .tmp-file, .tmp-abc)
+        // NOT .tmpfile (no hyphen after .tmp) or .tmp (exact match handled above)
         if pattern.ends_with('-')
             && pattern.starts_with('.')
-            && normalized.starts_with(&normalized_pattern[..normalized_pattern.len() - 1])
+            && normalized.len() > normalized_pattern.len() - 1
+            && normalized.as_bytes()[normalized_pattern.len() - 1] == b'-'
         {
-            return true;
+            let prefix = &normalized[..normalized_pattern.len() - 1];
+            if normalized.starts_with(prefix) {
+                return true;
+            }
         }
         // Glob-style * suffix: .build* matches .build-debug
         if pattern.ends_with('*') && normalized.starts_with(&pattern[..pattern.len() - 1]) {
