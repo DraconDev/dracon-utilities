@@ -25,6 +25,7 @@ pub(crate) async fn sync_repo(
     excluded_dir_names: &BTreeSet<String>,
     idle_seconds: u64,
     remote_failures: Option<&mut HashMap<String, usize>>,
+    dry_run: bool,
 ) -> Result<bool> {
     let svc = GitService::new(repo)?;
     if !svc.is_git_repo().await? {
