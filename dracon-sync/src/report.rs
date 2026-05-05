@@ -2062,7 +2062,7 @@ mod tests {
     #[test]
     fn test_repo_hint_behind() {
         let hint = repo_hint(&["BEHIND:2".into()], false, false);
-        assert_eq!(hint, "run repair-concerns --apply (pull/rebase)");
+        assert_eq!(hint, "run repair-concerns --apply (pull/merge)");
     }
 
     #[test]
