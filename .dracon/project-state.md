@@ -1,20 +1,23 @@
 # Project State
 
 ## Current Focus
-Refactored Git test isolation by changing the path lock function's visibility from `dead_code` to test-specific configuration.
+Added a Git command helper for test isolation to prevent PATH resolution races in parallel test runs.
 
 ## Context
-This change improves test reliability by ensuring the path lock utility is only available during testing, preventing accidental use in production code.
+To improve test reliability, we need consistent Git command execution across parallel test runs. The previous approach relied on PATH resolution which could cause races when multiple tests ran simultaneously.
 
 ## Completed
-- [x] Changed `acquire_path_lock()` visibility from `#[allow(dead_code)]` to `#[cfg(test)]` to restrict usage to test scope
+- [x] Added `test_git_cmd()` helper function that respects `DRACON_SYNC_GIT_BIN` environment variable
+- [x] Documented the helper function with usage examples
+- [x] Ensured the helper maintains the same interface as `std::process::Command`
 
 ## In Progress
-- [x] No active work in progress beyond this change
+- [ ] No active work in progress
 
 ## Blockers
 - None identified
 
 ## Next Steps
-1. Verify test suite passes with the new configuration
-2. Review any potential test cases that might need adjustment due to this change
+1. Update existing tests to use the new helper function
+2. Verify no test failures occur due to the change
+3. Consider adding more test isolation utilities if needed
