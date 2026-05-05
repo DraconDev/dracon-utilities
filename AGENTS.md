@@ -351,7 +351,7 @@ the ledger to ~/.local/state/dracon/ to break the cycle.
 
 ### dracon-sync
 
-**334 tests** in `src/` (git.rs, sync.rs, report.rs, policy.rs). Tests use `tempfile::TempDir` for isolation.
+**349 tests** in `src/` (git.rs, sync.rs, report.rs, policy.rs, main.rs). Tests use `tempfile::TempDir` for isolation.
 
 ```bash
 export DRACON_SYNC_GIT_BIN=/run/current-system/sw/bin/git
