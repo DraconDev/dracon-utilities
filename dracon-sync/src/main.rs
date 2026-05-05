@@ -2,6 +2,7 @@ mod policy;
 mod exclude;
 mod git;
 mod bump;
+mod secrets;
 mod simple_ai;
 #[cfg(feature = "scribe")]
 mod scribe;
