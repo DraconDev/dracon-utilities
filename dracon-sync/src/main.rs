@@ -109,6 +109,9 @@ enum Command {
     SyncNow {
         /// The repository path to sync immediately.
         repo: PathBuf,
+        /// Preview what would be done without making any changes.
+        #[arg(long)]
+        dry_run: bool,
     },
     /// Open sync policy in the system editor.
     EditConfig,
