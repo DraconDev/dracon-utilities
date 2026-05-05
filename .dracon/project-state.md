@@ -1,22 +1,22 @@
 # Project State
 
 ## Current Focus
-Update dracon-sync configuration paths and add PATH warning for dracon utilities
+Added uninstallation script and improved documentation for dracon utilities
 
 ## Context
-The changes standardize configuration paths for dracon-sync and add a warning when ~/.local/bin isn't in PATH, ensuring users can access dracon utilities.
+The project needed a proper uninstallation mechanism to clean up binaries and systemd services while preserving user data. Documentation was also improved to better explain the toolset's capabilities.
 
 ## Completed
-- [x] Changed dracon-sync policy path from absolute to user-relative (`~/.dracon/utilities/sync/dracon-sync.toml`)
-- [x] Added PATH warning for ~/.local/bin in install.sh
-- [x] Removed obsolete note.md
+- [x] Added uninstall.sh script to remove binaries and systemd services
+- [x] Enhanced AGENTS.md with comprehensive table of contents
+- [x] Updated README.md with clearer binary descriptions and feature list
 
 ## In Progress
-- [ ] None (changes are complete)
+- [ ] No active work in progress
 
 ## Blockers
-- None (changes are complete)
+- None identified
 
 ## Next Steps
-1. Verify PATH warning works across different shells
-2. Update documentation to reflect new paths
+1. Test uninstall.sh across different Linux distributions
+2. Add uninstallation documentation to README.md
