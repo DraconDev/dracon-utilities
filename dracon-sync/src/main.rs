@@ -712,6 +712,85 @@ async fn main() -> Result<()> {
                 println!("   Repos: {} discovered across {} roots", repos.len(), roots.len());
             }
         }
+        Command::Metrics => {
+            let policy = SyncPolicy::load(&policy_path)?;
+            let roots = policy.watch_root_paths();
+            let excluded_dir_names = excluded_dir_names_set(&policy);
+            let repos = git::discover_git_repos(&roots, &excluded_dir_names, &policy.exclude_repos, Some(&policy.system_repo));
+            let freeze = freeze_reason(&policy_path);
+            let frozen = freeze.is_some();
+
+            println!("# HELP dracon_sync_info Dracon sync daemon info");
+            println!("# TYPE dracon_sync_info gauge");
+            println!("dracon_sync_info{{version=\"{}\"}} 1", env!("CARGO_PKG_VERSION"));
+
+            println!("# HELP dracon_sync_repos_discovered_total Number of git repositories discovered");
+            println!("# TYPE dracon_sync_repos_discovered_total gauge");
+            println!("dracon_sync_repos_discovered_total {}", repos.len());
+
+            println!("# HELP dracon_sync_watch_roots_total Number of configured watch roots");
+            println!("# TYPE dracon_sync_watch_roots_total gauge");
+            println!("dracon_sync_watch_roots_total {}", roots.len());
+
+            println!("# HELP dracon_sync_remotes_total Number of configured remotes");
+            println!("# TYPE dracon_sync_remotes_total gauge");
+            println!("dracon_sync_remotes_total {}", policy.remotes.len());
+
+            println!("# HELP dracon_sync_freeze_state Whether sync is currently frozen (1=frozen, 0=active)");
+            println!("# TYPE dracon_sync_freeze_state gauge");
+            println!("dracon_sync_freeze_state {}", if frozen { 1 } else { 0 });
+
+            println!("# HELP dracon_sync_policy_auto_commit Whether auto-commit is enabled");
+            println!("# TYPE dracon_sync_policy_auto_commit gauge");
+            println!("dracon_sync_policy_auto_commit {}", if policy.auto_commit { 1 } else { 0 });
+
+            println!("# HELP dracon_sync_policy_auto_push Whether auto-push is enabled");
+            println!("# TYPE dracon_sync_policy_auto_push gauge");
+            println!("dracon_sync_policy_auto_push {}", if policy.auto_push { 1 } else { 0 });
+
+            println!("# HELP dracon_sync_policy_auto_pull Whether auto-pull is enabled");
+            println!("# TYPE dracon_sync_policy_auto_pull gauge");
+            println!("dracon_sync_policy_auto_pull {}", if policy.auto_pull { 1 } else { 0 });
+
+            println!("# HELP dracon_sync_policy_auto_repair_concerns Whether auto-repair concerns is enabled");
+            println!("# TYPE dracon_sync_policy_auto_repair_concerns gauge");
+            println!("dracon_sync_policy_auto_repair_concerns {}", if policy.auto_repair_concerns { 1 } else { 0 });
+
+            println!("# HELP dracon_sync_incident_ledger_max_lines Incident ledger max lines");
+            println!("# TYPE dracon_sync_incident_ledger_max_lines gauge");
+            println!("dracon_sync_incident_ledger_max_lines {}", policy.incident_ledger_max_lines);
+
+            let incident_path = report::incident_ledger_path(&policy_path);
+            if incident_path.exists() {
+                if let Ok(content) = std::fs::read_to_string(&incident_path) {
+                    let lines = content.lines().filter(|l| !l.trim().is_empty()).count();
+                    println!("# HELP dracon_sync_incident_ledger_lines_current Current number of lines in incident ledger");
+                    println!("# TYPE dracon_sync_incident_ledger_lines_current gauge");
+                    println!("dracon_sync_incident_ledger_lines_current {}", lines);
+                }
+            }
+
+            if let Some(home) = dirs::home_dir() {
+                let stuck_path = home.join(".local/state/dracon/dracon-sync-stuck-push-repos.json");
+                if stuck_path.exists() {
+                    if let Ok(content) = std::fs::read_to_string(&stuck_path) {
+                        if let Ok(stuck) = serde_json::from_str::<Vec<serde_json::Value>>(&content) {
+                            println!("# HELP dracon_sync_stuck_repos_total Number of repos permanently stuck on push");
+                            println!("# TYPE dracon_sync_stuck_repos_total gauge");
+                            println!("dracon_sync_stuck_repos_total {}", stuck.len());
+                        }
+                    }
+                }
+            }
+
+            println!("# HELP dracon_sync_push_retries Default push retry count");
+            println!("# TYPE dracon_sync_push_retries gauge");
+            println!("dracon_sync_push_retries {}", policy.push_retries);
+
+            println!("# HELP dracon_sync_pulse_interval_secs Sync pulse interval in seconds");
+            println!("# TYPE dracon_sync_pulse_interval_secs gauge");
+            println!("dracon_sync_pulse_interval_secs {}", policy.pulse_interval_secs);
+        }
     }
 
     Ok(())
