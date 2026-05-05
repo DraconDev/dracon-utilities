@@ -2026,8 +2026,8 @@ mod tests {
         assert_eq!(remotes_list[0], "origin");
     }
 
-    #[test]
-    fn test_auto_create_all_remotes_empty_when_no_auto_create() {
+    #[tokio::test]
+    async fn test_auto_create_all_remotes_empty_when_no_auto_create() {
         let remotes = vec![
             RemoteConfig {
                 name: "mirror1".to_string(),
@@ -2055,12 +2055,12 @@ mod tests {
             },
         ];
 
-        let results = crate::git::multi_remote::auto_create_all_remotes(&remotes, "test-repo");
+        let results = crate::git::multi_remote::auto_create_all_remotes(&remotes, "test-repo").await;
         assert!(results.is_empty(), "should return empty vec when no remotes have auto_create=true");
     }
 
-    #[test]
-    fn test_auto_create_all_remotes_generic_error() {
+    #[tokio::test]
+    async fn test_auto_create_all_remotes_generic_error() {
         let remotes = vec![RemoteConfig {
             name: "generic".to_string(),
             push_url: "git@generic.example.com:repo.git".to_string(),
@@ -2074,7 +2074,7 @@ mod tests {
             force_push_when_behind: false,
         }];
 
-        let results = crate::git::multi_remote::auto_create_all_remotes(&remotes, "test-repo");
+        let results = crate::git::multi_remote::auto_create_all_remotes(&remotes, "test-repo").await;
         assert_eq!(results.len(), 1);
         assert!(results[0].1.is_err(), "Generic auth should return error");
         let err_msg = format!("{}", results[0].1.as_ref().unwrap_err());
