@@ -1,15 +1,15 @@
 # Project State
 
 ## Current Focus
-Changed repository synchronization from rebase to merge strategy with updated error messages.
+Changed repository synchronization from rebase to merge strategy with updated logging and metrics.
 
 ## Context
-The code was updated to switch from a rebase-based pull strategy to a merge-based strategy for repository synchronization. This change was made to better handle potential conflicts and provide clearer error messages when operations fail.
+The change was made to simplify the synchronization process by switching from a rebase-based pull strategy to a merge-based approach. This reduces complexity in the workflow and aligns with common Git practices.
 
 ## Completed
-- [x] Updated pull operation from `pull_rebase()` to `pull_merge()`
-- [x] Modified all related error messages to reflect the merge strategy
-- [x] Updated debug messages to use "merge" terminology consistently
+- [x] Updated pull strategy from `--rebase --autostash` to `--no-rebase` (merge)
+- [x] Modified logging to reflect the new pull strategy
+- [x] Updated metrics to track merge operations instead of rebase operations
 
 ## In Progress
 - [ ] No active work in progress
@@ -19,4 +19,4 @@ The code was updated to switch from a rebase-based pull strategy to a merge-base
 
 ## Next Steps
 1. Verify the new merge strategy works as expected in test environments
-2. Update documentation to reflect the new synchronization behavior
+2. Update documentation to reflect the new synchronization approach
