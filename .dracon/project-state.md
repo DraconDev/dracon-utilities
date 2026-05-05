@@ -1,21 +1,22 @@
 # Project State
 
 ## Current Focus
-Refactored version file handling to use a centralized constant for consistency
+Refactored private remote directory handling to use platform-appropriate data directories.
 
 ## Context
-The changes standardize how version files are referenced across the codebase, reducing duplication and making future modifications easier.
+The previous implementation used a hardcoded home directory path, which isn't portable across platforms. This change uses `dirs::data_dir()` as the primary location, falling back to home directory if needed, and ensures the directory structure is created properly.
 
 ## Completed
-- [x] Made `VERSION_FILES` constant public in `bump.rs` for cross-module access
-- [x] Updated `sync.rs` to use the centralized constant instead of hardcoded values
+- [x] Changed private remotes directory path to use platform-appropriate data directory
+- [x] Added fallback to home directory if data directory isn't available
+- [x] Maintained existing directory creation logic
 
 ## In Progress
-- [ ] No active work in progress
+- [ ] None
 
 ## Blockers
-- None identified
+- None
 
 ## Next Steps
-1. Verify no unintended side effects from the constant refactoring
-2. Consider if additional version-related constants should be centralized
+1. Verify cross-platform behavior on Windows and macOS
+2. Ensure existing functionality remains unchanged for users with existing configurations

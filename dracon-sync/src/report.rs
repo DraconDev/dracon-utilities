@@ -1819,7 +1819,9 @@ fn create_private_remote(repo: &Path) -> Option<String> {
     }
 
     let repo_name = repo.file_name()?.to_str()?.to_string();
-    let private_remotes_dir = dirs::home_dir()?.join("dracon/private-remotes");
+    let private_remotes_dir = dirs::data_dir()
+        .unwrap_or_else(|| dirs::home_dir().unwrap_or_else(|| PathBuf::from(".")))
+        .join("dracon/private-remotes");
     
     if !private_remotes_dir.exists() {
         std::fs::create_dir_all(&private_remotes_dir).ok()?;
