@@ -127,7 +127,11 @@ pub(crate) async fn sync_repo(
         );
     }
 
-    let unstaged = unstage_excluded_paths(repo, excluded_dir_names).await?;
+    let unstaged = if dry_run {
+        0
+    } else {
+        unstage_excluded_paths(repo, excluded_dir_names).await?
+    };
     if unstaged > 0 {
         eprintln!(
             "🧹 removed {} staged excluded paths in {}",
@@ -135,7 +139,11 @@ pub(crate) async fn sync_repo(
             repo.display()
         );
     }
-    let unstaged_oversized = unstage_oversized_paths(repo, policy.max_stage_file_bytes).await?;
+    let unstaged_oversized = if dry_run {
+        0
+    } else {
+        unstage_oversized_paths(repo, policy.max_stage_file_bytes).await?
+    };
     if unstaged_oversized > 0 {
         eprintln!(
             "🧹 removed {} oversized staged paths in {}",
@@ -147,7 +155,11 @@ pub(crate) async fn sync_repo(
     // Remove any tracked files that live inside excluded directories
     // (e.g. build artifacts that were accidentally committed). This also
     // adds the directory pattern to .gitignore so it won't be re-tracked.
-    if let Some(removed_dirs) = remove_tracked_excluded_paths(repo, excluded_dir_names)? {
+    if let Some(removed_dirs) = if dry_run {
+        None
+    } else {
+        remove_tracked_excluded_paths(repo, excluded_dir_names)?
+    } {
         if !removed_dirs.is_empty() {
             eprintln!(
                 "🧹 removed {} tracked excluded dir(s) from {}: {:?}",
