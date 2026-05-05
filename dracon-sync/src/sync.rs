@@ -261,13 +261,20 @@ pub(crate) async fn sync_repo(
                 .partition(|p| repo.join(p).exists());
 
             if !existing.is_empty() {
-                let mut add_args = vec!["add", "-A", "-f", "--"];
-                for p in &existing {
-                    add_args.push(p);
-                }
-                if let Err(e) = run_git_with_timeout(repo, &add_args, 30, "add").await {
-                    eprintln!("⚠️ {} git add failed for {} paths: {:?}", repo.display(), existing.len(), existing);
-                    return Err(e);
+                if dry_run {
+                    println!("📝 Would stage {} file(s) in {}: {:?}", existing.len(), repo.display(), &existing[..existing.len().min(5)]);
+                    if existing.len() > 5 {
+                        println!("  ... and {} more", existing.len() - 5);
+                    }
+                } else {
+                    let mut add_args = vec!["add", "-A", "-f", "--"];
+                    for p in &existing {
+                        add_args.push(p);
+                    }
+                    if let Err(e) = run_git_with_timeout(repo, &add_args, 30, "add").await {
+                        eprintln!("⚠️ {} git add failed for {} paths: {:?}", repo.display(), existing.len(), existing);
+                        return Err(e);
+                    }
                 }
             }
 
