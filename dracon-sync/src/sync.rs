@@ -73,28 +73,32 @@ pub(crate) async fn sync_repo(
         .unwrap_or(policy.auto_bump_versions);
 
     if policy.auto_pull && has_origin && has_upstream && initial_status.behind > 0 && initial_status.is_clean {
-        match tokio::time::timeout(
-            Duration::from_secs(policy.pull_op_timeout_secs),
-            svc.pull_rebase(),
-        )
-        .await
-        {
-            Ok(Ok(())) => {}
-            Ok(Err(dracon_git::error::GitError::MergeConflict)) => {
-                eprintln!("⚠️ pull/rebase conflict in {} (manual intervention required)", repo.display());
-                return Ok(false);
-            }
-            Ok(Err(e)) => {
-                eprintln!("⚠️ pull/rebase failed for {}: {} - aborting sync pass", repo.display(), e);
-                return Ok(false);
-            }
-            Err(_) => {
-                eprintln!(
-                    "⚠️ pull/rebase timeout for {} after {}s - aborting sync pass",
-                    repo.display(),
-                    policy.pull_op_timeout_secs
-                );
-                return Ok(false);
+        if dry_run {
+            println!("🔽 Would pull/rebase {} commit(s) from upstream in {}", initial_status.behind, repo.display());
+        } else {
+            match tokio::time::timeout(
+                Duration::from_secs(policy.pull_op_timeout_secs),
+                svc.pull_rebase(),
+            )
+            .await
+            {
+                Ok(Ok(())) => {}
+                Ok(Err(dracon_git::error::GitError::MergeConflict)) => {
+                    eprintln!("⚠️ pull/rebase conflict in {} (manual intervention required)", repo.display());
+                    return Ok(false);
+                }
+                Ok(Err(e)) => {
+                    eprintln!("⚠️ pull/rebase failed for {}: {} - aborting sync pass", repo.display(), e);
+                    return Ok(false);
+                }
+                Err(_) => {
+                    eprintln!(
+                        "⚠️ pull/rebase timeout for {} after {}s - aborting sync pass",
+                        repo.display(),
+                        policy.pull_op_timeout_secs
+                    );
+                    return Ok(false);
+                }
             }
         }
     } else if policy.auto_pull && has_origin && has_upstream && initial_status.behind == 0 {

@@ -1,21 +1,23 @@
 # Project State
 
 ## Current Focus
-Added dry-run capability to sync operations
+Added dry-run capability to pull/rebase operations in sync_repo function
 
 ## Context
-The change enables users to test sync operations without making actual changes to the repository, which is useful for validation and debugging.
+This change implements a dry-run mode for pull/rebase operations, allowing users to preview what would happen without actually modifying the repository. This supports the broader goal of making sync operations safer and more predictable.
 
 ## Completed
-- [x] Added `dry_run` parameter to `sync_repo` function
-- [x] Enabled preview mode for sync operations
+- [x] Added dry-run check before executing pull/rebase
+- [x] Added dry-run message showing how many commits would be pulled
+- [x] Preserved all existing pull/rebase error handling paths
 
 ## In Progress
-- [ ] Implement dry-run behavior in all sync operations
+- [ ] None (this is a complete feature addition)
 
 ## Blockers
-- Need to implement dry-run logic for all repository operations
+- None (this is a self-contained feature)
 
 ## Next Steps
-1. Implement dry-run behavior for all sync operations
-2. Add integration tests for dry-run mode
+1. Test dry-run functionality with various repository states
+2. Document the new dry-run capability in user documentation
+3. Consider adding dry-run support to other sync operations
