@@ -533,7 +533,7 @@ async fn push_with_blob_check(
     blob_threshold: u64,
     has_origin: bool,
     ahead: usize,
-    remote_failures: Option<&mut HashMap<String, u32>>,
+    mut remote_failures: Option<&mut HashMap<String, usize>>,
 ) -> Result<bool> {
     if !policy.auto_push || !has_origin || ahead == 0 {
         return Ok(true);
