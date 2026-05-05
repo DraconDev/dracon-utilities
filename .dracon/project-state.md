@@ -1,22 +1,22 @@
 # Project State
 
 ## Current Focus
-Added environment variable management utilities for test isolation
+Added Git command helper utility to test helpers for consistent test execution
 
 ## Context
-This change supports comprehensive testing by providing utilities to manage environment variables in a way that ensures test isolation and reliability. The `EnvRestorer` struct and its implementation allow for safe manipulation of environment variables during tests, ensuring they are properly restored after each test case.
+This change supports improved test isolation by providing a standardized way to execute Git commands during tests, ensuring consistent behavior across test environments.
 
 ## Completed
-- [x] Added `EnvRestorer` struct to manage environment variables during tests
-- [x] Implemented `EnvRestorer` with documentation for saving and restoring values
-- [x] Added `#[allow(dead_code)]` to suppress warnings for test-specific utilities
+- [x] Added `test_git_cmd` helper function to standardize Git command execution in tests
+- [x] Updated test imports to include the new helper function
 
 ## In Progress
-- [ ] Integration of `EnvRestorer` into existing test cases
+- [ ] None
 
 ## Blockers
-- Need to verify that `EnvRestorer` works correctly across different test scenarios
+- None
 
 ## Next Steps
-1. Integrate `EnvRestorer` into relevant test cases
-2. Verify test isolation improvements with the new utilities
+1. Update existing tests to use the new `test_git_cmd` helper
+2. Document the new helper function in the testing guidelines
+```
