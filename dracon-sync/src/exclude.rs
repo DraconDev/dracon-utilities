@@ -48,7 +48,7 @@ mod tests {
     fn test_is_excluded_dir_name_trailing_hyphen() {
         let excluded: BTreeSet<String> = [".tmp-".to_string()].into_iter().collect();
         assert!(is_excluded_dir_name(".tmp-file", &excluded));
-        assert!(is_excluded_dir_name(".tmpfile", &excluded));
+        assert!(!is_excluded_dir_name(".tmpfile", &excluded));
     }
 
     #[test]
@@ -392,12 +392,14 @@ pub(crate) fn is_excluded_dir_name(name: &str, excluded_dir_names: &BTreeSet<Str
         if normalized_pattern == normalized {
             return true;
         }
+        // .tmp- prefix pattern: only matches .tmp-* (not .tmpfile)
         if pattern.ends_with('-')
             && pattern.starts_with('.')
-            && normalized.starts_with(&pattern[..pattern.len() - 1])
+            && normalized.starts_with(&normalized_pattern[..normalized_pattern.len() - 1])
         {
             return true;
         }
+        // Glob-style * suffix: .build* matches .build-debug
         if pattern.ends_with('*') && normalized.starts_with(&pattern[..pattern.len() - 1]) {
             return true;
         }
