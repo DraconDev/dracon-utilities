@@ -95,26 +95,26 @@ pub(crate) async fn sync_repo(
 
     if policy.auto_pull && has_origin && has_upstream && initial_status.behind > 0 && initial_status.is_clean {
         if dry_run {
-            println!("🔽 Would pull/rebase {} commit(s) from upstream in {}", initial_status.behind, repo.display());
+            println!("🔽 Would pull/merge {} commit(s) from upstream in {}", initial_status.behind, repo.display());
         } else {
             match tokio::time::timeout(
                 Duration::from_secs(policy.pull_op_timeout_secs),
-                svc.pull_rebase(),
+                svc.pull_merge(),
             )
             .await
             {
                 Ok(Ok(())) => {}
                 Ok(Err(dracon_git::error::GitError::MergeConflict)) => {
-                    eprintln!("⚠️ pull/rebase conflict in {} (manual intervention required)", repo.display());
+                    eprintln!("⚠️ pull/merge conflict in {} (manual intervention required)", repo.display());
                     return Ok(false);
                 }
                 Ok(Err(e)) => {
-                    eprintln!("⚠️ pull/rebase failed for {}: {} - aborting sync pass", repo.display(), e);
+                    eprintln!("⚠️ pull/merge failed for {}: {} - aborting sync pass", repo.display(), e);
                     return Ok(false);
                 }
                 Err(_) => {
                     eprintln!(
-                        "⚠️ pull/rebase timeout for {} after {}s - aborting sync pass",
+                        "⚠️ pull/merge timeout for {} after {}s - aborting sync pass",
                         repo.display(),
                         policy.pull_op_timeout_secs
                     );
@@ -125,25 +125,25 @@ pub(crate) async fn sync_repo(
     } else if policy.auto_pull && has_origin && has_upstream && initial_status.behind == 0 {
         if debug_enabled() {
             eprintln!(
-                "🐛 skip pull/rebase for {} (branch not behind upstream)",
+                "🐛 skip pull/merge for {} (branch not behind upstream)",
                 repo.display()
             );
         }
     } else if policy.auto_pull && has_origin && has_upstream && !initial_status.is_clean {
         if debug_enabled() {
             eprintln!(
-                "🐛 skip pull/rebase for {} (dirty repo, commit first)",
+                "🐛 skip pull/merge for {} (dirty repo, commit first)",
                 repo.display()
             );
         }
     } else if policy.auto_pull && !has_origin {
         eprintln!(
-            "ℹ️ skip pull/rebase for {} (no origin remote)",
+            "ℹ️ skip pull/merge for {} (no origin remote)",
             repo.display()
         );
     } else if policy.auto_pull && has_origin && !has_upstream {
         eprintln!(
-            "ℹ️ skip pull/rebase for {} (no tracking upstream on current branch)",
+            "ℹ️ skip pull/merge for {} (no tracking upstream on current branch)",
             repo.display()
         );
     }

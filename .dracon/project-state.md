@@ -1,24 +1,22 @@
 # Project State
 
 ## Current Focus
-Added webhook notifications for failed push operations in repository synchronization.
+Changed repository synchronization from rebase to merge strategy with updated error messages.
 
 ## Context
-To improve observability and incident response, the system now sends HTTP POST notifications when push operations fail, including details like the repository path, remote name, error message, and timestamp.
+The code was updated to switch from a rebase-based pull strategy to a merge-based strategy for repository synchronization. This change was made to better handle potential conflicts and provide clearer error messages when operations fail.
 
 ## Completed
-- [x] Added optional `webhook_url` configuration in SyncPolicy
-- [x] Implemented fire-and-forget HTTP POST for push failures
-- [x] Included structured JSON payload with failure details
-- [x] Background execution with 5s timeout to avoid blocking sync operations
+- [x] Updated pull operation from `pull_rebase()` to `pull_merge()`
+- [x] Modified all related error messages to reflect the merge strategy
+- [x] Updated debug messages to use "merge" terminology consistently
 
 ## In Progress
-- [ ] None (feature complete)
+- [ ] No active work in progress
 
 ## Blockers
-- None (feature is optional and non-blocking)
+- None identified
 
 ## Next Steps
-1. Document webhook payload structure in AGENTS.md
-2. Add integration tests for webhook notifications
-3. Consider adding retry logic for webhook failures
+1. Verify the new merge strategy works as expected in test environments
+2. Update documentation to reflect the new synchronization behavior
