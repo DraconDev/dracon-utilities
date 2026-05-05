@@ -13,6 +13,8 @@ use tokio::time::sleep;
 use crate::exclude::is_excluded_change_path;
 use crate::policy::{std_git_command, tokio_git_command, timestamp_secs, AuthType, RemoteConfig};
 
+pub(crate) const GIT_SSH_HARDENING: &str = "ssh -o ConnectTimeout=10 -o ConnectionAttempts=1 -o ServerAliveInterval=5 -o ServerAliveCountMax=2";
+
 #[cfg(test)]
 pub(crate) static PATH_LOCK: parking_lot::Mutex<()> = parking_lot::Mutex::new(());
 
