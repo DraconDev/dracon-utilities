@@ -1,20 +1,20 @@
 # Project State
 
 ## Current Focus
-Added documentation for Git command helper usage in tests
+Added test-specific attribute to Git command helper to ensure proper test isolation.
 
 ## Context
-The change adds documentation to clarify how to use the `test_git_cmd()` helper function in tests, which was recently introduced to standardize Git command execution and improve test isolation.
+This change was prompted by the need to improve test reliability by ensuring the Git command helper is only available in test contexts. This prevents accidental use in production code while maintaining test isolation.
 
 ## Completed
-- [x] Added documentation for Git command helper usage in test helpers
+- [x] Added `#[cfg(test)]` attribute to `EnvRestorer` struct to restrict its use to test code only
 
 ## In Progress
-- [x] None (documentation-only change)
+- [x] No active work in progress beyond this change
 
 ## Blockers
-- None
+- None identified for this specific change
 
 ## Next Steps
-1. Continue improving test isolation and reliability
-2. Expand comprehensive testing documentation for `dracon-sync`
+1. Verify the change doesn't break existing tests
+2. Consider adding more test-specific utilities if needed
