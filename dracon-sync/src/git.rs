@@ -402,7 +402,7 @@ pub(crate) async fn push_with_transport_fallbacks(
     timeout_secs: u64,
     op_label: &str,
 ) -> Result<()> {
-    let ssh_hardening = "ssh -o ConnectTimeout=10 -o ConnectionAttempts=1 -o ServerAliveInterval=5 -o ServerAliveCountMax=2";
+    let ssh_hardening = crate::git::GIT_SSH_HARDENING;
     match run_git_with_timeout_env(
         repo,
         &["push", "origin", "HEAD"],
@@ -1245,7 +1245,7 @@ pub(crate) async fn push_to_named_remote(
 ) -> Result<()> {
     let branch = current_branch(repo).unwrap_or_else(|| "main".to_string());
     let refspec = format!("HEAD:refs/heads/{}", branch);
-    let ssh_hardening = "ssh -o ConnectTimeout=10 -o ConnectionAttempts=1 -o ServerAliveInterval=5 -o ServerAliveCountMax=2";
+    let ssh_hardening = crate::git::GIT_SSH_HARDENING;
 
     let attempt_ssh = run_git_with_timeout_env(
         repo,
