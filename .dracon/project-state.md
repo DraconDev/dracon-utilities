@@ -1,21 +1,20 @@
 # Project State
 
 ## Current Focus
-Improved Git test isolation by standardizing Git command execution in tests
+Added dead code suppression for Git command helper in test helpers
 
 ## Context
-The change standardizes how Git commands are executed in tests to ensure consistent behavior across all test cases, particularly around environment variable handling and binary resolution.
+This change was made to address compiler warnings about unused code in the test helper function `test_git_cmd()`, which was recently added for improved Git test isolation.
 
 ## Completed
-- [x] Added `test_git_cmd()` helper function to replace direct `std::process::Command::new("git")` calls
-- [x] Updated documentation to clarify test isolation requirements
+- [x] Added `#[allow(dead_code)]` attribute to suppress compiler warnings for the unused Git command helper
 
 ## In Progress
-- [x] Refactoring of Git test infrastructure
+- [x] No active work in progress related to this change
 
 ## Blockers
-- None identified in this change
+- None
 
 ## Next Steps
-1. Update remaining test cases to use the new `test_git_cmd()` helper
-2. Verify all Git-related tests maintain consistent behavior after this change
+1. Verify the test helper continues to function correctly with the new attribute
+2. Review other test helpers for similar dead code warnings that may need suppression
