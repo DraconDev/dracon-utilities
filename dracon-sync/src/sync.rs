@@ -318,6 +318,8 @@ pub(crate) async fn sync_repo(
 
             // Build the payload from what we're actually going to commit (cached diff)
             let staged = git_name_status_entries(repo, &["diff", "--cached", "--name-status"]).await?;
+            let committed_entries: Vec<dracon_git::types::DiffFile> = staged
+                .into_iter()
                 .map(|(path, status)| dracon_git::types::DiffFile { path, status })
                 .collect();
 
