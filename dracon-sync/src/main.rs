@@ -141,6 +141,12 @@ enum Command {
         #[arg(long)]
         apply: bool,
     },
+    /// Check daemon health (policy valid, daemon responsive, repos healthy).
+    Health {
+        /// Emit machine-readable JSON.
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 #[derive(Subcommand, Debug)]
