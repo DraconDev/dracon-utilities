@@ -1122,7 +1122,114 @@ repo_name_map: Default::default(),
         force_push_when_behind: false,
     };
 
-    assert_eq!(config.resolve_repo_name(".dracon"), ".dracon");
+        assert_eq!(config.resolve_repo_name(".dracon"), ".dracon");
         assert_eq!(config.resolve_repo_name("my-repo"), "my-repo");
+    }
+
+    #[test]
+    fn test_validate_config_valid_policy() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let content = r#"
+auto_github_private = false
+auto_commit = true
+auto_pull = true
+auto_push = true
+auto_bump_versions = false
+watch_roots = ["/tmp"]
+remotes = []
+"#;
+        std::fs::write(tmp.path().join("policy.toml"), content).unwrap();
+        let result = validate_config(tmp.path().join("policy.toml").as_path());
+        assert!(result.is_valid(), "valid policy should pass: {:?}", result.errors);
+        assert!(result.warnings.is_empty(), "valid policy should have no warnings");
+    }
+
+    #[test]
+    fn test_validate_config_missing_watch_root() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let content = r#"
+auto_github_private = false
+watch_roots = ["/nonexistent/path/that/does/not/exist"]
+remotes = []
+"#;
+        std::fs::write(tmp.path().join("policy.toml"), content).unwrap();
+        let result = validate_config(tmp.path().join("policy.toml").as_path());
+        assert!(!result.is_valid(), "missing watch root should fail");
+        assert!(result.errors.iter().any(|e| e.contains("does not exist")), "should mention missing path");
+    }
+
+    #[test]
+    fn test_validate_config_invalid_webhook_url() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let content = r#"
+auto_github_private = false
+watch_roots = ["/tmp"]
+remotes = []
+webhook_url = "ftp://invalid.example.com/hook"
+"#;
+        std::fs::write(tmp.path().join("policy.toml"), content).unwrap();
+        let result = validate_config(tmp.path().join("policy.toml").as_path());
+        assert!(!result.is_valid(), "non-http webhook URL should fail");
+        assert!(result.errors.iter().any(|e| e.contains("webhook_url")), "should mention webhook_url");
+    }
+
+    #[test]
+    fn test_validate_config_empty_remote_push_url() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let content = r#"
+auto_github_private = false
+watch_roots = ["/tmp"]
+[[remotes]]
+name = "test"
+push_url = ""
+"#;
+        std::fs::write(tmp.path().join("policy.toml"), content).unwrap();
+        let result = validate_config(tmp.path().join("policy.toml").as_path());
+        assert!(!result.is_valid(), "empty push_url should fail");
+    }
+
+    #[test]
+    fn test_validate_config_missing_auto_create_account() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let content = r#"
+auto_github_private = false
+watch_roots = ["/tmp"]
+[[remotes]]
+name = "github"
+push_url = "git@github.com:{account}/{repo}.git"
+auto_create = true
+auto_create_account = ""
+"#;
+        std::fs::write(tmp.path().join("policy.toml"), content).unwrap();
+        let result = validate_config(tmp.path().join("policy.toml").as_path());
+        assert!(!result.is_valid(), "auto_create=true with empty account should fail");
+    }
+
+    #[test]
+    fn test_validate_config_no_watch_roots_error() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let content = r#"
+auto_github_private = false
+watch_roots = []
+remotes = []
+"#;
+        std::fs::write(tmp.path().join("policy.toml"), content).unwrap();
+        let result = validate_config(tmp.path().join("policy.toml").as_path());
+        assert!(!result.is_valid(), "no watch_roots should fail");
+        assert!(result.errors.iter().any(|e| e.contains("watch_roots")), "should mention watch_roots");
+    }
+
+    #[test]
+    fn test_validate_config_warns_on_no_remotes() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let content = r#"
+auto_github_private = false
+watch_roots = ["/tmp"]
+remotes = []
+"#;
+        std::fs::write(tmp.path().join("policy.toml"), content).unwrap();
+        let result = validate_config(tmp.path().join("policy.toml").as_path());
+        assert!(result.is_valid(), "no remotes is a warning not error");
+        assert!(result.warnings.iter().any(|w| w.contains("no remotes")), "should warn about no remotes");
     }
 }
