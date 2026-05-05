@@ -1771,7 +1771,7 @@ mod tests {
     fn test_get_remote_url_nonexistent_remote() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("test-repo");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["init", "-q", "-b", "master"])
             .arg(&repo)
             .status()
@@ -1783,7 +1783,7 @@ mod tests {
     fn test_list_remotes_empty() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("test-repo");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["init", "-q", "-b", "master"])
             .arg(&repo)
             .status()
@@ -1795,12 +1795,12 @@ mod tests {
     fn test_list_remotes_one_remote() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("test-repo");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["init", "-q", "-b", "master"])
             .arg(&repo)
             .status()
             .expect("git init");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["remote", "add", "origin", "git@github.com:Test/repo.git"])
             .current_dir(&repo)
             .status()
@@ -1813,7 +1813,7 @@ mod tests {
     fn test_ensure_remote_adds_new() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("test-repo");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["init", "-q", "-b", "master"])
             .arg(&repo)
             .status()
@@ -1829,12 +1829,12 @@ mod tests {
     fn test_ensure_remote_updates_existing() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("test-repo");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["init", "-q", "-b", "master"])
             .arg(&repo)
             .status()
             .expect("git init");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["remote", "add", "github", "git@github.com:Old/repo.git"])
             .current_dir(&repo)
             .status()
@@ -1850,7 +1850,7 @@ mod tests {
     fn test_ensure_remote_idempotent() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("test-repo");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["init", "-q", "-b", "master"])
             .arg(&repo)
             .status()
@@ -1868,17 +1868,17 @@ mod tests {
     fn test_remove_stale_remotes_preserves_origin() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("test-repo");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["init", "-q", "-b", "master"])
             .arg(&repo)
             .status()
             .expect("git init");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["remote", "add", "origin", "git@github.com:Test/repo.git"])
             .current_dir(&repo)
             .status()
             .expect("git remote add origin");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["remote", "add", "stale", "git@github.com:stale/repo.git"])
             .current_dir(&repo)
             .status()
@@ -1895,22 +1895,22 @@ mod tests {
     fn test_remove_stale_remotes_removes_nonkept() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("test-repo");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["init", "-q", "-b", "master"])
             .arg(&repo)
             .status()
             .expect("git init");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["remote", "add", "origin", "git@github.com:Test/repo.git"])
             .current_dir(&repo)
             .status()
             .expect("git remote add origin");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["remote", "add", "mirror1", "git@mirror1.example.com:repo.git"])
             .current_dir(&repo)
             .status()
             .expect("git remote add mirror1");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["remote", "add", "mirror2", "git@mirror2.example.com:repo.git"])
             .current_dir(&repo)
             .status()
@@ -1928,12 +1928,12 @@ mod tests {
     fn test_remove_stale_remotes_idempotent_when_empty() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("test-repo");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["init", "-q", "-b", "master"])
             .arg(&repo)
             .status()
             .expect("git init");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["remote", "add", "origin", "git@github.com:Test/repo.git"])
             .current_dir(&repo)
             .status()
@@ -1949,7 +1949,7 @@ mod tests {
     fn test_configure_all_remotes_single_remote() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("test-repo");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["init", "-q", "-b", "master"])
             .arg(&repo)
             .status()
@@ -1978,7 +1978,7 @@ mod tests {
     fn test_configure_all_remotes_multiple_remotes() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("test-repo");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["init", "-q", "-b", "master"])
             .arg(&repo)
             .status()
@@ -2024,7 +2024,7 @@ mod tests {
     fn test_configure_all_remotes_idempotent() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("test-repo");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["init", "-q", "-b", "master"])
             .arg(&repo)
             .status()
@@ -2279,12 +2279,12 @@ mod tests {
     async fn test_push_to_named_remote_fails_on_invalid_remote() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("test-repo");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["init", "-q", "-b", "master"])
             .arg(&repo)
             .status()
             .expect("git init");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["remote", "add", "origin", "git@invalid.example.com:repo.git"])
             .current_dir(&repo)
             .status()
@@ -2298,17 +2298,17 @@ mod tests {
     async fn test_push_to_all_remotes_returns_all_results() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("test-repo");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["init", "-q", "-b", "master"])
             .arg(&repo)
             .status()
             .expect("git init");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["remote", "add", "mirror1", "git@invalid1.example.com:repo.git"])
             .current_dir(&repo)
             .status()
             .expect("git remote add mirror1");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["remote", "add", "mirror2", "git@invalid2.example.com:repo.git"])
             .current_dir(&repo)
             .status()
@@ -2353,7 +2353,7 @@ mod tests {
     async fn test_push_mirror_remotes_empty_when_no_remotes() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("test-repo");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["init", "-q", "-b", "master"])
             .arg(&repo)
             .status()
@@ -2500,27 +2500,27 @@ mod tests {
     async fn test_push_with_retries_succeeds_first_attempt() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let bare = tmp.path().join("bare.git");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["init", "--bare", &bare.to_string_lossy()])
             .output()
             .expect("git init --bare");
         let repo = tmp.path().join("repo");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["init", "-q", &repo.to_string_lossy()])
             .output()
             .expect("git init");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["remote", "add", "origin", &bare.to_string_lossy()])
             .current_dir(&repo)
             .output()
             .expect("git remote add");
         std::fs::write(repo.join("f"), "content").expect("write file");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["add", "f"])
             .current_dir(&repo)
             .output()
             .expect("git add");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["commit", "-m", "init"])
             .current_dir(&repo)
             .output()
@@ -2646,27 +2646,27 @@ mod tests {
     async fn test_push_with_transport_fallbacks_ssh_succeeds_no_fallback() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let bare = tmp.path().join("bare.git");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["init", "--bare", &bare.to_string_lossy()])
             .output()
             .expect("git init --bare");
         let repo = tmp.path().join("repo");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["init", "-q", &repo.to_string_lossy()])
             .output()
             .expect("git init");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["remote", "add", "origin", &bare.to_string_lossy()])
             .current_dir(&repo)
             .output()
             .expect("git remote add");
         std::fs::write(repo.join("f"), "content").expect("write file");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["add", "f"])
             .current_dir(&repo)
             .output()
             .expect("git add");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["commit", "-m", "init"])
             .current_dir(&repo)
             .output()
@@ -2930,18 +2930,18 @@ mod tests {
     async fn test_run_git_with_timeout_succeeds() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("test-repo");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["init", "-q", "-b", "master"])
             .arg(&repo)
             .status()
             .expect("git init");
         std::fs::write(repo.join("file.txt"), "content").expect("write file");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["add", "."])
             .current_dir(&repo)
             .status()
             .expect("git add");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["commit", "-m", "init"])
             .current_dir(&repo)
             .status()
@@ -2955,18 +2955,18 @@ mod tests {
     async fn test_run_git_with_timeout_env_injects_env_vars() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("test-repo");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["init", "-q", "-b", "master"])
             .arg(&repo)
             .status()
             .expect("git init");
         std::fs::write(repo.join("file.txt"), "content").expect("write file");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["add", "."])
             .current_dir(&repo)
             .status()
             .expect("git add");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["commit", "-m", "init"])
             .current_dir(&repo)
             .status()
@@ -2986,18 +2986,18 @@ mod tests {
     async fn test_restore_paths_uses_git_restore_fallback_chain() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("test-repo");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["init", "-q", "-b", "master"])
             .arg(&repo)
             .status()
             .expect("git init");
         std::fs::write(repo.join("file.txt"), "original content").expect("write file");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["add", "."])
             .current_dir(&repo)
             .status()
             .expect("git add");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["commit", "-m", "init"])
             .current_dir(&repo)
             .status()
@@ -3015,25 +3015,25 @@ mod tests {
     async fn test_diagnose_divergence_remote_purely_behind() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("test-repo");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["init", "-q", "-b", "master"])
             .arg(&repo)
             .status()
             .expect("git init");
         std::fs::write(repo.join("file.txt"), "content").expect("write");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["add", "."])
             .current_dir(&repo)
             .status()
             .expect("git add");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["commit", "-m", "init"])
             .current_dir(&repo)
             .status()
             .expect("git commit");
 
         let local_commit = {
-            let output = std::process::Command::new("git")
+            let output = test_git_cmd()
                 .args(["rev-parse", "HEAD"])
                 .current_dir(&repo)
                 .output()
@@ -3041,13 +3041,13 @@ mod tests {
             String::from_utf8_lossy(&output.stdout).trim().to_string()
         };
 
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["remote", "add", "mirror", "git@mirror.example.com:repo.git"])
             .current_dir(&repo)
             .status()
             .expect("git remote add");
 
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["update-ref", "refs/remotes/mirror/master", &local_commit])
             .current_dir(&repo)
             .status()
@@ -3062,31 +3062,31 @@ mod tests {
     async fn test_diagnose_divergence_divergent() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("test-repo");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["init", "-q", "-b", "master"])
             .arg(&repo)
             .status()
             .expect("git init");
         std::fs::write(repo.join("file.txt"), "content").expect("write");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["add", "."])
             .current_dir(&repo)
             .status()
             .expect("git add");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["commit", "-m", "init"])
             .current_dir(&repo)
             .status()
             .expect("git commit");
 
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["remote", "add", "mirror", "git@mirror.example.com:repo.git"])
             .current_dir(&repo)
             .status()
             .expect("git remote add");
 
         let (local_commit, remote_commit) = {
-            let local = std::process::Command::new("git")
+            let local = test_git_cmd()
                 .args(["rev-parse", "HEAD"])
                 .current_dir(&repo)
                 .output()
@@ -3094,12 +3094,12 @@ mod tests {
                 .stdout;
             let local = String::from_utf8_lossy(&local).trim().to_string();
 
-            std::process::Command::new("git")
+            test_git_cmd()
                 .args(["commit", "--allow-empty", "-m", "other commit"])
                 .current_dir(&repo)
                 .status()
                 .expect("git commit --allow-empty");
-            let remote = std::process::Command::new("git")
+            let remote = test_git_cmd()
                 .args(["rev-parse", "HEAD"])
                 .current_dir(&repo)
                 .output()
@@ -3109,13 +3109,13 @@ mod tests {
             (local, remote)
         };
 
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["update-ref", "refs/remotes/mirror/master", &remote_commit])
             .current_dir(&repo)
             .status()
             .expect("git update-ref");
 
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["reset", "--hard", &local_commit])
             .current_dir(&repo)
             .status()
@@ -3195,42 +3195,42 @@ mod tests {
     async fn test_push_to_named_remote_no_auto_force_when_divergent() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("test-repo");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["init", "-q", "-b", "master"])
             .arg(&repo)
             .status()
             .expect("git init");
         std::fs::write(repo.join("file.txt"), "content").expect("write");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["add", "."])
             .current_dir(&repo)
             .status()
             .expect("git add");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["commit", "-m", "init"])
             .current_dir(&repo)
             .status()
             .expect("git commit");
 
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["remote", "add", "mirror", "git@mirror.example.com:repo.git"])
             .current_dir(&repo)
             .status()
             .expect("git remote add");
 
         let (_local_commit, remote_commit) = {
-            let local = std::process::Command::new("git")
+            let local = test_git_cmd()
                 .args(["rev-parse", "HEAD"])
                 .current_dir(&repo)
                 .output()
                 .expect("git rev-parse");
             let _local = String::from_utf8_lossy(&local.stdout).trim().to_string();
-            std::process::Command::new("git")
+            test_git_cmd()
                 .args(["commit", "--allow-empty", "-m", "other commit"])
                 .current_dir(&repo)
                 .status()
                 .expect("git commit");
-            let output = std::process::Command::new("git")
+            let output = test_git_cmd()
                 .args(["rev-parse", "HEAD"])
                 .current_dir(&repo)
                 .output()
@@ -3239,13 +3239,13 @@ mod tests {
             (local, remote)
         };
 
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["update-ref", "refs/remotes/mirror/master", &remote_commit])
             .current_dir(&repo)
             .status()
             .expect("git update-ref");
 
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["reset", "--hard", "HEAD^"])
             .current_dir(&repo)
             .status()
@@ -3260,37 +3260,37 @@ mod tests {
     async fn test_push_to_named_remote_no_auto_force_when_disabled() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("test-repo");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["init", "-q", "-b", "master"])
             .arg(&repo)
             .status()
             .expect("git init");
         std::fs::write(repo.join("file.txt"), "content").expect("write");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["add", "."])
             .current_dir(&repo)
             .status()
             .expect("git add");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["commit", "-m", "init"])
             .current_dir(&repo)
             .status()
             .expect("git commit");
 
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["remote", "add", "mirror", "git@mirror.example.com:repo.git"])
             .current_dir(&repo)
             .status()
             .expect("git remote add");
 
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["commit", "--allow-empty", "-m", "other commit"])
             .current_dir(&repo)
             .status()
             .expect("git commit");
 
         let remote_commit = {
-            let output = std::process::Command::new("git")
+            let output = test_git_cmd()
                 .args(["rev-parse", "HEAD"])
                 .current_dir(&repo)
                 .output()
@@ -3298,13 +3298,13 @@ mod tests {
             String::from_utf8_lossy(&output.stdout).trim().to_string()
         };
 
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["update-ref", "refs/remotes/mirror/master", &remote_commit])
             .current_dir(&repo)
             .status()
             .expect("git update-ref");
 
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["reset", "--hard", "HEAD^"])
             .current_dir(&repo)
             .status()
@@ -3319,12 +3319,12 @@ mod tests {
     fn test_detect_orphan_origin_detects_single_digit_suffix() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path();
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["init", "-q"])
             .current_dir(repo)
             .status()
             .expect("git init");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["remote", "add", "origin", "git@github.com:DraconDev/dracon-demons-9.git"])
             .current_dir(repo)
             .status()
@@ -3341,12 +3341,12 @@ mod tests {
     fn test_detect_orphan_origin_ignores_multi_digit_suffix() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path();
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["init", "-q"])
             .current_dir(repo)
             .status()
             .expect("git init");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["remote", "add", "origin", "git@github.com:DraconDev/project-2024.git"])
             .current_dir(repo)
             .status()
@@ -3360,12 +3360,12 @@ mod tests {
     fn test_detect_orphan_origin_ignores_legitimate_version() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path();
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["init", "-q"])
             .current_dir(repo)
             .status()
             .expect("git init");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["remote", "add", "origin", "git@github.com:DraconDev/api-v2.git"])
             .current_dir(repo)
             .status()
@@ -3379,12 +3379,12 @@ mod tests {
     fn test_detect_orphan_origin_no_suffix() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path();
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["init", "-q"])
             .current_dir(repo)
             .status()
             .expect("git init");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["remote", "add", "origin", "git@github.com:DraconDev/dracon-demons.git"])
             .current_dir(repo)
             .status()
@@ -3398,23 +3398,23 @@ mod tests {
     fn test_fix_orphan_origin_updates_remote_url() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path();
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["init", "-q"])
             .current_dir(repo)
             .status()
             .expect("git init");
         std::fs::write(repo.join("file.txt"), "content").expect("write");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["add", "."])
             .current_dir(repo)
             .status()
             .expect("git add");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["commit", "-m", "init"])
             .current_dir(repo)
             .status()
             .expect("git commit");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["remote", "add", "origin", "git@github.com:DraconDev/dracon-demons-9.git"])
             .current_dir(repo)
             .status()
@@ -3432,38 +3432,38 @@ mod tests {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path();
         let bare = tmp.path().join("bare.git");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["init", "-q", "--bare", bare.to_str().unwrap()])
             .status()
             .expect("git init bare");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["init", "-q", "-b", "main"])
             .current_dir(repo)
             .status()
             .expect("git init");
         std::fs::write(repo.join("file.txt"), "content").expect("write");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["add", "."])
             .current_dir(repo)
             .status()
             .expect("git add");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["commit", "-m", "init"])
             .current_dir(repo)
             .status()
             .expect("git commit");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["remote", "add", "origin", bare.to_str().unwrap()])
             .current_dir(repo)
             .status()
             .expect("git remote add");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["push", "-u", "origin", "main"])
             .current_dir(repo)
             .status()
             .expect("git push");
 
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["remote", "set-url", "origin", "git@github.com:DraconDev/dracon-demons-9.git"])
             .current_dir(repo)
             .status()
@@ -3476,7 +3476,7 @@ mod tests {
         assert_eq!(url, "git@github.com:DraconDev/dracon-demons.git");
 
         let upstream_info = {
-            let output = std::process::Command::new("git")
+            let output = test_git_cmd()
                 .args(["branch", "-vv", "--no-color"])
                 .current_dir(repo)
                 .output()
@@ -3491,48 +3491,48 @@ mod tests {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path();
         let bare = tmp.path().join("bare.git");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["init", "-q", "--bare", bare.to_str().unwrap()])
             .status()
             .expect("git init bare");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["init", "-q", "-b", "master"])
             .current_dir(repo)
             .status()
             .expect("git init");
         std::fs::write(repo.join("file.txt"), "content").expect("write");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["add", "."])
             .current_dir(repo)
             .status()
             .expect("git add");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["commit", "-m", "init"])
             .current_dir(repo)
             .status()
             .expect("git commit");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["remote", "add", "origin", bare.to_str().unwrap()])
             .current_dir(repo)
             .status()
             .expect("git remote add");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["push", "-u", "origin", "master"])
             .current_dir(repo)
             .status()
             .expect("git push");
 
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["checkout", "-b", "main"])
             .current_dir(repo)
             .status()
             .expect("git checkout main");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["commit", "--allow-empty", "-m", "main commit"])
             .current_dir(repo)
             .status()
             .expect("git commit main");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["push", "-u", "origin", "main"])
             .current_dir(repo)
             .status()
@@ -3542,7 +3542,7 @@ mod tests {
         assert!(result.is_ok(), "consolidate_to_main should succeed");
 
         let local_branches = {
-            let output = std::process::Command::new("git")
+            let output = test_git_cmd()
                 .args(["branch"])
                 .current_dir(repo)
                 .output()
@@ -3558,32 +3558,32 @@ mod tests {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path();
         let bare = tmp.path().join("bare.git");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["init", "-q", "--bare", bare.to_str().unwrap()])
             .status()
             .expect("git init bare");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["init", "-q", "-b", "master"])
             .current_dir(repo)
             .status()
             .expect("git init");
         std::fs::write(repo.join("file.txt"), "content").expect("write");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["add", "."])
             .current_dir(repo)
             .status()
             .expect("git add");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["commit", "-m", "init"])
             .current_dir(repo)
             .status()
             .expect("git commit");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["remote", "add", "origin", bare.to_str().unwrap()])
             .current_dir(repo)
             .status()
             .expect("git remote add");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["push", "-u", "origin", "master"])
             .current_dir(repo)
             .status()
@@ -3593,7 +3593,7 @@ mod tests {
         assert!(result.is_ok(), "rename_master_to_main should succeed");
 
         let current = {
-            let output = std::process::Command::new("git")
+            let output = test_git_cmd()
                 .args(["rev-parse", "--abbrev-ref", "HEAD"])
                 .current_dir(repo)
                 .output()
@@ -3607,23 +3607,23 @@ mod tests {
     fn test_has_only_master_branch_detects_master_only() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path();
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["init", "-q"])
             .current_dir(repo)
             .status()
             .expect("git init");
         std::fs::write(repo.join("file.txt"), "content").expect("write");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["add", "."])
             .current_dir(repo)
             .status()
             .expect("git add");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["commit", "-m", "init"])
             .current_dir(repo)
             .status()
             .expect("git commit");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["checkout", "-b", "master"])
             .current_dir(repo)
             .status()
@@ -3637,17 +3637,17 @@ mod tests {
     fn test_has_only_master_branch_ignores_main_and_master() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path();
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["init", "-q"])
             .current_dir(repo)
             .status()
             .expect("git init");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["checkout", "-b", "master"])
             .current_dir(repo)
             .status()
             .expect("git checkout master");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["branch", "main"])
             .current_dir(repo)
             .status()
@@ -3661,28 +3661,28 @@ mod tests {
     async fn test_prune_other_default_branch_deletes_main_when_on_master() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path();
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["init", "-q", "-b", "master"])
             .current_dir(repo)
             .status()
             .expect("git init");
         std::fs::write(repo.join("file.txt"), "content").expect("write");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["add", "."])
             .current_dir(repo)
             .status()
             .expect("git add");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["commit", "-m", "init"])
             .current_dir(repo)
             .status()
             .expect("git commit");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["checkout", "-b", "main"])
             .current_dir(repo)
             .status()
             .expect("git checkout main");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["checkout", "master"])
             .current_dir(repo)
             .status()
@@ -3691,7 +3691,7 @@ mod tests {
         prune_other_default_branch(repo).await;
 
         let local_branches = {
-            let output = std::process::Command::new("git")
+            let output = test_git_cmd()
                 .args(["branch"])
                 .current_dir(repo)
                 .output()
@@ -3710,28 +3710,28 @@ mod tests {
     async fn test_prune_other_default_branch_deletes_master_when_on_main() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path();
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["init", "-q", "-b", "main"])
             .current_dir(repo)
             .status()
             .expect("git init");
         std::fs::write(repo.join("file.txt"), "content").expect("write");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["add", "."])
             .current_dir(repo)
             .status()
             .expect("git add");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["commit", "-m", "init"])
             .current_dir(repo)
             .status()
             .expect("git commit");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["checkout", "-b", "master"])
             .current_dir(repo)
             .status()
             .expect("git checkout master");
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["checkout", "main"])
             .current_dir(repo)
             .status()
@@ -3740,7 +3740,7 @@ mod tests {
         prune_other_default_branch(repo).await;
 
         let local_branches = {
-            let output = std::process::Command::new("git")
+            let output = test_git_cmd()
                 .args(["branch"])
                 .current_dir(repo)
                 .output()

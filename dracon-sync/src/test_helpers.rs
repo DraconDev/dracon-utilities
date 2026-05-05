@@ -62,7 +62,6 @@
 /// ```ignore
 /// let output = test_git_cmd().current_dir(&repo).args(["status"]).output()?;
 /// ```
-#[cfg(test)]
 #[allow(dead_code)]
 pub(crate) fn test_git_cmd() -> std::process::Command {
     let git_path = crate::policy::git_binary();
