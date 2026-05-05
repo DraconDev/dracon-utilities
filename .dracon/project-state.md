@@ -1,21 +1,22 @@
 # Project State
 
 ## Current Focus
-Removed test-specific attribute from Git command helper to simplify test environment management.
+Added environment variable management utilities for test isolation
 
 ## Context
-The test-specific attribute (`#[cfg(test)]`) was previously used to mark the `EnvRestorer` struct as test-only. This change removes that restriction, making the environment variable management utilities more widely usable across the codebase.
+This change supports comprehensive testing by providing utilities to manage environment variables in a way that ensures test isolation and reliability. The `EnvRestorer` struct and its implementation allow for safe manipulation of environment variables during tests, ensuring they are properly restored after each test case.
 
 ## Completed
-- [x] Removed `#[cfg(test)]` attribute from `EnvRestorer` struct to make it available in non-test contexts
-- [x] Maintained all existing functionality while improving code reusability
+- [x] Added `EnvRestorer` struct to manage environment variables during tests
+- [x] Implemented `EnvRestorer` with documentation for saving and restoring values
+- [x] Added `#[allow(dead_code)]` to suppress warnings for test-specific utilities
 
 ## In Progress
-- [ ] None
+- [ ] Integration of `EnvRestorer` into existing test cases
 
 ## Blockers
-- None
+- Need to verify that `EnvRestorer` works correctly across different test scenarios
 
 ## Next Steps
-1. Review any dependent code that might need adjustments due to the broader visibility of `EnvRestorer`
-2. Consider adding integration tests to verify the utility's behavior in non-test scenarios
+1. Integrate `EnvRestorer` into relevant test cases
+2. Verify test isolation improvements with the new utilities

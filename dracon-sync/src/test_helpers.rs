@@ -69,11 +69,13 @@ pub(crate) fn test_git_cmd() -> std::process::Command {
     std::process::Command::new(git_path)
 }
 
+#[allow(dead_code)]
 pub(crate) struct EnvRestorer {
     key: String,
     old_value: Option<String>,
 }
 
+#[allow(dead_code)]
 impl EnvRestorer {
     /// Saves current value of `key`, sets it to `new_value`.
     /// On Drop: restores the original value (or removes if unset).
