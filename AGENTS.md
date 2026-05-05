@@ -174,16 +174,22 @@ All binaries support `-V, --version` and `-v, --verbose` (repeatable up to 2x fo
 dracon-sync [OPTIONS] <COMMAND>
 Commands:
   status           Show resolved policy path and sync scope
+  validate-config  Validate the sync policy for errors and warnings
   repos            One-off report across discovered repositories
   repair-concerns  Repair concern repos (dry-run by default; use --apply to execute)
   repair-warns     Repair warn repos (dirty-only triage; dry-run by default)
   once             Run one sync pass
   daemon           Run continuous sync loop [--interval-secs override]
-  sync-now         Sync a specific repository now
+  sync-now         Sync one or more repositories now [--dry-run] [repos...]
+  pause            Pause sync (creates freeze marker)
+  resume           Resume sync (removes freeze marker)
   edit-config      Open sync policy in the system editor
   test-ai          Test AI providers connectivity
+  health           Check daemon health [--json]
+  metrics          Print Prometheus-style metrics
   stuck            Manage repos permanently stuck on push
   dual-branch      Manage repos with both main and master branches
+  repair-origins   Detect and repair orphan origin URLs
 ```
 
 **Nested subcommands:**
