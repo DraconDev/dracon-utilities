@@ -112,6 +112,10 @@ enum Command {
     },
     /// Open sync policy in the system editor.
     EditConfig,
+    /// Pause sync (creates freeze marker).
+    Pause,
+    /// Resume sync (removes freeze marker).
+    Resume,
     /// Test AI providers connectivity.
     TestAi {
         /// Emit machine-readable JSON.
