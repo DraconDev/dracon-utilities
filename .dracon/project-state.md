@@ -1,14 +1,15 @@
 # Project State
 
 ## Current Focus
-Refactored version parsing and notification handling for better reliability
+Refined directory exclusion patterns to improve precision in file synchronization.
 
 ## Context
-The changes improve version parsing reliability and make desktop notifications non-blocking to prevent daemon delays
+The previous implementation had an edge case where patterns ending with `-` (like `.tmp-`) incorrectly matched names without trailing hyphens (like `.tmpfile`). This could lead to unintended exclusions.
 
 ## Completed
-- [x] Refactored version parsing in bump.rs to use serde_json for more robust JSON handling
-- [x] Made desktop notifications run in background using tokio::spawn to prevent blocking
+- [x] Fixed `.tmp-` pattern to only match names ending with `-` (e.g., `.tmp-` matches `.tmp-foo` but not `.tmpfile`)
+- [x] Added explicit comment explaining the `.tmp-` prefix matching behavior
+- [x] Added support for glob-style `*` suffix patterns (e.g., `.build*` matches `.build-debug`)
 
 ## In Progress
 - [ ] No active work in progress
@@ -17,5 +18,5 @@ The changes improve version parsing reliability and make desktop notifications n
 - None identified
 
 ## Next Steps
-1. Verify the new version parsing works with all supported version file formats
-2. Test notification behavior under high daemon load conditions
+1. Verify the new patterns work as expected in integration tests
+2. Document the updated exclusion pattern syntax in user documentation
