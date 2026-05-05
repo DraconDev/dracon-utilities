@@ -51,7 +51,19 @@
 ///
 /// # Fast but may have flaky failures:
 /// cargo test
+/// # Git Command Helper
+///
+/// Use `test_git_cmd()` instead of `std::process::Command::new("git")` in tests.
+/// This respects `DRACON_SYNC_GIT_BIN` and prevents PATH resolution races in parallel runs.
+///
+/// ```ignore
+/// let output = test_git_cmd().current_dir(&repo).args(["status"]).output()?;
 /// ```
+pub(crate) fn test_git_cmd() -> std::process::Command {
+    let git_path = crate::policy::git_binary();
+    std::process::Command::new(git_path)
+}
+
 pub(crate) struct EnvRestorer {
     key: String,
     old_value: Option<String>,
