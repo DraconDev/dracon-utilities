@@ -390,28 +390,36 @@ async fn main() -> Result<()> {
         Command::Daemon { interval_secs } => {
             run_daemon(policy_path, interval_secs).await?;
         }
-        Command::SyncNow { repo, dry_run } => {
+        Command::SyncNow { repos, dry_run } => {
             if let Some(reason) = freeze_reason(&policy_path) {
                 println!("⏸️ sync frozen ({})", reason);
                 return Ok(());
             }
-            if daemon::is_repo_stuck(&repo) {
-                println!("🔒 {} is stuck on push. Run 'dracon-sync stuck unstuck {}' first.", repo.display(), repo.display());
-                return Ok(());
-            }
             let policy = SyncPolicy::load(&policy_path)?;
             let excluded_dir_names = excluded_dir_names_set(&policy);
-            if sync_repo(&repo, &policy, &excluded_dir_names, 0, None, dry_run).await? {
-                if dry_run {
-                    println!("✅ dry-run complete for {}", repo.display());
-                } else {
-                    println!("🔁 synced {}", repo.display());
+            for repo in repos {
+                if daemon::is_repo_stuck(&repo) {
+                    println!("🔒 {} is stuck on push. Run 'dracon-sync stuck unstuck {}' first.", repo.display(), repo.display());
+                    continue;
                 }
-            } else {
-                if dry_run {
-                    println!("✅ no sync changes needed for {}", repo.display());
-                } else {
-                    println!("✅ no sync changes {}", repo.display());
+                match sync_repo(&repo, &policy, &excluded_dir_names, 0, None, dry_run).await {
+                    Ok(true) => {
+                        if dry_run {
+                            println!("✅ dry-run complete for {}", repo.display());
+                        } else {
+                            println!("🔁 synced {}", repo.display());
+                        }
+                    }
+                    Ok(false) => {
+                        if dry_run {
+                            println!("✅ no sync changes needed for {}", repo.display());
+                        } else {
+                            println!("✅ no sync changes {}", repo.display());
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("❌ error syncing {}: {}", repo.display(), e);
+                    }
                 }
             }
         }
