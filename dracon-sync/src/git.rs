@@ -2200,13 +2200,13 @@ mod tests {
         });
 
         let url = format!("http://127.0.0.1:{}/api/v1/repos", port);
-        let result = crate::git::multi_remote::create_repo_on_codeberg("test_token", "testuser", "myrepo", &url);
+        let result = crate::git::multi_remote::create_repo_on_codeberg("test_token", "testuser", "myrepo", &url).await;
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "git@codeberg.org:testuser/myrepo.git");
     }
 
-    #[test]
-    fn test_create_repo_on_codeberg_unprocessable_422() {
+    #[tokio::test]
+    async fn test_create_repo_on_codeberg_unprocessable_422() {
         let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
         let port = listener.local_addr().unwrap().port();
 
@@ -2219,13 +2219,13 @@ mod tests {
         });
 
         let url = format!("http://127.0.0.1:{}/api/v1/repos", port);
-        let result = crate::git::multi_remote::create_repo_on_codeberg("test_token", "testuser", "myrepo", &url);
+        let result = crate::git::multi_remote::create_repo_on_codeberg("test_token", "testuser", "myrepo", &url).await;
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "git@codeberg.org:testuser/myrepo.git");
     }
 
-    #[test]
-    fn test_create_repo_on_codeberg_unauthorized_401() {
+    #[tokio::test]
+    async fn test_create_repo_on_codeberg_unauthorized_401() {
         let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
         let port = listener.local_addr().unwrap().port();
 
