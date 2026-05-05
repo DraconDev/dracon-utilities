@@ -126,6 +126,16 @@ Repo discovery searches up to **4 levels deep** from each watch root. Dot-prefix
 
 Push operations use `push_with_retries` with SSH hardening (`ConnectTimeout`, `ConnectionAttempts`) and automatic HTTPS fallback on persistent timeout. The `push_retries` policy setting is respected. All transient network failures should now trigger retries rather than failing immediately.
 
+### dracon-sync Merge Strategy
+
+dracon-sync uses `git pull --no-rebase` (merge) instead of `git pull --rebase`. This preserves both local and remote histories without rewriting commits. Benefits:
+
+- **Less likely to conflict**: Merge handles parallel commits gracefully; rebase fails if the same lines were modified
+- **No history rewriting**: Commits are not rebased, so there's no risk of losing commits if the rebase is aborted
+- **Clear history**: Merge commits clearly show where branches diverged and merged
+
+When `auto_pull = true` and a repo is behind upstream, sync will create a merge commit rather than rebasing. This prevents the "rebase-abort causes true divergence" scenario.
+
 ### dracon-sync Automatic Remote Creation
 
 When `auto_github_private = true` in `dracon-sync.toml`, any repo in a watched root without an origin remote will automatically get:
