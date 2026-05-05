@@ -105,10 +105,10 @@ enum Command {
         #[arg(long)]
         interval_secs: Option<u64>,
     },
-    /// Sync a specific repository now.
+    /// Sync one or more repositories now.
     SyncNow {
-        /// The repository path to sync immediately.
-        repo: PathBuf,
+        /// The repository path(s) to sync immediately.
+        repos: Vec<PathBuf>,
         /// Preview what would be done without making any changes.
         #[arg(long)]
         dry_run: bool,
