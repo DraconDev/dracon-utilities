@@ -1648,15 +1648,20 @@ auto_bump_versions = false
     }
 
     #[tokio::test]
-    async fn test_sync_repo_dry_run_reports_would_stage() {
+    async fn test_sync_repo_dry_run_does_not_modify_working_tree() {
         let tmp = tempfile::tempdir().unwrap();
-        let repo = init_test_repo(&tmp, "dry-run-stage-test");
+        let repo = init_test_repo(&tmp, "dry-run-wt-test");
 
-        std::fs::write(repo.join("new.txt"), "content\n").unwrap();
+        std::fs::write(repo.join("tracked.txt"), "tracked\n").unwrap();
+        git_cmd(&repo, &["add", "tracked.txt"]);
+        git_cmd(&repo, &["commit", "-m", "add tracked"]);
+
+        std::fs::write(repo.join("modified.txt"), "modified\n").unwrap();
+        std::fs::write(repo.join("untracked.txt"), "untracked\n").unwrap();
 
         let toml_str = r#"
 auto_github_private = false
-auto_commit = false
+auto_commit = true
 auto_pull = false
 auto_push = false
 auto_bump_versions = false
@@ -1665,6 +1670,10 @@ auto_bump_versions = false
 
         let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, true).await;
         assert!(result.is_ok(), "dry-run should succeed");
-        assert!(result.unwrap(), "dry-run should return true (something to do)");
+
+        let output = git_cmd(&repo, &["status", "--porcelain"]);
+        let status = String::from_utf8_lossy(&output.stdout);
+        assert!(status.contains("modified.txt"), "modified.txt should still be modified");
+        assert!(status.contains("untracked.txt"), "untracked.txt should still be untracked");
     }
 }
