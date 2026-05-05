@@ -631,6 +631,81 @@ pub(crate) async fn sync_repo(
     Ok(false)
 }
 
+/// Push to origin with blob size check, then push to any additional named remotes.
+/// Returns `Ok(true)` if the push succeeded (or was skipped), `Ok(false)` on failure.
+async fn push_with_blob_check(
+    repo: &Path,
+    policy: &SyncPolicy,
+    blob_threshold: u64,
+    has_origin: bool,
+    ahead: usize,
+    remote_failures: Option<&mut HashMap<String, u32>>,
+) -> Result<bool> {
+    if !policy.auto_push || !has_origin || ahead == 0 {
+        return Ok(true);
+    }
+
+    let ahead_large = match detect_large_blobs_ahead(repo, blob_threshold) {
+        Ok(v) => v,
+        Err(e) => {
+            eprintln!("⚠️ large blob detection failed for {}: {} - skipping push", repo.display(), e);
+            return Ok(false);
+        }
+    };
+    if !ahead_large.is_empty() {
+        eprintln!(
+            "⚠️ skip push for {}: large blob(s) above {} bytes in ahead range ({} found)",
+            repo.display(),
+            blob_threshold,
+            ahead_large.len()
+        );
+        return Ok(false);
+    }
+
+    match push_with_retries(
+        repo,
+        policy.push_op_timeout_secs,
+        policy.push_retries,
+        "push",
+    )
+    .await
+    {
+        Ok(()) => {}
+        Err(e) => {
+            eprintln!("⚠️ push failed for {}: {}", repo.display(), e);
+            return Ok(false);
+        }
+    }
+
+    // Push to additional named remotes after origin push succeeds
+    if !policy.remotes.is_empty() {
+        let push_results = push_mirror_remotes(
+            repo,
+            &policy.remotes,
+            policy.push_op_timeout_secs,
+            policy.push_retries,
+        ).await;
+        let all_ok = push_results.iter().all(|(_, r)| r.is_ok());
+        if !all_ok {
+            for (name, result) in &push_results {
+                if let Err(e) = result {
+                    eprintln!("⚠️ push to {} failed for {}: {}", name, repo.display(), e);
+                    if let Some(ref mut rf) = remote_failures {
+                        *rf.entry(name.clone()).or_insert(0) += 1;
+                    }
+                }
+            }
+            return Ok(false);
+        } else if let Some(ref mut rf) = remote_failures {
+            for name in policy.remotes.iter().map(|r| r.name.clone()) {
+                rf.remove(&name);
+            }
+        }
+    }
+
+    Ok(true)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
