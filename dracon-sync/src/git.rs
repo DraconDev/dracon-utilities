@@ -1557,7 +1557,7 @@ mod tests {
     use super::*;
     use crate::git::multi_remote::{diagnose_divergence, push_to_named_remote, Divergence};
     use std::os::unix::fs::PermissionsExt;
-    use crate::test_helpers::EnvRestorer;
+    use crate::test_helpers::{EnvRestorer, test_git_cmd};
 
     #[test]
     fn test_strip_url_credentials_https_with_creds() {
