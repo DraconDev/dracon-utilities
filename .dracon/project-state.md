@@ -1,21 +1,22 @@
 # Project State
 
 ## Current Focus
-Convert Git repository creation tests to async/await pattern for better concurrency handling
+Convert Git repository creation tests to async/await pattern for better async compatibility
 
 ## Context
-The code was refactored to use async/await for Git repository creation tests to improve concurrency and better match the async implementation of the actual functions being tested.
+The codebase is transitioning to async/await for improved concurrency handling. This change aligns the test suite with the new async implementation of the Git repository creation functions.
 
 ## Completed
-- [x] Converted test_create_repo_on_codeberg_success_201 to async/await pattern
-- [x] Converted test_create_repo_on_codeberg_conflict_409 to async/await pattern
+- [x] Converted Git repository creation tests to async/await pattern
+- [x] Updated test annotations to use `#[tokio::test]` instead of `#[test]`
+- [x] Added `.await` to async function calls in test cases
 
 ## In Progress
 - [ ] No active work in progress beyond these changes
 
 ## Blockers
-- None identified
+- None identified for this specific change
 
 ## Next Steps
-1. Verify all Git-related tests now work correctly with async/await
-2. Ensure the async implementation matches the test expectations
+1. Verify all Git-related tests pass with the new async pattern
+2. Continue async conversion of other Git-related functionality
