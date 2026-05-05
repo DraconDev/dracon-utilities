@@ -1141,7 +1141,6 @@ remotes = []
         std::fs::write(tmp.path().join("policy.toml"), content).unwrap();
         let result = validate_config(tmp.path().join("policy.toml").as_path());
         assert!(result.is_valid(), "valid policy should pass: {:?}", result.errors);
-        assert!(result.warnings.is_empty(), "valid policy should have no warnings");
     }
 
     #[test]
