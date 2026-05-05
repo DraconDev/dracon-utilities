@@ -305,7 +305,12 @@ pub(crate) async fn sync_repo(
                 for p in &missing {
                     rm_args.push(p);
                 }
-                if let Err(e) = run_git_with_timeout(repo, &rm_args, 30, "rm").await {
+                if dry_run {
+                    println!("🗑️  Would delete (git rm) {} file(s) from {}: {:?}", missing.len(), repo.display(), &missing[..missing.len().min(5)]);
+                    if missing.len() > 5 {
+                        println!("  ... and {} more", missing.len() - 5);
+                    }
+                } else if let Err(e) = run_git_with_timeout(repo, &rm_args, 30, "rm").await {
                     eprintln!("⚠️ {} git rm failed for {} paths: {:?}", repo.display(), missing.len(), missing);
                     return Err(e);
                 }
@@ -313,8 +318,6 @@ pub(crate) async fn sync_repo(
 
             // Build the payload from what we're actually going to commit (cached diff)
             let staged = git_name_status_entries(repo, &["diff", "--cached", "--name-status"]).await?;
-            let committed_entries: Vec<dracon_git::types::DiffFile> = staged
-                .into_iter()
                 .map(|(path, status)| dracon_git::types::DiffFile { path, status })
                 .collect();
 
