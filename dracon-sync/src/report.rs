@@ -1120,6 +1120,7 @@ pub(crate) async fn run_repair_concerns(
                         // (but without the manual_only marking)
 
                         let large = detect_large_blobs_ahead(&repo, blob_threshold)
+                            .await
                             .unwrap_or_default();
                         if !large.is_empty() {
                             out!(

@@ -928,6 +928,7 @@ pub(crate) fn set_upstream_to_branch(repo: &Path, branch: &str) -> Result<()> {
 pub(crate) async fn detect_large_blobs_ahead(repo: &Path, min_bytes: u64) -> Result<Vec<(u64, String)>> {
     let timeout_secs = 60;
     let repo = repo.to_path_buf();
+    let repo_display = repo.display().to_string();
     
     tokio::time::timeout(
         Duration::from_secs(timeout_secs),
@@ -982,7 +983,7 @@ pub(crate) async fn detect_large_blobs_ahead(repo: &Path, min_bytes: u64) -> Res
     )
     .await
     .with_context(|| "timed out waiting for spawn_blocking in detect_large_blobs_ahead")?
-    .with_context(|| format!("detect_large_blobs_ahead timed out (>{}s) for {}", timeout_secs, repo.display()))?
+    .with_context(|| format!("detect_large_blobs_ahead timed out (>{}s) for {}", timeout_secs, repo_display))?
 }
 
 pub(crate) fn top_level_dir(path: &str) -> Option<String> {

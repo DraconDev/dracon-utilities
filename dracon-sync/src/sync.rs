@@ -538,7 +538,7 @@ async fn push_with_blob_check(
         return Ok(true);
     }
 
-    let ahead_large = match detect_large_blobs_ahead(repo, blob_threshold) {
+    let ahead_large = match detect_large_blobs_ahead(repo, blob_threshold).await {
         Ok(v) => v,
         Err(e) => {
             eprintln!("⚠️ large blob detection failed for {}: {} - skipping push", repo.display(), e);
