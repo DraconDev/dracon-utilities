@@ -1,22 +1,27 @@
 # Project State
 
 ## Current Focus
-Added comprehensive Prometheus-style metrics validation and testing
+Added new commands for repository management and monitoring in `dracon-sync`
 
 ## Context
-The recent addition of Prometheus-style metrics support needed proper validation to ensure metrics are correctly formatted and all expected metrics are included. This change adds tests to verify the metrics output format and completeness.
+The changes enhance repository synchronization capabilities by adding new commands for better control and observability. This aligns with recent work on comprehensive metrics, health checks, and freeze/resume functionality.
 
 ## Completed
-- [x] Added test for metrics output format validation
-- [x] Added test for presence of all expected metrics
-- [x] Implemented validation rules for metric naming conventions
+- [x] Added `validate-config` command for policy validation
+- [x] Added `pause` and `resume` commands for sync control
+- [x] Added `health` command for daemon status checks
+- [x] Added `metrics` command for Prometheus-style monitoring
+- [x] Added `repair-origins` command for origin URL management
+- [x] Enhanced `sync-now` to support multiple repositories
+- [x] Updated command documentation in AGENTS.md
 
 ## In Progress
-- [ ] None (tests are complete)
+- [ ] None (all changes are complete)
 
 ## Blockers
-- None (tests are complete and passing)
+- None (documentation updates are complete)
 
 ## Next Steps
-1. Verify test coverage with additional edge cases
-2. Consider adding integration tests for metrics endpoint
+1. Verify all new commands work as expected in integration tests
+2. Update user documentation to reflect new commands
+3. Consider adding more monitoring metrics based on usage patterns
