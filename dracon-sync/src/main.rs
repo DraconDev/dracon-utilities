@@ -279,6 +279,30 @@ async fn main() -> Result<()> {
                 println!("🌐 REMOTES: {}", policy.remotes.len());
             }
         }
+        Command::ValidateConfig => {
+            let result = policy::validate_config(&policy_path);
+            if result.is_valid() {
+                println!("✅ Policy is valid");
+            } else {
+                println!("❌ Policy has errors:");
+                for e in &result.errors {
+                    println!("  ERROR: {}", e);
+                }
+                if !result.warnings.is_empty() {
+                    println!("\n⚠️  Warnings:");
+                    for w in &result.warnings {
+                        println!("  WARNING: {}", w);
+                    }
+                }
+                std::process::exit(1);
+            }
+            if !result.warnings.is_empty() {
+                println!("⚠️  Policy has warnings:");
+                for w in &result.warnings {
+                    println!("  WARNING: {}", w);
+                }
+            }
+        }
         Command::Repos {
             only_concern,
             only_warn,
