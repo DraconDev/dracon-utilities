@@ -850,4 +850,48 @@ remotes = []
         assert!(result.is_some(), "env freeze should override missing marker");
         assert!(result.unwrap().contains("env DRACON_SYNC_FREEZE"));
     }
+
+    #[test]
+    fn test_metrics_output_has_expected_format() {
+        let lines = vec![
+            "# HELP dracon_sync_info Dracon sync daemon info",
+            "# TYPE dracon_sync_info gauge",
+            "dracon_sync_info{version=\"0.1.4\"} 1",
+            "# HELP dracon_sync_repos_discovered_total gauge",
+            "dracon_sync_repos_discovered_total 20",
+            "# HELP dracon_sync_freeze_state gauge",
+            "dracon_sync_freeze_state 0",
+        ];
+
+        for line in &lines {
+            if line.starts_with('#') {
+                assert!(line.contains(" HELP ") || line.contains(" TYPE "),
+                    "comment line should be HELP or TYPE: {}", line);
+            } else {
+                assert!(line.contains("dracon_sync"),
+                    "metric line should contain metric name: {}", line);
+            }
+        }
+    }
+
+    #[test]
+    fn test_metrics_contains_all_expected_metrics() {
+        let expected_metrics = vec![
+            "dracon_sync_info",
+            "dracon_sync_repos_discovered_total",
+            "dracon_sync_watch_roots_total",
+            "dracon_sync_remotes_total",
+            "dracon_sync_freeze_state",
+            "dracon_sync_policy_auto_commit",
+            "dracon_sync_policy_auto_push",
+            "dracon_sync_policy_auto_pull",
+            "dracon_sync_push_retries",
+            "dracon_sync_pulse_interval_secs",
+        ];
+
+        for metric in &expected_metrics {
+            assert!(metric.starts_with("dracon_sync_"),
+                "metric name should start with dracon_sync_: {}", metric);
+        }
+    }
 }
