@@ -2243,7 +2243,7 @@ mod tests {
         });
 
         let url = format!("http://127.0.0.1:{}/api/v1/repos", port);
-        let result = crate::git::multi_remote::create_repo_on_codeberg("bad_token", "testuser", "myrepo", &url);
+        let result = crate::git::multi_remote::create_repo_on_codeberg("bad_token", "testuser", "myrepo", &url).await;
         assert!(result.is_err());
         let err_msg = format!("{}", result.unwrap_err());
         assert!(err_msg.contains("401") || err_msg.contains("Unauthorized"), "error should mention 401: {}", err_msg);
