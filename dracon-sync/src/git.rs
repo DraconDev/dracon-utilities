@@ -1410,8 +1410,8 @@ pub(crate) fn create_repo_on_gitlab(account: &str, repo_name: &str) -> Result<St
     Ok(format!("git@gitlab.com:{}/{}.git", account, repo_name))
 }
 
-pub(crate) fn create_repo_on_codeberg(token: &str, account: &str, repo_name: &str, api_endpoint: &str) -> Result<String> {
-    let client = reqwest::blocking::Client::new();
+pub(crate) async fn create_repo_on_codeberg(token: &str, account: &str, repo_name: &str, api_endpoint: &str) -> Result<String> {
+    let client = reqwest::Client::new();
     let response = client
         .post(api_endpoint)
         .header("Authorization", format!("Bearer {}", token))
@@ -1422,6 +1422,7 @@ pub(crate) fn create_repo_on_codeberg(token: &str, account: &str, repo_name: &st
             "default_branch": "main"
         }))
         .send()
+        .await
         .with_context(|| "reqwest codeberg repo create failed")?;
 
     let status = response.status();
@@ -1430,14 +1431,14 @@ pub(crate) fn create_repo_on_codeberg(token: &str, account: &str, repo_name: &st
     }
 
     if !status.is_success() {
-        let body = response.text().unwrap_or_default();
+        let body = response.text().await.unwrap_or_default();
         anyhow::bail!("codeberg repo create failed ({}): {}", status, body);
     }
 
     Ok(format!("git@codeberg.org:{}/{}.git", account, repo_name))
 }
 
-pub(crate) fn auto_create_repo(config: &RemoteConfig, repo_name: &str) -> Result<String> {
+pub(crate) async fn auto_create_repo(config: &RemoteConfig, repo_name: &str) -> Result<String> {
     match config.auth_type {
         AuthType::GitHub => create_repo_on_github(&config.auto_create_account, repo_name),
         AuthType::GitLab => create_repo_on_gitlab(&config.auto_create_account, repo_name),
@@ -1446,13 +1447,13 @@ pub(crate) fn auto_create_repo(config: &RemoteConfig, repo_name: &str) -> Result
             let token = load_secret(token_var)
                 .with_context(|| format!("missing token for Codeberg (set {} env var or ~/.dracon/utilities/sync/secrets/*.env file)", token_var))?;
             let endpoint = config.api_endpoint.as_deref().unwrap_or("https://codeberg.org/api/v1/user/repos");
-            create_repo_on_codeberg(&token, &config.auto_create_account, repo_name, endpoint)
+            create_repo_on_codeberg(&token, &config.auto_create_account, repo_name, endpoint).await
         }
         AuthType::Generic => anyhow::bail!("Generic auth cannot auto-create repos"),
     }
 }
 
-pub(crate) fn auto_create_all_remotes(remotes: &[RemoteConfig], repo_name: &str) -> Vec<(String, Result<String>)> {
+pub(crate) async fn auto_create_all_remotes(remotes: &[RemoteConfig], repo_name: &str) -> Vec<(String, Result<String>)> {
         let mut results = Vec::new();
         for remote in remotes {
             if remote.auto_create {
