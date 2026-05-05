@@ -554,7 +554,7 @@ pub(crate) async fn sync_repo(
     // Re-fetch status for push decision (may have changed after pull/commit)
     let current_status = svc.get_status().await?;
     if policy.auto_push && current_status.ahead > 0 && has_origin {
-        if !push_with_blob_check(repo, policy, blob_threshold, has_origin, current_status.ahead, remote_failures).await? {
+        if !push_with_blob_check(repo, policy, blob_threshold, has_origin, current_status.ahead, remote_failures, dry_run).await? {
             return Ok(false);
         }
     } else if policy.auto_push && current_status.ahead > 0 && !has_origin {
