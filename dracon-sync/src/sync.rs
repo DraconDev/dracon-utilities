@@ -1582,4 +1582,89 @@ push_url = "{}"
         let status = String::from_utf8_lossy(&output.stdout);
         assert!(status.contains("dirty.txt"), "file should still be untracked/unstaged");
     }
+
+    #[tokio::test]
+    async fn test_sync_repo_dry_run_does_not_commit() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "dry-run-test");
+
+        std::fs::write(repo.join("new_file.txt"), "new content\n").unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = true
+auto_pull = false
+auto_push = false
+auto_bump_versions = false
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let commits_before = git_cmd(&repo, &["rev-list", "--count", "HEAD"]);
+        let commits_count_before: usize = String::from_utf8_lossy(&commits_before.stdout)
+            .trim().parse().unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, true).await;
+        assert!(result.is_ok(), "dry-run should succeed");
+
+        let commits_after = git_cmd(&repo, &["rev-list", "--count", "HEAD"]);
+        let commits_count_after: usize = String::from_utf8_lossy(&commits_after.stdout)
+            .trim().parse().unwrap();
+        assert_eq!(commits_count_before, commits_count_after,
+            "dry-run should not create any commits");
+
+        let status = git_cmd(&repo, &["status", "--porcelain"]);
+        let status_output = String::from_utf8_lossy(&status.stdout);
+        assert!(status_output.contains("new_file.txt"),
+            "file should still appear as untracked in working tree");
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_dry_run_does_not_push() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "dry-run-push-test");
+
+        std::fs::write(repo.join("file.txt"), "change\n").unwrap();
+        git_cmd(&repo, &["add", "."]);
+        git_cmd(&repo, &["commit", "-m", "add file"]);
+
+        let commits_before = git_cmd(&repo, &["rev-list", "--count", "HEAD"]);
+        let count_before: usize = String::from_utf8_lossy(&commits_before.stdout).trim().parse().unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = false
+auto_pull = false
+auto_push = true
+auto_bump_versions = false
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, true).await;
+        assert!(result.is_ok(), "dry-run should succeed");
+
+        let commits_after = git_cmd(&repo, &["rev-list", "--count", "HEAD"]);
+        let count_after: usize = String::from_utf8_lossy(&commits_after.stdout).trim().parse().unwrap();
+        assert_eq!(count_before, count_after, "dry-run should not change commit count");
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_dry_run_reports_would_stage() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "dry-run-stage-test");
+
+        std::fs::write(repo.join("new.txt"), "content\n").unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = false
+auto_pull = false
+auto_push = false
+auto_bump_versions = false
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, true).await;
+        assert!(result.is_ok(), "dry-run should succeed");
+        assert!(result.unwrap(), "dry-run should return true (something to do)");
+    }
 }
