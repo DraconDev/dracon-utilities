@@ -231,6 +231,8 @@ pub(crate) struct SyncPolicy {
     pub(crate) incident_ledger_max_lines: usize,
     #[serde(default = "default_incident_ledger_max_age_days")]
     pub(crate) incident_ledger_max_age_days: u64,
+    #[serde(default)]
+    pub(crate) webhook_url: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Default, Clone)]
