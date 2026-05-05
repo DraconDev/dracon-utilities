@@ -20,13 +20,16 @@ pub(crate) fn send_sync_conflict_notification(repo_path: &Path, reason: &str, de
         repo_name, reason, details
     );
     
-    if let Err(e) = notify_rust::Notification::new()
-        .summary(title)
-        .body(&body)
-        .show() 
-    {
-        eprintln!("⚠️ failed to send desktop notification: {}", e);
-    }
+    // Spawn in background to avoid blocking the daemon loop
+    tokio::spawn(async move {
+        if let Err(e) = notify_rust::Notification::new()
+            .summary(title)
+            .body(&body)
+            .show() 
+        {
+            eprintln!("⚠️ failed to send desktop notification: {}", e);
+        }
+    });
 }
 
 use crate::exclude::{
