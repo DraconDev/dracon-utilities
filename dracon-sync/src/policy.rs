@@ -434,6 +434,175 @@ pub(crate) fn resolve_policy_path() -> Result<PathBuf> {
     anyhow::bail!("sync policy not found")
 }
 
+#[derive(Debug, Default)]
+pub(crate) struct ValidateResult {
+    pub errors: Vec<String>,
+    pub warnings: Vec<String>,
+}
+
+impl ValidateResult {
+    fn error(&mut self, msg: String) {
+        self.errors.push(msg);
+    }
+
+    fn warn(&mut self, msg: String) {
+        self.warnings.push(msg);
+    }
+
+    fn is_valid(&self) -> bool {
+        self.errors.is_empty()
+    }
+}
+
+pub(crate) fn validate_config(policy_path: &Path) -> ValidateResult {
+    let mut result = ValidateResult::default();
+
+    let content = match std::fs::read_to_string(policy_path) {
+        Ok(c) => c,
+        Err(e) => {
+            result.error(format!("cannot read policy {}: {}", policy_path.display(), e));
+            return result;
+        }
+    };
+
+    let policy: SyncPolicy = match toml::from_str(&content) {
+        Ok(p) => p,
+        Err(e) => {
+            result.error(format!("TOML parse error: {}", e));
+            return result;
+        }
+    };
+
+    for root in &policy.watch_roots {
+        let path = Path::new(root);
+        if !path.exists() {
+            result.error(format!("watch root does not exist: {}", root));
+        } else if !path.is_dir() {
+            result.error(format!("watch root is not a directory: {}", root));
+        }
+    }
+
+    if policy.watch_roots.is_empty() {
+        result.error("no watch_roots defined (no directories will be synced)".to_string());
+    }
+
+    for (idx, remote) in policy.remotes.iter().enumerate() {
+        if remote.push_url.is_empty() {
+            result.error(format!("remote[{}] '{}': push_url is empty", idx, remote.name));
+        }
+
+        if remote.auto_create {
+            if remote.auto_create_account.is_empty() {
+                result.error(format!(
+                    "remote[{}] '{}': auto_create=true but auto_create_account is empty",
+                    idx, remote.name
+                ));
+            }
+
+            if let Some(token_var) = &remote.auto_create_token_var {
+                if token_var.is_empty() {
+                    result.error(format!(
+                        "remote[{}] '{}': auto_create_token_var is set but empty",
+                        idx, remote.name
+                    ));
+                } else if std::env::var(token_var).is_err() {
+                    let secrets_dir = crate::secrets::sync_secrets_dir();
+                    let secrets_path = secrets_dir.join(format!("{}.env", token_var.to_lowercase()));
+                    if !secrets_path.exists() {
+                        result.warn(format!(
+                            "remote[{}] '{}': auto_create_token_var '{}' not in env and no secret file at {}",
+                            idx, remote.name, token_var, secrets_path.display()
+                        ));
+                    }
+                }
+            }
+
+            if remote.auth_type == crate::policy::AuthType::Codeberg {
+                if let Some(api_endpoint) = &remote.api_endpoint {
+                    if api_endpoint.is_empty() {
+                        result.error(format!(
+                            "remote[{}] '{}': auth_type=codeberg but api_endpoint is empty",
+                            idx, remote.name
+                        ));
+                    } else if !api_endpoint.starts_with("http://") && !api_endpoint.starts_with("https://") {
+                        result.error(format!(
+                            "remote[{}] '{}': api_endpoint '{}' is not a valid URL",
+                            idx, remote.name, api_endpoint
+                        ));
+                    }
+                } else {
+                    result.warn(format!(
+                        "remote[{}] '{}': auth_type=codeberg but no api_endpoint set (will use default)",
+                        idx, remote.name
+                    ));
+                }
+            }
+        } else if !remote.push_url.contains("{repo}") && !remote.push_url.contains("{account}") {
+            result.warn(format!(
+                "remote[{}] '{}': push_url '{}' has no {{repo}} or {{account}} placeholder — repo names will not be substituted",
+                idx, remote.name, remote.push_url
+            ));
+        }
+
+        for (local_name, remote_name) in &remote.repo_name_map {
+            if local_name.is_empty() {
+                result.error(format!(
+                    "remote[{}] '{}': repo_name_map has empty local name (maps to '{}')",
+                    idx, remote.name, remote_name
+                ));
+            }
+            if remote_name.is_empty() {
+                result.error(format!(
+                    "remote[{}] '{}': repo_name_map local '{}' maps to empty remote name",
+                    idx, remote.name, local_name
+                ));
+            }
+            if local_name.contains('/') || local_name.contains('\\') {
+                result.error(format!(
+                    "remote[{}] '{}': repo_name_map local name '{}' is not a valid directory name",
+                    idx, remote.name, local_name
+                ));
+            }
+        }
+    }
+
+    if policy.remotes.is_empty() {
+        result.warn("no remotes defined (push operations will have no destination)".to_string());
+    }
+
+    for (idx, pattern) in policy.exclude_dir_names.iter().enumerate() {
+        if pattern.is_empty() {
+            result.warn(format!("exclude_dir_names[{}] is empty string", idx));
+        }
+    }
+
+    for (idx, pattern) in policy.exclude_file_patterns.iter().enumerate() {
+        if pattern.is_empty() {
+            result.warn(format!("exclude_file_patterns[{}] is empty string", idx));
+        }
+    }
+
+    if policy.auto_github_private {
+        if policy.auto_github_private_account.is_empty() {
+            result.error("auto_github_private=true but auto_github_private_account is empty".to_string());
+        }
+    }
+
+    if policy.pulse_interval_secs == 0 {
+        result.error("pulse_interval_secs must be > 0".to_string());
+    }
+
+    if policy.push_retries == 0 {
+        result.error("push_retries must be > 0".to_string());
+    }
+
+    if policy.max_stage_file_bytes == 0 {
+        result.error("max_stage_file_bytes must be > 0".to_string());
+    }
+
+    result
+}
+
 pub(crate) fn env_freeze_enabled() -> bool {
     matches!(
         std::env::var("DRACON_SYNC_FREEZE")
