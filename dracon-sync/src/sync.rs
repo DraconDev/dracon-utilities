@@ -24,7 +24,7 @@ pub(crate) async fn sync_repo(
     policy: &SyncPolicy,
     excluded_dir_names: &BTreeSet<String>,
     idle_seconds: u64,
-    mut remote_failures: Option<&mut HashMap<String, usize>>,
+    remote_failures: Option<&mut HashMap<String, usize>>,
 ) -> Result<bool> {
     let svc = GitService::new(repo)?;
     if !svc.is_git_repo().await? {
@@ -500,11 +500,10 @@ pub(crate) async fn sync_repo(
                 restore_paths(repo, &excluded_paths).await?;
             }
 
-            if policy.auto_push && has_origin {
-                if !push_with_blob_check(repo, policy, blob_threshold, has_origin, 1, remote_failures).await? {
+            if policy.auto_push && has_origin
+                && !push_with_blob_check(repo, policy, blob_threshold, has_origin, 1, remote_failures).await? {
                     return Ok(false);
                 }
-            }
         } else if policy.auto_push && !has_origin {
             eprintln!("ℹ️ skip push for {} (no origin remote)", repo.display());
         }
