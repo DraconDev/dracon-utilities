@@ -449,7 +449,7 @@ impl ValidateResult {
         self.warnings.push(msg);
     }
 
-    fn is_valid(&self) -> bool {
+    pub(crate) fn is_valid(&self) -> bool {
         self.errors.is_empty()
     }
 }
