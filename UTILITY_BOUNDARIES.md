@@ -17,7 +17,7 @@ Canonical library ownership is defined in `dracon-libs/docs/capability-boundarie
 - `dracon-sync`
   - Owns git sync automation (watch roots, pull/commit/push, deterministic commit payloads, freeze toggle).
   - Commit generation is deterministic only; AI commit generation is out-of-scope.
-  - Policy path: `/home/dracon/dracon/utilities/sync/dracon-sync.toml`.
+  - Policy path: `~/.dracon/utilities/sync/dracon-sync.toml`.
   - Incident ledger: defaults to `~/.local/state/dracon/dracon-sync-incidents.jsonl` (kept out of repos to avoid perpetual DIRTY state). Override with `DRACON_SYNC_LEDGER`.
   - Operating model doc: `/home/dracon/dracon/utilities/sync/AI_SYNC_MODEL.md`.
   - Required policy controls:
