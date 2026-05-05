@@ -1,22 +1,23 @@
 # Project State
 
 ## Current Focus
-Improved directory exclusion pattern matching for `.tmp-*` style patterns to prevent false positives.
+Optimized incident ledger retention checks by implementing lazy enforcement based on file size.
 
 ## Context
-The previous implementation of `.tmp-*` pattern matching incorrectly matched cases like `.tmpfile` (without a hyphen) and `.tmp` (exact match). This change refines the matching logic to ensure only valid `.tmp-*` patterns are matched, improving precision in file synchronization.
+The previous implementation checked retention after every incident record write, which could be inefficient for large ledgers. The new approach only performs retention checks when the file has likely grown past the maximum allowed lines.
 
 ## Completed
-- [x] Refined `.tmp-*` pattern matching to only match valid hyphenated patterns
-- [x] Added explicit check for hyphen presence after `.tmp` prefix
-- [x] Maintained existing exact match handling for `.tmp`
+- [x] Refactored incident retention to only check when file size suggests it's needed
+- [x] Added approximate line count estimation based on file size
+- [x] Maintained same error handling for retention failures
+- [x] Kept policy loading as optional to avoid unnecessary I/O
 
 ## In Progress
-- [ ] No active work in progress
+- [ ] None (this is a complete feature change)
 
 ## Blockers
-- None identified
+- None (this is a performance optimization)
 
 ## Next Steps
-1. Verify the updated pattern matching through additional test cases
-2. Document the new exclusion pattern behavior in project documentation
+1. Verify the new approach doesn't miss any retention cases
+2. Consider adding more sophisticated size estimation if needed

@@ -430,13 +430,24 @@ pub(crate) fn append_incident_record(policy_path: &Path, record: &IncidentRecord
             use std::io::Write;
             if let Err(e) = writeln!(file, "{}", line) {
                 eprintln!("⚠️ incident write failed ({}): {}", path.display(), e);
-            } else if let Ok(policy) = SyncPolicy::load(policy_path) {
-                if let Err(e) = enforce_retention(&path, &policy) {
-                    eprintln!("⚠️ incident retention failed ({}): {}", path.display(), e);
-                }
             }
         }
         Err(e) => eprintln!("⚠️ incident open failed ({}): {}", path.display(), e),
+    }
+    // ── lazy retention: only check when file has likely grown past max ──
+    if path.exists() {
+        if let Ok(metadata) = std::fs::metadata(&path) {
+            // rough estimate: ~200 bytes per JSON line
+            let approx_lines = metadata.len() as usize / 200;
+            let policy = SyncPolicy::load(policy_path).ok();
+            if let Some(ref p) = policy {
+                if approx_lines >= p.incident_ledger_max_lines {
+                    if let Err(e) = enforce_retention(&path, &policy.as_ref().unwrap()) {
+                        eprintln!("⚠️ incident retention failed ({}): {}", path.display(), e);
+                    }
+                }
+            }
+        }
     }
 }
 
