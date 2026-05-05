@@ -307,6 +307,28 @@ async fn main() -> Result<()> {
                 }
             }
         }
+        Command::Pause => {
+            if let Some(home) = dirs::home_dir() {
+                let marker = home.join(".dracon").join("dracon-sync.freeze");
+                std::fs::write(&marker, format!("paused at {}\n", chrono_lite_timestamp()))?;
+                println!("⏸️  Sync paused (freeze marker: {})", marker.display());
+            } else {
+                anyhow::bail!("cannot determine home directory");
+            }
+        }
+        Command::Resume => {
+            if let Some(home) = dirs::home_dir() {
+                let marker = home.join(".dracon").join("dracon-sync.freeze");
+                if marker.exists() {
+                    std::fs::remove_file(&marker)?;
+                    println!("▶️  Sync resumed (freeze marker removed)");
+                } else {
+                    println!("ℹ️  No freeze marker found — sync was not paused");
+                }
+            } else {
+                anyhow::bail!("cannot determine home directory");
+            }
+        }
         Command::Repos {
             only_concern,
             only_warn,
