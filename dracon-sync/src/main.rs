@@ -487,7 +487,7 @@ async fn main() -> Result<()> {
                     all_ok,
                     working_provider,
                 };
-                println!("{}", serde_json::to_string_pretty(&output).unwrap());
+                println!("{}", serde_json::to_string_pretty(&output)?);
             } else {
                 println!();
                 if all_ok {
