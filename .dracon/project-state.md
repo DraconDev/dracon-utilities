@@ -1,26 +1,20 @@
 # Project State
 
 ## Current Focus
-Added Prometheus-style metrics command to expose system status and configuration
+Added optional webhook URL configuration to SyncPolicy for incident notifications.
 
 ## Context
-This change implements a new `Metrics` command that outputs system metrics in Prometheus format, enabling monitoring and observability of the dracon-sync daemon's operational state.
+This change enables the system to send incident notifications to an external webhook URL when synchronization issues occur, enhancing monitoring capabilities.
 
 ## Completed
-- [x] Added metrics command that outputs Prometheus-formatted metrics
-- [x] Included core system metrics (version, discovered repos, watch roots)
-- [x] Added policy configuration metrics (auto-commit, auto-push, etc.)
-- [x] Included incident ledger monitoring
-- [x] Added stuck repository tracking
-- [x] Exposed operational parameters (push retries, pulse interval)
+- [x] Added optional `webhook_url` field to `SyncPolicy` with default value of `None`
 
 ## In Progress
-- [ ] None (feature is complete)
+- [ ] Implementation of webhook notification logic
 
 ## Blockers
-- None (feature is complete)
+- Webhook notification logic needs to be implemented and tested
 
 ## Next Steps
-1. Document the new metrics in project documentation
-2. Add integration tests for the metrics command
-3. Consider adding more detailed repository metrics if needed
+1. Implement webhook notification logic in the sync process
+2. Add configuration validation for the webhook URL
