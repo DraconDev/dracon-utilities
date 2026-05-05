@@ -640,6 +640,68 @@ async fn main() -> Result<()> {
                 println!("\n🔧 Run 'dracon-sync repair-origins --apply' to fix them");
             }
         }
+        Command::Health { json } => {
+            let policy = SyncPolicy::load(&policy_path)?;
+            let validate_result = policy::validate_config(&policy_path);
+            let roots = policy.watch_root_paths();
+            let excluded_dir_names = excluded_dir_names_set(&policy);
+            let repos = git::discover_git_repos(&roots, &excluded_dir_names, &policy.exclude_repos, Some(&policy.system_repo));
+            let freeze = freeze_reason(&policy_path);
+
+            let frozen = freeze.is_some();
+            let policy_ok = validate_result.is_valid();
+            let daemon_ok = true;
+
+            let status = if frozen || !policy_ok {
+                "unhealthy"
+            } else {
+                "healthy"
+            };
+
+            if json {
+                #[derive(serde::Serialize)]
+                struct HealthJson<'a> {
+                    status: &'a str,
+                    frozen: bool,
+                    freeze_reason: Option<&'a str>,
+                    policy_valid: bool,
+                    policy_errors: Vec<String>,
+                    policy_warnings: Vec<String>,
+                    daemon_running: bool,
+                    roots: usize,
+                    repos_discovered: usize,
+                }
+                let payload = HealthJson {
+                    status,
+                    frozen,
+                    freeze_reason: freeze.as_deref(),
+                    policy_valid: policy_ok,
+                    policy_errors: validate_result.errors,
+                    policy_warnings: validate_result.warnings,
+                    daemon_running: daemon_ok,
+                    roots: roots.len(),
+                    repos_discovered: repos.len(),
+                };
+                println!("{}", serde_json::to_string_pretty(&payload)?);
+            } else {
+                println!("🏥 Health Check");
+                println!("   Status: {}", if status == "healthy" { "✅ healthy" } else { "❌ unhealthy" });
+                println!("   Daemon: {}", if daemon_ok { "✅ running" } else { "❌ not running" });
+                if let Some(reason) = &freeze {
+                    println!("   Freeze: ⏸️ {}", reason);
+                } else {
+                    println!("   Freeze: off");
+                }
+                println!("   Policy: {}", if policy_ok { "✅ valid" } else { "❌ invalid" });
+                for e in &validate_result.errors {
+                    println!("      ERROR: {}", e);
+                }
+                for w in &validate_result.warnings {
+                    println!("      WARNING: {}", w);
+                }
+                println!("   Repos: {} discovered across {} roots", repos.len(), roots.len());
+            }
+        }
     }
 
     Ok(())
