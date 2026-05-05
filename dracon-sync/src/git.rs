@@ -925,62 +925,64 @@ pub(crate) fn set_upstream_to_branch(repo: &Path, branch: &str) -> Result<()> {
     }
 }
 
-pub(crate) fn detect_large_blobs_ahead(repo: &Path, min_bytes: u64) -> Result<Vec<(u64, String)>> {
+pub(crate) async fn detect_large_blobs_ahead(repo: &Path, min_bytes: u64) -> Result<Vec<(u64, String)>> {
     let timeout_secs = 60;
+    let repo = repo.to_path_buf();
     
-    let start = std::time::Instant::now();
-    
-    let rev_list = std_git_command()
-        .args(["rev-list", "--objects", "@{u}..HEAD"])
-        .current_dir(repo)
-        .output()
-        .with_context(|| format!("failed rev-list in {}", repo.display()))?;
-    if !rev_list.status.success() {
-        return Ok(Vec::new());
-    }
-    
-    if start.elapsed() > Duration::from_secs(timeout_secs) {
-        eprintln!("⚠️ detect_large_blobs_ahead timed out during rev-list for {}", repo.display());
-        return Ok(Vec::new());
-    }
-
-    let mut cat_file = std_git_command()
-        .args(["cat-file", "--batch-check=%(objectname) %(objecttype) %(objectsize) %(rest)"])
-        .current_dir(repo)
-        .stdin(std::process::Stdio::piped())
-        .stdout(std::process::Stdio::piped())
-        .spawn()
-        .with_context(|| format!("failed cat-file in {}", repo.display()))?;
-
-    if let Some(mut stdin) = cat_file.stdin.take() {
-        use std::io::Write;
-        stdin.write_all(&rev_list.stdout)?;
-    }
-    let output = cat_file.wait_with_output()?;
-    if !output.status.success() {
-        return Ok(Vec::new());
-    }
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let mut out: Vec<(u64, String)> = stdout
-        .lines()
-        .filter_map(|line| {
-            let mut parts = line.split_whitespace();
-            let _oid = parts.next()?;
-            let obj_type = parts.next()?;
-            let size_str = parts.next()?;
-            let path = parts.next()?;
-            if obj_type == "blob" {
-                let size = size_str.parse::<u64>().ok()?;
-                if size > min_bytes {
-                    return Some((size, path.to_string()));
-                }
+    tokio::time::timeout(
+        Duration::from_secs(timeout_secs),
+        tokio::task::spawn_blocking(move || -> Result<Vec<(u64, String)>> {
+            let rev_list = std_git_command()
+                .args(["rev-list", "--objects", "@{u}..HEAD"])
+                .current_dir(&repo)
+                .output()
+                .with_context(|| format!("failed rev-list in {}", repo.display()))?;
+            if !rev_list.status.success() {
+                return Ok(Vec::new());
             }
-            None
-        })
-        .collect();
-    out.sort_by_key(|a| a.0);
-    Ok(out)
+            
+            let mut cat_file = std_git_command()
+                .args(["cat-file", "--batch-check=%(objectname) %(objecttype) %(objectsize) %(rest)"])
+                .current_dir(&repo)
+                .stdin(std::process::Stdio::piped())
+                .stdout(std::process::Stdio::piped())
+                .spawn()
+                .with_context(|| format!("failed cat-file in {}", repo.display()))?;
+            
+            if let Some(mut stdin) = cat_file.stdin.take() {
+                use std::io::Write;
+                stdin.write_all(&rev_list.stdout)?;
+            }
+            let output = cat_file.wait_with_output()?;
+            if !output.status.success() {
+                return Ok(Vec::new());
+            }
+            
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let mut out: Vec<(u64, String)> = stdout
+                .lines()
+                .filter_map(|line| {
+                    let mut parts = line.split_whitespace();
+                    let _oid = parts.next()?;
+                    let obj_type = parts.next()?;
+                    let size_str = parts.next()?;
+                    let path = parts.next()?;
+                    if obj_type == "blob" {
+                        let size = size_str.parse::<u64>().ok()?;
+                        if size > min_bytes {
+                            return Some((size, path.to_string()));
+                        }
+                    }
+                    None
+                })
+                .collect();
+            out.sort_by_key(|a| a.0);
+            Ok(out)
+        }),
+    )
+    .await
+    .with_context(|| "timed out waiting for spawn_blocking in detect_large_blobs_ahead")?
+    .with_context(|| format!("detect_large_blobs_ahead timed out (>{}s) for {}", timeout_secs, repo.display()))?
 }
 
 pub(crate) fn top_level_dir(path: &str) -> Option<String> {
