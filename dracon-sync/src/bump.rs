@@ -96,7 +96,7 @@ const NOISE_PATTERNS: &[&str] = &[
     ".shellcheckrc",
 ];
 
-const VERSION_FILES: &[&str] = &[
+pub(crate) const VERSION_FILES: &[&str] = &[
     "Cargo.toml",
     "package.json",
     "VERSION",
