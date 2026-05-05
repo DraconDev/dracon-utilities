@@ -593,14 +593,18 @@ async fn push_with_blob_check(
         return Ok(false);
     }
 
-    match push_with_retries(
-        repo,
-        policy.push_op_timeout_secs,
-        policy.push_retries,
-        "push",
-    )
-    .await
-    {
+    match if dry_run {
+        println!("🔼 Would push to origin in {}", repo.display());
+        Ok(())
+    } else {
+        push_with_retries(
+            repo,
+            policy.push_op_timeout_secs,
+            policy.push_retries,
+            "push",
+        )
+        .await
+    } {
         Ok(()) => {}
         Err(e) => {
             eprintln!("⚠️ push failed for {}: {}", repo.display(), e);
@@ -610,12 +614,19 @@ async fn push_with_blob_check(
 
     // Push to additional named remotes after origin push succeeds
     if !policy.remotes.is_empty() {
-        let push_results = push_mirror_remotes(
-            repo,
-            &policy.remotes,
-            policy.push_op_timeout_secs,
-            policy.push_retries,
-        ).await;
+        let push_results = if dry_run {
+            for remote in &policy.remotes {
+                println!("🔼 Would push to {} in {}", remote.name, repo.display());
+            }
+            policy.remotes.iter().map(|r| (r.name.clone(), Ok(()))).collect()
+        } else {
+            push_mirror_remotes(
+                repo,
+                &policy.remotes,
+                policy.push_op_timeout_secs,
+                policy.push_retries,
+            ).await
+        };
         let all_ok = push_results.iter().all(|(_, r)| r.is_ok());
         if !all_ok {
             for (name, result) in &push_results {
