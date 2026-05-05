@@ -384,7 +384,7 @@ async fn main() -> Result<()> {
         Command::Daemon { interval_secs } => {
             run_daemon(policy_path, interval_secs).await?;
         }
-        Command::SyncNow { repo } => {
+        Command::SyncNow { repo, dry_run } => {
             if let Some(reason) = freeze_reason(&policy_path) {
                 println!("⏸️ sync frozen ({})", reason);
                 return Ok(());
@@ -395,10 +395,18 @@ async fn main() -> Result<()> {
             }
             let policy = SyncPolicy::load(&policy_path)?;
             let excluded_dir_names = excluded_dir_names_set(&policy);
-            if sync_repo(&repo, &policy, &excluded_dir_names, 0, None, false).await? {
-                println!("🔁 synced {}", repo.display());
+            if sync_repo(&repo, &policy, &excluded_dir_names, 0, None, dry_run).await? {
+                if dry_run {
+                    println!("✅ dry-run complete for {}", repo.display());
+                } else {
+                    println!("🔁 synced {}", repo.display());
+                }
             } else {
-                println!("✅ no sync changes {}", repo.display());
+                if dry_run {
+                    println!("✅ no sync changes needed for {}", repo.display());
+                } else {
+                    println!("✅ no sync changes {}", repo.display());
+                }
             }
         }
         Command::EditConfig => {
