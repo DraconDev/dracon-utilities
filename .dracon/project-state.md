@@ -1,21 +1,22 @@
 # Project State
 
 ## Current Focus
-Updated repository synchronization strategy from rebase to merge with documentation and test updates
+Update dracon-sync configuration paths and add PATH warning for dracon utilities
 
 ## Context
-The change addresses potential issues with the rebase strategy by switching to merge, which better handles parallel commits and preserves history integrity.
+The changes standardize configuration paths for dracon-sync and add a warning when ~/.local/bin isn't in PATH, ensuring users can access dracon utilities.
 
 ## Completed
-- [x] Updated AGENTS.md to document the new merge strategy and its benefits
-- [x] Updated test case in report.rs to reflect the merge strategy change
+- [x] Changed dracon-sync policy path from absolute to user-relative (`~/.dracon/utilities/sync/dracon-sync.toml`)
+- [x] Added PATH warning for ~/.local/bin in install.sh
+- [x] Removed obsolete note.md
 
 ## In Progress
-- [x] Documentation and test updates for the merge strategy implementation
+- [ ] None (changes are complete)
 
 ## Blockers
-- None identified in this commit
+- None (changes are complete)
 
 ## Next Steps
-1. Verify the merge strategy works as expected in production environments
-2. Monitor for any unexpected behavior in the merge commit creation process
+1. Verify PATH warning works across different shells
+2. Update documentation to reflect new paths

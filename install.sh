@@ -56,8 +56,17 @@ install_binary() {
 
 # dracon-sync with scribe and ai-bumper (both on by default)
 install_binary dracon-sync "scribe,ai-bumper" "dracon-sync"
-install_binary "dracon-system@0.2.0" "" "dracon-system"
+install_binary dracon-system "" "dracon-system"
 install_binary dracon-warden "" "dracon-warden"
+
+# Check if ~/.local/bin is in PATH
+if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
+    echo ""
+    echo "⚠️  WARNING: ~/.local/bin is not in your PATH"
+    echo "   Add this to your shell config to use dracon utilities:"
+    echo '   export PATH="$HOME/.local/bin:$PATH"'
+    echo ""
+fi
 
 mkdir -p ~/.config/systemd/user
 mkdir -p ~/.dracon/utilities/sync
