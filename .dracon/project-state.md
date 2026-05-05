@@ -1,21 +1,23 @@
 # Project State
 
 ## Current Focus
-Added webhook URL validation for SyncPolicy configuration
+Added optional webhook URL configuration to SyncPolicy for incident notifications
 
 ## Context
-To ensure webhook notifications are properly configured, we need to validate that the webhook_url (if provided) is a valid HTTP/HTTPS URL. This prevents misconfigured webhooks from causing silent failures in notification delivery.
+This change enables the system to send webhook notifications for failed push operations, enhancing monitoring and alerting capabilities. The webhook URL is made optional to maintain backward compatibility.
 
 ## Completed
-- [x] Added URL validation for webhook_url in SyncPolicy configuration
-- [x] Added error message for invalid URLs (non-http/https schemes)
+- [x] Added optional `webhook_url` field to SyncPolicy configuration
+- [x] Integrated webhook notification for failed push operations
 
 ## In Progress
-- [ ] Testing webhook notification delivery with valid/invalid URLs
+- [ ] Implement webhook URL validation logic
+- [ ] Add comprehensive error handling for webhook notifications
 
 ## Blockers
-- Need to verify webhook endpoint behavior with various URL formats
+- Need to define webhook payload structure and validation rules
+- Requires testing with various webhook service providers
 
 ## Next Steps
-1. Implement webhook notification delivery logic
-2. Add integration tests for webhook functionality
+1. Implement webhook URL validation
+2. Add unit tests for webhook notification functionality
