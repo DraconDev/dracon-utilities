@@ -503,7 +503,7 @@ pub(crate) fn repo_hint(flags: &[String], warn: bool, concern: bool) -> String {
         return "run repair-concerns --apply (push or rewrite)".to_string();
     }
     if flags.iter().any(|f| f.starts_with("BEHIND:")) {
-        return "run repair-concerns --apply (pull/rebase)".to_string();
+        return "run repair-concerns --apply (pull/merge)".to_string();
     }
     if warn {
         return "run repair-warns --apply".to_string();
