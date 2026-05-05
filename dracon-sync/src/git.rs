@@ -1117,38 +1117,7 @@ pub(crate) async fn restore_paths(repo: &Path, paths: &[String]) -> Result<()> {
 
 #[allow(dead_code)]
 pub(crate) fn load_secret(env_name: &str) -> Option<String> {
-    if let Ok(val) = std::env::var(env_name) {
-        if !val.is_empty() {
-            return Some(val);
-        }
-    }
-    let secrets_dir = dirs::home_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join(".dracon/utilities/sync/secrets");
-    if let Ok(entries) = std::fs::read_dir(&secrets_dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.extension().is_some_and(|e| e == "env") {
-                if let Ok(content) = std::fs::read_to_string(&path) {
-                    for line in content.lines() {
-                        let line = line.trim();
-                        if line.is_empty() || line.starts_with('#') {
-                            continue;
-                        }
-                        if let Some((key, value)) = line.split_once('=') {
-                            if key.trim() == env_name {
-                                let value = value.trim();
-                                if !value.is_empty() {
-                                    return Some(value.to_string());
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    None
+    crate::secrets::load_secret(env_name, &crate::secrets::sync_secrets_dir())
 }
 
 pub(crate) mod multi_remote {
