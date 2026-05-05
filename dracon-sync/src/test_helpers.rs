@@ -31,7 +31,8 @@
 /// 2. **`DRACON_SYNC_GIT_BIN`**: Some tests set this env var to mock the git binary.
 ///    While `git_binary()` no longer caches the value, tests using
 ///    `std::process::Command::new("git")` directly (not through `git_binary()`)
-///    don't check this env var at all.
+///    don't check this env var at all. Use `test_git_cmd()` from this module
+///    instead of `std::process::Command::new("git")` to ensure consistency.
 ///
 /// 3. **Registry/port state**: Integration-style tests `test_create_repo_on_github_*`,
 ///    `test_create_repo_on_gitlab_*` that start local TCP listeners can conflict.
