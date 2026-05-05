@@ -2109,8 +2109,8 @@ mod tests {
         assert!(err_msg.contains("missing token") || err_msg.contains("CODEBERG_TOKEN"), "error should mention missing token");
     }
 
-    #[test]
-    fn test_auto_create_all_remotes_github_success() {
+    #[tokio::test]
+    async fn test_auto_create_all_remotes_github_success() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let gh_mock = tmp.path().join("gh");
         std::fs::write(&gh_mock, "#!/bin/sh\nexit 0\n").expect("write gh mock");
@@ -2132,14 +2132,14 @@ mod tests {
             force_push_when_behind: false,
         }];
 
-        let results = crate::git::multi_remote::auto_create_all_remotes(&remotes, "test-repo");
+        let results = crate::git::multi_remote::auto_create_all_remotes(&remotes, "test-repo").await;
         assert_eq!(results.len(), 1);
         let url = results[0].1.as_ref().unwrap();
         assert_eq!(url, "git@github.com:testaccount/test-repo.git");
     }
 
-    #[test]
-    fn test_auto_create_all_remotes_gitlab_success() {
+    #[tokio::test]
+    async fn test_auto_create_all_remotes_gitlab_success() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let glab_mock = tmp.path().join("glab");
         std::fs::write(&glab_mock, "#!/bin/sh\nexit 0\n").expect("write glab mock");
@@ -2161,7 +2161,7 @@ mod tests {
             force_push_when_behind: false,
         }];
 
-        let results = crate::git::multi_remote::auto_create_all_remotes(&remotes, "test-repo");
+        let results = crate::git::multi_remote::auto_create_all_remotes(&remotes, "test-repo").await;
         assert_eq!(results.len(), 1);
         let url = results[0].1.as_ref().unwrap();
         assert_eq!(url, "git@gitlab.com:testaccount/test-repo.git");
