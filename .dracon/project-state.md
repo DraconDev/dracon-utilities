@@ -1,21 +1,20 @@
 # Project State
 
 ## Current Focus
-Added documentation notes file for tracking project documentation files
+Added documentation note about notifying of high CPU usage in dracon system
 
 ## Context
-The project needs a centralized location to track and manage documentation files across the repository. This change creates a notes file to serve as a starting point for documentation organization.
+This change was made to ensure the system properly alerts when CPU usage exceeds safe thresholds, which is critical for maintaining system stability and performance.
 
 ## Completed
-- [x] Created `notes.md` file to track documentation files
-- [x] Added initial note about saving documentation files
+- [x] Added note about CPU usage monitoring in dracon system
 
 ## In Progress
-- [ ] No active work in progress
+- [x] Documentation update for system monitoring requirements
 
 ## Blockers
-- None identified
+- None identified for this specific change
 
 ## Next Steps
-1. Populate `notes.md` with initial documentation file locations
-2. Review and expand documentation tracking strategy
+1. Review and expand documentation on other system monitoring requirements
+2. Implement actual CPU monitoring functionality based on these notes
