@@ -1,20 +1,21 @@
 # Project State
 
 ## Current Focus
-Added documentation links to AGENTS.md for better navigation to related files.
+Improved help text display in the installation script
 
 ## Context
-The project is in the planning phase, with the goal of improving documentation discoverability. This change adds cross-references to key documentation files (README, CONTRIBUTING, CHANGELOG) in AGENTS.md to help users and contributors find relevant information more easily.
+The change modifies how the help text is displayed when users run `install.sh --help` or `install.sh -h`. The previous implementation used a range pattern to extract help text, while the new version uses line numbers for more precise control.
 
 ## Completed
-- [x] Added documentation links in AGENTS.md pointing to README.md, CONTRIBUTING.md, and CHANGELOG.md
+- [x] Refactored help text extraction to use line numbers (2-17) instead of pattern matching
+- [x] Maintained the same functionality while improving precision
 
 ## In Progress
-- [x] Documentation structure enhancement for AGENTS.md
+- [ ] None
 
 ## Blockers
-- None identified for this specific change
+- None
 
 ## Next Steps
-1. Review and validate the new documentation links
-2. Continue expanding documentation coverage across the repository
+1. Verify the new line number range (2-17) correctly displays the intended help text
+2. Ensure the change doesn't affect other script functionality

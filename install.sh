@@ -32,7 +32,7 @@ BINARIES_ONLY=false
 for arg in "$@"; do
     case "$arg" in
         --help|-h)
-            sed -n '/^# /,/^$/p' "$0" | sed 's/^# //'
+            sed -n '2,17p' "$0"
             exit 0
             ;;
         --dry-run)
