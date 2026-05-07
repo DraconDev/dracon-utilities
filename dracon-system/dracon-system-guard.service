@@ -23,7 +23,7 @@ CPUQuota=10%
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=read-only
-ReadWritePaths=%h/.dracon %h/Dev
+ReadWritePaths=%h/.dracon %h/Dev %h/.local/state/dracon
 PrivateTmp=true
 
 [Install]

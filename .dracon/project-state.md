@@ -1,21 +1,20 @@
 # Project State
 
 ## Current Focus
-Improved help text display in the uninstallation script by refining the sed command for better readability and consistency.
+Added read-write path for Dracon systemd service to access user's local state directory
 
 ## Context
-The change was prompted by a need to standardize the help text display across all scripts. The previous implementation used a range-based sed command that relied on specific comment markers, which could be fragile. The new approach uses explicit line numbers for more reliable extraction.
+The systemd service needs access to the user's local state directory (`%h/.local/state/dracon`) to store runtime data and configuration files
 
 ## Completed
-- [x] Refactored help text extraction in uninstall.sh to use explicit line numbers (3-16) instead of marker-based ranges
-- [x] Improved sed command by removing empty comment lines and cleaning up formatting
+- [x] Added `%h/.local/state/dracon` to ReadWritePaths in systemd service configuration
 
 ## In Progress
-- [ ] None (this is a complete change)
+- [x] Systemd service configuration update
 
 ## Blockers
-- None (this is a documentation and formatting improvement)
+- None identified
 
 ## Next Steps
-1. Review other scripts for similar help text implementations
-2. Consider adding a standard comment format for all help text sections
+1. Verify the service can access the new directory
+2. Update documentation to reflect the new path requirement
