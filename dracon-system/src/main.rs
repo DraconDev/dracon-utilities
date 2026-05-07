@@ -2090,9 +2090,9 @@ async fn run_guard_once(
             && is_git_process(&p.command)
         {
             if kill_process(p.pid).await {
-                action = format!("kill:git-sigterm+sigkill");
+                action = "kill:git-sigterm+sigkill".to_string();
             } else {
-                action = format!("kill:git-sigterm-failed");
+                action = "kill:git-sigterm-failed".to_string();
             }
         }
 
