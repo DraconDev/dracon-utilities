@@ -9,11 +9,13 @@ CLI binaries for dracon system services. These install to `~/.local/bin/` and ru
 4. [Design Philosophy](#design-philosophy-sync-is-invisible-infrastructure)
 5. [Operational State](#operational-state)
 6. [Services](#services)
-7. [Policy Files](#policy-files)
-8. [AI Configuration](#ai-configuration)
-9. [CLI Reference](#cli-reference)
-10. [The Scribe](#the-scribe-ai-working-memory)
-11. [Testing](#testing)
+7. [Systemd Service Files](#systemd-service-files)
+8. [Policy Files](#policy-files)
+9. [AI Configuration](#ai-configuration)
+10. [CLI Reference](#cli-reference)
+11. [Environment Variables](#environment-variables)
+12. [The Scribe](#the-scribe-ai-working-memory)
+13. [Testing](#testing)
 
 ## Architecture
 
