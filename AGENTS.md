@@ -131,6 +131,31 @@ You can add custom protected paths in `dracon-system.toml`:
 
 Safety: every `remove_dir_all` call site in `dracon-system` checks the path against both system and user-protected paths before executing. The `--apply` flag is required for destructive operations.
 
+### dracon-system Process Monitoring & Logging
+
+The guard monitors processes using >`process_cpu_percent`% CPU for >`process_sustain_secs` seconds. All heavy processes are logged to a persistent JSONL file regardless of duration.
+
+**Persistent log file:** `~/.local/state/dracon/dracon-system-guard.log`
+- Logs both `heavy-brief` (any spike) and `heavy-sustained` (after sustain threshold) events
+- Auto-rotates when it exceeds `guard_log_max_mb`
+- JSONL format: `{"ts":1234567890,"event":"heavy-brief","details":"pid=123 ppid=1 cmd=git args=git init cpu=61.7% ..."}`
+
+**Auto-kill runaway git processes:**
+```toml
+[guard]
+auto_kill_git = false           # Enable to auto-kill git processes
+git_kill_threshold_secs = 60    # Kill after 60s of high CPU
+```
+
+When enabled, git processes (init, fetch, pull, clone, push) that sustain high CPU for the configured duration receive SIGTERM, then SIGKILL after 5 seconds if still alive. Disabled by default for safety.
+
+**Log configuration:**
+```toml
+[guard]
+guard_log_file = "~/.local/state/dracon/dracon-system-guard.log"
+guard_log_max_mb = 1            # Rotate at 1 MiB
+```
+
 ### dracon-sync Repo Discovery
 
 Repo discovery searches up to **4 levels deep** from each watch root. Dot-prefixed directories (e.g. `.config/`, `.dracon/`) are descended into if they contain a `.git` directory — only skipped after the `.git` check fails. The hardcoded exclusions are `objects` and whatever is in `exclude_dir_names` from policy.
