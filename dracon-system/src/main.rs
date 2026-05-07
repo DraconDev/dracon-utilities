@@ -879,7 +879,7 @@ async fn disk_use_percent_for(path: &str) -> Result<u8> {
 
 async fn process_samples() -> Result<Vec<ProcSample>> {
     let out = Command::new("ps")
-        .args(["-eo", "pid=,pcpu=,rss=,comm="])
+        .args(["-eo", "pid,ppid,pcpu,rss,comm,args", "--no-headers"])
         .output()
         .await?;
     if !out.status.success() {
