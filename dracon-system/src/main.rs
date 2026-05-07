@@ -598,7 +598,9 @@ impl Default for GuardPolicy {
 #[derive(Debug, Serialize)]
 struct GuardProcessAlert {
     pid: i32,
+    ppid: i32,
     command: String,
+    args: String,
     cpu_percent: f32,
     rss_mb: u64,
     sustained_secs: u64,
