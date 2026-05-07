@@ -4,20 +4,21 @@
 Added automatic git process management to prevent runaway CPU usage
 
 ## Context
-The system previously had CPU management features but lacked specific handling for git processes. This change adds configuration options to automatically detect and terminate git processes that sustain high CPU usage for extended periods.
+The system previously only monitored and reniced processes, but could not terminate runaway git operations that consumed excessive CPU resources. This change adds the ability to automatically kill git processes that exceed a configurable threshold.
 
 ## Completed
-- [x] Added `auto_kill_git` configuration option to enable/disable git process monitoring
-- [x] Added `git_kill_threshold_secs` configuration to set the CPU usage duration threshold
-- [x] Implemented default values (60 seconds) for the new configuration options
+- [x] Added `auto_kill_git` configuration option to GuardPolicy
+- [x] Implemented `kill_process` function with graceful TERM followed by forceful KILL
+- [x] Added `is_git_process` helper to identify problematic git operations
+- [x] Integrated git process killing into the guard monitoring loop
 
 ## In Progress
-- [ ] Implementation of the actual process monitoring and termination logic
+- [x] Implementation of git process monitoring and termination
 
 ## Blockers
-- Need to implement the process monitoring and termination logic
-- Requires testing with various git operations to ensure proper detection
+- None identified
 
 ## Next Steps
-1. Implement the process monitoring and termination logic
-2. Add comprehensive tests for the new git process management features
+1. Add configuration documentation for the new git killing parameters
+2. Add integration tests for the git process killing functionality
+3. Consider adding metrics for git process terminations
