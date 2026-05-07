@@ -23,7 +23,7 @@ REMOVE_LOGS=false
 for arg in "$@"; do
     case "$arg" in
         --help|-h)
-            sed -n '/^# /,/^$/p' "$0" | sed 's/^# //'
+            sed -n '3,16p' "$0" | sed 's/^# //; s/^#$//'
             exit 0
             ;;
         --force)

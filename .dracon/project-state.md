@@ -1,22 +1,21 @@
 # Project State
 
 ## Current Focus
-Refactored directory structure checks in `doctor.sh` to verify new paths for `dracon-libs/services/crates/` and `dracon-libs/tools/sync/dracon-git/`
+Improved help text display in the uninstallation script by refining the sed command for better readability and consistency.
 
 ## Context
-The code was updated to reflect changes in the project's directory structure. The checks for `dracon-libs/services/ai/` were removed as this path is no longer required, while the checks for the new paths were added to ensure the system can properly validate the expected directory structure.
+The change was prompted by a need to standardize the help text display across all scripts. The previous implementation used a range-based sed command that relied on specific comment markers, which could be fragile. The new approach uses explicit line numbers for more reliable extraction.
 
 ## Completed
-- [x] Removed check for `dracon-libs/services/ai/`
-- [x] Added check for `dracon-libs/services/crates/`
-- [x] Added check for `dracon-libs/tools/sync/dracon-git/`
+- [x] Refactored help text extraction in uninstall.sh to use explicit line numbers (3-16) instead of marker-based ranges
+- [x] Improved sed command by removing empty comment lines and cleaning up formatting
 
 ## In Progress
-- [ ] None
+- [ ] None (this is a complete change)
 
 ## Blockers
-- None
+- None (this is a documentation and formatting improvement)
 
 ## Next Steps
-1. Verify the new directory structure checks work as expected
-2. Update any related documentation to reflect the new paths
+1. Review other scripts for similar help text implementations
+2. Consider adding a standard comment format for all help text sections
