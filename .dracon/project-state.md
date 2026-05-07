@@ -1,20 +1,23 @@
 # Project State
 
 ## Current Focus
-Made `doctor.sh` executable by changing its permissions
+Added environment variable documentation for dracon-sync and dracon-system, including test environment guidelines.
 
 ## Context
-The `doctor.sh` script was previously a regular file (mode 100644) but needed to be executable (mode 100755) to function as a command-line tool.
+This change documents configuration options for the dracon utilities, particularly focusing on environment variables that control behavior and safety features. It also establishes best practices for test environment management.
 
 ## Completed
-- [x] Changed file permissions to make `doctor.sh` executable
+- [x] Added environment variable documentation for dracon-sync (git binary override)
+- [x] Added environment variable documentation for dracon-system (AI config, execution control, dangerous commands)
+- [x] Added test environment guidelines for environment variable management
+- [x] Included example Rust code for environment variable testing
 
 ## In Progress
-- [ ] None
+- [ ] None (documentation complete)
 
 ## Blockers
-- None
+- None (documentation is complete)
 
 ## Next Steps
-1. Verify the script executes correctly
-2. Document usage instructions for the doctor tool
+1. Review and verify all environment variable documentation is accurate
+2. Update related configuration files to reference this documentation

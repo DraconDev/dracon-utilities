@@ -416,6 +416,37 @@ the ledger to ~/.local/state/dracon/ to break the cycle.
 2. Continue reviewing dracon-system for any orphaned state files
 ```
 
+## Environment Variables
+
+### dracon-sync
+
+| Variable | Purpose | Example |
+|----------|---------|---------|
+| `DRACON_SYNC_GIT_BIN` | Override path to git binary (checked every call, not cached) | `/run/current-system/sw/bin/git` |
+
+### dracon-system
+
+| Variable | Purpose | Example |
+|----------|---------|---------|
+| `DRACON_AI_CONFIG` | Override dracon-ai config file path | `~/.dracon/utilities/ai/dracon-ai.toml` |
+| `DRACON_AI_APPLY` | Set to `0` for plan-only mode (don't execute commands) | `0` |
+| `DRACON_AI_DANGEROUS` | Set to `1` to allow dangerous commands (use with caution) | `1` |
+| `DRACON_AI_ALLOW_CMD` | Set to `1` to enable `/cmd` tool execution in REPL | `1` |
+
+### Test Environment
+
+All env var mutations in tests should use `EnvRestorer` (from `crate::test_helpers::EnvRestorer`) to prevent leakage between tests.
+
+```rust
+use crate::test_helpers::EnvRestorer;
+
+// Set an env var (restored on drop)
+let _guard = EnvRestorer::new("VAR_NAME", "value");
+
+// Remove an env var (restored on drop)
+let _guard = EnvRestorer::remove("VAR_NAME");
+```
+
 ## Testing
 
 ### dracon-sync
