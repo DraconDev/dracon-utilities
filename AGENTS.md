@@ -128,7 +128,7 @@ Service files are installed to `~/.config/systemd/user/` by `install.sh`.
 | `NoNewPrivileges` | `true` | Security hardening |
 | `ProtectSystem` | `strict` | Read-only system fs |
 | `ProtectHome` | `read-only` | Read-only home (except allowed paths) |
-| `ReadWritePaths` | `~/.dracon, ~/Dev` | Writable directories |
+| `ReadWritePaths` | `~/.dracon, ~/Dev, ~/.local/state/dracon` | Writable directories |
 
 ### dracon-warden.service
 

@@ -1,20 +1,20 @@
 # Project State
 
 ## Current Focus
-Added read-write path for Dracon systemd service to access user's local state directory
+Added a new read-write path for the Dracon systemd service to access user's local state directory.
 
 ## Context
-The systemd service needs access to the user's local state directory (`%h/.local/state/dracon`) to store runtime data and configuration files
+The change was made to ensure the `dracon-warden.service` has proper access to the `~/.local/state/dracon` directory, which is used for storing persistent state data.
 
 ## Completed
-- [x] Added `%h/.local/state/dracon` to ReadWritePaths in systemd service configuration
+- [x] Added `~/.local/state/dracon` to the `ReadWritePaths` in the systemd service configuration
 
 ## In Progress
-- [x] Systemd service configuration update
+- [x] Verification of the new path's functionality in the service
 
 ## Blockers
-- None identified
+- None reported
 
 ## Next Steps
-1. Verify the service can access the new directory
-2. Update documentation to reflect the new path requirement
+1. Test the service with the new path to ensure proper read/write operations
+2. Document any additional path requirements if discovered during testing
