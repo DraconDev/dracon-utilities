@@ -4,11 +4,11 @@
 Improved help text display in the installation script
 
 ## Context
-The change modifies how the help text is displayed when users run `install.sh --help` or `install.sh -h`. The previous implementation used a range pattern to extract help text, while the new version uses line numbers for more precise control.
+The change enhances the help text display by adjusting the sed command to skip the first line and remove comment markers, making the output cleaner and more readable.
 
 ## Completed
-- [x] Refactored help text extraction to use line numbers (2-17) instead of pattern matching
-- [x] Maintained the same functionality while improving precision
+- [x] Modified the help text display in install.sh to show lines 3-17 and remove comment markers
+- [x] Improved readability of the help text by removing '# ' prefixes
 
 ## In Progress
 - [ ] None
@@ -17,5 +17,5 @@ The change modifies how the help text is displayed when users run `install.sh --
 - None
 
 ## Next Steps
-1. Verify the new line number range (2-17) correctly displays the intended help text
+1. Verify the help text appears correctly in all supported environments
 2. Ensure the change doesn't affect other script functionality
