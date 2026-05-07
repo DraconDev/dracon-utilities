@@ -1,23 +1,26 @@
 # Project State
 
 ## Current Focus
-Added example configuration template for Dracon AI utilities
+Enhanced installer script with comprehensive installation options and upgrade support
 
 ## Context
-This change provides a standardized configuration template for Dracon AI utilities, allowing users to customize behavior through environment variables and file-based settings.
+The installer now needs to handle more complex installation scenarios including dry runs, forced overwrites, and service management during upgrades.
 
 ## Completed
-- [x] Added dracon-ai.example.toml with comprehensive configuration options
-- [x] Included documentation for configuration paths and environment variables
-- [x] Provided example values for system and NixOS paths
-- [x] Documented safety controls for AI execution
+- [x] Added comprehensive command-line options for installation control
+- [x] Implemented dry-run mode for previewing changes
+- [x] Added upgrade mode with service stopping/starting
+- [x] Enhanced binary installation with feature control
+- [x] Added binaries-only installation option
+- [x] Improved error handling and user feedback
 
 ## In Progress
-- [ ] None (configuration template is complete)
+- [ ] Testing service restart logic during upgrades
 
 ## Blockers
-- None (this is a documentation addition)
+- Need to verify service restart behavior across different systemd versions
 
 ## Next Steps
-1. Update AGENTS.md to reference the new configuration template
-2. Create user documentation explaining configuration options
+1. Complete testing of service management during upgrades
+2. Add more detailed documentation for installation options
+```
