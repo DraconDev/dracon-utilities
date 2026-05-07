@@ -96,6 +96,52 @@ systemctl --user restart dracon-system-guard.service
 systemctl --user restart dracon-warden.service
 ```
 
+## Systemd Service Files
+
+Service files are installed to `~/.config/systemd/user/` by `install.sh`.
+
+### dracon-sync.service
+
+| Setting | Value | Purpose |
+|---------|-------|---------|
+| `ExecStart` | `dracon-sync daemon` | Runs sync daemon |
+| `Restart` | `on-failure` | Restarts on crash |
+| `RestartSec` | `5` | Wait 5s before restart |
+| `Nice` | `10` | Lower CPU priority |
+| `CPUQuota` | `15%` | Max 15% CPU usage |
+| `MemoryMax` | `2G` | Max 2GB RAM |
+| `TasksMax` | `96` | Max 96 threads |
+| `Environment` | `DRACON_SYNC_POLICY` | Points to config file |
+| `Environment` | `GIT_TERMINAL_PROMPT=0` | Disables interactive git prompts |
+
+**Pre-start cleanup:** Kills stale `dracon-git pulse` processes to prevent lockups.
+
+### dracon-system-guard.service
+
+| Setting | Value | Purpose |
+|---------|-------|---------|
+| `ExecStart` | `dracon-system guard daemon` | Runs guard daemon |
+| `Restart` | `on-failure` | Restarts on crash |
+| `RestartSec` | `10` | Wait 10s before restart |
+| `MemoryMax` | `100M` | Max 100MB RAM |
+| `CPUQuota` | `10%` | Max 10% CPU usage |
+| `NoNewPrivileges` | `true` | Security hardening |
+| `ProtectSystem` | `strict` | Read-only system fs |
+| `ProtectHome` | `read-only` | Read-only home (except allowed paths) |
+| `ReadWritePaths` | `~/.dracon, ~/Dev` | Writable directories |
+
+### dracon-warden.service
+
+| Setting | Value | Purpose |
+|---------|-------|---------|
+| `ExecStart` | `dracon-warden daemon` | Runs warden daemon |
+| `Restart` | `on-failure` | Restarts on crash |
+| `RestartSec` | `3` | Wait 3s before restart |
+| `Nice` | `10` | Lower CPU priority |
+| `CPUQuota` | `10%` | Max 10% CPU usage |
+| `MemoryMax` | `1G` | Max 1GB RAM |
+| `TasksMax` | `64` | Max 64 threads |
+
 ## Policy Files
 
 | Utility | Policy Path | Example Config |

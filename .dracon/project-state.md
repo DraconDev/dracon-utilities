@@ -1,22 +1,26 @@
 # Project State
 
 ## Current Focus
-Updated AGENTS.md documentation structure to include systemd service files and environment variables.
+Added comprehensive systemd service documentation for Dracon Utilities
 
 ## Context
-The documentation was reorganized to better reflect the current implementation of systemd service management and environment variable configuration in the Dracon system.
+The project needs clear documentation for systemd service configurations to ensure proper daemon management. This change provides detailed specifications for resource limits, security hardening, and operational parameters for critical services.
 
 ## Completed
-- [x] Added section for systemd service files
-- [x] Added section for environment variables
-- [x] Reorganized documentation structure to maintain logical flow
+- [x] Added systemd service documentation for `dracon-sync.service`
+- [x] Added systemd service documentation for `dracon-system-guard.service`
+- [x] Added systemd service documentation for `dracon-warden.service`
+- [x] Documented resource limits (CPU, memory, threads)
+- [x] Included security hardening settings
+- [x] Added environment variable configurations
+- [x] Documented pre-start cleanup procedures
 
 ## In Progress
-- [ ] No active work in progress
+- [ ] None (documentation complete)
 
 ## Blockers
-- None identified
+- None (documentation is complete)
 
 ## Next Steps
-1. Verify the new documentation structure covers all current system components
-2. Update any related documentation that references the moved sections
+1. Review documentation for accuracy
+2. Update installation scripts to ensure proper service file deployment
