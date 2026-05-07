@@ -96,11 +96,11 @@ systemctl --user restart dracon-warden.service
 
 ## Policy Files
 
-| Utility | Policy Path |
-|---------|-------------|
-| dracon-sync | ~/.dracon/utilities/sync/dracon-sync.toml |
-| dracon-system | ~/.dracon/utilities/system/dracon-system.toml |
-| dracon-warden | ~/.dracon/utilities/warden/dracon-warden.toml |
+| Utility | Policy Path | Example Config |
+|---------|-------------|----------------|
+| dracon-sync | ~/.dracon/utilities/sync/dracon-sync.toml | [dracon-sync.example.toml](dracon-sync/dracon-sync.example.toml) |
+| dracon-system | ~/.dracon/utilities/system/dracon-system.toml | [dracon-system.example.toml](dracon-system/dracon-system.example.toml) |
+| dracon-warden | ~/.dracon/utilities/warden/dracon-warden.toml | [dracon-warden.example.toml](dracon-warden/dracon-warden.example.toml) |
 
 ## Operational State
 

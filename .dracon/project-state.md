@@ -1,22 +1,21 @@
 # Project State
 
 ## Current Focus
-Added process monitoring and auto-kill features for runaway Git processes in `dracon-system`.
+Added example configuration links to the AGENTS.md documentation table.
 
 ## Context
-To prevent CPU resource exhaustion from misbehaving Git operations, the system now monitors processes and can automatically terminate Git commands that sustain high CPU usage for extended periods.
+The change enhances the documentation by providing direct links to example configuration files for each utility, making it easier for users to understand and set up the utilities.
 
 ## Completed
-- [x] Added persistent JSONL logging for heavy process events
-- [x] Implemented auto-kill for Git processes exceeding CPU thresholds
-- [x] Configured log rotation and file location settings
+- [x] Added "Example Config" column to the policy files table
+- [x] Added links to example configuration files for dracon-sync, dracon-system, and dracon-warden
 
 ## In Progress
-- [ ] Testing edge cases for process detection and termination
+- [x] Documentation enhancement for utility configuration
 
 ## Blockers
-- None identified; feature is complete pending validation
+- None identified
 
 ## Next Steps
-1. Verify log rotation behavior with large log files
-2. Document the auto-kill configuration options in user guides
+1. Review and verify the example configuration files are accurate
+2. Update any related documentation that references these files
