@@ -4,19 +4,18 @@
 Added persistent logging configuration for the guard system
 
 ## Context
-To improve debugging and monitoring capabilities, we need to track guard system activity persistently. The previous implementation only logged to stdout, which isn't always available for analysis.
+To improve system monitoring and debugging capabilities, we need a standardized way to log guard system activities. This change provides default configuration for log file location and size limits.
 
 ## Completed
-- [x] Added configurable log file path for guard system
-- [x] Added log rotation based on maximum file size
-- [x] Implemented JSONL format for structured logging
+- [x] Added default log file path at `~/.local/state/dracon/dracon-system-guard.log`
+- [x] Set default log file size limit to 1 MiB with automatic rotation
 
 ## In Progress
-- [ ] Testing log file rotation behavior under high-volume conditions
+- [ ] None (this is a complete feature addition)
 
 ## Blockers
-- Need to define standard log entry format for consistency across components
+- None (this is a standalone configuration addition)
 
 ## Next Steps
-1. Implement log rotation tests
-2. Add log file monitoring to the documentation notes
+1. Verify log rotation behavior in production environments
+2. Add log level configuration options
