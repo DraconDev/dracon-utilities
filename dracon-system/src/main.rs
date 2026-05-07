@@ -867,23 +867,13 @@ fn parse_ps_output(output: &str) -> Vec<ProcSample> {
                 return None;
             }
             // Format: pid ppid pcpu rss comm args...
-            // We use whitespace split, but args can contain spaces
-            // So we take first 5 fields by whitespace, rest is args
             let mut parts = trimmed.split_whitespace();
             let pid = parts.next()?.parse::<i32>().ok()?;
             let ppid = parts.next()?.parse::<i32>().ok()?;
             let cpu_percent = parts.next()?.parse::<f32>().ok()?;
             let rss_kb = parts.next()?.parse::<u64>().ok()?;
             let command = parts.next()?.to_string();
-            let args = if command.is_empty() {
-                command.clone()
-            } else {
-                // Find where args start in the original line
-                // command is at position after 4 whitespace-separated fields
-                let cmd_pos = trimmed.find(&command)?;
-                let after_cmd = &trimmed[cmd_pos + command.len()..];
-                after_cmd.trim().to_string()
-            };
+            let args = parts.collect::<Vec<_>>().join(" ");
             Some(ProcSample {
                 pid,
                 ppid,

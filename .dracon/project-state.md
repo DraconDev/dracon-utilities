@@ -1,22 +1,21 @@
 # Project State
 
 ## Current Focus
-Removal of test suite for process monitoring and safety checks
+Refactored process argument parsing in `main.rs` to simplify handling of command-line arguments.
 
 ## Context
-The test suite for process monitoring and safety checks was removed as part of code cleanup. This was likely done to reduce maintenance overhead or focus development efforts elsewhere.
+The previous implementation had complex logic to handle whitespace in command arguments, which was error-prone. This change simplifies the parsing by joining all remaining parts after the first five fields as the arguments string.
 
 ## Completed
-- [x] Removed all test cases for process monitoring and safety checks
-- [x] Eliminated test infrastructure for these components
+- [x] Simplified process argument parsing by joining remaining fields after PID, PPID, CPU%, and RSS
+- [x] Removed complex whitespace handling logic for command arguments
 
 ## In Progress
-- [ ] None (test removal is complete)
+- [ ] None
 
 ## Blockers
 - None
 
 ## Next Steps
-1. Verify that the removed functionality is no longer needed
-2. Update documentation to reflect the removal of these test cases
-```
+1. Verify the simplified parsing works correctly with various process outputs
+2. Update related documentation if needed
