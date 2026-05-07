@@ -1,21 +1,22 @@
 # Project State
 
 ## Current Focus
-Improved process output handling in the kill_process function
+Added comprehensive Git process detection and parsing tests for CPU monitoring
 
 ## Context
-The change addresses potential UTF-8 decoding issues when handling process output by using String::from_utf8_lossy() instead of direct string conversion.
+The system needs to accurately identify and monitor Git-related processes to prevent runaway CPU usage. These tests ensure reliable detection of Git operations (init, fetch, pull, push, clone) while excluding other commands.
 
 ## Completed
-- [x] Added proper UTF-8 handling for process output in kill_process function
-- [x] Maintained the same functionality while improving robustness
+- [x] Added test cases for Git process detection (init, fetch, pull, push, clone)
+- [x] Added test for non-Git command rejection
+- [x] Added test for parsing ps output with all required fields
 
 ## In Progress
-- [ ] None (this is a focused bugfix)
+- [x] Comprehensive Git process monitoring implementation
 
 ## Blockers
-- None (this is a standalone improvement)
+- None identified
 
 ## Next Steps
-1. Verify the change doesn't affect existing functionality
-2. Consider adding similar improvements to other process handling functions if needed
+1. Implement Git process monitoring using these detection methods
+2. Integrate with existing CPU monitoring infrastructure
