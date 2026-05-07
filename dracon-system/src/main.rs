@@ -2072,7 +2072,19 @@ async fn run_guard_once(
         let now = Instant::now();
         let since = state.heavy_since.entry(p.pid).or_insert(now);
         let sustained = now.duration_since(*since).as_secs();
-        if sustained < guard.process_sustain_secs {
+        let is_sustained = sustained >= guard.process_sustain_secs;
+
+        // Always log heavy processes to persistent log (even brief spikes)
+        log_guard_event(
+            guard,
+            if is_sustained { "heavy-sustained" } else { "heavy-brief" },
+            &format!(
+                "pid={} ppid={} cmd={} args={} cpu={:.1}% rss={}MiB sustained={}s",
+                p.pid, p.ppid, p.command, p.args, p.cpu_percent, p.rss_mb, sustained
+            ),
+        );
+
+        if !is_sustained {
             continue;
         }
 
@@ -2109,7 +2121,9 @@ async fn run_guard_once(
 
         alerts.push(GuardProcessAlert {
             pid: p.pid,
+            ppid: p.ppid,
             command: p.command,
+            args: p.args,
             cpu_percent: p.cpu_percent,
             rss_mb: p.rss_mb,
             sustained_secs: sustained,
