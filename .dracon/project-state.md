@@ -1,25 +1,21 @@
 # Project State
 
 ## Current Focus
-Added persistent logging for guard system events with timestamped JSON entries
+Enhanced process sampling to include parent process ID and command arguments for better process tracking.
 
 ## Context
-To improve observability of the guard system's operations, we need to track events like CPU usage alerts and process management actions in a structured log file.
+This change improves the GuardProcessAlert structure to include more detailed process information, which is crucial for accurate process monitoring and management in the dracon-system.
 
 ## Completed
-- [x] Added `log_guard_event` function to write JSON-formatted log entries
-- [x] Implemented log file rotation based on size limit
-- [x] Added directory creation for log files if needed
-- [x] Included timestamp in each log entry
-- [x] Added error handling for file operations
+- [x] Added parent process ID (ppid) to GuardProcessAlert
+- [x] Added command arguments (args) to GuardProcessAlert
 
 ## In Progress
-- [x] Persistent logging implementation
+- [x] Process sampling enhancements for better process tracking
 
 ## Blockers
 - None identified
 
 ## Next Steps
-1. Verify log file format and content
-2. Add log rotation tests for edge cases
-3. Document the log format for other components
+1. Verify the enhanced process sampling works correctly in the guard system
+2. Update documentation to reflect the new process tracking capabilities
