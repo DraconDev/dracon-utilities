@@ -705,6 +705,23 @@ fn default_git_kill_threshold_secs() -> u64 {
     60
 }
 
+fn default_guard_log_file() -> String {
+    let home = match dirs::home_dir() {
+        Some(h) => h,
+        None => return String::new(),
+    };
+    home.join(".local")
+        .join("state")
+        .join("dracon")
+        .join("dracon-system-guard.log")
+        .display()
+        .to_string()
+}
+
+fn default_guard_log_max_mb() -> u64 {
+    1  // 1 MiB - keeps last ~1000 events, rotates automatically
+}
+
 fn default_auto_cleanup_rust() -> bool {
     true
 }
