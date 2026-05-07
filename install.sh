@@ -70,10 +70,29 @@ fi
 
 mkdir -p ~/.config/systemd/user
 mkdir -p ~/.dracon/utilities/sync
+mkdir -p ~/.dracon/utilities/system
+mkdir -p ~/.dracon/utilities/warden
 
 cp dracon-sync/dracon-sync.service ~/.config/systemd/user/dracon-sync.service 2>/dev/null || true
 cp dracon-system/dracon-system-guard.service ~/.config/systemd/user/dracon-system-guard.service 2>/dev/null || true
 cp dracon-warden/dracon-warden.service ~/.config/systemd/user/dracon-warden.service 2>/dev/null || true
+
+# Copy example configs if they don't exist
+if [ ! -f ~/.dracon/utilities/sync/dracon-sync.toml ] && [ -f dracon-sync/dracon-sync.example.toml ]; then
+    cp dracon-sync/dracon-sync.example.toml ~/.dracon/utilities/sync/dracon-sync.toml
+    echo "  Copied dracon-sync.example.toml → ~/.dracon/utilities/sync/dracon-sync.toml"
+fi
+
+if [ ! -f ~/.dracon/utilities/system/dracon-system.toml ] && [ -f dracon-system/dracon-system.example.toml ]; then
+    cp dracon-system/dracon-system.example.toml ~/.dracon/utilities/system/dracon-system.toml
+    echo "  Copied dracon-system.example.toml → ~/.dracon/utilities/system/dracon-system.toml"
+fi
+
+if [ ! -f ~/.dracon/utilities/warden/dracon-warden.toml ] && [ -f dracon-warden/dracon-warden.example.toml ]; then
+    cp dracon-warden/dracon-warden.example.toml ~/.dracon/utilities/warden/dracon-warden.toml
+    echo "  Copied dracon-warden.example.toml → ~/.dracon/utilities/warden/dracon-warden.toml"
+fi
+
 systemctl --user daemon-reload 2>/dev/null || true
 
 echo ""
