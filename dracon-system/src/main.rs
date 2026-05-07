@@ -788,9 +788,11 @@ fn parse_kinds(csv: &str) -> HashSet<String> {
 #[derive(Debug, Clone)]
 struct ProcSample {
     pid: i32,
+    ppid: i32,
     cpu_percent: f32,
     rss_mb: u64,
     command: String,
+    args: String,
 }
 
 #[derive(Debug, Default)]
@@ -832,16 +834,35 @@ fn parse_ps_output(output: &str) -> Vec<ProcSample> {
     output
         .lines()
         .filter_map(|line| {
-            let mut parts = line.split_whitespace();
+            let trimmed = line.trim();
+            if trimmed.is_empty() {
+                return None;
+            }
+            // Format: pid ppid pcpu rss comm args...
+            // We use whitespace split, but args can contain spaces
+            // So we take first 5 fields by whitespace, rest is args
+            let mut parts = trimmed.split_whitespace();
             let pid = parts.next()?.parse::<i32>().ok()?;
+            let ppid = parts.next()?.parse::<i32>().ok()?;
             let cpu_percent = parts.next()?.parse::<f32>().ok()?;
             let rss_kb = parts.next()?.parse::<u64>().ok()?;
             let command = parts.next()?.to_string();
+            let args = if command.is_empty() {
+                command.clone()
+            } else {
+                // Find where args start in the original line
+                // command is at position after 4 whitespace-separated fields
+                let cmd_pos = trimmed.find(&command)?;
+                let after_cmd = &trimmed[cmd_pos + command.len()..];
+                after_cmd.trim().to_string()
+            };
             Some(ProcSample {
                 pid,
+                ppid,
                 cpu_percent,
                 rss_mb: rss_kb / 1024,
                 command,
+                args,
             })
         })
         .collect()

@@ -1,22 +1,23 @@
 # Project State
 
 ## Current Focus
-Added comprehensive Git process detection and parsing tests for CPU monitoring
+Enhanced process sampling with parent process ID and command arguments tracking
 
 ## Context
-The system needs to accurately identify and monitor Git-related processes to prevent runaway CPU usage. These tests ensure reliable detection of Git operations (init, fetch, pull, push, clone) while excluding other commands.
+Improved process monitoring capabilities by adding parent process ID (ppid) and full command arguments to the process sampling system
 
 ## Completed
-- [x] Added test cases for Git process detection (init, fetch, pull, push, clone)
-- [x] Added test for non-Git command rejection
-- [x] Added test for parsing ps output with all required fields
+- [x] Added ppid field to ProcSample struct
+- [x] Added args field to ProcSample struct
+- [x] Enhanced ps output parsing to extract command arguments
+- [x] Improved empty line handling in process output parsing
 
 ## In Progress
-- [x] Comprehensive Git process monitoring implementation
+- [ ] None (changes are complete)
 
 ## Blockers
-- None identified
+- None (feature is complete)
 
 ## Next Steps
-1. Implement Git process monitoring using these detection methods
-2. Integrate with existing CPU monitoring infrastructure
+1. Update documentation to reflect new process sampling capabilities
+2. Add tests for the enhanced process parsing functionality
