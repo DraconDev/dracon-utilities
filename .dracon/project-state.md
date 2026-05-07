@@ -1,22 +1,22 @@
 # Project State
 
 ## Current Focus
-Enhanced process monitoring with persistent logging for both brief and sustained heavy processes
+Enhanced process monitoring to include parent process ID and command arguments in parsing
 
 ## Context
-The system now needs to track and log all heavy processes, not just sustained ones, to provide better visibility into system behavior. This change supports debugging and operational awareness by capturing both brief spikes and prolonged resource usage.
+The changes improve process monitoring by expanding the parsed fields to include parent process IDs (PPID) and command arguments, making the system more comprehensive for tracking process relationships and command execution details.
 
 ## Completed
-- [x] Added persistent logging for both brief and sustained heavy processes
-- [x] Included parent process ID and command arguments in guard event logs
-- [x] Enhanced process alert structure to include process arguments
+- [x] Added PPID field to process parsing
+- [x] Added command arguments extraction
+- [x] Expanded test coverage for comprehensive field parsing
 
 ## In Progress
-- [ ] No active work in progress beyond these changes
+- [ ] None (changes are complete)
 
 ## Blockers
-- None identified
+- None (changes are complete)
 
 ## Next Steps
-1. Verify log output format and content for completeness
-2. Ensure the new logging doesn't impact performance negatively
+1. Verify integration with existing process monitoring systems
+2. Update related documentation to reflect new parsing capabilities
