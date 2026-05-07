@@ -1,20 +1,25 @@
 # Project State
 
 ## Current Focus
-Added `std::io::Write` import for persistent logging configuration
+Added persistent logging for guard system events with timestamped JSON entries
 
 ## Context
-This change supports the recent persistent logging feature by importing the necessary I/O functionality for writing log files.
+To improve observability of the guard system's operations, we need to track events like CPU usage alerts and process management actions in a structured log file.
 
 ## Completed
-- [x] Added `std::io::Write` import to enable file writing operations
+- [x] Added `log_guard_event` function to write JSON-formatted log entries
+- [x] Implemented log file rotation based on size limit
+- [x] Added directory creation for log files if needed
+- [x] Included timestamp in each log entry
+- [x] Added error handling for file operations
 
 ## In Progress
-- [x] Implementation of persistent logging configuration
+- [x] Persistent logging implementation
 
 ## Blockers
 - None identified
 
 ## Next Steps
-1. Complete persistent logging configuration implementation
-2. Verify logging functionality with the new import
+1. Verify log file format and content
+2. Add log rotation tests for edge cases
+3. Document the log format for other components

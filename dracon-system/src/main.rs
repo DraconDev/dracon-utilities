@@ -940,6 +940,42 @@ async fn send_notification(guard: &GuardPolicy, title: &str, body: &str) {
     }
 }
 
+fn log_guard_event(guard: &GuardPolicy, event: &str, details: &str) {
+    if guard.guard_log_file.is_empty() {
+        return;
+    }
+    let path = PathBuf::from(&guard.guard_log_file);
+    if let Some(parent) = path.parent() {
+        if let Err(e) = fs::create_dir_all(parent) {
+            eprintln!("⚠️ failed to create log dir: {}", e);
+            return;
+        }
+    }
+    let max_bytes = guard.guard_log_max_mb.saturating_mul(1024 * 1024);
+    if max_bytes > 0 {
+        if let Ok(meta) = fs::metadata(&path) {
+            if meta.len() > max_bytes {
+                if let Err(e) = fs::remove_file(&path) {
+                    eprintln!("⚠️ failed to rotate guard log: {}", e);
+                }
+            }
+        }
+    }
+    let ts = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    let line = format!(r#"{{"ts":{},"event":"{}","details":"{}"}}"#, ts, event, details);
+    if let Err(e) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+        .and_then(|mut f| writeln!(f, "{}", line))
+    {
+        eprintln!("⚠️ failed to write guard log: {}", e);
+    }
+}
+
 fn should_notify(state: &mut GuardRuntimeState, key: &str, cooldown_secs: u64) -> bool {
     let now = Instant::now();
     if let Some(until) = state.notify_cooldowns.get(key).copied() {
