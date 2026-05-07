@@ -1,22 +1,28 @@
 # Project State
 
 ## Current Focus
-Enhanced process monitoring to include parent process ID and command arguments
+Expanded documentation for dracon-utilities with detailed usage instructions and configuration examples
 
 ## Context
-The change improves process tracking by adding parent process ID (PPID) and full command arguments to the parsed output, which is crucial for more accurate process management and debugging.
+The README.md was significantly expanded to provide comprehensive documentation for all three utilities (dracon-sync, dracon-system, dracon-warden) with practical examples and configuration guidance.
 
 ## Completed
-- [x] Added parent process ID (PPID) to process monitoring
-- [x] Added full command arguments to process monitoring
-- [x] Updated test case to verify new fields
+- [x] Added detailed table of contents
+- [x] Created "What You Get" section with purpose/benefit matrix
+- [x] Expanded Quick Start with prerequisites and verification steps
+- [x] Documented dracon-sync features including AI commit messages
+- [x] Added dracon-system process guard documentation
+- [x] Included dracon-warden security hardening details
+- [x] Added configuration examples for all utilities
+- [x] Included troubleshooting sections for common issues
 
 ## In Progress
-- [x] Implementation of enhanced process monitoring
+- [ ] No active work in progress shown in diff
 
 ## Blockers
-- None identified
+- None identified in this documentation update
 
 ## Next Steps
-1. Verify the enhanced monitoring works in production environments
-2. Document the new monitoring capabilities in the project documentation
+1. Update AGENTS.md referenced in the documentation
+2. Create example configuration files for distribution
+```
