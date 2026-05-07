@@ -17,15 +17,15 @@ check() {
     
     if eval "$cmd" &>/dev/null; then
         echo "  ✅ $name"
-        ((PASS++))
+        PASS=$((PASS + 1))
         return 0
     else
         if [ "$required" = true ]; then
             echo "  ❌ $name (REQUIRED)"
-            ((FAIL++))
+            FAIL=$((FAIL + 1))
         else
             echo "  ⚠️  $name (optional)"
-            ((WARN++))
+            WARN=$((WARN + 1))
         fi
         return 1
     fi
