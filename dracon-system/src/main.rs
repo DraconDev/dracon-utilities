@@ -3128,6 +3128,50 @@ interval_secs = 30
             std::env::set_var("HOME", h);
         }
     }
+
+    #[test]
+    fn is_git_process_detects_git_init() {
+        assert!(is_git_process("git-init"));
+        assert!(is_git_process("git init"));
+        assert!(is_git_process("git-init --bare"));
+    }
+
+    #[test]
+    fn is_git_process_detects_git_fetch_and_pull() {
+        assert!(is_git_process("git-fetch"));
+        assert!(is_git_process("git pull"));
+        assert!(is_git_process("git-pull origin main"));
+        assert!(is_git_process("git-fetch origin"));
+    }
+
+    #[test]
+    fn is_git_process_detects_git_push_and_clone() {
+        assert!(is_git_process("git-push"));
+        assert!(is_git_process("git push"));
+        assert!(is_git_process("git-clone"));
+        assert!(is_git_process("git clone"));
+    }
+
+    #[test]
+    fn is_git_process_rejects_non_git_commands() {
+        assert!(!is_git_process("git log"));
+        assert!(!is_git_process("git diff"));
+        assert!(!is_git_process("git status"));
+        assert!(!is_git_process("git commit"));
+        assert!(!is_git_process("bash"));
+        assert!(!is_git_process("python"));
+    }
+
+    #[test]
+    fn parse_ps_output_extracts_all_fields() {
+        let sample = "9999 75.0 8192000 git-fetch origin\n";
+        let rows = parse_ps_output(sample);
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].pid, 9999);
+        assert_eq!(rows[0].cpu_percent, 75.0);
+        assert_eq!(rows[0].rss_mb, 8192000 / 1024);
+        assert_eq!(rows[0].command, "git-fetch");
+    }
 }
 
 #[tokio::main]
