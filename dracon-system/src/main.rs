@@ -936,7 +936,8 @@ async fn kill_process(pid: i32) -> bool {
         .output()
         .await
     {
-        if !out.stdout.trim().is_empty() {
+        let trimmed = String::from_utf8_lossy(&out.stdout).trim().to_string();
+        if !trimmed.is_empty() {
             if let Err(e) = Command::new("kill")
                 .args(["-KILL", &pid.to_string()])
                 .output()
