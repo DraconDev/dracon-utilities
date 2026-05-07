@@ -454,6 +454,12 @@ struct GuardPolicy {
     auto_renice: bool,
     #[serde(default = "default_renice_value")]
     renice_value: i32,
+    /// Automatically kill runaway git processes (git-init, git-fetch, etc.) after sustain period
+    #[serde(default)]
+    auto_kill_git: bool,
+    /// Seconds a git process must sustain high CPU before auto-kill (if auto_kill_git is enabled)
+    #[serde(default = "default_git_kill_threshold_secs")]
+    git_kill_threshold_secs: u64,
     /// Automatically clean Rust build artifacts when disk hits action level
     #[serde(default = "default_auto_cleanup_rust")]
     auto_cleanup_rust: bool,
@@ -685,6 +691,10 @@ fn default_notify_cooldown_secs() -> u64 {
 
 fn default_renice_value() -> i32 {
     10
+}
+
+fn default_git_kill_threshold_secs() -> u64 {
+    60
 }
 
 fn default_auto_cleanup_rust() -> bool {

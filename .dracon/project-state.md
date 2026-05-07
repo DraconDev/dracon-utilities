@@ -1,20 +1,23 @@
 # Project State
 
 ## Current Focus
-Added documentation note about notifying of high CPU usage in dracon system
+Added automatic git process management to prevent runaway CPU usage
 
 ## Context
-This change was made to ensure the system properly alerts when CPU usage exceeds safe thresholds, which is critical for maintaining system stability and performance.
+The system previously had CPU management features but lacked specific handling for git processes. This change adds configuration options to automatically detect and terminate git processes that sustain high CPU usage for extended periods.
 
 ## Completed
-- [x] Added note about CPU usage monitoring in dracon system
+- [x] Added `auto_kill_git` configuration option to enable/disable git process monitoring
+- [x] Added `git_kill_threshold_secs` configuration to set the CPU usage duration threshold
+- [x] Implemented default values (60 seconds) for the new configuration options
 
 ## In Progress
-- [x] Documentation update for system monitoring requirements
+- [ ] Implementation of the actual process monitoring and termination logic
 
 ## Blockers
-- None identified for this specific change
+- Need to implement the process monitoring and termination logic
+- Requires testing with various git operations to ensure proper detection
 
 ## Next Steps
-1. Review and expand documentation on other system monitoring requirements
-2. Implement actual CPU monitoring functionality based on these notes
+1. Implement the process monitoring and termination logic
+2. Add comprehensive tests for the new git process management features
