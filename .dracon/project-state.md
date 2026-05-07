@@ -1,22 +1,23 @@
 # Project State
 
 ## Current Focus
-Added example configuration file handling for dracon utilities during installation.
+Added example configuration template for Dracon AI utilities
 
 ## Context
-The installation script now ensures example configuration files are copied to the user's home directory if they don't already exist. This provides users with ready-to-use templates for each dracon utility (sync, system, warden).
+This change provides a standardized configuration template for Dracon AI utilities, allowing users to customize behavior through environment variables and file-based settings.
 
 ## Completed
-- [x] Added directory creation for utility-specific config paths
-- [x] Implemented conditional copying of example config files
-- [x] Added user feedback for each copied configuration
+- [x] Added dracon-ai.example.toml with comprehensive configuration options
+- [x] Included documentation for configuration paths and environment variables
+- [x] Provided example values for system and NixOS paths
+- [x] Documented safety controls for AI execution
 
 ## In Progress
-- [x] Configuration file handling implementation
+- [ ] None (configuration template is complete)
 
 ## Blockers
-- None identified
+- None (this is a documentation addition)
 
 ## Next Steps
-1. Verify configuration file structure matches expected formats
-2. Document configuration options in user documentation
+1. Update AGENTS.md to reference the new configuration template
+2. Create user documentation explaining configuration options
