@@ -1,20 +1,21 @@
 # Project State
 
 ## Current Focus
-Added a new read-write path for the Dracon systemd service to access user's local state directory.
+Refactored string handling in process termination logic for git processes
 
 ## Context
-The change was made to ensure the `dracon-warden.service` has proper access to the `~/.local/state/dracon` directory, which is used for storing persistent state data.
+The change improves consistency in string handling when reporting process termination actions, particularly for git processes that need to be killed.
 
 ## Completed
-- [x] Added `~/.local/state/dracon` to the `ReadWritePaths` in the systemd service configuration
+- [x] Replaced `format!` macro with direct `to_string()` calls for consistency in string creation
+- [x] Maintained identical functionality while improving code clarity
 
 ## In Progress
-- [x] Verification of the new path's functionality in the service
+- [x] No active work in progress beyond this change
 
 ## Blockers
-- None reported
+- None identified for this specific change
 
 ## Next Steps
-1. Test the service with the new path to ensure proper read/write operations
-2. Document any additional path requirements if discovered during testing
+1. Verify no regression in process termination reporting
+2. Review other similar string handling patterns for potential refactoring
