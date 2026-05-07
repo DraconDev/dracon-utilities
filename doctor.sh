@@ -44,8 +44,8 @@ check "Bash version >= 4.0" "[[ \${BASH_VERSINFO[0]} -ge 4 ]]"
 echo ""
 echo "📁 Directory Structure"
 check "dracon-libs sibling directory" "[ -d ../dracon-libs ]"
-check "dracon-libs/services/ai/ exists" "[ -d ../dracon-libs/services/ai ]"
-check "dracon-libs/tools/sync/dracon-git/ exists" "[ -d ../dracon-libs/tools/sync/dracon-git ]"
+check "dracon-libs/services/crates/ exists" "[ -d ../dracon-libs/services/crates ]" false
+check "dracon-libs/tools/sync/dracon-git/ exists" "[ -d ../dracon-libs/tools/sync/dracon-git ]" false
 
 echo ""
 echo "🔧 Binaries"
