@@ -2783,13 +2783,15 @@ mod tests {
 
     #[test]
     fn parse_ps_output_extracts_all_fields() {
-        let sample = "9999 75.0 8192000 git-fetch origin\n";
+        let sample = "9999 1 75.0 8192000 git-fetch origin main\n";
         let rows = parse_ps_output(sample);
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].pid, 9999);
+        assert_eq!(rows[0].ppid, 1);
         assert_eq!(rows[0].cpu_percent, 75.0);
         assert_eq!(rows[0].rss_mb, 8192000 / 1024);
         assert_eq!(rows[0].command, "git-fetch");
+        assert_eq!(rows[0].args, "origin main");
     }
 }
 

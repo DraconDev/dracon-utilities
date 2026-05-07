@@ -1,21 +1,22 @@
 # Project State
 
 ## Current Focus
-Refactored process argument parsing in `main.rs` to simplify handling of command-line arguments.
+Enhanced process monitoring to include parent process ID and command arguments
 
 ## Context
-The previous implementation had complex logic to handle whitespace in command arguments, which was error-prone. This change simplifies the parsing by joining all remaining parts after the first five fields as the arguments string.
+The change improves process tracking by adding parent process ID (PPID) and full command arguments to the parsed output, which is crucial for more accurate process management and debugging.
 
 ## Completed
-- [x] Simplified process argument parsing by joining remaining fields after PID, PPID, CPU%, and RSS
-- [x] Removed complex whitespace handling logic for command arguments
+- [x] Added parent process ID (PPID) to process monitoring
+- [x] Added full command arguments to process monitoring
+- [x] Updated test case to verify new fields
 
 ## In Progress
-- [ ] None
+- [x] Implementation of enhanced process monitoring
 
 ## Blockers
-- None
+- None identified
 
 ## Next Steps
-1. Verify the simplified parsing works correctly with various process outputs
-2. Update related documentation if needed
+1. Verify the enhanced monitoring works in production environments
+2. Document the new monitoring capabilities in the project documentation
