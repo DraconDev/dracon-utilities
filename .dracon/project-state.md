@@ -1,21 +1,22 @@
 # Project State
 
 ## Current Focus
-Added comprehensive configuration templates for system monitoring and secret management
+Added process monitoring and auto-kill features for runaway Git processes in `dracon-system`.
 
 ## Context
-The project now requires configuration templates for both system monitoring (dracon-system) and secret management (dracon-warden) to ensure consistent deployment and operation across environments.
+To prevent CPU resource exhaustion from misbehaving Git operations, the system now monitors processes and can automatically terminate Git commands that sustain high CPU usage for extended periods.
 
 ## Completed
-- [x] Added dracon-system.example.toml with disk monitoring, process protection, and auto-cleanup policies
-- [x] Added dracon-warden.example.toml with secret encryption and watch root configurations
+- [x] Added persistent JSONL logging for heavy process events
+- [x] Implemented auto-kill for Git processes exceeding CPU thresholds
+- [x] Configured log rotation and file location settings
 
 ## In Progress
-- [ ] None (configuration templates are complete)
+- [ ] Testing edge cases for process detection and termination
 
 ## Blockers
-- None (configuration templates are ready for implementation)
+- None identified; feature is complete pending validation
 
 ## Next Steps
-1. Implement the configuration templates in the respective components
-2. Document the configuration options and their purposes
+1. Verify log rotation behavior with large log files
+2. Document the auto-kill configuration options in user guides
