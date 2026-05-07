@@ -564,6 +564,8 @@ impl Default for GuardPolicy {
             renice_value: default_renice_value(),
             auto_kill_git: false,
             git_kill_threshold_secs: default_git_kill_threshold_secs(),
+            guard_log_file: default_guard_log_file(),
+            guard_log_max_mb: default_guard_log_max_mb(),
             auto_cleanup_rust: default_auto_cleanup_rust(),
             cleanup_min_size_mb: default_cleanup_min_size_mb(),
             rust_search_roots: default_rust_search_roots(),
