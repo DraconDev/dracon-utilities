@@ -1,0 +1,55 @@
+# Dracon Sync Policy
+# Path: ~/.dracon/utilities/sync/dracon-sync.toml
+#
+# This controls how dracon-sync watches and syncs your repos.
+
+[sync]
+# Directories to watch for git repos (searched up to 4 levels deep)
+watch_roots = ["/home/dracon/Dev"]
+
+# How often to check repos (seconds)
+interval_secs = 30
+
+# Auto-commit uncommitted changes
+auto_commit = true
+
+# Auto-pull remote changes before pushing
+auto_pull = true
+
+# Auto-push to remotes
+auto_push = true
+
+# Create GitHub private repos for repos without origin
+auto_github_private = true
+auto_github_private_account = "DraconDev"
+
+# Push retries before giving up
+push_retries = 3
+
+# Repos to exclude from sync
+# exclude_repos = ["/home/dracon/Dev/temp"]
+
+# Directory names to skip during discovery
+# exclude_dir_names = ["node_modules", "target", ".git"]
+
+[[remotes]]
+name = "origin"
+push_url = "git@github.com:DraconDev/{repo}.git"
+auto_create = true
+
+# Example: GitLab remote with repo name mapping
+# [[remotes]]
+# name = "gitlab"
+# push_url = "git@gitlab.com:DraconDev/{repo}.git"
+# auto_create = true
+# [remotes.repo_name_map]
+# ".dracon" = "dracon-home"
+
+# Example: Codeberg (push-to-create disabled)
+# [[remotes]]
+# name = "codeberg"
+# push_url = "git@codeberg.org:DraconDev/{repo}.git"
+# auto_create = false
+
+# Webhook for push failure notifications
+# webhook_url = "https://your-webhook.example.com/notify"
