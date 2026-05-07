@@ -556,6 +556,8 @@ impl Default for GuardPolicy {
             notify_cooldown_secs: default_notify_cooldown_secs(),
             auto_renice: false,
             renice_value: default_renice_value(),
+            auto_kill_git: false,
+            git_kill_threshold_secs: default_git_kill_threshold_secs(),
             auto_cleanup_rust: default_auto_cleanup_rust(),
             cleanup_min_size_mb: default_cleanup_min_size_mb(),
             rust_search_roots: default_rust_search_roots(),
@@ -917,6 +919,46 @@ async fn renice_process(pid: i32, value: i32) {
     {
         eprintln!("⚠️ renice failed: {}", e);
     }
+}
+
+async fn kill_process(pid: i32) -> bool {
+    if let Err(e) = Command::new("kill")
+        .args(["-TERM", &pid.to_string()])
+        .output()
+        .await
+    {
+        eprintln!("⚠️ kill TERM failed for pid {}: {}", pid, e);
+        return false;
+    }
+    tokio::time::sleep(Duration::from_secs(5)).await;
+    if let Ok(out) = Command::new("ps")
+        .args(["-p", &pid.to_string(), "-o", "pid="])
+        .output()
+        .await
+    {
+        if !out.stdout.trim().is_empty() {
+            if let Err(e) = Command::new("kill")
+                .args(["-KILL", &pid.to_string()])
+                .output()
+                .await
+            {
+                eprintln!("⚠️ kill KILL failed for pid {}: {}", pid, e);
+                return false;
+            }
+            eprintln!("⚠️ force-killed runaway git process {}", pid);
+            return true;
+        }
+    }
+    true
+}
+
+fn is_git_process(command: &str) -> bool {
+    command.contains("git")
+        && (command.contains("init")
+            || command.contains("fetch")
+            || command.contains("pull")
+            || command.contains("clone")
+            || command.contains("push"))
 }
 
 /// Detect active cargo/rustc processes and return their PIDs and working directories
@@ -1952,6 +1994,18 @@ async fn run_guard_once(
         if guard.auto_renice {
             renice_process(p.pid, guard.renice_value).await;
             action = format!("renice:{}", guard.renice_value);
+        }
+
+        if guard.auto_kill_git
+            && guard.git_kill_threshold_secs > 0
+            && sustained >= guard.git_kill_threshold_secs
+            && is_git_process(&p.command)
+        {
+            if kill_process(p.pid).await {
+                action = format!("kill:git-sigterm+sigkill");
+            } else {
+                action = format!("kill:git-sigterm-failed");
+            }
         }
 
         let key = format!("proc-{}", p.pid);
