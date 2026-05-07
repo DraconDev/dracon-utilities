@@ -460,6 +460,12 @@ struct GuardPolicy {
     /// Seconds a git process must sustain high CPU before auto-kill (if auto_kill_git is enabled)
     #[serde(default = "default_git_kill_threshold_secs")]
     git_kill_threshold_secs: u64,
+    /// Path to persistent guard log file (JSONL format). Empty string disables file logging.
+    #[serde(default = "default_guard_log_file")]
+    guard_log_file: String,
+    /// Maximum size of guard log file in MiB before rotation (deletes old entries)
+    #[serde(default = "default_guard_log_max_mb")]
+    guard_log_max_mb: u64,
     /// Automatically clean Rust build artifacts when disk hits action level
     #[serde(default = "default_auto_cleanup_rust")]
     auto_cleanup_rust: bool,

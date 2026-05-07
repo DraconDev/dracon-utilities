@@ -1,23 +1,22 @@
 # Project State
 
 ## Current Focus
-Enhanced process sampling to include parent process ID and command arguments
+Added persistent logging configuration for the guard system
 
 ## Context
-Improved process monitoring capabilities to better track process relationships and command execution details
+To improve debugging and monitoring capabilities, we need to track guard system activity persistently. The previous implementation only logged to stdout, which isn't always available for analysis.
 
 ## Completed
-- [x] Modified process sampling to include parent process ID (ppid) and command arguments
-- [x] Removed CPU usage percentage from output format
-- [x] Maintained existing process ID, resident set size, and command name fields
+- [x] Added configurable log file path for guard system
+- [x] Added log rotation based on maximum file size
+- [x] Implemented JSONL format for structured logging
 
 ## In Progress
-- [ ] None (change is complete)
+- [ ] Testing log file rotation behavior under high-volume conditions
 
 ## Blockers
-- None (change is complete)
+- Need to define standard log entry format for consistency across components
 
 ## Next Steps
-1. Verify the new process sampling format works correctly with existing monitoring tools
-2. Update documentation to reflect the new process sampling output format
-```
+1. Implement log rotation tests
+2. Add log file monitoring to the documentation notes
