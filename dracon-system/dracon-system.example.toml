@@ -1,0 +1,86 @@
+# Dracon System Guard Policy
+# Path: ~/.dracon/utilities/system/dracon-system.toml
+#
+# Controls disk monitoring, process protection, and auto-cleanup.
+
+[guard]
+# Enable the guard daemon
+guard_enabled = true
+
+# Disk usage thresholds (percent)
+disk_early_warn_percent = 70
+disk_warn_percent = 80
+disk_action_percent = 90
+disk_critical_percent = 95
+
+# Freeze dracon-sync when disk hits action level
+freeze_sync_at_action = true
+
+# Unfreeze sync when disk drops below this level
+unfreeze_below_percent = 88
+
+# Process monitoring thresholds
+process_cpu_percent = 50.0      # Alert if CPU > 50%
+process_rss_mb = 4096           # Alert if RSS > 4GB
+process_sustain_secs = 30       # Alert after 30s sustained
+
+# Processes to exclude from monitoring (comma-separated)
+process_exempt_names = "systemd,dbus-daemon,Xorg,kwin_wayland,plasmashell"
+
+# Auto-renice heavy processes (lower priority)
+auto_renice = false
+renice_value = 10
+
+# Auto-kill runaway git processes (disabled by default)
+auto_kill_git = false
+git_kill_threshold_secs = 60
+
+# Notifications
+notify = true
+notify_command = "notify-send"
+notify_cooldown_secs = 300
+
+# Persistent logging of heavy processes
+guard_log_file = "~/.local/state/dracon/dracon-system-guard.log"
+guard_log_max_mb = 1
+
+# Auto-cleanup Rust target directories when disk is full
+auto_cleanup_rust = true
+cleanup_min_size_mb = 256
+rust_search_roots = "~/Dev"
+
+# Auto-cleanup old node_modules
+node_modules_search_roots = "~/Dev"
+node_modules_max_age_days = 30
+
+# Additional protected paths (besides system defaults)
+# protected_paths = ["/mnt/data", "/opt/important"]
+
+# Monitor inode usage
+monitor_inodes = true
+inode_warn_percent = 85
+
+# Monitor zombie processes
+monitor_zombies = true
+zombie_threshold = 20
+
+# Monitor large log files
+monitor_logs = true
+log_size_mb = 100
+log_dirs = "/var/log,~/.local/share/opencode/log"
+auto_truncate_logs = false
+log_max_truncate_mb = 50
+
+# Docker cleanup
+docker_prune = true
+docker_prune_volumes = false
+
+# Package cache cleanup
+clean_package_caches = true
+clean_trash = true
+clean_nix_garbage = true
+nix_keep_generations = 5
+
+# Disk trend prediction
+track_trends = true
+trend_warn_hours = 24

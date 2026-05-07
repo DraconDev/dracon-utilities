@@ -1,0 +1,16 @@
+# Dracon Warden Policy
+# Path: ~/.dracon/utilities/warden/dracon-warden.toml
+#
+# Controls secret encryption and watch roots.
+
+# Directories to watch for secrets
+watch_roots = ["/home/dracon/Dev"]
+
+# File extensions to scan
+# watch_extensions = [".py", ".js", ".ts", ".rs", ".toml", ".env"]
+
+# Markers that indicate encrypted content
+# secret_markers = ["DRACON_SECRET"]
+
+# Age key file location
+# age_key_file = "~/.config/dracon/warden/age.key"

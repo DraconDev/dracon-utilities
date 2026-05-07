@@ -1,23 +1,21 @@
 # Project State
 
 ## Current Focus
-Added configuration template for dracon-sync with Git repository synchronization policies
+Added comprehensive configuration templates for system monitoring and secret management
 
 ## Context
-This change provides a template configuration file for the dracon-sync utility, which will automatically manage Git repositories by watching directories, committing changes, pushing to remotes, and optionally creating GitHub repositories when needed.
+The project now requires configuration templates for both system monitoring (dracon-system) and secret management (dracon-warden) to ensure consistent deployment and operation across environments.
 
 ## Completed
-- [x] Added dracon-sync.example.toml configuration template
-- [x] Included settings for watch roots, sync intervals, and automatic operations
-- [x] Configured remote repository management with GitHub integration
-- [x] Added support for multiple remote configurations with repository name mapping
+- [x] Added dracon-system.example.toml with disk monitoring, process protection, and auto-cleanup policies
+- [x] Added dracon-warden.example.toml with secret encryption and watch root configurations
 
 ## In Progress
-- [ ] Implementation of the sync functionality based on this configuration
+- [ ] None (configuration templates are complete)
 
 ## Blockers
-- Implementation of the actual sync logic needs to be developed
+- None (configuration templates are ready for implementation)
 
 ## Next Steps
-1. Implement the sync functionality using the configuration template
-2. Add error handling and logging for sync operations
+1. Implement the configuration templates in the respective components
+2. Document the configuration options and their purposes
