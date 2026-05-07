@@ -1,26 +1,21 @@
 # Project State
 
 ## Current Focus
-Added comprehensive systemd service documentation for Dracon Utilities
+Added documentation links to README.md for contributors, changelog, and development workflow.
 
 ## Context
-The project needs clear documentation for systemd service configurations to ensure proper daemon management. This change provides detailed specifications for resource limits, security hardening, and operational parameters for critical services.
+The project is in the planning phase, with the first slice (`docs-discovery-01`) identified to scan for existing documentation. This commit adds navigation links to the README to improve discoverability of key documentation files.
 
 ## Completed
-- [x] Added systemd service documentation for `dracon-sync.service`
-- [x] Added systemd service documentation for `dracon-system-guard.service`
-- [x] Added systemd service documentation for `dracon-warden.service`
-- [x] Documented resource limits (CPU, memory, threads)
-- [x] Included security hardening settings
-- [x] Added environment variable configurations
-- [x] Documented pre-start cleanup procedures
+- [x] Added CONTRIBUTING.md link to README for development workflow
+- [x] Added CHANGELOG.md link to README for version history
 
 ## In Progress
-- [ ] None (documentation complete)
+- [ ] `docs-discovery-01` - Scanning repository for existing documentation files
 
 ## Blockers
-- None (documentation is complete)
+- None identified for this specific change
 
 ## Next Steps
-1. Review documentation for accuracy
-2. Update installation scripts to ensure proper service file deployment
+1. Complete `docs-discovery-01` slice to identify all documentation locations
+2. Begin documenting the project's architecture and conventions

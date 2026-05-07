@@ -3,6 +3,8 @@
 CLI binaries for dracon system services. These install to `~/.local/bin/` and run as systemd user services.
 
 **For AI agents:** See [AGENTS.md](AGENTS.md) for detailed architecture and conventions.
+**For contributors:** See [CONTRIBUTING.md](CONTRIBUTING.md) for development workflow.
+**For changes:** See [CHANGELOG.md](CHANGELOG.md) for version history.
 
 ---
 
