@@ -1,14 +1,14 @@
 # Project State
 
 ## Current Focus
-Refactored counter increment operations in `doctor.sh` for consistency and clarity.
+Refactored counter increment operations in `doctor.sh` for consistency
 
 ## Context
-The original code used `((PASS++))` style increments, which are valid but less explicit. The change replaces these with `PASS=$((PASS + 1))` for better readability and consistency across all counter increments.
+The script was using `((PASS++))` and `((WARN++))` syntax which is valid but less explicit. This change makes the increments more readable and consistent with other arithmetic operations.
 
 ## Completed
-- [x] Refactored all counter increments to use explicit arithmetic syntax
-- [x] Maintained identical functionality while improving code clarity
+- [x] Replaced `((PASS++))` with `PASS=$((PASS + 1))`
+- [x] Replaced `((WARN++))` with `WARN=$((WARN + 1))`
 
 ## In Progress
 - [ ] None
@@ -17,5 +17,5 @@ The original code used `((PASS++))` style increments, which are valid but less e
 - None
 
 ## Next Steps
-1. Verify no functional changes occurred in the health check script
-2. Review other scripts for similar increment patterns to refactor
+1. Verify the script still functions correctly after these changes
+2. Consider if there are other places in the codebase that could benefit from similar refactoring

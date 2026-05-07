@@ -102,11 +102,11 @@ echo ""
 echo "📝 PATH Check"
 if [[ ":$PATH:" == *":$HOME/.local/bin:"* ]]; then
     echo "  ✅ ~/.local/bin is in PATH"
-    ((PASS++))
+    PASS=$((PASS + 1))
 else
     echo "  ⚠️  ~/.local/bin is NOT in PATH"
     echo "     Add: export PATH=\"\$HOME/.local/bin:\$PATH\""
-    ((WARN++))
+    WARN=$((WARN + 1))
 fi
 
 echo ""
