@@ -1,21 +1,22 @@
 # Project State
 
 ## Current Focus
-Added example configuration links to the AGENTS.md documentation table.
+Added example configuration file handling for dracon utilities during installation.
 
 ## Context
-The change enhances the documentation by providing direct links to example configuration files for each utility, making it easier for users to understand and set up the utilities.
+The installation script now ensures example configuration files are copied to the user's home directory if they don't already exist. This provides users with ready-to-use templates for each dracon utility (sync, system, warden).
 
 ## Completed
-- [x] Added "Example Config" column to the policy files table
-- [x] Added links to example configuration files for dracon-sync, dracon-system, and dracon-warden
+- [x] Added directory creation for utility-specific config paths
+- [x] Implemented conditional copying of example config files
+- [x] Added user feedback for each copied configuration
 
 ## In Progress
-- [x] Documentation enhancement for utility configuration
+- [x] Configuration file handling implementation
 
 ## Blockers
 - None identified
 
 ## Next Steps
-1. Review and verify the example configuration files are accurate
-2. Update any related documentation that references these files
+1. Verify configuration file structure matches expected formats
+2. Document configuration options in user documentation
