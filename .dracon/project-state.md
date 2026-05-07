@@ -1,23 +1,23 @@
 # Project State
 
 ## Current Focus
-Enhanced process sampling with parent process ID and command arguments tracking
+Enhanced process sampling to include parent process ID and command arguments
 
 ## Context
-Improved process monitoring capabilities by adding parent process ID (ppid) and full command arguments to the process sampling system
+Improved process monitoring capabilities to better track process relationships and command execution details
 
 ## Completed
-- [x] Added ppid field to ProcSample struct
-- [x] Added args field to ProcSample struct
-- [x] Enhanced ps output parsing to extract command arguments
-- [x] Improved empty line handling in process output parsing
+- [x] Modified process sampling to include parent process ID (ppid) and command arguments
+- [x] Removed CPU usage percentage from output format
+- [x] Maintained existing process ID, resident set size, and command name fields
 
 ## In Progress
-- [ ] None (changes are complete)
+- [ ] None (change is complete)
 
 ## Blockers
-- None (feature is complete)
+- None (change is complete)
 
 ## Next Steps
-1. Update documentation to reflect new process sampling capabilities
-2. Add tests for the enhanced process parsing functionality
+1. Verify the new process sampling format works correctly with existing monitoring tools
+2. Update documentation to reflect the new process sampling output format
+```
