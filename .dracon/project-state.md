@@ -1,28 +1,28 @@
 # Project State
 
 ## Current Focus
-Added comprehensive system health check script for Dracon Utilities
+Enhanced the uninstallation script with comprehensive cleanup options and better user interaction
 
 ## Context
-To improve installation and troubleshooting, we needed a tool that verifies all prerequisites, binaries, services, and configurations are properly set up.
+The uninstall script was expanded to provide more control over what gets removed during uninstallation, making the process safer and more configurable for users.
 
 ## Completed
-- [x] Added `doctor.sh` script that checks:
-  - Required tools (Rust, Git, systemctl)
-  - Directory structure
-  - Binary availability
-  - Systemd service status
-  - Configuration files
-  - PATH configuration
-- [x] Implemented color-coded output with emoji indicators
-- [x] Added summary statistics of passed/warning/failed checks
+- [x] Added argument parsing for `--force`, `--configs`, `--logs`, and `--purge` options
+- [x] Implemented confirmation prompt (skippable with `--force`)
+- [x] Added support for removing configuration files (`~/.dracon/utilities`)
+- [x] Added support for removing log files (`~/.local/state/dracon`)
+- [x] Enhanced visual feedback with emoji indicators (✅ for success, ⚠️ for warnings)
+- [x] Added help documentation with usage examples
+- [x] Updated the list of binaries to include `dracon-ai`
+- [x] Improved error handling and user feedback throughout the script
 
 ## In Progress
-- [ ] None (complete feature)
+- [ ] None (all changes are complete)
 
 ## Blockers
-- None (standalone feature)
+- None (all functionality is implemented)
 
 ## Next Steps
-1. Document usage in main README
-2. Integrate with existing installation scripts
+1. Test the uninstall script with different combinations of arguments
+2. Update documentation to reflect the new uninstallation options
+3. Consider adding more granular cleanup options if needed
