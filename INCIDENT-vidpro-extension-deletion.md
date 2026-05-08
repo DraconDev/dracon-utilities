@@ -120,13 +120,41 @@ dracon-warden added `.dracon/`, `.gitattributes`, and modified `.gitignore` in v
 
 ## Remaining Questions
 
-1. What process actually removed the 46 files from disk?
-2. How did dracon-utilities files end up in the vidpro-extension repo?
-3. Should nested git repos be better handled by dracon-sync's discovery logic?
+1. ~~What process actually removed the 46 files from disk?~~ — **Answered**: The files were deleted by dracon-sync in commit `85af22e` after the broken safety check allowed the mass deletion to be committed. Files were later restored to disk manually but never re-added to git.
+2. ~~How did dracon-utilities files end up in the vidpro-extension repo?~~ — **Answered**: After the extension files were deleted from git tracking, dracon-sync (or another process) committed dracon-utilities files into the same repo, creating a "split brain" where git tracks dracon-utilities content while the working tree contains extension files.
+3. Should nested git repos be better handled by dracon-sync's discovery logic? — **Still relevant**: The nested repo structure in `browser-extensions-shared` remains a risk. dracon-sync discovers both parent and nested repos independently, which can lead to cross-repo confusion.
 
----
+## Additional Audit Findings
 
-## Recommendations
+### `unwrap_or(0)` Audit
+An audit of all `unwrap_or(0)` patterns in dracon-sync found **no other safety-critical issues**:
+- `report.rs:651` — Display timestamp (safe: 0 = no display)
+- `daemon.rs:740` — Remote failure count (safe: 0 = no failures)
+- `policy.rs:168` — System time (safe: edge case before epoch)
+
+The only dangerous instance (`sync.rs:313` using `git ls-files --count`) was already fixed.
+
+### Git Command Flag Audit
+All 114+ git command invocations use **valid flags**. No other invalid flags like `ls-files --count` were found.
+
+## Current State & Recommended Recovery
+
+The vidpro-extension repo is in a "split brain" state:
+- **Git tracks:** 101 dracon-utilities files (AGENTS.md, CHANGELOG.md, etc.)
+- **Working tree:** Extension files (package.json, entrypoints/, components/, etc.) — **untracked**
+- **Risk:** If dracon-sync commits now, it will commit dracon-utilities files to the vidpro-extension remote
+
+### Recovery Steps
+1. **Backup current state:** `git branch backup-split-brain`
+2. **Reset to pre-incident commit:** `git reset --hard <commit-before-85af22e>` (find with `git reflog`)
+3. **Restore extension files:** Ensure working tree has the correct extension files
+4. **Commit and push:** Stage and commit the extension files properly
+5. **Clean up:** Remove the backup branch once verified
+
+### Prevention
+- Add `browser-extensions-shared/vidpro-extension` to dracon-sync's `exclude_paths` until recovery is complete
+- Consider converting nested repos to git submodules
+- Monitor for any new mass-deletion guard triggers in the incident ledger
 
 1. **Never use nested git repos without submodules** — this creates ambiguity about which repo operations apply to
 2. **Audit all `unwrap_or(0)` patterns** — many exist across the codebase and could hide similar silent failures
