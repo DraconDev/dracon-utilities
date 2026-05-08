@@ -156,6 +156,10 @@ The vidpro-extension repo is in a "split brain" state:
 - Consider converting nested repos to git submodules
 - Monitor for any new mass-deletion guard triggers in the incident ledger
 
+---
+
+## Recommendations
+
 1. **Never use nested git repos without submodules** — this creates ambiguity about which repo operations apply to
 2. **Audit all `unwrap_or(0)` patterns** — many exist across the codebase and could hide similar silent failures
 3. **Add explicit error logging** for all git command failures, not just silent fallbacks
