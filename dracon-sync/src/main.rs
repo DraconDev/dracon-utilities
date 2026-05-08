@@ -112,6 +112,9 @@ enum Command {
         /// Preview what would be done without making any changes.
         #[arg(long)]
         dry_run: bool,
+        /// Bypass safety guards (e.g. mass-deletion prevention) for intentional operations.
+        #[arg(long)]
+        force: bool,
     },
     /// Open sync policy in the system editor.
     EditConfig,
@@ -392,7 +395,7 @@ async fn main() -> Result<()> {
         Command::Daemon { interval_secs } => {
             run_daemon(policy_path, interval_secs).await?;
         }
-        Command::SyncNow { repos, dry_run } => {
+        Command::SyncNow { repos, dry_run, force } => {
             if let Some(reason) = freeze_reason(&policy_path) {
                 println!("⏸️ sync frozen ({})", reason);
                 return Ok(());
@@ -404,7 +407,7 @@ async fn main() -> Result<()> {
                     println!("🔒 {} is stuck on push. Run 'dracon-sync stuck unstuck {}' first.", repo.display(), repo.display());
                     continue;
                 }
-                match sync_repo(&repo, &policy, &excluded_dir_names, 0, None, dry_run, Some(&policy_path), force_deletion).await {
+                match sync_repo(&repo, &policy, &excluded_dir_names, 0, None, dry_run, Some(&policy_path), force).await {
                     Ok(true) => {
                         if dry_run {
                             println!("✅ dry-run complete for {}", repo.display());
