@@ -1,9 +1,14 @@
 use std::collections::{BTreeSet, HashMap};
 use std::path::Path;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 use anyhow::Result;
 use dracon_git::{build_commit_message, GitService};
+
+/// Counter of how many times the mass-deletion safety guard has blocked a commit.
+/// Used by `dracon-sync metrics` for Prometheus-style monitoring.
+pub(crate) static MASS_DELETION_GUARD_BLOCKED: AtomicU64 = AtomicU64::new(0);
 
 use crate::exclude::{can_restore_entry, handle_large_untracked, is_large_untracked, remove_tracked_excluded_paths, should_stage_entry};
 use crate::git::{
@@ -329,6 +334,7 @@ pub(crate) async fn sync_repo(
                     eprintln!("⚠️ SAFETY: {}", reason);
                     eprintln!("⚠️ Refusing to stage mass deletion - this looks like a mistake or destructive operation");
                     eprintln!("⚠️ If you really want to delete these files, do: git add -A && git commit -m 'delete files'");
+                    MASS_DELETION_GUARD_BLOCKED.fetch_add(1, Ordering::Relaxed);
                     // Log incident for audit trail
                     if let Some(path) = policy_path {
                         append_incident_record(
