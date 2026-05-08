@@ -184,6 +184,30 @@ pub(crate) struct IncidentRecord {
     details: Option<String>,
 }
 
+impl IncidentRecord {
+    pub(crate) fn new(
+        ts_unix: u64,
+        scope: impl Into<String>,
+        repo: impl Into<String>,
+        reason: impl Into<String>,
+        action: impl Into<String>,
+        backup_branch: Option<String>,
+        result: impl Into<String>,
+        details: Option<String>,
+    ) -> Self {
+        Self {
+            ts_unix,
+            scope: scope.into(),
+            repo: repo.into(),
+            reason: reason.into(),
+            action: action.into(),
+            backup_branch,
+            result: result.into(),
+            details,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum ReportSignal {
     ActiveBoardChanged,
