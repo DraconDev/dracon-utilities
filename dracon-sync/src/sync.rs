@@ -1533,6 +1533,98 @@ push_url = "{}"
     }
 
     #[tokio::test]
+    async fn test_sync_repo_exactly_50_percent_deletion_allowed() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "exact-50-del-repo");
+
+        std::fs::write(repo.join("a.txt"), "a\n").unwrap();
+        std::fs::write(repo.join("b.txt"), "b\n").unwrap();
+        git_cmd(&repo, &["add", "-A"]);
+        git_cmd(&repo, &["commit", "-m", "add files"]);
+
+        // Delete exactly 1 of 2 files (50% — at threshold, should be ALLOWED)
+        std::fs::remove_file(repo.join("a.txt")).unwrap();
+
+        let toml_str = r#"
+        auto_github_private = false
+        auto_commit = true
+        auto_pull = false
+        auto_push = false
+        auto_bump_versions = false
+        "#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(result.is_ok(), "sync_repo should succeed");
+        assert!(result.unwrap(), "exactly 50% deletion should be committed (not blocked)");
+
+        let output = git_cmd(&repo, &["ls-files"]);
+        let tracked = String::from_utf8_lossy(&output.stdout);
+        assert!(!tracked.contains("a.txt"), "a.txt should be removed after 50% deletion commit");
+        assert!(tracked.contains("b.txt"), "b.txt should still be tracked");
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_empty_repo_no_panic() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "empty-repo");
+
+        // Repo has only the empty initial commit, no tracked files
+        let toml_str = r#"
+        auto_github_private = false
+        auto_commit = true
+        auto_pull = false
+        auto_push = false
+        auto_bump_versions = false
+        "#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(result.is_ok(), "sync_repo should not panic on empty repo");
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_mass_deletion_logs_incident() {
+        use crate::test_helpers::EnvRestorer;
+
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "mass-del-incident-repo");
+
+        std::fs::write(repo.join("a.txt"), "a\n").unwrap();
+        std::fs::write(repo.join("b.txt"), "b\n").unwrap();
+        std::fs::write(repo.join("c.txt"), "c\n").unwrap();
+        git_cmd(&repo, &["add", "-A"]);
+        git_cmd(&repo, &["commit", "-m", "add files"]);
+
+        // Delete ALL files to trigger the safety guard
+        std::fs::remove_file(repo.join("a.txt")).unwrap();
+        std::fs::remove_file(repo.join("b.txt")).unwrap();
+        std::fs::remove_file(repo.join("c.txt")).unwrap();
+
+        let ledger = tmp.path().join("test-incidents.jsonl");
+        let _ledger_guard = EnvRestorer::new("DRACON_SYNC_LEDGER", &ledger.to_string_lossy());
+
+        let toml_str = r#"
+        auto_github_private = false
+        auto_commit = true
+        auto_pull = false
+        auto_push = false
+        auto_bump_versions = false
+        "#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, Some(Path::new("/fake/policy.toml"))).await;
+        assert!(result.is_ok(), "sync_repo should succeed");
+        assert!(result.unwrap(), "mass deletion should be prevented");
+
+        // Verify incident was logged
+        assert!(ledger.exists(), "incident ledger should be created");
+        let content = std::fs::read_to_string(&ledger).unwrap();
+        assert!(content.contains("mass_deletion_guard"), "incident should contain mass_deletion_guard action");
+        assert!(content.contains("blocked"), "incident should have 'blocked' result");
+    }
+
+    #[tokio::test]
     async fn test_sync_repo_unstages_excluded_dir_paths() {
         let tmp = tempfile::tempdir().unwrap();
         let repo = init_test_repo(&tmp, "exclude-dir-repo");
