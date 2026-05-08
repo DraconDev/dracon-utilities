@@ -312,12 +312,16 @@ pub(crate) async fn sync_repo(
                     .unwrap_or(0);
 
                 let missing_count = missing.len();
-                let is_mass_deletion = total_tracked > 0 && missing_count >= total_tracked;
+                // Primary guard: ALL files missing (100%)
+                let is_total_wipe = total_tracked > 0 && missing_count >= total_tracked;
+                // Secondary guard: >50% of files missing (catches major accidental deletions)
+                let is_mass_deletion = total_tracked > 0 && missing_count * 2 > total_tracked;
 
-                if is_mass_deletion {
-                    eprintln!("⚠️ SAFETY: {} files missing from working tree ({}% of {} tracked)", missing_count, (missing_count * 100) / total_tracked, total_tracked);
+                if is_total_wipe || is_mass_deletion {
+                    let pct = (missing_count * 100) / total_tracked;
+                    eprintln!("⚠️ SAFETY: {} files missing from working tree ({}% of {} tracked)", missing_count, pct, total_tracked);
                     eprintln!("⚠️ Refusing to stage mass deletion - this looks like a mistake or destructive operation");
-                    eprintln!("⚠️ If you really want to delete all files, do: git add -A && git commit -m 'delete all'");
+                    eprintln!("⚠️ If you really want to delete these files, do: git add -A && git commit -m 'delete files'");
                     // Do NOT stage the deletions - let the user decide
                     return Ok(true);
                 }
