@@ -793,6 +793,11 @@ async fn main() -> Result<()> {
             println!("# HELP dracon_sync_pulse_interval_secs Sync pulse interval in seconds");
             println!("# TYPE dracon_sync_pulse_interval_secs gauge");
             println!("dracon_sync_pulse_interval_secs {}", policy.pulse_interval_secs);
+
+            let blocked = crate::sync::MASS_DELETION_GUARD_BLOCKED.load(std::sync::atomic::Ordering::Relaxed);
+            println!("# HELP dracon_sync_mass_deletion_guard_blocked_total Mass deletions blocked by safety guard");
+            println!("# TYPE dracon_sync_mass_deletion_guard_blocked_total counter");
+            println!("dracon_sync_mass_deletion_guard_blocked_total {}", blocked);
         }
     }
 
