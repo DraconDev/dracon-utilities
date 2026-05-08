@@ -48,6 +48,7 @@ pub(crate) async fn sync_repo(
     remote_failures: Option<&mut HashMap<String, usize>>,
     dry_run: bool,
     policy_path: Option<&Path>,
+    force_deletion: bool,
 ) -> Result<bool> {
     let svc = GitService::new(repo)?;
     if !svc.is_git_repo().await? {
@@ -303,14 +304,16 @@ pub(crate) async fn sync_repo(
             if !missing.is_empty() {
                 // SAFETY: If ALL files in the index are missing, this is likely a mistake
                 // or destructive operation. Do NOT stage mass deletions without warning.
-                // Get total tracked files count
-                let total_tracked: usize = std::process::Command::new("git")
-                    .args(["ls-files"])
-                    .current_dir(repo)
-                    .output()
-                    .ok()
-                    .map(|o| String::from_utf8_lossy(&o.stdout).lines().count())
-                    .unwrap_or(0);
+                // Use --force on sync-now to bypass this guard for intentional deletions.
+                if !force_deletion {
+                    // Get total tracked files count
+                    let total_tracked: usize = std::process::Command::new("git")
+                        .args(["ls-files"])
+                        .current_dir(repo)
+                        .output()
+                        .ok()
+                        .map(|o| String::from_utf8_lossy(&o.stdout).lines().count())
+                        .unwrap_or(0);
 
                 let missing_count = missing.len();
                 // Primary guard: ALL files missing (100%)
