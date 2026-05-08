@@ -1423,7 +1423,7 @@ push_url = "{}"
         "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(&not_repo, &policy, &BTreeSet::new(), 0, None, false).await;
+        let result = sync_repo(&not_repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
         assert!(result.is_ok(), "sync_repo should not error on non-git dir");
         assert!(!result.unwrap(), "non-git dir should return false");
     }
@@ -1560,7 +1560,7 @@ push_url = "{}"
         "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(&repo, &policy, &excluded, 0, None, false).await;
+        let result = sync_repo(&repo, &policy, &excluded, 0, None, false, None).await;
         assert!(result.is_ok(), "sync_repo should succeed");
 
         let output = git_cmd(&repo, &["log", "--oneline", "-1"]);
