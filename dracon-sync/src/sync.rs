@@ -1617,7 +1617,7 @@ push_url = "{}"
         "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, Some(Path::new("/fake/policy.toml"))).await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, Some(Path::new("/fake/policy.toml")), false).await;
         assert!(result.is_ok(), "sync_repo should succeed");
         assert!(result.unwrap(), "mass deletion should be prevented");
 
