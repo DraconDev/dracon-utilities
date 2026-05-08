@@ -122,7 +122,7 @@ dracon-warden added `.dracon/`, `.gitattributes`, and modified `.gitignore` in v
 
 1. ~~What process actually removed the 46 files from disk?~~ — **Answered**: The files were deleted by dracon-sync in commit `85af22e` after the broken safety check allowed the mass deletion to be committed. Files were later restored to disk manually but never re-added to git.
 2. ~~How did dracon-utilities files end up in the vidpro-extension repo?~~ — **Answered**: After the extension files were deleted from git tracking, dracon-sync (or another process) committed dracon-utilities files into the same repo, creating a "split brain" where git tracks dracon-utilities content while the working tree contains extension files.
-3. Should nested git repos be better handled by dracon-sync's discovery logic? — **Still relevant**: The nested repo structure in `browser-extensions-shared` remains a risk. dracon-sync discovers both parent and nested repos independently, which can lead to cross-repo confusion.
+3. Should nested git repos be better handled by dracon-sync's discovery logic? — **Still relevant**: The nested repo structure in `browser-extensions-shared` remains a risk. dracon-sync discovers both parent and nested repos independently, which can lead to cross-repo confusion. The `discover_git_repos_recursive` function does not stop recursing after finding a `.git` directory, continuing into subdirectories and discovering nested repos independently. Consider adding a flag to prevent descent into subdirectories of already-discovered repos.
 
 ## Additional Audit Findings
 
