@@ -47,6 +47,7 @@ pub(crate) async fn sync_repo(
     idle_seconds: u64,
     remote_failures: Option<&mut HashMap<String, usize>>,
     dry_run: bool,
+    policy_path: Option<&Path>,
 ) -> Result<bool> {
     let svc = GitService::new(repo)?;
     if !svc.is_git_repo().await? {
