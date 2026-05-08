@@ -404,7 +404,7 @@ async fn main() -> Result<()> {
                     println!("🔒 {} is stuck on push. Run 'dracon-sync stuck unstuck {}' first.", repo.display(), repo.display());
                     continue;
                 }
-                match sync_repo(&repo, &policy, &excluded_dir_names, 0, None, dry_run, Some(&policy_path)).await {
+                match sync_repo(&repo, &policy, &excluded_dir_names, 0, None, dry_run, Some(&policy_path), force_deletion).await {
                     Ok(true) => {
                         if dry_run {
                             println!("✅ dry-run complete for {}", repo.display());
