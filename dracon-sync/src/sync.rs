@@ -1794,7 +1794,7 @@ auto_bump_versions = false
         let commits_count_before: usize = String::from_utf8_lossy(&commits_before.stdout)
             .trim().parse().unwrap();
 
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, true, None).await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, true, None, false).await;
         assert!(result.is_ok(), "dry-run should succeed");
 
         let commits_after = git_cmd(&repo, &["rev-list", "--count", "HEAD"]);
@@ -1830,7 +1830,7 @@ auto_bump_versions = false
 "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, true, None).await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, true, None, false).await;
         assert!(result.is_ok(), "dry-run should succeed");
 
         let commits_after = git_cmd(&repo, &["rev-list", "--count", "HEAD"]);
@@ -1859,7 +1859,7 @@ auto_bump_versions = false
 "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, true, None).await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, true, None, false).await;
         assert!(result.is_ok(), "dry-run should succeed");
 
         let output = git_cmd(&repo, &["status", "--porcelain"]);
