@@ -191,6 +191,10 @@ fn discover_git_repos_recursive(
         let dot_git = path.join(".git");
         if dot_git.exists() && (dot_git.is_dir() || is_git_worktree_file(&dot_git)) {
             repos.push(path.clone());
+            // Don't recurse into subdirectories of a discovered repo — they're part of
+            // the same git working tree. Descending into subdirs would double-discover
+            // repos that have nested git structures (e.g. submodules with .git files).
+            continue;
         }
         if name.starts_with('.') {
             continue;
