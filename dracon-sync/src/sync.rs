@@ -17,7 +17,7 @@ use crate::git::multi_remote::{
     push_mirror_remotes,
 };
 use crate::policy::{debug_enabled, load_repo_override, SyncPolicy};
-use crate::report::{build_commit_context, detect_report_signals, push_large_blob_threshold_bytes};
+use crate::report::{append_incident_record, build_commit_context, detect_report_signals, IncidentRecord, push_large_blob_threshold_bytes};
 
 fn notify_webhook_failure(webhook_url: &str, repo: &Path, remote: &str, error: &str) {
     let payload = serde_json::json!({
