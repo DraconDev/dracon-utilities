@@ -162,6 +162,27 @@ Operational state (mutable files written at runtime) lives **outside the `.draco
 
 The incident ledger is appended every sync cycle. Keeping it at `~/.local/state/dracon/` instead of inside `.dracon` prevents the sync daemon from auto-committing its own operational data.
 
+### Incident Response
+
+When the safety guard triggers or other incidents occur, entries are written to the incident ledger:
+
+```bash
+# View recent incidents
+cat ~/.local/state/dracon/dracon-sync-incidents.jsonl | tail -20
+```
+
+Each line is a JSON object:
+```json
+{"ts_unix":1714896000,"scope":"safety","repo":"/path/to/repo","reason":"3 files missing from working tree (100% of 3 tracked)","action":"mass_deletion_guard","backup_branch":null,"result":"blocked","details":"total_tracked=3 missing_count=3"}
+```
+
+**After an incident:**
+1. Read the incident ledger to understand what happened
+2. Check the repo status: `git status` and `git log --oneline -5`
+3. If mass deletion was blocked, decide whether it was intentional
+4. For intentional deletions: manually commit with `git add -A && git commit -m 'delete files'`
+5. Review the safety guard code if the block was unexpected
+
 ### dracon-system Protected Paths
 
 `dracon-system` protects critical system directories from accidental deletion. The following are always protected (exact match):
