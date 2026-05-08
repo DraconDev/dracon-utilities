@@ -1479,6 +1479,42 @@ push_url = "{}"
     }
 
     #[tokio::test]
+    async fn test_sync_repo_partial_mass_deletion_prevented() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "partial-mass-del-repo");
+
+        std::fs::write(repo.join("a.txt"), "a\n").unwrap();
+        std::fs::write(repo.join("b.txt"), "b\n").unwrap();
+        std::fs::write(repo.join("c.txt"), "c\n").unwrap();
+        git_cmd(&repo, &["add", "-A"]);
+        git_cmd(&repo, &["commit", "-m", "add files"]);
+
+        // Delete 2 of 3 files (66% > 50% threshold)
+        std::fs::remove_file(repo.join("a.txt")).unwrap();
+        std::fs::remove_file(repo.join("b.txt")).unwrap();
+
+        let toml_str = r#"
+        auto_github_private = false
+        auto_commit = true
+        auto_pull = false
+        auto_push = false
+        auto_bump_versions = false
+        "#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false).await;
+        assert!(result.is_ok(), "sync_repo should succeed");
+        assert!(result.unwrap(), "partial mass deletion (>50%) should be prevented");
+
+        // Verify all files are still tracked (deletion was NOT committed)
+        let output = git_cmd(&repo, &["ls-files"]);
+        let tracked = String::from_utf8_lossy(&output.stdout);
+        assert!(tracked.contains("a.txt"), "a.txt should still be tracked after partial mass deletion safety");
+        assert!(tracked.contains("b.txt"), "b.txt should still be tracked after partial mass deletion safety");
+        assert!(tracked.contains("c.txt"), "c.txt should still be tracked after partial mass deletion safety");
+    }
+
+    #[tokio::test]
     async fn test_sync_repo_unstages_excluded_dir_paths() {
         let tmp = tempfile::tempdir().unwrap();
         let repo = init_test_repo(&tmp, "exclude-dir-repo");
