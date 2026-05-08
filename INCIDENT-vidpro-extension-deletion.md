@@ -160,11 +160,13 @@ The vidpro-extension repo is in a "split brain" state:
 
 ## Recommendations
 
-1. **Never use nested git repos without submodules** — this creates ambiguity about which repo operations apply to
-2. **Audit all `unwrap_or(0)` patterns** — many exist across the codebase and could hide similar silent failures
-3. **Add explicit error logging** for all git command failures, not just silent fallbacks
-4. **Consider adding repo boundary detection** to prevent cross-repo contamination
-5. **Add a `--force` flag** for intentional mass deletions (>50% of tracked files)
+1. ⬜ **Never use nested git repos without submodules** — this creates ambiguity about which repo operations apply to
+2. ✅ **Audit all `unwrap_or(0)` patterns** — **COMPLETED**. All 3 remaining instances in `report.rs:651`, `daemon.rs:740`, `policy.rs:168` are safe (display/timestamp counts only). The dangerous `sync.rs:313` instance was already fixed.
+3. ✅ **Audit all git command flags** — **COMPLETED**. All 114+ `Command::new("git")` invocations use valid flags. No other invalid flags like `ls-files --count` were found.
+4. ⬜ **Add explicit error logging** for all git command failures, not just silent fallbacks
+5. ⬜ **Consider adding repo boundary detection** to prevent cross-repo contamination
+6. ⬜ **Add a `--force` flag** for intentional mass deletions (>50% of tracked files)
+7. ⬜ **Prevent `discover_git_repos_recursive` from descending into subdirectories of already-discovered repos**
 
 ---
 
