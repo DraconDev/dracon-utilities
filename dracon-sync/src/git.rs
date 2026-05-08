@@ -1335,13 +1335,28 @@ pub(crate) async fn diagnose_divergence(repo: &Path, remote_name: &str, branch: 
         return Ok(Divergence::Divergent);
     }
 
-    let _local_ahead: u32 = counts[0].parse().unwrap_or(0);
-    let remote_ahead: u32 = counts[1].parse().unwrap_or(0);
+    let local_ahead: u32 = match counts[0].parse() {
+        Ok(v) => v,
+        Err(e) => {
+            eprintln!("⚠️ failed to parse local ahead count from rev-list output (\"{}\"): {}", counts[0], e);
+            return Ok(Divergence::Divergent);
+        }
+    };
+    let remote_ahead: u32 = match counts[1].parse() {
+        Ok(v) => v,
+        Err(e) => {
+            eprintln!("⚠️ failed to parse remote ahead count from rev-list output (\"{}\"): {}", counts[1], e);
+            return Ok(Divergence::Divergent);
+        }
+    };
 
-    if remote_ahead == 0 {
+    if remote_ahead == 0 && local_ahead > 0 {
         Ok(Divergence::RemotePurelyBehind)
-    } else {
+    } else if remote_ahead > 0 {
         Ok(Divergence::Divergent)
+    } else {
+        // Both are 0 - repos are in sync
+        Ok(Divergence::RemotePurelyBehind)
     }
 }
 
