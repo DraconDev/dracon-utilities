@@ -1322,13 +1322,14 @@ pub(crate) async fn push_to_named_remote(
     let branch = current_branch(repo).unwrap_or_else(|| "main".to_string());
     let refspec = format!("HEAD:refs/heads/{}", branch);
     let ssh_hardening = crate::git::GIT_SSH_HARDENING;
+    let no_prompt = &[("GIT_TERMINAL_PROMPT", "0")];
 
     let attempt_ssh = run_git_with_timeout_env(
         repo,
         &["push", remote_name, &refspec],
         timeout_secs,
         &format!("push-to-{}", remote_name),
-        &[("GIT_SSH_COMMAND", ssh_hardening)],
+        &[("GIT_SSH_COMMAND", ssh_hardening), ("GIT_TERMINAL_PROMPT", "0")],
     ).await;
 
     if attempt_ssh.is_ok() {
@@ -1337,23 +1338,60 @@ pub(crate) async fn push_to_named_remote(
 
     let remote_url = get_remote_url(repo, remote_name)
         .ok_or_else(|| anyhow::anyhow!("remote {} not found", remote_name))?;
-    if let Some(https) = github_https_url(&remote_url) {
-        if is_safe_branch_name(&branch) {
-            let https_push = run_git_with_timeout(
+
+    if is_safe_branch_name(&branch) {
+        // Try GitHub HTTPS (no PAT needed for public repos)
+        if let Some(https) = github_https_url(&remote_url) {
+            let result = run_git_with_timeout_env(
                 repo,
                 &["push", &https, &refspec],
                 timeout_secs,
-                &format!("push-to-{}https", remote_name),
+                &format!("push-to-{}-github-https", remote_name),
+                no_prompt,
             ).await;
-            if https_push.is_ok() {
+            if result.is_ok() {
                 return Ok(());
+            }
+        }
+
+        // Try GitLab HTTPS with PAT
+        if let Some(https) = gitlab_https_url(&remote_url) {
+            if let Some(token) = load_secret("GITLAB_TOKEN") {
+                let pat_url = format!("https://oauth2:{}@{}", token, https.strip_prefix("https://").unwrap_or(&https));
+                let result = run_git_with_timeout_env(
+                    repo,
+                    &["push", &pat_url, &refspec],
+                    timeout_secs,
+                    &format!("push-to-{}-gitlab-https", remote_name),
+                    no_prompt,
+                ).await;
+                if result.is_ok() {
+                    return Ok(());
+                }
+            }
+        }
+
+        // Try Codeberg HTTPS with PAT
+        if let Some(https) = codeberg_https_url(&remote_url) {
+            if let Some(token) = load_secret("CODEBERG_TOKEN") {
+                let pat_url = format!("https://git:{}@{}", token, https.strip_prefix("https://").unwrap_or(&https));
+                let result = run_git_with_timeout_env(
+                    repo,
+                    &["push", &pat_url, &refspec],
+                    timeout_secs,
+                    &format!("push-to-{}-codeberg-https", remote_name),
+                    no_prompt,
+                ).await;
+                if result.is_ok() {
+                    return Ok(());
+                }
             }
         }
     }
 
     let mut last_err = None;
     for attempt in 1..=retries.max(1) {
-        match run_git_with_timeout(repo, &["push", remote_name, "HEAD"], timeout_secs, &format!("push-to-{}", remote_name)).await {
+        match run_git_with_timeout_env(repo, &["push", remote_name, "HEAD"], timeout_secs, &format!("push-to-{}", remote_name), &[("GIT_TERMINAL_PROMPT", "0")]).await {
             Ok(()) => return Ok(()),
             Err(e) => {
                 let is_rejected = e.to_string().contains("non-fast-forward")
@@ -1363,11 +1401,12 @@ pub(crate) async fn push_to_named_remote(
                 if is_rejected && force_when_behind {
                     match diagnose_divergence(repo, remote_name, &branch).await {
                         Ok(Divergence::RemotePurelyBehind) => {
-                            let force_result = run_git_with_timeout(
+                            let force_result = run_git_with_timeout_env(
                                 repo,
                                 &["push", "--force-with-lease", remote_name, &format!("HEAD:refs/heads/{}", branch)],
                                 timeout_secs,
                                 &format!("force-push-to-{}", remote_name),
+                                &[("GIT_TERMINAL_PROMPT", "0")],
                             ).await;
                             if force_result.is_ok() {
                                 return Ok(());
