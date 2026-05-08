@@ -305,7 +305,9 @@ pub(crate) async fn sync_repo(
                 // SAFETY: If ALL files in the index are missing, this is likely a mistake
                 // or destructive operation. Do NOT stage mass deletions without warning.
                 // Use --force on sync-now to bypass this guard for intentional deletions.
-                if !force_deletion {
+                if force_deletion {
+                    eprintln!("⚠️ --force: bypassing mass-deletion safety guard for {} ({} files)", repo.display(), missing.len());
+                } else {
                     // Get total tracked files count
                     let total_tracked: usize = std::process::Command::new("git")
                         .args(["ls-files"])
