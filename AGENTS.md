@@ -512,7 +512,7 @@ let _guard = EnvRestorer::remove("VAR_NAME");
 
 ### dracon-sync
 
-**351 tests** in `src/` (git.rs, sync.rs, report.rs, policy.rs, main.rs). Tests use `tempfile::TempDir` for isolation.
+**354 tests** in `src/` (git.rs, sync.rs, report.rs, policy.rs, main.rs). Tests use `tempfile::TempDir` for isolation.
 
 ```bash
 export DRACON_SYNC_GIT_BIN=/run/current-system/sw/bin/git
