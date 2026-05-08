@@ -1915,7 +1915,7 @@ mod tests {
     use super::*;
     use dracon_git::types::{DiffFile, FileStatus, RepoStatus};
     use std::os::unix::fs::PermissionsExt;
-    use crate::test_helpers::{EnvRestorer, test_git_cmd};
+    use crate::test_helpers::EnvRestorer;
 
     fn make_status(is_clean: bool, ahead: usize, behind: usize) -> RepoStatus {
         RepoStatus {
