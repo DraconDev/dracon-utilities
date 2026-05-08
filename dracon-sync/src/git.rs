@@ -423,17 +423,6 @@ pub(crate) fn codeberg_https_url(origin: &str) -> Option<String> {
     None
 }
 
-/// Get the PAT-injected HTTPS URL for use with git push.
-/// Uses `oauth2` as the username and PAT as the password, which is the
-/// standard format for GitLab personal access tokens over HTTPS.
-fn inject_pat_into_url(https_url: &str, pat: &str) -> String {
-    if let Some(rest) = https_url.strip_prefix("https://") {
-        format!("https://oauth2:{}@{}", pat, rest)
-    } else {
-        https_url.to_string()
-    }
-}
-
 pub(crate) async fn push_with_transport_fallbacks(
     repo: &Path,
     timeout_secs: u64,
