@@ -346,6 +346,7 @@ pub(crate) async fn sync_repo(
                     // Do NOT stage the deletions - let the user decide
                     return Ok(true);
                 }
+                }
 
                 let mut rm_args = vec!["rm", "--ignore-unmatch", "--"];
                 for p in &missing {
