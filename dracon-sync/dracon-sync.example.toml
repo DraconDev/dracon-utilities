@@ -13,6 +13,15 @@ interval_secs = 30
 # Auto-commit uncommitted changes
 auto_commit = true
 
+# SAFETY: Mass-deletion prevention
+# If more than 50% of tracked files are missing from the working tree,
+# dracon-sync will refuse to auto-commit the deletions. This guards
+# against accidental mass deletion from filesystem issues, filter
+# misconfigurations, or destructive operations.
+#
+# When triggered, sync prints a warning and skips the commit.
+# To bypass manually: git add -A && git commit -m 'delete files'
+
 # Auto-pull remote changes before pushing
 auto_pull = true
 
