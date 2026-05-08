@@ -523,7 +523,7 @@ pub(crate) async fn push_with_retries(
     let mut last_err: Option<anyhow::Error> = None;
     let mut timeout_seen = false;
     for attempt in 1..=attempts {
-        match run_git_with_timeout(repo, &["push", "origin", "HEAD"], timeout_secs, op_label).await
+        match run_git_with_timeout_env(repo, &["push", "origin", "HEAD"], timeout_secs, op_label, &[("GIT_TERMINAL_PROMPT", "0")]).await
         {
             Ok(()) => return Ok(()),
             Err(e) => {
