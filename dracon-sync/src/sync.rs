@@ -304,11 +304,11 @@ pub(crate) async fn sync_repo(
                 // or destructive operation. Do NOT stage mass deletions without warning.
                 // Get total tracked files count
                 let total_tracked: usize = std::process::Command::new("git")
-                    .args(["ls-files", "--count"])
+                    .args(["ls-files"])
                     .current_dir(repo)
                     .output()
                     .ok()
-                    .and_then(|o| String::from_utf8_lossy(&o.stdout).trim().parse().ok())
+                    .map(|o| String::from_utf8_lossy(&o.stdout).lines().count())
                     .unwrap_or(0);
 
                 let missing_count = missing.len();
