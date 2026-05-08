@@ -328,16 +328,16 @@ pub(crate) async fn sync_repo(
                     if let Some(path) = policy_path {
                         append_incident_record(
                             path,
-                            &IncidentRecord {
-                                ts_unix: crate::policy::timestamp_secs(),
-                                scope: "safety".to_string(),
-                                repo: repo.display().to_string(),
-                                reason: reason.clone(),
-                                action: "mass_deletion_guard".to_string(),
-                                backup_branch: None,
-                                result: "blocked".to_string(),
-                                details: Some(format!("total_tracked={} missing_count={}", total_tracked, missing_count)),
-                            },
+                            &IncidentRecord::new(
+                                crate::policy::timestamp_secs(),
+                                "safety",
+                                repo.display().to_string(),
+                                reason.clone(),
+                                "mass_deletion_guard",
+                                None,
+                                "blocked",
+                                Some(format!("total_tracked={} missing_count={}", total_tracked, missing_count)),
+                            ),
                         );
                     }
                     // Do NOT stage the deletions - let the user decide
