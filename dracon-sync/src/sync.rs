@@ -320,9 +320,26 @@ pub(crate) async fn sync_repo(
 
                 if is_total_wipe || is_mass_deletion {
                     let pct = (missing_count * 100) / total_tracked;
-                    eprintln!("⚠️ SAFETY: {} files missing from working tree ({}% of {} tracked)", missing_count, pct, total_tracked);
+                    let reason = format!("{} files missing from working tree ({}% of {} tracked)", missing_count, pct, total_tracked);
+                    eprintln!("⚠️ SAFETY: {}", reason);
                     eprintln!("⚠️ Refusing to stage mass deletion - this looks like a mistake or destructive operation");
                     eprintln!("⚠️ If you really want to delete these files, do: git add -A && git commit -m 'delete files'");
+                    // Log incident for audit trail
+                    if let Some(path) = policy_path {
+                        append_incident_record(
+                            path,
+                            &IncidentRecord {
+                                ts_unix: crate::policy::timestamp_secs(),
+                                scope: "safety".to_string(),
+                                repo: repo.display().to_string(),
+                                reason: reason.clone(),
+                                action: "mass_deletion_guard".to_string(),
+                                backup_branch: None,
+                                result: "blocked".to_string(),
+                                details: Some(format!("total_tracked={} missing_count={}", total_tracked, missing_count)),
+                            },
+                        );
+                    }
                     // Do NOT stage the deletions - let the user decide
                     return Ok(true);
                 }
