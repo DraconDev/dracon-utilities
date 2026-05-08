@@ -440,36 +440,75 @@ pub(crate) async fn push_with_transport_fallbacks(
     op_label: &str,
 ) -> Result<()> {
     let ssh_hardening = crate::git::GIT_SSH_HARDENING;
+    let no_prompt = &[("GIT_TERMINAL_PROMPT", "0")];
     match run_git_with_timeout_env(
         repo,
         &["push", "origin", "HEAD"],
         timeout_secs,
         &format!("{op_label}-ssh-hardened"),
-        &[("GIT_SSH_COMMAND", ssh_hardening)],
+        &[("GIT_SSH_COMMAND", ssh_hardening), ("GIT_TERMINAL_PROMPT", "0")],
     )
     .await
     {
         Ok(()) => Ok(()),
         Err(e) => {
             let origin = origin_url(repo).unwrap_or_default();
+            let branch = current_branch(repo).unwrap_or_else(|| "main".to_string());
+            if !is_safe_branch_name(&branch) {
+                eprintln!("⚠️ branch name '{}' is unsafe, skipping https fallback", branch);
+                return Err(e);
+            }
+            let refspec = format!("HEAD:refs/heads/{branch}");
+
+            // Try GitHub HTTPS (no PAT needed for public repos)
             if let Some(https) = github_https_url(&origin) {
-                let branch = current_branch(repo).unwrap_or_else(|| "main".to_string());
-                if !is_safe_branch_name(&branch) {
-                    eprintln!("⚠️ branch name '{}' is unsafe, skipping https fallback", branch);
-                    return Err(e);
-                }
-                let refspec = format!("HEAD:refs/heads/{branch}");
-                run_git_with_timeout(
+                let result = run_git_with_timeout_env(
                     repo,
                     &["push", &https, &refspec],
                     timeout_secs,
-                    &format!("{op_label}-https-fallback"),
-                )
-                .await
-                .with_context(|| format!("ssh fallback failed first: {}", e))
-            } else {
-                Err(e)
+                    &format!("{op_label}-github-https"),
+                    no_prompt,
+                ).await;
+                if result.is_ok() {
+                    return Ok(());
+                }
             }
+
+            // Try GitLab HTTPS with PAT
+            if let Some(https) = gitlab_https_url(&origin) {
+                if let Some(token) = load_secret("GITLAB_TOKEN") {
+                    let pat_url = format!("https://oauth2:{}@{}", token, https.strip_prefix("https://").unwrap_or(&https));
+                    let result = run_git_with_timeout_env(
+                        repo,
+                        &["push", &pat_url, &refspec],
+                        timeout_secs,
+                        &format!("{op_label}-gitlab-https"),
+                        no_prompt,
+                    ).await;
+                    if result.is_ok() {
+                        return Ok(());
+                    }
+                }
+            }
+
+            // Try Codeberg HTTPS with PAT
+            if let Some(https) = codeberg_https_url(&origin) {
+                if let Some(token) = load_secret("CODEBERG_TOKEN") {
+                    let pat_url = format!("https://git:{}@{}", token, https.strip_prefix("https://").unwrap_or(&https));
+                    let result = run_git_with_timeout_env(
+                        repo,
+                        &["push", &pat_url, &refspec],
+                        timeout_secs,
+                        &format!("{op_label}-codeberg-https"),
+                        no_prompt,
+                    ).await;
+                    if result.is_ok() {
+                        return Ok(());
+                    }
+                }
+            }
+
+            Err(e)
         }
     }
 }
