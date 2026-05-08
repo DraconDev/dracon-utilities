@@ -317,6 +317,19 @@ Commands:
 
 **Global flags:** `-v` / `-vv` increase verbosity; `-V` prints version.
 
+### Safety Behaviors
+
+**dracon-sync mass-deletion prevention:** The sync daemon will refuse to auto-commit deletions that remove more than 50% of tracked files in a repository. This guards against accidental mass deletion caused by filesystem issues, filter misconfigurations, or destructive operations.
+
+When triggered, sync prints a warning and skips the commit:
+```
+⚠️ SAFETY: 30 files missing from working tree (65% of 46 tracked)
+⚠️ Refusing to stage mass deletion - this looks like a mistake or destructive operation
+⚠️ If you really want to delete these files, do: git add -A && git commit -m 'delete files'
+```
+
+To bypass: manually stage and commit the deletions with `git add -A && git commit`.
+
 ### dracon-system
 
 ```
