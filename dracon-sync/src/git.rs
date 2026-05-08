@@ -397,6 +397,43 @@ pub(crate) fn github_https_url(origin: &str) -> Option<String> {
     None
 }
 
+pub(crate) fn gitlab_https_url(origin: &str) -> Option<String> {
+    if let Some(rest) = origin.strip_prefix("git@gitlab.com:") {
+        return Some(format!("https://gitlab.com/{}", rest));
+    }
+    if let Some(rest) = origin.strip_prefix("ssh://git@gitlab.com/") {
+        return Some(format!("https://gitlab.com/{}", rest));
+    }
+    if origin.starts_with("https://gitlab.com/") {
+        return Some(strip_url_credentials(origin));
+    }
+    None
+}
+
+pub(crate) fn codeberg_https_url(origin: &str) -> Option<String> {
+    if let Some(rest) = origin.strip_prefix("git@codeberg.org:") {
+        return Some(format!("https://codeberg.org/{}", rest));
+    }
+    if let Some(rest) = origin.strip_prefix("ssh://git@codeberg.org/") {
+        return Some(format!("https://codeberg.org/{}", rest));
+    }
+    if origin.starts_with("https://codeberg.org/") {
+        return Some(strip_url_credentials(origin));
+    }
+    None
+}
+
+/// Get the PAT-injected HTTPS URL for use with git push.
+/// Uses `oauth2` as the username and PAT as the password, which is the
+/// standard format for GitLab personal access tokens over HTTPS.
+fn inject_pat_into_url(https_url: &str, pat: &str) -> String {
+    if let Some(rest) = https_url.strip_prefix("https://") {
+        format!("https://oauth2:{}@{}", pat, rest)
+    } else {
+        https_url.to_string()
+    }
+}
+
 pub(crate) async fn push_with_transport_fallbacks(
     repo: &Path,
     timeout_secs: u64,
