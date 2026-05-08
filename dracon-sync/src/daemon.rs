@@ -303,7 +303,7 @@ pub(crate) async fn run_once(policy_path: &Path) -> Result<()> {
     for repo in repos {
         match tokio::time::timeout(
             Duration::from_secs(policy.repo_sync_timeout_secs),
-            sync_repo(&repo, &policy, &excluded_dir_names, 0, None, false, Some(policy_path)),
+            sync_repo(&repo, &policy, &excluded_dir_names, 0, None, false, Some(policy_path), false),
         )
         .await
         {
@@ -633,6 +633,7 @@ pub(crate) async fn run_daemon(policy_path: PathBuf, override_interval_secs: Opt
                     Some(&mut entry.remote_failures),
                     false,
                     Some(&policy_path),
+                    false,
                 ),
             )
             .await
