@@ -437,6 +437,11 @@ git clone https://github.com/DraconDev/dracon-libs.git ../dracon-libs
    dracon-sync validate-config
    ```
 
+3. Check the incident ledger for blocked operations:
+   ```bash
+   cat ~/.local/state/dracon/dracon-sync-incidents.jsonl | tail -5
+   ```
+
 ### Disk cleanup not running
 
 ```bash
