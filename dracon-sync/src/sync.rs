@@ -1878,21 +1878,25 @@ auto_bump_versions = false
 
     /// Comprehensive boundary test for the mass-deletion safety guard.
     /// Covers the full matrix of (tracked_files, deleted_files) combinations
-    /// to verify the guard's >50% and 100% thresholds.
+    /// to verify the guard's >50% and 100% thresholds, and the atomic counter.
     #[tokio::test]
     async fn test_safety_guard_boundaries() {
-        // Helper: run sync_repo on a repo with the given tracked/deleted setup
-        async fn run_deletion_scenario(repo: &Path, tracked_files: &[&str], delete_files: &[&str], expect_blocked: bool) {
-            // Create repo with initial commit
+        async fn check_scenario(tmp: &tempfile::TempDir, name: &str, total: usize, delete_count: usize, expect_blocked: bool) {
             let before = crate::sync::MASS_DELETION_GUARD_BLOCKED.load(std::sync::atomic::Ordering::Relaxed);
+            let repo = init_test_repo(tmp, name);
 
-            for f in tracked_files {
+            // Create tracked files
+            let file_names: Vec<String> = (0..total).map(|i| format!("f{}.txt", i)).collect();
+            let file_refs: Vec<&str> = file_names.iter().map(|s| s.as_str()).collect();
+            for f in &file_names {
                 std::fs::write(repo.join(f), "content\n").unwrap();
             }
-            git_cmd(repo, &["add", "-A"]);
-            git_cmd(repo, &["commit", "-m", "setup"]);
+            git_cmd(&repo, &["add", "-A"]);
+            git_cmd(&repo, &["commit", "-m", "setup"]);
 
-            for f in delete_files {
+            // Delete files
+            let to_delete: Vec<&String> = file_names.iter().take(delete_count).collect();
+            for f in &to_delete {
                 std::fs::remove_file(repo.join(f)).unwrap();
             }
 
@@ -1904,67 +1908,57 @@ auto_bump_versions = false
         auto_bump_versions = false
         "#;
             let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
-            let result = sync_repo(repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
-            assert!(result.is_ok(), "sync_repo should succeed for {} tracked, {} deleted", tracked_files.len(), delete_files.len());
+            let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
+            assert!(result.is_ok(), "sync_repo should succeed for {} tracked, {} deleted", total, delete_count);
 
+            let pct = if total > 0 { (delete_count * 100) / total } else { 0 };
             if expect_blocked {
-                assert!(result.unwrap(), "guard should block (return true without commit) for {} tracked, {} deleted", tracked_files.len(), delete_files.len());
+                assert!(result.unwrap(), "guard should block {}% deletion ({} of {})", pct, delete_count, total);
                 // Verify deleted files are still tracked
-                let output = git_cmd(repo, &["ls-files"]);
+                let output = git_cmd(&repo, &["ls-files"]);
                 let tracked = String::from_utf8_lossy(&output.stdout);
-                for f in delete_files {
-                    assert!(tracked.contains(f), "{} should still be tracked after guard block", f);
+                for f in &to_delete {
+                    assert!(tracked.contains(f.as_str()), "{} should still be tracked after guard block ({}% deletion)", f, pct);
                 }
                 let after = crate::sync::MASS_DELETION_GUARD_BLOCKED.load(std::sync::atomic::Ordering::Relaxed);
-                assert_eq!(after, before + 1, "guard blocked counter should increment");
+                assert_eq!(after, before + 1, "guard blocked counter should increment for {}% deletion ({} of {})", pct, delete_count, total);
             } else {
-                assert!(result.unwrap(), "deletion should be committed for {} tracked, {} deleted", tracked_files.len(), delete_files.len());
+                assert!(result.unwrap(), "deletion should be committed for {}% ({} of {})", pct, delete_count, total);
                 // Verify deleted files are removed
-                let output = git_cmd(repo, &["ls-files"]);
+                let output = git_cmd(&repo, &["ls-files"]);
                 let tracked = String::from_utf8_lossy(&output.stdout);
-                for f in delete_files {
-                    assert!(!tracked.contains(f), "{} should be removed from index after commit", f);
+                for f in &to_delete {
+                    assert!(!tracked.contains(f.as_str()), "{} should be removed after commit ({}% deletion)", f, pct);
                 }
-                // Counter should NOT increment for allowed deletions
                 let after = crate::sync::MASS_DELETION_GUARD_BLOCKED.load(std::sync::atomic::Ordering::Relaxed);
-                assert_eq!(after, before, "guard blocked counter should NOT increment for allowed deletion");
+                assert_eq!(after, before, "guard blocked counter should NOT increment for allowed {}% deletion", pct);
             }
-
-            // Reset for next scenario: remove repo contents
-            for f in tracked_files {
-                let _ = std::fs::remove_file(repo.join(f));
-            }
-            git_cmd(repo, &["rm", "--cached", "-r", "--ignore-unmatch", "."]);
-            git_cmd(repo, &["commit", "--allow-empty", "-m", "reset"]);
         }
 
-        // ── Scenarios ──
-        // Empty repo: 0 tracked, 0 deleted
         let tmp = tempfile::tempdir().unwrap();
-        let repo = init_test_repo(&tmp, "boundary-del-repo");
 
         // 0 of 3 deleted (0%) — ALLOWED
-        run_deletion_scenario(&repo, &["a.txt", "b.txt", "c.txt"], &[], false).await;
+        check_scenario(&tmp, "boundary-0pct", 3, 0, false).await;
 
         // 1 of 3 deleted (33%) — ALLOWED
-        run_deletion_scenario(&repo, &["a.txt", "b.txt", "c.txt"], &["a.txt"], false).await;
+        check_scenario(&tmp, "boundary-33pct", 3, 1, false).await;
 
         // 1 of 2 deleted (50%) — ALLOWED (at threshold, >50% not >=50%)
-        run_deletion_scenario(&repo, &["a.txt", "b.txt"], &["a.txt"], false).await;
+        check_scenario(&tmp, "boundary-50pct", 2, 1, false).await;
 
         // 2 of 3 deleted (66%) — BLOCKED
-        run_deletion_scenario(&repo, &["a.txt", "b.txt", "c.txt"], &["a.txt", "b.txt"], true).await;
+        check_scenario(&tmp, "boundary-66pct", 3, 2, true).await;
 
         // 3 of 3 deleted (100%) — BLOCKED (total wipe)
-        run_deletion_scenario(&repo, &["a.txt", "b.txt", "c.txt"], &["a.txt", "b.txt", "c.txt"], true).await;
+        check_scenario(&tmp, "boundary-100pct", 3, 3, true).await;
 
         // 2 of 5 deleted (40%) — ALLOWED
-        run_deletion_scenario(&repo, &["a.txt", "b.txt", "c.txt", "d.txt", "e.txt"], &["a.txt", "b.txt"], false).await;
+        check_scenario(&tmp, "boundary-40pct", 5, 2, false).await;
 
         // 3 of 5 deleted (60%) — BLOCKED
-        run_deletion_scenario(&repo, &["a.txt", "b.txt", "c.txt", "d.txt", "e.txt"], &["a.txt", "b.txt", "c.txt"], true).await;
+        check_scenario(&tmp, "boundary-60pct", 5, 3, true).await;
 
-        // 1 of 1 deleted (100%) — BLOCKED (single file, but still 100%)
-        run_deletion_scenario(&repo, &["a.txt"], &["a.txt"], true).await;
+        // 1 of 1 deleted (100%) — BLOCKED (single file is still 100%)
+        check_scenario(&tmp, "boundary-single-100pct", 1, 1, true).await;
     }
 }
