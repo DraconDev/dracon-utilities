@@ -92,17 +92,12 @@ dracon-warden status    # Shows watch roots
 ### Essential Commands
 
 ```bash
-# Check what repos are being watched
-dracon-sync status
-
-# Pause sync (creates freeze marker)
-dracon-sync pause
-
-# Resume sync
-dracon-sync resume
-
 # Run one sync pass manually
 dracon-sync once
+
+# Sync a specific repo immediately (with --force to bypass safety checks)
+dracon-sync sync-now /path/to/repo
+dracon-sync sync-now --force /path/to/repo  # Bypass mass-deletion guard
 
 # Check daemon health
 dracon-sync health
