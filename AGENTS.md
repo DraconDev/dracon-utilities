@@ -351,6 +351,12 @@ When triggered, sync prints a warning and skips the commit:
 
 To bypass: manually stage and commit the deletions with `git add -A && git commit`.
 
+**Metrics:** A Prometheus counter `dracon_sync_mass_deletion_guard_blocked_total` is incremented each time the guard triggers. View it with `dracon-sync metrics`.
+
+**Force bypass:** For intentional mass deletions, use `dracon-sync sync-now --force <repo>` to skip the safety guard entirely. Use with caution — this will auto-commit ALL deletions without prompting.
+
+**Incident response after a block:** Read the incident ledger at `~/.local/state/dracon/dracon-sync-incidents.jsonl` to understand what was blocked and why.
+
 ### dracon-system
 
 ```
