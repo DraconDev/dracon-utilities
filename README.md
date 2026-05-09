@@ -181,6 +181,16 @@ push_url = "git@codeberg.org:DraconDev/{repo}.git"
 auto_create = false  # Codeberg doesn't support push-to-create
 ```
 
+**PAT-based HTTPS fallback:** If SSH authentication fails, dracon-sync automatically falls back to HTTPS using Personal Access Tokens (PATs). Store your tokens in `~/.dracon/utilities/sync/secrets/`:
+
+```bash
+# GitLab PAT (for HTTPS fallback when SSH fails)
+echo "GITLAB_TOKEN=glpat-xxxxxxxxxxxxxxxxxxxx" > ~/.dracon/utilities/sync/secrets/gitlab.env
+
+# Codeberg PAT (for HTTPS fallback when SSH fails)  
+echo "CODEBERG_TOKEN=cbp_xxxxxxxxxxxxxxxxxxxx" > ~/.dracon/utilities/sync/secrets/codeberg.env
+```
+
 ### AI Commit Messages
 
 To enable AI-generated commit messages, create `~/.dracon/utilities/sync/ai.toml`:
