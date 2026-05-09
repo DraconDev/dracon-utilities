@@ -8,7 +8,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **dracon-system**: Auto-kill policy for runaway git processes
+- **dracon-sync**: `sync-now --force` flag for intentional mass deletions
+  - Bypasses the mass-deletion safety guard completely
+  - Use with caution — commits ALL deletions without prompting
+- **dracon-sync**: `MASS_DELETION_GUARD_BLOCKED` Prometheus counter
+  - Counter `dracon_sync_mass_deletion_guard_blocked_total` incremented on each guard trigger
+  - View with `dracon-sync metrics`
+- **dracon-sync**: HTTPS+PAT fallback for GitLab and Codeberg pushes
+  - `gitlab_https_url()` and `codeberg_https_url()` functions convert SSH URLs to HTTPS
+  - `GITLAB_TOKEN` and `CODEBERG_TOKEN` used for authentication over HTTPS
+  - Applied to both `push_to_named_remote` and `push_with_transport_fallbacks`
+- **dracon-sync**: `GIT_TERMINAL_PROMPT=0` set on all git push commands
+  - Prevents interactive SSH login prompts in daemon, CLI, and tests
+- **dracon-sync**: Repo discovery optimization
+  - `discover_git_repos_recursive` now skips descending into subdirectories of already-discovered repos
+- **dracon-sync**: Enhanced mass-deletion guard boundary tests
+  - `test_safety_guard_boundaries` with 8 scenarios (0%, 33%, 50%, 66%, 100%, 40%, 60%, single-100%)
+  - Verifies both guard behavior and atomic counter increment
   - `auto_kill_git` config option (disabled by default)
   - `git_kill_threshold_secs` config option (default: 60s)
   - `kill_process()` function with SIGTERM → SIGKILL escalation
