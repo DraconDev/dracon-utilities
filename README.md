@@ -128,6 +128,31 @@ dracon-sync repair-concerns
 dracon-sync repair-concerns --apply
 ```
 
+### Safety: Mass-Deletion Prevention
+
+`dracon-sync` refuses to auto-commit deletions that remove more than 50% of tracked files. This guards against accidental mass deletion caused by filesystem issues, filter misconfigurations, or destructive operations.
+
+When triggered, you'll see:
+```
+⚠️ SAFETY: 30 files missing from working tree (65% of 46 tracked)
+⚠️ Refusing to stage mass deletion - this looks like a mistake or destructive operation
+```
+
+**To bypass manually:** Stage and commit the deletions yourself:
+```bash
+git add -A && git commit -m 'delete files'
+```
+
+**To bypass with force:** Use `--force` on `sync-now`:
+```bash
+dracon-sync sync-now --force /path/to/repo
+```
+
+**Metrics:** The counter `dracon_sync_mass_deletion_guard_blocked_total` tracks how many times the guard has triggered. View it with:
+```bash
+dracon-sync metrics
+```
+
 ### Configuration
 
 **Path:** `~/.dracon/utilities/sync/dracon-sync.toml`
