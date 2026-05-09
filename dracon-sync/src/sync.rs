@@ -1922,6 +1922,11 @@ auto_bump_versions = false
                 }
                 let after = crate::sync::MASS_DELETION_GUARD_BLOCKED.load(std::sync::atomic::Ordering::Relaxed);
                 assert_eq!(after, before + 1, "guard blocked counter should increment for {}% deletion ({} of {})", pct, delete_count, total);
+            } else if delete_count == 0 {
+                // No deletions at all → sync_repo returns false (nothing to do)
+                assert!(!result.unwrap(), "no changes should return false for {}% deletion ({} of {})", pct, delete_count, total);
+                let after = crate::sync::MASS_DELETION_GUARD_BLOCKED.load(std::sync::atomic::Ordering::Relaxed);
+                assert_eq!(after, before, "guard blocked counter should not increment");
             } else {
                 assert!(result.unwrap(), "deletion should be committed for {}% ({} of {})", pct, delete_count, total);
                 // Verify deleted files are removed
