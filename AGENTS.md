@@ -318,7 +318,7 @@ Commands:
   repair-warns     Repair warn repos (dirty-only triage; dry-run by default)
   once             Run one sync pass
   daemon           Run continuous sync loop [--interval-secs override]
-  sync-now         Sync one or more repositories now [--dry-run] [repos...]
+  sync-now         Sync one or more repositories now [--dry-run] [--force] [repos...]
   pause            Pause sync (creates freeze marker)
   resume           Resume sync (removes freeze marker)
   edit-config      Open sync policy in the system editor
