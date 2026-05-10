@@ -146,6 +146,10 @@ auto_commit = true
 auto_pull = true
 auto_push = true
 
+# Alert threshold: warn if repo has more than N unpushed commits
+# (should rarely trigger with auto_push enabled)
+alert_unpushed_threshold = 10
+
 # Automatically create GitHub repos for new projects
 auto_github_private = true
 auto_github_private_account = "DraconDev"
@@ -443,12 +447,23 @@ Check the guard log:
 cat ~/.local/state/dracon/dracon-system-guard.log | grep git
 ```
 
-Enable auto-kill if needed:
-```toml
-# ~/.dracon/utilities/system/dracon-system.toml
-[guard]
-auto_kill_git = true
-git_kill_threshold_secs = 60
+### Unpushed commits alert
+
+If you see:
+```
+🚨 ALERT: /path/to/repo has 15 unpushed commits (threshold: 10)
+```
+
+This means auto-push is failing. Check:
+```bash
+# Check if repo is stuck
+dracon-sync stuck list
+
+# Check push errors
+cd /path/to/repo && git push origin HEAD
+
+# View recent incidents
+cat ~/.local/state/dracon/dracon-sync-incidents.jsonl | tail -5
 ```
 
 ### Service won't start
