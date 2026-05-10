@@ -339,6 +339,10 @@ fn default_github_account() -> String {
     "DraconDev".to_string()
 }
 
+fn default_alert_unpushed_threshold() -> usize {
+    10
+}
+
 impl SyncPolicy {
     pub(crate) fn load(path: &Path) -> Result<Self> {
         let content = std::fs::read_to_string(path)
