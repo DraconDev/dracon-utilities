@@ -572,7 +572,10 @@ pub(crate) async fn sync_repo(
                         repo.display(),
                         post_commit_status.behind
                     );
-                    match svc.pull().await {
+                    match tokio::time::timeout(
+                        Duration::from_secs(policy.pull_op_timeout_secs),
+                        svc.pull_merge(),
+                    ).await {
                         Ok(()) => {
                             eprintln!("✅ post-commit pull succeeded for {}", repo.display());
                         }
