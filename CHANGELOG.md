@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **dracon-sync**: Enhanced mass-deletion guard boundary tests
   - `test_safety_guard_boundaries` with 8 scenarios (0%, 33%, 50%, 66%, 100%, 40%, 60%, single-100%)
   - Verifies both guard behavior and atomic counter increment
+  - Property-based test (`test_safety_guard_property`) using proptest to fuzz deletion percentages
 - **dracon-system**: Auto-kill policy for runaway git processes
   - `auto_kill_git` config option (disabled by default)
   - `git_kill_threshold_secs` config option (default: 60s)
