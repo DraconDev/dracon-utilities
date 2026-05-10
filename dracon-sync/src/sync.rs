@@ -597,13 +597,12 @@ pub(crate) async fn sync_repo(
 
             // ALERT: Check for excessive unpushed commits
             let alert_status = svc.get_status().await?;
-            const ALERT_THRESHOLD: usize = 10;
-            if alert_status.ahead > ALERT_THRESHOLD {
+            if alert_status.ahead > policy.alert_unpushed_threshold {
                 eprintln!(
                     "🚨 ALERT: {} has {} unpushed commits (threshold: {}). Something may be wrong with push.",
                     repo.display(),
                     alert_status.ahead,
-                    ALERT_THRESHOLD
+                    policy.alert_unpushed_threshold
                 );
             }
 
