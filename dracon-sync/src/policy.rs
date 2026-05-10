@@ -233,6 +233,8 @@ pub(crate) struct SyncPolicy {
     pub(crate) incident_ledger_max_age_days: u64,
     #[serde(default)]
     pub(crate) webhook_url: Option<String>,
+    #[serde(default = "default_alert_unpushed_threshold")]
+    pub(crate) alert_unpushed_threshold: usize,
 }
 
 #[derive(Debug, Deserialize, Default, Clone)]
