@@ -576,17 +576,20 @@ pub(crate) async fn sync_repo(
                         Duration::from_secs(policy.pull_op_timeout_secs),
                         svc.pull_merge(),
                     ).await {
-                        Ok(()) => {
+                        Ok(Ok(())) => {
                             eprintln!("✅ post-commit pull succeeded for {}", repo.display());
                         }
-                        Err(e) => {
-                            let err_text = format!("{}", e);
-                            if err_text.contains("CONFLICT") || err_text.contains("conflict") {
-                                eprintln!("⚠️ post-commit pull conflict in {}: {}", repo.display(), e);
-                                return Ok(false);
-                            }
-                            eprintln!("⚠️ post-commit pull failed for {}: {}", repo.display(), e);
+                        Ok(Err(dracon_git::error::GitError::MergeConflict)) => {
+                            eprintln!("⚠️ post-commit pull conflict in {} (manual intervention required)", repo.display());
+                            return Ok(false);
+                        }
+                        Ok(Err(e)) => {
+                            eprintln!("⚠️ post-commit pull failed for {}: {} - will still attempt push", repo.display(), e);
                             // Don't block push on pull failure; let push attempt handle it
+                        }
+                        Err(_) => {
+                            eprintln!("⚠️ post-commit pull timeout for {} after {}s - will still attempt push", repo.display(), policy.pull_op_timeout_secs);
+                            // Don't block push on pull timeout; let push attempt handle it
                         }
                     }
                 }
