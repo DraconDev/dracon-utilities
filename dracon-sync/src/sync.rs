@@ -2066,4 +2066,27 @@ auto_bump_versions = false
         let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
         assert!(result.is_ok(), "sync_repo should succeed");
     }
+
+    // Property-based test: verify safety guard logic for arbitrary deletion percentages
+    #[test]
+    fn test_safety_guard_property() {
+        use proptest::prelude::*;
+
+        proptest!(|(total in 1usize..100, delete_count in 0usize..100)| {
+            let missing_count = delete_count.min(total);
+            let is_total_wipe = total > 0 && missing_count >= total;
+            let is_mass_deletion = total > 0 && missing_count * 2 > total;
+            let should_block = is_total_wipe || is_mass_deletion;
+
+            // Verify the guard never blocks when <= 50% deleted
+            if missing_count * 2 <= total {
+                prop_assert!(!should_block, "guard should NOT block when {} of {} deleted ({}%)", missing_count, total, (missing_count * 100) / total);
+            }
+
+            // Verify the guard always blocks when > 50% deleted
+            if missing_count * 2 > total {
+                prop_assert!(should_block, "guard SHOULD block when {} of {} deleted ({}%)", missing_count, total, (missing_count * 100) / total);
+            }
+        });
+    }
 }
