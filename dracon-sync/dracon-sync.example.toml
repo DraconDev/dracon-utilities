@@ -35,6 +35,11 @@ auto_github_private_account = "DraconDev"
 # Push retries before giving up
 push_retries = 3
 
+# Alert threshold: warn if repo has more than N unpushed commits
+# This should rarely trigger with auto_push enabled — if it does,
+# something is wrong (repo stuck, push failing, etc.)
+alert_unpushed_threshold = 10
+
 # Repos to exclude from sync
 # exclude_repos = ["/home/dracon/Dev/temp"]
 
