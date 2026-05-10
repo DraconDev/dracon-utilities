@@ -104,28 +104,9 @@ dracon-sync health
 
 # View metrics
 dracon-sync metrics
-```
 
-### When Things Go Wrong
-
-```bash
-# List repos that are stuck (can't push)
-dracon-sync stuck list
-
-# Fix a stuck repo
-dracon-sync stuck unstuck /path/to/repo
-
-# List repos with both main and master branches
-dracon-sync dual-branch list
-
-# Consolidate dual branches to master
-dracon-sync dual-branch repair /path/to/repo
-
-# Run repair pass (dry-run by default)
-dracon-sync repair-concerns
-
-# Actually apply repairs
-dracon-sync repair-concerns --apply
+# Check for repos with too many unpushed commits
+dracon-sync metrics | grep unpushed
 ```
 
 ### Safety: Mass-Deletion Prevention
