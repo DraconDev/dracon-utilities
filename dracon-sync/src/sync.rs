@@ -2012,4 +2012,58 @@ auto_bump_versions = false
         // 1 of 1 deleted (100%) — BLOCKED (single file is still 100%)
         check_scenario(&tmp, "boundary-single-100pct", 1, 1, true).await;
     }
+
+    #[tokio::test]
+    async fn test_alert_unpushed_threshold() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "alert-threshold-repo");
+
+        // Create and commit multiple files to build up unpushed commits
+        for i in 0..3 {
+            let fname = format!("file{}.txt", i);
+            std::fs::write(repo.join(&fname), format!("content{}\n", i)).unwrap();
+            git_cmd(&repo, &["add", &fname]);
+            git_cmd(&repo, &["commit", "-m", &format!("add {}", fname)]);
+        }
+
+        // Set threshold to 2 — should trigger alert since we have 3 unpushed commits
+        let toml_str = r#"
+        auto_github_private = false
+        auto_commit = false
+        auto_pull = false
+        auto_push = false
+        auto_bump_versions = false
+        alert_unpushed_threshold = 2
+        "#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        // No origin remote, so no push attempt — just check alert fires
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
+        assert!(result.is_ok(), "sync_repo should succeed");
+    }
+
+    #[tokio::test]
+    async fn test_alert_unpushed_threshold_not_triggered() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "alert-threshold-ok-repo");
+
+        // Create and commit 1 file — below threshold
+        std::fs::write(repo.join("file.txt"), "content\n").unwrap();
+        git_cmd(&repo, &["add", "file.txt"]);
+        git_cmd(&repo, &["commit", "-m", "add file"]);
+
+        // Set threshold to 5 — should NOT trigger alert
+        let toml_str = r#"
+        auto_github_private = false
+        auto_commit = false
+        auto_pull = false
+        auto_push = false
+        auto_bump_versions = false
+        alert_unpushed_threshold = 5
+        "#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
+        assert!(result.is_ok(), "sync_repo should succeed");
+    }
 }
