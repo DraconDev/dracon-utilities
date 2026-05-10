@@ -560,6 +560,47 @@ pub(crate) async fn sync_repo(
             // If someone or something created the non-canonical branch, delete it.
             prune_other_default_branch(repo).await;
 
+            // CRITICAL FIX: After committing, check if we're behind upstream.
+            // If dirty+both-behind at cycle start, we skipped the initial pull.
+            // Now that we're clean (committed), pull before pushing to avoid
+            // creating a diverged state that fails push and gets marked stuck.
+            if policy.auto_pull {
+                let post_commit_status = svc.get_status().await?;
+                if post_commit_status.behind > 0 && post_commit_status.is_clean {
+                    eprintln!(
+                        "📥 post-commit pull for {} ({} behind)",
+                        repo.display(),
+                        post_commit_status.behind
+                    );
+                    match svc.pull().await {
+                        Ok(()) => {
+                            eprintln!("✅ post-commit pull succeeded for {}", repo.display());
+                        }
+                        Err(e) => {
+                            let err_text = format!("{}", e);
+                            if err_text.contains("CONFLICT") || err_text.contains("conflict") {
+                                eprintln!("⚠️ post-commit pull conflict in {}: {}", repo.display(), e);
+                                return Ok(false);
+                            }
+                            eprintln!("⚠️ post-commit pull failed for {}: {}", repo.display(), e);
+                            // Don't block push on pull failure; let push attempt handle it
+                        }
+                    }
+                }
+            }
+
+            // ALERT: Check for excessive unpushed commits
+            let alert_status = svc.get_status().await?;
+            const ALERT_THRESHOLD: usize = 10;
+            if alert_status.ahead > ALERT_THRESHOLD {
+                eprintln!(
+                    "🚨 ALERT: {} has {} unpushed commits (threshold: {}). Something may be wrong with push.",
+                    repo.display(),
+                    alert_status.ahead,
+                    ALERT_THRESHOLD
+                );
+            }
+
             // Restore any excluded modified paths that weren't committed
             // Skip gitlink entries (dirty submodules can't be restored this way)
             let restorable: Vec<_> = to_restore.iter()
