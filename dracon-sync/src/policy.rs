@@ -867,6 +867,7 @@ auto_repair_warns: true,
             incident_ledger_max_lines: 10_000,
             incident_ledger_max_age_days: 30,
             webhook_url: None,
+            alert_unpushed_threshold: 10,
         }
     }
 
