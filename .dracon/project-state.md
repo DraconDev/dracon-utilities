@@ -1,32 +1,34 @@
 # Project State
 
 ## Current Focus
-Completed investigation of vidpro-extension mass-deletion incident — all fixes, audits, and documentation finalized
+Fix multi-remote auth infra: SSH config for Codeberg, HTTPS+PAT fallback for GitLab/Codeberg, stall prevention, mass-deletion guard hardening
 
 ## Context
-Investigated and fixed a critical bug where `git ls-files --count` (invalid git flag) silently returned 0 due to `.unwrap_or(0)`, allowing dracon-sync to commit a mass deletion of all 46 files in vidpro-extension. The fix added a correct tracked-file count, a secondary >50% deletion guard, incident logging, and explicit error handling in divergence diagnosis. A full audit of all `unwrap_or(0)` patterns and git command flags found no other safety-critical issues.
+Completed backlog sprint to make dracon-sync work reliably across all 3 remotes (GitHub, GitLab, Codeberg). Fixed SSH config to include custom key path so Codeberg pushes work. Added HTTPS+PAT fallback for GitLab and Codeberg when SSH fails. Fixed stall bug where committed-but-still-behind repos would never pull before pushing. Fixed repo discovery descending into subdirs of already-discovered repos. Hardened mass-deletion guard with secondary check, incident logging, and `--force` bypass.
 
 ## Completed
-- [x] Fixed broken `git ls-files --count` → `git ls-files` + `.lines().count()` in sync.rs
-- [x] Added secondary >50% mass-deletion guard (`missing_count * 2 > total_tracked`)
-- [x] Added incident ledger logging for guard triggers (scope: "safety", action: "mass_deletion_guard")
-- [x] Fixed silent parse failure in git.rs divergence diagnosis with explicit error handling
-- [x] Added IncidentRecord::new() constructor for safe cross-module usage
-- [x] Added 2 tests: test_sync_repo_mass_deletion_prevented and test_sync_repo_partial_mass_deletion_prevented
-- [x] Updated CHANGELOG.md, AGENTS.md, dracon-sync.example.toml documentation
-- [x] Completed unwrap_or(0) audit: all 3 remaining instances are safe (display/timestamp counts)
-- [x] Completed git command flag audit: all 114+ invocations use valid flags
-- [x] Ran code review: 0 safety-critical issues, 0 medium issues, 2 observations
-- [x] Finalized INCIDENT-vidpro-extension-deletion.md with root cause, fixes, audits, and recommendations
-- [x] All 351 dracon-sync, 14 dracon-system, 56 dracon-warden tests passing
+- [x] SSH config fix: `GIT_SSH_HARDENING` → function with `-F $HOME/.dracon/secrets/ssh/config` for Codeberg SSH key discovery
+- [x] Codeberg push verified: SSH handshake + git push both succeed
+- [x] Codeberg PAT created + stored: `~/.dracon/utilities/sync/secrets/codeberg.env`
+- [x] GitLab PAT configured and stored: `~/.dracon/utilities/sync/secrets/gitlab.env`
+- [x] HTTPS+PAT fallback: `gitlab_https_url()` + `codeberg_https_url()` in push transport fallbacks
+- [x] `GIT_TERMINAL_PROMPT=0` + `BatchMode=yes` on all push commands (no interactive prompts)
+- [x] Post-commit pull check: if still behind upstream after commit, pull before pushing
+- [x] Repo discovery fix: `continue` after `.git` dir found prevents descending into subdirs
+- [x] Mass-deletion guard: fixed invalid `git ls-files --count`, added secondary >50% check, incident logging
+- [x] `--force` flag: `dracon-sync sync-now --force <repo>` bypasses mass-deletion guard
+- [x] Alert threshold: `alert_unpushed_threshold` field (default 10) + Prometheus counter
+- [x] Stall fixes: repaired dracon-code (304 commits merged), browser-extensions-shared (node_modules), tiles (debug.log)
+- [x] Docs: AGENTS.md (test count 358, incident response), CHANGELOG.md, README.md (safety, PAT setup, alert docs)
+- [x] All 358 tests passing (was 351) — added 8 boundary tests + alert threshold tests
+- [x] 42 orphan repos identified from old suffix loop bug (left for manual cleanup)
 
 ## In Progress
 - (none)
 
 ## Blockers
-- (none)
+- Orphan repo deletion blocked by GitHub sudo mode; user prefers to leave them
 
 ## Next Steps
-1. Consider adding edge-case tests (exactly 50% deletion, single file deletion)
-2. Consider preventing discover_git_repos_recursive from descending into subdirectories of already-discovered repos
-3. Consider adding `--force` flag for intentional mass deletions
+1. Monitor multi-remote sync stability (GitHub + GitLab + Codeberg)
+2. Consider periodic `gh auth refresh` automation for `delete_repo` scope
