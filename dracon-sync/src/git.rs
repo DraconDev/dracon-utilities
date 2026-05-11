@@ -437,14 +437,14 @@ pub(crate) async fn push_with_transport_fallbacks(
     timeout_secs: u64,
     op_label: &str,
 ) -> Result<()> {
-    let ssh_hardening = crate::git::GIT_SSH_HARDENING;
+    let ssh_hardening = crate::git::git_ssh_hardening();
     let no_prompt = &[("GIT_TERMINAL_PROMPT", "0")];
     match run_git_with_timeout_env(
         repo,
         &["push", "origin", "HEAD"],
         timeout_secs,
         &format!("{op_label}-ssh-hardened"),
-        &[("GIT_SSH_COMMAND", ssh_hardening), ("GIT_TERMINAL_PROMPT", "0")],
+        &[("GIT_SSH_COMMAND", &ssh_hardening), ("GIT_TERMINAL_PROMPT", "0")],
     )
     .await
     {
