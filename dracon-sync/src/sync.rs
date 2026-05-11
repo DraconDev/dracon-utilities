@@ -1553,9 +1553,9 @@ push_url = "{}"
     }
 
     #[tokio::test]
-    async fn test_sync_repo_partial_mass_deletion_prevented() {
+    async fn test_sync_repo_partial_deletion_allowed() {
         let tmp = tempfile::tempdir().unwrap();
-        let repo = init_test_repo(&tmp, "partial-mass-del-repo");
+        let repo = init_test_repo(&tmp, "partial-del-repo");
 
         std::fs::write(repo.join("a.txt"), "a\n").unwrap();
         std::fs::write(repo.join("b.txt"), "b\n").unwrap();
@@ -1563,7 +1563,7 @@ push_url = "{}"
         git_cmd(&repo, &["add", "-A"]);
         git_cmd(&repo, &["commit", "-m", "add files"]);
 
-        // Delete 2 of 3 files (66% > 50% threshold)
+        // Delete 2 of 3 files (66% — should be ALLOWED, only 100% wipe is blocked)
         std::fs::remove_file(repo.join("a.txt")).unwrap();
         std::fs::remove_file(repo.join("b.txt")).unwrap();
 
@@ -1578,14 +1578,14 @@ push_url = "{}"
 
         let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
         assert!(result.is_ok(), "sync_repo should succeed");
-        assert!(result.unwrap(), "partial mass deletion (>50%) should be prevented");
+        assert!(result.unwrap(), "partial deletion should be committed (not blocked)");
 
-        // Verify all files are still tracked (deletion was NOT committed)
+        // Verify deleted files are removed from tracking (deletion WAS committed)
         let output = git_cmd(&repo, &["ls-files"]);
         let tracked = String::from_utf8_lossy(&output.stdout);
-        assert!(tracked.contains("a.txt"), "a.txt should still be tracked after partial mass deletion safety");
-        assert!(tracked.contains("b.txt"), "b.txt should still be tracked after partial mass deletion safety");
-        assert!(tracked.contains("c.txt"), "c.txt should still be tracked after partial mass deletion safety");
+        assert!(!tracked.contains("a.txt"), "a.txt should be removed after partial deletion commit");
+        assert!(!tracked.contains("b.txt"), "b.txt should be removed after partial deletion commit");
+        assert!(tracked.contains("c.txt"), "c.txt should still be tracked");
     }
 
     #[tokio::test]
