@@ -1319,7 +1319,7 @@ pub(crate) async fn push_to_named_remote(
 ) -> Result<()> {
     let branch = current_branch(repo).unwrap_or_else(|| "main".to_string());
     let refspec = format!("HEAD:refs/heads/{}", branch);
-    let ssh_hardening = crate::git::GIT_SSH_HARDENING;
+    let ssh_hardening = crate::git::git_ssh_hardening();
     let no_prompt = &[("GIT_TERMINAL_PROMPT", "0")];
 
     let attempt_ssh = run_git_with_timeout_env(
@@ -1327,7 +1327,7 @@ pub(crate) async fn push_to_named_remote(
         &["push", remote_name, &refspec],
         timeout_secs,
         &format!("push-to-{}", remote_name),
-        &[("GIT_SSH_COMMAND", ssh_hardening), ("GIT_TERMINAL_PROMPT", "0")],
+        &[("GIT_SSH_COMMAND", &ssh_hardening), ("GIT_TERMINAL_PROMPT", "0")],
     ).await;
 
     if attempt_ssh.is_ok() {
