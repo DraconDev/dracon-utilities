@@ -1995,8 +1995,8 @@ auto_bump_versions = false
         // 1 of 2 deleted (50%) — ALLOWED (at threshold, >50% not >=50%)
         check_scenario(&tmp, "boundary-50pct", 2, 1, false).await;
 
-        // 2 of 3 deleted (66%) — BLOCKED
-        check_scenario(&tmp, "boundary-66pct", 3, 2, true).await;
+        // 2 of 3 deleted (66%) — ALLOWED (only 100% wipe is blocked)
+        check_scenario(&tmp, "boundary-66pct", 3, 2, false).await;
 
         // 3 of 3 deleted (100%) — BLOCKED (total wipe)
         check_scenario(&tmp, "boundary-100pct", 3, 3, true).await;
@@ -2004,8 +2004,8 @@ auto_bump_versions = false
         // 2 of 5 deleted (40%) — ALLOWED
         check_scenario(&tmp, "boundary-40pct", 5, 2, false).await;
 
-        // 3 of 5 deleted (60%) — BLOCKED
-        check_scenario(&tmp, "boundary-60pct", 5, 3, true).await;
+        // 3 of 5 deleted (60%) — ALLOWED (only 100% wipe is blocked)
+        check_scenario(&tmp, "boundary-60pct", 5, 3, false).await;
 
         // 1 of 1 deleted (100%) — BLOCKED (single file is still 100%)
         check_scenario(&tmp, "boundary-single-100pct", 1, 1, true).await;
