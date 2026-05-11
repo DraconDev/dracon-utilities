@@ -323,12 +323,10 @@ pub(crate) async fn sync_repo(
                         .unwrap_or(0);
 
                 let missing_count = missing.len();
-                // Primary guard: ALL files missing (100%)
+                // Guard: ALL files missing (100%) — this is almost always a mistake
                 let is_total_wipe = total_tracked > 0 && missing_count >= total_tracked;
-                // Secondary guard: >50% of files missing (catches major accidental deletions)
-                let is_mass_deletion = total_tracked > 0 && missing_count * 2 > total_tracked;
 
-                if is_total_wipe || is_mass_deletion {
+                if is_total_wipe {
                     let pct = (missing_count * 100) / total_tracked;
                     let reason = format!("{} files missing from working tree ({}% of {} tracked)", missing_count, pct, total_tracked);
                     eprintln!("⚠️ SAFETY: {}", reason);
