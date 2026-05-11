@@ -2073,17 +2073,14 @@ auto_bump_versions = false
         proptest!(|(total in 1usize..100, delete_count in 0usize..100)| {
             let missing_count = delete_count.min(total);
             let is_total_wipe = total > 0 && missing_count >= total;
-            let is_mass_deletion = total > 0 && missing_count * 2 > total;
-            let should_block = is_total_wipe || is_mass_deletion;
 
-            // Verify the guard never blocks when <= 50% deleted
-            if missing_count * 2 <= total {
-                prop_assert!(!should_block, "guard should NOT block when {} of {} deleted ({}%)", missing_count, total, (missing_count * 100) / total);
+            // Verify the guard only blocks 100% wipe, never partial deletions
+            if missing_count < total {
+                prop_assert!(!is_total_wipe, "guard should NOT block partial deletion: {} of {} ({}%)", missing_count, total, (missing_count * 100) / total);
             }
 
-            // Verify the guard always blocks when > 50% deleted
-            if missing_count * 2 > total {
-                prop_assert!(should_block, "guard SHOULD block when {} of {} deleted ({}%)", missing_count, total, (missing_count * 100) / total);
+            if missing_count >= total && total > 0 {
+                prop_assert!(is_total_wipe, "guard SHOULD block 100% wipe: {} of {} ({}%)", missing_count, total, (missing_count * 100) / total);
             }
         });
     }
