@@ -1986,12 +1986,16 @@ async fn run_guard_once(
 
     // Comprehensive auto-cleanup when disk hits action/critical level
     if dstate == "action" || dstate == "critical" {
+        let apply = guard.auto_cleanup_apply;
+        if !apply {
+            eprintln!("💡 disk at {}% — auto-cleanup is in dry-run mode (set auto_cleanup_apply = true to execute)", used);
+        }
         let mut total_reclaimed = 0u64;
         let mut all_cleaned: Vec<String> = Vec::new();
         
         // Rust target directories
         if guard.auto_cleanup_rust {
-            let result = auto_cleanup_rust_targets(guard, state, true).await?;
+            let result = auto_cleanup_rust_targets(guard, state, apply).await?;
             total_reclaimed += result.reclaimed_bytes;
             for p in &result.cleaned_paths {
                 eprintln!("🧹 Rust: {}", p);
