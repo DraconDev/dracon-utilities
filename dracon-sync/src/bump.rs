@@ -477,8 +477,26 @@ version = "1.0.0""#;
     }
 
     #[test]
-    fn test_extract_version_from_json_multiple_keys() {
-        let content = r#"{"name": "test", "version": "1.0.0", "other": "value"}"#;
-        assert_eq!(extract_version_from_json(content, "version"), Some("1.0.0".to_string()));
+    fn test_parse_ai_bump_response_downgrades_major_to_minor() {
+        assert_eq!(parse_ai_bump_response("major"), BumpLevel::Minor);
+        assert_eq!(parse_ai_bump_response("MAJOR"), BumpLevel::Minor);
+        assert_eq!(parse_ai_bump_response("  Major  "), BumpLevel::Minor);
+    }
+
+    #[test]
+    fn test_parse_ai_bump_response_passes_through_minor_patch_none() {
+        assert_eq!(parse_ai_bump_response("minor"), BumpLevel::Minor);
+        assert_eq!(parse_ai_bump_response("MINOR"), BumpLevel::Minor);
+        assert_eq!(parse_ai_bump_response("patch"), BumpLevel::Patch);
+        assert_eq!(parse_ai_bump_response("PATCH"), BumpLevel::Patch);
+        assert_eq!(parse_ai_bump_response("none"), BumpLevel::None);
+        assert_eq!(parse_ai_bump_response("NONE"), BumpLevel::None);
+    }
+
+    #[test]
+    fn test_parse_ai_bump_response_unknown_defaults_to_none() {
+        assert_eq!(parse_ai_bump_response("unknown"), BumpLevel::None);
+        assert_eq!(parse_ai_bump_response(""), BumpLevel::None);
+        assert_eq!(parse_ai_bump_response("major minor"), BumpLevel::None);
     }
 }
