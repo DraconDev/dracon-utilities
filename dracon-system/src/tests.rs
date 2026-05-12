@@ -360,4 +360,3 @@ use std::sync::{Mutex, OnceLock};
         let report = run_guard_once(&guard, &mut state).await;
         assert!(report.is_ok() || report.is_err(), "async guard execution should complete");
     }
-}
