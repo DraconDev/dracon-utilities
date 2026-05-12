@@ -2041,7 +2041,7 @@ async fn run_guard_once(
                 if p.exists() { Some(p) } else { None }
             })
             .collect();
-        let (bytes, cleaned) = match clean_old_node_modules(&roots, guard.node_modules_max_age_days, true, &guard.protected_paths).await {
+        let (bytes, cleaned) = match clean_old_node_modules(&roots, guard.node_modules_max_age_days, apply, &guard.protected_paths).await {
             Ok(result) => result,
             Err(e) => {
                 eprintln!("⚠️ Node modules cleanup failed: {}", e);
@@ -2056,7 +2056,7 @@ async fn run_guard_once(
         
         // Package caches
         if guard.clean_package_caches {
-            match clean_package_caches(true, true, true, true, true, &guard.protected_paths).await {
+            match clean_package_caches(true, true, true, true, apply, &guard.protected_paths).await {
                 Ok((bytes, cleaned)) => {
                     total_reclaimed += bytes;
                     all_cleaned.extend(cleaned.iter().map(|s| format!("Cache: {}", s)));
