@@ -2070,7 +2070,7 @@ async fn run_guard_once(
         
         // Docker
         if guard.docker_prune {
-            match docker_prune(true, guard.docker_prune_volumes).await {
+            match docker_prune(apply, guard.docker_prune_volumes).await {
                 Ok(bytes) => {
                     total_reclaimed += bytes;
                     if bytes > 0 {
