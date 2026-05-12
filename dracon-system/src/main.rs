@@ -89,7 +89,17 @@ fn check_path_str(path: &str, user_protected: &[&str]) -> bool {
     } else {
         path
     };
-    !TEST_PROTECTED.contains(&normalized) && !user_protected.contains(&normalized)
+    for prot in TEST_PROTECTED {
+        if is_protected_ancestor(normalized, prot) {
+            return false;
+        }
+    }
+    for prot in user_protected {
+        if is_protected_ancestor(normalized, prot) {
+            return false;
+        }
+    }
+    true
 }
 
 static ROLLING_LOG: std::sync::OnceLock<Mutex<Vec<String>>> = std::sync::OnceLock::new();
