@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use clap::{ArgAction, Parser, Subcommand};
-use dracon_security_kit::DraconWarden;
+pub(crate) use dracon_security_kit::DraconWarden;
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use notify::{Event, RecursiveMode, Watcher};
 use secrecy::ExposeSecret;
@@ -103,7 +103,7 @@ pub fn resolve_policy_path(
     anyhow::bail!("{}", error_msg)
 }
 
-pub fn discover_git_repos(
+pub(crate) fn discover_git_repos(
     roots: &[PathBuf],
     excluded_dir_names: &BTreeSet<String>,
 ) -> Vec<PathBuf> {
@@ -141,8 +141,8 @@ pub fn discover_git_repos(
     repos
 }
 
-const BLOCK_BEGIN: &str = "# --- BEGIN DRACON MANAGED BLOCK ---";
-const BLOCK_END: &str = "# --- END DRACON MANAGED BLOCK ---";
+pub(crate) const BLOCK_BEGIN: &str = "# --- BEGIN DRACON MANAGED BLOCK ---";
+pub(crate) const BLOCK_END: &str = "# --- END DRACON MANAGED BLOCK ---";
 const ENCRYPTED_SECRETS_HEADER: &[&str] = &[
     "",
     "# --- ENCRYPTED SECRETS (DO NOT REMOVE) ---",
@@ -233,7 +233,7 @@ enum Command {
 }
 
 #[derive(Debug, Deserialize, Clone)]
-struct WardenPolicy {
+pub(crate) struct WardenPolicy {
     #[serde(default)]
     protected_patterns: Vec<String>,
     #[serde(default)]
@@ -247,7 +247,7 @@ struct WardenPolicy {
 }
 
 impl WardenPolicy {
-    fn load(path: &Path) -> Result<Self> {
+    pub(crate) fn load(path: &Path) -> Result<Self> {
         let content = fs::read_to_string(path)
             .with_context(|| format!("failed to read policy {}", path.display()))?;
         let policy: Self = toml::from_str(&content)
@@ -255,7 +255,7 @@ impl WardenPolicy {
         Ok(policy)
     }
 
-    fn validate(&self) -> Result<()> {
+    pub(crate) fn validate(&self) -> Result<()> {
         fn is_allowed_plaintext_pattern(p: &str) -> bool {
             // Keep this tight. Plaintext patterns are an explicit escape hatch that disables
             // encryption in git history.
@@ -340,7 +340,7 @@ impl WardenPolicy {
     }
 }
 
-fn resolve_policy_path_local() -> Result<PathBuf> {
+pub(crate) fn resolve_policy_path_local() -> Result<PathBuf> {
     let home = dirs::home_dir().context("home not found")?;
     resolve_policy_path(
         &["DRACON_WARDEN_POLICY", "DRACON_SECURITY_POLICY"],
@@ -354,12 +354,12 @@ fn resolve_policy_path_local() -> Result<PathBuf> {
     )
 }
 
-fn discover_git_repos_local(roots: &[PathBuf]) -> Vec<PathBuf> {
+pub(crate) fn discover_git_repos_local(roots: &[PathBuf]) -> Vec<PathBuf> {
     let excluded = BTreeSet::new();
     discover_git_repos(roots, &excluded)
 }
 
-fn effective_watch_roots(policy: &WardenPolicy) -> Vec<PathBuf> {
+pub(crate) fn effective_watch_roots(policy: &WardenPolicy) -> Vec<PathBuf> {
     let mut roots = BTreeSet::new();
     for root in policy.watch_root_paths() {
         roots.insert(root);
@@ -367,7 +367,7 @@ fn effective_watch_roots(policy: &WardenPolicy) -> Vec<PathBuf> {
     roots.into_iter().collect()
 }
 
-fn effective_discovery_roots(policy: &WardenPolicy) -> Vec<PathBuf> {
+pub(crate) fn effective_discovery_roots(policy: &WardenPolicy) -> Vec<PathBuf> {
     let mut roots = BTreeSet::new();
     for root in policy.discover_root_paths() {
         roots.insert(root);
@@ -379,7 +379,7 @@ fn effective_discovery_roots(policy: &WardenPolicy) -> Vec<PathBuf> {
 }
 
 #[cfg(test)]
-fn replace_managed_block(current: &str, managed_block: &str) -> String {
+pub(crate) fn replace_managed_block(current: &str, managed_block: &str) -> String {
     // Replace ALL existing managed blocks, then append if none existed
     let mut out = String::new();
     let mut rest = current;
@@ -505,11 +505,11 @@ fn build_gitignore_block_with_existing(
 }
 
 #[cfg(test)]
-fn build_gitignore_block(policy: &WardenPolicy) -> Result<String> {
+pub(crate) fn build_gitignore_block(policy: &WardenPolicy) -> Result<String> {
     build_gitignore_block_with_existing(policy, "")
 }
 
-fn build_gitattributes_block(policy: &WardenPolicy) -> Result<String> {
+pub(crate) fn build_gitattributes_block(policy: &WardenPolicy) -> Result<String> {
     policy.validate()?;
     let mut lines = Vec::new();
     lines.push(BLOCK_BEGIN.to_string());
@@ -535,7 +535,7 @@ fn build_gitattributes_block(policy: &WardenPolicy) -> Result<String> {
 }
 
 #[cfg(test)]
-fn apply_managed_file(path: &Path, block: &str) -> Result<bool> {
+pub(crate) fn apply_managed_file(path: &Path, block: &str) -> Result<bool> {
     let current = fs::read_to_string(path).unwrap_or_default();
     let next = replace_managed_block(&current, block);
     if next != current {
@@ -549,7 +549,7 @@ fn apply_managed_file(path: &Path, block: &str) -> Result<bool> {
     Ok(false)
 }
 
-fn apply_overwrite_file(path: &Path, content: &str) -> Result<bool> {
+pub(crate) fn apply_overwrite_file(path: &Path, content: &str) -> Result<bool> {
     let current = fs::read_to_string(path).unwrap_or_default();
     let mut next = content.to_string();
     if !next.ends_with('\n') {
@@ -592,7 +592,7 @@ fn apply_overwrite_file(path: &Path, content: &str) -> Result<bool> {
 }
 
 #[cfg(test)]
-fn newest_file(paths: Vec<PathBuf>) -> Option<PathBuf> {
+pub(crate) fn newest_file(paths: Vec<PathBuf>) -> Option<PathBuf> {
     let mut with_mtime = paths
         .into_iter()
         .filter_map(|p| {
@@ -613,7 +613,7 @@ fn newest_file(paths: Vec<PathBuf>) -> Option<PathBuf> {
     with_mtime.into_iter().next().map(|(_, p)| p)
 }
 
-fn owner_pubkeys_in(dir: &Path) -> Vec<PathBuf> {
+pub(crate) fn owner_pubkeys_in(dir: &Path) -> Vec<PathBuf> {
     let mut out = Vec::new();
     let read_dir = match fs::read_dir(dir) {
         Ok(rd) => rd,
@@ -741,7 +741,7 @@ fn resolve_local_pubkey_path() -> Option<PathBuf> {
     None
 }
 
-fn publish_repo_pubkey(repo: &Path, pubkey_path: &Path) -> Result<bool> {
+pub(crate) fn publish_repo_pubkey(repo: &Path, pubkey_path: &Path) -> Result<bool> {
     let target_dir = repo.join(".dracon/data/keys");
     fs::create_dir_all(&target_dir)
         .with_context(|| format!("failed creating {}", target_dir.display()))?;
@@ -834,7 +834,7 @@ fn is_repo_checked_out(repo: &Path) -> bool {
     head_content.starts_with("ref: refs/heads/")
 }
 
-fn harden_repo(
+pub(crate) fn harden_repo(
     repo: &Path,
     policy: &WardenPolicy,
     pubkey_path: Option<&Path>,
@@ -882,7 +882,7 @@ fn harden_all(policy: &WardenPolicy) -> Result<()> {
     harden_repos(policy, repos)
 }
 
-fn harden_repos<I>(policy: &WardenPolicy, repos: I) -> Result<()>
+pub(crate) fn harden_repos<I>(policy: &WardenPolicy, repos: I) -> Result<()>
 where
     I: IntoIterator<Item = PathBuf>,
 {
@@ -943,7 +943,7 @@ fn repo_root_for_path(path: &Path, roots: &[PathBuf]) -> Option<PathBuf> {
     None
 }
 
-fn repos_for_event(event: &Event, roots: &[PathBuf]) -> BTreeSet<PathBuf> {
+pub(crate) fn repos_for_event(event: &Event, roots: &[PathBuf]) -> BTreeSet<PathBuf> {
     let ignore_fragments = [
         "/target/",
         "/node_modules/",
@@ -965,7 +965,7 @@ fn repos_for_event(event: &Event, roots: &[PathBuf]) -> BTreeSet<PathBuf> {
     repos
 }
 
-fn run_keygen() -> Result<()> {
+pub(crate) fn run_keygen() -> Result<()> {
     let home = dirs::home_dir().context("home directory not found")?;
 
     let keys_dir = home.join(".dracon/data/keys");
@@ -1420,7 +1420,7 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-fn build_globset(patterns: &[String]) -> Result<GlobSet> {
+pub(crate) fn build_globset(patterns: &[String]) -> Result<GlobSet> {
     let mut b = GlobSetBuilder::new();
     for p in patterns {
         // globset expects / separators
@@ -1430,11 +1430,11 @@ fn build_globset(patterns: &[String]) -> Result<GlobSet> {
     Ok(b.build()?)
 }
 
-fn is_marker_string(s: &str) -> bool {
+pub(crate) fn is_marker_string(s: &str) -> bool {
     s.contains("[DRACON_SECRET:")
 }
 
-fn marker_prefix_at(s: &str, idx: usize) -> Option<&'static str> {
+pub(crate) fn marker_prefix_at(s: &str, idx: usize) -> Option<&'static str> {
     if s[idx..].starts_with("[DRACON_SECRET:") {
         Some("[DRACON_SECRET:")
     } else {
@@ -1444,7 +1444,7 @@ fn marker_prefix_at(s: &str, idx: usize) -> Option<&'static str> {
 
 // Best-effort salvage for invalid JSON where marker tokens were injected as raw values/keys.
 // This only touches marker substrings; everything else is preserved.
-fn salvage_invalid_json_markers(content: &str) -> Option<String> {
+pub(crate) fn salvage_invalid_json_markers(content: &str) -> Option<String> {
     if !is_marker_string(content) {
         return None;
     }
@@ -1532,7 +1532,7 @@ fn scrub_json_value(v: &mut serde_json::Value) {
     }
 }
 
-fn scrub_markers(policy: &WardenPolicy, repos: &[PathBuf], apply: bool) -> Result<()> {
+pub(crate) fn scrub_markers(policy: &WardenPolicy, repos: &[PathBuf], apply: bool) -> Result<()> {
     let protected = build_globset(&policy.protected_patterns)?;
 
     let mut found = 0usize;
@@ -1728,7 +1728,7 @@ fn resmudge_repo(repo: &Path, policy: &WardenPolicy, apply: bool) -> Result<(usi
     Ok((found, changed))
 }
 
-fn resmudge_repos(policy: &WardenPolicy, repos: &[PathBuf], apply: bool) -> Result<(usize, usize)> {
+pub(crate) fn resmudge_repos(policy: &WardenPolicy, repos: &[PathBuf], apply: bool) -> Result<(usize, usize)> {
     policy.validate()?;
 
     let mut total_found = 0usize;
@@ -1756,7 +1756,7 @@ fn resmudge_repos(policy: &WardenPolicy, repos: &[PathBuf], apply: bool) -> Resu
     Ok((total_found, total_changed))
 }
 
-fn is_env_file_name(path: &str) -> bool {
+pub(crate) fn is_env_file_name(path: &str) -> bool {
     let path_lower = path.to_lowercase();
     path_lower.ends_with(".env")
         || path_lower.contains(".env.")
@@ -1765,7 +1765,7 @@ fn is_env_file_name(path: &str) -> bool {
         || path_lower.ends_with("/.envrc")
 }
 
-fn is_encrypted_env_content(content: &str) -> bool {
+pub(crate) fn is_encrypted_env_content(content: &str) -> bool {
     let trimmed = content.trim_end_matches('\n');
     trimmed.starts_with("[DRACON_SECRET:") && trimmed.ends_with(']')
 }
