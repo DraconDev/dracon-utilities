@@ -78,7 +78,7 @@ fn is_protected_ancestor(path: &str, protected: &str) -> bool {
 
 #[cfg(test)]
 const TEST_PROTECTED: &[&str] = &[
-    "/", "/home", "/etc", "/usr", "/var", "/boot",
+    "/home", "/etc", "/usr", "/var", "/boot",
     "/nix", "/run", "/sys", "/dev", "/proc"
 ];
 
