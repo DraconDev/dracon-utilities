@@ -485,7 +485,14 @@ impl SecretScanner {
             .map(|(_, p)| format!("(?:{})", p))
             .collect::<Vec<_>>()
             .join("|");
-        let full_regex = Regex::new(&format!("(?sm){}", combined))
+        // Use RegexBuilder to cap DFA memory and prevent excessive compilation
+        // costs from the large alternation. The regex crate uses finite automata
+        // (no catastrophic backtracking), but very large combined regexes can
+        // still use prohibitive memory during DFA construction.
+        let full_regex = regex::RegexBuilder::new(&format!("(?sm){}", combined))
+            .size_limit(10 * (1 << 20))   // 10 MiB total regex memory
+            .dfa_size_limit(5 * (1 << 20)) // 5 MiB DFA cache
+            .build()
             .map_err(|e| anyhow::anyhow!("invalid regex pattern in SecretScanner::new: {}", e))?;
 
         Ok(Self {
