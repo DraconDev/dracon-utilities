@@ -2577,9 +2577,7 @@ watch_roots = ["/tmp/test"]
         let keys_dir = td.path().join(".dracon").join("data").join("keys");
         std::fs::create_dir_all(&keys_dir).unwrap();
 
-        let _lock = HOME_MUTEX.lock().expect("home mutex poisoned");
-        let original_home = std::env::var("HOME").ok();
-        std::env::set_var("HOME", td.path().to_str().unwrap());
+        let _guard = HomeGuard::new(td.path().to_str().unwrap());
 
         let hostname_raw = hostname::get().expect("hostname").to_string_lossy().to_string();
         let hostname: String = hostname_raw.chars()
@@ -2589,12 +2587,6 @@ watch_roots = ["/tmp/test"]
         std::fs::write(&fake_secret, "already exists").unwrap();
 
         let result = run_keygen();
-
-        if let Some(home) = original_home {
-            std::env::set_var("HOME", home);
-        } else {
-            std::env::remove_var("HOME");
-        }
 
         assert!(result.is_err(), "should refuse to overwrite existing secret key");
         let err_msg = result.unwrap_err().to_string();
@@ -2607,9 +2599,7 @@ watch_roots = ["/tmp/test"]
         let keys_dir = td.path().join(".dracon").join("data").join("keys");
         std::fs::create_dir_all(&keys_dir).unwrap();
 
-        let _lock = HOME_MUTEX.lock().expect("home mutex poisoned");
-        let original_home = std::env::var("HOME").ok();
-        std::env::set_var("HOME", td.path().to_str().unwrap());
+        let _guard = HomeGuard::new(td.path().to_str().unwrap());
 
         let hostname_raw = hostname::get().expect("hostname").to_string_lossy().to_string();
         let hostname: String = hostname_raw.chars()
@@ -2619,12 +2609,6 @@ watch_roots = ["/tmp/test"]
         std::fs::write(&fake_pubkey, "already exists").unwrap();
 
         let result = run_keygen();
-
-        if let Some(home) = original_home {
-            std::env::set_var("HOME", home);
-        } else {
-            std::env::remove_var("HOME");
-        }
 
         assert!(result.is_err(), "should refuse to overwrite existing pubkey");
         let err_msg = result.unwrap_err().to_string();
