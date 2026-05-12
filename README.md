@@ -67,6 +67,18 @@ systemctl --user enable dracon-system-guard.service
 systemctl --user enable dracon-warden.service
 ```
 
+### Resource Limits
+
+All services run with conservative systemd resource limits:
+
+| Service | MemoryHigh | MemoryMax | CPUQuota | TasksMax |
+|---------|-----------|-----------|----------|----------|
+| dracon-sync | 768M | 2G | 15% | 96 |
+| dracon-system-guard | — | 100M | 10% | 32 |
+| dracon-warden | 384M | 1G | 10% | 64 |
+
+`MemoryHigh` is a soft limit that triggers memory reclaim before the hard `MemoryMax` limit is reached. This prevents sudden OOM kills while still constraining memory usage.
+
 ### Verify
 
 ```bash
