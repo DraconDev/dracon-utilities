@@ -1924,7 +1924,7 @@ auto_bump_versions = false
 
     /// Comprehensive boundary test for the mass-deletion safety guard.
     /// Covers the full matrix of (tracked_files, deleted_files) combinations
-    /// to verify the guard's >50% and 100% thresholds, and the atomic counter.
+    /// to verify the guard's >=85% threshold, and the atomic counter.
     #[tokio::test]
     async fn test_safety_guard_boundaries() {
         async fn check_scenario(tmp: &tempfile::TempDir, name: &str, total: usize, delete_count: usize, expect_blocked: bool) {
@@ -1994,10 +1994,10 @@ auto_bump_versions = false
         // 1 of 3 deleted (33%) — ALLOWED
         check_scenario(&tmp, "boundary-33pct", 3, 1, false).await;
 
-        // 1 of 2 deleted (50%) — ALLOWED (at threshold, >50% not >=50%)
+        // 1 of 2 deleted (50%) — ALLOWED
         check_scenario(&tmp, "boundary-50pct", 2, 1, false).await;
 
-        // 2 of 3 deleted (66%) — ALLOWED (only 100% wipe is blocked)
+        // 2 of 3 deleted (66%) — ALLOWED (below 85% threshold)
         check_scenario(&tmp, "boundary-66pct", 3, 2, false).await;
 
         // 3 of 3 deleted (100%) — BLOCKED (total wipe)
@@ -2006,8 +2006,14 @@ auto_bump_versions = false
         // 2 of 5 deleted (40%) — ALLOWED
         check_scenario(&tmp, "boundary-40pct", 5, 2, false).await;
 
-        // 3 of 5 deleted (60%) — ALLOWED (only 100% wipe is blocked)
+        // 3 of 5 deleted (60%) — ALLOWED (below 85% threshold)
         check_scenario(&tmp, "boundary-60pct", 5, 3, false).await;
+
+        // 5 of 6 deleted (83%) — ALLOWED (just below 85% threshold)
+        check_scenario(&tmp, "boundary-83pct", 6, 5, false).await;
+
+        // 6 of 7 deleted (~85.7%) — BLOCKED (at 85% threshold)
+        check_scenario(&tmp, "boundary-86pct", 7, 6, true).await;
 
         // 1 of 1 deleted (100%) — BLOCKED (single file is still 100%)
         check_scenario(&tmp, "boundary-single-100pct", 1, 1, true).await;
