@@ -265,14 +265,11 @@ fn test_auto_key_generation() -> Result<()> {
     let git_dir = temp_repo.path().join(".git");
     fs::create_dir(&git_dir)?;
 
-    let mut demon = DemonSecurity::new(None)?;
+    // Pass repo path directly instead of mutating global CWD
+    let mut demon = DemonSecurity::new(Some(temp_repo.path()))?;
     // Inject a memory identity so we have a current user key to save
     let key = age::x25519::Identity::generate();
     demon.add_memory_identity(key);
-
-    // Change directory to temp repo so get_repo_root finds it
-    let _guard = CleanDir::new(temp_repo.path());
-    std::env::set_current_dir(temp_repo.path())?;
 
     demon.ensure_current_user_key()?;
 
@@ -285,22 +282,6 @@ fn test_auto_key_generation() -> Result<()> {
     assert_eq!(path.extension().unwrap(), "pub");
 
     Ok(())
-}
-
-struct CleanDir {
-    original: std::path::PathBuf,
-}
-impl CleanDir {
-    fn new(path: &std::path::Path) -> Self {
-        let original = std::env::current_dir().unwrap();
-        let _ = std::env::set_current_dir(path);
-        Self { original }
-    }
-}
-impl Drop for CleanDir {
-    fn drop(&mut self) {
-        let _ = std::env::set_current_dir(&self.original);
-    }
 }
 
 #[test]
