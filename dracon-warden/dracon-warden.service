@@ -4,6 +4,8 @@ After=default.target
 
 [Service]
 Type=simple
+# NixOS-optimized PATH. On non-NixOS distributions, customize or use
+# PassEnvironment=PATH after running `systemctl --user import-environment PATH`.
 Environment=PATH=%h/.local/bin:/run/wrappers/bin:%h/.local/share/flatpak/exports/bin:/var/lib/flatpak/exports/bin:%h/.nix-profile/bin:/nix/profile/bin:%h/.local/state/nix/profile/bin:/etc/profiles/per-user/%u/bin:/nix/var/nix/profiles/default/bin:/run/current-system/sw/bin
 ExecStart=%h/.local/bin/dracon-warden daemon
 Restart=on-failure
