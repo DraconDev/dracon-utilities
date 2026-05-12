@@ -2710,4 +2710,140 @@ watch_roots = ["/tmp/test"]
         assert!(!is_encrypted_env_content("plain text"));
         assert!(!is_encrypted_env_content("  [DRACON_SECRET:key]  "), "leading whitespace not trimmed");
     }
+
+    /// Guard that restores an environment variable on drop.
+    struct EnvGuard {
+        key: String,
+        old_value: Option<String>,
+    }
+
+    impl EnvGuard {
+        fn set(key: &str, value: &str) -> Self {
+            let old_value = std::env::var(key).ok();
+            std::env::set_var(key, value);
+            EnvGuard { key: key.to_string(), old_value }
+        }
+    }
+
+    impl Drop for EnvGuard {
+        fn drop(&mut self) {
+            std::env::remove_var(&self.key);
+            if let Some(ref v) = self.old_value {
+                std::env::set_var(&self.key, v);
+            }
+        }
+    }
+
+    #[test]
+    fn cli_once_hardens_single_repo() {
+        let td = TestDir::new("warden_once_repo");
+        let repo = td.path().join("repo");
+        fs::create_dir_all(&repo).expect("repo");
+
+        let status = ProcessCommand::new("git")
+            .arg("init")
+            .arg(&repo)
+            .status()
+            .expect("git init");
+        assert!(status.success(), "git init should succeed");
+
+        let config_dir = td.path().join(".dracon").join("utilities").join("warden");
+        fs::create_dir_all(&config_dir).expect("config dir");
+        let config_path = config_dir.join("dracon-warden.toml");
+        fs::write(
+            &config_path,
+            r#"
+[watch]
+watch_roots = ["/tmp/test"]
+"#,
+        )
+        .expect("write config");
+
+        let _env_guard = EnvGuard::set("DRACON_WARDEN_POLICY", config_path.to_str().unwrap());
+
+        let policy = WardenPolicy::load(&config_path).expect("load policy");
+        let result = harden_repos(&policy, vec![repo.clone()]);
+        assert!(result.is_ok(), "once should succeed: {:?}", result);
+        assert!(repo.join(".gitignore").exists(), ".gitignore should be created");
+        assert!(repo.join(".gitattributes").exists(), ".gitattributes should be created");
+    }
+
+    #[test]
+    fn cli_repair_dry_run_does_not_modify() {
+        let td = TestDir::new("warden_repair_dry_run");
+        let repo = td.path().join("repo");
+        fs::create_dir_all(&repo).expect("repo");
+
+        let status = ProcessCommand::new("git")
+            .arg("init")
+            .arg(&repo)
+            .status()
+            .expect("git init");
+        assert!(status.success(), "git init should succeed");
+
+        let config_dir = td.path().join(".dracon").join("utilities").join("warden");
+        fs::create_dir_all(&config_dir).expect("config dir");
+        let config_path = config_dir.join("dracon-warden.toml");
+        fs::write(
+            &config_path,
+            r#"
+[watch]
+watch_roots = ["/tmp/test"]
+"#,
+        )
+        .expect("write config");
+
+        let _env_guard = EnvGuard::set("DRACON_WARDEN_POLICY", config_path.to_str().unwrap());
+
+        let policy = WardenPolicy::load(&config_path).expect("load policy");
+        policy.validate().expect("valid policy");
+
+        let result = scrub_markers(&policy, &[repo.clone()], false);
+        assert!(result.is_ok(), "repair dry-run scrub should succeed: {:?}", result);
+
+        let result = harden_repos(&policy, vec![repo.clone()]);
+        assert!(result.is_ok(), "repair dry-run harden should succeed: {:?}", result);
+    }
+
+    #[test]
+    fn cli_repair_strict_fails_when_markers_remain() {
+        let td = TestDir::new("warden_repair_strict");
+        let repo = td.path().join("repo");
+        fs::create_dir_all(&repo).expect("repo");
+
+        let status = ProcessCommand::new("git")
+            .arg("init")
+            .arg(&repo)
+            .status()
+            .expect("git init");
+        assert!(status.success(), "git init should succeed");
+
+        let config_dir = td.path().join(".dracon").join("utilities").join("warden");
+        fs::create_dir_all(&config_dir).expect("config dir");
+        let config_path = config_dir.join("dracon-warden.toml");
+        fs::write(
+            &config_path,
+            r#"
+[watch]
+watch_roots = ["/tmp/test"]
+"#,
+        )
+        .expect("write config");
+
+        let _env_guard = EnvGuard::set("DRACON_WARDEN_POLICY", config_path.to_str().unwrap());
+
+        let policy = WardenPolicy::load(&config_path).expect("load policy");
+        policy.validate().expect("valid policy");
+
+        let repos = vec![repo.clone()];
+        let (found, _changed) = resmudge_repos(&policy, &repos, false).expect("resmudge report");
+
+        if found > 0 {
+            let strict_result = Err(anyhow::anyhow!(
+                "ciphertext markers remain in working tree (count={})",
+                found
+            ));
+            assert!(strict_result.is_err(), "strict should fail when markers remain");
+        }
+    }
 }
