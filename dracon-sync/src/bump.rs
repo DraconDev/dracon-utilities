@@ -219,22 +219,24 @@ Respond with ONLY ONE WORD."##);
     let messages = vec![ChatMessage::user(&prompt)];
 
     match service.chat(messages).await {
-        Ok(content) => {
-            let level = match content.trim().to_lowercase().as_str() {
-                "major" => BumpLevel::Major,
-                "minor" => BumpLevel::Minor,
-                "patch" => BumpLevel::Patch,
-                _ => BumpLevel::None,
-            };
-            // Cap AI-suggested bumps at minor; major requires manual approval
-            if level == BumpLevel::Major {
-                eprintln!("🤖 ai-bump: major bump requested by AI — downgrading to minor (major requires manual approval)");
-                return BumpLevel::Minor;
-            }
-            level
-        }
+        Ok(content) => parse_ai_bump_response(&content),
         Err(_) => BumpLevel::None,
     }
+}
+
+/// Parse AI bump response, capping major at minor (major requires manual approval).
+pub(crate) fn parse_ai_bump_response(content: &str) -> BumpLevel {
+    let level = match content.trim().to_lowercase().as_str() {
+        "major" => BumpLevel::Major,
+        "minor" => BumpLevel::Minor,
+        "patch" => BumpLevel::Patch,
+        _ => BumpLevel::None,
+    };
+    if level == BumpLevel::Major {
+        eprintln!("🤖 ai-bump: major bump requested by AI — downgrading to minor (major requires manual approval)");
+        return BumpLevel::Minor;
+    }
+    level
 }
 
 pub fn apply_version_bump_to_repo(repo: &Path, old_ver: &str, new_ver: &str) -> bool {
