@@ -367,6 +367,38 @@ pub(crate) async fn run_git_with_timeout_env(
     run_child(child, repo, timeout_secs, &label).await
 }
 
+/// Create a temporary GIT_ASKPASS script that outputs the given token.
+/// The script is chmod 700 and should be deleted after use.
+#[cfg(unix)]
+async fn git_askpass_script(token: &str) -> Result<PathBuf> {
+    let nano = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let tmp_path = std::env::temp_dir()
+        .join(format!("dracon-git-askpass-{}-{}.sh", std::process::id(), nano));
+
+    // Escape single quotes in token for safe shell embedding
+    let escaped = token.replace('\'', "'\"'\"'");
+    let script = format!("#!/bin/sh\nprintf '%s\\n' '{}'\n", escaped);
+
+    tokio::fs::write(&tmp_path, &script)
+        .await
+        .with_context(|| format!("failed to write GIT_ASKPASS script to {}", tmp_path.display()))?;
+
+    use std::os::unix::fs::PermissionsExt;
+    let mut perms = tokio::fs::metadata(&tmp_path).await?.permissions();
+    perms.set_mode(0o700);
+    tokio::fs::set_permissions(&tmp_path, perms).await?;
+
+    Ok(tmp_path)
+}
+
+#[cfg(not(unix))]
+async fn git_askpass_script(_token: &str) -> Result<PathBuf> {
+    anyhow::bail!("GIT_ASKPASS helper is only implemented on Unix")
+}
+
 pub(crate) fn origin_url(repo: &Path) -> Option<String> {
     let out = std_git_command()
         .args(["remote", "get-url", "origin"])
