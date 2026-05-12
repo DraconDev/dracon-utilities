@@ -477,6 +477,12 @@ version = "1.0.0""#;
     }
 
     #[test]
+    fn test_extract_version_from_json_multiple_keys() {
+        let content = r#"{"name": "test", "version": "1.0.0", "other": "value"}"#;
+        assert_eq!(extract_version_from_json(content, "version"), Some("1.0.0".to_string()));
+    }
+
+    #[test]
     fn test_parse_ai_bump_response_downgrades_major_to_minor() {
         assert_eq!(parse_ai_bump_response("major"), BumpLevel::Minor);
         assert_eq!(parse_ai_bump_response("MAJOR"), BumpLevel::Minor);
