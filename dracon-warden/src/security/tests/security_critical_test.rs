@@ -416,10 +416,9 @@ fn test_load_repo_key_machine_key_env_var() {
 
     let (security, _guard) = init_security_with_repo(repo_root);
 
-    std::env::set_var("ARCANE_MACHINE_KEY", machine_identity.to_string().expose_secret());
+    let _env_guard = EnvRestorer::new("ARCANE_MACHINE_KEY", machine_identity.to_string().expose_secret());
     let loaded = security.load_repo_key().expect("load repo key via machine key");
     assert_eq!(loaded.get_key(), repo_key_bytes.as_slice());
-    std::env::remove_var("ARCANE_MACHINE_KEY");
 }
 
 #[test]
