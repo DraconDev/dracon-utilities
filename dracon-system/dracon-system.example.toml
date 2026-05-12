@@ -45,7 +45,10 @@ guard_log_file = "~/.local/state/dracon/dracon-system-guard.log"
 guard_log_max_mb = 1
 
 # Auto-cleanup Rust target directories when disk is full
+# ⚠️ auto_cleanup_apply must be true for the daemon to actually delete files.
+# When false (default), the daemon only logs what it would clean.
 auto_cleanup_rust = true
+auto_cleanup_apply = false
 cleanup_min_size_mb = 256
 rust_search_roots = "~/Dev"
 
