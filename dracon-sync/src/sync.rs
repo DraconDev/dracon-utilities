@@ -307,7 +307,7 @@ pub(crate) async fn sync_repo(
             }
 
             if !missing.is_empty() {
-                // SAFETY: If ALL files in the index are missing, this is likely a mistake
+                // SAFETY: If most files in the index are missing (>=85%), this is likely a mistake
                 // or destructive operation. Do NOT stage mass deletions without warning.
                 // Use --force on sync-now to bypass this guard for intentional deletions.
                 if force_deletion {
@@ -322,36 +322,38 @@ pub(crate) async fn sync_repo(
                         .map(|o| String::from_utf8_lossy(&o.stdout).lines().count())
                         .unwrap_or(0);
 
-                let missing_count = missing.len();
-                // Guard: ALL files missing (100%) — this is almost always a mistake
-                let is_total_wipe = total_tracked > 0 && missing_count >= total_tracked;
+                    let missing_count = missing.len();
+                    // Guard: >=85% of tracked files missing — this is almost always a mistake
+                    const MASS_DELETION_THRESHOLD_PCT: usize = 85;
+                    let is_mass_deletion = total_tracked > 0
+                        && (missing_count * 100) / total_tracked >= MASS_DELETION_THRESHOLD_PCT;
 
-                if is_total_wipe {
-                    let pct = (missing_count * 100) / total_tracked;
-                    let reason = format!("{} files missing from working tree ({}% of {} tracked)", missing_count, pct, total_tracked);
-                    eprintln!("⚠️ SAFETY: {}", reason);
-                    eprintln!("⚠️ Refusing to stage mass deletion - this looks like a mistake or destructive operation");
-                    eprintln!("⚠️ If you really want to delete these files, do: git add -A && git commit -m 'delete files'");
-                    MASS_DELETION_GUARD_BLOCKED.fetch_add(1, Ordering::Relaxed);
-                    // Log incident for audit trail
-                    if let Some(path) = policy_path {
-                        append_incident_record(
-                            path,
-                            &IncidentRecord::new(
-                                crate::policy::timestamp_secs(),
-                                "safety",
-                                repo.display().to_string(),
-                                reason.clone(),
-                                "mass_deletion_guard",
-                                None,
-                                "blocked",
-                                Some(format!("total_tracked={} missing_count={}", total_tracked, missing_count)),
-                            ),
-                        );
+                    if is_mass_deletion {
+                        let pct = (missing_count * 100) / total_tracked;
+                        let reason = format!("{} files missing from working tree ({}% of {} tracked)", missing_count, pct, total_tracked);
+                        eprintln!("⚠️ SAFETY: {}", reason);
+                        eprintln!("⚠️ Refusing to stage mass deletion - this looks like a mistake or destructive operation");
+                        eprintln!("⚠️ If you really want to delete these files, do: git add -A && git commit -m 'delete files'");
+                        MASS_DELETION_GUARD_BLOCKED.fetch_add(1, Ordering::Relaxed);
+                        // Log incident for audit trail
+                        if let Some(path) = policy_path {
+                            append_incident_record(
+                                path,
+                                &IncidentRecord::new(
+                                    crate::policy::timestamp_secs(),
+                                    "safety",
+                                    repo.display().to_string(),
+                                    reason.clone(),
+                                    "mass_deletion_guard",
+                                    None,
+                                    "blocked",
+                                    Some(format!("total_tracked={} missing_count={}", total_tracked, missing_count)),
+                                ),
+                            );
+                        }
+                        // Do NOT stage the deletions - let the user decide
+                        return Ok(true);
                     }
-                    // Do NOT stage the deletions - let the user decide
-                    return Ok(true);
-                }
                 }
 
                 let mut rm_args = vec!["rm", "--ignore-unmatch", "--"];
