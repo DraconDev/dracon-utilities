@@ -502,6 +502,11 @@ struct GuardPolicy {
     /// Automatically clean Rust build artifacts when disk hits action level
     #[serde(default = "default_auto_cleanup_rust")]
     auto_cleanup_rust: bool,
+    /// Require explicit opt-in for destructive auto-cleanup in daemon mode.
+    /// When false (default), the daemon only logs what it would clean without deleting.
+    /// Set to true to allow the daemon to actually delete files during auto-cleanup.
+    #[serde(default)]
+    auto_cleanup_apply: bool,
     /// Minimum size (MiB) for a target dir to be considered for auto-cleanup
     #[serde(default = "default_cleanup_min_size_mb")]
     cleanup_min_size_mb: u64,
@@ -600,6 +605,7 @@ impl Default for GuardPolicy {
             guard_log_file: default_guard_log_file(),
             guard_log_max_mb: default_guard_log_max_mb(),
             auto_cleanup_rust: default_auto_cleanup_rust(),
+            auto_cleanup_apply: false,
             cleanup_min_size_mb: default_cleanup_min_size_mb(),
             rust_search_roots: default_rust_search_roots(),
             node_modules_search_roots: default_node_modules_search_roots(),
