@@ -1,2 +1,32 @@
+[Unit]
+Description=Dracon System Guard - Proactive disk space monitoring and cleanup
+Documentation=https://github.com/DraconDev/dracon-utilities
+After=network.target
+
+[Service]
+Type=simple
+Environment=PATH=%h/.local/bin:/run/wrappers/bin:%h/.local/share/flatpak/exports/bin:/var/lib/flatpak/exports/bin:%h/.nix-profile/bin:/nix/profile/bin:%h/.local/state/nix/profile/bin:/etc/profiles/per-user/%u/bin:/nix/var/nix/profiles/default/bin:/run/current-system/sw/bin
+ExecStart=%h/.local/bin/dracon-system guard daemon
+Restart=on-failure
+RestartSec=10
 RestartPreventExitStatus=2 78
+
+# Run as the user who owns the service
+# For system-wide deployment, create a dedicated user
+# User=dracon-guard
+# Group=dracon-guard
+
+# Resource limits
+MemoryMax=100M
+CPUQuota=10%
 TasksMax=32
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=%h/.dracon %h/Dev %h/.local/state/dracon
+PrivateTmp=true
+
+[Install]
+WantedBy=default.target
