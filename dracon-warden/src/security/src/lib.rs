@@ -2265,7 +2265,14 @@ impl DemonSecurity {
             .and_then(|s| s.to_str())
             .unwrap_or("");
 
-        let is_sensitive_location = sensitive_dirs.iter().any(|dir| path_str.contains(dir))
+        // Check if any path component exactly matches a sensitive directory name.
+        // Using component-level matching avoids false positives like "my.ssh.config"
+        // matching ".ssh" via substring contains.
+        let path_components: Vec<&str> = std::path::Path::new(path_str)
+            .components()
+            .filter_map(|c| c.as_os_str().to_str())
+            .collect();
+        let is_sensitive_location = sensitive_dirs.iter().any(|dir| path_components.contains(dir))
             || sensitive_exts.iter().any(|ext| path_str.ends_with(ext))
             || sensitive_filenames.contains(&filename)
             || sensitive_filenames.iter().any(|p| filename.starts_with(p))
