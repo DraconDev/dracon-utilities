@@ -1,6 +1,6 @@
 mod common;
 
-use common::HomeGuard;
+use common::{HomeGuard, EnvRestorer};
 use secrecy::ExposeSecret;
 use std::fs;
 use std::io::Write;
