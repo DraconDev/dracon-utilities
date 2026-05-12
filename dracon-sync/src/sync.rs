@@ -200,6 +200,7 @@ pub(crate) async fn sync_repo(
 
     let mut status = svc.get_status().await?;
     let mut entries = svc.get_diff_entries().await?;
+    let mut filter_only_cleared = false;
 
     // Filter out entries that only differ due to clean/smudge filters.
     // `git diff HEAD` applies clean filters and correctly ignores filter-only changes.
@@ -215,6 +216,7 @@ pub(crate) async fn sync_repo(
             if !has_non_modified {
                 entries.clear();
                 status.is_clean = true;
+                filter_only_cleared = true;
             }
         } else {
             entries.retain(|e| {
@@ -236,7 +238,11 @@ pub(crate) async fn sync_repo(
             entries.len()
         );
     }
-    if entries.is_empty() {
+    // Only fall back to `git diff --name-status` when entries are empty for
+    // a reason *other* than filter-only clearing. The cli fallback does not
+    // apply clean filters and would re-detect filter-only changes as real
+    // modifications, potentially committing decrypted plaintext.
+    if entries.is_empty() && !filter_only_cleared {
         let fallback_entries = cli_diff_entries(repo).await?;
         if !fallback_entries.is_empty() {
             status.is_clean = false;
