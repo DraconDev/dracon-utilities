@@ -2839,7 +2839,7 @@ watch_roots = ["/tmp/test"]
         let (found, _changed) = resmudge_repos(&policy, &repos, false).expect("resmudge report");
 
         if found > 0 {
-            let strict_result = Err(anyhow::anyhow!(
+            let strict_result: anyhow::Result<()> = Err(anyhow::anyhow!(
                 "ciphertext markers remain in working tree (count={})",
                 found
             ));
