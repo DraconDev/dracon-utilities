@@ -2911,11 +2911,11 @@ mod tests {
     #[test]
     fn should_notify_respects_cooldown() {
         let mut state = GuardRuntimeState {
-            last_notification: std::collections::HashMap::new(),
-            heavy_log: std::collections::HashMap::new(),
+            heavy_since: std::collections::HashMap::new(),
             notify_cooldowns: std::collections::HashMap::new(),
-            last_auto_kill: std::collections::HashMap::new(),
+            last_disk_state: "ok".to_string(),
             disk_history: Vec::new(),
+            active_build_pids: std::collections::HashSet::new(),
         };
         let key = "test-key";
         assert!(should_notify(&mut state, key, 60), "first notify should succeed");
@@ -2960,13 +2960,12 @@ mod tests {
 
     #[tokio::test]
     async fn guard_report_completes_for_ok_disk() {
-        // Basic async test infrastructure: verify GuardReport can be constructed
         let mut state = GuardRuntimeState {
-            last_notification: std::collections::HashMap::new(),
-            heavy_log: std::collections::HashMap::new(),
+            heavy_since: std::collections::HashMap::new(),
             notify_cooldowns: std::collections::HashMap::new(),
-            last_auto_kill: std::collections::HashMap::new(),
+            last_disk_state: "ok".to_string(),
             disk_history: Vec::new(),
+            active_build_pids: std::collections::HashSet::new(),
         };
         let guard = GuardPolicy {
             disk_warn_percent: 70,
@@ -2977,11 +2976,7 @@ mod tests {
             track_trends: false,
             ..GuardPolicy::default()
         };
-        // We can't easily test run_guard_once without mocking disk state,
-        // but we can verify the async test runner works and state is valid.
         let report = run_guard_once(&guard, &mut state).await;
-        // On most systems this will succeed; if it fails due to disk read errors,
-        // we at least verified the async infrastructure compiles and runs.
         assert!(report.is_ok() || report.is_err(), "async guard execution should complete");
     }
 }
