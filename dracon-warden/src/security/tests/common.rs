@@ -35,3 +35,44 @@ impl Drop for HomeGuard {
         }
     }
 }
+
+/// Restores an environment variable to its original value on drop.
+pub struct EnvRestorer {
+    key: String,
+    old_value: Option<String>,
+}
+
+impl EnvRestorer {
+    /// Saves current value of `key`, sets it to `new_value`.
+    /// On Drop: restores the original value (or removes if unset).
+    pub fn new(key: &str, new_value: &str) -> Self {
+        let _lock = ENV_MUTEX.lock().expect("env lock poisoned");
+        let old_value = std::env::var(key).ok();
+        std::env::set_var(key, new_value);
+        EnvRestorer {
+            key: key.to_string(),
+            old_value,
+        }
+    }
+
+    /// Saves current value of `key`, removes the variable entirely.
+    /// On Drop: restores the original value (or removes if unset).
+    pub fn remove(key: &str) -> Self {
+        let _lock = ENV_MUTEX.lock().expect("env lock poisoned");
+        let old_value = std::env::var(key).ok();
+        std::env::remove_var(key);
+        EnvRestorer {
+            key: key.to_string(),
+            old_value,
+        }
+    }
+}
+
+impl Drop for EnvRestorer {
+    fn drop(&mut self) {
+        std::env::remove_var(&self.key);
+        if let Some(ref v) = self.old_value {
+            std::env::set_var(&self.key, v);
+        }
+    }
+}
