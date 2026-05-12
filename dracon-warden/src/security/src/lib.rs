@@ -2907,12 +2907,21 @@ pub fn encrypt_with_repo_key(&self, repo_key: &RepoKey, plaintext: &[u8]) -> Res
 
 pub struct Warden;
 
+/// Detect binary content by checking for null bytes.
+/// Git uses a similar heuristic: any null byte means binary.
+fn is_binary_content(bytes: &[u8]) -> bool {
+    bytes.contains(&0)
+}
+
 impl Warden {
     pub fn new() -> Result<Self> {
         Ok(Warden)
     }
 
     pub fn smudge(&self, bytes: &[u8], _path: Option<&str>) -> Result<Vec<u8>> {
+        if is_binary_content(bytes) {
+            return Ok(bytes.to_vec());
+        }
         let content = String::from_utf8_lossy(bytes);
         let smudged = DemonSecurity::new(None)?.smart_smudge(&content)?;
         Ok(smudged.into_bytes())
@@ -2927,6 +2936,9 @@ impl DraconWarden {
     }
 
     pub fn smudge(&self, bytes: &[u8], _path: Option<&str>) -> Result<Vec<u8>> {
+        if is_binary_content(bytes) {
+            return Ok(bytes.to_vec());
+        }
         let content = String::from_utf8_lossy(bytes);
         let security = DemonSecurity::get_or_init()?;
         let smudged = security.smart_smudge(&content)?;
