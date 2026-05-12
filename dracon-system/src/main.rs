@@ -2005,7 +2005,7 @@ async fn run_guard_once(
         
         // Trash
         if guard.clean_trash {
-            match empty_trash(true, &guard.protected_paths).await {
+            match empty_trash(apply, &guard.protected_paths).await {
                 Ok((bytes, cleaned)) => {
                     total_reclaimed += bytes;
                     all_cleaned.extend(cleaned.iter().map(|s| format!("Trash: {}", s)));
@@ -2019,7 +2019,7 @@ async fn run_guard_once(
         
         // Nix garbage
         if guard.clean_nix_garbage {
-            match clean_nix_garbage(guard.nix_keep_generations, true).await {
+            match clean_nix_garbage(guard.nix_keep_generations, apply).await {
                 Ok((bytes, cleaned)) => {
                     total_reclaimed += bytes;
                     all_cleaned.extend(cleaned.iter().map(|s| format!("Nix: {}", s)));
