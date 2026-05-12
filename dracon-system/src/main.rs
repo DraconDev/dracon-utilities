@@ -833,11 +833,11 @@ fn canonical_system_root() -> PathBuf {
 
 fn expand_tilde(raw: &str) -> PathBuf {
     if raw == "~" {
-        return dirs::home_dir().unwrap_or_else(|| PathBuf::from("/home"));
+        return dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
     }
     if let Some(rest) = raw.strip_prefix("~/") {
         return dirs::home_dir()
-            .unwrap_or_else(|| PathBuf::from("/home"))
+            .unwrap_or_else(|| PathBuf::from("."))
             .join(rest);
     }
     PathBuf::from(raw)
