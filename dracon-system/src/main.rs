@@ -8,18 +8,17 @@ use std::io::Write;
 #[cfg(unix)]
 use std::os::unix::fs::{symlink, OpenOptionsExt};
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::Arc;
+use std::sync::Mutex;
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::process::Command;
 use tokio::time::sleep;
 
 use dracon_system_lib::analyze_workspace_storage;
 
 const SYSTEM_PROTECTED: &[&str] = &[
-    "/", "/home", "/etc", "/usr", "/var", "/boot",
-    "/nix", "/run", "/sys", "/dev", "/proc"
+    "/", "/home", "/etc", "/usr", "/var", "/boot", "/nix", "/run", "/sys", "/dev", "/proc",
 ];
 
 fn check_safe_to_delete(path: &Path, user_protected: &[String]) -> Result<()> {
@@ -29,7 +28,11 @@ fn check_safe_to_delete(path: &Path, user_protected: &[String]) -> Result<()> {
             // Path doesn't exist — nothing to delete, nothing to protect
             return Ok(());
         }
-        Err(e) => anyhow::bail!("cannot canonicalize {}: {} — refusing to delete", path.display(), e),
+        Err(e) => anyhow::bail!(
+            "cannot canonicalize {}: {} — refusing to delete",
+            path.display(),
+            e
+        ),
     };
     let canon_str = canon.display().to_string();
 
@@ -47,7 +50,11 @@ fn check_safe_to_delete(path: &Path, user_protected: &[String]) -> Result<()> {
         let prot_canon = match Path::new(user_prot).canonicalize() {
             Ok(p) => p.display().to_string(),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
-            Err(e) => anyhow::bail!("cannot canonicalize user-protected path {}: {} — refusing", user_prot, e),
+            Err(e) => anyhow::bail!(
+                "cannot canonicalize user-protected path {}: {} — refusing",
+                user_prot,
+                e
+            ),
         };
         if is_protected_ancestor(&canon_str, &prot_canon) {
             anyhow::bail!(
@@ -82,8 +89,7 @@ pub(crate) fn is_protected_ancestor(path: &str, protected: &str) -> bool {
 
 #[cfg(test)]
 const TEST_PROTECTED: &[&str] = &[
-    "/", "/home", "/etc", "/usr", "/var", "/boot",
-    "/nix", "/run", "/sys", "/dev", "/proc"
+    "/", "/home", "/etc", "/usr", "/var", "/boot", "/nix", "/run", "/sys", "/dev", "/proc",
 ];
 
 #[cfg(test)]
@@ -191,10 +197,10 @@ pub(crate) fn acquire_daemon_lock(name: &str) -> Result<File> {
         .ok_or_else(|| anyhow::anyhow!("no home dir"))?
         .join(".dracon")
         .join("locks");
-    
+
     std::fs::create_dir_all(&lock_dir)?;
     let lock_file = lock_dir.join(format!("{}.lock", name));
-    
+
     let file = std::fs::OpenOptions::new()
         .create(true)
         .truncate(true)
@@ -373,7 +379,6 @@ enum GuardCommands {
         min_size_mb: Option<u64>,
     },
 }
-
 
 #[derive(Debug, Serialize)]
 struct StatusReport {
@@ -737,7 +742,7 @@ fn default_notify_command() -> String {
 }
 
 fn default_notify_cooldown_secs() -> u64 {
-    300  // 5 minutes - reduces notification spam during sustained issues
+    300 // 5 minutes - reduces notification spam during sustained issues
 }
 
 fn default_renice_value() -> i32 {
@@ -762,7 +767,7 @@ fn default_guard_log_file() -> String {
 }
 
 fn default_guard_log_max_mb() -> u64 {
-    1  // 1 MiB - keeps last ~1000 events, rotates automatically
+    1 // 1 MiB - keeps last ~1000 events, rotates automatically
 }
 
 fn default_auto_cleanup_rust() -> bool {
@@ -770,35 +775,35 @@ fn default_auto_cleanup_rust() -> bool {
 }
 
 fn default_cleanup_min_size_mb() -> u64 {
-    256  // 256 MiB minimum for auto-cleanup consideration
+    256 // 256 MiB minimum for auto-cleanup consideration
 }
 
 fn default_rust_search_roots() -> String {
-    "~/Dev".to_string()  // Default search location for Rust target directories
+    "~/Dev".to_string() // Default search location for Rust target directories
 }
 
 fn default_node_modules_search_roots() -> String {
-    "~/Dev".to_string()  // Default search location for node_modules directories
+    "~/Dev".to_string() // Default search location for node_modules directories
 }
 
 fn default_trend_warn_hours() -> u64 {
-    24  // Warn if disk will fill within 24 hours
+    24 // Warn if disk will fill within 24 hours
 }
 
 fn default_inode_warn_percent() -> u8 {
-    85  // Warn at 85% inode usage (inodes rarely an issue on modern filesystems)
+    85 // Warn at 85% inode usage (inodes rarely an issue on modern filesystems)
 }
 
 fn default_zombie_threshold() -> u64 {
-    20  // Alert if more than 20 zombie processes (a few zombies are normal)
+    20 // Alert if more than 20 zombie processes (a few zombies are normal)
 }
 
 fn default_log_size_mb() -> u64 {
-    100  // Alert on log files > 100 MiB
+    100 // Alert on log files > 100 MiB
 }
 
 fn default_log_max_truncate_mb() -> u64 {
-    50  // Truncate logs to 50 MiB by default
+    50 // Truncate logs to 50 MiB by default
 }
 
 fn default_log_dirs() -> String {
@@ -807,11 +812,11 @@ fn default_log_dirs() -> String {
 }
 
 fn default_node_modules_max_age_days() -> u64 {
-    30  // Clean node_modules not touched in 30 days
+    30 // Clean node_modules not touched in 30 days
 }
 
 fn default_nix_keep_generations() -> u32 {
-    5  // Keep last 5 nix generations
+    5 // Keep last 5 nix generations
 }
 
 pub(crate) fn human_bytes(bytes: u64) -> String {
@@ -995,7 +1000,10 @@ fn log_guard_event(guard: &GuardPolicy, event: &str, details: &str) {
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_secs();
-    let line = format!(r#"{{"ts":{},"event":"{}","details":"{}"}}"#, ts, event, details);
+    let line = format!(
+        r#"{{"ts":{},"event":"{}","details":"{}"}}"#,
+        ts, event, details
+    );
     if let Err(e) = std::fs::OpenOptions::new()
         .create(true)
         .append(true)
@@ -1057,7 +1065,10 @@ async fn kill_process(pid: i32) -> bool {
                 let cmd = content.replace('\0', " ");
                 let mut parts = cmd.split_whitespace();
                 let exe = parts.next().unwrap_or("");
-                let exe_name = Path::new(exe).file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+                let exe_name = Path::new(exe)
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_default();
                 let args = parts.collect::<Vec<_>>().join(" ");
                 is_git_process(&exe_name, &args)
             } else {
@@ -1067,7 +1078,10 @@ async fn kill_process(pid: i32) -> bool {
                 return false;
             };
             if !still_git {
-                eprintln!("⚠️ pid {} is no longer a git process — skipping SIGKILL", pid);
+                eprintln!(
+                    "⚠️ pid {} is no longer a git process — skipping SIGKILL",
+                    pid
+                );
                 return false;
             }
             if let Err(e) = Command::new("kill")
@@ -1106,7 +1120,7 @@ async fn detect_active_rust_builds() -> Result<HashSet<i32>> {
         .args(["-eo", "pid=,comm="])
         .output()
         .await?;
-    
+
     if !out.status.success() {
         return Ok(HashSet::new());
     }
@@ -1119,7 +1133,7 @@ async fn detect_active_rust_builds() -> Result<HashSet<i32>> {
             None => continue,
         };
         let comm = parts.next().unwrap_or("");
-        
+
         // Detect cargo, rustc, cargo-build, etc.
         if comm.contains("cargo") || comm.contains("rustc") || comm == "clippy-driver" {
             build_pids.insert(pid);
@@ -1138,16 +1152,16 @@ async fn get_process_cwd(pid: i32) -> Option<PathBuf> {
 /// Find all Rust target directories under the given search roots
 async fn find_rust_target_dirs(roots: &[PathBuf]) -> Result<Vec<TargetDirInfo>> {
     use walkdir::WalkDir;
-    
+
     let mut targets = Vec::new();
-    
+
     for root in roots {
         if !root.exists() {
             continue;
         }
-        
+
         for entry in WalkDir::new(root)
-            .max_depth(5)  // Don't go too deep
+            .max_depth(5) // Don't go too deep
             .follow_links(false)
             .into_iter()
             .filter_map(|e| e.ok())
@@ -1155,39 +1169,36 @@ async fn find_rust_target_dirs(roots: &[PathBuf]) -> Result<Vec<TargetDirInfo>> 
             if !entry.file_type().is_dir() {
                 continue;
             }
-            
+
             if entry.file_name() != "target" {
                 continue;
             }
-            
+
             let path = entry.path().to_path_buf();
-            
+
             // Check if there's a Cargo.toml in parent (confirm it's a Rust project)
             let parent = match path.parent() {
                 Some(p) => p,
                 None => continue,
             };
-            
+
             if !parent.join("Cargo.toml").exists() {
                 continue;
             }
-            
+
             // Get directory size using du
             let bytes = match get_dir_size(&path).await {
                 Ok(b) => b,
                 Err(_) => continue,
             };
-            
-            targets.push(TargetDirInfo {
-                path,
-                bytes,
-            });
+
+            targets.push(TargetDirInfo { path, bytes });
         }
     }
-    
+
     // Sort by size descending (clean largest first)
     targets.sort_by_key(|a| a.bytes);
-    
+
     Ok(targets)
 }
 
@@ -1198,11 +1209,11 @@ async fn get_dir_size(path: &Path) -> Result<u64> {
         .arg(path)
         .output()
         .await?;
-    
+
     if !out.status.success() {
         return Err(anyhow::anyhow!("du failed for {}", path.display()));
     }
-    
+
     let stdout = String::from_utf8_lossy(&out.stdout);
     let bytes = stdout
         .split_whitespace()
@@ -1210,7 +1221,7 @@ async fn get_dir_size(path: &Path) -> Result<u64> {
         .ok_or_else(|| anyhow::anyhow!("unexpected du output"))?
         .parse::<u64>()
         .context("failed to parse du output as byte count")?;
-    
+
     Ok(bytes)
 }
 
@@ -1226,30 +1237,37 @@ async fn auto_cleanup_rust_targets(
         cleaned_paths: Vec::new(),
         protected_paths: Vec::new(),
     };
-    
+
     // Parse search roots
-    let roots: Vec<PathBuf> = guard.rust_search_roots
+    let roots: Vec<PathBuf> = guard
+        .rust_search_roots
         .split(',')
         .filter_map(|s| {
             let s = s.trim();
-            if s.is_empty() { return None; }
+            if s.is_empty() {
+                return None;
+            }
             let p = expand_tilde(s);
-            if p.exists() { Some(p) } else { None }
+            if p.exists() {
+                Some(p)
+            } else {
+                None
+            }
         })
         .collect();
-    
+
     if roots.is_empty() {
         return Ok(result);
     }
-    
+
     // Find all target directories
     let targets = find_rust_target_dirs(&roots).await?;
-    
+
     // Detect active builds - ONLY protection mechanism
     // We protect target dirs where cargo/rustc is actively running
     let active_builds = detect_active_rust_builds().await?;
     state.active_build_pids = active_builds.clone();
-    
+
     // Get CWDs of active builds to protect their target dirs
     let mut protected_project_dirs: Vec<PathBuf> = Vec::new();
     for pid in &active_builds {
@@ -1265,21 +1283,21 @@ async fn auto_cleanup_rust_targets(
             }
         }
     }
-    
+
     let min_size_bytes = guard.cleanup_min_size_mb * 1024 * 1024;
-    
+
     for target in targets {
         // Skip if too small
         if target.bytes < min_size_bytes {
             continue;
         }
-        
+
         // Only skip if there's an ACTIVELY RUNNING cargo/rustc in this project
         let target_project = target.path.parent().unwrap_or(&target.path);
-        let has_active_build = protected_project_dirs.iter().any(|proj| {
-            target_project == proj
-        });
-        
+        let has_active_build = protected_project_dirs
+            .iter()
+            .any(|proj| target_project == proj);
+
         if has_active_build {
             result.protected_paths.push(format!(
                 "{} (active cargo/rustc process)",
@@ -1287,7 +1305,7 @@ async fn auto_cleanup_rust_targets(
             ));
             continue;
         }
-        
+
         if apply {
             check_safe_to_delete(&target.path, &guard.protected_paths)?;
             if let Err(e) = tokio::fs::remove_dir_all(&target.path).await {
@@ -1304,21 +1322,18 @@ async fn auto_cleanup_rust_targets(
             human_bytes(target.bytes)
         ));
     }
-    
+
     Ok(result)
 }
 
 /// Get inode usage percent for root filesystem
 async fn inode_use_percent() -> Result<u8> {
-    let out = Command::new("df")
-        .args(["-Pi", "/"])
-        .output()
-        .await?;
-    
+    let out = Command::new("df").args(["-Pi", "/"]).output().await?;
+
     if !out.status.success() {
         return Err(anyhow::anyhow!("df -i command failed"));
     }
-    
+
     let text = String::from_utf8_lossy(&out.stdout);
     // Parse: Filesystem Inodes IUsed IFree IUse% Mounted on
     text.lines()
@@ -1330,47 +1345,45 @@ async fn inode_use_percent() -> Result<u8> {
 
 /// Count zombie processes
 async fn count_zombie_processes() -> Result<u64> {
-    let out = Command::new("ps")
-        .args(["-eo", "stat="])
-        .output()
-        .await?;
-    
+    let out = Command::new("ps").args(["-eo", "stat="]).output().await?;
+
     if !out.status.success() {
         return Err(anyhow::anyhow!("ps command failed"));
     }
-    
+
     let text = String::from_utf8_lossy(&out.stdout);
-    let count = text.lines()
+    let count = text
+        .lines()
         .filter(|line| {
             let stat = line.trim();
             // Zombie processes have 'Z' in their stat
             stat.contains('Z') || stat.starts_with('Z')
         })
         .count();
-    
+
     Ok(count as u64)
 }
 
 /// Get inode info for root filesystem
 async fn get_inode_info() -> Result<(u64, u64, u64)> {
-    let out = Command::new("df")
-        .args(["-Pi", "/"])
-        .output()
-        .await?;
-    
+    let out = Command::new("df").args(["-Pi", "/"]).output().await?;
+
     if !out.status.success() {
         return Err(anyhow::anyhow!("df -i command failed"));
     }
-    
+
     let text = String::from_utf8_lossy(&out.stdout);
     // Parse: Filesystem Inodes IUsed IFree IUse% Mounted on
-    let line = text.lines().nth(1).ok_or_else(|| anyhow::anyhow!("no data line"))?;
+    let line = text
+        .lines()
+        .nth(1)
+        .ok_or_else(|| anyhow::anyhow!("no data line"))?;
     let parts: Vec<&str> = line.split_whitespace().collect();
-    
+
     let total = parts.get(1).and_then(|v| v.parse().ok()).unwrap_or(0);
     let used = parts.get(2).and_then(|v| v.parse().ok()).unwrap_or(0);
     let free = parts.get(3).and_then(|v| v.parse().ok()).unwrap_or(0);
-    
+
     Ok((total, used, free))
 }
 
@@ -1383,16 +1396,13 @@ async fn docker_prune(all: bool, volumes: bool) -> Result<u64> {
     if volumes {
         args.push("--volumes");
     }
-    
-    let out = Command::new("docker")
-        .args(&args)
-        .output()
-        .await?;
-    
+
+    let out = Command::new("docker").args(&args).output().await?;
+
     if !out.status.success() {
         return Err(anyhow::anyhow!("docker prune failed"));
     }
-    
+
     // Try to parse reclaimed space from output
     let text = String::from_utf8_lossy(&out.stdout);
     for line in text.lines() {
@@ -1406,15 +1416,21 @@ async fn docker_prune(all: bool, volumes: bool) -> Result<u64> {
             }
         }
     }
-    
+
     Ok(0)
 }
 
 fn parse_docker_size(s: &str) -> u64 {
     let s = s.trim();
-    let num: String = s.chars().take_while(|c| c.is_numeric() || *c == '.').collect();
-    let unit: String = s.chars().skip_while(|c| c.is_numeric() || *c == '.' || *c == ' ').collect();
-    
+    let num: String = s
+        .chars()
+        .take_while(|c| c.is_numeric() || *c == '.')
+        .collect();
+    let unit: String = s
+        .chars()
+        .skip_while(|c| c.is_numeric() || *c == '.' || *c == ' ')
+        .collect();
+
     let value: f64 = match num.parse() {
         Ok(v) => v,
         Err(_) => {
@@ -1430,7 +1446,7 @@ fn parse_docker_size(s: &str) -> u64 {
         "TB" | "TIB" => 1024.0 * 1024.0 * 1024.0 * 1024.0,
         _ => 1.0,
     };
-    
+
     (value * multiplier) as u64
 }
 
@@ -1445,7 +1461,7 @@ async fn clean_package_caches(
 ) -> Result<(u64, Vec<String>)> {
     let mut reclaimed = 0u64;
     let mut cleaned = Vec::new();
-    
+
     if cargo {
         if let Some(home) = dirs::home_dir() {
             let cargo_cache = home.join(".cargo/registry/cache");
@@ -1468,7 +1484,7 @@ async fn clean_package_caches(
             }
         }
     }
-    
+
     if npm {
         if let Some(home) = dirs::home_dir() {
             let npm_cache = home.join(".npm");
@@ -1491,7 +1507,7 @@ async fn clean_package_caches(
             }
         }
     }
-    
+
     if pip {
         if let Some(home) = dirs::home_dir() {
             let pip_cache = home.join(".cache/pip");
@@ -1514,7 +1530,7 @@ async fn clean_package_caches(
             }
         }
     }
-    
+
     if go {
         if let Some(home) = dirs::home_dir() {
             let go_cache = home.join(".cache/go-build");
@@ -1537,7 +1553,7 @@ async fn clean_package_caches(
             }
         }
     }
-    
+
     Ok((reclaimed, cleaned))
 }
 
@@ -1545,11 +1561,11 @@ async fn clean_package_caches(
 async fn empty_trash(apply: bool, protected_paths: &[String]) -> Result<(u64, Vec<String>)> {
     let mut reclaimed = 0u64;
     let mut cleaned = Vec::new();
-    
+
     if let Some(home) = dirs::home_dir() {
         let trash_files = home.join(".local/share/Trash/files");
         let trash_info = home.join(".local/share/Trash/info");
-        
+
         if trash_files.exists() {
             let size = get_dir_size(&trash_files).await.unwrap_or(0);
             if size > 0 {
@@ -1570,7 +1586,7 @@ async fn empty_trash(apply: bool, protected_paths: &[String]) -> Result<(u64, Ve
                 }
             }
         }
-        
+
         if trash_info.exists() {
             let info_size = get_dir_size(&trash_info).await.unwrap_or(0);
             if info_size > 0 {
@@ -1592,7 +1608,7 @@ async fn empty_trash(apply: bool, protected_paths: &[String]) -> Result<(u64, Ve
             }
         }
     }
-    
+
     Ok((reclaimed, cleaned))
 }
 
@@ -1641,7 +1657,10 @@ async fn clean_nix_garbage(keep_generations: u32, apply: bool) -> Result<(u64, V
         .map_err(|e| anyhow::anyhow!("failed to run nix-store: {}", e))?;
 
     if !out.status.success() {
-        return Err(anyhow::anyhow!("nix-store collect-garbage failed: {}", String::from_utf8_lossy(&out.stderr)));
+        return Err(anyhow::anyhow!(
+            "nix-store collect-garbage failed: {}",
+            String::from_utf8_lossy(&out.stderr)
+        ));
     }
 
     let text = String::from_utf8_lossy(&out.stdout);
@@ -1652,7 +1671,11 @@ async fn clean_nix_garbage(keep_generations: u32, apply: bool) -> Result<(u64, V
     }
 
     if !errs.is_empty() && reclaimed == 0 {
-        return Err(anyhow::anyhow!("nix cleanup had {} error(s): {}", errs.len(), errs.join("; ")));
+        return Err(anyhow::anyhow!(
+            "nix cleanup had {} error(s): {}",
+            errs.len(),
+            errs.join("; ")
+        ));
     }
 
     Ok((reclaimed, cleaned))
@@ -1666,17 +1689,17 @@ async fn clean_old_node_modules(
     protected_paths: &[String],
 ) -> Result<(u64, Vec<String>)> {
     use walkdir::WalkDir;
-    
+
     let mut reclaimed = 0u64;
     let mut cleaned = Vec::new();
     let now = SystemTime::now();
     let max_age_secs = max_age_days * 24 * 3600;
-    
+
     for root in roots {
         if !root.exists() {
             continue;
         }
-        
+
         for entry in WalkDir::new(root)
             .max_depth(5)
             .follow_links(false)
@@ -1686,28 +1709,28 @@ async fn clean_old_node_modules(
             if !entry.file_type().is_dir() {
                 continue;
             }
-            
+
             if entry.file_name() != "node_modules" {
                 continue;
             }
-            
+
             let path = entry.path().to_path_buf();
-            
+
             // Check age
             let modified_secs_ago = match fs::metadata(&path).and_then(|m| m.modified()) {
                 Ok(mtime) => now.duration_since(mtime).map(|d| d.as_secs()).unwrap_or(0),
                 Err(_) => continue,
             };
-            
+
             if modified_secs_ago < max_age_secs {
                 continue;
             }
-            
+
             let size = match get_dir_size(&path).await {
                 Ok(s) => s,
                 Err(_) => continue,
             };
-            
+
             if size > 0 {
                 let mut succeeded = true;
                 if apply {
@@ -1729,21 +1752,24 @@ async fn clean_old_node_modules(
             }
         }
     }
-    
+
     Ok((reclaimed, cleaned))
 }
 
 /// Find large log files
-async fn find_large_log_files(dirs: &[PathBuf], min_size_bytes: u64) -> Result<Vec<(PathBuf, u64)>> {
+async fn find_large_log_files(
+    dirs: &[PathBuf],
+    min_size_bytes: u64,
+) -> Result<Vec<(PathBuf, u64)>> {
     use walkdir::WalkDir;
-    
+
     let mut logs = Vec::new();
-    
+
     for dir in dirs {
         if !dir.exists() {
             continue;
         }
-        
+
         for entry in WalkDir::new(dir)
             .max_depth(3)
             .follow_links(false)
@@ -1753,41 +1779,47 @@ async fn find_large_log_files(dirs: &[PathBuf], min_size_bytes: u64) -> Result<V
             if !entry.file_type().is_file() {
                 continue;
             }
-            
+
             let path = entry.path();
-            let name = path.file_name()
+            let name = path
+                .file_name()
                 .map(|n| n.to_string_lossy().to_string())
                 .unwrap_or_default();
-            
+
             // Check if it looks like a log file
-            if !name.ends_with(".log") && 
-               !name.ends_with(".log.old") &&
-               !name.contains(".log.") &&
-               name != "journal" &&
-               !name.ends_with(".journal") {
+            if !name.ends_with(".log")
+                && !name.ends_with(".log.old")
+                && !name.contains(".log.")
+                && name != "journal"
+                && !name.ends_with(".journal")
+            {
                 continue;
             }
-            
+
             let size = match fs::metadata(path) {
                 Ok(m) => m.len(),
                 Err(_) => continue,
             };
-            
+
             if size >= min_size_bytes {
                 logs.push((path.to_path_buf(), size));
             }
         }
     }
-    
+
     // Sort by size descending
     logs.sort_by_key(|a| a.1);
-    
+
     Ok(logs)
 }
 
 /// Truncate a log file to a maximum size while optionally preserving header lines.
 /// Returns the number of bytes reclaimed, or an error on failure.
-fn truncate_log_file(path: &Path, max_size_bytes: u64, preserve_header_lines: usize) -> Result<u64> {
+fn truncate_log_file(
+    path: &Path,
+    max_size_bytes: u64,
+    preserve_header_lines: usize,
+) -> Result<u64> {
     use std::io::{BufRead, BufReader, Write};
 
     let original_size = std::fs::metadata(path)?.len();
@@ -1797,9 +1829,7 @@ fn truncate_log_file(path: &Path, max_size_bytes: u64, preserve_header_lines: us
 
     if preserve_header_lines == 0 {
         // Simple truncate: open with truncate flag
-        let file = std::fs::OpenOptions::new()
-            .write(true)
-            .open(path)?;
+        let file = std::fs::OpenOptions::new().write(true).open(path)?;
         file.set_len(max_size_bytes)?;
         let new_size = file.metadata()?.len();
         return Ok(original_size.saturating_sub(new_size));
@@ -1864,19 +1894,19 @@ pub(crate) fn predict_fill_time(history: &[(Instant, u8)]) -> Option<f64> {
     if history.len() < 3 {
         return None;
     }
-    
+
     // Simple linear regression on the last N samples
-    let n = history.len().min(20);  // Use up to 20 samples
+    let n = history.len().min(20); // Use up to 20 samples
     let recent = &history[history.len().saturating_sub(n)..];
-    
+
     if recent.len() < 3 {
         return None;
     }
-    
+
     // Calculate rate of change (percent per second)
     let mut total_rate = 0.0;
     let mut count = 0;
-    
+
     for i in 1..recent.len() {
         let dt = recent[i].0.duration_since(recent[i - 1].0).as_secs_f64();
         if dt <= 0.0 {
@@ -1886,24 +1916,24 @@ pub(crate) fn predict_fill_time(history: &[(Instant, u8)]) -> Option<f64> {
         total_rate += dp / dt;
         count += 1;
     }
-    
+
     if count == 0 {
         return None;
     }
-    
+
     let avg_rate = total_rate / count as f64;
-    
+
     // If rate is negative or zero, disk isn't filling
     if avg_rate <= 0.0 {
         return None;
     }
-    
+
     // Time until 100% from current
     let current = recent.last()?.1 as f64;
     let remaining_percent = 100.0 - current;
     let seconds_until_full = remaining_percent / avg_rate;
-    
-    Some(seconds_until_full / 3600.0)  // Return hours
+
+    Some(seconds_until_full / 3600.0) // Return hours
 }
 
 pub(crate) async fn run_guard_once(
@@ -1919,13 +1949,13 @@ pub(crate) async fn run_guard_once(
     if guard.track_trends {
         let now = Instant::now();
         state.disk_history.push((now, used));
-        
+
         // Keep only last 100 samples (about 50 minutes at 30s interval)
         if state.disk_history.len() > 100 {
             let excess = state.disk_history.len() - 100;
             state.disk_history.drain(0..excess);
         }
-        
+
         // Check for trend prediction warning
         if let Some(hours_until_full) = predict_fill_time(&state.disk_history) {
             if hours_until_full > 0.0 && hours_until_full <= guard.trend_warn_hours as f64 {
@@ -1968,11 +1998,19 @@ pub(crate) async fn run_guard_once(
                     eprintln!("failed to create freeze marker dir: {}", e);
                 }
             }
-            if let Err(e) = fs::write(&marker, format!("dracon-system guard freeze: disk={}%\n", used)) {
+            if let Err(e) = fs::write(
+                &marker,
+                format!("dracon-system guard freeze: disk={}%\n", used),
+            ) {
                 eprintln!("failed to write freeze marker: {}", e);
             } else {
                 sync_frozen = true;
-                emit_event(&DraconEvent::new("system", EventSeverity::Warn, "disk/freeze", format!("sync frozen at {}%", used)));
+                emit_event(&DraconEvent::new(
+                    "system",
+                    EventSeverity::Warn,
+                    "disk/freeze",
+                    format!("sync frozen at {}%", used),
+                ));
             }
         }
     } else if sync_frozen && used <= guard.unfreeze_below_percent {
@@ -1980,7 +2018,12 @@ pub(crate) async fn run_guard_once(
             eprintln!("failed to remove freeze marker: {}", e);
         } else {
             sync_frozen = false;
-            emit_event(&DraconEvent::new("system", EventSeverity::Info, "disk/unfreeze", format!("sync unfrozen at {}%", used)));
+            emit_event(&DraconEvent::new(
+                "system",
+                EventSeverity::Info,
+                "disk/unfreeze",
+                format!("sync unfrozen at {}%", used),
+            ));
         }
     }
 
@@ -1992,7 +2035,7 @@ pub(crate) async fn run_guard_once(
         }
         let mut total_reclaimed = 0u64;
         let mut all_cleaned: Vec<String> = Vec::new();
-        
+
         // Rust target directories
         if guard.auto_cleanup_rust {
             let result = auto_cleanup_rust_targets(guard, state, apply).await?;
@@ -2002,7 +2045,7 @@ pub(crate) async fn run_guard_once(
             }
             all_cleaned.extend(result.cleaned_paths);
         }
-        
+
         // Trash
         if guard.clean_trash {
             match empty_trash(apply, &guard.protected_paths).await {
@@ -2016,7 +2059,7 @@ pub(crate) async fn run_guard_once(
                 Err(e) => eprintln!("⚠️ Trash cleanup failed: {}", e),
             }
         }
-        
+
         // Nix garbage
         if guard.clean_nix_garbage {
             match clean_nix_garbage(guard.nix_keep_generations, apply).await {
@@ -2030,18 +2073,32 @@ pub(crate) async fn run_guard_once(
                 Err(e) => eprintln!("⚠️ Nix cleanup failed: {}", e),
             }
         }
-        
+
         // Old node_modules
-        let roots: Vec<PathBuf> = guard.node_modules_search_roots
+        let roots: Vec<PathBuf> = guard
+            .node_modules_search_roots
             .split(',')
             .filter_map(|s| {
                 let s = s.trim();
-                if s.is_empty() { return None; }
+                if s.is_empty() {
+                    return None;
+                }
                 let p = expand_tilde(s);
-                if p.exists() { Some(p) } else { None }
+                if p.exists() {
+                    Some(p)
+                } else {
+                    None
+                }
             })
             .collect();
-        let (bytes, cleaned) = match clean_old_node_modules(&roots, guard.node_modules_max_age_days, apply, &guard.protected_paths).await {
+        let (bytes, cleaned) = match clean_old_node_modules(
+            &roots,
+            guard.node_modules_max_age_days,
+            apply,
+            &guard.protected_paths,
+        )
+        .await
+        {
             Ok(result) => result,
             Err(e) => {
                 eprintln!("⚠️ Node modules cleanup failed: {}", e);
@@ -2053,10 +2110,11 @@ pub(crate) async fn run_guard_once(
         for c in &cleaned {
             eprintln!("📂 {}", c);
         }
-        
+
         // Package caches
         if guard.clean_package_caches {
-            match clean_package_caches(true, true, true, true, apply, &guard.protected_paths).await {
+            match clean_package_caches(true, true, true, true, apply, &guard.protected_paths).await
+            {
                 Ok((bytes, cleaned)) => {
                     total_reclaimed += bytes;
                     all_cleaned.extend(cleaned.iter().map(|s| format!("Cache: {}", s)));
@@ -2067,7 +2125,7 @@ pub(crate) async fn run_guard_once(
                 Err(e) => eprintln!("⚠️ Package cache cleanup failed: {}", e),
             }
         }
-        
+
         // Docker
         if guard.docker_prune {
             match docker_prune(apply, guard.docker_prune_volumes).await {
@@ -2080,7 +2138,7 @@ pub(crate) async fn run_guard_once(
                 Err(e) => eprintln!("⚠️ Docker prune failed: {}", e),
             }
         }
-        
+
         // Notify if anything was cleaned
         if total_reclaimed > 0 {
             let key = "auto-cleanup".to_string();
@@ -2134,7 +2192,11 @@ pub(crate) async fn run_guard_once(
         // Always log heavy processes to persistent log (even brief spikes)
         log_guard_event(
             guard,
-            if is_sustained { "heavy-sustained" } else { "heavy-brief" },
+            if is_sustained {
+                "heavy-sustained"
+            } else {
+                "heavy-brief"
+            },
             &format!(
                 "pid={} ppid={} cmd={} args={} cpu={:.1}% rss={}MiB sustained={}s",
                 p.pid, p.ppid, p.command, p.args, p.cpu_percent, p.rss_mb, sustained
@@ -2188,11 +2250,16 @@ pub(crate) async fn run_guard_once(
         });
     }
 
-    state.heavy_since.retain(|pid, _| current_heavy.contains(pid));
-    
+    state
+        .heavy_since
+        .retain(|pid, _| current_heavy.contains(pid));
+
     // Clean up stale notify_cooldowns entries (older than 2x cooldown period)
-    let cooldown_cutoff = Instant::now() - Duration::from_secs(guard.notify_cooldown_secs.saturating_mul(2));
-    state.notify_cooldowns.retain(|_, &mut since| since > cooldown_cutoff);
+    let cooldown_cutoff =
+        Instant::now() - Duration::from_secs(guard.notify_cooldown_secs.saturating_mul(2));
+    state
+        .notify_cooldowns
+        .retain(|_, &mut since| since > cooldown_cutoff);
 
     // Inode monitoring
     if guard.monitor_inodes {
@@ -2236,16 +2303,23 @@ pub(crate) async fn run_guard_once(
 
     // Large log file monitoring
     if guard.monitor_logs && !guard.log_dirs.trim().is_empty() {
-        let log_dirs: Vec<PathBuf> = guard.log_dirs
+        let log_dirs: Vec<PathBuf> = guard
+            .log_dirs
             .split(',')
             .filter_map(|s| {
                 let s = s.trim();
-                if s.is_empty() { return None; }
+                if s.is_empty() {
+                    return None;
+                }
                 let p = expand_tilde(s);
-                if p.exists() { Some(p) } else { None }
+                if p.exists() {
+                    Some(p)
+                } else {
+                    None
+                }
             })
             .collect();
-        
+
         if !log_dirs.is_empty() {
             let min_size = guard.log_size_mb * 1024 * 1024;
             match find_large_log_files(&log_dirs, min_size).await {
@@ -2257,12 +2331,14 @@ pub(crate) async fn run_guard_once(
                             "Found {} large log files (>{:.0} MiB): {}",
                             logs.len(),
                             guard.log_size_mb,
-                            top_logs.iter()
+                            top_logs
+                                .iter()
                                 .map(|(p, s)| format!("{} ({})", p.display(), human_bytes(*s)))
                                 .collect::<Vec<_>>()
                                 .join(", ")
                         );
-                        send_notification(guard, "Dracon System Guard - Large Log Files", &msg).await;
+                        send_notification(guard, "Dracon System Guard - Large Log Files", &msg)
+                            .await;
                     }
 
                     // Auto-truncate if enabled
@@ -2284,11 +2360,7 @@ pub(crate) async fn run_guard_once(
                                 }
                                 Ok(_) => {}
                                 Err(e) => {
-                                    eprintln!(
-                                        "⚠️ failed to truncate {}: {}",
-                                        path.display(),
-                                        e
-                                    );
+                                    eprintln!("⚠️ failed to truncate {}: {}", path.display(), e);
                                 }
                             }
                         }
@@ -2533,18 +2605,15 @@ async fn is_user_service_active(service: &str) -> bool {
         .await;
 
     match output {
-        Ok(out) if out.status.success() => {
-            String::from_utf8_lossy(&out.stdout).trim() == "active"
-        }
+        Ok(out) if out.status.success() => String::from_utf8_lossy(&out.stdout).trim() == "active",
         _ => false,
     }
 }
 
-
-
 async fn build_status_report() -> Result<StatusReport> {
     let root = canonical_system_root();
-    let (system_policy_path, _) = load_system_policy().unwrap_or_else(|_| (None, SystemPolicy::default()));
+    let (system_policy_path, _) =
+        load_system_policy().unwrap_or_else(|_| (None, SystemPolicy::default()));
     Ok(StatusReport {
         system_root: root.display().to_string(),
         nixos_root: root.join("nixos").display().to_string(),
@@ -2768,14 +2837,11 @@ async fn main() -> Result<()> {
                     "Cleanup mode: {}",
                     if cfg.apply { "APPLY" } else { "DRY-RUN" }
                 );
-                println!(
-                    "Kinds: {}",
-                    {
-                        let mut v: Vec<_> = cfg.kinds.iter().cloned().collect();
-                        v.sort();
-                        v.join(",")
-                    }
-                );
+                println!("Kinds: {}", {
+                    let mut v: Vec<_> = cfg.kinds.iter().cloned().collect();
+                    v.sort();
+                    v.join(",")
+                });
                 println!("Min size: {} MiB", cfg.min_size_mb);
                 println!("Allow tracked: {}", cfg.allow_tracked);
                 println!("Selected paths: {}", selected.len());
@@ -2906,7 +2972,9 @@ async fn main() -> Result<()> {
                     let reload_sighup_handler = reload.clone();
 
                     tokio::spawn(async move {
-                        if let Ok(mut sig) = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+                        if let Ok(mut sig) = tokio::signal::unix::signal(
+                            tokio::signal::unix::SignalKind::terminate(),
+                        ) {
                             sig.recv().await;
                             veprintln!(1, "system: received SIGTERM, shutting down gracefully...");
                             shutdown_sigterm.store(true, Ordering::SeqCst);
@@ -2916,7 +2984,9 @@ async fn main() -> Result<()> {
                     });
 
                     tokio::spawn(async move {
-                        if let Ok(mut sig) = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::interrupt()) {
+                        if let Ok(mut sig) = tokio::signal::unix::signal(
+                            tokio::signal::unix::SignalKind::interrupt(),
+                        ) {
                             sig.recv().await;
                             veprintln!(1, "system: received SIGINT, shutting down gracefully...");
                             shutdown_sigint.store(true, Ordering::SeqCst);
@@ -2926,7 +2996,9 @@ async fn main() -> Result<()> {
                     });
 
                     tokio::spawn(async move {
-                        if let Ok(mut sig) = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::hangup()) {
+                        if let Ok(mut sig) =
+                            tokio::signal::unix::signal(tokio::signal::unix::SignalKind::hangup())
+                        {
                             while sig.recv().await.is_some() {
                                 veprintln!(1, "system: received SIGHUP, reloading policy...");
                                 reload_sighup_handler.store(true, Ordering::SeqCst);
@@ -2936,7 +3008,11 @@ async fn main() -> Result<()> {
                         }
                     });
 
-                    veprintln!(1, "guard daemon started (interval={}s)", guard.interval_secs);
+                    veprintln!(
+                        1,
+                        "guard daemon started (interval={}s)",
+                        guard.interval_secs
+                    );
                     let interval = guard.interval_secs;
                     let mut elapsed = 0u64;
                     while !shutdown.load(Ordering::SeqCst) {
@@ -2947,7 +3023,13 @@ async fn main() -> Result<()> {
                                 Ok((policy_path, new_policy)) => {
                                     if policy_path.is_none() {
                                         eprintln!("system: SIGHUP reload warning: no policy file found, using defaults");
-                                        emit_event(&DraconEvent::new("system", EventSeverity::Warn, "guard/policy-reload", "SIGHUP reload: no policy file found, using defaults".to_string()));
+                                        emit_event(&DraconEvent::new(
+                                            "system",
+                                            EventSeverity::Warn,
+                                            "guard/policy-reload",
+                                            "SIGHUP reload: no policy file found, using defaults"
+                                                .to_string(),
+                                        ));
                                     }
                                     guard = new_policy.guard;
                                     normalize_guard_policy(&mut guard);
@@ -2956,13 +3038,26 @@ async fn main() -> Result<()> {
                                 }
                                 Err(e) => {
                                     eprintln!("system: SIGHUP reload warning: corrupted policy file, using defaults: {}", e);
-                                    emit_event(&DraconEvent::new("system", EventSeverity::Error, "guard/policy-reload", format!("SIGHUP reload: policy corrupted, using defaults: {}", e)));
+                                    emit_event(&DraconEvent::new(
+                                        "system",
+                                        EventSeverity::Error,
+                                        "guard/policy-reload",
+                                        format!(
+                                            "SIGHUP reload: policy corrupted, using defaults: {}",
+                                            e
+                                        ),
+                                    ));
                                 }
                             }
                         }
                         if let Err(e) = run_guard_once(&guard, &mut runtime).await {
                             eprintln!("guard pass failed: {}", e);
-                            emit_event(&DraconEvent::new("system", EventSeverity::Error, "guard", format!("pass failed: {e}")));
+                            emit_event(&DraconEvent::new(
+                                "system",
+                                EventSeverity::Error,
+                                "guard",
+                                format!("pass failed: {e}"),
+                            ));
                         }
                         while !shutdown.load(Ordering::SeqCst) && elapsed < interval {
                             sleep(Duration::from_secs(1)).await;
@@ -2971,10 +3066,16 @@ async fn main() -> Result<()> {
                     }
                     veprintln!(1, "system: guard daemon shutdown complete");
                 }
-                GuardCommands::Prune { json, docker, docker_volumes, package_caches, apply } => {
+                GuardCommands::Prune {
+                    json,
+                    docker,
+                    docker_volumes,
+                    package_caches,
+                    apply,
+                } => {
                     let mut reclaimed_total = 0u64;
                     let mut actions = Vec::new();
-                    
+
                     // Docker prune
                     if docker || docker_volumes {
                         if apply {
@@ -2991,10 +3092,19 @@ async fn main() -> Result<()> {
                             actions.push("Docker prune (dry-run, skipped)".to_string());
                         }
                     }
-                    
+
                     // Package cache cleanup
                     if package_caches {
-                        match clean_package_caches(true, true, true, true, apply, &guard.protected_paths).await {
+                        match clean_package_caches(
+                            true,
+                            true,
+                            true,
+                            true,
+                            apply,
+                            &guard.protected_paths,
+                        )
+                        .await
+                        {
                             Ok((bytes, cleaned)) => {
                                 for c in cleaned {
                                     actions.push(format!("Package cache: {}", c));
@@ -3006,19 +3116,20 @@ async fn main() -> Result<()> {
                             }
                         }
                     }
-                    
+
                     // If no specific flags, show what would be cleaned
                     if !docker && !docker_volumes && !package_caches {
                         // Show disk usage info
                         let disk = disk_use_percent_for(&guard.disk_mount_path).await?;
                         println!("Disk usage: {}% (mount: {})", disk, guard.disk_mount_path);
-                        
+
                         // Show inode info
                         if let Ok((total, used, _free)) = get_inode_info().await {
-                            let pct = used.saturating_mul(100).checked_div(total).unwrap_or(0) as u8;
+                            let pct =
+                                used.saturating_mul(100).checked_div(total).unwrap_or(0) as u8;
                             println!("Inode usage: {}% ({}/{} inodes used)", pct, used, total);
                         }
-                        
+
                         // Show potential cleanup targets
                         println!();
                         println!("Potential cleanup targets:");
@@ -3028,7 +3139,7 @@ async fn main() -> Result<()> {
                         println!();
                         println!("Add --apply to execute cleanup.");
                     }
-                    
+
                     if json {
                         #[derive(Serialize)]
                         struct PruneReport {
@@ -3048,36 +3159,49 @@ async fn main() -> Result<()> {
                             println!("  - {}", a);
                         }
                         println!("Total reclaimed: {}", human_bytes(reclaimed_total));
-                        
+
                         if !apply && (docker || docker_volumes || package_caches) {
                             println!();
                             println!("Note: This was a dry-run. Add --apply to execute.");
                         }
                     }
                 }
-                GuardCommands::Clean { json, apply, rust, trash, nix, caches, node_modules, docker, all, min_size_mb } => {
+                GuardCommands::Clean {
+                    json,
+                    apply,
+                    rust,
+                    trash,
+                    nix,
+                    caches,
+                    node_modules,
+                    docker,
+                    all,
+                    min_size_mb,
+                } => {
                     // If --all or no specific flags, do everything
-                    let do_all = all || (!rust && !trash && !nix && !caches && !node_modules && !docker);
+                    let do_all =
+                        all || (!rust && !trash && !nix && !caches && !node_modules && !docker);
                     let do_rust = rust || do_all;
                     let do_trash = trash || do_all;
                     let do_nix = nix || do_all;
                     let do_caches = caches || do_all;
                     let do_node = node_modules || do_all;
                     let do_docker = docker || do_all;
-                    
+
                     let mut guard_clone = guard.clone();
                     if let Some(mb) = min_size_mb {
                         guard_clone.cleanup_min_size_mb = mb;
                     }
-                    
+
                     let mut total_reclaimed = 0u64;
                     let mut actions: Vec<String> = Vec::new();
                     let mut failures: Vec<String> = Vec::new();
-                    
+
                     // Rust targets
                     if do_rust {
                         let mut runtime = GuardRuntimeState::default();
-                        let result = auto_cleanup_rust_targets(&guard_clone, &mut runtime, apply).await?;
+                        let result =
+                            auto_cleanup_rust_targets(&guard_clone, &mut runtime, apply).await?;
                         total_reclaimed += result.reclaimed_bytes;
                         for p in result.cleaned_paths {
                             actions.push(format!("Rust: {}", p));
@@ -3086,7 +3210,7 @@ async fn main() -> Result<()> {
                             actions.push(format!("Protected: {}", p));
                         }
                     }
-                    
+
                     // Trash
                     if do_trash {
                         match empty_trash(apply, &guard_clone.protected_paths).await {
@@ -3099,7 +3223,7 @@ async fn main() -> Result<()> {
                             Err(e) => failures.push(format!("Trash: {}", e)),
                         }
                     }
-                    
+
                     // Nix garbage
                     if do_nix {
                         match clean_nix_garbage(guard_clone.nix_keep_generations, apply).await {
@@ -3112,19 +3236,33 @@ async fn main() -> Result<()> {
                             Err(e) => failures.push(format!("Nix: {}", e)),
                         }
                     }
-                    
+
                     // Old node_modules
                     if do_node {
-                        let roots: Vec<PathBuf> = guard_clone.node_modules_search_roots
+                        let roots: Vec<PathBuf> = guard_clone
+                            .node_modules_search_roots
                             .split(',')
                             .filter_map(|s| {
                                 let s = s.trim();
-                                if s.is_empty() { return None; }
+                                if s.is_empty() {
+                                    return None;
+                                }
                                 let p = expand_tilde(s);
-                                if p.exists() { Some(p) } else { None }
+                                if p.exists() {
+                                    Some(p)
+                                } else {
+                                    None
+                                }
                             })
                             .collect();
-                        match clean_old_node_modules(&roots, guard_clone.node_modules_max_age_days, apply, &guard_clone.protected_paths).await {
+                        match clean_old_node_modules(
+                            &roots,
+                            guard_clone.node_modules_max_age_days,
+                            apply,
+                            &guard_clone.protected_paths,
+                        )
+                        .await
+                        {
                             Ok((bytes, cleaned)) => {
                                 total_reclaimed += bytes;
                                 for c in cleaned {
@@ -3134,10 +3272,19 @@ async fn main() -> Result<()> {
                             Err(e) => failures.push(format!("Node: {}", e)),
                         }
                     }
-                    
+
                     // Package caches
                     if do_caches {
-                        match clean_package_caches(true, true, true, true, apply, &guard_clone.protected_paths).await {
+                        match clean_package_caches(
+                            true,
+                            true,
+                            true,
+                            true,
+                            apply,
+                            &guard_clone.protected_paths,
+                        )
+                        .await
+                        {
                             Ok((bytes, cleaned)) => {
                                 total_reclaimed += bytes;
                                 for c in cleaned {
@@ -3147,7 +3294,7 @@ async fn main() -> Result<()> {
                             Err(e) => failures.push(format!("Cache: {}", e)),
                         }
                     }
-                    
+
                     // Docker
                     if do_docker {
                         match docker_prune(true, guard_clone.docker_prune_volumes).await {
@@ -3160,7 +3307,7 @@ async fn main() -> Result<()> {
                             Err(e) => failures.push(format!("Docker: {}", e)),
                         }
                     }
-                    
+
                     if json {
                         #[derive(Serialize)]
                         struct CleanReport {
@@ -3189,7 +3336,14 @@ async fn main() -> Result<()> {
                                 }
                                 println!();
                             }
-                            println!("Cleanup {}:", if apply { "results" } else { "preview (dry-run)" });
+                            println!(
+                                "Cleanup {}:",
+                                if apply {
+                                    "results"
+                                } else {
+                                    "preview (dry-run)"
+                                }
+                            );
                             for a in &actions {
                                 println!("  • {}", a);
                             }
@@ -3203,7 +3357,11 @@ async fn main() -> Result<()> {
                 }
             }
         }
-        Commands::Events { tail, source, severity } => {
+        Commands::Events {
+            tail,
+            source,
+            severity,
+        } => {
             let path = events_path();
             if !path.exists() {
                 println!("No events found ({} does not exist)", path.display());
@@ -3212,7 +3370,11 @@ async fn main() -> Result<()> {
             let contents = std::fs::read_to_string(&path)
                 .with_context(|| format!("failed to read {}", path.display()))?;
             let lines: Vec<&str> = contents.lines().collect();
-            let start = if lines.len() > tail { lines.len() - tail } else { 0 };
+            let start = if lines.len() > tail {
+                lines.len() - tail
+            } else {
+                0
+            };
             let mut shown = 0usize;
             for line in &lines[start..] {
                 if let Ok(val) = serde_json::from_str::<serde_json::Value>(line) {
@@ -3234,17 +3396,29 @@ async fn main() -> Result<()> {
                 println!("(no matching events)");
             }
         }
-        Commands::Zram { status, gen_config, memory_percent, algorithm } => {
+        Commands::Zram {
+            status,
+            gen_config,
+            memory_percent,
+            algorithm,
+        } => {
             if gen_config {
                 let mem_pct = memory_percent.unwrap_or(200);
                 let algo = algorithm.unwrap_or_else(|| "zstd".to_string());
                 let valid_algos = ["lzo", "lzo-rle", "lz4", "lz4hc", "zstd", "deflate", "842"];
                 if !valid_algos.contains(&algo.as_str()) {
-                    return Err(anyhow::anyhow!("Invalid algorithm. Valid: {}", valid_algos.join(", ")));
+                    return Err(anyhow::anyhow!(
+                        "Invalid algorithm. Valid: {}",
+                        valid_algos.join(", ")
+                    ));
                 }
                 let total_ram_kb: u64 = std::fs::read_to_string("/proc/meminfo")
                     .ok()
-                    .and_then(|s| s.lines().find(|l| l.starts_with("MemTotal:")).map(|l| l.split_whitespace().nth(1).unwrap_or("0").to_string()))
+                    .and_then(|s| {
+                        s.lines()
+                            .find(|l| l.starts_with("MemTotal:"))
+                            .map(|l| l.split_whitespace().nth(1).unwrap_or("0").to_string())
+                    })
                     .and_then(|s| s.parse().ok())
                     .unwrap_or(0);
                 let total_ram_gb = total_ram_kb as f64 / 1024.0 / 1024.0;
@@ -3255,39 +3429,44 @@ async fn main() -> Result<()> {
                 println!("  zramSwap = {{");
                 println!("    enable = true;");
                 println!("    algorithm = \"{}\";", algo);
-                println!("    # {}% of RAM = {}GB virtual swap (based on detected {} GB RAM)", mem_pct, (mem_pct as f64 / 100.0 * total_ram_gb), total_ram_gb);
+                println!(
+                    "    # {}% of RAM = {}GB virtual swap (based on detected {} GB RAM)",
+                    mem_pct,
+                    (mem_pct as f64 / 100.0 * total_ram_gb),
+                    total_ram_gb
+                );
                 println!("    memoryPercent = {};", mem_pct);
                 println!("  }};");
                 println!();
                 println!("# Then rebuild: sudo nixos-rebuild switch --flake ~/.dracon/nixos#");
                 return Ok(());
             }
-            
+
             if status || (!gen_config) {
                 // Show zram stats
                 let zram_path = "/sys/block/zram0";
                 let mm_stat_path = format!("{}/mm_stat", zram_path);
-                
+
                 println!("Zram Status");
                 println!("============");
-                
+
                 // Check if zram exists
                 if !std::path::Path::new(zram_path).exists() {
                     println!("No zram device found.");
                     return Ok(());
                 }
-                
+
                 // Get disksize
                 let disksize = std::fs::read_to_string(format!("{}/disksize", zram_path))
                     .map(|s| s.trim().parse::<u64>().unwrap_or(0))
                     .unwrap_or(0);
                 let disksize_gb = disksize / 1024 / 1024 / 1024;
-                
+
                 // Get current algorithm
                 let algo = std::fs::read_to_string(format!("{}/comp_algorithm", zram_path))
                     .map(|s| s.trim().to_string())
                     .unwrap_or_else(|_| "unknown".to_string());
-                
+
                 // Get mm_stat (original data size, compressed size, memory used)
                 let mm_stat = std::fs::read_to_string(&mm_stat_path)
                     .map(|s| {
@@ -3296,17 +3475,21 @@ async fn main() -> Result<()> {
                             .collect::<Vec<_>>()
                     })
                     .unwrap_or_default();
-                
+
                 // mm_stat fields are in bytes: orig_size, compr_size, mem_used (and more)
                 let orig = *mm_stat.first().unwrap_or(&0);
                 let compr = *mm_stat.get(1).unwrap_or(&0);
                 let mem_used = *mm_stat.get(2).unwrap_or(&0);
-                
+
                 let orig_gb = orig as f64 / 1024.0 / 1024.0 / 1024.0;
                 let compr_gb = compr as f64 / 1024.0 / 1024.0 / 1024.0;
                 let mem_used_gb = mem_used as f64 / 1024.0 / 1024.0 / 1024.0;
-                let ratio = if orig > 0 { compr as f64 / orig as f64 } else { 0.0 };
-                
+                let ratio = if orig > 0 {
+                    compr as f64 / orig as f64
+                } else {
+                    0.0
+                };
+
                 println!();
                 println!("Device: /dev/zram0");
                 println!("Disksize: {} GB", disksize_gb);
@@ -3316,12 +3499,18 @@ async fn main() -> Result<()> {
                 println!("  Original data: {:.1} GB", orig_gb);
                 println!("  Compressed:    {:.1} GB", compr_gb);
                 println!("  RAM used:      {:.1} GB", mem_used_gb);
-                println!("  Compression ratio: {:.1}% ({:.1}x)", ratio * 100.0, if ratio > 0.0 { 1.0 / ratio } else { 0.0 });
+                println!(
+                    "  Compression ratio: {:.1}% ({:.1}x)",
+                    ratio * 100.0,
+                    if ratio > 0.0 { 1.0 / ratio } else { 0.0 }
+                );
                 println!();
                 println!("Configuration options:");
                 println!("  --gen-config           Generate NixOS configuration snippet");
                 println!("  --memory-percent <N>   Set memory percent (default: 200 for 2x RAM)");
-                println!("  --algorithm <algo>     Set algorithm: lzo, lz4, lz4hc, zstd (default: zstd)");
+                println!(
+                    "  --algorithm <algo>     Set algorithm: lzo, lz4, lz4hc, zstd (default: zstd)"
+                );
                 println!();
                 println!("Example - generate config for 2x RAM with zstd:");
                 println!("  dracon-system zram --gen-config --memory-percent 200 --algorithm zstd");
