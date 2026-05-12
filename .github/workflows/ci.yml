@@ -14,7 +14,7 @@ jobs:
     name: Test Suite
     strategy:
       matrix:
-        crate: [dracon-sync, dracon-system, dracon-warden]
+        crate: [dracon-sync, dracon-system, dracon-warden, dracon-ai]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
@@ -23,7 +23,7 @@ jobs:
       - name: Checkout dracon-libs
         uses: actions/checkout@v4
         with:
-          repository: your-org/dracon-libs
+          repository: DraconDev/dracon-libs
           path: ../dracon-libs
 
       - name: Install Rust
@@ -42,9 +42,10 @@ jobs:
         working-directory: ./${{ matrix.crate }}
         run: cargo clippy --all-targets -- -D warnings
 
-      - name: Run tests
+      - name: Run tests (serial)
         working-directory: ./${{ matrix.crate }}
-        run: cargo test --all-targets
+        # Serial execution avoids flaky race conditions from shared global state
+        run: cargo test --all-targets -- --test-threads=1
 
   coverage:
     name: Coverage Report
@@ -57,7 +58,7 @@ jobs:
       - name: Checkout dracon-libs
         uses: actions/checkout@v4
         with:
-          repository: your-org/dracon-libs
+          repository: DraconDev/dracon-libs
           path: ../dracon-libs
 
       - name: Install Rust
