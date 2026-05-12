@@ -340,12 +340,12 @@ Commands:
 
 ### Safety Behaviors
 
-**dracon-sync mass-deletion prevention:** The sync daemon will refuse to auto-commit deletions that remove more than 50% of tracked files in a repository. This guards against accidental mass deletion caused by filesystem issues, filter misconfigurations, or destructive operations.
+**dracon-sync mass-deletion prevention:** The sync daemon will refuse to auto-commit deletions that remove 100% of tracked files in a repository. This guards against accidental total wipes caused by filesystem issues, filter misconfigurations, or destructive operations.
 
 When triggered, sync prints a warning and skips the commit:
 ```
-⚠️ SAFETY: 30 files missing from working tree (65% of 46 tracked)
-⚠️ Refusing to stage mass deletion - this looks like a mistake or destructive operation
+⚠️ SAFETY: 46 files missing from working tree (100% of 46 tracked)
+⚠️ Refusing to stage total wipe - this looks like a mistake or destructive operation
 ⚠️ If you really want to delete these files, do: git add -A && git commit -m 'delete files'
 ```
 
@@ -353,7 +353,7 @@ To bypass: manually stage and commit the deletions with `git add -A && git commi
 
 **Metrics:** A Prometheus counter `dracon_sync_mass_deletion_guard_blocked_total` is incremented each time the guard triggers. View it with `dracon-sync metrics`.
 
-**Force bypass:** For intentional mass deletions, use `dracon-sync sync-now --force <repo>` to skip the safety guard entirely. Use with caution — this will auto-commit ALL deletions without prompting.
+**Force bypass:** For intentional total wipes, use `dracon-sync sync-now --force <repo>` to skip the safety guard entirely. Use with caution — this will auto-commit ALL deletions without prompting.
 
 **Incident response after a block:** Read the incident ledger at `~/.local/state/dracon/dracon-sync-incidents.jsonl` to understand what was blocked and why.
 
