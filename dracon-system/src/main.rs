@@ -67,6 +67,10 @@ fn is_protected_ancestor(path: &str, protected: &str) -> bool {
     if path == protected {
         return true;
     }
+    // Root '/' is special: every path is a descendant, so only match exact.
+    if protected == "/" {
+        return path == "/";
+    }
     // Ensure protected ends with '/' so '/home' doesn't match '/homefoo'
     let prefix = if protected.ends_with('/') {
         protected.to_string()
@@ -78,7 +82,7 @@ fn is_protected_ancestor(path: &str, protected: &str) -> bool {
 
 #[cfg(test)]
 const TEST_PROTECTED: &[&str] = &[
-    "/home", "/etc", "/usr", "/var", "/boot",
+    "/", "/home", "/etc", "/usr", "/var", "/boot",
     "/nix", "/run", "/sys", "/dev", "/proc"
 ];
 
@@ -2863,10 +2867,10 @@ mod tests {
     }
 
     #[test]
-    fn is_protected_ancestor_root_matches_all() {
-        assert!(is_protected_ancestor("/anything", "/"));
-        assert!(is_protected_ancestor("/home", "/"));
+    fn is_protected_ancestor_root_matches_exact_only() {
         assert!(is_protected_ancestor("/", "/"));
+        assert!(!is_protected_ancestor("/anything", "/")); // root only matches exact to allow cleanup
+        assert!(!is_protected_ancestor("/home", "/"));
     }
 
     #[test]
