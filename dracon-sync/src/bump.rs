@@ -203,10 +203,11 @@ Staged Changes:
 {staged_diff}
 
 Respond with ONLY ONE WORD:
-- "major": BREAKING CHANGE
-- "minor": NEW FEATURE  
+- "minor": NEW FEATURE or BREAKING CHANGE (major bumps require manual approval)
 - "patch": BUG FIX / improvement
 - "none": NOISY/CHORE (docs, deps, config only)
+
+Note: major version bumps must be done manually. If you think major is warranted, respond with "minor".
 
 Respond with ONLY ONE WORD."##);
 
@@ -219,12 +220,18 @@ Respond with ONLY ONE WORD."##);
 
     match service.chat(messages).await {
         Ok(content) => {
-            match content.trim().to_lowercase().as_str() {
+            let level = match content.trim().to_lowercase().as_str() {
                 "major" => BumpLevel::Major,
                 "minor" => BumpLevel::Minor,
                 "patch" => BumpLevel::Patch,
                 _ => BumpLevel::None,
+            };
+            // Cap AI-suggested bumps at minor; major requires manual approval
+            if level == BumpLevel::Major {
+                eprintln!("🤖 ai-bump: major bump requested by AI — downgrading to minor (major requires manual approval)");
+                return BumpLevel::Minor;
             }
+            level
         }
         Err(_) => BumpLevel::None,
     }
