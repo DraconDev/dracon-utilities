@@ -3,7 +3,6 @@ members = [
     "dracon-sync",
     "dracon-system",
     "dracon-warden",
-    "dracon-ai",
 ]
 resolver = "2"
 
