@@ -1,13 +1,13 @@
 [workspace]
-[workspace]
 members = [
     "dracon-sync",
     "dracon-system",
     "dracon-warden",
 ]
 resolver = "2"
+
 [workspace.package]
-version = "0.2.13"
+version = "0.2.0"
 edition = "2021"
 authors = ["DraconDev"]
 
