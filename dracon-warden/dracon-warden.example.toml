@@ -3,14 +3,24 @@
 #
 # Controls secret encryption and watch roots.
 
-# Directories to watch for secrets
+# Directories to watch for filesystem events (daemon mode)
 watch_roots = ["/home/dracon/Dev"]
 
-# File extensions to scan
-# watch_extensions = [".py", ".js", ".ts", ".rs", ".toml", ".env"]
+# Directories to scan during discovery (once/repair commands)
+# If omitted, watch_roots are used for discovery as well.
+# discover_roots = ["/home/dracon/Dev"]
 
-# Markers that indicate encrypted content
-# secret_markers = ["DRACON_SECRET"]
+# Glob patterns for files that MUST be encrypted (age filter + gitattributes)
+# These files are tracked in git but stored as encrypted blobs.
+# Example: ["*.key", "*.pem", "*.env", ".ssh/*", "secrets/*"]
+protected_patterns = []
 
-# Age key file location
-# age_key_file = "~/.config/dracon/warden/age.key"
+# Glob patterns for files that must remain plaintext (excluded from encryption)
+# Use for files that need to be readable without decryption keys.
+# Example: ["*.md", "*.txt", "LICENSE*"]
+plaintext_patterns = []
+
+# Glob patterns for hygiene checks (files that should NOT exist in repo)
+# Warden will warn if these patterns are found in the working tree.
+# Example: ["*.secret", "*.private", "*.bak"]
+hygiene_patterns = []
