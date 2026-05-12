@@ -2817,6 +2817,43 @@ mod tests {
     }
 
     #[test]
+    fn is_protected_ancestor_exact_match() {
+        assert!(is_protected_ancestor("/home", "/home"));
+        assert!(is_protected_ancestor("/etc", "/etc"));
+        assert!(is_protected_ancestor("/", "/"));
+    }
+
+    #[test]
+    fn is_protected_ancestor_descendant_match() {
+        assert!(is_protected_ancestor("/home/dracon", "/home"));
+        assert!(is_protected_ancestor("/home/dracon/Dev", "/home"));
+        assert!(is_protected_ancestor("/etc/nginx/nginx.conf", "/etc"));
+    }
+
+    #[test]
+    fn is_protected_ancestor_rejects_partial_prefix() {
+        assert!(!is_protected_ancestor("/homefoo", "/home"));
+        assert!(!is_protected_ancestor("/homefoo/bar", "/home"));
+        assert!(!is_protected_ancestor("/etcnginx", "/etc"));
+    }
+
+    #[test]
+    fn is_protected_ancestor_root_matches_all() {
+        assert!(is_protected_ancestor("/anything", "/"));
+        assert!(is_protected_ancestor("/home", "/"));
+        assert!(is_protected_ancestor("/", "/"));
+    }
+
+    #[test]
+    fn check_path_str_blocks_descendants() {
+        assert!(!check_path_str("/home/dracon", &[]));
+        assert!(!check_path_str("/home/dracon/Dev", &[]));
+        assert!(!check_path_str("/etc/nginx", &[]));
+        assert!(check_path_str("/safe/path", &[]));
+        assert!(check_path_str("/homefoo", &[])); // partial prefix should be safe
+    }
+
+    #[test]
     fn parse_ps_output_extracts_all_fields() {
         let sample = "9999 1 75.0 8192000 git-fetch origin main\n";
         let rows = parse_ps_output(sample);
