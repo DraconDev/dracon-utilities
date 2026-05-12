@@ -504,36 +504,56 @@ pub(crate) async fn push_with_transport_fallbacks(
                 }
             }
 
-            // Try GitLab HTTPS with PAT
+            // Try GitLab HTTPS with PAT via GIT_ASKPASS (avoids token in URL/process listings)
             if let Some(https) = gitlab_https_url(&origin) {
                 if let Some(token) = load_secret("GITLAB_TOKEN") {
-                    let pat_url = format!("https://oauth2:{}@{}", token, https.strip_prefix("https://").unwrap_or(&https));
-                    let result = run_git_with_timeout_env(
-                        repo,
-                        &["push", &pat_url, &refspec],
-                        timeout_secs,
-                        &format!("{op_label}-gitlab-https"),
-                        no_prompt,
-                    ).await;
-                    if result.is_ok() {
-                        return Ok(());
+                    match git_askpass_script(&token).await {
+                        Ok(askpass) => {
+                            let result = run_git_with_timeout_env(
+                                repo,
+                                &["push", &https, &refspec],
+                                timeout_secs,
+                                &format!("{op_label}-gitlab-https"),
+                                &[
+                                    ("GIT_ASKPASS", askpass.to_str().unwrap_or("/bin/false")),
+                                    ("GIT_TERMINAL_PROMPT", "0"),
+                                ],
+                            ).await;
+                            let _ = tokio::fs::remove_file(&askpass).await;
+                            if result.is_ok() {
+                                return Ok(());
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("⚠️ failed to create GIT_ASKPASS helper for GitLab: {}", e);
+                        }
                     }
                 }
             }
 
-            // Try Codeberg HTTPS with PAT
+            // Try Codeberg HTTPS with PAT via GIT_ASKPASS (avoids token in URL/process listings)
             if let Some(https) = codeberg_https_url(&origin) {
                 if let Some(token) = load_secret("CODEBERG_TOKEN") {
-                    let pat_url = format!("https://git:{}@{}", token, https.strip_prefix("https://").unwrap_or(&https));
-                    let result = run_git_with_timeout_env(
-                        repo,
-                        &["push", &pat_url, &refspec],
-                        timeout_secs,
-                        &format!("{op_label}-codeberg-https"),
-                        no_prompt,
-                    ).await;
-                    if result.is_ok() {
-                        return Ok(());
+                    match git_askpass_script(&token).await {
+                        Ok(askpass) => {
+                            let result = run_git_with_timeout_env(
+                                repo,
+                                &["push", &https, &refspec],
+                                timeout_secs,
+                                &format!("{op_label}-codeberg-https"),
+                                &[
+                                    ("GIT_ASKPASS", askpass.to_str().unwrap_or("/bin/false")),
+                                    ("GIT_TERMINAL_PROMPT", "0"),
+                                ],
+                            ).await;
+                            let _ = tokio::fs::remove_file(&askpass).await;
+                            if result.is_ok() {
+                                return Ok(());
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("⚠️ failed to create GIT_ASKPASS helper for Codeberg: {}", e);
+                        }
                     }
                 }
             }
