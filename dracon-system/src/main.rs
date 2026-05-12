@@ -406,17 +406,17 @@ struct CleanupConfig {
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
-struct SystemPolicy {
+pub(crate) struct SystemPolicy {
     #[serde(default)]
-    storage: StoragePolicy,
+    pub(crate) storage: StoragePolicy,
     #[serde(default)]
-    links: LinkPolicy,
+    pub(crate) links: LinkPolicy,
     #[serde(default)]
-    guard: GuardPolicy,
+    pub(crate) guard: GuardPolicy,
 }
 
 #[derive(Debug, Clone, Deserialize)]
-struct StoragePolicy {
+pub(crate) struct StoragePolicy {
     #[serde(default)]
     default_root: String,
     #[serde(default = "default_min_size_mb")]
@@ -436,19 +436,19 @@ impl Default for StoragePolicy {
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
-struct LinkPolicy {
+pub(crate) struct LinkPolicy {
     #[serde(default)]
-    entries: Vec<LinkEntry>,
+    pub(crate) entries: Vec<LinkEntry>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
-struct LinkEntry {
-    link: String,
-    target: String,
+pub(crate) struct LinkEntry {
+    pub(crate) link: String,
+    pub(crate) target: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
-struct GuardPolicy {
+pub(crate) struct GuardPolicy {
     #[serde(default = "default_guard_enabled")]
     enabled: bool,
     #[serde(default = "default_disk_mount_path")]
@@ -646,7 +646,7 @@ struct GuardProcessAlert {
 }
 
 #[derive(Debug, Serialize)]
-struct GuardReport {
+pub(crate) struct GuardReport {
     enabled: bool,
     disk_use_percent: u8,
     disk_state: String,
@@ -654,11 +654,11 @@ struct GuardReport {
     alerts: Vec<GuardProcessAlert>,
 }
 
-fn default_min_size_mb() -> u64 {
+pub(crate) fn default_min_size_mb() -> u64 {
     512
 }
 
-fn default_kinds() -> String {
+pub(crate) fn default_kinds() -> String {
     "rust-build,node-deps,build-output,cache".to_string()
 }
 
@@ -814,7 +814,7 @@ fn default_nix_keep_generations() -> u32 {
     5  // Keep last 5 nix generations
 }
 
-fn human_bytes(bytes: u64) -> String {
+pub(crate) fn human_bytes(bytes: u64) -> String {
     const UNITS: [&str; 5] = ["B", "KiB", "MiB", "GiB", "TiB"];
     let mut value = bytes as f64;
     let mut idx = 0usize;
@@ -831,7 +831,7 @@ fn canonical_system_root() -> PathBuf {
         .join(".dracon")
 }
 
-fn expand_tilde(raw: &str) -> PathBuf {
+pub(crate) fn expand_tilde(raw: &str) -> PathBuf {
     if raw == "~" {
         return dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
     }
@@ -843,7 +843,7 @@ fn expand_tilde(raw: &str) -> PathBuf {
     PathBuf::from(raw)
 }
 
-fn parse_kinds(csv: &str) -> HashSet<String> {
+pub(crate) fn parse_kinds(csv: &str) -> HashSet<String> {
     csv.split(',')
         .map(|s| s.trim())
         .filter(|s| !s.is_empty())
@@ -852,24 +852,24 @@ fn parse_kinds(csv: &str) -> HashSet<String> {
 }
 
 #[derive(Debug, Clone)]
-struct ProcSample {
-    pid: i32,
-    ppid: i32,
-    cpu_percent: f32,
-    rss_mb: u64,
-    command: String,
-    args: String,
+pub(crate) struct ProcSample {
+    pub(crate) pid: i32,
+    pub(crate) ppid: i32,
+    pub(crate) cpu_percent: f32,
+    pub(crate) rss_mb: u64,
+    pub(crate) command: String,
+    pub(crate) args: String,
 }
 
 #[derive(Debug, Default)]
-struct GuardRuntimeState {
-    heavy_since: HashMap<i32, Instant>,
-    notify_cooldowns: HashMap<String, Instant>,
-    last_disk_state: String,
+pub(crate) struct GuardRuntimeState {
+    pub(crate) heavy_since: HashMap<i32, Instant>,
+    pub(crate) notify_cooldowns: HashMap<String, Instant>,
+    pub(crate) last_disk_state: String,
     /// History of disk usage samples for trend prediction (timestamp, percent)
-    disk_history: Vec<(Instant, u8)>,
+    pub(crate) disk_history: Vec<(Instant, u8)>,
     /// Active cargo build PIDs detected
-    active_build_pids: HashSet<i32>,
+    pub(crate) active_build_pids: HashSet<i32>,
 }
 
 /// Information about a Rust target directory for cleanup consideration
@@ -888,7 +888,7 @@ struct AutoCleanupResult {
     protected_paths: Vec<String>,
 }
 
-fn parse_df_use_percent(output: &str) -> Option<u8> {
+pub(crate) fn parse_df_use_percent(output: &str) -> Option<u8> {
     output
         .lines()
         .nth(1)
@@ -896,7 +896,7 @@ fn parse_df_use_percent(output: &str) -> Option<u8> {
         .and_then(|v| v.trim_end_matches('%').parse::<u8>().ok())
 }
 
-fn parse_ps_output(output: &str) -> Vec<ProcSample> {
+pub(crate) fn parse_ps_output(output: &str) -> Vec<ProcSample> {
     output
         .lines()
         .filter_map(|line| {
@@ -944,7 +944,7 @@ async fn process_samples() -> Result<Vec<ProcSample>> {
     Ok(parse_ps_output(&String::from_utf8_lossy(&out.stdout)))
 }
 
-fn disk_state(used: u8, guard: &GuardPolicy) -> &'static str {
+pub(crate) fn disk_state(used: u8, guard: &GuardPolicy) -> &'static str {
     if used >= guard.disk_critical_percent {
         "critical"
     } else if used >= guard.disk_action_percent {
@@ -1006,7 +1006,7 @@ fn log_guard_event(guard: &GuardPolicy, event: &str, details: &str) {
     }
 }
 
-fn should_notify(state: &mut GuardRuntimeState, key: &str, cooldown_secs: u64) -> bool {
+pub(crate) fn should_notify(state: &mut GuardRuntimeState, key: &str, cooldown_secs: u64) -> bool {
     let now = Instant::now();
     if let Some(until) = state.notify_cooldowns.get(key).copied() {
         if now < until {
@@ -1085,7 +1085,7 @@ async fn kill_process(pid: i32) -> bool {
     true
 }
 
-fn is_git_process(command: &str, args: &str) -> bool {
+pub(crate) fn is_git_process(command: &str, args: &str) -> bool {
     // Strict matching: only match known long-running git subcommands
     // that are safe to auto-kill. Avoids false positives like "legit-init".
     const GIT_CMDS: &[&str] = &["git-init", "git-fetch", "git-pull", "git-clone", "git-push"];
