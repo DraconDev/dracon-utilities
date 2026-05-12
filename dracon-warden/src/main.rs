@@ -1879,6 +1879,31 @@ mod tests {
     static NEXT_ID: AtomicU64 = AtomicU64::new(1);
     static HOME_MUTEX: Mutex<()> = Mutex::new(());
 
+    /// Guard that temporarily changes $HOME and restores it on drop.
+    struct HomeGuard {
+        original: Option<String>,
+        #[allow(dead_code)]
+        _lock: std::sync::MutexGuard<'static, ()>,
+    }
+
+    impl HomeGuard {
+        fn new(home: &str) -> Self {
+            let lock = HOME_MUTEX.lock().expect("home mutex poisoned");
+            let original = std::env::var("HOME").ok();
+            std::env::set_var("HOME", home);
+            HomeGuard { original, _lock: lock }
+        }
+    }
+
+    impl Drop for HomeGuard {
+        fn drop(&mut self) {
+            std::env::remove_var("HOME");
+            if let Some(ref v) = self.original {
+                std::env::set_var("HOME", v);
+            }
+        }
+    }
+
     struct TestDir {
         path: std::path::PathBuf,
         #[allow(dead_code)]
@@ -2259,14 +2284,8 @@ watch_roots = ["/tmp/test"]
         )
         .expect("write config");
 
-        let _lock = HOME_MUTEX.lock().expect("home mutex poisoned");
-        let original_home = std::env::var("HOME").ok();
-        std::env::set_var("HOME", td.path().to_str().unwrap());
+        let _guard = HomeGuard::new(td.path().to_str().unwrap());
         let path = resolve_policy_path_local();
-        std::env::remove_var("HOME");
-        if let Some(h) = original_home {
-            std::env::set_var("HOME", h);
-        }
 
         assert!(path.is_ok(), "should find config in default location");
     }
@@ -2537,17 +2556,9 @@ watch_roots = ["/tmp/test"]
         let td = TestDir::new("warden_keygen_success");
         let keys_dir = td.path().join(".dracon").join("data").join("keys");
 
-        let _lock = HOME_MUTEX.lock().expect("home mutex poisoned");
-        let original_home = std::env::var("HOME").ok();
-        std::env::set_var("HOME", td.path().to_str().unwrap());
+        let _guard = HomeGuard::new(td.path().to_str().unwrap());
 
         let result = run_keygen();
-
-        if let Some(home) = original_home {
-            std::env::set_var("HOME", home);
-        } else {
-            std::env::remove_var("HOME");
-        }
 
         assert!(result.is_ok(), "keygen should succeed: {:?}", result);
         let hostname_raw = hostname::get().expect("hostname").to_string_lossy().to_string();
