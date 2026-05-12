@@ -3,7 +3,7 @@ members = [
     "dracon-sync",
     "dracon-system",
     "dracon-warden",
-    "dracon-ai",
+    # "dracon-ai",  # requires dracon-libs/services/ai which is not yet available
 ]
 resolver = "2"
 

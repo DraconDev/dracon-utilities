@@ -14,7 +14,8 @@ jobs:
     name: Test Suite
     strategy:
       matrix:
-        crate: [dracon-sync, dracon-system, dracon-warden, dracon-ai]
+        crate: [dracon-sync, dracon-system, dracon-warden]
+        # dracon-ai excluded: requires dracon-libs/services/ai (not yet public)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
