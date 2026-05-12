@@ -526,7 +526,10 @@ impl SecretScanner {
             .map(|(_, p)| format!("(?:{})", p))
             .collect::<Vec<_>>()
             .join("|");
-        let full_regex = Regex::new(&format!("(?sm){}", combined))
+        let full_regex = regex::RegexBuilder::new(&format!("(?sm){}", combined))
+            .size_limit(10 * (1 << 20))
+            .dfa_size_limit(5 * (1 << 20))
+            .build()
             .map_err(|e| anyhow::anyhow!("invalid regex pattern in SecretScanner::new_without_age_keys: {}", e))?;
 
         Ok(Self {
