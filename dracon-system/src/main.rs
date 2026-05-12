@@ -33,11 +33,14 @@ fn check_safe_to_delete(path: &Path, user_protected: &[String]) -> Result<()> {
     };
     let canon_str = canon.display().to_string();
 
-    if SYSTEM_PROTECTED.contains(&canon_str.as_str()) {
-        anyhow::bail!(
-            "refusing to delete protected path {} (matches system root)",
-            canon.display()
-        );
+    for prot in SYSTEM_PROTECTED {
+        if is_protected_ancestor(&canon_str, prot) {
+            anyhow::bail!(
+                "refusing to delete protected path {} (under system root {})",
+                canon.display(),
+                prot
+            );
+        }
     }
 
     for user_prot in user_protected {
@@ -46,9 +49,9 @@ fn check_safe_to_delete(path: &Path, user_protected: &[String]) -> Result<()> {
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
             Err(e) => anyhow::bail!("cannot canonicalize user-protected path {}: {} — refusing", user_prot, e),
         };
-        if canon_str == prot_canon {
+        if is_protected_ancestor(&canon_str, &prot_canon) {
             anyhow::bail!(
-                "refusing to delete protected path {} (matches user-protected path {})",
+                "refusing to delete protected path {} (under user-protected path {})",
                 canon.display(),
                 user_prot
             );
@@ -56,6 +59,21 @@ fn check_safe_to_delete(path: &Path, user_protected: &[String]) -> Result<()> {
     }
 
     Ok(())
+}
+
+/// Check if `path` is equal to or a descendant of `protected`.
+/// Both must be canonicalized absolute paths.
+fn is_protected_ancestor(path: &str, protected: &str) -> bool {
+    if path == protected {
+        return true;
+    }
+    // Ensure protected ends with '/' so '/home' doesn't match '/homefoo'
+    let prefix = if protected.ends_with('/') {
+        protected.to_string()
+    } else {
+        format!("{}/", protected)
+    };
+    path.starts_with(&prefix)
 }
 
 #[cfg(test)]
