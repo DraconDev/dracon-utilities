@@ -1,1 +1,19 @@
+[Unit]
+Description=Dracon Warden (lightweight runtime)
+After=default.target
+
+[Service]
+Type=simple
+Environment=PATH=%h/.local/bin:/run/wrappers/bin:%h/.local/share/flatpak/exports/bin:/var/lib/flatpak/exports/bin:%h/.nix-profile/bin:/nix/profile/bin:%h/.local/state/nix/profile/bin:/etc/profiles/per-user/%u/bin:/nix/var/nix/profiles/default/bin:/run/current-system/sw/bin
+ExecStart=%h/.local/bin/dracon-warden daemon
+Restart=on-failure
+RestartSec=3
 RestartPreventExitStatus=2 78
+Nice=10
+CPUQuota=10%
+MemoryHigh=384M
+MemoryMax=1G
+TasksMax=64
+
+[Install]
+WantedBy=default.target
