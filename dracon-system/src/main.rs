@@ -452,19 +452,19 @@ pub(crate) struct GuardPolicy {
     #[serde(default = "default_guard_enabled")]
     enabled: bool,
     #[serde(default = "default_disk_mount_path")]
-    disk_mount_path: String,
+    pub(crate) disk_mount_path: String,
     #[serde(default = "default_guard_interval_secs")]
     interval_secs: u64,
     #[serde(default = "default_disk_early_warn_percent")]
     disk_early_warn_percent: u8,
     #[serde(default = "default_disk_warn_percent")]
-    disk_warn_percent: u8,
+    pub(crate) disk_warn_percent: u8,
     #[serde(default = "default_disk_action_percent")]
-    disk_action_percent: u8,
+    pub(crate) disk_action_percent: u8,
     #[serde(default = "default_disk_critical_percent")]
-    disk_critical_percent: u8,
+    pub(crate) disk_critical_percent: u8,
     #[serde(default = "default_true")]
-    freeze_sync_at_action: bool,
+    pub(crate) freeze_sync_at_action: bool,
     #[serde(default = "default_sync_freeze_marker")]
     sync_freeze_marker: String,
     #[serde(default = "default_unfreeze_below_percent")]
@@ -518,7 +518,7 @@ pub(crate) struct GuardPolicy {
     node_modules_search_roots: String,
     /// Enable disk space trend tracking and prediction
     #[serde(default = "default_true")]
-    track_trends: bool,
+    pub(crate) track_trends: bool,
     /// Warn when disk is predicted to fill within this many hours
     #[serde(default = "default_trend_warn_hours")]
     trend_warn_hours: u64,
@@ -1860,7 +1860,7 @@ fn truncate_log_file(path: &Path, max_size_bytes: u64, preserve_header_lines: us
 }
 
 /// Predict when disk will fill based on trend
-fn predict_fill_time(history: &[(Instant, u8)]) -> Option<f64> {
+pub(crate) fn predict_fill_time(history: &[(Instant, u8)]) -> Option<f64> {
     if history.len() < 3 {
         return None;
     }
@@ -1906,7 +1906,7 @@ fn predict_fill_time(history: &[(Instant, u8)]) -> Option<f64> {
     Some(seconds_until_full / 3600.0)  // Return hours
 }
 
-async fn run_guard_once(
+pub(crate) async fn run_guard_once(
     guard: &GuardPolicy,
     state: &mut GuardRuntimeState,
 ) -> Result<GuardReport> {
@@ -2325,32 +2325,32 @@ async fn run_guard_once(
 }
 
 #[derive(Debug, Serialize)]
-struct LinkEntryStatus {
-    link: String,
-    target: String,
-    exists: bool,
-    is_symlink: bool,
-    target_exists: bool,
-    points_to: String,
-    in_sync: bool,
-    issue: String,
+pub(crate) struct LinkEntryStatus {
+    pub(crate) link: String,
+    pub(crate) target: String,
+    pub(crate) exists: bool,
+    pub(crate) is_symlink: bool,
+    pub(crate) target_exists: bool,
+    pub(crate) points_to: String,
+    pub(crate) in_sync: bool,
+    pub(crate) issue: String,
 }
 
 #[derive(Debug, Serialize)]
-struct LinkStatusReport {
-    entries: Vec<LinkEntryStatus>,
-    total: usize,
-    healthy: usize,
-    drifted: usize,
-    missing_target: usize,
-    missing_link: usize,
+pub(crate) struct LinkStatusReport {
+    pub(crate) entries: Vec<LinkEntryStatus>,
+    pub(crate) total: usize,
+    pub(crate) healthy: usize,
+    pub(crate) drifted: usize,
+    pub(crate) missing_target: usize,
+    pub(crate) missing_link: usize,
 }
 
 fn path_display(path: &Path) -> String {
     path.display().to_string()
 }
 
-fn evaluate_link(entry: &LinkEntry) -> LinkEntryStatus {
+pub(crate) fn evaluate_link(entry: &LinkEntry) -> LinkEntryStatus {
     let link = expand_tilde(&entry.link);
     let target = expand_tilde(&entry.target);
     let target_exists = target.exists();
@@ -2405,7 +2405,7 @@ fn normalize_path(path: &Path) -> PathBuf {
     path.canonicalize().unwrap_or_else(|_| path.to_path_buf())
 }
 
-fn build_link_report(policy: &SystemPolicy) -> LinkStatusReport {
+pub(crate) fn build_link_report(policy: &SystemPolicy) -> LinkStatusReport {
     let mut entries = Vec::with_capacity(policy.links.entries.len());
     let mut healthy = 0usize;
     let mut drifted = 0usize;
@@ -2511,7 +2511,7 @@ fn resolve_system_policy_path() -> Option<PathBuf> {
     candidates.into_iter().find(|p| p.exists())
 }
 
-fn load_system_policy() -> Result<(Option<PathBuf>, SystemPolicy)> {
+pub(crate) fn load_system_policy() -> Result<(Option<PathBuf>, SystemPolicy)> {
     let Some(path) = resolve_system_policy_path() else {
         return Ok((None, SystemPolicy::default()));
     };
@@ -2560,7 +2560,7 @@ async fn build_status_report() -> Result<StatusReport> {
     })
 }
 
-fn normalize_guard_policy(policy: &mut GuardPolicy) {
+pub(crate) fn normalize_guard_policy(policy: &mut GuardPolicy) {
     policy.interval_secs = policy.interval_secs.max(5);
     policy.disk_warn_percent = policy.disk_warn_percent.clamp(1, 100);
     policy.disk_action_percent = policy
