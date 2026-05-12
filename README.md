@@ -123,12 +123,12 @@ dracon-sync metrics | grep unpushed
 
 ### Safety: Mass-Deletion Prevention
 
-`dracon-sync` refuses to auto-commit deletions that remove 100% of tracked files. This guards against accidental total wipes caused by filesystem issues, filter misconfigurations, or destructive operations.
+`dracon-sync` refuses to auto-commit deletions that remove 85% or more of tracked files. This guards against accidental mass deletions caused by filesystem issues, filter misconfigurations, or destructive operations.
 
 When triggered, you'll see:
 ```
-⚠️ SAFETY: 46 files missing from working tree (100% of 46 tracked)
-⚠️ Refusing to stage total wipe - this looks like a mistake or destructive operation
+⚠️ SAFETY: 46 files missing from working tree (85% of 46 tracked)
+⚠️ Refusing to stage mass deletion - this looks like a mistake or destructive operation
 ```
 
 **To bypass manually:** Stage and commit the deletions yourself:
