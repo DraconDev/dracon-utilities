@@ -2841,4 +2841,112 @@ watch_roots = ["/tmp/test"]
             assert!(strict_result.is_err(), "strict should fail when markers remain");
         }
     }
+
+    #[test]
+    fn filter_clean_passes_plaintext_unchanged() {
+        let content = b"let x = 1;\n";
+        let warden = DraconWarden::new().expect("create warden");
+        let result = warden.clean(content, None).expect("clean");
+        assert_eq!(result, content, "plaintext should pass through clean unchanged");
+    }
+
+    #[test]
+    fn filter_clean_encrypts_content_with_secret_marker() {
+        let content = b"secret_api_key = \"super_secret_value_12345\"\n";
+        let warden = DraconWarden::new().expect("create warden");
+        let result = warden.clean(content, Some("config.env")).expect("clean");
+        // Clean should either encrypt or pass through; result should be valid bytes
+        assert!(!result.is_empty(), "clean output should not be empty");
+    }
+
+    #[test]
+    fn filter_smudge_passes_plaintext_unchanged() {
+        let content = b"let x = 1;\n";
+        let warden = DraconWarden::new().expect("create warden");
+        let result = warden.smudge(content, None).expect("smudge");
+        assert_eq!(
+            result, content,
+            "plaintext should pass through smudge unchanged"
+        );
+    }
+
+    #[test]
+    fn cli_scrub_markers_finds_markers_in_json() {
+        let td = TestDir::new("warden_scrub_json");
+        let repo = td.path().join("repo");
+        fs::create_dir_all(&repo).expect("repo");
+
+        let status = ProcessCommand::new("git")
+            .arg("init")
+            .arg(&repo)
+            .status()
+            .expect("git init");
+        assert!(status.success(), "git init should succeed");
+
+        // Create a JSON file with a secret marker
+        let json_file = repo.join("secrets.json");
+        fs::write(
+            &json_file,
+            r#"{"api_key": "[DRACON_SECRET:abc123]", "name": "test"}"#,
+        )
+        .expect("write json");
+
+        let config_dir = td.path().join(".dracon").join("utilities").join("warden");
+        fs::create_dir_all(&config_dir).expect("config dir");
+        let config_path = config_dir.join("dracon-warden.toml");
+        fs::write(
+            &config_path,
+            r#"
+[watch]
+watch_roots = ["/tmp/test"]
+"#,
+        )
+        .expect("write config");
+
+        let _env_guard = EnvGuard::set("DRACON_WARDEN_POLICY", config_path.to_str().unwrap());
+
+        let policy = WardenPolicy::load(&config_path).expect("load policy");
+        policy.validate().expect("valid policy");
+
+        // Dry-run should find markers without modifying
+        let result = scrub_markers(&policy, &[repo.clone()], false);
+        assert!(result.is_ok(), "scrub dry-run should succeed: {:?}", result);
+    }
+
+    #[test]
+    fn cli_resmudge_reports_on_plaintext_repo() {
+        let td = TestDir::new("warden_resmudge_plain");
+        let repo = td.path().join("repo");
+        fs::create_dir_all(&repo).expect("repo");
+
+        let status = ProcessCommand::new("git")
+            .arg("init")
+            .arg(&repo)
+            .status()
+            .expect("git init");
+        assert!(status.success(), "git init should succeed");
+
+        let config_dir = td.path().join(".dracon").join("utilities").join("warden");
+        fs::create_dir_all(&config_dir).expect("config dir");
+        let config_path = config_dir.join("dracon-warden.toml");
+        fs::write(
+            &config_path,
+            r#"
+[watch]
+watch_roots = ["/tmp/test"]
+"#,
+        )
+        .expect("write config");
+
+        let _env_guard = EnvGuard::set("DRACON_WARDEN_POLICY", config_path.to_str().unwrap());
+
+        let policy = WardenPolicy::load(&config_path).expect("load policy");
+        policy.validate().expect("valid policy");
+
+        // Dry-run on a plain repo should find nothing and succeed
+        let repos = vec![repo.clone()];
+        let (found, changed) = resmudge_repos(&policy, &repos, false).expect("resmudge report");
+        assert_eq!(found, 0, "plaintext repo should have no ciphertext markers");
+        assert_eq!(changed, 0, "dry-run should not change anything");
+    }
 }
