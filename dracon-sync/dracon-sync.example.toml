@@ -3,67 +3,148 @@
 #
 # This controls how dracon-sync watches and syncs your repos.
 
-[sync]
-# Directories to watch for git repos (searched up to 4 levels deep)
-watch_roots = ["/home/dracon/Dev"]
+# =============================================================================
+#  SECTION 1: THE SOVEREIGN CORE
+# =============================================================================
+# [system_repo]
+# The primary repository for your machine laws and state (~/dracon).
+# The daemon ensures this repo is ALWAYS healthy and synchronized.
+# system_repo = "/home/dracon/dracon"
 
-# How often to check repos (seconds)
-interval_secs = 30
+# =============================================================================
+#  SECTION 2: THE RHYTHM (Sync Logic)
+# =============================================================================
+# How often (seconds) to scan repos for activity while daemon is running.
+pulse_interval_secs = 1
 
-# Auto-commit uncommitted changes
+# Push only after this many quiet seconds since last detected repo change.
+inactivity_push_delay_secs = 5
+
+# [auto_commit] - Automatically stage and commit local changes.
 auto_commit = true
 
-# SAFETY: Mass-deletion prevention
-# If more than 50% of tracked files are missing from the working tree,
-# dracon-sync will refuse to auto-commit the deletions. This guards
-# against accidental mass deletion from filesystem issues, filter
-# misconfigurations, or destructive operations.
-#
-# When triggered, sync prints a warning and skips the commit.
-# To bypass manually: git add -A && git commit -m 'delete files'
+# If true, bump patch versions before auto-commits (best-effort).
+# Applies when these files exist at repo root:
+# - Rust: Cargo.toml (+ keep Cargo.lock aligned for root package)
+# - Node/TS: package.json (+ align package-lock.json root version when applicable)
+# - Generic: VERSION
+auto_bump_versions = true
 
-# Auto-pull remote changes before pushing
+# [auto_pull]   - Pull remote changes before committing (uses merge, not rebase).
 auto_pull = true
 
-# Auto-push to remotes
+# [auto_push]   - Propagate local commits to all configured remotes.
 auto_push = true
 
-# Create GitHub private repos for repos without origin
-auto_github_private = true
-auto_github_private_account = "DraconDev"
+# [auto_repair_concerns] - Run concern repair logic after each sync pass.
+auto_repair_concerns = true
 
-# Push retries before giving up
+# [auto_repair_warns] - Run dirty-only warn triage after each sync pass.
+auto_repair_warns = true
+
+# [auto_rewrite_large_blobs] - Aggressive rewrite when large blobs are detected.
+# Keep false for safe default behavior.
+auto_rewrite_large_blobs = false
+
+# Git operation timeouts (seconds). Keep repo timeout larger than pull/push.
+pull_op_timeout_secs = 30
+push_op_timeout_secs = 300
+repo_sync_timeout_secs = 900
+
+# Retry count for push operations before fallback transport logic.
 push_retries = 3
 
-# Alert threshold: warn if repo has more than N unpushed commits
-# This should rarely trigger with auto_push enabled — if it does,
-# something is wrong (repo stuck, push failing, etc.)
-alert_unpushed_threshold = 10
+# Cooldown between failed auto-repair attempts on the same repo.
+repair_cooldown_secs = 60
 
-# Repos to exclude from sync
-# exclude_repos = ["/home/dracon/Dev/temp"]
+# Hard push guardrail for blob size; keep <= 100 MiB host limit.
+max_push_blob_bytes = 52428800
 
-# Directory names to skip during discovery
-# exclude_dir_names = ["node_modules", "target", ".git"]
+# Incident ledger retention policy.
+incident_ledger_max_lines = 10000
+incident_ledger_max_age_days = 30
 
+# =============================================================================
+#  SECTION 3: THE VAULT (Backup Strategy)
+# =============================================================================
+# 'Bundle' creates air-gapped git-bundle files in the backup_dir before every
+# sync attempt. This is your insurance against failed rebases or data loss.
+backup_policy = "Bundle"
+backup_dir = "/home/dracon/dracon/backups"
+
+# =============================================================================
+#  SECTION 4: THE SCOPE
+# =============================================================================
+# Roots recursively patrolled for .git repositories to sync.
+watch_roots = ["/home/dracon/Dev"]
+
+# Exclude heavy/generated trees from repo discovery and auto-staging.
+exclude_dir_names = [
+    "target",
+    "node_modules",
+    ".cache",
+    ".direnv",
+    ".venv",
+    "dist",
+    "build",
+    "archives",
+    ".tmp-*"
+]
+
+# Exclude specific file patterns from auto-staging.
+exclude_file_patterns = [
+    "*.log",
+    "nohup.out"
+]
+
+# Skip staging files larger than 50 MiB during auto-commit.
+max_stage_file_bytes = 52428800
+
+# =============================================================================
+#  SECTION 5: SAFETY
+# =============================================================================
+# Mass-deletion prevention: if 100% of tracked files are missing from the
+# working tree, dracon-sync will refuse to auto-commit. This guards against
+# accidental total wipes from filesystem issues or destructive operations.
+#
+# To bypass for intentional total wipes:
+#   dracon-sync sync-now --force <repo>
+
+# =============================================================================
+#  SECTION 6: REMOTES
+# =============================================================================
+# Origin remote is always pushed first. Mirror remotes are pushed after.
+# The {repo} placeholder is replaced with the repo directory name.
+
+# GitHub (origin)
 [[remotes]]
-name = "origin"
+name = "github"
 push_url = "git@github.com:DraconDev/{repo}.git"
 auto_create = true
 
-# Example: GitLab remote with repo name mapping
+# GitLab (with PAT-based HTTPS fallback)
+[[remotes]]
+name = "gitlab"
+push_url = "git@gitlab.com:dracondev/{repo}.git"
+auto_create = true
+
+# Codeberg (push-to-create disabled in Forgejo)
+[[remotes]]
+name = "codeberg"
+push_url = "git@codeberg.org:dracondev/{repo}.git"
+auto_create = false
+
+# Per-remote repo name mapping (e.g. for dot-prefixed dirs on GitLab)
 # [[remotes]]
 # name = "gitlab"
-# push_url = "git@gitlab.com:DraconDev/{repo}.git"
+# push_url = "git@gitlab.com:myorg/{repo}.git"
 # auto_create = true
 # [remotes.repo_name_map]
 # ".dracon" = "dracon-home"
 
-# Example: Codeberg (push-to-create disabled)
-# [[remotes]]
-# name = "codeberg"
-# push_url = "git@codeberg.org:DraconDev/{repo}.git"
-# auto_create = false
-
-# Webhook for push failure notifications
-# webhook_url = "https://your-webhook.example.com/notify"
+# =============================================================================
+#  SECTION 7: WEBHOOK
+# =============================================================================
+# On push failures (origin or mirror remotes), dracon-sync can send a
+# fire-and-forget HTTP POST to a configured webhook URL:
+# webhook_url = "https://your-webhook-endpoint.example/notify"
