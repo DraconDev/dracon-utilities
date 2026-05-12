@@ -679,7 +679,7 @@ fn default_unfreeze_below_percent() -> u8 {
 }
 
 fn default_process_cpu_percent() -> f32 {
-    180.0
+    50.0
 }
 
 fn default_process_rss_mb() -> u64 {
