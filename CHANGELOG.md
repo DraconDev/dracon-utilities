@@ -57,7 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **dracon-sync**: Critical bug in mass-deletion safety check — `git ls-files --count` is not a valid git command, causing `.unwrap_or(0)` to silently bypass the guard. Fixed by counting lines of `git ls-files` output.
-- **dracon-sync**: Strengthened mass-deletion guard with secondary threshold (>50% of tracked files missing triggers prevention, not just 100%)
+- **dracon-sync**: Strengthened mass-deletion guard — only 100% wipe triggers prevention (removed intermediate >50% threshold to prevent false positives during legitimate partial deletions)
 - **dracon-sync**: Divergence diagnosis in `git.rs` no longer silently falls back to `unwrap_or(0)` on parse errors — now explicitly returns `Divergent` with a warning log
 - **dracon-sync**: Merge strategy changed from `git pull --rebase` to `git pull --no-rebase`
 - **install.sh**: Now creates all config directories (sync, system, warden, ai)
