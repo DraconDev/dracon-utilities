@@ -1028,13 +1028,19 @@ async fn kill_process(pid: i32) -> bool {
     true
 }
 
-fn is_git_process(command: &str) -> bool {
-    command.contains("git")
-        && (command.contains("init")
-            || command.contains("fetch")
-            || command.contains("pull")
-            || command.contains("clone")
-            || command.contains("push"))
+fn is_git_process(command: &str, args: &str) -> bool {
+    // Strict matching: only match known long-running git subcommands
+    // that are safe to auto-kill. Avoids false positives like "legit-init".
+    const GIT_CMDS: &[&str] = &["git-init", "git-fetch", "git-pull", "git-clone", "git-push"];
+    if GIT_CMDS.contains(&command) {
+        return true;
+    }
+    if command == "git" {
+        let first_arg = args.split_whitespace().next().unwrap_or("");
+        const GIT_SUBCMDS: &[&str] = &["init", "fetch", "pull", "clone", "push"];
+        return GIT_SUBCMDS.contains(&first_arg);
+    }
+    false
 }
 
 /// Detect active cargo/rustc processes and return their PIDs and working directories
@@ -2087,7 +2093,7 @@ async fn run_guard_once(
         if guard.auto_kill_git
             && guard.git_kill_threshold_secs > 0
             && sustained >= guard.git_kill_threshold_secs
-            && is_git_process(&p.command)
+            && is_git_process(&p.command, &p.args)
         {
             if kill_process(p.pid).await {
                 action = "kill:git-sigterm+sigkill".to_string();
@@ -2750,35 +2756,36 @@ mod tests {
 
     #[test]
     fn is_git_process_detects_git_init() {
-        assert!(is_git_process("git-init"));
-        assert!(is_git_process("git init"));
-        assert!(is_git_process("git-init --bare"));
+        assert!(is_git_process("git-init", ""));
+        assert!(is_git_process("git", "init"));
+        assert!(is_git_process("git-init", "--bare"));
     }
 
     #[test]
     fn is_git_process_detects_git_fetch_and_pull() {
-        assert!(is_git_process("git-fetch"));
-        assert!(is_git_process("git pull"));
-        assert!(is_git_process("git-pull origin main"));
-        assert!(is_git_process("git-fetch origin"));
+        assert!(is_git_process("git-fetch", ""));
+        assert!(is_git_process("git", "pull"));
+        assert!(is_git_process("git-pull", "origin main"));
+        assert!(is_git_process("git-fetch", "origin"));
     }
 
     #[test]
     fn is_git_process_detects_git_push_and_clone() {
-        assert!(is_git_process("git-push"));
-        assert!(is_git_process("git push"));
-        assert!(is_git_process("git-clone"));
-        assert!(is_git_process("git clone"));
+        assert!(is_git_process("git-push", ""));
+        assert!(is_git_process("git", "push"));
+        assert!(is_git_process("git-clone", ""));
+        assert!(is_git_process("git", "clone"));
     }
 
     #[test]
     fn is_git_process_rejects_non_git_commands() {
-        assert!(!is_git_process("git log"));
-        assert!(!is_git_process("git diff"));
-        assert!(!is_git_process("git status"));
-        assert!(!is_git_process("git commit"));
-        assert!(!is_git_process("bash"));
-        assert!(!is_git_process("python"));
+        assert!(!is_git_process("git", "log"));
+        assert!(!is_git_process("git", "diff"));
+        assert!(!is_git_process("git", "status"));
+        assert!(!is_git_process("git", "commit"));
+        assert!(!is_git_process("bash", ""));
+        assert!(!is_git_process("python", ""));
+        assert!(!is_git_process("legit-init", "")); // false positive from old substring matching
     }
 
     #[test]
