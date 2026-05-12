@@ -2674,6 +2674,18 @@ mod tests {
         let _guard = env_lock().lock().expect("lock");
         let old_home = std::env::var("HOME").ok();
         std::env::set_var("HOME", "/tmp/dracon-home-test");
+        // Ensure HOME is restored even if the test panics
+        struct HomeGuard(Option<String>);
+        impl Drop for HomeGuard {
+            fn drop(&mut self) {
+                if let Some(ref v) = self.0 {
+                    std::env::set_var("HOME", v);
+                } else {
+                    std::env::remove_var("HOME");
+                }
+            }
+        }
+        let _home_guard = HomeGuard(old_home);
 
         assert_eq!(expand_tilde("~"), PathBuf::from("/tmp/dracon-home-test"));
         assert_eq!(
@@ -2681,12 +2693,6 @@ mod tests {
             PathBuf::from("/tmp/dracon-home-test/Dev/project")
         );
         assert_eq!(expand_tilde("/x/y"), PathBuf::from("/x/y"));
-
-        if let Some(v) = old_home {
-            std::env::set_var("HOME", v);
-        } else {
-            std::env::remove_var("HOME");
-        }
     }
 
     #[test]
