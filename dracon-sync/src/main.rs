@@ -851,9 +851,8 @@ remotes = []
         let policy_tmp = temp_policy(vec!["/dev/null"]);
         let policy_path = policy_tmp.path().join("policy.toml");
 
-        std::env::set_var("DRACON_SYNC_FREEZE", "1");
+        let _guard = crate::test_helpers::EnvRestorer::new("DRACON_SYNC_FREEZE", "1");
         let result = crate::policy::freeze_reason(&policy_path);
-        std::env::remove_var("DRACON_SYNC_FREEZE");
 
         assert!(result.is_some(), "env freeze should override missing marker");
         assert!(result.unwrap().contains("env DRACON_SYNC_FREEZE"));
