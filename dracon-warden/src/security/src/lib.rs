@@ -2971,6 +2971,15 @@ mod tests {
     }
 
     #[test]
+    fn test_smudge_passes_binary_unchanged() {
+        let warden = DraconWarden::new().expect("create warden");
+        // Binary content with null bytes should pass through unchanged
+        let binary = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR";
+        let result = warden.smudge(binary, None).expect("smudge binary");
+        assert_eq!(result, binary, "binary content should pass through smudge unchanged");
+    }
+
+    #[test]
     fn test_protection_exemptions() {
         let scanner = SecretScanner::new_without_age_keys().unwrap();
         let patterns = scanner.patterns.iter().map(|(n, _)| n.clone()).collect::<Vec<_>>();
