@@ -23,7 +23,7 @@ use crate::git::multi_remote::{
 };
 use crate::policy::{debug_enabled, load_repo_override, SyncPolicy};
 use crate::report::{append_incident_record, build_commit_context, detect_report_signals, IncidentRecord, push_large_blob_threshold_bytes};
-use crate::visibility::sync_mirror_visibility;
+use crate::visibility::{check_github_visibility, sync_mirror_visibility};
 
 /// Result of a single repository sync attempt.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -754,6 +754,12 @@ async fn push_with_blob_check(
     }
 
     // Push to additional named remotes after origin push succeeds
+    let private = if policy.sync_visibility {
+        check_github_visibility(repo).await.unwrap_or(true)
+    } else {
+        true
+    };
+
     if !policy.remotes.is_empty() {
         let push_results = if dry_run {
             for remote in &policy.remotes {
@@ -766,6 +772,7 @@ async fn push_with_blob_check(
                 &policy.remotes,
                 policy.push_op_timeout_secs,
                 policy.push_retries,
+                private,
             ).await
         };
         let all_ok = push_results.iter().all(|(_, r)| r.is_ok());
