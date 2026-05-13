@@ -223,7 +223,7 @@ pub(crate) async fn sync_repo(
                 if !matches!(e.status, dracon_git::types::FileStatus::Modified) {
                     return true;
                 }
-                diff_output.contains(&e.path.to_string_lossy().to_string())
+                diff_output.contains(&e.path)
             });
         }
     }
