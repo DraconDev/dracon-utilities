@@ -2130,8 +2130,8 @@ auto_bump_versions = false
     /// reset so that pre-existing modifications are not left staged uncommitted.
     #[tokio::test]
     async fn test_guard_blocks_resets_staged_changes() {
-        let repo = TempDir::new().unwrap().into_path();
-        git_cmd(&repo, &["init", "--bare"]);
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "guard-reset-repo");
 
         // Create two tracked files
         std::fs::write(repo.join("a.txt"), "a").unwrap();
@@ -2158,10 +2158,9 @@ auto_bump_versions = false
         assert!(matches!(result, Ok(SyncOutcome::Blocked)), "guard should block total wipe");
 
         // Verify index is clean — a.txt should NOT be staged
-        let staged = run_git_with_timeout(&repo, &["diff", "--cached", "--name-only"], 5, "check-staged")
-            .await
-            .unwrap();
-        assert!(staged.trim().is_empty(), "staged changes should be reset after guard blocks, got: {:?}", staged);
+        let staged = git_cmd(&repo, &["diff", "--cached", "--name-only"]);
+        let staged_str = String::from_utf8_lossy(&staged.stdout);
+        assert!(staged_str.trim().is_empty(), "staged changes should be reset after guard blocks, got: {:?}", staged_str);
     }
 
     /// CR-2 regression test: filter-only changes must NOT be re-detected by
@@ -2169,8 +2168,8 @@ auto_bump_versions = false
     /// committed as decrypted plaintext.
     #[tokio::test]
     async fn test_filter_only_skips_cli_diff_fallback() {
-        let repo = TempDir::new().unwrap().into_path();
-        git_cmd(&repo, &["init", "--bare"]);
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "filter-only-repo");
 
         // Create a file that looks like a filter-only change
         std::fs::write(repo.join("secret.txt"), "plaintext").unwrap();
@@ -2196,15 +2195,14 @@ auto_bump_versions = false
         // fall back to cli_diff_entries which would see the CRLF difference.
         let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
         assert!(
-            matches!(result, Ok(SyncOutcome::NothingToDo) | Ok(SyncOutcome::Success(false))),
-            "filter-only repo should produce NothingToDo, got {:?}",
+            matches!(result, Ok(SyncOutcome::NothingToDo) | Ok(SyncOutcome::Synced)),
+            "filter-only repo should produce NothingToDo or Synced without changes, got {:?}",
             result
         );
 
         // Verify nothing was staged
-        let staged = run_git_with_timeout(&repo, &["diff", "--cached", "--name-only"], 5, "check-staged")
-            .await
-            .unwrap();
-        assert!(staged.trim().is_empty(), "nothing should be staged for filter-only repo");
+        let staged = git_cmd(&repo, &["diff", "--cached", "--name-only"]);
+        let staged_str = String::from_utf8_lossy(&staged.stdout);
+        assert!(staged_str.trim().is_empty(), "nothing should be staged for filter-only repo");
     }
 }
