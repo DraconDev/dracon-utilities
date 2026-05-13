@@ -58,11 +58,13 @@ fn update_visibility_cache(repo_name: &str) {
 /// Supports both SSH (`git@github.com:owner/repo.git`) and HTTPS (`https://github.com/owner/repo.git`).
 pub(crate) fn parse_github_owner_repo(remote_url: &str) -> Option<(String, String)> {
     // SSH: git@github.com:owner/repo.git
-    if let Some(colon) = remote_url.rfind(':') {
-        let after_colon = &remote_url[colon + 1..];
-        let clean = after_colon.strip_suffix(".git").unwrap_or(after_colon);
-        if let Some(slash) = clean.find('/') {
-            return Some((clean[..slash].to_string(), clean[slash + 1..].to_string()));
+    if remote_url.contains('@') {
+        if let Some(colon) = remote_url.rfind(':') {
+            let after_colon = &remote_url[colon + 1..];
+            let clean = after_colon.strip_suffix(".git").unwrap_or(after_colon);
+            if let Some(slash) = clean.find('/') {
+                return Some((clean[..slash].to_string(), clean[slash + 1..].to_string()));
+            }
         }
     }
     // HTTPS: https://github.com/owner/repo.git
