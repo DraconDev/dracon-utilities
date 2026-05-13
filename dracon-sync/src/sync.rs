@@ -23,6 +23,7 @@ use crate::git::multi_remote::{
 };
 use crate::policy::{debug_enabled, load_repo_override, SyncPolicy};
 use crate::report::{append_incident_record, build_commit_context, detect_report_signals, IncidentRecord, push_large_blob_threshold_bytes};
+use crate::visibility::sync_mirror_visibility;
 
 /// Result of a single repository sync attempt.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -4,6 +4,7 @@ mod git;
 mod bump;
 mod secrets;
 mod simple_ai;
+mod visibility;
 #[cfg(feature = "scribe")]
 mod scribe;
 mod report;
