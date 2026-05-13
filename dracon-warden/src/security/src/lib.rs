@@ -471,6 +471,8 @@ impl SecretScanner {
         let patterns: Vec<(String, Regex)> = patterns_raw
             .iter()
             .filter_map(|(name, pattern)| {
+                // Build the processed pattern exactly as it appears in the
+                // combined regex so individual and combined behavior match.
                 let p = if pattern.starts_with("(?") {
                     pattern.to_string()
                 } else {
