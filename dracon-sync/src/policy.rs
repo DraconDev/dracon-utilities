@@ -304,12 +304,63 @@ pub(crate) struct SyncPolicy {
     /// Uses the same interval as visibility sync.
     #[serde(default)]
     pub(crate) sync_metadata: bool,
+    /// Master toggle for auto-publishing to package registries after version bumps.
+    /// Requires per-repo opt-in via `auto_publish` in `.dracon/dracon-sync.toml`.
+    /// Tags are created automatically: any bump -> git tag, major -> GitHub Release.
+    #[serde(default)]
+    pub(crate) auto_publish: bool,
+    /// Configured package registry publish targets.
+    #[serde(default)]
+    pub(crate) publish_targets: Vec<PublishTarget>,
+}
+
+/// Package registry type for auto-publish.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Default)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum PublishRegistry {
+    #[default]
+    CratesIo,
+    Npm,
+    Pypi,
+}
+
+impl PublishRegistry {
+    pub(crate) fn as_str(&self) -> &'static str {
+        match self {
+            PublishRegistry::CratesIo => "crates-io",
+            PublishRegistry::Npm => "npm",
+            PublishRegistry::Pypi => "pypi",
+        }
+    }
+}
+
+/// A configured package registry publish target.
+#[derive(Debug, Clone, Deserialize)]
+pub(crate) struct PublishTarget {
+    /// Human-readable name for this target (used in per-repo opt-in lists).
+    pub(crate) name: String,
+    /// Registry type (crates-io, npm, pypi).
+    pub(crate) registry: PublishRegistry,
+    /// Environment variable name or secret file key for the auth token.
+    /// Loaded via `load_secret()` from env or `~/.dracon/utilities/sync/secrets/`.
+    pub(crate) token_secret: String,
+    /// Timeout for the publish command in seconds.
+    #[serde(default = "default_publish_timeout_secs")]
+    pub(crate) publish_timeout_secs: u64,
+}
+
+fn default_publish_timeout_secs() -> u64 {
+    300
 }
 
 #[derive(Debug, Deserialize, Default, Clone)]
 pub(crate) struct RepoPolicyOverride {
     /// Optional per-repo override for `auto_bump_versions`.
     pub(crate) auto_bump_versions: Option<bool>,
+    /// Optional per-repo list of publish target names to auto-publish to.
+    /// Only used when global `auto_publish = true`.
+    #[serde(default)]
+    pub(crate) auto_publish: Vec<String>,
 }
 
 pub(crate) fn default_true() -> bool {
