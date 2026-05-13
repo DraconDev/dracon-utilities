@@ -103,9 +103,9 @@ max_stage_file_bytes = 52428800
 # =============================================================================
 #  SECTION 5: SAFETY
 # =============================================================================
-# Mass-deletion prevention: if 100% of tracked files are missing from the
+# Mass-deletion prevention: if >= 85% of tracked files are missing from the
 # working tree, dracon-sync will refuse to auto-commit. This guards against
-# accidental total wipes from filesystem issues or destructive operations.
+# accidental wipes from filesystem issues or destructive operations.
 #
 # To bypass for intentional total wipes:
 #   dracon-sync sync-now --force <repo>
@@ -160,8 +160,10 @@ auto_create = false
 #  SECTION 8: PUBLISH TARGETS (Package Registries)
 # =============================================================================
 # When true, version bumps trigger publish to configured registry targets.
-# Requires per-repo opt-in via .dracon/dracon-sync.toml auto_publish list.
-# Tags are created automatically: minor/patch -> git tag, major -> git tag + GitHub Release.
+# IMPORTANT: Even with auto_publish = true, nothing is published until the
+# repo explicitly opts in via .dracon/dracon-sync.toml (see below).
+# Tags are created automatically for opted-in repos:
+#   minor/patch -> git tag, major -> git tag + GitHub Release.
 # auto_publish = false
 #
 # Each publish target needs a token_secret — the env var name that holds the
@@ -178,6 +180,9 @@ auto_create = false
 # name = "npm"
 # registry = "npm"
 # token_secret = "NPM_TOKEN"             # env var name (token in secrets/npm.env)
+#   Create npm token at: https://www.npmjs.com/settings/tokens/create
+#   Use "Automation" type (never expires, bypasses 2FA for CI/CD)
+#   Note: `npm token create --automation` is deprecated in npm v11+
 # publish_timeout_secs = 120
 #
 # [[publish_targets]]
@@ -186,8 +191,17 @@ auto_create = false
 # token_secret = "TWINE_PASSWORD"        # env var name (token in secrets/pypi.env)
 # publish_timeout_secs = 120
 #
-# Per-repo opt-in (.dracon/dracon-sync.toml):
-# auto_publish = ["crates-io"]    # list of publish target names
+# PER-REPO OPT-IN (required even when auto_publish = true globally):
+# Create .dracon/dracon-sync.toml in the repo root:
+#
+#   # Only publish this repo to crates.io
+#   auto_publish = ["crates-io"]
+#
+#   # Publish to both crates.io and npm
+#   auto_publish = ["crates-io", "npm"]
+#
+# Without this file (or with an empty list), no tags, releases, or publishes
+# will happen for that repo — even if the global auto_publish is true.
 
 # =============================================================================
 #  SECTION 9: WEBHOOK
