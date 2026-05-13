@@ -3301,7 +3301,7 @@ async fn main() -> Result<()> {
 
                     // Docker
                     if do_docker {
-                        match docker_prune(true, guard_clone.docker_prune_volumes).await {
+                        match docker_prune(apply, guard_clone.docker_prune_volumes).await {
                             Ok(bytes) => {
                                 total_reclaimed += bytes;
                                 if bytes > 0 {
