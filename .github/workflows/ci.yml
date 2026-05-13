@@ -41,7 +41,7 @@ jobs:
 
       - name: Run clippy
         working-directory: ./${{ matrix.crate }}
-        run: cargo clippy --all-targets -- -D warnings
+        run: cargo clippy --all-targets --all-features -- -D warnings
 
       - name: Run tests (serial)
         working-directory: ./${{ matrix.crate }}
@@ -76,3 +76,25 @@ jobs:
         with:
           name: coverage-report
           path: coverage/
+
+  security-audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+
+      - name: Checkout dracon-libs
+        uses: actions/checkout@v4
+        with:
+          repository: DraconDev/dracon-libs
+          path: ../dracon-libs
+
+      - name: Install Rust
+        uses: dtolnay/rust-action@stable
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit
+
+      - name: Run cargo audit
+        run: cargo audit

@@ -1,5 +1,6 @@
 [Unit]
 Description=Dracon Warden (lightweight runtime)
+Documentation=https://github.com/DraconDev/dracon-utilities
 After=default.target
 
 [Service]
@@ -16,6 +17,11 @@ CPUQuota=10%
 MemoryHigh=384M
 MemoryMax=1G
 TasksMax=64
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=%h/.dracon %h/Dev %h/.local/state/dracon
+PrivateTmp=true
 
 [Install]
 WantedBy=default.target
