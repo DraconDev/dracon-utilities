@@ -356,6 +356,15 @@ fn predict_fill_time_estimates_for_filling_disk() {
 }
 
 #[tokio::test]
+async fn docker_prune_returns_zero_on_dry_run() {
+    // When apply=false, docker_prune should return immediately without
+    // invoking docker, yielding 0 bytes reclaimed.
+    let result = docker_prune(false, true, true).await;
+    assert!(result.is_ok(), "dry-run docker_prune should not error");
+    assert_eq!(result.unwrap(), 0, "dry-run should reclaim 0 bytes");
+}
+
+#[tokio::test]
 async fn guard_report_completes_for_ok_disk() {
     let mut state = GuardRuntimeState {
         heavy_since: std::collections::HashMap::new(),
