@@ -59,13 +59,28 @@ fn visibility_cache_dir() -> PathBuf {
 }
 
 /// Path to the cache file for a given repo.
-fn visibility_cache_path(repo_name: &str) -> PathBuf {
-    visibility_cache_dir().join(format!("{}.last", repo_name))
+/// Uses a hash of the full repo path to avoid collisions between
+/// same-named repos in different watch roots.
+fn visibility_cache_path(repo_path: &Path) -> PathBuf {
+    let path_str = repo_path.to_string_lossy();
+    let hash = simple_hash(&path_str);
+    visibility_cache_dir().join(format!("{}.last", hash))
+}
+
+/// Simple FNV-1a-like hash for cache file names.
+/// Not cryptographically secure — just for collision avoidance.
+fn simple_hash(s: &str) -> String {
+    let mut hash: u64 = 0xcbf29ce484222325; // FNV offset basis
+    for byte in s.bytes() {
+        hash ^= byte as u64;
+        hash = hash.wrapping_mul(0x100000001b3); // FNV prime
+    }
+    format!("{:016x}", hash)
 }
 
 /// Check whether the visibility cache is fresh (within `interval_hours`).
-fn is_visibility_cache_fresh(repo_name: &str, interval_hours: u64) -> bool {
-    let path = visibility_cache_path(repo_name);
+fn is_visibility_cache_fresh(repo_path: &Path, interval_hours: u64) -> bool {
+    let path = visibility_cache_path(repo_path);
     if !path.exists() {
         return false;
     }
@@ -84,13 +99,13 @@ fn is_visibility_cache_fresh(repo_name: &str, interval_hours: u64) -> bool {
 }
 
 /// Write the current timestamp to the visibility cache for a repo.
-fn update_visibility_cache(repo_name: &str) {
+fn update_visibility_cache(repo_path: &Path) {
     let dir = visibility_cache_dir();
     if let Err(e) = std::fs::create_dir_all(&dir) {
         eprintln!("⚠️ failed to create visibility cache dir {}: {}", dir.display(), e);
         return;
     }
-    let path = visibility_cache_path(repo_name);
+    let path = visibility_cache_path(repo_path);
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
@@ -211,10 +226,11 @@ pub(crate) fn sync_mirror_visibility(
     origin_url: &str,
     remotes: &[RemoteConfig],
     repo_name: &str,
+    repo_path: &Path,
     interval_hours: u64,
 ) {
     // Check cache first
-    if is_visibility_cache_fresh(repo_name, interval_hours) {
+    if is_visibility_cache_fresh(repo_path, interval_hours) {
         return;
     }
 
@@ -267,7 +283,7 @@ pub(crate) fn sync_mirror_visibility(
 
     // Update cache even on partial failures — we don't want to hammer APIs
     // on every sync cycle when a token is permanently missing.
-    update_visibility_cache(repo_name);
+    update_visibility_cache(repo_path);
 }
 
 /// Repo metadata fetched from GitHub: description + topics.
@@ -392,10 +408,11 @@ pub(crate) fn sync_mirror_metadata(
     origin_url: &str,
     remotes: &[RemoteConfig],
     repo_name: &str,
+    repo_path: &Path,
     interval_hours: u64,
 ) {
     // Check cache first (shares cache with visibility sync)
-    if is_visibility_cache_fresh(repo_name, interval_hours) {
+    if is_visibility_cache_fresh(repo_path, interval_hours) {
         return;
     }
 

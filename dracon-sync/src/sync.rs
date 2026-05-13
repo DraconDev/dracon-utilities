@@ -71,65 +71,67 @@ fn notify_webhook_failure(webhook_url: &str, repo: &Path, remote: &str, error: &
 /// Called before returning from sync_repo regardless of outcome.
 /// Get the old version, new version, and bump level from the repo after a version bump.
 /// Returns None if no bump info can be determined.
+///
+/// Handles Cargo.toml, package.json, and pyproject.toml.
+/// Falls back to "patch" level if old version cannot be determined
+/// (e.g., first commit in repo, or HEAD~1 doesn't exist).
 fn get_bump_info(repo: &Path) -> Option<(String, String, String)> {
     let new_ver = crate::release::detect_project_version(repo)?.0;
-    // Get old version from git HEAD (the version before the bump)
-    let old_ver = std::process::Command::new("git")
-        .args(["show", "HEAD~1:Cargo.toml"])
-        .current_dir(repo)
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::null())
-        .output()
-        .ok()
-        .and_then(|out| {
-            if out.status.success() {
-                let content = String::from_utf8_lossy(&out.stdout);
-                for line in content.lines() {
-                    let trimmed = line.trim();
-                    if trimmed.starts_with("version") {
-                        if let Some(v) = trimmed.split('=').nth(1) {
-                            let v = v.trim().trim_matches('"').trim();
-                            if !v.is_empty() && !v.starts_with("workspace") {
-                                return Some(v.to_string());
-                            }
-                        }
-                    }
-                }
-            }
-            None
-        })
-        .or_else(|| {
-            // Try package.json
-            std::process::Command::new("git")
-                .args(["show", "HEAD~1:package.json"])
-                .current_dir(repo)
-                .stdout(std::process::Stdio::piped())
-                .stderr(std::process::Stdio::null())
-                .output()
-                .ok()
-                .and_then(|out| {
-                    if out.status.success() {
-                        let content = String::from_utf8_lossy(&out.stdout);
-                        for line in content.lines() {
-                            let trimmed = line.trim();
-                            if trimmed.starts_with("\"version\"") {
-                                if let Some(v) = trimmed.split(':').nth(1) {
-                                    let v = v.trim().trim_matches('"').trim_matches(',').trim();
-                                    if !v.is_empty() {
-                                        return Some(v.to_string());
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    None
-                })
-        })
-        .unwrap_or_default();
+
+    // Determine which version file this project uses
+    let version_files = if repo.join("Cargo.toml").exists() {
+        &["Cargo.toml"][..]
+    } else if repo.join("package.json").exists() {
+        &["package.json"][..]
+    } else if repo.join("pyproject.toml").exists() {
+        &["pyproject.toml"][..]
+    } else {
+        &["Cargo.toml", "package.json", "pyproject.toml"][..]
+    };
+
+    let old_ver = version_files.iter().find_map(|file| {
+        let output = std::process::Command::new("git")
+            .args(["show", &format!("HEAD~1:{}", file)])
+            .current_dir(repo)
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::null())
+            .output()
+            .ok()?;
+
+        if !output.status.success() {
+            return None; // HEAD~1 doesn't exist or file not found at HEAD~1
+        }
+
+        let content = String::from_utf8_lossy(&output.stdout);
+        match *file {
+            "Cargo.toml" => content.lines()
+                .map(|l| l.trim())
+                .find(|l| l.starts_with("version") && !l.starts_with("version_prefix"))
+                .and_then(|l| l.split('=').nth(1))
+                .map(|v| v.trim().trim_matches('"').trim())
+                .filter(|v| !v.is_empty() && !v.starts_with("workspace"))
+                .map(|v| v.to_string()),
+            "package.json" => content.lines()
+                .map(|l| l.trim())
+                .find(|l| l.starts_with("\"version\""))
+                .and_then(|l| l.split(':').nth(1))
+                .map(|v| v.trim().trim_matches('"').trim_matches(',').trim())
+                .filter(|v| !v.is_empty())
+                .map(|v| v.to_string()),
+            "pyproject.toml" => content.lines()
+                .map(|l| l.trim())
+                .find(|l| l.starts_with("version") && !l.starts_with("version_prefix"))
+                .and_then(|l| l.split('=').nth(1))
+                .map(|v| v.trim().trim_matches('"').trim_matches(',').trim())
+                .filter(|v| !v.is_empty())
+                .map(|v| v.to_string()),
+            _ => None,
+        }
+    }).unwrap_or_default();
 
     // Determine bump level by comparing versions
     let level = if old_ver.is_empty() {
-        "patch" // Default
+        "patch" // Default when old version unavailable (first commit, etc.)
     } else {
         let old_parts: Vec<u32> = old_ver.split('.').filter_map(|s| s.parse().ok()).collect();
         let new_parts: Vec<u32> = new_ver.split('.').filter_map(|s| s.parse().ok()).collect();
@@ -164,10 +166,10 @@ fn maybe_sync_visibility_and_metadata(
         if !repo_name.is_empty() {
             // Run metadata sync first (before visibility writes the shared cache)
             if policy.sync_metadata {
-                sync_mirror_metadata(&origin_url, &policy.remotes, &repo_name, policy.sync_visibility_interval_hours);
+                sync_mirror_metadata(&origin_url, &policy.remotes, &repo_name, repo, policy.sync_visibility_interval_hours);
             }
             if policy.sync_visibility {
-                sync_mirror_visibility(&origin_url, &policy.remotes, &repo_name, policy.sync_visibility_interval_hours);
+                sync_mirror_visibility(&origin_url, &policy.remotes, &repo_name, repo, policy.sync_visibility_interval_hours);
             }
         }
     }
