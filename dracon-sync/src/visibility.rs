@@ -915,7 +915,7 @@ mod tests {
     fn test_sync_mirror_metadata_does_not_panic() {
         let repo_path = Path::new("/tmp/test_metadata_no_panic");
         let remotes: Vec<RemoteConfig> = vec![];
-        sync_mirror_metadata("git@github.com:DraconDev/test.git", &remotes, "test_metadata_no_panic", repo_path, 0);
+        sync_mirror_metadata("git@github.com:DraconDev/test.git", &remotes, repo_path, 0);
         // Should not panic even with no remotes
         let _ = std::fs::remove_file(visibility_cache_path(repo_path));
     }
@@ -924,7 +924,7 @@ mod tests {
     fn test_sync_mirror_metadata_handles_unparseable_origin() {
         let repo_path = Path::new("/tmp/test_metadata_bad_origin");
         let remotes: Vec<RemoteConfig> = vec![];
-        sync_mirror_metadata("not-a-url", &remotes, "test_metadata_bad_origin", repo_path, 0);
+        sync_mirror_metadata("not-a-url", &remotes, repo_path, 0);
         let _ = std::fs::remove_file(visibility_cache_path(repo_path));
     }
 
@@ -984,7 +984,7 @@ mod tests {
                 force_push_when_behind: false,
             },
         ];
-        sync_mirror_metadata("git@github.com:DraconDev/test.git", &remotes, "test_metadata_missing_tokens", Path::new("/tmp/test_metadata_missing_tokens"), 0);
+        sync_mirror_metadata("git@github.com:DraconDev/test.git", &remotes, Path::new("/tmp/test_metadata_missing_tokens"), 0);
         // Should not panic
         let _ = std::fs::remove_file(visibility_cache_path(Path::new("/tmp/test_metadata_missing_tokens")));
     }
