@@ -47,11 +47,11 @@ fn real_git_path() -> PathBuf {
 /// Get the list of files that actually differ from HEAD (filter-aware).
 /// Unlike `git status`, `git diff HEAD` applies clean filters and correctly
 /// ignores files that only differ due to smudge filter decryption.
-pub(crate) async fn git_diff_head_files(repo: &Path) -> Result<Vec<String>> {
+pub(crate) async fn git_diff_head_files(repo: &Path) -> Result<HashSet<PathBuf>> {
     let repo = repo.to_path_buf();
     let outcome = tokio::time::timeout(
         Duration::from_secs(30),
-        tokio::task::spawn_blocking(move || -> anyhow::Result<Vec<String>> {
+        tokio::task::spawn_blocking(move || -> anyhow::Result<HashSet<PathBuf>> {
             let output = std::process::Command::new("git")
                 .current_dir(&repo)
                 .args(["diff", "HEAD", "--name-only", "-z"])
@@ -59,10 +59,10 @@ pub(crate) async fn git_diff_head_files(repo: &Path) -> Result<Vec<String>> {
             if !output.status.success() {
                 anyhow::bail!("git diff HEAD exited with {}", output.status);
             }
-            let files: Vec<String> = String::from_utf8_lossy(&output.stdout)
+            let files: HashSet<PathBuf> = String::from_utf8_lossy(&output.stdout)
                 .split('\0')
                 .filter(|s| !s.is_empty())
-                .map(String::from)
+                .map(PathBuf::from)
                 .collect();
             Ok(files)
         }),
