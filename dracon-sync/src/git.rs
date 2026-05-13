@@ -2261,7 +2261,7 @@ mod tests {
             },
         ];
 
-        let results = crate::git::multi_remote::auto_create_all_remotes(&remotes, "test-repo").await;
+        let results = crate::git::multi_remote::auto_create_all_remotes(&remotes, "test-repo", true).await;
         assert!(results.is_empty(), "should return empty vec when no remotes have auto_create=true");
     }
 
@@ -2280,7 +2280,7 @@ mod tests {
             force_push_when_behind: false,
         }];
 
-        let results = crate::git::multi_remote::auto_create_all_remotes(&remotes, "test-repo").await;
+        let results = crate::git::multi_remote::auto_create_all_remotes(&remotes, "test-repo", true).await;
         assert_eq!(results.len(), 1);
         assert!(results[0].1.is_err(), "Generic auth should return error");
         let err_msg = format!("{}", results[0].1.as_ref().unwrap_err());
@@ -2307,7 +2307,7 @@ mod tests {
             force_push_when_behind: false,
         }];
 
-        let results = crate::git::multi_remote::auto_create_all_remotes(&remotes, "test-repo").await;
+        let results = crate::git::multi_remote::auto_create_all_remotes(&remotes, "test-repo", true).await;
 
         assert_eq!(results.len(), 1);
         assert!(results[0].1.is_err(), "Codeberg without token should return error");
@@ -2338,7 +2338,7 @@ mod tests {
             force_push_when_behind: false,
         }];
 
-        let results = crate::git::multi_remote::auto_create_all_remotes(&remotes, "test-repo").await;
+        let results = crate::git::multi_remote::auto_create_all_remotes(&remotes, "test-repo", true).await;
         assert_eq!(results.len(), 1);
         let url = results[0].1.as_ref().unwrap();
         assert_eq!(url, "git@github.com:testaccount/test-repo.git");
@@ -2367,7 +2367,7 @@ mod tests {
             force_push_when_behind: false,
         }];
 
-        let results = crate::git::multi_remote::auto_create_all_remotes(&remotes, "test-repo").await;
+        let results = crate::git::multi_remote::auto_create_all_remotes(&remotes, "test-repo", true).await;
         assert_eq!(results.len(), 1);
         let url = results[0].1.as_ref().unwrap();
         assert_eq!(url, "git@gitlab.com:testaccount/test-repo.git");
@@ -2539,7 +2539,7 @@ mod tests {
             .status()
             .expect("git init");
 
-        let results = crate::git::multi_remote::push_mirror_remotes(&repo, &[], 1, 0).await;
+        let results = crate::git::multi_remote::push_mirror_remotes(&repo, &[], 1, 0, true).await;
         assert!(results.is_empty(), "should return empty results for empty remotes");
     }
 
