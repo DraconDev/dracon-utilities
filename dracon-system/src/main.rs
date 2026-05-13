@@ -21,6 +21,13 @@ const SYSTEM_PROTECTED: &[&str] = &[
     "/", "/home", "/etc", "/usr", "/var", "/boot", "/nix", "/run", "/sys", "/dev", "/proc",
 ];
 
+/// Verifies that `path` is safe to delete (not a protected system path).
+///
+/// **Security note:** This function canonicalizes the path and returns it for
+/// the caller to delete separately. There is a TOCTOU window between
+/// canonicalization and deletion where a symlink could be planted.
+/// This is mitigated by the systemd service hardening:
+/// `NoNewPrivileges=true`, `ProtectSystem=strict`, `ProtectHome=read-only`.
 fn check_safe_to_delete(path: &Path, user_protected: &[String]) -> Result<PathBuf> {
     let canon = match path.canonicalize() {
         Ok(p) => p,
