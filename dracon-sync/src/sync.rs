@@ -126,11 +126,11 @@ pub(crate) async fn sync_repo(
                 Ok(Ok(())) => {}
                 Ok(Err(dracon_git::error::GitError::MergeConflict)) => {
                     eprintln!("⚠️ pull/merge conflict in {} (manual intervention required)", repo.display());
-                    return Ok(false);
+                    return Err(anyhow::anyhow!("pull/merge conflict"));
                 }
                 Ok(Err(e)) => {
                     eprintln!("⚠️ pull/merge failed for {}: {} - aborting sync pass", repo.display(), e);
-                    return Ok(false);
+                    return Err(anyhow::anyhow!("pull/merge failed: {}", e));
                 }
                 Err(_) => {
                     eprintln!(
@@ -138,7 +138,7 @@ pub(crate) async fn sync_repo(
                         repo.display(),
                         policy.pull_op_timeout_secs
                     );
-                    return Ok(false);
+                    return Err(anyhow::anyhow!("pull/merge timeout"));
                 }
             }
         }
