@@ -532,42 +532,35 @@ fn read_pypi_version(repo: &Path) -> Result<String> {
 
 /// Run the full release pipeline after a version bump.
 ///
-/// Steps:
-/// 1. Create and push git tag for every bump
-/// 2. Create GitHub Release for major bumps
-/// 3. Publish to configured registries
-///
-/// The entire pipeline is gated on the per-repo `auto_publish` opt-in list.
-/// If `repo_publish_targets` is empty, no tags, releases, or publishes happen.
-/// This prevents accidental releases for repos that haven't explicitly opted in.
+/// Steps (each gated independently):
+/// 1. Create and push git tag — gated on `repo_auto_tag`
+/// 2. Create GitHub Release for major bumps — gated on `repo_auto_release`
+/// 3. Publish to configured registries — gated on `repo_publish_targets`
 pub(crate) async fn run_release_pipeline(
     repo: &Path,
     old_version: &str,
     new_version: &str,
     bump_level: &str, // "major", "minor", "patch"
     policy: &SyncPolicy,
-    repo_publish_targets: &[String], // per-repo opt-in list — empty means no releases
+    repo_auto_tag: bool,
+    repo_auto_release: bool,
+    repo_publish_targets: &[String],
 ) -> Vec<ReleaseStep> {
-    // Gate: entire pipeline requires per-repo opt-in
-    if repo_publish_targets.is_empty() {
-        return vec![ReleaseStep::Skipped(
-            "no auto_publish targets in .dracon/dracon-sync.toml".to_string(),
-        )];
-    }
-
     let mut steps = Vec::new();
 
-    // Step 1: Create and push tag
-    match create_and_push_tag(repo, new_version).await {
-        Ok(step) => steps.push(step),
-        Err(e) => steps.push(ReleaseStep::Failed {
-            step: "create tag".to_string(),
-            error: e.to_string(),
-        }),
+    // Step 1: Create and push tag (gated on auto_tag)
+    if repo_auto_tag {
+        match create_and_push_tag(repo, new_version).await {
+            Ok(step) => steps.push(step),
+            Err(e) => steps.push(ReleaseStep::Failed {
+                step: "create tag".to_string(),
+                error: e.to_string(),
+            }),
+        }
     }
 
-    // Step 2: GitHub Release for major bumps
-    if bump_level == "major" {
+    // Step 2: GitHub Release for major bumps (gated on auto_release)
+    if repo_auto_release && bump_level == "major" {
         let tag = format!("v{new_version}");
         match create_github_release(repo, &tag).await {
             Ok(step) => steps.push(step),
@@ -578,7 +571,7 @@ pub(crate) async fn run_release_pipeline(
         }
     }
 
-    // Step 3: Publish to configured registries (requires global auto_publish too)
+    // Step 3: Publish to configured registries (gated on auto_publish + per-repo targets)
     if policy.auto_publish {
         for target in &policy.publish_targets {
             if !repo_publish_targets.contains(&target.name) {
