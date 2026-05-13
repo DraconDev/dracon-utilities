@@ -446,6 +446,7 @@ pub(crate) async fn sync_repo(
             }
 
             // Version bumper: deterministic patch-only (fallback when ai-bumper not enabled)
+            let mut version_bumped = false;
             if auto_bump_versions && cfg!(feature = "scribe") {
                 #[cfg(feature = "scribe")]
                 {
@@ -463,6 +464,7 @@ pub(crate) async fn sync_repo(
                             if let Some(new_ver) = bump_semver_patch(&current_ver) {
                                 let bumped = crate::bump::apply_version_bump_to_repo(repo, &current_ver, &new_ver);
                                 if bumped {
+                                    version_bumped = true;
                                     for file in crate::bump::VERSION_FILES {
                                         if repo.join(file).exists() {
                                             if let Err(e) = run_git_with_timeout(repo, &["add", file], 30, "add").await {
@@ -478,7 +480,8 @@ pub(crate) async fn sync_repo(
             }
 
             // AI version bumper: decides IF and what level to bump (when ai-bumper feature enabled)
-            if auto_bump_versions && cfg!(feature = "ai-bumper") {
+            // Skip if deterministic bumper already bumped to avoid double-bump.
+            if auto_bump_versions && !version_bumped && cfg!(feature = "ai-bumper") {
                 #[cfg(feature = "ai-bumper")]
                 {
                     use crate::bump::{ai_decide_bump_level, bump_semver_major, bump_semver_minor, bump_semver_patch, read_current_version, BumpLevel};
