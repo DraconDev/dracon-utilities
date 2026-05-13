@@ -29,21 +29,22 @@ pub(crate) enum ReleaseStep {
 }
 
 /// Check if a git tag already exists in the repo.
-pub(crate) async fn tag_exists(repo: &Path, tag: &str) -> Result<bool> {
-    let output = run_git_with_timeout(
-        repo,
-        &["tag", "--list", tag],
-        30,
-        "tag-list",
-    ).await?;
-    Ok(output.trim() == tag)
+pub(crate) fn tag_exists(repo: &Path, tag: &str) -> Result<bool> {
+    let output = std::process::Command::new("git")
+        .args(["tag", "--list", tag])
+        .current_dir(repo)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .output()
+        .context("failed to run git tag --list")?;
+    Ok(String::from_utf8_lossy(&output.stdout).trim() == tag)
 }
 
 /// Create a git tag for the given version and push it.
 pub(crate) async fn create_and_push_tag(repo: &Path, version: &str) -> Result<ReleaseStep> {
     let tag = format!("v{version}");
 
-    if tag_exists(repo, &tag).await? {
+    if tag_exists(repo, &tag)? {
         return Ok(ReleaseStep::Skipped(format!("tag {tag} already exists")));
     }
 
@@ -277,20 +278,14 @@ pub(crate) async fn publish_to_registry(
     token_env: &str,
     timeout_secs: u64,
 ) -> Result<ReleaseStep> {
-    let token = match load_secret(token_env) {
-        Ok(t) => t,
-        Err(_) => {
+    let token = match load_secret(token_env, repo) {
+        Some(t) if !t.is_empty() => t,
+        _ => {
             return Ok(ReleaseStep::Skipped(format!(
                 "no token found for {token_env}"
             )));
         }
     };
-
-    if token.is_empty() {
-        return Ok(ReleaseStep::Skipped(format!(
-            "empty token for {token_env}"
-        )));
-    }
 
     match registry {
         PublishRegistry::CratesIo => publish_crates_io(repo, &token, timeout_secs).await,
