@@ -156,9 +156,9 @@ Operational state (mutable files written at runtime) lives **outside the `.draco
 
 ```
 ~/.local/state/dracon/
-├── dracon-sync-incidents.jsonl   # Append-only incident ledger (2MB, 10k+ lines)
-└── dracon-sync-stuck-push-repos.json  # Stuck push tracking
-```
+├── dracon-sync-incidents.jsonl   # Append-only incident ledger
+├── dracon-sync-stuck-push-repos.json  # Stuck push tracking
+└── visibility-sync/              # Cache for visibility/metadata sync (per-repo timestamps)
 
 The incident ledger is appended every sync cycle. Keeping it at `~/.local/state/dracon/` instead of inside `.dracon` prevents the sync daemon from auto-committing its own operational data.
 
@@ -189,6 +189,8 @@ Each line is a JSON object:
 
 `/`, `/home`, `/etc`, `/usr`, `/var`, `/boot`, `/nix`, `/run`, `/sys`, `/dev`, `/proc`
 
+Protection uses ancestor matching: `/home` protects `/home/dracon`, `/home/dracon/Dev`, etc. Only `/` requires an exact match (since everything is a descendant of `/`).
+
 You can add custom protected paths in `dracon-system.toml`:
 
 ```toml
@@ -216,7 +218,7 @@ auto_kill_git = false           # Enable to auto-kill git processes
 git_kill_threshold_secs = 60    # Kill after 60s of high CPU
 ```
 
-When enabled, git processes (init, fetch, pull, clone, push) that sustain high CPU for the configured duration receive SIGTERM, then SIGKILL after 5 seconds if still alive. Disabled by default for safety.
+When enabled, git processes (init, fetch, pull, clone, push) that sustain high CPU for the configured duration receive SIGTERM. Before sending SIGKILL, the guard verifies the PID still belongs to the same git process via `/proc/{pid}/cmdline` to prevent killing a recycled PID. Disabled by default for safety.
 
 **Log configuration:**
 ```toml
@@ -302,6 +304,59 @@ Payload:
 
 The request runs in a background thread with a 5s timeout — webhook failures do not block sync operations.
 
+### Mirror Visibility & Metadata Sync
+
+When enabled, `dracon-sync` automatically mirrors GitHub's public/private status and repository metadata (description, topics/tags) to GitLab and Codeberg mirrors.
+
+```toml
+# dracon-sync.toml
+sync_visibility = true               # Mirror GitHub visibility to Codeberg/GitLab
+sync_metadata = true                 # Mirror description and topics/tags
+sync_visibility_interval_hours = 24  # Check at most once per day per repo
+```
+
+**How it works:**
+- Visibility and metadata are queried from GitHub via `gh api`
+- Mirrors are updated via their REST APIs (GitLab: `PRIVATE-TOKEN`, Codeberg: `Authorization: token`)
+- Timestamp-gated cache in `~/.local/state/dracon/visibility-sync/` prevents API overuse
+- `auth_type` is auto-detected from push URL (GitLab/Codeberg URLs are recognized)
+- Missing tokens for a mirror skip that mirror gracefully
+
+**At creation time:** If `sync_visibility = true`, new mirror repos inherit GitHub's visibility. If `false` (default), all mirrors are created as private.
+
+### Release Pipeline (Tags, Releases, Publishing)
+
+After a version bump, `dracon-sync` can automatically create git tags, GitHub Releases, and publish to package registries. Three separate toggles control each step:
+
+| Toggle | Default | Risk | Reversible? |
+|--------|---------|------|-------------|
+| `auto_tag` | `true` | Low | Yes (`git tag -d`) |
+| `auto_release` | `false` | Medium | Yes (`gh release delete`) |
+| `auto_publish` | `[]` | High | **No** (registries are immutable) |
+
+**Per-repo opt-in:** Tags, releases, and publishing require a `.dracon/dracon-sync.toml` in the repo:
+
+```toml
+# .dracon/dracon-sync.toml
+auto_tag = true              # default: on
+auto_release = true          # default: off — creates GitHub Release on major bumps
+auto_publish = ["crates-io"] # default: empty = no publishing
+```
+
+**Global publish targets** are configured in the main `dracon-sync.toml`:
+
+```toml
+auto_publish = false  # master toggle (default: off)
+
+[[publish_targets]]
+name = "crates-io"
+registry = "crates-io"    # crates-io | npm | pypi
+token_secret = "CARGO_REGISTRY_TOKEN"
+publish_timeout_secs = 300
+```
+
+**Safety:** Dry-run publish (`cargo publish --dry-run`, `npm publish --dry-run`) runs before real publish. Registry pre-check skips already-published versions. Publish failures log incidents but don't break the sync cycle.
+
 ## CLI Reference
 
 All binaries support `-V, --version` and `-v, --verbose` (repeatable up to 2x for `-vv`).
@@ -328,6 +383,8 @@ Commands:
   stuck            Manage repos permanently stuck on push
   dual-branch      Manage repos with both main and master branches
   repair-origins   Detect and repair orphan origin URLs
+  publish          Manually publish a repo to configured registries [--dry-run]
+  publish-status   Check current version and registry publish status
 ```
 
 **Nested subcommands:**
@@ -340,12 +397,12 @@ Commands:
 
 ### Safety Behaviors
 
-**dracon-sync mass-deletion prevention:** The sync daemon will refuse to auto-commit deletions that remove 100% of tracked files in a repository. This guards against accidental total wipes caused by filesystem issues, filter misconfigurations, or destructive operations.
+**dracon-sync mass-deletion prevention:** The sync daemon will refuse to auto-commit deletions that remove 85% or more of tracked files in a repository. This guards against accidental mass wipes caused by filesystem issues, filter misconfigurations, or destructive operations.
 
 When triggered, sync prints a warning and skips the commit:
 ```
-⚠️ SAFETY: 46 files missing from working tree (100% of 46 tracked)
-⚠️ Refusing to stage total wipe - this looks like a mistake or destructive operation
+⚠️ SAFETY: 46 files missing from working tree (85%+ of 46 tracked)
+⚠️ Refusing to stage mass deletion - this looks like a mistake or destructive operation
 ⚠️ If you really want to delete these files, do: git add -A && git commit -m 'delete files'
 ```
 
@@ -436,7 +493,7 @@ README for the full inventory and creation instructions.
 | `CODEBERG_TOKEN` | `codeberg.env` | HTTPS push fallback, repo creation, visibility/metadata sync | https://codeberg.org/user/settings/applications |
 | `GH_TOKEN` | env or `gh auth` | GitHub repo creation, visibility queries, GitHub Releases | https://github.com/settings/tokens or `gh auth login` |
 | `CARGO_REGISTRY_TOKEN` | user creates | Publish to crates.io | https://crates.io/settings/tokens |
-| `NPM_TOKEN` | user creates | Publish to npm | `npm token create --automation` |
+| `NPM_TOKEN` | user creates | Publish to npm | https://www.npmjs.com/settings/tokens/create (Automation type) |
 | `TWINE_PASSWORD` | user creates | Publish to PyPI | https://pypi.org/manage/account/token/ |
 
 **Token resolution**: `load_secret("NAME")` checks env var first, then scans
@@ -557,7 +614,7 @@ let _guard = EnvRestorer::remove("VAR_NAME");
 
 ### dracon-sync
 
-**358 tests** in `src/` (git.rs, sync.rs, report.rs, policy.rs, main.rs). Tests use `tempfile::TempDir` for isolation.
+**418 tests** in `src/` (git.rs, sync.rs, report.rs, policy.rs, main.rs, visibility.rs, release.rs, bump.rs, secrets.rs). Tests use `tempfile::TempDir` for isolation.
 
 ```bash
 export DRACON_SYNC_GIT_BIN=/run/current-system/sw/bin/git
