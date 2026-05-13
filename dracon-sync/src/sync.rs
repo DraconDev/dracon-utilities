@@ -24,6 +24,19 @@ use crate::git::multi_remote::{
 use crate::policy::{debug_enabled, load_repo_override, SyncPolicy};
 use crate::report::{append_incident_record, build_commit_context, detect_report_signals, IncidentRecord, push_large_blob_threshold_bytes};
 
+/// Result of a single repository sync attempt.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SyncOutcome {
+    /// A commit was made (or would be made in dry-run mode).
+    Synced,
+    /// Repository was clean, filter-only, or otherwise had nothing to do.
+    /// Does NOT indicate an error.
+    NothingToDo,
+    /// Sync was blocked by the mass-deletion guard or an in-progress git
+    /// operation (rebase, merge, cherry-pick) that requires manual intervention.
+    Blocked,
+}
+
 fn notify_webhook_failure(webhook_url: &str, repo: &Path, remote: &str, error: &str) {
     let payload = serde_json::json!({
         "event": "push_failure",
@@ -54,7 +67,7 @@ pub(crate) async fn sync_repo(
     dry_run: bool,
     policy_path: Option<&Path>,
     force_deletion: bool,
-) -> Result<bool> {
+) -> Result<SyncOutcome> {
     let svc = GitService::new(repo)?;
     if !svc.is_git_repo().await? {
         if debug_enabled() {
