@@ -565,7 +565,7 @@ pub(crate) fn validate_config(policy_path: &Path) -> ValidateResult {
                 }
             }
 
-            if remote.auth_type == crate::policy::AuthType::Codeberg {
+            if remote.effective_auth_type() == crate::policy::AuthType::Codeberg {
                 if let Some(api_endpoint) = &remote.api_endpoint {
                     if api_endpoint.is_empty() {
                         result.error(format!(

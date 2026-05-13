@@ -1645,7 +1645,7 @@ pub(crate) async fn create_repo_on_codeberg(token: &str, account: &str, repo_nam
 }
 
 pub(crate) async fn auto_create_repo(config: &RemoteConfig, repo_name: &str, private: bool) -> Result<String> {
-    match config.auth_type {
+    match config.effective_auth_type() {
         AuthType::GitHub => create_repo_on_github(&config.auto_create_account, repo_name),
         AuthType::GitLab => create_repo_on_gitlab(&config.auto_create_account, repo_name, private),
         AuthType::Codeberg => {
