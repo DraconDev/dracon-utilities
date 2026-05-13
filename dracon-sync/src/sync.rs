@@ -789,6 +789,18 @@ async fn push_with_blob_check(
         }
     }
 
+    // Sync mirror visibility to match GitHub origin (non-fatal)
+    if !dry_run && policy.sync_visibility {
+        if let Some(origin_url) = crate::git::multi_remote::get_remote_url(repo, "origin") {
+            let repo_name = repo.file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_default();
+            if !repo_name.is_empty() {
+                sync_mirror_visibility(&origin_url, &policy.remotes, &repo_name, policy.sync_visibility_interval_hours);
+            }
+        }
+    }
+
     Ok(true)
 }
 
