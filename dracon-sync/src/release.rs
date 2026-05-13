@@ -154,8 +154,8 @@ fn extract_repo_name(repo: &Path) -> Result<String> {
     } else if url.starts_with("git@") {
         url.strip_prefix("git@")
             .and_then(|s| s.split_once(':'))
-            .map(|(_, path)| path.trim_end_matches(".git"))
-            .unwrap_or(&url)
+            .map(|(_, path)| path.trim_end_matches(".git").to_string())
+            .unwrap_or_else(|| url.clone())
     } else if url.starts_with("https://") {
         // https://github.com/Owner/Repo.git -> Owner/Repo
         // Strip protocol and host to get owner/repo
@@ -166,10 +166,10 @@ fn extract_repo_name(repo: &Path) -> Result<String> {
             .collect::<Vec<_>>()
             .join("/")
     } else {
-        &url
+        url.clone()
     };
 
-    Ok(repo_name.to_string())
+    Ok(repo_name)
 }
 
 /// Check if a version already exists on a package registry.
