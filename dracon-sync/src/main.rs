@@ -408,19 +408,22 @@ async fn main() -> Result<()> {
                     continue;
                 }
                 match sync_repo(&repo, &policy, &excluded_dir_names, 0, None, dry_run, Some(&policy_path), force).await {
-                    Ok(true) => {
+                    Ok(crate::sync::SyncOutcome::Synced) => {
                         if dry_run {
                             println!("✅ dry-run complete for {}", repo.display());
                         } else {
                             println!("🔁 synced {}", repo.display());
                         }
                     }
-                    Ok(false) => {
+                    Ok(crate::sync::SyncOutcome::NothingToDo) => {
                         if dry_run {
                             println!("✅ no sync changes needed for {}", repo.display());
                         } else {
                             println!("✅ no sync changes {}", repo.display());
                         }
+                    }
+                    Ok(crate::sync::SyncOutcome::Blocked) => {
+                        println!("⏸️  sync blocked for {} (guard or manual intervention required)", repo.display());
                     }
                     Err(e) => {
                         eprintln!("❌ error syncing {}: {}", repo.display(), e);
