@@ -2133,31 +2133,34 @@ auto_bump_versions = false
         let tmp = tempfile::tempdir().unwrap();
         let repo = init_test_repo(&tmp, "guard-reset-repo");
 
-        // Create two tracked files
-        std::fs::write(repo.join("a.txt"), "a").unwrap();
-        std::fs::write(repo.join("b.txt"), "b").unwrap();
+        // Create 7 tracked files — 6 will be deleted (85.7% >= 85 threshold)
+        for i in 0..7 {
+            std::fs::write(repo.join(format!("file{i}.txt")), format!("content{i}")).unwrap();
+        }
         git_cmd(&repo, &["add", "."]);
         git_cmd(&repo, &["commit", "-m", "init"]);
 
-        // Modify a.txt so there's a real change to stage
-        std::fs::write(repo.join("a.txt"), "a-modified").unwrap();
+        // Modify file0 so there's a real change that would be staged
+        std::fs::write(repo.join("file0.txt"), "modified").unwrap();
 
         let toml_str = r#"
         auto_github_private = false
-        auto_commit = false
+        auto_commit = true
         auto_pull = false
         auto_push = false
         auto_bump_versions = false
         "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        // First sync: stages a.txt modification, then guard blocks because
-        // b.txt is missing (100% of 2 files = 100% > 85% threshold)
-        std::fs::remove_file(repo.join("b.txt")).unwrap();
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
-        assert!(matches!(result, Ok(SyncOutcome::Blocked)), "guard should block total wipe");
+        // Delete 6 files — this triggers the 85% mass-deletion guard
+        for i in 1..7 {
+            std::fs::remove_file(repo.join(format!("file{i}.txt"))).unwrap();
+        }
 
-        // Verify index is clean — a.txt should NOT be staged
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
+        assert!(matches!(result, Ok(SyncOutcome::Blocked)), "guard should block 85%+ deletion");
+
+        // Verify index is clean — file0 modification should have been reset
         let staged = git_cmd(&repo, &["diff", "--cached", "--name-only"]);
         let staged_str = String::from_utf8_lossy(&staged.stdout);
         assert!(staged_str.trim().is_empty(), "staged changes should be reset after guard blocks, got: {:?}", staged_str);
