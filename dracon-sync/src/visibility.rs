@@ -164,14 +164,15 @@ pub(crate) fn get_github_visibility(owner: &str, repo: &str) -> bool {
     stdout == "true"
 }
 
+const GITLAB_API_PROJECTS: &str = "https://gitlab.com/api/v4/projects/{}%2F{}";
+const CODEBERG_API_REPOS: &str = "https://codeberg.org/api/v1/repos/{}/{}";
+
 /// Set GitLab repo visibility using `curl` with PRIVATE-TOKEN.
 /// `private=true` means private, `private=false` means public.
 fn set_gitlab_visibility(owner: &str, repo: &str, token: &str, private: bool) -> Result<()> {
     let visibility = if private { "private" } else { "public" };
-    let url = format!(
-        "https://gitlab.com/api/v4/projects/{}%2F{}",
-        owner, repo
-    );
+    let encoded = format!("{}%2F{}", owner, repo);
+    let url = GITLAB_API_PROJECTS.replace("{}", &encoded);
     let output = std::process::Command::new("curl")
         .args([
             "-s", "-o", "/dev/null", "-w", "%{http_code}",
@@ -195,7 +196,7 @@ fn set_gitlab_visibility(owner: &str, repo: &str, token: &str, private: bool) ->
 /// Set Codeberg repo visibility using `curl` with Authorization token.
 /// `private=true` means private, `private=false` means public.
 fn set_codeberg_visibility(owner: &str, repo: &str, token: &str, private: bool) -> Result<()> {
-    let url = format!("https://codeberg.org/api/v1/repos/{}/{}", owner, repo);
+    let url = CODEBERG_API_REPOS.replace("{}", &format!("{}/{}", owner, repo));
     let json = format!("{{\"private\":{}}}", private);
     let output = std::process::Command::new("curl")
         .args([
@@ -348,10 +349,8 @@ struct RepoMetadataJson {
 
 /// Set GitLab repo description and topics using `curl` with PRIVATE-TOKEN.
 fn set_gitlab_metadata(owner: &str, repo: &str, token: &str, meta: &RepoMetadata) -> Result<()> {
-    let url = format!(
-        "https://gitlab.com/api/v4/projects/{}%2F{}",
-        owner, repo
-    );
+    let encoded = format!("{}%2F{}", owner, repo);
+    let url = GITLAB_API_PROJECTS.replace("{}", &encoded);
     let mut form_data = vec![format!("description={}", urlencoding::encode(&meta.description))];
     for topic in &meta.topics {
         form_data.push(format!("tag_list[]={}", urlencoding::encode(topic)));
@@ -380,7 +379,7 @@ fn set_gitlab_metadata(owner: &str, repo: &str, token: &str, meta: &RepoMetadata
 
 /// Set Codeberg repo description and topics using `curl` with Authorization token.
 fn set_codeberg_metadata(owner: &str, repo: &str, token: &str, meta: &RepoMetadata) -> Result<()> {
-    let url = format!("https://codeberg.org/api/v1/repos/{}/{}", owner, repo);
+    let url = CODEBERG_API_REPOS.replace("{}", &format!("{}/{}", owner, repo));
     let json = serde_json::json!({
         "description": if meta.description.is_empty() { serde_json::Value::Null } else { serde_json::Value::String(meta.description.clone()) },
         "topics": meta.topics,
