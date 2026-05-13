@@ -244,9 +244,15 @@ pub(crate) struct WardenPolicy {
     watch_roots: Vec<String>,
     #[serde(default)]
     discover_roots: Vec<String>,
+    #[serde(default)]
+    allow_v1_fallback: bool,
 }
 
 impl WardenPolicy {
+    pub(crate) fn apply_global_flags(&self) {
+        dracon_security_kit::set_allow_v1_fallback(self.allow_v1_fallback);
+    }
+
     pub(crate) fn load(path: &Path) -> Result<Self> {
         let content = fs::read_to_string(path)
             .with_context(|| format!("failed to read policy {}", path.display()))?;
@@ -1122,6 +1128,7 @@ fn find_git_repo(path: &Path) -> Option<PathBuf> {
 
 fn run_daemon(policy_path: PathBuf) -> Result<()> {
     let policy = WardenPolicy::load(&policy_path)?;
+    policy.apply_global_flags();
     policy.validate()?;
     let roots = effective_watch_roots(&policy);
     if roots.is_empty() {
