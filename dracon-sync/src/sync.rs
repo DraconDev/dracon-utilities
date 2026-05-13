@@ -607,7 +607,7 @@ pub(crate) async fn sync_repo(
                         }
                         Ok(Err(dracon_git::error::GitError::MergeConflict)) => {
                             eprintln!("⚠️ post-commit pull conflict in {} (manual intervention required)", repo.display());
-                            return Ok(false);
+                            return Err(anyhow::anyhow!("post-commit pull conflict"));
                         }
                         Ok(Err(e)) => {
                             eprintln!("⚠️ post-commit pull failed for {}: {} - will still attempt push", repo.display(), e);
@@ -669,13 +669,13 @@ pub(crate) async fn sync_repo(
 
             if policy.auto_push && has_origin
                 && !push_with_blob_check(repo, policy, blob_threshold, has_origin, 1, remote_failures, dry_run).await? {
-                    return Ok(false);
+                    return Err(anyhow::anyhow!("push failed"));
                 }
         } else if policy.auto_push && !has_origin {
             eprintln!("ℹ️ skip push for {} (no origin remote)", repo.display());
         }
 
-        return Ok(true);
+        return Ok(SyncOutcome::Synced);
     }
 
     // Re-fetch status for push decision (may have changed after pull/commit)
