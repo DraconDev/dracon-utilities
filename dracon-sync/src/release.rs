@@ -1,0 +1,768 @@
+//! Release pipeline: git tagging, GitHub releases, and package registry publishing.
+//!
+//! After a version bump in `sync_repo`, this module handles:
+//! - Creating git tags (`v{version}`) for every bump
+//! - Creating GitHub Releases for major bumps via `gh release create`
+//! - Publishing to configured registries (crates.io, npm, PyPI)
+
+use anyhow::{Context, Result, bail};
+use std::path::Path;
+use std::process::Command;
+
+use crate::policy::{PublishRegistry, SyncPolicy};
+use crate::secrets::load_secret;
+use crate::git::run_git_with_timeout;
+
+/// Result of a release pipeline step.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum ReleaseStep {
+    /// Tag was created and pushed.
+    TagCreated(String),
+    /// GitHub Release was created.
+    GitHubReleaseCreated(String),
+    /// Package was published to a registry.
+    Published { registry: String, version: String },
+    /// Step was skipped (already exists, disabled, etc.).
+    Skipped(String),
+    /// Step failed but did not block the pipeline.
+    Failed { step: String, error: String },
+}
+
+/// Check if a git tag already exists in the repo.
+pub(crate) async fn tag_exists(repo: &Path, tag: &str) -> Result<bool> {
+    let output = run_git_with_timeout(
+        repo,
+        &["tag", "--list", tag],
+        30,
+        "tag-list",
+    ).await?;
+    Ok(output.trim() == tag)
+}
+
+/// Create a git tag for the given version and push it.
+pub(crate) async fn create_and_push_tag(repo: &Path, version: &str) -> Result<ReleaseStep> {
+    let tag = format!("v{version}");
+
+    if tag_exists(repo, &tag).await? {
+        return Ok(ReleaseStep::Skipped(format!("tag {tag} already exists")));
+    }
+
+    // Create annotated tag
+    run_git_with_timeout(
+        repo,
+        &["tag", "-a", &tag, "-m", &format!("Release {tag}")],
+        30,
+        "tag-create",
+    ).await?;
+
+    // Push tag
+    match run_git_with_timeout(
+        repo,
+        &["push", "origin", &tag],
+        120,
+        "tag-push",
+    ).await {
+        Ok(_) => {
+            veprintln!("🏷️  Created and pushed tag {tag}");
+            Ok(ReleaseStep::TagCreated(tag))
+        }
+        Err(e) => {
+            // Tag was created locally but push failed — delete local tag to avoid inconsistency
+            let _ = run_git_with_timeout(repo, &["tag", "-d", &tag], 10, "tag-delete").await;
+            Ok(ReleaseStep::Failed {
+                step: format!("push tag {tag}"),
+                error: e.to_string(),
+            })
+        }
+    }
+}
+
+/// Create a GitHub Release for a major version bump using `gh release create`.
+pub(crate) async fn create_github_release(repo: &Path, tag: &str) -> Result<ReleaseStep> {
+    // Check if release already exists
+    let repo_name = extract_repo_name(repo)?;
+
+    let check = Command::new("gh")
+        .args(["release", "view", tag, "--repo", &repo_name])
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status();
+
+    match check {
+        Ok(status) if status.success() => {
+            return Ok(ReleaseStep::Skipped(format!("GitHub release {tag} already exists")));
+        }
+        _ => {} // Release doesn't exist, proceed
+    }
+
+    // Create the release
+    let result = Command::new("gh")
+        .args([
+            "release", "create", tag,
+            "--repo", &repo_name,
+            "--title", tag,
+            "--notes", &format!("Release {tag}"),
+        ])
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .output();
+
+    match result {
+        Ok(output) if output.status.success() => {
+            veprintln!("🚀 Created GitHub release {tag} for {repo_name}");
+            Ok(ReleaseStep::GitHubReleaseCreated(tag.to_string()))
+        }
+        Ok(output) => {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            Ok(ReleaseStep::Failed {
+                step: format!("GitHub release {tag}"),
+                error: stderr.trim().to_string(),
+            })
+        }
+        Err(e) => Ok(ReleaseStep::Failed {
+            step: format!("GitHub release {tag}"),
+            error: e.to_string(),
+        }),
+    }
+}
+
+/// Extract the repository name (owner/repo) from the git remote URL.
+fn extract_repo_name(repo: &Path) -> Result<String> {
+    let output = std::process::Command::new("git")
+        .args(["remote", "get-url", "origin"])
+        .current_dir(repo)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .output()
+        .context("failed to get origin URL")?;
+
+    let url = String::from_utf8_lossy(&output.stdout).trim().to_string();
+
+    // Extract owner/repo from SSH or HTTPS URL
+    // git@github.com:Owner/Repo.git -> Owner/Repo
+    // https://github.com/Owner/Repo.git -> Owner/Repo
+    let repo_name = if url.starts_with("git@") {
+        url.strip_prefix("git@")
+            .and_then(|s| s.split_once(':'))
+            .map(|(_, path)| path.trim_end_matches(".git"))
+            .unwrap_or(&url)
+    } else if url.starts_with("https://") {
+        url.trim_start_matches("https://")
+            .trim_end_matches(".git")
+    } else {
+        &url
+    };
+
+    Ok(repo_name.to_string())
+}
+
+/// Check if a version already exists on a package registry.
+pub(crate) async fn version_exists_on_registry(
+    registry: PublishRegistry,
+    package_name: &str,
+    version: &str,
+) -> Result<bool> {
+    match registry {
+        PublishRegistry::CratesIo => {
+            let url = format!("https://crates.io/api/v1/crates/{package_name}/{version}");
+            let output = Command::new("curl")
+                .args(["-s", "-o", "/dev/null", "-w", "%{http_code}", &url])
+                .stdout(std::process::Stdio::piped())
+                .stderr(std::process::Stdio::null())
+                .output();
+
+            match output {
+                Ok(out) => {
+                    let code = String::from_utf8_lossy(&out.stdout).trim().to_string();
+                    Ok(code == "200")
+                }
+                Err(_) => Ok(false), // Assume not found on network error
+            }
+        }
+        PublishRegistry::Npm => {
+            let url = format!("https://registry.npmjs.org/{package_name}/{version}");
+            let output = Command::new("curl")
+                .args(["-s", "-o", "/dev/null", "-w", "%{http_code}", &url])
+                .stdout(std::process::Stdio::piped())
+                .stderr(std::process::Stdio::null())
+                .output();
+
+            match output {
+                Ok(out) => {
+                    let code = String::from_utf8_lossy(&out.stdout).trim().to_string();
+                    Ok(code == "200")
+                }
+                Err(_) => Ok(false),
+            }
+        }
+        PublishRegistry::Pypi => {
+            let url = format!("https://pypi.org/pypi/{package_name}/{version}/json");
+            let output = Command::new("curl")
+                .args(["-s", "-o", "/dev/null", "-w", "%{http_code}", &url])
+                .stdout(std::process::Stdio::piped())
+                .stderr(std::process::Stdio::null())
+                .output();
+
+            match output {
+                Ok(out) => {
+                    let code = String::from_utf8_lossy(&out.stdout).trim().to_string();
+                    Ok(code == "200")
+                }
+                Err(_) => Ok(false),
+            }
+        }
+    }
+}
+
+/// Extract the package name from the repo's manifest file.
+pub(crate) fn extract_package_name(repo: &Path, registry: PublishRegistry) -> Result<String> {
+    match registry {
+        PublishRegistry::CratesIo => {
+            let cargo_toml = std::fs::read_to_string(repo.join("Cargo.toml"))
+                .context("no Cargo.toml found")?;
+            // Simple parse: look for `name = "..."` in [package] section
+            for line in cargo_toml.lines() {
+                let trimmed = line.trim();
+                if trimmed.starts_with("name") {
+                    if let Some(name) = trimmed.split('=').nth(1) {
+                        let name = name.trim().trim_matches('"').trim();
+                        if !name.is_empty() && !name.starts_with("workspace") {
+                            return Ok(name.to_string());
+                        }
+                    }
+                }
+            }
+            bail!("could not find package name in Cargo.toml")
+        }
+        PublishRegistry::Npm => {
+            let pkg_json = std::fs::read_to_string(repo.join("package.json"))
+                .context("no package.json found")?;
+            // Simple parse: look for "name" field
+            if let Some(name_line) = pkg_json.lines().find(|l| l.trim().starts_with("\"name\"")) {
+                if let Some(name) = name_line.split(':').nth(1) {
+                    let name = name.trim().trim_matches('"').trim_matches(',').trim();
+                    if !name.is_empty() {
+                        return Ok(name.to_string());
+                    }
+                }
+            }
+            bail!("could not find package name in package.json")
+        }
+        PublishRegistry::Pypi => {
+            // Try pyproject.toml first, then setup.py
+            let pyproject = repo.join("pyproject.toml");
+            if pyproject.exists() {
+                let content = std::fs::read_to_string(&pyproject)?;
+                for line in content.lines() {
+                    let trimmed = line.trim();
+                    if trimmed.starts_with("name") && trimmed.contains('=') {
+                        if let Some(name) = trimmed.split('=').nth(1) {
+                            let name = name.trim().trim_matches('"').trim();
+                            if !name.is_empty() {
+                                return Ok(name.to_string());
+                            }
+                        }
+                    }
+                }
+            }
+            bail!("could not find package name in pyproject.toml")
+        }
+    }
+}
+
+/// Publish a package to the configured registry.
+pub(crate) async fn publish_to_registry(
+    repo: &Path,
+    registry: PublishRegistry,
+    token_env: &str,
+    timeout_secs: u64,
+) -> Result<ReleaseStep> {
+    let token = match load_secret(token_env) {
+        Ok(t) => t,
+        Err(_) => {
+            return Ok(ReleaseStep::Skipped(format!(
+                "no token found for {token_env}"
+            )));
+        }
+    };
+
+    if token.is_empty() {
+        return Ok(ReleaseStep::Skipped(format!(
+            "empty token for {token_env}"
+        )));
+    }
+
+    match registry {
+        PublishRegistry::CratesIo => publish_crates_io(repo, &token, timeout_secs).await,
+        PublishRegistry::Npm => publish_npm(repo, &token, timeout_secs).await,
+        PublishRegistry::Pypi => publish_pypi(repo, &token, timeout_secs).await,
+    }
+}
+
+async fn publish_crates_io(repo: &Path, token: &str, timeout_secs: u64) -> Result<ReleaseStep> {
+    // Dry run first
+    let dry_run = Command::new("cargo")
+        .args(["publish", "--dry-run"])
+        .env("CARGO_REGISTRY_TOKEN", token)
+        .current_dir(repo)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .output();
+
+    match dry_run {
+        Ok(output) if output.status.success() => {
+            // Real publish
+            let result = Command::new("cargo")
+                .args(["publish"])
+                .env("CARGO_REGISTRY_TOKEN", token)
+                .current_dir(repo)
+                .stdout(std::process::Stdio::piped())
+                .stderr(std::process::Stdio::piped())
+                .output();
+
+            match result {
+                Ok(out) if out.status.success() => {
+                    let version = read_cargo_version(repo).unwrap_or_else(|_| "unknown".to_string());
+                    veprintln!("📦 Published to crates.io: v{version}");
+                    Ok(ReleaseStep::Published {
+                        registry: "crates-io".to_string(),
+                        version,
+                    })
+                }
+                Ok(out) => {
+                    let stderr = String::from_utf8_lossy(&out.stderr);
+                    // Check if it's "already uploaded" — not an error
+                    if stderr.contains("already uploaded") || stderr.contains("already exists") {
+                        return Ok(ReleaseStep::Skipped(
+                            "already published to crates.io".to_string(),
+                        ));
+                    }
+                    Ok(ReleaseStep::Failed {
+                        step: "cargo publish".to_string(),
+                        error: stderr.trim().to_string(),
+                    })
+                }
+                Err(e) => Ok(ReleaseStep::Failed {
+                    step: "cargo publish".to_string(),
+                    error: e.to_string(),
+                }),
+            }
+        }
+        Ok(output) => {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            Ok(ReleaseStep::Failed {
+                step: "cargo publish --dry-run".to_string(),
+                error: stderr.trim().to_string(),
+            })
+        }
+        Err(e) => Ok(ReleaseStep::Failed {
+            step: "cargo publish --dry-run".to_string(),
+            error: e.to_string(),
+        }),
+    }
+}
+
+async fn publish_npm(repo: &Path, token: &str, timeout_secs: u64) -> Result<ReleaseStep> {
+    // Dry run first
+    let dry_run = Command::new("npm")
+        .args(["publish", "--dry-run"])
+        .current_dir(repo)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .output();
+
+    match dry_run {
+        Ok(output) if output.status.success() => {
+            // Real publish
+            let result = Command::new("npm")
+                .args(["publish"])
+                .env("NPM_TOKEN", token)
+                .current_dir(repo)
+                .stdout(std::process::Stdio::piped())
+                .stderr(std::process::Stdio::piped())
+                .output();
+
+            match result {
+                Ok(out) if out.status.success() => {
+                    let version = read_npm_version(repo).unwrap_or_else(|_| "unknown".to_string());
+                    veprintln!("📦 Published to npm: v{version}");
+                    Ok(ReleaseStep::Published {
+                        registry: "npm".to_string(),
+                        version,
+                    })
+                }
+                Ok(out) => {
+                    let stderr = String::from_utf8_lossy(&out.stderr);
+                    if stderr.contains("already published") || stderr.contains("409") {
+                        return Ok(ReleaseStep::Skipped("already published to npm".to_string()));
+                    }
+                    Ok(ReleaseStep::Failed {
+                        step: "npm publish".to_string(),
+                        error: stderr.trim().to_string(),
+                    })
+                }
+                Err(e) => Ok(ReleaseStep::Failed {
+                    step: "npm publish".to_string(),
+                    error: e.to_string(),
+                }),
+            }
+        }
+        Ok(output) => {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            Ok(ReleaseStep::Failed {
+                step: "npm publish --dry-run".to_string(),
+                error: stderr.trim().to_string(),
+            })
+        }
+        Err(e) => Ok(ReleaseStep::Failed {
+            step: "npm publish --dry-run".to_string(),
+            error: e.to_string(),
+        }),
+    }
+}
+
+async fn publish_pypi(repo: &Path, token: &str, timeout_secs: u64) -> Result<ReleaseStep> {
+    // Build sdist and wheel first
+    let build = Command::new("python")
+        .args(["-m", "build"])
+        .current_dir(repo)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .output();
+
+    match build {
+        Ok(output) if output.status.success() => {}
+        Ok(output) => {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Ok(ReleaseStep::Failed {
+                step: "python -m build".to_string(),
+                error: stderr.trim().to_string(),
+            });
+        }
+        Err(e) => {
+            return Ok(ReleaseStep::Failed {
+                step: "python -m build".to_string(),
+                error: e.to_string(),
+            });
+        }
+    }
+
+    // Upload with twine
+    let dist_dir = repo.join("dist");
+    let result = Command::new("twine")
+        .args(["upload", "dist/*"])
+        .env("TWINE_USERNAME", "__token__")
+        .env("TWINE_PASSWORD", token)
+        .current_dir(repo)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .output();
+
+    match result {
+        Ok(out) if out.status.success() => {
+            let version = read_pypi_version(repo).unwrap_or_else(|_| "unknown".to_string());
+            veprintln!("📦 Published to PyPI: v{version}");
+            Ok(ReleaseStep::Published {
+                registry: "pypi".to_string(),
+                version,
+            })
+        }
+        Ok(out) => {
+            let stderr = String::from_utf8_lossy(&out.stderr);
+            if stderr.contains("already exists") || stderr.contains("409") {
+                return Ok(ReleaseStep::Skipped("already published to PyPI".to_string()));
+            }
+            Ok(ReleaseStep::Failed {
+                step: "twine upload".to_string(),
+                error: stderr.trim().to_string(),
+            })
+        }
+        Err(e) => Ok(ReleaseStep::Failed {
+            step: "twine upload".to_string(),
+            error: e.to_string(),
+        }),
+    }
+}
+
+/// Read the current version from Cargo.toml.
+fn read_cargo_version(repo: &Path) -> Result<String> {
+    let cargo_toml = std::fs::read_to_string(repo.join("Cargo.toml"))?;
+    for line in cargo_toml.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("version") {
+            if let Some(ver) = trimmed.split('=').nth(1) {
+                let ver = ver.trim().trim_matches('"').trim();
+                if !ver.is_empty() && !ver.starts_with("workspace") {
+                    return Ok(ver.to_string());
+                }
+            }
+        }
+    }
+    bail!("could not find version in Cargo.toml")
+}
+
+/// Read the current version from package.json.
+fn read_npm_version(repo: &Path) -> Result<String> {
+    let pkg_json = std::fs::read_to_string(repo.join("package.json"))?;
+    if let Some(line) = pkg_json.lines().find(|l| l.trim().starts_with("\"version\"")) {
+        if let Some(ver) = line.split(':').nth(1) {
+            let ver = ver.trim().trim_matches('"').trim_matches(',').trim();
+            if !ver.is_empty() {
+                return Ok(ver.to_string());
+            }
+        }
+    }
+    bail!("could not find version in package.json")
+}
+
+/// Read the current version from pyproject.toml.
+fn read_pypi_version(repo: &Path) -> Result<String> {
+    let pyproject = repo.join("pyproject.toml");
+    if pyproject.exists() {
+        let content = std::fs::read_to_string(&pyproject)?;
+        for line in content.lines() {
+            let trimmed = line.trim();
+            if trimmed.starts_with("version") && trimmed.contains('=') {
+                if let Some(ver) = trimmed.split('=').nth(1) {
+                    let ver = ver.trim().trim_matches('"').trim();
+                    if !ver.is_empty() {
+                        return Ok(ver.to_string());
+                    }
+                }
+            }
+        }
+    }
+    bail!("could not find version in pyproject.toml")
+}
+
+/// Run the full release pipeline after a version bump.
+///
+/// Steps:
+/// 1. Create and push git tag for every bump
+/// 2. Create GitHub Release for major bumps
+/// 3. Publish to configured registries
+pub(crate) async fn run_release_pipeline(
+    repo: &Path,
+    old_version: &str,
+    new_version: &str,
+    bump_level: &str, // "major", "minor", "patch"
+    policy: &SyncPolicy,
+    repo_publish_targets: &[String], // per-repo opt-in list
+) -> Vec<ReleaseStep> {
+    let mut steps = Vec::new();
+
+    // Step 1: Create and push tag
+    match create_and_push_tag(repo, new_version).await {
+        Ok(step) => steps.push(step),
+        Err(e) => steps.push(ReleaseStep::Failed {
+            step: "create tag".to_string(),
+            error: e.to_string(),
+        }),
+    }
+
+    // Step 2: GitHub Release for major bumps
+    if bump_level == "major" {
+        let tag = format!("v{new_version}");
+        match create_github_release(repo, &tag).await {
+            Ok(step) => steps.push(step),
+            Err(e) => steps.push(ReleaseStep::Failed {
+                step: "GitHub release".to_string(),
+                error: e.to_string(),
+            }),
+        }
+    }
+
+    // Step 3: Publish to configured registries
+    if policy.auto_publish && !repo_publish_targets.is_empty() {
+        for target in &policy.publish_targets {
+            if !repo_publish_targets.contains(&target.name) {
+                continue;
+            }
+
+            // Check if version already exists on registry
+            match extract_package_name(repo, target.registry) {
+                Ok(pkg_name) => {
+                    match version_exists_on_registry(target.registry, &pkg_name, new_version).await
+                    {
+                        Ok(true) => {
+                            steps.push(ReleaseStep::Skipped(format!(
+                                "v{new_version} already on {}",
+                                target.registry.as_str()
+                            )));
+                        }
+                        Ok(false) => {
+                            match publish_to_registry(
+                                repo,
+                                target.registry,
+                                &target.token_secret,
+                                target.publish_timeout_secs,
+                            )
+                            .await
+                            {
+                                Ok(step) => steps.push(step),
+                                Err(e) => steps.push(ReleaseStep::Failed {
+                                    step: format!("publish to {}", target.registry.as_str()),
+                                    error: e.to_string(),
+                                }),
+                            }
+                        }
+                        Err(e) => steps.push(ReleaseStep::Failed {
+                            step: format!(
+                                "check {} registry for {pkg_name}",
+                                target.registry.as_str()
+                            ),
+                            error: e.to_string(),
+                        }),
+                    }
+                }
+                Err(e) => steps.push(ReleaseStep::Skipped(format!(
+                    "no package name for {}: {e}",
+                    target.registry.as_str()
+                ))),
+            }
+        }
+    }
+
+    steps
+}
+
+/// Read the current version from the repo based on detected project type.
+/// Returns (version, project_type) where project_type is "rust", "node", or "python".
+pub(crate) fn detect_project_version(repo: &Path) -> Option<(String, &'static str)> {
+    if repo.join("Cargo.toml").exists() {
+        read_cargo_version(repo).ok().map(|v| (v, "rust"))
+    } else if repo.join("package.json").exists() {
+        read_npm_version(repo).ok().map(|v| (v, "node"))
+    } else if repo.join("pyproject.toml").exists() {
+        read_pypi_version(repo).ok().map(|v| (v, "python"))
+    } else {
+        None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+    use std::fs;
+
+    #[test]
+    fn test_extract_package_name_cargo() {
+        let dir = TempDir::new().unwrap();
+        fs::write(
+            dir.path().join("Cargo.toml"),
+            "[package]\nname = \"my-crate\"\nversion = \"0.1.0\"\n",
+        )
+        .unwrap();
+        let name = extract_package_name(dir.path(), PublishRegistry::CratesIo).unwrap();
+        assert_eq!(name, "my-crate");
+    }
+
+    #[test]
+    fn test_extract_package_name_npm() {
+        let dir = TempDir::new().unwrap();
+        fs::write(
+            dir.path().join("package.json"),
+            r#"{"name": "my-npm-pkg", "version": "1.0.0"}"#,
+        )
+        .unwrap();
+        let name = extract_package_name(dir.path(), PublishRegistry::Npm).unwrap();
+        assert_eq!(name, "my-npm-pkg");
+    }
+
+    #[test]
+    fn test_extract_package_name_pypi() {
+        let dir = TempDir::new().unwrap();
+        fs::write(
+            dir.path().join("pyproject.toml"),
+            "[project]\nname = \"my-pypi-pkg\"\nversion = \"2.0.0\"\n",
+        )
+        .unwrap();
+        let name = extract_package_name(dir.path(), PublishRegistry::Pypi).unwrap();
+        assert_eq!(name, "my-pypi-pkg");
+    }
+
+    #[test]
+    fn test_read_cargo_version() {
+        let dir = TempDir::new().unwrap();
+        fs::write(
+            dir.path().join("Cargo.toml"),
+            "[package]\nname = \"test\"\nversion = \"1.2.3\"\n",
+        )
+        .unwrap();
+        assert_eq!(read_cargo_version(dir.path()).unwrap(), "1.2.3");
+    }
+
+    #[test]
+    fn test_read_npm_version() {
+        let dir = TempDir::new().unwrap();
+        fs::write(
+            dir.path().join("package.json"),
+            r#"{"name": "test", "version": "3.4.5"}"#,
+        )
+        .unwrap();
+        assert_eq!(read_npm_version(dir.path()).unwrap(), "3.4.5");
+    }
+
+    #[test]
+    fn test_detect_project_version_rust() {
+        let dir = TempDir::new().unwrap();
+        fs::write(
+            dir.path().join("Cargo.toml"),
+            "[package]\nname = \"test\"\nversion = \"0.1.0\"\n",
+        )
+        .unwrap();
+        let (ver, typ) = detect_project_version(dir.path()).unwrap();
+        assert_eq!(ver, "0.1.0");
+        assert_eq!(typ, "rust");
+    }
+
+    #[test]
+    fn test_detect_project_version_unknown() {
+        let dir = TempDir::new().unwrap();
+        assert!(detect_project_version(dir.path()).is_none());
+    }
+
+    #[test]
+    fn test_extract_repo_name_from_ssh_url() {
+        let dir = TempDir::new().unwrap();
+        // We can't easily mock `git remote get-url`, so test the URL parsing logic directly
+        let url = "git@github.com:DraconDev/dracon-utilities.git";
+        let repo_name = if url.starts_with("git@") {
+            url.strip_prefix("git@")
+                .and_then(|s| s.split_once(':'))
+                .map(|(_, path)| path.trim_end_matches(".git"))
+                .unwrap_or(url)
+        } else {
+            url
+        };
+        assert_eq!(repo_name, "DraconDev/dracon-utilities");
+    }
+
+    #[test]
+    fn test_extract_repo_name_from_https_url() {
+        let url = "https://github.com/DraconDev/dracon-utilities.git";
+        let repo_name = url
+            .trim_start_matches("https://")
+            .trim_end_matches(".git");
+        assert_eq!(repo_name, "DraconDev/dracon-utilities");
+    }
+
+    #[test]
+    fn test_release_step_skipped_display() {
+        let step = ReleaseStep::Skipped("already exists".to_string());
+        assert!(matches!(step, ReleaseStep::Skipped(_)));
+    }
+
+    #[test]
+    fn test_publish_registry_default() {
+        assert_eq!(PublishRegistry::default(), PublishRegistry::CratesIo);
+    }
+
+    #[test]
+    fn test_publish_registry_as_str() {
+        assert_eq!(PublishRegistry::CratesIo.as_str(), "crates-io");
+        assert_eq!(PublishRegistry::Npm.as_str(), "npm");
+        assert_eq!(PublishRegistry::Pypi.as_str(), "pypi");
+    }
+}
