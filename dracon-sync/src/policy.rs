@@ -304,9 +304,18 @@ pub(crate) struct SyncPolicy {
     /// Uses the same interval as visibility sync.
     #[serde(default)]
     pub(crate) sync_metadata: bool,
+    /// When true, version bumps automatically create a git tag (e.g. v0.2.0).
+    /// Tags are cheap and reversible — default is true.
+    /// Per-repo override via `auto_tag` in .dracon/dracon-sync.toml.
+    #[serde(default = "default_true")]
+    pub(crate) auto_tag: bool,
+    /// When true, major version bumps create a GitHub Release.
+    /// Releases are public-facing milestones — default is false.
+    /// Per-repo override via `auto_release` in .dracon/dracon-sync.toml.
+    #[serde(default)]
+    pub(crate) auto_release: bool,
     /// Master toggle for auto-publishing to package registries after version bumps.
     /// Requires per-repo opt-in via `auto_publish` in `.dracon/dracon-sync.toml`.
-    /// Tags are created automatically: any bump -> git tag, major -> GitHub Release.
     #[serde(default)]
     pub(crate) auto_publish: bool,
     /// Configured package registry publish targets.
@@ -357,7 +366,15 @@ fn default_publish_timeout_secs() -> u64 {
 pub(crate) struct RepoPolicyOverride {
     /// Optional per-repo override for `auto_bump_versions`.
     pub(crate) auto_bump_versions: Option<bool>,
-    /// Optional per-repo list of publish target names to auto-publish to.
+    /// Per-repo override for auto-tagging. Defaults to true (inherited from global).
+    /// Set to false to disable version tags for this repo.
+    #[serde(default)]
+    pub(crate) auto_tag: Option<bool>,
+    /// Per-repo override for GitHub Releases on major bumps.
+    /// Defaults to false (inherited from global auto_release).
+    #[serde(default)]
+    pub(crate) auto_release: Option<bool>,
+    /// Per-repo list of publish target names to auto-publish to.
     /// Only used when global `auto_publish = true`.
     #[serde(default)]
     pub(crate) auto_publish: Vec<String>,
@@ -870,6 +887,8 @@ pub(crate) fn test_sync_policy() -> SyncPolicy {
         sync_visibility: false,
         sync_visibility_interval_hours: 24,
         sync_metadata: false,
+        auto_tag: true,
+        auto_release: false,
         auto_publish: false,
         publish_targets: vec![],
     }
