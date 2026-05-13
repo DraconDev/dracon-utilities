@@ -5,6 +5,7 @@ mod bump;
 mod secrets;
 mod simple_ai;
 mod visibility;
+mod release;
 #[cfg(feature = "scribe")]
 mod scribe;
 mod report;
@@ -153,6 +154,25 @@ enum Command {
     },
     /// Print Prometheus-style metrics.
     Metrics,
+    /// Publish a repository to configured package registries.
+    Publish {
+        /// The repository path to publish.
+        repo: PathBuf,
+        /// Only publish to these target names (defaults to all configured).
+        #[arg(long)]
+        targets: Vec<String>,
+        /// Skip the dry-run check and publish directly.
+        #[arg(long)]
+        skip_dry_run: bool,
+    },
+    /// Show publish status for a repository across configured registries.
+    PublishStatus {
+        /// The repository path to check.
+        repo: PathBuf,
+        /// Emit machine-readable JSON.
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 #[derive(Subcommand, Debug)]
