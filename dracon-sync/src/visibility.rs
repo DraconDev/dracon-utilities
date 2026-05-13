@@ -6,6 +6,51 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use crate::policy::{AuthType, RemoteConfig};
 use crate::secrets::{load_secret, sync_secrets_dir};
 
+/// Strip ANSI escape sequences from a string.
+/// Handles CSI sequences (ESC [ ... m), OSC sequences (ESC ] ... BEL/ST),
+/// and bare ESC sequences.
+fn strip_ansi(s: &str) -> String {
+    let mut result = String::with_capacity(s.len());
+    let mut chars = s.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '\x1b' {
+            // ESC sequence
+            match chars.peek() {
+                Some('[') => {
+                    // CSI sequence: ESC [ ... <final byte>
+                    chars.next();
+                    while let Some(&next) = chars.peek() {
+                        chars.next();
+                        if next >= '@' && next <= '~' {
+                            break;
+                        }
+                    }
+                }
+                Some(']') => {
+                    // OSC sequence: ESC ] ... BEL or ST
+                    chars.next();
+                    while let Some(next) = chars.next() {
+                        if next == '\x07' {
+                            break;
+                        }
+                        if next == '\x1b' && chars.peek() == Some(&'\\') {
+                            chars.next();
+                            break;
+                        }
+                    }
+                }
+                _ => {
+                    // Other ESC sequence (2-char): skip the next char
+                    chars.next();
+                }
+            }
+        } else {
+            result.push(c);
+        }
+    }
+    result
+}
+
 /// Directory for visibility sync cache files.
 fn visibility_cache_dir() -> PathBuf {
     dirs::home_dir()
@@ -255,7 +300,10 @@ pub(crate) fn get_github_metadata(owner: &str, repo: &str) -> RepoMetadata {
         eprintln!("⚠️ gh api metadata failed: {}", stderr.trim());
         return RepoMetadata::default();
     }
-    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let stdout_raw = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    // gh api --jq with JSON object construction can include ANSI color codes;
+    // strip them before parsing JSON.
+    let stdout = strip_ansi(&stdout_raw);
     // Parse JSON: {"description": "...", "topics": ["a","b"]}
     match serde_json::from_str::<RepoMetadataJson>(&stdout) {
         Ok(m) => RepoMetadata {
