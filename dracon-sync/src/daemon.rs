@@ -553,7 +553,7 @@ pub(crate) async fn run_daemon(policy_path: PathBuf, override_interval_secs: Opt
                             if !matches!(e.status, dracon_git::types::FileStatus::Modified) {
                                 return true;
                             }
-                            diff_head_files.contains(&e.path.to_string_lossy().to_string())
+                            diff_head_files.contains(&e.path)
                         })
                         .collect()
                 };
