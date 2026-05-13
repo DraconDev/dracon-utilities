@@ -2387,7 +2387,7 @@ mod tests {
         });
 
         let url = format!("http://127.0.0.1:{}/api/v1/repos", port);
-        let result = crate::git::multi_remote::create_repo_on_codeberg("test_token", "testuser", "myrepo", &url).await;
+        let result = crate::git::multi_remote::create_repo_on_codeberg("test_token", "testuser", "myrepo", &url, true).await;
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "git@codeberg.org:testuser/myrepo.git");
     }
@@ -2406,7 +2406,7 @@ mod tests {
         });
 
         let url = format!("http://127.0.0.1:{}/api/v1/repos", port);
-        let result = crate::git::multi_remote::create_repo_on_codeberg("test_token", "testuser", "myrepo", &url).await;
+        let result = crate::git::multi_remote::create_repo_on_codeberg("test_token", "testuser", "myrepo", &url, true).await;
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "git@codeberg.org:testuser/myrepo.git");
     }
@@ -2425,7 +2425,7 @@ mod tests {
         });
 
         let url = format!("http://127.0.0.1:{}/api/v1/repos", port);
-        let result = crate::git::multi_remote::create_repo_on_codeberg("test_token", "testuser", "myrepo", &url).await;
+        let result = crate::git::multi_remote::create_repo_on_codeberg("test_token", "testuser", "myrepo", &url, true).await;
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "git@codeberg.org:testuser/myrepo.git");
     }
