@@ -4,7 +4,7 @@ use dracon_git::{
     types::{DiffFile, FileStatus},
     GitService,
 };
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tokio::process::Command as TokioCommand;
