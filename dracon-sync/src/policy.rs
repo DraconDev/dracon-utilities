@@ -835,6 +835,47 @@ pub(crate) fn open_policy_in_editor(policy_path: &Path) -> Result<()> {
 }
 
 #[cfg(test)]
+pub(crate) fn test_sync_policy() -> SyncPolicy {
+    SyncPolicy {
+        system_repo: String::new(),
+        pulse_interval_secs: 1,
+        inactivity_push_delay_secs: 5,
+        auto_commit: true,
+        auto_bump_versions: true,
+        auto_pull: true,
+        auto_push: true,
+        backup_policy: String::new(),
+        backup_dir: String::new(),
+        exclude_repos: vec![],
+        exclude_dir_names: vec![],
+        exclude_file_patterns: vec![],
+        auto_repair_concerns: true,
+        auto_repair_warns: true,
+        auto_rewrite_large_blobs: true,
+        watch_roots: vec![],
+        remotes: vec![],
+        auto_github_private: false,
+        auto_github_private_account: "DraconDev".to_string(),
+        max_stage_file_bytes: 100 * 1024 * 1024,
+        pull_op_timeout_secs: 30,
+        push_op_timeout_secs: 300,
+        repo_sync_timeout_secs: 420,
+        push_retries: 3,
+        repair_cooldown_secs: 60,
+        max_push_blob_bytes: 100 * 1024 * 1024,
+        incident_ledger_max_lines: 10_000,
+        incident_ledger_max_age_days: 30,
+        webhook_url: None,
+        alert_unpushed_threshold: 10,
+        sync_visibility: false,
+        sync_visibility_interval_hours: 24,
+        sync_metadata: false,
+        auto_publish: false,
+        publish_targets: vec![],
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
@@ -961,43 +1002,7 @@ mod tests {
     }
 
     fn test_sync_policy() -> SyncPolicy {
-        SyncPolicy {
-            system_repo: String::new(),
-            pulse_interval_secs: 1,
-            inactivity_push_delay_secs: 5,
-            auto_commit: true,
-            auto_bump_versions: true,
-            auto_pull: true,
-            auto_push: true,
-            backup_policy: String::new(),
-            backup_dir: String::new(),
-            exclude_repos: vec![],
-            exclude_dir_names: vec![],
-            exclude_file_patterns: vec![],
-            auto_repair_concerns: true,
-auto_repair_warns: true,
-            auto_rewrite_large_blobs: true,
-            watch_roots: vec![],
-            remotes: vec![],
-            auto_github_private: false,
-            auto_github_private_account: "DraconDev".to_string(),
-            max_stage_file_bytes: 100 * 1024 * 1024,
-            pull_op_timeout_secs: 30,
-            push_op_timeout_secs: 300,
-            repo_sync_timeout_secs: 420,
-            push_retries: 3,
-            repair_cooldown_secs: 60,
-            max_push_blob_bytes: 100 * 1024 * 1024,
-            incident_ledger_max_lines: 10_000,
-            incident_ledger_max_age_days: 30,
-            webhook_url: None,
-            alert_unpushed_threshold: 10,
-            sync_visibility: false,
-            sync_visibility_interval_hours: 24,
-            sync_metadata: false,
-            auto_publish: false,
-            publish_targets: vec![],
-        }
+        super::test_sync_policy()
     }
 
     #[test]

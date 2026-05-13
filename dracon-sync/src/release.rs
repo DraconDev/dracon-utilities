@@ -828,7 +828,8 @@ mod tests {
             .status()
             .unwrap();
 
-        let policy = crate::policy::test_sync_policy();
+        let mut policy = crate::policy::test_sync_policy();
+        policy.auto_publish = true;
         let steps = run_release_pipeline(
             dir.path(),
             "0.1.0",
@@ -839,7 +840,7 @@ mod tests {
         )
         .await;
 
-        // Should have at least a tag step (publish skipped since no token/no auto_publish global)
+        // Should have at least a tag step (publish may skip since no token in test env)
         assert!(!steps.is_empty());
         assert!(steps.iter().any(|s| matches!(s, ReleaseStep::TagCreated(_))));
     }
