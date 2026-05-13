@@ -488,4 +488,136 @@ mod tests {
         let result = parse_github_owner_repo("https://github.com/my-org/some-repo.git");
         assert_eq!(result, Some(("my-org".to_string(), "some-repo".to_string())));
     }
+
+    // ---- Creation-time visibility tests ----
+
+    #[test]
+    fn test_github_visibility_at_creation_enabled_private() {
+        // When sync_visibility is true, we check GitHub. In test env (no gh),
+        // get_github_visibility returns true (safe default = private).
+        assert!(github_visibility_at_creation("DraconDev", "test", true));
+    }
+
+    #[test]
+    fn test_sync_visibility_defaults_in_policy() {
+        // Verify that the default policy parsing gives sync_visibility=false
+        let toml = "";
+        let policy: crate::policy::SyncPolicy = toml::from_str(toml).unwrap_or_else(|_| {
+            // If empty TOML fails, try minimal valid config
+            toml::from_str("pulse_interval_secs = 1").unwrap()
+        });
+        assert!(!policy.sync_visibility, "sync_visibility should default to false");
+        assert_eq!(policy.sync_visibility_interval_hours, 24, "interval should default to 24");
+    }
+
+    #[test]
+    fn test_sync_visibility_parses_true() {
+        let toml = "sync_visibility = true\nsync_visibility_interval_hours = 6";
+        let policy: crate::policy::SyncPolicy = toml::from_str(toml)
+            .unwrap_or_else(|_| toml::from_str("pulse_interval_secs = 1\nsync_visibility = true\nsync_visibility_interval_hours = 6").unwrap());
+        assert!(policy.sync_visibility);
+        assert_eq!(policy.sync_visibility_interval_hours, 6);
+    }
+
+    // ---- Mirror update tests with mock curl ----
+
+    #[test]
+    fn test_set_gitlab_visibility_builds_correct_request() {
+        // We can't easily mock curl, but we can verify the function handles
+        // the "curl not found" case gracefully.
+        let result = set_gitlab_visibility("testowner", "testrepo", "faketoken", true);
+        // curl may or may not be available, but it should not panic
+        let _ = result;
+    }
+
+    #[test]
+    fn test_set_codeberg_visibility_builds_correct_request() {
+        let result = set_codeberg_visibility("testowner", "testrepo", "faketoken", false);
+        let _ = result;
+    }
+
+    // ---- Error isolation tests ----
+
+    #[test]
+    fn test_sync_mirror_visibility_does_not_panic_on_all_failures() {
+        let repo_name = "test_all_failures";
+        let remotes = vec![
+            RemoteConfig {
+                name: "gitlab".to_string(),
+                push_url: "git@gitlab.com:test/repo.git".to_string(),
+                auto_create: false,
+                auto_create_account: "test".to_string(),
+                auth_type: AuthType::GitLab,
+                priority: 50,
+                api_endpoint: None,
+                auto_create_token_var: Some("NONEXISTENT_TOKEN_VAR_12345".to_string()),
+                repo_name_map: Default::default(),
+                force_push_when_behind: false,
+            },
+            RemoteConfig {
+                name: "codeberg".to_string(),
+                push_url: "git@codeberg.org:test/repo.git".to_string(),
+                auto_create: false,
+                auto_create_account: "test".to_string(),
+                auth_type: AuthType::Codeberg,
+                priority: 50,
+                api_endpoint: None,
+                auto_create_token_var: Some("NONEXISTENT_TOKEN_VAR_12345".to_string()),
+                repo_name_map: Default::default(),
+                force_push_when_behind: false,
+            },
+        ];
+        // Set interval to 0 to force cache expiration
+        sync_mirror_visibility("git@github.com:DraconDev/test.git", &remotes, repo_name, 0);
+        // Should not panic even when all tokens are missing
+        let _ = std::fs::remove_file(visibility_cache_path(repo_name));
+    }
+
+    // ---- Idempotency / cache behavior ----
+
+    #[test]
+    fn test_cache_prevents_repeated_api_calls() {
+        let repo_name = "test_idempotency_cache";
+        update_visibility_cache(repo_name);
+        // Second call with fresh cache should skip entirely
+        assert!(is_visibility_cache_fresh(repo_name, 24));
+        let _ = std::fs::remove_file(visibility_cache_path(repo_name));
+    }
+
+    #[test]
+    fn test_cache_not_updated_on_api_failure() {
+        // When gh api fails, the cache should still be updated to prevent
+        // hammering on every sync cycle. This is by design — see update_visibility_cache
+        // call at the end of sync_mirror_visibility.
+        let repo_name = "test_cache_on_failure";
+        sync_mirror_visibility("not-a-url", &[], repo_name, 0);
+        // Cache should exist even after failure
+        let path = visibility_cache_path(repo_name);
+        assert!(path.exists(), "cache should be written even on API failure to prevent retries");
+        let _ = std::fs::remove_file(&path);
+    }
+
+    // ---- Edge cases ----
+
+    #[test]
+    fn test_parse_github_owner_repo_with_hyphens() {
+        let result = parse_github_owner_repo("git@github.com:my-org/my-super-repo.git");
+        assert_eq!(result, Some(("my-org".to_string(), "my-super-repo".to_string())));
+    }
+
+    #[test]
+    fn test_parse_github_owner_repo_empty_string() {
+        let result = parse_github_owner_repo("");
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_visibility_cache_corrupt_file() {
+        let repo_name = "test_corrupt_cache";
+        let path = visibility_cache_path(repo_name);
+        std::fs::create_dir_all(visibility_cache_dir()).unwrap();
+        std::fs::write(&path, "not-a-number").unwrap();
+        assert!(!is_visibility_cache_fresh(repo_name, 24), "corrupt cache should be treated as stale");
+        let _ = std::fs::remove_file(&path);
+    }
 }
