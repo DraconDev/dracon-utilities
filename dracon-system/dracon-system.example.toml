@@ -36,8 +36,10 @@ auto_kill_git = false
 git_kill_threshold_secs = 60
 
 # Notifications
+# notify_command must be an absolute path (e.g. /usr/bin/notify-send).
+# For security, shell commands like "sh -c ..." are not allowed.
 notify = true
-notify_command = "notify-send"
+notify_command = "/usr/bin/notify-send"
 notify_cooldown_secs = 300
 
 # Persistent logging of heavy processes

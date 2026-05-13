@@ -737,7 +737,7 @@ fn default_process_exempt_names() -> String {
 }
 
 fn default_notify_command() -> String {
-    "notify-send".to_string()
+    "/usr/bin/notify-send".to_string()
 }
 
 fn default_notify_cooldown_secs() -> u64 {
