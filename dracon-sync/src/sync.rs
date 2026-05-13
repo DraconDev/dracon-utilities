@@ -160,17 +160,12 @@ fn maybe_sync_visibility_and_metadata(
         return;
     }
     if let Some(origin_url) = crate::git::multi_remote::get_remote_url(repo, "origin") {
-        let repo_name = repo.file_name()
-            .map(|n| n.to_string_lossy().to_string())
-            .unwrap_or_default();
-        if !repo_name.is_empty() {
-            // Run metadata sync first (before visibility writes the shared cache)
-            if policy.sync_metadata {
-                sync_mirror_metadata(&origin_url, &policy.remotes, &repo_name, repo, policy.sync_visibility_interval_hours);
-            }
-            if policy.sync_visibility {
-                sync_mirror_visibility(&origin_url, &policy.remotes, &repo_name, repo, policy.sync_visibility_interval_hours);
-            }
+        // Run metadata sync first (before visibility writes the shared cache)
+        if policy.sync_metadata {
+            sync_mirror_metadata(&origin_url, &policy.remotes, repo, policy.sync_visibility_interval_hours);
+        }
+        if policy.sync_visibility {
+            sync_mirror_visibility(&origin_url, &policy.remotes, repo, policy.sync_visibility_interval_hours);
         }
     }
 }

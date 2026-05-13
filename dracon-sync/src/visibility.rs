@@ -714,7 +714,7 @@ mod tests {
             repo_name_map: Default::default(),
             force_push_when_behind: false,
         }];
-        sync_mirror_visibility("git@github.com:DraconDev/test.git", &remotes, "test_skip_cached", repo_path, 24);
+        sync_mirror_visibility("git@github.com:DraconDev/test.git", &remotes, repo_path, 24);
         // If we got here without panicking, the cache skip worked
         let _ = std::fs::remove_file(visibility_cache_path(repo_path));
     }
@@ -724,7 +724,7 @@ mod tests {
         let repo_path = Path::new("/tmp/test_bad_origin");
         let remotes: Vec<RemoteConfig> = vec![];
         // Should not panic on unparseable URL
-        sync_mirror_visibility("not-a-valid-url", &remotes, "test_bad_origin", repo_path, 0);
+        sync_mirror_visibility("not-a-valid-url", &remotes, repo_path, 0);
         let _ = std::fs::remove_file(visibility_cache_path(repo_path));
     }
 
@@ -819,7 +819,7 @@ mod tests {
             },
         ];
         // Set interval to 0 to force cache expiration
-        sync_mirror_visibility("git@github.com:DraconDev/test.git", &remotes, "test_all_failures", Path::new("/tmp/test_all_failures"), 0);
+        sync_mirror_visibility("git@github.com:DraconDev/test.git", &remotes, Path::new("/tmp/test_all_failures"), 0);
         // Should not panic even when all tokens are missing
         let _ = std::fs::remove_file(visibility_cache_path(Path::new("/tmp/test_all_failures")));
     }
@@ -841,7 +841,7 @@ mod tests {
         // should still be written to prevent hammering on every sync cycle.
         let repo_path = Path::new("/tmp/test_cache_on_failure");
         let remotes: Vec<RemoteConfig> = vec![];
-        sync_mirror_visibility("git@github.com:DraconDev/test.git", &remotes, "test_cache_on_failure", repo_path, 0);
+        sync_mirror_visibility("git@github.com:DraconDev/test.git", &remotes, repo_path, 0);
         // Cache should exist even with no remotes to update
         let path = visibility_cache_path(repo_path);
         assert!(path.exists(), "cache should be written even when no remotes configured");
@@ -855,7 +855,7 @@ mod tests {
         // determine the GitHub owner/repo.
         let repo_path = Path::new("/tmp/test_cache_unparseable");
         let remotes: Vec<RemoteConfig> = vec![];
-        sync_mirror_visibility("not-a-url", &remotes, "test_cache_unparseable", repo_path, 0);
+        sync_mirror_visibility("not-a-url", &remotes, repo_path, 0);
         let path = visibility_cache_path(repo_path);
         assert!(!path.exists(), "cache should NOT be written for unparseable URLs (need to retry)");
     }
