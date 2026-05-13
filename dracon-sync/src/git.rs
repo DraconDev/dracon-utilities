@@ -2612,7 +2612,7 @@ mod tests {
         let orig_path = std::env::var("PATH").unwrap_or_default();
         let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
 
-        let result = multi_remote::create_repo_on_gitlab("testuser", "my-repo");
+        let result = multi_remote::create_repo_on_gitlab("testuser", "my-repo", true);
 
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "git@gitlab.com:testuser/my-repo.git");
@@ -2632,7 +2632,7 @@ mod tests {
         let orig_path = std::env::var("PATH").unwrap_or_default();
         let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
 
-        let result = multi_remote::create_repo_on_gitlab("testuser", "dracon-demons");
+        let result = multi_remote::create_repo_on_gitlab("testuser", "dracon-demons", true);
 
         assert!(result.is_ok());
         let url = result.unwrap();
@@ -2654,7 +2654,7 @@ mod tests {
         let orig_path = std::env::var("PATH").unwrap_or_default();
         let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
 
-        let result = multi_remote::create_repo_on_gitlab("testuser", "test-repo");
+        let result = multi_remote::create_repo_on_gitlab("testuser", "test-repo", true);
 
         assert!(result.is_err());
     }
@@ -2671,7 +2671,7 @@ mod tests {
         let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
         let _glab_guard = EnvRestorer::new("GITLAB_TOKEN", "test_gitlab_token");
 
-        let result = multi_remote::create_repo_on_gitlab("testuser", "test-repo");
+        let result = multi_remote::create_repo_on_gitlab("testuser", "test-repo", true);
 
         assert!(result.is_ok());
     }
