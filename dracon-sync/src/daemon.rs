@@ -487,7 +487,7 @@ pub(crate) async fn run_daemon(policy_path: PathBuf, override_interval_secs: Opt
                     continue;
                 }
             };
-            let status = match svc.get_status().await {
+            let mut status = match svc.get_status().await {
                 Ok(status) => status,
                 Err(e) => {
                     eprintln!("⚠️ {} status_failed: {}", repo.display(), e);
