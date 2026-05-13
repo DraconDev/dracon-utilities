@@ -11,7 +11,9 @@ use tokio::process::Command as TokioCommand;
 use tokio::time::sleep;
 
 use crate::exclude::is_excluded_change_path;
+use crate::helpers::is_repo_already_exists;
 use crate::policy::{std_git_command, tokio_git_command, timestamp_secs, AuthType, RemoteConfig};
+use crate::secrets::load_secret as secrets_load_secret;
 
 pub(crate) fn git_ssh_hardening() -> String {
     let home = std::env::var("HOME").unwrap_or_else(|_| "/root".to_string());
@@ -1266,7 +1268,7 @@ pub(crate) async fn restore_paths(repo: &Path, paths: &[String]) -> Result<()> {
 
 #[allow(dead_code)]
 pub(crate) fn load_secret(env_name: &str) -> Option<String> {
-    crate::secrets::load_secret(env_name, &crate::secrets::sync_secrets_dir())
+    secrets_load_secret(env_name, &crate::secrets::sync_secrets_dir())
 }
 
 pub(crate) mod multi_remote {
@@ -1529,7 +1531,7 @@ pub(crate) fn create_repo_on_github(account: &str, repo_name: &str) -> Result<St
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        if stderr.contains("Name already exists") || stderr.contains("already exists") {
+        if is_repo_already_exists(&stderr) {
             return Ok(format!("git@github.com:{}/{}.git", account, repo_name));
         }
         anyhow::bail!("gh repo create failed: {}", stderr.trim());
@@ -1557,7 +1559,7 @@ pub(crate) fn create_repo_on_gitlab(account: &str, repo_name: &str, private: boo
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        if stderr.contains("already exists") || stderr.contains("Name already exists") || stderr.contains("has already been taken") {
+        if is_repo_already_exists(&stderr) {
             return Ok(format!("git@gitlab.com:{}/{}.git", account, repo_name));
         }
         anyhow::bail!("glab repo create failed: {}", stderr.trim());

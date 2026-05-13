@@ -11,6 +11,7 @@ use std::path::Path;
 use std::process::Command;
 
 use crate::bump::{extract_version_from_cargo, extract_version_from_json};
+use crate::helpers::is_repo_already_exists;
 use crate::policy::{PublishRegistry, SyncPolicy};
 use crate::secrets::load_secret;
 use crate::git::run_git_with_timeout;
