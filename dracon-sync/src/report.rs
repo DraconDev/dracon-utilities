@@ -1638,9 +1638,9 @@ pub(crate) async fn run_repair_warns(
                     },
                 );
             }
-            Ok(Ok(changed)) => {
+            Ok(Ok(outcome)) => {
                 succeeded += 1;
-                out!("   ok: triage complete changed={}", changed);
+                out!("   ok: triage complete changed={}", outcome.has_changes());
                 append_incident_record(
                     policy_path,
                     &IncidentRecord {
@@ -1651,7 +1651,7 @@ pub(crate) async fn run_repair_warns(
                         action: "sync_triage".to_string(),
                         backup_branch: None,
                         result: "ok".to_string(),
-                        details: Some(format!("changed={}", changed)),
+                        details: Some(format!("changed={}", outcome.has_changes())),
                     },
                 );
             }
