@@ -64,7 +64,7 @@ pub(crate) async fn create_and_push_tag(repo: &Path, version: &str) -> Result<Re
         "tag-push",
     ).await {
         Ok(_) => {
-            veprintln!("🏷️  Created and pushed tag {tag}");
+            eprintln!("🏷️  Created and pushed tag {tag}");
             Ok(ReleaseStep::TagCreated(tag))
         }
         Err(e) => {
@@ -110,7 +110,7 @@ pub(crate) async fn create_github_release(repo: &Path, tag: &str) -> Result<Rele
 
     match result {
         Ok(output) if output.status.success() => {
-            veprintln!("🚀 Created GitHub release {tag} for {repo_name}");
+            eprintln!("🚀 Created GitHub release {tag} for {repo_name}");
             Ok(ReleaseStep::GitHubReleaseCreated(tag.to_string()))
         }
         Ok(output) => {
@@ -318,7 +318,7 @@ async fn publish_crates_io(repo: &Path, token: &str, timeout_secs: u64) -> Resul
             match result {
                 Ok(out) if out.status.success() => {
                     let version = read_cargo_version(repo).unwrap_or_else(|_| "unknown".to_string());
-                    veprintln!("📦 Published to crates.io: v{version}");
+                    eprintln!("📦 Published to crates.io: v{version}");
                     Ok(ReleaseStep::Published {
                         registry: "crates-io".to_string(),
                         version,
@@ -380,7 +380,7 @@ async fn publish_npm(repo: &Path, token: &str, timeout_secs: u64) -> Result<Rele
             match result {
                 Ok(out) if out.status.success() => {
                     let version = read_npm_version(repo).unwrap_or_else(|_| "unknown".to_string());
-                    veprintln!("📦 Published to npm: v{version}");
+                    eprintln!("📦 Published to npm: v{version}");
                     Ok(ReleaseStep::Published {
                         registry: "npm".to_string(),
                         version,
@@ -456,7 +456,7 @@ async fn publish_pypi(repo: &Path, token: &str, timeout_secs: u64) -> Result<Rel
     match result {
         Ok(out) if out.status.success() => {
             let version = read_pypi_version(repo).unwrap_or_else(|_| "unknown".to_string());
-            veprintln!("📦 Published to PyPI: v{version}");
+            eprintln!("📦 Published to PyPI: v{version}");
             Ok(ReleaseStep::Published {
                 registry: "pypi".to_string(),
                 version,
