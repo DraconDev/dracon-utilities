@@ -225,12 +225,18 @@ fn set_codeberg_visibility(owner: &str, repo: &str, token: &str, private: bool) 
 pub(crate) fn sync_mirror_visibility(
     origin_url: &str,
     remotes: &[RemoteConfig],
-    repo_name: &str,
     repo_path: &Path,
     interval_hours: u64,
 ) {
     // Check cache first
     if is_visibility_cache_fresh(repo_path, interval_hours) {
+        return;
+    }
+
+    let repo_name = repo_path.file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_default();
+    if repo_name.is_empty() {
         return;
     }
 
@@ -407,12 +413,18 @@ fn set_codeberg_metadata(owner: &str, repo: &str, token: &str, meta: &RepoMetada
 pub(crate) fn sync_mirror_metadata(
     origin_url: &str,
     remotes: &[RemoteConfig],
-    repo_name: &str,
     repo_path: &Path,
     interval_hours: u64,
 ) {
     // Check cache first (shares cache with visibility sync)
     if is_visibility_cache_fresh(repo_path, interval_hours) {
+        return;
+    }
+
+    let repo_name = repo_path.file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_default();
+    if repo_name.is_empty() {
         return;
     }
 
