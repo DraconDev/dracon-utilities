@@ -189,7 +189,8 @@ pub(crate) fn sync_mirror_visibility(
     }
 
     for remote in remotes {
-        if remote.auth_type == AuthType::GitLab {
+        let auth = remote.effective_auth_type();
+        if auth == AuthType::GitLab {
             let token_var = remote.auto_create_token_var.as_deref().unwrap_or("GITLAB_TOKEN");
             if let Some(token) = load_secret(token_var, &sync_secrets_dir()) {
                 let resolved_name = remote.resolve_repo_name(repo_name);
@@ -203,7 +204,7 @@ pub(crate) fn sync_mirror_visibility(
             }
         }
 
-        if remote.auth_type == AuthType::Codeberg {
+        if auth == AuthType::Codeberg {
             let token_var = remote.auto_create_token_var.as_deref().unwrap_or("CODEBERG_TOKEN");
             if let Some(token) = load_secret(token_var, &sync_secrets_dir()) {
                 let resolved_name = remote.resolve_repo_name(repo_name);
@@ -364,7 +365,8 @@ pub(crate) fn sync_mirror_metadata(
     }
 
     for remote in remotes {
-        if remote.auth_type == AuthType::GitLab {
+        let auth = remote.effective_auth_type();
+        if auth == AuthType::GitLab {
             let token_var = remote.auto_create_token_var.as_deref().unwrap_or("GITLAB_TOKEN");
             if let Some(token) = load_secret(token_var, &sync_secrets_dir()) {
                 let resolved_name = remote.resolve_repo_name(repo_name);
@@ -376,7 +378,7 @@ pub(crate) fn sync_mirror_metadata(
             }
         }
 
-        if remote.auth_type == AuthType::Codeberg {
+        if auth == AuthType::Codeberg {
             let token_var = remote.auto_create_token_var.as_deref().unwrap_or("CODEBERG_TOKEN");
             if let Some(token) = load_secret(token_var, &sync_secrets_dir()) {
                 let resolved_name = remote.resolve_repo_name(repo_name);
