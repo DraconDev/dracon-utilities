@@ -2294,7 +2294,7 @@ impl DemonSecurity {
             || has_multi_component
             || sensitive_exts.iter().any(|ext| path_str.ends_with(ext))
             || sensitive_filenames.contains(&filename)
-            || sensitive_filenames.iter().any(|p| filename.starts_with(p))
+            || sensitive_filenames.iter().any(|p| filename == *p || filename.starts_with(&format!("{}.", p)))
             || self
                 .managed_patterns
                 .iter()
