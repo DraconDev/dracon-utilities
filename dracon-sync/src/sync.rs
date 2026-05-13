@@ -23,7 +23,8 @@ use crate::git::multi_remote::{
 };
 use crate::policy::{debug_enabled, load_repo_override, SyncPolicy};
 use crate::report::{append_incident_record, build_commit_context, detect_report_signals, IncidentRecord, push_large_blob_threshold_bytes};
-use crate::visibility::{get_github_visibility, sync_mirror_visibility};
+use crate::git::{origin_url};
+use crate::visibility::{get_github_visibility, parse_github_owner_repo, sync_mirror_visibility};
 
 /// Result of a single repository sync attempt.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -101,7 +102,15 @@ pub(crate) async fn sync_repo(
     let has_origin = has_origin_remote(repo);
     let has_origin = if !has_origin && policy.auto_github_private {
         let private = if policy.sync_visibility {
-            get_github_visibility(repo).await.unwrap_or(true)
+            if let Some(url) = origin_url(repo) {
+                if let Some((owner, repo_name)) = parse_github_owner_repo(&url) {
+                    get_github_visibility(&owner, &repo_name)
+                } else {
+                    true
+                }
+            } else {
+                true
+            }
         } else {
             true
         };
@@ -760,7 +769,15 @@ async fn push_with_blob_check(
 
     // Push to additional named remotes after origin push succeeds
     let private = if policy.sync_visibility {
-        get_github_visibility(repo).await.unwrap_or(true)
+        if let Some(url) = origin_url(repo) {
+            if let Some((owner, repo_name)) = parse_github_owner_repo(&url) {
+                get_github_visibility(&owner, &repo_name)
+            } else {
+                true
+            }
+        } else {
+            true
+        }
     } else {
         true
     };
