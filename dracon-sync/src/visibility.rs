@@ -585,16 +585,28 @@ mod tests {
     }
 
     #[test]
-    fn test_cache_not_updated_on_api_failure() {
-        // When gh api fails, the cache should still be updated to prevent
-        // hammering on every sync cycle. This is by design — see update_visibility_cache
-        // call at the end of sync_mirror_visibility.
+    fn test_cache_written_on_parseable_origin_even_when_tokens_missing() {
+        // When origin URL is parseable but tokens are missing, the cache
+        // should still be written to prevent hammering on every sync cycle.
         let repo_name = "test_cache_on_failure";
-        sync_mirror_visibility("not-a-url", &[], repo_name, 0);
-        // Cache should exist even after failure
+        let remotes: Vec<RemoteConfig> = vec![];
+        sync_mirror_visibility("git@github.com:DraconDev/test.git", &remotes, repo_name, 0);
+        // Cache should exist even with no remotes to update
         let path = visibility_cache_path(repo_name);
-        assert!(path.exists(), "cache should be written even on API failure to prevent retries");
+        assert!(path.exists(), "cache should be written even when no remotes configured");
         let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn test_cache_not_written_on_unparseable_origin() {
+        // When the origin URL can't be parsed, we return early before writing cache.
+        // This is correct — the next cycle should retry since we couldn't even
+        // determine the GitHub owner/repo.
+        let repo_name = "test_cache_unparseable";
+        let remotes: Vec<RemoteConfig> = vec![];
+        sync_mirror_visibility("not-a-url", &remotes, repo_name, 0);
+        let path = visibility_cache_path(repo_name);
+        assert!(!path.exists(), "cache should NOT be written for unparseable URLs (need to retry)");
     }
 
     // ---- Edge cases ----
