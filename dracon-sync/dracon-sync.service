@@ -1,5 +1,6 @@
 [Unit]
 Description=Dracon Sync (deterministic sync runtime)
+Documentation=https://github.com/DraconDev/dracon-utilities
 After=default.target
 
 [Service]
@@ -20,6 +21,11 @@ CPUQuota=15%
 MemoryHigh=768M
 MemoryMax=2G
 TasksMax=96
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=%h/.dracon %h/Dev %h/.local/state/dracon %h/.ssh
+PrivateTmp=true
 
 [Install]
 WantedBy=default.target
