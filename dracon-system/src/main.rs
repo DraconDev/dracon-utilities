@@ -1308,8 +1308,8 @@ async fn auto_cleanup_rust_targets(
         }
 
         if apply {
-            check_safe_to_delete(&target.path, &guard.protected_paths)?;
-            if let Err(e) = tokio::fs::remove_dir_all(&target.path).await {
+            let safe_path = check_safe_to_delete(&target.path, &guard.protected_paths)?;
+            if let Err(e) = tokio::fs::remove_dir_all(&safe_path).await {
                 eprintln!("⚠️ failed to remove {}: {}", target.path.display(), e);
                 continue;
             }
@@ -1475,8 +1475,8 @@ async fn clean_package_caches(
                 if size > 0 {
                     let mut succeeded = true;
                     if apply {
-                        check_safe_to_delete(&cargo_cache, protected_paths)?;
-                        if let Err(e) = tokio::fs::remove_dir_all(&cargo_cache).await {
+                        let safe_path = check_safe_to_delete(&cargo_cache, protected_paths)?;
+                        if let Err(e) = tokio::fs::remove_dir_all(&safe_path).await {
                             eprintln!("⚠️ failed to remove cargo cache: {}", e);
                             succeeded = false;
                         }
@@ -1498,8 +1498,8 @@ async fn clean_package_caches(
                 if size > 0 {
                     let mut succeeded = true;
                     if apply {
-                        check_safe_to_delete(&npm_cache, protected_paths)?;
-                        if let Err(e) = tokio::fs::remove_dir_all(&npm_cache).await {
+                        let safe_path = check_safe_to_delete(&npm_cache, protected_paths)?;
+                        if let Err(e) = tokio::fs::remove_dir_all(&safe_path).await {
                             eprintln!("⚠️ failed to remove npm cache: {}", e);
                             succeeded = false;
                         }
@@ -1521,8 +1521,8 @@ async fn clean_package_caches(
                 if size > 0 {
                     let mut succeeded = true;
                     if apply {
-                        check_safe_to_delete(&pip_cache, protected_paths)?;
-                        if let Err(e) = tokio::fs::remove_dir_all(&pip_cache).await {
+                        let safe_path = check_safe_to_delete(&pip_cache, protected_paths)?;
+                        if let Err(e) = tokio::fs::remove_dir_all(&safe_path).await {
                             eprintln!("⚠️ failed to remove pip cache: {}", e);
                             succeeded = false;
                         }
@@ -1544,8 +1544,8 @@ async fn clean_package_caches(
                 if size > 0 {
                     let mut succeeded = true;
                     if apply {
-                        check_safe_to_delete(&go_cache, protected_paths)?;
-                        if let Err(e) = tokio::fs::remove_dir_all(&go_cache).await {
+                        let safe_path = check_safe_to_delete(&go_cache, protected_paths)?;
+                        if let Err(e) = tokio::fs::remove_dir_all(&safe_path).await {
                             eprintln!("⚠️ failed to remove go cache: {}", e);
                             succeeded = false;
                         }
@@ -1576,8 +1576,8 @@ async fn empty_trash(apply: bool, protected_paths: &[String]) -> Result<(u64, Ve
             if size > 0 {
                 let mut succeeded = true;
                 if apply {
-                    check_safe_to_delete(&trash_files, protected_paths)?;
-                    if let Err(e) = tokio::fs::remove_dir_all(&trash_files).await {
+                    let safe_path = check_safe_to_delete(&trash_files, protected_paths)?;
+                    if let Err(e) = tokio::fs::remove_dir_all(&safe_path).await {
                         eprintln!("⚠️ failed to remove trash files: {}", e);
                         succeeded = false;
                     } else if let Err(e) = tokio::fs::create_dir_all(&trash_files).await {
@@ -1597,8 +1597,8 @@ async fn empty_trash(apply: bool, protected_paths: &[String]) -> Result<(u64, Ve
             if info_size > 0 {
                 let mut succeeded = true;
                 if apply {
-                    check_safe_to_delete(&trash_info, protected_paths)?;
-                    if let Err(e) = tokio::fs::remove_dir_all(&trash_info).await {
+                    let safe_path = check_safe_to_delete(&trash_info, protected_paths)?;
+                    if let Err(e) = tokio::fs::remove_dir_all(&safe_path).await {
                         eprintln!("⚠️ failed to remove trash info: {}", e);
                         succeeded = false;
                     } else if let Err(e) = tokio::fs::create_dir_all(&trash_info).await {
@@ -1737,8 +1737,8 @@ async fn clean_old_node_modules(
             if size > 0 {
                 let mut succeeded = true;
                 if apply {
-                    check_safe_to_delete(&path, protected_paths)?;
-                    if let Err(e) = tokio::fs::remove_dir_all(&path).await {
+                    let safe_path = check_safe_to_delete(&path, protected_paths)?;
+                    if let Err(e) = tokio::fs::remove_dir_all(&safe_path).await {
                         eprintln!("⚠️ failed to remove {}: {}", path.display(), e);
                         succeeded = false;
                     }
@@ -2549,12 +2549,12 @@ fn apply_link_policy(policy: &SystemPolicy, force_replace: bool) -> Result<LinkS
         let meta = fs::symlink_metadata(&link).ok();
         if let Some(meta) = meta {
             if meta.file_type().is_symlink() {
-                check_safe_to_delete(&link, &[])?;
-                fs::remove_file(&link)?;
+                let safe_link = check_safe_to_delete(&link, &[])?;
+                fs::remove_file(&safe_link)?;
             } else if force_replace {
-                check_safe_to_delete(&link, &[])?;
+                let safe_link = check_safe_to_delete(&link, &[])?;
                 let backup = backup_path_for(&link);
-                fs::rename(&link, backup)?;
+                fs::rename(&safe_link, backup)?;
             } else {
                 continue;
             }
@@ -2885,10 +2885,10 @@ async fn main() -> Result<()> {
                 let user_protected = policy.guard.protected_paths.clone();
                 if cfg.apply {
                     for path in actionable {
-                        check_safe_to_delete(&path, &user_protected)?;
-                        if path.exists() {
+                        let safe_path = check_safe_to_delete(&path, &user_protected)?;
+                        if safe_path.exists() {
                             println!("Deleting {}", path.display());
-                            tokio::fs::remove_dir_all(path).await?;
+                            tokio::fs::remove_dir_all(&safe_path).await?;
                         }
                     }
                 } else {

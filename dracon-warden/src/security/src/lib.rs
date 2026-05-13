@@ -26,6 +26,16 @@ const DEFAULT_SECRET_MARKER: &str = "DRACON_SECRET";
 
 static DEFAULT_SECURITY_CACHE: OnceCell<DemonSecurity> = OnceCell::new();
 
+static ALLOW_V1_FALLBACK: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+pub fn set_allow_v1_fallback(allow: bool) {
+    ALLOW_V1_FALLBACK.store(allow, std::sync::atomic::Ordering::Relaxed);
+}
+
+pub fn is_v1_fallback_allowed() -> bool {
+    ALLOW_V1_FALLBACK.load(std::sync::atomic::Ordering::Relaxed)
+}
+
 const ENV_VERSION_HEADER_TEMPLATE: &str = r#"# =============================================================================
 # Dracon Warden Encrypted Environment File
 # This file is encrypted by dracon-warden for secure team collaboration.
@@ -2728,6 +2738,13 @@ pub fn encrypt_with_repo_key(&self, repo_key: &RepoKey, plaintext: &[u8]) -> Res
     /// Decrypt data using the legacy Git Seal V1 format (AES-256-CFB with derived IV).
     /// WARNING: This format uses a deterministic IV derived from the key (SHA-256 hash → first 16 bytes), which violates AES-CFB security requirements. Using the same IV for multiple encryptions leaks information about plaintext relationships. This format exists for backward compatibility with legacy git-seal ciphertexts. DO NOT use this for new encryptions. If you have ciphertexts created with this format, consider migrating to AES-256-GCM (encrypt_with_repo_key) with random nonces.
     pub fn decrypt_git_seal(&self, repo_key: &RepoKey, ciphertext: &[u8]) -> Result<Vec<u8>> {
+        if !is_v1_fallback_allowed() {
+            return Err(anyhow::anyhow!(
+                "V1 decryption disabled: legacy format uses deterministic IV which violates AES-CFB security. \
+                 Enable with allow_v1_fallback = true in policy, then migrate ciphertexts to V2."
+            ));
+        }
+        eprintln!("⚠️ WARNING: decrypting legacy V1 ciphertext (deterministic IV — insecure). Migrate to V2.");
         let mut hasher = Sha256::new();
         hasher.update(&repo_key.0);
         let key_hash = hasher.finalize();
