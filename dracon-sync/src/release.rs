@@ -501,7 +501,7 @@ fn read_npm_version(repo: &Path) -> Result<String> {
     let pkg_json = std::fs::read_to_string(repo.join("package.json"))?;
     if let Some(line) = pkg_json.lines().find(|l| l.trim().starts_with("\"version\"")) {
         if let Some(ver) = line.split(':').nth(1) {
-            let ver = ver.trim().trim_matches('"').trim_matches(',').trim();
+            let ver = ver.trim().trim_end_matches(',').trim_matches('"').trim();
             if !ver.is_empty() {
                 return Ok(ver.to_string());
             }
