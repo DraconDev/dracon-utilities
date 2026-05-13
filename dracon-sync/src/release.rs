@@ -771,4 +771,76 @@ mod tests {
         assert_eq!(PublishRegistry::Npm.as_str(), "npm");
         assert_eq!(PublishRegistry::Pypi.as_str(), "pypi");
     }
+
+    #[tokio::test]
+    async fn test_release_pipeline_skipped_when_no_repo_targets() {
+        let dir = TempDir::new().unwrap();
+        fs::write(
+            dir.path().join("Cargo.toml"),
+            "[package]\nname = \"test\"\nversion = \"0.2.0\"\n",
+        )
+        .unwrap();
+
+        let policy = crate::policy::test_sync_policy();
+        let steps = run_release_pipeline(
+            dir.path(),
+            "0.1.0",
+            "0.2.0",
+            "minor",
+            &policy,
+            &[], // empty repo targets → entire pipeline skipped
+        )
+        .await;
+
+        assert_eq!(steps.len(), 1);
+        assert!(matches!(&steps[0], ReleaseStep::Skipped(reason) if reason.contains("no auto_publish")));
+    }
+
+    #[tokio::test]
+    async fn test_release_pipeline_creates_tag_when_opted_in() {
+        let dir = TempDir::new().unwrap();
+        fs::write(
+            dir.path().join("Cargo.toml"),
+            "[package]\nname = \"test\"\nversion = \"0.2.0\"\n",
+        )
+        .unwrap();
+
+        // Init git repo so tag commands work
+        std::process::Command::new("git")
+            .args(["init"])
+            .current_dir(dir.path())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["add", "-A"])
+            .current_dir(dir.path())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["commit", "-m", "init", "--author", "test <test@test.com>"])
+            .current_dir(dir.path())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .unwrap();
+
+        let policy = crate::policy::test_sync_policy();
+        let steps = run_release_pipeline(
+            dir.path(),
+            "0.1.0",
+            "0.2.0",
+            "minor",
+            &policy,
+            &["crates-io".to_string()], // opted in
+        )
+        .await;
+
+        // Should have at least a tag step (publish skipped since no token/no auto_publish global)
+        assert!(!steps.is_empty());
+        assert!(steps.iter().any(|s| matches!(s, ReleaseStep::TagCreated(_))));
+    }
 }
