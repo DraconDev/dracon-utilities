@@ -801,4 +801,109 @@ mod tests {
         assert!(!is_visibility_cache_fresh(repo_name, 24), "corrupt cache should be treated as stale");
         let _ = std::fs::remove_file(&path);
     }
+
+    // ---- Metadata sync tests ----
+
+    #[test]
+    fn test_get_github_metadata_returns_empty_on_error() {
+        let meta = get_github_metadata("nonexistent-owner-12345", "nonexistent-repo-67890");
+        assert!(meta.description.is_empty(), "description should be empty on error");
+        assert!(meta.topics.is_empty(), "topics should be empty on error");
+    }
+
+    #[test]
+    fn test_sync_metadata_defaults_in_policy() {
+        let toml = "";
+        let policy: crate::policy::SyncPolicy = toml::from_str(toml).unwrap_or_else(|_| {
+            toml::from_str("pulse_interval_secs = 1").unwrap()
+        });
+        assert!(!policy.sync_metadata, "sync_metadata should default to false");
+    }
+
+    #[test]
+    fn test_sync_metadata_parses_true() {
+        let toml = "sync_metadata = true";
+        let policy: crate::policy::SyncPolicy = toml::from_str(toml).unwrap_or_else(|_| {
+            toml::from_str("pulse_interval_secs = 1\nsync_metadata = true").unwrap()
+        });
+        assert!(policy.sync_metadata);
+    }
+
+    #[test]
+    fn test_sync_mirror_metadata_does_not_panic() {
+        let repo_name = "test_metadata_no_panic";
+        let remotes: Vec<RemoteConfig> = vec![];
+        sync_mirror_metadata("git@github.com:DraconDev/test.git", &remotes, repo_name, 0);
+        // Should not panic even with no remotes
+        let _ = std::fs::remove_file(visibility_cache_path(repo_name));
+    }
+
+    #[test]
+    fn test_sync_mirror_metadata_handles_unparseable_origin() {
+        let repo_name = "test_metadata_bad_origin";
+        let remotes: Vec<RemoteConfig> = vec![];
+        sync_mirror_metadata("not-a-url", &remotes, repo_name, 0);
+        let _ = std::fs::remove_file(visibility_cache_path(repo_name));
+    }
+
+    #[test]
+    fn test_repo_metadata_default() {
+        let meta = RepoMetadata::default();
+        assert!(meta.description.is_empty());
+        assert!(meta.topics.is_empty());
+    }
+
+    #[test]
+    fn test_set_gitlab_metadata_does_not_panic() {
+        let meta = RepoMetadata {
+            description: "Test repo".to_string(),
+            topics: vec!["rust".to_string(), "cli".to_string()],
+        };
+        let result = set_gitlab_metadata("testowner", "testrepo", "faketoken", &meta);
+        let _ = result;
+    }
+
+    #[test]
+    fn test_set_codeberg_metadata_does_not_panic() {
+        let meta = RepoMetadata {
+            description: "Test repo".to_string(),
+            topics: vec!["rust".to_string()],
+        };
+        let result = set_codeberg_metadata("testowner", "testrepo", "faketoken", &meta);
+        let _ = result;
+    }
+
+    #[test]
+    fn test_sync_metadata_with_missing_tokens() {
+        let repo_name = "test_metadata_missing_tokens";
+        let remotes = vec![
+            RemoteConfig {
+                name: "gitlab".to_string(),
+                push_url: "git@gitlab.com:test/repo.git".to_string(),
+                auto_create: false,
+                auto_create_account: "test".to_string(),
+                auth_type: AuthType::GitLab,
+                priority: 50,
+                api_endpoint: None,
+                auto_create_token_var: Some("NONEXISTENT_TOKEN_VAR_META".to_string()),
+                repo_name_map: Default::default(),
+                force_push_when_behind: false,
+            },
+            RemoteConfig {
+                name: "codeberg".to_string(),
+                push_url: "git@codeberg.org:test/repo.git".to_string(),
+                auto_create: false,
+                auto_create_account: "test".to_string(),
+                auth_type: AuthType::Codeberg,
+                priority: 50,
+                api_endpoint: None,
+                auto_create_token_var: Some("NONEXISTENT_TOKEN_VAR_META2".to_string()),
+                repo_name_map: Default::default(),
+                force_push_when_behind: false,
+            },
+        ];
+        sync_mirror_metadata("git@github.com:DraconDev/test.git", &remotes, repo_name, 0);
+        // Should not panic
+        let _ = std::fs::remove_file(visibility_cache_path(repo_name));
+    }
 }
