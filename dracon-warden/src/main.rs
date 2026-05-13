@@ -1212,6 +1212,7 @@ fn run_daemon(policy_path: PathBuf) -> Result<()> {
             veprintln!(1, "warden: reloading policy on SIGHUP...");
             match WardenPolicy::load(&policy_path) {
                 Ok(p) => {
+                    p.apply_global_flags();
                     if let Err(e) = p.validate() {
                         eprintln!("warden: policy invalid on reload: {}", e);
                     } else {
