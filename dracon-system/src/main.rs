@@ -3061,6 +3061,7 @@ async fn main() -> Result<()> {
                                     }
                                     guard = new_policy.guard;
                                     normalize_guard_policy(&mut guard);
+                                    runtime.heavy_since.clear();
                                     veprintln!(2, "system: policy reloaded on SIGHUP (disk_warn={}%, disk_critical={}%)",
                                         guard.disk_warn_percent, guard.disk_critical_percent);
                                 }
