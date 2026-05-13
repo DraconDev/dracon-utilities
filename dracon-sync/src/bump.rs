@@ -1,6 +1,7 @@
 use std::path::Path;
 
-pub(crate) fn bump_semver_patch(ver: &str) -> Option<String> {
+/// Parse a semver string into (major, minor, patch) components.
+fn parse_semver(ver: &str) -> Option<(u64, u64, u64)> {
     let parts: Vec<&str> = ver.split('.').collect();
     if parts.len() < 3 {
         return None;
@@ -14,42 +15,65 @@ pub(crate) fn bump_semver_patch(ver: &str) -> Option<String> {
     let major: u64 = parts[0].parse().ok()?;
     let minor: u64 = parts[1].parse().ok()?;
     let patch: u64 = parts[2].parse().ok()?;
-    Some(format!("{}.{}.{}", major, minor, patch + 1))
+    Some((major, minor, patch))
 }
 
-pub(crate) fn bump_semver_minor(ver: &str) -> Option<String> {
-    let parts: Vec<&str> = ver.split('.').collect();
-    if parts.len() < 3 {
-        return None;
+pub(crate) fn bump_semver(ver: &str, level: BumpLevel) -> Option<String> {
+    let (major, minor, patch) = parse_semver(ver)?;
+    match level {
+        BumpLevel::Major => Some(format!("{}.0.0", major + 1)),
+        BumpLevel::Minor => Some(format!("{}.{}.0", major, minor + 1)),
+        BumpLevel::Patch => Some(format!("{}.{}.{}", major, minor, patch + 1)),
+        BumpLevel::None => None,
     }
-    if !parts[0].chars().all(|c| c.is_ascii_digit())
-        || !parts[1].chars().all(|c| c.is_ascii_digit())
-        || !parts[2].chars().all(|c| c.is_ascii_digit())
-    {
-        return None;
-    }
-    let major: u64 = parts[0].parse().ok()?;
-    let minor: u64 = parts[1].parse().ok()?;
-    let _patch: u64 = parts[2].parse().ok()?;
-    Some(format!("{}.{}.{}", major, minor + 1, 0))
 }
 
-pub(crate) fn bump_semver_major(ver: &str) -> Option<String> {
-    let parts: Vec<&str> = ver.split('.').collect();
-    if parts.len() < 3 {
-        return None;
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_bump_semver_patch() {
+        assert_eq!(bump_semver("1.2.3", BumpLevel::Patch), Some("1.2.4".to_string()));
+        assert_eq!(bump_semver("0.0.0", BumpLevel::Patch), Some("0.0.1".to_string()));
+        assert_eq!(bump_semver("v1.2.3", BumpLevel::Patch), None);
+        assert_eq!(bump_semver("1.2", BumpLevel::Patch), None);
     }
-    if !parts[0].chars().all(|c| c.is_ascii_digit())
-        || !parts[1].chars().all(|c| c.is_ascii_digit())
-        || !parts[2].chars().all(|c| c.is_ascii_digit())
-    {
-        return None;
+
+    #[test]
+    fn test_bump_semver_minor() {
+        assert_eq!(bump_semver("1.2.3", BumpLevel::Minor), Some("1.3.0".to_string()));
+        assert_eq!(bump_semver("0.0.0", BumpLevel::Minor), Some("0.1.0".to_string()));
     }
-    let major: u64 = parts[0].parse().ok()?;
-    let _minor: u64 = parts[1].parse().ok()?;
-    let _patch: u64 = parts[2].parse().ok()?;
-    Some(format!("{}.{}.{}", major + 1, 0, 0))
-}
+
+    #[test]
+    fn test_bump_semver_major() {
+        assert_eq!(bump_semver("1.2.3", BumpLevel::Major), Some("2.0.0".to_string()));
+        assert_eq!(bump_semver("0.9.9", BumpLevel::Major), Some("1.0.0".to_string()));
+    }
+
+    #[test]
+    fn test_bump_semver_edge_cases() {
+        assert_eq!(bump_semver("10.20.30", BumpLevel::Patch), Some("10.20.31".to_string()));
+        assert_eq!(bump_semver("10.20.30", BumpLevel::Minor), Some("10.21.0".to_string()));
+        assert_eq!(bump_semver("10.20.30", BumpLevel::Major), Some("11.0.0".to_string()));
+    }
+
+    #[test]
+    fn test_bump_semver_invalid_inputs() {
+        assert_eq!(bump_semver("1.2", BumpLevel::Patch), None);
+        assert_eq!(bump_semver("v1.2.3", BumpLevel::Patch), None);
+        assert_eq!(bump_semver("1.a.3", BumpLevel::Patch), None);
+        assert_eq!(bump_semver("", BumpLevel::Patch), None);
+        assert_eq!(bump_semver("1.2.3-alpha", BumpLevel::Patch), None);
+    }
+
+    #[test]
+    fn test_bump_semver_zero_versions() {
+        assert_eq!(bump_semver("0.0.1", BumpLevel::Patch), Some("0.0.2".to_string()));
+        assert_eq!(bump_semver("0.0.1", BumpLevel::Minor), Some("0.1.0".to_string()));
+        assert_eq!(bump_semver("0.0.1", BumpLevel::Major), Some("1.0.0".to_string()));
+    }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum BumpLevel {
@@ -278,58 +302,33 @@ fn bump_version_in_json(content: &str, old_ver: &str, new_ver: &str) -> String {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_bump_semver_patch() {
-        assert_eq!(bump_semver_patch("1.2.3"), Some("1.2.4".to_string()));
-        assert_eq!(bump_semver_patch("0.0.0"), Some("0.0.1".to_string()));
-        assert_eq!(bump_semver_patch("v1.2.3"), None);
-        assert_eq!(bump_semver_patch("1.2"), None);
-    }
-
-    #[test]
-    fn test_bump_semver_minor() {
-        assert_eq!(bump_semver_minor("1.2.3"), Some("1.3.0".to_string()));
-        assert_eq!(bump_semver_minor("0.0.0"), Some("0.1.0".to_string()));
-    }
-
-    #[test]
-    fn test_bump_semver_major() {
-        assert_eq!(bump_semver_major("1.2.3"), Some("2.0.0".to_string()));
-        assert_eq!(bump_semver_major("0.9.9"), Some("1.0.0".to_string()));
-    }
-
-    #[test]
-    fn test_bump_semver_edge_cases() {
-        assert_eq!(bump_semver_patch("10.20.30"), Some("10.20.31".to_string()));
-        assert_eq!(bump_semver_minor("10.20.30"), Some("10.21.0".to_string()));
-        assert_eq!(bump_semver_major("10.20.30"), Some("11.0.0".to_string()));
+#[test]
+    fn test_bump_semver_all_levels() {
+        assert_eq!(bump_semver("1.2.3", BumpLevel::Patch), Some("1.2.4".to_string()));
+        assert_eq!(bump_semver("1.2.3", BumpLevel::Minor), Some("1.3.0".to_string()));
+        assert_eq!(bump_semver("1.2.3", BumpLevel::Major), Some("2.0.0".to_string()));
+        assert_eq!(bump_semver("0.0.0", BumpLevel::Patch), Some("0.0.1".to_string()));
+        assert_eq!(bump_semver("0.0.0", BumpLevel::Minor), Some("0.1.0".to_string()));
+        assert_eq!(bump_semver("0.0.0", BumpLevel::Major), Some("1.0.0".to_string()));
+        assert_eq!(bump_semver("v1.2.3", BumpLevel::Patch), None);
+        assert_eq!(bump_semver("v1.2.3", BumpLevel::Minor), None);
+        assert_eq!(bump_semver("v1.2.3", BumpLevel::Major), None);
+        assert_eq!(bump_semver("1.2", BumpLevel::Patch), None);
+        assert_eq!(bump_semver("10.20.30", BumpLevel::Patch), Some("10.20.31".to_string()));
+        assert_eq!(bump_semver("10.20.30", BumpLevel::Minor), Some("10.21.0".to_string()));
+        assert_eq!(bump_semver("10.20.30", BumpLevel::Major), Some("11.0.0".to_string()));
+        assert_eq!(bump_semver("0.0.1", BumpLevel::Patch), Some("0.0.2".to_string()));
+        assert_eq!(bump_semver("0.0.1", BumpLevel::Minor), Some("0.1.0".to_string()));
+        assert_eq!(bump_semver("0.0.1", BumpLevel::Major), Some("1.0.0".to_string()));
     }
 
     #[test]
     fn test_bump_semver_invalid_inputs() {
-        assert_eq!(bump_semver_patch("1.2"), None);
-        assert_eq!(bump_semver_patch("v1.2.3"), None);
-        assert_eq!(bump_semver_patch("1.a.3"), None);
-        assert_eq!(bump_semver_patch(""), None);
-        assert_eq!(bump_semver_patch("1.2.3-alpha"), None);
-        assert_eq!(bump_semver_minor("1.2"), None);
-        assert_eq!(bump_semver_minor("v1.2.3"), None);
-        assert_eq!(bump_semver_major("1.2"), None);
-        assert_eq!(bump_semver_major("v1.2.3"), None);
-    }
-
-    #[test]
-    fn test_bump_semver_leading_v_rejected() {
-        assert_eq!(bump_semver_patch("v1.2.3"), None);
-        assert_eq!(bump_semver_minor("v1.2.3"), None);
-        assert_eq!(bump_semver_major("v1.2.3"), None);
-    }
-
-    #[test]
-    fn test_bump_semver_zero_versions() {
-        assert_eq!(bump_semver_patch("0.0.1"), Some("0.0.2".to_string()));
-        assert_eq!(bump_semver_minor("0.0.1"), Some("0.1.0".to_string()));
-        assert_eq!(bump_semver_major("0.0.1"), Some("1.0.0".to_string()));
+        assert_eq!(bump_semver("1.2", BumpLevel::Patch), None);
+        assert_eq!(bump_semver("v1.2.3", BumpLevel::Patch), None);
+        assert_eq!(bump_semver("1.a.3", BumpLevel::Patch), None);
+        assert_eq!(bump_semver("", BumpLevel::Patch), None);
+        assert_eq!(bump_semver("1.2.3-alpha", BumpLevel::Patch), None);
     }
 
     #[test]
