@@ -239,6 +239,10 @@ pub(crate) struct SyncPolicy {
     pub(crate) sync_visibility: bool,
     #[serde(default = "default_sync_visibility_interval_hours")]
     pub(crate) sync_visibility_interval_hours: u64,
+    /// When true, sync repo description and topics from GitHub to mirror remotes.
+    /// Uses the same interval as visibility sync.
+    #[serde(default)]
+    pub(crate) sync_metadata: bool,
 }
 
 #[derive(Debug, Deserialize, Default, Clone)]
