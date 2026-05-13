@@ -791,7 +791,7 @@ mod tests {
 
     #[test]
     fn test_sync_mirror_visibility_does_not_panic_on_all_failures() {
-        let repo_name = "test_all_failures";
+        let _repo_name = "test_all_failures";
         let remotes = vec![
             RemoteConfig {
                 name: "gitlab".to_string(),
@@ -957,7 +957,7 @@ mod tests {
 
     #[test]
     fn test_sync_metadata_with_missing_tokens() {
-        let repo_name = "test_metadata_missing_tokens";
+        let _repo_name = "test_metadata_missing_tokens";
         let remotes = vec![
             RemoteConfig {
                 name: "gitlab".to_string(),
