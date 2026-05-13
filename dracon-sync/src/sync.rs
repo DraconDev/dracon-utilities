@@ -1966,7 +1966,7 @@ auto_bump_versions = false
 
             // Create tracked files
             let file_names: Vec<String> = (0..total).map(|i| format!("f{}.txt", i)).collect();
-            let file_refs: Vec<&str> = file_names.iter().map(|s| s.as_str()).collect();
+            let _file_refs: Vec<&str> = file_names.iter().map(|s| s.as_str()).collect();
             for f in &file_names {
                 std::fs::write(repo.join(f), "content\n").unwrap();
             }
