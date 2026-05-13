@@ -959,4 +959,72 @@ mod tests {
         // Should not panic
         let _ = std::fs::remove_file(visibility_cache_path(repo_name));
     }
+
+    #[test]
+    fn test_strip_ansi_removes_color_codes() {
+        // Simulate gh api output with ANSI color codes
+        let input = "\x1b[1;38m{\x1b[m\n\x1b[1;34m\"description\"\x1b[m\x1b[1;38m:\x1b[m \x1b[32m\"Hello world\"\x1b[m,\n\x1b[1;34m\"topics\"\x1b[m\x1b[1;38m:\x1b[m\x1b[32m[\"rust\"]\x1b[m\n}";
+        let stripped = strip_ansi(input);
+        assert!(!stripped.contains('\x1b'), "ANSI codes should be removed: got {:?}", stripped);
+        let parsed: serde_json::Value = serde_json::from_str(&stripped).expect("should be valid JSON after stripping");
+        assert_eq!(parsed["description"], "Hello world");
+        assert_eq!(parsed["topics"][0], "rust");
+    }
+
+    #[test]
+    fn test_strip_ansi_passthrough_plain_text() {
+        let input = r#"{"description":"plain","topics":[]}"#;
+        assert_eq!(strip_ansi(input), input);
+    }
+
+    #[test]
+    fn test_resolve_account_from_ssh_url() {
+        let remote = RemoteConfig {
+            name: "gitlab".to_string(),
+            push_url: "git@gitlab.com:dracondev/{repo}.git".to_string(),
+            auto_create: false,
+            auto_create_account: String::new(),
+            auth_type: AuthType::GitLab,
+            priority: 50,
+            api_endpoint: None,
+            auto_create_token_var: None,
+            repo_name_map: Default::default(),
+            force_push_when_behind: false,
+        };
+        assert_eq!(remote.resolve_account(), "dracondev");
+    }
+
+    #[test]
+    fn test_resolve_account_from_https_url() {
+        let remote = RemoteConfig {
+            name: "codeberg".to_string(),
+            push_url: "https://codeberg.org/myorg/{repo}.git".to_string(),
+            auto_create: false,
+            auto_create_account: String::new(),
+            auth_type: AuthType::Codeberg,
+            priority: 50,
+            api_endpoint: None,
+            auto_create_token_var: None,
+            repo_name_map: Default::default(),
+            force_push_when_behind: false,
+        };
+        assert_eq!(remote.resolve_account(), "myorg");
+    }
+
+    #[test]
+    fn test_resolve_account_explicit_overrides() {
+        let remote = RemoteConfig {
+            name: "github".to_string(),
+            push_url: "git@github.com:DraconDev/{repo}.git".to_string(),
+            auto_create: false,
+            auto_create_account: "ExplicitAccount".to_string(),
+            auth_type: AuthType::GitHub,
+            priority: 50,
+            api_endpoint: None,
+            auto_create_token_var: None,
+            repo_name_map: Default::default(),
+            force_push_when_behind: false,
+        };
+        assert_eq!(remote.resolve_account(), "ExplicitAccount");
+    }
 }
