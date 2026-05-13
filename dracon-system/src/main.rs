@@ -2345,8 +2345,10 @@ pub(crate) async fn run_guard_once(
                             .await;
                     }
 
-                    // Auto-truncate if enabled
-                    if guard.auto_truncate_logs {
+                    // Auto-truncate if enabled AND user has opted into automatic cleanup.
+                    // Unlike other auto-cleanup actions, log truncation is relatively safe,
+                    // but we still respect the global dry-run gate for consistency.
+                    if guard.auto_truncate_logs && guard.auto_cleanup_apply {
                         let max_size = guard.log_max_truncate_mb * 1024 * 1024;
                         let preserve = guard.log_preserve_header_lines;
                         let mut total_reclaimed = 0u64;
