@@ -10,6 +10,7 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
+use crate::bump::{extract_version_from_cargo, extract_version_from_json};
 use crate::policy::{PublishRegistry, SyncPolicy};
 use crate::secrets::load_secret;
 use crate::git::run_git_with_timeout;
@@ -511,33 +512,14 @@ async fn publish_pypi(repo: &Path, token: &str, timeout_secs: u64) -> Result<Rel
 
 /// Read the current version from Cargo.toml.
 fn read_cargo_version(repo: &Path) -> Result<String> {
-    let cargo_toml = std::fs::read_to_string(repo.join("Cargo.toml"))?;
-    for line in cargo_toml.lines() {
-        let trimmed = line.trim();
-        if trimmed.starts_with("version") {
-            if let Some(ver) = trimmed.split('=').nth(1) {
-                let ver = ver.trim().trim_matches('"').trim();
-                if !ver.is_empty() && !ver.starts_with("workspace") {
-                    return Ok(ver.to_string());
-                }
-            }
-        }
-    }
-    bail!("could not find version in Cargo.toml")
+    let content = std::fs::read_to_string(repo.join("Cargo.toml"))?;
+    extract_version_from_cargo(&content).ok_or_else(|| anyhow::anyhow!("could not find version in Cargo.toml"))
 }
 
 /// Read the current version from package.json.
 fn read_npm_version(repo: &Path) -> Result<String> {
-    let pkg_json = std::fs::read_to_string(repo.join("package.json"))?;
-    if let Some(line) = pkg_json.lines().find(|l| l.trim().starts_with("\"version\"")) {
-        if let Some(ver) = line.split(':').nth(1) {
-            let ver = ver.trim().trim_end_matches(',').trim_matches('"').trim();
-            if !ver.is_empty() {
-                return Ok(ver.to_string());
-            }
-        }
-    }
-    bail!("could not find version in package.json")
+    let content = std::fs::read_to_string(repo.join("package.json"))?;
+    extract_version_from_json(&content, "version").ok_or_else(|| anyhow::anyhow!("could not find version in package.json"))
 }
 
 /// Read the current version from pyproject.toml.

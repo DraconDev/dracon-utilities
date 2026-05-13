@@ -104,7 +104,7 @@ pub fn deterministic_decide_bump_level(staged_diff: &str) -> BumpLevel {
     }
 }
 
-pub fn read_current_version(repo: &Path) -> Option<String> {
+pub(crate) fn read_current_version(repo: &Path) -> Option<String> {
     if let Ok(cargo) = std::fs::read_to_string(repo.join("Cargo.toml")) {
         if let Some(version) = extract_version_from_cargo(&cargo) {
             return Some(version);
@@ -124,7 +124,7 @@ pub fn read_current_version(repo: &Path) -> Option<String> {
     None
 }
 
-fn extract_version_from_cargo(content: &str) -> Option<String> {
+pub(crate) fn extract_version_from_cargo(content: &str) -> Option<String> {
     let mut section = String::new();
     for line in content.lines() {
         let trimmed = line.trim();
@@ -143,7 +143,7 @@ fn extract_version_from_cargo(content: &str) -> Option<String> {
     None
 }
 
-fn extract_version_from_json(content: &str, key: &str) -> Option<String> {
+pub(crate) fn extract_version_from_json(content: &str, key: &str) -> Option<String> {
     let needle = format!("\"{}\"", key);
     let start = 0usize;
     if let Some(idx) = content[start..].find(&needle) {

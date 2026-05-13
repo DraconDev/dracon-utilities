@@ -24,7 +24,7 @@ Completed backlog sprint to make dracon-sync work reliably across all 3 remotes 
 - [x] 42 orphan repos identified from old suffix loop bug (left for manual cleanup)
 
 ## In Progress
-- (none)
+- DRY refactoring (bump_semver, HTTPS fallback, is_push_rejected) — committed as 88f4535a
 
 ## Blockers
 - Orphan repo deletion blocked by GitHub sudo mode; user prefers to leave them
@@ -32,3 +32,5 @@ Completed backlog sprint to make dracon-sync work reliably across all 3 remotes 
 ## Next Steps
 1. Monitor multi-remote sync stability (GitHub + GitLab + Codeberg)
 2. Consider periodic `gh auth refresh` automation for `delete_repo` scope
+3. H2 git.rs module split (deferred — low risk)
+4. H3 #3 version parsing consolidation (deferred — higher risk)
