@@ -2816,7 +2816,7 @@ implemented new authentication flow
         let orig_path = std::env::var("PATH").unwrap_or_default();
         let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
 
-        let result = create_github_private_remote(&repo, "testaccount");
+        let result = create_github_private_remote(&repo, "testaccount", true);
 
         assert!(result.is_some());
         assert_eq!(result.unwrap(), "git@github.com:testaccount/my-repo.git");
@@ -2843,7 +2843,7 @@ implemented new authentication flow
         let orig_path = std::env::var("PATH").unwrap_or_default();
         let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
 
-        let result = create_github_private_remote(&repo, "testaccount");
+        let result = create_github_private_remote(&repo, "testaccount", true);
 
         assert!(result.is_some());
         let url = result.unwrap();
@@ -2874,7 +2874,7 @@ implemented new authentication flow
         let orig_path = std::env::var("PATH").unwrap_or_default();
         let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
 
-        let result = create_github_private_remote(&repo, "testaccount");
+        let result = create_github_private_remote(&repo, "testaccount", true);
 
         assert!(result.is_some());
         let remotes = crate::git::multi_remote::list_remotes(&repo);
@@ -2896,7 +2896,7 @@ implemented new authentication flow
         let _lock = crate::git::acquire_path_lock();
         let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), git_dir.to_string_lossy()));
 
-        let result = create_github_private_remote(&repo, "testaccount");
+        let result = create_github_private_remote(&repo, "testaccount", true);
 
         assert!(result.is_none());
     }

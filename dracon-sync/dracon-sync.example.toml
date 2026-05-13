@@ -143,7 +143,16 @@ auto_create = false
 # ".dracon" = "dracon-home"
 
 # =============================================================================
-#  SECTION 7: WEBHOOK
+#  SECTION 7: MIRROR VISIBILITY
+# =============================================================================
+# When true, mirrors (GitLab, Codeberg) match GitHub's public/private status.
+# When false (default), all auto-created mirrors are private.
+# Checked at most once per repo per sync_visibility_interval_hours.
+# sync_visibility = false
+# sync_visibility_interval_hours = 24
+
+# =============================================================================
+#  SECTION 8: WEBHOOK
 # =============================================================================
 # On push failures (origin or mirror remotes), dracon-sync can send a
 # fire-and-forget HTTP POST to a configured webhook URL:
