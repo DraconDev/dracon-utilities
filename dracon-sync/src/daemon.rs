@@ -740,6 +740,18 @@ pub(crate) async fn run_daemon(policy_path: PathBuf, override_interval_secs: Opt
             } else {
                 entry.failure_count += 1;
 
+                // Re-fetch status after sync attempt before making stuck decisions.
+                // sync_repo can resolve divergence (pull, merge, etc.), so stale
+                // pre-sync status would produce false stuck markings.
+                let status = match svc.get_status().await {
+                    Ok(s) => s,
+                    Err(e) => {
+                        eprintln!("⚠️ {} post-sync status failed: {}", repo.display(), e);
+                        // Keep old status as fallback
+                        status
+                    }
+                };
+
                 // Check if ALL configured remotes are failing — desktop notification
                 if !entry.remote_failures.is_empty() {
                     let all_failed = policy.remotes.iter()
