@@ -1291,6 +1291,7 @@ pub(crate) async fn push_mirror_remotes(
     remotes: &[RemoteConfig],
     timeout_secs: u64,
     retries: u32,
+    private: bool,
 ) -> Vec<(String, Result<()>)> {
     let repo_name = repo.file_name()
         .map(|n| n.to_string_lossy().to_string())
@@ -1298,7 +1299,7 @@ pub(crate) async fn push_mirror_remotes(
 
     configure_all_remotes(repo, remotes, &repo_name);
 
-    for (remote_name, create_result) in auto_create_all_remotes(remotes, &repo_name).await {
+    for (remote_name, create_result) in auto_create_all_remotes(remotes, &repo_name, private).await {
         match create_result {
             Ok(_) => {}
             Err(e) => {
