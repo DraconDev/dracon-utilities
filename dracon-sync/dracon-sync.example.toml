@@ -164,22 +164,26 @@ auto_create = false
 # Tags are created automatically: minor/patch -> git tag, major -> git tag + GitHub Release.
 # auto_publish = false
 #
+# Each publish target needs a token_secret — the env var name that holds the
+# registry API key. Store the actual token in ~/.dracon/utilities/sync/secrets/*.env.
+# See that directory's README for how to create each token.
+#
 # [[publish_targets]]
 # name = "crates-io"
 # registry = "crates-io"          # crates-io | npm | pypi
-# token_secret = "CARGO_REGISTRIES_CRATES_IO_TOKEN"
+# token_secret = "CARGO_REGISTRY_TOKEN"   # env var name (token in secrets/cratesio.env)
 # publish_timeout_secs = 300
 #
 # [[publish_targets]]
 # name = "npm"
 # registry = "npm"
-# token_secret = "NPM_TOKEN"
+# token_secret = "NPM_TOKEN"             # env var name (token in secrets/npm.env)
 # publish_timeout_secs = 120
 #
 # [[publish_targets]]
 # name = "pypi"
 # registry = "pypi"
-# token_secret = "TWINE_PASSWORD"
+# token_secret = "TWINE_PASSWORD"        # env var name (token in secrets/pypi.env)
 # publish_timeout_secs = 120
 #
 # Per-repo opt-in (.dracon/dracon-sync.toml):
