@@ -56,7 +56,7 @@ fn update_visibility_cache(repo_name: &str) {
 
 /// Parse `owner/repo` from a GitHub remote URL.
 /// Supports both SSH (`git@github.com:owner/repo.git`) and HTTPS (`https://github.com/owner/repo.git`).
-fn parse_github_owner_repo(remote_url: &str) -> Option<(String, String)> {
+pub(crate) fn parse_github_owner_repo(remote_url: &str) -> Option<(String, String)> {
     // SSH: git@github.com:owner/repo.git
     if let Some(colon) = remote_url.rfind(':') {
         let after_colon = &remote_url[colon + 1..];
