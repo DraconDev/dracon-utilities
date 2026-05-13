@@ -2270,6 +2270,8 @@ mod tests {
             incident_ledger_max_age_days: 30,
             webhook_url: None,
             alert_unpushed_threshold: 10,
+            sync_visibility: false,
+            sync_visibility_interval_hours: 24,
         }
     }
 
