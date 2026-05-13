@@ -72,9 +72,9 @@ fn notify_webhook_failure(webhook_url: &str, repo: &Path, remote: &str, error: &
 /// Get the old version, new version, and bump level from the repo after a version bump.
 /// Returns None if no bump info can be determined.
 ///
-/// Handles Cargo.toml, package.json, and pyproject.toml.
-/// Falls back to "patch" level if old version cannot be determined
-/// (e.g., first commit in repo, or HEAD~1 doesn't exist).
+/// Handles Cargo.toml, package.json, pyproject.toml, version.txt, VERSION,
+/// and pubspec.yaml. Falls back to "patch" level if old version cannot be
+/// determined (e.g., first commit in repo, or HEAD~1 doesn't exist).
 fn get_bump_info(repo: &Path) -> Option<(String, String, String)> {
     let new_ver = crate::release::detect_project_version(repo)?.0;
 
@@ -85,8 +85,14 @@ fn get_bump_info(repo: &Path) -> Option<(String, String, String)> {
         &["package.json"][..]
     } else if repo.join("pyproject.toml").exists() {
         &["pyproject.toml"][..]
+    } else if repo.join("pubspec.yaml").exists() {
+        &["pubspec.yaml"][..]
+    } else if repo.join("version.txt").exists() {
+        &["version.txt"][..]
+    } else if repo.join("VERSION").exists() {
+        &["VERSION"][..]
     } else {
-        &["Cargo.toml", "package.json", "pyproject.toml"][..]
+        &["Cargo.toml", "package.json", "pyproject.toml", "pubspec.yaml", "version.txt", "VERSION"][..]
     };
 
     let old_ver = version_files.iter().find_map(|file| {
@@ -125,6 +131,17 @@ fn get_bump_info(repo: &Path) -> Option<(String, String, String)> {
                 .map(|v| v.trim().trim_matches('"').trim_matches(',').trim())
                 .filter(|v| !v.is_empty())
                 .map(|v| v.to_string()),
+            "pubspec.yaml" => content.lines()
+                .map(|l| l.trim())
+                .find(|l| l.starts_with("version:"))
+                .and_then(|l| l.split(':').nth(1))
+                .map(|v| v.trim().split('+').next().unwrap_or("").trim())
+                .filter(|v| !v.is_empty())
+                .map(|v| v.to_string()),
+            "version.txt" | "VERSION" => {
+                let v = content.trim();
+                if !v.is_empty() && v.contains('.') { Some(v.to_string()) } else { None }
+            }
             _ => None,
         }
     }).unwrap_or_default();
