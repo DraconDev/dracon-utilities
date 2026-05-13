@@ -67,6 +67,31 @@ fn notify_webhook_failure(webhook_url: &str, repo: &Path, remote: &str, error: &
     });
 }
 
+/// Run visibility and metadata sync for a repo (non-fatal).
+/// Called before returning from sync_repo regardless of outcome.
+fn maybe_sync_visibility_and_metadata(
+    repo: &Path,
+    policy: &SyncPolicy,
+    dry_run: bool,
+) {
+    if dry_run || (!policy.sync_visibility && !policy.sync_metadata) {
+        return;
+    }
+    if let Some(origin_url) = crate::git::multi_remote::get_remote_url(repo, "origin") {
+        let repo_name = repo.file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_default();
+        if !repo_name.is_empty() {
+            if policy.sync_visibility {
+                sync_mirror_visibility(&origin_url, &policy.remotes, &repo_name, policy.sync_visibility_interval_hours);
+            }
+            if policy.sync_metadata {
+                sync_mirror_metadata(&origin_url, &policy.remotes, &repo_name, policy.sync_visibility_interval_hours);
+            }
+        }
+    }
+}
+
 pub(crate) async fn sync_repo(
     repo: &Path,
     policy: &SyncPolicy,
