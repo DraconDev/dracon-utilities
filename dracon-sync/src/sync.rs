@@ -426,6 +426,7 @@ pub(crate) async fn sync_repo(
                         if !dry_run {
                             let _ = run_git_with_timeout(repo, &["reset", "HEAD", "--"], 10, "reset-after-guard").await;
                         }
+                        maybe_sync_visibility_and_metadata(repo, policy, dry_run);
                         return Ok(SyncOutcome::Blocked);
                     }
                 }
