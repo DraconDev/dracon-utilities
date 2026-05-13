@@ -429,22 +429,6 @@ pub(crate) async fn sync_repo(
                 }
             };
 
-            if cfg!(feature = "scribe") {
-                #[cfg(feature = "scribe")]
-                if let Err(e) = crate::scribe::update_project_state_from_ai(repo, &staged_diff_names, staged_diff_content).await {
-                    eprintln!("📝 scribe failed for {}: {}", repo.display(), e);
-                }
-            }
-
-            // Stage project-state.md if scribe updated it
-            // Use -f (force) because project-state.md is in .dracon/ which is
-            // typically gitignored, so we need to override that.
-            if repo.join(".dracon/project-state.md").exists() {
-                if let Err(e) = run_git_with_timeout(repo, &["add", "-f", ".dracon/project-state.md"], 10, "add-project-state").await {
-                    eprintln!("⚠️ failed to stage project-state: {}", e);
-                }
-            }
-
             // Version bumper: deterministic patch-only (fallback when ai-bumper not enabled)
             let mut version_bumped = false;
             if auto_bump_versions && cfg!(feature = "scribe") {
