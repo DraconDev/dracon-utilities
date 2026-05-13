@@ -1400,73 +1400,8 @@ pub(crate) async fn push_to_named_remote(
         .ok_or_else(|| anyhow::anyhow!("remote {} not found", remote_name))?;
 
     if is_safe_branch_name(&branch) {
-        // Try GitHub HTTPS (no PAT needed for public repos)
-        if let Some(https) = github_https_url(&remote_url) {
-            let result = run_git_with_timeout_env(
-                repo,
-                &["push", &https, &refspec],
-                timeout_secs,
-                &format!("push-to-{}-github-https", remote_name),
-                no_prompt,
-            ).await;
-            if result.is_ok() {
-                return Ok(());
-            }
-        }
-
-        // Try GitLab HTTPS with PAT via GIT_ASKPASS (avoids token in URL/process listings)
-        if let Some(https) = gitlab_https_url(&remote_url) {
-            if let Some(token) = load_secret("GITLAB_TOKEN") {
-                match git_askpass_script(&token).await {
-                    Ok(askpass) => {
-                        let result = run_git_with_timeout_env(
-                            repo,
-                            &["push", &https, &refspec],
-                            timeout_secs,
-                            &format!("push-to-{}-gitlab-https", remote_name),
-                            &[
-                                ("GIT_ASKPASS", askpass.to_str().unwrap_or("/bin/false")),
-                                ("GIT_TERMINAL_PROMPT", "0"),
-                            ],
-                        ).await;
-                        let _ = tokio::fs::remove_file(&askpass).await;
-                        if result.is_ok() {
-                            return Ok(());
-                        }
-                    }
-                    Err(e) => {
-                        eprintln!("⚠️ failed to create GIT_ASKPASS helper for GitLab: {}", e);
-                    }
-                }
-            }
-        }
-
-        // Try Codeberg HTTPS with PAT via GIT_ASKPASS
-        if let Some(https) = codeberg_https_url(&remote_url) {
-            if let Some(token) = load_secret("CODEBERG_TOKEN") {
-                match git_askpass_script(&token).await {
-                    Ok(askpass) => {
-                        let result = run_git_with_timeout_env(
-                            repo,
-                            &["push", &https, &refspec],
-                            timeout_secs,
-                            &format!("push-to-{}-codeberg-https", remote_name),
-                            &[
-                                ("GIT_ASKPASS", askpass.to_str().unwrap_or("/bin/false")),
-                                ("GIT_TERMINAL_PROMPT", "0"),
-                            ],
-                        ).await;
-                        let _ = tokio::fs::remove_file(&askpass).await;
-                        if result.is_ok() {
-                            return Ok(());
-                        }
-                    }
-                    Err(e) => {
-                        eprintln!("⚠️ failed to create GIT_ASKPASS helper for Codeberg: {}", e);
-                    }
-                }
-            }
-        }
+        let fallback_label = format!("push-to-{}", remote_name);
+        push_https_fallback(repo, &remote_url, &refspec, timeout_secs, &fallback_label).await?;
     }
 
     let mut last_err = None;
