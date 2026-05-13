@@ -67,6 +67,34 @@ pub(crate) enum AuthType {
     Generic,
 }
 
+impl AuthType {
+    /// Auto-detect auth type from a push URL.
+    /// Returns the detected type, or `GitHub` (default) if no match.
+    pub(crate) fn from_push_url(url: &str) -> Self {
+        let lower = url.to_ascii_lowercase();
+        if lower.contains("gitlab") {
+            Self::GitLab
+        } else if lower.contains("codeberg") {
+            Self::Codeberg
+        } else if lower.contains("github") {
+            Self::GitHub
+        } else {
+            Self::Generic
+        }
+    }
+}
+
+impl RemoteConfig {
+    /// Returns the effective auth type: explicitly set if non-default,
+    /// otherwise auto-detected from the push_url.
+    pub(crate) fn effective_auth_type(&self) -> AuthType {
+        if self.auth_type != AuthType::GitHub {
+            return self.auth_type;
+        }
+        AuthType::from_push_url(&self.push_url)
+    }
+}
+
 fn deserialize_remotes_or_extra<'de, D>(deserializer: D) -> Result<Vec<RemoteConfig>, D::Error>
 where
     D: Deserializer<'de>,
