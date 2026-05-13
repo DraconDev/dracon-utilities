@@ -93,6 +93,39 @@ impl RemoteConfig {
         }
         AuthType::from_push_url(&self.push_url)
     }
+
+    /// Returns the account name: explicitly set if non-empty,
+    /// otherwise extracted from the push_url.
+    pub(crate) fn resolve_account(&self) -> String {
+        if !self.auto_create_account.is_empty() {
+            return self.auto_create_account.clone();
+        }
+        // Extract account from push_url patterns:
+        // SSH:   git@host:account/repo.git
+        // HTTPS: https://host/account/repo.git
+        let url = &self.push_url;
+        if url.contains('@') {
+            // SSH: git@host:account/{repo}.git → extract account before {repo}
+            if let Some(colon) = url.rfind(':') {
+                let after_colon = &url[colon + 1..];
+                if let Some(slash) = after_colon.find('/') {
+                    return after_colon[..slash].to_string();
+                }
+            }
+        } else if url.starts_with("http://") || url.starts_with("https://") {
+            // HTTPS: https://host/account/{repo}.git
+            if let Some(double_slash) = url.find("://") {
+                let after_proto = &url[double_slash + 3..];
+                if let Some(slash) = after_proto.find('/') {
+                    let after_host = &after_proto[slash + 1..];
+                    if let Some(slash) = after_host.find('/') {
+                        return after_host[..slash].to_string();
+                    }
+                }
+            }
+        }
+        self.auto_create_account.clone()
+    }
 }
 
 fn deserialize_remotes_or_extra<'de, D>(deserializer: D) -> Result<Vec<RemoteConfig>, D::Error>
