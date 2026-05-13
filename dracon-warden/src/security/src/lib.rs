@@ -442,10 +442,6 @@ impl SecretScanner {
                 r#"(?i)(?:secret|token|password|passwd|pwd|credential).{0,10}[=:].{0,5}["'][^\s"\[]{16,}["']"#,
             ),
             (
-                "Paranoid Long String (Quoted)",
-                r#"["'][A-Za-z0-9+/=_\-]{20,}["']"#, // Catch-all for long strings > 20 chars
-            ),
-            (
                 "Private Token Pattern",
                 r#"(?i)private[_-]?(?:key|token).{0,10}[=:].{0,5}["'][A-Za-z0-9_-]{20,}["']"#,
             ),
@@ -2947,7 +2943,8 @@ pub fn encrypt_with_repo_key(&self, repo_key: &RepoKey, plaintext: &[u8]) -> Res
 
         let mut file = fs::OpenOptions::new()
             .write(true)
-            .create_new(true)
+            .create(true)
+            .truncate(true)
             .mode(0o600)
             .open(&path)?;
         let mut writer = encryptor.wrap_output(&mut file)?;
