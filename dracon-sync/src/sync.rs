@@ -730,6 +730,26 @@ pub(crate) async fn sync_repo(
                     eprintln!("⚠️ some mirror pushes failed for {}", repo.display());
                 }
             }
+
+            // Release pipeline: tag + publish after version bump
+            if version_bumped {
+                if let Some((old_ver, new_ver, level)) = get_bump_info(repo) {
+                    let repo_targets = crate::policy::load_repo_override(repo)
+                        .auto_publish;
+                    let steps = crate::release::run_release_pipeline(
+                        repo, &old_ver, &new_ver, level.as_str(), policy, &repo_targets,
+                    ).await;
+                    for step in &steps {
+                        match step {
+                            crate::release::ReleaseStep::TagCreated(tag) => eprintln!("🏷️  {tag}"),
+                            crate::release::ReleaseStep::GitHubReleaseCreated(tag) => eprintln!("🚀 {tag}"),
+                            crate::release::ReleaseStep::Published { registry, version } => eprintln!("📦 published to {registry} v{version}"),
+                            crate::release::ReleaseStep::Skipped(reason) => { if debug_enabled() { eprintln!("🐛 release skipped: {reason}"); } }
+                            crate::release::ReleaseStep::Failed { step: s, error } => eprintln!("⚠️ release failed: {s} — {error}"),
+                        }
+                    }
+                }
+            }
         } else if policy.auto_push && !has_origin {
             eprintln!("ℹ️ skip push for {} (no origin remote)", repo.display());
         }
