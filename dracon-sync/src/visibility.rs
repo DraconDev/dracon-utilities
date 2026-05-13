@@ -476,6 +476,7 @@ pub(crate) fn sync_mirror_metadata(
 /// Check GitHub visibility at repo creation time and return whether the
 /// repo should be created as private. If `sync_visibility` is disabled,
 /// always returns `true` (private).
+#[cfg(test)]
 pub(crate) fn github_visibility_at_creation(
     owner: &str,
     repo_name: &str,
