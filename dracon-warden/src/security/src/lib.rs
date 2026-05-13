@@ -2272,7 +2272,22 @@ impl DemonSecurity {
             .components()
             .filter_map(|c| c.as_os_str().to_str())
             .collect();
-        let is_sensitive_location = sensitive_dirs.iter().any(|dir| path_components.contains(dir))
+
+        // Single-component matching
+        let has_single_component = sensitive_dirs.iter().any(|dir| {
+            !dir.contains('/') && path_components.contains(dir)
+        });
+        // Multi-component sequence matching (e.g. ".config/gcloud")
+        let has_multi_component = sensitive_dirs.iter().any(|dir| {
+            let parts: Vec<&str> = dir.split('/').collect();
+            if parts.len() < 2 {
+                return false;
+            }
+            path_components.windows(parts.len()).any(|window| window == parts.as_slice())
+        });
+
+        let is_sensitive_location = has_single_component
+            || has_multi_component
             || sensitive_exts.iter().any(|ext| path_str.ends_with(ext))
             || sensitive_filenames.contains(&filename)
             || sensitive_filenames.iter().any(|p| filename.starts_with(p))
