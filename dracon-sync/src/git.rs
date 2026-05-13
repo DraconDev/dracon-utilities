@@ -840,6 +840,15 @@ pub(crate) async fn unstage_oversized_paths(repo: &Path, max_stage_file_bytes: u
     Ok(removed)
 }
 
+/// Returns true if the error indicates a rejected push that might be
+/// resolvable with `--force-with-lease`.
+fn is_push_rejected(err_msg: &str) -> bool {
+    err_msg.contains("non-fast-forward")
+        || err_msg.contains("failed to push some refs")
+        || err_msg.contains("[rejected]")
+        || err_msg.contains("Updates were rejected")
+}
+
 pub(crate) fn current_branch(repo: &Path) -> Option<String> {
     let head_path = repo.join(".git").join("HEAD");
     if let Ok(content) = std::fs::read_to_string(&head_path) {
@@ -1409,10 +1418,7 @@ pub(crate) async fn push_to_named_remote(
         match run_git_with_timeout_env(repo, &["push", remote_name, "HEAD"], timeout_secs, &format!("push-to-{}", remote_name), &[("GIT_TERMINAL_PROMPT", "0")]).await {
             Ok(()) => return Ok(()),
             Err(e) => {
-                let is_rejected = e.to_string().contains("non-fast-forward")
-                    || e.to_string().contains("failed to push some refs")
-                    || e.to_string().contains("[rejected]")
-                    || e.to_string().contains("Updates were rejected");
+                let is_rejected = is_push_rejected(&e.to_string());
                 if is_rejected && force_when_behind {
                     match diagnose_divergence(repo, remote_name, &branch).await {
                         Ok(Divergence::RemotePurelyBehind) => {
