@@ -2273,6 +2273,8 @@ mod tests {
             sync_visibility: false,
             sync_visibility_interval_hours: 24,
             sync_metadata: false,
+            auto_tag: true,
+            auto_release: false,
             auto_publish: false,
             publish_targets: vec![],
         }
