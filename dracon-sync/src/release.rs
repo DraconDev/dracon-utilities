@@ -241,7 +241,7 @@ pub(crate) fn extract_package_name(repo: &Path, registry: PublishRegistry) -> Re
             // Simple parse: look for "name" field
             if let Some(name_line) = pkg_json.lines().find(|l| l.trim().starts_with("\"name\"")) {
                 if let Some(name) = name_line.split(':').nth(1) {
-                    let name = name.trim().trim_matches('"').trim_matches(',').trim();
+                    let name = name.trim().trim_end_matches(',').trim_matches('"').trim();
                     if !name.is_empty() {
                         return Ok(name.to_string());
                     }
