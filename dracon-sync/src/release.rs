@@ -766,31 +766,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_release_pipeline_skipped_when_no_repo_targets() {
-        let dir = TempDir::new().unwrap();
-        fs::write(
-            dir.path().join("Cargo.toml"),
-            "[package]\nname = \"test\"\nversion = \"0.2.0\"\n",
-        )
-        .unwrap();
-
-        let policy = crate::policy::test_sync_policy();
-        let steps = run_release_pipeline(
-            dir.path(),
-            "0.1.0",
-            "0.2.0",
-            "minor",
-            &policy,
-            &[], // empty repo targets → entire pipeline skipped
-        )
-        .await;
-
-        assert_eq!(steps.len(), 1);
-        assert!(matches!(&steps[0], ReleaseStep::Skipped(reason) if reason.contains("no auto_publish")));
-    }
-
-    #[tokio::test]
-    async fn test_release_pipeline_creates_tag_when_opted_in() {
+    async fn test_release_pipeline_tag_only_when_auto_tag_true() {
         let dir = TempDir::new().unwrap();
         fs::write(
             dir.path().join("Cargo.toml"),
@@ -821,24 +797,183 @@ mod tests {
             .status()
             .unwrap();
 
-        let mut policy = crate::policy::test_sync_policy();
-        policy.auto_publish = true;
+        let policy = crate::policy::test_sync_policy();
+        // auto_tag = true, auto_release = false, publish targets = []
         let steps = run_release_pipeline(
             dir.path(),
             "0.1.0",
             "0.2.0",
             "minor",
             &policy,
-            &["crates-io".to_string()], // opted in
+            true,  // auto_tag
+            false, // auto_release
+            &[],   // no publish targets
         )
         .await;
 
-        // Should have at least a tag step — either TagCreated or Failed (push fails without origin)
-        assert!(!steps.is_empty());
+        // Should have tag step — either TagCreated or Failed (push fails without origin)
         assert!(
             steps.iter().any(|s| matches!(s, ReleaseStep::TagCreated(_)))
                 || steps.iter().any(|s| matches!(s, ReleaseStep::Failed { step, .. } if step.contains("push tag"))),
             "expected tag creation or push attempt, got: {:?}", steps
+        );
+        // Should NOT have a release step
+        assert!(
+            !steps.iter().any(|s| matches!(s, ReleaseStep::GitHubReleaseCreated(_))),
+            "should not create GitHub release when auto_release=false"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_release_pipeline_no_tag_when_auto_tag_false() {
+        let dir = TempDir::new().unwrap();
+        fs::write(
+            dir.path().join("Cargo.toml"),
+            "[package]\nname = \"test\"\nversion = \"0.2.0\"\n",
+        )
+        .unwrap();
+
+        std::process::Command::new("git")
+            .args(["init"])
+            .current_dir(dir.path())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["add", "-A"])
+            .current_dir(dir.path())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["commit", "-m", "init", "--author", "test <test@test.com>"])
+            .current_dir(dir.path())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .unwrap();
+
+        let policy = crate::policy::test_sync_policy();
+        // auto_tag = false, auto_release = false, publish targets = []
+        let steps = run_release_pipeline(
+            dir.path(),
+            "0.1.0",
+            "0.2.0",
+            "minor",
+            &policy,
+            false, // auto_tag disabled
+            false, // auto_release disabled
+            &[],   // no publish targets
+        )
+        .await;
+
+        // Nothing should happen
+        assert!(steps.is_empty(), "expected no steps when all toggles off, got: {:?}", steps);
+    }
+
+    #[tokio::test]
+    async fn test_release_pipeline_release_on_major_when_auto_release_true() {
+        let dir = TempDir::new().unwrap();
+        fs::write(
+            dir.path().join("Cargo.toml"),
+            "[package]\nname = \"test\"\nversion = \"1.0.0\"\n",
+        )
+        .unwrap();
+
+        std::process::Command::new("git")
+            .args(["init"])
+            .current_dir(dir.path())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["add", "-A"])
+            .current_dir(dir.path())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["commit", "-m", "init", "--author", "test <test@test.com>"])
+            .current_dir(dir.path())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .unwrap();
+
+        let policy = crate::policy::test_sync_policy();
+        let steps = run_release_pipeline(
+            dir.path(),
+            "0.2.0",
+            "1.0.0",
+            "major",
+            &policy,
+            true,  // auto_tag
+            true,  // auto_release enabled
+            &[],   // no publish targets
+        )
+        .await;
+
+        // Should attempt GitHub release (will fail because no origin, but the attempt is what matters)
+        assert!(
+            steps.iter().any(|s| matches!(s, ReleaseStep::GitHubReleaseCreated(_)))
+                || steps.iter().any(|s| matches!(s, ReleaseStep::Failed { step, .. } if step.contains("GitHub release"))),
+            "expected GitHub release attempt on major bump with auto_release=true, got: {:?}", steps
+        );
+    }
+
+    #[tokio::test]
+    async fn test_release_pipeline_no_release_on_minor_even_if_auto_release_true() {
+        let dir = TempDir::new().unwrap();
+        fs::write(
+            dir.path().join("Cargo.toml"),
+            "[package]\nname = \"test\"\nversion = \"0.2.0\"\n",
+        )
+        .unwrap();
+
+        std::process::Command::new("git")
+            .args(["init"])
+            .current_dir(dir.path())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["add", "-A"])
+            .current_dir(dir.path())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["commit", "-m", "init", "--author", "test <test@test.com>"])
+            .current_dir(dir.path())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .unwrap();
+
+        let policy = crate::policy::test_sync_policy();
+        let steps = run_release_pipeline(
+            dir.path(),
+            "0.1.0",
+            "0.2.0",
+            "minor",
+            &policy,
+            true,  // auto_tag
+            true,  // auto_release enabled
+            &[],   // no publish targets
+        )
+        .await;
+
+        // Should NOT have a GitHub release step (only major bumps get releases)
+        assert!(
+            !steps.iter().any(|s| matches!(s, ReleaseStep::GitHubReleaseCreated(_)))
+                && !steps.iter().any(|s| matches!(s, ReleaseStep::Failed { step, .. } if step.contains("GitHub release"))),
+            "minor bump should not trigger GitHub release even with auto_release=true"
         );
     }
 }
