@@ -1285,7 +1285,7 @@ async fn auto_cleanup_rust_targets(
         }
     }
 
-    let min_size_bytes = guard.cleanup_min_size_mb * 1024 * 1024;
+    let min_size_bytes = guard.cleanup_min_size_mb.saturating_mul(1024).saturating_mul(1024);
 
     for target in targets {
         // Skip if too small
@@ -2328,7 +2328,7 @@ pub(crate) async fn run_guard_once(
             .collect();
 
         if !log_dirs.is_empty() {
-            let min_size = guard.log_size_mb * 1024 * 1024;
+            let min_size = guard.log_size_mb.saturating_mul(1024).saturating_mul(1024);
             match find_large_log_files(&log_dirs, min_size).await {
                 Ok(logs) if !logs.is_empty() => {
                     let key = "log-size-warning".to_string();
@@ -2352,7 +2352,7 @@ pub(crate) async fn run_guard_once(
                     // Unlike other auto-cleanup actions, log truncation is relatively safe,
                     // but we still respect the global dry-run gate for consistency.
                     if guard.auto_truncate_logs && guard.auto_cleanup_apply {
-                        let max_size = guard.log_max_truncate_mb * 1024 * 1024;
+                        let max_size = guard.log_max_truncate_mb.saturating_mul(1024).saturating_mul(1024);
                         let preserve = guard.log_preserve_header_lines;
                         let mut total_reclaimed = 0u64;
                         for (path, original_size) in &logs {
@@ -3189,9 +3189,11 @@ async fn main() -> Result<()> {
                     all,
                     min_size_mb,
                 } => {
-                    // If --all or no specific flags, do everything
-                    let do_all =
-                        all || (!rust && !trash && !nix && !caches && !node_modules && !docker);
+                    let do_all = all;
+                    if !do_all && !rust && !trash && !nix && !caches && !node_modules && !docker {
+                        eprintln!("⚠️ No cleanup targets specified. Use --all to clean everything, or specify individual flags (--rust, --trash, --nix, --caches, --node-modules, --docker).");
+                        return Ok(());
+                    }
                     let do_rust = rust || do_all;
                     let do_trash = trash || do_all;
                     let do_nix = nix || do_all;
