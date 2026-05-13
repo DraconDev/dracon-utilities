@@ -75,10 +75,9 @@ fn notify_webhook_failure(webhook_url: &str, repo: &Path, remote: &str, error: &
 /// Handles Cargo.toml, package.json, pyproject.toml, version.txt, VERSION,
 /// and pubspec.yaml. Falls back to "patch" level if old version cannot be
 /// determined (e.g., first commit in repo, or HEAD~1 doesn't exist).
-fn get_bump_info(repo: &Path) -> Option<(String, String, String)> {
+async fn get_bump_info(repo: &Path) -> Option<(String, String, String)> {
     let new_ver = crate::release::detect_project_version(repo)?.0;
 
-    // Determine which version file this project uses
     let version_files = if repo.join("Cargo.toml").exists() {
         &["Cargo.toml"][..]
     } else if repo.join("package.json").exists() {
@@ -95,13 +94,14 @@ fn get_bump_info(repo: &Path) -> Option<(String, String, String)> {
         &["Cargo.toml", "package.json", "pyproject.toml", "pubspec.yaml", "version.txt", "VERSION"][..]
     };
 
-    let old_ver = version_files.iter().find_map(|file| {
-        let file = file.to_string();
-        let repo = repo.to_path_buf();
+    let mut old_ver = String::new();
+    for file in version_files.iter() {
+        let repo_pb = repo.to_path_buf();
+        let file_s = file.to_string();
         let output = tokio::task::spawn_blocking(move || {
             std::process::Command::new("git")
-                .args(["show", &format!("HEAD~1:{}", file)])
-                .current_dir(&repo)
+                .args(["show", &format!("HEAD~1:{}", file_s)])
+                .current_dir(&repo_pb)
                 .stdout(std::process::Stdio::piped())
                 .stderr(std::process::Stdio::null())
                 .output()
@@ -109,49 +109,53 @@ fn get_bump_info(repo: &Path) -> Option<(String, String, String)> {
         })
         .await
         .ok()
-        .flatten()?;
+        .flatten();
 
-        if !output.status.success() {
-            return None;
-        }
-
-        let content = String::from_utf8_lossy(&output.stdout);
-        match file.as_str() {
-            "Cargo.toml" => content.lines()
-                .map(|l| l.trim())
-                .find(|l| l.starts_with("version") && !l.starts_with("version_prefix"))
-                .and_then(|l| l.split('=').nth(1))
-                .map(|v| v.trim().trim_matches('"').trim())
-                .filter(|v| !v.is_empty() && !v.starts_with("workspace"))
-                .map(|v| v.to_string()),
-            "package.json" => content.lines()
-                .map(|l| l.trim())
-                .find(|l| l.starts_with("\"version\""))
-                .and_then(|l| l.split(':').nth(1))
-                .map(|v| v.trim().trim_matches('"').trim_matches(',').trim())
-                .filter(|v| !v.is_empty())
-                .map(|v| v.to_string()),
-            "pyproject.toml" => content.lines()
-                .map(|l| l.trim())
-                .find(|l| l.starts_with("version") && !l.starts_with("version_prefix"))
-                .and_then(|l| l.split('=').nth(1))
-                .map(|v| v.trim().trim_matches('"').trim_matches(',').trim())
-                .filter(|v| !v.is_empty())
-                .map(|v| v.to_string()),
-            "pubspec.yaml" => content.lines()
-                .map(|l| l.trim())
-                .find(|l| l.starts_with("version:"))
-                .and_then(|l| l.split(':').nth(1))
-                .map(|v| v.trim().split('+').next().unwrap_or("").trim())
-                .filter(|v| !v.is_empty())
-                .map(|v| v.to_string()),
-            "version.txt" | "VERSION" => {
-                let v = content.trim();
-                if !v.is_empty() && v.contains('.') { Some(v.to_string()) } else { None }
+        if let Some(output) = output {
+            if !output.status.success() {
+                continue;
             }
-            _ => None,
+            let content = String::from_utf8_lossy(&output.stdout);
+            if let Some(v) = match *file {
+                "Cargo.toml" => content.lines()
+                    .map(|l| l.trim())
+                    .find(|l| l.starts_with("version") && !l.starts_with("version_prefix"))
+                    .and_then(|l| l.split('=').nth(1))
+                    .map(|v| v.trim().trim_matches('"').trim())
+                    .filter(|v| !v.is_empty() && !v.starts_with("workspace"))
+                    .map(|v| v.to_string()),
+                "package.json" => content.lines()
+                    .map(|l| l.trim())
+                    .find(|l| l.starts_with("\"version\""))
+                    .and_then(|l| l.split(':').nth(1))
+                    .map(|v| v.trim().trim_matches('"').trim_matches(',').trim())
+                    .filter(|v| !v.is_empty())
+                    .map(|v| v.to_string()),
+                "pyproject.toml" => content.lines()
+                    .map(|l| l.trim())
+                    .find(|l| l.starts_with("version") && !l.starts_with("version_prefix"))
+                    .and_then(|l| l.split('=').nth(1))
+                    .map(|v| v.trim().trim_matches('"').trim_matches(',').trim())
+                    .filter(|v| !v.is_empty())
+                    .map(|v| v.to_string()),
+                "pubspec.yaml" => content.lines()
+                    .map(|l| l.trim())
+                    .find(|l| l.starts_with("version:"))
+                    .and_then(|l| l.split(':').nth(1))
+                    .map(|v| v.trim().split('+').next().unwrap_or("").trim())
+                    .filter(|v| !v.is_empty())
+                    .map(|v| v.to_string()),
+                "version.txt" | "VERSION" => {
+                    let v = content.trim();
+                    if !v.is_empty() && v.contains('.') { Some(v.to_string()) } else { None }
+                }
+                _ => None,
+            } {
+                old_ver = v;
+                break;
+            }
         }
-    }).unwrap_or_default();
+    }
 
     // Determine bump level by comparing versions
     let level = if old_ver.is_empty() {
@@ -531,9 +535,13 @@ pub(crate) async fn sync_repo(
                             );
                         }
                         // Do NOT stage the deletions - let the user decide.
-                        // Unstage any previously-staged files so they don't leak into the next cycle.
+                        // Unstage only the missing files so they don't leak into the next cycle.
                         if !dry_run {
-                            let _ = run_git_with_timeout(repo, &["reset", "HEAD", "--"], 10, "reset-after-guard").await;
+                            let mut reset_args = vec!["reset", "HEAD", "--"];
+                            for p in &missing {
+                                reset_args.push(p);
+                            }
+                            let _ = run_git_with_timeout(repo, &reset_args, 10, "reset-after-guard").await;
                         }
                         maybe_sync_visibility_and_metadata(repo, policy, dry_run);
                         return Ok(SyncOutcome::Blocked);
@@ -849,7 +857,7 @@ pub(crate) async fn sync_repo(
 
             // Release pipeline: tag + release + publish after version bump
             if version_bumped {
-                if let Some((old_ver, new_ver, level)) = get_bump_info(repo) {
+                if let Some((old_ver, new_ver, level)) = get_bump_info(repo).await {
                     let repo_override = crate::policy::load_repo_override(repo);
                     let repo_auto_tag = repo_override.auto_tag.unwrap_or(policy.auto_tag);
                     let repo_auto_release = repo_override.auto_release.unwrap_or(policy.auto_release);
