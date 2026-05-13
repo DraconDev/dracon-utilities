@@ -3,6 +3,7 @@ use serde::Deserialize;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use crate::helpers::is_repo_already_exists;
 use crate::policy::{AuthType, RemoteConfig};
 use crate::secrets::{load_secret, sync_secrets_dir};
 
@@ -522,7 +523,7 @@ pub(crate) fn create_repo_on_github_with_visibility(
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        if stderr.contains("Name already exists") || stderr.contains("already exists") {
+        if is_repo_already_exists(&stderr) {
             return Ok(format!("git@github.com:{}/{}.git", account, repo_name));
         }
         anyhow::bail!("gh repo create failed: {}", stderr.trim());
@@ -554,7 +555,7 @@ pub(crate) fn create_repo_on_gitlab_with_visibility(
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        if stderr.contains("already exists") || stderr.contains("Name already exists") || stderr.contains("has already been taken") {
+        if is_repo_already_exists(&stderr) {
             return Ok(format!("git@gitlab.com:{}/{}.git", account, repo_name));
         }
         anyhow::bail!("glab repo create failed: {}", stderr.trim());

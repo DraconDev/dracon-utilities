@@ -6,6 +6,8 @@ use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
 
+use crate::helpers::{is_auth_error, is_rate_limited};
+
 #[derive(Debug, Clone)]
 enum ProviderStatus {
     AuthFailed,
@@ -203,10 +205,10 @@ impl SimpleAiService {
                     let msg = e.to_string().to_lowercase();
                     eprintln!("⚠️ AI {} failed: {}", pc.name, e);
                     let mut health = provider_health().lock().await;
-                    if msg.contains("401") || msg.contains("403") || msg.contains("unauthorized") || msg.contains("api key") {
+                    if is_auth_error(&msg) {
                         eprintln!("🔑 {}: auth error (skipping for session)", pc.name);
                         health.insert(pc.name.clone(), ProviderStatus::AuthFailed);
-                    } else if msg.contains("429") || msg.contains("rate limit") {
+                    } else if is_rate_limited(&msg) {
                         eprintln!("⏳ {}: rate limited (skipping 60s)", pc.name);
                         health.insert(pc.name.clone(), ProviderStatus::RateLimited {
                             until: Instant::now() + Duration::from_secs(60),

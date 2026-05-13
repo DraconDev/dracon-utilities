@@ -1,12 +1,12 @@
 mod policy;
 mod exclude;
 mod git;
+mod helpers;
 mod bump;
 mod secrets;
 mod simple_ai;
 mod visibility;
 mod release;
-#[cfg(feature = "scribe")]
 mod scribe;
 mod report;
 mod daemon;
@@ -17,7 +17,7 @@ use anyhow::Result;
 use clap::{ArgAction, Parser, Subcommand};
 use std::path::PathBuf;
 use std::sync::atomic::Ordering;
-
+use helpers::{is_auth_error, is_rate_limited};
 use policy::{resolve_policy_path, SyncPolicy, timestamp_secs};
 use policy::freeze_reason;
 use exclude::excluded_dir_names_set;
@@ -523,7 +523,7 @@ async fn main() -> Result<()> {
                     }
                     Ok((false, err)) => {
                         let err_lower = err.to_lowercase();
-                        if err_lower.contains("429") || err_lower.contains("rate limit") {
+                        if is_rate_limited(&err_lower) {
                             if json {
                                 println!("rate_limited");
                             } else {
@@ -536,7 +536,7 @@ async fn main() -> Result<()> {
                                 latency_ms: None,
                                 error: Some(err.to_string()),
                             });
-                        } else if err_lower.contains("401") || err_lower.contains("unauthorized") || err_lower.contains("api key") {
+                        } else if is_auth_error(&err_lower) {
                             if json {
                                 println!("auth_error");
                             } else {
