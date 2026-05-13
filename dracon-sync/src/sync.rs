@@ -107,20 +107,24 @@ pub(crate) async fn sync_repo(
         if debug_enabled() {
             eprintln!("🐛 {} is not recognized as git repo", repo.display());
         }
+        maybe_sync_visibility_and_metadata(repo, policy, dry_run);
         return Ok(SyncOutcome::NothingToDo);
     }
 
     // Bail out early if repo is in a conflict state - manual intervention required
     if is_rebase_in_progress(repo) {
         eprintln!("⚠️ {} has rebase in progress, skipping (manual intervention required)", repo.display());
+        maybe_sync_visibility_and_metadata(repo, policy, dry_run);
         return Ok(SyncOutcome::Blocked);
     }
     if is_merge_in_progress(repo) {
         eprintln!("⚠️ {} has merge in progress, skipping (manual intervention required)", repo.display());
+        maybe_sync_visibility_and_metadata(repo, policy, dry_run);
         return Ok(SyncOutcome::Blocked);
     }
     if is_cherry_pick_in_progress(repo) {
         eprintln!("⚠️ {} has cherry-pick in progress, skipping (manual intervention required)", repo.display());
+        maybe_sync_visibility_and_metadata(repo, policy, dry_run);
         return Ok(SyncOutcome::Blocked);
     }
 
@@ -598,6 +602,7 @@ pub(crate) async fn sync_repo(
                 if debug_enabled() {
                     eprintln!("🐛 {} skipped commit: all changes were filter-only (smudge/clean)", repo.display());
                 }
+                maybe_sync_visibility_and_metadata(repo, policy, dry_run);
                 return Ok(SyncOutcome::NothingToDo);
             }
 
