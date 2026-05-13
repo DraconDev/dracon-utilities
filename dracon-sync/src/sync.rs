@@ -736,6 +736,8 @@ pub(crate) async fn sync_repo(
         return Ok(SyncOutcome::Synced);
     }
 
+    maybe_sync_visibility_and_metadata(repo, policy, dry_run);
+
     // Re-fetch status for push decision (may have changed after pull/commit)
     let current_status = svc.get_status().await?;
     if policy.auto_push && current_status.ahead > 0 && has_origin {
