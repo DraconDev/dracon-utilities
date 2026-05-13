@@ -645,13 +645,19 @@ pub(crate) async fn run_daemon(policy_path: PathBuf, override_interval_secs: Opt
                     );
                     false
                 }
-                Ok(Ok(true)) => {
+                Ok(Ok(crate::sync::SyncOutcome::Synced)) => {
                     println!("🔁 synced {}", repo.display());
                     true
                 }
-                Ok(Ok(false)) => {
+                Ok(Ok(crate::sync::SyncOutcome::NothingToDo)) => {
                     if debug_enabled() {
                         eprintln!("🐛 {} nothing to commit", repo.display());
+                    }
+                    true
+                }
+                Ok(Ok(crate::sync::SyncOutcome::Blocked)) => {
+                    if debug_enabled() {
+                        eprintln!("🐛 {} blocked (guard or manual intervention)", repo.display());
                     }
                     false
                 }
