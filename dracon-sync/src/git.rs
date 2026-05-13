@@ -549,7 +549,7 @@ pub(crate) async fn push_with_transport_fallbacks(
     op_label: &str,
 ) -> Result<()> {
     let ssh_hardening = crate::git::git_ssh_hardening();
-    let no_prompt = &[("GIT_TERMINAL_PROMPT", "0")];
+    let _no_prompt = &[("GIT_TERMINAL_PROMPT", "0")];
     match run_git_with_timeout_env(
         repo,
         &["push", "origin", "HEAD"],
@@ -1393,7 +1393,7 @@ pub(crate) async fn push_to_named_remote(
     let branch = current_branch(repo).unwrap_or_else(|| "main".to_string());
     let refspec = format!("HEAD:refs/heads/{}", branch);
     let ssh_hardening = crate::git::git_ssh_hardening();
-    let no_prompt = &[("GIT_TERMINAL_PROMPT", "0")];
+    let _no_prompt = &[("GIT_TERMINAL_PROMPT", "0")];
 
     let attempt_ssh = run_git_with_timeout_env(
         repo,

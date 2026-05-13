@@ -964,7 +964,12 @@ async fn send_notification(guard: &GuardPolicy, title: &str, body: &str) {
     if !guard.notify || guard.notify_command.trim().is_empty() {
         return;
     }
-    if let Err(e) = Command::new(guard.notify_command.trim())
+    let cmd = guard.notify_command.trim();
+    if !cmd.starts_with('/') {
+        eprintln!("⚠️ notify_command must be an absolute path, got: {}", cmd);
+        return;
+    }
+    if let Err(e) = Command::new(cmd)
         .arg(title)
         .arg(body)
         .output()
@@ -1044,6 +1049,23 @@ async fn renice_process(pid: i32, value: i32) {
 }
 
 async fn kill_process(pid: i32) -> bool {
+    let proc_cmdline = PathBuf::from(format!("/proc/{}/cmdline", pid));
+    let still_git = if let Ok(content) = tokio::fs::read_to_string(&proc_cmdline).await {
+        let cmd = content.replace('\0', " ");
+        let mut parts = cmd.split_whitespace();
+        let exe = parts.next().unwrap_or("");
+        let exe_name = Path::new(exe)
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_default();
+        let args = parts.collect::<Vec<_>>().join(" ");
+        is_git_process(&exe_name, &args)
+    } else {
+        return false;
+    };
+    if !still_git {
+        return false;
+    }
     if let Err(e) = Command::new("kill")
         .args(["-TERM", &pid.to_string()])
         .output()
@@ -1060,8 +1082,6 @@ async fn kill_process(pid: i32) -> bool {
     {
         let trimmed = String::from_utf8_lossy(&out.stdout).trim().to_string();
         if !trimmed.is_empty() {
-            // PID still exists — verify it's still the same git process before SIGKILL
-            let proc_cmdline = PathBuf::from(format!("/proc/{}/cmdline", pid));
             let still_git = if let Ok(content) = tokio::fs::read_to_string(&proc_cmdline).await {
                 let cmd = content.replace('\0', " ");
                 let mut parts = cmd.split_whitespace();
@@ -1073,10 +1093,7 @@ async fn kill_process(pid: i32) -> bool {
                 let args = parts.collect::<Vec<_>>().join(" ");
                 is_git_process(&exe_name, &args)
             } else {
-                // Can't read /proc/{pid}/cmdline — PID may have been recycled to a non-git process.
-                // Conservative: skip SIGKILL to avoid killing an innocent process.
-                eprintln!("⚠️ cannot verify pid {} cmdline — skipping SIGKILL to avoid killing wrong process", pid);
-                return false;
+                false
             };
             if !still_git {
                 eprintln!(

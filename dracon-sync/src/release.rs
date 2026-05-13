@@ -11,7 +11,6 @@ use std::path::Path;
 use std::process::Command;
 
 use crate::bump::{extract_version_from_cargo, extract_version_from_json};
-use crate::helpers::is_repo_already_exists;
 use crate::policy::{PublishRegistry, SyncPolicy};
 use crate::secrets::load_secret;
 use crate::git::run_git_with_timeout;
@@ -326,7 +325,7 @@ pub(crate) async fn publish_to_registry(
     }
 }
 
-async fn publish_crates_io(repo: &Path, token: &str, timeout_secs: u64) -> Result<ReleaseStep> {
+async fn publish_crates_io(repo: &Path, token: &str, _timeout_secs: u64) -> Result<ReleaseStep> {
     // Dry run first
     let dry_run = Command::new("cargo")
         .args(["publish", "--dry-run"])
@@ -389,7 +388,7 @@ async fn publish_crates_io(repo: &Path, token: &str, timeout_secs: u64) -> Resul
     }
 }
 
-async fn publish_npm(repo: &Path, token: &str, timeout_secs: u64) -> Result<ReleaseStep> {
+async fn publish_npm(repo: &Path, token: &str, _timeout_secs: u64) -> Result<ReleaseStep> {
     // Dry run first
     let dry_run = Command::new("npm")
         .args(["publish", "--dry-run"])
@@ -448,7 +447,7 @@ async fn publish_npm(repo: &Path, token: &str, timeout_secs: u64) -> Result<Rele
     }
 }
 
-async fn publish_pypi(repo: &Path, token: &str, timeout_secs: u64) -> Result<ReleaseStep> {
+async fn publish_pypi(repo: &Path, token: &str, _timeout_secs: u64) -> Result<ReleaseStep> {
     // Build sdist and wheel first
     let build = Command::new("python")
         .args(["-m", "build"])
@@ -475,7 +474,7 @@ async fn publish_pypi(repo: &Path, token: &str, timeout_secs: u64) -> Result<Rel
     }
 
     // Upload with twine
-    let dist_dir = repo.join("dist");
+    let _dist_dir = repo.join("dist");
     let result = Command::new("twine")
         .args(["upload", "dist/*"])
         .env("TWINE_USERNAME", "__token__")
@@ -551,7 +550,7 @@ fn read_pypi_version(repo: &Path) -> Result<String> {
 /// 3. Publish to configured registries — gated on `repo_publish_targets`
 pub(crate) async fn run_release_pipeline(
     repo: &Path,
-    old_version: &str,
+    _old_version: &str,
     new_version: &str,
     bump_level: &str, // "major", "minor", "patch"
     policy: &SyncPolicy,
