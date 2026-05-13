@@ -537,11 +537,7 @@ pub(crate) async fn sync_repo(
                         // Do NOT stage the deletions - let the user decide.
                         // Unstage only the missing files so they don't leak into the next cycle.
                         if !dry_run {
-                            let mut reset_args = vec!["reset", "HEAD", "--"];
-                            for p in &missing {
-                                reset_args.push(p);
-                            }
-                            let _ = run_git_with_timeout(repo, &reset_args, 10, "reset-after-guard").await;
+                            let _ = run_git_with_timeout(repo, &["reset", "HEAD"], 10, "reset-after-guard").await;
                         }
                         maybe_sync_visibility_and_metadata(repo, policy, dry_run);
                         return Ok(SyncOutcome::Blocked);
