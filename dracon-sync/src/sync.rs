@@ -2125,4 +2125,86 @@ auto_bump_versions = false
             }
         });
     }
+
+    /// CR-1 regression test: when mass-deletion guard blocks, the index must be
+    /// reset so that pre-existing modifications are not left staged uncommitted.
+    #[tokio::test]
+    async fn test_guard_blocks_resets_staged_changes() {
+        let repo = TempDir::new().unwrap().into_path();
+        git_cmd(&repo, &["init", "--bare"]);
+
+        // Create two tracked files
+        std::fs::write(repo.join("a.txt"), "a").unwrap();
+        std::fs::write(repo.join("b.txt"), "b").unwrap();
+        git_cmd(&repo, &["add", "."]);
+        git_cmd(&repo, &["commit", "-m", "init"]);
+
+        // Modify a.txt so there's a real change to stage
+        std::fs::write(repo.join("a.txt"), "a-modified").unwrap();
+
+        let toml_str = r#"
+        auto_github_private = false
+        auto_commit = false
+        auto_pull = false
+        auto_push = false
+        auto_bump_versions = false
+        "#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        // First sync: stages a.txt modification, then guard blocks because
+        // b.txt is missing (100% of 2 files = 100% > 85% threshold)
+        std::fs::remove_file(repo.join("b.txt")).unwrap();
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
+        assert!(matches!(result, Ok(SyncOutcome::Blocked)), "guard should block total wipe");
+
+        // Verify index is clean — a.txt should NOT be staged
+        let staged = run_git_with_timeout(&repo, &["diff", "--cached", "--name-only"], 5, "check-staged")
+            .await
+            .unwrap();
+        assert!(staged.trim().is_empty(), "staged changes should be reset after guard blocks, got: {:?}", staged);
+    }
+
+    /// CR-2 regression test: filter-only changes must NOT be re-detected by
+    /// cli_diff_entries fallback, which would cause encrypted files to be
+    /// committed as decrypted plaintext.
+    #[tokio::test]
+    async fn test_filter_only_skips_cli_diff_fallback() {
+        let repo = TempDir::new().unwrap().into_path();
+        git_cmd(&repo, &["init", "--bare"]);
+
+        // Create a file that looks like a filter-only change
+        std::fs::write(repo.join("secret.txt"), "plaintext").unwrap();
+        git_cmd(&repo, &["add", "."]);
+        git_cmd(&repo, &["commit", "-m", "init"]);
+
+        // Simulate a filter-only state: working tree differs from index
+        // but git diff HEAD shows no changes (all changes are filter artifacts).
+        // We achieve this by writing the same content but with a different
+        // line ending that the clean filter would normalize.
+        std::fs::write(repo.join("secret.txt"), "plaintext\r\n").unwrap();
+
+        let toml_str = r#"
+        auto_github_private = false
+        auto_commit = false
+        auto_pull = false
+        auto_push = false
+        auto_bump_versions = false
+        "#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        // sync_repo should see filter-only changes, skip them, and NOT
+        // fall back to cli_diff_entries which would see the CRLF difference.
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
+        assert!(
+            matches!(result, Ok(SyncOutcome::NothingToDo) | Ok(SyncOutcome::Success(false))),
+            "filter-only repo should produce NothingToDo, got {:?}",
+            result
+        );
+
+        // Verify nothing was staged
+        let staged = run_git_with_timeout(&repo, &["diff", "--cached", "--name-only"], 5, "check-staged")
+            .await
+            .unwrap();
+        assert!(staged.trim().is_empty(), "nothing should be staged for filter-only repo");
+    }
 }
