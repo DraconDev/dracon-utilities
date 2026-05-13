@@ -73,21 +73,21 @@ pub(crate) async fn sync_repo(
         if debug_enabled() {
             eprintln!("🐛 {} is not recognized as git repo", repo.display());
         }
-        return Ok(false);
+        return Ok(SyncOutcome::NothingToDo);
     }
 
     // Bail out early if repo is in a conflict state - manual intervention required
     if is_rebase_in_progress(repo) {
         eprintln!("⚠️ {} has rebase in progress, skipping (manual intervention required)", repo.display());
-        return Ok(false);
+        return Ok(SyncOutcome::Blocked);
     }
     if is_merge_in_progress(repo) {
         eprintln!("⚠️ {} has merge in progress, skipping (manual intervention required)", repo.display());
-        return Ok(false);
+        return Ok(SyncOutcome::Blocked);
     }
     if is_cherry_pick_in_progress(repo) {
         eprintln!("⚠️ {} has cherry-pick in progress, skipping (manual intervention required)", repo.display());
-        return Ok(false);
+        return Ok(SyncOutcome::Blocked);
     }
 
     let has_origin = has_origin_remote(repo);
