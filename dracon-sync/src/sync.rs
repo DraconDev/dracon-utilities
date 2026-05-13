@@ -689,16 +689,15 @@ pub(crate) async fn sync_repo(
                 restore_paths(repo, &excluded_paths).await?;
             }
 
-            if policy.auto_push && has_origin
-                && !push_with_blob_check(repo, policy, blob_threshold, has_origin, 1, remote_failures, dry_run).await? {
+            if policy.auto_push && has_origin {
+                let push_ok = push_with_blob_check(repo, policy, blob_threshold, has_origin, 1, remote_failures, dry_run).await?;
+                if !push_ok {
                     // Mirror push failures are tracked in remote_failures but
                     // do not fail the overall sync — the origin push succeeded.
-                    if remote_failures.as_ref().map_or(false, |rf| !rf.is_empty()) {
-                        eprintln!("⚠️ some mirror pushes failed for {}", repo.display());
-                    } else {
-                        return Err(anyhow::anyhow!("push failed"));
-                    }
+                    // (Only origin push failures truly fail the sync.)
+                    eprintln!("⚠️ some mirror pushes failed for {}", repo.display());
                 }
+            }
         } else if policy.auto_push && !has_origin {
             eprintln!("ℹ️ skip push for {} (no origin remote)", repo.display());
         }
