@@ -759,7 +759,7 @@ mod tests {
 
     #[test]
     fn test_extract_repo_name_from_ssh_url() {
-        let dir = TempDir::new().unwrap();
+        let _dir = TempDir::new().unwrap();
         // We can't easily mock `git remote get-url`, so test the URL parsing logic directly
         let url = "git@github.com:DraconDev/dracon-utilities.git";
         let repo_name = if url.starts_with("git@") {
