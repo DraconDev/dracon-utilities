@@ -21,12 +21,11 @@ const SYSTEM_PROTECTED: &[&str] = &[
     "/", "/home", "/etc", "/usr", "/var", "/boot", "/nix", "/run", "/sys", "/dev", "/proc",
 ];
 
-fn check_safe_to_delete(path: &Path, user_protected: &[String]) -> Result<()> {
+fn check_safe_to_delete(path: &Path, user_protected: &[String]) -> Result<PathBuf> {
     let canon = match path.canonicalize() {
         Ok(p) => p,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            // Path doesn't exist — nothing to delete, nothing to protect
-            return Ok(());
+            return Ok(path.to_path_buf());
         }
         Err(e) => anyhow::bail!(
             "cannot canonicalize {}: {} — refusing to delete",
@@ -65,7 +64,7 @@ fn check_safe_to_delete(path: &Path, user_protected: &[String]) -> Result<()> {
         }
     }
 
-    Ok(())
+    Ok(canon)
 }
 
 /// Check if `path` is equal to or a descendant of `protected`.
@@ -1000,10 +999,12 @@ fn log_guard_event(guard: &GuardPolicy, event: &str, details: &str) {
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_secs();
-    let line = format!(
-        r#"{{"ts":{},"event":"{}","details":"{}"}}"#,
-        ts, event, details
-    );
+    let line = serde_json::json!({
+        "ts": ts,
+        "event": event,
+        "details": details
+    })
+    .to_string();
     if let Err(e) = std::fs::OpenOptions::new()
         .create(true)
         .append(true)
@@ -1625,9 +1626,8 @@ async fn clean_nix_garbage(keep_generations: u32, apply: bool) -> Result<(u64, V
     if apply && keep_generations > 0 {
         let gen_arg = keep_generations.to_string();
         if let Err(e) = Command::new("nix-env")
-            .arg("-d")
-            .arg(&gen_arg)
             .arg("--delete-generations")
+            .arg(&gen_arg)
             .output()
             .await
         {
@@ -1635,9 +1635,8 @@ async fn clean_nix_garbage(keep_generations: u32, apply: bool) -> Result<(u64, V
         }
 
         if let Err(e) = Command::new("nix-env")
-            .arg("-d")
-            .arg(&gen_arg)
             .arg("--delete-generations")
+            .arg(&gen_arg)
             .arg("-p")
             .arg("/nix/var/nix/profiles/default")
             .output()
@@ -2706,25 +2705,27 @@ async fn is_git_tracked_dir(path: &Path) -> Result<bool> {
         .arg(parent)
         .args(["rev-parse", "--show-toplevel"])
         .output()
-        .await?;
-    if !top_out.status.success() {
-        return Ok(false);
-    }
+        .await;
+    let top_out = match top_out {
+        Ok(o) if o.status.success() => o,
+        _ => return Err(anyhow::anyhow!("git rev-parse failed for {}", parent.display())),
+    };
 
     let repo_root = String::from_utf8_lossy(&top_out.stdout).trim().to_string();
     if repo_root.is_empty() {
-        return Ok(false);
+        return Err(anyhow::anyhow!("git rev-parse returned empty root for {}", parent.display()));
     }
 
     let ls_out = Command::new("git")
         .arg("-C")
-        .arg(repo_root)
+        .arg(&repo_root)
         .args(["ls-files", "--", &name])
         .output()
-        .await?;
-    if !ls_out.status.success() {
-        return Ok(false);
-    }
+        .await;
+    let ls_out = match ls_out {
+        Ok(o) if o.status.success() => o,
+        _ => return Err(anyhow::anyhow!("git ls-files failed for {} in {}", name, repo_root)),
+    };
 
     Ok(!String::from_utf8_lossy(&ls_out.stdout).trim().is_empty())
 }

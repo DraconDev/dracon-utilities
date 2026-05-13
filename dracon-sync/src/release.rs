@@ -32,10 +32,10 @@ pub(crate) enum ReleaseStep {
 /// Check if a git tag already exists in the repo.
 pub(crate) async fn tag_exists(repo: &Path, tag: &str) -> Result<bool> {
     let repo = repo.to_path_buf();
-    let tag = tag.to_string();
-    let output = tokio::task::spawn_blocking(move || {
+    let tag_owned = tag.to_string();
+    let result = tokio::task::spawn_blocking(move || {
         std::process::Command::new("git")
-            .args(["tag", "--list", &tag])
+            .args(["tag", "--list", &tag_owned])
             .current_dir(&repo)
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::null())
@@ -43,9 +43,8 @@ pub(crate) async fn tag_exists(repo: &Path, tag: &str) -> Result<bool> {
             .context("failed to run git tag --list")
     })
     .await
-    .context("spawn_blocking for tag_exists")?
-    ??;
-    Ok(String::from_utf8_lossy(&output.stdout).trim() == tag)
+    .context("spawn_blocking for tag_exists")??;
+    Ok(String::from_utf8_lossy(&result.stdout).trim() == tag)
 }
 
 /// Create a git tag for the given version and push it.
@@ -102,39 +101,43 @@ pub(crate) async fn create_github_release(repo: &Path, tag: &str) -> Result<Rele
     .await;
 
     match check {
-        Ok(status) if status.success() => {
+        Ok(Ok(status)) if status.success() => {
             return Ok(ReleaseStep::Skipped(format!("GitHub release {tag} already exists")));
         }
-        _ => {} // Release doesn't exist, proceed
+        _ => {}
     }
 
-    // Create the release
-    let result = Command::new("gh")
-        .args([
-            "release", "create", tag,
-            "--repo", &repo_name,
-            "--title", tag,
-            "--notes", &format!("Release {tag}"),
-        ])
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .output();
+    let repo_name_create = repo_name.clone();
+    let tag_create = tag.to_string();
+    let result = tokio::task::spawn_blocking(move || {
+        Command::new("gh")
+            .args([
+                "release", "create", &tag_create,
+                "--repo", &repo_name_create,
+                "--title", &tag_create,
+                "--notes", &format!("Release {tag_create}"),
+            ])
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .output()
+    })
+    .await;
 
     match result {
-        Ok(output) if output.status.success() => {
+        Ok(Ok(output)) if output.status.success() => {
             eprintln!("🚀 Created GitHub release {tag} for {repo_name}");
             Ok(ReleaseStep::GitHubReleaseCreated(tag.to_string()))
         }
-        Ok(output) => {
+        Ok(Ok(output)) => {
             let stderr = String::from_utf8_lossy(&output.stderr);
             Ok(ReleaseStep::Failed {
                 step: format!("GitHub release {tag}"),
                 error: stderr.trim().to_string(),
             })
         }
-        Err(e) => Ok(ReleaseStep::Failed {
+        _ => Ok(ReleaseStep::Failed {
             step: format!("GitHub release {tag}"),
-            error: e.to_string(),
+            error: "gh release create failed".to_string(),
         }),
     }
 }
