@@ -190,14 +190,15 @@ pub(crate) fn sync_mirror_visibility(
 
     for remote in remotes {
         let auth = remote.effective_auth_type();
+        let account = remote.resolve_account();
         if auth == AuthType::GitLab {
             let token_var = remote.auto_create_token_var.as_deref().unwrap_or("GITLAB_TOKEN");
             if let Some(token) = load_secret(token_var, &sync_secrets_dir()) {
                 let resolved_name = remote.resolve_repo_name(repo_name);
-                if let Err(e) = set_gitlab_visibility(&remote.auto_create_account, &resolved_name, &token, github_private) {
+                if let Err(e) = set_gitlab_visibility(&account, &resolved_name, &token, github_private) {
                     eprintln!("⚠️ failed to set GitLab visibility for {}: {}", resolved_name, e);
                 } else if crate::policy::debug_enabled() {
-                    eprintln!("🐛 set GitLab {}/{} to {}", remote.auto_create_account, resolved_name, visibility_str);
+                    eprintln!("🐛 set GitLab {}/{} to {}", account, resolved_name, visibility_str);
                 }
             } else {
                 eprintln!("⚠️ no GITLAB_TOKEN for visibility sync on {}", remote.name);
@@ -208,10 +209,10 @@ pub(crate) fn sync_mirror_visibility(
             let token_var = remote.auto_create_token_var.as_deref().unwrap_or("CODEBERG_TOKEN");
             if let Some(token) = load_secret(token_var, &sync_secrets_dir()) {
                 let resolved_name = remote.resolve_repo_name(repo_name);
-                if let Err(e) = set_codeberg_visibility(&remote.auto_create_account, &resolved_name, &token, github_private) {
+                if let Err(e) = set_codeberg_visibility(&account, &resolved_name, &token, github_private) {
                     eprintln!("⚠️ failed to set Codeberg visibility for {}: {}", resolved_name, e);
                 } else if crate::policy::debug_enabled() {
-                    eprintln!("🐛 set Codeberg {}/{} to {}", remote.auto_create_account, resolved_name, visibility_str);
+                    eprintln!("🐛 set Codeberg {}/{} to {}", account, resolved_name, visibility_str);
                 }
             } else {
                 eprintln!("⚠️ no CODEBERG_TOKEN for visibility sync on {}", remote.name);
@@ -366,14 +367,15 @@ pub(crate) fn sync_mirror_metadata(
 
     for remote in remotes {
         let auth = remote.effective_auth_type();
+        let account = remote.resolve_account();
         if auth == AuthType::GitLab {
             let token_var = remote.auto_create_token_var.as_deref().unwrap_or("GITLAB_TOKEN");
             if let Some(token) = load_secret(token_var, &sync_secrets_dir()) {
                 let resolved_name = remote.resolve_repo_name(repo_name);
-                if let Err(e) = set_gitlab_metadata(&remote.auto_create_account, &resolved_name, &token, &meta) {
+                if let Err(e) = set_gitlab_metadata(&account, &resolved_name, &token, &meta) {
                     eprintln!("⚠️ failed to set GitLab metadata for {}: {}", resolved_name, e);
                 } else if crate::policy::debug_enabled() {
-                    eprintln!("🐛 set GitLab {}/{} metadata", remote.auto_create_account, resolved_name);
+                    eprintln!("🐛 set GitLab {}/{} metadata", account, resolved_name);
                 }
             }
         }
@@ -382,10 +384,10 @@ pub(crate) fn sync_mirror_metadata(
             let token_var = remote.auto_create_token_var.as_deref().unwrap_or("CODEBERG_TOKEN");
             if let Some(token) = load_secret(token_var, &sync_secrets_dir()) {
                 let resolved_name = remote.resolve_repo_name(repo_name);
-                if let Err(e) = set_codeberg_metadata(&remote.auto_create_account, &resolved_name, &token, &meta) {
+                if let Err(e) = set_codeberg_metadata(&account, &resolved_name, &token, &meta) {
                     eprintln!("⚠️ failed to set Codeberg metadata for {}: {}", resolved_name, e);
                 } else if crate::policy::debug_enabled() {
-                    eprintln!("🐛 set Codeberg {}/{} metadata", remote.auto_create_account, resolved_name);
+                    eprintln!("🐛 set Codeberg {}/{} metadata", account, resolved_name);
                 }
             }
         }
