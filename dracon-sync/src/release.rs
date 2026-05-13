@@ -1034,4 +1034,37 @@ mod tests {
             "minor bump should not trigger GitHub release even with auto_release=true"
         );
     }
+
+    #[test]
+    fn test_detect_project_version_version_txt() {
+        let dir = TempDir::new().unwrap();
+        fs::write(dir.path().join("version.txt"), "1.2.3\n").unwrap();
+        let result = detect_project_version(dir.path());
+        assert_eq!(result, Some(("1.2.3".to_string(), "version.txt".to_string())));
+    }
+
+    #[test]
+    fn test_detect_project_version_version_file() {
+        let dir = TempDir::new().unwrap();
+        fs::write(dir.path().join("VERSION"), "2.0.0\n").unwrap();
+        let result = detect_project_version(dir.path());
+        assert_eq!(result, Some(("2.0.0".to_string(), "VERSION".to_string())));
+    }
+
+    #[test]
+    fn test_detect_project_version_pubspec_yaml() {
+        let dir = TempDir::new().unwrap();
+        fs::write(dir.path().join("pubspec.yaml"), "name: my_app\nversion: 3.1.0\n").unwrap();
+        let result = detect_project_version(dir.path());
+        assert_eq!(result, Some(("3.1.0".to_string(), "pubspec.yaml".to_string())));
+    }
+
+    #[test]
+    fn test_detect_project_version_cargo_takes_priority_over_version_txt() {
+        let dir = TempDir::new().unwrap();
+        fs::write(dir.path().join("Cargo.toml"), "[package]\nname = \"test\"\nversion = \"0.1.0\"\n").unwrap();
+        fs::write(dir.path().join("version.txt"), "9.9.9\n").unwrap();
+        let result = detect_project_version(dir.path());
+        assert_eq!(result, Some(("0.1.0".to_string(), "Cargo.toml".to_string())));
+    }
 }
