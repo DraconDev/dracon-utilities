@@ -536,14 +536,25 @@ fn read_pypi_version(repo: &Path) -> Result<String> {
 /// 1. Create and push git tag for every bump
 /// 2. Create GitHub Release for major bumps
 /// 3. Publish to configured registries
+///
+/// The entire pipeline is gated on the per-repo `auto_publish` opt-in list.
+/// If `repo_publish_targets` is empty, no tags, releases, or publishes happen.
+/// This prevents accidental releases for repos that haven't explicitly opted in.
 pub(crate) async fn run_release_pipeline(
     repo: &Path,
     old_version: &str,
     new_version: &str,
     bump_level: &str, // "major", "minor", "patch"
     policy: &SyncPolicy,
-    repo_publish_targets: &[String], // per-repo opt-in list
+    repo_publish_targets: &[String], // per-repo opt-in list — empty means no releases
 ) -> Vec<ReleaseStep> {
+    // Gate: entire pipeline requires per-repo opt-in
+    if repo_publish_targets.is_empty() {
+        return vec![ReleaseStep::Skipped(
+            "no auto_publish targets in .dracon/dracon-sync.toml".to_string(),
+        )];
+    }
+
     let mut steps = Vec::new();
 
     // Step 1: Create and push tag
@@ -567,8 +578,8 @@ pub(crate) async fn run_release_pipeline(
         }
     }
 
-    // Step 3: Publish to configured registries
-    if policy.auto_publish && !repo_publish_targets.is_empty() {
+    // Step 3: Publish to configured registries (requires global auto_publish too)
+    if policy.auto_publish {
         for target in &policy.publish_targets {
             if !repo_publish_targets.contains(&target.name) {
                 continue;
