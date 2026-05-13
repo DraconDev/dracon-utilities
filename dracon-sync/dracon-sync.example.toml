@@ -157,7 +157,36 @@ auto_create = false
 # sync_metadata = false
 
 # =============================================================================
-#  SECTION 8: WEBHOOK
+#  SECTION 8: PUBLISH TARGETS (Package Registries)
+# =============================================================================
+# When true, version bumps trigger publish to configured registry targets.
+# Requires per-repo opt-in via .dracon/dracon-sync.toml auto_publish list.
+# Tags are created automatically: minor/patch -> git tag, major -> git tag + GitHub Release.
+# auto_publish = false
+#
+# [[publish_targets]]
+# name = "crates-io"
+# registry = "crates-io"          # crates-io | npm | pypi
+# token_secret = "CARGO_REGISTRIES_CRATES_IO_TOKEN"
+# publish_timeout_secs = 300
+#
+# [[publish_targets]]
+# name = "npm"
+# registry = "npm"
+# token_secret = "NPM_TOKEN"
+# publish_timeout_secs = 120
+#
+# [[publish_targets]]
+# name = "pypi"
+# registry = "pypi"
+# token_secret = "TWINE_PASSWORD"
+# publish_timeout_secs = 120
+#
+# Per-repo opt-in (.dracon/dracon-sync.toml):
+# auto_publish = ["crates-io"]    # list of publish target names
+
+# =============================================================================
+#  SECTION 9: WEBHOOK
 # =============================================================================
 # On push failures (origin or mirror remotes), dracon-sync can send a
 # fire-and-forget HTTP POST to a configured webhook URL:
