@@ -1066,6 +1066,6 @@ mod tests {
         fs::write(dir.path().join("Cargo.toml"), "[package]\nname = \"test\"\nversion = \"0.1.0\"\n").unwrap();
         fs::write(dir.path().join("version.txt"), "9.9.9\n").unwrap();
         let result = detect_project_version(dir.path());
-        assert_eq!(result, Some(("0.1.0".to_string(), "Cargo.toml")));
+        assert_eq!(result, Some(("0.1.0".to_string(), "rust")));
     }
 }
