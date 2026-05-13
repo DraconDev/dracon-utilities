@@ -375,7 +375,7 @@ pub(crate) async fn sync_repo(
                         if !dry_run {
                             let _ = run_git_with_timeout(repo, &["reset", "HEAD", "--"], 10, "reset-after-guard").await;
                         }
-                        return Ok(true);
+                        return Ok(SyncOutcome::Blocked);
                     }
                 }
 
