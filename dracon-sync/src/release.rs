@@ -649,6 +649,29 @@ pub(crate) fn detect_project_version(repo: &Path) -> Option<(String, &'static st
         read_npm_version(repo).ok().map(|v| (v, "node"))
     } else if repo.join("pyproject.toml").exists() {
         read_pypi_version(repo).ok().map(|v| (v, "python"))
+    } else if repo.join("pubspec.yaml").exists() {
+        // Flutter/Dart: read version from pubspec.yaml
+        fs::read_to_string(repo.join("pubspec.yaml"))
+            .ok()
+            .and_then(|s| {
+                s.lines()
+                    .find(|l| l.trim().starts_with("version:"))
+                    .and_then(|l| l.split(':').nth(1))
+                    .map(|v| v.trim().to_string())
+            })
+            .map(|v| (v, "dart"))
+    } else if repo.join("VERSION").exists() || repo.join("version.txt").exists() {
+        // Plain text version files: single line with semver
+        let path = if repo.join("VERSION").exists() {
+            repo.join("VERSION")
+        } else {
+            repo.join("version.txt")
+        };
+        fs::read_to_string(path)
+            .ok()
+            .map(|s| s.trim().to_string())
+            .filter(|v| !v.is_empty())
+            .map(|v| (v, "plain"))
     } else {
         None
     }
