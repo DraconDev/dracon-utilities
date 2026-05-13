@@ -424,6 +424,24 @@ Store keys in `~/.dracon/utilities/sync/ai/secrets/*.env`:
 - `nvidia.env` → `NVIDIA_API_KEY=...`
 - `openrouter.env` → `OPENROUTER_API_KEY=...`
 
+### All Tokens & Secrets
+
+All secrets are stored in `~/.dracon/utilities/sync/secrets/*.env` (sync) and
+`~/.dracon/utilities/sync/ai/secrets/*.env` (AI). See the secrets directory
+README for the full inventory and creation instructions.
+
+| Token | File | Purpose | Source |
+|-------|------|---------|--------|
+| `GITLAB_TOKEN` | `gitlab.env` | HTTPS push fallback, repo creation, visibility/metadata sync | https://gitlab.com/-/profile/personal_access_tokens |
+| `CODEBERG_TOKEN` | `codeberg.env` | HTTPS push fallback, repo creation, visibility/metadata sync | https://codeberg.org/user/settings/applications |
+| `GH_TOKEN` | env or `gh auth` | GitHub repo creation, visibility queries, GitHub Releases | https://github.com/settings/tokens or `gh auth login` |
+| `CARGO_REGISTRY_TOKEN` | user creates | Publish to crates.io | https://crates.io/settings/tokens |
+| `NPM_TOKEN` | user creates | Publish to npm | `npm token create --automation` |
+| `TWINE_PASSWORD` | user creates | Publish to PyPI | https://pypi.org/manage/account/token/ |
+
+**Token resolution**: `load_secret("NAME")` checks env var first, then scans
+`*.env` files in the secrets directory. Missing tokens are skipped gracefully.
+
 ### Test AI Providers
 
 ```bash
