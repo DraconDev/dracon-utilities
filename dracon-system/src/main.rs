@@ -3089,7 +3089,7 @@ async fn main() -> Result<()> {
                     // Docker prune
                     if docker || docker_volumes {
                         if apply {
-                            match docker_prune(docker, docker_volumes).await {
+                            match docker_prune(apply, docker, docker_volumes).await {
                                 Ok(bytes) => {
                                     actions.push(format!("Docker prune: {}", human_bytes(bytes)));
                                     reclaimed_total += bytes;
