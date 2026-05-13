@@ -691,7 +691,13 @@ pub(crate) async fn sync_repo(
 
             if policy.auto_push && has_origin
                 && !push_with_blob_check(repo, policy, blob_threshold, has_origin, 1, remote_failures, dry_run).await? {
-                    return Err(anyhow::anyhow!("push failed"));
+                    // Mirror push failures are tracked in remote_failures but
+                    // do not fail the overall sync — the origin push succeeded.
+                    if remote_failures.as_ref().map_or(false, |rf| !rf.is_empty()) {
+                        eprintln!("⚠️ some mirror pushes failed for {}", repo.display());
+                    } else {
+                        return Err(anyhow::anyhow!("push failed"));
+                    }
                 }
         } else if policy.auto_push && !has_origin {
             eprintln!("ℹ️ skip push for {} (no origin remote)", repo.display());
