@@ -37,6 +37,13 @@ pub(crate) enum SyncOutcome {
     Blocked,
 }
 
+impl SyncOutcome {
+    /// Returns true if the sync produced changes (i.e. a commit was made).
+    pub fn has_changes(&self) -> bool {
+        matches!(self, SyncOutcome::Synced)
+    }
+}
+
 fn notify_webhook_failure(webhook_url: &str, repo: &Path, remote: &str, error: &str) {
     let payload = serde_json::json!({
         "event": "push_failure",
@@ -920,7 +927,7 @@ auto_bump_versions = false
 
         let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
         assert!(result.is_ok(), "sync_repo should succeed even during rebase");
-        assert!(!result.unwrap(), "rebase should cause early return (nothing synced)");
+        assert!(matches!(result, Ok(SyncOutcome::Blocked)), "rebase should cause early return (nothing synced)");
     }
 
     #[tokio::test]
@@ -959,7 +966,7 @@ auto_bump_versions = false
 
         let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
         assert!(result.is_ok(), "sync_repo should succeed even during merge");
-        assert!(!result.unwrap(), "merge should cause early return (nothing synced)");
+        assert!(matches!(result, Ok(SyncOutcome::Blocked)), "merge should cause early return (nothing synced)");
     }
 
     #[tokio::test]
@@ -998,7 +1005,7 @@ auto_bump_versions = false
 
         let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
         assert!(result.is_ok(), "sync_repo should succeed even during cherry-pick");
-        assert!(!result.unwrap(), "cherry-pick should cause early return (nothing synced)");
+        assert!(matches!(result, Ok(SyncOutcome::Blocked)), "cherry-pick should cause early return (nothing synced)");
     }
 
     #[tokio::test]
@@ -1037,7 +1044,7 @@ auto_bump_versions = false
 
         let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
         assert!(result.is_ok(), "sync_repo should succeed: {:?}", result);
-        assert!(result.unwrap(), "dirty repo with auto_commit should sync");
+        assert!(matches!(result, Ok(SyncOutcome::Synced)), "dirty repo with auto_commit should sync");
 
         // Verify commit was made
         let output = std::process::Command::new("git")
@@ -1081,7 +1088,7 @@ auto_bump_versions = false
 
         let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
         assert!(result.is_ok(), "sync_repo should succeed");
-        assert!(!result.unwrap(), "clean repo should return false (nothing to sync)");
+        assert!(matches!(result, Ok(SyncOutcome::NothingToDo)), "clean repo should return false (nothing to sync)");
     }
 
     #[tokio::test]
@@ -1120,7 +1127,7 @@ auto_bump_versions = false
 
         let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
         assert!(result.is_ok(), "sync_repo should succeed: {:?}", result);
-        assert!(result.unwrap(), "untracked file should be staged and committed");
+        assert!(matches!(result, Ok(SyncOutcome::Synced)), "untracked file should be staged and committed");
 
         // Verify file is tracked
         let output = std::process::Command::new("git")
@@ -1164,7 +1171,7 @@ auto_bump_versions = false
 
         let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
         assert!(result.is_ok(), "sync_repo should succeed");
-        assert!(!result.unwrap(), "not behind should return false (nothing to pull)");
+        assert!(matches!(result, Ok(SyncOutcome::NothingToDo)), "not behind should return false (nothing to pull)");
     }
 
     #[tokio::test]
@@ -1202,7 +1209,7 @@ auto_bump_versions = false
 
         let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
         assert!(result.is_ok(), "sync_repo should succeed with dirty repo");
-        assert!(!result.unwrap(), "dirty repo should skip pull and return false");
+        assert!(matches!(result, Ok(SyncOutcome::NothingToDo)), "dirty repo should skip pull and return false");
     }
 
     #[tokio::test]
@@ -1330,7 +1337,7 @@ push_url = "git@nonexistent.example.com:repo.git"
 
         let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
         assert!(result.is_ok(), "sync_repo should not error");
-        assert!(!result.unwrap(), "mirror push failure should return false (hard fail)");
+        assert!(matches!(result, Ok(SyncOutcome::NothingToDo)), "mirror push failure should return false (hard fail)");
     }
 
     #[tokio::test]
@@ -1388,7 +1395,7 @@ push_url = "git@nonexistent.example.com:repo.git"
         let mut remote_failures = HashMap::new();
         let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, Some(&mut remote_failures), false, None, false).await;
         assert!(result.is_ok());
-        assert!(!result.unwrap(), "mirror push failure should return false");
+        assert!(matches!(result, Ok(SyncOutcome::NothingToDo)), "mirror push failure should return false");
         assert_eq!(remote_failures.get("bad-mirror"), Some(&1), "bad-mirror failure should be tracked");
     }
 
@@ -1457,7 +1464,7 @@ push_url = "{}"
 
         let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
         assert!(result.is_ok(), "sync_repo should not error: {:?}", result);
-        assert!(result.unwrap(), "mirror push success should return true");
+        assert!(matches!(result, Ok(SyncOutcome::Synced)), "mirror push success should return true");
     }
 
     fn init_test_repo(tmp: &tempfile::TempDir, name: &str) -> std::path::PathBuf {
@@ -1509,7 +1516,7 @@ push_url = "{}"
 
         let result = sync_repo(&not_repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
         assert!(result.is_ok(), "sync_repo should not error on non-git dir");
-        assert!(!result.unwrap(), "non-git dir should return false");
+        assert!(matches!(result, Ok(SyncOutcome::NothingToDo)), "non-git dir should return false");
     }
 
     #[tokio::test]
@@ -1535,7 +1542,7 @@ push_url = "{}"
 
         let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
         assert!(result.is_ok(), "sync_repo should succeed");
-        assert!(result.unwrap(), "single deletion should be committed");
+        assert!(matches!(result, Ok(SyncOutcome::Synced)), "single deletion should be committed");
 
         let output = git_cmd(&repo, &["ls-files"]);
         let tracked = String::from_utf8_lossy(&output.stdout);
@@ -1570,7 +1577,7 @@ push_url = "{}"
 
         let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
         assert!(result.is_ok(), "sync_repo should succeed");
-        assert!(result.unwrap(), "mass deletion should be prevented (returns true without committing)");
+        assert!(matches!(result, Ok(SyncOutcome::Blocked)), "mass deletion should be prevented (returns true without committing)");
 
         // Verify files are still tracked (deletion was NOT committed)
         let output = git_cmd(&repo, &["ls-files"]);
@@ -1606,7 +1613,7 @@ push_url = "{}"
 
         let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
         assert!(result.is_ok(), "sync_repo should succeed");
-        assert!(result.unwrap(), "partial deletion should be committed (not blocked)");
+        assert!(matches!(result, Ok(SyncOutcome::Synced)), "partial deletion should be committed (not blocked)");
 
         // Verify deleted files are removed from tracking (deletion WAS committed)
         let output = git_cmd(&repo, &["ls-files"]);
@@ -1640,7 +1647,7 @@ push_url = "{}"
 
         let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
         assert!(result.is_ok(), "sync_repo should succeed");
-        assert!(result.unwrap(), "exactly 50% deletion should be committed (not blocked)");
+        assert!(matches!(result, Ok(SyncOutcome::Synced)), "exactly 50% deletion should be committed (not blocked)");
 
         let output = git_cmd(&repo, &["ls-files"]);
         let tracked = String::from_utf8_lossy(&output.stdout);
@@ -1699,7 +1706,7 @@ push_url = "{}"
 
         let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, Some(Path::new("/fake/policy.toml")), false).await;
         assert!(result.is_ok(), "sync_repo should succeed");
-        assert!(result.unwrap(), "mass deletion should be prevented");
+        assert!(matches!(result, Ok(SyncOutcome::Blocked)), "mass deletion should be prevented");
 
         // Verify incident was logged
         assert!(ledger.exists(), "incident ledger should be created");
@@ -1799,7 +1806,7 @@ push_url = "{}"
 
         let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
         assert!(result.is_ok(), "sync_repo should succeed");
-        assert!(result.unwrap(), "mixed changes should be committed");
+        assert!(matches!(result, Ok(SyncOutcome::Synced)), "mixed changes should be committed");
 
         let output = git_cmd(&repo, &["ls-files"]);
         let tracked = String::from_utf8_lossy(&output.stdout);
@@ -1826,7 +1833,7 @@ push_url = "{}"
 
         let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
         assert!(result.is_ok(), "sync_repo should succeed without origin");
-        assert!(!result.unwrap(), "no origin should skip pull and return false");
+        assert!(matches!(result, Ok(SyncOutcome::NothingToDo)), "no origin should skip pull and return false");
     }
 
     #[tokio::test]
@@ -1847,7 +1854,7 @@ push_url = "{}"
 
         let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
         assert!(result.is_ok(), "sync_repo should succeed");
-        assert!(!result.unwrap(), "auto_commit=false should not commit dirty files");
+        assert!(matches!(result, Ok(SyncOutcome::NothingToDo)), "auto_commit=false should not commit dirty files");
 
         let output = git_cmd(&repo, &["status", "--porcelain"]);
         let status = String::from_utf8_lossy(&output.stdout);
@@ -1985,7 +1992,7 @@ auto_bump_versions = false
 
             let pct = if total > 0 { (delete_count * 100) / total } else { 0 };
             if expect_blocked {
-                assert!(result.unwrap(), "guard should block {}% deletion ({} of {})", pct, delete_count, total);
+                assert!(matches!(result, Ok(SyncOutcome::Blocked)), "guard should block {}% deletion ({} of {})", pct, delete_count, total);
                 // Verify deleted files are still tracked
                 let output = git_cmd(&repo, &["ls-files"]);
                 let tracked = String::from_utf8_lossy(&output.stdout);
@@ -1996,11 +2003,11 @@ auto_bump_versions = false
                 assert_eq!(after, before + 1, "guard blocked counter should increment for {}% deletion ({} of {})", pct, delete_count, total);
             } else if delete_count == 0 {
                 // No deletions at all → sync_repo returns false (nothing to do)
-                assert!(!result.unwrap(), "no changes should return false for {}% deletion ({} of {})", pct, delete_count, total);
+                assert!(matches!(result, Ok(SyncOutcome::NothingToDo)), "no changes should return false for {}% deletion ({} of {})", pct, delete_count, total);
                 let after = crate::sync::MASS_DELETION_GUARD_BLOCKED.load(std::sync::atomic::Ordering::Relaxed);
                 assert_eq!(after, before, "guard blocked counter should not increment");
             } else {
-                assert!(result.unwrap(), "deletion should be committed for {}% ({} of {})", pct, delete_count, total);
+                assert!(matches!(result, Ok(SyncOutcome::Synced)), "deletion should be committed for {}% ({} of {})", pct, delete_count, total);
                 // Verify deleted files are removed
                 let output = git_cmd(&repo, &["ls-files"]);
                 let tracked = String::from_utf8_lossy(&output.stdout);
