@@ -6,6 +6,7 @@
 //! - Publishing to configured registries (crates.io, npm, PyPI)
 
 use anyhow::{Context, Result, bail};
+use std::fs;
 use std::path::Path;
 use std::process::Command;
 
