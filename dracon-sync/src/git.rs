@@ -1587,9 +1587,14 @@ pub(crate) fn create_repo_on_github(account: &str, repo_name: &str) -> Result<St
     Ok(format!("git@github.com:{}/{}.git", account, repo_name))
 }
 
-pub(crate) fn create_repo_on_gitlab(account: &str, repo_name: &str) -> Result<String> {
+pub(crate) fn create_repo_on_gitlab(account: &str, repo_name: &str, private: bool) -> Result<String> {
     let mut cmd = std::process::Command::new("glab");
-    cmd.args(["repo", "create", repo_name, "--private"]);
+    cmd.args(["repo", "create", repo_name]);
+    if private {
+        cmd.arg("--private");
+    } else {
+        cmd.arg("--public");
+    }
     
     // Load token from ~/.dracon/utilities/sync/secrets/*.env or env var
     if let Some(token) = load_secret("GITLAB_TOKEN") {
@@ -1610,7 +1615,7 @@ pub(crate) fn create_repo_on_gitlab(account: &str, repo_name: &str) -> Result<St
     Ok(format!("git@gitlab.com:{}/{}.git", account, repo_name))
 }
 
-pub(crate) async fn create_repo_on_codeberg(token: &str, account: &str, repo_name: &str, api_endpoint: &str) -> Result<String> {
+pub(crate) async fn create_repo_on_codeberg(token: &str, account: &str, repo_name: &str, api_endpoint: &str, private: bool) -> Result<String> {
     let client = reqwest::Client::new();
     let response = client
         .post(api_endpoint)
@@ -1618,7 +1623,7 @@ pub(crate) async fn create_repo_on_codeberg(token: &str, account: &str, repo_nam
         .header("Content-Type", "application/json")
         .json(&serde_json::json!({
             "name": repo_name,
-            "private": true,
+            "private": private,
             "default_branch": "main"
         }))
         .send()
@@ -1638,27 +1643,27 @@ pub(crate) async fn create_repo_on_codeberg(token: &str, account: &str, repo_nam
     Ok(format!("git@codeberg.org:{}/{}.git", account, repo_name))
 }
 
-pub(crate) async fn auto_create_repo(config: &RemoteConfig, repo_name: &str) -> Result<String> {
+pub(crate) async fn auto_create_repo(config: &RemoteConfig, repo_name: &str, private: bool) -> Result<String> {
     match config.auth_type {
         AuthType::GitHub => create_repo_on_github(&config.auto_create_account, repo_name),
-        AuthType::GitLab => create_repo_on_gitlab(&config.auto_create_account, repo_name),
+        AuthType::GitLab => create_repo_on_gitlab(&config.auto_create_account, repo_name, private),
         AuthType::Codeberg => {
             let token_var = config.auto_create_token_var.as_deref().unwrap_or("CODEBERG_TOKEN");
             let token = load_secret(token_var)
                 .with_context(|| format!("missing token for Codeberg (set {} env var or ~/.dracon/utilities/sync/secrets/*.env file)", token_var))?;
             let endpoint = config.api_endpoint.as_deref().unwrap_or("https://codeberg.org/api/v1/user/repos");
-            create_repo_on_codeberg(&token, &config.auto_create_account, repo_name, endpoint).await
+            create_repo_on_codeberg(&token, &config.auto_create_account, repo_name, endpoint, private).await
         }
         AuthType::Generic => anyhow::bail!("Generic auth cannot auto-create repos"),
     }
 }
 
-pub(crate) async fn auto_create_all_remotes(remotes: &[RemoteConfig], repo_name: &str) -> Vec<(String, Result<String>)> {
+pub(crate) async fn auto_create_all_remotes(remotes: &[RemoteConfig], repo_name: &str, private: bool) -> Vec<(String, Result<String>)> {
         let mut results = Vec::new();
         for remote in remotes {
             if remote.auto_create {
                 let resolved_name = remote.resolve_repo_name(repo_name);
-                let result = auto_create_repo(remote, &resolved_name).await;
+                let result = auto_create_repo(remote, &resolved_name, private).await;
                 results.push((remote.name.clone(), result));
             }
         }
