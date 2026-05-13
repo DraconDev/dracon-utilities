@@ -143,13 +143,18 @@ auto_create = false
 # ".dracon" = "dracon-home"
 
 # =============================================================================
-#  SECTION 7: MIRROR VISIBILITY
+#  SECTION 7: MIRROR VISIBILITY & METADATA
 # =============================================================================
 # When true, mirrors (GitLab, Codeberg) match GitHub's public/private status.
 # When false (default), all auto-created mirrors are private.
 # Checked at most once per repo per sync_visibility_interval_hours.
 # sync_visibility = false
 # sync_visibility_interval_hours = 24
+
+# When true, mirror repos also inherit the GitHub repo's description and topics.
+# This makes mirrors discoverable via topic search on GitLab/Codeberg.
+# Uses the same interval cache as visibility sync.
+# sync_metadata = false
 
 # =============================================================================
 #  SECTION 8: WEBHOOK
