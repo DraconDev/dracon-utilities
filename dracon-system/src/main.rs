@@ -2128,14 +2128,18 @@ pub(crate) async fn run_guard_once(
 
         // Docker
         if guard.docker_prune {
-            match docker_prune(apply, guard.docker_prune_volumes).await {
-                Ok(bytes) => {
-                    total_reclaimed += bytes;
-                    if bytes > 0 {
-                        eprintln!("🐳 Docker prune: {}", human_bytes(bytes));
+            if apply {
+                match docker_prune(true, guard.docker_prune_volumes).await {
+                    Ok(bytes) => {
+                        total_reclaimed += bytes;
+                        if bytes > 0 {
+                            eprintln!("🐳 Docker prune: {}", human_bytes(bytes));
+                        }
                     }
+                    Err(e) => eprintln!("⚠️ Docker prune failed: {}", e),
                 }
-                Err(e) => eprintln!("⚠️ Docker prune failed: {}", e),
+            } else {
+                eprintln!("🐳 Would prune Docker (dry-run)");
             }
         }
 
