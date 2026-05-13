@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::policy::{AuthType, RemoteConfig};
-use crate::secrets::load_secret;
+use crate::secrets::{load_secret, sync_secrets_dir};
 
 /// Directory for visibility sync cache files.
 fn visibility_cache_dir() -> PathBuf {
@@ -188,7 +188,7 @@ pub(crate) fn sync_mirror_visibility(
     for remote in remotes {
         if remote.auth_type == AuthType::GitLab {
             let token_var = remote.auto_create_token_var.as_deref().unwrap_or("GITLAB_TOKEN");
-            if let Some(token) = load_secret(token_var) {
+            if let Some(token) = load_secret(token_var, &sync_secrets_dir()) {
                 let resolved_name = remote.resolve_repo_name(repo_name);
                 if let Err(e) = set_gitlab_visibility(&remote.auto_create_account, &resolved_name, &token, github_private) {
                     eprintln!("⚠️ failed to set GitLab visibility for {}: {}", resolved_name, e);
@@ -202,7 +202,7 @@ pub(crate) fn sync_mirror_visibility(
 
         if remote.auth_type == AuthType::Codeberg {
             let token_var = remote.auto_create_token_var.as_deref().unwrap_or("CODEBERG_TOKEN");
-            if let Some(token) = load_secret(token_var) {
+            if let Some(token) = load_secret(token_var, &sync_secrets_dir()) {
                 let resolved_name = remote.resolve_repo_name(repo_name);
                 if let Err(e) = set_codeberg_visibility(&remote.auto_create_account, &resolved_name, &token, github_private) {
                     eprintln!("⚠️ failed to set Codeberg visibility for {}: {}", resolved_name, e);
@@ -260,7 +260,7 @@ pub(crate) fn create_repo_on_github_with_visibility(
         cmd.arg("--public");
     }
 
-    if let Some(token) = load_secret("GH_TOKEN") {
+    if let Some(token) = load_secret("GH_TOKEN", &sync_secrets_dir()) {
         cmd.env("GH_TOKEN", token);
     }
 
@@ -292,7 +292,7 @@ pub(crate) fn create_repo_on_gitlab_with_visibility(
         cmd.arg("--public");
     }
 
-    if let Some(token) = load_secret("GITLAB_TOKEN") {
+    if let Some(token) = load_secret("GITLAB_TOKEN", &sync_secrets_dir()) {
         cmd.env("GITLAB_TOKEN", token);
     }
 
