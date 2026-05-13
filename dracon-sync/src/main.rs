@@ -823,6 +823,76 @@ async fn main() -> Result<()> {
             println!("# TYPE dracon_sync_mass_deletion_guard_blocked_total counter");
             println!("dracon_sync_mass_deletion_guard_blocked_total {}", blocked);
         }
+        Command::Publish { repo, targets, skip_dry_run: _ } => {
+            let policy = SyncPolicy::load(&policy_path)?;
+            if !policy.auto_publish {
+                anyhow::bail!("auto_publish is disabled in config. Enable it or use `dracon-sync publish` with --force.");
+            }
+            let repo_targets = if targets.is_empty() {
+                policy.publish_targets.iter().map(|t| t.name.clone()).collect::<Vec<_>>()
+            } else {
+                targets
+            };
+            let version = release::detect_project_version(&repo)
+                .map(|(v, _)| v)
+                .unwrap_or_else(|| "unknown".to_string());
+            println!("Publishing {} (v{}) to: {}", repo.display(), version, repo_targets.join(", "));
+            let steps = release::run_release_pipeline(
+                &repo,
+                "",
+                &version,
+                "patch", // Default to patch for manual publish
+                &policy,
+                &repo_targets,
+            ).await;
+            for step in &steps {
+                match step {
+                    release::ReleaseStep::TagCreated(tag) => println!("  Tag: {tag}"),
+                    release::ReleaseStep::GitHubReleaseCreated(tag) => println!("  Release: {tag}"),
+                    release::ReleaseStep::Published { registry, version } => println!("  Published: {registry} v{version}"),
+                    release::ReleaseStep::Skipped(reason) => println!("  Skipped: {reason}"),
+                    release::ReleaseStep::Failed { step: s, error } => eprintln!("  Failed: {s} — {error}"),
+                }
+            }
+        }
+        Command::PublishStatus { repo, json } => {
+            let policy = SyncPolicy::load(&policy_path)?;
+            let version = release::detect_project_version(&repo)
+                .map(|(v, _)| v)
+                .unwrap_or_else(|| "unknown".to_string());
+            let mut statuses = Vec::new();
+            for target in &policy.publish_targets {
+                match release::extract_package_name(&repo, target.registry) {
+                    Ok(pkg_name) => {
+                        let exists = release::version_exists_on_registry(target.registry, &pkg_name, &version).await;
+                        statuses.push(serde_json::json!({
+                            "target": target.name,
+                            "registry": target.registry.as_str(),
+                            "package": pkg_name,
+                            "version": version,
+                            "published": exists.unwrap_or(false),
+                        }));
+                    }
+                    Err(e) => statuses.push(serde_json::json!({
+                        "target": target.name,
+                        "registry": target.registry.as_str(),
+                        "version": version,
+                        "error": e.to_string(),
+                    })),
+                }
+            }
+            if json {
+                println!("{}", serde_json::to_string_pretty(&statuses)?);
+            } else {
+                println!("Publish status for {} (v{}):", repo.display(), version);
+                for s in &statuses {
+                    let target = s["target"].as_str().unwrap_or("?");
+                    let published = s["published"].as_bool().unwrap_or(false);
+                    let status_str = if published { "published" } else { "not published" };
+                    println!("  {target}: {status_str}");
+                }
+            }
+        }
     }
 
     Ok(())
