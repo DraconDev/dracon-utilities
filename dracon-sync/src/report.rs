@@ -466,7 +466,7 @@ pub(crate) fn append_incident_record(policy_path: &Path, record: &IncidentRecord
             let policy = SyncPolicy::load(policy_path).ok();
             if let Some(ref p) = policy {
                 if approx_lines >= p.incident_ledger_max_lines {
-                    if let Err(e) = enforce_retention(&path, &policy.as_ref().unwrap()) {
+                    if let Err(e) = enforce_retention(&path, p) {
                         eprintln!("⚠️ incident retention failed ({}): {}", path.display(), e);
                     }
                 }

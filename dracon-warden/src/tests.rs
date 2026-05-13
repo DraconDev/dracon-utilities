@@ -67,6 +67,7 @@ mod tests {
             hygiene_patterns: vec!["target/".into(), "*.log".into()],
             watch_roots: vec![],
             discover_roots: vec![],
+            allow_v1_fallback: false,
         }
     }
 
@@ -125,6 +126,7 @@ mod tests {
             hygiene_patterns: vec![],
             watch_roots: vec![],
             discover_roots: vec![],
+            allow_v1_fallback: false,
         };
         assert!(build_gitattributes_block(&policy).is_err());
     }
@@ -314,6 +316,7 @@ mod tests {
             hygiene_patterns: vec![],
             watch_roots: vec![p1.display().to_string(), p1.display().to_string()],
             discover_roots: vec![],
+            allow_v1_fallback: false,
         };
         let merged = effective_watch_roots(&policy);
         assert_eq!(merged.len(), 1);
@@ -334,6 +337,7 @@ mod tests {
             hygiene_patterns: vec![],
             watch_roots: vec![p1.display().to_string()],
             discover_roots: vec![p1.display().to_string(), p2.display().to_string()],
+            allow_v1_fallback: false,
         };
         let merged = effective_discovery_roots(&policy);
         assert_eq!(merged.len(), 2);
@@ -628,6 +632,7 @@ watch_roots = ["/tmp/test"]
             hygiene_patterns: vec![],
             watch_roots: vec![],
             discover_roots: vec![],
+            allow_v1_fallback: false,
         };
         let roots = effective_watch_roots(&policy);
         assert!(roots.is_empty());
@@ -641,6 +646,7 @@ watch_roots = ["/tmp/test"]
             hygiene_patterns: vec![],
             watch_roots: vec![],
             discover_roots: vec![],
+            allow_v1_fallback: false,
         };
         let roots = effective_discovery_roots(&policy);
         assert!(roots.is_empty());
@@ -752,6 +758,7 @@ watch_roots = ["/tmp/test"]
             hygiene_patterns: vec![],
             watch_roots: vec![],
             discover_roots: vec![],
+            allow_v1_fallback: false,
         };
         assert!(policy.validate().is_ok());
     }
@@ -764,6 +771,7 @@ watch_roots = ["/tmp/test"]
             hygiene_patterns: vec![],
             watch_roots: vec![],
             discover_roots: vec![],
+            allow_v1_fallback: false,
         };
         let result = policy.validate();
         assert!(result.is_err(), "should reject overlapping patterns");
@@ -779,6 +787,7 @@ watch_roots = ["/tmp/test"]
             hygiene_patterns: vec![],
             watch_roots: vec![],
             discover_roots: vec![],
+            allow_v1_fallback: false,
         };
         let result = policy.validate();
         assert!(result.is_err(), "should reject non-allowlisted plaintext pattern");
@@ -792,6 +801,7 @@ watch_roots = ["/tmp/test"]
             hygiene_patterns: vec![],
             watch_roots: vec![],
             discover_roots: vec![],
+            allow_v1_fallback: false,
         };
         assert!(policy.validate().is_ok());
     }
@@ -804,6 +814,7 @@ watch_roots = ["/tmp/test"]
             hygiene_patterns: vec![],
             watch_roots: vec![],
             discover_roots: vec![],
+            allow_v1_fallback: false,
         };
         let result = policy.validate();
         assert!(result.is_err(), "should reject plaintext pattern with 'password'");
