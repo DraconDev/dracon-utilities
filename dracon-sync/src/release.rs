@@ -52,7 +52,7 @@ pub(crate) async fn tag_exists(repo: &Path, tag: &str) -> Result<bool> {
 pub(crate) async fn create_and_push_tag(repo: &Path, version: &str) -> Result<ReleaseStep> {
     let tag = format!("v{version}");
 
-    if tag_exists(repo, &tag)? {
+    if tag_exists(repo, &tag).await? {
         return Ok(ReleaseStep::Skipped(format!("tag {tag} already exists")));
     }
 
@@ -88,14 +88,18 @@ pub(crate) async fn create_and_push_tag(repo: &Path, version: &str) -> Result<Re
 
 /// Create a GitHub Release for a major version bump using `gh release create`.
 pub(crate) async fn create_github_release(repo: &Path, tag: &str) -> Result<ReleaseStep> {
-    // Check if release already exists
     let repo_name = extract_repo_name(repo)?;
 
-    let check = Command::new("gh")
-        .args(["release", "view", tag, "--repo", &repo_name])
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .status();
+    let repo_name_check = repo_name.clone();
+    let tag_check = tag.to_string();
+    let check = tokio::task::spawn_blocking(move || {
+        Command::new("gh")
+            .args(["release", "view", &tag_check, "--repo", &repo_name_check])
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+    })
+    .await;
 
     match check {
         Ok(status) if status.success() => {
