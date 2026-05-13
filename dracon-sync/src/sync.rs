@@ -96,20 +96,27 @@ fn get_bump_info(repo: &Path) -> Option<(String, String, String)> {
     };
 
     let old_ver = version_files.iter().find_map(|file| {
-        let output = std::process::Command::new("git")
-            .args(["show", &format!("HEAD~1:{}", file)])
-            .current_dir(repo)
-            .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::null())
-            .output()
-            .ok()?;
+        let file = file.to_string();
+        let repo = repo.to_path_buf();
+        let output = tokio::task::spawn_blocking(move || {
+            std::process::Command::new("git")
+                .args(["show", &format!("HEAD~1:{}", file)])
+                .current_dir(&repo)
+                .stdout(std::process::Stdio::piped())
+                .stderr(std::process::Stdio::null())
+                .output()
+                .ok()
+        })
+        .await
+        .ok()
+        .flatten()?;
 
         if !output.status.success() {
-            return None; // HEAD~1 doesn't exist or file not found at HEAD~1
+            return None;
         }
 
         let content = String::from_utf8_lossy(&output.stdout);
-        match *file {
+        match file.as_str() {
             "Cargo.toml" => content.lines()
                 .map(|l| l.trim())
                 .find(|l| l.starts_with("version") && !l.starts_with("version_prefix"))
@@ -479,13 +486,20 @@ pub(crate) async fn sync_repo(
                     eprintln!("⚠️ --force: bypassing mass-deletion safety guard for {} ({} files)", repo.display(), missing.len());
                 } else {
                     // Get total tracked files count
-                    let total_tracked: usize = std::process::Command::new("git")
-                        .args(["ls-files"])
-                        .current_dir(repo)
-                        .output()
-                        .ok()
-                        .map(|o| String::from_utf8_lossy(&o.stdout).lines().count())
-                        .unwrap_or(0);
+                    let total_tracked: usize = {
+                        let repo = repo.to_path_buf();
+                        tokio::task::spawn_blocking(move || {
+                            std::process::Command::new("git")
+                                .args(["ls-files"])
+                                .current_dir(&repo)
+                                .output()
+                                .ok()
+                                .map(|o| String::from_utf8_lossy(&o.stdout).lines().count())
+                                .unwrap_or(0)
+                        })
+                        .await
+                        .unwrap_or(0)
+                    };
 
                     let missing_count = missing.len();
                     // Guard: >=85% of tracked files missing — this is almost always a mistake
@@ -557,22 +571,30 @@ pub(crate) async fn sync_repo(
 
             // Get actual diff content for the scribe (stat + limited patch)
             let staged_diff_content: Option<String> = {
-                let stat_out = std::process::Command::new("git")
-                    .args(["diff", "--cached", "--stat"])
-                    .current_dir(repo)
-                    .output();
-                match stat_out {
-                    Ok(o) if o.status.success() => {
+                let repo_stat = repo.to_path_buf();
+                let repo_patch = repo.to_path_buf();
+                let stat_result = tokio::task::spawn_blocking(move || {
+                    std::process::Command::new("git")
+                        .args(["diff", "--cached", "--stat"])
+                        .current_dir(&repo_stat)
+                        .output()
+                })
+                .await;
+                match stat_result {
+                    Ok(Ok(o)) if o.status.success() => {
                         let stat = String::from_utf8_lossy(&o.stdout).to_string();
                         if stat.is_empty() {
                             None
                         } else {
-                            let patch_out = std::process::Command::new("git")
-                                .args(["diff", "--cached", "--unified=3", "--"])
-                                .current_dir(repo)
-                                .output();
-                            let patch_text = match patch_out {
-                                Ok(o) if o.status.success() => {
+                            let patch_result = tokio::task::spawn_blocking(move || {
+                                std::process::Command::new("git")
+                                    .args(["diff", "--cached", "--unified=3", "--"])
+                                    .current_dir(&repo_patch)
+                                    .output()
+                            })
+                            .await;
+                            let patch_text = match patch_result {
+                                Ok(Ok(o)) if o.status.success() => {
                                     let patch = String::from_utf8_lossy(&o.stdout).to_string();
                                     if patch.lines().count() > 200 {
                                         patch.lines().take(200).collect::<Vec<_>>().join("\n") + "\n... (truncated)"
@@ -591,7 +613,7 @@ pub(crate) async fn sync_repo(
 
             // Version bumper: deterministic patch-only (fallback when ai-bumper not enabled)
             let mut version_bumped = false;
-            if auto_bump_versions && cfg!(feature = "scribe") {
+            if !dry_run && auto_bump_versions && cfg!(feature = "scribe") {
                 #[cfg(feature = "scribe")]
                 {
                     use crate::bump::{deterministic_decide_bump_level, bump_semver_patch, read_current_version, BumpLevel};
@@ -625,7 +647,7 @@ pub(crate) async fn sync_repo(
 
             // AI version bumper: decides IF and what level to bump (when ai-bumper feature enabled)
             // Skip if deterministic bumper already bumped to avoid double-bump.
-            if auto_bump_versions && !version_bumped && cfg!(feature = "ai-bumper") {
+            if !dry_run && auto_bump_versions && !version_bumped && cfg!(feature = "ai-bumper") {
                 #[cfg(feature = "ai-bumper")]
                 {
                     use crate::bump::{ai_decide_bump_level, bump_semver_major, bump_semver_minor, bump_semver_patch, read_current_version, BumpLevel};
@@ -665,7 +687,7 @@ pub(crate) async fn sync_repo(
                 }
             }
 
-            if cfg!(feature = "scribe") {
+            if !dry_run && cfg!(feature = "scribe") {
                 #[cfg(feature = "scribe")]
                 if let Err(e) = crate::scribe::update_project_state_from_ai(repo, &staged_diff_names, staged_diff_content).await {
                     eprintln!("📝 scribe failed for {}: {}", repo.display(), e);

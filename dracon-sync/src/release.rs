@@ -30,14 +30,21 @@ pub(crate) enum ReleaseStep {
 }
 
 /// Check if a git tag already exists in the repo.
-pub(crate) fn tag_exists(repo: &Path, tag: &str) -> Result<bool> {
-    let output = std::process::Command::new("git")
-        .args(["tag", "--list", tag])
-        .current_dir(repo)
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::null())
-        .output()
-        .context("failed to run git tag --list")?;
+pub(crate) async fn tag_exists(repo: &Path, tag: &str) -> Result<bool> {
+    let repo = repo.to_path_buf();
+    let tag = tag.to_string();
+    let output = tokio::task::spawn_blocking(move || {
+        std::process::Command::new("git")
+            .args(["tag", "--list", &tag])
+            .current_dir(&repo)
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::null())
+            .output()
+            .context("failed to run git tag --list")
+    })
+    .await
+    .context("spawn_blocking for tag_exists")?
+    ??;
     Ok(String::from_utf8_lossy(&output.stdout).trim() == tag)
 }
 
