@@ -222,6 +222,175 @@ pub(crate) fn sync_mirror_visibility(
     update_visibility_cache(repo_name);
 }
 
+/// Repo metadata fetched from GitHub: description + topics.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct RepoMetadata {
+    pub(crate) description: String,
+    pub(crate) topics: Vec<String>,
+}
+
+/// Query GitHub for repo description and topics using `gh api`.
+/// Returns empty metadata on any error (non-fatal).
+pub(crate) fn get_github_metadata(owner: &str, repo: &str) -> RepoMetadata {
+    let output = match std::process::Command::new("gh")
+        .args([
+            "api",
+            &format!("repos/{}/{}", owner, repo),
+            "--jq",
+            "{description: .description, topics: .topics}",
+        ])
+        .output()
+    {
+        Ok(o) => o,
+        Err(e) => {
+            eprintln!("⚠️ gh api metadata failed (is gh installed?): {}", e);
+            return RepoMetadata::default();
+        }
+    };
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        eprintln!("⚠️ gh api metadata failed: {}", stderr.trim());
+        return RepoMetadata::default();
+    }
+    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    // Parse JSON: {"description": "...", "topics": ["a","b"]}
+    match serde_json::from_str::<RepoMetadataJson>(&stdout) {
+        Ok(m) => RepoMetadata {
+            description: m.description.unwrap_or_default().trim().to_string(),
+            topics: m.topics.unwrap_or_default(),
+        },
+        Err(e) => {
+            eprintln!("⚠️ failed to parse gh api metadata JSON: {}", e);
+            RepoMetadata::default()
+        }
+    }
+}
+
+#[derive(Deserialize)]
+struct RepoMetadataJson {
+    description: Option<String>,
+    topics: Option<Vec<String>>,
+}
+
+/// Set GitLab repo description and topics using `curl` with PRIVATE-TOKEN.
+fn set_gitlab_metadata(owner: &str, repo: &str, token: &str, meta: &RepoMetadata) -> Result<()> {
+    let url = format!(
+        "https://gitlab.com/api/v4/projects/{}%2F{}",
+        owner, repo
+    );
+    let mut form_data = vec![format!("description={}", urlencoding::encode(&meta.description))];
+    for topic in &meta.topics {
+        form_data.push(format!("tag_list[]={}", urlencoding::encode(topic)));
+    }
+    let form_body = form_data.join("&");
+
+    let output = std::process::Command::new("curl")
+        .args([
+            "-s", "-o", "/dev/null", "-w", "%{http_code}",
+            "-H", &format!("PRIVATE-TOKEN: {}", token),
+            "-X", "PUT",
+            "-d", &form_body,
+            &url,
+        ])
+        .output()
+        .with_context(|| "curl failed to run for GitLab metadata update")?;
+
+    let code = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    match code.as_str() {
+        "200" => Ok(()),
+        "401" => Err(anyhow::anyhow!("GitLab metadata update failed: unauthorized")),
+        "404" => Err(anyhow::anyhow!("GitLab metadata update failed: repo not found")),
+        _ => Err(anyhow::anyhow!("GitLab metadata update failed: HTTP {}", code)),
+    }
+}
+
+/// Set Codeberg repo description and topics using `curl` with Authorization token.
+fn set_codeberg_metadata(owner: &str, repo: &str, token: &str, meta: &RepoMetadata) -> Result<()> {
+    let url = format!("https://codeberg.org/api/v1/repos/{}/{}", owner, repo);
+    let json = serde_json::json!({
+        "description": if meta.description.is_empty() { serde_json::Value::Null } else { serde_json::Value::String(meta.description.clone()) },
+        "topics": meta.topics,
+    });
+
+    let output = std::process::Command::new("curl")
+        .args([
+            "-s", "-o", "/dev/null", "-w", "%{http_code}",
+            "-H", &format!("Authorization: token {}", token),
+            "-H", "Content-Type: application/json",
+            "-X", "PATCH",
+            "-d", &json.to_string(),
+            &url,
+        ])
+        .output()
+        .with_context(|| "curl failed to run for Codeberg metadata update")?;
+
+    let code = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    match code.as_str() {
+        "200" => Ok(()),
+        "401" => Err(anyhow::anyhow!("Codeberg metadata update failed: unauthorized")),
+        "404" => Err(anyhow::anyhow!("Codeberg metadata update failed: repo not found")),
+        _ => Err(anyhow::anyhow!("Codeberg metadata update failed: HTTP {}", code)),
+    }
+}
+
+/// Sync repo metadata (description + topics) from GitHub to all configured mirrors.
+///
+/// This function is **non-fatal**: errors are logged but never propagated.
+/// Reuses the same cache as visibility sync.
+pub(crate) fn sync_mirror_metadata(
+    origin_url: &str,
+    remotes: &[RemoteConfig],
+    repo_name: &str,
+    interval_hours: u64,
+) {
+    // Check cache first (shares cache with visibility sync)
+    if is_visibility_cache_fresh(repo_name, interval_hours) {
+        return;
+    }
+
+    let Some((owner, gh_repo)) = parse_github_owner_repo(origin_url) else {
+        // Already warned by visibility sync if called in same cycle
+        return;
+    };
+
+    let meta = get_github_metadata(&owner, &gh_repo);
+
+    if crate::policy::debug_enabled() {
+        eprintln!(
+            "🐛 GitHub {}/{} metadata: description={:?} topics={:?}",
+            owner, gh_repo, meta.description, meta.topics
+        );
+    }
+
+    for remote in remotes {
+        if remote.auth_type == AuthType::GitLab {
+            let token_var = remote.auto_create_token_var.as_deref().unwrap_or("GITLAB_TOKEN");
+            if let Some(token) = load_secret(token_var, &sync_secrets_dir()) {
+                let resolved_name = remote.resolve_repo_name(repo_name);
+                if let Err(e) = set_gitlab_metadata(&remote.auto_create_account, &resolved_name, &token, &meta) {
+                    eprintln!("⚠️ failed to set GitLab metadata for {}: {}", resolved_name, e);
+                } else if crate::policy::debug_enabled() {
+                    eprintln!("🐛 set GitLab {}/{} metadata", remote.auto_create_account, resolved_name);
+                }
+            }
+        }
+
+        if remote.auth_type == AuthType::Codeberg {
+            let token_var = remote.auto_create_token_var.as_deref().unwrap_or("CODEBERG_TOKEN");
+            if let Some(token) = load_secret(token_var, &sync_secrets_dir()) {
+                let resolved_name = remote.resolve_repo_name(repo_name);
+                if let Err(e) = set_codeberg_metadata(&remote.auto_create_account, &resolved_name, &token, &meta) {
+                    eprintln!("⚠️ failed to set Codeberg metadata for {}: {}", resolved_name, e);
+                } else if crate::policy::debug_enabled() {
+                    eprintln!("🐛 set Codeberg {}/{} metadata", remote.auto_create_account, resolved_name);
+                }
+            }
+        }
+    }
+
+    // Don't update cache here — visibility sync will do it in the same cycle
+}
+
 /// Check GitHub visibility at repo creation time and return whether the
 /// repo should be created as private. If `sync_visibility` is disabled,
 /// always returns `true` (private).

@@ -24,7 +24,7 @@ use crate::git::multi_remote::{
 use crate::policy::{debug_enabled, load_repo_override, SyncPolicy};
 use crate::report::{append_incident_record, build_commit_context, detect_report_signals, IncidentRecord, push_large_blob_threshold_bytes};
 use crate::git::{origin_url};
-use crate::visibility::{get_github_visibility, parse_github_owner_repo, sync_mirror_visibility};
+use crate::visibility::{get_github_visibility, parse_github_owner_repo, sync_mirror_visibility, sync_mirror_metadata};
 
 /// Result of a single repository sync attempt.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -824,13 +824,18 @@ async fn push_with_blob_check(
     }
 
     // Sync mirror visibility to match GitHub origin (non-fatal)
-    if !dry_run && policy.sync_visibility {
+    if !dry_run && (policy.sync_visibility || policy.sync_metadata) {
         if let Some(origin_url) = crate::git::multi_remote::get_remote_url(repo, "origin") {
             let repo_name = repo.file_name()
                 .map(|n| n.to_string_lossy().to_string())
                 .unwrap_or_default();
             if !repo_name.is_empty() {
-                sync_mirror_visibility(&origin_url, &policy.remotes, &repo_name, policy.sync_visibility_interval_hours);
+                if policy.sync_visibility {
+                    sync_mirror_visibility(&origin_url, &policy.remotes, &repo_name, policy.sync_visibility_interval_hours);
+                }
+                if policy.sync_metadata {
+                    sync_mirror_metadata(&origin_url, &policy.remotes, &repo_name, policy.sync_visibility_interval_hours);
+                }
             }
         }
     }
