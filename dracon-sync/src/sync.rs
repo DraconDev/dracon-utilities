@@ -1442,7 +1442,7 @@ push_url = "git@nonexistent.example.com:repo.git"
         let mut remote_failures = HashMap::new();
         let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, Some(&mut remote_failures), false, None, false).await;
         assert!(result.is_ok());
-        assert!(matches!(result, Ok(SyncOutcome::NothingToDo)), "mirror push failure should return false");
+        assert!(matches!(result.unwrap(), SyncOutcome::Synced), "mirror push failure should still return Synced (origin push succeeded)");
         assert_eq!(remote_failures.get("bad-mirror"), Some(&1), "bad-mirror failure should be tracked");
     }
 
