@@ -995,6 +995,8 @@ auto_repair_warns: true,
             sync_visibility: false,
             sync_visibility_interval_hours: 24,
             sync_metadata: false,
+            auto_publish: false,
+            publish_targets: vec![],
         }
     }
 
