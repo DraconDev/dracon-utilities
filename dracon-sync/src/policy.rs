@@ -882,6 +882,7 @@ auto_repair_warns: true,
             alert_unpushed_threshold: 10,
             sync_visibility: false,
             sync_visibility_interval_hours: 24,
+            sync_metadata: false,
         }
     }
 
