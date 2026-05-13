@@ -100,7 +100,12 @@ pub(crate) async fn sync_repo(
 
     let has_origin = has_origin_remote(repo);
     let has_origin = if !has_origin && policy.auto_github_private {
-        if let Some(url) = crate::report::create_github_private_remote(repo, &policy.auto_github_private_account) {
+        let private = if policy.sync_visibility {
+            check_github_visibility(repo).await.unwrap_or(true)
+        } else {
+            true
+        };
+        if let Some(url) = crate::report::create_github_private_remote(repo, &policy.auto_github_private_account, private) {
             println!("🔗 created remote for {}: {}", repo.display(), url);
             true
         } else {

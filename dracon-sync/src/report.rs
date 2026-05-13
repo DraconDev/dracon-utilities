@@ -892,7 +892,7 @@ pub(crate) async fn run_repair_concerns(
             if apply {
                 let private_remote = if policy.auto_github_private {
                     out!("   plan: create GitHub private repo as origin");
-                    create_github_private_remote(&repo, &policy.auto_github_private_account)
+                    create_github_private_remote(&repo, &policy.auto_github_private_account, true)
                 } else {
                     out!("   plan: create private bare repo as origin");
                     create_private_remote(&repo)
