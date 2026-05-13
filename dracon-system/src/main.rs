@@ -1388,7 +1388,11 @@ async fn get_inode_info() -> Result<(u64, u64, u64)> {
 }
 
 /// Clean Docker resources
-async fn docker_prune(all: bool, volumes: bool) -> Result<u64> {
+async fn docker_prune(apply: bool, all: bool, volumes: bool) -> Result<u64> {
+    if !apply {
+        // Dry-run: do not execute destructive docker commands
+        return Ok(0);
+    }
     let mut args = vec!["system", "prune", "-f"];
     if all {
         args.push("--all");
@@ -2129,7 +2133,7 @@ pub(crate) async fn run_guard_once(
         // Docker
         if guard.docker_prune {
             if apply {
-                match docker_prune(true, guard.docker_prune_volumes).await {
+                match docker_prune(guard.auto_cleanup_apply, true, guard.docker_prune_volumes).await {
                     Ok(bytes) => {
                         total_reclaimed += bytes;
                         if bytes > 0 {
