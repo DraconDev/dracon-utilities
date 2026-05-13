@@ -843,6 +843,8 @@ async fn main() -> Result<()> {
                 &version,
                 "patch", // Default to patch for manual publish
                 &policy,
+                true,  // auto_tag: always tag for manual publish
+                false, // auto_release: don't create GitHub release for manual publish
                 &repo_targets,
             ).await;
             for step in &steps {

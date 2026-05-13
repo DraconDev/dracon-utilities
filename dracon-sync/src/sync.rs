@@ -811,13 +811,16 @@ pub(crate) async fn sync_repo(
                 }
             }
 
-            // Release pipeline: tag + publish after version bump
+            // Release pipeline: tag + release + publish after version bump
             if version_bumped {
                 if let Some((old_ver, new_ver, level)) = get_bump_info(repo) {
-                    let repo_targets = crate::policy::load_repo_override(repo)
-                        .auto_publish;
+                    let repo_override = crate::policy::load_repo_override(repo);
+                    let repo_auto_tag = repo_override.auto_tag.unwrap_or(policy.auto_tag);
+                    let repo_auto_release = repo_override.auto_release.unwrap_or(policy.auto_release);
+                    let repo_publish_targets = repo_override.auto_publish;
                     let steps = crate::release::run_release_pipeline(
-                        repo, &old_ver, &new_ver, level.as_str(), policy, &repo_targets,
+                        repo, &old_ver, &new_ver, level.as_str(), policy,
+                        repo_auto_tag, repo_auto_release, &repo_publish_targets,
                     ).await;
                     for step in &steps {
                         match step {
