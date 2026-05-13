@@ -1710,7 +1710,7 @@ pub(crate) async fn run_repair_warns(
     Ok(summary)
 }
 
-pub(crate) fn create_github_private_remote(repo: &Path, account: &str) -> Option<String> {
+pub(crate) fn create_github_private_remote(repo: &Path, account: &str, private: bool) -> Option<String> {
     let repo_name = repo.file_name()?.to_str()?.to_string();
 
     // FIRST REPO CREATE ATTEMPT:
@@ -1724,8 +1724,14 @@ pub(crate) fn create_github_private_remote(repo: &Path, account: &str) -> Option
     //   2. GitHub counts orphan repos against quotas
     //   3. No cleanup mechanism existed
     //   NEVER reintroduce a suffix loop here or in any repo creation function.
-    let output = std::process::Command::new("gh")
-        .args(["repo", "create", &repo_name, "--private"])
+    let mut cmd = std::process::Command::new("gh");
+    cmd.args(["repo", "create", &repo_name]);
+    if private {
+        cmd.arg("--private");
+    } else {
+        cmd.arg("--public");
+    }
+    let output = cmd
         .current_dir(repo)
         .output()
         .ok()?;
