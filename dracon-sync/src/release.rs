@@ -141,15 +141,30 @@ fn extract_repo_name(repo: &Path) -> Result<String> {
 
     // Extract owner/repo from SSH or HTTPS URL
     // git@github.com:Owner/Repo.git -> Owner/Repo
+    // ssh://git@github.com:22/Owner/Repo.git -> Owner/Repo
     // https://github.com/Owner/Repo.git -> Owner/Repo
-    let repo_name = if url.starts_with("git@") {
+    let repo_name = if url.starts_with("ssh://") {
+        // ssh://git@host:port/Owner/Repo.git
+        url.trim_start_matches("ssh://")
+            .trim_end_matches(".git")
+            .split('/')
+            .skip(1) // skip the "git@host:port" part
+            .collect::<Vec<_>>()
+            .join("/")
+    } else if url.starts_with("git@") {
         url.strip_prefix("git@")
             .and_then(|s| s.split_once(':'))
             .map(|(_, path)| path.trim_end_matches(".git"))
             .unwrap_or(&url)
     } else if url.starts_with("https://") {
+        // https://github.com/Owner/Repo.git -> Owner/Repo
+        // Strip protocol and host to get owner/repo
         url.trim_start_matches("https://")
             .trim_end_matches(".git")
+            .split('/')
+            .skip(1) // skip the "github.com" part
+            .collect::<Vec<_>>()
+            .join("/")
     } else {
         &url
     };
@@ -743,8 +758,25 @@ mod tests {
         let url = "https://github.com/DraconDev/dracon-utilities.git";
         let repo_name = url
             .trim_start_matches("https://")
-            .trim_end_matches(".git");
-        assert_eq!(repo_name, "github.com/DraconDev/dracon-utilities");
+            .trim_end_matches(".git")
+            .split('/')
+            .skip(1)
+            .collect::<Vec<_>>()
+            .join("/");
+        assert_eq!(repo_name, "DraconDev/dracon-utilities");
+    }
+
+    #[test]
+    fn test_extract_repo_name_from_ssh_url_with_port() {
+        let url = "ssh://git@github.com:22/DraconDev/dracon-utilities.git";
+        let repo_name = url
+            .trim_start_matches("ssh://")
+            .trim_end_matches(".git")
+            .split('/')
+            .skip(1)
+            .collect::<Vec<_>>()
+            .join("/");
+        assert_eq!(repo_name, "DraconDev/dracon-utilities");
     }
 
     #[test]

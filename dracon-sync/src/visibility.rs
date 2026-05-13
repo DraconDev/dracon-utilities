@@ -623,23 +623,23 @@ mod tests {
 
     #[test]
     fn test_visibility_cache_not_fresh_when_missing() {
-        let repo_name = "test_repo_that_should_not_exist_12345";
-        assert!(!is_visibility_cache_fresh(repo_name, 24));
+        let repo_path = Path::new("/tmp/test_repo_that_should_not_exist_12345");
+        assert!(!is_visibility_cache_fresh(repo_path, 24));
     }
 
     #[test]
     fn test_visibility_cache_fresh_when_recent() {
-        let repo_name = "test_cache_fresh";
-        update_visibility_cache(repo_name);
-        assert!(is_visibility_cache_fresh(repo_name, 24));
+        let repo_path = Path::new("/tmp/test_cache_fresh");
+        update_visibility_cache(repo_path);
+        assert!(is_visibility_cache_fresh(repo_path, 24));
         // Cleanup
-        let _ = std::fs::remove_file(visibility_cache_path(repo_name));
+        let _ = std::fs::remove_file(visibility_cache_path(repo_path));
     }
 
     #[test]
     fn test_visibility_cache_stale_when_old() {
-        let repo_name = "test_cache_stale";
-        let path = visibility_cache_path(repo_name);
+        let repo_path = Path::new("/tmp/test_cache_stale");
+        let path = visibility_cache_path(repo_path);
         let old_ts = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
@@ -647,20 +647,20 @@ mod tests {
             .saturating_sub(25 * 3600);
         std::fs::create_dir_all(visibility_cache_dir()).unwrap();
         std::fs::write(&path, old_ts.to_string()).unwrap();
-        assert!(!is_visibility_cache_fresh(repo_name, 24));
+        assert!(!is_visibility_cache_fresh(repo_path, 24));
         let _ = std::fs::remove_file(&path);
     }
 
     #[test]
     fn test_visibility_cache_updates_timestamp() {
-        let repo_name = "test_cache_update";
-        let path = visibility_cache_path(repo_name);
+        let repo_path = Path::new("/tmp/test_cache_update");
+        let path = visibility_cache_path(repo_path);
         // Write old timestamp
         let old_ts = "1000";
         std::fs::create_dir_all(visibility_cache_dir()).unwrap();
         std::fs::write(&path, old_ts).unwrap();
         // Update
-        update_visibility_cache(repo_name);
+        update_visibility_cache(repo_path);
         let new_content = std::fs::read_to_string(&path).unwrap();
         let new_ts = new_content.trim().parse::<u64>().unwrap();
         let now = SystemTime::now()
@@ -687,8 +687,8 @@ mod tests {
 
     #[test]
     fn test_sync_mirror_visibility_skips_when_cache_fresh() {
-        let repo_name = "test_skip_cached";
-        update_visibility_cache(repo_name);
+        let repo_path = Path::new("/tmp/test_skip_cached");
+        update_visibility_cache(repo_path);
         // Should return immediately without error even with bad remotes
         let remotes = vec![RemoteConfig {
             name: "gitlab".to_string(),
@@ -702,18 +702,18 @@ mod tests {
             repo_name_map: Default::default(),
             force_push_when_behind: false,
         }];
-        sync_mirror_visibility("git@github.com:DraconDev/test.git", &remotes, repo_name, 24);
+        sync_mirror_visibility("git@github.com:DraconDev/test.git", &remotes, "test_skip_cached", repo_path, 24);
         // If we got here without panicking, the cache skip worked
-        let _ = std::fs::remove_file(visibility_cache_path(repo_name));
+        let _ = std::fs::remove_file(visibility_cache_path(repo_path));
     }
 
     #[test]
     fn test_sync_mirror_visibility_handles_unparseable_origin() {
-        let repo_name = "test_bad_origin";
+        let repo_path = Path::new("/tmp/test_bad_origin");
         let remotes: Vec<RemoteConfig> = vec![];
         // Should not panic on unparseable URL
-        sync_mirror_visibility("not-a-valid-url", &remotes, repo_name, 0);
-        let _ = std::fs::remove_file(visibility_cache_path(repo_name));
+        sync_mirror_visibility("not-a-valid-url", &remotes, "test_bad_origin", repo_path, 0);
+        let _ = std::fs::remove_file(visibility_cache_path(repo_path));
     }
 
     #[test]
@@ -807,31 +807,31 @@ mod tests {
             },
         ];
         // Set interval to 0 to force cache expiration
-        sync_mirror_visibility("git@github.com:DraconDev/test.git", &remotes, repo_name, 0);
+        sync_mirror_visibility("git@github.com:DraconDev/test.git", &remotes, "test_all_failures", Path::new("/tmp/test_all_failures"), 0);
         // Should not panic even when all tokens are missing
-        let _ = std::fs::remove_file(visibility_cache_path(repo_name));
+        let _ = std::fs::remove_file(visibility_cache_path(Path::new("/tmp/test_all_failures")));
     }
 
     // ---- Idempotency / cache behavior ----
 
     #[test]
     fn test_cache_prevents_repeated_api_calls() {
-        let repo_name = "test_idempotency_cache";
-        update_visibility_cache(repo_name);
+        let repo_path = Path::new("/tmp/test_idempotency_cache");
+        update_visibility_cache(repo_path);
         // Second call with fresh cache should skip entirely
-        assert!(is_visibility_cache_fresh(repo_name, 24));
-        let _ = std::fs::remove_file(visibility_cache_path(repo_name));
+        assert!(is_visibility_cache_fresh(repo_path, 24));
+        let _ = std::fs::remove_file(visibility_cache_path(repo_path));
     }
 
     #[test]
     fn test_cache_written_on_parseable_origin_even_when_tokens_missing() {
         // When origin URL is parseable but tokens are missing, the cache
         // should still be written to prevent hammering on every sync cycle.
-        let repo_name = "test_cache_on_failure";
+        let repo_path = Path::new("/tmp/test_cache_on_failure");
         let remotes: Vec<RemoteConfig> = vec![];
-        sync_mirror_visibility("git@github.com:DraconDev/test.git", &remotes, repo_name, 0);
+        sync_mirror_visibility("git@github.com:DraconDev/test.git", &remotes, "test_cache_on_failure", repo_path, 0);
         // Cache should exist even with no remotes to update
-        let path = visibility_cache_path(repo_name);
+        let path = visibility_cache_path(repo_path);
         assert!(path.exists(), "cache should be written even when no remotes configured");
         let _ = std::fs::remove_file(&path);
     }
@@ -841,10 +841,10 @@ mod tests {
         // When the origin URL can't be parsed, we return early before writing cache.
         // This is correct — the next cycle should retry since we couldn't even
         // determine the GitHub owner/repo.
-        let repo_name = "test_cache_unparseable";
+        let repo_path = Path::new("/tmp/test_cache_unparseable");
         let remotes: Vec<RemoteConfig> = vec![];
-        sync_mirror_visibility("not-a-url", &remotes, repo_name, 0);
-        let path = visibility_cache_path(repo_name);
+        sync_mirror_visibility("not-a-url", &remotes, "test_cache_unparseable", repo_path, 0);
+        let path = visibility_cache_path(repo_path);
         assert!(!path.exists(), "cache should NOT be written for unparseable URLs (need to retry)");
     }
 
@@ -864,11 +864,11 @@ mod tests {
 
     #[test]
     fn test_visibility_cache_corrupt_file() {
-        let repo_name = "test_corrupt_cache";
-        let path = visibility_cache_path(repo_name);
+        let repo_path = Path::new("/tmp/test_corrupt_cache");
+        let path = visibility_cache_path(repo_path);
         std::fs::create_dir_all(visibility_cache_dir()).unwrap();
         std::fs::write(&path, "not-a-number").unwrap();
-        assert!(!is_visibility_cache_fresh(repo_name, 24), "corrupt cache should be treated as stale");
+        assert!(!is_visibility_cache_fresh(repo_path, 24), "corrupt cache should be treated as stale");
         let _ = std::fs::remove_file(&path);
     }
 
@@ -901,19 +901,19 @@ mod tests {
 
     #[test]
     fn test_sync_mirror_metadata_does_not_panic() {
-        let repo_name = "test_metadata_no_panic";
+        let repo_path = Path::new("/tmp/test_metadata_no_panic");
         let remotes: Vec<RemoteConfig> = vec![];
-        sync_mirror_metadata("git@github.com:DraconDev/test.git", &remotes, repo_name, 0);
+        sync_mirror_metadata("git@github.com:DraconDev/test.git", &remotes, "test_metadata_no_panic", repo_path, 0);
         // Should not panic even with no remotes
-        let _ = std::fs::remove_file(visibility_cache_path(repo_name));
+        let _ = std::fs::remove_file(visibility_cache_path(repo_path));
     }
 
     #[test]
     fn test_sync_mirror_metadata_handles_unparseable_origin() {
-        let repo_name = "test_metadata_bad_origin";
+        let repo_path = Path::new("/tmp/test_metadata_bad_origin");
         let remotes: Vec<RemoteConfig> = vec![];
-        sync_mirror_metadata("not-a-url", &remotes, repo_name, 0);
-        let _ = std::fs::remove_file(visibility_cache_path(repo_name));
+        sync_mirror_metadata("not-a-url", &remotes, "test_metadata_bad_origin", repo_path, 0);
+        let _ = std::fs::remove_file(visibility_cache_path(repo_path));
     }
 
     #[test]
@@ -972,9 +972,9 @@ mod tests {
                 force_push_when_behind: false,
             },
         ];
-        sync_mirror_metadata("git@github.com:DraconDev/test.git", &remotes, repo_name, 0);
+        sync_mirror_metadata("git@github.com:DraconDev/test.git", &remotes, "test_metadata_missing_tokens", Path::new("/tmp/test_metadata_missing_tokens"), 0);
         // Should not panic
-        let _ = std::fs::remove_file(visibility_cache_path(repo_name));
+        let _ = std::fs::remove_file(visibility_cache_path(Path::new("/tmp/test_metadata_missing_tokens")));
     }
 
     #[test]
