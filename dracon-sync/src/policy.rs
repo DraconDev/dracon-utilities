@@ -731,11 +731,10 @@ pub(crate) fn validate_config(policy_path: &Path) -> ValidateResult {
         }
     }
 
-    if policy.auto_github_private {
-        if policy.auto_github_private_account.is_empty() {
+    if policy.auto_github_private
+        && policy.auto_github_private_account.is_empty() {
             result.error("auto_github_private=true but auto_github_private_account is empty".to_string());
         }
-    }
 
     if policy.pulse_interval_secs == 0 {
         result.error("pulse_interval_secs must be > 0".to_string());

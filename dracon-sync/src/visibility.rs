@@ -3,7 +3,6 @@ use serde::Deserialize;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::helpers::is_repo_already_exists;
 use crate::policy::{AuthType, RemoteConfig};
 use crate::secrets::{load_secret, sync_secrets_dir};
 
@@ -22,7 +21,7 @@ fn strip_ansi(s: &str) -> String {
                     chars.next();
                     while let Some(&next) = chars.peek() {
                         chars.next();
-                        if next >= '@' && next <= '~' {
+                        if ('@'..='~').contains(&next) {
                             break;
                         }
                     }
