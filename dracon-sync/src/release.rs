@@ -658,7 +658,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         fs::write(
             dir.path().join("package.json"),
-            r#"{"name": "my-npm-pkg", "version": "1.0.0"}"#,
+            "{\n  \"name\": \"my-npm-pkg\",\n  \"version\": \"1.0.0\"\n}\n",
         )
         .unwrap();
         let name = extract_package_name(dir.path(), PublishRegistry::Npm).unwrap();
@@ -693,7 +693,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         fs::write(
             dir.path().join("package.json"),
-            r#"{"name": "test", "version": "3.4.5"}"#,
+            "{\n  \"name\": \"test\",\n  \"version\": \"3.4.5\"\n}\n",
         )
         .unwrap();
         assert_eq!(read_npm_version(dir.path()).unwrap(), "3.4.5");
@@ -740,7 +740,7 @@ mod tests {
         let repo_name = url
             .trim_start_matches("https://")
             .trim_end_matches(".git");
-        assert_eq!(repo_name, "DraconDev/dracon-utilities");
+        assert_eq!(repo_name, "github.com/DraconDev/dracon-utilities");
     }
 
     #[test]
