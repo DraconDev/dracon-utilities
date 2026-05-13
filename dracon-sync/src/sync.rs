@@ -551,7 +551,7 @@ pub(crate) async fn sync_repo(
                 if debug_enabled() {
                     eprintln!("🐛 {} skipped commit: all changes were filter-only (smudge/clean)", repo.display());
                 }
-                return Ok(true);
+                return Ok(SyncOutcome::NothingToDo);
             }
 
             let signals = detect_report_signals(repo, &committed_entries);
