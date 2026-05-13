@@ -69,6 +69,86 @@ fn notify_webhook_failure(webhook_url: &str, repo: &Path, remote: &str, error: &
 
 /// Run visibility and metadata sync for a repo (non-fatal).
 /// Called before returning from sync_repo regardless of outcome.
+/// Get the old version, new version, and bump level from the repo after a version bump.
+/// Returns None if no bump info can be determined.
+fn get_bump_info(repo: &Path) -> Option<(String, String, String)> {
+    let new_ver = crate::release::detect_project_version(repo)?.0;
+    // Get old version from git HEAD (the version before the bump)
+    let old_ver = std::process::Command::new("git")
+        .args(["show", "HEAD~1:Cargo.toml"])
+        .current_dir(repo)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .output()
+        .ok()
+        .and_then(|out| {
+            if out.status.success() {
+                let content = String::from_utf8_lossy(&out.stdout);
+                for line in content.lines() {
+                    let trimmed = line.trim();
+                    if trimmed.starts_with("version") {
+                        if let Some(v) = trimmed.split('=').nth(1) {
+                            let v = v.trim().trim_matches('"').trim();
+                            if !v.is_empty() && !v.starts_with("workspace") {
+                                return Some(v.to_string());
+                            }
+                        }
+                    }
+                }
+            }
+            None
+        })
+        .or_else(|| {
+            // Try package.json
+            std::process::Command::new("git")
+                .args(["show", "HEAD~1:package.json"])
+                .current_dir(repo)
+                .stdout(std::process::Stdio::piped())
+                .stderr(std::process::Stdio::null())
+                .output()
+                .ok()
+                .and_then(|out| {
+                    if out.status.success() {
+                        let content = String::from_utf8_lossy(&out.stdout);
+                        for line in content.lines() {
+                            let trimmed = line.trim();
+                            if trimmed.starts_with("\"version\"") {
+                                if let Some(v) = trimmed.split(':').nth(1) {
+                                    let v = v.trim().trim_matches('"').trim_matches(',').trim();
+                                    if !v.is_empty() {
+                                        return Some(v.to_string());
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    None
+                })
+        })
+        .unwrap_or_default();
+
+    // Determine bump level by comparing versions
+    let level = if old_ver.is_empty() {
+        "patch" // Default
+    } else {
+        let old_parts: Vec<u32> = old_ver.split('.').filter_map(|s| s.parse().ok()).collect();
+        let new_parts: Vec<u32> = new_ver.split('.').filter_map(|s| s.parse().ok()).collect();
+        if old_parts.len() >= 3 && new_parts.len() >= 3 {
+            if new_parts[0] > old_parts[0] {
+                "major"
+            } else if new_parts[1] > old_parts[1] {
+                "minor"
+            } else {
+                "patch"
+            }
+        } else {
+            "patch"
+        }
+    };
+
+    Some((old_ver, new_ver, level.to_string()))
+}
+
 fn maybe_sync_visibility_and_metadata(
     repo: &Path,
     policy: &SyncPolicy,
