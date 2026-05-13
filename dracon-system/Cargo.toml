@@ -14,4 +14,4 @@ toml = "0.8"
 tokio = { version = "1", features = ["full"] }
 walkdir = "2"
 chrono = "0.4"
-dracon-system-lib = { package = "dracon-system", path = "../../dracon-libs/tools/system/dracon-system" }
+dracon-system-lib = { path = "../../dracon-libs/tools/system/dracon-system" }
