@@ -144,7 +144,8 @@ install_binary() {
 install_binary dracon-sync "scribe,ai-bumper" "dracon-sync"
 install_binary dracon-system "" "dracon-system"
 install_binary dracon-warden "" "dracon-warden"
-install_binary dracon-ai "" "dracon-ai"
+# dracon-ai is not in the workspace (depends on unpublished dracon-libs/services/ai)
+# Install separately from ./dracon-ai/ if needed
 
 echo ""
 
@@ -166,7 +167,6 @@ mkdir -p ~/.config/systemd/user
 mkdir -p ~/.dracon/utilities/sync
 mkdir -p ~/.dracon/utilities/system
 mkdir -p ~/.dracon/utilities/warden
-mkdir -p ~/.dracon/utilities/ai
 
 if [ "$DRY_RUN" = true ]; then
     echo "Would install systemd services to ~/.config/systemd/user/"
@@ -207,17 +207,13 @@ echo "Installing example configs..."
 copy_config "dracon-sync/dracon-sync.example.toml" "$HOME/.dracon/utilities/sync/dracon-sync.toml"
 copy_config "dracon-system/dracon-system.example.toml" "$HOME/.dracon/utilities/system/dracon-system.toml"
 copy_config "dracon-warden/dracon-warden.example.toml" "$HOME/.dracon/utilities/warden/dracon-warden.toml"
-copy_config "dracon-ai/dracon-ai.example.toml" "$HOME/.dracon/utilities/ai/dracon-ai.toml"
+# dracon-ai config not installed (crate not in workspace)
 
-# Copy AI provider config if new
-if [ ! -f "$HOME/.dracon/utilities/sync/ai.toml" ] && [ -f "dracon-sync/ai.example.toml" ]; then
-    if [ "$DRY_RUN" = true ]; then
-        echo "  Would copy ai.example.toml → ~/.dracon/utilities/sync/ai.toml"
-    else
-        cp dracon-sync/ai.example.toml "$HOME/.dracon/utilities/sync/ai.toml"
-        echo "  ✅ Copied ai.example.toml → ~/.dracon/utilities/sync/ai.toml"
-    fi
-fi
+# Create secrets directories with correct permissions
+mkdir -p "$HOME/.dracon/utilities/sync/secrets"
+chmod 700 "$HOME/.dracon/utilities/sync/secrets" 2>/dev/null || true
+mkdir -p "$HOME/.dracon/utilities/sync/ai/secrets"
+chmod 700 "$HOME/.dracon/utilities/sync/ai/secrets" 2>/dev/null || true
 
 if [ "$NO_RESTART" = true ]; then
     echo ""
@@ -256,6 +252,7 @@ echo "Binaries:"
 ls -la ~/.local/bin/dracon-* 2>/dev/null || true
 echo ""
 echo "Next steps:"
-echo "  1. Edit ~/.dracon/utilities/sync/ai.toml and set your API keys"
-echo "  2. Check 'dracon-sync status' to verify sync is working"
-echo "  3. Check 'dracon-system status' to verify guard is working"
+echo "  1. Add API keys to ~/.dracon/utilities/sync/ai/secrets/*.env"
+echo "  2. Add registry tokens to ~/.dracon/utilities/sync/secrets/*.env (crates.io, npm, etc.)"
+echo "  3. Check 'dracon-sync status' to verify sync is working"
+echo "  4. Check 'dracon-system status' to verify guard is working"
