@@ -23,7 +23,7 @@ use crate::policy::{SyncPolicy, freeze_reason, debug_enabled, timestamp_secs};
 use crate::exclude::{excluded_dir_names_set, has_sync_relevant_dirty_entries};
 use crate::git::{discover_git_repos, repo_diff_entries, has_origin_remote, has_tracking_upstream, has_both_main_and_master, git_diff_head_files};
 use crate::report::{ConcernRepairFilter, run_repair_concerns, run_repair_warns};
-use crate::sync::sync_repo;
+use crate::sync::{sync_repo, SyncOutcome};
 
 const STUCK_REPO_EXPIRY_SECS: u64 = 24 * 60 * 60; // 24 hours
 
@@ -313,11 +313,11 @@ pub(crate) async fn run_once(policy_path: &Path) -> Result<()> {
                     policy.repo_sync_timeout_secs
                 );
             }
-            Ok(Ok(true)) => {
+            Ok(Ok(SyncOutcome::Synced)) => {
                 changed += 1;
                 println!("🔁 synced {}", repo.display());
             }
-            Ok(Ok(false)) => {}
+            Ok(Ok(SyncOutcome::NothingToDo)) | Ok(Ok(SyncOutcome::Blocked)) => {}
             Ok(Err(e)) => {
                 eprintln!("⚠️ sync failed for {}: {}", repo.display(), e);
             }
