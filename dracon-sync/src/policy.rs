@@ -235,6 +235,10 @@ pub(crate) struct SyncPolicy {
     pub(crate) webhook_url: Option<String>,
     #[serde(default = "default_alert_unpushed_threshold")]
     pub(crate) alert_unpushed_threshold: usize,
+    #[serde(default)]
+    pub(crate) sync_visibility: bool,
+    #[serde(default = "default_sync_visibility_interval_hours")]
+    pub(crate) sync_visibility_interval_hours: u64,
 }
 
 #[derive(Debug, Deserialize, Default, Clone)]
@@ -341,6 +345,10 @@ fn default_github_account() -> String {
 
 fn default_alert_unpushed_threshold() -> usize {
     10
+}
+
+fn default_sync_visibility_interval_hours() -> u64 {
+    24
 }
 
 impl SyncPolicy {
@@ -868,6 +876,8 @@ auto_repair_warns: true,
             incident_ledger_max_age_days: 30,
             webhook_url: None,
             alert_unpushed_threshold: 10,
+            sync_visibility: false,
+            sync_visibility_interval_hours: 24,
         }
     }
 
