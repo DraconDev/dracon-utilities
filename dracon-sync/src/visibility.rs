@@ -79,7 +79,7 @@ pub(crate) fn parse_github_owner_repo(remote_url: &str) -> Option<(String, Strin
 /// Query GitHub for the visibility of a repo using `gh api`.
 /// Returns `true` if the repo is private, `false` if public.
 /// On any error (gh not installed, no auth, network failure), returns `true` as the safe default.
-fn get_github_visibility(owner: &str, repo: &str) -> bool {
+pub(crate) fn get_github_visibility(owner: &str, repo: &str) -> bool {
     let output = match std::process::Command::new("gh")
         .args(["api", &format!("repos/{}/{}", owner, repo), "--jq", ".private"])
         .output()
