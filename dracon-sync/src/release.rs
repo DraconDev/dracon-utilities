@@ -917,11 +917,14 @@ mod tests {
         )
         .await;
 
-        // Should attempt GitHub release (will fail because no origin, but the attempt is what matters)
+        // Should have a GitHub release step (Created, Failed, or Skipped if it already exists)
+        // Note: In environments with gh authenticated, `gh release view` may succeed against
+        // the real API, causing Skipped("already exists") instead of Failed.
         assert!(
             steps.iter().any(|s| matches!(s, ReleaseStep::GitHubReleaseCreated(_)))
-                || steps.iter().any(|s| matches!(s, ReleaseStep::Failed { step, .. } if step.contains("GitHub release"))),
-            "expected GitHub release attempt on major bump with auto_release=true, got: {:?}", steps
+                || steps.iter().any(|s| matches!(s, ReleaseStep::Failed { step, .. } if step.contains("GitHub release")))
+                || steps.iter().any(|s| matches!(s, ReleaseStep::Skipped(msg) if msg.contains("GitHub release"))),
+            "expected GitHub release step (created, failed, or skipped) on major bump with auto_release=true, got: {:?}", steps
         );
     }
 
