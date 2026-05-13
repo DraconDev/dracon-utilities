@@ -157,14 +157,25 @@ auto_create = false
 # sync_metadata = false
 
 # =============================================================================
-#  SECTION 8: PUBLISH TARGETS (Package Registries)
+#  SECTION 8: RELEASE PIPELINE (Tags, Releases, Publishing)
 # =============================================================================
-# When true, version bumps trigger publish to configured registry targets.
-# IMPORTANT: Even with auto_publish = true, nothing is published until the
-# repo explicitly opts in via .dracon/dracon-sync.toml (see below).
-# Tags are created automatically for opted-in repos:
-#   minor/patch -> git tag, major -> git tag + GitHub Release.
-# auto_publish = false
+# Three separate toggles control the release pipeline per repo.
+# All three default to "off" at the repo level — nothing happens unless
+# the repo explicitly opts in via .dracon/dracon-sync.toml.
+#
+# ┌──────────────┬─────────────┬──────────┬────────────────────────────────┐
+# │ Toggle       │ Default     │ Risk     │ Purpose                       │
+# ├──────────────┼─────────────┼──────────┼────────────────────────────────┤
+# │ auto_tag     │ true        │ Low      │ Git tag on every version bump  │
+# │ auto_release │ false       │ Medium   │ GitHub Release on major bumps │
+# │ auto_publish │ [] (empty)  │ High     │ Publish to package registries │
+# └──────────────┴─────────────┴──────────┴────────────────────────────────┘
+#
+# Tags are cheap, reversible, and universally useful — on by default.
+# Releases are public milestones — opt-in per repo.
+# Publishing is IRREVERSIBLE (crates.io/npm/PyPI are immutable) — explicit list.
+#
+# auto_publish = false          # global master toggle (default: off)
 #
 # Each publish target needs a token_secret — the env var name that holds the
 # registry API key. Store the actual token in ~/.dracon/utilities/sync/secrets/*.env.
@@ -194,14 +205,40 @@ auto_create = false
 # PER-REPO OPT-IN (required even when auto_publish = true globally):
 # Create .dracon/dracon-sync.toml in the repo root:
 #
-#   # Only publish this repo to crates.io
+#   # Tag every bump (default: true, safe to omit)
+#   auto_tag = true
+#
+#   # Create GitHub Releases for major bumps (default: false)
+#   auto_release = true
+#
+#   # Publish to specific registries (default: empty = no publishing)
 #   auto_publish = ["crates-io"]
 #
-#   # Publish to both crates.io and npm
-#   auto_publish = ["crates-io", "npm"]
+# Example configurations for different project types:
 #
-# Without this file (or with an empty list), no tags, releases, or publishes
-# will happen for that repo — even if the global auto_publish is true.
+#   Rust library:
+#     auto_tag = true
+#     auto_release = true
+#     auto_publish = ["crates-io"]
+#
+#   CLI binary (app, not a library):
+#     auto_tag = true
+#     auto_release = false
+#     auto_publish = []
+#
+#   Mixed Rust+JS library:
+#     auto_tag = true
+#     auto_release = true
+#     auto_publish = ["crates-io", "npm"]
+#
+#   Internal daemon (private, no publish):
+#     auto_tag = true
+#     auto_release = false
+#     auto_publish = []
+#
+# Without auto_publish targets, no publishing happens.
+# Without auto_release = true, no GitHub Releases are created.
+# Tags are created by default for every version bump unless auto_tag = false.
 
 # =============================================================================
 #  SECTION 9: WEBHOOK
