@@ -1041,7 +1041,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         fs::write(dir.path().join("version.txt"), "1.2.3\n").unwrap();
         let result = detect_project_version(dir.path());
-        assert_eq!(result, Some(("1.2.3".to_string(), "version.txt".to_string())));
+        assert_eq!(result, Some(("1.2.3".to_string(), "version.txt")));
     }
 
     #[test]
