@@ -15,6 +15,7 @@ toml = "0.8"
 dracon-git = { path = "../../dracon-libs/tools/sync/dracon-git" }
 notify-rust = "4"
 parking_lot = "0.12"
+urlencoding = "2"
 
 [dev-dependencies]
 tempfile = "3"
