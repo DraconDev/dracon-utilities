@@ -261,7 +261,7 @@ pub(crate) fn sync_mirror_visibility(
         if auth == AuthType::GitLab {
             let token_var = remote.auto_create_token_var.as_deref().unwrap_or("GITLAB_TOKEN");
             if let Some(token) = load_secret(token_var, &sync_secrets_dir()) {
-                let resolved_name = remote.resolve_repo_name(repo_name);
+                let resolved_name = remote.resolve_repo_name(&repo_name);
                 if let Err(e) = set_gitlab_visibility(&account, &resolved_name, &token, github_private) {
                     eprintln!("⚠️ failed to set GitLab visibility for {}: {}", resolved_name, e);
                 } else if crate::policy::debug_enabled() {
@@ -275,7 +275,7 @@ pub(crate) fn sync_mirror_visibility(
         if auth == AuthType::Codeberg {
             let token_var = remote.auto_create_token_var.as_deref().unwrap_or("CODEBERG_TOKEN");
             if let Some(token) = load_secret(token_var, &sync_secrets_dir()) {
-                let resolved_name = remote.resolve_repo_name(repo_name);
+                let resolved_name = remote.resolve_repo_name(&repo_name);
                 if let Err(e) = set_codeberg_visibility(&account, &resolved_name, &token, github_private) {
                     eprintln!("⚠️ failed to set Codeberg visibility for {}: {}", resolved_name, e);
                 } else if crate::policy::debug_enabled() {
@@ -448,7 +448,7 @@ pub(crate) fn sync_mirror_metadata(
         if auth == AuthType::GitLab {
             let token_var = remote.auto_create_token_var.as_deref().unwrap_or("GITLAB_TOKEN");
             if let Some(token) = load_secret(token_var, &sync_secrets_dir()) {
-                let resolved_name = remote.resolve_repo_name(repo_name);
+                let resolved_name = remote.resolve_repo_name(&repo_name);
                 if let Err(e) = set_gitlab_metadata(&account, &resolved_name, &token, &meta) {
                     eprintln!("⚠️ failed to set GitLab metadata for {}: {}", resolved_name, e);
                 } else if crate::policy::debug_enabled() {
@@ -460,7 +460,7 @@ pub(crate) fn sync_mirror_metadata(
         if auth == AuthType::Codeberg {
             let token_var = remote.auto_create_token_var.as_deref().unwrap_or("CODEBERG_TOKEN");
             if let Some(token) = load_secret(token_var, &sync_secrets_dir()) {
-                let resolved_name = remote.resolve_repo_name(repo_name);
+                let resolved_name = remote.resolve_repo_name(&repo_name);
                 if let Err(e) = set_codeberg_metadata(&account, &resolved_name, &token, &meta) {
                     eprintln!("⚠️ failed to set Codeberg metadata for {}: {}", resolved_name, e);
                 } else if crate::policy::debug_enabled() {
