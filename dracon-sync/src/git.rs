@@ -1521,7 +1521,7 @@ pub(crate) fn create_repo_on_github(account: &str, repo_name: &str) -> Result<St
 
     // PAT from ~/.dracon/utilities/sync/secrets/github.env
     // Falls back to gh's stored auth (gh auth login) if PAT is not found.
-    // TODO: Consider making PAT mandatory if it proves reliable over time.
+    // Falls back to gh's stored auth (gh auth login) if env var is not found.
     if let Some(token) = load_secret("GH_TOKEN") {
         cmd.env("GH_TOKEN", token);
     }

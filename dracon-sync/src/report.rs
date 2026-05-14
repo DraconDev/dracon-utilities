@@ -288,11 +288,14 @@ pub(crate) fn build_commit_context(
 
     let focus_is_stale = focus_line.as_ref().map_or(false, |focus| {
         last_commit_subject.as_ref().map_or(false, |subj| {
+            // Strip conventional commit prefix ("category(scope): ") from subject
             let subj_body = subj.splitn(2, ": ").nth(1).unwrap_or(subj);
-            if focus.len() <= subj_body.len() {
-                subj_body.contains(focus.as_str())
+            // If focus is longer, subj_body is likely truncated — do prefix match
+            if focus.len() > subj_body.len() {
+                let truncated = &focus[..subj_body.len().min(focus.len())];
+                subj_body.starts_with(truncated)
             } else {
-                subj_body.starts_with(&focus[..subj_body.len().min(focus.len())])
+                subj_body.contains(focus.as_str())
             }
         })
     });
@@ -592,7 +595,10 @@ pub(crate) async fn git_log_recent_subjects(repo: &Path, count: usize) -> Vec<St
                 .filter(|l| !l.is_empty())
                 .collect()
         }
-        _ => Vec::new(),
+        _ => {
+            eprintln!("⚠️ git_log_recent_subjects: git log failed for {} (dedup guard disabled this cycle)", repo.display());
+            Vec::new()
+        }
     }
 }
 
