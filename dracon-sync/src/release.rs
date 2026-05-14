@@ -13,7 +13,7 @@ use std::process::Command;
 use crate::bump::{extract_version_from_cargo, extract_version_from_json};
 use crate::policy::{PublishRegistry, SyncPolicy};
 use crate::secrets::load_secret;
-use crate::git::run_git_with_timeout;
+use crate::git::{run_git_with_timeout, run_git_with_timeout_env, git_ssh_hardening};
 
 /// Result of a release pipeline step.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -65,11 +65,12 @@ pub(crate) async fn create_and_push_tag(repo: &Path, version: &str) -> Result<Re
     ).await?;
 
     // Push tag
-    match run_git_with_timeout(
+    match run_git_with_timeout_env(
         repo,
         &["push", "origin", &tag],
         120,
         "tag-push",
+        &[("GIT_SSH_COMMAND", &git_ssh_hardening()), ("GIT_TERMINAL_PROMPT", "0")],
     ).await {
         Ok(_) => {
             eprintln!("🏷️  Created and pushed tag {tag}");

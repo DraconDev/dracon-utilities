@@ -1448,7 +1448,7 @@ pub(crate) async fn push_to_named_remote(
 
     let mut last_err = None;
     for attempt in 1..=retries.max(1) {
-        match run_git_with_timeout_env(repo, &["push", remote_name, "HEAD"], timeout_secs, &format!("push-to-{}", remote_name), &[("GIT_TERMINAL_PROMPT", "0")]).await {
+        match run_git_with_timeout_env(repo, &["push", remote_name, "HEAD"], timeout_secs, &format!("push-to-{}", remote_name), &[("GIT_SSH_COMMAND", &ssh_hardening), ("GIT_TERMINAL_PROMPT", "0")]).await {
             Ok(()) => return Ok(()),
             Err(e) => {
                 let is_rejected = is_push_rejected(&e.to_string());
@@ -1460,7 +1460,7 @@ pub(crate) async fn push_to_named_remote(
                                 &["push", "--force-with-lease", remote_name, &format!("HEAD:refs/heads/{}", branch)],
                                 timeout_secs,
                                 &format!("force-push-to-{}", remote_name),
-                                &[("GIT_TERMINAL_PROMPT", "0")],
+                                &[("GIT_SSH_COMMAND", &ssh_hardening), ("GIT_TERMINAL_PROMPT", "0")],
                             ).await;
                             if force_result.is_ok() {
                                 return Ok(());
