@@ -973,9 +973,14 @@ async fn process_samples() -> Result<Vec<ProcSample>> {
     let out = Command::new("ps")
         .args(["-eo", "pid,ppid,pcpu,rss,comm,args", "--no-headers"])
         .output()
-        .await?;
+        .await
+        .map_err(|e| anyhow::anyhow!("ps spawn failed: {} (is /run/current-system/sw/bin on PATH?)", e))?;
     if !out.status.success() {
-        return Err(anyhow::anyhow!("ps command failed"));
+        return Err(anyhow::anyhow!(
+            "ps command failed (exit {}): {}",
+            out.status.code().unwrap_or(-1),
+            String::from_utf8_lossy(&out.stderr)
+        ));
     }
     Ok(parse_ps_output(&String::from_utf8_lossy(&out.stdout)))
 }
@@ -1398,7 +1403,11 @@ async fn count_zombie_processes() -> Result<u64> {
     let out = Command::new("ps").args(["-eo", "stat="]).output().await?;
 
     if !out.status.success() {
-        return Err(anyhow::anyhow!("ps command failed"));
+        return Err(anyhow::anyhow!(
+            "ps stat failed (exit {}): {}",
+            out.status.code().unwrap_or(-1),
+            String::from_utf8_lossy(&out.stderr)
+        ));
     }
 
     let text = String::from_utf8_lossy(&out.stdout);
