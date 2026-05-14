@@ -129,12 +129,19 @@ install_binary() {
         (cd "$subdir" && cargo build --release -p "$package")
     fi
 
+    local resolved=""
     if [ -f "$subdir/$bin_path" ]; then
-        cp "$subdir/$bin_path" ~/.local/bin/$binary
+        resolved="$subdir/$bin_path"
+    elif [ -f "$bin_path" ]; then
+        resolved="$bin_path"
+    fi
+
+    if [ -n "$resolved" ]; then
+        cp "$resolved" ~/.local/bin/$binary
         chmod +x ~/.local/bin/$binary
         echo "  ✅ Installed ~/.local/bin/$binary"
     else
-        echo "  ❌ ERROR: Could not find binary for $package"
+        echo "  ❌ ERROR: Could not find binary for $package (checked $subdir/$bin_path and $bin_path)"
         return 1
     fi
 }
