@@ -1978,46 +1978,35 @@ pub(crate) fn predict_fill_time(history: &[(Instant, u8)]) -> Option<f64> {
     Some(seconds_until_full / 3600.0) // Return hours
 }
 
-pub(crate) async fn run_guard_once(
-    guard: &GuardPolicy,
-    state: &mut GuardRuntimeState,
-) -> Result<GuardReport> {
-    let used = disk_use_percent_for(&guard.disk_mount_path).await?;
-    let dstate = disk_state(used, guard).to_string();
-    let marker = sync_freeze_marker_path(guard);
-    let mut sync_frozen = marker.exists();
-
-    // Track disk history for trend prediction
-    if guard.track_trends {
-        let now = Instant::now();
-        state.disk_history.push((now, used));
-
-        // Keep only last 100 samples (about 50 minutes at 30s interval)
-        if state.disk_history.len() > 100 {
-            let excess = state.disk_history.len() - 100;
-            state.disk_history.drain(0..excess);
-        }
-
-        // Check for trend prediction warning
-        if let Some(hours_until_full) = predict_fill_time(&state.disk_history) {
-            if hours_until_full > 0.0 && hours_until_full <= guard.trend_warn_hours as f64 {
-                let key = "disk-trend-warning".to_string();
-                if should_notify(state, &key, guard.notify_cooldown_secs.max(3600)) {
-                    send_notification(
-                        guard,
-                        "Dracon System Guard - Disk Trend Warning",
-                        &format!(
-                            "Disk predicted to fill in {:.1} hours (currently {}%)",
-                            hours_until_full, used
-                        ),
-                    )
-                    .await;
-                }
+async fn check_disk_trends(guard: &GuardPolicy, state: &mut GuardRuntimeState, used: u8) {
+    if !guard.track_trends {
+        return;
+    }
+    let now = Instant::now();
+    state.disk_history.push((now, used));
+    if state.disk_history.len() > 100 {
+        let excess = state.disk_history.len() - 100;
+        state.disk_history.drain(0..excess);
+    }
+    if let Some(hours_until_full) = predict_fill_time(&state.disk_history) {
+        if hours_until_full > 0.0 && hours_until_full <= guard.trend_warn_hours as f64 {
+            let key = "disk-trend-warning".to_string();
+            if should_notify(state, &key, guard.notify_cooldown_secs.max(3600)) {
+                send_notification(
+                    guard,
+                    "Dracon System Guard - Disk Trend Warning",
+                    &format!(
+                        "Disk predicted to fill in {:.1} hours (currently {}%)",
+                        hours_until_full, used
+                    ),
+                )
+                .await;
             }
         }
     }
+}
 
-    // Early warning notification (70% threshold)
+async fn check_disk_early_warning(guard: &GuardPolicy, state: &mut GuardRuntimeState, used: u8) {
     if used >= guard.disk_early_warn_percent && used < guard.disk_warn_percent {
         let key = "disk-early-warn".to_string();
         if should_notify(state, &key, guard.notify_cooldown_secs.max(1800)) {
@@ -2032,9 +2021,12 @@ pub(crate) async fn run_guard_once(
             .await;
         }
     }
+}
 
+fn manage_sync_freeze(guard: &GuardPolicy, used: u8, dstate: &str, sync_frozen: &mut bool) {
+    let marker = sync_freeze_marker_path(guard);
     if guard.freeze_sync_at_action && (dstate == "action" || dstate == "critical") {
-        if !sync_frozen {
+        if !*sync_frozen {
             if let Some(parent) = marker.parent() {
                 if let Err(e) = fs::create_dir_all(parent) {
                     eprintln!("failed to create freeze marker dir: {}", e);
@@ -2046,7 +2038,7 @@ pub(crate) async fn run_guard_once(
             ) {
                 eprintln!("failed to write freeze marker: {}", e);
             } else {
-                sync_frozen = true;
+                *sync_frozen = true;
                 emit_event(&DraconEvent::new(
                     "system",
                     EventSeverity::Warn,
@@ -2055,11 +2047,11 @@ pub(crate) async fn run_guard_once(
                 ));
             }
         }
-    } else if sync_frozen && used <= guard.unfreeze_below_percent {
+    } else if *sync_frozen && used <= guard.unfreeze_below_percent {
         if let Err(e) = fs::remove_file(&marker) {
             eprintln!("failed to remove freeze marker: {}", e);
         } else {
-            sync_frozen = false;
+            *sync_frozen = false;
             emit_event(&DraconEvent::new(
                 "system",
                 EventSeverity::Info,
@@ -2068,141 +2060,137 @@ pub(crate) async fn run_guard_once(
             ));
         }
     }
+}
 
-    // Comprehensive auto-cleanup when disk hits action/critical level
-    if dstate == "action" || dstate == "critical" {
-        let apply = guard.auto_cleanup_apply;
-        if !apply {
-            eprintln!("💡 disk at {}% — auto-cleanup is in dry-run mode (set auto_cleanup_apply = true to execute)", used);
+async fn run_auto_cleanup(guard: &GuardPolicy, state: &mut GuardRuntimeState, used: u8) -> Result<()> {
+    let apply = guard.auto_cleanup_apply;
+    if !apply {
+        eprintln!("💡 disk at {}% — auto-cleanup is in dry-run mode (set auto_cleanup_apply = true to execute)", used);
+    }
+    let mut total_reclaimed = 0u64;
+    let mut all_cleaned: Vec<String> = Vec::new();
+
+    if guard.auto_cleanup_rust {
+        let result = auto_cleanup_rust_targets(guard, state, apply).await?;
+        total_reclaimed += result.reclaimed_bytes;
+        for p in &result.cleaned_paths {
+            eprintln!("🧹 Rust: {}", p);
         }
-        let mut total_reclaimed = 0u64;
-        let mut all_cleaned: Vec<String> = Vec::new();
+        all_cleaned.extend(result.cleaned_paths);
+    }
 
-        // Rust target directories
-        if guard.auto_cleanup_rust {
-            let result = auto_cleanup_rust_targets(guard, state, apply).await?;
-            total_reclaimed += result.reclaimed_bytes;
-            for p in &result.cleaned_paths {
-                eprintln!("🧹 Rust: {}", p);
-            }
-            all_cleaned.extend(result.cleaned_paths);
-        }
-
-        // Trash
-        if guard.clean_trash {
-            match empty_trash(apply, &guard.protected_paths).await {
-                Ok((bytes, cleaned)) => {
-                    total_reclaimed += bytes;
-                    all_cleaned.extend(cleaned.iter().map(|s| format!("Trash: {}", s)));
-                    for c in &cleaned {
-                        eprintln!("🗑️ {}", c);
-                    }
+    if guard.clean_trash {
+        match empty_trash(apply, &guard.protected_paths).await {
+            Ok((bytes, cleaned)) => {
+                total_reclaimed += bytes;
+                all_cleaned.extend(cleaned.iter().map(|s| format!("Trash: {}", s)));
+                for c in &cleaned {
+                    eprintln!("🗑️ {}", c);
                 }
-                Err(e) => eprintln!("⚠️ Trash cleanup failed: {}", e),
             }
-        }
-
-        // Nix garbage
-        if guard.clean_nix_garbage {
-            match clean_nix_garbage(guard.nix_keep_generations, apply).await {
-                Ok((bytes, cleaned)) => {
-                    total_reclaimed += bytes;
-                    all_cleaned.extend(cleaned.iter().map(|s| format!("Nix: {}", s)));
-                    for c in &cleaned {
-                        eprintln!("📦 {}", c);
-                    }
-                }
-                Err(e) => eprintln!("⚠️ Nix cleanup failed: {}", e),
-            }
-        }
-
-        // Old node_modules
-        let roots: Vec<PathBuf> = guard
-            .node_modules_search_roots
-            .split(',')
-            .filter_map(|s| {
-                let s = s.trim();
-                if s.is_empty() {
-                    return None;
-                }
-                let p = expand_tilde(s);
-                if p.exists() {
-                    Some(p)
-                } else {
-                    None
-                }
-            })
-            .collect();
-        let (bytes, cleaned) = match clean_old_node_modules(
-            &roots,
-            guard.node_modules_max_age_days,
-            apply,
-            &guard.protected_paths,
-        )
-        .await
-        {
-            Ok(result) => result,
-            Err(e) => {
-                eprintln!("⚠️ Node modules cleanup failed: {}", e);
-                (0, vec![])
-            }
-        };
-        total_reclaimed += bytes;
-        all_cleaned.extend(cleaned.iter().map(|s| format!("Node: {}", s)));
-        for c in &cleaned {
-            eprintln!("📂 {}", c);
-        }
-
-        // Package caches
-        if guard.clean_package_caches {
-            match clean_package_caches(true, true, true, true, apply, &guard.protected_paths).await
-            {
-                Ok((bytes, cleaned)) => {
-                    total_reclaimed += bytes;
-                    all_cleaned.extend(cleaned.iter().map(|s| format!("Cache: {}", s)));
-                    for c in &cleaned {
-                        eprintln!("💾 {}", c);
-                    }
-                }
-                Err(e) => eprintln!("⚠️ Package cache cleanup failed: {}", e),
-            }
-        }
-
-        // Docker
-        if guard.docker_prune {
-            if apply {
-                match docker_prune(guard.auto_cleanup_apply, true, guard.docker_prune_volumes).await {
-                    Ok(bytes) => {
-                        total_reclaimed += bytes;
-                        if bytes > 0 {
-                            eprintln!("🐳 Docker prune: {}", human_bytes(bytes));
-                        }
-                    }
-                    Err(e) => eprintln!("⚠️ Docker prune failed: {}", e),
-                }
-            } else {
-                eprintln!("🐳 Would prune Docker (dry-run)");
-            }
-        }
-
-        // Notify if anything was cleaned
-        if total_reclaimed > 0 {
-            let key = "auto-cleanup".to_string();
-            if should_notify(state, &key, guard.notify_cooldown_secs.max(600)) {
-                send_notification(
-                    guard,
-                    "Dracon System Guard - Auto Cleanup",
-                    &format!(
-                        "Reclaimed {} ({} items cleaned)",
-                        human_bytes(total_reclaimed),
-                        all_cleaned.len()
-                    ),
-                )
-                .await;
-            }
+            Err(e) => eprintln!("⚠️ Trash cleanup failed: {}", e),
         }
     }
 
+    if guard.clean_nix_garbage {
+        match clean_nix_garbage(guard.nix_keep_generations, apply).await {
+            Ok((bytes, cleaned)) => {
+                total_reclaimed += bytes;
+                all_cleaned.extend(cleaned.iter().map(|s| format!("Nix: {}", s)));
+                for c in &cleaned {
+                    eprintln!("📦 {}", c);
+                }
+            }
+            Err(e) => eprintln!("⚠️ Nix cleanup failed: {}", e),
+        }
+    }
+
+    let roots: Vec<PathBuf> = guard
+        .node_modules_search_roots
+        .split(',')
+        .filter_map(|s| {
+            let s = s.trim();
+            if s.is_empty() {
+                return None;
+            }
+            let p = expand_tilde(s);
+            if p.exists() {
+                Some(p)
+            } else {
+                None
+            }
+        })
+        .collect();
+    let (bytes, cleaned) = match clean_old_node_modules(
+        &roots,
+        guard.node_modules_max_age_days,
+        apply,
+        &guard.protected_paths,
+    )
+    .await
+    {
+        Ok(result) => result,
+        Err(e) => {
+            eprintln!("⚠️ Node modules cleanup failed: {}", e);
+            (0, vec![])
+        }
+    };
+    total_reclaimed += bytes;
+    all_cleaned.extend(cleaned.iter().map(|s| format!("Node: {}", s)));
+    for c in &cleaned {
+        eprintln!("📂 {}", c);
+    }
+
+    if guard.clean_package_caches {
+        match clean_package_caches(true, true, true, true, apply, &guard.protected_paths).await
+        {
+            Ok((bytes, cleaned)) => {
+                total_reclaimed += bytes;
+                all_cleaned.extend(cleaned.iter().map(|s| format!("Cache: {}", s)));
+                for c in &cleaned {
+                    eprintln!("💾 {}", c);
+                }
+            }
+            Err(e) => eprintln!("⚠️ Package cache cleanup failed: {}", e),
+        }
+    }
+
+    if guard.docker_prune {
+        if apply {
+            match docker_prune(guard.auto_cleanup_apply, true, guard.docker_prune_volumes).await {
+                Ok(bytes) => {
+                    total_reclaimed += bytes;
+                    if bytes > 0 {
+                        eprintln!("🐳 Docker prune: {}", human_bytes(bytes));
+                    }
+                }
+                Err(e) => eprintln!("⚠️ Docker prune failed: {}", e),
+            }
+        } else {
+            eprintln!("🐳 Would prune Docker (dry-run)");
+        }
+    }
+
+    if total_reclaimed > 0 {
+        let key = "auto-cleanup".to_string();
+        if should_notify(state, &key, guard.notify_cooldown_secs.max(600)) {
+            send_notification(
+                guard,
+                "Dracon System Guard - Auto Cleanup",
+                &format!(
+                    "Reclaimed {} ({} items cleaned)",
+                    human_bytes(total_reclaimed),
+                    all_cleaned.len()
+                ),
+            )
+            .await;
+        }
+    }
+
+    Ok(())
+}
+
+async fn check_disk_state_change(guard: &GuardPolicy, state: &mut GuardRuntimeState, used: u8, dstate: &str) {
     if state.last_disk_state != dstate {
         let key = format!("disk-state-{dstate}");
         if should_notify(state, &key, guard.notify_cooldown_secs) {
@@ -2213,9 +2201,14 @@ pub(crate) async fn run_guard_once(
             )
             .await;
         }
-        state.last_disk_state = dstate.clone();
+        state.last_disk_state = dstate.to_string();
     }
+}
 
+async fn check_heavy_processes(
+    guard: &GuardPolicy,
+    state: &mut GuardRuntimeState,
+) -> Result<Vec<GuardProcessAlert>> {
     let exempt = parse_kinds(&guard.process_exempt_names);
     let samples = process_samples().await?;
     let mut current_heavy = HashSet::new();
@@ -2235,7 +2228,6 @@ pub(crate) async fn run_guard_once(
         let sustained = now.duration_since(*since).as_secs();
         let is_sustained = sustained >= guard.process_sustain_secs;
 
-        // Always log heavy processes to persistent log (even brief spikes)
         log_guard_event(
             guard,
             if is_sustained {
@@ -2300,140 +2292,175 @@ pub(crate) async fn run_guard_once(
         .heavy_since
         .retain(|pid, _| current_heavy.contains(pid));
 
-    // Clean up stale notify_cooldowns entries (older than 2x cooldown period)
-    let cooldown_cutoff =
-        Instant::now() - Duration::from_secs(guard.notify_cooldown_secs.saturating_mul(2));
+    Ok(alerts)
+}
+
+fn cleanup_stale_cooldowns(state: &mut GuardRuntimeState, cooldown_secs: u64) {
+    let cutoff = Instant::now() - Duration::from_secs(cooldown_secs.saturating_mul(2));
     state
         .notify_cooldowns
-        .retain(|_, &mut since| since > cooldown_cutoff);
+        .retain(|_, &mut since| since > cutoff);
+}
 
-    // Inode monitoring
-    if guard.monitor_inodes {
-        if let Ok(inode_percent) = inode_use_percent().await {
-            if inode_percent >= guard.inode_warn_percent {
-                let key = "inode-warning".to_string();
-                if should_notify(state, &key, guard.notify_cooldown_secs.max(1800)) {
-                    send_notification(
-                        guard,
-                        "Dracon System Guard - Inode Warning",
-                        &format!(
-                            "Inode usage at {}% (threshold: {}%) - disk may have space but no file slots",
-                            inode_percent, guard.inode_warn_percent
-                        ),
-                    )
-                    .await;
-                }
+async fn check_inode_usage(guard: &GuardPolicy, state: &mut GuardRuntimeState) {
+    if !guard.monitor_inodes {
+        return;
+    }
+    if let Ok(inode_percent) = inode_use_percent().await {
+        if inode_percent >= guard.inode_warn_percent {
+            let key = "inode-warning".to_string();
+            if should_notify(state, &key, guard.notify_cooldown_secs.max(1800)) {
+                send_notification(
+                    guard,
+                    "Dracon System Guard - Inode Warning",
+                    &format!(
+                        "Inode usage at {}% (threshold: {}%) - disk may have space but no file slots",
+                        inode_percent, guard.inode_warn_percent
+                    ),
+                )
+                .await;
             }
         }
     }
+}
 
-    // Zombie process monitoring
-    if guard.monitor_zombies {
-        if let Ok(zombie_count) = count_zombie_processes().await {
-            if zombie_count > guard.zombie_threshold {
-                let key = "zombie-warning".to_string();
-                if should_notify(state, &key, guard.notify_cooldown_secs.max(3600)) {
-                    send_notification(
-                        guard,
-                        "Dracon System Guard - Zombie Processes",
-                        &format!(
-                            "Detected {} zombie processes (threshold: {})",
-                            zombie_count, guard.zombie_threshold
-                        ),
-                    )
-                    .await;
-                }
+async fn check_zombie_processes(guard: &GuardPolicy, state: &mut GuardRuntimeState) {
+    if !guard.monitor_zombies {
+        return;
+    }
+    if let Ok(zombie_count) = count_zombie_processes().await {
+        if zombie_count > guard.zombie_threshold {
+            let key = "zombie-warning".to_string();
+            if should_notify(state, &key, guard.notify_cooldown_secs.max(3600)) {
+                send_notification(
+                    guard,
+                    "Dracon System Guard - Zombie Processes",
+                    &format!(
+                        "Detected {} zombie processes (threshold: {})",
+                        zombie_count, guard.zombie_threshold
+                    ),
+                )
+                .await;
             }
         }
     }
+}
 
-    // Large log file monitoring
-    if guard.monitor_logs && !guard.log_dirs.trim().is_empty() {
-        let log_dirs: Vec<PathBuf> = guard
-            .log_dirs
-            .split(',')
-            .filter_map(|s| {
-                let s = s.trim();
-                if s.is_empty() {
-                    return None;
-                }
-                let p = expand_tilde(s);
-                if p.exists() {
-                    Some(p)
-                } else {
-                    None
-                }
-            })
-            .collect();
+async fn check_large_logs(guard: &GuardPolicy, state: &mut GuardRuntimeState) {
+    if !guard.monitor_logs || guard.log_dirs.trim().is_empty() {
+        return;
+    }
 
-        if !log_dirs.is_empty() {
-            let min_size = guard.log_size_mb.saturating_mul(1024).saturating_mul(1024);
-            match find_large_log_files(&log_dirs, min_size).await {
-                Ok(logs) if !logs.is_empty() => {
-                    let key = "log-size-warning".to_string();
+    let log_dirs: Vec<PathBuf> = guard
+        .log_dirs
+        .split(',')
+        .filter_map(|s| {
+            let s = s.trim();
+            if s.is_empty() {
+                return None;
+            }
+            let p = expand_tilde(s);
+            if p.exists() {
+                Some(p)
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    if log_dirs.is_empty() {
+        return;
+    }
+
+    let min_size = guard.log_size_mb.saturating_mul(1024).saturating_mul(1024);
+    match find_large_log_files(&log_dirs, min_size).await {
+        Ok(logs) if !logs.is_empty() => {
+            let key = "log-size-warning".to_string();
+            if should_notify(state, &key, guard.notify_cooldown_secs.max(3600)) {
+                let top_logs: Vec<_> = logs.iter().take(3).collect();
+                let msg = format!(
+                    "Found {} large log files (>{:.0} MiB): {}",
+                    logs.len(),
+                    guard.log_size_mb,
+                    top_logs
+                        .iter()
+                        .map(|(p, s)| format!("{} ({})", p.display(), human_bytes(*s)))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                );
+                send_notification(guard, "Dracon System Guard - Large Log Files", &msg)
+                    .await;
+            }
+
+            if guard.auto_truncate_logs && guard.auto_cleanup_apply {
+                let max_size = guard.log_max_truncate_mb.saturating_mul(1024).saturating_mul(1024);
+                let preserve = guard.log_preserve_header_lines;
+                let mut total_reclaimed = 0u64;
+                for (path, original_size) in &logs {
+                    match truncate_log_file(path, max_size, preserve) {
+                        Ok(reclaimed) if reclaimed > 0 => {
+                            eprintln!(
+                                "📝 truncated {}: {} -> {} (reclaimed {})",
+                                path.display(),
+                                human_bytes(*original_size),
+                                human_bytes(original_size.saturating_sub(reclaimed)),
+                                human_bytes(reclaimed)
+                            );
+                            total_reclaimed += reclaimed;
+                        }
+                        Ok(_) => {}
+                        Err(e) => {
+                            eprintln!("⚠️ failed to truncate {}: {}", path.display(), e);
+                        }
+                    }
+                }
+                if total_reclaimed > 0 {
+                    let key = "log-truncated".to_string();
                     if should_notify(state, &key, guard.notify_cooldown_secs.max(3600)) {
-                        let top_logs: Vec<_> = logs.iter().take(3).collect();
-                        let msg = format!(
-                            "Found {} large log files (>{:.0} MiB): {}",
-                            logs.len(),
-                            guard.log_size_mb,
-                            top_logs
-                                .iter()
-                                .map(|(p, s)| format!("{} ({})", p.display(), human_bytes(*s)))
-                                .collect::<Vec<_>>()
-                                .join(", ")
-                        );
-                        send_notification(guard, "Dracon System Guard - Large Log Files", &msg)
-                            .await;
-                    }
-
-                    // Auto-truncate if enabled AND user has opted into automatic cleanup.
-                    // Unlike other auto-cleanup actions, log truncation is relatively safe,
-                    // but we still respect the global dry-run gate for consistency.
-                    if guard.auto_truncate_logs && guard.auto_cleanup_apply {
-                        let max_size = guard.log_max_truncate_mb.saturating_mul(1024).saturating_mul(1024);
-                        let preserve = guard.log_preserve_header_lines;
-                        let mut total_reclaimed = 0u64;
-                        for (path, original_size) in &logs {
-                            match truncate_log_file(path, max_size, preserve) {
-                                Ok(reclaimed) if reclaimed > 0 => {
-                                    eprintln!(
-                                        "📝 truncated {}: {} -> {} (reclaimed {})",
-                                        path.display(),
-                                        human_bytes(*original_size),
-                                        human_bytes(original_size.saturating_sub(reclaimed)),
-                                        human_bytes(reclaimed)
-                                    );
-                                    total_reclaimed += reclaimed;
-                                }
-                                Ok(_) => {}
-                                Err(e) => {
-                                    eprintln!("⚠️ failed to truncate {}: {}", path.display(), e);
-                                }
-                            }
-                        }
-                        if total_reclaimed > 0 {
-                            let key = "log-truncated".to_string();
-                            if should_notify(state, &key, guard.notify_cooldown_secs.max(3600)) {
-                                send_notification(
-                                    guard,
-                                    "Dracon System Guard - Logs Truncated",
-                                    &format!(
-                                        "Reclaimed {} from {} log file(s) (max now: {} MiB)",
-                                        human_bytes(total_reclaimed),
-                                        logs.len(),
-                                        guard.log_max_truncate_mb
-                                    ),
-                                )
-                                .await;
-                            }
-                        }
+                        send_notification(
+                            guard,
+                            "Dracon System Guard - Logs Truncated",
+                            &format!(
+                                "Reclaimed {} from {} log file(s) (max now: {} MiB)",
+                                human_bytes(total_reclaimed),
+                                logs.len(),
+                                guard.log_max_truncate_mb
+                            ),
+                        )
+                        .await;
                     }
                 }
-                _ => {}
             }
         }
+        _ => {}
     }
+}
+
+pub(crate) async fn run_guard_once(
+    guard: &GuardPolicy,
+    state: &mut GuardRuntimeState,
+) -> Result<GuardReport> {
+    let used = disk_use_percent_for(&guard.disk_mount_path).await?;
+    let dstate = disk_state(used, guard).to_string();
+    let marker = sync_freeze_marker_path(guard);
+    let mut sync_frozen = marker.exists();
+
+    check_disk_trends(guard, state, used).await;
+    check_disk_early_warning(guard, state, used).await;
+    manage_sync_freeze(guard, used, &dstate, &mut sync_frozen);
+
+    if dstate == "action" || dstate == "critical" {
+        run_auto_cleanup(guard, state, used).await?;
+    }
+
+    check_disk_state_change(guard, state, used, &dstate).await;
+
+    let alerts = check_heavy_processes(guard, state).await?;
+    cleanup_stale_cooldowns(state, guard.notify_cooldown_secs);
+
+    check_inode_usage(guard, state).await;
+    check_zombie_processes(guard, state).await;
+    check_large_logs(guard, state).await;
 
     Ok(GuardReport {
         enabled: guard.enabled,
