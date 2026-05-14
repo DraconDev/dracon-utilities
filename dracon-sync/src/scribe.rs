@@ -1,8 +1,6 @@
 use crate::simple_ai::{ChatMessage, SimpleAiService};
 use std::path::Path;
 
-/// Sanitize untrusted content before embedding it in an AI prompt.
-/// Strips lines that look like prompt injection attempts.
 fn sanitize_for_prompt(input: &str) -> String {
     let injection_patterns = [
         "IGNORE", "IGNORE ALL", "DISREGARD", "FORGET",
@@ -20,22 +18,54 @@ fn sanitize_for_prompt(input: &str) -> String {
         .join("\n")
 }
 
-fn collect_git_context(repo: &Path) -> (String, String) {
-    let git_log = std::process::Command::new("git")
-        .args(["log", "--format=%s%n  files: %(trailers:key=file,valueonly)", "-20"])
+fn collect_recent_diffs(repo: &Path, count: usize) -> Vec<String> {
+    let count_arg = format!("-{}", count);
+    let output = match std::process::Command::new("git")
+        .args(["log", &count_arg, "--pretty=format:%H", "--diff-filter=ACDMRT"])
         .current_dir(repo)
         .output()
-        .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
-        .unwrap_or_else(|_| "no git history".to_string());
+    {
+        Ok(o) if o.status.success() => String::from_utf8_lossy(&o.stdout).to_string(),
+        _ => return Vec::new(),
+    };
 
-    let git_files = std::process::Command::new("git")
-        .args(["log", "--oneline", "--name-only", "-10"])
+    let hashes: Vec<&str> = output.lines().map(|l| l.trim()).filter(|l| !l.is_empty()).collect();
+    let mut diffs = Vec::new();
+    for hash in hashes {
+        let diff = match std::process::Command::new("git")
+            .args(["diff", "--stat", "--unified=1", &format!("{}^..{}", hash, hash)])
+            .current_dir(repo)
+            .output()
+        {
+            Ok(o) if o.status.success() => {
+                let d = String::from_utf8_lossy(&o.stdout).to_string();
+                if d.lines().count() > 50 {
+                    d.lines().take(50).collect::<Vec<_>>().join("\n") + "\n... (truncated)"
+                } else {
+                    d
+                }
+            }
+            _ => continue,
+        };
+        diffs.push(diff);
+    }
+    diffs
+}
+
+fn collect_recent_subjects(repo: &Path, count: usize) -> Vec<String> {
+    let count_arg = format!("-{}", count);
+    match std::process::Command::new("git")
+        .args(["log", &count_arg, "--pretty=format:%s"])
         .current_dir(repo)
         .output()
-        .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
-        .unwrap_or_default();
-
-    (git_log, git_files)
+    {
+        Ok(o) if o.status.success() => String::from_utf8_lossy(&o.stdout)
+            .lines()
+            .map(|l| l.trim().to_string())
+            .filter(|l| !l.is_empty())
+            .collect(),
+        _ => Vec::new(),
+    }
 }
 
 fn collect_blueprint(repo: &Path) -> String {
