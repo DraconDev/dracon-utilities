@@ -370,7 +370,7 @@ Commands:
   validate-config  Validate the sync policy for errors and warnings
   repos            One-off report across discovered repositories
   repair-concerns  Repair concern repos (dry-run by default; use --apply to execute)
-  repair-warns     Repair warn repos (dirty-only triage; dry-run by default)
+  repair-warns     Repair warn repos [--apply] [--repo <path>] [--json]
   once             Run one sync pass
   daemon           Run continuous sync loop [--interval-secs override]
   sync-now         Sync one or more repositories now [--dry-run] [--force] [repos...]
@@ -382,7 +382,7 @@ Commands:
   metrics          Print Prometheus-style metrics
   stuck            Manage repos permanently stuck on push
   dual-branch      Manage repos with both main and master branches
-  repair-origins   Detect and repair orphan origin URLs
+  repair-origins   Detect and repair orphan origin URLs [--apply]
   publish          Manually publish a repo to configured registries [--dry-run]
   publish-status   Check current version and registry publish status
 ```
