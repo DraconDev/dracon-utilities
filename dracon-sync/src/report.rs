@@ -880,7 +880,7 @@ async fn handle_no_upstream(
     apply: bool,
     human: bool,
     push_timeout_secs: u64,
-    push_retries: u32,
+    _push_retries: u32,
     reason: &str,
     policy_path: &Path,
 ) -> bool {
@@ -1006,7 +1006,7 @@ async fn handle_ahead(
     push_retries: u32,
     blob_threshold: u64,
     rewrite_large_any: bool,
-    excluded_dir_names: &std::collections::HashSet<String>,
+    excluded_dir_names: &std::collections::BTreeSet<String>,
     reason: &str,
     policy_path: &Path,
     svc: &GitService,
