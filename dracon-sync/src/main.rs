@@ -959,7 +959,7 @@ remotes = []
         let lines = vec![
             "# HELP dracon_sync_info Dracon sync daemon info",
             "# TYPE dracon_sync_info gauge",
-            "dracon_sync_info{version=\"{}\"} 1",
+            format!("dracon_sync_info{{version=\"{}\"}} 1", env!("CARGO_PKG_VERSION")),
             "# HELP dracon_sync_repos_discovered_total gauge",
             "dracon_sync_repos_discovered_total 20",
             "# HELP dracon_sync_freeze_state gauge",
