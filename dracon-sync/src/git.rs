@@ -293,25 +293,48 @@ pub(crate) async fn run_child(
     label: &str,
 ) -> Result<()> {
     let pid = child.id();
-    match tokio::time::timeout(Duration::from_secs(timeout_secs), child.wait()).await {
+    let stderr_handle = child.stderr.take();
+    let stderr_task = tokio::spawn(async move {
+        if let Some(mut stderr) = stderr_handle {
+            use tokio::io::AsyncReadExt;
+            let mut buf = Vec::new();
+            let _ = stderr.read_to_end(&mut buf).await;
+            String::from_utf8_lossy(&buf).trim().to_string()
+        } else {
+            String::new()
+        }
+    });
+    let wait_result = tokio::time::timeout(Duration::from_secs(timeout_secs), child.wait()).await;
+    let stderr_output = stderr_task.await.unwrap_or_default();
+    match wait_result {
         Ok(Ok(status)) => {
             if status.success() {
                 Ok(())
-            } else {
+            } else if stderr_output.is_empty() {
                 Err(anyhow::anyhow!(
                     "{} failed in {} with status {}",
                     label,
                     workdir.display(),
                     status
                 ))
+            } else {
+                Err(anyhow::anyhow!(
+                    "{} failed in {} with status {}: {}",
+                    label,
+                    workdir.display(),
+                    status,
+                    stderr_output
+                ))
             }
         }
-        Ok(Err(e)) => Err(anyhow::anyhow!(
-            "{} failed in {}: {}",
-            label,
-            workdir.display(),
-            e
-        )),
+        Ok(Err(e)) => {
+            let detail = if stderr_output.is_empty() {
+                format!("{}", e)
+            } else {
+                format!("{}: {}", e, stderr_output)
+            };
+            Err(anyhow::anyhow!("{} failed in {}: {}", label, workdir.display(), detail))
+        }
         Err(_) => {
             if let Some(pid) = pid {
                 kill_descendants(pid).await;
