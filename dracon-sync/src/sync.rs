@@ -2595,4 +2595,93 @@ auto_bump_versions = false
         let staged_str = String::from_utf8_lossy(&staged.stdout);
         assert!(staged_str.trim().is_empty(), "nothing should be staged for filter-only repo");
     }
+
+    // ── Dedup guard tests ──
+
+    #[test]
+    fn test_dedup_spam_detection() {
+        // Helper: mirrors the dedup logic in sync_repo
+        fn is_dedup_spam(recent_subjects: &[String], msg_subject: &str) -> bool {
+            !recent_subjects.is_empty()
+                && recent_subjects.iter().all(|s| s == msg_subject)
+        }
+
+        // Empty history — no dedup
+        assert!(!is_dedup_spam(&[], "test"));
+
+        // One match — not enough to trigger (threshold is 2)
+        assert!(!is_dedup_spam(&["test".to_string()], "test"));
+
+        // Two matches — blocked
+        assert!(is_dedup_spam(&["test".to_string(), "test".to_string()], "test"));
+
+        // Mixed subjects — not blocked
+        assert!(!is_dedup_spam(&["test".to_string(), "other".to_string()], "test"));
+
+        // Different subject entirely — not blocked
+        assert!(!is_dedup_spam(&["other".to_string(), "other".to_string()], "test"));
+
+        // Empty string subject edge case
+        assert!(is_dedup_spam(&["".to_string(), "".to_string()], ""));
+        assert!(!is_dedup_spam(&["".to_string(), "".to_string()], "test"));
+    }
+
+    #[tokio::test]
+    async fn test_git_log_recent_subjects_empty_repo() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "log-subjects-repo");
+
+        let subjects = crate::report::git_log_recent_subjects(&repo, 5).await;
+        assert_eq!(subjects, vec!["init"], "fresh repo should only have init commit");
+    }
+
+    #[tokio::test]
+    async fn test_git_log_recent_subjects_multiple_commits() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "log-subjects-multi");
+
+        // Add two more commits with different subjects
+        std::fs::write(repo.join("a.txt"), "a").unwrap();
+        git_cmd(&repo, &["add", "."]);
+        git_cmd(&repo, &["commit", "-m", "add a"]);
+
+        std::fs::write(repo.join("b.txt"), "b").unwrap();
+        git_cmd(&repo, &["add", "."]);
+        git_cmd(&repo, &["commit", "-m", "add b"]);
+
+        let subjects = crate::report::git_log_recent_subjects(&repo, 2).await;
+        assert_eq!(subjects, vec!["add b", "add a"]);
+    }
+
+    #[tokio::test]
+    async fn test_dedup_guard_via_sync_repo() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "dedup-sync-repo");
+
+        let toml_str = r#"
+        auto_github_private = false
+        auto_commit = true
+        auto_pull = false
+        auto_push = false
+        auto_bump_versions = false
+        "#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        // First commit with a specific subject (manual)
+        std::fs::write(repo.join("a.txt"), "a").unwrap();
+        git_cmd(&repo, &["add", "."]);
+        git_cmd(&repo, &["commit", "-m", "duplicate subject"]);
+
+        // Second commit with same subject (manual) — this is the "recent" history
+        std::fs::write(repo.join("b.txt"), "b").unwrap();
+        git_cmd(&repo, &["add", "."]);
+        git_cmd(&repo, &["commit", "-m", "duplicate subject"]);
+
+        // Now sync_repo tries to commit a third time. The generated message
+        // won't match "duplicate subject", so the guard won't block. But we
+        // verify that sync_repo handles the guard gracefully (no crash).
+        std::fs::write(repo.join("c.txt"), "c").unwrap();
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
+        assert!(result.is_ok(), "sync_repo should not crash when dedup guard is active");
+    }
 }

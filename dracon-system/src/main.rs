@@ -759,14 +759,15 @@ fn default_process_exempt_names() -> String {
 }
 
 fn default_notify_command() -> String {
+    let user = std::env::var("USER").unwrap_or_else(|_| "dracon".to_string());
     let candidates = [
-        "/etc/profiles/per-user/dracon/bin/notify-send",
-        "/run/current-system/sw/bin/notify-send",
-        "/usr/bin/notify-send",
+        format!("/etc/profiles/per-user/{}/bin/notify-send", user),
+        "/run/current-system/sw/bin/notify-send".to_string(),
+        "/usr/bin/notify-send".to_string(),
     ];
     for path in &candidates {
         if std::path::Path::new(path).exists() {
-            return path.to_string();
+            return path;
         }
     }
     "/usr/bin/notify-send".to_string()
@@ -1675,19 +1676,28 @@ async fn empty_trash(apply: bool, protected_paths: &[String]) -> Result<(u64, Ve
     Ok((reclaimed, cleaned))
 }
 
+static RESOLVE_BIN_CACHE: std::sync::OnceLock<std::sync::Mutex<std::collections::HashMap<String, String>>> =
+    std::sync::OnceLock::new();
+
 fn resolve_bin(name: &str) -> String {
+    let cache = RESOLVE_BIN_CACHE.get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()));
+    {
+        if let Some(cached) = cache.lock().unwrap().get(name) {
+            return cached.clone();
+        }
+    }
     let nixos_paths = [
         "/run/current-system/sw/bin",
         "/etc/profiles/per-user/dracon/bin",
         "/nix/var/nix/profiles/default/bin",
     ];
-    for dir in &nixos_paths {
-        let path = std::path::Path::new(dir).join(name);
-        if path.exists() {
-            return path.to_string_lossy().to_string();
-        }
-    }
-    name.to_string()
+    let result = nixos_paths
+        .iter()
+        .find(|dir| std::path::Path::new(dir).join(name).exists())
+        .map(|dir| std::path::Path::new(dir).join(name).to_string_lossy().to_string())
+        .unwrap_or_else(|| name.to_string());
+    cache.lock().unwrap().insert(name.to_string(), result.clone());
+    result
 }
 
 /// Run nix-collect-garbage
