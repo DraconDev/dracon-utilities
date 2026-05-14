@@ -1,25 +1,29 @@
 # Project State
 
 ## Current Focus
-Fix commit spam loop: bumper treats .dracon/ and .pub as meaningful, stale project-state.md drives identical commit messages
+Idling — all planned fixes deployed
 
 ## Context
-193 consecutive commits with identical messages (fix(fix multi-remote): ...) triggered by 3 interacting bugs: (1) NOISE_PATTERNS missing .dracon/ and .pub so pubkey rotation triggered version bumps, (2) stale project-state.md with no AI keys configured produced identical category/scope every cycle, (3) warden publish_repo_pubkey wrote new keys making repos dirty. Added .dracon/ and .pub to NOISE_PATTERNS, added stale focus detection in build_commit_context, added noise-only shortcut to skip scribe and use 'chore: sync metadata', changed plaintext gitattributes from -filter -diff -merge to -filter only.
+Fixed commit spam loop (7 bugs across dracon-sync and dracon-system) and disk cleanup failures (5 bugs). All binaries rebuilt, installed, and services restarted. Dedup guard and improved stale check now active.
 
 ## Completed
-- [x] Fix A: Added .dracon/ and .pub to NOISE_PATTERNS in bump.rs
-- [x] Fix B: Verified original logic already returns None for noise+version-only diffs
-- [x] Fix C: Stale focus detection — if focus line appears in last commit subject, clear description/category/scope
-- [x] Fix D: Noise-only shortcut — skip scribe call, use 'chore: sync metadata' commit message
-- [x] Fix F: Changed plaintext gitattributes from `-filter -diff -merge` to `-filter` only (restores normal diffing for Cargo.toml/Cargo.lock etc.)
+- [x] Fix stale focus check in report.rs (symmetric comparison with prefix stripping)
+- [x] Add "fix" to action_words preventing fix(fix ...) scope
+- [x] Add commit dedup guard (blocks after 2 identical subjects)
+- [x] Fix nix-store collect-garbage → nix-collect-garbage
+- [x] Fix auto_cleanup_apply defaults to false → set true in config
+- [x] Fix notify_command to absolute path with auto-detection
+- [x] Fix sync_freeze_marker to writable location
+- [x] Fix pkill to absolute path in sync service
+- [x] Add resolve_bin() for NixOS binary path resolution
+- [x] Add better error messages for ps command failures
 
 ## In Progress
-- Fix H: Compiler warnings (SyncContext dead_code, filter_only_cleared unused)
+- None
 
 ## Blockers
 - None
 
 ## Next Steps
-1. Fix compiler warnings in dracon-sync
-2. Run full test suite
-3. Rebuild + deploy + restart services
+1. Monitor dedup guard in production
+2. Consider squashing 354 historical spam commits

@@ -1008,7 +1008,7 @@ async fn stage_commit_and_push(
     };
 
     let msg_subject = msg.lines().next().unwrap_or("").to_string();
-    let recent_subjects = crate::report::git_log_recent_subjects(repo, 3).await;
+    let recent_subjects = crate::report::git_log_recent_subjects(repo, 2).await;
     let is_duplicate_spam = !recent_subjects.is_empty()
         && recent_subjects.iter().all(|s| s == &msg_subject);
 
