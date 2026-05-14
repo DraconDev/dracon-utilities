@@ -1865,9 +1865,15 @@ fn backfill_env_headers_repos(repos: &[PathBuf], apply: bool) -> Result<(usize, 
     Ok((total_found, total_changed))
 }
 
+const STREAM_IO_MAX_BYTES: usize = 10 * 1024 * 1024; // 10 MiB
+
 fn run_filter(is_clean: bool, path: Option<&str>) -> Result<()> {
     let mut input = Vec::new();
     std::io::stdin().read_to_end(&mut input)?;
+    if input.len() > STREAM_IO_MAX_BYTES {
+        std::io::stdout().write_all(&input)?;
+        return Ok(());
+    }
     let warden = DraconWarden::new()?;
     let output = if is_clean {
         warden.clean(&input, path)?
