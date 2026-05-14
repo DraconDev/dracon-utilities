@@ -723,10 +723,11 @@ async fn post_commit_pull(
 }
 
 async fn restore_excluded_paths(
-    repo: &Path,
+    ctx: &SyncContext<'_>,
     to_restore: &[dracon_git::types::DiffFile],
-    policy: &SyncPolicy,
 ) -> Result<()> {
+    let repo = ctx.repo;
+    let policy = ctx.policy;
     let restorable: Vec<_> = to_restore.iter()
         .filter(|e| can_restore_entry(repo, e))
         .filter(|e| !repo.join(&e.path).is_dir() || !crate::exclude::is_gitlink_unchanged(repo, &e.path))
@@ -793,14 +794,14 @@ async fn run_release_pipeline_if_bumped(
 }
 
 async fn push_with_blob_check(
-    repo: &Path,
-    policy: &SyncPolicy,
-    blob_threshold: u64,
-    has_origin: bool,
+    ctx: &mut SyncContext<'_>,
     ahead: usize,
-    mut remote_failures: Option<&mut HashMap<String, usize>>,
-    dry_run: bool,
 ) -> Result<bool> {
+    let repo = ctx.repo;
+    let policy = ctx.policy;
+    let blob_threshold = ctx.blob_threshold;
+    let has_origin = ctx.has_origin;
+    let dry_run = ctx.dry_run;
     if !policy.auto_push || !has_origin || ahead == 0 {
         return Ok(true);
     }
@@ -881,13 +882,13 @@ async fn push_with_blob_check(
                     if let Some(ref url) = policy.webhook_url {
                         notify_webhook_failure(url, repo, name, &e.to_string());
                     }
-                    if let Some(ref mut rf) = remote_failures {
+                    if let Some(ref mut rf) = ctx.remote_failures {
                         *rf.entry(name.clone()).or_insert(0) += 1;
                     }
                 }
             }
             return Ok(false);
-        } else if let Some(ref mut rf) = remote_failures {
+        } else if let Some(ref mut rf) = ctx.remote_failures {
             for name in policy.remotes.iter().map(|r| r.name.clone()) {
                 rf.remove(&name);
             }
