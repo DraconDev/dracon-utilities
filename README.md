@@ -97,7 +97,7 @@ dracon-warden status    # Shows watch roots
 
 1. Discovers all git repos under `~/Dev` (up to 4 levels deep)
 2. Every 30 seconds, checks each repo for uncommitted changes
-3. Auto-commits with AI-generated messages (or fallback to timestamp)
+3. Auto-commits with AI-generated messages (or fallback to file-pattern)
 4. Pulls remote changes (with merge, not rebase — safer)
 5. Pushes to origin and any mirror remotes
 

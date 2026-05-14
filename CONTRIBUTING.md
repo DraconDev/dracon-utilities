@@ -55,7 +55,7 @@ cd dracon-ai && cargo build --release
 ### Testing
 
 ```bash
-# dracon-sync (349 tests, use --test-threads=1 for reliability)
+# dracon-sync (406 tests, use --test-threads=1 for reliability)
 cd dracon-sync
 export DRACON_SYNC_GIT_BIN=/run/current-system/sw/bin/git
 cargo test -- --test-threads=1
@@ -84,7 +84,7 @@ cargo clippy
 ### dracon-sync
 - **Purpose**: Git sync automation
 - **Key files**: `src/sync.rs`, `src/git.rs`, `src/report.rs`
-- **Tests**: 349 tests using `tempfile::TempDir`
+- **Tests**: 406 tests using `tempfile::TempDir`
 - **Config**: `~/.dracon/utilities/sync/dracon-sync.toml`
 
 ### dracon-system
@@ -134,7 +134,7 @@ When adding config options to a utility:
 
 ## Commit Messages
 
-Since this repo uses dracon-sync for auto-commit, you don't need to worry about commit messages if sync is running. The AI scribe generates commit messages from `project-state.md`.
+Since this repo uses dracon-sync for auto-commit, you don't need to worry about commit messages if sync is running. The AI scribe generates commit messages directly from diffs (with local file-pattern fallback).
 
 For manual commits, use conventional commits:
 ```

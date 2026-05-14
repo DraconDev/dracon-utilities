@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **dracon-sync**: Scribe refactor — commit messages from diffs, not `project-state.md`
+  - `generate_commit_message()`: AI receives current diff (main) + 10 previous diffs (background) + recent subjects → returns subject line
+  - `local_fallback_message()`: file-pattern fallback (e.g., "update auth, jwt and 2 files") when AI unavailable
+  - Removed `scribe_update()` and `stage_project_state()` — replaced by direct commit message generation
+  - Removed `read_project_focus`, `extract_category_scope_from_focus`, `extract_scope_from_focus`, `git_log_recent_subjects`
+  - `project-state.md` is now manual-only: sync no longer auto-generates, stages, or commits it
+  - `parse_conventional_commit()` extracts (category, scope, description) from AI subject to prevent double-prefix
+
 ### Added
 - **dracon-sync**: Mirror visibility sync (`sync_visibility` config)
   - Mirrors on Codeberg/GitLab automatically match GitHub's public/private status
