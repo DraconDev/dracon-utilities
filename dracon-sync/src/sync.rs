@@ -43,11 +43,13 @@ struct SyncContext<'a> {
     excluded_dir_names: &'a BTreeSet<String>,
     dry_run: bool,
     force_deletion: bool,
+    #[allow(dead_code)]
     idle_seconds: u64,
     policy_path: Option<&'a Path>,
     has_origin: bool,
     has_upstream: bool,
     blob_threshold: u64,
+    #[allow(dead_code)]
     auto_bump_versions: bool,
     remote_failures: Option<&'a mut HashMap<String, usize>>,
 }
