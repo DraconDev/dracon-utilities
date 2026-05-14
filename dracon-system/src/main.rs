@@ -1689,7 +1689,8 @@ async fn clean_nix_garbage(keep_generations: u32, apply: bool) -> Result<(u64, V
 
     if apply && keep_generations > 0 {
         let gen_arg = keep_generations.to_string();
-        if let Err(e) = Command::new("nix-env")
+        let nix_env = resolve_bin("nix-env");
+        if let Err(e) = Command::new(&nix_env)
             .arg("--delete-generations")
             .arg(&gen_arg)
             .output()
@@ -1698,7 +1699,7 @@ async fn clean_nix_garbage(keep_generations: u32, apply: bool) -> Result<(u64, V
             errs.push(format!("nix-env delete generations: {}", e));
         }
 
-        if let Err(e) = Command::new("nix-env")
+        if let Err(e) = Command::new(&nix_env)
             .arg("--delete-generations")
             .arg(&gen_arg)
             .arg("-p")
@@ -1717,7 +1718,8 @@ async fn clean_nix_garbage(keep_generations: u32, apply: bool) -> Result<(u64, V
         args.push("--dry-run");
     }
 
-    let out = Command::new("nix-collect-garbage")
+    let nix_gc = resolve_bin("nix-collect-garbage");
+    let out = Command::new(&nix_gc)
         .args(&args)
         .output()
         .await
