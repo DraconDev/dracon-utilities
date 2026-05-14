@@ -414,6 +414,22 @@ To bypass: manually stage and commit the deletions with `git add -A && git commi
 
 **Incident response after a block:** Read the incident ledger at `~/.local/state/dracon/dracon-sync-incidents.jsonl` to understand what was blocked and why.
 
+**dracon-sync commit dedup guard:** The sync daemon will refuse to auto-commit if the last 2 commit subjects match the new commit subject. This prevents commit spam loops where the same message is generated repeatedly (e.g., from scribe stale-focus bugs).
+
+When triggered, sync logs a structured JSON line and resets staged changes:
+```
+{"ts":...,"level":"INFO","msg":"skipped commit: subject 'fix(spam)' repeated 2 times (dedup guard)","repo":"/path/to/repo"}
+```
+
+The commit is skipped and `SyncOutcome::NothingToDo` is returned. The daemon continues normally on the next cycle.
+
+**Behavior:**
+- Threshold: 2 consecutive identical subjects trigger the guard
+- Detection: reads last N commit subjects via `git log -N --pretty=format:%s`
+- Reset: `git reset HEAD --` clears staged changes after skip
+- Graceful degradation: if `git log` fails, the guard is disabled with a warning
+- Bypass: not needed — changing the commit subject (any real work) naturally resets the window
+
 ### dracon-system
 
 ```

@@ -458,7 +458,7 @@ async fn check_mass_deletion(
     if is_mass_deletion {
         let pct = (missing_count * 100) / total_tracked;
         let reason = format!("{} files missing from working tree ({}% of {} tracked)", missing_count, pct, total_tracked);
-        eprintln!("⚠️ SAFETY: {}", reason);
+        log_warn!("SAFETY: {}", reason);
         eprintln!("⚠️ Refusing to stage mass deletion - this looks like a mistake or destructive operation");
         eprintln!("⚠️ If you really want to delete these files, do: git add -A && git commit -m 'delete files'");
         MASS_DELETION_GUARD_BLOCKED.fetch_add(1, Ordering::Relaxed);
@@ -839,7 +839,7 @@ async fn push_with_blob_check(
     } {
         Ok(()) => {}
         Err(e) => {
-            eprintln!("⚠️ push failed for {}: {}", repo.display(), e);
+            log_warn!("push failed for {}: {}", repo.display(), e);
             if let Some(ref url) = policy.webhook_url {
                 notify_webhook_failure(url, repo, "origin", &e.to_string());
             }
@@ -880,7 +880,7 @@ async fn push_with_blob_check(
         if !all_ok {
             for (name, result) in &push_results {
                 if let Err(e) = result {
-                    eprintln!("⚠️ push to {} failed for {}: {}", name, repo.display(), e);
+                    log_warn!("push to {} failed for {}: {}", name, repo.display(), e);
                     if let Some(ref url) = policy.webhook_url {
                         notify_webhook_failure(url, repo, name, &e.to_string());
                     }
@@ -981,7 +981,7 @@ async fn stage_commit_and_push(
             return Err(anyhow::anyhow!("sync_repo: failed to reset HEAD after filter-only commit: {}", e));
         }
         if debug_enabled() {
-            eprintln!("🐛 {} skipped commit: all changes were filter-only (smudge/clean)", repo.display());
+            log_repo_info!(repo.to_string_lossy(), "skipped commit: all changes were filter-only (smudge/clean)");
         }
         maybe_sync_visibility_and_metadata(ctx);
         return Ok(Some(SyncOutcome::NothingToDo));
@@ -1055,7 +1055,7 @@ async fn stage_commit_and_push(
     if policy.auto_push && has_origin {
         let push_ok = push_with_blob_check(ctx, 1).await?;
         if !push_ok {
-            eprintln!("⚠️ some mirror pushes failed for {}", repo.display());
+            log_warn!("some mirror pushes failed for {}", repo.display());
         }
     }
 

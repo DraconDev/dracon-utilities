@@ -596,7 +596,7 @@ pub(crate) async fn git_log_recent_subjects(repo: &Path, count: usize) -> Vec<St
                 .collect()
         }
         _ => {
-            eprintln!("⚠️ git_log_recent_subjects: git log failed for {} (dedup guard disabled this cycle)", repo.display());
+            log_warn!("git_log_recent_subjects: git log failed for {} (dedup guard disabled this cycle)", repo.display());
             Vec::new()
         }
     }
