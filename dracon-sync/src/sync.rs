@@ -1100,6 +1100,7 @@ pub(crate) async fn sync_repo(
     Ok(SyncOutcome::NothingToDo)
 }
 
+#[cfg(test)]
 mod tests {
     use super::*;
 
