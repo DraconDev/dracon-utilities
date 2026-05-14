@@ -177,19 +177,17 @@ async fn get_bump_info(repo: &Path) -> Option<(String, String, String)> {
 }
 
 fn maybe_sync_visibility_and_metadata(
-    repo: &Path,
-    policy: &SyncPolicy,
-    dry_run: bool,
+    ctx: &SyncContext<'_>,
 ) {
-    if dry_run || (!policy.sync_visibility && !policy.sync_metadata) {
+    if ctx.dry_run || (!ctx.policy.sync_visibility && !ctx.policy.sync_metadata) {
         return;
     }
-    if let Some(origin_url) = crate::git::multi_remote::get_remote_url(repo, "origin") {
-        if policy.sync_metadata {
-            sync_mirror_metadata(&origin_url, &policy.remotes, repo, policy.sync_visibility_interval_hours);
+    if let Some(origin_url) = crate::git::multi_remote::get_remote_url(ctx.repo, "origin") {
+        if ctx.policy.sync_metadata {
+            sync_mirror_metadata(&origin_url, &ctx.policy.remotes, ctx.repo, ctx.policy.sync_visibility_interval_hours);
         }
-        if policy.sync_visibility {
-            sync_mirror_visibility(&origin_url, &policy.remotes, repo, policy.sync_visibility_interval_hours);
+        if ctx.policy.sync_visibility {
+            sync_mirror_visibility(&origin_url, &ctx.policy.remotes, ctx.repo, ctx.policy.sync_visibility_interval_hours);
         }
     }
 }
@@ -423,12 +421,13 @@ enum MassDeletionCheck {
 }
 
 async fn check_mass_deletion(
-    repo: &Path,
+    ctx: &SyncContext<'_>,
     missing: &[String],
-    force_deletion: bool,
-    dry_run: bool,
-    policy_path: Option<&Path>,
 ) -> Result<MassDeletionCheck> {
+    let repo = ctx.repo;
+    let force_deletion = ctx.force_deletion;
+    let dry_run = ctx.dry_run;
+    let policy_path = ctx.policy_path;
     if force_deletion {
         eprintln!("⚠️ --force: bypassing mass-deletion safety guard for {} ({} files)", repo.display(), missing.len());
         return Ok(MassDeletionCheck::Ok);
