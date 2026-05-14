@@ -1126,9 +1126,11 @@ pub(crate) async fn sync_repo(
             );
         }
         if !to_stage.is_empty() {
-            stage_commit_and_push(
+            if let Some(outcome) = stage_commit_and_push(
                 &svc, &mut ctx, &status, &to_stage, &to_restore,
-            ).await?;
+            ).await? {
+                return Ok(outcome);
+            }
         } else if policy.auto_push && !has_origin {
             eprintln!("ℹ️ skip push for {} (no origin remote)", repo.display());
         }
