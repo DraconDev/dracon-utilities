@@ -3,7 +3,7 @@ use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
-use crate::{log_error, log_warn, log_repo_info};
+use crate::{log_error, log_warn};
 
 use anyhow::Result;
 use dracon_git::{build_commit_message, GitService};
@@ -1008,21 +1008,6 @@ async fn stage_commit_and_push(
     } else {
         build_commit_message(&commit_ctx)
     };
-
-    let msg_subject = msg.lines().next().unwrap_or("").to_string();
-    let recent_subjects = crate::report::git_log_recent_subjects(repo, 2).await;
-    let is_duplicate_spam = !recent_subjects.is_empty()
-        && recent_subjects.iter().all(|s| s == &msg_subject);
-
-    if is_duplicate_spam {
-        log_repo_info!(repo.to_string_lossy().as_ref(), "skipped commit: subject '{}' repeated {} times (dedup guard)", msg_subject, recent_subjects.len());
-        if let Err(e) = run_git_with_timeout(repo, &["reset", "HEAD", "--"], 10, "reset").await {
-            log_error!("sync_repo: failed to reset HEAD after dedup skip for {}: {}", repo.display(), e);
-            return Err(anyhow::anyhow!("sync_repo: failed to reset HEAD after dedup skip: {}", e));
-        }
-        maybe_sync_visibility_and_metadata(ctx);
-        return Ok(Some(SyncOutcome::NothingToDo));
-    }
 
     if dry_run {
         println!("📝 Would commit {} file(s) in {}:", committed_entries.len(), repo.display());
