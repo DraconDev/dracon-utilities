@@ -2773,55 +2773,849 @@ async fn is_git_tracked_dir(path: &Path) -> Result<bool> {
 #[allow(clippy::items_after_test_module)]
 mod tests;
 
+async fn cmd_status(json: bool) -> Result<()> {
+    let report = build_status_report().await?;
+    if json {
+        println!("{}", serde_json::to_string_pretty(&report)?);
+    } else {
+        println!("system_root: {}", report.system_root);
+        println!("nixos_root: {}", report.nixos_root);
+        println!("sync_policy: {}", report.sync_policy);
+        println!("system_policy: {}", report.system_policy);
+        println!("sync_service_active: {}", report.sync_service_active);
+        println!("warden_service_active: {}", report.warden_service_active);
+    }
+    Ok(())
+}
+
+async fn cmd_doctor(json: bool, strict: bool) -> Result<()> {
+    let report = build_doctor_report().await;
+    if json {
+        println!("{}", serde_json::to_string_pretty(&report)?);
+    } else {
+        println!("system_root_exists: {}", report.system_root_exists);
+        println!("nixos_root_exists: {}", report.nixos_root_exists);
+        println!("canonical_libs_exists: {}", report.canonical_libs_exists);
+        println!("canonical_utils_exists: {}", report.canonical_utils_exists);
+        println!("sync_policy_exists: {}", report.sync_policy_exists);
+        println!(
+            "legacy_config_dracon_exists: {}",
+            report.legacy_config_dracon_exists
+        );
+        println!("sync_service_active: {}", report.sync_service_active);
+        println!("warden_service_active: {}", report.warden_service_active);
+    }
+    if strict {
+        let mut violations = Vec::new();
+        if report.legacy_config_dracon_exists {
+            violations.push("legacy ~/.config/dracon exists".to_string());
+        }
+        if !violations.is_empty() {
+            return Err(anyhow::anyhow!(
+                "strict doctor failed: {}",
+                violations.join("; ")
+            ));
+        }
+    }
+    Ok(())
+}
+
+async fn cmd_storage(
+    root: Option<PathBuf>,
+    json: bool,
+    cleanup: bool,
+    apply: bool,
+    allow_tracked: bool,
+    min_size_mb: Option<u64>,
+    kinds: Option<String>,
+) -> Result<()> {
+    let (_, policy) = load_system_policy()?;
+    let root = root.unwrap_or_else(|| {
+        if !policy.storage.default_root.trim().is_empty() {
+            return PathBuf::from(policy.storage.default_root.clone());
+        }
+        dirs::home_dir()
+            .unwrap_or_else(|| PathBuf::from("/home"))
+            .join("Dev")
+    });
+    let min_size_mb = min_size_mb.unwrap_or(policy.storage.min_size_mb);
+    let kinds = kinds.unwrap_or_else(|| policy.storage.kinds.clone());
+
+    let report = analyze_workspace_storage(&root, 15, 25).await?;
+
+    if json {
+        println!("{}", serde_json::to_string_pretty(&report)?);
+        return Ok(());
+    }
+
+    println!("Workspace: {}", report.root.display());
+    println!();
+    println!("Top projects:");
+    for item in &report.top_projects {
+        println!("  {:>10}  {}", human_bytes(item.bytes), item.path.display());
+    }
+
+    println!();
+    println!("Top hotspots:");
+    for item in &report.top_hotspots {
+        println!(
+            "  {:>10}  {:<12} {}",
+            human_bytes(item.bytes),
+            item.kind,
+            item.path.display()
+        );
+    }
+
+    if cleanup {
+        let cfg = CleanupConfig {
+            apply,
+            allow_tracked,
+            min_size_mb,
+            kinds: parse_kinds(&kinds),
+        };
+        let threshold = cfg.min_size_mb.saturating_mul(1024 * 1024);
+        let selected: Vec<_> = report
+            .top_hotspots
+            .iter()
+            .filter(|h| cfg.kinds.contains(&h.kind) && h.bytes >= threshold)
+            .collect();
+
+        println!();
+        println!(
+            "Cleanup mode: {}",
+            if cfg.apply { "APPLY" } else { "DRY-RUN" }
+        );
+        println!("Kinds: {}", {
+            let mut v: Vec<_> = cfg.kinds.iter().cloned().collect();
+            v.sort();
+            v.join(",")
+        });
+        println!("Min size: {} MiB", cfg.min_size_mb);
+        println!("Allow tracked: {}", cfg.allow_tracked);
+        println!("Selected paths: {}", selected.len());
+
+        let mut total = 0u64;
+        let mut actionable = Vec::new();
+        for item in selected {
+            let tracked = is_git_tracked_dir(&item.path).await.unwrap_or(true);
+            if tracked && !cfg.allow_tracked {
+                println!(
+                    "  {:>10}  {:<12} {}  [SKIP tracked]",
+                    human_bytes(item.bytes),
+                    item.kind,
+                    item.path.display()
+                );
+                continue;
+            }
+            total += item.bytes;
+            println!(
+                "  {:>10}  {:<12} {}{}",
+                human_bytes(item.bytes),
+                item.kind,
+                item.path.display(),
+                if tracked { "  [tracked]" } else { "" }
+            );
+            actionable.push(item.path.clone());
+        }
+        println!("Estimated reclaimed: {}", human_bytes(total));
+
+        let user_protected = policy.guard.protected_paths.clone();
+        if cfg.apply {
+            for path in actionable {
+                let safe_path = check_safe_to_delete(&path, &user_protected)?;
+                if safe_path.exists() {
+                    println!("Deleting {}", path.display());
+                    tokio::fs::remove_dir_all(&safe_path).await?;
+                }
+            }
+        } else {
+            println!("No changes made. Re-run with --apply to execute cleanup.");
+        }
+    }
+
+    Ok(())
+}
+
+fn cmd_link(cmd: LinkCommands) -> Result<()> {
+    let (_, policy) = load_system_policy()?;
+    match cmd {
+        LinkCommands::Status { json } | LinkCommands::Doctor { json } => {
+            let report = build_link_report(&policy);
+            if json {
+                println!("{}", serde_json::to_string_pretty(&report)?);
+            } else {
+                println!("links_total: {}", report.total);
+                println!("links_healthy: {}", report.healthy);
+                println!("links_drifted: {}", report.drifted);
+                println!("links_missing_target: {}", report.missing_target);
+                println!("links_missing_link: {}", report.missing_link);
+                for item in report.entries {
+                    println!(
+                        "- {} -> {} [{}]",
+                        item.link,
+                        item.target,
+                        if item.issue == "ok" {
+                            "ok".to_string()
+                        } else {
+                            item.issue
+                        }
+                    );
+                }
+            }
+        }
+        LinkCommands::Apply {
+            json,
+            force_replace,
+        } => {
+            let report = apply_link_policy(&policy, force_replace)?;
+            if json {
+                println!("{}", serde_json::to_string_pretty(&report)?);
+            } else {
+                println!("Applied link policy.");
+                println!("links_total: {}", report.total);
+                println!("links_healthy: {}", report.healthy);
+                println!("links_drifted: {}", report.drifted);
+            }
+        }
+    }
+    Ok(())
+}
+
+async fn cmd_guard_once(guard: &GuardPolicy, json: bool) -> Result<()> {
+    let mut runtime = GuardRuntimeState::default();
+    let report = run_guard_once(guard, &mut runtime).await?;
+    if json {
+        println!("{}", serde_json::to_string_pretty(&report)?);
+    } else {
+        println!("guard_enabled: {}", report.enabled);
+        println!("disk_use_percent: {}", report.disk_use_percent);
+        println!("disk_state: {}", report.disk_state);
+        println!("sync_frozen: {}", report.sync_frozen);
+        println!("alerts: {}", report.alerts.len());
+        for a in report.alerts {
+            println!(
+                "- pid={} cmd={} cpu={:.1}% rss={}MiB sustained={}s action={}",
+                a.pid,
+                a.command,
+                a.cpu_percent,
+                a.rss_mb,
+                a.sustained_secs,
+                a.action
+            );
+        }
+    }
+    Ok(())
+}
+
+async fn cmd_guard_daemon(guard: &mut GuardPolicy) -> Result<()> {
+    if !guard.enabled {
+        println!("guard disabled in policy");
+        return Ok(());
+    }
+    let _lock = acquire_daemon_lock("dracon-system-guard")
+        .with_context(|| "failed to acquire guard daemon lock")?;
+    let shutdown = Arc::new(AtomicBool::new(false));
+    let shutdown_sigterm = shutdown.clone();
+    let shutdown_sigint = shutdown.clone();
+    let reload = Arc::new(AtomicBool::new(false));
+    let reload_sighup = reload.clone();
+    let reload_sighup_handler = reload.clone();
+
+    tokio::spawn(async move {
+        if let Ok(mut sig) = tokio::signal::unix::signal(
+            tokio::signal::unix::SignalKind::terminate(),
+        ) {
+            sig.recv().await;
+            veprintln!(1, "system: received SIGTERM, shutting down gracefully...");
+            shutdown_sigterm.store(true, Ordering::SeqCst);
+        } else {
+            eprintln!("system: failed to set up SIGTERM handler");
+        }
+    });
+
+    tokio::spawn(async move {
+        if let Ok(mut sig) = tokio::signal::unix::signal(
+            tokio::signal::unix::SignalKind::interrupt(),
+        ) {
+            sig.recv().await;
+            veprintln!(1, "system: received SIGINT, shutting down gracefully...");
+            shutdown_sigint.store(true, Ordering::SeqCst);
+        } else {
+            eprintln!("system: failed to set up SIGINT handler");
+        }
+    });
+
+    tokio::spawn(async move {
+        if let Ok(mut sig) =
+            tokio::signal::unix::signal(tokio::signal::unix::SignalKind::hangup())
+        {
+            while sig.recv().await.is_some() {
+                veprintln!(1, "system: received SIGHUP, reloading policy...");
+                reload_sighup_handler.store(true, Ordering::SeqCst);
+            }
+        } else {
+            eprintln!("system: failed to set up SIGHUP handler");
+        }
+    });
+
+    veprintln!(
+        1,
+        "guard daemon started (interval={}s)",
+        guard.interval_secs
+    );
+    let interval = guard.interval_secs;
+    let mut elapsed = 0u64;
+    let mut runtime = GuardRuntimeState::default();
+    while !shutdown.load(Ordering::SeqCst) {
+        if reload_sighup.load(Ordering::SeqCst) {
+            reload_sighup.store(false, Ordering::SeqCst);
+            let result = load_system_policy();
+            match result {
+                Ok((policy_path, new_policy)) => {
+                    if policy_path.is_none() {
+                        eprintln!("system: SIGHUP reload warning: no policy file found, using defaults");
+                        emit_event(&DraconEvent::new(
+                            "system",
+                            EventSeverity::Warn,
+                            "guard/policy-reload",
+                            "SIGHUP reload: no policy file found, using defaults"
+                                .to_string(),
+                        ));
+                    }
+                    *guard = new_policy.guard;
+                    normalize_guard_policy(guard);
+                    runtime.heavy_since.clear();
+                    veprintln!(2, "system: policy reloaded on SIGHUP (disk_warn={}%, disk_critical={}%)",
+                        guard.disk_warn_percent, guard.disk_critical_percent);
+                }
+                Err(e) => {
+                    eprintln!("system: SIGHUP reload warning: corrupted policy file, using defaults: {}", e);
+                    emit_event(&DraconEvent::new(
+                        "system",
+                        EventSeverity::Error,
+                        "guard/policy-reload",
+                        format!(
+                            "SIGHUP reload: policy corrupted, using defaults: {}",
+                            e
+                        ),
+                    ));
+                }
+            }
+        }
+        if let Err(e) = run_guard_once(guard, &mut runtime).await {
+            eprintln!("guard pass failed: {}", e);
+            emit_event(&DraconEvent::new(
+                "system",
+                EventSeverity::Error,
+                "guard",
+                format!("pass failed: {e}"),
+            ));
+        }
+        while !shutdown.load(Ordering::SeqCst) && elapsed < interval {
+            sleep(Duration::from_secs(1)).await;
+            elapsed += 1;
+        }
+    }
+    veprintln!(1, "system: guard daemon shutdown complete");
+    Ok(())
+}
+
+async fn cmd_guard_prune(
+    guard: &GuardPolicy,
+    json: bool,
+    docker: bool,
+    docker_volumes: bool,
+    package_caches: bool,
+    apply: bool,
+) -> Result<()> {
+    let mut reclaimed_total = 0u64;
+    let mut actions = Vec::new();
+
+    if docker || docker_volumes {
+        if apply {
+            match docker_prune(apply, docker, docker_volumes).await {
+                Ok(bytes) => {
+                    actions.push(format!("Docker prune: {}", human_bytes(bytes)));
+                    reclaimed_total += bytes;
+                }
+                Err(e) => {
+                    actions.push(format!("Docker prune failed: {}", e));
+                }
+            }
+        } else {
+            actions.push("Docker prune (dry-run, skipped)".to_string());
+        }
+    }
+
+    if package_caches {
+        match clean_package_caches(
+            true,
+            true,
+            true,
+            true,
+            apply,
+            &guard.protected_paths,
+        )
+        .await
+        {
+            Ok((bytes, cleaned)) => {
+                for c in cleaned {
+                    actions.push(format!("Package cache: {}", c));
+                }
+                reclaimed_total += bytes;
+            }
+            Err(e) => {
+                actions.push(format!("Package cache cleanup failed: {}", e));
+            }
+        }
+    }
+
+    if !docker && !docker_volumes && !package_caches {
+        let disk = disk_use_percent_for(&guard.disk_mount_path).await?;
+        println!("Disk usage: {}% (mount: {})", disk, guard.disk_mount_path);
+
+        if let Ok((total, used, _free)) = get_inode_info().await {
+            let pct =
+                used.saturating_mul(100).checked_div(total).unwrap_or(0) as u8;
+            println!("Inode usage: {}% ({}/{} inodes used)", pct, used, total);
+        }
+
+        println!();
+        println!("Potential cleanup targets:");
+        println!("  --docker          Prune unused Docker images/containers");
+        println!("  --docker-volumes  Prune Docker volumes too (aggressive)");
+        println!("  --package-caches  Clean cargo/npm/pip/go caches");
+        println!();
+        println!("Add --apply to execute cleanup.");
+    }
+
+    if json {
+        #[derive(Serialize)]
+        struct PruneReport {
+            reclaimed_bytes: u64,
+            reclaimed_human: String,
+            actions: Vec<String>,
+        }
+        let report = PruneReport {
+            reclaimed_bytes: reclaimed_total,
+            reclaimed_human: human_bytes(reclaimed_total),
+            actions,
+        };
+        println!("{}", serde_json::to_string_pretty(&report)?);
+    } else if !actions.is_empty() {
+        println!("Prune results:");
+        for a in &actions {
+            println!("  - {}", a);
+        }
+        println!("Total reclaimed: {}", human_bytes(reclaimed_total));
+
+        if !apply && (docker || docker_volumes || package_caches) {
+            println!();
+            println!("Note: This was a dry-run. Add --apply to execute.");
+        }
+    }
+
+    Ok(())
+}
+
+async fn cmd_guard_clean(
+    guard: &GuardPolicy,
+    json: bool,
+    apply: bool,
+    rust: bool,
+    trash: bool,
+    nix: bool,
+    caches: bool,
+    node_modules: bool,
+    docker: bool,
+    all: bool,
+    min_size_mb: Option<u64>,
+) -> Result<()> {
+    let do_all = all;
+    if !do_all && !rust && !trash && !nix && !caches && !node_modules && !docker {
+        eprintln!("⚠️ No cleanup targets specified. Use --all to clean everything, or specify individual flags (--rust, --trash, --nix, --caches, --node-modules, --docker).");
+        return Ok(());
+    }
+    let do_rust = rust || do_all;
+    let do_trash = trash || do_all;
+    let do_nix = nix || do_all;
+    let do_caches = caches || do_all;
+    let do_node = node_modules || do_all;
+    let do_docker = docker || do_all;
+
+    let mut guard_clone = guard.clone();
+    if let Some(mb) = min_size_mb {
+        guard_clone.cleanup_min_size_mb = mb;
+    }
+
+    let mut total_reclaimed = 0u64;
+    let mut actions: Vec<String> = Vec::new();
+    let mut failures: Vec<String> = Vec::new();
+
+    if do_rust {
+        let mut runtime = GuardRuntimeState::default();
+        let result =
+            auto_cleanup_rust_targets(&guard_clone, &mut runtime, apply).await?;
+        total_reclaimed += result.reclaimed_bytes;
+        for p in result.cleaned_paths {
+            actions.push(format!("Rust: {}", p));
+        }
+        for p in result.protected_paths {
+            actions.push(format!("Protected: {}", p));
+        }
+    }
+
+    if do_trash {
+        match empty_trash(apply, &guard_clone.protected_paths).await {
+            Ok((bytes, cleaned)) => {
+                total_reclaimed += bytes;
+                for c in cleaned {
+                    actions.push(format!("Trash: {}", c));
+                }
+            }
+            Err(e) => failures.push(format!("Trash: {}", e)),
+        }
+    }
+
+    if do_nix {
+        match clean_nix_garbage(guard_clone.nix_keep_generations, apply).await {
+            Ok((bytes, cleaned)) => {
+                total_reclaimed += bytes;
+                for c in cleaned {
+                    actions.push(format!("Nix: {}", c));
+                }
+            }
+            Err(e) => failures.push(format!("Nix: {}", e)),
+        }
+    }
+
+    if do_node {
+        let roots: Vec<PathBuf> = guard_clone
+            .node_modules_search_roots
+            .split(',')
+            .filter_map(|s| {
+                let s = s.trim();
+                if s.is_empty() {
+                    return None;
+                }
+                let p = expand_tilde(s);
+                if p.exists() {
+                    Some(p)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        match clean_old_node_modules(
+            &roots,
+            guard_clone.node_modules_max_age_days,
+            apply,
+            &guard_clone.protected_paths,
+        )
+        .await
+        {
+            Ok((bytes, cleaned)) => {
+                total_reclaimed += bytes;
+                for c in cleaned {
+                    actions.push(format!("Node: {}", c));
+                }
+            }
+            Err(e) => failures.push(format!("Node: {}", e)),
+        }
+    }
+
+    if do_caches {
+        match clean_package_caches(
+            true,
+            true,
+            true,
+            true,
+            apply,
+            &guard_clone.protected_paths,
+        )
+        .await
+        {
+            Ok((bytes, cleaned)) => {
+                total_reclaimed += bytes;
+                for c in cleaned {
+                    actions.push(format!("Cache: {}", c));
+                }
+            }
+            Err(e) => failures.push(format!("Cache: {}", e)),
+        }
+    }
+
+    if do_docker {
+        match docker_prune(apply, apply, guard_clone.docker_prune_volumes).await {
+            Ok(bytes) => {
+                total_reclaimed += bytes;
+                if bytes > 0 {
+                    actions.push(format!("Docker: {}", human_bytes(bytes)));
+                }
+            }
+            Err(e) => failures.push(format!("Docker: {}", e)),
+        }
+    }
+
+    if json {
+        #[derive(Serialize)]
+        struct CleanReport {
+            reclaimed_bytes: u64,
+            reclaimed_human: String,
+            actions: Vec<String>,
+            failures: Vec<String>,
+            apply: bool,
+        }
+        let report = CleanReport {
+            reclaimed_bytes: total_reclaimed,
+            reclaimed_human: human_bytes(total_reclaimed),
+            actions,
+            failures,
+            apply,
+        };
+        println!("{}", serde_json::to_string_pretty(&report)?);
+    } else {
+        if actions.is_empty() && failures.is_empty() {
+            println!("Nothing to clean.");
+        } else {
+            if !failures.is_empty() {
+                eprintln!("⚠️ {} cleanup step(s) failed:", failures.len());
+                for f in &failures {
+                    eprintln!("  • {}", f);
+                }
+                println!();
+            }
+            println!(
+                "Cleanup {}:",
+                if apply {
+                    "results"
+                } else {
+                    "preview (dry-run)"
+                }
+            );
+            for a in &actions {
+                println!("  • {}", a);
+            }
+            println!();
+            println!("Total reclaimable: {}", human_bytes(total_reclaimed));
+            if !apply {
+                println!("Add --apply to execute cleanup.");
+            }
+        }
+    }
+
+    Ok(())
+}
+
+async fn cmd_guard(cmd: GuardCommands) -> Result<()> {
+    let (_, policy) = load_system_policy()?;
+    let mut guard = policy.guard;
+    normalize_guard_policy(&mut guard);
+    match cmd {
+        GuardCommands::Once { json } => cmd_guard_once(&guard, json).await,
+        GuardCommands::Daemon => cmd_guard_daemon(&mut guard).await,
+        GuardCommands::Prune {
+            json,
+            docker,
+            docker_volumes,
+            package_caches,
+            apply,
+        } => {
+            cmd_guard_prune(&guard, json, docker, docker_volumes, package_caches, apply)
+                .await
+        }
+        GuardCommands::Clean {
+            json,
+            apply,
+            rust,
+            trash,
+            nix,
+            caches,
+            node_modules,
+            docker,
+            all,
+            min_size_mb,
+        } => {
+            cmd_guard_clean(
+                &guard,
+                json,
+                apply,
+                rust,
+                trash,
+                nix,
+                caches,
+                node_modules,
+                docker,
+                all,
+                min_size_mb,
+            )
+            .await
+        }
+    }
+}
+
+fn cmd_events(tail: usize, source: Option<String>, severity: Option<String>) -> Result<()> {
+    let path = events_path();
+    if !path.exists() {
+        println!("No events found ({} does not exist)", path.display());
+        return Ok(());
+    }
+    let contents = std::fs::read_to_string(&path)
+        .with_context(|| format!("failed to read {}", path.display()))?;
+    let lines: Vec<&str> = contents.lines().collect();
+    let start = if lines.len() > tail {
+        lines.len() - tail
+    } else {
+        0
+    };
+    let mut shown = 0usize;
+    for line in &lines[start..] {
+        if let Ok(val) = serde_json::from_str::<serde_json::Value>(line) {
+            if let Some(ref s) = source {
+                if val.get("src").and_then(|v| v.as_str()) != Some(s.as_str()) {
+                    continue;
+                }
+            }
+            if let Some(ref s) = severity {
+                if val.get("sev").and_then(|v| v.as_str()) != Some(s.as_str()) {
+                    continue;
+                }
+            }
+            println!("{}", line);
+            shown += 1;
+        }
+    }
+    if shown == 0 {
+        println!("(no matching events)");
+    }
+    Ok(())
+}
+
+fn cmd_zram(
+    status: bool,
+    gen_config: bool,
+    memory_percent: Option<u32>,
+    algorithm: Option<String>,
+) -> Result<()> {
+    if gen_config {
+        let mem_pct = memory_percent.unwrap_or(200);
+        let algo = algorithm.unwrap_or_else(|| "zstd".to_string());
+        let valid_algos = ["lzo", "lzo-rle", "lz4", "lz4hc", "zstd", "deflate", "842"];
+        if !valid_algos.contains(&algo.as_str()) {
+            return Err(anyhow::anyhow!(
+                "Invalid algorithm. Valid: {}",
+                valid_algos.join(", ")
+            ));
+        }
+        let total_ram_kb: u64 = std::fs::read_to_string("/proc/meminfo")
+            .ok()
+            .and_then(|s| {
+                s.lines()
+                    .find(|l| l.starts_with("MemTotal:"))
+                    .map(|l| l.split_whitespace().nth(1).unwrap_or("0").to_string())
+            })
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(0);
+        let total_ram_gb = total_ram_kb as f64 / 1024.0 / 1024.0;
+        println!("# Zram configuration for NixOS");
+        println!("# Add this to your ~/.dracon/nixos/configuration.nix");
+        println!();
+        println!("  # --- ZRAM ---");
+        println!("  zramSwap = {{");
+        println!("    enable = true;");
+        println!("    algorithm = \"{}\";", algo);
+        println!(
+            "    # {}% of RAM = {}GB virtual swap (based on detected {} GB RAM)",
+            mem_pct,
+            (mem_pct as f64 / 100.0 * total_ram_gb),
+            total_ram_gb
+        );
+        println!("    memoryPercent = {};", mem_pct);
+        println!("  }};");
+        println!();
+        println!("# Then rebuild: sudo nixos-rebuild switch --flake ~/.dracon/nixos#");
+        return Ok(());
+    }
+
+    if status || (!gen_config) {
+        let zram_path = "/sys/block/zram0";
+        let mm_stat_path = format!("{}/mm_stat", zram_path);
+
+        println!("Zram Status");
+        println!("============");
+
+        if !std::path::Path::new(zram_path).exists() {
+            println!("No zram device found.");
+            return Ok(());
+        }
+
+        let disksize = std::fs::read_to_string(format!("{}/disksize", zram_path))
+            .map(|s| s.trim().parse::<u64>().unwrap_or(0))
+            .unwrap_or(0);
+        let disksize_gb = disksize / 1024 / 1024 / 1024;
+
+        let algo = std::fs::read_to_string(format!("{}/comp_algorithm", zram_path))
+            .map(|s| s.trim().to_string())
+            .unwrap_or_else(|_| "unknown".to_string());
+
+        let mm_stat = std::fs::read_to_string(&mm_stat_path)
+            .map(|s| {
+                s.split_whitespace()
+                    .filter_map(|v| v.parse::<u64>().ok())
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+
+        let orig = *mm_stat.first().unwrap_or(&0);
+        let compr = *mm_stat.get(1).unwrap_or(&0);
+        let mem_used = *mm_stat.get(2).unwrap_or(&0);
+
+        let orig_gb = orig as f64 / 1024.0 / 1024.0 / 1024.0;
+        let compr_gb = compr as f64 / 1024.0 / 1024.0 / 1024.0;
+        let mem_used_gb = mem_used as f64 / 1024.0 / 1024.0 / 1024.0;
+        let ratio = if orig > 0 {
+            compr as f64 / orig as f64
+        } else {
+            0.0
+        };
+
+        println!();
+        println!("Device: /dev/zram0");
+        println!("Disksize: {} GB", disksize_gb);
+        println!("Algorithm: {}", algo);
+        println!();
+        println!("Memory Usage:");
+        println!("  Original data: {:.1} GB", orig_gb);
+        println!("  Compressed:    {:.1} GB", compr_gb);
+        println!("  RAM used:      {:.1} GB", mem_used_gb);
+        println!(
+            "  Compression ratio: {:.1}% ({:.1}x)",
+            ratio * 100.0,
+            if ratio > 0.0 { 1.0 / ratio } else { 0.0 }
+        );
+        println!();
+        println!("Configuration options:");
+        println!("  --gen-config           Generate NixOS configuration snippet");
+        println!("  --memory-percent <N>   Set memory percent (default: 200 for 2x RAM)");
+        println!(
+            "  --algorithm <algo>     Set algorithm: lzo, lz4, lz4hc, zstd (default: zstd)"
+        );
+        println!();
+        println!("Example - generate config for 2x RAM with zstd:");
+        println!("  dracon-system zram --gen-config --memory-percent 200 --algorithm zstd");
+    }
+
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
     VERBOSITY.store(cli.verbose, Ordering::SeqCst);
 
     match cli.cmd {
-        Commands::Status { json } => {
-            let report = build_status_report().await?;
-            if json {
-                println!("{}", serde_json::to_string_pretty(&report)?);
-            } else {
-                println!("system_root: {}", report.system_root);
-                println!("nixos_root: {}", report.nixos_root);
-                println!("sync_policy: {}", report.sync_policy);
-                println!("system_policy: {}", report.system_policy);
-                println!("sync_service_active: {}", report.sync_service_active);
-                println!("warden_service_active: {}", report.warden_service_active);
-            }
-        }
-        Commands::Doctor { json, strict } => {
-            let report = build_doctor_report().await;
-            if json {
-                println!("{}", serde_json::to_string_pretty(&report)?);
-            } else {
-                println!("system_root_exists: {}", report.system_root_exists);
-                println!("nixos_root_exists: {}", report.nixos_root_exists);
-                println!("canonical_libs_exists: {}", report.canonical_libs_exists);
-                println!("canonical_utils_exists: {}", report.canonical_utils_exists);
-                println!("sync_policy_exists: {}", report.sync_policy_exists);
-                println!(
-                    "legacy_config_dracon_exists: {}",
-                    report.legacy_config_dracon_exists
-                );
-                println!("sync_service_active: {}", report.sync_service_active);
-                println!("warden_service_active: {}", report.warden_service_active);
-            }
-            if strict {
-                let mut violations = Vec::new();
-                if report.legacy_config_dracon_exists {
-                    violations.push("legacy ~/.config/dracon exists".to_string());
-                }
-                if !violations.is_empty() {
-                    return Err(anyhow::anyhow!(
-                        "strict doctor failed: {}",
-                        violations.join("; ")
-                    ));
-                }
-            }
-        }
+        Commands::Status { json } => cmd_status(json).await,
+        Commands::Doctor { json, strict } => cmd_doctor(json, strict).await,
         Commands::Storage {
             root,
             json,
@@ -2831,745 +3625,20 @@ async fn main() -> Result<()> {
             min_size_mb,
             kinds,
         } => {
-            let (_, policy) = load_system_policy()?;
-            let root = root.unwrap_or_else(|| {
-                if !policy.storage.default_root.trim().is_empty() {
-                    return PathBuf::from(policy.storage.default_root.clone());
-                }
-                dirs::home_dir()
-                    .unwrap_or_else(|| PathBuf::from("/home"))
-                    .join("Dev")
-            });
-            let min_size_mb = min_size_mb.unwrap_or(policy.storage.min_size_mb);
-            let kinds = kinds.unwrap_or_else(|| policy.storage.kinds.clone());
-
-            let report = analyze_workspace_storage(&root, 15, 25).await?;
-
-            if json {
-                println!("{}", serde_json::to_string_pretty(&report)?);
-                return Ok(());
-            }
-
-            println!("Workspace: {}", report.root.display());
-            println!();
-            println!("Top projects:");
-            for item in &report.top_projects {
-                println!("  {:>10}  {}", human_bytes(item.bytes), item.path.display());
-            }
-
-            println!();
-            println!("Top hotspots:");
-            for item in &report.top_hotspots {
-                println!(
-                    "  {:>10}  {:<12} {}",
-                    human_bytes(item.bytes),
-                    item.kind,
-                    item.path.display()
-                );
-            }
-
-            if cleanup {
-                let cfg = CleanupConfig {
-                    apply,
-                    allow_tracked,
-                    min_size_mb,
-                    kinds: parse_kinds(&kinds),
-                };
-                let threshold = cfg.min_size_mb.saturating_mul(1024 * 1024);
-                let selected: Vec<_> = report
-                    .top_hotspots
-                    .iter()
-                    .filter(|h| cfg.kinds.contains(&h.kind) && h.bytes >= threshold)
-                    .collect();
-
-                println!();
-                println!(
-                    "Cleanup mode: {}",
-                    if cfg.apply { "APPLY" } else { "DRY-RUN" }
-                );
-                println!("Kinds: {}", {
-                    let mut v: Vec<_> = cfg.kinds.iter().cloned().collect();
-                    v.sort();
-                    v.join(",")
-                });
-                println!("Min size: {} MiB", cfg.min_size_mb);
-                println!("Allow tracked: {}", cfg.allow_tracked);
-                println!("Selected paths: {}", selected.len());
-
-                let mut total = 0u64;
-                let mut actionable = Vec::new();
-                for item in selected {
-                    let tracked = is_git_tracked_dir(&item.path).await.unwrap_or(true);
-                    if tracked && !cfg.allow_tracked {
-                        println!(
-                            "  {:>10}  {:<12} {}  [SKIP tracked]",
-                            human_bytes(item.bytes),
-                            item.kind,
-                            item.path.display()
-                        );
-                        continue;
-                    }
-                    total += item.bytes;
-                    println!(
-                        "  {:>10}  {:<12} {}{}",
-                        human_bytes(item.bytes),
-                        item.kind,
-                        item.path.display(),
-                        if tracked { "  [tracked]" } else { "" }
-                    );
-                    actionable.push(item.path.clone());
-                }
-                println!("Estimated reclaimed: {}", human_bytes(total));
-
-                let user_protected = policy.guard.protected_paths.clone();
-                if cfg.apply {
-                    for path in actionable {
-                        let safe_path = check_safe_to_delete(&path, &user_protected)?;
-                        if safe_path.exists() {
-                            println!("Deleting {}", path.display());
-                            tokio::fs::remove_dir_all(&safe_path).await?;
-                        }
-                    }
-                } else {
-                    println!("No changes made. Re-run with --apply to execute cleanup.");
-                }
-            }
+            cmd_storage(root, json, cleanup, apply, allow_tracked, min_size_mb, kinds).await
         }
-        Commands::Link { cmd } => {
-            let (_, policy) = load_system_policy()?;
-            match cmd {
-                LinkCommands::Status { json } | LinkCommands::Doctor { json } => {
-                    let report = build_link_report(&policy);
-                    if json {
-                        println!("{}", serde_json::to_string_pretty(&report)?);
-                    } else {
-                        println!("links_total: {}", report.total);
-                        println!("links_healthy: {}", report.healthy);
-                        println!("links_drifted: {}", report.drifted);
-                        println!("links_missing_target: {}", report.missing_target);
-                        println!("links_missing_link: {}", report.missing_link);
-                        for item in report.entries {
-                            println!(
-                                "- {} -> {} [{}]",
-                                item.link,
-                                item.target,
-                                if item.issue == "ok" {
-                                    "ok".to_string()
-                                } else {
-                                    item.issue
-                                }
-                            );
-                        }
-                    }
-                }
-                LinkCommands::Apply {
-                    json,
-                    force_replace,
-                } => {
-                    let report = apply_link_policy(&policy, force_replace)?;
-                    if json {
-                        println!("{}", serde_json::to_string_pretty(&report)?);
-                    } else {
-                        println!("Applied link policy.");
-                        println!("links_total: {}", report.total);
-                        println!("links_healthy: {}", report.healthy);
-                        println!("links_drifted: {}", report.drifted);
-                    }
-                }
-            }
-        }
-        Commands::Guard { cmd } => {
-            let (_, policy) = load_system_policy()?;
-            let mut guard = policy.guard;
-            normalize_guard_policy(&mut guard);
-            let mut runtime = GuardRuntimeState::default();
-            match cmd {
-                GuardCommands::Once { json } => {
-                    let report = run_guard_once(&guard, &mut runtime).await?;
-                    if json {
-                        println!("{}", serde_json::to_string_pretty(&report)?);
-                    } else {
-                        println!("guard_enabled: {}", report.enabled);
-                        println!("disk_use_percent: {}", report.disk_use_percent);
-                        println!("disk_state: {}", report.disk_state);
-                        println!("sync_frozen: {}", report.sync_frozen);
-                        println!("alerts: {}", report.alerts.len());
-                        for a in report.alerts {
-                            println!(
-                                "- pid={} cmd={} cpu={:.1}% rss={}MiB sustained={}s action={}",
-                                a.pid,
-                                a.command,
-                                a.cpu_percent,
-                                a.rss_mb,
-                                a.sustained_secs,
-                                a.action
-                            );
-                        }
-                    }
-                }
-                GuardCommands::Daemon => {
-                    if !guard.enabled {
-                        println!("guard disabled in policy");
-                        return Ok(());
-                    }
-                    let _lock = acquire_daemon_lock("dracon-system-guard")
-                        .with_context(|| "failed to acquire guard daemon lock")?;
-                    let shutdown = Arc::new(AtomicBool::new(false));
-                    let shutdown_sigterm = shutdown.clone();
-                    let shutdown_sigint = shutdown.clone();
-                    let reload = Arc::new(AtomicBool::new(false));
-                    let reload_sighup = reload.clone();
-                    let reload_sighup_handler = reload.clone();
-
-                    tokio::spawn(async move {
-                        if let Ok(mut sig) = tokio::signal::unix::signal(
-                            tokio::signal::unix::SignalKind::terminate(),
-                        ) {
-                            sig.recv().await;
-                            veprintln!(1, "system: received SIGTERM, shutting down gracefully...");
-                            shutdown_sigterm.store(true, Ordering::SeqCst);
-                        } else {
-                            eprintln!("system: failed to set up SIGTERM handler");
-                        }
-                    });
-
-                    tokio::spawn(async move {
-                        if let Ok(mut sig) = tokio::signal::unix::signal(
-                            tokio::signal::unix::SignalKind::interrupt(),
-                        ) {
-                            sig.recv().await;
-                            veprintln!(1, "system: received SIGINT, shutting down gracefully...");
-                            shutdown_sigint.store(true, Ordering::SeqCst);
-                        } else {
-                            eprintln!("system: failed to set up SIGINT handler");
-                        }
-                    });
-
-                    tokio::spawn(async move {
-                        if let Ok(mut sig) =
-                            tokio::signal::unix::signal(tokio::signal::unix::SignalKind::hangup())
-                        {
-                            while sig.recv().await.is_some() {
-                                veprintln!(1, "system: received SIGHUP, reloading policy...");
-                                reload_sighup_handler.store(true, Ordering::SeqCst);
-                            }
-                        } else {
-                            eprintln!("system: failed to set up SIGHUP handler");
-                        }
-                    });
-
-                    veprintln!(
-                        1,
-                        "guard daemon started (interval={}s)",
-                        guard.interval_secs
-                    );
-                    let interval = guard.interval_secs;
-                    let mut elapsed = 0u64;
-                    while !shutdown.load(Ordering::SeqCst) {
-                        if reload_sighup.load(Ordering::SeqCst) {
-                            reload_sighup.store(false, Ordering::SeqCst);
-                            let result = load_system_policy();
-                            match result {
-                                Ok((policy_path, new_policy)) => {
-                                    if policy_path.is_none() {
-                                        eprintln!("system: SIGHUP reload warning: no policy file found, using defaults");
-                                        emit_event(&DraconEvent::new(
-                                            "system",
-                                            EventSeverity::Warn,
-                                            "guard/policy-reload",
-                                            "SIGHUP reload: no policy file found, using defaults"
-                                                .to_string(),
-                                        ));
-                                    }
-                                    guard = new_policy.guard;
-                                    normalize_guard_policy(&mut guard);
-                                    runtime.heavy_since.clear();
-                                    veprintln!(2, "system: policy reloaded on SIGHUP (disk_warn={}%, disk_critical={}%)",
-                                        guard.disk_warn_percent, guard.disk_critical_percent);
-                                }
-                                Err(e) => {
-                                    eprintln!("system: SIGHUP reload warning: corrupted policy file, using defaults: {}", e);
-                                    emit_event(&DraconEvent::new(
-                                        "system",
-                                        EventSeverity::Error,
-                                        "guard/policy-reload",
-                                        format!(
-                                            "SIGHUP reload: policy corrupted, using defaults: {}",
-                                            e
-                                        ),
-                                    ));
-                                }
-                            }
-                        }
-                        if let Err(e) = run_guard_once(&guard, &mut runtime).await {
-                            eprintln!("guard pass failed: {}", e);
-                            emit_event(&DraconEvent::new(
-                                "system",
-                                EventSeverity::Error,
-                                "guard",
-                                format!("pass failed: {e}"),
-                            ));
-                        }
-                        while !shutdown.load(Ordering::SeqCst) && elapsed < interval {
-                            sleep(Duration::from_secs(1)).await;
-                            elapsed += 1;
-                        }
-                    }
-                    veprintln!(1, "system: guard daemon shutdown complete");
-                }
-                GuardCommands::Prune {
-                    json,
-                    docker,
-                    docker_volumes,
-                    package_caches,
-                    apply,
-                } => {
-                    let mut reclaimed_total = 0u64;
-                    let mut actions = Vec::new();
-
-                    // Docker prune
-                    if docker || docker_volumes {
-                        if apply {
-                            match docker_prune(apply, docker, docker_volumes).await {
-                                Ok(bytes) => {
-                                    actions.push(format!("Docker prune: {}", human_bytes(bytes)));
-                                    reclaimed_total += bytes;
-                                }
-                                Err(e) => {
-                                    actions.push(format!("Docker prune failed: {}", e));
-                                }
-                            }
-                        } else {
-                            actions.push("Docker prune (dry-run, skipped)".to_string());
-                        }
-                    }
-
-                    // Package cache cleanup
-                    if package_caches {
-                        match clean_package_caches(
-                            true,
-                            true,
-                            true,
-                            true,
-                            apply,
-                            &guard.protected_paths,
-                        )
-                        .await
-                        {
-                            Ok((bytes, cleaned)) => {
-                                for c in cleaned {
-                                    actions.push(format!("Package cache: {}", c));
-                                }
-                                reclaimed_total += bytes;
-                            }
-                            Err(e) => {
-                                actions.push(format!("Package cache cleanup failed: {}", e));
-                            }
-                        }
-                    }
-
-                    // If no specific flags, show what would be cleaned
-                    if !docker && !docker_volumes && !package_caches {
-                        // Show disk usage info
-                        let disk = disk_use_percent_for(&guard.disk_mount_path).await?;
-                        println!("Disk usage: {}% (mount: {})", disk, guard.disk_mount_path);
-
-                        // Show inode info
-                        if let Ok((total, used, _free)) = get_inode_info().await {
-                            let pct =
-                                used.saturating_mul(100).checked_div(total).unwrap_or(0) as u8;
-                            println!("Inode usage: {}% ({}/{} inodes used)", pct, used, total);
-                        }
-
-                        // Show potential cleanup targets
-                        println!();
-                        println!("Potential cleanup targets:");
-                        println!("  --docker          Prune unused Docker images/containers");
-                        println!("  --docker-volumes  Prune Docker volumes too (aggressive)");
-                        println!("  --package-caches  Clean cargo/npm/pip/go caches");
-                        println!();
-                        println!("Add --apply to execute cleanup.");
-                    }
-
-                    if json {
-                        #[derive(Serialize)]
-                        struct PruneReport {
-                            reclaimed_bytes: u64,
-                            reclaimed_human: String,
-                            actions: Vec<String>,
-                        }
-                        let report = PruneReport {
-                            reclaimed_bytes: reclaimed_total,
-                            reclaimed_human: human_bytes(reclaimed_total),
-                            actions,
-                        };
-                        println!("{}", serde_json::to_string_pretty(&report)?);
-                    } else if !actions.is_empty() {
-                        println!("Prune results:");
-                        for a in &actions {
-                            println!("  - {}", a);
-                        }
-                        println!("Total reclaimed: {}", human_bytes(reclaimed_total));
-
-                        if !apply && (docker || docker_volumes || package_caches) {
-                            println!();
-                            println!("Note: This was a dry-run. Add --apply to execute.");
-                        }
-                    }
-                }
-                GuardCommands::Clean {
-                    json,
-                    apply,
-                    rust,
-                    trash,
-                    nix,
-                    caches,
-                    node_modules,
-                    docker,
-                    all,
-                    min_size_mb,
-                } => {
-                    let do_all = all;
-                    if !do_all && !rust && !trash && !nix && !caches && !node_modules && !docker {
-                        eprintln!("⚠️ No cleanup targets specified. Use --all to clean everything, or specify individual flags (--rust, --trash, --nix, --caches, --node-modules, --docker).");
-                        return Ok(());
-                    }
-                    let do_rust = rust || do_all;
-                    let do_trash = trash || do_all;
-                    let do_nix = nix || do_all;
-                    let do_caches = caches || do_all;
-                    let do_node = node_modules || do_all;
-                    let do_docker = docker || do_all;
-
-                    let mut guard_clone = guard.clone();
-                    if let Some(mb) = min_size_mb {
-                        guard_clone.cleanup_min_size_mb = mb;
-                    }
-
-                    let mut total_reclaimed = 0u64;
-                    let mut actions: Vec<String> = Vec::new();
-                    let mut failures: Vec<String> = Vec::new();
-
-                    // Rust targets
-                    if do_rust {
-                        let mut runtime = GuardRuntimeState::default();
-                        let result =
-                            auto_cleanup_rust_targets(&guard_clone, &mut runtime, apply).await?;
-                        total_reclaimed += result.reclaimed_bytes;
-                        for p in result.cleaned_paths {
-                            actions.push(format!("Rust: {}", p));
-                        }
-                        for p in result.protected_paths {
-                            actions.push(format!("Protected: {}", p));
-                        }
-                    }
-
-                    // Trash
-                    if do_trash {
-                        match empty_trash(apply, &guard_clone.protected_paths).await {
-                            Ok((bytes, cleaned)) => {
-                                total_reclaimed += bytes;
-                                for c in cleaned {
-                                    actions.push(format!("Trash: {}", c));
-                                }
-                            }
-                            Err(e) => failures.push(format!("Trash: {}", e)),
-                        }
-                    }
-
-                    // Nix garbage
-                    if do_nix {
-                        match clean_nix_garbage(guard_clone.nix_keep_generations, apply).await {
-                            Ok((bytes, cleaned)) => {
-                                total_reclaimed += bytes;
-                                for c in cleaned {
-                                    actions.push(format!("Nix: {}", c));
-                                }
-                            }
-                            Err(e) => failures.push(format!("Nix: {}", e)),
-                        }
-                    }
-
-                    // Old node_modules
-                    if do_node {
-                        let roots: Vec<PathBuf> = guard_clone
-                            .node_modules_search_roots
-                            .split(',')
-                            .filter_map(|s| {
-                                let s = s.trim();
-                                if s.is_empty() {
-                                    return None;
-                                }
-                                let p = expand_tilde(s);
-                                if p.exists() {
-                                    Some(p)
-                                } else {
-                                    None
-                                }
-                            })
-                            .collect();
-                        match clean_old_node_modules(
-                            &roots,
-                            guard_clone.node_modules_max_age_days,
-                            apply,
-                            &guard_clone.protected_paths,
-                        )
-                        .await
-                        {
-                            Ok((bytes, cleaned)) => {
-                                total_reclaimed += bytes;
-                                for c in cleaned {
-                                    actions.push(format!("Node: {}", c));
-                                }
-                            }
-                            Err(e) => failures.push(format!("Node: {}", e)),
-                        }
-                    }
-
-                    // Package caches
-                    if do_caches {
-                        match clean_package_caches(
-                            true,
-                            true,
-                            true,
-                            true,
-                            apply,
-                            &guard_clone.protected_paths,
-                        )
-                        .await
-                        {
-                            Ok((bytes, cleaned)) => {
-                                total_reclaimed += bytes;
-                                for c in cleaned {
-                                    actions.push(format!("Cache: {}", c));
-                                }
-                            }
-                            Err(e) => failures.push(format!("Cache: {}", e)),
-                        }
-                    }
-
-                    // Docker
-                    if do_docker {
-                        match docker_prune(apply, apply, guard_clone.docker_prune_volumes).await {
-                            Ok(bytes) => {
-                                total_reclaimed += bytes;
-                                if bytes > 0 {
-                                    actions.push(format!("Docker: {}", human_bytes(bytes)));
-                                }
-                            }
-                            Err(e) => failures.push(format!("Docker: {}", e)),
-                        }
-                    }
-
-                    if json {
-                        #[derive(Serialize)]
-                        struct CleanReport {
-                            reclaimed_bytes: u64,
-                            reclaimed_human: String,
-                            actions: Vec<String>,
-                            failures: Vec<String>,
-                            apply: bool,
-                        }
-                        let report = CleanReport {
-                            reclaimed_bytes: total_reclaimed,
-                            reclaimed_human: human_bytes(total_reclaimed),
-                            actions,
-                            failures,
-                            apply,
-                        };
-                        println!("{}", serde_json::to_string_pretty(&report)?);
-                    } else {
-                        if actions.is_empty() && failures.is_empty() {
-                            println!("Nothing to clean.");
-                        } else {
-                            if !failures.is_empty() {
-                                eprintln!("⚠️ {} cleanup step(s) failed:", failures.len());
-                                for f in &failures {
-                                    eprintln!("  • {}", f);
-                                }
-                                println!();
-                            }
-                            println!(
-                                "Cleanup {}:",
-                                if apply {
-                                    "results"
-                                } else {
-                                    "preview (dry-run)"
-                                }
-                            );
-                            for a in &actions {
-                                println!("  • {}", a);
-                            }
-                            println!();
-                            println!("Total reclaimable: {}", human_bytes(total_reclaimed));
-                            if !apply {
-                                println!("Add --apply to execute cleanup.");
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        Commands::Link { cmd } => cmd_link(cmd),
+        Commands::Guard { cmd } => cmd_guard(cmd).await,
         Commands::Events {
             tail,
             source,
             severity,
-        } => {
-            let path = events_path();
-            if !path.exists() {
-                println!("No events found ({} does not exist)", path.display());
-                return Ok(());
-            }
-            let contents = std::fs::read_to_string(&path)
-                .with_context(|| format!("failed to read {}", path.display()))?;
-            let lines: Vec<&str> = contents.lines().collect();
-            let start = if lines.len() > tail {
-                lines.len() - tail
-            } else {
-                0
-            };
-            let mut shown = 0usize;
-            for line in &lines[start..] {
-                if let Ok(val) = serde_json::from_str::<serde_json::Value>(line) {
-                    if let Some(ref s) = source {
-                        if val.get("src").and_then(|v| v.as_str()) != Some(s.as_str()) {
-                            continue;
-                        }
-                    }
-                    if let Some(ref s) = severity {
-                        if val.get("sev").and_then(|v| v.as_str()) != Some(s.as_str()) {
-                            continue;
-                        }
-                    }
-                    println!("{}", line);
-                    shown += 1;
-                }
-            }
-            if shown == 0 {
-                println!("(no matching events)");
-            }
-        }
+        } => cmd_events(tail, source, severity),
         Commands::Zram {
             status,
             gen_config,
             memory_percent,
             algorithm,
-        } => {
-            if gen_config {
-                let mem_pct = memory_percent.unwrap_or(200);
-                let algo = algorithm.unwrap_or_else(|| "zstd".to_string());
-                let valid_algos = ["lzo", "lzo-rle", "lz4", "lz4hc", "zstd", "deflate", "842"];
-                if !valid_algos.contains(&algo.as_str()) {
-                    return Err(anyhow::anyhow!(
-                        "Invalid algorithm. Valid: {}",
-                        valid_algos.join(", ")
-                    ));
-                }
-                let total_ram_kb: u64 = std::fs::read_to_string("/proc/meminfo")
-                    .ok()
-                    .and_then(|s| {
-                        s.lines()
-                            .find(|l| l.starts_with("MemTotal:"))
-                            .map(|l| l.split_whitespace().nth(1).unwrap_or("0").to_string())
-                    })
-                    .and_then(|s| s.parse().ok())
-                    .unwrap_or(0);
-                let total_ram_gb = total_ram_kb as f64 / 1024.0 / 1024.0;
-                println!("# Zram configuration for NixOS");
-                println!("# Add this to your ~/.dracon/nixos/configuration.nix");
-                println!();
-                println!("  # --- ZRAM ---");
-                println!("  zramSwap = {{");
-                println!("    enable = true;");
-                println!("    algorithm = \"{}\";", algo);
-                println!(
-                    "    # {}% of RAM = {}GB virtual swap (based on detected {} GB RAM)",
-                    mem_pct,
-                    (mem_pct as f64 / 100.0 * total_ram_gb),
-                    total_ram_gb
-                );
-                println!("    memoryPercent = {};", mem_pct);
-                println!("  }};");
-                println!();
-                println!("# Then rebuild: sudo nixos-rebuild switch --flake ~/.dracon/nixos#");
-                return Ok(());
-            }
-
-            if status || (!gen_config) {
-                // Show zram stats
-                let zram_path = "/sys/block/zram0";
-                let mm_stat_path = format!("{}/mm_stat", zram_path);
-
-                println!("Zram Status");
-                println!("============");
-
-                // Check if zram exists
-                if !std::path::Path::new(zram_path).exists() {
-                    println!("No zram device found.");
-                    return Ok(());
-                }
-
-                // Get disksize
-                let disksize = std::fs::read_to_string(format!("{}/disksize", zram_path))
-                    .map(|s| s.trim().parse::<u64>().unwrap_or(0))
-                    .unwrap_or(0);
-                let disksize_gb = disksize / 1024 / 1024 / 1024;
-
-                // Get current algorithm
-                let algo = std::fs::read_to_string(format!("{}/comp_algorithm", zram_path))
-                    .map(|s| s.trim().to_string())
-                    .unwrap_or_else(|_| "unknown".to_string());
-
-                // Get mm_stat (original data size, compressed size, memory used)
-                let mm_stat = std::fs::read_to_string(&mm_stat_path)
-                    .map(|s| {
-                        s.split_whitespace()
-                            .filter_map(|v| v.parse::<u64>().ok())
-                            .collect::<Vec<_>>()
-                    })
-                    .unwrap_or_default();
-
-                // mm_stat fields are in bytes: orig_size, compr_size, mem_used (and more)
-                let orig = *mm_stat.first().unwrap_or(&0);
-                let compr = *mm_stat.get(1).unwrap_or(&0);
-                let mem_used = *mm_stat.get(2).unwrap_or(&0);
-
-                let orig_gb = orig as f64 / 1024.0 / 1024.0 / 1024.0;
-                let compr_gb = compr as f64 / 1024.0 / 1024.0 / 1024.0;
-                let mem_used_gb = mem_used as f64 / 1024.0 / 1024.0 / 1024.0;
-                let ratio = if orig > 0 {
-                    compr as f64 / orig as f64
-                } else {
-                    0.0
-                };
-
-                println!();
-                println!("Device: /dev/zram0");
-                println!("Disksize: {} GB", disksize_gb);
-                println!("Algorithm: {}", algo);
-                println!();
-                println!("Memory Usage:");
-                println!("  Original data: {:.1} GB", orig_gb);
-                println!("  Compressed:    {:.1} GB", compr_gb);
-                println!("  RAM used:      {:.1} GB", mem_used_gb);
-                println!(
-                    "  Compression ratio: {:.1}% ({:.1}x)",
-                    ratio * 100.0,
-                    if ratio > 0.0 { 1.0 / ratio } else { 0.0 }
-                );
-                println!();
-                println!("Configuration options:");
-                println!("  --gen-config           Generate NixOS configuration snippet");
-                println!("  --memory-percent <N>   Set memory percent (default: 200 for 2x RAM)");
-                println!(
-                    "  --algorithm <algo>     Set algorithm: lzo, lz4, lz4hc, zstd (default: zstd)"
-                );
-                println!();
-                println!("Example - generate config for 2x RAM with zstd:");
-                println!("  dracon-system zram --gen-config --memory-percent 200 --algorithm zstd");
-            }
-        }
+        } => cmd_zram(status, gen_config, memory_percent, algorithm),
     }
-
-    Ok(())
 }
