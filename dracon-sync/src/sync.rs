@@ -913,12 +913,22 @@ pub(crate) async fn sync_repo(
         if debug_enabled() {
             eprintln!("🐛 {} is not recognized as git repo", repo.display());
         }
-        maybe_sync_visibility_and_metadata(repo, policy, dry_run);
+        let ctx = SyncContext {
+            repo, policy, excluded_dir_names, dry_run, force_deletion,
+            idle_seconds, policy_path, has_origin: false, has_upstream: false,
+            blob_threshold: 0, auto_bump_versions: false, remote_failures: None,
+        };
+        maybe_sync_visibility_and_metadata(&ctx);
         return Ok(SyncOutcome::NothingToDo);
     }
 
     if let Some(blocked) = check_conflict_state(repo) {
-        maybe_sync_visibility_and_metadata(repo, policy, dry_run);
+        let ctx = SyncContext {
+            repo, policy, excluded_dir_names, dry_run, force_deletion,
+            idle_seconds, policy_path, has_origin: false, has_upstream: false,
+            blob_threshold: 0, auto_bump_versions: false, remote_failures: None,
+        };
+        maybe_sync_visibility_and_metadata(&ctx);
         return Ok(blocked);
     }
 
@@ -932,9 +942,15 @@ pub(crate) async fn sync_repo(
         .auto_bump_versions
         .unwrap_or(policy.auto_bump_versions);
 
-    auto_pull_merge(&svc, repo, policy, has_origin, has_upstream, &initial_status, dry_run).await?;
+    let mut ctx = SyncContext {
+        repo, policy, excluded_dir_names, dry_run, force_deletion,
+        idle_seconds, policy_path, has_origin, has_upstream,
+        blob_threshold, auto_bump_versions, remote_failures,
+    };
 
-    clean_staged_paths(repo, policy, excluded_dir_names, dry_run).await?;
+    auto_pull_merge(&svc, &ctx, &initial_status).await?;
+
+    clean_staged_paths(&ctx).await?;
 
     let DiffResult { status, entries, filter_only_cleared: _ } = compute_diff_entries(&svc, repo).await?;
 
@@ -971,9 +987,9 @@ pub(crate) async fn sync_repo(
             stage_existing_files(repo, &existing, dry_run).await?;
 
             if !missing.is_empty() {
-                match check_mass_deletion(repo, &missing, force_deletion, dry_run, policy_path).await? {
+                match check_mass_deletion(&ctx, &missing).await? {
                     MassDeletionCheck::Blocked => {
-                        maybe_sync_visibility_and_metadata(repo, policy, dry_run);
+                        maybe_sync_visibility_and_metadata(&ctx);
                         return Ok(SyncOutcome::Blocked);
                     }
                     MassDeletionCheck::Ok => {}
@@ -1028,7 +1044,7 @@ pub(crate) async fn sync_repo(
                 if debug_enabled() {
                     eprintln!("🐛 {} skipped commit: all changes were filter-only (smudge/clean)", repo.display());
                 }
-                maybe_sync_visibility_and_metadata(repo, policy, dry_run);
+                maybe_sync_visibility_and_metadata(&ctx);
                 return Ok(SyncOutcome::NothingToDo);
             }
 
@@ -1037,7 +1053,7 @@ pub(crate) async fn sync_repo(
 
             let last_commit_subject = crate::report::git_log_field(repo, "%s").await;
 
-            let ctx = build_commit_context(
+            let commit_ctx = build_commit_context(
                 repo,
                 &status,
                 &committed_entries,
@@ -1049,7 +1065,7 @@ pub(crate) async fn sync_repo(
             let msg = if is_noise_only && !is_report {
                 "chore: sync metadata".to_string()
             } else {
-                build_commit_message(&ctx)
+                build_commit_message(&commit_ctx)
             };
 
             if dry_run {
@@ -1080,10 +1096,10 @@ pub(crate) async fn sync_repo(
                 );
             }
 
-            restore_excluded_paths(repo, &to_restore, policy).await?;
+            restore_excluded_paths(&ctx, &to_restore).await?;
 
             if policy.auto_push && has_origin {
-                let push_ok = push_with_blob_check(repo, policy, blob_threshold, has_origin, 1, remote_failures, dry_run).await?;
+                let push_ok = push_with_blob_check(&mut ctx, 1).await?;
                 if !push_ok {
                     eprintln!("⚠️ some mirror pushes failed for {}", repo.display());
                 }
@@ -1097,11 +1113,11 @@ pub(crate) async fn sync_repo(
         return Ok(SyncOutcome::Synced);
     }
 
-    maybe_sync_visibility_and_metadata(repo, policy, dry_run);
+    maybe_sync_visibility_and_metadata(&ctx);
 
     let current_status = svc.get_status().await?;
     if policy.auto_push && current_status.ahead > 0 && has_origin {
-        let push_ok = push_with_blob_check(repo, policy, blob_threshold, has_origin, current_status.ahead, remote_failures, dry_run).await?;
+        let push_ok = push_with_blob_check(&mut ctx, current_status.ahead).await?;
         if !push_ok {
             eprintln!("ℹ️ push partially skipped for {} (see warnings above)", repo.display());
         }
@@ -1109,7 +1125,7 @@ pub(crate) async fn sync_repo(
         eprintln!("ℹ️ skip push for {} (no origin remote)", repo.display());
     }
 
-    maybe_sync_visibility_and_metadata(repo, policy, dry_run);
+    maybe_sync_visibility_and_metadata(&ctx);
     Ok(SyncOutcome::NothingToDo)
 }
 
