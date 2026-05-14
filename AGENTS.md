@@ -414,21 +414,15 @@ To bypass: manually stage and commit the deletions with `git add -A && git commi
 
 **Incident response after a block:** Read the incident ledger at `~/.local/state/dracon/dracon-sync-incidents.jsonl` to understand what was blocked and why.
 
-**dracon-sync commit dedup guard:** The sync daemon will refuse to auto-commit if the last 2 commit subjects match the new commit subject. This prevents commit spam loops where the same message is generated repeatedly (e.g., from scribe stale-focus bugs).
-
-When triggered, sync logs a structured JSON line and resets staged changes:
-```
-{"ts":...,"level":"INFO","msg":"skipped commit: subject 'fix(spam)' repeated 2 times (dedup guard)","repo":"/path/to/repo"}
-```
-
-The commit is skipped and `SyncOutcome::NothingToDo` is returned. The daemon continues normally on the next cycle.
+**dracon-sync commit stale focus detection:** When the scribe's "Current Focus" line appears in 3+ of the last 5 commit subjects, it is considered stale. The stale focus is cleared from the commit context, causing `build_commit_message` to generate a message based on the actual diff content instead of repeating the old focus line.
 
 **Behavior:**
-- Threshold: 2 consecutive identical subjects trigger the guard
-- Detection: reads last N commit subjects via `git log -N --pretty=format:%s`
-- Reset: `git reset HEAD --` clears staged changes after skip
-- Graceful degradation: if `git log` fails, the guard is disabled with a warning
-- Bypass: not needed — changing the commit subject (any real work) naturally resets the window
+- Detection: reads last 5 commit subjects via `git log -5 --pretty=format:%s`
+- Threshold: focus content appearing in 3+ subjects → stale
+- Graceful degradation: if `git log` fails, the stale check is disabled with a warning
+- This catches alternating patterns (A/B/A/B/A) where the same focus is repeated across multiple commits
+
+**Why no dedup guard:** A dedup guard that blocks commits with duplicate subjects was removed because it couldn't distinguish between legitimate repeated work (same feature, multiple checkpoints) and actual spam. The stale focus detection addresses the root cause: if the scribe's focus line hasn't evolved, the generated messages repeat.
 
 ### dracon-system
 
