@@ -1,5 +1,4 @@
 use anyhow::Result;
-use crate::log_warn;
 use dracon_git::{
     types::{DiffFile, RepoStatus},
     CommitContext, extract_intent, GitService,
@@ -1527,12 +1526,14 @@ pub(crate) async fn run_repair_concerns(
             continue;
         }
 
+        #[allow(clippy::collapsible_if)]
         if status.behind > 0 && state.has_upstream {
             if handle_behind(&mut state, &repo, apply, human, policy.pull_op_timeout_secs, &reason, policy_path).await {
                 continue;
             }
         }
 
+        #[allow(clippy::collapsible_if)]
         if status.ahead > 0 && state.has_upstream {
             if handle_ahead(
                 &mut state,
