@@ -1685,22 +1685,22 @@ async fn clean_nix_garbage(keep_generations: u32, apply: bool) -> Result<(u64, V
         }
     }
 
-    let mut args = vec!["collect-garbage"];
+    let mut args: Vec<&str> = Vec::new();
     if apply {
         args.push("-d");
     } else {
         args.push("--dry-run");
     }
 
-    let out = Command::new("nix-store")
+    let out = Command::new("nix-collect-garbage")
         .args(&args)
         .output()
         .await
-        .map_err(|e| anyhow::anyhow!("failed to run nix-store: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("failed to run nix-collect-garbage: {}", e))?;
 
     if !out.status.success() {
         return Err(anyhow::anyhow!(
-            "nix-store collect-garbage failed: {}",
+            "nix-collect-garbage failed: {}",
             String::from_utf8_lossy(&out.stderr)
         ));
     }
