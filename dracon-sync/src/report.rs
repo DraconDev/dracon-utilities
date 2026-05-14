@@ -291,8 +291,8 @@ pub(crate) fn build_commit_context(
             if focus.len() <= subj.len() {
                 subj.contains(focus.as_str())
             } else {
-                focus.starts_with(subj.as_str())
-                    || focus[..subj.len().min(focus.len())] == *subj
+                focus.starts_with(subj)
+                    || focus[..subj.len().min(focus.len())] == subj.as_str()
             }
         })
     });
