@@ -265,6 +265,7 @@ pub(crate) fn build_commit_context(
     entries: &[DiffFile],
     is_checkpoint: bool,
     idle_seconds: u64,
+    last_commit_subject: Option<&str>,
 ) -> CommitContext {
     let changed_paths: Vec<PathBuf> = entries.iter().map(|e| e.path.clone()).collect();
     let intent_info = extract_intent(repo, &changed_paths, Some(&status.branch));
@@ -275,13 +276,30 @@ pub(crate) fn build_commit_context(
     });
 
     // Read project state for commit body (scribe)
-    let description = read_project_focus(repo);
+    let raw_description = read_project_focus(repo);
 
     // Extract category/scope from scribe's "Current Focus" line for better commit messages
-    let (scribe_category, scribe_scope) = description
-        .as_ref()
-        .and_then(|d| extract_category_scope_from_focus(d))
-        .unwrap_or((String::new(), String::new()));
+    let focus_line = raw_description.as_ref().and_then(|d| {
+        d.lines()
+            .skip_while(|l| !l.starts_with("## Current Focus"))
+            .nth(1)
+            .map(|l| l.trim().to_string())
+    });
+
+    let focus_is_stale = focus_line.as_ref().map_or(false, |focus| {
+        last_commit_subject
+            .map_or(false, |subj| subj.contains(focus.as_str()))
+    });
+
+    let (description, scribe_category, scribe_scope) = if focus_is_stale {
+        (None, String::new(), String::new())
+    } else {
+        let (cat, scope) = raw_description
+            .as_ref()
+            .and_then(|d| extract_category_scope_from_focus(d))
+            .unwrap_or((String::new(), String::new()));
+        (raw_description, cat, scope)
+    };
 
     CommitContext {
         intent: intent_info.intent,
