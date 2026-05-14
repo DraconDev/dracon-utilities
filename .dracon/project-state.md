@@ -1,36 +1,25 @@
 # Project State
 
 ## Current Focus
-Fix multi-remote auth infra: SSH config for Codeberg, HTTPS+PAT fallback for GitLab/Codeberg, stall prevention, mass-deletion guard hardening
+Fix commit spam loop: bumper treats .dracon/ and .pub as meaningful, stale project-state.md drives identical commit messages
 
 ## Context
-Completed backlog sprint to make dracon-sync work reliably across all 3 remotes (GitHub, GitLab, Codeberg). Fixed SSH config to include custom key path so Codeberg pushes work. Added HTTPS+PAT fallback for GitLab and Codeberg when SSH fails. Fixed stall bug where committed-but-still-behind repos would never pull before pushing. Fixed repo discovery descending into subdirs of already-discovered repos. Hardened mass-deletion guard with secondary check, incident logging, and `--force` bypass.
+193 consecutive commits with identical messages (fix(fix multi-remote): ...) triggered by 3 interacting bugs: (1) NOISE_PATTERNS missing .dracon/ and .pub so pubkey rotation triggered version bumps, (2) stale project-state.md with no AI keys configured produced identical category/scope every cycle, (3) warden publish_repo_pubkey wrote new keys making repos dirty. Added .dracon/ and .pub to NOISE_PATTERNS, added stale focus detection in build_commit_context, added noise-only shortcut to skip scribe and use 'chore: sync metadata', changed plaintext gitattributes from -filter -diff -merge to -filter only.
 
 ## Completed
-- [x] SSH config fix: `GIT_SSH_HARDENING` → function with `-F $HOME/.dracon/secrets/ssh/config` for Codeberg SSH key discovery
-- [x] Codeberg push verified: SSH handshake + git push both succeed
-- [x] Codeberg PAT created + stored: `~/.dracon/utilities/sync/secrets/codeberg.env`
-- [x] GitLab PAT configured and stored: `~/.dracon/utilities/sync/secrets/gitlab.env`
-- [x] HTTPS+PAT fallback: `gitlab_https_url()` + `codeberg_https_url()` in push transport fallbacks
-- [x] `GIT_TERMINAL_PROMPT=0` + `BatchMode=yes` on all push commands (no interactive prompts)
-- [x] Post-commit pull check: if still behind upstream after commit, pull before pushing
-- [x] Repo discovery fix: `continue` after `.git` dir found prevents descending into subdirs
-- [x] Mass-deletion guard: fixed invalid `git ls-files --count`, added secondary >50% check, incident logging
-- [x] `--force` flag: `dracon-sync sync-now --force <repo>` bypasses mass-deletion guard
-- [x] Alert threshold: `alert_unpushed_threshold` field (default 10) + Prometheus counter
-- [x] Stall fixes: repaired dracon-code (304 commits merged), browser-extensions-shared (node_modules), tiles (debug.log)
-- [x] Docs: AGENTS.md (test count 358, incident response), CHANGELOG.md, README.md (safety, PAT setup, alert docs)
-- [x] All 358 tests passing (was 351) — added 8 boundary tests + alert threshold tests
-- [x] 42 orphan repos identified from old suffix loop bug (left for manual cleanup)
+- [x] Fix A: Added .dracon/ and .pub to NOISE_PATTERNS in bump.rs
+- [x] Fix B: Verified original logic already returns None for noise+version-only diffs
+- [x] Fix C: Stale focus detection — if focus line appears in last commit subject, clear description/category/scope
+- [x] Fix D: Noise-only shortcut — skip scribe call, use 'chore: sync metadata' commit message
+- [x] Fix F: Changed plaintext gitattributes from `-filter -diff -merge` to `-filter` only (restores normal diffing for Cargo.toml/Cargo.lock etc.)
 
 ## In Progress
-- DRY refactoring (bump_semver, HTTPS fallback, is_push_rejected) — committed as 88f4535a
+- Fix H: Compiler warnings (SyncContext dead_code, filter_only_cleared unused)
 
 ## Blockers
-- Orphan repo deletion blocked by GitHub sudo mode; user prefers to leave them
+- None
 
 ## Next Steps
-1. Monitor multi-remote sync stability (GitHub + GitLab + Codeberg)
-2. Consider periodic `gh auth refresh` automation for `delete_repo` scope
-3. H2 git.rs module split (deferred — low risk)
-4. H3 #3 version parsing consolidation (deferred — higher risk)
+1. Fix compiler warnings in dracon-sync
+2. Run full test suite
+3. Rebuild + deploy + restart services
