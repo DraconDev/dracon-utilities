@@ -14,7 +14,7 @@ CLI binaries for dracon system services. These install to `~/.local/bin/` and ru
 9. [AI Configuration](#ai-configuration)
 10. [CLI Reference](#cli-reference)
 11. [Environment Variables](#environment-variables)
-12. [The Scribe](#the-scribe-ai-working-memory)
+12. [The Scribe](#the-scribe-ai-commit-message-generator)
 13. [Testing](#testing)
 
 ## Architecture
@@ -507,9 +507,20 @@ README for the full inventory and creation instructions.
 dracon-sync test-ai
 ```
 
-## The Scribe: AI Working Memory
+## The Scribe: AI Commit Message Generator
 
-The scribe is **you** (AI). The daemon maintains `.dracon/project-state.md` in each repo. This file is the **primary interface** between sync and the AI coder.
+The scribe generates unique, semantic commit subjects from diffs each sync cycle. It no longer writes or reads `project-state.md` — commit messages are generated directly from the actual code changes.
+
+### How It Works
+
+1. Collect current staged diff + 10 previous diffs + recent commit subjects
+2. AI receives the current diff (highlighted as THE main change) and previous diffs (background only)
+3. AI returns a single subject line in conventional commit format (e.g., `fix(auth): validate JWT expiry before accepting tokens`)
+4. Category/scope are extracted from the AI subject; `build_commit_message` assembles the final commit with footer
+
+### Fallback When AI Unavailable
+
+If no AI providers are configured or all fail, a local file-pattern fallback generates messages like `update auth, jwt and 2 files` from changed file stems.
 
 ### Why Frequent Commits?
 
@@ -519,67 +530,9 @@ Sync commits every change because:
 - More commits = better context for the AI's "what was I doing?"
 - Commits are cheap; context is valuable
 
-### Format
+### Manual project-state.md
 
-```markdown
-# Project State
-
-## Current Focus
-{one line: what you're working on right now}
-
-## Context
-{why: what problem are you solving? what prompted this change?}
-
-## Completed
-- [x] {what you finished, with context}
-
-## In Progress
-- [x] {what you're actively working on}
-
-## Blockers
-- {what's stopping progress: missing info, user decision needed, dependency}
-
-## Next Steps
-1. {immediate next action}
-2. {what comes after}
-```
-
-### Rules
-
-- **Current Focus** must be one line — it becomes the commit body
-- **Context** helps the AI recover understanding after time away
-- **Blockers** tell the AI what it can't proceed on
-- **Next Steps** give the AI a clear path forward
-- Be specific: "Fix TOCTOU race in warden keygen" not "fix bugs"
-- Don't document mechanical changes — only semantic state
-- If the file doesn't exist, create it when you have something meaningful to say
-
-### Example
-
-```markdown
-# Project State
-
-## Current Focus
-Refactor incident ledger to XDG state directory
-
-## Context
-The 2MB incident ledger was inside the .dracon git repo, causing
-self-referential churn. Every sync cycle added to the ledger,
-which dirtied the repo, which triggered another commit. Moved
-the ledger to ~/.local/state/dracon/ to break the cycle.
-
-## Completed
-- [x] Moved incident_ledger_path() from ~/.dracon/ to ~/.local/state/dracon/
-- [x] Moved stuck_repos_path() to XDG-compliant location
-- [x] 248 tests passing after path changes
-
-## Blockers
-- None
-
-## Next Steps
-1. Monitor for 24h to confirm no self-referential churn
-2. Continue reviewing dracon-system for any orphaned state files
-```
+The AI can still maintain `.dracon/project-state.md` manually for its own working memory across sessions. Sync no longer auto-generates, stages, or commits this file. If the AI wants it tracked, it must `git add` it explicitly.
 
 ## Environment Variables
 
