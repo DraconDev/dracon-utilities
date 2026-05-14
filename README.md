@@ -328,6 +328,9 @@ dracon-warden scrub-markers /path/to/repo
 # Fix ciphertext stuck in working tree
 dracon-warden resmudge /path/to/repo
 
+# System-wide repair (scrub + re-hardening)
+dracon-warden repair /path/to/repo
+
 # Run one hardening pass
 dracon-warden once /path/to/repo
 ```
