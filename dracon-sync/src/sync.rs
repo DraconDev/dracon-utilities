@@ -993,6 +993,7 @@ async fn stage_commit_and_push(
     let is_report = !signals.is_empty();
 
     let last_commit_subject = crate::report::git_log_field(repo, "%s").await;
+    let recent_subjects = crate::report::git_log_recent_subjects(repo, 5).await;
 
     let commit_ctx = build_commit_context(
         repo,
@@ -1001,6 +1002,7 @@ async fn stage_commit_and_push(
         !is_report,
         idle_seconds,
         last_commit_subject.as_deref(),
+        &recent_subjects,
     );
 
     let msg = if is_noise_only && !is_report {
@@ -2582,34 +2584,47 @@ auto_bump_versions = false
         assert!(staged_str.trim().is_empty(), "nothing should be staged for filter-only repo");
     }
 
-    // ── Dedup guard tests ──
+    // ── Stale focus detection tests ──
 
     #[test]
-    fn test_dedup_spam_detection() {
-        // Helper: mirrors the dedup logic in sync_repo
-        fn is_dedup_spam(recent_subjects: &[String], msg_subject: &str) -> bool {
-            !recent_subjects.is_empty()
-                && recent_subjects.iter().all(|s| s == msg_subject)
+    fn test_stale_focus_detection() {
+        // Helper: mirrors the stale focus logic in build_commit_context
+        fn focus_is_stale(focus: &str, recent_subjects: &[&str]) -> bool {
+            let focus_matches = recent_subjects.iter().filter(|subj| {
+                let subj_body = subj.splitn(2, ": ").nth(1).unwrap_or(subj);
+                if focus.len() > subj_body.len() {
+                    let truncated = &focus[..subj_body.len().min(focus.len())];
+                    subj_body.starts_with(truncated)
+                } else {
+                    subj_body.contains(focus)
+                }
+            }).count();
+            focus_matches >= 3
         }
 
-        // Empty history — no dedup
-        assert!(!is_dedup_spam(&[], "test"));
+        // Empty history — not stale
+        assert!(!focus_is_stale("add auth", &[]));
 
-        // One match — triggers (all non-empty subjects match)
-        assert!(is_dedup_spam(&["test".to_string()], "test"));
+        // 1 match out of 5 — not stale
+        assert!(!focus_is_stale("add auth", &["feat: add auth", "fix: bug", "chore: cleanup", "docs: readme", "test: unit"]));
 
-        // Two matches — also blocked
-        assert!(is_dedup_spam(&["test".to_string(), "test".to_string()], "test"));
+        // 2 matches — not stale (below threshold of 3)
+        assert!(!focus_is_stale("add auth", &["feat: add auth", "chore: sync metadata", "feat: add auth", "fix: bug", "docs: readme"]));
 
-        // Mixed subjects — not blocked
-        assert!(!is_dedup_spam(&["test".to_string(), "other".to_string()], "test"));
+        // 3 matches — stale (at threshold)
+        assert!(focus_is_stale("add auth", &["feat: add auth", "chore: sync metadata", "feat: add auth", "fix: bug", "feat: add auth"]));
 
-        // Different subject entirely — not blocked
-        assert!(!is_dedup_spam(&["other".to_string(), "other".to_string()], "test"));
+        // 5 matches — very stale
+        assert!(focus_is_stale("add auth", &["feat: add auth", "feat: add auth", "feat: add auth", "feat: add auth", "feat: add auth"]));
 
-        // Empty string subject edge case
-        assert!(is_dedup_spam(&["".to_string(), "".to_string()], ""));
-        assert!(!is_dedup_spam(&["".to_string(), "".to_string()], "test"));
+        // Alternating A/B/A/B/A pattern — A appears 3 times → stale
+        assert!(focus_is_stale("add auth", &["feat: add auth", "chore: sync metadata", "feat: add auth", "chore: sync metadata", "feat: add auth"]));
+
+        // Different focus — not stale
+        assert!(!focus_is_stale("fix bug", &["feat: add auth", "feat: add auth", "feat: add auth", "feat: add auth", "feat: add auth"]));
+
+        // Conventional commit prefix stripped: focus "add auth" matches subject "feat: add auth"
+        assert!(focus_is_stale("add auth", &["feat: add auth", "fix: add auth", "chore: add auth", "docs: other", "test: other"]));
     }
 
     #[tokio::test]
@@ -2640,9 +2655,9 @@ auto_bump_versions = false
     }
 
     #[tokio::test]
-    async fn test_dedup_guard_via_sync_repo() {
+    async fn test_sync_repo_with_duplicate_subjects_succeeds() {
         let tmp = tempfile::tempdir().unwrap();
-        let repo = init_test_repo(&tmp, "dedup-sync-repo");
+        let repo = init_test_repo(&tmp, "stale-focus-repo");
 
         let toml_str = r#"
         auto_github_private = false
@@ -2653,21 +2668,18 @@ auto_bump_versions = false
         "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        // First commit with a specific subject (manual)
+        // Manually commit twice with same subject
         std::fs::write(repo.join("a.txt"), "a").unwrap();
         git_cmd(&repo, &["add", "."]);
         git_cmd(&repo, &["commit", "-m", "duplicate subject"]);
 
-        // Second commit with same subject (manual) — this is the "recent" history
         std::fs::write(repo.join("b.txt"), "b").unwrap();
         git_cmd(&repo, &["add", "."]);
         git_cmd(&repo, &["commit", "-m", "duplicate subject"]);
 
-        // Now sync_repo tries to commit a third time. The generated message
-        // won't match "duplicate subject", so the guard won't block. But we
-        // verify that sync_repo handles the guard gracefully (no crash).
+        // sync_repo should succeed — no dedup guard blocking legitimate work
         std::fs::write(repo.join("c.txt"), "c").unwrap();
         let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
-        assert!(result.is_ok(), "sync_repo should not crash when dedup guard is active");
+        assert!(result.is_ok(), "sync_repo should succeed with duplicate subjects in history");
     }
 }

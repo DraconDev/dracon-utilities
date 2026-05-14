@@ -267,6 +267,7 @@ pub(crate) fn build_commit_context(
     is_checkpoint: bool,
     idle_seconds: u64,
     last_commit_subject: Option<&str>,
+    recent_subjects: &[String],
 ) -> CommitContext {
     let changed_paths: Vec<PathBuf> = entries.iter().map(|e| e.path.clone()).collect();
     let intent_info = extract_intent(repo, &changed_paths, Some(&status.branch));
@@ -288,17 +289,19 @@ pub(crate) fn build_commit_context(
     });
 
     let focus_is_stale = focus_line.as_ref().map_or(false, |focus| {
-        last_commit_subject.as_ref().map_or(false, |subj| {
-            // Strip conventional commit prefix ("category(scope): ") from subject
+        // Check if focus content appears in recent commit subjects.
+        // If 3+ of the last 5 subjects contain the focus text, it's stale
+        // (the same message has been generated repeatedly).
+        let focus_matches = recent_subjects.iter().filter(|subj| {
             let subj_body = subj.splitn(2, ": ").nth(1).unwrap_or(subj);
-            // If focus is longer, subj_body is likely truncated — do prefix match
             if focus.len() > subj_body.len() {
                 let truncated = &focus[..subj_body.len().min(focus.len())];
                 subj_body.starts_with(truncated)
             } else {
                 subj_body.contains(focus.as_str())
             }
-        })
+        }).count();
+        focus_matches >= 3
     });
 
     let (description, scribe_category, scribe_scope) = if focus_is_stale {
