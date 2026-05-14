@@ -287,8 +287,14 @@ pub(crate) fn build_commit_context(
     });
 
     let focus_is_stale = focus_line.as_ref().map_or(false, |focus| {
-        last_commit_subject
-            .map_or(false, |subj| subj.contains(focus.as_str()))
+        last_commit_subject.as_ref().map_or(false, |subj| {
+            if focus.len() <= subj.len() {
+                subj.contains(focus.as_str())
+            } else {
+                focus.starts_with(subj.as_str())
+                    || focus[..subj.len().min(focus.len())] == *subj
+            }
+        })
     });
 
     let (description, scribe_category, scribe_scope) = if focus_is_stale {
@@ -365,7 +371,7 @@ fn extract_category_scope_from_focus(content: &str) -> Option<(String, String)> 
 
 fn extract_scope_from_focus(focus: &str) -> String {
     // Skip common action words at the start
-    let action_words = ["updated", "added", "created", "fixed", "implemented",
+    let action_words = ["updated", "added", "created", "fixed", "fix", "implemented",
                         "removed", "deleted", "refactored", "improved", "changed",
                         "enhanced", "refined", "cleaned", "cleaned up"];
     let mut focus_trimmed = focus;
