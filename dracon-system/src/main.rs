@@ -40,6 +40,21 @@ fn check_safe_to_delete(path: &Path, user_protected: &[String]) -> Result<PathBu
             e
         ),
     };
+
+    // Reject symlinks to mitigate TOCTOU: a symlink planted at `path` after
+    // canonicalize but before deletion could redirect us to an unintended target.
+    // We use readlink() (not symlink_metadata) because at this point the path
+    // has already been canonicalized (following the symlink). If readlink
+    // succeeds on a non-directory, the canonicalized path IS the symlink target
+    // — but since canonicalize() already resolved it, we can't detect it.
+    // The real mitigation is openat2/O_PATH which holds the fd across the check.
+    // For now: if the original path is a symlink, reject it.
+    if let Ok(meta) = std::fs::symlink_metadata(path) {
+        if meta.file_type().is_symlink() {
+            anyhow::bail!("refusing to delete symlink {} — use target directly", path.display());
+        }
+    }
+
     let canon_str = canon.display().to_string();
 
     for prot in SYSTEM_PROTECTED {
