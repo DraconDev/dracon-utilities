@@ -63,14 +63,14 @@ dracon-sync is designed to be **invisible infrastructure** for an AI coder. The 
 
 **The AI workflow:**
 1. User says "work on dracon-utilities"
-2. AI reads `dracon-utilities/.dracon/project-state.md`
+2. AI reads `dracon-utilities/.dracon/project-state.md` (if present, for manual context)
 3. AI makes changes
 4. Sync daemon auto-commits and pushes
 5. Done
 
 **What sync provides:**
 - Auto-commit on every change (AI doesn't need to think about git)
-- project-state.md as the AI's working memory (context survives sessions)
+- AI-generated commit subjects from diffs (unique messages each cycle)
 - Incident ledger for debugging (AI can read what went wrong)
 - Freezing for pause (AI can pause sync during delicate operations)
 
