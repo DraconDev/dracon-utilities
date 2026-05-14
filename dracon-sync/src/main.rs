@@ -957,15 +957,15 @@ remotes = []
     #[test]
     fn test_metrics_output_has_expected_format() {
         let lines = vec![
-            "# HELP dracon_sync_info Dracon sync daemon info",
-            "# TYPE dracon_sync_info gauge",
+            "# HELP dracon_sync_info Dracon sync daemon info".to_string(),
+            "# TYPE dracon_sync_info gauge".to_string(),
             format!("dracon_sync_info{{version=\"{}\"}} 1", env!("CARGO_PKG_VERSION")),
-            "# HELP dracon_sync_repos_discovered_total gauge",
-            "dracon_sync_repos_discovered_total 20",
-            "# HELP dracon_sync_freeze_state gauge",
-            "dracon_sync_freeze_state 0",
+            "dracon_sync_repos_discovered_total 20".to_string(),
+            "# HELP dracon_sync_freeze_state gauge".to_string(),
+            "dracon_sync_freeze_state 0".to_string(),
         ];
 
+        let mut found_version_line = false;
         for line in &lines {
             if line.starts_with('#') {
                 assert!(line.contains(" HELP ") || line.contains(" TYPE "),
@@ -973,8 +973,12 @@ remotes = []
             } else {
                 assert!(line.contains("dracon_sync"),
                     "metric line should contain metric name: {}", line);
+                if line.contains("version=") {
+                    found_version_line = true;
+                }
             }
         }
+        assert!(found_version_line, "version metric line should be present");
     }
 
     #[test]
