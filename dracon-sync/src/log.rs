@@ -2,6 +2,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Log levels
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[allow(dead_code)]
 pub(crate) enum Level {
     Error,
     Warn,
@@ -54,6 +55,7 @@ pub(crate) fn log(level: Level, msg: &str) {
 }
 
 /// Emit a structured log line with optional repo path.
+#[allow(dead_code)]
 pub(crate) fn log_repo(level: Level, repo: &str, msg: &str) {
     let event = Event {
         ts: timestamp_secs(),

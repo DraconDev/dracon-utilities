@@ -151,7 +151,7 @@ pub fn local_fallback_message(diff_names: &str) -> String {
 
     let mut stems: Vec<String> = Vec::new();
     for entry in entries.iter().take(3) {
-        let path = entry.splitn(2, ": ").nth(1).unwrap_or(entry).trim();
+        let path = entry.split_once(": ").map(|(_, p)| p).unwrap_or(entry).trim();
         let stem = std::path::Path::new(path)
             .file_stem()
             .and_then(|s| s.to_str())

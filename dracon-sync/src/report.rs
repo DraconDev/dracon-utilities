@@ -500,27 +500,7 @@ pub(crate) fn truncate(value: &str, max_chars: usize) -> String {
     format!("{}…", shortened)
 }
 
-pub(crate) async fn git_log_recent_subjects(repo: &Path, count: usize) -> Vec<String> {
-    let count_arg = format!("-{}", count);
-    let output = tokio_git_command()
-        .args(["log", &count_arg, "--pretty=format:%s"])
-        .current_dir(repo)
-        .output()
-        .await;
-    match output {
-        Ok(out) if out.status.success() => {
-            String::from_utf8_lossy(&out.stdout)
-                .lines()
-                .map(|l| l.trim().to_string())
-                .filter(|l| !l.is_empty())
-                .collect()
-        }
-        _ => {
-            log_warn!("git_log_recent_subjects: git log failed for {}", repo.display());
-            Vec::new()
-        }
-    }
-}
+
 
 pub(crate) async fn git_log_field(repo: &Path, format: &str) -> Option<String> {
     let output = tokio_git_command()

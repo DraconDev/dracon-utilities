@@ -3,7 +3,7 @@ use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
-use crate::{log_error, log_warn};
+use crate::log_warn;
 
 use anyhow::Result;
 use dracon_git::{build_commit_message, GitService};
@@ -2605,33 +2605,6 @@ auto_bump_versions = false
 
         // Conventional commit prefix stripped: focus "add auth" matches subject "feat: add auth"
         assert!(focus_is_stale("add auth", &["feat: add auth", "fix: add auth", "chore: add auth", "docs: other", "test: other"]));
-    }
-
-    #[tokio::test]
-    async fn test_git_log_recent_subjects_empty_repo() {
-        let tmp = tempfile::tempdir().unwrap();
-        let repo = init_test_repo(&tmp, "log-subjects-repo");
-
-        let subjects = crate::report::git_log_recent_subjects(&repo, 5).await;
-        assert_eq!(subjects, vec!["init"], "fresh repo should only have init commit");
-    }
-
-    #[tokio::test]
-    async fn test_git_log_recent_subjects_multiple_commits() {
-        let tmp = tempfile::tempdir().unwrap();
-        let repo = init_test_repo(&tmp, "log-subjects-multi");
-
-        // Add two more commits with different subjects
-        std::fs::write(repo.join("a.txt"), "a").unwrap();
-        git_cmd(&repo, &["add", "."]);
-        git_cmd(&repo, &["commit", "-m", "add a"]);
-
-        std::fs::write(repo.join("b.txt"), "b").unwrap();
-        git_cmd(&repo, &["add", "."]);
-        git_cmd(&repo, &["commit", "-m", "add b"]);
-
-        let subjects = crate::report::git_log_recent_subjects(&repo, 2).await;
-        assert_eq!(subjects, vec!["add b", "add a"]);
     }
 
     #[tokio::test]
