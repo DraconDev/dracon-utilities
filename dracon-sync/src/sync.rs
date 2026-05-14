@@ -37,6 +37,7 @@ impl SyncOutcome {
     }
 }
 
+#[allow(dead_code)]
 struct SyncContext<'a> {
     repo: &'a Path,
     policy: &'a SyncPolicy,
@@ -355,6 +356,7 @@ async fn clean_staged_paths(
 struct DiffResult {
     status: dracon_git::types::RepoStatus,
     entries: Vec<dracon_git::types::DiffFile>,
+    #[allow(dead_code)]
     filter_only_cleared: bool,
 }
 
