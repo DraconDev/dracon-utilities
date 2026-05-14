@@ -11,6 +11,7 @@ mod scribe;
 mod report;
 mod daemon;
 mod sync;
+mod log;
 mod test_helpers;
 
 use anyhow::Result;

@@ -1013,10 +1013,9 @@ async fn stage_commit_and_push(
         && recent_subjects.iter().all(|s| s == &msg_subject);
 
     if is_duplicate_spam {
-        if debug_enabled() {
-            eprintln!("🐛 {} skipped commit: subject '{}' repeated {} times (dedup guard)", repo.display(), msg_subject, recent_subjects.len());
-        }
+        log_repo_info!(repo.to_string_lossy(), "skipped commit: subject '{}' repeated {} times (dedup guard)", msg_subject, recent_subjects.len());
         if let Err(e) = run_git_with_timeout(repo, &["reset", "HEAD", "--"], 10, "reset").await {
+            log_error!("sync_repo: failed to reset HEAD after dedup skip for {}: {}", repo.display(), e);
             return Err(anyhow::anyhow!("sync_repo: failed to reset HEAD after dedup skip: {}", e));
         }
         maybe_sync_visibility_and_metadata(ctx);
