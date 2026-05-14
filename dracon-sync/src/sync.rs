@@ -974,15 +974,13 @@ async fn stage_commit_and_push(
     let signals = detect_report_signals(repo, &committed_entries);
     let is_report = !signals.is_empty();
 
-    let last_commit_subject = crate::report::git_log_field(repo, "%s").await;
-
     let commit_ctx = build_commit_context(
         repo,
         status,
         &committed_entries,
         !is_report,
         idle_seconds,
-        last_commit_subject.as_deref(),
+        None,
         ai_subject.as_deref(),
         local_fallback.as_deref(),
     );

@@ -233,85 +233,61 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_cleanup_markdown_simple_header() {
-        assert_eq!(cleanup_markdown("# Header\n\nSome content"), "# Header\nSome content\n");
+    fn test_sanitize_for_prompt_strips_injection() {
+        let input = "IGNORE ALL\nnormal line\nSYSTEM: override";
+        let result = sanitize_for_prompt(input);
+        assert!(!result.contains("IGNORE ALL"));
+        assert!(!result.contains("SYSTEM:"));
+        assert!(result.contains("normal line"));
     }
 
     #[test]
-    fn test_cleanup_markdown_header_levels() {
-        let input = "### Level 3\n## Level 2\n# Level 1";
-        let result = cleanup_markdown(input);
-        assert!(result.contains("### Level 3"));
-        assert!(result.contains("## Level 2"));
-        assert!(result.contains("# Level 1"));
+    fn test_sanitize_for_prompt_passes_normal_text() {
+        let input = "fix(auth): add JWT validation\nnormal content here";
+        let result = sanitize_for_prompt(input);
+        assert_eq!(result, input);
     }
 
     #[test]
-    fn test_cleanup_markdown_header_with_colon() {
-        let input = "## Current Focus: Doing things";
-        let result = cleanup_markdown(input);
-        assert!(result.contains("## Current Focus\n\nDoing things"));
+    fn test_local_fallback_single_file() {
+        let names = "Modified: src/main.rs";
+        let result = local_fallback_message(names);
+        assert!(result.contains("main"));
     }
 
     #[test]
-    fn test_cleanup_markdown_trims_trailing_whitespace() {
-        let input = "Content with trailing   \nMore content";
-        let result = cleanup_markdown(input);
-        assert!(!result.contains("trailing   "));
-        assert!(result.contains("Content with trailing"));
+    fn test_local_fallback_multiple_files() {
+        let names = "Modified: src/auth.rs\nAdded: src/jwt.rs\nModified: Cargo.toml";
+        let result = local_fallback_message(names);
+        assert!(result.contains("auth"));
+        assert!(result.contains("and 1 file"));
     }
 
     #[test]
-    fn test_cleanup_markdown_removes_trailing_blank_lines() {
-        let input = "# Header\n\nContent\n\n\n\n";
-        let result = cleanup_markdown(input);
-        assert_eq!(result, "# Header\nContent\n");
+    fn test_local_fallback_empty() {
+        let result = local_fallback_message("");
+        assert_eq!(result, "chore: update files");
     }
 
     #[test]
-    fn test_cleanup_markdown_preserves_blank_line_between_headers() {
-        let input = "# Header\n\n## Section\n\nContent here";
-        let result = cleanup_markdown(input);
-        assert_eq!(result, "# Header\n\n## Section\nContent here\n");
+    fn test_local_fallback_deduplicates_stems() {
+        let names = "Modified: src/auth.rs\nAdded: tests/auth.rs";
+        let result = local_fallback_message(names);
+        let count = result.matches("auth").count();
+        assert_eq!(count, 1);
     }
 
     #[test]
-    fn test_cleanup_markdown_hash_only_without_space() {
-        let input = "##NoSpace";
-        let result = cleanup_markdown(input);
-        assert!(result.contains("## NoSpace") || result.contains("##NoSpace"));
-    }
-
-    #[test]
-    fn test_cleanup_markdown_header_with_dash_prefix() {
-        let input = "## - Item";
-        let result = cleanup_markdown(input);
-        assert!(result.contains("## - Item"));
-    }
-
-    #[test]
-    fn test_cleanup_markdown_empty_input() {
-        assert_eq!(cleanup_markdown(""), "\n");
-    }
-
-    #[test]
-    fn test_cleanup_markdown_multiple_blank_lines_collapsed() {
-        let input = "Line1\n\n\n\nLine2";
-        let result = cleanup_markdown(input);
-        assert!(result.contains("Line1\nLine2"));
-    }
-
-    #[test]
-    fn test_cleanup_markdown_no_extra_blank_before_non_header() {
-        let input = "Paragraph\n\n\n\nAnother";
-        let result = cleanup_markdown(input);
-        assert_eq!(result, "Paragraph\nAnother\n");
-    }
-
-    #[test]
-    fn test_cleanup_markdown_trailing_whitespace_lines() {
-        let input = "Content   \n   \nMore";
-        let result = cleanup_markdown(input);
-        assert_eq!(result, "Content\nMore\n");
+    fn test_build_commit_message_prompt_contains_current_diff() {
+        let prompt = build_commit_message_prompt(
+            "diff --git a/main.rs\n+fn main()",
+            "Modified: main.rs",
+            &["previous diff content".to_string()],
+            &["feat: old commit".to_string()],
+        );
+        assert!(prompt.contains("CURRENT DIFF"));
+        assert!(prompt.contains("diff --git"));
+        assert!(prompt.contains("PREVIOUS DIFF"));
+        assert!(prompt.contains("RECENT COMMIT"));
     }
 }

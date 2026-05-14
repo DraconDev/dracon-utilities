@@ -8,7 +8,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "0.2.251"
+version = "0.2.252"
 edition = "2021"
 authors = ["DraconDev"]
 
