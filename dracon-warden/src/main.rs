@@ -534,7 +534,7 @@ pub(crate) fn build_gitattributes_block(policy: &WardenPolicy) -> Result<String>
         lines.push(format!("{} filter=dracon diff=dracon merge=dracon", p));
     }
     for p in plaintext_patterns {
-        lines.push(format!("{} -filter -diff -merge", p));
+        lines.push(format!("{} -filter", p));
     }
     lines.push(BLOCK_END.to_string());
     Ok(lines.join("\n"))

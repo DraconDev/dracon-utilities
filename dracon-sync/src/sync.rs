@@ -992,6 +992,9 @@ pub(crate) async fn sync_repo(
                 .collect::<Vec<_>>()
                 .join("\n");
 
+            let is_noise_only = crate::bump::deterministic_decide_bump_level(&staged_diff_names)
+                == crate::bump::BumpLevel::None;
+
             let staged_diff_content = get_staged_diff_content(repo).await;
 
             let mut version_bumped = run_deterministic_bumper(repo, &committed_entries, dry_run, auto_bump_versions).await;
@@ -1005,7 +1008,9 @@ pub(crate) async fn sync_repo(
                 stage_version_files(repo).await;
             }
 
-            scribe_update(repo, &staged_diff_names, staged_diff_content, dry_run).await;
+            if !is_noise_only {
+                scribe_update(repo, &staged_diff_names, staged_diff_content, dry_run).await;
+            }
 
             stage_project_state(repo).await;
 
@@ -1029,15 +1034,22 @@ pub(crate) async fn sync_repo(
             let signals = detect_report_signals(repo, &committed_entries);
             let is_report = !signals.is_empty();
 
+            let last_commit_subject = crate::report::git_log_field(repo, "%s").await;
+
             let ctx = build_commit_context(
                 repo,
                 &status,
                 &committed_entries,
                 !is_report,
                 idle_seconds,
+                last_commit_subject.as_deref(),
             );
 
-            let msg = build_commit_message(&ctx);
+            let msg = if is_noise_only && !is_report {
+                "chore: sync metadata".to_string()
+            } else {
+                build_commit_message(&ctx)
+            };
 
             if dry_run {
                 println!("📝 Would commit {} file(s) in {}:", committed_entries.len(), repo.display());

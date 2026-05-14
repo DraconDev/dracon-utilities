@@ -112,8 +112,8 @@ mod tests {
         let block = build_gitattributes_block(&sample_policy()).expect("block");
         assert!(block.contains("*.env filter=dracon"));
         assert!(block.contains("secrets/** filter=dracon"));
-        assert!(block.contains("*.pub -filter -diff -merge"));
-        assert!(!block.contains("config/licenses.json -filter -diff -merge"));
+        assert!(block.contains("*.pub -filter"));
+        assert!(!block.contains("config/licenses.json -filter"));
         assert!(!block.contains("config/services.test.json -filter -diff -merge"));
         assert!(!block.contains("plan/pages/templates/*.json -filter -diff -merge"));
     }
