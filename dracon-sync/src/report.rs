@@ -246,20 +246,6 @@ pub(crate) fn detect_report_signals(
     signals
 }
 
-pub(crate) fn read_project_focus(repo: &Path) -> Option<String> {
-    let state_path = repo.join(".dracon/project-state.md");
-    let content = std::fs::read_to_string(&state_path).ok()?;
-    
-    // Return full project-state.md content for rich commit bodies
-    // This gives AI reading git history full context (Completed, In Progress, Open Issues)
-    let trimmed = content.trim();
-    if trimmed.is_empty() {
-        None
-    } else {
-        Some(trimmed.to_string())
-    }
-}
-
 pub(crate) fn build_commit_context(
     repo: &Path,
     status: &RepoStatus,
@@ -268,6 +254,7 @@ pub(crate) fn build_commit_context(
     idle_seconds: u64,
     _last_commit_subject: Option<&str>,
     ai_subject: Option<&str>,
+    local_fallback: Option<&str>,
 ) -> CommitContext {
     let changed_paths: Vec<PathBuf> = entries.iter().map(|e| e.path.clone()).collect();
     let intent_info = extract_intent(repo, &changed_paths, Some(&status.branch));
@@ -279,7 +266,10 @@ pub(crate) fn build_commit_context(
 
     let (category, scope, description) = match ai_subject {
         Some(subject) => parse_conventional_commit(subject),
-        None => (None, None, None),
+        None => match local_fallback {
+            Some(fallback) => (None, None, Some(fallback.to_string())),
+            None => (None, None, None),
+        },
     };
 
     CommitContext {
@@ -334,84 +324,6 @@ fn parse_conventional_commit(subject: &str) -> (Option<String>, Option<String>, 
     (None, None, Some(subject.to_string()))
 }
 
-fn extract_category_scope_from_focus(content: &str) -> Option<(String, String)> {
-    // Extract "Current Focus" line from project-state.md content
-    let focus_line = content
-        .lines()
-        .skip_while(|l| !l.starts_with("## Current Focus"))
-        .nth(1)?
-        .trim();
-
-    // Handle scribe format: "prefix(category): focus" where prefix might be "updated", "added", etc.
-    // e.g., "docs(security): updated session cleanup" or "fix(auth): added JWT validation"
-    if let Some(paren_start) = focus_line.find('(') {
-        if let Some(paren_end) = focus_line[paren_start..].find(')') {
-            let cat = &focus_line[paren_start+1..paren_start+paren_end];
-            if !cat.is_empty() && cat.len() <= 20 {
-                // Valid category in parentheses - extract focus after the closing paren
-                let focus_start = paren_start + paren_end + 1;
-                if focus_start < focus_line.len() {
-                    let after_cat = focus_line[focus_start..].trim_start_matches([' ', ':', '-']);
-                    return Some((cat.to_string(), extract_scope_from_focus(after_cat)));
-                }
-            }
-        }
-    }
-
-    // No valid format - derive from entire line
-    let focus_lower = focus_line.to_lowercase();
-
-    let category = if focus_lower.contains("fix") || focus_lower.contains("bug") || focus_lower.contains("error") || focus_lower.contains("issue") || focus_lower.contains("patch") {
-        "fix".to_string()
-    } else if focus_lower.contains("add") || focus_lower.contains("new") || focus_lower.contains("implement") || focus_lower.contains("create") || focus_lower.contains("support for") {
-        "feat".to_string()
-    } else if focus_lower.contains("remove") || focus_lower.contains("delete") || focus_lower.contains("clean up") || focus_lower.contains("refactor") {
-        "refactor".to_string()
-    } else if focus_lower.contains("security") || focus_lower.contains("encrypt") || focus_lower.contains("protect") || focus_lower.contains("auth") {
-        "security".to_string()
-    } else if focus_lower.contains("docs") || focus_lower.contains("documentation") || focus_lower.contains("readme") || focus_lower.contains("comment") {
-        "docs".to_string()
-    } else if focus_lower.contains("test") || focus_lower.contains("testing") || focus_lower.contains("verify") {
-        "test".to_string()
-    } else {
-        return None;
-    };
-
-    Some((category, extract_scope_from_focus(focus_line)))
-}
-
-fn extract_scope_from_focus(focus: &str) -> String {
-    // Skip common action words at the start
-    let action_words = ["updated", "added", "created", "fixed", "fix", "implemented",
-                        "removed", "deleted", "refactored", "improved", "changed",
-                        "enhanced", "refined", "cleaned", "cleaned up"];
-    let mut focus_trimmed = focus;
-    for action in &action_words {
-        if focus_trimmed.to_lowercase().starts_with(action) {
-            if let Some(rest) = focus_trimmed[action.len()..].trim_start().strip_prefix('-').or_else(|| Some(focus_trimmed[action.len()..].trim_start())) {
-                focus_trimmed = rest;
-            }
-            break;
-        }
-    }
-
-    // Take only 1-2 meaningful words for scope
-    let scope = focus_trimmed
-        .split_whitespace()
-        .filter(|w| !w.chars().all(|c| c == '.' || c == ',' || c == ')'))
-        .take(2)
-        .collect::<Vec<_>>()
-        .join(" ")
-        .trim_end_matches(['.', ',', ')'])
-        .to_lowercase();
-
-    // Allow 2-word scopes up to ~25 chars (e.g., "comprehensive test" = 20)
-    if scope.is_empty() || scope.len() > 25 {
-        focus_trimmed.split_whitespace().take(2).collect::<Vec<_>>().join(" ").to_lowercase()
-    } else {
-        scope
-    }
-}
 
 pub(crate) fn incident_ledger_path(_policy_path: &Path) -> PathBuf {
     // IMPORTANT: Keep this ledger OUT of git repositories by default.

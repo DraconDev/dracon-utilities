@@ -948,6 +948,12 @@ async fn stage_commit_and_push(
         None
     };
 
+    let local_fallback = if ai_subject.is_none() && !is_noise_only {
+        Some(crate::scribe::local_fallback_message(&staged_diff_names))
+    } else {
+        None
+    };
+
     let staged = git_name_status_entries(repo, &["diff", "--cached", "--name-status"]).await?;
     let committed_entries: Vec<dracon_git::types::DiffFile> = staged
         .into_iter()
@@ -978,15 +984,11 @@ async fn stage_commit_and_push(
         idle_seconds,
         last_commit_subject.as_deref(),
         ai_subject.as_deref(),
+        local_fallback.as_deref(),
     );
 
     let msg = if is_noise_only && !is_report {
         "chore: sync metadata".to_string()
-    } else if ai_subject.is_none() && !is_noise_only {
-        let fallback = crate::scribe::local_fallback_message(&staged_diff_names);
-        let mut commit_ctx = commit_ctx.clone();
-        commit_ctx.description = Some(fallback.clone());
-        build_commit_message(&commit_ctx)
     } else {
         build_commit_message(&commit_ctx)
     };
