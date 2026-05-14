@@ -780,6 +780,684 @@ pub(crate) async fn run_repos_report(policy_path: &Path, filter: RepoFilter, jso
     Ok(())
 }
 
+fn log_incident(
+    policy_path: &Path,
+    scope: impl Into<String>,
+    repo: impl Into<String>,
+    reason: impl Into<String>,
+    action: impl Into<String>,
+    backup_branch: Option<String>,
+    result: impl Into<String>,
+    details: Option<String>,
+) {
+    let record = IncidentRecord::new(
+        timestamp_secs(),
+        scope,
+        repo,
+        reason,
+        action,
+        backup_branch,
+        result,
+        details,
+    );
+    append_incident_record(policy_path, &record);
+}
+
+struct RepairState {
+    attempted_ops: usize,
+    succeeded_ops: usize,
+    manual_only: usize,
+    has_origin: bool,
+    has_upstream: bool,
+    push_ok: bool,
+}
+
+async fn handle_no_origin(
+    state: &mut RepairState,
+    repo: &Path,
+    apply: bool,
+    human: bool,
+    policy: &SyncPolicy,
+    reason: &str,
+    policy_path: &Path,
+) -> bool {
+    if state.has_origin {
+        return false;
+    }
+    state.attempted_ops += 1;
+    if apply {
+        let private_remote = if policy.auto_github_private {
+            if human {
+                println!("   plan: create GitHub private repo as origin");
+            }
+            create_github_private_remote(repo, &policy.auto_github_private_account, true)
+        } else {
+            if human {
+                println!("   plan: create private bare repo as origin");
+            }
+            create_private_remote(repo)
+        };
+        if let Some(private_remote) = private_remote {
+            state.succeeded_ops += 1;
+            state.has_origin = true;
+            state.has_upstream = true;
+            if human {
+                println!("   ok: created private remote: {}", private_remote);
+            }
+            log_incident(
+                policy_path,
+                "concern",
+                repo.display().to_string(),
+                reason,
+                "create_private_remote",
+                None,
+                "ok",
+                Some(format!("created private remote: {}", private_remote)),
+            );
+        } else {
+            state.manual_only += 1;
+            if human {
+                println!("   fail: could not create private remote");
+            }
+            log_incident(
+                policy_path,
+                "concern",
+                repo.display().to_string(),
+                reason,
+                "create_private_remote",
+                None,
+                "fail",
+                Some("failed to create private remote".to_string()),
+            );
+        }
+    }
+    true
+}
+
+async fn handle_no_upstream(
+    state: &mut RepairState,
+    repo: &Path,
+    apply: bool,
+    human: bool,
+    push_timeout_secs: u64,
+    push_retries: u32,
+    reason: &str,
+    policy_path: &Path,
+) -> bool {
+    if state.has_upstream {
+        return false;
+    }
+    state.attempted_ops += 1;
+    if human {
+        println!("   plan: set upstream via `git push -u origin HEAD`");
+    }
+    if apply {
+        match run_git_with_timeout(
+            repo,
+            &["push", "-u", "origin", "HEAD"],
+            push_timeout_secs,
+            "push -u",
+        )
+        .await
+        {
+            Ok(()) => {
+                state.succeeded_ops += 1;
+                state.has_upstream = true;
+                if human {
+                    println!("   ok: upstream configured");
+                }
+                log_incident(
+                    policy_path,
+                    "concern",
+                    repo.display().to_string(),
+                    reason,
+                    "set_upstream_push_u",
+                    None,
+                    "ok",
+                    None,
+                );
+            }
+            Err(e) => {
+                if human {
+                    println!("   fail: upstream configure failed: {}", e);
+                }
+                log_incident(
+                    policy_path,
+                    "concern",
+                    repo.display().to_string(),
+                    reason,
+                    "set_upstream_push_u",
+                    None,
+                    "fail",
+                    Some(e.to_string()),
+                );
+                return true;
+            }
+        }
+    }
+    false
+}
+
+async fn handle_behind(
+    state: &mut RepairState,
+    repo: &Path,
+    apply: bool,
+    human: bool,
+    pull_timeout_secs: u64,
+    reason: &str,
+    policy_path: &Path,
+) -> bool {
+    state.attempted_ops += 1;
+    if human {
+        println!("   plan: pull --no-rebase (merge)");
+    }
+    if apply {
+        match run_git_with_timeout(
+            repo,
+            &["pull", "--no-rebase"],
+            pull_timeout_secs,
+            "pull/merge",
+        )
+        .await
+        {
+            Ok(()) => {
+                state.succeeded_ops += 1;
+                if human {
+                    println!("   ok: pulled");
+                }
+                log_incident(
+                    policy_path,
+                    "concern",
+                    repo.display().to_string(),
+                    reason,
+                    "pull_merge",
+                    None,
+                    "ok",
+                    None,
+                );
+            }
+            Err(e) => {
+                if human {
+                    println!("   fail: pull failed: {}", e);
+                }
+                log_incident(
+                    policy_path,
+                    "concern",
+                    repo.display().to_string(),
+                    reason,
+                    "pull_merge",
+                    None,
+                    "fail",
+                    Some(e.to_string()),
+                );
+            }
+        }
+    }
+    false
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn handle_ahead(
+    state: &mut RepairState,
+    repo: &Path,
+    apply: bool,
+    human: bool,
+    push_timeout_secs: u64,
+    push_retries: u32,
+    blob_threshold: u64,
+    rewrite_large_any: bool,
+    excluded_dir_names: &std::collections::HashSet<String>,
+    reason: &str,
+    policy_path: &Path,
+    svc: &GitService,
+) -> bool {
+    state.attempted_ops += 1;
+    if human {
+        println!("   plan: push origin HEAD");
+    }
+    state.push_ok = false;
+    if !apply {
+        return false;
+    }
+    #[allow(unused_assignments)]
+    match push_with_retries(repo, push_timeout_secs, push_retries, "push").await {
+        Ok(()) => {
+            state.succeeded_ops += 1;
+            state.push_ok = true;
+            if human {
+                println!("   ok: pushed");
+            }
+            log_incident(
+                policy_path,
+                "concern",
+                repo.display().to_string(),
+                reason,
+                "push_origin_head",
+                None,
+                "ok",
+                None,
+            );
+        }
+        Err(e) => {
+            if human {
+                println!("   fail: push failed: {}", e);
+            }
+
+            let err_str = e.to_string().to_lowercase();
+
+            // Check if push failed because remote doesn't exist or is unreachable
+            // In this case, auto-create a private bare repo as the remote
+            let no_remote = err_str.contains("no such remote")
+                || err_str.contains("remote does not exist")
+                || err_str.contains("repository not found")
+                || err_str.contains("could not resolve host")
+                || err_str.contains("does not appear to be a git repository")
+                || (err_str.contains("exit status: 128") && err_str.contains("fatal:"));
+
+            if no_remote {
+                // Try to create a private bare repo and use it as origin
+                if human {
+                    println!("   info: no remote detected, creating private bare repo");
+                }
+                if let Some(private_remote) = create_private_remote(repo) {
+                    if human {
+                        println!("   info: created private remote: {}", private_remote);
+                    }
+                    // Retry push with new remote
+                    match push_with_retries(repo, push_timeout_secs, push_retries, "push").await
+                    {
+                        Ok(()) => {
+                            state.succeeded_ops += 1;
+                            state.push_ok = true;
+                            if human {
+                                println!("   ok: pushed to private remote");
+                            }
+                            log_incident(
+                                policy_path,
+                                "concern",
+                                repo.display().to_string(),
+                                reason,
+                                "push_origin_head",
+                                None,
+                                "ok",
+                                Some(format!("pushed to private remote: {}", private_remote)),
+                            );
+                            return true;
+                        }
+                        Err(e2) => {
+                            if human {
+                                println!(
+                                    "   fail: push to private remote also failed: {}",
+                                    e2
+                                );
+                            }
+                            log_incident(
+                                policy_path,
+                                "concern",
+                                repo.display().to_string(),
+                                reason,
+                                "push_origin_head",
+                                None,
+                                "fail",
+                                Some(e2.to_string()),
+                            );
+                            return true;
+                        }
+                    }
+                } else {
+                    if human {
+                        println!("   fail: could not create private remote");
+                    }
+                    log_incident(
+                        policy_path,
+                        "concern",
+                        repo.display().to_string(),
+                        reason,
+                        "push_origin_head",
+                        None,
+                        "fail",
+                        Some(e.to_string()),
+                    );
+                    return true;
+                }
+            }
+
+            // For permission denied or other errors on existing remote,
+            // just record failure and continue - no permanent marking
+            // These will retry on next cycle naturally
+            log_incident(
+                policy_path,
+                "concern",
+                repo.display().to_string(),
+                reason,
+                "push_origin_head",
+                None,
+                "fail",
+                Some(e.to_string()),
+            );
+            // Don't continue here - let it fall through to large blob detection below
+            // (but without the manual_only marking)
+
+            let large = detect_large_blobs_ahead(repo, blob_threshold)
+                .await
+                .unwrap_or_default();
+            if !large.is_empty() {
+                if human {
+                    println!(
+                        "   detect: large blobs in ahead range ({} entries)",
+                        large.len()
+                    );
+                }
+                let mut dirs = BTreeSet::new();
+                for (_, path) in &large {
+                    if let Some(dir) = top_level_dir(path) {
+                        if is_excluded_dir_name(&dir, excluded_dir_names) {
+                            dirs.insert(dir);
+                        }
+                    }
+                }
+                let dirs: Vec<String> = dirs.into_iter().collect();
+                let rewrite_paths: Vec<String> = if !dirs.is_empty() {
+                    dirs
+                } else if rewrite_large_any {
+                    let mut unique = BTreeSet::new();
+                    for (_, p) in &large {
+                        unique.insert(p.clone());
+                    }
+                    unique.into_iter().collect()
+                } else {
+                    Vec::new()
+                };
+
+                if rewrite_paths.is_empty() {
+                    if human {
+                        println!("   manual: large blobs found but not in excluded dirs");
+                    }
+                    log_incident(
+                        policy_path,
+                        "concern",
+                        repo.display().to_string(),
+                        reason,
+                        "large_blob_detected",
+                        None,
+                        "manual",
+                        Some(format!(
+                            "threshold={} entries={} rewrite_allowed=false",
+                            blob_threshold,
+                            large.len()
+                        )),
+                    );
+                } else {
+                    if human {
+                        println!(
+                            "   plan: rewrite ahead history removing paths {:?}",
+                            rewrite_paths
+                        );
+                    }
+                    match rewrite_ahead_paths(
+                        repo,
+                        &rewrite_paths,
+                        "backup/pre-sync-largeblob-fix",
+                    ) {
+                        Ok(Some(backup_branch)) => {
+                            let backup_branch_for_log = backup_branch.clone();
+                            if human {
+                                println!(
+                                    "   ok: rewrite complete (backup branch: {})",
+                                    backup_branch
+                                );
+                            }
+                            match push_with_retries(
+                                repo,
+                                push_timeout_secs,
+                                push_retries,
+                                "push-after-rewrite",
+                            )
+                            .await
+                            {
+                                Ok(()) => {
+                                    state.succeeded_ops += 1;
+                                    state.push_ok = true;
+                                    if human {
+                                        println!("   ok: pushed after rewrite");
+                                    }
+                                    log_incident(
+                                        policy_path,
+                                        "concern",
+                                        repo.display().to_string(),
+                                        reason,
+                                        "rewrite_then_push",
+                                        Some(backup_branch_for_log),
+                                        "ok",
+                                        Some(format!("paths={:?}", rewrite_paths)),
+                                    );
+                                }
+                                Err(e2) => {
+                                    if human {
+                                        println!(
+                                            "   fail: push after rewrite failed: {}",
+                                            e2
+                                        );
+                                    }
+                                    log_incident(
+                                        policy_path,
+                                        "concern",
+                                        repo.display().to_string(),
+                                        reason,
+                                        "rewrite_then_push",
+                                        Some(backup_branch),
+                                        "fail",
+                                        Some(e2.to_string()),
+                                    );
+                                }
+                            }
+                        }
+                        Ok(None) => {}
+                        Err(rewrite_err) => {
+                            if human {
+                                println!("   fail: rewrite failed: {}", rewrite_err);
+                            }
+                            log_incident(
+                                policy_path,
+                                "concern",
+                                repo.display().to_string(),
+                                reason,
+                                "rewrite_large_blob",
+                                None,
+                                "fail",
+                                Some(rewrite_err.to_string()),
+                            );
+                        }
+                    }
+                }
+            } else {
+                let branch = current_branch(repo).unwrap_or_default();
+                let dry_run = run_git_capture_output(
+                    repo,
+                    &["push", "--dry-run", "origin", "HEAD"],
+                    "push --dry-run",
+                )
+                .unwrap_or_default();
+                let looks_branch_mismatch =
+                    dry_run.to_ascii_lowercase().contains("up-to-date");
+                if looks_branch_mismatch
+                    && !branch.is_empty()
+                    && remote_branch_exists(repo, &branch)
+                    && has_tracking_upstream(repo)
+                {
+                    if human {
+                        println!(
+                            "   plan: align upstream to origin/{} (possible branch mismatch)",
+                            branch
+                        );
+                    }
+                    match set_upstream_to_branch(repo, &branch) {
+                        Ok(()) => {
+                            if human {
+                                println!("   ok: upstream realigned");
+                            }
+                            match push_with_retries(
+                                repo,
+                                push_timeout_secs,
+                                push_retries,
+                                "push-after-upstream-align",
+                            )
+                            .await
+                            {
+                                Ok(()) => {
+                                    state.succeeded_ops += 1;
+                                    state.push_ok = true;
+                                    if human {
+                                        println!("   ok: pushed after upstream align");
+                                    }
+                                    log_incident(
+                                        policy_path,
+                                        "concern",
+                                        repo.display().to_string(),
+                                        reason,
+                                        "realign_upstream_then_push",
+                                        None,
+                                        "ok",
+                                        Some(format!("branch={}", branch)),
+                                    );
+                                }
+                                Err(e2) => {
+                                    if human {
+                                        println!(
+                                            "   fail: push after upstream align failed: {}",
+                                            e2
+                                        );
+                                    }
+                                    log_incident(
+                                        policy_path,
+                                        "concern",
+                                        repo.display().to_string(),
+                                        reason,
+                                        "realign_upstream_then_push",
+                                        None,
+                                        "fail",
+                                        Some(e2.to_string()),
+                                    );
+                                }
+                            }
+                        }
+                        Err(set_err) => {
+                            if human {
+                                println!("   fail: upstream align failed: {}", set_err);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if !state.push_ok {
+        log_incident(
+            policy_path,
+            "concern",
+            repo.display().to_string(),
+            reason,
+            "push_origin_head",
+            None,
+            "fail",
+            Some("push did not clear concern".to_string()),
+        );
+    }
+    if state.push_ok {
+        if let Ok(next_after_push) = svc.get_status().await {
+            if next_after_push.ahead > 0 {
+                let branch = current_branch(repo).unwrap_or_default();
+                if !branch.is_empty() && remote_branch_exists(repo, &branch) {
+                    if human {
+                        println!(
+                            "   plan: realign upstream to origin/{} (ahead still > 0 after push)",
+                            branch
+                        );
+                    }
+                    match set_upstream_to_branch(repo, &branch) {
+                        Ok(()) => {
+                            if human {
+                                println!("   ok: upstream realigned");
+                            }
+                        }
+                        Err(e) => {
+                            if human {
+                                println!("   fail: upstream realign failed: {}", e);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    false
+}
+
+async fn verify_resolution(
+    repo: &Path,
+    apply: bool,
+    human: bool,
+    resolved: &mut usize,
+    reason: &str,
+    policy_path: &Path,
+    svc: &GitService,
+) {
+    if !apply {
+        return;
+    }
+    if let Ok(next) = svc.get_status().await {
+        let has_origin = has_origin_remote(repo);
+        let has_upstream = has_tracking_upstream(repo);
+        let still_concern = next.ahead > 0
+            || next.behind > 0
+            || !has_origin
+            || !has_upstream;
+        if !still_concern {
+            *resolved += 1;
+            if human {
+                println!("   resolved: concern cleared");
+            }
+            log_incident(
+                policy_path,
+                "concern",
+                repo.display().to_string(),
+                reason,
+                "verify_resolved",
+                None,
+                "ok",
+                None,
+            );
+        } else {
+            if human {
+                println!(
+                    "   remaining: ahead={} behind={} origin={} upstream={}",
+                    next.ahead,
+                    next.behind,
+                    has_origin,
+                    has_upstream
+                );
+            }
+            // Only notify on true divergence (both ahead AND behind) - that's
+            // the only case where we have no automatic resolution.
+            // If just ahead > 0, we can push. If just behind > 0, we can pull.
+            if next.ahead > 0 && next.behind > 0 {
+                let details = format!("ahead={} behind={}", next.ahead, next.behind);
+                send_sync_conflict_notification(repo, reason, &details);
+            }
+            log_incident(
+                policy_path,
+                "concern",
+                repo.display().to_string(),
+                reason,
+                "verify_resolved",
+                None,
+                "remaining",
+                Some(format!("ahead={} behind={}", next.ahead, next.behind)),
+            );
+        }
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn run_repair_concerns(
     policy_path: &Path,
@@ -824,9 +1502,14 @@ pub(crate) async fn run_repair_concerns(
     let blob_threshold = push_large_blob_threshold_bytes(&policy);
 
     let mut concerns = 0usize;
-    let mut attempted_ops = 0usize;
-    let mut succeeded_ops = 0usize;
-    let mut manual_only = 0usize;
+    let mut state = RepairState {
+        attempted_ops: 0,
+        succeeded_ops: 0,
+        manual_only: 0,
+        has_origin: false,
+        has_upstream: false,
+        push_ok: false,
+    };
     let mut resolved = 0usize;
 
     out!("📜 POLICY: {}", policy_path.display());
@@ -859,14 +1542,14 @@ pub(crate) async fn run_repair_concerns(
             }
         };
 
-        let mut has_origin = has_origin_remote(&repo);
-        let mut has_upstream = has_tracking_upstream(&repo);
-        let is_concern = repo_is_concern(&status, has_origin, has_upstream);
+        state.has_origin = has_origin_remote(&repo);
+        state.has_upstream = has_tracking_upstream(&repo);
+        let is_concern = repo_is_concern(&status, state.has_origin, state.has_upstream);
         if !is_concern {
             continue;
         }
-        let stuck_push = status.ahead > 0 && has_origin && has_upstream;
-        let stuck_pull = status.behind > 0 && has_origin && has_upstream;
+        let stuck_push = status.ahead > 0 && state.has_origin && state.has_upstream;
+        let stuck_pull = status.behind > 0 && state.has_origin && state.has_upstream;
         if matches!(filter, ConcernRepairFilter::StuckPush) && !stuck_push {
             continue;
         }
@@ -874,7 +1557,7 @@ pub(crate) async fn run_repair_concerns(
             continue;
         }
         concerns += 1;
-        let flags = repo_state_flags(&status, has_origin, has_upstream);
+        let flags = repo_state_flags(&status, state.has_origin, state.has_upstream);
         let reason = flags.join(",");
 
         out!(
@@ -883,592 +1566,55 @@ pub(crate) async fn run_repair_concerns(
             status.ahead,
             status.behind,
             status.is_clean,
-            has_origin,
-            has_upstream
+            state.has_origin,
+            state.has_upstream
         );
 
-        if !has_origin {
-            attempted_ops += 1;
-            if apply {
-                let private_remote = if policy.auto_github_private {
-                    out!("   plan: create GitHub private repo as origin");
-                    create_github_private_remote(&repo, &policy.auto_github_private_account, true)
-                } else {
-                    out!("   plan: create private bare repo as origin");
-                    create_private_remote(&repo)
-                };
-                if let Some(private_remote) = private_remote {
-                    succeeded_ops += 1;
-                    has_origin = true;
-                    has_upstream = true;
-                    out!("   ok: created private remote: {}", private_remote);
-                    append_incident_record(
-                        policy_path,
-                        &IncidentRecord {
-                            ts_unix: timestamp_secs(),
-                            scope: "concern".to_string(),
-                            repo: repo.display().to_string(),
-                            reason: reason.clone(),
-                            action: "create_private_remote".to_string(),
-                            backup_branch: None,
-                            result: "ok".to_string(),
-                            details: Some(format!("created private remote: {}", private_remote)),
-                        },
-                    );
-                } else {
-                    manual_only += 1;
-                    out!("   fail: could not create private remote");
-                    append_incident_record(
-                        policy_path,
-                        &IncidentRecord {
-                            ts_unix: timestamp_secs(),
-                            scope: "concern".to_string(),
-                            repo: repo.display().to_string(),
-                            reason: reason.clone(),
-                            action: "create_private_remote".to_string(),
-                            backup_branch: None,
-                            result: "fail".to_string(),
-                            details: Some("failed to create private remote".to_string()),
-                        },
-                    );
-                }
-            }
+        if handle_no_origin(&mut state, &repo, apply, human, &policy, &reason, policy_path).await {
             continue;
         }
 
-        if !has_upstream {
-            attempted_ops += 1;
-            out!("   plan: set upstream via `git push -u origin HEAD`");
-            if apply {
-                match run_git_with_timeout(
-                    &repo,
-                    &["push", "-u", "origin", "HEAD"],
-                    push_timeout_secs,
-                    "push -u",
-                )
-                .await
-                {
-                    Ok(()) => {
-                        succeeded_ops += 1;
-                        has_upstream = true;
-                        out!("   ok: upstream configured");
-                        append_incident_record(
-                            policy_path,
-                            &IncidentRecord {
-                                ts_unix: timestamp_secs(),
-                                scope: "concern".to_string(),
-                                repo: repo.display().to_string(),
-                                reason: reason.clone(),
-                                action: "set_upstream_push_u".to_string(),
-                                backup_branch: None,
-                                result: "ok".to_string(),
-                                details: None,
-                            },
-                        );
-                    }
-                    Err(e) => {
-                        out!("   fail: upstream configure failed: {}", e);
-                        append_incident_record(
-                            policy_path,
-                            &IncidentRecord {
-                                ts_unix: timestamp_secs(),
-                                scope: "concern".to_string(),
-                                repo: repo.display().to_string(),
-                                reason: reason.clone(),
-                                action: "set_upstream_push_u".to_string(),
-                                backup_branch: None,
-                                result: "fail".to_string(),
-                                details: Some(e.to_string()),
-                            },
-                        );
-                        continue;
-                    }
-                }
+        if handle_no_upstream(&mut state, &repo, apply, human, push_timeout_secs, push_retries, &reason, policy_path).await {
+            continue;
+        }
+
+        if status.behind > 0 && state.has_upstream {
+            if handle_behind(&mut state, &repo, apply, human, policy.pull_op_timeout_secs, &reason, policy_path).await {
+                continue;
             }
         }
 
-        if status.behind > 0 && has_upstream {
-            attempted_ops += 1;
-            out!("   plan: pull --no-rebase (merge)");
-            if apply {
-                match run_git_with_timeout(
-                    &repo,
-                    &["pull", "--no-rebase"],
-                    policy.pull_op_timeout_secs,
-                    "pull/merge",
-                )
-                .await
-                {
-                    Ok(()) => {
-                        succeeded_ops += 1;
-                        out!("   ok: pulled");
-                        append_incident_record(
-                            policy_path,
-                            &IncidentRecord {
-                                ts_unix: timestamp_secs(),
-                                scope: "concern".to_string(),
-                                repo: repo.display().to_string(),
-                                reason: reason.clone(),
-                                action: "pull_merge".to_string(),
-                                backup_branch: None,
-                                result: "ok".to_string(),
-                                details: None,
-                            },
-                        );
-                    }
-                    Err(e) => {
-                        out!("   fail: pull failed: {}", e);
-                        append_incident_record(
-                            policy_path,
-                            &IncidentRecord {
-                                ts_unix: timestamp_secs(),
-                                scope: "concern".to_string(),
-                                repo: repo.display().to_string(),
-                                reason: reason.clone(),
-                                action: "pull_merge".to_string(),
-                                backup_branch: None,
-                                result: "fail".to_string(),
-                                details: Some(e.to_string()),
-                            },
-                        );
-                    }
-                }
+        if status.ahead > 0 && state.has_upstream {
+            if handle_ahead(
+                &mut state,
+                &repo,
+                apply,
+                human,
+                push_timeout_secs,
+                push_retries,
+                blob_threshold,
+                rewrite_large_any,
+                &excluded_dir_names,
+                &reason,
+                policy_path,
+                &svc,
+            )
+            .await
+            {
+                continue;
             }
         }
 
-        if status.ahead > 0 && has_upstream {
-            attempted_ops += 1;
-            out!("   plan: push origin HEAD");
-            if apply {
-                let mut push_ok = false;
-                #[allow(unused_assignments)]
-                match push_with_retries(&repo, push_timeout_secs, push_retries, "push").await {
-                    Ok(()) => {
-                        succeeded_ops += 1;
-                        push_ok = true;
-                        out!("   ok: pushed");
-                        append_incident_record(
-                            policy_path,
-                            &IncidentRecord {
-                                ts_unix: timestamp_secs(),
-                                scope: "concern".to_string(),
-                                repo: repo.display().to_string(),
-                                reason: reason.clone(),
-                                action: "push_origin_head".to_string(),
-                                backup_branch: None,
-                                result: "ok".to_string(),
-                                details: None,
-                            },
-                        );
-                    }
-                    Err(e) => {
-                        out!("   fail: push failed: {}", e);
-
-                        let err_str = e.to_string().to_lowercase();
-                        
-                        // Check if push failed because remote doesn't exist or is unreachable
-                        // In this case, auto-create a private bare repo as the remote
-                        let no_remote = err_str.contains("no such remote")
-                            || err_str.contains("remote does not exist")
-                            || err_str.contains("repository not found")
-                            || err_str.contains("could not resolve host")
-                            || err_str.contains("does not appear to be a git repository")
-                            || (err_str.contains("exit status: 128") && err_str.contains("fatal:"));
-
-                        if no_remote {
-                            // Try to create a private bare repo and use it as origin
-                            out!("   info: no remote detected, creating private bare repo");
-                            if let Some(private_remote) = create_private_remote(&repo) {
-                                out!("   info: created private remote: {}", private_remote);
-                                // Retry push with new remote
-                                match push_with_retries(&repo, push_timeout_secs, push_retries, "push").await {
-                                    Ok(()) => {
-                                        succeeded_ops += 1;
-                                        push_ok = true;
-                                        out!("   ok: pushed to private remote");
-                                        append_incident_record(
-                                            policy_path,
-                                            &IncidentRecord {
-                                                ts_unix: timestamp_secs(),
-                                                scope: "concern".to_string(),
-                                                repo: repo.display().to_string(),
-                                                reason: reason.clone(),
-                                                action: "push_origin_head".to_string(),
-                                                backup_branch: None,
-                                                result: "ok".to_string(),
-                                                details: Some(format!("pushed to private remote: {}", private_remote)),
-                                            },
-                                        );
-                                        continue;
-                                    }
-                                    Err(e2) => {
-                                        out!("   fail: push to private remote also failed: {}", e2);
-                                        append_incident_record(
-                                            policy_path,
-                                            &IncidentRecord {
-                                                ts_unix: timestamp_secs(),
-                                                scope: "concern".to_string(),
-                                                repo: repo.display().to_string(),
-                                                reason: reason.clone(),
-                                                action: "push_origin_head".to_string(),
-                                                backup_branch: None,
-                                                result: "fail".to_string(),
-                                                details: Some(e2.to_string()),
-                                            },
-                                        );
-                                        continue;
-                                    }
-                                }
-                            } else {
-                                out!("   fail: could not create private remote");
-                                append_incident_record(
-                                    policy_path,
-                                    &IncidentRecord {
-                                        ts_unix: timestamp_secs(),
-                                        scope: "concern".to_string(),
-                                        repo: repo.display().to_string(),
-                                        reason: reason.clone(),
-                                        action: "push_origin_head".to_string(),
-                                        backup_branch: None,
-                                        result: "fail".to_string(),
-                                        details: Some(e.to_string()),
-                                    },
-                                );
-                                continue;
-                            }
-                        }
-
-                        // For permission denied or other errors on existing remote, 
-                        // just record failure and continue - no permanent marking
-                        // These will retry on next cycle naturally
-                        append_incident_record(
-                            policy_path,
-                            &IncidentRecord {
-                                ts_unix: timestamp_secs(),
-                                scope: "concern".to_string(),
-                                repo: repo.display().to_string(),
-                                reason: reason.clone(),
-                                action: "push_origin_head".to_string(),
-                                backup_branch: None,
-                                result: "fail".to_string(),
-                                details: Some(e.to_string()),
-                            },
-                        );
-                        // Don't continue here - let it fall through to large blob detection below
-                        // (but without the manual_only marking)
-
-                        let large = detect_large_blobs_ahead(&repo, blob_threshold)
-                            .await
-                            .unwrap_or_default();
-                        if !large.is_empty() {
-                            out!(
-                                "   detect: large blobs in ahead range ({} entries)",
-                                large.len()
-                            );
-                            let mut dirs = BTreeSet::new();
-                            for (_, path) in &large {
-                                if let Some(dir) = top_level_dir(path) {
-                                    if is_excluded_dir_name(&dir, &excluded_dir_names) {
-                                        dirs.insert(dir);
-                                    }
-                                }
-                            }
-                            let dirs: Vec<String> = dirs.into_iter().collect();
-                            let rewrite_paths: Vec<String> = if !dirs.is_empty() {
-                                dirs
-                            } else if rewrite_large_any {
-                                let mut unique = BTreeSet::new();
-                                for (_, p) in &large {
-                                    unique.insert(p.clone());
-                                }
-                                unique.into_iter().collect()
-                            } else {
-                                Vec::new()
-                            };
-
-                            if rewrite_paths.is_empty() {
-                                out!("   manual: large blobs found but not in excluded dirs");
-                                append_incident_record(
-                                    policy_path,
-                                    &IncidentRecord {
-                                        ts_unix: timestamp_secs(),
-                                        scope: "concern".to_string(),
-                                        repo: repo.display().to_string(),
-                                        reason: reason.clone(),
-                                        action: "large_blob_detected".to_string(),
-                                        backup_branch: None,
-                                        result: "manual".to_string(),
-                                        details: Some(format!(
-                                            "threshold={} entries={} rewrite_allowed=false",
-                                            blob_threshold,
-                                            large.len()
-                                        )),
-                                    },
-                                );
-                            } else {
-                                out!(
-                                    "   plan: rewrite ahead history removing paths {:?}",
-                                    rewrite_paths
-                                );
-                                match rewrite_ahead_paths(
-                                    &repo,
-                                    &rewrite_paths,
-                                    "backup/pre-sync-largeblob-fix",
-                                ) {
-                                    Ok(Some(backup_branch)) => {
-                                        let backup_branch_for_log = backup_branch.clone();
-                                        out!(
-                                            "   ok: rewrite complete (backup branch: {})",
-                                            backup_branch
-                                        );
-                                        match push_with_retries(
-                                            &repo,
-                                            push_timeout_secs,
-                                            push_retries,
-                                            "push-after-rewrite",
-                                        )
-                                        .await
-                                        {
-                                            Ok(()) => {
-                                                succeeded_ops += 1;
-                                                push_ok = true;
-                                                out!("   ok: pushed after rewrite");
-                                                append_incident_record(
-                                                    policy_path,
-                                                    &IncidentRecord {
-                                                        ts_unix: timestamp_secs(),
-                                                        scope: "concern".to_string(),
-                                                        repo: repo.display().to_string(),
-                                                        reason: reason.clone(),
-                                                        action: "rewrite_then_push".to_string(),
-                                                        backup_branch: Some(backup_branch_for_log),
-                                                        result: "ok".to_string(),
-                                                        details: Some(format!(
-                                                            "paths={:?}",
-                                                            rewrite_paths
-                                                        )),
-                                                    },
-                                                );
-                                            }
-                                            Err(e2) => {
-                                                out!(
-                                                    "   fail: push after rewrite failed: {}",
-                                                    e2
-                                                );
-                                                append_incident_record(
-                                                    policy_path,
-                                                    &IncidentRecord {
-                                                        ts_unix: timestamp_secs(),
-                                                        scope: "concern".to_string(),
-                                                        repo: repo.display().to_string(),
-                                                        reason: reason.clone(),
-                                                        action: "rewrite_then_push".to_string(),
-                                                        backup_branch: Some(backup_branch),
-                                                        result: "fail".to_string(),
-                                                        details: Some(e2.to_string()),
-                                                    },
-                                                );
-                                            }
-                                        }
-                                    }
-                                    Ok(None) => {}
-                                    Err(rewrite_err) => {
-                                        out!("   fail: rewrite failed: {}", rewrite_err);
-                                        append_incident_record(
-                                            policy_path,
-                                            &IncidentRecord {
-                                                ts_unix: timestamp_secs(),
-                                                scope: "concern".to_string(),
-                                                repo: repo.display().to_string(),
-                                                reason: reason.clone(),
-                                                action: "rewrite_large_blob".to_string(),
-                                                backup_branch: None,
-                                                result: "fail".to_string(),
-                                                details: Some(rewrite_err.to_string()),
-                                            },
-                                        );
-                                    }
-                                }
-                            }
-                        } else {
-                            let branch = current_branch(&repo).unwrap_or_default();
-                            let dry_run = run_git_capture_output(
-                                &repo,
-                                &["push", "--dry-run", "origin", "HEAD"],
-                                "push --dry-run",
-                            )
-                            .unwrap_or_default();
-                            let looks_branch_mismatch =
-                                dry_run.to_ascii_lowercase().contains("up-to-date");
-                            if looks_branch_mismatch
-                                && !branch.is_empty()
-                                && remote_branch_exists(&repo, &branch)
-                                && has_tracking_upstream(&repo)
-                            {
-                                out!(
-                                    "   plan: align upstream to origin/{} (possible branch mismatch)",
-                                    branch
-                                );
-                                match set_upstream_to_branch(&repo, &branch) {
-                                    Ok(()) => {
-                                        out!("   ok: upstream realigned");
-                                        match push_with_retries(
-                                            &repo,
-                                            push_timeout_secs,
-                                            push_retries,
-                                            "push-after-upstream-align",
-                                        )
-                                        .await
-                                        {
-                                            Ok(()) => {
-                                                succeeded_ops += 1;
-                                                push_ok = true;
-                                                out!("   ok: pushed after upstream align");
-                                                append_incident_record(
-                                                    policy_path,
-                                                    &IncidentRecord {
-                                                        ts_unix: timestamp_secs(),
-                                                        scope: "concern".to_string(),
-                                                        repo: repo.display().to_string(),
-                                                        reason: reason.clone(),
-                                                        action: "realign_upstream_then_push".to_string(),
-                                                        backup_branch: None,
-                                                        result: "ok".to_string(),
-                                                        details: Some(format!(
-                                                            "branch={}",
-                                                            branch
-                                                        )),
-                                                    },
-                                                );
-                                            }
-                                            Err(e2) => {
-                                                out!(
-                                                    "   fail: push after upstream align failed: {}",
-                                                    e2
-                                                );
-                                                append_incident_record(
-                                                    policy_path,
-                                                    &IncidentRecord {
-                                                        ts_unix: timestamp_secs(),
-                                                        scope: "concern".to_string(),
-                                                        repo: repo.display().to_string(),
-                                                        reason: reason.clone(),
-                                                        action: "realign_upstream_then_push".to_string(),
-                                                        backup_branch: None,
-                                                        result: "fail".to_string(),
-                                                        details: Some(e2.to_string()),
-                                                    },
-                                                );
-                                            }
-                                        }
-                                    }
-                                    Err(set_err) => {
-                                        out!("   fail: upstream align failed: {}", set_err)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                if !push_ok {
-                    append_incident_record(
-                        policy_path,
-                        &IncidentRecord {
-                            ts_unix: timestamp_secs(),
-                            scope: "concern".to_string(),
-                            repo: repo.display().to_string(),
-                            reason: reason.clone(),
-                            action: "push_origin_head".to_string(),
-                            backup_branch: None,
-                            result: "fail".to_string(),
-                            details: Some("push did not clear concern".to_string()),
-                        },
-                    );
-                }
-                if push_ok {
-                    if let Ok(next_after_push) = svc.get_status().await {
-                        if next_after_push.ahead > 0 {
-                            let branch = current_branch(&repo).unwrap_or_default();
-                            if !branch.is_empty() && remote_branch_exists(&repo, &branch) {
-                                out!(
-                                    "   plan: realign upstream to origin/{} (ahead still > 0 after push)",
-                                    branch
-                                );
-                                match set_upstream_to_branch(&repo, &branch) {
-                                    Ok(()) => out!("   ok: upstream realigned"),
-                                    Err(e) => out!("   fail: upstream realign failed: {}", e),
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        if apply {
-            if let Ok(next) = svc.get_status().await {
-                let has_origin = has_origin_remote(&repo);
-                let has_upstream = has_tracking_upstream(&repo);
-                let still_concern = next.ahead > 0
-                    || next.behind > 0
-                    || !has_origin
-                    || !has_upstream;
-                if !still_concern {
-                    resolved += 1;
-                    out!("   resolved: concern cleared");
-                    append_incident_record(
-                        policy_path,
-                        &IncidentRecord {
-                            ts_unix: timestamp_secs(),
-                            scope: "concern".to_string(),
-                            repo: repo.display().to_string(),
-                            reason,
-                            action: "verify_resolved".to_string(),
-                            backup_branch: None,
-                            result: "ok".to_string(),
-                            details: None,
-                        },
-                    );
-                } else {
-                    out!(
-                        "   remaining: ahead={} behind={} origin={} upstream={}",
-                        next.ahead,
-                        next.behind,
-                        has_origin,
-                        has_upstream
-                    );
-                    // Only notify on true divergence (both ahead AND behind) - that's
-                    // the only case where we have no automatic resolution.
-                    // If just ahead > 0, we can push. If just behind > 0, we can pull.
-                    if next.ahead > 0 && next.behind > 0 {
-                        let details = format!("ahead={} behind={}", next.ahead, next.behind);
-                        send_sync_conflict_notification(&repo, &reason, &details);
-                    }
-                    append_incident_record(
-                        policy_path,
-                        &IncidentRecord {
-                            ts_unix: timestamp_secs(),
-                            scope: "concern".to_string(),
-                            repo: repo.display().to_string(),
-                            reason,
-                            action: "verify_resolved".to_string(),
-                            backup_branch: None,
-                            result: "remaining".to_string(),
-                            details: Some(format!("ahead={} behind={}", next.ahead, next.behind)),
-                        },
-                    );
-                }
-            }
-        }
+        verify_resolution(&repo, apply, human, &mut resolved, &reason, policy_path, &svc).await;
     }
 
     let summary = RepairSummary {
         found: concerns,
-        planned: attempted_ops,
-        attempted: if apply { attempted_ops } else { 0 },
-        succeeded: succeeded_ops,
+        planned: state.attempted_ops,
+        attempted: if apply { state.attempted_ops } else { 0 },
+        succeeded: state.succeeded_ops,
         resolved_now: if apply { resolved } else { 0 },
-        manual_only,
+        manual_only: state.manual_only,
     };
     if json {
         let payload = RepairJson {
