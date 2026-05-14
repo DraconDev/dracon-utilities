@@ -414,15 +414,7 @@ To bypass: manually stage and commit the deletions with `git add -A && git commi
 
 **Incident response after a block:** Read the incident ledger at `~/.local/state/dracon/dracon-sync-incidents.jsonl` to understand what was blocked and why.
 
-**dracon-sync commit stale focus detection:** When the scribe's "Current Focus" line appears in 3+ of the last 5 commit subjects, it is considered stale. The stale focus is cleared from the commit context, causing `build_commit_message` to generate a message based on the actual diff content instead of repeating the old focus line.
-
-**Behavior:**
-- Detection: reads last 5 commit subjects via `git log -5 --pretty=format:%s`
-- Threshold: focus content appearing in 3+ subjects → stale
-- Graceful degradation: if `git log` fails, the stale check is disabled with a warning
-- This catches alternating patterns (A/B/A/B/A) where the same focus is repeated across multiple commits
-
-**Why no dedup guard:** A dedup guard that blocks commits with duplicate subjects was removed because it couldn't distinguish between legitimate repeated work (same feature, multiple checkpoints) and actual spam. The stale focus detection addresses the root cause: if the scribe's focus line hasn't evolved, the generated messages repeat.
+**dracon-sync commit message generation:** Instead of writing project-state.md and extracting a focus line, the scribe now generates commit subjects directly from diffs. The AI receives the current diff (highlighted as the main change), 10 previous diffs (background context), and recent commit subjects, then returns a single subject line. This produces unique, specific messages every cycle. When AI is unavailable, a local file-pattern fallback generates messages like "update auth, jwt and 2 files".
 
 ### dracon-system
 
