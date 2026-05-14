@@ -2610,10 +2610,10 @@ auto_bump_versions = false
         // Empty history — no dedup
         assert!(!is_dedup_spam(&[], "test"));
 
-        // One match — not enough to trigger (threshold is 2)
-        assert!(!is_dedup_spam(&["test".to_string()], "test"));
+        // One match — triggers (all non-empty subjects match)
+        assert!(is_dedup_spam(&["test".to_string()], "test"));
 
-        // Two matches — blocked
+        // Two matches — also blocked
         assert!(is_dedup_spam(&["test".to_string(), "test".to_string()], "test"));
 
         // Mixed subjects — not blocked
