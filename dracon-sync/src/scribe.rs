@@ -257,7 +257,7 @@ mod tests {
 
     #[test]
     fn test_local_fallback_multiple_files() {
-        let names = "Modified: src/auth.rs\nAdded: src/jwt.rs\nModified: Cargo.toml";
+        let names = "Modified: src/auth.rs\nAdded: src/jwt.rs\nModified: Cargo.toml\nAdded: lib.rs";
         let result = local_fallback_message(names);
         assert!(result.contains("auth"));
         assert!(result.contains("and 1 file"));
