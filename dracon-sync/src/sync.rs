@@ -664,30 +664,6 @@ async fn run_ai_bumper(
     false
 }
 
-async fn scribe_update(
-    repo: &Path,
-    staged_diff_names: &str,
-    staged_diff_content: Option<String>,
-    dry_run: bool,
-) {
-    #[cfg(feature = "scribe")]
-    if !dry_run {
-        if let Err(e) = crate::scribe::update_project_state_from_ai(repo, staged_diff_names, staged_diff_content).await {
-            eprintln!("📝 scribe failed for {}: {}", repo.display(), e);
-        }
-    }
-    #[cfg(not(feature = "scribe"))]
-    let _ = (repo, staged_diff_names, staged_diff_content, dry_run);
-}
-
-async fn stage_project_state(repo: &Path) {
-    if repo.join(".dracon/project-state.md").exists() {
-        if let Err(e) = run_git_with_timeout(repo, &["add", "-f", ".dracon/project-state.md"], 10, "add-project-state").await {
-            eprintln!("⚠️ failed to stage project-state: {}", e);
-        }
-    }
-}
-
 async fn post_commit_pull(
     svc: &GitService,
     repo: &Path,
@@ -966,11 +942,11 @@ async fn stage_commit_and_push(
         stage_version_files(repo).await;
     }
 
-    if !is_noise_only {
-        scribe_update(repo, &staged_diff_names, staged_diff_content, dry_run).await;
-    }
-
-    stage_project_state(repo).await;
+    let ai_subject = if !is_noise_only {
+        crate::scribe::generate_commit_message(repo, &staged_diff_names, staged_diff_content).await
+    } else {
+        None
+    };
 
     let staged = git_name_status_entries(repo, &["diff", "--cached", "--name-status"]).await?;
     let committed_entries: Vec<dracon_git::types::DiffFile> = staged
@@ -993,7 +969,6 @@ async fn stage_commit_and_push(
     let is_report = !signals.is_empty();
 
     let last_commit_subject = crate::report::git_log_field(repo, "%s").await;
-    let recent_subjects = crate::report::git_log_recent_subjects(repo, 5).await;
 
     let commit_ctx = build_commit_context(
         repo,
@@ -1002,11 +977,16 @@ async fn stage_commit_and_push(
         !is_report,
         idle_seconds,
         last_commit_subject.as_deref(),
-        &recent_subjects,
+        ai_subject.as_deref(),
     );
 
     let msg = if is_noise_only && !is_report {
         "chore: sync metadata".to_string()
+    } else if ai_subject.is_none() && !is_noise_only {
+        let fallback = crate::scribe::local_fallback_message(&staged_diff_names);
+        let mut commit_ctx = commit_ctx.clone();
+        commit_ctx.description = Some(fallback.clone());
+        build_commit_message(&commit_ctx)
     } else {
         build_commit_message(&commit_ctx)
     };

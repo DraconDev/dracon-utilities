@@ -266,8 +266,8 @@ pub(crate) fn build_commit_context(
     entries: &[DiffFile],
     is_checkpoint: bool,
     idle_seconds: u64,
-    last_commit_subject: Option<&str>,
-    recent_subjects: &[String],
+    _last_commit_subject: Option<&str>,
+    ai_subject: Option<&str>,
 ) -> CommitContext {
     let changed_paths: Vec<PathBuf> = entries.iter().map(|e| e.path.clone()).collect();
     let intent_info = extract_intent(repo, &changed_paths, Some(&status.branch));
@@ -277,41 +277,9 @@ pub(crate) fn build_commit_context(
         rel.to_string_lossy().to_string()
     });
 
-    // Read project state for commit body (scribe)
-    let raw_description = read_project_focus(repo);
-
-    // Extract category/scope from scribe's "Current Focus" line for better commit messages
-    let focus_line = raw_description.as_ref().and_then(|d| {
-        d.lines()
-            .skip_while(|l| !l.starts_with("## Current Focus"))
-            .nth(1)
-            .map(|l| l.trim().to_string())
-    });
-
-    let focus_is_stale = focus_line.as_ref().map_or(false, |focus| {
-        // Check if focus content appears in recent commit subjects.
-        // If 3+ of the last 5 subjects contain the focus text, it's stale
-        // (the same message has been generated repeatedly).
-        let focus_matches = recent_subjects.iter().filter(|subj| {
-            let subj_body = subj.splitn(2, ": ").nth(1).unwrap_or(subj);
-            if focus.len() > subj_body.len() {
-                let truncated = &focus[..subj_body.len().min(focus.len())];
-                subj_body.starts_with(truncated)
-            } else {
-                subj_body.contains(focus.as_str())
-            }
-        }).count();
-        focus_matches >= 3
-    });
-
-    let (description, scribe_category, scribe_scope) = if focus_is_stale {
-        (None, String::new(), String::new())
-    } else {
-        let (cat, scope) = raw_description
-            .as_ref()
-            .and_then(|d| extract_category_scope_from_focus(d))
-            .unwrap_or((String::new(), String::new()));
-        (raw_description, cat, scope)
+    let (category, scope, description) = match ai_subject {
+        Some(subject) => parse_conventional_commit(subject),
+        None => (None, None, None),
     };
 
     CommitContext {
@@ -322,12 +290,48 @@ pub(crate) fn build_commit_context(
         task_progress: intent_info.task_progress,
         refs,
         idle_seconds,
-        category: if scribe_category.is_empty() { None } else { Some(scribe_category) },
-        scope: if scribe_scope.is_empty() { None } else { Some(scribe_scope) },
+        category,
+        scope,
         severity: None,
         description,
         semantic_summary: None,
     }
+}
+
+fn parse_conventional_commit(subject: &str) -> (Option<String>, Option<String>, Option<String>) {
+    let valid_categories = [
+        "feat", "fix", "refactor", "docs", "test", "chore", "perf",
+        "security", "build", "ci", "style", "revert",
+    ];
+
+    if let Some(paren_start) = subject.find('(') {
+        if let Some(paren_end) = subject[paren_start..].find(')') {
+            let prefix = &subject[..paren_start];
+            let scope_text = &subject[paren_start + 1..paren_start + paren_end];
+            let after_paren = &subject[paren_start + paren_end + 1..];
+            let desc = after_paren.trim_start_matches([' ', ':', '-']).trim();
+
+            if valid_categories.contains(&prefix) && !scope_text.is_empty() && !desc.is_empty() {
+                return (
+                    Some(prefix.to_string()),
+                    Some(scope_text.to_string()),
+                    Some(desc.to_string()),
+                );
+            }
+        }
+    }
+
+    if let Some(colon_pos) = subject.find(": ") {
+        let prefix = &subject[..colon_pos];
+        if valid_categories.contains(&prefix) {
+            let desc = subject[colon_pos + 2..].trim().to_string();
+            if !desc.is_empty() {
+                return (Some(prefix.to_string()), None, Some(desc));
+            }
+        }
+    }
+
+    (None, None, Some(subject.to_string()))
 }
 
 fn extract_category_scope_from_focus(content: &str) -> Option<(String, String)> {
