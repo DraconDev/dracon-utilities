@@ -900,6 +900,155 @@ async fn push_with_blob_check(
     Ok(true)
 }
 
+async fn stage_commit_and_push(
+    svc: &GitService,
+    ctx: &mut SyncContext<'_>,
+    status: &dracon_git::types::RepoStatus,
+    to_stage: &[dracon_git::types::DiffFile],
+    to_restore: &[dracon_git::types::DiffFile],
+) -> Result<Option<SyncOutcome>> {
+    let repo = ctx.repo;
+    let policy = ctx.policy;
+    let dry_run = ctx.dry_run;
+    let auto_bump_versions = ctx.auto_bump_versions;
+    let has_origin = ctx.has_origin;
+    let idle_seconds = ctx.idle_seconds;
+
+    let stage_paths: Vec<String> = to_stage
+        .iter()
+        .map(|e| e.path.to_string_lossy().to_string())
+        .collect();
+
+    let (existing, missing): (Vec<_>, Vec<_>) = stage_paths
+        .into_iter()
+        .partition(|p| repo.join(p).exists());
+
+    stage_existing_files(repo, &existing, dry_run).await?;
+
+    if !missing.is_empty() {
+        match check_mass_deletion(ctx, &missing).await? {
+            MassDeletionCheck::Blocked => {
+                maybe_sync_visibility_and_metadata(ctx);
+                return Ok(Some(SyncOutcome::Blocked));
+            }
+            MassDeletionCheck::Ok => {}
+        }
+
+        git_rm_missing(repo, &missing, dry_run).await?;
+    }
+
+    let staged = git_name_status_entries(repo, &["diff", "--cached", "--name-status"]).await?;
+    let committed_entries: Vec<dracon_git::types::DiffFile> = staged
+        .into_iter()
+        .map(|(path, status)| dracon_git::types::DiffFile { path, status })
+        .collect();
+
+    let staged_diff_names = committed_entries.iter()
+        .map(|e| format!("{:?}: {}", e.status, e.path.display()))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    let is_noise_only = crate::bump::deterministic_decide_bump_level(&staged_diff_names)
+        == crate::bump::BumpLevel::None;
+
+    let staged_diff_content = get_staged_diff_content(repo).await;
+
+    let mut version_bumped = run_deterministic_bumper(repo, &committed_entries, dry_run, auto_bump_versions).await;
+    if version_bumped {
+        stage_version_files(repo).await;
+    }
+
+    let ai_bumped = run_ai_bumper(repo, &committed_entries, dry_run, auto_bump_versions, version_bumped).await;
+    if ai_bumped {
+        version_bumped = true;
+        stage_version_files(repo).await;
+    }
+
+    if !is_noise_only {
+        scribe_update(repo, &staged_diff_names, staged_diff_content, dry_run).await;
+    }
+
+    stage_project_state(repo).await;
+
+    let staged = git_name_status_entries(repo, &["diff", "--cached", "--name-status"]).await?;
+    let committed_entries: Vec<dracon_git::types::DiffFile> = staged
+        .into_iter()
+        .map(|(path, status)| dracon_git::types::DiffFile { path, status })
+        .collect();
+
+    if committed_entries.is_empty() {
+        if let Err(e) = run_git_with_timeout(repo, &["reset", "HEAD", "--"], 10, "reset").await {
+            return Err(anyhow::anyhow!("sync_repo: failed to reset HEAD after filter-only commit: {}", e));
+        }
+        if debug_enabled() {
+            eprintln!("🐛 {} skipped commit: all changes were filter-only (smudge/clean)", repo.display());
+        }
+        maybe_sync_visibility_and_metadata(ctx);
+        return Ok(Some(SyncOutcome::NothingToDo));
+    }
+
+    let signals = detect_report_signals(repo, &committed_entries);
+    let is_report = !signals.is_empty();
+
+    let last_commit_subject = crate::report::git_log_field(repo, "%s").await;
+
+    let commit_ctx = build_commit_context(
+        repo,
+        status,
+        &committed_entries,
+        !is_report,
+        idle_seconds,
+        last_commit_subject.as_deref(),
+    );
+
+    let msg = if is_noise_only && !is_report {
+        "chore: sync metadata".to_string()
+    } else {
+        build_commit_message(&commit_ctx)
+    };
+
+    if dry_run {
+        println!("📝 Would commit {} file(s) in {}:", committed_entries.len(), repo.display());
+        for entry in committed_entries.iter().take(10) {
+            println!("  {:?}: {}", entry.status, entry.path.display());
+        }
+        if committed_entries.len() > 10 {
+            println!("  ... and {} more", committed_entries.len() - 10);
+        }
+        println!("  message: {}", msg.lines().next().unwrap_or("(empty)"));
+    } else {
+        svc.commit(&msg).await?;
+        eprintln!("📝 committed {} file(s) in {}", committed_entries.len(), repo.display());
+    }
+
+    prune_other_default_branch(repo).await;
+
+    post_commit_pull(svc, repo, policy).await;
+
+    let alert_status = svc.get_status().await?;
+    if alert_status.ahead > policy.alert_unpushed_threshold {
+        eprintln!(
+            "🚨 ALERT: {} has {} unpushed commits (threshold: {}). Something may be wrong with push.",
+            repo.display(),
+            alert_status.ahead,
+            policy.alert_unpushed_threshold
+        );
+    }
+
+    restore_excluded_paths(ctx, to_restore).await?;
+
+    if policy.auto_push && has_origin {
+        let push_ok = push_with_blob_check(ctx, 1).await?;
+        if !push_ok {
+            eprintln!("⚠️ some mirror pushes failed for {}", repo.display());
+        }
+    }
+
+    run_release_pipeline_if_bumped(repo, policy, version_bumped).await;
+
+    Ok(None)
+}
+
 pub(crate) async fn sync_repo(
     repo: &Path,
     policy: &SyncPolicy,
