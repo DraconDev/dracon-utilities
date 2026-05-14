@@ -83,7 +83,6 @@ pub(crate) fn log_module(level: Level, module: &str, msg: &str) {
 }
 
 /// Convenience macros for each level.
-#[allow(unused_macros)]
 #[macro_export]
 macro_rules! log_error {
     ($($arg:tt)*) => {
