@@ -3,6 +3,8 @@ use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
+use crate::log::{self, Level};
+
 use anyhow::Result;
 use dracon_git::{build_commit_message, GitService};
 
