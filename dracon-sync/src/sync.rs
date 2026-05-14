@@ -3,7 +3,7 @@ use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
-use crate::log::{self, Level};
+use crate::{log_error, log_warn, log_info, log_repo_info, log_debug};
 
 use anyhow::Result;
 use dracon_git::{build_commit_message, GitService};
@@ -1015,7 +1015,7 @@ async fn stage_commit_and_push(
         && recent_subjects.iter().all(|s| s == &msg_subject);
 
     if is_duplicate_spam {
-        log_repo_info!(repo.to_string_lossy(), "skipped commit: subject '{}' repeated {} times (dedup guard)", msg_subject, recent_subjects.len());
+        log_repo_info!(repo.to_string_lossy().as_ref(), "skipped commit: subject '{}' repeated {} times (dedup guard)", msg_subject, recent_subjects.len());
         if let Err(e) = run_git_with_timeout(repo, &["reset", "HEAD", "--"], 10, "reset").await {
             log_error!("sync_repo: failed to reset HEAD after dedup skip for {}: {}", repo.display(), e);
             return Err(anyhow::anyhow!("sync_repo: failed to reset HEAD after dedup skip: {}", e));
