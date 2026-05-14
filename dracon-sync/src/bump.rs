@@ -71,6 +71,8 @@ const NOISE_PATTERNS: &[&str] = &[
     ".env.example",
     ".editorconfig",
     ".shellcheckrc",
+    ".dracon/",
+    ".pub",
 ];
 
 pub(crate) const VERSION_FILES: &[&str] = &[
