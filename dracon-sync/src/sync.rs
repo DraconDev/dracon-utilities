@@ -666,13 +666,14 @@ async fn scribe_update(
     staged_diff_content: Option<String>,
     dry_run: bool,
 ) {
-    if !dry_run && cfg!(feature = "scribe") {
-        #[cfg(feature = "scribe")]
+    #[cfg(feature = "scribe")]
+    if !dry_run {
         if let Err(e) = crate::scribe::update_project_state_from_ai(repo, staged_diff_names, staged_diff_content).await {
             eprintln!("📝 scribe failed for {}: {}", repo.display(), e);
         }
     }
-    let _ = (repo, staged_diff_names, staged_diff_content);
+    #[cfg(not(feature = "scribe"))]
+    let _ = (repo, staged_diff_names, staged_diff_content, dry_run);
 }
 
 async fn stage_project_state(repo: &Path) {
