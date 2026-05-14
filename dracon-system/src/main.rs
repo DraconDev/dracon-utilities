@@ -759,7 +759,17 @@ fn default_process_exempt_names() -> String {
 }
 
 fn default_notify_command() -> String {
-    "/etc/profiles/per-user/dracon/bin/notify-send".to_string()
+    let candidates = [
+        "/etc/profiles/per-user/dracon/bin/notify-send",
+        "/run/current-system/sw/bin/notify-send",
+        "/usr/bin/notify-send",
+    ];
+    for path in &candidates {
+        if std::path::Path::new(path).exists() {
+            return path.to_string();
+        }
+    }
+    "/usr/bin/notify-send".to_string()
 }
 
 fn default_notify_cooldown_secs() -> u64 {
@@ -1654,6 +1664,21 @@ async fn empty_trash(apply: bool, protected_paths: &[String]) -> Result<(u64, Ve
     }
 
     Ok((reclaimed, cleaned))
+}
+
+fn resolve_bin(name: &str) -> String {
+    let nixos_paths = [
+        "/run/current-system/sw/bin",
+        "/etc/profiles/per-user/dracon/bin",
+        "/nix/var/nix/profiles/default/bin",
+    ];
+    for dir in &nixos_paths {
+        let path = std::path::Path::new(dir).join(name);
+        if path.exists() {
+            return path.to_string_lossy().to_string();
+        }
+    }
+    name.to_string()
 }
 
 /// Run nix-collect-garbage
