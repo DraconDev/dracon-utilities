@@ -37,7 +37,6 @@ impl SyncOutcome {
     }
 }
 
-#[allow(dead_code)]
 struct SyncContext<'a> {
     repo: &'a Path,
     policy: &'a SyncPolicy,
@@ -50,6 +49,7 @@ struct SyncContext<'a> {
     has_upstream: bool,
     blob_threshold: u64,
     auto_bump_versions: bool,
+    remote_failures: Option<&'a mut HashMap<String, usize>>,
 }
 
 fn notify_webhook_failure(webhook_url: &str, repo: &Path, remote: &str, error: &str) {
@@ -240,15 +240,13 @@ fn ensure_origin_remote(repo: &Path, policy: &SyncPolicy) -> bool {
 
 async fn auto_pull_merge(
     svc: &GitService,
-    repo: &Path,
-    policy: &SyncPolicy,
-    has_origin: bool,
-    has_upstream: bool,
+    ctx: &SyncContext<'_>,
     initial_status: &dracon_git::types::RepoStatus,
-    dry_run: bool,
 ) -> Result<()> {
-    if policy.auto_pull && has_origin && has_upstream && initial_status.behind > 0 && initial_status.is_clean {
-        if dry_run {
+    let repo = ctx.repo;
+    let policy = ctx.policy;
+    if policy.auto_pull && ctx.has_origin && ctx.has_upstream && initial_status.behind > 0 && initial_status.is_clean {
+        if ctx.dry_run {
             println!("🔽 Would pull/merge {} commit(s) from upstream in {}", initial_status.behind, repo.display());
         } else {
             match tokio::time::timeout(
@@ -276,26 +274,26 @@ async fn auto_pull_merge(
                 }
             }
         }
-    } else if policy.auto_pull && has_origin && has_upstream && initial_status.behind == 0 {
+    } else if policy.auto_pull && ctx.has_origin && ctx.has_upstream && initial_status.behind == 0 {
         if debug_enabled() {
             eprintln!(
                 "🐛 skip pull/merge for {} (branch not behind upstream)",
                 repo.display()
             );
         }
-    } else if policy.auto_pull && has_origin && has_upstream && !initial_status.is_clean {
+    } else if policy.auto_pull && ctx.has_origin && ctx.has_upstream && !initial_status.is_clean {
         if debug_enabled() {
             eprintln!(
                 "🐛 skip pull/merge for {} (dirty repo, commit first)",
                 repo.display()
             );
         }
-    } else if policy.auto_pull && !has_origin {
+    } else if policy.auto_pull && !ctx.has_origin {
         eprintln!(
             "ℹ️ skip pull/merge for {} (no origin remote)",
             repo.display()
         );
-    } else if policy.auto_pull && has_origin && !has_upstream {
+    } else if policy.auto_pull && ctx.has_origin && !ctx.has_upstream {
         eprintln!(
             "ℹ️ skip pull/merge for {} (no tracking upstream on current branch)",
             repo.display()
@@ -305,11 +303,12 @@ async fn auto_pull_merge(
 }
 
 async fn clean_staged_paths(
-    repo: &Path,
-    policy: &SyncPolicy,
-    excluded_dir_names: &BTreeSet<String>,
-    dry_run: bool,
+    ctx: &SyncContext<'_>,
 ) -> Result<()> {
+    let repo = ctx.repo;
+    let policy = ctx.policy;
+    let excluded_dir_names = ctx.excluded_dir_names;
+    let dry_run = ctx.dry_run;
     let unstaged = if dry_run {
         0
     } else {
