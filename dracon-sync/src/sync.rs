@@ -983,7 +983,7 @@ async fn stage_commit_and_push(
             return Err(anyhow::anyhow!("sync_repo: failed to reset HEAD after filter-only commit: {}", e));
         }
         if debug_enabled() {
-            log_repo_info!(repo.to_string_lossy(), "skipped commit: all changes were filter-only (smudge/clean)");
+            log_repo_info!(repo.to_string_lossy().as_ref(), "skipped commit: all changes were filter-only (smudge/clean)");
         }
         maybe_sync_visibility_and_metadata(ctx);
         return Ok(Some(SyncOutcome::NothingToDo));
