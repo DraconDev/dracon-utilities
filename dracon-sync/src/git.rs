@@ -604,18 +604,22 @@ pub(crate) async fn push_with_retries(
     op_label: &str,
 ) -> Result<()> {
     let attempts = retries.max(1);
+    let ssh_hardening = crate::git::git_ssh_hardening();
     let mut last_err: Option<anyhow::Error> = None;
-    let mut timeout_seen = false;
     for attempt in 1..=attempts {
-        match run_git_with_timeout_env(repo, &["push", "origin", "HEAD"], timeout_secs, op_label, &[("GIT_TERMINAL_PROMPT", "0")]).await
+        match run_git_with_timeout_env(
+            repo,
+            &["push", "origin", "HEAD"],
+            timeout_secs,
+            op_label,
+            &[("GIT_SSH_COMMAND", &ssh_hardening), ("GIT_TERMINAL_PROMPT", "0")],
+        )
+        .await
         {
             Ok(()) => return Ok(()),
             Err(e) => {
-                let err_text = e.to_string();
-                let is_timeout = err_text.contains("timeout");
-                timeout_seen |= is_timeout;
                 last_err = Some(e);
-                if attempt < attempts && is_timeout {
+                if attempt < attempts {
                     let backoff = (attempt as u64).min(5);
                     eprintln!(
                         "⏱️ push retry {}/{} for {} after {}s",
@@ -627,14 +631,11 @@ pub(crate) async fn push_with_retries(
                     sleep(Duration::from_secs(backoff)).await;
                     continue;
                 }
-                break;
             }
         }
     }
-    if timeout_seen {
-        if let Ok(()) = push_with_transport_fallbacks(repo, timeout_secs, op_label).await {
-            return Ok(());
-        }
+    if let Ok(()) = push_with_transport_fallbacks(repo, timeout_secs, op_label).await {
+        return Ok(());
     }
     Err(last_err.unwrap_or_else(|| anyhow::anyhow!("push failed")))
 }
