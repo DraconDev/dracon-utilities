@@ -288,10 +288,11 @@ pub(crate) fn build_commit_context(
 
     let focus_is_stale = focus_line.as_ref().map_or(false, |focus| {
         last_commit_subject.as_ref().map_or(false, |subj| {
-            if focus.len() <= subj.len() {
-                subj.contains(focus.as_str())
+            let subj_body = subj.splitn(2, ": ").nth(1).unwrap_or(subj);
+            if focus.len() <= subj_body.len() {
+                subj_body.contains(focus.as_str())
             } else {
-                subj.starts_with(&focus[..subj.len().min(focus.len())])
+                subj_body.starts_with(&focus[..subj_body.len().min(focus.len())])
             }
         })
     });
