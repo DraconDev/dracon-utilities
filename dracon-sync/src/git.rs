@@ -22,6 +22,13 @@ pub(crate) fn git_ssh_hardening() -> String {
     )
 }
 
+pub(crate) fn git_ssh_env() -> Vec<(&'static str, String)> {
+    vec![
+        ("GIT_SSH_COMMAND", git_ssh_hardening()),
+        ("GIT_TERMINAL_PROMPT", "0".to_string()),
+    ]
+}
+
 #[cfg(test)]
 pub(crate) static PATH_LOCK: parking_lot::Mutex<()> = parking_lot::Mutex::new(());
 
