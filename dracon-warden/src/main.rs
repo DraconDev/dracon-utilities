@@ -1696,6 +1696,11 @@ fn resmudge_repo(repo: &Path, policy: &WardenPolicy, apply: bool) -> Result<(usi
         }
 
         let full = repo.join(&rel);
+        if let Ok(meta) = fs::metadata(&full) {
+            if meta.len() as usize > STREAM_IO_MAX_BYTES {
+                continue;
+            }
+        }
         let bytes = match fs::read(&full) {
             Ok(b) => b,
             Err(_) => continue,
