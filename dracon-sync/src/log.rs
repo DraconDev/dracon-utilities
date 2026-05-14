@@ -68,6 +68,7 @@ pub(crate) fn log_repo(level: Level, repo: &str, msg: &str) {
 }
 
 /// Emit a structured log line with optional module name.
+#[allow(dead_code)]
 pub(crate) fn log_module(level: Level, module: &str, msg: &str) {
     let event = Event {
         ts: timestamp_secs(),
@@ -82,6 +83,7 @@ pub(crate) fn log_module(level: Level, module: &str, msg: &str) {
 }
 
 /// Convenience macros for each level.
+#[allow(unused_macros)]
 #[macro_export]
 macro_rules! log_error {
     ($($arg:tt)*) => {

@@ -767,7 +767,7 @@ fn default_notify_command() -> String {
     ];
     for path in &candidates {
         if std::path::Path::new(path).exists() {
-            return path;
+            return path.clone();
         }
     }
     "/usr/bin/notify-send".to_string()
