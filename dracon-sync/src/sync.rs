@@ -1007,6 +1007,22 @@ async fn stage_commit_and_push(
         build_commit_message(&commit_ctx)
     };
 
+    let msg_subject = msg.lines().next().unwrap_or("").to_string();
+    let recent_subjects = crate::report::git_log_recent_subjects(repo, 3).await;
+    let is_duplicate_spam = !recent_subjects.is_empty()
+        && recent_subjects.iter().all(|s| s == &msg_subject);
+
+    if is_duplicate_spam {
+        if debug_enabled() {
+            eprintln!("🐛 {} skipped commit: subject '{}' repeated {} times (dedup guard)", repo.display(), msg_subject, recent_subjects.len());
+        }
+        if let Err(e) = run_git_with_timeout(repo, &["reset", "HEAD", "--"], 10, "reset").await {
+            return Err(anyhow::anyhow!("sync_repo: failed to reset HEAD after dedup skip: {}", e));
+        }
+        maybe_sync_visibility_and_metadata(ctx);
+        return Ok(Some(SyncOutcome::NothingToDo));
+    }
+
     if dry_run {
         println!("📝 Would commit {} file(s) in {}:", committed_entries.len(), repo.display());
         for entry in committed_entries.iter().take(10) {
