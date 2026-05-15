@@ -434,6 +434,14 @@ impl SecretScanner {
             // Generic High-Entropy / Passwords
             // ============================================================
             (
+                "Hex Secret (Quoted)",
+                r#"["'][a-fA-F0-9]{32,}["']"#,
+            ),
+            (
+                "High-Entropy Secret (Quoted)",
+                r#"["'][A-Za-z0-9]{24,}["']"#,
+            ),
+            (
                 "Generic API Key",
                 r#"(?i)(?:api[_-]?key|apikey).{0,10}[=:].{0,5}["'][^\s"\[]{20,}["']"#,
             ),
