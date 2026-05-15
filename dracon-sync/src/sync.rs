@@ -612,6 +612,10 @@ async fn run_ai_bumper(
 
         if let Some(current_ver) = read_current_version(repo) {
             let level = ai_decide_bump_level(repo, &current_ver, &staged_diff, &project_state).await;
+            if level == BumpLevel::Major {
+                eprintln!("🔒 major bump blocked (manual-only), skipping");
+                return false;
+            }
             if level != BumpLevel::None {
                 eprintln!("🤖 ai-bump: {} -> {}", current_ver, level.as_str());
                 let new_ver = bump_semver(&current_ver, level);

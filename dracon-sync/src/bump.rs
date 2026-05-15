@@ -215,7 +215,7 @@ Respond with ONLY ONE WORD."##);
     match service.chat(messages).await {
         Ok(content) => {
             match content.trim().to_lowercase().as_str() {
-                "major" => BumpLevel::Major,
+                "major" => BumpLevel::None,
                 "minor" => BumpLevel::Minor,
                 "patch" => BumpLevel::Patch,
                 _ => BumpLevel::None,
