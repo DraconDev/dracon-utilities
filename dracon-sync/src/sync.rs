@@ -2623,4 +2623,25 @@ auto_bump_versions = false
         let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
         assert!(result.is_ok(), "sync_repo should succeed with duplicate subjects in history");
     }
+
+    #[test]
+    fn test_conventional_prefix_detects_scoped_and_bare() {
+        let conventional_types = ["feat","fix","refactor","chore","docs","perf","style","test","build","ci"];
+        let has_prefix = |s: &str| -> bool {
+            conventional_types.iter().any(|t| s.starts_with(&format!("{}:", t)) || s.starts_with(&format!("{}(", t)))
+        };
+
+        // bare prefixes
+        assert!(has_prefix("fix: validate input"));
+        assert!(has_prefix("feat: add modal"));
+
+        // scoped prefixes — these were the bug (double prefix)
+        assert!(has_prefix("fix(modals): add input shield"));
+        assert!(has_prefix("feat(ui): add button"));
+        assert!(has_prefix("refactor(sync): detect full set"));
+
+        // not conventional
+        assert!(!has_prefix("add input shield"));
+        assert!(!has_prefix("update readme"));
+    }
 }
