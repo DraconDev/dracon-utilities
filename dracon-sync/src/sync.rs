@@ -988,7 +988,17 @@ async fn stage_commit_and_push(
     let msg = if is_noise_only && !is_report {
         build_commit_message(&commit_ctx)
     } else if let Some(ref ai_sub) = ai_subject {
-        if ai_subject.as_ref().map(|s| s.contains("chore") || s.contains("feat") || s.contains("fix") || s.contains("refactor") || s.contains("docs")).unwrap_or(false) {
+        let has_conventional_prefix = ai_sub.starts_with("feat:")
+            || ai_sub.starts_with("fix:")
+            || ai_sub.starts_with("refactor:")
+            || ai_sub.starts_with("chore:")
+            || ai_sub.starts_with("docs:")
+            || ai_sub.starts_with("perf:")
+            || ai_sub.starts_with("style:")
+            || ai_sub.starts_with("test:")
+            || ai_sub.starts_with("build:")
+            || ai_sub.starts_with("ci:");
+        if has_conventional_prefix {
             ai_sub.clone()
         } else {
             let category = commit_ctx.category.as_deref().unwrap_or("chore");
