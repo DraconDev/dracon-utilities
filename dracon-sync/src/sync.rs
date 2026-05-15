@@ -986,7 +986,23 @@ async fn stage_commit_and_push(
     );
 
     let msg = if is_noise_only && !is_report {
-        "chore: sync metadata".to_string()
+        if let Some(ref ai_sub) = ai_subject {
+            format!(
+                "{}({}): {}",
+                commit_ctx.category.as_deref().unwrap_or("chore"),
+                commit_ctx.scope.as_deref().unwrap_or("sync"),
+                ai_sub
+            )
+        } else if let Some(ref fb) = local_fallback {
+            format!(
+                "{}({}): {}",
+                commit_ctx.category.as_deref().unwrap_or("chore"),
+                commit_ctx.scope.as_deref().unwrap_or("sync"),
+                fb
+            )
+        } else {
+            "chore: sync metadata".to_string()
+        }
     } else {
         build_commit_message(&commit_ctx)
     };
