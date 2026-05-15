@@ -15,6 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Removed `read_project_focus`, `extract_category_scope_from_focus`, `extract_scope_from_focus`, `git_log_recent_subjects`
   - `project-state.md` is now manual-only: sync no longer auto-generates, stages, or commits it
   - `parse_conventional_commit()` extracts (category, scope, description) from AI subject to prevent double-prefix
+- **dracon-warden**: Secret scanner pattern fixes
+  - Added "Hex Secret (Quoted)" pattern: catches 32+ char mixed-case hex strings in quotes
+  - Added "High-Entropy Secret (Quoted)" pattern: catches 24+ char alphanumeric strings in quotes
+  - Added "Slack Bot Token (Compact)" pattern: catches `xoxb-` tokens without numeric ID segments
+  - GitHub token patterns (`ghp_`, `gho_`, `ghu_`, `ghs_`, `ghr_`): accept 30-40 chars (was exactly 36)
+  - Mailgun API Key pattern: accept 28-34 chars (was exactly 32)
 
 ### Added
 - **dracon-sync**: Mirror visibility sync (`sync_visibility` config)
