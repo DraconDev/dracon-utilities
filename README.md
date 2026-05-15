@@ -510,3 +510,4 @@ test change 2
 real test change
 trigger change 3
 scribe test change
+debug test
