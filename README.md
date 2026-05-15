@@ -507,3 +507,4 @@ This removes binaries and systemd services. Your git repos and configs in `~/.dr
 # AI Provider Status
 test change
 test change 2
+real test change
