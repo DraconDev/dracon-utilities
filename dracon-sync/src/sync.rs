@@ -960,16 +960,10 @@ async fn stage_commit_and_push(
             build_commit_message(&commit_ctx)
         }
     } else if let Some(ref ai_sub) = ai_subject {
-        let has_conventional_prefix = ai_sub.starts_with("feat:")
-            || ai_sub.starts_with("fix:")
-            || ai_sub.starts_with("refactor:")
-            || ai_sub.starts_with("chore:")
-            || ai_sub.starts_with("docs:")
-            || ai_sub.starts_with("perf:")
-            || ai_sub.starts_with("style:")
-            || ai_sub.starts_with("test:")
-            || ai_sub.starts_with("build:")
-            || ai_sub.starts_with("ci:");
+        let conventional_types = ["feat","fix","refactor","chore","docs","perf","style","test","build","ci"];
+        let has_conventional_prefix = conventional_types.iter().any(|t| {
+            ai_sub.starts_with(&format!("{}:", t)) || ai_sub.starts_with(&format!("{}(", t))
+        });
         if has_conventional_prefix {
             ai_sub.clone()
         } else {
