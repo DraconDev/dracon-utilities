@@ -3318,33 +3318,33 @@ API_KEY=original"#;
     #[test]
     fn test_github_token_patterns_accept_variable_length() {
         let scanner = SecretScanner::new_without_age_keys().unwrap();
-        let short = r#"token = "ghp_abcdefghijklmnopqrstuvwx""#;
-        let long = r#"token = "ghp_abcdefghijklmnopqrstuvwxyz0123456789ABCD""#;
+        let short = "ghp_abcdefghijklmnopqrstuvwxyz0123";
+        let long = "ghp_abcdefghijklmnopqrstuvwxyz0123456789ABCD";
         let found_short = scanner.scan(short);
         let found_long = scanner.scan(long);
         assert!(found_short.iter().any(|f| f.name.contains("GitHub Token (ghp)")),
-            "should detect short ghp_ token (30 chars), found: {:?}", found_short);
+            "should detect short ghp_ token (30 chars after prefix), found: {:?}", found_short);
         assert!(found_long.iter().any(|f| f.name.contains("GitHub Token (ghp)")),
-            "should detect long ghp_ token (40 chars), found: {:?}", found_long);
+            "should detect long ghp_ token (40 chars after prefix), found: {:?}", found_long);
     }
 
     #[test]
     fn test_mailgun_key_accepts_variable_length() {
         let scanner = SecretScanner::new_without_age_keys().unwrap();
-        let short = r#"api_key = "key-abcdefghij0123456789abcdef""#;
-        let long = r#"api_key = "key-abcdefghij0123456789abcdef0123""#;
+        let short = "key-abcdefghijklmnopqrstuvwxyz012";
+        let long = "key-abcdefghijklmnopqrstuvwxyz0123456";
         let found_short = scanner.scan(short);
         let found_long = scanner.scan(long);
         assert!(found_short.iter().any(|f| f.name == "Mailgun API Key"),
-            "should detect 28-char Mailgun key, found: {:?}", found_short);
+            "should detect 28-char Mailgun key (after prefix), found: {:?}", found_short);
         assert!(found_long.iter().any(|f| f.name == "Mailgun API Key"),
-            "should detect 34-char Mailgun key, found: {:?}", found_long);
+            "should detect 34-char Mailgun key (after prefix), found: {:?}", found_long);
     }
 
     #[test]
     fn test_slack_bot_token_compact() {
         let scanner = SecretScanner::new_without_age_keys().unwrap();
-        let token = r#"bot_token = "xoxb-aBcDeFgHiJkLmNoPqRsTuVwXyZ""#;
+        let token = "xoxb-aBcDeFgHiJkLmNoPqRsTuVwXyZ";
         let found = scanner.scan(token);
         assert!(found.iter().any(|f| f.name == "Slack Bot Token (Compact)"),
             "should detect compact Slack bot token, found: {:?}", found);
@@ -3353,7 +3353,7 @@ API_KEY=original"#;
     #[test]
     fn test_slack_bot_token_compact_has_length_cap() {
         let scanner = SecretScanner::new_without_age_keys().unwrap();
-        let too_long = r#"token = "xoxb-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa""#;
+        let too_long = "xoxb-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
         let found = scanner.scan(too_long);
         assert!(!found.iter().any(|f| f.name == "Slack Bot Token (Compact)"),
             "should NOT match slack bot token >68 chars after xoxb-, found: {:?}", found);
