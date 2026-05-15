@@ -191,7 +191,7 @@ fn test_massive_dataset_permutations() {
         "key-9yNmMZQZD3xEuI2Tlyk9oaB3FuBqOa",
     ];
 
-    let prefixes = vec!["let x = ", "const T = ", "var k=", "key: ", "\"s\": ", "export K=", "pass="];
+    let prefixes = vec!["let secret = ", "const TOKEN = ", "var key=", "key: ", "\"api_key\": ", "export SECRET=", "password="];
     let quotes = vec!["\"", "\'"];
     let mut total = 0;
     
