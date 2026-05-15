@@ -1773,6 +1773,68 @@ mod tests {
     }
 
     #[test]
+    fn test_git_ssh_hardening_contains_key_flags() {
+        let val = git_ssh_hardening();
+        assert!(val.contains("BatchMode=yes"), "should contain BatchMode=yes, got: {val}");
+        assert!(val.contains("-F"), "should contain -F flag for SSH config, got: {val}");
+        assert!(val.contains("ConnectTimeout=10"), "should contain ConnectTimeout, got: {val}");
+    }
+
+    #[test]
+    fn test_gitlab_https_url_ssh_colon_path() {
+        let url = "git@gitlab.com:owner/repo.git";
+        let result = gitlab_https_url(url);
+        assert_eq!(result, Some("https://gitlab.com/owner/repo.git".to_string()));
+    }
+
+    #[test]
+    fn test_gitlab_https_url_ssh_protocol() {
+        let url = "ssh://git@gitlab.com/owner/repo.git";
+        let result = gitlab_https_url(url);
+        assert_eq!(result, Some("https://gitlab.com/owner/repo.git".to_string()));
+    }
+
+    #[test]
+    fn test_gitlab_https_url_already_https() {
+        let url = "https://gitlab.com/owner/repo.git";
+        let result = gitlab_https_url(url);
+        assert_eq!(result, Some("https://gitlab.com/owner/repo.git".to_string()));
+    }
+
+    #[test]
+    fn test_gitlab_https_url_non_gitlab() {
+        assert!(gitlab_https_url("git@github.com:owner/repo.git").is_none());
+        assert!(gitlab_https_url("https://codeberg.org/owner/repo.git").is_none());
+    }
+
+    #[test]
+    fn test_codeberg_https_url_ssh_colon_path() {
+        let url = "git@codeberg.org:owner/repo.git";
+        let result = codeberg_https_url(url);
+        assert_eq!(result, Some("https://codeberg.org/owner/repo.git".to_string()));
+    }
+
+    #[test]
+    fn test_codeberg_https_url_ssh_protocol() {
+        let url = "ssh://git@codeberg.org/owner/repo.git";
+        let result = codeberg_https_url(url);
+        assert_eq!(result, Some("https://codeberg.org/owner/repo.git".to_string()));
+    }
+
+    #[test]
+    fn test_codeberg_https_url_already_https() {
+        let url = "https://codeberg.org/owner/repo.git";
+        let result = codeberg_https_url(url);
+        assert_eq!(result, Some("https://codeberg.org/owner/repo.git".to_string()));
+    }
+
+    #[test]
+    fn test_codeberg_https_url_non_codeberg() {
+        assert!(codeberg_https_url("git@github.com:owner/repo.git").is_none());
+        assert!(codeberg_https_url("https://gitlab.com/owner/repo.git").is_none());
+    }
+
+    #[test]
     fn test_fallback_status_rank_ordering() {
         assert!(fallback_status_rank(&FileStatus::Deleted) > fallback_status_rank(&FileStatus::Modified));
         assert!(fallback_status_rank(&FileStatus::Renamed) > fallback_status_rank(&FileStatus::Added));
