@@ -86,13 +86,19 @@ pub(crate) fn discover_git_repos(
     exclude_repos: &[String],
     system_repo: Option<&str>,
 ) -> Vec<PathBuf> {
-    let exclude_set: std::collections::HashSet<PathBuf> =
-        exclude_repos.iter().map(PathBuf::from).collect();
+    let exclude_set: std::collections::HashSet<String> = exclude_repos
+        .iter()
+        .map(|s| s.to_lowercase())
+        .collect();
     let mut repos = Vec::new();
     for root in roots {
         discover_git_repos_recursive(root, excluded_dir_names, &mut repos, 0, 4);
     }
-    repos.retain(|r| !exclude_set.contains(r));
+    repos.retain(|r| {
+        let abs = r.to_string_lossy().to_lowercase();
+        let name = r.file_name().map(|n| n.to_string_lossy().to_lowercase()).unwrap_or_default();
+        !exclude_set.contains(&abs) && !exclude_set.contains(&name)
+    });
 
     // Always include system_repo if it exists and is a git repo
     if let Some(system) = system_repo {
