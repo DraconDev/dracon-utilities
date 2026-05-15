@@ -294,7 +294,7 @@ impl SecretScanner {
                 "SendGrid API Key",
                 r"SG\.[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}",
             ),
-            ("Mailgun API Key", r"key-[0-9a-zA-Z]{32}"),
+            ("Mailgun API Key", r"key-[0-9a-zA-Z]{28,34}"),
             ("Mailchimp API Key", r"[0-9a-f]{32}-us[0-9]{1,2}"),
             // ============================================================
             // Database / Connection Strings
