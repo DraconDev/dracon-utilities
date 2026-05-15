@@ -3083,6 +3083,22 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_run_child_includes_stderr_on_failure() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let child = tokio::process::Command::new("git")
+            .args(["push", "nonexistent-remote", "nonexistent-branch"])
+            .current_dir(tmp.path())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .expect("spawn git");
+        let result = run_child(child, tmp.path(), 10, "test-stderr").await;
+        assert!(result.is_err(), "should fail for nonexistent remote");
+        let err_msg = format!("{}", result.unwrap_err());
+        assert!(!err_msg.contains("test-stderr failed") || err_msg.len() > 30,
+            "error message should include stderr detail, got: {}", err_msg);
+    }
+
+    #[tokio::test]
     async fn test_run_git_with_timeout_succeeds() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("test-repo");
