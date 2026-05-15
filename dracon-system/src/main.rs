@@ -89,6 +89,55 @@ fn check_safe_to_delete(path: &Path, user_protected: &[String]) -> Result<PathBu
     Ok(canon)
 }
 
+/// Guard-specific safety check — skips SYSTEM_PROTECTED check because the guard
+/// only deletes known artifact/cache directories (~/Dev/*/target, ~/.cache/*,
+/// ~/.local/share/Trash/*) which are legitimately under /home.
+/// Still checks user-protected paths, symlinks, and canonicalization.
+fn check_safe_to_delete_guard(path: &Path, user_protected: &[String]) -> Result<PathBuf> {
+    let canon = match path.canonicalize() {
+        Ok(p) => p,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            return Ok(path.to_path_buf());
+        }
+        Err(e) => anyhow::bail!(
+            "cannot canonicalize {}: {} — refusing to delete",
+            path.display(),
+            e
+        ),
+    };
+
+    // Reject symlinks to mitigate TOCTOU
+    if let Ok(meta) = std::fs::symlink_metadata(path) {
+        if meta.file_type().is_symlink() {
+            anyhow::bail!("refusing to delete symlink {} — use target directly", path.display());
+        }
+    }
+
+    let canon_str = canon.display().to_string();
+
+    // Only check user-protected paths, not SYSTEM_PROTECTED
+    for user_prot in user_protected {
+        let prot_canon = match Path::new(user_prot).canonicalize() {
+            Ok(p) => p.display().to_string(),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(e) => anyhow::bail!(
+                "cannot canonicalize user-protected path {}: {} — refusing",
+                user_prot,
+                e
+            ),
+        };
+        if is_protected_ancestor(&canon_str, &prot_canon) {
+            anyhow::bail!(
+                "refusing to delete protected path {} (under user-protected path {})",
+                canon.display(),
+                user_prot
+            );
+        }
+    }
+
+    Ok(canon)
+}
+
 /// Check if `path` is equal to or a descendant of `protected`.
 /// Both must be canonicalized absolute paths.
 pub(crate) fn is_protected_ancestor(path: &str, protected: &str) -> bool {
@@ -1363,7 +1412,14 @@ async fn auto_cleanup_rust_targets(
         }
 
         if apply {
-            let safe_path = check_safe_to_delete(&target.path, &guard.protected_paths)?;
+            let safe_path = match check_safe_to_delete_guard(&target.path, &guard.protected_paths) {
+                Ok(p) => p,
+                Err(e) => {
+                    eprintln!("⚠️ skipping {}: {}", target.path.display(), e);
+                    result.protected_paths.push(target.path.display().to_string());
+                    continue;
+                }
+            };
             if let Err(e) = tokio::fs::remove_dir_all(&safe_path).await {
                 eprintln!("⚠️ failed to remove {}: {}", target.path.display(), e);
                 continue;
