@@ -988,9 +988,13 @@ async fn stage_commit_and_push(
     let msg = if is_noise_only && !is_report {
         build_commit_message(&commit_ctx)
     } else if let Some(ref ai_sub) = ai_subject {
-        let category = commit_ctx.category.as_deref().unwrap_or("chore");
-        let scope = commit_ctx.scope.as_deref().unwrap_or("sync");
-        format!("{}({}): {}", category, scope, ai_sub)
+        if ai_subject.as_ref().map(|s| s.contains("chore") || s.contains("feat") || s.contains("fix") || s.contains("refactor") || s.contains("docs")).unwrap_or(false) {
+            ai_sub.clone()
+        } else {
+            let category = commit_ctx.category.as_deref().unwrap_or("chore");
+            let scope = commit_ctx.scope.as_deref().unwrap_or("sync");
+            format!("{}({}): {}", category, scope, ai_sub)
+        }
     } else if let Some(ref fb) = local_fallback {
         let category = commit_ctx.category.as_deref().unwrap_or("chore");
         let scope = commit_ctx.scope.as_deref().unwrap_or("sync");
