@@ -8,16 +8,17 @@
 guard_enabled = true
 
 # Disk usage thresholds (percent)
-disk_early_warn_percent = 70
-disk_warn_percent = 80
-disk_action_percent = 90
-disk_critical_percent = 95
+# Lower values = more aggressive early cleaning
+disk_early_warn_percent = 65
+disk_warn_percent = 75
+disk_action_percent = 85
+disk_critical_percent = 92
 
 # Freeze dracon-sync when disk hits action level
 freeze_sync_at_action = true
 
-# Unfreeze sync when disk drops below this level
-unfreeze_below_percent = 88
+# Unfreeze sync when disk drops below this level (set to ~warn_percent)
+unfreeze_below_percent = 70
 
 # Process monitoring thresholds
 process_cpu_percent = 50.0      # Alert if CPU > 50%
