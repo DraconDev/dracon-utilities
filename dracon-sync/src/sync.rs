@@ -579,41 +579,6 @@ async fn get_staged_diff_content(repo: &Path) -> Option<String> {
     }
 }
 
-async fn run_deterministic_bumper(
-    repo: &Path,
-    committed_entries: &[dracon_git::types::DiffFile],
-    dry_run: bool,
-    auto_bump_versions: bool,
-) -> bool {
-    if dry_run || !auto_bump_versions || !cfg!(feature = "scribe") {
-        return false;
-    }
-    #[cfg(feature = "scribe")]
-    {
-        use crate::bump::{deterministic_decide_bump_level, bump_semver, read_current_version, BumpLevel};
-
-        let staged_diff = committed_entries.iter()
-            .map(|e| format!("{:?}: {}", e.status, e.path.display()))
-            .collect::<Vec<_>>()
-            .join("\n");
-
-        if let Some(current_ver) = read_current_version(repo) {
-            let level = deterministic_decide_bump_level(&staged_diff);
-            if level != BumpLevel::None {
-                eprintln!("📦 bump: {} -> patch", current_ver);
-                if let Some(new_ver) = bump_semver(&current_ver, BumpLevel::Patch) {
-                    let bumped = crate::bump::apply_version_bump_to_repo(repo, &current_ver, &new_ver);
-                    if bumped {
-                        return true;
-                    }
-                }
-            }
-        }
-    }
-    let _ = (repo, committed_entries, auto_bump_versions);
-    false
-}
-
 async fn stage_version_files(repo: &Path) {
     for file in crate::bump::VERSION_FILES {
         if repo.join(file).exists() {
@@ -931,11 +896,8 @@ async fn stage_commit_and_push(
 
     let staged_diff_content = get_staged_diff_content(repo).await;
 
-    let mut version_bumped = run_deterministic_bumper(repo, &committed_entries, dry_run, auto_bump_versions).await;
-    if version_bumped {
-        stage_version_files(repo).await;
-    }
-
+    // AI bumper is the sole version bump decider — determines patch vs minor vs none
+    let mut version_bumped = false;
     let ai_bumped = run_ai_bumper(repo, &committed_entries, dry_run, auto_bump_versions, version_bumped).await;
     if ai_bumped {
         version_bumped = true;
