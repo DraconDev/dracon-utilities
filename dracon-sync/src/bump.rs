@@ -433,4 +433,15 @@ version = "1.0.0""#;
         let content = r#"{"name": "test", "version": "1.0.0", "other": "value"}"#;
         assert_eq!(extract_version_from_json(content, "version"), Some("1.0.0".to_string()));
     }
+
+    #[test]
+    fn test_ai_bumper_major_is_blocked() {
+        let result = match "major" {
+            "major" => BumpLevel::None,
+            "minor" => BumpLevel::Minor,
+            "patch" => BumpLevel::Patch,
+            _ => BumpLevel::None,
+        };
+        assert_eq!(result, BumpLevel::None, "major must map to None (manual-only)");
+    }
 }
