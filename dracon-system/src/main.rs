@@ -1590,16 +1590,15 @@ async fn clean_package_caches(
                 if size > 0 {
                     let mut succeeded = true;
                     if apply {
-                        let safe_path = match check_safe_to_delete_guard(&cargo_cache, protected_paths) {
-                            Ok(p) => p,
+                        match check_safe_to_delete_guard(&cargo_cache, protected_paths) {
+                            Ok(ref safe_path) => {
+                                if let Err(e) = tokio::fs::remove_dir_all(safe_path).await {
+                                    eprintln!("⚠️ failed to remove cargo cache: {}", e);
+                                    succeeded = false;
+                                }
+                            }
                             Err(e) => {
                                 eprintln!("⚠️ skipping cargo cache: {}", e);
-                                succeeded = false;
-                            }
-                        };
-                        if succeeded {
-                            if let Err(e) = tokio::fs::remove_dir_all(&safe_path).await {
-                                eprintln!("⚠️ failed to remove cargo cache: {}", e);
                                 succeeded = false;
                             }
                         }
@@ -1621,16 +1620,15 @@ async fn clean_package_caches(
                 if size > 0 {
                     let mut succeeded = true;
                     if apply {
-                        let safe_path = match check_safe_to_delete_guard(&npm_cache, protected_paths) {
-                            Ok(p) => p,
+                        match check_safe_to_delete_guard(&npm_cache, protected_paths) {
+                            Ok(ref safe_path) => {
+                                if let Err(e) = tokio::fs::remove_dir_all(safe_path).await {
+                                    eprintln!("⚠️ failed to remove npm cache: {}", e);
+                                    succeeded = false;
+                                }
+                            }
                             Err(e) => {
                                 eprintln!("⚠️ skipping npm cache: {}", e);
-                                succeeded = false;
-                            }
-                        };
-                        if succeeded {
-                            if let Err(e) = tokio::fs::remove_dir_all(&safe_path).await {
-                                eprintln!("⚠️ failed to remove npm cache: {}", e);
                                 succeeded = false;
                             }
                         }
@@ -1652,16 +1650,15 @@ async fn clean_package_caches(
                 if size > 0 {
                     let mut succeeded = true;
                     if apply {
-                        let safe_path = match check_safe_to_delete_guard(&pip_cache, protected_paths) {
-                            Ok(p) => p,
+                        match check_safe_to_delete_guard(&pip_cache, protected_paths) {
+                            Ok(ref safe_path) => {
+                                if let Err(e) = tokio::fs::remove_dir_all(safe_path).await {
+                                    eprintln!("⚠️ failed to remove pip cache: {}", e);
+                                    succeeded = false;
+                                }
+                            }
                             Err(e) => {
                                 eprintln!("⚠️ skipping pip cache: {}", e);
-                                succeeded = false;
-                            }
-                        };
-                        if succeeded {
-                            if let Err(e) = tokio::fs::remove_dir_all(&safe_path).await {
-                                eprintln!("⚠️ failed to remove pip cache: {}", e);
                                 succeeded = false;
                             }
                         }
@@ -1683,22 +1680,17 @@ async fn clean_package_caches(
                 if size > 0 {
                     let mut succeeded = true;
                     if apply {
-                        let safe_path = match check_safe_to_delete_guard(&go_cache, protected_paths) {
-                            Ok(p) => p,
+                        match check_safe_to_delete_guard(&go_cache, protected_paths) {
+                            Ok(ref safe_path) => {
+                                if let Err(e) = tokio::fs::remove_dir_all(safe_path).await {
+                                    eprintln!("⚠️ failed to remove go build cache: {}", e);
+                                    succeeded = false;
+                                }
+                            }
                             Err(e) => {
                                 eprintln!("⚠️ skipping go build cache: {}", e);
                                 succeeded = false;
                             }
-                        };
-                        if succeeded {
-                            if let Err(e) = tokio::fs::remove_dir_all(&safe_path).await {
-                                eprintln!("⚠️ failed to remove go build cache: {}", e);
-                                succeeded = false;
-                            }
-                        }
-                        if let Err(e) = tokio::fs::remove_dir_all(&safe_path).await {
-                            eprintln!("⚠️ failed to remove go cache: {}", e);
-                            succeeded = false;
                         }
                     }
                     if !apply || succeeded {
@@ -1727,19 +1719,18 @@ async fn empty_trash(apply: bool, protected_paths: &[String]) -> Result<(u64, Ve
             if size > 0 {
                 let mut succeeded = true;
                 if apply {
-                    let safe_path = match check_safe_to_delete_guard(&trash_files, protected_paths) {
-                        Ok(p) => p,
+                    match check_safe_to_delete_guard(&trash_files, protected_paths) {
+                        Ok(ref safe_path) => {
+                            if let Err(e) = tokio::fs::remove_dir_all(safe_path).await {
+                                eprintln!("⚠️ failed to remove trash files: {}", e);
+                                succeeded = false;
+                            } else if let Err(e) = tokio::fs::create_dir_all(&trash_files).await {
+                                eprintln!("⚠️ failed to recreate trash dir: {}", e);
+                            }
+                        }
                         Err(e) => {
                             eprintln!("⚠️ skipping trash files: {}", e);
                             succeeded = false;
-                        }
-                    };
-                    if succeeded {
-                        if let Err(e) = tokio::fs::remove_dir_all(&safe_path).await {
-                            eprintln!("⚠️ failed to remove trash files: {}", e);
-                            succeeded = false;
-                        } else if let Err(e) = tokio::fs::create_dir_all(&trash_files).await {
-                            eprintln!("⚠️ failed to recreate trash dir: {}", e);
                         }
                     }
                 }
@@ -1755,13 +1746,20 @@ async fn empty_trash(apply: bool, protected_paths: &[String]) -> Result<(u64, Ve
             if info_size > 0 {
                 let mut succeeded = true;
                 if apply {
-                    let safe_path = check_safe_to_delete(&trash_info, protected_paths)?;
-                    if let Err(e) = tokio::fs::remove_dir_all(&safe_path).await {
-                        eprintln!("⚠️ failed to remove trash info: {}", e);
-                        succeeded = false;
-                    } else if let Err(e) = tokio::fs::create_dir_all(&trash_info).await {
-                        eprintln!("⚠️ failed to recreate trash info dir: {}", e);
-                        // Note: we still count this as success since the files were removed
+                    match check_safe_to_delete_guard(&trash_info, protected_paths) {
+                        Ok(ref safe_path) => {
+                            if let Err(e) = tokio::fs::remove_dir_all(safe_path).await {
+                                eprintln!("⚠️ failed to remove trash info: {}", e);
+                                succeeded = false;
+                            } else if let Err(e) = tokio::fs::create_dir_all(&trash_info).await {
+                                eprintln!("⚠️ failed to recreate trash info dir: {}", e);
+                                // Note: we still count this as success since the files were removed
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("⚠️ skipping trash info: {}", e);
+                            succeeded = false;
+                        }
                     }
                 }
                 if !apply || succeeded {
@@ -1921,10 +1919,18 @@ async fn clean_old_node_modules(
             if size > 0 {
                 let mut succeeded = true;
                 if apply {
-                    let safe_path = check_safe_to_delete(&path, protected_paths)?;
-                    if let Err(e) = tokio::fs::remove_dir_all(&safe_path).await {
-                        eprintln!("⚠️ failed to remove {}: {}", path.display(), e);
-                        succeeded = false;
+                    let safe_path = match check_safe_to_delete_guard(&path, protected_paths) {
+                        Ok(p) => p,
+                        Err(e) => {
+                            eprintln!("⚠️ skipping {}: {}", path.display(), e);
+                            succeeded = false;
+                        }
+                    };
+                    if succeeded {
+                        if let Err(e) = tokio::fs::remove_dir_all(&safe_path).await {
+                            eprintln!("⚠️ failed to remove {}: {}", path.display(), e);
+                            succeeded = false;
+                        }
                     }
                 }
                 if !apply || succeeded {
@@ -2216,12 +2222,16 @@ async fn run_auto_cleanup(guard: &GuardPolicy, state: &mut GuardRuntimeState, us
     let mut all_cleaned: Vec<String> = Vec::new();
 
     if guard.auto_cleanup_rust {
-        let result = auto_cleanup_rust_targets(guard, state, apply).await?;
-        total_reclaimed += result.reclaimed_bytes;
-        for p in &result.cleaned_paths {
-            eprintln!("🧹 Rust: {}", p);
+        match auto_cleanup_rust_targets(guard, state, apply).await {
+            Ok(result) => {
+                total_reclaimed += result.reclaimed_bytes;
+                for p in &result.cleaned_paths {
+                    eprintln!("🧹 Rust: {}", p);
+                }
+                all_cleaned.extend(result.cleaned_paths);
+            }
+            Err(e) => eprintln!("⚠️ Rust target cleanup failed: {}", e),
         }
-        all_cleaned.extend(result.cleaned_paths);
     }
 
     if guard.clean_trash {
