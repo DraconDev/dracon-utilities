@@ -123,12 +123,12 @@ Service files are installed to `~/.config/systemd/user/` by `install.sh`.
 | `ExecStart` | `dracon-system guard daemon` | Runs guard daemon |
 | `Restart` | `on-failure` | Restarts on crash |
 | `RestartSec` | `10` | Wait 10s before restart |
-| `MemoryMax` | `100M` | Max 100MB RAM |
-| `CPUQuota` | `10%` | Max 10% CPU usage |
+| `MemoryMax` | `250M` | Max 250MB RAM |
+| `CPUQuota` | `20%` | Max 20% CPU usage |
 | `NoNewPrivileges` | `true` | Security hardening |
 | `ProtectSystem` | `strict` | Read-only system fs |
 | `ProtectHome` | `read-only` | Read-only home (except allowed paths) |
-| `ReadWritePaths` | `~/.dracon, ~/Dev, ~/.local/state/dracon` | Writable directories |
+| `ReadWritePaths` | `~/.dracon, ~/Dev, ~/.local/state/dracon, ~/.local/share/Trash, ~/.cargo, ~/.cache, ~/.npm` | Writable directories |
 
 ### dracon-warden.service
 
