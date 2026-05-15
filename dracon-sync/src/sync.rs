@@ -986,6 +986,8 @@ async fn stage_commit_and_push(
     );
 
     let msg = if is_noise_only && !is_report {
+        build_commit_message(&commit_ctx)
+    } else {
         if let Some(ref ai_sub) = ai_subject {
             format!(
                 "{}({}): {}",
@@ -1001,10 +1003,8 @@ async fn stage_commit_and_push(
                 fb
             )
         } else {
-            "chore: sync metadata".to_string()
+            build_commit_message(&commit_ctx)
         }
-    } else {
-        build_commit_message(&commit_ctx)
     };
 
     if dry_run {
