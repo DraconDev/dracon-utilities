@@ -1919,17 +1919,16 @@ async fn clean_old_node_modules(
             if size > 0 {
                 let mut succeeded = true;
                 if apply {
-                    let safe_path = match check_safe_to_delete_guard(&path, protected_paths) {
-                        Ok(p) => p,
+                    match check_safe_to_delete_guard(&path, protected_paths) {
+                        Ok(ref safe_path) => {
+                            if let Err(e) = tokio::fs::remove_dir_all(safe_path).await {
+                                eprintln!("⚠️ failed to remove {}: {}", path.display(), e);
+                                succeeded = false;
+                            }
+                        }
                         Err(e) => {
                             eprintln!("⚠️ skipping {}: {}", path.display(), e);
-                            succeeded = false;
-                        }
-                    };
-                    if succeeded {
-                        if let Err(e) = tokio::fs::remove_dir_all(&safe_path).await {
-                            eprintln!("⚠️ failed to remove {}: {}", path.display(), e);
-                            succeeded = false;
+                            continue;
                         }
                     }
                 }
