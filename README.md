@@ -511,3 +511,4 @@ real test change
 trigger change 3
 scribe test change
 debug test
+clean commit test
