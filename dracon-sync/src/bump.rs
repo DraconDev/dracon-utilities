@@ -198,11 +198,11 @@ Staged Changes:
 {staged_diff}
 
 Respond with ONLY ONE WORD:
-- "major": BREAKING CHANGE
-- "minor": NEW FEATURE  
+- "minor": NEW FEATURE
 - "patch": BUG FIX / improvement
 - "none": NOISY/CHORE (docs, deps, config only)
 
+NEVER respond "major" — major version bumps are manual-only.
 Respond with ONLY ONE WORD."##);
 
     let service = SimpleAiService::new();
