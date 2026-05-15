@@ -499,8 +499,6 @@ pub(crate) fn truncate(value: &str, max_chars: usize) -> String {
     format!("{}…", shortened)
 }
 
-
-
 pub(crate) async fn git_log_field(repo: &Path, format: &str) -> Option<String> {
     let output = tokio_git_command()
         .args(["log", "-1", &format!("--pretty=format:{}", format)])
