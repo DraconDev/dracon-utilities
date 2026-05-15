@@ -505,3 +505,4 @@ systemctl --user restart dracon-warden.service
 
 This removes binaries and systemd services. Your git repos and configs in `~/.dracon/` are preserved.
 # AI Provider Status
+test change
