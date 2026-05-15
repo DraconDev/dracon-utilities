@@ -943,22 +943,14 @@ async fn stage_commit_and_push(
     }
 
     let ai_subject = if !is_noise_only {
-        let sub = crate::scribe::generate_commit_message(repo, &staged_diff_names, staged_diff_content).await;
-        if sub.is_none() {
-            eprintln!("DEBUG: scribe returned None for staged_diff_names: {}", staged_diff_names);
-        }
-        sub
+        crate::scribe::generate_commit_message(repo, &staged_diff_names, staged_diff_content).await
     } else {
-        eprintln!("DEBUG: is_noise_only=true, skipping scribe");
         None
     };
 
     let local_fallback = if ai_subject.is_none() && !is_noise_only {
-        let fb = Some(crate::scribe::local_fallback_message(&staged_diff_names));
-        eprintln!("DEBUG: local_fallback generated: {:?}", fb);
-        fb
+        Some(crate::scribe::local_fallback_message(&staged_diff_names))
     } else {
-        eprintln!("DEBUG: local_fallback skipped (ai_subject={}, is_noise_only={})", ai_subject.is_some(), is_noise_only);
         None
     };
 
@@ -994,27 +986,17 @@ async fn stage_commit_and_push(
     );
 
     let msg = if is_noise_only && !is_report {
-        eprintln!("DEBUG: is_noise_only=true && !is_report, using build_commit_message");
         build_commit_message(&commit_ctx)
+    } else if let Some(ref ai_sub) = ai_subject {
+        let category = commit_ctx.category.as_deref().unwrap_or("chore");
+        let scope = commit_ctx.scope.as_deref().unwrap_or("sync");
+        format!("{}({}): {}", category, scope, ai_sub)
+    } else if let Some(ref fb) = local_fallback {
+        let category = commit_ctx.category.as_deref().unwrap_or("chore");
+        let scope = commit_ctx.scope.as_deref().unwrap_or("sync");
+        format!("{}({}): {}", category, scope, fb)
     } else {
-        eprintln!("DEBUG: is_noise_only={}, is_report={}, ai_subject={:?}, local_fallback={:?}", is_noise_only, is_report, ai_subject.as_ref().map(|s| s.as_str()), local_fallback.as_ref().map(|s| s.as_str()));
-        if let Some(ref ai_sub) = ai_subject {
-            format!(
-                "{}({}): {}",
-                commit_ctx.category.as_deref().unwrap_or("chore"),
-                commit_ctx.scope.as_deref().unwrap_or("sync"),
-                ai_sub
-            )
-        } else if let Some(ref fb) = local_fallback {
-            format!(
-                "{}({}): {}",
-                commit_ctx.category.as_deref().unwrap_or("chore"),
-                commit_ctx.scope.as_deref().unwrap_or("sync"),
-                fb
-            )
-        } else {
-            build_commit_message(&commit_ctx)
-        }
+        build_commit_message(&commit_ctx)
     };
 
     if dry_run {
