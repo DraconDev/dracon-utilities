@@ -104,7 +104,7 @@ pub(crate) fn discover_git_repos(
     if let Some(system) = system_repo {
         let system_path = PathBuf::from(system);
         let system_abs = system.to_lowercase();
-        let system_name = PathBuf::from(system).file_name()
+        let system_name = system_path.file_name()
             .map(|n| n.to_string_lossy().to_lowercase())
             .unwrap_or_default();
         if system_path.exists() && system_path.join(".git").exists()
