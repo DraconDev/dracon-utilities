@@ -2799,6 +2799,61 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_push_with_retries_includes_stderr_on_failure() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+
+        let real_git = real_git_path();
+        let always_fail = tmp.path().join("git");
+        std::fs::write(&always_fail, "#!/bin/sh\n\
+            echo 'permission denied for /nix/store/abc' >&2\n\
+            exit 128\n\
+            ").expect("write fail git");
+        std::fs::set_permissions(&always_fail, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+
+        let _lock = acquire_path_lock();
+        let orig_path = std::env::var("PATH").unwrap_or_default();
+        let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
+
+        let bare = tmp.path().join("bare.git");
+        std::process::Command::new(real_git.as_path())
+            .args(["init", "--bare", &bare.to_string_lossy()])
+            .output()
+            .expect("git init --bare");
+        let repo = tmp.path().join("repo");
+        std::process::Command::new(real_git.as_path())
+            .args(["init", "-q", &repo.to_string_lossy()])
+            .output()
+            .expect("git init");
+        std::process::Command::new(real_git.as_path())
+            .args(["remote", "add", "origin", &bare.to_string_lossy()])
+            .current_dir(&repo)
+            .output()
+            .expect("git remote add");
+        std::fs::write(repo.join("f"), "content").expect("write file");
+        std::process::Command::new(real_git.as_path())
+            .args(["add", "f"])
+            .current_dir(&repo)
+            .output()
+            .expect("git add");
+        std::process::Command::new(real_git.as_path())
+            .args(["commit", "-m", "init"])
+            .current_dir(&repo)
+            .output()
+            .expect("git commit");
+
+        drop(_guard);
+        drop(_lock);
+
+        let _git_bin_guard = EnvRestorer::new("DRACON_SYNC_GIT_BIN", &always_fail.to_string_lossy());
+        let result = crate::git::push_with_retries(&repo, 1, 1, "test-push-stderr").await;
+
+        assert!(result.is_err(), "push should fail");
+        let err_msg = format!("{}", result.unwrap_err());
+        assert!(err_msg.contains("permission denied") || err_msg.contains("/nix/store"),
+            "error message should include stderr output, got: {}", err_msg);
+    }
+
+    #[tokio::test]
     async fn test_push_with_transport_fallbacks_ssh_succeeds_no_fallback() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let bare = tmp.path().join("bare.git");
