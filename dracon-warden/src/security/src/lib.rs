@@ -221,11 +221,11 @@ impl SecretScanner {
             // ============================================================
             // GitHub / GitLab / Bitbucket
             // ============================================================
-            ("GitHub Token (ghp)", r"ghp_[A-Za-z0-9_]{36}"),
-            ("GitHub Token (gho)", r"gho_[A-Za-z0-9_]{36}"),
-            ("GitHub Token (ghu)", r"ghu_[A-Za-z0-9_]{36}"),
-            ("GitHub Token (ghs)", r"ghs_[A-Za-z0-9_]{36}"),
-            ("GitHub Token (ghr)", r"ghr_[A-Za-z0-9_]{36}"),
+            ("GitHub Token (ghp)", r"ghp_[A-Za-z0-9_]{30,40}"),
+            ("GitHub Token (gho)", r"gho_[A-Za-z0-9_]{30,40}"),
+            ("GitHub Token (ghu)", r"ghu_[A-Za-z0-9_]{30,40}"),
+            ("GitHub Token (ghs)", r"ghs_[A-Za-z0-9_]{30,40}"),
+            ("GitHub Token (ghr)", r"ghr_[A-Za-z0-9_]{30,40}"),
             (
                 "GitHub Client Secret",
                 r#"(?i)github.{0,20}client.{0,20}secret.{0,20}["']?[a-f0-9]{40}["']?"#,
@@ -271,6 +271,10 @@ impl SecretScanner {
             (
                 "Slack Bot Token",
                 r"xoxb-[0-9]{11}-[0-9]{11}-[a-zA-Z0-9]{24}",
+            ),
+            (
+                "Slack Bot Token (Compact)",
+                r"xoxb-[A-Za-z0-9]{24,}",
             ),
             // ============================================================
             // Discord
