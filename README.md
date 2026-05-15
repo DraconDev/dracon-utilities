@@ -508,3 +508,4 @@ This removes binaries and systemd services. Your git repos and configs in `~/.dr
 test change
 test change 2
 real test change
+trigger change 3
