@@ -910,7 +910,7 @@ async fn stage_commit_and_push(
         None
     };
 
-    let local_fallback = if ai_subject.is_none() && !is_noise_only {
+    let local_fallback = if ai_subject.is_none() {
         Some(crate::scribe::local_fallback_message(&staged_diff_names))
     } else {
         None
@@ -948,7 +948,13 @@ async fn stage_commit_and_push(
     );
 
     let msg = if is_noise_only && !is_report {
-        build_commit_message(&commit_ctx)
+        if let Some(ref fb) = local_fallback {
+            let category = commit_ctx.category.as_deref().unwrap_or("chore");
+            let scope = commit_ctx.scope.as_deref().unwrap_or("sync");
+            format!("{}({}): {}", category, scope, fb)
+        } else {
+            build_commit_message(&commit_ctx)
+        }
     } else if let Some(ref ai_sub) = ai_subject {
         let has_conventional_prefix = ai_sub.starts_with("feat:")
             || ai_sub.starts_with("fix:")
