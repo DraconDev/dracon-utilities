@@ -274,7 +274,7 @@ impl SecretScanner {
             ),
             (
                 "Slack Bot Token (Compact)",
-                r"xoxb-[A-Za-z0-9]{24,}",
+                r"xoxb-[A-Za-z0-9]{24,68}",
             ),
             // ============================================================
             // Discord
@@ -439,11 +439,11 @@ impl SecretScanner {
             // ============================================================
             (
                 "Hex Secret (Quoted)",
-                r#"["'][a-fA-F0-9]{32,}["']"#,
+                r#"(?i)(?:secret|token|key|password|credential|auth).{0,20}["'][a-fA-F0-9]{32,}["']"#,
             ),
             (
                 "High-Entropy Secret (Quoted)",
-                r#"["'][A-Za-z0-9]{24,}["']"#,
+                r#"(?i)(?:secret|token|key|password|credential|auth).{0,20}["'][A-Za-z0-9]{24,}["']"#,
             ),
             (
                 "Generic API Key",
@@ -3313,5 +3313,75 @@ API_KEY=original"#;
         assert_eq!(get_env_version("no version here"), 0);
         assert_eq!(get_env_version("Version: abc\n"), 0);
         assert_eq!(get_env_version("Version: 42\n"), 42);
+    }
+
+    #[test]
+    fn test_github_token_patterns_accept_variable_length() {
+        let scanner = SecretScanner::new_without_age_keys().unwrap();
+        let short = r#"token = "ghp_abcdefghijklmnopqrstuvwx""#;
+        let long = r#"token = "ghp_abcdefghijklmnopqrstuvwxyz0123456789ABCD""#;
+        let found_short = scanner.scan(short);
+        let found_long = scanner.scan(long);
+        assert!(found_short.iter().any(|f| f.name.contains("GitHub Token (ghp)")),
+            "should detect short ghp_ token (30 chars), found: {:?}", found_short);
+        assert!(found_long.iter().any(|f| f.name.contains("GitHub Token (ghp)")),
+            "should detect long ghp_ token (40 chars), found: {:?}", found_long);
+    }
+
+    #[test]
+    fn test_mailgun_key_accepts_variable_length() {
+        let scanner = SecretScanner::new_without_age_keys().unwrap();
+        let short = r#"api_key = "key-abcdefghij0123456789abcdef""#;
+        let long = r#"api_key = "key-abcdefghij0123456789abcdef0123""#;
+        let found_short = scanner.scan(short);
+        let found_long = scanner.scan(long);
+        assert!(found_short.iter().any(|f| f.name == "Mailgun API Key"),
+            "should detect 28-char Mailgun key, found: {:?}", found_short);
+        assert!(found_long.iter().any(|f| f.name == "Mailgun API Key"),
+            "should detect 34-char Mailgun key, found: {:?}", found_long);
+    }
+
+    #[test]
+    fn test_slack_bot_token_compact() {
+        let scanner = SecretScanner::new_without_age_keys().unwrap();
+        let token = r#"bot_token = "xoxb-aBcDeFgHiJkLmNoPqRsTuVwXyZ""#;
+        let found = scanner.scan(token);
+        assert!(found.iter().any(|f| f.name == "Slack Bot Token (Compact)"),
+            "should detect compact Slack bot token, found: {:?}", found);
+    }
+
+    #[test]
+    fn test_slack_bot_token_compact_has_length_cap() {
+        let scanner = SecretScanner::new_without_age_keys().unwrap();
+        let too_long = r#"token = "xoxb-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa""#;
+        let found = scanner.scan(too_long);
+        assert!(!found.iter().any(|f| f.name == "Slack Bot Token (Compact)"),
+            "should NOT match slack bot token >68 chars after xoxb-, found: {:?}", found);
+    }
+
+    #[test]
+    fn test_hex_secret_quoted_requires_context() {
+        let scanner = SecretScanner::new_without_age_keys().unwrap();
+        let with_context = r#"secret_key = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4""#;
+        let without_context = r#"label = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4""#;
+        let found_with = scanner.scan(with_context);
+        let found_without = scanner.scan(without_context);
+        assert!(found_with.iter().any(|f| f.name == "Hex Secret (Quoted)"),
+            "should detect hex secret with context keyword, found: {:?}", found_with);
+        assert!(!found_without.iter().any(|f| f.name == "Hex Secret (Quoted)"),
+            "should NOT detect hex string without context keyword, found: {:?}", found_without);
+    }
+
+    #[test]
+    fn test_high_entropy_secret_quoted_requires_context() {
+        let scanner = SecretScanner::new_without_age_keys().unwrap();
+        let with_context = r#"auth_token = "aBcDeFgHiJkLmNoPqRsTuVw""#;
+        let without_context = r#"class_name = "aBcDeFgHiJkLmNoPqRsTuVw""#;
+        let found_with = scanner.scan(with_context);
+        let found_without = scanner.scan(without_context);
+        assert!(found_with.iter().any(|f| f.name == "High-Entropy Secret (Quoted)"),
+            "should detect high-entropy secret with context keyword, found: {:?}", found_with);
+        assert!(!found_without.iter().any(|f| f.name == "High-Entropy Secret (Quoted)"),
+            "should NOT detect alphanumeric string without context keyword, found: {:?}", found_without);
     }
 }
