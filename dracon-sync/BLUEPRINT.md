@@ -125,19 +125,22 @@ dracon-sync is **invisible infrastructure** for an AI coder. The AI works on one
 - **Problem:** Policy is reloaded every loop iteration, could cause inconsistency mid-sync
 - **Fix:** Clone policy at start of each repo iteration
 - **Priority:** Low
-- **Status:** [ ]
+- **Status:** [x]
+- **Implementation:** `run_daemon()` now clones the policy inside the repo loop at `daemon.rs` so each repo has a consistent snapshot. Test: `test_policy_clone_at_repo_iteration`.
 
 ### 18. Repo discovery race
 - **Problem:** If a repo is deleted between discovery and processing, sync fails
 - **Fix:** Check repo existence before processing, handle ENOENT gracefully
 - **Priority:** Low
-- **Status:** [ ]
+- **Status:** [x]
+- **Implementation:** Added `repo.exists()` check at start of each repo iteration in `run_daemon()` and `run_once()`. Non-existent repos are skipped with cleanup of activity tracking. Tests: `test_skips_nonexistent_repo`, `test_is_repo_ready_nonexistent_path`.
 
 ### 19. Status inconsistency in CLI fallback
 - **Problem:** When fallback CLI entries are used, `status.staged_files` is not recalculated
 - **Fix:** Recalculate all status fields in fallback path
 - **Priority:** Low
-- **Status:** [ ]
+- **Status:** [x]
+- **Implementation:** In `compute_diff_entries()`, when fallback CLI entries are used, `staged_paths()` is now called to recalculate `status.staged_files` from actual staged paths. Test: `test_fallback_entries_recalculate_staged_files`.
 
 ---
 
