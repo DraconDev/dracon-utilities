@@ -26,7 +26,11 @@ pub(crate) fn load_secret(env_name: &str, secrets_dir: &Path) -> Option<String> 
 
     // 2. Permission check on secrets directory
     if let Err(e) = check_secrets_dir_permissions(secrets_dir) {
-        eprintln!("⚠️ secrets directory permission check failed for {}: {}", secrets_dir.display(), e);
+        eprintln!(
+            "⚠️ secrets directory permission check failed for {}: {}",
+            secrets_dir.display(),
+            e
+        );
         return None;
     }
 
@@ -69,8 +73,7 @@ fn check_secrets_dir_permissions(dir: &Path) -> Result<(), String> {
         // Directory doesn't exist yet — not a security issue
         return Ok(());
     }
-    let metadata = std::fs::metadata(dir)
-        .map_err(|e| format!("cannot read metadata: {}", e))?;
+    let metadata = std::fs::metadata(dir).map_err(|e| format!("cannot read metadata: {}", e))?;
     let mode = metadata.permissions().mode();
     if mode & 0o002 != 0 {
         return Err(format!(

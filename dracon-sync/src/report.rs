@@ -1,7 +1,8 @@
 use anyhow::Result;
 use dracon_git::{
+    extract_intent,
     types::{DiffFile, RepoStatus},
-    CommitContext, extract_intent, GitService,
+    CommitContext, GitService,
 };
 use serde::Serialize;
 use std::collections::BTreeSet;
@@ -13,19 +14,19 @@ pub(crate) fn send_sync_conflict_notification(repo_path: &Path, reason: &str, de
         .file_name()
         .map(|s| s.to_string_lossy().to_string())
         .unwrap_or_else(|| repo_path.display().to_string());
-    
+
     let title = "Dracon Sync: Manual Action Required";
     let body = format!(
         "Repository '{}' needs manual resolution.\nReason: {}\nDetails: {}",
         repo_name, reason, details
     );
-    
+
     // Spawn in background to avoid blocking the daemon loop
     tokio::spawn(async move {
         if let Err(e) = notify_rust::Notification::new()
             .summary(title)
             .body(&body)
-            .show() 
+            .show()
         {
             eprintln!("⚠️ failed to send desktop notification: {}", e);
         }
@@ -33,18 +34,16 @@ pub(crate) fn send_sync_conflict_notification(repo_path: &Path, reason: &str, de
 }
 
 use crate::exclude::{
-    excluded_dir_names_set,
-    has_sync_relevant_dirty_entries,
-    is_excluded_dir_name,
+    excluded_dir_names_set, has_sync_relevant_dirty_entries, is_excluded_dir_name,
 };
 use crate::git::{
-    has_origin_remote, has_tracking_upstream, discover_git_repos, push_with_retries, rewrite_ahead_paths, current_branch,
-    remote_branch_exists, set_upstream_to_branch, detect_large_blobs_ahead,
-    top_level_dir, repo_diff_entries, run_git_with_timeout, run_git_capture_output,
+    current_branch, detect_large_blobs_ahead, discover_git_repos, has_origin_remote,
+    has_tracking_upstream, push_with_retries, remote_branch_exists, repo_diff_entries,
+    rewrite_ahead_paths, run_git_capture_output, run_git_with_timeout, set_upstream_to_branch,
+    top_level_dir,
 };
 use crate::policy::{
-    SyncPolicy,
-    DEFAULT_GIT_HOST_BLOB_LIMIT_BYTES, tokio_git_command, timestamp_secs,
+    timestamp_secs, tokio_git_command, SyncPolicy, DEFAULT_GIT_HOST_BLOB_LIMIT_BYTES,
 };
 
 fn ansi(color: &str, text: &str) -> String {
@@ -216,23 +215,20 @@ pub(crate) enum ReportSignal {
     BlueprintModified,
 }
 
-pub(crate) fn detect_report_signals(
-    _repo: &Path,
-    changed_files: &[DiffFile],
-) -> Vec<ReportSignal> {
+pub(crate) fn detect_report_signals(_repo: &Path, changed_files: &[DiffFile]) -> Vec<ReportSignal> {
     let mut signals = Vec::new();
-    
+
     for file in changed_files {
         let path_str = file.path.to_string_lossy();
-        
+
         if path_str == "plan/ACTIVE_BOARD.md" || path_str.ends_with("/ACTIVE_BOARD.md") {
             signals.push(ReportSignal::ActiveBoardChanged);
         }
-        
+
         if path_str == "plan/index.md" || path_str.ends_with("/index.md") {
             signals.push(ReportSignal::IndexChanged);
         }
-        
+
         if path_str.contains("blueprint-") && path_str.ends_with(".md") {
             if file.status == dracon_git::types::FileStatus::Added {
                 signals.push(ReportSignal::BlueprintCreated);
@@ -241,7 +237,7 @@ pub(crate) fn detect_report_signals(
             }
         }
     }
-    
+
     signals
 }
 
@@ -320,7 +316,6 @@ fn parse_conventional_commit(subject: &str) -> (Option<String>, Option<String>, 
     (None, None, Some(subject.to_string()))
 }
 
-
 pub(crate) fn incident_ledger_path(_policy_path: &Path) -> PathBuf {
     // IMPORTANT: Keep this ledger OUT of git repositories by default.
     // The policy file typically lives inside the system repo; writing next to it
@@ -333,7 +328,11 @@ pub(crate) fn incident_ledger_path(_policy_path: &Path) -> PathBuf {
     }
 
     if let Some(home) = dirs::home_dir() {
-        return home.join(".local").join("state").join("dracon").join("dracon-sync-incidents.jsonl");
+        return home
+            .join(".local")
+            .join("state")
+            .join("dracon")
+            .join("dracon-sync-incidents.jsonl");
     }
 
     PathBuf::from("/tmp/dracon-sync-incidents.jsonl")
@@ -343,7 +342,8 @@ pub(crate) fn append_incident_record(policy_path: &Path, record: &IncidentRecord
     fn enforce_retention(path: &Path, policy: &SyncPolicy) -> Result<()> {
         let content = std::fs::read_to_string(path)?;
         let now = timestamp_secs();
-        let age_cutoff = now.saturating_sub(policy.incident_ledger_max_age_days.saturating_mul(86_400));
+        let age_cutoff =
+            now.saturating_sub(policy.incident_ledger_max_age_days.saturating_mul(86_400));
 
         let mut kept: Vec<String> = Vec::new();
         for line in content.lines() {
@@ -451,11 +451,19 @@ pub(crate) fn repo_state_flags(
     flags
 }
 
-pub(crate) fn repo_is_concern(status: &dracon_git::types::RepoStatus, has_origin: bool, has_upstream: bool) -> bool {
+pub(crate) fn repo_is_concern(
+    status: &dracon_git::types::RepoStatus,
+    has_origin: bool,
+    has_upstream: bool,
+) -> bool {
     status.ahead > 0 || status.behind > 0 || !has_origin || !has_upstream
 }
 
-pub(crate) fn repo_is_warn(status: &dracon_git::types::RepoStatus, has_origin: bool, has_upstream: bool) -> bool {
+pub(crate) fn repo_is_warn(
+    status: &dracon_git::types::RepoStatus,
+    has_origin: bool,
+    has_upstream: bool,
+) -> bool {
     !repo_is_concern(status, has_origin, has_upstream) && !status.is_clean
 }
 
@@ -520,11 +528,20 @@ pub(crate) async fn git_log_unix_timestamp(repo: &Path) -> Option<i64> {
         .and_then(|s| s.parse::<i64>().ok())
 }
 
-pub(crate) async fn run_repos_report(policy_path: &Path, filter: RepoFilter, json: bool) -> Result<()> {
+pub(crate) async fn run_repos_report(
+    policy_path: &Path,
+    filter: RepoFilter,
+    json: bool,
+) -> Result<()> {
     let policy = SyncPolicy::load(policy_path)?;
     let roots = policy.watch_root_paths();
     let excluded_dir_names = excluded_dir_names_set(&policy);
-    let repos = discover_git_repos(&roots, &excluded_dir_names, &policy.exclude_repos, Some(&policy.system_repo));
+    let repos = discover_git_repos(
+        &roots,
+        &excluded_dir_names,
+        &policy.exclude_repos,
+        Some(&policy.system_repo),
+    );
     let mut rows: Vec<RepoReportRow> = Vec::new();
     let mut init_or_status_failures = 0usize;
 
@@ -566,7 +583,11 @@ pub(crate) async fn run_repos_report(policy_path: &Path, filter: RepoFilter, jso
         );
         let effective_status = dracon_git::types::RepoStatus {
             is_clean: !effective_dirty,
-            modified_files: if effective_dirty { status.modified_files } else { 0 },
+            modified_files: if effective_dirty {
+                status.modified_files
+            } else {
+                0
+            },
             ..status.clone()
         };
 
@@ -1007,8 +1028,7 @@ async fn handle_ahead(
                         println!("   info: created private remote: {}", private_remote);
                     }
                     // Retry push with new remote
-                    match push_with_retries(repo, push_timeout_secs, push_retries, "push").await
-                    {
+                    match push_with_retries(repo, push_timeout_secs, push_retries, "push").await {
                         Ok(()) => {
                             state.succeeded_ops += 1;
                             state.push_ok = true;
@@ -1029,10 +1049,7 @@ async fn handle_ahead(
                         }
                         Err(e2) => {
                             if human {
-                                println!(
-                                    "   fail: push to private remote also failed: {}",
-                                    e2
-                                );
+                                println!("   fail: push to private remote also failed: {}", e2);
                             }
                             log_incident(
                                 policy_path,
@@ -1137,11 +1154,8 @@ async fn handle_ahead(
                             rewrite_paths
                         );
                     }
-                    match rewrite_ahead_paths(
-                        repo,
-                        &rewrite_paths,
-                        "backup/pre-sync-largeblob-fix",
-                    ) {
+                    match rewrite_ahead_paths(repo, &rewrite_paths, "backup/pre-sync-largeblob-fix")
+                    {
                         Ok(Some(backup_branch)) => {
                             let backup_branch_for_log = backup_branch.clone();
                             if human {
@@ -1177,10 +1191,7 @@ async fn handle_ahead(
                                 }
                                 Err(e2) => {
                                     if human {
-                                        println!(
-                                            "   fail: push after rewrite failed: {}",
-                                            e2
-                                        );
+                                        println!("   fail: push after rewrite failed: {}", e2);
                                     }
                                     log_incident(
                                         policy_path,
@@ -1221,8 +1232,7 @@ async fn handle_ahead(
                     "push --dry-run",
                 )
                 .unwrap_or_default();
-                let looks_branch_mismatch =
-                    dry_run.to_ascii_lowercase().contains("up-to-date");
+                let looks_branch_mismatch = dry_run.to_ascii_lowercase().contains("up-to-date");
                 if looks_branch_mismatch
                     && !branch.is_empty()
                     && remote_branch_exists(repo, &branch)
@@ -1351,10 +1361,7 @@ async fn verify_resolution(
     if let Ok(next) = svc.get_status().await {
         let has_origin = has_origin_remote(repo);
         let has_upstream = has_tracking_upstream(repo);
-        let still_concern = next.ahead > 0
-            || next.behind > 0
-            || !has_origin
-            || !has_upstream;
+        let still_concern = next.ahead > 0 || next.behind > 0 || !has_origin || !has_upstream;
         if !still_concern {
             *resolved += 1;
             if human {
@@ -1374,10 +1381,7 @@ async fn verify_resolution(
             if human {
                 println!(
                     "   remaining: ahead={} behind={} origin={} upstream={}",
-                    next.ahead,
-                    next.behind,
-                    has_origin,
-                    has_upstream
+                    next.ahead, next.behind, has_origin, has_upstream
                 );
             }
             // Only notify on true divergence (both ahead AND behind) - that's
@@ -1427,7 +1431,12 @@ pub(crate) async fn run_repair_concerns(
     let repos = if let Some(target_repo) = &only_repo {
         vec![target_repo.clone()]
     } else {
-        discover_git_repos(&roots, &excluded_dir_names, &policy.exclude_repos, Some(&policy.system_repo))
+        discover_git_repos(
+            &roots,
+            &excluded_dir_names,
+            &policy.exclude_repos,
+            Some(&policy.system_repo),
+        )
     };
     if repos.is_empty() {
         if let Some(target_repo) = &only_repo {
@@ -1466,7 +1475,8 @@ pub(crate) async fn run_repair_concerns(
     );
     out!(
         "⚙️ PUSH: timeout={}s retries={}",
-        push_timeout_secs, push_retries
+        push_timeout_secs,
+        push_retries
     );
 
     for repo in repos {
@@ -1513,17 +1523,48 @@ pub(crate) async fn run_repair_concerns(
             state.has_upstream
         );
 
-        if handle_no_origin(&mut state, &repo, apply, human, &policy, &reason, policy_path).await {
+        if handle_no_origin(
+            &mut state,
+            &repo,
+            apply,
+            human,
+            &policy,
+            &reason,
+            policy_path,
+        )
+        .await
+        {
             continue;
         }
 
-        if handle_no_upstream(&mut state, &repo, apply, human, push_timeout_secs, push_retries, &reason, policy_path).await {
+        if handle_no_upstream(
+            &mut state,
+            &repo,
+            apply,
+            human,
+            push_timeout_secs,
+            push_retries,
+            &reason,
+            policy_path,
+        )
+        .await
+        {
             continue;
         }
 
         #[allow(clippy::collapsible_if)]
         if status.behind > 0 && state.has_upstream {
-            if handle_behind(&mut state, &repo, apply, human, policy.pull_op_timeout_secs, &reason, policy_path).await {
+            if handle_behind(
+                &mut state,
+                &repo,
+                apply,
+                human,
+                policy.pull_op_timeout_secs,
+                &reason,
+                policy_path,
+            )
+            .await
+            {
                 continue;
             }
         }
@@ -1550,7 +1591,16 @@ pub(crate) async fn run_repair_concerns(
             }
         }
 
-        verify_resolution(&repo, apply, human, &mut resolved, &reason, policy_path, &svc).await;
+        verify_resolution(
+            &repo,
+            apply,
+            human,
+            &mut resolved,
+            &reason,
+            policy_path,
+            &svc,
+        )
+        .await;
     }
 
     let summary = RepairSummary {
@@ -1565,7 +1615,11 @@ pub(crate) async fn run_repair_concerns(
         let payload = RepairJson {
             policy: policy_path.display().to_string(),
             scope: "concern".to_string(),
-            mode: if apply { "apply".to_string() } else { "dry_run".to_string() },
+            mode: if apply {
+                "apply".to_string()
+            } else {
+                "dry_run".to_string()
+            },
             found: summary.found,
             planned: summary.planned,
             attempted: summary.attempted,
@@ -1613,7 +1667,12 @@ pub(crate) async fn run_repair_warns(
     let repos = if let Some(target_repo) = &only_repo {
         vec![target_repo.clone()]
     } else {
-        discover_git_repos(&roots, &excluded_dir_names, &policy.exclude_repos, Some(&policy.system_repo))
+        discover_git_repos(
+            &roots,
+            &excluded_dir_names,
+            &policy.exclude_repos,
+            Some(&policy.system_repo),
+        )
     };
     if repos.is_empty() {
         if let Some(target_repo) = &only_repo {
@@ -1666,7 +1725,11 @@ pub(crate) async fn run_repair_warns(
         let has_upstream = has_tracking_upstream(&repo);
         let effective_status = dracon_git::types::RepoStatus {
             is_clean: !effective_dirty,
-            modified_files: if effective_dirty { status.modified_files } else { 0 },
+            modified_files: if effective_dirty {
+                status.modified_files
+            } else {
+                0
+            },
             ..status.clone()
         };
         if !repo_is_warn(&effective_status, has_origin, has_upstream) {
@@ -1703,7 +1766,16 @@ pub(crate) async fn run_repair_warns(
         attempted += 1;
         match tokio::time::timeout(
             Duration::from_secs(policy.repo_sync_timeout_secs),
-            crate::sync::sync_repo(&repo, &policy, &excluded_dir_names, 0, None, false, Some(policy_path), false),
+            crate::sync::sync_repo(
+                &repo,
+                &policy,
+                &excluded_dir_names,
+                0,
+                None,
+                false,
+                Some(policy_path),
+                false,
+            ),
         )
         .await
         {
@@ -1722,10 +1794,7 @@ pub(crate) async fn run_repair_warns(
                         action: "sync_triage".to_string(),
                         backup_branch: None,
                         result: "fail".to_string(),
-                        details: Some(format!(
-                            "timeout={}s",
-                            policy.repo_sync_timeout_secs
-                        )),
+                        details: Some(format!("timeout={}s", policy.repo_sync_timeout_secs)),
                     },
                 );
             }
@@ -1777,7 +1846,11 @@ pub(crate) async fn run_repair_warns(
         let payload = RepairJson {
             policy: policy_path.display().to_string(),
             scope: "warn".to_string(),
-            mode: if apply { "apply".to_string() } else { "dry_run".to_string() },
+            mode: if apply {
+                "apply".to_string()
+            } else {
+                "dry_run".to_string()
+            },
             found: summary.found,
             planned: summary.planned,
             attempted: summary.attempted,
@@ -1801,7 +1874,11 @@ pub(crate) async fn run_repair_warns(
     Ok(summary)
 }
 
-pub(crate) fn create_github_private_remote(repo: &Path, account: &str, private: bool) -> Option<String> {
+pub(crate) fn create_github_private_remote(
+    repo: &Path,
+    account: &str,
+    private: bool,
+) -> Option<String> {
     let repo_name = repo.file_name()?.to_str()?.to_string();
 
     // FIRST REPO CREATE ATTEMPT:
@@ -1822,10 +1899,7 @@ pub(crate) fn create_github_private_remote(repo: &Path, account: &str, private: 
     } else {
         cmd.arg("--public");
     }
-    let output = cmd
-        .current_dir(repo)
-        .output()
-        .ok()?;
+    let output = cmd.current_dir(repo).output().ok()?;
 
     if output.status.success() {
         let remote_url = format!("git@github.com:{}/{}.git", account, repo_name);
@@ -1836,14 +1910,11 @@ pub(crate) fn create_github_private_remote(repo: &Path, account: &str, private: 
             .output();
 
         if let Err(e) = add_result {
-            eprintln!(
-                "⚠️ failed to add origin for {}: {}",
-                repo.display(), e
-            );
+            eprintln!("⚠️ failed to add origin for {}: {}", repo.display(), e);
         }
 
-        let mut current_branch = crate::git::current_branch(repo)
-            .unwrap_or_else(|| "main".to_string());
+        let mut current_branch =
+            crate::git::current_branch(repo).unwrap_or_else(|| "main".to_string());
 
         if current_branch == "master" {
             if let Err(e) = std::process::Command::new("git")
@@ -1851,14 +1922,23 @@ pub(crate) fn create_github_private_remote(repo: &Path, account: &str, private: 
                 .current_dir(repo)
                 .output()
             {
-                eprintln!("⚠️ failed to rename master to main in {}: {}", repo.display(), e);
+                eprintln!(
+                    "⚠️ failed to rename master to main in {}: {}",
+                    repo.display(),
+                    e
+                );
             } else {
                 current_branch = "main".to_string();
             }
         }
 
         let push_result = std::process::Command::new("git")
-            .args(["push", "-u", "origin", &format!("HEAD:refs/heads/{}", current_branch)])
+            .args([
+                "push",
+                "-u",
+                "origin",
+                &format!("HEAD:refs/heads/{}", current_branch),
+            ])
             .current_dir(repo)
             .output();
 
@@ -1867,7 +1947,8 @@ pub(crate) fn create_github_private_remote(repo: &Path, account: &str, private: 
                 let stderr = String::from_utf8_lossy(&push_output.stderr);
                 eprintln!(
                     "⚠️ failed to push initial commit for {}: {}",
-                    repo.display(), stderr
+                    repo.display(),
+                    stderr
                 );
             }
         } else {
@@ -1905,15 +1986,11 @@ pub(crate) fn create_github_private_remote(repo: &Path, account: &str, private: 
             .output();
 
         if let Err(e) = add_result {
-            eprintln!(
-                "⚠️ failed to add origin for {}: {}",
-                repo.display(), e
-            );
+            eprintln!("⚠️ failed to add origin for {}: {}", repo.display(), e);
         }
     }
 
-    let mut current_branch = crate::git::current_branch(repo)
-        .unwrap_or_else(|| "main".to_string());
+    let mut current_branch = crate::git::current_branch(repo).unwrap_or_else(|| "main".to_string());
 
     if current_branch == "master" {
         if let Err(e) = std::process::Command::new("git")
@@ -1921,14 +1998,23 @@ pub(crate) fn create_github_private_remote(repo: &Path, account: &str, private: 
             .current_dir(repo)
             .output()
         {
-            eprintln!("⚠️ failed to rename master to main in {}: {}", repo.display(), e);
+            eprintln!(
+                "⚠️ failed to rename master to main in {}: {}",
+                repo.display(),
+                e
+            );
         } else {
             current_branch = "main".to_string();
         }
     }
 
     let _ = std::process::Command::new("git")
-        .args(["push", "-u", "origin", &format!("HEAD:refs/heads/{}", current_branch)])
+        .args([
+            "push",
+            "-u",
+            "origin",
+            &format!("HEAD:refs/heads/{}", current_branch),
+        ])
         .current_dir(repo)
         .output();
 
@@ -1957,11 +2043,11 @@ fn create_private_remote(repo: &Path) -> Option<String> {
     let private_remotes_dir = dirs::data_dir()
         .unwrap_or_else(|| dirs::home_dir().unwrap_or_else(|| PathBuf::from(".")))
         .join("dracon/private-remotes");
-    
+
     if !private_remotes_dir.exists() {
         std::fs::create_dir_all(&private_remotes_dir).ok()?;
     }
-    
+
     let bare_repo_path = private_remotes_dir.join(format!("{}.git", repo_name));
     let mut final_path = bare_repo_path.clone();
     let mut counter = 1;
@@ -1969,15 +2055,15 @@ fn create_private_remote(repo: &Path) -> Option<String> {
         final_path = private_remotes_dir.join(format!("{}-{}.git", repo_name, counter));
         counter += 1;
     }
-    
+
     let bare_name = final_path.file_name()?.to_str()?;
-    
+
     let output = std::process::Command::new("git")
         .args(["init", "--bare", bare_name])
         .current_dir(&private_remotes_dir)
         .output()
         .ok()?;
-    
+
     if !output.status.success() {
         std::fs::create_dir_all(&final_path).ok()?;
         let output = std::process::Command::new("git")
@@ -1989,30 +2075,27 @@ fn create_private_remote(repo: &Path) -> Option<String> {
             return None;
         }
     }
-    
+
     let remote_url = format!("file://{}", final_path.display());
-    
+
     let add_result = std::process::Command::new("git")
         .args(["remote", "add", "origin", &remote_url])
         .current_dir(repo)
         .output();
-    
+
     if let Err(e) = add_result {
-        eprintln!(
-            "⚠️ failed to add origin for {}: {}",
-            repo.display(), e
-        );
+        eprintln!("⚠️ failed to add origin for {}: {}", repo.display(), e);
     }
-    
+
     Some(remote_url)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_helpers::EnvRestorer;
     use dracon_git::types::{DiffFile, FileStatus, RepoStatus};
     use std::os::unix::fs::PermissionsExt;
-    use crate::test_helpers::EnvRestorer;
 
     fn make_status(is_clean: bool, ahead: usize, behind: usize) -> RepoStatus {
         RepoStatus {
@@ -2228,48 +2311,40 @@ mod tests {
 
     #[test]
     fn test_detect_report_signals_active_board() {
-        let files = vec![
-            DiffFile {
-                path: std::path::PathBuf::from("plan/ACTIVE_BOARD.md"),
-                status: FileStatus::Modified,
-            }
-        ];
+        let files = vec![DiffFile {
+            path: std::path::PathBuf::from("plan/ACTIVE_BOARD.md"),
+            status: FileStatus::Modified,
+        }];
         let signals = detect_report_signals(std::path::Path::new("/fake"), &files);
         assert!(signals.contains(&ReportSignal::ActiveBoardChanged));
     }
 
     #[test]
     fn test_detect_report_signals_index() {
-        let files = vec![
-            DiffFile {
-                path: std::path::PathBuf::from("docs/index.md"),
-                status: FileStatus::Modified,
-            }
-        ];
+        let files = vec![DiffFile {
+            path: std::path::PathBuf::from("docs/index.md"),
+            status: FileStatus::Modified,
+        }];
         let signals = detect_report_signals(std::path::Path::new("/fake"), &files);
         assert!(signals.contains(&ReportSignal::IndexChanged));
     }
 
     #[test]
     fn test_detect_report_signals_blueprint_added() {
-        let files = vec![
-            DiffFile {
-                path: std::path::PathBuf::from("docs/blueprint-foo.md"),
-                status: FileStatus::Added,
-            }
-        ];
+        let files = vec![DiffFile {
+            path: std::path::PathBuf::from("docs/blueprint-foo.md"),
+            status: FileStatus::Added,
+        }];
         let signals = detect_report_signals(std::path::Path::new("/fake"), &files);
         assert!(signals.contains(&ReportSignal::BlueprintCreated));
     }
 
     #[test]
     fn test_detect_report_signals_blueprint_modified() {
-        let files = vec![
-            DiffFile {
-                path: std::path::PathBuf::from("docs/blueprint-bar.md"),
-                status: FileStatus::Modified,
-            }
-        ];
+        let files = vec![DiffFile {
+            path: std::path::PathBuf::from("docs/blueprint-bar.md"),
+            status: FileStatus::Modified,
+        }];
         let signals = detect_report_signals(std::path::Path::new("/fake"), &files);
         assert!(signals.contains(&ReportSignal::BlueprintModified));
     }
@@ -2301,7 +2376,11 @@ mod tests {
             } else {
                 std::env::set_var(var, value);
             }
-            Self { var: var.to_string(), original, _lock: lock }
+            Self {
+                var: var.to_string(),
+                original,
+                _lock: lock,
+            }
         }
     }
     impl Drop for VarGuard {
@@ -2318,7 +2397,9 @@ mod tests {
     fn test_incident_ledger_path_default() {
         let _guard = VarGuard::set_temp("DRACON_SYNC_LEDGER", "");
         let path = incident_ledger_path(std::path::Path::new("/fake/policy.toml"));
-        assert!(path.to_string_lossy().contains("dracon-sync-incidents.jsonl"));
+        assert!(path
+            .to_string_lossy()
+            .contains("dracon-sync-incidents.jsonl"));
     }
 
     #[test]
@@ -2380,36 +2461,30 @@ mod tests {
 
     #[test]
     fn test_report_signal_active_board_changed_exact_path() {
-        let files = vec![
-            DiffFile {
-                path: std::path::PathBuf::from("plan/ACTIVE_BOARD.md"),
-                status: FileStatus::Modified,
-            }
-        ];
+        let files = vec![DiffFile {
+            path: std::path::PathBuf::from("plan/ACTIVE_BOARD.md"),
+            status: FileStatus::Modified,
+        }];
         let signals = detect_report_signals(std::path::Path::new("/fake"), &files);
         assert!(signals.contains(&ReportSignal::ActiveBoardChanged));
     }
 
     #[test]
     fn test_report_signal_index_changed_nested() {
-        let files = vec![
-            DiffFile {
-                path: std::path::PathBuf::from("docs/plan/index.md"),
-                status: FileStatus::Modified,
-            }
-        ];
+        let files = vec![DiffFile {
+            path: std::path::PathBuf::from("docs/plan/index.md"),
+            status: FileStatus::Modified,
+        }];
         let signals = detect_report_signals(std::path::Path::new("/fake"), &files);
         assert!(signals.contains(&ReportSignal::IndexChanged));
     }
 
     #[test]
     fn test_report_signal_blueprint_created() {
-        let files = vec![
-            DiffFile {
-                path: std::path::PathBuf::from("docs/blueprint-foo.md"),
-                status: FileStatus::Added,
-            }
-        ];
+        let files = vec![DiffFile {
+            path: std::path::PathBuf::from("docs/blueprint-foo.md"),
+            status: FileStatus::Added,
+        }];
         let signals = detect_report_signals(std::path::Path::new("/fake"), &files);
         assert!(signals.contains(&ReportSignal::BlueprintCreated));
     }
@@ -2424,7 +2499,7 @@ mod tests {
             DiffFile {
                 path: std::path::PathBuf::from("docs/blueprint-bar.md"),
                 status: FileStatus::Modified,
-            }
+            },
         ];
         let signals = detect_report_signals(std::path::Path::new("/fake"), &files);
         assert!(signals.contains(&ReportSignal::ActiveBoardChanged));
@@ -2440,48 +2515,40 @@ mod tests {
 
     #[test]
     fn test_report_signal_no_match() {
-        let files = vec![
-            DiffFile {
-                path: std::path::PathBuf::from("src/main.rs"),
-                status: FileStatus::Modified,
-            }
-        ];
+        let files = vec![DiffFile {
+            path: std::path::PathBuf::from("src/main.rs"),
+            status: FileStatus::Modified,
+        }];
         let signals = detect_report_signals(std::path::Path::new("/fake"), &files);
         assert!(signals.is_empty());
     }
 
     #[test]
     fn test_report_signal_blueprint_added() {
-        let files = vec![
-            DiffFile {
-                path: std::path::PathBuf::from("docs/blueprint-new.md"),
-                status: FileStatus::Added,
-            }
-        ];
+        let files = vec![DiffFile {
+            path: std::path::PathBuf::from("docs/blueprint-new.md"),
+            status: FileStatus::Added,
+        }];
         let signals = detect_report_signals(std::path::Path::new("/fake"), &files);
         assert!(signals.contains(&ReportSignal::BlueprintCreated));
     }
 
     #[test]
     fn test_report_signal_blueprint_modified_other_dir() {
-        let files = vec![
-            DiffFile {
-                path: std::path::PathBuf::from("project/docs/blueprint-foo.md"),
-                status: FileStatus::Modified,
-            }
-        ];
+        let files = vec![DiffFile {
+            path: std::path::PathBuf::from("project/docs/blueprint-foo.md"),
+            status: FileStatus::Modified,
+        }];
         let signals = detect_report_signals(std::path::Path::new("/fake"), &files);
         assert!(signals.contains(&ReportSignal::BlueprintModified));
     }
 
     #[test]
     fn test_report_signal_index_changed_exact() {
-        let files = vec![
-            DiffFile {
-                path: std::path::PathBuf::from("plan/index.md"),
-                status: FileStatus::Modified,
-            }
-        ];
+        let files = vec![DiffFile {
+            path: std::path::PathBuf::from("plan/index.md"),
+            status: FileStatus::Modified,
+        }];
         let signals = detect_report_signals(std::path::Path::new("/fake"), &files);
         assert!(signals.contains(&ReportSignal::IndexChanged));
     }
@@ -2500,7 +2567,7 @@ mod tests {
             DiffFile {
                 path: std::path::PathBuf::from("docs/blueprint-new.md"),
                 status: FileStatus::Added,
-            }
+            },
         ];
         let signals = detect_report_signals(std::path::Path::new("/fake"), &files);
         assert!(signals.contains(&ReportSignal::ActiveBoardChanged));
@@ -2549,7 +2616,10 @@ mod tests {
 
     #[test]
     fn test_report_signal_partial_eq() {
-        assert_eq!(ReportSignal::ActiveBoardChanged, ReportSignal::ActiveBoardChanged);
+        assert_eq!(
+            ReportSignal::ActiveBoardChanged,
+            ReportSignal::ActiveBoardChanged
+        );
         assert_ne!(ReportSignal::ActiveBoardChanged, ReportSignal::IndexChanged);
     }
 
@@ -2671,24 +2741,20 @@ mod tests {
 
     #[test]
     fn test_report_signal_blueprint_modified() {
-        let files = vec![
-            DiffFile {
-                path: std::path::PathBuf::from("docs/blueprint-foo.md"),
-                status: FileStatus::Modified,
-            }
-        ];
+        let files = vec![DiffFile {
+            path: std::path::PathBuf::from("docs/blueprint-foo.md"),
+            status: FileStatus::Modified,
+        }];
         let signals = detect_report_signals(std::path::Path::new("/fake"), &files);
         assert!(signals.contains(&ReportSignal::BlueprintModified));
     }
 
     #[test]
     fn test_report_signal_blueprint_modified_plan_dir() {
-        let files = vec![
-            DiffFile {
-                path: std::path::PathBuf::from("plan/blueprint-bar.md"),
-                status: FileStatus::Modified,
-            }
-        ];
+        let files = vec![DiffFile {
+            path: std::path::PathBuf::from("plan/blueprint-bar.md"),
+            status: FileStatus::Modified,
+        }];
         let signals = detect_report_signals(std::path::Path::new("/fake"), &files);
         assert!(signals.contains(&ReportSignal::BlueprintModified));
     }
@@ -2740,39 +2806,43 @@ mod tests {
             ..test_sync_policy()
         };
         let threshold = push_large_blob_threshold_bytes(&policy);
-        assert_eq!(threshold, 10 * 1024 * 1024, "should use smaller of stage and push limit");
+        assert_eq!(
+            threshold,
+            10 * 1024 * 1024,
+            "should use smaller of stage and push limit"
+        );
     }
 
     #[test]
     fn test_detect_report_signals_blueprint_deleted() {
-        let files = vec![
-            DiffFile {
-                path: std::path::PathBuf::from("docs/blueprint-foo.md"),
-                status: FileStatus::Deleted,
-            }
-        ];
+        let files = vec![DiffFile {
+            path: std::path::PathBuf::from("docs/blueprint-foo.md"),
+            status: FileStatus::Deleted,
+        }];
         let signals = detect_report_signals(std::path::Path::new("/fake"), &files);
         assert!(signals.contains(&ReportSignal::BlueprintModified));
     }
 
     #[test]
     fn test_detect_report_signals_index_nested_dir() {
-        let files = vec![
-            DiffFile {
-                path: std::path::PathBuf::from("project/plan/index.md"),
-                status: FileStatus::Modified,
-            }
-        ];
+        let files = vec![DiffFile {
+            path: std::path::PathBuf::from("project/plan/index.md"),
+            status: FileStatus::Modified,
+        }];
         let signals = detect_report_signals(std::path::Path::new("/fake"), &files);
         assert!(signals.contains(&ReportSignal::IndexChanged));
     }
 
     #[test]
     fn test_parse_conventional_commit_full_format() {
-        let (cat, scope, desc) = parse_conventional_commit("fix(auth): validate JWT expiry before accepting tokens");
+        let (cat, scope, desc) =
+            parse_conventional_commit("fix(auth): validate JWT expiry before accepting tokens");
         assert_eq!(cat.as_deref(), Some("fix"));
         assert_eq!(scope.as_deref(), Some("auth"));
-        assert_eq!(desc.as_deref(), Some("validate JWT expiry before accepting tokens"));
+        assert_eq!(
+            desc.as_deref(),
+            Some("validate JWT expiry before accepting tokens")
+        );
     }
 
     #[test]
@@ -2801,10 +2871,18 @@ mod tests {
 
     #[test]
     fn test_parse_conventional_commit_all_categories() {
-        for cat in &["feat", "fix", "refactor", "docs", "test", "chore", "perf", "security", "build", "ci", "style", "revert"] {
+        for cat in &[
+            "feat", "fix", "refactor", "docs", "test", "chore", "perf", "security", "build", "ci",
+            "style", "revert",
+        ] {
             let subject = format!("{}(scope): something", cat);
             let (parsed_cat, _, _) = parse_conventional_commit(&subject);
-            assert_eq!(parsed_cat.as_deref(), Some(*cat), "failed for category: {}", cat);
+            assert_eq!(
+                parsed_cat.as_deref(),
+                Some(*cat),
+                "failed for category: {}",
+                cat
+            );
         }
     }
 
@@ -2819,11 +2897,16 @@ mod tests {
             .expect("git init");
 
         let gh_mock = tmp.path().join("gh");
-        std::fs::write(&gh_mock, "#!/bin/sh\necho \"mock gh called\" >&2\nexit 0\n").expect("write gh mock");
-        std::fs::set_permissions(&gh_mock, std::fs::Permissions::from_mode(0o755)).expect("chmod gh");
+        std::fs::write(&gh_mock, "#!/bin/sh\necho \"mock gh called\" >&2\nexit 0\n")
+            .expect("write gh mock");
+        std::fs::set_permissions(&gh_mock, std::fs::Permissions::from_mode(0o755))
+            .expect("chmod gh");
         let _lock = crate::git::acquire_path_lock();
         let orig_path = std::env::var("PATH").unwrap_or_default();
-        let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
+        let _guard = EnvRestorer::new(
+            "PATH",
+            &format!("{}:{}", tmp.path().to_string_lossy(), orig_path),
+        );
 
         let result = create_github_private_remote(&repo, "testaccount", true);
 
@@ -2847,10 +2930,14 @@ mod tests {
             "#!/bin/sh\necho ' Name already exists' >&2\nexit 1\n",
         )
         .expect("write gh mock");
-        std::fs::set_permissions(&gh_mock, std::fs::Permissions::from_mode(0o755)).expect("chmod gh");
+        std::fs::set_permissions(&gh_mock, std::fs::Permissions::from_mode(0o755))
+            .expect("chmod gh");
         let _lock = crate::git::acquire_path_lock();
         let orig_path = std::env::var("PATH").unwrap_or_default();
-        let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
+        let _guard = EnvRestorer::new(
+            "PATH",
+            &format!("{}:{}", tmp.path().to_string_lossy(), orig_path),
+        );
 
         let result = create_github_private_remote(&repo, "testaccount", true);
 
@@ -2878,10 +2965,14 @@ mod tests {
 
         let gh_mock = tmp.path().join("gh");
         std::fs::write(&gh_mock, "#!/bin/sh\nexit 1\n").expect("write gh mock");
-        std::fs::set_permissions(&gh_mock, std::fs::Permissions::from_mode(0o755)).expect("chmod gh");
+        std::fs::set_permissions(&gh_mock, std::fs::Permissions::from_mode(0o755))
+            .expect("chmod gh");
         let _lock = crate::git::acquire_path_lock();
         let orig_path = std::env::var("PATH").unwrap_or_default();
-        let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
+        let _guard = EnvRestorer::new(
+            "PATH",
+            &format!("{}:{}", tmp.path().to_string_lossy(), orig_path),
+        );
 
         let result = create_github_private_remote(&repo, "testaccount", true);
 
@@ -2903,7 +2994,14 @@ mod tests {
 
         let git_dir = std::path::Path::new("/run/current-system/sw/bin");
         let _lock = crate::git::acquire_path_lock();
-        let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), git_dir.to_string_lossy()));
+        let _guard = EnvRestorer::new(
+            "PATH",
+            &format!(
+                "{}:{}",
+                tmp.path().to_string_lossy(),
+                git_dir.to_string_lossy()
+            ),
+        );
 
         let result = create_github_private_remote(&repo, "testaccount", true);
 

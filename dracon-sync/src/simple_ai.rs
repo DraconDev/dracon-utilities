@@ -122,7 +122,10 @@ impl SimpleAiService {
             if let Some(_key) = Self::get_api_key(&pc.env) {
                 eprintln!("📡 AI: {} ready (key found)", name);
             } else {
-                eprintln!("📡 AI: {} configured but no API key (set {} env var)", name, pc.env);
+                eprintln!(
+                    "📡 AI: {} configured but no API key (set {} env var)",
+                    name, pc.env
+                );
             }
         }
 
@@ -151,8 +154,8 @@ impl SimpleAiService {
     fn load_config(path: &PathBuf) -> Result<AiConfig> {
         let content = std::fs::read_to_string(path)
             .with_context(|| format!("failed to read {}", path.display()))?;
-        let config: AiConfig = toml::from_str(&content)
-            .with_context(|| "failed to parse ai.toml")?;
+        let config: AiConfig =
+            toml::from_str(&content).with_context(|| "failed to parse ai.toml")?;
         Ok(config)
     }
 
@@ -198,7 +201,10 @@ impl SimpleAiService {
 
             match self.call_provider(pc, messages.clone()).await {
                 Ok(content) => {
-                    provider_health().lock().await.insert(pc.name.clone(), ProviderStatus::Healthy);
+                    provider_health()
+                        .lock()
+                        .await
+                        .insert(pc.name.clone(), ProviderStatus::Healthy);
                     return Ok(content);
                 }
                 Err(e) => {
@@ -210,9 +216,12 @@ impl SimpleAiService {
                         health.insert(pc.name.clone(), ProviderStatus::AuthFailed);
                     } else if is_rate_limited(&msg) {
                         eprintln!("⏳ {}: rate limited (skipping 60s)", pc.name);
-                        health.insert(pc.name.clone(), ProviderStatus::RateLimited {
-                            until: Instant::now() + Duration::from_secs(60),
-                        });
+                        health.insert(
+                            pc.name.clone(),
+                            ProviderStatus::RateLimited {
+                                until: Instant::now() + Duration::from_secs(60),
+                            },
+                        );
                     }
                     last_error = Some(e);
                 }
@@ -222,7 +231,11 @@ impl SimpleAiService {
         Err(last_error.unwrap_or_else(|| anyhow::anyhow!("no AI providers available")))
     }
 
-    async fn call_provider(&self, provider: &ProviderConfig, messages: Vec<ChatMessage>) -> Result<String> {
+    async fn call_provider(
+        &self,
+        provider: &ProviderConfig,
+        messages: Vec<ChatMessage>,
+    ) -> Result<String> {
         let Some(api_key) = Self::get_api_key(&provider.env) else {
             anyhow::bail!("no API key for {}", provider.env);
         };
@@ -231,18 +244,25 @@ impl SimpleAiService {
             return self.call_google_api(provider, &api_key, messages).await;
         }
 
-        let request_messages: Vec<RequestMessage> = messages.into_iter().map(|m| m.into()).collect();
+        let request_messages: Vec<RequestMessage> =
+            messages.into_iter().map(|m| m.into()).collect();
         let request = ChatRequest {
             model: provider.model.clone(),
             messages: request_messages,
         };
 
-        let url = format!("{}/chat/completions", provider.endpoint.trim_end_matches('/'));
+        let url = format!(
+            "{}/chat/completions",
+            provider.endpoint.trim_end_matches('/')
+        );
 
         let response = self
             .client
             .post(&url)
-            .header(&provider.auth_header, format!("{}{}", provider.auth_prefix, api_key))
+            .header(
+                &provider.auth_header,
+                format!("{}{}", provider.auth_prefix, api_key),
+            )
             .json(&request)
             .timeout(std::time::Duration::from_secs(60))
             .send()
@@ -252,7 +272,12 @@ impl SimpleAiService {
         let status = response.status();
         if !status.is_success() {
             let text = response.text().await.unwrap_or_default();
-            anyhow::bail!("{}: {} - {}", status, text.chars().take(100).collect::<String>(), provider.name);
+            anyhow::bail!(
+                "{}: {} - {}",
+                status,
+                text.chars().take(100).collect::<String>(),
+                provider.name
+            );
         }
 
         let chat_resp: ChatResponse = response.json().await.context("parse response")?;
@@ -264,7 +289,12 @@ impl SimpleAiService {
             .context("no choices in response")
     }
 
-    async fn call_google_api(&self, provider: &ProviderConfig, api_key: &str, messages: Vec<ChatMessage>) -> Result<String> {
+    async fn call_google_api(
+        &self,
+        provider: &ProviderConfig,
+        api_key: &str,
+        messages: Vec<ChatMessage>,
+    ) -> Result<String> {
         #[derive(Serialize)]
         struct GoogleRequest {
             contents: Vec<Content>,
@@ -333,7 +363,11 @@ impl SimpleAiService {
         let status = response.status();
         if !status.is_success() {
             let text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Google API {}: {}", status, text.chars().take(200).collect::<String>());
+            anyhow::bail!(
+                "Google API {}: {}",
+                status,
+                text.chars().take(200).collect::<String>()
+            );
         }
 
         let google_resp: GoogleResponse = response.json().await.context("parse google response")?;
@@ -411,7 +445,8 @@ mod tests {
 
     #[test]
     fn test_chat_message_preserves_content() {
-        let long_text = "This is a very long message content that should be preserved exactly as is";
+        let long_text =
+            "This is a very long message content that should be preserved exactly as is";
         let msg = ChatMessage::user(long_text);
         assert_eq!(msg.content, long_text);
     }

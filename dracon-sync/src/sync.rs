@@ -10,21 +10,26 @@ use dracon_git::{build_commit_message, GitService};
 
 pub(crate) static MASS_DELETION_GUARD_BLOCKED: AtomicU64 = AtomicU64::new(0);
 
-use crate::exclude::{can_restore_entry, handle_large_untracked, is_large_untracked, remove_tracked_excluded_paths, should_stage_entry};
+use crate::exclude::{
+    can_restore_entry, handle_large_untracked, is_large_untracked, remove_tracked_excluded_paths,
+    should_stage_entry,
+};
+use crate::git::multi_remote::push_mirror_remotes;
+use crate::git::origin_url;
 use crate::git::{
     cli_diff_entries, detect_large_blobs_ahead, git_name_status_entries, has_origin_remote,
-    has_tracking_upstream, is_cherry_pick_in_progress, is_merge_in_progress,
-    is_rebase_in_progress, prune_other_default_branch, push_with_retries,
-    restore_paths, run_git_with_timeout,
+    has_tracking_upstream, is_cherry_pick_in_progress, is_merge_in_progress, is_rebase_in_progress,
+    prune_other_default_branch, push_with_retries, restore_paths, run_git_with_timeout,
     unstage_excluded_paths, unstage_oversized_paths,
 };
-use crate::git::multi_remote::{
-    push_mirror_remotes,
-};
 use crate::policy::{debug_enabled, load_repo_override, SyncPolicy};
-use crate::report::{append_incident_record, build_commit_context, detect_report_signals, IncidentRecord, push_large_blob_threshold_bytes};
-use crate::git::{origin_url};
-use crate::visibility::{get_github_visibility, parse_github_owner_repo, sync_mirror_visibility, sync_mirror_metadata};
+use crate::report::{
+    append_incident_record, build_commit_context, detect_report_signals,
+    push_large_blob_threshold_bytes, IncidentRecord,
+};
+use crate::visibility::{
+    get_github_visibility, parse_github_owner_repo, sync_mirror_metadata, sync_mirror_visibility,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum SyncOutcome {
@@ -93,7 +98,14 @@ async fn get_bump_info(repo: &Path) -> Option<(String, String, String)> {
     } else if repo.join("VERSION").exists() {
         &["VERSION"][..]
     } else {
-        &["Cargo.toml", "package.json", "pyproject.toml", "pubspec.yaml", "version.txt", "VERSION"][..]
+        &[
+            "Cargo.toml",
+            "package.json",
+            "pyproject.toml",
+            "pubspec.yaml",
+            "version.txt",
+            "VERSION",
+        ][..]
     };
 
     let mut old_ver = String::new();
@@ -119,28 +131,32 @@ async fn get_bump_info(repo: &Path) -> Option<(String, String, String)> {
             }
             let content = String::from_utf8_lossy(&output.stdout);
             if let Some(v) = match *file {
-                "Cargo.toml" => content.lines()
+                "Cargo.toml" => content
+                    .lines()
                     .map(|l| l.trim())
                     .find(|l| l.starts_with("version") && !l.starts_with("version_prefix"))
                     .and_then(|l| l.split('=').nth(1))
                     .map(|v| v.trim().trim_matches('"').trim())
                     .filter(|v| !v.is_empty() && !v.starts_with("workspace"))
                     .map(|v| v.to_string()),
-                "package.json" => content.lines()
+                "package.json" => content
+                    .lines()
                     .map(|l| l.trim())
                     .find(|l| l.starts_with("\"version\""))
                     .and_then(|l| l.split(':').nth(1))
                     .map(|v| v.trim().trim_matches('"').trim_matches(',').trim())
                     .filter(|v| !v.is_empty())
                     .map(|v| v.to_string()),
-                "pyproject.toml" => content.lines()
+                "pyproject.toml" => content
+                    .lines()
                     .map(|l| l.trim())
                     .find(|l| l.starts_with("version") && !l.starts_with("version_prefix"))
                     .and_then(|l| l.split('=').nth(1))
                     .map(|v| v.trim().trim_matches('"').trim_matches(',').trim())
                     .filter(|v| !v.is_empty())
                     .map(|v| v.to_string()),
-                "pubspec.yaml" => content.lines()
+                "pubspec.yaml" => content
+                    .lines()
                     .map(|l| l.trim())
                     .find(|l| l.starts_with("version:"))
                     .and_then(|l| l.split(':').nth(1))
@@ -149,7 +165,11 @@ async fn get_bump_info(repo: &Path) -> Option<(String, String, String)> {
                     .map(|v| v.to_string()),
                 "version.txt" | "VERSION" => {
                     let v = content.trim();
-                    if !v.is_empty() && v.contains('.') { Some(v.to_string()) } else { None }
+                    if !v.is_empty() && v.contains('.') {
+                        Some(v.to_string())
+                    } else {
+                        None
+                    }
                 }
                 _ => None,
             } {
@@ -180,33 +200,50 @@ async fn get_bump_info(repo: &Path) -> Option<(String, String, String)> {
     Some((old_ver, new_ver, level.to_string()))
 }
 
-fn maybe_sync_visibility_and_metadata(
-    ctx: &SyncContext<'_>,
-) {
+fn maybe_sync_visibility_and_metadata(ctx: &SyncContext<'_>) {
     if ctx.dry_run || (!ctx.policy.sync_visibility && !ctx.policy.sync_metadata) {
         return;
     }
     if let Some(origin_url) = crate::git::multi_remote::get_remote_url(ctx.repo, "origin") {
         if ctx.policy.sync_metadata {
-            sync_mirror_metadata(&origin_url, &ctx.policy.remotes, ctx.repo, ctx.policy.sync_visibility_interval_hours);
+            sync_mirror_metadata(
+                &origin_url,
+                &ctx.policy.remotes,
+                ctx.repo,
+                ctx.policy.sync_visibility_interval_hours,
+            );
         }
         if ctx.policy.sync_visibility {
-            sync_mirror_visibility(&origin_url, &ctx.policy.remotes, ctx.repo, ctx.policy.sync_visibility_interval_hours);
+            sync_mirror_visibility(
+                &origin_url,
+                &ctx.policy.remotes,
+                ctx.repo,
+                ctx.policy.sync_visibility_interval_hours,
+            );
         }
     }
 }
 
 fn check_conflict_state(repo: &Path) -> Option<SyncOutcome> {
     if is_rebase_in_progress(repo) {
-        eprintln!("⚠️ {} has rebase in progress, skipping (manual intervention required)", repo.display());
+        eprintln!(
+            "⚠️ {} has rebase in progress, skipping (manual intervention required)",
+            repo.display()
+        );
         return Some(SyncOutcome::Blocked);
     }
     if is_merge_in_progress(repo) {
-        eprintln!("⚠️ {} has merge in progress, skipping (manual intervention required)", repo.display());
+        eprintln!(
+            "⚠️ {} has merge in progress, skipping (manual intervention required)",
+            repo.display()
+        );
         return Some(SyncOutcome::Blocked);
     }
     if is_cherry_pick_in_progress(repo) {
-        eprintln!("⚠️ {} has cherry-pick in progress, skipping (manual intervention required)", repo.display());
+        eprintln!(
+            "⚠️ {} has cherry-pick in progress, skipping (manual intervention required)",
+            repo.display()
+        );
         return Some(SyncOutcome::Blocked);
     }
     None
@@ -228,7 +265,11 @@ fn ensure_origin_remote(repo: &Path, policy: &SyncPolicy) -> bool {
         } else {
             true
         };
-        if let Some(url) = crate::report::create_github_private_remote(repo, &policy.auto_github_private_account, private) {
+        if let Some(url) = crate::report::create_github_private_remote(
+            repo,
+            &policy.auto_github_private_account,
+            private,
+        ) {
             println!("🔗 created remote for {}: {}", repo.display(), url);
             true
         } else {
@@ -247,9 +288,18 @@ async fn auto_pull_merge(
 ) -> Result<()> {
     let repo = ctx.repo;
     let policy = ctx.policy;
-    if policy.auto_pull && ctx.has_origin && ctx.has_upstream && initial_status.behind > 0 && initial_status.is_clean {
+    if policy.auto_pull
+        && ctx.has_origin
+        && ctx.has_upstream
+        && initial_status.behind > 0
+        && initial_status.is_clean
+    {
         if ctx.dry_run {
-            println!("🔽 Would pull/merge {} commit(s) from upstream in {}", initial_status.behind, repo.display());
+            println!(
+                "🔽 Would pull/merge {} commit(s) from upstream in {}",
+                initial_status.behind,
+                repo.display()
+            );
         } else {
             match tokio::time::timeout(
                 Duration::from_secs(policy.pull_op_timeout_secs),
@@ -259,11 +309,18 @@ async fn auto_pull_merge(
             {
                 Ok(Ok(())) => {}
                 Ok(Err(dracon_git::error::GitError::MergeConflict)) => {
-                    eprintln!("⚠️ pull/merge conflict in {} (manual intervention required)", repo.display());
+                    eprintln!(
+                        "⚠️ pull/merge conflict in {} (manual intervention required)",
+                        repo.display()
+                    );
                     return Err(anyhow::anyhow!("pull/merge conflict"));
                 }
                 Ok(Err(e)) => {
-                    eprintln!("⚠️ pull/merge failed for {}: {} - aborting sync pass", repo.display(), e);
+                    eprintln!(
+                        "⚠️ pull/merge failed for {}: {} - aborting sync pass",
+                        repo.display(),
+                        e
+                    );
                     return Err(anyhow::anyhow!("pull/merge failed: {}", e));
                 }
                 Err(_) => {
@@ -304,9 +361,7 @@ async fn auto_pull_merge(
     Ok(())
 }
 
-async fn clean_staged_paths(
-    ctx: &SyncContext<'_>,
-) -> Result<()> {
+async fn clean_staged_paths(ctx: &SyncContext<'_>) -> Result<()> {
     let repo = ctx.repo;
     let policy = ctx.policy;
     let excluded_dir_names = ctx.excluded_dir_names;
@@ -361,20 +416,19 @@ struct DiffResult {
     filter_only_cleared: bool,
 }
 
-async fn compute_diff_entries(
-    svc: &GitService,
-    repo: &Path,
-) -> Result<DiffResult> {
+async fn compute_diff_entries(svc: &GitService, repo: &Path) -> Result<DiffResult> {
     let mut status = svc.get_status().await?;
     let mut entries = svc.get_diff_entries().await?;
     let mut filter_only_cleared = false;
 
     {
-        let diff_output = crate::git::git_diff_head_files(repo).await.unwrap_or_default();
+        let diff_output = crate::git::git_diff_head_files(repo)
+            .await
+            .unwrap_or_default();
         if diff_output.is_empty() && !entries.is_empty() {
-            let has_non_modified = entries.iter().any(|e| {
-                !matches!(e.status, dracon_git::types::FileStatus::Modified)
-            });
+            let has_non_modified = entries
+                .iter()
+                .any(|e| !matches!(e.status, dracon_git::types::FileStatus::Modified));
             if !has_non_modified {
                 entries.clear();
                 status.is_clean = true;
@@ -416,7 +470,11 @@ async fn compute_diff_entries(
         }
     }
 
-    Ok(DiffResult { status, entries, filter_only_cleared })
+    Ok(DiffResult {
+        status,
+        entries,
+        filter_only_cleared,
+    })
 }
 
 enum MassDeletionCheck {
@@ -433,7 +491,11 @@ async fn check_mass_deletion(
     let dry_run = ctx.dry_run;
     let policy_path = ctx.policy_path;
     if force_deletion {
-        eprintln!("⚠️ --force: bypassing mass-deletion safety guard for {} ({} files)", repo.display(), missing.len());
+        eprintln!(
+            "⚠️ --force: bypassing mass-deletion safety guard for {} ({} files)",
+            repo.display(),
+            missing.len()
+        );
         return Ok(MassDeletionCheck::Ok);
     }
 
@@ -454,12 +516,15 @@ async fn check_mass_deletion(
 
     let missing_count = missing.len();
     const MASS_DELETION_THRESHOLD_PCT: usize = 85;
-    let is_mass_deletion = total_tracked > 0
-        && (missing_count * 100) / total_tracked >= MASS_DELETION_THRESHOLD_PCT;
+    let is_mass_deletion =
+        total_tracked > 0 && (missing_count * 100) / total_tracked >= MASS_DELETION_THRESHOLD_PCT;
 
     if is_mass_deletion {
         let pct = (missing_count * 100) / total_tracked;
-        let reason = format!("{} files missing from working tree ({}% of {} tracked)", missing_count, pct, total_tracked);
+        let reason = format!(
+            "{} files missing from working tree ({}% of {} tracked)",
+            missing_count, pct, total_tracked
+        );
         log_warn!("SAFETY: {}", reason);
         eprintln!("⚠️ Refusing to stage mass deletion - this looks like a mistake or destructive operation");
         eprintln!("⚠️ If you really want to delete these files, do: git add -A && git commit -m 'delete files'");
@@ -475,7 +540,10 @@ async fn check_mass_deletion(
                     "mass_deletion_guard",
                     None,
                     "blocked",
-                    Some(format!("total_tracked={} missing_count={}", total_tracked, missing_count)),
+                    Some(format!(
+                        "total_tracked={} missing_count={}",
+                        total_tracked, missing_count
+                    )),
                 ),
             );
         }
@@ -488,16 +556,17 @@ async fn check_mass_deletion(
     Ok(MassDeletionCheck::Ok)
 }
 
-async fn stage_existing_files(
-    repo: &Path,
-    existing: &[String],
-    dry_run: bool,
-) -> Result<()> {
+async fn stage_existing_files(repo: &Path, existing: &[String], dry_run: bool) -> Result<()> {
     if existing.is_empty() {
         return Ok(());
     }
     if dry_run {
-        println!("📝 Would stage {} file(s) in {}: {:?}", existing.len(), repo.display(), &existing[..existing.len().min(5)]);
+        println!(
+            "📝 Would stage {} file(s) in {}: {:?}",
+            existing.len(),
+            repo.display(),
+            &existing[..existing.len().min(5)]
+        );
         if existing.len() > 5 {
             println!("  ... and {} more", existing.len() - 5);
         }
@@ -507,18 +576,19 @@ async fn stage_existing_files(
             add_args.push(p);
         }
         if let Err(e) = run_git_with_timeout(repo, &add_args, 30, "add").await {
-            eprintln!("⚠️ {} git add failed for {} paths: {:?}", repo.display(), existing.len(), existing);
+            eprintln!(
+                "⚠️ {} git add failed for {} paths: {:?}",
+                repo.display(),
+                existing.len(),
+                existing
+            );
             return Err(e);
         }
     }
     Ok(())
 }
 
-async fn git_rm_missing(
-    repo: &Path,
-    missing: &[String],
-    dry_run: bool,
-) -> Result<()> {
+async fn git_rm_missing(repo: &Path, missing: &[String], dry_run: bool) -> Result<()> {
     if missing.is_empty() {
         return Ok(());
     }
@@ -527,12 +597,22 @@ async fn git_rm_missing(
         rm_args.push(p);
     }
     if dry_run {
-        println!("🗑️  Would delete (git rm) {} file(s) from {}: {:?}", missing.len(), repo.display(), &missing[..missing.len().min(5)]);
+        println!(
+            "🗑️  Would delete (git rm) {} file(s) from {}: {:?}",
+            missing.len(),
+            repo.display(),
+            &missing[..missing.len().min(5)]
+        );
         if missing.len() > 5 {
             println!("  ... and {} more", missing.len() - 5);
         }
     } else if let Err(e) = run_git_with_timeout(repo, &rm_args, 30, "rm").await {
-        eprintln!("⚠️ {} git rm failed for {} paths: {:?}", repo.display(), missing.len(), missing);
+        eprintln!(
+            "⚠️ {} git rm failed for {} paths: {:?}",
+            repo.display(),
+            missing.len(),
+            missing
+        );
         return Err(e);
     }
     Ok(())
@@ -565,7 +645,8 @@ async fn get_staged_diff_content(repo: &Path) -> Option<String> {
                     Ok(Ok(o)) if o.status.success() => {
                         let patch = String::from_utf8_lossy(&o.stdout).to_string();
                         if patch.lines().count() > 200 {
-                            patch.lines().take(200).collect::<Vec<_>>().join("\n") + "\n... (truncated)"
+                            patch.lines().take(200).collect::<Vec<_>>().join("\n")
+                                + "\n... (truncated)"
                         } else {
                             patch
                         }
@@ -603,15 +684,17 @@ async fn run_ai_bumper(
     {
         use crate::bump::{ai_decide_bump_level, bump_semver, read_current_version, BumpLevel};
 
-        let staged_diff = committed_entries.iter()
+        let staged_diff = committed_entries
+            .iter()
             .map(|e| format!("{:?}: {}", e.status, e.path.display()))
             .collect::<Vec<_>>()
             .join("\n");
-        let project_state = std::fs::read_to_string(repo.join(".dracon/project-state.md"))
-            .unwrap_or_default();
+        let project_state =
+            std::fs::read_to_string(repo.join(".dracon/project-state.md")).unwrap_or_default();
 
         if let Some(current_ver) = read_current_version(repo) {
-            let level = ai_decide_bump_level(repo, &current_ver, &staged_diff, &project_state).await;
+            let level =
+                ai_decide_bump_level(repo, &current_ver, &staged_diff, &project_state).await;
             // Defense-in-depth: ai_decide_bump_level maps "major" => BumpLevel::None,
             // so this guard cannot trigger via the AI path today. It exists to catch
             // BumpLevel::Major if a future code path or mapping change produces it.
@@ -624,7 +707,8 @@ async fn run_ai_bumper(
                 let new_ver = bump_semver(&current_ver, level);
 
                 if let Some(new_ver) = new_ver {
-                    let bumped = crate::bump::apply_version_bump_to_repo(repo, &current_ver, &new_ver);
+                    let bumped =
+                        crate::bump::apply_version_bump_to_repo(repo, &current_ver, &new_ver);
                     if bumped {
                         return true;
                     }
@@ -636,11 +720,7 @@ async fn run_ai_bumper(
     false
 }
 
-async fn post_commit_pull(
-    svc: &GitService,
-    repo: &Path,
-    policy: &SyncPolicy,
-) {
+async fn post_commit_pull(svc: &GitService, repo: &Path, policy: &SyncPolicy) {
     if !policy.auto_pull {
         return;
     }
@@ -657,18 +737,31 @@ async fn post_commit_pull(
         match tokio::time::timeout(
             Duration::from_secs(policy.pull_op_timeout_secs),
             svc.pull_merge(),
-        ).await {
+        )
+        .await
+        {
             Ok(Ok(())) => {
                 eprintln!("✅ post-commit pull succeeded for {}", repo.display());
             }
             Ok(Err(dracon_git::error::GitError::MergeConflict)) => {
-                eprintln!("⚠️ post-commit pull conflict in {} (manual intervention required)", repo.display());
+                eprintln!(
+                    "⚠️ post-commit pull conflict in {} (manual intervention required)",
+                    repo.display()
+                );
             }
             Ok(Err(e)) => {
-                eprintln!("⚠️ post-commit pull failed for {}: {} - will still attempt push", repo.display(), e);
+                eprintln!(
+                    "⚠️ post-commit pull failed for {}: {} - will still attempt push",
+                    repo.display(),
+                    e
+                );
             }
             Err(_) => {
-                eprintln!("⚠️ post-commit pull timeout for {} after {}s - will still attempt push", repo.display(), policy.pull_op_timeout_secs);
+                eprintln!(
+                    "⚠️ post-commit pull timeout for {} after {}s - will still attempt push",
+                    repo.display(),
+                    policy.pull_op_timeout_secs
+                );
             }
         }
     }
@@ -680,16 +773,21 @@ async fn restore_excluded_paths(
 ) -> Result<()> {
     let repo = ctx.repo;
     let policy = ctx.policy;
-    let restorable: Vec<_> = to_restore.iter()
+    let restorable: Vec<_> = to_restore
+        .iter()
         .filter(|e| can_restore_entry(repo, e))
-        .filter(|e| !repo.join(&e.path).is_dir() || !crate::exclude::is_gitlink_unchanged(repo, &e.path))
+        .filter(|e| {
+            !repo.join(&e.path).is_dir() || !crate::exclude::is_gitlink_unchanged(repo, &e.path)
+        })
         .collect();
 
     handle_large_untracked(repo, to_restore, policy)?;
 
     let other_untracked: Vec<_> = to_restore
         .iter()
-        .filter(|e| !can_restore_entry(repo, e) && !is_large_untracked(e, repo, policy.max_stage_file_bytes))
+        .filter(|e| {
+            !can_restore_entry(repo, e) && !is_large_untracked(e, repo, policy.max_stage_file_bytes)
+        })
         .collect();
 
     if !other_untracked.is_empty() {
@@ -716,11 +814,7 @@ async fn restore_excluded_paths(
     Ok(())
 }
 
-async fn run_release_pipeline_if_bumped(
-    repo: &Path,
-    policy: &SyncPolicy,
-    version_bumped: bool,
-) {
+async fn run_release_pipeline_if_bumped(repo: &Path, policy: &SyncPolicy, version_bumped: bool) {
     if !version_bumped {
         return;
     }
@@ -729,29 +823,45 @@ async fn run_release_pipeline_if_bumped(
         let repo_auto_tag = repo_override.auto_tag.unwrap_or(policy.auto_tag);
         let repo_auto_release = repo_override.auto_release.unwrap_or(policy.auto_release);
         let repo_publish_targets = repo_override.auto_publish;
-        let repo_nix_auto_update = repo_override.nix_auto_update.unwrap_or(policy.nix_auto_update);
+        let repo_nix_auto_update = repo_override
+            .nix_auto_update
+            .unwrap_or(policy.nix_auto_update);
         let steps = crate::release::run_release_pipeline(
-            repo, &old_ver, &new_ver, level.as_str(), policy,
-            repo_auto_tag, repo_auto_release, &repo_publish_targets,
+            repo,
+            &old_ver,
+            &new_ver,
+            level.as_str(),
+            policy,
+            repo_auto_tag,
+            repo_auto_release,
+            &repo_publish_targets,
             repo_nix_auto_update,
-        ).await;
+        )
+        .await;
         for step in &steps {
             match step {
                 crate::release::ReleaseStep::TagCreated(tag) => eprintln!("🏷️  {tag}"),
                 crate::release::ReleaseStep::GitHubReleaseCreated(tag) => eprintln!("🚀 {tag}"),
-                crate::release::ReleaseStep::Published { registry, version } => eprintln!("📦 published to {registry} v{version}"),
-                crate::release::ReleaseStep::NixFlakePRCreated(url) => eprintln!("📄 flake PR created: {url}"),
-                crate::release::ReleaseStep::Skipped(reason) => { if debug_enabled() { eprintln!("🐛 release skipped: {reason}"); } }
-                crate::release::ReleaseStep::Failed { step: s, error } => eprintln!("⚠️ release failed: {s} — {error}"),
+                crate::release::ReleaseStep::Published { registry, version } => {
+                    eprintln!("📦 published to {registry} v{version}")
+                }
+                crate::release::ReleaseStep::NixFlakePRCreated(url) => {
+                    eprintln!("📄 flake PR created: {url}")
+                }
+                crate::release::ReleaseStep::Skipped(reason) => {
+                    if debug_enabled() {
+                        eprintln!("🐛 release skipped: {reason}");
+                    }
+                }
+                crate::release::ReleaseStep::Failed { step: s, error } => {
+                    eprintln!("⚠️ release failed: {s} — {error}")
+                }
             }
         }
     }
 }
 
-async fn push_with_blob_check(
-    ctx: &mut SyncContext<'_>,
-    ahead: usize,
-) -> Result<bool> {
+async fn push_with_blob_check(ctx: &mut SyncContext<'_>, ahead: usize) -> Result<bool> {
     let repo = ctx.repo;
     let policy = ctx.policy;
     let blob_threshold = ctx.blob_threshold;
@@ -764,7 +874,11 @@ async fn push_with_blob_check(
     let ahead_large = match detect_large_blobs_ahead(repo, blob_threshold).await {
         Ok(v) => v,
         Err(e) => {
-            eprintln!("⚠️ large blob detection failed for {}: {} - skipping push", repo.display(), e);
+            eprintln!(
+                "⚠️ large blob detection failed for {}: {} - skipping push",
+                repo.display(),
+                e
+            );
             return Ok(false);
         }
     };
@@ -819,7 +933,11 @@ async fn push_with_blob_check(
             for remote in &policy.remotes {
                 println!("🔼 Would push to {} in {}", remote.name, repo.display());
             }
-            policy.remotes.iter().map(|r| (r.name.clone(), Ok(()))).collect()
+            policy
+                .remotes
+                .iter()
+                .map(|r| (r.name.clone(), Ok(())))
+                .collect()
         } else {
             push_mirror_remotes(
                 repo,
@@ -827,7 +945,8 @@ async fn push_with_blob_check(
                 policy.push_op_timeout_secs,
                 policy.push_retries,
                 private,
-            ).await
+            )
+            .await
         };
         let all_ok = push_results.iter().all(|(_, r)| r.is_ok());
         if !all_ok {
@@ -872,9 +991,8 @@ async fn stage_commit_and_push(
         .map(|e| e.path.to_string_lossy().to_string())
         .collect();
 
-    let (existing, missing): (Vec<_>, Vec<_>) = stage_paths
-        .into_iter()
-        .partition(|p| repo.join(p).exists());
+    let (existing, missing): (Vec<_>, Vec<_>) =
+        stage_paths.into_iter().partition(|p| repo.join(p).exists());
 
     stage_existing_files(repo, &existing, dry_run).await?;
 
@@ -896,7 +1014,8 @@ async fn stage_commit_and_push(
         .map(|(path, status)| dracon_git::types::DiffFile { path, status })
         .collect();
 
-    let staged_diff_names = committed_entries.iter()
+    let staged_diff_names = committed_entries
+        .iter()
         .map(|e| format!("{:?}: {}", e.status, e.path.display()))
         .collect::<Vec<_>>()
         .join("\n");
@@ -908,7 +1027,14 @@ async fn stage_commit_and_push(
 
     // AI bumper is the sole version bump decider — determines patch vs minor vs none
     let mut version_bumped = false;
-    let ai_bumped = run_ai_bumper(repo, &committed_entries, dry_run, auto_bump_versions, version_bumped).await;
+    let ai_bumped = run_ai_bumper(
+        repo,
+        &committed_entries,
+        dry_run,
+        auto_bump_versions,
+        version_bumped,
+    )
+    .await;
     if ai_bumped {
         version_bumped = true;
         stage_version_files(repo).await;
@@ -934,10 +1060,16 @@ async fn stage_commit_and_push(
 
     if committed_entries.is_empty() {
         if let Err(e) = run_git_with_timeout(repo, &["reset", "HEAD", "--"], 10, "reset").await {
-            return Err(anyhow::anyhow!("sync_repo: failed to reset HEAD after filter-only commit: {}", e));
+            return Err(anyhow::anyhow!(
+                "sync_repo: failed to reset HEAD after filter-only commit: {}",
+                e
+            ));
         }
         if debug_enabled() {
-            eprintln!("🐛 {} skipped commit: all changes were filter-only (smudge/clean)", repo.display());
+            eprintln!(
+                "🐛 {} skipped commit: all changes were filter-only (smudge/clean)",
+                repo.display()
+            );
         }
         maybe_sync_visibility_and_metadata(ctx);
         return Ok(Some(SyncOutcome::NothingToDo));
@@ -985,7 +1117,11 @@ async fn stage_commit_and_push(
     };
 
     if dry_run {
-        println!("📝 Would commit {} file(s) in {}:", committed_entries.len(), repo.display());
+        println!(
+            "📝 Would commit {} file(s) in {}:",
+            committed_entries.len(),
+            repo.display()
+        );
         for entry in committed_entries.iter().take(10) {
             println!("  {:?}: {}", entry.status, entry.path.display());
         }
@@ -995,7 +1131,11 @@ async fn stage_commit_and_push(
         println!("  message: {}", msg.lines().next().unwrap_or("(empty)"));
     } else {
         svc.commit(&msg).await?;
-        eprintln!("📝 committed {} file(s) in {}", committed_entries.len(), repo.display());
+        eprintln!(
+            "📝 committed {} file(s) in {}",
+            committed_entries.len(),
+            repo.display()
+        );
     }
 
     prune_other_default_branch(repo).await;
@@ -1042,9 +1182,18 @@ pub(crate) async fn sync_repo(
             eprintln!("🐛 {} is not recognized as git repo", repo.display());
         }
         let ctx = SyncContext {
-            repo, policy, excluded_dir_names, dry_run, force_deletion,
-            idle_seconds, policy_path, has_origin: false, has_upstream: false,
-            blob_threshold: 0, auto_bump_versions: false, remote_failures: None,
+            repo,
+            policy,
+            excluded_dir_names,
+            dry_run,
+            force_deletion,
+            idle_seconds,
+            policy_path,
+            has_origin: false,
+            has_upstream: false,
+            blob_threshold: 0,
+            auto_bump_versions: false,
+            remote_failures: None,
         };
         maybe_sync_visibility_and_metadata(&ctx);
         return Ok(SyncOutcome::NothingToDo);
@@ -1052,9 +1201,18 @@ pub(crate) async fn sync_repo(
 
     if let Some(blocked) = check_conflict_state(repo) {
         let ctx = SyncContext {
-            repo, policy, excluded_dir_names, dry_run, force_deletion,
-            idle_seconds, policy_path, has_origin: false, has_upstream: false,
-            blob_threshold: 0, auto_bump_versions: false, remote_failures: None,
+            repo,
+            policy,
+            excluded_dir_names,
+            dry_run,
+            force_deletion,
+            idle_seconds,
+            policy_path,
+            has_origin: false,
+            has_upstream: false,
+            blob_threshold: 0,
+            auto_bump_versions: false,
+            remote_failures: None,
         };
         maybe_sync_visibility_and_metadata(&ctx);
         return Ok(blocked);
@@ -1071,28 +1229,49 @@ pub(crate) async fn sync_repo(
         .unwrap_or(policy.auto_bump_versions);
 
     let mut ctx = SyncContext {
-        repo, policy, excluded_dir_names, dry_run, force_deletion,
-        idle_seconds, policy_path, has_origin, has_upstream,
-        blob_threshold, auto_bump_versions, remote_failures,
+        repo,
+        policy,
+        excluded_dir_names,
+        dry_run,
+        force_deletion,
+        idle_seconds,
+        policy_path,
+        has_origin,
+        has_upstream,
+        blob_threshold,
+        auto_bump_versions,
+        remote_failures,
     };
 
     auto_pull_merge(&svc, &ctx, &initial_status).await?;
 
     clean_staged_paths(&ctx).await?;
 
-    let DiffResult { status, entries, filter_only_cleared: _ } = compute_diff_entries(&svc, repo).await?;
+    let DiffResult {
+        status,
+        entries,
+        filter_only_cleared: _,
+    } = compute_diff_entries(&svc, repo).await?;
 
     if !status.is_clean && policy.auto_commit {
         let (to_stage, to_restore): (Vec<_>, Vec<_>) = entries
             .into_iter()
             .filter(|e| {
-                if repo.join(&e.path).is_dir() && crate::exclude::is_gitlink_unchanged(repo, &e.path) {
+                if repo.join(&e.path).is_dir()
+                    && crate::exclude::is_gitlink_unchanged(repo, &e.path)
+                {
                     return false;
                 }
                 true
             })
             .partition(|e| {
-                should_stage_entry(repo, e, excluded_dir_names, &policy.exclude_file_patterns, policy.max_stage_file_bytes)
+                should_stage_entry(
+                    repo,
+                    e,
+                    excluded_dir_names,
+                    &policy.exclude_file_patterns,
+                    policy.max_stage_file_bytes,
+                )
             });
         if debug_enabled() {
             eprintln!(
@@ -1103,9 +1282,9 @@ pub(crate) async fn sync_repo(
             );
         }
         if !to_stage.is_empty() {
-            if let Some(outcome) = stage_commit_and_push(
-                &svc, &mut ctx, &status, &to_stage, &to_restore,
-            ).await? {
+            if let Some(outcome) =
+                stage_commit_and_push(&svc, &mut ctx, &status, &to_stage, &to_restore).await?
+            {
                 return Ok(outcome);
             }
         } else if policy.auto_push && !has_origin {
@@ -1123,15 +1302,15 @@ pub(crate) async fn sync_repo(
     Ok(SyncOutcome::NothingToDo)
 }
 
-async fn handle_ahead_push(
-    ctx: &mut SyncContext<'_>,
-    svc: &GitService,
-) -> Result<()> {
+async fn handle_ahead_push(ctx: &mut SyncContext<'_>, svc: &GitService) -> Result<()> {
     let current_status = svc.get_status().await?;
     if ctx.policy.auto_push && current_status.ahead > 0 && ctx.has_origin {
         let push_ok = push_with_blob_check(ctx, current_status.ahead).await?;
         if !push_ok {
-            eprintln!("ℹ️ push partially skipped for {} (see warnings above)", ctx.repo.display());
+            eprintln!(
+                "ℹ️ push partially skipped for {} (see warnings above)",
+                ctx.repo.display()
+            );
         }
     } else if ctx.policy.auto_push && current_status.ahead > 0 && !ctx.has_origin {
         eprintln!("ℹ️ skip push for {} (no origin remote)", ctx.repo.display());
@@ -1153,7 +1332,13 @@ mod tests {
             .status()
             .unwrap();
         std::process::Command::new("git")
-            .args(["-C", &repo.to_string_lossy(), "config", "user.email", "test@test"])
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
             .status()
             .unwrap();
         std::process::Command::new("git")
@@ -1161,7 +1346,14 @@ mod tests {
             .status()
             .unwrap();
         std::process::Command::new("git")
-            .args(["-C", &repo.to_string_lossy(), "commit", "--allow-empty", "-m", "init"])
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
             .status()
             .unwrap();
 
@@ -1171,8 +1363,22 @@ auto_github_private_account = "TestAccount"
 "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
-        assert!(result.is_ok(), "sync_repo should handle missing gh gracefully: {:?}", result);
+        let result = sync_repo(
+            &repo,
+            &policy,
+            &BTreeSet::new(),
+            0,
+            None,
+            false,
+            None,
+            false,
+        )
+        .await;
+        assert!(
+            result.is_ok(),
+            "sync_repo should handle missing gh gracefully: {:?}",
+            result
+        );
     }
 
     #[tokio::test]
@@ -1185,7 +1391,13 @@ auto_github_private_account = "TestAccount"
             .status()
             .unwrap();
         std::process::Command::new("git")
-            .args(["-C", &repo.to_string_lossy(), "config", "user.email", "test@test"])
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
             .status()
             .unwrap();
         std::process::Command::new("git")
@@ -1193,7 +1405,14 @@ auto_github_private_account = "TestAccount"
             .status()
             .unwrap();
         std::process::Command::new("git")
-            .args(["-C", &repo.to_string_lossy(), "commit", "--allow-empty", "-m", "init"])
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
             .status()
             .unwrap();
 
@@ -1211,7 +1430,10 @@ auto_github_private_account = "TestAccount"
             .output()
             .unwrap()
             .stdout;
-        let count_before: usize = String::from_utf8_lossy(&commits_before).trim().parse().unwrap();
+        let count_before: usize = String::from_utf8_lossy(&commits_before)
+            .trim()
+            .parse()
+            .unwrap();
 
         let toml_str = r#"
 auto_github_private = false
@@ -1222,7 +1444,17 @@ auto_bump_versions = false
 "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
+        let result = sync_repo(
+            &repo,
+            &policy,
+            &BTreeSet::new(),
+            0,
+            None,
+            false,
+            None,
+            false,
+        )
+        .await;
         assert!(result.is_ok(), "sync_repo should succeed: {:?}", result);
 
         // Verify a commit was created
@@ -1231,11 +1463,16 @@ auto_bump_versions = false
             .output()
             .unwrap()
             .stdout;
-        let count_after: usize = String::from_utf8_lossy(&commits_after).trim().parse().unwrap();
+        let count_after: usize = String::from_utf8_lossy(&commits_after)
+            .trim()
+            .parse()
+            .unwrap();
         assert_eq!(
-            count_after, count_before + 1,
+            count_after,
+            count_before + 1,
             "sync_repo should have created one new commit (before={}, after={})",
-            count_before, count_after
+            count_before,
+            count_after
         );
     }
 
@@ -1249,7 +1486,13 @@ auto_bump_versions = false
             .status()
             .unwrap();
         std::process::Command::new("git")
-            .args(["-C", &repo.to_string_lossy(), "config", "user.email", "test@test"])
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
             .status()
             .unwrap();
         std::process::Command::new("git")
@@ -1257,7 +1500,14 @@ auto_bump_versions = false
             .status()
             .unwrap();
         std::process::Command::new("git")
-            .args(["-C", &repo.to_string_lossy(), "commit", "--allow-empty", "-m", "init"])
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
             .status()
             .unwrap();
 
@@ -1273,9 +1523,25 @@ auto_bump_versions = false
 "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
-        assert!(result.is_ok(), "sync_repo should succeed even during rebase");
-        assert!(matches!(result, Ok(SyncOutcome::Blocked)), "rebase should cause early return (nothing synced)");
+        let result = sync_repo(
+            &repo,
+            &policy,
+            &BTreeSet::new(),
+            0,
+            None,
+            false,
+            None,
+            false,
+        )
+        .await;
+        assert!(
+            result.is_ok(),
+            "sync_repo should succeed even during rebase"
+        );
+        assert!(
+            matches!(result, Ok(SyncOutcome::Blocked)),
+            "rebase should cause early return (nothing synced)"
+        );
     }
 
     #[tokio::test]
@@ -1288,7 +1554,13 @@ auto_bump_versions = false
             .status()
             .unwrap();
         std::process::Command::new("git")
-            .args(["-C", &repo.to_string_lossy(), "config", "user.email", "test@test"])
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
             .status()
             .unwrap();
         std::process::Command::new("git")
@@ -1296,7 +1568,14 @@ auto_bump_versions = false
             .status()
             .unwrap();
         std::process::Command::new("git")
-            .args(["-C", &repo.to_string_lossy(), "commit", "--allow-empty", "-m", "init"])
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
             .status()
             .unwrap();
 
@@ -1312,9 +1591,22 @@ auto_bump_versions = false
 "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
+        let result = sync_repo(
+            &repo,
+            &policy,
+            &BTreeSet::new(),
+            0,
+            None,
+            false,
+            None,
+            false,
+        )
+        .await;
         assert!(result.is_ok(), "sync_repo should succeed even during merge");
-        assert!(matches!(result, Ok(SyncOutcome::Blocked)), "merge should cause early return (nothing synced)");
+        assert!(
+            matches!(result, Ok(SyncOutcome::Blocked)),
+            "merge should cause early return (nothing synced)"
+        );
     }
 
     #[tokio::test]
@@ -1327,7 +1619,13 @@ auto_bump_versions = false
             .status()
             .unwrap();
         std::process::Command::new("git")
-            .args(["-C", &repo.to_string_lossy(), "config", "user.email", "test@test"])
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
             .status()
             .unwrap();
         std::process::Command::new("git")
@@ -1335,7 +1633,14 @@ auto_bump_versions = false
             .status()
             .unwrap();
         std::process::Command::new("git")
-            .args(["-C", &repo.to_string_lossy(), "commit", "--allow-empty", "-m", "init"])
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
             .status()
             .unwrap();
 
@@ -1351,9 +1656,25 @@ auto_bump_versions = false
 "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
-        assert!(result.is_ok(), "sync_repo should succeed even during cherry-pick");
-        assert!(matches!(result, Ok(SyncOutcome::Blocked)), "cherry-pick should cause early return (nothing synced)");
+        let result = sync_repo(
+            &repo,
+            &policy,
+            &BTreeSet::new(),
+            0,
+            None,
+            false,
+            None,
+            false,
+        )
+        .await;
+        assert!(
+            result.is_ok(),
+            "sync_repo should succeed even during cherry-pick"
+        );
+        assert!(
+            matches!(result, Ok(SyncOutcome::Blocked)),
+            "cherry-pick should cause early return (nothing synced)"
+        );
     }
 
     #[tokio::test]
@@ -1366,7 +1687,13 @@ auto_bump_versions = false
             .status()
             .unwrap();
         std::process::Command::new("git")
-            .args(["-C", &repo.to_string_lossy(), "config", "user.email", "test@test"])
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
             .status()
             .unwrap();
         std::process::Command::new("git")
@@ -1374,7 +1701,14 @@ auto_bump_versions = false
             .status()
             .unwrap();
         std::process::Command::new("git")
-            .args(["-C", &repo.to_string_lossy(), "commit", "--allow-empty", "-m", "init"])
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
             .status()
             .unwrap();
 
@@ -1390,9 +1724,22 @@ auto_bump_versions = false
 "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
+        let result = sync_repo(
+            &repo,
+            &policy,
+            &BTreeSet::new(),
+            0,
+            None,
+            false,
+            None,
+            false,
+        )
+        .await;
         assert!(result.is_ok(), "sync_repo should succeed: {:?}", result);
-        assert!(matches!(result, Ok(SyncOutcome::Synced)), "dirty repo with auto_commit should sync");
+        assert!(
+            matches!(result, Ok(SyncOutcome::Synced)),
+            "dirty repo with auto_commit should sync"
+        );
 
         // Verify commit was made
         let output = std::process::Command::new("git")
@@ -1400,7 +1747,10 @@ auto_bump_versions = false
             .output()
             .unwrap();
         let log = String::from_utf8_lossy(&output.stdout);
-        assert!(log.lines().count() >= 2, "should have at least 2 commits (init + auto-commit)");
+        assert!(
+            log.lines().count() >= 2,
+            "should have at least 2 commits (init + auto-commit)"
+        );
     }
 
     #[tokio::test]
@@ -1413,7 +1763,13 @@ auto_bump_versions = false
             .status()
             .unwrap();
         std::process::Command::new("git")
-            .args(["-C", &repo.to_string_lossy(), "config", "user.email", "test@test"])
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
             .status()
             .unwrap();
         std::process::Command::new("git")
@@ -1421,7 +1777,14 @@ auto_bump_versions = false
             .status()
             .unwrap();
         std::process::Command::new("git")
-            .args(["-C", &repo.to_string_lossy(), "commit", "--allow-empty", "-m", "init"])
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
             .status()
             .unwrap();
 
@@ -1434,9 +1797,22 @@ auto_bump_versions = false
 "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
+        let result = sync_repo(
+            &repo,
+            &policy,
+            &BTreeSet::new(),
+            0,
+            None,
+            false,
+            None,
+            false,
+        )
+        .await;
         assert!(result.is_ok(), "sync_repo should succeed");
-        assert!(matches!(result, Ok(SyncOutcome::NothingToDo)), "clean repo should return false (nothing to sync)");
+        assert!(
+            matches!(result, Ok(SyncOutcome::NothingToDo)),
+            "clean repo should return false (nothing to sync)"
+        );
     }
 
     #[tokio::test]
@@ -1449,7 +1825,13 @@ auto_bump_versions = false
             .status()
             .unwrap();
         std::process::Command::new("git")
-            .args(["-C", &repo.to_string_lossy(), "config", "user.email", "test@test"])
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
             .status()
             .unwrap();
         std::process::Command::new("git")
@@ -1457,7 +1839,14 @@ auto_bump_versions = false
             .status()
             .unwrap();
         std::process::Command::new("git")
-            .args(["-C", &repo.to_string_lossy(), "commit", "--allow-empty", "-m", "init"])
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
             .status()
             .unwrap();
 
@@ -1473,9 +1862,22 @@ auto_bump_versions = false
 "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
+        let result = sync_repo(
+            &repo,
+            &policy,
+            &BTreeSet::new(),
+            0,
+            None,
+            false,
+            None,
+            false,
+        )
+        .await;
         assert!(result.is_ok(), "sync_repo should succeed: {:?}", result);
-        assert!(matches!(result, Ok(SyncOutcome::Synced)), "untracked file should be staged and committed");
+        assert!(
+            matches!(result, Ok(SyncOutcome::Synced)),
+            "untracked file should be staged and committed"
+        );
 
         // Verify file is tracked
         let output = std::process::Command::new("git")
@@ -1483,7 +1885,10 @@ auto_bump_versions = false
             .output()
             .unwrap();
         let tracked = String::from_utf8_lossy(&output.stdout);
-        assert!(tracked.contains("newfile.txt"), "newfile.txt should be tracked");
+        assert!(
+            tracked.contains("newfile.txt"),
+            "newfile.txt should be tracked"
+        );
     }
 
     #[tokio::test]
@@ -1496,7 +1901,13 @@ auto_bump_versions = false
             .status()
             .unwrap();
         std::process::Command::new("git")
-            .args(["-C", &repo.to_string_lossy(), "config", "user.email", "test@test"])
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
             .status()
             .unwrap();
         std::process::Command::new("git")
@@ -1504,7 +1915,14 @@ auto_bump_versions = false
             .status()
             .unwrap();
         std::process::Command::new("git")
-            .args(["-C", &repo.to_string_lossy(), "commit", "--allow-empty", "-m", "init"])
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
             .status()
             .unwrap();
 
@@ -1517,9 +1935,22 @@ auto_bump_versions = false
 "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
+        let result = sync_repo(
+            &repo,
+            &policy,
+            &BTreeSet::new(),
+            0,
+            None,
+            false,
+            None,
+            false,
+        )
+        .await;
         assert!(result.is_ok(), "sync_repo should succeed");
-        assert!(matches!(result, Ok(SyncOutcome::NothingToDo)), "not behind should return false (nothing to pull)");
+        assert!(
+            matches!(result, Ok(SyncOutcome::NothingToDo)),
+            "not behind should return false (nothing to pull)"
+        );
     }
 
     #[tokio::test]
@@ -1532,7 +1963,13 @@ auto_bump_versions = false
             .status()
             .unwrap();
         std::process::Command::new("git")
-            .args(["-C", &repo.to_string_lossy(), "config", "user.email", "test@test"])
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
             .status()
             .unwrap();
         std::process::Command::new("git")
@@ -1540,7 +1977,14 @@ auto_bump_versions = false
             .status()
             .unwrap();
         std::process::Command::new("git")
-            .args(["-C", &repo.to_string_lossy(), "commit", "--allow-empty", "-m", "init"])
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
             .status()
             .unwrap();
 
@@ -1555,9 +1999,22 @@ auto_bump_versions = false
 "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
+        let result = sync_repo(
+            &repo,
+            &policy,
+            &BTreeSet::new(),
+            0,
+            None,
+            false,
+            None,
+            false,
+        )
+        .await;
         assert!(result.is_ok(), "sync_repo should succeed with dirty repo");
-        assert!(matches!(result, Ok(SyncOutcome::NothingToDo)), "dirty repo should skip pull and return false");
+        assert!(
+            matches!(result, Ok(SyncOutcome::NothingToDo)),
+            "dirty repo should skip pull and return false"
+        );
     }
 
     #[tokio::test]
@@ -1570,7 +2027,13 @@ auto_bump_versions = false
             .status()
             .unwrap();
         std::process::Command::new("git")
-            .args(["-C", &repo.to_string_lossy(), "config", "user.email", "test@test"])
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
             .status()
             .unwrap();
         std::process::Command::new("git")
@@ -1578,7 +2041,14 @@ auto_bump_versions = false
             .status()
             .unwrap();
         std::process::Command::new("git")
-            .args(["-C", &repo.to_string_lossy(), "commit", "--allow-empty", "-m", "init"])
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
             .status()
             .unwrap();
 
@@ -1591,7 +2061,17 @@ auto_bump_versions = false
 "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
+        let result = sync_repo(
+            &repo,
+            &policy,
+            &BTreeSet::new(),
+            0,
+            None,
+            false,
+            None,
+            false,
+        )
+        .await;
         assert!(result.is_ok(), "sync_repo should succeed without origin");
     }
 
@@ -1605,7 +2085,13 @@ auto_bump_versions = false
             .status()
             .unwrap();
         std::process::Command::new("git")
-            .args(["-C", &repo.to_string_lossy(), "config", "user.email", "test@test"])
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
             .status()
             .unwrap();
         std::process::Command::new("git")
@@ -1613,7 +2099,14 @@ auto_bump_versions = false
             .status()
             .unwrap();
         std::process::Command::new("git")
-            .args(["-C", &repo.to_string_lossy(), "commit", "--allow-empty", "-m", "init"])
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
             .status()
             .unwrap();
 
@@ -1626,7 +2119,17 @@ auto_bump_versions = false
 "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
+        let result = sync_repo(
+            &repo,
+            &policy,
+            &BTreeSet::new(),
+            0,
+            None,
+            false,
+            None,
+            false,
+        )
+        .await;
         assert!(result.is_ok(), "sync_repo should succeed without upstream");
     }
 
@@ -1647,7 +2150,13 @@ auto_bump_versions = false
             .status()
             .unwrap();
         std::process::Command::new("git")
-            .args(["-C", &repo.to_string_lossy(), "config", "user.email", "test@test"])
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
             .status()
             .unwrap();
         std::process::Command::new("git")
@@ -1655,18 +2164,39 @@ auto_bump_versions = false
             .status()
             .unwrap();
         std::process::Command::new("git")
-            .args(["-C", &repo.to_string_lossy(), "commit", "--allow-empty", "-m", "init"])
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
             .status()
             .unwrap();
         std::process::Command::new("git")
-            .args(["-C", &repo.to_string_lossy(), "remote", "add", "origin", &origin_bare.to_string_lossy()])
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "remote",
+                "add",
+                "origin",
+                &origin_bare.to_string_lossy(),
+            ])
             .status()
             .unwrap();
 
         // Point mirror to non-existent path so push fails
         let bad_mirror = tmp.path().join("nonexistent-mirror.git");
         std::process::Command::new("git")
-            .args(["-C", &repo.to_string_lossy(), "remote", "add", "mirror", &bad_mirror.to_string_lossy()])
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "remote",
+                "add",
+                "mirror",
+                &bad_mirror.to_string_lossy(),
+            ])
             .status()
             .unwrap();
 
@@ -1683,9 +2213,22 @@ push_url = "git@nonexistent.example.com:repo.git"
 "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
+        let result = sync_repo(
+            &repo,
+            &policy,
+            &BTreeSet::new(),
+            0,
+            None,
+            false,
+            None,
+            false,
+        )
+        .await;
         assert!(result.is_ok(), "sync_repo should not error");
-        assert!(matches!(result, Ok(SyncOutcome::NothingToDo)), "mirror push failure should return false (hard fail)");
+        assert!(
+            matches!(result, Ok(SyncOutcome::NothingToDo)),
+            "mirror push failure should return false (hard fail)"
+        );
     }
 
     #[tokio::test]
@@ -1705,7 +2248,13 @@ push_url = "git@nonexistent.example.com:repo.git"
             .status()
             .unwrap();
         std::process::Command::new("git")
-            .args(["-C", &repo.to_string_lossy(), "config", "user.email", "test@test"])
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
             .status()
             .unwrap();
         std::process::Command::new("git")
@@ -1713,15 +2262,36 @@ push_url = "git@nonexistent.example.com:repo.git"
             .status()
             .unwrap();
         std::process::Command::new("git")
-            .args(["-C", &repo.to_string_lossy(), "commit", "--allow-empty", "-m", "init"])
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
             .status()
             .unwrap();
         std::process::Command::new("git")
-            .args(["-C", &repo.to_string_lossy(), "remote", "add", "origin", &origin_bare.to_string_lossy()])
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "remote",
+                "add",
+                "origin",
+                &origin_bare.to_string_lossy(),
+            ])
             .status()
             .unwrap();
         std::process::Command::new("git")
-            .args(["-C", &repo.to_string_lossy(), "push", "-u", "origin", "master"])
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "push",
+                "-u",
+                "origin",
+                "master",
+            ])
             .status()
             .unwrap();
 
@@ -1741,10 +2311,27 @@ push_url = "git@nonexistent.example.com:repo.git"
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
         let mut remote_failures = HashMap::new();
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, Some(&mut remote_failures), false, None, false).await;
+        let result = sync_repo(
+            &repo,
+            &policy,
+            &BTreeSet::new(),
+            0,
+            Some(&mut remote_failures),
+            false,
+            None,
+            false,
+        )
+        .await;
         assert!(result.is_ok());
-        assert!(matches!(result.unwrap(), SyncOutcome::Synced), "mirror push failure should still return Synced (origin push succeeded)");
-        assert_eq!(remote_failures.get("bad-mirror"), Some(&1), "bad-mirror failure should be tracked");
+        assert!(
+            matches!(result.unwrap(), SyncOutcome::Synced),
+            "mirror push failure should still return Synced (origin push succeeded)"
+        );
+        assert_eq!(
+            remote_failures.get("bad-mirror"),
+            Some(&1),
+            "bad-mirror failure should be tracked"
+        );
     }
 
     #[tokio::test]
@@ -1770,7 +2357,13 @@ push_url = "git@nonexistent.example.com:repo.git"
             .status()
             .unwrap();
         std::process::Command::new("git")
-            .args(["-C", &repo.to_string_lossy(), "config", "user.email", "test@test"])
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
             .status()
             .unwrap();
         std::process::Command::new("git")
@@ -1778,16 +2371,37 @@ push_url = "git@nonexistent.example.com:repo.git"
             .status()
             .unwrap();
         std::process::Command::new("git")
-            .args(["-C", &repo.to_string_lossy(), "commit", "--allow-empty", "-m", "init"])
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
             .status()
             .unwrap();
         std::process::Command::new("git")
-            .args(["-C", &repo.to_string_lossy(), "remote", "add", "origin", &origin_bare.to_string_lossy()])
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "remote",
+                "add",
+                "origin",
+                &origin_bare.to_string_lossy(),
+            ])
             .status()
             .unwrap();
         // Push initial commit to origin so upstream is set
         std::process::Command::new("git")
-            .args(["-C", &repo.to_string_lossy(), "push", "-u", "origin", "master"])
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "push",
+                "-u",
+                "origin",
+                "master",
+            ])
             .status()
             .unwrap();
 
@@ -1810,9 +2424,22 @@ push_url = "{}"
         );
         let policy: SyncPolicy = toml::from_str(&toml_str).unwrap();
 
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
+        let result = sync_repo(
+            &repo,
+            &policy,
+            &BTreeSet::new(),
+            0,
+            None,
+            false,
+            None,
+            false,
+        )
+        .await;
         assert!(result.is_ok(), "sync_repo should not error: {:?}", result);
-        assert!(matches!(result, Ok(SyncOutcome::Synced)), "mirror push success should return true");
+        assert!(
+            matches!(result, Ok(SyncOutcome::Synced)),
+            "mirror push success should return true"
+        );
     }
 
     fn init_test_repo(tmp: &tempfile::TempDir, name: &str) -> std::path::PathBuf {
@@ -1823,7 +2450,13 @@ push_url = "{}"
             .status()
             .unwrap();
         std::process::Command::new("git")
-            .args(["-C", &repo.to_string_lossy(), "config", "user.email", "test@test"])
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
             .status()
             .unwrap();
         std::process::Command::new("git")
@@ -1831,7 +2464,14 @@ push_url = "{}"
             .status()
             .unwrap();
         std::process::Command::new("git")
-            .args(["-C", &repo.to_string_lossy(), "commit", "--allow-empty", "-m", "init"])
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
             .status()
             .unwrap();
         repo
@@ -1862,9 +2502,22 @@ push_url = "{}"
         "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(&not_repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
+        let result = sync_repo(
+            &not_repo,
+            &policy,
+            &BTreeSet::new(),
+            0,
+            None,
+            false,
+            None,
+            false,
+        )
+        .await;
         assert!(result.is_ok(), "sync_repo should not error on non-git dir");
-        assert!(matches!(result, Ok(SyncOutcome::NothingToDo)), "non-git dir should return false");
+        assert!(
+            matches!(result, Ok(SyncOutcome::NothingToDo)),
+            "non-git dir should return false"
+        );
     }
 
     #[tokio::test]
@@ -1888,14 +2541,33 @@ push_url = "{}"
         "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
+        let result = sync_repo(
+            &repo,
+            &policy,
+            &BTreeSet::new(),
+            0,
+            None,
+            false,
+            None,
+            false,
+        )
+        .await;
         assert!(result.is_ok(), "sync_repo should succeed");
-        assert!(matches!(result, Ok(SyncOutcome::Synced)), "single deletion should be committed");
+        assert!(
+            matches!(result, Ok(SyncOutcome::Synced)),
+            "single deletion should be committed"
+        );
 
         let output = git_cmd(&repo, &["ls-files"]);
         let tracked = String::from_utf8_lossy(&output.stdout);
-        assert!(tracked.contains("keep.txt"), "keep.txt should still be tracked");
-        assert!(!tracked.contains("remove.txt"), "remove.txt should be removed from index");
+        assert!(
+            tracked.contains("keep.txt"),
+            "keep.txt should still be tracked"
+        );
+        assert!(
+            !tracked.contains("remove.txt"),
+            "remove.txt should be removed from index"
+        );
     }
 
     #[tokio::test]
@@ -1923,16 +2595,38 @@ push_url = "{}"
         "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
+        let result = sync_repo(
+            &repo,
+            &policy,
+            &BTreeSet::new(),
+            0,
+            None,
+            false,
+            None,
+            false,
+        )
+        .await;
         assert!(result.is_ok(), "sync_repo should succeed");
-        assert!(matches!(result, Ok(SyncOutcome::Blocked)), "mass deletion should be prevented (returns true without committing)");
+        assert!(
+            matches!(result, Ok(SyncOutcome::Blocked)),
+            "mass deletion should be prevented (returns true without committing)"
+        );
 
         // Verify files are still tracked (deletion was NOT committed)
         let output = git_cmd(&repo, &["ls-files"]);
         let tracked = String::from_utf8_lossy(&output.stdout);
-        assert!(tracked.contains("a.txt"), "a.txt should still be tracked after mass deletion safety");
-        assert!(tracked.contains("b.txt"), "b.txt should still be tracked after mass deletion safety");
-        assert!(tracked.contains("c.txt"), "c.txt should still be tracked after mass deletion safety");
+        assert!(
+            tracked.contains("a.txt"),
+            "a.txt should still be tracked after mass deletion safety"
+        );
+        assert!(
+            tracked.contains("b.txt"),
+            "b.txt should still be tracked after mass deletion safety"
+        );
+        assert!(
+            tracked.contains("c.txt"),
+            "c.txt should still be tracked after mass deletion safety"
+        );
     }
 
     #[tokio::test]
@@ -1959,15 +2653,34 @@ push_url = "{}"
         "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
+        let result = sync_repo(
+            &repo,
+            &policy,
+            &BTreeSet::new(),
+            0,
+            None,
+            false,
+            None,
+            false,
+        )
+        .await;
         assert!(result.is_ok(), "sync_repo should succeed");
-        assert!(matches!(result, Ok(SyncOutcome::Synced)), "partial deletion should be committed (not blocked)");
+        assert!(
+            matches!(result, Ok(SyncOutcome::Synced)),
+            "partial deletion should be committed (not blocked)"
+        );
 
         // Verify deleted files are removed from tracking (deletion WAS committed)
         let output = git_cmd(&repo, &["ls-files"]);
         let tracked = String::from_utf8_lossy(&output.stdout);
-        assert!(!tracked.contains("a.txt"), "a.txt should be removed after partial deletion commit");
-        assert!(!tracked.contains("b.txt"), "b.txt should be removed after partial deletion commit");
+        assert!(
+            !tracked.contains("a.txt"),
+            "a.txt should be removed after partial deletion commit"
+        );
+        assert!(
+            !tracked.contains("b.txt"),
+            "b.txt should be removed after partial deletion commit"
+        );
         assert!(tracked.contains("c.txt"), "c.txt should still be tracked");
     }
 
@@ -1993,13 +2706,29 @@ push_url = "{}"
         "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
+        let result = sync_repo(
+            &repo,
+            &policy,
+            &BTreeSet::new(),
+            0,
+            None,
+            false,
+            None,
+            false,
+        )
+        .await;
         assert!(result.is_ok(), "sync_repo should succeed");
-        assert!(matches!(result, Ok(SyncOutcome::Synced)), "exactly 50% deletion should be committed (not blocked)");
+        assert!(
+            matches!(result, Ok(SyncOutcome::Synced)),
+            "exactly 50% deletion should be committed (not blocked)"
+        );
 
         let output = git_cmd(&repo, &["ls-files"]);
         let tracked = String::from_utf8_lossy(&output.stdout);
-        assert!(!tracked.contains("a.txt"), "a.txt should be removed after 50% deletion commit");
+        assert!(
+            !tracked.contains("a.txt"),
+            "a.txt should be removed after 50% deletion commit"
+        );
         assert!(tracked.contains("b.txt"), "b.txt should still be tracked");
     }
 
@@ -2018,7 +2747,17 @@ push_url = "{}"
         "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
+        let result = sync_repo(
+            &repo,
+            &policy,
+            &BTreeSet::new(),
+            0,
+            None,
+            false,
+            None,
+            false,
+        )
+        .await;
         assert!(result.is_ok(), "sync_repo should not panic on empty repo");
     }
 
@@ -2052,15 +2791,34 @@ push_url = "{}"
         "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, Some(Path::new("/fake/policy.toml")), false).await;
+        let result = sync_repo(
+            &repo,
+            &policy,
+            &BTreeSet::new(),
+            0,
+            None,
+            false,
+            Some(Path::new("/fake/policy.toml")),
+            false,
+        )
+        .await;
         assert!(result.is_ok(), "sync_repo should succeed");
-        assert!(matches!(result, Ok(SyncOutcome::Blocked)), "mass deletion should be prevented");
+        assert!(
+            matches!(result, Ok(SyncOutcome::Blocked)),
+            "mass deletion should be prevented"
+        );
 
         // Verify incident was logged
         assert!(ledger.exists(), "incident ledger should be created");
         let content = std::fs::read_to_string(&ledger).unwrap();
-        assert!(content.contains("mass_deletion_guard"), "incident should contain mass_deletion_guard action");
-        assert!(content.contains("blocked"), "incident should have 'blocked' result");
+        assert!(
+            content.contains("mass_deletion_guard"),
+            "incident should contain mass_deletion_guard action"
+        );
+        assert!(
+            content.contains("blocked"),
+            "incident should have 'blocked' result"
+        );
     }
 
     #[tokio::test]
@@ -2069,14 +2827,22 @@ push_url = "{}"
         let repo = init_test_repo(&tmp, "exclude-dir-repo");
 
         std::fs::create_dir_all(repo.join("node_modules/pkg")).unwrap();
-        std::fs::write(repo.join("node_modules/pkg/index.js"), "module.exports = {};\n").unwrap();
+        std::fs::write(
+            repo.join("node_modules/pkg/index.js"),
+            "module.exports = {};\n",
+        )
+        .unwrap();
         std::fs::create_dir_all(repo.join("src")).unwrap();
         std::fs::write(repo.join("src/main.rs"), "fn main() {}\n").unwrap();
         git_cmd(&repo, &["add", "-A"]);
         git_cmd(&repo, &["commit", "-m", "initial"]);
 
         std::fs::write(repo.join("node_modules/pkg/index.js"), "updated\n").unwrap();
-        std::fs::write(repo.join("src/main.rs"), "fn main() { println!(\"hello\"); }\n").unwrap();
+        std::fs::write(
+            repo.join("src/main.rs"),
+            "fn main() { println!(\"hello\"); }\n",
+        )
+        .unwrap();
         git_cmd(&repo, &["add", "-A"]);
 
         let mut excluded = BTreeSet::new();
@@ -2096,7 +2862,10 @@ push_url = "{}"
 
         let output = git_cmd(&repo, &["log", "--oneline", "-1"]);
         let last_commit = String::from_utf8_lossy(&output.stdout);
-        assert!(!last_commit.is_empty(), "should have committed the non-excluded change");
+        assert!(
+            !last_commit.is_empty(),
+            "should have committed the non-excluded change"
+        );
     }
 
     #[tokio::test]
@@ -2123,12 +2892,28 @@ push_url = "{}"
         "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
-        assert!(result.is_ok(), "sync_repo should succeed with oversized file");
+        let result = sync_repo(
+            &repo,
+            &policy,
+            &BTreeSet::new(),
+            0,
+            None,
+            false,
+            None,
+            false,
+        )
+        .await;
+        assert!(
+            result.is_ok(),
+            "sync_repo should succeed with oversized file"
+        );
 
         let output = git_cmd(&repo, &["ls-files"]);
         let tracked = String::from_utf8_lossy(&output.stdout);
-        assert!(tracked.contains("small2.txt"), "small file should be tracked");
+        assert!(
+            tracked.contains("small2.txt"),
+            "small file should be tracked"
+        );
     }
 
     #[tokio::test]
@@ -2152,14 +2937,33 @@ push_url = "{}"
         "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
+        let result = sync_repo(
+            &repo,
+            &policy,
+            &BTreeSet::new(),
+            0,
+            None,
+            false,
+            None,
+            false,
+        )
+        .await;
         assert!(result.is_ok(), "sync_repo should succeed");
-        assert!(matches!(result, Ok(SyncOutcome::Synced)), "mixed changes should be committed");
+        assert!(
+            matches!(result, Ok(SyncOutcome::Synced)),
+            "mixed changes should be committed"
+        );
 
         let output = git_cmd(&repo, &["ls-files"]);
         let tracked = String::from_utf8_lossy(&output.stdout);
-        assert!(tracked.contains("existing.txt"), "existing.txt should be tracked");
-        assert!(tracked.contains("brand_new.txt"), "brand_new.txt should be tracked");
+        assert!(
+            tracked.contains("existing.txt"),
+            "existing.txt should be tracked"
+        );
+        assert!(
+            tracked.contains("brand_new.txt"),
+            "brand_new.txt should be tracked"
+        );
 
         let show = git_cmd(&repo, &["show", "HEAD:existing.txt"]);
         assert_eq!(String::from_utf8_lossy(&show.stdout), "modified\n");
@@ -2179,9 +2983,22 @@ push_url = "{}"
         "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
+        let result = sync_repo(
+            &repo,
+            &policy,
+            &BTreeSet::new(),
+            0,
+            None,
+            false,
+            None,
+            false,
+        )
+        .await;
         assert!(result.is_ok(), "sync_repo should succeed without origin");
-        assert!(matches!(result, Ok(SyncOutcome::NothingToDo)), "no origin should skip pull and return false");
+        assert!(
+            matches!(result, Ok(SyncOutcome::NothingToDo)),
+            "no origin should skip pull and return false"
+        );
     }
 
     #[tokio::test]
@@ -2200,13 +3017,29 @@ push_url = "{}"
         "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
+        let result = sync_repo(
+            &repo,
+            &policy,
+            &BTreeSet::new(),
+            0,
+            None,
+            false,
+            None,
+            false,
+        )
+        .await;
         assert!(result.is_ok(), "sync_repo should succeed");
-        assert!(matches!(result, Ok(SyncOutcome::NothingToDo)), "auto_commit=false should not commit dirty files");
+        assert!(
+            matches!(result, Ok(SyncOutcome::NothingToDo)),
+            "auto_commit=false should not commit dirty files"
+        );
 
         let output = git_cmd(&repo, &["status", "--porcelain"]);
         let status = String::from_utf8_lossy(&output.stdout);
-        assert!(status.contains("dirty.txt"), "file should still be untracked/unstaged");
+        assert!(
+            status.contains("dirty.txt"),
+            "file should still be untracked/unstaged"
+        );
     }
 
     #[tokio::test]
@@ -2227,21 +3060,29 @@ auto_bump_versions = false
 
         let commits_before = git_cmd(&repo, &["rev-list", "--count", "HEAD"]);
         let commits_count_before: usize = String::from_utf8_lossy(&commits_before.stdout)
-            .trim().parse().unwrap();
+            .trim()
+            .parse()
+            .unwrap();
 
         let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, true, None, false).await;
         assert!(result.is_ok(), "dry-run should succeed");
 
         let commits_after = git_cmd(&repo, &["rev-list", "--count", "HEAD"]);
         let commits_count_after: usize = String::from_utf8_lossy(&commits_after.stdout)
-            .trim().parse().unwrap();
-        assert_eq!(commits_count_before, commits_count_after,
-            "dry-run should not create any commits");
+            .trim()
+            .parse()
+            .unwrap();
+        assert_eq!(
+            commits_count_before, commits_count_after,
+            "dry-run should not create any commits"
+        );
 
         let status = git_cmd(&repo, &["status", "--porcelain"]);
         let status_output = String::from_utf8_lossy(&status.stdout);
-        assert!(status_output.contains("new_file.txt"),
-            "file should still appear as untracked in working tree");
+        assert!(
+            status_output.contains("new_file.txt"),
+            "file should still appear as untracked in working tree"
+        );
     }
 
     #[tokio::test]
@@ -2254,7 +3095,10 @@ auto_bump_versions = false
         git_cmd(&repo, &["commit", "-m", "add file"]);
 
         let commits_before = git_cmd(&repo, &["rev-list", "--count", "HEAD"]);
-        let count_before: usize = String::from_utf8_lossy(&commits_before.stdout).trim().parse().unwrap();
+        let count_before: usize = String::from_utf8_lossy(&commits_before.stdout)
+            .trim()
+            .parse()
+            .unwrap();
 
         let toml_str = r#"
 auto_github_private = false
@@ -2269,8 +3113,14 @@ auto_bump_versions = false
         assert!(result.is_ok(), "dry-run should succeed");
 
         let commits_after = git_cmd(&repo, &["rev-list", "--count", "HEAD"]);
-        let count_after: usize = String::from_utf8_lossy(&commits_after.stdout).trim().parse().unwrap();
-        assert_eq!(count_before, count_after, "dry-run should not change commit count");
+        let count_after: usize = String::from_utf8_lossy(&commits_after.stdout)
+            .trim()
+            .parse()
+            .unwrap();
+        assert_eq!(
+            count_before, count_after,
+            "dry-run should not change commit count"
+        );
     }
 
     #[tokio::test]
@@ -2299,8 +3149,14 @@ auto_bump_versions = false
 
         let output = git_cmd(&repo, &["status", "--porcelain"]);
         let status = String::from_utf8_lossy(&output.stdout);
-        assert!(status.contains("modified.txt"), "modified.txt should still be modified");
-        assert!(status.contains("untracked.txt"), "untracked.txt should still be untracked");
+        assert!(
+            status.contains("modified.txt"),
+            "modified.txt should still be modified"
+        );
+        assert!(
+            status.contains("untracked.txt"),
+            "untracked.txt should still be untracked"
+        );
     }
 
     /// Comprehensive boundary test for the mass-deletion safety guard.
@@ -2308,8 +3164,15 @@ auto_bump_versions = false
     /// to verify the guard's >=85% threshold, and the atomic counter.
     #[tokio::test]
     async fn test_safety_guard_boundaries() {
-        async fn check_scenario(tmp: &tempfile::TempDir, name: &str, total: usize, delete_count: usize, expect_blocked: bool) {
-            let before = crate::sync::MASS_DELETION_GUARD_BLOCKED.load(std::sync::atomic::Ordering::Relaxed);
+        async fn check_scenario(
+            tmp: &tempfile::TempDir,
+            name: &str,
+            total: usize,
+            delete_count: usize,
+            expect_blocked: bool,
+        ) {
+            let before =
+                crate::sync::MASS_DELETION_GUARD_BLOCKED.load(std::sync::atomic::Ordering::Relaxed);
             let repo = init_test_repo(tmp, name);
 
             // Create tracked files
@@ -2335,35 +3198,96 @@ auto_bump_versions = false
         auto_bump_versions = false
         "#;
             let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
-            let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
-            assert!(result.is_ok(), "sync_repo should succeed for {} tracked, {} deleted", total, delete_count);
+            let result = sync_repo(
+                &repo,
+                &policy,
+                &BTreeSet::new(),
+                0,
+                None,
+                false,
+                None,
+                false,
+            )
+            .await;
+            assert!(
+                result.is_ok(),
+                "sync_repo should succeed for {} tracked, {} deleted",
+                total,
+                delete_count
+            );
 
-            let pct = if total > 0 { (delete_count * 100) / total } else { 0 };
+            let pct = if total > 0 {
+                (delete_count * 100) / total
+            } else {
+                0
+            };
             if expect_blocked {
-                assert!(matches!(result, Ok(SyncOutcome::Blocked)), "guard should block {}% deletion ({} of {})", pct, delete_count, total);
+                assert!(
+                    matches!(result, Ok(SyncOutcome::Blocked)),
+                    "guard should block {}% deletion ({} of {})",
+                    pct,
+                    delete_count,
+                    total
+                );
                 // Verify deleted files are still tracked
                 let output = git_cmd(&repo, &["ls-files"]);
                 let tracked = String::from_utf8_lossy(&output.stdout);
                 for f in &to_delete {
-                    assert!(tracked.contains(f.as_str()), "{} should still be tracked after guard block ({}% deletion)", f, pct);
+                    assert!(
+                        tracked.contains(f.as_str()),
+                        "{} should still be tracked after guard block ({}% deletion)",
+                        f,
+                        pct
+                    );
                 }
-                let after = crate::sync::MASS_DELETION_GUARD_BLOCKED.load(std::sync::atomic::Ordering::Relaxed);
-                assert_eq!(after, before + 1, "guard blocked counter should increment for {}% deletion ({} of {})", pct, delete_count, total);
+                let after = crate::sync::MASS_DELETION_GUARD_BLOCKED
+                    .load(std::sync::atomic::Ordering::Relaxed);
+                assert_eq!(
+                    after,
+                    before + 1,
+                    "guard blocked counter should increment for {}% deletion ({} of {})",
+                    pct,
+                    delete_count,
+                    total
+                );
             } else if delete_count == 0 {
                 // No deletions at all → sync_repo returns false (nothing to do)
-                assert!(matches!(result, Ok(SyncOutcome::NothingToDo)), "no changes should return false for {}% deletion ({} of {})", pct, delete_count, total);
-                let after = crate::sync::MASS_DELETION_GUARD_BLOCKED.load(std::sync::atomic::Ordering::Relaxed);
+                assert!(
+                    matches!(result, Ok(SyncOutcome::NothingToDo)),
+                    "no changes should return false for {}% deletion ({} of {})",
+                    pct,
+                    delete_count,
+                    total
+                );
+                let after = crate::sync::MASS_DELETION_GUARD_BLOCKED
+                    .load(std::sync::atomic::Ordering::Relaxed);
                 assert_eq!(after, before, "guard blocked counter should not increment");
             } else {
-                assert!(matches!(result, Ok(SyncOutcome::Synced)), "deletion should be committed for {}% ({} of {})", pct, delete_count, total);
+                assert!(
+                    matches!(result, Ok(SyncOutcome::Synced)),
+                    "deletion should be committed for {}% ({} of {})",
+                    pct,
+                    delete_count,
+                    total
+                );
                 // Verify deleted files are removed
                 let output = git_cmd(&repo, &["ls-files"]);
                 let tracked = String::from_utf8_lossy(&output.stdout);
                 for f in &to_delete {
-                    assert!(!tracked.contains(f.as_str()), "{} should be removed after commit ({}% deletion)", f, pct);
+                    assert!(
+                        !tracked.contains(f.as_str()),
+                        "{} should be removed after commit ({}% deletion)",
+                        f,
+                        pct
+                    );
                 }
-                let after = crate::sync::MASS_DELETION_GUARD_BLOCKED.load(std::sync::atomic::Ordering::Relaxed);
-                assert_eq!(after, before, "guard blocked counter should NOT increment for allowed {}% deletion", pct);
+                let after = crate::sync::MASS_DELETION_GUARD_BLOCKED
+                    .load(std::sync::atomic::Ordering::Relaxed);
+                assert_eq!(
+                    after, before,
+                    "guard blocked counter should NOT increment for allowed {}% deletion",
+                    pct
+                );
             }
         }
 
@@ -2425,7 +3349,17 @@ auto_bump_versions = false
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
         // No origin remote, so no push attempt — just check alert fires
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
+        let result = sync_repo(
+            &repo,
+            &policy,
+            &BTreeSet::new(),
+            0,
+            None,
+            false,
+            None,
+            false,
+        )
+        .await;
         assert!(result.is_ok(), "sync_repo should succeed");
     }
 
@@ -2450,7 +3384,17 @@ auto_bump_versions = false
         "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
+        let result = sync_repo(
+            &repo,
+            &policy,
+            &BTreeSet::new(),
+            0,
+            None,
+            false,
+            None,
+            false,
+        )
+        .await;
         assert!(result.is_ok(), "sync_repo should succeed");
     }
 
@@ -2505,13 +3449,30 @@ auto_bump_versions = false
             std::fs::remove_file(repo.join(format!("file{i}.txt"))).unwrap();
         }
 
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
-        assert!(matches!(result, Ok(SyncOutcome::Blocked)), "guard should block 85%+ deletion");
+        let result = sync_repo(
+            &repo,
+            &policy,
+            &BTreeSet::new(),
+            0,
+            None,
+            false,
+            None,
+            false,
+        )
+        .await;
+        assert!(
+            matches!(result, Ok(SyncOutcome::Blocked)),
+            "guard should block 85%+ deletion"
+        );
 
         // Verify index is clean — file0 modification should have been reset
         let staged = git_cmd(&repo, &["diff", "--cached", "--name-only"]);
         let staged_str = String::from_utf8_lossy(&staged.stdout);
-        assert!(staged_str.trim().is_empty(), "staged changes should be reset after guard blocks, got: {:?}", staged_str);
+        assert!(
+            staged_str.trim().is_empty(),
+            "staged changes should be reset after guard blocks, got: {:?}",
+            staged_str
+        );
     }
 
     /// CR-2 regression test: filter-only changes must NOT be re-detected by
@@ -2544,9 +3505,22 @@ auto_bump_versions = false
 
         // sync_repo should see filter-only changes, skip them, and NOT
         // fall back to cli_diff_entries which would see the CRLF difference.
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
+        let result = sync_repo(
+            &repo,
+            &policy,
+            &BTreeSet::new(),
+            0,
+            None,
+            false,
+            None,
+            false,
+        )
+        .await;
         assert!(
-            matches!(result, Ok(SyncOutcome::NothingToDo) | Ok(SyncOutcome::Synced)),
+            matches!(
+                result,
+                Ok(SyncOutcome::NothingToDo) | Ok(SyncOutcome::Synced)
+            ),
             "filter-only repo should produce NothingToDo or Synced without changes, got {:?}",
             result
         );
@@ -2554,7 +3528,10 @@ auto_bump_versions = false
         // Verify nothing was staged
         let staged = git_cmd(&repo, &["diff", "--cached", "--name-only"]);
         let staged_str = String::from_utf8_lossy(&staged.stdout);
-        assert!(staged_str.trim().is_empty(), "nothing should be staged for filter-only repo");
+        assert!(
+            staged_str.trim().is_empty(),
+            "nothing should be staged for filter-only repo"
+        );
     }
 
     #[tokio::test]
@@ -2582,14 +3559,29 @@ auto_bump_versions = false
 
         // sync_repo should succeed — no dedup guard blocking legitimate work
         std::fs::write(repo.join("c.txt"), "c").unwrap();
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None, false).await;
-        assert!(result.is_ok(), "sync_repo should succeed with duplicate subjects in history");
+        let result = sync_repo(
+            &repo,
+            &policy,
+            &BTreeSet::new(),
+            0,
+            None,
+            false,
+            None,
+            false,
+        )
+        .await;
+        assert!(
+            result.is_ok(),
+            "sync_repo should succeed with duplicate subjects in history"
+        );
     }
 
     #[test]
     fn test_conventional_prefix_detects_scoped_and_bare() {
         let has_prefix = |s: &str| -> bool {
-            crate::bump::CONVENTIONAL_COMMIT_TYPES.iter().any(|t| s.starts_with(&format!("{}:", t)) || s.starts_with(&format!("{}(", t)))
+            crate::bump::CONVENTIONAL_COMMIT_TYPES
+                .iter()
+                .any(|t| s.starts_with(&format!("{}:", t)) || s.starts_with(&format!("{}(", t)))
                 || s.starts_with("Revert \"")
         };
 

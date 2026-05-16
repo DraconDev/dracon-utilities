@@ -39,13 +39,20 @@ pub(crate) struct RemoteConfig {
 #[allow(dead_code)]
 impl RemoteConfig {
     pub(crate) fn resolve_push_url(&self, repo_name: &str) -> String {
-        let resolved_name = self.repo_name_map.get(repo_name).map(|s| s.as_str()).unwrap_or(repo_name);
+        let resolved_name = self
+            .repo_name_map
+            .get(repo_name)
+            .map(|s| s.as_str())
+            .unwrap_or(repo_name);
         let url = self.push_url.replace("{repo}", resolved_name);
         url.replace("{account}", &self.auto_create_account)
     }
 
     pub(crate) fn resolve_repo_name(&self, repo_name: &str) -> String {
-        self.repo_name_map.get(repo_name).cloned().unwrap_or_else(|| repo_name.to_string())
+        self.repo_name_map
+            .get(repo_name)
+            .cloned()
+            .unwrap_or_else(|| repo_name.to_string())
     }
 }
 
@@ -144,42 +151,42 @@ where
         RemotesOrExtra::New(configs) => Ok(configs),
         RemotesOrExtra::Legacy(names) => {
             let defaults = vec![
-        RemoteConfig {
-            name: "github".to_string(),
-            push_url: "git@github.com:{account}/{repo}.git".to_string(),
-            auto_create: false,
-            auto_create_account: "DraconDev".to_string(),
-            auth_type: AuthType::GitHub,
-            priority: 50,
-            api_endpoint: None,
-            auto_create_token_var: None,
-            repo_name_map: Default::default(),
-            force_push_when_behind: false,
-        },
-        RemoteConfig {
-            name: "gitlab".to_string(),
-            push_url: "git@gitlab.com:{account}/{repo}.git".to_string(),
-            auto_create: false,
-            auto_create_account: "DraconDev".to_string(),
-            auth_type: AuthType::GitLab,
-            priority: 50,
-            api_endpoint: None,
-            auto_create_token_var: None,
-            repo_name_map: Default::default(),
-            force_push_when_behind: false,
-        },
-        RemoteConfig {
-            name: "codeberg".to_string(),
-            push_url: "git@codeberg.org:{account}/{repo}.git".to_string(),
-            auto_create: false,
-            auto_create_account: "dracondev".to_string(),
-            auth_type: AuthType::Codeberg,
-            priority: 50,
-            api_endpoint: Some("https://codeberg.org/api/v1/repos".to_string()),
-            auto_create_token_var: None,
-            repo_name_map: Default::default(),
-            force_push_when_behind: false,
-        },
+                RemoteConfig {
+                    name: "github".to_string(),
+                    push_url: "git@github.com:{account}/{repo}.git".to_string(),
+                    auto_create: false,
+                    auto_create_account: "DraconDev".to_string(),
+                    auth_type: AuthType::GitHub,
+                    priority: 50,
+                    api_endpoint: None,
+                    auto_create_token_var: None,
+                    repo_name_map: Default::default(),
+                    force_push_when_behind: false,
+                },
+                RemoteConfig {
+                    name: "gitlab".to_string(),
+                    push_url: "git@gitlab.com:{account}/{repo}.git".to_string(),
+                    auto_create: false,
+                    auto_create_account: "DraconDev".to_string(),
+                    auth_type: AuthType::GitLab,
+                    priority: 50,
+                    api_endpoint: None,
+                    auto_create_token_var: None,
+                    repo_name_map: Default::default(),
+                    force_push_when_behind: false,
+                },
+                RemoteConfig {
+                    name: "codeberg".to_string(),
+                    push_url: "git@codeberg.org:{account}/{repo}.git".to_string(),
+                    auto_create: false,
+                    auto_create_account: "dracondev".to_string(),
+                    auth_type: AuthType::Codeberg,
+                    priority: 50,
+                    api_endpoint: Some("https://codeberg.org/api/v1/repos".to_string()),
+                    auto_create_token_var: None,
+                    repo_name_map: Default::default(),
+                    force_push_when_behind: false,
+                },
             ];
 
             let filtered: Vec<RemoteConfig> = defaults
@@ -618,7 +625,11 @@ pub(crate) fn validate_config(policy_path: &Path) -> ValidateResult {
     let content = match std::fs::read_to_string(policy_path) {
         Ok(c) => c,
         Err(e) => {
-            result.error(format!("cannot read policy {}: {}", policy_path.display(), e));
+            result.error(format!(
+                "cannot read policy {}: {}",
+                policy_path.display(),
+                e
+            ));
             return result;
         }
     };
@@ -646,7 +657,10 @@ pub(crate) fn validate_config(policy_path: &Path) -> ValidateResult {
 
     for (idx, remote) in policy.remotes.iter().enumerate() {
         if remote.push_url.is_empty() {
-            result.error(format!("remote[{}] '{}': push_url is empty", idx, remote.name));
+            result.error(format!(
+                "remote[{}] '{}': push_url is empty",
+                idx, remote.name
+            ));
         }
 
         if remote.auto_create {
@@ -665,7 +679,8 @@ pub(crate) fn validate_config(policy_path: &Path) -> ValidateResult {
                     ));
                 } else if std::env::var(token_var).is_err() {
                     let secrets_dir = crate::secrets::sync_secrets_dir();
-                    let secrets_path = secrets_dir.join(format!("{}.env", token_var.to_lowercase()));
+                    let secrets_path =
+                        secrets_dir.join(format!("{}.env", token_var.to_lowercase()));
                     if !secrets_path.exists() {
                         result.warn(format!(
                             "remote[{}] '{}': auto_create_token_var '{}' not in env and no secret file at {}",
@@ -682,7 +697,9 @@ pub(crate) fn validate_config(policy_path: &Path) -> ValidateResult {
                             "remote[{}] '{}': auth_type=codeberg but api_endpoint is empty",
                             idx, remote.name
                         ));
-                    } else if !api_endpoint.starts_with("http://") && !api_endpoint.starts_with("https://") {
+                    } else if !api_endpoint.starts_with("http://")
+                        && !api_endpoint.starts_with("https://")
+                    {
                         result.error(format!(
                             "remote[{}] '{}': api_endpoint '{}' is not a valid URL",
                             idx, remote.name, api_endpoint
@@ -740,10 +757,10 @@ pub(crate) fn validate_config(policy_path: &Path) -> ValidateResult {
         }
     }
 
-    if policy.auto_github_private
-        && policy.auto_github_private_account.is_empty() {
-            result.error("auto_github_private=true but auto_github_private_account is empty".to_string());
-        }
+    if policy.auto_github_private && policy.auto_github_private_account.is_empty() {
+        result
+            .error("auto_github_private=true but auto_github_private_account is empty".to_string());
+    }
 
     if policy.pulse_interval_secs == 0 {
         result.error("pulse_interval_secs must be > 0".to_string());
@@ -759,7 +776,10 @@ pub(crate) fn validate_config(policy_path: &Path) -> ValidateResult {
 
     if let Some(ref url) = policy.webhook_url {
         if !url.starts_with("http://") && !url.starts_with("https://") {
-            result.error(format!("webhook_url '{}' is not a valid http/https URL", url));
+            result.error(format!(
+                "webhook_url '{}' is not a valid http/https URL",
+                url
+            ));
         }
     }
 
@@ -1068,7 +1088,11 @@ mod tests {
             } else {
                 std::env::set_var(var, value);
             }
-            Self { var: var.to_string(), original, _lock: lock }
+            Self {
+                var: var.to_string(),
+                original,
+                _lock: lock,
+            }
         }
     }
     impl Drop for VarGuard {
@@ -1140,7 +1164,9 @@ mod tests {
     #[test]
     fn test_freeze_marker_paths_includes_dracondir() {
         let paths = freeze_marker_paths(std::path::Path::new("/fake.toml"));
-        assert!(paths.iter().any(|p| p.to_string_lossy().contains(".dracon")));
+        assert!(paths
+            .iter()
+            .any(|p| p.to_string_lossy().contains(".dracon")));
         assert!(paths.iter().any(|p| p.to_string_lossy().contains("freeze")));
     }
 
@@ -1155,7 +1181,10 @@ mod tests {
     #[test]
     fn test_sync_policy_watch_roots_filters_nonexistent() {
         let policy = SyncPolicy {
-            watch_roots: vec!["/nonexistent/path/one".to_string(), "/nonexistent/path/two".to_string()],
+            watch_roots: vec![
+                "/nonexistent/path/one".to_string(),
+                "/nonexistent/path/two".to_string(),
+            ],
             ..test_sync_policy()
         };
         let roots = policy.watch_root_paths();
@@ -1181,13 +1210,13 @@ mod tests {
             priority: 50,
             api_endpoint: None,
             auto_create_token_var: None,
-repo_name_map: Default::default(),
-        force_push_when_behind: false,
-    };
-    assert_eq!(
-        config.resolve_push_url("my-repo"),
-        "git@github.com:myorg/my-repo.git"
-    );
+            repo_name_map: Default::default(),
+            force_push_when_behind: false,
+        };
+        assert_eq!(
+            config.resolve_push_url("my-repo"),
+            "git@github.com:myorg/my-repo.git"
+        );
     }
 
     #[test]
@@ -1201,13 +1230,13 @@ repo_name_map: Default::default(),
             priority: 50,
             api_endpoint: None,
             auto_create_token_var: None,
-repo_name_map: Default::default(),
-        force_push_when_behind: false,
-    };
-    assert_eq!(
-        config.resolve_push_url("any-repo"),
-        "git@mirror.example.com:fixed/path.git"
-    );
+            repo_name_map: Default::default(),
+            force_push_when_behind: false,
+        };
+        assert_eq!(
+            config.resolve_push_url("any-repo"),
+            "git@mirror.example.com:fixed/path.git"
+        );
     }
 
     #[test]
@@ -1221,13 +1250,10 @@ repo_name_map: Default::default(),
             priority: 50,
             api_endpoint: None,
             auto_create_token_var: None,
-repo_name_map: Default::default(),
-        force_push_when_behind: false,
-    };
-    assert_eq!(
-        config.resolve_push_url("repo"),
-        "git@gitlab.com:testuser/"
-    );
+            repo_name_map: Default::default(),
+            force_push_when_behind: false,
+        };
+        assert_eq!(config.resolve_push_url("repo"), "git@gitlab.com:testuser/");
     }
 
     #[test]
@@ -1241,15 +1267,17 @@ repo_name_map: Default::default(),
             priority: 50,
             api_endpoint: None,
             auto_create_token_var: None,
-repo_name_map: Default::default(),
-        force_push_when_behind: false,
-    };
-    config.repo_name_map.insert(".dracon".to_string(), "dracon-home".to_string());
+            repo_name_map: Default::default(),
+            force_push_when_behind: false,
+        };
+        config
+            .repo_name_map
+            .insert(".dracon".to_string(), "dracon-home".to_string());
 
-    assert_eq!(
-        config.resolve_push_url(".dracon"),
-        "git@gitlab.com:myorg/dracon-home.git"
-    );
+        assert_eq!(
+            config.resolve_push_url(".dracon"),
+            "git@gitlab.com:myorg/dracon-home.git"
+        );
         assert_eq!(
             config.resolve_push_url("other-repo"),
             "git@gitlab.com:myorg/other-repo.git"
@@ -1267,12 +1295,14 @@ repo_name_map: Default::default(),
             priority: 50,
             api_endpoint: None,
             auto_create_token_var: None,
-    repo_name_map: Default::default(),
-        force_push_when_behind: false,
-    };
-    config.repo_name_map.insert(".dracon".to_string(), "dracon-home".to_string());
+            repo_name_map: Default::default(),
+            force_push_when_behind: false,
+        };
+        config
+            .repo_name_map
+            .insert(".dracon".to_string(), "dracon-home".to_string());
 
-    assert_eq!(config.resolve_repo_name(".dracon"), "dracon-home");
+        assert_eq!(config.resolve_repo_name(".dracon"), "dracon-home");
         assert_eq!(config.resolve_repo_name("other-repo"), "other-repo");
     }
 
@@ -1287,9 +1317,9 @@ repo_name_map: Default::default(),
             priority: 50,
             api_endpoint: None,
             auto_create_token_var: None,
-    repo_name_map: Default::default(),
-        force_push_when_behind: false,
-    };
+            repo_name_map: Default::default(),
+            force_push_when_behind: false,
+        };
 
         assert_eq!(config.resolve_repo_name(".dracon"), ".dracon");
         assert_eq!(config.resolve_repo_name("my-repo"), "my-repo");
@@ -1309,7 +1339,11 @@ remotes = []
 "#;
         std::fs::write(tmp.path().join("policy.toml"), content).unwrap();
         let result = validate_config(tmp.path().join("policy.toml").as_path());
-        assert!(result.is_valid(), "valid policy should pass: {:?}", result.errors);
+        assert!(
+            result.is_valid(),
+            "valid policy should pass: {:?}",
+            result.errors
+        );
     }
 
     #[test]
@@ -1323,7 +1357,10 @@ remotes = []
         std::fs::write(tmp.path().join("policy.toml"), content).unwrap();
         let result = validate_config(tmp.path().join("policy.toml").as_path());
         assert!(!result.is_valid(), "missing watch root should fail");
-        assert!(result.errors.iter().any(|e| e.contains("does not exist")), "should mention missing path");
+        assert!(
+            result.errors.iter().any(|e| e.contains("does not exist")),
+            "should mention missing path"
+        );
     }
 
     #[test]
@@ -1338,7 +1375,10 @@ webhook_url = "ftp://invalid.example.com/hook"
         std::fs::write(tmp.path().join("policy.toml"), content).unwrap();
         let result = validate_config(tmp.path().join("policy.toml").as_path());
         assert!(!result.is_valid(), "non-http webhook URL should fail");
-        assert!(result.errors.iter().any(|e| e.contains("webhook_url")), "should mention webhook_url");
+        assert!(
+            result.errors.iter().any(|e| e.contains("webhook_url")),
+            "should mention webhook_url"
+        );
     }
 
     #[test]
@@ -1370,7 +1410,10 @@ auto_create_account = ""
 "#;
         std::fs::write(tmp.path().join("policy.toml"), content).unwrap();
         let result = validate_config(tmp.path().join("policy.toml").as_path());
-        assert!(!result.is_valid(), "auto_create=true with empty account should fail");
+        assert!(
+            !result.is_valid(),
+            "auto_create=true with empty account should fail"
+        );
     }
 
     #[test]
@@ -1384,7 +1427,10 @@ remotes = []
         std::fs::write(tmp.path().join("policy.toml"), content).unwrap();
         let result = validate_config(tmp.path().join("policy.toml").as_path());
         assert!(!result.is_valid(), "no watch_roots should fail");
-        assert!(result.errors.iter().any(|e| e.contains("watch_roots")), "should mention watch_roots");
+        assert!(
+            result.errors.iter().any(|e| e.contains("watch_roots")),
+            "should mention watch_roots"
+        );
     }
 
     #[test]
@@ -1398,6 +1444,9 @@ remotes = []
         std::fs::write(tmp.path().join("policy.toml"), content).unwrap();
         let result = validate_config(tmp.path().join("policy.toml").as_path());
         assert!(result.is_valid(), "no remotes is a warning not error");
-        assert!(result.warnings.iter().any(|w| w.contains("no remotes")), "should warn about no remotes");
+        assert!(
+            result.warnings.iter().any(|w| w.contains("no remotes")),
+            "should warn about no remotes"
+        );
     }
 }

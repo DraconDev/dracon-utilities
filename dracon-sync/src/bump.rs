@@ -75,16 +75,22 @@ const NOISE_PATTERNS: &[&str] = &[
     ".pub",
 ];
 
-pub(crate) const VERSION_FILES: &[&str] = &[
-    "Cargo.toml",
-    "package.json",
-    "VERSION",
-    "Cargo.lock",
-];
+pub(crate) const VERSION_FILES: &[&str] = &["Cargo.toml", "package.json", "VERSION", "Cargo.lock"];
 
 pub(crate) const CONVENTIONAL_COMMIT_TYPES: &[&str] = &[
-    "feat", "fix", "docs", "style", "refactor", "perf", "test",
-    "build", "ci", "chore", "revert", "improvement", "security",
+    "feat",
+    "fix",
+    "docs",
+    "style",
+    "refactor",
+    "perf",
+    "test",
+    "build",
+    "ci",
+    "chore",
+    "revert",
+    "improvement",
+    "security",
 ];
 
 pub fn deterministic_decide_bump_level(staged_diff: &str) -> BumpLevel {
@@ -170,7 +176,6 @@ pub(crate) fn extract_version_from_json(content: &str, key: &str) -> Option<Stri
     }
 }
 
-
 #[cfg(feature = "ai-bumper")]
 pub async fn ai_decide_bump_level(
     _repo: &Path,
@@ -181,17 +186,17 @@ pub async fn ai_decide_bump_level(
     use crate::simple_ai::{ChatMessage, SimpleAiService};
 
     let version_only_patterns = ["Cargo.toml", "package.json", "VERSION", "Cargo.lock"];
-    let has_source_changes = staged_diff.lines()
+    let has_source_changes = staged_diff
+        .lines()
         .filter(|line| !line.is_empty())
-        .any(|line| {
-            !version_only_patterns.iter().any(|p| line.contains(p))
-        });
+        .any(|line| !version_only_patterns.iter().any(|p| line.contains(p)));
 
     if !has_source_changes {
         return BumpLevel::None;
     }
 
-    let prompt = format!(r##"You are a version bump advisor. Analyze the changes and decide if a version bump is warranted.
+    let prompt = format!(
+        r##"You are a version bump advisor. Analyze the changes and decide if a version bump is warranted.
 
 Current Version: {current_version}
 
@@ -207,7 +212,8 @@ Respond with ONLY ONE WORD:
 - "none": NOISY/CHORE (docs, deps, config only)
 
 NEVER respond "major" — major version bumps are manual-only.
-Respond with ONLY ONE WORD."##);
+Respond with ONLY ONE WORD."##
+    );
 
     let service = SimpleAiService::new();
     if service.is_empty() {
@@ -217,14 +223,12 @@ Respond with ONLY ONE WORD."##);
     let messages = vec![ChatMessage::user(&prompt)];
 
     match service.chat(messages).await {
-        Ok(content) => {
-            match content.trim().to_lowercase().as_str() {
-                "major" => BumpLevel::None,
-                "minor" => BumpLevel::Minor,
-                "patch" => BumpLevel::Patch,
-                _ => BumpLevel::None,
-            }
-        }
+        Ok(content) => match content.trim().to_lowercase().as_str() {
+            "major" => BumpLevel::None,
+            "minor" => BumpLevel::Minor,
+            "patch" => BumpLevel::Patch,
+            _ => BumpLevel::None,
+        },
         Err(_) => BumpLevel::None,
     }
 }
@@ -233,25 +237,24 @@ pub fn apply_version_bump_to_repo(repo: &Path, old_ver: &str, new_ver: &str) -> 
     if repo.join("Cargo.toml").exists() {
         if let Ok(content) = std::fs::read_to_string(repo.join("Cargo.toml")) {
             let bumped = bump_version_in_cargo_toml(&content, old_ver, new_ver);
-            if bumped != content
-                && std::fs::write(repo.join("Cargo.toml"), bumped).is_ok() {
-                    return true;
-                }
+            if bumped != content && std::fs::write(repo.join("Cargo.toml"), bumped).is_ok() {
+                return true;
+            }
         }
     }
     if repo.join("package.json").exists() {
         if let Ok(content) = std::fs::read_to_string(repo.join("package.json")) {
             let bumped = bump_version_in_json(&content, old_ver, new_ver);
-            if bumped != content
-                && std::fs::write(repo.join("package.json"), bumped).is_ok() {
-                    return true;
-                }
+            if bumped != content && std::fs::write(repo.join("package.json"), bumped).is_ok() {
+                return true;
+            }
         }
     }
     if repo.join("VERSION").exists()
-        && std::fs::write(repo.join("VERSION"), format!("{}\n", new_ver)).is_ok() {
-            return true;
-        }
+        && std::fs::write(repo.join("VERSION"), format!("{}\n", new_ver)).is_ok()
+    {
+        return true;
+    }
     false
 }
 
@@ -263,9 +266,17 @@ fn bump_version_in_cargo_toml(content: &str, old_ver: &str, new_ver: &str) -> St
             in_package = line.trim() == "[package]" || line.trim() == "[workspace.package]";
         }
         if in_package && (line.starts_with("version =") || line.starts_with("version=")) {
-            result.push_str(&line
-                .replace(&format!("version = \"{}\"", old_ver), &format!("version = \"{}\"", new_ver))
-                .replace(&format!("version=\"{}\"", old_ver), &format!("version=\"{}\"", new_ver)));
+            result.push_str(
+                &line
+                    .replace(
+                        &format!("version = \"{}\"", old_ver),
+                        &format!("version = \"{}\"", new_ver),
+                    )
+                    .replace(
+                        &format!("version=\"{}\"", old_ver),
+                        &format!("version=\"{}\"", new_ver),
+                    ),
+            );
         } else {
             result.push_str(line);
         }
@@ -275,8 +286,15 @@ fn bump_version_in_cargo_toml(content: &str, old_ver: &str, new_ver: &str) -> St
 }
 
 fn bump_version_in_json(content: &str, old_ver: &str, new_ver: &str) -> String {
-    content.replace(&format!("\"version\": \"{}\"", old_ver), &format!("\"version\": \"{}\"", new_ver))
-        .replace(&format!("\"version\":\"{}\"", old_ver), &format!("\"version\":\"{}\"", new_ver))
+    content
+        .replace(
+            &format!("\"version\": \"{}\"", old_ver),
+            &format!("\"version\": \"{}\"", new_ver),
+        )
+        .replace(
+            &format!("\"version\":\"{}\"", old_ver),
+            &format!("\"version\":\"{}\"", new_ver),
+        )
 }
 
 #[cfg(test)]
@@ -285,21 +303,45 @@ mod tests {
 
     #[test]
     fn test_bump_semver_all_levels() {
-        assert_eq!(bump_semver("1.2.3", BumpLevel::Patch), Some("1.2.4".to_string()));
-        assert_eq!(bump_semver("1.2.3", BumpLevel::Minor), Some("1.3.0".to_string()));
+        assert_eq!(
+            bump_semver("1.2.3", BumpLevel::Patch),
+            Some("1.2.4".to_string())
+        );
+        assert_eq!(
+            bump_semver("1.2.3", BumpLevel::Minor),
+            Some("1.3.0".to_string())
+        );
         assert_eq!(bump_semver("1.2.3", BumpLevel::Major), None);
-        assert_eq!(bump_semver("0.0.0", BumpLevel::Patch), Some("0.0.1".to_string()));
-        assert_eq!(bump_semver("0.0.0", BumpLevel::Minor), Some("0.1.0".to_string()));
+        assert_eq!(
+            bump_semver("0.0.0", BumpLevel::Patch),
+            Some("0.0.1".to_string())
+        );
+        assert_eq!(
+            bump_semver("0.0.0", BumpLevel::Minor),
+            Some("0.1.0".to_string())
+        );
         assert_eq!(bump_semver("0.0.0", BumpLevel::Major), None);
         assert_eq!(bump_semver("v1.2.3", BumpLevel::Patch), None);
         assert_eq!(bump_semver("v1.2.3", BumpLevel::Minor), None);
         assert_eq!(bump_semver("v1.2.3", BumpLevel::Major), None);
         assert_eq!(bump_semver("1.2", BumpLevel::Patch), None);
-        assert_eq!(bump_semver("10.20.30", BumpLevel::Patch), Some("10.20.31".to_string()));
-        assert_eq!(bump_semver("10.20.30", BumpLevel::Minor), Some("10.21.0".to_string()));
+        assert_eq!(
+            bump_semver("10.20.30", BumpLevel::Patch),
+            Some("10.20.31".to_string())
+        );
+        assert_eq!(
+            bump_semver("10.20.30", BumpLevel::Minor),
+            Some("10.21.0".to_string())
+        );
         assert_eq!(bump_semver("10.20.30", BumpLevel::Major), None);
-        assert_eq!(bump_semver("0.0.1", BumpLevel::Patch), Some("0.0.2".to_string()));
-        assert_eq!(bump_semver("0.0.1", BumpLevel::Minor), Some("0.1.0".to_string()));
+        assert_eq!(
+            bump_semver("0.0.1", BumpLevel::Patch),
+            Some("0.0.2".to_string())
+        );
+        assert_eq!(
+            bump_semver("0.0.1", BumpLevel::Minor),
+            Some("0.1.0".to_string())
+        );
         assert_eq!(bump_semver("0.0.1", BumpLevel::Major), None);
     }
 
@@ -387,7 +429,8 @@ mod tests {
 
     #[test]
     fn test_bump_version_in_cargo_toml_skips_deps() {
-        let content = "[package]\nversion = \"1.2.3\"\n\n[dependencies]\nmy-dep = { version = \"1.2.3\" }";
+        let content =
+            "[package]\nversion = \"1.2.3\"\n\n[dependencies]\nmy-dep = { version = \"1.2.3\" }";
         let result = bump_version_in_cargo_toml(content, "1.2.3", "1.2.4");
         assert!(result.contains("version = \"1.2.4\""));
         assert!(result.contains("my-dep = { version = \"1.2.3\" }"));
@@ -419,7 +462,10 @@ mod tests {
         let content = r#"[package]
 name = "test"
 version = "1.2.3""#;
-        assert_eq!(extract_version_from_cargo(content), Some("1.2.3".to_string()));
+        assert_eq!(
+            extract_version_from_cargo(content),
+            Some("1.2.3".to_string())
+        );
     }
 
     #[test]
@@ -429,7 +475,10 @@ version = "2.0.0"
 
 [package]
 name = "test""#;
-        assert_eq!(extract_version_from_cargo(content), Some("2.0.0".to_string()));
+        assert_eq!(
+            extract_version_from_cargo(content),
+            Some("2.0.0".to_string())
+        );
     }
 
     #[test]
@@ -447,13 +496,19 @@ members = ["crate1", "crate2"]
 [package]
 name = "test"
 version = "1.0.0""#;
-        assert_eq!(extract_version_from_cargo(content), Some("1.0.0".to_string()));
+        assert_eq!(
+            extract_version_from_cargo(content),
+            Some("1.0.0".to_string())
+        );
     }
 
     #[test]
     fn test_extract_version_from_json() {
         let content = r#"{"version": "1.2.3"}"#;
-        assert_eq!(extract_version_from_json(content, "version"), Some("1.2.3".to_string()));
+        assert_eq!(
+            extract_version_from_json(content, "version"),
+            Some("1.2.3".to_string())
+        );
     }
 
     #[test]
@@ -465,7 +520,10 @@ version = "1.0.0""#;
     #[test]
     fn test_extract_version_from_json_multiple_keys() {
         let content = r#"{"name": "test", "version": "1.0.0", "other": "value"}"#;
-        assert_eq!(extract_version_from_json(content, "version"), Some("1.0.0".to_string()));
+        assert_eq!(
+            extract_version_from_json(content, "version"),
+            Some("1.0.0".to_string())
+        );
     }
 
     #[test]
@@ -476,6 +534,10 @@ version = "1.0.0""#;
             "patch" => BumpLevel::Patch,
             _ => BumpLevel::None,
         };
-        assert_eq!(result, BumpLevel::None, "major must map to None (manual-only)");
+        assert_eq!(
+            result,
+            BumpLevel::None,
+            "major must map to None (manual-only)"
+        );
     }
 }

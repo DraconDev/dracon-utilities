@@ -19,10 +19,13 @@ macro_rules! veprintln {
     };
 }
 
-use crate::policy::{SyncPolicy, freeze_reason, debug_enabled, timestamp_secs};
 use crate::exclude::{excluded_dir_names_set, has_sync_relevant_dirty_entries};
-use crate::git::{discover_git_repos, repo_diff_entries, has_origin_remote, has_tracking_upstream, has_both_main_and_master, git_diff_head_files};
-use crate::report::{ConcernRepairFilter, run_repair_concerns, run_repair_warns};
+use crate::git::{
+    discover_git_repos, git_diff_head_files, has_both_main_and_master, has_origin_remote,
+    has_tracking_upstream, repo_diff_entries,
+};
+use crate::policy::{debug_enabled, freeze_reason, timestamp_secs, SyncPolicy};
+use crate::report::{run_repair_concerns, run_repair_warns, ConcernRepairFilter};
 use crate::sync::{sync_repo, SyncOutcome};
 
 const STUCK_REPO_EXPIRY_SECS: u64 = 24 * 60 * 60; // 24 hours
@@ -145,13 +148,18 @@ mod daemon_tests {
     fn test_stuck_repos_path_format() {
         let path = stuck_repos_path();
         assert!(path.to_string_lossy().contains(".local"));
-        assert!(path.to_string_lossy().contains("dracon-sync-stuck-push-repos.json"));
+        assert!(path
+            .to_string_lossy()
+            .contains("dracon-sync-stuck-push-repos.json"));
     }
 
     #[test]
     fn test_load_stuck_push_repos_nonexistent() {
         let temp_dir = tempfile::tempdir().unwrap();
-        let _guard = crate::test_helpers::EnvRestorer::new("DRACON_SYNC_STATE_DIR", temp_dir.path().to_string_lossy().as_ref());
+        let _guard = crate::test_helpers::EnvRestorer::new(
+            "DRACON_SYNC_STATE_DIR",
+            temp_dir.path().to_string_lossy().as_ref(),
+        );
         let repos = load_stuck_push_repos();
         assert!(repos.is_empty());
     }
@@ -232,7 +240,10 @@ fn save_stuck_push_repos(repos: &HashMap<PathBuf, u64>) {
     }
     let entries: Vec<StuckRepoEntry> = repos
         .iter()
-        .map(|(p, t)| StuckRepoEntry { path: p.clone(), stuck_since: *t })
+        .map(|(p, t)| StuckRepoEntry {
+            path: p.clone(),
+            stuck_since: *t,
+        })
         .collect();
     let content = serde_json::to_string_pretty(&entries).unwrap_or_else(|e| {
         eprintln!("⚠️ failed serializing stuck repos: {}", e);
@@ -243,7 +254,11 @@ fn save_stuck_push_repos(repos: &HashMap<PathBuf, u64>) {
     }
     let tmp_path = path.with_extension("tmp");
     if let Err(e) = std::fs::write(&tmp_path, &content) {
-        eprintln!("⚠️ failed writing stuck repos tmp ({}): {}", tmp_path.display(), e);
+        eprintln!(
+            "⚠️ failed writing stuck repos tmp ({}): {}",
+            tmp_path.display(),
+            e
+        );
         let _ = std::fs::remove_file(&tmp_path);
         return;
     }
@@ -296,13 +311,27 @@ pub(crate) async fn run_once(policy_path: &Path) -> Result<()> {
     let policy = SyncPolicy::load(policy_path)?;
     let roots = policy.watch_root_paths();
     let excluded_dir_names = excluded_dir_names_set(&policy);
-    let repos = discover_git_repos(&roots, &excluded_dir_names, &policy.exclude_repos, Some(&policy.system_repo));
+    let repos = discover_git_repos(
+        &roots,
+        &excluded_dir_names,
+        &policy.exclude_repos,
+        Some(&policy.system_repo),
+    );
 
     let mut changed = 0usize;
     for repo in repos {
         match tokio::time::timeout(
             Duration::from_secs(policy.repo_sync_timeout_secs),
-            sync_repo(&repo, &policy, &excluded_dir_names, 0, None, false, Some(policy_path), false),
+            sync_repo(
+                &repo,
+                &policy,
+                &excluded_dir_names,
+                0,
+                None,
+                false,
+                Some(policy_path),
+                false,
+            ),
         )
         .await
         {
@@ -349,7 +378,10 @@ pub(crate) async fn run_once(policy_path: &Path) -> Result<()> {
     Ok(())
 }
 
-pub(crate) async fn run_daemon(policy_path: PathBuf, override_interval_secs: Option<u64>) -> Result<()> {
+pub(crate) async fn run_daemon(
+    policy_path: PathBuf,
+    override_interval_secs: Option<u64>,
+) -> Result<()> {
     #[derive(Debug, Clone)]
     struct RepoActivity {
         fingerprint: String,
@@ -406,8 +438,12 @@ pub(crate) async fn run_daemon(policy_path: PathBuf, override_interval_secs: Opt
             reload.store(false, Ordering::SeqCst);
             match SyncPolicy::load(&policy_path) {
                 Ok(p) => {
-                    veprintln!(2, "sync: policy reloaded on SIGHUP (watch_root={} repos, excluded={})",
-                        p.watch_root_paths().len(), p.exclude_repos.len());
+                    veprintln!(
+                        2,
+                        "sync: policy reloaded on SIGHUP (watch_root={} repos, excluded={})",
+                        p.watch_root_paths().len(),
+                        p.exclude_repos.len()
+                    );
                     activity.clear();
                     repair_cooldowns.clear();
                     filter_cooldowns.clear();
@@ -423,11 +459,18 @@ pub(crate) async fn run_daemon(policy_path: PathBuf, override_interval_secs: Opt
                 continue;
             }
         };
-        let scan_interval = override_interval_secs.unwrap_or(policy.pulse_interval_secs).max(1);
+        let scan_interval = override_interval_secs
+            .unwrap_or(policy.pulse_interval_secs)
+            .max(1);
         let inactivity_delay = Duration::from_secs(policy.inactivity_push_delay_secs.max(1));
         let roots = policy.watch_root_paths();
         let excluded_dir_names = excluded_dir_names_set(&policy);
-        let repos = discover_git_repos(&roots, &excluded_dir_names, &policy.exclude_repos, Some(&policy.system_repo));
+        let repos = discover_git_repos(
+            &roots,
+            &excluded_dir_names,
+            &policy.exclude_repos,
+            Some(&policy.system_repo),
+        );
         let repo_set: BTreeSet<PathBuf> = repos.iter().cloned().collect();
         activity.retain(|repo, _| repo_set.contains(repo));
         repair_cooldowns.retain(|repo, _| repo_set.contains(repo));
@@ -451,18 +494,28 @@ pub(crate) async fn run_daemon(policy_path: PathBuf, override_interval_secs: Opt
                     continue;
                 }
                 // 5+ minutes since stuck was recorded - retry once
-                eprintln!("🔄 {} was stuck, retrying push after {}s", repo.display(), stuck_age_secs);
+                eprintln!(
+                    "🔄 {} was stuck, retrying push after {}s",
+                    repo.display(),
+                    stuck_age_secs
+                );
                 stuck_push_repos.remove(&repo);
                 save_stuck_push_repos(&stuck_push_repos);
             }
             if has_both_main_and_master(&repo) {
-                eprintln!("🔧 {} has both main+master, consolidating to main", repo.display());
+                eprintln!(
+                    "🔧 {} has both main+master, consolidating to main",
+                    repo.display()
+                );
                 if let Err(e) = crate::git::consolidate_to_main(&repo).await {
                     eprintln!("⚠️ failed to consolidate {} to main: {}", repo.display(), e);
                     continue;
                 }
             } else if crate::git::has_only_master_branch(&repo) {
-                eprintln!("🔧 {} has only 'master', renaming to 'main'", repo.display());
+                eprintln!(
+                    "🔧 {} has only 'master', renaming to 'main'",
+                    repo.display()
+                );
                 if let Err(e) = crate::git::rename_master_to_main(&repo).await {
                     eprintln!("⚠️ failed to rename {} master→main: {}", repo.display(), e);
                     continue;
@@ -501,8 +554,10 @@ pub(crate) async fn run_daemon(policy_path: PathBuf, override_interval_secs: Opt
 
             // Fast path: skip expensive git diff calls for clean, synced repos.
             // Only do detailed diff analysis when the repo actually has changes.
-            let (effective_dirty, _entries) =
-            if status.is_clean && status.ahead == 0 && status.behind == 0 {
+            let (effective_dirty, _entries) = if status.is_clean
+                && status.ahead == 0
+                && status.behind == 0
+            {
                 // Clean and synced — skip all expensive git calls
                 let has_remote_issues = !has_origin || !has_upstream;
                 if !has_remote_issues {
@@ -535,18 +590,22 @@ pub(crate) async fn run_daemon(policy_path: PathBuf, override_interval_secs: Opt
                 let filtered: Vec<_> = if diff_head_files.is_empty() && !raw_entries.is_empty() {
                     // git diff HEAD returned nothing. Only clear if ALL entries are Modified
                     // (filter-only). Untracked/Added files don't appear in git diff HEAD.
-                    let has_non_modified = raw_entries.iter().any(|e| {
-                        !matches!(e.status, dracon_git::types::FileStatus::Modified)
-                    });
+                    let has_non_modified = raw_entries
+                        .iter()
+                        .any(|e| !matches!(e.status, dracon_git::types::FileStatus::Modified));
                     if has_non_modified {
-                        raw_entries.into_iter()
-                            .filter(|e| !matches!(e.status, dracon_git::types::FileStatus::Modified))
+                        raw_entries
+                            .into_iter()
+                            .filter(|e| {
+                                !matches!(e.status, dracon_git::types::FileStatus::Modified)
+                            })
                             .collect()
                     } else {
                         Vec::new()
                     }
                 } else {
-                    raw_entries.into_iter()
+                    raw_entries
+                        .into_iter()
                         .filter(|e| {
                             // Always keep non-modified entries (added, deleted, etc.)
                             // For modified entries, only keep if git diff HEAD shows them
@@ -565,8 +624,7 @@ pub(crate) async fn run_daemon(policy_path: PathBuf, override_interval_secs: Opt
                     policy.max_stage_file_bytes,
                 );
                 let has_local_or_pending_work =
-                    dirty || status.ahead > 0 || status.behind > 0
-                    || !has_origin || !has_upstream;
+                    dirty || status.ahead > 0 || status.behind > 0 || !has_origin || !has_upstream;
                 if !has_local_or_pending_work {
                     activity.remove(&repo);
                     continue;
@@ -603,7 +661,7 @@ pub(crate) async fn run_daemon(policy_path: PathBuf, override_interval_secs: Opt
             if now.duration_since(entry.changed_at) < inactivity_delay {
                 continue;
             }
-            
+
             // MAX_FAILURES: per-cycle retry cap for transient errors.
             // Stuck repos (line ~505) trigger at failure_count >= 3 when repo is
             // clean + ahead > 0 — that's a permanent condition. MAX_FAILURES is
@@ -657,7 +715,10 @@ pub(crate) async fn run_daemon(policy_path: PathBuf, override_interval_secs: Opt
                 }
                 Ok(Ok(crate::sync::SyncOutcome::Blocked)) => {
                     if debug_enabled() {
-                        eprintln!("🐛 {} blocked (guard or manual intervention)", repo.display());
+                        eprintln!(
+                            "🐛 {} blocked (guard or manual intervention)",
+                            repo.display()
+                        );
                     }
                     false
                 }
@@ -682,12 +743,17 @@ pub(crate) async fn run_daemon(policy_path: PathBuf, override_interval_secs: Opt
                 .await
                 {
                     Ok(summary) => {
-                        if summary.found > 0 && summary.resolved_now == 0 && summary.succeeded == 0 {
+                        if summary.found > 0 && summary.resolved_now == 0 && summary.succeeded == 0
+                        {
                             should_cooldown = true;
                         }
                     }
                     Err(e) => {
-                        eprintln!("⚠️ auto-repair concerns failed for {}: {}", repo.display(), e);
+                        eprintln!(
+                            "⚠️ auto-repair concerns failed for {}: {}",
+                            repo.display(),
+                            e
+                        );
                         should_cooldown = true;
                     }
                 }
@@ -733,7 +799,11 @@ pub(crate) async fn run_daemon(policy_path: PathBuf, override_interval_secs: Opt
                         Instant::now() + Duration::from_secs(cooldown_secs),
                     );
                     if debug_enabled() {
-                        eprintln!("🐛 {} filter-only dirty, cooldown {}s", repo.display(), cooldown_secs);
+                        eprintln!(
+                            "🐛 {} filter-only dirty, cooldown {}s",
+                            repo.display(),
+                            cooldown_secs
+                        );
                     }
                 }
                 activity.remove(&repo);
@@ -753,7 +823,9 @@ pub(crate) async fn run_daemon(policy_path: PathBuf, override_interval_secs: Opt
 
                 // Check if ALL configured remotes are failing — desktop notification
                 if !entry.remote_failures.is_empty() {
-                    let all_failed = policy.remotes.iter()
+                    let all_failed = policy
+                        .remotes
+                        .iter()
                         .all(|r| entry.remote_failures.get(&r.name).copied().unwrap_or(0) > 0);
                     if all_failed {
                         let notify_key = format!("{}-all", repo.display());
@@ -770,9 +842,16 @@ pub(crate) async fn run_daemon(policy_path: PathBuf, override_interval_secs: Opt
                         }
 
                         // Fire only if not in cooldown (cooldown entry was removed above)
-                        if let std::collections::hash_map::Entry::Vacant(e) = remote_notify_cooldowns.entry(notify_key) {
-                            let failed_list: Vec<_> = entry.remote_failures.keys().cloned().collect();
-                            let msg = format!("All remotes failing: {}. Failures: {:?}", failed_list.join(", "), entry.remote_failures);
+                        if let std::collections::hash_map::Entry::Vacant(e) =
+                            remote_notify_cooldowns.entry(notify_key)
+                        {
+                            let failed_list: Vec<_> =
+                                entry.remote_failures.keys().cloned().collect();
+                            let msg = format!(
+                                "All remotes failing: {}. Failures: {:?}",
+                                failed_list.join(", "),
+                                entry.remote_failures
+                            );
                             crate::report::send_sync_conflict_notification(
                                 &repo,
                                 "All Remotes Failing",
@@ -790,13 +869,21 @@ pub(crate) async fn run_daemon(policy_path: PathBuf, override_interval_secs: Opt
                 // If repo is clean but has ahead commits and push keeps failing,
                 // it's permanently stuck (permission error, deleted remote, etc).
                 // Skip it entirely to unblock other repos.
-                if is_diverged || (!effective_dirty && status.ahead > 0 && entry.failure_count >= 3) {
+                if is_diverged || (!effective_dirty && status.ahead > 0 && entry.failure_count >= 3)
+                {
                     let reason = if is_diverged {
-                        format!("(diverged: ahead={}, behind={})", status.ahead, status.behind)
+                        format!(
+                            "(diverged: ahead={}, behind={})",
+                            status.ahead, status.behind
+                        )
                     } else {
                         format!("(ahead={}, clean)", status.ahead)
                     };
-                    eprintln!("🔒 {} permanently stuck on push {} skipping", repo.display(), reason);
+                    eprintln!(
+                        "🔒 {} permanently stuck on push {} skipping",
+                        repo.display(),
+                        reason
+                    );
                     stuck_push_repos.insert(repo.clone(), timestamp_secs());
                     save_stuck_push_repos(&stuck_push_repos);
                     activity.remove(&repo);

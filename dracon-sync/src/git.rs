@@ -12,7 +12,7 @@ use tokio::time::sleep;
 
 use crate::exclude::is_excluded_change_path;
 use crate::helpers::is_repo_already_exists;
-use crate::policy::{std_git_command, tokio_git_command, timestamp_secs, AuthType, RemoteConfig};
+use crate::policy::{std_git_command, timestamp_secs, tokio_git_command, AuthType, RemoteConfig};
 use crate::secrets::load_secret as secrets_load_secret;
 
 pub(crate) fn git_ssh_hardening() -> String {
@@ -35,15 +35,17 @@ fn real_git_path() -> PathBuf {
         }
     }
     static REAL_GIT: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
-    REAL_GIT.get_or_init(|| {
-        for candidate in ["/run/current-system/sw/bin/git", "/usr/bin/git", "/bin/git"] {
-            let path = PathBuf::from(candidate);
-            if path.exists() {
-                return path;
+    REAL_GIT
+        .get_or_init(|| {
+            for candidate in ["/run/current-system/sw/bin/git", "/usr/bin/git", "/bin/git"] {
+                let path = PathBuf::from(candidate);
+                if path.exists() {
+                    return path;
+                }
             }
-        }
-        PathBuf::from("git")
-    }).clone()
+            PathBuf::from("git")
+        })
+        .clone()
 }
 
 /// Get the list of files that actually differ from HEAD (filter-aware).
@@ -68,7 +70,8 @@ pub(crate) async fn git_diff_head_files(repo: &Path) -> Result<HashSet<PathBuf>>
                 .collect();
             Ok(files)
         }),
-    ).await;
+    )
+    .await;
     let inner = match outcome {
         Ok(inner) => inner,
         Err(_) => return Err(anyhow::anyhow!("git diff HEAD timed out")),
@@ -86,17 +89,18 @@ pub(crate) fn discover_git_repos(
     exclude_repos: &[String],
     system_repo: Option<&str>,
 ) -> Vec<PathBuf> {
-    let exclude_set: std::collections::HashSet<String> = exclude_repos
-        .iter()
-        .map(|s| s.to_lowercase())
-        .collect();
+    let exclude_set: std::collections::HashSet<String> =
+        exclude_repos.iter().map(|s| s.to_lowercase()).collect();
     let mut repos = Vec::new();
     for root in roots {
         discover_git_repos_recursive(root, excluded_dir_names, &mut repos, 0, 4);
     }
     repos.retain(|r| {
         let abs = r.to_string_lossy().to_lowercase();
-        let name = r.file_name().map(|n| n.to_string_lossy().to_lowercase()).unwrap_or_default();
+        let name = r
+            .file_name()
+            .map(|n| n.to_string_lossy().to_lowercase())
+            .unwrap_or_default();
         !exclude_set.contains(&abs) && !exclude_set.contains(&name)
     });
 
@@ -104,11 +108,15 @@ pub(crate) fn discover_git_repos(
     if let Some(system) = system_repo {
         let system_path = PathBuf::from(system);
         let system_abs = system.to_lowercase();
-        let system_name = system_path.file_name()
+        let system_name = system_path
+            .file_name()
             .map(|n| n.to_string_lossy().to_lowercase())
             .unwrap_or_default();
-        if system_path.exists() && system_path.join(".git").exists()
-            && !repos.contains(&system_path) && !exclude_set.contains(&system_abs) && !exclude_set.contains(&system_name)
+        if system_path.exists()
+            && system_path.join(".git").exists()
+            && !repos.contains(&system_path)
+            && !exclude_set.contains(&system_abs)
+            && !exclude_set.contains(&system_name)
         {
             repos.push(system_path);
         }
@@ -160,7 +168,8 @@ fn is_safe_branch_name(branch: &str) -> bool {
     if branch.ends_with('.') {
         return false;
     }
-    if branch.contains('\\') || branch.contains('~') || branch.contains('^') || branch.contains(':') {
+    if branch.contains('\\') || branch.contains('~') || branch.contains('^') || branch.contains(':')
+    {
         return false;
     }
     if branch.contains('?') || branch.contains('*') || branch.contains('[') {
@@ -201,7 +210,11 @@ fn discover_git_repos_recursive(
         if !path.is_dir() || path.is_symlink() {
             continue;
         }
-        let name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+        let name = path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_string();
         if excluded_dir_names.contains(&name) || name == "objects" {
             continue;
         }
@@ -223,7 +236,9 @@ fn discover_git_repos_recursive(
 pub(crate) fn has_origin_remote(repo: &Path) -> bool {
     let config_path = repo.join(".git").join("config");
     if let Ok(config) = std::fs::read_to_string(&config_path) {
-        return config.lines().any(|line| line.trim() == "[remote \"origin\"]");
+        return config
+            .lines()
+            .any(|line| line.trim() == "[remote \"origin\"]");
     }
     std_git_command()
         .arg("remote")
@@ -286,7 +301,11 @@ pub(crate) async fn kill_descendants(pid: u32) {
             }
         }
         let _ = TokioCommand::new("kill")
-            .args(["-".to_string() + signal, "--".to_string(), "-".to_string() + pid_s])
+            .args([
+                "-".to_string() + signal,
+                "--".to_string(),
+                "-".to_string() + pid_s,
+            ])
             .output()
             .await;
     }
@@ -343,7 +362,12 @@ pub(crate) async fn run_child(
             } else {
                 format!("{}: {}", e, stderr_output)
             };
-            Err(anyhow::anyhow!("{} failed in {}: {}", label, workdir.display(), detail))
+            Err(anyhow::anyhow!(
+                "{} failed in {}: {}",
+                label,
+                workdir.display(),
+                detail
+            ))
         }
         Err(_) => {
             if let Some(pid) = pid {
@@ -410,8 +434,11 @@ async fn git_askpass_script(token: &str) -> Result<PathBuf> {
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
         .as_nanos();
-    let tmp_path = std::env::temp_dir()
-        .join(format!("dracon-git-askpass-{}-{}.sh", std::process::id(), nano));
+    let tmp_path = std::env::temp_dir().join(format!(
+        "dracon-git-askpass-{}-{}.sh",
+        std::process::id(),
+        nano
+    ));
 
     // Escape single quotes in token for safe shell embedding
     let escaped = token.replace('\'', "'\"'\"'");
@@ -419,7 +446,12 @@ async fn git_askpass_script(token: &str) -> Result<PathBuf> {
 
     tokio::fs::write(&tmp_path, &script)
         .await
-        .with_context(|| format!("failed to write GIT_ASKPASS script to {}", tmp_path.display()))?;
+        .with_context(|| {
+            format!(
+                "failed to write GIT_ASKPASS script to {}",
+                tmp_path.display()
+            )
+        })?;
 
     use std::os::unix::fs::PermissionsExt;
     let mut perms = tokio::fs::metadata(&tmp_path).await?.permissions();
@@ -450,7 +482,8 @@ async fn push_https_fallback(
             timeout_secs,
             &format!("{}-github-https", op_label),
             no_prompt,
-        ).await;
+        )
+        .await;
         if result.is_ok() {
             return Ok(());
         }
@@ -469,7 +502,8 @@ async fn push_https_fallback(
                             ("GIT_ASKPASS", askpass.to_str().unwrap_or("/bin/false")),
                             ("GIT_TERMINAL_PROMPT", "0"),
                         ],
-                    ).await;
+                    )
+                    .await;
                     let _ = tokio::fs::remove_file(&askpass).await;
                     if result.is_ok() {
                         return Ok(());
@@ -495,7 +529,8 @@ async fn push_https_fallback(
                             ("GIT_ASKPASS", askpass.to_str().unwrap_or("/bin/false")),
                             ("GIT_TERMINAL_PROMPT", "0"),
                         ],
-                    ).await;
+                    )
+                    .await;
                     let _ = tokio::fs::remove_file(&askpass).await;
                     if result.is_ok() {
                         return Ok(());
@@ -588,7 +623,10 @@ pub(crate) async fn push_with_transport_fallbacks(
         &["push", "origin", "HEAD"],
         timeout_secs,
         &format!("{op_label}-ssh-hardened"),
-        &[("GIT_SSH_COMMAND", &ssh_hardening), ("GIT_TERMINAL_PROMPT", "0")],
+        &[
+            ("GIT_SSH_COMMAND", &ssh_hardening),
+            ("GIT_TERMINAL_PROMPT", "0"),
+        ],
     )
     .await
     {
@@ -597,7 +635,10 @@ pub(crate) async fn push_with_transport_fallbacks(
             let origin = origin_url(repo).unwrap_or_default();
             let branch = current_branch(repo).unwrap_or_else(|| "main".to_string());
             if !is_safe_branch_name(&branch) {
-                eprintln!("⚠️ branch name '{}' is unsafe, skipping https fallback", branch);
+                eprintln!(
+                    "⚠️ branch name '{}' is unsafe, skipping https fallback",
+                    branch
+                );
                 return Err(e);
             }
             let refspec = format!("HEAD:refs/heads/{branch}");
@@ -622,7 +663,10 @@ pub(crate) async fn push_with_retries(
             &["push", "origin", "HEAD"],
             timeout_secs,
             op_label,
-            &[("GIT_SSH_COMMAND", &ssh_hardening), ("GIT_TERMINAL_PROMPT", "0")],
+            &[
+                ("GIT_SSH_COMMAND", &ssh_hardening),
+                ("GIT_TERMINAL_PROMPT", "0"),
+            ],
         )
         .await
         {
@@ -672,7 +716,12 @@ pub(crate) async fn git_list_paths(repo: &Path, args: &[&str]) -> Result<Vec<Pat
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         if !stderr.trim().is_empty() {
-            eprintln!("⚠️ git {:?} failed in {}: {}", args, repo.display(), stderr.trim());
+            eprintln!(
+                "⚠️ git {:?} failed in {}: {}",
+                args,
+                repo.display(),
+                stderr.trim()
+            );
         }
         return Ok(Vec::new());
     }
@@ -768,10 +817,7 @@ pub(crate) async fn cli_diff_entries(repo: &Path) -> Result<Vec<DiffFile>> {
 
     Ok(entries
         .into_iter()
-        .map(|(path, status)| DiffFile {
-            path,
-            status,
-        })
+        .map(|(path, status)| DiffFile { path, status })
         .collect())
 }
 
@@ -799,7 +845,11 @@ pub(crate) async fn unstage_excluded_paths(
     let mut to_unstage = Vec::new();
     for path in staged {
         if !is_safe_git_path(&path) {
-            eprintln!("⚠️ skipping unsafe path {} in {}", path.display(), repo.display());
+            eprintln!(
+                "⚠️ skipping unsafe path {} in {}",
+                path.display(),
+                repo.display()
+            );
             continue;
         }
         if is_excluded_change_path(&path, excluded_dir_names) {
@@ -819,26 +869,35 @@ pub(crate) async fn unstage_excluded_paths(
         for path in chunk {
             cmd.arg(path);
         }
-        let status = cmd.status()
+        let status = cmd
+            .status()
             .await
-            .with_context(|| {
-                format!("failed to unstage paths in {}", repo.display())
-            })?;
+            .with_context(|| format!("failed to unstage paths in {}", repo.display()))?;
         if !status.success() {
             // If one chunk fails, it might be due to a specific path error.
             // Just log it and continue with other chunks.
-            eprintln!("⚠️ failed to unstage a chunk of paths in {}", repo.display());
+            eprintln!(
+                "⚠️ failed to unstage a chunk of paths in {}",
+                repo.display()
+            );
         }
     }
     Ok(removed)
 }
 
-pub(crate) async fn unstage_oversized_paths(repo: &Path, max_stage_file_bytes: u64) -> Result<usize> {
+pub(crate) async fn unstage_oversized_paths(
+    repo: &Path,
+    max_stage_file_bytes: u64,
+) -> Result<usize> {
     let staged = staged_paths(repo).await?;
     let mut to_unstage = Vec::new();
     for path in staged {
         if !is_safe_git_path(&path) {
-            eprintln!("⚠️ skipping unsafe path {} in {}", path.display(), repo.display());
+            eprintln!(
+                "⚠️ skipping unsafe path {} in {}",
+                path.display(),
+                repo.display()
+            );
             continue;
         }
         let full = repo.join(&path);
@@ -864,13 +923,15 @@ pub(crate) async fn unstage_oversized_paths(repo: &Path, max_stage_file_bytes: u
         for path in chunk {
             cmd.arg(path);
         }
-        let status = cmd.status()
+        let status = cmd
+            .status()
             .await
-            .with_context(|| {
-                format!("failed to unstage oversized paths in {}", repo.display())
-            })?;
+            .with_context(|| format!("failed to unstage oversized paths in {}", repo.display()))?;
         if !status.success() {
-            eprintln!("⚠️ failed to unstage a chunk of oversized paths in {}", repo.display());
+            eprintln!(
+                "⚠️ failed to unstage a chunk of oversized paths in {}",
+                repo.display()
+            );
         }
     }
     Ok(removed)
@@ -990,9 +1051,7 @@ pub(crate) async fn consolidate_to_main(repo: &Path) -> Result<()> {
         eprintln!("⚠️ failed to delete remote master branch: {}", e);
     }
     if has_origin_remote(repo) && !has_tracking_upstream(repo) {
-        if let Err(e) =
-            push_with_retries(repo, 60, 3, "consolidate-to-main").await
-        {
+        if let Err(e) = push_with_retries(repo, 60, 3, "consolidate-to-main").await {
             eprintln!("⚠️ failed to push main with upstream: {}", e);
         }
     }
@@ -1009,9 +1068,7 @@ pub(crate) async fn rename_master_to_main(repo: &Path) -> Result<()> {
             .with_context(|| format!("failed to rename master to main in {}", repo.display()))?;
     }
     if has_origin_remote(repo) {
-        if let Err(e) =
-            push_with_retries(repo, 60, 3, "rename-master-to-main").await
-        {
+        if let Err(e) = push_with_retries(repo, 60, 3, "rename-master-to-main").await {
             eprintln!("⚠️ failed to push main to origin: {}", e);
         }
         if let Err(e) = std_git_command()
@@ -1107,11 +1164,14 @@ pub(crate) fn set_upstream_to_branch(repo: &Path, branch: &str) -> Result<()> {
     }
 }
 
-pub(crate) async fn detect_large_blobs_ahead(repo: &Path, min_bytes: u64) -> Result<Vec<(u64, String)>> {
+pub(crate) async fn detect_large_blobs_ahead(
+    repo: &Path,
+    min_bytes: u64,
+) -> Result<Vec<(u64, String)>> {
     let timeout_secs = 60;
     let repo = repo.to_path_buf();
     let repo_display = repo.display().to_string();
-    
+
     tokio::time::timeout(
         Duration::from_secs(timeout_secs),
         tokio::task::spawn_blocking(move || -> Result<Vec<(u64, String)>> {
@@ -1123,15 +1183,18 @@ pub(crate) async fn detect_large_blobs_ahead(repo: &Path, min_bytes: u64) -> Res
             if !rev_list.status.success() {
                 return Ok(Vec::new());
             }
-            
+
             let mut cat_file = std_git_command()
-                .args(["cat-file", "--batch-check=%(objectname) %(objecttype) %(objectsize) %(rest)"])
+                .args([
+                    "cat-file",
+                    "--batch-check=%(objectname) %(objecttype) %(objectsize) %(rest)",
+                ])
                 .current_dir(&repo)
                 .stdin(std::process::Stdio::piped())
                 .stdout(std::process::Stdio::piped())
                 .spawn()
                 .with_context(|| format!("failed cat-file in {}", repo.display()))?;
-            
+
             if let Some(mut stdin) = cat_file.stdin.take() {
                 use std::io::Write;
                 stdin.write_all(&rev_list.stdout)?;
@@ -1140,7 +1203,7 @@ pub(crate) async fn detect_large_blobs_ahead(repo: &Path, min_bytes: u64) -> Res
             if !output.status.success() {
                 return Ok(Vec::new());
             }
-            
+
             let stdout = String::from_utf8_lossy(&output.stdout);
             let mut out: Vec<(u64, String)> = stdout
                 .lines()
@@ -1165,7 +1228,12 @@ pub(crate) async fn detect_large_blobs_ahead(repo: &Path, min_bytes: u64) -> Res
     )
     .await
     .with_context(|| "timed out waiting for spawn_blocking in detect_large_blobs_ahead")?
-    .with_context(|| format!("detect_large_blobs_ahead timed out (>{}s) for {}", timeout_secs, repo_display))?
+    .with_context(|| {
+        format!(
+            "detect_large_blobs_ahead timed out (>{}s) for {}",
+            timeout_secs, repo_display
+        )
+    })?
 }
 
 pub(crate) fn top_level_dir(path: &str) -> Option<String> {
@@ -1274,10 +1342,18 @@ pub(crate) async fn restore_paths(repo: &Path, paths: &[String]) -> Result<()> {
     }
 
     // Prefer `git restore` (newer git). Fallback to `reset` + `checkout`.
-    let mut args = vec!["restore".to_string(), "--staged".to_string(), "--worktree".to_string(), "--".to_string()];
+    let mut args = vec![
+        "restore".to_string(),
+        "--staged".to_string(),
+        "--worktree".to_string(),
+        "--".to_string(),
+    ];
     args.extend(paths.iter().cloned());
     let args_ref: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-    if run_git_with_timeout(repo, &args_ref, 30, "restore").await.is_ok() {
+    if run_git_with_timeout(repo, &args_ref, 30, "restore")
+        .await
+        .is_ok()
+    {
         return Ok(());
     }
 
@@ -1289,7 +1365,10 @@ pub(crate) async fn restore_paths(repo: &Path, paths: &[String]) -> Result<()> {
     let reset_ref: Vec<&str> = reset.iter().map(|s| s.as_str()).collect();
     if let Err(e) = run_git_with_timeout(repo, &reset_ref, 30, "reset").await {
         eprintln!("⚠️ git reset fallback failed for {}: {}", repo.display(), e);
-        return Err(anyhow::anyhow!("restore failed: git restore failed and reset fallback also failed: {}", e));
+        return Err(anyhow::anyhow!(
+            "restore failed: git restore failed and reset fallback also failed: {}",
+            e
+        ));
     }
 
     let mut checkout: Vec<String> = Vec::new();
@@ -1309,343 +1388,439 @@ pub(crate) mod multi_remote {
     use super::*;
 
     pub(crate) fn ensure_remote(repo: &Path, name: &str, url: &str) -> Result<()> {
-    let existing = get_remote_url(repo, name);
-    match existing {
-        Some(cur) if cur == url => Ok(()),
-        Some(_) => {
-            std_git_command()
-                .args(["remote", "set-url", name, url])
-                .current_dir(repo)
-                .status()
-                .with_context(|| format!("git remote set-url {} in {}", name, repo.display()))?;
-            Ok(())
-        }
-        None => {
-            std_git_command()
-                .args(["remote", "add", name, url])
-                .current_dir(repo)
-                .status()
-                .with_context(|| format!("git remote add {} in {}", name, repo.display()))?;
-            Ok(())
-        }
-    }
-}
-
-pub(crate) fn configure_all_remotes(repo: &Path, remotes: &[RemoteConfig], repo_name: &str) {
-    for remote in remotes {
-        let url = remote.resolve_push_url(repo_name);
-        if let Err(e) = ensure_remote(repo, &remote.name, &url) {
-            eprintln!("⚠️ failed to configure remote {} for {}: {}", remote.name, repo.display(), e);
-        }
-    }
-}
-
-pub(crate) async fn push_mirror_remotes(
-    repo: &Path,
-    remotes: &[RemoteConfig],
-    timeout_secs: u64,
-    retries: u32,
-    private: bool,
-) -> Vec<(String, Result<()>)> {
-    let repo_name = repo.file_name()
-        .map(|n| n.to_string_lossy().to_string())
-        .unwrap_or_default();
-
-    configure_all_remotes(repo, remotes, &repo_name);
-
-    for (remote_name, create_result) in auto_create_all_remotes(remotes, &repo_name, private).await {
-        match create_result {
-            Ok(_) => {}
-            Err(e) => {
-                eprintln!("⚠️ auto-create failed for {} on {}: {}", repo_name, remote_name, e);
+        let existing = get_remote_url(repo, name);
+        match existing {
+            Some(cur) if cur == url => Ok(()),
+            Some(_) => {
+                std_git_command()
+                    .args(["remote", "set-url", name, url])
+                    .current_dir(repo)
+                    .status()
+                    .with_context(|| {
+                        format!("git remote set-url {} in {}", name, repo.display())
+                    })?;
+                Ok(())
+            }
+            None => {
+                std_git_command()
+                    .args(["remote", "add", name, url])
+                    .current_dir(repo)
+                    .status()
+                    .with_context(|| format!("git remote add {} in {}", name, repo.display()))?;
+                Ok(())
             }
         }
     }
 
-    let all_remote_names: Vec<_> = remotes.iter().map(|r| r.name.as_str()).collect();
-    if let Err(e) = remove_stale_remotes(repo, &all_remote_names) {
-        eprintln!("⚠️ failed to clean stale remotes for {}: {}", repo.display(), e);
-    }
-
-    push_to_all_remotes(repo, remotes, timeout_secs, retries).await
-}
-
-pub(crate) fn get_remote_url(repo: &Path, name: &str) -> Option<String> {
-    let output = std_git_command()
-        .args(["remote", "get-url", name])
-        .current_dir(repo)
-        .output()
-        .ok()?;
-    if output.status.success() {
-        Some(String::from_utf8_lossy(&output.stdout).trim().to_string())
-    } else {
-        None
-    }
-}
-
-pub(crate) fn list_remotes(repo: &Path) -> Vec<String> {
-    let output = std_git_command()
-        .args(["remote"])
-        .current_dir(repo)
-        .output()
-        .ok();
-    match output {
-        Some(o) if o.status.success() => String::from_utf8_lossy(&o.stdout)
-            .lines()
-            .map(String::from)
-            .filter(|s| !s.is_empty())
-            .collect(),
-        _ => Vec::new(),
-    }
-}
-
-pub(crate) fn remove_stale_remotes(repo: &Path, keep: &[&str]) -> Result<()> {
-    let current = list_remotes(repo);
-    let keep_set: std::collections::HashSet<_> = keep.iter().collect();
-    for remote in current {
-        if remote == "origin" {
-            continue;
-        }
-        if !keep_set.contains(&remote.as_str()) {
-            std_git_command()
-                .args(["remote", "remove", &remote])
-                .current_dir(repo)
-                .status()
-                .with_context(|| format!("git remote remove {} in {}", remote, repo.display()))?;
+    pub(crate) fn configure_all_remotes(repo: &Path, remotes: &[RemoteConfig], repo_name: &str) {
+        for remote in remotes {
+            let url = remote.resolve_push_url(repo_name);
+            if let Err(e) = ensure_remote(repo, &remote.name, &url) {
+                eprintln!(
+                    "⚠️ failed to configure remote {} for {}: {}",
+                    remote.name,
+                    repo.display(),
+                    e
+                );
+            }
         }
     }
-    Ok(())
-}
 
-pub(crate) async fn push_to_named_remote(
-    repo: &Path,
-    remote_name: &str,
-    timeout_secs: u64,
-    retries: u32,
-    force_when_behind: bool,
-) -> Result<()> {
-    let branch = current_branch(repo).unwrap_or_else(|| "main".to_string());
-    let refspec = format!("HEAD:refs/heads/{}", branch);
-    let ssh_hardening = crate::git::git_ssh_hardening();
-    let _no_prompt = &[("GIT_TERMINAL_PROMPT", "0")];
+    pub(crate) async fn push_mirror_remotes(
+        repo: &Path,
+        remotes: &[RemoteConfig],
+        timeout_secs: u64,
+        retries: u32,
+        private: bool,
+    ) -> Vec<(String, Result<()>)> {
+        let repo_name = repo
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_default();
 
-    let attempt_ssh = run_git_with_timeout_env(
-        repo,
-        &["push", remote_name, &refspec],
-        timeout_secs,
-        &format!("push-to-{}", remote_name),
-        &[("GIT_SSH_COMMAND", &ssh_hardening), ("GIT_TERMINAL_PROMPT", "0")],
-    ).await;
+        configure_all_remotes(repo, remotes, &repo_name);
 
-    if attempt_ssh.is_ok() {
-        return Ok(());
+        for (remote_name, create_result) in
+            auto_create_all_remotes(remotes, &repo_name, private).await
+        {
+            match create_result {
+                Ok(_) => {}
+                Err(e) => {
+                    eprintln!(
+                        "⚠️ auto-create failed for {} on {}: {}",
+                        repo_name, remote_name, e
+                    );
+                }
+            }
+        }
+
+        let all_remote_names: Vec<_> = remotes.iter().map(|r| r.name.as_str()).collect();
+        if let Err(e) = remove_stale_remotes(repo, &all_remote_names) {
+            eprintln!(
+                "⚠️ failed to clean stale remotes for {}: {}",
+                repo.display(),
+                e
+            );
+        }
+
+        push_to_all_remotes(repo, remotes, timeout_secs, retries).await
     }
 
-    let remote_url = get_remote_url(repo, remote_name)
-        .ok_or_else(|| anyhow::anyhow!("remote {} not found", remote_name))?;
-
-    if is_safe_branch_name(&branch) {
-        let fallback_label = format!("push-to-{}", remote_name);
-        push_https_fallback(repo, &remote_url, &refspec, timeout_secs, &fallback_label).await?;
+    pub(crate) fn get_remote_url(repo: &Path, name: &str) -> Option<String> {
+        let output = std_git_command()
+            .args(["remote", "get-url", name])
+            .current_dir(repo)
+            .output()
+            .ok()?;
+        if output.status.success() {
+            Some(String::from_utf8_lossy(&output.stdout).trim().to_string())
+        } else {
+            None
+        }
     }
 
-    let mut last_err = None;
-    for attempt in 1..=retries.max(1) {
-        match run_git_with_timeout_env(repo, &["push", remote_name, "HEAD"], timeout_secs, &format!("push-to-{}", remote_name), &[("GIT_SSH_COMMAND", &ssh_hardening), ("GIT_TERMINAL_PROMPT", "0")]).await {
-            Ok(()) => return Ok(()),
-            Err(e) => {
-                let is_rejected = is_push_rejected(&e.to_string());
-                if is_rejected && force_when_behind {
-                    match diagnose_divergence(repo, remote_name, &branch).await {
-                        Ok(Divergence::RemotePurelyBehind) => {
-                            let force_result = run_git_with_timeout_env(
-                                repo,
-                                &["push", "--force-with-lease", remote_name, &format!("HEAD:refs/heads/{}", branch)],
-                                timeout_secs,
-                                &format!("force-push-to-{}", remote_name),
-                                &[("GIT_SSH_COMMAND", &ssh_hardening), ("GIT_TERMINAL_PROMPT", "0")],
-                            ).await;
-                            if force_result.is_ok() {
-                                return Ok(());
+    pub(crate) fn list_remotes(repo: &Path) -> Vec<String> {
+        let output = std_git_command()
+            .args(["remote"])
+            .current_dir(repo)
+            .output()
+            .ok();
+        match output {
+            Some(o) if o.status.success() => String::from_utf8_lossy(&o.stdout)
+                .lines()
+                .map(String::from)
+                .filter(|s| !s.is_empty())
+                .collect(),
+            _ => Vec::new(),
+        }
+    }
+
+    pub(crate) fn remove_stale_remotes(repo: &Path, keep: &[&str]) -> Result<()> {
+        let current = list_remotes(repo);
+        let keep_set: std::collections::HashSet<_> = keep.iter().collect();
+        for remote in current {
+            if remote == "origin" {
+                continue;
+            }
+            if !keep_set.contains(&remote.as_str()) {
+                std_git_command()
+                    .args(["remote", "remove", &remote])
+                    .current_dir(repo)
+                    .status()
+                    .with_context(|| {
+                        format!("git remote remove {} in {}", remote, repo.display())
+                    })?;
+            }
+        }
+        Ok(())
+    }
+
+    pub(crate) async fn push_to_named_remote(
+        repo: &Path,
+        remote_name: &str,
+        timeout_secs: u64,
+        retries: u32,
+        force_when_behind: bool,
+    ) -> Result<()> {
+        let branch = current_branch(repo).unwrap_or_else(|| "main".to_string());
+        let refspec = format!("HEAD:refs/heads/{}", branch);
+        let ssh_hardening = crate::git::git_ssh_hardening();
+        let _no_prompt = &[("GIT_TERMINAL_PROMPT", "0")];
+
+        let attempt_ssh = run_git_with_timeout_env(
+            repo,
+            &["push", remote_name, &refspec],
+            timeout_secs,
+            &format!("push-to-{}", remote_name),
+            &[
+                ("GIT_SSH_COMMAND", &ssh_hardening),
+                ("GIT_TERMINAL_PROMPT", "0"),
+            ],
+        )
+        .await;
+
+        if attempt_ssh.is_ok() {
+            return Ok(());
+        }
+
+        let remote_url = get_remote_url(repo, remote_name)
+            .ok_or_else(|| anyhow::anyhow!("remote {} not found", remote_name))?;
+
+        if is_safe_branch_name(&branch) {
+            let fallback_label = format!("push-to-{}", remote_name);
+            push_https_fallback(repo, &remote_url, &refspec, timeout_secs, &fallback_label).await?;
+        }
+
+        let mut last_err = None;
+        for attempt in 1..=retries.max(1) {
+            match run_git_with_timeout_env(
+                repo,
+                &["push", remote_name, "HEAD"],
+                timeout_secs,
+                &format!("push-to-{}", remote_name),
+                &[
+                    ("GIT_SSH_COMMAND", &ssh_hardening),
+                    ("GIT_TERMINAL_PROMPT", "0"),
+                ],
+            )
+            .await
+            {
+                Ok(()) => return Ok(()),
+                Err(e) => {
+                    let is_rejected = is_push_rejected(&e.to_string());
+                    if is_rejected && force_when_behind {
+                        match diagnose_divergence(repo, remote_name, &branch).await {
+                            Ok(Divergence::RemotePurelyBehind) => {
+                                let force_result = run_git_with_timeout_env(
+                                    repo,
+                                    &[
+                                        "push",
+                                        "--force-with-lease",
+                                        remote_name,
+                                        &format!("HEAD:refs/heads/{}", branch),
+                                    ],
+                                    timeout_secs,
+                                    &format!("force-push-to-{}", remote_name),
+                                    &[
+                                        ("GIT_SSH_COMMAND", &ssh_hardening),
+                                        ("GIT_TERMINAL_PROMPT", "0"),
+                                    ],
+                                )
+                                .await;
+                                if force_result.is_ok() {
+                                    return Ok(());
+                                }
+                            }
+                            Ok(Divergence::Divergent) | Err(_) => {
+                                last_err = Some(e);
                             }
                         }
-                        Ok(Divergence::Divergent) | Err(_) => {
-                            last_err = Some(e);
-                        }
+                    } else {
+                        last_err = Some(e);
                     }
-                } else {
-                    last_err = Some(e);
-                }
-                if attempt < retries.max(1) {
-                    sleep(Duration::from_secs(attempt as u64)).await;
+                    if attempt < retries.max(1) {
+                        sleep(Duration::from_secs(attempt as u64)).await;
+                    }
                 }
             }
         }
-    }
-    Err(last_err.unwrap_or_else(|| anyhow::anyhow!("push to {} failed", remote_name)))
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum Divergence {
-    RemotePurelyBehind,
-    Divergent,
-}
-
-pub(crate) async fn diagnose_divergence(repo: &Path, remote_name: &str, branch: &str) -> Result<Divergence> {
-    let local_head = run_git_capture_output(repo, &["rev-parse", "HEAD"], "rev-parse")?;
-    let local_head = local_head.trim();
-    let remote_ref = format!("refs/remotes/{}/{}", remote_name, branch);
-
-    let rev_list_output = run_git_capture_output(
-        repo,
-        &["rev-list", "--left-right", "--count", &format!("{}...{}", local_head, remote_ref)],
-        "rev-list",
-    )?;
-
-    let counts: Vec<&str> = rev_list_output.trim().split('\t').collect();
-    if counts.len() != 2 {
-        return Ok(Divergence::Divergent);
+        Err(last_err.unwrap_or_else(|| anyhow::anyhow!("push to {} failed", remote_name)))
     }
 
-    let local_ahead: u32 = match counts[0].parse() {
-        Ok(v) => v,
-        Err(e) => {
-            eprintln!("⚠️ failed to parse local ahead count from rev-list output (\"{}\"): {}", counts[0], e);
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(crate) enum Divergence {
+        RemotePurelyBehind,
+        Divergent,
+    }
+
+    pub(crate) async fn diagnose_divergence(
+        repo: &Path,
+        remote_name: &str,
+        branch: &str,
+    ) -> Result<Divergence> {
+        let local_head = run_git_capture_output(repo, &["rev-parse", "HEAD"], "rev-parse")?;
+        let local_head = local_head.trim();
+        let remote_ref = format!("refs/remotes/{}/{}", remote_name, branch);
+
+        let rev_list_output = run_git_capture_output(
+            repo,
+            &[
+                "rev-list",
+                "--left-right",
+                "--count",
+                &format!("{}...{}", local_head, remote_ref),
+            ],
+            "rev-list",
+        )?;
+
+        let counts: Vec<&str> = rev_list_output.trim().split('\t').collect();
+        if counts.len() != 2 {
             return Ok(Divergence::Divergent);
         }
-    };
-    let remote_ahead: u32 = match counts[1].parse() {
-        Ok(v) => v,
-        Err(e) => {
-            eprintln!("⚠️ failed to parse remote ahead count from rev-list output (\"{}\"): {}", counts[1], e);
-            return Ok(Divergence::Divergent);
+
+        let local_ahead: u32 = match counts[0].parse() {
+            Ok(v) => v,
+            Err(e) => {
+                eprintln!(
+                    "⚠️ failed to parse local ahead count from rev-list output (\"{}\"): {}",
+                    counts[0], e
+                );
+                return Ok(Divergence::Divergent);
+            }
+        };
+        let remote_ahead: u32 = match counts[1].parse() {
+            Ok(v) => v,
+            Err(e) => {
+                eprintln!(
+                    "⚠️ failed to parse remote ahead count from rev-list output (\"{}\"): {}",
+                    counts[1], e
+                );
+                return Ok(Divergence::Divergent);
+            }
+        };
+
+        if remote_ahead == 0 && local_ahead > 0 {
+            Ok(Divergence::RemotePurelyBehind)
+        } else if remote_ahead > 0 {
+            Ok(Divergence::Divergent)
+        } else {
+            // Both are 0 - repos are in sync
+            Ok(Divergence::RemotePurelyBehind)
         }
-    };
-
-    if remote_ahead == 0 && local_ahead > 0 {
-        Ok(Divergence::RemotePurelyBehind)
-    } else if remote_ahead > 0 {
-        Ok(Divergence::Divergent)
-    } else {
-        // Both are 0 - repos are in sync
-        Ok(Divergence::RemotePurelyBehind)
-    }
-}
-
-pub(crate) async fn push_to_all_remotes(
-    repo: &Path,
-    remotes: &[RemoteConfig],
-    timeout_secs: u64,
-    retries: u32,
-) -> Vec<(String, Result<()>)> {
-    let mut sorted = remotes.to_vec();
-    sorted.sort_by_key(|r| r.priority);
-
-    let mut results = Vec::new();
-    for remote in sorted {
-        let result = push_to_named_remote(repo, &remote.name, timeout_secs, retries, remote.force_push_when_behind).await;
-        results.push((remote.name.clone(), result));
-    }
-    results
-}
-
-pub(crate) fn create_repo_on_github(account: &str, repo_name: &str) -> Result<String> {
-    let mut cmd = std::process::Command::new("gh");
-    cmd.args(["repo", "create", repo_name, "--private"]);
-
-    // PAT from ~/.dracon/utilities/sync/secrets/github.env
-    // Falls back to gh's stored auth (gh auth login) if PAT is not found.
-    // Falls back to gh's stored auth (gh auth login) if env var is not found.
-    if let Some(token) = load_secret("GH_TOKEN") {
-        cmd.env("GH_TOKEN", token);
     }
 
-    let output = cmd.output()
-        .with_context(|| "gh repo create failed")?;
+    pub(crate) async fn push_to_all_remotes(
+        repo: &Path,
+        remotes: &[RemoteConfig],
+        timeout_secs: u64,
+        retries: u32,
+    ) -> Vec<(String, Result<()>)> {
+        let mut sorted = remotes.to_vec();
+        sorted.sort_by_key(|r| r.priority);
 
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        if is_repo_already_exists(&stderr) {
-            return Ok(format!("git@github.com:{}/{}.git", account, repo_name));
+        let mut results = Vec::new();
+        for remote in sorted {
+            let result = push_to_named_remote(
+                repo,
+                &remote.name,
+                timeout_secs,
+                retries,
+                remote.force_push_when_behind,
+            )
+            .await;
+            results.push((remote.name.clone(), result));
         }
-        anyhow::bail!("gh repo create failed: {}", stderr.trim());
+        results
     }
 
-    Ok(format!("git@github.com:{}/{}.git", account, repo_name))
-}
+    pub(crate) fn create_repo_on_github(account: &str, repo_name: &str) -> Result<String> {
+        let mut cmd = std::process::Command::new("gh");
+        cmd.args(["repo", "create", repo_name, "--private"]);
 
-pub(crate) fn create_repo_on_gitlab(account: &str, repo_name: &str, private: bool) -> Result<String> {
-    let mut cmd = std::process::Command::new("glab");
-    cmd.args(["repo", "create", repo_name]);
-    if private {
-        cmd.arg("--private");
-    } else {
-        cmd.arg("--public");
-    }
-    
-    // Load token from ~/.dracon/utilities/sync/secrets/*.env or env var
-    if let Some(token) = load_secret("GITLAB_TOKEN") {
-        cmd.env("GITLAB_TOKEN", token);
-    }
-    
-    let output = cmd.output()
-        .with_context(|| "glab repo create failed")?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        if is_repo_already_exists(&stderr) {
-            return Ok(format!("git@gitlab.com:{}/{}.git", account, repo_name));
+        // PAT from ~/.dracon/utilities/sync/secrets/github.env
+        // Falls back to gh's stored auth (gh auth login) if PAT is not found.
+        // Falls back to gh's stored auth (gh auth login) if env var is not found.
+        if let Some(token) = load_secret("GH_TOKEN") {
+            cmd.env("GH_TOKEN", token);
         }
-        anyhow::bail!("glab repo create failed: {}", stderr.trim());
+
+        let output = cmd.output().with_context(|| "gh repo create failed")?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            if is_repo_already_exists(&stderr) {
+                return Ok(format!("git@github.com:{}/{}.git", account, repo_name));
+            }
+            anyhow::bail!("gh repo create failed: {}", stderr.trim());
+        }
+
+        Ok(format!("git@github.com:{}/{}.git", account, repo_name))
     }
 
-    Ok(format!("git@gitlab.com:{}/{}.git", account, repo_name))
-}
+    pub(crate) fn create_repo_on_gitlab(
+        account: &str,
+        repo_name: &str,
+        private: bool,
+    ) -> Result<String> {
+        let mut cmd = std::process::Command::new("glab");
+        cmd.args(["repo", "create", repo_name]);
+        if private {
+            cmd.arg("--private");
+        } else {
+            cmd.arg("--public");
+        }
 
-pub(crate) async fn create_repo_on_codeberg(token: &str, account: &str, repo_name: &str, api_endpoint: &str, private: bool) -> Result<String> {
-    let client = reqwest::Client::new();
-    let response = client
-        .post(api_endpoint)
-        .header("Authorization", format!("Bearer {}", token))
-        .header("Content-Type", "application/json")
-        .json(&serde_json::json!({
-            "name": repo_name,
-            "private": private,
-            "default_branch": "main"
-        }))
-        .send()
-        .await
-        .with_context(|| "reqwest codeberg repo create failed")?;
+        // Load token from ~/.dracon/utilities/sync/secrets/*.env or env var
+        if let Some(token) = load_secret("GITLAB_TOKEN") {
+            cmd.env("GITLAB_TOKEN", token);
+        }
 
-    let status = response.status();
-    if status.as_u16() == 409 || status.as_u16() == 422 {
-        return Ok(format!("git@codeberg.org:{}/{}.git", account, repo_name));
+        let output = cmd.output().with_context(|| "glab repo create failed")?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            if is_repo_already_exists(&stderr) {
+                return Ok(format!("git@gitlab.com:{}/{}.git", account, repo_name));
+            }
+            anyhow::bail!("glab repo create failed: {}", stderr.trim());
+        }
+
+        Ok(format!("git@gitlab.com:{}/{}.git", account, repo_name))
     }
 
-    if !status.is_success() {
-        let body = response.text().await.unwrap_or_default();
-        anyhow::bail!("codeberg repo create failed ({}): {}", status, body);
+    pub(crate) async fn create_repo_on_codeberg(
+        token: &str,
+        account: &str,
+        repo_name: &str,
+        api_endpoint: &str,
+        private: bool,
+    ) -> Result<String> {
+        let client = reqwest::Client::new();
+        let response = client
+            .post(api_endpoint)
+            .header("Authorization", format!("Bearer {}", token))
+            .header("Content-Type", "application/json")
+            .json(&serde_json::json!({
+                "name": repo_name,
+                "private": private,
+                "default_branch": "main"
+            }))
+            .send()
+            .await
+            .with_context(|| "reqwest codeberg repo create failed")?;
+
+        let status = response.status();
+        if status.as_u16() == 409 || status.as_u16() == 422 {
+            return Ok(format!("git@codeberg.org:{}/{}.git", account, repo_name));
+        }
+
+        if !status.is_success() {
+            let body = response.text().await.unwrap_or_default();
+            anyhow::bail!("codeberg repo create failed ({}): {}", status, body);
+        }
+
+        Ok(format!("git@codeberg.org:{}/{}.git", account, repo_name))
     }
 
-    Ok(format!("git@codeberg.org:{}/{}.git", account, repo_name))
-}
-
-pub(crate) async fn auto_create_repo(config: &RemoteConfig, repo_name: &str, private: bool) -> Result<String> {
-    match config.effective_auth_type() {
-        AuthType::GitHub => create_repo_on_github(&config.auto_create_account, repo_name),
-        AuthType::GitLab => create_repo_on_gitlab(&config.auto_create_account, repo_name, private),
-        AuthType::Codeberg => {
-            let token_var = config.auto_create_token_var.as_deref().unwrap_or("CODEBERG_TOKEN");
-            let token = load_secret(token_var)
+    pub(crate) async fn auto_create_repo(
+        config: &RemoteConfig,
+        repo_name: &str,
+        private: bool,
+    ) -> Result<String> {
+        match config.effective_auth_type() {
+            AuthType::GitHub => create_repo_on_github(&config.auto_create_account, repo_name),
+            AuthType::GitLab => {
+                create_repo_on_gitlab(&config.auto_create_account, repo_name, private)
+            }
+            AuthType::Codeberg => {
+                let token_var = config
+                    .auto_create_token_var
+                    .as_deref()
+                    .unwrap_or("CODEBERG_TOKEN");
+                let token = load_secret(token_var)
                 .with_context(|| format!("missing token for Codeberg (set {} env var or ~/.dracon/utilities/sync/secrets/*.env file)", token_var))?;
-            let endpoint = config.api_endpoint.as_deref().unwrap_or("https://codeberg.org/api/v1/user/repos");
-            create_repo_on_codeberg(&token, &config.auto_create_account, repo_name, endpoint, private).await
+                let endpoint = config
+                    .api_endpoint
+                    .as_deref()
+                    .unwrap_or("https://codeberg.org/api/v1/user/repos");
+                create_repo_on_codeberg(
+                    &token,
+                    &config.auto_create_account,
+                    repo_name,
+                    endpoint,
+                    private,
+                )
+                .await
+            }
+            AuthType::Generic => anyhow::bail!("Generic auth cannot auto-create repos"),
         }
-        AuthType::Generic => anyhow::bail!("Generic auth cannot auto-create repos"),
     }
-}
 
-pub(crate) async fn auto_create_all_remotes(remotes: &[RemoteConfig], repo_name: &str, private: bool) -> Vec<(String, Result<String>)> {
+    pub(crate) async fn auto_create_all_remotes(
+        remotes: &[RemoteConfig],
+        repo_name: &str,
+        private: bool,
+    ) -> Vec<(String, Result<String>)> {
         let mut results = Vec::new();
         for remote in remotes {
             if remote.auto_create {
@@ -1676,7 +1851,13 @@ pub(crate) fn detect_orphan_origin(repo: &Path) -> Option<(String, String)> {
     // legitimate version suffixes (e.g., api-v2, project-2024)
     if let Some(dash) = repo_part.rfind("-") {
         let suffix_num = &repo_part[dash + 1..];
-        if suffix_num.len() == 1 && suffix_num.chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false) {
+        if suffix_num.len() == 1
+            && suffix_num
+                .chars()
+                .next()
+                .map(|c| c.is_ascii_digit())
+                .unwrap_or(false)
+        {
             let prefix = &current[..current.len() - path_part.len()];
             let canonical_repo = &repo_part[..dash];
             let canonical = format!("{}{}{}", prefix, canonical_repo, suffix);
@@ -1693,13 +1874,24 @@ pub(crate) fn fix_orphan_origin(repo: &Path, canonical_url: &str) -> Result<()> 
         .args(["remote", "set-url", "origin", canonical_url])
         .current_dir(repo)
         .status()
-        .with_context(|| format!("git remote set-url origin {} in {}", canonical_url, repo.display()))?;
+        .with_context(|| {
+            format!(
+                "git remote set-url origin {} in {}",
+                canonical_url,
+                repo.display()
+            )
+        })?;
 
     // Update upstream tracking for current branch if upstream was set
     if let Some(branch) = current_branch(repo) {
         if has_tracking_upstream(repo) {
             let _ = std_git_command()
-                .args(["branch", "--set-upstream-to", &format!("origin/{}", branch), &branch])
+                .args([
+                    "branch",
+                    "--set-upstream-to",
+                    &format!("origin/{}", branch),
+                    &branch,
+                ])
                 .current_dir(repo)
                 .output();
         }
@@ -1723,8 +1915,8 @@ pub(crate) fn acquire_path_lock() -> parking_lot::MutexGuard<'static, ()> {
 mod tests {
     use super::*;
     use crate::git::multi_remote::{diagnose_divergence, push_to_named_remote, Divergence};
+    use crate::test_helpers::{test_git_cmd, EnvRestorer};
     use std::os::unix::fs::PermissionsExt;
-    use crate::test_helpers::{EnvRestorer, test_git_cmd};
 
     #[test]
     fn test_strip_url_credentials_https_with_creds() {
@@ -1751,7 +1943,10 @@ mod tests {
     fn test_github_https_url_with_embedded_newline() {
         let url = "git@github.com:owner/repo.git\n";
         let result = github_https_url(url);
-        assert_eq!(result, Some("https://github.com/owner/repo.git\n".to_string()));
+        assert_eq!(
+            result,
+            Some("https://github.com/owner/repo.git\n".to_string())
+        );
     }
 
     #[test]
@@ -1785,30 +1980,48 @@ mod tests {
     #[test]
     fn test_git_ssh_hardening_contains_key_flags() {
         let val = git_ssh_hardening();
-        assert!(val.contains("BatchMode=yes"), "should contain BatchMode=yes, got: {val}");
-        assert!(val.contains("-F"), "should contain -F flag for SSH config, got: {val}");
-        assert!(val.contains("ConnectTimeout=10"), "should contain ConnectTimeout, got: {val}");
+        assert!(
+            val.contains("BatchMode=yes"),
+            "should contain BatchMode=yes, got: {val}"
+        );
+        assert!(
+            val.contains("-F"),
+            "should contain -F flag for SSH config, got: {val}"
+        );
+        assert!(
+            val.contains("ConnectTimeout=10"),
+            "should contain ConnectTimeout, got: {val}"
+        );
     }
 
     #[test]
     fn test_gitlab_https_url_ssh_colon_path() {
         let url = "git@gitlab.com:owner/repo.git";
         let result = gitlab_https_url(url);
-        assert_eq!(result, Some("https://gitlab.com/owner/repo.git".to_string()));
+        assert_eq!(
+            result,
+            Some("https://gitlab.com/owner/repo.git".to_string())
+        );
     }
 
     #[test]
     fn test_gitlab_https_url_ssh_protocol() {
         let url = "ssh://git@gitlab.com/owner/repo.git";
         let result = gitlab_https_url(url);
-        assert_eq!(result, Some("https://gitlab.com/owner/repo.git".to_string()));
+        assert_eq!(
+            result,
+            Some("https://gitlab.com/owner/repo.git".to_string())
+        );
     }
 
     #[test]
     fn test_gitlab_https_url_already_https() {
         let url = "https://gitlab.com/owner/repo.git";
         let result = gitlab_https_url(url);
-        assert_eq!(result, Some("https://gitlab.com/owner/repo.git".to_string()));
+        assert_eq!(
+            result,
+            Some("https://gitlab.com/owner/repo.git".to_string())
+        );
     }
 
     #[test]
@@ -1821,21 +2034,30 @@ mod tests {
     fn test_codeberg_https_url_ssh_colon_path() {
         let url = "git@codeberg.org:owner/repo.git";
         let result = codeberg_https_url(url);
-        assert_eq!(result, Some("https://codeberg.org/owner/repo.git".to_string()));
+        assert_eq!(
+            result,
+            Some("https://codeberg.org/owner/repo.git".to_string())
+        );
     }
 
     #[test]
     fn test_codeberg_https_url_ssh_protocol() {
         let url = "ssh://git@codeberg.org/owner/repo.git";
         let result = codeberg_https_url(url);
-        assert_eq!(result, Some("https://codeberg.org/owner/repo.git".to_string()));
+        assert_eq!(
+            result,
+            Some("https://codeberg.org/owner/repo.git".to_string())
+        );
     }
 
     #[test]
     fn test_codeberg_https_url_already_https() {
         let url = "https://codeberg.org/owner/repo.git";
         let result = codeberg_https_url(url);
-        assert_eq!(result, Some("https://codeberg.org/owner/repo.git".to_string()));
+        assert_eq!(
+            result,
+            Some("https://codeberg.org/owner/repo.git".to_string())
+        );
     }
 
     #[test]
@@ -1846,16 +2068,33 @@ mod tests {
 
     #[test]
     fn test_fallback_status_rank_ordering() {
-        assert!(fallback_status_rank(&FileStatus::Deleted) > fallback_status_rank(&FileStatus::Modified));
-        assert!(fallback_status_rank(&FileStatus::Renamed) > fallback_status_rank(&FileStatus::Added));
-        assert!(fallback_status_rank(&FileStatus::TypeChange) > fallback_status_rank(&FileStatus::Unknown));
+        assert!(
+            fallback_status_rank(&FileStatus::Deleted)
+                > fallback_status_rank(&FileStatus::Modified)
+        );
+        assert!(
+            fallback_status_rank(&FileStatus::Renamed) > fallback_status_rank(&FileStatus::Added)
+        );
+        assert!(
+            fallback_status_rank(&FileStatus::TypeChange)
+                > fallback_status_rank(&FileStatus::Unknown)
+        );
     }
 
     #[test]
     fn test_parse_name_status_line_valid_lines() {
-        assert_eq!(parse_name_status_line("M\tfile.rs"), Some((PathBuf::from("file.rs"), FileStatus::Modified)));
-        assert_eq!(parse_name_status_line("A\tnew.rs"), Some((PathBuf::from("new.rs"), FileStatus::Added)));
-        assert_eq!(parse_name_status_line("D\tdeleted.rs"), Some((PathBuf::from("deleted.rs"), FileStatus::Deleted)));
+        assert_eq!(
+            parse_name_status_line("M\tfile.rs"),
+            Some((PathBuf::from("file.rs"), FileStatus::Modified))
+        );
+        assert_eq!(
+            parse_name_status_line("A\tnew.rs"),
+            Some((PathBuf::from("new.rs"), FileStatus::Added))
+        );
+        assert_eq!(
+            parse_name_status_line("D\tdeleted.rs"),
+            Some((PathBuf::from("deleted.rs"), FileStatus::Deleted))
+        );
     }
 
     #[test]
@@ -1891,7 +2130,10 @@ mod tests {
 
     #[test]
     fn test_top_level_dir_path_with_multiple_slashes() {
-        assert_eq!(top_level_dir("src///nested/main.rs"), Some("src".to_string()));
+        assert_eq!(
+            top_level_dir("src///nested/main.rs"),
+            Some("src".to_string())
+        );
     }
 
     #[test]
@@ -1953,7 +2195,11 @@ mod tests {
 
         let secrets_dir = tmp_home.path().join(".dracon/utilities/sync/secrets");
         std::fs::create_dir_all(&secrets_dir).expect("create secrets dir");
-        std::fs::write(secrets_dir.join("test.env"), "TEST_FILE_SECRET_TOKEN=file_token_abc123\n").expect("write env file");
+        std::fs::write(
+            secrets_dir.join("test.env"),
+            "TEST_FILE_SECRET_TOKEN=file_token_abc123\n",
+        )
+        .expect("write env file");
 
         let result = load_secret("TEST_FILE_SECRET_TOKEN");
 
@@ -1989,7 +2235,11 @@ mod tests {
 
         let secrets_dir = tmp_home.path().join(".dracon/utilities/sync/secrets");
         std::fs::create_dir_all(&secrets_dir).expect("create secrets dir");
-        std::fs::write(secrets_dir.join("another.env"), "PRECEDENCE_SECRET=file_value\n").expect("write env file");
+        std::fs::write(
+            secrets_dir.join("another.env"),
+            "PRECEDENCE_SECRET=file_value\n",
+        )
+        .expect("write env file");
 
         let result = load_secret("PRECEDENCE_SECRET");
 
@@ -2048,7 +2298,8 @@ mod tests {
             .status()
             .expect("git init");
 
-        multi_remote::ensure_remote(&repo, "github", "git@github.com:Test/repo.git").expect("ensure_remote");
+        multi_remote::ensure_remote(&repo, "github", "git@github.com:Test/repo.git")
+            .expect("ensure_remote");
 
         let url = multi_remote::get_remote_url(&repo, "github");
         assert_eq!(url, Some("git@github.com:Test/repo.git".to_string()));
@@ -2069,7 +2320,8 @@ mod tests {
             .status()
             .expect("git remote add");
 
-        multi_remote::ensure_remote(&repo, "github", "git@github.com:New/repo.git").expect("ensure_remote");
+        multi_remote::ensure_remote(&repo, "github", "git@github.com:New/repo.git")
+            .expect("ensure_remote");
 
         let url = multi_remote::get_remote_url(&repo, "github");
         assert_eq!(url, Some("git@github.com:New/repo.git".to_string()));
@@ -2085,8 +2337,10 @@ mod tests {
             .status()
             .expect("git init");
 
-        multi_remote::ensure_remote(&repo, "github", "git@github.com:Test/repo.git").expect("ensure_remote 1");
-        multi_remote::ensure_remote(&repo, "github", "git@github.com:Test/repo.git").expect("ensure_remote 2");
+        multi_remote::ensure_remote(&repo, "github", "git@github.com:Test/repo.git")
+            .expect("ensure_remote 1");
+        multi_remote::ensure_remote(&repo, "github", "git@github.com:Test/repo.git")
+            .expect("ensure_remote 2");
 
         let remotes = multi_remote::list_remotes(&repo);
         assert_eq!(remotes.len(), 1);
@@ -2113,11 +2367,18 @@ mod tests {
             .status()
             .expect("git remote add stale");
 
-        crate::git::multi_remote::remove_stale_remotes(&repo, &["github"]).expect("remove_stale_remotes");
+        crate::git::multi_remote::remove_stale_remotes(&repo, &["github"])
+            .expect("remove_stale_remotes");
 
         let remotes = multi_remote::list_remotes(&repo);
-        assert!(remotes.contains(&"origin".to_string()), "origin must be preserved");
-        assert!(!remotes.contains(&"stale".to_string()), "stale not in keep list, should be removed");
+        assert!(
+            remotes.contains(&"origin".to_string()),
+            "origin must be preserved"
+        );
+        assert!(
+            !remotes.contains(&"stale".to_string()),
+            "stale not in keep list, should be removed"
+        );
     }
 
     #[test]
@@ -2135,22 +2396,42 @@ mod tests {
             .status()
             .expect("git remote add origin");
         test_git_cmd()
-            .args(["remote", "add", "mirror1", "git@mirror1.example.com:repo.git"])
+            .args([
+                "remote",
+                "add",
+                "mirror1",
+                "git@mirror1.example.com:repo.git",
+            ])
             .current_dir(&repo)
             .status()
             .expect("git remote add mirror1");
         test_git_cmd()
-            .args(["remote", "add", "mirror2", "git@mirror2.example.com:repo.git"])
+            .args([
+                "remote",
+                "add",
+                "mirror2",
+                "git@mirror2.example.com:repo.git",
+            ])
             .current_dir(&repo)
             .status()
             .expect("git remote add mirror2");
 
-        crate::git::multi_remote::remove_stale_remotes(&repo, &["mirror1"]).expect("remove_stale_remotes");
+        crate::git::multi_remote::remove_stale_remotes(&repo, &["mirror1"])
+            .expect("remove_stale_remotes");
 
         let remotes = multi_remote::list_remotes(&repo);
-        assert!(remotes.contains(&"origin".to_string()), "origin always preserved");
-        assert!(remotes.contains(&"mirror1".to_string()), "kept remote mirror1 preserved");
-        assert!(!remotes.contains(&"mirror2".to_string()), "non-kept remote mirror2 removed");
+        assert!(
+            remotes.contains(&"origin".to_string()),
+            "origin always preserved"
+        );
+        assert!(
+            remotes.contains(&"mirror1".to_string()),
+            "kept remote mirror1 preserved"
+        );
+        assert!(
+            !remotes.contains(&"mirror2".to_string()),
+            "non-kept remote mirror2 removed"
+        );
     }
 
     #[test]
@@ -2168,7 +2449,8 @@ mod tests {
             .status()
             .expect("git remote add origin");
 
-        crate::git::multi_remote::remove_stale_remotes(&repo, &[]).expect("remove_stale_remotes with empty keep list");
+        crate::git::multi_remote::remove_stale_remotes(&repo, &[])
+            .expect("remove_stale_remotes with empty keep list");
 
         let remotes = multi_remote::list_remotes(&repo);
         assert_eq!(remotes, vec!["origin"]);
@@ -2200,7 +2482,10 @@ mod tests {
         crate::git::multi_remote::configure_all_remotes(&repo, &remotes, "my-repo");
 
         let url = multi_remote::get_remote_url(&repo, "mirror");
-        assert_eq!(url, Some("git@mirror.example.com:myorg/my-repo.git".to_string()));
+        assert_eq!(
+            url,
+            Some("git@mirror.example.com:myorg/my-repo.git".to_string())
+        );
     }
 
     #[test]
@@ -2243,10 +2528,16 @@ mod tests {
         crate::git::multi_remote::configure_all_remotes(&repo, &remotes, "multi-repo");
 
         let github_url = multi_remote::get_remote_url(&repo, "github");
-        assert_eq!(github_url, Some("git@github.com:testuser/multi-repo.git".to_string()));
+        assert_eq!(
+            github_url,
+            Some("git@github.com:testuser/multi-repo.git".to_string())
+        );
 
         let gitlab_url = multi_remote::get_remote_url(&repo, "gitlab");
-        assert_eq!(gitlab_url, Some("git@gitlab.com:testuser/multi-repo.git".to_string()));
+        assert_eq!(
+            gitlab_url,
+            Some("git@gitlab.com:testuser/multi-repo.git".to_string())
+        );
     }
 
     #[test]
@@ -2309,8 +2600,12 @@ mod tests {
             },
         ];
 
-        let results = crate::git::multi_remote::auto_create_all_remotes(&remotes, "test-repo", true).await;
-        assert!(results.is_empty(), "should return empty vec when no remotes have auto_create=true");
+        let results =
+            crate::git::multi_remote::auto_create_all_remotes(&remotes, "test-repo", true).await;
+        assert!(
+            results.is_empty(),
+            "should return empty vec when no remotes have auto_create=true"
+        );
     }
 
     #[tokio::test]
@@ -2328,11 +2623,15 @@ mod tests {
             force_push_when_behind: false,
         }];
 
-        let results = crate::git::multi_remote::auto_create_all_remotes(&remotes, "test-repo", true).await;
+        let results =
+            crate::git::multi_remote::auto_create_all_remotes(&remotes, "test-repo", true).await;
         assert_eq!(results.len(), 1);
         assert!(results[0].1.is_err(), "Generic auth should return error");
         let err_msg = format!("{}", results[0].1.as_ref().unwrap_err());
-        assert!(err_msg.contains("cannot auto-create"), "error should mention auto-create not supported");
+        assert!(
+            err_msg.contains("cannot auto-create"),
+            "error should mention auto-create not supported"
+        );
     }
 
     #[tokio::test]
@@ -2355,12 +2654,19 @@ mod tests {
             force_push_when_behind: false,
         }];
 
-        let results = crate::git::multi_remote::auto_create_all_remotes(&remotes, "test-repo", true).await;
+        let results =
+            crate::git::multi_remote::auto_create_all_remotes(&remotes, "test-repo", true).await;
 
         assert_eq!(results.len(), 1);
-        assert!(results[0].1.is_err(), "Codeberg without token should return error");
+        assert!(
+            results[0].1.is_err(),
+            "Codeberg without token should return error"
+        );
         let err_msg = format!("{}", results[0].1.as_ref().unwrap_err());
-        assert!(err_msg.contains("missing token") || err_msg.contains("CODEBERG_TOKEN"), "error should mention missing token");
+        assert!(
+            err_msg.contains("missing token") || err_msg.contains("CODEBERG_TOKEN"),
+            "error should mention missing token"
+        );
     }
 
     #[tokio::test]
@@ -2368,10 +2674,14 @@ mod tests {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let gh_mock = tmp.path().join("gh");
         std::fs::write(&gh_mock, "#!/bin/sh\nexit 0\n").expect("write gh mock");
-        std::fs::set_permissions(&gh_mock, std::fs::Permissions::from_mode(0o755)).expect("chmod gh");
+        std::fs::set_permissions(&gh_mock, std::fs::Permissions::from_mode(0o755))
+            .expect("chmod gh");
         let _lock = acquire_path_lock();
         let orig_path = std::env::var("PATH").unwrap_or_default();
-        let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
+        let _guard = EnvRestorer::new(
+            "PATH",
+            &format!("{}:{}", tmp.path().to_string_lossy(), orig_path),
+        );
 
         let remotes = vec![RemoteConfig {
             name: "origin".to_string(),
@@ -2386,7 +2696,8 @@ mod tests {
             force_push_when_behind: false,
         }];
 
-        let results = crate::git::multi_remote::auto_create_all_remotes(&remotes, "test-repo", true).await;
+        let results =
+            crate::git::multi_remote::auto_create_all_remotes(&remotes, "test-repo", true).await;
         assert_eq!(results.len(), 1);
         let url = results[0].1.as_ref().unwrap();
         assert_eq!(url, "git@github.com:testaccount/test-repo.git");
@@ -2397,10 +2708,14 @@ mod tests {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let glab_mock = tmp.path().join("glab");
         std::fs::write(&glab_mock, "#!/bin/sh\nexit 0\n").expect("write glab mock");
-        std::fs::set_permissions(&glab_mock, std::fs::Permissions::from_mode(0o755)).expect("chmod glab");
+        std::fs::set_permissions(&glab_mock, std::fs::Permissions::from_mode(0o755))
+            .expect("chmod glab");
         let _lock = acquire_path_lock();
         let orig_path = std::env::var("PATH").unwrap_or_default();
-        let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
+        let _guard = EnvRestorer::new(
+            "PATH",
+            &format!("{}:{}", tmp.path().to_string_lossy(), orig_path),
+        );
 
         let remotes = vec![RemoteConfig {
             name: "origin".to_string(),
@@ -2415,7 +2730,8 @@ mod tests {
             force_push_when_behind: false,
         }];
 
-        let results = crate::git::multi_remote::auto_create_all_remotes(&remotes, "test-repo", true).await;
+        let results =
+            crate::git::multi_remote::auto_create_all_remotes(&remotes, "test-repo", true).await;
         assert_eq!(results.len(), 1);
         let url = results[0].1.as_ref().unwrap();
         assert_eq!(url, "git@gitlab.com:testaccount/test-repo.git");
@@ -2435,7 +2751,14 @@ mod tests {
         });
 
         let url = format!("http://127.0.0.1:{}/api/v1/repos", port);
-        let result = crate::git::multi_remote::create_repo_on_codeberg("test_token", "testuser", "myrepo", &url, true).await;
+        let result = crate::git::multi_remote::create_repo_on_codeberg(
+            "test_token",
+            "testuser",
+            "myrepo",
+            &url,
+            true,
+        )
+        .await;
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "git@codeberg.org:testuser/myrepo.git");
     }
@@ -2454,7 +2777,14 @@ mod tests {
         });
 
         let url = format!("http://127.0.0.1:{}/api/v1/repos", port);
-        let result = crate::git::multi_remote::create_repo_on_codeberg("test_token", "testuser", "myrepo", &url, true).await;
+        let result = crate::git::multi_remote::create_repo_on_codeberg(
+            "test_token",
+            "testuser",
+            "myrepo",
+            &url,
+            true,
+        )
+        .await;
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "git@codeberg.org:testuser/myrepo.git");
     }
@@ -2473,7 +2803,14 @@ mod tests {
         });
 
         let url = format!("http://127.0.0.1:{}/api/v1/repos", port);
-        let result = crate::git::multi_remote::create_repo_on_codeberg("test_token", "testuser", "myrepo", &url, true).await;
+        let result = crate::git::multi_remote::create_repo_on_codeberg(
+            "test_token",
+            "testuser",
+            "myrepo",
+            &url,
+            true,
+        )
+        .await;
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "git@codeberg.org:testuser/myrepo.git");
     }
@@ -2497,10 +2834,21 @@ mod tests {
         });
 
         let url = format!("http://127.0.0.1:{}/api/v1/repos", port);
-        let result = crate::git::multi_remote::create_repo_on_codeberg("bad_token", "testuser", "myrepo", &url, true).await;
+        let result = crate::git::multi_remote::create_repo_on_codeberg(
+            "bad_token",
+            "testuser",
+            "myrepo",
+            &url,
+            true,
+        )
+        .await;
         assert!(result.is_err());
         let err_msg = format!("{}", result.unwrap_err());
-        assert!(err_msg.contains("401") || err_msg.contains("Unauthorized"), "error should mention 401: {}", err_msg);
+        assert!(
+            err_msg.contains("401") || err_msg.contains("Unauthorized"),
+            "error should mention 401: {}",
+            err_msg
+        );
     }
 
     #[tokio::test]
@@ -2513,12 +2861,18 @@ mod tests {
             .status()
             .expect("git init");
         test_git_cmd()
-            .args(["remote", "add", "origin", "git@invalid.example.com:repo.git"])
+            .args([
+                "remote",
+                "add",
+                "origin",
+                "git@invalid.example.com:repo.git",
+            ])
             .current_dir(&repo)
             .status()
             .expect("git remote add");
 
-        let result = crate::git::multi_remote::push_to_named_remote(&repo, "origin", 1, 0, false).await;
+        let result =
+            crate::git::multi_remote::push_to_named_remote(&repo, "origin", 1, 0, false).await;
         assert!(result.is_err(), "push to invalid remote should fail");
     }
 
@@ -2532,12 +2886,22 @@ mod tests {
             .status()
             .expect("git init");
         test_git_cmd()
-            .args(["remote", "add", "mirror1", "git@invalid1.example.com:repo.git"])
+            .args([
+                "remote",
+                "add",
+                "mirror1",
+                "git@invalid1.example.com:repo.git",
+            ])
             .current_dir(&repo)
             .status()
             .expect("git remote add mirror1");
         test_git_cmd()
-            .args(["remote", "add", "mirror2", "git@invalid2.example.com:repo.git"])
+            .args([
+                "remote",
+                "add",
+                "mirror2",
+                "git@invalid2.example.com:repo.git",
+            ])
             .current_dir(&repo)
             .status()
             .expect("git remote add mirror2");
@@ -2588,7 +2952,10 @@ mod tests {
             .expect("git init");
 
         let results = crate::git::multi_remote::push_mirror_remotes(&repo, &[], 1, 0, true).await;
-        assert!(results.is_empty(), "should return empty results for empty remotes");
+        assert!(
+            results.is_empty(),
+            "should return empty results for empty remotes"
+        );
     }
 
     #[test]
@@ -2599,7 +2966,10 @@ mod tests {
         std::fs::set_permissions(&gh_mock, std::fs::Permissions::from_mode(0o755)).expect("chmod");
         let _lock = acquire_path_lock();
         let orig_path = std::env::var("PATH").unwrap_or_default();
-        let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
+        let _guard = EnvRestorer::new(
+            "PATH",
+            &format!("{}:{}", tmp.path().to_string_lossy(), orig_path),
+        );
 
         let result = multi_remote::create_repo_on_github("testuser", "my-repo");
 
@@ -2619,7 +2989,10 @@ mod tests {
         std::fs::set_permissions(&gh_mock, std::fs::Permissions::from_mode(0o755)).expect("chmod");
         let _lock = acquire_path_lock();
         let orig_path = std::env::var("PATH").unwrap_or_default();
-        let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
+        let _guard = EnvRestorer::new(
+            "PATH",
+            &format!("{}:{}", tmp.path().to_string_lossy(), orig_path),
+        );
 
         let result = multi_remote::create_repo_on_github("testuser", "dracon-demons");
 
@@ -2642,7 +3015,10 @@ mod tests {
 
         let _lock = acquire_path_lock();
         let orig_path = std::env::var("PATH").unwrap_or_default();
-        let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
+        let _guard = EnvRestorer::new(
+            "PATH",
+            &format!("{}:{}", tmp.path().to_string_lossy(), orig_path),
+        );
         let _gh_guard = EnvRestorer::new("GH_TOKEN", "test_pat_from_env");
 
         let result = multi_remote::create_repo_on_github("testuser", "test-repo");
@@ -2655,10 +3031,14 @@ mod tests {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let glab_mock = tmp.path().join("glab");
         std::fs::write(&glab_mock, "#!/bin/sh\nexit 0\n").expect("write glab mock");
-        std::fs::set_permissions(&glab_mock, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+        std::fs::set_permissions(&glab_mock, std::fs::Permissions::from_mode(0o755))
+            .expect("chmod");
         let _lock = acquire_path_lock();
         let orig_path = std::env::var("PATH").unwrap_or_default();
-        let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
+        let _guard = EnvRestorer::new(
+            "PATH",
+            &format!("{}:{}", tmp.path().to_string_lossy(), orig_path),
+        );
 
         let result = multi_remote::create_repo_on_gitlab("testuser", "my-repo", true);
 
@@ -2675,10 +3055,14 @@ mod tests {
             "#!/bin/sh\necho 'Repository has already been taken' >&2\nexit 1\n",
         )
         .expect("write glab mock");
-        std::fs::set_permissions(&glab_mock, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+        std::fs::set_permissions(&glab_mock, std::fs::Permissions::from_mode(0o755))
+            .expect("chmod");
         let _lock = acquire_path_lock();
         let orig_path = std::env::var("PATH").unwrap_or_default();
-        let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
+        let _guard = EnvRestorer::new(
+            "PATH",
+            &format!("{}:{}", tmp.path().to_string_lossy(), orig_path),
+        );
 
         let result = multi_remote::create_repo_on_gitlab("testuser", "dracon-demons", true);
 
@@ -2697,10 +3081,14 @@ mod tests {
             "#!/bin/sh\necho 'Connection timeout' >&2\nexit 128\n",
         )
         .expect("write glab mock");
-        std::fs::set_permissions(&glab_mock, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+        std::fs::set_permissions(&glab_mock, std::fs::Permissions::from_mode(0o755))
+            .expect("chmod");
         let _lock = acquire_path_lock();
         let orig_path = std::env::var("PATH").unwrap_or_default();
-        let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
+        let _guard = EnvRestorer::new(
+            "PATH",
+            &format!("{}:{}", tmp.path().to_string_lossy(), orig_path),
+        );
 
         let result = multi_remote::create_repo_on_gitlab("testuser", "test-repo", true);
 
@@ -2711,12 +3099,20 @@ mod tests {
     fn test_create_repo_on_gitlab_token_passed_as_env_var() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let glab_mock = tmp.path().join("glab");
-        std::fs::write(&glab_mock, "#!/bin/sh\nif [ -n \"$GITLAB_TOKEN\" ]; then echo 'Token received'; fi\nexit 0\n").expect("write glab mock");
-        std::fs::set_permissions(&glab_mock, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+        std::fs::write(
+            &glab_mock,
+            "#!/bin/sh\nif [ -n \"$GITLAB_TOKEN\" ]; then echo 'Token received'; fi\nexit 0\n",
+        )
+        .expect("write glab mock");
+        std::fs::set_permissions(&glab_mock, std::fs::Permissions::from_mode(0o755))
+            .expect("chmod");
 
         let _lock = acquire_path_lock();
         let orig_path = std::env::var("PATH").unwrap_or_default();
-        let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
+        let _guard = EnvRestorer::new(
+            "PATH",
+            &format!("{}:{}", tmp.path().to_string_lossy(), orig_path),
+        );
         let _glab_guard = EnvRestorer::new("GITLAB_TOKEN", "test_gitlab_token");
 
         let result = multi_remote::create_repo_on_gitlab("testuser", "test-repo", true);
@@ -2755,7 +3151,11 @@ mod tests {
             .expect("git commit");
 
         let result = crate::git::push_with_retries(&repo, 5, 3, "test-push").await;
-        assert!(result.is_ok(), "push should succeed on first attempt: {:?}", result);
+        assert!(
+            result.is_ok(),
+            "push should succeed on first attempt: {:?}",
+            result
+        );
     }
 
     #[tokio::test]
@@ -2767,8 +3167,10 @@ mod tests {
         let real_git = real_git_path();
         let fail_script = tmp.path().join("git");
         let counter_path = counter.display().to_string();
-        std::fs::write(&fail_script, format!(
-            "#!/bin/sh\n\
+        std::fs::write(
+            &fail_script,
+            format!(
+                "#!/bin/sh\n\
             count=$(cat {counter})\n\
             if [ \"$count\" -lt 1 ]; then\n\
                 echo \"simulated failure\" >&2\n\
@@ -2777,14 +3179,20 @@ mod tests {
             fi\n\
             exec {real_git} \"$@\"\n\
             ",
-            counter = counter_path,
-            real_git = real_git.display()
-        )).expect("write fail script");
-        std::fs::set_permissions(&fail_script, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+                counter = counter_path,
+                real_git = real_git.display()
+            ),
+        )
+        .expect("write fail script");
+        std::fs::set_permissions(&fail_script, std::fs::Permissions::from_mode(0o755))
+            .expect("chmod");
 
         let _lock = acquire_path_lock();
         let orig_path = std::env::var("PATH").unwrap_or_default();
-        let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
+        let _guard = EnvRestorer::new(
+            "PATH",
+            &format!("{}:{}", tmp.path().to_string_lossy(), orig_path),
+        );
 
         let bare = tmp.path().join("bare.git");
         std::process::Command::new(real_git.as_path())
@@ -2815,7 +3223,11 @@ mod tests {
 
         drop(_lock);
         let result = crate::git::push_with_retries(&repo, 5, 3, "test-push-retry").await;
-        assert!(result.is_ok(), "push should eventually succeed after retry: {:?}", result);
+        assert!(
+            result.is_ok(),
+            "push should eventually succeed after retry: {:?}",
+            result
+        );
     }
 
     #[tokio::test]
@@ -2824,15 +3236,23 @@ mod tests {
 
         let real_git = real_git_path();
         let always_fail = tmp.path().join("git");
-        std::fs::write(&always_fail, "#!/bin/sh\n\
+        std::fs::write(
+            &always_fail,
+            "#!/bin/sh\n\
             echo 'always fail' >&2\n\
             exit 1\n\
-            ").expect("write fail git");
-        std::fs::set_permissions(&always_fail, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+            ",
+        )
+        .expect("write fail git");
+        std::fs::set_permissions(&always_fail, std::fs::Permissions::from_mode(0o755))
+            .expect("chmod");
 
         let _lock = acquire_path_lock();
         let orig_path = std::env::var("PATH").unwrap_or_default();
-        let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
+        let _guard = EnvRestorer::new(
+            "PATH",
+            &format!("{}:{}", tmp.path().to_string_lossy(), orig_path),
+        );
 
         let bare = tmp.path().join("bare.git");
         std::process::Command::new(real_git.as_path())
@@ -2864,7 +3284,8 @@ mod tests {
         drop(_guard);
         drop(_lock);
 
-        let _git_bin_guard = EnvRestorer::new("DRACON_SYNC_GIT_BIN", &always_fail.to_string_lossy());
+        let _git_bin_guard =
+            EnvRestorer::new("DRACON_SYNC_GIT_BIN", &always_fail.to_string_lossy());
         let result = crate::git::push_with_retries(&repo, 1, 2, "test-push-fail").await;
 
         assert!(result.is_err(), "push should fail after exhausting retries");
@@ -2876,15 +3297,23 @@ mod tests {
 
         let real_git = real_git_path();
         let always_fail = tmp.path().join("git");
-        std::fs::write(&always_fail, "#!/bin/sh\n\
+        std::fs::write(
+            &always_fail,
+            "#!/bin/sh\n\
             echo 'permission denied for /nix/store/abc' >&2\n\
             exit 128\n\
-            ").expect("write fail git");
-        std::fs::set_permissions(&always_fail, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+            ",
+        )
+        .expect("write fail git");
+        std::fs::set_permissions(&always_fail, std::fs::Permissions::from_mode(0o755))
+            .expect("chmod");
 
         let _lock = acquire_path_lock();
         let orig_path = std::env::var("PATH").unwrap_or_default();
-        let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
+        let _guard = EnvRestorer::new(
+            "PATH",
+            &format!("{}:{}", tmp.path().to_string_lossy(), orig_path),
+        );
 
         let bare = tmp.path().join("bare.git");
         std::process::Command::new(real_git.as_path())
@@ -2916,13 +3345,17 @@ mod tests {
         drop(_guard);
         drop(_lock);
 
-        let _git_bin_guard = EnvRestorer::new("DRACON_SYNC_GIT_BIN", &always_fail.to_string_lossy());
+        let _git_bin_guard =
+            EnvRestorer::new("DRACON_SYNC_GIT_BIN", &always_fail.to_string_lossy());
         let result = crate::git::push_with_retries(&repo, 1, 1, "test-push-stderr").await;
 
         assert!(result.is_err(), "push should fail");
         let err_msg = format!("{}", result.unwrap_err());
-        assert!(err_msg.contains("permission denied") || err_msg.contains("/nix/store"),
-            "error message should include stderr output, got: {}", err_msg);
+        assert!(
+            err_msg.contains("permission denied") || err_msg.contains("/nix/store"),
+            "error message should include stderr output, got: {}",
+            err_msg
+        );
     }
 
     #[tokio::test]
@@ -2965,20 +3398,27 @@ mod tests {
         let real_git = real_git_path();
         let fail_git = tmp.path().join("git");
         let real_git_path_str = real_git.display().to_string();
-        std::fs::write(&fail_git, format!(
-            "#!/bin/sh\n\
+        std::fs::write(
+            &fail_git,
+            format!(
+                "#!/bin/sh\n\
             if echo \"$@\" | grep -q 'GIT_SSH_COMMAND'; then\n\
                 echo 'SSH failure' >&2\n\
                 exit 128\n\
             fi\n\
             exec {real_git_path_str} \"$@\"\n\
             "
-        )).expect("write fail git");
+            ),
+        )
+        .expect("write fail git");
         std::fs::set_permissions(&fail_git, std::fs::Permissions::from_mode(0o755)).expect("chmod");
 
         let _lock = acquire_path_lock();
         let orig_path = std::env::var("PATH").unwrap_or_default();
-        let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
+        let _guard = EnvRestorer::new(
+            "PATH",
+            &format!("{}:{}", tmp.path().to_string_lossy(), orig_path),
+        );
 
         let bare = tmp.path().join("bare.git");
         std::process::Command::new(real_git.as_path())
@@ -3010,7 +3450,11 @@ mod tests {
 
         drop(_lock);
         let result = crate::git::push_with_transport_fallbacks(&repo, 5, "test-push-fb").await;
-        assert!(result.is_ok(), "HTTPS fallback should succeed after SSH failure: {:?}", result);
+        assert!(
+            result.is_ok(),
+            "HTTPS fallback should succeed after SSH failure: {:?}",
+            result
+        );
     }
 
     #[tokio::test]
@@ -3021,11 +3465,15 @@ mod tests {
         let always_fail = tmp.path().join("git");
         std::fs::write(&always_fail, "#!/bin/sh\necho 'always fail' >&2\nexit 1\n")
             .expect("write fail git");
-        std::fs::set_permissions(&always_fail, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+        std::fs::set_permissions(&always_fail, std::fs::Permissions::from_mode(0o755))
+            .expect("chmod");
 
         let _lock = acquire_path_lock();
         let orig_path = std::env::var("PATH").unwrap_or_default();
-        let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
+        let _guard = EnvRestorer::new(
+            "PATH",
+            &format!("{}:{}", tmp.path().to_string_lossy(), orig_path),
+        );
 
         let bare = tmp.path().join("bare.git");
         std::process::Command::new(real_git.as_path())
@@ -3058,8 +3506,10 @@ mod tests {
         drop(_guard);
         drop(_lock);
 
-        let _git_bin_guard = EnvRestorer::new("DRACON_SYNC_GIT_BIN", &always_fail.to_string_lossy());
-        let result = crate::git::push_with_transport_fallbacks(&repo, 1, "test-push-both-fail").await;
+        let _git_bin_guard =
+            EnvRestorer::new("DRACON_SYNC_GIT_BIN", &always_fail.to_string_lossy());
+        let result =
+            crate::git::push_with_transport_fallbacks(&repo, 1, "test-push-both-fail").await;
 
         assert!(result.is_err(), "both SSH and HTTPS should fail");
     }
@@ -3096,7 +3546,11 @@ mod tests {
             .expect("git commit");
 
         let result = multi_remote::push_to_named_remote(&repo, "mirror", 5, 0, false).await;
-        assert!(result.is_ok(), "SSH push to named remote should succeed: {:?}", result);
+        assert!(
+            result.is_ok(),
+            "SSH push to named remote should succeed: {:?}",
+            result
+        );
     }
 
     #[tokio::test]
@@ -3105,20 +3559,27 @@ mod tests {
         let real_git = real_git_path();
         let fail_git = tmp.path().join("git");
         let real_git_path_str = real_git.display().to_string();
-        std::fs::write(&fail_git, format!(
-            "#!/bin/sh\n\
+        std::fs::write(
+            &fail_git,
+            format!(
+                "#!/bin/sh\n\
             if echo \"$@\" | grep -q 'GIT_SSH_COMMAND'; then\n\
                 echo 'SSH failure' >&2\n\
                 exit 128\n\
             fi\n\
             exec {real_git_path_str} \"$@\"\n\
             "
-        )).expect("write fail git");
+            ),
+        )
+        .expect("write fail git");
         std::fs::set_permissions(&fail_git, std::fs::Permissions::from_mode(0o755)).expect("chmod");
 
         let _lock = acquire_path_lock();
         let orig_path = std::env::var("PATH").unwrap_or_default();
-        let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
+        let _guard = EnvRestorer::new(
+            "PATH",
+            &format!("{}:{}", tmp.path().to_string_lossy(), orig_path),
+        );
 
         let bare = tmp.path().join("bare.git");
         std::process::Command::new(real_git.as_path())
@@ -3150,7 +3611,11 @@ mod tests {
 
         drop(_lock);
         let result = multi_remote::push_to_named_remote(&repo, "mirror", 5, 0, false).await;
-        assert!(result.is_ok(), "HTTPS fallback should succeed after SSH failure: {:?}", result);
+        assert!(
+            result.is_ok(),
+            "HTTPS fallback should succeed after SSH failure: {:?}",
+            result
+        );
     }
 
     #[tokio::test]
@@ -3159,13 +3624,20 @@ mod tests {
 
         let real_git = real_git_path();
         let always_fail = tmp.path().join("git");
-        std::fs::write(&always_fail, "#!/bin/sh\necho 'SSH failure' >&2\nexit 128\n")
-            .expect("write fail git");
-        std::fs::set_permissions(&always_fail, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+        std::fs::write(
+            &always_fail,
+            "#!/bin/sh\necho 'SSH failure' >&2\nexit 128\n",
+        )
+        .expect("write fail git");
+        std::fs::set_permissions(&always_fail, std::fs::Permissions::from_mode(0o755))
+            .expect("chmod");
 
         let _lock = acquire_path_lock();
         let orig_path = std::env::var("PATH").unwrap_or_default();
-        let _guard = EnvRestorer::new("PATH", &format!("{}:{}", tmp.path().to_string_lossy(), orig_path));
+        let _guard = EnvRestorer::new(
+            "PATH",
+            &format!("{}:{}", tmp.path().to_string_lossy(), orig_path),
+        );
 
         let bare = tmp.path().join("bare.git");
         std::process::Command::new(real_git.as_path())
@@ -3203,7 +3675,8 @@ mod tests {
         drop(_guard);
         drop(_lock);
 
-        let _git_bin_guard = EnvRestorer::new("DRACON_SYNC_GIT_BIN", &always_fail.to_string_lossy());
+        let _git_bin_guard =
+            EnvRestorer::new("DRACON_SYNC_GIT_BIN", &always_fail.to_string_lossy());
         let result = multi_remote::push_to_named_remote(&repo, "mirror", 1, 0, false).await;
 
         assert!(result.is_err(), "push should fail");
@@ -3221,8 +3694,11 @@ mod tests {
         let result = run_child(child, tmp.path(), 10, "test-stderr").await;
         assert!(result.is_err(), "should fail for nonexistent remote");
         let err_msg = format!("{}", result.unwrap_err());
-        assert!(!err_msg.contains("test-stderr failed") || err_msg.len() > 30,
-            "error message should include stderr detail, got: {}", err_msg);
+        assert!(
+            !err_msg.contains("test-stderr failed") || err_msg.len() > 30,
+            "error message should include stderr detail, got: {}",
+            err_msg
+        );
     }
 
     #[tokio::test]
@@ -3276,9 +3752,17 @@ mod tests {
             &["log", "--format=%s"],
             10,
             "log",
-            &[("GIT_AUTHOR_NAME", "Test Author"), ("GIT_COMMITTER_NAME", "Test Committer")],
-        ).await;
-        assert!(result.is_ok(), "git log with env vars should work: {:?}", result);
+            &[
+                ("GIT_AUTHOR_NAME", "Test Author"),
+                ("GIT_COMMITTER_NAME", "Test Committer"),
+            ],
+        )
+        .await;
+        assert!(
+            result.is_ok(),
+            "git log with env vars should work: {:?}",
+            result
+        );
     }
 
     #[tokio::test]
@@ -3307,7 +3791,10 @@ mod tests {
         let result = restore_paths(&repo, &["file.txt".to_string()]).await;
         assert!(result.is_ok(), "restore_paths should succeed: {:?}", result);
         let content = std::fs::read_to_string(repo.join("file.txt")).expect("read file");
-        assert_eq!(content, "original content", "file should be restored to original content");
+        assert_eq!(
+            content, "original content",
+            "file should be restored to original content"
+        );
     }
 
     #[tokio::test]
@@ -3354,7 +3841,11 @@ mod tests {
 
         let result = diagnose_divergence(&repo, "mirror", "master").await;
         assert!(result.is_ok(), "diagnose_divergence should succeed");
-        assert_eq!(result.unwrap(), Divergence::RemotePurelyBehind, "remote with no extra commits should be purely behind");
+        assert_eq!(
+            result.unwrap(),
+            Divergence::RemotePurelyBehind,
+            "remote with no extra commits should be purely behind"
+        );
     }
 
     #[tokio::test]
@@ -3422,7 +3913,11 @@ mod tests {
 
         let result = diagnose_divergence(&repo, "mirror", "master").await;
         assert!(result.is_ok(), "diagnose_divergence should succeed");
-        assert_eq!(result.unwrap(), Divergence::Divergent, "remote with commits local lacks should be divergent");
+        assert_eq!(
+            result.unwrap(),
+            Divergence::Divergent,
+            "remote with commits local lacks should be divergent"
+        );
     }
 
     #[tokio::test]
@@ -3487,7 +3982,11 @@ mod tests {
 
         drop(acquire_path_lock());
         let result = push_to_named_remote(&repo, "mirror", 5, 0, true).await;
-        assert!(result.is_ok(), "push with force_when_behind=true should succeed when remote is purely behind: {:?}", result);
+        assert!(
+            result.is_ok(),
+            "push with force_when_behind=true should succeed when remote is purely behind: {:?}",
+            result
+        );
     }
 
     #[tokio::test]
@@ -3552,7 +4051,11 @@ mod tests {
 
         drop(acquire_path_lock());
         let result = push_to_named_remote(&repo, "mirror", 5, 0, true).await;
-        assert!(result.is_err(), "push with force_when_behind=true should fail when remote is divergent: {:?}", result);
+        assert!(
+            result.is_err(),
+            "push with force_when_behind=true should fail when remote is divergent: {:?}",
+            result
+        );
     }
 
     #[tokio::test]
@@ -3611,7 +4114,10 @@ mod tests {
 
         drop(acquire_path_lock());
         let result = push_to_named_remote(&repo, "mirror", 5, 0, false).await;
-        assert!(result.is_err(), "push with force_when_behind=false should fail with rejected error");
+        assert!(
+            result.is_err(),
+            "push with force_when_behind=false should fail with rejected error"
+        );
     }
 
     #[test]
@@ -3624,7 +4130,12 @@ mod tests {
             .status()
             .expect("git init");
         test_git_cmd()
-            .args(["remote", "add", "origin", "git@github.com:DraconDev/dracon-demons-9.git"])
+            .args([
+                "remote",
+                "add",
+                "origin",
+                "git@github.com:DraconDev/dracon-demons-9.git",
+            ])
             .current_dir(repo)
             .status()
             .expect("git remote add");
@@ -3646,13 +4157,21 @@ mod tests {
             .status()
             .expect("git init");
         test_git_cmd()
-            .args(["remote", "add", "origin", "git@github.com:DraconDev/project-2024.git"])
+            .args([
+                "remote",
+                "add",
+                "origin",
+                "git@github.com:DraconDev/project-2024.git",
+            ])
             .current_dir(repo)
             .status()
             .expect("git remote add");
 
         let result = detect_orphan_origin(repo);
-        assert!(result.is_none(), "should NOT detect -2024 as orphan (multi-digit)");
+        assert!(
+            result.is_none(),
+            "should NOT detect -2024 as orphan (multi-digit)"
+        );
     }
 
     #[test]
@@ -3665,13 +4184,21 @@ mod tests {
             .status()
             .expect("git init");
         test_git_cmd()
-            .args(["remote", "add", "origin", "git@github.com:DraconDev/api-v2.git"])
+            .args([
+                "remote",
+                "add",
+                "origin",
+                "git@github.com:DraconDev/api-v2.git",
+            ])
             .current_dir(repo)
             .status()
             .expect("git remote add");
 
         let result = detect_orphan_origin(repo);
-        assert!(result.is_none(), "should NOT detect -v2 as orphan (not pure digits)");
+        assert!(
+            result.is_none(),
+            "should NOT detect -v2 as orphan (not pure digits)"
+        );
     }
 
     #[test]
@@ -3684,16 +4211,24 @@ mod tests {
             .status()
             .expect("git init");
         test_git_cmd()
-            .args(["remote", "add", "origin", "git@github.com:DraconDev/dracon-demons.git"])
+            .args([
+                "remote",
+                "add",
+                "origin",
+                "git@github.com:DraconDev/dracon-demons.git",
+            ])
             .current_dir(repo)
             .status()
             .expect("git remote add");
 
         let result = detect_orphan_origin(repo);
-        assert!(result.is_none(), "should NOT detect normal repo name as orphan");
+        assert!(
+            result.is_none(),
+            "should NOT detect normal repo name as orphan"
+        );
     }
 
-#[test]
+    #[test]
     fn test_fix_orphan_origin_updates_remote_url() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path();
@@ -3714,7 +4249,12 @@ mod tests {
             .status()
             .expect("git commit");
         test_git_cmd()
-            .args(["remote", "add", "origin", "git@github.com:DraconDev/dracon-demons-9.git"])
+            .args([
+                "remote",
+                "add",
+                "origin",
+                "git@github.com:DraconDev/dracon-demons-9.git",
+            ])
             .current_dir(repo)
             .status()
             .expect("git remote add");
@@ -3763,7 +4303,12 @@ mod tests {
             .expect("git push");
 
         test_git_cmd()
-            .args(["remote", "set-url", "origin", "git@github.com:DraconDev/dracon-demons-9.git"])
+            .args([
+                "remote",
+                "set-url",
+                "origin",
+                "git@github.com:DraconDev/dracon-demons-9.git",
+            ])
             .current_dir(repo)
             .status()
             .expect("git remote set-url");
@@ -3782,7 +4327,10 @@ mod tests {
                 .expect("git branch -vv");
             String::from_utf8_lossy(&output.stdout).to_string()
         };
-        assert!(upstream_info.contains("origin/main"), "branch should track origin/main after fix");
+        assert!(
+            upstream_info.contains("origin/main"),
+            "branch should track origin/main after fix"
+        );
     }
 
     #[tokio::test]
@@ -3849,7 +4397,10 @@ mod tests {
             String::from_utf8_lossy(&output.stdout).to_string()
         };
         assert!(local_branches.contains("main"), "main branch should exist");
-        assert!(!local_branches.contains("master"), "master local branch should be deleted");
+        assert!(
+            !local_branches.contains("master"),
+            "master local branch should be deleted"
+        );
     }
 
     #[tokio::test]
@@ -4001,8 +4552,16 @@ mod tests {
                 .filter(|s| !s.is_empty())
                 .collect::<Vec<String>>()
         };
-        assert!(local_branches.contains(&"master".to_string()), "master should still exist: {:?}", local_branches);
-        assert!(!local_branches.contains(&"main".to_string()), "main should be deleted: {:?}", local_branches);
+        assert!(
+            local_branches.contains(&"master".to_string()),
+            "master should still exist: {:?}",
+            local_branches
+        );
+        assert!(
+            !local_branches.contains(&"main".to_string()),
+            "main should be deleted: {:?}",
+            local_branches
+        );
     }
 
     #[tokio::test]
@@ -4050,7 +4609,15 @@ mod tests {
                 .filter(|s| !s.is_empty())
                 .collect::<Vec<String>>()
         };
-        assert!(local_branches.contains(&"main".to_string()), "main should still exist: {:?}", local_branches);
-        assert!(!local_branches.contains(&"master".to_string()), "master should be deleted: {:?}", local_branches);
+        assert!(
+            local_branches.contains(&"main".to_string()),
+            "main should still exist: {:?}",
+            local_branches
+        );
+        assert!(
+            !local_branches.contains(&"master".to_string()),
+            "master should be deleted: {:?}",
+            local_branches
+        );
     }
 }

@@ -5,15 +5,15 @@
 //! - Creating GitHub Releases for major bumps via `gh release create`
 //! - Publishing to configured registries (crates.io, npm, PyPI)
 
-use anyhow::{Context, Result, bail};
+use anyhow::{bail, Context, Result};
 use std::fs;
 use std::path::Path;
 use std::process::Command;
 
 use crate::bump::{extract_version_from_cargo, extract_version_from_json};
+use crate::git::{git_ssh_hardening, run_git_with_timeout, run_git_with_timeout_env};
 use crate::policy::{PublishRegistry, SyncPolicy};
 use crate::secrets::load_secret;
-use crate::git::{run_git_with_timeout, run_git_with_timeout_env, git_ssh_hardening};
 
 /// Result of a release pipeline step.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -64,7 +64,8 @@ pub(crate) async fn create_and_push_tag(repo: &Path, version: &str) -> Result<Re
         &["tag", "-a", &tag, "-m", &format!("Release {tag}")],
         30,
         "tag-create",
-    ).await?;
+    )
+    .await?;
 
     // Push tag
     match run_git_with_timeout_env(
@@ -72,8 +73,13 @@ pub(crate) async fn create_and_push_tag(repo: &Path, version: &str) -> Result<Re
         &["push", "origin", &tag],
         120,
         "tag-push",
-        &[("GIT_SSH_COMMAND", &git_ssh_hardening()), ("GIT_TERMINAL_PROMPT", "0")],
-    ).await {
+        &[
+            ("GIT_SSH_COMMAND", &git_ssh_hardening()),
+            ("GIT_TERMINAL_PROMPT", "0"),
+        ],
+    )
+    .await
+    {
         Ok(_) => {
             eprintln!("🏷️  Created and pushed tag {tag}");
             Ok(ReleaseStep::TagCreated(tag))
@@ -106,7 +112,9 @@ pub(crate) async fn create_github_release(repo: &Path, tag: &str) -> Result<Rele
 
     match check {
         Ok(Ok(status)) if status.success() => {
-            return Ok(ReleaseStep::Skipped(format!("GitHub release {tag} already exists")));
+            return Ok(ReleaseStep::Skipped(format!(
+                "GitHub release {tag} already exists"
+            )));
         }
         _ => {}
     }
@@ -116,10 +124,15 @@ pub(crate) async fn create_github_release(repo: &Path, tag: &str) -> Result<Rele
     let result = tokio::task::spawn_blocking(move || {
         Command::new("gh")
             .args([
-                "release", "create", &tag_create,
-                "--repo", &repo_name_create,
-                "--title", &tag_create,
-                "--notes", &format!("Release {tag_create}"),
+                "release",
+                "create",
+                &tag_create,
+                "--repo",
+                &repo_name_create,
+                "--title",
+                &tag_create,
+                "--notes",
+                &format!("Release {tag_create}"),
             ])
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
@@ -253,8 +266,8 @@ pub(crate) async fn version_exists_on_registry(
 pub(crate) fn extract_package_name(repo: &Path, registry: PublishRegistry) -> Result<String> {
     match registry {
         PublishRegistry::CratesIo => {
-            let cargo_toml = std::fs::read_to_string(repo.join("Cargo.toml"))
-                .context("no Cargo.toml found")?;
+            let cargo_toml =
+                std::fs::read_to_string(repo.join("Cargo.toml")).context("no Cargo.toml found")?;
             // Simple parse: look for `name = "..."` in [package] section
             for line in cargo_toml.lines() {
                 let trimmed = line.trim();
@@ -351,7 +364,8 @@ async fn publish_crates_io(repo: &Path, token: &str, _timeout_secs: u64) -> Resu
 
             match result {
                 Ok(out) if out.status.success() => {
-                    let version = read_cargo_version(repo).unwrap_or_else(|_| "unknown".to_string());
+                    let version =
+                        read_cargo_version(repo).unwrap_or_else(|_| "unknown".to_string());
                     eprintln!("📦 Published to crates.io: v{version}");
                     Ok(ReleaseStep::Published {
                         registry: "crates-io".to_string(),
@@ -499,7 +513,9 @@ async fn publish_pypi(repo: &Path, token: &str, _timeout_secs: u64) -> Result<Re
         Ok(out) => {
             let stderr = String::from_utf8_lossy(&out.stderr);
             if stderr.contains("already exists") || stderr.contains("409") {
-                return Ok(ReleaseStep::Skipped("already published to PyPI".to_string()));
+                return Ok(ReleaseStep::Skipped(
+                    "already published to PyPI".to_string(),
+                ));
             }
             Ok(ReleaseStep::Failed {
                 step: "twine upload".to_string(),
@@ -516,13 +532,15 @@ async fn publish_pypi(repo: &Path, token: &str, _timeout_secs: u64) -> Result<Re
 /// Read the current version from Cargo.toml.
 fn read_cargo_version(repo: &Path) -> Result<String> {
     let content = std::fs::read_to_string(repo.join("Cargo.toml"))?;
-    extract_version_from_cargo(&content).ok_or_else(|| anyhow::anyhow!("could not find version in Cargo.toml"))
+    extract_version_from_cargo(&content)
+        .ok_or_else(|| anyhow::anyhow!("could not find version in Cargo.toml"))
 }
 
 /// Read the current version from package.json.
 fn read_npm_version(repo: &Path) -> Result<String> {
     let content = std::fs::read_to_string(repo.join("package.json"))?;
-    extract_version_from_json(&content, "version").ok_or_else(|| anyhow::anyhow!("could not find version in package.json"))
+    extract_version_from_json(&content, "version")
+        .ok_or_else(|| anyhow::anyhow!("could not find version in package.json"))
 }
 
 /// Read the current version from pyproject.toml.
@@ -642,17 +660,17 @@ pub(crate) async fn run_release_pipeline(
     // Step 4: Nix flake PR (gated on nix_auto_update and presence of flake.nix)
     if repo_nix_auto_update && crate::nix::has_flake_nix(repo) {
         match crate::nix::update_flake_version(repo, new_version) {
-            Ok(true) => {
-                match crate::nix::create_flake_pr(repo, new_version).await {
-                    Ok(step) => steps.push(step),
-                    Err(e) => steps.push(ReleaseStep::Failed {
-                        step: "nix flake pr".to_string(),
-                        error: e.to_string(),
-                    }),
-                }
-            }
+            Ok(true) => match crate::nix::create_flake_pr(repo, new_version).await {
+                Ok(step) => steps.push(step),
+                Err(e) => steps.push(ReleaseStep::Failed {
+                    step: "nix flake pr".to_string(),
+                    error: e.to_string(),
+                }),
+            },
             Ok(false) => {
-                steps.push(ReleaseStep::Skipped("flake.nix version already up to date".to_string()));
+                steps.push(ReleaseStep::Skipped(
+                    "flake.nix version already up to date".to_string(),
+                ));
             }
             Err(e) => steps.push(ReleaseStep::Failed {
                 step: "update flake.nix version".to_string(),
@@ -704,8 +722,8 @@ pub(crate) fn detect_project_version(repo: &Path) -> Option<(String, &'static st
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::TempDir;
     use std::fs;
+    use tempfile::TempDir;
 
     #[test]
     fn test_extract_package_name_cargo() {
@@ -893,13 +911,20 @@ mod tests {
 
         // Should have tag step — either TagCreated or Failed (push fails without origin)
         assert!(
-            steps.iter().any(|s| matches!(s, ReleaseStep::TagCreated(_)))
-                || steps.iter().any(|s| matches!(s, ReleaseStep::Failed { step, .. } if step.contains("push tag"))),
-            "expected tag creation or push attempt, got: {:?}", steps
+            steps
+                .iter()
+                .any(|s| matches!(s, ReleaseStep::TagCreated(_)))
+                || steps.iter().any(
+                    |s| matches!(s, ReleaseStep::Failed { step, .. } if step.contains("push tag"))
+                ),
+            "expected tag creation or push attempt, got: {:?}",
+            steps
         );
         // Should NOT have a release step
         assert!(
-            !steps.iter().any(|s| matches!(s, ReleaseStep::GitHubReleaseCreated(_))),
+            !steps
+                .iter()
+                .any(|s| matches!(s, ReleaseStep::GitHubReleaseCreated(_))),
             "should not create GitHub release when auto_release=false"
         );
     }
@@ -951,7 +976,11 @@ mod tests {
         .await;
 
         // Nothing should happen
-        assert!(steps.is_empty(), "expected no steps when all toggles off, got: {:?}", steps);
+        assert!(
+            steps.is_empty(),
+            "expected no steps when all toggles off, got: {:?}",
+            steps
+        );
     }
 
     #[tokio::test]
@@ -1082,7 +1111,11 @@ mod tests {
     #[test]
     fn test_detect_project_version_pubspec_yaml() {
         let dir = TempDir::new().unwrap();
-        fs::write(dir.path().join("pubspec.yaml"), "name: my_app\nversion: 3.1.0\n").unwrap();
+        fs::write(
+            dir.path().join("pubspec.yaml"),
+            "name: my_app\nversion: 3.1.0\n",
+        )
+        .unwrap();
         let result = detect_project_version(dir.path());
         assert_eq!(result, Some(("3.1.0".to_string(), "dart")));
     }
@@ -1090,7 +1123,11 @@ mod tests {
     #[test]
     fn test_detect_project_version_cargo_takes_priority_over_version_txt() {
         let dir = TempDir::new().unwrap();
-        fs::write(dir.path().join("Cargo.toml"), "[package]\nname = \"test\"\nversion = \"0.1.0\"\n").unwrap();
+        fs::write(
+            dir.path().join("Cargo.toml"),
+            "[package]\nname = \"test\"\nversion = \"0.1.0\"\n",
+        )
+        .unwrap();
         fs::write(dir.path().join("version.txt"), "9.9.9\n").unwrap();
         let result = detect_project_version(dir.path());
         assert_eq!(result, Some(("0.1.0".to_string(), "rust")));

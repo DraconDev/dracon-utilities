@@ -263,13 +263,10 @@ mod tests {
             status: FileStatus::Added,
         }];
         let excluded: BTreeSet<String> = ["target".to_string()].into_iter().collect();
-        assert!(!has_sync_relevant_dirty_entries(
-            repo,
-            &entries,
-            &excluded,
-            &[],
-            100 * 1024 * 1024
-        ), "untracked file in excluded dir should be ignored (not large, not restorable)");
+        assert!(
+            !has_sync_relevant_dirty_entries(repo, &entries, &excluded, &[], 100 * 1024 * 1024),
+            "untracked file in excluded dir should be ignored (not large, not restorable)"
+        );
     }
 
     #[test]
@@ -310,7 +307,10 @@ mod tests {
 
         let excluded: BTreeSet<String> = ["nonexistent".to_string()].into_iter().collect();
         let result = remove_tracked_excluded_paths(repo, &excluded).unwrap();
-        assert_eq!(result, None, "should return None when no tracked excluded paths found");
+        assert_eq!(
+            result, None,
+            "should return None when no tracked excluded paths found"
+        );
     }
 
     #[test]
@@ -347,7 +347,10 @@ mod tests {
         let patterns: Vec<String> = vec![];
         let result = append_to_gitignore(repo, &patterns);
         assert!(result.is_ok());
-        assert!(!repo.join(".gitignore").exists(), "should not create .gitignore for empty patterns");
+        assert!(
+            !repo.join(".gitignore").exists(),
+            "should not create .gitignore for empty patterns"
+        );
     }
 
     #[test]
@@ -373,7 +376,10 @@ mod tests {
     #[test]
     fn test_matches_file_pattern_middle_wildcard() {
         assert!(matches_file_pattern("data.json.gz", "*.json.gz"));
-        assert!(matches_file_pattern("test.backup.json.gz", "*.backup.json.gz"));
+        assert!(matches_file_pattern(
+            "test.backup.json.gz",
+            "*.backup.json.gz"
+        ));
         assert!(!matches_file_pattern("data.json", "*.json.gz"));
     }
 

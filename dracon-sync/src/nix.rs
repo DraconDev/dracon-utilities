@@ -6,8 +6,8 @@
 use std::path::Path;
 use std::process::Command;
 
-use anyhow::Context;
 use crate::git::git_ssh_hardening;
+use anyhow::Context;
 
 const FLAKE_NIX: &str = "flake.nix";
 
@@ -46,8 +46,11 @@ fn update_version_in_flake_nix(content: &str, new_version: &str) -> String {
         } else if trimmed.ends_with("};") {
             // End of buildRustPackage block
             in_build_rust_package = false;
-        } else if !trimmed.is_empty() && !trimmed.starts_with('#')
-            && trimmed.starts_with(char::is_alphabetic) && trimmed.contains(" = ") {
+        } else if !trimmed.is_empty()
+            && !trimmed.starts_with('#')
+            && trimmed.starts_with(char::is_alphabetic)
+            && trimmed.contains(" = ")
+        {
             // A top-level attribute (starts with letter, not indented, contains =)
             // cannot be inside a buildRustPackage block.
             let indent_len = line.len() - line.trim_start().len();
@@ -59,7 +62,7 @@ fn update_version_in_flake_nix(content: &str, new_version: &str) -> String {
         if in_build_rust_package && line.contains("version = \"") {
             if let Some(start_idx) = line.find("version = \"") {
                 let after_quote = start_idx + 10;
-if let Some(end_quote_relative) = line[after_quote + 1..].find('"') {
+                if let Some(end_quote_relative) = line[after_quote + 1..].find('"') {
                     // +1 to skip the opening quote, then +1 to get the position after that quote
                     let end_quote = after_quote + 1 + end_quote_relative;
                     let prefix = &line[..start_idx];
@@ -85,7 +88,10 @@ if let Some(end_quote_relative) = line[after_quote + 1..].find('"') {
     result
 }
 
-pub async fn create_flake_pr(repo: &Path, new_version: &str) -> anyhow::Result<crate::release::ReleaseStep> {
+pub async fn create_flake_pr(
+    repo: &Path,
+    new_version: &str,
+) -> anyhow::Result<crate::release::ReleaseStep> {
     let repo_name = extract_repo_name(repo)?;
     let default_branch = detect_default_branch(repo).unwrap_or_else(|| "main".to_string());
 
@@ -101,7 +107,16 @@ pub async fn create_flake_pr(repo: &Path, new_version: &str) -> anyhow::Result<c
 
     let check = tokio::task::spawn_blocking(move || {
         Command::new("gh")
-            .args(["pr", "list", "--repo", &repo_name_for_check, "--head", &branch_name_check, "--json", "number"])
+            .args([
+                "pr",
+                "list",
+                "--repo",
+                &repo_name_for_check,
+                "--head",
+                &branch_name_check,
+                "--json",
+                "number",
+            ])
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::null())
             .output()
@@ -119,19 +134,28 @@ pub async fn create_flake_pr(repo: &Path, new_version: &str) -> anyhow::Result<c
         }
     }
 
-    let commit_msg = format!("chore: update flake.nix to v{}\n\nAuto-commit by dracon-sync", new_version);
+    let commit_msg = format!(
+        "chore: update flake.nix to v{}\n\nAuto-commit by dracon-sync",
+        new_version
+    );
 
     run_git_for_nix_pr(repo, &branch_name, &commit_msg).await?;
 
     let result = tokio::task::spawn_blocking(move || {
         Command::new("gh")
             .args([
-                "pr", "create",
-                "--repo", &repo_name,
-                "--base", &default_branch,
-                "--head", &branch_name,
-                "--title", &title,
-                "--body", &body,
+                "pr",
+                "create",
+                "--repo",
+                &repo_name,
+                "--base",
+                &default_branch,
+                "--head",
+                &branch_name,
+                "--title",
+                &title,
+                "--body",
+                &body,
             ])
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
@@ -148,7 +172,9 @@ pub async fn create_flake_pr(repo: &Path, new_version: &str) -> anyhow::Result<c
         Ok(output) => {
             let stderr = String::from_utf8_lossy(&output.stderr);
             if stderr.contains("No commit") || stderr.contains("everything up-to-date") {
-                Ok(crate::release::ReleaseStep::Skipped("flake.nix already at latest version".to_string()))
+                Ok(crate::release::ReleaseStep::Skipped(
+                    "flake.nix already at latest version".to_string(),
+                ))
             } else {
                 Ok(crate::release::ReleaseStep::Failed {
                     step: "gh pr create".to_string(),
@@ -163,19 +189,18 @@ pub async fn create_flake_pr(repo: &Path, new_version: &str) -> anyhow::Result<c
     }
 }
 
-async fn run_git_for_nix_pr(repo: &Path, branch_name: &str, commit_msg: &str) -> anyhow::Result<()> {
+async fn run_git_for_nix_pr(
+    repo: &Path,
+    branch_name: &str,
+    commit_msg: &str,
+) -> anyhow::Result<()> {
     use crate::git::run_git_with_timeout;
 
     run_git_with_timeout(repo, &["checkout", "-b", branch_name], 30, "nix-pr-branch").await?;
 
     run_git_with_timeout(repo, &["add", "flake.nix"], 30, "nix-pr-add").await?;
 
-    match run_git_with_timeout(
-        repo,
-        &["commit", "-m", commit_msg],
-        30,
-        "nix-pr-commit",
-    ).await {
+    match run_git_with_timeout(repo, &["commit", "-m", commit_msg], 30, "nix-pr-commit").await {
         Ok(_) => {}
         Err(e) => {
             let msg = e.to_string();
@@ -199,7 +224,8 @@ async fn run_git_for_nix_pr(repo: &Path, branch_name: &str, commit_msg: &str) ->
         120,
         "nix-pr-push",
         &env,
-    ).await;
+    )
+    .await;
 
     // Always restore the previous branch even on push failure
     let _ = run_git_with_timeout(repo, &["checkout", "-"], 30, "nix-pr-return").await;
@@ -219,12 +245,14 @@ fn extract_repo_name(repo: &Path) -> anyhow::Result<String> {
     let url = String::from_utf8_lossy(&output.stdout).trim().to_string();
 
     if url.starts_with("git@") {
-        Ok(url.strip_prefix("git@")
+        Ok(url
+            .strip_prefix("git@")
             .and_then(|s| s.split_once(':'))
             .map(|(_, path)| path.trim_end_matches(".git").to_string())
             .unwrap_or_else(|| url.clone()))
     } else if url.starts_with("https://") {
-        Ok(url.trim_start_matches("https://")
+        Ok(url
+            .trim_start_matches("https://")
             .trim_end_matches(".git")
             .split('/')
             .skip(1)
@@ -246,7 +274,9 @@ fn detect_default_branch(repo: &Path) -> Option<String> {
 
     let ref_name_cow = String::from_utf8_lossy(&output.stdout);
     let ref_name = ref_name_cow.trim();
-    ref_name.strip_prefix("refs/remotes/origin/").map(String::from)
+    ref_name
+        .strip_prefix("refs/remotes/origin/")
+        .map(String::from)
 }
 
 #[cfg(test)]
@@ -257,7 +287,7 @@ mod tests {
         flake_content.contains("version = \"")
     }
 
-#[test]
+    #[test]
     fn test_update_version_in_flake_nix_basic() {
         let content = r#"{
   description = "My app";
@@ -269,7 +299,11 @@ mod tests {
   };
 }"#;
         let updated = update_version_in_flake_nix(content, "1.1.0");
-        assert!(updated.contains("1.1.0"), "missing 1.1.0, got:\n{}", updated);
+        assert!(
+            updated.contains("1.1.0"),
+            "missing 1.1.0, got:\n{}",
+            updated
+        );
     }
 
     #[test]
@@ -295,7 +329,11 @@ mod tests {
 }"#;
         let updated = update_version_in_flake_nix(content, "15.0.0");
         eprintln!("=== UPDATED ===\n{}\n=== END ===", updated);
-        assert!(updated.contains("15.0.0"), "missing 15.0.0, got:\n{}", updated);
+        assert!(
+            updated.contains("15.0.0"),
+            "missing 15.0.0, got:\n{}",
+            updated
+        );
     }
 
     #[test]
@@ -351,7 +389,10 @@ mod tests {
         assert!(changed, "expected file to be modified");
 
         let written = std::fs::read_to_string(&flake_path).unwrap();
-        assert!(written.contains(r#"version = "15.0.0";"#), "missing updated version with semicolon");
+        assert!(
+            written.contains(r#"version = "15.0.0";"#),
+            "missing updated version with semicolon"
+        );
         assert!(!written.contains("version = \"14.0.0\""));
     }
 
@@ -385,8 +426,16 @@ mod tests {
 }"#;
         let updated = update_version_in_flake_nix(content, "2.0.0");
         eprintln!("=== UPDATED ===\n{}\n=== END ===", updated);
-        assert!(updated.contains("2.0.0"), "missing 2.0.0, got:\n{}", updated);
-        assert!(updated.contains("version = \"2.0.0\";"), "semicolon dropped, got:\n{}", updated);
+        assert!(
+            updated.contains("2.0.0"),
+            "missing 2.0.0, got:\n{}",
+            updated
+        );
+        assert!(
+            updated.contains("version = \"2.0.0\";"),
+            "semicolon dropped, got:\n{}",
+            updated
+        );
     }
 
     #[test]

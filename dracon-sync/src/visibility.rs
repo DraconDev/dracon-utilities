@@ -102,7 +102,11 @@ fn is_visibility_cache_fresh(repo_path: &Path, interval_hours: u64) -> bool {
 fn update_visibility_cache(repo_path: &Path) {
     let dir = visibility_cache_dir();
     if let Err(e) = std::fs::create_dir_all(&dir) {
-        eprintln!("⚠️ failed to create visibility cache dir {}: {}", dir.display(), e);
+        eprintln!(
+            "⚠️ failed to create visibility cache dir {}: {}",
+            dir.display(),
+            e
+        );
         return;
     }
     let path = visibility_cache_path(repo_path);
@@ -111,7 +115,11 @@ fn update_visibility_cache(repo_path: &Path) {
         .unwrap_or_default()
         .as_secs();
     if let Err(e) = std::fs::write(&path, now.to_string()) {
-        eprintln!("⚠️ failed to write visibility cache {}: {}", path.display(), e);
+        eprintln!(
+            "⚠️ failed to write visibility cache {}: {}",
+            path.display(),
+            e
+        );
     }
 }
 
@@ -144,7 +152,12 @@ pub(crate) fn parse_github_owner_repo(remote_url: &str) -> Option<(String, Strin
 /// On any error (gh not installed, no auth, network failure), returns `true` as the safe default.
 pub(crate) fn get_github_visibility(owner: &str, repo: &str) -> bool {
     let output = match std::process::Command::new("gh")
-        .args(["api", &format!("repos/{}/{}", owner, repo), "--jq", ".private"])
+        .args([
+            "api",
+            &format!("repos/{}/{}", owner, repo),
+            "--jq",
+            ".private",
+        ])
         .output()
     {
         Ok(o) => o,
@@ -174,10 +187,17 @@ fn set_gitlab_visibility(owner: &str, repo: &str, token: &str, private: bool) ->
     let url = GITLAB_API_PROJECTS.replace("{}", &encoded);
     let output = std::process::Command::new("curl")
         .args([
-            "-s", "-o", "/dev/null", "-w", "%{http_code}",
-            "-H", &format!("PRIVATE-TOKEN: {}", token),
-            "-X", "PUT",
-            "-d", &format!("visibility={}", visibility),
+            "-s",
+            "-o",
+            "/dev/null",
+            "-w",
+            "%{http_code}",
+            "-H",
+            &format!("PRIVATE-TOKEN: {}", token),
+            "-X",
+            "PUT",
+            "-d",
+            &format!("visibility={}", visibility),
             &url,
         ])
         .output()
@@ -186,9 +206,16 @@ fn set_gitlab_visibility(owner: &str, repo: &str, token: &str, private: bool) ->
     let code = String::from_utf8_lossy(&output.stdout).trim().to_string();
     match code.as_str() {
         "200" => Ok(()),
-        "401" => Err(anyhow::anyhow!("GitLab visibility update failed: unauthorized (invalid token)")),
-        "404" => Err(anyhow::anyhow!("GitLab visibility update failed: repo not found")),
-        _ => Err(anyhow::anyhow!("GitLab visibility update failed: HTTP {}", code)),
+        "401" => Err(anyhow::anyhow!(
+            "GitLab visibility update failed: unauthorized (invalid token)"
+        )),
+        "404" => Err(anyhow::anyhow!(
+            "GitLab visibility update failed: repo not found"
+        )),
+        _ => Err(anyhow::anyhow!(
+            "GitLab visibility update failed: HTTP {}",
+            code
+        )),
     }
 }
 
@@ -199,11 +226,19 @@ fn set_codeberg_visibility(owner: &str, repo: &str, token: &str, private: bool) 
     let json = format!("{{\"private\":{}}}", private);
     let output = std::process::Command::new("curl")
         .args([
-            "-s", "-o", "/dev/null", "-w", "%{http_code}",
-            "-H", &format!("Authorization: token {}", token),
-            "-H", "Content-Type: application/json",
-            "-X", "PATCH",
-            "-d", &json,
+            "-s",
+            "-o",
+            "/dev/null",
+            "-w",
+            "%{http_code}",
+            "-H",
+            &format!("Authorization: token {}", token),
+            "-H",
+            "Content-Type: application/json",
+            "-X",
+            "PATCH",
+            "-d",
+            &json,
             &url,
         ])
         .output()
@@ -212,9 +247,16 @@ fn set_codeberg_visibility(owner: &str, repo: &str, token: &str, private: bool) 
     let code = String::from_utf8_lossy(&output.stdout).trim().to_string();
     match code.as_str() {
         "200" => Ok(()),
-        "401" => Err(anyhow::anyhow!("Codeberg visibility update failed: unauthorized (invalid token)")),
-        "404" => Err(anyhow::anyhow!("Codeberg visibility update failed: repo not found")),
-        _ => Err(anyhow::anyhow!("Codeberg visibility update failed: HTTP {}", code)),
+        "401" => Err(anyhow::anyhow!(
+            "Codeberg visibility update failed: unauthorized (invalid token)"
+        )),
+        "404" => Err(anyhow::anyhow!(
+            "Codeberg visibility update failed: repo not found"
+        )),
+        _ => Err(anyhow::anyhow!(
+            "Codeberg visibility update failed: HTTP {}",
+            code
+        )),
     }
 }
 
@@ -234,7 +276,8 @@ pub(crate) fn sync_mirror_visibility(
         return;
     }
 
-    let repo_name = repo_path.file_name()
+    let repo_name = repo_path
+        .file_name()
         .map(|n| n.to_string_lossy().to_string())
         .unwrap_or_default();
     if repo_name.is_empty() {
@@ -242,7 +285,10 @@ pub(crate) fn sync_mirror_visibility(
     }
 
     let Some((owner, gh_repo)) = parse_github_owner_repo(origin_url) else {
-        eprintln!("⚠️ could not parse GitHub owner/repo from origin URL: {}", origin_url);
+        eprintln!(
+            "⚠️ could not parse GitHub owner/repo from origin URL: {}",
+            origin_url
+        );
         return;
     };
 
@@ -250,23 +296,31 @@ pub(crate) fn sync_mirror_visibility(
     let visibility_str = if github_private { "private" } else { "public" };
 
     if crate::policy::debug_enabled() {
-        eprintln!(
-            "🐛 GitHub repo {}/{} is {}",
-            owner, gh_repo, visibility_str
-        );
+        eprintln!("🐛 GitHub repo {}/{} is {}", owner, gh_repo, visibility_str);
     }
 
     for remote in remotes {
         let auth = remote.effective_auth_type();
         let account = remote.resolve_account();
         if auth == AuthType::GitLab {
-            let token_var = remote.auto_create_token_var.as_deref().unwrap_or("GITLAB_TOKEN");
+            let token_var = remote
+                .auto_create_token_var
+                .as_deref()
+                .unwrap_or("GITLAB_TOKEN");
             if let Some(token) = load_secret(token_var, &sync_secrets_dir()) {
                 let resolved_name = remote.resolve_repo_name(&repo_name);
-                if let Err(e) = set_gitlab_visibility(&account, &resolved_name, &token, github_private) {
-                    eprintln!("⚠️ failed to set GitLab visibility for {}: {}", resolved_name, e);
+                if let Err(e) =
+                    set_gitlab_visibility(&account, &resolved_name, &token, github_private)
+                {
+                    eprintln!(
+                        "⚠️ failed to set GitLab visibility for {}: {}",
+                        resolved_name, e
+                    );
                 } else if crate::policy::debug_enabled() {
-                    eprintln!("🐛 set GitLab {}/{} to {}", account, resolved_name, visibility_str);
+                    eprintln!(
+                        "🐛 set GitLab {}/{} to {}",
+                        account, resolved_name, visibility_str
+                    );
                 }
             } else {
                 eprintln!("⚠️ no GITLAB_TOKEN for visibility sync on {}", remote.name);
@@ -274,16 +328,30 @@ pub(crate) fn sync_mirror_visibility(
         }
 
         if auth == AuthType::Codeberg {
-            let token_var = remote.auto_create_token_var.as_deref().unwrap_or("CODEBERG_TOKEN");
+            let token_var = remote
+                .auto_create_token_var
+                .as_deref()
+                .unwrap_or("CODEBERG_TOKEN");
             if let Some(token) = load_secret(token_var, &sync_secrets_dir()) {
                 let resolved_name = remote.resolve_repo_name(&repo_name);
-                if let Err(e) = set_codeberg_visibility(&account, &resolved_name, &token, github_private) {
-                    eprintln!("⚠️ failed to set Codeberg visibility for {}: {}", resolved_name, e);
+                if let Err(e) =
+                    set_codeberg_visibility(&account, &resolved_name, &token, github_private)
+                {
+                    eprintln!(
+                        "⚠️ failed to set Codeberg visibility for {}: {}",
+                        resolved_name, e
+                    );
                 } else if crate::policy::debug_enabled() {
-                    eprintln!("🐛 set Codeberg {}/{} to {}", account, resolved_name, visibility_str);
+                    eprintln!(
+                        "🐛 set Codeberg {}/{} to {}",
+                        account, resolved_name, visibility_str
+                    );
                 }
             } else {
-                eprintln!("⚠️ no CODEBERG_TOKEN for visibility sync on {}", remote.name);
+                eprintln!(
+                    "⚠️ no CODEBERG_TOKEN for visibility sync on {}",
+                    remote.name
+                );
             }
         }
     }
@@ -350,7 +418,10 @@ struct RepoMetadataJson {
 fn set_gitlab_metadata(owner: &str, repo: &str, token: &str, meta: &RepoMetadata) -> Result<()> {
     let encoded = format!("{}%2F{}", owner, repo);
     let url = GITLAB_API_PROJECTS.replace("{}", &encoded);
-    let mut form_data = vec![format!("description={}", urlencoding::encode(&meta.description))];
+    let mut form_data = vec![format!(
+        "description={}",
+        urlencoding::encode(&meta.description)
+    )];
     for topic in &meta.topics {
         form_data.push(format!("tag_list[]={}", urlencoding::encode(topic)));
     }
@@ -358,10 +429,17 @@ fn set_gitlab_metadata(owner: &str, repo: &str, token: &str, meta: &RepoMetadata
 
     let output = std::process::Command::new("curl")
         .args([
-            "-s", "-o", "/dev/null", "-w", "%{http_code}",
-            "-H", &format!("PRIVATE-TOKEN: {}", token),
-            "-X", "PUT",
-            "-d", &form_body,
+            "-s",
+            "-o",
+            "/dev/null",
+            "-w",
+            "%{http_code}",
+            "-H",
+            &format!("PRIVATE-TOKEN: {}", token),
+            "-X",
+            "PUT",
+            "-d",
+            &form_body,
             &url,
         ])
         .output()
@@ -370,9 +448,16 @@ fn set_gitlab_metadata(owner: &str, repo: &str, token: &str, meta: &RepoMetadata
     let code = String::from_utf8_lossy(&output.stdout).trim().to_string();
     match code.as_str() {
         "200" => Ok(()),
-        "401" => Err(anyhow::anyhow!("GitLab metadata update failed: unauthorized")),
-        "404" => Err(anyhow::anyhow!("GitLab metadata update failed: repo not found")),
-        _ => Err(anyhow::anyhow!("GitLab metadata update failed: HTTP {}", code)),
+        "401" => Err(anyhow::anyhow!(
+            "GitLab metadata update failed: unauthorized"
+        )),
+        "404" => Err(anyhow::anyhow!(
+            "GitLab metadata update failed: repo not found"
+        )),
+        _ => Err(anyhow::anyhow!(
+            "GitLab metadata update failed: HTTP {}",
+            code
+        )),
     }
 }
 
@@ -386,11 +471,19 @@ fn set_codeberg_metadata(owner: &str, repo: &str, token: &str, meta: &RepoMetada
 
     let output = std::process::Command::new("curl")
         .args([
-            "-s", "-o", "/dev/null", "-w", "%{http_code}",
-            "-H", &format!("Authorization: token {}", token),
-            "-H", "Content-Type: application/json",
-            "-X", "PATCH",
-            "-d", &json.to_string(),
+            "-s",
+            "-o",
+            "/dev/null",
+            "-w",
+            "%{http_code}",
+            "-H",
+            &format!("Authorization: token {}", token),
+            "-H",
+            "Content-Type: application/json",
+            "-X",
+            "PATCH",
+            "-d",
+            &json.to_string(),
             &url,
         ])
         .output()
@@ -399,9 +492,16 @@ fn set_codeberg_metadata(owner: &str, repo: &str, token: &str, meta: &RepoMetada
     let code = String::from_utf8_lossy(&output.stdout).trim().to_string();
     match code.as_str() {
         "200" => Ok(()),
-        "401" => Err(anyhow::anyhow!("Codeberg metadata update failed: unauthorized")),
-        "404" => Err(anyhow::anyhow!("Codeberg metadata update failed: repo not found")),
-        _ => Err(anyhow::anyhow!("Codeberg metadata update failed: HTTP {}", code)),
+        "401" => Err(anyhow::anyhow!(
+            "Codeberg metadata update failed: unauthorized"
+        )),
+        "404" => Err(anyhow::anyhow!(
+            "Codeberg metadata update failed: repo not found"
+        )),
+        _ => Err(anyhow::anyhow!(
+            "Codeberg metadata update failed: HTTP {}",
+            code
+        )),
     }
 }
 
@@ -420,7 +520,8 @@ pub(crate) fn sync_mirror_metadata(
         return;
     }
 
-    let repo_name = repo_path.file_name()
+    let repo_name = repo_path
+        .file_name()
         .map(|n| n.to_string_lossy().to_string())
         .unwrap_or_default();
     if repo_name.is_empty() {
@@ -445,11 +546,17 @@ pub(crate) fn sync_mirror_metadata(
         let auth = remote.effective_auth_type();
         let account = remote.resolve_account();
         if auth == AuthType::GitLab {
-            let token_var = remote.auto_create_token_var.as_deref().unwrap_or("GITLAB_TOKEN");
+            let token_var = remote
+                .auto_create_token_var
+                .as_deref()
+                .unwrap_or("GITLAB_TOKEN");
             if let Some(token) = load_secret(token_var, &sync_secrets_dir()) {
                 let resolved_name = remote.resolve_repo_name(&repo_name);
                 if let Err(e) = set_gitlab_metadata(&account, &resolved_name, &token, &meta) {
-                    eprintln!("⚠️ failed to set GitLab metadata for {}: {}", resolved_name, e);
+                    eprintln!(
+                        "⚠️ failed to set GitLab metadata for {}: {}",
+                        resolved_name, e
+                    );
                 } else if crate::policy::debug_enabled() {
                     eprintln!("🐛 set GitLab {}/{} metadata", account, resolved_name);
                 }
@@ -457,11 +564,17 @@ pub(crate) fn sync_mirror_metadata(
         }
 
         if auth == AuthType::Codeberg {
-            let token_var = remote.auto_create_token_var.as_deref().unwrap_or("CODEBERG_TOKEN");
+            let token_var = remote
+                .auto_create_token_var
+                .as_deref()
+                .unwrap_or("CODEBERG_TOKEN");
             if let Some(token) = load_secret(token_var, &sync_secrets_dir()) {
                 let resolved_name = remote.resolve_repo_name(&repo_name);
                 if let Err(e) = set_codeberg_metadata(&account, &resolved_name, &token, &meta) {
-                    eprintln!("⚠️ failed to set Codeberg metadata for {}: {}", resolved_name, e);
+                    eprintln!(
+                        "⚠️ failed to set Codeberg metadata for {}: {}",
+                        resolved_name, e
+                    );
                 } else if crate::policy::debug_enabled() {
                     eprintln!("🐛 set Codeberg {}/{} metadata", account, resolved_name);
                 }
@@ -499,19 +612,28 @@ mod tests {
     #[test]
     fn test_parse_github_owner_repo_ssh() {
         let result = parse_github_owner_repo("git@github.com:DraconDev/my-repo.git");
-        assert_eq!(result, Some(("DraconDev".to_string(), "my-repo".to_string())));
+        assert_eq!(
+            result,
+            Some(("DraconDev".to_string(), "my-repo".to_string()))
+        );
     }
 
     #[test]
     fn test_parse_github_owner_repo_https() {
         let result = parse_github_owner_repo("https://github.com/DraconDev/my-repo.git");
-        assert_eq!(result, Some(("DraconDev".to_string(), "my-repo".to_string())));
+        assert_eq!(
+            result,
+            Some(("DraconDev".to_string(), "my-repo".to_string()))
+        );
     }
 
     #[test]
     fn test_parse_github_owner_repo_no_git_suffix() {
         let result = parse_github_owner_repo("git@github.com:DraconDev/my-repo");
-        assert_eq!(result, Some(("DraconDev".to_string(), "my-repo".to_string())));
+        assert_eq!(
+            result,
+            Some(("DraconDev".to_string(), "my-repo".to_string()))
+        );
     }
 
     #[test]
@@ -625,13 +747,19 @@ mod tests {
     #[test]
     fn test_parse_github_owner_repo_with_dots() {
         let result = parse_github_owner_repo("git@github.com:DraconDev/.dracon.git");
-        assert_eq!(result, Some(("DraconDev".to_string(), ".dracon".to_string())));
+        assert_eq!(
+            result,
+            Some(("DraconDev".to_string(), ".dracon".to_string()))
+        );
     }
 
     #[test]
     fn test_parse_github_owner_repo_with_name_mapping() {
         let result = parse_github_owner_repo("https://github.com/my-org/some-repo.git");
-        assert_eq!(result, Some(("my-org".to_string(), "some-repo".to_string())));
+        assert_eq!(
+            result,
+            Some(("my-org".to_string(), "some-repo".to_string()))
+        );
     }
 
     // ---- Creation-time visibility tests ----
@@ -651,8 +779,14 @@ mod tests {
             // If empty TOML fails, try minimal valid config
             toml::from_str("pulse_interval_secs = 1").unwrap()
         });
-        assert!(!policy.sync_visibility, "sync_visibility should default to false");
-        assert_eq!(policy.sync_visibility_interval_hours, 24, "interval should default to 24");
+        assert!(
+            !policy.sync_visibility,
+            "sync_visibility should default to false"
+        );
+        assert_eq!(
+            policy.sync_visibility_interval_hours, 24,
+            "interval should default to 24"
+        );
     }
 
     #[test]
@@ -713,7 +847,12 @@ mod tests {
             },
         ];
         // Set interval to 0 to force cache expiration
-        sync_mirror_visibility("git@github.com:DraconDev/test.git", &remotes, Path::new("/tmp/test_all_failures"), 0);
+        sync_mirror_visibility(
+            "git@github.com:DraconDev/test.git",
+            &remotes,
+            Path::new("/tmp/test_all_failures"),
+            0,
+        );
         // Should not panic even when all tokens are missing
         let _ = std::fs::remove_file(visibility_cache_path(Path::new("/tmp/test_all_failures")));
     }
@@ -738,7 +877,10 @@ mod tests {
         sync_mirror_visibility("git@github.com:DraconDev/test.git", &remotes, repo_path, 0);
         // Cache should exist even with no remotes to update
         let path = visibility_cache_path(repo_path);
-        assert!(path.exists(), "cache should be written even when no remotes configured");
+        assert!(
+            path.exists(),
+            "cache should be written even when no remotes configured"
+        );
         let _ = std::fs::remove_file(&path);
     }
 
@@ -751,7 +893,10 @@ mod tests {
         let remotes: Vec<RemoteConfig> = vec![];
         sync_mirror_visibility("not-a-url", &remotes, repo_path, 0);
         let path = visibility_cache_path(repo_path);
-        assert!(!path.exists(), "cache should NOT be written for unparseable URLs (need to retry)");
+        assert!(
+            !path.exists(),
+            "cache should NOT be written for unparseable URLs (need to retry)"
+        );
     }
 
     // ---- Edge cases ----
@@ -759,7 +904,10 @@ mod tests {
     #[test]
     fn test_parse_github_owner_repo_with_hyphens() {
         let result = parse_github_owner_repo("git@github.com:my-org/my-super-repo.git");
-        assert_eq!(result, Some(("my-org".to_string(), "my-super-repo".to_string())));
+        assert_eq!(
+            result,
+            Some(("my-org".to_string(), "my-super-repo".to_string()))
+        );
     }
 
     #[test]
@@ -774,7 +922,10 @@ mod tests {
         let path = visibility_cache_path(repo_path);
         std::fs::create_dir_all(visibility_cache_dir()).unwrap();
         std::fs::write(&path, "not-a-number").unwrap();
-        assert!(!is_visibility_cache_fresh(repo_path, 24), "corrupt cache should be treated as stale");
+        assert!(
+            !is_visibility_cache_fresh(repo_path, 24),
+            "corrupt cache should be treated as stale"
+        );
         let _ = std::fs::remove_file(&path);
     }
 
@@ -783,17 +934,22 @@ mod tests {
     #[test]
     fn test_get_github_metadata_returns_empty_on_error() {
         let meta = get_github_metadata("nonexistent-owner-12345", "nonexistent-repo-67890");
-        assert!(meta.description.is_empty(), "description should be empty on error");
+        assert!(
+            meta.description.is_empty(),
+            "description should be empty on error"
+        );
         assert!(meta.topics.is_empty(), "topics should be empty on error");
     }
 
     #[test]
     fn test_sync_metadata_defaults_in_policy() {
         let toml = "";
-        let policy: crate::policy::SyncPolicy = toml::from_str(toml).unwrap_or_else(|_| {
-            toml::from_str("pulse_interval_secs = 1").unwrap()
-        });
-        assert!(!policy.sync_metadata, "sync_metadata should default to false");
+        let policy: crate::policy::SyncPolicy = toml::from_str(toml)
+            .unwrap_or_else(|_| toml::from_str("pulse_interval_secs = 1").unwrap());
+        assert!(
+            !policy.sync_metadata,
+            "sync_metadata should default to false"
+        );
     }
 
     #[test]
@@ -878,9 +1034,16 @@ mod tests {
                 force_push_when_behind: false,
             },
         ];
-        sync_mirror_metadata("git@github.com:DraconDev/test.git", &remotes, Path::new("/tmp/test_metadata_missing_tokens"), 0);
+        sync_mirror_metadata(
+            "git@github.com:DraconDev/test.git",
+            &remotes,
+            Path::new("/tmp/test_metadata_missing_tokens"),
+            0,
+        );
         // Should not panic
-        let _ = std::fs::remove_file(visibility_cache_path(Path::new("/tmp/test_metadata_missing_tokens")));
+        let _ = std::fs::remove_file(visibility_cache_path(Path::new(
+            "/tmp/test_metadata_missing_tokens",
+        )));
     }
 
     #[test]
@@ -888,8 +1051,13 @@ mod tests {
         // Simulate gh api output with ANSI color codes
         let input = "\x1b[1;38m{\x1b[m\n\x1b[1;34m\"description\"\x1b[m\x1b[1;38m:\x1b[m \x1b[32m\"Hello world\"\x1b[m,\n\x1b[1;34m\"topics\"\x1b[m\x1b[1;38m:\x1b[m\x1b[32m[\"rust\"]\x1b[m\n}";
         let stripped = strip_ansi(input);
-        assert!(!stripped.contains('\x1b'), "ANSI codes should be removed: got {:?}", stripped);
-        let parsed: serde_json::Value = serde_json::from_str(&stripped).expect("should be valid JSON after stripping");
+        assert!(
+            !stripped.contains('\x1b'),
+            "ANSI codes should be removed: got {:?}",
+            stripped
+        );
+        let parsed: serde_json::Value =
+            serde_json::from_str(&stripped).expect("should be valid JSON after stripping");
         assert_eq!(parsed["description"], "Hello world");
         assert_eq!(parsed["topics"][0], "rust");
     }

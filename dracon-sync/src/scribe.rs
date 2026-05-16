@@ -3,10 +3,21 @@ use std::path::Path;
 
 fn sanitize_for_prompt(input: &str) -> String {
     let injection_patterns = [
-        "IGNORE", "IGNORE ALL", "DISREGARD", "FORGET",
-        "SYSTEM:", "CRITICAL:", "INSTRUCTION:", "OVERRIDE",
-        "YOU ARE", "YOU MUST", "ACT AS", "PRETEND",
-        "NEW INSTRUCTION", "STOP", "DO NOT FOLLOW",
+        "IGNORE",
+        "IGNORE ALL",
+        "DISREGARD",
+        "FORGET",
+        "SYSTEM:",
+        "CRITICAL:",
+        "INSTRUCTION:",
+        "OVERRIDE",
+        "YOU ARE",
+        "YOU MUST",
+        "ACT AS",
+        "PRETEND",
+        "NEW INSTRUCTION",
+        "STOP",
+        "DO NOT FOLLOW",
     ];
     input
         .lines()
@@ -21,7 +32,12 @@ fn sanitize_for_prompt(input: &str) -> String {
 fn collect_recent_diffs(repo: &Path, count: usize) -> Vec<String> {
     let count_arg = format!("-{}", count);
     let output = match std::process::Command::new("git")
-        .args(["log", &count_arg, "--pretty=format:%H", "--diff-filter=ACDMRT"])
+        .args([
+            "log",
+            &count_arg,
+            "--pretty=format:%H",
+            "--diff-filter=ACDMRT",
+        ])
         .current_dir(repo)
         .output()
     {
@@ -29,11 +45,20 @@ fn collect_recent_diffs(repo: &Path, count: usize) -> Vec<String> {
         _ => return Vec::new(),
     };
 
-    let hashes: Vec<&str> = output.lines().map(|l| l.trim()).filter(|l| !l.is_empty()).collect();
+    let hashes: Vec<&str> = output
+        .lines()
+        .map(|l| l.trim())
+        .filter(|l| !l.is_empty())
+        .collect();
     let mut diffs = Vec::new();
     for hash in hashes {
         let diff = match std::process::Command::new("git")
-            .args(["diff", "--stat", "--unified=1", &format!("{}^..{}", hash, hash)])
+            .args([
+                "diff",
+                "--stat",
+                "--unified=1",
+                &format!("{}^..{}", hash, hash),
+            ])
             .current_dir(repo)
             .output()
         {
@@ -85,7 +110,11 @@ fn build_commit_message_prompt(
             .enumerate()
             .map(|(i, d)| {
                 let d = sanitize_for_prompt(d);
-                format!("--- PREVIOUS DIFF {} (background context only) ---\n{}\n--- END ---", i + 1, d)
+                format!(
+                    "--- PREVIOUS DIFF {} (background context only) ---\n{}\n--- END ---",
+                    i + 1,
+                    d
+                )
             })
             .collect();
         format!("\n\nPREVIOUS DIFFS (background only — do NOT describe these, just use for understanding work trajectory):\n{}", entries.join("\n\n"))
@@ -95,7 +124,10 @@ fn build_commit_message_prompt(
         String::new()
     } else {
         let subjects = sanitize_for_prompt(&recent_subjects.join("\n"));
-        format!("\n\nRECENT COMMIT SUBJECTS (for context, do NOT repeat these):\n{}", subjects)
+        format!(
+            "\n\nRECENT COMMIT SUBJECTS (for context, do NOT repeat these):\n{}",
+            subjects
+        )
     };
 
     format!(
@@ -151,7 +183,11 @@ pub fn local_fallback_message(diff_names: &str) -> String {
 
     let mut stems: Vec<String> = Vec::new();
     for entry in entries.iter().take(3) {
-        let path = entry.split_once(": ").map(|(_, p)| p).unwrap_or(entry).trim();
+        let path = entry
+            .split_once(": ")
+            .map(|(_, p)| p)
+            .unwrap_or(entry)
+            .trim();
         let stem = std::path::Path::new(path)
             .file_stem()
             .and_then(|s| s.to_str())
@@ -184,11 +220,18 @@ pub(crate) async fn generate_commit_message(
         return None;
     }
 
-    let current_diff = staged_diff_content.as_deref().unwrap_or("(no diff content available)");
+    let current_diff = staged_diff_content
+        .as_deref()
+        .unwrap_or("(no diff content available)");
     let recent_diffs = collect_recent_diffs(repo, 10);
     let recent_subjects = collect_recent_subjects(repo, 10);
 
-    let prompt = build_commit_message_prompt(current_diff, staged_diff_names, &recent_diffs, &recent_subjects);
+    let prompt = build_commit_message_prompt(
+        current_diff,
+        staged_diff_names,
+        &recent_diffs,
+        &recent_subjects,
+    );
     let messages = vec![ChatMessage::user(&prompt)];
 
     match service.chat(messages).await {
@@ -199,13 +242,21 @@ pub(crate) async fn generate_commit_message(
                 return None;
             }
             let lower = subject.to_lowercase();
-            if lower.contains("ignore all") || lower.contains("disregard") || lower.contains("system prompt") {
-                eprintln!("📝 scribe: rejected AI output (possible injection), using local fallback");
+            if lower.contains("ignore all")
+                || lower.contains("disregard")
+                || lower.contains("system prompt")
+            {
+                eprintln!(
+                    "📝 scribe: rejected AI output (possible injection), using local fallback"
+                );
                 return None;
             }
             if subject.len() > 100 {
                 let truncated: String = subject.chars().take(97).collect();
-                eprintln!("📝 scribe: generated commit subject (truncated): {}", truncated);
+                eprintln!(
+                    "📝 scribe: generated commit subject (truncated): {}",
+                    truncated
+                );
                 Some(format!("{}...", truncated))
             } else {
                 eprintln!("📝 scribe: generated commit subject: {}", subject);
