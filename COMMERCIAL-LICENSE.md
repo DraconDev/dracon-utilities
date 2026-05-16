@@ -4,7 +4,7 @@
 
 ## Preamble
 
-All Dracon software is available under the GNU Affero General Public License (AGPLv3) for open source, community, and non-commercial use. Organizations with fewer than 10 employees may use Dracon software under AGPLv3 at no cost. Organizations with 10 or more employees require a Commercial License for any Production Use of Dracon software that does not comply with AGPLv3's source disclosure requirements. Visit https://dracon.uk/licensing for details and purchase.
+All Dracon software is available under the GNU Affero General Public License v3 (AGPLv3). Anyone may use Dracon software under AGPLv3 at any scale, provided they comply with its terms (including source disclosure for network use). This Commercial License is an alternative for organizations that cannot or prefer not to comply with AGPLv3's requirements. Organizations with fewer than 10 employees may use this Commercial License at no cost. Organizations with 10 or more employees require a paid Commercial License for Production Use under these terms. Visit https://dracon.uk/licensing for details and purchase.
 
 This document constitutes a legally binding agreement between the licensee ("You" or "Your") and Dracon ("Licensor"). By purchasing or activating a Commercial License, You agree to be bound by these terms.
 
@@ -44,9 +44,11 @@ Subject to the terms and payment obligations in this agreement, Licensor grants 
 
 ## 3. Pricing
 
-Organizations with fewer than 10 employees may use Dracon Software under AGPLv3 at no cost — no Commercial License is needed.
+Organizations with fewer than 10 employees may use Dracon Software under this Commercial License or AGPLv3 at no cost.
 
-Organizations with 10 or more employees require a Commercial License for any Production Use of Dracon Software that does not comply with AGPLv3's source disclosure requirements. Pricing is based on Organization size and is set annually.
+Organizations with 10 or more employees that wish to use Dracon Software without complying with AGPLv3's source disclosure requirements require a paid Commercial License for Production Use. Pricing is based on Organization size and is set annually.
+
+AGPLv3 remains available to all organizations regardless of size, provided they comply with its terms.
 
 For current pricing and online purchasing, visit **https://dracon.uk/licensing**.
 For pricing inquiries: **license@dracon.uk**
@@ -55,7 +57,9 @@ For pricing inquiries: **license@dracon.uk**
 
 ## 4. Production Use Definition
 
-Organizations with 10 or more employees require a Commercial License for any **Production Use** of Dracon Software (see Section 3 — Pricing). Organizations with fewer than 10 employees may use Dracon Software under AGPLv3 at no cost, regardless of use case.
+This Commercial License is an alternative to AGPLv3 for organizations that prefer not to comply with AGPLv3's source disclosure requirements. Organizations with 10 or more employees require a paid Commercial License for **Production Use** under these terms (see Section 3 — Pricing). Organizations with fewer than 10 employees may use Dracon Software under this Commercial License or AGPLv3 at no cost, regardless of use case.
+
+**Nothing in this agreement restricts any party from using Dracon Software under AGPLv3, at any scale, provided they comply with AGPLv3's terms.**
 
 **Production Use includes:**
 - Running Dracon Software in a live environment that serves end users or external clients
@@ -164,7 +168,7 @@ If a dispute arises, the parties will attempt to resolve it through good-faith n
 
 ## 14. Compatibility with Open Source
 
-If You qualify under the AGPLv3 terms, You may use Dracon Software under AGPLv3 at no cost. The Commercial License and AGPLv3 are mutually exclusive: if You have an active Commercial License, the AGPLv3 terms do not apply to Your use. If Your Commercial License expires or is terminated, You must either renew or comply with AGPLv3.
+AGPLv3 is always available to any person or organization, at any scale, provided they comply with its terms. The Commercial License is an alternative — not a replacement — for organizations that prefer not to comply with AGPLv3's source disclosure or copyleft requirements. The Commercial License and AGPLv3 are mutually exclusive: if You have an active Commercial License, the AGPLv3 terms do not apply to Your use. If Your Commercial License expires or is terminated, You must either renew, comply with AGPLv3, or cease use.
 
 AGPLv3 remains available for:
 - Open source projects that distribute source code under AGPLv3
