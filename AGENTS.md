@@ -203,7 +203,7 @@ You can add custom protected paths in `dracon-system.toml`:
 # protected_paths = ["/mnt/data", "/opt/important"]
 ```
 
-Safety: every `remove_dir_all` call site in `dracon-system` checks the path against both system and user-protected paths before executing. The `--apply` flag is required for destructive operations.
+Safety: most `remove_dir_all` call sites in `dracon-system` check the path against both system and user-protected paths before executing. The guard-specific `check_safe_to_delete_guard` skips SYSTEM_PROTECTED (only checks user-protected) because the guard only deletes known artifact/cache directories (target/, node_modules/, ~/.cache/, Trash) which are legitimately under /home. The `--apply` flag is required for destructive operations.
 
 ### dracon-system Process Monitoring & Logging
 
