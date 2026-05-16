@@ -86,10 +86,7 @@
             # Warden doesn't need openssl/libgit2/libssh2, but they're
             # harmless to include via the shared commonArgs.
             nativeCheckInputs = [ pkgs.git ];
-            checkFlags = [ "--test-threads=1" ];
-            # Skip the age encryption test in the Nix sandbox (no ~/.config/age/ids).
-            # That test is #[test] (not #[ignore]) so we exclude it by name.
-            cargoTestOptions = [ "--" "--skip" "filter_clean_encrypts_content_with_secret_marker" ];
+            checkFlags = [ "--test-threads=1" "--skip" "filter_clean_encrypts_content_with_secret_marker" ];
           });
 
           # All three binaries in one derivation
