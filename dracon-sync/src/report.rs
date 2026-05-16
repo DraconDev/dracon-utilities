@@ -3100,4 +3100,15 @@ mod tests {
 
         assert!(result.is_none());
     }
+
+    #[test]
+    fn test_shorten_when() {
+        assert_eq!(shorten_when("5 seconds ago"), "5s");
+        assert_eq!(shorten_when("29 minutes ago"), "29m");
+        assert_eq!(shorten_when("3 hours ago"), "3h");
+        assert_eq!(shorten_when("2 days ago"), "2d");
+        assert_eq!(shorten_when("6 weeks ago"), "6w");
+        assert_eq!(shorten_when("just now"), "now");
+        assert_eq!(shorten_when("unknown"), "unknown");
+    }
 }
