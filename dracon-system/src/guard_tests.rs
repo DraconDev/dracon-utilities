@@ -2,7 +2,7 @@
 //!
 //! These tests verify the guard runtime components after extraction from main.rs.
 
-use crate::policy::{GuardPolicy};
+use crate::policy::GuardPolicy;
 use std::path::PathBuf;
 use std::time::Instant;
 
@@ -46,27 +46,25 @@ fn guard_policy_disk_thresholds_are_public() {
 
 #[test]
 fn guard_report_can_be_created_with_alerts() {
-    use crate::GuardReport;
     use crate::GuardProcessAlert;
+    use crate::GuardReport;
 
     let report = GuardReport {
         enabled: true,
         disk_use_percent: 72,
         disk_state: "warn".to_string(),
         sync_frozen: false,
-        alerts: vec![
-            GuardProcessAlert {
-                pid: 12345,
-                ppid: 1,
-                command: "cargo".to_string(),
-                args: "build".to_string(),
-                cpu_percent: 250.0,
-                rss_mb: 1024,
-                sustained_secs: 35,
-                action: "reniced".to_string(),
-                nice_value: 5,
-            }
-        ],
+        alerts: vec![GuardProcessAlert {
+            pid: 12345,
+            ppid: 1,
+            command: "cargo".to_string(),
+            args: "build".to_string(),
+            cpu_percent: 250.0,
+            rss_mb: 1024,
+            sustained_secs: 35,
+            action: "reniced".to_string(),
+            nice_value: 5,
+        }],
     };
     assert!(report.enabled);
     assert_eq!(report.disk_use_percent, 72);
@@ -294,7 +292,7 @@ fn predict_fill_time_estimates_for_filling_disk() {
     let history: Vec<(Instant, u8)> = vec![
         (now - std::time::Duration::from_secs(7200), 30u8), // 2 hours ago: 30%
         (now - std::time::Duration::from_secs(3600), 60u8), // 1 hour ago: 60%
-        (now, 90u8),                                          // now: 90%
+        (now, 90u8),                                        // now: 90%
     ];
     let result = crate::predict_fill_time(&history);
     assert!(result.is_some());
