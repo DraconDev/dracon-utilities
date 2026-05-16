@@ -67,9 +67,9 @@ fn update_version_in_flake_nix(content: &str, new_version: &str) -> String {
     }
 
     if !changed {
-        return Ok(content.to_string());
+        return content.to_string();
     }
-    Ok(result)
+    result
 }
 
 pub async fn create_flake_pr(repo: &Path, new_version: &str) -> anyhow::Result<crate::release::ReleaseStep> {
@@ -248,7 +248,7 @@ mod tests {
     src = ./.;
   };
 }"#;
-        let updated = update_version_in_flake_nix(content, "1.1.0").unwrap();
+        let updated = update_version_in_flake_nix(content, "1.1.0");
         assert!(updated.contains(r#"version = "1.1.0""#));
         assert!(!updated.contains("version = \"1.0.0\""));
     }
@@ -258,7 +258,7 @@ mod tests {
         let content = r#"{
   description = "No package here";
 }"#;
-        let updated = update_version_in_flake_nix(content, "2.0.0").unwrap();
+        let updated = update_version_in_flake_nix(content, "2.0.0");
         assert_eq!(updated, content);
     }
 
