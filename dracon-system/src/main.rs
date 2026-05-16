@@ -3167,7 +3167,7 @@ async fn cmd_guard_once(guard: &GuardPolicy, json: bool) -> Result<()> {
     if json {
         println!("{}", serde_json::to_string_pretty(&report)?);
     } else {
-        println!("guard_enabled: {}", report.enabled);
+        println!("enabled: {}", report.enabled);
         println!("disk_use_percent: {}", report.disk_use_percent);
         println!("disk_state: {}", report.disk_state);
         println!("sync_frozen: {}", report.sync_frozen);
