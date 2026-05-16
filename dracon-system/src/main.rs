@@ -956,6 +956,10 @@ pub(crate) struct GuardRuntimeState {
     pub(crate) disk_history: Vec<(Instant, u8)>,
     /// Active cargo build PIDs detected
     pub(crate) active_build_pids: HashSet<i32>,
+    /// Currently reniced PIDs and their applied nice value
+    pub(crate) reniced_pids: HashMap<i32, i32>,
+    /// When a previously-heavy process stopped being heavy (for un-renice recovery)
+    pub(crate) cooled_since: HashMap<i32, Instant>,
 }
 
 /// Information about a Rust target directory for cleanup consideration
