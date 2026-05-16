@@ -62,19 +62,21 @@ fn update_version_in_flake_nix(content: &str, new_version: &str) -> String {
 if in_build_rust_package && line.contains("version = \"") {
             if let Some(start_idx) = line.find("version = \"") {
                 let after_quote = start_idx + 10;
-                eprintln!("DEBUG line={:?} start_idx={} after_quote={} char_at_after_quote={:?}", line, start_idx, after_quote, line.chars().nth(after_quote));
-if let Some(end_quote_relative) = line[after_quote + 1..].find('"') {
-                    // +1 to skip the opening quote, then +1 to get the position after that quote
+                if let Some(end_quote_relative) = line[after_quote + 1..].find('"') {
                     let end_quote = after_quote + 1 + end_quote_relative;
                     let prefix = &line[..start_idx];
-                    let suffix = &line[end_quote..]; // after the closing quote (may be empty or include semicolon)
-                    result.push_str(prefix);
-                    result.push_str("version = \"");
-                    result.push_str(new_version);
-                    result.push('"');
-                    result.push_str(suffix);
-                    result.push('\n');
-                    changed = true;
+                    let old_version = &line[after_quote + 1..end_quote];
+                    let suffix = &line[end_quote + 1..];
+                    let new_line = format!("{}version = \"{}\"{};", prefix, new_version, suffix);
+                    eprintln!("DEBUG: prefix={:?} old_version={:?} suffix={:?} new_line={:?}", prefix, old_version, suffix, new_line);
+                    if new_line == line {
+                        result.push_str(line);
+                        result.push('\n');
+                    } else {
+                        result.push_str(&new_line);
+                        result.push('\n');
+                        changed = true;
+                    }
                     continue;
                 }
             }
