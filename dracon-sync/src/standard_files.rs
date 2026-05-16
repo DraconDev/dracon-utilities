@@ -49,8 +49,13 @@ pub(crate) fn ensure_standard_files(
                 .with_context(|| format!("failed to remove existing {}", cfg.target))?;
         }
 
-        std::fs::copy(&source_path, &target_path)
-            .with_context(|| format!("failed to copy {} to {}", source_path.display(), target_path.display()))?;
+        std::fs::copy(&source_path, &target_path).with_context(|| {
+            format!(
+                "failed to copy {} to {}",
+                source_path.display(),
+                target_path.display()
+            )
+        })?;
 
         copied.push(target_path);
     }
@@ -98,7 +103,10 @@ mod tests {
         assert!(result.is_ok());
         let copied = result.unwrap();
         assert_eq!(copied.len(), 1);
-        assert_eq!(std::fs::read_to_string(repo_dir.join("LICENSE")).unwrap(), "AGPL");
+        assert_eq!(
+            std::fs::read_to_string(repo_dir.join("LICENSE")).unwrap(),
+            "AGPL"
+        );
     }
 
     #[test]
@@ -123,7 +131,10 @@ mod tests {
         assert!(result.is_ok());
         let copied = result.unwrap();
         assert!(copied.is_empty());
-        assert_eq!(std::fs::read_to_string(repo_dir.join("LICENSE")).unwrap(), "EXISTING");
+        assert_eq!(
+            std::fs::read_to_string(repo_dir.join("LICENSE")).unwrap(),
+            "EXISTING"
+        );
     }
 
     #[test]
@@ -148,7 +159,10 @@ mod tests {
         assert!(result.is_ok());
         let copied = result.unwrap();
         assert_eq!(copied.len(), 1);
-        assert_eq!(std::fs::read_to_string(repo_dir.join("LICENSE")).unwrap(), "NEW_AGPL");
+        assert_eq!(
+            std::fs::read_to_string(repo_dir.join("LICENSE")).unwrap(),
+            "NEW_AGPL"
+        );
     }
 
     #[test]
@@ -196,7 +210,7 @@ mod tests {
         let repo_dir = dir.path();
         let template_dir = dir.path().join("templates");
         std::fs::create_dir(&template_dir).unwrap();
-std::fs::write(template_dir.join("LICENSE"), "AGPLv3").unwrap();
+        std::fs::write(template_dir.join("LICENSE"), "AGPLv3").unwrap();
         let sync_path = dir.path().join("sync.toml");
         let sync_dir = sync_path.parent().unwrap();
 
@@ -211,6 +225,9 @@ std::fs::write(template_dir.join("LICENSE"), "AGPLv3").unwrap();
         assert!(result.is_ok());
         let copied = result.unwrap();
         assert_eq!(copied.len(), 1);
-        assert_eq!(std::fs::read_to_string(repo_dir.join("LICENSE")).unwrap(), "AGPLv3");
+        assert_eq!(
+            std::fs::read_to_string(repo_dir.join("LICENSE")).unwrap(),
+            "AGPLv3"
+        );
     }
 }
