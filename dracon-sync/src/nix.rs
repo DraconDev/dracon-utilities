@@ -47,7 +47,7 @@ fn update_version_in_flake_nix(content: &str, new_version: &str) -> anyhow::Resu
         if (in_package || in_build_rust_package) && line.contains("version = \"") {
             if let Some(start_idx) = line.find("version = \"") {
                 let after_quote = start_idx + 10; // skip "version = ""
-                if let Some(end_quote) = line[after_quote..].find('"') {
+                if let Some(_) = line[after_quote..].find('"') {
                     result.push_str(&line[..start_idx]);
                     result.push_str("version = \"");
                     result.push_str(new_version);
@@ -208,6 +208,7 @@ fn extract_repo_name(repo: &Path) -> anyhow::Result<String> {
     }
 }
 
+#[allow(dead_code)]
 pub fn flake_has_hardcoded_version(flake_content: &str) -> bool {
     flake_content.contains("version = \"")
 }
