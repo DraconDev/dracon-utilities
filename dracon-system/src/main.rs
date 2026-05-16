@@ -2752,6 +2752,7 @@ async fn cmd_storage(
             .top_hotspots
             .iter()
             .filter(|h| cfg.kinds.contains(&h.kind) && h.bytes >= threshold)
+            .cloned()
             .collect();
 
         println!();
