@@ -1158,22 +1158,6 @@ async fn renice_process(pid: i32, value: i32) {
     }
 }
 
-#[allow(dead_code)]
-pub(crate) fn is_git_process(command: &str, args: &str) -> bool {
-    // Strict matching: only match known long-running git subcommands
-    // that are safe to auto-kill. Avoids false positives like "legit-init".
-    const GIT_CMDS: &[&str] = &["git-init", "git-fetch", "git-pull", "git-clone", "git-push"];
-    if GIT_CMDS.contains(&command) {
-        return true;
-    }
-    if command == "git" {
-        let first_arg = args.split_whitespace().next().unwrap_or("");
-        const GIT_SUBCMDS: &[&str] = &["init", "fetch", "pull", "clone", "push"];
-        return GIT_SUBCMDS.contains(&first_arg);
-    }
-    false
-}
-
 /// Detect active cargo/rustc processes and return their PIDs and working directories
 async fn detect_active_rust_builds() -> Result<HashSet<i32>> {
     let out = Command::new("ps")

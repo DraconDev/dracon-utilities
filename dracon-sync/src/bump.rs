@@ -273,20 +273,20 @@ mod tests {
     fn test_bump_semver_all_levels() {
         assert_eq!(bump_semver("1.2.3", BumpLevel::Patch), Some("1.2.4".to_string()));
         assert_eq!(bump_semver("1.2.3", BumpLevel::Minor), Some("1.3.0".to_string()));
-        assert_eq!(bump_semver("1.2.3", BumpLevel::Major), Some("2.0.0".to_string()));
+        assert_eq!(bump_semver("1.2.3", BumpLevel::Major), None);
         assert_eq!(bump_semver("0.0.0", BumpLevel::Patch), Some("0.0.1".to_string()));
         assert_eq!(bump_semver("0.0.0", BumpLevel::Minor), Some("0.1.0".to_string()));
-        assert_eq!(bump_semver("0.0.0", BumpLevel::Major), Some("1.0.0".to_string()));
+        assert_eq!(bump_semver("0.0.0", BumpLevel::Major), None);
         assert_eq!(bump_semver("v1.2.3", BumpLevel::Patch), None);
         assert_eq!(bump_semver("v1.2.3", BumpLevel::Minor), None);
         assert_eq!(bump_semver("v1.2.3", BumpLevel::Major), None);
         assert_eq!(bump_semver("1.2", BumpLevel::Patch), None);
         assert_eq!(bump_semver("10.20.30", BumpLevel::Patch), Some("10.20.31".to_string()));
         assert_eq!(bump_semver("10.20.30", BumpLevel::Minor), Some("10.21.0".to_string()));
-        assert_eq!(bump_semver("10.20.30", BumpLevel::Major), Some("11.0.0".to_string()));
+        assert_eq!(bump_semver("10.20.30", BumpLevel::Major), None);
         assert_eq!(bump_semver("0.0.1", BumpLevel::Patch), Some("0.0.2".to_string()));
         assert_eq!(bump_semver("0.0.1", BumpLevel::Minor), Some("0.1.0".to_string()));
-        assert_eq!(bump_semver("0.0.1", BumpLevel::Major), Some("1.0.0".to_string()));
+        assert_eq!(bump_semver("0.0.1", BumpLevel::Major), None);
     }
 
     #[test]

@@ -162,40 +162,6 @@ fn parse_ps_output_works() {
 }
 
 #[test]
-fn is_git_process_detects_git_init() {
-    assert!(is_git_process("git-init", ""));
-    assert!(is_git_process("git", "init"));
-    assert!(is_git_process("git-init", "--bare"));
-}
-
-#[test]
-fn is_git_process_detects_git_fetch_and_pull() {
-    assert!(is_git_process("git-fetch", ""));
-    assert!(is_git_process("git", "pull"));
-    assert!(is_git_process("git-pull", "origin main"));
-    assert!(is_git_process("git-fetch", "origin"));
-}
-
-#[test]
-fn is_git_process_detects_git_push_and_clone() {
-    assert!(is_git_process("git-push", ""));
-    assert!(is_git_process("git", "push"));
-    assert!(is_git_process("git-clone", ""));
-    assert!(is_git_process("git", "clone"));
-}
-
-#[test]
-fn is_git_process_rejects_non_git_commands() {
-    assert!(!is_git_process("git", "log"));
-    assert!(!is_git_process("git", "diff"));
-    assert!(!is_git_process("git", "status"));
-    assert!(!is_git_process("git", "commit"));
-    assert!(!is_git_process("bash", ""));
-    assert!(!is_git_process("python", ""));
-    assert!(!is_git_process("legit-init", "")); // false positive from old substring matching
-}
-
-#[test]
 fn is_protected_ancestor_exact_match() {
     assert!(is_protected_ancestor("/home", "/home"));
     assert!(is_protected_ancestor("/etc", "/etc"));
@@ -396,4 +362,22 @@ fn test_graduated_nice_value_cpu_plus_memory() {
 fn test_graduated_nice_value_clamped() {
     assert_eq!(graduated_nice_value(0.0, 0, 5), 5);
     assert_eq!(graduated_nice_value(0.0, 0, 0), 0);
+}
+
+#[test]
+fn test_graduated_nice_value_negative_base_clamped() {
+    assert_eq!(graduated_nice_value(0.0, 0, -5), 0);
+}
+
+#[test]
+fn test_graduated_nice_value_high_base_clamped() {
+    assert_eq!(graduated_nice_value(0.0, 0, 20), 19);
+}
+
+#[test]
+fn test_graduated_nice_value_memory_boundary() {
+    assert_eq!(graduated_nice_value(0.0, 4095, 0), 0);
+    assert_eq!(graduated_nice_value(0.0, 4096, 0), 5);
+    assert_eq!(graduated_nice_value(0.0, 8191, 0), 5);
+    assert_eq!(graduated_nice_value(0.0, 8192, 0), 10);
 }
