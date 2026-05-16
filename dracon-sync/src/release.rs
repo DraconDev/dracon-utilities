@@ -551,6 +551,7 @@ fn read_pypi_version(repo: &Path) -> Result<String> {
 /// 1. Create and push git tag — gated on `repo_auto_tag`
 /// 2. Create GitHub Release for major bumps — gated on `repo_auto_release`
 /// 3. Publish to configured registries — gated on `repo_publish_targets`
+/// 4. Create Nix flake PR — gated on `nix_auto_update` and presence of `flake.nix`
 pub(crate) async fn run_release_pipeline(
     repo: &Path,
     _old_version: &str,
@@ -560,6 +561,7 @@ pub(crate) async fn run_release_pipeline(
     repo_auto_tag: bool,
     repo_auto_release: bool,
     repo_publish_targets: &[String],
+    repo_nix_auto_update: bool,
 ) -> Vec<ReleaseStep> {
     let mut steps = Vec::new();
 
@@ -634,6 +636,28 @@ pub(crate) async fn run_release_pipeline(
                     target.registry.as_str()
                 ))),
             }
+        }
+    }
+
+    // Step 4: Nix flake PR (gated on nix_auto_update and presence of flake.nix)
+    if repo_nix_auto_update && crate::nix::has_flake_nix(repo) {
+        match crate::nix::update_flake_version(repo, new_version) {
+            Ok(true) => {
+                match crate::nix::create_flake_pr(repo, new_version).await {
+                    Ok(step) => steps.push(step),
+                    Err(e) => steps.push(ReleaseStep::Failed {
+                        step: "nix flake pr".to_string(),
+                        error: e.to_string(),
+                    }),
+                }
+            }
+            Ok(false) => {
+                steps.push(ReleaseStep::Skipped("flake.nix version already up to date".to_string()));
+            }
+            Err(e) => steps.push(ReleaseStep::Failed {
+                step: "update flake.nix version".to_string(),
+                error: e.to_string(),
+            }),
         }
     }
 
