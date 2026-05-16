@@ -262,6 +262,8 @@ mod tests {
 }"#;
         let updated = update_version_in_flake_nix(content, "1.1.0");
         eprintln!("=== UPDATED ===\n{}\n=== END ===", updated);
+        eprintln!("contains '1.1.0': {}", updated.contains("1.1.0"));
+        eprintln!("contains 'version': {}", updated.contains("version"));
         assert!(updated.contains("1.1.0"), "missing 1.1.0, got:\n{}", updated);
     }
 
