@@ -301,14 +301,17 @@ pub(crate) fn is_repo_ready(repo: &Path) -> bool {
     }
     let git_bin = std::env::var("DRACON_SYNC_GIT_BIN").unwrap_or_else(|_| "git".to_string());
     let output = std::process::Command::new(&git_bin)
-        .args(["ls-files"])
+        .args(["rev-parse", "HEAD"])
         .current_dir(repo)
         .output()
         .ok();
     match output {
         Some(o) => {
-            let count = String::from_utf8_lossy(&o.stdout).lines().filter(|l| !l.is_empty()).count();
-            count > 0
+            if !o.status.success() {
+                return false;
+            }
+            let hash = String::from_utf8_lossy(&o.stdout).trim().to_string();
+            !hash.is_empty()
         }
         None => false,
     }
@@ -4702,7 +4705,7 @@ mod tests {
     }
 
     #[test]
-    fn test_is_repo_ready_no_tracked_files() {
+    fn test_is_repo_ready_no_commits() {
         let _lock = acquire_path_lock();
         let tmp = tempfile::TempDir::new().unwrap();
         let repo = tmp.path();
@@ -4721,6 +4724,34 @@ mod tests {
             .current_dir(repo)
             .status()
             .expect("git config");
-        assert!(!is_repo_ready(repo), "repo with zero tracked files should not be ready");
+        assert!(!is_repo_ready(repo), "repo with zero commits (HEAD doesn't resolve) should not be ready");
+    }
+
+    #[test]
+    fn test_is_repo_ready_empty_commit() {
+        let _lock = acquire_path_lock();
+        let tmp = tempfile::TempDir::new().unwrap();
+        let repo = tmp.path();
+        test_git_cmd()
+            .args(["init", "-q", "-b", "main"])
+            .current_dir(repo)
+            .status()
+            .expect("git init");
+        test_git_cmd()
+            .args(["config", "user.email", "test@test.com"])
+            .current_dir(repo)
+            .status()
+            .expect("git config");
+        test_git_cmd()
+            .args(["config", "user.name", "test"])
+            .current_dir(repo)
+            .status()
+            .expect("git config");
+        test_git_cmd()
+            .args(["commit", "--allow-empty", "-m", "init"])
+            .current_dir(repo)
+            .status()
+            .expect("git commit");
+        assert!(is_repo_ready(repo), "repo with empty commit (HEAD resolves) should be ready");
     }
 }
