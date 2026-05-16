@@ -19,7 +19,7 @@ pub fn update_flake_version(repo: &Path, new_version: &str) -> anyhow::Result<bo
     let flake_path = repo.join(FLAKE_NIX);
     let content = std::fs::read_to_string(&flake_path)?;
 
-    let updated = update_version_in_flake_nix(&content, new_version)?;
+    let updated = update_version_in_flake_nix(&content, new_version);
     if updated == content {
         return Ok(false);
     }
@@ -28,7 +28,7 @@ pub fn update_flake_version(repo: &Path, new_version: &str) -> anyhow::Result<bo
     Ok(true)
 }
 
-fn update_version_in_flake_nix(content: &str, new_version: &str) -> anyhow::Result<String> {
+fn update_version_in_flake_nix(content: &str, new_version: &str) -> String {
     let mut result = String::with_capacity(content.len());
     let mut changed = false;
 
@@ -229,7 +229,6 @@ fn detect_default_branch(repo: &Path) -> Option<String> {
     ref_name.strip_prefix("refs/remotes/origin/").map(String::from)
 }
 
-#[allow(dead_code)]
 pub fn flake_has_hardcoded_version(flake_content: &str) -> bool {
     flake_content.contains("version = \"")
 }
