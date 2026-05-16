@@ -1616,6 +1616,8 @@ pub(crate) mod multi_remote {
                                 .await;
                                 if force_result.is_ok() {
                                     return Ok(());
+                                }
+                            }
                             Ok(Divergence::Divergent) | Err(_) => {
                                 last_err = Some(e);
                             }
@@ -4651,12 +4653,32 @@ mod tests {
         let _lock = acquire_path_lock();
         let tmp = tempfile::TempDir::new().unwrap();
         let repo = tmp.path();
-        test_git_cmd(repo, &["init", "-b", "main"]);
-        test_git_cmd(repo, &["config", "user.email", "test@test.com"]);
-        test_git_cmd(repo, &["config", "user.name", "test"]);
+        test_git_cmd()
+            .args(["init", "-q", "-b", "main"])
+            .current_dir(repo)
+            .status()
+            .expect("git init");
+        test_git_cmd()
+            .args(["config", "user.email", "test@test.com"])
+            .current_dir(repo)
+            .status()
+            .expect("git config");
+        test_git_cmd()
+            .args(["config", "user.name", "test"])
+            .current_dir(repo)
+            .status()
+            .expect("git config");
         std::fs::write(repo.join("hello.txt"), "hello").unwrap();
-        test_git_cmd(repo, &["add", "."]);
-        test_git_cmd(repo, &["commit", "-m", "initial"]);
+        test_git_cmd()
+            .args(["add", "."])
+            .current_dir(repo)
+            .status()
+            .expect("git add");
+        test_git_cmd()
+            .args(["commit", "-m", "initial"])
+            .current_dir(repo)
+            .status()
+            .expect("git commit");
         assert!(is_repo_ready(repo), "normal repo with committed files should be ready");
     }
 
@@ -4684,9 +4706,21 @@ mod tests {
         let _lock = acquire_path_lock();
         let tmp = tempfile::TempDir::new().unwrap();
         let repo = tmp.path();
-        test_git_cmd(repo, &["init", "-b", "main"]);
-        test_git_cmd(repo, &["config", "user.email", "test@test.com"]);
-        test_git_cmd(repo, &["config", "user.name", "test"]);
+        test_git_cmd()
+            .args(["init", "-q", "-b", "main"])
+            .current_dir(repo)
+            .status()
+            .expect("git init");
+        test_git_cmd()
+            .args(["config", "user.email", "test@test.com"])
+            .current_dir(repo)
+            .status()
+            .expect("git config");
+        test_git_cmd()
+            .args(["config", "user.name", "test"])
+            .current_dir(repo)
+            .status()
+            .expect("git config");
         assert!(!is_repo_ready(repo), "repo with zero tracked files should not be ready");
     }
 }
