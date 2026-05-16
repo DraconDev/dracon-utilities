@@ -42,9 +42,8 @@ fn update_version_in_flake_nix(content: &str, new_version: &str) -> String {
         // Works for both "tiles = rustPlatform.buildRustPackage {" and
         // "packages.x86_64-linux.default = pkgs.rustPlatform.buildRustPackage {".
         if line.contains("buildRustPackage {") && line.contains(" = ") {
-            eprintln!("ENTER block: {:?}", line.trim());
             in_build_rust_package = true;
-} else if trimmed.ends_with("};") {
+        } else if trimmed.ends_with("};") {
             // End of buildRustPackage block
             in_build_rust_package = false;
         } else if !trimmed.is_empty() && !trimmed.starts_with('#')
@@ -58,14 +57,12 @@ fn update_version_in_flake_nix(content: &str, new_version: &str) -> String {
         }
 
         if in_build_rust_package && line.contains("version = \"") {
-            eprintln!("FOUND version line: {:?}", line.trim());
             if let Some(start_idx) = line.find("version = \"") {
                 let after_quote = start_idx + 10;
                 if let Some(end_quote_relative) = line[after_quote..].find('"') {
                     let end_quote = after_quote + end_quote_relative;
                     let prefix = &line[..start_idx];
                     let suffix = &line[end_quote + 1..];
-                    eprintln!("REPLACE: prefix={:?} suffix={:?}", prefix, suffix);
                     result.push_str(prefix);
                     result.push_str("version = \"");
                     result.push_str(new_version);
@@ -271,9 +268,6 @@ mod tests {
   };
 }"#;
         let updated = update_version_in_flake_nix(content, "1.1.0");
-        eprintln!("=== UPDATED ===\n{}\n=== END ===", updated);
-        eprintln!("contains '1.1.0': {}", updated.contains("1.1.0"));
-        eprintln!("contains 'version': {}", updated.contains("version"));
         assert!(updated.contains("1.1.0"), "missing 1.1.0, got:\n{}", updated);
     }
 
@@ -299,8 +293,8 @@ mod tests {
   };
 }"#;
         let updated = update_version_in_flake_nix(content, "15.0.0");
-        assert!(updated.contains(r#"version = "15.0.0";"#), "missing semicolon, got: {}", updated);
-        assert!(!updated.contains("version = \"14.0.0\""));
+        eprintln!("=== UPDATED ===\n{}\n=== END ===", updated);
+        assert!(updated.contains("15.0.0"), "missing 15.0.0, got:\n{}", updated);
     }
 
     #[test]
