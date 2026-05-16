@@ -3286,7 +3286,15 @@ async fn cmd_guard(cmd: GuardCommands) -> Result<()> {
     }
 }
 
-fn cmd_events(tail: usize, source: Option<String>, severity: Option<String>) -> Result<()> {
+fn cmd_events(
+    tail: usize,
+    source: Option<String>,
+    severity: Option<String>,
+    dedup: bool,
+    json_output: bool,
+) -> Result<()> {
+    use comfy_table::{presets::UTF8_FULL_CONDENSED, Attribute, Cell, Color, ContentArrangement, Table};
+
     let path = events_path();
     if !path.exists() {
         println!("No events found ({} does not exist)", path.display());
@@ -3300,27 +3308,139 @@ fn cmd_events(tail: usize, source: Option<String>, severity: Option<String>) -> 
     } else {
         0
     };
-    let mut shown = 0usize;
+
+    let mut parsed: Vec<serde_json::Value> = Vec::new();
     for line in &lines[start..] {
         if let Ok(val) = serde_json::from_str::<serde_json::Value>(line) {
             if let Some(ref s) = source {
-                if val.get("src").and_then(|v| v.as_str()) != Some(s.as_str()) {
+                if val.get("domain").and_then(|v| v.as_str()) != Some(s.as_str()) {
                     continue;
                 }
             }
-            if let Some(ref s) = severity {
-                if val.get("sev").and_then(|v| v.as_str()) != Some(s.as_str()) {
+            let sev_lower = severity.as_deref().map(|s| s.to_lowercase());
+            if let Some(ref sl) = sev_lower {
+                let val_sev = val
+                    .get("severity")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_lowercase();
+                if val_sev != *sl {
                     continue;
                 }
             }
-            println!("{}", line);
-            shown += 1;
+            parsed.push(val);
         }
     }
-    if shown == 0 {
-        println!("(no matching events)");
+
+    if dedup {
+        parsed.dedup_by(|a, b| {
+            a.get("domain") == b.get("domain")
+                && a.get("severity") == b.get("severity")
+                && a.get("path") == b.get("path")
+                && a.get("message") == b.get("message")
+        });
     }
+
+    if json_output {
+        for ev in &parsed {
+            println!("{}", serde_json::to_string(ev).unwrap_or_default());
+        }
+        if parsed.is_empty() {
+            println!("(no matching events)");
+        }
+        return Ok(());
+    }
+
+    if parsed.is_empty() {
+        println!("(no matching events)");
+        return Ok(());
+    }
+
+    let mut table = Table::new();
+    table
+        .load_preset(UTF8_FULL_CONDENSED)
+        .set_content_arrangement(ContentArrangement::Dynamic)
+        .set_header(vec![
+            Cell::new("SEV"),
+            Cell::new("DOMAIN"),
+            Cell::new("PATH"),
+            Cell::new("MESSAGE"),
+            Cell::new("TIME"),
+        ]);
+
+    for ev in &parsed {
+        let sev = ev
+            .get("severity")
+            .and_then(|v| v.as_str())
+            .unwrap_or("-");
+        let domain = ev
+            .get("domain")
+            .and_then(|v| v.as_str())
+            .unwrap_or("-");
+        let evpath = ev
+            .get("path")
+            .and_then(|v| v.as_str())
+            .unwrap_or("-");
+        let message = ev
+            .get("message")
+            .and_then(|v| v.as_str())
+            .unwrap_or("-");
+        let ts = ev
+            .get("timestamp")
+            .and_then(|v| v.as_str())
+            .unwrap_or("-");
+
+        let ts_short = shorten_event_time(ts);
+
+        let (sev_str, sev_color) = match sev.to_lowercase().as_str() {
+            "error" | "critical" => (sev, Color::Red),
+            "warn" | "warning" => (sev, Color::Yellow),
+            _ => (sev, Color::Green),
+        };
+
+        table.add_row(vec![
+            Cell::new(sev_str).fg(sev_color).add_attribute(Attribute::Bold),
+            Cell::new(domain),
+            Cell::new(evpath),
+            Cell::new(message),
+            Cell::new(ts_short),
+        ]);
+    }
+
+    println!("{table}");
+    println!("{} events", parsed.len());
     Ok(())
+}
+
+fn shorten_event_time(ts: &str) -> String {
+    if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(ts) {
+        let now = chrono::Utc::now();
+        let diff = now.signed_duration_since(dt);
+        if diff.num_seconds() < 0 {
+            return "just now".to_string();
+        }
+        let mins = diff.num_minutes();
+        if mins < 1 {
+            return format!("{}s", diff.num_seconds());
+        }
+        if mins < 60 {
+            return format!("{mins}m");
+        }
+        let hours = diff.num_hours();
+        if hours < 24 {
+            return format!("{hours}h");
+        }
+        let days = diff.num_days();
+        if days < 30 {
+            return format!("{days}d");
+        }
+        return format!("{}mo", days / 30);
+    }
+    if ts.len() > 19 {
+        ts[..19].to_string()
+    } else {
+        ts.to_string()
+    }
 }
 
 fn cmd_zram(
