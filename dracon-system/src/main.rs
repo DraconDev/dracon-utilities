@@ -23,9 +23,9 @@ use dracon_system_lib::analyze_workspace_storage;
 mod policy;
 pub(crate) use policy::*;
 
+mod events_tests;
 mod guard_tests;
 mod links_tests;
-mod events_tests;
 
 const SYSTEM_PROTECTED: &[&str] = &[
     "/", "/home", "/etc", "/usr", "/var", "/boot", "/nix", "/run", "/sys", "/dev", "/proc",
@@ -562,22 +562,12 @@ struct TargetDirInfo {
 
 /// Result of automatic cleanup operation
 #[derive(Debug, Serialize)]
+#[derive(Default)]
 struct AutoCleanupResult {
     pub(crate) cleaned_count: usize,
     pub(crate) reclaimed_bytes: u64,
     pub(crate) cleaned_paths: Vec<String>,
     pub(crate) protected_paths: Vec<String>,
-}
-
-impl Default for AutoCleanupResult {
-    fn default() -> Self {
-        Self {
-            cleaned_count: 0,
-            reclaimed_bytes: 0,
-            cleaned_paths: Vec::new(),
-            protected_paths: Vec::new(),
-        }
-    }
 }
 
 pub(crate) fn parse_df_use_percent(output: &str) -> Option<u8> {
