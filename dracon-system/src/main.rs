@@ -1145,7 +1145,7 @@ fn graduated_nice_value(cpu_percent: f32, rss_mb: u64, base_nice: i32) -> i32 {
         .find(|(threshold, _)| rss_mb >= *threshold)
         .map(|(_, nice)| *nice)
         .unwrap_or(0);
-    cpu_nice.max(mem_nice).min(19).max(0)
+    cpu_nice.max(mem_nice).clamp(0, 19)
 }
 
 async fn renice_process(pid: i32, value: i32) {
