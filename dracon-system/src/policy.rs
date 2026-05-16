@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 // Policy structs
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Default, Clone, Deserialize)]
 pub(crate) struct SystemPolicy {
     #[serde(default)]
     pub(crate) storage: StoragePolicy,
