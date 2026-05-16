@@ -19,6 +19,7 @@ use crate::git::origin_url;
 use crate::git::{
     cli_diff_entries, detect_large_blobs_ahead, git_name_status_entries, has_origin_remote,
     has_tracking_upstream, is_cherry_pick_in_progress, is_merge_in_progress, is_rebase_in_progress,
+    is_repo_ready,
     prune_other_default_branch, push_with_retries, restore_paths, run_git_with_timeout,
     unstage_excluded_paths, unstage_oversized_paths,
 };
@@ -1216,6 +1217,14 @@ pub(crate) async fn sync_repo(
         };
         maybe_sync_visibility_and_metadata(&ctx);
         return Ok(blocked);
+    }
+
+    if !is_repo_ready(repo) {
+        eprintln!(
+            "⏳ {} not ready (mid-clone or empty repo), skipping",
+            repo.display()
+        );
+        return Ok(SyncOutcome::NothingToDo);
     }
 
     let has_origin = ensure_origin_remote(repo, policy);
