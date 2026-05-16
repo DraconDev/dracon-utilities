@@ -76,7 +76,11 @@
             version = "0.2.0";
             buildAndTestSubdir = "dracon-system";
             nativeCheckInputs = [ pkgs.git ];
-            checkFlags = [ "--test-threads=1" ];
+            checkFlags = [
+              "--test-threads=1"
+              # Skip tests that require D-Bus (no D-Bus in Nix sandbox)
+              "--skip" "guard_report_completes_for_ok_disk"
+            ];
           });
 
           dracon-warden = pkgs.rustPlatform.buildRustPackage (commonArgs // {
