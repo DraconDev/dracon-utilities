@@ -20,7 +20,7 @@ This document constitutes a legally binding agreement between the licensee ("You
 
 - **"Organization"** means the legal entity (company, LLC, partnership, or other organization) that is the licensee. This includes all subsidiaries and affiliates under common control.
 
-- **"Engineer"** means a full-time, part-time, or contract developer who contributes to software development using Dracon Software. A developer who spends less than 20% of their time on work involving Dracon counts as 0.5 engineers.
+- **"Employee"** means a full-time, part-time, or contract individual who performs work for the Organization. Employee count is measured at the Organization level, not per project or per team.
 
 ---
 
