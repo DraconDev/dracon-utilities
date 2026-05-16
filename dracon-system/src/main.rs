@@ -2412,7 +2412,7 @@ async fn check_heavy_processes(
                         .file_name()
                         .map(|n| n.to_string_lossy().to_string())
                         .unwrap_or_default();
-                    exe_name == orig_cmd
+                    exe_name == orig_cmd.as_str()
                 }
                 Err(_) => false,
             };
