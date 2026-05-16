@@ -2607,9 +2607,9 @@ async fn cmd_status(json: bool) -> Result<()> {
 }
 
  async fn cmd_doctor(json: bool, strict: bool) -> Result<()> {
-    use comfy_table::{presets::UTF8_FULL_CONDENSED, Attribute, Cell, Color, ContentArrangement, Table};
+     use comfy_table::{presets::UTF8_FULL_CONDENSED, Cell, Color, ContentArrangement, Table};
 
-    let report = build_doctor_report().await;
+     let report = build_doctor_report().await;
     if json {
         println!("{}", serde_json::to_string_pretty(&report)?);
     } else {
@@ -2826,7 +2826,7 @@ async fn cmd_storage(
 }
 
  fn cmd_link(cmd: LinkCommands) -> Result<()> {
-    use comfy_table::{presets::UTF8_FULL_CONDENSED, Attribute, Cell, Color, ContentArrangement, Table};
+    use comfy_table::{presets::UTF8_FULL_CONDENSED, Cell, Color, ContentArrangement, Table};
 
     let (_, policy) = load_system_policy()?;
     match cmd {
