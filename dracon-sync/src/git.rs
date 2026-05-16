@@ -4572,7 +4572,7 @@ mod tests {
 
         let local_branches = {
             let output = test_git_cmd()
-                .args(["branch"])
+                .args(["branch", "--no-color"])
                 .current_dir(repo)
                 .output()
                 .expect("git branch");
@@ -4629,7 +4629,7 @@ mod tests {
 
         let local_branches = {
             let output = test_git_cmd()
-                .args(["branch"])
+                .args(["branch", "--no-color"])
                 .current_dir(repo)
                 .output()
                 .expect("git branch");

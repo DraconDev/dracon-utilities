@@ -2423,7 +2423,7 @@ async fn check_heavy_processes(
     let now = Instant::now();
     let release_dur = Duration::from_secs(guard.release_after_secs);
     let mut to_unrenice = Vec::new();
-    for (&pid, _) in &state.reniced_pids {
+    for &pid in state.reniced_pids.keys() {
         if current_heavy.contains(&pid) {
             state.cooled_since.remove(&pid);
             continue;
