@@ -521,7 +521,7 @@ pub(crate) struct ProcSample {
     pub(crate) args: String,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub(crate) struct GuardRuntimeState {
     pub(crate) heavy_since: HashMap<i32, Instant>,
     pub(crate) notify_cooldowns: HashMap<String, Instant>,
