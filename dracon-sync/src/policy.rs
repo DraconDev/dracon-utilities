@@ -1560,7 +1560,9 @@ overwrite = true
     #[test]
     fn test_standard_files_mixed_form() {
         let toml = r#"
-standard_files = ["LICENSE"]
+[[standard_files]]
+source = "templates/LICENSE"
+target = "LICENSE"
 
 [[standard_files]]
 source = "templates/CUSTOM"
