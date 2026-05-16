@@ -218,10 +218,10 @@ fn parse_df_use_percent_works() {
 }
 
 #[test]
-fn parse_df_use_percent_missing_percent_sign() {
-    // parse_df_use_percent uses line.split_whitespace().nth(4) and then
-    // trim_end_matches('%').parse::<u8>() — "80 /" gives "80" (no %) → parses as 80
-    // So this test captures actual behavior: no % sign → still parses as Some(80)
+fn parse_df_use_percent_parses_without_percent_sign() {
+    // parse_df_use_percent takes the 4th column and parses it as a number.
+    // If the value is "80" without %, it still parses as Some(80).
+    // This is normal df output behavior when the Use% column lacks the % sign.
     let output = "Filesystem   1024-blocks    Used Available Capacity Mounted on\n/dev/sda1      19512345  15678901   3823444      80 /";
     assert_eq!(crate::parse_df_use_percent(output), Some(80));
 }
