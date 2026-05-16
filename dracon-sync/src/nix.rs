@@ -41,14 +41,12 @@ fn update_version_in_flake_nix(content: &str, new_version: &str) -> String {
         // Detect start of buildRustPackage block via attribute assignment.
         // Works for both "tiles = rustPlatform.buildRustPackage {" and
         // "packages.x86_64-linux.default = pkgs.rustPlatform.buildRustPackage {".
-        if line.contains(" = rustPlatform.buildRustPackage {")
+if line.contains(" = rustPlatform.buildRustPackage {")
             || line.contains("= pkgs.rustPlatform.buildRustPackage {") {
             in_build_rust_package = true;
-        } else if trimmed.ends_with("};") {
-            // End of block
-            in_build_rust_package = false;
-        } else if trimmed.starts_with(char::is_alphabetic) && trimmed.contains(" = ") && !trimmed.ends_with("{") && !line.starts_with(' ') && !line.starts_with('\t') {
-            // Top-level attribute — can't be inside a buildRustPackage block
+        } else if trimmed.ends_with("};") || trimmed.starts_with(char::is_alphabetic) {
+            // End of buildRustPackage block (either explicit }; or a new top-level attr).
+            // Lines starting with alphabetic (not space/tab) that contain = are top-level attrs.
             in_build_rust_package = false;
         }
 
