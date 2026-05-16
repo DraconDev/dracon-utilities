@@ -2,10 +2,8 @@
 //!
 //! These tests verify the guard runtime components after extraction from main.rs.
 
+use super::*;
 use std::time::Instant;
-
-// GuardPolicy is re-exported via pub(crate) use policy::* in main.rs.
-use crate::GuardPolicy;
 
 // ---------------------------------------------------------------------------
 // GuardRuntimeState
