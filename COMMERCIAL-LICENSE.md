@@ -4,7 +4,7 @@
 
 ## Preamble
 
-All Dracon software is available under the GNU Affero General Public License (AGPLv3) for open source, community, and non-commercial use. If you want to use Dracon software in a commercial product or service **without** being subject to the AGPL's source disclosure requirements, you need a Commercial License.
+All Dracon software is available under the GNU Affero General Public License (AGPLv3) for open source, community, and non-commercial use. If you want to use Dracon software in a commercial product or service **without** being subject to the AGPL's source disclosure requirements, you need a Commercial License. Visit https://dracon.uk/licensing for details and purchase.
 
 This document constitutes a legally binding agreement between the licensee ("You" or "Your") and Dracon ("Licensor"). By purchasing or activating a Commercial License, You agree to be bound by these terms.
 
@@ -55,6 +55,7 @@ Subject to the terms and payment obligations in this agreement, Licensor grants 
 - Each Licensed Instance requires a separate license unless otherwise agreed in writing.
 - Licenses are priced per Organization, not per seat.
 
+For current pricing and online purchasing, visit **https://dracon.uk/licensing**.
 For pricing inquiries: **license@dracon.uk**
 
 ---
@@ -178,9 +179,9 @@ AGPLv3 remains available for:
 
 ## 13. How to Purchase
 
-1. Contact **license@dracon.uk** with a brief description of Your use case and the number of engineers using Dracon Software
-2. We'll respond within two (2) business days with a tailored quote
-3. Upon agreement and payment, You'll receive a signed Commercial License certificate
+1. Visit **https://dracon.uk/licensing** to purchase online
+2. For custom agreements, custom pricing, or questions, contact **license@dracon.uk**
+3. Upon purchase, You'll receive a signed Commercial License certificate
 4. Retain the certificate for Your records as proof of license
 
 ---
@@ -194,4 +195,4 @@ If You already have a signed agreement with Dracon, Your existing terms apply. C
 ---
 
 *Dracon — Sovereign tools. Compile-time guarantees.*
-*Website: https://dracon.uk | Email: license@dracon.uk*
+*Website: https://dracon.uk/licensing | Email: license@dracon.uk*
