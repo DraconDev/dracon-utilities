@@ -83,8 +83,8 @@ pub(crate) const VERSION_FILES: &[&str] = &[
 ];
 
 pub(crate) const CONVENTIONAL_COMMIT_TYPES: &[&str] = &[
-    "feat", "fix", "refactor", "docs", "test", "chore", "perf",
-    "security", "build", "ci", "style", "revert",
+    "feat", "fix", "docs", "style", "refactor", "perf", "test",
+    "build", "ci", "chore", "revert", "improvement", "security",
 ];
 
 pub fn deterministic_decide_bump_level(staged_diff: &str) -> BumpLevel {
@@ -257,8 +257,22 @@ pub fn apply_version_bump_to_repo(repo: &Path, old_ver: &str, new_ver: &str) -> 
 }
 
 fn bump_version_in_cargo_toml(content: &str, old_ver: &str, new_ver: &str) -> String {
-    content.replace(&format!("version = \"{}\"", old_ver), &format!("version = \"{}\"", new_ver))
-        .replace(&format!("version=\"{}\"", old_ver), &format!("version=\"{}\"", new_ver))
+    let mut in_package = false;
+    let mut result = String::with_capacity(content.len());
+    for line in content.lines() {
+        if line.trim().starts_with('[') {
+            in_package = line.trim() == "[package]" || line.trim() == "[workspace.package]";
+        }
+        if in_package && (line.starts_with("version =") || line.starts_with("version=")) {
+            result.push_str(&line
+                .replace(&format!("version = \"{}\"", old_ver), &format!("version = \"{}\"", new_ver))
+                .replace(&format!("version=\"{}\"", old_ver), &format!("version=\"{}\"", new_ver)));
+        } else {
+            result.push_str(line);
+        }
+        result.push('\n');
+    }
+    result
 }
 
 fn bump_version_in_json(content: &str, old_ver: &str, new_ver: &str) -> String {
@@ -353,23 +367,31 @@ mod tests {
 
     #[test]
     fn test_bump_version_in_cargo_toml() {
-        let content = r#"version = "1.2.3""#;
+        let content = "[package]\nversion = \"1.2.3\"";
         let result = bump_version_in_cargo_toml(content, "1.2.3", "1.2.4");
         assert!(result.contains("1.2.4"));
     }
 
     #[test]
     fn test_bump_version_in_cargo_toml_no_space() {
-        let content = r#"version="1.2.3""#;
+        let content = "[package]\nversion=\"1.2.3\"";
         let result = bump_version_in_cargo_toml(content, "1.2.3", "1.2.4");
-        assert!(result.contains("1.2.4"));
+        assert!(result.contains("\"1.2.4\""));
     }
 
     #[test]
     fn test_bump_version_in_cargo_toml_not_found() {
-        let content = r#"name = "test""#;
+        let content = "[package]\nname = \"test\"";
         let result = bump_version_in_cargo_toml(content, "1.2.3", "1.2.4");
-        assert_eq!(result, content);
+        assert_eq!(result.trim_end(), content);
+    }
+
+    #[test]
+    fn test_bump_version_in_cargo_toml_skips_deps() {
+        let content = "[package]\nversion = \"1.2.3\"\n\n[dependencies]\nmy-dep = { version = \"1.2.3\" }";
+        let result = bump_version_in_cargo_toml(content, "1.2.3", "1.2.4");
+        assert!(result.contains("version = \"1.2.4\""));
+        assert!(result.contains("my-dep = { version = \"1.2.3\" }"));
     }
 
     #[test]

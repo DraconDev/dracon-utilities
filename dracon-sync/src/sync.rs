@@ -2630,6 +2630,7 @@ auto_bump_versions = false
     fn test_conventional_prefix_detects_scoped_and_bare() {
         let has_prefix = |s: &str| -> bool {
             crate::bump::CONVENTIONAL_COMMIT_TYPES.iter().any(|t| s.starts_with(&format!("{}:", t)) || s.starts_with(&format!("{}(", t)))
+                || s.starts_with("Revert \"")
         };
 
         // bare prefixes
@@ -2646,6 +2647,13 @@ auto_bump_versions = false
         assert!(has_prefix("security: fix XSS vulnerability"));
         assert!(has_prefix("revert(auth): undo token change"));
         assert!(has_prefix("security(crypto): fix padding oracle"));
+
+        // improvement — newly added
+        assert!(has_prefix("improvement: faster lookup"));
+        assert!(has_prefix("improvement(cache): faster lookup"));
+
+        // git Revert subjects — should not get chore(sync): prefix
+        assert!(has_prefix("Revert \"feat(auth): add SSO\""));
 
         // not conventional
         assert!(!has_prefix("add input shield"));
