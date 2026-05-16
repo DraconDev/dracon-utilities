@@ -87,7 +87,7 @@ fn update_version_in_flake_nix(content: &str, new_version: &str) -> Result<Strin
     Ok(result)
 }
 
-pub async fn create_flake_pr(repo: &Path, new_version: &str) -> Result<ReleaseStep> {
+pub async fn create_flake_pr(repo: &Path, new_version: &str) -> anyhow::Result<release::ReleaseStep> {
     let repo_name = extract_repo_name(repo)?;
 
     let branch_name = format!("chore/update-flake-v{}", new_version);
