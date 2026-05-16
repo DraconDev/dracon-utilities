@@ -225,7 +225,8 @@ fn detect_default_branch(repo: &Path) -> Option<String> {
         .output()
         .ok()?;
 
-    let ref_name = String::from_utf8_lossy(&output.stdout).trim();
+    let ref_name_cow = String::from_utf8_lossy(&output.stdout);
+    let ref_name = ref_name_cow.trim();
     ref_name.strip_prefix("refs/remotes/origin/").map(String::from)
 }
 
@@ -274,7 +275,7 @@ mod tests {
     };
   };
 }"#;
-        let updated = update_version_in_flake_nix(content, "15.0.0").unwrap();
+        let updated = update_version_in_flake_nix(content, "15.0.0");
         assert!(updated.contains(r#"version = "15.0.0""#));
         assert!(!updated.contains("version = \"14.0.0\""));
     }
@@ -288,7 +289,7 @@ mod tests {
     src = ./.;
   };
 }"#;
-        let updated = update_version_in_flake_nix(content, "0.2.0").unwrap();
+        let updated = update_version_in_flake_nix(content, "0.2.0");
         assert!(updated.contains(r#"version = "0.2.0""#));
     }
 
