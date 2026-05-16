@@ -410,11 +410,9 @@ mod tests {
         std::fs::write(&flake_path, original).unwrap();
 
         let changed = update_flake_version(dir.path(), "15.0.0").unwrap();
-        eprintln!("changed={}", changed);
         let written = std::fs::read_to_string(&flake_path).unwrap();
-        eprintln!("written={:?}", written);
-
-        let written = std::fs::read_to_string(&flake_path).unwrap();
+        eprintln!("changed={} written_len={} original_len={}", changed, written.len(), original.len());
+        assert!(!changed, "expected no change when version already matches");
         assert_eq!(written, original);
     }
 
