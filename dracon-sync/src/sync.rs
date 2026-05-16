@@ -612,6 +612,8 @@ async fn run_ai_bumper(
 
         if let Some(current_ver) = read_current_version(repo) {
             let level = ai_decide_bump_level(repo, &current_ver, &staged_diff, &project_state).await;
+            // Defense-in-depth: ai_decide_bump_level already maps "major" => None,
+            // but this guard catches it if the mapping is ever accidentally changed.
             if level == BumpLevel::Major {
                 eprintln!("🔒 major bump blocked (manual-only), skipping");
                 return false;

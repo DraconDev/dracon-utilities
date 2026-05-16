@@ -2418,6 +2418,27 @@ async fn check_heavy_processes(
         }
     }
     for pid in to_unrenice {
+        if let Some((_nice, ref orig_cmd)) = state.reniced_pids.get(&pid) {
+            let proc_cmdline = PathBuf::from(format!("/proc/{}/cmdline", pid));
+            let same_process = match std::fs::read_to_string(&proc_cmdline) {
+                Ok(content) => {
+                    let cmd = content.replace('\0', " ");
+                    let exe = cmd.split_whitespace().next().unwrap_or("");
+                    let exe_name = std::path::Path::new(exe)
+                        .file_name()
+                        .map(|n| n.to_string_lossy().to_string())
+                        .unwrap_or_default();
+                    exe_name == orig_cmd
+                }
+                Err(_) => false,
+            };
+            if !same_process {
+                eprintln!("🔧 skip un-renice pid={} — PID recycled (was {}, now different)", pid, orig_cmd);
+                state.reniced_pids.remove(&pid);
+                state.cooled_since.remove(&pid);
+                continue;
+            }
+        }
         renice_process(pid, 0).await;
         eprintln!("🔧 un-renice pid={} -> nice 0 (pressure released)", pid);
         state.reniced_pids.remove(&pid);
@@ -2435,7 +2456,7 @@ async fn check_heavy_processes(
         let summary: Vec<String> = state
             .reniced_pids
             .iter()
-            .map(|(pid, nice)| format!("pid={}:nice={}", pid, nice))
+            .map(|(pid, (nice, _))| format!("pid={}:nice={}", pid, nice))
             .collect();
         eprintln!("🔧 reniced active: [{}]", summary.join(", "));
     }

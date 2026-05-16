@@ -21,7 +21,7 @@ fn parse_semver(ver: &str) -> Option<(u64, u64, u64)> {
 pub(crate) fn bump_semver(ver: &str, level: BumpLevel) -> Option<String> {
     let (major, minor, patch) = parse_semver(ver)?;
     match level {
-        BumpLevel::Major => Some(format!("{}.0.0", major + 1)),
+        BumpLevel::Major => None,
         BumpLevel::Minor => Some(format!("{}.{}.0", major, minor + 1)),
         BumpLevel::Patch => Some(format!("{}.{}.{}", major, minor, patch + 1)),
         BumpLevel::None => None,
