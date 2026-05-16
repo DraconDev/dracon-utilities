@@ -270,6 +270,8 @@ fn should_notify_respects_cooldown() {
         last_disk_state: "ok".to_string(),
         disk_history: Vec::new(),
         active_build_pids: std::collections::HashSet::new(),
+        reniced_pids: std::collections::HashMap::new(),
+        cooled_since: std::collections::HashMap::new(),
     };
     let key = "test-key";
     assert!(
@@ -344,6 +346,8 @@ async fn guard_report_completes_for_ok_disk() {
         last_disk_state: "ok".to_string(),
         disk_history: Vec::new(),
         active_build_pids: std::collections::HashSet::new(),
+        reniced_pids: std::collections::HashMap::new(),
+        cooled_since: std::collections::HashMap::new(),
     };
     let guard = GuardPolicy {
         disk_warn_percent: 70,
