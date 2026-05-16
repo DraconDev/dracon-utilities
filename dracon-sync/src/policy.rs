@@ -1526,4 +1526,72 @@ remotes = []
             "should warn about no remotes"
         );
     }
+
+    #[test]
+    fn test_standard_files_short_form() {
+        let toml = r#"
+standard_files = ["LICENSE", "CLA.md"]
+"#;
+        let policy: SyncPolicy = toml::from_str(toml).unwrap();
+        assert_eq!(policy.standard_files.len(), 2);
+        assert_eq!(policy.standard_files[0].source, "templates/LICENSE");
+        assert_eq!(policy.standard_files[0].target, "LICENSE");
+        assert!(!policy.standard_files[0].overwrite);
+        assert_eq!(policy.standard_files[1].source, "templates/CLA.md");
+        assert_eq!(policy.standard_files[1].target, "CLA.md");
+        assert!(!policy.standard_files[1].overwrite);
+    }
+
+    #[test]
+    fn test_standard_files_long_form() {
+        let toml = r#"
+[[standard_files]]
+source = "templates/CUSTOM"
+target = "NOTICE"
+overwrite = true
+"#;
+        let policy: SyncPolicy = toml::from_str(toml).unwrap();
+        assert_eq!(policy.standard_files.len(), 1);
+        assert_eq!(policy.standard_files[0].source, "templates/CUSTOM");
+        assert_eq!(policy.standard_files[0].target, "NOTICE");
+        assert!(policy.standard_files[0].overwrite);
+    }
+
+    #[test]
+    fn test_standard_files_mixed_form() {
+        let toml = r#"
+standard_files = ["LICENSE"]
+
+[[standard_files]]
+source = "templates/CUSTOM"
+target = "NOTICE"
+overwrite = true
+"#;
+        let policy: SyncPolicy = toml::from_str(toml).unwrap();
+        assert_eq!(policy.standard_files.len(), 2);
+        assert_eq!(policy.standard_files[0].source, "templates/LICENSE");
+        assert_eq!(policy.standard_files[0].target, "LICENSE");
+        assert!(!policy.standard_files[0].overwrite);
+        assert_eq!(policy.standard_files[1].source, "templates/CUSTOM");
+        assert_eq!(policy.standard_files[1].target, "NOTICE");
+        assert!(policy.standard_files[1].overwrite);
+    }
+
+    #[test]
+    fn test_standard_files_empty() {
+        let toml = r#"
+standard_files = []
+"#;
+        let policy: SyncPolicy = toml::from_str(toml).unwrap();
+        assert!(policy.standard_files.is_empty());
+    }
+
+    #[test]
+    fn test_standard_files_default_empty() {
+        let toml = r#"
+pulse_interval_secs = 1
+"#;
+        let policy: SyncPolicy = toml::from_str(toml).unwrap();
+        assert!(policy.standard_files.is_empty());
+    }
 }
