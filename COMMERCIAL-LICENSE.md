@@ -102,7 +102,7 @@ Dracon reserves the right to verify compliance with this restriction and to term
 
 ---
 
-## 6. Term and Termination
+## 9. Term and Termination
 
 **This license is effective for one (1) year from the date of purchase or activation.**
 
@@ -110,16 +110,16 @@ It will renew automatically unless either party provides written notice of cance
 
 **Dracon may terminate this license immediately if You:**
 - Fail to pay the license fee when due
-- Violate the Competing Product restriction (Section 5)
+- Violate the Competing Product restriction (Section 8)
 - Exceed the permitted number of Licensed Instances
 - Attempt to transfer this license to a third party
 - Breach any other term of this agreement and fail to cure within thirty (30) days of written notice
 
-Upon termination, You must cease all use of Dracon Software under this license. Sections 7, 8, 9, 10, and 12 survive termination.
+Upon termination, You must cease all use of Dracon Software under this license. Sections 10, 11, 12, 13, and 15 survive termination.
 
 ---
 
-## 7. Disclaimer of Warranty
+## 10. Disclaimer of Warranty
 
 **DRACON SOFTWARE IS PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED.**
 
@@ -132,17 +132,17 @@ Licensor does not warrant that Dracon Software will meet Your requirements, that
 
 ---
 
-## 8. Limitation of Liability
+## 11. Limitation of Liability
 
 **TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL LICENSOR BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING BUT NOT LIMITED TO LOSS OF PROFITS, DATA, BUSINESS, OR GOODWILL) ARISING OUT OF OR RELATED TO THIS AGREEMENT OR YOUR USE OF DRACON SOFTWARE, EVEN IF LICENSOR HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.**
 
-**LICENSOR'S TOTAL CUMULATIVE LIABILITY UNDER THIS AGREEMENT SHALL NOT EXCEED THE ANNUAL LICENSE FEE PAID BY YOU FOR THE SPECIFIC LICENSE GIVING RISE TO THE CLAIM.**
+**LICENSOR'S TOTAL CUMULATIVE LIABILITY UNDER THIS AGREEMENT SHALL NOT EXCEED THE ANNUAL LICENSE FEE PAID BY YOU FOR THE SPECIFIC LICENSE GIVING RISE TO THE CLAIM, OR ONE HUNDRED POUNDS STERLING (GBP 100) IF YOU PAID NOTHING.**
 
 This limitation applies regardless of the form of action, whether in contract, tort, strict liability, or otherwise.
 
 ---
 
-## 9. Indemnification
+## 12. Indemnification
 
 **You agree to indemnify, defend, and hold harmless Licensor and its officers, directors, employees, and agents from and against any and all claims, damages, losses, costs, and expenses (including reasonable legal fees) arising out of or related to:**
 
@@ -152,7 +152,7 @@ This limitation applies regardless of the form of action, whether in contract, t
 
 ---
 
-## 10. Governing Law and Dispute Resolution
+## 13. Governing Law and Dispute Resolution
 
 **This agreement shall be governed by and construed in accordance with the laws of England and Wales.**
 
@@ -162,7 +162,7 @@ If a dispute arises, the parties will attempt to resolve it through good-faith n
 
 ---
 
-## 11. Compatibility with Open Source
+## 14. Compatibility with Open Source
 
 If You qualify under the AGPLv3 terms, You may use Dracon Software under AGPLv3 at no cost. The Commercial License and AGPLv3 are mutually exclusive: if You have an active Commercial License, the AGPLv3 terms do not apply to Your use. If Your Commercial License expires or is terminated, You must either renew or comply with AGPLv3.
 
@@ -174,7 +174,7 @@ AGPLv3 remains available for:
 
 ---
 
-## 12. General Provisions
+## 15. General Provisions
 
 - **Entire Agreement**: This agreement constitutes the entire understanding between the parties and supersedes all prior agreements, representations, and understandings.
 
@@ -190,7 +190,7 @@ AGPLv3 remains available for:
 
 ---
 
-## 13. How to Purchase
+## 16. How to Purchase
 
 1. Visit **https://dracon.uk/licensing** to purchase online
 2. For custom agreements, custom pricing, or questions, contact **license@dracon.uk**
@@ -199,7 +199,7 @@ AGPLv3 remains available for:
 
 ---
 
-## 14. Enterprise and Custom Agreements
+## 17. Enterprise and Custom Agreements
 
 If Your organization has specific requirements — including custom pricing, on-premises deployment support, or bespoke contractual terms — contact **license@dracon.uk** to discuss a tailored agreement.
 
