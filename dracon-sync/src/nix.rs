@@ -67,13 +67,15 @@ if in_build_rust_package && line.contains("version = \"") {
                     let prefix = &line[..start_idx];
                     let old_version = &line[after_quote + 1..end_quote];
                     let suffix = &line[end_quote + 1..];
-                    let new_line = format!("{}version = \"{}\"{};", prefix, new_version, suffix);
-                    eprintln!("DEBUG: prefix={:?} old_version={:?} suffix={:?} new_line={:?}", prefix, old_version, suffix, new_line);
-                    if new_line == line {
+                    if old_version == new_version {
                         result.push_str(line);
                         result.push('\n');
                     } else {
-                        result.push_str(&new_line);
+                        result.push_str(prefix);
+                        result.push_str("version = \"");
+                        result.push_str(new_version);
+                        result.push('"');
+                        result.push_str(suffix);
                         result.push('\n');
                         changed = true;
                     }
