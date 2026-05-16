@@ -72,7 +72,27 @@ If You are unsure whether Your use qualifies as Production Use, contact **licens
 
 ---
 
-## 5. Competing Product Restriction
+## 5. Patents
+
+No patent license is granted under this agreement, whether express, implied, through exhaustion, or otherwise, except to the minimum extent required by applicable law.
+
+---
+
+## 6. Trademarks
+
+This agreement does not grant any right to use Dracon's names, trademarks, service marks, logos, or branding, except as strictly necessary for accurate attribution or as separately authorized in writing by Dracon.
+
+---
+
+## 7. Source Redistribution
+
+You may distribute applications, binaries, or other works built with Dracon Software, but this agreement does not permit public redistribution of Dracon Software's source code, whether modified or unmodified, except with Dracon's separate written permission.
+
+You may provide access to Dracon Software's source code to Your employees and contractors solely as needed to exercise Your rights under this agreement, provided they are acting on Your behalf and are bound by terms at least as protective of Dracon as this agreement.
+
+---
+
+## 8. Competing Product Restriction
 
 **You may not use this Commercial License to develop, build, or enhance a Competing Product.**
 
