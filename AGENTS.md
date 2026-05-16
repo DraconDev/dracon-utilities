@@ -167,6 +167,28 @@ Service files are installed to `~/.config/systemd/user/` by `install.sh`.
 | dracon-system | ~/.dracon/utilities/system/dracon-system.toml | [dracon-system.example.toml](dracon-system/dracon-system.example.toml) |
 | dracon-warden | ~/.dracon/utilities/warden/dracon-warden.toml | [dracon-warden.example.toml](dracon-warden/dracon-warden.example.toml) |
 
+### Standard Files
+
+`dracon-sync` can ensure standard files (LICENSE, CLA, etc.) exist in every synced repository. Templates live in `~/.dracon/utilities/sync/templates/`.
+
+```toml
+# dracon-sync.toml — short form (filename only)
+standard_files = ["LICENSE", "CLA.md"]
+
+# Long form with explicit source/target
+# [[standard_files]]
+# source = "templates/CUSTOM"
+# target = "CUSTOM_NOTICE"
+# overwrite = false   # default: false (never overwrites)
+```
+
+Per-repo opt-out via `.dracon/dracon-sync.toml`:
+```toml
+skip_standard_files = ["CLA.md"]
+```
+
+Files are only copied if the target doesn't exist. Missing templates print a warning but don't block sync.
+
 ## Operational State
 
 Operational state (mutable files written at runtime) lives **outside the `.dracon` git tree** to prevent self-referential churn:
