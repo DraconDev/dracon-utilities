@@ -42,6 +42,10 @@ fn update_version_in_flake_nix(content: &str, new_version: &str) -> anyhow::Resu
         } else if trimmed.ends_with("= rustPlatform.buildRustPackage {")
             || trimmed.ends_with("= pkgs.rustPlatform.buildRustPackage {") {
             in_build_rust_package = true;
+        } else if trimmed.ends_with("};") {
+            in_build_rust_package = false;
+        } else if trimmed.starts_with(char::is_alphabetic) && trimmed.contains(" = ") && !trimmed.contains("{") {
+            in_build_rust_package = false;
         }
 
         if (in_package || in_build_rust_package) && line.contains("version = \"") {
@@ -176,6 +180,9 @@ async fn run_git_for_nix_pr(repo: &Path, branch_name: &str, commit_msg: &str) ->
 
     use crate::git::run_git_with_timeout_env;
     run_git_with_timeout_env(repo, &["push", "-u", "origin", branch_name], 120, "nix-pr-push", &env).await?;
+
+    // Return to the previous branch so the sync cycle continues normally
+    run_git_with_timeout(repo, &["checkout", "-"], 30, "nix-pr-return").await?;
 
     Ok(())
 }
