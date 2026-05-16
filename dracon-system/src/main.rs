@@ -524,7 +524,7 @@ pub(crate) struct LinkEntry {
 
 #[derive(Debug, Clone, Deserialize)]
 pub(crate) struct GuardPolicy {
-    #[serde(default = "default_guard_enabled")]
+    #[serde(default = "default_enabled")]
     enabled: bool,
     #[serde(default = "default_disk_mount_path")]
     pub(crate) disk_mount_path: String,
@@ -652,7 +652,7 @@ pub(crate) struct GuardPolicy {
 impl Default for GuardPolicy {
     fn default() -> Self {
         Self {
-            enabled: default_guard_enabled(),
+            enabled: default_enabled(),
             disk_mount_path: default_disk_mount_path(),
             interval_secs: default_guard_interval_secs(),
             disk_early_warn_percent: default_disk_early_warn_percent(),
