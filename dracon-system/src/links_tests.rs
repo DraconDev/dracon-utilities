@@ -38,7 +38,7 @@ fn evaluate_link_missing_link_returns_missing() {
     assert!(!status.is_symlink);
     assert!(!status.target_exists);
     assert_eq!(status.in_sync, false);
-    assert!(status.issue.is_some());
+    assert!(!status.issue.is_empty());
 }
 
 #[test]
