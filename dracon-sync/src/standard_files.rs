@@ -132,7 +132,8 @@ mod tests {
         std::fs::create_dir(&template_dir).unwrap();
         std::fs::write(template_dir.join("LICENSE"), "NEW_AGPL").unwrap();
         std::fs::write(repo_dir.join("LICENSE"), "OLD_LICENSE").unwrap();
-        let sync_dir = dir.path().join("sync.toml").parent().unwrap();
+        let sync_path = dir.path().join("sync.toml");
+        let sync_dir = sync_path.parent().unwrap();
 
         let policy = make_policy(vec![StandardFileConfig {
             source: "templates/LICENSE".to_string(),
