@@ -69,6 +69,10 @@
             cargoBuildFeatures = [ "scribe" "ai-bumper" ];
             # Tests need git and serial execution
             nativeCheckInputs = [ pkgs.git ];
+            preCheck = ''
+              git config --global user.email "dracon@nix.build"
+              git config --global user.name "Dracon Nix Build"
+            '';
             checkFlags = [ "--test-threads=1" ];
           });
 
