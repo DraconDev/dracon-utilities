@@ -366,11 +366,11 @@ fn default_log_dirs() -> String {
     String::new()
 }
 
-fn default_node_modules_max_age_days() -> u64 {
+pub(crate) fn default_node_modules_max_age_days() -> u64 {
     30
 }
 
-fn default_nix_keep_generations() -> u32 {
+pub(crate) fn default_nix_keep_generations() -> u32 {
     5
 }
 

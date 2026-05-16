@@ -21,29 +21,8 @@ use dracon_system_lib::analyze_workspace_storage;
 // Note: GuardRuntimeState, ProcSample, AutoCleanupResult are in main.rs,
 // so tests use crate::* to access them without explicit re-exports.
 mod policy;
-pub(crate) use policy::{
-    AutoCleanupResult, canonical_system_root, default_disk_action_percent,
-    default_disk_critical_percent, default_disk_warn_percent, default_enabled,
-    default_guard_log_file, default_guard_log_max_mb, default_nix_keep_generations,
-    default_node_modules_max_age_days, default_process_cpu_percent,
-    default_process_exempt_names, default_process_rss_mb, default_process_sustain_secs,
-    default_release_after_secs, default_renice_value, default_notify_command,
-    default_notify_cooldown_secs, default_true, default_auto_cleanup_rust,
-    default_cleanup_min_size_mb, default_rust_search_roots,
-    default_node_modules_search_roots, default_trend_warn_hours, default_inode_warn_percent,
-    default_zombie_threshold, default_log_size_mb, default_log_max_truncate_mb,
-    default_log_dirs, default_kinds, default_min_size_mb, default_sync_freeze_marker,
-    default_unfreeze_below_percent, expand_tilde, GuardPolicy, GuardReport,
-    human_bytes, is_protected_ancestor, LinkEntry, LinkPolicy, parse_kinds,
-    StoragePolicy, SystemPolicy,
-};
-pub(crate) use policy::disk_state;
-pub(crate) use policy::graduated_nice_value;
-pub(crate) use policy::parse_df_use_percent;
-pub(crate) use policy::parse_ps_output;
-pub(crate) use policy::should_notify;
-pub(crate) use policy::predict_fill_time;
-pub(crate) use policy::AutoCleanupResult;
+pub(crate) use policy::*;
+
 mod guard_tests;
 
 const SYSTEM_PROTECTED: &[&str] = &[

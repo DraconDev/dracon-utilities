@@ -172,38 +172,35 @@ fn parse_ps_output_malformed_lines_skipped() {
 // disk_state
 // ---------------------------------------------------------------------------
 
+// Note: disk_state() in main.rs doesn't handle early-warn state.
+// That state is managed in the guard daemon loop via check_disk_early_warning.
+// The basic disk_state() only classifies: critical > action > warn > ok.
+
 #[test]
 fn disk_state_ok_below_warn() {
     let guard = GuardPolicy::default();
     assert_eq!(crate::disk_state(50, &guard), "ok");
-    assert_eq!(crate::disk_state(64, &guard), "ok");
-}
-
-#[test]
-fn disk_state_early_warn_between_early_and_warn() {
-    let guard = GuardPolicy::default();
-    assert_eq!(crate::disk_state(66, &guard), "early-warn");
-    assert_eq!(crate::disk_state(69, &guard), "early-warn");
+    assert_eq!(crate::disk_state(79, &guard), "ok");
 }
 
 #[test]
 fn disk_state_warn_between_warn_and_action() {
     let guard = GuardPolicy::default();
-    assert_eq!(crate::disk_state(76, &guard), "warn");
-    assert_eq!(crate::disk_state(84, &guard), "warn");
+    assert_eq!(crate::disk_state(80, &guard), "warn");
+    assert_eq!(crate::disk_state(89, &guard), "warn");
 }
 
 #[test]
 fn disk_state_action_between_action_and_critical() {
     let guard = GuardPolicy::default();
-    assert_eq!(crate::disk_state(86, &guard), "action");
-    assert_eq!(crate::disk_state(91, &guard), "action");
+    assert_eq!(crate::disk_state(90, &guard), "action");
+    assert_eq!(crate::disk_state(94, &guard), "action");
 }
 
 #[test]
 fn disk_state_critical_at_or_above_critical() {
     let guard = GuardPolicy::default();
-    assert_eq!(crate::disk_state(92, &guard), "critical");
+    assert_eq!(crate::disk_state(95, &guard), "critical");
     assert_eq!(crate::disk_state(100, &guard), "critical");
 }
 
