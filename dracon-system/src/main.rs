@@ -376,12 +376,18 @@ enum Commands {
         /// Number of recent events to show.
         #[arg(short, long, default_value = "50")]
         tail: usize,
-        /// Filter by source (e.g. sync, warden, system).
+        /// Filter by source domain (e.g. system, warden, sync).
         #[arg(short, long)]
         source: Option<String>,
         /// Filter by severity (info, warn, error, critical).
         #[arg(short, long)]
         severity: Option<String>,
+        /// Deduplicate consecutive identical events.
+        #[arg(long)]
+        dedup: bool,
+        /// Output as JSON (raw JSONL, one per line).
+        #[arg(long)]
+        json: bool,
     },
     /// Zram management: show stats and generate NixOS config for tuning.
     Zram {
@@ -3466,7 +3472,9 @@ async fn main() -> Result<()> {
             tail,
             source,
             severity,
-        } => cmd_events(tail, source, severity),
+            dedup,
+            json,
+        } => cmd_events(tail, source, severity, dedup, json),
         Commands::Zram {
             status,
             gen_config,
