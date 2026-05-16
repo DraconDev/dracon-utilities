@@ -737,7 +737,7 @@ fn default_true() -> bool {
     true
 }
 
-fn default_guard_enabled() -> bool {
+fn default_enabled() -> bool {
     true
 }
 
@@ -1240,7 +1240,7 @@ async fn find_rust_target_dirs(roots: &[PathBuf]) -> Result<Vec<TargetDirInfo>> 
         }
     }
 
-    // Sort by size descending (clean largest first)
+    // Sort ascending (smallest first); iteration cleans all above threshold so order is arbitrary
     targets.sort_by_key(|a| a.bytes);
 
     Ok(targets)
@@ -1938,7 +1938,7 @@ async fn find_large_log_files(
         }
     }
 
-    // Sort by size descending
+    // Sort ascending by size (smallest first)
     logs.sort_by_key(|a| a.1);
 
     Ok(logs)
