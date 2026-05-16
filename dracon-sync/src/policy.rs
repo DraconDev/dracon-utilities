@@ -321,6 +321,11 @@ pub(crate) struct SyncPolicy {
     /// Configured package registry publish targets.
     #[serde(default)]
     pub(crate) publish_targets: Vec<PublishTarget>,
+    /// When true, version bumps in repos with a `flake.nix` create a PR updating
+    /// the flake's version field (in addition to tagging and publishing).
+    /// Default is false.
+    #[serde(default)]
+    pub(crate) nix_auto_update: bool,
 }
 
 /// Package registry type for auto-publish.
@@ -378,6 +383,10 @@ pub(crate) struct RepoPolicyOverride {
     /// Only used when global `auto_publish = true`.
     #[serde(default)]
     pub(crate) auto_publish: Vec<String>,
+    /// Per-repo override for nix flake auto-update. Defaults to false (inherited from global).
+    /// Set to true to enable auto-creating PRs for flake version updates.
+    #[serde(default)]
+    pub(crate) nix_auto_update: Option<bool>,
 }
 
 pub(crate) fn default_true() -> bool {
