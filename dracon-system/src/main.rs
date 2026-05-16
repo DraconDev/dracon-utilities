@@ -1125,6 +1125,29 @@ fn sync_freeze_marker_path(guard: &GuardPolicy) -> PathBuf {
     PathBuf::from(guard.sync_freeze_marker.clone())
 }
 
+fn graduated_nice_value(cpu_percent: f32, rss_mb: u64, base_nice: i32) -> i32 {
+    let cpu_tiers: &[(f32, i32)] = &[
+        (500.0, 15),
+        (300.0, 10),
+        (180.0, 5),
+    ];
+    let mem_tiers: &[(u64, i32)] = &[
+        (8192, 10),
+        (4096, 5),
+    ];
+    let cpu_nice = cpu_tiers
+        .iter()
+        .find(|(threshold, _)| cpu_percent >= *threshold)
+        .map(|(_, nice)| *nice)
+        .unwrap_or(base_nice);
+    let mem_nice = mem_tiers
+        .iter()
+        .find(|(threshold, _)| rss_mb >= *threshold)
+        .map(|(_, nice)| *nice)
+        .unwrap_or(0);
+    cpu_nice.max(mem_nice).min(19).max(0)
+}
+
 async fn renice_process(pid: i32, value: i32) {
     if let Err(e) = Command::new("renice")
         .args(["-n", &value.to_string(), "-p", &pid.to_string()])
