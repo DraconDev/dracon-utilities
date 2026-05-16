@@ -380,6 +380,13 @@ mod tests {
     }
 
     #[test]
+    fn test_bump_version_in_json_no_space() {
+        let content = r#""version":"1.2.3""#;
+        let result = bump_version_in_json(content, "1.2.3", "1.2.4");
+        assert!(result.contains("\"version\":\"1.2.4\""));
+    }
+
+    #[test]
     fn test_bump_version_in_json_not_found() {
         let content = r#""name": "test""#;
         let result = bump_version_in_json(content, "1.2.3", "1.2.4");

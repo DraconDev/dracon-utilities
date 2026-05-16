@@ -231,8 +231,6 @@ renice_value = 5                    # Base nice value (used if no tier matches h
 release_after_secs = 120             # Un-renice after 2 min of being non-heavy
 ```
 
-When enabled, git processes (init, fetch, pull, clone, push) that sustain high CPU for the configured duration receive SIGTERM. Before sending SIGKILL, the guard verifies the PID still belongs to the same git process via `/proc/{pid}/cmdline` to prevent killing a recycled PID. Disabled by default for safety.
-
 **Log configuration:**
 ```toml
 [guard]
