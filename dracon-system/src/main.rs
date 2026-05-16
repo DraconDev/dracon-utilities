@@ -3257,7 +3257,7 @@ async fn cmd_guard(cmd: GuardCommands) -> Result<()> {
             caches,
             node_modules,
             docker,
-            all,
+            all: _,
             min_size_mb,
         } => {
             let targets = CleanTargets {
