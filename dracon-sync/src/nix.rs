@@ -238,6 +238,10 @@ pub fn flake_has_hardcoded_version(flake_content: &str) -> bool {
 mod tests {
     use super::*;
 
+    fn flake_has_hardcoded_version(flake_content: &str) -> bool {
+        flake_content.contains("version = \"")
+    }
+
     #[test]
     fn test_update_version_in_flake_nix_basic() {
         let content = r#"{
