@@ -224,15 +224,7 @@ fn disk_state_transitions_at_thresholds() {
 
 #[test]
 fn should_notify_respects_cooldown() {
-    let mut state = GuardRuntimeState {
-        heavy_since: std::collections::HashMap::new(),
-        notify_cooldowns: std::collections::HashMap::new(),
-        last_disk_state: "ok".to_string(),
-        disk_history: Vec::new(),
-        active_build_pids: std::collections::HashSet::new(),
-        reniced_pids: std::collections::HashMap::new(),
-        cooled_since: std::collections::HashMap::new(),
-    };
+    let mut state = GuardRuntimeState::default();
     let key = "test-key";
     assert!(
         should_notify(&mut state, key, 60),
@@ -300,15 +292,7 @@ async fn docker_prune_returns_zero_on_dry_run() {
 
 #[tokio::test]
 async fn guard_report_completes_for_ok_disk() {
-    let mut state = GuardRuntimeState {
-        heavy_since: std::collections::HashMap::new(),
-        notify_cooldowns: std::collections::HashMap::new(),
-        last_disk_state: "ok".to_string(),
-        disk_history: Vec::new(),
-        active_build_pids: std::collections::HashSet::new(),
-        reniced_pids: std::collections::HashMap::new(),
-        cooled_since: std::collections::HashMap::new(),
-    };
+    let mut state = GuardRuntimeState::default();
     let guard = GuardPolicy {
         disk_warn_percent: 70,
         disk_action_percent: 85,

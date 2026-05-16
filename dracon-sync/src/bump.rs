@@ -152,9 +152,8 @@ pub(crate) fn extract_version_from_cargo(content: &str) -> Option<String> {
 
 pub(crate) fn extract_version_from_json(content: &str, key: &str) -> Option<String> {
     let needle = format!("\"{}\"", key);
-    let start = 0usize;
-    if let Some(idx) = content[start..].find(&needle) {
-        let key_pos = start + idx;
+    if let Some(idx) = content.find(&needle) {
+        let key_pos = idx;
         let after_key = key_pos + needle.len();
         let rest = &content[after_key..];
         let colon_rel = rest.find(':')?;

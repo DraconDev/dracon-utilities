@@ -2554,49 +2554,6 @@ auto_bump_versions = false
         assert!(staged_str.trim().is_empty(), "nothing should be staged for filter-only repo");
     }
 
-    // ── Stale focus detection tests ──
-
-    #[test]
-    fn test_stale_focus_detection() {
-        // Helper: mirrors the stale focus logic in build_commit_context
-        fn focus_is_stale(focus: &str, recent_subjects: &[&str]) -> bool {
-            let focus_matches = recent_subjects.iter().filter(|subj| {
-                let subj_body = subj.splitn(2, ": ").nth(1).unwrap_or(subj);
-                if focus.len() > subj_body.len() {
-                    let truncated = &focus[..subj_body.len().min(focus.len())];
-                    subj_body.starts_with(truncated)
-                } else {
-                    subj_body.contains(focus)
-                }
-            }).count();
-            focus_matches >= 3
-        }
-
-        // Empty history — not stale
-        assert!(!focus_is_stale("add auth", &[]));
-
-        // 1 match out of 5 — not stale
-        assert!(!focus_is_stale("add auth", &["feat: add auth", "fix: bug", "chore: cleanup", "docs: readme", "test: unit"]));
-
-        // 2 matches — not stale (below threshold of 3)
-        assert!(!focus_is_stale("add auth", &["feat: add auth", "chore: sync metadata", "feat: add auth", "fix: bug", "docs: readme"]));
-
-        // 3 matches — stale (at threshold)
-        assert!(focus_is_stale("add auth", &["feat: add auth", "chore: sync metadata", "feat: add auth", "fix: bug", "feat: add auth"]));
-
-        // 5 matches — very stale
-        assert!(focus_is_stale("add auth", &["feat: add auth", "feat: add auth", "feat: add auth", "feat: add auth", "feat: add auth"]));
-
-        // Alternating A/B/A/B/A pattern — A appears 3 times → stale
-        assert!(focus_is_stale("add auth", &["feat: add auth", "chore: sync metadata", "feat: add auth", "chore: sync metadata", "feat: add auth"]));
-
-        // Different focus — not stale
-        assert!(!focus_is_stale("fix bug", &["feat: add auth", "feat: add auth", "feat: add auth", "feat: add auth", "feat: add auth"]));
-
-        // Conventional commit prefix stripped: focus "add auth" matches subject "feat: add auth"
-        assert!(focus_is_stale("add auth", &["feat: add auth", "fix: add auth", "chore: add auth", "docs: other", "test: other"]));
-    }
-
     #[tokio::test]
     async fn test_sync_repo_with_duplicate_subjects_succeeds() {
         let tmp = tempfile::tempdir().unwrap();
