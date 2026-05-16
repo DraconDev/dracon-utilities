@@ -7,6 +7,7 @@ mod secrets;
 mod simple_ai;
 mod visibility;
 mod release;
+mod nix;
 mod scribe;
 mod report;
 mod daemon;

@@ -6,8 +6,29 @@
 use std::path::Path;
 use std::process::Command;
 
+use anyhow::{Context, Result};
 use crate::release::ReleaseStep;
 use crate::git::git_ssh_hardening;
+
+#[derive(Debug)]
+pub enum NixError {
+    Io(std::io::Error),
+    Git(String),
+    Gh(String),
+}
+impl std::fmt::Display for NixError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            NixError::Io(e) => write!(f, "IO error: {}", e),
+            NixError::Git(s) => write!(f, "git error: {}", s),
+            NixError::Gh(s) => write!(f, "gh error: {}", s),
+        }
+    }
+}
+impl std::error::Error for NixError {}
+impl From<std::io::Error> for NixError {
+    fn from(e: std::io::Error) -> Self { NixError::Io(e) }
+}
 
 const FLAKE_NIX: &str = "flake.nix";
 
