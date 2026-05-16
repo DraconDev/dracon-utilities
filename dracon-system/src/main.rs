@@ -952,8 +952,8 @@ pub(crate) struct GuardRuntimeState {
     pub(crate) disk_history: Vec<(Instant, u8)>,
     /// Active cargo build PIDs detected
     pub(crate) active_build_pids: HashSet<i32>,
-    /// Currently reniced PIDs and their applied nice value
-    pub(crate) reniced_pids: HashMap<i32, i32>,
+    /// Currently reniced PIDs: (nice_value, original_command) for PID identity verification
+    pub(crate) reniced_pids: HashMap<i32, (i32, String)>,
     /// When a previously-heavy process stopped being heavy (for un-renice recovery)
     pub(crate) cooled_since: HashMap<i32, Instant>,
 }
@@ -2358,11 +2358,11 @@ async fn check_heavy_processes(
         let mut nice_applied = 0;
 
         if guard.auto_renice {
-            let already_niced = state.reniced_pids.get(&p.pid).copied();
+            let already_niced = state.reniced_pids.get(&p.pid).map(|(n, _)| *n);
             let nice_val = graduated_nice_value(p.cpu_percent, p.rss_mb, guard.renice_value);
             if already_niced != Some(nice_val) {
                 renice_process(p.pid, nice_val).await;
-                state.reniced_pids.insert(p.pid, nice_val);
+                state.reniced_pids.insert(p.pid, (nice_val, p.command.clone()));
                 eprintln!(
                     "🔧 renice pid={} cmd={} -> nice {} (cpu={:.1}% rss={}MiB)",
                     p.pid, p.command, nice_val, p.cpu_percent, p.rss_mb

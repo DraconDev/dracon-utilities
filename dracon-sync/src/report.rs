@@ -288,10 +288,7 @@ pub(crate) fn build_commit_context(
 }
 
 fn parse_conventional_commit(subject: &str) -> (Option<String>, Option<String>, Option<String>) {
-    let valid_categories = [
-        "feat", "fix", "refactor", "docs", "test", "chore", "perf",
-        "security", "build", "ci", "style", "revert",
-    ];
+    let valid_categories = crate::bump::CONVENTIONAL_COMMIT_TYPES;
 
     if let Some(paren_start) = subject.find('(') {
         if let Some(paren_end) = subject[paren_start..].find(')') {

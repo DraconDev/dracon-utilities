@@ -5,7 +5,7 @@
 
 [guard]
 # Enable the guard daemon
-guard_enabled = true
+enabled = true
 
 # Disk usage thresholds (percent)
 # Lower values = more aggressive early cleaning
