@@ -2781,7 +2781,7 @@ async fn cmd_storage(
 
         let mut total = 0u64;
         let mut actionable = Vec::new();
-        for item in selected {
+        for item in &selected {
             let tracked = is_git_tracked_dir(&item.path).await.unwrap_or(true);
             if tracked && !cfg.allow_tracked {
                 table.add_row(vec![
@@ -2804,8 +2804,7 @@ async fn cmd_storage(
         }
 
         println!();
-        let selected_count = selected.len();
-        println!("Selected {selected_count} paths:");
+        println!("Selected {} paths:", selected.len());
         println!("{table}");
         println!("Estimated reclaimed: {}", human_bytes(total));
 
