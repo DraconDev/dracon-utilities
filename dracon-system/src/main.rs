@@ -3275,7 +3275,7 @@ async fn cmd_guard_daemon(guard: &mut GuardPolicy) -> Result<()> {
                                     .file_name()
                                     .map(|n| n.to_string_lossy().to_string())
                                     .unwrap_or_default();
-                                exe_name == orig_cmd
+exe_name == orig_cmd.as_str()
                             }
                             Err(_) => false,
                         };
