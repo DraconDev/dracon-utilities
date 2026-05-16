@@ -19,11 +19,11 @@ pub(crate) struct SystemPolicy {
 #[derive(Debug, Clone, Deserialize)]
 pub(crate) struct StoragePolicy {
     #[serde(default)]
-    default_root: String,
+    pub(crate) default_root: String,
     #[serde(default = "default_min_size_mb")]
-    min_size_mb: u64,
+    pub(crate) min_size_mb: u64,
     #[serde(default = "default_kinds")]
-    kinds: String,
+    pub(crate) kinds: String,
 }
 
 impl Default for StoragePolicy {
@@ -51,13 +51,13 @@ pub(crate) struct LinkEntry {
 #[derive(Debug, Clone, Deserialize)]
 pub(crate) struct GuardPolicy {
     #[serde(default = "default_enabled")]
-    enabled: bool,
+    pub(crate) enabled: bool,
     #[serde(default = "default_disk_mount_path")]
     pub(crate) disk_mount_path: String,
     #[serde(default = "default_guard_interval_secs")]
-    interval_secs: u64,
+    pub(crate) interval_secs: u64,
     #[serde(default = "default_disk_early_warn_percent")]
-    disk_early_warn_percent: u8,
+    pub(crate) disk_early_warn_percent: u8,
     #[serde(default = "default_disk_warn_percent")]
     pub(crate) disk_warn_percent: u8,
     #[serde(default = "default_disk_action_percent")]
@@ -67,9 +67,9 @@ pub(crate) struct GuardPolicy {
     #[serde(default = "default_true")]
     pub(crate) freeze_sync_at_action: bool,
     #[serde(default = "default_sync_freeze_marker")]
-    sync_freeze_marker: String,
+    pub(crate) sync_freeze_marker: String,
     #[serde(default = "default_unfreeze_below_percent")]
-    unfreeze_below_percent: u8,
+    pub(crate) unfreeze_below_percent: u8,
     #[serde(default = "default_process_cpu_percent")]
     pub(crate) process_cpu_percent: f32,
     #[serde(default = "default_process_rss_mb")]
@@ -107,25 +107,25 @@ pub(crate) struct GuardPolicy {
     #[serde(default = "default_true")]
     pub(crate) track_trends: bool,
     #[serde(default = "default_trend_warn_hours")]
-    trend_warn_hours: u64,
+    pub(crate) trend_warn_hours: u64,
     #[serde(default = "default_true")]
     pub(crate) monitor_inodes: bool,
     #[serde(default = "default_inode_warn_percent")]
-    inode_warn_percent: u8,
+    pub(crate) inode_warn_percent: u8,
     #[serde(default = "default_true")]
     pub(crate) monitor_zombies: bool,
     #[serde(default = "default_zombie_threshold")]
-    zombie_threshold: u64,
+    pub(crate) zombie_threshold: u64,
     #[serde(default = "default_true")]
     pub(crate) monitor_logs: bool,
     #[serde(default = "default_log_size_mb")]
-    log_size_mb: u64,
+    pub(crate) log_size_mb: u64,
     #[serde(default = "default_log_dirs")]
-    log_dirs: String,
+    pub(crate) log_dirs: String,
     #[serde(default)]
     pub(crate) auto_truncate_logs: bool,
     #[serde(default = "default_log_max_truncate_mb")]
-    log_max_truncate_mb: u64,
+    pub(crate) log_max_truncate_mb: u64,
     #[serde(default)]
     pub(crate) log_preserve_header_lines: usize,
     #[serde(default = "default_true")]
