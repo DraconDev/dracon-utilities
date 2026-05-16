@@ -84,7 +84,8 @@ mod tests {
         let template_dir = dir.path().join("templates");
         std::fs::create_dir(&template_dir).unwrap();
         std::fs::write(template_dir.join("LICENSE"), "AGPL").unwrap();
-        let sync_dir = dir.path().join("sync.toml").parent().unwrap();
+        let sync_path = dir.path().join("sync.toml");
+        let sync_dir = sync_path.parent().unwrap();
 
         let policy = make_policy(vec![StandardFileConfig {
             source: "templates/LICENSE".to_string(),
@@ -108,7 +109,8 @@ mod tests {
         std::fs::create_dir(&template_dir).unwrap();
         std::fs::write(template_dir.join("LICENSE"), "AGPL").unwrap();
         std::fs::write(repo_dir.join("LICENSE"), "EXISTING").unwrap();
-        let sync_dir = dir.path().join("sync.toml").parent().unwrap();
+        let sync_path = dir.path().join("sync.toml");
+        let sync_dir = sync_path.parent().unwrap();
 
         let policy = make_policy(vec![StandardFileConfig {
             source: "templates/LICENSE".to_string(),
@@ -194,8 +196,9 @@ mod tests {
         let repo_dir = dir.path();
         let template_dir = dir.path().join("templates");
         std::fs::create_dir(&template_dir).unwrap();
-        std::fs::write(template_dir.join("LICENSE"), "AGPLv3").unwrap();
-        let sync_dir = dir.path().join("sync.toml").parent().unwrap();
+std::fs::write(template_dir.join("LICENSE"), "AGPLv3").unwrap();
+        let sync_path = dir.path().join("sync.toml");
+        let sync_dir = sync_path.parent().unwrap();
 
         let policy = make_policy(vec![StandardFileConfig {
             source: "templates/LICENSE".to_string(),

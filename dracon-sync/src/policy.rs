@@ -305,7 +305,7 @@ pub(crate) fn timestamp_secs() -> u64 {
         .unwrap_or(0)
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Default, Deserialize, Clone)]
 pub(crate) struct SyncPolicy {
     #[serde(default)]
     pub(crate) system_repo: String,
