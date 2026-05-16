@@ -189,6 +189,32 @@ mod daemon_tests {
     }
 
     #[test]
+    fn test_skips_nonexistent_repo() {
+        // If a repo is deleted between discovery and processing, the daemon
+        // should skip it gracefully rather than panicking or erroring.
+        use crate::policy::SyncPolicy;
+        use crate::git::discover_git_repos;
+
+        let policy = SyncPolicy::default();
+        let excluded = crate::exclude::excluded_dir_names_set(&policy);
+
+        // Nonexistent repo should not be discovered
+        let repos = discover_git_repos(
+            &[PathBuf::from("/nonexistent/path")],
+            &excluded,
+            &[],
+            None,
+        );
+        assert!(repos.is_empty(), "should not discover nonexistent paths");
+    }
+
+    #[test]
+    fn test_is_repo_ready_nonexistent_path() {
+        // is_repo_ready should return false for a repo path that doesn't exist
+        assert!(!is_repo_ready(Path::new("/nonexistent/repo")));
+    }
+
+    #[test]
     fn test_policy_clone_at_repo_iteration() {
         // Verifies that a cloned SyncPolicy is an independent snapshot:
         // each repo iteration should clone the policy to avoid race conditions
