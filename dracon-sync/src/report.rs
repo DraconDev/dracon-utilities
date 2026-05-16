@@ -679,7 +679,13 @@ pub(crate) async fn run_repos_report(
 
     if let Some(pattern) = filter_name {
         let pat = pattern.to_lowercase();
-        rows.retain(|r| r.repo.to_lowercase().contains(&pat));
+        rows.retain(|r| {
+            let name = std::path::Path::new(&r.repo)
+                .file_name()
+                .map(|n| n.to_string_lossy().to_lowercase())
+                .unwrap_or_default();
+            name.contains(&pat)
+        });
     }
 
     let concern_count = rows.iter().filter(|r| r.concern).count();
