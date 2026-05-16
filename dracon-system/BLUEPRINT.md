@@ -106,6 +106,11 @@ trend_warn_hours = 24
 - Delegates to `dracon-system-lib::analyze_workspace_storage`
 - Cleanup respects `--allow-tracked` flag to avoid deleting git-tracked directories
 
+### Module Decomposition
+- Policy structs (`SystemPolicy`, `StoragePolicy`, `LinkPolicy`, `GuardPolicy`, `LinkEntry`) and default value functions extracted into `src/policy.rs`
+- This reduces the monolithic `main.rs` from ~3900 lines and improves testability
+- Main.rs re-exports everything via `mod policy; pub(crate) use policy::*;` for backward compatibility
+
 ---
 
 ## Remaining Low Priority
