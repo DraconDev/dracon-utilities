@@ -65,6 +65,15 @@ enum Command {
         /// Emit machine-readable JSON.
         #[arg(long)]
         json: bool,
+        /// Sort repos by field: updated, name, modified, ahead, behind.
+        #[arg(long, default_value = "updated")]
+        sort: String,
+        /// Filter repos by name (substring match).
+        #[arg(long)]
+        filter: Option<String>,
+        /// Show full repo paths instead of short names.
+        #[arg(long)]
+        full_path: bool,
     },
     /// Repair concern repos (dry-run by default; use --apply to execute).
     RepairConcerns {
@@ -386,6 +395,9 @@ async fn main() -> Result<()> {
             only_concern,
             only_warn,
             json,
+            sort,
+            filter: filter_name,
+            full_path,
         } => {
             let filter = if only_concern {
                 RepoFilter::Concern
@@ -394,7 +406,7 @@ async fn main() -> Result<()> {
             } else {
                 RepoFilter::All
             };
-            run_repos_report(&policy_path, filter, json).await?;
+            run_repos_report(&policy_path, filter, json, &sort, filter_name.as_deref(), full_path).await?;
         }
         Command::RepairConcerns {
             apply,

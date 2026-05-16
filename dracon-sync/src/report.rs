@@ -532,6 +532,9 @@ pub(crate) async fn run_repos_report(
     policy_path: &Path,
     filter: RepoFilter,
     json: bool,
+    sort: &str,
+    filter_name: Option<&str>,
+    full_path: bool,
 ) -> Result<()> {
     let policy = SyncPolicy::load(policy_path)?;
     let roots = policy.watch_root_paths();
