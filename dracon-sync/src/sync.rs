@@ -729,15 +729,18 @@ async fn run_release_pipeline_if_bumped(
         let repo_auto_tag = repo_override.auto_tag.unwrap_or(policy.auto_tag);
         let repo_auto_release = repo_override.auto_release.unwrap_or(policy.auto_release);
         let repo_publish_targets = repo_override.auto_publish;
+        let repo_nix_auto_update = repo_override.nix_auto_update.unwrap_or(policy.nix_auto_update);
         let steps = crate::release::run_release_pipeline(
             repo, &old_ver, &new_ver, level.as_str(), policy,
             repo_auto_tag, repo_auto_release, &repo_publish_targets,
+            repo_nix_auto_update,
         ).await;
         for step in &steps {
             match step {
                 crate::release::ReleaseStep::TagCreated(tag) => eprintln!("🏷️  {tag}"),
                 crate::release::ReleaseStep::GitHubReleaseCreated(tag) => eprintln!("🚀 {tag}"),
                 crate::release::ReleaseStep::Published { registry, version } => eprintln!("📦 published to {registry} v{version}"),
+                crate::release::ReleaseStep::NixFlakePRCreated(url) => eprintln!("📄 flake PR created: {url}"),
                 crate::release::ReleaseStep::Skipped(reason) => { if debug_enabled() { eprintln!("🐛 release skipped: {reason}"); } }
                 crate::release::ReleaseStep::Failed { step: s, error } => eprintln!("⚠️ release failed: {s} — {error}"),
             }
