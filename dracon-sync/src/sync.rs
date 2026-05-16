@@ -2625,9 +2625,8 @@ auto_bump_versions = false
 
     #[test]
     fn test_conventional_prefix_detects_scoped_and_bare() {
-        let conventional_types = ["feat","fix","refactor","chore","docs","perf","style","test","build","ci"];
         let has_prefix = |s: &str| -> bool {
-            conventional_types.iter().any(|t| s.starts_with(&format!("{}:", t)) || s.starts_with(&format!("{}(", t)))
+            crate::bump::CONVENTIONAL_COMMIT_TYPES.iter().any(|t| s.starts_with(&format!("{}:", t)) || s.starts_with(&format!("{}(", t)))
         };
 
         // bare prefixes
@@ -2638,6 +2637,12 @@ auto_bump_versions = false
         assert!(has_prefix("fix(modals): add input shield"));
         assert!(has_prefix("feat(ui): add button"));
         assert!(has_prefix("refactor(sync): detect full set"));
+
+        // revert and security — were missing from the list
+        assert!(has_prefix("revert: undo auth change"));
+        assert!(has_prefix("security: fix XSS vulnerability"));
+        assert!(has_prefix("revert(auth): undo token change"));
+        assert!(has_prefix("security(crypto): fix padding oracle"));
 
         // not conventional
         assert!(!has_prefix("add input shield"));
