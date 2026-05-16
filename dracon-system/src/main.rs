@@ -3261,13 +3261,14 @@ async fn cmd_guard_once(guard: &GuardPolicy, json: bool) -> Result<()> {
         println!("alerts: {}", report.alerts.len());
         for a in report.alerts {
             println!(
-                "- pid={} cmd={} cpu={:.1}% rss={}MiB sustained={}s action={}",
+                "- pid={} cmd={} cpu={:.1}% rss={}MiB sustained={}s action={} nice={}",
                 a.pid,
                 a.command,
                 a.cpu_percent,
                 a.rss_mb,
                 a.sustained_secs,
-                a.action
+                a.action,
+                a.nice_value
             );
         }
     }
@@ -3352,6 +3353,8 @@ async fn cmd_guard_daemon(guard: &mut GuardPolicy) -> Result<()> {
                     *guard = new_policy.guard;
                     normalize_guard_policy(guard);
                     runtime.heavy_since.clear();
+                    runtime.reniced_pids.clear();
+                    runtime.cooled_since.clear();
                     veprintln!(2, "system: policy reloaded on SIGHUP (disk_warn={}%, disk_critical={}%)",
                         guard.disk_warn_percent, guard.disk_critical_percent);
                 }
