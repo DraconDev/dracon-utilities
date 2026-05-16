@@ -64,6 +64,33 @@ fn dracon_event_via_new_constructor() {
 fn emit_event_does_not_panic() {
     use crate::{DraconEvent, EventSeverity};
     let event = DraconEvent::new("test", EventSeverity::Info, "/tmp", "test event");
-    // Should not panic — just records the event
     crate::emit_event(&event);
+}
+
+#[test]
+fn shorten_event_time_relative() {
+    use crate::shorten_event_time;
+    let now = chrono::Utc::now();
+    let ts_30s = (now - chrono::Duration::seconds(30)).to_rfc3339();
+    assert_eq!(shorten_event_time(&ts_30s), "30s");
+
+    let ts_5m = (now - chrono::Duration::minutes(5)).to_rfc3339();
+    assert_eq!(shorten_event_time(&ts_5m), "5m");
+
+    let ts_2h = (now - chrono::Duration::hours(2)).to_rfc3339();
+    assert_eq!(shorten_event_time(&ts_2h), "2h");
+
+    let ts_3d = (now - chrono::Duration::days(3)).to_rfc3339();
+    assert_eq!(shorten_event_time(&ts_3d), "3d");
+
+    let ts_60d = (now - chrono::Duration::days(60)).to_rfc3339();
+    assert_eq!(shorten_event_time(&ts_60d), "2mo");
+}
+
+#[test]
+fn shorten_event_time_non_rfc3339() {
+    use crate::shorten_event_time;
+    assert_eq!(shorten_event_time("not-a-date"), "not-a-date");
+    let truncated = "2026-05-15T17:22:57";
+    assert_eq!(shorten_event_time(truncated), "2026-05-15T17:22:57");
 }
