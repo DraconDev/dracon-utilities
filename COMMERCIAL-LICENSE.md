@@ -42,19 +42,11 @@ Subject to the terms and payment obligations in this agreement, Licensor grants 
 
 ---
 
-## 3. Pricing Tiers
+## 3. Pricing
 
-| Tier | Employees | Annual License Fee |
-|------|:----------|:-------------------|
-| **Indie** | 0–9 | Free (no purchase needed) |
-| **Startup** | 10–99 | $500/yr |
-| **Growth** | 100–999 | $5,000/yr |
-| **Scale** | 1,000–9,999 | $25,000/yr |
-| **Global** | 10,000+ | $100,000/yr |
+Organizations with fewer than 10 employees may use Dracon Software under AGPLv3 at no cost — no Commercial License is needed.
 
-- Licenses are annual and recurring. Renewal is required to maintain active status.
-- Licenses are priced per Organization, not per seat.
-- Azumi and Tiles are covered by one company license. Hosted services (Dracon Platform) are separate.
+Organizations with 10 or more employees require a Commercial License for any Production Use of Dracon Software that does not comply with AGPLv3's source disclosure requirements. Pricing is based on Organization size and is set annually.
 
 For current pricing and online purchasing, visit **https://dracon.uk/licensing**.
 For pricing inquiries: **license@dracon.uk**
@@ -63,7 +55,7 @@ For pricing inquiries: **license@dracon.uk**
 
 ## 4. Production Use Definition
 
-Organizations with 10 or more employees require a Commercial License for any **Production Use** of Dracon Software. Organizations with fewer than 10 employees may use Dracon Software under AGPLv3 at no cost.
+Organizations with 10 or more employees require a Commercial License for any **Production Use** of Dracon Software (see Section 3 — Pricing). Organizations with fewer than 10 employees may use Dracon Software under AGPLv3 at no cost, regardless of use case.
 
 **Production Use includes:**
 - Running Dracon Software in a live environment that serves end users or external clients
