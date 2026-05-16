@@ -287,6 +287,33 @@ pub(crate) fn is_cherry_pick_in_progress(repo: &Path) -> bool {
     repo.join(".git").join("CHERRY_PICK_HEAD").exists()
 }
 
+pub(crate) fn is_repo_ready(repo: &Path) -> bool {
+    let head = repo.join(".git").join("HEAD");
+    if !head.exists() {
+        return false;
+    }
+    if let Ok(content) = std::fs::read_to_string(&head) {
+        if content.trim().is_empty() {
+            return false;
+        }
+    } else {
+        return false;
+    }
+    let git_bin = std::env::var("DRACON_SYNC_GIT_BIN").unwrap_or_else(|_| "git".to_string());
+    let output = std::process::Command::new(&git_bin)
+        .args(["ls-files"])
+        .current_dir(repo)
+        .output()
+        .ok();
+    match output {
+        Some(o) => {
+            let count = String::from_utf8_lossy(&o.stdout).lines().filter(|l| !l.is_empty()).count();
+            count > 0
+        }
+        None => false,
+    }
+}
+
 pub(crate) async fn kill_descendants(pid: u32) {
     let pid_s = pid.to_string();
 
