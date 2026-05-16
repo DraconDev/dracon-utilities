@@ -24,7 +24,6 @@ mod policy;
 pub(crate) use policy::*;
 
 mod events_tests;
-#[cfg(test)]
 mod guard_tests;
 mod links_tests;
 
