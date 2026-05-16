@@ -564,12 +564,6 @@ pub(crate) struct GuardPolicy {
     renice_value: i32,
     #[serde(default = "default_release_after_secs")]
     release_after_secs: u64,
-    /// Automatically kill runaway git processes (git-init, git-fetch, etc.) after sustain period
-    #[serde(default)]
-    auto_kill_git: bool,
-    /// Seconds a git process must sustain high CPU before auto-kill (if auto_kill_git is enabled)
-    #[serde(default = "default_git_kill_threshold_secs")]
-    git_kill_threshold_secs: u64,
     /// Path to persistent guard log file (JSONL format). Empty string disables file logging.
     #[serde(default = "default_guard_log_file")]
     guard_log_file: String,
@@ -678,8 +672,6 @@ impl Default for GuardPolicy {
             auto_renice: false,
             renice_value: default_renice_value(),
             release_after_secs: default_release_after_secs(),
-            auto_kill_git: false,
-            git_kill_threshold_secs: default_git_kill_threshold_secs(),
             guard_log_file: default_guard_log_file(),
             guard_log_max_mb: default_guard_log_max_mb(),
             auto_cleanup_rust: default_auto_cleanup_rust(),
