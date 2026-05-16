@@ -211,11 +211,24 @@ The guard monitors processes using >`process_cpu_percent`% CPU for >`process_sus
 - Auto-rotates when it exceeds `guard_log_max_mb`
 - JSONL format: `{"ts":1234567890,"event":"heavy-brief","details":"pid=123 ppid=1 cmd=git args=git init cpu=61.7% ..."}`
 
-**Auto-kill runaway git processes:**
+**Graduated auto-renice:**
+When `auto_renice = true`, heavy processes are reniced with a graduated nice value based on severity. Higher CPU/memory usage = higher nice value (lower priority). The process still gets full CPU when nothing else needs it — it just yields to the DE and other interactive processes.
+
+| CPU usage | Nice value | Effect |
+|-----------|-----------|--------|
+| >= 180% | 5 | Gentle deprio |
+| >= 300% | 10 | Moderate deprio |
+| >= 500% | 15 | Strong deprio |
+| RSS >= 4GB | 5 | Memory hog deprio |
+| RSS >= 8GB | 10 | Heavy memory deprio |
+
+When a process is no longer heavy for `release_after_secs` (default 120s), it is un-reniced back to nice 0.
+
 ```toml
 [guard]
-auto_kill_git = false           # Enable to auto-kill git processes
-git_kill_threshold_secs = 60    # Kill after 60s of high CPU
+auto_renice = true
+renice_value = 5                    # Base nice value (used if no tier matches higher)
+release_after_secs = 120             # Un-renice after 2 min of being non-heavy
 ```
 
 When enabled, git processes (init, fetch, pull, clone, push) that sustain high CPU for the configured duration receive SIGTERM. Before sending SIGKILL, the guard verifies the PID still belongs to the same git process via `/proc/{pid}/cmdline` to prevent killing a recycled PID. Disabled by default for safety.
