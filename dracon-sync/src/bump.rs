@@ -234,11 +234,12 @@ Respond with ONLY ONE WORD."##
 }
 
 pub fn apply_version_bump_to_repo(repo: &Path, old_ver: &str, new_ver: &str) -> bool {
+    let mut changed = false;
     if repo.join("Cargo.toml").exists() {
         if let Ok(content) = std::fs::read_to_string(repo.join("Cargo.toml")) {
             let bumped = bump_version_in_cargo_toml(&content, old_ver, new_ver);
             if bumped != content && std::fs::write(repo.join("Cargo.toml"), bumped).is_ok() {
-                return true;
+                changed = true;
             }
         }
     }
@@ -246,16 +247,23 @@ pub fn apply_version_bump_to_repo(repo: &Path, old_ver: &str, new_ver: &str) -> 
         if let Ok(content) = std::fs::read_to_string(repo.join("package.json")) {
             let bumped = bump_version_in_json(&content, old_ver, new_ver);
             if bumped != content && std::fs::write(repo.join("package.json"), bumped).is_ok() {
-                return true;
+                changed = true;
             }
         }
     }
     if repo.join("VERSION").exists()
         && std::fs::write(repo.join("VERSION"), format!("{}\n", new_ver)).is_ok()
     {
-        return true;
+        changed = true;
     }
-    false
+    // Keep flake.nix in sync with version bumps so the flake version
+    // is updated in the same commit as Cargo.toml — no separate PR needed.
+    if repo.join("flake.nix").is_file() {
+        if let Ok(true) = crate::nix::update_flake_version(repo, new_ver) {
+            changed = true;
+        }
+    }
+    changed
 }
 
 fn bump_version_in_cargo_toml(content: &str, old_ver: &str, new_ver: &str) -> String {
