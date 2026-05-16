@@ -4,7 +4,78 @@ use std::path::{Path, PathBuf};
 use std::process::Command as StdCommand;
 use tokio::process::Command as TokioCommand;
 
-pub(crate) const DEFAULT_GIT_HOST_BLOB_LIMIT_BYTES: u64 = 100 * 1024 * 1024;
+#[derive(Debug, Clone, Deserialize)]
+pub(crate) struct StandardFileConfig {
+    pub(crate) source: String,
+    pub(crate) target: String,
+    #[serde(default)]
+    pub(crate) overwrite: bool,
+}
+
+impl StandardFileConfig {
+    pub(crate) fn source_path(&self, base_dir: &Path) -> PathBuf {
+        let expanded = expand_tilde(&self.source);
+        if expanded.is_absolute() {
+            expanded
+        } else {
+            base_dir.join(&expanded)
+        }
+    }
+}
+
+fn expand_tilde(path: &str) -> PathBuf {
+    if let Some(rest) = path.strip_prefix('~') {
+        dirs::home_dir()
+            .map(|h| h.join(rest))
+            .unwrap_or_else(|| PathBuf::from(path))
+    } else {
+        PathBuf::from(path)
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+pub(crate) enum StandardFilesEntry {
+    Short(String),
+    Full(StandardFileConfig),
+}
+
+impl From<String> for StandardFileConfig {
+    fn from(name: String) -> Self {
+        StandardFileConfig {
+            source: format!("templates/{}", name),
+            target: name,
+            overwrite: false,
+        }
+    }
+}
+
+impl From<StandardFileConfig> for StandardFileConfig {
+    fn from(cfg: StandardFileConfig) -> Self {
+        cfg
+    }
+}
+
+fn deserialize_standard_files<'de, D>(deserializer: D) -> Result<Vec<StandardFileConfig>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let raw: Vec<StandardFilesEntry> = Deserialize::deserialize(deserializer)?;
+    Ok(raw.into_iter().map(|e| e.into_full()).collect())
+}
+
+pub(crate) trait IntoStandardFileConfig {
+    fn into_full(self) -> StandardFileConfig;
+}
+
+impl IntoStandardFileConfig for StandardFilesEntry {
+    fn into_full(self) -> StandardFileConfig {
+        match self {
+            StandardFilesEntry::Short(name) => name.into(),
+            StandardFilesEntry::Full(cfg) => cfg,
+        }
+    }
+}
 
 #[derive(Debug, Clone, Deserialize)]
 #[allow(dead_code)]
