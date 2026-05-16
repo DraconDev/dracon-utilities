@@ -24,6 +24,8 @@ pub(crate) enum ReleaseStep {
     GitHubReleaseCreated(String),
     /// Package was published to a registry.
     Published { registry: String, version: String },
+    /// Nix flake PR was created.
+    NixFlakePRCreated(String),
     /// Step was skipped (already exists, disabled, etc.).
     Skipped(String),
     /// Step failed but did not block the pipeline.
