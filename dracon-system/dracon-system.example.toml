@@ -82,6 +82,7 @@ log_size_mb = 100
 log_dirs = "/var/log,~/.local/share/opencode/log"
 auto_truncate_logs = false
 log_max_truncate_mb = 50
+log_preserve_header_lines = 0   # Lines to preserve when truncating logs
 
 # Docker cleanup
 docker_prune = true
