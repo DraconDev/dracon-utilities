@@ -19,15 +19,15 @@ RestartPreventExitStatus=2 78
 # Group=dracon-guard
 
 # Resource limits
-MemoryMax=100M
-CPUQuota=10%
-TasksMax=32
+MemoryMax=250M
+CPUQuota=20%
+TasksMax=64
 
 # Security hardening
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=read-only
-ReadWritePaths=%h/.dracon %h/Dev %h/.local/state/dracon
+ReadWritePaths=%h/.dracon %h/Dev %h/.local/state/dracon %h/.local/share/Trash %h/.cargo %h/.cache %h/.npm
 PrivateTmp=true
 
 [Install]

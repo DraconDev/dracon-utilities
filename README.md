@@ -261,9 +261,10 @@ disk_critical_percent = 95
 process_cpu_percent = 50.0      # Alert if CPU > 50%
 process_sustain_secs = 30       # For at least 30 seconds
 
-# Auto-kill runaway git processes (disabled by default)
-auto_kill_git = false
-git_kill_threshold_secs = 60
+# Auto-renice heavy processes (graduated: higher CPU/memory = higher nice value)
+auto_renice = true
+renice_value = 5
+release_after_secs = 120
 
 # Notifications
 notify = true
@@ -381,8 +382,9 @@ disk_warn_percent = 70
 disk_action_percent = 80
 disk_critical_percent = 90
 process_cpu_percent = 30.0
-auto_kill_git = true
-git_kill_threshold_secs = 30
+auto_renice = true
+renice_value = 5
+release_after_secs = 120
 auto_cleanup_rust = true
 ```
 
