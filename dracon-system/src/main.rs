@@ -2805,6 +2805,7 @@ async fn cmd_storage(
 
         println!();
         let selected_count = selected.len();
+        println!("Selected {selected_count} paths:");
         println!("{table}");
         println!("Estimated reclaimed: {}", human_bytes(total));
 
