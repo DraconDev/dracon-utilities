@@ -38,7 +38,11 @@
 
         # Shared native build inputs for crates that need C libraries
         nativeBuildDeps = [ pkgs.pkg-config ];
-        buildDeps = [ pkgs.openssl pkgs.libgit2 pkgs.libssh2 ];
+        buildDeps = [ pkgs.openssl pkgs.libssh2 ];
+        # NOTE: libgit2 is NOT included here — libgit2-sys 0.16.x bundles
+        # libgit2 1.7.x and nixpkgs ships 1.9.x, so we let it vendor its own.
+        # libssh2-sys also vendors by default; set LIBSSH2_NO_VENDOR=1 only
+        # if the nixpkgs version is compatible.
 
         # Common buildRustPackage arguments.
         # src points at the merged tree root; buildAndTestSubdir selects the crate.
@@ -54,9 +58,6 @@
           };
           nativeBuildInputs = nativeBuildDeps;
           buildInputs = buildDeps;
-          # Tell libgit2/libssh2 to use system libraries (not vendor)
-          LIBGIT2_NO_VENDOR = "1";
-          LIBSSH2_NO_VENDOR = "1";
         };
 
       in {
@@ -121,9 +122,6 @@
           ]);
 
           buildInputs = buildDeps;
-
-          LIBGIT2_NO_VENDOR = "1";
-          LIBSSH2_NO_VENDOR = "1";
 
           shellHook = ''
             echo "Dracon Utilities dev shell loaded"
