@@ -1616,50 +1616,6 @@ pub(crate) mod multi_remote {
                                 .await;
                                 if force_result.is_ok() {
                                     return Ok(());
-    #[test]
-    fn test_is_repo_ready_normal_repo() {
-        let _lock = acquire_path_lock();
-        let tmp = tempfile::TempDir::new().unwrap();
-        let repo = tmp.path();
-        test_git_cmd(repo, &["init"]);
-        test_git_cmd(repo, &["config", "user.email", "test@test.com"]);
-        test_git_cmd(repo, &["config", "user.name", "test"]);
-        std::fs::write(repo.join("hello.txt"), "hello").unwrap();
-        test_git_cmd(repo, &["add", "."]);
-        test_git_cmd(repo, &["commit", "-m", "initial"]);
-        assert!(is_repo_ready(repo), "normal repo with committed files should be ready");
-    }
-
-    #[test]
-    fn test_is_repo_ready_no_head() {
-        let tmp = tempfile::TempDir::new().unwrap();
-        let repo = tmp.path();
-        let git_dir = repo.join(".git");
-        std::fs::create_dir_all(&git_dir).unwrap();
-        assert!(!is_repo_ready(repo), "repo without .git/HEAD should not be ready");
-    }
-
-    #[test]
-    fn test_is_repo_ready_empty_head() {
-        let tmp = tempfile::TempDir::new().unwrap();
-        let repo = tmp.path();
-        let git_dir = repo.join(".git");
-        std::fs::create_dir_all(&git_dir).unwrap();
-        std::fs::write(git_dir.join("HEAD"), "").unwrap();
-        assert!(!is_repo_ready(repo), "repo with empty .git/HEAD should not be ready");
-    }
-
-    #[test]
-    fn test_is_repo_ready_no_tracked_files() {
-        let _lock = acquire_path_lock();
-        let tmp = tempfile::TempDir::new().unwrap();
-        let repo = tmp.path();
-        test_git_cmd(repo, &["init"]);
-        test_git_cmd(repo, &["config", "user.email", "test@test.com"]);
-        test_git_cmd(repo, &["config", "user.name", "test"]);
-        assert!(!is_repo_ready(repo), "repo with zero tracked files should not be ready");
-    }
-}
                             Ok(Divergence::Divergent) | Err(_) => {
                                 last_err = Some(e);
                             }
