@@ -19,6 +19,7 @@ use dracon_system_lib::analyze_workspace_storage;
 
 mod policy;
 pub(crate) use policy::*;
+mod guard_tests;
 
 const SYSTEM_PROTECTED: &[&str] = &[
     "/", "/home", "/etc", "/usr", "/var", "/boot", "/nix", "/run", "/sys", "/dev", "/proc",
