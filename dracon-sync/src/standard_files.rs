@@ -12,6 +12,8 @@ pub(crate) fn ensure_standard_files(
         return Ok(vec![]);
     }
 
+    eprintln!("DEBUG ensure_standard_files called for {}", repo.display());
+
     let sync_base = policy_base_dir
         .map(|p| p.to_path_buf())
         .or_else(|| dirs::home_dir().map(|h| h.join(".dracon/utilities/sync")));
@@ -20,20 +22,27 @@ pub(crate) fn ensure_standard_files(
         anyhow::bail!("cannot resolve standard files base dir: no policy path and no home dir");
     };
 
+    eprintln!("DEBUG sync_base = {}", base.display());
+
     let mut copied = Vec::new();
 
     for cfg in &policy.standard_files {
         if repo_override.skip_standard_files.contains(&cfg.target) {
+            eprintln!("DEBUG skipping {} (in skip list)", cfg.target);
             continue;
         }
 
         let target_path = repo.join(&cfg.target);
 
+        eprintln!("DEBUG checking target {} exists={}", target_path.display(), target_path.exists());
+
         if target_path.exists() && !cfg.overwrite {
+            eprintln!("DEBUG skipping {} (exists, overwrite=false)", cfg.target);
             continue;
         }
 
         let source_path = cfg.source_path(&base);
+        eprintln!("DEBUG source for {} = {}", cfg.target, source_path.display());
 
         if !source_path.exists() {
             eprintln!(
@@ -57,9 +66,11 @@ pub(crate) fn ensure_standard_files(
             )
         })?;
 
+        eprintln!("DEBUG copied {} -> {}", source_path.display(), target_path.display());
         copied.push(target_path);
     }
 
+    eprintln!("DEBUG ensure_standard_files returning {} files", copied.len());
     Ok(copied)
 }
 
