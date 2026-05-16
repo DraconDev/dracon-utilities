@@ -77,6 +77,30 @@ jobs:
           name: coverage-report
           path: coverage/
 
+  nix-build:
+    name: Nix Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v30
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+
+      - name: Check flake
+        run: nix flake check --no-build
+
+      - name: Build dracon-sync
+        run: nix build .#dracon-sync
+
+      - name: Build dracon-system
+        run: nix build .#dracon-system
+
+      - name: Build dracon-warden
+        run: nix build .#dracon-warden
+
   security-audit:
     name: Security Audit
     runs-on: ubuntu-latest
