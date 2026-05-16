@@ -263,6 +263,7 @@ fn bump_version_in_cargo_toml(content: &str, old_ver: &str, new_ver: &str) -> St
 
 fn bump_version_in_json(content: &str, old_ver: &str, new_ver: &str) -> String {
     content.replace(&format!("\"version\": \"{}\"", old_ver), &format!("\"version\": \"{}\"", new_ver))
+        .replace(&format!("\"version\":\"{}\"", old_ver), &format!("\"version\":\"{}\"", new_ver))
 }
 
 #[cfg(test)]
