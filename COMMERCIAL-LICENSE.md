@@ -63,7 +63,7 @@ For pricing inquiries: **license@dracon.uk**
 
 ## 4. Production Use Definition
 
-The Startup, Scale, and Enterprise tiers require a Commercial License for any **Production Use** of Dracon Software.
+Organizations with 10 or more employees require a Commercial License for any **Production Use** of Dracon Software. Organizations with fewer than 10 employees may use Dracon Software under AGPLv3 at no cost.
 
 **Production Use includes:**
 - Running Dracon Software in a live environment that serves end users or external clients
@@ -74,7 +74,7 @@ The Startup, Scale, and Enterprise tiers require a Commercial License for any **
 - Development and testing in non-production environments
 - Personal or academic use not connected to commercial activity
 - Evaluation of Dracon Software for potential purchase (up to 90 days)
-- Internal use that does not serve end users or generate revenue
+- Internal use that does not serve end users or generate revenue by organizations with fewer than 10 employees
 
 If You are unsure whether Your use qualifies as Production Use, contact **license@dracon.uk** before deploying.
 
