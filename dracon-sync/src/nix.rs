@@ -42,20 +42,30 @@ fn update_version_in_flake_nix(content: &str, new_version: &str) -> String {
         // Works for both "tiles = rustPlatform.buildRustPackage {" and
         // "packages.x86_64-linux.default = pkgs.rustPlatform.buildRustPackage {".
         if line.contains("buildRustPackage {") && line.contains(" = ") {
+            eprintln!("ENTER block: {:?}", line.trim());
             in_build_rust_package = true;
-        } else if trimmed.ends_with("};") || trimmed.starts_with(char::is_alphabetic) {
-            // End of buildRustPackage block (either explicit }; or a new top-level attr).
-            // Lines starting with alphabetic (not space/tab) that contain = are top-level attrs.
+} else if trimmed.ends_with("};") {
+            // End of buildRustPackage block
             in_build_rust_package = false;
+        } else if !trimmed.is_empty() && !trimmed.starts_with('#')
+            && trimmed.starts_with(char::is_alphabetic) && trimmed.contains(" = ") {
+            // A top-level attribute (starts with letter, not indented, contains =)
+            // cannot be inside a buildRustPackage block.
+            let indent_len = line.len() - line.trim_start().len();
+            if indent_len == 0 {
+                in_build_rust_package = false;
+            }
         }
 
         if in_build_rust_package && line.contains("version = \"") {
+            eprintln!("FOUND version line: {:?}", line.trim());
             if let Some(start_idx) = line.find("version = \"") {
-                let after_quote = start_idx + 10; // skip "version = ""
+                let after_quote = start_idx + 10;
                 if let Some(end_quote_relative) = line[after_quote..].find('"') {
                     let end_quote = after_quote + end_quote_relative;
                     let prefix = &line[..start_idx];
-                    let suffix = &line[end_quote + 1..]; // everything after the closing quote
+                    let suffix = &line[end_quote + 1..];
+                    eprintln!("REPLACE: prefix={:?} suffix={:?}", prefix, suffix);
                     result.push_str(prefix);
                     result.push_str("version = \"");
                     result.push_str(new_version);
