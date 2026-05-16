@@ -187,6 +187,28 @@ mod daemon_tests {
         let path = stuck_repos_path();
         assert!(path.starts_with(expected_base));
     }
+
+    #[test]
+    fn test_policy_clone_at_repo_iteration() {
+        // Verifies that a cloned SyncPolicy is an independent snapshot:
+        // each repo iteration should clone the policy to avoid race conditions
+        // from mid-cycle policy reloads (e.g., SIGHUP).
+        use crate::policy::SyncPolicy;
+
+        let policy = SyncPolicy::default();
+        let cloned = policy.clone();
+
+        // Debug format should match — same field values
+        assert_eq!(format!("{:?}", policy), format!("{:?}", cloned));
+
+        // Verify key fields are carried over
+        assert_eq!(policy.auto_commit, cloned.auto_commit);
+        assert_eq!(policy.auto_pull, cloned.auto_pull);
+        assert_eq!(policy.auto_push, cloned.auto_push);
+        assert_eq!(policy.pulse_interval_secs, cloned.pulse_interval_secs);
+        assert_eq!(policy.push_retries, cloned.push_retries);
+        assert_eq!(policy.max_stage_file_bytes, cloned.max_stage_file_bytes);
+    }
 }
 
 fn stuck_repos_path() -> PathBuf {
@@ -484,6 +506,10 @@ pub(crate) async fn run_daemon(
         }
 
         for repo in repos {
+            // Clone policy at each repo iteration for a consistent snapshot.
+            // If the policy is reloaded mid-cycle (SIGHUP), this repo still
+            // operates on the policy version it was started with.
+            let policy = policy.clone();
             let now = Instant::now();
             if !is_repo_ready(&repo) {
                 if debug_enabled() {
