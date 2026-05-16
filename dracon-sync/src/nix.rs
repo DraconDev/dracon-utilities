@@ -33,21 +33,25 @@ fn update_version_in_flake_nix(content: &str, new_version: &str) -> anyhow::Resu
     let mut changed = false;
 
     let mut in_package = false;
+    let mut in_build_rust_package = false;
     for line in content.lines() {
-        if line.trim().starts_with('[') {
-            in_package = line.trim() == "[package]";
+        let trimmed = line.trim();
+        if trimmed.starts_with('[') {
+            in_package = trimmed == "[package]";
+            in_build_rust_package = false;
+        } else if trimmed.ends_with("= rustPlatform.buildRustPackage {")
+            || trimmed.ends_with("= pkgs.rustPlatform.buildRustPackage {") {
+            in_build_rust_package = true;
         }
 
-        if in_package && line.contains("version = \"") {
-            if let Some(idx) = line.find("version = \"") {
-                let rest = &line[idx..];
-                if let Some(_end_idx) = rest[13..].find('"') {
-                    let old_ver_start = idx + 13;
-                    let prefix = &line[..old_ver_start];
-                    result.push_str(prefix);
-                    result.push('"');
+        if (in_package || in_build_rust_package) && line.contains("version = \"") {
+            if let Some(start_idx) = line.find("version = \"") {
+                let after_quote = start_idx + 10; // skip "version = ""
+                if let Some(end_quote) = line[after_quote..].find('"') {
+                    result.push_str(&line[..start_idx]);
+                    result.push_str("version = \"");
                     result.push_str(new_version);
-                    result.push('"');
+                    result.push_str("\"");
                     result.push('\n');
                     changed = true;
                     continue;
