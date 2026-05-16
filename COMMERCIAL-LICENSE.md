@@ -4,7 +4,7 @@
 
 ## Preamble
 
-All Dracon software is available under the GNU Affero General Public License (AGPLv3) for open source, community, and non-commercial use. If you want to use Dracon software in a commercial product or service **without** being subject to the AGPL's source disclosure requirements, you need a Commercial License. Visit https://dracon.uk/licensing for details and purchase.
+All Dracon software is available under the GNU Affero General Public License (AGPLv3) for open source, community, and non-commercial use. Organizations with fewer than 10 employees may use Dracon software under AGPLv3 at no cost. Organizations with 10 or more employees require a Commercial License for any Production Use of Dracon software that does not comply with AGPLv3's source disclosure requirements. Visit https://dracon.uk/licensing for details and purchase.
 
 This document constitutes a legally binding agreement between the licensee ("You" or "Your") and Dracon ("Licensor"). By purchasing or activating a Commercial License, You agree to be bound by these terms.
 
@@ -44,16 +44,17 @@ Subject to the terms and payment obligations in this agreement, Licensor grants 
 
 ## 3. Pricing Tiers
 
-| Tier | Engineered By | Annual License Fee |
-|------|:-------------|:-------------------|
-| **Indie** | Up to 3 engineers | Free |
-| **Startup** | 4–10 engineers | Contact for pricing |
-| **Scale** | 11–50 engineers | Contact for pricing |
-| **Enterprise** | 51+ engineers or revenue > £5M/year | Contact for pricing |
+| Tier | Employees | Annual License Fee |
+|------|:----------|:-------------------|
+| **Indie** | 0–9 | Free (no purchase needed) |
+| **Startup** | 10–99 | $500/yr |
+| **Growth** | 100–999 | $5,000/yr |
+| **Scale** | 1,000–9,999 | $25,000/yr |
+| **Global** | 10,000+ | $100,000/yr |
 
 - Licenses are annual and recurring. Renewal is required to maintain active status.
-- Each Licensed Instance requires a separate license unless otherwise agreed in writing.
 - Licenses are priced per Organization, not per seat.
+- Azumi and Tiles are covered by one company license. Hosted services (Dracon Platform) are separate.
 
 For current pricing and online purchasing, visit **https://dracon.uk/licensing**.
 For pricing inquiries: **license@dracon.uk**
