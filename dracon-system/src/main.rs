@@ -3464,30 +3464,47 @@ async fn cmd_guard_prune(
     Ok(())
 }
 
-async fn cmd_guard_clean(
-    guard: &GuardPolicy,
-    json: bool,
-    apply: bool,
+/// Represents which cleanup targets are enabled.
+#[derive(Debug, Clone, Default)]
+struct CleanTargets {
     rust: bool,
     trash: bool,
     nix: bool,
     caches: bool,
     node_modules: bool,
     docker: bool,
-    all: bool,
+}
+
+impl CleanTargets {
+    /// Returns true if no targets are enabled.
+    fn is_empty(&self) -> bool {
+        !self.rust && !self.trash && !self.nix && !self.caches && !self.node_modules && !self.docker
+    }
+
+    /// Returns true if ANY target is enabled.
+    fn any(&self) -> bool {
+        self.rust || self.trash || self.nix || self.caches || self.node_modules || self.docker
+    }
+}
+
+async fn cmd_guard_clean(
+    guard: &GuardPolicy,
+    json: bool,
+    apply: bool,
+    targets: CleanTargets,
     min_size_mb: Option<u64>,
 ) -> Result<()> {
-    let do_all = all;
-    if !do_all && !rust && !trash && !nix && !caches && !node_modules && !docker {
+    let do_all = targets.is_empty();
+    if !do_all && !targets.any() {
         eprintln!("⚠️ No cleanup targets specified. Use --all to clean everything, or specify individual flags (--rust, --trash, --nix, --caches, --node-modules, --docker).");
         return Ok(());
     }
-    let do_rust = rust || do_all;
-    let do_trash = trash || do_all;
-    let do_nix = nix || do_all;
-    let do_caches = caches || do_all;
-    let do_node = node_modules || do_all;
-    let do_docker = docker || do_all;
+    let do_rust = targets.rust || do_all;
+    let do_trash = targets.trash || do_all;
+    let do_nix = targets.nix || do_all;
+    let do_caches = targets.caches || do_all;
+    let do_node = targets.node_modules || do_all;
+    let do_docker = targets.docker || do_all;
 
     let mut guard_clone = guard.clone();
     if let Some(mb) = min_size_mb {
@@ -3671,20 +3688,15 @@ async fn cmd_guard(cmd: GuardCommands) -> Result<()> {
             all,
             min_size_mb,
         } => {
-            cmd_guard_clean(
-                &guard,
-                json,
-                apply,
+            let targets = CleanTargets {
                 rust,
                 trash,
                 nix,
                 caches,
                 node_modules,
                 docker,
-                all,
-                min_size_mb,
-            )
-            .await
+            };
+            cmd_guard_clean(&guard, json, apply, targets, min_size_mb).await
         }
     }
 }

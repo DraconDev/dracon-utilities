@@ -1061,7 +1061,7 @@ watch_roots = ["/tmp/test"]
         let policy = WardenPolicy::load(&config_path).expect("load policy");
         policy.validate().expect("valid policy");
 
-        let result = scrub_markers(&policy, &[repo.clone()], false);
+        let result = scrub_markers(&policy, std::slice::from_ref(&repo), false);
         assert!(
             result.is_ok(),
             "repair dry-run scrub should succeed: {:?}",
@@ -1191,7 +1191,7 @@ watch_roots = ["/tmp/test"]
         policy.validate().expect("valid policy");
 
         // Dry-run should find markers without modifying
-        let result = scrub_markers(&policy, &[repo.clone()], false);
+        let result = scrub_markers(&policy, std::slice::from_ref(&repo), false);
         assert!(result.is_ok(), "scrub dry-run should succeed: {:?}", result);
     }
 
