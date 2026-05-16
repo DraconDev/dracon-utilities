@@ -2606,22 +2606,50 @@ async fn cmd_status(json: bool) -> Result<()> {
     Ok(())
 }
 
-async fn cmd_doctor(json: bool, strict: bool) -> Result<()> {
+ async fn cmd_doctor(json: bool, strict: bool) -> Result<()> {
+    use comfy_table::{presets::UTF8_FULL_CONDENSED, Attribute, Cell, Color, ContentArrangement, Table};
+
     let report = build_doctor_report().await;
     if json {
         println!("{}", serde_json::to_string_pretty(&report)?);
     } else {
-        println!("system_root_exists: {}", report.system_root_exists);
-        println!("nixos_root_exists: {}", report.nixos_root_exists);
-        println!("canonical_libs_exists: {}", report.canonical_libs_exists);
-        println!("canonical_utils_exists: {}", report.canonical_utils_exists);
-        println!("sync_policy_exists: {}", report.sync_policy_exists);
-        println!(
-            "legacy_config_dracon_exists: {}",
-            report.legacy_config_dracon_exists
-        );
-        println!("sync_service_active: {}", report.sync_service_active);
-        println!("warden_service_active: {}", report.warden_service_active);
+        let mut table = Table::new();
+        table
+            .load_preset(UTF8_FULL_CONDENSED)
+            .set_content_arrangement(ContentArrangement::Dynamic)
+            .set_header(vec![
+                Cell::new("STATUS"),
+                Cell::new("CHECK"),
+                Cell::new("DETAIL"),
+            ]);
+
+        let checks: Vec<(&str, bool, &str)> = vec![
+            ("system root", report.system_root_exists, "~/.dracon"),
+            ("nixos root", report.nixos_root_exists, "~/.dracon/nixos"),
+            ("libs exists", report.canonical_libs_exists, "~/Dev/dracon-libs"),
+            ("utils exists", report.canonical_utils_exists, "~/Dev/dracon-utilities"),
+            ("sync policy", report.sync_policy_exists, "sync/dracon-sync.toml"),
+            ("legacy config", !report.legacy_config_dracon_exists, "~/.config/dracon (should not exist)"),
+            ("sync service", report.sync_service_active, "dracon-sync.service"),
+            ("warden service", report.warden_service_active, "dracon-warden.service"),
+        ];
+
+        for (label, ok, detail) in &checks {
+            let (icon, color) = if *ok {
+                ("\u{2705}", Color::Green)
+            } else {
+                ("\u{274c}", Color::Red)
+            };
+            table.add_row(vec![
+                Cell::new(icon).fg(color),
+                Cell::new(label),
+                Cell::new(detail),
+            ]);
+        }
+
+        println!("{table}");
+        let pass = checks.iter().filter(|(_, ok, _)| *ok).count();
+        println!("{}/{} checks passed", pass, checks.len());
     }
     if strict {
         let mut violations = Vec::new();
