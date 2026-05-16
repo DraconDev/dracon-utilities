@@ -1,6 +1,6 @@
 mod common;
 
-use common::{HomeGuard, EnvRestorer};
+use common::{EnvRestorer, HomeGuard};
 use secrecy::ExposeSecret;
 use std::fs;
 use std::io::Write;
@@ -13,7 +13,9 @@ fn init_security() -> (dracon_security::DemonSecurity, HomeGuard) {
     (security, _guard)
 }
 
-fn init_security_with_repo(repo_root: &std::path::Path) -> (dracon_security::DemonSecurity, HomeGuard) {
+fn init_security_with_repo(
+    repo_root: &std::path::Path,
+) -> (dracon_security::DemonSecurity, HomeGuard) {
     let _guard = HomeGuard::new();
     let mut security = dracon_security::DemonSecurity::new(Some(repo_root)).expect("init security");
     let identity = age::x25519::Identity::generate();
@@ -25,7 +27,10 @@ fn make_keys_dir(repo_root: &std::path::Path) -> std::path::PathBuf {
     repo_root.join(".git").join("arcane").join("keys")
 }
 
-fn setup_repo_with_age_key(repo_root: &std::path::Path, master_identity: &age::x25519::Identity) -> Vec<u8> {
+fn setup_repo_with_age_key(
+    repo_root: &std::path::Path,
+    master_identity: &age::x25519::Identity,
+) -> Vec<u8> {
     let keys_dir = make_keys_dir(repo_root);
     fs::create_dir_all(&keys_dir).expect("create keys dir");
 
@@ -50,7 +55,11 @@ fn encrypt_for_recipient(recipient: &age::x25519::Recipient, plaintext: &[u8]) -
 
 fn write_age_key(keys_dir: &std::path::Path, identity: &age::x25519::Identity, filename: &str) {
     fs::create_dir_all(keys_dir).expect("create keys dir");
-    fs::write(keys_dir.join(filename), identity.to_string().expose_secret().as_bytes()).expect("write age key");
+    fs::write(
+        keys_dir.join(filename),
+        identity.to_string().expose_secret().as_bytes(),
+    )
+    .expect("write age key");
 }
 
 // =============================================================================
@@ -71,8 +80,16 @@ fn test_env_manager_to_env_file_variables() {
 #[test]
 fn test_env_manager_to_env_file_secrets() {
     let mut em = dracon_security::EnvironmentManager::new();
-    em.add_secret("database".to_string(), "PASSWORD".to_string(), "super_secret".to_string());
-    em.add_secret("api".to_string(), "API_KEY".to_string(), "key_12345".to_string());
+    em.add_secret(
+        "database".to_string(),
+        "PASSWORD".to_string(),
+        "super_secret".to_string(),
+    );
+    em.add_secret(
+        "api".to_string(),
+        "API_KEY".to_string(),
+        "key_12345".to_string(),
+    );
 
     let output = em.to_env_file();
     assert!(output.contains("# Group: database"));
@@ -99,7 +116,8 @@ fn test_env_manager_load_from_env_file() {
     fs::write(&env_path, "VAR1=\"value1\"\nVAR2=value2\nEMPTY=\n").expect("write env file");
 
     let mut em = dracon_security::EnvironmentManager::new();
-    em.load_from_env_file(&env_path).expect("load from env file");
+    em.load_from_env_file(&env_path)
+        .expect("load from env file");
 
     assert_eq!(em.variables.get("VAR1").map(|s| s.as_str()), Some("value1"));
     assert_eq!(em.variables.get("VAR2").map(|s| s.as_str()), Some("value2"));
@@ -123,7 +141,10 @@ fn test_env_manager_load_from_env_file_with_single_quotes() {
 
     let mut em = dracon_security::EnvironmentManager::new();
     em.load_from_env_file(&env_path).expect("load");
-    assert_eq!(em.variables.get("KEY").map(|s| s.as_str()), Some("single quoted value"));
+    assert_eq!(
+        em.variables.get("KEY").map(|s| s.as_str()),
+        Some("single quoted value")
+    );
 }
 
 #[test]
@@ -135,7 +156,10 @@ fn test_env_manager_load_from_env_file_with_embedded_equals() {
 
     let mut em = dracon_security::EnvironmentManager::new();
     em.load_from_env_file(&env_path).expect("load");
-    assert_eq!(em.variables.get("EQUATION").map(|s| s.as_str()), Some("a=b=c"));
+    assert_eq!(
+        em.variables.get("EQUATION").map(|s| s.as_str()),
+        Some("a=b=c")
+    );
 }
 
 #[test]
@@ -148,7 +172,11 @@ fn test_env_manager_combined() {
     let mut em = dracon_security::EnvironmentManager::new();
     em.add_variable("FROM_CODE".to_string(), "code_val".to_string());
     em.load_from_env_file(&env_path).expect("load");
-    em.add_secret("creds".to_string(), "API_KEY".to_string(), "key".to_string());
+    em.add_secret(
+        "creds".to_string(),
+        "API_KEY".to_string(),
+        "key".to_string(),
+    );
 
     let output = em.to_env_file();
     assert!(output.contains("FROM_CODE=\"code_val\""));
@@ -255,7 +283,9 @@ fn test_load_repo_key_with_master_identity_in_keys_dir() {
 // encrypt_with_repo_key / decrypt_with_repo_key tests
 // =============================================================================
 
-fn make_repo_with_master(repo_root: &std::path::Path) -> (dracon_security::DemonSecurity, [u8; 32], HomeGuard) {
+fn make_repo_with_master(
+    repo_root: &std::path::Path,
+) -> (dracon_security::DemonSecurity, [u8; 32], HomeGuard) {
     let keys_dir = make_keys_dir(repo_root);
     fs::create_dir_all(&keys_dir).expect("create keys dir");
 
@@ -320,8 +350,12 @@ fn test_encrypt_with_repo_key_random_nonce_per_call() {
     let loaded_key = security.load_repo_key().expect("load repo key");
 
     let plaintext = b"same message";
-    let ct1 = security.encrypt_with_repo_key(&loaded_key, plaintext).expect("encrypt1");
-    let ct2 = security.encrypt_with_repo_key(&loaded_key, plaintext).expect("encrypt2");
+    let ct1 = security
+        .encrypt_with_repo_key(&loaded_key, plaintext)
+        .expect("encrypt1");
+    let ct2 = security
+        .encrypt_with_repo_key(&loaded_key, plaintext)
+        .expect("encrypt2");
     assert_ne!(ct1, ct2, "random nonce should produce different ciphertext");
 }
 
@@ -406,7 +440,8 @@ fn test_load_repo_key_machine_key_env_var() {
     write_age_key(&keys_dir, &machine_identity, "machine:runner.age");
 
     let repo_key_bytes: [u8; 32] = rand::random();
-    let recipients: Vec<Box<dyn age::Recipient + Send>> = vec![Box::new(machine_identity.to_public())];
+    let recipients: Vec<Box<dyn age::Recipient + Send>> =
+        vec![Box::new(machine_identity.to_public())];
     let encryptor = age::Encryptor::with_recipients(recipients).expect("encryptor");
     let mut encrypted = vec![];
     let mut writer = encryptor.wrap_output(&mut encrypted).expect("wrap");
@@ -416,8 +451,13 @@ fn test_load_repo_key_machine_key_env_var() {
 
     let (security, _guard) = init_security_with_repo(repo_root);
 
-    let _env_guard = EnvRestorer::new("ARCANE_MACHINE_KEY", machine_identity.to_string().expose_secret());
-    let loaded = security.load_repo_key().expect("load repo key via machine key");
+    let _env_guard = EnvRestorer::new(
+        "ARCANE_MACHINE_KEY",
+        machine_identity.to_string().expose_secret(),
+    );
+    let loaded = security
+        .load_repo_key()
+        .expect("load repo key via machine key");
     assert_eq!(loaded.get_key(), repo_key_bytes.as_slice());
 }
 
@@ -439,7 +479,10 @@ fn test_load_repo_key_team_key() {
     let team_dir = home.join(".demon").join("teams");
     fs::create_dir_all(&team_dir).expect("create team dir");
 
-    let encrypted_team = encrypt_for_recipient(&master_identity.to_public(), team_identity.to_string().expose_secret().as_bytes());
+    let encrypted_team = encrypt_for_recipient(
+        &master_identity.to_public(),
+        team_identity.to_string().expose_secret().as_bytes(),
+    );
     fs::write(team_dir.join("my-team.key"), encrypted_team).expect("write team key file");
 
     let repo_key_bytes: [u8; 32] = rand::random();
@@ -506,7 +549,10 @@ fn test_generate_master_identity_refuses_existing_identity() {
     fs::write(identity_dir.join("identity.age"), "age1xxxxx").expect("create fake identity");
 
     let result = security.generate_master_identity();
-    assert!(result.is_err(), "should refuse to overwrite existing identity");
+    assert!(
+        result.is_err(),
+        "should refuse to overwrite existing identity"
+    );
     assert!(result.unwrap_err().to_string().contains("SAFETY TRIGGERED"));
 }
 
@@ -574,7 +620,11 @@ fn test_encrypt_for_node_uses_disk_master_identities() {
     let home = std::env::var("HOME").map(std::path::PathBuf::from).unwrap();
     let demon_dir = home.join(".demon");
     fs::create_dir_all(&demon_dir).expect("create .demon dir");
-    fs::write(demon_dir.join("identity.age"), disk_identity.to_string().expose_secret().as_bytes()).expect("write disk identity");
+    fs::write(
+        demon_dir.join("identity.age"),
+        disk_identity.to_string().expose_secret().as_bytes(),
+    )
+    .expect("write disk identity");
 
     let node_identity = age::x25519::Identity::generate();
     let node_recipient_str = node_identity.to_public().to_string();
@@ -586,5 +636,8 @@ fn test_encrypt_for_node_uses_disk_master_identities() {
 
     // disk_identity should be able to decrypt (it was loaded via load_master_identities)
     let result = security.decrypt_v2(&encrypted);
-    assert!(result.is_ok(), "disk identity should be able to decrypt what encrypt_for_node produced");
+    assert!(
+        result.is_ok(),
+        "disk identity should be able to decrypt what encrypt_for_node produced"
+    );
 }

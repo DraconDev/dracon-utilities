@@ -19,7 +19,10 @@ mod tests {
             let lock = HOME_MUTEX.lock().expect("home mutex poisoned");
             let original = std::env::var("HOME").ok();
             std::env::set_var("HOME", home);
-            HomeGuard { original, _lock: lock }
+            HomeGuard {
+                original,
+                _lock: lock,
+            }
         }
     }
 
@@ -524,8 +527,14 @@ watch_roots = ["/tmp/test"]
         let next = replace_managed_block(&current, &block);
         assert!(next.contains("prefix"));
         assert!(next.contains("new"));
-        assert!(!next.contains("first"), "first block content should be replaced");
-        assert!(!next.contains("second"), "second block content should be replaced");
+        assert!(
+            !next.contains("first"),
+            "first block content should be replaced"
+        );
+        assert!(
+            !next.contains("second"),
+            "second block content should be replaced"
+        );
         assert!(next.contains("mid"));
         assert!(next.contains(" suffix"));
     }
@@ -535,7 +544,10 @@ watch_roots = ["/tmp/test"]
         let current = "  prefix\n";
         let block = format!("{BLOCK_BEGIN}\nmanaged\n{BLOCK_END}");
         let next = replace_managed_block(current, &block);
-        assert!(next.starts_with("  prefix\n"), "leading content should be preserved");
+        assert!(
+            next.starts_with("  prefix\n"),
+            "leading content should be preserved"
+        );
     }
 
     #[test]
@@ -556,7 +568,11 @@ watch_roots = ["/tmp/test"]
         let result = apply_overwrite_file(&file, "hello world");
         assert!(result.is_ok(), "should create new file");
         let content = std::fs::read_to_string(&file).unwrap();
-        assert!(content.starts_with("hello world"), "should contain content: {:?}", content);
+        assert!(
+            content.starts_with("hello world"),
+            "should contain content: {:?}",
+            content
+        );
         std::fs::remove_dir_all(td.path()).ok();
     }
 
@@ -568,7 +584,11 @@ watch_roots = ["/tmp/test"]
         let result = apply_overwrite_file(&file, "new content");
         assert!(result.is_ok(), "should overwrite");
         let content = std::fs::read_to_string(&file).unwrap();
-        assert!(content.starts_with("new content"), "should contain new content: {:?}", content);
+        assert!(
+            content.starts_with("new content"),
+            "should contain new content: {:?}",
+            content
+        );
         std::fs::remove_dir_all(td.path()).ok();
     }
 
@@ -576,29 +596,64 @@ watch_roots = ["/tmp/test"]
     fn is_marker_string_edge_cases() {
         assert!(!is_marker_string(""), "empty string should not match");
         assert!(!is_marker_string("[DRACON_SECRET]"), "no colon");
-        assert!(!is_marker_string("DRACON_SECRET not in brackets"), "not in brackets");
+        assert!(
+            !is_marker_string("DRACON_SECRET not in brackets"),
+            "not in brackets"
+        );
         assert!(!is_marker_string("[WRONG_SECRET:abc]"), "wrong prefix");
-        assert!(is_marker_string("[DRACON_SECRET:]"), "empty key is still a marker");
-        assert!(is_marker_string("[DRACON_SECRET: ]"), "space key is still a marker");
+        assert!(
+            is_marker_string("[DRACON_SECRET:]"),
+            "empty key is still a marker"
+        );
+        assert!(
+            is_marker_string("[DRACON_SECRET: ]"),
+            "space key is still a marker"
+        );
         assert!(is_marker_string("[DRACON_SECRET:abc123]"), "basic key");
-        assert!(is_marker_string("[DRACON_SECRET:abc-123_456]"), "key with dash underscore");
+        assert!(
+            is_marker_string("[DRACON_SECRET:abc-123_456]"),
+            "key with dash underscore"
+        );
     }
 
     #[test]
     fn marker_prefix_at_edge_cases() {
         assert_eq!(marker_prefix_at("no bracket here", 0), None);
-        assert_eq!(marker_prefix_at("[DRACON_SECRET:abc]", 0), Some("[DRACON_SECRET:"), "starts at position 0");
-        assert_eq!(marker_prefix_at("[DRACON_SECRET:abc]", 1), None, "starts at position 1");
-        assert_eq!(marker_prefix_at("prefix [DRACON_SECRET", 8), None, "incomplete bracket without colon");
-        assert_eq!(marker_prefix_at("[DRACON_SECRET:abc] more", 0), Some("[DRACON_SECRET:"), "marker at start followed by more");
-        assert_eq!(marker_prefix_at("text [DRACON_SECRET:abc] end", 5), Some("[DRACON_SECRET:"), "at position 5 [ bracket is at position 5");
+        assert_eq!(
+            marker_prefix_at("[DRACON_SECRET:abc]", 0),
+            Some("[DRACON_SECRET:"),
+            "starts at position 0"
+        );
+        assert_eq!(
+            marker_prefix_at("[DRACON_SECRET:abc]", 1),
+            None,
+            "starts at position 1"
+        );
+        assert_eq!(
+            marker_prefix_at("prefix [DRACON_SECRET", 8),
+            None,
+            "incomplete bracket without colon"
+        );
+        assert_eq!(
+            marker_prefix_at("[DRACON_SECRET:abc] more", 0),
+            Some("[DRACON_SECRET:"),
+            "marker at start followed by more"
+        );
+        assert_eq!(
+            marker_prefix_at("text [DRACON_SECRET:abc] end", 5),
+            Some("[DRACON_SECRET:"),
+            "at position 5 [ bracket is at position 5"
+        );
     }
 
     #[test]
     fn salvage_invalid_json_no_marker_returns_none() {
         assert!(salvage_invalid_json_markers("just normal json").is_none());
         assert!(salvage_invalid_json_markers("").is_none());
-        assert!(salvage_invalid_json_markers("[DRACON_SECRE").is_none(), "incomplete marker should return None");
+        assert!(
+            salvage_invalid_json_markers("[DRACON_SECRE").is_none(),
+            "incomplete marker should return None"
+        );
     }
 
     #[test]
@@ -695,14 +750,26 @@ watch_roots = ["/tmp/test"]
         let result = run_keygen();
 
         assert!(result.is_ok(), "keygen should succeed: {:?}", result);
-        let hostname_raw = hostname::get().expect("hostname").to_string_lossy().to_string();
-        let hostname: String = hostname_raw.chars()
+        let hostname_raw = hostname::get()
+            .expect("hostname")
+            .to_string_lossy()
+            .to_string();
+        let hostname: String = hostname_raw
+            .chars()
             .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
             .collect();
         let secret_path = keys_dir.join(format!("machine_{}.age", hostname));
         let pubkey_path = keys_dir.join(format!("owner_{}.pub", hostname));
-        assert!(secret_path.exists(), "secret key should be created at {}", secret_path.display());
-        assert!(pubkey_path.exists(), "pubkey should be created at {}", pubkey_path.display());
+        assert!(
+            secret_path.exists(),
+            "secret key should be created at {}",
+            secret_path.display()
+        );
+        assert!(
+            pubkey_path.exists(),
+            "pubkey should be created at {}",
+            pubkey_path.display()
+        );
     }
 
     #[test]
@@ -713,8 +780,12 @@ watch_roots = ["/tmp/test"]
 
         let _guard = HomeGuard::new(td.path().to_str().unwrap());
 
-        let hostname_raw = hostname::get().expect("hostname").to_string_lossy().to_string();
-        let hostname: String = hostname_raw.chars()
+        let hostname_raw = hostname::get()
+            .expect("hostname")
+            .to_string_lossy()
+            .to_string();
+        let hostname: String = hostname_raw
+            .chars()
             .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
             .collect();
         let fake_secret = keys_dir.join(format!("machine_{}.age", hostname));
@@ -722,9 +793,16 @@ watch_roots = ["/tmp/test"]
 
         let result = run_keygen();
 
-        assert!(result.is_err(), "should refuse to overwrite existing secret key");
+        assert!(
+            result.is_err(),
+            "should refuse to overwrite existing secret key"
+        );
         let err_msg = result.unwrap_err().to_string();
-        assert!(err_msg.contains("already exists"), "error should mention already exists: {}", err_msg);
+        assert!(
+            err_msg.contains("already exists"),
+            "error should mention already exists: {}",
+            err_msg
+        );
     }
 
     #[test]
@@ -735,8 +813,12 @@ watch_roots = ["/tmp/test"]
 
         let _guard = HomeGuard::new(td.path().to_str().unwrap());
 
-        let hostname_raw = hostname::get().expect("hostname").to_string_lossy().to_string();
-        let hostname: String = hostname_raw.chars()
+        let hostname_raw = hostname::get()
+            .expect("hostname")
+            .to_string_lossy()
+            .to_string();
+        let hostname: String = hostname_raw
+            .chars()
             .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
             .collect();
         let fake_pubkey = keys_dir.join(format!("owner_{}.pub", hostname));
@@ -744,10 +826,16 @@ watch_roots = ["/tmp/test"]
 
         let result = run_keygen();
 
-        assert!(result.is_err(), "should refuse to overwrite existing pubkey");
+        assert!(
+            result.is_err(),
+            "should refuse to overwrite existing pubkey"
+        );
         let err_msg = result.unwrap_err().to_string();
-        assert!(err_msg.contains("already exists") || err_msg.contains("file may already exist"),
-            "error should mention already exists: {}", err_msg);
+        assert!(
+            err_msg.contains("already exists") || err_msg.contains("file may already exist"),
+            "error should mention already exists: {}",
+            err_msg
+        );
     }
 
     #[test]
@@ -790,7 +878,10 @@ watch_roots = ["/tmp/test"]
             allow_v1_fallback: false,
         };
         let result = policy.validate();
-        assert!(result.is_err(), "should reject non-allowlisted plaintext pattern");
+        assert!(
+            result.is_err(),
+            "should reject non-allowlisted plaintext pattern"
+        );
     }
 
     #[test]
@@ -817,7 +908,10 @@ watch_roots = ["/tmp/test"]
             allow_v1_fallback: false,
         };
         let result = policy.validate();
-        assert!(result.is_err(), "should reject plaintext pattern with 'password'");
+        assert!(
+            result.is_err(),
+            "should reject plaintext pattern with 'password'"
+        );
     }
 
     #[test]
@@ -842,7 +936,10 @@ watch_roots = ["/tmp/test"]
         assert!(!is_encrypted_env_content("DRACON_SECRET:key"));
         assert!(!is_encrypted_env_content("[OTHER_SECRET:key]"));
         assert!(!is_encrypted_env_content("plain text"));
-        assert!(!is_encrypted_env_content("  [DRACON_SECRET:key]  "), "leading whitespace not trimmed");
+        assert!(
+            !is_encrypted_env_content("  [DRACON_SECRET:key]  "),
+            "leading whitespace not trimmed"
+        );
     }
 
     /// Guard that restores an environment variable on drop.
@@ -855,7 +952,10 @@ watch_roots = ["/tmp/test"]
         fn set(key: &str, value: &str) -> Self {
             let old_value = std::env::var(key).ok();
             std::env::set_var(key, value);
-            EnvGuard { key: key.to_string(), old_value }
+            EnvGuard {
+                key: key.to_string(),
+                old_value,
+            }
         }
     }
 
@@ -898,8 +998,14 @@ watch_roots = ["/tmp/test"]
         let policy = WardenPolicy::load(&config_path).expect("load policy");
         let result = harden_repos(&policy, vec![repo.clone()]);
         assert!(result.is_ok(), "once should succeed: {:?}", result);
-        assert!(repo.join(".gitignore").exists(), ".gitignore should be created");
-        assert!(repo.join(".gitattributes").exists(), ".gitattributes should be created");
+        assert!(
+            repo.join(".gitignore").exists(),
+            ".gitignore should be created"
+        );
+        assert!(
+            repo.join(".gitattributes").exists(),
+            ".gitattributes should be created"
+        );
     }
 
     #[test]
@@ -933,10 +1039,18 @@ watch_roots = ["/tmp/test"]
         policy.validate().expect("valid policy");
 
         let result = scrub_markers(&policy, &[repo.clone()], false);
-        assert!(result.is_ok(), "repair dry-run scrub should succeed: {:?}", result);
+        assert!(
+            result.is_ok(),
+            "repair dry-run scrub should succeed: {:?}",
+            result
+        );
 
         let result = harden_repos(&policy, vec![repo.clone()]);
-        assert!(result.is_ok(), "repair dry-run harden should succeed: {:?}", result);
+        assert!(
+            result.is_ok(),
+            "repair dry-run harden should succeed: {:?}",
+            result
+        );
     }
 
     #[test]
@@ -977,7 +1091,10 @@ watch_roots = ["/tmp/test"]
                 "ciphertext markers remain in working tree (count={})",
                 found
             ));
-            assert!(strict_result.is_err(), "strict should fail when markers remain");
+            assert!(
+                strict_result.is_err(),
+                "strict should fail when markers remain"
+            );
         }
     }
 
@@ -986,7 +1103,10 @@ watch_roots = ["/tmp/test"]
         let content = b"let x = 1;\n";
         let warden = DraconWarden::new().expect("create warden");
         let result = warden.clean(content, None).expect("clean");
-        assert_eq!(result, content, "plaintext should pass through clean unchanged");
+        assert_eq!(
+            result, content,
+            "plaintext should pass through clean unchanged"
+        );
     }
 
     #[test]

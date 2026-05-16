@@ -1,5 +1,5 @@
-use proptest::prelude::*;
 use dracon_security::DemonSecurity;
+use proptest::prelude::*;
 use std::sync::OnceLock;
 
 static TEST_SECURITY: OnceLock<DemonSecurity> = OnceLock::new();

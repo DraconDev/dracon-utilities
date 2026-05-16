@@ -191,16 +191,24 @@ fn test_massive_dataset_permutations() {
         "key-9yNmMZQZD3xEuI2Tlyk9oaB3FuBqOa",
     ];
 
-    let prefixes = vec!["let secret = ", "const TOKEN = ", "var key=", "key: ", "\"api_key\": ", "export SECRET=", "password="];
+    let prefixes = vec![
+        "let secret = ",
+        "const TOKEN = ",
+        "var key=",
+        "key: ",
+        "\"api_key\": ",
+        "export SECRET=",
+        "password=",
+    ];
     let quotes = vec!["\"", "\'"];
     let mut total = 0;
-    
+
     for raw in patterns {
         for prefix in &prefixes {
             for q in &quotes {
                 let input = format!("{}{}{}{}", prefix, q, raw, q);
                 if scanner.scan(&input).is_empty() {
-                     panic!("Failed to detect: {}", input);
+                    panic!("Failed to detect: {}", input);
                 }
                 total += 1;
             }

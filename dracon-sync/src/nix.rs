@@ -59,7 +59,7 @@ fn update_version_in_flake_nix(content: &str, new_version: &str) -> String {
             }
         }
 
-if in_build_rust_package && line.contains("version = \"") {
+        if in_build_rust_package && line.contains("version = \"") {
             if let Some(start_idx) = line.find("version = \"") {
                 let after_quote = start_idx + 10;
                 if let Some(end_quote_relative) = line[after_quote + 1..].find('"') {
@@ -416,7 +416,12 @@ mod tests {
 
         let changed = update_flake_version(dir.path(), "15.0.0").unwrap();
         let written = std::fs::read_to_string(&flake_path).unwrap();
-        eprintln!("changed={} written_len={} original_len={}", changed, written.len(), original.len());
+        eprintln!(
+            "changed={} written_len={} original_len={}",
+            changed,
+            written.len(),
+            original.len()
+        );
         assert!(!changed, "expected no change when version already matches");
         assert_eq!(written, original);
     }

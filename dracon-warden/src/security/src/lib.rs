@@ -7,6 +7,7 @@ use anyhow::{Context, Result};
 use base64::{engine::general_purpose, Engine as _};
 use cfb_mode::cipher::{AsyncStreamCipher, KeyIvInit};
 
+use once_cell::sync::OnceCell;
 use regex::Regex;
 use secrecy::ExposeSecret;
 use serde::{Deserialize, Serialize};
@@ -16,7 +17,6 @@ use std::io::{Read, Write};
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
-use once_cell::sync::OnceCell;
 
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
@@ -272,10 +272,7 @@ impl SecretScanner {
                 "Slack Bot Token",
                 r"xoxb-[0-9]{11}-[0-9]{11}-[a-zA-Z0-9]{24}",
             ),
-            (
-                "Slack Bot Token (Compact)",
-                r"xoxb-[A-Za-z0-9]{24,68}",
-            ),
+            ("Slack Bot Token (Compact)", r"xoxb-[A-Za-z0-9]{24,68}"),
             // ============================================================
             // Discord
             // ============================================================
@@ -428,9 +425,18 @@ impl SecretScanner {
             ("DeepSeek API Key", r"sk-[A-Za-z0-9]{20,}"),
             ("Mistral API Key", r"mistral-[A-Za-z0-9_-]{20,}"),
             // Cloudflare R2
-            ("Cloudflare R2 Account ID", r"(?:account[_-]?id|cf[_-]?account[_-]?id).{0,10}[0-9a-f]{32}"),
-            ("Cloudflare R2 Access Key", r"(?:access[_-]?key[_-]?id|cf[_-]?access[_-]?key[_-]?id).{0,10}[0-9a-f]{20}"),
-            ("Cloudflare R2 Secret Key", r"(?:secret[_-]?key|cf[_-]?secret[_-]?key).{0,10}[a-f0-9]{40}"),
+            (
+                "Cloudflare R2 Account ID",
+                r"(?:account[_-]?id|cf[_-]?account[_-]?id).{0,10}[0-9a-f]{32}",
+            ),
+            (
+                "Cloudflare R2 Access Key",
+                r"(?:access[_-]?key[_-]?id|cf[_-]?access[_-]?key[_-]?id).{0,10}[0-9a-f]{20}",
+            ),
+            (
+                "Cloudflare R2 Secret Key",
+                r"(?:secret[_-]?key|cf[_-]?secret[_-]?key).{0,10}[a-f0-9]{40}",
+            ),
             // Backblaze B2
             ("Backblaze B2 Key ID", r"0055[a-f0-9]{16}"),
             ("Backblaze B2 Application Key", r"K005[a-zA-Z0-9]{20,}"),
@@ -510,7 +516,7 @@ impl SecretScanner {
         // (no catastrophic backtracking), but very large combined regexes can
         // still use prohibitive memory during DFA construction.
         let full_regex = regex::RegexBuilder::new(&format!("(?sm){}", combined))
-            .size_limit(10 * (1 << 20))   // 10 MiB total regex memory
+            .size_limit(10 * (1 << 20)) // 10 MiB total regex memory
             .dfa_size_limit(5 * (1 << 20)) // 5 MiB DFA cache
             .build()
             .map_err(|e| anyhow::anyhow!("invalid regex pattern in SecretScanner::new: {}", e))?;
@@ -552,7 +558,12 @@ impl SecretScanner {
             .size_limit(10 * (1 << 20))
             .dfa_size_limit(5 * (1 << 20))
             .build()
-            .map_err(|e| anyhow::anyhow!("invalid regex pattern in SecretScanner::new_without_age_keys: {}", e))?;
+            .map_err(|e| {
+                anyhow::anyhow!(
+                    "invalid regex pattern in SecretScanner::new_without_age_keys: {}",
+                    e
+                )
+            })?;
 
         Ok(Self {
             patterns,
@@ -663,10 +674,7 @@ impl EnvironmentManager {
     }
 
     pub fn add_secret(&mut self, group: String, key: String, value: String) {
-        self.secrets
-            .entry(group)
-            .or_default()
-            .insert(key, value);
+        self.secrets.entry(group).or_default().insert(key, value);
     }
 
     pub fn to_env_file(&self) -> String {
@@ -1234,8 +1242,8 @@ impl DemonSecurity {
 
         // Encrypt the repo key for the recipient
         let recipients: Vec<Box<dyn age::Recipient + Send>> = vec![Box::new(recipient.clone())];
-        let encryptor = age::Encryptor::with_recipients(recipients)
-            .context("failed to create encryptor")?;
+        let encryptor =
+            age::Encryptor::with_recipients(recipients).context("failed to create encryptor")?;
 
         let mut encrypted = vec![];
         let mut writer = encryptor.wrap_output(&mut encrypted)?;
@@ -1416,8 +1424,8 @@ impl DemonSecurity {
 
         // Encryption logic
         let recipients: Vec<Box<dyn age::Recipient + Send>> = vec![Box::new(recipient.clone())];
-        let encryptor = age::Encryptor::with_recipients(recipients)
-            .context("failed to create encryptor")?;
+        let encryptor =
+            age::Encryptor::with_recipients(recipients).context("failed to create encryptor")?;
 
         let mut encrypted = vec![];
         let mut writer = encryptor.wrap_output(&mut encrypted)?;
@@ -1648,7 +1656,10 @@ impl DemonSecurity {
                                     .to_string();
                                 for line in content.lines() {
                                     let line = line.trim();
-                                    if !line.is_empty() && !line.starts_with('#') && seen.insert(line.to_string()) {
+                                    if !line.is_empty()
+                                        && !line.starts_with('#')
+                                        && seen.insert(line.to_string())
+                                    {
                                         recipients.push((name.clone(), line.to_string()));
                                     }
                                 }
@@ -1734,8 +1745,8 @@ impl DemonSecurity {
         output_path: &Path,
     ) -> Result<()> {
         let recipients: Vec<Box<dyn age::Recipient + Send>> = vec![Box::new(recipient.clone())];
-        let encryptor = age::Encryptor::with_recipients(recipients)
-            .context("failed to create encryptor")?;
+        let encryptor =
+            age::Encryptor::with_recipients(recipients).context("failed to create encryptor")?;
 
         let mut encrypted = vec![];
         let mut writer = encryptor.wrap_output(&mut encrypted)?;
@@ -1909,8 +1920,12 @@ impl DemonSecurity {
                                     // Parse potential multiple keys per file or single key
                                     for line in pub_str.lines() {
                                         let line = line.trim();
-                                        if !line.is_empty() && !line.starts_with('#') && seen_keys.insert(line.to_string()) {
-                                            if let Ok(recipient) = line.parse::<x25519::Recipient>() {
+                                        if !line.is_empty()
+                                            && !line.starts_with('#')
+                                            && seen_keys.insert(line.to_string())
+                                        {
+                                            if let Ok(recipient) = line.parse::<x25519::Recipient>()
+                                            {
                                                 recipients.push(recipient);
                                             }
                                         }
@@ -2143,7 +2158,8 @@ impl DemonSecurity {
 
         // Sort to get the latest
         backups.sort();
-        let latest_backup = backups.last()
+        let latest_backup = backups
+            .last()
             .ok_or_else(|| anyhow::anyhow!("No backups found for file: {:?}", file_path))?;
 
         // Decrypt
@@ -2296,23 +2312,27 @@ impl DemonSecurity {
             .collect();
 
         // Single-component matching
-        let has_single_component = sensitive_dirs.iter().any(|dir| {
-            !dir.contains('/') && path_components.contains(dir)
-        });
+        let has_single_component = sensitive_dirs
+            .iter()
+            .any(|dir| !dir.contains('/') && path_components.contains(dir));
         // Multi-component sequence matching (e.g. ".config/gcloud")
         let has_multi_component = sensitive_dirs.iter().any(|dir| {
             let parts: Vec<&str> = dir.split('/').collect();
             if parts.len() < 2 {
                 return false;
             }
-            path_components.windows(parts.len()).any(|window| window == parts.as_slice())
+            path_components
+                .windows(parts.len())
+                .any(|window| window == parts.as_slice())
         });
 
         let is_sensitive_location = has_single_component
             || has_multi_component
             || sensitive_exts.iter().any(|ext| path_str.ends_with(ext))
             || sensitive_filenames.contains(&filename)
-            || sensitive_filenames.iter().any(|p| filename == *p || filename.starts_with(&format!("{}.", p)))
+            || sensitive_filenames
+                .iter()
+                .any(|p| filename == *p || filename.starts_with(&format!("{}.", p)))
             || self
                 .managed_patterns
                 .iter()
@@ -2519,7 +2539,11 @@ impl DemonSecurity {
             let entry = match entry {
                 Ok(e) => e,
                 Err(e) => {
-                    eprintln!("⚠️ walk error during secret restore at {}: {}", root.display(), e);
+                    eprintln!(
+                        "⚠️ walk error during secret restore at {}: {}",
+                        root.display(),
+                        e
+                    );
                     walk_errors += 1;
                     continue;
                 }
@@ -2532,7 +2556,10 @@ impl DemonSecurity {
         }
 
         if walk_errors > 0 {
-            return Err(anyhow::anyhow!("decrypt_path completed with {} walk error(s)", walk_errors));
+            return Err(anyhow::anyhow!(
+                "decrypt_path completed with {} walk error(s)",
+                walk_errors
+            ));
         }
 
         Ok(total_restored)
@@ -2632,7 +2659,11 @@ impl DemonSecurity {
             let entry = match entry {
                 Ok(e) => e,
                 Err(e) => {
-                    eprintln!("⚠️ walk error during marker scan at {}: {}", root.display(), e);
+                    eprintln!(
+                        "⚠️ walk error during marker scan at {}: {}",
+                        root.display(),
+                        e
+                    );
                     stats.walk_errors += 1;
                     continue;
                 }
@@ -2645,7 +2676,10 @@ impl DemonSecurity {
         }
 
         if stats.walk_errors > 0 {
-            return Err(anyhow::anyhow!("migrate_markers_in_path completed with {} walk error(s)", stats.walk_errors));
+            return Err(anyhow::anyhow!(
+                "migrate_markers_in_path completed with {} walk error(s)",
+                stats.walk_errors
+            ));
         }
 
         Ok(stats)
@@ -2694,12 +2728,12 @@ impl DemonSecurity {
     }
 
     /// Encrypt data using the repo key with AES-256-GCM.
-///
-/// SECURITY NOTE: Uses a random 12-byte nonce per encryption. For very high-volume
-/// repositories (2^48+ encrypted files with the same repo key), nonce collision
-/// becomes a meaningful risk for GCM mode. For typical use, the random nonce
-/// per-file is sufficient. Consider key rotation if your repo will exceed this scale.
-pub fn encrypt_with_repo_key(&self, repo_key: &RepoKey, plaintext: &[u8]) -> Result<Vec<u8>> {
+    ///
+    /// SECURITY NOTE: Uses a random 12-byte nonce per encryption. For very high-volume
+    /// repositories (2^48+ encrypted files with the same repo key), nonce collision
+    /// becomes a meaningful risk for GCM mode. For typical use, the random nonce
+    /// per-file is sufficient. Consider key rotation if your repo will exceed this scale.
+    pub fn encrypt_with_repo_key(&self, repo_key: &RepoKey, plaintext: &[u8]) -> Result<Vec<u8>> {
         let key = Key::<Aes256Gcm>::from_slice(&repo_key.0);
         let cipher = Aes256Gcm::new(key);
 
@@ -2806,7 +2840,11 @@ pub fn encrypt_with_repo_key(&self, repo_key: &RepoKey, plaintext: &[u8]) -> Res
             let entries = match fs::read_dir(keys_dir) {
                 Ok(e) => e,
                 Err(e) => {
-                    eprintln!("⚠️ failed to read keychain directory {}: {}", keys_dir.display(), e);
+                    eprintln!(
+                        "⚠️ failed to read keychain directory {}: {}",
+                        keys_dir.display(),
+                        e
+                    );
                     continue;
                 }
             };
@@ -2815,7 +2853,11 @@ pub fn encrypt_with_repo_key(&self, repo_key: &RepoKey, plaintext: &[u8]) -> Res
                 let entry = match entry {
                     Ok(e) => e,
                     Err(e) => {
-                        eprintln!("⚠️ failed to read keychain entry in {}: {}", keys_dir.display(), e);
+                        eprintln!(
+                            "⚠️ failed to read keychain entry in {}: {}",
+                            keys_dir.display(),
+                            e
+                        );
                         continue;
                     }
                 };
@@ -3038,13 +3080,20 @@ mod tests {
         // Binary content with null bytes should pass through unchanged
         let binary = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR";
         let result = warden.smudge(binary, None).expect("smudge binary");
-        assert_eq!(result, binary, "binary content should pass through smudge unchanged");
+        assert_eq!(
+            result, binary,
+            "binary content should pass through smudge unchanged"
+        );
     }
 
     #[test]
     fn test_protection_exemptions() {
         let scanner = SecretScanner::new_without_age_keys().unwrap();
-        let patterns = scanner.patterns.iter().map(|(n, _)| n.clone()).collect::<Vec<_>>();
+        let patterns = scanner
+            .patterns
+            .iter()
+            .map(|(n, _)| n.clone())
+            .collect::<Vec<_>>();
         eprintln!(
             "Patterns in scanner (excluding age keys): {}",
             patterns.len()
@@ -3078,11 +3127,7 @@ mod tests {
         let security = DemonSecurity::new(None).unwrap();
         let dir = tempfile::tempdir().unwrap();
         let file = dir.path().join("sample.env");
-        std::fs::write(
-            &file,
-            "A=[OLD_SECRET:abc]\nB=[OLD_SECRET:def]\nC=plain\n",
-        )
-        .unwrap();
+        std::fs::write(&file, "A=[OLD_SECRET:abc]\nB=[OLD_SECRET:def]\nC=plain\n").unwrap();
 
         let stats = security
             .migrate_markers_in_path(dir.path(), true, false, "OLD_SECRET", "DRACON_SECRET")
@@ -3180,8 +3225,7 @@ API_KEY=original"#;
         let s1 = DemonSecurity::get_or_init().unwrap();
         let s2 = DemonSecurity::get_or_init().unwrap();
         assert_eq!(
-            s1 as *const _ as usize,
-            s2 as *const _ as usize,
+            s1 as *const _ as usize, s2 as *const _ as usize,
             "get_or_init should return the same cached instance"
         );
     }
@@ -3199,9 +3243,15 @@ API_KEY=original"#;
         let plaintext = b"hello world, this is a secret message";
 
         let recipient = security.master_identities()[0].to_public();
-        let encrypted = security.encrypt_v2(plaintext, vec![Box::new(recipient)]).unwrap();
+        let encrypted = security
+            .encrypt_v2(plaintext, vec![Box::new(recipient)])
+            .unwrap();
         assert!(!encrypted.is_empty());
-        assert_ne!(encrypted, plaintext.to_vec(), "encrypted should differ from plaintext");
+        assert_ne!(
+            encrypted,
+            plaintext.to_vec(),
+            "encrypted should differ from plaintext"
+        );
 
         let decrypted = security.decrypt_v2(&encrypted).unwrap();
         assert_eq!(decrypted, plaintext, "decrypted should match original");
@@ -3221,7 +3271,9 @@ API_KEY=original"#;
         let security = test_security_with_identity();
         let plaintext: Vec<u8> = (0..256).map(|i| i as u8).collect();
         let recipient = security.master_identities()[0].to_public();
-        let encrypted = security.encrypt_v2(&plaintext, vec![Box::new(recipient)]).unwrap();
+        let encrypted = security
+            .encrypt_v2(&plaintext, vec![Box::new(recipient)])
+            .unwrap();
         let decrypted = security.decrypt_v2(&encrypted).unwrap();
         assert_eq!(decrypted, plaintext, "binary data should roundtrip");
     }
@@ -3231,7 +3283,9 @@ API_KEY=original"#;
         let security = test_security_with_identity();
         let plaintext = b"secret data for unlock_payload test";
         let recipient = security.master_identities()[0].to_public();
-        let encrypted = security.encrypt_v2(plaintext, vec![Box::new(recipient)]).unwrap();
+        let encrypted = security
+            .encrypt_v2(plaintext, vec![Box::new(recipient)])
+            .unwrap();
 
         let unlocked = security.unlock_payload(&encrypted).unwrap();
         assert_eq!(unlocked, plaintext, "unlock_payload should decrypt v2");
@@ -3254,7 +3308,9 @@ API_KEY=original"#;
 
         let plaintext = b"data encrypted to key1";
         let recipient = security1.master_identities()[0].to_public();
-        let encrypted = security1.encrypt_v2(plaintext, vec![Box::new(recipient)]).unwrap();
+        let encrypted = security1
+            .encrypt_v2(plaintext, vec![Box::new(recipient)])
+            .unwrap();
 
         let result = security2.decrypt_v2(&encrypted);
         assert!(result.is_err(), "decrypt with wrong identity should fail");
@@ -3264,7 +3320,10 @@ API_KEY=original"#;
     fn test_decrypt_v2_requires_master_identity() {
         let security = DemonSecurity::new(None).unwrap();
         let result = security.decrypt_v2(b"some encrypted data");
-        assert!(result.is_err(), "decrypt_v2 should fail without master identities");
+        assert!(
+            result.is_err(),
+            "decrypt_v2 should fail without master identities"
+        );
     }
 
     #[test]
@@ -3286,9 +3345,18 @@ API_KEY=original"#;
 
     #[test]
     fn test_normalize_secret_marker_valid() {
-        assert_eq!(normalize_secret_marker("API_SECRET"), Some("API_SECRET".to_string()));
-        assert_eq!(normalize_secret_marker("DB_SECRET"), Some("DB_SECRET".to_string()));
-        assert_eq!(normalize_secret_marker("  api_secret  "), Some("API_SECRET".to_string()));
+        assert_eq!(
+            normalize_secret_marker("API_SECRET"),
+            Some("API_SECRET".to_string())
+        );
+        assert_eq!(
+            normalize_secret_marker("DB_SECRET"),
+            Some("DB_SECRET".to_string())
+        );
+        assert_eq!(
+            normalize_secret_marker("  api_secret  "),
+            Some("API_SECRET".to_string())
+        );
     }
 
     #[test]
@@ -3322,10 +3390,20 @@ API_KEY=original"#;
         let long = "ghp_abcdefghijklmnopqrstuvwxyz0123456789ABCD";
         let found_short = scanner.scan(short);
         let found_long = scanner.scan(long);
-        assert!(found_short.iter().any(|f| f.name.contains("GitHub Token (ghp)")),
-            "should detect short ghp_ token (30 chars after prefix), found: {:?}", found_short);
-        assert!(found_long.iter().any(|f| f.name.contains("GitHub Token (ghp)")),
-            "should detect long ghp_ token (40 chars after prefix), found: {:?}", found_long);
+        assert!(
+            found_short
+                .iter()
+                .any(|f| f.name.contains("GitHub Token (ghp)")),
+            "should detect short ghp_ token (30 chars after prefix), found: {:?}",
+            found_short
+        );
+        assert!(
+            found_long
+                .iter()
+                .any(|f| f.name.contains("GitHub Token (ghp)")),
+            "should detect long ghp_ token (40 chars after prefix), found: {:?}",
+            found_long
+        );
     }
 
     #[test]
@@ -3335,10 +3413,16 @@ API_KEY=original"#;
         let long = "key-abcdefghijklmnopqrstuvwxyz0123456";
         let found_short = scanner.scan(short);
         let found_long = scanner.scan(long);
-        assert!(found_short.iter().any(|f| f.name == "Mailgun API Key"),
-            "should detect 28-char Mailgun key (after prefix), found: {:?}", found_short);
-        assert!(found_long.iter().any(|f| f.name == "Mailgun API Key"),
-            "should detect 34-char Mailgun key (after prefix), found: {:?}", found_long);
+        assert!(
+            found_short.iter().any(|f| f.name == "Mailgun API Key"),
+            "should detect 28-char Mailgun key (after prefix), found: {:?}",
+            found_short
+        );
+        assert!(
+            found_long.iter().any(|f| f.name == "Mailgun API Key"),
+            "should detect 34-char Mailgun key (after prefix), found: {:?}",
+            found_long
+        );
     }
 
     #[test]
@@ -3346,8 +3430,11 @@ API_KEY=original"#;
         let scanner = SecretScanner::new_without_age_keys().unwrap();
         let token = "xoxb-aBcDeFgHiJkLmNoPqRsTuVwXyZ";
         let found = scanner.scan(token);
-        assert!(found.iter().any(|f| f.name == "Slack Bot Token (Compact)"),
-            "should detect compact Slack bot token, found: {:?}", found);
+        assert!(
+            found.iter().any(|f| f.name == "Slack Bot Token (Compact)"),
+            "should detect compact Slack bot token, found: {:?}",
+            found
+        );
     }
 
     #[test]
@@ -3355,8 +3442,11 @@ API_KEY=original"#;
         let scanner = SecretScanner::new_without_age_keys().unwrap();
         let reasonable = "xoxb-aBcDeFgHiJkLmNoPqRsTuVwXyZ01234567890123456789012345678901234567";
         let found = scanner.scan(reasonable);
-        assert!(found.iter().any(|f| f.name == "Slack Bot Token (Compact)"),
-            "should match slack bot token up to 68 chars after xoxb-, found: {:?}", found);
+        assert!(
+            found.iter().any(|f| f.name == "Slack Bot Token (Compact)"),
+            "should match slack bot token up to 68 chars after xoxb-, found: {:?}",
+            found
+        );
     }
 
     #[test]
@@ -3366,10 +3456,18 @@ API_KEY=original"#;
         let without_context = r#"label = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4""#;
         let found_with = scanner.scan(with_context);
         let found_without = scanner.scan(without_context);
-        assert!(found_with.iter().any(|f| f.name == "Hex Secret (Quoted)"),
-            "should detect hex secret with context keyword, found: {:?}", found_with);
-        assert!(!found_without.iter().any(|f| f.name == "Hex Secret (Quoted)"),
-            "should NOT detect hex string without context keyword, found: {:?}", found_without);
+        assert!(
+            found_with.iter().any(|f| f.name == "Hex Secret (Quoted)"),
+            "should detect hex secret with context keyword, found: {:?}",
+            found_with
+        );
+        assert!(
+            !found_without
+                .iter()
+                .any(|f| f.name == "Hex Secret (Quoted)"),
+            "should NOT detect hex string without context keyword, found: {:?}",
+            found_without
+        );
     }
 
     #[test]
@@ -3379,9 +3477,19 @@ API_KEY=original"#;
         let without_context = r#"class_name = "aBcDeFgHiJkLmNoPqRsTuVwX""#;
         let found_with = scanner.scan(with_context);
         let found_without = scanner.scan(without_context);
-        assert!(found_with.iter().any(|f| f.name == "High-Entropy Secret (Quoted)"),
-            "should detect high-entropy secret with context keyword, found: {:?}", found_with);
-        assert!(!found_without.iter().any(|f| f.name == "High-Entropy Secret (Quoted)"),
-            "should NOT detect alphanumeric string without context keyword, found: {:?}", found_without);
+        assert!(
+            found_with
+                .iter()
+                .any(|f| f.name == "High-Entropy Secret (Quoted)"),
+            "should detect high-entropy secret with context keyword, found: {:?}",
+            found_with
+        );
+        assert!(
+            !found_without
+                .iter()
+                .any(|f| f.name == "High-Entropy Secret (Quoted)"),
+            "should NOT detect alphanumeric string without context keyword, found: {:?}",
+            found_without
+        );
     }
 }

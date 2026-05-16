@@ -38,8 +38,14 @@ fn expand_tilde_with_home_unset_falls_back_to_dot() {
     // but we can verify the fallback path is wired correctly by testing
     // the helper directly if we could mock it. Instead, just verify
     // non-tilde paths pass through unchanged.
-    assert_eq!(expand_tilde("/absolute/path"), PathBuf::from("/absolute/path"));
-    assert_eq!(expand_tilde("relative/path"), PathBuf::from("relative/path"));
+    assert_eq!(
+        expand_tilde("/absolute/path"),
+        PathBuf::from("/absolute/path")
+    );
+    assert_eq!(
+        expand_tilde("relative/path"),
+        PathBuf::from("relative/path")
+    );
 }
 
 #[test]
@@ -303,7 +309,10 @@ async fn guard_report_completes_for_ok_disk() {
         ..GuardPolicy::default()
     };
     let report = run_guard_once(&guard, &mut state).await;
-    assert!(report.is_ok(), "guard should complete successfully with default policy on ok disk");
+    assert!(
+        report.is_ok(),
+        "guard should complete successfully with default policy on ok disk"
+    );
 }
 
 #[test]
@@ -375,7 +384,10 @@ fn guard_safe_delete_allows_paths_under_system_protected() {
     let target = tmp.join("target");
     std::fs::create_dir_all(&target).unwrap();
     let result = check_safe_to_delete_guard(&target, &[]);
-    assert!(result.is_ok(), "guard safe delete should allow paths under /home (system-protected skipped)");
+    assert!(
+        result.is_ok(),
+        "guard safe delete should allow paths under /home (system-protected skipped)"
+    );
     let _ = std::fs::remove_dir_all(&tmp);
 }
 
@@ -386,7 +398,10 @@ fn guard_safe_delete_blocks_user_protected() {
     std::fs::create_dir_all(&target).unwrap();
     let user_protected = vec![tmp.display().to_string()];
     let result = check_safe_to_delete_guard(&target, &user_protected);
-    assert!(result.is_err(), "guard safe delete should block user-protected paths");
+    assert!(
+        result.is_err(),
+        "guard safe delete should block user-protected paths"
+    );
     let _ = std::fs::remove_dir_all(&tmp);
 }
 

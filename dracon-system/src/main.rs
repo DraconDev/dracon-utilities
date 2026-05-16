@@ -51,7 +51,10 @@ fn check_safe_to_delete(path: &Path, user_protected: &[String]) -> Result<PathBu
     // For now: if the original path is a symlink, reject it.
     if let Ok(meta) = std::fs::symlink_metadata(path) {
         if meta.file_type().is_symlink() {
-            anyhow::bail!("refusing to delete symlink {} — use target directly", path.display());
+            anyhow::bail!(
+                "refusing to delete symlink {} — use target directly",
+                path.display()
+            );
         }
     }
 
@@ -109,7 +112,10 @@ fn check_safe_to_delete_guard(path: &Path, user_protected: &[String]) -> Result<
     // Reject symlinks to mitigate TOCTOU
     if let Ok(meta) = std::fs::symlink_metadata(path) {
         if meta.file_type().is_symlink() {
-            anyhow::bail!("refusing to delete symlink {} — use target directly", path.display());
+            anyhow::bail!(
+                "refusing to delete symlink {} — use target directly",
+                path.display()
+            );
         }
     }
 
@@ -1024,7 +1030,12 @@ async fn process_samples() -> Result<Vec<ProcSample>> {
         .args(["-eo", "pid,ppid,pcpu,rss,comm,args", "--no-headers"])
         .output()
         .await
-        .map_err(|e| anyhow::anyhow!("ps spawn failed: {} (is /run/current-system/sw/bin on PATH?)", e))?;
+        .map_err(|e| {
+            anyhow::anyhow!(
+                "ps spawn failed: {} (is /run/current-system/sw/bin on PATH?)",
+                e
+            )
+        })?;
     if !out.status.success() {
         return Err(anyhow::anyhow!(
             "ps command failed (exit {}): {}",
@@ -1056,12 +1067,7 @@ async fn send_notification(guard: &GuardPolicy, title: &str, body: &str) {
         eprintln!("⚠️ notify_command must be an absolute path, got: {}", cmd);
         return;
     }
-    if let Err(e) = Command::new(cmd)
-        .arg(title)
-        .arg(body)
-        .output()
-        .await
-    {
+    if let Err(e) = Command::new(cmd).arg(title).arg(body).output().await {
         eprintln!("⚠️ notification failed: {}", e);
     }
 }
@@ -1126,15 +1132,8 @@ fn sync_freeze_marker_path(guard: &GuardPolicy) -> PathBuf {
 }
 
 fn graduated_nice_value(cpu_percent: f32, rss_mb: u64, base_nice: i32) -> i32 {
-    let cpu_tiers: &[(f32, i32)] = &[
-        (500.0, 15),
-        (300.0, 10),
-        (180.0, 5),
-    ];
-    let mem_tiers: &[(u64, i32)] = &[
-        (8192, 10),
-        (4096, 5),
-    ];
+    let cpu_tiers: &[(f32, i32)] = &[(500.0, 15), (300.0, 10), (180.0, 5)];
+    let mem_tiers: &[(u64, i32)] = &[(8192, 10), (4096, 5)];
     let cpu_nice = cpu_tiers
         .iter()
         .find(|(threshold, _)| cpu_percent >= *threshold)
@@ -1328,7 +1327,10 @@ async fn auto_cleanup_rust_targets(
         }
     }
 
-    let min_size_bytes = guard.cleanup_min_size_mb.saturating_mul(1024).saturating_mul(1024);
+    let min_size_bytes = guard
+        .cleanup_min_size_mb
+        .saturating_mul(1024)
+        .saturating_mul(1024);
 
     for target in targets {
         // Skip if too small
@@ -1355,7 +1357,9 @@ async fn auto_cleanup_rust_targets(
                 Ok(p) => p,
                 Err(e) => {
                     eprintln!("⚠️ skipping {}: {}", target.path.display(), e);
-                    result.protected_paths.push(target.path.display().to_string());
+                    result
+                        .protected_paths
+                        .push(target.path.display().to_string());
                     continue;
                 }
             };
@@ -1712,11 +1716,13 @@ async fn empty_trash(apply: bool, protected_paths: &[String]) -> Result<(u64, Ve
     Ok((reclaimed, cleaned))
 }
 
-static RESOLVE_BIN_CACHE: std::sync::OnceLock<std::sync::Mutex<std::collections::HashMap<String, String>>> =
-    std::sync::OnceLock::new();
+static RESOLVE_BIN_CACHE: std::sync::OnceLock<
+    std::sync::Mutex<std::collections::HashMap<String, String>>,
+> = std::sync::OnceLock::new();
 
 fn resolve_bin(name: &str) -> String {
-    let cache = RESOLVE_BIN_CACHE.get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()));
+    let cache =
+        RESOLVE_BIN_CACHE.get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()));
     {
         if let Some(cached) = cache.lock().unwrap().get(name) {
             return cached.clone();
@@ -1730,9 +1736,17 @@ fn resolve_bin(name: &str) -> String {
     let result = nixos_paths
         .iter()
         .find(|dir| std::path::Path::new(dir).join(name).exists())
-        .map(|dir| std::path::Path::new(dir).join(name).to_string_lossy().to_string())
+        .map(|dir| {
+            std::path::Path::new(dir)
+                .join(name)
+                .to_string_lossy()
+                .to_string()
+        })
         .unwrap_or_else(|| name.to_string());
-    cache.lock().unwrap().insert(name.to_string(), result.clone());
+    cache
+        .lock()
+        .unwrap()
+        .insert(name.to_string(), result.clone());
     result
 }
 
@@ -2151,7 +2165,11 @@ fn manage_sync_freeze(guard: &GuardPolicy, used: u8, dstate: &str, sync_frozen: 
     }
 }
 
-async fn run_auto_cleanup(guard: &GuardPolicy, state: &mut GuardRuntimeState, used: u8) -> Result<()> {
+async fn run_auto_cleanup(
+    guard: &GuardPolicy,
+    state: &mut GuardRuntimeState,
+    used: u8,
+) -> Result<()> {
     let apply = guard.auto_cleanup_apply;
     if !apply {
         eprintln!("💡 disk at {}% — auto-cleanup is in dry-run mode (set auto_cleanup_apply = true to execute)", used);
@@ -2235,8 +2253,7 @@ async fn run_auto_cleanup(guard: &GuardPolicy, state: &mut GuardRuntimeState, us
     }
 
     if guard.clean_package_caches {
-        match clean_package_caches(true, true, true, true, apply, &guard.protected_paths).await
-        {
+        match clean_package_caches(true, true, true, true, apply, &guard.protected_paths).await {
             Ok((bytes, cleaned)) => {
                 total_reclaimed += bytes;
                 all_cleaned.extend(cleaned.iter().map(|s| format!("Cache: {}", s)));
@@ -2283,7 +2300,12 @@ async fn run_auto_cleanup(guard: &GuardPolicy, state: &mut GuardRuntimeState, us
     Ok(())
 }
 
-async fn check_disk_state_change(guard: &GuardPolicy, state: &mut GuardRuntimeState, used: u8, dstate: &str) {
+async fn check_disk_state_change(
+    guard: &GuardPolicy,
+    state: &mut GuardRuntimeState,
+    used: u8,
+    dstate: &str,
+) {
     if state.last_disk_state != dstate {
         let key = format!("disk-state-{dstate}");
         if should_notify(state, &key, guard.notify_cooldown_secs) {
@@ -2346,7 +2368,9 @@ async fn check_heavy_processes(
             let nice_val = graduated_nice_value(p.cpu_percent, p.rss_mb, guard.renice_value);
             if already_niced != Some(nice_val) {
                 renice_process(p.pid, nice_val).await;
-                state.reniced_pids.insert(p.pid, (nice_val, p.command.clone()));
+                state
+                    .reniced_pids
+                    .insert(p.pid, (nice_val, p.command.clone()));
                 eprintln!(
                     "🔧 renice pid={} cmd={} -> nice {} (cpu={:.1}% rss={}MiB)",
                     p.pid, p.command, nice_val, p.cpu_percent, p.rss_mb
@@ -2363,8 +2387,16 @@ async fn check_heavy_processes(
                 "Dracon System Guard",
                 &format!(
                     "Heavy process {} (pid={} cpu={:.1}% rss={}MiB) sustained {}s{}",
-                    p.command, p.pid, p.cpu_percent, p.rss_mb, sustained,
-                    if nice_applied > 0 { format!(" reniced={}", nice_applied) } else { String::new() }
+                    p.command,
+                    p.pid,
+                    p.cpu_percent,
+                    p.rss_mb,
+                    sustained,
+                    if nice_applied > 0 {
+                        format!(" reniced={}", nice_applied)
+                    } else {
+                        String::new()
+                    }
                 ),
             )
             .await;
@@ -2417,7 +2449,10 @@ async fn check_heavy_processes(
                 Err(_) => false,
             };
             if !same_process {
-                eprintln!("🔧 skip un-renice pid={} — PID recycled (was {}, now different)", pid, orig_cmd);
+                eprintln!(
+                    "🔧 skip un-renice pid={} — PID recycled (was {}, now different)",
+                    pid, orig_cmd
+                );
                 state.reniced_pids.remove(&pid);
                 state.cooled_since.remove(&pid);
                 continue;
@@ -2428,12 +2463,14 @@ async fn check_heavy_processes(
         state.reniced_pids.remove(&pid);
         state.cooled_since.remove(&pid);
     }
-    state.cooled_since.retain(|pid, _| state.reniced_pids.contains_key(pid));
+    state
+        .cooled_since
+        .retain(|pid, _| state.reniced_pids.contains_key(pid));
 
     // Clean up reniced_pids for processes that no longer exist
-    state.reniced_pids.retain(|pid, _| {
-        PathBuf::from(format!("/proc/{}", pid)).exists()
-    });
+    state
+        .reniced_pids
+        .retain(|pid, _| PathBuf::from(format!("/proc/{}", pid)).exists());
 
     // Summary feedback
     if !state.reniced_pids.is_empty() {
@@ -2541,12 +2578,14 @@ async fn check_large_logs(guard: &GuardPolicy, state: &mut GuardRuntimeState) {
                         .collect::<Vec<_>>()
                         .join(", ")
                 );
-                send_notification(guard, "Dracon System Guard - Large Log Files", &msg)
-                    .await;
+                send_notification(guard, "Dracon System Guard - Large Log Files", &msg).await;
             }
 
             if guard.auto_truncate_logs && guard.auto_cleanup_apply {
-                let max_size = guard.log_max_truncate_mb.saturating_mul(1024).saturating_mul(1024);
+                let max_size = guard
+                    .log_max_truncate_mb
+                    .saturating_mul(1024)
+                    .saturating_mul(1024);
                 let preserve = guard.log_preserve_header_lines;
                 let mut total_reclaimed = 0u64;
                 for (path, original_size) in &logs {
@@ -2927,12 +2966,20 @@ async fn is_git_tracked_dir(path: &Path) -> Result<bool> {
         .await;
     let top_out = match top_out {
         Ok(o) if o.status.success() => o,
-        _ => return Err(anyhow::anyhow!("git rev-parse failed for {}", parent.display())),
+        _ => {
+            return Err(anyhow::anyhow!(
+                "git rev-parse failed for {}",
+                parent.display()
+            ))
+        }
     };
 
     let repo_root = String::from_utf8_lossy(&top_out.stdout).trim().to_string();
     if repo_root.is_empty() {
-        return Err(anyhow::anyhow!("git rev-parse returned empty root for {}", parent.display()));
+        return Err(anyhow::anyhow!(
+            "git rev-parse returned empty root for {}",
+            parent.display()
+        ));
     }
 
     let ls_out = Command::new("git")
@@ -2943,7 +2990,13 @@ async fn is_git_tracked_dir(path: &Path) -> Result<bool> {
         .await;
     let ls_out = match ls_out {
         Ok(o) if o.status.success() => o,
-        _ => return Err(anyhow::anyhow!("git ls-files failed for {} in {}", name, repo_root)),
+        _ => {
+            return Err(anyhow::anyhow!(
+                "git ls-files failed for {} in {}",
+                name,
+                repo_root
+            ))
+        }
     };
 
     Ok(!String::from_utf8_lossy(&ls_out.stdout).trim().is_empty())
@@ -3175,13 +3228,7 @@ async fn cmd_guard_once(guard: &GuardPolicy, json: bool) -> Result<()> {
         for a in report.alerts {
             println!(
                 "- pid={} cmd={} cpu={:.1}% rss={}MiB sustained={}s action={} nice={}",
-                a.pid,
-                a.command,
-                a.cpu_percent,
-                a.rss_mb,
-                a.sustained_secs,
-                a.action,
-                a.nice_value
+                a.pid, a.command, a.cpu_percent, a.rss_mb, a.sustained_secs, a.action, a.nice_value
             );
         }
     }
@@ -3203,9 +3250,9 @@ async fn cmd_guard_daemon(guard: &mut GuardPolicy) -> Result<()> {
     let reload_sighup_handler = reload.clone();
 
     tokio::spawn(async move {
-        if let Ok(mut sig) = tokio::signal::unix::signal(
-            tokio::signal::unix::SignalKind::terminate(),
-        ) {
+        if let Ok(mut sig) =
+            tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+        {
             sig.recv().await;
             veprintln!(1, "system: received SIGTERM, shutting down gracefully...");
             shutdown_sigterm.store(true, Ordering::SeqCst);
@@ -3215,9 +3262,9 @@ async fn cmd_guard_daemon(guard: &mut GuardPolicy) -> Result<()> {
     });
 
     tokio::spawn(async move {
-        if let Ok(mut sig) = tokio::signal::unix::signal(
-            tokio::signal::unix::SignalKind::interrupt(),
-        ) {
+        if let Ok(mut sig) =
+            tokio::signal::unix::signal(tokio::signal::unix::SignalKind::interrupt())
+        {
             sig.recv().await;
             veprintln!(1, "system: received SIGINT, shutting down gracefully...");
             shutdown_sigint.store(true, Ordering::SeqCst);
@@ -3227,8 +3274,7 @@ async fn cmd_guard_daemon(guard: &mut GuardPolicy) -> Result<()> {
     });
 
     tokio::spawn(async move {
-        if let Ok(mut sig) =
-            tokio::signal::unix::signal(tokio::signal::unix::SignalKind::hangup())
+        if let Ok(mut sig) = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::hangup())
         {
             while sig.recv().await.is_some() {
                 veprintln!(1, "system: received SIGHUP, reloading policy...");
@@ -3254,13 +3300,14 @@ async fn cmd_guard_daemon(guard: &mut GuardPolicy) -> Result<()> {
             match result {
                 Ok((policy_path, new_policy)) => {
                     if policy_path.is_none() {
-                        eprintln!("system: SIGHUP reload warning: no policy file found, using defaults");
+                        eprintln!(
+                            "system: SIGHUP reload warning: no policy file found, using defaults"
+                        );
                         emit_event(&DraconEvent::new(
                             "system",
                             EventSeverity::Warn,
                             "guard/policy-reload",
-                            "SIGHUP reload: no policy file found, using defaults"
-                                .to_string(),
+                            "SIGHUP reload: no policy file found, using defaults".to_string(),
                         ));
                     }
                     *guard = new_policy.guard;
@@ -3275,31 +3322,38 @@ async fn cmd_guard_daemon(guard: &mut GuardPolicy) -> Result<()> {
                                     .file_name()
                                     .map(|n| n.to_string_lossy().to_string())
                                     .unwrap_or_default();
-exe_name == orig_cmd.as_str()
+                                exe_name == orig_cmd.as_str()
                             }
                             Err(_) => false,
                         };
                         if !same_process {
-                            eprintln!("⚠ SIGHUP skip un-renice pid={} — PID recycled (was {})", pid, orig_cmd);
+                            eprintln!(
+                                "⚠ SIGHUP skip un-renice pid={} — PID recycled (was {})",
+                                pid, orig_cmd
+                            );
                             continue;
                         }
                         renice_process(pid, 0).await;
                     }
                     runtime = GuardRuntimeState::default();
                     interval = guard.interval_secs;
-                    veprintln!(2, "system: policy reloaded on SIGHUP (disk_warn={}%, disk_critical={}%)",
-                        guard.disk_warn_percent, guard.disk_critical_percent);
+                    veprintln!(
+                        2,
+                        "system: policy reloaded on SIGHUP (disk_warn={}%, disk_critical={}%)",
+                        guard.disk_warn_percent,
+                        guard.disk_critical_percent
+                    );
                 }
                 Err(e) => {
-                    eprintln!("system: SIGHUP reload warning: corrupted policy file, using defaults: {}", e);
+                    eprintln!(
+                        "system: SIGHUP reload warning: corrupted policy file, using defaults: {}",
+                        e
+                    );
                     emit_event(&DraconEvent::new(
                         "system",
                         EventSeverity::Error,
                         "guard/policy-reload",
-                        format!(
-                            "SIGHUP reload: policy corrupted, using defaults: {}",
-                            e
-                        ),
+                        format!("SIGHUP reload: policy corrupted, using defaults: {}", e),
                     ));
                 }
             }
@@ -3350,16 +3404,7 @@ async fn cmd_guard_prune(
     }
 
     if package_caches {
-        match clean_package_caches(
-            true,
-            true,
-            true,
-            true,
-            apply,
-            &guard.protected_paths,
-        )
-        .await
-        {
+        match clean_package_caches(true, true, true, true, apply, &guard.protected_paths).await {
             Ok((bytes, cleaned)) => {
                 for c in cleaned {
                     actions.push(format!("Package cache: {}", c));
@@ -3377,8 +3422,7 @@ async fn cmd_guard_prune(
         println!("Disk usage: {}% (mount: {})", disk, guard.disk_mount_path);
 
         if let Ok((total, used, _free)) = get_inode_info().await {
-            let pct =
-                used.saturating_mul(100).checked_div(total).unwrap_or(0) as u8;
+            let pct = used.saturating_mul(100).checked_div(total).unwrap_or(0) as u8;
             println!("Inode usage: {}% ({}/{} inodes used)", pct, used, total);
         }
 
@@ -3456,8 +3500,7 @@ async fn cmd_guard_clean(
 
     if do_rust {
         let mut runtime = GuardRuntimeState::default();
-        let result =
-            auto_cleanup_rust_targets(&guard_clone, &mut runtime, apply).await?;
+        let result = auto_cleanup_rust_targets(&guard_clone, &mut runtime, apply).await?;
         total_reclaimed += result.reclaimed_bytes;
         for p in result.cleaned_paths {
             actions.push(format!("Rust: {}", p));
@@ -3527,15 +3570,8 @@ async fn cmd_guard_clean(
     }
 
     if do_caches {
-        match clean_package_caches(
-            true,
-            true,
-            true,
-            true,
-            apply,
-            &guard_clone.protected_paths,
-        )
-        .await
+        match clean_package_caches(true, true, true, true, apply, &guard_clone.protected_paths)
+            .await
         {
             Ok((bytes, cleaned)) => {
                 total_reclaimed += bytes;
@@ -3622,10 +3658,7 @@ async fn cmd_guard(cmd: GuardCommands) -> Result<()> {
             docker_volumes,
             package_caches,
             apply,
-        } => {
-            cmd_guard_prune(&guard, json, docker, docker_volumes, package_caches, apply)
-                .await
-        }
+        } => cmd_guard_prune(&guard, json, docker, docker_volumes, package_caches, apply).await,
         GuardCommands::Clean {
             json,
             apply,
@@ -3799,9 +3832,7 @@ fn cmd_zram(
         println!("Configuration options:");
         println!("  --gen-config           Generate NixOS configuration snippet");
         println!("  --memory-percent <N>   Set memory percent (default: 200 for 2x RAM)");
-        println!(
-            "  --algorithm <algo>     Set algorithm: lzo, lz4, lz4hc, zstd (default: zstd)"
-        );
+        println!("  --algorithm <algo>     Set algorithm: lzo, lz4, lz4hc, zstd (default: zstd)");
         println!();
         println!("Example - generate config for 2x RAM with zstd:");
         println!("  dracon-system zram --gen-config --memory-percent 200 --algorithm zstd");
@@ -3827,7 +3858,16 @@ async fn main() -> Result<()> {
             min_size_mb,
             kinds,
         } => {
-            cmd_storage(root, json, cleanup, apply, allow_tracked, min_size_mb, kinds).await
+            cmd_storage(
+                root,
+                json,
+                cleanup,
+                apply,
+                allow_tracked,
+                min_size_mb,
+                kinds,
+            )
+            .await
         }
         Commands::Link { cmd } => cmd_link(cmd),
         Commands::Guard { cmd } => cmd_guard(cmd).await,

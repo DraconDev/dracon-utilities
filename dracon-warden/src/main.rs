@@ -11,8 +11,8 @@ use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command as ProcessCommand;
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
-use std::sync::Arc;
 use std::sync::mpsc;
+use std::sync::Arc;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 use zeroize::Zeroizing;
@@ -571,7 +571,6 @@ pub(crate) fn apply_overwrite_file(path: &Path, content: &str) -> Result<bool> {
         ));
         #[cfg(unix)]
         {
-            
             fs::OpenOptions::new()
                 .write(true)
                 .create_new(true)
@@ -624,7 +623,11 @@ pub(crate) fn owner_pubkeys_in(dir: &Path) -> Vec<PathBuf> {
     let read_dir = match fs::read_dir(dir) {
         Ok(rd) => rd,
         Err(e) => {
-            eprintln!("⚠️ cannot read owner pubkeys directory {}: {}", dir.display(), e);
+            eprintln!(
+                "⚠️ cannot read owner pubkeys directory {}: {}",
+                dir.display(),
+                e
+            );
             return out;
         }
     };
@@ -1059,7 +1062,12 @@ pub(crate) fn run_keygen() -> Result<()> {
             .write(true)
             .create_new(true)
             .open(&pubkey_path)
-            .with_context(|| format!("failed to create {}, file may already exist", pubkey_path.display()))?
+            .with_context(|| {
+                format!(
+                    "failed to create {}, file may already exist",
+                    pubkey_path.display()
+                )
+            })?
             .write_all(format!("{}\n", recipient).as_bytes())
             .with_context(|| format!("failed to write {}", pubkey_path.display()))?;
     }
@@ -1070,7 +1078,12 @@ pub(crate) fn run_keygen() -> Result<()> {
             .write(true)
             .create_new(true)
             .open(&pubkey_path)
-            .with_context(|| format!("failed to create {}, file may already exist", pubkey_path.display()))?;
+            .with_context(|| {
+                format!(
+                    "failed to create {}, file may already exist",
+                    pubkey_path.display()
+                )
+            })?;
         f.write_all(format!("{}\n", recipient).as_bytes())
             .with_context(|| format!("failed to write {}", pubkey_path.display()))?;
     }
@@ -1166,7 +1179,9 @@ fn run_daemon(policy_path: PathBuf) -> Result<()> {
     let reload_sighup = reload.clone();
 
     tokio::spawn(async move {
-        if let Ok(mut sig) = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+        if let Ok(mut sig) =
+            tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+        {
             sig.recv().await;
             veprintln!(1, "warden: received SIGTERM, shutting down gracefully...");
             shutdown_sigterm.store(true, Ordering::SeqCst);
@@ -1176,7 +1191,9 @@ fn run_daemon(policy_path: PathBuf) -> Result<()> {
     });
 
     tokio::spawn(async move {
-        if let Ok(mut sig) = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::interrupt()) {
+        if let Ok(mut sig) =
+            tokio::signal::unix::signal(tokio::signal::unix::SignalKind::interrupt())
+        {
             sig.recv().await;
             veprintln!(1, "warden: received SIGINT, shutting down gracefully...");
             shutdown_sigint.store(true, Ordering::SeqCst);
@@ -1186,7 +1203,8 @@ fn run_daemon(policy_path: PathBuf) -> Result<()> {
     });
 
     tokio::spawn(async move {
-        if let Ok(mut sig) = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::hangup()) {
+        if let Ok(mut sig) = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::hangup())
+        {
             sig.recv().await;
             veprintln!(1, "warden: received SIGHUP, reloading policy...");
             reload_sighup.store(true, Ordering::SeqCst);
@@ -1741,7 +1759,11 @@ fn resmudge_repo(repo: &Path, policy: &WardenPolicy, apply: bool) -> Result<(usi
     Ok((found, changed))
 }
 
-pub(crate) fn resmudge_repos(policy: &WardenPolicy, repos: &[PathBuf], apply: bool) -> Result<(usize, usize)> {
+pub(crate) fn resmudge_repos(
+    policy: &WardenPolicy,
+    repos: &[PathBuf],
+    apply: bool,
+) -> Result<(usize, usize)> {
     policy.validate()?;
 
     let mut total_found = 0usize;
@@ -1812,7 +1834,10 @@ fn backfill_env_headers_repo(repo: &Path, apply: bool) -> Result<(usize, usize)>
 
         if !apply {
             if is_encrypted {
-                println!("🔎 .env without header (encrypted, skipping): {}", full.display());
+                println!(
+                    "🔎 .env without header (encrypted, skipping): {}",
+                    full.display()
+                );
             } else {
                 println!("🔎 .env without header: {}", full.display());
             }
@@ -1820,7 +1845,10 @@ fn backfill_env_headers_repo(repo: &Path, apply: bool) -> Result<(usize, usize)>
         }
 
         if is_encrypted {
-            eprintln!("⚠️ refusing to decrypt encrypted file during header backfill: {}", full.display());
+            eprintln!(
+                "⚠️ refusing to decrypt encrypted file during header backfill: {}",
+                full.display()
+            );
             continue;
         }
 
@@ -1889,4 +1917,5 @@ fn run_filter(is_clean: bool, path: Option<&str>) -> Result<()> {
     Ok(())
 }
 
-#[cfg(test)] mod tests;
+#[cfg(test)]
+mod tests;

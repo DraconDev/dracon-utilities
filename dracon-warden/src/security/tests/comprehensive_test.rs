@@ -295,13 +295,17 @@ fn test_encrypt_decrypt_multiple_recipients() -> Result<()> {
     let recipient1 = key.to_public();
     let recipient2 = age::x25519::Identity::generate().to_public();
 
-    let encrypted = demon.encrypt_v2(plaintext, vec![
-        Box::new(recipient1.clone()),
-        Box::new(recipient2.clone()),
-    ])?;
+    let encrypted = demon.encrypt_v2(
+        plaintext,
+        vec![Box::new(recipient1.clone()), Box::new(recipient2.clone())],
+    )?;
 
     let decrypted = demon.decrypt_v2(&encrypted)?;
-    assert_eq!(&decrypted[..], plaintext, "multi-recipient should roundtrip");
+    assert_eq!(
+        &decrypted[..],
+        plaintext,
+        "multi-recipient should roundtrip"
+    );
 
     Ok(())
 }
@@ -311,8 +315,7 @@ fn test_dracon_security_singleton_same_instance() -> Result<()> {
     let s1 = DemonSecurity::get_or_init()?;
     let s2 = DemonSecurity::get_or_init()?;
     assert_eq!(
-        s1 as *const _ as usize,
-        s2 as *const _ as usize,
+        s1 as *const _ as usize, s2 as *const _ as usize,
         "get_or_init should return the same instance"
     );
     Ok(())

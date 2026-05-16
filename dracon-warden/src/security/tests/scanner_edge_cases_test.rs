@@ -13,7 +13,7 @@ fn test_patterns_are_valid_regexes() {
 #[test]
 fn test_scanner_handles_empty_input() {
     let scanner = SecretScanner::new().unwrap();
-    let result = scanner.scan_and_replace("", |_,_| "[REDACTED]".to_string());
+    let result = scanner.scan_and_replace("", |_, _| "[REDACTED]".to_string());
     assert_eq!(result, "");
 }
 
@@ -21,7 +21,7 @@ fn test_scanner_handles_empty_input() {
 fn test_scanner_handles_clean_text() {
     let scanner = SecretScanner::new().unwrap();
     let clean = "this is just regular text with no secrets in it";
-    let result = scanner.scan_and_replace(clean, |_,_| "[REDACTED]".to_string());
+    let result = scanner.scan_and_replace(clean, |_, _| "[REDACTED]".to_string());
     assert_eq!(result, clean, "clean text should pass through unchanged");
 }
 
@@ -29,8 +29,11 @@ fn test_scanner_handles_clean_text() {
 fn test_scanner_handles_unicode_content() {
     let scanner = SecretScanner::new().unwrap();
     let unicode = "日本語と한국어_api_key=abcdefghij1234567890ABCDEF";
-    let result = scanner.scan_and_replace(unicode, |_,_| "[REDACTED]".to_string());
-    assert!(result.contains("[REDACTED]"), "secrets in unicode should be detected");
+    let result = scanner.scan_and_replace(unicode, |_, _| "[REDACTED]".to_string());
+    assert!(
+        result.contains("[REDACTED]"),
+        "secrets in unicode should be detected"
+    );
 }
 
 #[test]
@@ -38,7 +41,7 @@ fn test_scanner_completes_quickly_on_large_clean_input() {
     let scanner = SecretScanner::new().unwrap();
     let large = "normal text content\n".repeat(1000);
     let now = std::time::Instant::now();
-    let result = scanner.scan_and_replace(&large, |_,_| "[REDACTED]".to_string());
+    let result = scanner.scan_and_replace(&large, |_, _| "[REDACTED]".to_string());
     let elapsed = now.elapsed();
     assert_eq!(result, large, "clean large input should pass through");
     assert!(

@@ -7,7 +7,7 @@ fn test_azure_sas_pattern_completes_in_reasonable_time() {
     let input = "sv=2019-02-02&sig=abc123def456".to_string();
 
     let now = std::time::Instant::now();
-    let _result = scanner.scan_and_replace(&input, |_,_| "[REDACTED]".to_string());
+    let _result = scanner.scan_and_replace(&input, |_, _| "[REDACTED]".to_string());
     let elapsed = now.elapsed();
 
     assert!(
@@ -23,7 +23,7 @@ fn test_generic_assignment_pattern_completes_in_reasonable_time() {
     let input = "MY_API_KEY=abcdefghij1234567890abcdef".to_string();
 
     let now = std::time::Instant::now();
-    let _result = scanner.scan_and_replace(&input, |_,_| "[REDACTED]".to_string());
+    let _result = scanner.scan_and_replace(&input, |_, _| "[REDACTED]".to_string());
     let elapsed = now.elapsed();
 
     assert!(
@@ -39,7 +39,7 @@ fn test_scanner_performance_under_large_evil_input() {
     let evil = "x".repeat(10_000);
 
     let now = std::time::Instant::now();
-    let result = scanner.scan_and_replace(&evil, |_,_| "[REDACTED]".to_string());
+    let result = scanner.scan_and_replace(&evil, |_, _| "[REDACTED]".to_string());
     let elapsed = now.elapsed();
 
     assert!(
@@ -61,7 +61,7 @@ fn test_scanner_performance_mixed_secret_and_filler() {
     let input = format!("{}\n{}\n{}", filler, secret, filler);
 
     let now = std::time::Instant::now();
-    let result = scanner.scan_and_replace(&input, |_,_| "[REDACTED]".to_string());
+    let result = scanner.scan_and_replace(&input, |_, _| "[REDACTED]".to_string());
     let elapsed = now.elapsed();
 
     assert!(
@@ -81,9 +81,7 @@ fn test_nested_quantifier_patterns_do_not_cause_exponential_blowup() {
     let input = "xx".to_string() + &"a".repeat(50);
 
     let now = std::time::Instant::now();
-    let result = scanner.scan_and_replace(&input, |_name, _found| {
-        "[REDACTED]".to_string()
-    });
+    let result = scanner.scan_and_replace(&input, |_name, _found| "[REDACTED]".to_string());
     let elapsed = now.elapsed();
 
     assert!(
@@ -91,10 +89,7 @@ fn test_nested_quantifier_patterns_do_not_cause_exponential_blowup() {
         "nested quantifier pattern took {:?}, should be < 2s",
         elapsed
     );
-    assert!(
-        result.len() == input.len(),
-        "output should not explode"
-    );
+    assert!(result.len() == input.len(), "output should not explode");
 }
 
 #[test]
@@ -115,9 +110,8 @@ fn test_scanner_detects_known_secret_patterns() {
     ];
 
     for secret in test_cases {
-        let result = scanner.scan_and_replace(secret, |name, found| {
-            format!("[{}:{}]", name, found)
-        });
+        let result =
+            scanner.scan_and_replace(secret, |name, found| format!("[{}:{}]", name, found));
         assert!(
             result.contains("["),
             "secret '{}' should be detected, got: {}",
