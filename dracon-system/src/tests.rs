@@ -319,10 +319,7 @@ async fn guard_report_completes_for_ok_disk() {
         ..GuardPolicy::default()
     };
     let report = run_guard_once(&guard, &mut state).await;
-    assert!(
-        report.is_ok() || report.is_err(),
-        "async guard execution should complete"
-    );
+    assert!(report.is_ok(), "guard should complete successfully with default policy on ok disk");
 }
 
 #[test]
