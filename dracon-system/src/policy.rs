@@ -139,7 +139,7 @@ pub(crate) struct GuardPolicy {
     #[serde(default = "default_true")]
     pub(crate) clean_nix_garbage: bool,
     #[serde(default = "default_nix_keep_generations")]
-    nix_keep_generations: u32,
+    pub(crate) nix_keep_generations: u32,
     #[serde(default = "default_node_modules_max_age_days")]
     pub(crate) node_modules_max_age_days: u64,
     #[serde(default)]
@@ -248,7 +248,7 @@ pub(crate) fn default_disk_critical_percent() -> u8 {
     95
 }
 
-fn default_sync_freeze_marker() -> String {
+pub(crate) fn default_sync_freeze_marker() -> String {
     let home = match dirs::home_dir() {
         Some(h) => h,
         None => {
