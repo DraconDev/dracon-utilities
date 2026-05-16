@@ -249,8 +249,9 @@ mod tests {
   };
 }"#;
         let updated = update_version_in_flake_nix(content, "1.1.0");
-        assert!(updated.contains(r#"version = "1.1.0""#));
-        assert!(!updated.contains("version = \"1.0.0\""));
+        eprintln!("=== UPDATED ===\n{}\n=== END ===", updated);
+        assert!(updated.contains(r#"version = "1.1.0""#), "missing 1.1.0, got:\n{}", updated);
+        assert!(!updated.contains("version = \"1.0.0\""), "still has 1.0.0");
     }
 
     #[test]
