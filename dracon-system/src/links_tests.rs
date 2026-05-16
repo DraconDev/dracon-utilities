@@ -2,7 +2,8 @@
 //!
 //! These tests verify the link management components after extraction from main.rs.
 
-use crate::policy::{LinkEntry, LinkPolicy, SystemPolicy};
+// Note: types like LinkEntry, LinkPolicy, SystemPolicy, LinkEntryStatus, LinkStatusReport
+// are accessed via crate::* re-exports from pub(crate) use policy::* in main.rs.
 
 #[test]
 fn link_entry_stores_link_and_target() {
