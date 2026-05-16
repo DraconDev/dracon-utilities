@@ -61,6 +61,24 @@ fn ansi(color: &str, text: &str) -> String {
     format!("\x1b[{}m{}\x1b[0m", codes, text)
 }
 
+fn shorten_when(s: &str) -> String {
+    let s = s.trim();
+    s.replace(" seconds ago", "s")
+        .replace(" second ago", "s")
+        .replace(" minutes ago", "m")
+        .replace(" minute ago", "m")
+        .replace(" hours ago", "h")
+        .replace(" hour ago", "h")
+        .replace(" days ago", "d")
+        .replace(" day ago", "d")
+        .replace(" weeks ago", "w")
+        .replace(" week ago", "w")
+        .replace(" months ago", "mo")
+        .replace(" month ago", "mo")
+        .replace(" years ago", "y")
+        .replace(" year ago", "y")
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum RepoFilter {
     All,
@@ -640,7 +658,13 @@ pub(crate) async fn run_repos_report(
         });
     }
 
-    rows.sort_by_key(|a| a.last_unix);
+    match sort {
+        "name" => rows.sort_by(|a, b| a.repo.cmp(&b.repo)),
+        "modified" => rows.sort_by(|a, b| b.modified.cmp(&a.modified)),
+        "ahead" => rows.sort_by(|a, b| b.ahead.cmp(&a.ahead)),
+        "behind" => rows.sort_by(|a, b| b.behind.cmp(&a.behind)),
+        _ => rows.sort_by_key(|a| a.last_unix),
+    }
 
     let concern_count_all = rows.iter().filter(|r| r.concern).count();
     let warn_count_all = rows.iter().filter(|r| r.warn).count();
@@ -651,6 +675,11 @@ pub(crate) async fn run_repos_report(
         RepoFilter::All => {}
         RepoFilter::Concern => rows.retain(|r| r.concern),
         RepoFilter::Warn => rows.retain(|r| r.warn),
+    }
+
+    if let Some(pattern) = filter_name {
+        let pat = pattern.to_lowercase();
+        rows.retain(|r| r.repo.to_lowercase().contains(&pat));
     }
 
     let concern_count = rows.iter().filter(|r| r.concern).count();
@@ -713,36 +742,90 @@ pub(crate) async fn run_repos_report(
             ),
         }
     );
-    println!("🕒 SORT: last modified (newest first)");
+    let sort_label = match sort {
+        "name" => "name",
+        "modified" => "modified files",
+        "ahead" => "ahead count",
+        "behind" => "behind count",
+        _ => "last modified (newest first)",
+    };
+    println!("🕒 SORT: {sort_label}");
     println!();
 
+    use comfy_table::{presets::UTF8_FULL_CONDENSED, Cell, Color, Table};
+
+    let mut table = Table::new();
+    table.load_preset(UTF8_FULL_CONDENSED);
+    table.set_header(vec![
+        Cell::new("#"),
+        Cell::new("STATUS"),
+        Cell::new("REPO"),
+        Cell::new("BRANCH"),
+        Cell::new("MOD"),
+        Cell::new("STG"),
+        Cell::new("AHD"),
+        Cell::new("BHD"),
+        Cell::new("UPDATED"),
+    ]);
+
     for (idx, row) in rows.iter().enumerate() {
-        let severity = if row.concern {
-            ansi("31", "CONCERN")
+        let status_text = if row.concern {
+            "CONCERN".to_string()
         } else if row.warn {
-            ansi("33", "WARN")
+            "WARN".to_string()
         } else {
-            ansi("32", "OK")
+            "OK".to_string()
+        };
+        let status_color = if row.concern {
+            Color::Red
+        } else if row.warn {
+            Color::Yellow
+        } else {
+            Color::Green
         };
 
-        println!("{}. [{}] {}", idx + 1, severity, row.repo);
-        println!(
-            "   updated={} branch={} state={} modified={} staged={} ahead={} behind={}",
-            row.last_when,
-            row.branch,
-            row.state_flags.join(","),
-            row.modified,
-            row.staged,
-            row.ahead,
-            row.behind
-        );
-        println!(
-            "   last={} by {} {}",
-            row.last_hash, row.last_author, row.last_msg
-        );
-        println!("   hint={}", row.hint);
-        println!();
+        let repo_name = if full_path {
+            row.repo.clone()
+        } else {
+            std::path::Path::new(&row.repo)
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_else(|| row.repo.clone())
+        };
+
+        table.add_row(vec![
+            Cell::new(idx + 1),
+            Cell::new(status_text).fg(status_color),
+            Cell::new(repo_name),
+            Cell::new(&row.branch),
+            Cell::new(row.modified),
+            Cell::new(row.staged),
+            Cell::new(row.ahead),
+            Cell::new(row.behind),
+            Cell::new(shorten_when(&row.last_when)),
+        ]);
     }
+
+    println!("{table}");
+    println!();
+    println!(
+        "{} repos: {} {}  {} {}  {} {}  ❌ {}{}",
+        rows.len(),
+        ansi("32", "OK"),
+        ok_count,
+        ansi("33", "WARN"),
+        warn_count,
+        ansi("31", "CONCERN"),
+        concern_count,
+        init_or_status_failures,
+        match filter {
+            RepoFilter::All => String::new(),
+            RepoFilter::Concern | RepoFilter::Warn => format!(
+                "  (all: OK {} WARN {} CONCERN {})",
+                ok_count_all, warn_count_all, concern_count_all
+            ),
+        }
+    );
 
     Ok(())
 }
