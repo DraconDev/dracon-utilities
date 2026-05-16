@@ -660,9 +660,9 @@ pub(crate) async fn run_repos_report(
 
     match sort {
         "name" => rows.sort_by(|a, b| a.repo.cmp(&b.repo)),
-        "modified" => rows.sort_by(|a, b| b.modified.cmp(&a.modified)),
-        "ahead" => rows.sort_by(|a, b| b.ahead.cmp(&a.ahead)),
-        "behind" => rows.sort_by(|a, b| b.behind.cmp(&a.behind)),
+        "modified" => rows.sort_by_key(|b| std::cmp::Reverse(b.modified)),
+        "ahead" => rows.sort_by_key(|b| std::cmp::Reverse(b.ahead)),
+        "behind" => rows.sort_by_key(|b| std::cmp::Reverse(b.behind)),
         _ => rows.sort_by_key(|a| a.last_unix),
     }
 
