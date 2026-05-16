@@ -3244,7 +3244,7 @@ async fn cmd_guard_daemon(guard: &mut GuardPolicy) -> Result<()> {
         "guard daemon started (interval={}s)",
         guard.interval_secs
     );
-    let interval = guard.interval_secs;
+    let mut interval = guard.interval_secs;
     let mut elapsed = 0u64;
     let mut runtime = GuardRuntimeState::default();
     while !shutdown.load(Ordering::SeqCst) {
