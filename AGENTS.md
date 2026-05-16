@@ -150,7 +150,14 @@ Service files are installed to `~/.config/systemd/user/` by `install.sh`.
 | `Nice` | `10` | Lower CPU priority |
 | `CPUQuota` | `10%` | Max 10% CPU usage |
 | `MemoryMax` | `1G` | Max 1GB RAM |
+| `MemoryHigh` | `384M` | Soft memory limit |
 | `TasksMax` | `64` | Max 64 threads |
+| `NoNewPrivileges` | `true` | Security hardening |
+| `ProtectSystem` | `strict` | Read-only system fs |
+| `ProtectHome` | `read-only` | Read-only home (except allowed paths) |
+| `ReadWritePaths` | `~/.dracon, ~/Dev, ~/.local/state/dracon` | Writable directories |
+| `PrivateTmp` | `true` | Isolated /tmp |
+| `RestartPreventExitStatus` | `2 78` | Don't restart on config/argument errors |
 
 ## Policy Files
 
