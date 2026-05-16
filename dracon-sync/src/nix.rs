@@ -74,6 +74,7 @@ fn update_version_in_flake_nix(content: &str, new_version: &str) -> anyhow::Resu
 
 pub async fn create_flake_pr(repo: &Path, new_version: &str) -> anyhow::Result<crate::release::ReleaseStep> {
     let repo_name = extract_repo_name(repo)?;
+    let default_branch = detect_default_branch(repo).unwrap_or_else(|| "main".to_string());
 
     let branch_name = format!("chore/update-flake-v{}", new_version);
     let branch_name_check = branch_name.clone();
@@ -114,7 +115,7 @@ pub async fn create_flake_pr(repo: &Path, new_version: &str) -> anyhow::Result<c
             .args([
                 "pr", "create",
                 "--repo", &repo_name,
-                "--base", "main",
+                "--base", &default_branch,
                 "--head", &branch_name,
                 "--title", &title,
                 "--body", &body,
@@ -213,6 +214,19 @@ fn extract_repo_name(repo: &Path) -> anyhow::Result<String> {
     } else {
         Ok(url.clone())
     }
+}
+
+fn detect_default_branch(repo: &Path) -> Option<String> {
+    let output = std::process::Command::new("git")
+        .args(["symbolic-ref", "refs/remotes/origin/HEAD"])
+        .current_dir(repo)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .output()
+        .ok()?;
+
+    let ref_name = String::from_utf8_lossy(&output.stdout).trim();
+    ref_name.strip_prefix("refs/remotes/origin/").map(String::from)
 }
 
 #[allow(dead_code)]
