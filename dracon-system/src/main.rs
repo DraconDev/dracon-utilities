@@ -19,6 +19,13 @@ use dracon_system_lib::analyze_workspace_storage;
 
 mod policy;
 pub(crate) use policy::*;
+pub(crate) use policy::disk_state;
+pub(crate) use policy::graduated_nice_value;
+pub(crate) use policy::parse_df_use_percent;
+pub(crate) use policy::parse_ps_output;
+pub(crate) use policy::should_notify;
+pub(crate) use policy::predict_fill_time;
+pub(crate) use policy::AutoCleanupResult;
 mod guard_tests;
 
 const SYSTEM_PROTECTED: &[&str] = &[
