@@ -84,6 +84,7 @@ mod tests {
         let template_dir = dir.path().join("templates");
         std::fs::create_dir(&template_dir).unwrap();
         std::fs::write(template_dir.join("LICENSE"), "AGPL").unwrap();
+        let sync_dir = dir.path().join("sync.toml").parent().unwrap();
 
         let policy = make_policy(vec![StandardFileConfig {
             source: "templates/LICENSE".to_string(),
@@ -92,7 +93,7 @@ mod tests {
         }]);
 
         let repo_override = make_override(vec![]);
-        let result = ensure_standard_files(repo_dir, &policy, &repo_override, Some(&dir.path().join("sync.toml").parent().unwrap()));
+        let result = ensure_standard_files(repo_dir, &policy, &repo_override, Some(sync_dir));
         assert!(result.is_ok());
         let copied = result.unwrap();
         assert_eq!(copied.len(), 1);
@@ -107,6 +108,7 @@ mod tests {
         std::fs::create_dir(&template_dir).unwrap();
         std::fs::write(template_dir.join("LICENSE"), "AGPL").unwrap();
         std::fs::write(repo_dir.join("LICENSE"), "EXISTING").unwrap();
+        let sync_dir = dir.path().join("sync.toml").parent().unwrap();
 
         let policy = make_policy(vec![StandardFileConfig {
             source: "templates/LICENSE".to_string(),
@@ -115,7 +117,7 @@ mod tests {
         }]);
 
         let repo_override = make_override(vec![]);
-        let result = ensure_standard_files(repo_dir, &policy, &repo_override, Some(&dir.path().join("sync.toml").parent().unwrap()));
+        let result = ensure_standard_files(repo_dir, &policy, &repo_override, Some(sync_dir));
         assert!(result.is_ok());
         let copied = result.unwrap();
         assert!(copied.is_empty());
@@ -130,6 +132,7 @@ mod tests {
         std::fs::create_dir(&template_dir).unwrap();
         std::fs::write(template_dir.join("LICENSE"), "NEW_AGPL").unwrap();
         std::fs::write(repo_dir.join("LICENSE"), "OLD_LICENSE").unwrap();
+        let sync_dir = dir.path().join("sync.toml").parent().unwrap();
 
         let policy = make_policy(vec![StandardFileConfig {
             source: "templates/LICENSE".to_string(),
@@ -138,7 +141,7 @@ mod tests {
         }]);
 
         let repo_override = make_override(vec![]);
-        let result = ensure_standard_files(repo_dir, &policy, &repo_override, Some(&dir.path().join("sync.toml").parent().unwrap()));
+        let result = ensure_standard_files(repo_dir, &policy, &repo_override, Some(sync_dir));
         assert!(result.is_ok());
         let copied = result.unwrap();
         assert_eq!(copied.len(), 1);
@@ -160,7 +163,7 @@ mod tests {
         }]);
 
         let repo_override = make_override(vec!["CLA.md".to_string()]);
-        let result = ensure_standard_files(repo_dir, &policy, &repo_override, Some(&dir.path().join("sync.toml").parent().unwrap()));
+        let result = ensure_standard_files(repo_dir, &policy, &repo_override, None);
         assert!(result.is_ok());
         let copied = result.unwrap();
         assert!(copied.is_empty());
@@ -171,7 +174,6 @@ mod tests {
     fn test_warns_when_template_missing() {
         let dir = TempDir::new().unwrap();
         let repo_dir = dir.path();
-        let sync_dir = dir.path().join("sync.toml").parent().unwrap();
         std::fs::write(repo_dir.join("LICENSE"), "EXISTING").unwrap();
 
         let policy = make_policy(vec![StandardFileConfig {
@@ -181,7 +183,7 @@ mod tests {
         }]);
 
         let repo_override = make_override(vec![]);
-        let result = ensure_standard_files(repo_dir, &policy, &repo_override, Some(sync_dir));
+        let result = ensure_standard_files(repo_dir, &policy, &repo_override, None);
         assert!(result.is_ok());
     }
 
@@ -192,6 +194,7 @@ mod tests {
         let template_dir = dir.path().join("templates");
         std::fs::create_dir(&template_dir).unwrap();
         std::fs::write(template_dir.join("LICENSE"), "AGPLv3").unwrap();
+        let sync_dir = dir.path().join("sync.toml").parent().unwrap();
 
         let policy = make_policy(vec![StandardFileConfig {
             source: "templates/LICENSE".to_string(),
@@ -200,7 +203,7 @@ mod tests {
         }]);
 
         let repo_override = make_override(vec![]);
-        let result = ensure_standard_files(repo_dir, &policy, &repo_override, Some(&dir.path().join("sync.toml").parent().unwrap()));
+        let result = ensure_standard_files(repo_dir, &policy, &repo_override, Some(sync_dir));
         assert!(result.is_ok());
         let copied = result.unwrap();
         assert_eq!(copied.len(), 1);
