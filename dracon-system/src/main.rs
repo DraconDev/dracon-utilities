@@ -23,8 +23,11 @@ use dracon_system_lib::analyze_workspace_storage;
 mod policy;
 pub(crate) use policy::*;
 
+#[cfg(test)]
 mod events_tests;
+#[cfg(test)]
 mod guard_tests;
+#[cfg(test)]
 mod links_tests;
 
 const SYSTEM_PROTECTED: &[&str] = &[
