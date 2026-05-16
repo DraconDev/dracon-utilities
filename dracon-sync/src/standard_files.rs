@@ -1,4 +1,4 @@
-use crate::policy::{RepoPolicyOverride, StandardFileConfig, SyncPolicy};
+use crate::policy::{RepoPolicyOverride, SyncPolicy};
 use anyhow::{Context, Result};
 use std::path::{Path, PathBuf};
 
@@ -66,6 +66,7 @@ pub(crate) fn ensure_standard_files(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::policy::StandardFileConfig;
     use tempfile::TempDir;
 
     fn make_policy(standard_files: Vec<StandardFileConfig>) -> SyncPolicy {
