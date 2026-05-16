@@ -110,7 +110,14 @@ Service files are installed to `~/.config/systemd/user/` by `install.sh`.
 | `Nice` | `10` | Lower CPU priority |
 | `CPUQuota` | `15%` | Max 15% CPU usage |
 | `MemoryMax` | `2G` | Max 2GB RAM |
+| `MemoryHigh` | `768M` | Soft memory limit |
 | `TasksMax` | `96` | Max 96 threads |
+| `NoNewPrivileges` | `true` | Security hardening |
+| `ProtectSystem` | `strict` | Read-only system fs |
+| `ProtectHome` | `read-only` | Read-only home (except allowed paths) |
+| `ReadWritePaths` | `~/.dracon, ~/Dev, ~/.local/state/dracon, ~/.ssh` | Writable directories |
+| `PrivateTmp` | `true` | Isolated /tmp |
+| `RestartPreventExitStatus` | `2 78` | Don't restart on config/argument errors |
 | `Environment` | `DRACON_SYNC_POLICY` | Points to config file |
 | `Environment` | `GIT_TERMINAL_PROMPT=0` | Disables interactive git prompts |
 
