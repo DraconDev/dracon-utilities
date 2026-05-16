@@ -185,16 +185,7 @@ async fn run_git_for_nix_pr(repo: &Path, branch_name: &str, commit_msg: &str) ->
         ("GIT_TERMINAL_PROMPT", "0"),
     ];
 
-    // Push and always return to the previous branch, even on failure
-    let push_result = run_git_with_timeout_env(
-        repo,
-        &["push", "-u", "origin", branch_name],
-        120,
-        "nix-pr-push",
-        &env,
-    ).await;
-
-    // Always restore the previous branch before returning
+    // Always restore the previous branch even on push failure
     let _ = run_git_with_timeout(repo, &["checkout", "-"], 30, "nix-pr-return").await;
 
     push_result
