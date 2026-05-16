@@ -3265,10 +3265,28 @@ async fn cmd_guard_daemon(guard: &mut GuardPolicy) -> Result<()> {
                     }
                     *guard = new_policy.guard;
                     normalize_guard_policy(guard);
-                    for (&pid, _) in &runtime.reniced_pids {
+                    for (&pid, (_, ref orig_cmd)) in &runtime.reniced_pids {
+                        let proc_cmdline = PathBuf::from(format!("/proc/{}/cmdline", pid));
+                        let same_process = match std::fs::read_to_string(&proc_cmdline) {
+                            Ok(content) => {
+                                let cmd = content.replace('\0', " ");
+                                let exe = cmd.split_whitespace().next().unwrap_or("");
+                                let exe_name = Path::new(exe)
+                                    .file_name()
+                                    .map(|n| n.to_string_lossy().to_string())
+                                    .unwrap_or_default();
+                                exe_name == orig_cmd
+                            }
+                            Err(_) => false,
+                        };
+                        if !same_process {
+                            eprintln!("⚠ SIGHUP skip un-renice pid={} — PID recycled (was {})", pid, orig_cmd);
+                            continue;
+                        }
                         renice_process(pid, 0).await;
                     }
                     runtime = GuardRuntimeState::default();
+                    interval = guard.interval_secs;
                     veprintln!(2, "system: policy reloaded on SIGHUP (disk_warn={}%, disk_critical={}%)",
                         guard.disk_warn_percent, guard.disk_critical_percent);
                 }

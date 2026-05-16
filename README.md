@@ -25,7 +25,7 @@ CLI binaries for dracon system services. These install to `~/.local/bin/` and ru
 | Binary | What It Does | Why You Want It |
 |--------|-------------|-----------------|
 | **dracon-sync** | Auto-commits, pulls, and pushes your git repos | Never lose work. Auto-commit on every change. |
-| **dracon-system** | Watches disk space and kills runaway processes | Prevents "disk full" crashes and runaway CPU. |
+| **dracon-system** | Watches disk space and renices runaway processes | Prevents "disk full" crashes and runaway CPU. |
 | **dracon-warden** | Encrypts secrets in git repos | Keep API keys safe in version control. |
 
 All three run as background daemons via systemd user services.
@@ -74,7 +74,7 @@ All services run with conservative systemd resource limits:
 | Service | MemoryHigh | MemoryMax | CPUQuota | TasksMax |
 |---------|-----------|-----------|----------|----------|
 | dracon-sync | 768M | 2G | 15% | 96 |
-| dracon-system-guard | — | 100M | 10% | 32 |
+| dracon-system-guard | — | 250M | 20% | 64 |
 | dracon-warden | 384M | 1G | 10% | 64 |
 
 `MemoryHigh` is a soft limit that triggers memory reclaim before the hard `MemoryMax` limit is reached. This prevents sudden OOM kills while still constraining memory usage.
@@ -219,10 +219,11 @@ dracon-sync test-ai
 ### How It Works
 
 1. Every 30 seconds, checks disk usage
-2. At 90%: freezes dracon-sync and starts cleanup
-3. At 95%: critical — aggressive cleanup
-4. Monitors processes using >50% CPU for >30s
-5. Can auto-renice or auto-kill runaway git processes
+2. At 65%: early warning
+3. At 75%: freezes dracon-sync and starts cleanup
+4. At 85%: aggressive cleanup
+5. At 92%: critical — emergency cleanup
+6. Monitors processes using >50% CPU (180% in live config) for >30s, graduates nice to deprioritize
 
 ### Essential Commands
 
