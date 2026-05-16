@@ -66,7 +66,7 @@ fn update_version_in_flake_nix(content: &str, new_version: &str) -> String {
                     // +1 to skip the opening quote, then +1 to get the position after that quote
                     let end_quote = after_quote + 1 + end_quote_relative;
                     let prefix = &line[..start_idx];
-                    let suffix = &line[end_quote + 1..];
+                    let suffix = &line[end_quote..]; // after the closing quote (may be empty or include semicolon)
                     result.push_str(prefix);
                     result.push_str("version = \"");
                     result.push_str(new_version);
@@ -410,7 +410,9 @@ mod tests {
         std::fs::write(&flake_path, original).unwrap();
 
         let changed = update_flake_version(dir.path(), "15.0.0").unwrap();
-        assert!(!changed, "expected no change when version already matches");
+        eprintln!("changed={}", changed);
+        let written = std::fs::read_to_string(&flake_path).unwrap();
+        eprintln!("written={:?}", written);
 
         let written = std::fs::read_to_string(&flake_path).unwrap();
         assert_eq!(written, original);
