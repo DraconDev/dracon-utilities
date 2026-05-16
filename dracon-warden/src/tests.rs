@@ -291,6 +291,29 @@ mod tests {
     }
 
     #[test]
+    fn publish_repo_pubkey_no_churn_different_valid_key() {
+        let td = TestDir::new("warden_publish_key_no_churn");
+        let repo = td.path().join("repo");
+        fs::create_dir_all(&repo).expect("repo");
+        let keys_dir = repo.join(".dracon/data/keys");
+        fs::create_dir_all(&keys_dir).expect("keys dir");
+
+        let key_a = td.path().join("owner_test.pub");
+        fs::write(&key_a, "age1aaa").expect("key a");
+        assert!(publish_repo_pubkey(&repo, &key_a).expect("first publish"));
+
+        let key_b = td.path().join("owner_test.pub");
+        fs::write(&key_b, "age1bbb").expect("key b");
+        assert!(!publish_repo_pubkey(&repo, &key_b).expect("churn protection"));
+
+        assert_eq!(
+            fs::read_to_string(keys_dir.join("owner_test.pub")).expect("read"),
+            "age1aaa",
+            "existing valid key must not be overwritten by a different valid key"
+        );
+    }
+
+    #[test]
     fn salvage_invalid_json_replaces_marker_tokens_and_parses() {
         let a = "{[DRACON_SECRET:abc]: \"x\"}";
         let salvaged = salvage_invalid_json_markers(a).expect("salvaged");

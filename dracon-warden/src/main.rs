@@ -722,6 +722,8 @@ fn resolve_local_pubkey_path() -> Option<PathBuf> {
     .collect::<Vec<_>>();
 
     // Prefer newest valid owner pubkey; break ties by path for determinism.
+    // Keys in ~/.dracon/data/keys/ sort before legacy dirs due to path order,
+    // so when mtimes are equal the canonical location wins.
     let mut owners = owner_candidates;
     owners.sort_by(|a, b| {
         let ma = fs::metadata(a)
@@ -738,12 +740,19 @@ fn resolve_local_pubkey_path() -> Option<PathBuf> {
             .unwrap_or(0);
         mb.cmp(&ma).then_with(|| a.cmp(b))
     });
-    for p in owners {
-        let Ok(bytes) = fs::read(&p) else {
+    for p in &owners {
+        let Ok(bytes) = fs::read(p) else {
             continue;
         };
-        if validate_owner_age_pubkey_bytes(&p, &bytes).is_ok() {
-            return Some(p);
+        if validate_owner_age_pubkey_bytes(p, &bytes).is_ok() {
+            let p_str = p.to_string_lossy();
+            if p_str.contains("/.demon/") || p_str.contains("/.dracon/keys/") {
+                eprintln!(
+                    "ℹ️ using owner pubkey from legacy path: {} (consider migrating to ~/.dracon/data/keys/)",
+                    p.display()
+                );
+            }
+            return Some(p.clone());
         }
     }
 
