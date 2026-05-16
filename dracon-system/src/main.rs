@@ -557,10 +557,21 @@ struct TargetDirInfo {
 /// Result of automatic cleanup operation
 #[derive(Debug, Serialize)]
 struct AutoCleanupResult {
-    cleaned_count: usize,
-    reclaimed_bytes: u64,
-    cleaned_paths: Vec<String>,
-    protected_paths: Vec<String>,
+    pub(crate) cleaned_count: usize,
+    pub(crate) reclaimed_bytes: u64,
+    pub(crate) cleaned_paths: Vec<String>,
+    pub(crate) protected_paths: Vec<String>,
+}
+
+impl Default for AutoCleanupResult {
+    fn default() -> Self {
+        Self {
+            cleaned_count: 0,
+            reclaimed_bytes: 0,
+            cleaned_paths: Vec::new(),
+            protected_paths: Vec::new(),
+        }
+    }
 }
 
 pub(crate) fn parse_df_use_percent(output: &str) -> Option<u8> {
