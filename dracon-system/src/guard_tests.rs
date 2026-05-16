@@ -3,7 +3,6 @@
 //! These tests verify the guard runtime components after extraction from main.rs.
 
 use crate::policy::GuardPolicy;
-use std::time::Instant;
 
 // ---------------------------------------------------------------------------
 // GuardRuntimeState
