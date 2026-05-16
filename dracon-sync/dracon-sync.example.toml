@@ -259,6 +259,32 @@ auto_create = false
 # Without nix_auto_update, flake.nix version fields are NOT updated automatically.
 #
 # =============================================================================
+#  SECTION 8: STANDARD FILES
+# =============================================================================
+# Standard files to ensure exist in every synced repository.
+# Templates live in ~/.dracon/utilities/sync/templates/ (auto-resolved from short form).
+# Files are ONLY copied if the target does not exist (never overwrites).
+#
+# Short form — filename only (resolves to templates/{name}):
+standard_files = ["LICENSE", "CLA.md"]
+#
+# Long form — for explicit source path or overwrite behavior:
+# [[standard_files]]
+# source = "templates/CUSTOM"
+# target = "CUSTOM_NOTICE"
+# overwrite = false   # default: false (never overwrites existing files)
+#
+# Per-repo opt-out (via .dracon/dracon-sync.toml in repo root):
+#   skip_standard_files = ["CLA.md"]
+#
+# Template path resolution:
+#   - Absolute paths: used as-is
+#   - ~/ paths: expanded to home directory
+#   - Relative paths: resolved relative to sync config dir (~/.dracon/utilities/sync/)
+#
+# If a template file is missing, a warning is printed but sync continues.
+
+# =============================================================================
 #  SECTION 9: WEBHOOK
 # =============================================================================
 # On push failures (origin or mirror remotes), dracon-sync can send a
