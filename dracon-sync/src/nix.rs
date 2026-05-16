@@ -230,10 +230,6 @@ fn detect_default_branch(repo: &Path) -> Option<String> {
     ref_name.strip_prefix("refs/remotes/origin/").map(String::from)
 }
 
-pub fn flake_has_hardcoded_version(flake_content: &str) -> bool {
-    flake_content.contains("version = \"")
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
