@@ -41,7 +41,7 @@ fn update_version_in_flake_nix(content: &str, new_version: &str) -> String {
         // Detect start of buildRustPackage block via attribute assignment.
         // Works for both "tiles = rustPlatform.buildRustPackage {" and
         // "packages.x86_64-linux.default = pkgs.rustPlatform.buildRustPackage {".
-if line.contains(" = rustPlatform.buildRustPackage {")
+        if line.contains(" = rustPlatform.buildRustPackage {")
             || line.contains("= pkgs.rustPlatform.buildRustPackage {") {
             in_build_rust_package = true;
         } else if trimmed.ends_with("};") || trimmed.starts_with(char::is_alphabetic) {
@@ -59,7 +59,7 @@ if line.contains(" = rustPlatform.buildRustPackage {")
                     let suffix = &line[end_quote + 1..]; // everything after the closing quote
                     result.push_str(prefix);
                     result.push_str("version = \"");
-                    result.push(new_version);
+                    result.push_str(new_version);
                     result.push('"');
                     result.push_str(suffix);
                     result.push('\n');
@@ -250,7 +250,7 @@ mod tests {
         flake_content.contains("version = \"")
     }
 
-    #[test]
+#[test]
     fn test_update_version_in_flake_nix_basic() {
         let content = r#"{
   description = "My app";
@@ -262,8 +262,8 @@ mod tests {
   };
 }"#;
         let updated = update_version_in_flake_nix(content, "1.1.0");
-        assert!(updated.contains(r#"version = "1.1.0""#), "missing 1.1.0, got:\n{}", updated);
-        assert!(!updated.contains("version = \"1.0.0\""), "still has 1.0.0");
+        assert!(updated.contains(r#"version = "1.1.0";"#), "missing semicolon, got:\n{}", updated);
+        assert!(!updated.contains("version = \"1.0.0\""));
     }
 
     #[test]
@@ -288,7 +288,7 @@ mod tests {
   };
 }"#;
         let updated = update_version_in_flake_nix(content, "15.0.0");
-        assert!(updated.contains(r#"version = "15.0.0""#));
+        assert!(updated.contains(r#"version = "15.0.0";"#), "missing semicolon, got: {}", updated);
         assert!(!updated.contains("version = \"14.0.0\""));
     }
 
@@ -326,5 +326,70 @@ mod tests {
     #[test]
     fn test_flake_has_hardcoded_version_false() {
         assert!(!flake_has_hardcoded_version(r#"name = "tiles""#));
+    }
+
+    #[test]
+    fn test_update_flake_version_disk_round_trip() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let flake_path = dir.path().join("flake.nix");
+        let original = r#"{
+  tiles = rustPlatform.buildRustPackage {
+    pname = "tiles";
+    version = "14.0.0";
+    src = ./.;
+  };
+}"#;
+        std::fs::write(&flake_path, original).unwrap();
+
+        let changed = update_flake_version(dir.path(), "15.0.0").unwrap();
+        assert!(changed, "expected file to be modified");
+
+        let written = std::fs::read_to_string(&flake_path).unwrap();
+        assert!(written.contains(r#"version = "15.0.0";"#), "missing updated version with semicolon");
+        assert!(!written.contains("version = \"14.0.0\""));
+    }
+
+    #[test]
+    fn test_update_flake_version_no_change_when_already_current() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let flake_path = dir.path().join("flake.nix");
+        let original = r#"{
+  tiles = rustPlatform.buildRustPackage {
+    pname = "tiles";
+    version = "15.0.0";
+    src = ./.;
+  };
+}"#;
+        std::fs::write(&flake_path, original).unwrap();
+
+        let changed = update_flake_version(dir.path(), "15.0.0").unwrap();
+        assert!(!changed, "expected no change when version already matches");
+
+        let written = std::fs::read_to_string(&flake_path).unwrap();
+        assert_eq!(written, original);
+    }
+
+    #[test]
+    fn test_update_version_preserves_semicolon() {
+        // Ensure semicolons after version lines are preserved
+        let content = r#"{
+  tiles = rustPlatform.buildRustPackage {
+    pname = "tiles";
+    version = "1.0.0";
+  };
+}"#;
+        let updated = update_version_in_flake_nix(content, "2.0.0");
+        assert!(updated.contains(r#"version = "2.0.0";"#), "semicolon dropped, got:\n{}", updated);
+        assert!(!updated.contains("version = \"1.0.0\""));
+    }
+
+    #[test]
+    fn test_update_version_no_extra_newline() {
+        let content = r#"{
+  tiles = rustPlatform.buildRustPackage { pname = "tiles"; version = "1.0.0"; src = ./.; };
+}"#;
+        let updated = update_version_in_flake_nix(content, "2.0.0");
+        assert!(updated.contains(r#"version = "2.0.0""#));
+        assert!(!updated.contains("version = \"1.0.0\""));
     }
 }
