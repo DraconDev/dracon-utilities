@@ -183,13 +183,19 @@ async fn run_git_for_nix_pr(repo: &Path, branch_name: &str, commit_msg: &str) ->
         ("GIT_TERMINAL_PROMPT", "0"),
     ];
 
-    use crate::git::run_git_with_timeout_env;
-    run_git_with_timeout_env(repo, &["push", "-u", "origin", branch_name], 120, "nix-pr-push", &env).await?;
+    // Push and always return to the previous branch, even on failure
+    let push_result = run_git_with_timeout_env(
+        repo,
+        &["push", "-u", "origin", branch_name],
+        120,
+        "nix-pr-push",
+        &env,
+    ).await;
 
-    // Return to the previous branch so the sync cycle continues normally
-    run_git_with_timeout(repo, &["checkout", "-"], 30, "nix-pr-return").await?;
+    // Always restore the previous branch before returning
+    let _ = run_git_with_timeout(repo, &["checkout", "-"], 30, "nix-pr-return").await;
 
-    Ok(())
+    push_result
 }
 
 fn extract_repo_name(repo: &Path) -> anyhow::Result<String> {
