@@ -106,6 +106,34 @@ fi
 echo "Installing dracon utilities to ~/.local/bin/"
 mkdir -p ~/.local/bin
 
+# Clean up orphaned binaries from previous architectures
+ORPHANS=(
+    dracon-system-guard
+    dracon-security-daemon-guard
+)
+for orphan in "${ORPHANS[@]}"; do
+    if [ -f ~/.local/bin/"$orphan" ]; then
+        if [ "$DRY_RUN" = true ]; then
+            echo "  Would remove orphan: ~/.local/bin/$orphan"
+        else
+            rm -f ~/.local/bin/"$orphan"
+            echo "  🧹 Removed orphan: ~/.local/bin/$orphan"
+        fi
+    fi
+done
+
+# Clean up stale .bak files
+for bak in ~/.local/bin/dracon-*.bak*; do
+    [ -f "$bak" ] || continue
+    if [ "$DRY_RUN" = true ]; then
+        echo "  Would remove stale backup: $bak"
+    else
+        rm -f "$bak"
+        echo "  🧹 Removed stale backup: $(basename "$bak")"
+    fi
+done
+echo ""
+
 # Build with release and install manually for feature control
 install_binary() {
     local package=$1
@@ -137,9 +165,36 @@ install_binary() {
     fi
 
     if [ -n "$resolved" ]; then
+        local installed=~/.local/bin/$binary
+        local new_hash=$(md5sum "$resolved" | cut -d' ' -f1)
+
+        if [ -f "$installed" ]; then
+            local old_hash=$(md5sum "$installed" | cut -d' ' -f1)
+            if [ "$new_hash" = "$old_hash" ]; then
+                echo "  ⏭️  ~/.local/bin/$binary unchanged (same hash)"
+                return 0
+            else
+                echo "  ✅ Installed ~/.local/bin/$binary (updated)"
+            fi
+        else
+            echo "  ✅ Installed ~/.local/bin/$binary (new)"
+        fi
+
         cp "$resolved" ~/.local/bin/$binary
         chmod +x ~/.local/bin/$binary
-        echo "  ✅ Installed ~/.local/bin/$binary"
+
+        # Warn if debug build is newer than release — developer may have uninstalled changes
+        local debug_path=""
+        if [ -f "$subdir/target/debug/$binary" ]; then
+            debug_path="$subdir/target/debug/$binary"
+        elif [ -f "target/debug/$binary" ]; then
+            debug_path="target/debug/$binary"
+        fi
+        if [ -n "$debug_path" ] && [ "$debug_path" -nt "$resolved" ]; then
+            echo "  ⚠️  WARNING: target/debug/$binary is NEWER than target/release/$binary"
+            echo "     You may have code changes that aren't in this release build."
+            echo "     Run './install.sh' again after your changes to pick them up."
+        fi
     else
         echo "  ❌ ERROR: Could not find binary for $package (checked $subdir/$bin_path and $bin_path)"
         return 1
