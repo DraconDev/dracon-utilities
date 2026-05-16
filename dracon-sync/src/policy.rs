@@ -4,6 +4,8 @@ use std::path::{Path, PathBuf};
 use std::process::Command as StdCommand;
 use tokio::process::Command as TokioCommand;
 
+pub(crate) const DEFAULT_GIT_HOST_BLOB_LIMIT_BYTES: u64 = 100 * 1024 * 1024;
+
 #[derive(Debug, Clone, Deserialize)]
 pub(crate) struct StandardFileConfig {
     pub(crate) source: String,
