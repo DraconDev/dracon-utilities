@@ -50,11 +50,7 @@ impl From<String> for StandardFileConfig {
     }
 }
 
-impl From<StandardFileConfig> for StandardFileConfig {
-    fn from(cfg: StandardFileConfig) -> Self {
-        cfg
-    }
-}
+
 
 fn deserialize_standard_files<'de, D>(deserializer: D) -> Result<Vec<StandardFileConfig>, D::Error>
 where
