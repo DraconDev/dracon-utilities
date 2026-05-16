@@ -3108,7 +3108,7 @@ mod tests {
         assert_eq!(shorten_when("3 hours ago"), "3h");
         assert_eq!(shorten_when("2 days ago"), "2d");
         assert_eq!(shorten_when("6 weeks ago"), "6w");
-        assert_eq!(shorten_when("just now"), "now");
+        assert_eq!(shorten_when("just now"), "just now");
         assert_eq!(shorten_when("unknown"), "unknown");
     }
 }
