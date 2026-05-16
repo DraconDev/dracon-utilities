@@ -402,6 +402,11 @@ pub(crate) struct SyncPolicy {
     /// Default is false.
     #[serde(default)]
     pub(crate) nix_auto_update: bool,
+    /// Standard files to ensure exist in every synced repository.
+    /// Short form (filename string) resolves to `templates/{name}` in the sync config dir.
+    /// Long form allows specifying explicit source/target paths and overwrite behavior.
+    #[serde(default, deserialize_with = "deserialize_standard_files")]
+    pub(crate) standard_files: Vec<StandardFileConfig>,
 }
 
 /// Package registry type for auto-publish.
@@ -463,6 +468,10 @@ pub(crate) struct RepoPolicyOverride {
     /// Set to true to enable auto-creating PRs for flake version updates.
     #[serde(default)]
     pub(crate) nix_auto_update: Option<bool>,
+    /// Per-repo list of standard file targets to skip.
+    /// Use the target filename (e.g., "CLA.md") not the source path.
+    #[serde(default)]
+    pub(crate) skip_standard_files: Vec<String>,
 }
 
 pub(crate) fn default_true() -> bool {
