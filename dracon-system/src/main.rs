@@ -2675,6 +2675,8 @@ async fn cmd_storage(
     min_size_mb: Option<u64>,
     kinds: Option<String>,
 ) -> Result<()> {
+    use comfy_table::{presets::UTF8_FULL_CONDENSED, Attribute, Cell, Color, ContentArrangement, Table};
+
     let (_, policy) = load_system_policy()?;
     let root = root.unwrap_or_else(|| {
         if !policy.storage.default_root.trim().is_empty() {
@@ -2695,21 +2697,47 @@ async fn cmd_storage(
     }
 
     println!("Workspace: {}", report.root.display());
-    println!();
-    println!("Top projects:");
-    for item in &report.top_projects {
-        println!("  {:>10}  {}", human_bytes(item.bytes), item.path.display());
+
+    if !report.top_projects.is_empty() {
+        let mut table = Table::new();
+        table
+            .load_preset(UTF8_FULL_CONDENSED)
+            .set_content_arrangement(ContentArrangement::Dynamic)
+            .set_header(vec![
+                Cell::new("SIZE"),
+                Cell::new("PROJECT"),
+            ]);
+        for item in &report.top_projects {
+            table.add_row(vec![
+                Cell::new(human_bytes(item.bytes)).add_attribute(Attribute::Bold),
+                Cell::new(item.path.display().to_string()),
+            ]);
+        }
+        println!();
+        println!("Top projects:");
+        println!("{table}");
     }
 
-    println!();
-    println!("Top hotspots:");
-    for item in &report.top_hotspots {
-        println!(
-            "  {:>10}  {:<12} {}",
-            human_bytes(item.bytes),
-            item.kind,
-            item.path.display()
-        );
+    if !report.top_hotspots.is_empty() {
+        let mut table = Table::new();
+        table
+            .load_preset(UTF8_FULL_CONDENSED)
+            .set_content_arrangement(ContentArrangement::Dynamic)
+            .set_header(vec![
+                Cell::new("SIZE"),
+                Cell::new("KIND"),
+                Cell::new("PATH"),
+            ]);
+        for item in &report.top_hotspots {
+            table.add_row(vec![
+                Cell::new(human_bytes(item.bytes)).add_attribute(Attribute::Bold),
+                Cell::new(&item.kind),
+                Cell::new(item.path.display().to_string()),
+            ]);
+        }
+        println!();
+        println!("Top hotspots:");
+        println!("{table}");
     }
 
     if cleanup {
@@ -2738,31 +2766,45 @@ async fn cmd_storage(
         });
         println!("Min size: {} MiB", cfg.min_size_mb);
         println!("Allow tracked: {}", cfg.allow_tracked);
-        println!("Selected paths: {}", selected.len());
+
+        let mut table = Table::new();
+        table
+            .load_preset(UTF8_FULL_CONDENSED)
+            .set_content_arrangement(ContentArrangement::Dynamic)
+            .set_header(vec![
+                Cell::new("SIZE"),
+                Cell::new("KIND"),
+                Cell::new("PATH"),
+                Cell::new("STATUS"),
+            ]);
 
         let mut total = 0u64;
         let mut actionable = Vec::new();
         for item in selected {
             let tracked = is_git_tracked_dir(&item.path).await.unwrap_or(true);
             if tracked && !cfg.allow_tracked {
-                println!(
-                    "  {:>10}  {:<12} {}  [SKIP tracked]",
-                    human_bytes(item.bytes),
-                    item.kind,
-                    item.path.display()
-                );
+                table.add_row(vec![
+                    Cell::new(human_bytes(item.bytes)),
+                    Cell::new(&item.kind),
+                    Cell::new(item.path.display().to_string()),
+                    Cell::new("SKIP tracked").fg(Color::Yellow),
+                ]);
                 continue;
             }
             total += item.bytes;
-            println!(
-                "  {:>10}  {:<12} {}{}",
-                human_bytes(item.bytes),
-                item.kind,
-                item.path.display(),
-                if tracked { "  [tracked]" } else { "" }
-            );
+            let status = if tracked { "tracked" } else { "untracked" };
+            table.add_row(vec![
+                Cell::new(human_bytes(item.bytes)),
+                Cell::new(&item.kind),
+                Cell::new(item.path.display().to_string()),
+                Cell::new(status),
+            ]);
             actionable.push(item.path.clone());
         }
+
+        println!();
+        println!("Selected {} paths:", selected.len());
+        println!("{table}");
         println!("Estimated reclaimed: {}", human_bytes(total));
 
         let user_protected = policy.guard.protected_paths.clone();
