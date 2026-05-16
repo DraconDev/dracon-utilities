@@ -32,23 +32,27 @@ fn update_version_in_flake_nix(content: &str, new_version: &str) -> String {
     let mut result = String::with_capacity(content.len());
     let mut changed = false;
 
-    let mut in_package = false;
+    // Track when we're inside a buildRustPackage attribute block.
+    // Reset on }; (end of block) or a top-level attribute (which can't be inside buildRustPackage).
     let mut in_build_rust_package = false;
     for line in content.lines() {
         let trimmed = line.trim();
-        if trimmed.starts_with('[') {
-            in_package = trimmed == "[package]";
-            in_build_rust_package = false;
-        } else if line.contains(" = rustPlatform.buildRustPackage {")
+
+        // Detect start of buildRustPackage block via attribute assignment.
+        // Works for both "tiles = rustPlatform.buildRustPackage {" and
+        // "packages.x86_64-linux.default = pkgs.rustPlatform.buildRustPackage {".
+        if line.contains(" = rustPlatform.buildRustPackage {")
             || line.contains("= pkgs.rustPlatform.buildRustPackage {") {
             in_build_rust_package = true;
         } else if trimmed.ends_with("};") {
+            // End of block
             in_build_rust_package = false;
         } else if trimmed.starts_with(char::is_alphabetic) && trimmed.contains(" = ") && !trimmed.ends_with("{") && !line.starts_with(' ') && !line.starts_with('\t') {
+            // Top-level attribute — can't be inside a buildRustPackage block
             in_build_rust_package = false;
         }
 
-        if (in_package || in_build_rust_package) && line.contains("version = \"") {
+        if in_build_rust_package && line.contains("version = \"") {
             if let Some(start_idx) = line.find("version = \"") {
                 let after_quote = start_idx + 10; // skip "version = ""
                 if let Some(end_quote_relative) = line[after_quote..].find('"') {
