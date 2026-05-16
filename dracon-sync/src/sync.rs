@@ -1248,12 +1248,15 @@ pub(crate) async fn sync_repo(
         policy,
         &repo_override,
         policy_path.map(|p| p.parent().unwrap_or(p)),
+        dry_run,
     )?;
 
     if !copied_standard_files.is_empty() && !dry_run {
-        for path in &copied_standard_files {
-            stage_existing_files(repo, &[path.to_string_lossy().to_string()], dry_run).await?;
-        }
+        let paths: Vec<String> = copied_standard_files
+            .iter()
+            .map(|p| p.to_string_lossy().to_string())
+            .collect();
+        stage_existing_files(repo, &paths, dry_run).await?;
     }
 
     auto_pull_merge(&svc, &ctx, &initial_status).await?;
