@@ -51,11 +51,15 @@ fn update_version_in_flake_nix(content: &str, new_version: &str) -> String {
         if (in_package || in_build_rust_package) && line.contains("version = \"") {
             if let Some(start_idx) = line.find("version = \"") {
                 let after_quote = start_idx + 10; // skip "version = ""
-                if let Some(_) = line[after_quote..].find('"') {
-                    result.push_str(&line[..start_idx]);
+                if let Some(end_quote_relative) = line[after_quote..].find('"') {
+                    let end_quote = after_quote + end_quote_relative;
+                    let prefix = &line[..start_idx];
+                    let suffix = &line[end_quote + 1..]; // everything after the closing quote
+                    result.push_str(prefix);
                     result.push_str("version = \"");
-                    result.push_str(new_version);
-                    result.push_str("\"");
+                    result.push(new_version);
+                    result.push('"');
+                    result.push_str(suffix);
                     result.push('\n');
                     changed = true;
                     continue;
