@@ -1158,75 +1158,7 @@ async fn renice_process(pid: i32, value: i32) {
     }
 }
 
-async fn kill_process(pid: i32) -> bool {
-    let proc_cmdline = PathBuf::from(format!("/proc/{}/cmdline", pid));
-    let still_git = if let Ok(content) = tokio::fs::read_to_string(&proc_cmdline).await {
-        let cmd = content.replace('\0', " ");
-        let mut parts = cmd.split_whitespace();
-        let exe = parts.next().unwrap_or("");
-        let exe_name = Path::new(exe)
-            .file_name()
-            .map(|n| n.to_string_lossy().to_string())
-            .unwrap_or_default();
-        let args = parts.collect::<Vec<_>>().join(" ");
-        is_git_process(&exe_name, &args)
-    } else {
-        return false;
-    };
-    if !still_git {
-        return false;
-    }
-    if let Err(e) = Command::new("kill")
-        .args(["-TERM", &pid.to_string()])
-        .output()
-        .await
-    {
-        eprintln!("⚠️ kill TERM failed for pid {}: {}", pid, e);
-        return false;
-    }
-    tokio::time::sleep(Duration::from_secs(5)).await;
-    if let Ok(out) = Command::new("ps")
-        .args(["-p", &pid.to_string(), "-o", "pid="])
-        .output()
-        .await
-    {
-        let trimmed = String::from_utf8_lossy(&out.stdout).trim().to_string();
-        if !trimmed.is_empty() {
-            let still_git = if let Ok(content) = tokio::fs::read_to_string(&proc_cmdline).await {
-                let cmd = content.replace('\0', " ");
-                let mut parts = cmd.split_whitespace();
-                let exe = parts.next().unwrap_or("");
-                let exe_name = Path::new(exe)
-                    .file_name()
-                    .map(|n| n.to_string_lossy().to_string())
-                    .unwrap_or_default();
-                let args = parts.collect::<Vec<_>>().join(" ");
-                is_git_process(&exe_name, &args)
-            } else {
-                false
-            };
-            if !still_git {
-                eprintln!(
-                    "⚠️ pid {} is no longer a git process — skipping SIGKILL",
-                    pid
-                );
-                return false;
-            }
-            if let Err(e) = Command::new("kill")
-                .args(["-KILL", &pid.to_string()])
-                .output()
-                .await
-            {
-                eprintln!("⚠️ kill KILL failed for pid {}: {}", pid, e);
-                return false;
-            }
-            eprintln!("⚠️ force-killed runaway git process {}", pid);
-            return true;
-        }
-    }
-    true
-}
-
+#[allow(dead_code)]
 pub(crate) fn is_git_process(command: &str, args: &str) -> bool {
     // Strict matching: only match known long-running git subcommands
     // that are safe to auto-kill. Avoids false positives like "legit-init".
