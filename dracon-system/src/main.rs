@@ -3265,9 +3265,10 @@ async fn cmd_guard_daemon(guard: &mut GuardPolicy) -> Result<()> {
                     }
                     *guard = new_policy.guard;
                     normalize_guard_policy(guard);
-                    runtime.heavy_since.clear();
-                    runtime.reniced_pids.clear();
-                    runtime.cooled_since.clear();
+                    for (&pid, _) in &runtime.reniced_pids {
+                        renice_process(pid, 0).await;
+                    }
+                    runtime = GuardRuntimeState::default();
                     veprintln!(2, "system: policy reloaded on SIGHUP (disk_warn={}%, disk_critical={}%)",
                         guard.disk_warn_percent, guard.disk_critical_percent);
                 }
