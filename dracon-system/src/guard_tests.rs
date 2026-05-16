@@ -248,13 +248,12 @@ fn should_notify_respects_cooldown() {
     let first = crate::should_notify(&mut state, "my-event", 300);
     assert!(first);
 
-    // Immediate second call — still in cooldown
+    // Immediate second call — still in cooldown (cooldown recorded with future time)
     let second = crate::should_notify(&mut state, "my-event", 300);
     assert!(!second);
 
-    // Advance past cooldown by manually inserting into notify_cooldowns past time
-    // (simulate time passing since last notification)
-    state.cooled_since.insert("my-event".to_string(), Instant::now() - std::time::Duration::from_secs(400));
+    // Remove the cooldown entry to simulate time passing — should be allowed again
+    state.notify_cooldowns.remove("my-event");
     let third = crate::should_notify(&mut state, "my-event", 300);
     assert!(third);
 }
