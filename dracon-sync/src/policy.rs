@@ -899,6 +899,7 @@ pub(crate) fn test_sync_policy() -> SyncPolicy {
         auto_release: false,
         auto_publish: false,
         publish_targets: vec![],
+        nix_auto_update: false,
     }
 }
 

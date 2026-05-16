@@ -6,7 +6,7 @@
 use std::path::Path;
 use std::process::Command;
 
-use anyhow::{Context, Result};
+use anyhow::Context;
 use crate::git::git_ssh_hardening;
 
 const FLAKE_NIX: &str = "flake.nix";

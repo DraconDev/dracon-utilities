@@ -354,21 +354,23 @@ sync_visibility_interval_hours = 24  # Check at most once per day per repo
 
 ### Release Pipeline (Tags, Releases, Publishing)
 
-After a version bump, `dracon-sync` can automatically create git tags, GitHub Releases, and publish to package registries. Three separate toggles control each step:
+After a version bump, `dracon-sync` can automatically create git tags, GitHub Releases, publish to package registries, and update Nix flake versions via PR. Four separate toggles control each step:
 
 | Toggle | Default | Risk | Reversible? |
 |--------|---------|------|-------------|
 | `auto_tag` | `true` | Low | Yes (`git tag -d`) |
 | `auto_release` | `false` | Medium | Yes (`gh release delete`) |
 | `auto_publish` | `[]` | High | **No** (registries are immutable) |
+| `nix_auto_update` | `false` | Low | Yes (close PR) |
 
-**Per-repo opt-in:** Tags, releases, and publishing require a `.dracon/dracon-sync.toml` in the repo:
+**Per-repo opt-in:** Tags, releases, publishing, and Nix flake PRs require a `.dracon/dracon-sync.toml` in the repo:
 
 ```toml
 # .dracon/dracon-sync.toml
 auto_tag = true              # default: on
 auto_release = true          # default: off — creates GitHub Release on major bumps
 auto_publish = ["crates-io"] # default: empty = no publishing
+nix_auto_update = true       # default: off — creates PR updating flake.nix version
 ```
 
 **Global publish targets** are configured in the main `dracon-sync.toml`:
