@@ -4,7 +4,8 @@
 
 use std::time::Instant;
 
-// Note: GuardPolicy is accessed via crate::* re-export from pub(crate) use policy::* in main.rs.
+// GuardPolicy is re-exported via pub(crate) use policy::* in main.rs.
+use crate::GuardPolicy;
 
 // ---------------------------------------------------------------------------
 // GuardRuntimeState
