@@ -16,9 +16,9 @@ fn dracon_event_debug() {
     let event = DraconEvent {
         domain: "guard".to_string(),
         severity: EventSeverity::Warn,
-        path: Some("/tmp/test".to_string()),
+        path: "/tmp/test".to_string(),
         message: "test warning".to_string(),
-        timestamp: 1234567890,
+        timestamp: chrono::Utc::now().to_rfc3339(),
     };
     let debug = format!("{:?}", event);
     assert!(debug.contains("guard"));
@@ -38,43 +38,32 @@ fn dracon_event_all_severity_levels() {
 }
 
 #[test]
-fn dracon_event_with_null_path() {
+fn dracon_event_with_empty_path() {
     use crate::{DraconEvent, EventSeverity};
     let event = DraconEvent {
         domain: "system".to_string(),
         severity: EventSeverity::Info,
-        path: None,
+        path: String::new(),
         message: "no path event".to_string(),
-        timestamp: 0,
+        timestamp: chrono::Utc::now().to_rfc3339(),
     };
-    assert!(event.path.is_none());
+    assert!(event.path.is_empty());
     assert_eq!(event.message, "no path event");
 }
 
 #[test]
-fn dracon_event_timestamp_persists() {
+fn dracon_event_via_new_constructor() {
     use crate::{DraconEvent, EventSeverity};
-    let ts: u64 = 9876543210;
-    let event = DraconEvent {
-        domain: "test".to_string(),
-        severity: EventSeverity::Critical,
-        path: None,
-        message: "critical event".to_string(),
-        timestamp: ts,
-    };
-    assert_eq!(event.timestamp, ts);
+    let event = DraconEvent::new("guard", EventSeverity::Error, "/tmp/path", "error occurred");
+    assert_eq!(event.domain, "guard");
+    assert_eq!(event.message, "error occurred");
+    assert!(!event.timestamp.is_empty());
 }
 
 #[test]
 fn emit_event_does_not_panic() {
     use crate::{DraconEvent, EventSeverity};
-    let event = DraconEvent {
-        domain: "test".to_string(),
-        severity: EventSeverity::Info,
-        path: None,
-        message: "test".to_string(),
-        timestamp: 0,
-    };
+    let event = DraconEvent::new("test", EventSeverity::Info, "/tmp", "test event");
     // Should not panic — just records the event
     crate::emit_event(&event);
 }
