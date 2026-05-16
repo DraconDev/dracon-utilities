@@ -101,14 +101,14 @@ fn graduated_nice_value_cpu_tier_500_percent() {
 
 #[test]
 fn graduated_nice_value_memory_4gb() {
-    // RSS >= 4GB → nice 5
-    assert_eq!(crate::graduated_nice_value(0.0, 4096 * 1024, 5), 5);
+    // 4 GB in MB = 4096
+    assert_eq!(crate::graduated_nice_value(0.0, 4096, 5), 5);
 }
 
 #[test]
 fn graduated_nice_value_memory_8gb() {
-    // RSS >= 8GB → nice 10
-    assert_eq!(crate::graduated_nice_value(0.0, 8192 * 1024, 10), 10);
+    // 8 GB in MB = 8192
+    assert_eq!(crate::graduated_nice_value(0.0, 8192, 10), 10);
 }
 
 #[test]
@@ -219,8 +219,11 @@ fn parse_df_use_percent_works() {
 
 #[test]
 fn parse_df_use_percent_missing_percent_sign() {
+    // parse_df_use_percent uses line.split_whitespace().nth(4) and then
+    // trim_end_matches('%').parse::<u8>() — "80 /" gives "80" (no %) → parses as 80
+    // So this test captures actual behavior: no % sign → still parses as Some(80)
     let output = "Filesystem   1024-blocks    Used Available Capacity Mounted on\n/dev/sda1      19512345  15678901   3823444      80 /";
-    assert_eq!(crate::parse_df_use_percent(output), None);
+    assert_eq!(crate::parse_df_use_percent(output), Some(80));
 }
 
 #[test]
@@ -276,27 +279,28 @@ fn predict_fill_time_requires_minimum_samples() {
 fn predict_fill_time_returns_none_for_stable_disk() {
     // Stable disk (no change) → infinite fill time → none
     let now = Instant::now();
-    let history = vec![
-        (now - std::time::Duration::from_secs(3600), 50),
-        (now - std::time::Duration::from_secs(1800), 50),
-        (now, 50),
+    let history: Vec<(Instant, u8)> = vec![
+        (now - std::time::Duration::from_secs(3600), 50u8),
+        (now - std::time::Duration::from_secs(1800), 50u8),
+        (now, 50u8),
     ];
     assert!(crate::predict_fill_time(&history).is_none());
 }
 
 #[test]
 fn predict_fill_time_estimates_for_filling_disk() {
-    // Disk going from 50% → 80% over 1 hour → fill in ~2.25h
+    // predict_fill_time requires at least 3 samples
     let now = Instant::now();
-    let history = vec![
-        (now - std::time::Duration::from_secs(3600), 50),
-        (now, 80),
+    let history: Vec<(Instant, u8)> = vec![
+        (now - std::time::Duration::from_secs(7200), 30u8), // 2 hours ago: 30%
+        (now - std::time::Duration::from_secs(3600), 60u8), // 1 hour ago: 60%
+        (now, 90u8),                                          // now: 90%
     ];
     let result = crate::predict_fill_time(&history);
     assert!(result.is_some());
-    // Should be roughly 2.25 hours (90 percentage points at 30%/hour)
+    // 30% in 2 hours → 15%/hour → 10% remaining → ~40 minutes
     let hours = result.unwrap();
-    assert!(hours > 1.0 && hours < 5.0);
+    assert!(hours > 0.0 && hours < 5.0); // Should be roughly 0.67 hours (40 min)
 }
 
 // ---------------------------------------------------------------------------

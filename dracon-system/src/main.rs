@@ -729,7 +729,7 @@ fn sync_freeze_marker_path(guard: &GuardPolicy) -> PathBuf {
     PathBuf::from(guard.sync_freeze_marker.clone())
 }
 
-fn graduated_nice_value(cpu_percent: f32, rss_mb: u64, base_nice: i32) -> i32 {
+pub(crate) fn graduated_nice_value(cpu_percent: f32, rss_mb: u64, base_nice: i32) -> i32 {
     let cpu_tiers: &[(f32, i32)] = &[(500.0, 15), (300.0, 10), (180.0, 5)];
     let mem_tiers: &[(u64, i32)] = &[(8192, 10), (4096, 5)];
     let cpu_nice = cpu_tiers
