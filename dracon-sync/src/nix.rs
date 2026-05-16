@@ -7,28 +7,7 @@ use std::path::Path;
 use std::process::Command;
 
 use anyhow::{Context, Result};
-use crate::release::ReleaseStep;
 use crate::git::git_ssh_hardening;
-
-#[derive(Debug)]
-pub enum NixError {
-    Io(std::io::Error),
-    Git(String),
-    Gh(String),
-}
-impl std::fmt::Display for NixError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            NixError::Io(e) => write!(f, "IO error: {}", e),
-            NixError::Git(s) => write!(f, "git error: {}", s),
-            NixError::Gh(s) => write!(f, "gh error: {}", s),
-        }
-    }
-}
-impl std::error::Error for NixError {}
-impl From<std::io::Error> for NixError {
-    fn from(e: std::io::Error) -> Self { NixError::Io(e) }
-}
 
 const FLAKE_NIX: &str = "flake.nix";
 
@@ -36,7 +15,7 @@ pub fn has_flake_nix(repo: &Path) -> bool {
     repo.join(FLAKE_NIX).is_file()
 }
 
-pub fn update_flake_version(repo: &Path, new_version: &str) -> Result<bool> {
+pub fn update_flake_version(repo: &Path, new_version: &str) -> anyhow::Result<bool> {
     let flake_path = repo.join(FLAKE_NIX);
     let content = std::fs::read_to_string(&flake_path)?;
 
@@ -49,8 +28,7 @@ pub fn update_flake_version(repo: &Path, new_version: &str) -> Result<bool> {
     Ok(true)
 }
 
-fn update_version_in_flake_nix(content: &str, new_version: &str) -> Result<String> {
-    let version_pattern = format!("version = \"");
+fn update_version_in_flake_nix(content: &str, new_version: &str) -> anyhow::Result<String> {
     let mut result = String::with_capacity(content.len());
     let mut changed = false;
 
@@ -63,9 +41,8 @@ fn update_version_in_flake_nix(content: &str, new_version: &str) -> Result<Strin
         if in_package && line.contains("version = \"") {
             if let Some(idx) = line.find("version = \"") {
                 let rest = &line[idx..];
-                if let Some(end_idx) = rest[13..].find('"') {
+                if let Some(_end_idx) = rest[13..].find('"') {
                     let old_ver_start = idx + 13;
-                    let old_ver_end = old_ver_start + end_idx;
                     let prefix = &line[..old_ver_start];
                     result.push_str(prefix);
                     result.push('"');
@@ -87,10 +64,12 @@ fn update_version_in_flake_nix(content: &str, new_version: &str) -> Result<Strin
     Ok(result)
 }
 
-pub async fn create_flake_pr(repo: &Path, new_version: &str) -> anyhow::Result<release::ReleaseStep> {
+pub async fn create_flake_pr(repo: &Path, new_version: &str) -> anyhow::Result<crate::release::ReleaseStep> {
     let repo_name = extract_repo_name(repo)?;
 
     let branch_name = format!("chore/update-flake-v{}", new_version);
+    let branch_name_check = branch_name.clone();
+    let repo_name_for_check = repo_name.clone();
     let title = format!("chore: update flake.nix to v{}", new_version);
     let body = format!(
         "Update flake.nix version field to v{} after release bump.\n\n\
@@ -98,10 +77,9 @@ pub async fn create_flake_pr(repo: &Path, new_version: &str) -> anyhow::Result<r
         new_version
     );
 
-    // Check if branch already exists
     let check = tokio::task::spawn_blocking(move || {
         Command::new("gh")
-            .args(["pr", "list", "--repo", &repo_name, "--head", &branch_name, "--json", "number"])
+            .args(["pr", "list", "--repo", &repo_name_for_check, "--head", &branch_name_check, "--json", "number"])
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::null())
             .output()
@@ -111,7 +89,7 @@ pub async fn create_flake_pr(repo: &Path, new_version: &str) -> anyhow::Result<r
     if let Ok(output) = check {
         if let Ok(json) = serde_json::from_slice::<serde_json::Value>(&output.stdout) {
             if json.as_array().map(|arr| !arr.is_empty()).unwrap_or(false) {
-                return Ok(ReleaseStep::Skipped(format!(
+                return Ok(crate::release::ReleaseStep::Skipped(format!(
                     "flake PR branch '{}' already exists",
                     branch_name
                 )));
@@ -121,10 +99,8 @@ pub async fn create_flake_pr(repo: &Path, new_version: &str) -> anyhow::Result<r
 
     let commit_msg = format!("chore: update flake.nix to v{}\n\nAuto-commit by dracon-sync", new_version);
 
-    // Create branch, commit, push
     run_git_for_nix_pr(repo, &branch_name, &commit_msg).await?;
 
-    // Create PR via gh
     let result = tokio::task::spawn_blocking(move || {
         Command::new("gh")
             .args([
@@ -145,27 +121,27 @@ pub async fn create_flake_pr(repo: &Path, new_version: &str) -> anyhow::Result<r
         Ok(output) if output.status.success() => {
             let pr_url = String::from_utf8_lossy(&output.stdout).trim().to_string();
             eprintln!("📄 Created flake PR: {}", pr_url);
-            Ok(ReleaseStep::NixFlakePRCreated(pr_url))
+            Ok(crate::release::ReleaseStep::NixFlakePRCreated(pr_url))
         }
         Ok(output) => {
             let stderr = String::from_utf8_lossy(&output.stderr);
             if stderr.contains("No commit") || stderr.contains("everything up-to-date") {
-                Ok(ReleaseStep::Skipped("flake.nix already at latest version".to_string()))
+                Ok(crate::release::ReleaseStep::Skipped("flake.nix already at latest version".to_string()))
             } else {
-                Ok(ReleaseStep::Failed {
+                Ok(crate::release::ReleaseStep::Failed {
                     step: "gh pr create".to_string(),
                     error: stderr.trim().to_string(),
                 })
             }
         }
-        Err(e) => Ok(ReleaseStep::Failed {
+        Err(e) => Ok(crate::release::ReleaseStep::Failed {
             step: "gh pr create".to_string(),
             error: e.to_string(),
         }),
     }
 }
 
-async fn run_git_for_nix_pr(repo: &Path, branch_name: &str, commit_msg: &str) -> Result<()> {
+async fn run_git_for_nix_pr(repo: &Path, branch_name: &str, commit_msg: &str) -> anyhow::Result<()> {
     use crate::git::run_git_with_timeout;
 
     run_git_with_timeout(repo, &["checkout", "-b", branch_name], 30, "nix-pr-branch").await?;
@@ -200,7 +176,7 @@ async fn run_git_for_nix_pr(repo: &Path, branch_name: &str, commit_msg: &str) ->
     Ok(())
 }
 
-fn extract_repo_name(repo: &Path) -> Result<String> {
+fn extract_repo_name(repo: &Path) -> anyhow::Result<String> {
     let output = std::process::Command::new("git")
         .args(["remote", "get-url", "origin"])
         .current_dir(repo)
@@ -212,19 +188,19 @@ fn extract_repo_name(repo: &Path) -> Result<String> {
     let url = String::from_utf8_lossy(&output.stdout).trim().to_string();
 
     if url.starts_with("git@") {
-        url.strip_prefix("git@")
+        Ok(url.strip_prefix("git@")
             .and_then(|s| s.split_once(':'))
             .map(|(_, path)| path.trim_end_matches(".git").to_string())
-            .unwrap_or_else(|| url.clone())
+            .unwrap_or_else(|| url.clone()))
     } else if url.starts_with("https://") {
-        url.trim_start_matches("https://")
+        Ok(url.trim_start_matches("https://")
             .trim_end_matches(".git")
             .split('/')
             .skip(1)
             .collect::<Vec<_>>()
-            .join("/")
+            .join("/"))
     } else {
-        url.clone()
+        Ok(url.clone())
     }
 }
 
