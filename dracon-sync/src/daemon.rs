@@ -368,6 +368,11 @@ pub(crate) async fn run_once(policy_path: &Path) -> Result<()> {
 
     let mut changed = 0usize;
     for repo in repos {
+        // Guard against repo-discovery race
+        if !repo.exists() {
+            eprintln!("⚠️ {} repo path vanished between discovery and sync, skipping", repo.display());
+            continue;
+        }
         match tokio::time::timeout(
             Duration::from_secs(policy.repo_sync_timeout_secs),
             sync_repo(
@@ -536,6 +541,17 @@ pub(crate) async fn run_daemon(
             // If the policy is reloaded mid-cycle (SIGHUP), this repo still
             // operates on the policy version it was started with.
             let policy = policy.clone();
+
+            // Guard against repo-discovery race: if a repo was deleted between
+            // discovery and processing, skip it and clean up tracking.
+            if !repo.exists() {
+                if debug_enabled() {
+                    eprintln!("⏳ {} repo path vanished, skipping", repo.display());
+                }
+                activity.remove(&repo);
+                continue;
+            }
+
             let now = Instant::now();
             if !is_repo_ready(&repo) {
                 if debug_enabled() {
