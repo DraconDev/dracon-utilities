@@ -378,30 +378,37 @@ fn test_graduated_nice_value_memory_boundary() {
 
 #[test]
 fn guard_safe_delete_allows_paths_under_system_protected() {
-    let tmp = tempfile::tempdir().unwrap();
-    let target = tmp.path().join("target");
+    let tmp = std::env::temp_dir().join("dracon_test_guard_safe_1");
+    let _ = std::fs::remove_dir_all(&tmp);
+    let target = tmp.join("target");
     std::fs::create_dir_all(&target).unwrap();
     let result = check_safe_to_delete_guard(&target, &[]);
     assert!(result.is_ok(), "guard safe delete should allow paths under /home (system-protected skipped)");
+    let _ = std::fs::remove_dir_all(&tmp);
 }
 
 #[test]
 fn guard_safe_delete_blocks_user_protected() {
-    let tmp = tempfile::tempdir().unwrap();
-    let target = tmp.path().join("target");
+    let tmp = std::env::temp_dir().join("dracon_test_guard_safe_2");
+    let _ = std::fs::remove_dir_all(&tmp);
+    let target = tmp.join("target");
     std::fs::create_dir_all(&target).unwrap();
-    let user_protected = vec![tmp.path().display().to_string()];
+    let user_protected = vec![tmp.display().to_string()];
     let result = check_safe_to_delete_guard(&target, &user_protected);
     assert!(result.is_err(), "guard safe delete should block user-protected paths");
+    let _ = std::fs::remove_dir_all(&tmp);
 }
 
 #[test]
 fn guard_safe_delete_rejects_symlink() {
-    let tmp = tempfile::tempdir().unwrap();
-    let real = tmp.path().join("real_target");
+    let tmp = std::env::temp_dir().join("dracon_test_guard_safe_3");
+    let _ = std::fs::remove_dir_all(&tmp);
+    let real = tmp.join("real_target");
     std::fs::create_dir_all(&real).unwrap();
-    let link = tmp.path().join("link_target");
+    let link = tmp.join("link_target");
+    let _ = std::fs::remove_file(&link);
     std::os::unix::fs::symlink(&real, &link).unwrap();
     let result = check_safe_to_delete_guard(&link, &[]);
     assert!(result.is_err(), "guard safe delete should reject symlinks");
+    let _ = std::fs::remove_dir_all(&tmp);
 }
