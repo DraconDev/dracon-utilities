@@ -57,15 +57,11 @@ where
     D: Deserializer<'de>,
 {
     let raw: Vec<StandardFilesEntry> = Deserialize::deserialize(deserializer)?;
-    Ok(raw.into_iter().map(|e| e.into_full()).collect())
+    Ok(raw.into_iter().map(|e| e.into_config()).collect())
 }
 
-pub(crate) trait IntoStandardFileConfig {
-    fn into_full(self) -> StandardFileConfig;
-}
-
-impl IntoStandardFileConfig for StandardFilesEntry {
-    fn into_full(self) -> StandardFileConfig {
+impl StandardFilesEntry {
+    fn into_config(self) -> StandardFileConfig {
         match self {
             StandardFilesEntry::Short(name) => name.into(),
             StandardFilesEntry::Full(cfg) => cfg,

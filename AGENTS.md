@@ -179,7 +179,7 @@ standard_files = ["LICENSE", "CLA.md"]
 # [[standard_files]]
 # source = "templates/CUSTOM"
 # target = "CUSTOM_NOTICE"
-# overwrite = false   # default: false (never overwrites)
+# overwrite = false   # default: false; set true to replace existing files
 ```
 
 Per-repo opt-out via `.dracon/dracon-sync.toml`:
@@ -187,7 +187,9 @@ Per-repo opt-out via `.dracon/dracon-sync.toml`:
 skip_standard_files = ["CLA.md"]
 ```
 
-Files are only copied if the target doesn't exist. Missing templates print a warning but don't block sync.
+Files are only copied if the target doesn't exist (default `overwrite = false`). Set `overwrite = true` to replace existing files with the template version. Missing templates print a warning but don't block sync.
+
+Source path resolution: absolute paths used as-is, `~/` expanded to home directory, relative paths resolved from `~/.dracon/utilities/sync/`.
 
 ## Operational State
 
