@@ -417,6 +417,77 @@ struct DiffResult {
     filter_only_cleared: bool,
 }
 
+#[cfg(test)]
+mod diff_tests {
+    use crate::git::{cli_diff_entries, staged_paths};
+    use std::path::PathBuf;
+
+    #[test]
+    fn test_fallback_entries_recalculate_staged_files() {
+        // When cli_diff_entries fallback is used, staged_files must be
+        // recalculated from actual staged paths rather than leaving the
+        // (potentially stale) libgit2 count.
+        use crate::git::staged_paths;
+
+        // Create a temp repo with a staged file
+        let tmp = tempfile::tempdir().unwrap();
+        let repo_path = tmp.path().join("test-repo");
+        std::fs::create_dir_all(&repo_path).unwrap();
+
+        // Initialize git repo
+        let output = std::process::Command::new("git")
+            .args(["init"])
+            .current_dir(&repo_path)
+            .output()
+            .expect("git init failed");
+        assert!(output.status.success(), "git init failed: {:?}", output);
+
+        // Configure git user
+        std::process::Command::new("git")
+            .args(["config", "user.email", "test@test.com"])
+            .current_dir(&repo_path)
+            .output()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["config", "user.name", "Test"])
+            .current_dir(&repo_path)
+            .output()
+            .unwrap();
+
+        // Create initial commit
+        std::fs::write(repo_path.join("README.md"), "initial").unwrap();
+        std::process::Command::new("git")
+            .args(["add", "README.md"])
+            .current_dir(&repo_path)
+            .output()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["commit", "-m", "initial"])
+            .current_dir(&repo_path)
+            .output()
+            .unwrap();
+
+        // Now add a new file (staged)
+        std::fs::write(repo_path.join("new_file.rs"), "fn main() {}").unwrap();
+        std::process::Command::new("git")
+            .args(["add", "new_file.rs"])
+            .current_dir(&repo_path)
+            .output()
+            .unwrap();
+
+        // staged_paths should find the staged file
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let staged = rt.block_on(staged_paths(&repo_path)).unwrap();
+        assert_eq!(staged.len(), 1, "expected 1 staged file, got {:?}", staged);
+        assert!(staged.contains(&std::path::PathBuf::from("new_file.rs")));
+
+        // The fallback code path: cli_diff_entries should find it
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let entries = rt.block_on(crate::git::cli_diff_entries(&repo_path)).unwrap();
+        assert!(!entries.is_empty(), "cli_diff_entries should find the staged file");
+    }
+}
+
 async fn compute_diff_entries(svc: &GitService, repo: &Path) -> Result<DiffResult> {
     let mut status = svc.get_status().await?;
     let mut entries = svc.get_diff_entries().await?;
@@ -460,12 +531,19 @@ async fn compute_diff_entries(svc: &GitService, repo: &Path) -> Result<DiffResul
         if !fallback_entries.is_empty() {
             status.is_clean = false;
             status.modified_files = fallback_entries.len();
+            // Recalculate staged_files from actual staged paths when using
+            // fallback CLI entries, since the libgit2 count may be stale
+            // (libgit2 returned 0 entries but CLI found changes).
+            if let Ok(staged) = crate::git::staged_paths(repo).await {
+                status.staged_files = staged.len();
+            }
             entries = fallback_entries;
             if debug_enabled() {
                 eprintln!(
-                    "🐛 {} fallback entries(cli)={} => forcing dirty",
+                    "🐛 {} fallback entries(cli)={} staged={} => forcing dirty",
                     repo.display(),
-                    status.modified_files
+                    status.modified_files,
+                    status.staged_files,
                 );
             }
         }
