@@ -562,6 +562,8 @@ pub(crate) struct GuardPolicy {
     auto_renice: bool,
     #[serde(default = "default_renice_value")]
     renice_value: i32,
+    #[serde(default = "default_release_after_secs")]
+    release_after_secs: u64,
     /// Automatically kill runaway git processes (git-init, git-fetch, etc.) after sustain period
     #[serde(default)]
     auto_kill_git: bool,
@@ -675,6 +677,7 @@ impl Default for GuardPolicy {
             notify_cooldown_secs: default_notify_cooldown_secs(),
             auto_renice: false,
             renice_value: default_renice_value(),
+            release_after_secs: default_release_after_secs(),
             auto_kill_git: false,
             git_kill_threshold_secs: default_git_kill_threshold_secs(),
             guard_log_file: default_guard_log_file(),
@@ -718,6 +721,7 @@ struct GuardProcessAlert {
     rss_mb: u64,
     sustained_secs: u64,
     action: String,
+    nice_value: i32,
 }
 
 #[derive(Debug, Serialize)]
@@ -827,7 +831,11 @@ fn default_notify_cooldown_secs() -> u64 {
 }
 
 fn default_renice_value() -> i32 {
-    10
+    5
+}
+
+fn default_release_after_secs() -> u64 {
+    120
 }
 
 fn default_git_kill_threshold_secs() -> u64 {
@@ -2427,9 +2435,21 @@ async fn check_heavy_processes(
         }
 
         let mut action = "notify".to_string();
+        let mut nice_applied = 0;
+
         if guard.auto_renice {
-            renice_process(p.pid, guard.renice_value).await;
-            action = format!("renice:{}", guard.renice_value);
+            let already_niced = state.reniced_pids.get(&p.pid).copied();
+            let nice_val = graduated_nice_value(p.cpu_percent, p.rss_mb, guard.renice_value);
+            if already_niced != Some(nice_val) {
+                renice_process(p.pid, nice_val).await;
+                state.reniced_pids.insert(p.pid, nice_val);
+                eprintln!(
+                    "🔧 renice pid={} cmd={} -> nice {} (cpu={:.1}% rss={}MiB)",
+                    p.pid, p.command, nice_val, p.cpu_percent, p.rss_mb
+                );
+            }
+            nice_applied = nice_val;
+            action = format!("renice:{}", nice_val);
         }
 
         if guard.auto_kill_git
@@ -2450,8 +2470,9 @@ async fn check_heavy_processes(
                 guard,
                 "Dracon System Guard",
                 &format!(
-                    "Heavy process {} (pid={} cpu={:.1}% rss={}MiB) sustained {}s",
-                    p.command, p.pid, p.cpu_percent, p.rss_mb, sustained
+                    "Heavy process {} (pid={} cpu={:.1}% rss={}MiB) sustained {}s{}",
+                    p.command, p.pid, p.cpu_percent, p.rss_mb, sustained,
+                    if nice_applied > 0 { format!(" reniced={}", nice_applied) } else { String::new() }
                 ),
             )
             .await;
@@ -2466,12 +2487,50 @@ async fn check_heavy_processes(
             rss_mb: p.rss_mb,
             sustained_secs: sustained,
             action,
+            nice_value: nice_applied,
         });
     }
 
     state
         .heavy_since
         .retain(|pid, _| current_heavy.contains(pid));
+
+    // Un-renice recovery: processes that are no longer heavy
+    let now = Instant::now();
+    let release_dur = Duration::from_secs(guard.release_after_secs);
+    let mut to_unrenice = Vec::new();
+    for (&pid, _) in &state.reniced_pids {
+        if current_heavy.contains(&pid) {
+            state.cooled_since.remove(&pid);
+            continue;
+        }
+        let cooled_at = state.cooled_since.entry(pid).or_insert(now);
+        if now.duration_since(*cooled_at) >= release_dur {
+            to_unrenice.push(pid);
+        }
+    }
+    for pid in to_unrenice {
+        renice_process(pid, 0).await;
+        eprintln!("🔧 un-renice pid={} -> nice 0 (pressure released)", pid);
+        state.reniced_pids.remove(&pid);
+        state.cooled_since.remove(&pid);
+    }
+    state.cooled_since.retain(|pid, _| state.reniced_pids.contains_key(pid));
+
+    // Clean up reniced_pids for processes that no longer exist
+    state.reniced_pids.retain(|pid, _| {
+        PathBuf::from(format!("/proc/{}", pid)).exists()
+    });
+
+    // Summary feedback
+    if !state.reniced_pids.is_empty() {
+        let summary: Vec<String> = state
+            .reniced_pids
+            .iter()
+            .map(|(pid, nice)| format!("pid={}:nice={}", pid, nice))
+            .collect();
+        eprintln!("🔧 reniced active: [{}]", summary.join(", "));
+    }
 
     Ok(alerts)
 }
