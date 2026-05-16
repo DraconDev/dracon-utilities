@@ -901,6 +901,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "clap",
+ "comfy-table",
  "dirs",
  "dracon-security",
  "globset",

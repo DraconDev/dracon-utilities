@@ -1578,19 +1578,21 @@ fn scrub_json_value(v: &mut serde_json::Value) {
     }
 }
 
-pub(crate) fn scrub_markers(policy: &WardenPolicy, repos: &[PathBuf], apply: bool) -> Result<()> {
+ pub(crate) fn scrub_markers(policy: &WardenPolicy, repos: &[PathBuf], apply: bool) -> Result<()> {
+    use comfy_table::{presets::UTF8_FULL_CONDENSED, Attribute, Cell, Color, ContentArrangement, Table};
+
     let protected = build_globset(&policy.protected_patterns)?;
 
     let mut found = 0usize;
     let mut changed = 0usize;
     let mut skipped = 0usize;
+    let mut rows: Vec<(String, String, String)> = Vec::new();
 
     for repo in repos {
         if !repo.join(".git").exists() {
             continue;
         }
 
-        // Scan both tracked and untracked (but not ignored) files.
         let out = std::process::Command::new("git")
             .arg("-C")
             .arg(repo)
@@ -1602,7 +1604,7 @@ pub(crate) fn scrub_markers(policy: &WardenPolicy, repos: &[PathBuf], apply: boo
             .with_context(|| format!("git ls-files failed for {}", repo.display()))?;
         if !out.status.success() {
             eprintln!(
-                "⚠️ git ls-files failed for {} (status {})",
+                "\u{26a0}\u{fe0f} git ls-files failed for {} (status {})",
                 repo.display(),
                 out.status
             );
@@ -1616,7 +1618,7 @@ pub(crate) fn scrub_markers(policy: &WardenPolicy, repos: &[PathBuf], apply: boo
             }
             let rel_norm = rel.replace('\\', "/");
             if protected.is_match(&rel_norm) {
-                continue; // markers are allowed in protected/encrypted files.
+                continue;
             }
             if !rel_norm.ends_with(".json") {
                 continue;
@@ -1632,31 +1634,35 @@ pub(crate) fn scrub_markers(policy: &WardenPolicy, repos: &[PathBuf], apply: boo
 
             found += 1;
             if !apply {
-                println!("⚠️ markers found: {}", path.display());
+                let repo_name = repo
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_else(|| repo.display().to_string());
+                rows.push((repo_name, rel_norm.clone(), "found".to_string()));
                 continue;
             }
 
-            // Attempt structured scrub; if parse fails (broken JSON), do not guess.
             let parsed: serde_json::Value = match serde_json::from_str(&content) {
                 Ok(v) => v,
                 Err(_) => {
-                    // Fallback: try to salvage invalid JSON where markers were injected as raw tokens.
                     let Some(salvaged) = salvage_invalid_json_markers(&content) else {
                         skipped += 1;
-                        eprintln!(
-                            "⚠️ cannot scrub invalid JSON (manual fix needed): {}",
-                            path.display()
-                        );
+                        let repo_name = repo
+                            .file_name()
+                            .map(|n| n.to_string_lossy().to_string())
+                            .unwrap_or_else(|| repo.display().to_string());
+                        rows.push((repo_name, rel_norm.clone(), "invalid JSON".to_string()));
                         continue;
                     };
                     match serde_json::from_str(&salvaged) {
                         Ok(v) => v,
                         Err(_) => {
                             skipped += 1;
-                            eprintln!(
-                                "⚠️ cannot scrub invalid JSON (manual fix needed): {}",
-                                path.display()
-                            );
+                            let repo_name = repo
+                                .file_name()
+                                .map(|n| n.to_string_lossy().to_string())
+                                .unwrap_or_else(|| repo.display().to_string());
+                            rows.push((repo_name, rel_norm.clone(), "invalid JSON".to_string()));
                             continue;
                         }
                     }
@@ -1670,18 +1676,48 @@ pub(crate) fn scrub_markers(policy: &WardenPolicy, repos: &[PathBuf], apply: boo
                 fs::write(&path, &next)
                     .with_context(|| format!("failed writing {}", path.display()))?;
                 changed += 1;
-                println!("✅ scrubbed: {}", path.display());
+                let repo_name = repo
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_else(|| repo.display().to_string());
+                rows.push((repo_name, rel_norm.clone(), "scrubbed".to_string()));
             }
         }
     }
 
+    if !rows.is_empty() {
+        let mut table = Table::new();
+        table
+            .load_preset(UTF8_FULL_CONDENSED)
+            .set_content_arrangement(ContentArrangement::Dynamic)
+            .set_header(vec![
+                Cell::new("REPO"),
+                Cell::new("FILE"),
+                Cell::new("STATUS"),
+            ]);
+
+        for (repo, file, status) in &rows {
+            let (status_str, color) = match status.as_str() {
+                "scrubbed" => ("\u{2705} scrubbed", Color::Green),
+                "invalid JSON" => ("\u{274c} invalid JSON", Color::Red),
+                _ => ("\u{26a0}\u{fe0f} found", Color::Yellow),
+            };
+            table.add_row(vec![
+                Cell::new(repo),
+                Cell::new(file),
+                Cell::new(status_str).fg(color),
+            ]);
+        }
+
+        println!("{table}");
+    }
+
     if apply {
         println!(
-            "✅ scrub complete (found: {}, changed: {}, skipped_invalid_json: {})",
-            found, changed, skipped
+            "scrub complete (found: {found}, changed: {changed}, skipped_invalid_json: {skipped})"
         );
     } else {
-        println!("✅ scrub report complete (found: {})", found);
+        println!("scrub report complete (found: {found})");
     }
     Ok(())
 }
