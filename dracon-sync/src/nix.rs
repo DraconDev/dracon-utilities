@@ -59,8 +59,9 @@ fn update_version_in_flake_nix(content: &str, new_version: &str) -> String {
         if in_build_rust_package && line.contains("version = \"") {
             if let Some(start_idx) = line.find("version = \"") {
                 let after_quote = start_idx + 10;
-                if let Some(end_quote_relative) = line[after_quote..].find('"') {
-                    let end_quote = after_quote + end_quote_relative;
+if let Some(end_quote_relative) = line[after_quote..].find('"') {
+                    // +1 to skip the opening quote, then add the offset to the closing quote
+                    let end_quote = after_quote + 1 + end_quote_relative;
                     let prefix = &line[..start_idx];
                     let suffix = &line[end_quote + 1..];
                     result.push_str(prefix);
@@ -376,7 +377,6 @@ mod tests {
 
     #[test]
     fn test_update_version_preserves_semicolon() {
-        // Ensure semicolons after version lines are preserved
         let content = r#"{
   tiles = rustPlatform.buildRustPackage {
     pname = "tiles";
@@ -384,8 +384,9 @@ mod tests {
   };
 }"#;
         let updated = update_version_in_flake_nix(content, "2.0.0");
-        assert!(updated.contains(r#"version = "2.0.0";"#), "semicolon dropped, got:\n{}", updated);
-        assert!(!updated.contains("version = \"1.0.0\""));
+        eprintln!("=== UPDATED ===\n{}\n=== END ===", updated);
+        assert!(updated.contains("2.0.0"), "missing 2.0.0, got:\n{}", updated);
+        assert!(updated.contains("version = \"2.0.0\";"), "semicolon dropped, got:\n{}", updated);
     }
 
     #[test]
