@@ -960,8 +960,7 @@ async fn stage_commit_and_push(
             build_commit_message(&commit_ctx)
         }
     } else if let Some(ref ai_sub) = ai_subject {
-        let conventional_types = ["feat","fix","refactor","chore","docs","perf","style","test","build","ci"];
-        let has_conventional_prefix = conventional_types.iter().any(|t| {
+        let has_conventional_prefix = crate::bump::CONVENTIONAL_COMMIT_TYPES.iter().any(|t| {
             ai_sub.starts_with(&format!("{}:", t)) || ai_sub.starts_with(&format!("{}(", t))
         });
         if has_conventional_prefix {

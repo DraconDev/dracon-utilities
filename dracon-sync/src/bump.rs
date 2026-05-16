@@ -82,6 +82,11 @@ pub(crate) const VERSION_FILES: &[&str] = &[
     "Cargo.lock",
 ];
 
+pub(crate) const CONVENTIONAL_COMMIT_TYPES: &[&str] = &[
+    "feat", "fix", "refactor", "docs", "test", "chore", "perf",
+    "security", "build", "ci", "style", "revert",
+];
+
 pub fn deterministic_decide_bump_level(staged_diff: &str) -> BumpLevel {
     let mut has_meaningful_change = false;
 
