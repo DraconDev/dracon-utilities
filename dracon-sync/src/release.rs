@@ -995,6 +995,7 @@ mod tests {
             true,  // auto_tag
             true,  // auto_release enabled
             &[],   // no publish targets
+            false, // nix_auto_update
         )
         .await;
 
@@ -1050,6 +1051,7 @@ mod tests {
             true,  // auto_tag
             true,  // auto_release enabled
             &[],   // no publish targets
+            false, // nix_auto_update
         )
         .await;
 

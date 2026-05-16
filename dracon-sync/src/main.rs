@@ -847,12 +847,14 @@ async fn main() -> Result<()> {
                 true,  // auto_tag: always tag for manual publish
                 false, // auto_release: don't create GitHub release for manual publish
                 &repo_targets,
+                false, // nix_auto_update: disabled for manual publish
             ).await;
             for step in &steps {
                 match step {
                     release::ReleaseStep::TagCreated(tag) => println!("  Tag: {tag}"),
                     release::ReleaseStep::GitHubReleaseCreated(tag) => println!("  Release: {tag}"),
                     release::ReleaseStep::Published { registry, version } => println!("  Published: {registry} v{version}"),
+                    release::ReleaseStep::NixFlakePRCreated(url) => println!("  Nix flake PR: {url}"),
                     release::ReleaseStep::Skipped(reason) => println!("  Skipped: {reason}"),
                     release::ReleaseStep::Failed { step: s, error } => eprintln!("  Failed: {s} — {error}"),
                 }
