@@ -43,7 +43,7 @@ fn update_version_in_flake_nix(content: &str, new_version: &str) -> String {
             in_build_rust_package = true;
         } else if trimmed.ends_with("};") {
             in_build_rust_package = false;
-        } else if trimmed.starts_with(char::is_alphabetic) && trimmed.contains(" = ") && !trimmed.contains("{") {
+        } else if trimmed.starts_with(char::is_alphabetic) && trimmed.contains(" = ") && !trimmed.ends_with("{") && !line.starts_with(' ') && !line.starts_with('\t') {
             in_build_rust_package = false;
         }
 
