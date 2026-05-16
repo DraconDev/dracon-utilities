@@ -39,8 +39,7 @@ fn update_version_in_flake_nix(content: &str, new_version: &str) -> String {
         if trimmed.starts_with('[') {
             in_package = trimmed == "[package]";
             in_build_rust_package = false;
-        } else if trimmed.ends_with("= rustPlatform.buildRustPackage {")
-            || trimmed.ends_with("= pkgs.rustPlatform.buildRustPackage {") {
+        } else if trimmed.ends_with("buildRustPackage {") && trimmed.contains(" = ") {
             in_build_rust_package = true;
         } else if trimmed.ends_with("};") {
             in_build_rust_package = false;
