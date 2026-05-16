@@ -25,6 +25,7 @@ pub(crate) use policy::*;
 
 mod guard_tests;
 mod links_tests;
+mod events_tests;
 
 const SYSTEM_PROTECTED: &[&str] = &[
     "/", "/home", "/etc", "/usr", "/var", "/boot", "/nix", "/run", "/sys", "/dev", "/proc",
