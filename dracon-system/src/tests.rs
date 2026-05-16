@@ -376,10 +376,21 @@ fn test_graduated_nice_value_memory_boundary() {
     assert_eq!(graduated_nice_value(0.0, 8192, 0), 10);
 }
 
+fn guard_test_tmp(name: &str) -> std::path::PathBuf {
+    std::env::temp_dir().join(format!(
+        "dracon_test_{}_{}_{}",
+        name,
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ))
+}
+
 #[test]
 fn guard_safe_delete_allows_paths_under_system_protected() {
-    let tmp = std::env::temp_dir().join("dracon_test_guard_safe_1");
-    let _ = std::fs::remove_dir_all(&tmp);
+    let tmp = guard_test_tmp("guard_safe_1");
     let target = tmp.join("target");
     std::fs::create_dir_all(&target).unwrap();
     let result = check_safe_to_delete_guard(&target, &[]);
@@ -389,8 +400,7 @@ fn guard_safe_delete_allows_paths_under_system_protected() {
 
 #[test]
 fn guard_safe_delete_blocks_user_protected() {
-    let tmp = std::env::temp_dir().join("dracon_test_guard_safe_2");
-    let _ = std::fs::remove_dir_all(&tmp);
+    let tmp = guard_test_tmp("guard_safe_2");
     let target = tmp.join("target");
     std::fs::create_dir_all(&target).unwrap();
     let user_protected = vec![tmp.display().to_string()];
@@ -401,8 +411,7 @@ fn guard_safe_delete_blocks_user_protected() {
 
 #[test]
 fn guard_safe_delete_rejects_symlink() {
-    let tmp = std::env::temp_dir().join("dracon_test_guard_safe_3");
-    let _ = std::fs::remove_dir_all(&tmp);
+    let tmp = guard_test_tmp("guard_safe_3");
     let real = tmp.join("real_target");
     std::fs::create_dir_all(&real).unwrap();
     let link = tmp.join("link_target");

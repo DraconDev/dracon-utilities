@@ -965,7 +965,7 @@ async fn stage_commit_and_push(
     } else if let Some(ref ai_sub) = ai_subject {
         let has_conventional_prefix = crate::bump::CONVENTIONAL_COMMIT_TYPES.iter().any(|t| {
             ai_sub.starts_with(&format!("{}:", t)) || ai_sub.starts_with(&format!("{}(", t))
-        });
+        }) || ai_sub.starts_with("Revert \"");
         if has_conventional_prefix {
             ai_sub.clone()
         } else {
