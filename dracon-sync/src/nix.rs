@@ -59,10 +59,11 @@ fn update_version_in_flake_nix(content: &str, new_version: &str) -> String {
             }
         }
 
-        if in_build_rust_package && line.contains("version = \"") {
+if in_build_rust_package && line.contains("version = \"") {
             if let Some(start_idx) = line.find("version = \"") {
                 let after_quote = start_idx + 10;
-                if let Some(end_quote_relative) = line[after_quote + 1..].find('"') {
+                eprintln!("DEBUG line={:?} start_idx={} after_quote={} char_at_after_quote={:?}", line, start_idx, after_quote, line.chars().nth(after_quote));
+if let Some(end_quote_relative) = line[after_quote + 1..].find('"') {
                     // +1 to skip the opening quote, then +1 to get the position after that quote
                     let end_quote = after_quote + 1 + end_quote_relative;
                     let prefix = &line[..start_idx];
