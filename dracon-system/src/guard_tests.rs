@@ -135,6 +135,7 @@ fn graduated_nice_value_high_base_clamped_to_max() {
 
 #[test]
 fn parse_ps_output_extracts_all_fields() {
+    // ps output uses KB for RSS (ps man page: rss: resident set size in KB)
     let output = "12345  1  50.0  1024  cargo\n  23456  12345  25.0  2048  rustc";
     let samples = crate::parse_ps_output(output);
     assert_eq!(samples.len(), 2);
@@ -142,13 +143,14 @@ fn parse_ps_output_extracts_all_fields() {
     assert_eq!(samples[0].pid, 12345);
     assert_eq!(samples[0].ppid, 1);
     assert_eq!(samples[0].cpu_percent, 50.0);
-    assert_eq!(samples[0].rss_mb, 1024);
+    // RSS is in KB, converted to MB via /1024
+    assert_eq!(samples[0].rss_mb, 1024 / 1024); // 1024 KB = 1 MB
     assert_eq!(samples[0].command, "cargo");
 
     assert_eq!(samples[1].pid, 23456);
     assert_eq!(samples[1].ppid, 12345);
     assert_eq!(samples[1].cpu_percent, 25.0);
-    assert_eq!(samples[1].rss_mb, 2048);
+    assert_eq!(samples[1].rss_mb, 2048 / 1024); // 2048 KB = 2 MB
     assert_eq!(samples[1].command, "rustc");
 }
 
