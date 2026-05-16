@@ -240,6 +240,24 @@ auto_create = false
 # Without auto_release = true, no GitHub Releases are created.
 # Tags are created by default for every version bump unless auto_tag = false.
 
+# nix_auto_update = false            # global master toggle (default: off)
+#
+# When true and a version bump occurs in a repo with flake.nix, dracon-sync:
+#   1. Updates the version field in flake.nix (inside [package] block)
+#   2. Creates a PR via `gh` with the flake.nix change
+#
+# This is independent of tagging and publishing — it only applies to repos
+# that have a flake.nix file AND are connected to GitHub (gh CLI required).
+#
+# Per-repo opt-in (via .dracon/dracon-sync.toml):
+#   nix_auto_update = true
+#
+# Nix flake version update (if enabled globally and repo has flake.nix):
+#   auto_tag = true
+#   nix_auto_update = true
+#
+# Without nix_auto_update, flake.nix version fields are NOT updated automatically.
+#
 # =============================================================================
 #  SECTION 9: WEBHOOK
 # =============================================================================
