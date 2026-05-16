@@ -22,7 +22,7 @@ macro_rules! veprintln {
 use crate::exclude::{excluded_dir_names_set, has_sync_relevant_dirty_entries};
 use crate::git::{
     discover_git_repos, git_diff_head_files, has_both_main_and_master, has_origin_remote,
-    has_tracking_upstream, repo_diff_entries,
+    has_tracking_upstream, is_repo_ready, repo_diff_entries,
 };
 use crate::policy::{debug_enabled, freeze_reason, timestamp_secs, SyncPolicy};
 use crate::report::{run_repair_concerns, run_repair_warns, ConcernRepairFilter};
@@ -485,6 +485,12 @@ pub(crate) async fn run_daemon(
 
         for repo in repos {
             let now = Instant::now();
+            if !is_repo_ready(&repo) {
+                if debug_enabled() {
+                    eprintln!("⏳ {} not ready (mid-clone or empty repo), skipping", repo.display());
+                }
+                continue;
+            }
             // Skip repos that are stuck on push, but retry them every 5 minutes
             // to see if the issue resolved (e.g., remote was recreated, permissions fixed, etc.)
             if let Some(stuck_since) = stuck_push_repos.get(&repo).copied() {
