@@ -70,6 +70,7 @@
             # Tests need git and serial execution
             nativeCheckInputs = [ pkgs.git ];
             preCheck = ''
+              export HOME="$TMPDIR"
               git config --global user.email "dracon@nix.build"
               git config --global user.name "Dracon Nix Build"
             '';
