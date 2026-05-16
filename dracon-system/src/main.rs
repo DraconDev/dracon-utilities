@@ -830,10 +830,6 @@ fn default_release_after_secs() -> u64 {
     120
 }
 
-fn default_git_kill_threshold_secs() -> u64 {
-    60
-}
-
 fn default_guard_log_file() -> String {
     let home = match dirs::home_dir() {
         Some(h) => h,
@@ -2442,18 +2438,6 @@ async fn check_heavy_processes(
             }
             nice_applied = nice_val;
             action = format!("renice:{}", nice_val);
-        }
-
-        if guard.auto_kill_git
-            && guard.git_kill_threshold_secs > 0
-            && sustained >= guard.git_kill_threshold_secs
-            && is_git_process(&p.command, &p.args)
-        {
-            if kill_process(p.pid).await {
-                action = "kill:git-sigterm+sigkill".to_string();
-            } else {
-                action = "kill:git-sigterm-failed".to_string();
-            }
         }
 
         let key = format!("proc-{}", p.pid);
