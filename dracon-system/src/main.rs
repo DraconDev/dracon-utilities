@@ -2782,7 +2782,9 @@ async fn cmd_storage(
     Ok(())
 }
 
-fn cmd_link(cmd: LinkCommands) -> Result<()> {
+ fn cmd_link(cmd: LinkCommands) -> Result<()> {
+    use comfy_table::{presets::UTF8_FULL_CONDENSED, Attribute, Cell, Color, ContentArrangement, Table};
+
     let (_, policy) = load_system_policy()?;
     match cmd {
         LinkCommands::Status { json } | LinkCommands::Doctor { json } => {
@@ -2790,23 +2792,45 @@ fn cmd_link(cmd: LinkCommands) -> Result<()> {
             if json {
                 println!("{}", serde_json::to_string_pretty(&report)?);
             } else {
-                println!("links_total: {}", report.total);
-                println!("links_healthy: {}", report.healthy);
-                println!("links_drifted: {}", report.drifted);
-                println!("links_missing_target: {}", report.missing_target);
-                println!("links_missing_link: {}", report.missing_link);
-                for item in report.entries {
-                    println!(
-                        "- {} -> {} [{}]",
-                        item.link,
-                        item.target,
-                        if item.issue == "ok" {
-                            "ok".to_string()
-                        } else {
-                            item.issue
-                        }
-                    );
+                let mut table = Table::new();
+                table
+                    .load_preset(UTF8_FULL_CONDENSED)
+                    .set_content_arrangement(ContentArrangement::Dynamic)
+                    .set_header(vec![
+                        Cell::new("STATUS"),
+                        Cell::new("LINK"),
+                        Cell::new("TARGET"),
+                        Cell::new("ISSUE"),
+                    ]);
+
+                for item in &report.entries {
+                    let (icon, color) = if item.issue == "ok" {
+                        ("\u{2705}", Color::Green)
+                    } else if item.issue.contains("missing") || item.issue.contains("not exist") {
+                        ("\u{274c}", Color::Red)
+                    } else {
+                        ("\u{26a0}\u{fe0f}", Color::Yellow)
+                    };
+
+                    let issue = if item.issue == "ok" {
+                        String::new()
+                    } else {
+                        format!("\u{2192} {}", item.issue)
+                    };
+
+                    table.add_row(vec![
+                        Cell::new(icon).fg(color),
+                        Cell::new(&item.link),
+                        Cell::new(&item.target),
+                        Cell::new(issue),
+                    ]);
                 }
+
+                println!("{table}");
+                println!(
+                    "{} links: {} ok, {} drifted, {} missing target, {} missing link",
+                    report.total, report.healthy, report.drifted, report.missing_target, report.missing_link
+                );
             }
         }
         LinkCommands::Apply {
@@ -2818,9 +2842,10 @@ fn cmd_link(cmd: LinkCommands) -> Result<()> {
                 println!("{}", serde_json::to_string_pretty(&report)?);
             } else {
                 println!("Applied link policy.");
-                println!("links_total: {}", report.total);
-                println!("links_healthy: {}", report.healthy);
-                println!("links_drifted: {}", report.drifted);
+                println!(
+                    "{} links: {} ok, {} drifted",
+                    report.total, report.healthy, report.drifted
+                );
             }
         }
     }
