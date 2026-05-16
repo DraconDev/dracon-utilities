@@ -526,14 +526,24 @@ pub(crate) struct GuardRuntimeState {
     pub(crate) heavy_since: HashMap<i32, Instant>,
     pub(crate) notify_cooldowns: HashMap<String, Instant>,
     pub(crate) last_disk_state: String,
-    /// History of disk usage samples for trend prediction (timestamp, percent)
     pub(crate) disk_history: Vec<(Instant, u8)>,
-    /// Active cargo build PIDs detected
     pub(crate) active_build_pids: HashSet<i32>,
-    /// Currently reniced PIDs: (nice_value, original_command) for PID identity verification
     pub(crate) reniced_pids: HashMap<i32, (i32, String)>,
-    /// When a previously-heavy process stopped being heavy (for un-renice recovery)
     pub(crate) cooled_since: HashMap<i32, Instant>,
+}
+
+impl Default for GuardRuntimeState {
+    fn default() -> Self {
+        Self {
+            heavy_since: HashMap::new(),
+            notify_cooldowns: HashMap::new(),
+            last_disk_state: String::new(),
+            disk_history: Vec::new(),
+            active_build_pids: HashSet::new(),
+            reniced_pids: HashMap::new(),
+            cooled_since: HashMap::new(),
+        }
+    }
 }
 
 /// Information about a Rust target directory for cleanup consideration
