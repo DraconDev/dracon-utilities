@@ -769,6 +769,17 @@ pub(crate) fn publish_repo_pubkey(repo: &Path, pubkey_path: &Path) -> Result<boo
         return Ok(false);
     }
 
+    // Churn protection: if the repo already has a valid owner pubkey, don't
+    // overwrite it with a different one. Multiple owner keys may exist on the
+    // machine and resolve_local_pubkey_path() can pick different ones across
+    // cycles when mtimes are equal. Overwriting causes an infinite warden→sync
+    // churn loop. Only overwrite when the target is missing or invalid.
+    if let Some(ref existing) = current_bytes {
+        if validate_owner_age_pubkey_bytes(&target, existing).is_ok() {
+            return Ok(false);
+        }
+    }
+
     fs::write(&target, source_bytes)
         .with_context(|| format!("failed writing {}", target.display()))?;
     Ok(true)
