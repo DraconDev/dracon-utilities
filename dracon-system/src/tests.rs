@@ -360,3 +360,36 @@ async fn guard_report_completes_for_ok_disk() {
         "async guard execution should complete"
     );
 }
+
+#[test]
+fn test_graduated_nice_value_cpu_tiers() {
+    assert_eq!(graduated_nice_value(100.0, 0, 5), 5);
+    assert_eq!(graduated_nice_value(180.0, 0, 5), 5);
+    assert_eq!(graduated_nice_value(250.0, 0, 5), 5);
+    assert_eq!(graduated_nice_value(300.0, 0, 5), 10);
+    assert_eq!(graduated_nice_value(450.0, 0, 5), 10);
+    assert_eq!(graduated_nice_value(500.0, 0, 5), 15);
+    assert_eq!(graduated_nice_value(900.0, 0, 5), 15);
+}
+
+#[test]
+fn test_graduated_nice_value_memory_tiers() {
+    assert_eq!(graduated_nice_value(0.0, 2000, 5), 5);
+    assert_eq!(graduated_nice_value(0.0, 4096, 5), 5);
+    assert_eq!(graduated_nice_value(0.0, 5000, 5), 5);
+    assert_eq!(graduated_nice_value(0.0, 8192, 5), 10);
+    assert_eq!(graduated_nice_value(0.0, 16000, 5), 10);
+}
+
+#[test]
+fn test_graduated_nice_value_cpu_plus_memory() {
+    assert_eq!(graduated_nice_value(300.0, 8192, 5), 10);
+    assert_eq!(graduated_nice_value(500.0, 4096, 5), 15);
+    assert_eq!(graduated_nice_value(180.0, 8192, 5), 10);
+}
+
+#[test]
+fn test_graduated_nice_value_clamped() {
+    assert_eq!(graduated_nice_value(0.0, 0, 5), 5);
+    assert_eq!(graduated_nice_value(0.0, 0, 0), 0);
+}
