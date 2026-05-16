@@ -19,9 +19,8 @@ use crate::git::origin_url;
 use crate::git::{
     cli_diff_entries, detect_large_blobs_ahead, git_name_status_entries, has_origin_remote,
     has_tracking_upstream, is_cherry_pick_in_progress, is_merge_in_progress, is_rebase_in_progress,
-    is_repo_ready,
-    prune_other_default_branch, push_with_retries, restore_paths, run_git_with_timeout,
-    unstage_excluded_paths, unstage_oversized_paths,
+    is_repo_ready, prune_other_default_branch, push_with_retries, restore_paths,
+    run_git_with_timeout, unstage_excluded_paths, unstage_oversized_paths,
 };
 use crate::policy::{debug_enabled, load_repo_override, SyncPolicy};
 use crate::report::{
@@ -483,8 +482,13 @@ mod diff_tests {
 
         // The fallback code path: cli_diff_entries should find it
         let rt = tokio::runtime::Runtime::new().unwrap();
-        let entries = rt.block_on(crate::git::cli_diff_entries(&repo_path)).unwrap();
-        assert!(!entries.is_empty(), "cli_diff_entries should find the staged file");
+        let entries = rt
+            .block_on(crate::git::cli_diff_entries(&repo_path))
+            .unwrap();
+        assert!(
+            !entries.is_empty(),
+            "cli_diff_entries should find the staged file"
+        );
     }
 }
 

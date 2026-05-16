@@ -4682,7 +4682,10 @@ mod tests {
             .current_dir(repo)
             .status()
             .expect("git commit");
-        assert!(is_repo_ready(repo), "normal repo with committed files should be ready");
+        assert!(
+            is_repo_ready(repo),
+            "normal repo with committed files should be ready"
+        );
     }
 
     #[test]
@@ -4691,7 +4694,10 @@ mod tests {
         let repo = tmp.path();
         let git_dir = repo.join(".git");
         std::fs::create_dir_all(&git_dir).unwrap();
-        assert!(!is_repo_ready(repo), "repo without .git/HEAD should not be ready");
+        assert!(
+            !is_repo_ready(repo),
+            "repo without .git/HEAD should not be ready"
+        );
     }
 
     #[test]
@@ -4701,7 +4707,10 @@ mod tests {
         let git_dir = repo.join(".git");
         std::fs::create_dir_all(&git_dir).unwrap();
         std::fs::write(git_dir.join("HEAD"), "").unwrap();
-        assert!(!is_repo_ready(repo), "repo with empty .git/HEAD should not be ready");
+        assert!(
+            !is_repo_ready(repo),
+            "repo with empty .git/HEAD should not be ready"
+        );
     }
 
     #[test]
@@ -4724,7 +4733,10 @@ mod tests {
             .current_dir(repo)
             .status()
             .expect("git config");
-        assert!(!is_repo_ready(repo), "repo with zero commits (HEAD doesn't resolve) should not be ready");
+        assert!(
+            !is_repo_ready(repo),
+            "repo with zero commits (HEAD doesn't resolve) should not be ready"
+        );
     }
 
     #[test]
@@ -4752,6 +4764,9 @@ mod tests {
             .current_dir(repo)
             .status()
             .expect("git commit");
-        assert!(is_repo_ready(repo), "repo with empty commit (HEAD resolves) should be ready");
+        assert!(
+            is_repo_ready(repo),
+            "repo with empty commit (HEAD resolves) should be ready"
+        );
     }
 }

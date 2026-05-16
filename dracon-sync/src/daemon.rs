@@ -192,19 +192,14 @@ mod daemon_tests {
     fn test_skips_nonexistent_repo() {
         // If a repo is deleted between discovery and processing, the daemon
         // should skip it gracefully rather than panicking or erroring.
-        use crate::policy::SyncPolicy;
         use crate::git::discover_git_repos;
+        use crate::policy::SyncPolicy;
 
         let policy = SyncPolicy::default();
         let excluded = crate::exclude::excluded_dir_names_set(&policy);
 
         // Nonexistent repo should not be discovered
-        let repos = discover_git_repos(
-            &[PathBuf::from("/nonexistent/path")],
-            &excluded,
-            &[],
-            None,
-        );
+        let repos = discover_git_repos(&[PathBuf::from("/nonexistent/path")], &excluded, &[], None);
         assert!(repos.is_empty(), "should not discover nonexistent paths");
     }
 
@@ -370,7 +365,10 @@ pub(crate) async fn run_once(policy_path: &Path) -> Result<()> {
     for repo in repos {
         // Guard against repo-discovery race
         if !repo.exists() {
-            eprintln!("⚠️ {} repo path vanished between discovery and sync, skipping", repo.display());
+            eprintln!(
+                "⚠️ {} repo path vanished between discovery and sync, skipping",
+                repo.display()
+            );
             continue;
         }
         match tokio::time::timeout(
@@ -555,7 +553,10 @@ pub(crate) async fn run_daemon(
             let now = Instant::now();
             if !is_repo_ready(&repo) {
                 if debug_enabled() {
-                    eprintln!("⏳ {} not ready (mid-clone or empty repo), skipping", repo.display());
+                    eprintln!(
+                        "⏳ {} not ready (mid-clone or empty repo), skipping",
+                        repo.display()
+                    );
                 }
                 continue;
             }

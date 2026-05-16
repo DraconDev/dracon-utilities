@@ -1,6 +1,6 @@
 use serde::Deserialize;
 use std::collections::HashSet;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 // ---------------------------------------------------------------------------
 // Policy structs
