@@ -721,7 +721,7 @@ fn resolve_local_pubkey_path() -> Option<PathBuf> {
     .flat_map(|dir| owner_pubkeys_in(&dir))
     .collect::<Vec<_>>();
 
-    // Prefer newest valid owner pubkey.
+    // Prefer newest valid owner pubkey; break ties by path for determinism.
     let mut owners = owner_candidates;
     owners.sort_by(|a, b| {
         let ma = fs::metadata(a)
@@ -736,7 +736,7 @@ fn resolve_local_pubkey_path() -> Option<PathBuf> {
             .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
             .map(|d| d.as_secs())
             .unwrap_or(0);
-        mb.cmp(&ma)
+        mb.cmp(&ma).then_with(|| a.cmp(b))
     });
     for p in owners {
         let Ok(bytes) = fs::read(&p) else {
