@@ -37,7 +37,7 @@
         '';
 
         # Shared native build inputs for crates that need C libraries
-        nativeBuildDeps = [ pkgs.pkg-config ];
+        nativeBuildDeps = [ pkgs.pkg-config pkgs.cmake ];
         buildDeps = [ pkgs.openssl pkgs.libssh2 ];
         # NOTE: libgit2 is NOT included here — libgit2-sys 0.16.x bundles
         # libgit2 1.7.x and nixpkgs ships 1.9.x, so we let it vendor its own.
