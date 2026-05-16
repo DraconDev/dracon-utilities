@@ -377,10 +377,10 @@ enum Commands {
         #[arg(short, long, default_value = "50")]
         tail: usize,
         /// Filter by source domain (e.g. system, warden, sync).
-        #[arg(short, long)]
+        #[arg(short = 'S', long)]
         source: Option<String>,
         /// Filter by severity (info, warn, error, critical).
-        #[arg(short, long)]
+        #[arg(short = 's', long)]
         severity: Option<String>,
         /// Deduplicate consecutive identical events.
         #[arg(long)]
