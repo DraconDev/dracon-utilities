@@ -1,26 +1,9 @@
-//! File staging and path management — unstage, restore, list paths, blob detection.
+//! File staging and path management — unstage, restore, blob detection.
 
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use anyhow::{Context, Result};
-
-/// List file paths under a directory that match given extensions, up to a max.
-pub(crate) async fn git_list_paths(
-    repo: &Path,
-    path: &str,
-    max_files: usize,
-) -> Result<Vec<PathBuf>> {
-    let mut cmd = tokio::process::Command::new("git");
-    cmd.args(["ls-files", "--", path])
-        .current_dir(repo)
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::null());
-    let output = cmd.output().await?;
-    let files: Vec<PathBuf> = String::from_utf8_lossy(&output.stdout)
-        .lines().filter(|s| !s.is_empty()).take(max_files).map(PathBuf::from).collect();
-    Ok(files)
-}
 
 /// Unstage paths that match excluded directory patterns.
 /// Returns the count of unstaged files.

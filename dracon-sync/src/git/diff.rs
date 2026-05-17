@@ -76,6 +76,7 @@ pub(crate) async fn git_name_status_entries(
 }
 
 /// Git status rank for sorting: higher = more relevant to sync.
+#[cfg(test)]
 pub(crate) fn fallback_status_rank(status: &FileStatus) -> u8 {
     match status {
         FileStatus::Deleted => 5,

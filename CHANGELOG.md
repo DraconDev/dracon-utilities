@@ -7,7 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **CI/CD pipeline**: `.github/workflows/ci.yml` — fmt check, clippy, build, serial tests
+- **Lint gates**: `#![warn(missing_docs)]` on all 4 crate roots
+- **dracon-libs docs**: Fixed all 95 missing-doc warnings in dracon-git
+- **Module extraction** (dracon-system): `events.rs`, `links.rs`, `zram.rs`, `doctor.rs`, `safety.rs` — 850 lines, 20% main.rs reduction
+- **Module extraction** (dracon-sync): `branch.rs`, `config.rs`, `diff.rs`, `discovery.rs`, `misc.rs`, `multi_remote.rs`, `ops.rs`, `push.rs`, `staging.rs`, `status.rs`, `urls.rs` — 1,846 lines, 45% git/mod.rs reduction
+
 ### Changed
+- **Service restart policy**: All 3 services changed from `Restart=on-failure` to `Restart=always` — daemons now restart even after clean exits, preventing 5+ hour outages
+- **CLI output style**: All status commands now use Title Case keys (`Policy:` not `POLICY:`) for consistency with JSON output and health check format
+- **Daemon log noise**: Silent when healthy — concern/warn summaries only print when `found > 0`, AI provider status logs only at startup
+- **Structured logging**: `log.rs` now prints human-readable `⚠️ message` to stderr instead of raw JSON — JSON incident records stay in the ledger file only
+- **Link status**: Prints "No configured links" instead of empty table when 0 links exist
 - **dracon-sync**: Scribe refactor — commit messages from diffs, not `project-state.md`
   - `generate_commit_message()`: AI receives current diff (main) + 10 previous diffs (background) + recent subjects → returns subject line
   - `local_fallback_message()`: file-pattern fallback (e.g., "update auth, jwt and 2 files") when AI unavailable

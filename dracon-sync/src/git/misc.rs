@@ -44,6 +44,7 @@ pub(crate) fn fix_orphan_origin(repo: &Path, canonical_url: &str) -> Result<()> 
 }
 
 /// Acquire a test path lock for serializing PATH-modifying tests.
+#[cfg(test)]
 pub(crate) fn acquire_path_lock() -> parking_lot::MutexGuard<'static, ()> {
     static PATH_LOCK: OnceLock<parking_lot::Mutex<()>> = OnceLock::new();
     let lock = PATH_LOCK.get_or_init(|| parking_lot::Mutex::new(()));

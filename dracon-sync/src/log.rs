@@ -1,10 +1,7 @@
 //! Structured logging — human-readable to stderr.
 
-use std::time::{SystemTime, UNIX_EPOCH};
-
 /// Log levels
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-#[allow(dead_code)]
 pub(crate) enum Level {
     Error,
     Warn,
@@ -13,15 +10,6 @@ pub(crate) enum Level {
 }
 
 impl Level {
-    fn as_str(&self) -> &'static str {
-        match self {
-            Level::Error => "ERROR",
-            Level::Warn => "WARN",
-            Level::Info => "INFO",
-            Level::Debug => "DEBUG",
-        }
-    }
-
     fn emoji(&self) -> &'static str {
         match self {
             Level::Error => "❌",
@@ -30,27 +18,6 @@ impl Level {
             Level::Debug => "🔍",
         }
     }
-}
-
-/// Structured log event — for incident ledger serialization only.
-#[derive(Debug, serde::Serialize)]
-#[allow(dead_code)]
-pub(crate) struct Event<'a> {
-    ts: u64,
-    level: &'a str,
-    msg: &'a str,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    repo: Option<&'a str>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    module: Option<&'a str>,
-}
-
-#[allow(dead_code)]
-fn timestamp_secs() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs()
 }
 
 /// Emit a human-readable log line to stderr.

@@ -11,7 +11,7 @@ Environment=PATH=%h/.local/bin:/run/wrappers/bin:%h/.local/share/flatpak/exports
 Environment=DRACON_SYNC_POLICY=%h/.dracon/utilities/sync/dracon-sync.toml
 Environment=GIT_TERMINAL_PROMPT=0
 PassEnvironment=SSH_AUTH_SOCK
-ExecStartPre=-pkill -x -f "dracon-git pulse"
+ExecStartPre=-/run/current-system/sw/bin/pkill -x -f "dracon-git pulse"
 ExecStart=%h/.local/bin/dracon-sync daemon
 Restart=always
 RestartSec=5
