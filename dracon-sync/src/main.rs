@@ -1094,6 +1094,8 @@ async fn cmd_scaffold(
     use anyhow::Context;
     use comfy_table::{presets::UTF8_FULL_CONDENSED, Cell, Color, ContentArrangement, Table};
     let policy = SyncPolicy::load(policy_path)?;
+    eprintln!("DEBUG: standard_files.len() = {}", policy.standard_files.len());
+    eprintln!("DEBUG: standard_files_auto = {}", policy.standard_files_auto);
 
     if policy.standard_files.is_empty() {
         println!("No standard files configured in policy.");
