@@ -104,8 +104,11 @@ enum Command {
     Pause,
     /// Resume sync (removes freeze marker).
     Resume,
-    /// Open sync policy in the system editor.
-    EditConfig,
+    /// Manage sync configuration.
+    Config {
+        #[command(subcommand)]
+        cmd: ConfigCommands,
+    },
     /// Repair concern repos (dry-run by default; use --apply to execute).
     RepairConcerns {
         /// Execute git operations to repair concerns.
@@ -166,12 +169,12 @@ enum Command {
         #[command(subcommand)]
         cmd: PublishCommands,
     },
-    /// Scaffold standard files (LICENSE, CLA, etc.) into repositories.
+/// Scaffold standard files (LICENSE, CLA, etc.) into repositories.
     Scaffold {
         /// Repository path to scaffold. Defaults to all discovered repos.
         #[arg(long)]
         repo: Option<PathBuf>,
-        /// Only scaffold these files (by target name, e.g. LICENSE, CLA.md).
+        /// Only scaffold these files (by name, e.g. LICENSE, CLA.md).
         #[arg(long)]
         files: Vec<String>,
         /// Overwrite existing files with template versions.
@@ -181,8 +184,6 @@ enum Command {
         #[arg(long)]
         dry_run: bool,
     },
-    /// Validate the sync policy for errors and warnings.
-    ValidateConfig,
     /// Test AI providers connectivity.
     TestAi {
         /// Emit machine-readable JSON.
@@ -234,6 +235,14 @@ enum PublishCommands {
         #[arg(long)]
         json: bool,
     },
+}
+
+#[derive(Subcommand, Debug)]
+enum ConfigCommands {
+    /// Open sync policy in the system editor.
+    Edit,
+    /// Validate the sync policy for errors and warnings.
+    Validate,
 }
 
 #[tokio::main]
@@ -369,15 +378,31 @@ async fn main() -> Result<()> {
                 println!("🌐 REMOTES: {}", policy.remotes.len());
             }
         }
-        Command::ValidateConfig => {
-            let result = policy::validate_config(&policy_path);
-            if result.is_valid() {
-                println!("✅ Policy is valid");
-            } else {
-                println!("❌ Policy has errors:");
-                for e in &result.errors {
-                    println!("  ERROR: {}", e);
+Command::Config { cmd } => {
+            match cmd {
+                ConfigCommands::Edit => {
+                    policy::open_policy_in_editor(&policy_path)?;
                 }
+                ConfigCommands::Validate => {
+                    let result = policy::validate_config(&policy_path);
+                    if result.is_valid() {
+                        println!("✅ Policy is valid");
+                    } else {
+                        println!("❌ Policy has errors:");
+                        for e in &result.errors {
+                            println!("  ERROR: {}", e);
+                        }
+                        if !result.warnings.is_empty() {
+                            println!("\n⚠️  Warnings:");
+                            for w in &result.warnings {
+                                println!("  WARNING: {}", w);
+                            }
+                        }
+                        std::process::exit(1);
+                    }
+                }
+            }
+        }
                 if !result.warnings.is_empty() {
                     println!("\n⚠️  Warnings:");
                     for w in &result.warnings {
