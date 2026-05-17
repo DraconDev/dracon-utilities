@@ -2785,17 +2785,27 @@ async fn cmd_status(json: bool) -> Result<()> {
                 Cell::new("VALUE"),
             ]);
 
-        let rows: Vec<(&str, bool, &str)> = vec![
-            ("system root", report.system_root_exists, &report.system_root),
-            ("nixos root", report.nixos_root_exists, &report.nixos_root),
-            ("sync policy", report.sync_policy_exists, &report.sync_policy),
-            ("system policy", report.system_policy_exists, &report.system_policy),
-            ("sync service", report.sync_service_active, "dracon-sync.service"),
-            ("warden service", report.warden_service_active, "dracon-warden.service"),
+        let rows: Vec<(&str, &str)> = vec![
+            ("system root", &report.system_root),
+            ("nixos root", &report.nixos_root),
+            ("sync policy", &report.sync_policy),
+            ("system policy", &report.system_policy),
         ];
 
-        for (label, ok, detail) in &rows {
-            let (icon, color) = if *ok {
+        let service_rows: Vec<(&str, bool)> = vec![
+            ("sync service", report.sync_service_active),
+            ("warden service", report.warden_service_active),
+        ];
+
+        for (label, detail) in &rows {
+            table.add_row(vec![
+                Cell::new(" "),
+                Cell::new(*label),
+                Cell::new(*detail),
+            ]);
+        }
+        for (label, active) in &service_rows {
+            let (icon, color) = if *active {
                 ("\u{2705}", Color::Green)
             } else {
                 ("\u{274c}", Color::Red)
@@ -2803,7 +2813,7 @@ async fn cmd_status(json: bool) -> Result<()> {
             table.add_row(vec![
                 Cell::new(icon).fg(color),
                 Cell::new(*label),
-                Cell::new(*detail),
+                Cell::new(if *active { "active" } else { "inactive" }),
             ]);
         }
 
