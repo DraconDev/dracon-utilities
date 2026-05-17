@@ -2322,6 +2322,56 @@ async fn check_large_logs(guard: &GuardPolicy, state: &mut GuardRuntimeState) {
     }
 }
 
+async fn run_proactive_cleanup(
+    guard: &GuardPolicy,
+    state: &mut GuardRuntimeState,
+) -> Result<()> {
+    let apply = guard.auto_cleanup_apply;
+    if !apply {
+        eprintln!("💡 proactive cleanup in dry-run mode (set auto_cleanup_apply = true to execute)");
+    }
+
+    let mut total_reclaimed = 0u64;
+    let mut all_cleaned: Vec<String> = Vec::new();
+
+    if guard.auto_cleanup_rust {
+        match proactive_cleanup_rust_targets(guard, state, apply).await {
+            Ok(result) => {
+                total_reclaimed += result.reclaimed_bytes;
+                for p in &result.cleaned_paths {
+                    eprintln!("🧹 Proactive Rust: {}", p);
+                }
+                all_cleaned.extend(result.cleaned_paths);
+            }
+            Err(e) => eprintln!("⚠️ Proactive Rust target cleanup failed: {}", e),
+        }
+    }
+
+    if total_reclaimed > 0 {
+        let key = "proactive-cleanup".to_string();
+        if should_notify(state, &key, guard.notify_cooldown_secs.max(3600)) {
+            send_notification(
+                guard,
+                "Dracon System Guard - Proactive Cleanup",
+                &format!(
+                    "Proactively reclaimed {} ({} stale items)",
+                    human_bytes(total_reclaimed),
+                    all_cleaned.len()
+                ),
+            )
+            .await;
+        }
+        emit_event(&DraconEvent::new(
+            "system",
+            EventSeverity::Info,
+            "guard/proactive-cleanup",
+            format!("reclaimed {} from {} stale items", human_bytes(total_reclaimed), all_cleaned.len()),
+        ));
+    }
+
+    Ok(())
+}
+
 pub(crate) async fn run_guard_once(
     guard: &GuardPolicy,
     state: &mut GuardRuntimeState,
@@ -2337,6 +2387,17 @@ pub(crate) async fn run_guard_once(
 
     if dstate == "action" || dstate == "critical" {
         run_auto_cleanup(guard, state, used).await?;
+    } else if used >= guard.proactive_cleanup_percent && guard.auto_cleanup_rust {
+        state.guard_cycle += 1;
+        let interval = guard.proactive_cleanup_interval_cycles;
+        let due = state.guard_cycle % interval == 0;
+        let cooldown_ok = state
+            .last_proactive_cleanup
+            .map_or(true, |t| t.elapsed().as_secs() >= interval * guard.interval_secs);
+        if due && cooldown_ok {
+            run_proactive_cleanup(guard, state).await?;
+            state.last_proactive_cleanup = Some(Instant::now());
+        }
     }
 
     check_disk_state_change(guard, state, used, &dstate).await;
@@ -2601,6 +2662,9 @@ pub(crate) fn normalize_guard_policy(policy: &mut GuardPolicy) {
         .disk_critical_percent
         .max(policy.disk_action_percent)
         .min(100);
+    policy.proactive_cleanup_percent = policy
+        .proactive_cleanup_percent
+        .min(policy.disk_action_percent.saturating_sub(1));
     policy.unfreeze_below_percent = policy
         .unfreeze_below_percent
         .min(policy.disk_action_percent.saturating_sub(1));
@@ -2608,6 +2672,8 @@ pub(crate) fn normalize_guard_policy(policy: &mut GuardPolicy) {
     policy.process_rss_mb = policy.process_rss_mb.max(64);
     policy.process_sustain_secs = policy.process_sustain_secs.max(5);
     policy.notify_cooldown_secs = policy.notify_cooldown_secs.max(5);
+    policy.rust_target_max_age_days = policy.rust_target_max_age_days.max(1);
+    policy.proactive_cleanup_interval_cycles = policy.proactive_cleanup_interval_cycles.max(1);
     if policy.sync_freeze_marker.trim().is_empty() {
         policy.sync_freeze_marker = default_sync_freeze_marker();
     }
