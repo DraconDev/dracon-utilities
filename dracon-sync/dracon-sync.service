@@ -13,7 +13,7 @@ Environment=GIT_TERMINAL_PROMPT=0
 PassEnvironment=SSH_AUTH_SOCK
 ExecStartPre=-pkill -x -f "dracon-git pulse"
 ExecStart=%h/.local/bin/dracon-sync daemon
-Restart=on-failure
+Restart=always
 RestartSec=5
 RestartPreventExitStatus=2 78
 Nice=10

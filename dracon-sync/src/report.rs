@@ -712,7 +712,7 @@ pub(crate) async fn run_repos_report(
         return Ok(());
     }
 
-    println!("📜 POLICY: {}", policy_path.display());
+    println!("📜 Policy: {}", policy_path.display());
     match filter {
         RepoFilter::All => {}
         RepoFilter::Concern => {
@@ -1556,21 +1556,6 @@ pub(crate) async fn run_repair_concerns(
     };
     let mut resolved = 0usize;
 
-    out!("📜 POLICY: {}", policy_path.display());
-    out!(
-        "🛠️ MODE: {}",
-        if apply {
-            "APPLY (mutating)"
-        } else {
-            "DRY-RUN (no changes)"
-        }
-    );
-    out!(
-        "⚙️ PUSH: timeout={}s retries={}",
-        push_timeout_secs,
-        push_retries
-    );
-
     for repo in repos {
         let svc = match GitService::new(&repo) {
             Ok(svc) => svc,
@@ -1721,8 +1706,8 @@ pub(crate) async fn run_repair_concerns(
             ledger: incident_ledger_path(policy_path).display().to_string(),
         };
         println!("{}", serde_json::to_string_pretty(&payload)?);
-    } else {
-        println!("\n✅ concern management summary");
+    } else if summary.found > 0 {
+        println!("\n✅ Concern management summary");
         println!("   concerns_found: {}", summary.found);
         println!("   operations_planned: {}", summary.planned);
         println!("   operations_succeeded: {}", summary.succeeded);
@@ -1779,16 +1764,6 @@ pub(crate) async fn run_repair_warns(
     let mut warns = 0usize;
     let mut attempted = 0usize;
     let mut succeeded = 0usize;
-
-    out!("📜 POLICY: {}", policy_path.display());
-    out!(
-        "🧹 WARN MODE: {}",
-        if apply {
-            "APPLY (mutating)"
-        } else {
-            "DRY-RUN (no changes)"
-        }
-    );
 
     for repo in repos {
         let svc = match GitService::new(&repo) {
@@ -1952,8 +1927,8 @@ pub(crate) async fn run_repair_warns(
             ledger: incident_ledger_path(policy_path).display().to_string(),
         };
         println!("{}", serde_json::to_string_pretty(&payload)?);
-    } else {
-        println!("\n✅ warn management summary");
+    } else if summary.found > 0 {
+        println!("\n✅ Warn management summary");
         println!("   warns_found: {}", summary.found);
         println!("   operations_planned: {}", summary.planned);
         println!("   operations_attempted: {}", summary.attempted);

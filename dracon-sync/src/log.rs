@@ -1,3 +1,5 @@
+//! Structured logging — human-readable to stderr.
+
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Log levels
@@ -19,10 +21,20 @@ impl Level {
             Level::Debug => "DEBUG",
         }
     }
+
+    fn emoji(&self) -> &'static str {
+        match self {
+            Level::Error => "❌",
+            Level::Warn => "⚠️",
+            Level::Info => "ℹ️",
+            Level::Debug => "🔍",
+        }
+    }
 }
 
-/// Structured log event — emitted as JSONL for machine parsing.
+/// Structured log event — for incident ledger serialization only.
 #[derive(Debug, serde::Serialize)]
+#[allow(dead_code)]
 pub(crate) struct Event<'a> {
     ts: u64,
     level: &'a str,
@@ -33,6 +45,7 @@ pub(crate) struct Event<'a> {
     module: Option<&'a str>,
 }
 
+#[allow(dead_code)]
 fn timestamp_secs() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -40,48 +53,21 @@ fn timestamp_secs() -> u64 {
         .as_secs()
 }
 
-/// Emit a structured log line to stderr as JSON.
+/// Emit a human-readable log line to stderr.
 pub(crate) fn log(level: Level, msg: &str) {
-    let event = Event {
-        ts: timestamp_secs(),
-        level: level.as_str(),
-        msg,
-        repo: None,
-        module: None,
-    };
-    if let Ok(line) = serde_json::to_string(&event) {
-        eprintln!("{}", line);
-    }
+    eprintln!("{} {}", level.emoji(), msg);
 }
 
-/// Emit a structured log line with optional repo path.
+/// Emit a human-readable log line with repo context.
 #[allow(dead_code)]
 pub(crate) fn log_repo(level: Level, repo: &str, msg: &str) {
-    let event = Event {
-        ts: timestamp_secs(),
-        level: level.as_str(),
-        msg,
-        repo: Some(repo),
-        module: None,
-    };
-    if let Ok(line) = serde_json::to_string(&event) {
-        eprintln!("{}", line);
-    }
+    eprintln!("{} [{}] {}", level.emoji(), repo, msg);
 }
 
-/// Emit a structured log line with optional module name.
+/// Emit a human-readable log line with module context.
 #[allow(dead_code)]
 pub(crate) fn log_module(level: Level, module: &str, msg: &str) {
-    let event = Event {
-        ts: timestamp_secs(),
-        level: level.as_str(),
-        msg,
-        repo: None,
-        module: Some(module),
-    };
-    if let Ok(line) = serde_json::to_string(&event) {
-        eprintln!("{}", line);
-    }
+    eprintln!("{} [{}] {}", level.emoji(), module, msg);
 }
 
 /// Convenience macros for each level.

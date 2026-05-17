@@ -1,3 +1,5 @@
+#![warn(missing_docs)]
+
 mod bump;
 mod daemon;
 mod exclude;
@@ -309,22 +311,22 @@ async fn main() -> Result<()> {
                 };
                 println!("{}", serde_json::to_string_pretty(&payload)?);
             } else {
-                println!("📜 POLICY: {}", policy_path.display());
-                println!("🔁 ROOTS: {:?}", roots);
-                println!("📦 REPOS_DISCOVERED: {}", repos.len());
-                println!("⏱️ PULSE: {}s", policy.pulse_interval_secs);
+                println!("📜 Policy: {}", policy_path.display());
+                println!("🔁 Roots: {:?}", roots);
+                println!("📦 Repos: {}", repos.len());
+                println!("⏱️  Pulse: {}s", policy.pulse_interval_secs);
                 println!(
-                    "⏳ INACTIVITY_PUSH_DELAY: {}s",
+                    "⏳ Inactivity delay: {}s",
                     policy.inactivity_push_delay_secs
                 );
                 println!(
-                    "⏸️ FREEZE: {}",
+                    "⏸️  Freeze: {}",
                     freeze
                         .map(|r| format!("ON ({})", r))
                         .unwrap_or_else(|| "OFF".to_string())
                 );
                 println!(
-                    "⚙️ FLAGS: auto_commit={} auto_pull={} auto_push={} auto_bump_versions={} auto_repair_concerns={} auto_repair_warns={} auto_rewrite_large_blobs={}",
+                    "⚙️  Flags: auto_commit={} auto_pull={} auto_push={} auto_bump_versions={} auto_repair_concerns={} auto_repair_warns={} auto_rewrite_large_blobs={}",
                     policy.auto_commit,
                     policy.auto_pull,
                     policy.auto_push,
@@ -333,39 +335,39 @@ async fn main() -> Result<()> {
                     policy.auto_repair_warns,
                     policy.auto_rewrite_large_blobs
                 );
-                println!("📏 MAX_STAGE_FILE_BYTES: {}", policy.max_stage_file_bytes);
+                println!("📏 Max stage file bytes: {}", policy.max_stage_file_bytes);
                 println!(
-                    "🧱 PUSH_BLOB_THRESHOLD_BYTES: {}",
+                    "🧱 Push blob threshold: {}",
                     push_large_blob_threshold_bytes(&policy)
                 );
-                println!("🚫 EXCLUDE_DIRS: {:?}", policy.exclude_dir_names);
+                println!("🚫 Exclude dirs: {:?}", policy.exclude_dir_names);
                 println!(
-                    "🚫 EXCLUDE_FILE_PATTERNS: {:?}",
+                    "🚫 Exclude file patterns: {:?}",
                     policy.exclude_file_patterns
                 );
                 println!(
-                    "⏱️ TIMEOUTS: pull={}s push={}s repo={}s retries={}",
+                    "⏱️  Timeouts: pull={}s push={}s repo={}s retries={}",
                     policy.pull_op_timeout_secs,
                     policy.push_op_timeout_secs,
                     policy.repo_sync_timeout_secs,
                     policy.push_retries
                 );
                 println!(
-                    "🧯 REPAIR: cooldown={}s ledger_max_lines={} ledger_max_age_days={}",
+                    "🧯 Repair: cooldown={}s ledger_max_lines={} ledger_max_age_days={}",
                     policy.repair_cooldown_secs,
                     policy.incident_ledger_max_lines,
                     policy.incident_ledger_max_age_days
                 );
                 if !policy.system_repo.is_empty() {
-                    println!("🏛️ SYSTEM_REPO: {}", policy.system_repo);
+                    println!("🏛️  System repo: {}", policy.system_repo);
                 }
                 if !policy.backup_policy.is_empty() || !policy.backup_dir.is_empty() {
                     println!(
-                        "🧰 BACKUP: policy={} dir={}",
+                        "🧰 Backup: policy={} dir={}",
                         policy.backup_policy, policy.backup_dir
                     );
                 }
-                println!("🌐 REMOTES: {}", policy.remotes.len());
+                println!("🌐 Remotes: {}", policy.remotes.len());
             }
         }
         Command::Config { cmd } => {
@@ -515,6 +517,18 @@ Command::Repair { cmd } => {
                     } else {
                         ConcernRepairFilter::All
                     };
+                    if !json {
+                        println!("📜 Policy: {}", policy_path.display());
+                        println!(
+                            "🛠️ Mode: {}",
+                            if apply { "APPLY (mutating)" } else { "DRY-RUN (no changes)" }
+                        );
+                        println!(
+                            "⚙️ Push: timeout={}s retries={}",
+                            push_timeout_secs.unwrap_or(0),
+                            push_retries
+                        );
+                    }
                     run_repair_concerns(
                         &policy_path,
                         apply,
@@ -528,6 +542,13 @@ Command::Repair { cmd } => {
                     .await?;
                 }
                 RepairCommands::Warns { apply, repo, json } => {
+                    if !json {
+                        println!("📜 Policy: {}", policy_path.display());
+                        println!(
+                            "🧹 Warn mode: {}",
+                            if apply { "APPLY (mutating)" } else { "DRY-RUN (no changes)" }
+                        );
+                    }
                     run_repair_warns(&policy_path, apply, repo, json).await?;
                 }
                 RepairCommands::Origins { apply } => {

@@ -57,11 +57,13 @@ git clone https://github.com/DraconDev/dracon-libs.git ../dracon-libs
 ### Building
 
 ```bash
+# Build all utilities (from repo root)
+cargo build --release
+
 # Build a specific utility
-cd dracon-sync && cargo build --release
-cd dracon-system && cargo build --release
-cd dracon-warden && cargo build --release
-cd dracon-ai && cargo build --release
+cargo build --release -p dracon-sync
+cargo build --release -p dracon-system
+cargo build --release -p dracon-warden
 
 # Or use install.sh for full install
 ./install.sh
@@ -70,18 +72,14 @@ cd dracon-ai && cargo build --release
 ### Testing
 
 ```bash
-# dracon-sync (406 tests, use --test-threads=1 for reliability)
-cd dracon-sync
+# All tests (serial — avoids PATH race conditions)
 export DRACON_SYNC_GIT_BIN=/run/current-system/sw/bin/git
 cargo test -- --test-threads=1
 
-# dracon-system
-cd dracon-system
-cargo test -- --test-threads=1
-
-# dracon-warden
-cd dracon-warden
-cargo test
+# Per-package
+cargo test -p dracon-sync -- --test-threads=1
+cargo test -p dracon-system -- --test-threads=1
+cargo test -p dracon-warden -- --test-threads=1
 ```
 
 ### Code Style

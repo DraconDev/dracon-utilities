@@ -1,3 +1,5 @@
+#![warn(missing_docs)]
+
 use anyhow::{Context, Result};
 use clap::{ArgAction, Parser, Subcommand};
 pub(crate) use dracon_security_kit::DraconWarden;
@@ -1368,16 +1370,16 @@ async fn main() -> Result<()> {
             let policy_path = resolve_policy_path_local()?;
             let policy = WardenPolicy::load(&policy_path)?;
             policy.validate()?;
-            println!("📜 POLICY: {}", policy_path.display());
-            println!("🛡️ WATCH_ROOTS: {:?}", effective_watch_roots(&policy));
+            println!("📜 Policy: {}", policy_path.display());
+            println!("🛡️  Watch roots: {:?}", effective_watch_roots(&policy));
             if !policy.discover_roots.is_empty() {
                 println!(
-                    "🧭 DISCOVERY_ROOTS: {:?}",
+                    "🧭 Discovery roots: {:?}",
                     effective_discovery_roots(&policy)
                 );
             }
             println!(
-                "🔑 PUBKEY_SOURCE: {}",
+                "🔑 Pubkey source: {}",
                 resolve_local_pubkey_path()
                     .map(|p| p.display().to_string())
                     .unwrap_or_else(|| "NOT_FOUND (set DRACON_OWNER_PUBKEY)".to_string())

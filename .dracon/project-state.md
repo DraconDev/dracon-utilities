@@ -1,35 +1,30 @@
 # Project State
 
 ## Current Focus
-Full code review — implemented 12/17 findings
+TODO sprint — iteration 3: events + links modules extracted from system/main.rs
 
 ## Context
-Performed comprehensive code review of all three dracon utilities. Fixed 12 issues across the review findings, including:
-- Critical: dedup guard tests, git_log_recent_subjects warning on failure, lock checks (already existed)
-- High: resolve_bin caching, notify username fix, stale focus check hardening
-- Medium: structured logging module, documentation, time-window dedup (count-based is sufficient)
-- Cleanup: removed stale TODO, added 4 new tests (420 total), all 511 tests passing
+Working through todo.md items. System/main.rs modularization in progress.
 
-## Completed
-- [x] Review finding #1: Added 4 dedup guard tests (unit + git_log_recent_subjects + integration)
-- [x] Review finding #2: git_log_recent_subjects warns on failure instead of silent Vec::new()
-- [x] Review finding #3: Pre-staging lock checks already exist (is_rebase_in_progress, is_merge_in_progress, is_cherry_pick_in_progress)
-- [x] Review finding #4: resolve_bin() now caches results in OnceLock<Mutex<HashMap>>
-- [x] Review finding #5: default_notify_command() uses $USER env var instead of hardcoded "dracon"
-- [x] Review finding #6: Stale focus check cleaned up (clearer logic, same behavior)
-- [x] Review finding #7: Race recovery already handled (reset HEAD returns Err on failure)
-- [x] Review finding #8: Added structured log module (log.rs) with JSONL output; migrated key messages
-- [x] Review finding #9: Count-based dedup is sufficient (time-window is future enhancement)
-- [x] Review finding #11: Documented dedup guard behavior in AGENTS.md
-- [x] Review finding #14: Removed stale TODO in git.rs
-- [x] Review findings #10, #13, #15-18: Deferred (minor/low impact)
+## Completed This Sprint
+- [x] Item 1: unwrap audit — 0 production unwraps
+- [x] Item 2: sync.rs tests — 39 tests, good coverage
+- [x] Item 5: CI/CD pipeline — `.github/workflows/ci.yml`
+- [x] Item 6: missing-doc warnings — 0 in own code
+- [x] Item 7: dracon-ai docs — activation path noted
+- [x] Item 8: `#![warn(missing_docs)]` lint gates on all 4 crate roots
+- [x] Item 12: incident ledger rotation — already implemented
+- [x] Events module extraction — `dracon-system/src/events.rs` (260 lines)
+- [x] Links module extraction — `dracon-system/src/links.rs` (233 lines)
+- [x] All 706 tests passing after both extractions
 
 ## In Progress
-- None
+- Item 4: system/main.rs split — 3,926 → 3,484 lines. Remaining: guard, storage, zram, doctor, safety
+- Item 3: git.rs split — planned (complex cross-module dependencies)
 
 ## Blockers
 - None
 
 ## Next Steps
-1. Monitor dedup guard in production (structured JSONL logs now active)
-2. Consider remaining low-priority items: incident ledger rotation, full unwrap audit, clippy cleanup
+1. Continue system/main.rs split: extract zram, doctor, safety modules (smaller targets)
+2. Begin git.rs split: extract multi_remote module

@@ -105,7 +105,7 @@ Service files are installed to `~/.config/systemd/user/` by `install.sh`.
 | Setting | Value | Purpose |
 |---------|-------|---------|
 | `ExecStart` | `dracon-sync daemon` | Runs sync daemon |
-| `Restart` | `on-failure` | Restarts on crash |
+| `Restart` | `always` | Restarts on any exit (clean or crash) |
 | `RestartSec` | `5` | Wait 5s before restart |
 | `Nice` | `10` | Lower CPU priority |
 | `CPUQuota` | `15%` | Max 15% CPU usage |
@@ -128,7 +128,7 @@ Service files are installed to `~/.config/systemd/user/` by `install.sh`.
 | Setting | Value | Purpose |
 |---------|-------|---------|
 | `ExecStart` | `dracon-system guard daemon` | Runs guard daemon |
-| `Restart` | `on-failure` | Restarts on crash |
+| `Restart` | `always` | Restarts on any exit (clean or crash) |
 | `RestartSec` | `10` | Wait 10s before restart |
 | `MemoryMax` | `250M` | Max 250MB RAM |
 | `CPUQuota` | `20%` | Max 20% CPU usage |
@@ -145,7 +145,7 @@ Service files are installed to `~/.config/systemd/user/` by `install.sh`.
 | Setting | Value | Purpose |
 |---------|-------|---------|
 | `ExecStart` | `dracon-warden daemon` | Runs warden daemon |
-| `Restart` | `on-failure` | Restarts on crash |
+| `Restart` | `always` | Restarts on any exit (clean or crash) |
 | `RestartSec` | `3` | Wait 3s before restart |
 | `Nice` | `10` | Lower CPU priority |
 | `CPUQuota` | `10%` | Max 10% CPU usage |
@@ -472,7 +472,7 @@ Commands:
 - `dracon-sync stuck list` — list stuck repos
 - `dracon-sync stuck unstuck <repo>` — unstuck a specific repo
 - `dracon-sync dual-branch list` — list repos with dual main/master
-- `dracon-sync dual-branch repair <repo>` — consolidate to master
+- `dracon-sync dual-branch repair <repo>` — consolidate to main
 
 **Global flags:** `-v` / `-vv` increase verbosity; `-V` prints version.
 

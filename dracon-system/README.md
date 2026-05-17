@@ -95,7 +95,7 @@ After=network.target
 [Service]
 Type=simple
 ExecStart=/usr/local/bin/dracon-system guard daemon
-Restart=on-failure
+Restart=always
 RestartSec=10
 User=root
 # Or use dedicated user with appropriate permissions

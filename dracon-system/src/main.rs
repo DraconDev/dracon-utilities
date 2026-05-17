@@ -20,8 +20,18 @@ use dracon_system_lib::analyze_workspace_storage;
 // Re-export policy items (types and utility fns that live in policy.rs)
 // Note: GuardRuntimeState, ProcSample, AutoCleanupResult are in main.rs,
 // so tests use crate::* to access them without explicit re-exports.
+mod doctor;
+pub(crate) use doctor::*;
+mod events;
+pub(crate) use events::*;
+mod links;
+pub(crate) use links::*;
 mod policy;
 pub(crate) use policy::*;
+mod safety;
+pub(crate) use safety::*;
+mod zram;
+pub(crate) use zram::*;
 
 #[cfg(test)]
 mod events_tests;
@@ -29,152 +39,6 @@ mod events_tests;
 mod guard_tests;
 #[cfg(test)]
 mod links_tests;
-
-const SYSTEM_PROTECTED: &[&str] = &[
-    "/", "/home", "/etc", "/usr", "/var", "/boot", "/nix", "/run", "/sys", "/dev", "/proc",
-];
-
-/// Verifies that `path` is safe to delete (not a protected system path).
-///
-/// **Security note:** This function canonicalizes the path and returns it for
-/// the caller to delete separately. There is a TOCTOU window between
-/// canonicalization and deletion where a symlink could be planted.
-/// This is mitigated by the systemd service hardening:
-/// `NoNewPrivileges=true`, `ProtectSystem=strict`, `ProtectHome=read-only`.
-fn check_safe_to_delete(path: &Path, user_protected: &[String]) -> Result<PathBuf> {
-    let canon = match path.canonicalize() {
-        Ok(p) => p,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            return Ok(path.to_path_buf());
-        }
-        Err(e) => anyhow::bail!(
-            "cannot canonicalize {}: {} — refusing to delete",
-            path.display(),
-            e
-        ),
-    };
-
-    // Reject symlinks to mitigate TOCTOU: a symlink planted at `path` after
-    // canonicalize but before deletion could redirect us to an unintended target.
-    // We use readlink() (not symlink_metadata) because at this point the path
-    // has already been canonicalized (following the symlink). If readlink
-    // succeeds on a non-directory, the canonicalized path IS the symlink target
-    // — but since canonicalize() already resolved it, we can't detect it.
-    // The real mitigation is openat2/O_PATH which holds the fd across the check.
-    // For now: if the original path is a symlink, reject it.
-    if let Ok(meta) = std::fs::symlink_metadata(path) {
-        if meta.file_type().is_symlink() {
-            anyhow::bail!(
-                "refusing to delete symlink {} — use target directly",
-                path.display()
-            );
-        }
-    }
-
-    let canon_str = canon.display().to_string();
-
-    for prot in SYSTEM_PROTECTED {
-        if is_protected_ancestor(&canon_str, prot) {
-            anyhow::bail!(
-                "refusing to delete protected path {} (under system root {})",
-                canon.display(),
-                prot
-            );
-        }
-    }
-
-    for user_prot in user_protected {
-        let prot_canon = match Path::new(user_prot).canonicalize() {
-            Ok(p) => p.display().to_string(),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
-            Err(e) => anyhow::bail!(
-                "cannot canonicalize user-protected path {}: {} — refusing",
-                user_prot,
-                e
-            ),
-        };
-        if is_protected_ancestor(&canon_str, &prot_canon) {
-            anyhow::bail!(
-                "refusing to delete protected path {} (under user-protected path {})",
-                canon.display(),
-                user_prot
-            );
-        }
-    }
-
-    Ok(canon)
-}
-
-/// Guard-specific safety check — skips SYSTEM_PROTECTED check because the guard
-/// only deletes known artifact/cache directories (~/Dev/*/target, ~/.cache/*,
-/// ~/.local/share/Trash/*) which are legitimately under /home.
-/// Still checks user-protected paths, symlinks, and canonicalization.
-fn check_safe_to_delete_guard(path: &Path, user_protected: &[String]) -> Result<PathBuf> {
-    let canon = match path.canonicalize() {
-        Ok(p) => p,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            return Ok(path.to_path_buf());
-        }
-        Err(e) => anyhow::bail!(
-            "cannot canonicalize {}: {} — refusing to delete",
-            path.display(),
-            e
-        ),
-    };
-
-    // Reject symlinks to mitigate TOCTOU
-    if let Ok(meta) = std::fs::symlink_metadata(path) {
-        if meta.file_type().is_symlink() {
-            anyhow::bail!(
-                "refusing to delete symlink {} — use target directly",
-                path.display()
-            );
-        }
-    }
-
-    let canon_str = canon.display().to_string();
-
-    // Only check user-protected paths, not SYSTEM_PROTECTED
-    for user_prot in user_protected {
-        let prot_canon = match Path::new(user_prot).canonicalize() {
-            Ok(p) => p.display().to_string(),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
-            Err(e) => anyhow::bail!(
-                "cannot canonicalize user-protected path {}: {} — refusing",
-                user_prot,
-                e
-            ),
-        };
-        if is_protected_ancestor(&canon_str, &prot_canon) {
-            anyhow::bail!(
-                "refusing to delete protected path {} (under user-protected path {})",
-                canon.display(),
-                user_prot
-            );
-        }
-    }
-
-    Ok(canon)
-}
-
-/// Check if `path` is equal to or a descendant of `protected`.
-/// Both must be canonicalized absolute paths.
-pub(crate) fn is_protected_ancestor(path: &str, protected: &str) -> bool {
-    if path == protected {
-        return true;
-    }
-    // Root '/' is special: every path is a descendant, so only match exact.
-    if protected == "/" {
-        return path == "/";
-    }
-    // Ensure protected ends with '/' so '/home' doesn't match '/homefoo'
-    let prefix = if protected.ends_with('/') {
-        protected.to_string()
-    } else {
-        format!("{}/", protected)
-    };
-    path.starts_with(&prefix)
-}
 
 #[cfg(test)]
 const TEST_PROTECTED: &[&str] = &[
@@ -201,12 +65,6 @@ pub(crate) fn check_path_str(path: &str, user_protected: &[&str]) -> bool {
     true
 }
 
-static ROLLING_LOG: std::sync::OnceLock<Mutex<Vec<String>>> = std::sync::OnceLock::new();
-
-fn get_log() -> &'static Mutex<Vec<String>> {
-    ROLLING_LOG.get_or_init(|| Mutex::new(Vec::new()))
-}
-
 static VERBOSITY: AtomicU8 = AtomicU8::new(0);
 
 #[macro_export]
@@ -216,69 +74,6 @@ macro_rules! veprintln {
             eprintln!($($arg)*);
         }
     };
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-pub enum EventSeverity {
-    Debug,
-    Info,
-    Warn,
-    Error,
-    Critical,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct DraconEvent {
-    pub domain: String,
-    pub severity: EventSeverity,
-    pub path: String,
-    pub message: String,
-    pub timestamp: String,
-}
-
-impl DraconEvent {
-    pub fn new<T1: ToString, T2: ToString, T3: ToString>(
-        domain: T1,
-        severity: EventSeverity,
-        path: T2,
-        message: T3,
-    ) -> Self {
-        Self {
-            domain: domain.to_string(),
-            severity,
-            path: path.to_string(),
-            message: message.to_string(),
-            timestamp: chrono::Utc::now().to_rfc3339(),
-        }
-    }
-}
-
-pub fn emit_event(event: &DraconEvent) {
-    if let Ok(mut log) = get_log().lock() {
-        if log.len() >= 1000 {
-            log.remove(0);
-        }
-        log.push(format!(
-            "[{}] {:?}: {} - {}",
-            event.timestamp, event.severity, event.path, event.message
-        ));
-    }
-    eprintln!(
-        "[{}] {:?}: {} - {}",
-        event.timestamp, event.severity, event.path, event.message
-    );
-    if let Some(events_path) = dirs::home_dir().map(|h| h.join(".dracon/events.jsonl")) {
-        if let Ok(mut file) = std::fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&events_path)
-        {
-            use std::io::Write;
-            if let Ok(json) = serde_json::to_string(event) {
-                let _ = writeln!(file, "{}", json);
-            }
-        }
-    }
 }
 
 pub(crate) fn acquire_daemon_lock(name: &str) -> Result<File> {
@@ -312,11 +107,6 @@ pub(crate) fn acquire_daemon_lock(name: &str) -> Result<File> {
     Ok(file)
 }
 
-pub(crate) fn events_path() -> PathBuf {
-    dirs::home_dir()
-        .map(|h| h.join(".dracon/events.jsonl"))
-        .unwrap_or_else(|| PathBuf::from("/tmp/dracon-events.jsonl"))
-}
 
 #[derive(Parser, Debug)]
 #[command(name = "dracon-system")]
@@ -496,15 +286,28 @@ struct StatusReport {
 }
 
 #[derive(Debug, Serialize)]
-struct DoctorReport {
-    system_root_exists: bool,
-    nixos_root_exists: bool,
-    canonical_libs_exists: bool,
-    canonical_utils_exists: bool,
-    sync_policy_exists: bool,
-    legacy_config_dracon_exists: bool,
-    sync_service_active: bool,
-    warden_service_active: bool,
+pub(crate) struct DoctorReport {
+    pub(crate) system_root_exists: bool,
+    pub(crate) nixos_root_exists: bool,
+    pub(crate) canonical_libs_exists: bool,
+    pub(crate) canonical_utils_exists: bool,
+    pub(crate) sync_policy_exists: bool,
+    pub(crate) legacy_config_dracon_exists: bool,
+    pub(crate) sync_service_active: bool,
+    pub(crate) warden_service_active: bool,
+}
+
+impl DoctorReport {
+    fn all_ok(&self) -> bool {
+        self.system_root_exists
+            && self.nixos_root_exists
+            && self.canonical_libs_exists
+            && self.canonical_utils_exists
+            && self.sync_policy_exists
+            && !self.legacy_config_dracon_exists
+            && self.sync_service_active
+            && self.warden_service_active
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -2451,152 +2254,6 @@ pub(crate) struct LinkStatusReport {
     pub(crate) missing_link: usize,
 }
 
-fn path_display(path: &Path) -> String {
-    path.display().to_string()
-}
-
-pub(crate) fn evaluate_link(entry: &LinkEntry) -> LinkEntryStatus {
-    let link = expand_tilde(&entry.link);
-    let target = expand_tilde(&entry.target);
-    let target_exists = target.exists();
-    let meta = fs::symlink_metadata(&link).ok();
-    let exists = meta.is_some();
-    let is_symlink = meta
-        .as_ref()
-        .map(|m| m.file_type().is_symlink())
-        .unwrap_or(false);
-
-    let mut points_to = String::new();
-    let mut in_sync = false;
-    let issue = if !target_exists {
-        "target_missing".to_string()
-    } else if !exists {
-        "link_missing".to_string()
-    } else if !is_symlink {
-        "path_not_symlink".to_string()
-    } else {
-        match fs::read_link(&link) {
-            Ok(actual) => {
-                let actual_abs = if actual.is_absolute() {
-                    actual
-                } else {
-                    link.parent().unwrap_or_else(|| Path::new("/")).join(actual)
-                };
-                points_to = path_display(&actual_abs);
-                if normalize_path(&actual_abs) == normalize_path(&target) {
-                    in_sync = true;
-                    "ok".to_string()
-                } else {
-                    "link_target_mismatch".to_string()
-                }
-            }
-            Err(_) => "readlink_failed".to_string(),
-        }
-    };
-
-    LinkEntryStatus {
-        link: path_display(&link),
-        target: path_display(&target),
-        exists,
-        is_symlink,
-        target_exists,
-        points_to,
-        in_sync,
-        issue,
-    }
-}
-
-fn normalize_path(path: &Path) -> PathBuf {
-    path.canonicalize().unwrap_or_else(|_| path.to_path_buf())
-}
-
-pub(crate) fn build_link_report(policy: &SystemPolicy) -> LinkStatusReport {
-    let mut entries = Vec::with_capacity(policy.links.entries.len());
-    let mut healthy = 0usize;
-    let mut drifted = 0usize;
-    let mut missing_target = 0usize;
-    let mut missing_link = 0usize;
-
-    for entry in &policy.links.entries {
-        let status = evaluate_link(entry);
-        match status.issue.as_str() {
-            "ok" => healthy += 1,
-            "target_missing" => {
-                drifted += 1;
-                missing_target += 1;
-            }
-            "link_missing" => {
-                drifted += 1;
-                missing_link += 1;
-            }
-            _ => drifted += 1,
-        }
-        entries.push(status);
-    }
-
-    LinkStatusReport {
-        total: entries.len(),
-        entries,
-        healthy,
-        drifted,
-        missing_target,
-        missing_link,
-    }
-}
-
-fn backup_path_for(link: &Path) -> PathBuf {
-    let ts = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
-    let name = link
-        .file_name()
-        .map(|n| n.to_string_lossy().to_string())
-        .unwrap_or_else(|| "link".to_string());
-    let backup_name = format!("{name}.dracon-system-backup-{ts}");
-    link.with_file_name(backup_name)
-}
-
-fn apply_link_policy(policy: &SystemPolicy, force_replace: bool) -> Result<LinkStatusReport> {
-    for entry in &policy.links.entries {
-        let link = expand_tilde(&entry.link);
-        let target = expand_tilde(&entry.target);
-
-        if !target.exists() {
-            continue;
-        }
-
-        if let Some(parent) = link.parent() {
-            fs::create_dir_all(parent)?;
-        }
-
-        let meta = fs::symlink_metadata(&link).ok();
-        if let Some(meta) = meta {
-            if meta.file_type().is_symlink() {
-                let safe_link = check_safe_to_delete(&link, &[])?;
-                fs::remove_file(&safe_link)?;
-            } else if force_replace {
-                let safe_link = check_safe_to_delete(&link, &[])?;
-                let backup = backup_path_for(&link);
-                fs::rename(&safe_link, backup)?;
-            } else {
-                continue;
-            }
-        }
-
-        #[cfg(unix)]
-        {
-            symlink(&target, &link)?;
-        }
-        #[cfg(not(unix))]
-        {
-            return Err(anyhow::anyhow!("link apply is only supported on unix"));
-        }
-    }
-
-    Ok(build_link_report(policy))
-}
-
 fn resolve_system_policy_path() -> Option<PathBuf> {
     if let Ok(custom) = std::env::var("DRACON_SYSTEM_POLICY") {
         let p = PathBuf::from(custom);
@@ -2693,31 +2350,6 @@ pub(crate) fn normalize_guard_policy(policy: &mut GuardPolicy) {
     }
 }
 
-async fn build_doctor_report() -> DoctorReport {
-    let root = canonical_system_root();
-    let nixos = root.join("nixos");
-    let libs = dirs::home_dir()
-        .unwrap_or_else(|| PathBuf::from("/home"))
-        .join("Dev/dracon-libs");
-    let utils = dirs::home_dir()
-        .unwrap_or_else(|| PathBuf::from("/home"))
-        .join("Dev/dracon-utilities");
-    let policy = root.join("utilities/sync/dracon-sync.toml");
-    let legacy_cfg = dirs::home_dir()
-        .unwrap_or_else(|| PathBuf::from("/home"))
-        .join(".config/dracon");
-
-    DoctorReport {
-        system_root_exists: root.exists(),
-        nixos_root_exists: nixos.exists(),
-        canonical_libs_exists: libs.exists(),
-        canonical_utils_exists: utils.exists(),
-        sync_policy_exists: policy.exists(),
-        legacy_config_dracon_exists: legacy_cfg.exists(),
-        sync_service_active: is_user_service_active("dracon-sync.service").await,
-        warden_service_active: is_user_service_active("dracon-warden.service").await,
-    }
-}
 
 async fn is_git_tracked_dir(path: &Path) -> Result<bool> {
     let parent = match path.parent() {
@@ -2831,65 +2463,6 @@ async fn cmd_status(json: bool) -> Result<()> {
     Ok(())
 }
 
- async fn cmd_doctor(json: bool, strict: bool) -> Result<()> {
-     use comfy_table::{presets::UTF8_FULL_CONDENSED, Cell, Color, ContentArrangement, Table};
-
-     let report = build_doctor_report().await;
-    if json {
-        println!("{}", serde_json::to_string_pretty(&report)?);
-    } else {
-        let mut table = Table::new();
-        table
-            .load_preset(UTF8_FULL_CONDENSED)
-            .set_content_arrangement(ContentArrangement::Dynamic)
-            .set_header(vec![
-                Cell::new("STATUS"),
-                Cell::new("CHECK"),
-                Cell::new("DETAIL"),
-            ]);
-
-        let checks: Vec<(&str, bool, &str)> = vec![
-            ("system root", report.system_root_exists, "~/.dracon"),
-            ("nixos root", report.nixos_root_exists, "~/.dracon/nixos"),
-            ("libs exists", report.canonical_libs_exists, "~/Dev/dracon-libs"),
-            ("utils exists", report.canonical_utils_exists, "~/Dev/dracon-utilities"),
-            ("sync policy", report.sync_policy_exists, "sync/dracon-sync.toml"),
-            ("legacy config", !report.legacy_config_dracon_exists, "~/.config/dracon (should not exist)"),
-            ("sync service", report.sync_service_active, "dracon-sync.service"),
-            ("warden service", report.warden_service_active, "dracon-warden.service"),
-        ];
-
-        for (label, ok, detail) in &checks {
-            let (icon, color) = if *ok {
-                ("\u{2705}", Color::Green)
-            } else {
-                ("\u{274c}", Color::Red)
-            };
-            table.add_row(vec![
-                Cell::new(icon).fg(color),
-                Cell::new(label),
-                Cell::new(detail),
-            ]);
-        }
-
-        println!("{table}");
-        let pass = checks.iter().filter(|(_, ok, _)| *ok).count();
-        println!("{}/{} checks passed", pass, checks.len());
-    }
-    if strict {
-        let mut violations = Vec::new();
-        if report.legacy_config_dracon_exists {
-            violations.push("legacy ~/.config/dracon exists".to_string());
-        }
-        if !violations.is_empty() {
-            return Err(anyhow::anyhow!(
-                "strict doctor failed: {}",
-                violations.join("; ")
-            ));
-        }
-    }
-    Ok(())
-}
 
 async fn cmd_storage(
     root: Option<PathBuf>,
@@ -3050,75 +2623,6 @@ async fn cmd_storage(
     Ok(())
 }
 
- fn cmd_link(cmd: LinkCommands) -> Result<()> {
-    use comfy_table::{presets::UTF8_FULL_CONDENSED, Cell, Color, ContentArrangement, Table};
-
-    let (_, policy) = load_system_policy()?;
-    match cmd {
-        LinkCommands::Status { json } | LinkCommands::Doctor { json } => {
-            let report = build_link_report(&policy);
-            if json {
-                println!("{}", serde_json::to_string_pretty(&report)?);
-            } else {
-                let mut table = Table::new();
-                table
-                    .load_preset(UTF8_FULL_CONDENSED)
-                    .set_content_arrangement(ContentArrangement::Dynamic)
-                    .set_header(vec![
-                        Cell::new("STATUS"),
-                        Cell::new("LINK"),
-                        Cell::new("TARGET"),
-                        Cell::new("ISSUE"),
-                    ]);
-
-                for item in &report.entries {
-                    let (icon, color) = if item.issue == "ok" {
-                        ("\u{2705}", Color::Green)
-                    } else if item.issue.contains("missing") || item.issue.contains("not exist") {
-                        ("\u{274c}", Color::Red)
-                    } else {
-                        ("\u{26a0}\u{fe0f}", Color::Yellow)
-                    };
-
-                    let issue = if item.issue == "ok" {
-                        String::new()
-                    } else {
-                        format!("\u{2192} {}", item.issue)
-                    };
-
-                    table.add_row(vec![
-                        Cell::new(icon).fg(color),
-                        Cell::new(&item.link),
-                        Cell::new(&item.target),
-                        Cell::new(issue),
-                    ]);
-                }
-
-                println!("{table}");
-                println!(
-                    "{} links: {} ok, {} drifted, {} missing target, {} missing link",
-                    report.total, report.healthy, report.drifted, report.missing_target, report.missing_link
-                );
-            }
-        }
-        LinkCommands::Apply {
-            json,
-            force_replace,
-        } => {
-            let report = apply_link_policy(&policy, force_replace)?;
-            if json {
-                println!("{}", serde_json::to_string_pretty(&report)?);
-            } else {
-                println!("Applied link policy.");
-                println!(
-                    "{} links: {} ok, {} drifted",
-                    report.total, report.healthy, report.drifted
-                );
-            }
-        }
-    }
-    Ok(())
-}
 
 async fn cmd_guard_once(guard: &GuardPolicy, json: bool) -> Result<()> {
     let mut runtime = GuardRuntimeState::default();
@@ -3605,278 +3109,6 @@ async fn cmd_guard(cmd: GuardCommands) -> Result<()> {
             cmd_guard_clean(&guard, json, apply, targets, min_size_mb).await
         }
     }
-}
-
-fn cmd_events(
-    tail: usize,
-    source: Option<String>,
-    severity: Option<String>,
-    dedup: bool,
-    json_output: bool,
-) -> Result<()> {
-    use comfy_table::{presets::UTF8_FULL_CONDENSED, Attribute, Cell, Color, ContentArrangement, Table};
-
-    let path = events_path();
-    if !path.exists() {
-        println!("No events found ({} does not exist)", path.display());
-        return Ok(());
-    }
-    let contents = std::fs::read_to_string(&path)
-        .with_context(|| format!("failed to read {}", path.display()))?;
-    let lines: Vec<&str> = contents.lines().collect();
-    let start = if lines.len() > tail {
-        lines.len() - tail
-    } else {
-        0
-    };
-
-    let mut parsed: Vec<serde_json::Value> = Vec::new();
-    for line in &lines[start..] {
-        if let Ok(val) = serde_json::from_str::<serde_json::Value>(line) {
-            if let Some(ref s) = source {
-                if val.get("domain").and_then(|v| v.as_str()) != Some(s.as_str()) {
-                    continue;
-                }
-            }
-            let sev_lower = severity.as_deref().map(|s| s.to_lowercase());
-            if let Some(ref sl) = sev_lower {
-                let val_sev = val
-                    .get("severity")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("")
-                    .to_lowercase();
-                if val_sev != *sl {
-                    continue;
-                }
-            }
-            parsed.push(val);
-        }
-    }
-
-    if dedup {
-        parsed.dedup_by(|a, b| {
-            a.get("domain") == b.get("domain")
-                && a.get("severity") == b.get("severity")
-                && a.get("path") == b.get("path")
-                && a.get("message") == b.get("message")
-        });
-    }
-
-    if json_output {
-        for ev in &parsed {
-            println!("{}", serde_json::to_string(ev).unwrap_or_default());
-        }
-        if parsed.is_empty() {
-            println!("(no matching events)");
-        }
-        return Ok(());
-    }
-
-    if parsed.is_empty() {
-        println!("(no matching events)");
-        return Ok(());
-    }
-
-    let mut table = Table::new();
-    table
-        .load_preset(UTF8_FULL_CONDENSED)
-        .set_content_arrangement(ContentArrangement::Dynamic)
-        .set_header(vec![
-            Cell::new("SEV"),
-            Cell::new("DOMAIN"),
-            Cell::new("PATH"),
-            Cell::new("MESSAGE"),
-            Cell::new("TIME"),
-        ]);
-
-    for ev in &parsed {
-        let sev = ev
-            .get("severity")
-            .and_then(|v| v.as_str())
-            .unwrap_or("-");
-        let domain = ev
-            .get("domain")
-            .and_then(|v| v.as_str())
-            .unwrap_or("-");
-        let evpath = ev
-            .get("path")
-            .and_then(|v| v.as_str())
-            .unwrap_or("-");
-        let message = ev
-            .get("message")
-            .and_then(|v| v.as_str())
-            .unwrap_or("-");
-        let ts = ev
-            .get("timestamp")
-            .and_then(|v| v.as_str())
-            .unwrap_or("-");
-
-        let ts_short = shorten_event_time(ts);
-
-        let (sev_str, sev_color) = match sev.to_lowercase().as_str() {
-            "error" | "critical" => (sev, Color::Red),
-            "warn" | "warning" => (sev, Color::Yellow),
-            _ => (sev, Color::Green),
-        };
-
-        table.add_row(vec![
-            Cell::new(sev_str).fg(sev_color).add_attribute(Attribute::Bold),
-            Cell::new(domain),
-            Cell::new(evpath),
-            Cell::new(message),
-            Cell::new(ts_short),
-        ]);
-    }
-
-    println!("{table}");
-    println!("{} events", parsed.len());
-    Ok(())
-}
-
-fn shorten_event_time(ts: &str) -> String {
-    if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(ts) {
-        let now = chrono::Utc::now();
-        let diff = now.signed_duration_since(dt);
-        if diff.num_seconds() < 0 {
-            return "just now".to_string();
-        }
-        let mins = diff.num_minutes();
-        if mins < 1 {
-            return format!("{}s", diff.num_seconds());
-        }
-        if mins < 60 {
-            return format!("{mins}m");
-        }
-        let hours = diff.num_hours();
-        if hours < 24 {
-            return format!("{hours}h");
-        }
-        let days = diff.num_days();
-        if days < 30 {
-            return format!("{days}d");
-        }
-        return format!("{}mo", days / 30);
-    }
-    if ts.len() > 19 {
-        ts[..19].to_string()
-    } else {
-        ts.to_string()
-    }
-}
-
-fn cmd_zram(
-    status: bool,
-    gen_config: bool,
-    memory_percent: Option<u32>,
-    algorithm: Option<String>,
-) -> Result<()> {
-    if gen_config {
-        let mem_pct = memory_percent.unwrap_or(200);
-        let algo = algorithm.unwrap_or_else(|| "zstd".to_string());
-        let valid_algos = ["lzo", "lzo-rle", "lz4", "lz4hc", "zstd", "deflate", "842"];
-        if !valid_algos.contains(&algo.as_str()) {
-            return Err(anyhow::anyhow!(
-                "Invalid algorithm. Valid: {}",
-                valid_algos.join(", ")
-            ));
-        }
-        let total_ram_kb: u64 = std::fs::read_to_string("/proc/meminfo")
-            .ok()
-            .and_then(|s| {
-                s.lines()
-                    .find(|l| l.starts_with("MemTotal:"))
-                    .map(|l| l.split_whitespace().nth(1).unwrap_or("0").to_string())
-            })
-            .and_then(|s| s.parse().ok())
-            .unwrap_or(0);
-        let total_ram_gb = total_ram_kb as f64 / 1024.0 / 1024.0;
-        println!("# Zram configuration for NixOS");
-        println!("# Add this to your ~/.dracon/nixos/configuration.nix");
-        println!();
-        println!("  # --- ZRAM ---");
-        println!("  zramSwap = {{");
-        println!("    enable = true;");
-        println!("    algorithm = \"{}\";", algo);
-        println!(
-            "    # {}% of RAM = {}GB virtual swap (based on detected {} GB RAM)",
-            mem_pct,
-            (mem_pct as f64 / 100.0 * total_ram_gb),
-            total_ram_gb
-        );
-        println!("    memoryPercent = {};", mem_pct);
-        println!("  }};");
-        println!();
-        println!("# Then rebuild: sudo nixos-rebuild switch --flake ~/.dracon/nixos#");
-        return Ok(());
-    }
-
-    if status || (!gen_config) {
-        let zram_path = "/sys/block/zram0";
-        let mm_stat_path = format!("{}/mm_stat", zram_path);
-
-        println!("Zram Status");
-        println!("============");
-
-        if !std::path::Path::new(zram_path).exists() {
-            println!("No zram device found.");
-            return Ok(());
-        }
-
-        let disksize = std::fs::read_to_string(format!("{}/disksize", zram_path))
-            .map(|s| s.trim().parse::<u64>().unwrap_or(0))
-            .unwrap_or(0);
-        let disksize_gb = disksize / 1024 / 1024 / 1024;
-
-        let algo = std::fs::read_to_string(format!("{}/comp_algorithm", zram_path))
-            .map(|s| s.trim().to_string())
-            .unwrap_or_else(|_| "unknown".to_string());
-
-        let mm_stat = std::fs::read_to_string(&mm_stat_path)
-            .map(|s| {
-                s.split_whitespace()
-                    .filter_map(|v| v.parse::<u64>().ok())
-                    .collect::<Vec<_>>()
-            })
-            .unwrap_or_default();
-
-        let orig = *mm_stat.first().unwrap_or(&0);
-        let compr = *mm_stat.get(1).unwrap_or(&0);
-        let mem_used = *mm_stat.get(2).unwrap_or(&0);
-
-        let orig_gb = orig as f64 / 1024.0 / 1024.0 / 1024.0;
-        let compr_gb = compr as f64 / 1024.0 / 1024.0 / 1024.0;
-        let mem_used_gb = mem_used as f64 / 1024.0 / 1024.0 / 1024.0;
-        let ratio = if orig > 0 {
-            compr as f64 / orig as f64
-        } else {
-            0.0
-        };
-
-        println!();
-        println!("Device: /dev/zram0");
-        println!("Disksize: {} GB", disksize_gb);
-        println!("Algorithm: {}", algo);
-        println!();
-        println!("Memory Usage:");
-        println!("  Original data: {:.1} GB", orig_gb);
-        println!("  Compressed:    {:.1} GB", compr_gb);
-        println!("  RAM used:      {:.1} GB", mem_used_gb);
-        println!(
-            "  Compression ratio: {:.1}% ({:.1}x)",
-            ratio * 100.0,
-            if ratio > 0.0 { 1.0 / ratio } else { 0.0 }
-        );
-        println!();
-        println!("Configuration options:");
-        println!("  --gen-config           Generate NixOS configuration snippet");
-        println!("  --memory-percent <N>   Set memory percent (default: 200 for 2x RAM)");
-        println!("  --algorithm <algo>     Set algorithm: lzo, lz4, lz4hc, zstd (default: zstd)");
-        println!();
-        println!("Example - generate config for 2x RAM with zstd:");
-        println!("  dracon-system zram --gen-config --memory-percent 200 --algorithm zstd");
-    }
-
-    Ok(())
 }
 
 #[tokio::main]

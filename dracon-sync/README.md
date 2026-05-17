@@ -14,7 +14,7 @@ When `auto_github_private = true`, newly initialized repos without an origin rem
 
 ### Self-Healing
 - Detects and repairs common git issues (conflicted remotes, stuck pushes)
-- Consolidates dual-main/master branch repos to master
+- Consolidates dual main/master branch repos to main
 - Manages permanently stuck repos
 
 ### AI Scribe Integration

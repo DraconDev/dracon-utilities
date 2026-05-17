@@ -109,7 +109,10 @@ impl SimpleAiService {
         let config = match Self::load_config(&config_path) {
             Ok(c) => c,
             Err(e) => {
-                eprintln!("📡 AI: no config at {}: {}", config_path.display(), e);
+                static LOGGED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+                if !LOGGED.swap(true, std::sync::atomic::Ordering::Relaxed) {
+                    eprintln!("📡 AI: no config at {}: {}", config_path.display(), e);
+                }
                 return Self {
                     providers: Vec::new(),
                     client: reqwest::Client::new(),
@@ -117,16 +120,27 @@ impl SimpleAiService {
             }
         };
 
+        let mut first_call = true;
+        static INIT: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+        if INIT.swap(true, std::sync::atomic::Ordering::Relaxed) {
+            first_call = false;
+        }
+
         for pc in &config.providers {
             let name = &pc.name;
             if let Some(_key) = Self::get_api_key(&pc.env) {
-                eprintln!("📡 AI: {} ready (key found)", name);
+                if first_call {
+                    eprintln!("📡 AI: {} ready (key found)", name);
+                }
             } else {
-                eprintln!(
-                    "📡 AI: {} configured but no API key (set {} env var)",
-                    name, pc.env
-                );
+                if first_call {
+                    eprintln!(
+                        "📡 AI: {} configured but no API key (set {} env var)",
+                        name, pc.env
+                    );
+                }
             }
+
         }
 
         let active_providers: Vec<ProviderConfig> = config
