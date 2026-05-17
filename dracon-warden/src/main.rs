@@ -1726,7 +1726,9 @@ fn scrub_json_value(v: &mut serde_json::Value) {
         } else if found == 0 {
             println!("✅ No DRACON_SECRET markers found in {} repos", repos.len());
         }
+    }
     Ok(())
+}
 
 fn git_ls_files(repo: &Path) -> Result<Vec<String>> {
     let out = ProcessCommand::new("git")
