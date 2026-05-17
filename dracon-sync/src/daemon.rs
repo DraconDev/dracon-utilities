@@ -448,6 +448,7 @@ pub(crate) async fn run_daemon(
     let mut filter_cooldowns: HashMap<PathBuf, Instant> = HashMap::new();
     let mut stuck_push_repos = load_stuck_push_repos();
     let mut remote_notify_cooldowns: HashMap<String, Instant> = HashMap::new();
+    let mut cycle_count: u64 = 0;
 
     // ── Startup cleanup: prune stale state from previous runs ──
     {
@@ -569,6 +570,13 @@ pub(crate) async fn run_daemon(
         repair_cooldowns.retain(|repo, _| repo_set.contains(repo));
         filter_cooldowns.retain(|repo, _| repo_set.contains(repo));
         stuck_push_repos.retain(|repo, _| repo_set.contains(repo));
+
+        // Periodic broken tracking repair (every ~5 min at 1s interval)
+        cycle_count += 1;
+        if cycle_count % 300 == 0 {
+            let repo_refs: Vec<PathBuf> = repo_set.iter().cloned().collect();
+            repair_broken_tracking(&repo_refs);
+        }
 
         if let Some(reason) = freeze_reason(&policy_path) {
             println!("⏸️ sync daemon paused ({})", reason);

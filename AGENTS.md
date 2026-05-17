@@ -210,6 +210,29 @@ Operational state (mutable files written at runtime) lives **outside the `.draco
 
 The incident ledger is appended every sync cycle. Keeping it at `~/.local/state/dracon/` instead of inside `.dracon` prevents the sync daemon from auto-committing its own operational data.
 
+### Startup Cleanup
+
+On every daemon start/restart, the sync daemon prunes stale state:
+- **Stuck repos**: Removes entries for repos no longer on disk, saves pruned result to JSON
+- **Incident ledger**: Enforces retention (max age + max lines) immediately at start
+- **Visibility cache**: Removes orphan `.last` files for deleted repos
+- **Broken tracking**: Repairs `origin/master: gone` refs → `origin/{branch}` (also runs every ~5 min in the loop)
+
+The guard daemon rotates its log file if oversized at startup.
+
+### GitHub Orphan Cleanup
+
+The old suffix loop bug created 61 orphan repos (e.g., `dracon-code-1` through `dracon-code-11`). A cleanup script is provided:
+
+```bash
+# Dry run (list only)
+./scripts/cleanup-github-orphans.sh
+
+# Actually delete (requires delete_repo scope)
+gh auth refresh -h github.com -s delete_repo
+./scripts/cleanup-github-orphans.sh --apply
+```
+
 ### Incident Response
 
 When the safety guard triggers or other incidents occur, entries are written to the incident ledger:
