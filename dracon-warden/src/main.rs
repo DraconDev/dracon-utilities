@@ -1691,7 +1691,7 @@ fn scrub_json_value(v: &mut serde_json::Value) {
         }
     }
 
-        if !rows.is_empty() {
+    if !rows.is_empty() {
             let mut table = Table::new();
             table
                 .load_preset(UTF8_FULL_CONDENSED)
