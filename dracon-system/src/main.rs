@@ -481,6 +481,7 @@ struct StatusReport {
     nixos_root: String,
     sync_policy: String,
     system_policy: String,
+    system_policy_exists: bool,
     sync_service_active: bool,
     warden_service_active: bool,
 }
@@ -2635,8 +2636,7 @@ async fn is_user_service_active(service: &str) -> bool {
 
 async fn build_status_report() -> Result<StatusReport> {
     let root = canonical_system_root();
-    let (system_policy_path, _) =
-        load_system_policy().unwrap_or_else(|_| (None, SystemPolicy::default()));
+    let system_policy_path = root.join("utilities/system/dracon-system.toml");
     Ok(StatusReport {
         system_root: root.display().to_string(),
         nixos_root: root.join("nixos").display().to_string(),
@@ -2645,8 +2645,9 @@ async fn build_status_report() -> Result<StatusReport> {
             .display()
             .to_string(),
         system_policy: system_policy_path
-            .map(|p| p.display().to_string())
-            .unwrap_or_else(|| "<default>".to_string()),
+            .display()
+            .to_string(),
+        system_policy_exists: system_policy_path.exists(),
         sync_service_active: is_user_service_active("dracon-sync.service").await,
         warden_service_active: is_user_service_active("dracon-warden.service").await,
     })
