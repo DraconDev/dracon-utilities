@@ -158,7 +158,7 @@ const FORBIDDEN_PLAINTEXT_SUBSTRINGS: &[&str] = &[
 
 #[derive(Parser, Debug)]
 #[command(name = "dracon-warden")]
-#[command(about = "Lightweight Warden runtime")]
+#[command(about = "Secret encryption — age-based git filter and key management")]
 #[command(version)]
 struct Cli {
     /// Increase output verbosity. Can be repeated up to 2 times (-v, -vv).
