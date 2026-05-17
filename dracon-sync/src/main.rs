@@ -760,17 +760,15 @@ Command::Repair { cmd } => {
                 }
             }
         }
-        Command::Stuck { cmd } => match cmd {
-            StuckCommands::List => {
-                list_stuck_repos();
-            }
-            StuckCommands::Unstuck { repo } => {
-                unstuck_repo(&repo);
-            }
-        },
-        Command::DualBranch { cmd } => {
+        Command::Repair { cmd } => {
             match cmd {
-                DualBranchCommands::List => {
+                RepairCommands::StuckList => {
+                    list_stuck_repos();
+                }
+                RepairCommands::StuckUnstuck { repo } => {
+                    unstuck_repo(&repo);
+                }
+                RepairCommands::DualBranchList => {
                     let policy = SyncPolicy::load(&policy_path)?;
                     let roots = policy.watch_root_paths();
                     let excluded_dir_names = excluded_dir_names_set(&policy);
@@ -783,8 +781,7 @@ Command::Repair { cmd } => {
                     let mut found = 0;
                     for repo in repos {
                         if has_both_main_and_master(&repo) {
-                            let branch =
-                                git::current_branch(&repo).unwrap_or_else(|| "unknown".to_string());
+                            let branch = git::current_branch(&repo).unwrap_or_else(|| "unknown".to_string());
                             println!("   {} (currently on {})", repo.display(), branch);
                             found += 1;
                         }
@@ -792,10 +789,10 @@ Command::Repair { cmd } => {
                     if found == 0 {
                         println!("✅ no repos with both main and master");
                     } else {
-                        println!("\n🔧 Run 'dracon-sync dual-branch repair <path>' to consolidate to main");
+                        println!("\n🔧 Run 'dracon-sync repair dual-branch-repair <path>' to consolidate to main");
                     }
                 }
-                DualBranchCommands::Repair { repo } => {
+                RepairCommands::DualBranchRepair { repo } => {
                     if !has_both_main_and_master(&repo) {
                         println!("ℹ️ {} does not have both main and master", repo.display());
                         return Ok(());
@@ -809,36 +806,37 @@ Command::Repair { cmd } => {
                         }
                     }
                 }
-            }
-        }
-        Command::RepairOrigins { apply } => {
-            let policy = SyncPolicy::load(&policy_path)?;
-            let roots = policy.watch_root_paths();
-            let excluded_dir_names = excluded_dir_names_set(&policy);
-            let repos = git::discover_git_repos(
-                &roots,
-                &excluded_dir_names,
-                &policy.exclude_repos,
-                Some(&policy.system_repo),
-            );
-            let mut found = 0;
-            for repo in repos {
-                if let Some((current, canonical)) = detect_orphan_origin(&repo) {
-                    println!("   {}: {} -> {}", repo.display(), current, canonical);
-                    found += 1;
-                    if apply {
-                        if let Err(e) = fix_orphan_origin(&repo, &canonical) {
-                            eprintln!("❌ failed to fix origin for {}: {}", repo.display(), e);
-                        } else {
-                            println!("✅ fixed origin for {}", repo.display());
+                RepairCommands::Origins { apply } => {
+                    let policy = SyncPolicy::load(&policy_path)?;
+                    let roots = policy.watch_root_paths();
+                    let excluded_dir_names = excluded_dir_names_set(&policy);
+                    let repos = git::discover_git_repos(
+                        &roots,
+                        &excluded_dir_names,
+                        &policy.exclude_repos,
+                        Some(&policy.system_repo),
+                    );
+                    let mut found = 0;
+                    for repo in repos {
+                        if let Some((current, canonical)) = detect_orphan_origin(&repo) {
+                            println!("   {}: {} -> {}", repo.display(), current, canonical);
+                            found += 1;
+                            if apply {
+                                if let Err(e) = fix_orphan_origin(&repo, &canonical) {
+                                    eprintln!("❌ failed to fix origin for {}: {}", repo.display(), e);
+                                } else {
+                                    println!("✅ fixed origin for {}", repo.display());
+                                }
+                            }
                         }
                     }
+                    if found == 0 {
+                        println!("✅ no orphan origins found");
+                    } else if !apply {
+                        println!("\n🔧 Run 'dracon-sync repair origins --apply' to fix them");
+                    }
                 }
-            }
-            if found == 0 {
-                println!("✅ no orphan origins found");
-            } else if !apply {
-                println!("\n🔧 Run 'dracon-sync repair-origins --apply' to fix them");
+                _ => {}
             }
         }
         Command::Health { json } => {
