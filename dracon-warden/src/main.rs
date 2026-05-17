@@ -158,7 +158,7 @@ const FORBIDDEN_PLAINTEXT_SUBSTRINGS: &[&str] = &[
 
 #[derive(Parser, Debug)]
 #[command(name = "dracon-warden")]
-#[command(about = "Secret encryption — age-based git filter and key management")]
+#[command(about = "Lightweight Warden runtime")]
 #[command(version)]
 struct Cli {
     /// Increase output verbosity. Can be repeated up to 2 times (-v, -vv).
@@ -170,15 +170,25 @@ struct Cli {
 
 #[derive(Subcommand, Debug)]
 enum Command {
-    /// Show resolved policy path and watch roots.
-    Status,
+    /// Run forever with filesystem event debounce.
+    Daemon,
     /// Run one hardening pass and exit.
     Once {
         /// Optional repo path to harden. If omitted, hardens repos in warden discovery scope.
         repo: Option<PathBuf>,
     },
-    /// Run forever with filesystem event debounce.
-    Daemon,
+    /// Show resolved policy path and watch roots.
+    Status,
+    /// Git filter clean operation (stdin -> stdout).
+    FilterClean {
+        /// Optional path from git filter (%f)
+        path: Option<String>,
+    },
+    /// Git filter smudge operation (stdin -> stdout).
+    FilterSmudge {
+        /// Optional path from git filter (%f)
+        path: Option<String>,
+    },
     /// Scan plaintext JSON files for DRACON_SECRET markers and optionally scrub them.
     ScrubMarkers {
         /// Apply edits in-place. Without this flag, the command is a dry-run report.
@@ -213,29 +223,13 @@ enum Command {
         /// Optional repo path to scan. If omitted, scans repos in warden discovery scope.
         repo: Option<PathBuf>,
     },
-    /// Git filter clean operation (stdin -> stdout).
-    FilterClean {
-        /// Optional path from git filter (%f)
-        path: Option<String>,
-    },
-    /// Git filter smudge operation (stdin -> stdout).
-    FilterSmudge {
-        /// Optional path from git filter (%f)
-        path: Option<String>,
-    },
     /// Generate a new age keypair for this machine.
     ///
     /// Creates ~/dracon/data/keys/machine_<hostname>.age (secret) and
     /// ~/dracon/data/keys/owner_<hostname>.pub (public). Also publishes
     /// the public key to the current repo's .dracon/data/keys/ directory.
-    Keygen {
-        /// Also publish the public key to the current repo.
-        #[arg(long)]
-        publish: bool,
-        /// Optional repo path to publish the public key to.
-        #[arg(long)]
-        repo: Option<PathBuf>,
-    },
+    /// Fails if either file already exists to prevent accidental overwrite.
+    Keygen,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -1692,40 +1686,38 @@ fn scrub_json_value(v: &mut serde_json::Value) {
     }
 
     if !rows.is_empty() {
-            let mut table = Table::new();
-            table
-                .load_preset(UTF8_FULL_CONDENSED)
-                .set_content_arrangement(ContentArrangement::Dynamic)
-                .set_header(vec![
-                    Cell::new("REPO"),
-                    Cell::new("FILE"),
-                    Cell::new("STATUS"),
-                ]);
+        let mut table = Table::new();
+        table
+            .load_preset(UTF8_FULL_CONDENSED)
+            .set_content_arrangement(ContentArrangement::Dynamic)
+            .set_header(vec![
+                Cell::new("REPO"),
+                Cell::new("FILE"),
+                Cell::new("STATUS"),
+            ]);
 
-            for (repo, file, status) in &rows {
-                let (status_str, color) = match status.as_str() {
-                    "scrubbed" => ("\u{2705} scrubbed", Color::Green),
-                    "invalid JSON" => ("\u{274c} invalid JSON", Color::Red),
-                    _ => ("\u{26a0}\u{fe0f} found", Color::Yellow),
-                };
-                table.add_row(vec![
-                    Cell::new(repo),
-                    Cell::new(file),
-                    Cell::new(status_str).fg(color),
-                ]);
-            }
-
-            println!("{table}");
-            if apply {
-                println!(
-                    "scrub complete (found: {found}, changed: {changed}, skipped_invalid_json: {skipped})"
-                );
-            } else {
-                println!("scrub report complete (found: {found})");
-            }
-        } else if found == 0 {
-            println!("✅ No DRACON_SECRET markers found in {} repos", repos.len());
+        for (repo, file, status) in &rows {
+            let (status_str, color) = match status.as_str() {
+                "scrubbed" => ("\u{2705} scrubbed", Color::Green),
+                "invalid JSON" => ("\u{274c} invalid JSON", Color::Red),
+                _ => ("\u{26a0}\u{fe0f} found", Color::Yellow),
+            };
+            table.add_row(vec![
+                Cell::new(repo),
+                Cell::new(file),
+                Cell::new(status_str).fg(color),
+            ]);
         }
+
+        println!("{table}");
+    }
+
+    if apply {
+        println!(
+            "scrub complete (found: {found}, changed: {changed}, skipped_invalid_json: {skipped})"
+        );
+    } else {
+        println!("scrub report complete (found: {found})");
     }
     Ok(())
 }
