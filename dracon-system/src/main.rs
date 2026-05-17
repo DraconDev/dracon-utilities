@@ -1076,6 +1076,7 @@ async fn proactive_cleanup_rust_targets(
 
     Ok(result)
 }
+
 async fn inode_use_percent() -> Result<u8> {
     let out = Command::new("df").args(["-Pi", "/"]).output().await?;
 
@@ -2393,7 +2394,7 @@ pub(crate) async fn run_guard_once(
         let due = state.guard_cycle.is_multiple_of(interval);
         let cooldown_ok = state
             .last_proactive_cleanup
-            .is_none_or(|t| t.elapsed().as_secs() >= interval * guard.interval_secs);
+            .is_none_or(|t| t.elapsed().as_secs() >= interval.saturating_mul(guard.interval_secs));
         if due && cooldown_ok {
             run_proactive_cleanup(guard, state).await?;
             state.last_proactive_cleanup = Some(Instant::now());
