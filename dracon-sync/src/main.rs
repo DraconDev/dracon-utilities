@@ -956,7 +956,7 @@ println!("🔧 Consolidating {} to main...", repo.display());
                         } else {
                             if json { println!("warn"); } else { println!("⚠️  (unexpected response: {}...)", resp.chars().take(20).collect::<String>()); }
                             working_provider = Some(name.clone());
-                            results.push(ProviderResult { name: name.clone(), status: "warn".to_string(), latency_ms: None, error: Some(format!("unexpected response")) });
+                            results.push(ProviderResult { name: name.clone(), status: "warn".to_string(), latency_ms: None, error: Some("unexpected response".to_string()) });
                         }
                     }
                     Ok((false, err)) => {
