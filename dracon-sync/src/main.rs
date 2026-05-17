@@ -544,16 +544,6 @@ Command::Repair { cmd } => {
             }
         }
         Command::Health { json } => {
-        Command::RepairWarns { apply, repo, json } => {
-            run_repair_warns(&policy_path, apply, repo, json).await?;
-        }
-        Command::Once => {
-            run_once(&policy_path).await?;
-        }
-        Command::Daemon { interval_secs } => {
-            run_daemon(policy_path, interval_secs).await?;
-        }
-        Command::SyncNow {
             repos,
             dry_run,
             force,
