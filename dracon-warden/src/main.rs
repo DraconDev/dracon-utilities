@@ -170,25 +170,15 @@ struct Cli {
 
 #[derive(Subcommand, Debug)]
 enum Command {
-    /// Run forever with filesystem event debounce.
-    Daemon,
+    /// Show resolved policy path and watch roots.
+    Status,
     /// Run one hardening pass and exit.
     Once {
         /// Optional repo path to harden. If omitted, hardens repos in warden discovery scope.
         repo: Option<PathBuf>,
     },
-    /// Show resolved policy path and watch roots.
-    Status,
-    /// Git filter clean operation (stdin -> stdout).
-    FilterClean {
-        /// Optional path from git filter (%f)
-        path: Option<String>,
-    },
-    /// Git filter smudge operation (stdin -> stdout).
-    FilterSmudge {
-        /// Optional path from git filter (%f)
-        path: Option<String>,
-    },
+    /// Run forever with filesystem event debounce.
+    Daemon,
     /// Scan plaintext JSON files for DRACON_SECRET markers and optionally scrub them.
     ScrubMarkers {
         /// Apply edits in-place. Without this flag, the command is a dry-run report.
@@ -222,6 +212,16 @@ enum Command {
         strict: bool,
         /// Optional repo path to scan. If omitted, scans repos in warden discovery scope.
         repo: Option<PathBuf>,
+    },
+    /// Git filter clean operation (stdin -> stdout).
+    FilterClean {
+        /// Optional path from git filter (%f)
+        path: Option<String>,
+    },
+    /// Git filter smudge operation (stdin -> stdout).
+    FilterSmudge {
+        /// Optional path from git filter (%f)
+        path: Option<String>,
     },
     /// Generate a new age keypair for this machine.
     ///
