@@ -21,7 +21,6 @@ use clap::{ArgAction, Parser, Subcommand};
 use daemon::{list_stuck_repos, run_daemon, run_once, unstuck_repo};
 use exclude::excluded_dir_names_set;
 use git::{consolidate_to_main, detect_orphan_origin, fix_orphan_origin, has_both_main_and_master};
-use helpers::{is_auth_error, is_rate_limited};
 use policy::freeze_reason;
 use policy::{resolve_policy_path, timestamp_secs, SyncPolicy};
 use report::{
