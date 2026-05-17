@@ -1084,6 +1084,146 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
+async fn cmd_scaffold(
+    policy_path: &Path,
+    repo: Option<PathBuf>,
+    files: Vec<String>,
+    overwrite: bool,
+    dry_run: bool,
+) -> Result<()> {
+    use crate::policy::RepoPolicyOverride;
+    use comfy_table::{presets::UTF8_FULL_CONDENSED, Cell, Color, ContentArrangement, Table};
+
+    let policy = SyncPolicy::load(policy_path)?;
+
+    if policy.standard_files.is_empty() {
+        println!("No standard files configured in policy.");
+        println!("Add [[standard_files]] entries to {}", policy_path.display());
+        return Ok(());
+    }
+
+    let filtered_configs: Vec<_> = if files.is_empty() {
+        policy.standard_files.clone()
+    } else {
+        policy
+            .standard_files
+            .iter()
+            .filter(|c| files.contains(&c.target))
+            .cloned()
+            .collect()
+    };
+
+    if filtered_configs.is_empty() {
+        println!("No matching standard files found.");
+        return Ok(());
+    }
+
+    let repos = if let Some(repo_path) = repo {
+        vec![repo_path]
+    } else {
+        let roots = &policy.watch_roots;
+        let excluded: std::collections::BTreeSet<String> =
+            policy.exclude_dir_names.iter().cloned().collect();
+        discover_git_repos(roots, &excluded, &policy.exclude_repos, None)
+    };
+
+    let policy_base = policy_path.parent().unwrap_or(policy_path);
+    let mut results: Vec<(String, String, String)> = Vec::new();
+    let mut total_copied = 0usize;
+
+    for repo_path in &repos {
+        let repo_override = RepoPolicyOverride::load(repo_path);
+        let repo_name = repo_path
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_else(|| repo_path.display().to_string());
+
+        for cfg in &filtered_configs {
+            if repo_override.skip_standard_files.contains(&cfg.target) {
+                continue;
+            }
+
+            let target_path = repo_path.join(&cfg.target);
+            if target_path.exists() && !overwrite && !cfg.overwrite {
+                continue;
+            }
+
+            let source_path = cfg.source_path(&policy_base.to_path_buf());
+            if !source_path.exists() {
+                results.push((repo_name.clone(), cfg.target.clone(), "template missing".to_string()));
+                continue;
+            }
+
+            if dry_run {
+                results.push((repo_name.clone(), cfg.target.clone(), "would copy".to_string()));
+                total_copied += 1;
+                continue;
+            }
+
+            if target_path.exists() && (overwrite || cfg.overwrite) {
+                if target_path.is_dir() {
+                    std::fs::remove_dir_all(&target_path)
+                        .with_context(|| format!("failed to remove {}", cfg.target))?;
+                } else {
+                    std::fs::remove_file(&target_path)
+                        .with_context(|| format!("failed to remove {}", cfg.target))?;
+                }
+            }
+
+            if let Some(parent) = target_path.parent() {
+                std::fs::create_dir_all(parent)
+                    .with_context(|| format!("failed to create {}", parent.display()))?;
+            }
+
+            match std::fs::copy(&source_path, &target_path) {
+                Ok(_) => {
+                    results.push((repo_name.clone(), cfg.target.clone(), "copied".to_string()));
+                    total_copied += 1;
+                }
+                Err(e) => {
+                    results.push((repo_name.clone(), cfg.target.clone(), format!("error: {e}")));
+                }
+            }
+        }
+    }
+
+    if results.is_empty() {
+        println!("No standard files to scaffold (all repos already have them).");
+        return Ok(());
+    }
+
+    let mut table = Table::new();
+    table
+        .load_preset(UTF8_FULL_CONDENSED)
+        .set_content_arrangement(ContentArrangement::Dynamic)
+        .set_header(vec![
+            Cell::new("REPO"),
+            Cell::new("FILE"),
+            Cell::new("STATUS"),
+        ]);
+
+    for (repo_name, file, status) in &results {
+        let (status_str, color) = match status.as_str() {
+            "copied" => ("\u{2705} copied", Color::Green),
+            "would copy" => ("\u{1f4dd} would copy", Color::Yellow),
+            "template missing" => ("\u{274c} template missing", Color::Red),
+            s if s.starts_with("error:") => ("\u{274c} error", Color::Red),
+            _ => (status.as_str(), Color::White),
+        };
+        table.add_row(vec![
+            Cell::new(repo_name),
+            Cell::new(file),
+            Cell::new(status_str).fg(color),
+        ]);
+    }
+
+    println!("{table}");
+    let mode = if dry_run { "DRY-RUN" } else { "APPLIED" };
+    println!("{mode}: {total_copied} files scaffolded across {} repos", repos.len());
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use tempfile::TempDir;
