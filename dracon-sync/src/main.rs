@@ -416,6 +416,70 @@ async fn main() -> Result<()> {
                 anyhow::bail!("cannot determine home directory");
             }
         }
+        Command::Once => {
+            run_once(&policy_path).await?;
+        }
+        Command::Daemon { interval_secs } => {
+            run_daemon(policy_path, interval_secs).await?;
+        }
+        Command::SyncNow {
+            repos,
+            dry_run,
+            force,
+        } => {
+            if let Some(reason) = freeze_reason(&policy_path) {
+                println!("⏸️ sync frozen ({})", reason);
+                return Ok(());
+            }
+            let policy = SyncPolicy::load(&policy_path)?;
+            let excluded_dir_names = excluded_dir_names_set(&policy);
+            for repo in repos {
+                if daemon::is_repo_stuck(&repo) {
+                    println!(
+                        "🔒 {} is stuck on push. Run 'dracon-sync repair stuck-unstuck {}' first.",
+                        repo.display(),
+                        repo.display()
+                    );
+                    continue;
+                }
+                match sync_repo(
+                    &repo,
+                    &policy,
+                    &excluded_dir_names,
+                    0,
+                    None,
+                    dry_run,
+                    Some(&policy_path),
+                    force,
+                )
+                .await
+                {
+                    Ok(crate::sync::SyncOutcome::Synced) => {
+                        if dry_run {
+                            println!("✅ dry-run complete for {}", repo.display());
+                        } else {
+                            println!("🔁 synced {}", repo.display());
+                        }
+                    }
+                    Ok(crate::sync::SyncOutcome::NothingToDo) => {
+                        if dry_run {
+                            println!("✅ no sync changes needed for {}", repo.display());
+                        } else {
+                            println!("✅ no sync changes {}", repo.display());
+                        }
+                    }
+                    Ok(crate::sync::SyncOutcome::Blocked) => {
+                        println!(
+                            "⏸️  sync blocked for {} (guard or manual intervention required)",
+                            repo.display()
+                        );
+                    }
+                    Err(e) => {
+                        eprintln!("❌ error syncing {}: {}", repo.display(), e);
+                    }
+                }
+            }
+        }
         Command::Repos {
             only_concern,
             only_warn,
@@ -845,6 +909,81 @@ Command::Repair { cmd } => {
                             println!("  {target}: {status_str}");
                         }
                     }
+                }
+            }
+        }
+        Command::TestAi { json } => {
+            use simple_ai::SimpleAiService;
+
+            let service = SimpleAiService::new();
+            if service.is_empty() {
+                if json {
+                    println!(r#"{{"providers":[],"all_ok":false,"error":"no providers configured"}}"#);
+                } else {
+                    println!("❌ No AI providers configured");
+                    println!("   Add providers to ~/.dracon/utilities/sync/ai.toml");
+                }
+                return Ok(());
+            }
+
+            SimpleAiService::reset_health().await;
+
+            let providers = service.provider_names();
+
+            #[derive(serde::Serialize)]
+            struct ProviderResult {
+                name: String,
+                status: String,
+                latency_ms: Option<u64>,
+                error: Option<String>,
+            }
+
+            let mut results: Vec<ProviderResult> = Vec::new();
+            let mut all_ok = true;
+            let mut working_provider = None;
+
+            for name in &providers {
+                if json {
+                    print!("Testing {}... ", name);
+                } else {
+                    print!("   Testing {}... ", name);
+                }
+                match service.test_provider(name).await {
+                    Ok((true, resp)) => {
+                        if resp.trim().to_uppercase().contains("OK") {
+                            if json { println!("ok"); } else { println!("✅"); }
+                            working_provider = Some(name.clone());
+                            results.push(ProviderResult { name: name.clone(), status: "ok".to_string(), latency_ms: None, error: None });
+                        } else {
+                            if json { println!("warn"); } else { println!("⚠️  (unexpected response: {}...)", resp.chars().take(20).collect::<String>()); }
+                            working_provider = Some(name.clone());
+                            results.push(ProviderResult { name: name.clone(), status: "warn".to_string(), latency_ms: None, error: Some(format!("unexpected response")) });
+                        }
+                    }
+                    Err(e) => {
+                        if json { println!("error"); } else { println!("❌ {}", e.to_string().chars().take(40).collect::<String>()); }
+                        all_ok = false;
+                        results.push(ProviderResult { name: name.clone(), status: "error".to_string(), latency_ms: None, error: Some(e.to_string()) });
+                    }
+                }
+            }
+
+            if json {
+                #[derive(serde::Serialize)]
+                struct JsonOutput { providers: Vec<ProviderResult>, all_ok: bool, working_provider: Option<String> }
+                let output = JsonOutput { providers: results, all_ok, working_provider };
+                println!("{}", serde_json::to_string_pretty(&output)?);
+            } else {
+                println!();
+                if all_ok {
+                    println!("✅ All AI providers ready");
+                } else if working_provider.is_some() {
+                    println!("⚠️  Some providers failed but fallback available");
+                } else {
+                    println!("❌ All AI providers failed");
+                }
+                if let Some(ref wp) = working_provider {
+                    println!("   Using: {} (fallback order: {:?})", wp, providers);
                 }
             }
         }
