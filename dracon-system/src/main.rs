@@ -334,13 +334,16 @@ struct Cli {
 enum Commands {
     /// Show core path and service status.
     Status {
+        /// Emit machine-readable JSON.
         #[arg(long)]
         json: bool,
     },
     /// Run deterministic diagnostics for canonical dracon setup.
     Doctor {
+        /// Emit machine-readable JSON.
         #[arg(long)]
         json: bool,
+        /// Fail non-zero on any warning (normally warnings are non-fatal).
         #[arg(long)]
         strict: bool,
     },
@@ -366,16 +369,22 @@ enum Commands {
     Storage {
         /// Optional root path to analyze. Defaults to policy or ~/Dev.
         root: Option<PathBuf>,
+        /// Emit machine-readable JSON.
         #[arg(long)]
         json: bool,
+        /// List cleanup targets without modifying anything.
         #[arg(long)]
         cleanup: bool,
+        /// Execute cleanup (delete files, empty trash).
         #[arg(long)]
         apply: bool,
+        /// Also remove directories tracked by git (target/, node_modules/).
         #[arg(long)]
         allow_tracked: bool,
+        /// Minimum file size to consider (MiB). [default: 50]
         #[arg(long)]
         min_size_mb: Option<u64>,
+        /// Comma-separated kinds to clean (targets, trash, nix, caches, node_modules, docker).
         #[arg(long)]
         kinds: Option<String>,
     },
