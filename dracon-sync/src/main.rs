@@ -1,5 +1,7 @@
 #![warn(missing_docs)]
 
+//! Dracon Sync — git sync automation daemon.
+
 mod bump;
 mod daemon;
 mod exclude;

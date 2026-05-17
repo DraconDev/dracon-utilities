@@ -436,6 +436,40 @@ pub(crate) fn append_incident_record(policy_path: &Path, record: &IncidentRecord
     }
 }
 
+/// Enforce incident ledger retention at daemon startup.
+/// Removes entries older than max_age_days and truncates to max_lines.
+pub(crate) fn enforce_retention_at_startup(policy_path: &Path, policy: &SyncPolicy) -> Result<()> {
+    let path = incident_ledger_path(policy_path);
+    if !path.exists() { return Ok(()); }
+    let content = std::fs::read_to_string(&path)?;
+    let now = timestamp_secs();
+    let age_cutoff = now.saturating_sub(policy.incident_ledger_max_age_days.saturating_mul(86_400));
+    let mut kept: Vec<String> = Vec::new();
+    for line in content.lines() {
+        let line = line.trim();
+        if line.is_empty() { continue; }
+        let keep_by_age = serde_json::from_str::<serde_json::Value>(line)
+            .ok()
+            .and_then(|v| v.get("ts_unix").and_then(|t| t.as_u64()))
+            .map(|ts| ts >= age_cutoff)
+            .unwrap_or(true);
+        if keep_by_age { kept.push(line.to_string()); }
+    }
+    if kept.len() > policy.incident_ledger_max_lines {
+        let drop_n = kept.len() - policy.incident_ledger_max_lines;
+        kept.drain(0..drop_n);
+    }
+    let mut out = String::new();
+    for line in &kept { out.push_str(line); out.push('\n'); }
+    std::fs::write(&path, &out)?;
+    let original = content.lines().count();
+    let removed = original - kept.len();
+    if removed > 0 {
+        eprintln!("🧹 startup: pruned {} stale incident entries ({} remain)", removed, kept.len());
+    }
+    Ok(())
+}
+
 pub(crate) fn repo_state_flags(
     status: &dracon_git::types::RepoStatus,
     has_origin: bool,

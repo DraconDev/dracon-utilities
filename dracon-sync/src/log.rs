@@ -2,6 +2,7 @@
 
 /// Log levels
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[allow(dead_code)]
 pub(crate) enum Level {
     Error,
     Warn,
@@ -37,7 +38,7 @@ pub(crate) fn log_module(level: Level, module: &str, msg: &str) {
     eprintln!("{} [{}] {}", level.emoji(), module, msg);
 }
 
-/// Convenience macros for each level.
+/// Log an error-level message.
 #[macro_export]
 macro_rules! log_error {
     ($($arg:tt)*) => {
@@ -45,6 +46,7 @@ macro_rules! log_error {
     };
 }
 
+/// Log a warning-level message.
 #[macro_export]
 macro_rules! log_warn {
     ($($arg:tt)*) => {
@@ -52,6 +54,7 @@ macro_rules! log_warn {
     };
 }
 
+/// Log an info-level message.
 #[macro_export]
 macro_rules! log_info {
     ($($arg:tt)*) => {
@@ -59,6 +62,7 @@ macro_rules! log_info {
     };
 }
 
+/// Log a debug-level message.
 #[macro_export]
 macro_rules! log_debug {
     ($($arg:tt)*) => {
@@ -66,6 +70,7 @@ macro_rules! log_debug {
     };
 }
 
+/// Log a warning with repo context.
 #[macro_export]
 macro_rules! log_repo_warn {
     ($repo:expr, $($arg:tt)*) => {
@@ -73,6 +78,7 @@ macro_rules! log_repo_warn {
     };
 }
 
+/// Log info with repo context.
 #[macro_export]
 macro_rules! log_repo_info {
     ($repo:expr, $($arg:tt)*) => {
@@ -80,6 +86,7 @@ macro_rules! log_repo_info {
     };
 }
 
+/// Log debug with repo context.
 #[macro_export]
 macro_rules! log_repo_debug {
     ($repo:expr, $($arg:tt)*) => {

@@ -81,6 +81,8 @@ impl From<ChatMessage> for RequestMessage {
 struct ChatRequest {
     model: String,
     messages: Vec<RequestMessage>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    max_tokens: Option<u32>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -263,6 +265,7 @@ impl SimpleAiService {
         let request = ChatRequest {
             model: provider.model.clone(),
             messages: request_messages,
+            max_tokens: Some(256),
         };
 
         let url = format!(

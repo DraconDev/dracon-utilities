@@ -1,8 +1,9 @@
 //! Miscellaneous git utilities — secret loading, orphan origin detection, path locking.
 
 use std::path::Path;
-use std::sync::OnceLock;
 use anyhow::{Context, Result};
+#[cfg(test)]
+use std::sync::OnceLock;
 
 /// Load a secret by environment variable name using the sync secrets directory.
 pub(crate) fn load_secret(env_name: &str) -> Option<String> {

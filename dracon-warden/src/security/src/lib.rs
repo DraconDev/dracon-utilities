@@ -1,4 +1,7 @@
 #![warn(missing_docs)]
+#![allow(missing_docs)] // Internal security module — docs deferred
+
+//! Age-based encryption, secret scanning, and filter pipeline for dracon-warden.
 
 use aes_gcm::{
     aead::{Aead, KeyInit},

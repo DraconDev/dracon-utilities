@@ -10,6 +10,7 @@ use tokio::time::sleep;
 
 pub(crate) static VERBOSITY: AtomicU8 = AtomicU8::new(0);
 
+/// Conditional eprintln based on verbosity level.
 #[macro_export]
 macro_rules! veprintln {
     ($lvl:expr, $($arg:tt)*) => {
@@ -23,6 +24,7 @@ use crate::exclude::{excluded_dir_names_set, has_sync_relevant_dirty_entries};
 use crate::git::{
     discover_git_repos, git_diff_head_files, has_both_main_and_master, has_origin_remote,
     has_tracking_upstream, is_repo_ready, repo_diff_entries,
+    repair_broken_tracking,
 };
 use crate::policy::{debug_enabled, freeze_reason, timestamp_secs, SyncPolicy};
 use crate::report::{run_repair_concerns, run_repair_warns, ConcernRepairFilter};
@@ -446,6 +448,46 @@ pub(crate) async fn run_daemon(
     let mut filter_cooldowns: HashMap<PathBuf, Instant> = HashMap::new();
     let mut stuck_push_repos = load_stuck_push_repos();
     let mut remote_notify_cooldowns: HashMap<String, Instant> = HashMap::new();
+
+    // ── Startup cleanup: prune stale state from previous runs ──
+    {
+        let policy = match SyncPolicy::load(&policy_path) {
+            Ok(p) => p,
+            Err(e) => {
+                eprintln!("⚠️ failed loading policy for startup cleanup: {}", e);
+                SyncPolicy::default()
+            }
+        };
+        let roots = policy.watch_root_paths();
+        let excluded_dir_names = excluded_dir_names_set(&policy);
+        let discovered = discover_git_repos(&roots, &excluded_dir_names, &policy.exclude_repos, Some(&policy.system_repo));
+        let repo_set: std::collections::BTreeSet<PathBuf> = discovered.iter().cloned().collect();
+
+        // Prune stuck repos no longer on disk
+        let before = stuck_push_repos.len();
+        stuck_push_repos.retain(|repo, _| repo_set.contains(repo));
+        if stuck_push_repos.len() != before {
+            save_stuck_push_repos(&stuck_push_repos);
+            eprintln!("🧹 startup: pruned {} stale stuck repos", before - stuck_push_repos.len());
+        }
+
+        // Enforce incident ledger retention now
+        if let Err(e) = crate::report::enforce_retention_at_startup(&policy_path, &policy) {
+            eprintln!("⚠️ startup: incident ledger cleanup failed: {}", e);
+        }
+
+        // Prune visibility cache for deleted repos
+        if let Err(e) = crate::visibility::prune_stale_visibility_cache(&repo_set) {
+            eprintln!("⚠️ startup: visibility cache cleanup failed: {}", e);
+        }
+
+        // Repair broken upstream tracking references (e.g. origin/master: gone)
+        let discovered_refs: Vec<PathBuf> = repo_set.iter().cloned().collect();
+        let fixed = repair_broken_tracking(&discovered_refs);
+        if fixed > 0 {
+            eprintln!("🧹 startup: repaired {} broken upstream tracking refs", fixed);
+        }
+    }
 
     let shutdown = Arc::new(AtomicBool::new(false));
     let shutdown_sigterm = shutdown.clone();

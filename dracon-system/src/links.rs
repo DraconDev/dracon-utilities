@@ -5,7 +5,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::{check_safe_to_delete, expand_tilde, load_system_policy, LinkCommands, LinkEntry, LinkEntryStatus, LinkStatusReport, SystemPolicy};
+use crate::{check_safe_to_delete, expand_tilde, LinkCommands, LinkEntry, LinkEntryStatus, LinkStatusReport, SystemPolicy};
 
 /// Evaluate a single link entry: check if symlink exists and points to the correct target.
 pub(crate) fn evaluate_link(entry: &LinkEntry) -> LinkEntryStatus {

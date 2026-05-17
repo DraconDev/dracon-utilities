@@ -1,6 +1,6 @@
 //! Branch operations — current branch, main/master management, upstream tracking.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 
 use super::{has_origin_remote, has_tracking_upstream, is_safe_branch_name};
@@ -234,4 +234,47 @@ pub(crate) fn set_upstream_to_branch(repo: &Path, branch: &str) -> Result<()> {
             target
         ))
     }
+}
+
+/// Detect and repair broken upstream tracking references (e.g. `origin/master: gone`).
+/// Returns the number of repos repaired.
+pub(crate) fn repair_broken_tracking(repos: &[PathBuf]) -> usize {
+    let mut repaired = 0;
+    for repo in repos {
+        let output = match std::process::Command::new("git")
+            .args(["branch", "-vv"])
+            .current_dir(repo)
+            .output()
+        {
+            Ok(o) => o,
+            Err(_) => continue,
+        };
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        for line in stdout.lines() {
+            // Match lines like: `* main abc1234 [origin/master: gone] ...`
+            let trimmed = line.trim();
+            if !trimmed.starts_with('*') && !trimmed.starts_with(' ') {
+                continue;
+            }
+            if !trimmed.contains(": gone]") {
+                continue;
+            }
+            // Extract branch name (first field after * or space)
+            let branch = trimmed
+                .split_whitespace()
+                .nth(0)
+                .map(|s| s.trim_start_matches('*'))
+                .unwrap_or("")
+            .to_string();
+            if branch.is_empty() || !is_safe_branch_name(&branch) {
+                continue;
+            }
+            if set_upstream_to_branch(repo, &branch).is_ok() {
+                eprintln!("🧹 startup: fixed broken tracking in {} ({}/{} -> origin/{}", 
+                    repo.display(), branch, branch, branch);
+                repaired += 1;
+            }
+        }
+    }
+    repaired
 }

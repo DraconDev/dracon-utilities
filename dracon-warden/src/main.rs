@@ -1,5 +1,7 @@
 #![warn(missing_docs)]
 
+//! Dracon Warden — security hardening and encryption daemon.
+
 use anyhow::{Context, Result};
 use clap::{ArgAction, Parser, Subcommand};
 pub(crate) use dracon_security_kit::DraconWarden;
@@ -27,6 +29,7 @@ fn get_log() -> &'static Mutex<Vec<String>> {
 
 static VERBOSITY: AtomicU8 = AtomicU8::new(0);
 
+/// Conditional eprintln based on verbosity level.
 #[macro_export]
 macro_rules! veprintln {
     ($lvl:expr, $($arg:tt)*) => {
@@ -36,25 +39,38 @@ macro_rules! veprintln {
     };
 }
 
+/// Event severity levels.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EventSeverity {
+    /// Debug diagnostic.
     Debug,
+    /// Informational.
     Info,
+    /// Warning.
     Warn,
+    /// Error.
     Error,
+    /// Critical failure.
     Critical,
 }
 
+/// A structured event emitted by dracon services.
 #[derive(Debug, Clone)]
 pub struct DraconEvent {
+    /// Source domain.
     pub domain: String,
+    /// Severity level.
     pub severity: EventSeverity,
+    /// Related filesystem path.
     pub path: String,
+    /// Human-readable message.
     pub message: String,
+    /// RFC 3339 timestamp.
     pub timestamp: String,
 }
 
 impl DraconEvent {
+    /// Create a new event.
     pub fn new<T1: ToString, T2: ToString, T3: ToString>(
         domain: T1,
         severity: EventSeverity,
@@ -71,6 +87,7 @@ impl DraconEvent {
     }
 }
 
+/// Emit an event to the in-memory log and stderr.
 pub fn emit_event(event: &DraconEvent) {
     if let Ok(mut log) = get_log().lock() {
         if log.len() >= 1000 {
@@ -87,6 +104,7 @@ pub fn emit_event(event: &DraconEvent) {
     );
 }
 
+/// Resolve policy path from env vars or default locations.
 pub fn resolve_policy_path(
     env_var: &[&str],
     paths: &[PathBuf],

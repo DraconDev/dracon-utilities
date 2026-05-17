@@ -1119,3 +1119,30 @@ mod tests {
         assert_eq!(remote.resolve_account(), "ExplicitAccount");
     }
 }
+
+/// Remove visibility cache entries for repos that no longer exist on disk.
+pub(crate) fn prune_stale_visibility_cache(
+    repo_set: &std::collections::BTreeSet<std::path::PathBuf>,
+) -> Result<()> {
+    let cache_dir = visibility_cache_dir();
+    if !cache_dir.exists() { return Ok(()); }
+    // Build set of valid cache hashes from current repos
+    let valid_hashes: std::collections::HashSet<String> = repo_set
+        .iter()
+        .map(|r| format!("{}.last", simple_hash(&r.to_string_lossy())))
+        .collect();
+    let mut removed = 0;
+    for entry in std::fs::read_dir(&cache_dir)? {
+        let entry = entry?;
+        let name = entry.file_name();
+        let name_str = name.to_string_lossy();
+        if name_str.ends_with(".last") && !valid_hashes.contains(name_str.as_ref()) {
+            std::fs::remove_file(entry.path())?;
+            removed += 1;
+        }
+    }
+    if removed > 0 {
+        eprintln!("🧹 startup: pruned {} stale visibility cache entries", removed);
+    }
+    Ok(())
+}

@@ -6,12 +6,13 @@ use std::collections::{HashMap, HashSet};
 use std::fs::{self, File};
 use std::io::Write;
 #[cfg(unix)]
-use std::os::unix::fs::{symlink, OpenOptionsExt};
+use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::Arc;
-use std::sync::Mutex;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+#[cfg(test)]
+use std::os::unix::fs::symlink;
 use tokio::process::Command;
 use tokio::time::sleep;
 
@@ -2652,6 +2653,28 @@ async fn cmd_guard_daemon(guard: &mut GuardPolicy) -> Result<()> {
     }
     let _lock = acquire_daemon_lock("dracon-system-guard")
         .with_context(|| "failed to acquire guard daemon lock")?;
+
+    // ── Startup cleanup: rotate guard log if oversized ──
+    {
+        let log_path = if guard.guard_log_file.is_empty() {
+            PathBuf::from("/tmp/dracon-system-guard.log")
+        } else {
+            PathBuf::from(&guard.guard_log_file)
+        };
+        let max_bytes = guard.guard_log_max_mb.saturating_mul(1024 * 1024);
+        if max_bytes > 0 {
+            if let Ok(meta) = std::fs::metadata(&log_path) {
+                if meta.len() > max_bytes {
+                    if let Err(e) = std::fs::remove_file(&log_path) {
+                        eprintln!("⚠️ startup: failed to rotate guard log: {}", e);
+                    } else {
+                        eprintln!("🧹 startup: rotated guard log (was {} bytes)", meta.len());
+                    }
+                }
+            }
+        }
+    }
+
     let shutdown = Arc::new(AtomicBool::new(false));
     let shutdown_sigterm = shutdown.clone();
     let shutdown_sigint = shutdown.clone();
