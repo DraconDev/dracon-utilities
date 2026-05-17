@@ -344,6 +344,24 @@ enum Commands {
         #[arg(long)]
         strict: bool,
     },
+    /// Show recent events from the shared event stream.
+    Events {
+        /// Number of recent events to show.
+        #[arg(short, long, default_value = "50")]
+        tail: usize,
+        /// Filter by source domain (e.g. system, warden, sync).
+        #[arg(long)]
+        source: Option<String>,
+        /// Filter by severity (info, warn, error, critical).
+        #[arg(short, long)]
+        severity: Option<String>,
+        /// Deduplicate consecutive identical events.
+        #[arg(long)]
+        dedup: bool,
+        /// Output as JSON (raw JSONL, one per line).
+        #[arg(long)]
+        json: bool,
+    },
     /// Analyze storage hotspots and optionally clean safe build/cache dirs.
     Storage {
         /// Optional root path to analyze. Defaults to policy or ~/Dev.
@@ -366,29 +384,6 @@ enum Commands {
         #[command(subcommand)]
         cmd: LinkCommands,
     },
-    /// Guard runtime: monitor disk/process pressure and notify/mitigate.
-    Guard {
-        #[command(subcommand)]
-        cmd: GuardCommands,
-    },
-    /// Show recent events from the shared event stream.
-    Events {
-        /// Number of recent events to show.
-        #[arg(short, long, default_value = "50")]
-        tail: usize,
-        /// Filter by source domain (e.g. system, warden, sync).
-        #[arg(long)]
-        source: Option<String>,
-        /// Filter by severity (info, warn, error, critical).
-        #[arg(short, long)]
-        severity: Option<String>,
-        /// Deduplicate consecutive identical events.
-        #[arg(long)]
-        dedup: bool,
-        /// Output as JSON (raw JSONL, one per line).
-        #[arg(long)]
-        json: bool,
-    },
     /// Zram management: show stats and generate NixOS config for tuning.
     Zram {
         /// Show current zram statistics.
@@ -403,6 +398,11 @@ enum Commands {
         /// Compression algorithm (lzo, lz4, lz4hc, zstd).
         #[arg(long)]
         algorithm: Option<String>,
+    },
+    /// Guard runtime: monitor disk/process pressure and notify/mitigate.
+    Guard {
+        #[command(subcommand)]
+        cmd: GuardCommands,
     },
 }
 

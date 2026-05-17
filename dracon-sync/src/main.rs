@@ -378,7 +378,7 @@ async fn main() -> Result<()> {
                 println!("🌐 REMOTES: {}", policy.remotes.len());
             }
         }
-Command::Config { cmd } => {
+        Command::Config { cmd } => {
             match cmd {
                 ConfigCommands::Edit => {
                     policy::open_policy_in_editor(&policy_path)?;
@@ -400,21 +400,6 @@ Command::Config { cmd } => {
                         }
                         std::process::exit(1);
                     }
-                }
-            }
-        }
-                if !result.warnings.is_empty() {
-                    println!("\n⚠️  Warnings:");
-                    for w in &result.warnings {
-                        println!("  WARNING: {}", w);
-                    }
-                }
-                std::process::exit(1);
-            }
-            if !result.warnings.is_empty() {
-                println!("⚠️  Policy has warnings:");
-                for w in &result.warnings {
-                    println!("  WARNING: {}", w);
                 }
             }
         }
@@ -999,7 +984,7 @@ Command::Config { cmd } => {
             println!("# TYPE dracon_sync_mass_deletion_guard_blocked_total counter");
             println!("dracon_sync_mass_deletion_guard_blocked_total {}", blocked);
         }
-Command::Publish { cmd } => {
+        Command::Publish { cmd } => {
             match cmd {
                 PublishCommands::Run { repo, targets, skip_dry_run: _ } => {
                     let policy = SyncPolicy::load(&policy_path)?;
