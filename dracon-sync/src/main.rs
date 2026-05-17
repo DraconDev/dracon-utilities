@@ -1092,6 +1092,7 @@ async fn cmd_scaffold(
     dry_run: bool,
 ) -> Result<()> {
     use anyhow::Context;
+    use comfy_table::{presets::UTF8_FULL_CONDENSED, Cell, Color, ContentArrangement, Table};
     let policy = SyncPolicy::load(policy_path)?;
 
     if policy.standard_files.is_empty() {
