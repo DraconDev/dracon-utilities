@@ -546,6 +546,8 @@ pub(crate) struct GuardRuntimeState {
     pub(crate) active_build_pids: HashSet<i32>,
     pub(crate) reniced_pids: HashMap<i32, (i32, String)>,
     pub(crate) cooled_since: HashMap<i32, Instant>,
+    pub(crate) guard_cycle: u64,
+    pub(crate) last_proactive_cleanup: Option<Instant>,
 }
 
 /// Information about a Rust target directory for cleanup consideration
@@ -553,6 +555,7 @@ pub(crate) struct GuardRuntimeState {
 struct TargetDirInfo {
     path: PathBuf,
     bytes: u64,
+    mtime_secs_ago: u64,
 }
 
 /// Result of automatic cleanup operation
@@ -820,7 +823,14 @@ async fn find_rust_target_dirs(roots: &[PathBuf]) -> Result<Vec<TargetDirInfo>> 
                 Err(_) => continue,
             };
 
-            targets.push(TargetDirInfo { path, bytes });
+            let mtime_secs_ago = match fs::metadata(&path).and_then(|m| m.modified()) {
+                Ok(mtime) => {
+                    SystemTime::now().duration_since(mtime).map(|d| d.as_secs()).unwrap_or(0)
+                }
+                Err(_) => 0,
+            };
+
+            targets.push(TargetDirInfo { path, bytes, mtime_secs_ago });
         }
     }
 
@@ -966,7 +976,106 @@ async fn auto_cleanup_rust_targets(
     Ok(result)
 }
 
-/// Get inode usage percent for root filesystem
+/// Proactive cleanup: remove stale Rust target dirs (older than max_age_days)
+/// even when disk is not at action/critical level. Only cleans targets that
+/// haven't been touched in a while, skipping actively-built projects.
+async fn proactive_cleanup_rust_targets(
+    guard: &GuardPolicy,
+    state: &mut GuardRuntimeState,
+    apply: bool,
+) -> Result<AutoCleanupResult> {
+    let mut result = AutoCleanupResult {
+        cleaned_count: 0,
+        reclaimed_bytes: 0,
+        cleaned_paths: Vec::new(),
+        protected_paths: Vec::new(),
+    };
+
+    let roots: Vec<PathBuf> = guard
+        .rust_search_roots
+        .split(',')
+        .filter_map(|s| {
+            let s = s.trim();
+            if s.is_empty() {
+                return None;
+            }
+            let p = expand_tilde(s);
+            if p.exists() { Some(p) } else { None }
+        })
+        .collect();
+
+    if roots.is_empty() {
+        return Ok(result);
+    }
+
+    let targets = find_rust_target_dirs(&roots).await?;
+    let active_builds = detect_active_rust_builds().await?;
+    state.active_build_pids = active_builds.clone();
+
+    let mut protected_project_dirs: Vec<PathBuf> = Vec::new();
+    for pid in &active_builds {
+        if let Some(cwd) = get_process_cwd(*pid).await {
+            let mut dir = cwd.clone();
+            while let Some(parent) = dir.parent() {
+                if dir.join("Cargo.toml").exists() {
+                    protected_project_dirs.push(dir);
+                    break;
+                }
+                dir = parent.to_path_buf();
+            }
+        }
+    }
+
+    let min_size_bytes = guard.cleanup_min_size_mb.saturating_mul(1024).saturating_mul(1024);
+    let max_age_secs = guard.rust_target_max_age_days.saturating_mul(24).saturating_mul(3600);
+
+    for target in targets {
+        if target.bytes < min_size_bytes {
+            continue;
+        }
+
+        if target.mtime_secs_ago < max_age_secs {
+            continue;
+        }
+
+        let target_project = target.path.parent().unwrap_or(&target.path);
+        let has_active_build = protected_project_dirs.iter().any(|proj| target_project == proj);
+
+        if has_active_build {
+            result.protected_paths.push(format!(
+                "{} (active cargo/rustc process)",
+                target.path.display()
+            ));
+            continue;
+        }
+
+        if apply {
+            let safe_path = match check_safe_to_delete_guard(&target.path, &guard.protected_paths) {
+                Ok(p) => p,
+                Err(e) => {
+                    eprintln!("⚠️ proactive: skipping {}: {}", target.path.display(), e);
+                    result.protected_paths.push(target.path.display().to_string());
+                    continue;
+                }
+            };
+            if let Err(e) = tokio::fs::remove_dir_all(&safe_path).await {
+                eprintln!("⚠️ proactive: failed to remove {}: {}", target.path.display(), e);
+                continue;
+            }
+        }
+
+        result.cleaned_count += 1;
+        result.reclaimed_bytes += target.bytes;
+        result.cleaned_paths.push(format!(
+            "{} ({} days stale, {})",
+            target.path.display(),
+            target.mtime_secs_ago / 86400,
+            human_bytes(target.bytes)
+        ));
+    }
+
+    Ok(result)
+}
 async fn inode_use_percent() -> Result<u8> {
     let out = Command::new("df").args(["-Pi", "/"]).output().await?;
 

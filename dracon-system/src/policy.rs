@@ -144,6 +144,12 @@ pub(crate) struct GuardPolicy {
     pub(crate) node_modules_max_age_days: u64,
     #[serde(default)]
     pub(crate) protected_paths: Vec<String>,
+    #[serde(default = "default_proactive_cleanup_percent")]
+    pub(crate) proactive_cleanup_percent: u8,
+    #[serde(default = "default_rust_target_max_age_days")]
+    pub(crate) rust_target_max_age_days: u64,
+    #[serde(default = "default_proactive_cleanup_interval_cycles")]
+    pub(crate) proactive_cleanup_interval_cycles: u64,
 }
 
 impl Default for GuardPolicy {
@@ -196,6 +202,9 @@ impl Default for GuardPolicy {
             nix_keep_generations: 5,
             node_modules_max_age_days: default_node_modules_max_age_days(),
             protected_paths: Vec::new(),
+            proactive_cleanup_percent: default_proactive_cleanup_percent(),
+            rust_target_max_age_days: default_rust_target_max_age_days(),
+            proactive_cleanup_interval_cycles: default_proactive_cleanup_interval_cycles(),
         }
     }
 }
@@ -372,6 +381,18 @@ pub(crate) fn default_node_modules_max_age_days() -> u64 {
 
 pub(crate) fn default_nix_keep_generations() -> u32 {
     5
+}
+
+pub(crate) fn default_proactive_cleanup_percent() -> u8 {
+    50
+}
+
+pub(crate) fn default_rust_target_max_age_days() -> u64 {
+    14
+}
+
+pub(crate) fn default_proactive_cleanup_interval_cycles() -> u64 {
+    120
 }
 
 // ---------------------------------------------------------------------------
