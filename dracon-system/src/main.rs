@@ -2390,10 +2390,10 @@ pub(crate) async fn run_guard_once(
     } else if used >= guard.proactive_cleanup_percent && guard.auto_cleanup_rust {
         state.guard_cycle += 1;
         let interval = guard.proactive_cleanup_interval_cycles;
-        let due = state.guard_cycle % interval == 0;
+        let due = state.guard_cycle.is_multiple_of(interval);
         let cooldown_ok = state
             .last_proactive_cleanup
-            .map_or(true, |t| t.elapsed().as_secs() >= interval * guard.interval_secs);
+            .is_none_or(|t| t.elapsed().as_secs() >= interval * guard.interval_secs);
         if due && cooldown_ok {
             run_proactive_cleanup(guard, state).await?;
             state.last_proactive_cleanup = Some(Instant::now());
