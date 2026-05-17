@@ -1730,21 +1730,6 @@ fn scrub_json_value(v: &mut serde_json::Value) {
     Ok(())
 }
 
-        if found > 0 {
-            println!("{table}");
-            if apply {
-                println!(
-                    "scrub complete (found: {found}, changed: {changed}, skipped_invalid_json: {skipped})"
-                );
-            } else {
-                println!("scrub report complete (found: {found})");
-            }
-        } else {
-            println!("✅ No DRACON_SECRET markers found in {} repos", rows.len());
-        }
-    Ok(())
-}
-
 fn git_ls_files(repo: &Path) -> Result<Vec<String>> {
     let out = ProcessCommand::new("git")
         .arg("-C")
