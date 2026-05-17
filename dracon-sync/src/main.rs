@@ -1085,15 +1085,13 @@ async fn main() -> Result<()> {
 }
 
 async fn cmd_scaffold(
-    policy_path: &Path,
+    policy_path: &std::path::Path,
     repo: Option<PathBuf>,
     files: Vec<String>,
     overwrite: bool,
     dry_run: bool,
 ) -> Result<()> {
-    use crate::policy::RepoPolicyOverride;
-    use comfy_table::{presets::UTF8_FULL_CONDENSED, Cell, Color, ContentArrangement, Table};
-
+    use anyhow::Context;
     let policy = SyncPolicy::load(policy_path)?;
 
     if policy.standard_files.is_empty() {
@@ -1124,7 +1122,7 @@ async fn cmd_scaffold(
         let roots = &policy.watch_roots;
         let excluded: std::collections::BTreeSet<String> =
             policy.exclude_dir_names.iter().cloned().collect();
-        discover_git_repos(roots, &excluded, &policy.exclude_repos, None)
+        git::discover_git_repos(roots, &excluded, &policy.exclude_repos, None)
     };
 
     let policy_base = policy_path.parent().unwrap_or(policy_path);
@@ -1132,7 +1130,7 @@ async fn cmd_scaffold(
     let mut total_copied = 0usize;
 
     for repo_path in &repos {
-        let repo_override = RepoPolicyOverride::load(repo_path);
+        let repo_override = policy::load_repo_override(repo_path);
         let repo_name = repo_path
             .file_name()
             .map(|n| n.to_string_lossy().to_string())
