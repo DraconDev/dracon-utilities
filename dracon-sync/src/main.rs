@@ -1120,10 +1120,10 @@ async fn cmd_scaffold(
     let repos = if let Some(repo_path) = repo {
         vec![repo_path]
     } else {
-        let roots = &policy.watch_roots;
+        let roots: Vec<PathBuf> = policy.watch_roots.iter().map(|s| PathBuf::from(s)).collect();
         let excluded: std::collections::BTreeSet<String> =
             policy.exclude_dir_names.iter().cloned().collect();
-        git::discover_git_repos(roots, &excluded, &policy.exclude_repos, None)
+        git::discover_git_repos(&roots, &excluded, &policy.exclude_repos, None)
     };
 
     let policy_base = policy_path.parent().unwrap_or(policy_path);
