@@ -553,9 +553,6 @@ Command::Config { cmd } => {
                 }
             }
         }
-        Command::EditConfig => {
-            policy::open_policy_in_editor(&policy_path)?;
-        }
         Command::TestAi { json } => {
             use simple_ai::SimpleAiService;
 
