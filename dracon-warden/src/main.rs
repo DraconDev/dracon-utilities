@@ -213,14 +213,12 @@ enum Command {
         /// Optional repo path to scan. If omitted, scans repos in warden discovery scope.
         repo: Option<PathBuf>,
     },
-    /// Git filter clean operation (stdin -> stdout).
-    #[command(hide = true)]
+    /// Git filter clean operation (stdin -> stdout). Called by git, not for direct use.
     FilterClean {
         /// Optional path from git filter (%f)
         path: Option<String>,
     },
-    #[command(hide = true)]
-    /// Git filter smudge operation (stdin -> stdout).
+    /// Git filter smudge operation (stdin -> stdout). Called by git, not for direct use.
     FilterSmudge {
         /// Optional path from git filter (%f)
         path: Option<String>,
