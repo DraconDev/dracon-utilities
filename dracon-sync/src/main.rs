@@ -433,35 +433,117 @@ async fn main() -> Result<()> {
             };
             run_repos_report(&policy_path, filter, json, &sort, filter_name.as_deref(), full_path).await?;
         }
-        Command::RepairConcerns {
-            apply,
-            repo,
-            push_timeout_secs,
-            push_retries,
-            rewrite_large_any,
-            only_stuck_push,
-            only_stuck_pull,
-            json,
-        } => {
-            let filter = if only_stuck_push {
-                ConcernRepairFilter::StuckPush
-            } else if only_stuck_pull {
-                ConcernRepairFilter::StuckPull
-            } else {
-                ConcernRepairFilter::All
-            };
-            run_repair_concerns(
-                &policy_path,
-                apply,
-                repo,
-                push_timeout_secs,
-                push_retries,
-                rewrite_large_any,
-                filter,
-                json,
-            )
-            .await?;
+Command::Repair { cmd } => {
+            match cmd {
+                RepairCommands::Concerns {
+                    apply,
+                    repo,
+                    push_timeout_secs,
+                    push_retries,
+                    rewrite_large_any,
+                    only_stuck_push,
+                    only_stuck_pull,
+                    json,
+                } => {
+                    let filter = if only_stuck_push {
+                        ConcernRepairFilter::StuckPush
+                    } else if only_stuck_pull {
+                        ConcernRepairFilter::StuckPull
+                    } else {
+                        ConcernRepairFilter::All
+                    };
+                    run_repair_concerns(
+                        &policy_path,
+                        apply,
+                        repo,
+                        push_timeout_secs,
+                        push_retries,
+                        rewrite_large_any,
+                        filter,
+                        json,
+                    )
+                    .await?;
+                }
+                RepairCommands::Warns { apply, repo, json } => {
+                    run_repair_warns(&policy_path, apply, repo, json).await?;
+                }
+                RepairCommands::Origins { apply } => {
+                    let policy = SyncPolicy::load(&policy_path)?;
+                    let roots = policy.watch_root_paths();
+                    let excluded_dir_names = excluded_dir_names_set(&policy);
+                    let repos = git::discover_git_repos(
+                        &roots,
+                        &excluded_dir_names,
+                        &policy.exclude_repos,
+                        Some(&policy.system_repo),
+                    );
+                    let mut found = 0;
+                    for repo in repos {
+                        if let Some((current, canonical)) = detect_orphan_origin(&repo) {
+                            println!("   {}: {} -> {}", repo.display(), current, canonical);
+                            found += 1;
+                            if apply {
+                                if let Err(e) = fix_orphan_origin(&repo, &canonical) {
+                                    eprintln!("❌ failed to fix origin for {}: {}", repo.display(), e);
+                                } else {
+                                    println!("✅ fixed origin for {}", repo.display());
+                                }
+                            }
+                        }
+                    }
+                    if found == 0 {
+                        println!("✅ no orphan origins found");
+                    } else if !apply {
+                        println!("\n🔧 Run 'dracon-sync repair origins --apply' to fix them");
+                    }
+                }
+                RepairCommands::StuckList => {
+                    list_stuck_repos();
+                }
+                RepairCommands::StuckUnstuck { repo } => {
+                    unstuck_repo(&repo);
+                }
+                RepairCommands::DualBranchList => {
+                    let policy = SyncPolicy::load(&policy_path)?;
+                    let roots = policy.watch_root_paths();
+                    let excluded_dir_names = excluded_dir_names_set(&policy);
+                    let repos = git::discover_git_repos(
+                        &roots,
+                        &excluded_dir_names,
+                        &policy.exclude_repos,
+                        Some(&policy.system_repo),
+                    );
+                    let mut found = 0;
+                    for repo in repos {
+                        if has_both_main_and_master(&repo) {
+                            let branch = git::current_branch(&repo).unwrap_or_else(|| "unknown".to_string());
+                            println!("   {} (currently on {})", repo.display(), branch);
+                            found += 1;
+                        }
+                    }
+                    if found == 0 {
+                        println!("✅ no repos with both main and master");
+                    } else {
+                        println!("\n🔧 Run 'dracon-sync repair dual-branch-repair <path>' to consolidate to main");
+                    }
+                }
+                RepairCommands::DualBranchRepair { repo } => {
+                    if !has_both_main_and_master(&repo) {
+                        println!("ℹ️ {} does not have both main and master", repo.display());
+                        return Ok(());
+                    }
+                    println!("🔧 Consolidating {} to main...", repo.display());
+                    match consolidate_to_main(&repo).await {
+                        Ok(()) => println!("✅ consolidated to main"),
+                        Err(e) => {
+                            eprintln!("❌ failed: {}", e);
+                            return Err(e);
+                        }
+                    }
+                }
+            }
         }
+        Command::Health { json } => {
         Command::RepairWarns { apply, repo, json } => {
             run_repair_warns(&policy_path, apply, repo, json).await?;
         }
