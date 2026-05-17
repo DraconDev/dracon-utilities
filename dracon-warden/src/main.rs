@@ -1727,6 +1727,7 @@ fn scrub_json_value(v: &mut serde_json::Value) {
         } else {
             println!("✅ No DRACON_SECRET markers found in {} repos", rows.len());
         }
+    }
     Ok(())
 }
 
