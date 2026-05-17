@@ -111,7 +111,8 @@ impl SimpleAiService {
         let config = match Self::load_config(&config_path) {
             Ok(c) => c,
             Err(e) => {
-                static LOGGED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+                static LOGGED: std::sync::atomic::AtomicBool =
+                    std::sync::atomic::AtomicBool::new(false);
                 if !LOGGED.swap(true, std::sync::atomic::Ordering::Relaxed) {
                     eprintln!("📡 AI: no config at {}: {}", config_path.display(), e);
                 }
@@ -142,7 +143,6 @@ impl SimpleAiService {
                     );
                 }
             }
-
         }
 
         let active_providers: Vec<ProviderConfig> = config

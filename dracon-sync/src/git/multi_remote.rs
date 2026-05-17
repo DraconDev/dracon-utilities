@@ -10,7 +10,10 @@ use anyhow::{Context, Result};
 use crate::helpers::is_repo_already_exists;
 use crate::policy::{std_git_command, AuthType, RemoteConfig};
 
-use super::{current_branch, git_ssh_hardening, is_push_rejected, is_safe_branch_name, load_secret, push_https_fallback, run_git_capture_output, run_git_with_timeout_env};
+use super::{
+    current_branch, git_ssh_hardening, is_push_rejected, is_safe_branch_name, load_secret,
+    push_https_fallback, run_git_capture_output, run_git_with_timeout_env,
+};
 
 /// Configure a remote URL. Adds if missing, updates if URL differs.
 pub(crate) fn ensure_remote(repo: &Path, name: &str, url: &str) -> Result<()> {
@@ -22,9 +25,7 @@ pub(crate) fn ensure_remote(repo: &Path, name: &str, url: &str) -> Result<()> {
                 .args(["remote", "set-url", name, url])
                 .current_dir(repo)
                 .status()
-                .with_context(|| {
-                    format!("git remote set-url {} in {}", name, repo.display())
-                })?;
+                .with_context(|| format!("git remote set-url {} in {}", name, repo.display()))?;
             Ok(())
         }
         None => {
@@ -68,8 +69,7 @@ pub(crate) async fn push_mirror_remotes(
 
     configure_all_remotes(repo, remotes, &repo_name);
 
-    for (remote_name, create_result) in
-        auto_create_all_remotes(remotes, &repo_name, private).await
+    for (remote_name, create_result) in auto_create_all_remotes(remotes, &repo_name, private).await
     {
         match create_result {
             Ok(_) => {}
@@ -138,9 +138,7 @@ pub(crate) fn remove_stale_remotes(repo: &Path, keep: &[&str]) -> Result<()> {
                 .args(["remote", "remove", &remote])
                 .current_dir(repo)
                 .status()
-                .with_context(|| {
-                    format!("git remote remove {} in {}", remote, repo.display())
-                })?;
+                .with_context(|| format!("git remote remove {} in {}", remote, repo.display()))?;
         }
     }
     Ok(())
@@ -342,12 +340,12 @@ pub(crate) fn create_repo_on_github(account: &str, repo_name: &str) -> Result<St
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         if is_repo_already_exists(&stderr) {
-            return Ok(format!("git@github.com:{}/{}.git", account, repo_name));
+            return Ok(format!("https://github.com/{}/{}.git", account, repo_name));
         }
         anyhow::bail!("gh repo create failed: {}", stderr.trim());
     }
 
-    Ok(format!("git@github.com:{}/{}.git", account, repo_name))
+    Ok(format!("https://github.com/{}/{}.git", account, repo_name))
 }
 
 /// Create a repo on GitLab using `glab` CLI.
@@ -424,9 +422,7 @@ pub(crate) async fn auto_create_repo(
 ) -> Result<String> {
     match config.effective_auth_type() {
         AuthType::GitHub => create_repo_on_github(&config.auto_create_account, repo_name),
-        AuthType::GitLab => {
-            create_repo_on_gitlab(&config.auto_create_account, repo_name, private)
-        }
+        AuthType::GitLab => create_repo_on_gitlab(&config.auto_create_account, repo_name, private),
         AuthType::Codeberg => {
             let token_var = config
                 .auto_create_token_var

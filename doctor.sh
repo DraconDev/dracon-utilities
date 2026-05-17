@@ -49,7 +49,7 @@ check "dracon-libs/tools/sync/dracon-git/ exists" "[ -d ../dracon-libs/tools/syn
 
 echo ""
 echo "🔧 Binaries"
-for binary in dracon-sync dracon-system dracon-warden dracon-ai; do
+for binary in dracon-sync dracon-system dracon-warden; do
     if [ -f "target/release/$binary" ]; then
         echo "  ✅ $binary (built)"
         ((PASS++))

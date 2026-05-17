@@ -440,32 +440,45 @@ pub(crate) fn append_incident_record(policy_path: &Path, record: &IncidentRecord
 /// Removes entries older than max_age_days and truncates to max_lines.
 pub(crate) fn enforce_retention_at_startup(policy_path: &Path, policy: &SyncPolicy) -> Result<()> {
     let path = incident_ledger_path(policy_path);
-    if !path.exists() { return Ok(()); }
+    if !path.exists() {
+        return Ok(());
+    }
     let content = std::fs::read_to_string(&path)?;
     let now = timestamp_secs();
     let age_cutoff = now.saturating_sub(policy.incident_ledger_max_age_days.saturating_mul(86_400));
     let mut kept: Vec<String> = Vec::new();
     for line in content.lines() {
         let line = line.trim();
-        if line.is_empty() { continue; }
+        if line.is_empty() {
+            continue;
+        }
         let keep_by_age = serde_json::from_str::<serde_json::Value>(line)
             .ok()
             .and_then(|v| v.get("ts_unix").and_then(|t| t.as_u64()))
             .map(|ts| ts >= age_cutoff)
             .unwrap_or(true);
-        if keep_by_age { kept.push(line.to_string()); }
+        if keep_by_age {
+            kept.push(line.to_string());
+        }
     }
     if kept.len() > policy.incident_ledger_max_lines {
         let drop_n = kept.len() - policy.incident_ledger_max_lines;
         kept.drain(0..drop_n);
     }
     let mut out = String::new();
-    for line in &kept { out.push_str(line); out.push('\n'); }
+    for line in &kept {
+        out.push_str(line);
+        out.push('\n');
+    }
     std::fs::write(&path, &out)?;
     let original = content.lines().count();
     let removed = original - kept.len();
     if removed > 0 {
-        eprintln!("🧹 startup: pruned {} stale incident entries ({} remain)", removed, kept.len());
+        eprintln!(
+            "🧹 startup: pruned {} stale incident entries ({} remain)",
+            removed,
+            kept.len()
+        );
     }
     Ok(())
 }
@@ -638,11 +651,8 @@ pub(crate) async fn run_repos_report(
         );
         let effective_status = dracon_git::types::RepoStatus {
             is_clean: !effective_dirty,
-            modified_files: if effective_dirty {
-                status.modified_files
-            } else {
-                0
-            },
+            modified_files: status.modified_files,
+            staged_files: status.staged_files,
             ..status.clone()
         };
 
@@ -1826,11 +1836,8 @@ pub(crate) async fn run_repair_warns(
         let has_upstream = has_tracking_upstream(&repo);
         let effective_status = dracon_git::types::RepoStatus {
             is_clean: !effective_dirty,
-            modified_files: if effective_dirty {
-                status.modified_files
-            } else {
-                0
-            },
+            modified_files: status.modified_files,
+            staged_files: status.staged_files,
             ..status.clone()
         };
         if !repo_is_warn(&effective_status, has_origin, has_upstream) {
@@ -2003,7 +2010,7 @@ pub(crate) fn create_github_private_remote(
     let output = cmd.current_dir(repo).output().ok()?;
 
     if output.status.success() {
-        let remote_url = format!("git@github.com:{}/{}.git", account, repo_name);
+        let remote_url = format!("https://github.com/{}/{}.git", account, repo_name);
 
         let add_result = std::process::Command::new("git")
             .args(["remote", "add", "origin", &remote_url])
@@ -2070,7 +2077,7 @@ pub(crate) fn create_github_private_remote(
     }
 
     // Repo already exists — reuse it instead of creating a new one with a suffix
-    let remote_url = format!("git@github.com:{}/{}.git", account, repo_name);
+    let remote_url = format!("https://github.com/{}/{}.git", account, repo_name);
 
     // Check if origin already exists locally before adding
     let has_origin = std::process::Command::new("git")
@@ -3014,7 +3021,7 @@ mod tests {
         let result = create_github_private_remote(&repo, "testaccount", true);
 
         assert!(result.is_some());
-        assert_eq!(result.unwrap(), "git@github.com:testaccount/my-repo.git");
+        assert_eq!(result.unwrap(), "https://github.com/testaccount/my-repo.git");
     }
 
     #[test]
@@ -3048,7 +3055,7 @@ mod tests {
         let url = result.unwrap();
         assert!(!url.contains("-1"), "should NOT contain suffix -1: {}", url);
         assert!(!url.contains("-2"), "should NOT contain suffix -2: {}", url);
-        assert_eq!(url, "git@github.com:testaccount/dracon-demons.git");
+        assert_eq!(url, "https://github.com/testaccount/dracon-demons.git");
     }
 
     #[test]

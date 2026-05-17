@@ -5,14 +5,14 @@ use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 use std::fs::{self, File};
 use std::io::Write;
+#[cfg(test)]
+use std::os::unix::fs::symlink;
 #[cfg(unix)]
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
-#[cfg(test)]
-use std::os::unix::fs::symlink;
 use tokio::process::Command;
 use tokio::time::sleep;
 
@@ -107,7 +107,6 @@ pub(crate) fn acquire_daemon_lock(name: &str) -> Result<File> {
 
     Ok(file)
 }
-
 
 #[derive(Parser, Debug)]
 #[command(name = "dracon-system")]
@@ -373,8 +372,7 @@ struct TargetDirInfo {
 }
 
 /// Result of automatic cleanup operation
-#[derive(Debug, Serialize)]
-#[derive(Default)]
+#[derive(Debug, Serialize, Default)]
 struct AutoCleanupResult {
     pub(crate) cleaned_count: usize,
     pub(crate) reclaimed_bytes: u64,
@@ -388,6 +386,44 @@ pub(crate) fn parse_df_use_percent(output: &str) -> Option<u8> {
         .nth(1)
         .and_then(|line| line.split_whitespace().nth(4))
         .and_then(|v| v.trim_end_matches('%').parse::<u8>().ok())
+}
+
+/// Parsed disk usage details from `df -P` output.
+pub(crate) struct DiskDetails {
+    pub(crate) total_bytes: u64,
+    pub(crate) used_bytes: u64,
+    pub(crate) avail_bytes: u64,
+    pub(crate) use_percent: u8,
+    pub(crate) mount: String,
+}
+
+pub(crate) fn parse_df_details(output: &str) -> Option<DiskDetails> {
+    let line = output.lines().nth(1)?;
+    let parts: Vec<&str> = line.split_whitespace().collect();
+    if parts.len() < 6 {
+        return None;
+    }
+    let total_bytes = parts[1].parse::<u64>().ok()? * 1024;
+    let used_bytes = parts[2].parse::<u64>().ok()? * 1024;
+    let avail_bytes = parts[3].parse::<u64>().ok()? * 1024;
+    let use_percent = parts[4].trim_end_matches('%').parse::<u8>().ok()?;
+    let mount = parts[5].to_string();
+    Some(DiskDetails {
+        total_bytes,
+        used_bytes,
+        avail_bytes,
+        use_percent,
+        mount,
+    })
+}
+
+async fn disk_details_for(path: &str) -> Result<DiskDetails> {
+    let out = Command::new("df").args(["-P", path]).output().await?;
+    if !out.status.success() {
+        return Err(anyhow::anyhow!("df command failed"));
+    }
+    let text = String::from_utf8_lossy(&out.stdout);
+    parse_df_details(&text).ok_or_else(|| anyhow::anyhow!("failed parsing df output"))
 }
 
 pub(crate) fn parse_ps_output(output: &str) -> Vec<ProcSample> {
@@ -533,6 +569,12 @@ fn sync_freeze_marker_path(guard: &GuardPolicy) -> PathBuf {
     PathBuf::from(guard.sync_freeze_marker.clone())
 }
 
+/// Graduated auto-renice: higher CPU/memory usage = higher nice value (lower priority).
+/// The process still gets full CPU when nothing else needs it — it just yields to the DE
+/// and other interactive processes.
+///
+/// **INVARIANT: This function is the ONLY process management action the guard takes.**
+/// The guard NEVER kills processes — it only renices. Killing is explicitly banned.
 pub(crate) fn graduated_nice_value(cpu_percent: f32, rss_mb: u64, base_nice: i32) -> i32 {
     let cpu_tiers: &[(f32, i32)] = &[(500.0, 15), (300.0, 10), (180.0, 5)];
     let mem_tiers: &[(u64, i32)] = &[(8192, 10), (4096, 5)];
@@ -638,13 +680,18 @@ async fn find_rust_target_dirs(roots: &[PathBuf]) -> Result<Vec<TargetDirInfo>> 
             };
 
             let mtime_secs_ago = match fs::metadata(&path).and_then(|m| m.modified()) {
-                Ok(mtime) => {
-                    SystemTime::now().duration_since(mtime).map(|d| d.as_secs()).unwrap_or(0)
-                }
+                Ok(mtime) => SystemTime::now()
+                    .duration_since(mtime)
+                    .map(|d| d.as_secs())
+                    .unwrap_or(0),
                 Err(_) => 0,
             };
 
-            targets.push(TargetDirInfo { path, bytes, mtime_secs_ago });
+            targets.push(TargetDirInfo {
+                path,
+                bytes,
+                mtime_secs_ago,
+            });
         }
     }
 
@@ -814,7 +861,11 @@ async fn proactive_cleanup_rust_targets(
                 return None;
             }
             let p = expand_tilde(s);
-            if p.exists() { Some(p) } else { None }
+            if p.exists() {
+                Some(p)
+            } else {
+                None
+            }
         })
         .collect();
 
@@ -840,8 +891,14 @@ async fn proactive_cleanup_rust_targets(
         }
     }
 
-    let min_size_bytes = guard.cleanup_min_size_mb.saturating_mul(1024).saturating_mul(1024);
-    let max_age_secs = guard.rust_target_max_age_days.saturating_mul(24).saturating_mul(3600);
+    let min_size_bytes = guard
+        .cleanup_min_size_mb
+        .saturating_mul(1024)
+        .saturating_mul(1024);
+    let max_age_secs = guard
+        .rust_target_max_age_days
+        .saturating_mul(24)
+        .saturating_mul(3600);
 
     for target in targets {
         if target.bytes < min_size_bytes {
@@ -853,7 +910,9 @@ async fn proactive_cleanup_rust_targets(
         }
 
         let target_project = target.path.parent().unwrap_or(&target.path);
-        let has_active_build = protected_project_dirs.iter().any(|proj| target_project == proj);
+        let has_active_build = protected_project_dirs
+            .iter()
+            .any(|proj| target_project == proj);
 
         if has_active_build {
             result.protected_paths.push(format!(
@@ -868,12 +927,18 @@ async fn proactive_cleanup_rust_targets(
                 Ok(p) => p,
                 Err(e) => {
                     eprintln!("⚠️ proactive: skipping {}: {}", target.path.display(), e);
-                    result.protected_paths.push(target.path.display().to_string());
+                    result
+                        .protected_paths
+                        .push(target.path.display().to_string());
                     continue;
                 }
             };
             if let Err(e) = tokio::fs::remove_dir_all(&safe_path).await {
-                eprintln!("⚠️ proactive: failed to remove {}: {}", target.path.display(), e);
+                eprintln!(
+                    "⚠️ proactive: failed to remove {}: {}",
+                    target.path.display(),
+                    e
+                );
                 continue;
             }
         }
@@ -2137,13 +2202,12 @@ async fn check_large_logs(guard: &GuardPolicy, state: &mut GuardRuntimeState) {
     }
 }
 
-async fn run_proactive_cleanup(
-    guard: &GuardPolicy,
-    state: &mut GuardRuntimeState,
-) -> Result<()> {
+async fn run_proactive_cleanup(guard: &GuardPolicy, state: &mut GuardRuntimeState) -> Result<()> {
     let apply = guard.auto_cleanup_apply;
     if !apply {
-        eprintln!("💡 proactive cleanup in dry-run mode (set auto_cleanup_apply = true to execute)");
+        eprintln!(
+            "💡 proactive cleanup in dry-run mode (set auto_cleanup_apply = true to execute)"
+        );
     }
 
     let mut total_reclaimed = 0u64;
@@ -2180,7 +2244,11 @@ async fn run_proactive_cleanup(
             "system",
             EventSeverity::Info,
             "guard/proactive-cleanup",
-            format!("reclaimed {} from {} stale items", human_bytes(total_reclaimed), all_cleaned.len()),
+            format!(
+                "reclaimed {} from {} stale items",
+                human_bytes(total_reclaimed),
+                all_cleaned.len()
+            ),
         ));
     }
 
@@ -2311,9 +2379,7 @@ async fn build_status_report() -> Result<StatusReport> {
             .join("utilities/sync/dracon-sync.toml")
             .display()
             .to_string(),
-        system_policy: system_policy_path
-            .display()
-            .to_string(),
+        system_policy: system_policy_path.display().to_string(),
         system_policy_exists: system_policy_path.exists(),
         sync_service_active: is_user_service_active("dracon-sync.service").await,
         warden_service_active: is_user_service_active("dracon-warden.service").await,
@@ -2350,7 +2416,6 @@ pub(crate) fn normalize_guard_policy(policy: &mut GuardPolicy) {
         policy.notify_command = default_notify_command();
     }
 }
-
 
 async fn is_git_tracked_dir(path: &Path) -> Result<bool> {
     let parent = match path.parent() {
@@ -2440,11 +2505,7 @@ async fn cmd_status(json: bool) -> Result<()> {
         ];
 
         for (label, detail) in &rows {
-            table.add_row(vec![
-                Cell::new(" "),
-                Cell::new(*label),
-                Cell::new(*detail),
-            ]);
+            table.add_row(vec![Cell::new(" "), Cell::new(*label), Cell::new(*detail)]);
         }
         for (label, active) in &service_rows {
             let (icon, color) = if *active {
@@ -2464,7 +2525,6 @@ async fn cmd_status(json: bool) -> Result<()> {
     Ok(())
 }
 
-
 async fn cmd_storage(
     root: Option<PathBuf>,
     json: bool,
@@ -2474,7 +2534,9 @@ async fn cmd_storage(
     min_size_mb: Option<u64>,
     kinds: Option<String>,
 ) -> Result<()> {
-    use comfy_table::{presets::UTF8_FULL_CONDENSED, Attribute, Cell, Color, ContentArrangement, Table};
+    use comfy_table::{
+        presets::UTF8_FULL_CONDENSED, Attribute, Cell, Color, ContentArrangement, Table,
+    };
 
     let (_, policy) = load_system_policy()?;
     let root = root.unwrap_or_else(|| {
@@ -2495,17 +2557,68 @@ async fn cmd_storage(
         return Ok(());
     }
 
-    println!("Workspace: {}", report.root.display());
+    // ── Disk health header ──
+    let disk = disk_details_for(&root.to_string_lossy()).await.ok();
+    if let Some(ref d) = disk {
+        let state_icon = match disk_state(d.use_percent, &policy.guard) {
+            "ok" => "✅",
+            "warn" => "⚠️",
+            "action" => "🟠",
+            "critical" => "🔴",
+            _ => "",
+        };
+        let state_label = disk_state(d.use_percent, &policy.guard);
+        println!("💻 Disk: {} / {} ({}% used, {} free) — {} {}",
+            human_bytes(d.used_bytes),
+            human_bytes(d.total_bytes),
+            d.use_percent,
+            human_bytes(d.avail_bytes),
+            state_icon,
+            state_label,
+        );
+        println!("   Mount: {}  Thresholds: warn={}%, action={}%, critical={}%",
+            d.mount,
+            policy.guard.disk_warn_percent,
+            policy.guard.disk_action_percent,
+            policy.guard.disk_critical_percent,
+        );
+    }
+
+    // ── Per-kind subtotals ──
+    let mut kind_totals: HashMap<String, u64> = HashMap::new();
+    for item in &report.top_hotspots {
+        *kind_totals.entry(item.kind.clone()).or_default() += item.bytes;
+    }
+    let mut kind_vec: Vec<_> = kind_totals.into_iter().collect();
+    kind_vec.sort_by(|a, b| b.1.cmp(&a.1));
+    if !kind_vec.is_empty() {
+        let mut table = Table::new();
+        table
+            .load_preset(UTF8_FULL_CONDENSED)
+            .set_content_arrangement(ContentArrangement::Dynamic)
+            .set_header(vec![Cell::new("SIZE"), Cell::new("KIND")]);
+        for (kind, bytes) in &kind_vec {
+            table.add_row(vec![
+                Cell::new(human_bytes(*bytes)).add_attribute(Attribute::Bold),
+                Cell::new(kind),
+            ]);
+        }
+        println!();
+        println!("Breakdown by kind:");
+        println!("{table}");
+    }
+
+    // ── Total workspace size ──
+    let total_workspace: u64 = report.top_projects.iter().map(|p| p.bytes).sum();
+    println!();
+    println!("📁 Workspace: {} ({})", report.root.display(), human_bytes(total_workspace));
 
     if !report.top_projects.is_empty() {
         let mut table = Table::new();
         table
             .load_preset(UTF8_FULL_CONDENSED)
             .set_content_arrangement(ContentArrangement::Dynamic)
-            .set_header(vec![
-                Cell::new("SIZE"),
-                Cell::new("PROJECT"),
-            ]);
+            .set_header(vec![Cell::new("SIZE"), Cell::new("PROJECT")]);
         for item in &report.top_projects {
             table.add_row(vec![
                 Cell::new(human_bytes(item.bytes)).add_attribute(Attribute::Bold),
@@ -2554,6 +2667,14 @@ async fn cmd_storage(
             .cloned()
             .collect();
 
+        // ── Available cleanup kinds hint ──
+        let all_kinds: Vec<_> = report
+            .top_hotspots
+            .iter()
+            .map(|h| h.kind.as_str())
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .collect();
         println!();
         println!(
             "Cleanup mode: {}",
@@ -2566,6 +2687,11 @@ async fn cmd_storage(
         });
         println!("Min size: {} MiB", cfg.min_size_mb);
         println!("Allow tracked: {}", cfg.allow_tracked);
+        println!("Available kinds: {}", {
+            let mut v: Vec<_> = all_kinds;
+            v.sort();
+            v.join(", ")
+        });
 
         let mut table = Table::new();
         table
@@ -2580,6 +2706,8 @@ async fn cmd_storage(
 
         let mut total = 0u64;
         let mut actionable = Vec::new();
+        // Per-kind reclaim tracking
+        let mut reclaim_by_kind: HashMap<String, u64> = HashMap::new();
         for item in &selected {
             let tracked = is_git_tracked_dir(&item.path).await.unwrap_or(true);
             if tracked && !cfg.allow_tracked {
@@ -2592,6 +2720,7 @@ async fn cmd_storage(
                 continue;
             }
             total += item.bytes;
+            *reclaim_by_kind.entry(item.kind.clone()).or_default() += item.bytes;
             let status = if tracked { "tracked" } else { "untracked" };
             table.add_row(vec![
                 Cell::new(human_bytes(item.bytes)),
@@ -2605,44 +2734,191 @@ async fn cmd_storage(
         println!();
         println!("Selected {} paths:", selected.len());
         println!("{table}");
+
+        // ── Per-kind reclaim summary ──
+        if !reclaim_by_kind.is_empty() {
+            let mut rk: Vec<_> = reclaim_by_kind.into_iter().collect();
+            rk.sort_by(|a, b| b.1.cmp(&a.1));
+            let summary: Vec<String> = rk
+                .iter()
+                .map(|(k, b)| format!("{} ({})", k, human_bytes(*b)))
+                .collect();
+            println!("Reclaim by kind: {}", summary.join(", "));
+        }
+
         println!("Estimated reclaimed: {}", human_bytes(total));
+
+        // ── Disk % projection ──
+        if let Some(ref d) = disk {
+            let projected_used = d.used_bytes.saturating_sub(total);
+            let projected_pct =
+                (projected_used as f64 / d.total_bytes as f64 * 100.0).round() as u8;
+            println!(
+                "Disk projection: {}% → {}% ({} free → {} free)",
+                d.use_percent,
+                projected_pct,
+                human_bytes(d.avail_bytes),
+                human_bytes(d.avail_bytes.saturating_add(total)),
+            );
+        }
 
         let user_protected = policy.guard.protected_paths.clone();
         if cfg.apply {
             for path in actionable {
                 let safe_path = check_safe_to_delete(&path, &user_protected)?;
                 if safe_path.exists() {
-                    println!("Deleting {}", path.display());
+                    println!("🗑️  Deleting {}", path.display());
                     tokio::fs::remove_dir_all(&safe_path).await?;
                 }
             }
+            println!("✅ Cleanup complete.");
         } else {
-            println!("No changes made. Re-run with --apply to execute cleanup.");
+            println!("💡 No changes made. Re-run with --apply to execute cleanup.");
         }
+    } else {
+        // Hint when not in cleanup mode
+        println!();
+        println!("💡 Run with --cleanup to see reclaimable space, or --cleanup --apply to delete.");
     }
 
     Ok(())
 }
 
-
 async fn cmd_guard_once(guard: &GuardPolicy, json: bool) -> Result<()> {
+    use comfy_table::{
+        presets::UTF8_FULL_CONDENSED, Cell, ContentArrangement, Table,
+    };
+
     let mut runtime = GuardRuntimeState::default();
     let report = run_guard_once(guard, &mut runtime).await?;
     if json {
         println!("{}", serde_json::to_string_pretty(&report)?);
-    } else {
-        println!("enabled: {}", report.enabled);
-        println!("disk_use_percent: {}", report.disk_use_percent);
-        println!("disk_state: {}", report.disk_state);
-        println!("sync_frozen: {}", report.sync_frozen);
-        println!("alerts: {}", report.alerts.len());
-        for a in report.alerts {
-            println!(
-                "- pid={} cmd={} cpu={:.1}% rss={}MiB sustained={}s action={} nice={}",
-                a.pid, a.command, a.cpu_percent, a.rss_mb, a.sustained_secs, a.action, a.nice_value
-            );
-        }
+        return Ok(());
     }
+
+    // ── Disk health ──
+    let disk = disk_details_for(&guard.disk_mount_path).await.ok();
+    let state_label = report.disk_state.as_str();
+    let state_icon = match state_label {
+        "ok" => "✅",
+        "warn" => "⚠️",
+        "action" => "🟠",
+        "critical" => "🔴",
+        _ => "",
+    };
+
+    let mut table = Table::new();
+    table
+        .load_preset(UTF8_FULL_CONDENSED)
+        .set_content_arrangement(ContentArrangement::Dynamic)
+        .set_header(vec![Cell::new("STATUS"), Cell::new("CHECK"), Cell::new("VALUE")]);
+
+    table.add_row(vec![
+        Cell::new(if report.enabled { "✅" } else { "❌" }),
+        Cell::new("Guard"),
+        Cell::new(if report.enabled { "enabled" } else { "disabled" }),
+    ]);
+
+    if let Some(ref d) = disk {
+        table.add_row(vec![
+            Cell::new(state_icon),
+            Cell::new("Disk Usage"),
+            Cell::new(format!(
+                "{}% ({}) — {} / {}",
+                d.use_percent,
+                state_label,
+                human_bytes(d.used_bytes),
+                human_bytes(d.total_bytes)
+            )),
+        ]);
+        table.add_row(vec![
+            Cell::new(""),
+            Cell::new("Disk Free"),
+            Cell::new(format!(
+                "{} on {}",
+                human_bytes(d.avail_bytes),
+                d.mount,
+            )),
+        ]);
+    } else {
+        table.add_row(vec![
+            Cell::new(state_icon),
+            Cell::new("Disk Usage"),
+            Cell::new(format!("{}% ({})", report.disk_use_percent, state_label)),
+        ]);
+    }
+
+    table.add_row(vec![
+        Cell::new(if report.sync_frozen { "⏸️" } else { "" }),
+        Cell::new("Sync Frozen"),
+        Cell::new(if report.sync_frozen { "yes" } else { "no" }),
+    ]);
+
+    table.add_row(vec![
+        Cell::new(""),
+        Cell::new("Thresholds"),
+        Cell::new(format!(
+            "warn={}% action={}% critical={}%",
+            guard.disk_warn_percent, guard.disk_action_percent, guard.disk_critical_percent
+        )),
+    ]);
+
+    table.add_row(vec![
+        Cell::new(""),
+        Cell::new("Process Monitor"),
+        Cell::new(format!(
+            "cpu>{}% for >{}s, auto_renice={}",
+            guard.process_cpu_percent, guard.process_sustain_secs, guard.auto_renice
+        )),
+    ]);
+
+    if report.alerts.is_empty() {
+        table.add_row(vec![
+            Cell::new("✅"),
+            Cell::new("Heavy Processes"),
+            Cell::new("none"),
+        ]);
+    } else {
+        table.add_row(vec![
+            Cell::new("⚠️"),
+            Cell::new("Heavy Processes"),
+            Cell::new(format!("{} active", report.alerts.len())),
+        ]);
+    }
+
+    println!("{table}");
+
+    // ── Process detail table ──
+    if !report.alerts.is_empty() {
+        let mut ptable = Table::new();
+        ptable
+            .load_preset(UTF8_FULL_CONDENSED)
+            .set_content_arrangement(ContentArrangement::Dynamic)
+            .set_header(vec![
+                Cell::new("PID"),
+                Cell::new("CPU"),
+                Cell::new("RSS"),
+                Cell::new("SUSTAINED"),
+                Cell::new("ACTION"),
+                Cell::new("NICE"),
+                Cell::new("COMMAND"),
+            ]);
+        for a in &report.alerts {
+            ptable.add_row(vec![
+                Cell::new(a.pid),
+                Cell::new(format!("{:.1}%", a.cpu_percent)),
+                Cell::new(format!("{}MiB", a.rss_mb)),
+                Cell::new(format!("{}s", a.sustained_secs)),
+                Cell::new(&a.action),
+                Cell::new(a.nice_value),
+                Cell::new(if a.args.is_empty() { a.command.clone() } else { format!("{} {}", a.command, a.args) }),
+            ]);
+        }
+        println!();
+        println!("Heavy processes:");
+        println!("{ptable}");
+    }
+
     Ok(())
 }
 

@@ -1,6 +1,21 @@
 # Dracon Utilities
 
-CLI binaries for dracon system services. These install to `~/.local/bin/` and run as systemd user services.
+**Invisible git infrastructure for AI-powered development.** Three daemon services that make git, disk, and secrets management something you never think about.
+
+dracon-sync is the core: an auto-commit, multi-mirror sync daemon that watches your repos, commits every change with AI-generated messages, and pushes to GitHub, GitLab, and Codeberg simultaneously. It's designed so that an AI coder (or a human) can just edit files and walk away — sync, commit, push, and mirror happen automatically.
+
+**Why this exists:** Tools like `git-auto-sync` handle single-repo auto-commit. Mirror tools like `gitea-mirror` handle one-way replication. But nothing combines invisible auto-commit + multi-provider mirroring + AI scribe + release pipeline + safety guards into a single daemon. dracon-sync is the only tool that lets an AI coder never think about git while keeping every repo synced across 3 providers.
+
+| Capability | git-auto-sync | gitea-mirror | git-bridge | swarf | **dracon-sync** |
+|---|:-:|:-:|:-:|:-:|:-:|
+| Auto-commit on change | ✅ | ❌ | ❌ | ✅ | ✅ |
+| Multi-repo watch | ❌ | ✅ | ✅ | ❌ | ✅ |
+| Multi-provider mirror | ❌ | ✅ (→1) | ✅ | ❌ | ✅ (3+) |
+| AI commit messages | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Version bump + release | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Safety guards | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Visibility sync | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Broken tracking repair | ❌ | ❌ | ❌ | ❌ | ✅ |
 
 **For AI agents:** See [AGENTS.md](AGENTS.md) for detailed architecture and conventions.
 **For contributors:** See [CONTRIBUTING.md](CONTRIBUTING.md) for development workflow.
@@ -12,7 +27,7 @@ CLI binaries for dracon system services. These install to `~/.local/bin/` and ru
 
 1. [What You Get](#what-you-get)
 2. [Quick Start](#quick-start)
-3. [dracon-sync — Git Sync Automation](#dracon-sync--git-sync-automation)
+3. [dracon-sync — Invisible Git Sync](#dracon-sync--invisible-git-sync)
 4. [dracon-system — Disk & Process Guard](#dracon-system--disk--process-guard)
 5. [dracon-warden — Security Hardening](#dracon-warden--security-hardening)
 6. [Configuration Examples](#configuration-examples)
@@ -24,7 +39,7 @@ CLI binaries for dracon system services. These install to `~/.local/bin/` and ru
 
 | Binary | What It Does | Why You Want It |
 |--------|-------------|-----------------|
-| **dracon-sync** | Auto-commits, pulls, and pushes your git repos | Never lose work. Auto-commit on every change. |
+| **dracon-sync** | Auto-commits, mirrors to 3 providers, AI commit messages, release pipeline | Never think about git. Edit files, walk away. |
 | **dracon-system** | Watches disk space and renices runaway processes | Prevents "disk full" crashes and runaway CPU. |
 | **dracon-warden** | Encrypts secrets in git repos | Keep API keys safe in version control. |
 
@@ -89,17 +104,61 @@ dracon-warden status    # Shows watch roots
 
 ---
 
-## dracon-sync — Git Sync Automation
+## dracon-sync — Invisible Git Sync
 
-**Purpose:** Watches your repos and auto-commits/pushes changes. You never have to run `git commit` or `git push` manually.
+**Purpose:** Makes git invisible. You edit files, sync handles everything else — auto-commit, auto-push, multi-mirror, AI messages, release pipeline.
+
+### Design Philosophy
+
+dracon-sync is **invisible infrastructure** for an AI coder. The AI works on one repo at a time, makes changes, and sync handles the rest — the AI never needs to think about commits, pushes, or cross-repo coordination.
+
+**The workflow:**
+1. You (or an AI agent) edit files in a repo
+2. Sync daemon detects changes within seconds
+3. After a brief inactivity delay (5s default), sync commits with an AI-generated message
+4. Pushes to origin (GitHub) and all mirror remotes (GitLab, Codeberg)
+5. Done — no manual git commands needed
+
+**What sync provides:**
+- Auto-commit on every change (every edit gets a checkpoint)
+- AI-generated commit subjects from diffs (unique, semantic messages each cycle)
+- Multi-provider mirroring (GitHub + GitLab + Codeberg simultaneously)
+- Auto-create GitHub repos for new projects
+- Visibility sync (mirrors GitHub's public/private status to GitLab/Codeberg)
+- Version bumping, tagging, and release pipeline
+- Self-healing: repairs broken tracking refs, stuck pushes, dual branches
+- Safety guards: blocks mass deletions, respects freeze markers
+
+**What sync doesn't do:**
+- Interactive prompts — everything runs non-interactively
+- Session management — each daemon cycle is independent
+- Dashboard — status is available via `repos` and `health` commands
+
+### Transport: HTTPS + PAT (Primary), SSH (Fallback)
+
+dracon-sync uses **HTTPS with Personal Access Tokens** as the primary transport for GitHub. This is more reliable than SSH — no SSH agent timeouts, no key rotation, and `gh auth` handles token refresh automatically. GitLab and Codeberg mirrors use SSH by default, with HTTPS PAT fallback on SSH failures.
+
+**GitHub:** HTTPS via `gh auth` credential helper. Configure once:
+```bash
+gh auth login
+```
+
+**GitLab & Codeberg:** SSH by default. Store PATs for HTTPS fallback:
+```bash
+# GitLab PAT (for HTTPS fallback and API operations)
+echo "GITLAB_TOKEN=glpat-xxxxxxxxxxxxxxxxxxxx" > ~/.dracon/utilities/sync/secrets/gitlab.env
+
+# Codeberg PAT (for HTTPS fallback and API operations)
+echo "CODEBERG_TOKEN=cbp_xxxxxxxxxxxxxxxxxxxx" > ~/.dracon/utilities/sync/secrets/codeberg.env
+```
 
 ### How It Works
 
 1. Discovers all git repos under `~/Dev` (up to 4 levels deep)
-2. Every 30 seconds, checks each repo for uncommitted changes
-3. Auto-commits with AI-generated messages (or fallback to file-pattern)
-4. Pulls remote changes (with merge, not rebase — safer)
-5. Pushes to origin and any mirror remotes
+2. Every pulse (default 1s), checks each repo for uncommitted changes
+3. After inactivity delay (default 5s since last change), auto-commits with AI-generated messages
+4. Pulls remote changes (with merge, not rebase — safer, less likely to conflict)
+5. Pushes to origin (GitHub) and mirror remotes (GitLab, Codeberg)
 
 ### Essential Commands
 
@@ -114,11 +173,11 @@ dracon-sync sync-now --force /path/to/repo  # Bypass mass-deletion guard
 # Check daemon health
 dracon-sync health
 
+# View all repos and their sync status
+dracon-sync repos
+
 # View metrics
 dracon-sync metrics
-
-# Check for repos with too many unpushed commits
-dracon-sync metrics | grep unpushed
 ```
 
 ### Safety: Mass-Deletion Prevention
@@ -153,39 +212,34 @@ dracon-sync metrics
 ```toml
 [sync]
 watch_roots = ["/home/dracon/Dev"]
-interval_secs = 30
+pulse_interval_secs = 1
+inactivity_push_delay_secs = 5
 auto_commit = true
 auto_pull = true
 auto_push = true
 
 # Alert threshold: warn if repo has more than N unpushed commits
-# (should rarely trigger with auto_push enabled)
 alert_unpushed_threshold = 10
 
 # Automatically create GitHub repos for new projects
 auto_github_private = true
 auto_github_private_account = "DraconDev"
 
-# Push to multiple remotes
+# Push to multiple remotes (GitHub uses HTTPS + PAT, others use SSH)
 [[remotes]]
-name = "origin"
-push_url = "git@github.com:DraconDev/{repo}.git"
-auto_create = true
+name = "github"
+push_url = "https://github.com/DraconDev/{repo}.git"
+auto_create = false
+
+[[remotes]]
+name = "gitlab"
+push_url = "git@gitlab.com:dracondev/{repo}.git"
+auto_create = false
 
 [[remotes]]
 name = "codeberg"
-push_url = "git@codeberg.org:DraconDev/{repo}.git"
-auto_create = false  # Codeberg doesn't support push-to-create
-```
-
-**PAT-based HTTPS fallback:** If SSH authentication fails, dracon-sync automatically falls back to HTTPS using Personal Access Tokens (PATs). Store your tokens in `~/.dracon/utilities/sync/secrets/`:
-
-```bash
-# GitLab PAT (for HTTPS fallback when SSH fails)
-echo "GITLAB_TOKEN=glpat-xxxxxxxxxxxxxxxxxxxx" > ~/.dracon/utilities/sync/secrets/gitlab.env
-
-# Codeberg PAT (for HTTPS fallback when SSH fails)  
-echo "CODEBERG_TOKEN=cbp_xxxxxxxxxxxxxxxxxxxx" > ~/.dracon/utilities/sync/secrets/codeberg.env
+push_url = "git@codeberg.org:dracondev/{repo}.git"
+auto_create = false  # Codeberg/Forgejo doesn't support push-to-create
 ```
 
 ### AI Commit Messages
@@ -214,7 +268,7 @@ dracon-sync test-ai
 
 ## dracon-system — Disk & Process Guard
 
-**Purpose:** Monitors disk usage and CPU-heavy processes. Auto-cleans when disk is full and can kill runaway processes.
+**Purpose:** Monitors disk usage and CPU-heavy processes. Auto-cleans when disk is full and auto-renices runaway processes (**never kills** — only deprioritizes).
 
 ### How It Works
 
@@ -223,7 +277,7 @@ dracon-sync test-ai
 3. At 75%: freezes dracon-sync and starts cleanup
 4. At 85%: aggressive cleanup
 5. At 92%: critical — emergency cleanup
-6. Monitors processes using >50% CPU (180% in live config) for >30s, graduates nice to deprioritize
+6. Monitors processes using >50% CPU (180% in live config) for >30s, graduates nice to deprioritize (**never kills**)
 
 ### Essential Commands
 
@@ -368,7 +422,7 @@ dracon-warden once /path/to/repo
 # ~/.dracon/utilities/sync/dracon-sync.toml
 [sync]
 watch_roots = ["/home/dracon/Dev"]
-interval_secs = 30
+pulse_interval_secs = 1
 auto_commit = true
 auto_pull = true
 auto_push = true
@@ -389,7 +443,7 @@ release_after_secs = 120
 auto_cleanup_rust = true
 ```
 
-### Multi-Remote Push
+### Multi-Remote Mirror
 
 ```toml
 # ~/.dracon/utilities/sync/dracon-sync.toml
@@ -398,15 +452,17 @@ auto_push = true
 
 [[remotes]]
 name = "github"
-push_url = "git@github.com:DraconDev/{repo}.git"
+push_url = "https://github.com/DraconDev/{repo}.git"
 
 [[remotes]]
 name = "gitlab"
-push_url = "git@gitlab.com:DraconDev/{repo}.git"
+push_url = "git@gitlab.com:dracondev/{repo}.git"
 auto_create = true
 
-[remotes.repo_name_map]
-".dracon" = "dracon-home"
+[[remotes]]
+name = "codeberg"
+push_url = "git@codeberg.org:dracondev/{repo}.git"
+auto_create = false  # Codeberg doesn't support push-to-create
 ```
 
 ---

@@ -1,9 +1,9 @@
 #[cfg(test)]
-use std::path::PathBuf;
+use crate::policy::{AuthType, RemoteConfig};
 #[cfg(test)]
 use dracon_git::types::FileStatus;
 #[cfg(test)]
-use crate::policy::{AuthType, RemoteConfig};
+use std::path::PathBuf;
 
 mod branch;
 pub(crate) use branch::*;
@@ -555,7 +555,7 @@ mod tests {
         let remotes = vec![
             RemoteConfig {
                 name: "github".to_string(),
-                push_url: "git@github.com:{account}/{repo}.git".to_string(),
+                push_url: "https://github.com/{account}/{repo}.git".to_string(),
                 auto_create: false,
                 auto_create_account: "testuser".to_string(),
                 auth_type: AuthType::GitHub,
@@ -582,7 +582,7 @@ mod tests {
         let github_url = multi_remote::get_remote_url(&repo, "github");
         assert_eq!(
             github_url,
-            Some("git@github.com:testuser/multi-repo.git".to_string())
+            Some("https://github.com/testuser/multi-repo.git".to_string())
         );
         let gitlab_url = multi_remote::get_remote_url(&repo, "gitlab");
         assert_eq!(
@@ -601,7 +601,7 @@ mod tests {
             .expect("git init");
         let remotes = vec![RemoteConfig {
             name: "origin".to_string(),
-            push_url: "git@github.com:user/repo.git".to_string(),
+            push_url: "https://github.com/user/repo.git".to_string(),
             auto_create: false,
             auto_create_account: "user".to_string(),
             auth_type: AuthType::GitHub,
@@ -722,7 +722,7 @@ mod tests {
         );
         let remotes = vec![RemoteConfig {
             name: "origin".to_string(),
-            push_url: "git@github.com:{account}/{repo}.git".to_string(),
+            push_url: "https://github.com/{account}/{repo}.git".to_string(),
             auto_create: true,
             auto_create_account: "testaccount".to_string(),
             auth_type: AuthType::GitHub,
@@ -736,7 +736,7 @@ mod tests {
             crate::git::multi_remote::auto_create_all_remotes(&remotes, "test-repo", true).await;
         assert_eq!(results.len(), 1);
         let url = results[0].1.as_ref().unwrap();
-        assert_eq!(url, "git@github.com:testaccount/test-repo.git");
+        assert_eq!(url, "https://github.com/testaccount/test-repo.git");
     }
     #[tokio::test]
     async fn test_auto_create_all_remotes_gitlab_success() {
@@ -985,7 +985,7 @@ mod tests {
         );
         let result = multi_remote::create_repo_on_github("testuser", "my-repo");
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), "git@github.com:testuser/my-repo.git");
+        assert_eq!(result.unwrap(), "https://github.com/testuser/my-repo.git");
     }
     #[test]
     fn test_create_repo_on_github_already_exists_returns_url_without_suffix() {
@@ -1007,7 +1007,7 @@ mod tests {
         assert!(result.is_ok());
         let url = result.unwrap();
         assert!(!url.contains("-1"), "should NOT have suffix -1: {}", url);
-        assert_eq!(url, "git@github.com:testuser/dracon-demons.git");
+        assert_eq!(url, "https://github.com/testuser/dracon-demons.git");
     }
     #[test]
     fn test_create_repo_on_github_pat_passed_as_env_var() {

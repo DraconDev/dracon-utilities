@@ -1598,7 +1598,7 @@ fn scrub_json_value(v: &mut serde_json::Value) {
     }
 }
 
- pub(crate) fn scrub_markers(policy: &WardenPolicy, repos: &[PathBuf], apply: bool) -> Result<()> {
+pub(crate) fn scrub_markers(policy: &WardenPolicy, repos: &[PathBuf], apply: bool) -> Result<()> {
     use comfy_table::{presets::UTF8_FULL_CONDENSED, Cell, Color, ContentArrangement, Table};
 
     let protected = build_globset(&policy.protected_patterns)?;

@@ -1125,7 +1125,9 @@ pub(crate) fn prune_stale_visibility_cache(
     repo_set: &std::collections::BTreeSet<std::path::PathBuf>,
 ) -> Result<()> {
     let cache_dir = visibility_cache_dir();
-    if !cache_dir.exists() { return Ok(()); }
+    if !cache_dir.exists() {
+        return Ok(());
+    }
     // Build set of valid cache hashes from current repos
     let valid_hashes: std::collections::HashSet<String> = repo_set
         .iter()
@@ -1142,7 +1144,10 @@ pub(crate) fn prune_stale_visibility_cache(
         }
     }
     if removed > 0 {
-        eprintln!("🧹 startup: pruned {} stale visibility cache entries", removed);
+        eprintln!(
+            "🧹 startup: pruned {} stale visibility cache entries",
+            removed
+        );
     }
     Ok(())
 }

@@ -1,7 +1,7 @@
 //! Miscellaneous git utilities — secret loading, orphan origin detection, path locking.
 
-use std::path::Path;
 use anyhow::{Context, Result};
+use std::path::Path;
 #[cfg(test)]
 use std::sync::OnceLock;
 
@@ -23,7 +23,11 @@ pub(crate) fn detect_orphan_origin(repo: &Path) -> Option<(String, String)> {
     if let Some(dash) = repo_part.rfind('-') {
         let suffix_num = &repo_part[dash + 1..];
         if suffix_num.len() == 1
-            && suffix_num.chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false)
+            && suffix_num
+                .chars()
+                .next()
+                .map(|c| c.is_ascii_digit())
+                .unwrap_or(false)
         {
             let prefix = &current[..current.len() - path_part.len()];
             let canonical_repo = &repo_part[..dash];
@@ -50,7 +54,9 @@ pub(crate) fn acquire_path_lock() -> parking_lot::MutexGuard<'static, ()> {
     static PATH_LOCK: OnceLock<parking_lot::Mutex<()>> = OnceLock::new();
     let lock = PATH_LOCK.get_or_init(|| parking_lot::Mutex::new(()));
     loop {
-        if let Some(guard) = lock.try_lock() { return guard; }
+        if let Some(guard) = lock.try_lock() {
+            return guard;
+        }
         std::thread::sleep(std::time::Duration::from_millis(10));
     }
 }

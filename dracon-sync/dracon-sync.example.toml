@@ -119,7 +119,7 @@ max_stage_file_bytes = 52428800
 # GitHub (origin)
 [[remotes]]
 name = "github"
-push_url = "git@github.com:DraconDev/{repo}.git"
+push_url = "https://github.com/DraconDev/{repo}.git"
 auto_create = true
 
 # GitLab (with PAT-based HTTPS fallback)

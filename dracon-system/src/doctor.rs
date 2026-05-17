@@ -53,7 +53,11 @@ pub(crate) async fn cmd_doctor(json: bool, strict: bool) -> Result<()> {
     table
         .load_preset(UTF8_FULL_CONDENSED)
         .set_content_arrangement(ContentArrangement::Dynamic)
-        .set_header(vec![Cell::new(" "), Cell::new("CHECK"), Cell::new("STATUS")]);
+        .set_header(vec![
+            Cell::new(" "),
+            Cell::new("CHECK"),
+            Cell::new("STATUS"),
+        ]);
 
     let checks: Vec<(&str, bool)> = vec![
         ("~/.dracon/nixos", report.nixos_root_exists),
@@ -75,7 +79,11 @@ pub(crate) async fn cmd_doctor(json: bool, strict: bool) -> Result<()> {
         if !ok {
             has_failures = true;
         }
-        table.add_row(vec![Cell::new(icon).fg(color), Cell::new(*label), Cell::new(if *ok { "ok" } else { "missing" })]);
+        table.add_row(vec![
+            Cell::new(icon).fg(color),
+            Cell::new(*label),
+            Cell::new(if *ok { "ok" } else { "missing" }),
+        ]);
     }
 
     println!("{table}");

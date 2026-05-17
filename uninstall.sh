@@ -61,7 +61,7 @@ if [ "$FORCE" = false ]; then
 fi
 
 # Binaries to remove
-BINARIES="dracon-sync dracon-system dracon-warden dracon-ai"
+BINARIES="dracon-sync dracon-system dracon-warden"
 
 # Service files to remove
 SERVICES="dracon-sync.service dracon-system-guard.service dracon-warden.service"

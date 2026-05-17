@@ -142,7 +142,8 @@ pub(crate) fn is_safe_branch_name(branch: &str) -> bool {
     if branch.ends_with('.') {
         return false;
     }
-    if branch.contains('\\') || branch.contains('~') || branch.contains('^') || branch.contains(':') {
+    if branch.contains('\\') || branch.contains('~') || branch.contains('^') || branch.contains(':')
+    {
         return false;
     }
     if branch.contains('?') || branch.contains('*') || branch.contains('[') {

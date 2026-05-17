@@ -799,7 +799,7 @@ dependencies = [
 
 [[package]]
 name = "dracon-git"
-version = "94.6.0"
+version = "94.7.0"
 dependencies = [
  "anyhow",
  "git2",
@@ -877,7 +877,7 @@ dependencies = [
 
 [[package]]
 name = "dracon-system-lib"
-version = "94.6.0"
+version = "94.7.0"
 dependencies = [
  "anyhow",
  "dirs",

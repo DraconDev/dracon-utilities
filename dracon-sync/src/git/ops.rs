@@ -1,8 +1,8 @@
 //! Git process operations — spawn, timeout, kill, and capture output.
 
+use anyhow::{Context, Result};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
-use anyhow::{Context, Result};
 use tokio::process::Command as TokioCommand;
 
 /// Kill descendant processes of a given PID using pkill (TERM then KILL).
@@ -20,7 +20,11 @@ pub(crate) async fn kill_descendants(pid: u32) {
             }
         }
         let _ = TokioCommand::new("kill")
-            .args(["-".to_string() + signal, "--".to_string(), "-".to_string() + pid_s])
+            .args([
+                "-".to_string() + signal,
+                "--".to_string(),
+                "-".to_string() + pid_s,
+            ])
             .output()
             .await;
     }
@@ -56,14 +60,34 @@ pub(crate) async fn run_child(
             if status.success() {
                 Ok(())
             } else if stderr_output.is_empty() {
-                Err(anyhow::anyhow!("{} failed in {} with status {}", label, workdir.display(), status))
+                Err(anyhow::anyhow!(
+                    "{} failed in {} with status {}",
+                    label,
+                    workdir.display(),
+                    status
+                ))
             } else {
-                Err(anyhow::anyhow!("{} failed in {} with status {}: {}", label, workdir.display(), status, stderr_output))
+                Err(anyhow::anyhow!(
+                    "{} failed in {} with status {}: {}",
+                    label,
+                    workdir.display(),
+                    status,
+                    stderr_output
+                ))
             }
         }
         Ok(Err(e)) => {
-            let detail = if stderr_output.is_empty() { format!("{}", e) } else { format!("{}: {}", e, stderr_output) };
-            Err(anyhow::anyhow!("{} failed in {}: {}", label, workdir.display(), detail))
+            let detail = if stderr_output.is_empty() {
+                format!("{}", e)
+            } else {
+                format!("{}: {}", e, stderr_output)
+            };
+            Err(anyhow::anyhow!(
+                "{} failed in {}: {}",
+                label,
+                workdir.display(),
+                detail
+            ))
         }
         Err(_) => {
             if let Some(pid) = pid {
@@ -71,7 +95,12 @@ pub(crate) async fn run_child(
             }
             let _ = child.start_kill();
             let _ = child.wait().await;
-            Err(anyhow::anyhow!("{} timeout in {} after {}s", label, workdir.display(), timeout_secs))
+            Err(anyhow::anyhow!(
+                "{} timeout in {} after {}s",
+                label,
+                workdir.display(),
+                timeout_secs
+            ))
         }
     }
 }
@@ -113,7 +142,8 @@ pub(crate) async fn run_git_with_timeout_env(
     for (k, v) in env {
         cmd.env(k, v);
     }
-    let child = cmd.spawn()
+    let child = cmd
+        .spawn()
         .with_context(|| format!("failed to spawn {} in {}", label, repo.display()))?;
     run_child(child, repo, timeout_secs, &label).await
 }
@@ -132,9 +162,14 @@ pub(crate) async fn git_askpass_script(token: &str) -> Result<PathBuf> {
     ));
     let escaped = token.replace('\'', "'\"'\"'");
     let script = format!("#!/bin/sh\nprintf '%s\\n' '{}'\n", escaped);
-    tokio::fs::write(&tmp_path, &script).await.with_context(|| {
-        format!("failed to write GIT_ASKPASS script to {}", tmp_path.display())
-    })?;
+    tokio::fs::write(&tmp_path, &script)
+        .await
+        .with_context(|| {
+            format!(
+                "failed to write GIT_ASKPASS script to {}",
+                tmp_path.display()
+            )
+        })?;
     use std::os::unix::fs::PermissionsExt;
     let mut perms = tokio::fs::metadata(&tmp_path).await?.permissions();
     perms.set_mode(0o700);

@@ -76,7 +76,10 @@ pub(crate) fn check_safe_to_delete(path: &Path, user_protected: &[String]) -> Re
 /// only deletes known artifact/cache directories (~/Dev/*/target, ~/.cache/*,
 /// ~/.local/share/Trash/*) which are legitimately under /home.
 /// Still checks user-protected paths, symlinks, and canonicalization.
-pub(crate) fn check_safe_to_delete_guard(path: &Path, user_protected: &[String]) -> Result<PathBuf> {
+pub(crate) fn check_safe_to_delete_guard(
+    path: &Path,
+    user_protected: &[String],
+) -> Result<PathBuf> {
     let canon = match path.canonicalize() {
         Ok(p) => p,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {

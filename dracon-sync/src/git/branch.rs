@@ -1,7 +1,7 @@
 //! Branch operations — current branch, main/master management, upstream tracking.
 
-use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
+use std::path::{Path, PathBuf};
 
 use super::{has_origin_remote, has_tracking_upstream, is_safe_branch_name};
 
@@ -262,16 +262,21 @@ pub(crate) fn repair_broken_tracking(repos: &[PathBuf]) -> usize {
             // Extract branch name (first field after * or space)
             let branch = trimmed
                 .split_whitespace()
-                .nth(0)
+                .next()
                 .map(|s| s.trim_start_matches('*'))
                 .unwrap_or("")
-            .to_string();
+                .to_string();
             if branch.is_empty() || !is_safe_branch_name(&branch) {
                 continue;
             }
             if set_upstream_to_branch(repo, &branch).is_ok() {
-                eprintln!("🧹 startup: fixed broken tracking in {} ({}/{} -> origin/{}", 
-                    repo.display(), branch, branch, branch);
+                eprintln!(
+                    "🧹 startup: fixed broken tracking in {} ({}/{} -> origin/{}",
+                    repo.display(),
+                    branch,
+                    branch,
+                    branch
+                );
                 repaired += 1;
             }
         }

@@ -216,7 +216,7 @@ where
             let defaults = vec![
                 RemoteConfig {
                     name: "github".to_string(),
-                    push_url: "git@github.com:{account}/{repo}.git".to_string(),
+                    push_url: "https://github.com/{account}/{repo}.git".to_string(),
                     auto_create: false,
                     auto_create_account: "DraconDev".to_string(),
                     auth_type: AuthType::GitHub,
@@ -1389,7 +1389,7 @@ mod tests {
     fn test_resolve_repo_name_without_mapping() {
         let config = RemoteConfig {
             name: "github".to_string(),
-            push_url: "git@github.com:{account}/{repo}.git".to_string(),
+            push_url: "https://github.com/{account}/{repo}.git".to_string(),
             auto_create: false,
             auto_create_account: "myorg".to_string(),
             auth_type: AuthType::GitHub,
@@ -1483,7 +1483,7 @@ auto_github_private = false
 watch_roots = ["/tmp"]
 [[remotes]]
 name = "github"
-push_url = "git@github.com:{account}/{repo}.git"
+push_url = "https://github.com/{account}/{repo}.git"
 auto_create = true
 auto_create_account = ""
 "#;

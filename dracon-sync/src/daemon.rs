@@ -23,8 +23,7 @@ macro_rules! veprintln {
 use crate::exclude::{excluded_dir_names_set, has_sync_relevant_dirty_entries};
 use crate::git::{
     discover_git_repos, git_diff_head_files, has_both_main_and_master, has_origin_remote,
-    has_tracking_upstream, is_repo_ready, repo_diff_entries,
-    repair_broken_tracking,
+    has_tracking_upstream, is_repo_ready, repair_broken_tracking, repo_diff_entries,
 };
 use crate::policy::{debug_enabled, freeze_reason, timestamp_secs, SyncPolicy};
 use crate::report::{run_repair_concerns, run_repair_warns, ConcernRepairFilter};
@@ -461,7 +460,12 @@ pub(crate) async fn run_daemon(
         };
         let roots = policy.watch_root_paths();
         let excluded_dir_names = excluded_dir_names_set(&policy);
-        let discovered = discover_git_repos(&roots, &excluded_dir_names, &policy.exclude_repos, Some(&policy.system_repo));
+        let discovered = discover_git_repos(
+            &roots,
+            &excluded_dir_names,
+            &policy.exclude_repos,
+            Some(&policy.system_repo),
+        );
         let repo_set: std::collections::BTreeSet<PathBuf> = discovered.iter().cloned().collect();
 
         // Prune stuck repos no longer on disk
@@ -469,7 +473,10 @@ pub(crate) async fn run_daemon(
         stuck_push_repos.retain(|repo, _| repo_set.contains(repo));
         if stuck_push_repos.len() != before {
             save_stuck_push_repos(&stuck_push_repos);
-            eprintln!("🧹 startup: pruned {} stale stuck repos", before - stuck_push_repos.len());
+            eprintln!(
+                "🧹 startup: pruned {} stale stuck repos",
+                before - stuck_push_repos.len()
+            );
         }
 
         // Enforce incident ledger retention now
@@ -486,7 +493,10 @@ pub(crate) async fn run_daemon(
         let discovered_refs: Vec<PathBuf> = repo_set.iter().cloned().collect();
         let fixed = repair_broken_tracking(&discovered_refs);
         if fixed > 0 {
-            eprintln!("🧹 startup: repaired {} broken upstream tracking refs", fixed);
+            eprintln!(
+                "🧹 startup: repaired {} broken upstream tracking refs",
+                fixed
+            );
         }
     }
 
@@ -573,7 +583,7 @@ pub(crate) async fn run_daemon(
 
         // Periodic broken tracking repair (every ~5 min at 1s interval)
         cycle_count += 1;
-        if cycle_count % 300 == 0 {
+        if cycle_count.is_multiple_of(300) {
             let repo_refs: Vec<PathBuf> = repo_set.iter().cloned().collect();
             repair_broken_tracking(&repo_refs);
         }

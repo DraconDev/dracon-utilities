@@ -183,26 +183,11 @@ pub(crate) fn cmd_events(
         ]);
 
     for ev in &parsed {
-        let sev = ev
-            .get("severity")
-            .and_then(|v| v.as_str())
-            .unwrap_or("-");
-        let domain = ev
-            .get("domain")
-            .and_then(|v| v.as_str())
-            .unwrap_or("-");
-        let evpath = ev
-            .get("path")
-            .and_then(|v| v.as_str())
-            .unwrap_or("-");
-        let message = ev
-            .get("message")
-            .and_then(|v| v.as_str())
-            .unwrap_or("-");
-        let ts = ev
-            .get("timestamp")
-            .and_then(|v| v.as_str())
-            .unwrap_or("-");
+        let sev = ev.get("severity").and_then(|v| v.as_str()).unwrap_or("-");
+        let domain = ev.get("domain").and_then(|v| v.as_str()).unwrap_or("-");
+        let evpath = ev.get("path").and_then(|v| v.as_str()).unwrap_or("-");
+        let message = ev.get("message").and_then(|v| v.as_str()).unwrap_or("-");
+        let ts = ev.get("timestamp").and_then(|v| v.as_str()).unwrap_or("-");
 
         let ts_short = shorten_event_time(ts);
 

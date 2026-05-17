@@ -30,12 +30,12 @@ TOTAL=$(echo "$ALL_REPOS" | wc -l)
 SUFFIXED=$(echo "$ALL_REPOS" | grep -E -- '-[0-9]+$' || true)
 SUFFIXED_COUNT=$(echo "$SUFFIXED" | grep -c . || true)
 
-# Category 2: Test repos
-TEST_REPOS=$(echo "$ALL_REPOS" | grep -E '^test-repo' || true)
+# Category 2: Test repos (exclude ones already counted as suffix orphans)
+TEST_REPOS=$(echo "$ALL_REPOS" | grep -E '^test-repo' | grep -v -E -- '-[0-9]+$' || true)
 TEST_COUNT=$(echo "$TEST_REPOS" | grep -c . || true)
 
 # Get local repo names
-LOCAL_REPOS=$(ls -d ~/Dev/*/.git 2>/dev/null | sed 's|~/Dev/||;s|/.git||' | xargs -I{} basename {} || true)
+LOCAL_REPOS=$(ls -d $HOME/Dev/*/.git 2>/dev/null | sed "s|$HOME/Dev/||;s|/.git||" | xargs -I{} basename {} || true)
 
 # Category 3: Remote-only (not in local ~/Dev)
 REMOTE_ONLY=""
@@ -98,3 +98,7 @@ else
     echo ""
     echo "💡 Run with --apply to actually delete these repos."
 fi
+
+# NOTE: Category 3 (remote-only stale) is intentionally NOT auto-deleted.
+# These repos may be legitimate remote-only projects. Review manually with:
+#   gh repo list DraconDev --limit 400 --json name --jq '.[].name'

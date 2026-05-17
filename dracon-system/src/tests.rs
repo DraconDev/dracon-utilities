@@ -431,8 +431,10 @@ fn normalize_proactive_cleanup_percent_bounded_by_action() {
     policy.disk_action_percent = 85;
     policy.proactive_cleanup_percent = 90;
     normalize_guard_policy(&mut policy);
-    assert!(policy.proactive_cleanup_percent < policy.disk_action_percent,
-        "proactive_cleanup_percent must be below disk_action_percent");
+    assert!(
+        policy.proactive_cleanup_percent < policy.disk_action_percent,
+        "proactive_cleanup_percent must be below disk_action_percent"
+    );
 }
 
 #[test]

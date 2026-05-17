@@ -285,6 +285,8 @@ The guard monitors processes using >`process_cpu_percent`% CPU for >`process_sus
 **Graduated auto-renice:**
 When `auto_renice = true`, heavy processes are reniced with a graduated nice value based on severity. Higher CPU/memory usage = higher nice value (lower priority). The process still gets full CPU when nothing else needs it — it just yields to the DE and other interactive processes.
 
+**⚠️ CRITICAL INVARIANT: The guard NEVER kills processes — it only renices.** Killing is explicitly banned. If a process needs to be stopped, that must be done manually or by its own service manager. The guard's only process management action is `renice`.
+
 | CPU usage | Nice value | Effect |
 |-----------|-----------|--------|
 | >= 180% | 5 | Gentle deprio |
@@ -351,7 +353,7 @@ When `auto_pull = true` and a repo is behind upstream, sync will create a merge 
 When `auto_github_private = true` in `dracon-sync.toml`, any repo in a watched root without an origin remote will automatically get:
 
 1. A private GitHub repo created via `gh repo create --private`
-2. SSH remote added: `git@github.com:<account>/<repo>.git`
+2. HTTPS remote added: `https://github.com/<account>/<repo>.git`
 3. Initial commit pushed: `git push -u origin HEAD`
 
 Requirements: `gh` CLI installed and authenticated (`gh auth status`).

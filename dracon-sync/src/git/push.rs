@@ -1,9 +1,9 @@
 //! Push operations — HTTPS fallback, transport fallbacks, retry logic.
 
-use std::path::Path;
 use anyhow::Result;
-use tokio::time::sleep;
+use std::path::Path;
 use std::time::Duration;
+use tokio::time::sleep;
 
 /// Push with HTTPS fallback for GitHub/GitLab/Codeberg.
 pub(crate) async fn push_https_fallback(
@@ -17,10 +17,16 @@ pub(crate) async fn push_https_fallback(
 
     if let Some(https) = super::github_https_url(remote_url) {
         let result = super::run_git_with_timeout_env(
-            repo, &["push", &https, refspec], timeout_secs,
-            &format!("{}-github-https", op_label), no_prompt,
-        ).await;
-        if result.is_ok() { return Ok(()); }
+            repo,
+            &["push", &https, refspec],
+            timeout_secs,
+            &format!("{}-github-https", op_label),
+            no_prompt,
+        )
+        .await;
+        if result.is_ok() {
+            return Ok(());
+        }
     }
 
     if let Some(https) = super::gitlab_https_url(remote_url) {
@@ -28,15 +34,20 @@ pub(crate) async fn push_https_fallback(
             match super::git_askpass_script(&token).await {
                 Ok(askpass) => {
                     let result = super::run_git_with_timeout_env(
-                        repo, &["push", &https, refspec], timeout_secs,
+                        repo,
+                        &["push", &https, refspec],
+                        timeout_secs,
                         &format!("{}-gitlab-https", op_label),
                         &[
                             ("GIT_ASKPASS", askpass.to_str().unwrap_or("/bin/false")),
                             ("GIT_TERMINAL_PROMPT", "0"),
                         ],
-                    ).await;
+                    )
+                    .await;
                     let _ = tokio::fs::remove_file(&askpass).await;
-                    if result.is_ok() { return Ok(()); }
+                    if result.is_ok() {
+                        return Ok(());
+                    }
                 }
                 Err(e) => {
                     eprintln!("⚠️ failed to create GIT_ASKPASS helper for GitLab: {}", e);
@@ -50,15 +61,20 @@ pub(crate) async fn push_https_fallback(
             match super::git_askpass_script(&token).await {
                 Ok(askpass) => {
                     let result = super::run_git_with_timeout_env(
-                        repo, &["push", &https, refspec], timeout_secs,
+                        repo,
+                        &["push", &https, refspec],
+                        timeout_secs,
                         &format!("{}-codeberg-https", op_label),
                         &[
                             ("GIT_ASKPASS", askpass.to_str().unwrap_or("/bin/false")),
                             ("GIT_TERMINAL_PROMPT", "0"),
                         ],
-                    ).await;
+                    )
+                    .await;
                     let _ = tokio::fs::remove_file(&askpass).await;
-                    if result.is_ok() { return Ok(()); }
+                    if result.is_ok() {
+                        return Ok(());
+                    }
                 }
                 Err(e) => {
                     eprintln!("⚠️ failed to create GIT_ASKPASS helper for Codeberg: {}", e);
@@ -86,13 +102,18 @@ pub(crate) async fn push_with_transport_fallbacks(
             ("GIT_SSH_COMMAND", ssh_hardening.as_str()),
             ("GIT_TERMINAL_PROMPT", "0"),
         ],
-    ).await {
+    )
+    .await
+    {
         Ok(()) => Ok(()),
         Err(e) => {
             let origin = super::origin_url(repo).unwrap_or_default();
             let branch = super::current_branch(repo).unwrap_or_else(|| "main".to_string());
             if !super::is_safe_branch_name(&branch) {
-                eprintln!("⚠️ branch name '{}' is unsafe, skipping https fallback", branch);
+                eprintln!(
+                    "⚠️ branch name '{}' is unsafe, skipping https fallback",
+                    branch
+                );
                 return Err(e);
             }
             let refspec = format!("HEAD:refs/heads/{branch}");
@@ -121,7 +142,9 @@ pub(crate) async fn push_with_retries(
                 ("GIT_SSH_COMMAND", ssh_hardening.as_str()),
                 ("GIT_TERMINAL_PROMPT", "0"),
             ],
-        ).await {
+        )
+        .await
+        {
             Ok(()) => return Ok(()),
             Err(e) => {
                 last_err = Some(e);
@@ -129,7 +152,10 @@ pub(crate) async fn push_with_retries(
                     let backoff = (attempt as u64).min(5);
                     eprintln!(
                         "⏱️ push retry {}/{} for {} after {}s",
-                        attempt + 1, attempts, repo.display(), backoff
+                        attempt + 1,
+                        attempts,
+                        repo.display(),
+                        backoff
                     );
                     sleep(Duration::from_secs(backoff)).await;
                     continue;

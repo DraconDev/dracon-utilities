@@ -13,15 +13,20 @@ dracon-sync is **invisible infrastructure** for an AI coder. The AI works on one
 
 **Core principles:**
 - Sync is automatic and invisible — the AI never thinks about commits or pushes
-- `project-state.md` is the primary interface — it serves as AI working memory
+- `project-state.md` can be maintained manually by the AI for its own working memory
 - Frequent commits are a feature, not a bug — more checkpoints = better recovery
 - Structured output for machines (--json) > pretty text for humans
 
 **What sync handles:**
 - Auto-commit on every change
-- Auto-push with retries and SSH hardening
+- Auto-push with HTTPS/PAT (GitHub) + SSH (GitLab/Codeberg) with retries and fallback
+- Multi-provider mirroring (GitHub + GitLab + Codeberg simultaneously)
+- AI-generated commit messages from diffs
 - Freeze toggle for pausing sync during delicate operations
 - Incident ledger for debugging
+- Visibility sync (mirror GitHub public/private status to GitLab/Codeberg)
+- Self-healing (broken tracking, stuck pushes, dual branches)
+- Release pipeline (version bump, tag, publish)
 
 **What sync doesn't need:**
 - Global workspace dashboards
@@ -177,12 +182,13 @@ They're intentionally both set to 50MB to keep things simple, but could be confi
 ### Overview
 dracon-sync has integrated AI for generating commit messages (scribe) and deciding version bumps.
 
-**The scribe is the AI's working memory.** The daemon maintains `.dracon/project-state.md` in each repo. The AI reads this file on session start to understand past work. Frequent commits ensure the AI can recover from any point in history.
+**The scribe generates commit messages from diffs.** The AI receives the current diff + 10 previous diffs + recent commit subjects, then returns a single subject line in conventional commit format. This produces unique, specific messages every cycle.
 
 ### Features
-- **Scribe:** AI generates `project-state.md` and commit messages with context
+- **Scribe:** AI generates commit subjects from diffs (not project-state.md)
 - **AI Bumper:** AI decides semver bump level (major/minor/patch/none) based on changes
 - **Fallback Chain:** Multiple AI providers tried in order until one succeeds
+- **Local Fallback:** File-pattern fallback when no AI providers available (e.g., `update auth, jwt and 2 files`)
 
 ### Why Frequent Commits?
 - The AI reads git history to understand past work
@@ -190,36 +196,9 @@ dracon-sync has integrated AI for generating commit messages (scribe) and decidi
 - More commits = better context for the AI's "what was I doing?"
 - Commits are cheap; context is valuable
 
-### project-state.md Format
+### Manual project-state.md
 
-```markdown
-# Project State
-
-## Current Focus
-(one line: what you're working on right now)
-
-## Context
-(why: what problem are you solving? what prompted this change?)
-
-## Completed
-- [x] (what you finished, with context)
-
-## In Progress
-- [x] (what you're actively working on)
-
-## Blockers
-- (what's stopping progress: missing info, user decision needed, dependency)
-
-## Next Steps
-1. (immediate next action)
-2. (what comes after)
-```
-
-**Rules:**
-- **Current Focus** must be one line — it becomes the commit body
-- **Context** helps the AI recover understanding after time away
-- **Blockers** tell the AI what it can't proceed on
-- **Next Steps** give the AI a clear path forward
+The AI can still maintain `.dracon/project-state.md` manually for its own working memory across sessions. Sync no longer auto-generates, stages, or commits this file. If the AI wants it tracked, it must `git add` it explicitly.
 
 ### Configuration
 AI providers are configured in `~/.dracon/utilities/sync/ai.toml`:

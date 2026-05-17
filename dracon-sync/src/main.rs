@@ -372,31 +372,29 @@ async fn main() -> Result<()> {
                 println!("🌐 Remotes: {}", policy.remotes.len());
             }
         }
-        Command::Config { cmd } => {
-            match cmd {
-                ConfigCommands::Edit => {
-                    policy::open_policy_in_editor(&policy_path)?;
-                }
-                ConfigCommands::Validate => {
-                    let result = policy::validate_config(&policy_path);
-                    if result.is_valid() {
-                        println!("✅ Policy is valid");
-                    } else {
-                        println!("❌ Policy has errors:");
-                        for e in &result.errors {
-                            println!("  ERROR: {}", e);
-                        }
-                        if !result.warnings.is_empty() {
-                            println!("\n⚠️  Warnings:");
-                            for w in &result.warnings {
-                                println!("  WARNING: {}", w);
-                            }
-                        }
-                        std::process::exit(1);
+        Command::Config { cmd } => match cmd {
+            ConfigCommands::Edit => {
+                policy::open_policy_in_editor(&policy_path)?;
+            }
+            ConfigCommands::Validate => {
+                let result = policy::validate_config(&policy_path);
+                if result.is_valid() {
+                    println!("✅ Policy is valid");
+                } else {
+                    println!("❌ Policy has errors:");
+                    for e in &result.errors {
+                        println!("  ERROR: {}", e);
                     }
+                    if !result.warnings.is_empty() {
+                        println!("\n⚠️  Warnings:");
+                        for w in &result.warnings {
+                            println!("  WARNING: {}", w);
+                        }
+                    }
+                    std::process::exit(1);
                 }
             }
-        }
+        },
         Command::Pause => {
             if let Some(home) = dirs::home_dir() {
                 let marker = home.join(".dracon").join("dracon-sync.freeze");
@@ -498,137 +496,152 @@ async fn main() -> Result<()> {
             } else {
                 RepoFilter::All
             };
-            run_repos_report(&policy_path, filter, json, &sort, filter_name.as_deref(), full_path).await?;
+            run_repos_report(
+                &policy_path,
+                filter,
+                json,
+                &sort,
+                filter_name.as_deref(),
+                full_path,
+            )
+            .await?;
         }
-Command::Repair { cmd } => {
-            match cmd {
-                RepairCommands::Concerns {
+        Command::Repair { cmd } => match cmd {
+            RepairCommands::Concerns {
+                apply,
+                repo,
+                push_timeout_secs,
+                push_retries,
+                rewrite_large_any,
+                only_stuck_push,
+                only_stuck_pull,
+                json,
+            } => {
+                let filter = if only_stuck_push {
+                    ConcernRepairFilter::StuckPush
+                } else if only_stuck_pull {
+                    ConcernRepairFilter::StuckPull
+                } else {
+                    ConcernRepairFilter::All
+                };
+                if !json {
+                    println!("📜 Policy: {}", policy_path.display());
+                    println!(
+                        "🛠️ Mode: {}",
+                        if apply {
+                            "APPLY (mutating)"
+                        } else {
+                            "DRY-RUN (no changes)"
+                        }
+                    );
+                    println!(
+                        "⚙️ Push: timeout={}s retries={}",
+                        push_timeout_secs.unwrap_or(0),
+                        push_retries
+                    );
+                }
+                run_repair_concerns(
+                    &policy_path,
                     apply,
                     repo,
                     push_timeout_secs,
                     push_retries,
                     rewrite_large_any,
-                    only_stuck_push,
-                    only_stuck_pull,
+                    filter,
                     json,
-                } => {
-                    let filter = if only_stuck_push {
-                        ConcernRepairFilter::StuckPush
-                    } else if only_stuck_pull {
-                        ConcernRepairFilter::StuckPull
-                    } else {
-                        ConcernRepairFilter::All
-                    };
-                    if !json {
-                        println!("📜 Policy: {}", policy_path.display());
-                        println!(
-                            "🛠️ Mode: {}",
-                            if apply { "APPLY (mutating)" } else { "DRY-RUN (no changes)" }
-                        );
-                        println!(
-                            "⚙️ Push: timeout={}s retries={}",
-                            push_timeout_secs.unwrap_or(0),
-                            push_retries
-                        );
-                    }
-                    run_repair_concerns(
-                        &policy_path,
-                        apply,
-                        repo,
-                        push_timeout_secs,
-                        push_retries,
-                        rewrite_large_any,
-                        filter,
-                        json,
-                    )
-                    .await?;
-                }
-                RepairCommands::Warns { apply, repo, json } => {
-                    if !json {
-                        println!("📜 Policy: {}", policy_path.display());
-                        println!(
-                            "🧹 Warn mode: {}",
-                            if apply { "APPLY (mutating)" } else { "DRY-RUN (no changes)" }
-                        );
-                    }
-                    run_repair_warns(&policy_path, apply, repo, json).await?;
-                }
-                RepairCommands::Origins { apply } => {
-                    let policy = SyncPolicy::load(&policy_path)?;
-                    let roots = policy.watch_root_paths();
-                    let excluded_dir_names = excluded_dir_names_set(&policy);
-                    let repos = git::discover_git_repos(
-                        &roots,
-                        &excluded_dir_names,
-                        &policy.exclude_repos,
-                        Some(&policy.system_repo),
+                )
+                .await?;
+            }
+            RepairCommands::Warns { apply, repo, json } => {
+                if !json {
+                    println!("📜 Policy: {}", policy_path.display());
+                    println!(
+                        "🧹 Warn mode: {}",
+                        if apply {
+                            "APPLY (mutating)"
+                        } else {
+                            "DRY-RUN (no changes)"
+                        }
                     );
-                    let mut found = 0;
-                    for repo in repos {
-                        if let Some((current, canonical)) = detect_orphan_origin(&repo) {
-                            println!("   {}: {} -> {}", repo.display(), current, canonical);
-                            found += 1;
-                            if apply {
-                                if let Err(e) = fix_orphan_origin(&repo, &canonical) {
-                                    eprintln!("❌ failed to fix origin for {}: {}", repo.display(), e);
-                                } else {
-                                    println!("✅ fixed origin for {}", repo.display());
-                                }
+                }
+                run_repair_warns(&policy_path, apply, repo, json).await?;
+            }
+            RepairCommands::Origins { apply } => {
+                let policy = SyncPolicy::load(&policy_path)?;
+                let roots = policy.watch_root_paths();
+                let excluded_dir_names = excluded_dir_names_set(&policy);
+                let repos = git::discover_git_repos(
+                    &roots,
+                    &excluded_dir_names,
+                    &policy.exclude_repos,
+                    Some(&policy.system_repo),
+                );
+                let mut found = 0;
+                for repo in repos {
+                    if let Some((current, canonical)) = detect_orphan_origin(&repo) {
+                        println!("   {}: {} -> {}", repo.display(), current, canonical);
+                        found += 1;
+                        if apply {
+                            if let Err(e) = fix_orphan_origin(&repo, &canonical) {
+                                eprintln!("❌ failed to fix origin for {}: {}", repo.display(), e);
+                            } else {
+                                println!("✅ fixed origin for {}", repo.display());
                             }
                         }
                     }
-                    if found == 0 {
-                        println!("✅ no orphan origins found");
-                    } else if !apply {
-                        println!("\n🔧 Run 'dracon-sync repair origins --apply' to fix them");
+                }
+                if found == 0 {
+                    println!("✅ no orphan origins found");
+                } else if !apply {
+                    println!("\n🔧 Run 'dracon-sync repair origins --apply' to fix them");
+                }
+            }
+            RepairCommands::StuckList => {
+                list_stuck_repos();
+            }
+            RepairCommands::StuckUnstuck { repo } => {
+                unstuck_repo(&repo);
+            }
+            RepairCommands::DualBranchList => {
+                let policy = SyncPolicy::load(&policy_path)?;
+                let roots = policy.watch_root_paths();
+                let excluded_dir_names = excluded_dir_names_set(&policy);
+                let repos = git::discover_git_repos(
+                    &roots,
+                    &excluded_dir_names,
+                    &policy.exclude_repos,
+                    Some(&policy.system_repo),
+                );
+                let mut found = 0;
+                for repo in repos {
+                    if has_both_main_and_master(&repo) {
+                        let branch =
+                            git::current_branch(&repo).unwrap_or_else(|| "unknown".to_string());
+                        println!("   {} (currently on {})", repo.display(), branch);
+                        found += 1;
                     }
                 }
-                RepairCommands::StuckList => {
-                    list_stuck_repos();
+                if found == 0 {
+                    println!("✅ no repos with both main and master");
+                } else {
+                    println!("\n🔧 Run 'dracon-sync repair dual-branch-repair <path>' to consolidate to main");
                 }
-                RepairCommands::StuckUnstuck { repo } => {
-                    unstuck_repo(&repo);
+            }
+            RepairCommands::DualBranchRepair { repo } => {
+                if !has_both_main_and_master(&repo) {
+                    println!("ℹ️ {} does not have both main and master", repo.display());
+                    return Ok(());
                 }
-                RepairCommands::DualBranchList => {
-                    let policy = SyncPolicy::load(&policy_path)?;
-                    let roots = policy.watch_root_paths();
-                    let excluded_dir_names = excluded_dir_names_set(&policy);
-                    let repos = git::discover_git_repos(
-                        &roots,
-                        &excluded_dir_names,
-                        &policy.exclude_repos,
-                        Some(&policy.system_repo),
-                    );
-                    let mut found = 0;
-                    for repo in repos {
-                        if has_both_main_and_master(&repo) {
-                            let branch = git::current_branch(&repo).unwrap_or_else(|| "unknown".to_string());
-                            println!("   {} (currently on {})", repo.display(), branch);
-                            found += 1;
-                        }
-                    }
-                    if found == 0 {
-                        println!("✅ no repos with both main and master");
-                    } else {
-                        println!("\n🔧 Run 'dracon-sync repair dual-branch-repair <path>' to consolidate to main");
-                    }
-                }
-                RepairCommands::DualBranchRepair { repo } => {
-                    if !has_both_main_and_master(&repo) {
-                        println!("ℹ️ {} does not have both main and master", repo.display());
-                        return Ok(());
-                    }
-println!("🔧 Consolidating {} to main...", repo.display());
-                    match consolidate_to_main(&repo).await {
-                        Ok(()) => println!("✅ consolidated to main"),
-                        Err(e) => {
-                            eprintln!("❌ failed: {}", e);
-                            return Err(e);
-                        }
+                println!("🔧 Consolidating {} to main...", repo.display());
+                match consolidate_to_main(&repo).await {
+                    Ok(()) => println!("✅ consolidated to main"),
+                    Err(e) => {
+                        eprintln!("❌ failed: {}", e);
+                        return Err(e);
                     }
                 }
             }
-        }
+        },
         Command::Health { json } => {
             let policy = SyncPolicy::load(&policy_path)?;
             let validate_result = policy::validate_config(&policy_path);
@@ -835,112 +848,122 @@ println!("🔧 Consolidating {} to main...", repo.display());
             println!("# TYPE dracon_sync_mass_deletion_guard_blocked_total counter");
             println!("dracon_sync_mass_deletion_guard_blocked_total {}", blocked);
         }
-        Command::Publish { cmd } => {
-            match cmd {
-                PublishCommands::Run { repo, targets, skip_dry_run: _ } => {
-                    let policy = SyncPolicy::load(&policy_path)?;
-                    if !policy.auto_publish {
-                        anyhow::bail!("auto_publish is disabled in config. Enable it or use `dracon-sync publish run` with --force.");
-                    }
-                    let repo_targets = if targets.is_empty() {
-                        policy
-                            .publish_targets
-                            .iter()
-                            .map(|t| t.name.clone())
-                            .collect::<Vec<_>>()
-                    } else {
-                        targets
-                    };
-                    let version = release::detect_project_version(&repo)
-                        .map(|(v, _)| v)
-                        .unwrap_or_else(|| "unknown".to_string());
-                    println!(
-                        "Publishing {} (v{}) to: {}",
-                        repo.display(),
-                        version,
-                        repo_targets.join(", ")
-                    );
-                    let steps = release::run_release_pipeline(
-                        &repo,
-                        "",
-                        &version,
-                        "patch",
-                        &policy,
-                        true,
-                        false,
-                        &repo_targets,
-                        false,
-                    )
-                    .await;
-                    for step in &steps {
-                        match step {
-                            release::ReleaseStep::TagCreated(tag) => println!("  Tag: {tag}"),
-                            release::ReleaseStep::GitHubReleaseCreated(tag) => println!("  Release: {tag}"),
-                            release::ReleaseStep::Published { registry, version } => {
-                                println!("  Published: {registry} v{version}")
-                            }
-                            release::ReleaseStep::NixFlakePRCreated(url) => {
-                                println!("  Nix flake PR: {url}")
-                            }
-                            release::ReleaseStep::Skipped(reason) => println!("  Skipped: {reason}"),
-                            release::ReleaseStep::Failed { step: s, error } => {
-                                eprintln!("  Failed: {s} — {error}")
-                            }
-                        }
-                    }
+        Command::Publish { cmd } => match cmd {
+            PublishCommands::Run {
+                repo,
+                targets,
+                skip_dry_run: _,
+            } => {
+                let policy = SyncPolicy::load(&policy_path)?;
+                if !policy.auto_publish {
+                    anyhow::bail!("auto_publish is disabled in config. Enable it or use `dracon-sync publish run` with --force.");
                 }
-                PublishCommands::Status { repo, json } => {
-                    let policy = SyncPolicy::load(&policy_path)?;
-                    let version = release::detect_project_version(&repo)
-                        .map(|(v, _)| v)
-                        .unwrap_or_else(|| "unknown".to_string());
-                    let mut statuses = Vec::new();
-                    for target in &policy.publish_targets {
-                        match release::extract_package_name(&repo, target.registry) {
-                            Ok(pkg_name) => {
-                                let exists = release::version_exists_on_registry(
-                                    target.registry,
-                                    &pkg_name,
-                                    &version,
-                                )
-                                .await;
-                                statuses.push(serde_json::json!({
-                                    "target": target.name,
-                                    "registry": target.registry.as_str(),
-                                    "package": pkg_name,
-                                    "version": version,
-                                    "published": exists.unwrap_or(false),
-                                }));
-                            }
-                            Err(e) => statuses.push(serde_json::json!({
-                                "target": target.name,
-                                "registry": target.registry.as_str(),
-                                "version": version,
-                                "error": e.to_string(),
-                            })),
+                let repo_targets = if targets.is_empty() {
+                    policy
+                        .publish_targets
+                        .iter()
+                        .map(|t| t.name.clone())
+                        .collect::<Vec<_>>()
+                } else {
+                    targets
+                };
+                let version = release::detect_project_version(&repo)
+                    .map(|(v, _)| v)
+                    .unwrap_or_else(|| "unknown".to_string());
+                println!(
+                    "Publishing {} (v{}) to: {}",
+                    repo.display(),
+                    version,
+                    repo_targets.join(", ")
+                );
+                let steps = release::run_release_pipeline(
+                    &repo,
+                    "",
+                    &version,
+                    "patch",
+                    &policy,
+                    true,
+                    false,
+                    &repo_targets,
+                    false,
+                )
+                .await;
+                for step in &steps {
+                    match step {
+                        release::ReleaseStep::TagCreated(tag) => println!("  Tag: {tag}"),
+                        release::ReleaseStep::GitHubReleaseCreated(tag) => {
+                            println!("  Release: {tag}")
                         }
-                    }
-                    if json {
-                        println!("{}", serde_json::to_string_pretty(&statuses)?);
-                    } else {
-                        println!("Publish status for {} (v{}):", repo.display(), version);
-                        for s in &statuses {
-                            let target = s["target"].as_str().unwrap_or("?");
-                            let published = s["published"].as_bool().unwrap_or(false);
-                            let status_str = if published { "published" } else { "not published" };
-                            println!("  {target}: {status_str}");
+                        release::ReleaseStep::Published { registry, version } => {
+                            println!("  Published: {registry} v{version}")
+                        }
+                        release::ReleaseStep::NixFlakePRCreated(url) => {
+                            println!("  Nix flake PR: {url}")
+                        }
+                        release::ReleaseStep::Skipped(reason) => println!("  Skipped: {reason}"),
+                        release::ReleaseStep::Failed { step: s, error } => {
+                            eprintln!("  Failed: {s} — {error}")
                         }
                     }
                 }
             }
-        }
+            PublishCommands::Status { repo, json } => {
+                let policy = SyncPolicy::load(&policy_path)?;
+                let version = release::detect_project_version(&repo)
+                    .map(|(v, _)| v)
+                    .unwrap_or_else(|| "unknown".to_string());
+                let mut statuses = Vec::new();
+                for target in &policy.publish_targets {
+                    match release::extract_package_name(&repo, target.registry) {
+                        Ok(pkg_name) => {
+                            let exists = release::version_exists_on_registry(
+                                target.registry,
+                                &pkg_name,
+                                &version,
+                            )
+                            .await;
+                            statuses.push(serde_json::json!({
+                                "target": target.name,
+                                "registry": target.registry.as_str(),
+                                "package": pkg_name,
+                                "version": version,
+                                "published": exists.unwrap_or(false),
+                            }));
+                        }
+                        Err(e) => statuses.push(serde_json::json!({
+                            "target": target.name,
+                            "registry": target.registry.as_str(),
+                            "version": version,
+                            "error": e.to_string(),
+                        })),
+                    }
+                }
+                if json {
+                    println!("{}", serde_json::to_string_pretty(&statuses)?);
+                } else {
+                    println!("Publish status for {} (v{}):", repo.display(), version);
+                    for s in &statuses {
+                        let target = s["target"].as_str().unwrap_or("?");
+                        let published = s["published"].as_bool().unwrap_or(false);
+                        let status_str = if published {
+                            "published"
+                        } else {
+                            "not published"
+                        };
+                        println!("  {target}: {status_str}");
+                    }
+                }
+            }
+        },
         Command::TestAi { json } => {
             use simple_ai::SimpleAiService;
 
             let service = SimpleAiService::new();
             if service.is_empty() {
                 if json {
-                    println!(r#"{{"providers":[],"all_ok":false,"error":"no providers configured"}}"#);
+                    println!(
+                        r#"{{"providers":[],"all_ok":false,"error":"no providers configured"}}"#
+                    );
                 } else {
                     println!("❌ No AI providers configured");
                     println!("   Add providers to ~/.dracon/utilities/sync/ai.toml");
@@ -973,43 +996,108 @@ println!("🔧 Consolidating {} to main...", repo.display());
                 match service.test_provider(name).await {
                     Ok((true, resp)) => {
                         if resp.trim().to_uppercase().contains("OK") {
-                            if json { println!("ok"); } else { println!("✅"); }
+                            if json {
+                                println!("ok");
+                            } else {
+                                println!("✅");
+                            }
                             working_provider = Some(name.clone());
-                            results.push(ProviderResult { name: name.clone(), status: "ok".to_string(), latency_ms: None, error: None });
+                            results.push(ProviderResult {
+                                name: name.clone(),
+                                status: "ok".to_string(),
+                                latency_ms: None,
+                                error: None,
+                            });
                         } else {
-                            if json { println!("warn"); } else { println!("⚠️  (unexpected response: {}...)", resp.chars().take(20).collect::<String>()); }
+                            if json {
+                                println!("warn");
+                            } else {
+                                println!(
+                                    "⚠️  (unexpected response: {}...)",
+                                    resp.chars().take(20).collect::<String>()
+                                );
+                            }
                             working_provider = Some(name.clone());
-                            results.push(ProviderResult { name: name.clone(), status: "warn".to_string(), latency_ms: None, error: Some("unexpected response".to_string()) });
+                            results.push(ProviderResult {
+                                name: name.clone(),
+                                status: "warn".to_string(),
+                                latency_ms: None,
+                                error: Some("unexpected response".to_string()),
+                            });
                         }
                     }
                     Ok((false, err)) => {
                         let err_lower = err.to_lowercase();
                         if helpers::is_rate_limited(&err_lower) {
-                            if json { println!("rate_limited"); } else { println!("⏳ rate limited"); }
+                            if json {
+                                println!("rate_limited");
+                            } else {
+                                println!("⏳ rate limited");
+                            }
                             all_ok = false;
-                            results.push(ProviderResult { name: name.clone(), status: "rate_limited".to_string(), latency_ms: None, error: Some(err.to_string()) });
+                            results.push(ProviderResult {
+                                name: name.clone(),
+                                status: "rate_limited".to_string(),
+                                latency_ms: None,
+                                error: Some(err.to_string()),
+                            });
                         } else if helpers::is_auth_error(&err_lower) {
-                            if json { println!("auth_error"); } else { println!("🔑 auth error (check API key)"); }
+                            if json {
+                                println!("auth_error");
+                            } else {
+                                println!("🔑 auth error (check API key)");
+                            }
                             all_ok = false;
-                            results.push(ProviderResult { name: name.clone(), status: "auth_error".to_string(), latency_ms: None, error: Some(err.to_string()) });
+                            results.push(ProviderResult {
+                                name: name.clone(),
+                                status: "auth_error".to_string(),
+                                latency_ms: None,
+                                error: Some(err.to_string()),
+                            });
                         } else {
-                            if json { println!("error"); } else { println!("❌ {}", err.chars().take(40).collect::<String>()); }
+                            if json {
+                                println!("error");
+                            } else {
+                                println!("❌ {}", err.chars().take(40).collect::<String>());
+                            }
                             all_ok = false;
-                            results.push(ProviderResult { name: name.clone(), status: "error".to_string(), latency_ms: None, error: Some(err.to_string()) });
+                            results.push(ProviderResult {
+                                name: name.clone(),
+                                status: "error".to_string(),
+                                latency_ms: None,
+                                error: Some(err.to_string()),
+                            });
                         }
                     }
                     Err(e) => {
-                        if json { println!("error"); } else { println!("❌ {}", e.to_string().chars().take(40).collect::<String>()); }
+                        if json {
+                            println!("error");
+                        } else {
+                            println!("❌ {}", e.to_string().chars().take(40).collect::<String>());
+                        }
                         all_ok = false;
-                        results.push(ProviderResult { name: name.clone(), status: "error".to_string(), latency_ms: None, error: Some(e.to_string()) });
+                        results.push(ProviderResult {
+                            name: name.clone(),
+                            status: "error".to_string(),
+                            latency_ms: None,
+                            error: Some(e.to_string()),
+                        });
                     }
                 }
             }
 
             if json {
                 #[derive(serde::Serialize)]
-                struct JsonOutput { providers: Vec<ProviderResult>, all_ok: bool, working_provider: Option<String> }
-                let output = JsonOutput { providers: results, all_ok, working_provider };
+                struct JsonOutput {
+                    providers: Vec<ProviderResult>,
+                    all_ok: bool,
+                    working_provider: Option<String>,
+                }
+                let output = JsonOutput {
+                    providers: results,
+                    all_ok,
+                    working_provider,
+                };
                 println!("{}", serde_json::to_string_pretty(&output)?);
             } else {
                 println!();
@@ -1051,7 +1139,10 @@ async fn cmd_scaffold(
 
     if policy.standard_files.is_empty() {
         println!("No standard files configured in policy.");
-        println!("Add [[standard_files]] entries to {}", policy_path.display());
+        println!(
+            "Add [[standard_files]] entries to {}",
+            policy_path.display()
+        );
         return Ok(());
     }
 
@@ -1103,12 +1194,20 @@ async fn cmd_scaffold(
 
             let source_path = cfg.source_path(policy_base);
             if !source_path.exists() {
-                results.push((repo_name.clone(), cfg.target.clone(), "template missing".to_string()));
+                results.push((
+                    repo_name.clone(),
+                    cfg.target.clone(),
+                    "template missing".to_string(),
+                ));
                 continue;
             }
 
             if dry_run {
-                results.push((repo_name.clone(), cfg.target.clone(), "would copy".to_string()));
+                results.push((
+                    repo_name.clone(),
+                    cfg.target.clone(),
+                    "would copy".to_string(),
+                ));
                 total_copied += 1;
                 continue;
             }
@@ -1172,7 +1271,10 @@ async fn cmd_scaffold(
 
     println!("{table}");
     let mode = if dry_run { "DRY-RUN" } else { "APPLIED" };
-    println!("{mode}: {total_copied} files scaffolded across {} repos", repos.len());
+    println!(
+        "{mode}: {total_copied} files scaffolded across {} repos",
+        repos.len()
+    );
 
     Ok(())
 }

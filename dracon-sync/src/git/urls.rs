@@ -13,7 +13,11 @@ pub(crate) fn origin_url(repo: &Path) -> Option<String> {
         return None;
     }
     let url = String::from_utf8_lossy(&out.stdout).trim().to_string();
-    if url.is_empty() { None } else { Some(url) }
+    if url.is_empty() {
+        None
+    } else {
+        Some(url)
+    }
 }
 
 /// Strip userinfo credentials from an HTTPS URL.
