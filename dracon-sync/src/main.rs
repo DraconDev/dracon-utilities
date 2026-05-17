@@ -960,6 +960,22 @@ println!("🔧 Consolidating {} to main...", repo.display());
                             results.push(ProviderResult { name: name.clone(), status: "warn".to_string(), latency_ms: None, error: Some(format!("unexpected response")) });
                         }
                     }
+                    Ok((false, err)) => {
+                        let err_lower = err.to_lowercase();
+                        if helpers::is_rate_limited(&err_lower) {
+                            if json { println!("rate_limited"); } else { println!("⏳ rate limited"); }
+                            all_ok = false;
+                            results.push(ProviderResult { name: name.clone(), status: "rate_limited".to_string(), latency_ms: None, error: Some(err.to_string()) });
+                        } else if helpers::is_auth_error(&err_lower) {
+                            if json { println!("auth_error"); } else { println!("🔑 auth error (check API key)"); }
+                            all_ok = false;
+                            results.push(ProviderResult { name: name.clone(), status: "auth_error".to_string(), latency_ms: None, error: Some(err.to_string()) });
+                        } else {
+                            if json { println!("error"); } else { println!("❌ {}", err.chars().take(40).collect::<String>()); }
+                            all_ok = false;
+                            results.push(ProviderResult { name: name.clone(), status: "error".to_string(), latency_ms: None, error: Some(err.to_string()) });
+                        }
+                    }
                     Err(e) => {
                         if json { println!("error"); } else { println!("❌ {}", e.to_string().chars().take(40).collect::<String>()); }
                         all_ok = false;
