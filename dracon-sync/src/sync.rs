@@ -418,8 +418,6 @@ struct DiffResult {
 
 #[cfg(test)]
 mod diff_tests {
-    use crate::git::{cli_diff_entries, staged_paths};
-    use std::path::PathBuf;
 
     #[test]
     fn test_fallback_entries_recalculate_staged_files() {
