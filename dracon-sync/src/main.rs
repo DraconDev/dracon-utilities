@@ -596,7 +596,7 @@ Command::Repair { cmd } => {
                         println!("ℹ️ {} does not have both main and master", repo.display());
                         return Ok(());
                     }
-                    println!("🔧 Consolidating {} to main...", repo.display());
+println!("🔧 Consolidating {} to main...", repo.display());
                     match consolidate_to_main(&repo).await {
                         Ok(()) => println!("✅ consolidated to main"),
                         Err(e) => {
@@ -606,7 +606,7 @@ Command::Repair { cmd } => {
                     }
                 }
             }
-}
+        }
         Command::Health { json } => {
             let policy = SyncPolicy::load(&policy_path)?;
             let validate_result = policy::validate_config(&policy_path);
