@@ -2772,12 +2772,41 @@ async fn cmd_status(json: bool) -> Result<()> {
     if json {
         println!("{}", serde_json::to_string_pretty(&report)?);
     } else {
-        println!("system_root: {}", report.system_root);
-        println!("nixos_root: {}", report.nixos_root);
-        println!("sync_policy: {}", report.sync_policy);
-        println!("system_policy: {}", report.system_policy);
-        println!("sync_service_active: {}", report.sync_service_active);
-        println!("warden_service_active: {}", report.warden_service_active);
+        use comfy_table::{presets::UTF8_FULL_CONDENSED, Cell, Color, ContentArrangement, Table};
+
+        let mut table = Table::new();
+        table
+            .load_preset(UTF8_FULL_CONDENSED)
+            .set_content_arrangement(ContentArrangement::Dynamic)
+            .set_header(vec![
+                Cell::new("STATUS"),
+                Cell::new("KEY"),
+                Cell::new("VALUE"),
+            ]);
+
+        let rows: Vec<(&str, bool, &str)> = vec![
+            ("system root", report.system_root_exists, &report.system_root),
+            ("nixos root", report.nixos_root_exists, &report.nixos_root),
+            ("sync policy", report.sync_policy_exists, &report.sync_policy),
+            ("system policy", report.system_policy_exists, &report.system_policy),
+            ("sync service", report.sync_service_active, "dracon-sync.service"),
+            ("warden service", report.warden_service_active, "dracon-warden.service"),
+        ];
+
+        for (label, ok, detail) in &rows {
+            let (icon, color) = if *ok {
+                ("\u{2705}", Color::Green)
+            } else {
+                ("\u{274c}", Color::Red)
+            };
+            table.add_row(vec![
+                Cell::new(icon).fg(color),
+                Cell::new(*label),
+                Cell::new(*detail),
+            ]);
+        }
+
+        println!("{table}");
     }
     Ok(())
 }

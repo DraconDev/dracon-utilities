@@ -170,25 +170,15 @@ struct Cli {
 
 #[derive(Subcommand, Debug)]
 enum Command {
-    /// Run forever with filesystem event debounce.
-    Daemon,
+    /// Show resolved policy path and watch roots.
+    Status,
     /// Run one hardening pass and exit.
     Once {
         /// Optional repo path to harden. If omitted, hardens repos in warden discovery scope.
         repo: Option<PathBuf>,
     },
-    /// Show resolved policy path and watch roots.
-    Status,
-    /// Git filter clean operation (stdin -> stdout).
-    FilterClean {
-        /// Optional path from git filter (%f)
-        path: Option<String>,
-    },
-    /// Git filter smudge operation (stdin -> stdout).
-    FilterSmudge {
-        /// Optional path from git filter (%f)
-        path: Option<String>,
-    },
+    /// Run forever with filesystem event debounce.
+    Daemon,
     /// Scan plaintext JSON files for DRACON_SECRET markers and optionally scrub them.
     ScrubMarkers {
         /// Apply edits in-place. Without this flag, the command is a dry-run report.
@@ -223,13 +213,29 @@ enum Command {
         /// Optional repo path to scan. If omitted, scans repos in warden discovery scope.
         repo: Option<PathBuf>,
     },
+    /// Git filter clean operation (stdin -> stdout).
+    FilterClean {
+        /// Optional path from git filter (%f)
+        path: Option<String>,
+    },
+    /// Git filter smudge operation (stdin -> stdout).
+    FilterSmudge {
+        /// Optional path from git filter (%f)
+        path: Option<String>,
+    },
     /// Generate a new age keypair for this machine.
     ///
     /// Creates ~/dracon/data/keys/machine_<hostname>.age (secret) and
     /// ~/dracon/data/keys/owner_<hostname>.pub (public). Also publishes
     /// the public key to the current repo's .dracon/data/keys/ directory.
-    /// Fails if either file already exists to prevent accidental overwrite.
-    Keygen,
+    Keygen {
+        /// Also publish the public key to the current repo.
+        #[arg(long)]
+        publish: bool,
+        /// Optional repo path to publish the public key to.
+        #[arg(long)]
+        repo: Option<PathBuf>,
+    },
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -1709,16 +1715,18 @@ fn scrub_json_value(v: &mut serde_json::Value) {
             ]);
         }
 
-        println!("{table}");
-    }
-
-    if apply {
-        println!(
-            "scrub complete (found: {found}, changed: {changed}, skipped_invalid_json: {skipped})"
-        );
-    } else {
-        println!("scrub report complete (found: {found})");
-    }
+        if found > 0 {
+            println!("{table}");
+            if apply {
+                println!(
+                    "scrub complete (found: {found}, changed: {changed}, skipped_invalid_json: {skipped})"
+                );
+            } else {
+                println!("scrub report complete (found: {found})");
+            }
+        } else {
+            println!("✅ No DRACON_SECRET markers found in {} repos", rows.len());
+        }
     Ok(())
 }
 
