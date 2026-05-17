@@ -161,24 +161,10 @@ enum Command {
         #[command(subcommand)]
         cmd: DualBranchCommands,
     },
-    /// Publish a repository to configured package registries.
+    /// Publish to package registries and check publish status.
     Publish {
-        /// The repository path to publish.
-        repo: PathBuf,
-        /// Only publish to these target names (defaults to all configured).
-        #[arg(long)]
-        targets: Vec<String>,
-        /// Skip the dry-run check and publish directly.
-        #[arg(long)]
-        skip_dry_run: bool,
-    },
-    /// Show publish status for a repository across configured registries.
-    PublishStatus {
-        /// The repository path to check.
-        repo: PathBuf,
-        /// Emit machine-readable JSON.
-        #[arg(long)]
-        json: bool,
+        #[command(subcommand)]
+        cmd: PublishCommands,
     },
     /// Scaffold standard files (LICENSE, CLA, etc.) into repositories.
     Scaffold {
@@ -224,6 +210,29 @@ enum DualBranchCommands {
     Repair {
         /// The repository path to consolidate.
         repo: PathBuf,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum PublishCommands {
+    /// Publish a repository to configured package registries.
+    Run {
+        /// The repository path to publish.
+        repo: PathBuf,
+        /// Only publish to these target names (defaults to all configured).
+        #[arg(long)]
+        targets: Vec<String>,
+        /// Skip the dry-run check and publish directly.
+        #[arg(long)]
+        skip_dry_run: bool,
+    },
+    /// Show publish status for a repository across configured registries.
+    Status {
+        /// The repository path to check.
+        repo: PathBuf,
+        /// Emit machine-readable JSON.
+        #[arg(long)]
+        json: bool,
     },
 }
 
