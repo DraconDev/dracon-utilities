@@ -1597,4 +1597,23 @@ pulse_interval_secs = 1
         let policy: SyncPolicy = toml::from_str(toml).unwrap();
         assert!(policy.standard_files.is_empty());
     }
+
+    #[test]
+    fn test_standard_files_auto_default_false() {
+        let toml = r#"
+pulse_interval_secs = 1
+"#;
+        let policy: SyncPolicy = toml::from_str(toml).unwrap();
+        assert!(!policy.standard_files_auto);
+    }
+
+    #[test]
+    fn test_standard_files_auto_explicit_true() {
+        let toml = r#"
+pulse_interval_secs = 1
+standard_files_auto = true
+"#;
+        let policy: SyncPolicy = toml::from_str(toml).unwrap();
+        assert!(policy.standard_files_auto);
+    }
 }
