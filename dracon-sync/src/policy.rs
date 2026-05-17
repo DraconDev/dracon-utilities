@@ -402,8 +402,9 @@ pub(crate) struct SyncPolicy {
     #[serde(default, deserialize_with = "deserialize_standard_files")]
     pub(crate) standard_files: Vec<StandardFileConfig>,
     /// Automatically copy standard files during the sync cycle.
-    /// When false (default), standard files are only applied via `dracon-sync scaffold`.
-    #[serde(default)]
+    /// When true (default), standard files are auto-copied to repos during sync.
+    /// When false, use `dracon-sync scaffold` to apply on demand.
+    #[serde(default = "default_true")]
     pub(crate) standard_files_auto: bool,
 }
 
@@ -997,7 +998,7 @@ pub(crate) fn test_sync_policy() -> SyncPolicy {
         publish_targets: vec![],
         nix_auto_update: false,
         standard_files: vec![],
-        standard_files_auto: false,
+        standard_files_auto: true,
     }
 }
 
@@ -1599,12 +1600,12 @@ pulse_interval_secs = 1
     }
 
     #[test]
-    fn test_standard_files_auto_default_false() {
+    fn test_standard_files_auto_default_true() {
         let toml = r#"
 pulse_interval_secs = 1
 "#;
         let policy: SyncPolicy = toml::from_str(toml).unwrap();
-        assert!(!policy.standard_files_auto);
+        assert!(policy.standard_files_auto);
     }
 
     #[test]
