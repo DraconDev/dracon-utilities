@@ -401,6 +401,10 @@ pub(crate) struct SyncPolicy {
     /// Long form allows specifying explicit source/target paths and overwrite behavior.
     #[serde(default, deserialize_with = "deserialize_standard_files")]
     pub(crate) standard_files: Vec<StandardFileConfig>,
+    /// Automatically copy standard files during the sync cycle.
+    /// When false (default), standard files are only applied via `dracon-sync scaffold`.
+    #[serde(default)]
+    pub(crate) standard_files_auto: bool,
 }
 
 /// Package registry type for auto-publish.
@@ -993,6 +997,7 @@ pub(crate) fn test_sync_policy() -> SyncPolicy {
         publish_targets: vec![],
         nix_auto_update: false,
         standard_files: vec![],
+        standard_files_auto: false,
     }
 }
 
