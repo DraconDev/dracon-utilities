@@ -52,8 +52,6 @@ enum Command {
         #[arg(long)]
         json: bool,
     },
-    /// Validate the sync policy for errors and warnings.
-    ValidateConfig,
     /// One-off report across discovered repositories.
     Repos {
         /// Show only concern repos.
@@ -75,6 +73,39 @@ enum Command {
         #[arg(long)]
         full_path: bool,
     },
+    /// Check daemon health (policy valid, daemon responsive, repos healthy).
+    Health {
+        /// Emit machine-readable JSON.
+        #[arg(long)]
+        json: bool,
+    },
+    /// Print Prometheus-style metrics.
+    Metrics,
+    /// Run one sync pass.
+    Once,
+    /// Run continuous sync loop.
+    Daemon {
+        /// Override the policy scan interval (seconds). Defaults to policy value.
+        #[arg(long)]
+        interval_secs: Option<u64>,
+    },
+    /// Sync one or more repositories now.
+    SyncNow {
+        /// The repository path(s) to sync immediately.
+        repos: Vec<PathBuf>,
+        /// Preview what would be done without making any changes.
+        #[arg(long)]
+        dry_run: bool,
+        /// Bypass safety guards (e.g. mass-deletion prevention) for intentional operations.
+        #[arg(long)]
+        force: bool,
+    },
+    /// Pause sync (creates freeze marker).
+    Pause,
+    /// Resume sync (removes freeze marker).
+    Resume,
+    /// Open sync policy in the system editor.
+    EditConfig,
     /// Repair concern repos (dry-run by default; use --apply to execute).
     RepairConcerns {
         /// Execute git operations to repair concerns.
@@ -114,36 +145,11 @@ enum Command {
         #[arg(long)]
         json: bool,
     },
-    /// Run one sync pass.
-    Once,
-    /// Run continuous sync loop.
-    Daemon {
-        /// Override the policy scan interval (seconds). Defaults to policy value.
+    /// Detect and repair origin URLs pointing to orphan -N suffixed repos.
+    RepairOrigins {
+        /// Execute git operations to repair origins.
         #[arg(long)]
-        interval_secs: Option<u64>,
-    },
-    /// Sync one or more repositories now.
-    SyncNow {
-        /// The repository path(s) to sync immediately.
-        repos: Vec<PathBuf>,
-        /// Preview what would be done without making any changes.
-        #[arg(long)]
-        dry_run: bool,
-        /// Bypass safety guards (e.g. mass-deletion prevention) for intentional operations.
-        #[arg(long)]
-        force: bool,
-    },
-    /// Open sync policy in the system editor.
-    EditConfig,
-    /// Pause sync (creates freeze marker).
-    Pause,
-    /// Resume sync (removes freeze marker).
-    Resume,
-    /// Test AI providers connectivity.
-    TestAi {
-        /// Emit machine-readable JSON.
-        #[arg(long)]
-        json: bool,
+        apply: bool,
     },
     /// Manage repos permanently stuck on push.
     Stuck {
@@ -155,20 +161,6 @@ enum Command {
         #[command(subcommand)]
         cmd: DualBranchCommands,
     },
-    /// Detect and repair origin URLs pointing to orphan -N suffixed repos.
-    RepairOrigins {
-        /// Execute git operations to repair origins.
-        #[arg(long)]
-        apply: bool,
-    },
-    /// Check daemon health (policy valid, daemon responsive, repos healthy).
-    Health {
-        /// Emit machine-readable JSON.
-        #[arg(long)]
-        json: bool,
-    },
-    /// Print Prometheus-style metrics.
-    Metrics,
     /// Publish a repository to configured package registries.
     Publish {
         /// The repository path to publish.
@@ -202,6 +194,14 @@ enum Command {
         /// Preview what would be done without making any changes.
         #[arg(long)]
         dry_run: bool,
+    },
+    /// Validate the sync policy for errors and warnings.
+    ValidateConfig,
+    /// Test AI providers connectivity.
+    TestAi {
+        /// Emit machine-readable JSON.
+        #[arg(long)]
+        json: bool,
     },
 }
 
