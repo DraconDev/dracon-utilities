@@ -286,6 +286,25 @@ guard_log_file = "~/.local/state/dracon/dracon-system-guard.log"
 guard_log_max_mb = 1            # Rotate at 1 MiB
 ```
 
+### dracon-system Proactive Cleanup
+
+The guard can clean stale Rust target directories **before** disk reaches action/critical levels. This prevents disk pressure from building up in the first place.
+
+**How it works:**
+- When disk usage is above `proactive_cleanup_percent` (default 50%) but below `disk_action_percent`, the guard runs a lightweight cleanup every N cycles
+- Only target dirs older than `rust_target_max_age_days` (default 14) are removed — recently-used build artifacts are preserved
+- Active builds (running cargo/rustc) are always protected
+- Full aggressive cleanup (all targets regardless of age) still only triggers at `disk_action_percent`/`disk_critical_percent`
+
+```toml
+[guard]
+proactive_cleanup_percent = 50        # Start proactive cleanup at 50% disk
+rust_target_max_age_days = 14          # Only remove targets untouched for 14+ days
+proactive_cleanup_interval_cycles = 120 # Run every 120 guard cycles (~1h at 30s interval)
+```
+
+**Throttling:** Proactive cleanup also requires at least `interval_cycles × interval_secs` seconds since the last proactive pass, preventing redundant scans even if cycles run fast.
+
 ### dracon-sync Repo Discovery
 
 Repo discovery searches up to **4 levels deep** from each watch root. Dot-prefixed directories (e.g. `.config/`, `.dracon/`) are descended into if they contain a `.git` directory — only skipped after the `.git` check fails. The hardcoded exclusions are `objects` and whatever is in `exclude_dir_names` from policy.

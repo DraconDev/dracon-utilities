@@ -417,3 +417,54 @@ fn guard_safe_delete_rejects_symlink() {
     assert!(result.is_err(), "guard safe delete should reject symlinks");
     let _ = std::fs::remove_dir_all(&tmp);
 }
+
+#[test]
+fn proactive_cleanup_defaults() {
+    assert_eq!(default_proactive_cleanup_percent(), 50);
+    assert_eq!(default_rust_target_max_age_days(), 14);
+    assert_eq!(default_proactive_cleanup_interval_cycles(), 120);
+}
+
+#[test]
+fn normalize_proactive_cleanup_percent_bounded_by_action() {
+    let mut policy = GuardPolicy::default();
+    policy.disk_action_percent = 85;
+    policy.proactive_cleanup_percent = 90;
+    normalize_guard_policy(&mut policy);
+    assert!(policy.proactive_cleanup_percent < policy.disk_action_percent,
+        "proactive_cleanup_percent must be below disk_action_percent");
+}
+
+#[test]
+fn normalize_rust_target_max_age_days_min_1() {
+    let mut policy = GuardPolicy::default();
+    policy.rust_target_max_age_days = 0;
+    normalize_guard_policy(&mut policy);
+    assert!(policy.rust_target_max_age_days >= 1);
+}
+
+#[test]
+fn normalize_proactive_interval_min_1() {
+    let mut policy = GuardPolicy::default();
+    policy.proactive_cleanup_interval_cycles = 0;
+    normalize_guard_policy(&mut policy);
+    assert!(policy.proactive_cleanup_interval_cycles >= 1);
+}
+
+#[test]
+fn guard_runtime_state_default_cycle_zero() {
+    let state = GuardRuntimeState::default();
+    assert_eq!(state.guard_cycle, 0);
+    assert!(state.last_proactive_cleanup.is_none());
+}
+
+#[test]
+fn target_dir_info_has_mtime() {
+    let info = TargetDirInfo {
+        path: PathBuf::from("/tmp/test/target"),
+        bytes: 1024,
+        mtime_secs_ago: 86400 * 15,
+    };
+    assert_eq!(info.mtime_secs_ago, 86400 * 15);
+    assert_eq!(info.bytes, 1024);
+}
