@@ -122,6 +122,24 @@ for orphan in "${ORPHANS[@]}"; do
     fi
 done
 
+# Clean up stale binaries from ~/.cargo/bin (leftover from cargo install)
+# These get shadowed by ~/.local/bin but can cause confusion if PATH order varies
+CARGO_BIN_STALE=(
+    dracon-sync
+    dracon-system
+    dracon-warden
+)
+for stale in "${CARGO_BIN_STALE[@]}"; do
+    if [ -f ~/.cargo/bin/"$stale" ]; then
+        if [ "$DRY_RUN" = true ]; then
+            echo "  Would remove stale ~/.cargo/bin/$stale (outdated cargo install artifact)"
+        else
+            rm -f ~/.cargo/bin/"$stale"
+            echo "  🧹 Removed stale ~/.cargo/bin/$stale (outdated cargo install artifact)"
+        fi
+    fi
+done
+
 # Clean up stale .bak files
 for bak in ~/.local/bin/dracon-*.bak*; do
     [ -f "$bak" ] || continue
