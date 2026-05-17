@@ -1334,13 +1334,17 @@ pub(crate) async fn sync_repo(
         remote_failures,
     };
 
-    let copied_standard_files = crate::standard_files::ensure_standard_files(
-        repo,
-        policy,
-        &repo_override,
-        policy_path.map(|p| p.parent().unwrap_or(p)),
-        dry_run,
-    )?;
+    let copied_standard_files = if policy.standard_files_auto {
+        crate::standard_files::ensure_standard_files(
+            repo,
+            policy,
+            &repo_override,
+            policy_path.map(|p| p.parent().unwrap_or(p)),
+            dry_run,
+        )?
+    } else {
+        vec![]
+    };
 
     if !copied_standard_files.is_empty() && !dry_run {
         let paths: Vec<String> = copied_standard_files
