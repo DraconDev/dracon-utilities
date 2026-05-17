@@ -1691,31 +1691,30 @@ fn scrub_json_value(v: &mut serde_json::Value) {
         }
     }
 
-    if !rows.is_empty() {
-        let mut table = Table::new();
-        table
-            .load_preset(UTF8_FULL_CONDENSED)
-            .set_content_arrangement(ContentArrangement::Dynamic)
-            .set_header(vec![
-                Cell::new("REPO"),
-                Cell::new("FILE"),
-                Cell::new("STATUS"),
-            ]);
+        if !rows.is_empty() {
+            let mut table = Table::new();
+            table
+                .load_preset(UTF8_FULL_CONDENSED)
+                .set_content_arrangement(ContentArrangement::Dynamic)
+                .set_header(vec![
+                    Cell::new("REPO"),
+                    Cell::new("FILE"),
+                    Cell::new("STATUS"),
+                ]);
 
-        for (repo, file, status) in &rows {
-            let (status_str, color) = match status.as_str() {
-                "scrubbed" => ("\u{2705} scrubbed", Color::Green),
-                "invalid JSON" => ("\u{274c} invalid JSON", Color::Red),
-                _ => ("\u{26a0}\u{fe0f} found", Color::Yellow),
-            };
-            table.add_row(vec![
-                Cell::new(repo),
-                Cell::new(file),
-                Cell::new(status_str).fg(color),
-            ]);
-        }
+            for (repo, file, status) in &rows {
+                let (status_str, color) = match status.as_str() {
+                    "scrubbed" => ("\u{2705} scrubbed", Color::Green),
+                    "invalid JSON" => ("\u{274c} invalid JSON", Color::Red),
+                    _ => ("\u{26a0}\u{fe0f} found", Color::Yellow),
+                };
+                table.add_row(vec![
+                    Cell::new(repo),
+                    Cell::new(file),
+                    Cell::new(status_str).fg(color),
+                ]);
+            }
 
-        if found > 0 {
             println!("{table}");
             if apply {
                 println!(
@@ -1724,9 +1723,10 @@ fn scrub_json_value(v: &mut serde_json::Value) {
             } else {
                 println!("scrub report complete (found: {found})");
             }
-        } else {
-            println!("✅ No DRACON_SECRET markers found in {} repos", rows.len());
+        } else if found == 0 {
+            println!("✅ No DRACON_SECRET markers found in {} repos", repos.len());
         }
+    }
     Ok(())
 }
 
