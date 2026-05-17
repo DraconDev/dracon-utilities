@@ -188,6 +188,21 @@ enum Command {
         #[arg(long)]
         json: bool,
     },
+    /// Scaffold standard files (LICENSE, CLA, etc.) into repositories.
+    Scaffold {
+        /// Repository path to scaffold. Defaults to all discovered repos.
+        #[arg(long)]
+        repo: Option<PathBuf>,
+        /// Only scaffold these files (by target name, e.g. LICENSE, CLA.md).
+        #[arg(long)]
+        files: Vec<String>,
+        /// Overwrite existing files with template versions.
+        #[arg(long)]
+        overwrite: bool,
+        /// Preview what would be done without making any changes.
+        #[arg(long)]
+        dry_run: bool,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -1055,6 +1070,14 @@ async fn main() -> Result<()> {
                     println!("  {target}: {status_str}");
                 }
             }
+        }
+        Command::Scaffold {
+            repo,
+            files,
+            overwrite,
+            dry_run,
+        } => {
+            cmd_scaffold(&policy_path, repo, files, overwrite, dry_run).await?;
         }
     }
 
