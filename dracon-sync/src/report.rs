@@ -2543,6 +2543,7 @@ mod tests {
             publish_targets: vec![],
             nix_auto_update: false,
             standard_files: vec![],
+            standard_files_auto: false,
         }
     }
 
