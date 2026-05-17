@@ -109,8 +109,43 @@ enum Command {
         #[command(subcommand)]
         cmd: ConfigCommands,
     },
+    /// Repair and manage repositories (concerns, warns, origins, stuck repos, dual-branch).
+    Repair {
+        #[command(subcommand)]
+        cmd: RepairCommands,
+    },
+    /// Publish to package registries and check publish status.
+    Publish {
+        #[command(subcommand)]
+        cmd: PublishCommands,
+    },
+    /// Scaffold standard files (LICENSE, CLA, etc.) into repositories.
+    Scaffold {
+        /// Repository path to scaffold. Defaults to all discovered repos.
+        #[arg(long)]
+        repo: Option<PathBuf>,
+        /// Only scaffold these files (by name, e.g. LICENSE, CLA.md).
+        #[arg(long)]
+        files: Vec<String>,
+        /// Overwrite existing files with template versions.
+        #[arg(long)]
+        overwrite: bool,
+        /// Preview what would be done without making any changes.
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Test AI providers connectivity.
+    TestAi {
+        /// Emit machine-readable JSON.
+        #[arg(long)]
+        json: bool,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum RepairCommands {
     /// Repair concern repos (dry-run by default; use --apply to execute).
-    RepairConcerns {
+    Concerns {
         /// Execute git operations to repair concerns.
         #[arg(long)]
         apply: bool,
@@ -137,7 +172,7 @@ enum Command {
         json: bool,
     },
     /// Repair warn repos (dirty-only triage; dry-run by default).
-    RepairWarns {
+    Warns {
         /// Execute git operations to repair warns.
         #[arg(long)]
         apply: bool,
@@ -149,66 +184,22 @@ enum Command {
         json: bool,
     },
     /// Detect and repair origin URLs pointing to orphan -N suffixed repos.
-    RepairOrigins {
+    Origins {
         /// Execute git operations to repair origins.
         #[arg(long)]
         apply: bool,
     },
-    /// Manage repos permanently stuck on push.
-    Stuck {
-        #[command(subcommand)]
-        cmd: StuckCommands,
-    },
-    /// Manage repos that have both main and master branches.
-    DualBranch {
-        #[command(subcommand)]
-        cmd: DualBranchCommands,
-    },
-    /// Publish to package registries and check publish status.
-    Publish {
-        #[command(subcommand)]
-        cmd: PublishCommands,
-    },
-/// Scaffold standard files (LICENSE, CLA, etc.) into repositories.
-    Scaffold {
-        /// Repository path to scaffold. Defaults to all discovered repos.
-        #[arg(long)]
-        repo: Option<PathBuf>,
-        /// Only scaffold these files (by name, e.g. LICENSE, CLA.md).
-        #[arg(long)]
-        files: Vec<String>,
-        /// Overwrite existing files with template versions.
-        #[arg(long)]
-        overwrite: bool,
-        /// Preview what would be done without making any changes.
-        #[arg(long)]
-        dry_run: bool,
-    },
-    /// Test AI providers connectivity.
-    TestAi {
-        /// Emit machine-readable JSON.
-        #[arg(long)]
-        json: bool,
-    },
-}
-
-#[derive(Subcommand, Debug)]
-enum StuckCommands {
     /// List repos that are permanently stuck on push.
-    List,
+    StuckList,
     /// Unstuck a repo that was marked as permanently stuck.
-    Unstuck {
+    StuckUnstuck {
         /// The repository path to unstuck.
         repo: PathBuf,
     },
-}
-
-#[derive(Subcommand, Debug)]
-enum DualBranchCommands {
     /// List repos that have both main and master branches.
-    List,
+    DualBranchList,
     /// Consolidate a repo with both main and master to main only.
-    Repair {
+    DualBranchRepair {
         /// The repository path to consolidate.
         repo: PathBuf,
     },
