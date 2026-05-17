@@ -320,7 +320,7 @@ pub(crate) fn events_path() -> PathBuf {
 
 #[derive(Parser, Debug)]
 #[command(name = "dracon-system")]
-#[command(about = "Deterministic system utility (no AI)")]
+#[command(about = "Disk/process guard, storage analyzer, and system diagnostics")]
 #[command(version)]
 struct Cli {
     /// Increase output verbosity. Can be repeated up to 2 times (-v, -vv).

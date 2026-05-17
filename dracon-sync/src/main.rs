@@ -34,7 +34,7 @@ use sync::sync_repo;
 
 #[derive(Parser, Debug)]
 #[command(name = "dracon-sync")]
-#[command(about = "Dracon sync runtime")]
+#[command(about = "Git sync automation — auto-commit, push, and mirror your repos")]
 #[command(version)]
 struct Cli {
     /// Increase output verbosity. Can be repeated up to 2 times (-v, -vv).
