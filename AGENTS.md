@@ -167,13 +167,18 @@ Service files are installed to `~/.config/systemd/user/` by `install.sh`.
 | dracon-system | ~/.dracon/utilities/system/dracon-system.toml | [dracon-system.example.toml](dracon-system/dracon-system.example.toml) |
 | dracon-warden | ~/.dracon/utilities/warden/dracon-warden.toml | [dracon-warden.example.toml](dracon-warden/dracon-warden.example.toml) |
 
-### Standard Files
+ ### Standard Files
 
 `dracon-sync` can ensure standard files (LICENSE, CLA, etc.) exist in every synced repository. Templates live in `~/.dracon/utilities/sync/templates/`.
+
+**By default, standard files are NOT auto-copied during the sync cycle.** Use `dracon-sync scaffold` to apply them on demand, or set `standard_files_auto = true` to re-enable auto-copying.
 
 ```toml
 # dracon-sync.toml — short form (filename only)
 standard_files = ["LICENSE", "CLA.md"]
+
+# Enable auto-copying during sync (default: false)
+standard_files_auto = false
 
 # Long form with explicit source/target
 # [[standard_files]]
@@ -190,6 +195,8 @@ skip_standard_files = ["CLA.md"]
 Files are only copied if the target doesn't exist (default `overwrite = false`). Set `overwrite = true` to replace existing files with the template version. Missing templates print a warning but don't block sync.
 
 Source path resolution: absolute paths used as-is, `~/` expanded to home directory, relative paths resolved from `~/.dracon/utilities/sync/`.
+
+**Important:** In TOML, top-level fields like `standard_files` must appear BEFORE any section headers (`[...]` or `[[...]]`). If placed after a section header, they will be silently parsed as belonging to that section and ignored by the policy loader.
 
 ## Operational State
 
@@ -439,6 +446,7 @@ Commands:
   repair-origins   Detect and repair orphan origin URLs [--apply]
   publish          Manually publish a repo to configured registries [--dry-run]
   publish-status   Check current version and registry publish status
+  scaffold         Scaffold standard files (LICENSE, CLA, etc.) into repos [--repo] [--files] [--overwrite] [--dry-run]
 ```
 
 **Nested subcommands:**
