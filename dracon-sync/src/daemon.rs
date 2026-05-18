@@ -805,16 +805,6 @@ pub(crate) async fn run_daemon(
                 (dirty, filtered)
             };
 
-            // DEBUG: log repo state
-            eprintln!(
-                "🏃 {} is_clean={} ahead={} behind={} effective_dirty={}",
-                repo.display(),
-                status.is_clean,
-                status.ahead,
-                status.behind,
-                effective_dirty,
-            );
-
             let fingerprint = format!(
                 "{}:{}:{}:{}:{}",
                 status.branch,
