@@ -617,7 +617,13 @@ pub(crate) async fn run_daemon(
             Some(&policy.system_repo),
         );
         let repo_set: BTreeSet<PathBuf> = repos.iter().cloned().collect();
-        activity.retain(|repo, _| repo_set.contains(repo));
+        activity.retain(|repo, _| {
+            let keep = repo_set.contains(repo);
+            if !keep {
+                initial_repos.remove(repo);
+            }
+            keep
+        });
         pending_repos.retain(|repo, _| repo_set.contains(repo));
         repair_cooldowns.retain(|repo, _| repo_set.contains(repo));
         filter_cooldowns.retain(|repo, _| repo_set.contains(repo));
