@@ -880,7 +880,30 @@ fn is_repo_checked_out(repo: &Path) -> bool {
     };
 
     let head_content = head_content.trim();
-    head_content.starts_with("ref: refs/heads/")
+    if !head_content.starts_with("ref: refs/heads/") {
+        return false;
+    }
+
+    // Guard against mid-clone race: after git-fetch but before checkout completes,
+    // HEAD points to a valid branch but the working tree doesn't have files yet.
+    // If the warden writes files (e.g., publish_repo_pubkey) now, git's checkout
+    // fails with "Untracked working tree file would be overwritten by merge."
+
+    // 1. If index.lock exists, a git operation (checkout, add, etc.) is in progress.
+    if git_dir.join("index.lock").exists() {
+        return false;
+    }
+
+    // 2. If the index doesn't exist or is empty (just the git-init header ~104 bytes),
+    //    checkout hasn't written files yet. A real checkout produces an index with
+    //    entries for every tracked file (well above 128 bytes).
+    let index = git_dir.join("index");
+    match fs::metadata(&index) {
+        Ok(meta) if meta.len() > 128 => { /* index has entries — checkout done */ }
+        _ => return false,
+    }
+
+    true
 }
 
 pub(crate) fn harden_repo(
