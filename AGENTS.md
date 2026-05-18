@@ -218,6 +218,7 @@ On every daemon start/restart, the sync daemon prunes stale state:
 - **Visibility cache**: Removes orphan `.last` files for deleted repos
 - **Broken tracking**: Repairs `origin/master: gone` refs → `origin/{branch}` (also runs every ~5 min in the loop)
 - **Stale index.lock**: Removes `.git/index.lock` files with no holding process (left by crashed git operations). Without this, a stale lock blocks all git operations in that repo and the daemon can never commit changes there.
+- **Clone race guard**: The daemon skips repos with an active `index.lock` (mid-checkout) and applies a 15-second grace period to newly discovered repos. This prevents the daemon from interfering with `git clone` — during clone, HEAD resolves after fetch but checkout may still be in progress. If the daemon writes files (standard_files, project-state) before checkout completes, git aborts with "Untracked working tree file would be overwritten by merge." Only repos discovered AFTER the initial startup scan get the grace period; repos present at daemon start are processed immediately.
 
 ### Daemon Reliability
 
