@@ -1,7 +1,7 @@
 # Dracon Utilities — TODO
 
 ## Done ✅
-- [x] Clone race bug: WARDEN was root cause (publish_repo_pubkey writes files during clone). Fixed in warden `is_repo_checked_out` + sync daemon grace period + index.lock guards
+- [x] Clone race bug: IndexLock acquires `.git/index.lock` (git's own protocol) before working-tree writes in both warden and sync daemons. O_EXCL atomic, no TOCTOU race, no heuristics.
 - [x] Global git filter.dracon path: fixed ~/.cargo/bin → ~/.local/bin
 - [x] Mass deletion guard: tiered thresholds (85%+, 70%+ ≥5 files, 10+ absolute)
 - [x] `repo_diff_entries` root cause fix: returns ALL diff entries when dirty, not just when staged
