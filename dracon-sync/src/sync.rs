@@ -1349,6 +1349,18 @@ pub(crate) async fn sync_repo(
     };
 
     let copied_standard_files = if policy.standard_files_auto {
+        // Acquire git's index.lock before writing standard files to the working tree.
+        // This prevents conflicting with git's own checkout during clone — if git
+        // holds the lock, we skip; if we hold it, git waits. No heuristics needed.
+        let _lock = match crate::git::IndexLock::acquire(repo) {
+            Ok(lock) => lock,
+            Err(e) => {
+                if crate::policy::debug_enabled() {
+                    eprintln!("⏳ {}", e);
+                }
+                vec![] // skip standard files this cycle
+            }
+        };
         crate::standard_files::ensure_standard_files(
             repo,
             policy,

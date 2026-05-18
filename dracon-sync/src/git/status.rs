@@ -1,8 +1,72 @@
 //! Repository status checks — origin, upstream, conflict state, readiness.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use super::current_branch;
+
+/// RAII guard that acquires `.git/index.lock` using the same protocol git uses.
+///
+/// Git commands (checkout, add, reset, etc.) hold this lock while modifying
+/// the working tree. By acquiring it too, we guarantee mutual exclusion with
+/// any in-flight git operation. If the lock is held, we skip; if we hold it,
+/// git's checkout waits for us.
+///
+/// This is the definitive fix for the clone race: during `git clone`, checkout
+/// holds index.lock. Our `ensure_standard_files` / `publish_repo_pubkey`
+/// write files to the working tree. Without the lock, these appear before
+/// checkout completes → "Untracked working tree file would be overwritten by
+/// merge." With the lock, either git holds it (we skip) or we hold it
+/// (git's checkout waits until we're done).
+pub(crate) struct IndexLock {
+    path: PathBuf,
+    /// True if we successfully created the lock (our responsibility to clean up).
+    held: bool,
+}
+
+impl IndexLock {
+    /// Try to acquire `.git/index.lock` for a repo.
+    /// Returns Ok(lock) if acquired, Err if another process holds it.
+    /// Uses `O_EXCL` (create_new) for atomic creation — no TOCTOU race.
+    pub(crate) fn acquire(repo: &Path) -> Result<Self, String> {
+        let path = repo.join(".git").join("index.lock");
+        match std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true) // O_EXCL — fails if file exists
+            .open(&path)
+        {
+            Ok(_file) => Ok(Self { path, held: true }),
+            Err(e)
+                if e.kind() == std::io::ErrorKind::AlreadyExists =>
+            {
+                Err(format!(
+                    "index.lock held by another git operation, skipping {}",
+                    repo.display()
+                ))
+            }
+            Err(e) => Err(format!(
+                "failed to create index.lock for {}: {}",
+                repo.display(),
+                e
+            )),
+        }
+    }
+
+    /// Create a no-op lock (for commands that don't need coordination).
+    pub(crate) fn bypass() -> Self {
+        Self {
+            path: PathBuf::new(),
+            held: false,
+        }
+    }
+}
+
+impl Drop for IndexLock {
+    fn drop(&mut self) {
+        if self.held {
+            let _ = std::fs::remove_file(&self.path);
+        }
+    }
+}
 
 /// Check whether an `origin` remote exists via config or git CLI.
 pub(crate) fn has_origin_remote(repo: &Path) -> bool {
