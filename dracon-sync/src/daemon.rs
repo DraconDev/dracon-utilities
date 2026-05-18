@@ -655,6 +655,7 @@ pub(crate) async fn run_daemon(
                     eprintln!("⏳ {} repo path vanished, skipping", repo.display());
                 }
                 activity.remove(&repo);
+                initial_repos.remove(&repo);
                 continue;
             }
 
@@ -791,6 +792,7 @@ pub(crate) async fn run_daemon(
                 let has_remote_issues = !has_origin || !has_upstream;
                 if !has_remote_issues {
                     activity.remove(&repo);
+                    initial_repos.remove(&repo);
                     continue;
                 }
                 // Remote issues but clean — check for dirty files that
@@ -806,6 +808,7 @@ pub(crate) async fn run_daemon(
                 );
                 if !dirty {
                     activity.remove(&repo);
+                    initial_repos.remove(&repo);
                     continue;
                 }
                 (dirty, entries)
@@ -856,6 +859,7 @@ pub(crate) async fn run_daemon(
                     dirty || status.ahead > 0 || status.behind > 0 || !has_origin || !has_upstream;
                 if !has_local_or_pending_work {
                     activity.remove(&repo);
+                    initial_repos.remove(&repo);
                     continue;
                 }
                 (dirty, filtered)
@@ -1099,6 +1103,7 @@ pub(crate) async fn run_daemon(
                     }
                 }
                 activity.remove(&repo);
+                initial_repos.remove(&repo);
             } else {
                 entry.failure_count += 1;
 
@@ -1184,6 +1189,7 @@ pub(crate) async fn run_daemon(
                     stuck_push_repos.insert(repo.clone(), timestamp_secs());
                     save_stuck_push_repos(&stuck_push_repos);
                     activity.remove(&repo);
+                    initial_repos.remove(&repo);
                 }
             }
         }
