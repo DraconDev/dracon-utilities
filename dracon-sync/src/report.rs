@@ -3021,7 +3021,10 @@ mod tests {
         let result = create_github_private_remote(&repo, "testaccount", true);
 
         assert!(result.is_some());
-        assert_eq!(result.unwrap(), "https://github.com/testaccount/my-repo.git");
+        assert_eq!(
+            result.unwrap(),
+            "https://github.com/testaccount/my-repo.git"
+        );
     }
 
     #[test]

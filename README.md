@@ -205,6 +205,17 @@ dracon-sync sync-now --force /path/to/repo
 dracon-sync metrics
 ```
 
+### Report Accuracy
+
+The `repos` command shows **real dirty file counts** — the MOD/STG columns reflect the actual number of modified/staged files, regardless of whether they're excluded by policy. The OK/WARN/CONCERN status still uses the effective filter, so a repo with 30 files in `target/` shows MOD=30 but status=OK. Previously, the report zeroed out the counts when `effective_dirty` was false, making repos with dozens of uncommitted files appear clean.
+
+### Daemon Reliability
+
+- **Push timeouts** (60s default): A hanging mirror push (e.g. GitLab unreachable) blocks the entire daemon. 60s per push / 120s per repo keeps things responsive
+- **Stale lock cleanup**: On startup, removes orphan `.git/index.lock` files that block all git operations in a repo
+- **Filter-only cooldown**: Repos with clean/smudge filter changes (e.g. dracon-warden) show as dirty but have no diff — the daemon detects this and cools down instead of tight-looping
+- **Fingerprint scheduling**: Only syncs after 5s of no fingerprint change, preventing partial-change commits
+
 ### Configuration
 
 **Path:** `~/.dracon/utilities/sync/dracon-sync.toml`

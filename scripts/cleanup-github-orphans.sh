@@ -35,7 +35,7 @@ TEST_REPOS=$(echo "$ALL_REPOS" | grep -E '^test-repo' | grep -v -E -- '-[0-9]+$'
 TEST_COUNT=$(echo "$TEST_REPOS" | grep -c . || true)
 
 # Get local repo names
-LOCAL_REPOS=$(ls -d $HOME/Dev/*/.git 2>/dev/null | sed "s|$HOME/Dev/||;s|/.git||" | xargs -I{} basename {} || true)
+LOCAL_REPOS=$(find "$HOME/Dev" -maxdepth 2 -name '.git' -type d 2>/dev/null | sed "s|$HOME/Dev/||;s|/.git||" | xargs -I{} basename {} || true)
 
 # Category 3: Remote-only (not in local ~/Dev)
 REMOTE_ONLY=""

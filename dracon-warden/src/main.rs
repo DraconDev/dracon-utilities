@@ -245,8 +245,8 @@ enum Command {
     },
     /// Generate a new age keypair for this machine.
     ///
-    /// Creates ~/dracon/data/keys/machine_<hostname>.age (secret) and
-    /// ~/dracon/data/keys/owner_<hostname>.pub (public). Also publishes
+    /// Creates ~/dracon/data/keys/`machine_<hostname>`.age (secret) and
+    /// ~/dracon/data/keys/`owner_<hostname>`.pub (public). Also publishes
     /// the public key to the current repo's .dracon/data/keys/ directory.
     /// Fails if either file already exists to prevent accidental overwrite.
     Keygen,

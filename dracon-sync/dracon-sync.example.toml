@@ -48,8 +48,8 @@ auto_rewrite_large_blobs = false
 
 # Git operation timeouts (seconds). Keep repo timeout larger than pull/push.
 pull_op_timeout_secs = 30
-push_op_timeout_secs = 300
-repo_sync_timeout_secs = 900
+push_op_timeout_secs = 60
+repo_sync_timeout_secs = 120
 
 # Retry count for push operations before fallback transport logic.
 push_retries = 3

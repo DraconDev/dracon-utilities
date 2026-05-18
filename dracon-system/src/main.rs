@@ -2568,7 +2568,8 @@ async fn cmd_storage(
             _ => "",
         };
         let state_label = disk_state(d.use_percent, &policy.guard);
-        println!("💻 Disk: {} / {} ({}% used, {} free) — {} {}",
+        println!(
+            "💻 Disk: {} / {} ({}% used, {} free) — {} {}",
             human_bytes(d.used_bytes),
             human_bytes(d.total_bytes),
             d.use_percent,
@@ -2576,7 +2577,8 @@ async fn cmd_storage(
             state_icon,
             state_label,
         );
-        println!("   Mount: {}  Thresholds: warn={}%, action={}%, critical={}%",
+        println!(
+            "   Mount: {}  Thresholds: warn={}%, action={}%, critical={}%",
             d.mount,
             policy.guard.disk_warn_percent,
             policy.guard.disk_action_percent,
@@ -2590,7 +2592,7 @@ async fn cmd_storage(
         *kind_totals.entry(item.kind.clone()).or_default() += item.bytes;
     }
     let mut kind_vec: Vec<_> = kind_totals.into_iter().collect();
-    kind_vec.sort_by(|a, b| b.1.cmp(&a.1));
+    kind_vec.sort_by_key(|b| std::cmp::Reverse(b.1));
     if !kind_vec.is_empty() {
         let mut table = Table::new();
         table
@@ -2611,7 +2613,11 @@ async fn cmd_storage(
     // ── Total workspace size ──
     let total_workspace: u64 = report.top_projects.iter().map(|p| p.bytes).sum();
     println!();
-    println!("📁 Workspace: {} ({})", report.root.display(), human_bytes(total_workspace));
+    println!(
+        "📁 Workspace: {} ({})",
+        report.root.display(),
+        human_bytes(total_workspace)
+    );
 
     if !report.top_projects.is_empty() {
         let mut table = Table::new();
@@ -2738,7 +2744,7 @@ async fn cmd_storage(
         // ── Per-kind reclaim summary ──
         if !reclaim_by_kind.is_empty() {
             let mut rk: Vec<_> = reclaim_by_kind.into_iter().collect();
-            rk.sort_by(|a, b| b.1.cmp(&a.1));
+            rk.sort_by_key(|b| std::cmp::Reverse(b.1));
             let summary: Vec<String> = rk
                 .iter()
                 .map(|(k, b)| format!("{} ({})", k, human_bytes(*b)))
@@ -2785,9 +2791,7 @@ async fn cmd_storage(
 }
 
 async fn cmd_guard_once(guard: &GuardPolicy, json: bool) -> Result<()> {
-    use comfy_table::{
-        presets::UTF8_FULL_CONDENSED, Cell, ContentArrangement, Table,
-    };
+    use comfy_table::{presets::UTF8_FULL_CONDENSED, Cell, ContentArrangement, Table};
 
     let mut runtime = GuardRuntimeState::default();
     let report = run_guard_once(guard, &mut runtime).await?;
@@ -2811,12 +2815,20 @@ async fn cmd_guard_once(guard: &GuardPolicy, json: bool) -> Result<()> {
     table
         .load_preset(UTF8_FULL_CONDENSED)
         .set_content_arrangement(ContentArrangement::Dynamic)
-        .set_header(vec![Cell::new("STATUS"), Cell::new("CHECK"), Cell::new("VALUE")]);
+        .set_header(vec![
+            Cell::new("STATUS"),
+            Cell::new("CHECK"),
+            Cell::new("VALUE"),
+        ]);
 
     table.add_row(vec![
         Cell::new(if report.enabled { "✅" } else { "❌" }),
         Cell::new("Guard"),
-        Cell::new(if report.enabled { "enabled" } else { "disabled" }),
+        Cell::new(if report.enabled {
+            "enabled"
+        } else {
+            "disabled"
+        }),
     ]);
 
     if let Some(ref d) = disk {
@@ -2834,11 +2846,7 @@ async fn cmd_guard_once(guard: &GuardPolicy, json: bool) -> Result<()> {
         table.add_row(vec![
             Cell::new(""),
             Cell::new("Disk Free"),
-            Cell::new(format!(
-                "{} on {}",
-                human_bytes(d.avail_bytes),
-                d.mount,
-            )),
+            Cell::new(format!("{} on {}", human_bytes(d.avail_bytes), d.mount,)),
         ]);
     } else {
         table.add_row(vec![
@@ -2911,7 +2919,11 @@ async fn cmd_guard_once(guard: &GuardPolicy, json: bool) -> Result<()> {
                 Cell::new(format!("{}s", a.sustained_secs)),
                 Cell::new(&a.action),
                 Cell::new(a.nice_value),
-                Cell::new(if a.args.is_empty() { a.command.clone() } else { format!("{} {}", a.command, a.args) }),
+                Cell::new(if a.args.is_empty() {
+                    a.command.clone()
+                } else {
+                    format!("{} {}", a.command, a.args)
+                }),
             ]);
         }
         println!();

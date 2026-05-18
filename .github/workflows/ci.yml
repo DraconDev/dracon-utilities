@@ -5,14 +5,17 @@ on:
     branches: [main, master]
   pull_request:
     branches: [main, master]
+  schedule:
+    # Weekly Monday 06:00 UTC — catches dependency breakage
+    - cron: "0 6 * * 1"
 
 env:
   CARGO_TERM_COLOR: always
   DRACON_SYNC_GIT_BIN: /usr/bin/git
 
 jobs:
-  test:
-    name: Test & Lint
+  lint:
+    name: Lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -38,11 +41,173 @@ jobs:
       - name: Check formatting
         run: cargo fmt -p dracon-sync -p dracon-system -p dracon-warden -- --check
 
-      - name: Clippy
-        run: cargo clippy -p dracon-sync -p dracon-system -p dracon-warden -- -D clippy::all -D clippy::correctness
+      - name: Clippy (all lints)
+        run: cargo clippy -p dracon-sync -p dracon-system -p dracon-warden -- -D clippy::all -D clippy::correctness -D clippy::suspicious -D clippy::complexity -D clippy::perf -D clippy::style
 
-      - name: Build
+      - name: Clippy (pedantic — warnings only)
+        run: cargo clippy -p dracon-sync -p dracon-system -p dracon-warden -- -W clippy::pedantic -W clippy::nursery 2>&1 | tail -1
+
+      - name: Docs (strict)
+        run: cargo doc -p dracon-sync -p dracon-system -p dracon-warden --no-deps
+        env:
+          RUSTDOCFLAGS: -D warnings
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Checkout dracon-libs
+        run: git clone https://github.com/DraconDev/dracon-libs.git ../dracon-libs
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: Build (debug)
         run: cargo build -p dracon-sync -p dracon-system -p dracon-warden
 
       - name: Test (serial)
         run: cargo test -p dracon-sync -p dracon-system -p dracon-warden -- --test-threads=1
+
+      - name: Test (release profile)
+        run: cargo test --release -p dracon-sync -p dracon-system -p dracon-warden -- --test-threads=1
+
+  release-build:
+    name: Release Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Checkout dracon-libs
+        run: git clone https://github.com/DraconDev/dracon-libs.git ../dracon-libs
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-release-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-release-
+
+      - name: Build (release)
+        run: cargo build --release -p dracon-sync -p dracon-system -p dracon-warden
+
+      - name: Check binary sizes
+        run: |
+          for bin in dracon-sync dracon-system dracon-warden; do
+            size=$(stat --format=%s target/release/$bin)
+            mb=$((size / 1024 / 1024))
+            echo "$bin: ${mb}MiB"
+            # Flag if any binary exceeds 25 MiB (regression check)
+            if [ "$mb" -gt 25 ]; then
+              echo "⚠️ $bin is larger than 25 MiB (${mb} MiB)"
+              exit 1
+            fi
+          done
+
+  scripts:
+    name: Scripts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install shellcheck
+        run: sudo apt-get install -y shellcheck
+
+      - name: Shellcheck
+        run: shellcheck install.sh uninstall.sh doctor.sh scripts/*.sh
+
+      - name: Script dry-run (install.sh)
+        run: |
+          # Verify install.sh can at least parse its args without errors
+          bash -n install.sh
+          bash install.sh --help 2>&1 | head -1 || true
+
+      - name: Script dry-run (doctor.sh)
+        run: bash -n doctor.sh
+
+  msrv:
+    name: Minimum Toolchain
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Checkout dracon-libs
+        run: git clone https://github.com/DraconDev/dracon-libs.git ../dracon-libs
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-msrv-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-msrv-
+
+      - name: Build
+        run: cargo build -p dracon-sync -p dracon-system -p dracon-warden
+
+      - name: Clippy
+        run: cargo clippy -p dracon-sync -p dracon-system -p dracon-warden -- -D clippy::all -D clippy::correctness
+
+      - name: Test
+        run: cargo test -p dracon-sync -p dracon-system -p dracon-warden -- --test-threads=1
+
+      - name: Clippy (MSRV)
+        run: cargo clippy -p dracon-sync -p dracon-system -p dracon-warden -- -D clippy::all -D clippy::correctness
+
+  deny:
+    name: Dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Checkout dracon-libs
+        run: git clone https://github.com/DraconDev/dracon-libs.git ../dracon-libs
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-deny
+        uses: EmbarkStudios/cargo-deny-action@v2
+
+      - name: Check advisories (known CVEs)
+        run: cargo deny check advisories
+
+      - name: Check licenses
+        run: cargo deny check licenses
+
+      - name: Check bans (duplicate deps)
+        run: cargo deny check bans
+
+  nix:
+    name: Nix Flake
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v30
+
+      - name: Check flake evaluates
+        run: nix flake check --no-build

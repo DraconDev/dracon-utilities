@@ -498,6 +498,34 @@ pub(crate) async fn run_daemon(
                 fixed
             );
         }
+
+        // Remove stale .git/index.lock files from crashed git processes.
+        // A lock file with no holding process prevents all git operations.
+        let mut locks_removed = 0u64;
+        for repo in &repo_set {
+            let lock = repo.join(".git/index.lock");
+            if lock.exists() {
+                // Check if any process is actually using it
+                let in_use = std::process::Command::new("fuser")
+                    .arg(&lock)
+                    .output()
+                    .map(|o| o.status.success())
+                    .unwrap_or(false);
+                if !in_use {
+                    if let Err(e) = std::fs::remove_file(&lock) {
+                        eprintln!("⚠️ startup: failed to remove {}: {}", lock.display(), e);
+                    } else {
+                        locks_removed += 1;
+                    }
+                }
+            }
+        }
+        if locks_removed > 0 {
+            eprintln!(
+                "🧹 startup: removed {} stale .git/index.lock files",
+                locks_removed
+            );
+        }
     }
 
     let shutdown = Arc::new(AtomicBool::new(false));

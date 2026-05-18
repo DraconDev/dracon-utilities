@@ -184,10 +184,12 @@ install_binary() {
 
     if [ -n "$resolved" ]; then
         local installed=~/.local/bin/$binary
-        local new_hash=$(md5sum "$resolved" | cut -d' ' -f1)
+        local new_hash
+        new_hash=$(md5sum "$resolved" | cut -d' ' -f1)
 
         if [ -f "$installed" ]; then
-            local old_hash=$(md5sum "$installed" | cut -d' ' -f1)
+            local old_hash
+            old_hash=$(md5sum "$installed" | cut -d' ' -f1)
             if [ "$new_hash" = "$old_hash" ]; then
                 echo "  ⏭️  ~/.local/bin/$binary unchanged (same hash)"
                 return 0
@@ -198,8 +200,8 @@ install_binary() {
             echo "  ✅ Installed ~/.local/bin/$binary (new)"
         fi
 
-        cp "$resolved" ~/.local/bin/$binary
-        chmod +x ~/.local/bin/$binary
+        cp "$resolved" ~/.local/bin/"$binary"
+        chmod +x ~/.local/bin/"$binary"
 
         # Warn if debug build is newer than release — developer may have uninstalled changes
         local debug_path=""
@@ -233,6 +235,7 @@ echo ""
 if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
     echo "⚠️  WARNING: ~/.local/bin is not in your PATH"
     echo "   Add this to your shell config to use dracon utilities:"
+    # shellcheck disable=SC2016  # intentional: show literal $HOME in advice to user
     echo '   export PATH="$HOME/.local/bin:$PATH"'
     echo ""
 fi

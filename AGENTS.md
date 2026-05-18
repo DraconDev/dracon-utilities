@@ -217,6 +217,19 @@ On every daemon start/restart, the sync daemon prunes stale state:
 - **Incident ledger**: Enforces retention (max age + max lines) immediately at start
 - **Visibility cache**: Removes orphan `.last` files for deleted repos
 - **Broken tracking**: Repairs `origin/master: gone` refs → `origin/{branch}` (also runs every ~5 min in the loop)
+- **Stale index.lock**: Removes `.git/index.lock` files with no holding process (left by crashed git operations). Without this, a stale lock blocks all git operations in that repo and the daemon can never commit changes there.
+
+### Daemon Reliability
+
+**Push timeouts:** Default `push_op_timeout_secs=60` (was 300). A hanging mirror push (e.g. GitLab unreachable) blocks the entire daemon — no other repos get synced until it times out. With 3 mirrors at 300s each, a single repo could block the daemon for 15 minutes. 60s per push / 120s per repo keeps the daemon responsive.
+
+**Filter-only cooldown:** Repos with clean/smudge filter changes (e.g. dracon-warden encryption) show as dirty in `git status` but have no diff after staging. The daemon detects this, resets the staging area, and applies a cooldown to prevent tight re-check loops.
+
+**Fingerprint-based scheduling:** The daemon uses a fingerprint (branch + effective_dirty + staged + ahead + behind) to determine if a repo needs syncing. Only after the fingerprint stays stable for `inactivity_push_delay_secs` (default 5s) does the daemon attempt a sync. This prevents partial-change commits.
+
+### Report Accuracy (repos command)
+
+The `repos` command shows **real dirty file counts** from libgit2's `get_status()`, not filtered counts. The OK/WARN/CONCERN status uses `has_sync_relevant_dirty_entries()` (which excludes target/, node_modules/, oversized files, etc.), but the MOD/STG columns always show the actual number of modified/staged files. Previously, when `effective_dirty` was false (all changes excluded by policy), the report showed 0 — making repos with 30+ uncommitted files appear clean.
 
 The guard daemon rotates its log file if oversized at startup.
 

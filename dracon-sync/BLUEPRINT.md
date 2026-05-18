@@ -155,7 +155,7 @@ dracon-sync is **invisible infrastructure** for an AI coder. The AI works on one
 - `pulse_interval_secs = 1` - OK (minimum 1)
 - `inactivity_push_delay_secs = 5` - OK (minimum 1)
 - `pull_op_timeout_secs = 10` - OK (minimum 5)
-- `push_op_timeout_secs = 300` - OK (minimum 10)
+- `push_op_timeout_secs = 60` - Reduced from 300 (a hanging push blocks the entire daemon for 5 min)
 - `repo_sync_timeout_secs = 900` - OK (must be > push + 30)
 - `push_retries = 3` - OK
 - `repair_cooldown_secs = 60` - OK (minimum 1)
