@@ -866,6 +866,68 @@ fn ensure_repo_filter_config(repo: &Path) -> Result<bool> {
     Ok(changed)
 }
 
+/// RAII guard that acquires `.git/index.lock` using the same protocol git uses.
+///
+/// Git commands (checkout, add, reset, etc.) hold this lock while modifying
+/// the working tree. By acquiring it too, the warden guarantees mutual exclusion
+/// with any in-flight git operation — no heuristic timing, no grace periods,
+/// no races. If the lock is held, we skip; if we hold it, git waits for us.
+///
+/// This is the definitive fix for the clone race: during `git clone`, checkout
+/// holds index.lock. The warden's `harden_repo` → `publish_repo_pubkey` writes
+/// `.pub` files to the working tree. Without the lock, these appear before
+/// checkout completes → "Untracked working tree file would be overwritten by merge."
+/// With the lock, either git holds it (warden skips) or warden holds it
+/// (git's checkout waits until we're done).
+struct IndexLock {
+    path: PathBuf,
+    /// True if we successfully created the lock (our responsibility to clean up).
+    held: bool,
+}
+
+impl IndexLock {
+    /// Try to acquire `.git/index.lock` for a repo.
+    /// Returns Ok(lock) if acquired, Err if another process holds it.
+    /// Uses `O_EXCL` (create_new) for atomic creation — no TOCTOU race.
+    fn acquire(repo: &Path) -> Result<Self> {
+        let path = repo.join(".git").join("index.lock");
+        match fs::OpenOptions::new()
+            .write(true)
+            .create_new(true) // O_EXCL — fails if file exists
+            .open(&path)
+        {
+            Ok(_file) => Ok(Self { path, held: true }),
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                Err(anyhow::anyhow!(
+                    "index.lock held by another git operation, skipping {}",
+                    repo.display()
+                ))
+            }
+            Err(e) => Err(anyhow::anyhow!(
+                "failed to create index.lock for {}: {}",
+                repo.display(),
+                e
+            )),
+        }
+    }
+
+    /// Create a no-op lock (for `once`/`repair` commands that don't need coordination).
+    fn bypass() -> Self {
+        Self {
+            path: PathBuf::new(),
+            held: false,
+        }
+    }
+}
+
+impl Drop for IndexLock {
+    fn drop(&mut self) {
+        if self.held {
+            let _ = fs::remove_file(&self.path);
+        }
+    }
+}
+
 fn is_repo_checked_out(repo: &Path) -> bool {
     let git_dir = repo.join(".git");
     let head = git_dir.join("HEAD");
@@ -919,15 +981,39 @@ pub(crate) fn harden_repo(
 ) -> Result<(bool, bool, bool)> {
     policy.validate()?;
 
-    // The daemon must not write files to repos mid-clone (the warden's publish_repo_pubkey
-    // writes .pub files to .dracon/data/keys/ — if this happens before git's checkout
-    // completes, git aborts with "Untracked working tree file would be overwritten").
-    // The `once` command and tests bypass this check because the user explicitly
-    // requested hardening.
-    if !skip_checkout_check && !is_repo_checked_out(repo) {
+    // Acquire git's index.lock before writing ANY working-tree files.
+    // This is the same coordination protocol git uses internally — checkout,
+    // add, reset, etc. all hold this lock while modifying the working tree.
+    // By acquiring it too, we guarantee mutual exclusion:
+    //   - If git holds it → our acquire fails → we skip (git is mid-checkout)
+    //   - If we hold it → git's checkout waits for us → no conflict
+    // This eliminates ALL race conditions without heuristics or grace periods.
+    //
+    // The `once`/`repair` commands skip the lock because the user explicitly
+    // requested hardening and may not even have a git operation in progress.
+    let _lock = if skip_checkout_check {
+        IndexLock::bypass()
+    } else if !is_repo_checked_out(repo) {
+        // Quick pre-check: if the repo clearly isn't checked out (no HEAD,
+        // no commits), skip before even trying the lock. This avoids creating
+        // an index.lock in a repo that git init hasn't committed to yet.
         return Ok((false, false, false));
-    }
+    } else {
+        match IndexLock::acquire(repo) {
+            Ok(lock) => lock,
+            Err(e) => {
+                // Another git operation is in progress — skip gracefully.
+                // This is normal during clone/checkout and not an error.
+                if debug_enabled() {
+                    eprintln!("⏳ {}", e);
+                }
+                return Ok((false, false, false));
+            }
+        }
+    };
 
+    // All working-tree writes below are now safe — we hold index.lock,
+    // so no concurrent git checkout can write the same files.
     let gitignore_path = repo.join(".gitignore");
     let gitattributes_path = repo.join(".gitattributes");
 
