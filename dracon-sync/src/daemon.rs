@@ -1,6 +1,6 @@
 use anyhow::Result;
 use dracon_git::GitService;
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
@@ -455,6 +455,7 @@ pub(crate) async fn run_daemon(
 
     let mut activity: HashMap<PathBuf, RepoActivity> = HashMap::new();
     let mut pending_repos: HashMap<PathBuf, Instant> = HashMap::new();
+    let mut initial_repos: HashSet<PathBuf> = HashSet::new(); // repos seen on first scan
     let mut repair_cooldowns: HashMap<PathBuf, Instant> = HashMap::new();
     let mut filter_cooldowns: HashMap<PathBuf, Instant> = HashMap::new();
     let mut stuck_push_repos = load_stuck_push_repos();
@@ -479,6 +480,7 @@ pub(crate) async fn run_daemon(
             Some(&policy.system_repo),
         );
         let repo_set: std::collections::BTreeSet<PathBuf> = discovered.iter().cloned().collect();
+        initial_repos = repo_set.iter().cloned().collect();
 
         // Prune stuck repos no longer on disk
         let before = stuck_push_repos.len();
@@ -682,16 +684,28 @@ pub(crate) async fn run_daemon(
             // files here can create working-tree files that conflict with
             // git's own checkout, causing "Untracked working tree file would
             // be overwritten by merge" errors.
-            const PENDING_GRACE_SECS: Duration = Duration::from_secs(15);
-            if let Some(&entry_time) = pending_repos.get(&repo) {
-                if Instant::now().duration_since(entry_time) < PENDING_GRACE_SECS {
+            //
+            // Only applies to repos discovered AFTER the first scan cycle.
+            // Repos present at daemon startup are assumed to be stable
+            // (already checked out) and are processed immediately.
+            if !initial_repos.contains(&repo) && cycle_count > 0 {
+                const PENDING_GRACE_SECS: Duration = Duration::from_secs(15);
+                if let Some(&entry_time) = pending_repos.get(&repo) {
+                    if Instant::now().duration_since(entry_time) < PENDING_GRACE_SECS {
+                        continue;
+                    }
+                    pending_repos.remove(&repo);
+                } else {
+                    // First time seeing this repo after startup: enter grace period
+                    pending_repos.insert(repo.clone(), Instant::now());
+                    if debug_enabled() {
+                        eprintln!(
+                            "⏳ {} new repo, entering 15s grace period",
+                            repo.display()
+                        );
+                    }
                     continue;
                 }
-                pending_repos.remove(&repo);
-            } else {
-                // First time seeing this repo: enter grace period
-                pending_repos.insert(repo.clone(), Instant::now());
-                continue;
             }
 
             // Skip repos that are stuck on push, but retry them every 5 minutes
