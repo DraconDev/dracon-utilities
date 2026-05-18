@@ -1352,22 +1352,21 @@ pub(crate) async fn sync_repo(
         // Acquire git's index.lock before writing standard files to the working tree.
         // This prevents conflicting with git's own checkout during clone — if git
         // holds the lock, we skip; if we hold it, git waits. No heuristics needed.
-        let _lock = match crate::git::IndexLock::acquire(repo) {
-            Ok(lock) => lock,
+        match crate::git::IndexLock::acquire(repo) {
+            Ok(_lock) => crate::standard_files::ensure_standard_files(
+                repo,
+                policy,
+                &repo_override,
+                policy_path.map(|p| p.parent().unwrap_or(p)),
+                dry_run,
+            )?,
             Err(e) => {
                 if crate::policy::debug_enabled() {
                     eprintln!("⏳ {}", e);
                 }
                 vec![] // skip standard files this cycle
             }
-        };
-        crate::standard_files::ensure_standard_files(
-            repo,
-            policy,
-            &repo_override,
-            policy_path.map(|p| p.parent().unwrap_or(p)),
-            dry_run,
-        )?
+        }
     } else {
         vec![]
     };
