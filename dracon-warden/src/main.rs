@@ -1368,7 +1368,7 @@ fn run_daemon(policy_path: PathBuf) -> Result<()> {
             if let Err(e) = scrub_markers(&policy, &repos_vec, true) {
                 eprintln!("warden: scrub_markers failed: {}", e);
             }
-            if let Err(e) = harden_repos(&policy, repos_vec) {
+            if let Err(e) = harden_repos(&policy, repos_vec, false) {
                 eprintln!("warden: harden_repos failed: {}", e);
             }
             last_run = Instant::now();
@@ -1447,7 +1447,7 @@ async fn main() -> Result<()> {
             policy.validate()?;
             if let Some(r) = repo {
                 scrub_markers(&policy, std::slice::from_ref(&r), true)?;
-                harden_repos(&policy, vec![r])?;
+                harden_repos(&policy, vec![r], true)?;
             } else {
                 harden_all(&policy)?;
             }
@@ -1498,7 +1498,7 @@ async fn main() -> Result<()> {
             if !dry_run {
                 // Hardening (managed blocks + marker scrub)
                 scrub_markers(&policy, &repos, true)?;
-                harden_repos(&policy, repos.clone())?;
+                harden_repos(&policy, repos.clone(), true)?;
                 // Fix ciphertext stuck in worktree (if identities allow).
                 resmudge_repos(&policy, &repos, true)?;
                 // Backfill .env files with Dracon Warden headers if missing.
