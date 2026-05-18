@@ -1004,9 +1004,7 @@ pub(crate) fn harden_repo(
             Err(e) => {
                 // Another git operation is in progress — skip gracefully.
                 // This is normal during clone/checkout and not an error.
-                if debug_enabled() {
-                    eprintln!("⏳ {}", e);
-                }
+                veprintln!(1, "⏳ {}", e);
                 return Ok((false, false, false));
             }
         }
