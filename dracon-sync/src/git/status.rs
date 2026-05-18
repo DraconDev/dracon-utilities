@@ -111,20 +111,10 @@ pub(crate) fn is_repo_ready(repo: &Path) -> bool {
     if let Ok(meta) = std::fs::metadata(&index) {
         // git-init creates an index of ~96 bytes (header only).
         // A checked-out repo has entries accumulating to at least 4KB+.
-        if meta.len() < 256 {
-            let out = std::process::Command::new(&git_bin)
-                .args(["ls-files"])
-                .current_dir(repo)
-                .output()
-                .ok();
-            if let Some(o) = out {
-                let stdout = String::from_utf8_lossy(&o.stdout);
-                if stdout.lines().count() < 3 {
-                    // Fewer than 3 tracked files = checkout not complete.
-                    // A real repo will have dozens/hundreds of tracked files.
-                    return false;
-                }
-            }
+        if meta.len() < 128 {
+            // An index smaller than 128 bytes means no tracked files
+            // have been checked out (just the git-init header at ~104 bytes).
+            return false;
         }
     }
 
