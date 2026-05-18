@@ -675,6 +675,25 @@ pub(crate) async fn run_daemon(
                 }
                 continue;
             }
+            // Grace period for newly discovered repos: skip git operations
+            // for the first 15s to avoid interfering with in-progress clones.
+            // During git clone, HEAD resolves after fetch but checkout may
+            // still be in progress — running git status or writing standard
+            // files here can create working-tree files that conflict with
+            // git's own checkout, causing "Untracked working tree file would
+            // be overwritten by merge" errors.
+            const PENDING_GRACE_SECS: Duration = Duration::from_secs(15);
+            if let Some(&entry_time) = pending_repos.get(&repo) {
+                if Instant::now().duration_since(entry_time) < PENDING_GRACE_SECS {
+                    continue;
+                }
+                pending_repos.remove(&repo);
+            } else {
+                // First time seeing this repo: enter grace period
+                pending_repos.insert(repo.clone(), Instant::now());
+                continue;
+            }
+
             // Skip repos that are stuck on push, but retry them every 5 minutes
             // to see if the issue resolved (e.g., remote was recreated, permissions fixed, etc.)
             if let Some(stuck_since) = stuck_push_repos.get(&repo).copied() {
