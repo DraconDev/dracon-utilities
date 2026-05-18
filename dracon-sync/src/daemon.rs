@@ -454,6 +454,7 @@ pub(crate) async fn run_daemon(
     }
 
     let mut activity: HashMap<PathBuf, RepoActivity> = HashMap::new();
+    let mut pending_repos: HashMap<PathBuf, Instant> = HashMap::new();
     let mut repair_cooldowns: HashMap<PathBuf, Instant> = HashMap::new();
     let mut filter_cooldowns: HashMap<PathBuf, Instant> = HashMap::new();
     let mut stuck_push_repos = load_stuck_push_repos();
@@ -615,6 +616,7 @@ pub(crate) async fn run_daemon(
         );
         let repo_set: BTreeSet<PathBuf> = repos.iter().cloned().collect();
         activity.retain(|repo, _| repo_set.contains(repo));
+        pending_repos.retain(|repo, _| repo_set.contains(repo));
         repair_cooldowns.retain(|repo, _| repo_set.contains(repo));
         filter_cooldowns.retain(|repo, _| repo_set.contains(repo));
         stuck_push_repos.retain(|repo, _| repo_set.contains(repo));
