@@ -208,7 +208,7 @@ mod tests {
             .expect("git init");
         assert!(status.success(), "git init should succeed");
 
-        let (a, b, c) = harden_repo(&repo, &sample_policy(), Some(&key)).expect("harden");
+        let (a, b, c) = harden_repo(&repo, &sample_policy(), Some(&key), true).expect("harden");
         assert!(a, "gitignore should be written");
         assert!(b, ".gitattributes should be written");
         assert!(c, "pubkey should be published");
@@ -229,7 +229,7 @@ mod tests {
             .expect("git init");
         assert!(status.success());
 
-        let (_a, b, _c) = harden_repo(&repo, &sample_policy(), None).expect("harden");
+        let (_a, b, _c) = harden_repo(&repo, &sample_policy(), None, true).expect("harden");
         assert!(b);
 
         let clean = ProcessCommand::new("git")
@@ -1019,7 +1019,7 @@ watch_roots = ["/tmp/test"]
         let _env_guard = EnvGuard::set("DRACON_WARDEN_POLICY", config_path.to_str().unwrap());
 
         let policy = WardenPolicy::load(&config_path).expect("load policy");
-        let result = harden_repos(&policy, vec![repo.clone()]);
+        let result = harden_repos(&policy, vec![repo.clone()], true);
         assert!(result.is_ok(), "once should succeed: {:?}", result);
         assert!(
             repo.join(".gitignore").exists(),
@@ -1068,7 +1068,7 @@ watch_roots = ["/tmp/test"]
             result
         );
 
-        let result = harden_repos(&policy, vec![repo.clone()]);
+        let result = harden_repos(&policy, vec![repo.clone()], true);
         assert!(
             result.is_ok(),
             "repair dry-run harden should succeed: {:?}",

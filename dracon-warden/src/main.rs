@@ -958,11 +958,11 @@ pub(crate) fn harden_repo(
     ))
 }
 
-fn harden_all(policy: &WardenPolicy) -> Result<()> {
+fn harden_all(policy: &WardenPolicy, skip_checkout_check: bool) -> Result<()> {
     let roots = effective_discovery_roots(policy);
     let repos = discover_git_repos_local(&roots);
     scrub_markers(policy, &repos, true)?;
-    harden_repos(policy, repos, false) // daemon: enforce checkout check
+    harden_repos(policy, repos, skip_checkout_check)
 }
 
 pub(crate) fn harden_repos<I>(
@@ -1291,7 +1291,7 @@ fn run_daemon(policy_path: PathBuf) -> Result<()> {
         }
     });
 
-    if let Err(e) = harden_all(&policy) {
+    if let Err(e) = harden_all(&policy, false) {
         eprintln!("⚠️ initial hardening pass failed: {}", e);
     }
 
@@ -1317,7 +1317,7 @@ fn run_daemon(policy_path: PathBuf) -> Result<()> {
                         if let Err(e) = backfill_env_headers_repos(&discovered_repos, true) {
                             eprintln!("warden: SIGHUP backfill failed: {}", e);
                         }
-                        if let Err(e) = harden_all(&p) {
+                        if let Err(e) = harden_all(&p, false) {
                             eprintln!("warden: SIGHUP harden failed: {}", e);
                         }
                     }
@@ -1394,7 +1394,7 @@ fn run_daemon(policy_path: PathBuf) -> Result<()> {
                 last_sweep = Instant::now();
                 continue;
             }
-            if let Err(e) = harden_all(&policy) {
+            if let Err(e) = harden_all(&policy, false) {
                 eprintln!("warden: harden_all failed in sweep: {}", e);
             }
             let roots = effective_discovery_roots(&policy);
@@ -1449,7 +1449,7 @@ async fn main() -> Result<()> {
                 scrub_markers(&policy, std::slice::from_ref(&r), true)?;
                 harden_repos(&policy, vec![r], true)?;
             } else {
-                harden_all(&policy)?;
+                harden_all(&policy, true)?;
             }
         }
         Command::Daemon => {
