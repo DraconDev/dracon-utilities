@@ -76,47 +76,20 @@ pub(crate) fn is_repo_ready(repo: &Path) -> bool {
     } else {
         return false;
     }
-    // Verify HEAD resolves to a valid commit hash.
-    // This catches repos that are mid-initialization (no commits yet).
     let git_bin = std::env::var("DRACON_SYNC_GIT_BIN").unwrap_or_else(|_| "git".to_string());
     let output = std::process::Command::new(&git_bin)
         .args(["rev-parse", "HEAD"])
         .current_dir(repo)
         .output()
         .ok();
-    let hash_valid = match output {
+    match output {
         Some(o) => {
             if !o.status.success() {
-                false
-            } else {
-                let hash = String::from_utf8_lossy(&o.stdout).trim().to_string();
-                !hash.is_empty()
+                return false;
             }
+            let hash = String::from_utf8_lossy(&o.stdout).trim().to_string();
+            !hash.is_empty()
         }
         None => false,
-    };
-    if !hash_valid {
-        return false;
     }
-
-    // Guard against mid-clone race: after git-fetch but before checkout completes,
-    // repos have a valid HEAD but no tracked files in the index yet. If the daemon
-    // touches such a repo (git status, standard_files, etc.), it can create files
-    // that conflict with git's own checkout, causing "Untracked working tree file
-    // would be overwritten by merge" errors on future clones.
-    //
-    // Check if there are any tracked files in the index — an empty or near-empty
-    // index means the checkout hasn't happened yet.
-    let index = repo.join(".git").join("index");
-    if let Ok(meta) = std::fs::metadata(&index) {
-        // git-init creates an index of ~96 bytes (header only).
-        // A checked-out repo has entries accumulating to at least 4KB+.
-        if meta.len() < 128 {
-            // An index smaller than 128 bytes means no tracked files
-            // have been checked out (just the git-init header at ~104 bytes).
-            return false;
-        }
-    }
-
-    true
 }

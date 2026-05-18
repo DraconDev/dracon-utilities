@@ -658,6 +658,21 @@ pub(crate) async fn run_daemon(
                 }
                 continue;
             }
+            // Skip repos mid-checkout (clone's checkout phase holds index.lock).
+            // Without this guard, the daemon can interfere with git checkout by
+            // creating files (standard_files, project-state.md, etc.) that later
+            // cause "Untracked working tree file would be overwritten by merge"
+            // errors when git's own checkout tries to write them.
+            let lock = repo.join(".git").join("index.lock");
+            if lock.exists() {
+                if debug_enabled() {
+                    eprintln!(
+                        "⏳ {} has index.lock (mid-checkout), skipping",
+                        repo.display()
+                    );
+                }
+                continue;
+            }
             // Skip repos that are stuck on push, but retry them every 5 minutes
             // to see if the issue resolved (e.g., remote was recreated, permissions fixed, etc.)
             if let Some(stuck_since) = stuck_push_repos.get(&repo).copied() {
