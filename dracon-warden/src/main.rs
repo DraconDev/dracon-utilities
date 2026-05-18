@@ -894,26 +894,37 @@ fn is_repo_checked_out(repo: &Path) -> bool {
         return false;
     }
 
-    // 2. If the index doesn't exist or is empty (just the git-init header ~104 bytes),
-    //    checkout hasn't written files yet. A real checkout produces an index with
-    //    entries for every tracked file (well above 128 bytes).
-    let index = git_dir.join("index");
-    match fs::metadata(&index) {
-        Ok(meta) if meta.len() > 128 => { /* index has entries — checkout done */ }
-        _ => return false,
+    // 2. Verify HEAD resolves to a valid commit. This catches:
+    //    - git init (no commits yet — rev-parse HEAD fails)
+    //    - mid-clone (fetch done, checkout not yet — rev-parse may succeed but
+    //      the working tree is incomplete; index.lock above catches most of these)
+    let output = std::process::Command::new("git")
+        .args(["rev-parse", "HEAD"])
+        .current_dir(repo)
+        .output();
+    match output {
+        Ok(o) if o.status.success() => {
+            let hash = String::from_utf8_lossy(&o.stdout).trim().to_string();
+            !hash.is_empty()
+        }
+        _ => false,
     }
-
-    true
 }
 
 pub(crate) fn harden_repo(
     repo: &Path,
     policy: &WardenPolicy,
     pubkey_path: Option<&Path>,
+    skip_checkout_check: bool,
 ) -> Result<(bool, bool, bool)> {
     policy.validate()?;
 
-    if !is_repo_checked_out(repo) {
+    // The daemon must not write files to repos mid-clone (the warden's publish_repo_pubkey
+    // writes .pub files to .dracon/data/keys/ — if this happens before git's checkout
+    // completes, git aborts with "Untracked working tree file would be overwritten").
+    // The `once` command and tests bypass this check because the user explicitly
+    // requested hardening.
+    if !skip_checkout_check && !is_repo_checked_out(repo) {
         return Ok((false, false, false));
     }
 
@@ -951,10 +962,14 @@ fn harden_all(policy: &WardenPolicy) -> Result<()> {
     let roots = effective_discovery_roots(policy);
     let repos = discover_git_repos_local(&roots);
     scrub_markers(policy, &repos, true)?;
-    harden_repos(policy, repos)
+    harden_repos(policy, repos, false) // daemon: enforce checkout check
 }
 
-pub(crate) fn harden_repos<I>(policy: &WardenPolicy, repos: I) -> Result<()>
+pub(crate) fn harden_repos<I>(
+    policy: &WardenPolicy,
+    repos: I,
+    skip_checkout_check: bool,
+) -> Result<()>
 where
     I: IntoIterator<Item = PathBuf>,
 {
@@ -965,7 +980,7 @@ where
 
     let mut changed = 0usize;
     for repo in repos {
-        match harden_repo(&repo, policy, pubkey_path.as_deref()) {
+        match harden_repo(&repo, policy, pubkey_path.as_deref(), skip_checkout_check) {
             Ok((a, b, c)) => {
                 if a || b || c {
                     changed += 1;
