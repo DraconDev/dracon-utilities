@@ -516,11 +516,17 @@ Commands:
 
 ### Safety Behaviors
 
-**dracon-sync mass-deletion prevention:** The sync daemon will refuse to auto-commit deletions that remove 85% or more of tracked files in a repository. This guards against accidental mass wipes caused by filesystem issues, filter misconfigurations, or destructive operations.
+**dracon-sync mass-deletion prevention:** The sync daemon will refuse to auto-commit deletions that meet ANY of these tiered thresholds:
+
+| Threshold | Condition | Example |
+|-----------|-----------|--------|
+| **85%+** | `missing_count * 100 / total_tracked >= 85%` | 17 of 20 files deleted |
+| **70%+ with 5+ files** | `pct >= 70% AND missing_count >= 5` | 6 of 8 files deleted |
+| **10+ absolute** | `missing_count >= 10` regardless of percentage | 10 of 100 files deleted |
 
 When triggered, sync prints a warning and skips the commit:
 ```
-⚠️ SAFETY: 46 files missing from working tree (85%+ of 46 tracked)
+⚠️ SAFETY: 22 files missing from working tree (78% of 28 tracked)
 ⚠️ Refusing to stage mass deletion - this looks like a mistake or destructive operation
 ⚠️ If you really want to delete these files, do: git add -A && git commit -m 'delete files'
 ```

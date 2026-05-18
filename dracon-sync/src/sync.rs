@@ -596,9 +596,19 @@ async fn check_mass_deletion(
     };
 
     let missing_count = missing.len();
+    // Tiered mass-deletion detection:
+    //   85%+ of tracked files missing → always block (large repos)
+    //   70%+ with ≥5 missing files → block (catches small repos losing most files)
+    //   10+ missing files → block regardless of repo size
     const MASS_DELETION_THRESHOLD_PCT: usize = 85;
-    let is_mass_deletion =
-        total_tracked > 0 && (missing_count * 100) / total_tracked >= MASS_DELETION_THRESHOLD_PCT;
+    const MODERATE_THRESHOLD_PCT: usize = 70;
+    const MODERATE_MIN_MISSING: usize = 5;
+    const ABSOLUTE_MIN_MISSING: usize = 10;
+    let is_mass_deletion = total_tracked > 0
+        && ((missing_count * 100) / total_tracked >= MASS_DELETION_THRESHOLD_PCT
+            || (missing_count >= ABSOLUTE_MIN_MISSING)
+            || (missing_count >= MODERATE_MIN_MISSING
+                && (missing_count * 100) / total_tracked >= MODERATE_THRESHOLD_PCT));
 
     if is_mass_deletion {
         let pct = (missing_count * 100) / total_tracked;
@@ -3423,17 +3433,31 @@ auto_bump_versions = false
         // 2 of 5 deleted (40%) — ALLOWED
         check_scenario(&tmp, "boundary-40pct", 5, 2, false).await;
 
-        // 3 of 5 deleted (60%) — ALLOWED (below 85% threshold)
+        // 3 of 5 deleted (60%) — ALLOWED (below 70% + 5 minimum)
         check_scenario(&tmp, "boundary-60pct", 5, 3, false).await;
 
-        // 5 of 6 deleted (83%) — ALLOWED (just below 85% threshold)
-        check_scenario(&tmp, "boundary-83pct", 6, 5, false).await;
+        // 5 of 6 deleted (83%) — BLOCKED (83% >= 70% AND 5 >= 5 minimum)
+        // This is the obs-wayland-hotkey scenario: 22/28 = 78.6% would now be caught
+        check_scenario(&tmp, "boundary-83pct", 6, 5, true).await;
 
         // 6 of 7 deleted (~85.7%) — BLOCKED (at 85% threshold)
         check_scenario(&tmp, "boundary-86pct", 7, 6, true).await;
 
         // 1 of 1 deleted (100%) — BLOCKED (single file is still 100%)
         check_scenario(&tmp, "boundary-single-100pct", 1, 1, true).await;
+
+        // 10 of 30 deleted (33%) — BLOCKED (absolute: 10+ missing files)
+        check_scenario(&tmp, "boundary-10-absolute", 30, 10, true).await;
+
+        // 5 of 10 deleted (50%) — BLOCKED (70%+ with 5+ missing)
+        // Actually 50% < 70%, so ALLOWED — need 7 of 10
+        check_scenario(&tmp, "boundary-50pct-10files", 10, 5, false).await;
+
+        // 7 of 10 deleted (70%) — BLOCKED (70% threshold with 7 >= 5 missing)
+        check_scenario(&tmp, "boundary-70pct-10files", 10, 7, true).await;
+
+        // 22 of 28 deleted (78.6%) — BLOCKED (obs-wayland-hotkey scenario)
+        check_scenario(&tmp, "boundary-obs-hotkey", 28, 22, true).await;
     }
 
     #[tokio::test]

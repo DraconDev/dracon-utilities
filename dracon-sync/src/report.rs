@@ -543,6 +543,7 @@ pub(crate) fn repo_is_concern(
     status.ahead > 0 || status.behind > 0 || !has_origin || !has_upstream
 }
 
+#[allow(dead_code)]
 pub(crate) fn repo_is_warn(
     status: &dracon_git::types::RepoStatus,
     has_origin: bool,
@@ -678,7 +679,16 @@ pub(crate) async fn run_repos_report(
         let has_origin = has_origin_remote(&repo);
         let has_upstream = has_tracking_upstream(&repo);
 
+        // Classification uses REAL dirty state (not effective/filter-only).
+        // A repo with any modified or staged files is at least WARN.
+        // effective_dirty is only for the daemon's commit decision.
+        let real_is_dirty = !status.is_clean;
+        let concern = repo_is_concern(&effective_status, has_origin, has_upstream);
+        let warn = !concern && real_is_dirty;
+
+        // Flags still use effective_status for ahead/behind/origin detection
         let flags = repo_state_flags(&effective_status, has_origin, has_upstream);
+        let hint = repo_hint(&flags, warn, concern);
 
         let last_hash = status
             .last_commit_hash
@@ -697,10 +707,6 @@ pub(crate) async fn run_repos_report(
             .await
             .unwrap_or_else(|| "-".to_string());
         let last_unix = git_log_unix_timestamp(&repo).await.unwrap_or(0);
-
-        let concern = repo_is_concern(&effective_status, has_origin, has_upstream);
-        let warn = repo_is_warn(&effective_status, has_origin, has_upstream);
-        let hint = repo_hint(&flags, warn, concern);
 
         rows.push(RepoReportRow {
             repo: repo.display().to_string(),
@@ -1859,7 +1865,10 @@ pub(crate) async fn run_repair_warns(
             staged_files: status.staged_files,
             ..status.clone()
         };
-        if !repo_is_warn(&effective_status, has_origin, has_upstream) {
+        // Use real dirty state for classification — a repo with modified files
+        // is WARN even if the daemon wouldn't auto-commit them (filter-only).
+        let real_is_dirty = !status.is_clean;
+        if !real_is_dirty {
             continue;
         }
         warns += 1;

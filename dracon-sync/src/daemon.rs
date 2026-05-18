@@ -441,6 +441,9 @@ pub(crate) async fn run_daemon(
     struct RepoActivity {
         fingerprint: String,
         changed_at: Instant,
+        /// When the repo first became dirty in this cycle.
+        /// Unlike changed_at, this doesn't reset on fingerprint changes.
+        dirty_since: Option<Instant>,
         failure_count: usize,
         remote_failures: HashMap<String, usize>,
     }
@@ -812,20 +815,45 @@ pub(crate) async fn run_daemon(
                     RepoActivity {
                         fingerprint,
                         changed_at: now,
+                        dirty_since: if effective_dirty { Some(now) } else { None },
                         failure_count: 0,
                         remote_failures: HashMap::new(),
                     },
                 );
                 continue;
             };
+            // Track when the repo first became dirty in this activity window.
+            // This persists across fingerprint changes so that actively-edited
+            // repos still get synced after a maximum delay (30s).
+            if effective_dirty && entry.dirty_since.is_none() {
+                entry.dirty_since = Some(now);
+            } else if !effective_dirty {
+                entry.dirty_since = None;
+            }
             if entry.fingerprint != fingerprint {
                 entry.fingerprint = fingerprint;
                 entry.changed_at = now;
                 entry.failure_count = 0;
-                continue;
+                // Don't skip if the repo has been dirty for > 5s —
+                // sync it regardless of fingerprint changes.
+                const MAX_DIRTY_DELAY: Duration = Duration::from_secs(5);
+                let dirty_long_enough = entry
+                    .dirty_since
+                    .is_some_and(|since| now.duration_since(since) >= MAX_DIRTY_DELAY);
+                if !dirty_long_enough {
+                    continue;
+                }
             }
             if now.duration_since(entry.changed_at) < inactivity_delay {
-                continue;
+                // Same check for the stable-fingerprint case:
+                // allow sync if dirty for > 5s even if fingerprint is stable.
+                const MAX_DIRTY_DELAY: Duration = Duration::from_secs(5);
+                let dirty_long_enough = entry
+                    .dirty_since
+                    .is_some_and(|since| now.duration_since(since) >= MAX_DIRTY_DELAY);
+                if !dirty_long_enough {
+                    continue;
+                }
             }
 
             // MAX_FAILURES: per-cycle retry cap for transient errors.
