@@ -218,7 +218,9 @@ On every daemon start/restart, the sync daemon prunes stale state:
 - **Visibility cache**: Removes orphan `.last` files for deleted repos
 - **Broken tracking**: Repairs `origin/master: gone` refs → `origin/{branch}` (also runs every ~5 min in the loop)
 - **Stale index.lock**: Removes `.git/index.lock` files with no holding process (left by crashed git operations). Without this, a stale lock blocks all git operations in that repo and the daemon can never commit changes there.
-- **Clone race guard**: The daemon skips repos with an active `index.lock` (mid-checkout) and applies a 15-second grace period to newly discovered repos. This prevents the daemon from interfering with `git clone` — during clone, HEAD resolves after fetch but checkout may still be in progress. If the daemon writes files (standard_files, project-state) before checkout completes, git aborts with "Untracked working tree file would be overwritten by merge." Only repos discovered AFTER the initial startup scan get the grace period; repos present at daemon start are processed immediately.
+- **Clone race guard**: The warden daemon (not the sync daemon) was the true root cause of clone failures. The warden's `publish_repo_pubkey()` writes `.pub` files to `.dracon/data/keys/` during `harden_repo()`. When triggered by filesystem events during a `git clone`, these files appear before git's checkout phase, causing "Untracked working tree file would be overwritten by merge." Fixed in two layers:
+  1. **Warden**: `is_repo_checked_out()` now checks for `index.lock` and verifies HEAD resolves to a valid commit. The daemon path enforces this check; the `once`/`repair` commands skip it (user-requested).
+  2. **Sync daemon**: 15-second grace period for newly discovered repos + `index.lock` guard. Repos present at startup are processed immediately; repos discovered later (e.g., mid-clone) are deferred. When a repo is removed from the activity map (deleted), it's also removed from `initial_repos` so re-cloned repos get the grace period.
 
 ### Daemon Reliability
 

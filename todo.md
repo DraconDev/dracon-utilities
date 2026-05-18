@@ -1,7 +1,8 @@
 # Dracon Utilities — TODO
 
 ## Done ✅
-- [x] Clone race bug: daemon now skips repos with active index.lock + 15s grace period for newly discovered repos
+- [x] Clone race bug: WARDEN was root cause (publish_repo_pubkey writes files during clone). Fixed in warden `is_repo_checked_out` + sync daemon grace period + index.lock guards
+- [x] Global git filter.dracon path: fixed ~/.cargo/bin → ~/.local/bin
 - [x] Mass deletion guard: tiered thresholds (85%+, 70%+ ≥5 files, 10+ absolute)
 - [x] `repo_diff_entries` root cause fix: returns ALL diff entries when dirty, not just when staged
 - [x] Status reporting honesty: WARN uses real dirty state, not `effective_dirty`
