@@ -30,5 +30,24 @@ ProtectHome=read-only
 ReadWritePaths=%h/.dracon %h/Dev %h/.local/state/dracon %h/.local/share/Trash %h/.cargo %h/.cache %h/.npm
 PrivateTmp=true
 
+# Kernel-level sandboxing (all certain — these daemons never use these privileges)
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelLogs=true
+ProtectClock=true
+ProtectHostname=true
+ProtectControlGroups=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+RemoveIPC=true
+CapabilityBoundingSet=
+RestrictNamespaces=true
+
+# Syscall allowlist — returns EPERM instead of SIGSYS for safe discovery
+SystemCallFilter=@system-service
+SystemCallError=errno
+
 [Install]
 WantedBy=default.target

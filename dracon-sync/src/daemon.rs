@@ -864,6 +864,18 @@ pub(crate) async fn run_daemon(
                         repo.display(),
                         policy.repo_sync_timeout_secs
                     );
+                    // Rate-limit: notify at most once per repo per 30 min
+                    let notify_key = format!("timeout-{}", repo.display());
+                    if let std::collections::hash_map::Entry::Vacant(e) =
+                        remote_notify_cooldowns.entry(notify_key)
+                    {
+                        crate::report::send_sync_conflict_notification(
+                            &repo,
+                            "Sync Timeout",
+                            &format!("exceeded {}s limit", policy.repo_sync_timeout_secs),
+                        );
+                        e.insert(Instant::now() + Duration::from_secs(1800));
+                    }
                     false
                 }
                 Ok(Ok(crate::sync::SyncOutcome::Synced)) => {
@@ -887,6 +899,21 @@ pub(crate) async fn run_daemon(
                 }
                 Ok(Err(e)) => {
                     eprintln!("⚠️ sync failed for {}: {}", repo.display(), e);
+                    let err_str = e.to_string();
+                    if err_str.contains("push") || err_str.contains("remote") {
+                        // Rate-limit: notify at most once per repo per 30 min
+                        let notify_key = format!("pushfail-{}", repo.display());
+                        if let std::collections::hash_map::Entry::Vacant(e) =
+                            remote_notify_cooldowns.entry(notify_key)
+                        {
+                            crate::report::send_sync_conflict_notification(
+                                &repo,
+                                "Push Failed",
+                                &err_str,
+                            );
+                            e.insert(Instant::now() + Duration::from_secs(1800));
+                        }
+                    }
                     false
                 }
             };
@@ -942,6 +969,15 @@ pub(crate) async fn run_daemon(
             }
 
             if sync_success {
+                // Notify if this repo was previously stuck
+                if stuck_push_repos.remove(&repo).is_some() {
+                    save_stuck_push_repos(&stuck_push_repos);
+                    crate::report::send_sync_conflict_notification(
+                        &repo,
+                        "Unstuck",
+                        "push succeeded after being stuck",
+                    );
+                }
                 entry.failure_count = 0;
                 entry.remote_failures.clear();
                 // Re-check if repo is still dirty (filter-only changes persist).
@@ -1046,6 +1082,11 @@ pub(crate) async fn run_daemon(
                         "🔒 {} permanently stuck on push {} skipping",
                         repo.display(),
                         reason
+                    );
+                    crate::report::send_sync_conflict_notification(
+                        &repo,
+                        "Stuck on Push",
+                        &reason,
                     );
                     stuck_push_repos.insert(repo.clone(), timestamp_secs());
                     save_stuck_push_repos(&stuck_push_repos);

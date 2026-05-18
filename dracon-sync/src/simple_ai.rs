@@ -281,7 +281,7 @@ impl SimpleAiService {
                 format!("{}{}", provider.auth_prefix, api_key),
             )
             .json(&request)
-            .timeout(std::time::Duration::from_secs(60))
+            .timeout(std::time::Duration::from_secs(10))
             .send()
             .await
             .context("request failed")?;
@@ -372,7 +372,7 @@ impl SimpleAiService {
             .post(&url)
             .header("Content-Type", "application/json")
             .json(&request)
-            .timeout(std::time::Duration::from_secs(60))
+            .timeout(std::time::Duration::from_secs(10))
             .send()
             .await
             .context("google api request failed")?;

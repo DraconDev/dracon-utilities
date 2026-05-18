@@ -23,5 +23,25 @@ ProtectHome=read-only
 ReadWritePaths=%h/.dracon %h/Dev %h/.local/state/dracon
 PrivateTmp=true
 
+# Kernel-level sandboxing (all certain — these daemons never use these privileges)
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelLogs=true
+ProtectClock=true
+ProtectHostname=true
+ProtectControlGroups=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+RemoveIPC=true
+CapabilityBoundingSet=
+RestrictNamespaces=true
+
+# Syscall allowlist — warden uses inotify, so include @io-event
+# Returns EPERM instead of SIGSYS for safe discovery
+SystemCallFilter=@system-service @io-event
+SystemCallError=errno
+
 [Install]
 WantedBy=default.target
