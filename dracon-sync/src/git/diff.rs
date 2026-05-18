@@ -126,12 +126,18 @@ pub(crate) async fn cli_diff_entries(repo: &Path) -> Result<Vec<DiffFile>> {
 pub(crate) async fn repo_diff_entries(repo: &Path) -> Result<Vec<DiffFile>> {
     let svc = GitService::new(repo)?;
     let status = svc.get_status().await?;
-    if !status.is_clean && status.staged_files > 0 {
-        let diff = cli_diff_entries(repo).await?;
-        if !diff.is_empty() {
-            return Ok(diff);
-        }
+    if status.is_clean {
+        return Ok(Vec::new());
     }
+    // Get diff entries between HEAD and working tree (includes both staged
+    // and unstaged modifications, but NOT untracked files).
+    let diff = cli_diff_entries(repo).await?;
+    if !diff.is_empty() {
+        return Ok(diff);
+    }
+    // Only staged files (git add'ed but no working tree differences yet)
+    // or repos where diff parsing produced no results.
+    // Return empty — the caller should handle staged-only repos separately.
     Ok(Vec::new())
 }
 

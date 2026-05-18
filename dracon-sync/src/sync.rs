@@ -1,4 +1,5 @@
 use std::collections::{BTreeSet, HashMap};
+use std::io::Write;
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
@@ -1230,6 +1231,8 @@ async fn stage_commit_and_push(
             committed_entries.len(),
             repo.display()
         );
+        // Flush so journald captures commit activity in real-time
+        let _ = std::io::stderr().flush();
     }
 
     prune_other_default_branch(repo).await;

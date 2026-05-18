@@ -1,6 +1,7 @@
 use anyhow::Result;
 use dracon_git::GitService;
 use std::collections::{BTreeSet, HashMap};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::Arc;
@@ -436,6 +437,10 @@ pub(crate) async fn run_daemon(
     policy_path: PathBuf,
     override_interval_secs: Option<u64>,
 ) -> Result<()> {
+    // Note: Rust's stdio buffers are separate from C's FILE* buffers.
+    // When running under systemd (socket-based journal capture), Rust defaults
+    // to block buffering. We can't use setvbuf on Rust's handles, so instead
+    // we flush stderr at strategic points in the daemon loop (see flush calls below).
     eprintln!("🔄 dracon-sync daemon started");
     #[derive(Debug, Clone)]
     struct RepoActivity {
@@ -571,8 +576,7 @@ pub(crate) async fn run_daemon(
         }
     });
 
-    while !shutdown.load(Ordering::SeqCst) {
-        if reload.load(Ordering::SeqCst) {
+    while !shutdown.load(Ordering::SeqCst) {        if reload.load(Ordering::SeqCst) {
             reload.store(false, Ordering::SeqCst);
             match SyncPolicy::load(&policy_path) {
                 Ok(p) => {
@@ -801,6 +805,16 @@ pub(crate) async fn run_daemon(
                 (dirty, filtered)
             };
 
+            // DEBUG: log repo state
+            eprintln!(
+                "🏃 {} is_clean={} ahead={} behind={} effective_dirty={}",
+                repo.display(),
+                status.is_clean,
+                status.ahead,
+                status.behind,
+                effective_dirty,
+            );
+
             let fingerprint = format!(
                 "{}:{}:{}:{}:{}",
                 status.branch,
@@ -911,6 +925,8 @@ pub(crate) async fn run_daemon(
                 }
                 Ok(Ok(crate::sync::SyncOutcome::Synced)) => {
                     println!("🔁 synced {}", repo.display());
+                    // Flush so journald captures sync activity in real-time
+                    let _ = std::io::stdout().flush();
                     true
                 }
                 Ok(Ok(crate::sync::SyncOutcome::NothingToDo)) => {
@@ -1125,6 +1141,12 @@ pub(crate) async fn run_daemon(
                 }
             }
         }
+
+        // Flush stderr after each full scan cycle so journald captures
+        // all output from this cycle. Rust's block buffering under systemd
+        // can delay output for minutes without explicit flushes.
+        let _ = std::io::stderr().flush();
+        let _ = std::io::stdout().flush();
 
         sleep(Duration::from_secs(scan_interval)).await;
     }
