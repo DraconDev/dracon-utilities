@@ -455,7 +455,7 @@ pub(crate) async fn run_daemon(
 
     let mut activity: HashMap<PathBuf, RepoActivity> = HashMap::new();
     let mut pending_repos: HashMap<PathBuf, Instant> = HashMap::new();
-    let mut initial_repos: HashSet<PathBuf> = HashSet::new(); // repos seen on first scan
+    let mut initial_repos: HashSet<PathBuf>; // populated after first scan
     let mut repair_cooldowns: HashMap<PathBuf, Instant> = HashMap::new();
     let mut filter_cooldowns: HashMap<PathBuf, Instant> = HashMap::new();
     let mut stuck_push_repos = load_stuck_push_repos();

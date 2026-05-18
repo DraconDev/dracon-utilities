@@ -52,6 +52,7 @@ impl IndexLock {
     }
 
     /// Create a no-op lock (for commands that don't need coordination).
+    #[allow(dead_code)]
     pub(crate) fn bypass() -> Self {
         Self {
             path: PathBuf::new(),
