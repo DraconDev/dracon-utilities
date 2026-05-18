@@ -63,10 +63,29 @@ fn ansi(color: &str, text: &str) -> String {
 
 fn shorten_when(s: &str) -> String {
     let s = s.trim();
+
+    // Parse "N minutes ago" and convert to hours+minutes if >= 60
+    if let Some(rest) = s.strip_suffix(" minutes ago") {
+        if let Ok(mins) = rest.parse::<u64>() {
+            if mins >= 60 {
+                let h = mins / 60;
+                let m = mins % 60;
+                if m == 0 {
+                    return format!("{}h", h);
+                }
+                return format!("{}h{}m", h, m);
+            }
+            return format!("{}m", mins);
+        }
+    }
+    if let Some(rest) = s.strip_suffix(" minute ago") {
+        if let Ok(mins) = rest.parse::<u64>() {
+            return format!("{}m", mins);
+        }
+    }
+
     s.replace(" seconds ago", "s")
         .replace(" second ago", "s")
-        .replace(" minutes ago", "m")
-        .replace(" minute ago", "m")
         .replace(" hours ago", "h")
         .replace(" hour ago", "h")
         .replace(" days ago", "d")
@@ -3125,6 +3144,9 @@ mod tests {
     fn test_shorten_when() {
         assert_eq!(shorten_when("5 seconds ago"), "5s");
         assert_eq!(shorten_when("29 minutes ago"), "29m");
+        assert_eq!(shorten_when("74 minutes ago"), "1h14m");
+        assert_eq!(shorten_when("60 minutes ago"), "1h");
+        assert_eq!(shorten_when("119 minutes ago"), "1h59m");
         assert_eq!(shorten_when("3 hours ago"), "3h");
         assert_eq!(shorten_when("2 days ago"), "2d");
         assert_eq!(shorten_when("6 weeks ago"), "6w");

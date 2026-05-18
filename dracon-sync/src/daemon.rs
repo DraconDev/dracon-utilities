@@ -16,6 +16,8 @@ macro_rules! veprintln {
     ($lvl:expr, $($arg:tt)*) => {
         if $lvl <= VERBOSITY.load(Ordering::SeqCst) {
             eprintln!($($arg)*);
+            use std::io::Write;
+            let _ = std::io::stderr().flush();
         }
     };
 }
@@ -434,6 +436,7 @@ pub(crate) async fn run_daemon(
     policy_path: PathBuf,
     override_interval_secs: Option<u64>,
 ) -> Result<()> {
+    eprintln!("🔄 dracon-sync daemon started");
     #[derive(Debug, Clone)]
     struct RepoActivity {
         fingerprint: String,

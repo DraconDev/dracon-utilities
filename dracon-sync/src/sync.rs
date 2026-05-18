@@ -1121,9 +1121,12 @@ async fn stage_commit_and_push(
         stage_version_files(repo).await;
     }
 
-    let ai_subject = if !is_noise_only {
+    let ai_subject = if !is_noise_only && staged_diff_names.len() <= 20 {
         crate::scribe::generate_commit_message(repo, &staged_diff_names, staged_diff_content).await
     } else {
+        // Skip AI for noise-only changes or large diffs (>20 files).
+        // Large diffs produce generic AI messages anyway, and the 3-provider
+        // timeout (30s) blocks the daemon's entire cycle.
         None
     };
 

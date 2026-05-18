@@ -22,20 +22,29 @@ impl Level {
 }
 
 /// Emit a human-readable log line to stderr.
+/// Automatically flushes to ensure journald captures each line immediately.
 pub(crate) fn log(level: Level, msg: &str) {
     eprintln!("{} {}", level.emoji(), msg);
+    use std::io::Write;
+    let _ = std::io::stderr().flush();
 }
 
 /// Emit a human-readable log line with repo context.
+/// Automatically flushes to ensure journald captures each line immediately.
 #[allow(dead_code)]
 pub(crate) fn log_repo(level: Level, repo: &str, msg: &str) {
     eprintln!("{} [{}] {}", level.emoji(), repo, msg);
+    use std::io::Write;
+    let _ = std::io::stderr().flush();
 }
 
 /// Emit a human-readable log line with module context.
+/// Automatically flushes to ensure journald captures each line immediately.
 #[allow(dead_code)]
 pub(crate) fn log_module(level: Level, module: &str, msg: &str) {
     eprintln!("{} [{}] {}", level.emoji(), module, msg);
+    use std::io::Write;
+    let _ = std::io::stderr().flush();
 }
 
 /// Log an error-level message.
