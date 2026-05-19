@@ -99,8 +99,9 @@ enum Command {
         /// Preview what would be done without making any changes.
         #[arg(long)]
         dry_run: bool,
-        /// Bypass safety guards (e.g. mass-deletion prevention) for intentional operations.
+        /// No-op (mass deletion guard removed; kept for CLI compatibility).
         #[arg(long)]
+        #[allow(dead_code)]
         force: bool,
     },
     /// Pause sync (creates freeze marker).
