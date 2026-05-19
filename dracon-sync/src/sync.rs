@@ -22,7 +22,7 @@ use crate::git::{
 };
 use crate::policy::{debug_enabled, load_repo_override, SyncPolicy};
 use crate::report::{
-    append_incident_record, build_commit_context, detect_report_signals,
+    build_commit_context, detect_report_signals,
     push_large_blob_threshold_bytes,
 };
 use crate::visibility::{
