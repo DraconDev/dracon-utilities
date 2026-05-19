@@ -123,12 +123,12 @@ enum Command {
         #[command(subcommand)]
         cmd: PublishCommands,
     },
-    /// Scaffold standard files (LICENSE, CLA, etc.) into repositories.
+    /// Scaffold standard files (LICENSE) into repositories.
     Scaffold {
         /// Repository path to scaffold. Defaults to all discovered repos.
         #[arg(long)]
         repo: Option<PathBuf>,
-        /// Only scaffold these files (by name, e.g. LICENSE, CLA.md).
+        /// Only scaffold these files (by name, e.g. LICENSE).
         #[arg(long)]
         files: Vec<String>,
         /// Overwrite existing files with template versions.

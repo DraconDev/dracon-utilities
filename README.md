@@ -577,9 +577,8 @@ This removes binaries and systemd services. Your git repos and configs in `~/.dr
 
 ## License
 
-This project is dual-licensed:
+AGPL-3.0-only — See [LICENSE](LICENSE) for the full text.
 
-- **AGPL-3.0-only** — See [LICENSE](LICENSE) for the full text. This is the default license for open source use.
-- **Commercial License** — For organizations that prefer not to comply with AGPLv3's source disclosure requirements. See [COMMERCIAL-LICENSE.md](COMMERCIAL-LICENSE.md) for details.
+Copyright (C) 2026 Dracon. All rights reserved.
 
-By contributing to this project, you agree to the terms in [CLA.md](CLA.md).
+For commercial licensing inquiries, contact the author.
