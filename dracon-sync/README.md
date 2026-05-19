@@ -137,9 +137,9 @@ dracon-sync dual-branch repair ~/Dev/repo
 dracon-sync repair-origins
 dracon-sync repair-origins --apply
 
-# Scaffold standard files (LICENSE, CLA, etc.)
+# Scaffold standard files (LICENSE)
 dracon-sync scaffold
-dracon-sync scaffold --repo ~/Dev/repo --files LICENSE,CLA.md
+dracon-sync scaffold --repo ~/Dev/repo --files LICENSE
 
 # Manually publish to registries
 dracon-sync publish ~/Dev/repo

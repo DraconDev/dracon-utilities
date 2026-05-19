@@ -4,18 +4,15 @@ Thank you for your interest in contributing! This project is primarily designed 
 
 ## License
 
-All contributions are subject to the terms of the [AGPLv3 license](./LICENSE) and the [Contributor License Agreement (CLA)](./CLA.md).
-
-**By submitting a Contribution (including via pull request, issue, comment, or any other method), you agree to be bound by both the AGPLv3 license and the CLA.**
+All contributions are licensed under [AGPL-3.0-only](./LICENSE). By submitting a Contribution (including via pull request, issue, comment, or any other method), you agree that your contribution will be licensed under the same terms.
 
 ## Before You Submit a Pull Request
 
-1. **Read the CLA** — Make sure you understand and agree to the [Contributor License Agreement](./CLA.md) before submitting any Contribution.
-2. **Fork and branch** — Create a feature branch from `main` for your changes.
-3. **Write clean, idiomatic code** — Follow the existing style and conventions of the project.
-4. **Test your changes** — Ensure all existing and new tests pass before opening a PR.
-5. **Describe your changes** — Include a clear PR description explaining *what* changed and *why*.
-6. **Keep scope small** — One PR per logical change. Don't bundle unrelated fixes.
+1. **Fork and branch** — Create a feature branch from `main` for your changes.
+2. **Write clean, idiomatic code** — Follow the existing style and conventions of the project.
+3. **Test your changes** — Ensure all existing and new tests pass before opening a PR.
+4. **Describe your changes** — Include a clear PR description explaining *what* changed and *why*.
+5. **Keep scope small** — One PR per logical change. Don't bundle unrelated fixes.
 
 ## Quick Links
 
@@ -97,13 +94,13 @@ cargo clippy
 ### dracon-sync
 - **Purpose**: Git sync automation
 - **Key files**: `src/sync.rs`, `src/git.rs`, `src/report.rs`
-- **Tests**: 406 tests using `tempfile::TempDir`
+- **Tests**: 456 tests using `tempfile::TempDir`
 - **Config**: `~/.dracon/utilities/sync/dracon-sync.toml`
 
 ### dracon-system
 - **Purpose**: Disk/process protection
 - **Key files**: `src/main.rs` (guard runtime), `src/storage.rs`
-- **Tests**: 55 tests
+- **Tests**: 81 tests
 - **Config**: `~/.dracon/utilities/system/dracon-system.toml`
 
 ### dracon-warden
@@ -187,7 +184,3 @@ export RUST_LOG=debug
 - Check [AGENTS.md](AGENTS.md) for architecture details
 - Run `./doctor.sh` to diagnose setup issues
 - Check `~/.local/state/dracon/dracon-sync-incidents.jsonl` for runtime errors
-
----
-
-*For details on commercial licensing, see [COMMERCIAL-LICENSE.md](./COMMERCIAL-LICENSE.md).*
