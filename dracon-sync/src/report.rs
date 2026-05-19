@@ -84,9 +84,27 @@ fn shorten_when(s: &str) -> String {
         }
     }
 
-    s.replace(" seconds ago", "s")
-        .replace(" second ago", "s")
-        .replace(" hours ago", "h")
+    // Convert seconds to minutes if >= 60
+    if let Some(rest) = s.strip_suffix(" seconds ago") {
+        if let Ok(secs) = rest.parse::<u64>() {
+            if secs >= 60 {
+                let m = secs / 60;
+                let s_remainder = secs % 60;
+                if s_remainder == 0 {
+                    return format!("{}m", m);
+                }
+                return format!("{}m{}s", m, s_remainder);
+            }
+            return format!("{}s", secs);
+        }
+    }
+    if let Some(rest) = s.strip_suffix(" second ago") {
+        if let Ok(secs) = rest.parse::<u64>() {
+            return format!("{}s", secs);
+        }
+    }
+
+    s.replace(" hours ago", "h")
         .replace(" hour ago", "h")
         .replace(" days ago", "d")
         .replace(" day ago", "d")
