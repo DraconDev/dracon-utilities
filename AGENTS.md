@@ -169,32 +169,21 @@ Service files are installed to `~/.config/systemd/user/` by `install.sh`.
 
  ### Standard Files
 
-`dracon-sync` can ensure standard files (LICENSE, CLA, etc.) exist in every synced repository. Templates live in `~/.dracon/utilities/sync/templates/`.
+`dracon-sync` auto-copies AGPL v3 LICENSE to every synced repository. This ensures all Dracon repos carry the same copyleft license. You own the copyright → you're the only one who can sell commercial licenses.
 
-**Standard files are NOT auto-copied during sync by default.** Use `dracon-sync scaffold` to apply on demand (e.g., for new repos). Existing files are never overwritten unless `--overwrite` is passed. Set `standard_files_auto = true` to re-enable auto-copying every cycle (not recommended — commercial licenses end up in repos where they don't belong).
+**AGPL v3 LICENSE is auto-copied during every sync cycle.** New repos always get it. Existing files are never overwritten.
 
 ```toml
-# dracon-sync.toml — short form (filename only)
-standard_files = ["LICENSE", "CLA.md"]
-
-# Auto-copy during sync (default: false — use scaffold command instead)
-standard_files_auto = false
-
-# Long form with explicit source/target
-# [[standard_files]]
-# source = "templates/CUSTOM"
-# target = "CUSTOM_NOTICE"
-# overwrite = false   # default: false; set true to replace existing files
+standard_files = ["LICENSE"]
+standard_files_auto = true
 ```
 
 Per-repo opt-out via `.dracon/dracon-sync.toml`:
 ```toml
-skip_standard_files = ["CLA.md"]
+skip_standard_files = ["LICENSE"]
 ```
 
-Files are only copied if the target doesn't exist (default `overwrite = false`). Set `overwrite = true` to replace existing files with the template version. Missing templates print a warning but don't block sync.
-
-Source path resolution: absolute paths used as-is, `~/` expanded to home directory, relative paths resolved from `~/.dracon/utilities/sync/`.
+Templates live in `~/.dracon/utilities/sync/templates/`. Source path resolution: absolute paths used as-is, `~/` expanded to home directory, relative paths resolved from `~/.dracon/utilities/sync/`.
 
 **Important:** In TOML, top-level fields like `standard_files` must appear BEFORE any section headers (`[...]` or `[[...]]`). If placed after a section header, they will be silently parsed as belonging to that section and ignored by the policy loader.
 
@@ -504,7 +493,7 @@ Commands:
   repair-origins   Detect and repair orphan origin URLs [--apply]
   publish          Manually publish a repo to configured registries [--dry-run]
   publish-status   Check current version and registry publish status
-  scaffold         Scaffold standard files (LICENSE, CLA, etc.) into repos [--repo] [--files] [--overwrite] [--dry-run]
+  scaffold         Scaffold standard files (LICENSE) into repos [--repo] [--files] [--overwrite] [--dry-run]
 ```
 
 **Nested subcommands:**

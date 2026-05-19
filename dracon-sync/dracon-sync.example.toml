@@ -261,19 +261,17 @@ auto_create = false
 # =============================================================================
 #  SECTION 9: STANDARD FILES
 # =============================================================================
-# Standard files to scaffold into repos on demand (NOT auto-copied during sync).
-# Use `dracon-sync scaffold` to apply manually. Auto-copy is disabled by default
-# because commercial licenses and CLAs don't belong in every repo (e.g. game jams,
-# profile repos, automation tools).
+# AGPL v3 LICENSE is auto-copied to every new repo during sync.
+# This ensures all Dracon repos carry the same copyleft license.
+# You own the copyright → you're the only one who can sell commercial licenses.
 # Templates live in ~/.dracon/utilities/sync/templates/ (auto-resolved from short form).
 # Files are only copied if the target does not exist (overwrite = false, the default).
-# Set overwrite = true to replace existing files with the template version.
 #
 # Short form — filename only (resolves to templates/{name}):
-# standard_files = ["LICENSE", "CLA.md", "COMMERCIAL-LICENSE.md"]
+# standard_files = ["LICENSE"]
 #
-# Auto-copy during sync (default: false — use scaffold command instead):
-# standard_files_auto = false
+# Auto-copy during sync (default: true — ensures new repos always get AGPL):
+# standard_files_auto = true
 #
 # Long form — for explicit source path or overwrite behavior:
 # [[standard_files]]
@@ -282,7 +280,7 @@ auto_create = false
 # overwrite = false   # default: false (never overwrites existing files)
 #
 # Per-repo opt-out (via .dracon/dracon-sync.toml in repo root):
-#   skip_standard_files = ["CLA.md"]
+#   skip_standard_files = ["LICENSE"]
 #
 # Template path resolution:
 #   - Absolute paths: used as-is
