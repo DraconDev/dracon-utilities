@@ -49,6 +49,7 @@ struct SyncContext<'a> {
     dry_run: bool,
     #[allow(dead_code)]
     idle_seconds: u64,
+    #[allow(dead_code)]
     policy_path: Option<&'a Path>,
     has_origin: bool,
     has_upstream: bool,
@@ -606,7 +607,7 @@ async fn stage_existing_files(repo: &Path, existing: &[String], dry_run: bool) -
             for p in &force_paths {
                 add_args.push(p.as_str());
             }
-            if let Err(e) = run_git_with_timeout(repo, &add_args, 30, "add (force-tracked)").await {
+            if let Err(_) = run_git_with_timeout(repo, &add_args, 30, "add (force-tracked)").await {
                 eprintln!(
                     "⚠️ {} git add -f failed for {} tracked gitignored paths: {:?}",
                     repo.display(),

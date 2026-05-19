@@ -427,7 +427,7 @@ async fn main() -> Result<()> {
         Command::SyncNow {
             repos,
             dry_run,
-            force,
+            force: _,
         } => {
             if let Some(reason) = freeze_reason(&policy_path) {
                 println!("⏸️ sync frozen ({})", reason);
