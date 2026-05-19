@@ -150,6 +150,23 @@ for bak in ~/.local/bin/dracon-*.bak*; do
         echo "  🧹 Removed stale backup: $(basename "$bak")"
     fi
 done
+
+# Scan PATH for shadowing binaries — any dracon-* in a directory
+# other than ~/.local/bin will take priority depending on PATH order.
+# This catches stale installs in /usr/local/bin, ~/bin, etc.
+IFS=':' read -ra _path_dirs <<< "$PATH"
+for _dir in "${_path_dirs[@]}"; do
+    [ "$_dir" = "$HOME/.local/bin" ] && continue
+    for _stale in "$_dir"/dracon-sync "$_dir"/dracon-system "$_dir"/dracon-warden; do
+        [ -f "$_stale" ] || continue
+        if [ "$DRY_RUN" = true ]; then
+            echo "  Would remove shadowing binary: $_stale"
+        else
+            rm -f "$_stale"
+            echo "  🧹 Removed shadowing binary: $_stale"
+        fi
+    done
+done
 echo ""
 
 # Build with release and install manually for feature control
@@ -200,8 +217,31 @@ install_binary() {
             echo "  ✅ Installed ~/.local/bin/$binary (new)"
         fi
 
+        # Stop the running daemon before overwriting its binary.
+        # Without this, `cp` fails with "Text file busy" on Linux.
+        local svc_name=""
+        case "$binary" in
+            dracon-sync)   svc_name=dracon-sync.service ;;
+            dracon-system) svc_name=dracon-system-guard.service ;;
+            dracon-warden)  svc_name=dracon-warden.service ;;
+        esac
+        local did_stop=false
+        if [ -n "$svc_name" ] && systemctl --user is-active "$svc_name" &>/dev/null; then
+            systemctl --user stop "$svc_name" 2>/dev/null && did_stop=true || true
+            # Wait for process to exit (up to 5s)
+            for _ in $(seq 1 10); do
+                pgrep -x "$binary" &>/dev/null || break
+                sleep 0.5
+            done
+        fi
+
         cp "$resolved" ~/.local/bin/"$binary"
         chmod +x ~/.local/bin/"$binary"
+
+        # Restart the daemon if we stopped it
+        if [ "$did_stop" = true ]; then
+            systemctl --user start "$svc_name" 2>/dev/null || true
+        fi
 
         # Warn if debug build is newer than release — developer may have uninstalled changes
         local debug_path=""
@@ -259,6 +299,8 @@ else
     cp dracon-system/dracon-system-guard.service ~/.config/systemd/user/dracon-system-guard.service 2>/dev/null || true
     cp dracon-warden/dracon-warden.service ~/.config/systemd/user/dracon-warden.service 2>/dev/null || true
     systemctl --user daemon-reload 2>/dev/null || true
+    # Wait for systemd to settle after daemon-reload
+    sleep 1
     echo "✅ Systemd services installed"
 fi
 
@@ -333,6 +375,24 @@ echo "✅ Installation complete!"
 echo ""
 echo "Binaries:"
 ls -la ~/.local/bin/dracon-* 2>/dev/null || true
+
+# Verify running daemons are using the installed binary
+VERIFY_OK=true
+for bin in dracon-sync dracon-system dracon-warden; do
+    pid=$(pgrep -x "$bin" 2>/dev/null | head -1)
+    [ -n "$pid" ] || continue
+    running=$(readlink /proc/$pid/exe 2>/dev/null)
+    expected="$HOME/.local/bin/$bin"
+    if [ -n "$running" ] && [ "$running" != "$expected" ]; then
+        echo "⚠️  WARNING: $bin (PID $pid) running from $running, not $expected"
+        echo "   This means a stale version is still active. Restart the service:"
+        echo "   systemctl --user restart $(systemctl --user list-units --type=service --state=running | grep -o "$bin[^ ]*\.service" | head -1)"
+        VERIFY_OK=false
+    fi
+done
+if [ "$VERIFY_OK" = true ]; then
+    echo "✅ All running daemons verified at ~/.local/bin/"
+fi
 echo ""
 echo "Next steps:"
 echo "  1. Add API keys to ~/.dracon/utilities/sync/ai/secrets/*.env"
