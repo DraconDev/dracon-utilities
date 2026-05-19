@@ -170,6 +170,8 @@ done
 echo ""
 
 # Build with release and install manually for feature control
+RESTARTED_SERVICES=""
+
 install_binary() {
     local package=$1
     local features=$2
@@ -238,9 +240,11 @@ install_binary() {
         cp "$resolved" ~/.local/bin/"$binary"
         chmod +x ~/.local/bin/"$binary"
 
-        # Restart the daemon if we stopped it
+        # Restart the daemon if we stopped it — track it so the
+        # final restart block doesn't double-restart.
         if [ "$did_stop" = true ]; then
             systemctl --user start "$svc_name" 2>/dev/null || true
+            RESTARTED_SERVICES="$RESTARTED_SERVICES $svc_name"
         fi
 
         # Warn if debug build is newer than release — developer may have uninstalled changes
@@ -353,13 +357,21 @@ echo "Restarting services..."
 
 restart_service() {
     local service=$1
-    
+
+    # Skip if already restarted during binary install
+    if [[ " $RESTARTED_SERVICES " == *" $service "* ]]; then
+        if [ "$VERBOSE" = true ]; then
+            echo "  ⏭️  $service already restarted during install"
+        fi
+        return 0
+    fi
+
     if [ "$DRY_RUN" = true ]; then
         echo "  Would restart $service"
         return 0
     fi
-    
-    if systemctl --user list-unit-files | grep -q "^$service"; then
+
+    if systemctl --user list-unit-files 2>/dev/null | grep -q "^$service"; then
         systemctl --user restart "$service" 2>/dev/null && echo "  ✅ $service restarted" || echo "  ⚠️ Could not restart $service"
     else
         echo "  ⚠️ $service not found"
