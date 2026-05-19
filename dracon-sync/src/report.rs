@@ -1927,7 +1927,7 @@ pub(crate) async fn run_repair_warns(
                 0,
                 None,
                 false,
-                false,
+                Some(policy_path),
             ),
         )
         .await
