@@ -1503,7 +1503,6 @@ auto_github_private_account = "TestAccount"
             None,
             false,
             None,
-            false,
         )
         .await;
         assert!(
@@ -1584,7 +1583,6 @@ auto_bump_versions = false
             None,
             false,
             None,
-            false,
         )
         .await;
         assert!(result.is_ok(), "sync_repo should succeed: {:?}", result);
@@ -1663,7 +1661,6 @@ auto_bump_versions = false
             None,
             false,
             None,
-            false,
         )
         .await;
         assert!(
@@ -1731,7 +1728,6 @@ auto_bump_versions = false
             None,
             false,
             None,
-            false,
         )
         .await;
         assert!(result.is_ok(), "sync_repo should succeed even during merge");
@@ -1796,7 +1792,6 @@ auto_bump_versions = false
             None,
             false,
             None,
-            false,
         )
         .await;
         assert!(
@@ -1864,7 +1859,6 @@ auto_bump_versions = false
             None,
             false,
             None,
-            false,
         )
         .await;
         assert!(result.is_ok(), "sync_repo should succeed: {:?}", result);
@@ -1937,7 +1931,6 @@ auto_bump_versions = false
             None,
             false,
             None,
-            false,
         )
         .await;
         assert!(result.is_ok(), "sync_repo should succeed");
@@ -2002,7 +1995,6 @@ auto_bump_versions = false
             None,
             false,
             None,
-            false,
         )
         .await;
         assert!(result.is_ok(), "sync_repo should succeed: {:?}", result);
@@ -2075,7 +2067,6 @@ auto_bump_versions = false
             None,
             false,
             None,
-            false,
         )
         .await;
         assert!(result.is_ok(), "sync_repo should succeed");
@@ -2139,7 +2130,6 @@ auto_bump_versions = false
             None,
             false,
             None,
-            false,
         )
         .await;
         assert!(result.is_ok(), "sync_repo should succeed with dirty repo");
@@ -2201,7 +2191,6 @@ auto_bump_versions = false
             None,
             false,
             None,
-            false,
         )
         .await;
         assert!(result.is_ok(), "sync_repo should succeed without origin");
@@ -2259,7 +2248,6 @@ auto_bump_versions = false
             None,
             false,
             None,
-            false,
         )
         .await;
         assert!(result.is_ok(), "sync_repo should succeed without upstream");
@@ -2353,7 +2341,6 @@ push_url = "git@nonexistent.example.com:repo.git"
             None,
             false,
             None,
-            false,
         )
         .await;
         assert!(result.is_ok(), "sync_repo should not error");
@@ -2451,7 +2438,6 @@ push_url = "git@nonexistent.example.com:repo.git"
             Some(&mut remote_failures),
             false,
             None,
-            false,
         )
         .await;
         assert!(result.is_ok());
@@ -2564,7 +2550,6 @@ push_url = "{}"
             None,
             false,
             None,
-            false,
         )
         .await;
         assert!(result.is_ok(), "sync_repo should not error: {:?}", result);
@@ -2642,7 +2627,6 @@ push_url = "{}"
             None,
             false,
             None,
-            false,
         )
         .await;
         assert!(result.is_ok(), "sync_repo should not error on non-git dir");
@@ -2681,7 +2665,6 @@ push_url = "{}"
             None,
             false,
             None,
-            false,
         )
         .await;
         assert!(result.is_ok(), "sync_repo should succeed");
@@ -2736,7 +2719,6 @@ push_url = "{}"
             None,
             false,
             None,
-            false,
         )
         .await;
         assert!(result.is_ok(), "sync_repo should succeed");
@@ -2789,7 +2771,6 @@ push_url = "{}"
             None,
             false,
             None,
-            false,
         )
         .await;
         assert!(result.is_ok(), "sync_repo should succeed");
@@ -2830,7 +2811,6 @@ push_url = "{}"
             None,
             false,
             None,
-            false,
         )
         .await;
         assert!(result.is_ok(), "sync_repo should not panic on empty repo");
@@ -2874,7 +2854,7 @@ push_url = "{}"
         "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(&repo, &policy, &excluded, 0, None, false, None, false).await;
+        let result = sync_repo(&repo, &policy, &excluded, 0, None, false, None.await;
         assert!(result.is_ok(), "sync_repo should succeed");
 
         let output = git_cmd(&repo, &["log", "--oneline", "-1"]);
@@ -2917,7 +2897,6 @@ push_url = "{}"
             None,
             false,
             None,
-            false,
         )
         .await;
         assert!(
@@ -2962,7 +2941,6 @@ push_url = "{}"
             None,
             false,
             None,
-            false,
         )
         .await;
         assert!(result.is_ok(), "sync_repo should succeed");
@@ -3008,7 +2986,6 @@ push_url = "{}"
             None,
             false,
             None,
-            false,
         )
         .await;
         assert!(result.is_ok(), "sync_repo should succeed without origin");
@@ -3042,7 +3019,6 @@ push_url = "{}"
             None,
             false,
             None,
-            false,
         )
         .await;
         assert!(result.is_ok(), "sync_repo should succeed");
@@ -3081,7 +3057,7 @@ auto_bump_versions = false
             .parse()
             .unwrap();
 
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, true, None, false).await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, true, None.await;
         assert!(result.is_ok(), "dry-run should succeed");
 
         let commits_after = git_cmd(&repo, &["rev-list", "--count", "HEAD"]);
@@ -3126,7 +3102,7 @@ auto_bump_versions = false
 "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, true, None, false).await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, true, None.await;
         assert!(result.is_ok(), "dry-run should succeed");
 
         let commits_after = git_cmd(&repo, &["rev-list", "--count", "HEAD"]);
@@ -3161,7 +3137,7 @@ auto_bump_versions = false
 "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, true, None, false).await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, true, None.await;
         assert!(result.is_ok(), "dry-run should succeed");
 
         let output = git_cmd(&repo, &["status", "--porcelain"]);
@@ -3214,7 +3190,6 @@ auto_bump_versions = false
             None,
             false,
             None,
-            false,
         )
         .await;
         assert!(result.is_ok(), "sync_repo should succeed");
@@ -3249,7 +3224,6 @@ auto_bump_versions = false
             None,
             false,
             None,
-            false,
         )
         .await;
         assert!(result.is_ok(), "sync_repo should succeed");
@@ -3314,7 +3288,6 @@ auto_bump_versions = false
             None,
             false,
             None,
-            false,
         )
         .await;
         assert!(
@@ -3370,7 +3343,6 @@ auto_bump_versions = false
             None,
             false,
             None,
-            false,
         )
         .await;
         assert!(
@@ -3424,7 +3396,6 @@ auto_bump_versions = false
             None,
             false,
             None,
-            false,
         )
         .await;
         assert!(
