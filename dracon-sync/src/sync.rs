@@ -663,7 +663,11 @@ async fn stage_existing_files(repo: &Path, existing: &[String], dry_run: bool) -
             println!("  ... and {} more", existing.len() - 5);
         }
     } else {
-        let mut add_args = vec!["add", "-A", "-f", "--"];
+        // NOTE: intentionally no -f flag — we want .gitignore to be respected.
+        // Without -f, `git add` skips gitignored files like target/ and node_modules/.
+        // Previously, -f caused target/ build artifacts to be force-added when
+        // untracked directory entries (e.g. "pully/") were expanded by git.
+        let mut add_args = vec!["add", "-A", "--"];
         for p in existing {
             add_args.push(p);
         }
