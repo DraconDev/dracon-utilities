@@ -371,6 +371,7 @@ restart_service() {
         return 0
     fi
 
+    echo "DEBUG: checking $service..." && systemctl --user list-unit-files 2>/dev/null | grep "^$service" | head -1 && echo "DEBUG: found" || echo "DEBUG: NOT FOUND"
     if systemctl --user list-unit-files 2>/dev/null | grep -q "^$service"; then
         systemctl --user restart "$service" 2>/dev/null && echo "  ✅ $service restarted" || echo "  ⚠️ Could not restart $service"
     else
