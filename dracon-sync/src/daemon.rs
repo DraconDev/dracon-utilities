@@ -385,7 +385,6 @@ pub(crate) async fn run_once(policy_path: &Path) -> Result<()> {
                 None,
                 false,
                 Some(policy_path),
-                false,
             ),
         )
         .await
@@ -948,7 +947,6 @@ pub(crate) async fn run_daemon(
                     Some(&mut entry.remote_failures),
                     false,
                     Some(&policy_path),
-                    false,
                 ),
             )
             .await
