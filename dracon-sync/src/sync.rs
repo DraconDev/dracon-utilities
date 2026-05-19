@@ -9,6 +9,9 @@ use crate::log_warn;
 use anyhow::Result;
 use dracon_git::{build_commit_message, GitService};
 
+// Prometheus counter for mass deletion guard — removed.
+// The clone race bug (root cause of spurious mass deletions) is fixed by
+// IndexLock. Git revert is the safety net for any bad commits.
 pub(crate) static MASS_DELETION_GUARD_BLOCKED: AtomicU64 = AtomicU64::new(0);
 
 use crate::exclude::{
@@ -559,98 +562,6 @@ async fn compute_diff_entries(svc: &GitService, repo: &Path) -> Result<DiffResul
     })
 }
 
-enum MassDeletionCheck {
-    Ok,
-    Blocked,
-}
-
-async fn check_mass_deletion(
-    ctx: &SyncContext<'_>,
-    missing: &[String],
-) -> Result<MassDeletionCheck> {
-    let repo = ctx.repo;
-    let force_deletion = ctx.force_deletion;
-    let dry_run = ctx.dry_run;
-    let policy_path = ctx.policy_path;
-    if force_deletion {
-        eprintln!(
-            "⚠️ --force: bypassing mass-deletion safety guard for {} ({} files)",
-            repo.display(),
-            missing.len()
-        );
-        return Ok(MassDeletionCheck::Ok);
-    }
-
-    let total_tracked: usize = {
-        let repo = repo.to_path_buf();
-        tokio::task::spawn_blocking(move || {
-            std::process::Command::new("git")
-                .args(["ls-files"])
-                .current_dir(&repo)
-                .output()
-                .ok()
-                .map(|o| String::from_utf8_lossy(&o.stdout).lines().count())
-                .unwrap_or(0)
-        })
-        .await
-        .unwrap_or(0)
-    };
-
-    let missing_count = missing.len();
-    // Tiered mass-deletion detection:
-    //   85%+ of tracked files missing → always block (large repos)
-    //   70%+ with ≥5 missing files → block (catches small repos losing most files)
-    //   10+ missing AND >5% of tracked → block (absolute floor for medium repos)
-    //   The 5% floor prevents false positives on large repos (e.g. 38/4121=0.9% is fine)
-    const MASS_DELETION_THRESHOLD_PCT: usize = 85;
-    const MODERATE_THRESHOLD_PCT: usize = 70;
-    const MODERATE_MIN_MISSING: usize = 5;
-    const ABSOLUTE_MIN_MISSING: usize = 10;
-    const ABSOLUTE_PCT_FLOOR: usize = 5; // absolute rule only applies if >5% of tracked
-    let is_mass_deletion = total_tracked > 0
-        && ((missing_count * 100) / total_tracked >= MASS_DELETION_THRESHOLD_PCT
-            || (missing_count >= ABSOLUTE_MIN_MISSING
-                && (missing_count * 100) / total_tracked >= ABSOLUTE_PCT_FLOOR)
-            || (missing_count >= MODERATE_MIN_MISSING
-                && (missing_count * 100) / total_tracked >= MODERATE_THRESHOLD_PCT));
-
-    if is_mass_deletion {
-        let pct = (missing_count * 100) / total_tracked;
-        let reason = format!(
-            "{} files missing from working tree ({}% of {} tracked)",
-            missing_count, pct, total_tracked
-        );
-        log_warn!("SAFETY: {}", reason);
-        eprintln!("⚠️ Refusing to stage mass deletion - this looks like a mistake or destructive operation");
-        eprintln!("⚠️ If you really want to delete these files, do: git add -A && git commit -m 'delete files'");
-        MASS_DELETION_GUARD_BLOCKED.fetch_add(1, Ordering::Relaxed);
-        if let Some(path) = policy_path {
-            append_incident_record(
-                path,
-                &IncidentRecord::new(
-                    crate::policy::timestamp_secs(),
-                    "safety",
-                    repo.display().to_string(),
-                    reason.clone(),
-                    "mass_deletion_guard",
-                    None,
-                    "blocked",
-                    Some(format!(
-                        "total_tracked={} missing_count={}",
-                        total_tracked, missing_count
-                    )),
-                ),
-            );
-        }
-        if !dry_run {
-            let _ = run_git_with_timeout(repo, &["reset", "HEAD"], 10, "reset-after-guard").await;
-        }
-        return Ok(MassDeletionCheck::Blocked);
-    }
-
-    Ok(MassDeletionCheck::Ok)
-}
-
 async fn stage_existing_files(repo: &Path, existing: &[String], dry_run: bool) -> Result<()> {
     if existing.is_empty() {
         return Ok(());
@@ -1192,14 +1103,6 @@ async fn stage_commit_and_push(
     stage_existing_files(repo, &existing, dry_run).await?;
 
     if !missing.is_empty() {
-        match check_mass_deletion(ctx, &missing).await? {
-            MassDeletionCheck::Blocked => {
-                maybe_sync_visibility_and_metadata(ctx);
-                return Ok(Some(SyncOutcome::Blocked));
-            }
-            MassDeletionCheck::Ok => {}
-        }
-
         git_rm_missing(repo, &missing, dry_run).await?;
     }
 
