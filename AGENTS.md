@@ -171,14 +171,14 @@ Service files are installed to `~/.config/systemd/user/` by `install.sh`.
 
 `dracon-sync` can ensure standard files (LICENSE, CLA, etc.) exist in every synced repository. Templates live in `~/.dracon/utilities/sync/templates/`.
 
-**Standard files are auto-copied during every sync cycle by default.** Existing files are never overwritten. Use `dracon-sync scaffold` for on-demand application, or set `standard_files_auto = false` to disable auto-copying.
+**Standard files are NOT auto-copied during sync by default.** Use `dracon-sync scaffold` to apply on demand (e.g., for new repos). Existing files are never overwritten unless `--overwrite` is passed. Set `standard_files_auto = true` to re-enable auto-copying every cycle (not recommended — commercial licenses end up in repos where they don't belong).
 
 ```toml
 # dracon-sync.toml — short form (filename only)
 standard_files = ["LICENSE", "CLA.md"]
 
-# Auto-copy during sync (default: true)
-standard_files_auto = true
+# Auto-copy during sync (default: false — use scaffold command instead)
+standard_files_auto = false
 
 # Long form with explicit source/target
 # [[standard_files]]

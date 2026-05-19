@@ -261,13 +261,19 @@ auto_create = false
 # =============================================================================
 #  SECTION 9: STANDARD FILES
 # =============================================================================
-# Standard files to ensure exist in every synced repository.
+# Standard files to scaffold into repos on demand (NOT auto-copied during sync).
+# Use `dracon-sync scaffold` to apply manually. Auto-copy is disabled by default
+# because commercial licenses and CLAs don't belong in every repo (e.g. game jams,
+# profile repos, automation tools).
 # Templates live in ~/.dracon/utilities/sync/templates/ (auto-resolved from short form).
 # Files are only copied if the target does not exist (overwrite = false, the default).
 # Set overwrite = true to replace existing files with the template version.
 #
 # Short form — filename only (resolves to templates/{name}):
 # standard_files = ["LICENSE", "CLA.md", "COMMERCIAL-LICENSE.md"]
+#
+# Auto-copy during sync (default: false — use scaffold command instead):
+# standard_files_auto = false
 #
 # Long form — for explicit source path or overwrite behavior:
 # [[standard_files]]
