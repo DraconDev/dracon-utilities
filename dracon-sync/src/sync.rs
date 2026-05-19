@@ -600,14 +600,17 @@ async fn check_mass_deletion(
     // Tiered mass-deletion detection:
     //   85%+ of tracked files missing → always block (large repos)
     //   70%+ with ≥5 missing files → block (catches small repos losing most files)
-    //   10+ missing files → block regardless of repo size
+    //   10+ missing AND >5% of tracked → block (absolute floor for medium repos)
+    //   The 5% floor prevents false positives on large repos (e.g. 38/4121=0.9% is fine)
     const MASS_DELETION_THRESHOLD_PCT: usize = 85;
     const MODERATE_THRESHOLD_PCT: usize = 70;
     const MODERATE_MIN_MISSING: usize = 5;
     const ABSOLUTE_MIN_MISSING: usize = 10;
+    const ABSOLUTE_PCT_FLOOR: usize = 5; // absolute rule only applies if >5% of tracked
     let is_mass_deletion = total_tracked > 0
         && ((missing_count * 100) / total_tracked >= MASS_DELETION_THRESHOLD_PCT
-            || (missing_count >= ABSOLUTE_MIN_MISSING)
+            || (missing_count >= ABSOLUTE_MIN_MISSING
+                && (missing_count * 100) / total_tracked >= ABSOLUTE_PCT_FLOOR)
             || (missing_count >= MODERATE_MIN_MISSING
                 && (missing_count * 100) / total_tracked >= MODERATE_THRESHOLD_PCT));
 
@@ -3560,8 +3563,13 @@ auto_bump_versions = false
         // 1 of 1 deleted (100%) — BLOCKED (single file is still 100%)
         check_scenario(&tmp, "boundary-single-100pct", 1, 1, true).await;
 
-        // 10 of 30 deleted (33%) — BLOCKED (absolute: 10+ missing files)
+        // 10 of 30 deleted (33%) — BLOCKED (absolute: 10+ missing AND 33% > 5% floor)
         check_scenario(&tmp, "boundary-10-absolute", 30, 10, true).await;
+
+        // 38 of 4121 deleted (0.9%) — ALLOWED (10+ missing but <5% of tracked)
+        // This is the browser-extensions-shared scenario: large repo, small deletion
+        // Using 100 tracked / 4 deleted = 4% < 5% floor → ALLOWED
+        check_scenario(&tmp, "boundary-large-repo-sparse-delete", 100, 4, false).await;
 
         // 5 of 10 deleted (50%) — BLOCKED (70%+ with 5+ missing)
         // Actually 50% < 70%, so ALLOWED — need 7 of 10
