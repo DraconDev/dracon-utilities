@@ -3246,11 +3246,11 @@ auto_bump_versions = false
     /// CR-1 regression test: when mass-deletion guard blocks, the index must be
     /// reset so that pre-existing modifications are not left staged uncommitted.
     #[tokio::test]
-    async fn test_guard_blocks_resets_staged_changes() {
+    async fn test_deletions_committed_when_intentional() {
         let tmp = tempfile::tempdir().unwrap();
-        let repo = init_test_repo(&tmp, "guard-reset-repo");
+        let repo = init_test_repo(&tmp, "deletion-commit-repo");
 
-        // Create 7 tracked files — 6 will be deleted (85.7% >= 85 threshold)
+        // Create 7 tracked files — 6 will be deleted
         for i in 0..7 {
             std::fs::write(repo.join(format!("file{i}.txt")), format!("content{i}")).unwrap();
         }
@@ -3269,7 +3269,7 @@ auto_bump_versions = false
         "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        // Delete 6 files — this triggers the 85% mass-deletion guard
+        // Delete 6 files — no guard, daemon commits everything
         for i in 1..7 {
             std::fs::remove_file(repo.join(format!("file{i}.txt"))).unwrap();
         }
@@ -3285,17 +3285,17 @@ auto_bump_versions = false
         )
         .await;
         assert!(
-            matches!(result, Ok(SyncOutcome::Blocked)),
-            "guard should block 85%+ deletion"
+            matches!(result, Ok(SyncOutcome::Synced)),
+            "deletions should be committed, not blocked"
         );
 
-        // Verify index is clean — file0 modification should have been reset
-        let staged = git_cmd(&repo, &["diff", "--cached", "--name-only"]);
-        let staged_str = String::from_utf8_lossy(&staged.stdout);
+        // Verify the deleted files are gone from tracking
+        let ls = git_cmd(&repo, &["ls-files"]);
+        let ls_str = String::from_utf8_lossy(&ls.stdout);
         assert!(
-            staged_str.trim().is_empty(),
-            "staged changes should be reset after guard blocks, got: {:?}",
-            staged_str
+            ls_str.trim() == "file0.txt",
+            "only file0 should remain, got: {:?}",
+            ls_str
         );
     }
 
