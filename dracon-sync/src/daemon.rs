@@ -1241,6 +1241,7 @@ pub(crate) async fn run_daemon(
         // === Sustained-state notifications ===
         // Check for repos that have been in a concerning state for too long.
         // These fire once per repo per sustained incident, rate-limited to 30 min.
+        let notification_now = Instant::now();
         const STUCK_AHEAD_THRESHOLD: Duration = Duration::from_secs(600);  // 10 min
         const STUCK_BEHIND_THRESHOLD: Duration = Duration::from_secs(1800); // 30 min
         const MIRROR_DEGRADED_THRESHOLD: usize = 3; // 3 consecutive fails
@@ -1248,7 +1249,7 @@ pub(crate) async fn run_daemon(
         for (repo, entry) in &activity {
             // Repo stuck ahead (unpushed commits piling up)
             if let Some(since) = entry.ahead_since {
-                if now.duration_since(since) >= STUCK_AHEAD_THRESHOLD {
+                if notification_now.duration_since(since) >= STUCK_AHEAD_THRESHOLD {
                     let notify_key = format!("stuck-ahead-{}", repo.display());
                     if let std::collections::hash_map::Entry::Vacant(e) =
                         remote_notify_cooldowns.entry(notify_key.clone())
