@@ -750,7 +750,7 @@ pub(crate) async fn run_repos_report(
         "modified" => rows.sort_by_key(|b| std::cmp::Reverse(b.modified)),
         "ahead" => rows.sort_by_key(|b| std::cmp::Reverse(b.ahead)),
         "behind" => rows.sort_by_key(|b| std::cmp::Reverse(b.behind)),
-        _ => rows.sort_by_key(|a| a.last_unix),
+        _ => rows.sort_by_key(|a| std::cmp::Reverse(a.last_unix)),
     }
 
     let concern_count_all = rows.iter().filter(|r| r.concern).count();
