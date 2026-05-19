@@ -1,18 +1,12 @@
 use std::collections::{BTreeSet, HashMap};
 use std::io::Write;
 use std::path::Path;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 use crate::log_warn;
 
 use anyhow::Result;
 use dracon_git::{build_commit_message, GitService};
-
-// Prometheus counter for mass deletion guard — removed.
-// The clone race bug (root cause of spurious mass deletions) is fixed by
-// IndexLock. Git revert is the safety net for any bad commits.
-pub(crate) static MASS_DELETION_GUARD_BLOCKED: AtomicU64 = AtomicU64::new(0);
 
 use crate::exclude::{
     can_restore_entry, handle_large_untracked, is_large_untracked, remove_tracked_excluded_paths,
@@ -29,7 +23,6 @@ use crate::git::{
 use crate::policy::{debug_enabled, load_repo_override, SyncPolicy};
 use crate::report::{
     append_incident_record, build_commit_context, detect_report_signals,
-    push_large_blob_threshold_bytes, IncidentRecord,
 };
 use crate::visibility::{
     get_github_visibility, parse_github_owner_repo, sync_mirror_metadata, sync_mirror_visibility,
