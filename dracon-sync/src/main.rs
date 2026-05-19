@@ -451,7 +451,6 @@ async fn main() -> Result<()> {
                     None,
                     dry_run,
                     Some(&policy_path),
-                    force,
                 )
                 .await
                 {
