@@ -323,10 +323,10 @@ pub(crate) fn unstuck_repo(repo: &Path) -> bool {
     let mut repos = load_stuck_push_repos();
     if repos.remove(repo).is_some() {
         save_stuck_push_repos(&repos);
-        println!("🔓 unstuck: {}", repo.display());
+        eprintln!("🔓 unstuck: {}", repo.display());
         true
     } else {
-        println!("ℹ️ {} not in stuck repos", repo.display());
+        eprintln!("ℹ️ {} not in stuck repos", repo.display());
         false
     }
 }
@@ -334,14 +334,14 @@ pub(crate) fn unstuck_repo(repo: &Path) -> bool {
 pub(crate) fn list_stuck_repos() {
     let repos = load_stuck_push_repos();
     if repos.is_empty() {
-        println!("✅ no stuck repos");
+        eprintln!("✅ no stuck repos");
         return;
     }
-    println!("🔒 stuck repos (expire after 24h):");
+    eprintln!("🔒 stuck repos (expire after 24h):");
     let now = timestamp_secs();
     for (path, since) in repos {
         let age_hrs = (now.saturating_sub(since)) / 3600;
-        println!("   {} ({}h ago)", path.display(), age_hrs);
+        eprintln!("   {} ({}h ago)", path.display(), age_hrs);
     }
 }
 
@@ -351,7 +351,7 @@ pub(crate) fn is_repo_stuck(repo: &Path) -> bool {
 
 pub(crate) async fn run_once(policy_path: &Path) -> Result<()> {
     if let Some(reason) = freeze_reason(policy_path) {
-        println!("⏸️ sync frozen ({})", reason);
+        eprintln!("⏸️ sync frozen ({})", reason);
         return Ok(());
     }
 
@@ -992,9 +992,9 @@ pub(crate) async fn run_daemon(
                     false
                 }
                 Ok(Ok(crate::sync::SyncOutcome::Synced)) => {
-                    println!("🔁 synced {}", repo.display());
+                    eprintln!("🔁 synced {}", repo.display());
                     // Flush so journald captures sync activity in real-time
-                    let _ = std::io::stdout().flush();
+                    let _ = std::io::stderr().flush();
                     true
                 }
                 Ok(Ok(crate::sync::SyncOutcome::NothingToDo)) => {

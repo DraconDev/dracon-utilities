@@ -508,10 +508,10 @@ Commands:
 ```
 
 **Nested subcommands:**
-- `dracon-sync stuck list` — list stuck repos
-- `dracon-sync stuck unstuck <repo>` — unstuck a specific repo
-- `dracon-sync dual-branch list` — list repos with dual main/master
-- `dracon-sync dual-branch repair <repo>` — consolidate to main
+- `dracon-sync repair stuck-list` — list stuck repos
+- `dracon-sync repair stuck-unstuck <repo>` — unstuck a specific repo
+- `dracon-sync repair dual-branch-list` — list repos with dual main/master
+- `dracon-sync repair dual-branch-repair <repo>` — consolidate to main
 
 **Global flags:** `-v` / `-vv` increase verbosity; `-V` prints version.
 
