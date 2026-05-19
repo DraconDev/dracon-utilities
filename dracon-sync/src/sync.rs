@@ -2816,7 +2816,6 @@ push_url = "{}"
         assert!(result.is_ok(), "sync_repo should not panic on empty repo");
     }
 
-    #[tokio::test]
 
     #[tokio::test]
     async fn test_sync_repo_unstages_excluded_dir_paths() {
@@ -3153,10 +3152,6 @@ auto_bump_versions = false
     }
 
     /// Comprehensive boundary test for the mass-deletion safety guard.
-    /// Covers the full matrix of (tracked_files, deleted_files) combinations
-    /// to verify the guard's >=85% threshold, and the atomic counter.
-    #[tokio::test]
-
     #[tokio::test]
     async fn test_alert_unpushed_threshold() {
         let tmp = tempfile::tempdir().unwrap();
