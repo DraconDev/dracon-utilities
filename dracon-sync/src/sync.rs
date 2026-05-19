@@ -663,25 +663,121 @@ async fn stage_existing_files(repo: &Path, existing: &[String], dry_run: bool) -
             println!("  ... and {} more", existing.len() - 5);
         }
     } else {
-        // NOTE: intentionally no -f flag — we want .gitignore to be respected.
-        // Without -f, `git add` skips gitignored files like target/ and node_modules/.
-        // Previously, -f caused target/ build artifacts to be force-added when
-        // untracked directory entries (e.g. "pully/") were expanded by git.
-        let mut add_args = vec!["add", "-A", "--"];
-        for p in existing {
-            add_args.push(p);
+        // Filter out gitignored paths to avoid "The following paths are ignored
+        // by one of your .gitignore files" errors. Without this, a single
+        // gitignored path in the list causes the entire `git add` to fail,
+        // blocking ALL files from being committed.
+        //
+        // We use `git check-ignore` to detect gitignored paths, then split:
+        // - Non-ignored paths: `git add -A -- <paths>` (respects .gitignore)
+        // - Ignored but already-tracked paths: `git add -A -f -- <paths>` (force
+        //   re-stage; git already tracks these so gitignore shouldn't block updates)
+        // - Ignored and untracked: skip entirely (.gitignore is intentional)
+        let (force_paths, normal_paths) =
+            partition_gitignored(repo, existing).await;
+
+        if !normal_paths.is_empty() {
+            let mut add_args = vec!["add", "-A", "--"];
+            for p in &normal_paths {
+                add_args.push(p.as_str());
+            }
+            if let Err(e) = run_git_with_timeout(repo, &add_args, 30, "add").await {
+                eprintln!(
+                    "⚠️ {} git add failed for {} paths: {:?}",
+                    repo.display(),
+                    normal_paths.len(),
+                    &normal_paths[..normal_paths.len().min(5)]
+                );
+                return Err(e);
+            }
         }
-        if let Err(e) = run_git_with_timeout(repo, &add_args, 30, "add").await {
-            eprintln!(
-                "⚠️ {} git add failed for {} paths: {:?}",
-                repo.display(),
-                existing.len(),
-                existing
-            );
-            return Err(e);
+
+        // Force-add already-tracked gitignored files (git tracks them already,
+        // so .gitignore shouldn't prevent staging updates to tracked content)
+        if !force_paths.is_empty() {
+            let mut add_args = vec!["add", "-A", "-f", "--"];
+            for p in &force_paths {
+                add_args.push(p.as_str());
+            }
+            if let Err(e) = run_git_with_timeout(repo, &add_args, 30, "add (force-tracked)").await {
+                eprintln!(
+                    "⚠️ {} git add -f failed for {} tracked gitignored paths: {:?}",
+                    repo.display(),
+                    force_paths.len(),
+                    &force_paths[..force_paths.len().min(5)]
+                );
+                // Non-fatal: tracked gitignored files can be re-attempted next cycle
+            }
         }
     }
     Ok(())
+}
+
+/// Partition paths into (force_add, normal_add) based on .gitignore.
+/// - Paths gitignored AND already tracked in git → force_add (git add -f)
+/// - All others → normal_add (git add, respects .gitignore)
+async fn partition_gitignored(repo: &Path, paths: &[String]) -> (Vec<String>, Vec<String>) {
+    if paths.is_empty() {
+        return (Vec::new(), Vec::new());
+    }
+
+    // Run `git check-ignore` to find gitignored paths
+    let ignored: std::collections::HashSet<String> = {
+        let mut check_args = vec!["check-ignore"];
+        for p in paths {
+            check_args.push(p.as_str());
+        }
+        let output = crate::policy::tokio_git_command()
+            .args(&check_args)
+            .current_dir(repo)
+            .output()
+            .await;
+        match output {
+            Ok(o) if o.status.success() || o.status.code() == Some(1) => {
+                // Exit 0 = some ignored, exit 1 = none ignored
+                String::from_utf8_lossy(&o.stdout)
+                    .lines()
+                    .filter(|l| !l.is_empty())
+                    .map(|l| l.to_string())
+                    .collect()
+            }
+            _ => std::collections::HashSet::new(),
+        }
+    };
+
+    // Get list of already-tracked paths (git ls-files)
+    let tracked: std::collections::HashSet<String> = {
+        let output = crate::policy::tokio_git_command()
+            .args(&["ls-files"])
+            .current_dir(repo)
+            .output()
+            .await;
+        match output {
+            Ok(o) if o.status.success() => String::from_utf8_lossy(&o.stdout)
+                .lines()
+                .filter(|l| !l.is_empty())
+                .map(|l| l.to_string())
+                .collect(),
+            _ => std::collections::HashSet::new(),
+        }
+    };
+
+    let mut force_paths = Vec::new();
+    let mut normal_paths = Vec::new();
+
+    for p in paths {
+        if ignored.contains(p) {
+            // Gitignored — only force-add if already tracked
+            if tracked.contains(p) {
+                force_paths.push(p.clone());
+            }
+            // Untracked + gitignored = skip (respect .gitignore)
+        } else {
+            normal_paths.push(p.clone());
+        }
+    }
+
+    (force_paths, normal_paths)
 }
 
 async fn git_rm_missing(repo: &Path, missing: &[String], dry_run: bool) -> Result<()> {
