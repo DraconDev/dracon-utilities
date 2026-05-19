@@ -1266,7 +1266,7 @@ pub(crate) async fn run_daemon(
 
             // Repo stuck behind (unpulled upstream changes)
             if let Some(since) = entry.behind_since {
-                if now.duration_since(since) >= STUCK_BEHIND_THRESHOLD {
+                if notification_now.duration_since(since) >= STUCK_BEHIND_THRESHOLD {
                     let notify_key = format!("stuck-behind-{}", repo.display());
                     if let std::collections::hash_map::Entry::Vacant(e) =
                         remote_notify_cooldowns.entry(notify_key.clone())
