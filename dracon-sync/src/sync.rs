@@ -23,6 +23,7 @@ use crate::git::{
 use crate::policy::{debug_enabled, load_repo_override, SyncPolicy};
 use crate::report::{
     append_incident_record, build_commit_context, detect_report_signals,
+    push_large_blob_threshold_bytes,
 };
 use crate::visibility::{
     get_github_visibility, parse_github_owner_repo, sync_mirror_metadata, sync_mirror_visibility,
@@ -46,7 +47,6 @@ struct SyncContext<'a> {
     policy: &'a SyncPolicy,
     excluded_dir_names: &'a BTreeSet<String>,
     dry_run: bool,
-    force_deletion: bool,
     #[allow(dead_code)]
     idle_seconds: u64,
     policy_path: Option<&'a Path>,
@@ -1270,7 +1270,6 @@ pub(crate) async fn sync_repo(
     remote_failures: Option<&mut HashMap<String, usize>>,
     dry_run: bool,
     policy_path: Option<&Path>,
-    force_deletion: bool,
 ) -> Result<SyncOutcome> {
     let svc = GitService::new(repo)?;
     if !svc.is_git_repo().await? {
@@ -1282,7 +1281,6 @@ pub(crate) async fn sync_repo(
             policy,
             excluded_dir_names,
             dry_run,
-            force_deletion,
             idle_seconds,
             policy_path,
             has_origin: false,
@@ -1301,7 +1299,6 @@ pub(crate) async fn sync_repo(
             policy,
             excluded_dir_names,
             dry_run,
-            force_deletion,
             idle_seconds,
             policy_path,
             has_origin: false,
@@ -1337,7 +1334,6 @@ pub(crate) async fn sync_repo(
         policy,
         excluded_dir_names,
         dry_run,
-        force_deletion,
         idle_seconds,
         policy_path,
         has_origin,
