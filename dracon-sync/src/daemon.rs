@@ -1095,6 +1095,10 @@ pub(crate) async fn run_daemon(
                 }
                 entry.failure_count = 0;
                 entry.remote_failures.clear();
+                // Mirror pushes succeeded — reset consecutive fail counters
+                for count in entry.mirror_consecutive_fails.values_mut() {
+                    *count = 0;
+                }
                 // Re-check if repo is still dirty (filter-only changes persist).
                 // If so, use a long cooldown instead of removing from activity
                 // to prevent tight triage loops on phantom changes.
@@ -1208,6 +1212,22 @@ pub(crate) async fn run_daemon(
                     save_stuck_push_repos(&stuck_push_repos);
                     activity.remove(&repo);
                     initial_repos.remove(&repo);
+                }
+            }
+
+            // Update mirror consecutive-fail tracking from remote_failures.
+            // If a mirror has failures this cycle, increment its counter;
+            // if it has no failures (not in remote_failures), reset to 0.
+            if let Some(entry) = activity.get_mut(&repo) {
+                for remote in &policy.remotes {
+                    let count = entry.mirror_consecutive_fails
+                        .entry(remote.name.clone())
+                        .or_insert(0);
+                    if entry.remote_failures.contains_key(&remote.name) {
+                        *count += 1;
+                    } else {
+                        *count = 0;
+                    }
                 }
             }
         }
