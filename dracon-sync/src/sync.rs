@@ -2685,7 +2685,6 @@ push_url = "{}"
         );
     }
 
-    #[tokio::test]
 
     #[tokio::test]
     async fn test_sync_repo_partial_deletion_allowed() {
