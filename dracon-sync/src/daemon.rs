@@ -448,6 +448,12 @@ pub(crate) async fn run_daemon(
         /// When the repo first became dirty in this cycle.
         /// Unlike changed_at, this doesn't reset on fingerprint changes.
         dirty_since: Option<Instant>,
+        /// When the repo first became ahead of origin (unpushed commits).
+        ahead_since: Option<Instant>,
+        /// When the repo first became behind origin (unpulled commits).
+        behind_since: Option<Instant>,
+        /// Which mirrors have failed consecutively (name → consecutive fail count).
+        mirror_consecutive_fails: HashMap<String, usize>,
         failure_count: usize,
         remote_failures: HashMap<String, usize>,
     }
@@ -879,6 +885,9 @@ pub(crate) async fn run_daemon(
                         fingerprint,
                         changed_at: now,
                         dirty_since: if effective_dirty { Some(now) } else { None },
+                        ahead_since: if status.ahead > 0 { Some(now) } else { None },
+                        behind_since: if status.behind > 0 { Some(now) } else { None },
+                        mirror_consecutive_fails: HashMap::new(),
                         failure_count: 0,
                         remote_failures: HashMap::new(),
                     },
@@ -892,6 +901,17 @@ pub(crate) async fn run_daemon(
                 entry.dirty_since = Some(now);
             } else if !effective_dirty {
                 entry.dirty_since = None;
+            }
+            // Track ahead/behind state transitions for sustained-state notifications
+            if status.ahead > 0 && entry.ahead_since.is_none() {
+                entry.ahead_since = Some(now);
+            } else if status.ahead == 0 {
+                entry.ahead_since = None;
+            }
+            if status.behind > 0 && entry.behind_since.is_none() {
+                entry.behind_since = Some(now);
+            } else if status.behind == 0 {
+                entry.behind_since = None;
             }
             if entry.fingerprint != fingerprint {
                 entry.fingerprint = fingerprint;
@@ -1197,6 +1217,66 @@ pub(crate) async fn run_daemon(
         // can delay output for minutes without explicit flushes.
         let _ = std::io::stderr().flush();
         let _ = std::io::stdout().flush();
+
+        // === Sustained-state notifications ===
+        // Check for repos that have been in a concerning state for too long.
+        // These fire once per repo per sustained incident, rate-limited to 30 min.
+        const STUCK_AHEAD_THRESHOLD: Duration = Duration::from_secs(600);  // 10 min
+        const STUCK_BEHIND_THRESHOLD: Duration = Duration::from_secs(1800); // 30 min
+        const MIRROR_DEGRADED_THRESHOLD: usize = 3; // 3 consecutive fails
+
+        for (repo, entry) in &activity {
+            // Repo stuck ahead (unpushed commits piling up)
+            if let Some(since) = entry.ahead_since {
+                if now.duration_since(since) >= STUCK_AHEAD_THRESHOLD {
+                    let notify_key = format!("stuck-ahead-{}", repo.display());
+                    if let std::collections::hash_map::Entry::Vacant(e) =
+                        remote_notify_cooldowns.entry(notify_key.clone())
+                    {
+                        crate::report::send_sync_conflict_notification(
+                            repo,
+                            "Stuck Ahead (Unpushed)",
+                            "commits not reaching origin for >10 min — push may be failing",
+                        );
+                        e.insert(Instant::now() + Duration::from_secs(1800));
+                    }
+                }
+            }
+
+            // Repo stuck behind (unpulled upstream changes)
+            if let Some(since) = entry.behind_since {
+                if now.duration_since(since) >= STUCK_BEHIND_THRESHOLD {
+                    let notify_key = format!("stuck-behind-{}", repo.display());
+                    if let std::collections::hash_map::Entry::Vacant(e) =
+                        remote_notify_cooldowns.entry(notify_key.clone())
+                    {
+                        crate::report::send_sync_conflict_notification(
+                            repo,
+                            "Stuck Behind (Unpulled)",
+                            "upstream has unmerged changes for >30 min — pull may be failing",
+                        );
+                        e.insert(Instant::now() + Duration::from_secs(1800));
+                    }
+                }
+            }
+
+            // Mirror degraded (one mirror consistently failing)
+            for (mirror_name, fail_count) in &entry.mirror_consecutive_fails {
+                if *fail_count >= MIRROR_DEGRADED_THRESHOLD {
+                    let notify_key = format!("mirror-{}-{}", repo.display(), mirror_name);
+                    if let std::collections::hash_map::Entry::Vacant(e) =
+                        remote_notify_cooldowns.entry(notify_key.clone())
+                    {
+                        crate::report::send_sync_conflict_notification(
+                            repo,
+                            &format!("Mirror Degraded: {}", mirror_name),
+                            &format!("{} consecutive push failures — mirror may be unreachable", fail_count),
+                        );
+                        e.insert(Instant::now() + Duration::from_secs(1800));
+                    }
+                }
+            }
+        }
 
         sleep(Duration::from_secs(scan_interval)).await;
     }
