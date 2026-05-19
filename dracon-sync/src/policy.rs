@@ -468,7 +468,7 @@ pub(crate) struct RepoPolicyOverride {
     #[serde(default)]
     pub(crate) nix_auto_update: Option<bool>,
     /// Per-repo list of standard file targets to skip.
-    /// Use the target filename (e.g., "CLA.md") not the source path.
+    /// Use the target filename (e.g., "LICENSE") not the source path.
     #[serde(default)]
     pub(crate) skip_standard_files: Vec<String>,
 }

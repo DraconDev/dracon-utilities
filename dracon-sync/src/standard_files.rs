@@ -197,20 +197,20 @@ mod tests {
         let repo_dir = dir.path();
         let template_dir = dir.path().join("templates");
         std::fs::create_dir(&template_dir).unwrap();
-        std::fs::write(template_dir.join("CLA.md"), "CLA content").unwrap();
+        std::fs::write(template_dir.join("CUSTOM.md"), "custom content").unwrap();
 
         let policy = make_policy(vec![StandardFileConfig {
-            source: "templates/CLA.md".to_string(),
-            target: "CLA.md".to_string(),
+            source: "templates/CUSTOM.md".to_string(),
+            target: "CUSTOM.md".to_string(),
             overwrite: false,
         }]);
 
-        let repo_override = make_override(vec!["CLA.md".to_string()]);
+        let repo_override = make_override(vec!["CUSTOM.md".to_string()]);
         let result = ensure_standard_files(repo_dir, &policy, &repo_override, None, false);
         assert!(result.is_ok());
         let copied = result.unwrap();
         assert!(copied.is_empty());
-        assert!(!repo_dir.join("CLA.md").exists());
+        assert!(!repo_dir.join("CUSTOM.md").exists());
     }
 
     #[test]
