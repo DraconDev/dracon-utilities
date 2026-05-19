@@ -642,7 +642,7 @@ pub(crate) async fn run_daemon(
         }
 
         if let Some(reason) = freeze_reason(&policy_path) {
-            println!("⏸️ sync daemon paused ({})", reason);
+            eprintln!("⏸️ sync daemon paused ({})", reason);
             sleep(Duration::from_secs(scan_interval)).await;
             continue;
         }
