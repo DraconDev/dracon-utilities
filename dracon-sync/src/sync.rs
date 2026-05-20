@@ -607,7 +607,7 @@ async fn stage_existing_files(repo: &Path, existing: &[String], dry_run: bool) -
             for p in &force_paths {
                 add_args.push(p.as_str());
             }
-            if let Err(_) = run_git_with_timeout(repo, &add_args, 30, "add (force-tracked)").await {
+            if run_git_with_timeout(repo, &add_args, 30, "add (force-tracked)").await.is_err() {
                 eprintln!(
                     "⚠️ {} git add -f failed for {} tracked gitignored paths: {:?}",
                     repo.display(),
@@ -656,7 +656,7 @@ async fn partition_gitignored(repo: &Path, paths: &[String]) -> (Vec<String>, Ve
     // Get list of already-tracked paths (git ls-files)
     let tracked: std::collections::HashSet<String> = {
         let output = crate::policy::tokio_git_command()
-            .args(&["ls-files"])
+            .args(["ls-files"])
             .current_dir(repo)
             .output()
             .await;
