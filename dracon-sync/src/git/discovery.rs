@@ -14,6 +14,15 @@ pub(crate) fn discover_git_repos(
     let exlude_set: HashSet<String> = exclude_repos.iter().map(|s| s.to_lowercase()).collect();
     let mut repos = Vec::new();
     for root in roots {
+        // Check if the root itself is a git repo (before recursing into children).
+        // This handles the case where a watch root is itself a git repo (e.g., ~/.dracon).
+        let root_dot_git = root.join(".git");
+        if root_dot_git.exists()
+            && (root_dot_git.is_dir() || is_git_worktree_file(&root_dot_git))
+            && !exlude_set.contains(&root.to_string_lossy().to_lowercase())
+        {
+            repos.push(root.clone());
+        }
         discover_git_repos_recursive(root, excluded_dir_names, &mut repos, 0, 4);
     }
     repos.retain(|r| {
