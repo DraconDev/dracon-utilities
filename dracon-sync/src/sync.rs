@@ -793,6 +793,28 @@ async fn run_ai_bumper(
             std::fs::read_to_string(repo.join(".dracon/project-state.md")).unwrap_or_default();
 
         if let Some(current_ver) = read_current_version(repo) {
+            // Skip bump if this version already has a git tag (prevents infinite bump loop).
+            // The daemon tags every bump it creates, so a tag for the current version means
+            // this version was already released — don't bump it again.
+            let tag_name = format!("v{}", current_ver);
+            let repo_path = repo.to_path_buf();
+            let tag_n = tag_name.clone();
+            let tag_exists = tokio::task::spawn_blocking(move || -> bool {
+                std::process::Command::new("git")
+                    .args(["tag", "-l", &tag_n])
+                    .current_dir(&repo_path)
+                    .stdout(std::process::Stdio::piped())
+                    .stderr(std::process::Stdio::null())
+                    .output()
+                    .map(|o| !String::from_utf8_lossy(&o.stdout).trim().is_empty())
+                    .unwrap_or(false)
+            })
+            .await
+            .unwrap_or(false);
+            if tag_exists {
+                return false;
+            }
+
             let level =
                 ai_decide_bump_level(repo, &current_ver, &staged_diff, &project_state).await;
             // Defense-in-depth: ai_decide_bump_level maps "major" => BumpLevel::None,
