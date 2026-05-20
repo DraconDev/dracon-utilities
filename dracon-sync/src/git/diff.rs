@@ -122,7 +122,29 @@ pub(crate) async fn cli_diff_entries(repo: &Path) -> Result<Vec<DiffFile>> {
     Ok(entries)
 }
 
-/// Get diff entries from both repo status and diff (accounts for staged-only changes).
+/// Get untracked file entries via `git ls-files --others --exclude-standard`.
+pub(crate) async fn untracked_entries(repo: &Path) -> Result<Vec<DiffFile>> {
+    let output = TokioCommand::new("git")
+        .args(["ls-files", "--others", "--exclude-standard", "-z"])
+        .current_dir(repo)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .output()
+        .await?;
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    Ok(stdout
+        .split('\0')
+        .filter(|s| !s.is_empty())
+        .map(|p| DiffFile {
+            path: PathBuf::from(p),
+            status: FileStatus::Added,
+        })
+        .collect())
+}
+
+/// Get diff entries from both repo status, diff, and untracked files.
+/// This ensures untracked files are included in the diff entries so the
+/// daemon can detect and commit them.
 pub(crate) async fn repo_diff_entries(repo: &Path) -> Result<Vec<DiffFile>> {
     let svc = GitService::new(repo)?;
     let status = svc.get_status().await?;
@@ -133,11 +155,24 @@ pub(crate) async fn repo_diff_entries(repo: &Path) -> Result<Vec<DiffFile>> {
     // and unstaged modifications, but NOT untracked files).
     let diff = cli_diff_entries(repo).await?;
     if !diff.is_empty() {
-        return Ok(diff);
+        // Only return diff entries if there are actual changes.
+        // Also include any untracked files that may exist alongside mods.
+        let untracked = untracked_entries(repo).await.unwrap_or_default();
+        if untracked.is_empty() {
+            return Ok(diff);
+        }
+        let mut combined = diff;
+        combined.extend(untracked);
+        return Ok(combined);
+    }
+    // cli_diff_entries returned empty. Check for untracked files or
+    // staged-only changes.
+    let untracked = untracked_entries(repo).await.unwrap_or_default();
+    if !untracked.is_empty() {
+        return Ok(untracked);
     }
     // Only staged files (git add'ed but no working tree differences yet)
     // or repos where diff parsing produced no results.
-    // Return empty — the caller should handle staged-only repos separately.
     Ok(Vec::new())
 }
 
