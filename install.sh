@@ -92,14 +92,35 @@ done
 if [ "$UPGRADE" = true ]; then
     echo "Stopping services for upgrade..."
     for service in dracon-sync.service dracon-system-guard.service dracon-warden.service; do
-        if systemctl --user is-active "$service" &>/dev/null; then
-            if [ "$DRY_RUN" = true ]; then
-                echo "  Would stop $service"
-            else
+        # Map service name to binary name
+        _bin=""
+        case "$service" in
+            dracon-sync.service)   _bin=dracon-sync ;;
+            dracon-system-guard.service) _bin=dracon-system ;;
+            dracon-warden.service)  _bin=dracon-warden ;;
+        esac
+
+        if [ "$DRY_RUN" = true ]; then
+            if systemctl --user is-active "$service" &>/dev/null; then
+                echo "  Would stop $service (systemctl)"
+            fi
+            if pgrep -x "$_bin" &>/dev/null; then
+                echo "  Would kill $_bin (pkill fallback)"
+            fi
+        else
+            # Stop via systemd (clean shutdown)
+            if systemctl --user is-active "$service" &>/dev/null; then
                 systemctl --user stop "$service" 2>/dev/null && echo "  Stopped $service" || true
+            fi
+            # Catch any remaining processes (manual runs, stale)
+            if pgrep -x "$_bin" &>/dev/null; then
+                pkill -x "$_bin" 2>/dev/null || true
+                echo "  Killed $_bin (non-systemd process)"
             fi
         fi
     done
+    # Wait for all processes to exit
+    sleep 1
     echo ""
 fi
 
@@ -221,6 +242,9 @@ install_binary() {
 
         # Stop the running daemon before overwriting its binary.
         # Without this, `cp` fails with "Text file busy" on Linux.
+        # We try TWO approaches to ensure no process holds the binary:
+        #   1. Systemd stop (clean service shutdown)
+        #   2. pkill fallback (catches manual runs, stale processes outside systemd)
         local svc_name=""
         case "$binary" in
             dracon-sync)   svc_name=dracon-sync.service ;;
@@ -228,9 +252,21 @@ install_binary() {
             dracon-warden)  svc_name=dracon-warden.service ;;
         esac
         local did_stop=false
+
+        # Approach 1: Clean systemd shutdown (handles Restart=always gracefully)
         if [ -n "$svc_name" ] && systemctl --user is-active "$svc_name" &>/dev/null; then
             systemctl --user stop "$svc_name" 2>/dev/null && did_stop=true || true
-            # Wait for process to exit (up to 5s)
+        fi
+
+        # Approach 2: Catch-all — kill ANY remaining process named $binary,
+        # regardless of how it was started (manual, stale, non-systemd).
+        if pgrep -x "$binary" &>/dev/null; then
+            pkill -x "$binary" 2>/dev/null || true
+            did_stop=true
+        fi
+
+        # Wait for process to fully exit (up to 5s)
+        if [ "$did_stop" = true ]; then
             for _ in $(seq 1 10); do
                 pgrep -x "$binary" &>/dev/null || break
                 sleep 0.5
