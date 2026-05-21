@@ -40,3 +40,26 @@
 - **.dracon discovery fix**: `discover_git_repos()` now correctly finds dot-prefixed watch roots (`.dracon`).
 - **GitLab sync**: `.dracon` pushes successfully to `dracondev/dracon-home` on GitLab.
 - **All 602 tests passing**: No regressions.
+
+## System Audit Complete (2026-05-21) — 8 Iterations
+
+### Bugs Found & Fixed
+- **HTTPS GitHub push_url in policy**: Policy had `https://github.com/DraconDev/{repo}.git` but no GitHub app token for HTTPS auth → all pushes failed. Fixed to SSH: `git@github.com:DraconDev/{repo}.git`
+- **Missing repo_name_map in policy**: `.dracon` repo was pushing to `DraconDev/.dracon.git` instead of `DraconDev/dracon-home.git`. Fixed by adding `repo_name_map = { ".dracon" = "dracon-home" }` to all 3 remotes (github, gitlab, codeberg).
+- **TOML corruption**: Bad sed commands introduced duplicate entries for codeberg remote. Fixed with Python string replacement.
+
+### System Health (Final State)
+| Component | Status |
+|-----------|--------|
+| GitHub mirror | ✅ Synced via SSH |
+| GitLab mirror | ✅ Synced via SSH |
+| Codeberg | ⚠️ Requires manual repo creation (Forgejo push-to-create disabled) |
+| Tests | ✅ 456/456 passing |
+| Clippy | ✅ 0 warnings |
+| Daemon uptime | ✅ 30+ sync events in last 10 min |
+| Warden encryption | ✅ Verified working |
+| All 3 services | ✅ active |
+
+### Deferred (User Action Required)
+- **Codeberg repo**: User must create `dracondev/dracon-home` manually on codeberg.org (Settings → SSH Keys + Create Repo). Once created, daemon will auto-push.
+
