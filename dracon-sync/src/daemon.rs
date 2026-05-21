@@ -349,24 +349,104 @@ pub(crate) fn is_repo_stuck(repo: &Path) -> bool {
     load_stuck_push_repos().contains_key(repo)
 }
 
+/// Run startup cleanup: prune stale state from previous runs.
+/// Called by both `run_once` (for one-shot sync) and `run_daemon` (on startup).
+/// Returns the number of stale index.lock files removed.
+pub(crate) async fn run_startup_cleanup(policy_path: &Path) -> (BTreeSet<PathBuf>, u64) {
+    let policy = match SyncPolicy::load(policy_path) {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("⚠️ failed loading policy for startup cleanup: {}", e);
+            SyncPolicy::default()
+        }
+    };
+    let roots = policy.watch_root_paths();
+    let excluded_dir_names = excluded_dir_names_set(&policy);
+    let discovered = discover_git_repos(
+        &roots,
+        &excluded_dir_names,
+        &policy.exclude_repos,
+        Some(&policy.system_repo),
+    );
+    let repo_set: BTreeSet<PathBuf> = discovered.iter().cloned().collect();
+
+    // Prune stuck repos no longer on disk
+    let mut stuck_push_repos = load_stuck_push_repos();
+    let before = stuck_push_repos.len();
+    stuck_push_repos.retain(|repo, _| repo_set.contains(repo));
+    if stuck_push_repos.len() != before {
+        save_stuck_push_repos(&stuck_push_repos);
+        eprintln!(
+            "🧹 startup: pruned {} stale stuck repos",
+            before - stuck_push_repos.len()
+        );
+    }
+
+    // Enforce incident ledger retention now
+    if let Err(e) = crate::report::enforce_retention_at_startup(policy_path, &policy) {
+        eprintln!("⚠️ startup: incident ledger cleanup failed: {}", e);
+    }
+
+    // Prune visibility cache for deleted repos
+    if let Err(e) = crate::visibility::prune_stale_visibility_cache(&repo_set) {
+        eprintln!("⚠️ startup: visibility cache cleanup failed: {}", e);
+    }
+
+    // Repair broken upstream tracking references (e.g. origin/master: gone)
+    let discovered_refs: Vec<PathBuf> = repo_set.iter().cloned().collect();
+    let fixed = repair_broken_tracking(&discovered_refs);
+    if fixed > 0 {
+        eprintln!(
+            "🧹 startup: repaired {} broken upstream tracking refs",
+            fixed
+        );
+    }
+
+    // Remove stale .git/index.lock files from crashed git processes.
+    // A lock file with no holding process prevents all git operations.
+    let mut locks_removed = 0u64;
+    for repo in &repo_set {
+        let lock = repo.join(".git/index.lock");
+        if lock.exists() {
+            // Check if any process is actually using it
+            let in_use = std::process::Command::new("fuser")
+                .arg(&lock)
+                .output()
+                .map(|o| o.status.success())
+                .unwrap_or(false);
+            if !in_use {
+                if let Err(e) = std::fs::remove_file(&lock) {
+                    eprintln!("⚠️ startup: failed to remove {}: {}", lock.display(), e);
+                } else {
+                    locks_removed += 1;
+                }
+            }
+        }
+    }
+    if locks_removed > 0 {
+        eprintln!(
+            "🧹 startup: removed {} stale .git/index.lock files",
+            locks_removed
+        );
+    }
+
+    (repo_set, locks_removed)
+}
+
 pub(crate) async fn run_once(policy_path: &Path) -> Result<()> {
     if let Some(reason) = freeze_reason(policy_path) {
         eprintln!("⏸️ sync frozen ({})", reason);
         return Ok(());
     }
 
+    // Clean up stale state from previous runs (including index.lock files)
+    let (repo_set, _) = run_startup_cleanup(policy_path).await;
+
     let policy = SyncPolicy::load(policy_path)?;
-    let roots = policy.watch_root_paths();
     let excluded_dir_names = excluded_dir_names_set(&policy);
-    let repos = discover_git_repos(
-        &roots,
-        &excluded_dir_names,
-        &policy.exclude_repos,
-        Some(&policy.system_repo),
-    );
 
     let mut changed = 0usize;
-    for repo in repos {
+    for repo in &repo_set {
         // Guard against repo-discovery race
         if !repo.exists() {
             eprintln!(
@@ -468,86 +548,11 @@ pub(crate) async fn run_daemon(
     let mut cycle_count: u64 = 0;
 
     // ── Startup cleanup: prune stale state from previous runs ──
-    {
-        let policy = match SyncPolicy::load(&policy_path) {
-            Ok(p) => p,
-            Err(e) => {
-                eprintln!("⚠️ failed loading policy for startup cleanup: {}", e);
-                SyncPolicy::default()
-            }
-        };
-        let roots = policy.watch_root_paths();
-        let excluded_dir_names = excluded_dir_names_set(&policy);
-        let discovered = discover_git_repos(
-            &roots,
-            &excluded_dir_names,
-            &policy.exclude_repos,
-            Some(&policy.system_repo),
-        );
-        let repo_set: std::collections::BTreeSet<PathBuf> = discovered.iter().cloned().collect();
-        initial_repos = repo_set.iter().cloned().collect();
+    let (repo_set, _) = run_startup_cleanup(&policy_path).await;
 
-        // Prune stuck repos no longer on disk
-        let before = stuck_push_repos.len();
-        stuck_push_repos.retain(|repo, _| repo_set.contains(repo));
-        if stuck_push_repos.len() != before {
-            save_stuck_push_repos(&stuck_push_repos);
-            eprintln!(
-                "🧹 startup: pruned {} stale stuck repos",
-                before - stuck_push_repos.len()
-            );
-        }
-
-        // Enforce incident ledger retention now
-        if let Err(e) = crate::report::enforce_retention_at_startup(&policy_path, &policy) {
-            eprintln!("⚠️ startup: incident ledger cleanup failed: {}", e);
-        }
-
-        // Prune visibility cache for deleted repos
-        if let Err(e) = crate::visibility::prune_stale_visibility_cache(&repo_set) {
-            eprintln!("⚠️ startup: visibility cache cleanup failed: {}", e);
-        }
-
-        // Repair broken upstream tracking references (e.g. origin/master: gone)
-        let discovered_refs: Vec<PathBuf> = repo_set.iter().cloned().collect();
-        let fixed = repair_broken_tracking(&discovered_refs);
-        if fixed > 0 {
-            eprintln!(
-                "🧹 startup: repaired {} broken upstream tracking refs",
-                fixed
-            );
-        }
-
-        // Remove stale .git/index.lock files from crashed git processes.
-        // A lock file with no holding process prevents all git operations.
-        let mut locks_removed = 0u64;
-        for repo in &repo_set {
-            let lock = repo.join(".git/index.lock");
-            if lock.exists() {
-                // Check if any process is actually using it
-                let in_use = std::process::Command::new("fuser")
-                    .arg(&lock)
-                    .output()
-                    .map(|o| o.status.success())
-                    .unwrap_or(false);
-                if !in_use {
-                    if let Err(e) = std::fs::remove_file(&lock) {
-                        eprintln!("⚠️ startup: failed to remove {}: {}", lock.display(), e);
-                    } else {
-                        locks_removed += 1;
-                    }
-                }
-            }
-        }
-        if locks_removed > 0 {
-            eprintln!(
-                "🧹 startup: removed {} stale .git/index.lock files",
-                locks_removed
-            );
-        }
-    }
-
-    let shutdown = Arc::new(AtomicBool::new(false));
+    // ── Startup cleanup: prune stale state from previous runs ──
+    let (repo_set, _) = run_startup_cleanup(&policy_path).await;
+    let initial_repos: HashSet<PathBuf> = repo_set.iter().cloned().collect();
     let shutdown_sigterm = shutdown.clone();
     let shutdown_sigint = shutdown.clone();
     let reload = Arc::new(AtomicBool::new(false));
