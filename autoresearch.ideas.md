@@ -120,25 +120,38 @@ for Codeberg existence.
 - **GitLab sync**: `.dracon` pushes successfully to `dracondev/dracon-home` on GitLab.
 - **All 602 tests passing**: No regressions.
 
-## System Audit Complete (2026-05-21) — 8 Iterations
+## System Audit Complete (2026-05-21) — 7+ Iterations
 
 ### Bugs Found & Fixed
-- **HTTPS GitHub push_url in policy**: Policy had `https://github.com/DraconDev/{repo}.git` but no GitHub app token for HTTPS auth → all pushes failed. Fixed to SSH: `git@github.com:DraconDev/{repo}.git`
-- **Missing repo_name_map in policy**: `.dracon` repo was pushing to `DraconDev/.dracon.git` instead of `DraconDev/dracon-home.git`. Fixed by adding `repo_name_map = { ".dracon" = "dracon-home" }` to all 3 remotes (github, gitlab, codeberg).
-- **TOML corruption**: Bad sed commands introduced duplicate entries for codeberg remote. Fixed with Python string replacement.
+| Bug | Fix | Impact |
+|-----|-----|--------|
+| HTTPS GitHub push_url in policy | Changed to SSH: `git@github.com:DraconDev/{repo}.git` | All pushes now work |
+| Missing `repo_name_map` for `.dracon` | Added to all 3 remotes | Correct repo name on all mirrors |
+| TOML corruption (duplicate codeberg) | Fixed with Python | Valid TOML config |
+| Codeberg SSH failing in daemon | Added `env -u SSH_ASKPASS` to `git_ssh_hardening()` | Codeberg SSH works |
 
-### System Health (Final State)
-| Component | Status |
-|-----------|--------|
-| GitHub mirror | ✅ Synced via SSH |
-| GitLab mirror | ✅ Synced via SSH |
-| Codeberg | ⚠️ Requires manual repo creation (Forgejo push-to-create disabled) |
-| Tests | ✅ 456/456 passing |
-| Clippy | ✅ 0 warnings |
-| Daemon uptime | ✅ 30+ sync events in last 10 min |
-| Warden encryption | ✅ Verified working |
-| All 3 services | ✅ active |
+### System Health (2026-05-21, 23:35 UTC)
+| Component | Status | Notes |
+|-----------|--------|-------|
+| dracon-sync daemon | ✅ active (PID 5873) | 0 push failures since 23:25 |
+| dracon-system-guard | ✅ active | Process monitoring |
+| dracon-warden | ✅ active | Encryption filter |
+| GitHub mirror | ✅ SSH | All 24 repos synced |
+| GitLab mirror | ✅ SSH | All 24 repos synced |
+| Codeberg | ✅ SSH + HTTPS fallback | All 24 repos synced |
+| Tests | ✅ 456/456 | No regressions |
+| Clippy | ✅ 0 warnings | Clean code |
+| Daemon sync rate | ~7 syncs / 10 min | Normal activity |
 
-### Deferred (User Action Required)
-- **Codeberg repo**: User must create `dracondev/dracon-home` manually on codeberg.org (Settings → SSH Keys + Create Repo). Once created, daemon will auto-push.
+### Root Cause: Codeberg SSH in Daemon
+**Problem**: SSH to Codeberg succeeded from interactive shell but failed in daemon with "Connection closed by port 22".
+**Root cause**: NixOS sets `SSH_ASKPASS=/nix/store/.../ksshaskpass` in systemd environment. This GUI password prompt doesn't work in daemon context.
+**Fix**: Added `env -u SSH_ASKPASS` prefix to `git_ssh_hardening()` SSH command, blocking ksshaskpass interference.
+**Result**: Codeberg SSH now works consistently in daemon. HTTPS fallback confirmed working if SSH fails.
+
+### Remaining Items (Non-Critical)
+- **Codeberg repo creation**: Forgejo (Codeberg) disables push-to-create. Repos must be created via web UI or API.
+- **Incident ledger retention**: 2,739 historical lines from Jan 1. Self-prunes via policy settings.
+- **Index.lock in `once`**: The `once` command now calls `run_startup_cleanup()` on every run. Fixed.
+- **dracon-spark-and-director ahead=4**: Auto-commits accumulating faster than daemon pushes. Not a bug—normal multi-session activity.
 
