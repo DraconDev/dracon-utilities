@@ -353,6 +353,7 @@ pub(crate) fn is_repo_stuck(repo: &Path) -> bool {
 /// Called by both `run_once` (for one-shot sync) and `run_daemon` (on startup).
 /// Returns the number of stale index.lock files removed.
 pub(crate) async fn run_startup_cleanup(policy_path: &Path) -> (BTreeSet<PathBuf>, u64) {
+    eprintln!("🧹 startup: running cleanup...");
     let policy = match SyncPolicy::load(policy_path) {
         Ok(p) => p,
         Err(e) => {
