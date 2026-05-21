@@ -409,7 +409,7 @@ pub(crate) async fn run_startup_cleanup(policy_path: &Path) -> (BTreeSet<PathBuf
     for repo in &repo_set {
         let lock = repo.join(".git/index.lock");
         if lock.exists() {
-            // Check if any process is actually using it
+            eprintln!("🧹 startup: found index.lock in {} (checking fuser...)", repo.display());
             let in_use = std::process::Command::new("fuser")
                 .arg(&lock)
                 .output()
