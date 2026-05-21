@@ -25,3 +25,18 @@
 - NixOS rebuild times
 - Network latency to GitHub/GitLab/Codeberg
 - Memory usage of daemon under high repo load
+
+## Performance Findings (2026-05-21)
+
+- **Metric clarification**: `sync_cycle_ms` (41,408ms) measures the `once` command — a FULL sequential stress test that processes all 24 repos + pushes to all 3 remotes. This is NOT the daemon iteration time.
+- **Real daemon iteration**: ~156ms per clean cycle (pulse_interval=1s, inactivity_delay=5s). Daemon is fast.
+- **Per-repo overhead**: ~35ms per `git status` call. Negligible.
+- **Push overhead**: ~584ms per push (network-bound). Largest cost in dirty-repo cycles.
+- **No optimization warranted**: Daemon is well-optimized. The 41s is expected for the sequential `once` command.
+
+## Verified Working (No Action Needed)
+
+- **Warden encryption**: Working correctly. New `secrets/**` files get `[DRACON_SECRET:...]` blobs in git index on `git add`. Smudge filter decrypts on checkout.
+- **.dracon discovery fix**: `discover_git_repos()` now correctly finds dot-prefixed watch roots (`.dracon`).
+- **GitLab sync**: `.dracon` pushes successfully to `dracondev/dracon-home` on GitLab.
+- **All 602 tests passing**: No regressions.
