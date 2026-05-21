@@ -4,10 +4,13 @@
 use std::path::PathBuf;
 
 /// Returns the SSH command with hardened security options for git operations.
+/// Disables SSH_ASKPASS from NixOS/system environment to prevent GUI password prompts
+/// in daemon context where they would block or fail silently.
 pub(crate) fn git_ssh_hardening() -> String {
     let home = std::env::var("HOME").unwrap_or_else(|_| "/root".to_string());
+    // Unset SSH_ASKPASS so NixOS's ksshaskpass doesn't interfere with git SSH auth
     format!(
-        "ssh -o BatchMode=yes -F {home}/.dracon/secrets/ssh/config -o ConnectTimeout=10 -o ConnectionAttempts=1 -o ServerAliveInterval=5 -o ServerAliveCountMax=2"
+        "env -u SSH_ASKPASS ssh -o BatchMode=yes -F {home}/.dracon/secrets/ssh/config -o ConnectTimeout=10 -o ConnectionAttempts=1 -o ServerAliveInterval=5 -o ServerAliveCountMax=2"
     )
 }
 
