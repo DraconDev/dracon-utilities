@@ -57,7 +57,9 @@ pub(crate) async fn push_https_fallback(
     }
 
     if let Some(https) = super::codeberg_https_url(remote_url) {
+        eprintln!("🔍 codeberg_https_url matched: {}", https);
         if let Some(token) = super::load_secret("CODEBERG_TOKEN") {
+            eprintln!("🔍 CODEBERG_TOKEN loaded ({} chars), creating askpass script", token.len());
             match super::git_askpass_script(&token).await {
                 Ok(askpass) => {
                     let result = super::run_git_with_timeout_env(
@@ -80,6 +82,8 @@ pub(crate) async fn push_https_fallback(
                     eprintln!("⚠️ failed to create GIT_ASKPASS helper for Codeberg: {}", e);
                 }
             }
+        } else {
+            eprintln!("⚠️ CODEBERG_TOKEN not found - HTTPS fallback will fail");
         }
     }
 
