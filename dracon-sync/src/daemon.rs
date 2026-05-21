@@ -549,7 +549,7 @@ pub(crate) async fn run_daemon(
 
     // ── Startup cleanup: prune stale state from previous runs ──
     let (repo_set, _) = run_startup_cleanup(&policy_path).await;
-    let initial_repos: HashSet<PathBuf> = repo_set.iter().cloned().collect();
+    initial_repos = repo_set.iter().cloned().collect();
     let shutdown = Arc::new(AtomicBool::new(false));
     let shutdown_sigterm = shutdown.clone();
     let shutdown_sigint = shutdown.clone();
