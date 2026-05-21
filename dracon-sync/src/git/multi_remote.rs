@@ -169,8 +169,10 @@ pub(crate) async fn push_to_named_remote(
     .await;
 
     if attempt_ssh.is_ok() {
+        eprintln!("🔍 [{}] SSH succeeded for {}", remote_name, repo_name);
         return Ok(());
     }
+    eprintln!("🔍 [{}] SSH failed for {}, trying HTTPS fallback", remote_name, repo_name);
 
     let remote_url = get_remote_url(repo, remote_name)
         .ok_or_else(|| anyhow::anyhow!("remote {} not found", remote_name))?;
