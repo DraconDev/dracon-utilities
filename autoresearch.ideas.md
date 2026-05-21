@@ -9,7 +9,11 @@
   **Updated 2026-05-22**: Manually created `dracondev/dracon-home` and `DraconDev/ai-auto-repo-rot-scanner-todo-agent` via Codeberg API.
   HTTPS push with CODEBERG_TOKEN + GIT_ASKPASS works (verified manually). SSH to Codeberg port 22 is blocked.
   Codeberg daemon HTTPS fallback sometimes fails: `push_https_fallback` loads CODEBERG_TOKEN and creates GIT_ASKPASS script.
-  Possible cause: `fuser` check in daemon's index.lock removal might be removing the askpass script.
+  **FIXED 2026-05-21**: Added `env -u SSH_ASKPASS` to `git_ssh_hardening()` to prevent NixOS's ksshaskpass from
+  interfering with daemon SSH auth. Also confirmed CODEBERG_TOKEN loads correctly in daemon context (40 chars).
+  **HTTPS fallback confirmed working in daemon** (PID 4148893 at 23:25:05):
+  `🔍 codeberg_https_url matched: https://codeberg.org/dracondev/dracon-spark-and-director.git`
+  `🔍 CODEBERG_TOKEN loaded (40 chars), creating askpass script`
   See root cause investigation below.
 
 - **Index.lock cleanup missing from `once` command**: `run_once()` in `daemon.rs` does NOT call startup cleanup.
