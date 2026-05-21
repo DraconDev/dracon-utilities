@@ -69,6 +69,25 @@ SSH to GitLab:   exit=128 (SSH works - 'ls' not a valid git command)
 HTTPS to Codeberg: works (GIT_ASKPASS with CODEBERG_TOKEN)
 ```
 
+**Updated 2026-05-21 (late):** SSH to Codeberg actually WORKS from interactive shell:
+```
+$ ssh -F /home/dracon/.dracon/secrets/ssh/config git@codeberg.org
+Hi there, dracondev! You've successfully authenticated with the key named main
+```
+But daemon context sometimes fails with "Connection closed by 217.197.84.140 port 22".
+The daemon has `SSH_ASKPASS=/nix/store/.../ksshaskpass` in environment - this may interfere.
+SSH to Codeberg succeeded for `browser-extensions-shared`, `dracon-utilities`, `dracon-spark-and-director`
+but FAILED for `ai-auto-repo-rot-scanner-todo-agent` with "Connection closed by port 22".
+HTTPS fallback never triggers because SSH sometimes succeeds (inconsistent).
+
+### Daemon Environment Issues
+
+- **SSH_ASKPASS from NixOS**: Daemon has `SSH_ASKPASS=/nix/store/mk919nkflnyjgmgykzbf6ip0ikjvmwb5-ksshaskpass-6.5.6/bin/ksshaskpass`
+- This may cause daemon SSH to behave differently from interactive shell SSH
+- `ksshaskpass` is a GUI password prompt - will fail in daemon context
+- **Possible fix**: Clear `SSH_ASKPASS` in daemon's environment, or set `GIT_ASKPASS` explicitly
+- **Test command**: `ssh -o BatchMode=yes -F ~/.dracon/secrets/ssh/config git@codeberg.org` → works in shell but daemon sometimes fails
+
 ### push_to_named_remote Flow for Codeberg
 
 ```
