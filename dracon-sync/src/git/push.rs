@@ -57,12 +57,9 @@ pub(crate) async fn push_https_fallback(
     }
 
     if let Some(https) = super::codeberg_https_url(remote_url) {
-        eprintln!("🔍 debug: codeberg_https_url matched: {}", https);
         if let Some(token) = super::load_secret("CODEBERG_TOKEN") {
-            eprintln!("🔍 debug: CODEBERG_TOKEN loaded ({} chars)", token.len());
             match super::git_askpass_script(&token).await {
                 Ok(askpass) => {
-                    eprintln!("🔍 debug: askpass script created: {:?}", askpass);
                     let result = super::run_git_with_timeout_env(
                         repo,
                         &["push", &https, refspec],
