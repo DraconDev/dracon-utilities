@@ -153,5 +153,5 @@ for Codeberg existence.
 - **Codeberg repo creation**: Forgejo (Codeberg) disables push-to-create. Repos must be created via web UI or API.
 - **Incident ledger retention**: 2,739 historical lines from Jan 1. Self-prunes via policy settings.
 - **Index.lock in `once`**: The `once` command now calls `run_startup_cleanup()` on every run. Fixed.
-- **dracon-spark-and-director ahead=4**: Auto-commits accumulating faster than daemon pushes. Not a bug—normal multi-session activity.
+- **dracon-spark-and-director ahead=N**: AI generates commits faster than daemon can push. Fingerprint-based scheduling waits 5s after each change. Normal multi-session behavior — not a bug.
 
