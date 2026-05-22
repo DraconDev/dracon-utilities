@@ -35,6 +35,13 @@ impl ChatMessage {
             content: content.to_string(),
         }
     }
+
+    pub fn system(content: &str) -> Self {
+        ChatMessage {
+            role: "system".to_string(),
+            content: content.to_string(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]
