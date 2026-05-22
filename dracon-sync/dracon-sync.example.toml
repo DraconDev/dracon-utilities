@@ -42,6 +42,12 @@ auto_repair_concerns = true
 # [auto_repair_warns] - Run dirty-only warn triage after each sync pass.
 auto_repair_warns = true
 
+# [todo_commit_messages]
+# Instead of file-stem summaries ("update scribe, sync"), read root `todo.md`,
+# find the first `[ ]` task, and use it as commit message context.
+# Falls back to file-stem summary if no `[ ]` found or no `todo.md`.
+todo_commit_messages = false
+
 # [auto_rewrite_large_blobs] - Aggressive rewrite when large blobs are detected.
 # Keep false for safe default behavior.
 auto_rewrite_large_blobs = false

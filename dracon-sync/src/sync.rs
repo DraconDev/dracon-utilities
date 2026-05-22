@@ -1164,7 +1164,14 @@ async fn stage_commit_and_push(
     };
 
     let local_fallback = if ai_subject.is_none() {
-        Some(crate::scribe::local_fallback_message(&staged_diff_names))
+        if ctx.policy.todo_commit_messages {
+            Some(crate::scribe::todo_context_message(
+                repo,
+                &staged_diff_names,
+            ))
+        } else {
+            Some(crate::scribe::local_fallback_message(&staged_diff_names))
+        }
     } else {
         None
     };

@@ -1,4 +1,5 @@
 use crate::simple_ai::{ChatMessage, SimpleAiService};
+use crate::todo_parser::parse_todo_task;
 use std::path::Path;
 
 /// Build the **system** prompt — authoritative instructions the AI should follow.
@@ -184,6 +185,70 @@ pub fn local_fallback_message(diff_names: &str) -> String {
 
     let desc = stems.join(", ");
     format!("update {}{}", desc, suffix)
+}
+
+/// Generate a commit message aligned to the first open `[ ]` in root `todo.md`.
+///
+/// Format:
+/// ```
+/// [todo] <task title>
+///
+/// Changed files:
+/// - <file1> (Modified)
+/// - <file2> (Added)
+///
+/// Task scope:
+/// - <sub-item 1>
+/// - <sub-item 2>
+/// ```
+///
+/// Falls back to `local_fallback_message` if no `[ ]` is found in `todo.md`.
+pub fn todo_context_message(repo: &Path, diff_names: &str) -> String {
+    let task = match parse_todo_task(repo) {
+        Some(t) => t,
+        None => return local_fallback_message(diff_names),
+    };
+
+    // Subject line: truncate task title to ~60 chars
+    let title = if task.title.len() > 60 {
+        let mut s: String = task.title.chars().take(57).collect();
+        s.push_str("...");
+        s
+    } else {
+        task.title.clone()
+    };
+
+    let mut msg = format!("[todo] {}", title);
+
+    // Changed files section
+    let entries: Vec<&str> = diff_names
+        .lines()
+        .filter(|l| !l.trim().is_empty())
+        .collect();
+
+    if !entries.is_empty() {
+        msg.push_str("\n\nChanged files:");
+        for entry in entries.iter().take(10) {
+            if let Some((status, path)) = entry.split_once(": ") {
+                msg.push_str(&format!("\n- {} ({})", path, status));
+            } else {
+                msg.push_str(&format!("\n- {}", entry));
+            }
+        }
+        if entries.len() > 10 {
+            msg.push_str(&format!("\n  ... and {} more", entries.len() - 10));
+        }
+    }
+
+    // Task scope section (sub-items)
+    if !task.sub_items.is_empty() {
+        msg.push_str("\n\nTask scope:");
+        for item in &task.sub_items {
+            msg.push_str(&format!("\n- {}", item));
+        }
+    }
+
+    msg
 }
 
 #[cfg(feature = "scribe")]
