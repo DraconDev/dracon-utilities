@@ -2,7 +2,7 @@
 
 ## P0 — Must Answer Before Finish
 
-- [ ] **Periodic incident ledger pruning**: Currently only prunes at daemon startup. Need to decide on approach: prune every N entries, every 24h, or at a configurable interval in the main loop.
+- [x] **Periodic incident ledger pruning**: Implemented in Iteration 5. Extracted shared `enforce_retention()` function, runs every 1800 cycles (~30 min) in the daemon main loop.
 
 ## P1 — Should Answer
 

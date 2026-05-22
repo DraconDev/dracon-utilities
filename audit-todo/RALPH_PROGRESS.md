@@ -34,3 +34,11 @@
   - Wrote research doc: `audit-todo/proc-macro-error-investigation.md`
   - Cargo check passes clean
   - No code changes needed now — monitored and understood
+
+## Iteration 5 ✅
+- **Item #5: Add periodic incident ledger pruning** ✅
+  - Extracted shared `enforce_retention()` function in `report.rs` (was inline in `append_incident_record` + duplicated in `enforce_retention_at_startup`)
+  - Simplified `enforce_retention_at_startup` to delegate to shared function
+  - Added periodic pruning every 1800 cycles (~30 min at 1s interval) in daemon main loop
+  - All 456 tests pass, cargo check clean
+  - Committed by sync daemon as `chore(sync): update ...`
