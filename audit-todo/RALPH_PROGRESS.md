@@ -60,3 +60,13 @@
   - Total savings: ~5.2M across all three binaries
   - cargo check passes clean
   - Committed as `chore(audit): enable release profile optimizations (strip=true, lto=thin)`
+
+## Iteration 8 ✅
+- **Item #8: Test `nix_auto_update` end-to-end** ✅
+  - **Bug found**: `update_version_in_flake_nix` parser failed on dracon-utilities' actual flake.nix format
+    - Detection checked `line.contains("buildRustPackage {")` but actual flake uses `buildRustPackage (commonArgs // {` (merged-src layout with parenthesized args)
+    - Exit only recognized `};` as block end, but merged-src uses `});`
+  - **Fix**: Changed detection to check `buildRustPackage` + `{` + `=` independently; added `});` as valid block-end marker
+  - Added `test_update_version_merged_src_style` test exercising the actual flake format
+  - Added `test_update_version_merged_src_closing_detection` test verifying proper block boundaries
+  - All 458 tests pass (14 nix tests, 2 new), cargo check clean
