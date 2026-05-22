@@ -399,4 +399,76 @@ mod tests {
         let count = result.matches("auth").count();
         assert_eq!(count, 1);
     }
+
+    #[test]
+    fn test_todo_context_finds_task_and_renders_files() {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::write(
+            tmp.path().join("todo.md"),
+            "- [x] Done\n- [ ] My active task\n  - acceptance criteria\n- [ ] Another\n",
+        )
+        .unwrap();
+        let diff_names = "Modified: src/scribe.rs\nAdded: tests/test.rs";
+        let result = todo_context_message(tmp.path(), diff_names);
+        assert!(result.contains("[todo] My active task"));
+        assert!(result.contains("Changed files:"));
+        assert!(result.contains("scribe.rs (Modified)"));
+        assert!(result.contains("test.rs (Added)"));
+        assert!(result.contains("Task scope:"));
+        assert!(result.contains("acceptance criteria"));
+    }
+
+    #[test]
+    fn test_todo_context_falls_back_when_no_open_task() {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::write(tmp.path().join("todo.md"), "- [x] All done\n")
+            .unwrap();
+        let diff_names = "Modified: src/main.rs";
+        let result = todo_context_message(tmp.path(), diff_names);
+        // Should produce local_fallback output (no [todo] prefix)
+        assert!(!result.contains("[todo]"));
+        assert!(result.contains("main"));
+    }
+
+    #[test]
+    fn test_todo_context_falls_back_when_no_todo_file() {
+        let tmp = tempfile::tempdir().unwrap();
+        // No todo.md written
+        let diff_names = "Modified: src/main.rs";
+        let result = todo_context_message(tmp.path(), diff_names);
+        assert!(!result.contains("[todo]"));
+        assert!(result.contains("main"));
+    }
+
+    #[test]
+    fn test_todo_context_truncates_long_title() {
+        let tmp = tempfile::tempdir().unwrap();
+        let long_title = "a".repeat(100);
+        std::fs::write(
+            tmp.path().join("todo.md"),
+            format!("- [ ] {}\n", long_title),
+        )
+        .unwrap();
+        let diff_names = "Modified: src/main.rs";
+        let result = todo_context_message(tmp.path(), diff_names);
+        assert!(result.contains("[todo]"));
+        // Should be truncated (60 chars + "...")
+        assert!(result.len() < 200);
+        assert!(result.contains("..."));
+    }
+
+    #[test]
+    fn test_todo_context_limits_file_list() {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::write(tmp.path().join("todo.md"), "- [ ] Task\n")
+            .unwrap();
+        let many_files: Vec<String> = (0..15)
+            .map(|i| format!("Modified: src/file{}.rs", i))
+            .collect();
+        let diff_names = many_files.join("\n");
+        let result = todo_context_message(tmp.path(), &diff_names);
+        assert!(result.contains("[todo] Task"));
+        assert!(result.contains("... and "));
+        assert!(result.contains("more"));
+    }
 }

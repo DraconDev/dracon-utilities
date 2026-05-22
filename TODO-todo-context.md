@@ -12,7 +12,7 @@ Existing behavior is completely preserved. This is an opt-in toggle.
 
 **Goal:** A clean, tested parser that extracts the active task from `todo.md`.
 
-- [ ] **`parse_todo_task()` — core parser function**
+- [x] **`parse_todo_task()` — core parser function**
   - Read root `<repo>/todo.md`
   - Find the first line matching `- [ ]` (not `[x]`, not `[~]`)
   - Extract the task title text after the marker
@@ -20,7 +20,7 @@ Existing behavior is completely preserved. This is an opt-in toggle.
   - **File:** `dracon-sync/src/todo_parser.rs` (new module)
   - **Signature:** `pub fn parse_todo_task(repo: &Path) -> Option<TodoTask>`
 
-- [ ] **`TodoTask` struct**
+- [x] **`TodoTask` struct**
   ```rust
   pub struct TodoTask {
       pub line_number: usize,   // 1-indexed line in todo.md
@@ -29,13 +29,13 @@ Existing behavior is completely preserved. This is an opt-in toggle.
   }
   ```
 
-- [ ] **Sub-item collection rules**
+- [x] **Sub-item collection rules**
   - After finding `- [ ] task title`, collect all subsequent indented lines
   - Stop at the next `- [ ]` or `- [x]` or `##` header at the same depth
   - Empty lines between sections are skipped (don't break collection)
   - This captures the task's acceptance criteria / scope notes
 
-- [ ] **Edge cases handled**
+- [x] **Edge cases handled**
   - `todo.md` doesn't exist → `None` (graceful fallback)
   - `todo.md` is empty → `None`
   - No `[ ]` found (all `[x]`) → `None`
@@ -43,7 +43,7 @@ Existing behavior is completely preserved. This is an opt-in toggle.
   - `- [ ]` inside nested lists (`  - [ ]`) → matched as sub-items, not new tasks
   - File has only `[~]` (in-progress, not open) → treated same as `[x]`, not selected
 
-- [ ] **Tests for `todo_parser.rs`**
+- [x] **Tests for `todo_parser.rs`**
   - Parse a standard todo.md with one `[ ]` at top
   - Parse sub-items correctly
   - Return `None` when no `[ ]` found
@@ -59,13 +59,13 @@ Existing behavior is completely preserved. This is an opt-in toggle.
 
 **Goal:** A new message generator that wraps the task context around the file changes.
 
-- [ ] **`todo_context_message()` — main formatting function**
+- [x] **`todo_context_message()` — main formatting function**
   - **Input:** `repo: &Path`, `staged_diff_names: &str`, `todo_task: &TodoTask`
   - **Output:** `String` — the formatted commit message body
   - **File:** `dracon-sync/src/scribe.rs`
   - **Pattern:** Subject = `[todo] <task title (truncate to ~60 chars)>`, body includes file changes + sub-items
 
-- [ ] **Format specification**
+- [x] **Format specification**
   ```
   [todo] Monitor daemon stability with all fixes over 24h
   
@@ -79,17 +79,17 @@ Existing behavior is completely preserved. This is an opt-in toggle.
   - git add should never force-add build artifacts
   ```
 
-- [ ] **Integration with existing message flow**
+- [x] **Integration with existing message flow**
   - `local_fallback_message()` is unchanged — still produces `update scribe, sync`
   - New `todo_context_message()` replaces it when config toggle is on
   - The message is wrapped with `chore(sync):` the same way in `sync.rs`
 
-- [ ] **Subject line truncation rules**
+- [x] **Subject line truncation rules**
   - Task title goes in subject after `[todo]` prefix
   - Truncate to ~60 chars if over, append `…`
   - Never produce a blank subject
 
-- [ ] **Tests for formatting**
+- [x] **Tests for formatting**
   - Basic formatting with 2 changed files
   - Truncation of long task title
   - Empty file list (unlikely but safe)
@@ -101,12 +101,12 @@ Existing behavior is completely preserved. This is an opt-in toggle.
 
 **Goal:** A `dracon-sync.toml` option to enable todo-context mode.
 
-- [ ] **Add field to `SyncPolicy` struct**
+- [x] **Add field to `SyncPolicy` struct**
   - **File:** `dracon-sync/src/policy.rs`
   - **Field:** `pub(crate) todo_commit_messages: bool`
   - **Default:** `false` (existing behavior preserved)
 
-- [ ] **Add to example config**
+- [x] **Add to example config**
   - **File:** `dracon-sync/dracon-sync.example.toml`
   - **Entry:**
     ```toml
@@ -123,7 +123,7 @@ Existing behavior is completely preserved. This is an opt-in toggle.
 
 **Goal:** Modify the commit message generation in `sync.rs` to use the new mode when enabled.
 
-- [ ] **In `stage_commit_and_push()` (sync.rs ~line 1155)**
+- [x] **In `stage_commit_and_push()` (sync.rs ~line 1155)**
   - After determining `staged_diff_names` and before the current fallback chain:
     ```rust
     let local_fallback = if policy.todo_commit_messages {
@@ -138,11 +138,11 @@ Existing behavior is completely preserved. This is an opt-in toggle.
     };
     ```
 
-- [ ] **Verify the message wrapping still works**
+- [x] **Verify the message wrapping still works**
   - The existing `chore(sync): <msg>` wrapping in sync.rs applies automatically
   - No changes needed to the message assembly logic
 
-- [ ] **No changes to AI path**
+- [x] **No changes to AI path**
   - `generate_commit_message()` still runs as before
   - `local_fallback` only triggers when AI returns None
   - todo-context mode only applies to the fallback path

@@ -2576,6 +2576,7 @@ mod tests {
             nix_auto_update: false,
             standard_files: vec![],
             standard_files_auto: true,
+            todo_commit_messages: false,
         }
     }
 
