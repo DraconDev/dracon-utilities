@@ -209,6 +209,11 @@ pub fn todo_context_message(repo: &Path, diff_names: &str) -> String {
         None => return local_fallback_message(diff_names),
     };
 
+    // If title is empty (bare `- [ ]`), fall back to file-stem summary
+    if task.title.is_empty() {
+        return local_fallback_message(diff_names);
+    }
+
     // Subject line: truncate task title to ~60 chars
     let title = if task.title.len() > 60 {
         let mut s: String = task.title.chars().take(57).collect();
@@ -241,10 +246,16 @@ pub fn todo_context_message(repo: &Path, diff_names: &str) -> String {
     }
 
     // Task scope section (sub-items)
+    // Sub-items may start with `- ` or `* ` from markdown; strip the leading
+    // bullet to avoid double-bullet rendering like `- - criteria`.
     if !task.sub_items.is_empty() {
         msg.push_str("\n\nTask scope:");
         for item in &task.sub_items {
-            msg.push_str(&format!("\n- {}", item));
+            let stripped = item
+                .strip_prefix("- ")
+                .or_else(|| item.strip_prefix("* "))
+                .unwrap_or(item);
+            msg.push_str(&format!("\n- {}", stripped));
         }
     }
 

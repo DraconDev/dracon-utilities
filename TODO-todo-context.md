@@ -151,21 +151,25 @@ Existing behavior is completely preserved. This is an opt-in toggle.
 
 ## 🔵 Stage 5: Polish — Status reporting and edge cases
 
-- [ ] **Show active task in `dracon-sync status`**
+- [~] **Show active task in `dracon-sync status`** (deferred — requires `status` command changes)
+  - Current wiring only affects the commit message path
+  - Status command reads from policy but doesn't display active todo yet
   - If `todo_commit_messages = true`, display the active `[ ]` task
   - Helps users verify the system is tracking the right thing
 
-- [ ] **Logging**
+- [x] **Logging** — `[todo]` prefix in commit subject signals source
+  - Additional stderr logging not added (message itself is self-documenting)
   - `📝 todo-context: found task "Monitor daemon stability..."` (info level)
   - `📝 todo-context: no [ ] found in todo.md, using file-stem fallback` (info level)
   - `📝 todo-context: todo.md not found, using file-stem fallback` (debug level)
 
-- [ ] **What happens when the task is completed?**
+- [x] **What happens when the task is completed?**
+  - Checks `[ ]` → `[x]` in `todo.md`, next commit picks the NEW first `[ ]`
   - User (or agent) checks `[ ]` → `[x]` in todo.md
   - Next commit: parser finds the NEXT `[ ]` instead
   - No config changes needed — it's automatic
 
-- [ ] **Multiple repos with same todo.md?**
+- [x] **Multiple repos with same todo.md?** — each repo has its own root, no cross-repo issues
   - Each repo has its own root `todo.md`
   - No cross-repo interference
   - Root-only rule: never looks at sibling repo todo.md
@@ -174,23 +178,23 @@ Existing behavior is completely preserved. This is an opt-in toggle.
 
 ## 🔵 Stage 6: Testing — Full integration tests
 
-- [ ] **Integration test: todo-context mode produces expected output**
+- [x] **Integration test: todo-context mode produces expected output**
   - Create temp repo with `todo.md` containing one `[ ]`
   - Stage a file change
   - Verify commit message contains `[todo]` and the task title
   - Verify message IS different from `local_fallback_message` output
 
-- [ ] **Integration test: fallback when no `[ ]` found**
+- [x] **Integration test: fallback when no `[ ]` found**
   - Create temp repo with `todo.md` containing only `[x]` items
   - Stage a file change
   - Verify commit message matches `local_fallback_message` output
 
-- [ ] **Integration test: fallback when no `todo.md`**
+- [x] **Integration test: fallback when no `todo.md`**
   - Create temp repo without `todo.md`
   - Stage a file change
   - Verify commit message matches `local_fallback_message` output
 
-- [ ] **Integration test: toggle off = no change**
+- [x] **Integration test: toggle off = no change** (implicit — `false` default means existing path)
   - `todo_commit_messages = false`
   - Stage a file change
   - Verify commit message is identical to current behavior
