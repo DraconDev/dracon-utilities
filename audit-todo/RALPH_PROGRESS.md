@@ -52,3 +52,11 @@
   - Strengthened post-processing output validation: rejects AI outputs starting with "I will", "I cannot", "I am", "You are"
   - All 456 + 65 tests pass across all crates, cargo check clean
   - Committed by sync daemon
+
+## Iteration 7 ✅
+- **Item #7: Enable release profile optimizations** ✅
+  - Added `strip = true` and `lto = "thin"` to workspace `[profile.release]` in Cargo.toml
+  - Size reductions: dracon-sync 13M→10M (-23%), dracon-system 4.0M→3.2M (-20%), dracon-warden 6.2M→4.8M (-23%)
+  - Total savings: ~5.2M across all three binaries
+  - cargo check passes clean
+  - Committed as `chore(audit): enable release profile optimizations (strip=true, lto=thin)`
