@@ -42,3 +42,13 @@
   - Added periodic pruning every 1800 cycles (~30 min at 1s interval) in daemon main loop
   - All 456 tests pass, cargo check clean
   - Committed by sync daemon as `chore(sync): update ...`
+
+## Iteration 6 ✅
+- **Item #6: Review scribe prompt injection sanitization** ✅
+  - Replaced blocklist `sanitize_for_prompt()` with **structural separation**: system message for authoritative instructions, user message for untrusted diff data
+  - Added `ChatMessage::system()` constructor in `simple_ai.rs`
+  - Split `build_commit_message_prompt()` → `build_system_instructions()` + `build_user_content()`
+  - Removed fragile blocklist patterns (IGNORE, SYSTEM:, YOU ARE, etc.) — no longer needed
+  - Strengthened post-processing output validation: rejects AI outputs starting with "I will", "I cannot", "I am", "You are"
+  - All 456 + 65 tests pass across all crates, cargo check clean
+  - Committed by sync daemon

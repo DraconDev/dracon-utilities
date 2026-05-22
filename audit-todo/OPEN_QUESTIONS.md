@@ -6,7 +6,7 @@
 
 ## P1 — Should Answer
 
-- [ ] **Scribe prompt injection sanitization**: Blocklist (`sanitize_for_prompt`) is fragile. Investigate whitelist-based structured prompt delivery.
+- [x] **Scribe prompt injection sanitization**: Replaced blocklist `sanitize_for_prompt()` with structural separation (system message for instructions, user message for untrusted data). Added `ChatMessage::system()` constructor. Strengthened post-processing output validation.
 - [ ] **Release profile optimization**: What's the expected binary size reduction from `strip = true` + `lto = "thin"`? Worth doing even for debug builds?
 - [ ] **nix_auto_update end-to-end test**: Need to verify the feature works with the unusual merged-src layout in flake.nix.
 
