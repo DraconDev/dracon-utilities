@@ -476,50 +476,6 @@ pub(crate) fn append_incident_record(policy_path: &Path, record: &IncidentRecord
         }
     }
 }
-    // ── append logic ──
-    let path = incident_ledger_path(policy_path);
-    let line = match serde_json::to_string(record) {
-        Ok(v) => v,
-        Err(e) => {
-            eprintln!("⚠️ incident serialize failed: {}", e);
-            return;
-        }
-    };
-    let parent = path.parent().map(Path::to_path_buf);
-    if let Some(dir) = parent {
-        if let Err(e) = std::fs::create_dir_all(&dir) {
-            eprintln!("⚠️ failed to create incident ledger dir: {}", e);
-        }
-    }
-    match std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&path)
-    {
-        Ok(mut file) => {
-            use std::io::Write;
-            if let Err(e) = writeln!(file, "{}", line) {
-                eprintln!("⚠️ incident write failed ({}): {}", path.display(), e);
-            }
-        }
-        Err(e) => eprintln!("⚠️ incident open failed ({}): {}", path.display(), e),
-    }
-    // ── lazy retention: only check when file has likely grown past max ──
-    if path.exists() {
-        if let Ok(metadata) = std::fs::metadata(&path) {
-            // rough estimate: ~200 bytes per JSON line
-            let approx_lines = metadata.len() as usize / 200;
-            let policy = SyncPolicy::load(policy_path).ok();
-            if let Some(ref p) = policy {
-                if approx_lines >= p.incident_ledger_max_lines {
-                    if let Err(e) = enforce_retention(&path, p) {
-                        eprintln!("⚠️ incident retention failed ({}): {}", path.display(), e);
-                    }
-                }
-            }
-        }
-    }
-}
 
 /// Enforce incident ledger retention at daemon startup.
 /// Delegates to the shared [`enforce_retention`] function.
