@@ -20,7 +20,7 @@
 ///
 /// # Parallel Test Constraints
 ///
-/// Tests pass reliably with `--test-threads=1` (334/334 pass). In parallel mode,
+/// Tests pass reliably with `--test-threads=1` (458/458 pass as of 2026-05-22). In parallel mode,
 /// ~10-20 tests fail unpredictably due to these shared global states:
 ///
 /// 1. **PATH**: Tests that add mock binary dirs to PATH (for gh/glab mocking)

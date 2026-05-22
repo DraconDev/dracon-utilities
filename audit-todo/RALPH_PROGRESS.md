@@ -70,3 +70,8 @@
   - Added `test_update_version_merged_src_style` test exercising the actual flake format
   - Added `test_update_version_merged_src_closing_detection` test verifying proper block boundaries
   - All 458 tests pass (14 nix tests, 2 new), cargo check clean
+
+## Iteration 9 ✅
+- **Item #9: Update `EnvRestorer` docstring** ✅
+  - Updated stale test count from "334/334 pass" to "458/458 pass as of 2026-05-22"
+  - cargo check passes clean
