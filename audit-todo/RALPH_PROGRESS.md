@@ -84,3 +84,26 @@
     - Use `systemctl --user disable` first to permanently stop
     - How to check restart status via `systemctl --user status`
   - cargo check passes clean
+
+## Iteration 11 ✅
+- **Item #11: Run `cargo update`** ✅
+  - Updated 11 packages to latest compatible versions (either, filetime, kqueue-sys, num-conv, openssl, openssl-sys, pin-project, pin-project-internal, serde_json, tower-http, winnow)
+  - 458 tests pass, cargo check clean
+
+---
+
+## All 11 items complete
+
+| # | Item | Status |
+|---|------|--------|
+| 1 | Settle GitHub Actions billing | 🔴 BLOCKED (manual action at github.com/settings/billing) |
+| 2 | Bump git2 in dracon-libs | ✅ Committed |
+| 3 | Investigate wal-backup daemon loop | ✅ Doc written |
+| 4 | Monitor proc-macro-error | ✅ Doc written (not yanked) |
+| 5 | Add periodic incident ledger pruning | ✅ Committed |
+| 6 | Review scribe prompt injection | ✅ Committed (structural separation) |
+| 7 | Enable release profile optimizations | ✅ Committed (strip=true, lto=thin) |
+| 8 | Test nix_auto_update | ✅ Committed (merged-src bugfix) |
+| 9 | Update EnvRestorer docstring | ✅ Committed (458/458) |
+| 10 | Document Restart=always behavior | ✅ Committed (AGENTS.md) |
+| 11 | Run cargo update | ✅ 11 packages updated |
