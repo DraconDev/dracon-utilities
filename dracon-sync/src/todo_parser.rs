@@ -62,29 +62,22 @@ pub fn parse_todo_task(repo: &Path) -> Option<TodoTask> {
 /// Returns the task title text after the marker, or `None`.
 fn is_open_task_line(line: &str) -> Option<&str> {
     let line = line.trim();
-    // Match: `- [ ] ` or `* [ ] ` with optional leading whitespace
-    if let Some(rest) = line.strip_prefix("- [") {
-        if rest.starts_with("] ") || rest == "]" {
-            // Must be `[ ]` not `[x]` or `[~]`
-            // We already stripped `- [`, so check the next char is `]`
-            if rest.starts_with("] ") {
-                Some(rest[2..].trim())
-            } else if rest == "]" {
-                // `- [ ]` with nothing after — treat as empty title, still valid
-                Some("")
-            } else {
-                None
-            }
+    // Match: `- [ ] ` or `* [ ] ` — the marker has a space between `[` and `]`
+    // This distinguishes `[ ]` (open) from `[x]` or `[~]` (not open).
+    if let Some(rest) = line.strip_prefix("- [ ") {
+        // rest starts with `] ` or is just `]`
+        if rest.starts_with("] ") {
+            Some(rest[2..].trim())
+        } else if rest == "]" {
+            Some("")
         } else {
             None
         }
-    } else if let Some(rest) = line.strip_prefix("* [") {
-        if rest.starts_with("] ") || rest == "]" {
-            if rest.starts_with("] ") {
-                Some(rest[2..].trim())
-            } else {
-                Some("")
-            }
+    } else if let Some(rest) = line.strip_prefix("* [ ") {
+        if rest.starts_with("] ") {
+            Some(rest[2..].trim())
+        } else if rest == "]" {
+            Some("")
         } else {
             None
         }
