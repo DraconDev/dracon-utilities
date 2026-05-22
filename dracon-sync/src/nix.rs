@@ -33,18 +33,20 @@ fn update_version_in_flake_nix(content: &str, new_version: &str) -> String {
     let mut changed = false;
 
     // Track when we're inside a buildRustPackage attribute block.
-    // Reset on }; (end of block) or a top-level attribute (which can't be inside buildRustPackage).
+    // Reset on }; or }); (end of block) or a top-level attribute (which can't be inside buildRustPackage).
     let mut in_build_rust_package = false;
     for line in content.lines() {
         let trimmed = line.trim();
 
         // Detect start of buildRustPackage block via attribute assignment.
-        // Works for both "tiles = rustPlatform.buildRustPackage {" and
-        // "packages.x86_64-linux.default = pkgs.rustPlatform.buildRustPackage {".
-        if line.contains("buildRustPackage {") && line.contains(" = ") {
+        // Handles both "buildRustPackage {" (standard) and
+        // "buildRustPackage (commonArgs // {" (merged-src layout).
+        if line.contains("buildRustPackage") && line.contains('{') && line.contains(" = ") {
             in_build_rust_package = true;
-        } else if trimmed.ends_with("};") {
+        } else if trimmed.ends_with("};") || trimmed.ends_with("});")
+        {
             // End of buildRustPackage block
+            // "};" = standard close, "});" = merged-src close (parenthesized arg)
             in_build_rust_package = false;
         } else if !trimmed.is_empty()
             && !trimmed.starts_with('#')
@@ -456,5 +458,57 @@ mod tests {
         let updated = update_version_in_flake_nix(content, "2.0.0");
         assert!(updated.contains(r#"version = "2.0.0""#));
         assert!(!updated.contains("version = \"1.0.0\""));
+    }
+
+    #[test]
+    fn test_update_version_merged_src_style() {
+        // This is the actual flake.nix format used by dracon-utilities:
+        // buildRustPackage (commonArgs // { ... });
+        let content = r#"  dracon-sync = pkgs.rustPlatform.buildRustPackage (commonArgs // {
+    pname = "dracon-sync";
+    version = "0.1.5";
+    buildAndTestSubdir = "dracon-sync";
+  });
+
+  dracon-system = pkgs.rustPlatform.buildRustPackage (commonArgs // {
+    pname = "dracon-system";
+    version = "0.2.0";
+    buildAndTestSubdir = "dracon-system";
+  });
+"#;
+        let updated = update_version_in_flake_nix(content, "0.2.0");
+        assert!(
+            updated.contains(r#"version = "0.2.0""#),
+            "missing 0.2.0, got:\n{}",
+            updated
+        );
+        // Only dracon-sync should change; dracon-system stays at 0.2.0 (already matches)
+        assert!(
+            updated.contains(r#"version = "0.2.0""#),
+            "should contain updated version"
+        );
+        // Verify structure is preserved
+        assert!(updated.contains("buildRustPackage (commonArgs // {"));
+        assert!(updated.contains("});"));
+    }
+
+    #[test]
+    fn test_update_version_merged_src_closing_detection() {
+        // Verify that }); correctly exits the in_build_rust_package state
+        let content = r#"  pkg-a = buildRustPackage (args // {
+    version = "1.0.0";
+  });
+
+  pkg-b = buildRustPackage (args // {
+    version = "2.0.0";
+  });
+"#;
+        let updated = update_version_in_flake_nix(content, "3.0.0");
+        // Both should be updated since they're separate blocks
+        assert!(
+            updated.matches("3.0.0").count() == 2,
+            "expected both blocks updated, got:\n{}",
+            updated
+        );
     }
 }
