@@ -4,7 +4,7 @@
   "taskDir": "/home/dracon/Dev/dracon-utilities/audit-todo",
   "cwd": "/home/dracon/Dev/dracon-utilities",
   "status": "running",
-  "currentIteration": 5,
+  "currentIteration": 6,
   "maxIterations": 15,
   "timeout": 600,
   "completionPromise": "DONE",
