@@ -9,11 +9,13 @@
 - **Status**: [BLOCKED: requires manual user action on GitHub.com]
 - **HYPOTHESIS**: Account may have an expired payment method or spending limit that needs manual reset
 
-### 2. Bump `git2` in dracon-libs/dracon-git (🔴)
-- **Severity**: P0 — open RUSTSEC advisory, potential UB
+### 2. Bump `git2` in dracon-libs/dracon-git (🔴) ✅ DONE
+- **Severity**: P0 — was open RUSTSEC advisory, now resolved
 - **Issue**: RUSTSEC-2026-0008: Unsoundness in `Buf` struct dereferencing
-- **Status**: Not yet started — deferred while billing is unresolved
-- **Dependency**: Needs dracon-libs sibling repo access
+- **Status**: ✅ **Done in iteration 2**
+- **Changes**: `git2` bumped 0.18.3→0.21.0, API breaks fixed (shorthand/summary/url/path Result changes), `Oid::zero()`→`Oid::ZERO_SHA1`, `deny.toml` ignore entry removed
+- **Verification**: 40/40 dracon-git tests pass, 456/456 dracon-sync tests pass, `cargo deny check advisories` clean
+- **Commits**: `a6e3ee47` (dracon-utilities), `b38d73e`+`c3cafe7` (dracon-libs)
 
 ### 3. Investigate `wal-backup` daemon sync loop (🔴)
 - **Severity**: P0 — CPU/ledger waste from rapid cycling
