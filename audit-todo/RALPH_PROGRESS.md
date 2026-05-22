@@ -75,3 +75,12 @@
 - **Item #9: Update `EnvRestorer` docstring** ✅
   - Updated stale test count from "334/334 pass" to "458/458 pass as of 2026-05-22"
   - cargo check passes clean
+
+## Iteration 10 ✅
+- **Item #10: Document `Restart=always` behavior** ✅
+  - Added documentation note in AGENTS.md after service tables explaining:
+    - `Restart=always` restarts on any exit (including `systemctl stop`)
+    - Use `systemctl --user restart` (not stop+start) for proper restarts
+    - Use `systemctl --user disable` first to permanently stop
+    - How to check restart status via `systemctl --user status`
+  - cargo check passes clean

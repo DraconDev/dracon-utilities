@@ -159,6 +159,15 @@ Service files are installed to `~/.config/systemd/user/` by `install.sh`.
 | `PrivateTmp` | `true` | Isolated /tmp |
 | `RestartPreventExitStatus` | `2 78` | Don't restart on config/argument errors |
 
+> **⚠️ `Restart=always` behavior**: Unlike `Restart=on-failure` (which only restarts after crashes),
+> `Restart=always` restarts the daemon **on any exit** — including `systemctl stop`.
+> This means `systemctl --user stop <service>` alone will NOT keep the daemon stopped;
+> systemd will restart it within `RestartSec` seconds.
+>
+> - **To restart**: use `systemctl --user restart <service>` (single command, not stop+start)
+> - **To permanently stop**: use `systemctl --user disable <service>` first, then stop
+> - **To check**: `systemctl --user status <service>` shows `Active: active (running)` or `Active: activating (auto-restart)`
+
 ## Policy Files
 
 | Utility | Policy Path | Example Config |
