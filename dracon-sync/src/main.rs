@@ -18,6 +18,7 @@ mod simple_ai;
 mod standard_files;
 mod sync;
 mod test_helpers;
+mod todo_parser;
 mod visibility;
 
 use anyhow::Result;
