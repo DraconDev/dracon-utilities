@@ -10,11 +10,7 @@ all-features = false
 [advisories]
 unmaintained = "workspace"
 unsound = "all"
-ignore = [
-    # git2 0.18.3 has unsound deref (RUSTSEC-2026-0008).
-    # This comes through dracon-libs/dracon-git. Update when git2 is bumped.
-    { id = "RUSTSEC-2026-0008", reason = "dracon-libs pinned to git2 0.18.x; update pending" },
-]
+ignore = []
 
 [bans]
 multiple-versions = "warn"
