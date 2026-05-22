@@ -23,3 +23,14 @@
   - Wrote investigation report: `audit-todo/wal-backup-investigation.md`
   - Cargo check passes clean
   - No code changes needed in dracon-sync — sync daemon behavior is correct
+
+## Iteration 4 ✅
+- **Item #4: Monitor `proc-macro-error` removal** ✅
+  - **Status**: **NOT yanked** — confirmed via crates.io API on 2026-05-22
+  - Dependency chain: `dracon-security → age 0.10.1 → i18n-embed-fl 0.7.0 → proc-macro-error 1.0.4`
+  - Upgrade path identified: `age 0.10 → 0.11` + `secrecy 0.8 → 0.10` eliminates dep entirely
+  - age 0.11 drops `i18n-embed-fl` (and thus `proc-macro-error`)
+  - API break in age 0.11: `Decryptor` changed from enum to struct, `Encryptor::with_recipients` takes iterator
+  - Wrote research doc: `audit-todo/proc-macro-error-investigation.md`
+  - Cargo check passes clean
+  - No code changes needed now — monitored and understood
