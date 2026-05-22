@@ -5,7 +5,7 @@ version = "0.1.1"
 edition = "2021"
 
 [dependencies]
-age = "0.11"
+age = "0.10"
 anyhow = "1.0"
 chrono = "0.4"
 comfy-table = "7"
