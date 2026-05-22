@@ -393,41 +393,89 @@ pub(crate) fn incident_ledger_path(_policy_path: &Path) -> PathBuf {
     PathBuf::from("/tmp/dracon-sync-incidents.jsonl")
 }
 
-pub(crate) fn append_incident_record(policy_path: &Path, record: &IncidentRecord) {
-    fn enforce_retention(path: &Path, policy: &SyncPolicy) -> Result<()> {
-        let content = std::fs::read_to_string(path)?;
-        let now = timestamp_secs();
-        let age_cutoff =
-            now.saturating_sub(policy.incident_ledger_max_age_days.saturating_mul(86_400));
-
-        let mut kept: Vec<String> = Vec::new();
-        for line in content.lines() {
-            let line = line.trim();
-            if line.is_empty() {
-                continue;
-            }
-            let keep_by_age = serde_json::from_str::<serde_json::Value>(line)
-                .ok()
-                .and_then(|v| v.get("ts_unix").and_then(|t| t.as_u64()))
-                .map(|ts| ts >= age_cutoff)
-                .unwrap_or(true);
-            if keep_by_age {
-                kept.push(line.to_string());
-            }
-        }
-        if kept.len() > policy.incident_ledger_max_lines {
-            let drop_n = kept.len() - policy.incident_ledger_max_lines;
-            kept.drain(0..drop_n);
-        }
-        let mut out = String::new();
-        for line in kept {
-            out.push_str(&line);
-            out.push('\n');
-        }
-        std::fs::write(path, &out)?;
-
-        Ok(())
+/// Enforce incident ledger retention at any time.
+/// Removes entries older than max_age_days and truncates to max_lines.
+/// Returns the number of pruned entries (or 0 if nothing was removed).
+pub(crate) fn enforce_retention(path: &Path, policy: &SyncPolicy) -> Result<usize> {
+    if !path.exists() {
+        return Ok(0);
     }
+    let content = std::fs::read_to_string(path)?;
+    let original_count = content.lines().count();
+    let now = timestamp_secs();
+    let age_cutoff =
+        now.saturating_sub(policy.incident_ledger_max_age_days.saturating_mul(86_400));
+
+    let mut kept: Vec<String> = Vec::new();
+    for line in content.lines() {
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        let keep_by_age = serde_json::from_str::<serde_json::Value>(line)
+            .ok()
+            .and_then(|v| v.get("ts_unix").and_then(|t| t.as_u64()))
+            .map(|ts| ts >= age_cutoff)
+            .unwrap_or(true);
+        if keep_by_age {
+            kept.push(line.to_string());
+        }
+    }
+    if kept.len() > policy.incident_ledger_max_lines {
+        let drop_n = kept.len() - policy.incident_ledger_max_lines;
+        kept.drain(0..drop_n);
+    }
+    let out = kept.join("\n") + "\n";
+    std::fs::write(path, &out)?;
+
+    let removed = original_count.saturating_sub(kept.len());
+    Ok(removed)
+}
+
+pub(crate) fn append_incident_record(policy_path: &Path, record: &IncidentRecord) {
+    let path = incident_ledger_path(policy_path);
+    let line = match serde_json::to_string(record) {
+        Ok(v) => v,
+        Err(e) => {
+            eprintln!("⚠️ incident serialize failed: {}", e);
+            return;
+        }
+    };
+    let parent = path.parent().map(Path::to_path_buf);
+    if let Some(dir) = parent {
+        if let Err(e) = std::fs::create_dir_all(&dir) {
+            eprintln!("⚠️ failed to create incident ledger dir: {}", e);
+        }
+    }
+    match std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+    {
+        Ok(mut file) => {
+            use std::io::Write;
+            if let Err(e) = writeln!(file, "{}", line) {
+                eprintln!("⚠️ incident write failed ({}): {}", path.display(), e);
+            }
+        }
+        Err(e) => eprintln!("⚠️ incident open failed ({}): {}", path.display(), e),
+    }
+    // ── lazy retention: only check when file has likely grown past max ──
+    if path.exists() {
+        if let Ok(metadata) = std::fs::metadata(&path) {
+            // rough estimate: ~200 bytes per JSON line
+            let approx_lines = metadata.len() as usize / 200;
+            let policy = SyncPolicy::load(policy_path).ok();
+            if let Some(ref p) = policy {
+                if approx_lines >= p.incident_ledger_max_lines {
+                    if let Err(e) = enforce_retention(&path, p).map(|_| ()) {
+                        eprintln!("⚠️ incident retention failed ({}): {}", path.display(), e);
+                    }
+                }
+            }
+        }
+    }
+}
     // ── append logic ──
     let path = incident_ledger_path(policy_path);
     let line = match serde_json::to_string(record) {
@@ -474,47 +522,14 @@ pub(crate) fn append_incident_record(policy_path: &Path, record: &IncidentRecord
 }
 
 /// Enforce incident ledger retention at daemon startup.
-/// Removes entries older than max_age_days and truncates to max_lines.
+/// Delegates to the shared [`enforce_retention`] function.
 pub(crate) fn enforce_retention_at_startup(policy_path: &Path, policy: &SyncPolicy) -> Result<()> {
     let path = incident_ledger_path(policy_path);
-    if !path.exists() {
-        return Ok(());
-    }
-    let content = std::fs::read_to_string(&path)?;
-    let now = timestamp_secs();
-    let age_cutoff = now.saturating_sub(policy.incident_ledger_max_age_days.saturating_mul(86_400));
-    let mut kept: Vec<String> = Vec::new();
-    for line in content.lines() {
-        let line = line.trim();
-        if line.is_empty() {
-            continue;
-        }
-        let keep_by_age = serde_json::from_str::<serde_json::Value>(line)
-            .ok()
-            .and_then(|v| v.get("ts_unix").and_then(|t| t.as_u64()))
-            .map(|ts| ts >= age_cutoff)
-            .unwrap_or(true);
-        if keep_by_age {
-            kept.push(line.to_string());
-        }
-    }
-    if kept.len() > policy.incident_ledger_max_lines {
-        let drop_n = kept.len() - policy.incident_ledger_max_lines;
-        kept.drain(0..drop_n);
-    }
-    let mut out = String::new();
-    for line in &kept {
-        out.push_str(line);
-        out.push('\n');
-    }
-    std::fs::write(&path, &out)?;
-    let original = content.lines().count();
-    let removed = original - kept.len();
+    let removed = enforce_retention(&path, policy)?;
     if removed > 0 {
         eprintln!(
-            "🧹 startup: pruned {} stale incident entries ({} remain)",
+            "🧹 startup: pruned {} stale incident entries (remaining after reload)",
             removed,
-            kept.len()
         );
     }
     Ok(())

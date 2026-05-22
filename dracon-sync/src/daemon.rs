@@ -645,6 +645,24 @@ pub(crate) async fn run_daemon(
             repair_broken_tracking(&repo_refs);
         }
 
+        // Periodic incident ledger pruning (every ~30 min at 1s interval)
+        if cycle_count.is_multiple_of(1800) {
+            let ledger_path = crate::report::incident_ledger_path(policy_path);
+            if ledger_path.exists() {
+                let inc_policy = SyncPolicy::load(policy_path).ok();
+                if let Some(ref p) = inc_policy {
+                    if let Ok(removed) = crate::report::enforce_retention(&ledger_path, p) {
+                        if removed > 0 {
+                            eprintln!(
+                                "🧹 periodic: pruned {} stale incident entries ({} remain after reload)",
+                                removed,
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
         if let Some(reason) = freeze_reason(&policy_path) {
             eprintln!("⏸️ sync daemon paused ({})", reason);
             sleep(Duration::from_secs(scan_interval)).await;
