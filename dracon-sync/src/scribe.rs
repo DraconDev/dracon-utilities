@@ -209,16 +209,12 @@ pub fn todo_context_message(repo: &Path, diff_names: &str) -> String {
         return local_fallback_message(diff_names);
     }
 
-    // Subject line: truncate task title to ~60 chars
-    let title = if task.title.len() > 60 {
-        let mut s: String = task.title.chars().take(57).collect();
-        s.push_str("...");
-        s
-    } else {
-        task.title.clone()
-    };
+    // Subject line: routing key format for downstream AI
+    // Title is NOT the task text (that's in the diff) — just the ratio of claims
+    let checked_count = task.sub_items.len() as u64;
+    let title = format!("sync: {} checked", checked_count);
 
-    let mut msg = format!("[todo] {}", title);
+    let mut msg = format!("{}", title);
 
     // Changed files section
     let entries: Vec<&str> = diff_names
