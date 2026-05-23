@@ -201,7 +201,7 @@ pub fn local_fallback_message(diff_names: &str) -> String {
 pub fn todo_context_message(repo: &Path, diff_names: &str) -> String {
     let task = match parse_todo_task(repo) {
         Some(t) => t,
-        None => return local_fallback_message(diff_names),
+        None => return local_fallback_message(diff_names),;
     };
 
     // If title is empty (bare `- [ ]`), fall back to file-stem summary
