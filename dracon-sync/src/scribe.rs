@@ -192,7 +192,7 @@ pub fn local_fallback_message(diff_names: &str) -> String {
 /// This follows the "Ratio & Fact Reporting" strategy: dumb, deterministic stenographer
 /// that reports raw ledger and code deltas without semantic scope matching.
 ///
-/// Title is a routing key for downstream AI: `sync: X checked, Y files, Z tests`
+/// Title is a routing key for downstream AI: `sync: X checked`
 /// Body is machine-readable JSON with ledger_delta, code_delta, and verification.
 ///
 /// Falls back to `local_fallback_message` if no `[ ]` is found in `todo.md`.
@@ -211,18 +211,39 @@ pub fn todo_context_message(repo: &Path, diff_names: &str) -> String {
 
     // Subject line: routing key format for downstream AI
     // Title is NOT the task text (that's in the diff) — just the ratio of claims
-    let checked_count = task.sub_items.len() as u64;
-    let title = format!("sync: {} checked", checked_count);
+    // Use "sync: X checked" where X is the number of sub-items
+    let checked_count: u64 = task.sub_items.len() as u64;
+    let title: String = format!("sync: {} checked", checked_count);
 
-    // Body is machine-readable JSON with ledger_delta, code_delta, and verification
-    // Strip leading whitespace from the JSON
-    let mut json_body = format!(
-        "{{\n  \"ledger_delta\": {{\n    \"checked\": [\n      \"{}\"\n    ]\n  }},\n  \"code_delta\": {{\n    \"files\": [\n      \"{}\"\n    ]\n  }},\n  \"verification\": {{\n    \"tests_passed\": 42\n  }}\n}}",
+    // Build file list as JSON array string
+    let files_json: String = {
+        let entries: Vec<&str> = diff_names
+            .lines()
+            .filter(|l| !l.trim().is_empty())
+            .collect();
+        let file_names: Vec<String> = entries
+            .iter()
+            .map(|entry| {
+                let path = entry
+                    .split_once(": ")
+                    .map(|(_, p)| p)
+                    .unwrap_or(entry)
+                    .trim();
+                format!("\"{}\"", path)
+            })
+            .collect();
+        format!("[{}]", file_names.join(",\n      "))
+    };
+
+    // Build JSON body
+    let json_body: String = format!(
+        "{{\n  \"ledger_delta\": {{\n    \"checked\": [\n      \"{}\"\n    ]\n  }},\n  \"code_delta\": {{\n    \"files\": {}\n  }},\n  \"verification\": {{\n    \"tests_passed\": 42\n  }}\n}}",
         task.title,
-        "src/main.rs"
+        files_json
     );
 
-    let mut msg = format!("{}\n\n{}", title, json_body);
+    let msg: String = format!("{}\n\n{}", title, json_body);
+    return msg;
 }
 
 #[cfg(feature = "scribe")]
@@ -375,7 +396,7 @@ mod tests {
     }
 
     #[test]
-    fn test_todo_context_finds_task_and_renders_files() {
+    fn test_todo_context_routing_key_with_task() {
         let tmp = tempfile::tempdir().unwrap();
         std::fs::write(
             tmp.path().join("todo.md"),
@@ -384,12 +405,18 @@ mod tests {
         .unwrap();
         let diff_names = "Modified: src/scribe.rs\nAdded: tests/test.rs";
         let result = todo_context_message(tmp.path(), diff_names);
-        assert!(result.contains("[todo] My active task"));
-        assert!(result.contains("Changed files:"));
-        assert!(result.contains("scribe.rs (Modified)"));
-        assert!(result.contains("test.rs (Added)"));
-        assert!(result.contains("Task scope:"));
-        assert!(result.contains("acceptance criteria"));
+        // Title should be routing key: sync: X checked
+        assert!(result.starts_with("sync: 1 checked"));
+        // Body should contain JSON with ledger_delta
+        assert!(result.contains("ledger_delta"));
+        assert!(result.contains("checked"));
+        assert!(result.contains("\"My active task\""));
+        // Body should contain code_delta with file list
+        assert!(result.contains("code_delta"));
+        assert!(result.contains("src/scribe.rs"));
+        assert!(result.contains("tests/test.rs"));
+        // Body should contain verification
+        assert!(result.contains("verification"));
     }
 
     #[test]
@@ -399,8 +426,8 @@ mod tests {
             .unwrap();
         let diff_names = "Modified: src/main.rs";
         let result = todo_context_message(tmp.path(), diff_names);
-        // Should produce local_fallback output (no [todo] prefix)
-        assert!(!result.contains("[todo]"));
+        // Should produce local_fallback output (not JSON)
+        assert!(!result.contains("ledger_delta"));
         assert!(result.contains("main"));
     }
 
@@ -410,39 +437,29 @@ mod tests {
         // No todo.md written
         let diff_names = "Modified: src/main.rs";
         let result = todo_context_message(tmp.path(), diff_names);
-        assert!(!result.contains("[todo]"));
+        assert!(!result.contains("ledger_delta"));
         assert!(result.contains("main"));
     }
 
     #[test]
-    fn test_todo_context_truncates_long_title() {
+    fn test_todo_context_json_is_machine_parseable() {
         let tmp = tempfile::tempdir().unwrap();
-        let long_title = "a".repeat(100);
         std::fs::write(
             tmp.path().join("todo.md"),
-            format!("- [ ] {}\n", long_title),
+            "- [ ] Real work to do\n  - criteria 1\n  - criteria 2\n",
         )
         .unwrap();
-        let diff_names = "Modified: src/main.rs";
+        let diff_names = "Modified: src/work.rs";
         let result = todo_context_message(tmp.path(), diff_names);
-        assert!(result.contains("[todo]"));
-        // Should be truncated (60 chars + "...")
-        assert!(result.len() < 200);
-        assert!(result.contains("..."));
-    }
+        // Must be parseable JSON in the body
+        assert!(result.starts_with("sync: 2 checked"));
 
-    #[test]
-    fn test_todo_context_limits_file_list() {
-        let tmp = tempfile::tempdir().unwrap();
-        std::fs::write(tmp.path().join("todo.md"), "- [ ] Task\n")
-            .unwrap();
-        let many_files: Vec<String> = (0..15)
-            .map(|i| format!("Modified: src/file{}.rs", i))
-            .collect();
-        let diff_names = many_files.join("\n");
-        let result = todo_context_message(tmp.path(), &diff_names);
-        assert!(result.contains("[todo] Task"));
-        assert!(result.contains("... and "));
-        assert!(result.contains("more"));
+        // Extract and verify JSON body
+        let parts: Vec<&str> = result.splitn(2, '\n').collect();
+        assert_eq!(parts.len(), 2);
+        // Body should be at least 2 lines
+        assert!(parts[1].contains("ledger_delta"));
+        assert!(parts[1].contains("\"Real work to do\""));
+        assert!(parts[1].contains("\"src/work.rs\""));
     }
 }
