@@ -21,7 +21,7 @@ fi
 
 # Invariant 2: No blocking TODO comments
 echo "--- Invariant 2: No blocking TODO comments ---"
-if grep -r "FIXME:\|BLOCKING:" src/ --include="*.rs" 2>/dev/null; then
+if grep -r "FIXME:\|BLOCKING:" dracon-*/src/ --include="*.rs" 2>/dev/null; then
   echo "FAIL: Found FIXME: or BLOCKING: comments"
   failures=$((failures + 1))
 else

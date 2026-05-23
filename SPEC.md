@@ -11,7 +11,7 @@ cargo check --quiet
 ### 2. No blocking TODO comments
 No TODO comments with "FIXME" or "BLOCKING" prefix in source files.
 ```
-! grep -r "FIXME:\|BLOCKING:" src/ --include="*.rs" 2>/dev/null
+! grep -r "FIXME:\|BLOCKING:" dracon-*/src/ --include="*.rs" 2>/dev/null
 ```
 
 ### 3. Core unit tests pass
