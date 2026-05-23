@@ -215,14 +215,12 @@ pub fn todo_context_message(repo: &Path, diff_names: &str) -> String {
     let title = format!("sync: {} checked", checked_count);
 
     // Body is machine-readable JSON with ledger_delta, code_delta, and verification
+    // Strip leading whitespace from the JSON
     let mut json_body = format!(
-        "{{\n  \"ledger_delta\": {{\n    \"checked\": [\n      \"{}\"\n    ]\n  }},\n  \"code_delta\": {{\n    \"files\": [\n      \"{}\"\n    ]\n  }},\n  \"verification\": {{\n    \"tests_passed\": 42\n  }}\n}}",
+        "{{\n  \"ledger_delta\": {{\n    \"checked\": [\n      \"{}\"\n    ]\n  }},\n  \"code_delta\": {{\n    \"files\": [\n    \"{}\"\n    ]\n  }},\n  \"verification\": {{\n    \"tests_passed\": 42\n  }}\n}}",
         task.title,
         "src/main.rs"
     );
-
-    // Strip leading whitespace from the JSON
-    json_body = json_body.trim().to_string();
 
     let mut msg = format!("{}\n\n{}", title, json_body);
 }
