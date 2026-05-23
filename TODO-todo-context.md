@@ -10,8 +10,8 @@ Title is routing key for downstream AI: `sync: X checked`. Body is JSON with led
 - [x] **Parser** — `parse_todo_task()` exists in `todo_parser.rs`, tested
 - [x] **Config** — `todo_commit_messages: bool` in policy, defaults to `false`
 - [x] **Wiring** — `sync.rs` uses `todo_context_message()` when toggle is on
-- [ ] **Format update** — Change from human prose to JSON routing-key format
-- [ ] **Tests** — Update integration tests for new format
+- [x] **Format update** — Changed to JSON routing-key format
+- [x] **Tests** — Updated integration tests
 
 ---
 
