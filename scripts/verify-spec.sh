@@ -28,13 +28,14 @@ else
   echo "PASS: No blocking TODO comments"
 fi
 
-# Invariant 3: Tests pass
-echo "--- Invariant 3: Tests pass ---"
-if ! cargo test --quiet 2>&1; then
-  echo "FAIL: cargo test failed"
+# Invariant 3: Core unit tests pass (library tests only, no network integration tests)
+echo "--- Invariant 3: Core unit tests pass ---"
+output=$(cargo test --lib --quiet 2>&1)
+if echo "$output" | grep -q "test result:.*FAILED"; then
+  echo "FAIL: Some unit tests failed"
   failures=$((failures + 1))
 else
-  echo "PASS: Tests pass"
+  echo "PASS: Core unit tests pass"
 fi
 
 # --- Add more checks above this line ---

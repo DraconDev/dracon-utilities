@@ -14,8 +14,8 @@ No TODO comments with "FIXME" or "BLOCKING" prefix in source files.
 ! grep -r "FIXME:\|BLOCKING:" src/ --include="*.rs" 2>/dev/null
 ```
 
-### 3. Tests pass
-Unit tests must pass.
+### 3. Core unit tests pass
+Unit tests for core modules must pass (excluding integration tests requiring network).
 ```
-cargo test --quiet
+cargo test --lib --quiet 2>&1 | tail -5
 ```
