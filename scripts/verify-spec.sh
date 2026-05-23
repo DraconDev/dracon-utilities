@@ -10,16 +10,32 @@ echo "=== Running spec verification ==="
 
 failures=0
 
-# Add your invariant checks below
+# Invariant 1: Project compiles
+echo "--- Invariant 1: Project compiles ---"
+if ! cargo check --quiet 2>&1; then
+  echo "FAIL: cargo check failed"
+  failures=$((failures + 1))
+else
+  echo "PASS: Project compiles"
+fi
 
-# Example:
-# echo "--- Invariant 1: Project compiles ---"
-# if ! npm run build --quiet 2>/dev/null; then
-#   echo "FAIL: npm run build failed"
-#   failures=$((failures + 1))
-# else
-#   echo "PASS: Project compiles"
-# fi
+# Invariant 2: No blocking TODO comments
+echo "--- Invariant 2: No blocking TODO comments ---"
+if grep -r "FIXME:\|BLOCKING:" src/ --include="*.rs" 2>/dev/null; then
+  echo "FAIL: Found FIXME: or BLOCKING: comments"
+  failures=$((failures + 1))
+else
+  echo "PASS: No blocking TODO comments"
+fi
+
+# Invariant 3: Tests pass
+echo "--- Invariant 3: Tests pass ---"
+if ! cargo test --quiet 2>&1; then
+  echo "FAIL: cargo test failed"
+  failures=$((failures + 1))
+else
+  echo "PASS: Tests pass"
+fi
 
 # --- Add more checks above this line ---
 

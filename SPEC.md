@@ -2,11 +2,20 @@
 
 ## Invariants
 
-### 1. Example Invariant
-Description of what must be true.
+### 1. Project compiles
+The Rust project must compile without errors.
 ```
-[check] Add your verification check here
+cargo check --quiet
 ```
 
-### 2. Add more invariants below
-Add more invariants following the same pattern.
+### 2. No blocking TODO comments
+No TODO comments with "FIXME" or "BLOCKING" prefix in source files.
+```
+! grep -r "FIXME:\|BLOCKING:" src/ --include="*.rs" 2>/dev/null
+```
+
+### 3. Tests pass
+Unit tests must pass.
+```
+cargo test --quiet
+```
