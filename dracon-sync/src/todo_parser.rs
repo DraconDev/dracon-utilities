@@ -343,4 +343,3 @@ mod tests {
         assert!(task.sub_items.is_empty());
     }
 }
-// FIXME: test
