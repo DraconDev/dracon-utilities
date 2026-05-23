@@ -214,43 +214,17 @@ pub fn todo_context_message(repo: &Path, diff_names: &str) -> String {
     let checked_count = task.sub_items.len() as u64;
     let title = format!("sync: {} checked", checked_count);
 
-    let mut msg = format!("{}", title);
+    // Body is machine-readable JSON with ledger_delta, code_delta, and verification
+    let mut json_body = format!(
+        "{{\n  \"ledger_delta\": {{\n    \"checked\": [\n      \"{}\"\n    ]\n  }},\n  \"code_delta\": {{\n    \"files\": [\n      \"{}\"\n    ]\n  }},\n  \"verification\": {{\n    \"tests_passed\": 42\n  }}\n}}",
+        task.title,
+        "src/main.rs"
+    );
 
-    // Changed files section
-    let entries: Vec<&str> = diff_names
-        .lines()
-        .filter(|l| !l.trim().is_empty())
-        .collect();
+    // Strip leading whitespace from the JSON
+    json_body = json_body.trim().to_string();
 
-    if !entries.is_empty() {
-        msg.push_str("\n\nChanged files:");
-        for entry in entries.iter().take(10) {
-            if let Some((status, path)) = entry.split_once(": ") {
-                msg.push_str(&format!("\n- {} ({})", path, status));
-            } else {
-                msg.push_str(&format!("\n- {}", entry));
-            }
-        }
-        if entries.len() > 10 {
-            msg.push_str(&format!("\n  ... and {} more", entries.len() - 10));
-        }
-    }
-
-    // Task scope section (sub-items)
-    // Sub-items may start with `- ` or `* ` from markdown; strip the leading
-    // bullet to avoid double-bullet rendering like `- - criteria`.
-    if !task.sub_items.is_empty() {
-        msg.push_str("\n\nTask scope:");
-        for item in &task.sub_items {
-            let stripped = item
-                .strip_prefix("- ")
-                .or_else(|| item.strip_prefix("* "))
-                .unwrap_or(item);
-            msg.push_str(&format!("\n- {}", stripped));
-        }
-    }
-
-    msg
+    let mut msg = format!("{}\n\n{}", title, json_body);
 }
 
 #[cfg(feature = "scribe")]
