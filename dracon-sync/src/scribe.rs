@@ -189,20 +189,15 @@ pub fn local_fallback_message(diff_names: &str) -> String {
 
 /// Generate a commit message aligned to the first open `[ ]` in root `todo.md`.
 ///
-/// Format:
-/// ```
-/// [todo] <task title>
+/// This follows the "Ratio & Fact Reporting" strategy: dumb, deterministic stenographer
+/// that reports raw ledger and code deltas without semantic scope matching.
 ///
-/// Changed files:
-/// - <file1> (Modified)
-/// - <file2> (Added)
-///
-/// Task scope:
-/// - <sub-item 1>
-/// - <sub-item 2>
-/// ```
+/// Title is a routing key for downstream AI: `sync: X checked, Y files, Z tests`
+/// Body is machine-readable JSON with ledger_delta, code_delta, and verification.
 ///
 /// Falls back to `local_fallback_message` if no `[ ]` is found in `todo.md`.
+///
+/// For AI-to-AI consumption only — no human browsability, no prose, no redundancy.
 pub fn todo_context_message(repo: &Path, diff_names: &str) -> String {
     let task = match parse_todo_task(repo) {
         Some(t) => t,
