@@ -7,11 +7,40 @@ Audit date: 2026-05-23
 ## 🔴 Must Fix (AI-to-AI Version Control)
 
 - [x] **Complete full audit of repo state**
-  - ✅ Review all 26 repos in ~/Dev
+  - ✅ Review all 27 repos in ~/Dev
   - ✅ Check which ones have auto GitHub private repo creation
   - ✅ Document findings in repo-specific TODOs
   - ✅ Fix any repos missing remotes
   - **See:** `AUDIT.md` for full audit results
+
+- [ ] **Auto-create private remotes for all 3 platforms**
+  - GitHub: `auto_create = true` ✅ (enabled)
+  - GitLab: `auto_create = false` ❌ (needs enablement)
+  - Codeberg: `auto_create = false` ❌ (needs enablement)
+  - **Goal:** Make all 3 platforms auto-create private remotes
+  - **Expected outcome:** All 27 repos should have remotes on GitHub, GitLab, and Codeberg
+
+## 🟡 Should Fix
+
+- [ ] **Verify auto_create works for all platforms**
+  - Test with a fresh clone: `git clone https://github.com/DraconDev/test-repo.git`
+  - Check if GitHub remote is created automatically
+  - Check if GitLab remote is created automatically
+  - Check if Codeberg remote is created automatically
+  - **Expected:** All 3 remotes should be created by auto_create
+
+- [ ] **Fix stuck push for pully-fully-pull-based-fleet-reconciler**
+  - Status: 2 ahead, 0 behind
+  - Investigate why push is stuck
+  - Check if remote exists on GitHub
+  - Check if there are local changes that can't be pushed
+
+- [ ] **Fix detached HEAD for cli-file-manager**
+  - Status: detached HEAD, no remotes configured
+  - Investigate why auto_create didn't work
+  - Check if `gh` CLI is authenticated: `gh auth status`
+  - Check if `dracon-sync` daemon is running
+  - **Expected:** Should auto-create GitHub, GitLab, and Codeberg remotes
 
 - [ ] **Verify auto_create = true is working**
   - Test with a fresh repo clone
