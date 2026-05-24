@@ -9,10 +9,12 @@
 
 | Status | Count |
 |--------|-------|
-| ✅ Has GitHub Remote | 25 |
-| ❌ No Remote | 1 |
+| ✅ Has GitHub Remote | 24 |
+| ❌ No Remote | 3 |
 
-**Total:** 26 repos audited
+**Total:** 27 repos audited
+
+**Note:** 3 CONCERN repos are newly created/renamed repos that haven't been synced yet.
 
 ---
 
@@ -74,13 +76,25 @@ done
 25. video-uploader
 26. wal-backup
 
-### ❌ CONCERN — No Remote (1 repo)
+### ❌ CONCERN — No Remote (3 repos)
 
 1. **auto-ai-video-processor-folder-watcher-daemon-cli**
    - Location: `~/Dev/auto-ai-video-processor-folder-watcher-daemon-cli`
    - Status: Has `.git` but no remotes configured
    - Expected: Should have auto-created GitHub private repo
    - Action: Investigate why auto_create didn't work
+
+2. **pully-fully-pull-based-fleet-reconciler**
+   - Location: `~/Dev/pully-fully-pull-based-fleet-reconciler`
+   - Status: Has `.git` but CONCERN status (2 ahead, stuck push)
+   - Expected: Should have auto-created GitHub private repo
+   - Action: Investigate stuck push issue
+
+3. **cli-file-manager**
+   - Location: `~/Dev/cli-file-manager`
+   - Status: Has `.git` but CONCERN status (detached HEAD)
+   - Expected: Should have auto-created GitHub private repo
+   - Action: Investigate detached HEAD status
 
 ---
 
