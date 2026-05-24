@@ -13,10 +13,10 @@ Audit date: 2026-05-23
   - ✅ Fix any repos missing remotes
   - **See:** `AUDIT.md` for full audit results
 
-- [ ] **Auto-create private remotes for all 3 platforms**
-  - GitHub: `auto_create = true` ✅ (enabled)
-  - GitLab: `auto_create = false` ❌ (needs enablement)
-  - Codeberg: `auto_create = false` ❌ (needs enablement)
+- [x] **Auto-create private remotes for all 3 platforms**
+  - ✅ GitHub: `auto_create = true` (enabled)
+  - ✅ GitLab: `auto_create = true` (enabled)
+  - ✅ Codeberg: `auto_create = true` (enabled)
   - **Goal:** Make all 3 platforms auto-create private remotes
   - **Expected outcome:** All 27 repos should have remotes on GitHub, GitLab, and Codeberg
 
