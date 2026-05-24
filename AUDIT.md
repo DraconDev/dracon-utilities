@@ -1,7 +1,7 @@
 # Full Repo Audit — AI-to-AI Version Control
 
-**Date:** 2026-05-23
-**Total Repos:** 26
+**Date:** 2026-05-24
+**Total Repos:** 27
 
 ---
 
@@ -9,160 +9,55 @@
 
 | Status | Count |
 |--------|-------|
-| ✅ Has GitHub Remote | 24 |
-| ❌ No Remote | 3 |
-
-**Total:** 27 repos audited
-
-**Note:** 3 CONCERN repos are newly created/renamed repos that haven't been synced yet.
+| ✅ OK | 23 |
+| ⚠️ WARN | 1 |
+| ❌ CONCERN | 3 |
 
 ---
 
-## 🎯 Audit Tasks
+## ❌ CONCERN Repos
 
-### Primary Audit: Verify All Repos Have GitHub Remotes
+### 1. pully-fully-pull-based-fleet-reconciler — STUCK PUSH (19 ahead)
+- **Remotes:** GitHub, GitLab, Codeberg (all configured) ✅
+- **Issue:** GitHub repo **doesn't exist** on GitHub (`gh repo view` returns 404)
+- **Symptom:** 19 local commits ahead, push fails with "Repository not found"
+- **Incident ledger:** 7+ "STUCK_PUSH" entries, all same error
+- **Fix:** Create GitHub repo, then push
 
-For each repo in `~/Dev`, verify that `git remote -v` shows both `github` and `codeberg` remotes.
+### 2. avid — NO REMOTES, NO COMMITS
+- **Remotes:** None
+- **Commits:** 0 ("No commits yet on master")
+- **Files:** 12 untracked (Cargo.toml, src/, tests/, etc.)
+- **Fix:** Auto-create should handle this when daemon runs
 
-**Command to run:**
-```bash
-cd ~/Dev && find . -name ".git" -type d 2>/dev/null | while read repo; do
-  echo "=== $(basename "$repo") ==="
-  git -C "$repo" remote -v
-done
-```
-
-**Expected Result:**
-- 25 repos should show:
-  ```
-  codeberg    git@codeberg.org:dracondev/<repo>.git (fetch)
-  codeberg    git@codeberg.org:dracondev/<repo>.git (push)
-  github      git@github.com:DraconDev/<repo>.git (fetch)
-  github      git@github.com:DraconDev/<repo>.git (push)
-  ```
-
-- 1 repo (auto-ai-video-processor-folder-watcher-daemon-cli) shows **NO REMOTE**
+### 3. cli-file-manager — NO REMOTES, NO COMMITS
+- **Remotes:** None
+- **Commits:** 0 ("No commits yet on master")
+- **Files:** 1 untracked (todo.md)
+- **Fix:** Auto-create should handle this when daemon runs
 
 ---
 
-## 🔍 Current Findings
+## ⚠️ WARN Repos
 
-### ✅ OK — Has GitHub Remote (25 repos)
-
-1. ai-auto-repo-rot-scanner-todo-agent
-2. ai-auto-writer
-3. ai-vid-editor
-4. azumi
-5. browser-extensions-shared
-6. dracon-code
-7. dracon-demons
-8. DraconDev
-9. dracon-libs
-10. dracon-platform
-11. dracon-rust-ui
-12. dracon-terminal-engine
-13. dracon-utilities
-14. dracon-voice-notifications
-15. dragon-spark-and-director
-16. Junk-Runner-bevy
-17. opencode-auto-review-completed-todos
-18. pi-auto-review
-19. pully-fully-pull-based-fleet-reconciler
-20. respec
-21. sqlite-embedded-continuous-wal-backup-to-object-storage
-22. tiles
-23. todo-addict
-24. video-factory
-25. video-uploader
-26. wal-backup
-
-### ❌ CONCERN — No Remote (3 repos)
-
-1. **auto-ai-video-processor-folder-watcher-daemon-cli**
-   - Location: `~/Dev/auto-ai-video-processor-folder-watcher-daemon-cli`
-   - Status: Has `.git` but no remotes configured
-   - Expected: Should have auto-created GitHub private repo
-   - Action: Investigate why auto_create didn't work
-
-2. **pully-fully-pull-based-fleet-reconciler**
-   - Location: `~/Dev/pully-fully-pull-based-fleet-reconciler`
-   - Status: Has `.git` but CONCERN status (2 ahead, stuck push)
-   - Expected: Should have auto-created GitHub private repo
-   - Action: Investigate stuck push issue
-
-3. **cli-file-manager**
-   - Location: `~/Dev/cli-file-manager`
-   - Status: Has `.git` but CONCERN status (detached HEAD)
-   - Expected: Should have auto-created GitHub private repo
-   - Action: Investigate detached HEAD status
+### 1. dracon-platform — DIRTY (3 modified)
+- **Remotes:** GitHub, GitLab, Codeberg ✅
+- **Issue:** 3 modified files, normal dirty state
+- **Fix:** Sync daemon will auto-commit
 
 ---
 
-## 🛠️ Action Items
+## ✅ RESOLVED (since last audit)
 
-### 1. Fix auto-ai-video-processor-folder-watcher-daemon-cli
-
-This repo has no remote configured. The auto_create should have created one.
-
-**Check:**
-```bash
-cd ~/Dev/auto-ai-video-processor-folder-watcher-daemon-cli
-git remote -v
-```
-
-**Expected output (if working):**
-```
-github  git@github.com:DraconDev/auto-ai-video-processor-folder-watcher-daemon-cli.git (fetch)
-github  git@github.com:DraconDev/auto-ai-video-processor-folder-watcher-daemon-cli.git (push)
-```
-
-**If empty:**
-1. Check `~/.dracon/utilities/sync/dracon-sync.toml` has `auto_create = true` for GitHub remote
-2. Check that `gh` CLI is authenticated: `gh auth status`
-3. Manually create the repo: `gh repo create auto-ai-video-processor-folder-watcher-daemon-cli --private`
-4. Add remote: `git remote add origin https://github.com/DraconDev/auto-ai-video-processor-folder-watcher-daemon-cli.git`
+### auto-ai-video-processor-folder-watcher-daemon-cli
+- **Status:** Deleted from disk — no longer exists
+- github.com: 404 (never created)
+- **Resolved by deletion**
 
 ---
 
-### 2. Verify Auto-Create is Working
+## 🔧 Action Items
 
-Test with a fresh clone to confirm auto_create works:
-
-```bash
-cd /tmp && rm -rf test-auto-create && git clone https://github.com/DraconDev/test-auto-create.git test-auto-create
-cd test-auto-create
-git remote -v
-```
-
-**Expected:** Should show github remote immediately (auto_create should have created it).
-
----
-
-### 3. Document Findings in Repo-Specific TODOs
-
-For each repo, update its `TODO.md` with:
-- Current remote status
-- Any issues found
-- Next steps
-
----
-
-## 📝 Notes
-
-- **auto_create = true** was added to `~/.dracon/utilities/sync/dracon-sync.toml`
-- GitHub has 30 repos under `DraconDev` account
-- Incident ledger shows auto_create attempts working
-- The CONCERN repo (`auto-ai-video-processor-folder-watcher-daemon-cli`) needs manual investigation
-
----
-
-## 🔁 For Later AI Agent Loop
-
-This file is designed for the AI to:
-1. Read this audit
-2. Loop through each task
-3. Check repo status
-4. Document findings in repo-specific TODOs
-5. Fix broken auto_create logic if needed
-
-The AI agent can use this as a checklist to verify all repos have proper remote configuration before syncing.
+- [ ] **Fix pully-fully:** Create GitHub repo, push 19 commits
+- [ ] **Fix avid:** Trigger auto-create (or create repos manually)
+- [ ] **Fix cli-file-manager:** Trigger auto-create (or create repos manually)
