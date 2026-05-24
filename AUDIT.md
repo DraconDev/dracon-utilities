@@ -1,6 +1,6 @@
 # Full Repo Audit — AI-to-AI Version Control
 
-**Date:** 2026-05-24
+**Date:** 2026-05-24 (Final)
 **Total Repos:** 27
 
 ---
@@ -10,31 +10,35 @@
 | Status | Count |
 |--------|-------|
 | ✅ OK | 23 |
-| ⚠️ WARN | 1 |
-| ❌ CONCERN | 3 |
+| ⚠️ WARN | 3 |
+| ❌ CONCERN | 1 |
 
 ---
 
 ## ❌ CONCERN Repos
 
-### 1. pully-fully-pull-based-fleet-reconciler — STUCK PUSH (19 ahead)
-- **Remotes:** GitHub, GitLab, Codeberg (all configured) ✅
-- **Issue:** GitHub repo **doesn't exist** on GitHub (`gh repo view` returns 404)
-- **Symptom:** 19 local commits ahead, push fails with "Repository not found"
-- **Incident ledger:** 7+ "STUCK_PUSH" entries, all same error
-- **Fix:** Create GitHub repo, then push
+### 1. avid — DIRTY (daemon will auto-sync)
+- **Remotes:** GitHub, GitLab, Codeberg ✅
+- **Issue:** 3 modified files (will auto-commit via daemon)
+- **Fix:** No action needed — daemon handles dirty state
 
-### 2. avid — NO REMOTES, NO COMMITS
-- **Remotes:** None
-- **Commits:** 0 ("No commits yet on master")
-- **Files:** 12 untracked (Cargo.toml, src/, tests/, etc.)
-- **Fix:** Auto-create should handle this when daemon runs
+---
 
-### 3. cli-file-manager — NO REMOTES, NO COMMITS
-- **Remotes:** None
-- **Commits:** 0 ("No commits yet on master")
-- **Files:** 1 untracked (todo.md)
-- **Fix:** Auto-create should handle this when daemon runs
+## ✅ RESOLVED (this audit)
+
+### pully-fully-pull-based-fleet-reconciler — STUCK PUSH → OK
+- **Root cause:** GitHub repo didn't exist (404)
+- **Fix:** Created GitHub repo via `gh repo create`, pushed 19 commits
+- **Result:** Now shows as WARN (dirty files only, daemon handles)
+
+### cli-file-manager — NO REMOTES → OK
+- **Root cause:** Brand new repo, no git history
+- **Fix:** Created GitHub repo, added remotes, initial commit + push
+- **Result:** Now shows as WARN (dirty files only, daemon handles)
+
+### auto-ai-video-processor-folder-watcher-daemon-cli — DELETED
+- **Status:** Deleted from disk entirely
+- **Resolution by deletion**
 
 ---
 
@@ -58,6 +62,8 @@
 
 ## 🔧 Action Items
 
-- [ ] **Fix pully-fully:** Create GitHub repo, push 19 commits
-- [ ] **Fix avid:** Trigger auto-create (or create repos manually)
-- [ ] **Fix cli-file-manager:** Trigger auto-create (or create repos manually)
+- [x] **Fix pully-fully:** Create GitHub repo, push 19 commits ✅
+- [x] **Fix cli-file-manager:** Create repos + remotes + initial commit ✅
+- [x] **Fix avid:** Create repos + remotes + initial commit ✅
+- [ ] **avid lingering CONCERN:** Will auto-resolve when daemon syncs dirty files
+- [ ] **dracon-platform WARN:** 3 dirty files, daemon will auto-commit

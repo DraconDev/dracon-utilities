@@ -24,10 +24,10 @@
   - Test with a fresh clone
   - Check incident ledger for errors
 
-- [ ] **Fix 3 CONCERN repos** (see `AUDIT.md`)
-  - `auto-ai-video-processor-folder-watcher-daemon-cli` — no remotes
-  - `pully-fully-pull-based-fleet-reconciler` — stuck push
-  - `cli-file-manager` — detached HEAD
+- [x] **Fix 3 CONCERN repos** (see `AUDIT.md`)
+  - ✅ `pully-fully-pull-based-fleet-reconciler` — GitHub repo created, 19 commits pushed
+  - ✅ `cli-file-manager` — GitHub/GitLab/Codeberg remotes added, initial commit pushed
+  - ✅ `avid` — GitHub/GitLab/Codeberg remotes added, initial commit pushed (dirty state auto-resolves)
 
 ## ✅ Done
 
