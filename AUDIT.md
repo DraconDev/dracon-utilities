@@ -13,57 +13,54 @@
 | ⚠️ WARN | 3 |
 | ❌ CONCERN | 1 |
 
----
-
-## ❌ CONCERN Repos
-
-### 1. avid — DIRTY (daemon will auto-sync)
-- **Remotes:** GitHub, GitLab, Codeberg ✅
-- **Issue:** 3 modified files (will auto-commit via daemon)
-- **Fix:** No action needed — daemon handles dirty state
+All WARN/CONCERN are just dirty files — daemon auto-resolves.
 
 ---
 
-## ✅ RESOLVED (this audit)
+## 🔧 Root Cause: Auto-Create Was Broken
 
-### pully-fully-pull-based-fleet-reconciler — STUCK PUSH → OK
-- **Root cause:** GitHub repo didn't exist (404)
-- **Fix:** Created GitHub repo via `gh repo create`, pushed 19 commits
-- **Result:** Now shows as WARN (dirty files only, daemon handles)
+### Two-level auto-create system:
+1. **`auto_github_private`** — Creates GitHub `origin` remote (was **missing** from policy, defaulted to `false`)
+2. **`[[remotes]]` `auto_create`** — Creates mirror remotes (GitHub, GitLab, Codeberg)
 
-### cli-file-manager — NO REMOTES → OK
-- **Root cause:** Brand new repo, no git history
-- **Fix:** Created GitHub repo, added remotes, initial commit + push
-- **Result:** Now shows as WARN (dirty files only, daemon handles)
+### The bug chain:
+```
+auto_github_private = false (default)
+    → origin never created
+    → has_origin = false
+    → auto_push gate skipped
+    → push_mirror_remotes never called
+    → mirror auto_create never runs
+```
 
-### auto-ai-video-processor-folder-watcher-daemon-cli — DELETED
-- **Status:** Deleted from disk entirely
-- **Resolution by deletion**
+### Fix:
+Added to `dracon-sync.toml`:
+```toml
+auto_github_private = true
+auto_github_private_account = "DraconDev"
+```
+
+### Verified end-to-end:
+Test repo auto-created all 4 remotes (origin + github + gitlab + codeberg) within seconds.
 
 ---
 
-## ⚠️ WARN Repos
+## ✅ Resolved Issues
 
-### 1. dracon-platform — DIRTY (3 modified)
-- **Remotes:** GitHub, GitLab, Codeberg ✅
-- **Issue:** 3 modified files, normal dirty state
-- **Fix:** Sync daemon will auto-commit
-
----
-
-## ✅ RESOLVED (since last audit)
-
-### auto-ai-video-processor-folder-watcher-daemon-cli
-- **Status:** Deleted from disk — no longer exists
-- github.com: 404 (never created)
-- **Resolved by deletion**
+| Repo | Issue | Fix |
+|------|-------|-----|
+| pully-fully | GitHub repo 404 | Created repo, pushed 19 commits |
+| avid | No remotes | Created repos + remotes + init commit |
+| cli-file-manager | No remotes | Created repos + remotes + init commit |
+| auto-ai-video-... | Deleted | Resolved by deletion |
+| New repos generally | No auto-create | Added auto_github_private = true |
 
 ---
 
 ## 🔧 Action Items
 
-- [x] **Fix pully-fully:** Create GitHub repo, push 19 commits ✅
-- [x] **Fix cli-file-manager:** Create repos + remotes + initial commit ✅
-- [x] **Fix avid:** Create repos + remotes + initial commit ✅
-- [ ] **avid lingering CONCERN:** Will auto-resolve when daemon syncs dirty files
-- [ ] **dracon-platform WARN:** 3 dirty files, daemon will auto-commit
+- [x] **Fix auto_create for new repos** — Added `auto_github_private = true` to policy ✅
+- [x] **Verify all 3 platforms** — Test confirmed GitHub, GitLab, Codeberg all auto-create ✅
+- [x] **Fix pully-fully** — GitHub repo created, pushed ✅
+- [x] **Fix avid** — Repos + remotes created ✅
+- [x] **Fix cli-file-manager** — Repos + remotes created ✅
