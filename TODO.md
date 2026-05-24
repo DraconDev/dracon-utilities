@@ -1,26 +1,26 @@
 # Dracon Utilities — TODO
 
-Audit date: 2026-05-22
+Audit date: 2026-05-23
 
 ---
 
-## 🔴 Must Fix
+## 🔴 Must Fix (AI-to-AI Version Control)
 
-- [ ] **Settle GitHub Actions billing**
-  - All CI jobs blocked: *"Recent account payments have failed or your spending limit needs to be increased."*
-  - 10+ consecutive failures, every job silently skipped
-  - → `https://github.com/settings/billing`
+- [ ] **Complete full audit of repo state**
+  - Review all 26 repos in ~/Dev
+  - Check which ones have auto GitHub private repo creation
+  - Document findings in repo-specific TODOs
+  - Fix any repos missing remotes
 
-- [ ] **Bump `git2` in dracon-libs/dracon-git** (RUSTSEC-2026-0008)
-  - Unsound: *"Potential undefined behavior when dereferencing Buf struct"*
-  - Currently pinned to 0.18.3; acknowledged in `deny.toml` but fix pending
-  - Blocks clearing an open advisory
+- [ ] **Verify auto_create = true is working**
+  - Test with a fresh repo clone
+  - Confirm GitHub remote is created automatically
+  - Check incident ledger for any auto_create errors
 
-- [ ] **Investigate `wal-backup` daemon sync loop**
-  - Incident ledger shows 12+ rapid triage entries in tight succession
-  - Stale `index.lock` failure at least once
-  - Daemon cycling rapidly on this repo — wasting CPU and ledger space
-  - Check for git hooks, filesystem events, or fingerprint debounce gaps
+- [ ] **Fix `auto-ai-video-processor-folder-watcher-daemon-cli`**
+  - This repo has no remote (CONCERN status)
+  - Auto-create should have created GitHub remote
+  - Need to investigate why it didn't
 
 ## 🟡 Should Fix
 
@@ -64,3 +64,5 @@ Audit date: 2026-05-22
 - All 3 service files installed and hardened
 - `deny.toml` configured with advisories/licenses/bans
 - Policy example configs present
+- Architecture spec document created and committed
+- GitHub auto_create enabled in dracon-sync.toml
