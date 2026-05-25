@@ -582,3 +582,4 @@ AGPL-3.0-only — See [LICENSE](LICENSE) for the full text.
 Copyright (C) 2026 Dracon. All rights reserved.
 
 For commercial licensing inquiries, contact the author.
+test
