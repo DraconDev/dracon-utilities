@@ -36,3 +36,4 @@
 - [x] **Auto-create all platforms** — `auto_create = true` for GitHub, GitLab, Codeberg
 - [x] **Architecture spec** — `dracon-sync-architecture.md`
 test
+test-comment
