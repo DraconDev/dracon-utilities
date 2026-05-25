@@ -35,3 +35,4 @@
 - [x] **Full repo audit** — 27 repos, 24 OK, 3 CONCERN
 - [x] **Auto-create all platforms** — `auto_create = true` for GitHub, GitLab, Codeberg
 - [x] **Architecture spec** — `dracon-sync-architecture.md`
+test
