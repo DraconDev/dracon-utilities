@@ -273,6 +273,8 @@ install_binary() {
             done
         fi
 
+        # Remove old binary before copying to ensure clean replacement
+        rm -f ~/.local/bin/"$binary"
         cp "$resolved" ~/.local/bin/"$binary"
         chmod +x ~/.local/bin/"$binary"
 
