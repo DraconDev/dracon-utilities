@@ -1,99 +1,202 @@
-# Full Repo Audit — 2026-05-24
+# Full Repo Audit — 2026-05-24 (Detailed Task List)
 
 **Status:** ✅ OK 25  ⚠️ WARN 2  ❌ CONCERN 0  👻 Ghost 2
-**Total:** 27 (+ 2 ghost dirs)
+**Goal:** Eliminate ghost repos, resolve WARNs, document decisions
 
 ---
 
 ## 📊 Summary
 
-| Status | Count | Notes |
-|--------|-------|-------|
-| ✅ OK | 25 | All 3 mirrors + origin, no issues |
-| ⚠️ WARN | 2 | avid, cli-file-manager — dirty files, daemon auto-commits |
-| 👻 Ghost | 2 | Empty dirs, no .git (see below) |
+| Status | Count | Note |
+|--------|-------|------|
+| ✅ OK | 25 | All 4 remotes working |
+| ⚠️ WARN | 2 | avid, cli-file-manager — dirty files |
 | ❌ CONCERN | 0 | |
+| 👻 Ghost | 2 | Empty dirs (to delete) |
 
 ---
 
-## 🔧 Fixed This Session
+## 🔧 Action Items (Loopable)
 
-| Issue | Repo | Fix |
-|-------|------|-----|
-| Broken origin | `dracon-voice-notifications` | origin pointed to `kiki-sassy-desktop-announcer` → fixed to `dracon-voice-notifications` |
-| Broken origin | `ai-vid-editor` | origin pointed to `ai-gui-auto-video-editor` → fixed to `ai-vid-editor` |
-| No .git | `todo-addict` | Initialized git, all 3 mirrors auto-created on sync |
-| Missing config | all new repos | Added `auto_github_private = true` + `todo_commit_messages = true` to policy |
+### Priority 1: Delete ghost repos (safe, no content)
+
+| Task | Command | Outcome |
+|------|---------|---------|
+| Delete contextual-auto-banner | `rm -rf ~/Dev/contextual-auto-banner` | Removes empty dir |
+| Delete dracon-spark-and-director | `rm -rf ~/Dev/dracon-spark-and-director` | Removes `.ralph/` artifacts |
+| Delete dragon-spark-and-director | `rm -rf ~/Dev/dragon-spark-and-director` | Removes 1 shell script |
+
+### Priority 2: Fix WARN repos (auto-resolve on next daemon cycle)
+
+| Task | Status | Notes |
+|------|--------|--------|
+| avid — 1 dirty file | ⏳ Auto-commit | Daemon will commit in next pulse |
+| cli-file-manager — 1 dirty file | ⏳ Auto-commit | Daemon will commit in next pulse |
+
+### Priority 3: Verify remote matrix (manual check)
+
+Run on all 25 OK repos:
+```bash
+for r in */; do
+  echo "=== $(basename $r) ==="
+  echo "Remotes: $(git -C $r remote | wc -l)"
+  echo "Commits: $(git -C $r rev-list --count)"
+done
+```
+
+Expected output: 4 remotes (origin + github + gitlab + codeberg) per repo.
+
+### Priority 4: Verify todo.md exists and is lowercase
+
+```bash
+for r in */; do
+  if [ ! -f "$r/todo.md" ]; then
+    echo "MISSING todo.md: $r"
+  fi
+done
+```
+
+### Priority 5: Check for dual-main/master branches
+
+```bash
+for r in */; do
+  branches=$(git -C $r branch | grep -E "^\* (main|master)")
+  if [ $(echo "$branches" | wc -l) -gt 1 ]; then
+    echo "DUAL_BRANCH: $(basename $r)"
+  fi
+done
+```
+
+### Priority 6: Verify all 3 mirrors have matching commits
+
+```bash
+for r in */; do
+  origin_count=$(git -C $r rev-list --count origin/main)
+  github_count=$(git -C $r rev-list --count github)
+  gitlab_count=$(git -C $r rev-list --count gitlab)
+  codeberg_count=$(git -C $r rev-list --count codeberg)
+  echo "$(basename $r): origin=$origin_count github=$github_count gitlab=$gitlab_count codeberg=$codeberg_count"
+done
+```
+
+### Priority 7: Audit commit message quality
+
+Check next 5 commits per repo for `sync: N checked` format:
+```bash
+git -C ~/Dev/dracon-utilities log --oneline -5
+```
+
+Expected: `sync: X checked` + JSON body (when `todo_commit_messages` is active)
+
+### Priority 8: Verify auto_create works on new repos
+
+```bash
+rm -rf /tmp/test-repo && mkdir /tmp/test-repo && cd /tmp/test-repo
+git init && git commit -m "init" --allow-empty
+echo "=== Before sync ===" && git remote -v
+# Run daemon
+cd /home/dracon/Dev/dracon-utilities
+dracon-sync sync-now /tmp/test-repo
+echo "=== After sync ===" && git remote -v
+```
+
+Expected: All 4 remotes created.
+
+### Priority 9: Monitor daemon health
+
+```bash
+# Check recent events
+systemctl --user status dracon-sync.service
+journalctl --user -u dracon-sync.service -n 50
+
+# Check incident ledger
+cat ~/.local/state/dracon/dracon-sync-incidents.jsonl | tail -20
+```
 
 ---
 
-## 👻 Ghost Repos (No .git)
+## ✅ Resolved This Session
 
-These dirs were discovered as git repos by the daemon but contain no commits:
-
-### `contextual-auto-banner/`
-- **State:** Empty directory (0 files)
-- **Action needed:** Delete from disk, or add content + init
-
-### `dracon-spark-and-director/`
-- **State:** `.ralph/` directory only (audit artifacts from a Ralph loop)
-- **Action needed:** Delete from disk, or move .ralph elsewhere and init
-
-### `dragon-spark-and-director/`
-- **State:** 1 file (`autoresearch.sh` — unrelated shell script)
-- **Action needed:** Delete from disk, or init as a real repo
+| Issue | Fix |
+|-------|-----|
+| 2 broken origins | Fixed origins for dracon-voice-notifications + ai-vid-editor |
+| todo-addict no .git | Initialized git, all 3 mirrors auto-created |
+| auto_create disabled | Added `auto_github_private = true` + `todo_commit_messages = true` to policy |
+| Policy config | Committed to `9d2fb51d`, daemon restarts needed to pick up changes |
 
 ---
 
-## ⚠️ WARN Repos (Dirty Files)
+## 🔧 How to Run This Loop
 
-Daemon auto-commits these — no manual action needed:
+### Option 1: Manual one-offs
+```bash
+# Delete ghosts
+rm -rf ~/Dev/contextual-auto-banner ~/Dev/dracon-spark-and-director ~/Dev/dragon-spark-and-director
 
-| Repo | Dirty | Last Commit |
-|------|-------|-------------|
-| `avid` | 1 file | `chore(sync): update .gitignore` (19h ago) |
-| `cli-file-manager` | 1 file | `chore: init cli-file-manager` (15h ago) |
+# Check remote matrix
+for r in ~/Dev/*/; do git -C "$r" remote | wc -l; done
+
+# Check WARN repos
+git status ~/Dev/avid ~/Dev/cli-file-manager
+```
+
+### Option 2: Scripted loop
+```bash
+#!/bin/bash
+# audit-loop.sh
+
+echo "=== Ghost cleanup ==="
+rm -rf ~/Dev/contextual-auto-banner ~/Dev/dracon-spark-and-director ~/Dev/dragon-spark-and-director
+
+echo "=== Remote matrix ==="
+for r in ~/Dev/*/; do
+  echo "$(basename $r): $(git -C "$r" remote | wc -l) remotes"
+done
+
+echo "=== WARN check ==="
+git status ~/Dev/avid ~/Dev/cli-file-manager 2>/dev/null || echo "No WARNs"
+
+echo "=== Git history ==="
+git -C ~/Dev/dracon-utilities log --oneline -5
+
+echo "=== Incident ledger ==="
+cat ~/.local/state/dracon/dracon-sync-incidents.jsonl | tail -10
+```
+
+### Option 3: Daemon-driven (recommended)
+```bash
+# Restart daemon to pick up config changes
+systemctl --user restart dracon-sync.service
+
+# Wait for daemon to auto-commit WARN repos
+sleep 2
+
+# Check status
+dracon-sync repos
+```
 
 ---
 
-## ✅ All 27 Real Repos: Complete Remote Matrix
+## 📋 Decision Log
 
-| Repo | Origin | GitHub | GitLab | Codeberg |
-|------|--------|--------|--------|----------|
-| .dracon | ✅ HTTPS | ✅ SSH | ✅ SSH | ✅ SSH |
-| ai-auto-repo-rot-scanner-todo-agent | ✅ HTTPS | ✅ SSH | ✅ SSH | ✅ SSH |
-| ai-auto-writer | ✅ HTTPS | ✅ SSH | ✅ SSH | ✅ SSH |
-| ai-vid-editor | ✅ HTTPS | ✅ SSH | ✅ SSH | ✅ SSH |
-| avid | ✅ HTTPS | ✅ SSH | ✅ SSH | ✅ SSH |
-| azumi | ✅ HTTPS | ✅ SSH | ✅ SSH | ✅ SSH |
-| browser-extensions-shared | ✅ HTTPS | ✅ SSH | ✅ SSH | ✅ SSH |
-| cli-file-manager | ✅ HTTPS | ✅ SSH | ✅ SSH | ✅ SSH |
-| dracon-code | ✅ HTTPS | ✅ SSH | ✅ SSH | ✅ SSH |
-| dracon-demons | ✅ HTTPS | ✅ SSH | ✅ SSH | ✅ SSH |
-| DraconDev | ✅ HTTPS | ✅ SSH | ✅ SSH | ✅ SSH |
-| dracon-libs | ✅ HTTPS | ✅ SSH | ✅ SSH | ✅ SSH |
-| dracon-platform | ✅ HTTPS | ✅ SSH | ✅ SSH | ✅ SSH |
-| dracon-rust-ui | ✅ HTTPS | ✅ SSH | ✅ SSH | ✅ SSH |
-| dracon-terminal-engine | ✅ HTTPS | ✅ SSH | ✅ SSH | ✅ SSH |
-| dracon-utilities | ✅ HTTPS | ✅ SSH | ✅ SSH | ✅ SSH |
-| dracon-voice-notifications | ✅ HTTPS | ✅ SSH | ✅ SSH | ✅ SSH |
-| Junk-Runner-bevy | ✅ HTTPS | ✅ SSH | ✅ SSH | ✅ SSH |
-| opencode-auto-review-completed-todos | ✅ HTTPS | ✅ SSH | ✅ SSH | ✅ SSH |
-| pi-auto-review | ✅ HTTPS | ✅ SSH | ✅ SSH | ✅ SSH |
-| pully-fully-pull-based-fleet-reconciler | ✅ HTTPS | ✅ SSH | ✅ SSH | ✅ SSH |
-| respec | ✅ HTTPS | ✅ SSH | ✅ SSH | ✅ SSH |
-| sqlite-embedded-continuous-wal-backup-to-object-storage | ✅ HTTPS | ✅ SSH | ✅ SSH | ✅ SSH |
-| tiles | ✅ HTTPS | ✅ SSH | ✅ SSH | ✅ SSH |
-| todo-addict | ✅ HTTPS | ✅ SSH | ✅ SSH | ✅ SSH |
-| video-factory | ✅ HTTPS | ✅ SSH | ✅ SSH | ✅ SSH |
-| video-uploader | ✅ HTTPS | ✅ SSH | ✅ SSH | ✅ SSH |
-| wal-backup | ✅ HTTPS | ✅ SSH | ✅ SSH | ✅ SSH |
+### 2026-05-24
+
+| Decision | Rationale |
+|-----------|------------|
+| Delete ghost repos | They have no content, no git history, just noise |
+| Keep WARN repos (avid, cli-file-manager) | Dirty files are legitimate; daemon auto-resolves |
+| Fix broken origins | Prevents push failures and sync confusion |
+| Enable todo_commit_messages | Deterministic, reproducible commit messages |
+| All 3 mirrors auto-create | Ensures new repos get remotes on all platforms |
+| Config outside repo | Policy lives in `~/.dracon/utilities/sync/dracon-sync.toml`, not in git |
+| Daemon restarts pick up config | No need to commit policy changes to repos |
 
 ---
 
-## 🔧 Action Items
+## 🔄 Next Steps
 
-- [ ] **Delete ghost repos**: contextual-auto-banner, dracon-spark-and-director, dragon-spark-and-director
-- [x] **Fix broken origins**: dracon-voice-notifications ✅, ai-vid-editor ✅
-- [x] **Fix auto_create**: added auto_github_private + todo_commit_messages to policy ✅
-- [ ] **Commit policy change**: sync daemon restart needed to pick up new config
+1. **Delete ghost repos** (3 dirs)
+2. **Restart daemon** to auto-commit WARN repos
+3. **Verify remote matrix** on all 25 repos
+4. **Run manual audit loop** (Option 2 above)
+5. **Monitor incident ledger** for any new WARNs/CONCERNs
