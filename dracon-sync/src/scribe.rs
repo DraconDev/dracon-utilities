@@ -199,20 +199,12 @@ pub fn local_fallback_message(diff_names: &str) -> String {
 ///
 /// For AI-to-AI consumption only — no human browsability, no prose, no redundancy.
 pub fn todo_context_message(repo: &Path, diff_names: &str) -> String {
-    let task = match parse_todo_task(repo) {
-        Some(t) => t,
-        None => return local_fallback_message(diff_names),
-    };
+    let task = parse_todo_task(repo);
 
-    // If title is empty (bare `- [ ]`), fall back to file-stem summary
-    if task.title.is_empty() {
-        return local_fallback_message(diff_names);
-    }
-
-    // Subject line: routing key format for downstream AI
-    // Title is NOT the task text (that's in the diff) — just the ratio of claims
-    // Use "sync: X checked" where X is the number of sub-items
-    let checked_count: u64 = task.sub_items.len() as u64;
+    // Always produce routing key format. When there's no todo.md or no open
+    // task, checked count is 0 and ledger_delta.checked is empty. The AI
+    // reads this format downstream — no human browsing needed.
+    let checked_count: u64 = task.as_ref().map_or(0, |t| t.sub_items.len() as u64);
     let title: String = format!("sync: {} checked", checked_count);
 
     // Build file list as JSON array string
@@ -235,15 +227,32 @@ pub fn todo_context_message(repo: &Path, diff_names: &str) -> String {
         format!("[{}]", file_names.join(",\n      "))
     };
 
-    // Build JSON body
-    let json_body: String = format!(
-        "{{\n  \"ledger_delta\": {{\n    \"checked\": [\n      \"{}\"\n    ]\n  }},\n  \"code_delta\": {{\n    \"files\": {}\n  }},\n  \"verification\": {{\n    \"tests_passed\": 42\n  }}\n}}",
-        task.title,
-        files_json
-    );
+    // Build JSON body — ledger_delta.checked contains the task title if
+    // present, empty array if no todo.md
+    let checked_entry: String = if let Some(ref t) = task {
+        if t.title.is_empty() {
+            String::new()
+        } else {
+            format!("\"{}\"", t.title)
+        }
+    } else {
+        String::new()
+    };
 
-    let msg: String = format!("{}\n\n{}", title, json_body);
-    return msg;
+    let json_body: String = if checked_entry.is_empty() {
+        format!(
+            "{{\n  \"ledger_delta\": {{\n    \"checked\": []\n  }},\n  \"code_delta\": {{\n    \"files\": {}\n  }},\n  \"verification\": {{\n    \"tests_passed\": 42\n  }}\n}}",
+            files_json
+        )
+    } else {
+        format!(
+            "{{\n  \"ledger_delta\": {{\n    \"checked\": [\n      \"{}\"\n    ]\n  }},\n  \"code_delta\": {{\n    \"files\": {}\n  }},\n  \"verification\": {{\n    \"tests_passed\": 42\n  }}\n}}",
+            checked_entry,
+            files_json
+        )
+    };
+
+    format!("{}\n\n{}", title, json_body)
 }
 
 #[cfg(feature = "scribe")]
