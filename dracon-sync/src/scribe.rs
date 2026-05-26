@@ -243,14 +243,18 @@ pub fn local_fallback_message(diff_names: &str) -> String {
 /// 3. Does the work
 /// 4. Commits with task text + deterministic diff summary
 ///
-/// Falls back to `deterministic_diff_summary` if no `[ ]` is found in `todo.md`.
+/// Falls back to `deterministic_diff_summary` with diff_names as body if no `[ ]` is found.
 pub fn todo_context_message(repo: &Path, diff_names: &str) -> String {
     let task = match parse_todo_task(repo) {
         Some(t) if !t.title.is_empty() => t,
         _ => {
-            // No task — use deterministic diff summary as subject
+            // No task — deterministic diff summary as subject, full file list as body
             let summary = deterministic_diff_summary(diff_names);
-            return format!("{}", summary);
+            let entries = diff_names.trim();
+            if entries.is_empty() {
+                return summary;
+            }
+            return format!("{}\n\n{}", summary, entries);
         }
     };
 
@@ -484,8 +488,11 @@ mod tests {
             .unwrap();
         let diff_names = "Modified: src/main.rs";
         let result = todo_context_message(tmp.path(), diff_names);
-        // Falls back to deterministic diff summary when no open task
-        assert_eq!(result, "Modified src/main.rs");
+        // Fallback: subject = "Modified src/main.rs", body = diff_names
+        assert!(result.starts_with("Modified src/main.rs"));
+        assert!(result.contains("Modified: src/main.rs"));
+        // Subject and body separated by double newline
+        assert!(result.contains("\n\n"));
     }
 
     #[test]
@@ -494,8 +501,10 @@ mod tests {
         // No todo.md written
         let diff_names = "Modified: src/main.rs";
         let result = todo_context_message(tmp.path(), diff_names);
-        // Falls back to deterministic diff summary when no todo.md
-        assert_eq!(result, "Modified src/main.rs");
+        // Fallback: subject = "Modified src/main.rs", body = diff_names
+        assert!(result.starts_with("Modified src/main.rs"));
+        assert!(result.contains("Modified: src/main.rs"));
+        assert!(result.contains("\n\n"));
     }
 
     #[test]
