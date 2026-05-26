@@ -189,29 +189,50 @@ pub fn local_fallback_message(diff_names: &str) -> String {
 
 /// Generate a commit message aligned to the first open `[ ]` in root `todo.md`.
 ///
-/// The commit message IS the task text — no JSON, no ledger, no verification.
-/// The physical act of checking the box `[ ]` → `[x]` is the receipt.
+/// The commit message is **informative** — it shows both:
+/// 1. The task text (alignment with what was planned)
+/// 2. The diff summary (what actually changed)
 ///
 /// Strategy (from the AI commit discussion):
 /// 1. Worker reads todo.md
 /// 2. Finds first `[ ]` task
 /// 3. Does the work
-/// 4. Commits with the task text as the message
+/// 4. Commits with task text + deterministic diff summary
 ///
 /// Falls back to `local_fallback_message` if no `[ ]` is found in `todo.md`.
-pub fn todo_context_message(repo: &Path, _diff_names: &str) -> String {
+pub fn todo_context_message(repo: &Path, diff_names: &str) -> String {
     let task = match parse_todo_task(repo) {
         Some(t) => t,
-        None => return local_fallback_message(""),
+        None => return local_fallback_message(diff_names),
     };
 
-    // The commit message is simply the task title — the text of the checked box.
-    // No JSON. No ledger. No verification. The box check IS the receipt.
     if task.title.is_empty() {
-        local_fallback_message("")
-    } else {
-        task.title.clone()
+        return local_fallback_message(diff_names);
     }
+
+    // Build file list from diff names
+    let files: Vec<&str> = diff_names
+        .lines()
+        .filter(|l| !l.trim().is_empty())
+        .map(|l| l.split_once(": ").map(|(_, p)| p.trim()).unwrap_or(l.trim()))
+        .collect();
+
+    let file_count = files.len();
+    let files_summary: String = if file_count == 0 {
+        "No files changed".to_string()
+    } else if file_count == 1 {
+        files[0].to_string()
+    } else {
+        let top3: String = files.iter().take(3).map(|f| f.to_string()).collect::<Vec<_>>().join(", ");
+        if file_count > 3 {
+            format!("{}, and {} more", top3, file_count - 3)
+        } else {
+            top3
+        }
+    };
+
+    // Format: subject = task text, body = deterministic diff summary
+    format!("{}\n\n{}\n{}", task.title, files_summary, diff_names)
 }
 
 #[cfg(feature = "scribe")]
