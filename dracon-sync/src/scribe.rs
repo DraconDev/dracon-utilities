@@ -150,6 +150,50 @@ fn collect_recent_subjects(repo: &Path, count: usize) -> Vec<String> {
     }
 }
 
+/// Deterministic fallback when no todo.md / no open task.
+/// Groups by action (Modified, Added, Deleted) and reports counts + file names.
+/// Format: "Modified 2, Added 1: file1.rs, file2.rs; new.rs"
+fn deterministic_diff_summary(diff_names: &str) -> String {
+    let entries: Vec<(&str, &str)> = diff_names
+        .lines()
+        .filter(|l| !l.trim().is_empty())
+        .filter_map(|l| l.split_once(": "))
+        .map(|(status, path)| (status.trim(), path.trim()))
+        .collect();
+
+    if entries.is_empty() {
+        return "No files changed".to_string();
+    }
+
+    // Group by status
+    use std::collections::BTreeMap;
+    let mut groups: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
+    for (status, path) in &entries {
+        groups.entry(status).or_default().push(path);
+    }
+
+    let total = entries.len();
+    if total == 1 {
+        let (status, path) = entries[0];
+        return format!("{} {}", status, path);
+    }
+
+    // Build summary: "Modified 2, Added 1: file1.rs, file2.rs; new.rs"
+    let mut parts: Vec<String> = Vec::new();
+    for (status, paths) in &groups {
+        let count = paths.len();
+        let names: Vec<&str> = paths.iter().take(2).copied().collect();
+        let name_str = if names.len() < paths.len() {
+            format!("{}, ...", names.join(", "))
+        } else {
+            names.join(", ")
+        };
+        parts.push(format!("{} {}: {}", status, count, name_str));
+    }
+
+    format!("{}", parts.join("; "))
+}
+
 pub fn local_fallback_message(diff_names: &str) -> String {
     let entries: Vec<&str> = diff_names
         .lines()
@@ -199,16 +243,16 @@ pub fn local_fallback_message(diff_names: &str) -> String {
 /// 3. Does the work
 /// 4. Commits with task text + deterministic diff summary
 ///
-/// Falls back to `local_fallback_message` if no `[ ]` is found in `todo.md`.
+/// Falls back to `deterministic_diff_summary` if no `[ ]` is found in `todo.md`.
 pub fn todo_context_message(repo: &Path, diff_names: &str) -> String {
     let task = match parse_todo_task(repo) {
-        Some(t) => t,
-        None => return local_fallback_message(diff_names),
+        Some(t) if !t.title.is_empty() => t,
+        _ => {
+            // No task — use deterministic diff summary as subject
+            let summary = deterministic_diff_summary(diff_names);
+            return format!("{}", summary);
+        }
     };
-
-    if task.title.is_empty() {
-        return local_fallback_message(diff_names);
-    }
 
     // Build file list from diff names
     let files: Vec<&str> = diff_names
@@ -356,6 +400,38 @@ mod tests {
     }
 
     #[test]
+    fn test_deterministic_diff_single_file() {
+        let names = "Modified: src/main.rs";
+        let result = deterministic_diff_summary(names);
+        assert_eq!(result, "Modified src/main.rs");
+    }
+
+    #[test]
+    fn test_deterministic_diff_multiple_files() {
+        let names = "Modified: src/auth.rs\nAdded: src/jwt.rs\nModified: Cargo.toml\nAdded: lib.rs";
+        let result = deterministic_diff_summary(names);
+        assert!(result.contains("Modified 2"));
+        assert!(result.contains("Added 2"));
+        assert!(result.contains("auth.rs"));
+        assert!(result.contains("jwt.rs"));
+    }
+
+    #[test]
+    fn test_deterministic_diff_empty() {
+        let result = deterministic_diff_summary("");
+        assert_eq!(result, "No files changed");
+    }
+
+    #[test]
+    fn test_deterministic_diff_groups_by_status() {
+        let names = "Modified: src/a.rs\nAdded: src/b.rs\nDeleted: src/c.rs";
+        let result = deterministic_diff_summary(names);
+        assert!(result.contains("Modified 1"));
+        assert!(result.contains("Added 1"));
+        assert!(result.contains("Deleted 1"));
+    }
+
+    #[test]
     fn test_local_fallback_single_file() {
         let names = "Modified: src/main.rs";
         let result = local_fallback_message(names);
@@ -408,8 +484,8 @@ mod tests {
             .unwrap();
         let diff_names = "Modified: src/main.rs";
         let result = todo_context_message(tmp.path(), diff_names);
-        // Falls back to local_fallback_message when no open task
-        assert!(result.contains("main"));
+        // Falls back to deterministic diff summary when no open task
+        assert_eq!(result, "Modified src/main.rs");
     }
 
     #[test]
@@ -418,8 +494,8 @@ mod tests {
         // No todo.md written
         let diff_names = "Modified: src/main.rs";
         let result = todo_context_message(tmp.path(), diff_names);
-        // Falls back to local_fallback_message when no todo.md
-        assert!(result.contains("main"));
+        // Falls back to deterministic diff summary when no todo.md
+        assert_eq!(result, "Modified src/main.rs");
     }
 
     #[test]
