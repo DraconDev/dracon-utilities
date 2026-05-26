@@ -1134,10 +1134,13 @@ async fn stage_commit_and_push(
         .collect::<Vec<_>>()
         .join("\n");
 
-    let is_noise_only = crate::bump::deterministic_decide_bump_level(&staged_diff_names)
-        == crate::bump::BumpLevel::None;
-
     let staged_diff_content = get_staged_diff_content(repo).await;
+
+    // Noise detection is for version bumping only — does NOT block commit
+    // message selection. todo_context_message always produces the routing key
+    // format when todo_commit_messages is true.
+    let noise_for_bump = crate::bump::deterministic_decide_bump_level(&staged_diff_names)
+        == crate::bump::BumpLevel::None;
 
     // AI bumper is the sole version bump decider — determines patch vs minor vs none
     let mut version_bumped = false;
@@ -1154,12 +1157,12 @@ async fn stage_commit_and_push(
         stage_version_files(repo).await;
     }
 
-    let ai_subject = if !is_noise_only && staged_diff_names.len() <= 20 {
+    // Only skip AI for noise-only changes or large diffs (>20 files).
+    // Large diffs produce generic AI messages anyway, and the 3-provider
+    // timeout (30s) blocks the daemon's entire cycle.
+    let ai_subject = if !noise_for_bump && staged_diff_names.len() <= 20 {
         crate::scribe::generate_commit_message(repo, &staged_diff_names, staged_diff_content).await
     } else {
-        // Skip AI for noise-only changes or large diffs (>20 files).
-        // Large diffs produce generic AI messages anyway, and the 3-provider
-        // timeout (30s) blocks the daemon's entire cycle.
         None
     };
 
