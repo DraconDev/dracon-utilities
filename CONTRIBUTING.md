@@ -184,3 +184,4 @@ export RUST_LOG=debug
 - Check [AGENTS.md](AGENTS.md) for architecture details
 - Run `./doctor.sh` to diagnose setup issues
 - Check `~/.local/state/dracon/dracon-sync-incidents.jsonl` for runtime errors
+
