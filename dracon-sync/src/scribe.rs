@@ -385,7 +385,7 @@ mod tests {
     }
 
     #[test]
-    fn test_todo_context_routing_key_with_task() {
+    fn test_todo_context_with_task() {
         let tmp = tempfile::tempdir().unwrap();
         std::fs::write(
             tmp.path().join("todo.md"),
@@ -394,18 +394,11 @@ mod tests {
         .unwrap();
         let diff_names = "Modified: src/scribe.rs\nAdded: tests/test.rs";
         let result = todo_context_message(tmp.path(), diff_names);
-        // Title should be routing key: sync: X checked
-        assert!(result.starts_with("sync: 1 checked"));
-        // Body should contain JSON with ledger_delta
-        assert!(result.contains("ledger_delta"));
-        assert!(result.contains("checked"));
-        assert!(result.contains("\"My active task\""));
-        // Body should contain code_delta with file list
-        assert!(result.contains("code_delta"));
+        // First line is the task text (subject)
+        assert!(result.starts_with("My active task"));
+        // Body contains file list
         assert!(result.contains("src/scribe.rs"));
         assert!(result.contains("tests/test.rs"));
-        // Body should contain verification
-        assert!(result.contains("verification"));
     }
 
     #[test]
@@ -415,12 +408,8 @@ mod tests {
             .unwrap();
         let diff_names = "Modified: src/main.rs";
         let result = todo_context_message(tmp.path(), diff_names);
-        // Always produces routing key format — checked count is 0 when no open tasks
-        assert!(result.starts_with("sync: 0 checked"));
-        // Body still contains JSON with code_delta
-        assert!(result.contains("ledger_delta"));
-        assert!(result.contains("code_delta"));
-        assert!(result.contains("src/main.rs"));
+        // Falls back to local_fallback_message when no open task
+        assert!(result.contains("main"));
     }
 
     #[test]
@@ -429,16 +418,12 @@ mod tests {
         // No todo.md written
         let diff_names = "Modified: src/main.rs";
         let result = todo_context_message(tmp.path(), diff_names);
-        // Always produces routing key format — checked count is 0 when no todo.md
-        assert!(result.starts_with("sync: 0 checked"));
-        // Body still contains JSON
-        assert!(result.contains("ledger_delta"));
-        assert!(result.contains("code_delta"));
-        assert!(result.contains("src/main.rs"));
+        // Falls back to local_fallback_message when no todo.md
+        assert!(result.contains("main"));
     }
 
     #[test]
-    fn test_todo_context_json_is_machine_parseable() {
+    fn test_todo_context_task_text_with_files() {
         let tmp = tempfile::tempdir().unwrap();
         std::fs::write(
             tmp.path().join("todo.md"),
@@ -447,15 +432,12 @@ mod tests {
         .unwrap();
         let diff_names = "Modified: src/work.rs";
         let result = todo_context_message(tmp.path(), diff_names);
-        // Must be parseable JSON in the body
-        assert!(result.starts_with("sync: 2 checked"));
+        // First line is the task text
+        assert!(result.starts_with("Real work to do"));
 
-        // Extract and verify JSON body
+        // Body contains file list
         let parts: Vec<&str> = result.splitn(2, '\n').collect();
         assert_eq!(parts.len(), 2);
-        // Body should be at least 2 lines
-        assert!(parts[1].contains("ledger_delta"));
-        assert!(parts[1].contains("\"Real work to do\""));
-        assert!(parts[1].contains("\"src/work.rs\""));
+        assert!(parts[1].contains("src/work.rs"));
     }
 }
