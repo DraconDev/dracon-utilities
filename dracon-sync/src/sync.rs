@@ -1216,15 +1216,7 @@ async fn stage_commit_and_push(
         local_fallback.as_deref(),
     );
 
-    let msg = if noise_for_bump && !is_report {
-        if let Some(ref fb) = local_fallback {
-            let category = commit_ctx.category.as_deref().unwrap_or("chore");
-            let scope = commit_ctx.scope.as_deref().unwrap_or("sync");
-            format!("{}({}): {}", category, scope, fb)
-        } else {
-            build_commit_message(&commit_ctx)
-        }
-    } else if let Some(ref ai_sub) = ai_subject {
+    let msg = if let Some(ref ai_sub) = ai_subject {
         let has_conventional_prefix = crate::bump::CONVENTIONAL_COMMIT_TYPES.iter().any(|t| {
             ai_sub.starts_with(&format!("{}:", t)) || ai_sub.starts_with(&format!("{}(", t))
         }) || ai_sub.starts_with("Revert \"");
@@ -1235,6 +1227,11 @@ async fn stage_commit_and_push(
             let scope = commit_ctx.scope.as_deref().unwrap_or("sync");
             format!("{}({}): {}", category, scope, ai_sub)
         }
+    } else if ctx.policy.todo_commit_messages {
+        // todo_context_message returns "task text\n\nfiles..."
+        // First line is the subject (task text), rest is the body
+        // Use as-is -- do NOT wrap with category(scope): prefix
+        local_fallback.unwrap_or_else(|| build_commit_message(&commit_ctx))
     } else if let Some(ref fb) = local_fallback {
         let category = commit_ctx.category.as_deref().unwrap_or("chore");
         let scope = commit_ctx.scope.as_deref().unwrap_or("sync");
