@@ -2,12 +2,15 @@
 
 ## Active Work
 
-- [ ] Fix commit message generation — all commits say "update main" instead of "sync: N checked"
+- [x] Fix commit message generation — all commits say "update main" instead of "sync: N checked"
   - `todo_commit_messages = true` is set in policy but daemon produces generic messages
   - Root cause: `is_noise_only` logic conflates version bumping with commit message selection
   - `deterministic_decide_bump_level` returns `BumpLevel::None` for most changes → `is_noise_only = true`
   - When `is_noise_only` is true, code uses `local_fallback` but the actual output is "update main", not "sync: N checked"
   - Fix: call `todo_context_message` directly when `todo_commit_messages` is true, before noise detection
+  - ✅ Fixed: rewrote `todo_context_message` to return task text as subject + diff summary as body
+  - ✅ Fixed: updated `sync.rs` message selection to use task text directly without `category(scope):` prefix
+  - ✅ Fixed: renamed `is_noise_only` to `noise_for_bump` to clarify it only affects version bumping
   - Expected: commits like `chore(sync): sync: 2 checked\n\n{...}`
 
 ## Completed
