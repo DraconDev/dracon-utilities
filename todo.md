@@ -2,8 +2,9 @@
 
 ## Active Work
 
-- [ ] Test deterministic commit message format with task text as subject
+- [x] Test deterministic commit message format with task text as subject
   - Verify the daemon uses todo.md task text instead of `sync: N checked`
+  - ✅ Confirmed: commit `14ec5a41` has subject = task text, body = diff summary
 
 - [x] Fix commit message generation — all commits say "update main" instead of "sync: N checked"
   - `todo_commit_messages = true` is set in policy but daemon produces generic messages
