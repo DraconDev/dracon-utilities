@@ -2,6 +2,9 @@
 
 ## Active Work
 
+- [ ] Test deterministic commit message format with task text as subject
+  - Verify the daemon uses todo.md task text instead of `sync: N checked`
+
 - [x] Fix commit message generation — all commits say "update main" instead of "sync: N checked"
   - `todo_commit_messages = true` is set in policy but daemon produces generic messages
   - Root cause: `is_noise_only` logic conflates version bumping with commit message selection
