@@ -202,3 +202,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **MAJOR**: Breaking changes to config format or CLI interface
 - **MINOR**: New features, backward compatible
 - **PATCH**: Bug fixes, documentation updates
+
