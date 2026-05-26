@@ -1216,7 +1216,7 @@ async fn stage_commit_and_push(
         local_fallback.as_deref(),
     );
 
-    let msg = if is_noise_only && !is_report {
+    let msg = if noise_for_bump && !is_report {
         if let Some(ref fb) = local_fallback {
             let category = commit_ctx.category.as_deref().unwrap_or("chore");
             let scope = commit_ctx.scope.as_deref().unwrap_or("sync");
