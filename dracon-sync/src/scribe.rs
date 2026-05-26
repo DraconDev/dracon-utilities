@@ -435,9 +435,12 @@ mod tests {
             .unwrap();
         let diff_names = "Modified: src/main.rs";
         let result = todo_context_message(tmp.path(), diff_names);
-        // Should produce local_fallback output (not JSON)
-        assert!(!result.contains("ledger_delta"));
-        assert!(result.contains("main"));
+        // Always produces routing key format — checked count is 0 when no open tasks
+        assert!(result.starts_with("sync: 0 checked"));
+        // Body still contains JSON with code_delta
+        assert!(result.contains("ledger_delta"));
+        assert!(result.contains("code_delta"));
+        assert!(result.contains("src/main.rs"));
     }
 
     #[test]
@@ -446,8 +449,12 @@ mod tests {
         // No todo.md written
         let diff_names = "Modified: src/main.rs";
         let result = todo_context_message(tmp.path(), diff_names);
-        assert!(!result.contains("ledger_delta"));
-        assert!(result.contains("main"));
+        // Always produces routing key format — checked count is 0 when no todo.md
+        assert!(result.starts_with("sync: 0 checked"));
+        // Body still contains JSON
+        assert!(result.contains("ledger_delta"));
+        assert!(result.contains("code_delta"));
+        assert!(result.contains("src/main.rs"));
     }
 
     #[test]
