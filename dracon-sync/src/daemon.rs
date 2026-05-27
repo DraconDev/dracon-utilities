@@ -409,7 +409,10 @@ pub(crate) async fn run_startup_cleanup(policy_path: &Path) -> (BTreeSet<PathBuf
     for repo in &repo_set {
         let lock = repo.join(".git/index.lock");
         if lock.exists() {
-            eprintln!("🧹 startup: found index.lock in {} (checking fuser...)", repo.display());
+            eprintln!(
+                "🧹 startup: found index.lock in {} (checking fuser...)",
+                repo.display()
+            );
             let in_use = std::process::Command::new("fuser")
                 .arg(&lock)
                 .output()
@@ -588,7 +591,8 @@ pub(crate) async fn run_daemon(
         }
     });
 
-    while !shutdown.load(Ordering::SeqCst) {        if reload.load(Ordering::SeqCst) {
+    while !shutdown.load(Ordering::SeqCst) {
+        if reload.load(Ordering::SeqCst) {
             reload.store(false, Ordering::SeqCst);
             match SyncPolicy::load(&policy_path) {
                 Ok(p) => {
@@ -652,10 +656,7 @@ pub(crate) async fn run_daemon(
                 if let Ok(p) = SyncPolicy::load(policy_path.as_ref()) {
                     if let Ok(removed) = crate::report::enforce_retention(&ledger_path, &p) {
                         if removed > 0 {
-                            eprintln!(
-                                "🧹 periodic: pruned {} stale incident entries",
-                                removed,
-                            );
+                            eprintln!("🧹 periodic: pruned {} stale incident entries", removed,);
                         }
                     }
                 }
@@ -732,10 +733,7 @@ pub(crate) async fn run_daemon(
                     // First time seeing this repo after startup: enter grace period
                     pending_repos.insert(repo.clone(), Instant::now());
                     if debug_enabled() {
-                        eprintln!(
-                            "⏳ {} new repo, entering 15s grace period",
-                            repo.display()
-                        );
+                        eprintln!("⏳ {} new repo, entering 15s grace period", repo.display());
                     }
                     continue;
                 }
@@ -1224,11 +1222,7 @@ pub(crate) async fn run_daemon(
                         repo.display(),
                         reason
                     );
-                    crate::report::send_sync_conflict_notification(
-                        &repo,
-                        "Stuck on Push",
-                        &reason,
-                    );
+                    crate::report::send_sync_conflict_notification(&repo, "Stuck on Push", &reason);
                     stuck_push_repos.insert(repo.clone(), timestamp_secs());
                     save_stuck_push_repos(&stuck_push_repos);
                     activity.remove(&repo);
@@ -1241,7 +1235,8 @@ pub(crate) async fn run_daemon(
             // if it has no failures (not in remote_failures), reset to 0.
             if let Some(entry) = activity.get_mut(&repo) {
                 for remote in &policy.remotes {
-                    let count = entry.mirror_consecutive_fails
+                    let count = entry
+                        .mirror_consecutive_fails
                         .entry(remote.name.clone())
                         .or_insert(0);
                     if entry.remote_failures.contains_key(&remote.name) {
@@ -1263,7 +1258,7 @@ pub(crate) async fn run_daemon(
         // Check for repos that have been in a concerning state for too long.
         // These fire once per repo per sustained incident, rate-limited to 30 min.
         let notification_now = Instant::now();
-        const STUCK_AHEAD_THRESHOLD: Duration = Duration::from_secs(600);  // 10 min
+        const STUCK_AHEAD_THRESHOLD: Duration = Duration::from_secs(600); // 10 min
         const STUCK_BEHIND_THRESHOLD: Duration = Duration::from_secs(1800); // 30 min
         const MIRROR_DEGRADED_THRESHOLD: usize = 3; // 3 consecutive fails
 
@@ -1312,7 +1307,10 @@ pub(crate) async fn run_daemon(
                         crate::report::send_sync_conflict_notification(
                             repo,
                             &format!("Mirror Degraded: {}", mirror_name),
-                            &format!("{} consecutive push failures — mirror may be unreachable", fail_count),
+                            &format!(
+                                "{} consecutive push failures — mirror may be unreachable",
+                                fail_count
+                            ),
                         );
                         e.insert(Instant::now() + Duration::from_secs(1800));
                     }

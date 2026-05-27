@@ -11,9 +11,13 @@ use crate::helpers::{is_auth_error, is_rate_limited};
 #[derive(Debug, Clone)]
 enum ProviderStatus {
     AuthFailed,
-    RateLimited { until: Instant },
+    RateLimited {
+        until: Instant,
+    },
     /// Transient failure (parse error, timeout, etc.) — skip for 5 min
-    TransientFailed { until: Instant },
+    TransientFailed {
+        until: Instant,
+    },
     Healthy,
 }
 
@@ -221,7 +225,9 @@ impl SimpleAiService {
             match provider_health().lock().await.get(&pc.name) {
                 Some(ProviderStatus::AuthFailed) => continue,
                 Some(ProviderStatus::RateLimited { until }) if Instant::now() < *until => continue,
-                Some(ProviderStatus::TransientFailed { until }) if Instant::now() < *until => continue,
+                Some(ProviderStatus::TransientFailed { until }) if Instant::now() < *until => {
+                    continue
+                }
                 _ => {}
             }
 

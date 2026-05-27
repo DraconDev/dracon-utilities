@@ -249,7 +249,11 @@ fn scan_diff_for_transitions(repo: &Path) -> Vec<(String, String, String)> {
                         if old_text.as_deref() == new_text.as_deref() {
                             if let Some(task) = new_text {
                                 if !task.is_empty() {
-                                    transitions.push((task, state.to_string(), current_file.clone()));
+                                    transitions.push((
+                                        task,
+                                        state.to_string(),
+                                        current_file.clone(),
+                                    ));
                                 }
                             }
                         }
@@ -573,18 +577,42 @@ mod tests {
         std::fs::create_dir(&repo).unwrap();
 
         // Init git repo
-        std::process::Command::new("git").args(["init"]).current_dir(&repo).output().unwrap();
-        std::process::Command::new("git").args(["config", "user.email", "test@test.com"]).current_dir(&repo).output().unwrap();
-        std::process::Command::new("git").args(["config", "user.name", "Test"]).current_dir(&repo).output().unwrap();
+        std::process::Command::new("git")
+            .args(["init"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["config", "user.email", "test@test.com"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["config", "user.name", "Test"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
 
         // Write initial file with open task
         std::fs::write(repo.join("tasks.md"), "- [ ] Fix the login bug\n").unwrap();
-        std::process::Command::new("git").args(["add", "tasks.md"]).current_dir(&repo).output().unwrap();
-        std::process::Command::new("git").args(["commit", "-m", "init"]).current_dir(&repo).output().unwrap();
+        std::process::Command::new("git")
+            .args(["add", "tasks.md"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["commit", "-m", "init"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
 
         // Modify to [x] and stage
         std::fs::write(repo.join("tasks.md"), "- [x] Fix the login bug\n").unwrap();
-        std::process::Command::new("git").args(["add", "tasks.md"]).current_dir(&repo).output().unwrap();
+        std::process::Command::new("git")
+            .args(["add", "tasks.md"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
 
         let diff_names = "Modified: tasks.md";
         let result = todo_context_message(&repo, diff_names);
@@ -606,17 +634,41 @@ mod tests {
         let repo = tmp.path().join("repo");
         std::fs::create_dir(&repo).unwrap();
 
-        std::process::Command::new("git").args(["init"]).current_dir(&repo).output().unwrap();
-        std::process::Command::new("git").args(["config", "user.email", "test@test.com"]).current_dir(&repo).output().unwrap();
-        std::process::Command::new("git").args(["config", "user.name", "Test"]).current_dir(&repo).output().unwrap();
+        std::process::Command::new("git")
+            .args(["init"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["config", "user.email", "test@test.com"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["config", "user.name", "Test"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
 
         std::fs::write(repo.join("todo.md"), "- [ ] Start refactor\n").unwrap();
-        std::process::Command::new("git").args(["add", "todo.md"]).current_dir(&repo).output().unwrap();
-        std::process::Command::new("git").args(["commit", "-m", "init"]).current_dir(&repo).output().unwrap();
+        std::process::Command::new("git")
+            .args(["add", "todo.md"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["commit", "-m", "init"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
 
         // [ ] → [~]
         std::fs::write(repo.join("todo.md"), "- [~] Start refactor\n").unwrap();
-        std::process::Command::new("git").args(["add", "todo.md"]).current_dir(&repo).output().unwrap();
+        std::process::Command::new("git")
+            .args(["add", "todo.md"])
+            .current_dir(&repo)
+            .output()
+            .unwrap();
 
         let diff_names = "Modified: todo.md";
         let result = todo_context_message(&repo, diff_names);

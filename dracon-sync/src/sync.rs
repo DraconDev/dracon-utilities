@@ -21,10 +21,7 @@ use crate::git::{
     run_git_with_timeout, unstage_excluded_paths, unstage_oversized_paths,
 };
 use crate::policy::{debug_enabled, load_repo_override, SyncPolicy};
-use crate::report::{
-    build_commit_context, detect_report_signals,
-    push_large_blob_threshold_bytes,
-};
+use crate::report::{build_commit_context, detect_report_signals, push_large_blob_threshold_bytes};
 use crate::visibility::{
     get_github_visibility, parse_github_owner_repo, sync_mirror_metadata, sync_mirror_visibility,
 };
@@ -581,8 +578,7 @@ async fn stage_existing_files(repo: &Path, existing: &[String], dry_run: bool) -
         // - Ignored but already-tracked paths: `git add -A -f -- <paths>` (force
         //   re-stage; git already tracks these so gitignore shouldn't block updates)
         // - Ignored and untracked: skip entirely (.gitignore is intentional)
-        let (force_paths, normal_paths) =
-            partition_gitignored(repo, existing).await;
+        let (force_paths, normal_paths) = partition_gitignored(repo, existing).await;
 
         if !normal_paths.is_empty() {
             let mut add_args = vec!["add", "-A", "--"];
@@ -607,7 +603,10 @@ async fn stage_existing_files(repo: &Path, existing: &[String], dry_run: bool) -
             for p in &force_paths {
                 add_args.push(p.as_str());
             }
-            if run_git_with_timeout(repo, &add_args, 30, "add (force-tracked)").await.is_err() {
+            if run_git_with_timeout(repo, &add_args, 30, "add (force-tracked)")
+                .await
+                .is_err()
+            {
                 eprintln!(
                     "⚠️ {} git add -f failed for {} tracked gitignored paths: {:?}",
                     repo.display(),
@@ -1524,16 +1523,7 @@ auto_github_private_account = "TestAccount"
 "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(
-            &repo,
-            &policy,
-            &BTreeSet::new(),
-            0,
-            None,
-            false,
-            None,
-        )
-        .await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
         assert!(
             result.is_ok(),
             "sync_repo should handle missing gh gracefully: {:?}",
@@ -1604,16 +1594,7 @@ auto_bump_versions = false
 "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(
-            &repo,
-            &policy,
-            &BTreeSet::new(),
-            0,
-            None,
-            false,
-            None,
-        )
-        .await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
         assert!(result.is_ok(), "sync_repo should succeed: {:?}", result);
 
         // Verify a commit was created
@@ -1682,16 +1663,7 @@ auto_bump_versions = false
 "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(
-            &repo,
-            &policy,
-            &BTreeSet::new(),
-            0,
-            None,
-            false,
-            None,
-        )
-        .await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
         assert!(
             result.is_ok(),
             "sync_repo should succeed even during rebase"
@@ -1749,16 +1721,7 @@ auto_bump_versions = false
 "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(
-            &repo,
-            &policy,
-            &BTreeSet::new(),
-            0,
-            None,
-            false,
-            None,
-        )
-        .await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
         assert!(result.is_ok(), "sync_repo should succeed even during merge");
         assert!(
             matches!(result, Ok(SyncOutcome::Blocked)),
@@ -1813,16 +1776,7 @@ auto_bump_versions = false
 "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(
-            &repo,
-            &policy,
-            &BTreeSet::new(),
-            0,
-            None,
-            false,
-            None,
-        )
-        .await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
         assert!(
             result.is_ok(),
             "sync_repo should succeed even during cherry-pick"
@@ -1880,16 +1834,7 @@ auto_bump_versions = false
 "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(
-            &repo,
-            &policy,
-            &BTreeSet::new(),
-            0,
-            None,
-            false,
-            None,
-        )
-        .await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
         assert!(result.is_ok(), "sync_repo should succeed: {:?}", result);
         assert!(
             matches!(result, Ok(SyncOutcome::Synced)),
@@ -1952,16 +1897,7 @@ auto_bump_versions = false
 "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(
-            &repo,
-            &policy,
-            &BTreeSet::new(),
-            0,
-            None,
-            false,
-            None,
-        )
-        .await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
         assert!(result.is_ok(), "sync_repo should succeed");
         assert!(
             matches!(result, Ok(SyncOutcome::NothingToDo)),
@@ -2016,16 +1952,7 @@ auto_bump_versions = false
 "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(
-            &repo,
-            &policy,
-            &BTreeSet::new(),
-            0,
-            None,
-            false,
-            None,
-        )
-        .await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
         assert!(result.is_ok(), "sync_repo should succeed: {:?}", result);
         assert!(
             matches!(result, Ok(SyncOutcome::Synced)),
@@ -2088,16 +2015,7 @@ auto_bump_versions = false
 "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(
-            &repo,
-            &policy,
-            &BTreeSet::new(),
-            0,
-            None,
-            false,
-            None,
-        )
-        .await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
         assert!(result.is_ok(), "sync_repo should succeed");
         assert!(
             matches!(result, Ok(SyncOutcome::NothingToDo)),
@@ -2151,16 +2069,7 @@ auto_bump_versions = false
 "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(
-            &repo,
-            &policy,
-            &BTreeSet::new(),
-            0,
-            None,
-            false,
-            None,
-        )
-        .await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
         assert!(result.is_ok(), "sync_repo should succeed with dirty repo");
         assert!(
             matches!(result, Ok(SyncOutcome::NothingToDo)),
@@ -2212,16 +2121,7 @@ auto_bump_versions = false
 "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(
-            &repo,
-            &policy,
-            &BTreeSet::new(),
-            0,
-            None,
-            false,
-            None,
-        )
-        .await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
         assert!(result.is_ok(), "sync_repo should succeed without origin");
     }
 
@@ -2269,16 +2169,7 @@ auto_bump_versions = false
 "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(
-            &repo,
-            &policy,
-            &BTreeSet::new(),
-            0,
-            None,
-            false,
-            None,
-        )
-        .await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
         assert!(result.is_ok(), "sync_repo should succeed without upstream");
     }
 
@@ -2362,16 +2253,7 @@ push_url = "git@nonexistent.example.com:repo.git"
 "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(
-            &repo,
-            &policy,
-            &BTreeSet::new(),
-            0,
-            None,
-            false,
-            None,
-        )
-        .await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
         assert!(result.is_ok(), "sync_repo should not error");
         assert!(
             matches!(result, Ok(SyncOutcome::NothingToDo)),
@@ -2571,16 +2453,7 @@ push_url = "{}"
         );
         let policy: SyncPolicy = toml::from_str(&toml_str).unwrap();
 
-        let result = sync_repo(
-            &repo,
-            &policy,
-            &BTreeSet::new(),
-            0,
-            None,
-            false,
-            None,
-        )
-        .await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
         assert!(result.is_ok(), "sync_repo should not error: {:?}", result);
         assert!(
             matches!(result, Ok(SyncOutcome::Synced)),
@@ -2648,16 +2521,7 @@ push_url = "{}"
         "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(
-            &not_repo,
-            &policy,
-            &BTreeSet::new(),
-            0,
-            None,
-            false,
-            None,
-        )
-        .await;
+        let result = sync_repo(&not_repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
         assert!(result.is_ok(), "sync_repo should not error on non-git dir");
         assert!(
             matches!(result, Ok(SyncOutcome::NothingToDo)),
@@ -2686,16 +2550,7 @@ push_url = "{}"
         "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(
-            &repo,
-            &policy,
-            &BTreeSet::new(),
-            0,
-            None,
-            false,
-            None,
-        )
-        .await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
         assert!(result.is_ok(), "sync_repo should succeed");
         assert!(
             matches!(result, Ok(SyncOutcome::Synced)),
@@ -2713,7 +2568,6 @@ push_url = "{}"
             "remove.txt should be removed from index"
         );
     }
-
 
     #[tokio::test]
     async fn test_sync_repo_partial_deletion_allowed() {
@@ -2739,16 +2593,7 @@ push_url = "{}"
         "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(
-            &repo,
-            &policy,
-            &BTreeSet::new(),
-            0,
-            None,
-            false,
-            None,
-        )
-        .await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
         assert!(result.is_ok(), "sync_repo should succeed");
         assert!(
             matches!(result, Ok(SyncOutcome::Synced)),
@@ -2791,16 +2636,7 @@ push_url = "{}"
         "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(
-            &repo,
-            &policy,
-            &BTreeSet::new(),
-            0,
-            None,
-            false,
-            None,
-        )
-        .await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
         assert!(result.is_ok(), "sync_repo should succeed");
         assert!(
             matches!(result, Ok(SyncOutcome::Synced)),
@@ -2831,19 +2667,9 @@ push_url = "{}"
         "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(
-            &repo,
-            &policy,
-            &BTreeSet::new(),
-            0,
-            None,
-            false,
-            None,
-        )
-        .await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
         assert!(result.is_ok(), "sync_repo should not panic on empty repo");
     }
-
 
     #[tokio::test]
     async fn test_sync_repo_unstages_excluded_dir_paths() {
@@ -2916,16 +2742,7 @@ push_url = "{}"
         "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(
-            &repo,
-            &policy,
-            &BTreeSet::new(),
-            0,
-            None,
-            false,
-            None,
-        )
-        .await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
         assert!(
             result.is_ok(),
             "sync_repo should succeed with oversized file"
@@ -2960,16 +2777,7 @@ push_url = "{}"
         "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(
-            &repo,
-            &policy,
-            &BTreeSet::new(),
-            0,
-            None,
-            false,
-            None,
-        )
-        .await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
         assert!(result.is_ok(), "sync_repo should succeed");
         assert!(
             matches!(result, Ok(SyncOutcome::Synced)),
@@ -3005,16 +2813,7 @@ push_url = "{}"
         "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(
-            &repo,
-            &policy,
-            &BTreeSet::new(),
-            0,
-            None,
-            false,
-            None,
-        )
-        .await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
         assert!(result.is_ok(), "sync_repo should succeed without origin");
         assert!(
             matches!(result, Ok(SyncOutcome::NothingToDo)),
@@ -3038,16 +2837,7 @@ push_url = "{}"
         "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(
-            &repo,
-            &policy,
-            &BTreeSet::new(),
-            0,
-            None,
-            false,
-            None,
-        )
-        .await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
         assert!(result.is_ok(), "sync_repo should succeed");
         assert!(
             matches!(result, Ok(SyncOutcome::NothingToDo)),
@@ -3205,16 +2995,7 @@ auto_bump_versions = false
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
         // No origin remote, so no push attempt — just check alert fires
-        let result = sync_repo(
-            &repo,
-            &policy,
-            &BTreeSet::new(),
-            0,
-            None,
-            false,
-            None,
-        )
-        .await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
         assert!(result.is_ok(), "sync_repo should succeed");
     }
 
@@ -3239,16 +3020,7 @@ auto_bump_versions = false
         "#;
         let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
 
-        let result = sync_repo(
-            &repo,
-            &policy,
-            &BTreeSet::new(),
-            0,
-            None,
-            false,
-            None,
-        )
-        .await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
         assert!(result.is_ok(), "sync_repo should succeed");
     }
 
@@ -3303,16 +3075,7 @@ auto_bump_versions = false
             std::fs::remove_file(repo.join(format!("file{i}.txt"))).unwrap();
         }
 
-        let result = sync_repo(
-            &repo,
-            &policy,
-            &BTreeSet::new(),
-            0,
-            None,
-            false,
-            None,
-        )
-        .await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
         assert!(
             matches!(result, Ok(SyncOutcome::Synced)),
             "deletions should be committed, not blocked"
@@ -3358,16 +3121,7 @@ auto_bump_versions = false
 
         // sync_repo should see filter-only changes, skip them, and NOT
         // fall back to cli_diff_entries which would see the CRLF difference.
-        let result = sync_repo(
-            &repo,
-            &policy,
-            &BTreeSet::new(),
-            0,
-            None,
-            false,
-            None,
-        )
-        .await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
         assert!(
             matches!(
                 result,
@@ -3411,16 +3165,7 @@ auto_bump_versions = false
 
         // sync_repo should succeed — no dedup guard blocking legitimate work
         std::fs::write(repo.join("c.txt"), "c").unwrap();
-        let result = sync_repo(
-            &repo,
-            &policy,
-            &BTreeSet::new(),
-            0,
-            None,
-            false,
-            None,
-        )
-        .await;
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
         assert!(
             result.is_ok(),
             "sync_repo should succeed with duplicate subjects in history"

@@ -403,8 +403,7 @@ pub(crate) fn enforce_retention(path: &Path, policy: &SyncPolicy) -> Result<usiz
     let content = std::fs::read_to_string(path)?;
     let original_count = content.lines().count();
     let now = timestamp_secs();
-    let age_cutoff =
-        now.saturating_sub(policy.incident_ledger_max_age_days.saturating_mul(86_400));
+    let age_cutoff = now.saturating_sub(policy.incident_ledger_max_age_days.saturating_mul(86_400));
 
     let mut kept: Vec<String> = Vec::new();
     for line in content.lines() {

@@ -897,12 +897,10 @@ impl IndexLock {
             .open(&path)
         {
             Ok(_file) => Ok(Self { path, held: true }),
-            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
-                Err(anyhow::anyhow!(
-                    "index.lock held by another git operation, skipping {}",
-                    repo.display()
-                ))
-            }
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => Err(anyhow::anyhow!(
+                "index.lock held by another git operation, skipping {}",
+                repo.display()
+            )),
             Err(e) => Err(anyhow::anyhow!(
                 "failed to create index.lock for {}: {}",
                 repo.display(),

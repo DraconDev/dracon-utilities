@@ -43,8 +43,7 @@ fn update_version_in_flake_nix(content: &str, new_version: &str) -> String {
         // "buildRustPackage (commonArgs // {" (merged-src layout).
         if line.contains("buildRustPackage") && line.contains('{') && line.contains(" = ") {
             in_build_rust_package = true;
-        } else if trimmed.ends_with("};") || trimmed.ends_with("});")
-        {
+        } else if trimmed.ends_with("};") || trimmed.ends_with("});") {
             // End of buildRustPackage block
             // "};" = standard close, "});" = merged-src close (parenthesized arg)
             in_build_rust_package = false;

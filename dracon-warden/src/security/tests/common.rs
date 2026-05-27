@@ -37,11 +37,13 @@ impl Drop for HomeGuard {
 }
 
 /// Restores an environment variable to its original value on drop.
+#[allow(dead_code)]
 pub struct EnvRestorer {
     key: String,
     old_value: Option<String>,
 }
 
+#[allow(dead_code)]
 impl EnvRestorer {
     /// Saves current value of `key`, sets it to `new_value`.
     /// On Drop: restores the original value (or removes if unset).
@@ -54,6 +56,7 @@ impl EnvRestorer {
             old_value,
         }
     }
+}
 
 impl Drop for EnvRestorer {
     fn drop(&mut self) {

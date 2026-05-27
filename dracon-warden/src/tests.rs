@@ -1,4 +1,5 @@
 #[cfg(test)]
+#[allow(clippy::module_inception)]
 mod tests {
     use crate::*;
     use std::sync::atomic::{AtomicU64, Ordering};
