@@ -233,22 +233,14 @@ pub fn local_fallback_message(diff_names: &str) -> String {
 
 /// Generate a commit message aligned to the first open `[ ]` in root `todo.md`.
 ///
-/// The commit message is **informative** — it shows both:
-/// 1. The task text (alignment with what was planned)
-/// 2. The diff summary (what actually changed)
+/// Subject: `close(todo): <task text>` — machine-parseable signal that a task was closed.
+/// Body: acceptance criteria + file list — everything downstream AI needs to verify.
 ///
-/// Strategy (from the AI commit discussion):
-/// 1. Worker reads todo.md
-/// 2. Finds first `[ ]` task
-/// 3. Does the work
-/// 4. Commits with task text + deterministic diff summary
-///
-/// Falls back to `deterministic_diff_summary` with diff_names as body if no `[ ]` is found.
+/// Falls back to deterministic diff summary when no `todo.md` or no open `[ ]`.
 pub fn todo_context_message(repo: &Path, diff_names: &str) -> String {
     let task = match parse_todo_task(repo) {
         Some(t) if !t.title.is_empty() => t,
         _ => {
-            // No task — deterministic diff summary as subject, full file list as body
             let summary = deterministic_diff_summary(diff_names);
             let entries = diff_names.trim();
             if entries.is_empty() {
@@ -258,29 +250,33 @@ pub fn todo_context_message(repo: &Path, diff_names: &str) -> String {
         }
     };
 
-    // Build file list from diff names
+    // Build body: acceptance criteria + file list
+    let mut body_parts: Vec<String> = Vec::new();
+
+    // Sub-items = acceptance criteria / verification steps
+    if !task.sub_items.is_empty() {
+        for item in &task.sub_items {
+            body_parts.push(format!("- {}", item));
+        }
+    }
+
+    // File list
     let files: Vec<&str> = diff_names
         .lines()
         .filter(|l| !l.trim().is_empty())
-        .map(|l| l.split_once(": ").map(|(_, p)| p.trim()).unwrap_or(l.trim()))
         .collect();
-
     let file_count = files.len();
-    let files_summary: String = if file_count == 0 {
-        "No files changed".to_string()
-    } else if file_count == 1 {
-        files[0].to_string()
-    } else {
-        let top3: String = files.iter().take(3).map(|f| f.to_string()).collect::<Vec<_>>().join(", ");
-        if file_count > 3 {
-            format!("{}, and {} more", top3, file_count - 3)
-        } else {
-            top3
+    if file_count > 0 {
+        body_parts.push(format!("{} file{} changed:", file_count, if file_count == 1 { "" } else { "s" }));
+        for f in &files {
+            body_parts.push(format!("  {}", f));
         }
-    };
+    }
 
-    // Format: subject = task text, body = deterministic diff summary
-    format!("{}\n\n{}\n{}", task.title, files_summary, diff_names)
+    let body = body_parts.join("\n");
+
+    // Subject with close(todo): prefix for grep-ability
+    format!("close(todo): {}\n\n{}", task.title, body)
 }
 
 #[cfg(feature = "scribe")]
@@ -474,9 +470,12 @@ mod tests {
         .unwrap();
         let diff_names = "Modified: src/scribe.rs\nAdded: tests/test.rs";
         let result = todo_context_message(tmp.path(), diff_names);
-        // First line is the task text (subject)
-        assert!(result.starts_with("My active task"));
+        // Subject has close(todo): prefix
+        assert!(result.starts_with("close(todo): My active task"));
+        // Body contains acceptance criteria
+        assert!(result.contains("- acceptance criteria"));
         // Body contains file list
+        assert!(result.contains("2 files changed:"));
         assert!(result.contains("src/scribe.rs"));
         assert!(result.contains("tests/test.rs"));
     }
@@ -488,10 +487,9 @@ mod tests {
             .unwrap();
         let diff_names = "Modified: src/main.rs";
         let result = todo_context_message(tmp.path(), diff_names);
-        // Fallback: subject = "Modified src/main.rs", body = diff_names
+        // Falls back to deterministic diff summary
         assert!(result.starts_with("Modified src/main.rs"));
         assert!(result.contains("Modified: src/main.rs"));
-        // Subject and body separated by double newline
         assert!(result.contains("\n\n"));
     }
 
@@ -501,7 +499,7 @@ mod tests {
         // No todo.md written
         let diff_names = "Modified: src/main.rs";
         let result = todo_context_message(tmp.path(), diff_names);
-        // Fallback: subject = "Modified src/main.rs", body = diff_names
+        // Falls back to deterministic diff summary
         assert!(result.starts_with("Modified src/main.rs"));
         assert!(result.contains("Modified: src/main.rs"));
         assert!(result.contains("\n\n"));
@@ -517,12 +515,15 @@ mod tests {
         .unwrap();
         let diff_names = "Modified: src/work.rs";
         let result = todo_context_message(tmp.path(), diff_names);
-        // First line is the task text
-        assert!(result.starts_with("Real work to do"));
+        // Subject has close(todo): prefix
+        assert!(result.starts_with("close(todo): Real work to do"));
+
+        // Body contains sub-items
+        assert!(result.contains("- criteria 1"));
+        assert!(result.contains("- criteria 2"));
 
         // Body contains file list
-        let parts: Vec<&str> = result.splitn(2, '\n').collect();
-        assert_eq!(parts.len(), 2);
-        assert!(parts[1].contains("src/work.rs"));
+        assert!(result.contains("1 file changed:"));
+        assert!(result.contains("src/work.rs"));
     }
 }
