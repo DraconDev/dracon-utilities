@@ -1,42 +1,20 @@
 # TODO
 
 ## Active Work
-- [ ] Final format verification test task
-  - Check that sub-items render without double dash
-  - Verify Accept criteria header appears
-  - Confirm close(todo): prefix is in subject
-- [ ] Test enhanced commit message format with sub-items and close(todo): prefix
-  - Verify close(todo): prefix appears in subject
-  - Verify acceptance criteria appear in body
-  - Verify file list appears in body with counts
 
-- [x] Test deterministic commit message format with task text as subject
-  - Verify the daemon uses todo.md task text instead of `sync: N checked`
-  - ✅ Confirmed: commit `14ec5a41` has subject = task text, body = diff summary
-
-- [x] Fix commit message generation — all commits say "update main" instead of "sync: N checked"
-  - `todo_commit_messages = true` is set in policy but daemon produces generic messages
-  - Root cause: `is_noise_only` logic conflates version bumping with commit message selection
-  - `deterministic_decide_bump_level` returns `BumpLevel::None` for most changes → `is_noise_only = true`
-  - When `is_noise_only` is true, code uses `local_fallback` but the actual output is "update main", not "sync: N checked"
-  - Fix: call `todo_context_message` directly when `todo_commit_messages` is true, before noise detection
-  - ✅ Fixed: rewrote `todo_context_message` to return task text as subject + diff summary as body
-  - ✅ Fixed: updated `sync.rs` message selection to use task text directly without `category(scope):` prefix
-  - ✅ Fixed: renamed `is_noise_only` to `noise_for_bump` to clarify it only affects version bumping
-  - Expected: commits like `chore(sync): sync: 2 checked\n\n{...}`
-
-## Completed
-
-- [x] Add `todo_commit_messages` config toggle
-- [x] Implement `todo_context_message()` — routing key title + JSON body
-- [x] Add `parse_todo_task()` — reads root todo.md, finds first open `[ ]` task
-- [x] Add `local_fallback_message()` — file-stem summary fallback
-- [x] Wire into `sync.rs` commit path
-- [x] Add 13 tests for todo_parser, 11 tests for scribe
-- [x] Add auto_create for GitHub, GitLab, Codeberg
-- [x] Exclude `.dracon` and `.ralph` from `exclude_dir_names`
-- [x] Add binary freshness check to `install.sh`
-- [x] Full audit of 28 repos — all OK, 0 WARN, 0 CONCERN
-- [x] Archive 5 redundant markdown files
-- [x] Fix broken remotes on `dracon-voice-notifications` and `ai-vid-editor`
-- [x] Delete ghost repos
+- [ ] Rewrite `todo_context_message` to scan diff for task transitions instead of reading root `todo.md`
+  - [ ] Replace `parse_todo_task(repo)` with a function that runs `git diff --cached -U0` on the repo and scans hunks for `[ ]` → `[x]` / `[~]` state changes
+  - [ ] Detect transitions: line was `- - [ ]` before, now `+ - [x]` or `+ - [~]` — extract the task text from the new line
+  - [ ] Subject: always use `deterministic_diff_summary(diff_names)` — no `close(todo):` prefix, always reliable
+  - [ ] Body: append `Task transitions:` block when any transitions found, with file:line reference
+  - [ ] Fallback: when no transitions detected, commmit body is just the file list (same as today's fallback)
+- [ ] Update all scribe tests for the new format
+  - [ ] `test_todo_context_with_task` → test that transitions appear in body when diff contains `[ ]` → `[x]`
+  - [ ] `test_todo_context_falls_back_when_no_open_task` → test that no `Task transitions:` block when no transitions
+  - [ ] `test_todo_context_falls_back_when_no_todo_file` → still falls back to pure diff
+  - [ ] `test_todo_context_task_text_with_files` → test mixed transitions (`[x]` + `[~]`)
+  - [ ] New test: transition diff contains `[ ]` → `[~]` for in-progress tasks
+- [ ] Install and verify in production
+  - [ ] Build release binary, stop daemon, copy, start daemon
+  - [ ] Create a test commit with `[x]` transitions, verify body shows task transitions
+  - [ ] Create a test commit with no transitions, verify pure diff fallback
