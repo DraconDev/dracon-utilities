@@ -255,8 +255,9 @@ pub fn todo_context_message(repo: &Path, diff_names: &str) -> String {
 
     // Sub-items = acceptance criteria / verification steps
     if !task.sub_items.is_empty() {
+        body_parts.push("Acceptance criteria:".to_string());
         for item in &task.sub_items {
-            body_parts.push(format!("- {}", item));
+            body_parts.push(format!("  {}", item));
         }
     }
 
@@ -472,8 +473,9 @@ mod tests {
         let result = todo_context_message(tmp.path(), diff_names);
         // Subject has close(todo): prefix
         assert!(result.starts_with("close(todo): My active task"));
-        // Body contains acceptance criteria
-        assert!(result.contains("- acceptance criteria"));
+        // Body contains acceptance criteria header and sub-items
+        assert!(result.contains("Acceptance criteria:"));
+        assert!(result.contains("  - acceptance criteria"));
         // Body contains file list
         assert!(result.contains("2 files changed:"));
         assert!(result.contains("src/scribe.rs"));
@@ -518,7 +520,8 @@ mod tests {
         // Subject has close(todo): prefix
         assert!(result.starts_with("close(todo): Real work to do"));
 
-        // Body contains sub-items
+        // Body contains sub-items under Acceptance criteria header
+        assert!(result.contains("Acceptance criteria:"));
         assert!(result.contains("- criteria 1"));
         assert!(result.contains("- criteria 2"));
 
