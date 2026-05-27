@@ -1,5 +1,4 @@
 use crate::simple_ai::{ChatMessage, SimpleAiService};
-use crate::todo_parser::parse_todo_task;
 use std::path::Path;
 
 /// Build the **system** prompt — authoritative instructions the AI should follow.
@@ -194,6 +193,93 @@ fn deterministic_diff_summary(diff_names: &str) -> String {
     format!("{}", parts.join("; "))
 }
 
+/// Scan the staged diff for task state transitions (`[ ]` → `[x]` / `[~]`).
+///
+/// Returns Vec<(task_text, new_state, file)> — one entry per transition found.
+/// \"[x]\" means completed, \"[~]\" means in-progress.
+///
+/// Strategy: parse `git diff --cached -U0` to find adjacent `- [ ]` / `+ [x]` pairs.
+/// The diff itself IS the receipt — we don't read `todo.md` directly.
+fn scan_diff_for_transitions(repo: &Path) -> Vec<(String, String, String)> {
+    let output = match std::process::Command::new("git")
+        .args(["diff", "--cached", "-U0"])
+        .current_dir(repo)
+        .output()
+    {
+        Ok(o) if o.status.success() => String::from_utf8_lossy(&o.stdout).to_string(),
+        _ => return Vec::new(),
+    };
+
+    let mut transitions = Vec::new();
+    let mut current_file = String::new();
+    let lines: Vec<&str> = output.lines().collect();
+    let mut i = 0;
+
+    while i < lines.len() {
+        let line = lines[i];
+
+        if line.starts_with("+++ b/") {
+            current_file = line.trim_start_matches("+++ b/").to_string();
+        }
+
+        // Look for `- [ ]` line — the old (open) task line
+        if line.starts_with('-') && contains_open_task(&line[1..]) {
+            let old_text = extract_task_text(&line[1..], "[ ]");
+            // Scan forward within same hunk (until next @@ or file header) for matching + [x] / [~]
+            let mut j = i + 1;
+            while j < lines.len() {
+                let next = lines[j];
+                if next.starts_with("@@") || next.starts_with("diff --git") || next.starts_with("--- ") {
+                    break;
+                }
+                if next.starts_with('+') {
+                    let new_line = &next[1..];
+                    let (marker, state) = if new_line.contains("[x]") {
+                        ("[x]", "[x]")
+                    } else if new_line.contains("[~]") {
+                        ("[~]", "[~]")
+                    } else {
+                        ("", "")
+                    };
+                    if !marker.is_empty() {
+                        let new_text = extract_task_text(new_line, marker);
+                        // Match: task text should be similar (same after stripping markers)
+                        if old_text.as_deref() == new_text.as_deref() {
+                            if let Some(task) = new_text {
+                                if !task.is_empty() {
+                                    transitions.push((task, state.to_string(), current_file.clone()));
+                                }
+                            }
+                        }
+                    }
+                }
+                j += 1;
+            }
+        }
+
+        i += 1;
+    }
+
+    transitions
+}
+
+fn contains_open_task(line: &str) -> bool {
+    line.contains("[ ]")
+}
+
+fn extract_task_text(line: &str, marker: &str) -> Option<String> {
+    if let Some(pos) = line.find(marker) {
+        let after = line[pos + marker.len()..].trim();
+        if after.is_empty() {
+            None
+        } else {
+            Some(after.to_string())
+        }
+    } else {
+        None
+    }
+}
+
 pub fn local_fallback_message(diff_names: &str) -> String {
     let entries: Vec<&str> = diff_names
         .lines()
@@ -231,33 +317,27 @@ pub fn local_fallback_message(diff_names: &str) -> String {
     format!("update {}{}", desc, suffix)
 }
 
-/// Generate a commit message aligned to the first open `[ ]` in root `todo.md`.
+/// Generate a commit message from the staged diff.
 ///
-/// Subject: `close(todo): <task text>` — machine-parseable signal that a task was closed.
-/// Body: acceptance criteria + file list — everything downstream AI needs to verify.
+/// **Subject**: always `deterministic_diff_summary(diff_names)` — reliable ground truth.
+/// **Body**: enriched with `Task transitions:` when the diff shows `[ ]` → `[x]` / `[~]` changes.
 ///
-/// Falls back to deterministic diff summary when no `todo.md` or no open `[ ]`.
+/// No longer reads root `todo.md` directly. Instead, scans the git diff for checked boxes —
+/// the Worker's own diff IS the receipt of what was completed.
 pub fn todo_context_message(repo: &Path, diff_names: &str) -> String {
-    let task = match parse_todo_task(repo) {
-        Some(t) if !t.title.is_empty() => t,
-        _ => {
-            let summary = deterministic_diff_summary(diff_names);
-            let entries = diff_names.trim();
-            if entries.is_empty() {
-                return summary;
-            }
-            return format!("{}\n\n{}", summary, entries);
-        }
-    };
+    // Subject is always the deterministic diff summary — never wrong
+    let summary = deterministic_diff_summary(diff_names);
 
-    // Build body: acceptance criteria + file list
+    // Scan diff for task transitions the Worker made in changed files
+    let transitions = scan_diff_for_transitions(repo);
+
+    // Build body: Task transitions (if any) + file list
     let mut body_parts: Vec<String> = Vec::new();
 
-    // Sub-items = acceptance criteria / verification steps
-    if !task.sub_items.is_empty() {
-        body_parts.push("Acceptance criteria:".to_string());
-        for item in &task.sub_items {
-            body_parts.push(format!("  {}", item));
+    if !transitions.is_empty() {
+        body_parts.push("Task transitions:".to_string());
+        for (task_text, state, file) in &transitions {
+            body_parts.push(format!("  {} {} ({})", state, task_text, file));
         }
     }
 
@@ -275,9 +355,11 @@ pub fn todo_context_message(repo: &Path, diff_names: &str) -> String {
     }
 
     let body = body_parts.join("\n");
-
-    // Subject with close(todo): prefix for grep-ability
-    format!("close(todo): {}\n\n{}", task.title, body)
+    if body.is_empty() {
+        summary
+    } else {
+        format!("{}\n\n{}", summary, body)
+    }
 }
 
 #[cfg(feature = "scribe")]
