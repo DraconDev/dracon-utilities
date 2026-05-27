@@ -1,6 +1,10 @@
 # TODO
 
 ## Active Work
+- [ ] Final format verification test task
+  - Check that sub-items render without double dash
+  - Verify Accept criteria header appears
+  - Confirm close(todo): prefix is in subject
 - [ ] Test enhanced commit message format with sub-items and close(todo): prefix
   - Verify close(todo): prefix appears in subject
   - Verify acceptance criteria appear in body
