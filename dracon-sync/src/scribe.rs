@@ -190,7 +190,7 @@ fn deterministic_diff_summary(diff_names: &str) -> String {
         parts.push(format!("{} {}: {}", status, count, name_str));
     }
 
-    format!("{}", parts.join("; "))
+    parts.join("; ").to_string()
 }
 
 /// Scan the staged diff for task state transitions (`[ ]` → `[x]` / `[~]`).
@@ -229,11 +229,13 @@ fn scan_diff_for_transitions(repo: &Path) -> Vec<(String, String, String)> {
             let mut j = i + 1;
             while j < lines.len() {
                 let next = lines[j];
-                if next.starts_with("@@") || next.starts_with("diff --git") || next.starts_with("--- ") {
+                if next.starts_with("@@")
+                    || next.starts_with("diff --git")
+                    || next.starts_with("--- ")
+                {
                     break;
                 }
-                if next.starts_with('+') {
-                    let new_line = &next[1..];
+                if let Some(new_line) = next.strip_prefix('+') {
                     let (marker, state) = if new_line.contains("[x]") {
                         ("[x]", "[x]")
                     } else if new_line.contains("[~]") {
@@ -348,7 +350,11 @@ pub fn todo_context_message(repo: &Path, diff_names: &str) -> String {
         .collect();
     let file_count = files.len();
     if file_count > 0 {
-        body_parts.push(format!("{} file{} changed:", file_count, if file_count == 1 { "" } else { "s" }));
+        body_parts.push(format!(
+            "{} file{} changed:",
+            file_count,
+            if file_count == 1 { "" } else { "s" }
+        ));
         for f in &files {
             body_parts.push(format!("  {}", f));
         }

@@ -55,19 +55,6 @@ impl EnvRestorer {
         }
     }
 
-    /// Saves current value of `key`, removes the variable entirely.
-    /// On Drop: restores the original value (or removes if unset).
-    pub fn remove(key: &str) -> Self {
-        let _lock = ENV_MUTEX.lock().expect("env lock poisoned");
-        let old_value = std::env::var(key).ok();
-        std::env::remove_var(key);
-        EnvRestorer {
-            key: key.to_string(),
-            old_value,
-        }
-    }
-}
-
 impl Drop for EnvRestorer {
     fn drop(&mut self) {
         std::env::remove_var(&self.key);

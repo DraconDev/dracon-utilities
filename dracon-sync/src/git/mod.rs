@@ -707,6 +707,7 @@ mod tests {
             "error should mention missing token"
         );
     }
+    #[allow(clippy::await_holding_lock)]
     #[tokio::test]
     async fn test_auto_create_all_remotes_github_success() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
@@ -738,6 +739,7 @@ mod tests {
         let url = results[0].1.as_ref().unwrap();
         assert_eq!(url, "https://github.com/testaccount/test-repo.git");
     }
+    #[allow(clippy::await_holding_lock)]
     #[tokio::test]
     async fn test_auto_create_all_remotes_gitlab_success() {
         let tmp = tempfile::TempDir::new().expect("temp dir");

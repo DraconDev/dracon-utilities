@@ -15,7 +15,6 @@ pub(crate) fn git_ssh_hardening() -> String {
 }
 
 /// Lock for serializing tests that modify PATH.
-
 /// Get the real git binary path, checking env var override first.
 #[cfg(test)]
 #[allow(dead_code)]
