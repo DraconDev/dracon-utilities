@@ -544,71 +544,91 @@ mod tests {
     }
 
     #[test]
-    fn test_todo_context_with_task() {
+    fn test_todo_context_no_transitions_pure_diff() {
+        // Non-git temp dir: git diff --cached fails → no transitions → pure fallback
         let tmp = tempfile::tempdir().unwrap();
-        std::fs::write(
-            tmp.path().join("todo.md"),
-            "- [x] Done\n- [ ] My active task\n  - acceptance criteria\n- [ ] Another\n",
-        )
-        .unwrap();
-        let diff_names = "Modified: src/scribe.rs\nAdded: tests/test.rs";
+        let diff_names = "Modified: src/main.rs\nAdded: src/lib.rs";
         let result = todo_context_message(tmp.path(), diff_names);
-        // Subject has close(todo): prefix
-        assert!(result.starts_with("close(todo): My active task"));
-        // Body contains acceptance criteria header and sub-items
-        assert!(result.contains("Acceptance criteria:"));
-        assert!(result.contains("  - acceptance criteria"));
-        // Body contains file list
+        // Subject is deterministic diff summary (BTreeMap: Added before Modified alphabetically)
+        assert!(result.starts_with("Added 1: src/lib.rs; Modified 1: src/main.rs"));
+        // Body has file list
         assert!(result.contains("2 files changed:"));
-        assert!(result.contains("src/scribe.rs"));
-        assert!(result.contains("tests/test.rs"));
+        assert!(result.contains("Modified: src/main.rs"));
+        assert!(result.contains("Added: src/lib.rs"));
+        // No Task transitions block
+        assert!(!result.contains("Task transitions:"));
     }
 
     #[test]
-    fn test_todo_context_falls_back_when_no_open_task() {
+    fn test_todo_context_with_transitions() {
+        // Real git repo with staged [ ] → [x] transition
         let tmp = tempfile::tempdir().unwrap();
-        std::fs::write(tmp.path().join("todo.md"), "- [x] All done\n")
-            .unwrap();
-        let diff_names = "Modified: src/main.rs";
-        let result = todo_context_message(tmp.path(), diff_names);
-        // Falls back to deterministic diff summary
-        assert!(result.starts_with("Modified src/main.rs"));
-        assert!(result.contains("Modified: src/main.rs"));
-        assert!(result.contains("\n\n"));
+        let repo = tmp.path().join("repo");
+        std::fs::create_dir(&repo).unwrap();
+
+        // Init git repo
+        std::process::Command::new("git").args(["init"]).current_dir(&repo).output().unwrap();
+        std::process::Command::new("git").args(["config", "user.email", "test@test.com"]).current_dir(&repo).output().unwrap();
+        std::process::Command::new("git").args(["config", "user.name", "Test"]).current_dir(&repo).output().unwrap();
+
+        // Write initial file with open task
+        std::fs::write(repo.join("tasks.md"), "- [ ] Fix the login bug\n").unwrap();
+        std::process::Command::new("git").args(["add", "tasks.md"]).current_dir(&repo).output().unwrap();
+        std::process::Command::new("git").args(["commit", "-m", "init"]).current_dir(&repo).output().unwrap();
+
+        // Modify to [x] and stage
+        std::fs::write(repo.join("tasks.md"), "- [x] Fix the login bug\n").unwrap();
+        std::process::Command::new("git").args(["add", "tasks.md"]).current_dir(&repo).output().unwrap();
+
+        let diff_names = "Modified: tasks.md";
+        let result = todo_context_message(&repo, diff_names);
+        // Subject is deterministic diff summary (not close(todo):)
+        assert!(result.starts_with("Modified tasks.md"));
+        // Body has Task transitions block
+        assert!(result.contains("Task transitions:"));
+        assert!(result.contains("[x]"));
+        assert!(result.contains("Fix the login bug"));
+        assert!(result.contains("tasks.md"));
+        // Body has file list
+        assert!(result.contains("1 file changed:"));
+    }
+
+    #[test]
+    fn test_todo_context_with_in_progress_transition() {
+        // [ ] → [~] transition
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("repo");
+        std::fs::create_dir(&repo).unwrap();
+
+        std::process::Command::new("git").args(["init"]).current_dir(&repo).output().unwrap();
+        std::process::Command::new("git").args(["config", "user.email", "test@test.com"]).current_dir(&repo).output().unwrap();
+        std::process::Command::new("git").args(["config", "user.name", "Test"]).current_dir(&repo).output().unwrap();
+
+        std::fs::write(repo.join("todo.md"), "- [ ] Start refactor\n").unwrap();
+        std::process::Command::new("git").args(["add", "todo.md"]).current_dir(&repo).output().unwrap();
+        std::process::Command::new("git").args(["commit", "-m", "init"]).current_dir(&repo).output().unwrap();
+
+        // [ ] → [~]
+        std::fs::write(repo.join("todo.md"), "- [~] Start refactor\n").unwrap();
+        std::process::Command::new("git").args(["add", "todo.md"]).current_dir(&repo).output().unwrap();
+
+        let diff_names = "Modified: todo.md";
+        let result = todo_context_message(&repo, diff_names);
+        assert!(result.contains("Task transitions:"));
+        assert!(result.contains("[~]"));
+        assert!(result.contains("Start refactor"));
+        assert!(!result.contains("[x]")); // no [x] transitions
     }
 
     #[test]
     fn test_todo_context_falls_back_when_no_todo_file() {
         let tmp = tempfile::tempdir().unwrap();
-        // No todo.md written
+        // No todo.md written, no git repo → pure fallback
         let diff_names = "Modified: src/main.rs";
         let result = todo_context_message(tmp.path(), diff_names);
         // Falls back to deterministic diff summary
         assert!(result.starts_with("Modified src/main.rs"));
         assert!(result.contains("Modified: src/main.rs"));
         assert!(result.contains("\n\n"));
-    }
-
-    #[test]
-    fn test_todo_context_task_text_with_files() {
-        let tmp = tempfile::tempdir().unwrap();
-        std::fs::write(
-            tmp.path().join("todo.md"),
-            "- [ ] Real work to do\n  - criteria 1\n  - criteria 2\n",
-        )
-        .unwrap();
-        let diff_names = "Modified: src/work.rs";
-        let result = todo_context_message(tmp.path(), diff_names);
-        // Subject has close(todo): prefix
-        assert!(result.starts_with("close(todo): Real work to do"));
-
-        // Body contains sub-items under Acceptance criteria header
-        assert!(result.contains("Acceptance criteria:"));
-        assert!(result.contains("- criteria 1"));
-        assert!(result.contains("- criteria 2"));
-
-        // Body contains file list
-        assert!(result.contains("1 file changed:"));
-        assert!(result.contains("src/work.rs"));
     }
 }
