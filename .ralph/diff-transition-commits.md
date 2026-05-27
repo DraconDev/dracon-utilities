@@ -7,8 +7,8 @@ Rewrite `todo_context_message` to scan git diff for task state transitions (`[ ]
 4. Body: `Task transitions:` block when transitions found, else just file list
 
 ## Checklist
-- [ ] Write `scan_diff_for_transitions(repo)` function
-- [ ] Rewrite `todo_context_message` to use transitions
-- [ ] Update tests (task transitions, no transitions, mixed, fallback)
-- [ ] All 479+ tests pass
-- [ ] Install binary, test in production
+- [x] Write `scan_diff_for_transitions(repo)` function
+- [x] Rewrite `todo_context_message` to use transitions
+- [x] Update tests (task transitions, no transitions, mixed, fallback)
+- [x] All 479+ tests pass
+- [x] Install binary, test in production
