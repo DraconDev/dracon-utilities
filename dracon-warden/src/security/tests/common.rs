@@ -58,6 +58,7 @@ impl EnvRestorer {
     }
 }
 
+#[allow(dead_code)]
 impl Drop for EnvRestorer {
     fn drop(&mut self) {
         std::env::remove_var(&self.key);
