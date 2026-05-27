@@ -1,3 +1,3 @@
-- [ ] Add rate limiting middleware using Redis
+- [x] Add rate limiting middleware using Redis
   - Verify 429 response after 5 requests
   - Verify Redis fallback on cache miss
