@@ -1,6 +1,10 @@
 # TODO
 
 ## Active Work
+- [ ] Test enhanced commit message format with sub-items and close(todo): prefix
+  - Verify close(todo): prefix appears in subject
+  - Verify acceptance criteria appear in body
+  - Verify file list appears in body with counts
 
 - [x] Test deterministic commit message format with task text as subject
   - Verify the daemon uses todo.md task text instead of `sync: N checked`
