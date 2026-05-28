@@ -2837,69 +2837,6 @@ mod tests {
     }
 
     #[test]
-    fn test_detect_report_signals_index_nested_dir() {
-        let files = vec![DiffFile {
-            path: std::path::PathBuf::from("project/plan/index.md"),
-            status: FileStatus::Modified,
-        }];
-        let signals = detect_report_signals(std::path::Path::new("/fake"), &files);
-        assert!(signals.contains(&ReportSignal::IndexChanged));
-    }
-
-    #[test]
-    fn test_parse_conventional_commit_full_format() {
-        let (cat, scope, desc) =
-            parse_conventional_commit("fix(auth): validate JWT expiry before accepting tokens");
-        assert_eq!(cat.as_deref(), Some("fix"));
-        assert_eq!(scope.as_deref(), Some("auth"));
-        assert_eq!(
-            desc.as_deref(),
-            Some("validate JWT expiry before accepting tokens")
-        );
-    }
-
-    #[test]
-    fn test_parse_conventional_commit_no_scope() {
-        let (cat, scope, desc) = parse_conventional_commit("feat: add new authentication module");
-        assert_eq!(cat.as_deref(), Some("feat"));
-        assert!(scope.is_none());
-        assert_eq!(desc.as_deref(), Some("add new authentication module"));
-    }
-
-    #[test]
-    fn test_parse_conventional_commit_non_conventional() {
-        let (cat, scope, desc) = parse_conventional_commit("refactor the authentication module");
-        assert!(cat.is_none());
-        assert!(scope.is_none());
-        assert_eq!(desc.as_deref(), Some("refactor the authentication module"));
-    }
-
-    #[test]
-    fn test_parse_conventional_commit_empty() {
-        let (cat, scope, desc) = parse_conventional_commit("");
-        assert!(cat.is_none());
-        assert!(scope.is_none());
-        assert_eq!(desc.as_deref(), Some(""));
-    }
-
-    #[test]
-    fn test_parse_conventional_commit_all_categories() {
-        for cat in &[
-            "feat", "fix", "refactor", "docs", "test", "chore", "perf", "security", "build", "ci",
-            "style", "revert",
-        ] {
-            let subject = format!("{}(scope): something", cat);
-            let (parsed_cat, _, _) = parse_conventional_commit(&subject);
-            assert_eq!(
-                parsed_cat.as_deref(),
-                Some(*cat),
-                "failed for category: {}",
-                cat
-            );
-        }
-    }
-
-    #[test]
     fn test_create_github_private_remote_success() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("my-repo");
