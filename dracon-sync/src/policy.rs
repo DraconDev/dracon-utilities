@@ -899,11 +899,13 @@ fn check_toml_field_ordering(content: &str, result: &mut ValidateResult) {
                         && !key.starts_with('\'')
                         && !key.is_empty()
                         && !key.contains('{')
+                        && !key.contains('.')
                     {
                         result.warn(format!(
-                            "field '{}' appears after a section header -- fields must be \
-                             defined before any [section] or [[remotes]] block or they may \
-                             be silently ignored by the TOML parser",
+                            "field '{}' appears after a section header -- top-level fields \
+                             must be defined before any [section] or [[remotes]] block or \
+                             they will be silently ignored by the TOML parser (they become \
+                             table fields instead)",
                             key
                         ));
                     }
