@@ -1694,7 +1694,7 @@ url = "git@github.com:foo/bar.git"
     }
 
     #[test]
-    fn test_validate_toml_field_ordering_ok_on_sequential_fields() {
+    fn test_validate_toml_field_ordering_ok_with_all_fields_before_sections() {
         use crate::policy::ValidateResult;
         let toml = r#"
 pulse_interval_secs = 1
@@ -1702,6 +1702,9 @@ standard_files_auto = true
 
 [sync]
 auto_pull = true
+
+[remote "origin"]
+url = "git@github.com:foo/bar.git"
 "#;
         let content = toml;
         let mut result = ValidateResult::default();
