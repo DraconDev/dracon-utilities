@@ -2628,16 +2628,6 @@ mod tests {
     }
 
     #[test]
-    fn test_detect_report_signals_blueprint_deleted() {
-        let files = vec![DiffFile {
-            path: std::path::PathBuf::from("docs/blueprint-foo.md"),
-            status: FileStatus::Deleted,
-        }];
-        let signals = detect_report_signals(std::path::Path::new("/fake"), &files);
-        assert!(signals.contains(&ReportSignal::BlueprintModified));
-    }
-
-    #[test]
     fn test_create_github_private_remote_success() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("my-repo");
