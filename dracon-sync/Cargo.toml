@@ -24,6 +24,6 @@ tempfile = "3"
 proptest = "1"
 
 [features]
-default = ["scribe", "ai-bumper"]
+default = ["ai-bumper"]
 scribe = []
 ai-bumper = []
