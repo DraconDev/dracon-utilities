@@ -1006,14 +1006,6 @@ async fn stage_commit_and_push(
         .map(|(path, status)| dracon_git::types::DiffFile { path, status })
         .collect();
 
-    let staged_diff_names = committed_entries
-        .iter()
-        .map(|e| format!("{:?}: {}", e.status, e.path.display()))
-        .collect::<Vec<_>>()
-        .join("\n");
-
-    let local_fallback = crate::scribe::local_fallback_message(&staged_diff_names);
-
     let version_bumped = false;
 
     if committed_entries.is_empty() {
@@ -1044,7 +1036,7 @@ async fn stage_commit_and_push(
         idle_seconds,
         None,
         None,
-        Some(&local_fallback),
+        None,
     );
 
     let msg = build_commit_message(&commit_ctx);
