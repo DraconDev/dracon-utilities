@@ -12,9 +12,7 @@ mod nix;
 mod policy;
 mod release;
 mod report;
-mod scribe;
 mod secrets;
-mod simple_ai;
 mod standard_files;
 mod sync;
 mod test_helpers;
@@ -137,12 +135,6 @@ enum Command {
         /// Preview what would be done without making any changes.
         #[arg(long)]
         dry_run: bool,
-    },
-    /// Test AI providers connectivity.
-    TestAi {
-        /// Emit machine-readable JSON.
-        #[arg(long)]
-        json: bool,
     },
 }
 

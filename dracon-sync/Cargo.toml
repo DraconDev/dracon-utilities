@@ -25,5 +25,3 @@ proptest = "1"
 
 [features]
 default = []
-scribe = []
-ai-bumper = []
