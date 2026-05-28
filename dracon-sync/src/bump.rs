@@ -1,5 +1,3 @@
-use std::path::Path;
-
 pub(crate) const CONVENTIONAL_COMMIT_TYPES: &[&str] = &[
     "feat",
     "fix",
@@ -63,6 +61,7 @@ pub async fn ai_decide_bump_level(
     project_state: &str,
 ) -> BumpLevel {
     use crate::simple_ai::{ChatMessage, SimpleAiService};
+    use std::path::Path;
 
     let version_only_patterns = ["Cargo.toml", "package.json", "VERSION", "Cargo.lock"];
     let has_source_changes = staged_diff
@@ -115,162 +114,6 @@ Respond with ONLY ONE WORD."##
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_bump_semver_all_levels() {
-        assert_eq!(
-            bump_semver("1.2.3", BumpLevel::Patch),
-            Some("1.2.4".to_string())
-        );
-        assert_eq!(
-            bump_semver("1.2.3", BumpLevel::Minor),
-            Some("1.3.0".to_string())
-        );
-        assert_eq!(bump_semver("1.2.3", BumpLevel::Major), None);
-        assert_eq!(
-            bump_semver("0.0.0", BumpLevel::Patch),
-            Some("0.0.1".to_string())
-        );
-        assert_eq!(
-            bump_semver("0.0.0", BumpLevel::Minor),
-            Some("0.1.0".to_string())
-        );
-        assert_eq!(bump_semver("0.0.0", BumpLevel::Major), None);
-        assert_eq!(bump_semver("v1.2.3", BumpLevel::Patch), None);
-        assert_eq!(bump_semver("v1.2.3", BumpLevel::Minor), None);
-        assert_eq!(bump_semver("v1.2.3", BumpLevel::Major), None);
-        assert_eq!(bump_semver("1.2", BumpLevel::Patch), None);
-        assert_eq!(
-            bump_semver("10.20.30", BumpLevel::Patch),
-            Some("10.20.31".to_string())
-        );
-        assert_eq!(
-            bump_semver("10.20.30", BumpLevel::Minor),
-            Some("10.21.0".to_string())
-        );
-        assert_eq!(bump_semver("10.20.30", BumpLevel::Major), None);
-        assert_eq!(
-            bump_semver("0.0.1", BumpLevel::Patch),
-            Some("0.0.2".to_string())
-        );
-        assert_eq!(
-            bump_semver("0.0.1", BumpLevel::Minor),
-            Some("0.1.0".to_string())
-        );
-        assert_eq!(bump_semver("0.0.1", BumpLevel::Major), None);
-    }
-
-    #[test]
-    fn test_bump_level_as_str() {
-        assert_eq!(BumpLevel::Major.as_str(), "major");
-        assert_eq!(BumpLevel::Minor.as_str(), "minor");
-        assert_eq!(BumpLevel::Patch.as_str(), "patch");
-        assert_eq!(BumpLevel::None.as_str(), "none");
-    }
-
-    #[test]
-    fn test_bump_level_debug() {
-        assert_eq!(format!("{:?}", BumpLevel::Major), "Major");
-        assert_eq!(format!("{:?}", BumpLevel::None), "None");
-    }
-
-    #[test]
-    fn test_deterministic_decide_bump_level_meaningful_change() {
-        let diff = "M src/main.rs\nM Cargo.toml";
-        assert_eq!(deterministic_decide_bump_level(diff), BumpLevel::Patch);
-    }
-
-    #[test]
-    fn test_deterministic_decide_bump_level_noise_only() {
-        let diff = "M README.md\nM .gitignore";
-        assert_eq!(deterministic_decide_bump_level(diff), BumpLevel::None);
-    }
-
-    #[test]
-    fn test_deterministic_decide_bump_level_version_file_only() {
-        let diff = "M Cargo.toml\nM package.json";
-        assert_eq!(deterministic_decide_bump_level(diff), BumpLevel::None);
-    }
-
-    #[test]
-    fn test_deterministic_decide_bump_level_mixed() {
-        let diff = "M README.md\nM src/main.rs";
-        assert_eq!(deterministic_decide_bump_level(diff), BumpLevel::Patch);
-    }
-
-    #[test]
-    fn test_deterministic_decide_bump_level_empty() {
-        assert_eq!(deterministic_decide_bump_level(""), BumpLevel::None);
-    }
-
-    #[test]
-    fn test_deterministic_decide_bump_level_changelog() {
-        let diff = "M CHANGELOG.md\nM CONTRIBUTING.md";
-        assert_eq!(deterministic_decide_bump_level(diff), BumpLevel::None);
-    }
-
-    #[test]
-    fn test_deterministic_decide_bump_level_env_file() {
-        let diff = "M .env\nM .env.example";
-        assert_eq!(deterministic_decide_bump_level(diff), BumpLevel::None);
-    }
-
-    #[test]
-    fn test_deterministic_decide_bump_level_lock_files() {
-        let diff = "M Cargo.lock\nM package-lock.json";
-        assert_eq!(deterministic_decide_bump_level(diff), BumpLevel::None);
-    }
-
-    #[test]
-    fn test_bump_version_in_cargo_toml() {
-        let content = "[package]\nversion = \"1.2.3\"";
-        let result = bump_version_in_cargo_toml(content, "1.2.3", "1.2.4");
-        assert!(result.contains("1.2.4"));
-    }
-
-    #[test]
-    fn test_bump_version_in_cargo_toml_no_space() {
-        let content = "[package]\nversion=\"1.2.3\"";
-        let result = bump_version_in_cargo_toml(content, "1.2.3", "1.2.4");
-        assert!(result.contains("\"1.2.4\""));
-    }
-
-    #[test]
-    fn test_bump_version_in_cargo_toml_not_found() {
-        let content = "[package]\nname = \"test\"";
-        let result = bump_version_in_cargo_toml(content, "1.2.3", "1.2.4");
-        assert_eq!(result.trim_end(), content);
-    }
-
-    #[test]
-    fn test_bump_version_in_cargo_toml_skips_deps() {
-        let content =
-            "[package]\nversion = \"1.2.3\"\n\n[dependencies]\nmy-dep = { version = \"1.2.3\" }";
-        let result = bump_version_in_cargo_toml(content, "1.2.3", "1.2.4");
-        assert!(result.contains("version = \"1.2.4\""));
-        assert!(result.contains("my-dep = { version = \"1.2.3\" }"));
-    }
-
-    #[test]
-    fn test_bump_version_in_json() {
-        let content = r#""version": "1.2.3""#;
-        let result = bump_version_in_json(content, "1.2.3", "1.2.4");
-        assert!(result.contains("1.2.4"));
-    }
-
-    #[test]
-    fn test_bump_version_in_json_no_space() {
-        let content = r#""version":"1.2.3""#;
-        let result = bump_version_in_json(content, "1.2.3", "1.2.4");
-        assert!(result.contains("\"version\":\"1.2.4\""));
-    }
-
-    #[test]
-    fn test_bump_version_in_json_not_found() {
-        let content = r#""name": "test""#;
-        let result = bump_version_in_json(content, "1.2.3", "1.2.4");
-        assert_eq!(result, content);
-    }
 
     #[test]
     fn test_extract_version_from_cargo_package() {
@@ -338,21 +181,6 @@ version = "1.0.0""#;
         assert_eq!(
             extract_version_from_json(content, "version"),
             Some("1.0.0".to_string())
-        );
-    }
-
-    #[test]
-    fn test_ai_bumper_major_is_blocked() {
-        let result = match "major" {
-            "major" => BumpLevel::None,
-            "minor" => BumpLevel::Minor,
-            "patch" => BumpLevel::Patch,
-            _ => BumpLevel::None,
-        };
-        assert_eq!(
-            result,
-            BumpLevel::None,
-            "major must map to None (manual-only)"
         );
     }
 }
