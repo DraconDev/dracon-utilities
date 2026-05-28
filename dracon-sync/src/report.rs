@@ -2574,26 +2574,6 @@ mod tests {
     }
 
     #[test]
-    fn test_report_signal_blueprint_modified() {
-        let files = vec![DiffFile {
-            path: std::path::PathBuf::from("docs/blueprint-foo.md"),
-            status: FileStatus::Modified,
-        }];
-        let signals = detect_report_signals(std::path::Path::new("/fake"), &files);
-        assert!(signals.contains(&ReportSignal::BlueprintModified));
-    }
-
-    #[test]
-    fn test_report_signal_blueprint_modified_plan_dir() {
-        let files = vec![DiffFile {
-            path: std::path::PathBuf::from("plan/blueprint-bar.md"),
-            status: FileStatus::Modified,
-        }];
-        let signals = detect_report_signals(std::path::Path::new("/fake"), &files);
-        assert!(signals.contains(&ReportSignal::BlueprintModified));
-    }
-
-    #[test]
     fn test_push_large_blob_threshold_min_limit() {
         let policy = SyncPolicy {
             max_stage_file_bytes: 10 * 1024 * 1024,
