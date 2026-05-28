@@ -973,6 +973,37 @@ async fn push_with_blob_check(ctx: &mut SyncContext<'_>, ahead: usize) -> Result
     Ok(true)
 }
 
+/// Scan staged diff for task markers and return a progress summary if found.
+/// Recognizes `- [x]` (done), `- [~]` (in progress), `- [ ]` (pending) in diff content.
+async fn scan_staged_tasks(repo: &Path) -> Option<String> {
+    let output = run_git_with_timeout(repo, &["diff", "--cached", "--unified=0"], 10, "diff").await.ok()??;
+    let mut done = 0usize;
+    let mut in_progress = 0usize;
+    let mut pending = 0usize;
+    for line in output.lines() {
+        if !line.starts_with('+') || line.starts_with("+++") {
+            continue;
+        }
+        let content = line[1..].trim();
+        if content.starts_with("- [x]") || content.starts_with("- [X]") {
+            done += 1;
+        } else if content.starts_with("- [~]") {
+            in_progress += 1;
+        } else if content.starts_with("- [ ]") {
+            pending += 1;
+        }
+    }
+    let total = done + in_progress + pending;
+    if total == 0 {
+        return None;
+    }
+    Some(if in_progress > 0 {
+        format!("{}/{} done ({} in progress)", done, total, in_progress)
+    } else {
+        format!("{}/{} done", done, total)
+    })
+}
+
 async fn stage_commit_and_push(
     svc: &GitService,
     ctx: &mut SyncContext<'_>,
