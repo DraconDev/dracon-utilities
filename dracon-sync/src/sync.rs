@@ -6,7 +6,7 @@ use std::time::Duration;
 use crate::log_warn;
 
 use anyhow::Result;
-use dracon_git::{build_commit_message, GitService};
+use dracon_git::GitService;
 
 use crate::exclude::{
     can_restore_entry, handle_large_untracked, is_large_untracked, remove_tracked_excluded_paths,
@@ -21,7 +21,7 @@ use crate::git::{
     run_git_capture_output, run_git_with_timeout, unstage_excluded_paths, unstage_oversized_paths,
 };
 use crate::policy::{debug_enabled, load_repo_override, SyncPolicy};
-use crate::report::{build_commit_context, detect_report_signals, push_large_blob_threshold_bytes};
+use crate::report::push_large_blob_threshold_bytes;
 use crate::visibility::{
     get_github_visibility, parse_github_owner_repo, sync_mirror_metadata, sync_mirror_visibility,
 };
@@ -1068,7 +1068,7 @@ fn compute_blast_radius(repo: &Path) -> String {
 async fn stage_commit_and_push(
     svc: &GitService,
     ctx: &mut SyncContext<'_>,
-    status: &dracon_git::types::RepoStatus,
+    _status: &dracon_git::types::RepoStatus,
     to_stage: &[dracon_git::types::DiffFile],
     to_restore: &[dracon_git::types::DiffFile],
 ) -> Result<Option<SyncOutcome>> {
@@ -1076,7 +1076,7 @@ async fn stage_commit_and_push(
     let policy = ctx.policy;
     let dry_run = ctx.dry_run;
     let has_origin = ctx.has_origin;
-    let idle_seconds = ctx.idle_seconds;
+    let _idle_seconds = ctx.idle_seconds;
 
     let stage_paths: Vec<String> = to_stage
         .iter()

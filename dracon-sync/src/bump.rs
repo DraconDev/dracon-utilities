@@ -1,19 +1,3 @@
-pub(crate) const CONVENTIONAL_COMMIT_TYPES: &[&str] = &[
-    "feat",
-    "fix",
-    "docs",
-    "style",
-    "refactor",
-    "perf",
-    "test",
-    "build",
-    "ci",
-    "chore",
-    "revert",
-    "improvement",
-    "security",
-];
-
 pub(crate) fn extract_version_from_cargo(content: &str) -> Option<String> {
     let mut section = String::new();
     for line in content.lines() {
