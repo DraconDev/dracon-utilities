@@ -1701,12 +1701,7 @@ url = "git@github.com:foo/bar.git"
         let toml = r#"
 pulse_interval_secs = 1
 standard_files_auto = true
-
-[sync]
-auto_pull = true
-
-[remote "origin"]
-url = "git@github.com:foo/bar.git"
+auto_github_private = false
 "#;
         let content = toml;
         let mut result = ValidateResult::default();
