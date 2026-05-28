@@ -717,88 +717,6 @@ async fn git_rm_missing(repo: &Path, missing: &[String], dry_run: bool) -> Resul
     Ok(())
 }
 
-async fn stage_version_files(repo: &Path) {
-    for file in crate::bump::VERSION_FILES {
-        if repo.join(file).exists() {
-            if let Err(e) = run_git_with_timeout(repo, &["add", file], 30, "add").await {
-                eprintln!("⚠️ failed to stage {}: {}", file, e);
-            }
-        }
-    }
-}
-
-async fn run_ai_bumper(
-    repo: &Path,
-    committed_entries: &[dracon_git::types::DiffFile],
-    dry_run: bool,
-    auto_bump_versions: bool,
-    version_bumped: bool,
-) -> bool {
-    if dry_run || !auto_bump_versions || version_bumped || !cfg!(feature = "ai-bumper") {
-        return false;
-    }
-    #[cfg(feature = "ai-bumper")]
-    {
-        use crate::bump::{ai_decide_bump_level, bump_semver, read_current_version, BumpLevel};
-
-        let staged_diff = committed_entries
-            .iter()
-            .map(|e| format!("{:?}: {}", e.status, e.path.display()))
-            .collect::<Vec<_>>()
-            .join("\n");
-        let project_state =
-            std::fs::read_to_string(repo.join(".dracon/project-state.md")).unwrap_or_default();
-
-        if let Some(current_ver) = read_current_version(repo) {
-            // Skip bump if this version already has a git tag (prevents infinite bump loop).
-            // The daemon tags every bump it creates, so a tag for the current version means
-            // this version was already released — don't bump it again.
-            let tag_name = format!("v{}", current_ver);
-            let repo_path = repo.to_path_buf();
-            let tag_n = tag_name.clone();
-            let tag_exists = tokio::task::spawn_blocking(move || -> bool {
-                std::process::Command::new("git")
-                    .args(["tag", "-l", &tag_n])
-                    .current_dir(&repo_path)
-                    .stdout(std::process::Stdio::piped())
-                    .stderr(std::process::Stdio::null())
-                    .output()
-                    .map(|o| !String::from_utf8_lossy(&o.stdout).trim().is_empty())
-                    .unwrap_or(false)
-            })
-            .await
-            .unwrap_or(false);
-            if tag_exists {
-                return false;
-            }
-
-            let level =
-                ai_decide_bump_level(repo, &current_ver, &staged_diff, &project_state).await;
-            // Defense-in-depth: ai_decide_bump_level maps "major" => BumpLevel::None,
-            // so this guard cannot trigger via the AI path today. It exists to catch
-            // BumpLevel::Major if a future code path or mapping change produces it.
-            if level == BumpLevel::Major {
-                eprintln!("🔒 major bump blocked (manual-only), skipping");
-                return false;
-            }
-            if level != BumpLevel::None {
-                eprintln!("🤖 ai-bump: {} -> {}", current_ver, level.as_str());
-                let new_ver = bump_semver(&current_ver, level);
-
-                if let Some(new_ver) = new_ver {
-                    let bumped =
-                        crate::bump::apply_version_bump_to_repo(repo, &current_ver, &new_ver);
-                    if bumped {
-                        return true;
-                    }
-                }
-            }
-        }
-    }
-    let _ = (repo, committed_entries, auto_bump_versions, version_bumped);
-    false
-}
-
 async fn post_commit_pull(svc: &GitService, repo: &Path, policy: &SyncPolicy) {
     if !policy.auto_pull {
         return;
@@ -1065,7 +983,6 @@ async fn stage_commit_and_push(
     let repo = ctx.repo;
     let policy = ctx.policy;
     let dry_run = ctx.dry_run;
-    let auto_bump_versions = ctx.auto_bump_versions;
     let has_origin = ctx.has_origin;
     let idle_seconds = ctx.idle_seconds;
 
