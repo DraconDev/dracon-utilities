@@ -1037,6 +1037,8 @@ async fn stage_commit_and_push(
         .map(|(path, status)| dracon_git::types::DiffFile { path, status })
         .collect();
 
+    let task_description = scan_staged_tasks(repo);
+
     let version_bumped = false;
 
     if committed_entries.is_empty() {
@@ -1067,7 +1069,7 @@ async fn stage_commit_and_push(
         idle_seconds,
         None,
         None,
-        None,
+        task_description.as_deref(),
     );
 
     let msg = build_commit_message(&commit_ctx);
