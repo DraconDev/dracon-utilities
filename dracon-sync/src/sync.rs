@@ -988,7 +988,11 @@ async fn push_with_blob_check(ctx: &mut SyncContext<'_>, ahead: usize) -> Result
     let blob_threshold = ctx.blob_threshold;
     let has_origin = ctx.has_origin;
     let dry_run = ctx.dry_run;
-    if !policy.auto_push || !has_origin || ahead == 0 {
+    // Push if: auto_push enabled, origin exists, AND either:
+    //   - there are unpushed commits (ahead > 0), OR
+    //   - the current branch has no upstream tracking (newly created branch)
+    let branch_has_upstream = super::git::has_tracking_upstream(repo);
+    if !policy.auto_push || !has_origin || (ahead == 0 && branch_has_upstream) {
         return Ok(true);
     }
 
