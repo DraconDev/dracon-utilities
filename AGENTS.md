@@ -247,7 +247,7 @@ gh auth refresh -h github.com -s delete_repo
 
 ### Incident Response
 
-When the safety guard triggers or other incidents occur, entries are written to the incident ledger:
+When incidents or warnings occur, entries are written to the incident ledger:
 
 ```bash
 # View recent incidents
@@ -256,15 +256,16 @@ cat ~/.local/state/dracon/dracon-sync-incidents.jsonl | tail -20
 
 Each line is a JSON object:
 ```json
-{"ts_unix":1714896000,"scope":"safety","repo":"/path/to/repo","reason":"3 files missing from working tree (100% of 3 tracked)","action":"mass_deletion_guard","backup_branch":null,"result":"blocked","details":"total_tracked=3 missing_count=3"}
+{"ts_unix":1714896000,"scope":"safety","repo":"/path/to/repo","reason":"description of what happened","action":"action_taken","backup_branch":null,"result":"result","details":"additional details"}
 ```
+
+Common `scope` values: `safety` (safety guard triggers), `repair` (auto-repair), `sync` (sync operations), `mirror` (mirror push failures).
 
 **After an incident:**
 1. Read the incident ledger to understand what happened
 2. Check the repo status: `git status` and `git log --oneline -5`
-3. If mass deletion was blocked, decide whether it was intentional
-4. For intentional deletions: manually commit with `git add -A && git commit -m 'delete files'`
-5. Review the safety guard code if the block was unexpected
+3. Take appropriate action based on the incident type
+4. For intentional destructive operations: use `git add -A && git commit -m 'delete files'` directly
 
 ### dracon-system Protected Paths
 
@@ -490,7 +491,7 @@ Commands:
   repair-warns     Repair warn repos [--apply] [--repo <path>] [--json]
   once             Run one sync pass
   daemon           Run continuous sync loop [--interval-secs override]
-  sync-now         Sync one or more repositories now [--dry-run] [--force] [repos...]
+  sync-now         Sync one or more repositories now [--dry-run] [repos...]
   pause            Pause sync (creates freeze marker)
   resume           Resume sync (removes freeze marker)
   edit-config      Open sync policy in the system editor
@@ -515,26 +516,17 @@ Commands:
 
 ### Safety Behaviors
 
-**dracon-sync mass-deletion prevention:** The sync daemon will refuse to auto-commit deletions that meet ANY of these tiered thresholds:
+**dracon-sync mass-deletion prevention:** The mass-deletion safety guard was **removed** in a prior change (IndexLock fixes the root cause — the clone race that could produce "Untracked working tree file would be overwritten by merge" errors during concurrent git operations). The metric `dracon_sync_mass_deletion_guard_blocked_total` is always `0`.
 
-| Threshold | Condition | Example |
-|-----------|-----------|--------|
-| **85%+** | `missing_count * 100 / total_tracked >= 85%` | 17 of 20 files deleted |
-| **70%+ with 5+ files** | `pct >= 70% AND missing_count >= 5` | 6 of 8 files deleted |
-| **10+ absolute** | `missing_count >= 10` regardless of percentage | 10 of 100 files deleted |
+The primary safety mechanism is now `IndexLock` (`.git/index.lock` coordination), which prevents sync/warden from writing working-tree files while git's checkout is in progress. Git's own revert capability serves as the safety net for any committed changes.
 
-When triggered, sync prints a warning and skips the commit:
-```
-⚠️ SAFETY: 22 files missing from working tree (78% of 28 tracked)
-⚠️ Refusing to stage mass deletion - this looks like a mistake or destructive operation
-⚠️ If you really want to delete these files, do: git add -A && git commit -m 'delete files'
-```
+**What the removed guard did:** The daemon used to compare `git ls-files` counts before/after and would refuse to stage a commit if ≥85% of tracked files were deleted, or ≥70% with 5+ files, or 10+ absolute. This logic is now gone.
 
-To bypass: manually stage and commit the deletions with `git add -A && git commit`.
+**Removing a large number of files intentionally:** Use `git add -A && git commit -m 'delete files'` directly — no daemon involvement needed.
 
-**Metrics:** A Prometheus counter `dracon_sync_mass_deletion_guard_blocked_total` is incremented each time the guard triggers. View it with `dracon-sync metrics`.
+**Note:** The `sync-now --force` flag is **ignored** in the current CLI (present for compatibility but non-functional after guard removal).
 
-**Force bypass:** For intentional total wipes, use `dracon-sync sync-now --force <repo>` to skip the safety guard entirely. Use with caution — this will auto-commit ALL deletions without prompting.
+**Metrics:** `dracon_sync_mass_deletion_guard_blocked_total` is always `0`. View it with `dracon-sync metrics`.
 
 **Incident response after a block:** Read the incident ledger at `~/.local/state/dracon/dracon-sync-incidents.jsonl` to understand what was blocked and why.
 
