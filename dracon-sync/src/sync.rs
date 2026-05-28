@@ -717,48 +717,6 @@ async fn git_rm_missing(repo: &Path, missing: &[String], dry_run: bool) -> Resul
     Ok(())
 }
 
-async fn get_staged_diff_content(repo: &Path) -> Option<String> {
-    let repo_stat = repo.to_path_buf();
-    let repo_patch = repo.to_path_buf();
-    let stat_result = tokio::task::spawn_blocking(move || {
-        std::process::Command::new("git")
-            .args(["diff", "--cached", "--stat"])
-            .current_dir(&repo_stat)
-            .output()
-    })
-    .await;
-    match stat_result {
-        Ok(Ok(o)) if o.status.success() => {
-            let stat = String::from_utf8_lossy(&o.stdout).to_string();
-            if stat.is_empty() {
-                None
-            } else {
-                let patch_result = tokio::task::spawn_blocking(move || {
-                    std::process::Command::new("git")
-                        .args(["diff", "--cached", "--unified=3", "--"])
-                        .current_dir(&repo_patch)
-                        .output()
-                })
-                .await;
-                let patch_text = match patch_result {
-                    Ok(Ok(o)) if o.status.success() => {
-                        let patch = String::from_utf8_lossy(&o.stdout).to_string();
-                        if patch.lines().count() > 200 {
-                            patch.lines().take(200).collect::<Vec<_>>().join("\n")
-                                + "\n... (truncated)"
-                        } else {
-                            patch
-                        }
-                    }
-                    _ => String::new(),
-                };
-                Some(format!("{}\n\n{}", stat, patch_text))
-            }
-        }
-        _ => None,
-    }
-}
-
 async fn stage_version_files(repo: &Path) {
     for file in crate::bump::VERSION_FILES {
         if repo.join(file).exists() {
@@ -1137,56 +1095,7 @@ async fn stage_commit_and_push(
         .collect::<Vec<_>>()
         .join("\n");
 
-    let staged_diff_content = get_staged_diff_content(repo).await;
-
-    // Noise detection is for version bumping only — does NOT block commit
-    // message selection. todo_context_message always produces the routing key
-    // format when todo_commit_messages is true.
-    let _noise_for_bump = crate::bump::deterministic_decide_bump_level(&staged_diff_names)
-        == crate::bump::BumpLevel::None;
-
-    // AI bumper is the sole version bump decider — determines patch vs minor vs none
     let mut version_bumped = false;
-    let ai_bumped = run_ai_bumper(
-        repo,
-        &committed_entries,
-        dry_run,
-        auto_bump_versions,
-        version_bumped,
-    )
-    .await;
-    if ai_bumped {
-        version_bumped = true;
-        stage_version_files(repo).await;
-    }
-
-    // Skip AI for large diffs (>20 files) only — noise files still deserve
-    // semantic commit messages. The 3-provider timeout (30s) would block
-    // the daemon's entire cycle on large diffs, so those use local_fallback.
-    let ai_subject = if staged_diff_names.len() <= 20 {
-        crate::scribe::generate_commit_message(repo, &staged_diff_names, staged_diff_content).await
-    } else {
-        None
-    };
-
-    let local_fallback = if ai_subject.is_none() {
-        if ctx.policy.todo_commit_messages {
-            Some(crate::scribe::todo_context_message(
-                repo,
-                &staged_diff_names,
-            ))
-        } else {
-            Some(crate::scribe::local_fallback_message(&staged_diff_names))
-        }
-    } else {
-        None
-    };
-
-    let staged = git_name_status_entries(repo, &["diff", "--cached", "--name-status"]).await?;
-    let committed_entries: Vec<dracon_git::types::DiffFile> = staged
-        .into_iter()
-        .map(|(path, status)| dracon_git::types::DiffFile { path, status })
-        .collect();
 
     if committed_entries.is_empty() {
         if let Err(e) = run_git_with_timeout(repo, &["reset", "HEAD", "--"], 10, "reset").await {
@@ -1215,33 +1124,11 @@ async fn stage_commit_and_push(
         !is_report,
         idle_seconds,
         None,
-        ai_subject.as_deref(),
-        local_fallback.as_deref(),
+        None,
+        None,
     );
 
-    let msg = if let Some(ref ai_sub) = ai_subject {
-        let has_conventional_prefix = crate::bump::CONVENTIONAL_COMMIT_TYPES.iter().any(|t| {
-            ai_sub.starts_with(&format!("{}:", t)) || ai_sub.starts_with(&format!("{}(", t))
-        }) || ai_sub.starts_with("Revert \"");
-        if has_conventional_prefix {
-            ai_sub.clone()
-        } else {
-            let category = commit_ctx.category.as_deref().unwrap_or("chore");
-            let scope = commit_ctx.scope.as_deref().unwrap_or("sync");
-            format!("{}({}): {}", category, scope, ai_sub)
-        }
-    } else if ctx.policy.todo_commit_messages {
-        // todo_context_message returns "task text\n\nfiles..."
-        // First line is the subject (task text), rest is the body
-        // Use as-is -- do NOT wrap with category(scope): prefix
-        local_fallback.unwrap_or_else(|| build_commit_message(&commit_ctx))
-    } else if let Some(ref fb) = local_fallback {
-        let category = commit_ctx.category.as_deref().unwrap_or("chore");
-        let scope = commit_ctx.scope.as_deref().unwrap_or("sync");
-        format!("{}({}): {}", category, scope, fb)
-    } else {
-        build_commit_message(&commit_ctx)
-    };
+    let msg = build_commit_message(&commit_ctx);
 
     if dry_run {
         println!(
