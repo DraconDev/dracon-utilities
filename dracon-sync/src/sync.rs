@@ -973,33 +973,96 @@ async fn push_with_blob_check(ctx: &mut SyncContext<'_>, ahead: usize) -> Result
     Ok(true)
 }
 
-/// Scan staged diff for task markers and return a progress summary if found.
+/// Scan staged diff for task markers and return INTENT domain if found.
 /// Only recognizes `- [x]` (done/closure) and `- [~]` (in progress).
 /// Ignores `- [ ]` (pending) — those are just noise, might never be worked on.
+/// Returns formatted INTENT: "CLOSED: [task1], [task2]" or "WIP: [task1]"
 fn scan_staged_tasks(repo: &Path) -> Option<String> {
     let output = run_git_capture_output(repo, &["diff", "--cached", "--unified=0"], "diff").ok()?;
-    let mut done = 0usize;
-    let mut in_progress = 0usize;
+    let mut closed_tasks: Vec<String> = Vec::new();
+    let mut wip_tasks: Vec<String> = Vec::new();
     for line in output.lines() {
         if !line.starts_with('+') || line.starts_with("+++") {
             continue;
         }
         let content = line[1..].trim();
         if content.starts_with("- [x]") || content.starts_with("- [X]") {
-            done += 1;
+            let task_text = content[5..].trim();
+            if !task_text.is_empty() {
+                closed_tasks.push(task_text.to_string());
+            }
         } else if content.starts_with("- [~]") {
-            in_progress += 1;
+            let task_text = content[5..].trim();
+            if !task_text.is_empty() {
+                wip_tasks.push(task_text.to_string());
+            }
         }
     }
-    if done == 0 && in_progress == 0 {
+    if closed_tasks.is_empty() && wip_tasks.is_empty() {
         return None;
     }
-    Some(match (done > 0, in_progress > 0) {
-        (true, true) => format!("{} done, {} in progress", done, in_progress),
-        (true, false) => format!("{} done", done),
-        (false, true) => format!("{} in progress", in_progress),
-        _ => unreachable!(),
-    })
+    // Sanitize: strip brackets and pipes to prevent breaking regex delimiters
+    let sanitize = |s: &str| {
+        s.replace('[', "").replace(']', "").replace('|', "/")
+    };
+    let mut parts = Vec::new();
+    if !closed_tasks.is_empty() {
+        let tasks: Vec<String> = closed_tasks.iter().map(|t| sanitize(t)).collect();
+        parts.push(format!("CLOSED: [{}]", tasks.join("], [")));
+    }
+    if !wip_tasks.is_empty() {
+        let tasks: Vec<String> = wip_tasks.iter().map(|t| sanitize(t)).collect();
+        parts.push(format!("WIP: [{}]", tasks.join("], [")));
+    }
+    Some(parts.join(" | "))
+}
+
+/// Compute BLAST RADIUS from staged diff.
+/// Returns formatted string: "FILES:X DIRS:Y DELTA:+A/-B"
+fn compute_blast_radius(repo: &Path) -> String {
+    let output = match run_git_capture_output(repo, &["diff", "--cached", "--numstat"], "numstat") {
+        Ok(o) => o,
+        Err(_) => return "FILES:0 DIRS:none DELTA:+0/-0".to_string(),
+    };
+
+    let mut files = 0usize;
+    let mut added = 0i64;
+    let mut removed = 0i64;
+    let mut dirs: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+
+    for line in output.lines() {
+        let parts: Vec<&str> = line.split('\t').collect();
+        if parts.len() < 3 {
+            continue;
+        }
+        let a = parts[0].parse::<i64>().unwrap_or(0);
+        let r = parts[1].parse::<i64>().unwrap_or(0);
+        let path = parts[2];
+
+        // Binary files show as "-" in numstat
+        if parts[0] != "-" {
+            added += a;
+        }
+        if parts[1] != "-" {
+            removed += r;
+        }
+        files += 1;
+
+        // Extract top-level directory
+        if let Some(first_component) = path.split('/').next() {
+            if !first_component.is_empty() && first_component != "." {
+                dirs.insert(first_component.to_string());
+            }
+        }
+    }
+
+    let dirs_str = if dirs.is_empty() {
+        "root".to_string()
+    } else {
+        dirs.iter().take(3).cloned().collect::<Vec<_>>().join(",")
+    };
+
+    format!("FILES:{} DIRS:{} DELTA:+{}/-{}", files, dirs_str, added, removed)
 }
 
 async fn stage_commit_and_push(
@@ -1036,6 +1099,7 @@ async fn stage_commit_and_push(
         .collect();
 
     let task_description = scan_staged_tasks(repo);
+    let blast_radius = compute_blast_radius(repo);
 
     let version_bumped = false;
 
@@ -1055,6 +1119,12 @@ async fn stage_commit_and_push(
         maybe_sync_visibility_and_metadata(ctx);
         return Ok(Some(SyncOutcome::NothingToDo));
     }
+
+    // Build routing key: [INTENT] | [BLAST RADIUS]
+    let msg = match task_description {
+        Some(ref intent) => format!("{} | {}", intent, blast_radius),
+        None => blast_radius.clone(),
+    };
 
     let signals = detect_report_signals(repo, &committed_entries);
     let is_report = !signals.is_empty();
