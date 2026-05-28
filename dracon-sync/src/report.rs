@@ -1,9 +1,5 @@
 use anyhow::Result;
-use dracon_git::{
-    extract_intent,
-    types::{DiffFile, RepoStatus},
-    CommitContext, GitService,
-};
+use dracon_git::GitService;
 use serde::Serialize;
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
@@ -260,115 +256,6 @@ impl IncidentRecord {
             details,
         }
     }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub(crate) enum ReportSignal {
-    ActiveBoardChanged,
-    IndexChanged,
-    BlueprintCreated,
-    BlueprintModified,
-}
-
-pub(crate) fn detect_report_signals(_repo: &Path, changed_files: &[DiffFile]) -> Vec<ReportSignal> {
-    let mut signals = Vec::new();
-
-    for file in changed_files {
-        let path_str = file.path.to_string_lossy();
-
-        if path_str == "plan/ACTIVE_BOARD.md" || path_str.ends_with("/ACTIVE_BOARD.md") {
-            signals.push(ReportSignal::ActiveBoardChanged);
-        }
-
-        if path_str == "plan/index.md" || path_str.ends_with("/index.md") {
-            signals.push(ReportSignal::IndexChanged);
-        }
-
-        if path_str.contains("blueprint-") && path_str.ends_with(".md") {
-            if file.status == dracon_git::types::FileStatus::Added {
-                signals.push(ReportSignal::BlueprintCreated);
-            } else {
-                signals.push(ReportSignal::BlueprintModified);
-            }
-        }
-    }
-
-    signals
-}
-
-pub(crate) fn build_commit_context(
-    repo: &Path,
-    status: &RepoStatus,
-    entries: &[DiffFile],
-    is_checkpoint: bool,
-    idle_seconds: u64,
-    _last_commit_subject: Option<&str>,
-    ai_subject: Option<&str>,
-    local_fallback: Option<&str>,
-) -> CommitContext {
-    let changed_paths: Vec<PathBuf> = entries.iter().map(|e| e.path.clone()).collect();
-    let intent_info = extract_intent(repo, &changed_paths, Some(&status.branch));
-
-    let refs = intent_info.blueprint.as_ref().map(|p| {
-        let rel = p.strip_prefix(repo).unwrap_or(p);
-        rel.to_string_lossy().to_string()
-    });
-
-    let (category, scope, description) = match ai_subject {
-        Some(subject) => parse_conventional_commit(subject),
-        None => match local_fallback {
-            Some(fallback) => (None, None, Some(fallback.to_string())),
-            None => (None, None, None),
-        },
-    };
-
-    CommitContext {
-        intent: intent_info.intent,
-        track: intent_info.track,
-        is_checkpoint,
-        files: entries.to_vec(),
-        task_progress: intent_info.task_progress,
-        refs,
-        idle_seconds,
-        category,
-        scope,
-        severity: None,
-        description,
-        semantic_summary: None,
-    }
-}
-
-fn parse_conventional_commit(subject: &str) -> (Option<String>, Option<String>, Option<String>) {
-    let valid_categories = crate::bump::CONVENTIONAL_COMMIT_TYPES;
-
-    if let Some(paren_start) = subject.find('(') {
-        if let Some(paren_end) = subject[paren_start..].find(')') {
-            let prefix = &subject[..paren_start];
-            let scope_text = &subject[paren_start + 1..paren_start + paren_end];
-            let after_paren = &subject[paren_start + paren_end + 1..];
-            let desc = after_paren.trim_start_matches([' ', ':', '-']).trim();
-
-            if valid_categories.contains(&prefix) && !scope_text.is_empty() && !desc.is_empty() {
-                return (
-                    Some(prefix.to_string()),
-                    Some(scope_text.to_string()),
-                    Some(desc.to_string()),
-                );
-            }
-        }
-    }
-
-    if let Some(colon_pos) = subject.find(": ") {
-        let prefix = &subject[..colon_pos];
-        if valid_categories.contains(&prefix) {
-            let desc = subject[colon_pos + 2..].trim().to_string();
-            if !desc.is_empty() {
-                return (Some(prefix.to_string()), None, Some(desc));
-            }
-        }
-    }
-
-    (None, None, Some(subject.to_string()))
 }
 
 pub(crate) fn incident_ledger_path(_policy_path: &Path) -> PathBuf {
