@@ -1126,22 +1126,6 @@ async fn stage_commit_and_push(
         None => blast_radius.clone(),
     };
 
-    let signals = detect_report_signals(repo, &committed_entries);
-    let is_report = !signals.is_empty();
-
-    let commit_ctx = build_commit_context(
-        repo,
-        status,
-        &committed_entries,
-        !is_report,
-        idle_seconds,
-        None,
-        None,
-        task_description.as_deref(),
-    );
-
-    let msg = build_commit_message(&commit_ctx);
-
     if dry_run {
         println!(
             "📝 Would commit {} file(s) in {}:",
