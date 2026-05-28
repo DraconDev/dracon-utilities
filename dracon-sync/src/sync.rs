@@ -1411,11 +1411,18 @@ pub(crate) async fn sync_repo(
 
     clean_staged_paths(&ctx).await?;
 
-    let DiffResult {
-        status,
-        entries,
-        filter_only_cleared: _,
-    } = compute_diff_entries(&svc, repo).await?;
+    // filter_only_cleared: changes present but all filtered out by clean/smudge.
+    // Don't stage/commit — apply a cooldown and skip.
+    if filter_only_cleared {
+        let cooldown_secs = policy.inactivity_push_delay_secs.max(5);
+        eprintln!(
+            "🐛 {} filter-only dirty, cooldown {}s",
+            repo.display(),
+            cooldown_secs
+        );
+        // Note: cooldown is applied by the caller (daemon loop). We just skip staging.
+        return Ok(SyncOutcome::NothingToDo);
+    }
 
     if !status.is_clean && policy.auto_commit {
         let (to_stage, to_restore): (Vec<_>, Vec<_>) = entries
