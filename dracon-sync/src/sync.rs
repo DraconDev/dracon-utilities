@@ -1142,7 +1142,7 @@ async fn stage_commit_and_push(
     // Noise detection is for version bumping only — does NOT block commit
     // message selection. todo_context_message always produces the routing key
     // format when todo_commit_messages is true.
-    let noise_for_bump = crate::bump::deterministic_decide_bump_level(&staged_diff_names)
+    let _noise_for_bump = crate::bump::deterministic_decide_bump_level(&staged_diff_names)
         == crate::bump::BumpLevel::None;
 
     // AI bumper is the sole version bump decider — determines patch vs minor vs none
