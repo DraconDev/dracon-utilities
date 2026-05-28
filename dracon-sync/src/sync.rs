@@ -1006,13 +1006,7 @@ async fn stage_commit_and_push(
         .map(|(path, status)| dracon_git::types::DiffFile { path, status })
         .collect();
 
-    let staged_diff_names = committed_entries
-        .iter()
-        .map(|e| format!("{:?}: {}", e.status, e.path.display()))
-        .collect::<Vec<_>>()
-        .join("\n");
-
-    let mut version_bumped = false;
+    let version_bumped = false;
 
     if committed_entries.is_empty() {
         if let Err(e) = run_git_with_timeout(repo, &["reset", "HEAD", "--"], 10, "reset").await {

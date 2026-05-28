@@ -1,4 +1,3 @@
-use crate::simple_ai::{ChatMessage, SimpleAiService};
 use std::path::Path;
 
 /// Build the **system** prompt — authoritative instructions the AI should follow.
