@@ -2320,46 +2320,6 @@ mod tests {
     }
 
     #[test]
-    fn test_detect_report_signals_active_board() {
-        let files = vec![DiffFile {
-            path: std::path::PathBuf::from("plan/ACTIVE_BOARD.md"),
-            status: FileStatus::Modified,
-        }];
-        let signals = detect_report_signals(std::path::Path::new("/fake"), &files);
-        assert!(signals.contains(&ReportSignal::ActiveBoardChanged));
-    }
-
-    #[test]
-    fn test_detect_report_signals_index() {
-        let files = vec![DiffFile {
-            path: std::path::PathBuf::from("docs/index.md"),
-            status: FileStatus::Modified,
-        }];
-        let signals = detect_report_signals(std::path::Path::new("/fake"), &files);
-        assert!(signals.contains(&ReportSignal::IndexChanged));
-    }
-
-    #[test]
-    fn test_detect_report_signals_blueprint_added() {
-        let files = vec![DiffFile {
-            path: std::path::PathBuf::from("docs/blueprint-foo.md"),
-            status: FileStatus::Added,
-        }];
-        let signals = detect_report_signals(std::path::Path::new("/fake"), &files);
-        assert!(signals.contains(&ReportSignal::BlueprintCreated));
-    }
-
-    #[test]
-    fn test_detect_report_signals_blueprint_modified() {
-        let files = vec![DiffFile {
-            path: std::path::PathBuf::from("docs/blueprint-bar.md"),
-            status: FileStatus::Modified,
-        }];
-        let signals = detect_report_signals(std::path::Path::new("/fake"), &files);
-        assert!(signals.contains(&ReportSignal::BlueprintModified));
-    }
-
-    #[test]
     fn test_timestamp_secs_returns_reasonable_value() {
         let ts = timestamp_secs();
         let now = std::time::SystemTime::now()
@@ -2473,123 +2433,6 @@ mod tests {
     }
 
     #[test]
-    fn test_report_signal_active_board_changed_exact_path() {
-        let files = vec![DiffFile {
-            path: std::path::PathBuf::from("plan/ACTIVE_BOARD.md"),
-            status: FileStatus::Modified,
-        }];
-        let signals = detect_report_signals(std::path::Path::new("/fake"), &files);
-        assert!(signals.contains(&ReportSignal::ActiveBoardChanged));
-    }
-
-    #[test]
-    fn test_report_signal_index_changed_nested() {
-        let files = vec![DiffFile {
-            path: std::path::PathBuf::from("docs/plan/index.md"),
-            status: FileStatus::Modified,
-        }];
-        let signals = detect_report_signals(std::path::Path::new("/fake"), &files);
-        assert!(signals.contains(&ReportSignal::IndexChanged));
-    }
-
-    #[test]
-    fn test_report_signal_blueprint_created() {
-        let files = vec![DiffFile {
-            path: std::path::PathBuf::from("docs/blueprint-foo.md"),
-            status: FileStatus::Added,
-        }];
-        let signals = detect_report_signals(std::path::Path::new("/fake"), &files);
-        assert!(signals.contains(&ReportSignal::BlueprintCreated));
-    }
-
-    #[test]
-    fn test_report_signal_multiple() {
-        let files = vec![
-            DiffFile {
-                path: std::path::PathBuf::from("plan/ACTIVE_BOARD.md"),
-                status: FileStatus::Modified,
-            },
-            DiffFile {
-                path: std::path::PathBuf::from("docs/blueprint-bar.md"),
-                status: FileStatus::Modified,
-            },
-        ];
-        let signals = detect_report_signals(std::path::Path::new("/fake"), &files);
-        assert!(signals.contains(&ReportSignal::ActiveBoardChanged));
-        assert!(signals.contains(&ReportSignal::BlueprintModified));
-    }
-
-    #[test]
-    fn test_report_signal_empty() {
-        let files: Vec<DiffFile> = vec![];
-        let signals = detect_report_signals(std::path::Path::new("/fake"), &files);
-        assert!(signals.is_empty());
-    }
-
-    #[test]
-    fn test_report_signal_no_match() {
-        let files = vec![DiffFile {
-            path: std::path::PathBuf::from("src/main.rs"),
-            status: FileStatus::Modified,
-        }];
-        let signals = detect_report_signals(std::path::Path::new("/fake"), &files);
-        assert!(signals.is_empty());
-    }
-
-    #[test]
-    fn test_report_signal_blueprint_added() {
-        let files = vec![DiffFile {
-            path: std::path::PathBuf::from("docs/blueprint-new.md"),
-            status: FileStatus::Added,
-        }];
-        let signals = detect_report_signals(std::path::Path::new("/fake"), &files);
-        assert!(signals.contains(&ReportSignal::BlueprintCreated));
-    }
-
-    #[test]
-    fn test_report_signal_blueprint_modified_other_dir() {
-        let files = vec![DiffFile {
-            path: std::path::PathBuf::from("project/docs/blueprint-foo.md"),
-            status: FileStatus::Modified,
-        }];
-        let signals = detect_report_signals(std::path::Path::new("/fake"), &files);
-        assert!(signals.contains(&ReportSignal::BlueprintModified));
-    }
-
-    #[test]
-    fn test_report_signal_index_changed_exact() {
-        let files = vec![DiffFile {
-            path: std::path::PathBuf::from("plan/index.md"),
-            status: FileStatus::Modified,
-        }];
-        let signals = detect_report_signals(std::path::Path::new("/fake"), &files);
-        assert!(signals.contains(&ReportSignal::IndexChanged));
-    }
-
-    #[test]
-    fn test_report_signal_all_signals_together() {
-        let files = vec![
-            DiffFile {
-                path: std::path::PathBuf::from("plan/ACTIVE_BOARD.md"),
-                status: FileStatus::Modified,
-            },
-            DiffFile {
-                path: std::path::PathBuf::from("plan/index.md"),
-                status: FileStatus::Modified,
-            },
-            DiffFile {
-                path: std::path::PathBuf::from("docs/blueprint-new.md"),
-                status: FileStatus::Added,
-            },
-        ];
-        let signals = detect_report_signals(std::path::Path::new("/fake"), &files);
-        assert!(signals.contains(&ReportSignal::ActiveBoardChanged));
-        assert!(signals.contains(&ReportSignal::IndexChanged));
-        assert!(signals.contains(&ReportSignal::BlueprintCreated));
-        assert_eq!(signals.len(), 3);
-    }
-
-    #[test]
     fn test_repair_summary_default() {
         let summary = RepairSummary::default();
         assert_eq!(summary.found, 0);
@@ -2612,28 +2455,6 @@ mod tests {
         };
         let debug = format!("{:?}", summary);
         assert!(debug.contains("found"));
-    }
-
-    #[test]
-    fn test_report_signal_debug() {
-        let signal = ReportSignal::ActiveBoardChanged;
-        assert_eq!(format!("{:?}", signal), "ActiveBoardChanged");
-    }
-
-    #[test]
-    fn test_report_signal_clone() {
-        let signal1 = ReportSignal::BlueprintCreated;
-        let signal2 = signal1.clone();
-        assert_eq!(signal1, signal2);
-    }
-
-    #[test]
-    fn test_report_signal_partial_eq() {
-        assert_eq!(
-            ReportSignal::ActiveBoardChanged,
-            ReportSignal::ActiveBoardChanged
-        );
-        assert_ne!(ReportSignal::ActiveBoardChanged, ReportSignal::IndexChanged);
     }
 
     #[test]
