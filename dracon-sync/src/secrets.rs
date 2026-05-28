@@ -13,9 +13,8 @@ use std::os::unix::fs::PermissionsExt;
 /// Security: if the secrets directory is world-writable, secrets are refused
 /// to prevent malicious injection by other users.
 ///
-/// The two different secrets directories used across the codebase:
+/// The secrets directory:
 /// - `~/.dracon/utilities/sync/secrets` — general sync secrets (git.rs)
-/// - `~/.dracon/utilities/sync/ai/secrets` — AI provider keys (simple_ai.rs)
 pub(crate) fn load_secret(env_name: &str, secrets_dir: &Path) -> Option<String> {
     // 1. Check env var directly
     if let Ok(val) = std::env::var(env_name) {
@@ -108,11 +107,4 @@ pub(crate) fn sync_secrets_dir() -> PathBuf {
     dirs::home_dir()
         .unwrap_or_else(|| PathBuf::from("."))
         .join(".dracon/utilities/sync/secrets")
-}
-
-/// Returns the AI secrets directory: `~/.dracon/utilities/sync/ai/secrets`.
-pub(crate) fn ai_secrets_dir() -> PathBuf {
-    dirs::home_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join(".dracon/utilities/sync/ai/secrets")
 }
