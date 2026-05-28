@@ -1411,16 +1411,21 @@ pub(crate) async fn sync_repo(
 
     clean_staged_paths(&ctx).await?;
 
+    let DiffResult {
+        status,
+        entries,
+        filter_only_cleared,
+    } = compute_diff_entries(&svc, repo).await?;
+
     // filter_only_cleared: changes present but all filtered out by clean/smudge.
-    // Don't stage/commit — apply a cooldown and skip.
+    // Don't stage/commit — return NothingToDo so the daemon applies a cooldown.
     if filter_only_cleared {
-        let cooldown_secs = policy.inactivity_push_delay_secs.max(5);
-        eprintln!(
-            "🐛 {} filter-only dirty, cooldown {}s",
-            repo.display(),
-            cooldown_secs
-        );
-        // Note: cooldown is applied by the caller (daemon loop). We just skip staging.
+        if debug_enabled() {
+            eprintln!(
+                "🐛 {} filter-only dirty, returning NothingToDo for cooldown",
+                repo.display(),
+            );
+        }
         return Ok(SyncOutcome::NothingToDo);
     }
 
@@ -1475,7 +1480,9 @@ pub(crate) async fn sync_repo(
 
 async fn handle_ahead_push(ctx: &mut SyncContext<'_>, svc: &GitService) -> Result<()> {
     let current_status = svc.get_status().await?;
-    if ctx.policy.auto_push && current_status.ahead > 0 && ctx.has_origin {
+    let branch_has_upstream = super::git::has_tracking_upstream(ctx.repo);
+    let should_push = current_status.ahead > 0 || !branch_has_upstream;
+    if ctx.policy.auto_push && should_push && ctx.has_origin {
         let push_ok = push_with_blob_check(ctx, current_status.ahead).await?;
         if !push_ok {
             eprintln!(
@@ -1483,7 +1490,7 @@ async fn handle_ahead_push(ctx: &mut SyncContext<'_>, svc: &GitService) -> Resul
                 ctx.repo.display()
             );
         }
-    } else if ctx.policy.auto_push && current_status.ahead > 0 && !ctx.has_origin {
+    } else if ctx.policy.auto_push && should_push && !ctx.has_origin {
         eprintln!("ℹ️ skip push for {} (no origin remote)", ctx.repo.display());
     }
     Ok(())

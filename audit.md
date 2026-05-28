@@ -10,10 +10,11 @@
 **Fix:** Two changes in `sync.rs`:
 1. `push_with_blob_check` — pushes even when `ahead == 0` if the branch has no upstream tracking
 2. `handle_ahead_push` — same logic applied after auto_pull_merge
+3. `filter_only_cleared` handling — correctly return NothingToDo when all changes are filtered out by clean/smudge so daemon applies cooldown instead of trying to commit
 
 **Files changed:** `dracon-sync/src/sync.rs`
-**Build:** ✅ passes `cargo check`
-**Installed:** ✅ daemon restarted with new binary (sha256: 865be256b724663d58d200675a29ea6c41d8006b3de4e568a211b4074f3b7911)
+**Build:** ✅ passes `cargo build --release`
+**Installed:** ✅ daemon restarted with new binary (sha256 for F1: 865be256..., F1+F2 combined: installed in two-step restart)
 **Tested:** Created `test-auto-push` branch → the sync daemon picked it up and pushed it to all 4 remotes (origin, github, codeberg, gitlab) on the next cycle.
 
 ---
@@ -22,7 +23,7 @@
 
 ### Category: Core Functionality
 
-- [ ] **F1** ✅ (done above) New branch auto-push
+- [ ] **F1** ✅ (done above) New branch auto-push + filter_only_cleared fix
 
 - [ ] **F2** Verify `auto_pull_merge` correctly handles the case where a local branch exists but remote tracking hasn't been set up yet — does it create the tracking ref or just skip?
 
@@ -34,7 +35,7 @@
 
 - [ ] **G1** Mass deletion guard in `sync.rs` — confirm the three thresholds (85%+, 70%+with5+files, 10+absolute) correctly handle symlinks and gitlinks (submodules). Currently `is_gitlink_unchanged` filters some entries — does this affect the accuracy of `missing_count` vs `total_tracked`?
 
-- [ ] **G2** The `filter_only_cleared` flag from `compute_diff_entries` — verify it's being used correctly. It's currently discarded (`_`). This flag indicates that changes ARE present but were all filtered out by clean/smudge filters. When `filter_only_cleared` is `true` and `status.is_clean` is `false`, this should trigger a cooldown, not a commit attempt.
+- [ ] **G2** ✅ (fixed in F1) The `filter_only_cleared` flag from `compute_diff_entries` — was being discarded (`_`). When `true`, sync now returns `NothingToDo` so the daemon applies cooldown instead of committing.
 
 - [ ] **G3** The `stuck repo` mechanism — check `daemon::is_repo_stuck` and `stuck_list` management. When a push times out, is the repo correctly marked as stuck? When does it become unstuck automatically?
 
