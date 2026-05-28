@@ -974,12 +974,12 @@ async fn push_with_blob_check(ctx: &mut SyncContext<'_>, ahead: usize) -> Result
 }
 
 /// Scan staged diff for task markers and return a progress summary if found.
-/// Recognizes `- [x]` (done), `- [~]` (in progress), `- [ ]` (pending) in diff content.
+/// Only recognizes `- [x]` (done/closure) and `- [~]` (in progress).
+/// Ignores `- [ ]` (pending) — those are just noise, might never be worked on.
 fn scan_staged_tasks(repo: &Path) -> Option<String> {
     let output = run_git_capture_output(repo, &["diff", "--cached", "--unified=0"], "diff").ok()?;
     let mut done = 0usize;
     let mut in_progress = 0usize;
-    let mut pending = 0usize;
     for line in output.lines() {
         if !line.starts_with('+') || line.starts_with("+++") {
             continue;
@@ -989,18 +989,16 @@ fn scan_staged_tasks(repo: &Path) -> Option<String> {
             done += 1;
         } else if content.starts_with("- [~]") {
             in_progress += 1;
-        } else if content.starts_with("- [ ]") {
-            pending += 1;
         }
     }
-    let total = done + in_progress + pending;
-    if total == 0 {
+    if done == 0 && in_progress == 0 {
         return None;
     }
-    Some(if in_progress > 0 {
-        format!("{}/{} done ({} in progress)", done, total, in_progress)
-    } else {
-        format!("{}/{} done", done, total)
+    Some(match (done > 0, in_progress > 0) {
+        (true, true) => format!("{} done, {} in progress", done, in_progress),
+        (true, false) => format!("{} done", done),
+        (false, true) => format!("{} in progress", in_progress),
+        _ => unreachable!(),
     })
 }
 
