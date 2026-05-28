@@ -18,7 +18,7 @@ use crate::git::{
     cli_diff_entries, detect_large_blobs_ahead, git_name_status_entries, has_origin_remote,
     has_tracking_upstream, is_cherry_pick_in_progress, is_merge_in_progress, is_rebase_in_progress,
     is_repo_ready, prune_other_default_branch, push_with_retries, restore_paths,
-    run_git_with_timeout, unstage_excluded_paths, unstage_oversized_paths,
+    run_git_capture_output, run_git_with_timeout, unstage_excluded_paths, unstage_oversized_paths,
 };
 use crate::policy::{debug_enabled, load_repo_override, SyncPolicy};
 use crate::report::{build_commit_context, detect_report_signals, push_large_blob_threshold_bytes};
@@ -975,8 +975,8 @@ async fn push_with_blob_check(ctx: &mut SyncContext<'_>, ahead: usize) -> Result
 
 /// Scan staged diff for task markers and return a progress summary if found.
 /// Recognizes `- [x]` (done), `- [~]` (in progress), `- [ ]` (pending) in diff content.
-async fn scan_staged_tasks(repo: &Path) -> Option<String> {
-    let output = run_git_with_timeout(repo, &["diff", "--cached", "--unified=0"], 10, "diff").await.ok()??;
+fn scan_staged_tasks(repo: &Path) -> Option<String> {
+    let output = run_git_capture_output(repo, &["diff", "--cached", "--unified=0"], "diff").ok()?;
     let mut done = 0usize;
     let mut in_progress = 0usize;
     let mut pending = 0usize;
