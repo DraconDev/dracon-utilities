@@ -53,64 +53,6 @@ pub(crate) fn extract_version_from_json(content: &str, key: &str) -> Option<Stri
     }
 }
 
-#[cfg(feature = "ai-bumper")]
-pub async fn ai_decide_bump_level(
-    _repo: &Path,
-    current_version: &str,
-    staged_diff: &str,
-    project_state: &str,
-) -> BumpLevel {
-    use crate::simple_ai::{ChatMessage, SimpleAiService};
-    use std::path::Path;
-
-    let version_only_patterns = ["Cargo.toml", "package.json", "VERSION", "Cargo.lock"];
-    let has_source_changes = staged_diff
-        .lines()
-        .filter(|line| !line.is_empty())
-        .any(|line| !version_only_patterns.iter().any(|p| line.contains(p)));
-
-    if !has_source_changes {
-        return BumpLevel::None;
-    }
-
-    let prompt = format!(
-        r##"You are a version bump advisor. Analyze the changes and decide if a version bump is warranted.
-
-Current Version: {current_version}
-
-Project State:
-{project_state}
-
-Staged Changes:
-{staged_diff}
-
-Respond with ONLY ONE WORD:
-- "minor": NEW FEATURE
-- "patch": BUG FIX / improvement
-- "none": NOISY/CHORE (docs, deps, config only)
-
-NEVER respond "major" — major version bumps are manual-only.
-Respond with ONLY ONE WORD."##
-    );
-
-    let service = SimpleAiService::new();
-    if service.is_empty() {
-        return BumpLevel::None;
-    }
-
-    let messages = vec![ChatMessage::user(&prompt)];
-
-    match service.chat(messages).await {
-        Ok(content) => match content.trim().to_lowercase().as_str() {
-            "major" => BumpLevel::None,
-            "minor" => BumpLevel::Minor,
-            "patch" => BumpLevel::Patch,
-            _ => BumpLevel::None,
-        },
-        Err(_) => BumpLevel::None,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
