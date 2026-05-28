@@ -866,7 +866,53 @@ pub(crate) fn validate_config(policy_path: &Path) -> ValidateResult {
         }
     }
 
+    check_toml_field_ordering(&content, &mut result);
     result
+}
+
+fn check_toml_field_ordering(content: &str, result: &mut ValidateResult) {
+    let mut first_section_pos: Option<usize> = None;
+    let mut pos = 0;
+    let bytes = content.as_bytes();
+
+    while pos < bytes.len() {
+        let line_start = pos;
+        while pos < bytes.len() && bytes[pos] != b'\n' {
+            pos += 1;
+        }
+        let line = &content[line_start..pos];
+        let stripped = line.trim();
+
+        if stripped.starts_with('[') {
+            if first_section_pos.is_none() {
+                first_section_pos = Some(line_start);
+            }
+        } else if !stripped.is_empty()
+            && !stripped.starts_with('#')
+            && stripped.contains('=')
+        {
+            if let Some(first_sec) = first_section_pos {
+                if line_start > first_sec {
+                    let (key, _) = stripped.split_once('=').unwrap_or((stripped, ""));
+                    let key = key.trim();
+                    if !key.starts_with('"')
+                        && !key.starts_with('\'')
+                        && !key.is_empty()
+                        && !key.contains('{')
+                    {
+                        result.warn(format!(
+                            "field '{}' appears after a section header -- fields must be \
+                             defined before any [section] or [[remotes]] block or they may \
+                             be silently ignored by the TOML parser",
+                            key
+                        ));
+                    }
+                }
+            }
+        }
+
+        pos += 1;
+    }
 }
 
 pub(crate) fn env_freeze_enabled() -> bool {
@@ -1620,5 +1666,46 @@ standard_files_auto = true
 "#;
         let policy: SyncPolicy = toml::from_str(toml).unwrap();
         assert!(policy.standard_files_auto);
+    }
+
+    #[test]
+    fn test_validate_toml_field_ordering_warns_on_post_section_fields() {
+        use crate::policy::ValidateResult;
+        let toml = r#"
+pulse_interval_secs = 1
+
+[sync]
+auto_pull = true
+
+[remote "origin"]
+url = "git@github.com:foo/bar.git"
+"#;
+        let content = toml;
+        let mut result = ValidateResult::default();
+        check_toml_field_ordering(content, &mut result);
+        assert!(
+            result.warnings.iter().any(|w| {
+                w.contains("'auto_pull' appears after a section header")
+                    || w.contains("'url' appears after a section header")
+            }),
+            "expected warning about fields after section, got: {:?}",
+            result.warnings
+        );
+    }
+
+    #[test]
+    fn test_validate_toml_field_ordering_ok_on_sequential_fields() {
+        use crate::policy::ValidateResult;
+        let toml = r#"
+pulse_interval_secs = 1
+standard_files_auto = true
+
+[sync]
+auto_pull = true
+"#;
+        let content = toml;
+        let mut result = ValidateResult::default();
+        check_toml_field_ordering(content, &mut result);
+        assert!(result.warnings.is_empty(), "expected no warnings, got: {:?}", result.warnings);
     }
 }
