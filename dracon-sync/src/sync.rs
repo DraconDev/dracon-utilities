@@ -1,4 +1,4 @@
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::io::Write;
 use std::path::Path;
 use std::time::Duration;
@@ -977,18 +977,107 @@ async fn push_with_blob_check(ctx: &mut SyncContext<'_>, ahead: usize) -> Result
 
 
 
+/// Categorize a file path into a change category for AI-readable commit messages.
+///
+/// Categories help AI understand the nature of a change at a glance:
+/// - `src`: source code files (.rs, .py, .js, .ts, .go, .c, .cpp, etc.)
+/// - `test`: test files (paths containing /test, _test., .test., _spec.)
+/// - `config`: configuration files (.toml, .yaml, .yml, .json, .nix, .env, .gitignore)
+/// - `docs`: documentation (.md, .txt, .rst, README, LICENSE, CHANGELOG)
+/// - `data`: data files (.csv, .sql, .db, .lock)
+/// - `build`: build artifacts (Cargo.toml, package.json, Makefile, Dockerfile)
+/// - `other`: anything else
+fn categorize_file(path: &str) -> &'static str {
+    let lower = path.to_ascii_lowercase();
+    let basename = path.rsplit('/').next().unwrap_or(path);
+    let basename_lower = basename.to_ascii_lowercase();
+
+    // Test files (check first — test source files should be categorized as test)
+    if lower.contains("/test") || lower.contains("/tests")
+        || basename_lower.contains("_test.") || basename_lower.contains(".test.")
+        || basename_lower.contains("_spec.") || basename_lower.contains("_tests.")
+        || basename_lower == "tests.rs" || basename_lower == "test_helpers.rs"
+    {
+        return "test";
+    }
+
+    // Build/config manifests (check before generic config)
+    if basename == "Cargo.toml" || basename == "package.json" || basename == "package-lock.json"
+        || basename == "Cargo.lock" || basename == "Makefile" || basename == "Dockerfile"
+        || basename == "flake.nix" || basename == "flake.lock" || basename == "build.rs"
+        || basename == "pyproject.toml" || basename == "setup.py" || basename == "setup.cfg"
+    {
+        return "build";
+    }
+
+    // Configuration files
+    if lower.ends_with(".toml") || lower.ends_with(".yaml") || lower.ends_with(".yml")
+        || lower.ends_with(".json") || lower.ends_with(".nix") || lower.ends_with(".env")
+        || basename == ".gitignore" || basename == ".gitattributes"
+        || basename == ".editorconfig" || basename == ".prettierrc"
+        || lower.ends_with(".service") || lower.ends_with(".timer") || lower.ends_with(".socket")
+    {
+        return "config";
+    }
+
+    // Documentation
+    if lower.ends_with(".md") || lower.ends_with(".mdx") || lower.ends_with(".txt")
+        || lower.ends_with(".rst") || lower.ends_with(".adoc")
+        || basename_lower.starts_with("readme") || basename_lower.starts_with("license")
+        || basename_lower.starts_with("changelog") || basename_lower.starts_with("contributing")
+        || lower.ends_with(".md")
+    {
+        return "docs";
+    }
+
+    // Data files
+    if lower.ends_with(".csv") || lower.ends_with(".sql") || lower.ends_with(".db")
+        || lower.ends_with(".sqlite") || lower.ends_with(".lock")
+        || lower.ends_with(".jsonl") || lower.ends_with(".ndjson")
+    {
+        return "data";
+    }
+
+    // Source code
+    if lower.ends_with(".rs") || lower.ends_with(".py") || lower.ends_with(".js")
+        || lower.ends_with(".ts") || lower.ends_with(".tsx") || lower.ends_with(".jsx")
+        || lower.ends_with(".go") || lower.ends_with(".c") || lower.ends_with(".cpp")
+        || lower.ends_with(".h") || lower.ends_with(".hpp") || lower.ends_with(".java")
+        || lower.ends_with(".rb") || lower.ends_with(".php") || lower.ends_with(".swift")
+        || lower.ends_with(".kt") || lower.ends_with(".scala") || lower.ends_with(".ex")
+        || lower.ends_with(".exs") || lower.ends_with(".sh") || lower.ends_with(".bash")
+        || lower.ends_with(".zsh") || lower.ends_with(".fish") || lower.ends_with(".lua")
+    {
+        return "src";
+    }
+
+    "other"
+}
+
 /// Compute BLAST RADIUS from staged diff.
-/// Returns formatted string: "FILES:X DIRS:Y DELTA:+A/-B"
+///
+/// Returns a structured message optimized for AI consumption:
+///
+/// Format: "update N file(s) [CATEGORY_BREAKDOWN] [TOP_FILES] [DELTA]"
+///
+/// Example: "update 5 file(s) [src:3 test:1 config:1] src/sync.rs src/daemon.rs [+42/-12]"
+///
+/// This gives AI:
+/// - File count for change magnitude
+/// - Category breakdown for change type (code vs config vs tests)
+/// - Top changed files for context on WHAT changed
+/// - Line delta for change size
 fn compute_blast_radius(repo: &Path) -> String {
     let output = match run_git_capture_output(repo, &["diff", "--cached", "--numstat"], "numstat") {
         Ok(o) => o,
-        Err(_) => return "FILES:0 DIRS:none DELTA:+0/-0".to_string(),
+        Err(_) => return "update 0 file(s) [+0/-0]".to_string(),
     };
 
     let mut files = 0usize;
     let mut added = 0i64;
     let mut removed = 0i64;
-    let mut dirs: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+    let mut category_counts: BTreeMap<&str, usize> = BTreeMap::new();
+    let mut file_changes: Vec<(i64, String)> = Vec::new(); // (lines_changed, path)
 
     for line in output.lines() {
         let parts: Vec<&str> = line.split('\t').collect();
@@ -1000,31 +1089,57 @@ fn compute_blast_radius(repo: &Path) -> String {
         let path = parts[2];
 
         // Binary files show as "-" in numstat
-        if parts[0] != "-" {
-            added += a;
-        }
-        if parts[1] != "-" {
-            removed += r;
-        }
+        let a_val = if parts[0] != "-" { a } else { 0 };
+        let r_val = if parts[1] != "-" { r } else { 0 };
+
+        added += a_val;
+        removed += r_val;
         files += 1;
 
-        // Extract top-level directory
-        if let Some(first_component) = path.split('/').next() {
-            if !first_component.is_empty() && first_component != "." {
-                dirs.insert(first_component.to_string());
-            }
-        }
+        // Categorize and track
+        let category = categorize_file(path);
+        *category_counts.entry(category).or_insert(0) += 1;
+
+        // Track for top-files ranking
+        let lines_changed = a_val + r_val;
+        file_changes.push((lines_changed, path.to_string()));
     }
 
-    let dirs_str = if dirs.is_empty() {
-        "root".to_string()
+    // Build category breakdown: "src:3 test:1 config:2"
+    let categories: Vec<String> = category_counts
+        .iter()
+        .map(|(cat, count)| format!("{}:{}", cat, count))
+        .collect();
+    let category_str = if categories.is_empty() {
+        String::new()
     } else {
-        dirs.iter().take(3).cloned().collect::<Vec<_>>().join(",")
+        format!(" [{}]", categories.join(" "))
+    };
+
+    // Top 3 changed files by lines changed
+    file_changes.sort_by(|a, b| b.0.cmp(&a.0));
+    let top_files: Vec<String> = file_changes
+        .iter()
+        .take(3)
+        .map(|(_, path)| {
+            // Abbreviate path: show last 2 components
+            let components: Vec<&str> = path.split('/').collect();
+            if components.len() <= 2 {
+                path.clone()
+            } else {
+                components[components.len() - 2..].join("/")
+            }
+        })
+        .collect();
+    let files_str = if top_files.is_empty() {
+        String::new()
+    } else {
+        format!(" {}", top_files.join(" "))
     };
 
     format!(
-        "FILES:{} DIRS:{} DELTA:+{}/-{}",
-        files, dirs_str, added, removed
+        "update {} file(s){}{} [+{}/-{}]",
+        files, category_str, files_str, added, removed
     )
 }
 
