@@ -15,7 +15,6 @@ fn get_log() -> &'static Mutex<Vec<String>> {
 
 /// Severity levels for dracon events.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[allow(dead_code)]
 pub enum EventSeverity {
     /// Debug-level diagnostic information.
     Debug,

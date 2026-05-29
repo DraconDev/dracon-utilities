@@ -418,7 +418,7 @@ pub(crate) fn repo_is_concern(
     status.ahead > 0 || status.behind > 0 || !has_origin || !has_upstream
 }
 
-#[allow(dead_code)]
+#[cfg(test)]
 pub(crate) fn repo_is_warn(
     status: &dracon_git::types::RepoStatus,
     has_origin: bool,
