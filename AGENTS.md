@@ -628,20 +628,16 @@ dracon-sync test-ai
 Commit messages are structured for AI consumption. Format:
 
 ```
-update N file(s) [CATEGORY:count ...] [top_files...] [+added/-removed]
+N file(s) in DIRS [file1, file2, ...] DELTA:+A/-B
 ```
 
-Example: `update 5 file(s) [src:3 test:1 config:1] sync.rs daemon.rs [+42/-12]`
+Example: `5 file(s) in src,tests [src/sync.rs, src/daemon.rs, tests/sync_test.rs] DELTA:+42/-12`
 
-Categories: `src` (source code), `test` (test files), `config` (.toml/.yaml/.json), `docs` (.md/README), `build` (Cargo.toml/package.json), `data` (.csv/.sql/.lock), `other`.
-
-Top files show the 3 most-changed files by line count (abbreviated to last 2 path components).
-
-This gives AI:
-- **File count** for change magnitude
-- **Category breakdown** for change type (code vs config vs tests)
-- **Top changed files** for context on WHAT changed
-- **Line delta** for change size
+Design principles:
+- **Machine-parseable** — consistent structure, no ambiguous heuristics
+- **Shows actual files** — AI can infer category from path (no arbitrary categorization)
+- **Preserves DIRS** — scope understanding at a glance
+- **Compact** — fits in git log --oneline without wrapping
 
 ## Environment Variables
 
