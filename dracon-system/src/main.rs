@@ -1087,6 +1087,27 @@ fn parse_docker_size(s: &str) -> u64 {
     (value * multiplier) as u64
 }
 
+/// Try to remove a cache directory, returning whether it succeeded.
+async fn try_remove_cache_dir(path: &Path, name: &str, apply: bool, protected_paths: &[String]) -> bool {
+    if !apply {
+        return true;
+    }
+    match check_safe_to_delete_guard(path, protected_paths) {
+        Ok(ref safe_path) => {
+            if let Err(e) = tokio::fs::remove_dir_all(safe_path).await {
+                eprintln!("⚠️ failed to remove {name} cache: {e}");
+                false
+            } else {
+                true
+            }
+        }
+        Err(e) => {
+            eprintln!("⚠️ skipping {name} cache: {e}");
+            false
+        }
+    }
+}
+
 /// Clean package manager caches
 async fn clean_package_caches(
     cargo: bool,
@@ -1099,123 +1120,29 @@ async fn clean_package_caches(
     let mut reclaimed = 0u64;
     let mut cleaned = Vec::new();
 
-    if cargo {
-        if let Some(home) = dirs::home_dir() {
-            let cargo_cache = home.join(".cargo/registry/cache");
-            if cargo_cache.exists() {
-                let size = get_dir_size(&cargo_cache).await.unwrap_or(0);
-                if size > 0 {
-                    let mut succeeded = true;
-                    if apply {
-                        match check_safe_to_delete_guard(&cargo_cache, protected_paths) {
-                            Ok(ref safe_path) => {
-                                if let Err(e) = tokio::fs::remove_dir_all(safe_path).await {
-                                    eprintln!("⚠️ failed to remove cargo cache: {}", e);
-                                    succeeded = false;
-                                }
-                            }
-                            Err(e) => {
-                                eprintln!("⚠️ skipping cargo cache: {}", e);
-                                succeeded = false;
-                            }
-                        }
-                    }
-                    if !apply || succeeded {
-                        cleaned.push(format!("cargo registry cache ({})", human_bytes(size)));
-                        reclaimed += size;
-                    }
-                }
-            }
-        }
-    }
+    let home = dirs::home_dir().unwrap_or_default();
+    let targets: Vec<(&str, bool, &str)> = vec![
+        ("cargo registry cache", cargo, ".cargo/registry/cache"),
+        ("npm cache", npm, ".npm"),
+        ("pip cache", pip, ".cache/pip"),
+        ("go build cache", go, ".cache/go-build"),
+    ];
 
-    if npm {
-        if let Some(home) = dirs::home_dir() {
-            let npm_cache = home.join(".npm");
-            if npm_cache.exists() {
-                let size = get_dir_size(&npm_cache).await.unwrap_or(0);
-                if size > 0 {
-                    let mut succeeded = true;
-                    if apply {
-                        match check_safe_to_delete_guard(&npm_cache, protected_paths) {
-                            Ok(ref safe_path) => {
-                                if let Err(e) = tokio::fs::remove_dir_all(safe_path).await {
-                                    eprintln!("⚠️ failed to remove npm cache: {}", e);
-                                    succeeded = false;
-                                }
-                            }
-                            Err(e) => {
-                                eprintln!("⚠️ skipping npm cache: {}", e);
-                                succeeded = false;
-                            }
-                        }
-                    }
-                    if !apply || succeeded {
-                        cleaned.push(format!("npm cache ({})", human_bytes(size)));
-                        reclaimed += size;
-                    }
-                }
-            }
+    for (label, enabled, rel_path) in targets {
+        if !enabled {
+            continue;
         }
-    }
-
-    if pip {
-        if let Some(home) = dirs::home_dir() {
-            let pip_cache = home.join(".cache/pip");
-            if pip_cache.exists() {
-                let size = get_dir_size(&pip_cache).await.unwrap_or(0);
-                if size > 0 {
-                    let mut succeeded = true;
-                    if apply {
-                        match check_safe_to_delete_guard(&pip_cache, protected_paths) {
-                            Ok(ref safe_path) => {
-                                if let Err(e) = tokio::fs::remove_dir_all(safe_path).await {
-                                    eprintln!("⚠️ failed to remove pip cache: {}", e);
-                                    succeeded = false;
-                                }
-                            }
-                            Err(e) => {
-                                eprintln!("⚠️ skipping pip cache: {}", e);
-                                succeeded = false;
-                            }
-                        }
-                    }
-                    if !apply || succeeded {
-                        cleaned.push(format!("pip cache ({})", human_bytes(size)));
-                        reclaimed += size;
-                    }
-                }
-            }
+        let cache_path = home.join(rel_path);
+        if !cache_path.exists() {
+            continue;
         }
-    }
-
-    if go {
-        if let Some(home) = dirs::home_dir() {
-            let go_cache = home.join(".cache/go-build");
-            if go_cache.exists() {
-                let size = get_dir_size(&go_cache).await.unwrap_or(0);
-                if size > 0 {
-                    let mut succeeded = true;
-                    if apply {
-                        match check_safe_to_delete_guard(&go_cache, protected_paths) {
-                            Ok(ref safe_path) => {
-                                if let Err(e) = tokio::fs::remove_dir_all(safe_path).await {
-                                    eprintln!("⚠️ failed to remove go build cache: {}", e);
-                                    succeeded = false;
-                                }
-                            }
-                            Err(e) => {
-                                eprintln!("⚠️ skipping go build cache: {}", e);
-                                succeeded = false;
-                            }
-                        }
-                    }
-                    if !apply || succeeded {
-                        cleaned.push(format!("go build cache ({})", human_bytes(size)));
-                        reclaimed += size;
-                    }
-                }
-            }
+        let size = get_dir_size(&cache_path).await.unwrap_or(0);
+        if size == 0 {
+            continue;
+        }
+        if try_remove_cache_dir(&cache_path, label, apply, protected_paths).await {
+            cleaned.push(format!("{label} ({})", human_bytes(size)));
+            reclaimed += size;
         }
     }
 
