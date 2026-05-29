@@ -625,7 +625,23 @@ dracon-sync test-ai
 
 ## Commit Messages
 
-Commit messages are simple mechanical messages (e.g., "update 3 file(s)"). No AI scribe, task scanning, or blast radius calculation is performed. This is intentional — AI-generated messages were not useful for AI workflows.
+Commit messages are structured for AI consumption. Format:
+
+```
+update N file(s) [CATEGORY:count ...] [top_files...] [+added/-removed]
+```
+
+Example: `update 5 file(s) [src:3 test:1 config:1] sync.rs daemon.rs [+42/-12]`
+
+Categories: `src` (source code), `test` (test files), `config` (.toml/.yaml/.json), `docs` (.md/README), `build` (Cargo.toml/package.json), `data` (.csv/.sql/.lock), `other`.
+
+Top files show the 3 most-changed files by line count (abbreviated to last 2 path components).
+
+This gives AI:
+- **File count** for change magnitude
+- **Category breakdown** for change type (code vs config vs tests)
+- **Top changed files** for context on WHAT changed
+- **Line delta** for change size
 
 ## Environment Variables
 
