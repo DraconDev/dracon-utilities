@@ -1,6 +1,6 @@
 # dracon-system
 
-A deterministic system utility for proactive disk space monitoring and automatic cleanup. Designed to prevent "disk full" emergencies on development machines and servers.
+**Proactive disk space monitoring and automatic cleanup.** Prevents "disk full" emergencies on development machines and servers.
 
 ## Features
 
@@ -17,6 +17,17 @@ A deterministic system utility for proactive disk space monitoring and automatic
   - Protects target dirs in their working directories
   - Protects recently modified target dirs (configurable)
 - Configurable minimum size threshold
+
+### Process Monitoring & Graduated Renice
+- Monitors processes using excessive CPU
+- Graduated renice based on severity:
+  - ≥180% CPU → nice 5 (gentle deprio)
+  - ≥300% CPU → nice 10 (moderate deprio)
+  - ≥500% CPU → nice 15 (strong deprio)
+  - RSS ≥4GB → nice 5 (memory hog deprio)
+  - RSS ≥8GB → nice 10 (heavy memory deprio)
+- **Never kills processes** — only renices
+- Auto-releases renice after process is no longer heavy
 
 ### Build-Aware Monitoring
 - Detects active Rust build processes
@@ -140,6 +151,20 @@ dracon-system guard once
 
 # Run as daemon (continuous monitoring)
 dracon-system guard daemon
+
+# Show recent events
+dracon-system events
+dracon-system events -t 50
+dracon-system events -s guard -s severity
+
+# Manage symlinks
+dracon-system link status
+dracon-system link doctor
+dracon-system link apply
+
+# Zram stats
+dracon-system zram --status
+dracon-system zram --gen-config
 ```
 
 ### Systemd Service Management
@@ -160,7 +185,7 @@ journalctl --user -u dracon-system-guard -f
 
 ## Configuration
 
-Create `~/dracon/utilities/system/dracon-system.toml`:
+Create `~/.dracon/utilities/system/dracon-system.toml`:
 
 ```toml
 [guard]
@@ -182,6 +207,18 @@ cleanup_min_size_mb = 256
 rust_search_roots = "~/Dev"  # Default; add more paths as needed
 protect_recent_minutes = 30
 
+# Proactive cleanup (before disk reaches action level)
+proactive_cleanup_percent = 50
+rust_target_max_age_days = 14
+proactive_cleanup_interval_cycles = 120
+
+# Process monitoring
+process_cpu_percent = 180
+process_sustain_secs = 30
+auto_renice = true
+renice_value = 5
+release_after_secs = 120
+
 # Trend prediction
 track_trends = true
 trend_warn_hours = 24
@@ -199,6 +236,10 @@ monitor_logs = true
 log_size_mb = 100
 log_dirs = "/var/log,~/logs"
 
+# Guard log rotation
+guard_log_file = "~/.local/state/dracon/dracon-system-guard.log"
+guard_log_max_mb = 1
+
 # Notifications
 notify = true
 notify_command = "notify-send"
@@ -207,6 +248,9 @@ notify_cooldown_secs = 300
 # Sync freeze (for use with dracon-sync)
 freeze_sync_at_action = true
 unfreeze_below_percent = 88
+
+# Protected paths (in addition to system defaults)
+# protected_paths = ["/mnt/data", "/opt/important"]
 ```
 
 ## How It Works
@@ -231,6 +275,25 @@ When disk hits action level (90%):
    - Modified within `protect_recent_minutes`
 4. Delete unprotected target dirs ≥ `cleanup_min_size_mb`
 5. Send notification with cleanup summary
+
+### Proactive Cleanup
+
+When disk usage is above `proactive_cleanup_percent` (default 50%) but below `disk_action_percent`:
+
+1. Only target dirs older than `rust_target_max_age_days` (default 14) are removed
+2. Recently-used build artifacts are preserved
+3. Active builds (running cargo/rustc) are always protected
+4. Runs every `proactive_cleanup_interval_cycles` guard cycles
+
+### Process Monitoring
+
+The guard monitors processes using >`process_cpu_percent`% CPU for >`process_sustain_secs` seconds:
+
+1. All heavy processes are logged to persistent JSONL file
+2. When `auto_renice = true`, heavy processes are reniced with graduated values
+3. Higher CPU/memory usage = higher nice value (lower priority)
+4. Process still gets full CPU when nothing else needs it
+5. Un-reniced back to nice 0 after `release_after_secs` of being non-heavy
 
 ### Trend Prediction
 
