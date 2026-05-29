@@ -654,7 +654,7 @@ From the diff, we deterministically extract:
    - `BIN:B` — binary files changed
    - `NEW:file1,file2` — newly created files (searchable)
    - `DEL:file1,file2` — deleted files (searchable)
-   - `DEPS:changed` — dependency file modified (Cargo.toml, package.json, etc.)
+   - `DEPS:+reqwest,-serde` — specific dependencies added/removed (Cargo.toml, package.json, etc.)
 
 ### Commit Format
 
@@ -675,7 +675,7 @@ WIP: Refactor DB pool | 2 file(s) in src [db.py] DELTA:+50/-10
 CLOSED: Add auth module | 5 file(s) in src [auth.py, jwt.py] DELTA:+200/-0 | NEW:src/auth.py,src/jwt.py TEST:80
 
 # Dependency change (security audit signal)
-2 file(s) in . [Cargo.toml, Cargo.lock] DELTA:+50/-10 | DEPS:changed
+2 file(s) in . [Cargo.toml, Cargo.lock] DELTA:+50/-10 | DEPS:+reqwest,-hyper
 
 # Binary file added (context window warning for AI)
 1 file(s) in assets [logo.png] DELTA:+0/-0 | BIN:1
