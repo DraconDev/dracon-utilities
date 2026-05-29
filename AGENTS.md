@@ -625,19 +625,32 @@ dracon-sync test-ai
 
 ## Commit Messages
 
-Commit messages are structured for AI consumption. Format:
+Commit messages are **mechanical facts**, not AI-generated summaries.
+
+### Why not AI-generated messages?
+
+AI-generated commit messages are bad for AI workflows:
+- They hallucinate context and intent
+- They try to summarize but AI reads the diff anyway
+- They're verbose, inconsistent, and noisy
+- They add zero information over the actual diff
+
+### What we use instead
+
+Simple mechanical facts:
 
 ```
-N file(s) in DIRS [file1, file2, ...] DELTA:+A/-B
+5 file(s) in src,dracon [src/sync.rs, src/daemon.rs, dracon/policy.toml] DELTA:+150/-20
 ```
 
-Example: `5 file(s) in src,tests [src/sync.rs, src/daemon.rs, tests/sync_test.rs] DELTA:+42/-12`
+- **File count** — how much changed
+- **DIRS** — which directories (scope)
+- **File list** — searchable with `git log --grep="sync.rs"`
+- **DELTA** — lines added/removed
 
-Design principles:
-- **Machine-parseable** — consistent structure, no ambiguous heuristics
-- **Shows actual files** — AI can infer category from path (no arbitrary categorization)
-- **Preserves DIRS** — scope understanding at a glance
-- **Compact** — fits in git log --oneline without wrapping
+### The commit message is an INDEX, not a description
+
+AI gets its understanding from the **diff**, not the commit message. The message just helps you find the right commit when searching.
 
 ## Environment Variables
 

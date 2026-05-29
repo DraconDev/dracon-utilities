@@ -977,19 +977,25 @@ async fn push_with_blob_check(ctx: &mut SyncContext<'_>, ahead: usize) -> Result
 
 
 
-/// Compute BLAST RADIUS from staged diff.
+/// Compute commit message from staged diff.
 ///
-/// Returns a structured, machine-readable message optimized for AI consumption.
+/// Returns a simple mechanical message with facts about what changed.
+/// Format: "N file(s) in DIRS DELTA:+A/-B"
 ///
-/// Format: "N file(s) in DIRS: [file1, file2, ...] DELTA:+A/-B"
+/// # Why mechanical messages?
 ///
-/// Example: "5 file(s) in src,tests [src/sync.rs, src/daemon.rs, tests/sync_test.rs] DELTA:+42/-12"
+/// AI-generated commit messages are bad for AI workflows:
+/// - They try to summarize and hallucinate context
+/// - They're verbose and redundant (AI reads the diff, not the message)
+/// - They're inconsistent and hard to search
 ///
-/// Design goals:
-/// - Machine-parseable (consistent structure, no ambiguous heuristics)
-/// - Shows ACTUAL changed files, not categorization (AI can infer category from path)
-/// - Preserves DIRS for scope understanding
-/// - Compact — fits in git log --oneline without wrapping
+/// Simple mechanical facts work better:
+/// - Searchable: `git log --grep="sync.rs"` finds commits touching that file
+/// - Honest: no interpretation, just data
+/// - Compact: fits in `git log --oneline`
+/// - The AI gets its understanding from the actual diff, not the commit message
+///
+/// The commit message is an INDEX, not a description.
 fn compute_blast_radius(repo: &Path) -> String {
     let output = match run_git_capture_output(repo, &["diff", "--cached", "--numstat"], "numstat") {
         Ok(o) => o,
