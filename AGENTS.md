@@ -625,45 +625,77 @@ dracon-sync test-ai
 
 ## Commit Messages
 
-Commit messages are **mechanical facts**, not AI-generated summaries.
+Commit messages are **deterministic facts extracted from the diff**. No AI, no LLMs, no prose.
 
-### Why not AI-generated messages?
+### Core Principle: No AI-Generated Messages
 
-AI-generated commit messages are bad for AI workflows:
-- They hallucinate context and intent
-- They try to summarize but AI reads the diff anyway
-- They're verbose, inconsistent, and noisy
-- They add zero information over the actual diff
+- **No LLM at the commit boundary** — zero AI calls when generating commit messages
+- **No inference, no guessing** — just regex on git diff output
+- **No prose** — structured key-value pairs only
+- **AI reads the diff, not the message** — the message is just an INDEX for searching
 
-### What we use instead
+### What Gets Extracted
 
-Deterministic extraction from the diff:
+From the diff, we deterministically extract:
+
+1. **Task state transitions** (from `todo.md`/`TODO.md` only)
+   - `[x]` → `CLOSED: task name`
+   - `[~]` → `WIP: task name`
+   - Only if the repo has a task file — no false positives from random markdown
+
+2. **Blast radius** (from `git diff --numstat`)
+   - `FILES:N` — total files changed
+   - `DIRS:X,Y` — top-level directories (scope)
+   - `[file1, file2]` — top 3 changed files (searchable)
+   - `DELTA:+A/-B` — lines added/removed
+
+3. **Metrics** (also from diff)
+   - `TEST:T` — lines changed in test files
+   - `BIN:B` — binary files changed
+
+### Commit Format
 
 ```
-CLOSED: First task, Third task | 2 file(s) in src [auth.py, db.py] DELTA:+50/-10
+[INTENT] | N file(s) in DIRS [files] DELTA:+A/-B [METRICS]
 ```
 
-**When tasks are completed** (markdown `[ ]` → `[x]` in todo.md):
-- Task names appear first: `CLOSED: task1, task2`
-- Searchable: `git log --grep="First task"` finds the exact commit
-- No inference — just extracted from the diff with regex
+**Examples:**
 
-**When no tasks are completed**, just shows blast radius:
+```bash
+# Task completed + test code written
+CLOSED: Implement JWT | 3 file(s) in src [auth.py, jwt.py] DELTA:+140/-12 | TEST:45
+
+# Task in progress (partial work)
+WIP: Refactor DB pool | 2 file(s) in src [db.py] DELTA:+50/-10
+
+# No tasks, just code changes
+5 file(s) in src [auth.py, db.py] DELTA:+100/-20 | TEST:30
+
+# Binary file added (context window warning for AI)
+1 file(s) in assets [logo.png] DELTA:+0/-0 | BIN:1
 ```
-3 file(s) in src [auth.py, db.py, utils.py] DELTA:+100/-20
+
+### How AI Searches This
+
+```bash
+# Find when a specific task was completed
+git log --grep="JWT"
+
+# Find all paused/in-progress work
+git log --grep="WIP:"
+
+# Find commits touching auth code
+git log --grep="DIRS:auth"
+
+# Find commits with binary files (skip in context window)
+git log --grep="BIN:"
 ```
 
-### What's included
+### What This Is NOT
 
-- **CLOSED:** — task names from `[x]` completions in markdown diffs (if any)
-- **FILES:N** — total files changed
-- **DIRS:X,Y** — top-level directories touched (scope)
-- **[file1, file2]** — top 3 changed files by lines (searchable)
-- **DELTA:+A/-B** — lines added/removed
-
-### The commit message is an INDEX, not a description
-
-AI gets its understanding from the **diff**, not the commit message. The message just helps you find the right commit when searching.
+- NOT AI-scribed messages (removed — they were useless)
+- NOT conventional commits (`feat:`, `fix:`) — human bias
+- NOT natural language summaries — AI reads the diff
 
 ## Environment Variables
 
