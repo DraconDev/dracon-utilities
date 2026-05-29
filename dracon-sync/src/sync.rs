@@ -1010,9 +1010,6 @@ async fn stage_commit_and_push(
         .map(|(path, status)| dracon_git::types::DiffFile { path, status })
         .collect();
 
-    let task_description = scan_staged_tasks(repo);
-    let blast_radius = compute_blast_radius(repo);
-
     let version_bumped = false;
 
     if committed_entries.is_empty() {
@@ -1032,11 +1029,8 @@ async fn stage_commit_and_push(
         return Ok(Some(SyncOutcome::NothingToDo));
     }
 
-    // Build routing key: [INTENT] | [BLAST RADIUS]
-    let msg = match task_description {
-        Some(ref intent) => format!("{} | {}", intent, blast_radius),
-        None => blast_radius.clone(),
-    };
+    // Simple commit message - just "update" + file count
+    let msg = format!("update {} file(s)", committed_entries.len());
 
     if dry_run {
         println!(
