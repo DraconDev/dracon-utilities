@@ -988,35 +988,24 @@ struct TaskTransitions {
 
 /// Extract task state transitions from the staged diff.
 ///
-/// Only extracts from files named `todo.md` or `TODO.md` (case-insensitive).
-/// Ignores random markdown files to avoid false positives.
-///
-/// Scans for:
+/// Scans ALL markdown files for:
 /// - `- [x]` additions → task completed (CLOSED)
 /// - `- [~]` additions → task in-progress (WIP)
+///
+/// This catches task completions in any .md file:
+/// - todo.md, TODO.md, tasks.md
+/// - audit.md, AUDIT.md
+/// - Any other markdown file with checkboxes
 ///
 /// This is deterministic — no LLM, no inference. Just regex on the diff.
 /// The AI can then search `git log --grep="JWT"` to find when that task was touched.
 fn extract_task_transitions(repo: &Path) -> TaskTransitions {
-    // Only extract from todo/task files, not random markdown
-    let task_files = ["todo.md", "TODO.md", "tasks.md", "TASKS.md"];
-    
-    // Check if any of these files exist in the repo
-    let has_task_file = task_files.iter().any(|f| repo.join(f).exists());
-    if !has_task_file {
-        return TaskTransitions::default();
-    }
-
-    // Get the diff for task files only
-    let diff_args: Vec<&str> = {
-        let mut args = vec!["diff", "--cached", "--unified=0", "--"];
-        for f in &task_files {
-            args.push(f);
-        }
-        args
-    };
-    
-    let output = match run_git_capture_output(repo, &diff_args, "task-diff") {
+    // Get the diff for ALL markdown files
+    let output = match run_git_capture_output(
+        repo,
+        &["diff", "--cached", "--unified=0", "--", "*.md"],
+        "task-diff",
+    ) {
         Ok(o) => o,
         Err(_) => return TaskTransitions::default(),
     };

@@ -638,10 +638,10 @@ Commit messages are **deterministic facts extracted from the diff**. No AI, no L
 
 From the diff, we deterministically extract:
 
-1. **Task state transitions** (from `todo.md`/`TODO.md` only)
+1. **Task state transitions** (from ANY `.md` file)
    - `[x]` → `CLOSED: task name`
    - `[~]` → `WIP: task name`
-   - Only if the repo has a task file — no false positives from random markdown
+   - Works in `todo.md`, `audit.md`, `README.md`, any markdown file with checkboxes
 
 2. **Blast radius** (from `git diff --numstat`)
    - `FILES:N` — total files changed
