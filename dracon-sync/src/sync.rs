@@ -988,22 +988,22 @@ struct TaskTransitions {
 
 /// Extract task state transitions from the staged diff.
 ///
-/// Scans ALL markdown files for:
-/// - `- [x]` additions → task completed (CLOSED)
-/// - `- [~]` additions → task in-progress (WIP)
+/// Scans ALL staged files for:
+/// - `- [x]` or `// [x]` additions → task completed (CLOSED)
+/// - `- [~]` or `// [~]` additions → task in-progress (WIP)
 ///
-/// This catches task completions in any .md file:
-/// - todo.md, TODO.md, tasks.md
-/// - audit.md, AUDIT.md
-/// - Any other markdown file with checkboxes
+/// Works in any file:
+/// - Markdown: `- [x] Fix bug`
+/// - Code comments: `// [x] Implemented JWT`
+/// - Text files: `[x] Done`
+/// - Any file with checkbox syntax
 ///
 /// This is deterministic — no LLM, no inference. Just regex on the diff.
-/// The AI can then search `git log --grep="JWT"` to find when that task was touched.
 fn extract_task_transitions(repo: &Path) -> TaskTransitions {
-    // Get the diff for ALL markdown files
+    // Get the diff for ALL files (not just markdown)
     let output = match run_git_capture_output(
         repo,
-        &["diff", "--cached", "--unified=0", "--", "*.md"],
+        &["diff", "--cached", "--unified=0"],
         "task-diff",
     ) {
         Ok(o) => o,
@@ -1017,29 +1017,20 @@ fn extract_task_transitions(repo: &Path) -> TaskTransitions {
         if !line.starts_with('+') || line.starts_with("+++") {
             continue;
         }
-        let trimmed = &line[1..]; // Remove leading `+`
-        let trimmed = trimmed.trim();
+        let content = &line[1..]; // Remove leading `+`
+        let trimmed = content.trim();
 
-        // Check for `- [x]` or `- [X]` (completed)
-        if let Some(rest) = trimmed.strip_prefix("- [x]").or_else(|| trimmed.strip_prefix("- [X]")) {
-            let task = sanitize_task_name(rest.trim());
-            if !task.is_empty() {
-                transitions.closed.push(task);
-            }
-        } else if let Some(rest) = trimmed.strip_prefix("* [x]").or_else(|| trimmed.strip_prefix("* [X]")) {
-            let task = sanitize_task_name(rest.trim());
+        // Check for completed tasks: [x] or [X]
+        // Matches: `- [x]`, `* [x]`, `// [x]`, `# [x]`, plain `[x]`
+        if let Some(rest) = extract_checkbox_text(trimmed, 'x').or_else(|| extract_checkbox_text(trimmed, 'X')) {
+            let task = sanitize_task_name(rest);
             if !task.is_empty() {
                 transitions.closed.push(task);
             }
         }
-        // Check for `- [~]` (in-progress)
-        else if let Some(rest) = trimmed.strip_prefix("- [~]") {
-            let task = sanitize_task_name(rest.trim());
-            if !task.is_empty() {
-                transitions.progress.push(task);
-            }
-        } else if let Some(rest) = trimmed.strip_prefix("* [~]") {
-            let task = sanitize_task_name(rest.trim());
+        // Check for in-progress tasks: [~]
+        else if let Some(rest) = extract_checkbox_text(trimmed, '~') {
+            let task = sanitize_task_name(rest);
             if !task.is_empty() {
                 transitions.progress.push(task);
             }
@@ -1047,6 +1038,31 @@ fn extract_task_transitions(repo: &Path) -> TaskTransitions {
     }
 
     transitions
+}
+
+/// Extract text after a checkbox marker like `[x]`, `[~]`, etc.
+///
+/// Handles common prefixes:
+/// - `- [x] task` (markdown list)
+/// - `* [x] task` (markdown list)
+/// - `// [x] task` (code comment)
+/// - `# [x] task` (code comment)
+/// - `<!-- [x] task` (HTML comment)
+/// - `[x] task` (plain)
+fn extract_checkbox_text<'a>(line: &'a str, marker: char) -> Option<&'a str> {
+    // Build the marker pattern: `[x]`, `[~]`, etc.
+    let pattern = format!("[{}]", marker);
+    
+    // Try common prefixes
+    let prefixes = ["- ", "* ", "// ", "# ", "<!-- ", ""];
+    for prefix in &prefixes {
+        let full_prefix = format!("{}{}", prefix, pattern);
+        if let Some(rest) = line.strip_prefix(&full_prefix) {
+            return Some(rest.trim());
+        }
+    }
+    
+    None
 }
 
 /// Sanitize a task name for use in the routing key.
