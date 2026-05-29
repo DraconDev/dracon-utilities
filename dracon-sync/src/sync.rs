@@ -18,7 +18,7 @@ use crate::git::{
     cli_diff_entries, detect_large_blobs_ahead, git_name_status_entries, has_origin_remote,
     has_tracking_upstream, is_cherry_pick_in_progress, is_merge_in_progress, is_rebase_in_progress,
     is_repo_ready, prune_other_default_branch, push_with_retries, restore_paths,
-    run_git_with_timeout, unstage_excluded_paths, unstage_oversized_paths,
+    run_git_capture_output, run_git_with_timeout, unstage_excluded_paths, unstage_oversized_paths,
 };
 use crate::policy::{debug_enabled, load_repo_override, SyncPolicy};
 use crate::report::push_large_blob_threshold_bytes;
