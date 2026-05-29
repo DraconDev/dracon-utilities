@@ -1435,6 +1435,15 @@ async fn run_do_task(
     max_bytes: usize,
 ) -> Result<DoCliResponse> {
     let cfg = load_config();
+    let home = dirs::home_dir().unwrap_or_default();
+    let system_root = cfg
+        .system_root
+        .clone()
+        .unwrap_or_else(|| home.join("dracon"));
+    let nixos_root = cfg
+        .nixos_root
+        .clone()
+        .unwrap_or_else(|| home.join("dracon/nixos"));
     let mut messages: Vec<ChatMessage> = vec![
         ChatMessage {
             role: "system".to_string(),
@@ -1449,14 +1458,8 @@ async fn run_do_task(
                 std::env::current_dir()
                     .unwrap_or_else(|_| PathBuf::from("."))
                     .display(),
-                cfg.system_root
-                    .as_deref()
-                    .unwrap_or_else(|| dirs::home_dir().unwrap_or_default().join("dracon").leak())
-                    .display(),
-                cfg.nixos_root
-                    .as_deref()
-                    .unwrap_or_else(|| dirs::home_dir().unwrap_or_default().join("dracon/nixos").leak())
-                    .display(),
+                system_root.display(),
+                nixos_root.display(),
             ),
         },
         ChatMessage {
@@ -1736,11 +1739,11 @@ async fn run_do_repl(
                         dim("config:"),
                         cfg.system_root
                             .as_deref()
-                            .unwrap_or_else(|| dirs::home_dir().unwrap_or_default().join("dracon").leak())
+                            .unwrap_or_else(|| dirs::home_dir().unwrap_or_default().join("dracon").as_path())
                             .display(),
                         cfg.nixos_root
                             .as_deref()
-                            .unwrap_or_else(|| dirs::home_dir().unwrap_or_default().join("dracon/nixos").leak())
+                            .unwrap_or_else(|| dirs::home_dir().unwrap_or_default().join("dracon/nixos").as_path())
                             .display(),
                         cfg.do_auto_probe_nix
                     );
