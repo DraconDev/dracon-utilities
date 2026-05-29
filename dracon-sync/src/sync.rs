@@ -977,6 +977,57 @@ async fn push_with_blob_check(ctx: &mut SyncContext<'_>, ahead: usize) -> Result
 
 
 
+/// Compute BLAST RADIUS from staged diff.
+/// Returns formatted string: "FILES:X DIRS:Y DELTA:+A/-B"
+fn compute_blast_radius(repo: &Path) -> String {
+    let output = match run_git_capture_output(repo, &["diff", "--cached", "--numstat"], "numstat") {
+        Ok(o) => o,
+        Err(_) => return "FILES:0 DIRS:none DELTA:+0/-0".to_string(),
+    };
+
+    let mut files = 0usize;
+    let mut added = 0i64;
+    let mut removed = 0i64;
+    let mut dirs: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+
+    for line in output.lines() {
+        let parts: Vec<&str> = line.split('\t').collect();
+        if parts.len() < 3 {
+            continue;
+        }
+        let a = parts[0].parse::<i64>().unwrap_or(0);
+        let r = parts[1].parse::<i64>().unwrap_or(0);
+        let path = parts[2];
+
+        // Binary files show as "-" in numstat
+        if parts[0] != "-" {
+            added += a;
+        }
+        if parts[1] != "-" {
+            removed += r;
+        }
+        files += 1;
+
+        // Extract top-level directory
+        if let Some(first_component) = path.split('/').next() {
+            if !first_component.is_empty() && first_component != "." {
+                dirs.insert(first_component.to_string());
+            }
+        }
+    }
+
+    let dirs_str = if dirs.is_empty() {
+        "root".to_string()
+    } else {
+        dirs.iter().take(3).cloned().collect::<Vec<_>>().join(",")
+    };
+
+    format!(
+        "FILES:{} DIRS:{} DELTA:+{}/-{}",
+        files, dirs_str, added, removed
+    )
+}
+
 async fn stage_commit_and_push(
     svc: &GitService,
     ctx: &mut SyncContext<'_>,
@@ -1010,6 +1061,8 @@ async fn stage_commit_and_push(
         .map(|(path, status)| dracon_git::types::DiffFile { path, status })
         .collect();
 
+    let blast_radius = compute_blast_radius(repo);
+
     let version_bumped = false;
 
     if committed_entries.is_empty() {
@@ -1029,8 +1082,8 @@ async fn stage_commit_and_push(
         return Ok(Some(SyncOutcome::NothingToDo));
     }
 
-    // Simple commit message - just "update" + file count
-    let msg = format!("update {} file(s)", committed_entries.len());
+    // Use blast radius as commit message
+    let msg = blast_radius;
 
     if dry_run {
         println!(
