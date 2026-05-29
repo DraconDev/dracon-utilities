@@ -1054,27 +1054,67 @@ fn sanitize_task_name(name: &str) -> String {
         .to_string()
 }
 
+/// Check if a file path looks like a test file.
+///
+/// Common patterns:
+/// - tests/, test/, __tests__/
+/// - *_test.rs, *_test.py, *_test.go
+/// - *.test.ts, *.test.js, *.spec.ts
+/// - test_*.py, test_*.rs
+fn is_test_file(path: &str) -> bool {
+    let lower = path.to_ascii_lowercase();
+    let basename = path.rsplit('/').next().unwrap_or(path);
+    let basename_lower = basename.to_ascii_lowercase();
+
+    // Directory patterns
+    if lower.contains("/test") || lower.contains("/tests") || lower.contains("/__tests__") {
+        return true;
+    }
+
+    // Suffix patterns (before extension)
+    if basename_lower.contains("_test.") || basename_lower.contains("_tests.")
+        || basename_lower.contains(".test.") || basename_lower.contains(".spec.")
+    {
+        return true;
+    }
+
+    // Prefix patterns
+    if basename_lower.starts_with("test_") {
+        return true;
+    }
+
+    false
+}
+
 /// Compute commit message from staged diff.
 ///
-/// Returns a simple mechanical message with facts about what changed.
+/// Returns a structured message with task state + blast radius.
 ///
-/// Format: "[CLOSED: task1, task2] | N file(s) in DIRS DELTA:+A/-B"
+/// Format: "[INTENT] | FILES:N DIRS:X DELTA:+A/-B [TEST:T] [BIN:B]"
 ///
-/// If tasks are completed, they appear first for searchability:
-/// - `git log --grep="JWT"` finds the commit where JWT was implemented
+/// INTENT (from markdown diff):
+/// - `CLOSED: task1, task2` — tasks marked [x]
+/// - `WIP: task1` — tasks marked [~]
+/// - Omitted if no task transitions found
 ///
-/// If no tasks are completed, just shows the blast radius:
-/// - `git log --grep="sync.rs"` finds commits touching that file
+/// BLAST RADIUS (from git diff --numstat):
+/// - FILES:N — total files changed
+/// - DIRS:X,Y — top-level directories touched
+/// - DELTA:+A/-B — lines added/removed
+///
+/// METRICS (also from diff):
+/// - TEST:T — lines changed in test files (shows if AI wrote tests)
+/// - BIN:B — binary files changed (context window warning)
 ///
 /// # Why mechanical messages?
 ///
 /// AI-generated commit messages are bad for AI workflows:
-/// - They try to summarize and hallucinate context
-/// - They're verbose and redundant (AI reads the diff, not the message)
-/// - They're inconsistent and hard to search
+/// - They hallucinate context and intent
+/// - They try to summarize but AI reads the diff anyway
+/// - They're verbose, inconsistent, and noisy
 ///
 /// Simple mechanical facts work better:
-/// - Searchable: `git log --grep="sync.rs"` finds commits touching that file
+/// - Searchable: `git log --grep="JWT"` finds commits touching that task
 /// - Honest: no interpretation, just data
 /// - Compact: fits in `git log --oneline`
 /// - The AI gets its understanding from the actual diff, not the commit message
@@ -1091,22 +1131,42 @@ fn compute_blast_radius(repo: &Path) -> String {
     let mut removed = 0i64;
     let mut dirs: BTreeSet<String> = BTreeSet::new();
     let mut file_changes: Vec<(i64, String)> = Vec::new();
+    let mut test_lines = 0i64;
+    let mut binary_count = 0usize;
 
     for line in output.lines() {
         let parts: Vec<&str> = line.split('\t').collect();
         if parts.len() < 3 {
             continue;
         }
-        let a = parts[0].parse::<i64>().unwrap_or(0);
-        let r = parts[1].parse::<i64>().unwrap_or(0);
+        let a = parts[0];
+        let r = parts[1];
         let path = parts[2];
 
-        let a_val = if parts[0] != "-" { a } else { 0 };
-        let r_val = if parts[1] != "-" { r } else { 0 };
+        // Binary files show as "-" in numstat
+        if a == "-" || r == "-" {
+            binary_count += 1;
+            files += 1;
+            // Still track the directory
+            if let Some(first_component) = path.split('/').next() {
+                if !first_component.is_empty() && first_component != "." {
+                    dirs.insert(first_component.to_string());
+                }
+            }
+            continue;
+        }
+
+        let a_val = a.parse::<i64>().unwrap_or(0);
+        let r_val = r.parse::<i64>().unwrap_or(0);
 
         added += a_val;
         removed += r_val;
         files += 1;
+
+        // Track test file lines separately
+        if is_test_file(path) {
+            test_lines += a_val + r_val;
+        }
 
         // Extract top-level directory for scope
         if let Some(first_component) = path.split('/').next() {
@@ -1127,34 +1187,56 @@ fn compute_blast_radius(repo: &Path) -> String {
         .map(|(_, path)| path.clone())
         .collect();
 
+    // Build routing key components
+
+    // 1. Task intent (from markdown diff)
+    let transitions = extract_task_transitions(repo);
+    let intent_prefix = {
+        let mut parts = Vec::new();
+        if !transitions.closed.is_empty() {
+            parts.push(format!("CLOSED: {}", transitions.closed.join(", ")));
+        }
+        if !transitions.progress.is_empty() {
+            parts.push(format!("WIP: {}", transitions.progress.join(", ")));
+        }
+        if parts.is_empty() {
+            String::new()
+        } else {
+            format!("{} | ", parts.join(" | "))
+        }
+    };
+
+    // 2. File count and dirs
     let dirs_str = if dirs.is_empty() {
         "root".to_string()
     } else {
         dirs.iter().take(3).cloned().collect::<Vec<_>>().join(",")
     };
 
+    // 3. Top changed files
     let files_str = if top_files.is_empty() {
         String::new()
     } else {
         format!(" [{}]", top_files.join(", "))
     };
 
-    // Extract completed tasks from markdown diff
-    let completed_tasks = extract_completed_tasks(repo);
-    let task_prefix = if completed_tasks.is_empty() {
+    // 4. Metrics suffix
+    let mut metrics = Vec::new();
+    if test_lines > 0 {
+        metrics.push(format!("TEST:{}", test_lines));
+    }
+    if binary_count > 0 {
+        metrics.push(format!("BIN:{}", binary_count));
+    }
+    let metrics_str = if metrics.is_empty() {
         String::new()
     } else {
-        // Sanitize task names: remove brackets that would confuse parsing
-        let sanitized: Vec<String> = completed_tasks
-            .iter()
-            .map(|t| t.replace('[', "(").replace(']', ")"))
-            .collect();
-        format!("CLOSED: {} | ", sanitized.join(", "))
+        format!(" | {}", metrics.join(" "))
     };
 
     format!(
-        "{}{} file(s) in {}{} DELTA:+{}/-{}",
-        task_prefix, files, dirs_str, files_str, added, removed
+        "{}{} file(s) in {}{} DELTA:+{}/-{}{}",
+        intent_prefix, files, dirs_str, files_str, added, removed, metrics_str
     )
 }
 
