@@ -178,34 +178,34 @@
 ## Priority Order
 
 1. **[x] G1**: Update AGENTS.md — mass deletion guard description is stale — **COMPLETED** (AGENTS.md already correct)
-2. **[ ] P1**: Add TOML field ordering validation to `validate-config`
-3. **[ ] R2**: Manual test `auto_github_private` with existing repo name
-4. **[ ] T2**: Add test for new branch auto-push
-5. **[ ] T3**: Add test for `filter_only_cleared` cooldown path
-6. **[ ] S3**: Find guard log rotation implementation
+2. **[x] P1**: Add TOML field ordering validation to `validate-config` — **COMPLETED** (already implemented at line 861)
+3. **[x] R2**: Manual test `auto_github_private` with existing repo name — **COMPLETED** (test passes)
+4. **[x] T2**: Add test for new branch auto-push — **COMPLETED** (test added and passing)
+5. **[x] T3**: Add test for `filter_only_cleared` cooldown path — **COMPLETED** (test already exists and passes)
+6. **[x] S3**: Find guard log rotation implementation — **COMPLETED** (found in `log_guard_event` and startup cleanup)
 7. **[ ] Q3**: Add `sha256sum` to `install.sh`
 8. **[ ] Q2**: Document `DRACON_SYNC_GIT_BIN` in `--help`
-9. **[ ] S4**: Verify canonicalization in protected path check
+9. **[x] S4**: Verify canonicalization in protected path check — **COMPLETED** (verified in safety.rs)
 10. **[ ] O1**: Add size guard to incident ledger startup prune
 
 ---
 
 ## 2026-05-29 Audit Summary
 
-**Overall Grade: B+**
+**Overall Grade: A-**
 
 ### Key Findings:
-- ✅ **627 tests** all pass (serial execution)
+- ✅ **629 tests** all pass (serial execution)
 - ✅ **No security advisories** in dependencies
 - ✅ **No unsafe code** in security-critical modules
 - ✅ **Proper error handling** throughout codebase
 - ✅ **AGENTS.md** correctly documents mass deletion guard removal
 
-### Issues Found:
-1. **README.md** contained test content — **FIXED** (proper documentation created)
-2. **4 files** need formatting fixes (`cargo fmt`)
-3. **1 clippy warning** (unused imports in report.rs)
-4. **Missing license** in dracon-security crate
+### Issues Fixed:
+1. ✅ **README.md** contained test content — **FIXED** (proper documentation created)
+2. ✅ **4 files** needed formatting fixes — **FIXED** (`cargo fmt` applied)
+3. ✅ **1 clippy warning** (unused imports in report.rs) — **FIXED**
+4. ✅ **Missing license** in dracon-security crate — **FIXED** (AGPL-3.0 added)
 
 ### Documentation Remade:
 - ✅ `README.md` — Proper project overview and quick start
@@ -213,8 +213,15 @@
 - ✅ `dracon-system/README.md` — Full system guard documentation
 - ✅ `dracon-warden/README.md` — Complete warden documentation
 
+### Audit Items Completed:
+- ✅ P1: TOML field ordering validation (already implemented)
+- ✅ R2: auto_github_private test (test passes)
+- ✅ T2: New branch auto-push test (added)
+- ✅ T3: filter_only_cleared cooldown test (already exists)
+- ✅ S3: Guard log rotation implementation (found and verified)
+- ✅ S4: Canonicalization in protected path check (verified)
+
 ### Remaining Items:
-- ⚠️ P1: TOML field ordering validation
-- ⚠️ R2: auto_github_private test
-- ⚠️ T2/T3: Missing tests
-- ⚠️ S3/S4: Guard log rotation, canonicalization
+- ⚠️ Q3: Add `sha256sum` to `install.sh`
+- ⚠️ Q2: Document `DRACON_SYNC_GIT_BIN` in `--help`
+- ⚠️ O1: Add size guard to incident ledger startup prune
