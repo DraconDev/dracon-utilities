@@ -652,6 +652,9 @@ From the diff, we deterministically extract:
 3. **Metrics** (also from diff)
    - `TEST:T` — lines changed in test files
    - `BIN:B` — binary files changed
+   - `NEW:file1,file2` — newly created files (searchable)
+   - `DEL:file1,file2` — deleted files (searchable)
+   - `DEPS:changed` — dependency file modified (Cargo.toml, package.json, etc.)
 
 ### Commit Format
 
@@ -668,11 +671,17 @@ CLOSED: Implement JWT | 3 file(s) in src [auth.py, jwt.py] DELTA:+140/-12 | TEST
 # Task in progress (partial work)
 WIP: Refactor DB pool | 2 file(s) in src [db.py] DELTA:+50/-10
 
-# No tasks, just code changes
-5 file(s) in src [auth.py, db.py] DELTA:+100/-20 | TEST:30
+# New files added
+CLOSED: Add auth module | 5 file(s) in src [auth.py, jwt.py] DELTA:+200/-0 | NEW:src/auth.py,src/jwt.py TEST:80
+
+# Dependency change (security audit signal)
+2 file(s) in . [Cargo.toml, Cargo.lock] DELTA:+50/-10 | DEPS:changed
 
 # Binary file added (context window warning for AI)
 1 file(s) in assets [logo.png] DELTA:+0/-0 | BIN:1
+
+# Files deleted (refactoring)
+3 file(s) in src [old.py, legacy.py] DELTA:+0/-150 | DEL:src/old.py,src/legacy.py
 ```
 
 ### How AI Searches This
@@ -689,6 +698,15 @@ git log --grep="DIRS:auth"
 
 # Find commits with binary files (skip in context window)
 git log --grep="BIN:"
+
+# Find commits where new files were added
+git log --grep="NEW:"
+
+# Find commits where files were deleted
+git log --grep="DEL:"
+
+# Find commits with dependency changes (security audit)
+git log --grep="DEPS:"
 ```
 
 ### What This Is NOT
