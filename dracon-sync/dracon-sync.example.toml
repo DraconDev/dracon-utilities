@@ -2,6 +2,11 @@
 # Path: ~/.dracon/utilities/sync/dracon-sync.toml
 #
 # This controls how dracon-sync watches and syncs your repos.
+#
+# ⚠️  TOML FIELD ORDERING: Top-level fields (like standard_files) must appear
+# BEFORE any section headers ([...] or [[...]]). Fields after a section header
+# are silently parsed as belonging to that section and will be ignored by the
+# policy loader.
 
 # =============================================================================
 #  SECTION 1: THE SOVEREIGN CORE

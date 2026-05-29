@@ -821,6 +821,7 @@ dependencies = [
  "cfb-mode",
  "dirs",
  "log",
+ "once_cell",
  "proptest",
  "rand 0.8.6",
  "rayon",

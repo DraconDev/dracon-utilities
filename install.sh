@@ -425,6 +425,11 @@ echo "✅ Installation complete!"
 echo ""
 echo "Binaries:"
 ls -la ~/.local/bin/dracon-* 2>/dev/null || true
+echo ""
+echo "Checksums:"
+for bin in ~/.local/bin/dracon-*; do
+    [ -f "$bin" ] && sha256sum "$bin" 2>/dev/null || true
+done
 
 # Verify running daemons are using the installed binary
 VERIFY_OK=true
