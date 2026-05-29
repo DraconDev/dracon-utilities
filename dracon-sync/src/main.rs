@@ -98,8 +98,7 @@ enum Command {
         #[arg(long)]
         dry_run: bool,
         /// No-op (mass deletion guard removed; kept for CLI compatibility).
-        #[arg(long)]
-        #[allow(dead_code)]
+        #[arg(long, hide = true)]
         force: bool,
     },
     /// Pause sync (creates freeze marker).

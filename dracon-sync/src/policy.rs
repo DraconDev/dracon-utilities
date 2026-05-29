@@ -70,7 +70,6 @@ impl StandardFilesEntry {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-#[allow(dead_code)]
 pub(crate) struct RemoteConfig {
     pub(crate) name: String,
     pub(crate) push_url: String,
@@ -99,7 +98,6 @@ pub(crate) struct RemoteConfig {
     pub(crate) force_push_when_behind: bool,
 }
 
-#[allow(dead_code)]
 impl RemoteConfig {
     pub(crate) fn resolve_push_url(&self, repo_name: &str) -> String {
         let resolved_name = self
