@@ -1196,7 +1196,7 @@ fn compute_blast_radius(repo: &Path) -> String {
     }
 
     // Sort by lines changed descending, take top 3
-    file_changes.sort_by(|a, b| b.0.cmp(&a.0));
+    file_changes.sort_by_key(|b| std::cmp::Reverse(b.0));
     let top_files: Vec<String> = file_changes
         .iter()
         .take(3)
