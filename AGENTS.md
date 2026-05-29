@@ -530,7 +530,7 @@ The primary safety mechanism is now `IndexLock` (`.git/index.lock` coordination)
 
 **Incident response after a block:** Read the incident ledger at `~/.local/state/dracon/dracon-sync-incidents.jsonl` to understand what was blocked and why.
 
-**dracon-sync commit message generation:** Instead of writing project-state.md and extracting a focus line, the scribe now generates commit subjects directly from diffs. The AI receives the current diff (highlighted as the main change), 10 previous diffs (background context), and recent commit subjects, then returns a single subject line. This produces unique, specific messages every cycle. When AI is unavailable, a local file-pattern fallback generates messages like "update auth, jwt and 2 files".
+**dracon-sync commit message generation:** Commit messages are now simple mechanical messages (e.g., "update 3 file(s)"). AI scribe was removed as AI-generated messages were not useful for AI workflows. No task scanning or blast radius calculation is performed.
 
 ### dracon-system
 
@@ -623,32 +623,9 @@ README for the full inventory and creation instructions.
 dracon-sync test-ai
 ```
 
-## The Scribe: AI Commit Message Generator
+## Commit Messages
 
-The scribe generates unique, semantic commit subjects from diffs each sync cycle. It no longer writes or reads `project-state.md` — commit messages are generated directly from the actual code changes.
-
-### How It Works
-
-1. Collect current staged diff + 10 previous diffs + recent commit subjects
-2. AI receives the current diff (highlighted as THE main change) and previous diffs (background only)
-3. AI returns a single subject line in conventional commit format (e.g., `fix(auth): validate JWT expiry before accepting tokens`)
-4. Category/scope are extracted from the AI subject; `build_commit_message` assembles the final commit with footer
-
-### Fallback When AI Unavailable
-
-If no AI providers are configured or all fail, a local file-pattern fallback generates messages like `update auth, jwt and 2 files` from changed file stems.
-
-### Why Frequent Commits?
-
-Sync commits every change because:
-- The AI reads git history to understand past work
-- Every commit is a checkpoint the AI can recover to
-- More commits = better context for the AI's "what was I doing?"
-- Commits are cheap; context is valuable
-
-### Manual project-state.md
-
-The AI can still maintain `.dracon/project-state.md` manually for its own working memory across sessions. Sync no longer auto-generates, stages, or commits this file. If the AI wants it tracked, it must `git add` it explicitly.
+Commit messages are simple mechanical messages (e.g., "update 3 file(s)"). No AI scribe, task scanning, or blast radius calculation is performed. This is intentional — AI-generated messages were not useful for AI workflows.
 
 ## Environment Variables
 
