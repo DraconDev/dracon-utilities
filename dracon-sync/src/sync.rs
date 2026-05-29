@@ -977,14 +977,24 @@ async fn push_with_blob_check(ctx: &mut SyncContext<'_>, ahead: usize) -> Result
 
 
 
-/// Extract completed task names from the staged diff.
+/// Task state transitions extracted from a markdown diff.
+#[derive(Debug, Default)]
+struct TaskTransitions {
+    /// Tasks marked `[x]` (completed)
+    closed: Vec<String>,
+    /// Tasks marked `[~]` (in-progress)
+    progress: Vec<String>,
+}
+
+/// Extract task state transitions from the staged diff.
 ///
-/// Scans markdown files (todo.md, TODO.md, *.md) for lines that changed
-/// from `- [ ]` to `- [x]`. Returns the task text for each completion.
+/// Scans markdown files for:
+/// - `- [x]` additions → task completed (CLOSED)
+/// - `- [~]` additions → task in-progress (WIP)
 ///
 /// This is deterministic — no LLM, no inference. Just regex on the diff.
-/// The AI can then search `git log --grep="JWT"` to find when that task was completed.
-fn extract_completed_tasks(repo: &Path) -> Vec<String> {
+/// The AI can then search `git log --grep="JWT"` to find when that task was touched.
+fn extract_task_transitions(repo: &Path) -> TaskTransitions {
     // Get the diff for markdown files
     let output = match run_git_capture_output(
         repo,
@@ -992,49 +1002,56 @@ fn extract_completed_tasks(repo: &Path) -> Vec<String> {
         "task-diff",
     ) {
         Ok(o) => o,
-        Err(_) => return Vec::new(),
+        Err(_) => return TaskTransitions::default(),
     };
 
-    let mut tasks = Vec::new();
-    let mut removed_open: std::collections::HashSet<String> = std::collections::HashSet::new();
-    let mut added_closed: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut transitions = TaskTransitions::default();
 
     for line in output.lines() {
-        // Look for removed lines with `- [ ]` (the old open task)
-        if line.starts_with('-') && !line.starts_with("---") {
-            let trimmed = &line[1..]; // Remove the leading `-`
-            let trimmed = trimmed.trim();
-            if let Some(rest) = trimmed.strip_prefix("- [ ]").or_else(|| trimmed.strip_prefix("- [~]")) {
-                removed_open.insert(rest.trim().to_string());
-            } else if let Some(rest) = trimmed.strip_prefix("* [ ]").or_else(|| trimmed.strip_prefix("* [~]")) {
-                removed_open.insert(rest.trim().to_string());
+        // Only look at ADDED lines (start with `+` but not `+++`)
+        if !line.starts_with('+') || line.starts_with("+++") {
+            continue;
+        }
+        let trimmed = &line[1..]; // Remove leading `+`
+        let trimmed = trimmed.trim();
+
+        // Check for `- [x]` or `- [X]` (completed)
+        if let Some(rest) = trimmed.strip_prefix("- [x]").or_else(|| trimmed.strip_prefix("- [X]")) {
+            let task = sanitize_task_name(rest.trim());
+            if !task.is_empty() {
+                transitions.closed.push(task);
+            }
+        } else if let Some(rest) = trimmed.strip_prefix("* [x]").or_else(|| trimmed.strip_prefix("* [X]")) {
+            let task = sanitize_task_name(rest.trim());
+            if !task.is_empty() {
+                transitions.closed.push(task);
             }
         }
-        // Look for added lines with `- [x]` (the new completed task)
-        if line.starts_with('+') && !line.starts_with("+++") {
-            let trimmed = &line[1..]; // Remove the leading `+`
-            let trimmed = trimmed.trim();
-            if let Some(rest) = trimmed.strip_prefix("- [x]").or_else(|| trimmed.strip_prefix("- [X]")) {
-                added_closed.insert(rest.trim().to_string());
-            } else if let Some(rest) = trimmed.strip_prefix("* [x]").or_else(|| trimmed.strip_prefix("* [X]")) {
-                added_closed.insert(rest.trim().to_string());
+        // Check for `- [~]` (in-progress)
+        else if let Some(rest) = trimmed.strip_prefix("- [~]") {
+            let task = sanitize_task_name(rest.trim());
+            if !task.is_empty() {
+                transitions.progress.push(task);
+            }
+        } else if let Some(rest) = trimmed.strip_prefix("* [~]") {
+            let task = sanitize_task_name(rest.trim());
+            if !task.is_empty() {
+                transitions.progress.push(task);
             }
         }
     }
 
-    // A task completion is when a previously open task (`- [ ]`) was removed
-    // AND a closed task (`- [x]`) was added with the same or similar text.
-    // To be safe, we just report any newly added `- [x]` lines.
-    // The downstream AI can read the diff to verify.
-    for task in added_closed {
-        // Sanitize: remove pipe chars that would break the routing key
-        let sanitized = task.replace('|', "/");
-        if !sanitized.is_empty() {
-            tasks.push(sanitized);
-        }
-    }
+    transitions
+}
 
-    tasks
+/// Sanitize a task name for use in the routing key.
+/// Removes chars that would break parsing (pipes, brackets).
+fn sanitize_task_name(name: &str) -> String {
+    name.replace('|', "/")
+        .replace('[', "(")
+        .replace(']', ")")
+        .trim()
+        .to_string()
 }
 
 /// Compute commit message from staged diff.
