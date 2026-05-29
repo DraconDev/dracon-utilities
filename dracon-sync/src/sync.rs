@@ -1042,19 +1042,18 @@ fn extract_task_transitions(repo: &Path) -> TaskTransitions {
 
 /// Extract text after a checkbox marker like `[x]`, `[~]`, etc.
 ///
-/// Handles common prefixes:
+/// Handles common text/markdown prefixes:
 /// - `- [x] task` (markdown list)
 /// - `* [x] task` (markdown list)
-/// - `// [x] task` (code comment)
-/// - `# [x] task` (code comment)
-/// - `<!-- [x] task` (HTML comment)
-/// - `[x] task` (plain)
+/// - `[x] task` (plain text)
+///
+/// Does NOT match code comments (`//`, `#`) — nobody puts checkmarks in code.
 fn extract_checkbox_text<'a>(line: &'a str, marker: char) -> Option<&'a str> {
     // Build the marker pattern: `[x]`, `[~]`, etc.
     let pattern = format!("[{}]", marker);
     
-    // Try common prefixes
-    let prefixes = ["- ", "* ", "// ", "# ", "<!-- ", ""];
+    // Try common text/markdown prefixes only
+    let prefixes = ["- ", "* ", ""];
     for prefix in &prefixes {
         let full_prefix = format!("{}{}", prefix, pattern);
         if let Some(rest) = line.strip_prefix(&full_prefix) {
