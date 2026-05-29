@@ -637,16 +637,29 @@ AI-generated commit messages are bad for AI workflows:
 
 ### What we use instead
 
-Simple mechanical facts:
+Deterministic extraction from the diff:
 
 ```
-5 file(s) in src,dracon [src/sync.rs, src/daemon.rs, dracon/policy.toml] DELTA:+150/-20
+CLOSED: First task, Third task | 2 file(s) in src [auth.py, db.py] DELTA:+50/-10
 ```
 
-- **File count** — how much changed
-- **DIRS** — which directories (scope)
-- **File list** — searchable with `git log --grep="sync.rs"`
-- **DELTA** — lines added/removed
+**When tasks are completed** (markdown `[ ]` → `[x]` in todo.md):
+- Task names appear first: `CLOSED: task1, task2`
+- Searchable: `git log --grep="First task"` finds the exact commit
+- No inference — just extracted from the diff with regex
+
+**When no tasks are completed**, just shows blast radius:
+```
+3 file(s) in src [auth.py, db.py, utils.py] DELTA:+100/-20
+```
+
+### What's included
+
+- **CLOSED:** — task names from `[x]` completions in markdown diffs (if any)
+- **FILES:N** — total files changed
+- **DIRS:X,Y** — top-level directories touched (scope)
+- **[file1, file2]** — top 3 changed files by lines (searchable)
+- **DELTA:+A/-B** — lines added/removed
 
 ### The commit message is an INDEX, not a description
 
