@@ -2121,7 +2121,7 @@ fn create_private_remote(repo: &Path) -> Option<String> {
 mod tests {
     use super::*;
     use crate::test_helpers::EnvRestorer;
-    use dracon_git::types::{DiffFile, FileStatus, RepoStatus};
+    use dracon_git::types::RepoStatus;
     use std::os::unix::fs::PermissionsExt;
 
     fn make_status(is_clean: bool, ahead: usize, behind: usize) -> RepoStatus {
