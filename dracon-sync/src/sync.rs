@@ -1,4 +1,4 @@
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::io::Write;
 use std::path::Path;
 use std::time::Duration;
@@ -977,10 +977,77 @@ async fn push_with_blob_check(ctx: &mut SyncContext<'_>, ahead: usize) -> Result
 
 
 
+/// Extract completed task names from the staged diff.
+///
+/// Scans markdown files (todo.md, TODO.md, *.md) for lines that changed
+/// from `- [ ]` to `- [x]`. Returns the task text for each completion.
+///
+/// This is deterministic — no LLM, no inference. Just regex on the diff.
+/// The AI can then search `git log --grep="JWT"` to find when that task was completed.
+fn extract_completed_tasks(repo: &Path) -> Vec<String> {
+    // Get the diff for markdown files
+    let output = match run_git_capture_output(
+        repo,
+        &["diff", "--cached", "--unified=0", "--", "*.md", "todo.md", "TODO.md"],
+        "task-diff",
+    ) {
+        Ok(o) => o,
+        Err(_) => return Vec::new(),
+    };
+
+    let mut tasks = Vec::new();
+    let mut removed_open: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut added_closed: std::collections::HashSet<String> = std::collections::HashSet::new();
+
+    for line in output.lines() {
+        // Look for removed lines with `- [ ]` (the old open task)
+        if line.starts_with('-') && !line.starts_with("---") {
+            let trimmed = &line[1..]; // Remove the leading `-`
+            let trimmed = trimmed.trim();
+            if let Some(rest) = trimmed.strip_prefix("- [ ]").or_else(|| trimmed.strip_prefix("- [~]")) {
+                removed_open.insert(rest.trim().to_string());
+            } else if let Some(rest) = trimmed.strip_prefix("* [ ]").or_else(|| trimmed.strip_prefix("* [~]")) {
+                removed_open.insert(rest.trim().to_string());
+            }
+        }
+        // Look for added lines with `- [x]` (the new completed task)
+        if line.starts_with('+') && !line.starts_with("+++") {
+            let trimmed = &line[1..]; // Remove the leading `+`
+            let trimmed = trimmed.trim();
+            if let Some(rest) = trimmed.strip_prefix("- [x]").or_else(|| trimmed.strip_prefix("- [X]")) {
+                added_closed.insert(rest.trim().to_string());
+            } else if let Some(rest) = trimmed.strip_prefix("* [x]").or_else(|| trimmed.strip_prefix("* [X]")) {
+                added_closed.insert(rest.trim().to_string());
+            }
+        }
+    }
+
+    // A task completion is when a previously open task (`- [ ]`) was removed
+    // AND a closed task (`- [x]`) was added with the same or similar text.
+    // To be safe, we just report any newly added `- [x]` lines.
+    // The downstream AI can read the diff to verify.
+    for task in added_closed {
+        // Sanitize: remove pipe chars that would break the routing key
+        let sanitized = task.replace('|', "/");
+        if !sanitized.is_empty() {
+            tasks.push(sanitized);
+        }
+    }
+
+    tasks
+}
+
 /// Compute commit message from staged diff.
 ///
 /// Returns a simple mechanical message with facts about what changed.
-/// Format: "N file(s) in DIRS DELTA:+A/-B"
+///
+/// Format: "[CLOSED: task1, task2] | N file(s) in DIRS DELTA:+A/-B"
+///
+/// If tasks are completed, they appear first for searchability:
+/// - `git log --grep="JWT"` finds the commit where JWT was implemented
+///
+/// If no tasks are completed, just shows the blast radius:
+/// - `git log --grep="sync.rs"` finds commits touching that file
 ///
 /// # Why mechanical messages?
 ///
@@ -1055,9 +1122,22 @@ fn compute_blast_radius(repo: &Path) -> String {
         format!(" [{}]", top_files.join(", "))
     };
 
+    // Extract completed tasks from markdown diff
+    let completed_tasks = extract_completed_tasks(repo);
+    let task_prefix = if completed_tasks.is_empty() {
+        String::new()
+    } else {
+        // Sanitize task names: remove brackets that would confuse parsing
+        let sanitized: Vec<String> = completed_tasks
+            .iter()
+            .map(|t| t.replace('[', "(").replace(']', ")"))
+            .collect();
+        format!("CLOSED: {} | ", sanitized.join(", "))
+    };
+
     format!(
-        "{} file(s) in {}{} DELTA:+{}/-{}",
-        files, dirs_str, files_str, added, removed
+        "{}{} file(s) in {}{} DELTA:+{}/-{}",
+        task_prefix, files, dirs_str, files_str, added, removed
     )
 }
 
