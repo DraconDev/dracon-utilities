@@ -12,7 +12,7 @@ use anyhow::{Context, Result};
 use base64::{engine::general_purpose, Engine as _};
 use cfb_mode::cipher::{AsyncStreamCipher, KeyIvInit};
 
-use once_cell::sync::OnceCell;
+use std::sync::OnceLock;
 use regex::Regex;
 use secrecy::ExposeSecret;
 use serde::{Deserialize, Serialize};
@@ -29,7 +29,7 @@ use zeroize::{Zeroize, ZeroizeOnDrop};
 const HEADER_V2_MAGIC: &[u8] = b"age-encryption.org/v1";
 const DEFAULT_SECRET_MARKER: &str = "DRACON_SECRET";
 
-static DEFAULT_SECURITY_CACHE: OnceCell<DemonSecurity> = OnceCell::new();
+static DEFAULT_SECURITY_CACHE: OnceLock<DemonSecurity> = OnceLock::new();
 
 static ALLOW_V1_FALLBACK: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
