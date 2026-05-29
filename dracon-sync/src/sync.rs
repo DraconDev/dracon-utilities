@@ -1075,6 +1075,83 @@ fn sanitize_task_name(name: &str) -> String {
         .to_string()
 }
 
+/// Detect dependency file changes from the staged diff.
+///
+/// Returns a list of dependency names that were added or removed.
+/// Looks for changes in:
+/// - Cargo.toml (Rust)
+/// - package.json (Node)
+/// - requirements.txt (Python)
+/// - go.mod (Go)
+///
+/// Format: `+dep1,-dep2` (added deps, removed deps)
+fn detect_dependency_changes(repo: &Path) -> Option<String> {
+    let dep_files = ["Cargo.toml", "package.json", "requirements.txt", "go.mod"];
+    
+    // Check if any dep files are in the staged diff
+    let has_dep_change = dep_files.iter().any(|f| {
+        let output = run_git_capture_output(
+            repo,
+            &["diff", "--cached", "--name-only", "--", f],
+            "dep-check",
+        );
+        output.map(|o| !o.trim().is_empty()).unwrap_or(false)
+    });
+    
+    if !has_dep_change {
+        return None;
+    }
+    
+    // For now, just report that deps changed
+    // TODO: Parse the actual diff to extract specific dep names
+    Some("changed".to_string())
+}
+
+/// Extract newly added and deleted files from the staged diff.
+///
+/// Returns (new_files, deleted_files) as vectors of file paths.
+fn extract_new_deleted_files(repo: &Path) -> (Vec<String>, Vec<String>) {
+    let output = match run_git_capture_output(
+        repo,
+        &["diff", "--cached", "--name-status"],
+        "name-status",
+    ) {
+        Ok(o) => o,
+        Err(_) => return (Vec::new(), Vec::new()),
+    };
+
+    let mut new_files = Vec::new();
+    let mut deleted_files = Vec::new();
+
+    for line in output.lines() {
+        let parts: Vec<&str> = line.split('\t').collect();
+        if parts.len() < 2 {
+            continue;
+        }
+        let status = parts[0];
+        let path = parts[1];
+        
+        // Only track source files, not lock files or generated files
+        let should_track = !path.ends_with(".lock") 
+            && !path.ends_with(".sum")
+            && !path.contains("/target/")
+            && !path.contains("/node_modules/")
+            && !path.contains("/__pycache__/");
+        
+        if !should_track {
+            continue;
+        }
+
+        match status {
+            "A" => new_files.push(path.to_string()),
+            "D" => deleted_files.push(path.to_string()),
+            _ => {} // Modified, renamed, etc.
+        }
+    }
+
+    (new_files, deleted_files)
+}
+
 /// Check if a file path looks like a test file.
 ///
 /// Common patterns:
@@ -1249,6 +1326,53 @@ fn compute_blast_radius(repo: &Path) -> String {
     if binary_count > 0 {
         metrics.push(format!("BIN:{}", binary_count));
     }
+    
+    // 5. New/deleted files
+    let (new_files, deleted_files) = extract_new_deleted_files(repo);
+    if !new_files.is_empty() {
+        // Show top 3 new files by name (searchable)
+        let display: Vec<String> = new_files.iter().take(3)
+            .map(|f| {
+                // Abbreviate: show just filename if nested
+                let parts: Vec<&str> = f.split('/').collect();
+                if parts.len() > 2 {
+                    parts[parts.len()-2..].join("/")
+                } else {
+                    f.clone()
+                }
+            })
+            .collect();
+        let suffix = if new_files.len() > 3 {
+            format!("+{}more", new_files.len() - 3)
+        } else {
+            String::new()
+        };
+        metrics.push(format!("NEW:{}{}", display.join(","), suffix));
+    }
+    if !deleted_files.is_empty() {
+        let display: Vec<String> = deleted_files.iter().take(3)
+            .map(|f| {
+                let parts: Vec<&str> = f.split('/').collect();
+                if parts.len() > 2 {
+                    parts[parts.len()-2..].join("/")
+                } else {
+                    f.clone()
+                }
+            })
+            .collect();
+        let suffix = if deleted_files.len() > 3 {
+            format!("+{}more", deleted_files.len() - 3)
+        } else {
+            String::new()
+        };
+        metrics.push(format!("DEL:{}{}", display.join(","), suffix));
+    }
+    
+    // 6. Dependency changes
+    if let Some(dep_info) = detect_dependency_changes(repo) {
+        metrics.push(format!("DEPS:{}", dep_info));
+    }
+    
     let metrics_str = if metrics.is_empty() {
         String::new()
     } else {
