@@ -1451,11 +1451,11 @@ async fn run_do_task(
                     .display(),
                 cfg.system_root
                     .as_deref()
-                    .unwrap_or_else(|| Path::new("/home/dracon/dracon"))
+                    .unwrap_or_else(|| dirs::home_dir().unwrap_or_default().join("dracon").leak())
                     .display(),
                 cfg.nixos_root
                     .as_deref()
-                    .unwrap_or_else(|| Path::new("/home/dracon/dracon/nixos"))
+                    .unwrap_or_else(|| dirs::home_dir().unwrap_or_default().join("dracon/nixos").leak())
                     .display(),
             ),
         },
@@ -1481,7 +1481,7 @@ async fn run_do_task(
         let nixos_root = cfg
             .nixos_root
             .clone()
-            .unwrap_or_else(|| PathBuf::from("/home/dracon/dracon/nixos"));
+            .unwrap_or_else(|| dirs::home_dir().unwrap_or_default().join("dracon/nixos"));
         let probes = [
             ("nix --version", "confirm nix is available"),
             (
@@ -1736,11 +1736,11 @@ async fn run_do_repl(
                         dim("config:"),
                         cfg.system_root
                             .as_deref()
-                            .unwrap_or_else(|| Path::new("/home/dracon/dracon"))
+                            .unwrap_or_else(|| dirs::home_dir().unwrap_or_default().join("dracon").leak())
                             .display(),
                         cfg.nixos_root
                             .as_deref()
-                            .unwrap_or_else(|| Path::new("/home/dracon/dracon/nixos"))
+                            .unwrap_or_else(|| dirs::home_dir().unwrap_or_default().join("dracon/nixos").leak())
                             .display(),
                         cfg.do_auto_probe_nix
                     );
