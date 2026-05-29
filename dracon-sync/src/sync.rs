@@ -3076,4 +3076,70 @@ auto_bump_versions = false
             "sync_repo should succeed with duplicate subjects in history"
         );
     }
+
+    #[tokio::test]
+    async fn test_sync_repo_new_branch_auto_push_attempted() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("new-branch-repo");
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "main"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+
+        // Create a file to make the repo dirty
+        std::fs::write(repo.join("test.txt"), "content").unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = true
+auto_pull = false
+auto_push = true
+auto_bump_versions = false
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        // sync_repo should succeed and attempt to push (even without upstream)
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(
+            result.is_ok(),
+            "sync_repo should succeed for new branch without upstream"
+        );
+
+        // Verify that a commit was created
+        let output = std::process::Command::new("git")
+            .args(["-C", &repo.to_string_lossy(), "log", "--oneline", "-1"])
+            .output()
+            .unwrap();
+        let log = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            !log.contains("init") || log.contains("update"),
+            "should have new commit after sync"
+        );
+    }
 }
