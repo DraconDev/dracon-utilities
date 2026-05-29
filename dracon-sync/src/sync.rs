@@ -986,13 +986,13 @@ fn scan_staged_tasks(repo: &Path) -> Option<String> {
             continue;
         }
         let content = line[1..].trim();
-        if content.starts_with("- [x]") || content.starts_with("- [X]") {
-            let task_text = content[5..].trim();
+        if let Some(rest) = content.strip_prefix("- [x]").or_else(|| content.strip_prefix("- [X]")) {
+            let task_text = rest.trim();
             if !task_text.is_empty() {
                 closed_tasks.push(task_text.to_string());
             }
-        } else if content.starts_with("- [~]") {
-            let task_text = content[5..].trim();
+        } else if let Some(rest) = content.strip_prefix("- [~]") {
+            let task_text = rest.trim();
             if !task_text.is_empty() {
                 wip_tasks.push(task_text.to_string());
             }
@@ -1003,7 +1003,7 @@ fn scan_staged_tasks(repo: &Path) -> Option<String> {
     }
     // Sanitize: strip brackets and pipes to prevent breaking regex delimiters
     let sanitize = |s: &str| {
-        s.replace('[', "").replace(']', "").replace('|', "/")
+        s.replace(['[', ']'], "").replace('|', "/")
     };
     let mut parts = Vec::new();
     if !closed_tasks.is_empty() {
