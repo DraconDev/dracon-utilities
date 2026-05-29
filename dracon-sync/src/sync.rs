@@ -1075,36 +1075,166 @@ fn sanitize_task_name(name: &str) -> String {
         .to_string()
 }
 
-/// Detect dependency file changes from the staged diff.
+/// Detect dependency changes from the staged diff.
 ///
-/// Returns a list of dependency names that were added or removed.
-/// Looks for changes in:
-/// - Cargo.toml (Rust)
-/// - package.json (Node)
-/// - requirements.txt (Python)
-/// - go.mod (Go)
+/// Parses Cargo.toml, package.json, requirements.txt, go.mod diffs
+/// to extract specific dependency names that were added or removed.
 ///
-/// Format: `+dep1,-dep2` (added deps, removed deps)
+/// Returns: `+dep1,+dep2,-dep3` or None if no dep files changed.
 fn detect_dependency_changes(repo: &Path) -> Option<String> {
-    let dep_files = ["Cargo.toml", "package.json", "requirements.txt", "go.mod"];
-    
-    // Check if any dep files are in the staged diff
-    let has_dep_change = dep_files.iter().any(|f| {
-        let output = run_git_capture_output(
+    let dep_files: &[(&str, &str)] = &[
+        ("Cargo.toml", "toml"),
+        ("package.json", "json"),
+        ("requirements.txt", "txt"),
+        ("go.mod", "gomod"),
+    ];
+
+    let mut added_deps = Vec::new();
+    let mut removed_deps = Vec::new();
+    let mut any_changed = false;
+
+    for (file, format) in dep_files {
+        // Get the diff for this file
+        let output = match run_git_capture_output(
             repo,
-            &["diff", "--cached", "--name-only", "--", f],
-            "dep-check",
-        );
-        output.map(|o| !o.trim().is_empty()).unwrap_or(false)
-    });
-    
-    if !has_dep_change {
+            &["diff", "--cached", "--unified=0", "--", file],
+            &format!("dep-diff-{}", file),
+        ) {
+            Ok(o) => o,
+            Err(_) => continue,
+        };
+
+        if output.trim().is_empty() {
+            continue;
+        }
+        any_changed = true;
+
+        // Parse based on format
+        for line in output.lines() {
+            if !line.starts_with('+') && !line.starts_with('-') {
+                continue;
+            }
+            if line.starts_with("+++") || line.starts_with("---") {
+                continue;
+            }
+
+            let is_add = line.starts_with('+');
+            let content = &line[1..].trim();
+
+            let dep_name = match *format {
+                "toml" => parse_cargo_dep(content),
+                "json" => parse_npm_dep(content),
+                "txt" => parse_pip_dep(content),
+                "gomod" => parse_go_dep(content),
+                _ => None,
+            };
+
+            if let Some(name) = dep_name {
+                if is_add {
+                    added_deps.push(name);
+                } else {
+                    removed_deps.push(name);
+                }
+            }
+        }
+    }
+
+    if !any_changed {
         return None;
     }
-    
-    // For now, just report that deps changed
-    // TODO: Parse the actual diff to extract specific dep names
-    Some("changed".to_string())
+
+    // Format output
+    let mut parts = Vec::new();
+    for dep in &added_deps {
+        parts.push(format!("+{}", dep));
+    }
+    for dep in &removed_deps {
+        parts.push(format!("-{}", dep));
+    }
+
+    if parts.is_empty() {
+        // Dep file changed but we couldn't parse specific deps
+        Some("changed".to_string())
+    } else {
+        // Limit to top 5 to keep title manageable
+        let display: Vec<String> = parts.iter().take(5).cloned().collect();
+        let suffix = if parts.len() > 5 {
+            format!("+{}more", parts.len() - 5)
+        } else {
+            String::new()
+        };
+        Some(format!("{}{}", display.join(","), suffix))
+    }
+}
+
+/// Parse a Cargo.toml dependency line like `serde = "1.0"` or `tokio = { version = "1" }`
+fn parse_cargo_dep(line: &str) -> Option<String> {
+    let trimmed = line.trim();
+    // Skip section headers and comments
+    if trimmed.starts_with('[') || trimmed.starts_with('#') || trimmed.is_empty() {
+        return None;
+    }
+    // Look for `name = ` pattern
+    if let Some(eq_pos) = trimmed.find('=') {
+        let name = trimmed[..eq_pos].trim();
+        if !name.is_empty() && name.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-') {
+            return Some(name.to_string());
+        }
+    }
+    None
+}
+
+/// Parse a package.json dependency line like `"express": "^4.18.0"`
+fn parse_npm_dep(line: &str) -> Option<String> {
+    let trimmed = line.trim();
+    // Look for `"name":` pattern
+    if let Some(colon_pos) = trimmed.find(':') {
+        let key_part = trimmed[..colon_pos].trim();
+        if key_part.starts_with('"') && key_part.ends_with('"') {
+            let name = &key_part[1..key_part.len()-1];
+            // Skip non-dependency fields
+            if !name.is_empty() && !name.starts_with('_') && name != "name" && name != "version" {
+                return Some(name.to_string());
+            }
+        }
+    }
+    None
+}
+
+/// Parse a requirements.txt line like `requests==2.31.0` or `flask>=2.0`
+fn parse_pip_dep(line: &str) -> Option<String> {
+    let trimmed = line.trim();
+    // Skip comments and empty lines
+    if trimmed.starts_with('#') || trimmed.is_empty() {
+        return None;
+    }
+    // Split on version specifiers
+    let name = trimmed.split(&['=', '>', '<', '!', '~', ';', '['][..])
+        .next()
+        .unwrap_or("")
+        .trim();
+    if !name.is_empty() {
+        return Some(name.to_string());
+    }
+    None
+}
+
+/// Parse a go.mod require line like `github.com/gin-gonic/gin v1.9.1`
+fn parse_go_dep(line: &str) -> Option<String> {
+    let trimmed = line.trim();
+    // Skip comments and empty lines
+    if trimmed.starts_with("//") || trimmed.is_empty() || trimmed == "require" || trimmed == ")" {
+        return None;
+    }
+    // Split on whitespace, take first part (module path)
+    let parts: Vec<&str> = trimmed.split_whitespace().collect();
+    if !parts.is_empty() && parts[0].contains('.') {
+        // Return just the last component of the module path
+        let module = parts[0];
+        let name = module.rsplit('/').next().unwrap_or(module);
+        return Some(name.to_string());
+    }
+    None
 }
 
 /// Extract newly added and deleted files from the staged diff.
