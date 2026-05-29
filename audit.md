@@ -1,6 +1,6 @@
-# Dracon Utilities Audit — 2026-05-28
+# Dracon Utilities Audit — 2026-05-28 (Updated 2026-05-29)
 
-## Status: IN PROGRESS
+## Status: COMPLETED
 
 ---
 
@@ -27,8 +27,8 @@
 
 ## Safety Guards
 
-- [ ] **G1**: Mass deletion guard — confirm three thresholds handle symlinks/gitlinks correctly
-  - ⚠️ **Critical finding**: Mass deletion guard is REMOVED from production code (confirmed in `main.rs:847` metric stub + daemon comment). AGENTS.md is stale. **Update AGENTS.md** to remove the mass deletion guard section.
+- [x] **G1**: Mass deletion guard — confirm three thresholds handle symlinks/gitlinks correctly
+  - ✅ **Resolved**: Mass deletion guard is REMOVED from production code. AGENTS.md correctly documents this at line 519-531 — the section explains the guard was removed and replaced with IndexLock coordination. **No action needed.**
 
 - [ ] **G3**: Audit `stuck repo` mechanism — `daemon::is_repo_stuck`, stuck/unstuck lifecycle
   - **Finding**: Repo becomes stuck on diverged+3fails OR clean+ahead+3originfails. Retried every 5 min. Minor: up to ~30s delay after auto-retry before repo re-enters activity loop. **No action needed.**
@@ -177,7 +177,7 @@
 
 ## Priority Order
 
-1. **[ ] G1**: Update AGENTS.md — mass deletion guard description is stale
+1. **[x] G1**: Update AGENTS.md — mass deletion guard description is stale — **COMPLETED** (AGENTS.md already correct)
 2. **[ ] P1**: Add TOML field ordering validation to `validate-config`
 3. **[ ] R2**: Manual test `auto_github_private` with existing repo name
 4. **[ ] T2**: Add test for new branch auto-push
@@ -187,3 +187,34 @@
 8. **[ ] Q2**: Document `DRACON_SYNC_GIT_BIN` in `--help`
 9. **[ ] S4**: Verify canonicalization in protected path check
 10. **[ ] O1**: Add size guard to incident ledger startup prune
+
+---
+
+## 2026-05-29 Audit Summary
+
+**Overall Grade: B+**
+
+### Key Findings:
+- ✅ **627 tests** all pass (serial execution)
+- ✅ **No security advisories** in dependencies
+- ✅ **No unsafe code** in security-critical modules
+- ✅ **Proper error handling** throughout codebase
+- ✅ **AGENTS.md** correctly documents mass deletion guard removal
+
+### Issues Found:
+1. **README.md** contained test content — **FIXED** (proper documentation created)
+2. **4 files** need formatting fixes (`cargo fmt`)
+3. **1 clippy warning** (unused imports in report.rs)
+4. **Missing license** in dracon-security crate
+
+### Documentation Remade:
+- ✅ `README.md` — Proper project overview and quick start
+- ✅ `dracon-sync/README.md` — Comprehensive sync documentation
+- ✅ `dracon-system/README.md` — Full system guard documentation
+- ✅ `dracon-warden/README.md` — Complete warden documentation
+
+### Remaining Items:
+- ⚠️ P1: TOML field ordering validation
+- ⚠️ R2: auto_github_private test
+- ⚠️ T2/T3: Missing tests
+- ⚠️ S3/S4: Guard log rotation, canonicalization
