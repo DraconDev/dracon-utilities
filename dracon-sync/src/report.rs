@@ -295,7 +295,11 @@ pub(crate) fn enforce_retention(path: &Path, policy: &SyncPolicy) -> Result<usiz
             policy.incident_ledger_max_lines,
         );
         let content = std::fs::read_to_string(path)?;
-        let lines: Vec<&str> = content.lines().rev().take(policy.incident_ledger_max_lines).collect();
+        let lines: Vec<&str> = content
+            .lines()
+            .rev()
+            .take(policy.incident_ledger_max_lines)
+            .collect();
         let out = lines.iter().rev().copied().collect::<Vec<_>>().join("\n") + "\n";
         std::fs::write(path, &out)?;
         return Ok(lines.len());

@@ -986,7 +986,10 @@ fn scan_staged_tasks(repo: &Path) -> Option<String> {
             continue;
         }
         let content = line[1..].trim();
-        if let Some(rest) = content.strip_prefix("- [x]").or_else(|| content.strip_prefix("- [X]")) {
+        if let Some(rest) = content
+            .strip_prefix("- [x]")
+            .or_else(|| content.strip_prefix("- [X]"))
+        {
             let task_text = rest.trim();
             if !task_text.is_empty() {
                 closed_tasks.push(task_text.to_string());
@@ -1002,9 +1005,7 @@ fn scan_staged_tasks(repo: &Path) -> Option<String> {
         return None;
     }
     // Sanitize: strip brackets and pipes to prevent breaking regex delimiters
-    let sanitize = |s: &str| {
-        s.replace(['[', ']'], "").replace('|', "/")
-    };
+    let sanitize = |s: &str| s.replace(['[', ']'], "").replace('|', "/");
     let mut parts = Vec::new();
     if !closed_tasks.is_empty() {
         let tasks: Vec<String> = closed_tasks.iter().map(|t| sanitize(t)).collect();
@@ -1062,7 +1063,10 @@ fn compute_blast_radius(repo: &Path) -> String {
         dirs.iter().take(3).cloned().collect::<Vec<_>>().join(",")
     };
 
-    format!("FILES:{} DIRS:{} DELTA:+{}/-{}", files, dirs_str, added, removed)
+    format!(
+        "FILES:{} DIRS:{} DELTA:+{}/-{}",
+        files, dirs_str, added, removed
+    )
 }
 
 async fn stage_commit_and_push(

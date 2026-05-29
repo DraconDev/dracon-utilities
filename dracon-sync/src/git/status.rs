@@ -46,7 +46,6 @@ impl IndexLock {
             )),
         }
     }
-
 }
 
 impl Drop for IndexLock {

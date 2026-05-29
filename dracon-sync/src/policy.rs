@@ -879,10 +879,7 @@ fn check_toml_field_ordering(content: &str, result: &mut ValidateResult) {
             if first_section_pos.is_none() {
                 first_section_pos = Some(line_start);
             }
-        } else if !stripped.is_empty()
-            && !stripped.starts_with('#')
-            && stripped.contains('=')
-        {
+        } else if !stripped.is_empty() && !stripped.starts_with('#') && stripped.contains('=') {
             if let Some(first_sec) = first_section_pos {
                 if line_start > first_sec {
                     let (key, _) = stripped.split_once('=').unwrap_or((stripped, ""));
@@ -1697,6 +1694,10 @@ auto_github_private = false
         let content = toml;
         let mut result = ValidateResult::default();
         check_toml_field_ordering(content, &mut result);
-        assert!(result.warnings.is_empty(), "expected no warnings, got: {:?}", result.warnings);
+        assert!(
+            result.warnings.is_empty(),
+            "expected no warnings, got: {:?}",
+            result.warnings
+        );
     }
 }

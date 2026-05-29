@@ -1088,7 +1088,12 @@ fn parse_docker_size(s: &str) -> u64 {
 }
 
 /// Try to remove a cache directory, returning whether it succeeded.
-async fn try_remove_cache_dir(path: &Path, name: &str, apply: bool, protected_paths: &[String]) -> bool {
+async fn try_remove_cache_dir(
+    path: &Path,
+    name: &str,
+    apply: bool,
+    protected_paths: &[String],
+) -> bool {
     if !apply {
         return true;
     }
