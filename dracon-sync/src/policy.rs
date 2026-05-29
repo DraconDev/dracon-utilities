@@ -332,12 +332,6 @@ pub(crate) struct SyncPolicy {
     pub(crate) exclude_file_patterns: Vec<String>,
     #[serde(default = "default_true")]
     pub(crate) auto_repair_concerns: bool,
-    /// If true, use todo-context mode for commit messages.
-    /// Reads root `todo.md`, finds first `[ ]` task, and uses that
-    /// as the commit message context instead of file-stem summaries.
-    /// Falls back to normal behavior if no `[ ]` is found.
-    #[serde(default)]
-    pub(crate) todo_commit_messages: bool,
     #[serde(default = "default_true")]
     pub(crate) auto_repair_warns: bool,
     #[serde(default = "default_true")]
