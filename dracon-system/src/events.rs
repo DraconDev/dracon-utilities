@@ -16,16 +16,12 @@ fn get_log() -> &'static Mutex<Vec<String>> {
 /// Severity levels for dracon events.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub enum EventSeverity {
-    /// Debug-level diagnostic information.
-    Debug,
     /// Normal operational information.
     Info,
     /// Warning about a potential issue.
     Warn,
     /// Error that affected an operation.
     Error,
-    /// Critical error requiring immediate attention.
-    Critical,
 }
 
 /// A structured event emitted by dracon services.
