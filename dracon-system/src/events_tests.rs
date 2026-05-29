@@ -30,11 +30,9 @@ fn dracon_event_debug() {
 fn dracon_event_all_severity_levels() {
     use crate::EventSeverity;
     // Just verify all variants exist
-    let _ = EventSeverity::Debug;
     let _ = EventSeverity::Info;
     let _ = EventSeverity::Warn;
     let _ = EventSeverity::Error;
-    let _ = EventSeverity::Critical;
 }
 
 #[test]
