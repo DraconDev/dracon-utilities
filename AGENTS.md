@@ -564,7 +564,7 @@ Commands:
 
 ## AI Configuration
 
-dracon-sync uses AI for commit messages (scribe) and version bumping. Configure providers in `~/.dracon/utilities/sync/ai.toml`:
+dracon-sync uses AI for version bumping. Configure providers in `~/.dracon/utilities/sync/ai.toml`:
 
 ```toml
 [[providers]]
