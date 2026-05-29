@@ -36,6 +36,9 @@ use sync::sync_repo;
 #[derive(Parser, Debug)]
 #[command(name = "dracon-sync")]
 #[command(about = "Git sync automation — auto-commit, push, and mirror your repos")]
+#[command(
+    after_help = "ENVIRONMENT:\n  DRACON_SYNC_GIT_BIN    Override path to git binary (checked every call)\n  DRACON_SYNC_POLICY    Custom sync policy file path\n  DRACON_SYNC_STATE_DIR Custom state directory path"
+)]
 #[command(version)]
 struct Cli {
     /// Increase output verbosity. Can be repeated up to 2 times (-v, -vv).

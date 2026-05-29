@@ -287,6 +287,19 @@ pub(crate) fn enforce_retention(path: &Path, policy: &SyncPolicy) -> Result<usiz
     if !path.exists() {
         return Ok(0);
     }
+    let meta = std::fs::metadata(path)?;
+    if meta.len() > 100 * 1024 * 1024 {
+        eprintln!(
+            "⚠️ incident ledger is {}MB (>100MB), truncating to last {} lines",
+            meta.len() / (1024 * 1024),
+            policy.incident_ledger_max_lines,
+        );
+        let content = std::fs::read_to_string(path)?;
+        let lines: Vec<&str> = content.lines().rev().take(policy.incident_ledger_max_lines).collect();
+        let out = lines.iter().rev().copied().collect::<Vec<_>>().join("\n") + "\n";
+        std::fs::write(path, &out)?;
+        return Ok(lines.len());
+    }
     let content = std::fs::read_to_string(path)?;
     let original_count = content.lines().count();
     let now = timestamp_secs();
