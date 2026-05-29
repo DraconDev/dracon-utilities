@@ -1298,7 +1298,7 @@ fn resolve_bin(name: &str) -> String {
     let cache =
         RESOLVE_BIN_CACHE.get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()));
     {
-        if let Some(cached) = cache.lock().unwrap().get(name) {
+        if let Some(cached) = cache.lock().unwrap_or_else(|e| e.into_inner()).get(name) {
             return cached.clone();
         }
     }
