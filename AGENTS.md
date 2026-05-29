@@ -14,7 +14,7 @@ CLI binaries for dracon system services. These install to `~/.local/bin/` and ru
 9. [AI Configuration](#ai-configuration)
 10. [CLI Reference](#cli-reference)
 11. [Environment Variables](#environment-variables)
-12. [The Scribe](#the-scribe-ai-commit-message-generator)
+12. [Commit Messages](#commit-messages)
 13. [Testing](#testing)
 
 ## Architecture
@@ -70,7 +70,7 @@ dracon-sync is designed to be **invisible infrastructure** for an AI coder. The 
 
 **What sync provides:**
 - Auto-commit on every change (AI doesn't need to think about git)
-- AI-generated commit subjects from diffs (unique messages each cycle)
+- Mechanical commit messages (simple file counts)
 - Incident ledger for debugging (AI can read what went wrong)
 - Freezing for pause (AI can pause sync during delicate operations)
 
