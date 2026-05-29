@@ -1734,17 +1734,20 @@ async fn run_do_repl(
                 }
                 if line == "/config" {
                     let cfg = load_config();
+                    let home = dirs::home_dir().unwrap_or_default();
+                    let sr = cfg
+                        .system_root
+                        .clone()
+                        .unwrap_or_else(|| home.join("dracon"));
+                    let nr = cfg
+                        .nixos_root
+                        .clone()
+                        .unwrap_or_else(|| home.join("dracon/nixos"));
                     eprintln!(
                         "{} system_root={} nixos_root={} do_auto_probe_nix={}",
                         dim("config:"),
-                        cfg.system_root
-                            .as_deref()
-                            .unwrap_or_else(|| dirs::home_dir().unwrap_or_default().join("dracon").as_path())
-                            .display(),
-                        cfg.nixos_root
-                            .as_deref()
-                            .unwrap_or_else(|| dirs::home_dir().unwrap_or_default().join("dracon/nixos").as_path())
-                            .display(),
+                        sr.display(),
+                        nr.display(),
                         cfg.do_auto_probe_nix
                     );
                     continue;
