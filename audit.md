@@ -1,6 +1,6 @@
 # Dracon Utilities Audit — 2026-05-28 (Updated 2026-05-29)
 
-## Status: COMPLETED
+## Status: COMPLETED (updated 2026-05-30)
 
 ---
 
@@ -225,3 +225,32 @@
 - ⚠️ Q3: Add `sha256sum` to `install.sh`
 - ⚠️ Q2: Document `DRACON_SYNC_GIT_BIN` in `--help`
 - ⚠️ O1: Add size guard to incident ledger startup prune
+
+## 2026-05-30 Audit Findings
+
+### Bugs Fixed:
+1. **TOML field ordering** — `exclude_repos`, `exclude_dir_names`, `standard_files`, etc. were silently ignored because they appeared after `[[remotes]]` section headers. Fixed by moving all top-level fields before section headers.
+2. **Validator false positives** — `[[remotes]]` fields (`name`, `push_url`, `auto_create`) were incorrectly flagged as "appears after a section header". Fixed by tracking `in_table` state in the validator.
+3. **`auto_create_account` validation** — Reported as error when empty, but `resolve_account()` extracts account from push_url. Downgraded to warning. Also fixed `auto_create_repo` to use `resolve_account()` instead of raw `auto_create_account`.
+4. **Diverged repo recovery** — `repair-concerns` used stale status after pull, causing push to fail on repos that were just merged. Fixed by re-fetching status after `handle_behind` completes.
+
+### Config Fixes:
+- `dracon-sync.toml` — Moved all top-level fields before section headers
+- Added TOML field ordering warning comment
+
+### Repo Issues:
+- `respec` — Was CONCERN (diverged, ahead=1 behind=3). Fixed by manual merge + daemon fix.
+- `nixpkgs` — Was CONCERN (diverged, ahead=2). Needs manual `git pull`.
+- `respec`, `todo-addict` — Missing LICENSE files. Fixed via `dracon-sync scaffold`.
+
+### Audit Results:
+- ✅ 57 repos: 55 OK, 1 WARN, 1 CONCERN (Junk-Runner-bevy, stale)
+- ✅ All 3 binary hashes match
+- ✅ All 3 daemons running correct binary
+- ✅ All 3 services active
+- ✅ Health: healthy (warnings only)
+- ✅ Tests: 398 + 65 + 65 all pass
+- ✅ Clippy: clean
+- ✅ Build artifacts: none tracked
+- ✅ License files: all present (after scaffold)
+- ✅ Stuck repos: none
