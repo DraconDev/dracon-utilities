@@ -304,8 +304,7 @@ install_binary() {
 }
 
 # Install all binaries
-# dracon-sync with scribe and ai-bumper (both on by default)
-install_binary dracon-sync "scribe,ai-bumper" "dracon-sync"
+install_binary dracon-sync "" "dracon-sync"
 install_binary dracon-system "" "dracon-system"
 install_binary dracon-warden "" "dracon-warden"
 # dracon-ai is not in the workspace (depends on unpublished dracon-libs/services/ai)
