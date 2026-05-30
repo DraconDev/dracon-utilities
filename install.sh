@@ -240,47 +240,33 @@ install_binary() {
             echo "  ✅ Installed ~/.local/bin/$binary (new)"
         fi
 
-        # Stop the running daemon before overwriting its binary.
-        # Without this, `cp` fails with "Text file busy" on Linux.
-        # We try TWO approaches to ensure no process holds the binary:
-        #   1. Systemd stop (clean service shutdown)
-        #   2. pkill fallback (catches manual runs, stale processes outside systemd)
+        # Always scrap the old daemon before installing new binary.
+        # Prevents "Text file busy" and stale binary issues.
         local svc_name=""
         case "$binary" in
             dracon-sync)   svc_name=dracon-sync.service ;;
             dracon-system) svc_name=dracon-system-guard.service ;;
             dracon-warden)  svc_name=dracon-warden.service ;;
         esac
-        local did_stop=false
 
-        # Approach 1: Clean systemd shutdown (handles Restart=always gracefully)
-        if [ -n "$svc_name" ] && systemctl --user is-active "$svc_name" &>/dev/null; then
-            systemctl --user stop "$svc_name" 2>/dev/null && did_stop=true || true
+        # Stop service + kill all processes — always, no check
+        if [ -n "$svc_name" ]; then
+            systemctl --user stop "$svc_name" 2>/dev/null || true
         fi
+        pkill -x "$binary" 2>/dev/null || true
+        # Wait for process to fully exit (up to 3s)
+        for _ in $(seq 1 6); do
+            pgrep -x "$binary" &>/dev/null || break
+            sleep 0.5
+        done
 
-        # Approach 2: Catch-all — kill ANY remaining process named $binary,
-        # regardless of how it was started (manual, stale, non-systemd).
-        if pgrep -x "$binary" &>/dev/null; then
-            pkill -x "$binary" 2>/dev/null || true
-            did_stop=true
-        fi
-
-        # Wait for process to fully exit (up to 5s)
-        if [ "$did_stop" = true ]; then
-            for _ in $(seq 1 10); do
-                pgrep -x "$binary" &>/dev/null || break
-                sleep 0.5
-            done
-        fi
-
-        # Remove old binary before copying to ensure clean replacement
+        # Remove old binary and install new
         rm -f ~/.local/bin/"$binary"
         cp "$resolved" ~/.local/bin/"$binary"
         chmod +x ~/.local/bin/"$binary"
 
-        # Restart the daemon if we stopped it — track it so the
-        # final restart block doesn't double-restart.
-        if [ "$did_stop" = true ]; then
+        # Restart the service and track it for the final restart block
+        if [ -n "$svc_name" ]; then
             systemctl --user start "$svc_name" 2>/dev/null || true
             RESTARTED_SERVICES="$RESTARTED_SERVICES $svc_name"
         fi
