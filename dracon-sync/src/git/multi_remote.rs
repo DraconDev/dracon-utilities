@@ -329,7 +329,7 @@ pub(crate) async fn push_to_all_remotes(
 /// Create a private repo on GitHub using `gh` CLI.
 pub(crate) fn create_repo_on_github(account: &str, repo_name: &str) -> Result<String> {
     let mut cmd = std::process::Command::new("gh");
-    cmd.args(["repo", "create", repo_name, "--private", "--default-branch", "main"]);
+    cmd.args(["repo", "create", repo_name, "--private"]);
 
     if let Some(token) = load_secret("GH_TOKEN") {
         cmd.env("GH_TOKEN", token);
@@ -344,6 +344,14 @@ pub(crate) fn create_repo_on_github(account: &str, repo_name: &str) -> Result<St
         }
         anyhow::bail!("gh repo create failed: {}", stderr.trim());
     }
+
+    // Set default branch to main via API (gh CLI doesn't support --default-branch)
+    let mut patch = std::process::Command::new("gh");
+    patch.args(["api", "-X", "PATCH", &format!("repos/{}/{}", account, repo_name), "--field", "default_branch=main"]);
+    if let Some(token) = load_secret("GH_TOKEN") {
+        patch.env("GH_TOKEN", token);
+    }
+    let _ = patch.output(); // best effort — repo is created either way
 
     Ok(format!("https://github.com/{}/{}.git", account, repo_name))
 }
