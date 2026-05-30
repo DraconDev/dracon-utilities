@@ -1507,10 +1507,12 @@ fn compute_blast_radius(repo: &Path) -> String {
             test_lines += a_val + r_val;
         }
 
-        // Extract top-level directory for scope
-        if let Some(first_component) = path.split('/').next() {
-            if !first_component.is_empty() && first_component != "." {
-                dirs.insert(first_component.to_string());
+        // Extract top-level directory for scope (skip root-level files)
+        if path.contains('/') {
+            if let Some(first_component) = path.split('/').next() {
+                if !first_component.is_empty() && first_component != "." {
+                    dirs.insert(first_component.to_string());
+                }
             }
         }
 
@@ -1571,10 +1573,9 @@ fn compute_blast_radius(repo: &Path) -> String {
     // 5. New/deleted files
     let (new_files, deleted_files) = extract_new_deleted_files(repo);
     if !new_files.is_empty() {
-        // Show top 3 new files by name (searchable)
-        let display: Vec<String> = new_files.iter().take(3)
+        // Show top 10 new files (searchable), abbreviate nested paths
+        let display: Vec<String> = new_files.iter().take(10)
             .map(|f| {
-                // Abbreviate: show just filename if nested
                 let parts: Vec<&str> = f.split('/').collect();
                 if parts.len() > 2 {
                     parts[parts.len()-2..].join("/")
@@ -1583,15 +1584,15 @@ fn compute_blast_radius(repo: &Path) -> String {
                 }
             })
             .collect();
-        let suffix = if new_files.len() > 3 {
-            format!("+{}more", new_files.len() - 3)
+        let suffix = if new_files.len() > 10 {
+            format!("+{}more", new_files.len() - 10)
         } else {
             String::new()
         };
         metrics.push(format!("NEW:{}{}", display.join(","), suffix));
     }
     if !deleted_files.is_empty() {
-        let display: Vec<String> = deleted_files.iter().take(3)
+        let display: Vec<String> = deleted_files.iter().take(10)
             .map(|f| {
                 let parts: Vec<&str> = f.split('/').collect();
                 if parts.len() > 2 {
@@ -1601,8 +1602,8 @@ fn compute_blast_radius(repo: &Path) -> String {
                 }
             })
             .collect();
-        let suffix = if deleted_files.len() > 3 {
-            format!("+{}more", deleted_files.len() - 3)
+        let suffix = if deleted_files.len() > 10 {
+            format!("+{}more", deleted_files.len() - 10)
         } else {
             String::new()
         };
