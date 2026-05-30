@@ -1550,15 +1550,28 @@ fn compute_blast_radius(repo: &Path) -> String {
 
     // Build routing key components
 
-    // 1. Task intent (from markdown diff)
+    // 1. Task intent (from markdown diff) — cap at 10 tasks per category
     let transitions = extract_task_transitions(repo);
     let intent_prefix = {
+        const MAX_TASKS: usize = 10;
         let mut parts = Vec::new();
         if !transitions.closed.is_empty() {
-            parts.push(format!("CLOSED: {}", transitions.closed.join(", ")));
+            let shown: Vec<&str> = transitions.closed.iter().take(MAX_TASKS).map(|s| s.as_str()).collect();
+            let suffix = if transitions.closed.len() > MAX_TASKS {
+                format!(" +{}more", transitions.closed.len() - MAX_TASKS)
+            } else {
+                String::new()
+            };
+            parts.push(format!("CLOSED: {}{}", shown.join(", "), suffix));
         }
         if !transitions.progress.is_empty() {
-            parts.push(format!("WIP: {}", transitions.progress.join(", ")));
+            let shown: Vec<&str> = transitions.progress.iter().take(MAX_TASKS).map(|s| s.as_str()).collect();
+            let suffix = if transitions.progress.len() > MAX_TASKS {
+                format!(" +{}more", transitions.progress.len() - MAX_TASKS)
+            } else {
+                String::new()
+            };
+            parts.push(format!("WIP: {}{}", shown.join(", "), suffix));
         }
         if parts.is_empty() {
             String::new()
