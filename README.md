@@ -22,14 +22,23 @@ systemctl --user restart dracon-warden.service
 
 ### dracon-sync
 
-**Invisible git sync for AI-powered development.** An auto-commit, multi-mirror daemon that watches your repos, commits every change with AI-generated messages, and pushes to GitHub, GitLab, and Codeberg simultaneously.
+**Invisible git sync for AI-powered development.** An auto-commit, multi-mirror daemon that watches your repos, commits every change with deterministic, facts-based messages, and pushes to GitHub, GitLab, and Codeberg simultaneously.
 
 **Key Features:**
 - Auto-commit on file changes
 - Multi-provider mirror (GitHub, GitLab, Codeberg)
-- AI-generated commit messages
+- Deterministic commit messages (routing keys for AI-to-AI communication)
 - Automatic remote creation
 - Self-healing and repair
+
+**Commit Message Format:**
+```
+CLOSED: Implement JWT | 3 file(s) in src [auth.py, jwt.py] DELTA:+140/-12 | TEST:45
+WIP: Refactor DB | 2 file(s) in src [db.py] DELTA:+50/-10
+3 file(s) in src [auth.py] DELTA:+100/-20 | TEST:30 | NEW:src/auth.py DEPS:+reqwest,-hyper
+```
+
+Every metric is extracted deterministically from the diff — no AI, no guessing. Messages are optimized for `git log --grep=` queries.
 
 **Quick Commands:**
 ```bash

@@ -70,9 +70,10 @@ dracon-sync is designed to be **invisible infrastructure** for an AI coder. The 
 
 **What sync provides:**
 - Auto-commit on every change (AI doesn't need to think about git)
-- Mechanical commit messages (simple file counts)
+- Deterministic commit messages (routing keys for AI-to-AI communication)
 - Incident ledger for debugging (AI can read what went wrong)
 - Freezing for pause (AI can pause sync during delicate operations)
+- Deterministic telemetry (task state, blast radius, metrics — all from diff)
 
 **What sync doesn't need:**
 - Global workspace state (AI works on one repo at a time)
@@ -656,7 +657,7 @@ From the diff, we deterministically extract:
    - `DEL:file1,file2` — deleted files (searchable)
    - `DEPS:+reqwest,-serde` — specific dependencies added/removed
    - `MERGE:` — merge commit (has two parents)
-   - `REVERT:` — revert commit (Cargo.toml, package.json, etc.)
+   - `REVERT:` — revert commit (has REVERT_HEAD)
 
 ### Commit Format
 
