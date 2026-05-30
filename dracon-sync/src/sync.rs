@@ -1065,9 +1065,38 @@ fn extract_checkbox_text<'a>(line: &'a str, marker: char) -> Option<&'a str> {
 }
 
 /// Sanitize a task name for use in the routing key.
-/// Removes chars that would break parsing (pipes, brackets).
+///
+/// Removes:
+/// - Markdown formatting: `**`, `__`, `*`, `_`
+/// - Pipe characters: `|`
+/// - Square brackets: `[`, `]`
+///
+/// If the name starts with `**identifier**` (common pattern), extracts only the identifier.
 fn sanitize_task_name(name: &str) -> String {
+    // Common pattern: `**F-reframe** description` → extract just `F-reframe`
+    if name.starts_with("**") {
+        if let Some(end) = name.find("**") {
+            if end >= 2 {
+                let identifier = &name[2..end];
+                // If there's description after, include first meaningful word
+                let rest = &name[end + 2..];
+                if rest.is_empty() {
+                    return identifier.to_string();
+                }
+                let first_word = rest.trim().split_whitespace().next().unwrap_or("");
+                if first_word.is_empty() {
+                    return identifier.to_string();
+                }
+                return format!("{} {}", identifier, first_word);
+            }
+        }
+    }
+    
+    // Fallback: general sanitization
     name.replace('|', "/")
+        .replace("**", "")
+        .replace("__", "")
+        .replace('*', "")
         .replace('[', "(")
         .replace(']', ")")
         .trim()
