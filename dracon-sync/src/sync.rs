@@ -1072,6 +1072,7 @@ fn extract_checkbox_text(line: &str, marker: char) -> Option<&str> {
 /// - Square brackets: `[`, `]`
 ///
 /// If the name starts with `**identifier**` (common pattern), extracts only the identifier.
+/// Truncates to 60 chars to keep commit subjects compact.
 fn sanitize_task_name(name: &str) -> String {
     // Common pattern: `**F-reframe** description` → extract just `F-reframe`
     if name.starts_with("**") {
@@ -1081,19 +1082,19 @@ fn sanitize_task_name(name: &str) -> String {
                 // If there's description after, include first meaningful word
                 let rest = &name[end + 2..];
                 if rest.is_empty() {
-                    return identifier.to_string();
+                    return truncate_task(identifier);
                 }
                 let first_word = rest.split_whitespace().next().unwrap_or("");
                 if first_word.is_empty() {
-                    return identifier.to_string();
+                    return truncate_task(identifier);
                 }
-                return format!("{} {}", identifier, first_word);
+                return truncate_task(&format!("{} {}", identifier, first_word));
             }
         }
     }
     
     // Fallback: general sanitization
-    name.replace('|', "/")
+    let sanitized = name.replace('|', "/")
         .replace("**", "")
         .replace("__", "")
         .replace('*', "")
@@ -1101,7 +1102,26 @@ fn sanitize_task_name(name: &str) -> String {
         .replace(']', ")")
         .replace('`', "")  // Strip backticks (code in task names)
         .trim()
-        .to_string()
+        .to_string();
+    truncate_task(&sanitized)
+}
+
+/// Truncate a task name to a reasonable length for commit subjects.
+/// Cuts at sentence boundary (`.`, `—`, `–`) or 60 chars, whichever comes first.
+fn truncate_task(name: &str) -> String {
+    const MAX_LEN: usize = 60;
+    if name.len() <= MAX_LEN {
+        return name.to_string();
+    }
+    // Try to cut at sentence boundary
+    if let Some(pos) = name[..MAX_LEN].rfind(|c: char| c == '.' || c == '—' || c == '–') {
+        let truncated = &name[..pos + 1];
+        if truncated.len() >= 10 {
+            return truncated.to_string();
+        }
+    }
+    // Hard truncate at 60 chars
+    format!("{}...", &name[..MAX_LEN])
 }
 
 /// Detect dependency changes from the staged diff.
@@ -1549,9 +1569,9 @@ fn compute_blast_radius(repo: &Path) -> String {
 
     // 2. File count and dirs
     let dirs_str = if dirs.is_empty() {
-        "root".to_string()
+        String::new()
     } else {
-        dirs.iter().take(3).cloned().collect::<Vec<_>>().join(",")
+        format!(" in {}", dirs.iter().take(3).cloned().collect::<Vec<_>>().join(","))
     };
 
     // 3. Top changed files
@@ -1645,7 +1665,7 @@ fn compute_blast_radius(repo: &Path) -> String {
     };
 
     format!(
-        "{}{} file(s) in {}{} DELTA:+{}/-{}{}",
+        "{}{} file(s){}{} DELTA:+{}/-{}{}",
         intent_prefix, files, dirs_str, files_str, added, removed, metrics_str
     )
 }
