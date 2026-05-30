@@ -1048,7 +1048,7 @@ fn extract_task_transitions(repo: &Path) -> TaskTransitions {
 /// - `[x] task` (plain text)
 ///
 /// Does NOT match code comments (`//`, `#`) — nobody puts checkmarks in code.
-fn extract_checkbox_text<'a>(line: &'a str, marker: char) -> Option<&'a str> {
+fn extract_checkbox_text(line: &str, marker: char) -> Option<&str> {
     // Build the marker pattern: `[x]`, `[~]`, etc.
     let pattern = format!("[{}]", marker);
     
@@ -1083,7 +1083,7 @@ fn sanitize_task_name(name: &str) -> String {
                 if rest.is_empty() {
                     return identifier.to_string();
                 }
-                let first_word = rest.trim().split_whitespace().next().unwrap_or("");
+                let first_word = rest.split_whitespace().next().unwrap_or("");
                 if first_word.is_empty() {
                     return identifier.to_string();
                 }
