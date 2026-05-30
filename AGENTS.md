@@ -658,6 +658,7 @@ From the diff, we deterministically extract:
    - `DEPS:+reqwest,-serde` — specific dependencies added/removed
    - `MERGE:` — merge commit (has two parents)
    - `REVERT:` — revert commit (has REVERT_HEAD)
+   - `TAG:v1.2.0` — this commit is tagged (release milestone)
 
 ### Commit Format
 
@@ -722,7 +723,9 @@ git log --grep="MERGE:"
 
 # Find revert commits
 git log --grep="REVERT:"
-```
+
+# Find release commits
+git log --grep="TAG:"
 
 ### What This Is NOT
 

@@ -1342,6 +1342,42 @@ fn is_test_file(path: &str) -> bool {
     false
 }
 
+/// Get the tag pointing to the current HEAD commit.
+///
+/// Returns the tag name if this commit is tagged, otherwise None.
+/// Uses `git describe --tags --always --exact-match` for exact tag match.
+fn get_current_tag(repo: &Path) -> Option<String> {
+    // First try exact match (HEAD is exactly on a tag)
+    let exact = run_git_capture_output(
+        repo,
+        &["describe", "--tags", "--always", "--exact-match"],
+        "tag-exact",
+    ).ok()?;
+    
+    let tag = exact.trim();
+    if !tag.is_empty() && !tag.contains('-') {
+        // Got an exact tag (no commit count suffix)
+        return Some(tag.to_string());
+    }
+    
+    // Fall back to --all (check all refs for this commit)
+    let all_tags = run_git_capture_output(
+        repo,
+        &["tag", "--points-at", "HEAD"],
+        "tag-points-at",
+    ).ok()?;
+    
+    // Return the first lightweight tag (ignore annotated ones for simplicity)
+    for line in all_tags.lines() {
+        let tag = line.trim();
+        if !tag.is_empty() && !tag.contains('^') {
+            return Some(tag.to_string());
+        }
+    }
+    
+    None
+}
+
 /// Compute commit message from staged diff.
 ///
 /// Returns a structured message with task state + blast radius.
@@ -1537,6 +1573,11 @@ fn compute_blast_radius(repo: &Path) -> String {
     }
     if repo.join(".git/REVERT_HEAD").exists() {
         metrics.push("REVERT:".to_string());
+    }
+    
+    // 8. Tag detection — if this commit is tagged, include the tag
+    if let Some(tag) = get_current_tag(repo) {
+        metrics.push(format!("TAG:{}", tag));
     }
     
     let metrics_str = if metrics.is_empty() {
