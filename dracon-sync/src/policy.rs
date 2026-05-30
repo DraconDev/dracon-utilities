@@ -1534,7 +1534,7 @@ push_url = ""
     }
 
     #[test]
-    fn test_validate_config_missing_auto_create_account() {
+    fn test_validate_config_missing_auto_create_account_is_warning() {
         let tmp = tempfile::TempDir::new().unwrap();
         let content = r#"
 auto_github_private = false
@@ -1548,8 +1548,12 @@ auto_create_account = ""
         std::fs::write(tmp.path().join("policy.toml"), content).unwrap();
         let result = validate_config(tmp.path().join("policy.toml").as_path());
         assert!(
-            !result.is_valid(),
-            "auto_create=true with empty account should fail"
+            result.is_valid(),
+            "auto_create=true with empty account is now valid (account extracted from push_url)"
+        );
+        assert!(
+            result.warnings.iter().any(|w| w.contains("auto_create_account")),
+            "should have a warning about empty auto_create_account"
         );
     }
 
