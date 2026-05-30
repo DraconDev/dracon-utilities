@@ -1502,6 +1502,14 @@ fn compute_blast_radius(repo: &Path) -> String {
         metrics.push(format!("DEPS:{}", dep_info));
     }
     
+    // 7. Merge/revert detection
+    if repo.join(".git/MERGE_HEAD").exists() {
+        metrics.push("MERGE:".to_string());
+    }
+    if repo.join(".git/REVERT_HEAD").exists() {
+        metrics.push("REVERT:".to_string());
+    }
+    
     let metrics_str = if metrics.is_empty() {
         String::new()
     } else {

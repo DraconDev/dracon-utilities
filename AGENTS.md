@@ -654,7 +654,9 @@ From the diff, we deterministically extract:
    - `BIN:B` — binary files changed
    - `NEW:file1,file2` — newly created files (searchable)
    - `DEL:file1,file2` — deleted files (searchable)
-   - `DEPS:+reqwest,-serde` — specific dependencies added/removed (Cargo.toml, package.json, etc.)
+   - `DEPS:+reqwest,-serde` — specific dependencies added/removed
+   - `MERGE:` — merge commit (has two parents)
+   - `REVERT:` — revert commit (Cargo.toml, package.json, etc.)
 
 ### Commit Format
 
@@ -682,6 +684,12 @@ CLOSED: Add auth module | 5 file(s) in src [auth.py, jwt.py] DELTA:+200/-0 | NEW
 
 # Files deleted (refactoring)
 3 file(s) in src [old.py, legacy.py] DELTA:+0/-150 | DEL:src/old.py,src/legacy.py
+
+# Merge commit
+MERGE: | 5 file(s) in src [auth.py, db.py] DELTA:+200/-50
+
+# Revert commit
+REVERT: | 2 file(s) in src [auth.py] DELTA:+10/-100
 ```
 
 ### How AI Searches This
@@ -707,6 +715,12 @@ git log --grep="DEL:"
 
 # Find commits with dependency changes (security audit)
 git log --grep="DEPS:"
+
+# Find merge commits
+git log --grep="MERGE:"
+
+# Find revert commits
+git log --grep="REVERT:"
 ```
 
 ### What This Is NOT
