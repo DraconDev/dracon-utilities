@@ -1650,7 +1650,12 @@ fn compute_blast_radius(repo: &Path) -> String {
     
     // 9. Test-only detection — if ALL changed files are test files
     if !file_changes.is_empty() && file_changes.iter().all(|(_, path)| is_test_file(path)) {
-        metrics.push("TESTONLY:".to_string());
+        let test_files: Vec<String> = file_changes.iter().take(5).map(|(_, p)| {
+            let parts: Vec<&str> = p.split('/').collect();
+            if parts.len() > 2 { parts[parts.len()-2..].join("/") } else { p.clone() }
+        }).collect();
+        let suffix = if file_changes.len() > 5 { format!("+{}more", file_changes.len() - 5) } else { String::new() };
+        metrics.push(format!("TESTONLY:{}{}", test_files.join(","), suffix));
     }
     
     // 10. Env file detection — if any env files changed
