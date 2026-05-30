@@ -1525,7 +1525,7 @@ pub(crate) async fn run_repair_concerns(
                 continue;
             }
         };
-        let status = match svc.get_status().await {
+        let mut status = match svc.get_status().await {
             Ok(status) => status,
             Err(e) => {
                 eprintln!("⚠️ {} status_failed: {}", repo.display(), e);
@@ -1604,6 +1604,12 @@ pub(crate) async fn run_repair_concerns(
             .await
             {
                 continue;
+            }
+            // Re-fetch status after pull — the repo state may have changed
+            // (e.g. diverged repo is now just ahead after merge).
+            if let Ok(new_status) = svc.get_status().await {
+                status = new_status;
+                state.has_upstream = has_tracking_upstream(&repo);
             }
         }
 
