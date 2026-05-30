@@ -687,11 +687,11 @@ CLOSED: Add auth module | 5 file(s) in src [auth.py, jwt.py] DELTA:+200/-0 | NEW
 # Files deleted (refactoring)
 3 file(s) in src [old.py, legacy.py] DELTA:+0/-150 | DEL:src/old.py,src/legacy.py
 
+# Release commit (tagged)
+CLOSED: Release v1.0.0 | 10 file(s) in src [lib.rs] DELTA:+500/-100 | TAG:v1.0.0
+
 # Merge commit
 MERGE: | 5 file(s) in src [auth.py, db.py] DELTA:+200/-50
-
-# Revert commit
-REVERT: | 2 file(s) in src [auth.py] DELTA:+10/-100
 ```
 
 ### How AI Searches This
