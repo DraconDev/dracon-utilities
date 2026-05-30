@@ -1099,6 +1099,7 @@ fn sanitize_task_name(name: &str) -> String {
         .replace('*', "")
         .replace('[', "(")
         .replace(']', ")")
+        .replace('`', "")  // Strip backticks (code in task names)
         .trim()
         .to_string()
 }
