@@ -136,7 +136,7 @@ echo "10. CLIPPY"
 echo "    Lints all 3 packages."
 echo "═══════════════════════════════════════════════════════════"
 cd ~/Dev/dracon-utilities
-cargo clippy --release -p dracon-sync -p dracon-system -p dracon-warden --features "scribe,ai-bumper" 2>&1 | grep -E "^error|warning.*dracon" | head -5
+cargo clippy --release -p dracon-sync -p dracon-system -p dracon-warden 2>&1 | grep -E "^error|warning.*dracon" | head -5
 echo "  (no output = clean)"
 
 echo ""

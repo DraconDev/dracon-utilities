@@ -66,7 +66,7 @@
             pname = "dracon-sync";
             version = "0.1.5";
             buildAndTestSubdir = "dracon-sync";
-            cargoBuildFeatures = [ "scribe" "ai-bumper" ];
+            cargoBuildFeatures = [ ];
             # Tests need git, serial execution, and network access (some tests hang
             # in the Nix sandbox). Tests run via 'cargo test' in CI.
             doCheck = false;
