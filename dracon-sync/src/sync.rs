@@ -1110,18 +1110,38 @@ fn sanitize_task_name(name: &str) -> String {
 /// Cuts at sentence boundary (`.`, `—`, `–`) or 60 chars, whichever comes first.
 fn truncate_task(name: &str) -> String {
     const MAX_LEN: usize = 60;
-    if name.len() <= MAX_LEN {
+    // Find the char boundary at or before MAX_LEN bytes
+    let truncated_at_max = if name.len() <= MAX_LEN {
         return name.to_string();
+    } else {
+        // Walk chars to find the last valid boundary <= MAX_LEN
+        let mut last_boundary = 0;
+        for (i, _) in name.char_indices() {
+            if i > MAX_LEN {
+                break;
+            }
+            last_boundary = i;
+        }
+        last_boundary
+    };
+    // Try to cut at sentence boundary within the first MAX_LEN bytes
+    let mut last_boundary_pos = None;
+    for (i, c) in name.char_indices() {
+        if i >= truncated_at_max {
+            break;
+        }
+        if c == '.' || c == '—' || c == '–' {
+            last_boundary_pos = Some(i + c.len_utf8());
+        }
     }
-    // Try to cut at sentence boundary
-    if let Some(pos) = name[..MAX_LEN].rfind(['.', '—', '–']) {
-        let truncated = &name[..pos + 1];
+    if let Some(pos) = last_boundary_pos {
+        let truncated = &name[..pos];
         if truncated.len() >= 10 {
             return truncated.to_string();
         }
     }
-    // Hard truncate at 60 chars
-    format!("{}...", &name[..MAX_LEN])
+    // Hard truncate at char boundary
+    format!("{}...", &name[..truncated_at_max])
 }
 
 /// Detect dependency changes from the staged diff.
