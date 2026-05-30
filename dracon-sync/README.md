@@ -265,24 +265,24 @@ Store API keys in `~/.dracon/utilities/sync/ai/secrets/`:
 - `mistral.env` → `MISTRAL_API_KEY=...`
 - `nvidia.env` → `NVIDIA_API_KEY=...`
 
-## The Scribe: AI Commit Messages
+## Commit Messages
 
-The scribe generates unique, semantic commit subjects from diffs each sync cycle. It does NOT write or read `project-state.md` — commit messages are generated directly from the actual code changes.
+Commit messages are deterministic facts extracted from the diff — no AI, no inference.
 
-### How It Works
+### Format
 
-1. Collect current staged diff + 10 previous diffs + recent commit subjects
-2. AI receives the current diff (highlighted as THE main change) and previous diffs (background only)
-3. AI returns a single subject line in conventional commit format (e.g., `fix(auth): validate JWT expiry before accepting tokens`)
-4. Category/scope are extracted from the AI subject; `build_commit_message` assembles the final commit with footer
+```
+[INTENT] | N file(s) in DIRS [files] DELTA:+A/-B [METRICS]
+```
 
-### Fallback When AI Unavailable
+- **INTENT** — task state transitions from markdown (`CLOSED: task1, task2` or `WIP: task1`), capped at 10 tasks
+- **DIRS** — top-level directories touched (root files show no `in` clause)
+- **DELTA** — lines added/removed
+- **METRICS** — `TEST:`, `NEW:`, `DEL:`, `DEPS:`, `BIN:`, `TESTONLY:`, `ENV:`, `TAG:`, `MERGE:`, `REVERT:`
 
-If no AI providers are configured or all fail, a local file-pattern fallback generates messages like `update auth, jwt and 2 files` from changed file stems.
+### Why Mechanical Messages?
 
-### Manual project-state.md
-
-The AI can still maintain `.dracon/project-state.md` manually for its own working memory across sessions. Sync no longer auto-generates, stages, or commits this file. If the AI wants it tracked, it must `git add` it explicitly.
+AI-generated commit messages were removed — they hallucinated context and AI reads the diff anyway. Mechanical facts are searchable (`git log --grep="JWT"`), honest, and compact.
 
 ## Startup Cleanup
 
