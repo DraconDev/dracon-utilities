@@ -1171,6 +1171,12 @@ fn detect_dependency_changes(repo: &Path) -> Option<String> {
     if !any_changed {
         return None;
     }
+    
+    // If we couldn't parse any actual deps, skip the DEPS indicator
+    // (e.g., version bump in package.json has no actual dependency changes)
+    if added_deps.is_empty() && removed_deps.is_empty() {
+        return None;
+    }
 
     // Format output
     let mut parts = Vec::new();
