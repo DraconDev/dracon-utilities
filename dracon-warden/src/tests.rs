@@ -421,9 +421,14 @@ watch_roots = ["/tmp/test"]
         )
         .expect("write config");
 
+        let old_val = std::env::var("DRACON_WARDEN_POLICY").ok();
         std::env::set_var("DRACON_WARDEN_POLICY", config_path.display().to_string());
         let path = resolve_policy_path_local().expect("should resolve");
-        std::env::remove_var("DRACON_WARDEN_POLICY");
+        // Restore env var to prevent parallel test interference
+        match old_val {
+            Some(v) => std::env::set_var("DRACON_WARDEN_POLICY", v),
+            None => std::env::remove_var("DRACON_WARDEN_POLICY"),
+        }
 
         assert_eq!(path, config_path);
     }
