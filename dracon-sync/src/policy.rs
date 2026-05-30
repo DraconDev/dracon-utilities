@@ -740,8 +740,11 @@ pub(crate) fn validate_config(policy_path: &Path) -> ValidateResult {
 
         if remote.auto_create {
             if remote.auto_create_account.is_empty() {
-                result.error(format!(
-                    "remote[{}] '{}': auto_create=true but auto_create_account is empty",
+                // Downgraded to warning: resolve_account() extracts the account
+                // from the push_url (e.g. git@host:account/{repo}.git → account).
+                result.warn(format!(
+                    "remote[{}] '{}': auto_create=true with empty auto_create_account \
+                     (account will be extracted from push_url via resolve_account())",
                     idx, remote.name
                 ));
             }

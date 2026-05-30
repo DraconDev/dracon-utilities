@@ -420,9 +420,10 @@ pub(crate) async fn auto_create_repo(
     repo_name: &str,
     private: bool,
 ) -> Result<String> {
+    let account = config.resolve_account();
     match config.effective_auth_type() {
-        AuthType::GitHub => create_repo_on_github(&config.auto_create_account, repo_name),
-        AuthType::GitLab => create_repo_on_gitlab(&config.auto_create_account, repo_name, private),
+        AuthType::GitHub => create_repo_on_github(&account, repo_name),
+        AuthType::GitLab => create_repo_on_gitlab(&account, repo_name, private),
         AuthType::Codeberg => {
             let token_var = config
                 .auto_create_token_var
@@ -436,7 +437,7 @@ pub(crate) async fn auto_create_repo(
                 .unwrap_or("https://codeberg.org/api/v1/user/repos");
             create_repo_on_codeberg(
                 &token,
-                &config.auto_create_account,
+                &account,
                 repo_name,
                 endpoint,
                 private,
