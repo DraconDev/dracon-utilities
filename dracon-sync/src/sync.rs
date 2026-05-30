@@ -1378,6 +1378,46 @@ fn get_current_tag(repo: &Path) -> Option<String> {
     None
 }
 
+/// Check if any environment files were changed in the staged diff.
+///
+/// Looks for:
+/// - .env, .env.*, .envrc
+/// - .secrets, secrets.*
+/// - config/settings files with secrets patterns
+///
+/// Returns true if any env-like files changed.
+fn has_env_changes(repo: &Path) -> bool {
+    let env_patterns = [
+        ".env",
+        ".env.",  // .env.local, .env.production, etc.
+        ".envrc",
+        ".secrets",
+        "secrets.",
+    ];
+    
+    let output = match run_git_capture_output(
+        repo,
+        &["diff", "--cached", "--name-only"],
+        "env-check",
+    ) {
+        Ok(o) => o,
+        Err(_) => return false,
+    };
+    
+    for line in output.lines() {
+        let path = line.trim();
+        // Check if file name matches any env pattern
+        let basename = path.rsplit('/').next().unwrap_or(path);
+        for pattern in &env_patterns {
+            if basename.starts_with(pattern) || basename == *pattern {
+                return true;
+            }
+        }
+    }
+    
+    false
+}
+
 /// Compute commit message from staged diff.
 ///
 /// Returns a structured message with task state + blast radius.
@@ -1578,6 +1618,16 @@ fn compute_blast_radius(repo: &Path) -> String {
     // 8. Tag detection — if this commit is tagged, include the tag
     if let Some(tag) = get_current_tag(repo) {
         metrics.push(format!("TAG:{}", tag));
+    }
+    
+    // 9. Test-only detection — if ALL changed files are test files
+    if !file_changes.is_empty() && file_changes.iter().all(|(_, path)| is_test_file(path)) {
+        metrics.push("TESTONLY:".to_string());
+    }
+    
+    // 10. Env file detection — if any env files changed
+    if has_env_changes(repo) {
+        metrics.push("ENV:".to_string());
     }
     
     let metrics_str = if metrics.is_empty() {

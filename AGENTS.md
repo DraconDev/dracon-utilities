@@ -659,6 +659,8 @@ From the diff, we deterministically extract:
    - `MERGE:` — merge commit (has two parents)
    - `REVERT:` — revert commit (has REVERT_HEAD)
    - `TAG:v1.2.0` — this commit is tagged (release milestone)
+   - `TESTONLY:` — all changed files are test files (no production code)
+   - `ENV:` — env files changed (`.env`, `.envrc`, etc.)
 
 ### Commit Format
 
@@ -692,6 +694,12 @@ CLOSED: Release v1.0.0 | 10 file(s) in src [lib.rs] DELTA:+500/-100 | TAG:v1.0.0
 
 # Merge commit
 MERGE: | 5 file(s) in src [auth.py, db.py] DELTA:+200/-50
+
+# Test-only commit (no production code changes)
+CLOSED: Add auth tests | 2 file(s) in src [auth_test.py] DELTA:+100/-0 | TEST:100 TESTONLY:
+
+# Env file changed (security audit)
+1 file(s) in . [.env.example] DELTA:+5/-2 | ENV:
 ```
 
 ### How AI Searches This
@@ -726,6 +734,12 @@ git log --grep="REVERT:"
 
 # Find release commits
 git log --grep="TAG:"
+
+# Find test-only commits (no production code)
+git log --grep="TESTONLY:"
+
+# Find commits with env file changes
+git log --grep="ENV:"
 
 ### What This Is NOT
 
