@@ -1867,11 +1867,32 @@ pub(crate) async fn sync_repo(
     }
 
     if !is_repo_ready(repo) {
-        eprintln!(
-            "⏳ {} not ready (mid-clone or empty repo), skipping",
-            repo.display()
-        );
-        return Ok(SyncOutcome::NothingToDo);
+        // Empty repo (no commits) — create initial commit so auto-create can push
+        if !dry_run {
+            let git_bin = crate::policy::git_binary();
+            let has_files = std::fs::read_dir(repo)
+                .map(|mut dirs| dirs.any(|e| e.ok().map_or(false, |e| e.file_name() != ".git")))
+                .unwrap_or(false);
+            if has_files {
+                let _ = std::process::Command::new(&git_bin)
+                    .args(["add", "-A"])
+                    .current_dir(repo)
+                    .output();
+                let _ = std::process::Command::new(&git_bin)
+                    .args(["commit", "-m", "initial"])
+                    .current_dir(repo)
+                    .output();
+                eprintln!("📝 {} created initial commit (empty repo)", repo.display());
+            } else {
+                eprintln!(
+                    "⏳ {} not ready (mid-clone or empty repo), skipping",
+                    repo.display()
+                );
+                return Ok(SyncOutcome::NothingToDo);
+            }
+        } else {
+            return Ok(SyncOutcome::NothingToDo);
+        }
     }
 
     let has_origin = ensure_origin_remote(repo, policy);
