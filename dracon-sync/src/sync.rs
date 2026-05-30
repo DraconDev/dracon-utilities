@@ -1114,7 +1114,7 @@ fn truncate_task(name: &str) -> String {
         return name.to_string();
     }
     // Try to cut at sentence boundary
-    if let Some(pos) = name[..MAX_LEN].rfind(|c: char| c == '.' || c == '—' || c == '–') {
+    if let Some(pos) = name[..MAX_LEN].rfind(['.', '—', '–']) {
         let truncated = &name[..pos + 1];
         if truncated.len() >= 10 {
             return truncated.to_string();

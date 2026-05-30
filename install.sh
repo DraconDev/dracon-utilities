@@ -307,8 +307,7 @@ install_binary() {
 install_binary dracon-sync "" "dracon-sync"
 install_binary dracon-system "" "dracon-system"
 install_binary dracon-warden "" "dracon-warden"
-# dracon-ai is not in the workspace (depends on unpublished dracon-libs/services/ai)
-# Install separately from ./dracon-ai/ if needed
+# dracon-ai removed — superseded by dracon-code (when available)
 
 echo ""
 
@@ -373,7 +372,7 @@ echo "Installing example configs..."
 copy_config "dracon-sync/dracon-sync.example.toml" "$HOME/.dracon/utilities/sync/dracon-sync.toml"
 copy_config "dracon-system/dracon-system.example.toml" "$HOME/.dracon/utilities/system/dracon-system.toml"
 copy_config "dracon-warden/dracon-warden.example.toml" "$HOME/.dracon/utilities/warden/dracon-warden.toml"
-# dracon-ai config not installed (crate not in workspace)
+
 
 # Create secrets directories with correct permissions
 mkdir -p "$HOME/.dracon/utilities/sync/secrets"
