@@ -867,6 +867,8 @@ fn check_toml_field_ordering(content: &str, result: &mut ValidateResult) {
     let mut pos = 0;
     let bytes = content.as_bytes();
 
+    let mut in_table = false; // inside a [[remotes]] or [[...]] table entry
+
     while pos < bytes.len() {
         let line_start = pos;
         while pos < bytes.len() && bytes[pos] != b'\n' {
@@ -875,13 +877,23 @@ fn check_toml_field_ordering(content: &str, result: &mut ValidateResult) {
         let line = &content[line_start..pos];
         let stripped = line.trim();
 
-        if stripped.starts_with('[') {
+        if stripped.starts_with("[[") {
+            // Enters a new table entry — fields inside are table-scoped, not top-level
+            in_table = true;
+            if first_section_pos.is_none() {
+                first_section_pos = Some(line_start);
+            }
+        } else if stripped.starts_with('[') && !stripped.starts_with("[[") {
+            // Single-bracket section like [repo_name_map], [extra_remotes]
+            in_table = false;
             if first_section_pos.is_none() {
                 first_section_pos = Some(line_start);
             }
         } else if !stripped.is_empty() && !stripped.starts_with('#') && stripped.contains('=') {
             if let Some(first_sec) = first_section_pos {
-                if line_start > first_sec {
+                // Only warn for top-level fields after a section header.
+                // Fields inside [[remotes]] table entries are correctly placed.
+                if line_start > first_sec && !in_table {
                     let (key, _) = stripped.split_once('=').unwrap_or((stripped, ""));
                     let key = key.trim();
                     if !key.starts_with('"')
