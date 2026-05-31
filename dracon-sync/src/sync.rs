@@ -1364,7 +1364,6 @@ fn extract_new_deleted_files(repo: &Path) -> (Vec<String>, Vec<String>) {
 /// - *_test.rs, *_test.py, *_test.go
 /// - *.test.ts, *.test.js, *.spec.ts
 /// - test_*.py, test_*.rs
-/// Ensure the warden clean/smudge filter is set up for a repo.
 fn ensure_warden_filter(repo: &Path) {
     let gitattributes = repo.join(".gitattributes");
     let has_filter = std::fs::read_to_string(&gitattributes)
