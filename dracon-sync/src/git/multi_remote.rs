@@ -311,17 +311,33 @@ pub(crate) async fn push_to_all_remotes(
     let mut sorted = remotes.to_vec();
     sorted.sort_by_key(|r| r.priority);
 
-    let mut results = Vec::new();
+    // Push to all remotes concurrently for faster sync
+    let mut handles = Vec::new();
     for remote in sorted {
-        let result = push_to_named_remote(
-            repo,
-            &remote.name,
-            timeout_secs,
-            retries,
-            remote.force_push_when_behind,
-        )
-        .await;
-        results.push((remote.name.clone(), result));
+        let repo = repo.to_path_buf();
+        let name = remote.name.clone();
+        let force_push = remote.force_push_when_behind;
+        handles.push(tokio::spawn(async move {
+            let result = push_to_named_remote(
+                &repo,
+                &name,
+                timeout_secs,
+                retries,
+                force_push,
+            )
+            .await;
+            (name, result)
+        }));
+    }
+
+    let mut results = Vec::new();
+    for handle in handles {
+        match handle.await {
+            Ok(result) => results.push(result),
+            Err(e) => {
+                eprintln!("⚠️ push task failed: {}", e);
+            }
+        }
     }
     results
 }

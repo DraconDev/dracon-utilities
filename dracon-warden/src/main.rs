@@ -1577,8 +1577,11 @@ async fn main() -> Result<()> {
             }
         }
         Command::Daemon => {
-            let policy_path = resolve_policy_path_local()?;
-            run_daemon(policy_path)?;
+            eprintln!("⚠️  The 'daemon' command is deprecated.");
+            eprintln!("    Hook-based enforcement (pre-commit + pre-push) is now the primary security layer.");
+            eprintln!("    Use 'dracon-warden setup-hooks' to install hooks globally.");
+            eprintln!("    Use 'dracon-warden once <repo>' for one-time hardening.");
+            std::process::exit(0);
         }
         Command::ScrubMarkers { apply, repo } => {
             let policy_path = resolve_policy_path_local()?;
