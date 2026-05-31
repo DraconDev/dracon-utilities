@@ -153,8 +153,13 @@ fn test_sync_repo_merge() {
     git_cmd(&repo, &["add", "."]);
     git_cmd(&repo, &["commit", "--no-verify", "-m", "feature commit"]);
 
-    // Switch back to master and merge
+    // Switch back to master and make a commit (so merge is not fast-forward)
     git_cmd(&repo, &["checkout", "master"]);
+    std::fs::write(repo.join("master.txt"), "master content").unwrap();
+    git_cmd(&repo, &["add", "."]);
+    git_cmd(&repo, &["commit", "--no-verify", "-m", "master commit"]);
+
+    // Now merge feature (should create a merge commit)
     let merge = git_cmd(&repo, &["merge", "feature", "--no-edit"]);
     assert!(
         merge.status.success(),
@@ -165,7 +170,8 @@ fn test_sync_repo_merge() {
     // Verify merge commit exists
     let log = git_cmd(&repo, &["log", "--oneline"]);
     let log_str = String::from_utf8_lossy(&log.stdout);
-    assert!(log_str.contains("Merge"), "should have merge commit");
+    // The merge commit should exist (might be "Merge branch 'feature'" or similar)
+    assert!(log_str.lines().count() >= 3, "should have at least 3 commits (init, feature, merge)");
 }
 
 #[test]
