@@ -172,14 +172,6 @@ Sync daemon:
 - [ ] Remove any warden-related imports or references
 - [ ] Sync becomes completely warden-unaware — no subprocess calls, no validation
 
-#### Sync: Add pre-commit hook validation (optional)
-
-- [ ] Consider: should sync also validate the hook exists before pushing?
-  - If the pre-commit hook is installed globally, the commit would have been blocked
-  - But if someone uses `--no-verify`, the hook is bypassed
-  - Sync could add a final check before push: verify the committed blobs contain `[DRACON_SECRET:]` markers for sensitive files
-- [ ] This is defense-in-depth, not required for the core guarantee
-
 #### Migration
 
 - [ ] Existing repos with warden filter already configured continue working (hooks are additive)

@@ -1364,46 +1364,6 @@ fn extract_new_deleted_files(repo: &Path) -> (Vec<String>, Vec<String>) {
 /// - *_test.rs, *_test.py, *_test.go
 /// - *.test.ts, *.test.js, *.spec.ts
 /// - test_*.py, test_*.rs
-fn ensure_warden_filter(repo: &Path) {
-    let gitattributes = repo.join(".gitattributes");
-    let has_filter = std::fs::read_to_string(&gitattributes)
-        .map(|c| c.contains("filter=dracon"))
-        .unwrap_or(false);
-
-    if !has_filter {
-        // Check if warden binary exists
-        let warden_bin = std::env::var("DRACON_SYNC_GIT_BIN")
-            .ok()
-            .map(|_| ())
-            .or_else(|| {
-                std::process::Command::new("which")
-                    .arg("dracon-warden")
-                    .output()
-                    .ok()
-                    .and_then(|o| if o.status.success() { Some(()) } else { None })
-            });
-
-        if warden_bin.is_some() {
-            let output = std::process::Command::new("dracon-warden")
-                .arg("once")
-                .arg(repo)
-                .output();
-            match output {
-                Ok(o) if o.status.success() => {
-                    eprintln!("🛡️ warden filter set up for {}", repo.display());
-                }
-                Ok(o) => {
-                    let stderr = String::from_utf8_lossy(&o.stderr);
-                    if !stderr.is_empty() {
-                        eprintln!("⚠️ warden setup failed for {}: {}", repo.display(), stderr.trim());
-                    }
-                }
-                Err(_) => {} // warden not found, skip silently
-            }
-        }
-    }
-}
-
 fn is_test_file(path: &str) -> bool {
     let lower = path.to_ascii_lowercase();
     let basename = path.rsplit('/').next().unwrap_or(path);
@@ -1846,10 +1806,6 @@ async fn stage_commit_and_push(
     restore_excluded_paths(ctx, to_restore).await?;
 
     if policy.auto_push && has_origin {
-        // Ensure warden filter is set up before pushing — prevents plaintext secret leaks
-        if !dry_run {
-            ensure_warden_filter(repo);
-        }
         let push_ok = push_with_blob_check(ctx, 1).await?;
         if !push_ok {
             log_warn!("some mirror pushes failed for {}", repo.display());
@@ -2901,7 +2857,7 @@ push_url = "git@nonexistent.example.com:repo.git"
     }
 
     #[tokio::test]
-    async fn test_sync_repo_mirror_failure_tracks_remote_failures() {
+    async fn test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBwM01mM1czaldpaWNFaUIvSkVJNHRrV0xaUE53cEdiTmxVL0NWeGhMc2dVCkN0NGxWbU9ZYVk5b3BrMGV0Z0hhSDNTRVFvZW9EUGtWVFd2S2FoaThmb1UKLT4gWDI1NTE5IE1WRVVpWUVSellwOERqejdmM1VUNG5NZUJSbjFydHhlam9Ndm9abENxMHMKYVRGWDRFYU96WVdJUnhRMDNaUDR6Rk1lTFZVWkRTcVF6elQxTndmMEY1RQotPiAnN202MC1ncmVhc2UgdHI3QC91cFAgIyU4KSM/dyBMClZDdUhpd1BPVzN6dE40S1pDTXhLMTVBRkdUR2EyNG8KLS0tIHQ0VUY5ZFRhdXdQSXdKSGNZaC9IMTVQaVh2aDVaQXRyZVcxS25URmRtMVUK15wNNgk/4XdNHuG6F3ZFZZANDCzOnjmdBKKveMmUTyhbAckqooeCYA9avtV6ashvAek1igVGWL3L]() {
         let tmp = tempfile::tempdir().unwrap();
         let origin_bare = tmp.path().join("origin.git");
         std::process::Command::new("git")
@@ -3254,7 +3210,7 @@ push_url = "{}"
     }
 
     #[tokio::test]
-    async fn test_sync_repo_exactly_50_percent_deletion_allowed() {
+    async fn test_sync_repo_exac[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBGK21velU4aHArZzlBNnJOeXdSdGxLV1Y0MzlmZ0xuVTAvWW1ueEhmRFdFCjdOYllRbytXM0NSd004czFJRzk2NHhIbmZWTFBNb2tvcEZQdmRIWHpzdGcKLT4gWDI1NTE5IGF1a3lYUmRyd25uL3B3NUZ1RWtJZFNUNEJKN2dYdEFCVno3ekZJOFdNeW8Ka2NzWGtjM0owTFR6cmZiM2lHM2V1clY4UkNOUXhYdDNlTWMrM2NJVkFxWQotPiB+S1wtZ3JlYXNlIHFOeXt2fiBACmsyK0JkUQotLS0gRDI3K2FZeGVyajcxTHVEL2hBdU9MSERYMkJXUWdDcUtKZUljd011ZlFEYwrfnhB2+FeGmMVOh2XB1uLjS0e7d10SCe1/z7s6LCrt2zjmMBziEdt1PbVkT5YFKS4uc8OWjCI/0D8N8syx8gw=]() {
         let tmp = tempfile::tempdir().unwrap();
         let repo = init_test_repo(&tmp, "exact-50-del-repo");
 

@@ -311,6 +311,18 @@ if [ "$BINARIES_ONLY" = true ]; then
     exit 0
 fi
 
+# Install warden git hooks (pre-commit + pre-push enforcement)
+if [ "$DRY_RUN" = true ]; then
+    echo "Would install warden git hooks via: dracon-warden setup-hooks --global"
+else
+    if command -v dracon-warden &>/dev/null || [ -f ~/.local/bin/dracon-warden ]; then
+        ~/.local/bin/dracon-warden setup-hooks --global 2>/dev/null || \
+            echo "⚠️  Could not install warden hooks (run manually: dracon-warden setup-hooks)"
+    else
+        echo "⚠️  dracon-warden not found, skipping hook installation"
+    fi
+fi
+
 # Install systemd service files
 mkdir -p ~/.config/systemd/user
 mkdir -p ~/.dracon/utilities/sync

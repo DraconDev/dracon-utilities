@@ -197,7 +197,10 @@ enum Command {
         /// Optional repo path to harden. If omitted, hardens repos in warden discovery scope.
         repo: Option<PathBuf>,
     },
-    /// Run forever with filesystem event debounce.
+    /// [DEPRECATED] Run forever with filesystem event debounce.
+    ///
+    /// Deprecated: Hook-based enforcement (pre-commit + pre-push) is now the
+    /// primary security layer. The daemon is optional for proactive hardening.
     Daemon,
     /// Scan plaintext JSON files for DRACON_SECRET markers and optionally scrub them.
     ScrubMarkers {
@@ -250,6 +253,22 @@ enum Command {
     /// the public key to the current repo's .dracon/data/keys/ directory.
     /// Fails if either file already exists to prevent accidental overwrite.
     Keygen,
+    /// Install git hooks globally for warden encryption enforcement.
+    ///
+    /// Installs pre-commit and pre-push hooks to ~/.config/git/hooks/
+    /// and sets core.hooksPath globally. The pre-commit hook blocks commits
+    /// if the warden filter is not configured. The pre-push hook scans for
+    /// plaintext secrets as defense-in-depth.
+    SetupHooks {
+        /// Install hooks globally (default). Sets core.hooksPath in global git config.
+        #[arg(long, conflicts_with = "local")]
+        global: bool,
+        /// Install hooks locally into a specific repo's .git/hooks/ directory.
+        #[arg(long, conflicts_with = "global")]
+        local: bool,
+        /// Repo path for --local mode. Defaults to current directory.
+        repo: Option<PathBuf>,
+    },
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -1053,6 +1072,9 @@ pub(crate) fn harden_repo(
         None => false,
     };
 
+    // Install git hooks if not already present
+    let _ = install_hooks_for_repo(repo);
+
     Ok((
         gitignore_changed,
         gitattributes_changed || filter_cfg_changed,
@@ -1621,6 +1643,14 @@ async fn main() -> Result<()> {
         Command::Keygen => {
             run_keygen()?;
         }
+        Command::SetupHooks { global: _, local, repo } => {
+            let mode = if local {
+                HookMode::Local
+            } else {
+                HookMode::Global
+            };
+            run_setup_hooks(mode, repo.as_deref())?;
+        }
     }
 
     Ok(())
@@ -2130,6 +2160,198 @@ fn run_filter(is_clean: bool, path: Option<&str>) -> Result<()> {
         warden.smudge(&input, path)?
     };
     std::io::stdout().write_all(&output)?;
+    Ok(())
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum HookMode {
+    Global,
+    Local,
+}
+
+fn hook_dir(mode: HookMode, repo: Option<&Path>) -> Result<PathBuf> {
+    match mode {
+        HookMode::Global => {
+            let home = dirs::home_dir().context("could not determine home directory")?;
+            Ok(home.join(".config/git/hooks"))
+        }
+        HookMode::Local => {
+            let repo_path = repo.context("--local requires a repo path")?;
+            let git_dir = repo_path.join(".git");
+            if !git_dir.exists() {
+                return Err(anyhow::anyhow!(
+                    "not a git repo: {} (no .git directory)",
+                    repo_path.display()
+                ));
+            }
+            Ok(git_dir.join("hooks"))
+        }
+    }
+}
+
+const PRE_COMMIT_HOOK: &str = r#"#!/bin/sh
+# Dracon Warden — pre-commit hook
+# Validates that the warden encryption filter is configured before committing.
+# Installed by: dracon-warden setup-hooks
+
+REPO=$(git rev-parse --show-toplevel)
+
+# Check .gitattributes has filter=dracon patterns
+if ! grep -q "filter=dracon" "$REPO/.gitattributes" 2>/dev/null; then
+    echo "❌ Warden filter missing from .gitattributes."
+    echo "   Run: dracon-warden once $REPO"
+    exit 1
+fi
+
+# Check git config has filter.dracon.clean set
+if ! git -C "$REPO" config filter.dracon.clean >/dev/null 2>&1; then
+    echo "❌ Warden filter not configured in git config."
+    echo "   Run: dracon-warden once $REPO"
+    exit 1
+fi
+
+# Check filter binary is on PATH
+if ! command -v dracon-warden >/dev/null 2>&1; then
+    echo "❌ dracon-warden binary not found on PATH."
+    echo "   Install it or add to PATH."
+    exit 1
+fi
+"#;
+
+const PRE_PUSH_HOOK: &str = r#"#!/bin/sh
+# Dracon Warden — pre-push hook
+# Defense-in-depth: scans push for plaintext secrets.
+# Catches --no-verify bypass of pre-commit hook.
+# Installed by: dracon-warden setup-hooks
+
+# Read push info from stdin (remote URL and branch refs)
+while read local_ref local_sha remote_ref remote_sha; do
+    # Skip branch deletions
+    if [ "$local_sha" = "0000000000000000000000000000000000000000" ]; then
+        continue
+    fi
+
+    # Determine the diff range to scan
+    if [ "$remote_sha" = "0000000000000000000000000000000000000000" ]; then
+        # New branch — scan entire local commit history being pushed
+        DIFF=$(git diff "$remote_ref".."$local_sha" 2>/dev/null)
+    else
+        # Existing branch — scan commits being pushed
+        DIFF=$(git diff "$remote_sha".."$local_sha" 2>/dev/null)
+    fi
+
+    # Scan for common plaintext secret patterns
+    if echo "$DIFF" | grep -qE '(AKIA[A-Z0-9]{16}|-----BEGIN [A-Z]+ PRIVATE KEY|password\s*=\s*["\x27][^"\x27]+|secret\s*=\s*["\x27][^"\x27]+|api_key\s*=\s*["\x27][^"\x27]+)'; then
+        echo "⚠️  Possible plaintext secrets detected in push."
+        echo "   The warden filter may have been bypassed."
+        echo "   Run: dracon-warden once $(git rev-parse --show-toplevel)"
+        exit 1
+    fi
+done
+"#;
+
+fn run_setup_hooks(mode: HookMode, repo: Option<&Path>) -> Result<()> {
+    let dir = hook_dir(mode, repo)?;
+    fs::create_dir_all(&dir)
+        .with_context(|| format!("failed to create hook directory: {}", dir.display()))?;
+
+    let pre_commit_path = dir.join("pre-commit");
+    let pre_push_path = dir.join("pre-push");
+
+    fs::write(&pre_commit_path, PRE_COMMIT_HOOK)
+        .with_context(|| format!("failed to write {}", pre_commit_path.display()))?;
+    fs::write(&pre_push_path, PRE_PUSH_HOOK)
+        .with_context(|| format!("failed to write {}", pre_push_path.display()))?;
+
+    // Set executable permissions
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let perms = fs::Permissions::from_mode(0o755);
+        fs::set_permissions(&pre_commit_path, perms.clone())?;
+        fs::set_permissions(&pre_push_path, perms)?;
+    }
+
+    // Set core.hooksPath
+    match mode {
+        HookMode::Global => {
+            let output = std::process::Command::new("git")
+                .args(["config", "--global", "core.hooksPath", &dir.to_string_lossy()])
+                .output()
+                .context("failed to run git config")?;
+            if !output.status.success() {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                return Err(anyhow::anyhow!(
+                    "failed to set core.hooksPath: {}",
+                    stderr.trim()
+                ));
+            }
+            println!("✅ Global hooks installed to {}", dir.display());
+            println!("   core.hooksPath set to {}", dir.display());
+        }
+        HookMode::Local => {
+            let repo_path = repo.context("--local requires a repo path")?;
+            let output = std::process::Command::new("git")
+                .args(["-C"])
+                .arg(&repo_path)
+                .args(["config", "local", "core.hooksPath", &dir.to_string_lossy()])
+                .output()
+                .context("failed to run git config")?;
+            if !output.status.success() {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                return Err(anyhow::anyhow!(
+                    "failed to set local core.hooksPath: {}",
+                    stderr.trim()
+                ));
+            }
+            println!(
+                "✅ Local hooks installed to {} for {}",
+                dir.display(),
+                repo_path.display()
+            );
+        }
+    }
+
+    println!("   pre-commit: blocks commits if warden filter is missing");
+    println!("   pre-push:   scans for plaintext secrets (defense-in-depth)");
+    Ok(())
+}
+
+fn install_hooks_for_repo(repo: &Path) -> Result<()> {
+    let hooks_dir = repo.join(".git/hooks");
+    if !hooks_dir.exists() {
+        return Ok(());
+    }
+
+    let pre_commit_path = hooks_dir.join("pre-commit");
+    let pre_push_path = hooks_dir.join("pre-push");
+
+    // Only install if not already present (don't overwrite user hooks)
+    if pre_commit_path.exists() && pre_push_path.exists() {
+        return Ok(());
+    }
+
+    fs::create_dir_all(&hooks_dir)?;
+
+    if !pre_commit_path.exists() {
+        fs::write(&pre_commit_path, PRE_COMMIT_HOOK)?;
+    }
+    if !pre_push_path.exists() {
+        fs::write(&pre_push_path, PRE_PUSH_HOOK)?;
+    }
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let perms = fs::Permissions::from_mode(0o755);
+        if !pre_commit_path.exists() {
+            fs::set_permissions(&pre_commit_path, perms.clone())?;
+        }
+        if !pre_push_path.exists() {
+            fs::set_permissions(&pre_push_path, perms)?;
+        }
+    }
+
     Ok(())
 }
 
