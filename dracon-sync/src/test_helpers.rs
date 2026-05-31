@@ -93,6 +93,7 @@ pub(crate) fn test_commit_cmd() -> std::process::Command {
 /// ```ignore
 /// let repo = create_test_repo();
 /// ```
+#[cfg(test)]
 #[allow(dead_code)]
 pub(crate) fn create_test_repo() -> std::path::PathBuf {
     let tmp = tempfile::TempDir::new().expect("temp dir");
@@ -125,6 +126,7 @@ pub(crate) fn create_test_repo() -> std::path::PathBuf {
 /// ```ignore
 /// let (repo, bare) = create_test_repo_with_remote();
 /// ```
+#[cfg(test)]
 #[allow(dead_code)]
 pub(crate) fn create_test_repo_with_remote() -> (std::path::PathBuf, std::path::PathBuf) {
     let tmp = tempfile::TempDir::new().expect("temp dir");
