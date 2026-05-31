@@ -1364,6 +1364,40 @@ fn extract_new_deleted_files(repo: &Path) -> (Vec<String>, Vec<String>) {
 /// - *_test.rs, *_test.py, *_test.go
 /// - *.test.ts, *.test.js, *.spec.ts
 /// - test_*.py, test_*.rs
+/// Check committed files for unencrypted secrets.
+/// Returns list of files that match secret patterns but don't contain DRACON_SECRET markers.
+fn check_unencrypted_secrets(repo: &Path, entries: &[dracon_git::types::DiffFile]) -> Vec<String> {
+    let secret_patterns = [".env", ".env."];
+    let secret_names = ["config.json", "credentials.json", "service-account.json"];
+    let mut found = Vec::new();
+
+    for entry in entries {
+        if entry.status == dracon_git::types::FileStatus::Deleted {
+            continue; // skip deleted files
+        }
+        let path_str = entry.path.to_string_lossy();
+        let basename = entry.path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+
+        let is_secret = secret_patterns.iter().any(|p| basename.starts_with(p))
+            || secret_names.iter().any(|n| basename == *n);
+
+        if !is_secret {
+            continue;
+        }
+
+        // Check if file contains DRACON_SECRET markers (already encrypted)
+        let full_path = repo.join(&entry.path);
+        if let Ok(content) = std::fs::read_to_string(&full_path) {
+            if content.contains("[DRACON_SECRET:") {
+                continue; // already encrypted
+            }
+            // File matches secret pattern but is plaintext
+            found.push(path_str.to_string());
+        }
+    }
+    found
+}
+
 fn is_test_file(path: &str) -> bool {
     let lower = path.to_ascii_lowercase();
     let basename = path.rsplit('/').next().unwrap_or(path);
@@ -1806,6 +1840,20 @@ async fn stage_commit_and_push(
     restore_excluded_paths(ctx, to_restore).await?;
 
     if policy.auto_push && has_origin {
+        // Block push if committed files contain unencrypted secrets
+        if !dry_run {
+            let secret_files = check_unencrypted_secrets(repo, &committed_entries);
+            if !secret_files.is_empty() {
+                eprintln!(
+                    "🚨 BLOCKED push for {}: {} file(s) contain unencrypted secrets: {}",
+                    repo.display(),
+                    secret_files.len(),
+                    secret_files.join(", ")
+                );
+                eprintln!("   Run 'dracon-warden once {}' to encrypt before pushing", repo.display());
+                return Ok(Some(SyncOutcome::NothingToDo));
+            }
+        }
         let push_ok = push_with_blob_check(ctx, 1).await?;
         if !push_ok {
             log_warn!("some mirror pushes failed for {}", repo.display());
