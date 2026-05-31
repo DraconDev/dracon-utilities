@@ -1366,6 +1366,8 @@ fn extract_new_deleted_files(repo: &Path) -> (Vec<String>, Vec<String>) {
 /// - test_*.py, test_*.rs
 /// Ensure the warden clean/smudge filter is set up for a repo.
 /// If `.gitattributes` doesn't have `filter=dracon`, run `dracon-warden once` to set it up.
+///
+/// This prevents plaintext secrets from being pushed to remotes.
 fn ensure_warden_filter(repo: &Path) {
     let gitattributes = repo.join(".gitattributes");
     let has_filter = std::fs::read_to_string(&gitattributes)
@@ -1404,40 +1406,6 @@ fn ensure_warden_filter(repo: &Path) {
             }
         }
     }
-}
-
-/// Check committed files for unencrypted secrets.
-/// Returns list of files that match secret patterns but don't contain DRACON_SECRET markers.
-fn check_unencrypted_secrets(repo: &Path, entries: &[dracon_git::types::DiffFile]) -> Vec<String> {
-    let secret_patterns = [".env", ".env."];
-    let secret_names = ["config.json", "credentials.json", "service-account.json"];
-    let mut found = Vec::new();
-
-    for entry in entries {
-        if entry.status == dracon_git::types::FileStatus::Deleted {
-            continue; // skip deleted files
-        }
-        let path_str = entry.path.to_string_lossy();
-        let basename = entry.path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
-
-        let is_secret = secret_patterns.iter().any(|p| basename.starts_with(p))
-            || secret_names.iter().any(|n| basename == *n);
-
-        if !is_secret {
-            continue;
-        }
-
-        // Check if file contains DRACON_SECRET markers (already encrypted)
-        let full_path = repo.join(&entry.path);
-        if let Ok(content) = std::fs::read_to_string(&full_path) {
-            if content.contains("[DRACON_SECRET:") {
-                continue; // already encrypted
-            }
-            // File matches secret pattern but is plaintext
-            found.push(path_str.to_string());
-        }
-    }
-    found
 }
 
 fn is_test_file(path: &str) -> bool {
@@ -1951,7 +1919,7 @@ pub(crate) async fn sync_repo(
         if !dry_run {
             let git_bin = crate::policy::git_binary();
             let has_files = std::fs::read_dir(repo)
-                .map(|mut dirs| dirs.any(|e| e.ok().map_or(false, |e| e.file_name() != ".git")))
+                .map(|mut dirs| dirs.any(|e| e.ok().is_some_and(|e| e.file_name() != ".git")))
                 .unwrap_or(false);
             if has_files {
                 let _ = std::process::Command::new(&git_bin)
