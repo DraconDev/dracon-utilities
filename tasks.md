@@ -1,256 +1,64 @@
-# Dracon Utilities — Audit Task List
-
-**Audit date:** 2026-05-29
-**Workspace:** 0.112.3 | **Tests:** 656 pass, 0 fail, 6 ignored | **Unsafe:** 0
-
----
-
-## CRITICAL — Must Fix
-
-### ~~C1: Hardcoded `/home/dracon/` paths in dracon-ai~~ ✅ DONE
-
-**File:** `dracon-ai/src/main.rs`
-**Fix:** Replaced all 5 hardcoded `/home/dracon/dracon` paths with `dirs::home_dir()` fallbacks. Computed values before format macros to avoid lifetime issues.
-
----
-
-### ~~C2: Mutex poison crash in dracon-system guard~~ ✅ DONE
-
-**File:** `dracon-system/src/main.rs:1301`
-**Fix:** Changed `cache.lock().unwrap()` to `cache.lock().unwrap_or_else(|e| e.into_inner())` for poison recovery.
-
----
-
-## HIGH — Should Fix
-
-### ~~H1: Dead code cleanup (17 suppressions)~~ ✅ DONE
-
-| Item | Action Taken |
-|------|--------------|
-| `log.rs` (Level, log_repo, log_module, 6 macros) | Removed dead items, kept only `warn()` + `log_warn!` |
-| `RemoteConfig` struct + impl | Removed `#[allow(dead_code)]` — struct IS used |
-| `repo_is_warn()` | Changed to `#[cfg(test)]` — test-only |
-| `SyncNow.force` | Changed to `hide = true` — keep CLI compat, hide from help |
-| `IndexLock::bypass()` | Removed — never called |
-| `EventSeverity::Debug`, `Critical` | Removed variants — never constructed |
-
----
-
-### ~~H2: Compiler warning — `todo_commit_messages` field~~ ✅ DONE
-
-**File:** `dracon-sync/src/policy.rs`
-**Fix:** Removed field from struct, default impl, test data, and example config.
-
----
-
-### ~~H3: Clippy warnings (3 fixable issues)~~ ✅ DONE
-
-**File:** `dracon-sync/src/sync.rs`
-**Fix:**
-1. `starts_with("- [~]")` + `content[5..]` → `strip_prefix("- [~]")`
-2. `starts_with("- [x]") || starts_with("- [X]")` → `strip_prefix` with `or_else`
-3. `replace('[', "").replace(']', "")` → `replace(['[', ']'], "")`
-
----
-
-### ~~H4: Duplicated cache cleanup in dracon-system~~ ✅ DONE
-
-**File:** `dracon-system/src/main.rs`
-**Fix:** Extracted `try_remove_cache_dir()` helper. Replaced 4 identical 30-line blocks with a loop over `(label, enabled, rel_path)` tuples. Reduced nesting from 8 levels to 4.
-
----
-
-### ~~H5: Duplicated shutdown signal setup (3x)~~ ⏭️ SKIPPED
-
-3 clone calls across 3 crates — extracting a helper would be over-engineering for this simple pattern.
-
----
-
-## MEDIUM — Nice to Have
-
-### ~~M3: `once_cell` → `std::sync::OnceLock`~~ ⏭️ SKIPPED
-
-`OnceLock::get_or_try_init` is unstable (Rust issue #109737). `once_cell` stays until `get_or_try stabilizes.
-
-### M4: curl → reqwest migration — Backlog
-
-Large refactor, not urgent. `curl` works and is well-tested.
-
-### M1: Split dracon-system/src/main.rs — Backlog
-
-3,469 lines. Splitting is a significant refactor. Do when touching the file for other reasons.
-
-### M2: Break long functions — Backlog
-
-`run_daemon()` (191 lines) and `emit_event()` (180 lines). Break when touching these functions.
-
----
-
-## LOW — Done
-
-### ~~L1: Add `DRACON_SYNC_GIT_BIN` to clap help text~~ ✅ DONE
-
-Added `after_help` with ENVIRONMENT section documenting `DRACON_SYNC_GIT_BIN`, `DRACON_SYNC_POLICY`, `DRACON_SYNC_STATE_DIR`.
-
----
-
-### ~~L2: Add `sha256sum` to install.sh output~~ ✅ DONE
-
-Added checksum block after `ls -la` that prints sha256sum for each installed binary.
-
----
-
-### ~~L3: Add TOML field ordering warning to example config~~ ✅ DONE
-
-Added warning comment at top of `dracon-sync.example.toml` about field ordering requirements.
-
----
-
-### ~~L4: Add size guard to incident ledger startup~~ ✅ DONE
-
-Added 100MB size check before `read_to_string`. If exceeded, truncates to `max_lines` and logs warning.
-
----
-
-### ~~L5: Add test for new branch auto-push~~ ⏭️ SKIPPED
-
-Deferred — requires setting up git mock infrastructure.
-
-### ~~L6: Add test for filter_only_cleared cooldown~~ ⏭️ SKIPPED
-
-Deferred — requires filter mock infrastructure.
-
----
-
-## INFO — No Action Required
-
-| Item | Status |
-|------|--------|
-| Zero unsafe code | Excellent |
-| Zero production panics | Excellent (after C2 fix) |
-| All dependencies actively maintained | Good |
-| cargo-deny enforcing advisories | Good |
-| IndexLock TOCTOU mitigation | Solid |
-| Atomic file writes everywhere | Good |
-| Secret directory permission checks | Good |
-| All 656 tests passing | Good |
-
----
-
-## Summary
-
-| Status | Count |
-|--------|-------|
-| ✅ Completed | 12 |
-| ⏭️ Skipped (not worth it) | 4 |
-| 📋 Backlog (large refactor) | 4 |
-| **Total** | **20** |
-
-### Verification
-
-```
-cargo check --workspace    → 0 warnings
-cargo clippy --workspace   → 0 warnings
-cargo test --workspace     → 656 pass, 0 fail
-```
-
-### Files Modified
-
-| File | Changes |
-|------|---------|
-| `dracon-ai/src/main.rs` | Fixed 5 hardcoded paths → `dirs::home_dir()` |
-| `dracon-system/src/main.rs` | Mutex poison recovery, extracted cache cleanup helper |
-| `dracon-system/src/events.rs` | Removed `Debug`/`Critical` variants |
-| `dracon-system/src/events_tests.rs` | Updated test for removed variants |
-| `dracon-sync/src/main.rs` | Added env var help text, hid `--force` flag |
-| `dracon-sync/src/log.rs` | Stripped to only `warn()` + `log_warn!` |
-| `dracon-sync/src/policy.rs` | Removed `RemoteConfig` dead_code allow, removed `todo_commit_messages` |
-| `dracon-sync/src/report.rs` | `repo_is_warn` → `#[cfg(test)]`, added ledger size guard |
-| `dracon-sync/src/sync.rs` | Fixed 3 clippy warnings |
-| `dracon-sync/src/git/status.rs` | Removed `IndexLock::bypass()` |
-| `dracon-sync/dracon-sync.example.toml` | Added TOML ordering warning, removed `todo_commit_messages` |
-| `install.sh` | Added sha256sum output |
-
----
-
-## Warden Filter Expansion Strategy
+# Dracon Utilities — Task List
+
+## Completed
+
+- [x] C1: Fix hardcoded `/home/dracon/` paths in dracon-ai
+- [x] C2: Fix mutex poison crash in dracon-system guard
+- [x] H1: Dead code cleanup (17 suppressions)
+- [x] H2: Remove `todo_commit_messages` compiler warning
+- [x] H3: Fix clippy warnings (3 issues)
+- [x] H4: Extract duplicated cache cleanup helper in dracon-system
+- [x] L1: Add `DRACON_SYNC_GIT_BIN` to clap help text
+- [x] L2: Add `sha256sum` to install.sh output
+- [x] L3: Add TOML field ordering warning to example config
+- [x] L4: Add size guard to incident ledger startup
+- [x] Fix TOML field ordering — fields after `[[remotes]]` silently ignored
+- [x] Fix validator false positives on `[[remotes]]` fields
+- [x] Fix `auto_create_account` validation — downgrade to warning
+- [x] Fix diverged repo recovery — re-fetch status after pull in repair-concerns
+- [x] Fix `create_repo_on_github` — add `--default-branch main` (then API fallback)
+- [x] Fix commit message: root files counted as directories
+- [x] Fix commit message: DEL/NEW show top 10 instead of top 3
+- [x] Fix commit message: `CLOSED:` truncation (60 chars per task, 10 tasks max)
+- [x] Fix commit message: `TESTONLY:` shows file names
+- [x] Fix `truncate_task` UTF-8 crash — multi-byte char boundary panic
+- [x] Remove `scribe` and `ai-bumper` features from sync
+- [x] Remove dracon-ai from workspace
+- [x] Clean up 25 repos with dual master/main branches
+- [x] Scaffold missing LICENSE files
+- [x] Add regression tests for `truncate_task`
+
+## Skipped
+
+- [ ] H5: Extract duplicated shutdown signal setup (3x) — over-engineering
+- [ ] M3: `once_cell` → `std::sync::OnceLock` — unstable API
+- [ ] L5: Test for new branch auto-push — needs git mock infrastructure
+- [ ] L6: Test for filter_only_cleared cooldown — needs filter mock
+
+## Backlog
+
+- [ ] M1: Split dracon-system/src/main.rs (3,469 lines)
+- [ ] M2: Break long functions — `run_daemon()` (191 lines), `emit_event()` (180 lines)
+- [ ] M4: curl → reqwest migration
+
+## Warden Filter Expansion
 
 ### Problem
 
-Currently the warden only encrypts files matching `protected_patterns` (`.env`, `config.json`, `*.pem`, etc.). Secrets hardcoded in source code (Rust, Python, TypeScript, shell scripts) pass through unencrypted. The `SecretScanner` with 50+ regex patterns exists but is never applied to code files because `filter=dracon` isn't set for them.
+Warden only encrypts files matching `protected_patterns` (`.env`, `config.json`, `*.pem`). Secrets in source code pass through unencrypted. `SecretScanner` with 50+ regex patterns exists but isn't applied to code files.
 
 ### Goal
 
-Every `git add` should scan file content for secrets and encrypt any found — regardless of file type. No plaintext secrets should ever reach a git commit.
+Every `git add` scans file content for secrets and encrypts any found — regardless of file type.
 
-### Strategy: Expand filter + daemon detection
+### Tasks
 
-**Phase 1: Expand `.gitattributes` patterns**
-
-Apply `filter=dracon` to all text-based source and config files:
-
-```gitattributes
-# Source code — scan for hardcoded secrets
-*.rs filter=dracon diff=dracon merge=dracon
-*.py filter=dracon diff=dracon merge=dracon
-*.ts filter=dracon diff=dracon merge=dracon
-*.js filter=dracon diff=dracon merge=dracon
-*.go filter=dracon diff=dracon merge=dracon
-*.sh filter=dracon diff=dracon merge=dracon
-*.yml filter=dracon diff=dracon merge=dracon
-*.yaml filter=dracon diff=dracon merge=dracon
-*.toml filter=dracon diff=dracon merge=dracon
-*.md filter=dracon diff=dracon merge=dracon
-*.sql filter=dracon diff=dracon merge=dracon
-*.env filter=dracon diff=dracon merge=dracon
-*.env.* filter=dracon diff=dracon merge=dracon
-*.json filter=dracon diff=dracon merge=dracon
-*.pem filter=dracon diff=dracon merge=dracon
-*.key filter=dracon diff=dracon merge=dracon
-*.age filter=dracon diff=dracon merge=dracon
-secrets/** filter=dracon diff=dracon merge=dracon
-
-# Exclude build artifacts and binaries
-target/ -filter
-node_modules/ -filter
-*.png -filter
-*.jpg -filter
-*.so -filter
-*.o -filter
-```
-
-**Phase 2: Daemon detects `git add` and ensures filter**
-
-The warden daemon (or a lighter alternative) watches for filesystem events:
-
-1. `git add secret.rs` → inotify fires
-2. Check: does `.gitattributes` have `filter=dracon` for `*.rs`?
-3. If no → set up filter, then re-add the file (so clean filter runs)
-4. If yes → clean filter already scanned content, secrets encrypted
-
-**Phase 3: Hook alternative (if daemon is too heavy)**
-
-Git has no `pre-add` hook, but we can use:
-- `post-index-change` hook — fires after `git add` modifies the index
-- Check if newly added files have unencrypted secrets
-- If yes → re-add with filter
-
-This is reactive (secret is briefly in the index) but catches it before commit.
-
-### Implementation Plan
-
-1. Update warden policy to include source code patterns in `protected_patterns`
-2. Update `build_gitattributes_block()` to include new patterns
-3. Update `ensure_warden_filter()` in sync to include new patterns
-4. Add `post-index-change` git hook as lightweight alternative to daemon
-5. Test: create repo, add file with hardcoded AWS key, verify encryption
-
-### Decision: Daemon vs Hook
-
-| Approach | Pros | Cons |
-|----------|------|------|
-| **Daemon** | Catches at `git add` time, proactive | 24/7 process, resource usage |
-| **Post-index hook** | Lightweight, no daemon | Reactive (brief window), per-repo setup |
-| **Both** | Defense in depth | More complexity |
-
-**Recommendation:** Start with post-index hook (lightweight, no daemon). Add daemon later if the hook proves insufficient.
+- [ ] Update warden policy `protected_patterns` to include source code: `*.rs`, `*.py`, `*.ts`, `*.js`, `*.go`, `*.sh`, `*.yml`, `*.yaml`, `*.toml`, `*.md`, `*.sql`
+- [ ] Update `build_gitattributes_block()` to generate patterns for new file types
+- [ ] Update `ensure_warden_filter()` in sync to include new patterns
+- [ ] Add `post-index-change` git hook — detects unencrypted secrets after `git add`, re-adds with filter
+- [ ] Install hook via git template (`~/.git-templates/hooks/post-index-change`)
+- [ ] Set `git config --global init.templateDir ~/.git-templates` for new repos
+- [ ] One-time migration: run `dracon-warden once` on all existing repos
+- [ ] Test: create repo, add `.rs` file with hardcoded AWS key, verify encryption on `git add`
+- [ ] Test: verify files with no secrets pass through unchanged (no false positives)
