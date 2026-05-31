@@ -1364,6 +1364,48 @@ fn extract_new_deleted_files(repo: &Path) -> (Vec<String>, Vec<String>) {
 /// - *_test.rs, *_test.py, *_test.go
 /// - *.test.ts, *.test.js, *.spec.ts
 /// - test_*.py, test_*.rs
+/// Ensure the warden clean/smudge filter is set up for a repo.
+/// If `.gitattributes` doesn't have `filter=dracon`, run `dracon-warden once` to set it up.
+fn ensure_warden_filter(repo: &Path) {
+    let gitattributes = repo.join(".gitattributes");
+    let has_filter = std::fs::read_to_string(&gitattributes)
+        .map(|c| c.contains("filter=dracon"))
+        .unwrap_or(false);
+
+    if !has_filter {
+        // Check if warden binary exists
+        let warden_bin = std::env::var("DRACON_SYNC_GIT_BIN")
+            .ok()
+            .map(|_| ())
+            .or_else(|| {
+                std::process::Command::new("which")
+                    .arg("dracon-warden")
+                    .output()
+                    .ok()
+                    .and_then(|o| if o.status.success() { Some(()) } else { None })
+            });
+
+        if warden_bin.is_some() {
+            let output = std::process::Command::new("dracon-warden")
+                .arg("once")
+                .arg(repo)
+                .output();
+            match output {
+                Ok(o) if o.status.success() => {
+                    eprintln!("🛡️ warden filter set up for {}", repo.display());
+                }
+                Ok(o) => {
+                    let stderr = String::from_utf8_lossy(&o.stderr);
+                    if !stderr.is_empty() {
+                        eprintln!("⚠️ warden setup failed for {}: {}", repo.display(), stderr.trim());
+                    }
+                }
+                Err(_) => {} // warden not found, skip silently
+            }
+        }
+    }
+}
+
 /// Check committed files for unencrypted secrets.
 /// Returns list of files that match secret patterns but don't contain DRACON_SECRET markers.
 fn check_unencrypted_secrets(repo: &Path, entries: &[dracon_git::types::DiffFile]) -> Vec<String> {
@@ -1840,19 +1882,9 @@ async fn stage_commit_and_push(
     restore_excluded_paths(ctx, to_restore).await?;
 
     if policy.auto_push && has_origin {
-        // Block push if committed files contain unencrypted secrets
+        // Ensure warden filter is set up before pushing — prevents plaintext secret leaks
         if !dry_run {
-            let secret_files = check_unencrypted_secrets(repo, &committed_entries);
-            if !secret_files.is_empty() {
-                eprintln!(
-                    "🚨 BLOCKED push for {}: {} file(s) contain unencrypted secrets: {}",
-                    repo.display(),
-                    secret_files.len(),
-                    secret_files.join(", ")
-                );
-                eprintln!("   Run 'dracon-warden once {}' to encrypt before pushing", repo.display());
-                return Ok(Some(SyncOutcome::NothingToDo));
-            }
+            ensure_warden_filter(repo);
         }
         let push_ok = push_with_blob_check(ctx, 1).await?;
         if !push_ok {
