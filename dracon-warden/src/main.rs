@@ -1346,6 +1346,7 @@ fn find_git_repo(path: &Path) -> Option<PathBuf> {
 }
 
 #[allow(dead_code)]
+#[allow(dead_code)]
 fn run_daemon(policy_path: PathBuf) -> Result<()> {
     let policy = WardenPolicy::load(&policy_path)?;
     policy.apply_global_flags();
