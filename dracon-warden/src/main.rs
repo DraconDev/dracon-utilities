@@ -13,11 +13,8 @@ use std::fs;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command as ProcessCommand;
-use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
-use std::sync::mpsc;
-use std::sync::Arc;
+use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::Mutex;
-use std::time::{Duration, Instant};
 use zeroize::Zeroizing;
 
 static ROLLING_LOG: std::sync::OnceLock<Mutex<Vec<String>>> = std::sync::OnceLock::new();
