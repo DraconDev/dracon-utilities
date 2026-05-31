@@ -1365,9 +1365,6 @@ fn extract_new_deleted_files(repo: &Path) -> (Vec<String>, Vec<String>) {
 /// - *.test.ts, *.test.js, *.spec.ts
 /// - test_*.py, test_*.rs
 /// Ensure the warden clean/smudge filter is set up for a repo.
-/// If `.gitattributes` doesn't have `filter=dracon`, run `dracon-warden once` to set it up.
-///
-/// This prevents plaintext secrets from being pushed to remotes.
 fn ensure_warden_filter(repo: &Path) {
     let gitattributes = repo.join(".gitattributes");
     let has_filter = std::fs::read_to_string(&gitattributes)
