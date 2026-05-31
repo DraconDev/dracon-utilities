@@ -25,14 +25,13 @@ use std::str::FromStr;
 
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
-// Module declarations for future refactoring
-// Each module will contain a subset of the code below
-// pub mod scanner;    // SecretScanner and patterns (lines 137-665)
-// pub mod environment; // EnvironmentManager (lines 667-725)
-// pub mod keys;       // RepoKey, TeamKey (lines 727-787)
-// pub mod crypto;     // encrypt/decrypt functions (lines 1834-2019)
-// pub mod backup;     // backup/restore functions (lines 1778-1833)
-// pub mod filter;     // smart_clean/smudge (lines 2215-3063)
+pub mod modules;
+
+pub use modules::scanner::SecretScanner;
+pub use modules::scanner::SecretFinding;
+pub use modules::environment::EnvironmentManager;
+pub use modules::keys::RepoKey;
+pub use modules::keys::TeamKey;
 
 // V2 Encryption Constants
 const HEADER_V2_MAGIC: &[u8] = b"age-encryption.org/v1";
@@ -143,656 +142,15 @@ impl RegistryCredential {
 }
 
 #[derive(Clone)]
-pub struct SecretScanner {
-    patterns: Vec<(String, Regex)>,
-    full_regex: Regex,
-}
-
-impl SecretScanner {
-    /// Expose patterns for integrity testing (e.g. Max Length Check)
-    pub fn get_patterns() -> Vec<(&'static str, &'static str)> {
-        vec![
-            // ============================================================
-            // AWS
-            // ============================================================
-            ("AWS Access Key ID", r"AKIA[0-9A-Z]{16}"),
-            (
-                "AWS Secret Access Key",
-                r#"(?i)aws(.{0,20})?["'][0-9a-zA-Z/+]{40}["']"#,
-            ),
-            (
-                "AWS Session Token",
-                r"(?i)aws_session_token\s*=\s*[a-zA-Z0-9/+=]{16,}",
-            ),
-            // ============================================================
-            // Cloud Providers Extended
-            // ============================================================
-            ("GCP API Key", r"AIza[0-9A-Za-z\-_]{35}"),
-            ("GCP OAuth Access Token", r"ya29\.[0-9A-Za-z_\-]{20,80}"),
-            (
-                "Azure Shared Access Signature",
-                r"sv=\d{4}-\d{2}-\d{2}&(?:[a-z]{2,3}=[a-z0-9%]+&)+sig=[a-zA-Z0-9%+\/]{10,}",
-            ),
-            ("Azure Storage Account Key", r"[a-zA-Z0-9+/]{86}=="),
-            ("Alibaba Access Key ID", r"LTAI[a-zA-Z0-9]{20}"),
-            (
-                "AWS MWS Key",
-                r"amzn\.mws\.[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
-            ),
-            // ============================================================
-            // Google Cloud
-            // ============================================================
-            ("Google API Key", r"AIza[0-9A-Za-z\\-_]{35}"),
-            (
-                "Google Client ID",
-                r"[0-9]+-[0-9a-z_]{32}\.apps\.googleusercontent\.com",
-            ),
-            (
-                "Google Service Account",
-                r#"(?i)"type":\s*"service_account""#,
-            ),
-            (
-                "Firebase Database URL",
-                r"https://[a-z0-9-]+\.firebaseio\.com",
-            ),
-            (
-                "Firebase API Key",
-                r#"(?i)firebase.{0,20}["'][A-Za-z0-9_]{30,}["']"#,
-            ),
-            // ============================================================
-            // Azure / Microsoft
-            // ============================================================
-            (
-                "Azure Shared Access Signature",
-                r"sv=\d{4}-\d{2}-\d{2}&(?:[a-z]{2,3}=[a-z0-9%]+&)+sig=[a-zA-Z0-9%+\/]{10,}",
-            ),
-            ("Azure Storage Account Key", r"[a-zA-Z0-9+/]{86}=="),
-            (
-                "Azure Storage Key",
-                r"DefaultEndpointsProtocol=https;AccountName=[^;]+;AccountKey=[A-Za-z0-9+/=]{88}",
-            ),
-            ("Azure SAS Token", r"sig=[A-Za-z0-9%]+&se=[0-9]+"),
-            (
-                "Azure AD Client Secret",
-                r#"(?i)azure.{0,20}client.{0,20}secret.{0,20}["'][A-Za-z0-9_.\-~]{34,}["']"#,
-            ),
-            // ============================================================
-            // Alibaba / IBM / Oracle
-            // ============================================================
-            ("Alibaba Access Key ID", r"LTAI[a-zA-Z0-9]{20}"),
-            (
-                "Alibaba Secret Key",
-                r"(?i)(?:alibaba|aliyun).{0,20}(?:secret|key).{0,20}\s*[:=]\s*[a-zA-Z0-9]{30}",
-            ),
-            (
-                "IBM Cloud API Key",
-                r"(?i)(?:ibm).{0,20}(?:cloud|api|iam).{0,20}(?:key).{0,20}\s*[:=]\s*[a-zA-Z0-9_\-]{44}",
-            ),
-            (
-                "Oracle Cloud API Key",
-                r"(?i)ocid1\.[a-z]+\.[a-z0-9]+\.[a-z0-9]+",
-            ),
-            // ============================================================
-            // GitHub / GitLab / Bitbucket
-            // ============================================================
-            ("GitHub Token (ghp)", r"ghp_[A-Za-z0-9_]{30,40}"),
-            ("GitHub Token (gho)", r"gho_[A-Za-z0-9_]{30,40}"),
-            ("GitHub Token (ghu)", r"ghu_[A-Za-z0-9_]{30,40}"),
-            ("GitHub Token (ghs)", r"ghs_[A-Za-z0-9_]{30,40}"),
-            ("GitHub Token (ghr)", r"ghr_[A-Za-z0-9_]{30,40}"),
-            (
-                "GitHub Client Secret",
-                r#"(?i)github.{0,20}client.{0,20}secret.{0,20}["']?[a-f0-9]{40}["']?"#,
-            ),
-            ("Google Client Secret", r#"(?i)GOCSPX-[A-Za-z0-9_\-]{28,}"#),
-            (
-                "Discord Client Secret",
-                r#"(?i)discord.{0,20}client.{0,20}secret.{0,20}["']?[A-Za-z0-9_\-]{32}["']?"#,
-            ),
-            (
-                "Microsoft Client Secret",
-                r#"(?i)microsoft.{0,20}client.{0,20}secret.{0,20}["']?[A-Za-z0-9_.\-~]{34,}["']?"#,
-            ),
-            (
-                "GitHub App Token",
-                r#"(?i)github.{0,20}["'][A-Za-z0-9_]{35,40}["']"#,
-            ),
-            ("GitLab Token", r"glpat-[A-Za-z0-9\-_]{20,}"),
-            ("GitLab Runner Token", r"GR1348941[A-Za-z0-9\-_]{20,}"),
-            (
-                "Bitbucket Token",
-                r#"(?i)bitbucket.{0,20}["'][A-Za-z0-9_]{30,}["']"#,
-            ),
-            // ============================================================
-            // Stripe (ONLY LIVE KEYS)
-            // ============================================================
-            ("Stripe Live Secret Key", r"sk_live_[0-9a-zA-Z]{24,}"),
-            ("Stripe Live Restricted Key", r"rk_live_[0-9a-zA-Z]{24,}"),
-            ("Stripe Test Secret Key", r"sk_test_[0-9a-zA-Z]{24,}"),
-            ("Stripe Test Restricted Key", r"rk_test_[0-9a-zA-Z]{24,}"),
-            ("Stripe Webhook Secret", r"whsec_[0-9a-zA-Z]{24,}"),
-            // ============================================================
-            // Slack
-            // ============================================================
-            (
-                "Slack Token",
-                r"xox[baprs]-[0-9]{10,13}-[0-9]{10,13}[a-zA-Z0-9-]*",
-            ),
-            (
-                "Slack Webhook",
-                r"https://hooks\.slack\.com/services/T[A-Z0-9]+/B[A-Z0-9]+/[A-Za-z0-9]+",
-            ),
-            (
-                "Slack Bot Token",
-                r"xoxb-[0-9]{11}-[0-9]{11}-[a-zA-Z0-9]{24}",
-            ),
-            ("Slack Bot Token (Compact)", r"xoxb-[A-Za-z0-9]{24,68}"),
-            // ============================================================
-            // Discord
-            // ============================================================
-            ("Discord Token", r"[MN][A-Za-z\d]{23,}\.[\w-]{6}\.[\w-]{27}"),
-            (
-                "Discord Webhook",
-                r"https://discord(?:app)?\.com/api/webhooks/[0-9]+/[A-Za-z0-9_-]+",
-            ),
-            ("Telegram Bot Token", r"[0-9]{8,10}:[a-zA-Z0-9_-]{35}"),
-            // ============================================================
-            // Twilio / SendGrid / Mailgun
-            // ============================================================
-            ("Twilio API Key", r"SK[a-f0-9]{32}"),
-            ("Twilio Account SID", r"AC[a-f0-9]{32}"),
-            (
-                "SendGrid API Key",
-                r"SG\.[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}",
-            ),
-            ("Mailgun API Key", r"key-[0-9a-zA-Z]{28,34}"),
-            ("Mailchimp API Key", r"[0-9a-f]{32}-us[0-9]{1,2}"),
-            // ============================================================
-            // Database / Connection Strings
-            // ============================================================
-            ("PostgreSQL URL", r"postgres(?:ql)?://[^:]+:[^@]+@[^/]+"),
-            ("MySQL URL", r"[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB2cTdlckw4bE5BVmV2OVhKQjZBZGFXTU5ISGRyOVd4bmY1NFVCNnlCMWxvCkdqZXZ6cm1UY0lKUDVrMHJNaHVRVTNyOXNLVzMzbGNhZjZZRmNqQS9UN1EKLT4gWDI1NTE5IHRDUkpiS0txWDgrZEJ1L21GRXpiZ3RzQXU5aVJGOWJxNHl1YVRqSkhOVEEKdGdJRnJ1V2s0SndCZlc4TFpBUjRIcERGc2kwNE9TVEwxRDFrbjV6TG5lZwotPiBfaiotZ3JlYXNlIChWal0jSlUgfnYgcU1udm0oCitJdTBKOVZnZ1JNVXdxUFBFV0JLVWcrZWRzZTNZS2NEeGF1bm9EK0NGcFpnMDA2OXpaeW5iYTU1bG16bkFjLzAKMTNKY2N5Tk15V2M3TVAvUlRJNHEzdTdjQWFIRDFtUWlkNWdhdUJISjBYZWtGR2EzaXUzZVh3Ci0tLSBCbXJZaTg3b3lraktCL2VFWVpwTU5ZRDJKeFI0djVGUC9jakQzeFRFU0JRCs49o65R9b40QpJvVceE7hiNVE9EtKgxw6yxF5RoBBnAUs4CrQ7eOmbP7Jr0bAWkzTmCOHsvHg==]/]+"),
-            ("MongoDB URL", r"mongodb(?:\+srv)?://[^:]+:[^@]+@[^/]+"),
-            ("Redis URL", r"[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAzTlJZanQvaTM1QTQxM2pGczlrclRJTEMyYVlOMURmY1FoVVVqYVNUYjE0Ci9IeFNYU040R1dMWEljRTNDT1hKU21WVDN4UzdsVGF1aitNamRLR3pra1UKLT4gWDI1NTE5IERTdEVIZHFGZ21oK3RzM0ZKazNucGZZZXJJbnUzeElxdWJzSzFXeXBxMkUKTkxBOGFFcC9wdWE2NjdiM1F0dTZCYVlBeGhKcHAvU05aOHJZNThXMGhnMAotPiB1VFRPW2dzLWdyZWFzZQpxU1B5THExODB5ekJEMkc0anIzY2ppeHRzTmhlSy9Ud1JBYUo2UXNkaWo5Z0NVVGVlRkU4THNtZ2hoamRJRTZrCnYxdUlLY3dwMk5Jb1VNaFU0eThWOUhoM081T2N6c1k4bWMxYmJjQnh1YkNnZkdGaEdLcGpzYS9qZHcKLS0tIE85L2M1VDl3L0pqUDJ4OHliMHlrME1MaEV5anRJUk9QTGtBZEVmZGcxY28KgWpanbsu65PhiwRmZoF8NdhR5BhdTaS4aSFkFxPkPZmsZv5hEuVJV5g2yrSq00bI+VaqI7zf]/]+"),
-            (
-                "Database Password",
-                r#"(?i)(?:db|database)(?:_)?(?:pass|password|pwd).{0,10}[=:].{0,5}["'][^"']{8,}["']"#,
-            ),
-            // ============================================================
-            // Auth / Tokens / JWT
-            // ============================================================
-            (
-                "JWT Token",
-                r"eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}",
-            ),
-            ("Bearer Token", r"(?i)bearer\s+[A-Za-z0-9_\-\.=]{20,}"),
-            ("Basic Auth Header", r"(?i)basic\s+[A-Za-z0-9+/=]{20,}"),
-            (
-                "OAuth Token",
-                r#"(?i)oauth.{0,20}["'][A-Za-z0-9_-]{20,}["']"#,
-            ),
-            // ============================================================
-            // SSH / Private Keys
-            // ============================================================
-            (
-                "RSA Private Key",
-                r"(?s)[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBPQWx1YXhtUlUvVkF1SDc1VUFWZHlYNTZuZ2JWeisxZUtXVFMrR2llclRJCjk1VUt5TFc0M2pRRkFJazhudVhhZzFUT1pqem9FQXJ3QVBaUmcvWXRtZU0KLT4gWDI1NTE5IGh0YWNYVC9ZZXdzSDdmd09SNitMNmNqUGVCUHdMUWdSQVdjc1RGczA2MzAKRVFvTEJDNTlLejh5SlV0c2pJMGlIUXk3NC9Pc3I2MnNrZFdSdDB5S0RHVQotPiA1PX5nMy1ncmVhc2UgMThtRGE6ID9ACmlza2RHbVJwRzFZWkxWMVBEbnZVYnh3NUp5NFFIY2tQRDdWQlpnaktUREFsOE4zM3gzbFVRbG9TYUJvb1ByQW4KNVp6L3lIbiswNFVqTmVrdU9KbkZlVW0xMTYvdGg2UVc0aDl0Z3ZkVTFybHJoNFpwcjhRUTkyUUxCUQotLS0gUi9QRFNxdTR0T2Z1MW5OKzJKM1dNdWw4R2phTlEySHBRN1hKQ2VBWWhBZwqdCni/rBpEM/ZvB6kDdXL7w5REJqHYtzZ1qR5O+XsUAQtdbymmnAdWkkviJSXF8hej2riVijQ1o4JiP1y+202cUWN26bCl7ONJwYdREHmVkUXFhppbT65r4jPNOjWYAg==]",
-            ),
-            (
-                "DSA Private Key",
-                r"(?s)[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB0Nm56UXNGVTBGNjJPTkNRWVFaQ3V1dERSTi90eUNVRytONzFlR0I0Mm0wCnVkcHNUMHZjLy9qRlNuQzlVcE9mR0dHVFJ1NzJPbXdoK3NzSlE5WWdxZFkKLT4gWDI1NTE5IHh5N2x6M2dqUjRHR0hPRkcvWTF2UTdWTlRYYmh2VVVDeVhlN3k2dlF4aVEKYVVWcEZsYzdpTitEUE5uWWZJYTQvaWVnTWFvZjIzOGJweU9PZUZ5c2s3OAotPiBsJCMtZ3JlYXNlIHVCKThIaFsgdGIgLTg7YQovTHhDbzh6dEc4akJLVHJMaUVJWlZ5NnR2c05zZ0EKLS0tIHNnOThoalRlMHE0UjJoZmh4QXo4VXZ3UytaUVBkb1FBM0JDeTNPK0IwSjQKH+8NmNhHAQdFm9ANNljX9v8tRyM9aAdN/dUsKBCZ9Hz0itJ/V0vGyV7JO72/ublc90R7EJh6awB9vRVCQzC9rGt1cdtVUk4UaKj2Y4ncUoXCu5s4HWRIfO42jvnAfZY=]",
-            ),
-            (
-                "EC Private Key",
-                r"(?s)[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBTd3VhSFdWaHBNWjNkbWNPRlBRbUJZVTVjS3ViRVNVSnFMNlhXdTV4YlhjCjAraDFnQXNTOWJEaG80Zld1N3NpYzZWTSs3Zm14UE5ZMVRINTdEMTNmMk0KLT4gWDI1NTE5IEdGeElRc0tXM213bGdDZG56NStZSDlQdUMwN2d1WTY3Zml6NUdMcG5sU00KTTVseHc3dTBtMzExM3BUTnUvdFd1TUJ0QmIwUnZTcEd6bUFEN1h6RGhWYwotPiA5MFMxMy1ncmVhc2UgR0FeVCZ3IFk2IEMmXnhKfU4gPC5RazRtfHcKbGwvZ1NTbEErR05pTGdWWjFWeCt2c1NnUmxsamRUeFB4Tm1PVERQQWV0aURQQ2tSTmlabXpsUldZTWJFWUUrUgprTExlaThmVTdjR0FTNXlWS1RwdWFxK2R6MmY2SzFFSTh1QlBtSDAzQUEKLS0tIGdpVzhjZDNpMWZQd3k1VkttM1M5WTdSVzdOKzkzOW5ReGV2Z2taS0d5Z2sK47QkCIyrPpCUn7X25aa64zWM9e4dx+WQofmxE970I8vZCXJGDpCjPYrvbzX5CjBflRjyY0mKQzBKKLPTpDOuqKJRr67RzZeq7qzjk/l3vMzxquuK2Obo4RUyUof+]",
-            ),
-            (
-                "OpenSSH Private Key",
-                r"(?s)[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAzUCtUeXJGMEw1VVRoQm5KeDZWZmFXVTJUNU1UR0h3OWN1aXpiWENZS2hjClRqRWFmY3lhYkFzUjhsMEEwbStHL2p5NmRKZTVETnhKUWJuNzFXa2FTeWMKLT4gWDI1NTE5IG9oOXpmR0ZQejlQeldZRjJ3Q1dHT3hBVDRqbXJ0OHZaVGJxem50TUNjSGsKeStJTjR1V0prRDlNelVYR080YmFDOVdrY3RRaExZNHpZdUtSZjFMRnkvawotPiA8eiVrXXJXLWdyZWFzZSAsTQpXMTFyYUpWaURHcjBLcEJUaDRObWhxcUhOa0NyCi0tLSBQZHk5U0hhZSs2VXZ6WDBJQ0hCZDY3cFhETFlDRlU0VzR1UFByWnFYTG40CnDHbgpdkH8hRi/L18dKjrWHTp3zogD01FEEbeASsFGqeaxLOB+txp6onrxddAQ+cNtUN/oKWeeCVgYZmdcOgBa0wUhOIhUFgsaopqK8CJu+JbVXUUexNCCpL8FwByTMw4QnnsskrN8=]",
-            ),
-            (
-                "PGP Private Key",
-                r"(?s)[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBnVEJrcFVIdEs0Qzkrd2RMek5UenN5VGpkNER5Z3hEWWxlMENXM21ySDNjClQvMk1Tckx6Sm1EWldEa0JSdVFwOVBEQ0R1S3RrODVzTjg1anozS1lsU0EKLT4gWDI1NTE5IFhsbWZXTG1ld0VEaXpiL20za2VtbjBHdHpmMkFESkYrb0dMS1dHOTBuaG8KdlRwQzAyRXlTMG9sbkhFcmhlZnJRWWsvL2dUUkdKcXk2TitwVXR1WmFNOAotPiBeLWdyZWFzZSAhIGk5XGJiQ2ggJwpjTEF0aWlXMGgyUnJXKytIYk9ULwotLS0gdlMwRnJ1L0MxVHoyWUtOMXZhZXRRNkZPS1RtRnJVVCtxaDlIM0ZHNFIrTQp3HGvjzisY2TDRrQTcmNKp06Ect3ivwyrVWMixhREykzW7cla7O28z7j5DBxaQ0TeZMM3IHg+YLmWt4U8aXE5AW50+neHyEshP004r9ZEDNEIuKGIgO8tF2CT02m7X6A==]",
-            ),
-            (
-                "SSH Private Key (generic)",
-                r"(?s)-----BEGIN [A-Z ]+ PRIVATE KEY-----.*?-----END [A-Z ]+ PRIVATE KEY-----",
-            ),
-            // ============================================================
-            // NPM / PyPI / Package Managers
-            // ============================================================
-            (
-                "NPM Token",
-                r"//registry\.npmjs\.org/:_authToken=[A-Za-z0-9_-]+",
-            ),
-            ("NPM Access Token", r"npm_[A-Za-z0-9]{36}"),
-            ("PyPI Token", r"pypi-AgEIcHlwaS5vcmc[A-Za-z0-9_-]{50,}"),
-            ("NuGet API Key", r"oy2[a-z0-9]{43}"),
-            // ============================================================
-            // Heroku / Vercel / Netlify
-            // ============================================================
-            (
-                "Heroku API Key",
-                r#"(?i)heroku.{0,20}["'][0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}["']"#,
-            ),
-            (
-                "Vercel Token",
-                r#"(?i)vercel.{0,20}["'][A-Za-z0-9]{24}["']"#,
-            ),
-            (
-                "Netlify Token",
-                r#"(?i)netlify.{0,20}["'][A-Za-z0-9_-]{40,}["']"#,
-            ),
-            // ============================================================
-            // OpenAI / Anthropic / AI APIs
-            // ============================================================
-            ("OpenAI API Key", r"sk-[a-zA-Z0-9_\-]{20,}"),
-            (
-                "Cohere API Key",
-                r#"(?i)cohere.{0,20}["'][A-Za-z0-9]{40}["']"#,
-            ),
-            // ============================================================
-            // DigitalOcean / Linode / Vultr
-            // ============================================================
-            ("DigitalOcean Token", r"dop_v1_[a-f0-9]{64}"),
-            (
-                "DigitalOcean Spaces Key",
-                r#"(?i)digitalocean.{0,20}spaces.{0,20}["'][A-Z0-9]{20}["']"#,
-            ),
-            ("Linode Token", r#"(?i)linode.{0,20}["'][a-f0-9]{64}["']"#),
-            // ============================================================
-            // Shopify / Square / Payment
-            // ============================================================
-            ("Shopify Token", r"shpat_[a-fA-F0-9]{32}"),
-            ("Shopify Secret", r"shpss_[a-fA-F0-9]{32}"),
-            ("Square Access Token", r"sq0atp-[A-Za-z0-9_-]{22}"),
-            ("Square OAuth Secret", r"sq0csp-[A-Za-z0-9_-]{43}"),
-            (
-                "PayPal Client ID",
-                r#"(?i)paypal.{0,20}client.{0,20}id.{0,10}["'][A-Za-z0-9_-]{80}["']"#,
-            ),
-            // ============================================================
-            // HashiCorp / Vault
-            // ============================================================
-            ("HashiCorp Vault Token", r"hvs\.[A-Za-z0-9_-]{24,}"),
-            (
-                "HashiCorp Terraform Token",
-                r#"(?i)terraform.{0,20}["'][A-Za-z0-9]{14}\.[A-Za-z0-9]{24}\.[A-Za-z0-9]{67}["']"#,
-            ),
-            // ============================================================
-            // Age Encryption (Arcane uses this!)
-            // ============================================================
-            (
-                "Age Secret Key",
-                r"AGE-SECRET-KEY-1[QPZRY9X8GF2TVDW0S3JN54KHCE6MUA7L]{58}",
-            ),
-            // ============================================================
-            // AI / Cloud Provider API Keys
-            // ============================================================
-            ("NVIDIA API Key", r"nvapi-[A-Za-z0-9_-]{20,}"),
-            ("OpenRouter API Key", r"sk-or-v1-[A-Za-z0-9_-]{20,}"),
-            ("MiniMax API Key", r"sk-cp-[A-Za-z0-9_-]{20,}"),
-            ("Modal API Key", r"modalresearch_[A-Za-z0-9_-]{20,}"),
-            ("Resend API Key", r"re_[A-Za-z0-9_-]{20,}"),
-            ("Together AI API Key", r"tly_[A-Za-z0-9_-]{20,}"),
-            ("Groq API Key", r"gsk_[A-Za-z0-9_-]{20,}"),
-            ("DeepSeek API Key", r"sk-[A-Za-z0-9]{20,}"),
-            ("Mistral API Key", r"mistral-[A-Za-z0-9_-]{20,}"),
-            // Cloudflare R2
-            (
-                "Cloudflare R2 Account ID",
-                r"(?:account[_-]?id|cf[_-]?account[_-]?id).{0,10}[0-9a-f]{32}",
-            ),
-            (
-                "Cloudflare R2 Access Key",
-                r"(?:access[_-]?key[_-]?id|cf[_-]?access[_-]?key[_-]?id).{0,10}[0-9a-f]{20}",
-            ),
-            (
-                "Cloudflare R2 Secret Key",
-                r"(?:secret[_-]?key|cf[_-]?secret[_-]?key).{0,10}[a-f0-9]{40}",
-            ),
-            // Backblaze B2
-            ("Backblaze B2 Key ID", r"0055[a-f0-9]{16}"),
-            ("Backblaze B2 Application Key", r"K005[a-zA-Z0-9]{20,}"),
-            // ============================================================
-            // Generic High-Entropy / Passwords
-            // ============================================================
-            (
-                "Hex Secret (Quoted)",
-                r#"(?i)(?:secret|token|key|password|credential|auth).{0,20}["'][a-fA-F0-9]{32,}["']"#,
-            ),
-            (
-                "High-Entropy Secret (Quoted)",
-                r#"(?i)(?:secret|token|key|password|credential|auth).{0,20}["'][A-Za-z0-9]{24,}["']"#,
-            ),
-            (
-                "Generic API Key",
-                r#"(?i)(?:api[_-]?key|apikey).{0,10}[=:].{0,5}["'][^\s"\[]{20,}["']"#,
-            ),
-            (
-                "Generic Secret",
-                r#"(?i)(?:secret|token|password|passwd|pwd|credential).{0,10}[=:].{0,5}["'][^\s"\[]{16,}["']"#,
-            ),
-            (
-                "Private Token Pattern",
-                r#"(?i)private[_-]?(?:key|token).{0,10}[=:].{0,5}["'][A-Za-z0-9_-]{20,}["']"#,
-            ),
-            // ============================================================
-            // Unquoted Assignments (Env Vars / Configs)
-            // ============================================================
-            // (
-            //     "Generic Secret (Unquoted)",
-            //     r#"(?i)(?:secret|token|password|passwd|pwd|credential).{0,10}=[^\s"\[]{16,}"#,
-            // ),
-            (
-                "Generic API Key (Unquoted)",
-                r#"(?i)(?:api[_-]?key|apikey).{0,10}=[A-Za-z0-9_-]{20,}"#,
-            ),
-            (
-                "Private Key Variable (Unquoted)",
-                r#"(?i)[A-Z0-9_]*PRIVATE_KEY[A-Z0-9_]*=[A-Za-z0-9_-]{20,}"#,
-            ),
-            (
-                "Password Variable (Unquoted)",
-                r#"(?i)[A-Z0-9_]*PASSWORD[A-Z0-9_]*=[a-zA-Z0-9!$%&*+\-.=?@^_~]{8,}"#,
-            ),
-            (
-                "Generic Assignment (Unquoted)",
-                r#"(?i)[A-Z][A-Z0-9_]*(?:KEY|SECRET|TOKEN|PASSWORD|PASSWD|CREDENTIAL|AUTH|ACCESS)[A-Z0-9_]*=[^\s"'`]{20,}"#,
-            ),
-        ]
-    }
-
-    pub fn new() -> Result<Self> {
-        let patterns_raw = Self::get_patterns();
-
-        let patterns: Vec<(String, Regex)> = patterns_raw
-            .iter()
-            .filter_map(|(name, pattern)| {
-                // Build the processed pattern exactly as it appears in the
-                // combined regex so individual and combined behavior match.
-                let p = if pattern.starts_with("(?") {
-                    pattern.to_string()
-                } else {
-                    format!("(?sm){}", pattern)
-                };
-                Regex::new(&p).ok().map(|re| (name.to_string(), re))
-            })
-            .collect();
-
-        let combined: String = patterns_raw
-            .iter()
-            .map(|(_, p)| format!("(?:{})", p))
-            .collect::<Vec<_>>()
-            .join("|");
-        // Use RegexBuilder to cap DFA memory and prevent excessive compilation
-        // costs from the large alternation. The regex crate uses finite automata
-        // (no catastrophic backtracking), but very large combined regexes can
-        // still use prohibitive memory during DFA construction.
-        let full_regex = regex::RegexBuilder::new(&format!("(?sm){}", combined))
-            .size_limit(10 * (1 << 20)) // 10 MiB total regex memory
-            .dfa_size_limit(5 * (1 << 20)) // 5 MiB DFA cache
-            .build()
-            .map_err(|e| anyhow::anyhow!("invalid regex pattern in SecretScanner::new: {}", e))?;
-
-        Ok(Self {
-            patterns,
-            full_regex,
-        })
-    }
-
-    /// Create a scanner that excludes age identity key patterns.
-    /// Used for master.age and identity.age files to prevent encrypting
-    /// the age key itself while still scanning for other secrets.
-    pub fn new_without_age_keys() -> Result<Self> {
-        let patterns_raw = Self::get_patterns();
-
-        let patterns: Vec<(String, Regex)> = patterns_raw
-            .iter()
-            .filter(|(name, _)| *name != "Age Secret Key")
-            .filter_map(|(name, pattern)| {
-                // Build the processed pattern exactly as it appears in the
-                // combined regex so individual and combined behavior match.
-                let p = if pattern.starts_with("(?") {
-                    pattern.to_string()
-                } else {
-                    format!("(?sm){}", pattern)
-                };
-                Regex::new(&p).ok().map(|re| (name.to_string(), re))
-            })
-            .collect();
-
-        let combined: String = patterns_raw
-            .iter()
-            .filter(|(name, _)| *name != "Age Secret Key")
-            .map(|(_, p)| format!("(?:{})", p))
-            .collect::<Vec<_>>()
-            .join("|");
-        let full_regex = regex::RegexBuilder::new(&format!("(?sm){}", combined))
-            .size_limit(10 * (1 << 20))
-            .dfa_size_limit(5 * (1 << 20))
-            .build()
-            .map_err(|e| {
-                anyhow::anyhow!(
-                    "invalid regex pattern in SecretScanner::new_without_age_keys: {}",
-                    e
-                )
-            })?;
-
-        Ok(Self {
-            patterns,
-            full_regex,
-        })
-    }
-
-    pub fn scan(&self, content: &str) -> Vec<SecretFinding> {
-        use rayon::prelude::*;
-
-        // Fast-path: Use the optimized single-pass regex to see if ANY secret exists
-        if !self.full_regex.is_match(content) {
-            return Vec::new();
-        }
-
-        let found: Vec<SecretFinding> = self
-            .patterns
-            .par_iter()
-            .flat_map(|(name, re)| {
-                let mut results = Vec::new();
-                for mat in re.find_iter(content) {
-                    let start_idx = mat.start();
-
-                    // SAFEGUARD: Ignore secrets already inside an encrypted tag.
-                    // Accepts any marker name that ends with "_SECRET".
-                    if is_inside_secret_tag(content, start_idx) {
-                        continue;
-                    }
-
-                    let line_num = content[..start_idx].chars().filter(|&c| c == '\n').count() + 1;
-                    let matching_str = mat.as_str();
-                    let snippet = if matching_str.len() > 60 {
-                        format!("{}...", &matching_str[..60])
-                    } else {
-                        matching_str.to_string()
-                    };
-
-                    results.push(SecretFinding {
-                        name: name.clone(),
-                        line: line_num,
-                        snippet,
-                    });
-                }
-                results
-            })
-            .collect();
-
-        // Sort by line number for consistent output
-        let mut sorted = found;
-        sorted.sort_by_key(|f| f.line);
-        sorted
-    }
-    /// Returns the number of patterns loaded
-    pub fn pattern_count(&self) -> usize {
-        self.patterns.len()
-    }
-
-    /// Scans content and replaces detected secrets using a callback.
-    /// This allows for in-situ transformation (e.g. wrapping in REDACTED_REGEX)
-    pub fn scan_and_replace<F>(&self, content: &str, mut f: F) -> String
-    where
-        F: FnMut(&str, &str) -> String,
-    {
-        let mut new_result = String::new();
-        let mut last_end = 0;
-
-        for mat in self.full_regex.find_iter(content) {
-            let matched_str = mat.as_str();
-
-            // 1. SAFEGUARD: Check if we are inside an existing tag
-            if is_inside_secret_tag(content, mat.start()) {
-                continue;
-            }
-
-            // 3. Find which specific pattern matched
-            let mut pattern_name = "Unknown";
-            for (name, re) in &self.patterns {
-                if re.is_match(matched_str) {
-                    pattern_name = name;
-                    break;
-                }
-            }
-
-            new_result.push_str(&content[last_end..mat.start()]);
-            new_result.push_str(&f(pattern_name, matched_str));
-            last_end = mat.end();
-        }
-
-        new_result.push_str(&content[last_end..]);
-        new_result
-    }
-}
 
 /// Structured environment manager for complex secrets
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
-pub struct EnvironmentManager {
-    pub variables: std::collections::HashMap<String, String>,
-    pub secrets: std::collections::HashMap<String, std::collections::HashMap<String, String>>, // Grouped secrets
-}
-
-impl EnvironmentManager {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn add_variable(&mut self, key: String, value: String) {
-        self.variables.insert(key, value);
-    }
-
-    pub fn add_secret(&mut self, group: String, key: String, value: String) {
-        self.secrets.entry(group).or_default().insert(key, value);
-    }
-
-    pub fn to_env_file(&self) -> String {
-        let mut out = String::new();
-        for (k, v) in &self.variables {
-            out.push_str(&format!("{}=\"{}\"\n", k, v.replace('"', "\\\"")));
-        }
-        for (group, vars) in &self.secrets {
-            out.push_str(&format!("# Group: {}\n", group));
-            for (k, v) in vars {
-                out.push_str(&format!("{}=\"{}\"\n", k, v.replace('"', "\\\"")));
-            }
-        }
-        out
-    }
-
-    /// Load variables from a .env file path
-    pub fn load_from_env_file(&mut self, path: &std::path::Path) -> Result<()> {
-        if !path.exists() {
-            return Ok(());
-        }
-        let content = std::fs::read_to_string(path)?;
-        for line in content.lines() {
-            let line = line.trim();
-            if line.is_empty() || line.starts_with('#') {
-                continue;
-            }
-            if let Some((k, v)) = line.split_once('=') {
-                let key = k.trim().to_string();
-                let mut value = v.trim().to_string();
-                // Strip quotes if present
-                if (value.starts_with('"') && value.ends_with('"'))
-                    || (value.starts_with('\'') && value.ends_with('\''))
-                {
-                    value = value[1..value.len() - 1].to_string();
-                }
-                self.add_variable(key, value);
-            }
-        }
-        Ok(())
-    }
-}
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct SecretFinding {
-    pub name: String,
-    pub line: usize,
-    pub snippet: String,
-}
 
 #[derive(Zeroize, ZeroizeOnDrop, Clone)]
-pub struct RepoKey(Vec<u8>);
-
-impl RepoKey {
-    pub fn from_file(path: &Path) -> Result<Self> {
-        let bytes = fs::read(path)?;
-        if bytes.len() != REPO_KEY_LEN {
-            return Err(anyhow::anyhow!("Invalid key length"));
-        }
-        Ok(RepoKey(bytes))
-    }
-
-    pub fn get_key(&self) -> &[u8] {
-        &self.0
-    }
-
-    #[cfg(test)]
-    pub fn from_vec(bytes: Vec<u8>) -> Option<Self> {
-        if bytes.len() == 32 {
-            Some(RepoKey(bytes))
-        } else {
-            None
-        }
-    }
-
-    #[cfg(test)]
-    pub fn from_secret_bytes(bytes: [u8; 32]) -> Self {
-        RepoKey(bytes.to_vec())
-    }
-}
 
 #[derive(Zeroize, ZeroizeOnDrop)]
-pub struct TeamKey(Vec<u8>);
-
-impl TeamKey {
-    pub fn to_public(&self) -> Result<age::x25519::Recipient> {
-        let key_str = String::from_utf8(self.0.clone())
-            .map_err(|_| anyhow::anyhow!("TeamKey contains invalid UTF-8"))?;
-        let identity = x25519::Identity::from_str(&key_str)
-            .map_err(|_| anyhow::anyhow!("TeamKey is not a valid x25519 identity"))?;
-        Ok(identity.to_public())
-    }
-    pub fn len(&self) -> usize {
-        self.0.len()
-    }
-    pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
-    }
-
-    #[cfg(test)]
-    pub fn from_identity_string(s: String) -> Self {
-        TeamKey(s.into_bytes())
-    }
-}
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct MarkerMigrationStats {
@@ -3117,7 +2475,7 @@ mod tests {
             patterns.contains(&"Age Secret Key".to_string())
         );
 
-        let content = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAwWnBUcHd4NVpkV3FURnkvaEZoOUtudFdhS2hkbXdmZktKMXN6ZGFQcXd3Cmx2MzJQWDVpLzJ2NkxmOHBJWDd2Q1MzUHY0c2JlVnl0eFR0dVRVL2huMGMKLT4gWDI1NTE5IDJWV3I1UEhZekgxOTh4Sm9MeUNXTDdpc3RXT3hiY3pqSlg4UDNya1RNblUKNmp5WnpBTG1weVZKcFZlTjViM2FGTGtUcVI0c1Z1UEpqRndOQWtyOFpTdwotPiA6LWdyZWFzZSAjJVUgKWwscEQxIDUuaApiOGJUV04wMW9zbjRDM3JCelIxVUdRcjRKQlV1dGlUSS9jMktSNEJVeFV1SngyY2Y3WkRSeUlvejJXN1B4cjZtCjVHV01pL00KLS0tIEEzNzk1aGxBaDN2YjcrRFZ4eDhEQmkrQzBhNjhBN2tnaks1WENmTzVNYlEKkFFKcveJL/j2eER1M0BCgniboMhT0xK8o2UR2G4A9YQnvzigoSp8Mz/7poACJRVvSY3l05yu/pwNM8crym1IvDb2zVlvFkIi7nd8szHty/ApbtndEvr17n4+VOuxk8u7/YA7xZrwd6lqdw==]";
+        let content = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBGdEJGdWRSa2RqVkg3SUFweUFwYXRWd1U3V09WRFJkZ1J2RjFibG9NSnprCjYzYlZYaG1qS282SjZFck5HSzIwUDV4a3BkU2hhemhCWll2cHh6aWg2VHcKLT4gWDI1NTE5IHFEb2lsUjlGaFoxNFpJdVBEVGlDeENhcWxXNzRVNHBVb1JUcno1NVMxeTgKWmVjMURySjdjYUV1Y045dlNqeUtEMlZ2UFRhN0xWb1EvMmpwTzNKWjZEMAotPiAnIVYtZ3JlYXNlIDR5dSB0PztAQV85PCBZS30gai1ATUwKTTA4Zlo0TlB2ZkwyelVLNDV3VENFTnhud3JhUThjdy9FSHdNS0NWdFpMTFpMK0tnRGdRdFROeE0vcEtSQU9pcApRS3cydDFMWTlGdmt0ZGxjbERKZ3VUMjFPNnpKSGE0ME9KYlZhc2NEVElsZFY0TmFYRG1ObUhESVY1NUtPMWJKCndBCi0tLSBna3BWaWNEd3ppNEFINnJtMFJoMEtNNUlkMU42clR5QU5rVTBIUnhDaU5ZCmtuWs5BlV5fj3RJCbMMYHfZmaxRUQe9yxIZUF+pya1mA3XOlyrppLXe4WaftANXajnwDKLEXaSAzRnvvZJ6Tsnbc5z5/RquV9j/fh3AROIzupY9BGRktp02FZUb2hzD9LaSgb2EpAU4Lv0=]";
         let scanned = scanner.scan_and_replace(content, |name, secret| {
             eprintln!("Match found: {} -> {}", name, secret);
             format!("[MATCHED:{}]", name)
@@ -3400,8 +2758,8 @@ API_KEY=original"#;
     #[test]
     fn test_github_token_patterns_accept_variable_length() {
         let scanner = SecretScanner::new_without_age_keys().unwrap();
-        let short = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBEdkI2OTVSbHJSSGFzV0xmYnlrZVFxQStsK0N3Y0xTT1hBTWx6MjNTZUJRCmhSNXViUnJZWFFrcGlHbFRRaXVWdzBieEs1V0I1aTJ0SEFHUm9oRXBEQUEKLT4gWDI1NTE5IHhuMHo5dlNIeU5GN3ZScVhORTJYSUpScnBHUnVmc24rMDhSbjRxajJORFEKUjNzRVFHY1lmdlVSTlh3QnpCaVNXSWdLWnpNd0ZmQ3J0dnAxQ3dWSSs5WQotPiBLMi1ncmVhc2UgQ0ZbISNdXyBxIGEgdUFQNHNLTEMKOUFNKy9HSkl3MXhkYXcKLS0tIFBtSGRuZ0pZVmM2QU5Yc0krOUhWLzBtNjdLcUdEUTE4OHZPY1ZCbXZuWEUK0Qbqze+rKbJ+192sC6MP+z0HKX8kYcOdskeZul8nOSc8/5gJCpZE/mkVJOz8vSgPRlwWr7Gd/AQBh+W8pgxzu5b2]";
-        let long = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA1SW42WW80OG9iRmozeHhMT09ISytMSTk0WVY4RVEyR3duYlRwV3p3M3k0CkFUVzN1OG1yTXlNQ1BNUVRCVmlJZjFPR2xsWXhkb2xEZk04VkhLYkFvcmsKLT4gWDI1NTE5IDlyQUU5OExGQTdCK1BKMGVieDhyeSt5VUJhbCtBL3VrS2drR0ZLeURPQ00KNFpLYnJGOVpZajhMRzhFVTg3ajRhbzFPQ2FhK3NIVnpwaVlxVkFSOFB3OAotPiAwPTxTK2UtZ3JlYXNlCmdBRU1WMm1pRURvYmxCdm5hT3RydnIwCi0tLSBjMnN2UVk4MEdieHNKUE55SkYwWHdDaTZZQ2xmd3R4ZldBMXJmTWp2dW44Cr0HZpxT4IVlAiksV8MCkHl3J+WUtvRXydULPtXX+CjMFoKAU8ojwAomLYgLbpaNZX59t9irnxgpTM0ujOgdL8RlN7jD6VPp/SVxVcc=]";
+        let short = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBKUGRvQWNMREtxbTlaalNNZlAxUWw2YzluOFdSMlF5VzJIN3JDRU5nTEN3CjJ6S2paNllieXc1SXlIaG41SnhJcGhiYW9qQ3p6aFk4NjdsdWgwckk3QVUKLT4gWDI1NTE5IGd0ZjRlcm5pdC9zdlZwcWExS0tBNGl5cXo0UUVNYmRxNnpyTDNPTVphVjAKZ0NzQklickM0TEN3aFNNMTZ0cEdnbzA3bTZPc1ZOVlBMUnhkUThqMmpUZwotPiBrdy1ncmVhc2UgMT4yJmFzIEJvRFdbRXovIDtySU0KcURlemJ5ZDg2ajJqV0dlMzRxejQxQzJHblhTaDZPQmhLMEtSdW84NzFja3BaVXNqZmxVRTVhcHQxWmFuOEFuRQpNNElNCi0tLSBxR1lPNUZFZWZUWC9pMVdCMWh0Y1UvOE1SYWhNaUQ2QW4zZ1RqODErTmtNCrkYvTtHa2JP/H0i9t6YZLHtuGW0RIv9ogXk+G2BpFARopczMc8m8WLnc7JNB4Sy0g7A78AMUPFuAnWmw37aLBbMCg==]";
+        let long = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBVcHhYdW1Ga1R1bWplRjI3QmhjT1kzSmhKL0dRLzIvZ0JVMS9oSUVXUXpNCkkvVHFvejgvWVkzNEp4NXRHV2QxNFRJVWQvVVBKck9ZWnJsaW4zbWJobGsKLT4gWDI1NTE5IE1qZXM1ZldXWDFMRlVZY1hMU1BVRXM0WjhtSkJXRExxSnJFK2JOL0E2eU0KOXZzWEdpYmw3d1MxRzFtU3dCSmJ1cDIwa2JGWFNON0FSQ3FOeXgyVmtwTQotPiB6NjUmTmUxfC1ncmVhc2UgKDs7IDZbKgpvQkJYL2dUcVZVeE91YjJzOVlONk5JUHpOUUViZThtbmhuR3p2SnVIKzZNCi0tLSA5M0pnTWxiYzNCMUtVUkhKR25iWmRCRmxGR3VJNWdVK3ZFako2WHhoc1lnCmhyXkg92vcf8UlGxHnYrgpGuok9obZHCaNYH+r2QVyzKUQNJOunSbcZahe3gEnBaQ9br2nLnPqNyy1Az6ifokwVPpGKHurhdC53kAc=]";
         let found_short = scanner.scan(short);
         let found_long = scanner.scan(long);
         assert!(
@@ -3423,8 +2781,8 @@ API_KEY=original"#;
     #[test]
     fn test_mailgun_key_accepts_variable_length() {
         let scanner = SecretScanner::new_without_age_keys().unwrap();
-        let short = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBHaVFaOUM1UmZMVExHOEZYeGlxRWxERmVqcDlBRlJRYlg4S0duNlNDR2dBCmhiZVlvYk9YKzlPNVNjcFo3N05xUEtLODBXQ1JNVTM0Y0dHWmwzTTV2SkEKLT4gWDI1NTE5IEFnNnFlVVhRK0FNY0NSZG9VY3ZIZWVLWjdBM2dvWVYwNXhHUVJCdEdKM1EKNk5HUUVkd0syNzVJRlhIWjBoSTJ5MFlScHBpcFdOVzVEUkdGTGRmbzg4QQotPiAqXFotZ3JlYXNlIGleCkl4d1pIek5YYkhLQ2k4a0F6YjhHUTJMaGg4TXBLR0M4YkxRODRtbDdtWUFHVStMa2J4cUhEUXN4Z01KdTBLOAotLS0gZ1dmRkpEb2l0TGlqQnMxVVFlRUhxejJHS0pGOHZxQkE1ckdZbVdDcDNvYwrgFX5is1StndT3KFgxQcMku7Avq1tS/0YX0pA8qzD4F/kMLxHYoAO7qZzYuANe6FJCSM1gHW/ALQyW0Ux7WDu1AQ==]";
-        let long = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB3aHg0SUNLaGd4QjFGZVROQWFqZEFvZDNoQ290RGVrY2RWbC9vbm9xSlVVCi9FVXRkUXcrditHQlNXcjI2Wlc2VTU0b0hFTUlrb1U0c0tRVWtuMXQrUm8KLT4gWDI1NTE5IE1RWTFpSHIrWTk3RzVQNHZXckowcE14U3lTWjA5d0l4YytCeENjOVJ3REEKVitkNnNPMXFHTjJnelFGZHVKQVJYUC83YzFxTlUrSW8vQWc0LzUxV1NBSQotPiBKW0JyaS1ncmVhc2UgLXogO2wKWWp0TTBseWZ6SUdaZ0VyYgotLS0gZHYvaHg2dzArWXV0cVlYL3d1ZHA5SnJYUU1Za1RuKzBTeHFSYTBFQXBlZwpI1hKNFhENLxlkRgtWwG6rHia1iaNfL7qaJj9Swfrqq3kpQHu6xNnZRG8Lq263voKfpFwsyHtUHf6DPN30GoOzFMSKr1E=]";
+        let short = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA4TEZsOE4zYm9CbVB1NFQzN0RGNklGRy9nTmJxZzl5TGxSSWxWL2t3SzNZCk4wa0cwR2s3aDdCZW5vNjlTbDN2bzFQM3VvclJWZEs3ZmVSSEFTcmZJbjQKLT4gWDI1NTE5IHJhYWdmOVdJaEx2SnRDb1A0Tk1TT2hybEYxNzZyKzIvYTFlaFRHYjJvWGsKQS9LY2twMWpRNGUwa2FyWWRVNFU1aHFEakVMVEpRWUp6eDdTSjdQcWlWQQotPiA9VD08LWdyZWFzZSAzYiBibCBEVmExN3BxIC1iCnhMQXNvS1c3SzlhZGNmTkRzKzVORGRUWHkvaGZnMmluQWZYYmVXa2VHMk9ZMjFCZHFtYW0vRHpBWC9MeVNlZnEKMDVVMm4zaVR5N1FqcXFrVEZRCi0tLSBTRzFLYXRsRC9MVmgxc3FrdVNHTnZSVm41R2FCTW1GSEdlYkpkOXBhNDJrCqP/NI1STvrgllR/bXtteUnRUWfVjMk6mrRyOx7Osp4UGJsTHSFWnUf72GWPivJQF9AsixdFJzFleCE4HUYhIBda]";
+        let long = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBFR3h0SzJLeGhYdHRNOVdZQjh6QjIwTlZWVC9zSVRNSU1yQUpiV0dnZTJRClEvMUUvV3IxMnhZdjhIYXc0aDNiUGZTSEoycFBIQWJuMTUxQzNocDVXR1EKLT4gWDI1NTE5IFRKY1ZqcGwxbk5DR1NpaVdydERSazErM1lXNEpPTTF4Z0xiSmxTcE8ydzAKYXUzTHRiamxMeGEzdzVZQmhJb1Q4VVhPcVYyNzZYVmFtMUVGMHNoZGRRNAotPiA4KHY4ITQuLWdyZWFzZSB+KyBZOi0gLWsgO30kR3UKaFA0Ci0tLSBsQkJ5dHltTTlnNEJxc3J2b2JHcUpPb0QxMkIwN3lZemtkaEN6d2ZIb013Cl35GPaCUvn04qtslmV1nxytLKD+xhcxZc+yIIZ03x+xoDAyJhfDo4w2uAAUEwNGHqt2EtbJKU7wxic0tY/PQEMQm0AHRA==]";
         let found_short = scanner.scan(short);
         let found_long = scanner.scan(long);
         assert!(
@@ -3442,7 +2800,7 @@ API_KEY=original"#;
     #[test]
     fn test_slack_bot_token_compact() {
         let scanner = SecretScanner::new_without_age_keys().unwrap();
-        let [DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBYZUZrNHgvb0VySDk1OTIyRzk3YkllTlVla2RNS3VVMFFGYWZjcHY1S3hvCkY3OXVvS1M5RW56TTlPaVV5VEU5LzZCNUtGME9OaWlzKzJYSGNOaDMxc2sKLT4gWDI1NTE5IHRCNlhMeWNiZTZkWEhta0pGaFlwT3YreUJZZllSbStoV0pzbm1YNURtV00KYS9Odk42WmpOVlVEY2lpVmVtaXM1bnVXTUJCaXN5d1kySU1FbVBKNFY1SQotPiBvflc1RzI1IS1ncmVhc2UgaisgaidgTE5zID5vMSogZydWTF4oCmJjRU95SVFiZEg1UHBQYWxYMmEreTZnV25oYWFzVFVvVDMvY2QzdGF4NjZTTE53LzJaemVVYnhFMXRtcTYyeVUKajFxdFdBR2NVUUF0dVNzendQSXdldGkvUHI2TU44bTloMWMKLS0tIGlmdGYrYzROQUVhZmhWRHZzWUorcklwZldRZFRzMjZQaW9sYi9vYlZhMFEK02L8bMnuxAkhuOUqjUopR0jbi8Kh2lfGSPXza1rGVjEeJHv+3HDJ7RlgMDcwnVDCuTNJP/80j5lmTWzMSC96aZEs6+MvBLnTrA==];
+        let [DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBlUzVyVjBTM3V6ZXJVZkpudkZYNEY4WTBPOGNmaTV4cWRoSW50NFZUQ0ZBCndNb3pjWjV2RFRqcitmaUhYR3MxMUUwdlZLN2t2TTFmOC9ZWFl2MzNMRTAKLT4gWDI1NTE5IGZDaVFCeXhmRDVnclJEbVdCbUw3R3lwMTZESVRjUEZKLzlnYTZzeHB0bkUKdjluZzgrQlVSL1h5V21INVdicmJtNURHeG1TNTJ0SzF0OFpldHdnaXBvSQotPiBELWdyZWFzZSBHOSZTIFxIX10kQmsKNTlUNmlBdG16UWI4TGVxa0w1Z1RsTWxIM0tRCi0tLSBOYTBZSk1hbk5JSWd4bklydnZXOGM0VzdRejlOd3FsQjkybng0WCs3eGE4CsGF1h6N5FM6O9RNlD5AY/FwikYvnzLqHwEbbpm1xIFb6u3198bEcjKTuzw4/2xx8j/95zQlzmklwn2BU7PxhqJweoOlggPGhZ0=];
         let found = scanner.scan(token);
         assert!(
             found.iter().any(|f| f.name == "Slack Bot Token (Compact)"),
@@ -3454,7 +2812,7 @@ API_KEY=original"#;
     #[test]
     fn test_slack_bot_token_compact_has_length_cap() {
         let scanner = SecretScanner::new_without_age_keys().unwrap();
-        let reasonable = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBiaHYxbWxKUkYyY1VpOStWOEdXZWlLNTJvaFZHdU5McUYwclNmWWlUZnk0CjIxK3Y1UFo2dm9YWXVnRVQ0WGJ6d25TM2k3MUlIblhQMDB3U3Y4WFpOQzAKLT4gWDI1NTE5IE9teC93azQrSHR4M2p3NHhmOG1jZ3dwbENLZGd5Y3kwUUp6cGtHKzlyMHMKV2JPQjVHWmk3T1YzQWFsSFI5bzZVYVZOY2pSSFpoR2NuQlNhMTJqL3dwQQotPiBgTVoyYjctZ3JlYXNlIEUkR3R5IE88IDhmJCcgOgpRWFpjRnRValVoVnl1ZXM3cEwrUHRrMkhmS2g2RWJMSm9rUGxUSmZ6c1RsbElRYVBsMnVjYXprMWxadlM5TE1VCno0NUxITzZZVFNNbFdlawotLS0gcVNtM3l0dnZPeDcvOEM2OHEvdWhlMU4zSlgxY3NIWjExUlBwT1gvS25VTQqXPBbFcg5Bmg+VzG/DYC5IGDMaBsdP8+wy8Bt1osP841vGXxva/HrshC9lsBkKwVZdrbBP6Hm3E+hv0cHKUQjOpo9OXsOZ9ODF8+SZBb7NW8/vatEfro7x/xWAOq7g7mBGYDbX/Q==]";
+        let reasonable = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB6Tjd1d2t0QVFlK3NqNURRVGdSZlI1ZzViOU11QjNYSzIxRzBDV0NXWkZrCmxHMThOWTRxN05qZnIwcXZEakVRUi85NFEvMjJWRXZWamx6cURqaVArcVEKLT4gWDI1NTE5IFphWDZyNDZkc1kxQitvUWw5RkNTM0xPUVM0Qy9Pc1MySVE3Mm9zaDkyU1UKR3M5ZDh0M2N2WkxtUVdpNW1iWEt3YmZtQXE3cUxhL1N5M3lxSHh6S0FyOAotPiAwYjhTLWdyZWFzZSAuVE1dXU9oIgp6RDBmdzhVYTVmQkFtMGZXcE5GSmw2dUgzYkJyODMzZGxqL1pZMFh1R2RBN2NoZmJITWF4dW5HK2NCbTRDd2N0Cmx1ZEVIejdEL1lhb2Jjb1d2N3FKSVJzSjJvQUpPVDBraHVRWTVnUTlSYVFNYWl2VHkzOGJuRXcKLS0tIDJ2OXlkSGJZUGZwK0pkSmZiSU4rVUJxbmNHcDNrc2QrUmx3RFBWdThJZUkKHNOHI0yv0KoGO7y9on6JUy7bpsdB7oxWVNjYWgs+nc2FtD9Q99VRRif6Aop/4MNY3+LkpctIjbxBmcNgYUi7Rr3TcLMIdYhLeaPce9F/UVfBRs5vwRmZ2Ox5+HUhBmE6RwUsQMw=]";
         let found = scanner.scan(reasonable);
         assert!(
             found.iter().any(|f| f.name == "Slack Bot Token (Compact)"),
@@ -3466,7 +2824,7 @@ API_KEY=original"#;
     #[test]
     fn test_hex_secret_quoted_requires_context() {
         let scanner = SecretScanner::new_without_age_keys().unwrap();
-        let with_context = r#"[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAzdDB4S0YxNWwrQXIzaVd0WmhieEl4SG5oUisrUXJGNGRNY2MvNWd0dDBVCmp2dDR6VFlvakEwVkFyWlRYNVRMVUp2ZWVEcVFFbTQ2NzRmVjVROHJZeFEKLT4gWDI1NTE5IGVKemNXSEVnYUFWWjdrbjJOREpFbVdPVDJIM1AyZTlLUHRQY2lkbDI1RzQKNHBnRzFQV3Y5U3BKeThlTDhxdzFjcWlxbVBLMkJHNlBjSStFZlNwb0xEMAotPiAsTiQ6LWdyZWFzZSBKSzhNe3QKUGJGeERoc043WjRrODdYNGFNaVQ1VTZBVDE5STZjM1dLZjY4cjE2M1J2VHBhTnNZSnZENnFpZjZld1l2cExWKwphdXdOZ1RybjRxTHphWTlHTVFHSlJUZi80aDc3S3gzR2psR0ZwckFqMlRvCi0tLSBwbENDcCtSejF4c1JzYWdmMUpxSTROMFE0dmlTWGpDd2wyZGVKTFZURWdNCheKB5pn/waTGVtSwKDvZkVKK4xh2TYCfMK4vzfzvBtUIJvj42Y4z/Q8q5qFYzNGSGKozc+Dp/ri3Y9Ylnst71D3FomSYoIJDv1a2OJErzw=]"#;
+        let with_context = r#"[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB2V25LQmk4UWJwRnpzZDhoalVvem9uWU1IZmlkbzBoTzllYlRwWTEvem1VCnBYYVpZQlF1MkZkSnBjSUZiRmducVByc3ViVnk4UU96dDNhVHNmT3Q3OGMKLT4gWDI1NTE5IEw4QXNTbE5xMEpFQVRXWVZNOEx0QnZjN2hKTURxbld5cnNUa3JpekFwbVEKclJ6RXFVZ2ZnQSsvVFM0ODdaWVd1VHdRS01YSU8yWlBQK2l4UDE1OGlGYwotPiBEUC1ncmVhc2UKbTJtMlk0b1l4ZnpHYUJqMnRFaTFOUG1Qa2duUjAyZHRLTjJhOGJJSTBkM3VLZ3IxbzVBZHh3Ci0tLSBDVlkySDVlSWVPMTFXbjJpOU9rMUt4WnlDM0JoNkw2YjJBTUpleS9Cc29NCpOdKl5ncmyp4JRTjYDNbg4/rMccQMGxudlJIFpHW3Sxz0xAjk2C/+n4OGrj9kL/ZE0NEYMktxmFAD8CDrj5qJsz3t0JA/muRGTqe6gcFac=]"#;
         let without_context = r#"label = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4""#;
         let found_with = scanner.scan(with_context);
         let found_without = scanner.scan(without_context);
@@ -3487,7 +2845,7 @@ API_KEY=original"#;
     #[test]
     fn test_high_entropy_secret_quoted_requires_context() {
         let scanner = SecretScanner::new_without_age_keys().unwrap();
-        let with_context = r#"[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBkZlMyR0hlK3BpdjJjS010WTNBemNYdDB3UlFTTmNXR0lpczRrczdLb25FCjJCWHpwNTdEcW5YZW9PTmRJU0JMdHp2NkpMRWJwdS9GNU9ZZTNBM0xHZncKLT4gWDI1NTE5IDBXZ0p5UmR1T0hINHZBZjVyT0Jwb3pJSVB3M2xPV2RUcUNvSllMdjUvbU0KaEZZeGgxVmgrZmhBRmdPV3NNcFpVUkwrVExTYXVjWGgvbU1md3g3WXh0dwotPiBjXzxlay5+Oi1ncmVhc2UgW11TMTI7ZnAgJHNwJyB0ajoKYkNKclROOGJLK2FqCi0tLSBhQW9jRW5QU0lMSTlHQVR1N2lvTDVqT2NCdHdzZTk3ajBjbWRibVFFM3dnCq4lTw5/3twP6Kz+XnthRyfYjk3xZQi9aBrdSgqSEl+hXRSo4EgVjFZTB4xRUoL/iHgJintSRxCbdADjEHgrUziT+w==]"#;
+        let with_context = r#"[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBIOWZGK2ZGYzRtZDBwZjZJR1dScWhUK1VjUHVSS0tDS0sxUFh6NHlucDNBCk9BMHZnV2xhT1UxdUhFei9iUitmOThNRm54WHpqRlRKb2Q1S3hXRlF2TlEKLT4gWDI1NTE5IG9yQmVlTmt4Qktra0FtdkF4SzJCVTlENFBzd3E2alViMloweWkyYXNqSDAKN3EzNjFPLzFFYitRd1V5R3BlcHJPZjB0cG5tb2ZLc1h3OUM3N1hqcUkvRQotPiBTeCNEdC1ncmVhc2UgJk51Qkk5UCAjTUoqICRzLVROXGI4IEhtfgpRMmhoRmU0b21sYXpDSy9UaXNrTEZCM3RESm5lZE5RZ2toQzMybzZvUzltRElVM3dnYW1WeXdpUTRrYjBwR00vCkh5cnUybmhBYWZKQjVrWW9McUNGdU1zK04va3kwZ25jdW5iRGpjK2JnR1pFQmgvMUNpaHUwdG5meVB1ZQotLS0gdE0xQmVVdU9Lek95dWgwaW9FZVdROUhlQTZxTi9XbVJ6ZVNQT2lsc0VCOAq83dkx9ojjvz+5xPeA6AUdk6Z/hJ9A4Cg33dDaeZKNFHdjHDg7d9pK0cGdPqe3+477gS2isB/frMm3dqhZSZNxBQg=]"#;
         let without_context = r#"class_name = "aBcDeFgHiJkLmNoPqRsTuVwX""#;
         let found_with = scanner.scan(with_context);
         let found_without = scanner.scan(without_context);
