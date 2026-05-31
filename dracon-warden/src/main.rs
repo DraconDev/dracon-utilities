@@ -290,7 +290,6 @@ pub(crate) struct WardenPolicy {
 
 impl WardenPolicy {
     #[allow(dead_code)]
-    #[allow(dead_code)]
     pub(crate) fn apply_global_flags(&self) {
         dracon_security_kit::set_allow_v1_fallback(self.allow_v1_fallback);
     }
@@ -1137,7 +1136,6 @@ where
 }
 
 #[allow(dead_code)]
-#[allow(dead_code)]
 fn repo_root_for_path(path: &Path, roots: &[PathBuf]) -> Option<PathBuf> {
     if !roots.iter().any(|r| path.starts_with(r)) {
         return None;
@@ -1159,7 +1157,6 @@ fn repo_root_for_path(path: &Path, roots: &[PathBuf]) -> Option<PathBuf> {
     None
 }
 
-#[allow(dead_code)]
 #[allow(dead_code)]
 pub(crate) fn repos_for_event(event: &Event, roots: &[PathBuf]) -> BTreeSet<PathBuf> {
     let ignore_fragments = [
@@ -1348,7 +1345,6 @@ fn find_git_repo(path: &Path) -> Option<PathBuf> {
     None
 }
 
-#[allow(dead_code)]
 #[allow(dead_code)]
 fn run_daemon(policy_path: PathBuf) -> Result<()> {
     let policy = WardenPolicy::load(&policy_path)?;
