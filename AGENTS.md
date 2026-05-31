@@ -32,6 +32,8 @@ dracon-libs/                <- Shared libraries (REQUIRED for building)
 
 **Key point:** `dracon-utilities` contains the CLI wrappers. `dracon-libs` contains shared library code. Only the CLI binaries get installed.
 
+**Warden ↔ Sync are completely independent.** Sync never calls warden. Warden never calls sync. Encryption is enforced by git hooks installed by warden, not by sync.
+
 ## Prerequisites
 
 **Required sibling directory:** `dracon-libs` must be checked out as a sibling to `dracon-utilities`:
@@ -470,7 +472,7 @@ auto_publish = false  # master toggle (default: off)
 [[publish_targets]]
 name = "crates-io"
 registry = "crates-io"    # crates-io | npm | pypi
-token_secret = "CARGO_REGISTRY_TOKEN"
+[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB6WWR6cHlROXpubGJ6OSt4ZUoyVUhMd1VIK1pXc3p1Zk0vdVpwQmpzWVYwCnNzdzRRbElPNzF4RVRmaHo3cFhuYVQ5MlRYQnVzR3FHcDJ1WDRFRm9Kb0EKLT4gWDI1NTE5IHRVWTNXeWk2a05CZ2pKd3pwd0pma1ZnQ2xvTjUwbmN4UGJFdUhicmh1Mk0KeDN6R051Q3F0SUszcTZOOGdqSlRxbmZZZGtyNXpudFZOa1VJQU9DZW0wVQotPiBDbCUkeXotZ3JlYXNlIGBXKGJNIkkgbD8nOiI7VQowTWVrcWFKZHA0d0poZHZxeHcKLS0tIEc0THc1UTI1QjVKdCs1UDRKY25KR3FJM2grOGVYak9JWXZINjhkV2s1VXMK43S4Labo/1DZdt3PINecGNErffAV5b1DO83Xl0pDbJ3weQlF4doZKk0w6Zu9eLiQjspDscWZh4/iaixGOF+dr/sGDAZP]
 publish_timeout_secs = 300
 ```
 
