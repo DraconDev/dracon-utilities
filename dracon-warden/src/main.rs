@@ -301,6 +301,26 @@ impl WardenPolicy {
                     | ".dracon/data/keys/"
                     | ".dracon/data/keys/*.pub"
                     | "*.pub"
+                    // Build artifacts and binaries
+                    | "target/"
+                    | "node_modules/"
+                    | ".cache/"
+                    | "*.o"
+                    | "*.so"
+                    | "*.dylib"
+                    | "*.dll"
+                    | "*.exe"
+                    // Binary files
+                    | "*.png"
+                    | "*.jpg"
+                    | "*.jpeg"
+                    | "*.gif"
+                    | "*.ico"
+                    | "*.svg"
+                    | "*.woff"
+                    | "*.woff2"
+                    | "*.ttf"
+                    | "*.otf"
             ) || p.ends_with(".pub")
                 || p.ends_with(".events.jsonl")
                 || p.replace('\\', "/").starts_with(".dracon/data/")
