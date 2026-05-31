@@ -237,10 +237,10 @@ auto_create = false  # Codeberg/Forgejo doesn't support push-to-create
 Store PATs for HTTPS fallback and API operations:
 ```bash
 # GitLab
-echo "GITLAB_TOKEN=glpat-xxxxxxxxxxxxxxxxxxxx" > ~/.dracon/utilities/sync/secrets/gitlab.env
+echo "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBSUEJFVUlFU3dWWU1RWUZSR0EzbVd6TmFraFNKMDlqUCtDV0dtWkljMUNJCm9tSXovN2pFMnVBT3ByaUx1a1U1eEd2VVZtQXJIbGJSMXdIY3FQVDZwWHcKLT4gWDI1NTE5IFE1QUp5WVlxWUhGUWRVTFd3UWYxQW9URVZrV2FTL0FiK0F2OVFtVjA4MDAKWmJ3VWZFelVLeEpxbFE0cVlacUdhdnM5cXYyK3A4Y0dhRkdreXNDUFVmVQotPiBaNFBAbS1ncmVhc2UgbEpoUX0xfgpEWldXVk1WUndDMjNUY1BsSU5oU1NLSm5CbVFPc1N0QXdLU3Jhb3lWR2dIYlhyYXBjVUN4Qkg2NGRSTFJpZFJsCnlBYmlGcStyRkhIeGR5KzRBNUUvU1JZK2ZTOGlrb0pnCi0tLSBkZHVuRmk2eXhqODQ3OXUvOEJiTG1JdVRHbGxsMU1QR1VUMWJGaWlrT25VCqghMf7kVGa0kHq6tramFWVlvNeFaxn4xjfoQonHJMXfKfzR/lbCCLOAjWYhpyTrqXeWW3oXgz4+wjI6H1KF2CD1OMvoh0WL]" > ~/.dracon/utilities/sync/secrets/gitlab.env
 
 # Codeberg
-echo "CODEBERG_TOKEN=cbp_xxxxxxxxxxxxxxxxxxxx" > ~/.dracon/utilities/sync/secrets/codeberg.env
+echo "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBEVHNHejVFeUt3cWlRRVdyVWMxaDVHdTVIMUZsK3NqRUNoWnVHcGZwMFFFCjBBUVp6M1JTSVBScHczNGR4YkJmQW4zNGZwTGFRNFh4SWhRRXIwYVhtUnMKLT4gWDI1NTE5IGlNNzRtdGwzam1DYWlaYjNGbDR1SVpCdngyU3BpOW5XbUI3a1JSRmpDUTAKOTExcUpoRkk0ZndsWWM0WTMvTjNjVTJzUWk4Y2FDQnJ6OEVMT3RidVZrVQotPiApU1t0fXwrRS1ncmVhc2UgKCg7VUJnVzMgcigiIDF4RyBzCmJ3bTY5NXhtYVFYNHVOdmZBQ1cxdjgydmlCbXVRWk5Feko4RGFtOFJ3ZnNVUXYwcnFlYlZCSFJ3ZG41RlY2a2oKWUFRaWN2WENnRkowbkd5T2ZZTXZIZwotLS0gTzlKbnpPbThKNEI5MmtoVUE2MHZEL2xabmJ1MUVNQW93b2toZlBtZGVLSQqIM2DSCpItpMa5G2ttGM4lVgm09ikFT3nNG+dQ/dQ6zODjulnnW6uB8GOFSSY0TNvLVAghauWGUSbpQn9sEBWxRtdbSoLN8A==]" > ~/.dracon/utilities/sync/secrets/codeberg.env
 ```
 
 ### AI Providers
@@ -303,6 +303,63 @@ Broken tracking repair also runs every ~300 cycles (~5 min) in the daemon loop, 
 **Filter-only cooldown:** Repos with clean/smudge filter changes (e.g. dracon-warden encryption) show as dirty in `git status` but have no diff after staging. The daemon detects this, resets the staging area, and applies a cooldown to prevent tight re-check loops.
 
 **Fingerprint-based scheduling:** The daemon uses a fingerprint (branch + effective_dirty + staged + ahead + behind) to determine if a repo needs syncing. Only after the fingerprint stays stable for `inactivity_push_delay_secs` (default 5s) does the daemon attempt a sync.
+
+## Push Failure Decision Tree
+
+When a push fails, dracon-sync follows this decision tree to recover:
+
+```
+Push Attempt
+├── SSH push with hardening (ConnectTimeout=10, ConnectionAttempts=2)
+│   ├── Success → Done ✅
+│   └── Failure → Continue
+├── Retry loop (configurable retries, linear backoff 1-5s)
+│   ├── Success → Done ✅
+│   └── Failure → Continue
+├── Transport fallback (SSH → HTTPS)
+│   ├── GitHub HTTPS (no token needed for public repos)
+│   ├── GitLab HTTPS (requires GITLAB_TOKEN)
+│   ├── Codeberg HTTPS (requires CODEBERG_TOKEN)
+│   ├── Success → Done ✅
+│   └── All fail → Continue
+└── Final failure handling
+    ├── Diverged (ahead > 0 AND behind > 0) → Mark as stuck, skip
+    ├── Clean + ahead > 0 + 3 failures → Mark as stuck, skip
+    └── Other → Log incident, continue to next repo
+```
+
+### Failure Modes and Recovery
+
+| Failure Type | Cause | Recovery |
+|--------------|-------|----------|
+| **SSH timeout** | Network issue, SSH agent not running | HTTPS fallback, retry |
+| **SSH auth failed** | Expired key, permission denied | HTTPS fallback with PAT |
+| **HTTPS auth failed** | Expired/missing PAT | Check token in secrets/ |
+| **Non-fast-forward** | Remote has diverged | Auto-force if `force_when_behind` and remote is purely behind |
+| **Rejected** | Branch protection, permission denied | Manual intervention needed |
+| **Network unreachable** | DNS failure, firewall | Retry with backoff |
+| **Timeout** | Hanging connection, large repo | Reduce `push_op_timeout_secs` |
+
+### Stuck Push Detection
+
+A repo is marked as "stuck" when:
+- **Diverged**: `ahead > 0 AND behind > 0` — requires manual resolution
+- **Clean + ahead + failures**: Repo has no uncommitted changes, has unpushed commits, and push has failed 3+ times — indicates a permanent issue (deleted remote, permission denied, etc.)
+
+Stuck repos are tracked in `~/.local/state/dracon/dracon-sync-stuck-push-repos.json` and skipped until manually unstuck:
+```bash
+dracon-sync repair stuck-unstuck /path/to/repo
+```
+
+### Push Timeouts
+
+| Setting | Default | Purpose |
+|---------|---------|---------|
+| `push_op_timeout_secs` | 60s | Per-push timeout (SSH or HTTPS) |
+| `push_retries` | 3 | Number of SSH retry attempts |
+| `repo_sync_timeout_secs` | 120s | Total timeout per repo (all pushes) |
+
+With defaults, a single repo can block the daemon for at most 120s (2 minutes). With 3 mirrors, worst case is 3 × 60s = 180s, but parallel pushes reduce this.
 
 ## Report Accuracy
 
