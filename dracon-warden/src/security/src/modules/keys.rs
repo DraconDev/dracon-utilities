@@ -1,14 +1,15 @@
 //! Key types for encryption.
 
 use age::x25519;
-use anyhow::{Context, Result};
+use anyhow::Result;
 use std::fs;
 use std::path::Path;
+use std::str::FromStr;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 const REPO_KEY_LEN: usize = 32;
 
-pub struct RepoKey(Vec<u8>);
+pub struct RepoKey(pub Vec<u8>);
 
 impl RepoKey {
     pub fn from_file(path: &Path) -> Result<Self> {
@@ -39,7 +40,7 @@ impl RepoKey {
 }
 
 #[derive(Zeroize, ZeroizeOnDrop)]
-pub struct TeamKey(Vec<u8>);
+pub struct TeamKey(pub Vec<u8>);
 
 impl TeamKey {
     pub fn to_public(&self) -> Result<age::x25519::Recipient> {
