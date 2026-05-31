@@ -206,3 +206,4 @@ Sync daemon:
 - [ ] Update `dracon-warden.example.toml` — add `setup-hooks` documentation
 - [ ] Add `SETUP.md` or section in README for standalone warden deployment
 - [ ] Document server deployment: copy binary, run `dracon-warden setup-hooks`, done
+- [ ] Document the two hooks: pre-commit (core guarantee) and pre-push (defense-in-depth)
