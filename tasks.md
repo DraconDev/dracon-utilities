@@ -150,11 +150,11 @@ Sync daemon:
 #### Warden: Remove or deprecate daemon
 
 - [x] Mark `daemon` command as deprecated in help text
-- [ ] Keep daemon code functional for backward compatibility but not required
-- [ ] Update `dracon-warden.service` systemd unit:
+- [x] Keep daemon code functional for backward compatibility but not required
+- [x] Update `dracon-warden.service` systemd unit:
   - Option A: Remove the service entirely from `install.sh`
   - Option B: Keep service but add comment explaining it's optional
-- [ ] The hook-based approach means the daemon is only needed for:
+- [x] The hook-based approach means the daemon is only needed for:
   - Proactive hardening of repos that haven't been committed to yet
   - Policy reload via SIGHUP
   - Periodic sweep as safety net (not required for security)
@@ -195,7 +195,7 @@ Sync daemon:
 #### Documentation
 
 - [x] Update `AGENTS.md` — remove warden daemon dependency from sync section
-- [ ] Update `dracon-warden.example.toml` — add `setup-hooks` documentation
+- [x] Update `dracon-warden.example.toml` — add `setup-hooks` documentation
 - [ ] Add `SETUP.md` or section in README for standalone warden deployment
-- [ ] Document server deployment: copy binary, run `dracon-warden setup-hooks`, done
+- [x] Document server deployment: copy binary, run `dracon-warden setup-hooks`, done
 - [x] Document the two hooks: pre-commit (core guarantee) and pre-push (defense-in-depth)

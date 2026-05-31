@@ -2,6 +2,15 @@
 # Path: ~/.dracon/utilities/warden/dracon-warden.toml
 #
 # Controls secret encryption and watch roots.
+#
+# Quick start:
+#   1. Install: ./install.sh (installs binary + hooks automatically)
+#   2. Or manually: dracon-warden setup-hooks --global
+#   3. Harden a repo: dracon-warden once <repo>
+#
+# The setup-hooks command installs git hooks (pre-commit + pre-push) globally
+# that enforce encryption. The pre-commit hook blocks commits if the filter
+# is not configured. The pre-push hook scans for plaintext secrets.
 
 # Directories to watch for filesystem events (daemon mode)
 watch_roots = ["/home/dracon/Dev"]

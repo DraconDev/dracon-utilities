@@ -414,7 +414,11 @@ restart_service() {
 
 restart_service dracon-sync.service
 restart_service dracon-system-guard.service
-restart_service dracon-warden.service
+# Warden daemon is optional — hooks are the primary enforcement layer.
+# Only restart if the service is already running.
+if systemctl --user is-active dracon-warden.service &>/dev/null; then
+    restart_service dracon-warden.service
+fi
 
 echo ""
 echo "✅ Installation complete!"
@@ -446,7 +450,8 @@ if [ "$VERIFY_OK" = true ]; then
 fi
 echo ""
 echo "Next steps:"
-echo "  1. Add API keys to ~/.dracon/utilities/sync/ai/secrets/*.env"
-echo "  2. Add registry tokens to ~/.dracon/utilities/sync/secrets/*.env (crates.io, npm, etc.)"
-echo "  3. Check 'dracon-sync status' to verify sync is working"
-echo "  4. Check 'dracon-system status' to verify guard is working"
+echo "  1. Warden hooks are installed globally (pre-commit + pre-push)"
+echo "  2. Add API keys to ~/.dracon/utilities/sync/ai/secrets/*.env"
+echo "  3. Add registry tokens to ~/.dracon/utilities/sync/secrets/*.env (crates.io, npm, etc.)"
+echo "  4. Check 'dracon-sync status' to verify sync is working"
+echo "  5. Check 'dracon-system status' to verify guard is working"
