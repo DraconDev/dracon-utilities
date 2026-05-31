@@ -68,6 +68,97 @@ pub(crate) fn test_git_cmd() -> std::process::Command {
     std::process::Command::new(git_path)
 }
 
+/// Create a git commit command with `--no-verify` to bypass warden hooks.
+///
+/// Tests that only need to set up git state (not test warden behavior) should use
+/// this helper to avoid interference from globally installed warden hooks.
+///
+/// ```ignore
+/// test_commit_cmd().current_dir(&repo).args(["-m", "init"]).output()?;
+/// ```
+#[allow(dead_code)]
+pub(crate) fn test_commit_cmd() -> std::process::Command {
+    let mut cmd = test_git_cmd();
+    cmd.args(["commit", "--no-verify"]);
+    cmd
+}
+
+/// Create a simple test repo with one commit.
+///
+/// Returns the path to the created repo. The repo has a single file "f" with
+/// content "content" and one commit with message "init".
+///
+/// Uses `--no-verify` to bypass warden hooks.
+///
+/// ```ignore
+/// let repo = create_test_repo();
+/// ```
+#[allow(dead_code)]
+pub(crate) fn create_test_repo() -> std::path::PathBuf {
+    let tmp = tempfile::TempDir::new().expect("temp dir");
+    let repo = tmp.path().to_path_buf();
+    test_git_cmd()
+        .args(["init", "-q", &repo.to_string_lossy()])
+        .output()
+        .expect("git init");
+    std::fs::write(repo.join("f"), "content").expect("write file");
+    test_git_cmd()
+        .args(["add", "f"])
+        .current_dir(&repo)
+        .output()
+        .expect("git add");
+    test_commit_cmd()
+        .args(["-m", "init"])
+        .current_dir(&repo)
+        .output()
+        .expect("git commit");
+    // Prevent TempDir from being dropped (repo must outlive the caller)
+    std::mem::forget(tmp);
+    repo
+}
+
+/// Create a test repo with a bare remote.
+///
+/// Returns (repo_path, bare_path). The repo has a single commit and is
+/// configured with "origin" pointing to the bare repo.
+///
+/// ```ignore
+/// let (repo, bare) = create_test_repo_with_remote();
+/// ```
+#[allow(dead_code)]
+pub(crate) fn create_test_repo_with_remote() -> (std::path::PathBuf, std::path::PathBuf) {
+    let tmp = tempfile::TempDir::new().expect("temp dir");
+    let bare = tmp.path().join("bare.git");
+    test_git_cmd()
+        .args(["init", "--bare", &bare.to_string_lossy()])
+        .output()
+        .expect("git init --bare");
+    let repo = tmp.path().join("repo");
+    test_git_cmd()
+        .args(["init", "-q", &repo.to_string_lossy()])
+        .output()
+        .expect("git init");
+    test_git_cmd()
+        .args(["remote", "add", "origin", &bare.to_string_lossy()])
+        .current_dir(&repo)
+        .output()
+        .expect("git remote add");
+    std::fs::write(repo.join("f"), "content").expect("write file");
+    test_git_cmd()
+        .args(["add", "f"])
+        .current_dir(&repo)
+        .output()
+        .expect("git add");
+    test_commit_cmd()
+        .args(["-m", "init"])
+        .current_dir(&repo)
+        .output()
+        .expect("git commit");
+    // Prevent TempDir from being dropped
+    std::mem::forget(tmp);
+    (repo, bare)
+}
+
 #[allow(dead_code)]
 pub(crate) struct EnvRestorer {
     key: String,

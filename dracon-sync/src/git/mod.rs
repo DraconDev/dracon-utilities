@@ -304,7 +304,7 @@ mod tests {
         std::fs::create_dir_all(&secrets_dir).expect("create secrets dir");
         std::fs::write(
             secrets_dir.join("weird.env"),
-            "# This is a comment\n\nTOKEN_BEFORE=value_before\n\nCOMMENTED_SECRET_TOKEN=commented_token_xyz\n# Another comment\nTOKEN_AFTER=value_after\n",
+            "# This is a comment\n\[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBMc2RqaU12WTMzN1hheWd6MExIdG5Va1lvVkRHbDJpeFVkOWl0N0tLK3hrCkpGZ3N4ZEI3bHlBajdqUUppTVVVQis5VnU5Y1dBUDQ3bWR5Z3FCZ25MSW8KLT4gWDI1NTE5IFZiM3pLUjhCMmNWa1hmcnNxNVEwS2N5ZHZCOCtZNFhBbW5SMnJaL3FQamcKNHlGZ0liQ1dJNXBYdEZjOGJpaWorcy91bURXN3E0UHdpRUNLUUphckJXawotPiAhTlpJOT9fLWdyZWFzZSBgIjkKM0VPbXVTMDF6MVJUVzBSY0FCcy84bDhYSXcKLS0tIEJuUW9IQStjSnFvUUVyOUJiVXBxQ2V5TW12MFhiMW1mWDhUSEpsenpla2MKVVt3x+Xwtr0HEKdC9AunFbJgUmfQhTAnfoXKzIU3Y7xrTwbJncnp7V5gmLL0pUSEItc3O6zRb5igtMiHu6a9nzAaoI6FsGGbh9wI8duGK3ioOQI0QHtTOrTzru63AAWOX0CFuPhL0I3U38c=] Another comment\nTOKEN_AFTER=value_after\n",
         )
         .expect("write env file");
         let result = load_secret("COMMENTED_SECRET_TOKEN");
@@ -380,7 +380,7 @@ mod tests {
         assert_eq!(url, Some("git@github.com:Test/repo.git".to_string()));
     }
     #[test]
-    fn test_ensure_remote_updates_existing() {
+    fn test_ensu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBWSUJOZzhXbEJUaDNvelllSDFzYjBjMk81K1R2M05qZDBJellsaWRNczI4CjFzWkJKdmxvYmJCUHRvcENEc1pQWlpUV2hacTZlWE5OR2IrK2F2RkZSemMKLT4gWDI1NTE5IGtIbHdjR2V6bkVRUGRQejJPQXZ3dGFmNDFndkNKdERTd3dJVDBNU2pqVTAKbWJDK1NXZWtsblpYZDllUEkvcnVnUitOL2k3ZkVqdzA0UTJOVTlNdWYzawotPiAnL3Z0TWYtZ3JlYXNlIGwnIXkgYnY9KTEwIElAciB4Nz1fIQo4UUFuSUdrckpOWkQ2TXArc1lDN0VidjVVVUVIVzJOMVZwcEcvc1NjZXFKdlpsUSs0Ykk0WUcwL1VFQ2ZqcFgxCjRwU240ZkZUUjNzcU5GY04zSHVIeHU5bkh5SkxkN3libmlGRUZvOHl3Y3laaFRaSmlVMFU5ZFEKLS0tIEQ4K1dBTytqdmFBdXZRaEtUcXg5dzFPTVNoRnR0K0xRTGRaaWowL1JIZDQKJtH5ZQ0xCXOD2u1NvLudatmPZASM/l7RUmJTsqj+zuYhnZO/jRLRH57+cWTXxlGjWgBWlXVJLqEVpg==]() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("test-repo");
         test_git_cmd()
@@ -516,7 +516,7 @@ mod tests {
         assert_eq!(remotes, vec!["origin"]);
     }
     #[test]
-    fn test_configure_all_remotes_single_remote() {
+    fn test_configu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBIbW4rZXZjSGdmSENYNmVYVHpTUFhSb0Y5OURLaWo3Nlh4dDVyNjVGUVg0Ck1aMi9MVnI3Y01zREtvdVo2WUFXR2xWMTFXMDFweHI2SjcrR09vMk1NK2MKLT4gWDI1NTE5IENsVkFaNFo5Zkx0cnJIS2JZNDFQSjByOUpMeGdYRGhlSmRDVGpNOWtKVVkKd2hBOHplR2NCWEx6a0NhRlhzWDFiSkxDdkZ5Vjh2SU9jZUJlNll2Z1crbwotPiBqS2MtZ3JlYXNlIC17YHoociAkQStpIDQ1IEUKeHEwd0dOMkV3THNwT24zdVJWOGlLcnRDMVdWZFRBVU1vc2FURCtINTRQdEVQeXpmL0xRNTNRbEhDdHVFNDVVcQoyOFQvWnp2bgotLS0gNXcrUitvUDJLZVFFdXBGTTFKalJxaW5OeWZTcEJ6dVVsSGQ5dWZtVzJUbwr5rQRC0qwy6yUfvxE0mPomHCHxaRvFimczAVAax9xtvQk0GJoy8wjfn5FP3hh1szrdGM/UwafLdlZC62k=]() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("test-repo");
         test_git_cmd()
@@ -544,7 +544,7 @@ mod tests {
         );
     }
     #[test]
-    fn test_configure_all_remotes_multiple_remotes() {
+    fn test_configu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAvb2xLUDIxVENBV1FGLzEzeERzb0RkT3pFMG9ldmJ3OEF2a0hEQi9ySzBBCnNlTFZiWjg5c3pkb0I1T2Q5bXZFUmc4cEdHZXRJajlVdUprQ2xKMEJvSlEKLT4gWDI1NTE5IFZEdU85NGNENnJTemZkcHlCa2l4S0cxY2ZpOW5FNThQM1NaMFBaajNSVEEKbHVraEluZndHMXo3RVp0dFdWVUZPYmFpTjJBZ0o1aER6dnRETVJ2WjJsSQotPiA5bls6LWdyZWFzZQpQY3UvY1pqZHFrY3d1KzhObU5xdFlEbHdnUGZ2ajMyaG5NbUtjSGJ0eHNkcGV0cE1SRWM1ZUJqMlpxQU5OeFg5ClpKS1UxZwotLS0gQURvSTNXbHRUZ0tTdUtYTHVUYjVBbDNVUGhPby93MXNrK3hTcHFsdTVOOAqp8PvyZtST4Tofv9wKQ2+loARMliIWAsNHEhKVaCfCg23s07CMj05RGs98LdeguKr9njF/LIIgdkPqauhiOng=]() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("test-repo");
         test_git_cmd()
@@ -591,7 +591,7 @@ mod tests {
         );
     }
     #[test]
-    fn test_configure_all_remotes_idempotent() {
+    fn test_configu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBid1JZMmRBd0RnbWcwUmY0MUdEa045Vm9aTWtheExhbTJIM3NxQitpNER3CnNVWXFKZ0UrbXpCdldOWEhkc05KVVpRM0g4aGZPN2tIVENPV2RWM1drbGsKLT4gWDI1NTE5IGRrcXl2MTVvakNYbWJ3L3FvZTZ4Z2xCRzRFRVdKbjk4b0g3c1VEK0Z2aU0KVjhobmxhWkRjd0t5ZmZudXJpWFlJYjRaOHNwK0p5QklUdEpRR2pLckZ5QQotPiBNQV4tZ3JlYXNlIFQgNVYgenIKdUg1bk1OQ0dPbEtIQndSOXFENlNaR3IvN2cKLS0tIHkwWFlxVFBDRTZMWFZ2NkMwZ0RXZWNLSzJhb0pFN0hiakJPcHFlam9wUncKMkrqW4uaQgaiJ734zBMw2p5KrzuuPy7ynhp2loIB2ZSe5hOl04amAS6hfUbT3+LDuAsy3olPN63t]() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("test-repo");
         test_git_cmd()
@@ -1120,13 +1120,14 @@ mod tests {
             .args(["init", "--bare", &bare.to_string_lossy()])
             .output()
             .expect("git init --bare");
+        let bare_url = format!("file://{}", bare.to_string_lossy());
         let repo = tmp.path().join("repo");
         test_git_cmd()
             .args(["init", "-q", &repo.to_string_lossy()])
             .output()
             .expect("git init");
         test_git_cmd()
-            .args(["remote", "add", "origin", &bare.to_string_lossy()])
+            .args(["remote", "add", "origin", &bare_url])
             .current_dir(&repo)
             .output()
             .expect("git remote add");
@@ -1137,7 +1138,7 @@ mod tests {
             .output()
             .expect("git add");
         test_git_cmd()
-            .args(["commit", "-m", "init"])
+            .args(["commit", "--no-verify", "-m", "init"])
             .current_dir(&repo)
             .output()
             .expect("git commit");
@@ -1186,13 +1187,14 @@ mod tests {
             .args(["init", "--bare", &bare.to_string_lossy()])
             .output()
             .expect("git init --bare");
+        let bare_url = format!("file://{}", bare.to_string_lossy());
         let repo = tmp.path().join("repo");
         std::process::Command::new(real_git.as_path())
             .args(["init", "-q", &repo.to_string_lossy()])
             .output()
             .expect("git init");
         std::process::Command::new(real_git.as_path())
-            .args(["remote", "add", "origin", &bare.to_string_lossy()])
+            .args(["remote", "add", "origin", &bare_url])
             .current_dir(&repo)
             .output()
             .expect("git remote add");
@@ -1203,7 +1205,7 @@ mod tests {
             .output()
             .expect("git add");
         std::process::Command::new(real_git.as_path())
-            .args(["commit", "-m", "init"])
+            .args(["commit", "--no-verify", "-m", "init"])
             .current_dir(&repo)
             .output()
             .expect("git commit");
@@ -1258,7 +1260,7 @@ mod tests {
             .output()
             .expect("git add");
         std::process::Command::new(real_git.as_path())
-            .args(["commit", "-m", "init"])
+            .args(["commit", "--no-verify", "-m", "init"])
             .current_dir(&repo)
             .output()
             .expect("git commit");
@@ -1312,7 +1314,7 @@ mod tests {
             .output()
             .expect("git add");
         std::process::Command::new(real_git.as_path())
-            .args(["commit", "-m", "init"])
+            .args(["commit", "--no-verify", "-m", "init"])
             .current_dir(&repo)
             .output()
             .expect("git commit");
@@ -1337,13 +1339,14 @@ mod tests {
             .args(["init", "--bare", &bare.to_string_lossy()])
             .output()
             .expect("git init --bare");
+        let bare_url = format!("file://{}", bare.to_string_lossy());
         let repo = tmp.path().join("repo");
         test_git_cmd()
             .args(["init", "-q", &repo.to_string_lossy()])
             .output()
             .expect("git init");
         test_git_cmd()
-            .args(["remote", "add", "origin", &bare.to_string_lossy()])
+            .args(["remote", "add", "origin", &bare_url])
             .current_dir(&repo)
             .output()
             .expect("git remote add");
@@ -1354,7 +1357,7 @@ mod tests {
             .output()
             .expect("git add");
         test_git_cmd()
-            .args(["commit", "-m", "init"])
+            .args(["commit", "--no-verify", "-m", "init"])
             .current_dir(&repo)
             .output()
             .expect("git commit");
@@ -1410,7 +1413,7 @@ mod tests {
             .output()
             .expect("git add");
         std::process::Command::new(real_git.as_path())
-            .args(["commit", "-m", "init"])
+            .args(["commit", "--no-verify", "-m", "init"])
             .current_dir(&repo)
             .output()
             .expect("git commit");
@@ -1460,7 +1463,7 @@ mod tests {
             .output()
             .expect("git add");
         std::process::Command::new(real_git.as_path())
-            .args(["commit", "-m", "init"])
+            .args(["commit", "--no-verify", "-m", "init"])
             .current_dir(&repo)
             .output()
             .expect("git commit");
@@ -1481,13 +1484,14 @@ mod tests {
             .args(["init", "--bare", &bare.to_string_lossy()])
             .output()
             .expect("git init --bare");
+        let bare_url = format!("file://{}", bare.to_string_lossy());
         let repo = tmp.path().join("repo");
         std::process::Command::new(real_git.as_path())
             .args(["init", "-q", "-b", "master", &repo.to_string_lossy()])
             .output()
             .expect("git init");
         std::process::Command::new(real_git.as_path())
-            .args(["remote", "add", "mirror", &bare.to_string_lossy()])
+            .args(["remote", "add", "mirror", &bare_url])
             .current_dir(&repo)
             .output()
             .expect("git remote add");
@@ -1498,7 +1502,7 @@ mod tests {
             .output()
             .expect("git add");
         std::process::Command::new(real_git.as_path())
-            .args(["commit", "-m", "init"])
+            .args(["commit", "--no-verify", "-m", "init"])
             .current_dir(&repo)
             .output()
             .expect("git commit");
@@ -1558,7 +1562,7 @@ mod tests {
             .output()
             .expect("git add");
         std::process::Command::new(real_git.as_path())
-            .args(["commit", "-m", "init"])
+            .args(["commit", "--no-verify", "-m", "init"])
             .current_dir(&repo)
             .output()
             .expect("git commit");
@@ -1616,7 +1620,7 @@ mod tests {
             .output()
             .expect("git add");
         std::process::Command::new(real_git.as_path())
-            .args(["commit", "-m", "init"])
+            .args(["commit", "--no-verify", "-m", "init"])
             .current_dir(&repo)
             .output()
             .expect("git commit");
@@ -1661,7 +1665,7 @@ mod tests {
             .status()
             .expect("git add");
         test_git_cmd()
-            .args(["commit", "-m", "init"])
+            .args(["commit", "--no-verify", "-m", "init"])
             .current_dir(&repo)
             .status()
             .expect("git commit");
@@ -1684,7 +1688,7 @@ mod tests {
             .status()
             .expect("git add");
         test_git_cmd()
-            .args(["commit", "-m", "init"])
+            .args(["commit", "--no-verify", "-m", "init"])
             .current_dir(&repo)
             .status()
             .expect("git commit");
@@ -1706,7 +1710,7 @@ mod tests {
         );
     }
     #[tokio::test]
-    async fn test_restore_paths_uses_git_restore_fallback_chain() {
+    async fn test_resto[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBaZVkyYktDZXdXSklHK3Vma09xUWpwandZNWs4c2VzNjcwYW9wNzc1aW5jCnZtRHFKZldKTnNBWTZ0TlFJL2d0dGM4R3h3WGhkRzRVODRMQWM3RkQ3SDgKLT4gWDI1NTE5IC83c3lyQXdqN0hhQTdlYWFrU1V3TVY1WHVvdDFLUlo0U0ZxSWs3amtybVUKbTkrMXI4aHdQSnlEUmNnTk9mVy8zSE8zWkJ4YmJXWVdQcW50c0Y1YU9WSQotPiBuezdvdy4tZ3JlYXNlIF5gWnMwQiBtY10xVlYgQmBuRDdYIGtGSzZOfWM+CnRWUmF2Y2RSWFhhdmhwZFRIOWw4L3hRMkk4SXk5NFJ3Mks2eUw4bG1pMHBaQnp6ZmJTK2ROZ1Nna2FJYTlMcFcKKzZoM3p5N3RSYTZMeGhzdm1tYWs0YTNPUXZoN0xEMGJhN0RRZUYwNFVmMmxkZwotLS0gWUxrTEtsTE85VnEyOXRrTWlpNEJWSE5uRk4zUWdaL1k0aE9ZcFZuV05FdwqJCoNf1b4mqRVFhSY7cbUcg6YKboyuSFNjDxDw0AYvHjWLcRVtiRCPPOcBEyfmCDgnnfNcpmkm7zpNSNSrnotJv6yYd9aCNAE=]() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("test-repo");
         test_git_cmd()
@@ -1721,7 +1725,7 @@ mod tests {
             .status()
             .expect("git add");
         test_git_cmd()
-            .args(["commit", "-m", "init"])
+            .args(["commit", "--no-verify", "-m", "init"])
             .current_dir(&repo)
             .status()
             .expect("git commit");
@@ -1750,7 +1754,7 @@ mod tests {
             .status()
             .expect("git add");
         test_git_cmd()
-            .args(["commit", "-m", "init"])
+            .args(["commit", "--no-verify", "-m", "init"])
             .current_dir(&repo)
             .status()
             .expect("git commit");
@@ -1796,7 +1800,7 @@ mod tests {
             .status()
             .expect("git add");
         test_git_cmd()
-            .args(["commit", "-m", "init"])
+            .args(["commit", "--no-verify", "-m", "init"])
             .current_dir(&repo)
             .status()
             .expect("git commit");
@@ -1814,7 +1818,7 @@ mod tests {
                 .stdout;
             let local = String::from_utf8_lossy(&local).trim().to_string();
             test_git_cmd()
-                .args(["commit", "--allow-empty", "-m", "other commit"])
+                .args(["commit", "--no-verify", "--allow-empty", "-m", "other commit"])
                 .current_dir(&repo)
                 .status()
                 .expect("git commit --allow-empty");
@@ -1854,13 +1858,14 @@ mod tests {
             .args(["init", "--bare", &bare.to_string_lossy()])
             .output()
             .expect("git init --bare");
+        let bare_url = format!("file://{}", bare.to_string_lossy());
         let repo = tmp.path().join("repo");
         std::process::Command::new(real_git.as_path())
             .args(["init", "-q", "-b", "master", &repo.to_string_lossy()])
             .output()
             .expect("git init");
         std::process::Command::new(real_git.as_path())
-            .args(["remote", "add", "mirror", &bare.to_string_lossy()])
+            .args(["remote", "add", "mirror", &bare_url])
             .current_dir(&repo)
             .output()
             .expect("git remote add");
@@ -1871,12 +1876,12 @@ mod tests {
             .output()
             .expect("git add");
         std::process::Command::new(real_git.as_path())
-            .args(["commit", "-m", "init"])
+            .args(["commit", "--no-verify", "-m", "init"])
             .current_dir(&repo)
             .output()
             .expect("git commit");
         std::process::Command::new(real_git.as_path())
-            .args(["commit", "--allow-empty", "-m", "other commit"])
+            .args(["commit", "--no-verify", "--allow-empty", "-m", "other commit"])
             .current_dir(&repo)
             .output()
             .expect("git commit");
@@ -1922,7 +1927,7 @@ mod tests {
             .status()
             .expect("git add");
         test_git_cmd()
-            .args(["commit", "-m", "init"])
+            .args(["commit", "--no-verify", "-m", "init"])
             .current_dir(&repo)
             .status()
             .expect("git commit");
@@ -1939,7 +1944,7 @@ mod tests {
                 .expect("git rev-parse");
             let _local = String::from_utf8_lossy(&local.stdout).trim().to_string();
             test_git_cmd()
-                .args(["commit", "--allow-empty", "-m", "other commit"])
+                .args(["commit", "--no-verify", "--allow-empty", "-m", "other commit"])
                 .current_dir(&repo)
                 .status()
                 .expect("git commit");
@@ -1985,7 +1990,7 @@ mod tests {
             .status()
             .expect("git add");
         test_git_cmd()
-            .args(["commit", "-m", "init"])
+            .args(["commit", "--no-verify", "-m", "init"])
             .current_dir(&repo)
             .status()
             .expect("git commit");
@@ -1995,7 +2000,7 @@ mod tests {
             .status()
             .expect("git remote add");
         test_git_cmd()
-            .args(["commit", "--allow-empty", "-m", "other commit"])
+            .args(["commit", "--no-verify", "--allow-empty", "-m", "other commit"])
             .current_dir(&repo)
             .status()
             .expect("git commit");
@@ -2140,7 +2145,7 @@ mod tests {
             .status()
             .expect("git add");
         test_git_cmd()
-            .args(["commit", "-m", "init"])
+            .args(["commit", "--no-verify", "-m", "init"])
             .current_dir(repo)
             .status()
             .expect("git commit");
@@ -2180,7 +2185,7 @@ mod tests {
             .status()
             .expect("git add");
         test_git_cmd()
-            .args(["commit", "-m", "init"])
+            .args(["commit", "--no-verify", "-m", "init"])
             .current_dir(repo)
             .status()
             .expect("git commit");
@@ -2242,7 +2247,7 @@ mod tests {
             .status()
             .expect("git add");
         test_git_cmd()
-            .args(["commit", "-m", "init"])
+            .args(["commit", "--no-verify", "-m", "init"])
             .current_dir(repo)
             .status()
             .expect("git commit");
@@ -2308,7 +2313,7 @@ mod tests {
             .status()
             .expect("git add");
         test_git_cmd()
-            .args(["commit", "-m", "init"])
+            .args(["commit", "--no-verify", "-m", "init"])
             .current_dir(repo)
             .status()
             .expect("git commit");
@@ -2350,7 +2355,7 @@ mod tests {
             .status()
             .expect("git add");
         test_git_cmd()
-            .args(["commit", "-m", "init"])
+            .args(["commit", "--no-verify", "-m", "init"])
             .current_dir(repo)
             .status()
             .expect("git commit");
@@ -2400,7 +2405,7 @@ mod tests {
             .status()
             .expect("git add");
         test_git_cmd()
-            .args(["commit", "-m", "init"])
+            .args(["commit", "--no-verify", "-m", "init"])
             .current_dir(repo)
             .status()
             .expect("git commit");
@@ -2454,7 +2459,7 @@ mod tests {
             .status()
             .expect("git add");
         test_git_cmd()
-            .args(["commit", "-m", "init"])
+            .args(["commit", "--no-verify", "-m", "init"])
             .current_dir(repo)
             .status()
             .expect("git commit");
@@ -2519,7 +2524,7 @@ mod tests {
             .status()
             .expect("git add");
         test_git_cmd()
-            .args(["commit", "-m", "initial"])
+            .args(["commit", "--no-verify", "-m", "initial"])
             .current_dir(repo)
             .status()
             .expect("git commit");
@@ -2597,7 +2602,7 @@ mod tests {
             .status()
             .expect("git config");
         test_git_cmd()
-            .args(["commit", "--allow-empty", "-m", "init"])
+            .args(["commit", "--no-verify", "--allow-empty", "-m", "init"])
             .current_dir(repo)
             .status()
             .expect("git commit");

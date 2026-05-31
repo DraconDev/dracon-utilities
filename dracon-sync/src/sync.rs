@@ -454,7 +454,7 @@ mod diff_tests {
             .output()
             .unwrap();
         std::process::Command::new("git")
-            .args(["commit", "-m", "initial"])
+            .args(["commit", "--no-verify", "-m", "initial"])
             .current_dir(&repo_path)
             .output()
             .unwrap();
@@ -1879,7 +1879,7 @@ pub(crate) async fn sync_repo(
                     .current_dir(repo)
                     .output();
                 let _ = std::process::Command::new(&git_bin)
-                    .args(["commit", "-m", "initial"])
+                    .args(["commit", "--no-verify", "-m", "initial"])
                     .current_dir(repo)
                     .output();
                 eprintln!("📝 {} created initial commit (empty repo)", repo.display());
@@ -2105,6 +2105,7 @@ mod tests {
                 "-C",
                 &repo.to_string_lossy(),
                 "commit",
+                "--no-verify",
                 "--allow-empty",
                 "-m",
                 "init",
@@ -2154,6 +2155,7 @@ auto_github_private_account = "TestAccount"
                 "-C",
                 &repo.to_string_lossy(),
                 "commit",
+                "--no-verify",
                 "--allow-empty",
                 "-m",
                 "init",
@@ -2239,6 +2241,7 @@ auto_bump_versions = false
                 "-C",
                 &repo.to_string_lossy(),
                 "commit",
+                "--no-verify",
                 "--allow-empty",
                 "-m",
                 "init",
@@ -2297,6 +2300,7 @@ auto_bump_versions = false
                 "-C",
                 &repo.to_string_lossy(),
                 "commit",
+                "--no-verify",
                 "--allow-empty",
                 "-m",
                 "init",
@@ -2352,6 +2356,7 @@ auto_bump_versions = false
                 "-C",
                 &repo.to_string_lossy(),
                 "commit",
+                "--no-verify",
                 "--allow-empty",
                 "-m",
                 "init",
@@ -2410,6 +2415,7 @@ auto_bump_versions = false
                 "-C",
                 &repo.to_string_lossy(),
                 "commit",
+                "--no-verify",
                 "--allow-empty",
                 "-m",
                 "init",
@@ -2476,6 +2482,7 @@ auto_bump_versions = false
                 "-C",
                 &repo.to_string_lossy(),
                 "commit",
+                "--no-verify",
                 "--allow-empty",
                 "-m",
                 "init",
@@ -2528,6 +2535,7 @@ auto_bump_versions = false
                 "-C",
                 &repo.to_string_lossy(),
                 "commit",
+                "--no-verify",
                 "--allow-empty",
                 "-m",
                 "init",
@@ -2594,6 +2602,7 @@ auto_bump_versions = false
                 "-C",
                 &repo.to_string_lossy(),
                 "commit",
+                "--no-verify",
                 "--allow-empty",
                 "-m",
                 "init",
@@ -2646,6 +2655,7 @@ auto_bump_versions = false
                 "-C",
                 &repo.to_string_lossy(),
                 "commit",
+                "--no-verify",
                 "--allow-empty",
                 "-m",
                 "init",
@@ -2700,6 +2710,7 @@ auto_bump_versions = false
                 "-C",
                 &repo.to_string_lossy(),
                 "commit",
+                "--no-verify",
                 "--allow-empty",
                 "-m",
                 "init",
@@ -2748,6 +2759,7 @@ auto_bump_versions = false
                 "-C",
                 &repo.to_string_lossy(),
                 "commit",
+                "--no-verify",
                 "--allow-empty",
                 "-m",
                 "init",
@@ -2803,6 +2815,7 @@ auto_bump_versions = false
                 "-C",
                 &repo.to_string_lossy(),
                 "commit",
+                "--no-verify",
                 "--allow-empty",
                 "-m",
                 "init",
@@ -2857,7 +2870,7 @@ push_url = "git@nonexistent.example.com:repo.git"
     }
 
     #[tokio::test]
-    async fn test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBwM01mM1czaldpaWNFaUIvSkVJNHRrV0xaUE53cEdiTmxVL0NWeGhMc2dVCkN0NGxWbU9ZYVk5b3BrMGV0Z0hhSDNTRVFvZW9EUGtWVFd2S2FoaThmb1UKLT4gWDI1NTE5IE1WRVVpWUVSellwOERqejdmM1VUNG5NZUJSbjFydHhlam9Ndm9abENxMHMKYVRGWDRFYU96WVdJUnhRMDNaUDR6Rk1lTFZVWkRTcVF6elQxTndmMEY1RQotPiAnN202MC1ncmVhc2UgdHI3QC91cFAgIyU4KSM/dyBMClZDdUhpd1BPVzN6dE40S1pDTXhLMTVBRkdUR2EyNG8KLS0tIHQ0VUY5ZFRhdXdQSXdKSGNZaC9IMTVQaVh2aDVaQXRyZVcxS25URmRtMVUK15wNNgk/4XdNHuG6F3ZFZZANDCzOnjmdBKKveMmUTyhbAckqooeCYA9avtV6ashvAek1igVGWL3L]() {
+    async fn test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBlaU0reVVUaXF3S1hnb1JOeDN2TkEwNkxPOW5sWXhxd1ppRjhBR091K2wwCjlnK1FQVHRkNm5zaTlQZ0VwYmtHYWpKc3JWYTdHbzJITlF0aCtjYTdMajAKLT4gWDI1NTE5IDRuWG5oViswdnF4Kzk4K3RIV0JOSFBvaU1MMVhub0dzRCtic0VrdWM4RE0KRzVyYmlma1QxUjloaFUydEpsUkhOaktocVh3RXVPazVPMHVnUmJ6b1BJZwotPiBiNS1ncmVhc2UgXVdwLzM9XCBfIClYJy90c3lPClFrNDhzMzZwc3p6b3pPMWZHUFd5RmFaaWFhRktrblpFSGVWZDlSbmU1K1doCi0tLSA4WDVNN3FjMHN6RmxaSjl2VUNyWnBHS0R3QzNRWHhLQ0c2b3p4eGQyelVzCtQ3x4iXvyxMOMPlVcIQEZFdtx8idpX7uWl5lI2NpsJ9rx6UZwsqVFZKoYIGyNhJJs9KusakwbXNhw==]() {
         let tmp = tempfile::tempdir().unwrap();
         let origin_bare = tmp.path().join("origin.git");
         std::process::Command::new("git")
@@ -2891,6 +2904,7 @@ push_url = "git@nonexistent.example.com:repo.git"
                 "-C",
                 &repo.to_string_lossy(),
                 "commit",
+                "--no-verify",
                 "--allow-empty",
                 "-m",
                 "init",
@@ -2999,6 +3013,7 @@ push_url = "git@nonexistent.example.com:repo.git"
                 "-C",
                 &repo.to_string_lossy(),
                 "commit",
+                "--no-verify",
                 "--allow-empty",
                 "-m",
                 "init",
@@ -3082,6 +3097,7 @@ push_url = "{}"
                 "-C",
                 &repo.to_string_lossy(),
                 "commit",
+                "--no-verify",
                 "--allow-empty",
                 "-m",
                 "init",
@@ -3132,7 +3148,7 @@ push_url = "{}"
         std::fs::write(repo.join("keep.txt"), "keep\n").unwrap();
         std::fs::write(repo.join("remove.txt"), "remove\n").unwrap();
         git_cmd(&repo, &["add", "-A"]);
-        git_cmd(&repo, &["commit", "-m", "add files"]);
+        git_cmd(&repo, &["commit", "--no-verify", "-m", "add files"]);
 
         std::fs::remove_file(repo.join("remove.txt")).unwrap();
 
@@ -3173,7 +3189,7 @@ push_url = "{}"
         std::fs::write(repo.join("b.txt"), "b\n").unwrap();
         std::fs::write(repo.join("c.txt"), "c\n").unwrap();
         git_cmd(&repo, &["add", "-A"]);
-        git_cmd(&repo, &["commit", "-m", "add files"]);
+        git_cmd(&repo, &["commit", "--no-verify", "-m", "add files"]);
 
         // Delete 2 of 3 files (66% — should be ALLOWED, only 100% wipe is blocked)
         std::fs::remove_file(repo.join("a.txt")).unwrap();
@@ -3210,14 +3226,14 @@ push_url = "{}"
     }
 
     #[tokio::test]
-    async fn test_sync_repo_exac[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBGK21velU4aHArZzlBNnJOeXdSdGxLV1Y0MzlmZ0xuVTAvWW1ueEhmRFdFCjdOYllRbytXM0NSd004czFJRzk2NHhIbmZWTFBNb2tvcEZQdmRIWHpzdGcKLT4gWDI1NTE5IGF1a3lYUmRyd25uL3B3NUZ1RWtJZFNUNEJKN2dYdEFCVno3ekZJOFdNeW8Ka2NzWGtjM0owTFR6cmZiM2lHM2V1clY4UkNOUXhYdDNlTWMrM2NJVkFxWQotPiB+S1wtZ3JlYXNlIHFOeXt2fiBACmsyK0JkUQotLS0gRDI3K2FZeGVyajcxTHVEL2hBdU9MSERYMkJXUWdDcUtKZUljd011ZlFEYwrfnhB2+FeGmMVOh2XB1uLjS0e7d10SCe1/z7s6LCrt2zjmMBziEdt1PbVkT5YFKS4uc8OWjCI/0D8N8syx8gw=]() {
+    async fn test_sync_repo_exac[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB4d2laYk4wK1U4eXhUNGphSHFxeG9xa3hpakFhNUJCaURlUlg5SVYzTjM0CnVUaEpvM2I4U3VlQWEzMTZIVEEyT2hXR0M4UDd3Ky9CYWo5blVNK1g2aVEKLT4gWDI1NTE5IDBldGpGRE01UnRSSlhqTmFydFBENEp1bW5hZW1hY05QMVgrOGl2SFRYeXMKSHFFMlpPMkg1cWNQT2lvVE1QWkxiUUI1eVVXd201Wi81NnFMUXhaODYzNAotPiAxODAuOk5MLWdyZWFzZSA9YURtIl8Kb2lid1ZMeEtENlN0RHJ3OWpqNnBqdWF6Q3cKLS0tIG8xSlhSZGU4ZGZGWExSYXhUT3kydi9ZQnZLZW9jdzFRcUQ1eXd5QU53TlkKHoNCkaWVyAUrhfGN0H2qQgIVlDdWs+yg8+s8E5kCah4OSxH9zirTqfZIbe/YxbGvN2HNYOCIxHt8FbRRA1Ex]() {
         let tmp = tempfile::tempdir().unwrap();
         let repo = init_test_repo(&tmp, "exact-50-del-repo");
 
         std::fs::write(repo.join("a.txt"), "a\n").unwrap();
         std::fs::write(repo.join("b.txt"), "b\n").unwrap();
         git_cmd(&repo, &["add", "-A"]);
-        git_cmd(&repo, &["commit", "-m", "add files"]);
+        git_cmd(&repo, &["commit", "--no-verify", "-m", "add files"]);
 
         // Delete exactly 1 of 2 files (50% — at threshold, should be ALLOWED)
         std::fs::remove_file(repo.join("a.txt")).unwrap();
@@ -3280,7 +3296,7 @@ push_url = "{}"
         std::fs::create_dir_all(repo.join("src")).unwrap();
         std::fs::write(repo.join("src/main.rs"), "fn main() {}\n").unwrap();
         git_cmd(&repo, &["add", "-A"]);
-        git_cmd(&repo, &["commit", "-m", "initial"]);
+        git_cmd(&repo, &["commit", "--no-verify", "-m", "initial"]);
 
         std::fs::write(repo.join("node_modules/pkg/index.js"), "updated\n").unwrap();
         std::fs::write(
@@ -3320,7 +3336,7 @@ push_url = "{}"
 
         std::fs::write(repo.join("small.txt"), "small content\n").unwrap();
         git_cmd(&repo, &["add", "-A"]);
-        git_cmd(&repo, &["commit", "-m", "initial"]);
+        git_cmd(&repo, &["commit", "--no-verify", "-m", "initial"]);
 
         let big_content = vec![b'X'; 1024];
         std::fs::write(repo.join("bigfile.bin"), &big_content).unwrap();
@@ -3358,7 +3374,7 @@ push_url = "{}"
 
         std::fs::write(repo.join("existing.txt"), "original\n").unwrap();
         git_cmd(&repo, &["add", "-A"]);
-        git_cmd(&repo, &["commit", "-m", "initial"]);
+        git_cmd(&repo, &["commit", "--no-verify", "-m", "initial"]);
 
         std::fs::write(repo.join("existing.txt"), "modified\n").unwrap();
         std::fs::write(repo.join("brand_new.txt"), "new file\n").unwrap();
@@ -3497,7 +3513,7 @@ auto_bump_versions = false
 
         std::fs::write(repo.join("file.txt"), "change\n").unwrap();
         git_cmd(&repo, &["add", "."]);
-        git_cmd(&repo, &["commit", "-m", "add file"]);
+        git_cmd(&repo, &["commit", "--no-verify", "-m", "add file"]);
 
         let commits_before = git_cmd(&repo, &["rev-list", "--count", "HEAD"]);
         let count_before: usize = String::from_utf8_lossy(&commits_before.stdout)
@@ -3535,7 +3551,7 @@ auto_bump_versions = false
 
         std::fs::write(repo.join("tracked.txt"), "tracked\n").unwrap();
         git_cmd(&repo, &["add", "tracked.txt"]);
-        git_cmd(&repo, &["commit", "-m", "add tracked"]);
+        git_cmd(&repo, &["commit", "--no-verify", "-m", "add tracked"]);
 
         std::fs::write(repo.join("modified.txt"), "modified\n").unwrap();
         std::fs::write(repo.join("untracked.txt"), "untracked\n").unwrap();
@@ -3575,7 +3591,7 @@ auto_bump_versions = false
             let fname = format!("file{}.txt", i);
             std::fs::write(repo.join(&fname), format!("content{}\n", i)).unwrap();
             git_cmd(&repo, &["add", &fname]);
-            git_cmd(&repo, &["commit", "-m", &format!("add {}", fname)]);
+            git_cmd(&repo, &["commit", "--no-verify", "-m", &format!("add {}", fname)]);
         }
 
         // Set threshold to 2 — should trigger alert since we have 3 unpushed commits
@@ -3602,7 +3618,7 @@ auto_bump_versions = false
         // Create and commit 1 file — below threshold
         std::fs::write(repo.join("file.txt"), "content\n").unwrap();
         git_cmd(&repo, &["add", "file.txt"]);
-        git_cmd(&repo, &["commit", "-m", "add file"]);
+        git_cmd(&repo, &["commit", "--no-verify", "-m", "add file"]);
 
         // Set threshold to 5 — should NOT trigger alert
         let toml_str = r#"
@@ -3651,7 +3667,7 @@ auto_bump_versions = false
             std::fs::write(repo.join(format!("file{i}.txt")), format!("content{i}")).unwrap();
         }
         git_cmd(&repo, &["add", "."]);
-        git_cmd(&repo, &["commit", "-m", "init"]);
+        git_cmd(&repo, &["commit", "--no-verify", "-m", "init"]);
 
         // Modify file0 so there's a real change that would be staged
         std::fs::write(repo.join("file0.txt"), "modified").unwrap();
@@ -3697,7 +3713,7 @@ auto_bump_versions = false
         // Create a file that looks like a filter-only change
         std::fs::write(repo.join("secret.txt"), "plaintext").unwrap();
         git_cmd(&repo, &["add", "."]);
-        git_cmd(&repo, &["commit", "-m", "init"]);
+        git_cmd(&repo, &["commit", "--no-verify", "-m", "init"]);
 
         // Simulate a filter-only state: working tree differs from index
         // but git diff HEAD shows no changes (all changes are filter artifacts).
@@ -3752,11 +3768,11 @@ auto_bump_versions = false
         // Manually commit twice with same subject
         std::fs::write(repo.join("a.txt"), "a").unwrap();
         git_cmd(&repo, &["add", "."]);
-        git_cmd(&repo, &["commit", "-m", "duplicate subject"]);
+        git_cmd(&repo, &["commit", "--no-verify", "-m", "duplicate subject"]);
 
         std::fs::write(repo.join("b.txt"), "b").unwrap();
         git_cmd(&repo, &["add", "."]);
-        git_cmd(&repo, &["commit", "-m", "duplicate subject"]);
+        git_cmd(&repo, &["commit", "--no-verify", "-m", "duplicate subject"]);
 
         // sync_repo should succeed — no dedup guard blocking legitimate work
         std::fs::write(repo.join("c.txt"), "c").unwrap();
@@ -3795,6 +3811,7 @@ auto_bump_versions = false
                 "-C",
                 &repo.to_string_lossy(),
                 "commit",
+                "--no-verify",
                 "--allow-empty",
                 "-m",
                 "init",

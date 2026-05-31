@@ -2293,7 +2293,7 @@ fn run_setup_hooks(mode: HookMode, repo: Option<&Path>) -> Result<()> {
             let repo_path = repo.context("--local requires a repo path")?;
             let output = std::process::Command::new("git")
                 .args(["-C"])
-                .arg(&repo_path)
+                .arg(repo_path)
                 .args(["config", "local", "core.hooksPath", &dir.to_string_lossy()])
                 .output()
                 .context("failed to run git config")?;
