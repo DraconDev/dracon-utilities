@@ -5,7 +5,7 @@
 use anyhow::{Context, Result};
 use clap::{ArgAction, Parser, Subcommand};
 pub(crate) use dracon_security_kit::DraconWarden;
-use globset::{GlobSet, GlobSetBuilder};
+use globset::GlobSetBuilder;
 
 use secrecy::ExposeSecret;
 use serde::Deserialize;
@@ -15,9 +15,8 @@ use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command as ProcessCommand;
 use std::sync::atomic::{AtomicU8, Ordering};
-use std::sync::Arc;
 use std::sync::Mutex;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use zeroize::Zeroizing;
 
 static ROLLING_LOG: std::sync::OnceLock<Mutex<Vec<String>>> = std::sync::OnceLock::new();
