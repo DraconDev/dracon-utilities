@@ -2043,6 +2043,40 @@ async fn handle_ahead_push(ctx: &mut SyncContext<'_>, svc: &GitService) -> Resul
 mod tests {
     use super::*;
 
+    #[test]
+    fn test_truncate_task_multibyte_utf8() {
+        // Regression: em dash (—) is 3 bytes. Truncating at byte boundary
+        // inside it caused "not a char boundary" panic.
+        let input = "T-001 Set Tauri CSP — Replaced \"csp\": null with strict policy including wasm-unsafe-eval";
+        let result = truncate_task(input);
+        assert!(result.len() <= 64); // 60 + "..."
+        assert!(!result.ends_with('\u{200B}')); // no broken chars
+        // Should cut at the em dash boundary
+        assert!(result.contains('—') || result.ends_with("..."));
+    }
+
+    #[test]
+    fn test_truncate_task_short() {
+        let input = "short task";
+        assert_eq!(truncate_task(input), "short task");
+    }
+
+    #[test]
+    fn test_truncate_task_at_sentence_boundary() {
+        let input = "Fix the bug. Now add tests for the fix and update documentation.";
+        let result = truncate_task(input);
+        assert!(result.ends_with('.'));
+        assert!(result.len() <= 64);
+    }
+
+    #[test]
+    fn test_truncate_task_hard_cutoff() {
+        let input = "This is a very long task name that has no sentence boundaries and just keeps going and going and going";
+        let result = truncate_task(input);
+        assert!(result.ends_with("..."));
+        assert!(result.len() <= 64);
+    }
+
     #[tokio::test]
     async fn test_sync_repo_auto_github_private_graceful_on_no_gh() {
         let tmp = tempfile::tempdir().unwrap();
