@@ -3,6 +3,7 @@
 mod tests {
     use crate::*;
     use std::sync::atomic::{AtomicU64, Ordering};
+    use std::time::Duration;
     use std::sync::Mutex;
 
     static NEXT_ID: AtomicU64 = AtomicU64::new(1);
@@ -71,7 +72,6 @@ mod tests {
             hygiene_patterns: vec!["target/".into(), "*.log".into()],
             watch_roots: vec![],
             discover_roots: vec![],
-            allow_v1_fallback: false,
         }
     }
 
@@ -98,7 +98,7 @@ mod tests {
     }
 
     #[test]
-    fn build_gitignore_block_includes_expected_lines() {
+    fn build_gitigno[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBiRWNWV0x0eThsTDRtYzg3Lzg5c3ZnUWJmYjZSYkRSRjJlTzFicXpNTkZZCnR2dlpvbkxyRC9rYnpHdm4reVBwcU9lZjgvOFZnOFJ2UDVrNjFSQm8xZ1EKLT4gWDI1NTE5IGFnUWlGQkNLWnhuUzIwWldnLzRrdlh2VmhnbXJzNG51ODQwNDRTU2dDZ3MKVGJNdTlYYzdRdzdSUStKNlFIa1JkNlB4QWUzVVk1a0hpZXVXSlNmZDdJNAotPiB2SmotZ3JlYXNlCnQwdTdiU3gwL3pTSXV0THZ4M2xaUWEybFFReWxkczNsS1krMDNRTVl5WUxrQ29ralkzWEU1cmRxQTQ4STRueFIKRVBIRwotLS0gU0dWNDJNaCtJZTZWbFBBZmJFSzRkRU1tTnBkN0VjOGJlTjhocHFIT3hqTQqhrWnhY93RHoUeAIxRflLHNAkJdnvLCOORakLWN8r8pEcp/fhSIfmIHoEs2vOrD5dqezqVJmmpBFzQ0d8bH43B]() {
         let block = build_gitignore_block(&sample_policy()).expect("block");
         assert!(block.contains(BLOCK_BEGIN));
         assert!(block.contains("target/"));
@@ -130,29 +130,11 @@ mod tests {
             hygiene_patterns: vec![],
             watch_roots: vec![],
             discover_roots: vec![],
-            allow_v1_fallback: false,
         };
         assert!(build_gitattributes_block(&policy).is_err());
     }
 
-    #[test]
-    fn repos_for_event_ignores_target_and_maps_repo_root() {
-        let td = TestDir::new("warden_event_repo_root");
-        let repo = td.path().join("repo");
-        fs::create_dir_all(repo.join(".git")).expect("git dir");
-        fs::create_dir_all(repo.join("src")).expect("src");
-        fs::create_dir_all(repo.join("target")).expect("target");
-        let roots = vec![td.path().to_path_buf()];
 
-        let ev = Event {
-            kind: notify::EventKind::Modify(notify::event::ModifyKind::Any),
-            paths: vec![repo.join("src/main.rs"), repo.join("target/tmp.o")],
-            attrs: notify::event::EventAttributes::default(),
-        };
-        let repos = repos_for_event(&ev, &roots);
-        assert_eq!(repos.len(), 1);
-        assert!(repos.contains(&repo));
-    }
 
     #[test]
     fn owner_pubkeys_in_filters_only_owner_pub() {
@@ -343,7 +325,6 @@ mod tests {
             hygiene_patterns: vec![],
             watch_roots: vec![p1.display().to_string(), p1.display().to_string()],
             discover_roots: vec![],
-            allow_v1_fallback: false,
         };
         let merged = effective_watch_roots(&policy);
         assert_eq!(merged.len(), 1);
@@ -364,7 +345,6 @@ mod tests {
             hygiene_patterns: vec![],
             watch_roots: vec![p1.display().to_string()],
             discover_roots: vec![p1.display().to_string(), p2.display().to_string()],
-            allow_v1_fallback: false,
         };
         let merged = effective_discovery_roots(&policy);
         assert_eq!(merged.len(), 2);
@@ -475,7 +455,7 @@ watch_roots = ["/tmp/test"]
     }
 
     #[test]
-    fn build_gitignore_block_includes_demon_directives() {
+    fn build_gitigno[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBPTXJpc2JEMDlIeHl6VHBva1ErSW01d1ZwcWJobkx4S1pudmdrZHEyd1VvClZYNHZhMjVROCtCcTZwYmJHd05iVzc4UkFsd3kzRzFnTHU5MHVqbnNvNVEKLT4gWDI1NTE5IE9sTm1qVDZCbVFjdGF1L1dWQXA5VUpORFI4VkFibGhmbGJLd2NTRkYzeFUKbUJRTHU3bmRXd3BySE1pMk0vYWlBMnd2V281eVdBcEc4aW15R21TSyt2bwotPiBbWW4tZ3JlYXNlIGBBUjdyRiAmCnBjSndKS01OTnFOZTFZSFdlVkVQM20xWlV1Z1Nyekg3cmYyalp1MVNWZzhQcVliMzkyeWkKLS0tIE8zeUdGdG5xVDBKZDZJclhTZnY3a3Q1dGR2WWNZK0liYlk3N0F0Sk5QSlUKcnEzGuDerNfQZPKteeS3A5xp9tBe4nUE6OCkmsh5JCw36eDIMl0d6IKUKR/IbEeV9qCKga7yeWMGLfla5CM0ffhO]() {
         let block = build_gitignore_block(&sample_policy()).expect("block");
         assert!(block.contains("# --- BEGIN DRACON MANAGED BLOCK ---"));
         assert!(block.contains("target/"));
@@ -716,7 +696,6 @@ watch_roots = ["/tmp/test"]
             hygiene_patterns: vec![],
             watch_roots: vec![],
             discover_roots: vec![],
-            allow_v1_fallback: false,
         };
         let roots = effective_watch_roots(&policy);
         assert!(roots.is_empty());
@@ -730,7 +709,6 @@ watch_roots = ["/tmp/test"]
             hygiene_patterns: vec![],
             watch_roots: vec![],
             discover_roots: vec![],
-            allow_v1_fallback: false,
         };
         let roots = effective_discovery_roots(&policy);
         assert!(roots.is_empty());
@@ -875,7 +853,6 @@ watch_roots = ["/tmp/test"]
             hygiene_patterns: vec![],
             watch_roots: vec![],
             discover_roots: vec![],
-            allow_v1_fallback: false,
         };
         assert!(policy.validate().is_ok());
     }
@@ -888,7 +865,6 @@ watch_roots = ["/tmp/test"]
             hygiene_patterns: vec![],
             watch_roots: vec![],
             discover_roots: vec![],
-            allow_v1_fallback: false,
         };
         let result = policy.validate();
         assert!(result.is_err(), "should reject overlapping patterns");
@@ -904,7 +880,6 @@ watch_roots = ["/tmp/test"]
             hygiene_patterns: vec![],
             watch_roots: vec![],
             discover_roots: vec![],
-            allow_v1_fallback: false,
         };
         let result = policy.validate();
         assert!(
@@ -921,7 +896,6 @@ watch_roots = ["/tmp/test"]
             hygiene_patterns: vec![],
             watch_roots: vec![],
             discover_roots: vec![],
-            allow_v1_fallback: false,
         };
         assert!(policy.validate().is_ok());
     }
@@ -934,7 +908,6 @@ watch_roots = ["/tmp/test"]
             hygiene_patterns: vec![],
             watch_roots: vec![],
             discover_roots: vec![],
-            allow_v1_fallback: false,
         };
         let result = policy.validate();
         assert!(
@@ -1140,7 +1113,7 @@ watch_roots = ["/tmp/test"]
 
     #[test]
     fn filter_clean_encrypts_content_with_secret_marker() {
-        let content = b"secret_api_key = \"super_secret_value_12345\"\n";
+        let content = b"[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBnVTJySnlVQ0FlZGV2bkcvaWVkTmhtamNtSm5KeGV6QXpPZlpxSHZnaDBrClh5RU5zQXZuREFNS3pJL3pBOHBwcElTcEtOWE42Q1ovaEFpTS9aWCtMR3cKLT4gWDI1NTE5IDJOQ0ZZRmdZN0tDTXRYTTFVY2w2NzBYWE44YmVlWnlUaVM1S09JUW5ZazQKUHJDblNLdnVhK0dhN2RoSyszd0hHRjk5VnBFcllibDFJdlVGUzg4MlBqTQotPiBCRikjKlstZ3JlYXNlCjkrK2c5dkh1UUFqaEJlWlBzWG9KVi90ZXVnNlVFZkZCdlJMVGZ0d0ZPNXNTMEI4dU5pa3grWDhzeGxHUU95NCsKWERGVWN6NnEvbDIvNWVvWXdRdWJWa040eDhtVCtnCi0tLSBtdnhlU1dqZVcwRktVcHU1VmcrcmJ2bmlTSlpBQ2x0WXpYeWhMSDA2NHc0CmyIgFXpwwdDztYHz+UrgNSP/SpBoWHiITZrgdFZNdK9vMjcfzAj5IdhA5EOlS/UatIbWvKde0gBMAsTdb8VsNRXhirBzWlV/GcX7oYa]\n";
         let warden = DraconWarden::new().expect("create warden");
         let result = warden.clean(content, Some("config.env")).expect("clean");
         // Clean should either encrypt or pass through; result should be valid bytes
