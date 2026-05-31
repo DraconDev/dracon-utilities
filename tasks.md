@@ -170,3 +170,87 @@ cargo test --workspace     → 656 pass, 0 fail
 | `dracon-sync/src/git/status.rs` | Removed `IndexLock::bypass()` |
 | `dracon-sync/dracon-sync.example.toml` | Added TOML ordering warning, removed `todo_commit_messages` |
 | `install.sh` | Added sha256sum output |
+
+---
+
+## Warden Filter Expansion Strategy
+
+### Problem
+
+Currently the warden only encrypts files matching `protected_patterns` (`.env`, `config.json`, `*.pem`, etc.). Secrets hardcoded in source code (Rust, Python, TypeScript, shell scripts) pass through unencrypted. The `SecretScanner` with 50+ regex patterns exists but is never applied to code files because `filter=dracon` isn't set for them.
+
+### Goal
+
+Every `git add` should scan file content for secrets and encrypt any found — regardless of file type. No plaintext secrets should ever reach a git commit.
+
+### Strategy: Expand filter + daemon detection
+
+**Phase 1: Expand `.gitattributes` patterns**
+
+Apply `filter=dracon` to all text-based source and config files:
+
+```gitattributes
+# Source code — scan for hardcoded secrets
+*.rs filter=dracon diff=dracon merge=dracon
+*.py filter=dracon diff=dracon merge=dracon
+*.ts filter=dracon diff=dracon merge=dracon
+*.js filter=dracon diff=dracon merge=dracon
+*.go filter=dracon diff=dracon merge=dracon
+*.sh filter=dracon diff=dracon merge=dracon
+*.yml filter=dracon diff=dracon merge=dracon
+*.yaml filter=dracon diff=dracon merge=dracon
+*.toml filter=dracon diff=dracon merge=dracon
+*.md filter=dracon diff=dracon merge=dracon
+*.sql filter=dracon diff=dracon merge=dracon
+*.env filter=dracon diff=dracon merge=dracon
+*.env.* filter=dracon diff=dracon merge=dracon
+*.json filter=dracon diff=dracon merge=dracon
+*.pem filter=dracon diff=dracon merge=dracon
+*.key filter=dracon diff=dracon merge=dracon
+*.age filter=dracon diff=dracon merge=dracon
+secrets/** filter=dracon diff=dracon merge=dracon
+
+# Exclude build artifacts and binaries
+target/ -filter
+node_modules/ -filter
+*.png -filter
+*.jpg -filter
+*.so -filter
+*.o -filter
+```
+
+**Phase 2: Daemon detects `git add` and ensures filter**
+
+The warden daemon (or a lighter alternative) watches for filesystem events:
+
+1. `git add secret.rs` → inotify fires
+2. Check: does `.gitattributes` have `filter=dracon` for `*.rs`?
+3. If no → set up filter, then re-add the file (so clean filter runs)
+4. If yes → clean filter already scanned content, secrets encrypted
+
+**Phase 3: Hook alternative (if daemon is too heavy)**
+
+Git has no `pre-add` hook, but we can use:
+- `post-index-change` hook — fires after `git add` modifies the index
+- Check if newly added files have unencrypted secrets
+- If yes → re-add with filter
+
+This is reactive (secret is briefly in the index) but catches it before commit.
+
+### Implementation Plan
+
+1. Update warden policy to include source code patterns in `protected_patterns`
+2. Update `build_gitattributes_block()` to include new patterns
+3. Update `ensure_warden_filter()` in sync to include new patterns
+4. Add `post-index-change` git hook as lightweight alternative to daemon
+5. Test: create repo, add file with hardcoded AWS key, verify encryption
+
+### Decision: Daemon vs Hook
+
+| Approach | Pros | Cons |
+|----------|------|------|
+| **Daemon** | Catches at `git add` time, proactive | 24/7 process, resource usage |
+| **Post-index hook** | Lightweight, no daemon | Reactive (brief window), per-repo setup |
+| **Both** | Defense in depth | More complexity |
+
+**Recommendation:** Start with post-index hook (lightweight, no daemon). Add daemon later if the hook proves insufficient.
