@@ -73,21 +73,21 @@ Sync daemon:
 
 #### Warden: Add `setup-hooks` command
 
-- [ ] Add `SetupHooks` variant to `Command` enum in `dracon-warden/src/main.rs`
-- [ ] Implement `run_setup_hooks()`:
+- [x] Add `SetupHooks` variant to `Command` enum in `dracon-warden/src/main.rs`
+- [x] Implement `run_setup_hooks()`:
   - Create `~/.config/git/hooks/` directory if missing
   - Write `pre-commit` hook script that validates `filter=dracon` in `.gitattributes` and `filter.dracon.clean` in git config
   - Set executable permissions (`chmod +x`)
   - Run `git config --global core.hooksPath ~/.config/git/hooks/`
   - Print confirmation
-- [ ] Add `--global` flag (default) and `--local` flag to `setup-hooks` command
+- [x] Add `--global` flag (default) and `--local` flag to `setup-hooks` command
   - `--global`: sets `core.hooksPath` globally, hooks apply to all repos
   - `--local`: installs hooks into a specific repo's `.git/hooks/`, sets `core.hooksPath` locally
-- [ ] Add help text and examples to clap
+- [x] Add help text and examples to clap
 
 #### Warden: Write pre-commit hook
 
-- [ ] Create hook script (written by `setup-hooks`):
+- [x] Create hook script (written by `setup-hooks`):
   ```bash
   #!/bin/sh
   # Validates warden filter is configured before commit
@@ -114,15 +114,15 @@ Sync daemon:
     exit 1
   fi
   ```
-- [ ] Hook checks three preconditions:
+- [x] Hook checks three preconditions:
   1. `.gitattributes` contains `filter=dracon`
   2. `git config filter.dracon.clean` is set
   3. `dracon-warden` binary is on PATH
-- [ ] If any check fails: print clear error with fix command, exit non-zero (blocks commit)
+- [x] If any check fails: print clear error with fix command, exit non-zero (blocks commit)
 
 #### Warden: Add `pre-push` hook
 
-- [ ] Write `pre-push` hook script:
+- [x] Write `pre-push` hook script:
   ```bash
   #!/bin/sh
   # Defense-in-depth: scan push for plaintext secrets
@@ -137,19 +137,19 @@ Sync daemon:
     exit 1
   }
   ```
-- [ ] Only fires if pre-commit was bypassed with `--no-verify`
-- [ ] Scans the diff being pushed for common secret patterns (AWS keys, PEM headers, password assignments)
-- [ ] Pattern list should be minimal and non-chatty — only real secrets, not false positives
+- [x] Only fires if pre-commit was bypassed with `--no-verify`
+- [x] Scans the diff being pushed for common secret patterns (AWS keys, PEM headers, password assignments)
+- [x] Pattern list should be minimal and non-chatty — only real secrets, not false positives
 
 #### Warden: Update `harden_repo()` to install hooks
 
-- [ ] After setting up `.gitattributes` and filter config, also run hook installation
-- [ ] This ensures `dracon-warden once <repo>` both configures the filter AND installs the hook
-- [ ] Only install if not already present (check for hook file existence)
+- [x] After setting up `.gitattributes` and filter config, also run hook installation
+- [x] This ensures `dracon-warden once <repo>` both configures the filter AND installs the hook
+- [x] Only install if not already present (check for hook file existence)
 
 #### Warden: Remove or deprecate daemon
 
-- [ ] Mark `daemon` command as deprecated in help text
+- [x] Mark `daemon` command as deprecated in help text
 - [ ] Keep daemon code functional for backward compatibility but not required
 - [ ] Update `dracon-warden.service` systemd unit:
   - Option A: Remove the service entirely from `install.sh`
@@ -161,23 +161,23 @@ Sync daemon:
 
 #### Warden: Add to `install.sh`
 
-- [ ] Add `setup-hooks` call to `install.sh` after binary installation
-- [ ] Ensure `core.hooksPath` is set globally during install
-- [ ] One-time setup — no per-repo action needed
+- [x] Add `setup-hooks` call to `install.sh` after binary installation
+- [x] Ensure `core.hooksPath` is set globally during install
+- [x] One-time setup — no per-repo action needed
 
 #### Sync: Remove `ensure_warden_filter()`
 
-- [ ] Delete `ensure_warden_filter()` function from `dracon-sync/src/sync.rs` (lines 1367-1405)
-- [ ] Remove the call at line 1851 in `stage_commit_and_push()`
-- [ ] Remove any warden-related imports or references
-- [ ] Sync becomes completely warden-unaware — no subprocess calls, no validation
+- [x] Delete `ensure_warden_filter()` function from `dracon-sync/src/sync.rs` (lines 1367-1405)
+- [x] Remove the call at line 1851 in `stage_commit_and_push()`
+- [x] Remove any warden-related imports or references
+- [x] Sync becomes completely warden-unaware — no subprocess calls, no validation
 
 #### Migration
 
-- [ ] Existing repos with warden filter already configured continue working (hooks are additive)
-- [ ] Existing repos without hooks get them on next `dracon-warden once` or install
-- [ ] No breaking changes — old filter config still works, hooks are new enforcement layer
-- [ ] Update `AGENTS.md` to reflect new architecture
+- [x] Existing repos with warden filter already configured continue working (hooks are additive)
+- [x] Existing repos without hooks get them on next `dracon-warden once` or install
+- [x] No breaking changes — old filter config still works, hooks are new enforcement layer
+- [x] Update `AGENTS.md` to reflect new architecture
 
 #### Testing
 
@@ -185,7 +185,7 @@ Sync daemon:
 - [ ] Test: `dracon-warden once <repo>` → filter configured + hook installed → commit succeeds
 - [ ] Test: delete `.gitattributes` filter entry → commit blocked with clear error
 - [ ] Test: delete git config filter entry → commit blocked with clear error
-- [ ] Test: `--no-verify` bypasses hook (expected — user chose to skip)
+- [ ] Test: `--no-verify` bypasses pre-commit hook (expected — user chose to skip)
 - [ ] Test: `setup-hooks --local` installs to specific repo
 - [ ] Test: `setup-hooks --global` sets global `core.hooksPath`
 - [ ] Test: `--no-verify` bypasses pre-commit but pre-push catches plaintext secrets
@@ -194,8 +194,8 @@ Sync daemon:
 
 #### Documentation
 
-- [ ] Update `AGENTS.md` — remove warden daemon dependency from sync section
+- [x] Update `AGENTS.md` — remove warden daemon dependency from sync section
 - [ ] Update `dracon-warden.example.toml` — add `setup-hooks` documentation
 - [ ] Add `SETUP.md` or section in README for standalone warden deployment
 - [ ] Document server deployment: copy binary, run `dracon-warden setup-hooks`, done
-- [ ] Document the two hooks: pre-commit (core guarantee) and pre-push (defense-in-depth)
+- [x] Document the two hooks: pre-commit (core guarantee) and pre-push (defense-in-depth)

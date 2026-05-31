@@ -2344,10 +2344,10 @@ fn install_hooks_for_repo(repo: &Path) -> Result<()> {
     {
         use std::os::unix::fs::PermissionsExt;
         let perms = fs::Permissions::from_mode(0o755);
-        if !pre_commit_path.exists() {
+        if pre_commit_path.exists() {
             fs::set_permissions(&pre_commit_path, perms.clone())?;
         }
-        if !pre_push_path.exists() {
+        if pre_push_path.exists() {
             fs::set_permissions(&pre_push_path, perms)?;
         }
     }

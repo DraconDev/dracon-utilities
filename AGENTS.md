@@ -90,13 +90,13 @@ Services are in `~/.config/systemd/user/`:
 |---------|--------|---------|
 | dracon-sync.service | dracon-sync daemon | Git sync automation |
 | dracon-system-guard.service | dracon-system guard daemon | Disk/process protection |
-| dracon-warden.service | dracon-warden daemon | Security hardening |
+| dracon-warden.service | dracon-warden daemon | Security hardening (optional — hooks are primary) |
 
 ```bash
 # Restart after install (install.sh does this automatically)
 systemctl --user restart dracon-sync.service
 systemctl --user restart dracon-system-guard.service
-systemctl --user restart dracon-warden.service
+systemctl --user restart dracon-warden.service  # optional
 ```
 
 ## Systemd Service Files
@@ -472,7 +472,7 @@ auto_publish = false  # master toggle (default: off)
 [[publish_targets]]
 name = "crates-io"
 registry = "crates-io"    # crates-io | npm | pypi
-[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB6WWR6cHlROXpubGJ6OSt4ZUoyVUhMd1VIK1pXc3p1Zk0vdVpwQmpzWVYwCnNzdzRRbElPNzF4RVRmaHo3cFhuYVQ5MlRYQnVzR3FHcDJ1WDRFRm9Kb0EKLT4gWDI1NTE5IHRVWTNXeWk2a05CZ2pKd3pwd0pma1ZnQ2xvTjUwbmN4UGJFdUhicmh1Mk0KeDN6R051Q3F0SUszcTZOOGdqSlRxbmZZZGtyNXpudFZOa1VJQU9DZW0wVQotPiBDbCUkeXotZ3JlYXNlIGBXKGJNIkkgbD8nOiI7VQowTWVrcWFKZHA0d0poZHZxeHcKLS0tIEc0THc1UTI1QjVKdCs1UDRKY25KR3FJM2grOGVYak9JWXZINjhkV2s1VXMK43S4Labo/1DZdt3PINecGNErffAV5b1DO83Xl0pDbJ3weQlF4doZKk0w6Zu9eLiQjspDscWZh4/iaixGOF+dr/sGDAZP]
+[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA4bXJ2YjA1aDJVNkJibXVnYmo2WTVHeWRZczZKNWVPQmNha05qVXk5ajNjCk8rOU85MzhzNUpRazQ3aGJZVXpzODJKRHduQzFqNFNlZDZ0OVNuSXYvcjQKLT4gWDI1NTE5IHZVZXVHcDhnWXhMU3JqMGxxdVhENnA2V1JTK3NnYllRa2xDc3dGVDZweHcKZ2ovd2ZIVlNEQ0JCZC8zQmkvNkQ1MGQvK2ZtVXhYbzBxZ0pmRWVYMFB6SQotPiBzLlNfSiwtZ3JlYXNlIFdHJ0tyTyYgfilBIHcKZ0NTd2c0V3pOZTBIeUI3WGxPQnVCZk9MQnZ4TmxZN3Ftb2RRNVdsUzVpT2VCeFQ3ekNFT3prMzBMUUxVdW1RSApFU1pIYW5TMGRmNjJ6RkhaRitRb0JFVkVtL3Bldm0xdldlR2pMOVJBMkRZYUlHcWwvbDAKLS0tIGw4SzJua0xkS0FpSGRMZDZ0bWJsQm03T3VkS1lCZkx1OFRmRWMydU5BRkEKc3Nee6dgjB6NlG2lNEAPYN4werIWf8ZI0JjK7clOQTQYnQ8Q8vUz0TNqaHlSwIV6GYa5LA0vMZ2z/z4tS3TQYltHyKEW]
 publish_timeout_secs = 300
 ```
 
@@ -554,16 +554,21 @@ Commands:
 ```
 dracon-warden [OPTIONS] <COMMAND>
 Commands:
-  daemon         Run forever with filesystem event debounce
+  daemon         [DEPRECATED] Run forever with filesystem event debounce
   once           Run one hardening pass [repo]
   status         Show resolved policy path and watch roots
   filter-clean   Git filter clean (stdin -> stdout)
   filter-smudge  Git filter smudge (stdin -> stdout)
-  scrub-markers   Scan DRACON_SECRET markers [--apply] [repo]
+  scrub-markers  Scan DRACON_SECRET markers [--apply] [repo]
   resmudge       Fix ciphertext stuck in working tree [--apply] [repo]
   repair         System-wide repair pass [--dry-run] [--strict] [repo]
   keygen         Generate new age keypair
+  setup-hooks    Install git hooks for encryption enforcement [--global|--local] [repo]
 ```
+
+**Git hooks (installed by `setup-hooks`):**
+- `pre-commit`: Blocks commits if warden filter is not configured
+- `pre-push`: Scans for plaintext secrets as defense-in-depth (catches `--no-verify` bypass)
 
 ## AI Configuration
 
