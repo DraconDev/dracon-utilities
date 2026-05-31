@@ -5,8 +5,8 @@
 use anyhow::{Context, Result};
 use clap::{ArgAction, Parser, Subcommand};
 pub(crate) use dracon_security_kit::DraconWarden;
-use globset::GlobSetBuilder;
-
+use globset::{Glob, GlobSet, GlobSetBuilder};
+use notify::{Event, RecursiveMode, Watcher};
 use secrecy::ExposeSecret;
 use serde::Deserialize;
 use std::collections::BTreeSet;
@@ -14,9 +14,11 @@ use std::fs;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command as ProcessCommand;
-use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
+use std::sync::mpsc;
+use std::sync::Arc;
 use std::sync::Mutex;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use zeroize::Zeroizing;
 
 static ROLLING_LOG: std::sync::OnceLock<Mutex<Vec<String>>> = std::sync::OnceLock::new();
@@ -281,9 +283,17 @@ pub(crate) struct WardenPolicy {
     watch_roots: Vec<String>,
     #[serde(default)]
     discover_roots: Vec<String>,
+    #[serde(default)]
+    #[allow(dead_code)]
+    allow_v1_fallback: bool,
 }
 
 impl WardenPolicy {
+    #[allow(dead_code)]
+    pub(crate) fn apply_global_flags(&self) {
+        dracon_security_kit::set_allow_v1_fallback(self.allow_v1_fallback);
+    }
+
     pub(crate) fn load(path: &Path) -> Result<Self> {
         let content = fs::read_to_string(path)
             .with_context(|| format!("failed to read policy {}", path.display()))?;
@@ -1125,6 +1135,51 @@ where
     Ok(())
 }
 
+#[allow(dead_code)]
+fn repo_root_for_path(path: &Path, roots: &[PathBuf]) -> Option<PathBuf> {
+    if !roots.iter().any(|r| path.starts_with(r)) {
+        return None;
+    }
+
+    let mut cur = if path.is_file() {
+        path.parent().map(Path::to_path_buf)?
+    } else {
+        path.to_path_buf()
+    };
+    loop {
+        if cur.join(".git").exists() {
+            return Some(cur);
+        }
+        if !cur.pop() {
+            break;
+        }
+    }
+    None
+}
+
+#[allow(dead_code)]
+pub(crate) fn repos_for_event(event: &Event, roots: &[PathBuf]) -> BTreeSet<PathBuf> {
+    let ignore_fragments = [
+        "/target/",
+        "/node_modules/",
+        "/.cache/",
+        "/.git/objects/",
+        "/.git/index.lock",
+    ];
+
+    let mut repos = BTreeSet::new();
+    for p in &event.paths {
+        let s = p.to_string_lossy();
+        if ignore_fragments.iter().any(|f| s.contains(f)) {
+            continue;
+        }
+        if let Some(repo) = repo_root_for_path(p, roots) {
+            repos.insert(repo);
+        }
+    }
+    repos
+}
+
 pub(crate) fn run_keygen() -> Result<()> {
     let home = dirs::home_dir().context("home directory not found")?;
 
@@ -1291,6 +1346,394 @@ fn find_git_repo(path: &Path) -> Option<PathBuf> {
 }
 
 #[allow(dead_code)]
+fn run_daemon(policy_path: PathBuf) -> Result<()> {
+    let policy = WardenPolicy::load(&policy_path)?;
+    policy.apply_global_flags();
+    policy.validate()?;
+    let roots = effective_watch_roots(&policy);
+    if roots.is_empty() {
+        return Err(anyhow::anyhow!("no valid watch_roots in policy"));
+    }
+
+    let (tx, rx) = mpsc::channel::<notify::Result<Event>>();
+    let mut watcher = notify::recommended_watcher(move |res| {
+        let _ = tx.send(res);
+    })?;
+
+    let mut watched = 0usize;
+    for root in &roots {
+        match watcher.watch(root, RecursiveMode::Recursive) {
+            Ok(()) => watched += 1,
+            Err(e) => eprintln!("⚠️ failed to watch {}: {}", root.display(), e),
+        }
+    }
+    if watched == 0 {
+        return Err(anyhow::anyhow!("no watch roots could be registered"));
+    }
+
+    println!("🛡️ dracon-warden active. Monitoring {:?}", roots);
+
+    let mut last_run = Instant::now();
+    let mut last_sweep = Instant::now();
+    let debounce = Duration::from_secs(2);
+    let sweep_every = Duration::from_secs(300);
+    let mut pending_repos = BTreeSet::new();
+
+    let shutdown = Arc::new(AtomicBool::new(false));
+    let shutdown_sigterm = shutdown.clone();
+    let shutdown_sigint = shutdown.clone();
+    let reload = Arc::new(AtomicBool::new(false));
+    let reload_sighup = reload.clone();
+
+    tokio::spawn(async move {
+        if let Ok(mut sig) =
+            tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+        {
+            sig.recv().await;
+            veprintln!(1, "warden: received SIGTERM, shutting down gracefully...");
+            shutdown_sigterm.store(true, Ordering::SeqCst);
+        } else {
+            eprintln!("warden: failed to set up SIGTERM handler");
+        }
+    });
+
+    tokio::spawn(async move {
+        if let Ok(mut sig) =
+            tokio::signal::unix::signal(tokio::signal::unix::SignalKind::interrupt())
+        {
+            sig.recv().await;
+            veprintln!(1, "warden: received SIGINT, shutting down gracefully...");
+            shutdown_sigint.store(true, Ordering::SeqCst);
+        } else {
+            eprintln!("warden: failed to set up SIGINT handler");
+        }
+    });
+
+    tokio::spawn(async move {
+        if let Ok(mut sig) = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::hangup())
+        {
+            sig.recv().await;
+            veprintln!(1, "warden: received SIGHUP, reloading policy...");
+            reload_sighup.store(true, Ordering::SeqCst);
+        } else {
+            eprintln!("warden: failed to set up SIGHUP handler");
+        }
+    });
+
+    if let Err(e) = harden_all(&policy, false) {
+        eprintln!("⚠️ initial hardening pass failed: {}", e);
+    }
+
+    // Initial backfill sweep to add headers to .env files missing them.
+    let roots = effective_discovery_roots(&policy);
+    let discovered_repos = discover_git_repos_local(&roots);
+    if let Err(e) = backfill_env_headers_repos(&discovered_repos, true) {
+        eprintln!("⚠️ initial backfill sweep failed: {}", e);
+    }
+
+    while !shutdown.load(Ordering::SeqCst) {
+        if reload.load(Ordering::SeqCst) {
+            reload.store(false, Ordering::SeqCst);
+            veprintln!(1, "warden: reloading policy on SIGHUP...");
+            match WardenPolicy::load(&policy_path) {
+                Ok(p) => {
+                    p.apply_global_flags();
+                    if let Err(e) = p.validate() {
+                        eprintln!("warden: policy invalid on reload: {}", e);
+                    } else {
+                        let roots = effective_discovery_roots(&p);
+                        let discovered_repos = discover_git_repos_local(&roots);
+                        if let Err(e) = backfill_env_headers_repos(&discovered_repos, true) {
+                            eprintln!("warden: SIGHUP backfill failed: {}", e);
+                        }
+                        if let Err(e) = harden_all(&p, false) {
+                            eprintln!("warden: SIGHUP harden failed: {}", e);
+                        }
+                    }
+                }
+                Err(e) => eprintln!("warden: SIGHUP policy reload failed: {}", e),
+            }
+        }
+
+        match rx.recv_timeout(Duration::from_secs(1)) {
+            Ok(Ok(event)) => {
+                pending_repos.extend(repos_for_event(&event, &roots));
+            }
+            Ok(Err(e)) => {
+                eprintln!("⚠️ watch error: {}", e);
+                emit_event(&DraconEvent::new(
+                    "warden",
+                    EventSeverity::Warn,
+                    "watch",
+                    format!("error: {e}"),
+                ));
+            }
+            Err(mpsc::RecvTimeoutError::Timeout) => {}
+            Err(mpsc::RecvTimeoutError::Disconnected) => {
+                break;
+            }
+        }
+
+        if !pending_repos.is_empty() && last_run.elapsed() >= debounce {
+            let policy = match WardenPolicy::load(&policy_path) {
+                Ok(p) => p,
+                Err(e) => {
+                    eprintln!("warden: policy load failed: {}", e);
+                    emit_event(&DraconEvent::new(
+                        "warden",
+                        EventSeverity::Error,
+                        "policy",
+                        format!("load failed: {e}"),
+                    ));
+                    continue;
+                }
+            };
+            if let Err(e) = policy.validate() {
+                eprintln!("warden: policy invalid: {}", e);
+                continue;
+            }
+            let repos = std::mem::take(&mut pending_repos);
+            let repos_vec = repos.into_iter().collect::<Vec<_>>();
+            if let Err(e) = scrub_markers(&policy, &repos_vec, true) {
+                eprintln!("warden: scrub_markers failed: {}", e);
+            }
+            if let Err(e) = harden_repos(&policy, repos_vec, false) {
+                eprintln!("warden: harden_repos failed: {}", e);
+            }
+            last_run = Instant::now();
+        }
+
+        if last_sweep.elapsed() >= sweep_every {
+            let policy = match WardenPolicy::load(&policy_path) {
+                Ok(p) => p,
+                Err(e) => {
+                    eprintln!("⚠️ policy load failed in sweep: {}", e);
+                    emit_event(&DraconEvent::new(
+                        "warden",
+                        EventSeverity::Warn,
+                        "policy",
+                        format!("sweep load failed: {e}"),
+                    ));
+                    last_sweep = Instant::now();
+                    continue;
+                }
+            };
+            if let Err(e) = policy.validate() {
+                eprintln!("warden: policy invalid in sweep: {}", e);
+                last_sweep = Instant::now();
+                continue;
+            }
+            if let Err(e) = harden_all(&policy, false) {
+                eprintln!("warden: harden_all failed in sweep: {}", e);
+            }
+            let roots = effective_discovery_roots(&policy);
+            let discovered_repos = discover_git_repos_local(&roots);
+            if let Err(e) = backfill_env_headers_repos(&discovered_repos, true) {
+                eprintln!("warden: backfill sweep failed: {}", e);
+            }
+            last_sweep = Instant::now();
+        }
+    }
+
+    veprintln!(1, "warden: shutdown complete");
+    Ok(())
+}
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    let cli = Cli::parse();
+    VERBOSITY.store(cli.verbose, Ordering::SeqCst);
+
+    match cli.cmd {
+        Command::FilterClean { path } => {
+            run_filter(true, path.as_deref())?;
+        }
+        Command::FilterSmudge { path } => {
+            run_filter(false, path.as_deref())?;
+        }
+        Command::Status => {
+            let policy_path = resolve_policy_path_local()?;
+            let policy = WardenPolicy::load(&policy_path)?;
+            policy.validate()?;
+            println!("📜 Policy: {}", policy_path.display());
+            println!("🛡️  Watch roots: {:?}", effective_watch_roots(&policy));
+            if !policy.discover_roots.is_empty() {
+                println!(
+                    "🧭 Discovery roots: {:?}",
+                    effective_discovery_roots(&policy)
+                );
+            }
+            println!(
+                "🔑 Pubkey source: {}",
+                resolve_local_pubkey_path()
+                    .map(|p| p.display().to_string())
+                    .unwrap_or_else(|| "NOT_FOUND (set DRACON_OWNER_PUBKEY)".to_string())
+            );
+        }
+        Command::Once { repo } => {
+            let policy_path = resolve_policy_path_local()?;
+            let policy = WardenPolicy::load(&policy_path)?;
+            policy.validate()?;
+            if let Some(r) = repo {
+                scrub_markers(&policy, std::slice::from_ref(&r), true)?;
+                harden_repos(&policy, vec![r], true)?;
+            } else {
+                harden_all(&policy, true)?;
+            }
+        }
+        Command::Daemon => {
+            eprintln!("⚠️  The 'daemon' command is deprecated.");
+            eprintln!("    Hook-based enforcement (pre-commit + pre-push) is now the primary security layer.");
+            eprintln!("    Use 'dracon-warden setup-hooks' to install hooks globally.");
+            eprintln!("    Use 'dracon-warden once <repo>' for one-time hardening.");
+            std::process::exit(0);
+        }
+        Command::ScrubMarkers { apply, repo } => {
+            let policy_path = resolve_policy_path_local()?;
+            let policy = WardenPolicy::load(&policy_path)?;
+            policy.validate()?;
+            let roots = effective_discovery_roots(&policy);
+            let repos = if let Some(r) = repo {
+                vec![r]
+            } else {
+                discover_git_repos_local(&roots)
+            };
+            scrub_markers(&policy, &repos, apply)?;
+        }
+        Command::Resmudge { apply, repo } => {
+            let policy_path = resolve_policy_path_local()?;
+            let policy = WardenPolicy::load(&policy_path)?;
+            policy.validate()?;
+            let roots = effective_discovery_roots(&policy);
+            let repos = if let Some(r) = repo {
+                vec![r]
+            } else {
+                discover_git_repos_local(&roots)
+            };
+            let _ = resmudge_repos(&policy, &repos, apply)?;
+        }
+        Command::Repair {
+            dry_run,
+            strict,
+            repo,
+        } => {
+            let policy_path = resolve_policy_path_local()?;
+            let policy = WardenPolicy::load(&policy_path)?;
+            policy.validate()?;
+            let roots = effective_discovery_roots(&policy);
+            let repos = if let Some(r) = repo {
+                vec![r]
+            } else {
+                discover_git_repos_local(&roots)
+            };
+
+            if !dry_run {
+                // Hardening (managed blocks + marker scrub)
+                scrub_markers(&policy, &repos, true)?;
+                harden_repos(&policy, repos.clone(), true)?;
+                // Fix ciphertext stuck in worktree (if identities allow).
+                resmudge_repos(&policy, &repos, true)?;
+                // Backfill .env files with Dracon Warden headers if missing.
+                backfill_env_headers_repos(&repos, true)?;
+            }
+
+            // Always report remaining ciphertext markers.
+            let (found, _changed) = resmudge_repos(&policy, &repos, false)?;
+            // Always report .env files missing headers (even in dry_run).
+            let (_, _) = backfill_env_headers_repos(&repos, false)?;
+            if strict && found > 0 {
+                return Err(anyhow::anyhow!(
+                    "ciphertext markers remain in working tree (count={})",
+                    found
+                ));
+            }
+        }
+        Command::Keygen => {
+            run_keygen()?;
+        }
+        Command::SetupHooks { global: _, local, repo } => {
+            let mode = if local {
+                HookMode::Local
+            } else {
+                HookMode::Global
+            };
+            run_setup_hooks(mode, repo.as_deref())?;
+        }
+    }
+
+    Ok(())
+}
+
+pub(crate) fn build_globset(patterns: &[String]) -> Result<GlobSet> {
+    let mut b = GlobSetBuilder::new();
+    for p in patterns {
+        // globset expects / separators
+        let pat = p.replace('\\', "/");
+        b.add(Glob::new(&pat).with_context(|| format!("invalid glob pattern: {p}"))?);
+    }
+    Ok(b.build()?)
+}
+
+pub(crate) fn is_marker_string(s: &str) -> bool {
+    s.contains("[DRACON_SECRET:")
+}
+
+pub(crate) fn marker_prefix_at(s: &str, idx: usize) -> Option<&'static str> {
+    if s[idx..].starts_with("[DRACON_SECRET:") {
+        Some("[DRACON_SECRET:")
+    } else {
+        None
+    }
+}
+
+// Best-effort salvage for invalid JSON where marker tokens were injected as raw values/keys.
+// This only touches marker substrings; everything else is preserved.
+pub(crate) fn salvage_invalid_json_markers(content: &str) -> Option<String> {
+    if !is_marker_string(content) {
+        return None;
+    }
+
+    let mut out = String::with_capacity(content.len());
+    let mut i = 0usize;
+    let bytes = content.as_bytes();
+    while i < content.len() {
+        if marker_prefix_at(content, i).is_none() {
+            out.push(bytes[i] as char);
+            i += 1;
+            continue;
+        }
+
+        // Find closing bracket of marker token.
+        let Some(end_rel) = content[i..].find(']') else {
+            // malformed marker; stop salvage
+            return None;
+        };
+        let end = i + end_rel; // points at ']'
+
+        // Decide whether marker was used as an object key or as a value.
+        // If the next non-ws char after ']' is ':', it's being used as a key.
+        let mut j = end + 1;
+        while j < content.len() && content.as_bytes()[j].is_ascii_whitespace() {
+            j += 1;
+        }
+        let is_key = j < content.len() && content.as_bytes()[j] == b':';
+
+        if is_key {
+            out.push_str("\"__scrubbed__\"");
+        } else {
+            out.push_str("null");
+        }
+
+        i = end + 1;
+    }
+
+    if out != content {
+        Some(out)
+    } else {
+        None
+    }
+}
+
 fn scrub_json_value(v: &mut serde_json::Value) {
     match v {
         serde_json::Value::String(s) if is_marker_string(s) => {
