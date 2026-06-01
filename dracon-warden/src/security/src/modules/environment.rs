@@ -2,18 +2,10 @@
 
 use anyhow::Result;
 
+#[derive(Default)]
 pub struct EnvironmentManager {
     pub variables: std::collections::HashMap<String, String>,
     pub secrets: std::collections::HashMap<String, std::collections::HashMap<String, String>>, // Grouped secrets
-}
-
-impl Default for EnvironmentManager {
-    fn default() -> Self {
-        Self {
-            variables: std::collections::HashMap::new(),
-            secrets: std::collections::HashMap::new(),
-        }
-    }
 }
 
 impl EnvironmentManager {
