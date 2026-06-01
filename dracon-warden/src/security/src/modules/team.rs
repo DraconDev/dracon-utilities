@@ -1,14 +1,11 @@
-//! Team key management and collaboration.
+#! Team operations.
 
-use age::x25519;
-use anyhow::{Context, Result};
-use std::fs;
-use std::path::{Path, PathBuf};
+use anyhow::Result;
 
 use crate::DemonSecurity;
-use crate::TeamKey;
 
 impl DemonSecurity {
+    /// Load a Team Key from ~/demon/teams/<name>.key
     pub fn load_team_key(&self, team_name: &str) -> Result<TeamKey> {
         let home = dirs::home_dir().context("Could not find home directory")?;
         let team_key_path = home
@@ -55,6 +52,8 @@ impl DemonSecurity {
         Ok(TeamKey(key_bytes))
     }
 
+
+    /// Create a new Team (Generates a new Identity, saves to keychain)
     pub fn create_team(&self, team_name: &str) -> Result<()> {
         // Validate name
         if team_name.contains('/') || team_name.contains('\\') || team_name.contains(':') {
@@ -99,6 +98,8 @@ impl DemonSecurity {
         Ok(())
     }
 
+
+    /// Add a new team member by encrypting the repo key for them
     pub fn add_team_member(&self, alias: &str, public_key_str: &str) -> Result<()> {
         let recipient: x25519::Recipient = public_key_str
             .parse()
@@ -132,6 +133,8 @@ impl DemonSecurity {
         Ok(())
     }
 
+
+    /// Create an Invite for a user to join a Team
     pub fn create_team_invite(&self, team_name: &str, user_public_key: &str) -> Result<PathBuf> {
         let team_key = self.load_team_key(team_name)?;
 
@@ -162,6 +165,8 @@ impl DemonSecurity {
         Ok(invite_path)
     }
 
+
+    /// Accept a Team Invite
     pub fn accept_team_invite(&self, invite_path: &Path) -> Result<String> {
         let identity = self
             .master_identities
@@ -239,6 +244,8 @@ impl DemonSecurity {
         Ok(team_name.to_string())
     }
 
+
+    /// Revoke a recipient's access to this repo by removing their key files
     pub fn revoke_recipient(&self, public_key_str: &str) -> Result<()> {
         // SAFETY: Refuse to revoke ANY master identity key.
         for id in &self.master_identities {
@@ -289,6 +296,8 @@ impl DemonSecurity {
         }
     }
 
+
+    /// List all authorized recipients in the current repository
     pub fn list_authorized_recipients(&self) -> Result<Vec<(String, String)>> {
         let repo_root = self.get_repo_root()?;
         let mut recipients = Vec::new();
@@ -330,6 +339,8 @@ impl DemonSecurity {
         Ok(recipients)
     }
 
+
+    /// List all team members (aliases)
     pub fn list_team_members(&self) -> Result<Vec<String>> {
         let repo_root = self.get_repo_root()?;
         let keys_dir = repo_root.join(".git").join("arcane").join("keys");
@@ -356,5 +367,6 @@ impl DemonSecurity {
         }
         Ok(members)
     }
+
 
 }

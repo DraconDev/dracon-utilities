@@ -1,14 +1,13 @@
-//! Key generation and management.
+#! Keygen operations.
 
-use age::x25519;
-use anyhow::{Context, Result};
-use std::fs;
-use std::os::unix::fs::OpenOptionsExt;
-use std::path::Path;
+use anyhow::Result;
 
 use crate::DemonSecurity;
 
 impl DemonSecurity {
+    /// Explicitly generate and save a new Master Identity
+    /// CRITICAL: This should only ever be called ONCE per user.
+    /// If an identity already exists, this will refuse to overwrite it.
     pub fn generate_master_identity(&mut self) -> Result<()> {
         let home = dirs::home_dir().context("Could not find home directory")?;
         let identity_path = home.join(".demon").join("identity.age");
@@ -105,6 +104,8 @@ impl DemonSecurity {
         Ok(())
     }
 
+
+    /// Generate a new Machine Identity (Private Key, Public Key)
     pub fn generate_machine_identity() -> (String, String) {
         let identity = x25519::Identity::generate();
         let pub_key = identity.to_public().to_string();
@@ -113,6 +114,8 @@ impl DemonSecurity {
         (priv_key.to_string(), pub_key)
     }
 
+
+    /// Authorize a Machine (Public Key) to access this repo
     pub fn whitelist_machine(&self, public_key_str: &str) -> Result<()> {
         let recipient: x25519::Recipient = public_key_str
             .parse()
@@ -142,6 +145,9 @@ impl DemonSecurity {
         Ok(())
     }
 
+
+    /// Ensure the current user's public key is present in the repo keys.
+    /// This prevents "lockout" by ensuring we can always decrypt what we encrypt.
     pub fn ensure_current_user_key(&self) -> Result<()> {
         let repo_root = match self.get_repo_root() {
             Ok(r) => r,
@@ -180,5 +186,6 @@ impl DemonSecurity {
         }
         Ok(())
     }
+
 
 }

@@ -1,16 +1,20 @@
-//! Encryption and decryption operations.
+#! Crypto operations.
 
-use age::x25519;
-use anyhow::{Context, Result};
-use std::io::Cursor;
-use std::path::Path;
+use anyhow::Result;
 
 use crate::DemonSecurity;
 
 impl DemonSecurity {
+    // ============================================================
+    // V2: DIRECT RECIPIENT ENCRYPTION (Standard Age)
+    // ============================================================
+
+    /// V2 Encryption: Encrypt directly to a list of recipients (No RepoKey)
     pub fn encrypt_v2(
         &self,
 
+    /// V2 Decryption: Decrypt using the User's Identities (Try ALL known keys)
+    /// V2 Decryption: Decrypt using the User's Identities (Try ALL known keys)
     pub fn decrypt_v2(&self, encrypted_data: &[u8]) -> Result<Vec<u8>> {
         if self.master_identities.is_empty() {
             return Err(anyhow::anyhow!(
@@ -44,6 +48,8 @@ impl DemonSecurity {
         }
     }
 
+
+    /// Gather all known recipients (Master, Imported, Team, Machine) for encryption.
     pub fn gather_all_recipients(&self) -> Result<Vec<x25519::Recipient>> {
         let master = self
             .master_identities
@@ -107,6 +113,8 @@ impl DemonSecurity {
         Ok(recipients)
     }
 
+
+    /// Unified payload unlocking logic: try ALL known keys.
     pub fn unlock_payload(&self, encrypted_data: &[u8]) -> Result<Vec<u8>> {
         // 1. Try Age (V2) format
         if encrypted_data.starts_with(HEADER_V2_MAGIC) {
@@ -146,6 +154,8 @@ impl DemonSecurity {
         ))
     }
 
+
+    /// Helper for encrypting data to all known recipients.
     pub fn encrypt_v2_for_all(&self, data: &[u8]) -> Result<Vec<u8>> {
         let recipients = self.gather_all_recipients()?;
         let age_recipients: Vec<Box<dyn age::Recipient + Send>> = recipients
@@ -155,6 +165,8 @@ impl DemonSecurity {
         self.encrypt_v2(data, age_recipients)
     }
 
+
+    /// Encrypt data for a specific node (runner) + master keys
     pub fn encrypt_for_node(&self, data: &[u8], node_recipient: &str) -> Result<Vec<u8>> {
         let mut recipients = Vec::new();
 
@@ -178,6 +190,13 @@ impl DemonSecurity {
         self.encrypt_v2(data, age_recipients)
     }
 
+
+    /// Encrypt data using the repo key with AES-256-GCM.
+    ///
+    /// SECURITY NOTE: Uses a random 12-byte nonce per encryption. For very high-volume
+    /// repositories (2^48+ encrypted files with the same repo key), nonce collision
+    /// becomes a meaningful risk for GCM mode. For typical use, the random nonce
+    /// per-file is sufficient. Consider key rotation if your repo will exceed this scale.
     pub fn encrypt_with_repo_key(&self, repo_key: &RepoKey, plaintext: &[u8]) -> Result<Vec<u8>> {
         let key = Key::<Aes256Gcm>::from_slice(&repo_key.0);
         let cipher = Aes256Gcm::new(key);
@@ -197,9 +216,13 @@ impl DemonSecurity {
         Ok(result)
     }
 
+
+    /// Decrypt data using the repo key
     pub fn decrypt_with_repo_key(
         &self,
 
+    /// Decrypt data using the legacy Git Seal V1 format (AES-256-CFB with derived IV).
+    /// WARNING: This format uses a deterministic IV derived from the key (SHA-256 hash → first 16 bytes), which violates AES-CFB security requirements. Using the same IV for multiple encryptions leaks information about plaintext relationships. This format exists for backward compatibility with legacy git-seal ciphertexts. DO NOT use this for new encryptions. If you have ciphertexts created with this format, consider migrating to AES-256-GCM (encrypt_with_repo_key) with random nonces.
     pub fn decrypt_git_seal(&self, repo_key: &RepoKey, ciphertext: &[u8]) -> Result<Vec<u8>> {
         if !is_v1_fallback_allowed() {
             return Err(anyhow::anyhow!(
@@ -238,5 +261,6 @@ impl DemonSecurity {
 
         Ok(plaintext)
     }
+
 
 }

@@ -1,17 +1,20 @@
-//! Git clean/smudge filter pipeline for encryption.
+#! Filter operations.
 
-use anyhow::{Context, Result};
-use std::io::{Read, Write};
-use std::path::Path;
+use anyhow::Result;
 
 use crate::DemonSecurity;
 
 impl DemonSecurity {
+    /// In-situ Clean: Scan for secrets and replace with REDACTED_REGEX tags.
     pub fn smart_clean(&self, content: &str) -> Result<String> {
         let scanner = SecretScanner::new()?;
         self.smart_clean_with_scanner(content, &scanner)
     }
 
+
+    /// Smart Clean with Path Context:
+    /// If the path is in a sensitive directory (e.g. .ssh, .aws) OR force_encrypt is true, encrypt the ENTIRE file.
+    /// Otherwise, use regex-based in-situ encryption (if text).
     pub fn smart_clean_with_path(&self, content: &[u8], path_str: &str) -> Result<Vec<u8>> {
         // 1. Definition of Sensitive Paths (Still used for binary detection)
         let sensitive_dirs = [
@@ -178,6 +181,8 @@ impl DemonSecurity {
         }
     }
 
+
+    /// In-situ Smudge: Decrypt REDACTED_REGEX tags back to plaintext.
     pub fn smart_smudge(&self, content: &str) -> Result<String> {
         let markers = self.secret_tag_prefixes();
         let mut result = String::new();
@@ -230,6 +235,9 @@ impl DemonSecurity {
         Ok(result)
     }
 
+
+    /// Git Clean Filter: Encrypt stdin -> stdout
+    /// V2 Upgrade: Encrypts to ALL known public keys (User + Machines + Teams)
     pub fn seal_clean(&self, file_path: Option<&str>) -> Result<()> {
         use std::io::{Read, Write};
 
@@ -266,46 +274,8 @@ impl DemonSecurity {
         Ok(())
     }
 
-    pub fn seal_smudge(&self, file_path: Option<&str>) -> Result<()> {
-        use std::io::{Read, Write};
 
-        // 1. Read content
-        let mut buffer = Vec::new();
-        if let Some(path) = file_path {
-            let mut file = fs::File::open(path)?;
-            file.read_to_end(&mut buffer)?;
-        } else {
-            std::io::stdin().read_to_end(&mut buffer)?;
-        }
-
-        // 2. Check for V2 (Age) Header
-        if buffer.starts_with(HEADER_V2_MAGIC) {
-            match self.unlock_payload(&buffer) {
-                Ok(plaintext) => {
-                    std::io::stdout().write_all(&plaintext)?;
-                    return Ok(());
-                }
-                Err(e) => {
-                    eprintln!("⚠️ V2 Decryption Failed: {}", e);
-                    // Fallthrough to pass raw (might be intended?)
-                }
-            }
-        }
-
-        // 3. Check for *_SECRET text wrapper format
-        if let Ok(text) = std::str::from_utf8(&buffer) {
-            if self.contains_any_secret_tag(text) {
-                let smudged = self.smart_smudge(text)?;
-                std::io::stdout().write_all(smudged.as_bytes())?;
-                return Ok(());
-            }
-        }
-
-        // 4. Fallback: Pass raw buffer (Plaintext or already decrypted)
-        std::io::stdout().write_all(&buffer)?;
-        Ok(())
-    }
-
+    /// Recursive disk-wide decryption: Replaces all [*_SECRET:...] tags with plaintext in-place.
     pub fn decrypt_path(&self, root: &Path, recursive: bool, dry_run: bool) -> Result<usize> {
         let mut total_restored = 0;
         let mut walk_errors = 0;
@@ -359,7 +329,53 @@ impl DemonSecurity {
         Ok(total_restored)
     }
 
+
+    /// Migrate secret marker prefixes in-place without touching encrypted payload bytes.
+    /// Example: `[OLD_MARKER:...]` -> `[DRACON_SECRET:...]`.
     pub fn migrate_markers_in_path(
         &self,
+
+    /// Git Smudge Filter: Decrypt stdin/file -> stdout
+    /// Gracefully handles: V2 (Direct), V1 (RepoKey), Plaintext, REDACTED_REGEX wrapped
+    pub fn seal_smudge(&self, file_path: Option<&str>) -> Result<()> {
+        use std::io::{Read, Write};
+
+        // 1. Read content
+        let mut buffer = Vec::new();
+        if let Some(path) = file_path {
+            let mut file = fs::File::open(path)?;
+            file.read_to_end(&mut buffer)?;
+        } else {
+            std::io::stdin().read_to_end(&mut buffer)?;
+        }
+
+        // 2. Check for V2 (Age) Header
+        if buffer.starts_with(HEADER_V2_MAGIC) {
+            match self.unlock_payload(&buffer) {
+                Ok(plaintext) => {
+                    std::io::stdout().write_all(&plaintext)?;
+                    return Ok(());
+                }
+                Err(e) => {
+                    eprintln!("⚠️ V2 Decryption Failed: {}", e);
+                    // Fallthrough to pass raw (might be intended?)
+                }
+            }
+        }
+
+        // 3. Check for *_SECRET text wrapper format
+        if let Ok(text) = std::str::from_utf8(&buffer) {
+            if self.contains_any_secret_tag(text) {
+                let smudged = self.smart_smudge(text)?;
+                std::io::stdout().write_all(smudged.as_bytes())?;
+                return Ok(());
+            }
+        }
+
+        // 4. Fallback: Pass raw buffer (Plaintext or already decrypted)
+        std::io::stdout().write_all(&buffer)?;
+        Ok(())
+    }
+
 
 }

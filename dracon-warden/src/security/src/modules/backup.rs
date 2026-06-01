@@ -1,13 +1,13 @@
-//! Backup and restore operations for encrypted files.
+#! Backup operations.
 
-use anyhow::{Context, Result};
-use sha2::{Digest, Sha256};
-use std::fs;
-use std::path::{Path, PathBuf};
+use anyhow::Result;
 
 use crate::DemonSecurity;
 
 impl DemonSecurity {
+    /// Create a secure backup of a file before modification.
+    /// The backup is encrypted with all known keys and stored in ~/demon/backups/
+    /// Returns the path to the backup file.
     pub fn backup_file(&self, file_path: &Path, content: &[u8]) -> Result<PathBuf> {
         let path_str = file_path.to_string_lossy();
         if path_str.contains("demon/backups") || path_str.contains("arcane/backups") {
@@ -45,6 +45,9 @@ impl DemonSecurity {
         Ok(backup_path)
     }
 
+
+    /// Restore a file from the latest secure backup.
+    /// Finds the backup matching the file path hash and decrypts it to the target path.
     pub fn restore_file(&self, file_path: &Path) -> Result<PathBuf> {
         let home = self.get_home()?;
         let backup_dir = home.join(".demon").join("backups");
@@ -100,6 +103,8 @@ impl DemonSecurity {
         Ok(latest_backup.clone())
     }
 
+
+    /// List all available backups for a given file path, sorted by timestamp (newest first).
     pub fn list_backups(&self, file_path: &Path) -> Result<Vec<PathBuf>> {
         let home = self.get_home()?;
         let backup_dir = home.join(".demon").join("backups");
@@ -132,5 +137,6 @@ impl DemonSecurity {
 
         Ok(backups)
     }
+
 
 }
