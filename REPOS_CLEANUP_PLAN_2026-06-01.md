@@ -4,57 +4,57 @@
 
 21 of 34 repos are in WARN state. Investigation reveals:
 
-- **17 repos**: Only untracked build artifacts (target/, node_modules/, .dracon/ data dirs)
-- **4 repos**: Have actual file changes (goal management, spec work, deletions)
+- **15 repos**: Only untracked build artifacts (target/, node_modules/, .dracon/ data dirs)
+- **4 repos**: Have BOTH untracked build artifacts AND modified files (mixed state)
+- **1 repo**: Real content changes only (spec work on stale branch)
+- **1 repo**: Only untracked .dracon/ data directory (no build artifacts)
 
 **No security concerns found.** No commits or pushes were made during analysis.
 
+**Note on counting:** The original draft of this plan had a counting error (17+2+1+13=33 vs 34 total). Corrected categorization: 15 pure build + 4 mixed + 1 real + 1 data-only = 21 WARN. Plus 13 OK = 34 total.
+
 ## Per-Repo Recommendations
 
-### Category A: Build Artifacts Only (17 repos — bulk fix needed)
+### Category A: Build Artifacts Only (15 repos — bulk fix needed)
 
 These repos have only untracked `target/`, `node_modules/`, or `.dracon/` directories. No code changes present. Action: update .gitignore to exclude these patterns, then run `dracon-sync repair-warns --apply`.
 
 | # | Repo | Untracked | Size | Branch | Recommendation |
 |---|------|-----------|------|--------|----------------|
-| 1 | dracon-terminal-engine | target/, crates/cargo-dracon/target/, crates/dracon-macros/target/ | 51G | main | DISCARD: add `target/` to .gitignore |
-| 2 | dracon-utilities | target/ | 15G | main | DISCARD: target/ (plus active goal file change — commit) |
-| 3 | dracon-platform | target/ | 8.7G | main | DISCARD: add `target/` to .gitignore |
-| 4 | rust-ai-web-auto | target/ | 4.5G | main | DISCARD: target/ (plus 1 deleted file — verify intentional) |
-| 5 | dracon-ai-lib | target/, .dracon/ | 2.7G | main | DISCARD: add `target/` and `.dracon/` to .gitignore |
-| 6 | avid | target/ | — | main | DISCARD: add `target/` to .gitignore |
-| 7 | cli-file-manager | target/, cfm-lib/target/ | — | main | DISCARD: add `target/` to .gitignore |
-| 8 | ai-auto-writer | target/ | — | main | DISCARD: add `target/` to .gitignore |
-| 9 | Junk-Runner-bevy | target/ | — | tauri2 | DISCARD: add `target/` to .gitignore |
-| 10 | browser-extensions-shared | node_modules/, cursor-style/node_modules/, wxt-shared/node_modules/ | 951M | main | DISCARD: add `node_modules/` to .gitignore |
-| 11 | respec-spec-reconciler | node_modules/ | 231M | autoresearch/evolutionary-reconciler-2026-05-30 | INVESTIGATE: stale branch with 16 large commits |
-| 12 | ai-auto-repo-rot-scanner-todo-agent | target/ | — | main | DISCARD: add `target/` to .gitignore |
-| 13 | opencode-auto-review-completed-todos | node_modules/ | 61M | main | DISCARD: add `node_modules/` to .gitignore |
-| 14 | pully-fully-pull-based-fleet-reconciler | pully-types/target/ | — | main | DISCARD: add `target/` to .gitignore |
-| 15 | dracon-demons | target/ | — | main | DISCARD: add `target/` to .gitignore |
-| 16 | dracon-voice-notifications | target/ | — | main | DISCARD: add `target/` to .gitignore |
-| 17 | wal-backup | target/ | — | main | DISCARD: add `target/` to .gitignore |
-| 18 | pi-auto-review | node_modules/ | 264M | main | DISCARD: add `node_modules/` to .gitignore |
-| 19 | video-factory | target/, web/node_modules/ | — | main | DISCARD: add `target/` and `node_modules/` to .gitignore |
-| 20 | video-uploader | target/ | — | main | DISCARD: add `target/` to .gitignore |
-| 21 | dracon-code | target/, examples/phase2/example2/target/ | — | main | DISCARD: add `target/` to .gitignore |
+| A1 | dracon-terminal-engine | target/, crates/cargo-dracon/target/, crates/dracon-macros/target/ | 51G | main | DISCARD: add `target/` to .gitignore |
+| A2 | dracon-platform | target/ | 8.7G | main | DISCARD: add `target/` to .gitignore |
+| A3 | rust-ai-web-auto | target/ | 4.5G | main | DISCARD: add `target/` to .gitignore |
+| A4 | avid | target/ | — | main | DISCARD: add `target/` to .gitignore |
+| A5 | ai-auto-writer | target/ | — | main | DISCARD: add `target/` to .gitignore |
+| A6 | browser-extensions-shared | node_modules/, cursor-style/node_modules/, wxt-shared/node_modules/ | 951M | main | DISCARD: add `node_modules/` to .gitignore |
+| A7 | respec-spec-reconciler | node_modules/ | 231M | autoresearch/evolutionary-reconciler-2026-05-30 | DISCARD: add `node_modules/` to .gitignore (but see B1 — branch also has spec work) |
+| A8 | ai-auto-repo-rot-scanner-todo-agent | target/ | — | main | DISCARD: add `target/` to .gitignore |
+| A9 | opencode-auto-review-completed-todos | node_modules/ | 61M | main | DISCARD: add `node_modules/` to .gitignore |
+| A10 | pully-fully-pull-based-fleet-reconciler | pully-types/target/ | — | main | DISCARD: add `target/` to .gitignore |
+| A11 | dracon-demons | target/ | — | main | DISCARD: add `target/` to .gitignore |
+| A12 | wal-backup | target/ | — | main | DISCARD: add `target/` to .gitignore |
+| A13 | pi-auto-review | node_modules/ | 264M | main | DISCARD: add `node_modules/` to .gitignore |
+| A14 | video-uploader | target/ | — | main | DISCARD: add `target/` to .gitignore |
+| A15 | dracon-code | target/, examples/phase2/example2/target/ | — | main | DISCARD: add `target/` to .gitignore |
 
-### Category B: Real Content Changes (3 repos)
+### Category A-Mixed: Build Artifacts + Modified Files (4 repos)
 
-#### B1. dracon-utilities (branch: main, last: 80 seconds ago)
-- **1 file changed**: `.pi/goals/active_goal_2026060112445269_mpv55vx0-ly82en.md` (5 insertions, 5 deletions)
-- **Recommendation**: COMMIT — this is the current goal file. Auto-commit should handle it via daemon.
+These repos have BOTH untracked build artifacts AND tracked-file modifications. Two actions needed: (1) update .gitignore for artifacts, (2) commit the real file changes.
 
-#### B2. rust-ai-web-auto (branch: main, last: 4 minutes ago)
-- **1 file deleted**: `.pi/goals/active_goal_2026060112380730_mpv4x744-pzio9k.md`
-- **1 file added**: `.pi/goals/archived/goal_2026060112440792_mpv4x744-pzio9k.md`
-- **1 untracked**: `target/`
-- **Recommendation**: COMMIT — goal file was archived. Verify archive file exists before committing.
+| # | Repo | Modified Files | Untracked | Branch | Recommendation |
+|---|------|---------------|-----------|--------|----------------|
+| M1 | dracon-utilities | `.pi/goals/...md` (goal file update) | target/ (15G) | main | COMMIT goal file + add `target/` to .gitignore |
+| M2 | rust-ai-web-auto | `.pi/goals/...md` (1 deleted, 1 added — goal archived) | target/ (4.5G) | main | COMMIT goal archive + add `target/` to .gitignore |
+| M3 | cli-file-manager | `.pi/goals/...md`, `src/daemon.rs` (2 files) | cfm-lib/target/, target/ | main | COMMIT real changes + add `target/` to .gitignore |
+| M4 | Junk-Runner-bevy | `tools/capture-tauri-diag.mjs` (1 file) | target/ | tauri2 | COMMIT tool change + add `target/` to .gitignore |
 
-#### B3. respec-spec-reconciler (branch: autoresearch/evolutionary-reconciler-2026-05-30, last: 16 hours ago)
+### Category B: Real Content Changes Only (1 repo)
+
+#### B1. respec-spec-reconciler (branch: autoresearch/evolutionary-reconciler-2026-05-30, last: 16 hours ago)
 - **Stale branch** with 16 commits >1000 line changes to `src/spec_parser.ts` and `SPEC.md`
 - **49,101 lines diverged from main**
 - **Recommendation**: INVESTIGATE — this is the real outlier. Review the branch to determine if work should be merged or discarded.
+- Note: This repo also has untracked `node_modules/` (231M) — see A7.
 - Recent commits (last 5):
   - `723da998`: spec_parser.ts, SPEC.md DELTA:+2647/-15
   - `e36bb79a`: spec_parser.ts, SPEC.md DELTA:+2071/-15
@@ -62,15 +62,31 @@ These repos have only untracked `target/`, `node_modules/`, or `.dracon/` direct
   - `8710c3ba`: spec_parser.ts, SPEC.md DELTA:+8132/-15 ← **8K outlier**
   - `ecc69f15`: spec_parser.ts, SPEC.md DELTA:+2243/-15
 
+### Category D: Untracked Data Directory Only (1 repo)
+
+#### D1. dracon-ai-lib (branch: main)
+- **2 untracked**: `target/` (2.7G), `.dracon/` (data directory)
+- **No modified tracked files**
+- **Recommendation**: INVESTIGATE — `.dracon/` may contain data that should be tracked or may be cache. Add `target/` to .gitignore, evaluate `.dracon/`.
+
 ### Category C: No Action Needed (13 OK repos)
 
 The following 13 repos are confirmed clean: DraconDev, .dracon, youtube-video-uploader, volume-and-video-pro, tiles-tui-file-manager, SamAI, git-seal, obs-wayland-hotkey, kittentts-showcase, test-auto-create, opencode-auto-force-resume, opencode-auto-continue, dracon-libs.
 
+## Disk Size Summary
+
+| Category | Count | Untracked Size |
+|----------|------|----------------|
+| target/ dirs | 16 | **~248 GB** |
+| node_modules/ dirs | 4 | ~1.2 GB |
+| .dracon/ dirs | 2 | ~228 KB |
+| **Total untracked** | **22** | **~249 GB** |
+
 ## Recommended Action Plan
 
-### Step 1: Bulk .gitignore Fix (17 repos)
+### Step 1: Bulk .gitignore Fix (19 repos — 15 Category A + 4 Category A-Mixed)
 
-For each repo in Category A, add or update `.gitignore` with these patterns:
+For each repo in Category A and A-Mixed, add or update `.gitignore` with these patterns:
 
 ```gitignore
 # Build artifacts
@@ -78,27 +94,39 @@ target/
 **/target/
 node_modules/
 **/node_modules/
-# Local data
-.dracon/
 ```
+
+This prevents future tracking of build artifacts. **Note: adding to .gitignore only stops tracking — it does NOT reclaim disk space.** To reclaim disk, run `git clean -fdx` or manually delete the untracked directories.
+
+For Category D (dracon-ai-lib), additionally evaluate whether `.dracon/` should be tracked or added to .gitignore.
 
 This can be automated using `dracon-sync repair-warns --apply` after the .gitignore patterns are in place.
 
-### Step 2: Commit Goal File Changes (2 repos)
+### Step 2: Commit Real File Changes (4 Category A-Mixed repos)
 
 ```bash
-# For dracon-utilities
+# For dracon-utilities (M1)
 cd ~/Dev/dracon-utilities
 git add .pi/goals/active_goal_2026060112445269_mpv55vx0-ly82en.md
 git commit -m "chore(goal): update active goal state"
 
-# For rust-ai-web-auto
+# For rust-ai-web-auto (M2)
 cd ~/Dev/rust-ai-web-auto
 git add .pi/goals/
 git commit -m "chore(goal): archive completed goal"
+
+# For cli-file-manager (M3)
+cd ~/Dev/cli-file-manager
+git add .pi/goals/active_goal_2026060114150509_mpv8dw5g-j14ssp.md src/daemon.rs
+git commit -m "feat: update goal state and daemon"
+
+# For Junk-Runner-bevy (M4)
+cd ~/Dev/Junk-Runner-bevy
+git add tools/capture-tauri-diag.mjs
+git commit -m "chore(tools): update tauri capture script"
 ```
 
-### Step 3: Investigate respec-spec-reconciler Stale Branch
+### Step 3: Investigate respec-spec-reconciler Stale Branch (B1)
 
 ```bash
 cd ~/Dev/respec-spec-reconciler
@@ -110,22 +138,45 @@ git diff main..autoresearch/evolutionary-reconciler-2026-05-30 --stat
 #   git branch -D autoresearch/evolutionary-reconciler-2026-05-30  (if discard)
 ```
 
-### Step 4: Run Repair
+### Step 4: Investigate dracon-ai-lib .dracon/ Data (D1)
+
+```bash
+cd ~/Dev/dracon-ai-lib
+ls -la .dracon/
+# Determine if .dracon/ contains data that should be tracked or if it's cache
+# Either:
+#   git add .dracon/ && git commit  (if data should be tracked)
+#   echo ".dracon/" >> .gitignore  (if data should not be tracked)
+```
+
+### Step 5: Run Repair (Optional, After Steps 1-4)
 
 ```bash
 dracon-sync repair-warns --apply
 ```
 
+### Step 6: Reclaim Disk Space (Optional)
+
+```bash
+# WARNING: This permanently deletes untracked files. Only run after commits are verified.
+# For each repo with untracked target/ or node_modules/:
+cd ~/Dev/<repo>
+git clean -fdx   # Delete all untracked files and directories
+```
+
 ## Risk Assessment
 
 - **Low risk**: Bulk .gitignore fixes are safe — they only prevent tracking, don't delete data
-- **Medium risk**: Committing goal file changes — these are internal .pi/goals/ files, no external impact
+- **Low risk**: Committing goal file changes (M1, M2) — internal .pi/goals/ files, no external impact
+- **Medium risk**: Committing code changes (M3, M4) — review diffs before committing
 - **Medium risk**: Merging/discarding respec-spec-reconciler branch — need to review the 8K spec changes first
+- **Low risk**: Investigating dracon-ai-lib .dracon/ — just inspection
+- **High risk**: `git clean -fdx` — permanently deletes untracked files. Only run after all commits are verified.
 
 ## Estimated Impact
 
-- **Disk space recovery**: ~75 GB (after removing untracked target/ and node_modules/ from .gitignore)
-- **WARN count reduction**: From 21 to 0 (after repair)
+- **WARN count reduction**: From 21 to 0 (after .gitignore fixes and commits)
+- **Disk space reclamation** (if `git clean -fdx` is run): ~249 GB
 - **Sync health**: All repos will be in clean state
 
 ## Files Referenced
