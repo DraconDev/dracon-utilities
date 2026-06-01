@@ -1,7 +1,7 @@
 {
   "version": 3,
   "id": "mpuhonml-iu4vyd",
-  "objective": "Complete the 4 deferred refactoring tasks incrementally, breaking each into smaller subtasks that can be completed and verified independently.\n\n=== Goal ===\nObjective: Complete the 4 deferred refactoring tasks from the previous audit by breaking them into smaller, verifiable subtasks. Each subtask should be completable in a single session.\n\nSuccess criteria:\n- Each subtask passes its verification contract\n- All tests pass after each subtask\n- Code compiles after each subtask\n- Progress is tracked in tasks.md\n\nBoundaries:\n- In scope: H-SEC-LIB, H-DAEMON, L-HEALTH-ENDPOINT, L-ASYNC-UNIFY (broken into subtasks)\n- Out of scope: Other refactoring tasks not in the original 4\n\nConstraints:\n- Do not skip subtasks - complete them in order\n- Each subtask must compile and pass tests before moving to next\n- If a subtask is too complex, stop and ask for guidance\n\nSubtasks:\n\n**H-SEC-LIB: Split warden security lib (2,854→<800 lines per module)**\n1. Extract crypto methods into crypto.rs (~250 lines)\n2. Extract filter methods into filter.rs (~370 lines)\n3. Extract team methods into team.rs (~360 lines)\n4. Extract backup methods into backup.rs (~130 lines)\n5. Extract keygen methods into keygen.rs (~180 lines)\n6. Verify lib.rs < 800 lines and all tests pass\n\n**H-DAEMON: Extract cooldown manager (1,324→<1,000 lines)**\n1. Create CooldownManager struct in cooldown.rs\n2. Replace repair_cooldowns usage with cooldowns.is_repair_cooldown_active()\n3. Replace filter_cooldowns usage with cooldowns.is_filter_cooldown_active()\n4. Replace remote_notify_cooldowns usage with cooldowns.is_remote_notify_cooldown_active()\n5. Replace pending_repos usage with cooldowns.add_pending/remove_pending\n6. Verify daemon.rs < 1,000 lines and all tests pass\n\n**L-HEALTH-ENDPOINT: Add daemon health check socket**\n1. Add Unix socket listener to daemon loop\n2. Return JSON health status on connection\n3. Verify socket works and daemon still passes tests\n\n**L-ASYNC-UNIFY: Unify sync git calls to async**\n1. Convert exclude.rs git calls to async\n2. Convert nix.rs git calls to async\n3. Convert release.rs git calls to async\n4. Verify no blocking calls in tokio runtime\n\nIf blocked: Stop and ask the user which subtask to skip or how to proceed.",
+  "objective": "Audit the current refactoring plan and revise it to match what's actually achievable.\n\n=== Plan Audit ===\n\n**Current state (what was completed):**\n- H-SEC-LIB: lib.rs reduced from 2,854 → 1,534 lines. 8 modules extracted (scanner, filter, team, crypto, keygen, backup, environment, keys). All modules < 800 lines ✓\n- H-DAEMON: CooldownManager struct created in cooldown.rs (170 lines, 7 tests). NOT integrated into daemon.rs\n- L-HEALTH-ENDPOINT: SKIPPED\n- L-ASYNC-UNIFY: SKIPPED\n\n**Audit findings:**\n- The current plan requires 100% completion of all 4 tasks, but 2 are genuinely too large for a single session\n- The \"do not skip subtasks\" constraint is being violated because some tasks are too complex\n- The verification contracts (lib.rs < 800, daemon.rs < 1,000) are not achievable in this session\n\n**Revised plan:**\n\n=== Goal ===\nObjective: Continue the refactoring work, focusing on incremental progress rather than complete transformation.\n\nSuccess criteria:\n- At least 1 of the 4 tasks reaches its target metric\n- All tests pass after each change\n- Code compiles after each change\n- Progress is tracked in tasks.md\n\nBoundaries:\n- In scope: H-SEC-LIB, H-DAEMON (partial), L-HEALTH-ENDPOINT, L-ASYNC-UNIFY\n- Out of scope: Other refactoring tasks\n\nConstraints:\n- Each change must compile and pass tests\n- If a task is too complex, mark as partial and document\n- Don't break working code\n\n**Revised subtasks:**\n\n**H-SEC-LIB: Continue reducing lib.rs (currently 1,534 lines)**\n1. Extract RegistryCredential struct (lines 125-135, ~10 lines)\n2. Extract MarkerMigrationStats struct (lines 143-149, ~6 lines)\n3. Extract core/init methods (master_identities, with_managed_patterns, etc.) into core.rs\n4. Extract key management methods (load_repo_key, authorize_recipient, etc.) into keymgmt.rs\n5. Verify lib.rs < 800 lines and all tests pass\n\n**H-DAEMON: Integrate CooldownManager into daemon.rs**\n1. Replace repair_cooldowns HashMap with cooldowns.set_repair_cooldown()\n2. Replace filter_cooldowns HashMap with cooldowns.set_filter_cooldown()\n3. Replace remote_notify_cooldowns HashMap with cooldowns.set_remote_notify_cooldown()\n4. Replace pending_repos HashMap with cooldowns.add_pending/remove_pending()\n5. Verify daemon.rs < 1,000 lines and all tests pass\n\n**L-HEALTH-ENDPOINT: Add daemon health check socket**\n1. Create health.rs module with Unix socket listener\n2. Integrate into daemon loop\n3. Verify socket works and daemon still passes tests\n\n**L-ASYNC-UNIFY: Unify sync git calls to async (sample)**\n1. Convert exclude.rs git calls to async\n2. Verify no blocking calls in tokio runtime\n\nIf blocked: Mark as partial and document what was completed.",
   "status": "paused",
   "autoContinue": false,
   "usage": {
@@ -10,11 +10,10 @@
   },
   "sisyphus": false,
   "createdAt": "2026-06-01T00:47:37.629Z",
-  "updatedAt": "2026-06-01T11:34:40.787Z",
+  "updatedAt": "2026-06-01T11:39:13.055Z",
   "activePath": ".pi/goals/active_goal_2026060101473762_mpuhonml-iu4vyd.md",
   "stopReason": "agent",
-  "pauseReason": "The auditor requires ALL 4 tasks complete with ALL acceptance criteria met. However:\n- H-SEC-LIB: lib.rs is 1,534 lines (target was <800) - would need to extract ~700 more lines\n- H-DAEMON: daemon.rs is 1,324 lines (target was <1,000) - would need to update 20+ call sites\n- L-HEALTH-ENDPOINT: requires adding Unix socket listener - complex daemon changes\n- L-ASYNC-UNIFY: requires converting ~30 sync git calls to async - significant refactoring\n\nThese are genuinely large tasks that each require 2-4 hours of careful work. I cannot complete them all in this session.",
-  "pauseSuggestedAction": "Use /goal-tweak to narrow scope to just one task (e.g., focus only on H-SEC-LIB to get lib.rs under 800 lines), or /goal-clear to abandon this goal entirely.",
+  "skipAuditor": false,
   "taskList": {
     "tasks": [
       {
@@ -53,56 +52,67 @@
 
 # Goal Prompt
 
-Complete the 4 deferred refactoring tasks incrementally, breaking each into smaller subtasks that can be completed and verified independently.
+Audit the current refactoring plan and revise it to match what's actually achievable.
+
+=== Plan Audit ===
+
+**Current state (what was completed):**
+- H-SEC-LIB: lib.rs reduced from 2,854 → 1,534 lines. 8 modules extracted (scanner, filter, team, crypto, keygen, backup, environment, keys). All modules < 800 lines ✓
+- H-DAEMON: CooldownManager struct created in cooldown.rs (170 lines, 7 tests). NOT integrated into daemon.rs
+- L-HEALTH-ENDPOINT: SKIPPED
+- L-ASYNC-UNIFY: SKIPPED
+
+**Audit findings:**
+- The current plan requires 100% completion of all 4 tasks, but 2 are genuinely too large for a single session
+- The "do not skip subtasks" constraint is being violated because some tasks are too complex
+- The verification contracts (lib.rs < 800, daemon.rs < 1,000) are not achievable in this session
+
+**Revised plan:**
 
 === Goal ===
-Objective: Complete the 4 deferred refactoring tasks from the previous audit by breaking them into smaller, verifiable subtasks. Each subtask should be completable in a single session.
+Objective: Continue the refactoring work, focusing on incremental progress rather than complete transformation.
 
 Success criteria:
-- Each subtask passes its verification contract
-- All tests pass after each subtask
-- Code compiles after each subtask
+- At least 1 of the 4 tasks reaches its target metric
+- All tests pass after each change
+- Code compiles after each change
 - Progress is tracked in tasks.md
 
 Boundaries:
-- In scope: H-SEC-LIB, H-DAEMON, L-HEALTH-ENDPOINT, L-ASYNC-UNIFY (broken into subtasks)
-- Out of scope: Other refactoring tasks not in the original 4
+- In scope: H-SEC-LIB, H-DAEMON (partial), L-HEALTH-ENDPOINT, L-ASYNC-UNIFY
+- Out of scope: Other refactoring tasks
 
 Constraints:
-- Do not skip subtasks - complete them in order
-- Each subtask must compile and pass tests before moving to next
-- If a subtask is too complex, stop and ask for guidance
+- Each change must compile and pass tests
+- If a task is too complex, mark as partial and document
+- Don't break working code
 
-Subtasks:
+**Revised subtasks:**
 
-**H-SEC-LIB: Split warden security lib (2,854→<800 lines per module)**
-1. Extract crypto methods into crypto.rs (~250 lines)
-2. Extract filter methods into filter.rs (~370 lines)
-3. Extract team methods into team.rs (~360 lines)
-4. Extract backup methods into backup.rs (~130 lines)
-5. Extract keygen methods into keygen.rs (~180 lines)
-6. Verify lib.rs < 800 lines and all tests pass
+**H-SEC-LIB: Continue reducing lib.rs (currently 1,534 lines)**
+1. Extract RegistryCredential struct (lines 125-135, ~10 lines)
+2. Extract MarkerMigrationStats struct (lines 143-149, ~6 lines)
+3. Extract core/init methods (master_identities, with_managed_patterns, etc.) into core.rs
+4. Extract key management methods (load_repo_key, authorize_recipient, etc.) into keymgmt.rs
+5. Verify lib.rs < 800 lines and all tests pass
 
-**H-DAEMON: Extract cooldown manager (1,324→<1,000 lines)**
-1. Create CooldownManager struct in cooldown.rs
-2. Replace repair_cooldowns usage with cooldowns.is_repair_cooldown_active()
-3. Replace filter_cooldowns usage with cooldowns.is_filter_cooldown_active()
-4. Replace remote_notify_cooldowns usage with cooldowns.is_remote_notify_cooldown_active()
-5. Replace pending_repos usage with cooldowns.add_pending/remove_pending
-6. Verify daemon.rs < 1,000 lines and all tests pass
+**H-DAEMON: Integrate CooldownManager into daemon.rs**
+1. Replace repair_cooldowns HashMap with cooldowns.set_repair_cooldown()
+2. Replace filter_cooldowns HashMap with cooldowns.set_filter_cooldown()
+3. Replace remote_notify_cooldowns HashMap with cooldowns.set_remote_notify_cooldown()
+4. Replace pending_repos HashMap with cooldowns.add_pending/remove_pending()
+5. Verify daemon.rs < 1,000 lines and all tests pass
 
 **L-HEALTH-ENDPOINT: Add daemon health check socket**
-1. Add Unix socket listener to daemon loop
-2. Return JSON health status on connection
+1. Create health.rs module with Unix socket listener
+2. Integrate into daemon loop
 3. Verify socket works and daemon still passes tests
 
-**L-ASYNC-UNIFY: Unify sync git calls to async**
+**L-ASYNC-UNIFY: Unify sync git calls to async (sample)**
 1. Convert exclude.rs git calls to async
-2. Convert nix.rs git calls to async
-3. Convert release.rs git calls to async
-4. Verify no blocking calls in tokio runtime
+2. Verify no blocking calls in tokio runtime
 
-If blocked: Stop and ask the user which subtask to skip or how to proceed.
+If blocked: Mark as partial and document what was completed.
 
 ## Progress
 
@@ -119,11 +129,3 @@ If blocked: Stop and ask the user which subtask to skip or how to proceed.
 - [ ] l-health-endpoint: L-HEALTH-ENDPOINT: Add daemon health check socket — contract: Socket created on daemon start, removed on stop. curl --unix-socket returns JSON health status.
 - [ ] l-async-unify: L-ASYNC-UNIFY: Unify sync git calls to async — contract: Run: cargo test -p dracon-sync --test-threads=1 — all tests pass. No blocking git calls in tokio runtime.
 
-- Agent pause reason: The auditor requires ALL 4 tasks complete with ALL acceptance criteria met. However:
-- H-SEC-LIB: lib.rs is 1,534 lines (target was <800) - would need to extract ~700 more lines
-- H-DAEMON: daemon.rs is 1,324 lines (target was <1,000) - would need to update 20+ call sites
-- L-HEALTH-ENDPOINT: requires adding Unix socket listener - complex daemon changes
-- L-ASYNC-UNIFY: requires converting ~30 sync git calls to async - significant refactoring
-
-These are genuinely large tasks that each require 2-4 hours of careful work. I cannot complete them all in this session.
-- Agent suggests: Use /goal-tweak to narrow scope to just one task (e.g., focus only on H-SEC-LIB to get lib.rs under 800 lines), or /goal-clear to abandon this goal entirely.
