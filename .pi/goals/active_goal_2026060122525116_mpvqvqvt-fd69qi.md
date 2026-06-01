@@ -6,11 +6,11 @@
   "autoContinue": true,
   "usage": {
     "tokensUsed": 1043050,
-    "activeSeconds": 338
+    "activeSeconds": 404
   },
   "sisyphus": false,
   "createdAt": "2026-06-01T21:52:51.161Z",
-  "updatedAt": "2026-06-01T21:58:34.368Z",
+  "updatedAt": "2026-06-01T21:59:41.296Z",
   "activePath": ".pi/goals/active_goal_2026060122525116_mpvqvqvt-fd69qi.md",
   "taskList": {
     "tasks": [
@@ -79,7 +79,7 @@ Address all 5 items on the master roadmap: review stale branch, document fix, up
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 5m38s
+- Time spent: 6m44s
 - Tokens used: 1M (1,043,050) tokens
 ## Tasks
 
