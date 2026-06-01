@@ -3,6 +3,7 @@
 //! Dracon Sync — git sync automation daemon.
 
 mod bump;
+mod cooldown;
 mod daemon;
 mod exclude;
 mod git;
