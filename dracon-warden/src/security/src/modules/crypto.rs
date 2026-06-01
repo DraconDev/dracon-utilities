@@ -1,12 +1,23 @@
 //! Encryption and decryption operations.
 
+use aes_gcm::{
+    aead::{Aead, KeyInit},
+    Aes256Gcm, Key, Nonce,
+};
 use age::x25519;
 use anyhow::{Context, Result};
-use std::io::Cursor;
+use cfb_mode::cipher::{AsyncStreamCipher, KeyIvInit};
+use secrecy::ExposeSecret;
+use sha2::{Digest, Sha256};
+use std::fs;
+use std::io::{Cursor, Read, Write};
 use std::path::Path;
 
+use crate::is_v1_fallback_allowed;
 use crate::DemonSecurity;
 use crate::RepoKey;
+
+const HEADER_V2_MAGIC: &[u8] = b"age-encryption.org/v1";
 
 impl DemonSecurity {
     pub fn encrypt_v2(

@@ -1389,10 +1389,6 @@ impl DemonSecurity {
     }
 
     /// In-situ Clean: Scan for secrets and replace with REDACTED_REGEX tags.
-    pub fn smart_clean(&self, content: &str) -> Result<String> {
-        let scanner = SecretScanner::new()?;
-        self.smart_clean_with_scanner(content, &scanner)
-    }
 
     /// In-situ Clean with a specific scanner (allows filtering patterns)
     fn smart_clean_with_scanner(&self, content: &str, scanner: &SecretScanner) -> Result<String> {
@@ -1426,171 +1422,6 @@ impl DemonSecurity {
     /// Smart Clean with Path Context:
     /// If the path is in a sensitive directory (e.g. .ssh, .aws) OR force_encrypt is true, encrypt the ENTIRE file.
     /// Otherwise, use regex-based in-situ encryption (if text).
-    pub fn smart_clean_with_path(&self, content: &[u8], path_str: &str) -> Result<Vec<u8>> {
-        // 1. Definition of Sensitive Paths (Still used for binary detection)
-        let sensitive_dirs = [
-            ".ssh",
-            "demon/keys",
-            "demon/secrets",
-            ".aws",
-            ".kube",
-            ".gnupg",
-            ".azure",
-            ".config/gcloud",
-        ];
-
-        let sensitive_exts = [
-            ".age", ".key", ".p12", ".pfx", ".pem", ".crt", ".der", ".asc", ".zip", ".tar", ".gz",
-            ".bz2", ".7z", ".rar", ".tgz", ".xz", ".tar.gz", ".tar.bz2", ".tar.xz", ".sqlite",
-            ".sqlite3", ".db", ".vmdk", ".img", ".qcow2", ".vdi", ".iso", ".docker", ".oci",
-            ".xlsx", ".csv", ".ods", ".kdbx", ".1pif", ".sql", ".apk", ".aab", ".dmg", ".pcap",
-            ".pcapng", ".ovpn", ".tfstate", ".tfplan", ".tfvars",
-        ];
-
-        let sensitive_filenames = [
-            "id_rsa",
-            "id_ed25519",
-            "id_ecdsa",
-            "id_dsa",
-            "id_xmss",
-            "master.age",
-            "identity.age",
-            "owner.age",
-            "demon-key",
-            "id_rsa.pub",
-            "id_ed25519.pub",
-            "credentials",
-            ".bash_history",
-            ".zsh_history",
-            ".sh_history",
-            "core",
-            "known_hosts",
-            "vault.yml",
-            ".terraform.lock.hcl",
-            "terraform.tfvars",
-            ".env",
-            ".env.local",
-            ".env.production",
-            ".env.development",
-            ".env.staging",
-            ".npmrc",
-            ".pypirc",
-            "netrc",
-            ".pgpass",
-            ".my.cnf",
-        ];
-
-        let filename = std::path::Path::new(path_str)
-            .file_name()
-            .and_then(|s| s.to_str())
-            .unwrap_or("");
-
-        // Check if any path component exactly matches a sensitive directory name.
-        // Using component-level matching avoids false positives like "my.ssh.config"
-        // matching ".ssh" via substring contains.
-        let path_components: Vec<&str> = std::path::Path::new(path_str)
-            .components()
-            .filter_map(|c| c.as_os_str().to_str())
-            .collect();
-
-        // Single-component matching
-        let has_single_component = sensitive_dirs
-            .iter()
-            .any(|dir| !dir.contains('/') && path_components.contains(dir));
-        // Multi-component sequence matching (e.g. ".config/gcloud")
-        let has_multi_component = sensitive_dirs.iter().any(|dir| {
-            let parts: Vec<&str> = dir.split('/').collect();
-            if parts.len() < 2 {
-                return false;
-            }
-            path_components
-                .windows(parts.len())
-                .any(|window| window == parts.as_slice())
-        });
-
-        let is_sensitive_location = has_single_component
-            || has_multi_component
-            || sensitive_exts.iter().any(|ext| path_str.ends_with(ext))
-            || sensitive_filenames.contains(&filename)
-            || sensitive_filenames
-                .iter()
-                .any(|p| filename == *p || filename.starts_with(&format!("{}.", p)))
-            || self
-                .managed_patterns
-                .iter()
-                .any(|p| filename == p || path_str.contains(p));
-
-        // 2. Process based on content type
-        match std::str::from_utf8(content) {
-            Ok(text_content) => {
-                // Full encryption for sensitive files that shouldn't leak structure
-                let is_full_encrypt = is_sensitive_location
-                    && (filename.starts_with(".env")
-                        || filename == "credentials"
-                        || filename.starts_with(".bash_history")
-                        || filename.starts_with(".zsh_history")
-                        || filename.starts_with(".sh_history")
-                        || filename == "vault.yml");
-                if is_full_encrypt {
-                    // Don't double-encrypt
-                    if content.starts_with(HEADER_V2_MAGIC)
-                        || self.starts_with_any_secret_tag(content)
-                    {
-                        return Ok(content.to_vec());
-                    }
-                    // Add/increment version header for .env files to track changes
-                    let content_to_encrypt = if filename.starts_with(".env") {
-                        // Check if this is already a warden-managed file by looking for our marker
-                        if text_content.contains("Dracon Warden") {
-                            // Remove old header and add new one with incremented version
-                            let stripped = strip_env_version_header(text_content);
-                            format!(
-                                "{}\n{}",
-                                make_env_version_header(text_content),
-                                stripped.trim()
-                            )
-                        } else {
-                            // First time encryption - add v1 header
-                            format!(
-                                "{}\n{}",
-                                make_env_version_header(text_content),
-                                text_content
-                            )
-                        }
-                    } else {
-                        text_content.to_string()
-                    };
-                    return self.encrypt_v2_to_b64_tag(content_to_encrypt.as_bytes());
-                }
-                // For identity files (master.age, identity.age), use a scanner that
-                // skips age key patterns to avoid encrypting the identity itself,
-                // but still catches other embedded secrets like API keys.
-                let is_identity_file = filename == "master.age" || filename == "identity.age";
-                let cleaned = if is_identity_file {
-                    let scanner = SecretScanner::new_without_age_keys()?;
-                    self.smart_clean_with_scanner(text_content, &scanner)?
-                } else {
-                    self.smart_clean(text_content)?
-                };
-                Ok(cleaned.into_bytes())
-            }
-            Err(_) => {
-                // Binary Data: Only encrypt if it is in a sensitive location
-                if is_sensitive_location {
-                    // Don't double-encrypt
-                    if content.starts_with(HEADER_V2_MAGIC)
-                        || self.starts_with_any_secret_tag(content)
-                    {
-                        return Ok(content.to_vec());
-                    }
-                    self.encrypt_v2_to_b64_tag(content)
-                } else {
-                    // Normal binary path -> Passthrough (preserves images, etc)
-                    Ok(content.to_vec())
-                }
-            }
-        }
-    }
 
     fn encrypt_v2_to_b64_tag(&self, content: &[u8]) -> Result<Vec<u8>> {
         match self.encrypt_v2_for_all(content) {
@@ -1603,149 +1434,11 @@ impl DemonSecurity {
     }
 
     /// In-situ Smudge: Decrypt REDACTED_REGEX tags back to plaintext.
-    pub fn smart_smudge(&self, content: &str) -> Result<String> {
-        let markers = self.secret_tag_prefixes();
-        let mut result = String::new();
-        let mut last_end = 0;
-
-        while last_end < content.len() {
-            let mut next: Option<(usize, usize)> = None;
-            for marker in &markers {
-                if let Some(start_idx) = content[last_end..].find(marker) {
-                    let absolute_start = last_end + start_idx;
-                    let marker_len = marker.len();
-                    if next
-                        .map(|(best_idx, _)| absolute_start < best_idx)
-                        .unwrap_or(true)
-                    {
-                        next = Some((absolute_start, marker_len));
-                    }
-                }
-            }
-
-            let Some((absolute_start, marker_len)) = next else {
-                break;
-            };
-
-            result.push_str(&content[last_end..absolute_start]);
-
-            // Find closing bracket
-            if let Some(end_offset) = content[absolute_start..].find(']') {
-                let absolute_end = absolute_start + end_offset + 1;
-                let b64 = &content[absolute_start + marker_len..absolute_end - 1];
-
-                match general_purpose::STANDARD.decode(b64.trim()) {
-                    Ok(encrypted) => match self.unlock_payload(&encrypted) {
-                        Ok(plaintext) => {
-                            result.push_str(&String::from_utf8_lossy(&plaintext));
-                        }
-                        Err(_) => result.push_str(&content[absolute_start..absolute_end]),
-                    },
-                    Err(_) => result.push_str(&content[absolute_start..absolute_end]),
-                }
-                last_end = absolute_end;
-            } else {
-                // No closing bracket found, treat as normal text
-                result.push_str(&content[absolute_start..]);
-                last_end = content.len();
-            }
-        }
-
-        result.push_str(&content[last_end..]);
-        Ok(result)
-    }
 
     /// Git Clean Filter: Encrypt stdin -> stdout
     /// V2 Upgrade: Encrypts to ALL known public keys (User + Machines + Teams)
-    pub fn seal_clean(&self, file_path: Option<&str>) -> Result<()> {
-        use std::io::{Read, Write};
-
-        // 1. Read plaintext from stdin
-        let mut buffer = Vec::new();
-        std::io::stdin().read_to_end(&mut buffer)?;
-
-        // Auto-add key to avoid lockout (Ensure keys folder exists)
-        if let Err(e) = self.ensure_current_user_key() {
-            eprintln!("⚠️ failed to ensure user key: {}", e);
-        }
-
-        // 3. Backup (Safety Net) - must happen before buffer is potentially moved
-        if let Some(path) = file_path {
-            if path.contains(".env") {
-                if let Err(e) = self.backup_secret(path, &buffer) {
-                    eprintln!("⚠️ failed to backup .env file: {}", e);
-                }
-            }
-        }
-
-        // 4. Smart Clean: Targeted encryption only to preserve Git diffs.
-        // Every file (UTF-8) is scanned for secrets.
-        // Binary files are passed through untouched to preserve Git diffs.
-        let output = if let Ok(text_content) = std::str::from_utf8(&buffer) {
-            self.smart_clean(text_content)?.into_bytes()
-        } else {
-            buffer
-        };
-
-        // 5. Write to stdout
-        std::io::stdout().write_all(&output)?;
-
-        Ok(())
-    }
 
     /// Recursive disk-wide decryption: Replaces all [*_SECRET:...] tags with plaintext in-place.
-    pub fn decrypt_path(&self, root: &Path, recursive: bool, dry_run: bool) -> Result<usize> {
-        let mut total_restored = 0;
-        let mut walk_errors = 0;
-
-        if !root.exists() {
-            return Err(anyhow::anyhow!("Path does not exist: {:?}", root));
-        }
-
-        if root.is_file() {
-            return self.decrypt_file(root, dry_run);
-        }
-
-        let walker = walkdir::WalkDir::new(root)
-            .max_depth(if recursive { usize::MAX } else { 1 })
-            .into_iter()
-            .filter_entry(|e| {
-                let name = e.file_name().to_string_lossy();
-                if e.path() == root {
-                    return true;
-                }
-                !name.starts_with('.') || name == ".env"
-            });
-
-        for entry in walker {
-            let entry = match entry {
-                Ok(e) => e,
-                Err(e) => {
-                    eprintln!(
-                        "⚠️ walk error during secret restore at {}: {}",
-                        root.display(),
-                        e
-                    );
-                    walk_errors += 1;
-                    continue;
-                }
-            };
-            if entry.file_type().is_file() {
-                if let Ok(count) = self.decrypt_file(entry.path(), dry_run) {
-                    total_restored += count;
-                }
-            }
-        }
-
-        if walk_errors > 0 {
-            return Err(anyhow::anyhow!(
-                "decrypt_path completed with {} walk error(s)",
-                walk_errors
-            ));
-        }
-
-        Ok(total_restored)
-    }
 
     fn decrypt_file(&self, path: &Path, dry_run: bool) -> Result<usize> {
         let content = match std::fs::read_to_string(path) {
@@ -1778,136 +1471,9 @@ impl DemonSecurity {
 
     /// Migrate secret marker prefixes in-place without touching encrypted payload bytes.
     /// Example: `[OLD_MARKER:...]` -> `[DRACON_SECRET:...]`.
-    pub fn migrate_markers_in_path(
-        &self,
-        root: &Path,
-        recursive: bool,
-        dry_run: bool,
-        from_marker: &str,
-        to_marker: &str,
-    ) -> Result<MarkerMigrationStats> {
-        let from = normalize_secret_marker(from_marker)
-            .ok_or_else(|| anyhow::anyhow!("Invalid source marker: {}", from_marker))?;
-        let to = normalize_secret_marker(to_marker)
-            .ok_or_else(|| anyhow::anyhow!("Invalid target marker: {}", to_marker))?;
-
-        let from_prefix = format!("[{}:", from);
-        let to_prefix = format!("[{}:", to);
-        let mut stats = MarkerMigrationStats::default();
-
-        if !root.exists() {
-            return Err(anyhow::anyhow!("Path does not exist: {:?}", root));
-        }
-
-        let mut process_file = |path: &Path| -> Result<()> {
-            let content = match fs::read_to_string(path) {
-                Ok(c) => c,
-                Err(_) => return Ok(()),
-            };
-            stats.files_scanned += 1;
-
-            let count = content.matches(&from_prefix).count();
-            if count == 0 {
-                return Ok(());
-            }
-
-            let migrated = content.replace(&from_prefix, &to_prefix);
-            if !dry_run {
-                fs::write(path, migrated)?;
-            }
-
-            stats.files_changed += 1;
-            stats.markers_changed += count;
-            Ok(())
-        };
-
-        if root.is_file() {
-            process_file(root)?;
-            return Ok(stats);
-        }
-
-        let walker = walkdir::WalkDir::new(root)
-            .max_depth(if recursive { usize::MAX } else { 1 })
-            .into_iter()
-            .filter_entry(|e| {
-                let name = e.file_name().to_string_lossy();
-                if e.path() == root {
-                    return true;
-                }
-                !name.starts_with('.') || name == ".env"
-            });
-
-        for entry in walker {
-            let entry = match entry {
-                Ok(e) => e,
-                Err(e) => {
-                    eprintln!(
-                        "⚠️ walk error during marker scan at {}: {}",
-                        root.display(),
-                        e
-                    );
-                    stats.walk_errors += 1;
-                    continue;
-                }
-            };
-            if entry.file_type().is_file() {
-                if let Err(e) = process_file(entry.path()) {
-                    eprintln!("⚠️ failed to process {}: {}", entry.path().display(), e);
-                }
-            }
-        }
-
-        if stats.walk_errors > 0 {
-            return Err(anyhow::anyhow!(
-                "migrate_markers_in_path completed with {} walk error(s)",
-                stats.walk_errors
-            ));
-        }
-
-        Ok(stats)
-    }
 
     /// Git Smudge Filter: Decrypt stdin/file -> stdout
     /// Gracefully handles: V2 (Direct), V1 (RepoKey), Plaintext, REDACTED_REGEX wrapped
-    pub fn seal_smudge(&self, file_path: Option<&str>) -> Result<()> {
-        use std::io::{Read, Write};
-
-        // 1. Read content
-        let mut buffer = Vec::new();
-        if let Some(path) = file_path {
-            let mut file = fs::File::open(path)?;
-            file.read_to_end(&mut buffer)?;
-        } else {
-            std::io::stdin().read_to_end(&mut buffer)?;
-        }
-
-        // 2. Check for V2 (Age) Header
-        if buffer.starts_with(HEADER_V2_MAGIC) {
-            match self.unlock_payload(&buffer) {
-                Ok(plaintext) => {
-                    std::io::stdout().write_all(&plaintext)?;
-                    return Ok(());
-                }
-                Err(e) => {
-                    eprintln!("⚠️ V2 Decryption Failed: {}", e);
-                    // Fallthrough to pass raw (might be intended?)
-                }
-            }
-        }
-
-        // 3. Check for *_SECRET text wrapper format
-        if let Ok(text) = std::str::from_utf8(&buffer) {
-            if self.contains_any_secret_tag(text) {
-                let smudged = self.smart_smudge(text)?;
-                std::io::stdout().write_all(smudged.as_bytes())?;
-                return Ok(());
-            }
-        }
-
-        // 4. Fallback: Pass raw buffer (Plaintext or already decrypted)
-        std::io::stdout().write_all(&buffer)?;
-        Ok(())
-    }
 
     /// Encrypt data using the repo key with AES-256-GCM.
     ///
@@ -2206,7 +1772,7 @@ mod tests {
             patterns.contains(&"Age Secret Key".to_string())
         );
 
-        let content = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA2TWh5K3RmNEN2Wm9DL2E1Y2ErVjU1WTg3QVVIWlFPYUt3ZmUvQUxWYkZVClZTY1luWnpqSGtReGRveSt1UFJoVUZ2TmZyVnZCaDJ2bjIzMVdIclNtT28KLT4gWDI1NTE5IEdnWkVlWGdGZ0dIdEJNRUlWdWV4c1Iza0thMERSWUF1ODVDWktFcFlMRVkKMFRiaEZCZkVOZ25lMVJwTElhSWtqZlZ4SC85dGx0d2NFeTBNN21QM3RhYwotPiAjXlp8fC1ncmVhc2UgamwgKHAgKExRICtwcFhDRAprUm1vMmZDcG5OOG1SenpNM3U2M0FXVURTSkV1RjdpdEV4TWZkOEQ3Y05wYW9rN0lsM0xPOTdVNlM3eXh5ZEwzCndmWjdHSDNlZnZFSFNSRG91T1NLZk04em0wLzFQdis2dGZmMS8xawotLS0gUXVMNkg3elhqL0U2aUJwbXRYOEtLNitFU2l3MmFFUXRGdjFwT21kSE1sSQoIM916M533AgFuSd9yb+JoCC+DxVKKVoiBg38rlEDpjfzbZHVknBqCUy3nZU9IuvW9hlyAmeUWZmEDM7kPQbwXhWi3SAJZHwYTJjvkXGGxfJytRHOjfeZQf3ChHBw4w1QdtqpiacIkn3wB]";
+        let content = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBZTVQ0cDV6cmp3Q1JXZkNBTHZ2cThvS2haWVVrZ0ZobVRNWHhkZ0FRSHpZClRhRis0ME1vN29EQjVTRmhRdDBsSWNGWndJbzJxTCtWTVhxU1ArTWJFY0kKLT4gWDI1NTE5IDVjcjgrYURKdlRXdExvRTJEd010UEZ1dW13a0hIVDM2ZS9oNGNTeldXMzAKRlNHbmVhalg0UFptemp6RTBKenkyN0daTUFJdWpHQTZTb3pGN1NlaHFpRQotPiAsentjeC1ncmVhc2UgL00ieSBFXSRWTU93SQpPWUpTY096TjY3SEd1bUp1Sk9ESllaSWpSTHMxejN5cW5Cbm9BWTZJN2ROMHZYd1VmaGhKTkFFdHFxeTYxaVNJCjRRCi0tLSBFUHlDWUF2T3BoVkVRa2p1QTRBbFF3aXh3RHo5dVJaN2VISy9KOWxoeXNjCmZSddwvt7axaiqi5ltf6kUIehsG192e7b7QcI0P3wghm43Zy8EAIY41kSjNCx1ROKt8ZYzuVgwSQqS7yGZQ8WWdIJAa2xgpUSnpcO2nj3q03FyFvDzJp2yoefhzLBf67ogpd2d9yDP5Ezo=]";
         let scanned = scanner.scan_and_replace(content, |name, secret| {
             eprintln!("Match found: {} -> {}", name, secret);
             format!("[MATCHED:{}]", name)
@@ -2489,8 +2055,8 @@ API_KEY=original"#;
     #[test]
     fn test_github_token_patterns_accept_variable_length() {
         let scanner = SecretScanner::new_without_age_keys().unwrap();
-        let short = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBEd01uRkdqTFAycVBBMEJ2T29acWpwYlZHZWdPeVFNZDNWYmE4VjRWTWp3CjZ6QnN4VjVKNnI4aGd6TnNreUJ3NEhYZ2ZDU1VIYXR5TzdlTUpiVjJCNzAKLT4gWDI1NTE5IE9Ia2JYd0JNS0lBUXZKK3JkVGN1OEtHcUJFb3RLbGJ2bjFORUR0Z21hUkEKT2M2MnNaeC9rTUU4MkpvcXpBa2UrQkpPZmRRNkVYZUxhVUVCT3JEMEVIOAotPiBjLWdyZWFzZSBeYQoramVVNWJoeXpVUkxELzRUWTZ3VEc1NnZFSmlHcUdrd0VHWVVML2o2N24zNzJDTUhrTzdQZ3Q1N3hnYnAveDNnCmNibXhlMWxIOU92cGVFdkZsR2Q0djVEQnhLUWh5M1FOeWVnOTNGaWJpanhjL1A4djZGR0xFUERwCi0tLSBGa1NkT1hNMDFZRzFRcVdnSjNtNktMZ2MxVi9WWURheFFrU1h6QURZQVZ3CumlyjWSe5hv6sbL8fzSsekryp537d3GSQsihHPSKaNWSs2qkb99TRHaWjTVnGotL3zVAKczTFiSabI5dv0WWtQRHA==]";
-        let long = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB4d3BxbVNnWkY0MStSSzJjOXdhcFNyTFhqTm4wNUMvMmFzbjhaWHIwdG5nCm5UcWdNdkliaHlsNDk0a3VNQ2JjOXdvTlV1aVc3VW1LUWo2ZTRBbFZMUFUKLT4gWDI1NTE5IHpuVW9nTHVTY3RES2R1MWVFMzdQZHhFUUozdVpQR3RnNUErbEtJbkJJUmcKNUJ3S2hiYmx5VTVKaDFQOUd6N1phdWJjOFJIQ09WMVFrSFJtYi9iaGlQSQotPiBlLy1ncmVhc2UKVEtrNVJCOTNDOHpLY0gvT2RzdlA0K08xdG1uMGl4NHNnazZlZzM1UVV3c3Fxd2F0bVc1cVJJU1FSZUtNK2ZpYwpzdmRyCi0tLSBrSGN0SVFabjZ5ZDdVcmFtalZUOTBZbEhNTEg3dHl0a29jOWtTeHd6NTFNCj7E7pnwMCkZEXtSfMusr0KN+S6Kgh4japScKUZiHDc5fYMHSQCd3VOaGt5KpNPR54d/IfZYqprCzeUGt/+peixwpKoIJ4LwCVOTNMY=]";
+        let short = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBUSG4vakR3MUVhRVpOeWk2ZkhQNEttOHFJQ3Q2NTZpVkxGOHVnVW14VmtRCngrK0Fkb3ZDNzdTa09tVkpPS3NlWjZlbDhxbFpWTm5VMmdaakxFaTlJeVkKLT4gWDI1NTE5IDB5cEVRcndua0ZteWJmYnFPa1piUk51bzIxcWU5TXd4RHlrODNsTDZPUlEKdWFpV1FNWkRCME1oZHhIRlJ3TTBkY1NmNW13YWtrV2ltVmRHQWZOVW41RQotPiA8PzM/eygtZ3JlYXNlCktBCi0tLSA5SW1EL0x4amxocnU3OEVnb1ZDMlNBcHg2aDkrUjRjdG8zREhkazc4T1NRCpPbgYsPub0rYMWuEnkXJ5b9WZRlEhROMqwo/3eePBegCe03UWHhUwDYGWSxEvyoqJXQqBqB9c8numzlkV+iw82Qvw==]";
+        let long = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBIZUdBVWJZZXQ5U0grUVJMMk8vMHg2UlNwd2ZPQUZnTGtoVHMyVExQMlRFCjE5c0xVcVZmSUo5QTRuS3Z6VnFFYlNzNndyTzcxSWFGbTBVRHpNR0JqWDgKLT4gWDI1NTE5IDQ2b0t4WGljNHRuSDlkWmQrUGtBZTB4RndtRWpIS1FUZVo1LzAzeGpYUWsKU1hXNG1LaW5wNlR1N2RWR1JsTTQzaFZPSU1yRTNKOGZsMzNyUWk3UmVyVQotPiBCdzl2dHljTi1ncmVhc2UgeSc7eT5PICRSRVdLIEtTZDRpQwpYajNGT1JNSk81ZlQzYWJnN01iTFlYa0NwZzZEUzAwbm5CVEhyeUxzdUF6U2RKVE5rRGxWMDNwdmQ4V3V3TXJOCmhqYW5Hc21tcTNFUFVscmUKLS0tIGxHMmhKRURUTEdsbXVJc3M2Wkt4R1MyQUVUaW5HNkxlL0N1eVdVbmpGalkKz0Zqu5eA6hsxIEbMkZjNpK7h0E9C330CRZaM6frGwgxGmi4KtndwshhoTKuqQnszwtswiXgVtyxyOXRyxssirfkHf2za3huitmHMbg==]";
         let found_short = scanner.scan(short);
         let found_long = scanner.scan(long);
         assert!(
@@ -2512,8 +2078,8 @@ API_KEY=original"#;
     #[test]
     fn test_mailgun_key_accepts_variable_length() {
         let scanner = SecretScanner::new_without_age_keys().unwrap();
-        let short = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBtbEV3bDZXSWgwQ2dQUVlESm95MnVhbWhvRUQ5UFY2UGkyQ25Xb0lwcmhBCjFDOEI1RG04anJLQUN1VWZWVWRCbkpUTzNLTm9PVGVEamR3NGNtYmJQLzAKLT4gWDI1NTE5IHNLOElYemJvWlJNZUY4ZU0zSElyb1ZsNjdxL0FEWDNBUnJWcEQvNmxJeGsKUyt2aHFtVDdiUXdQNnlQa2syMEVxNE55NmRaZmQ1UkdRTng4MGRYK2UzSQotPiBBLWdyZWFzZSB2IGduIExcSiQ3P2YKMEV5NjAxaU1odVEyNUhCbzZCY3EvQmdad2hHSUlFb0s2MjRiTDQrd0R3Ci0tLSBZUC9nTTA1bi9QbWREY0VXMTkzajhUQytKREwxUVdoalRJQllHU2tjMjQwChBsz5NJGM9GVll/WiNfOsLbNDiIWdalXONwR6bXtI2ykJ2dfV1rfQcCddJIl6zRaMP3itfMYPZ95LKTwvpSAKHV]";
-        let long = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBENkVRaE4yQmUxbytBR2RWZDVhSTdCUlh2dkMrNnk1eGpnVVEwMFh6U1JvCmtGK0lvSjZqdEUya3Mrcms5aENFRk1DK3A2ZlNvd1k5UVZDbjRtVzU5cUEKLT4gWDI1NTE5IGh4ek5XM0ttR1pQbTdibUNiejVjOUM3cVlQQ0JtVEFiVy9PZHMxeHpEUVEKdFQrNkpDRitXaytTSHdIcUtHSmpHcktnOGp4cDhrYnRjQlNNSSthRmE1bwotPiB+ODkhLWdyZWFzZSBuPDggXgo4dW8wUWpZWVZXMjZxeXJSNkJYUWF3eFErcnpOZ3JaMk41STNOclNXWW56cTRQMHY4QTNjZG1NYWpCN1kzMzZjCno0NUpVU3RGN0lBcFRESG9JN0FLCi0tLSA3NmhVL0Nwc3JSVVJzVXNJamwwYkYzVnE5NnE5ZGoxT3lKWlY5aFh0ZE5nCuc3bNviHoWWPocmZR8PnYRo7pIz8XClmfKb2xSTz4VyGbSm7dFvZ16fUqHaPvZxsdehWE/E3PWKYoAzpqBWr2a6pbnDFg==]";
+        let short = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA4bkdnbWQ3U1FlUU42MmphZ0Z6c0oxWTUxVXM2ekVxajJ0WFAydFE1SXlVCmFPNHNIUUxpV3gxQksxTXdpT3VSOGtPSVl0UjNlSGcrRnd4VkxEMUg5dlkKLT4gWDI1NTE5IDczdWorb0VadUZPbFJabFlMOHpaaTgzZmUyZ1Nxdm5SWmpNLytLRVB2RTAKdU9JYmtDVm1DN3VJQytCQ09RRi82bHdNemtWSE0zaFgySXNSdUNoeS9LVQotPiBWLWdyZWFzZSBXR1FpMz52YiAmPDByP3N0XQpxMnoyL01mamFKTUZZNStlNy9qME1wenZHbDFlRTJXQTBqcWVhQUhFeFZkS0dRTVlNVW5vYlQvSzF4OTdtTVRlCmtOU1F3UmhFZlU2R0IzTzUweWh3UE5tNzVPVDVqN0ErQ1NVQ3B0N0QwL1Y0MTJCVEZMZncxMEllekpNCi0tLSAwTWpwand6ZHVyejJsN1JpekdhelNNb1U5Nm45MENCWDFJVW1jRHZJWWtFCj9QX79LG+VR7IHijR67isoPNr2leug3kJTdQsi5GPGDMhwcRhdDGt16fYtCpfh2T4aWCq0EUz6awjXCY04QsDTS]";
+        let long = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSByclRBdVVZdkFmbDZBT1E3dE9uaTR3Nm9zNFVuWHI2bnV0Z1IvVUxhZmkwCjNpZ0F3TXo0bHNGc0FMUU5UUnZpODZsZ1ExaU85TzdTOTNSNUt4MjFzc28KLT4gWDI1NTE5IHp4K1BQZnVvT2ZzS2xxMFQ5djlrVExLdXlmSi9QSzlkTkZPNnBQb0JueWMKOHFpUHM3QzF6aWtleGZqMXNPVWJ1UXZiZ3hsV29HK2cyVHB0dHo5Ny91TQotPiBfLWdyZWFzZSBrVyBKSiA9cE1hbV0KCi0tLSBNeFZQeCtjLzNWdDkzQ1RTaGNIcDlhRjB6aFVkd2ZWd2JPS3dHUDMrMzI4Cny0CPH5NlPiACz91R7VMx1TMmeZAPW7fx5OxbIXTSbGEL8PZ23UKuYTBRPC8MUTdV9TKmPiL3hhxymfDBbfxkd+zhIaNQ==]";
         let found_short = scanner.scan(short);
         let found_long = scanner.scan(long);
         assert!(
@@ -2531,7 +2097,7 @@ API_KEY=original"#;
     #[test]
     fn test_slack_bot_token_compact() {
         let scanner = SecretScanner::new_without_age_keys().unwrap();
-        let [DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA2Vno3MS9qV3VUM3kwVUwxTTFJZFVpNFQ2WWNmWGc5UDhEbkRZdnA0YXhBCmlZT3QyeGMycUF0L2hJVkVMbzNCZHhYL0Q5c2JuUEVZS0xQSFA3THA4TzQKLT4gWDI1NTE5IDhHNVhmQmRWU2gzWmdzT1ZhbDVyM3gva1E5Q3ByOVBNWmsxcnNMQ0FMeFkKdng2QTNhczBzVjFPcHg4R0kvZ0lCbUpaM1MvbWxYRVE4dXZ5YzVock1aVQotPiBiS10sey1ncmVhc2UgLi9iYUJCTW4KUExCNyswWG1NZ0NCYkV3MW5ucHhDZzFyV2gvMGdyUUxja3h6U2tRMEZIOHc1UEJHaVhxSmUyV0dkVzF4UWZLKwp4NG9qMld5YUp6WTlrNmZ2Q0c0Z2RsQk4xcUloWlBNck16MVdSbUdEODA1TFBGOVIKLS0tIGFBN2E4K3JkeENDRmhlZmJ1QUs5aW5WTnJuYWZ5ZHBNTlZ1Yi9ibGJzR28K2Vpcj0Xhbrzzl7/WhBACEfa4HIoFDJp6+huuKc38bOis2qr3wBLXANLuHt4eOrz7BB8q4v9xTPOvwIevbyiVdNe/be3FeUCD9A==];
+        let [DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBKN1U3M0dOUXhuNVdza2xZZnRLYnV1Z0JXNUVGYWs0UGZMbFFSTUVnSUJrCkc0NFhDMmhZbHRZeXkwQWlpMXNrNkxKV3ptb3dDeTh3UHFIc1J0UlN1N1EKLT4gWDI1NTE5IFhzajk4UVQ0VGF3UHB6T2JVbnNPMXpxV1ZOek9xR1ZzRmx4endEZDFVQmcKTXNrNmZaanNiQzl3d0RuY1NkaWlscmpTeUZXMm0vNFRtaGpBRG5rMkYzOAotPiAyLWdyZWFzZSB0Clp5WVN6UUh4RnVpbWRIZ0VyZHcvdTVxU1NjL1hTaHo5YzZqcjhWdFJxNWVtWHpQUHFvYzk1UQotLS0gb3RVTTM0bUFYSWMrSHJWN29Ca1VFMkc2MFV1KzM4akRIRERmN05lWWY2VQrfaarXzLmeZ8en+Dd0p1RUAW3cNS9613AiHjN5q0a74DWmnUfKuQPvoWHU4Z0k3toezy/okTBgAZK9IDSXnQlhWu0LKZ+j6F+u];
         let found = scanner.scan(token);
         assert!(
             found.iter().any(|f| f.name == "Slack Bot Token (Compact)"),
@@ -2543,7 +2109,7 @@ API_KEY=original"#;
     #[test]
     fn test_slack_bot_token_compact_has_length_cap() {
         let scanner = SecretScanner::new_without_age_keys().unwrap();
-        let reasonable = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBSVTM1cmJocXJKUTY1MGhqR2xxTWRaSjdnZkFoS0I4MVROek5wY3RpNlNJCmk1SDZoZE5HS08xVXdnT29OdE5MOGJnZTJMTkdqdjBaSjRGOTA4ZTZqcE0KLT4gWDI1NTE5IHdXZitVeStGZTVZa0I2aFNRQWw0VSsyUkRhOUJHR3BlQzlhZTMyUlRjREUKTEJzZEh5by9yVGpYempTcHZFcE5jZEFxNjVFTm1YNXZrNHgwMVJiSkc4WQotPiA8LWdyZWFzZQo1QW5NUFk0YkRQSFoydVptZnJFdGR4M1FhaUNkdnBLVTlocEw3TVQvZ2xuV0VKMURET2FUbUszU2FzN3VxUk9yCmd5ekJSM1F0U1NZeUtVd1A1TUFTWG0xa2dTamhQOXQ0RU1JdXB6MzZSLzF3bGUyQzdvaS9QOXpNV244SHdMUQotLS0gVDB5WWMzenpVRDEyYnJ0ZGw0TkcyRmV3NkJ5VVRyd1Q0bk12aEduNmFxMAqESTY/OMDomoSbgkyswRfZ1GpXkhm4GZzy+H42turUcY0YO5hhuutwV2G5QaANmi7DmW6Ii/ln4zsOB7xJ7cIs31UOCu45bJZdm9jj9Wl6Y88txw65L8kDyotBPZghX8fpHlzoBA==]";
+        let reasonable = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBLZitIZWNwSENYZFJsR0dwNlplODM3ZFpZRG9ycGJ1UThVaERpRjUreTJNCnJtV2xHK1h1RmMyWStJdGYzemF5dlZGN2pNOFk1UWRmcExWMXlhZktlUDQKLT4gWDI1NTE5IGpYN3BhcHVTYXd6QkN2azF4SzNMaFE5N2lHK1Z1c3hjaDYyS25xTkROaFkKUlF4dzdaYkNMTjRJUitIa1Zyc3RSUFhUQ1dQdkIvRC9qc2hMVzUra3BYOAotPiBAPko7Uy1ncmVhc2UgSyBFNVcmbXc7cwpMalZJZWxHOUZmWnFucVdtMVpPN0VtMkJrU1QrVUQvSW5kam9LSHl1THZsbEx1dnZKQ28KLS0tIDladENvWU52Y2k3M29tdTRLRkZabTl5RWdSeUNYZGNMaWd2MU9UaFNGVW8K8wyV3YUQZXaPQIIFDYG35sm9lEYvA91yGPK65O5OGCFlPYeRCpdSxzmnb02ctox/+QKz0b0+SZwQKelndUZErUbiPwX0zplp53/MmrqH/DWHm5BYRzTatkSmgZU91+6dienI3Ss=]";
         let found = scanner.scan(reasonable);
         assert!(
             found.iter().any(|f| f.name == "Slack Bot Token (Compact)"),
@@ -2555,7 +2121,7 @@ API_KEY=original"#;
     #[test]
     fn test_hex_secret_quoted_requires_context() {
         let scanner = SecretScanner::new_without_age_keys().unwrap();
-        let with_context = r#"[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBaNjlTcUtLTVp6SmNKdC8wVi9CRXFxNVVxNGpYdkVvaUc3MGJvN2d4R2pjCmVjRnNwYXhHRXlqOUZXQ3RKYkJDaWVSZWxIT0VsVnhYdFZuaU1uZy9ER0UKLT4gWDI1NTE5IGhOS1ViNTdPT2c3dFB6cEY1a013UUxpR1FBVWtqVWxmSmtrM3ExMkZEbW8KdkkxWGJDUDExOWpOZE10N0hpYnd0RzlUSVVRYWdHUThpWDBmYnkvQW4wOAotPiAmcG5jbigiLWdyZWFzZSBBIFMleSBDN3VlIExde2kiCkFsek5TVEZ0ZHFnYnpUcCtFUFNHWXh2QlB6cFhpNVJPY05yMGYwRUQwVENnVDBrK1cwL3hIS1JXY3ZHbkxQUXUKZEswQVhvUEkzNmE4d2ZVVHN0Vjg1TGtsZnhqdjJVTXNCN1Q2Ci0tLSBiTFlTMFhsL21yenZZMUZlMWdnQ3R6ZUh2TkdTQUFnTkprR3R2a3RPTE5vCv/RaZs8948v88+g0BAR4mvkUYdxWW7psH2pDK+UX1m3dwBTzDt8y1DQHhUI63sKMHhlcR3oxq9DimYKaoKvnC8VTxYLNNSBHlOBduIdPTA=]"#;
+        let with_context = r#"[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBZbUVSbE9EaGlLTS9yakxFbW4xbHBJQm1SMUgxdGg0L3F2S3BtaEYxOGxjClh0ajF0aGw5Z1ZpeEhaUGZsNXkzblk4MzZsNHIyRGpHRWNyZWdhVEhMTVUKLT4gWDI1NTE5IEt5eEFpblowdnNscjE5R3hyaTdxWENzUU8xOUt6ZENLUTc5OVgrczNmUUUKVitoNW85eEhEUFE1QnVvTU1qbzRvOThFbmJ6N0x1Z3l6Syt4di9GZ2R6WQotPiB0WT9SLWdyZWFzZSBLQlAgdSxjCkdNTHNyc0V5TmR5M1Q4cEhWUmo3R3dXT3B1NEcvT1BXKzh5UGFQVVZQTzd2bExDNU81T1o1b3Zxd20yYjFidVkKT1ZEazhnCi0tLSBwZGc5MjBtYm4vZUJDR1l6VE9qZjVuQ1VFVUVwUW0yUGhGTlZRclV2ZzlFCvn+bYrira7tA8xUQI+TiIJK942ORo3zTGo/v2OIm3ksG5tEswKfNN4R+iH15M8gU55rqFWL1+hFdobMxkpmUuIYgY7mOxg6ENYaKjozCuE=]"#;
         let without_context = r#"label = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4""#;
         let found_with = scanner.scan(with_context);
         let found_without = scanner.scan(without_context);
@@ -2576,7 +2142,7 @@ API_KEY=original"#;
     #[test]
     fn test_high_entropy_secret_quoted_requires_context() {
         let scanner = SecretScanner::new_without_age_keys().unwrap();
-        let with_context = r#"[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBJa29SS3JhaU9XWUlYMGlNV2ZjUDVDRmx4ZXp5ODJESW0rampWRXJkaVM0CkRxMDROaW0yeWovNGs1bDY1ZnJxMzIvZUgwMEltTnhDNHhyNDhOTU04RkkKLT4gWDI1NTE5IC95N1M4OWgwTGxPQkVuREFpc1VhVUhESndKZ1VxWlVqdHhkVnBtSmFRR1UKZFNBYkU4UXBWS2tsc2I5aDhmaXAyNjVpTDZzK2xZbldrQ2QzZVNDU1BRWQotPiB6M29KIS1ncmVhc2UgQExnPDRNIDNqP0V2PD4gQD5Kdnx7fApzdWpTQ1IyTjZKdDQ0RVdNamVNNFUyYXhMMnZ5UE5SdDgzSi83V3JJSldLYXpMc1JlU3MxWGxxMSswdUtycDhNCmM1UHIKLS0tIC9Pb0tJTEVEQi9VOWp1MDZ0Ly9ud2pEZXRKNjUwZkd4cTM1WEQ4SGZwb0EK8DxbqeaTnT8zYO7z583NDbwdzM1OKdE2+vDGj337870J87pBz/ng9wV7tSqNzdAcsuB5azebqBcMrCEpn2NPaZCv]"#;
+        let with_context = r#"[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBkZjhCM0JKbitMU0Fuc0ZHc0JIS1U3TFErQlJ6MVZneG0zR2JPZVBBUkRnCmYrc0I4TUJ2a1Vzd0wwTmxhSEJzZkIzQUdIWW0wb0FQTlgyRFlMdllXamcKLT4gWDI1NTE5IDVEeW1zQzJaZG9mMEx0RnJ4V21scDRKVTh6UWhsaDc5Z21yT0MwUlhuSE0KcDBHSDJqNysrT0F1ekZuYWhwNFdieDBHRG5DUWxjcWRvY01OVTVwcVk4cwotPiBoLWdyZWFzZQorZDYrSXJEQ01qZHIvTDVyOWlFMU93c1BtNHVxQ3daUEY3VjE4c252NWNpdWdaamFwcGNYQWs0UHpVQkY1dDRiCkVrTkhnOEErNGhDRWR3Ci0tLSBCQlBvR0pxYlQyOHRaS2h6TlU5dHVIM1ZaY0ZGWC81SjZvczNnUFlyTk40Cs4KBXm272AY5x+KiKf6+ELNrmfY1w9AdUTqni77m7eL6P1eGgJc42csRRZNMlc7YyWBZAd8R8dmin+4sVZZN/FZRA==]"#;
         let without_context = r#"class_name = "aBcDeFgHiJkLmNoPqRsTuVwX""#;
         let found_with = scanner.scan(with_context);
         let found_without = scanner.scan(without_context);
