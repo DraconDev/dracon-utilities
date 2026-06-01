@@ -392,6 +392,105 @@ impl DemonSecurity {
         }
     }
 
+    /// Explicitly generate and save a new Master Identity
+    /// CRITICAL: This should only ever be called ONCE per user.
+    /// If an identity already exists, this will refuse to overwrite it.
+    pub fn generate_master_identity(&mut self) -> Result<()> {
+        let home = dirs::home_dir().context("Could not find home directory")?;
+        let identity_path = home.join(".demon").join("identity.age");
+        // Protection: Check legacy path too
+        let legacy_path = home.join(".demon").join("identity.txt");
+
+        // PROTECTION: Scan for ANY existing identity files (backups, corrupted, legacy)
+        // We refuse to init if there is ANY trace of an identity to prevent data loss.
+        if let Some(parent) = identity_path.parent() {
+            if parent.exists() {
+                for entry in fs::read_dir(parent)? {
+                    let entry = entry?;
+                    let path = entry.path();
+                    let file_name = path.file_name().and_then(|s| s.to_str()).unwrap_or("");
+
+                    if file_name.starts_with("identity") {
+                        return Err(anyhow::anyhow!(
+                            "🛡️ SAFETY TRIGGERED: Found existing identity artifact '{:?}'.\n\n\
+                             CRITICAL: Demon refuses to overwrite, modify, or delete Master Identity files.\n\
+                             This ensures you can NEVER be locked out of your secrets by an automated process.\n\n\
+                             To generate a NEW identity, you must MANUALLY move or delete all 'identity*' files in {:?}.",
+                            file_name,
+                            parent
+                        ));
+                    }
+                }
+            }
+        }
+
+        if legacy_path.exists() {
+            return Err(anyhow::anyhow!(
+                "🛡️ SAFETY TRIGGERED: Legacy identity found at {:?}. Please remove explicitly.",
+                legacy_path
+            ));
+        }
+
+        // Generate new identity
+        let key = x25519::Identity::generate();
+        if let Some(parent) = identity_path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+
+        // Save Private Identity
+        let file = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o400)
+            .open(&identity_path)?;
+        let mut writer = file;
+        #[cfg(not(unix))]
+        {
+            let mut perms = writer.metadata()?.permissions();
+            perms.set_mode(0o400);
+            if let Err(e) = fs::set_permissions(&identity_path, perms) {
+                eprintln!(
+                    "⚠️ failed to set permissions on {}: {}",
+                    identity_path.display(),
+                    e
+                );
+            }
+        }
+        writeln!(writer, "{}", key.to_string().expose_secret())?;
+
+        // Save Public Key for sharing
+        let pub_path = home.join(".demon").join("identity.pub");
+        fs::write(&pub_path, key.to_public().to_string())?;
+
+        // Auto-Backup Master Identity
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        let backup_dir = home.join(".demon").join("backups");
+        if let Err(e) = fs::create_dir_all(&backup_dir) {
+            eprintln!(
+                "⚠️ failed to create backup dir {}: {}",
+                backup_dir.display(),
+                e
+            );
+        }
+        let backup_path = backup_dir.join(format!("master_{}.age", timestamp));
+        if let Ok(mut b_file) = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o400)
+            .open(&backup_path)
+        {
+            if let Err(e) = writeln!(b_file, "{}", key.to_string().expose_secret()) {
+                eprintln!("⚠️ failed to write backup {}: {}", backup_path.display(), e);
+            }
+        }
+
+        self.master_identities = vec![key];
+        Ok(())
+    }
+
     /// Helper to get the repo root, either from configured path or CWD
     fn get_repo_root(&self) -> Result<PathBuf> {
         if let Some(root) = &self.repo_root {
@@ -535,6 +634,92 @@ impl DemonSecurity {
         Err(anyhow::anyhow!("No matching machine key found"))
     }
 
+    /// Generate a new Machine Identity (Private Key, Public Key)
+    pub fn generate_machine_identity() -> (String, String) {
+        let identity = x25519::Identity::generate();
+        let pub_key = identity.to_public().to_string();
+        let identity_str = identity.to_string();
+        let priv_key = identity_str.expose_secret();
+        (priv_key.to_string(), pub_key)
+    }
+
+    /// Authorize a Machine (Public Key) to access this repo
+    pub fn whitelist_machine(&self, public_key_str: &str) -> Result<()> {
+        let recipient: x25519::Recipient = public_key_str
+            .parse()
+            .map_err(|e| anyhow::anyhow!("Invalid machine public key: {}", e))?;
+
+        let repo_key = self
+            .load_repo_key()
+            .context("Must have access to repo to whitelist machines")?;
+
+        let repo_root = self.get_repo_root()?;
+        let keys_dir = repo_root.join(".git").join("arcane").join("keys");
+
+        // Use hash or similar ID for filename
+        let safe_name = public_key_str
+            .replace(":", "_")
+            .chars()
+            .take(12)
+            .collect::<String>();
+        let machine_file = keys_dir.join(format!("machine:{}.age", safe_name));
+        let pub_file = keys_dir.join(format!("machine:{}.pub", safe_name));
+
+        // Save public key (for V2 filtering)
+        fs::write(&pub_file, public_key_str)?;
+
+        self.encrypt_and_save_key(&repo_key, &recipient, &machine_file)?;
+
+        Ok(())
+    }
+
+    /// Load a Team Key from ~/demon/teams/<name>.key
+    pub fn load_team_key(&self, team_name: &str) -> Result<TeamKey> {
+        let home = dirs::home_dir().context("Could not find home directory")?;
+        let team_key_path = home
+            .join(".demon")
+            .join("teams")
+            .join(format!("{}.key", team_name));
+
+        if !team_key_path.exists() {
+            return Err(anyhow::anyhow!(
+                "Team key '{}' not found in keychain",
+                team_name
+            ));
+        }
+
+        // Team keys are encrypted with Master Identity
+        // Team keys are encrypted with Master Identity. Use PRIMARY (first in ring).
+        let identity = self
+            .master_identities
+            .first()
+            .context("Master identity required to unlock team keys")?;
+
+        // Decrypt the file
+        let encrypted_bytes = fs::read(&team_key_path)?;
+        // Fix: Wrap input in Cursor for Decryptor
+        let decryptor = age::Decryptor::new(std::io::Cursor::new(&encrypted_bytes))?;
+
+        let mut reader = match decryptor {
+            age::Decryptor::Recipients(d) => d
+                .decrypt(std::iter::once(identity as &dyn age::Identity))
+                .map_err(|e| anyhow::anyhow!("Decryption failed: {}", e))?,
+            age::Decryptor::Passphrase(_) => {
+                return Err(anyhow::anyhow!("Passphrase encryption not supported"))
+            }
+        };
+
+        let mut key_bytes = Vec::new();
+        use std::io::Read;
+        reader.read_to_end(&mut key_bytes)?;
+
+        if key_bytes.len() != 32 {
+            return Err(anyhow::anyhow!("Invalid team key length"));
+        }
+
+        Ok(TeamKey(key_bytes))
+    }
+
     fn decrypt_repo_key_with_team_key(&self, path: &Path, team_key: &TeamKey) -> Result<RepoKey> {
         let encrypted_bytes = fs::read(path)?;
 
@@ -563,6 +748,315 @@ impl DemonSecurity {
         }
 
         Ok(RepoKey(key_bytes))
+    }
+
+    /// Create a new Team (Generates a new Identity, saves to keychain)
+    pub fn create_team(&self, team_name: &str) -> Result<()> {
+        // Validate name
+        if team_name.contains('/') || team_name.contains('\\') || team_name.contains(':') {
+            return Err(anyhow::anyhow!("Invalid team name"));
+        }
+
+        let home = dirs::home_dir().context("Could not find home directory")?;
+        let team_dir = home.join(".demon").join("teams");
+        fs::create_dir_all(&team_dir)?;
+
+        let team_key_path = team_dir.join(format!("{}.key", team_name));
+        if team_key_path.exists() {
+            return Err(anyhow::anyhow!(
+                "Team '{}' already exists in your keychain",
+                team_name
+            ));
+        }
+
+        // Generate new Identity for the team
+        let team_identity = x25519::Identity::generate();
+        let team_identity_string = team_identity.to_string(); // Extend lifetime
+        let team_secret = team_identity_string.expose_secret();
+
+        // Encrypt this secret with Master Identity for storage
+        let master = self
+            .master_identities
+            .first()
+            .context("Master identity required")?;
+        let recipient = master.to_public();
+
+        // Encryption logic
+        let recipients: Vec<Box<dyn age::Recipient + Send>> = vec![Box::new(recipient.clone())];
+        let encryptor =
+            age::Encryptor::with_recipients(recipients).context("failed to create encryptor")?;
+
+        let mut encrypted = vec![];
+        let mut writer = encryptor.wrap_output(&mut encrypted)?;
+        writer.write_all(team_secret.as_bytes())?;
+        writer.finish()?;
+
+        std::fs::write(&team_key_path, encrypted)?;
+        Ok(())
+    }
+
+    /// Add a new team member by encrypting the repo key for them
+    pub fn add_team_member(&self, alias: &str, public_key_str: &str) -> Result<()> {
+        let recipient: x25519::Recipient = public_key_str
+            .parse()
+            .map_err(|e| anyhow::anyhow!("Invalid public key: {}", e))?;
+
+        let repo_key = self
+            .load_repo_key()
+            .context("Must have access to repo to add members")?;
+
+        // Sanitize alias
+        let alias = alias.trim();
+        if alias.is_empty() || alias.contains('/') || alias.contains('\\') {
+            return Err(anyhow::anyhow!("Invalid alias"));
+        }
+
+        let repo_root = self.get_repo_root()?;
+        let keys_dir = repo_root.join(".git").join("arcane").join("keys");
+        let key_path = keys_dir.join(format!("{}.age", alias));
+        let pub_key_path = keys_dir.join(format!("{}.pub", alias));
+
+        if key_path.exists() {
+            return Err(anyhow::anyhow!("Member '{}' already exists", alias));
+        }
+
+        // Save public key (for V2 filtering)
+        fs::write(&pub_key_path, public_key_str)?;
+
+        // Save Age key (encrypted for member)
+        self.encrypt_and_save_key(&repo_key, &recipient, &key_path)?;
+
+        Ok(())
+    }
+
+    /// Create an Invite for a user to join a Team
+    pub fn create_team_invite(&self, team_name: &str, user_public_key: &str) -> Result<PathBuf> {
+        let team_key = self.load_team_key(team_name)?;
+
+        let recipient: x25519::Recipient = user_public_key
+            .parse()
+            .map_err(|e| anyhow::anyhow!("Invalid user public key: {}", e))?;
+
+        let repo_root = self.get_repo_root()?;
+
+        // Generate a random invite ID
+        let invite_id = uuid::Uuid::new_v4().to_string();
+
+        let invites_dir = repo_root.join(".demon").join("invites").join(team_name);
+        fs::create_dir_all(&invites_dir)?;
+
+        let invite_path = invites_dir.join(format!("{}.age", invite_id));
+
+        // Encrypt the TEAM KEY for the USER
+        let recipients: Vec<Box<dyn age::Recipient + Send>> = vec![Box::new(recipient)];
+        let encryptor =
+            age::Encryptor::with_recipients(recipients).context("Failed to create encryptor")?;
+
+        let mut file = fs::File::create(&invite_path)?;
+        let mut writer = encryptor.wrap_output(&mut file)?;
+        writer.write_all(&team_key.0)?;
+        writer.finish()?;
+
+        Ok(invite_path)
+    }
+
+    /// Accept a Team Invite
+    pub fn accept_team_invite(&self, invite_path: &Path) -> Result<String> {
+        let identity = self
+            .master_identities
+            .first()
+            .context("Master identity required to accept invite")?;
+
+        let encrypted_bytes = fs::read(invite_path)?;
+        let decryptor = age::Decryptor::new(std::io::Cursor::new(&encrypted_bytes))?;
+
+        let mut reader = match decryptor {
+            age::Decryptor::Recipients(d) => d
+                .decrypt(std::iter::once(identity as &dyn age::Identity))
+                .map_err(|e| anyhow::anyhow!("Decryption failed: {}", e))?,
+            age::Decryptor::Passphrase(_) => {
+                return Err(anyhow::anyhow!("Passphrase encryption not supported"))
+            }
+        };
+
+        let mut key_bytes = Vec::new();
+        reader.read_to_end(&mut key_bytes)?;
+
+        if key_bytes.len() != 32 {
+            return Err(anyhow::anyhow!("Invalid invite content"));
+        }
+
+        // Determine team name from path: demon/invites/<team_name>/...
+        let team_name = invite_path
+            .parent()
+            .and_then(|p| p.file_name())
+            .and_then(|s| s.to_str())
+            .ok_or_else(|| anyhow::anyhow!("Could not determine team name from path"))?;
+
+        // Save to key chain
+        let home = dirs::home_dir().context("Could not find home directory")?;
+        let team_dir = home.join(".demon").join("teams");
+        fs::create_dir_all(&team_dir)?;
+
+        let team_key_path = team_dir.join(format!("{}.key", team_name));
+
+        // Encrypt for local storage (Master Identity)
+        let master = self
+            .master_identities
+            .first()
+            .context("Master identity required to accept invite")?;
+        let recipient = master.to_public();
+
+        let recipients: Vec<Box<dyn age::Recipient + Send>> = vec![Box::new(recipient)];
+        let encryptor =
+            age::Encryptor::with_recipients(recipients).context("Failed to create encryptor")?;
+
+        let mut encrypted = vec![];
+        let mut writer = encryptor.wrap_output(&mut encrypted)?;
+        writer.write_all(&key_bytes)?;
+        writer.finish()?;
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            let mut file = fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .mode(0o600)
+                .open(&team_key_path)?;
+            file.write_all(&encrypted)?;
+        }
+        #[cfg(not(unix))]
+        {
+            fs::write(&team_key_path, &encrypted)?;
+            let metadata = fs::metadata(&team_key_path)?;
+            let mut perms = metadata.permissions();
+            perms.set_mode(0o600);
+            fs::set_permissions(&team_key_path, perms)?;
+        }
+
+        Ok(team_name.to_string())
+    }
+
+    /// Revoke a recipient's access to this repo by removing their key files
+    pub fn revoke_recipient(&self, public_key_str: &str) -> Result<()> {
+        // SAFETY: Refuse to revoke ANY master identity key.
+        for id in &self.master_identities {
+            if id.to_public().to_string() == public_key_str {
+                return Err(anyhow::anyhow!(
+                    "🛡️ SAFETY TRIGGERED: Refusing to revoke a Master Identity key.\n\
+                     Master identities must be managed MANUALLY via the filesystem to prevent lockout."
+                ));
+            }
+        }
+
+        let repo_root = self.get_repo_root()?;
+        let search_paths = vec![
+            repo_root.join(".demon").join("data").join("keys"),
+            repo_root.join(".git").join("arcane").join("keys"),
+        ];
+
+        let mut removed_count = 0;
+        for dir in search_paths {
+            if dir.exists() {
+                for entry in fs::read_dir(dir)? {
+                    let entry = entry?;
+                    let path = entry.path();
+                    if let Ok(content) = fs::read_to_string(&path) {
+                        if content.contains(public_key_str) {
+                            if let Err(e) = fs::remove_file(&path) {
+                                eprintln!("⚠️ failed to remove {}: {}", path.display(), e);
+                            }
+
+                            let age_path = path.with_extension("age");
+                            if age_path.exists() {
+                                if let Err(e) = fs::remove_file(&age_path) {
+                                    eprintln!("⚠️ failed to remove {}: {}", age_path.display(), e);
+                                }
+                            }
+
+                            removed_count += 1;
+                        }
+                    }
+                }
+            }
+        }
+
+        if removed_count > 0 {
+            Ok(())
+        } else {
+            Err(anyhow::anyhow!("No files found for this recipient"))
+        }
+    }
+
+    /// List all authorized recipients in the current repository
+    pub fn list_authorized_recipients(&self) -> Result<Vec<(String, String)>> {
+        let repo_root = self.get_repo_root()?;
+        let mut recipients = Vec::new();
+        let mut seen = std::collections::HashSet::new();
+
+        let search_paths = vec![
+            repo_root.join(".demon").join("data").join("keys"),
+            repo_root.join(".git").join("arcane").join("keys"),
+        ];
+
+        for dir in search_paths {
+            if dir.exists() {
+                if let Ok(entries) = fs::read_dir(dir) {
+                    for entry in entries.flatten() {
+                        let path = entry.path();
+                        let ext = path.extension().and_then(|s| s.to_str()).unwrap_or("");
+                        if ext == "pub" || ext == "key" {
+                            if let Ok(content) = fs::read_to_string(&path) {
+                                let name = path
+                                    .file_stem()
+                                    .and_then(|s| s.to_str())
+                                    .unwrap_or("unknown")
+                                    .to_string();
+                                for line in content.lines() {
+                                    let line = line.trim();
+                                    if !line.is_empty()
+                                        && !line.starts_with('#')
+                                        && seen.insert(line.to_string())
+                                    {
+                                        recipients.push((name.clone(), line.to_string()));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Ok(recipients)
+    }
+
+    /// List all team members (aliases)
+    pub fn list_team_members(&self) -> Result<Vec<String>> {
+        let repo_root = self.get_repo_root()?;
+        let keys_dir = repo_root.join(".git").join("arcane").join("keys");
+
+        if !keys_dir.exists() {
+            return Ok(Vec::new());
+        }
+
+        let mut members = Vec::new();
+        for entry in fs::read_dir(keys_dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.extension().and_then(|s| s.to_str()) == Some("age") {
+                if let Some(name) = path.file_stem().and_then(|s| s.to_str()) {
+                    if !name.starts_with("machine:")
+                        && !name.starts_with("team:")
+                        && name != "repo"
+                        && name != "owner"
+                    {
+                        members.push(name.to_string());
+                    }
+                }
+            }
+        }
+        Ok(members)
     }
 
     fn try_decrypt_directory(&self, dir: &Path, identity: &x25519::Identity) -> Result<RepoKey> {
@@ -686,6 +1180,13 @@ impl DemonSecurity {
         Ok(())
     }
 
+    // ============================================================
+    // V2: DIRECT RECIPIENT ENCRYPTION (Standard Age)
+    // ============================================================
+
+    /// V2 Encryption: Encrypt directly to a list of recipients (No RepoKey)
+    pub fn encrypt_v2(
+        &self,
         data: &[u8],
         recipients: Vec<Box<dyn age::Recipient + Send>>,
     ) -> Result<Vec<u8>> {
@@ -698,6 +1199,145 @@ impl DemonSecurity {
         writer.finish()?;
 
         Ok(encrypted)
+    }
+
+    /// V2 Decryption: Decrypt using the User's Identities (Try ALL known keys)
+    /// V2 Decryption: Decrypt using the User's Identities (Try ALL known keys)
+    pub fn decrypt_v2(&self, encrypted_data: &[u8]) -> Result<Vec<u8>> {
+        if self.master_identities.is_empty() {
+            return Err(anyhow::anyhow!(
+                "Master identity required for V2 decryption"
+            ));
+        }
+
+        let decryptor = age::Decryptor::new(std::io::Cursor::new(encrypted_data))?;
+
+        match decryptor {
+            age::Decryptor::Recipients(d) => {
+                // Pass ALL identities to the decryptor at once.
+                // Age will try them one by one.
+                let identities: Vec<&dyn age::Identity> = self
+                    .master_identities
+                    .iter()
+                    .map(|id| id as &dyn age::Identity)
+                    .collect();
+
+                let mut reader = d
+                    .decrypt(identities.into_iter())
+                    .map_err(|e| anyhow::anyhow!("Decryption failed: {}", e))?;
+
+                let mut plaintext = Vec::new();
+                reader.read_to_end(&mut plaintext)?;
+                Ok(plaintext)
+            }
+            age::Decryptor::Passphrase(_) => {
+                Err(anyhow::anyhow!("Passphrase encryption not supported"))
+            }
+        }
+    }
+
+    /// Gather all known recipients (Master, Imported, Team, Machine) for encryption.
+    pub fn gather_all_recipients(&self) -> Result<Vec<x25519::Recipient>> {
+        let master = self
+            .master_identities
+            .first()
+            .context("Master identity required to gathering recipients")?;
+        let mut seen_keys = std::collections::HashSet::new();
+        let mut recipients = Vec::new();
+
+        // 1. Self (Master)
+        let master_pub = master.to_public();
+        seen_keys.insert(master_pub.to_string());
+        recipients.push(master_pub);
+
+        // 2. Imported Heritage Identities
+        for id in &self.imported_identities {
+            let pub_key = id.to_public();
+            let pub_str = pub_key.to_string();
+            if seen_keys.insert(pub_str) {
+                recipients.push(pub_key);
+            }
+        }
+
+        // 3. Authorized Machine & Team Keys from the current repo
+        if let Ok(repo_root) = self.get_repo_root() {
+            // Check BOTH new committed path (V2 Standard) and legacy path
+            let search_paths = vec![
+                repo_root.join(".demon").join("data").join("keys"), // V2 Standard
+                repo_root.join(".git").join("arcane").join("keys"), // Legacy
+            ];
+
+            for keys_dir in search_paths {
+                if keys_dir.exists() {
+                    if let Ok(entries) = fs::read_dir(keys_dir) {
+                        for entry in entries.flatten() {
+                            let path = entry.path();
+                            // Accept .pub files (standard) and .key files (legacy pubkeys sometimes named .key)
+                            let ext = path.extension().and_then(|s| s.to_str()).unwrap_or("");
+                            if ext == "pub" || ext == "key" {
+                                if let Ok(pub_str) = fs::read_to_string(&path) {
+                                    // Parse potential multiple keys per file or single key
+                                    for line in pub_str.lines() {
+                                        let line = line.trim();
+                                        if !line.is_empty()
+                                            && !line.starts_with('#')
+                                            && seen_keys.insert(line.to_string())
+                                        {
+                                            if let Ok(recipient) = line.parse::<x25519::Recipient>()
+                                            {
+                                                recipients.push(recipient);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(recipients)
+    }
+
+    /// Unified payload unlocking logic: try ALL known keys.
+    pub fn unlock_payload(&self, encrypted_data: &[u8]) -> Result<Vec<u8>> {
+        // 1. Try Age (V2) format
+        if encrypted_data.starts_with(HEADER_V2_MAGIC) {
+            // Try ALL Master keys
+            for id in &self.master_identities {
+                if let Ok(plaintext) = self.decrypt_v2_with_identity(encrypted_data, id) {
+                    return Ok(plaintext);
+                }
+            }
+            // Try Imported
+            for id in &self.imported_identities {
+                if let Ok(plaintext) = self.decrypt_v2_with_identity(encrypted_data, id) {
+                    return Ok(plaintext);
+                }
+            }
+        }
+
+        // 2. Try RepoKey (V1) format - if we have a RepoKey
+        if let Ok(repo_key) = self.load_repo_key() {
+            if let Ok(plaintext) = self.decrypt_with_repo_key(&repo_key, encrypted_data) {
+                return Ok(plaintext);
+            }
+            if let Ok(plaintext) = self.decrypt_git_seal(&repo_key, encrypted_data) {
+                return Ok(plaintext);
+            }
+        }
+
+        // 3. Drunk guy with keychain (brute force all keys in ~/demon/keys)
+        if let Some(plaintext) = self.try_keychain_bruteforce(encrypted_data) {
+            return Ok(plaintext);
+        }
+
+        Err(anyhow::anyhow!(
+            "Decryption failed after trying all keys (V2 + V1 + Keychain). Magic: {:?}, Len: {}",
+            &encrypted_data.get(0..20).unwrap_or(&[]),
+            encrypted_data.len()
+        ))
     }
 
     fn decrypt_v2_with_identity(
@@ -717,6 +1357,218 @@ impl DemonSecurity {
         let mut plaintext = Vec::new();
         reader.read_to_end(&mut plaintext)?;
         Ok(plaintext)
+    }
+
+    /// Helper for encrypting data to all known recipients.
+    pub fn encrypt_v2_for_all(&self, data: &[u8]) -> Result<Vec<u8>> {
+        let recipients = self.gather_all_recipients()?;
+        let age_recipients: Vec<Box<dyn age::Recipient + Send>> = recipients
+            .into_iter()
+            .map(|r| Box::new(r) as Box<dyn age::Recipient + Send>)
+            .collect();
+        self.encrypt_v2(data, age_recipients)
+    }
+
+    /// Encrypt data for a specific node (runner) + master keys
+    pub fn encrypt_for_node(&self, data: &[u8], node_recipient: &str) -> Result<Vec<u8>> {
+        let mut recipients = Vec::new();
+
+        // 1. Add node recipient
+        let node: x25519::Recipient = node_recipient
+            .parse::<x25519::Recipient>()
+            .map_err(|e| anyhow::anyhow!("Invalid node recipient: {}", e))?;
+        recipients.push(node);
+
+        // 2. Add master keys (so Director/User can still recover/debug)
+        let master_ids = self.load_master_identities()?;
+        for id in master_ids {
+            recipients.push(id.to_public());
+        }
+
+        let age_recipients: Vec<Box<dyn age::Recipient + Send>> = recipients
+            .into_iter()
+            .map(|r| Box::new(r) as Box<dyn age::Recipient + Send>)
+            .collect();
+
+        self.encrypt_v2(data, age_recipients)
+    }
+
+    /// Ensure the current user's public key is present in the repo keys.
+    /// This prevents "lockout" by ensuring we can always decrypt what we encrypt.
+    pub fn ensure_current_user_key(&self) -> Result<()> {
+        let repo_root = match self.get_repo_root() {
+            Ok(r) => r,
+            Err(_) => return Ok(()), // Not in a repo, skip
+        };
+
+        let identity = self
+            .master_identities
+            .first()
+            .context("No master identity found")?;
+        let pub_key = identity.to_public();
+        let pub_key_str = pub_key.to_string();
+
+        // Use a short hash of the key for the filename to allow multiple owners
+        // without conflict or overwriting.
+        let safe_id = pub_key_str.chars().take(8).collect::<String>();
+        let filename = format!("owner_{}.pub", safe_id);
+
+        let keys_dir = repo_root.join(".demon").join("data").join("keys");
+        fs::create_dir_all(&keys_dir)?;
+
+        let key_path = keys_dir.join(&filename);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            let mut file = fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .mode(0o644)
+                .open(&key_path)?;
+            file.write_all(pub_key_str.as_bytes())?;
+        }
+        #[cfg(not(unix))]
+        {
+            fs::write(&key_path, &pub_key_str)?;
+        }
+        Ok(())
+    }
+
+    /// Create a secure backup of a file before modification.
+    /// The backup is encrypted with all known keys and stored in ~/demon/backups/
+    /// Returns the path to the backup file.
+    pub fn backup_file(&self, file_path: &Path, content: &[u8]) -> Result<PathBuf> {
+        let path_str = file_path.to_string_lossy();
+        if path_str.contains("demon/backups") || path_str.contains("arcane/backups") {
+            return Err(anyhow::anyhow!(
+                "Recursion guard: Skipping backup of backup file"
+            ));
+        }
+
+        // Auto-ensure our key is in the repo before we do anything that might rely on it later
+
+        let home = self.get_home()?;
+        let backup_dir = home.join(".demon").join("backups");
+        fs::create_dir_all(&backup_dir)?;
+
+        // Hash the path to create a deterministic but safe filename
+        let mut hasher = Sha256::new();
+        hasher.update(file_path.to_string_lossy().as_bytes());
+        let hash = hasher.finalize();
+        let hash_hex: String = hash.iter().map(|b| format!("{:02x}", b)).collect();
+
+        // Timestamp
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+
+        // Filename: <hash>_<timestamp>.age
+        let filename = format!("{}_{}.age", hash_hex, timestamp);
+        let backup_path = backup_dir.join(filename);
+
+        // Encrypt logic (using encrypt_v2_for_all)
+        let encrypted = self.encrypt_v2_for_all(content)?;
+
+        fs::write(&backup_path, encrypted)?;
+        Ok(backup_path)
+    }
+
+    /// Restore a file from the latest secure backup.
+    /// Finds the backup matching the file path hash and decrypts it to the target path.
+    pub fn restore_file(&self, file_path: &Path) -> Result<PathBuf> {
+        let home = self.get_home()?;
+        let backup_dir = home.join(".demon").join("backups");
+
+        if !backup_dir.exists() {
+            return Err(anyhow::anyhow!(
+                "No backups found for file: {:?}",
+                file_path
+            ));
+        }
+
+        // Hash the path to find matching backups
+        let mut hasher = Sha256::new();
+        hasher.update(file_path.to_string_lossy().as_bytes());
+        let hash = hasher.finalize();
+        let hash_hex: String = hash.iter().map(|b| format!("{:02x}", b)).collect();
+
+        // Find matching backup files
+        let mut backups = Vec::new();
+        if backup_dir.exists() {
+            for entry in fs::read_dir(&backup_dir)? {
+                let entry = entry?;
+                let path = entry.path();
+                if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                    // Check if file starts with the hash
+                    if name.starts_with(&hash_hex) && name.ends_with(".age") {
+                        backups.push(path);
+                    }
+                }
+            }
+        }
+
+        if backups.is_empty() {
+            return Err(anyhow::anyhow!(
+                "No backups found for file: {:?}",
+                file_path
+            ));
+        }
+
+        // Sort to get the latest
+        backups.sort();
+        let latest_backup = backups
+            .last()
+            .ok_or_else(|| anyhow::anyhow!("No backups found for file: {:?}", file_path))?;
+
+        // Decrypt
+        let encrypted_content = fs::read(latest_backup)?;
+        let decrypted_content = self.unlock_payload(&encrypted_content)?;
+
+        // Write back
+        fs::write(file_path, decrypted_content)?;
+
+        Ok(latest_backup.clone())
+    }
+
+    /// List all available backups for a given file path, sorted by timestamp (newest first).
+    pub fn list_backups(&self, file_path: &Path) -> Result<Vec<PathBuf>> {
+        let home = self.get_home()?;
+        let backup_dir = home.join(".demon").join("backups");
+
+        if !backup_dir.exists() {
+            return Ok(Vec::new());
+        }
+
+        // Hash the path to find matching backups
+        let mut hasher = Sha256::new();
+        hasher.update(file_path.to_string_lossy().as_bytes());
+        let hash = hasher.finalize();
+        let hash_hex: String = hash.iter().map(|b| format!("{:02x}", b)).collect();
+
+        // Find matching backup files
+        let mut backups = Vec::new();
+        for entry in fs::read_dir(&backup_dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                // Check if file starts with the hash
+                if name.starts_with(&hash_hex) && name.ends_with(".age") {
+                    backups.push(path);
+                }
+            }
+        }
+
+        // Sort reverse (newest first)
+        backups.sort_by(|a, b| b.cmp(a));
+
+        Ok(backups)
+    }
+
+    /// In-situ Clean: Scan for secrets and replace with REDACTED_REGEX tags.
+    pub fn smart_clean(&self, content: &str) -> Result<String> {
+        let scanner = SecretScanner::new()?;
+        self.smart_clean_with_scanner(content, &scanner)
     }
 
     /// In-situ Clean with a specific scanner (allows filtering patterns)
@@ -748,6 +1600,175 @@ impl DemonSecurity {
         }
     }
 
+    /// Smart Clean with Path Context:
+    /// If the path is in a sensitive directory (e.g. .ssh, .aws) OR force_encrypt is true, encrypt the ENTIRE file.
+    /// Otherwise, use regex-based in-situ encryption (if text).
+    pub fn smart_clean_with_path(&self, content: &[u8], path_str: &str) -> Result<Vec<u8>> {
+        // 1. Definition of Sensitive Paths (Still used for binary detection)
+        let sensitive_dirs = [
+            ".ssh",
+            "demon/keys",
+            "demon/secrets",
+            ".aws",
+            ".kube",
+            ".gnupg",
+            ".azure",
+            ".config/gcloud",
+        ];
+
+        let sensitive_exts = [
+            ".age", ".key", ".p12", ".pfx", ".pem", ".crt", ".der", ".asc", ".zip", ".tar", ".gz",
+            ".bz2", ".7z", ".rar", ".tgz", ".xz", ".tar.gz", ".tar.bz2", ".tar.xz", ".sqlite",
+            ".sqlite3", ".db", ".vmdk", ".img", ".qcow2", ".vdi", ".iso", ".docker", ".oci",
+            ".xlsx", ".csv", ".ods", ".kdbx", ".1pif", ".sql", ".apk", ".aab", ".dmg", ".pcap",
+            ".pcapng", ".ovpn", ".tfstate", ".tfplan", ".tfvars",
+        ];
+
+        let sensitive_filenames = [
+            "id_rsa",
+            "id_ed25519",
+            "id_ecdsa",
+            "id_dsa",
+            "id_xmss",
+            "master.age",
+            "identity.age",
+            "owner.age",
+            "demon-key",
+            "id_rsa.pub",
+            "id_ed25519.pub",
+            "credentials",
+            ".bash_history",
+            ".zsh_history",
+            ".sh_history",
+            "core",
+            "known_hosts",
+            "vault.yml",
+            ".terraform.lock.hcl",
+            "terraform.tfvars",
+            ".env",
+            ".env.local",
+            ".env.production",
+            ".env.development",
+            ".env.staging",
+            ".npmrc",
+            ".pypirc",
+            "netrc",
+            ".pgpass",
+            ".my.cnf",
+        ];
+
+        let filename = std::path::Path::new(path_str)
+            .file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or("");
+
+        // Check if any path component exactly matches a sensitive directory name.
+        // Using component-level matching avoids false positives like "my.ssh.config"
+        // matching ".ssh" via substring contains.
+        let path_components: Vec<&str> = std::path::Path::new(path_str)
+            .components()
+            .filter_map(|c| c.as_os_str().to_str())
+            .collect();
+
+        // Single-component matching
+        let has_single_component = sensitive_dirs
+            .iter()
+            .any(|dir| !dir.contains('/') && path_components.contains(dir));
+        // Multi-component sequence matching (e.g. ".config/gcloud")
+        let has_multi_component = sensitive_dirs.iter().any(|dir| {
+            let parts: Vec<&str> = dir.split('/').collect();
+            if parts.len() < 2 {
+                return false;
+            }
+            path_components
+                .windows(parts.len())
+                .any(|window| window == parts.as_slice())
+        });
+
+        let is_sensitive_location = has_single_component
+            || has_multi_component
+            || sensitive_exts.iter().any(|ext| path_str.ends_with(ext))
+            || sensitive_filenames.contains(&filename)
+            || sensitive_filenames
+                .iter()
+                .any(|p| filename == *p || filename.starts_with(&format!("{}.", p)))
+            || self
+                .managed_patterns
+                .iter()
+                .any(|p| filename == p || path_str.contains(p));
+
+        // 2. Process based on content type
+        match std::str::from_utf8(content) {
+            Ok(text_content) => {
+                // Full encryption for sensitive files that shouldn't leak structure
+                let is_full_encrypt = is_sensitive_location
+                    && (filename.starts_with(".env")
+                        || filename == "credentials"
+                        || filename.starts_with(".bash_history")
+                        || filename.starts_with(".zsh_history")
+                        || filename.starts_with(".sh_history")
+                        || filename == "vault.yml");
+                if is_full_encrypt {
+                    // Don't double-encrypt
+                    if content.starts_with(HEADER_V2_MAGIC)
+                        || self.starts_with_any_secret_tag(content)
+                    {
+                        return Ok(content.to_vec());
+                    }
+                    // Add/increment version header for .env files to track changes
+                    let content_to_encrypt = if filename.starts_with(".env") {
+                        // Check if this is already a warden-managed file by looking for our marker
+                        if text_content.contains("Dracon Warden") {
+                            // Remove old header and add new one with incremented version
+                            let stripped = strip_env_version_header(text_content);
+                            format!(
+                                "{}\n{}",
+                                make_env_version_header(text_content),
+                                stripped.trim()
+                            )
+                        } else {
+                            // First time encryption - add v1 header
+                            format!(
+                                "{}\n{}",
+                                make_env_version_header(text_content),
+                                text_content
+                            )
+                        }
+                    } else {
+                        text_content.to_string()
+                    };
+                    return self.encrypt_v2_to_b64_tag(content_to_encrypt.as_bytes());
+                }
+                // For identity files (master.age, identity.age), use a scanner that
+                // skips age key patterns to avoid encrypting the identity itself,
+                // but still catches other embedded secrets like API keys.
+                let is_identity_file = filename == "master.age" || filename == "identity.age";
+                let cleaned = if is_identity_file {
+                    let scanner = SecretScanner::new_without_age_keys()?;
+                    self.smart_clean_with_scanner(text_content, &scanner)?
+                } else {
+                    self.smart_clean(text_content)?
+                };
+                Ok(cleaned.into_bytes())
+            }
+            Err(_) => {
+                // Binary Data: Only encrypt if it is in a sensitive location
+                if is_sensitive_location {
+                    // Don't double-encrypt
+                    if content.starts_with(HEADER_V2_MAGIC)
+                        || self.starts_with_any_secret_tag(content)
+                    {
+                        return Ok(content.to_vec());
+                    }
+                    self.encrypt_v2_to_b64_tag(content)
+                } else {
+                    // Normal binary path -> Passthrough (preserves images, etc)
+                    Ok(content.to_vec())
+                }
+            }
+        }
+    }
+
     fn encrypt_v2_to_b64_tag(&self, content: &[u8]) -> Result<Vec<u8>> {
         match self.encrypt_v2_for_all(content) {
             Ok(encrypted) => {
@@ -756,6 +1777,151 @@ impl DemonSecurity {
             }
             Err(e) => Err(anyhow::anyhow!("Failed to encrypt sensitive file: {}", e)),
         }
+    }
+
+    /// In-situ Smudge: Decrypt REDACTED_REGEX tags back to plaintext.
+    pub fn smart_smudge(&self, content: &str) -> Result<String> {
+        let markers = self.secret_tag_prefixes();
+        let mut result = String::new();
+        let mut last_end = 0;
+
+        while last_end < content.len() {
+            let mut next: Option<(usize, usize)> = None;
+            for marker in &markers {
+                if let Some(start_idx) = content[last_end..].find(marker) {
+                    let absolute_start = last_end + start_idx;
+                    let marker_len = marker.len();
+                    if next
+                        .map(|(best_idx, _)| absolute_start < best_idx)
+                        .unwrap_or(true)
+                    {
+                        next = Some((absolute_start, marker_len));
+                    }
+                }
+            }
+
+            let Some((absolute_start, marker_len)) = next else {
+                break;
+            };
+
+            result.push_str(&content[last_end..absolute_start]);
+
+            // Find closing bracket
+            if let Some(end_offset) = content[absolute_start..].find(']') {
+                let absolute_end = absolute_start + end_offset + 1;
+                let b64 = &content[absolute_start + marker_len..absolute_end - 1];
+
+                match general_purpose::STANDARD.decode(b64.trim()) {
+                    Ok(encrypted) => match self.unlock_payload(&encrypted) {
+                        Ok(plaintext) => {
+                            result.push_str(&String::from_utf8_lossy(&plaintext));
+                        }
+                        Err(_) => result.push_str(&content[absolute_start..absolute_end]),
+                    },
+                    Err(_) => result.push_str(&content[absolute_start..absolute_end]),
+                }
+                last_end = absolute_end;
+            } else {
+                // No closing bracket found, treat as normal text
+                result.push_str(&content[absolute_start..]);
+                last_end = content.len();
+            }
+        }
+
+        result.push_str(&content[last_end..]);
+        Ok(result)
+    }
+
+    /// Git Clean Filter: Encrypt stdin -> stdout
+    /// V2 Upgrade: Encrypts to ALL known public keys (User + Machines + Teams)
+    pub fn seal_clean(&self, file_path: Option<&str>) -> Result<()> {
+        use std::io::{Read, Write};
+
+        // 1. Read plaintext from stdin
+        let mut buffer = Vec::new();
+        std::io::stdin().read_to_end(&mut buffer)?;
+
+        // Auto-add key to avoid lockout (Ensure keys folder exists)
+        if let Err(e) = self.ensure_current_user_key() {
+            eprintln!("⚠️ failed to ensure user key: {}", e);
+        }
+
+        // 3. Backup (Safety Net) - must happen before buffer is potentially moved
+        if let Some(path) = file_path {
+            if path.contains(".env") {
+                if let Err(e) = self.backup_secret(path, &buffer) {
+                    eprintln!("⚠️ failed to backup .env file: {}", e);
+                }
+            }
+        }
+
+        // 4. Smart Clean: Targeted encryption only to preserve Git diffs.
+        // Every file (UTF-8) is scanned for secrets.
+        // Binary files are passed through untouched to preserve Git diffs.
+        let output = if let Ok(text_content) = std::str::from_utf8(&buffer) {
+            self.smart_clean(text_content)?.into_bytes()
+        } else {
+            buffer
+        };
+
+        // 5. Write to stdout
+        std::io::stdout().write_all(&output)?;
+
+        Ok(())
+    }
+
+    /// Recursive disk-wide decryption: Replaces all [*_SECRET:...] tags with plaintext in-place.
+    pub fn decrypt_path(&self, root: &Path, recursive: bool, dry_run: bool) -> Result<usize> {
+        let mut total_restored = 0;
+        let mut walk_errors = 0;
+
+        if !root.exists() {
+            return Err(anyhow::anyhow!("Path does not exist: {:?}", root));
+        }
+
+        if root.is_file() {
+            return self.decrypt_file(root, dry_run);
+        }
+
+        let walker = walkdir::WalkDir::new(root)
+            .max_depth(if recursive { usize::MAX } else { 1 })
+            .into_iter()
+            .filter_entry(|e| {
+                let name = e.file_name().to_string_lossy();
+                if e.path() == root {
+                    return true;
+                }
+                !name.starts_with('.') || name == ".env"
+            });
+
+        for entry in walker {
+            let entry = match entry {
+                Ok(e) => e,
+                Err(e) => {
+                    eprintln!(
+                        "⚠️ walk error during secret restore at {}: {}",
+                        root.display(),
+                        e
+                    );
+                    walk_errors += 1;
+                    continue;
+                }
+            };
+            if entry.file_type().is_file() {
+                if let Ok(count) = self.decrypt_file(entry.path(), dry_run) {
+                    total_restored += count;
+                }
+            }
+        }
+
+        if walk_errors > 0 {
+            return Err(anyhow::anyhow!(
+                "decrypt_path completed with {} walk error(s)",
+                walk_errors
+            ));
+        }
+
+        Ok(total_restored)
     }
 
     fn decrypt_file(&self, path: &Path, dry_run: bool) -> Result<usize> {
@@ -787,6 +1953,10 @@ impl DemonSecurity {
         Ok(tag_count)
     }
 
+    /// Migrate secret marker prefixes in-place without touching encrypted payload bytes.
+    /// Example: `[OLD_MARKER:...]` -> `[DRACON_SECRET:...]`.
+    pub fn migrate_markers_in_path(
+        &self,
         root: &Path,
         recursive: bool,
         dry_run: bool,
@@ -874,6 +2044,76 @@ impl DemonSecurity {
         Ok(stats)
     }
 
+    /// Git Smudge Filter: Decrypt stdin/file -> stdout
+    /// Gracefully handles: V2 (Direct), V1 (RepoKey), Plaintext, REDACTED_REGEX wrapped
+    pub fn seal_smudge(&self, file_path: Option<&str>) -> Result<()> {
+        use std::io::{Read, Write};
+
+        // 1. Read content
+        let mut buffer = Vec::new();
+        if let Some(path) = file_path {
+            let mut file = fs::File::open(path)?;
+            file.read_to_end(&mut buffer)?;
+        } else {
+            std::io::stdin().read_to_end(&mut buffer)?;
+        }
+
+        // 2. Check for V2 (Age) Header
+        if buffer.starts_with(HEADER_V2_MAGIC) {
+            match self.unlock_payload(&buffer) {
+                Ok(plaintext) => {
+                    std::io::stdout().write_all(&plaintext)?;
+                    return Ok(());
+                }
+                Err(e) => {
+                    eprintln!("⚠️ V2 Decryption Failed: {}", e);
+                    // Fallthrough to pass raw (might be intended?)
+                }
+            }
+        }
+
+        // 3. Check for *_SECRET text wrapper format
+        if let Ok(text) = std::str::from_utf8(&buffer) {
+            if self.contains_any_secret_tag(text) {
+                let smudged = self.smart_smudge(text)?;
+                std::io::stdout().write_all(smudged.as_bytes())?;
+                return Ok(());
+            }
+        }
+
+        // 4. Fallback: Pass raw buffer (Plaintext or already decrypted)
+        std::io::stdout().write_all(&buffer)?;
+        Ok(())
+    }
+
+    /// Encrypt data using the repo key with AES-256-GCM.
+    ///
+    /// SECURITY NOTE: Uses a random 12-byte nonce per encryption. For very high-volume
+    /// repositories (2^48+ encrypted files with the same repo key), nonce collision
+    /// becomes a meaningful risk for GCM mode. For typical use, the random nonce
+    /// per-file is sufficient. Consider key rotation if your repo will exceed this scale.
+    pub fn encrypt_with_repo_key(&self, repo_key: &RepoKey, plaintext: &[u8]) -> Result<Vec<u8>> {
+        let key = Key::<Aes256Gcm>::from_slice(&repo_key.0);
+        let cipher = Aes256Gcm::new(key);
+
+        let mut nonce_bytes = [0u8; 12];
+        use rand::RngCore;
+        rand::thread_rng().fill_bytes(&mut nonce_bytes);
+        let nonce = Nonce::from_slice(&nonce_bytes);
+
+        let ciphertext = cipher
+            .encrypt(nonce, plaintext)
+            .map_err(|e| anyhow::anyhow!("Encryption failure: {}", e))?;
+
+        let mut result = Vec::with_capacity(12 + ciphertext.len());
+        result.extend_from_slice(&nonce_bytes);
+        result.extend_from_slice(&ciphertext);
+        Ok(result)
+    }
+
+    /// Decrypt data using the repo key
+    pub fn decrypt_with_repo_key(
+        &self,
         repo_key: &RepoKey,
         encrypted_data: &[u8],
     ) -> Result<Vec<u8>> {
@@ -892,6 +2132,47 @@ impl DemonSecurity {
         let plaintext = cipher
             .decrypt(nonce, ciphertext)
             .map_err(|e| anyhow::anyhow!("Decryption failure: {}", e))?;
+
+        Ok(plaintext)
+    }
+
+    /// Decrypt data using the legacy Git Seal V1 format (AES-256-CFB with derived IV).
+    /// WARNING: This format uses a deterministic IV derived from the key (SHA-256 hash → first 16 bytes), which violates AES-CFB security requirements. Using the same IV for multiple encryptions leaks information about plaintext relationships. This format exists for backward compatibility with legacy git-seal ciphertexts. DO NOT use this for new encryptions. If you have ciphertexts created with this format, consider migrating to AES-256-GCM (encrypt_with_repo_key) with random nonces.
+    pub fn decrypt_git_seal(&self, repo_key: &RepoKey, ciphertext: &[u8]) -> Result<Vec<u8>> {
+        if !is_v1_fallback_allowed() {
+            return Err(anyhow::anyhow!(
+                "V1 decryption disabled: legacy format uses deterministic IV which violates AES-CFB security. \
+                 Enable with allow_v1_fallback = true in policy, then migrate ciphertexts to V2."
+            ));
+        }
+        eprintln!("⚠️ WARNING: decrypting legacy V1 ciphertext (deterministic IV — insecure). Migrate to V2.");
+        let mut hasher = Sha256::new();
+        hasher.update(&repo_key.0);
+        let key_hash = hasher.finalize();
+
+        let key = &key_hash[..32];
+        let iv = &key_hash[..16];
+
+        // Using dynamic dispatch or just specific type
+        // Using specific Decryptor type from cfb_mode
+        let cipher = cfb_mode::Decryptor::<aes::Aes256>::new_from_slices(key, iv)
+            .map_err(|e| anyhow::anyhow!("CFB init error: {}", e))?;
+
+        let mut plaintext = ciphertext.to_vec();
+        cipher.decrypt(&mut plaintext);
+
+        // Simple heuristic: check if result is likely plaintext
+        // If it's garbage, it was probably not encrypted this way
+        let is_likely_plaintext = plaintext
+            .iter()
+            .take(20)
+            .all(|&b| b.is_ascii() && (b.is_ascii_graphic() || b.is_ascii_whitespace() || b == 0));
+
+        if !is_likely_plaintext {
+            return Err(anyhow::anyhow!(
+                "Git Seal decryption produced binary garbage"
+            ));
+        }
 
         Ok(plaintext)
     }
@@ -1181,7 +2462,7 @@ mod tests {
             patterns.contains(&"Age Secret Key".to_string())
         );
 
-        let content = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBlYUhkbkJUOFNnbEpsbE15QTNtREUyRmNuWWxJK0pkc1BQYjNsSDJscGpvCitITVJGNW9oSzQxR3Jpazk3QmJHMDZ4VVU3YjMwNlJKTnF5WFZOclZ2cHcKLT4gWDI1NTE5IG9GbzFzenFXd3NhZnpnYVh5VWRoMktLTjJ0dmFrbDJSanBkYjMyQ2t2VGcKNVdHU0M0S2srUHUwcjhnelY1MkdTQUJ5UkQvNUVMK1g5ckxObUIwTStXQQotPiBDKEgvYWxCXS1ncmVhc2UgUygKWGxRZ3ozeEtqaDl6OHVIZGdyaXBtR1VCTFBmT21PS2VKbURPbTFsTUlvc2UyNEhJYmRZUERSTFNPa29jRHV0eQpjTUVleldnTmxnCi0tLSAzcGh5OWdMaWtpanRaNHZuSm1YK0JsMjFXazFGRHZxZGpiRExRNFEvckJrCrKl4//Br3ptL910xSrgQm8ywFZU1TMA1p1Md3loMxMwdnTQR0RarF2LoFveOHqMps7SZnOkvUfJVXWsTmQRhRVrufPyqeaNrtZEge1yb+lheCvTCZOLYMqKdVWmcEi3zbemKzRInoAH2c8=]";
+        let content = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBFWGUwK1FLa0RrajluMnpieFdYemEzWjloZjJ6bmVON01XRm9mcGtteTE0CkZRVTRiekFiV0U5QzVQWmRHU2lwUUNoUlp6VCtRaXVnUjNwNW1LY2dWVmcKLT4gWDI1NTE5IC9sM2ZpMmVQd0tMT1FGNzl0T0ZCNnQ2dmZYV0JtWnRKOExkTzllYUk4Rk0KOGtSUEVNeTZkNHEyL2ZtNDBoZ0RDNlJpdlh3bUVQcGE2Sy8yWGd5Zk9YcwotPiB2RDkjLWdyZWFzZSBbKWVNNW9AJSBOMX5gbjlyCnA5UXZ5VnoweUtBdWQxWFFvcTU4ZzB6WG1LSUwrUXRDRUZib1B3Wis3UHVYYWdzR3Q2S2pzZmZUQ1VxSS9zc1YKNkJFNUVsZGZLL0RIdEFtOGxNZlZ4UQotLS0gaW1uOHdGUGs3TThkN1dIdnhNTC9OUERzejhMdTJ2Z2IwZ3FKd204a0ZEOAq5D8pC4DiAZ08TiIkErL4Glm/+Y0oFVkWhAOsutD0gLMQPeS4WINJ2I8LOkYBRJq2r721VjDJ1seoXHtlVZa5aMl0LXbFNZ/1ghS0K+AtghSItectCMqd+lnhwKcAHJC3Y3jzSBEpr8ph5]";
         let scanned = scanner.scan_and_replace(content, |name, secret| {
             eprintln!("Match found: {} -> {}", name, secret);
             format!("[MATCHED:{}]", name)
@@ -1464,8 +2745,8 @@ API_KEY=original"#;
     #[test]
     fn test_github_token_patterns_accept_variable_length() {
         let scanner = SecretScanner::new_without_age_keys().unwrap();
-        let short = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBpOFd2OTRtRVFEbXd3RkVoWS9hYm9NaTd3bEJ0WmZocTBWclcrMkVJczBVClZKODZwRzQ4RzgxenZQUFpNMDBUV0pqQjcrYlJja2hpY3Q3Nk0yVUpBVDQKLT4gWDI1NTE5IGdCZDlsaGh1Q2lCVVkrTTdMVzIwaEZGNDNteWdGNlIxSVRIcEl2TUE5amsKYkFpakdQeTZCV0ZiZGs3aDNnYTFab3k4OHhYZS9aYWZWa3BCcFZ3NFBLVQotPiBVUkdlfS1ncmVhc2UKeFY3UFhlVGN4QmlCc0FWYVRaVGxmZ2xRUVhCb081cmVuSHhuR29td2RhSE5DODFjS3drVkViYmxVZwotLS0gN2daUCtyVis3WTB5VlRLajVuRzFXNko5NGkvcEpYVmVqYlltUERlRHVPTQrZgzBnVeqFAxgnTOg8CCoLctMDhi05EXG3nINAJamO71qvn+nmf8KT0hhUn73pm+3VmwNZE562Gj1fJuaxxbKENkk=]";
-        let long = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBmN1IyeGNPKzdidGhMa1lndW8xVVpQZWNobkVJMzBBemI3Zk9IMmZ2eW1nCnNTVjc3SGJZanlzdGYrRDNJWnVlVnBkdUJrVmZmNnNyMUdQWnlWYlVFc3cKLT4gWDI1NTE5IEdlKy9wODY0TFJnb2lIcFJqNjlwRnNMam1sd3lCZWxFRWsvSkR3eGJJV3MKM0lKMElxK2ZkMFVlcU03cy9kZVRlanozbW52MjQ1ZkY0THpjS0FJVEdtdwotPiAuN08tZ3JlYXNlIFZEPFZCVSBJb1QgelQte1BkICIrYlZ4N0VqCjdSc054ZGhaQ0NhUnd6c2hCdWQwKzlzZ04vVG4KLS0tIGtpMm1Gd3d2eXozV0plL2hpb0lLZ2dYOENZVmNDV2c2aE9nc3QwZncrUlUKf6ArY8vlEyJxZHjfyH7CqIgdTkEg+WUjnSpZzFR6nxw4kqRgSRpQDbap+DdjEPIfP520qFk+7SirtHW4up+hllZhEbxR9qhLa0VZSw==]";
+        let short = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB4cGhjZldNdTJjU1hPc1Fvazd3WldOcjVZU3IrYXJ5MkE2bHZWa0JydVJzCjFNN1hzdG1TZWw5cHlsbFhxR0JsVmNLMWlRZ1B3VDNtTUdPYk90VS9RTGcKLT4gWDI1NTE5IHNKN1FXWm5KbkhLc3dwVmNUemMxVDJZeklBVjZFMzZDMVpjK043R2RoVTQKZXBvaU9PRG9OejdXT3lzU1dXcjBXKzc4OFdrTW55ZUVpTS9reExPYVZiRQotPiBTSS1ncmVhc2UgWnlQCjA1QmtVTXM0L2p2cFBBWUN3VUlCUHpLYTdCQmlJRGl4aUtIR01ERXkxTGJVcGdiV2JxSUtibjBzNXZEdDJFOXcKWm5uL1V0dENMdjd6TzVSZlRvWTZoOWw0cjZKcm9zQnRYOHRSa2IvaStWNWgyNm5sOFl4UndpMk1RN3NpR1hPVgppUQotLS0gTnhkZnlydm1uMHFkdGlUckFzSEJvR1V1YUdySzNOZTJGOTR0YW84anEwZwoEqS/y44eYzGdXbdwrvylO9ngSULWwLIeaNrjvP+TqJJLff8lD6KwLXdcoi0fBtzFyJTRAgtuvy+I4EW5TFhhVErc=]";
+        let long = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAvVnJ5UUNUeGhCT1J2SHlyWGhQN2N6TkJDWFVjbkc0eC9XYU53RDZVeGc4CjdaWDMxdjlVTVhzZ3VXMGMxSzlaQmNYQ0dVQnUvdVprYUVkazdUdmoyTGsKLT4gWDI1NTE5IDV0blIyV1VieXJaK0gyWFpXNTB2NUtaV3RoT2Jydm1zQnBZOXpoZjNxVGsKT0Y5M3VvVHh2K0JUSlc4NUFQekdTL1hrQko3S1FsNDRZeTFRSWU3ekZXRQotPiBwOmxUQU0/Xy1ncmVhc2UgJkJkUTVxIG1VU0I9cgphMnZYNlFSc3J6QlFGa3pZeW5EUlRDVkxpYTFJdHE1RWNLUW8yV0x4SlJieStkb3YKLS0tIDRmRHFoZ21ZemNRRys1TDBOUmxXcTk0cFNXVDhrL2wyQlBzcGtMUHVrL0UKQqZf0vOA2Bfg6PJq6R7J1R6TgHyPMS8bTA22vZqK2z8AOlkm4uLAwbVCjRT7lk4LLujCW8CNmPf4reG1SNH4evKObMdeSdijRW7/pg==]";
         let found_short = scanner.scan(short);
         let found_long = scanner.scan(long);
         assert!(
@@ -1487,8 +2768,8 @@ API_KEY=original"#;
     #[test]
     fn test_mailgun_key_accepts_variable_length() {
         let scanner = SecretScanner::new_without_age_keys().unwrap();
-        let short = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBESWFYL0xBamFBaWcrRldUWUI5cUQwazlKSlpaNldPdUxKZ0JXQm05VVdJCkVUWDFmMGhHS2FzQStMSEhoM2VxZGVSVlJKcFM2ZFdoZkx2eXRtNXo4amcKLT4gWDI1NTE5IGdvREpPeS82VUI4b0o0bHpDZWdZWVBoTERaWXpQMjB5aTluRGxjL2pWUmMKZ1Vtd1Z1K2JCd09TN256R2lnQk5RVmgxN1E0RDFOQ1BEWHF6cTBEaGZXbwotPiBzXi1ncmVhc2UKeHNoMEpaZ2UwSngzMUVZCi0tLSBFVG5sMnM3Y1RhNnh3UzJzM2VKOXZaYU5QL1ZXWGlpbkFGSmNEcS9YNGNrClqNXTcWYsoaSbbuwv8M7DFP9S4Qg3Is30YDbnXDYTB3yzFo7YTfdgLI2iI53tfNGtMPqSmefwuJdb6ltTmBljlW]";
-        let long = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBDU2N6MGM4TCtycUhyMUIvS0QzTTZGdC85NUxBS2pBRU1vbnlnT1hnS1ZnCnF2c1ZycUpmVVIvbXZVR1QyVklWVDlUNXRpRWR0QmtCRnlJQmJyZVJkZG8KLT4gWDI1NTE5IExZNWVaVDhCOFkwR3NWUXhVZG9Xa0xQajBNalJCNjlJcGU4dE5RWGJtRVkKSlZOZ3F2cTdoZjV4TTJ2SHFXYWE5UEE5S0xJZmh3MGFGbndiUXVQSEh5dwotPiBRQ3ktZ3JlYXNlIFwmLVtNQiBAcjUgPypNCmZFL2JaakpvbHZudkJIenE0Vlg0bVJOYUJuUUdiZzBkCi0tLSBjQm9URnhYN3hHUzQxRDlQTmRHbEpEbllIcXphallkdkptR0liZktxOU9BChFPqZhGcOeFh13gb9rnQxGCNvbgmWggmLKys4dUrxkMFly2kQ3EIygt6K0w1+prUsiEfxkiXDHz/9TJingytOcvKEeb9A==]";
+        let short = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAwMXBhYzVSUm8wTFp0N3lQd1dzclJzQUxhQ2pqRDJ6aTIrdThPN3g3QzNzCk1LUjd1dnFWQWRGanY2WDJrN3RYbDBaR0JMMkRyVUlDa25ZcUFIazZnVm8KLT4gWDI1NTE5IEd6cEZ6bENDR2ZwTE94R1hHTE9QWjhNL1ZjWGJCdnBCWmRtSjM3bUJzM1UKQ0daU09OSmdrUFlzV1ZuUGM2UmJFQkJQVnFJbmZJWUdVSlNHRnREYmgrTQotPiA+WG5nMXtSLWdyZWFzZSBoZ0cgfnNbO0RhbyBETEhbaiBYbQpicHVaOEtkdC9PdXVUaCtERmdNTzkrbURhUW53V0NRYkl3TjBVZTV6K2VnVUxrUjdRQ05ueUlTZFR4bWYraGtSCktncEJYTDV1TEhXazVpaWE4TGVZK2VBCi0tLSBMRkRTbmlTanRzbnlWdnM5bkxqK291WjNkNkpieVlEbjJDazlKbFBhT0tjCvj0bPYo7gpLNwd99UeS5g1wynocNxfkuzIAkYdOOqThPc8GLxjd6dbNPN4Wk2+8PKUevb97KFMpA3JDl3hLttQ2]";
+        let long = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBXcmU4YVNsZDkybG9DZ3drbm1rb0FmNzJDUEpWdWlFSzY2Zm1HZGd5V0ZvCkNvWmtrV2JkVENSbXU2SkxmdG12Nndia2x5ZjRzR09pbHoxbThUZWtTQkUKLT4gWDI1NTE5IGQvWTloWWtOM3JrNXZVWHljS1hWbW1yKzB3STZiM2oyYU9VaHEvc3BoREkKTVRDNTVENjR1RnpRQmZXWFVlQ0FyTzM0T2g3dG5oU1U0K0E5QTJNR1NPbwotPiBfRCQ8LWdyZWFzZQoycUg0QVF6V2ZQcEQzVkhHdjNyQmo2b2xzUmhtaTJWZTN5Q1hzbWxOcSt5OE42czlXa1BZUFpFZVJqeVhPVTQ4ClhjUWRKUnZLZG5LQmRaTzVhVmVXcWZvYThrYlFSemtNQ2cKLS0tIE82SVk5YVd1MFJyUXlOUFhadFcvdUpPUE5PY0d5Z2oyUC9OS25SNyt0V0EKxgw/k5DhMIclorHgIEUJTpLK71MFXWuxMHLvVs3oRmeSxUThfa1A/NSeE3SUaelkjbUDXZUF5eIge0eHyqqSu5PEwYVw]";
         let found_short = scanner.scan(short);
         let found_long = scanner.scan(long);
         assert!(
@@ -1506,7 +2787,7 @@ API_KEY=original"#;
     #[test]
     fn test_slack_bot_token_compact() {
         let scanner = SecretScanner::new_without_age_keys().unwrap();
-        let [DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBaSVpvSE1wRzdTWWxzbTByazdSVTRBd3oxZkE3MVkyZVgrR3FBbEZ4KzJjCmZxWTlzT3pGYlhRNkVYbkZvU215aGd3M1YxMUNSajhvaEdUU3RFb0RZcVkKLT4gWDI1NTE5IEh2b0NIYnN2NnVONGliQ2pldWFzb1g5NlZrWkk4TSswR0txalN4VVYybG8KalkvWmN4KzVsQTM2WlRVbTZNbmtpSGtHUkRKYnBOSkV2Y1lxZm1HTU52NAotPiBONic2US1ncmVhc2UKMTZScgotLS0gMy9iZ0MyOXZaVW9wQkthckoyQ1A1aXBoR2pjZFp5ci9ZMWVmUGVGRmlyQQrxMuYSn0DVq2/MwimDONxvDxvGH9b73sKNK9e0jST1TXKP07hKc7lk/9F2f129Z2KBR18UtnQSE3LYwd9hZ9bvov8qoAwJtC1A];
+        let [DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBmOUtmOEo5SE5qN2g5UlgxdXl0N0FXcXBtWFByek1HK1FYRUNGVnB3U2o4CjdYVXdwaWQ3alFIaU0zc2xqZGdBeUlzdExiQ0luZi9WTDV6VlJWNkx6VEEKLT4gWDI1NTE5IGdwSlF2ZWlIL21lUXJsQ1NnbXVWMnpFY3plTm5WaWZXOUw0YURHUWIrUmMKUFFENldhM25veGtWRE9lNnF5bjJWUElwSlBSWTNWcFlqZUc0WC9KcDNPRQotPiB+W3ItZ3JlYXNlICoiV3JHS3d0ClJGVHU1RGpLODMzSmtrZDFzZ0UvbjdsSHA3VERPUDBUdm9zd3ZrK2pWNW44Z0d2RDdJTmFQazZ2SEhkZnQxRHQKVHlROHpCK1Q0bWNCZnEwa3o3ZDAyRWJrWDMvVTAzNEtFdk8zSk1qOG44eW5ObStYeStZS3duY1VodGlRVVEKLS0tIEVIb3lVTWk2MlYzdW9aNmRtVEU4Mm40TThkNy9SZ2loWlorOHl6dUxDWEEKna8XJMFEVjZDcd8+UT/G4dSw5jzhDDvZc/v3QMj10j0vEAFt5FXQIbJJJoGBUCf4+06AmIPXcouruMPdCzlYiBVSLuS9nhds0A==];
         let found = scanner.scan(token);
         assert!(
             found.iter().any(|f| f.name == "Slack Bot Token (Compact)"),
@@ -1518,7 +2799,7 @@ API_KEY=original"#;
     #[test]
     fn test_slack_bot_token_compact_has_length_cap() {
         let scanner = SecretScanner::new_without_age_keys().unwrap();
-        let reasonable = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB6NTBFUEFOUU1VamtnWndISXgrdnZuWUU5Q0NxOHZYV1NhZEx0eHVQTXdVClIwQkdqRjVkaERqdFkwLzFHQURhR3l5aUNPNExTa01kZm0xY2lHcm43WE0KLT4gWDI1NTE5IEpTZ0FhVm1Ec3l3YS82aXpTNEMxM3Z3N0VzOEFxeHIwcHFnUElwakdsQU0KQWpubnVNdHFHNzNJYW9iZlhGb2dZTk9Fb0RsNHJ3U05XLzlnNHJsbExCdwotPiApIS1ncmVhc2UgXHd1Z30kIFdsRUd8OyBWQGdbMEdmOApFQWt4bWdQTi90MDd5dCtZTWZuL09ia0YxQ1MxblhWWW1EL3ZSSjlBclhUTUNXRnlZakJ5NkVzTXBPMjIxbDlZCjhRc0FqVU0KLS0tIGc3cldWWUswTUcxa3hMYWlqMU03MitFd3BnR3dmUHNjR3hqWVZ4UUFtZFEKGKhwoPjslFeC/RW5JsB1Rh8qly46db94zc598iz7t4AOTEpm5YvQB/wtFilUYE6vRDnE8Ihc3QVkmxI9j8+5gHf07g9EKCakXaZy7lG1zHmeYJ+cMtyQSLLO/dtEYvMt/FtES54=]";
+        let reasonable = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB6SHpETUVpRnIxUkVmb1NWYzYzVSs5TXNOQ05YQlVRZlZpTURkajNJUWpvCjI5NWhIamMxc3FXakJ4dFA2NHVjTzljdWhkbFY1VUp1anhxbS9wVHFhVHMKLT4gWDI1NTE5IEZuTGhmS0YxM1pyZEpzM0U0TG9Vd1pYcHBQRXlocnppR29sWU43dEZQQm8KOXNhU3JWOS9wV3ZHM09kcitPWFBXWG0zKzRwV25LV0swQ1NJNUJBYk14OAotPiBAQERnJictZ3JlYXNlICV1THg4ZiAyVypafX0sIDp+bAp5TktLbVdXbHczRllKUVo0K0ZMRnhVaXdnNGQrMmU1VEtia1ZWTHU0QnIvTmdwYzhGTVlsL21uYUV0U2VNUzRECnBZK1BqNlA2VjdLdmQyYSszdzhBSXh1UE9ObmR2dTlTYlN1akh2TkhZWHlOCi0tLSBaSjlVTDZTZVdLVDRRUGxMNEluZlkvSGY1YkR0blRmTnRZSGtLaWVkU2xjCs+ktAbZWdUKaqZDbvI0gx2jxFBhLyfRL42EXTjPYTv0M33JluaFYZ7q1JBr4yD1Av5b5PHWmGy3bpD4xSvpsMABSCjrwVLQ+09Ga73IUFvV8g24NqL9smReQ6fWepaudTRqjp1Z]";
         let found = scanner.scan(reasonable);
         assert!(
             found.iter().any(|f| f.name == "Slack Bot Token (Compact)"),
@@ -1530,7 +2811,7 @@ API_KEY=original"#;
     #[test]
     fn test_hex_secret_quoted_requires_context() {
         let scanner = SecretScanner::new_without_age_keys().unwrap();
-        let with_context = r#"[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBmRHNuOEhWb0pwa3QyY25aNnFrTjJ6NkErV0wrdWpaenF0bTlhL1g2b2pFCkZSZExqditOU21qRzJ0UHZiVjJZS0hRR1RPeUY1dmJDc2x2MnFYdll1ZlkKLT4gWDI1NTE5IDlsSTh2MEhQcHl2VWdlWHFGR3pMa0pXWis2NEZvdmI4WkYwL1pGK0NLMnMKRDMxQmZSMmMvdmVsREhjU0NzZkZVelMraW5wVGZ1RW9MQ1p2QXRJR0g2cwotPiA0TVBQKS1ncmVhc2UgV3JdXmU/IG9IZ35DQVREIGc4YmAKOFMzWnhlSlBUSmtRczQ5b3dHcGd2c24yVE91L3hOazluNGwvMUFoOXJaSTFBbTIxbGhJazNwZE5DVllJKzRoQQpNZmV5YmZoSnI0encvNXRvbnRhTC9WMEI3TUdabWR2QQotLS0gbVE3ejd3RGFNOW9BbWhLWUU5SVlQZVRIVGxuUkJGcnRkclB0Sktxc1VJdwp8OF5bSa7LcgTYL8GzqynG3u1zODCzWQGVjvs2SMM/FyKg+Z+PByqcFBy89hhnsOwHuqd1sQaeX6wzJQbS0spA3iLdh2XRCBA1u1aLhoQU]"#;
+        let with_context = r#"[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA4SFYzd2J5eXZVVUVkRGQ1T1gyTzdyRnlKY29KYXFuUGhIZm9GZ1RoTkU0ClFPSXQ1RURyQWwxRmpIZUlCNVE0azFjYytzMkVuSWd5QkY2M0ozSUN0Tm8KLT4gWDI1NTE5IFJobnBXa3NFMmVza1JJOElObDF4a3lycG50MFV3V0lKTmE3Rk9Ud2dKaGcKcXd0QUhHVkpra1JkUk5YOXZpNzA1cFVYZk1BeEhVdzNKVng2UkI1bFVnMAotPiA0OTk1REBxLWdyZWFzZSB6Pnp9IHhXPHdlSSIKeG12dE1aZzByTDZ5RFhsTlFlY0pxZ1lQZHlBK3F6a0V1bkZxbDFWWlpoM0JhdVBjaFlYbnloYU1MWXZYV0dyKwpNVFJnRmNRb3pvVlhNOWlmZklDT2hSbG5VZTdReVluWW1RCi0tLSBPQ2x2NFpSY0lldE1idWI5NFlzTk5GbUt0Y2Fvd1JUcWxnV25KL0JIYkZnCpSXadeVb+aQXhjKWHVyg039DB9eYcG/mtxVQMoLFPsgQi6i2AZnq/4rjs13y4vPl3x1BCwb9NYM1kHCQzmDb2Rsio5jNz9bBwJvaSkeKDo=]"#;
         let without_context = r#"label = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4""#;
         let found_with = scanner.scan(with_context);
         let found_without = scanner.scan(without_context);
@@ -1551,7 +2832,7 @@ API_KEY=original"#;
     #[test]
     fn test_high_entropy_secret_quoted_requires_context() {
         let scanner = SecretScanner::new_without_age_keys().unwrap();
-        let with_context = r#"[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBGMGNXTDUzYW84TjNKUml2Z2k0c2NQYzYxU2Q0aFFFRzdUMWptVGo1c1FJCnlyTGM2SDNVQ2VJK0VpSWUyWVlhY0FCT25LWG5mOVdCb0lCOC9mMGE4TlUKLT4gWDI1NTE5IHpscG9QRTNVQzZGN2E0cURFRVJsTTFsbFNVMXRzc0o3R1NrOUJRQ3R3ek0Kbll1a3dJb3grZTBSVWVHYjI0TlNyTytiOTJPSmZ5b3U0OWo4WHV6WGVPZwotPiBtKjE6dHstZ3JlYXNlIENjXTIpMTIgJz0KQnU0bC9TZzNBN3JyRGo3Y0FPM1RFQmhLeTVGYjgvSWNQeGN4V3RZTTlvQ2VhN0tvZCtrMW9STy9QVTFTaTZ6VgpRdUFid3dadjRjWWltZkNUUUNDcEpsTTZUQ2FoREppcWlVRE4KLS0tIDJNRXdOMW1CZFpTSTRNWnd2T0tzc0hPOVpTSGVtdkhJZDk2dTN3Zmk2NFUK6N5cj8nC1rnMNLFISqAuvaHcRrYM3jngWkeYTcCKSpI+KKYMKbQ1n6hyYD1vkx96bhY7aLJ34oI3RF7ME4RkXLoI]"#;
+        let with_context = r#"[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA5VkR5VXhCNU5Eanh5eU5CcHdSVllWYjF3Z3U5S1NXSDdEdG9PZFZqejAwCnViSkp0dFlnL2svZEZlOGhvSHNPK0hNcTdqdDNYbGNaVkJROHdtK0J1TmMKLT4gWDI1NTE5IFhsVlFtZ1J0RXJVZThTTnVVNmJTSVhLd1EzdUxvbVN6WEZ2cm9IZHJDR3cKZUE2QWNOQURPNXJvZUNMM1A3M2ZzVnc5M1UvWjRzWFVMNG0yNi9MNHBoZwotPiAnN3k6PHNMLWdyZWFzZSBYJEBYWSFdfiB6Cnkyc1RwUzhiUmhuYgotLS0gVCtCc3BMbTBiV3pRUS9qaVR6YnllWG9FTXZWUFllQVAvTEZ2ZHg3TldyOApiKNuW8bzsxa6qjxM8/9Stfb3OfgqxzvqukGD+aiZrzg3u5LrJTqHwfuDcjo8QS0lqry3l5FTy3hfeE7fCt0rgKtQ=]"#;
         let without_context = r#"class_name = "aBcDeFgHiJkLmNoPqRsTuVwX""#;
         let found_with = scanner.scan(with_context);
         let found_without = scanner.scan(without_context);

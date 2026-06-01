@@ -1,6 +1,9 @@
 use anyhow::Result;
 use dracon_git::GitService;
 use std::collections::{BTreeSet, HashMap, HashSet};
+
+mod cooldown;
+use cooldown::CooldownManager;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
@@ -543,12 +546,9 @@ pub(crate) async fn run_daemon(
     }
 
     let mut activity: HashMap<PathBuf, RepoActivity> = HashMap::new();
-    let mut pending_repos: HashMap<PathBuf, Instant> = HashMap::new();
+    let mut cooldowns = CooldownManager::new();
     let mut initial_repos: HashSet<PathBuf>; // populated after first scan
-    let mut repair_cooldowns: HashMap<PathBuf, Instant> = HashMap::new();
-    let mut filter_cooldowns: HashMap<PathBuf, Instant> = HashMap::new();
     let mut stuck_push_repos = load_stuck_push_repos();
-    let mut remote_notify_cooldowns: HashMap<String, Instant> = HashMap::new();
     let mut cycle_count: u64 = 0;
 
     // ── Startup cleanup: prune stale state from previous runs ──
