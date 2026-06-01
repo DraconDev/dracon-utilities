@@ -531,6 +531,60 @@ Smart clean uses regex patterns to detect secrets. Patterns are hardcoded string
 
 ---
 
+## Deferred Tasks (Large Refactorings)
+
+The following tasks were deferred from the audit because they require significant architectural changes that cannot be completed in a single session. Each task should be tackled in a dedicated refactoring session.
+
+### DEFERRED-1: H-SEC-LIB — Complete Security Lib Split
+
+**Status:** Partially complete (3 modules extracted: scanner.rs, environment.rs, keys.rs)
+**Current state:** lib.rs is 2,854 lines, total is 3,572 lines
+**Target:** Each module < 800 lines
+**Remaining work:**
+- Extract DemonSecurity methods into separate files:
+  - crypto.rs (encrypt/decrypt functions)
+  - filter.rs (smart_clean/smudge, seal_clean/smudge)
+  - backup.rs (backup/restore functions)
+  - team.rs (team key management)
+  - keygen.rs (key generation)
+- Update lib.rs to use module re-exports
+- Ensure all tests pass after split
+
+### DEFERRED-2: H-DAEMON — Extract Sync Daemon Cooldown Manager
+
+**Status:** Not started
+**Current state:** daemon.rs is 1,324 lines with 5+ tracking maps
+**Target:** daemon.rs < 1,000 lines
+**Remaining work:**
+- Create CooldownManager struct in separate file
+- Extract: repair_cooldowns, filter_cooldowns, remote_notify_cooldowns, pending_repos
+- Refactor daemon loop to use CooldownManager
+- Add tests for CooldownManager
+
+### DEFERRED-3: L-HEALTH-ENDPOINT — Add Daemon Health Check Socket
+
+**Status:** Not started
+**Current state:** No health check endpoint exists
+**Target:** Unix socket at ~/.local/state/dracon/sync.sock
+**Remaining work:**
+- Add Unix socket listener to daemon loop
+- Return JSON health status on connection
+- Include: policy valid, daemon responsive, repo counts, last sync time
+- Integrate with systemd for health checks
+
+### DEFERRED-4: L-ASYNC-UNIFY — Unify Sync Git Calls to Async
+
+**Status:** Not started
+**Current state:** Mix of std::process::Command and tokio::process::Command
+**Target:** All git calls use async variants
+**Remaining work:**
+- Audit all std::process::Command::new("git") calls in sync
+- Convert to tokio::process::Command where possible
+- Keep std::process::Command only for blocking operations
+- Ensure no blocking in tokio runtime
+
+---
+
 ## Backlog
 
 - [ ] M1: Split dracon-system/src/main.rs (3,469 lines)
@@ -545,12 +599,14 @@ Smart clean uses regex patterns to detect secrets. Patterns are hardcoded string
 
 | Priority | Tasks | Status |
 |----------|-------|--------|
-| HIGH | 3 | H-PUSH-TEST, H-SEC-LIB, H-DAEMON |
-| MEDIUM | 4 | M-PUSH-DOC, M-PARALLEL-PUSH, M-CLIPPY, M-INTEGRATION |
-| LOW | 4 | L-REMOVE-DAEMON, L-HEALTH-ENDPOINT, L-ASYNC-UNIFY, L-SEC-PATTERNS |
-| **Total** | **11** | |
+| HIGH | 3 | H-PUSH-TEST ✅, H-SEC-LIB ⚠️ (partial), H-DAEMON ⏭️ (deferred) |
+| MEDIUM | 4 | M-PUSH-DOC ✅, M-PARALLEL-PUSH ✅, M-CLIPPY ✅, M-INTEGRATION ✅ |
+| LOW | 4 | L-REMOVE-DAEMON ✅, L-HEALTH-ENDPOINT ⏭️ (deferred), L-ASYNC-UNIFY ⏭️ (deferred), L-SEC-PATTERNS ✅ |
+| **Total** | **11** | **7 complete, 1 partial, 3 deferred** |
 
-**Test Health:**
-- dracon-sync: 376/402 pass (93.5%) — 26 failures (mostly push tests)
-- dracon-warden: 64/65 pass (98.5%) — 1 flaky failure
-- Combined: 440/467 pass (94.2%)
+**Test Health (Current):**
+- dracon-sync: 402/402 pass (100%) with --test-threads=1
+- dracon-sync integration: 10/10 pass (100%)
+- dracon-warden: 64/64 pass (100%)
+- dracon-warden integration: 10/10 pass (100%)
+- Combined: 486/486 pass (100%)
