@@ -133,6 +133,7 @@ pub(crate) struct RepoReportRow {
     branch: String,
     modified: usize,
     staged: usize,
+    untracked: usize,
     ahead: usize,
     behind: usize,
     last_hash: String,
@@ -441,7 +442,10 @@ pub(crate) fn repo_is_warn(
     has_origin: bool,
     has_upstream: bool,
 ) -> bool {
-    !repo_is_concern(status, has_origin, has_upstream) && !status.is_clean
+    // WARN: has TRACKED modifications or staged changes, but not a concern.
+    // Untracked files (build artifacts) do NOT count as warn.
+    !repo_is_concern(status, has_origin, has_upstream)
+        && (status.modified_files > 0 || status.staged_files > 0)
 }
 
 pub(crate) fn repo_hint(flags: &[String], warn: bool, concern: bool) -> String {
@@ -571,10 +575,11 @@ pub(crate) async fn run_repos_report(
         let has_origin = has_origin_remote(&repo);
         let has_upstream = has_tracking_upstream(&repo);
 
-        // Classification uses REAL dirty state (not effective/filter-only).
-        // A repo with any modified or staged files is at least WARN.
-        // effective_dirty is only for the daemon's commit decision.
-        let real_is_dirty = !status.is_clean;
+        // Classification: a repo is WARN if it has TRACKED modifications or
+        // staged changes. Untracked files (e.g., target/, node_modules/) are
+        // NOT counted — they are build artifacts that shouldn't trigger
+        // WARN. A repo with only untracked build artifacts is OK.
+        let real_is_dirty = status.modified_files > 0 || status.staged_files > 0;
         let concern = repo_is_concern(&effective_status, has_origin, has_upstream);
         let warn = !concern && real_is_dirty;
 
@@ -606,6 +611,7 @@ pub(crate) async fn run_repos_report(
             branch: effective_status.branch,
             modified: effective_status.modified_files,
             staged: effective_status.staged_files,
+            untracked: effective_status.untracked_files,
             ahead: effective_status.ahead,
             behind: effective_status.behind,
             last_hash,
@@ -730,6 +736,7 @@ pub(crate) async fn run_repos_report(
         Cell::new("BRANCH"),
         Cell::new("MOD"),
         Cell::new("STG"),
+        Cell::new("UTR"),
         Cell::new("AHD"),
         Cell::new("BHD"),
         Cell::new("UPDATED"),
@@ -767,6 +774,7 @@ pub(crate) async fn run_repos_report(
             Cell::new(&row.branch),
             Cell::new(row.modified),
             Cell::new(row.staged),
+            Cell::new(row.untracked),
             Cell::new(row.ahead),
             Cell::new(row.behind),
             Cell::new(shorten_when(&row.last_when)),
@@ -1763,9 +1771,10 @@ pub(crate) async fn run_repair_warns(
             staged_files: status.staged_files,
             ..status.clone()
         };
-        // Use real dirty state for classification — a repo with modified files
-        // is WARN even if the daemon wouldn't auto-commit them (filter-only).
-        let real_is_dirty = !status.is_clean;
+        // Use real dirty state for classification — a repo with TRACKED
+        // modified files is WARN even if the daemon wouldn't auto-commit them.
+        // Untracked files (build artifacts) do NOT count as dirty.
+        let real_is_dirty = status.modified_files > 0 || status.staged_files > 0;
         if !real_is_dirty {
             continue;
         }
@@ -2136,7 +2145,8 @@ mod tests {
             is_clean,
             ahead,
             behind,
-            modified_files: 0,
+            modified_files: if is_clean { 0 } else { 1 },
+            untracked_files: 0,
             staged_files: 0,
             last_commit_hash: None,
             last_commit_msg: None,
@@ -2526,6 +2536,7 @@ mod tests {
             branch: "main".to_string(),
             modified: 0,
             staged: 0,
+            untracked: 0,
             ahead: 0,
             behind: 0,
             last_hash: "abc123".to_string(),
