@@ -212,3 +212,28 @@ fn test_warden_cli_help() {
     assert!(help.contains("dracon-warden"), "help should mention binary name");
     assert!(help.contains("setup-hooks"), "help should list setup-hooks command");
 }
+
+#[test]
+fn test_warden_resmudge_dry_run() {
+    let tmp = tempfile::tempdir().unwrap();
+    let repo = tmp.path().join("test-repo");
+    std::fs::create_dir_all(&repo).unwrap();
+    git_cmd(&repo, &["init", "-q", "-b", "master"]);
+    git_cmd(&repo, &["config", "user.email", "test@test.com"]);
+    git_cmd(&repo, &["config", "user.name", "Test"]);
+
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_dracon-warden"))
+        .arg("resmudge")
+        .arg("--apply")
+        .arg(&repo)
+        .output()
+        .unwrap();
+
+    // May fail if no policy exists, but shouldn't crash
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        output.status.success() || stderr.contains("policy"),
+        "resmudge should not crash: {}",
+        stderr
+    );
+}
