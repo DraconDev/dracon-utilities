@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 269918,
-    "activeSeconds": 2147
+    "tokensUsed": 270203,
+    "activeSeconds": 2162
   },
   "sisyphus": false,
   "createdAt": "2026-06-01T00:47:37.629Z",
-  "updatedAt": "2026-06-01T01:23:55.398Z",
+  "updatedAt": "2026-06-01T01:24:10.634Z",
   "activePath": ".pi/goals/active_goal_2026060101473762_mpuhonml-iu4vyd.md",
   "taskList": {
     "tasks": [
@@ -61,8 +61,8 @@ Complete the 4 deferred refactoring tasks from the previous audit: split the war
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 35m47s
-- Tokens used: 270K (269,918) tokens
+- Time spent: 36m02s
+- Tokens used: 270K (270,203) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
