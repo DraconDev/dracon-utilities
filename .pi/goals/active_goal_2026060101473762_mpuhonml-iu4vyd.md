@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 611222,
-    "activeSeconds": 2353
+    "tokensUsed": 612409,
+    "activeSeconds": 2366
   },
   "sisyphus": false,
   "createdAt": "2026-06-01T00:47:37.629Z",
-  "updatedAt": "2026-06-01T11:17:35.356Z",
+  "updatedAt": "2026-06-01T11:17:48.442Z",
   "activePath": ".pi/goals/active_goal_2026060101473762_mpuhonml-iu4vyd.md",
   "taskList": {
     "tasks": [
@@ -110,8 +110,8 @@ If blocked: Stop and ask the user which subtask to skip or how to proceed.
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 39m13s
-- Tokens used: 611K (611,222) tokens
+- Time spent: 39m26s
+- Tokens used: 612K (612,409) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->

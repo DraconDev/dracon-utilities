@@ -1185,160 +1185,13 @@ impl DemonSecurity {
     // ============================================================
 
     /// V2 Encryption: Encrypt directly to a list of recipients (No RepoKey)
-    pub fn encrypt_v2(
-        &self,
-        data: &[u8],
-        recipients: Vec<Box<dyn age::Recipient + Send>>,
-    ) -> Result<Vec<u8>> {
-        let encryptor =
-            age::Encryptor::with_recipients(recipients).context("Failed to create encryptor")?;
-
-        let mut encrypted = vec![];
-        let mut writer = encryptor.wrap_output(&mut encrypted)?;
-        writer.write_all(data)?;
-        writer.finish()?;
-
-        Ok(encrypted)
-    }
 
     /// V2 Decryption: Decrypt using the User's Identities (Try ALL known keys)
     /// V2 Decryption: Decrypt using the User's Identities (Try ALL known keys)
-    pub fn decrypt_v2(&self, encrypted_data: &[u8]) -> Result<Vec<u8>> {
-        if self.master_identities.is_empty() {
-            return Err(anyhow::anyhow!(
-                "Master identity required for V2 decryption"
-            ));
-        }
-
-        let decryptor = age::Decryptor::new(std::io::Cursor::new(encrypted_data))?;
-
-        match decryptor {
-            age::Decryptor::Recipients(d) => {
-                // Pass ALL identities to the decryptor at once.
-                // Age will try them one by one.
-                let identities: Vec<&dyn age::Identity> = self
-                    .master_identities
-                    .iter()
-                    .map(|id| id as &dyn age::Identity)
-                    .collect();
-
-                let mut reader = d
-                    .decrypt(identities.into_iter())
-                    .map_err(|e| anyhow::anyhow!("Decryption failed: {}", e))?;
-
-                let mut plaintext = Vec::new();
-                reader.read_to_end(&mut plaintext)?;
-                Ok(plaintext)
-            }
-            age::Decryptor::Passphrase(_) => {
-                Err(anyhow::anyhow!("Passphrase encryption not supported"))
-            }
-        }
-    }
 
     /// Gather all known recipients (Master, Imported, Team, Machine) for encryption.
-    pub fn gather_all_recipients(&self) -> Result<Vec<x25519::Recipient>> {
-        let master = self
-            .master_identities
-            .first()
-            .context("Master identity required to gathering recipients")?;
-        let mut seen_keys = std::collections::HashSet::new();
-        let mut recipients = Vec::new();
-
-        // 1. Self (Master)
-        let master_pub = master.to_public();
-        seen_keys.insert(master_pub.to_string());
-        recipients.push(master_pub);
-
-        // 2. Imported Heritage Identities
-        for id in &self.imported_identities {
-            let pub_key = id.to_public();
-            let pub_str = pub_key.to_string();
-            if seen_keys.insert(pub_str) {
-                recipients.push(pub_key);
-            }
-        }
-
-        // 3. Authorized Machine & Team Keys from the current repo
-        if let Ok(repo_root) = self.get_repo_root() {
-            // Check BOTH new committed path (V2 Standard) and legacy path
-            let search_paths = vec![
-                repo_root.join(".demon").join("data").join("keys"), // V2 Standard
-                repo_root.join(".git").join("arcane").join("keys"), // Legacy
-            ];
-
-            for keys_dir in search_paths {
-                if keys_dir.exists() {
-                    if let Ok(entries) = fs::read_dir(keys_dir) {
-                        for entry in entries.flatten() {
-                            let path = entry.path();
-                            // Accept .pub files (standard) and .key files (legacy pubkeys sometimes named .key)
-                            let ext = path.extension().and_then(|s| s.to_str()).unwrap_or("");
-                            if ext == "pub" || ext == "key" {
-                                if let Ok(pub_str) = fs::read_to_string(&path) {
-                                    // Parse potential multiple keys per file or single key
-                                    for line in pub_str.lines() {
-                                        let line = line.trim();
-                                        if !line.is_empty()
-                                            && !line.starts_with('#')
-                                            && seen_keys.insert(line.to_string())
-                                        {
-                                            if let Ok(recipient) = line.parse::<x25519::Recipient>()
-                                            {
-                                                recipients.push(recipient);
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        Ok(recipients)
-    }
 
     /// Unified payload unlocking logic: try ALL known keys.
-    pub fn unlock_payload(&self, encrypted_data: &[u8]) -> Result<Vec<u8>> {
-        // 1. Try Age (V2) format
-        if encrypted_data.starts_with(HEADER_V2_MAGIC) {
-            // Try ALL Master keys
-            for id in &self.master_identities {
-                if let Ok(plaintext) = self.decrypt_v2_with_identity(encrypted_data, id) {
-                    return Ok(plaintext);
-                }
-            }
-            // Try Imported
-            for id in &self.imported_identities {
-                if let Ok(plaintext) = self.decrypt_v2_with_identity(encrypted_data, id) {
-                    return Ok(plaintext);
-                }
-            }
-        }
-
-        // 2. Try RepoKey (V1) format - if we have a RepoKey
-        if let Ok(repo_key) = self.load_repo_key() {
-            if let Ok(plaintext) = self.decrypt_with_repo_key(&repo_key, encrypted_data) {
-                return Ok(plaintext);
-            }
-            if let Ok(plaintext) = self.decrypt_git_seal(&repo_key, encrypted_data) {
-                return Ok(plaintext);
-            }
-        }
-
-        // 3. Drunk guy with keychain (brute force all keys in ~/demon/keys)
-        if let Some(plaintext) = self.try_keychain_bruteforce(encrypted_data) {
-            return Ok(plaintext);
-        }
-
-        Err(anyhow::anyhow!(
-            "Decryption failed after trying all keys (V2 + V1 + Keychain). Magic: {:?}, Len: {}",
-            &encrypted_data.get(0..20).unwrap_or(&[]),
-            encrypted_data.len()
-        ))
-    }
 
     fn decrypt_v2_with_identity(
         &self,
@@ -1360,38 +1213,8 @@ impl DemonSecurity {
     }
 
     /// Helper for encrypting data to all known recipients.
-    pub fn encrypt_v2_for_all(&self, data: &[u8]) -> Result<Vec<u8>> {
-        let recipients = self.gather_all_recipients()?;
-        let age_recipients: Vec<Box<dyn age::Recipient + Send>> = recipients
-            .into_iter()
-            .map(|r| Box::new(r) as Box<dyn age::Recipient + Send>)
-            .collect();
-        self.encrypt_v2(data, age_recipients)
-    }
 
     /// Encrypt data for a specific node (runner) + master keys
-    pub fn encrypt_for_node(&self, data: &[u8], node_recipient: &str) -> Result<Vec<u8>> {
-        let mut recipients = Vec::new();
-
-        // 1. Add node recipient
-        let node: x25519::Recipient = node_recipient
-            .parse::<x25519::Recipient>()
-            .map_err(|e| anyhow::anyhow!("Invalid node recipient: {}", e))?;
-        recipients.push(node);
-
-        // 2. Add master keys (so Director/User can still recover/debug)
-        let master_ids = self.load_master_identities()?;
-        for id in master_ids {
-            recipients.push(id.to_public());
-        }
-
-        let age_recipients: Vec<Box<dyn age::Recipient + Send>> = recipients
-            .into_iter()
-            .map(|r| Box::new(r) as Box<dyn age::Recipient + Send>)
-            .collect();
-
-        self.encrypt_v2(data, age_recipients)
-    }
 
     /// Ensure the current user's public key is present in the repo keys.
     /// This prevents "lockout" by ensuring we can always decrypt what we encrypt.
@@ -2092,90 +1915,11 @@ impl DemonSecurity {
     /// repositories (2^48+ encrypted files with the same repo key), nonce collision
     /// becomes a meaningful risk for GCM mode. For typical use, the random nonce
     /// per-file is sufficient. Consider key rotation if your repo will exceed this scale.
-    pub fn encrypt_with_repo_key(&self, repo_key: &RepoKey, plaintext: &[u8]) -> Result<Vec<u8>> {
-        let key = Key::<Aes256Gcm>::from_slice(&repo_key.0);
-        let cipher = Aes256Gcm::new(key);
-
-        let mut nonce_bytes = [0u8; 12];
-        use rand::RngCore;
-        rand::thread_rng().fill_bytes(&mut nonce_bytes);
-        let nonce = Nonce::from_slice(&nonce_bytes);
-
-        let ciphertext = cipher
-            .encrypt(nonce, plaintext)
-            .map_err(|e| anyhow::anyhow!("Encryption failure: {}", e))?;
-
-        let mut result = Vec::with_capacity(12 + ciphertext.len());
-        result.extend_from_slice(&nonce_bytes);
-        result.extend_from_slice(&ciphertext);
-        Ok(result)
-    }
 
     /// Decrypt data using the repo key
-    pub fn decrypt_with_repo_key(
-        &self,
-        repo_key: &RepoKey,
-        encrypted_data: &[u8],
-    ) -> Result<Vec<u8>> {
-        if encrypted_data.len() < 12 {
-            // Graceful fallback: If data is too short, it might be plain text or empty.
-            // For filter, error to be safe.
-            return Err(anyhow::anyhow!("Invalid ciphertext length"));
-        }
-
-        let nonce = Nonce::from_slice(&encrypted_data[..12]);
-        let ciphertext = &encrypted_data[12..];
-
-        let key = Key::<Aes256Gcm>::from_slice(&repo_key.0);
-        let cipher = Aes256Gcm::new(key);
-
-        let plaintext = cipher
-            .decrypt(nonce, ciphertext)
-            .map_err(|e| anyhow::anyhow!("Decryption failure: {}", e))?;
-
-        Ok(plaintext)
-    }
 
     /// Decrypt data using the legacy Git Seal V1 format (AES-256-CFB with derived IV).
     /// WARNING: This format uses a deterministic IV derived from the key (SHA-256 hash → first 16 bytes), which violates AES-CFB security requirements. Using the same IV for multiple encryptions leaks information about plaintext relationships. This format exists for backward compatibility with legacy git-seal ciphertexts. DO NOT use this for new encryptions. If you have ciphertexts created with this format, consider migrating to AES-256-GCM (encrypt_with_repo_key) with random nonces.
-    pub fn decrypt_git_seal(&self, repo_key: &RepoKey, ciphertext: &[u8]) -> Result<Vec<u8>> {
-        if !is_v1_fallback_allowed() {
-            return Err(anyhow::anyhow!(
-                "V1 decryption disabled: legacy format uses deterministic IV which violates AES-CFB security. \
-                 Enable with allow_v1_fallback = true in policy, then migrate ciphertexts to V2."
-            ));
-        }
-        eprintln!("⚠️ WARNING: decrypting legacy V1 ciphertext (deterministic IV — insecure). Migrate to V2.");
-        let mut hasher = Sha256::new();
-        hasher.update(&repo_key.0);
-        let key_hash = hasher.finalize();
-
-        let key = &key_hash[..32];
-        let iv = &key_hash[..16];
-
-        // Using dynamic dispatch or just specific type
-        // Using specific Decryptor type from cfb_mode
-        let cipher = cfb_mode::Decryptor::<aes::Aes256>::new_from_slices(key, iv)
-            .map_err(|e| anyhow::anyhow!("CFB init error: {}", e))?;
-
-        let mut plaintext = ciphertext.to_vec();
-        cipher.decrypt(&mut plaintext);
-
-        // Simple heuristic: check if result is likely plaintext
-        // If it's garbage, it was probably not encrypted this way
-        let is_likely_plaintext = plaintext
-            .iter()
-            .take(20)
-            .all(|&b| b.is_ascii() && (b.is_ascii_graphic() || b.is_ascii_whitespace() || b == 0));
-
-        if !is_likely_plaintext {
-            return Err(anyhow::anyhow!(
-                "Git Seal decryption produced binary garbage"
-            ));
-        }
-
-        Ok(plaintext)
-    }
 
     /// "Drunk guy with keychain" - try all keys from ~/demon/keys/
     fn try_keychain_bruteforce(&self, ciphertext: &[u8]) -> Option<Vec<u8>> {
@@ -2462,7 +2206,7 @@ mod tests {
             patterns.contains(&"Age Secret Key".to_string())
         );
 
-        let content = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBFWGUwK1FLa0RrajluMnpieFdYemEzWjloZjJ6bmVON01XRm9mcGtteTE0CkZRVTRiekFiV0U5QzVQWmRHU2lwUUNoUlp6VCtRaXVnUjNwNW1LY2dWVmcKLT4gWDI1NTE5IC9sM2ZpMmVQd0tMT1FGNzl0T0ZCNnQ2dmZYV0JtWnRKOExkTzllYUk4Rk0KOGtSUEVNeTZkNHEyL2ZtNDBoZ0RDNlJpdlh3bUVQcGE2Sy8yWGd5Zk9YcwotPiB2RDkjLWdyZWFzZSBbKWVNNW9AJSBOMX5gbjlyCnA5UXZ5VnoweUtBdWQxWFFvcTU4ZzB6WG1LSUwrUXRDRUZib1B3Wis3UHVYYWdzR3Q2S2pzZmZUQ1VxSS9zc1YKNkJFNUVsZGZLL0RIdEFtOGxNZlZ4UQotLS0gaW1uOHdGUGs3TThkN1dIdnhNTC9OUERzejhMdTJ2Z2IwZ3FKd204a0ZEOAq5D8pC4DiAZ08TiIkErL4Glm/+Y0oFVkWhAOsutD0gLMQPeS4WINJ2I8LOkYBRJq2r721VjDJ1seoXHtlVZa5aMl0LXbFNZ/1ghS0K+AtghSItectCMqd+lnhwKcAHJC3Y3jzSBEpr8ph5]";
+        let content = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA2TWh5K3RmNEN2Wm9DL2E1Y2ErVjU1WTg3QVVIWlFPYUt3ZmUvQUxWYkZVClZTY1luWnpqSGtReGRveSt1UFJoVUZ2TmZyVnZCaDJ2bjIzMVdIclNtT28KLT4gWDI1NTE5IEdnWkVlWGdGZ0dIdEJNRUlWdWV4c1Iza0thMERSWUF1ODVDWktFcFlMRVkKMFRiaEZCZkVOZ25lMVJwTElhSWtqZlZ4SC85dGx0d2NFeTBNN21QM3RhYwotPiAjXlp8fC1ncmVhc2UgamwgKHAgKExRICtwcFhDRAprUm1vMmZDcG5OOG1SenpNM3U2M0FXVURTSkV1RjdpdEV4TWZkOEQ3Y05wYW9rN0lsM0xPOTdVNlM3eXh5ZEwzCndmWjdHSDNlZnZFSFNSRG91T1NLZk04em0wLzFQdis2dGZmMS8xawotLS0gUXVMNkg3elhqL0U2aUJwbXRYOEtLNitFU2l3MmFFUXRGdjFwT21kSE1sSQoIM916M533AgFuSd9yb+JoCC+DxVKKVoiBg38rlEDpjfzbZHVknBqCUy3nZU9IuvW9hlyAmeUWZmEDM7kPQbwXhWi3SAJZHwYTJjvkXGGxfJytRHOjfeZQf3ChHBw4w1QdtqpiacIkn3wB]";
         let scanned = scanner.scan_and_replace(content, |name, secret| {
             eprintln!("Match found: {} -> {}", name, secret);
             format!("[MATCHED:{}]", name)
@@ -2745,8 +2489,8 @@ API_KEY=original"#;
     #[test]
     fn test_github_token_patterns_accept_variable_length() {
         let scanner = SecretScanner::new_without_age_keys().unwrap();
-        let short = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB4cGhjZldNdTJjU1hPc1Fvazd3WldOcjVZU3IrYXJ5MkE2bHZWa0JydVJzCjFNN1hzdG1TZWw5cHlsbFhxR0JsVmNLMWlRZ1B3VDNtTUdPYk90VS9RTGcKLT4gWDI1NTE5IHNKN1FXWm5KbkhLc3dwVmNUemMxVDJZeklBVjZFMzZDMVpjK043R2RoVTQKZXBvaU9PRG9OejdXT3lzU1dXcjBXKzc4OFdrTW55ZUVpTS9reExPYVZiRQotPiBTSS1ncmVhc2UgWnlQCjA1QmtVTXM0L2p2cFBBWUN3VUlCUHpLYTdCQmlJRGl4aUtIR01ERXkxTGJVcGdiV2JxSUtibjBzNXZEdDJFOXcKWm5uL1V0dENMdjd6TzVSZlRvWTZoOWw0cjZKcm9zQnRYOHRSa2IvaStWNWgyNm5sOFl4UndpMk1RN3NpR1hPVgppUQotLS0gTnhkZnlydm1uMHFkdGlUckFzSEJvR1V1YUdySzNOZTJGOTR0YW84anEwZwoEqS/y44eYzGdXbdwrvylO9ngSULWwLIeaNrjvP+TqJJLff8lD6KwLXdcoi0fBtzFyJTRAgtuvy+I4EW5TFhhVErc=]";
-        let long = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAvVnJ5UUNUeGhCT1J2SHlyWGhQN2N6TkJDWFVjbkc0eC9XYU53RDZVeGc4CjdaWDMxdjlVTVhzZ3VXMGMxSzlaQmNYQ0dVQnUvdVprYUVkazdUdmoyTGsKLT4gWDI1NTE5IDV0blIyV1VieXJaK0gyWFpXNTB2NUtaV3RoT2Jydm1zQnBZOXpoZjNxVGsKT0Y5M3VvVHh2K0JUSlc4NUFQekdTL1hrQko3S1FsNDRZeTFRSWU3ekZXRQotPiBwOmxUQU0/Xy1ncmVhc2UgJkJkUTVxIG1VU0I9cgphMnZYNlFSc3J6QlFGa3pZeW5EUlRDVkxpYTFJdHE1RWNLUW8yV0x4SlJieStkb3YKLS0tIDRmRHFoZ21ZemNRRys1TDBOUmxXcTk0cFNXVDhrL2wyQlBzcGtMUHVrL0UKQqZf0vOA2Bfg6PJq6R7J1R6TgHyPMS8bTA22vZqK2z8AOlkm4uLAwbVCjRT7lk4LLujCW8CNmPf4reG1SNH4evKObMdeSdijRW7/pg==]";
+        let short = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBEd01uRkdqTFAycVBBMEJ2T29acWpwYlZHZWdPeVFNZDNWYmE4VjRWTWp3CjZ6QnN4VjVKNnI4aGd6TnNreUJ3NEhYZ2ZDU1VIYXR5TzdlTUpiVjJCNzAKLT4gWDI1NTE5IE9Ia2JYd0JNS0lBUXZKK3JkVGN1OEtHcUJFb3RLbGJ2bjFORUR0Z21hUkEKT2M2MnNaeC9rTUU4MkpvcXpBa2UrQkpPZmRRNkVYZUxhVUVCT3JEMEVIOAotPiBjLWdyZWFzZSBeYQoramVVNWJoeXpVUkxELzRUWTZ3VEc1NnZFSmlHcUdrd0VHWVVML2o2N24zNzJDTUhrTzdQZ3Q1N3hnYnAveDNnCmNibXhlMWxIOU92cGVFdkZsR2Q0djVEQnhLUWh5M1FOeWVnOTNGaWJpanhjL1A4djZGR0xFUERwCi0tLSBGa1NkT1hNMDFZRzFRcVdnSjNtNktMZ2MxVi9WWURheFFrU1h6QURZQVZ3CumlyjWSe5hv6sbL8fzSsekryp537d3GSQsihHPSKaNWSs2qkb99TRHaWjTVnGotL3zVAKczTFiSabI5dv0WWtQRHA==]";
+        let long = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB4d3BxbVNnWkY0MStSSzJjOXdhcFNyTFhqTm4wNUMvMmFzbjhaWHIwdG5nCm5UcWdNdkliaHlsNDk0a3VNQ2JjOXdvTlV1aVc3VW1LUWo2ZTRBbFZMUFUKLT4gWDI1NTE5IHpuVW9nTHVTY3RES2R1MWVFMzdQZHhFUUozdVpQR3RnNUErbEtJbkJJUmcKNUJ3S2hiYmx5VTVKaDFQOUd6N1phdWJjOFJIQ09WMVFrSFJtYi9iaGlQSQotPiBlLy1ncmVhc2UKVEtrNVJCOTNDOHpLY0gvT2RzdlA0K08xdG1uMGl4NHNnazZlZzM1UVV3c3Fxd2F0bVc1cVJJU1FSZUtNK2ZpYwpzdmRyCi0tLSBrSGN0SVFabjZ5ZDdVcmFtalZUOTBZbEhNTEg3dHl0a29jOWtTeHd6NTFNCj7E7pnwMCkZEXtSfMusr0KN+S6Kgh4japScKUZiHDc5fYMHSQCd3VOaGt5KpNPR54d/IfZYqprCzeUGt/+peixwpKoIJ4LwCVOTNMY=]";
         let found_short = scanner.scan(short);
         let found_long = scanner.scan(long);
         assert!(
@@ -2768,8 +2512,8 @@ API_KEY=original"#;
     #[test]
     fn test_mailgun_key_accepts_variable_length() {
         let scanner = SecretScanner::new_without_age_keys().unwrap();
-        let short = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAwMXBhYzVSUm8wTFp0N3lQd1dzclJzQUxhQ2pqRDJ6aTIrdThPN3g3QzNzCk1LUjd1dnFWQWRGanY2WDJrN3RYbDBaR0JMMkRyVUlDa25ZcUFIazZnVm8KLT4gWDI1NTE5IEd6cEZ6bENDR2ZwTE94R1hHTE9QWjhNL1ZjWGJCdnBCWmRtSjM3bUJzM1UKQ0daU09OSmdrUFlzV1ZuUGM2UmJFQkJQVnFJbmZJWUdVSlNHRnREYmgrTQotPiA+WG5nMXtSLWdyZWFzZSBoZ0cgfnNbO0RhbyBETEhbaiBYbQpicHVaOEtkdC9PdXVUaCtERmdNTzkrbURhUW53V0NRYkl3TjBVZTV6K2VnVUxrUjdRQ05ueUlTZFR4bWYraGtSCktncEJYTDV1TEhXazVpaWE4TGVZK2VBCi0tLSBMRkRTbmlTanRzbnlWdnM5bkxqK291WjNkNkpieVlEbjJDazlKbFBhT0tjCvj0bPYo7gpLNwd99UeS5g1wynocNxfkuzIAkYdOOqThPc8GLxjd6dbNPN4Wk2+8PKUevb97KFMpA3JDl3hLttQ2]";
-        let long = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBXcmU4YVNsZDkybG9DZ3drbm1rb0FmNzJDUEpWdWlFSzY2Zm1HZGd5V0ZvCkNvWmtrV2JkVENSbXU2SkxmdG12Nndia2x5ZjRzR09pbHoxbThUZWtTQkUKLT4gWDI1NTE5IGQvWTloWWtOM3JrNXZVWHljS1hWbW1yKzB3STZiM2oyYU9VaHEvc3BoREkKTVRDNTVENjR1RnpRQmZXWFVlQ0FyTzM0T2g3dG5oU1U0K0E5QTJNR1NPbwotPiBfRCQ8LWdyZWFzZQoycUg0QVF6V2ZQcEQzVkhHdjNyQmo2b2xzUmhtaTJWZTN5Q1hzbWxOcSt5OE42czlXa1BZUFpFZVJqeVhPVTQ4ClhjUWRKUnZLZG5LQmRaTzVhVmVXcWZvYThrYlFSemtNQ2cKLS0tIE82SVk5YVd1MFJyUXlOUFhadFcvdUpPUE5PY0d5Z2oyUC9OS25SNyt0V0EKxgw/k5DhMIclorHgIEUJTpLK71MFXWuxMHLvVs3oRmeSxUThfa1A/NSeE3SUaelkjbUDXZUF5eIge0eHyqqSu5PEwYVw]";
+        let short = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBtbEV3bDZXSWgwQ2dQUVlESm95MnVhbWhvRUQ5UFY2UGkyQ25Xb0lwcmhBCjFDOEI1RG04anJLQUN1VWZWVWRCbkpUTzNLTm9PVGVEamR3NGNtYmJQLzAKLT4gWDI1NTE5IHNLOElYemJvWlJNZUY4ZU0zSElyb1ZsNjdxL0FEWDNBUnJWcEQvNmxJeGsKUyt2aHFtVDdiUXdQNnlQa2syMEVxNE55NmRaZmQ1UkdRTng4MGRYK2UzSQotPiBBLWdyZWFzZSB2IGduIExcSiQ3P2YKMEV5NjAxaU1odVEyNUhCbzZCY3EvQmdad2hHSUlFb0s2MjRiTDQrd0R3Ci0tLSBZUC9nTTA1bi9QbWREY0VXMTkzajhUQytKREwxUVdoalRJQllHU2tjMjQwChBsz5NJGM9GVll/WiNfOsLbNDiIWdalXONwR6bXtI2ykJ2dfV1rfQcCddJIl6zRaMP3itfMYPZ95LKTwvpSAKHV]";
+        let long = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBENkVRaE4yQmUxbytBR2RWZDVhSTdCUlh2dkMrNnk1eGpnVVEwMFh6U1JvCmtGK0lvSjZqdEUya3Mrcms5aENFRk1DK3A2ZlNvd1k5UVZDbjRtVzU5cUEKLT4gWDI1NTE5IGh4ek5XM0ttR1pQbTdibUNiejVjOUM3cVlQQ0JtVEFiVy9PZHMxeHpEUVEKdFQrNkpDRitXaytTSHdIcUtHSmpHcktnOGp4cDhrYnRjQlNNSSthRmE1bwotPiB+ODkhLWdyZWFzZSBuPDggXgo4dW8wUWpZWVZXMjZxeXJSNkJYUWF3eFErcnpOZ3JaMk41STNOclNXWW56cTRQMHY4QTNjZG1NYWpCN1kzMzZjCno0NUpVU3RGN0lBcFRESG9JN0FLCi0tLSA3NmhVL0Nwc3JSVVJzVXNJamwwYkYzVnE5NnE5ZGoxT3lKWlY5aFh0ZE5nCuc3bNviHoWWPocmZR8PnYRo7pIz8XClmfKb2xSTz4VyGbSm7dFvZ16fUqHaPvZxsdehWE/E3PWKYoAzpqBWr2a6pbnDFg==]";
         let found_short = scanner.scan(short);
         let found_long = scanner.scan(long);
         assert!(
@@ -2787,7 +2531,7 @@ API_KEY=original"#;
     #[test]
     fn test_slack_bot_token_compact() {
         let scanner = SecretScanner::new_without_age_keys().unwrap();
-        let [DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBmOUtmOEo5SE5qN2g5UlgxdXl0N0FXcXBtWFByek1HK1FYRUNGVnB3U2o4CjdYVXdwaWQ3alFIaU0zc2xqZGdBeUlzdExiQ0luZi9WTDV6VlJWNkx6VEEKLT4gWDI1NTE5IGdwSlF2ZWlIL21lUXJsQ1NnbXVWMnpFY3plTm5WaWZXOUw0YURHUWIrUmMKUFFENldhM25veGtWRE9lNnF5bjJWUElwSlBSWTNWcFlqZUc0WC9KcDNPRQotPiB+W3ItZ3JlYXNlICoiV3JHS3d0ClJGVHU1RGpLODMzSmtrZDFzZ0UvbjdsSHA3VERPUDBUdm9zd3ZrK2pWNW44Z0d2RDdJTmFQazZ2SEhkZnQxRHQKVHlROHpCK1Q0bWNCZnEwa3o3ZDAyRWJrWDMvVTAzNEtFdk8zSk1qOG44eW5ObStYeStZS3duY1VodGlRVVEKLS0tIEVIb3lVTWk2MlYzdW9aNmRtVEU4Mm40TThkNy9SZ2loWlorOHl6dUxDWEEKna8XJMFEVjZDcd8+UT/G4dSw5jzhDDvZc/v3QMj10j0vEAFt5FXQIbJJJoGBUCf4+06AmIPXcouruMPdCzlYiBVSLuS9nhds0A==];
+        let [DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA2Vno3MS9qV3VUM3kwVUwxTTFJZFVpNFQ2WWNmWGc5UDhEbkRZdnA0YXhBCmlZT3QyeGMycUF0L2hJVkVMbzNCZHhYL0Q5c2JuUEVZS0xQSFA3THA4TzQKLT4gWDI1NTE5IDhHNVhmQmRWU2gzWmdzT1ZhbDVyM3gva1E5Q3ByOVBNWmsxcnNMQ0FMeFkKdng2QTNhczBzVjFPcHg4R0kvZ0lCbUpaM1MvbWxYRVE4dXZ5YzVock1aVQotPiBiS10sey1ncmVhc2UgLi9iYUJCTW4KUExCNyswWG1NZ0NCYkV3MW5ucHhDZzFyV2gvMGdyUUxja3h6U2tRMEZIOHc1UEJHaVhxSmUyV0dkVzF4UWZLKwp4NG9qMld5YUp6WTlrNmZ2Q0c0Z2RsQk4xcUloWlBNck16MVdSbUdEODA1TFBGOVIKLS0tIGFBN2E4K3JkeENDRmhlZmJ1QUs5aW5WTnJuYWZ5ZHBNTlZ1Yi9ibGJzR28K2Vpcj0Xhbrzzl7/WhBACEfa4HIoFDJp6+huuKc38bOis2qr3wBLXANLuHt4eOrz7BB8q4v9xTPOvwIevbyiVdNe/be3FeUCD9A==];
         let found = scanner.scan(token);
         assert!(
             found.iter().any(|f| f.name == "Slack Bot Token (Compact)"),
@@ -2799,7 +2543,7 @@ API_KEY=original"#;
     #[test]
     fn test_slack_bot_token_compact_has_length_cap() {
         let scanner = SecretScanner::new_without_age_keys().unwrap();
-        let reasonable = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB6SHpETUVpRnIxUkVmb1NWYzYzVSs5TXNOQ05YQlVRZlZpTURkajNJUWpvCjI5NWhIamMxc3FXakJ4dFA2NHVjTzljdWhkbFY1VUp1anhxbS9wVHFhVHMKLT4gWDI1NTE5IEZuTGhmS0YxM1pyZEpzM0U0TG9Vd1pYcHBQRXlocnppR29sWU43dEZQQm8KOXNhU3JWOS9wV3ZHM09kcitPWFBXWG0zKzRwV25LV0swQ1NJNUJBYk14OAotPiBAQERnJictZ3JlYXNlICV1THg4ZiAyVypafX0sIDp+bAp5TktLbVdXbHczRllKUVo0K0ZMRnhVaXdnNGQrMmU1VEtia1ZWTHU0QnIvTmdwYzhGTVlsL21uYUV0U2VNUzRECnBZK1BqNlA2VjdLdmQyYSszdzhBSXh1UE9ObmR2dTlTYlN1akh2TkhZWHlOCi0tLSBaSjlVTDZTZVdLVDRRUGxMNEluZlkvSGY1YkR0blRmTnRZSGtLaWVkU2xjCs+ktAbZWdUKaqZDbvI0gx2jxFBhLyfRL42EXTjPYTv0M33JluaFYZ7q1JBr4yD1Av5b5PHWmGy3bpD4xSvpsMABSCjrwVLQ+09Ga73IUFvV8g24NqL9smReQ6fWepaudTRqjp1Z]";
+        let reasonable = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBSVTM1cmJocXJKUTY1MGhqR2xxTWRaSjdnZkFoS0I4MVROek5wY3RpNlNJCmk1SDZoZE5HS08xVXdnT29OdE5MOGJnZTJMTkdqdjBaSjRGOTA4ZTZqcE0KLT4gWDI1NTE5IHdXZitVeStGZTVZa0I2aFNRQWw0VSsyUkRhOUJHR3BlQzlhZTMyUlRjREUKTEJzZEh5by9yVGpYempTcHZFcE5jZEFxNjVFTm1YNXZrNHgwMVJiSkc4WQotPiA8LWdyZWFzZQo1QW5NUFk0YkRQSFoydVptZnJFdGR4M1FhaUNkdnBLVTlocEw3TVQvZ2xuV0VKMURET2FUbUszU2FzN3VxUk9yCmd5ekJSM1F0U1NZeUtVd1A1TUFTWG0xa2dTamhQOXQ0RU1JdXB6MzZSLzF3bGUyQzdvaS9QOXpNV244SHdMUQotLS0gVDB5WWMzenpVRDEyYnJ0ZGw0TkcyRmV3NkJ5VVRyd1Q0bk12aEduNmFxMAqESTY/OMDomoSbgkyswRfZ1GpXkhm4GZzy+H42turUcY0YO5hhuutwV2G5QaANmi7DmW6Ii/ln4zsOB7xJ7cIs31UOCu45bJZdm9jj9Wl6Y88txw65L8kDyotBPZghX8fpHlzoBA==]";
         let found = scanner.scan(reasonable);
         assert!(
             found.iter().any(|f| f.name == "Slack Bot Token (Compact)"),
@@ -2811,7 +2555,7 @@ API_KEY=original"#;
     #[test]
     fn test_hex_secret_quoted_requires_context() {
         let scanner = SecretScanner::new_without_age_keys().unwrap();
-        let with_context = r#"[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA4SFYzd2J5eXZVVUVkRGQ1T1gyTzdyRnlKY29KYXFuUGhIZm9GZ1RoTkU0ClFPSXQ1RURyQWwxRmpIZUlCNVE0azFjYytzMkVuSWd5QkY2M0ozSUN0Tm8KLT4gWDI1NTE5IFJobnBXa3NFMmVza1JJOElObDF4a3lycG50MFV3V0lKTmE3Rk9Ud2dKaGcKcXd0QUhHVkpra1JkUk5YOXZpNzA1cFVYZk1BeEhVdzNKVng2UkI1bFVnMAotPiA0OTk1REBxLWdyZWFzZSB6Pnp9IHhXPHdlSSIKeG12dE1aZzByTDZ5RFhsTlFlY0pxZ1lQZHlBK3F6a0V1bkZxbDFWWlpoM0JhdVBjaFlYbnloYU1MWXZYV0dyKwpNVFJnRmNRb3pvVlhNOWlmZklDT2hSbG5VZTdReVluWW1RCi0tLSBPQ2x2NFpSY0lldE1idWI5NFlzTk5GbUt0Y2Fvd1JUcWxnV25KL0JIYkZnCpSXadeVb+aQXhjKWHVyg039DB9eYcG/mtxVQMoLFPsgQi6i2AZnq/4rjs13y4vPl3x1BCwb9NYM1kHCQzmDb2Rsio5jNz9bBwJvaSkeKDo=]"#;
+        let with_context = r#"[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBaNjlTcUtLTVp6SmNKdC8wVi9CRXFxNVVxNGpYdkVvaUc3MGJvN2d4R2pjCmVjRnNwYXhHRXlqOUZXQ3RKYkJDaWVSZWxIT0VsVnhYdFZuaU1uZy9ER0UKLT4gWDI1NTE5IGhOS1ViNTdPT2c3dFB6cEY1a013UUxpR1FBVWtqVWxmSmtrM3ExMkZEbW8KdkkxWGJDUDExOWpOZE10N0hpYnd0RzlUSVVRYWdHUThpWDBmYnkvQW4wOAotPiAmcG5jbigiLWdyZWFzZSBBIFMleSBDN3VlIExde2kiCkFsek5TVEZ0ZHFnYnpUcCtFUFNHWXh2QlB6cFhpNVJPY05yMGYwRUQwVENnVDBrK1cwL3hIS1JXY3ZHbkxQUXUKZEswQVhvUEkzNmE4d2ZVVHN0Vjg1TGtsZnhqdjJVTXNCN1Q2Ci0tLSBiTFlTMFhsL21yenZZMUZlMWdnQ3R6ZUh2TkdTQUFnTkprR3R2a3RPTE5vCv/RaZs8948v88+g0BAR4mvkUYdxWW7psH2pDK+UX1m3dwBTzDt8y1DQHhUI63sKMHhlcR3oxq9DimYKaoKvnC8VTxYLNNSBHlOBduIdPTA=]"#;
         let without_context = r#"label = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4""#;
         let found_with = scanner.scan(with_context);
         let found_without = scanner.scan(without_context);
@@ -2832,7 +2576,7 @@ API_KEY=original"#;
     #[test]
     fn test_high_entropy_secret_quoted_requires_context() {
         let scanner = SecretScanner::new_without_age_keys().unwrap();
-        let with_context = r#"[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA5VkR5VXhCNU5Eanh5eU5CcHdSVllWYjF3Z3U5S1NXSDdEdG9PZFZqejAwCnViSkp0dFlnL2svZEZlOGhvSHNPK0hNcTdqdDNYbGNaVkJROHdtK0J1TmMKLT4gWDI1NTE5IFhsVlFtZ1J0RXJVZThTTnVVNmJTSVhLd1EzdUxvbVN6WEZ2cm9IZHJDR3cKZUE2QWNOQURPNXJvZUNMM1A3M2ZzVnc5M1UvWjRzWFVMNG0yNi9MNHBoZwotPiAnN3k6PHNMLWdyZWFzZSBYJEBYWSFdfiB6Cnkyc1RwUzhiUmhuYgotLS0gVCtCc3BMbTBiV3pRUS9qaVR6YnllWG9FTXZWUFllQVAvTEZ2ZHg3TldyOApiKNuW8bzsxa6qjxM8/9Stfb3OfgqxzvqukGD+aiZrzg3u5LrJTqHwfuDcjo8QS0lqry3l5FTy3hfeE7fCt0rgKtQ=]"#;
+        let with_context = r#"[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBJa29SS3JhaU9XWUlYMGlNV2ZjUDVDRmx4ZXp5ODJESW0rampWRXJkaVM0CkRxMDROaW0yeWovNGs1bDY1ZnJxMzIvZUgwMEltTnhDNHhyNDhOTU04RkkKLT4gWDI1NTE5IC95N1M4OWgwTGxPQkVuREFpc1VhVUhESndKZ1VxWlVqdHhkVnBtSmFRR1UKZFNBYkU4UXBWS2tsc2I5aDhmaXAyNjVpTDZzK2xZbldrQ2QzZVNDU1BRWQotPiB6M29KIS1ncmVhc2UgQExnPDRNIDNqP0V2PD4gQD5Kdnx7fApzdWpTQ1IyTjZKdDQ0RVdNamVNNFUyYXhMMnZ5UE5SdDgzSi83V3JJSldLYXpMc1JlU3MxWGxxMSswdUtycDhNCmM1UHIKLS0tIC9Pb0tJTEVEQi9VOWp1MDZ0Ly9ud2pEZXRKNjUwZkd4cTM1WEQ4SGZwb0EK8DxbqeaTnT8zYO7z583NDbwdzM1OKdE2+vDGj337870J87pBz/ng9wV7tSqNzdAcsuB5azebqBcMrCEpn2NPaZCv]"#;
         let without_context = r#"class_name = "aBcDeFgHiJkLmNoPqRsTuVwX""#;
         let found_with = scanner.scan(with_context);
         let found_without = scanner.scan(without_context);
