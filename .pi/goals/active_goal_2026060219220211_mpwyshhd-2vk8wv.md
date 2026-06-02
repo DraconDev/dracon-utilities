@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 185426,
-    "activeSeconds": 165
+    "tokensUsed": 186441,
+    "activeSeconds": 352
   },
   "sisyphus": false,
   "createdAt": "2026-06-02T18:22:02.113Z",
-  "updatedAt": "2026-06-02T18:25:18.145Z",
+  "updatedAt": "2026-06-02T18:28:25.741Z",
   "activePath": ".pi/goals/active_goal_2026060219220211_mpwyshhd-2vk8wv.md",
   "taskList": {
     "tasks": [
@@ -53,8 +53,8 @@ Diagnose why each of the 7 currently-WARN repos isn't committing, fix any policy
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 2m45s
-- Tokens used: 185K (185,426) tokens
+- Time spent: 5m52s
+- Tokens used: 186K (186,441) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
