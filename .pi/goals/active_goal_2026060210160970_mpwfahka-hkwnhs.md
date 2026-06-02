@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 426050,
-    "activeSeconds": 10726
+    "tokensUsed": 952429,
+    "activeSeconds": 22734
   },
   "sisyphus": false,
   "createdAt": "2026-06-02T09:16:09.706Z",
-  "updatedAt": "2026-06-02T12:15:52.120Z",
+  "updatedAt": "2026-06-02T16:07:57.886Z",
   "activePath": ".pi/goals/active_goal_2026060210160970_mpwfahka-hkwnhs.md",
   "taskList": {
     "tasks": [
@@ -73,13 +73,17 @@
       {
         "id": "clear-stuck-state",
         "title": "Clear STUCK_PUSH state via dracon-sync unstuck command",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-02T12:17:02.889Z",
+        "evidence": "STUCK_PUSH state is fully cleared. After running `dracon-sync once`, the state went from 6 CONCERN + 6 WARN (12 problem repos) to 0 CONCERN + 1 WARN. The 7 previously STUCK_PUSH repos (avid, ai-auto-w",
         "verificationContract": "For each repo that had STUCK_PUSH, run `dracon-sync repair stuck-unstuck <repo>` or whatever the unstuck command is. Verify `dracon-sync repos` no longer shows STUCK_PUSH for any repo."
       },
       {
         "id": "final-verification",
         "title": "Final verification: all repos clean, sync healthy",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-02T12:22:42.290Z",
+        "evidence": "Final verification complete. (1) `dracon-sync repos` shows 0 CONCERN repos (down from 6), only normal WARN/OK. (2) `dracon-sync repair stuck-list` shows \"no stuck repos\". (3) All 7 filter-repo'd repos",
         "verificationContract": "`dracon-sync repos` shows 0 CONCERN, 0 STUCK_PUSH. `dracon-sync health` returns OK. `tail ~/.local/state/dracon/dracon-sync-incidents.jsonl` shows no new STUCK_PUSH entries since backup creation."
       }
     ],
@@ -127,8 +131,8 @@ If blocked: Stop and ask the user immediately. Do not proceed if any filter-repo
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 2h58m46s
-- Tokens used: 426K (426,050) tokens
+- Time spent: 6h18m54s
+- Tokens used: 952K (952,429) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
@@ -139,6 +143,6 @@ If blocked: Stop and ask the user immediately. Do not proceed if any filter-repo
 - [x] filter-repo-ai-auto-writer: Run filter-repo on ai-auto-writer — evidence: Successfully ran git filter-repo on ai-auto-writer. Stashed uncommitted changes, removed target/ from all history, re-added remotes, force-pushed to all 4 (codeberg, github, gitlab, origin) successful
 - [x] filter-repo-dracon-code: Run filter-repo on dracon-code — evidence: Successfully ran git filter-repo on dracon-code. Stashed uncommitted changes, removed target/ from all history, re-added remotes, force-pushed to all 4 (codeberg, github, gitlab, origin) successfully.
 - [x] filter-repo-remaining: Run filter-repo on remaining affected repos (if any from triage) — evidence: Successfully ran git filter-repo on remaining 4 repos: dracoon-ai-lib (target/), rust-ai-web-auto (target/), dracoon-voice-notifications (assets/models/), browser-extensions-shared (node_modules/ + *.
-- [ ] clear-stuck-state: Clear STUCK_PUSH state via dracon-sync unstuck command — contract: For each repo that had STUCK_PUSH, run `dracon-sync repair stuck-unstuck <repo>` or whatever the unstuck command is. Verify `dracon-sync repos` no longer shows STUCK_PUSH for any repo.
-- [ ] final-verification: Final verification: all repos clean, sync healthy — contract: `dracon-sync repos` shows 0 CONCERN, 0 STUCK_PUSH. `dracon-sync health` returns OK. `tail ~/.local/state/dracon/dracon-sync-incidents.jsonl` shows no new STUCK_PUSH entries since backup creation.
+- [x] clear-stuck-state: Clear STUCK_PUSH state via dracon-sync unstuck command — evidence: STUCK_PUSH state is fully cleared. After running `dracon-sync once`, the state went from 6 CONCERN + 6 WARN (12 problem repos) to 0 CONCERN + 1 WARN. The 7 previously STUCK_PUSH repos (avid, ai-auto-w
+- [x] final-verification: Final verification: all repos clean, sync healthy — evidence: Final verification complete. (1) `dracon-sync repos` shows 0 CONCERN repos (down from 6), only normal WARN/OK. (2) `dracon-sync repair stuck-list` shows "no stuck repos". (3) All 7 filter-repo'd repos
 
