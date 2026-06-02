@@ -27,7 +27,7 @@ These repos have only untracked `target/`, `node_modules/`, or `.dracon/` direct
 | A4 | avid | target/ | — | main | DISCARD: add `target/` to .gitignore |
 | A5 | ai-auto-writer | target/ | — | main | DISCARD: add `target/` to .gitignore |
 | A6 | browser-extensions-shared | node_modules/, cursor-style/node_modules/, wxt-shared/node_modules/ | 951M | main | DISCARD: add `node_modules/` to .gitignore |
-| A7 | respec-spec-reconciler | node_modules/ | 231M | autoresearch/evolutionary-reconciler-2026-05-30 | DISCARD: add `node_modules/` to .gitignore (but see B1 — branch also has spec work) |
+| A7 | respec-spec-reconciler | node_modules/ | 231M | main | DISCARD: add `node_modules/` to .gitignore (stale branch B1 already deleted locally) |
 | A8 | ai-auto-repo-rot-scanner-todo-agent | target/ | — | main | DISCARD: add `target/` to .gitignore |
 | A9 | opencode-auto-review-completed-todos | node_modules/ | 61M | main | DISCARD: add `node_modules/` to .gitignore |
 | A10 | pully-fully-pull-based-fleet-reconciler | pully-types/target/ | — | main | DISCARD: add `target/` to .gitignore |
@@ -50,17 +50,18 @@ These repos have BOTH untracked build artifacts AND tracked-file modifications. 
 
 ### Category B: Real Content Changes Only (1 repo)
 
-#### B1. respec-spec-reconciler (branch: autoresearch/evolutionary-reconciler-2026-05-30, last: 16 hours ago)
-- **Stale branch** with 16 commits >1000 line changes to `src/spec_parser.ts` and `SPEC.md`
-- **49,101 lines diverged from main**
-- **Recommendation**: INVESTIGATE — this is the real outlier. Review the branch to determine if work should be merged or discarded.
+#### B1. respec-spec-reconciler ✅ INVESTIGATED & RESOLVED
+- **Branch**: `autoresearch/evolutionary-reconciler-2026-05-30` — **locally deleted** (2026-06-01)
+- **Remote tracking branches** still exist on origin/github/gitlab/codeberg (89 commits ahead, 49,095 lines diverged across 19 files)
+- **Investigation**: Branch contained evolutionary spec reconciliation work — experimental AI-driven approach to spec parsing. The divergence was too large (49K lines) to merge safely, and the approach was deemed experimental.
+- **Action taken**: Local branch deleted. Remote branches can be cleaned up with:
+  ```bash
+  git push origin --delete autoresearch/evolutionary-reconciler-2026-05-30
+  git push github --delete autoresearch/evolutionary-reconciler-2026-05-30
+  git push gitlab --delete autoresearch/evolutionary-reconciler-2026-05-30
+  git push codeberg --delete autoresearch/evolutionary-reconciler-2026-05-30
+  ```
 - Note: This repo also has untracked `node_modules/` (231M) — see A7.
-- Recent commits (last 5):
-  - `723da998`: spec_parser.ts, SPEC.md DELTA:+2647/-15
-  - `e36bb79a`: spec_parser.ts, SPEC.md DELTA:+2071/-15
-  - `f2db7cbb`: SPEC.md DELTA:+212/-0
-  - `8710c3ba`: spec_parser.ts, SPEC.md DELTA:+8132/-15 ← **8K outlier**
-  - `ecc69f15`: spec_parser.ts, SPEC.md DELTA:+2243/-15
 
 ### Category D: Untracked Data Directory Only (1 repo)
 
@@ -185,3 +186,22 @@ git clean -fdx   # Delete all untracked files and directories
 - Sync tool: `dracon-sync` (in `~/.local/bin/`)
 - Incident ledger: `~/.local/state/dracon/dracon-sync-incidents.jsonl`
 - This plan: `REPOS_CLEANUP_PLAN_2026-06-01.md`
+
+## Investigation Results (2026-06-01)
+
+### respec-spec-reconciler (B1) — Resolved
+
+**Action**: Local branch `autoresearch/evolutionary-reconciler-2026-05-30` deleted.
+
+**Findings**:
+- 89 commits ahead of main, 49,095 lines diverged across 19 files
+- All changes in `src/spec_parser.ts` and `SPEC.md` — an evolutionary spec reconciliation approach
+- The 8K-line outlier commit (`8710c3ba`) suggests automated/experimental generation
+- Branch was created 2026-05-30, last commit ~16 hours before investigation
+- Remote tracking branches still exist on origin/github/gitlab/codeberg — can be cleaned up if desired
+
+**Recommendation**: Branch was experimental and too divergent to merge. Local deletion is sufficient. Remote cleanup is optional but recommended to reduce confusion.
+
+### Disk Space Reclamation — Pending
+
+The `git clean -fdx` cleanup of ~249 GB of `target/` and `node_modules/` directories is pending execution. See Step 6 of the Action Plan.

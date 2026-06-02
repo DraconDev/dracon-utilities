@@ -235,6 +235,49 @@ The `repos` command shows **real dirty file counts** from libgit2's `get_status(
 
 The guard daemon rotates its log file if oversized at startup.
 
+### Untracked vs Modified Distinction
+
+**Critical concept:** `git status` groups files into "Changes not staged" (modified tracked files) and "Untracked files" (files git doesn't know about). The sync daemon treats these very differently:
+
+- **Modified tracked files** (`M` in git status): Real code changes. The daemon commits and pushes these.
+- **Untracked files** (`??` in git status): Build artifacts (`target/`, `node_modules/`), caches, generated data. The daemon ignores these for sync purposes.
+
+The `repos` command reflects this split:
+- **MOD column** shows modified tracked files (real changes)
+- **STG column** shows staged files
+- **Untracked files** are counted separately and do NOT trigger WARN status
+- The OK/WARN/CONCERN status only considers **sync-relevant** dirty entries (tracked modifications), not untracked build artifacts
+
+### !target/ Policy
+
+`.gitignore` is managed by `dracon-warden` (marked with `# --- BEGIN DRACON MANAGED BLOCK ---`). The warden manages a blocklist/allowlist pattern:
+
+1. **Broad excludes**: `target/`, `node_modules/`, `build/`, `dist/`, `__pycache__/`, `*.log`, `*.db`, etc. are all excluded from tracking.
+2. **Allowlist overrides**: `!*.rs`, `!*.py`, `!*.toml`, `!*.md`, `!Cargo.lock`, etc. force-track specific file types through the excludes.
+
+**`target/` is NOT in the allowlist.** This means:
+- `target/` directories are always untracked (never committed)
+- They appear as `??` in `git status` but do NOT affect sync behavior
+- `git clean -fdx` can safely delete them (they're build artifacts, not source)
+
+**⚠️ Do NOT add `!target/` to .gitignore.** This would force-track build artifacts, bloating the repo and causing sync conflicts.
+
+### Daemon-Managed Files Warning
+
+**Do NOT edit the following files directly — they are managed by daemon processes:**
+
+| File | Managed by | Risk of editing |
+|------|-----------|-----------------|
+| `.gitignore` (DRACON MANAGED BLOCK) | dracon-warden | Warden overwrites on next harden pass |
+| `.gitattributes` (DRACON MANAGED BLOCK) | dracon-warden | Warden overwrites on next harden pass |
+| `.dracon/data/keys/*.pub` | dracon-warden | Warden publishes on harden |
+| `.pi/goals/*.md` | pi (auto-sync) | Sync daemon auto-commits |
+
+If you need to modify a daemon-managed file, either:
+1. Edit the **source template** in `~/.dracon/utilities/sync/templates/` or `~/.dracon/utilities/warden/`
+2. Use the CLI command (`dracon-warden setup-hooks`, `dracon-sync scaffold`)
+3. Edit directly but accept that the daemon may overwrite your changes
+
 ### GitHub Orphan Cleanup
 
 The old suffix loop bug created 61 orphan repos (e.g., `dracon-code-1` through `dracon-code-11`). A cleanup script is provided:
@@ -472,7 +515,7 @@ auto_publish = false  # master toggle (default: off)
 [[publish_targets]]
 name = "crates-io"
 registry = "crates-io"    # crates-io | npm | pypi
-[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA4bXJ2YjA1aDJVNkJibXVnYmo2WTVHeWRZczZKNWVPQmNha05qVXk5ajNjCk8rOU85MzhzNUpRazQ3aGJZVXpzODJKRHduQzFqNFNlZDZ0OVNuSXYvcjQKLT4gWDI1NTE5IHZVZXVHcDhnWXhMU3JqMGxxdVhENnA2V1JTK3NnYllRa2xDc3dGVDZweHcKZ2ovd2ZIVlNEQ0JCZC8zQmkvNkQ1MGQvK2ZtVXhYbzBxZ0pmRWVYMFB6SQotPiBzLlNfSiwtZ3JlYXNlIFdHJ0tyTyYgfilBIHcKZ0NTd2c0V3pOZTBIeUI3WGxPQnVCZk9MQnZ4TmxZN3Ftb2RRNVdsUzVpT2VCeFQ3ekNFT3prMzBMUUxVdW1RSApFU1pIYW5TMGRmNjJ6RkhaRitRb0JFVkVtL3Bldm0xdldlR2pMOVJBMkRZYUlHcWwvbDAKLS0tIGw4SzJua0xkS0FpSGRMZDZ0bWJsQm03T3VkS1lCZkx1OFRmRWMydU5BRkEKc3Nee6dgjB6NlG2lNEAPYN4werIWf8ZI0JjK7clOQTQYnQ8Q8vUz0TNqaHlSwIV6GYa5LA0vMZ2z/z4tS3TQYltHyKEW]
+[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAzLzdHK2RLOUxvSkNlbGlJYWEwK3JwYTBpd3dCSm9QZ21oLzkvVkNHbGlJCkV0c0c2ZjJqQVpHT2EwZmtzMEZxQU1QOFg5TzBUWm1nclg2ZmR1d0VnVzgKLT4gWDI1NTE5IHJVVVRwbS9GeXNtbUhXK2M4OU9aZVZtZEFwTkI3RnVhaVNUZ1g4K2o5VFUKaTdnUGhNc2VGdGdlc1hEeTA5Znp3Wjd1Wlo4a3YvR0I4ZWhzNlE5aE95OAotPiBGTjIkSy1ncmVhc2UKUXBRN2VZVHFUMmx5M3JpVVRJNmh4WnVhTEpBY0JSVklpc0szMDdzRXUwcVd0ZFpaWlZNTmxvMTRGSXFmdlErbgphSlBDKzA5TjJlQkY3bDlWV1IzZ2ZhcEhOeFN1S0RzeDVRCi0tLSBRdWM5eU16N081d1NPZUw4c254YWZ0SWMvcU1RQXVodVZub0ZVZ0lMek9rCoFpa5thY93+TNy1eb7CcywaSTjABmK2Pu5KoV1vjN/rceZQjoVc5Ii1ZHAQkvuI4Dmde/2wSjGv9qQ9efqq3UAoyVeBkA==]
 publish_timeout_secs = 300
 ```
 
