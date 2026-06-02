@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 392996,
-    "activeSeconds": 9334
+    "tokensUsed": 409377,
+    "activeSeconds": 10152
   },
   "sisyphus": false,
   "createdAt": "2026-06-02T09:16:09.706Z",
-  "updatedAt": "2026-06-02T11:52:20.285Z",
+  "updatedAt": "2026-06-02T12:06:15.115Z",
   "activePath": ".pi/goals/active_goal_2026060210160970_mpwfahka-hkwnhs.md",
   "taskList": {
     "tasks": [
@@ -127,8 +127,8 @@ If blocked: Stop and ask the user immediately. Do not proceed if any filter-repo
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 2h35m34s
-- Tokens used: 393K (392,996) tokens
+- Time spent: 2h49m12s
+- Tokens used: 409K (409,377) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
