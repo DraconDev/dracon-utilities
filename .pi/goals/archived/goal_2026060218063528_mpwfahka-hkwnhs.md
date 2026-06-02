@@ -2,16 +2,16 @@
   "version": 3,
   "id": "mpwfahka-hkwnhs",
   "objective": "Remove large binary files (>50MB) from git history in STUCK_PUSH repos using `git filter-repo`, so that sync can successfully push and clear the stuck state for all 6 CONCERN + 6 WARN repos.\n\nSuccess criteria:\n- 0 repos with STUCK_PUSH status in incident ledger\n- All 6 CONCERN repos show as OK or WARN (not CONCERN) in `dracon-sync repos`\n- Large binaries (target/debug/deps/*.rlib, target/release/deps/*.rlib, *.onnx, etc.) removed from git history\n- All remote mirrors (origin, github, gitlab, codeberg) have the cleaned history (force-pushed)\n- Backup branch created for each repo before filter-repo runs\n- Verification: `git count-objects -vH` shows pack size reduced, no warnings on push\n\nBoundaries:\n- In scope: 6 CONCERN repos with STUCK_PUSH (avid, ai-auto-writer, dracon-code, and likely others), plus any other repos found during triage with large binaries in history\n- Out of scope: repos without large binaries in history (just uncommitted changes — sync handles those), the 4 deferred refactoring tasks\n\nConstraints:\n- ALWAYS create a backup branch (`backup/pre-filter-<date>`) before running `git filter-repo`\n- ALWAYS verify the backup is pushed to all remotes before destructive operations\n- NEVER run `git filter-repo` on a repo without first confirming the remote backup branch is pushed\n- Use `git-filter-repo` (the Python tool) — NOT `git filter-branch` (deprecated, slow)\n- Force-push to ALL configured remotes, not just origin\n- After filter-repo, run full test suite to verify nothing broke\n- If any step fails, STOP and ask the user — do not continue to next repo\n\nVerification contract:\n- `dracon-sync repos` shows 0 CONCERN repos with STUCK_PUSH\n- `dracon-sync stuck` shows 0 stuck repos (or the unstuck command works cleanly)\n- `git push origin main` succeeds without warnings for all affected repos\n- Backup branches exist and are pushed: `git branch -r | grep backup/pre-filter-`\n- Incident ledger shows no new STUCK_PUSH entries after goal completion\n\nIf blocked: Stop and ask the user immediately. Do not proceed if any filter-repo operation fails or if a remote rejects the force-push.",
-  "status": "active",
+  "status": "complete",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 952429,
-    "activeSeconds": 22734
+    "tokensUsed": 986513,
+    "activeSeconds": 25654
   },
   "sisyphus": false,
   "createdAt": "2026-06-02T09:16:09.706Z",
-  "updatedAt": "2026-06-02T16:07:57.886Z",
-  "activePath": ".pi/goals/active_goal_2026060210160970_mpwfahka-hkwnhs.md",
+  "updatedAt": "2026-06-02T17:06:35.286Z",
+  "stopReason": "agent",
   "taskList": {
     "tasks": [
       {
@@ -89,7 +89,8 @@
     ],
     "blockCompletion": false,
     "proposedAt": "2026-06-02T09:16:09.708Z"
-  }
+  },
+  "archivedPath": ".pi/goals/archived/goal_2026060218063528_mpwfahka-hkwnhs.md"
 }
 
 # Goal Prompt
@@ -128,11 +129,11 @@ If blocked: Stop and ask the user immediately. Do not proceed if any filter-repo
 
 ## Progress
 
-- Status: running
+- Status: complete
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 6h18m54s
-- Tokens used: 952K (952,429) tokens
+- Time spent: 7h07m34s
+- Tokens used: 987K (986,513) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->

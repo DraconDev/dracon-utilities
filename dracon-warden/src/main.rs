@@ -15,6 +15,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command as ProcessCommand;
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::Mutex;
+use std::time::Duration;
 use zeroize::Zeroizing;
 
 static ROLLING_LOG: std::sync::OnceLock<Mutex<Vec<String>>> = std::sync::OnceLock::new();
@@ -24,6 +25,15 @@ fn get_log() -> &'static Mutex<Vec<String>> {
 }
 
 static VERBOSITY: AtomicU8 = AtomicU8::new(0);
+
+/// Wall-clock timeout for filter-clean and filter-smudge operations.
+///
+/// Git invokes the filter as a subprocess and pipes file content via stdin. If the parent
+/// (git) crashes or never sends EOF, the filter process would otherwise hang forever
+/// (read_to_end blocks indefinitely). 30s is generous for normal operations (a 100MB
+/// file encrypts in <1s) but caps the worst-case hang. On timeout we exit non-zero
+/// so git knows the filter failed; returning passthrough would silently corrupt data.
+const FILTER_TIMEOUT_SECS: u64 = 30;
 
 /// Conditional eprintln based on verbosity level.
 #[macro_export]
@@ -1299,10 +1309,10 @@ async fn main() -> Result<()> {
 
     match cli.cmd {
         Command::FilterClean { path } => {
-            run_filter(true, path.as_deref())?;
+            run_filter_with_timeout(true, "filter-clean", path).await?;
         }
         Command::FilterSmudge { path } => {
-            run_filter(false, path.as_deref())?;
+            run_filter_with_timeout(false, "filter-smudge", path).await?;
         }
         Command::Status => {
             let policy_path = resolve_policy_path_local()?;
@@ -1906,6 +1916,43 @@ fn backfill_env_headers_repos(repos: &[PathBuf], apply: bool) -> Result<(usize, 
 }
 
 const STREAM_IO_MAX_BYTES: usize = 10 * 1024 * 1024; // 10 MiB
+
+/// Run the filter with a wall-clock timeout, preventing indefinite hangs.
+///
+/// `run_filter` is a sync function that does a blocking `stdin.read_to_end()`. If the
+/// parent (git) never sends EOF — e.g. it crashed, was killed, or the file path was
+/// deleted while the filter held it open — the process would otherwise hang forever.
+/// In a `#[tokio::main]` context, this also keeps the runtime's worker threads alive.
+///
+/// We run the filter in `spawn_blocking` (so the blocking I/O doesn't stall the
+/// runtime's reactor) wrapped in `tokio::time::timeout`. On timeout we log a warning
+/// to stderr and exit with status 1 — git treats non-zero exit as filter failure,
+/// which is the correct behavior: returning passthrough would silently corrupt data
+/// (encrypted content would be written to disk as plaintext, or vice versa).
+async fn run_filter_with_timeout(is_clean: bool, label: &str, path: Option<String>) -> Result<()> {
+    let join_result = tokio::time::timeout(
+        Duration::from_secs(FILTER_TIMEOUT_SECS),
+        tokio::task::spawn_blocking(move || run_filter(is_clean, path.as_deref())),
+    )
+    .await;
+
+    match join_result {
+        // spawn_blocking returned Ok(filter returned Ok(()))
+        Ok(Ok(Ok(()))) => Ok(()),
+        // spawn_blocking returned Ok(filter returned Err)
+        Ok(Ok(Err(e))) => Err(e),
+        // spawn_blocking itself panicked or was cancelled
+        Ok(Err(join_err)) => Err(anyhow::anyhow!("{} task panicked: {}", label, join_err)),
+        // Timeout fired
+        Err(_elapsed) => {
+            eprintln!(
+                "dracon-warden: {} timed out after {}s, exiting (parent likely gone)",
+                label, FILTER_TIMEOUT_SECS
+            );
+            std::process::exit(1);
+        }
+    }
+}
 
 fn run_filter(is_clean: bool, path: Option<&str>) -> Result<()> {
     let mut input = Vec::new();
