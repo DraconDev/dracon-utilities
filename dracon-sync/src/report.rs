@@ -734,12 +734,14 @@ pub(crate) async fn run_repos_report(
         Cell::new("STATUS"),
         Cell::new("REPO"),
         Cell::new("BRANCH"),
-        Cell::new("MOD"),
-        Cell::new("STG"),
-        Cell::new("UTR"),
-        Cell::new("AHD"),
-        Cell::new("BHD"),
-        Cell::new("UPDATED"),
+        Cell::new("MODIFIED"),
+        Cell::new("STAGED"),
+        Cell::new("UNTRACKED"),
+        Cell::new("AHEAD"),
+        Cell::new("BEHIND"),
+        Cell::new("LAST COMMIT"),
+        Cell::new("LAST PUSH"),
+        Cell::new("AUTHOR"),
     ]);
 
     for (idx, row) in rows.iter().enumerate() {
