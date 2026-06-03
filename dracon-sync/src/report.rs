@@ -141,6 +141,7 @@ pub(crate) struct RepoReportRow {
     last_when: String,
     last_msg: String,
     last_unix: i64,
+    last_push: String,
     concern: bool,
     warn: bool,
     hint: String,
