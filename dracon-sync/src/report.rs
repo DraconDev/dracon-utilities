@@ -70,7 +70,7 @@ fn shorten_when(s: &str) -> String {
                 if m == 0 {
                     return format!("{}h", h);
                 }
-                return format!("{}h{}m", h, m);
+                return format!("{}h {}m", h, m);
             }
             return format!("{}m", mins);
         }
@@ -90,7 +90,7 @@ fn shorten_when(s: &str) -> String {
                 if s_remainder == 0 {
                     return format!("{}m", m);
                 }
-                return format!("{}m{}s", m, s_remainder);
+                return format!("{}m {}s", m, s_remainder);
             }
             return format!("{}s", secs);
         }
@@ -101,14 +101,69 @@ fn shorten_when(s: &str) -> String {
         }
     }
 
-    s.replace(" hours ago", "h")
-        .replace(" hour ago", "h")
-        .replace(" days ago", "d")
-        .replace(" day ago", "d")
-        .replace(" weeks ago", "w")
+    // Convert hours to days when >= 24
+    if let Some(rest) = s.strip_suffix(" hours ago") {
+        if let Ok(hrs) = rest.parse::<u64>() {
+            if hrs >= 24 {
+                let d = hrs / 24;
+                let h = hrs % 24;
+                if h == 0 {
+                    return format!("{}d", d);
+                }
+                return format!("{}d {}h", d, h);
+            }
+            return format!("{}h", hrs);
+        }
+    }
+    if let Some(rest) = s.strip_suffix(" hour ago") {
+        if let Ok(hrs) = rest.parse::<u64>() {
+            return format!("{}h", hrs);
+        }
+    }
+
+    // Convert days to weeks when >= 7
+    if let Some(rest) = s.strip_suffix(" days ago") {
+        if let Ok(days) = rest.parse::<u64>() {
+            if days >= 7 {
+                let w = days / 7;
+                let d = days % 7;
+                if d == 0 {
+                    return format!("{}w", w);
+                }
+                return format!("{}w {}d", w, d);
+            }
+            return format!("{}d", days);
+        }
+    }
+    if let Some(rest) = s.strip_suffix(" day ago") {
+        if let Ok(days) = rest.parse::<u64>() {
+            return format!("{}d", days);
+        }
+    }
+
+    // Convert months to years when >= 12
+    if let Some(rest) = s.strip_suffix(" months ago") {
+        if let Ok(months) = rest.parse::<u64>() {
+            if months >= 12 {
+                let y = months / 12;
+                let mo = months % 12;
+                if mo == 0 {
+                    return format!("{}y", y);
+                }
+                return format!("{}y {}mo", y, mo);
+            }
+            return format!("{}mo", months);
+        }
+    }
+    if let Some(rest) = s.strip_suffix(" month ago") {
+        if let Ok(months) = rest.parse::<u64>() {
+            return format!("{}mo", months);
+        }
+    }
+
+    // Weeks and years stay as-is (w, y)
+    s.replace(" weeks ago", "w")
         .replace(" week ago", "w")
-        .replace(" months ago", "mo")
-        .replace(" month ago", "mo")
         .replace(" years ago", "y")
         .replace(" year ago", "y")
 }
