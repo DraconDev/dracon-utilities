@@ -2932,11 +2932,19 @@ mod tests {
     fn test_shorten_when() {
         assert_eq!(shorten_when("5 seconds ago"), "5s");
         assert_eq!(shorten_when("29 minutes ago"), "29m");
-        assert_eq!(shorten_when("74 minutes ago"), "1h14m");
+        assert_eq!(shorten_when("74 minutes ago"), "1h 14m");
         assert_eq!(shorten_when("60 minutes ago"), "1h");
-        assert_eq!(shorten_when("119 minutes ago"), "1h59m");
+        assert_eq!(shorten_when("119 minutes ago"), "1h 59m");
         assert_eq!(shorten_when("3 hours ago"), "3h");
+        assert_eq!(shorten_when("25 hours ago"), "1d 1h");
+        assert_eq!(shorten_when("24 hours ago"), "1d");
+        assert_eq!(shorten_when("48 hours ago"), "2d");
         assert_eq!(shorten_when("2 days ago"), "2d");
+        assert_eq!(shorten_when("7 days ago"), "1w");
+        assert_eq!(shorten_when("8 days ago"), "1w 1d");
+        assert_eq!(shorten_when("14 days ago"), "2w");
+        assert_eq!(shorten_when("12 months ago"), "1y");
+        assert_eq!(shorten_when("13 months ago"), "1y 1mo");
         assert_eq!(shorten_when("6 weeks ago"), "6w");
         assert_eq!(shorten_when("just now"), "just now");
         assert_eq!(shorten_when("unknown"), "unknown");
