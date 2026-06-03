@@ -5,19 +5,21 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 542644,
-    "activeSeconds": 331
+    "tokensUsed": 632266,
+    "activeSeconds": 351
   },
   "sisyphus": false,
   "createdAt": "2026-06-03T16:26:04.865Z",
-  "updatedAt": "2026-06-03T16:31:42.625Z",
+  "updatedAt": "2026-06-03T16:32:02.856Z",
   "activePath": ".pi/goals/active_goal_2026060317260486_mpya37wi-1zimyq.md",
   "taskList": {
     "tasks": [
       {
         "id": "diagnose",
         "title": "Gather diagnostics for the 3 CONCERN repos",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-03T16:32:02.854Z",
+        "evidence": "Per-repo diagnostics captured (git status, branch -vv, log, remote, ledger, mtime, processes). Diagnosis complete:\n- browser-extensions-shared: push-loop. Goal file mtime 17:26:52 ↔ last commit 17:26:",
         "verificationContract": "For each of browser-extensions-shared, dracon-platform, Junk-Runner-bevy: capture `git status` (full, not just modified/staged), `git branch -vv`, `git log --oneline -5 <tracked-branch>`, `git ls-remote origin <tracked-branch>` for the relevant branch, the last 20 lines of the incident ledger filtered to that repo, and a 5-line summary explaining the root cause of the CONCERN status. Output a one-paragraph diagnosis per repo."
       },
       {
@@ -84,12 +86,13 @@ Investigate why `browser-extensions-shared`, `dracon-platform`, and `Junk-Runner
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 5m31s
-- Tokens used: 543K (542,644) tokens
+- Time spent: 5m51s
+- Tokens used: 632K (632,266) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
-- [ ] diagnose: Gather diagnostics for the 3 CONCERN repos — contract: For each of browser-extensions-shared, dracon-platform, Junk-Runner-bevy: capture `git status` (full, not just modified/staged), `git branch -vv`, `git log --oneline -5 <tracked-branch>`, `git ls-remote origin <tracked-branch>` for the relevant branch, the last 20 lines of the incident ledger filtered to that repo, and a 5-line summary explaining the root cause of the CONCERN status. Output a one-paragraph diagnosis per repo.
+- [x] diagnose: Gather diagnostics for the 3 CONCERN repos — evidence: Per-repo diagnostics captured (git status, branch -vv, log, remote, ledger, mtime, processes). Diagnosis complete:
+- browser-extensions-shared: push-loop. Goal file mtime 17:26:52 ↔ last commit 17:26:
 - [ ] fix-browser-extensions-shared: Apply fix for browser-extensions-shared — contract: Repo returns OK in `dracon-sync repos`. Working tree has no sync-relevant dirty entries. Untracked files are either added to a commit, .gitignore'd via the warden-managed block (not direct edit), or determined to be safe build artifacts the daemon ignores. No new incidents in the ledger.
 - [ ] fix-dracon-platform: Apply fix for dracon-platform — contract: Repo returns OK in `dracon-sync repos`. The 15 local commits are pushed to origin/main (or the tracked branch). The 1-behind divergence is resolved (pulled + merged per `git pull --no-rebase` policy) or the merge conflict is escalated to the user. No new incidents in the ledger.
 - [ ] fix-junk-runner-bevy: Apply fix for Junk-Runner-bevy — contract: Repo returns OK in `dracon-sync repos`. Either: (a) tauri2 is brought in sync with origin (5 local commits pushed, 116-behind resolved via merge or rebase, no force-push); or (b) the divergence is explicitly accepted with a documented reason (e.g., tauri2 is intentionally long-lived and the daemon should skip it — handled via per-repo config, not by ignoring the stall). Push is verified successful. No new incidents in the ledger.
