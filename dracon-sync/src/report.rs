@@ -2566,6 +2566,7 @@ mod tests {
             last_when: "2024-01-01".to_string(),
             last_msg: "test commit".to_string(),
             last_unix: 1700000000,
+            last_push: "5m ago".to_string(),
             concern: false,
             warn: false,
             hint: "healthy".to_string(),
