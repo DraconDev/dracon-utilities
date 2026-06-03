@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 96966,
-    "activeSeconds": 648
+    "tokensUsed": 97313,
+    "activeSeconds": 659
   },
   "sisyphus": false,
   "createdAt": "2026-06-03T00:24:57.361Z",
-  "updatedAt": "2026-06-03T00:37:18.816Z",
+  "updatedAt": "2026-06-03T00:37:30.547Z",
   "activePath": ".pi/goals/active_goal_2026060301245736_mpxbr7dd-ykvkdu.md",
   "taskList": {
     "tasks": [
@@ -25,7 +25,9 @@
       {
         "id": "systemd-service",
         "title": "Create systemd user service for the general watcher",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-03T00:37:30.545Z",
+        "evidence": "Created ~/.config/systemd/user/all-repos-watcher.service (CPUQuota=10%, MemoryMax=128M, Nice=15, Restart=always, RestartSec=2). Enabled and started. Verified active (running) with 10.1M memory. Disabl",
         "verificationContract": "Create ~/.config/systemd/user/all-repos-watcher.service, enable and start it. The service runs the watcher script with bounded resources (CPUQuota=10%, MemoryMax=128M, Nice=15)."
       },
       {
@@ -49,12 +51,12 @@ Extend the cli-file-manager polling wrapper pattern to all 22 watched repos so e
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 10m48s
-- Tokens used: 97K (96,966) tokens
+- Time spent: 10m59s
+- Tokens used: 97K (97,313) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
 - [x] generalize-watcher: Create a general-purpose all-repos polling watcher — evidence: Created ~/.dracon/utilities/sync/bin/all-repos-watcher.sh — queries daemon for repo list via `dracon-sync repos --json`, loops through all 22 repos calling sync-now every 1s. Verified 22 repos match d
-- [ ] systemd-service: Create systemd user service for the general watcher — contract: Create ~/.config/systemd/user/all-repos-watcher.service, enable and start it. The service runs the watcher script with bounded resources (CPUQuota=10%, MemoryMax=128M, Nice=15).
+- [x] systemd-service: Create systemd user service for the general watcher — evidence: Created ~/.config/systemd/user/all-repos-watcher.service (CPUQuota=10%, MemoryMax=128M, Nice=15, Restart=always, RestartSec=2). Enabled and started. Verified active (running) with 10.1M memory. Disabl
 - [ ] verify-5s-behavior: Verify 5s commit behavior for all repos — contract: Make a change in 3 different repos (e.g., dracron-platform, dracron-terminal-engine, browser-extensions-shared), verify the watcher commits and pushes each within 5-10s. All 4 remotes in sync for all repos. 0 CONCERN, 0 STUCK_PUSH.
 
