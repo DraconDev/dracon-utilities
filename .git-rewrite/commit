@@ -1,31 +1,23 @@
-tree c58bcc169b69962541003304dc90bc8ff297c691
-parent 43f9eafd989fa11040503f19cfc5257e2eaf9027
-author DraconDev <dracsharp@gmail.com> 1777937892 +0100
-committer DraconDev <dracsharp@gmail.com> 1777937892 +0100
+tree 4ec717dde12136a5796151e08f4e29d5c16878ae
+parent 021dd5a31925f9054f86c235c5059ed9e1c596c4
+author DraconDev <dracsharp@gmail.com> 1777596318 +0100
+committer DraconDev <dracsharp@gmail.com> 1778742499 +0100
 
-refactor(test configuration): Removed test configuration attribute from main.rs
+feat(unit tests): Added unit tests for `disk_state` thresholds and utility functions `h...
 
-# Project State
+#Project State
 
 ## Current Focus
-Removed test configuration attribute from main.rs
-
-## Context
-The test configuration attribute was removed to simplify the module structure and reduce unnecessary compilation of test code in non-test builds.
+Added unit tests for `disk_state` thresholds and utility functions `human_bytes` and `expand_tilde`.
 
 ## Completed
-- [x] Removed `#[cfg(test)]` attribute from test_helpers module
-
-## In Progress
-- [ ] None
-
-## Blockers
-- None
-
-## Next Steps
-1. Verify no test functionality is affected by this change
-2. Ensure test helpers are still accessible when needed
+- [x] Test that `disk_state` returns `"ok"` when usage is below warning threshold
+- [x] Test that `disk_state` returns `"warn"` when usage is at or above warning percentage
+- [x] Test that `disk_state` returns `"action"` when usage is at or above action percentage
+- [x] Test that `disk_state` returns `"critical"` when usage is at or above critical percentage
+- [x] Test that `human_bytes` correctly formats large byte values as GiB strings
+- [x] Test that `expand_tilde` handles absence of `HOME` gracefully
 ---
-category: refactor
-scope: test configuration
+category: feat
+scope: unit tests
 ---
