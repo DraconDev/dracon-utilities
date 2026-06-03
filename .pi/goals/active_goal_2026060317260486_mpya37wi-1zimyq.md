@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 2237137,
-    "activeSeconds": 728
+    "tokensUsed": 2353440,
+    "activeSeconds": 750
   },
   "sisyphus": false,
   "createdAt": "2026-06-03T16:26:04.865Z",
-  "updatedAt": "2026-06-03T16:38:28.091Z",
+  "updatedAt": "2026-06-03T16:38:50.635Z",
   "activePath": ".pi/goals/active_goal_2026060317260486_mpya37wi-1zimyq.md",
   "taskList": {
     "tasks": [
@@ -49,7 +49,9 @@
       {
         "id": "verify",
         "title": "Verify final state with `dracon-sync repos`",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-03T16:38:50.633Z",
+        "evidence": "Final `dracon-sync repos` report: 22 OK, 0 WARN, 0 CONCERN, 0 ❌ — meets the goal's success criteria exactly. All 3 originally-CONCERN repos are in OK state with clean working trees and 0 ahead / 0 beh",
         "verificationContract": "`dracon-sync repos` shows 22 OK / 0 WARN / 0 CONCERN / 0 ❌. The 19 originally-OK repos are still OK (spot-check the summary line for any unexpected WARN/CONCERN). Incident ledger has no new `scope:\"sync\"` errors from this work. If any config was changed, `dracon-sync validate-config` returns clean."
       }
     ],
@@ -92,8 +94,8 @@ Investigate why `browser-extensions-shared`, `dracon-platform`, and `Junk-Runner
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 12m08s
-- Tokens used: 2.2M (2,237,137) tokens
+- Time spent: 12m30s
+- Tokens used: 2.4M (2,353,440) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
@@ -102,5 +104,5 @@ Investigate why `browser-extensions-shared`, `dracon-platform`, and `Junk-Runner
 - [x] fix-browser-extensions-shared: Apply fix for browser-extensions-shared — evidence: Repo state: `git status` shows clean working tree, on main, ahead=0, behind=0, 0 modified, 0 staged, 0 untracked at moment of completion (2 untracked files appeared transiently during diagnose — likel
 - [x] fix-dracon-platform: Apply fix for dracon-platform — evidence: Repo state: `git status` shows clean working tree (no uncommitted modifications), on main, ahead=0, behind=0. The 1-behind divergence was resolved by daemon's `pull_merge` at 17:27:04 (ledger entry ts
 - [x] fix-junk-runner-bevy: Apply fix for Junk-Runner-bevy — evidence: Repo state: `git status` shows clean working tree, on tauri2, ahead=0, behind=0. Fix applied: `git pull --no-rebase -X ours origin tauri2` to merge the 116-behind while preserving the local rename of 
-- [ ] verify: Verify final state with `dracon-sync repos` — contract: `dracon-sync repos` shows 22 OK / 0 WARN / 0 CONCERN / 0 ❌. The 19 originally-OK repos are still OK (spot-check the summary line for any unexpected WARN/CONCERN). Incident ledger has no new `scope:"sync"` errors from this work. If any config was changed, `dracon-sync validate-config` returns clean.
+- [x] verify: Verify final state with `dracon-sync repos` — evidence: Final `dracon-sync repos` report: 22 OK, 0 WARN, 0 CONCERN, 0 ❌ — meets the goal's success criteria exactly. All 3 originally-CONCERN repos are in OK state with clean working trees and 0 ahead / 0 beh
 
