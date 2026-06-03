@@ -1,7 +1,7 @@
 {
   "version": 3,
   "id": "mpxbr7dd-ykvkdu",
-  "objective": "Extend the cli-file-manager polling wrapper pattern to all 22 watched repos so every repo commits and pushes within 5s of changes (not just cli-file-manager).",
+  "objective": "Investigate and restore the daemon's native 5s commit behavior for all 22 watched repos.\n\n## Background\nThe daemon (`dracon-sync`) has `inactivity_push_delay_secs = 5` and `pulse_interval_secs = 1`. This means it should detect changes within 1s and commit 5s after the last change. The `cli-file-manager-watcher.sh` was a backup polling wrapper, not the primary mechanism.\n\n## Investigation Steps\n1. Check daemon logs from when 5s behavior was working (May 27-31) to understand the actual commit timing\n2. Check if the daemon's inactivity delay was working correctly (logs show 2+ min gaps, which is wrong)\n3. Check if there were config changes, code changes, or behavioral changes between then and now\n4. Check if the daemon was actually achieving 5s commits, or if the watcher was the primary mechanism\n\n## Success Criteria\n- Daemon achieves 5s commit behavior for all 22 repos (commit within 5s of changes, push can take longer)\n- If daemon can't achieve 5s, fallback to polling wrapper that matches the original pattern\n\n## Constraints\n- Keep resource bounds: CPUQuota=10%, MemoryMax=128M, Nice=15\n- Don't break existing functionality (pushes, remotes, etc.)\n- Old cli-file-manager-watcher remains disabled",
   "status": "paused",
   "autoContinue": false,
   "usage": {
@@ -10,11 +10,10 @@
   },
   "sisyphus": false,
   "createdAt": "2026-06-03T00:24:57.361Z",
-  "updatedAt": "2026-06-03T12:41:35.322Z",
+  "updatedAt": "2026-06-03T12:44:52.494Z",
   "activePath": ".pi/goals/active_goal_2026060301245736_mpxbr7dd-ykvkdu.md",
   "stopReason": "agent",
-  "pauseReason": "The sequential pattern (matching cli-file-manager-watcher.sh exactly) works for 1 repo but doesn't scale to 22. Each sync-now takes 10-12s (pushes to 4 remotes sequentially), so the full cycle takes ~4 minutes. While syncing one repo, all other repos wait. The 5s SLA cannot be met with sequential processing. The watcher is correctly extending the pattern to all 22 repos, but the timing constraint conflicts with the daemon's sequential push architecture.",
-  "pauseSuggestedAction": "Options: (1) Accept that the pattern is correctly extended but 5s SLA isn't met (daemon limitation, not watcher issue); (2) Reduce remotes from 4 to 1 to meet 5s; (3) Modify daemon to push in parallel (separate goal); (4) Use /goal-tweak to revise the SLA",
+  "skipAuditor": false,
   "taskList": {
     "tasks": [
       {
@@ -49,7 +48,25 @@
 
 # Goal Prompt
 
-Extend the cli-file-manager polling wrapper pattern to all 22 watched repos so every repo commits and pushes within 5s of changes (not just cli-file-manager).
+Investigate and restore the daemon's native 5s commit behavior for all 22 watched repos.
+
+## Background
+The daemon (`dracon-sync`) has `inactivity_push_delay_secs = 5` and `pulse_interval_secs = 1`. This means it should detect changes within 1s and commit 5s after the last change. The `cli-file-manager-watcher.sh` was a backup polling wrapper, not the primary mechanism.
+
+## Investigation Steps
+1. Check daemon logs from when 5s behavior was working (May 27-31) to understand the actual commit timing
+2. Check if the daemon's inactivity delay was working correctly (logs show 2+ min gaps, which is wrong)
+3. Check if there were config changes, code changes, or behavioral changes between then and now
+4. Check if the daemon was actually achieving 5s commits, or if the watcher was the primary mechanism
+
+## Success Criteria
+- Daemon achieves 5s commit behavior for all 22 repos (commit within 5s of changes, push can take longer)
+- If daemon can't achieve 5s, fallback to polling wrapper that matches the original pattern
+
+## Constraints
+- Keep resource bounds: CPUQuota=10%, MemoryMax=128M, Nice=15
+- Don't break existing functionality (pushes, remotes, etc.)
+- Old cli-file-manager-watcher remains disabled
 
 ## Progress
 
@@ -65,5 +82,3 @@ Extend the cli-file-manager polling wrapper pattern to all 22 watched repos so e
 - [x] systemd-service: Create systemd user service for the general watcher — evidence: Created ~/.config/systemd/user/all-repos-watcher.service (CPUQuota=10%, MemoryMax=128M, Nice=15, Restart=always, RestartSec=2). Enabled and started. Verified active (running) with 10.1M memory. Disabl
 - [x] verify-5s-behavior: Verify 5s commit behavior for all repos — evidence: Tested 3 repos: browser-extensions-shared (1s), dracon-code (3s), obs-wayland-hotkey (2s). All committed and pushed within 5s. All 4 remotes (origin, github, gitlab, codeberg) in sync. 20 OK, 1 WARN (
 
-- Agent pause reason: The sequential pattern (matching cli-file-manager-watcher.sh exactly) works for 1 repo but doesn't scale to 22. Each sync-now takes 10-12s (pushes to 4 remotes sequentially), so the full cycle takes ~4 minutes. While syncing one repo, all other repos wait. The 5s SLA cannot be met with sequential processing. The watcher is correctly extending the pattern to all 22 repos, but the timing constraint conflicts with the daemon's sequential push architecture.
-- Agent suggests: Options: (1) Accept that the pattern is correctly extended but 5s SLA isn't met (daemon limitation, not watcher issue); (2) Reduce remotes from 4 to 1 to meet 5s; (3) Modify daemon to push in parallel (separate goal); (4) Use /goal-tweak to revise the SLA
