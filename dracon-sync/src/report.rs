@@ -636,6 +636,7 @@ pub(crate) async fn run_repos_report(
             last_when,
             last_msg,
             last_unix,
+            last_push,
             concern,
             warn,
             hint,
