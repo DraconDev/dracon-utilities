@@ -5,19 +5,21 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 170386,
-    "activeSeconds": 92
+    "tokensUsed": 171848,
+    "activeSeconds": 104
   },
   "sisyphus": false,
   "createdAt": "2026-06-03T17:54:25.109Z",
-  "updatedAt": "2026-06-03T17:55:59.353Z",
+  "updatedAt": "2026-06-03T17:56:12.929Z",
   "activePath": ".pi/goals/active_goal_2026060318542510_mpyd8tlh-e56ujq.md",
   "taskList": {
     "tasks": [
       {
         "id": "diagnose-dte",
         "title": "Diagnose dracon-terminal-engine (CONCERN: 1 modified, 2 ahead, last push 61s ago)",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-03T17:56:05.343Z",
+        "evidence": "**Diagnostic Report: dracon-terminal-engine**\n- Root Cause: Active pi session produced goal-file commits (active_goal_2026060318411632_mpycrwyo-kxbguo.md). Session archived the goal (commit 746d0912).",
         "verificationContract": "Capture git status, branch -vv, log --oneline -5, ls-remote origin main, incident ledger entries, process scan for pi/node/bun with CWD in this repo, file mtime of modified files. Produce root cause summary.",
         "subtasks": [
           {
@@ -47,13 +49,17 @@
           {
             "id": "jrb-processes",
             "title": "Check for active pi/writer processes in Junk-Runner-bevy",
-            "status": "pending",
+            "status": "complete",
+            "completedAt": "2026-06-03T17:56:12.925Z",
+            "evidence": "Scanned /proc for any process with CWD containing 'Junk-Runner-bevy'. Found 1 node process (PID 1448663, CWD=Junk-Runner-bevy/web, CMD=node .../vite) — this is a Vite dev server, not a pi session. No ",
             "verificationContract": "Scan /proc for any process with CWD in Junk-Runner-bevy. List all found."
           },
           {
             "id": "jrb-divergence",
             "title": "Check if 7 ahead are new commits since previous merge",
-            "status": "pending",
+            "status": "complete",
+            "completedAt": "2026-06-03T17:56:12.927Z",
+            "evidence": "git log --oneline origin/tauri2..tauri2 returns empty (0 commits ahead). git rev-list --count origin/tauri2..tauri2 = 0. The 7 ahead commits from the original report were all goal-file updates (active",
             "verificationContract": "Run git log --oneline origin/tauri2..tauri2 to see unpushed commits. Determine if goal-file updates from active session or real code changes."
           }
         ]
@@ -91,12 +97,13 @@ Investigate why `dracon-terminal-engine` and `Junk-Runner-bevy` are flagged CONC
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 1m32s
-- Tokens used: 170K (170,386) tokens
+- Time spent: 1m44s
+- Tokens used: 172K (171,848) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
-- [ ] diagnose-dte: Diagnose dracon-terminal-engine (CONCERN: 1 modified, 2 ahead, last push 61s ago) — contract: Capture git status, branch -vv, log --oneline -5, ls-remote origin main, incident ledger entries, process scan for pi/node/bun with CWD in this repo, file mtime of modified files. Produce root cause summary.
+- [x] diagnose-dte: Diagnose dracon-terminal-engine (CONCERN: 1 modified, 2 ahead, last push 61s ago) — evidence: **Diagnostic Report: dracon-terminal-engine**
+- Root Cause: Active pi session produced goal-file commits (active_goal_2026060318411632_mpycrwyo-kxbguo.md). Session archived the goal (commit 746d0912).
 - [ ] diagnose-jrb: Diagnose Junk-Runner-bevy (CONCERN: 1 modified, 7 ahead, last push 7 days ago) — contract: Capture git status, branch -vv, log --oneline -5, ls-remote origin tauri2, incident ledger entries, process scan, file mtime. Note: was durably fixed in previous goal (merge 45e9f2af3) — investigate why CONCERN again.
 - [ ] fix-dte: Apply fix for dracon-terminal-engine — contract: Repo returns OK in dracon-sync repos with 0 ahead, 0 behind, clean working tree. Fix is durable.
 - [ ] fix-jrb: Apply fix for Junk-Runner-bevy — contract: Repo returns OK in dracon-sync repos with 0 ahead, 0 behind, clean working tree. Fix is durable.
