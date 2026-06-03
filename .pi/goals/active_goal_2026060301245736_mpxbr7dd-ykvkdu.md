@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 2763141,
-    "activeSeconds": 37175
+    "tokensUsed": 2853941,
+    "activeSeconds": 37216
   },
   "sisyphus": false,
   "createdAt": "2026-06-03T00:24:57.361Z",
-  "updatedAt": "2026-06-03T13:23:55.666Z",
+  "updatedAt": "2026-06-03T13:24:38.137Z",
   "activePath": ".pi/goals/active_goal_2026060301245736_mpxbr7dd-ykvkdu.md",
   "taskList": {
     "tasks": [
@@ -71,8 +71,8 @@ The daemon (`dracon-sync`) has `inactivity_push_delay_secs = 5` and `pulse_inter
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 10h19m35s
-- Tokens used: 2.8M (2,763,141) tokens
+- Time spent: 10h20m16s
+- Tokens used: 2.9M (2,853,941) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
