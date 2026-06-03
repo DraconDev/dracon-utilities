@@ -1382,6 +1382,12 @@ async fn handle_ahead(
                                         "ok",
                                         Some(format!("branch={}", branch)),
                                     );
+                                    // Also push to mirror remotes
+                                    if let Ok(policy) = SyncPolicy::load(policy_path) {
+                                        if !policy.remotes.is_empty() {
+                                            push_mirror_remotes(repo, &policy.remotes, push_timeout_secs, push_retries, true).await;
+                                        }
+                                    }
                                 }
                                 Err(e2) => {
                                     if human {
