@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 2009262,
-    "activeSeconds": 662
+    "tokensUsed": 2122529,
+    "activeSeconds": 695
   },
   "sisyphus": false,
   "createdAt": "2026-06-03T16:26:04.865Z",
-  "updatedAt": "2026-06-03T16:37:21.432Z",
+  "updatedAt": "2026-06-03T16:37:54.812Z",
   "activePath": ".pi/goals/active_goal_2026060317260486_mpya37wi-1zimyq.md",
   "taskList": {
     "tasks": [
@@ -25,19 +25,25 @@
       {
         "id": "fix-browser-extensions-shared",
         "title": "Apply fix for browser-extensions-shared",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-03T16:37:54.808Z",
+        "evidence": "Repo state: `git status` shows clean working tree, on main, ahead=0, behind=0, 0 modified, 0 staged, 0 untracked at moment of completion (2 untracked files appeared transiently during diagnose — likel",
         "verificationContract": "Repo returns OK in `dracon-sync repos`. Working tree has no sync-relevant dirty entries. Untracked files are either added to a commit, .gitignore'd via the warden-managed block (not direct edit), or determined to be safe build artifacts the daemon ignores. No new incidents in the ledger."
       },
       {
         "id": "fix-dracon-platform",
         "title": "Apply fix for dracon-platform",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-03T16:37:54.810Z",
+        "evidence": "Repo state: `git status` shows clean working tree (no uncommitted modifications), on main, ahead=0, behind=0. The 1-behind divergence was resolved by daemon's `pull_merge` at 17:27:04 (ledger entry ts",
         "verificationContract": "Repo returns OK in `dracon-sync repos`. The 15 local commits are pushed to origin/main (or the tracked branch). The 1-behind divergence is resolved (pulled + merged per `git pull --no-rebase` policy) or the merge conflict is escalated to the user. No new incidents in the ledger."
       },
       {
         "id": "fix-junk-runner-bevy",
         "title": "Apply fix for Junk-Runner-bevy",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-03T16:37:54.811Z",
+        "evidence": "Repo state: `git status` shows clean working tree, on tauri2, ahead=0, behind=0. Fix applied: `git pull --no-rebase -X ours origin tauri2` to merge the 116-behind while preserving the local rename of ",
         "verificationContract": "Repo returns OK in `dracon-sync repos`. Either: (a) tauri2 is brought in sync with origin (5 local commits pushed, 116-behind resolved via merge or rebase, no force-push); or (b) the divergence is explicitly accepted with a documented reason (e.g., tauri2 is intentionally long-lived and the daemon should skip it — handled via per-repo config, not by ignoring the stall). Push is verified successful. No new incidents in the ledger."
       },
       {
@@ -86,15 +92,15 @@ Investigate why `browser-extensions-shared`, `dracon-platform`, and `Junk-Runner
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 11m02s
-- Tokens used: 2M (2,009,262) tokens
+- Time spent: 11m35s
+- Tokens used: 2.1M (2,122,529) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
 - [x] diagnose: Gather diagnostics for the 3 CONCERN repos — evidence: Per-repo diagnostics captured (git status, branch -vv, log, remote, ledger, mtime, processes). Diagnosis complete:
 - browser-extensions-shared: push-loop. Goal file mtime 17:26:52 ↔ last commit 17:26:
-- [ ] fix-browser-extensions-shared: Apply fix for browser-extensions-shared — contract: Repo returns OK in `dracon-sync repos`. Working tree has no sync-relevant dirty entries. Untracked files are either added to a commit, .gitignore'd via the warden-managed block (not direct edit), or determined to be safe build artifacts the daemon ignores. No new incidents in the ledger.
-- [ ] fix-dracon-platform: Apply fix for dracon-platform — contract: Repo returns OK in `dracon-sync repos`. The 15 local commits are pushed to origin/main (or the tracked branch). The 1-behind divergence is resolved (pulled + merged per `git pull --no-rebase` policy) or the merge conflict is escalated to the user. No new incidents in the ledger.
-- [ ] fix-junk-runner-bevy: Apply fix for Junk-Runner-bevy — contract: Repo returns OK in `dracon-sync repos`. Either: (a) tauri2 is brought in sync with origin (5 local commits pushed, 116-behind resolved via merge or rebase, no force-push); or (b) the divergence is explicitly accepted with a documented reason (e.g., tauri2 is intentionally long-lived and the daemon should skip it — handled via per-repo config, not by ignoring the stall). Push is verified successful. No new incidents in the ledger.
+- [x] fix-browser-extensions-shared: Apply fix for browser-extensions-shared — evidence: Repo state: `git status` shows clean working tree, on main, ahead=0, behind=0, 0 modified, 0 staged, 0 untracked at moment of completion (2 untracked files appeared transiently during diagnose — likel
+- [x] fix-dracon-platform: Apply fix for dracon-platform — evidence: Repo state: `git status` shows clean working tree (no uncommitted modifications), on main, ahead=0, behind=0. The 1-behind divergence was resolved by daemon's `pull_merge` at 17:27:04 (ledger entry ts
+- [x] fix-junk-runner-bevy: Apply fix for Junk-Runner-bevy — evidence: Repo state: `git status` shows clean working tree, on tauri2, ahead=0, behind=0. Fix applied: `git pull --no-rebase -X ours origin tauri2` to merge the 116-behind while preserving the local rename of 
 - [ ] verify: Verify final state with `dracon-sync repos` — contract: `dracon-sync repos` shows 22 OK / 0 WARN / 0 CONCERN / 0 ❌. The 19 originally-OK repos are still OK (spot-check the summary line for any unexpected WARN/CONCERN). Incident ledger has no new `scope:"sync"` errors from this work. If any config was changed, `dracon-sync validate-config` returns clean.
 
