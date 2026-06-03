@@ -1,23 +1,36 @@
-tree 4ec717dde12136a5796151e08f4e29d5c16878ae
-parent 021dd5a31925f9054f86c235c5059ed9e1c596c4
-author DraconDev <dracsharp@gmail.com> 1777596318 +0100
-committer DraconDev <dracsharp@gmail.com> 1778742499 +0100
+tree 765bdb11067a959656133110814a5213dcb1d66b
+parent 699a6a281c235f5aca9e7da5399678e27abcebfd
+author DraconDev <dracsharp@gmail.com> 1778726097 +0100
+committer DraconDev <dracsharp@gmail.com> 1778742505 +0100
 
-feat(unit tests): Added unit tests for `disk_state` thresholds and utility functions `h...
+fix(fix commit): Fix commit spam loop: bumper treats .dracon/ and .pub as meaningful, ...
 
-#Project State
+# Project State
 
 ## Current Focus
-Added unit tests for `disk_state` thresholds and utility functions `human_bytes` and `expand_tilde`.
+Fix commit spam loop: bumper treats .dracon/ and .pub as meaningful, stale project-state.md drives identical commit messages
+
+## Context
+193 consecutive commits with identical messages (fix(fix multi-remote): ...) triggered by 3 interacting bugs: (1) NOISE_PATTERNS missing .dracon/ and .pub so pubkey rotation triggered version bumps, (2) stale project-state.md with no AI keys configured produced identical category/scope every cycle, (3) warden publish_repo_pubkey wrote new keys making repos dirty. Added .dracon/ and .pub to NOISE_PATTERNS, added stale focus detection in build_commit_context, added noise-only shortcut to skip scribe and use 'chore: sync metadata', changed plaintext gitattributes from -filter -diff -merge to -filter only.
 
 ## Completed
-- [x] Test that `disk_state` returns `"ok"` when usage is below warning threshold
-- [x] Test that `disk_state` returns `"warn"` when usage is at or above warning percentage
-- [x] Test that `disk_state` returns `"action"` when usage is at or above action percentage
-- [x] Test that `disk_state` returns `"critical"` when usage is at or above critical percentage
-- [x] Test that `human_bytes` correctly formats large byte values as GiB strings
-- [x] Test that `expand_tilde` handles absence of `HOME` gracefully
+- [x] Fix A: Added .dracon/ and .pub to NOISE_PATTERNS in bump.rs
+- [x] Fix B: Verified original logic already returns None for noise+version-only diffs
+- [x] Fix C: Stale focus detection — if focus line appears in last commit subject, clear description/category/scope
+- [x] Fix D: Noise-only shortcut — skip scribe call, use 'chore: sync metadata' commit message
+- [x] Fix F: Changed plaintext gitattributes from `-filter -diff -merge` to `-filter` only (restores normal diffing for Cargo.toml/Cargo.lock etc.)
+
+## In Progress
+- Fix H: Compiler warnings (SyncContext dead_code, filter_only_cleared unused)
+
+## Blockers
+- None
+
+## Next Steps
+1. Fix compiler warnings in dracon-sync
+2. Run full test suite
+3. Rebuild + deploy + restart services
 ---
-category: feat
-scope: unit tests
+category: fix
+scope: fix commit
 ---
