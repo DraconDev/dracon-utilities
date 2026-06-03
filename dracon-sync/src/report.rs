@@ -604,6 +604,21 @@ pub(crate) async fn run_repos_report(
             .await
             .unwrap_or_else(|| "-".to_string());
         let last_unix = git_log_unix_timestamp(&repo).await.unwrap_or(0);
+        // Get last push time from reflog (e.g., "3f5d2ad ... update by push")
+        let last_push = git_log_field(&repo, "ORIG_HEAD")
+            .await
+            .map(|_| {
+                // Use reflog to find last push timestamp
+                use std::process::Command;
+                Command::new("git")
+                    .args(["-C", repo.to_str().unwrap_or(""), "reflog", "show", "origin/main", "--format=%cr", "-1"])
+                    .output()
+                    .ok()
+                    .and_then(|o| String::from_utf8(o.stdout).ok())
+                    .map(|s| s.lines().next().unwrap_or("-").trim().to_string())
+                    .unwrap_or_else(|| "-".to_string())
+            })
+            .unwrap_or_else(|| "-".to_string());
 
         rows.push(RepoReportRow {
             repo: repo.display().to_string(),
