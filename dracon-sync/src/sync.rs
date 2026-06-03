@@ -858,6 +858,49 @@ async fn run_release_pipeline_if_bumped(repo: &Path, policy: &SyncPolicy, versio
     }
 }
 
+/// Background push — owned values, no lifetime constraints.
+/// Pushes to origin + all mirror remotes. Returns true if all succeeded.
+async fn push_background(repo: &std::path::Path, policy: &SyncPolicy) -> Result<bool> {
+    // Push to origin
+    match push_with_retries(
+        repo,
+        policy.push_op_timeout_secs,
+        policy.push_retries,
+        "push",
+    )
+    .await
+    {
+        Ok(()) => {}
+        Err(e) => {
+            eprintln!("⚠️ background push to origin failed for {}: {}", repo.display(), e);
+            return Ok(false);
+        }
+    }
+
+    // Push to mirror remotes
+    if !policy.remotes.is_empty() {
+        let private = true;
+        let push_results = push_mirror_remotes(
+            repo,
+            &policy.remotes,
+            policy.push_op_timeout_secs,
+            policy.push_retries,
+            private,
+        )
+        .await;
+        let all_ok = push_results.iter().all(|(_, r)| r.is_ok());
+        if !all_ok {
+            for (name, result) in &push_results {
+                if let Err(e) = result {
+                    eprintln!("⚠️ background push to {} failed for {}: {}", name, repo.display(), e);
+                }
+            }
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
 async fn push_with_blob_check(ctx: &mut SyncContext<'_>, ahead: usize) -> Result<bool> {
     let repo = ctx.repo;
     let policy = ctx.policy;
@@ -1806,10 +1849,16 @@ async fn stage_commit_and_push(
     restore_excluded_paths(ctx, to_restore).await?;
 
     if policy.auto_push && has_origin {
-        let push_ok = push_with_blob_check(ctx, 1).await?;
-        if !push_ok {
-            log_warn!("some mirror pushes failed for {}", repo.display());
-        }
+        // Fire-and-forget: push in background so commit latency stays ~5s
+        let bg_repo = repo.to_path_buf();
+        let bg_policy = policy.clone();
+        tokio::spawn(async move {
+            match push_background(&bg_repo, &bg_policy).await {
+                Ok(true) => {}
+                Ok(false) => eprintln!("⚠️ background push failed for {}", bg_repo.display()),
+                Err(e) => eprintln!("⚠️ background push error for {}: {}", bg_repo.display(), e),
+            }
+        });
     }
 
     run_release_pipeline_if_bumped(repo, policy, version_bumped).await;
@@ -2870,7 +2919,7 @@ push_url = "git@nonexistent.example.com:repo.git"
     }
 
     #[tokio::test]
-    async fn test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBlaU0reVVUaXF3S1hnb1JOeDN2TkEwNkxPOW5sWXhxd1ppRjhBR091K2wwCjlnK1FQVHRkNm5zaTlQZ0VwYmtHYWpKc3JWYTdHbzJITlF0aCtjYTdMajAKLT4gWDI1NTE5IDRuWG5oViswdnF4Kzk4K3RIV0JOSFBvaU1MMVhub0dzRCtic0VrdWM4RE0KRzVyYmlma1QxUjloaFUydEpsUkhOaktocVh3RXVPazVPMHVnUmJ6b1BJZwotPiBiNS1ncmVhc2UgXVdwLzM9XCBfIClYJy90c3lPClFrNDhzMzZwc3p6b3pPMWZHUFd5RmFaaWFhRktrblpFSGVWZDlSbmU1K1doCi0tLSA4WDVNN3FjMHN6RmxaSjl2VUNyWnBHS0R3QzNRWHhLQ0c2b3p4eGQyelVzCtQ3x4iXvyxMOMPlVcIQEZFdtx8idpX7uWl5lI2NpsJ9rx6UZwsqVFZKoYIGyNhJJs9KusakwbXNhw==]() {
+    async fn test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBvZWRBOXg0Y01jUUxDNFJobEhnK01vYXBlTWdBSnA4bFlVdHJ2bHVUWlRNCjdCMzBVOUVVUHMyc0JUS2tEUEZ5WEdxQVVhT1dXenArSjFqaWRCbllKR00KLT4gWDI1NTE5IFVkczh5dUordWlrWWJRTUpQTlJVSEZDQmkzb0QvUzJjMVlVaUJiWWp0UVEKRHJLNVhWLzZLeW5HRmczZmFOMEwxZ3I3ZVBXTlhqcm9MUXhCYXNKN1hUVQotPiBTdGNeLWdyZWFzZSBVN0ElbGMrIGEKN0tUOGVCQVdDNXdNMXNJM2Q0YUxzdzg2Sm5Vd1d6QzZRYlVhNS96bThpUjJiVk4wQk1XVitBeHJmQVdFaU5XOAp6MDlXVnFxdXgwd2dZWFNJdUV1ZTdvRjlVOTRjMUJJR09ZR2JielpJVyt3clhaYSsKLS0tIHZrbExROHkrdThsUHFaTTQ1Ti8rYkxHL2JmTWxCNG9TNHhROFBJZWFad2cKpEFH2kghIa333kjCieHDHElaZWQCy8WpuvnN9LukG3aPQHPBJUDCjVaUvcZsC+VT6pGLV/4yhHKj]() {
         let tmp = tempfile::tempdir().unwrap();
         let origin_bare = tmp.path().join("origin.git");
         std::process::Command::new("git")
@@ -3226,7 +3275,7 @@ push_url = "{}"
     }
 
     #[tokio::test]
-    async fn test_sync_repo_exac[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB4d2laYk4wK1U4eXhUNGphSHFxeG9xa3hpakFhNUJCaURlUlg5SVYzTjM0CnVUaEpvM2I4U3VlQWEzMTZIVEEyT2hXR0M4UDd3Ky9CYWo5blVNK1g2aVEKLT4gWDI1NTE5IDBldGpGRE01UnRSSlhqTmFydFBENEp1bW5hZW1hY05QMVgrOGl2SFRYeXMKSHFFMlpPMkg1cWNQT2lvVE1QWkxiUUI1eVVXd201Wi81NnFMUXhaODYzNAotPiAxODAuOk5MLWdyZWFzZSA9YURtIl8Kb2lid1ZMeEtENlN0RHJ3OWpqNnBqdWF6Q3cKLS0tIG8xSlhSZGU4ZGZGWExSYXhUT3kydi9ZQnZLZW9jdzFRcUQ1eXd5QU53TlkKHoNCkaWVyAUrhfGN0H2qQgIVlDdWs+yg8+s8E5kCah4OSxH9zirTqfZIbe/YxbGvN2HNYOCIxHt8FbRRA1Ex]() {
+    async fn test_sync_repo_exac[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA0WWo4Y0l1NDBkRGtrOWtEc1FYT2FOWHZlLzJ2dWk3VklwVWJpc01mcGxjCnRpY3A3YVhrTGxVTHNhUEgrckQrWXo2aTF1SkhCeU5pUWlEbDJDdmdGcU0KLT4gWDI1NTE5IElwOGJESm5yb0tndEZwVVR6VS9wRnR2b3VpWkFNMzJxd3JBc2NyR1FneHMKUzRjSDhNa1NUa3l6ZmhoNlpVY01lTEp0OHNvZERlQXdXeEpzcHRpeVZDbwotPiA3Oy1ncmVhc2UKUDVSM3NKZjNyUWxFRnF4cVdVMzF2WXoxMEozR01hK3oxMTdqU3B0VmlBUElKaDU1UmZ6Y0xtNmg0dTJ2bi9yTgp5T3hzalA3Y2FQWQotLS0gWFlEdUtqNm5JMGh1cFFSS1pkeUtmNHNsQ0JYUU9LU2I4aEg0a3pXNUpCawpibFj7zBxg3dqaO6njau8wdIWn0SrAl2QrS89APt2VCSDhmBjyXuKz1zhMenbGpfk9ojAyVoFDcqY0kmqkexw=]() {
         let tmp = tempfile::tempdir().unwrap();
         let repo = init_test_repo(&tmp, "exact-50-del-repo");
 
