@@ -38,6 +38,7 @@ use crate::git::{
     rewrite_ahead_paths, run_git_capture_output, run_git_with_timeout, set_upstream_to_branch,
     top_level_dir,
 };
+use crate::git::multi_remote::push_mirror_remotes;
 use crate::policy::{
     timestamp_secs, tokio_git_command, SyncPolicy, DEFAULT_GIT_HOST_BLOB_LIMIT_BYTES,
 };
@@ -1084,6 +1085,25 @@ async fn handle_ahead(
                 "ok",
                 None,
             );
+            // Also push to mirror remotes (codeberg, gitlab, etc.)
+            if let Ok(policy) = SyncPolicy::load(policy_path) {
+                if !policy.remotes.is_empty() {
+                    let mirror_results = push_mirror_remotes(
+                        repo,
+                        &policy.remotes,
+                        push_timeout_secs,
+                        push_retries,
+                        true,
+                    ).await;
+                    for (name, result) in &mirror_results {
+                        if let Err(e) = result {
+                            if human {
+                                println!("   warn: mirror push to {} failed: {}", name, e);
+                            }
+                        }
+                    }
+                }
+            }
         }
         Err(e) => {
             if human {
