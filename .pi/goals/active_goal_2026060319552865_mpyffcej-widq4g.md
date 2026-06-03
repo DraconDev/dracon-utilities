@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 278239,
-    "activeSeconds": 1100
+    "tokensUsed": 280416,
+    "activeSeconds": 1111
   },
   "sisyphus": false,
   "createdAt": "2026-06-03T18:55:28.651Z",
-  "updatedAt": "2026-06-03T19:14:08.080Z",
+  "updatedAt": "2026-06-03T19:14:19.128Z",
   "activePath": ".pi/goals/active_goal_2026060319552865_mpyffcej-widq4g.md",
   "taskList": {
     "tasks": [
@@ -53,8 +53,8 @@ Fix the 1 remaining CONCERN repo (dracon-platform) and verify that dracon-sync i
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 18m20s
-- Tokens used: 278K (278,239) tokens
+- Time spent: 18m31s
+- Tokens used: 280K (280,416) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
