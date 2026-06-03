@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 171848,
-    "activeSeconds": 104
+    "tokensUsed": 173541,
+    "activeSeconds": 114
   },
   "sisyphus": false,
   "createdAt": "2026-06-03T17:54:25.109Z",
-  "updatedAt": "2026-06-03T17:56:12.929Z",
+  "updatedAt": "2026-06-03T17:56:24.654Z",
   "activePath": ".pi/goals/active_goal_2026060318542510_mpyd8tlh-e56ujq.md",
   "taskList": {
     "tasks": [
@@ -43,7 +43,9 @@
       {
         "id": "diagnose-jrb",
         "title": "Diagnose Junk-Runner-bevy (CONCERN: 1 modified, 7 ahead, last push 7 days ago)",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-03T17:56:18.674Z",
+        "evidence": "**Diagnostic Report: Junk-Runner-bevy**\n- Root Cause: Active pi session produced goal-file commits (active_goal_2026060318410804_mpycrqkp-8emufq.md). The 7 ahead were all goal-file updates. Daemon pus",
         "verificationContract": "Capture git status, branch -vv, log --oneline -5, ls-remote origin tauri2, incident ledger entries, process scan, file mtime. Note: was durably fixed in previous goal (merge 45e9f2af3) — investigate why CONCERN again.",
         "subtasks": [
           {
@@ -67,13 +69,17 @@
       {
         "id": "fix-dte",
         "title": "Apply fix for dracon-terminal-engine",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-03T17:56:24.652Z",
+        "evidence": "dracon-terminal-engine is already OK: git status shows clean working tree, ahead=0, behind=0, tracking origin/main. No fix was needed — the daemon pushed all commits after the pi session terminated.",
         "verificationContract": "Repo returns OK in dracon-sync repos with 0 ahead, 0 behind, clean working tree. Fix is durable."
       },
       {
         "id": "fix-jrb",
         "title": "Apply fix for Junk-Runner-bevy",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-03T17:56:24.653Z",
+        "evidence": "Junk-Runner-bevy is already OK: git status shows clean working tree, ahead=0, behind=0, tracking origin/tauri2. No fix was needed — the daemon pushed all commits after the pi session terminated. Previ",
         "verificationContract": "Repo returns OK in dracon-sync repos with 0 ahead, 0 behind, clean working tree. Fix is durable."
       },
       {
@@ -97,15 +103,16 @@ Investigate why `dracon-terminal-engine` and `Junk-Runner-bevy` are flagged CONC
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 1m44s
-- Tokens used: 172K (171,848) tokens
+- Time spent: 1m54s
+- Tokens used: 174K (173,541) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
 - [x] diagnose-dte: Diagnose dracon-terminal-engine (CONCERN: 1 modified, 2 ahead, last push 61s ago) — evidence: **Diagnostic Report: dracon-terminal-engine**
 - Root Cause: Active pi session produced goal-file commits (active_goal_2026060318411632_mpycrwyo-kxbguo.md). Session archived the goal (commit 746d0912).
-- [ ] diagnose-jrb: Diagnose Junk-Runner-bevy (CONCERN: 1 modified, 7 ahead, last push 7 days ago) — contract: Capture git status, branch -vv, log --oneline -5, ls-remote origin tauri2, incident ledger entries, process scan, file mtime. Note: was durably fixed in previous goal (merge 45e9f2af3) — investigate why CONCERN again.
-- [ ] fix-dte: Apply fix for dracon-terminal-engine — contract: Repo returns OK in dracon-sync repos with 0 ahead, 0 behind, clean working tree. Fix is durable.
-- [ ] fix-jrb: Apply fix for Junk-Runner-bevy — contract: Repo returns OK in dracon-sync repos with 0 ahead, 0 behind, clean working tree. Fix is durable.
+- [x] diagnose-jrb: Diagnose Junk-Runner-bevy (CONCERN: 1 modified, 7 ahead, last push 7 days ago) — evidence: **Diagnostic Report: Junk-Runner-bevy**
+- Root Cause: Active pi session produced goal-file commits (active_goal_2026060318410804_mpycrqkp-8emufq.md). The 7 ahead were all goal-file updates. Daemon pus
+- [x] fix-dte: Apply fix for dracon-terminal-engine — evidence: dracon-terminal-engine is already OK: git status shows clean working tree, ahead=0, behind=0, tracking origin/main. No fix was needed — the daemon pushed all commits after the pi session terminated.
+- [x] fix-jrb: Apply fix for Junk-Runner-bevy — evidence: Junk-Runner-bevy is already OK: git status shows clean working tree, ahead=0, behind=0, tracking origin/tauri2. No fix was needed — the daemon pushed all commits after the pi session terminated. Previ
 - [ ] verify: Verify final state with dracon-sync repos (3 runs over 15s) — contract: dracon-sync repos shows 22 OK / 0 WARN / 0 CONCERN / 0 in 3 consecutive runs over 15 seconds. All 20 originally-OK repos remain OK. Incident ledger has no new scope:sync errors. Diagnostic reports produced for both repos.
 
