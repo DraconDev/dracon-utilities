@@ -5,19 +5,21 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 94833,
-    "activeSeconds": 595
+    "tokensUsed": 95539,
+    "activeSeconds": 606
   },
   "sisyphus": false,
   "createdAt": "2026-06-03T00:24:57.361Z",
-  "updatedAt": "2026-06-03T00:36:23.376Z",
+  "updatedAt": "2026-06-03T00:36:34.903Z",
   "activePath": ".pi/goals/active_goal_2026060301245736_mpxbr7dd-ykvkdu.md",
   "taskList": {
     "tasks": [
       {
         "id": "generalize-watcher",
         "title": "Create a general-purpose all-repos polling watcher",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-03T00:36:34.901Z",
+        "evidence": "Created ~/.dracon/utilities/sync/bin/all-repos-watcher.sh — queries daemon for repo list via `dracon-sync repos --json`, loops through all 22 repos calling sync-now every 1s. Verified 22 repos match d",
         "verificationContract": "Create ~/.dracon/utilities/sync/bin/all-repos-watcher.sh that loops through all 22 watched repos and calls `dracon-sync sync-now <repo>` every 1 second. When all repos are clean, the loop is nearly instant. When any repo is dirty, it's committed and pushed within 1-2s."
       },
       {
@@ -47,12 +49,12 @@ Extend the cli-file-manager polling wrapper pattern to all 22 watched repos so e
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 9m55s
-- Tokens used: 95K (94,833) tokens
+- Time spent: 10m06s
+- Tokens used: 96K (95,539) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
-- [ ] generalize-watcher: Create a general-purpose all-repos polling watcher — contract: Create ~/.dracon/utilities/sync/bin/all-repos-watcher.sh that loops through all 22 watched repos and calls `dracon-sync sync-now <repo>` every 1 second. When all repos are clean, the loop is nearly instant. When any repo is dirty, it's committed and pushed within 1-2s.
+- [x] generalize-watcher: Create a general-purpose all-repos polling watcher — evidence: Created ~/.dracon/utilities/sync/bin/all-repos-watcher.sh — queries daemon for repo list via `dracon-sync repos --json`, loops through all 22 repos calling sync-now every 1s. Verified 22 repos match d
 - [ ] systemd-service: Create systemd user service for the general watcher — contract: Create ~/.config/systemd/user/all-repos-watcher.service, enable and start it. The service runs the watcher script with bounded resources (CPUQuota=10%, MemoryMax=128M, Nice=15).
 - [ ] verify-5s-behavior: Verify 5s commit behavior for all repos — contract: Make a change in 3 different repos (e.g., dracron-platform, dracron-terminal-engine, browser-extensions-shared), verify the watcher commits and pushes each within 5-10s. All 4 remotes in sync for all repos. 0 CONCERN, 0 STUCK_PUSH.
 
