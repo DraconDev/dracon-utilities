@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 4287,
-    "activeSeconds": 0
+    "tokensUsed": 156687,
+    "activeSeconds": 17
   },
   "sisyphus": false,
   "createdAt": "2026-06-03T17:54:25.109Z",
-  "updatedAt": "2026-06-03T17:54:25.113Z",
+  "updatedAt": "2026-06-03T17:54:43.117Z",
   "activePath": ".pi/goals/active_goal_2026060318542510_mpyd8tlh-e56ujq.md",
   "taskList": {
     "tasks": [
@@ -87,8 +87,8 @@ Investigate why `dracon-terminal-engine` and `Junk-Runner-bevy` are flagged CONC
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 0s
-- Tokens used: 4.3K (4,287) tokens
+- Time spent: 17s
+- Tokens used: 157K (156,687) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
