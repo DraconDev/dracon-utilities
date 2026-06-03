@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 816230,
-    "activeSeconds": 34185
+    "tokensUsed": 1260596,
+    "activeSeconds": 34224
   },
   "sisyphus": false,
   "createdAt": "2026-06-03T00:24:57.361Z",
-  "updatedAt": "2026-06-03T09:59:41.090Z",
+  "updatedAt": "2026-06-03T10:00:21.797Z",
   "activePath": ".pi/goals/active_goal_2026060301245736_mpxbr7dd-ykvkdu.md",
   "taskList": {
     "tasks": [
@@ -53,8 +53,8 @@ Extend the cli-file-manager polling wrapper pattern to all 22 watched repos so e
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 9h29m45s
-- Tokens used: 816K (816,230) tokens
+- Time spent: 9h30m24s
+- Tokens used: 1.3M (1,260,596) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
