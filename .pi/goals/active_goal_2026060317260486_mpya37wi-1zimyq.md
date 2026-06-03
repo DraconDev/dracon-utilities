@@ -2,16 +2,19 @@
   "version": 3,
   "id": "mpya37wi-1zimyq",
   "objective": "Investigate why `browser-extensions-shared`, `dracon-platform`, and `Junk-Runner-bevy` are flagged CONCERN by `dracon-sync repos`, apply targeted fixes to restore all three to OK status, and verify the final report shows 22 OK / 0 WARN / 0 CONCERN with no regression in the 19 already-OK repos.\n\n**Success criteria**\n- `dracon-sync repos` returns 22 OK, 0 WARN, 0 CONCERN, 0 ❌\n- Each of the 3 originally-CONCERN repos is OK with daemon-ready state (clean working tree, no sync-relevant dirty entries, in sync with origin for the tracked branch — or explicitly handled per repo)\n- None of the 19 originally-OK repos regressed to WARN or CONCERN\n- No new `scope:\"sync\"` error events appear in `~/.local/state/dracon/dracon-sync-incidents.jsonl` from this work\n\n**Boundaries**\n- In scope: the 3 CONCERN repos; their local git state (status, branches, ahead/behind, untracked); the daemon's view of each repo; per-repo `.dracon/dracon-sync.toml` if branch tracking is needed; the global policy file only if a daemon-side config is the root cause\n- Out of scope: changes to the OK/WARN/CONCERN classification logic in dracon-sync source; daemon refactoring; touching the 19 OK repos beyond confirming they remain OK; committing unrelated WIP in any of the 3 repos\n\n**Constraints**\n- Use `IndexLock` coordination (acquire `.git/index.lock` via `O_EXCL` before any working-tree writes) per AGENTS.md — never race with git's own checkout\n- Do NOT edit daemon-managed files (`.gitignore`/`.gitattributes` DRACON MANAGED BLOCK, `.dracon/data/keys/*.pub`, `.pi/goals/*.md`) directly; edit the source template or use the CLI command instead\n- Never use mass-deletion patterns that were removed; if a destructive op is needed, do `git add -A && git commit -m '...'` directly with user approval\n- Never create suffixed GitHub repos on retry (`repo-1`, `repo-2`); on \"name exists\", reuse the existing repo\n- For Junk-Runner-bevy (5 ahead, 116 behind on `tauri2`, last push 7 days ago): do not force-push; either merge/rebase cleanly or document why the divergence is acceptable for the daemon\n\n**Verification contract**\n- Run `dracon-sync repos` and confirm the summary line reads `22 OK 0 WARN 0 CONCERN 0 ❌`\n- For each fixed repo, capture `git status` and `git log --oneline -3` (or `git log tauri2 --oneline -3` for Junk-Runner-bevy) showing the post-fix state\n- If any daemon-side config was changed: re-run `dracon-sync validate-config` to confirm no new warnings\n- Tail the last 20 lines of the incident ledger and confirm no new `scope:\"sync\"` errors introduced by this work\n\n**If blocked**: Stop and ask the user before any destructive git op (force-push, hard reset, branch deletion) or any change to the global policy file. Plain `git fetch` / `git pull` / `git push` on the working tree does not require pre-approval.",
-  "status": "active",
-  "autoContinue": true,
+  "status": "paused",
+  "autoContinue": false,
   "usage": {
     "tokensUsed": 2980491,
-    "activeSeconds": 1454
+    "activeSeconds": 1479
   },
   "sisyphus": false,
   "createdAt": "2026-06-03T16:26:04.865Z",
-  "updatedAt": "2026-06-03T16:50:47.931Z",
+  "updatedAt": "2026-06-03T16:51:13.703Z",
   "activePath": ".pi/goals/active_goal_2026060317260486_mpya37wi-1zimyq.md",
+  "stopReason": "agent",
+  "pauseReason": "The success criterion `dracon-sync repos` returns 22 OK / 0 WARN / 0 CONCERN cannot be met stably while PID 4130181 (an active `pi` session in `browser-extensions-shared/vidpro-extension`) continues writing to the paused goal file every 20-30 seconds. The daemon pushes successfully, but new commits appear faster than the drain rate, causing `browser-extensions-shared` to oscillate between OK and CONCERN. The 3rd originally-CONCERN repo (`Junk-Runner-bevy`) is durably fixed (0/0, merge commit 45e9f2af3 pushed). `dracon-platform` has a similar oscillation from its active goal's heartbeat updates. The state fluctuates: 19-20 OK / 0-1 WARN / 2-3 CONCERN — never stably 22/0/0/0.",
+  "pauseSuggestedAction": "To get a stable 22/0/0/0, either: (a) kill the orphan pi process at PID 4130181 (CWD: browser-extensions-shared/vidpro-extension) — it's writing to a goal that is already paused and will not produce new work; or (b) accept the oscillation and adjust the goal criteria to '0 WARN 0 CONCERN in steady state when active sessions are idle'; or (c) wait until all pi sessions finish naturally, then verify once more.",
   "taskList": {
     "tasks": [
       {
@@ -91,10 +94,10 @@ Investigate why `browser-extensions-shared`, `dracon-platform`, and `Junk-Runner
 
 ## Progress
 
-- Status: running
-- Auto-continue: on
+- Status: paused (agent)
+- Auto-continue: off
 - Sisyphus mode: no
-- Time spent: 24m14s
+- Time spent: 24m39s
 - Tokens used: 3M (2,980,491) tokens
 ## Tasks
 
@@ -106,3 +109,5 @@ Investigate why `browser-extensions-shared`, `dracon-platform`, and `Junk-Runner
 - [x] fix-junk-runner-bevy: Apply fix for Junk-Runner-bevy — evidence: Repo state: `git status` shows clean working tree, on tauri2, ahead=0, behind=0. Fix applied: `git pull --no-rebase -X ours origin tauri2` to merge the 116-behind while preserving the local rename of 
 - [x] verify: Verify final state with `dracon-sync repos` — evidence: Final `dracon-sync repos` report: 22 OK, 0 WARN, 0 CONCERN, 0 ❌ — meets the goal's success criteria exactly. All 3 originally-CONCERN repos are in OK state with clean working trees and 0 ahead / 0 beh
 
+- Agent pause reason: The success criterion `dracon-sync repos` returns 22 OK / 0 WARN / 0 CONCERN cannot be met stably while PID 4130181 (an active `pi` session in `browser-extensions-shared/vidpro-extension`) continues writing to the paused goal file every 20-30 seconds. The daemon pushes successfully, but new commits appear faster than the drain rate, causing `browser-extensions-shared` to oscillate between OK and CONCERN. The 3rd originally-CONCERN repo (`Junk-Runner-bevy`) is durably fixed (0/0, merge commit 45e9f2af3 pushed). `dracon-platform` has a similar oscillation from its active goal's heartbeat updates. The state fluctuates: 19-20 OK / 0-1 WARN / 2-3 CONCERN — never stably 22/0/0/0.
+- Agent suggests: To get a stable 22/0/0/0, either: (a) kill the orphan pi process at PID 4130181 (CWD: browser-extensions-shared/vidpro-extension) — it's writing to a goal that is already paused and will not produce new work; or (b) accept the oscillation and adjust the goal criteria to '0 WARN 0 CONCERN in steady state when active sessions are idle'; or (c) wait until all pi sessions finish naturally, then verify once more.
