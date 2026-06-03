@@ -606,21 +606,54 @@ pub(crate) async fn run_repos_report(
             .await
             .unwrap_or_else(|| "-".to_string());
         let last_unix = git_log_unix_timestamp(&repo).await.unwrap_or(0);
-        // Get last push time from reflog
+        // Get last push time from reflog — scan all remote branches and pick the most recent
         let last_push = {
             use std::process::Command;
-            let output = Command::new("git")
-                .args([
-                    "-C", repo.to_str().unwrap_or(""),
-                    "reflog", "show", "origin/main",
-                    "--format=%cr", "-1",
-                ])
+            let repo_str = repo.to_str().unwrap_or("").to_string();
+            let current_branch = effective_status.branch.clone();
+            // Collect candidate refs: origin/<current>, plus all origin/* branches
+            let mut candidates: Vec<String> = vec![format!("origin/{}", current_branch)];
+            // List all origin/* branches
+            if let Ok(br_out) = Command::new("git")
+                .args(["-C", &repo_str, "for-each-ref", "--format=%(refname:short)", "refs/remotes/origin/"])
                 .output()
-                .ok()
-                .and_then(|o| String::from_utf8(o.stdout).ok())
-                .and_then(|s| s.lines().next().map(|l| l.trim().to_string()))
-                .filter(|s| !s.is_empty());
-            output.unwrap_or_else(|| "-".to_string())
+            {
+                if let Ok(s) = String::from_utf8(br_out.stdout) {
+                    for line in s.lines() {
+                        let t = line.trim().to_string();
+                        if !t.is_empty() && !candidates.contains(&t) {
+                            candidates.push(t);
+                        }
+                    }
+                }
+            }
+            let mut best: Option<String> = None;
+            let mut best_unix: i64 = 0;
+            for cand in &candidates {
+                let out = Command::new("git")
+                    .args([
+                        "-C", &repo_str,
+                        "reflog", "show", cand,
+                        "--format=%ct %cr", "-1",
+                    ])
+                    .output()
+                    .ok()
+                    .and_then(|o| String::from_utf8(o.stdout).ok());
+                if let Some(s) = out {
+                    if let Some(line) = s.lines().next() {
+                        let mut parts = line.splitn(2, ' ');
+                        if let (Some(ts), Some(rel)) = (parts.next(), parts.next()) {
+                            if let Ok(u) = ts.parse::<i64>() {
+                                if u > best_unix {
+                                    best_unix = u;
+                                    best = Some(rel.trim().to_string());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            best.filter(|s| !s.is_empty()).unwrap_or_else(|| "-".to_string())
         };
 
         rows.push(RepoReportRow {
