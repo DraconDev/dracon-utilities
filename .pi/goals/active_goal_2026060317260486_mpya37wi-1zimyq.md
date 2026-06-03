@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 3055088,
-    "activeSeconds": 1641
+    "tokensUsed": 3056785,
+    "activeSeconds": 1666
   },
   "sisyphus": false,
   "createdAt": "2026-06-03T16:26:04.865Z",
-  "updatedAt": "2026-06-03T16:54:56.866Z",
+  "updatedAt": "2026-06-03T16:55:22.304Z",
   "activePath": ".pi/goals/active_goal_2026060317260486_mpya37wi-1zimyq.md",
   "taskList": {
     "tasks": [
@@ -94,8 +94,8 @@ Investigate why `browser-extensions-shared`, `dracon-platform`, and `Junk-Runner
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 27m21s
-- Tokens used: 3.1M (3,055,088) tokens
+- Time spent: 27m46s
+- Tokens used: 3.1M (3,056,785) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
