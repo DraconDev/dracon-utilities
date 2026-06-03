@@ -2075,13 +2075,16 @@ async fn handle_ahead_push(ctx: &mut SyncContext<'_>, svc: &GitService) -> Resul
     let branch_has_upstream = super::git::has_tracking_upstream(ctx.repo);
     let should_push = current_status.ahead > 0 || !branch_has_upstream;
     if ctx.policy.auto_push && should_push && ctx.has_origin {
-        let push_ok = push_with_blob_check(ctx, current_status.ahead).await?;
-        if !push_ok {
-            eprintln!(
-                "ℹ️ push partially skipped for {} (see warnings above)",
-                ctx.repo.display()
-            );
-        }
+        // Fire-and-forget: push in background
+        let bg_repo = ctx.repo.to_path_buf();
+        let bg_policy = ctx.policy.clone();
+        tokio::spawn(async move {
+            match push_background(&bg_repo, &bg_policy).await {
+                Ok(true) => {}
+                Ok(false) => eprintln!("⚠️ background push failed for {}", bg_repo.display()),
+                Err(e) => eprintln!("⚠️ background push error for {}: {}", bg_repo.display(), e),
+            }
+        });
     } else if ctx.policy.auto_push && should_push && !ctx.has_origin {
         eprintln!("ℹ️ skip push for {} (no origin remote)", ctx.repo.display());
     }
@@ -2919,7 +2922,7 @@ push_url = "git@nonexistent.example.com:repo.git"
     }
 
     #[tokio::test]
-    async fn test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBvZWRBOXg0Y01jUUxDNFJobEhnK01vYXBlTWdBSnA4bFlVdHJ2bHVUWlRNCjdCMzBVOUVVUHMyc0JUS2tEUEZ5WEdxQVVhT1dXenArSjFqaWRCbllKR00KLT4gWDI1NTE5IFVkczh5dUordWlrWWJRTUpQTlJVSEZDQmkzb0QvUzJjMVlVaUJiWWp0UVEKRHJLNVhWLzZLeW5HRmczZmFOMEwxZ3I3ZVBXTlhqcm9MUXhCYXNKN1hUVQotPiBTdGNeLWdyZWFzZSBVN0ElbGMrIGEKN0tUOGVCQVdDNXdNMXNJM2Q0YUxzdzg2Sm5Vd1d6QzZRYlVhNS96bThpUjJiVk4wQk1XVitBeHJmQVdFaU5XOAp6MDlXVnFxdXgwd2dZWFNJdUV1ZTdvRjlVOTRjMUJJR09ZR2JielpJVyt3clhaYSsKLS0tIHZrbExROHkrdThsUHFaTTQ1Ti8rYkxHL2JmTWxCNG9TNHhROFBJZWFad2cKpEFH2kghIa333kjCieHDHElaZWQCy8WpuvnN9LukG3aPQHPBJUDCjVaUvcZsC+VT6pGLV/4yhHKj]() {
+    async fn test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBxd3FLSkRXdnhpcHg0cnlxVllRWTc5eG1rMHE5cG9YcVpjN3dqaFhsVmdzCm5LeUlUOEQ4UDl1VVBrbCt5RC9Jd3FFSnArYXFFbkp6eWFPYitNaENmQTAKLT4gWDI1NTE5IG11R2NpTThxWk53Q05wQmZ2dE9rUjR3VDdlUHptUDY5R1pVdm5MVUVEenMKV243Y1pmK3UrTGxicXpUUU5sUnFoQ0x3NHYxc0R3YkcrL3VndlNsYkRQbwotPiB5dVxQLWdyZWFzZSA6ICNsZGhzKlghIDN6XHptIGN+RTxgNDsKcUFURFVuWDA4a1FJSWM5cEFZVE5jUE1WTllSZkp2ZThUcnU5RFcrTWFBCi0tLSBjOGdGclpvc3BqbmxrTk1YZWVwbUJKVDFlTUJucnA0WDJEMjVIVnl4RVVnCp9hvtaThjvSYQM+d0c6AwOG9PjgwCYPE1Oyn+ZXC3lIhnTraHQdZfW9hRpbvqlM2LKqDHc8feEg5A==]() {
         let tmp = tempfile::tempdir().unwrap();
         let origin_bare = tmp.path().join("origin.git");
         std::process::Command::new("git")
@@ -3275,7 +3278,7 @@ push_url = "{}"
     }
 
     #[tokio::test]
-    async fn test_sync_repo_exac[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA0WWo4Y0l1NDBkRGtrOWtEc1FYT2FOWHZlLzJ2dWk3VklwVWJpc01mcGxjCnRpY3A3YVhrTGxVTHNhUEgrckQrWXo2aTF1SkhCeU5pUWlEbDJDdmdGcU0KLT4gWDI1NTE5IElwOGJESm5yb0tndEZwVVR6VS9wRnR2b3VpWkFNMzJxd3JBc2NyR1FneHMKUzRjSDhNa1NUa3l6ZmhoNlpVY01lTEp0OHNvZERlQXdXeEpzcHRpeVZDbwotPiA3Oy1ncmVhc2UKUDVSM3NKZjNyUWxFRnF4cVdVMzF2WXoxMEozR01hK3oxMTdqU3B0VmlBUElKaDU1UmZ6Y0xtNmg0dTJ2bi9yTgp5T3hzalA3Y2FQWQotLS0gWFlEdUtqNm5JMGh1cFFSS1pkeUtmNHNsQ0JYUU9LU2I4aEg0a3pXNUpCawpibFj7zBxg3dqaO6njau8wdIWn0SrAl2QrS89APt2VCSDhmBjyXuKz1zhMenbGpfk9ojAyVoFDcqY0kmqkexw=]() {
+    async fn test_sync_repo_exac[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAwR280MjFmSDljcXlpZjR1eG9RSE9lazNEOWxvSC9WWThZc0VtMWJwUG40CmVIRVV4NmNhdUtDMC85TmJUUkF6VkFHWHJhQUdCNWorWWUxUlpkazVsaUUKLT4gWDI1NTE5IDZRbm1rUndqV0huSDB4Z2hnRGNHOVBIdnFQZUE4c1FRZm5yNm9sK2J0eDAKaTFOTmhBRXAzVGxJcE9jRyswcHFmeWFsdTJtUUx1Q24yUXpQczliT1h5TQotPiBDc28tZ3JlYXNlIGdLVCAiVGYzIGt2KStgIEBGLEkKalB3TjN0UVFUemtjakQ1bkRqWnpmZXZQKytoWnJka0RHdTk3MnF4V0RSemJNUnV1b0ZwdE80a25lR0IvTVJOMQp3NGtJTEdjLzRCNEo2UQotLS0gV2hMN0pad2ZOZnkwL3NLdHVlM2d4eEpnSGExcGVQYmJUUUxwb3ZiZWNzNArXkkUtbenPmracMCsEyPZOII1ZIdXagio+8K6yt9NRIwjx9bOsPqW869zxejzXpdR2g7uVVu5Dmc0kib//i7o=]() {
         let tmp = tempfile::tempdir().unwrap();
         let repo = init_test_repo(&tmp, "exact-50-del-repo");
 
