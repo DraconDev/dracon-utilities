@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 167040,
-    "activeSeconds": 76
+    "tokensUsed": 170386,
+    "activeSeconds": 92
   },
   "sisyphus": false,
   "createdAt": "2026-06-03T17:54:25.109Z",
-  "updatedAt": "2026-06-03T17:55:42.757Z",
+  "updatedAt": "2026-06-03T17:55:59.353Z",
   "activePath": ".pi/goals/active_goal_2026060318542510_mpyd8tlh-e56ujq.md",
   "taskList": {
     "tasks": [
@@ -23,13 +23,17 @@
           {
             "id": "dte-processes",
             "title": "Check for active pi/writer processes in dracon-terminal-engine",
-            "status": "pending",
+            "status": "complete",
+            "completedAt": "2026-06-03T17:55:59.349Z",
+            "evidence": "No pi/node/bun processes found with CWD in dracon-terminal-engine. Process scan covered all /proc/[0-9]*/ entries checking CWD against the repo path. Only found processes in other repos (browser-exten",
             "verificationContract": "Scan /proc for any process with CWD in dracon-terminal-engine. List all found processes with PID, command, state."
           },
           {
             "id": "dte-push",
             "title": "Check why 2 commits still ahead after recent push",
-            "status": "pending",
+            "status": "complete",
+            "completedAt": "2026-06-03T17:55:59.352Z",
+            "evidence": "Ran git push --dry-run: would be 'Everything up-to-date'. Git confirms ahead=0, behind=0. The 2 ahead commits from the original report were goal-file updates that the daemon pushed successfully (last ",
             "verificationContract": "Run git push --dry-run to see if push would succeed. Check incident ledger for recent push attempts. Determine if ahead commits are from pi session or daemon auto-commit."
           }
         ]
@@ -87,8 +91,8 @@ Investigate why `dracon-terminal-engine` and `Junk-Runner-bevy` are flagged CONC
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 1m16s
-- Tokens used: 167K (167,040) tokens
+- Time spent: 1m32s
+- Tokens used: 170K (170,386) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
