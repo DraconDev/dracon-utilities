@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 168685,
-    "activeSeconds": 148
+    "tokensUsed": 170713,
+    "activeSeconds": 167
   },
   "sisyphus": false,
   "createdAt": "2026-06-04T17:59:55.860Z",
-  "updatedAt": "2026-06-04T18:02:36.017Z",
+  "updatedAt": "2026-06-04T18:02:56.235Z",
   "activePath": ".pi/goals/active_goal_2026060418595586_mpzsvrh0-yjeamn.md",
   "taskList": {
     "tasks": [
@@ -47,8 +47,8 @@ Add desktop notification on persistent push failure and enhance dracon-sync repo
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 2m28s
-- Tokens used: 169K (168,685) tokens
+- Time spent: 2m47s
+- Tokens used: 171K (170,713) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
