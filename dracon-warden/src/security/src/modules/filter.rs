@@ -3,7 +3,6 @@
 use anyhow::Result;
 use base64::{engine::general_purpose, Engine as _};
 use std::fs;
-use std::io::{Read, Write};
 use std::path::Path;
 
 use crate::make_env_version_header;
