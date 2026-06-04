@@ -167,7 +167,7 @@ pub(crate) async fn push_with_retries(
                 if !tried_pull && is_push_rejected(&err_msg) {
                     tried_pull = true;
                     eprintln!(
-                        "🔄 push rejected (fetch first) for {} — pulling origin HEAD and retrying",
+                        "🔄 push rejected (non-fast-forward) for {} — pulling origin HEAD and retrying",
                         repo.display()
                     );
                     let pull_result = super::run_git_with_timeout_env(
