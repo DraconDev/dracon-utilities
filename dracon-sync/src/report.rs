@@ -583,6 +583,21 @@ pub(crate) fn push_large_blob_threshold_bytes(policy: &SyncPolicy) -> u64 {
         .min(DEFAULT_GIT_HOST_BLOB_LIMIT_BYTES)
 }
 
+pub(crate) fn get_repo_size(repo_path: &str) -> String {
+    use std::process::Command;
+    let output = Command::new("du")
+        .args(["-sh", repo_path])
+        .output();
+    
+    match output {
+        Ok(o) if o.status.success() => {
+            let stdout = String::from_utf8_lossy(&o.stdout);
+            stdout.split_whitespace().next().unwrap_or("-").to_string()
+        }
+        _ => "-".to_string()
+    }
+}
+
 pub(crate) fn truncate(value: &str, max_chars: usize) -> String {
     if value.chars().count() <= max_chars {
         return value.to_string();
@@ -843,7 +858,7 @@ pub(crate) async fn run_repos_report(
         return Ok(());
     }
 
-    println!("📜 Policy: {}", policy_path.display());
+    println!("📜 {}", policy_path.display());
     match filter {
         RepoFilter::All => {}
         RepoFilter::Concern => {
@@ -862,7 +877,7 @@ pub(crate) async fn run_repos_report(
         }
     }
     println!(
-        "📦 REPOS: {}  {} {}  {} {}  {} {}  ❌ {}{}",
+        "📦 {} repos  {} {}  {} {}  {} {}  ❌ {}{}",
         rows.len(),
         ansi("32", "OK"),
         ok_count,
@@ -879,33 +894,27 @@ pub(crate) async fn run_repos_report(
             ),
         }
     );
-    let sort_label = match sort {
-        "name" => "name",
-        "modified" => "modified files",
-        "ahead" => "ahead count",
-        "behind" => "behind count",
-        _ => "last modified (newest first)",
-    };
-    println!("🕒 SORT: {sort_label}");
     println!();
 
-    use comfy_table::{presets::UTF8_FULL_CONDENSED, Cell, Color, Table};
+    use comfy_table::{presets::UTF8_FULL_CONDENSED, Cell, Color, Table, Attribute, ContentArrangement};
 
     let mut table = Table::new();
     table.load_preset(UTF8_FULL_CONDENSED);
+    table.set_content_arrangement(ContentArrangement::DynamicFullWidth);
     table.set_header(vec![
         Cell::new("#"),
         Cell::new("STATUS"),
         Cell::new("REPO"),
         Cell::new("BRANCH"),
-        Cell::new("MODIFIED"),
-        Cell::new("STAGED"),
-        Cell::new("UNTRACKED"),
-        Cell::new("AHEAD"),
-        Cell::new("BEHIND"),
+        Cell::new("MOD"),
+        Cell::new("STG"),
+        Cell::new("UT"),
+        Cell::new("↑"),
+        Cell::new("↓"),
         Cell::new("PUSH"),
-        Cell::new("LAST COMMIT"),
-        Cell::new("LAST PUSH"),
+        Cell::new("COMMIT"),
+        Cell::new("PUSH"),
+        Cell::new("SIZE"),
         Cell::new("AUTHOR"),
     ]);
 
@@ -941,19 +950,36 @@ pub(crate) async fn run_repos_report(
             _ => Color::White,
         };
 
+        // Color-code numeric columns based on severity
+        let modified_color = if row.modified > 0 { Color::Yellow } else { Color::White };
+        let staged_color = if row.staged > 0 { Color::Cyan } else { Color::White };
+        let ahead_color = if row.ahead > 0 { Color::Yellow } else { Color::White };
+        let behind_color = if row.behind > 0 { Color::Red } else { Color::White };
+        
+        // Format repo size on disk
+        let repo_size = get_repo_size(&row.repo);
+        
+        // Color branches: main/master in bold, others in cyan
+        let branch_color = if row.branch == "main" || row.branch == "master" {
+            Color::White
+        } else {
+            Color::Cyan
+        };
+
         table.add_row(vec![
             Cell::new(idx + 1),
             Cell::new(status_text).fg(status_color),
             Cell::new(repo_name),
-            Cell::new(&row.branch),
-            Cell::new(row.modified),
-            Cell::new(row.staged),
+            Cell::new(&row.branch).fg(branch_color),
+            Cell::new(row.modified).fg(modified_color),
+            Cell::new(row.staged).fg(staged_color),
             Cell::new(row.untracked),
-            Cell::new(row.ahead),
-            Cell::new(row.behind),
+            Cell::new(row.ahead).fg(ahead_color),
+            Cell::new(row.behind).fg(behind_color),
             Cell::new(&row.push_status).fg(push_color),
             Cell::new(shorten_when(&row.last_when)),
             Cell::new(shorten_when(&row.last_push)),
+            Cell::new(repo_size),
             Cell::new(&row.last_author),
         ]);
     }
@@ -3055,7 +3081,7 @@ mod tests {
     }
 
     #[test]
-    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBmMGpFVGNCTGNWT2pGS3daWkM3SFRDSVhKT2lZWlNhaEk1R1Jmd3p1TUdFCmZwRlZWNmpxTU1ydUV1c1psaHBza0VwVDN1RjZYRTdVYmhESDdIREMwQzQKLT4gWDI1NTE5IEtZNDduZUFHdlc2SUhSUktjNkQ1LzYxS05pamtLZzRMeCtzd01BSno0eTgKLy9seWFjSEd6VHRpKzhpaTFZY28wUVNpY2N6MmNaYUNIU0IvYnFqY3kxawotPiBJIVonNFBdTS1ncmVhc2Ugez5SKSBUPApGcGpuUzNpazJ6cUxFdTlTRHFmN3UvWmVnL3ZlSG5uN1dHTzdobmR0ZVBNWVppNHJOTkhHenl4Wko4UVVrU1FkCmgxRkVYUnltYVBVZFdnQTgKLS0tIDhZQWIrN3liUnpUUWMzYmVqTFU0T0ZqVzduTnpnUHVVRlZRVnV4L1RoaUEKhKRwIh2O5ZKyMb96oLNaHRkPsu4gvwYiTLYdW19vU2FPfRWMRLhgIRHCWHu5O2vxIXyeQ6gqYVZBxjyHuw==]() {
+    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBuOFExWnM0VWZnQjM3aWNkaEFVY09GK0Y2cWoxZTFOa0lmQ2UwdjFDVTBzCjdBUmd1K2dBcy9GWGJ0TFBjODI3NjFZbklDdHFuMlk1RUozTFEzQ0dNK00KLT4gWDI1NTE5IEZHK2Z4cmtxMnhSTjV3Z0NzWG5mRm9zM3JGZ0ZhZXFXRlZLSndlMmErRUkKMUd5eml4L2RKWnV0MFpGbDVwaWR1M2VSMkN3QUdSTnAzTDBLR0xSTFlEdwotPiBzRy1ncmVhc2UgVW18W1tyIFogYjsocEV8eSA9XiFzISIKUG05ODhzZkNGbXI5TWd2V3BRMW9UNDRmcVNOY2xneUFrOHg2SGo4VW9iNHRTNmQ4OWcKLS0tIGVPdFpBaUVtUUh6aWZ3ak9QcnJRSDVxSEwzTE1OdjBVNDNlRU0wR21hYTQK+tw+EgPuyd0mAYz0Zjurl/Aq9kHPrJOpODP0jWYOBPYbuM5JTmFl5jlLiiy/w7lFChAwQebEsZdDdoHxgw==]() {
         let mut cooldowns = std::collections::HashMap::new();
         let repo = std::path::PathBuf::from("/test/repo");
         let notify_key = format!("push-fail-{}", repo.display());
