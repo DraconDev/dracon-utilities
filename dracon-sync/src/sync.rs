@@ -689,10 +689,7 @@ async fn partition_gitignored(repo: &Path, paths: &[String]) -> (Vec<String>, Ve
     let mut normal_paths = Vec::new();
 
     for p in paths {
-        if tracked.contains(p) && !ignored.contains(p) {
-            // OLD BUGGY: ignore the gitignore→force rule, treat tracked like normal
-            normal_paths.push(p.clone());
-        } else if tracked.contains(p) {
+        if tracked.contains(p) {
             // Tracked file: always force-add with `git add -f`. `git add <path>`
             // re-evaluates gitignore and refuses for tracked files that match
             // a rule; `-f` bypasses the check. gitignore intent doesn't apply
@@ -2944,7 +2941,7 @@ push_url = "git@nonexistent.example.com:repo.git"
     }
 
     #[tokio::test]
-    async fn test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBUeXBac1h5Sk1uRHNmY3BSMFVqZ1NkRmhDdWZtUzhCa3JCRGVKVWE2T1Y4CnRJSmcvRzF0NVVmcXNEcFVRZy9ZNUUvcnRxRkxZQytxOXVwNUU1cXRsdTQKLT4gWDI1NTE5IEJ4Q2xxV1Nkclo4UEk3d1ZHVVAwTlNaQ295cFpvaWR2ZVUzemoya0R2MzAKMWlqUXYzWXZJZGNqYmJEOHNHQld5Wlp2UEZka29seFVHRktDY0Z0SW1qTQotPiAjNlQtZ3JlYXNlIDRuQysgfCZcODQ6ciBlNWoKbFVxNExpSlRzWU8xTncKLS0tIGd4STJydUNLOHdxaS9GUVFkZkJpNTN6MTJsVEFLc1JBa2xYdzJtck8wUTgK22aFwt3EEnF0ECdhG5Yp0AAc6jd5Ksru6O4fZXVkk0V2qM8Ki/8s5xxAPIZpcQclxRxM+e/CX4Zt]() {
+    async fn test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBFRkJSYVBJWlVDWUxXdThrampQVENFN0JOOEhTZE9MUHl5NlFKdmdvMlZVCks0YVhweGYwK0Yzb3pIMzFTbmc5YzN6NXQ5a1JBTlZ0ZG80Nkw3WVRLODgKLT4gWDI1NTE5IFZWajNaSHBvcGJGV0lWL29lS1UzUVlBeEtWVWNTaWs0MjB0MVVqOUtBeUUKUnkzbFpXby9YNDAxcUpPa1NXaFpYOUc0OW5Ndzd6V2piZXg3cUFILzRQTQotPiBLLWdyZWFzZSBEXApNZXc0STByenBNVEdVbllVVEZ4d3NNM2pWQllXenB0Ti8wNk0zVk1KUFAwb0ZoSnZ0UncKLS0tIElReU9jVFB5d0o5ZXE4YU8wTE1tanBXR05xNXFBOWtwdk5wUXJDcGdpZ3MKH+vKn7yi5cndH7b1Q6haaA0Dyztcg+EJ+yiYDRlAQmvyMUn4sYUwvEQOp9JkOcw99PUZtkQ2sywK]() {
         let tmp = tempfile::tempdir().unwrap();
         let origin_bare = tmp.path().join("origin.git");
         std::process::Command::new("git")
@@ -3300,7 +3297,7 @@ push_url = "{}"
     }
 
     #[tokio::test]
-    async fn test_sync_repo_exac[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBrTDgyM0pNdGlVd3JiTzBkK09Ya2wwS3FNbGpEQWJsYkM1cUhaYy9JdFc4ClFYU256STY1SG9YY2I1dE03VmRNYUE3bVVEamdGdm1sNjRzZkR3a056M1EKLT4gWDI1NTE5IHRDY2lXeXIwaUU2cDkvcS9JYXVmYWdJTnpTUStCdStVdUJURWg4Zm5yUVEKN3BBWUpKZ0JEWXliSjZqTmMzd042ZWVRY2xuSEpwNDZhVHJUYS9XNnhXcwotPiB6NC1ncmVhc2UgW3hyClZBZWtIMm5adUlickFYazFIeUdKUlEvM1NDTnFDUQotLS0gamxwNUcrM2FzVlBoeDdxQ0MzSnFIVDE1dGhJWW5HSzJCenhaNjhXYXc3RQrAoWztqBEMCaIMYsY2dA8SE5l1sZxbiSmD//Bh7eCq9EwQ3mvqiKKoohZ6rd+YyRePD6N8in1bLyb5GOqsB08=]() {
+    async fn test_sync_repo_exac[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB2aTRKa0thRjc4Slo0OTc0UE5ZcE4rY0x1aXlzUkhNbGtIRnUvRWg3ZHhrCmpudFltTi9LUitxbFpBMCt0aVpYSC9hbkhnVW9SWW40OGFRQTVIUUtFUTQKLT4gWDI1NTE5IEliSExoWjBmcDVOdzdOakRucjJlNXV4dXhFaXlCM29TZHI3azRzRG9ZemMKRnlYcHl6YWFqWHBCb29iLzVNcHJtaUpmSFU2ZTZIWTNIUTUycGNLck1KSQotPiByeyVPLWdyZWFzZSBjL0RKTwp1bmxxVm9SZ09KcWtqNVJUOUxNelFCSG1vR1dQUUE0N2lEWUduK0pJKzh6ckJnCi0tLSBZVDRobzJ4VkcrUC9IeGJjTkZkTkNFQXB0MlZlRkNjSHRjQjZEUlltSnNzCjWbHDikj6duv4jNfc+0aZcUMT6JK1ibgBJO0BLC5h8zBVpYfUXTSj8vt2HboBmz+NWHEuRGciyOjx1V7Gq+8w==]() {
         let tmp = tempfile::tempdir().unwrap();
         let repo = init_test_repo(&tmp, "exact-50-del-repo");
 
