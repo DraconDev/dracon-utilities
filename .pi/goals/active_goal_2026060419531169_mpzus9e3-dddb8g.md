@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 130310,
-    "activeSeconds": 312
+    "tokensUsed": 130841,
+    "activeSeconds": 331
   },
   "sisyphus": false,
   "createdAt": "2026-06-04T18:53:11.691Z",
-  "updatedAt": "2026-06-04T18:58:38.060Z",
+  "updatedAt": "2026-06-04T18:58:58.395Z",
   "activePath": ".pi/goals/active_goal_2026060419531169_mpzus9e3-dddb8g.md",
   "taskList": {
     "tasks": [
@@ -49,8 +49,8 @@ Make the daemon resilient to stale state by refreshing git status before reporti
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 5m12s
-- Tokens used: 130K (130,310) tokens
+- Time spent: 5m31s
+- Tokens used: 131K (130,841) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
