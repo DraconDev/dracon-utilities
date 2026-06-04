@@ -123,6 +123,12 @@ pub(crate) async fn push_with_transport_fallbacks(
 }
 
 /// Push with retries (SSH) and then HTTPS fallback.
+///
+/// On a `[rejected] (fetch first)` error (i.e. the local branch is behind
+/// origin), runs `git pull --no-rebase origin HEAD` once and retries the
+/// push. This unblocks repos where the local ahead has commits but origin
+/// has moved forward (e.g. mirror pushed while local was idle). Without this,
+/// the daemon would loop indefinitely on the same `fetch first` rejection.
 pub(crate) async fn push_with_retries(
     repo: &Path,
     timeout_secs: u64,
@@ -132,6 +138,7 @@ pub(crate) async fn push_with_retries(
     let attempts = retries.max(1);
     let ssh_hardening = crate::git::git_ssh_hardening();
     let mut last_err: Option<anyhow::Error> = None;
+    let mut tried_pull = false;
     for attempt in 1..=attempts {
         match super::run_git_with_timeout_env(
             repo,
@@ -147,7 +154,49 @@ pub(crate) async fn push_with_retries(
         {
             Ok(()) => return Ok(()),
             Err(e) => {
+                let err_msg = e.to_string();
                 last_err = Some(e);
+
+                // On the first failure that looks like a non-fast-forward
+                // (e.g. `! [rejected] HEAD -> main (fetch first)`), run
+                // `git pull --no-rebase origin HEAD` once and let the
+                // outer loop retry. This handles the common case where
+                // the local branch is behind origin (e.g. a mirror
+                // pushed while this repo was idle).
+                if !tried_pull && is_push_rejected(&err_msg) && err_msg.contains("fetch first") {
+                    tried_pull = true;
+                    eprintln!(
+                        "🔄 push rejected (fetch first) for {} — pulling origin HEAD and retrying",
+                        repo.display()
+                    );
+                    let pull_result = super::run_git_with_timeout_env(
+                        repo,
+                        &["pull", "--no-rebase", "origin", "HEAD"],
+                        timeout_secs,
+                        &format!("{}-auto-pull", op_label),
+                        &[
+                            ("GIT_SSH_COMMAND", ssh_hardening.as_str()),
+                            ("GIT_TERMINAL_PROMPT", "0"),
+                        ],
+                    )
+                    .await;
+                    match pull_result {
+                        Ok(()) => {
+                            // Don't sleep — retry the push immediately
+                            // (we don't increment `attempt` either; treat
+                            // the pull as part of the recovery).
+                            continue;
+                        }
+                        Err(pull_err) => {
+                            eprintln!(
+                                "⚠️ auto-pull failed for {}: {} — continuing with retry",
+                                repo.display(),
+                                pull_err
+                            );
+                        }
+                    }
+                }
+
                 if attempt < attempts {
                     let backoff = (attempt as u64).min(5);
                     eprintln!(
