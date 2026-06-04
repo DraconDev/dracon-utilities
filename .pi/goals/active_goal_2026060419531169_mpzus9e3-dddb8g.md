@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 135792,
-    "activeSeconds": 387
+    "tokensUsed": 137636,
+    "activeSeconds": 436
   },
   "sisyphus": false,
   "createdAt": "2026-06-04T18:53:11.691Z",
-  "updatedAt": "2026-06-04T18:59:56.989Z",
+  "updatedAt": "2026-06-04T19:00:46.509Z",
   "activePath": ".pi/goals/active_goal_2026060419531169_mpzus9e3-dddb8g.md",
   "taskList": {
     "tasks": [
@@ -33,7 +33,9 @@
       {
         "id": "task-3",
         "title": "Add tests for stale state detection and resolution",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-04T19:00:46.508Z",
+        "evidence": "Added 2 new tests: test_stale_ahead_detection_logic (verifies diverged/stale detection logic) and test_stale_ahead_resolution (verifies stale ahead count is resolved to 0). All tests pass, clippy clea",
         "verificationContract": "New tests verify that stale state is detected and corrected"
       }
     ],
@@ -51,12 +53,12 @@ Make the daemon resilient to stale state by refreshing git status before reporti
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 6m27s
-- Tokens used: 136K (135,792) tokens
+- Time spent: 7m16s
+- Tokens used: 138K (137,636) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
 - [x] task-1: Add status refresh before daemon reports repos (re-check actual git status, not cached) — evidence: Added stale ahead count detection in daemon.rs: before marking a repo as stuck, does git fetch --dry-run and re-checks status. If ahead count was stale (now 0), clears failure count and updates status
 - [x] task-2: Auto-resolve stuck pushes that are actually pushed (ahead count stale) — evidence: Added git update-index --refresh to get_status() in dracon-git/src/lib.rs. This forces a git index refresh before reading status, preventing stale state. Also added stale ahead detection in daemon.rs 
-- [ ] task-3: Add tests for stale state detection and resolution — contract: New tests verify that stale state is detected and corrected
+- [x] task-3: Add tests for stale state detection and resolution — evidence: Added 2 new tests: test_stale_ahead_detection_logic (verifies diverged/stale detection logic) and test_stale_ahead_resolution (verifies stale ahead count is resolved to 0). All tests pass, clippy clea
 
