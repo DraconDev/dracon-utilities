@@ -413,19 +413,34 @@ async fn main() -> Result<()> {
                     Cell::new("🧯 Repair"),
                     Cell::new(format!("cooldown={}s ledger_max_lines={} ledger_max_age_days={}",
                         policy.repair_cooldown_secs,
-                    policy.incident_ledger_max_lines,
-                    policy.incident_ledger_max_age_days
-                );
+                        policy.incident_ledger_max_lines,
+                        policy.incident_ledger_max_age_days
+                    )),
+                ]);
+                
+                // System repo
                 if !policy.system_repo.is_empty() {
-                    println!("🏛️  System repo: {}", policy.system_repo);
+                    table.add_row(vec![
+                        Cell::new("🏛️ System repo"),
+                        Cell::new(&policy.system_repo),
+                    ]);
                 }
+                
+                // Backup
                 if !policy.backup_policy.is_empty() || !policy.backup_dir.is_empty() {
-                    println!(
-                        "🧰 Backup: policy={} dir={}",
-                        policy.backup_policy, policy.backup_dir
-                    );
+                    table.add_row(vec![
+                        Cell::new("🧰 Backup"),
+                        Cell::new(format!("policy={} dir={}", policy.backup_policy, policy.backup_dir)),
+                    ]);
                 }
-                println!("🌐 Remotes: {}", policy.remotes.len());
+                
+                // Remotes
+                table.add_row(vec![
+                    Cell::new("🌐 Remotes"),
+                    Cell::new(policy.remotes.len()),
+                ]);
+                
+                println!("{table}");
             }
         }
         Command::Config { cmd } => match cmd {
