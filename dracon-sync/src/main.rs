@@ -309,50 +309,110 @@ async fn main() -> Result<()> {
                 };
                 println!("{}", serde_json::to_string_pretty(&payload)?);
             } else {
-                println!("📜 Policy: {}", policy_path.display());
-                println!("🔁 Roots: {:?}", roots);
-                println!("📦 Repos: {}", repos.len());
-                println!("⏱️  Pulse: {}s", policy.pulse_interval_secs);
-                println!(
-                    "⏳ Inactivity delay: {}s",
-                    policy.inactivity_push_delay_secs
-                );
-                println!(
-                    "⏸️  Freeze: {}",
-                    freeze
-                        .map(|r| format!("ON ({})", r))
-                        .unwrap_or_else(|| "OFF".to_string())
-                );
-                println!(
-                    "⚙️  Flags: auto_commit={} auto_pull={} auto_push={} auto_bump_versions={} auto_repair_concerns={} auto_repair_warns={} auto_rewrite_large_blobs={}",
-                    policy.auto_commit,
-                    policy.auto_pull,
-                    policy.auto_push,
-                    policy.auto_bump_versions,
-                    policy.auto_repair_concerns,
-                    policy.auto_repair_warns,
-                    policy.auto_rewrite_large_blobs
-                );
-                println!("📏 Max stage file bytes: {}", policy.max_stage_file_bytes);
-                println!(
-                    "🧱 Push blob threshold: {}",
-                    push_large_blob_threshold_bytes(&policy)
-                );
-                println!("🚫 Exclude dirs: {:?}", policy.exclude_dir_names);
-                println!(
-                    "🚫 Exclude file patterns: {:?}",
-                    policy.exclude_file_patterns
-                );
-                println!(
-                    "⏱️  Timeouts: pull={}s push={}s repo={}s retries={}",
-                    policy.pull_op_timeout_secs,
-                    policy.push_op_timeout_secs,
-                    policy.repo_sync_timeout_secs,
-                    policy.push_retries
-                );
-                println!(
-                    "🧯 Repair: cooldown={}s ledger_max_lines={} ledger_max_age_days={}",
-                    policy.repair_cooldown_secs,
+                use comfy_table::{presets::UTF8_FULL_CONDENSED, Cell, Color, Table, ContentArrangement};
+                
+                let mut table = Table::new();
+                table.load_preset(UTF8_FULL_CONDENSED);
+                table.set_content_arrangement(ContentArrangement::DynamicFullWidth);
+                table.set_header(vec![
+                    Cell::new("KEY"),
+                    Cell::new("VALUE"),
+                ]);
+                
+                // Policy path
+                table.add_row(vec![
+                    Cell::new("📜 Policy"),
+                    Cell::new(policy_path.display().to_string()),
+                ]);
+                
+                // Roots
+                let roots_str: Vec<String> = roots.iter().map(|p| p.display().to_string()).collect();
+                table.add_row(vec![
+                    Cell::new("🔁 Roots"),
+                    Cell::new(roots_str.join(", ")),
+                ]);
+                
+                // Repos
+                table.add_row(vec![
+                    Cell::new("📦 Repos"),
+                    Cell::new(repos.len()),
+                ]);
+                
+                // Pulse & Inactivity
+                table.add_row(vec![
+                    Cell::new("⏱️ Pulse"),
+                    Cell::new(format!("{}s", policy.pulse_interval_secs)),
+                ]);
+                table.add_row(vec![
+                    Cell::new("⏳ Inactivity"),
+                    Cell::new(format!("{}s", policy.inactivity_push_delay_secs)),
+                ]);
+                
+                // Freeze
+                let freeze_str = freeze
+                    .map(|r| format!("ON ({})", r))
+                    .unwrap_or_else(|| "OFF".to_string());
+                let freeze_color = if freeze_str == "OFF" { Color::Green } else { Color::Red };
+                table.add_row(vec![
+                    Cell::new("⏸️ Freeze"),
+                    Cell::new(freeze_str).fg(freeze_color),
+                ]);
+                
+                // Flags
+                let flags = vec![
+                    format!("auto_commit={}", policy.auto_commit),
+                    format!("auto_pull={}", policy.auto_pull),
+                    format!("auto_push={}", policy.auto_push),
+                    format!("auto_bump_versions={}", policy.auto_bump_versions),
+                    format!("auto_repair_concerns={}", policy.auto_repair_concerns),
+                    format!("auto_repair_warns={}", policy.auto_repair_warns),
+                    format!("auto_rewrite_large_blobs={}", policy.auto_rewrite_large_blobs),
+                ].join(" ");
+                table.add_row(vec![
+                    Cell::new("⚙️ Flags"),
+                    Cell::new(flags),
+                ]);
+                
+                // Limits
+                table.add_row(vec![
+                    Cell::new("📏 Max stage file"),
+                    Cell::new(format!("{}", policy.max_stage_file_bytes)),
+                ]);
+                table.add_row(vec![
+                    Cell::new("🧱 Push blob threshold"),
+                    Cell::new(format!("{}", push_large_blob_threshold_bytes(&policy))),
+                ]);
+                
+                // Exclude
+                if !policy.exclude_dir_names.is_empty() {
+                    table.add_row(vec![
+                        Cell::new("🚫 Exclude dirs"),
+                        Cell::new(policy.exclude_dir_names.join(", ")),
+                    ]);
+                }
+                if !policy.exclude_file_patterns.is_empty() {
+                    table.add_row(vec![
+                        Cell::new("🚫 Exclude patterns"),
+                        Cell::new(policy.exclude_file_patterns.join(", ")),
+                    ]);
+                }
+                
+                // Timeouts
+                table.add_row(vec![
+                    Cell::new("⏱️ Timeouts"),
+                    Cell::new(format!("pull={}s push={}s repo={}s retries={}",
+                        policy.pull_op_timeout_secs,
+                        policy.push_op_timeout_secs,
+                        policy.repo_sync_timeout_secs,
+                        policy.push_retries
+                    )),
+                ]);
+                
+                // Repair
+                table.add_row(vec![
+                    Cell::new("🧯 Repair"),
+                    Cell::new(format!("cooldown={}s ledger_max_lines={} ledger_max_age_days={}",
+                        policy.repair_cooldown_secs,
                     policy.incident_ledger_max_lines,
                     policy.incident_ledger_max_age_days
                 );
