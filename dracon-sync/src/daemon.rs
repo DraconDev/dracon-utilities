@@ -1148,6 +1148,17 @@ pub(crate) async fn run_daemon(
             } else {
                 entry.failure_count += 1;
 
+                // Notify on persistent push failure (every 3 consecutive failures)
+                if entry.failure_count >= 3 && entry.failure_count % 3 == 0 {
+                    crate::report::notify_push_failure(
+                        &repo,
+                        "origin",
+                        &format!("{} consecutive failures", entry.failure_count),
+                        entry.failure_count,
+                        &mut remote_notify_cooldowns,
+                    );
+                }
+
                 // Re-fetch status after sync attempt before making stuck decisions.
                 // sync_repo can resolve divergence (pull, merge, etc.), so stale
                 // pre-sync status would produce false stuck markings.
