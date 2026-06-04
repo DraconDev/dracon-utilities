@@ -1773,7 +1773,7 @@ async fn stage_commit_and_push(
         // `ctx.remote_failures` (the caller passes a `&mut HashMap`).
         // The `tokio::spawn` fire-and-forget pattern was removed because
         // it bypassed the failure-tracking needed by callers like
-        // `test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBQZnZPU0ZWWVRKbFZqaktHbWd5eFJHUU1Dc1lxWVBEMS9YMlk4OGZWRWhzClYwYzVZeEk1VDNoSWd0QllTYndOMmx0SlV1Q2lSZ3RLOVd5SVNUaldLTm8KLT4gWDI1NTE5IFRzOW94ZGlmY2RqSHhEaHpUL3NHWnhnTVk0SUpuakJoN0JSZTNyRVUzR0UKdFk0YU1hM3kvT0NiZmp6RHYwbXlRSlU5MUhidlBGRXpaeDN5aEhBd0J0OAotPiB0Li1ncmVhc2UgPExIbHUjfgppR1RMUEVVWDA0YTRXM3ZhbXhNY0drNmxkTEkyCi0tLSB1a2FoMUZ0bWFUYmZXaXVBU2lUNmhtSW9aS3RsV0IvNyt5aXNiaS9kVVdnCtjz50z/k8vXztoapk1dT4ExUka4yY45N6pgZITcWQS3cEEXFsRBQp6bm8ZyA9JqvpBDAaDUj4Lwkw==]`.
+        // `test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBhNFRKUzdZcXBFV1V6c1hBdjZFNEF3bGhuL1NodTJJNXZVTzdYMVNFTEJnCmNSM21qblBBdWY0RVg3aWZLR2FnSUxKVXdOZVNBblM2V2ZUY3FHTFY0TncKLT4gWDI1NTE5IFZIKzlGdERrQk0vVE5iSVRNNmFTQXlTc2VhUzZLWWJrdjExczQ0MFlMQkEKazJDb1JLVUM1YUJhaXBMUzNDbHVyNTdtQzAvdXpPT0lGNVpuSFVzaXd1ZwotPiBrUSI0aXQhfi1ncmVhc2UgaF90dCBONVkwLSkgXzkibCAjKE4tPjwKSU5BTGhKMXVUM1Y3M0U4UVUvN2V1NmQ4V1BidXpLTVJtbGRJRzdIeUMzaHAyM0t3QXNkRTdBbk00OWFMWURrNQplZTg3eVUyazRWQ1pzd0JNMWlRZWpBCi0tLSBMNkVldllHdURkZDRGVlFKOWVuWERjSGlLb0lmQ1g1K0VKcXhPVFVZbyt3Ck06c+0/wtODVSVeXfk8Vsm7mvXxIdUoJqu14AkNMP61RfP2u0movOgz8v9HHsOolBjzHmYAegPLLw==]`.
         match push_background(repo, policy, ctx.remote_failures.as_deref_mut()).await {
             Ok(true) => {}
             Ok(false) => eprintln!("⚠️ push failed for {}", repo.display()),
@@ -1998,7 +1998,7 @@ async fn handle_ahead_push(ctx: &mut SyncContext<'_>, svc: &GitService) -> Resul
         // Push synchronously so mirror failures are tracked in
         // `ctx.remote_failures`. Previously this used `tokio::spawn`
         // (fire-and-forget), which made the failure tracking unreachable
-        // for callers like the test `test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBHQkRUVDBDaXloZDcxekNYQnh1dUVYRzJ1OGFQbTM1dnFHdkprUmxHSG1rCmpZRm5FNXo3K3pRYXlBT1JaOTJzdkdSbTZKVk5mR0ZkckZtam5lVUhRblUKLT4gWDI1NTE5IFh2WkhpZHBOOFRSdHdsL2F4aVVpVzdqUDhTWXcyRlM3UFhJK0p3RVM1V28KeGZLZkREazA5SkRkVElnczdFbWxDZlQrczdSYnVURzZjWkk3dDh6a0Q5TQotPiBURX4sLVJ6Ui1ncmVhc2UKOTBvdEZkTW91bXVWUmNaL3Q2cHdyMEZZTFN0UDkzVXpSclFkcFRua0s1d3Bna2c0aWlQT1JoK2duODJKdXVSLwplTTk1ajNjaGQ4blFlUUpzTVF6a3Q3QmhYU285clV6dVNTM2orVVZLekhKMmRVcWwKLS0tIHZCUk4rRnhXTTAvMFRDcnNwL0lZUDJvY2VDSVZLT3hCQkZoRmV2SUpNT0UK+T/lkouxsljctn31PWYnLMa/llyYbFORWIH57IGm4lJd8deGDffHr0XMZrliVx+DGB8Gsq6F2u90]`.
+        // for callers like the test `test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAwMFFIcmd2ei83M3phN09rMXBZSXNiUXRDc0FhY2JZZzFDME02ZkRZK3dJCmpIOG9vS2dJU280SWRKeWVkQUFWTWI0MnJGbXA5bFV0T1R2SXl5UGxoVm8KLT4gWDI1NTE5IEVNbFlUR2ZsbEwrRU5wb3hBNURRQnhhdlJxMDhHYXpsc1B1SXpNT0VWekUKS1gxaTdVZm8xYjR2aFo0eVQ2eDduNXNUSCtMdGlPTGhtRjR4aVlmbWV3SQotPiAvRiFrb0hMLWdyZWFzZSBUQiB+diBVUT1SayAnClpiTHJLS1RxcFBWRzFkL05xRlZzbWNsOFQ5NmNmckpEK2s5SSt2N2xjaGVnNDBTZ0l6N0NwTGUxWHF3Z0RYMksKWmlKeHhNaXdzWXcyb1JuZHpVTDZXSmk0WDRvazhvc0ZWQVprK0VXQ2ZiRVAKLS0tIGlLTzBqU2R5NUJwNnRZOHJZeDFLNHpXbmYwL0hHMzNVZ2o4Z2cvWU5JR3MKR6YA5YdzZWoB87xg8hfvjIYr8hUiD9CzXeUK1R7E04Pwsbdz/Htfcz93M6OgC8rRq1sqtkSljxv0]`.
         match push_background(ctx.repo, ctx.policy, ctx.remote_failures.as_deref_mut()).await {
             Ok(true) => {}
             Ok(false) => eprintln!("⚠️ push failed for {}", ctx.repo.display()),
@@ -2841,7 +2841,7 @@ push_url = "git@nonexistent.example.com:repo.git"
     }
 
     #[tokio::test]
-    async fn test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBUS1k0bmlsWE5pOGNST3hGM0IwUWUvcGIvUUVSa3lEK25UWWswemlLcEJjCkpyTk4xUWNFZ2xLbE93QjVMVG93dm9XSm5ITXQ4UmU4R015bUkrNkpFQk0KLT4gWDI1NTE5IFd3UzhFbmU4V1pCZjBEYy82djJxanEybHJ2eE56WXRIdGRvOHE3Vy9kV00KODAwem9WSjBqN0VpZzM2VW1VckVKZHpURHM1WjRYa2ZmNDNqWnVleGNGQQotPiBhRVFJTFItZ3JlYXNlIEs1IHM/WXh2fjEgWlJ2NzwzbXIKbzRhZWhuQ1ExQ1dDRG8xWk16Z1VqMlZjQ29kOGJtN1Z4ZTBRcXI2dEhQMVhpc085Q3hBYk8wVVI1UUNGTTJvCi0tLSBLdW01c05GYkFBaTJscU9QNkNsLzlBWW1raER0Y1FuTUVUYmRWTktJR0k0CgOUdX32zO86MJNZqAB/pdiJH0shHw+jX5TxfvsyowcAft9Poegp5AS9pr8OUEWiF6Qvm9xB23rK+w==]() {
+    async fn test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBwZnFIV1JReng5RERrcVA1ZFRTMGhiTVVxYm5DODBoVHB2T1FGQjFQYjNJCnZDbzYxbWx1aDdSeWFhVndZclVvNjRhMDl6MW52SUFMZHZZYitUT0gxWWcKLT4gWDI1NTE5IFBKYW1PbnBSa0wwL2hmVlNjLzEwNXVmSDQxeU9XU3NrRVQwZW1odnp5QVkKSGNmLzNmeEFGZDJ2VGRFTFN2bUJrZzRjdTluNHI5NXF3SlZUZzMrVTVkOAotPiBWT0w2Ii4mLWdyZWFzZSA6YSpuRy5zeyBfIEJpQzogK3cyIgpxNG5mTk1LRVlhWGg0cWI5TnRIdUk5RWdwWXRQVys2dEdHMk8vclF4ei9MNXNWWlk3aHRkNXkrc2xyb2o1U1A1Ck5RNWFHZjdGVTBuQmgrQ2tsRFVJT2d5UTlSODVPYWxaTFdtNnBSa0dIczZEbXhsd0Ezb3ljakNMajNpcWVWYkEKaEEKLS0tIEkxZDlwWFhrTjFEQnZ6U1dDL1FJSkpPMnZOVVcvUlVWYS9qUUd2dHVtRUkKHOyg95hhwIfBe/7ghIiQSNvMZ8FeyK+ggFqp84w/Gc8lAPJ8xWAxzD30ZrYb227yBn/rdhR2ZYt9]() {
         let tmp = tempfile::tempdir().unwrap();
         let origin_bare = tmp.path().join("origin.git");
         std::process::Command::new("git")
@@ -3197,7 +3197,7 @@ push_url = "{}"
     }
 
     #[tokio::test]
-    async fn test_sync_repo_exac[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBkOE51U00xSloraEw4eStUTWo3c1Q5MGVKZm1sN2tlVzR4QXM3SU43aGxBCjJDQlZ0a0VDQjM2VDBDQnB1WWdnMko0ekd5WU5LdUNESFlPSnlhbnVPRHMKLT4gWDI1NTE5ICt0TU1Wb0NacWF4RWlzRE5BMkoxUHBMbEFBMnJycktIM25FOWtPS0kvenMKMlh2aURxOTZSV25nQzVBOVpOZ0F3N1MwYlpSc1ZvNkRoN3dmaFZNSlZJSQotPiAoVT94L15ZLWdyZWFzZSBRPSBzViYxJC1iOSBncHwhQSA4ejI/CnBOUXVFajNMOUpYZUVDUWVSaHhoU2dGOGV4bVZJTmN3cHcKLS0tIDZwdm1VZGE4TFZKMDk4ZzVRQW55WW5BWjNxbis5eDNNeVlwUUM3TVNwZUEK6eiRf8U69KAtlkTUn7gq3kdi0v0I7qiIqQsHXont8eOt465W44zwN2LW3y2gEGQnkYJ4PmTEuQWxCN0+l/aJ]() {
+    async fn test_sync_repo_exac[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA5YWZ0ZXVjTW1WRnhicHo4ZHlGUWJFbGxIVXIwVCs0dUh1WWhQL05iU2h3ClZCV2huTEZEUlRLN3JCZVRPK2NROWZuQk5tWllCdVJjeGxLbEplSStxQnMKLT4gWDI1NTE5IFZRcTdFRzF4WmcxNnZmNkw3eml2L2ZLN3ZrU1NkbW5SUjVMUVRjc1NKaTQKUDRQWXFqSTZvZ0xXcUx5V0Iyb2N5WEhTeStYbXhsbnlTWFRyWlh5L0xCawotPiBcLTU+ZmstZ3JlYXNlIHMuTiFlbiAsfSFGNmk5CnRHd1p2aTZnMnZGTkVNeE5oNW1VeWxNK0lIeThKMDhaU3dLYW5GbmtSNG5iMmpTUW1RQzEyaS84ZmE2U1dzem8KbjRDcGJ4NmwKLS0tIDEzeG81S290Y0RIMVV5UUpSMUYwWlNieGxyaWhQdWFNNEpkODl4WmR1WGMKyUlmWPGclSK9JbtoTtaNCiXf50ppFLo8ZO0BE8eEUrM38mo0shf5c99Q/iVPpXAXH6aR9x3quJMLTnJFGmK8]() {
         let tmp = tempfile::tempdir().unwrap();
         let repo = init_test_repo(&tmp, "exact-50-del-repo");
 
@@ -4025,6 +4025,7 @@ auto_bump_versions = false
             .args(["-C", &divergent.to_string_lossy(), "push", "origin", "main"])
             .output()
             .unwrap();
+        eprintln!("DEBUG: divergent pushed; origin now has init+divergent");
 
         // Now make a local commit on the original repo. Pushing this will
         // be rejected with "fetch first" because origin/main has moved.
