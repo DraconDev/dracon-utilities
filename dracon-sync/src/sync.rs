@@ -1135,6 +1135,84 @@ fn truncate_task(name: &str) -> String {
     format!("{}...", &name[..truncated_at_max])
 }
 
+/// Extract goal metadata from .pi/goals/ JSON files in the staged diff.
+///
+/// When a goal file changes, reads the full file and extracts:
+/// - Goal status, pause/stop reasons
+/// - Token usage and active time
+/// - Per-task evidence and skip reasons
+///
+/// Returns None if no goal files changed or parsing fails.
+fn extract_goal_metadata(repo: &Path) -> Option<GoalMetadata> {
+    // Get list of staged files
+    let files_output = run_git_capture_output(
+        repo,
+        &["diff", "--cached", "--name-only"],
+        "goal-files",
+    ).ok()?;
+    
+    // Find goal files that changed
+    let goal_files: Vec<&str> = files_output.lines()
+        .filter(|f| f.starts_with(".pi/goals/") && f.ends_with(".md"))
+        .collect();
+    
+    if goal_files.is_empty() {
+        return None;
+    }
+    
+    // Read the first goal file (most recent)
+    let goal_path = repo.join(goal_files[0]);
+    let content = std::fs::read_to_string(&goal_path).ok()?;
+    
+    // Parse JSON - goal files have JSON at the top, markdown at the bottom
+    // Find the end of JSON by counting braces
+    let mut depth = 0;
+    let mut json_end = 0;
+    for (i, c) in content.chars().enumerate() {
+        if c == '{' { depth += 1; }
+        else if c == '}' { depth -= 1; }
+        if depth == 0 && i > 0 {
+            json_end = i + 1;
+            break;
+        }
+    }
+    
+    if json_end == 0 {
+        return None;
+    }
+    
+    let json_str = &content[..json_end];
+    let value: serde_json::Value = serde_json::from_str(json_str).ok()?;
+    
+    let mut metadata = GoalMetadata::default();
+    
+    // Extract top-level fields
+    metadata.status = value["status"].as_str().map(String::from);
+    metadata.pause_reason = value["pauseReason"].as_str().map(String::from);
+    metadata.stop_reason = value["stopReason"].as_str().map(String::from);
+    
+    if let Some(usage) = value["usage"].as_object() {
+        metadata.tokens_used = usage["tokensUsed"].as_u64();
+        metadata.active_seconds = usage["activeSeconds"].as_u64();
+    }
+    
+    // Extract task details
+    if let Some(tasks) = value["taskList"]["tasks"].as_array() {
+        for task in tasks {
+            let detail = TaskDetail {
+                id: task["id"].as_str().unwrap_or("").to_string(),
+                title: task["title"].as_str().unwrap_or("").to_string(),
+                status: task["status"].as_str().unwrap_or("").to_string(),
+                evidence: task["evidence"].as_str().map(String::from),
+                skip_reason: task["skipReason"].as_str().map(String::from),
+            };
+            metadata.task_details.push(detail);
+        }
+    }
+    
+    Some(metadata)
+}
+
 /// Detect dependency changes from the staged diff.
 ///
 /// Parses Cargo.toml, package.json, requirements.txt, go.mod diffs
@@ -1805,7 +1883,7 @@ async fn stage_commit_and_push(
         // `ctx.remote_failures` (the caller passes a `&mut HashMap`).
         // The `tokio::spawn` fire-and-forget pattern was removed because
         // it bypassed the failure-tracking needed by callers like
-        // `test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBxaW82bjQ4T1BJSmlDcDBucGZpeHJObFg2TnlaWWJrTDlrTUY2WklSOFFJCncwU2lCbzd3K2l5NkR1aXZWVjdEaHZuMkRDaXBLSkhPMkk2UnE4dHJTUGMKLT4gWDI1NTE5IDI3UzFyaE9iUHJpYzk0Zzc1NXQrZW5Ja0dEV09HNktIeW1uL1BIQ3RCZ0EKbjVlMVVxb1JWS2hlMzQyZjM3aFB6NzhGeGZkYXFnbjQ5Zncydm4zUkdtRQotPiAzelQtZ3JlYXNlIGYgKVkgLApPZW9Ra2M1SStQZG9hZ2VaZURUYUU5UEMva3RmWGtkc2xVQ3FYSllwVEVYdlljc3VFT21rOThNVmo1dnBFdEszCnRDcFBXOWsKLS0tIFRVWGJObVp2UE5hSFI5bFEwOG9YNzJCcjVCRTR1QTdYSUxKZC9JWDNpbkEKL8kNbcgxrLFL2Cdt6bHRiAuwDVehGRLidDYiEYqNfPu4b0SL4r0PhMzcuE+CcLx20qg03Y7w5Koj]`.
+        // `test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA1WGFxcFY3UzZ1Z2dkbnJKZmtGbVR3SVQ5dVJsODVIb1pqL1AyM01aTUVvCm8vUnhCZ3lCOWx4TldEUVJ2T1RxYmlwZEcwVGVmcE1QSDFNazBpSnlQL2cKLT4gWDI1NTE5IDJKOG40S3h0ay9FN2xoN1I0TDFHS1BPUFl5RWh5bEZvQnhvMUE2Q0gyWFkKQmpGbGNQT3YxalgxbmxCaXd4NlVZZlJWSVpqbTVHVnUwYWFCbGVyS3hnSQotPiAoajJXPXRRLWdyZWFzZSBnL3x1PSh3SApVbzFMa0hIMEdGZW83REJPUGNuSUpWMUxnWFh1SGJVQllOTDBNS2swQjByS245NVdoK2IxYitmclF0RmRuK1VaCm8wak1WWi9HY3dVZmZaR29GR0lXeVplbgotLS0gNTVGd25weUtDeHVVcVlQNTljNU80UWE4ditQNEJtSG43TDQvVkNSYWNlYwp3QoT5EdVQvWv5JuFInqLQTpsnWlCBr2L4vaWWd0SALWYjx3zPk7IYKRE9j8CYrm2/ZRG6vkcXnxM=]`.
         match push_background(repo, policy, ctx.remote_failures.as_deref_mut()).await {
             Ok(true) => {}
             Ok(false) => eprintln!("⚠️ push failed for {}", repo.display()),
@@ -2026,7 +2104,7 @@ async fn handle_ahead_push(ctx: &mut SyncContext<'_>, svc: &GitService) -> Resul
         // Push synchronously so mirror failures are tracked in
         // `ctx.remote_failures`. Previously this used `tokio::spawn`
         // (fire-and-forget), which made the failure tracking unreachable
-        // for callers like the test `test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBlSmVURFI2WW5xcGZXcXY1UUZzUzdOQ3lzYkxnczhLYXJ5bGdKMWNUaXd3CitqakZ2RUJVbDM4dzZLSXl6UVlTQ2l3N3NxNU1JbDBBMUp3VE1XK2JoWVUKLT4gWDI1NTE5IC9UTDdJVSt0bXcydlpzMWJOUXVjWWk4RWhOQ1dsaEFqSEgwSmNrVXF6RkUKVFkrZ0FzQjlrTGJ2SW5uOXR3Z2tlemwwcjRoa2ZpNzc1UGZzRWtoUlc5NAotPiBXWkZUWjtDLWdyZWFzZQpJeVd2cWxuOXJ2NUYrNURBRnNFUjc3dEZ5dwotLS0gNy9ScElYTDYrZXZaM25rRWE5WXZsdkdWS2FFQktYNDNIeXE1MHVxVkwzSQp/w+liAyGNGrou9huJ1AtmZn6knA1mR0oKojMJp1J5s1Wc1O1iqc5Xs/Xz4da/ro+CO1vPfFpvJwE=]`.
+        // for callers like the test `test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBhTmxGNTVmUW1ST1JUenNhRUo3SWRZNGswUWNTcXRNVlhNRHpOeEtpUVR3Ck9UZjI2dXE1UjhnNFFzUjlRUEp2QzZhTWw0aG5QeUNOczYyQmRwQWpzQUkKLT4gWDI1NTE5IEFGUlYvY2tuZ1UxSGF5RnJORGZvN1lqekptNURMK0laejJkRkFvMnNFQjAKWFYxbDlHOW9SV1FlbmUvUXpUV2hTY051YnRmVStXV252OGNReUNMTk50TQotPiBSQXxfLzQ7Qi1ncmVhc2UKVEtGMXpTS1RMWmRzOHpOVldITnBadmsKLS0tIDdEdGdjVDQ2QnBhb1lNY2xSU0QwM210OGFoTkFsUW1laUlmQzFlM0o2Tk0KJcnFq8lNPCbv944dWGJAJREZLkDmUnqCc0uKOed8R/uQINktTVjunjwh9O3fKOjWcaF31o2b3R2/]`.
         match push_background(ctx.repo, ctx.policy, ctx.remote_failures.as_deref_mut()).await {
             Ok(true) => {}
             Ok(false) => eprintln!("⚠️ push failed for {}", ctx.repo.display()),
@@ -2869,7 +2947,7 @@ push_url = "git@nonexistent.example.com:repo.git"
     }
 
     #[tokio::test]
-    async fn test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBuL0hZb0dGSElnSGRCeFRYK2ViMEVMR29XZ05BbUcya2JpK1VGY2pJQ2g0CnlDTDh0NSsvZVVtYTRTM1ZRUFBMbUswdC9OMTJHVjFWVUI5NXF1QjZRRW8KLT4gWDI1NTE5IHV2d2gvVGl0bXNBS2VtUGo2VjUyRjZVRWFlNUVQcGZrSnYybTRDVFpTRXcKMHp2L0pNRzRQL0FsY3ZmQzN4Vi9MR0RKMFJlamxRSnZGbnNrRisvQWo3SQotPiApIVY8eToiLWdyZWFzZQpaZFJLOURYNUhwQU1qZWhDTCtYZUVjdkZob0NabE0vaVBKaTYvT3ROdVJucHJXRldZdWtxbnpHV0hzazRDV1BkCjVvOXVjTitINkVoQlF6S1pzTVdHc0h2WmxtOFFaL3NGK0JaQ0ViUnpuTmQvWFFDM3lEYmxOQQotLS0gbzhvcm01NTBVYTAxUW16S0N5OG1hSmlPYmZBczcraHYrOEk0QnJTdUltUQoZEN+rnKxJe0/FUlBiDEL0tH87DUCZ4QXbwReyjJuY0H43ndc7nI6f7037161Uh+UWRlAoupKEkTo=]() {
+    async fn test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBvMUZNdFdrUWZwQ21Fb2ZJU1RzTUlkSUxGNE1OUkVBM2tJcmNCc3VGQmdrCnhoaDZ4Q1pkWEFiQ2dBc0RGbC8yZGVKbkJJMXFxdVdWVnZMQ2ZSVVdxNXcKLT4gWDI1NTE5IDI2WWNkeGpDbmFsRDJ1K3BwbXFROG9XNVg5eE15T2JXM2RmaWIrWUlqU2MKTFpuTFVVZmt6cDZ5c3NKZzVrNHpFdGhzWndweFRmaFBUa0pwSnJDQ2IwZwotPiAqZCotZ3JlYXNlIEVeIVZKLSB5UipHbztyIGAlIFA6Sy4iJ3w2Ck8wbVFxQlJESHhoWmo4YkZIWTJ3cEFwbnVJT00KLS0tIE9RRGRSK0tJRGxJTmJtMDJhMXY4b2craUJvaXpqTGNKbHpqYlowbVlaMzQKdGSSdpZdDbZdn4epmlxLDzFvY6Vborvj+bkZbCB4CgC9xU/Ob8+P/ygoX9ikJ2Dzo2z+38hwRXlv]() {
         let tmp = tempfile::tempdir().unwrap();
         let origin_bare = tmp.path().join("origin.git");
         std::process::Command::new("git")
@@ -3225,7 +3303,7 @@ push_url = "{}"
     }
 
     #[tokio::test]
-    async fn test_sync_repo_exac[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBSbXJhd1JFZTROR2RWVDR0WTV5NEJzMkxLRkViK2ZXQU5FdTR2YTJrRFhFCkl3K2ZDdllpTHNCTGRJdTZMWjVza3U2bmR3T1RJRlVxallaZ1NzUXF3NG8KLT4gWDI1NTE5IFNjK3BTeVAvUW83VWh3VTVHajA4c21YUEJxMTVJQVJ5YXRrU1Byd3h6Q1kKZ2hyNEJpa1VmWTlVdGtxRnpOVFJiL0pZSkJ1M3JBV0hPMzVJOGNkZGVoOAotPiB2LWdyZWFzZSBOIGk2IC8oCjJhMWE3dFJYMjhCbDFHbTJnb05TSENENVNHcnp5OGZvMkQvdEJmaWtYbXViWUM1QnVrUUl6YnA4S0NxZnNPeEoKd0ZRQgotLS0gMkIvUGdoWVl2TjN0L05zY21hWk1vdzVCOG0yTkg2Vjk5YlRHQ3l2OHhJcwo3G2tSwY52LAONqyus99qV/NDY5fXu9gXIW528riJkvlbiPoX6fAonL2/ZBTRKKiPzE804COU04NiWjGbIMJY=]() {
+    async fn test_sync_repo_exac[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAzemkvRW5ZOWlOOHdoTWc1RDE4cDZSZkhKUUNCekZwNzFpMlZMSE5UR2s4Cm5YejVFTW8vdnNqMTZLZlVzL1V4VnR6NlBoTVN6bVhNVDhWYkR5eU9xVTgKLT4gWDI1NTE5IERnblY0R3EzYU0zTUZOTzdSV0dMNE9MMDk2MGx4RUhWeDQrNWVVaGRaRUkKUUNuWWRYTzI2WmhGR042SS9HV0Nib3dlTGo1VTFFMThMQmYrVTZCTTNQNAotPiBqPS1ncmVhc2UgJiA0R3k2RmReCm1kWGtaN3QySGJkOWtnCi0tLSAvWlIwcVZFSEpYNy95eG4yVVVxRXg4Q3dVOEN5bnVMaXZnSVVLL1AraE13Cu2JSiQc7CrYtSvqHVhDP8noqN2Gmjwc1dS/wdGrH/c0ArZ1gV5DI8Rw+qOGb/8hrxJ0POtU6t6oNYsBNeGZcg==]() {
         let tmp = tempfile::tempdir().unwrap();
         let repo = init_test_repo(&tmp, "exact-50-del-repo");
 
