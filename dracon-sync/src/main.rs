@@ -359,7 +359,7 @@ async fn main() -> Result<()> {
                 ]);
                 
                 // Flags
-                let flags = vec![
+                let flags = [
                     format!("auto_commit={}", policy.auto_commit),
                     format!("auto_pull={}", policy.auto_pull),
                     format!("auto_push={}", policy.auto_push),
