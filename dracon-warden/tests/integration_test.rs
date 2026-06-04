@@ -49,7 +49,7 @@ fn test_warden_keygen() {
     std::fs::create_dir_all(&home).unwrap();
 
     // Set HOME to temp dir
-    let _guard = unsafe { std::env::set_var("HOME", &home) };
+    unsafe { std::env::set_var("HOME", &home) };
 
     let output = std::process::Command::new(env!("CARGO_BIN_EXE_dracon-warden"))
         .arg("keygen")
