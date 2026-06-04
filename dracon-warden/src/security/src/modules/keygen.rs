@@ -6,7 +6,6 @@ use secrecy::ExposeSecret;
 use std::fs;
 use std::io::Write;
 use std::os::unix::fs::OpenOptionsExt;
-use std::path::Path;
 
 use crate::DemonSecurity;
 

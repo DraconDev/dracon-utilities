@@ -1,6 +1,6 @@
 //! Git clean/smudge filter pipeline for encryption.
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use base64::{engine::general_purpose, Engine as _};
 use std::fs;
 use std::io::{Read, Write};

@@ -1,6 +1,6 @@
 //! Backup and restore operations for encrypted files.
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Path, PathBuf};

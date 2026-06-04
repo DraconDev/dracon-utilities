@@ -7,11 +7,9 @@ use aes_gcm::{
 use age::x25519;
 use anyhow::{Context, Result};
 use cfb_mode::cipher::{AsyncStreamCipher, KeyIvInit};
-use secrecy::ExposeSecret;
 use sha2::{Digest, Sha256};
 use std::fs;
-use std::io::{Cursor, Read, Write};
-use std::path::Path;
+use std::io::{Read, Write};
 
 use crate::is_v1_fallback_allowed;
 use crate::DemonSecurity;
