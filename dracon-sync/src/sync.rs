@@ -940,121 +940,6 @@ async fn push_background(
     Ok(true)
 }
 
-async fn push_with_blob_check(ctx: &mut SyncContext<'_>, ahead: usize) -> Result<bool> {
-    let repo = ctx.repo;
-    let policy = ctx.policy;
-    let blob_threshold = ctx.blob_threshold;
-    let has_origin = ctx.has_origin;
-    let dry_run = ctx.dry_run;
-    // Push if: auto_push enabled, origin exists, AND either:
-    //   - there are unpushed commits (ahead > 0), OR
-    //   - the current branch has no upstream tracking (newly created branch)
-    let branch_has_upstream = super::git::has_tracking_upstream(repo);
-    if !policy.auto_push || !has_origin || (ahead == 0 && branch_has_upstream) {
-        return Ok(true);
-    }
-
-    let ahead_large = match detect_large_blobs_ahead(repo, blob_threshold).await {
-        Ok(v) => v,
-        Err(e) => {
-            eprintln!(
-                "⚠️ large blob detection failed for {}: {} - skipping push",
-                repo.display(),
-                e
-            );
-            return Ok(false);
-        }
-    };
-    if !ahead_large.is_empty() {
-        eprintln!(
-            "⚠️ skip push for {}: large blob(s) above {} bytes in ahead range ({} found)",
-            repo.display(),
-            blob_threshold,
-            ahead_large.len()
-        );
-        return Ok(false);
-    }
-
-    match if dry_run {
-        println!("🔼 Would push to origin in {}", repo.display());
-        Ok(())
-    } else {
-        push_with_retries(
-            repo,
-            policy.push_op_timeout_secs,
-            policy.push_retries,
-            "push",
-        )
-        .await
-    } {
-        Ok(()) => {}
-        Err(e) => {
-            log_warn!("push failed for {}: {}", repo.display(), e);
-            if let Some(ref url) = policy.webhook_url {
-                notify_webhook_failure(url, repo, "origin", &e.to_string());
-            }
-            return Ok(false);
-        }
-    }
-
-    let private = if policy.sync_visibility {
-        if let Some(url) = origin_url(repo) {
-            if let Some((owner, repo_name)) = parse_github_owner_repo(&url) {
-                get_github_visibility(&owner, &repo_name)
-            } else {
-                true
-            }
-        } else {
-            true
-        }
-    } else {
-        true
-    };
-
-    if !policy.remotes.is_empty() {
-        let push_results = if dry_run {
-            for remote in &policy.remotes {
-                println!("🔼 Would push to {} in {}", remote.name, repo.display());
-            }
-            policy
-                .remotes
-                .iter()
-                .map(|r| (r.name.clone(), Ok(())))
-                .collect()
-        } else {
-            push_mirror_remotes(
-                repo,
-                &policy.remotes,
-                policy.push_op_timeout_secs,
-                policy.push_retries,
-                private,
-            )
-            .await
-        };
-        let all_ok = push_results.iter().all(|(_, r)| r.is_ok());
-        if !all_ok {
-            for (name, result) in &push_results {
-                if let Err(e) = result {
-                    log_warn!("push to {} failed for {}: {}", name, repo.display(), e);
-                    if let Some(ref url) = policy.webhook_url {
-                        notify_webhook_failure(url, repo, name, &e.to_string());
-                    }
-                    if let Some(ref mut rf) = ctx.remote_failures {
-                        *rf.entry(name.clone()).or_insert(0) += 1;
-                    }
-                }
-            }
-            return Ok(false);
-        } else if let Some(ref mut rf) = ctx.remote_failures {
-            for name in policy.remotes.iter().map(|r| r.name.clone()) {
-                rf.remove(&name);
-            }
-        }
-    }
-
-    Ok(true)
-}
-
 /// Task state transitions extracted from a markdown diff.
 #[derive(Debug, Default)]
 struct TaskTransitions {
@@ -2957,7 +2842,7 @@ push_url = "git@nonexistent.example.com:repo.git"
     }
 
     #[tokio::test]
-    async fn test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAreXArRndzUkFBbmpSekswVGlMQ3Z5M3QxVDZmYjNuT01RR05EUzBUSnlNCjdGOW51S3pMYzNkYzB5bDJOLzhKQXNOTy9ieUV6UjZlTjA4eGp2cGlpbDgKLT4gWDI1NTE5IHhJZmpuUWxxL0FoclRva1pPT2ROL3d5U0xZYm1yVEZOUzNGdGltQ2taR2MKZFpiZUJlVEJGQXJxdXZKNXlueGUzNEVNdzFWdGZoTUcyWlFta2FPQjk1RQotPiBrfTdqPS1ncmVhc2UKbEdYWHcvTStJTlQrK0kzMmtTeHVXZjI0R25lVi9vZHl1WUFRMEZYazdLR0JSL3RKUCsrdmJzbW5lV09TM2ZNbAppZmdSK2N2Y29TeHhrdwotLS0gMXFROHVGMmhPZGtGV0tsc05QVzBKZ25SZFlkbStVVmZBck9KeTZlZlZmOAoj+0S2iWkjJ20cXCsAVB+SCvKU2Lgnlwl4ZuFgLREbVpm1Tn1WFAmcP+JZ4Eluz40nRDkAdu4qNJM=]() {
+    async fn test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBMZHU2MjJHVk8vUVNLVUFSYjc4blJlc3RvRmFGamtyODRyTkFzaitYeXlVCm8zTVVwREd0b3drS2tNL2h4dGJhb0I2eUxYa2ZnTUdaNUxXRlVQZFBMNmcKLT4gWDI1NTE5IHRpbmdJaW9XVlVKZkJpVHVMcm5OVnZuNXp3dk9Ib0hGb1k2ZG5qUTYvRGsKK1Y1VmZzU0JRcDJRS3hTUUl4T0R5L0ZtcktEM3kzb0JmM3J1cnQvZjZKTQotPiBSOC1CMllzTC1ncmVhc2UgP11mIWhQeW8KWFVFcVZiVVRhTnpaaFc3T3FYdHU3MjZiUWc0S0FUZWZxaW5CNEVUZ3BnNEZxenhFY3YxL1dDblBGb0NZbWpCVApBamRiUFlJRUhBbnNmVFU4emZVCi0tLSBqRlBVdm96YUFJK1JveTFuakREWk9KRFF3bkdGRU9ESEx1QTZTbUx3WWlFCpsCFrehsPqE3dg2U76N32dd44b3rWooV0+Vf2sVSnKo4bl/FYvnrN3MCplYAEjyaXWCBPzafvEU5w==]() {
         let tmp = tempfile::tempdir().unwrap();
         let origin_bare = tmp.path().join("origin.git");
         std::process::Command::new("git")
@@ -3313,7 +3198,7 @@ push_url = "{}"
     }
 
     #[tokio::test]
-    async fn test_sync_repo_exac[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBJRUZ1eGFoTjlBRFRENC9SU1RqSSttOExveWpGRmJEbjRWdTcxWHZqdW5RCmcwTWttL0NwYkhQYzFxUkdPVDRUbnZIc2ZNOHJ0d1FZTWNKMGVzSGN5YTgKLT4gWDI1NTE5IFhrR05oTUVSa0EzTHhERkdZVDc4c3pSRndNZnRBRXZodktPNDg4Z1dJRWsKUlE1YUJMK0RrWkNPa0VoNXVLc2R5NzQzUWNlNkxLbGJVNStaZnhSUjlNSQotPiBTKS1ncmVhc2UKR1phKzR1bi92U0pqNDRMWDViQU9RWmlpVHZLWjhESmg4cHI3aDduai9TYUwzV0p5cFFhQ1NsQmJsU1Q0YUZMbgpKSWI0T0EKLS0tIHdMaEJUbHJhRVBpTHNEQVpObmNUVHQ0QzIwQ3JOeUVreHF4UXpzK0lEVDgKu4W52DbBPVRnJSq2aucbt9Wf7B9Gs7yHZUWBDpbQVsEzJo91TIYZV/DrrDt/sao2YBV7nAuxVUXV4OmjC5RL]() {
+    async fn test_sync_repo_exac[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBsclBFNlJwSzhLWS9rbSsydGpkN2VxREJuMERpWEVrZ0hmQmV0VGNaU3dZCkEreU5OcTAvQ3dGenRZamFMaU0zQ3NPbVpwWFcvaWxMNENVLzR5NnF6Mk0KLT4gWDI1NTE5IFNNY29QSk1aM0d5ZlJ0L1VCMXRueE1wY3RLUllLYmdoc2dPcnd0M3dLUjQKZnFmb1U2OWtueHUyZDBXdHZqY3N5K3BKSVJRano0R2ZqK1lYOGtKVWFBVQotPiA2RWJiIidLLWdyZWFzZSBsIlpvKU9cICVeQ29QbCAmZGNsJCA9KApLMzFkc0tHWHZIemRJRGtIK2sxUFpnZUdCdlpzRjgzZlZ5aWNrMnJMaUVsSkJielZtTjliVk8xdTA4bzhaZStxCkdrM2xJMG9Jd3ZvTHJpWkNtZlRBVDh5aGg3RzNCUG4wdERGQ2FRZHdCcU5PCi0tLSAyVGtXUDVsQjFYQkF3cmMvcFFkcm1UQW1ob0VUWHovU29CcmpvejZ0N05rCkbZoF+Kq5PxBtsATuW/AppE1+3hSZAdWs/RBigTcmwdkP6gyPqEsEKhni+IHomJZRdHU7wEsTNPMmchDht4DQ==]() {
         let tmp = tempfile::tempdir().unwrap();
         let repo = init_test_repo(&tmp, "exact-50-del-repo");
 
