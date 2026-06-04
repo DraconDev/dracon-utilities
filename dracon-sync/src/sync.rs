@@ -1773,7 +1773,7 @@ async fn stage_commit_and_push(
         // `ctx.remote_failures` (the caller passes a `&mut HashMap`).
         // The `tokio::spawn` fire-and-forget pattern was removed because
         // it bypassed the failure-tracking needed by callers like
-        // `test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAxMkpESmd1eDgvc2tETnhIaGE0OUh3cityaDdTOFFaQ09oRVROaU1mUG5vCmlZNW94N2xOQ0xCYlZXT1VwQVppbVFUM1hLV2FTRHFIMG41OUZ0TklZYTgKLT4gWDI1NTE5IGRON0tjdGdkUnFvbUN5bTByWlZDMHppVzJ4SE9zQ3JWSHZmVWVKa3o3VjQKUW9kcmhpTHZZUzh2YlUyd2lzWXVWaUwrdXd2ZlZmendrVTV4SUp5UmZhNAotPiA1KUdFPC1ncmVhc2UKd0tSQjMyNVpmKzlJcytMdk1sbElXRzRrOTlMTTZkeVhrZmxMendNZUt1S0owQk94VjJPdG55RQotLS0gQzZiRk9zY3ZnZXFwVzZGKzlEK245d0MwaHNkVFJaWGFPY1ZCZmxEclZPTQruzAWaqWZcY7dtfNh3nVGy1zFjVQ5E96sFkJbzJwKrAG6pUffW4Cx9Zisld/mi/KexSs0lWGm9WN0=]`.
+        // `test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBPRGpadEdyNGRRdXVnRjFHbE9rNVp5RGlhRHJoalBKUmhXRFpNT3NQcmdVCmR0MCthZ29UODFYdHcwVzhhcDJaZ2dxVFNZVDZ5WEZjeEp3UUhlVFA3RTgKLT4gWDI1NTE5IDgreXpyaFU5VHhjZkFxNWFLWUhSV0IxSFQ3enhxbkljTkE1SWFRbHUrQW8KajJPcGVHZ0VRN1BYbDJNQjNMNXdnbVdmNDcrc01mV3JtK25EekxkRmQzOAotPiAwSFZ+NXMtLWdyZWFzZSA7WSFPSSA9VFJ9KDFpaiBJZDwKVVhvL3VEaGxSUWtqTjIrMnYwMEpwMit5Mml4cVJFU3ByTzhaQmx1T05jRUZZSjg1cVV3QnplZ2tCUUFSTGFKZApoZUZTNDVXNGNxRy93b0tEUEFPc2tabU9CUGNKdlZIT0NuVHFQK1B2RmVFCi0tLSBCRWM2dXRnYVBEQkdDaTJiK1MzSG54eTRXY3NWWWF0VlNPUDJlN09uT0JBCgjbfayUzCAMkR0oqREJ/veUV+A4PF38WEjZ0co5PRZHJo6UmHR+IL+IoWD+1NX3X0qiHIRNNXR5oA==]`.
         match push_background(repo, policy, ctx.remote_failures.as_deref_mut()).await {
             Ok(true) => {}
             Ok(false) => eprintln!("⚠️ push failed for {}", repo.display()),
@@ -1998,7 +1998,7 @@ async fn handle_ahead_push(ctx: &mut SyncContext<'_>, svc: &GitService) -> Resul
         // Push synchronously so mirror failures are tracked in
         // `ctx.remote_failures`. Previously this used `tokio::spawn`
         // (fire-and-forget), which made the failure tracking unreachable
-        // for callers like the test `test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBoWlNwR3hXZ1c2aHR6bXl6R3V5RWpZWlgwT0pKY1Y2d3czY2ZXc2lKc0FVCjFHOVcvMFlTeWFKZEFjTzgxWnA2L1lxUmVNZHh3Ukh6SWtnc3BtU3ZTVjgKLT4gWDI1NTE5IHBZb1p4YTNXZVpySDhvV2svNEw2eEwvNWZjcERZYm91bkF2cGgvTFNieDAKTGppMmNTYTZGOTVQbEt0SGhTaE5jNGhtWGNjL05zeFRqUWdBUTYvTGxWUQotPiBcWElAZn5BLWdyZWFzZSB2IF8KZkV0MDZDelVUNUx4UStqWE83VFp5NjlQWXRLMjVXL1FqdGxRVDZJanV0Ry8yUQotLS0gWllUSWpkLzFZWnhXV1Z6amQ2blBBTG5sTVVIdXowSFZENTYwdGh5VjQwawpz3PxKDq2vWkJjSNshOVRzbc7hDW0oVSUoQnjvFOuViEFQTloG/fMbQFsoMC03FaU7vTLRy6YgCyI=]`.
+        // for callers like the test `test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBRS1VveW1odVNwazBocTJObVlkUHczazhaWFJwS1V5SmJXNndudmlOeldvCnRXNXMyNjlKUkIyc2pyOVRJamthUWV5Zzg2d1U5RFhhUWlxVUxFaC9MTTQKLT4gWDI1NTE5IEM2ZERwZnE1MVpMYmw5WnZKbGpUK2NLOUhybThZM2xwSGV1clVOWmVXMDgKUnFkb2Y1RVlTaWZ5enRhWTJ5Njh1UFRiTzlNVi9lVEUvK05CYTV6ZVErOAotPiB9bl8rUS1ncmVhc2UKYVBDcFRoWTRkMmRmTUtqSGRxVGVQUjF6V0hXVgotLS0gdTNKSGM4OGxNNXJmaDdiZnJDeEVwSHBMR3lkQVRtOXNMMU1GM0tVYzkrZwqm/1OejDH8TAKLzuwdHGhulwzwIRzWlChuZuG2Da1ychRhuNjY5/ZrKOYmH0/dVknNBBcs0Ye4KKg=]`.
         match push_background(ctx.repo, ctx.policy, ctx.remote_failures.as_deref_mut()).await {
             Ok(true) => {}
             Ok(false) => eprintln!("⚠️ push failed for {}", ctx.repo.display()),
@@ -2841,7 +2841,7 @@ push_url = "git@nonexistent.example.com:repo.git"
     }
 
     #[tokio::test]
-    async fn test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBYRjVrS1NLeW9XRDlIZU0zNmthcTYxQnh5dGc4bEJyVXl1VzVQR3ZOU2tNCmtxQ1ZPd0sxcys0eWZodkNMcm9ibkEvVGlhZlFZT29tT0tScTQzOFlsVlEKLT4gWDI1NTE5IGJ5WnQyUXhydUhraGJPcFRDellJMHJwajc3MTBmMFFISWtyUm04aGhwek0KSTRSQmRhK2VhMVhzQ1F2OFJOL0dyUUhkSjhiakNXVUlyQktwWjVpKzd1awotPiAnOk8tZ3JlYXNlIFw9Cm9OdlNPN09WNmIwR0ZyMUxJM0RacGdLWWJZcmtUclpPYWtjMVJIdkZ1WmdSeGo2WVhSOXgxN3daQWtGRENLalcKZ3J3Ci0tLSBtWnJCOEpNVXA4WlZ2ajN3c1A1K3ZFVFZ3U21ibHU4akV3RUxQQWphK1FJCtPFqq4bsk07Dqb7dP64RELGQIuDAkxt9RjcZYzy+zM0m4rhcDf5a9MYzPCD8N3U/UIv3wsIVQyLGg==]() {
+    async fn test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBiZ3RDUUdnVEU3QWh4S2N3Tkp0UlNaOVRhMWZ5dytZUTJ2dEVHOTM4Y0QwClBlSUdjMEhHK2FkS0JHT1hBMGpEQ09oOUt1aU5NY3BhVU5raG1hR2VvNmMKLT4gWDI1NTE5IFhEMEt6dHVpU2IwQjRGdWtQSkVDY25MLzV3MTVTSlAzMW1LRnEyb0lYMWsKS0kxLzUwbXlJdCtBbGE4dVFmVTBRRENHT1lUSVowYThjNWgreGJGeGc5NAotPiBNInBxPyRELWdyZWFzZSBHU0BTPyA8YiBUSyhCZiBjWHpbJTRCCjcxM0REVnBNc1VuUWg4S25neG55cnJ4Sm9UWUJJa2lHNFRTWAotLS0gN0tmYUdTd2xxejZNQVgyV0dCc0RkYVRUV084TmxJU2NYZXh5STJJbzVlTQpq4jEZe6jmCAQ93XrCLgCWpSpu2NnA+7Cg3rdFP4WidocDTI6lV+FGMU2wCKEDnmj9TGsngzuAfCI=]() {
         let tmp = tempfile::tempdir().unwrap();
         let origin_bare = tmp.path().join("origin.git");
         std::process::Command::new("git")
@@ -3197,7 +3197,7 @@ push_url = "{}"
     }
 
     #[tokio::test]
-    async fn test_sync_repo_exac[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBmbGJoZXl2eEkvaWxsY1pNTk9NWE5YcHNwTWdsKy9QSFd4SXlUMDUzbW1nCkFkUE53NU12LzVHUXJjQ2x2YTBPM0dZRk5qb3FqOElGWm9USzZNemc0d3cKLT4gWDI1NTE5IE54N1AxdGhhellSQ2lRNkVvTlErZ0N1ekJPc0UyQndzL2NacGtndzlBbkEKR3pBazNrd1QzM25LR09GbmNBOXpiVUVYUGQ1OE50QUd2MFNUSjlGQzJCTQotPiBKWWh2Z1wtZ3JlYXNlCkV6S2hkWkZyS0psYnR6YUtiWXl5c2x6SkRoL3puSGVBQ3hzNDZma3pnOURrVnJPNklJaTc4UVRZMldwbWRkaG8KY2xocTEzMTlLMkFQREEKLS0tIEYrMTRaRjVHZnRxNnpoWHZqSFVsajVuVE1LNXBUckl3aWtMZWJxbExhU2sKl+JU6V4B9ox4sHCZxL1cqwAiou/8aby7T6o/HQZSC2zO5v7ozKlZfy2VKqrsbchEJ6t422a4CNFRqR9ebBDU]() {
+    async fn test_sync_repo_exac[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSByUXpsNlIwMlU4UDlhQ1d2cVZadWtDYzdXeCswSWQ1aU9EUzVUUWNIMnpJCmhXY2ZzSjFzM2w3RVFXeWg3Q2MvZCtqbDRCN0ErSzRneGZaaG1MZjBhbjAKLT4gWDI1NTE5ICtqTTQwSXBlRkNzR3MzZmkwMk1UTkN4RDJmSUc0RUc4OHd6Sy9IbmVyVTQKaW5EMkFVZ3Nwc1R5c2piQlU4ZXE2OHdmMWIvN0xVRHYxQ1pOejl5aS9acwotPiAnN0otZ3JlYXNlCit5REFob2lkWEtNQXJsZW1pTnMyWGZsVG8yK3pqcEZLVWpqMFFHT3krNGVyenN6Mk9ud2QzRTlwVXR6c2taeGoKTDlVCi0tLSBRNXR4WTFaU2FKNmRIam9OdHQ3NnhJYVZqWmhUb3lOellKNVR5YnVpZzY0CoNKNC4NjPdPKZdr5nx5HzD/y4R68BAQeva/VDHrc3M1bMkX+DoDrkpOw9Igeb8LanROUQb0B0KQJGULGcH7DQ==]() {
         let tmp = tempfile::tempdir().unwrap();
         let repo = init_test_repo(&tmp, "exact-50-del-repo");
 
@@ -3964,7 +3964,6 @@ auto_bump_versions = false
     async fn test_push_with_retries_fetches_first_on_rejection() {
         let tmp = tempfile::tempdir().unwrap();
         let origin_bare = tmp.path().join("origin.git");
-        // Use absolute path for the bare repo init
         let origin_bare_str = origin_bare.canonicalize().unwrap_or(origin_bare.clone());
         test_git_cmd()
             .args(["init", "--bare", "-b", "main", &origin_bare_str.to_string_lossy()])
@@ -3997,40 +3996,31 @@ auto_bump_versions = false
             .output()
             .unwrap();
 
-        // Add a divergent commit directly to origin (simulating a mirror push
-        // that happened while this local repo was idle). Clone with absolute path.
-        let divergent = tmp.path().join("divergent-clone");
+        // Push a second commit to origin (so origin has 2 commits).
+        // This simulates a mirror or external push that moved origin ahead.
+        std::fs::write(repo.join("extra.txt"), "extra\n").unwrap();
         test_git_cmd()
-            .args(["clone", "-q", &origin_bare_str.to_string_lossy(), &divergent.to_string_lossy()])
-            .output()
-            .unwrap();
-        test_git_cmd()
-            .args(["-C", &divergent.to_string_lossy(), "config", "user.email", "t@t"])
-            .output()
-            .unwrap();
-        test_git_cmd()
-            .args(["-C", &divergent.to_string_lossy(), "config", "user.name", "t"])
-            .output()
-            .unwrap();
-        std::fs::write(divergent.join("divergent.txt"), "x\n").unwrap();
-        test_git_cmd()
-            .args(["-C", &divergent.to_string_lossy(), "add", "divergent.txt"])
+            .args(["-C", &repo.to_string_lossy(), "add", "extra.txt"])
             .output()
             .unwrap();
         test_commit_cmd()
-            .args(["-C", &divergent.to_string_lossy(), "-m", "divergent"])
+            .args(["-C", &repo.to_string_lossy(), "-m", "extra"])
             .output()
             .unwrap();
-        let div_log_out = test_git_cmd()
-            .args(["-C", &divergent.to_string_lossy(), "log", "--oneline", "--all"])
+        test_git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "push", "origin", "main"])
             .output()
             .unwrap();
-        let div_log = String::from_utf8_lossy(&div_log_out.stdout);
-        eprintln!("DEBUG: divergent log={}", div_log);
-        eprintln!("DEBUG: divergent pushed; origin now has init+divergent");
 
-        // Now make a local commit on the original repo. Pushing this will
-        // be rejected with "fetch first" because origin/main has moved.
+        // Reset local back to init (simulating the local repo being idle
+        // while origin moved forward via a mirror push).
+        test_git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "reset", "--hard", "HEAD~1"])
+            .output()
+            .unwrap();
+
+        // Now make a local commit. Pushing this will be rejected with
+        // "fetch first" because origin/main has 2 commits but local only has 1.
         std::fs::write(repo.join("local.txt"), "local change\n").unwrap();
         test_git_cmd()
             .args(["-C", &repo.to_string_lossy(), "add", "local.txt"])
@@ -4046,18 +4036,13 @@ auto_bump_versions = false
             .args(["-C", &repo.to_string_lossy(), "push", "origin", "HEAD"])
             .output()
             .unwrap();
-        let plain_stdout = String::from_utf8_lossy(&plain_push.stdout);
-        let plain_stderr = String::from_utf8_lossy(&plain_push.stderr);
-        eprintln!("DEBUG: plain push status={} stdout={} stderr={}", plain_push.status, plain_stdout, plain_stderr);
-        eprintln!("DEBUG: local log={}", String::from_utf8_lossy(&test_git_cmd().args(["-C", &repo.to_string_lossy(), "log", "--oneline", "--all"]).output().unwrap().stdout));
-        eprintln!("DEBUG: origin log={}", String::from_utf8_lossy(&test_git_cmd().args(["-C", &origin_bare_str.to_string_lossy(), "log", "--oneline", "--all"]).output().unwrap().stdout));
         assert!(
             !plain_push.status.success(),
             "precondition: plain push should fail with fetch-first; stderr: {}",
-            plain_stderr
+            String::from_utf8_lossy(&plain_push.stderr)
         );
 
-        // Reset for the real test (undo the failed push)
+        // Reset local again for the real test (undo the failed push)
         test_git_cmd()
             .args(["-C", &repo.to_string_lossy(), "reset", "--hard", "HEAD~1"])
             .output()
