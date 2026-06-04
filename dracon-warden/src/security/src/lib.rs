@@ -566,7 +566,6 @@ impl DemonSecurity {
     /// Add a new team member by encrypting the repo key for them
     /// Create an Invite for a user to join a Team
     /// Accept a Team Invite
-
     /// Revoke a recipient's access to this repo by removing their key files
 
     /// List all authorized recipients in the current repository
@@ -703,7 +702,6 @@ impl DemonSecurity {
     /// V2 Decryption: Decrypt using the User's Identities (Try ALL known keys)
     /// Gather all known recipients (Master, Imported, Team, Machine) for encryption.
     /// Unified payload unlocking logic: try ALL known keys.
-
     fn decrypt_v2_with_identity(
         &self,
         encrypted_data: &[u8],
@@ -730,7 +728,6 @@ impl DemonSecurity {
     /// Create a secure backup of a file before modification.
     /// The backup is encrypted with all known keys and stored in ~/demon/backups/
     /// Returns the path to the backup file.
-
     /// Restore a file from the latest secure backup.
     /// Finds the backup matching the file path hash and decrypts it to the target path.
 
@@ -824,7 +821,6 @@ impl DemonSecurity {
     /// becomes a meaningful risk for GCM mode. For typical use, the random nonce
     /// per-file is sufficient. Consider key rotation if your repo will exceed this scale.
     /// Decrypt data using the repo key
-
     /// Decrypt data using the legacy Git Seal V1 format (AES-256-CFB with derived IV).
     /// WARNING: This format uses a deterministic IV derived from the key (SHA-256 hash → first 16 bytes), which violates AES-CFB security requirements. Using the same IV for multiple encryptions leaks information about plaintext relationships. This format exists for backward compatibility with legacy git-seal ciphertexts. DO NOT use this for new encryptions. If you have ciphertexts created with this format, consider migrating to AES-256-GCM (encrypt_with_repo_key) with random nonces.
 
@@ -1109,7 +1105,7 @@ mod tests {
             patterns.contains(&"Age Secret Key".to_string())
         );
 
-        let content = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA5bzZDVGVTT09qMnhPby94c01adDFsRTBQQjM3c1BmS0JNOVFFK0lwK2xzCmo1czVNVkJWN2EwY0dBclNUMXhiczlmL054UHRTQnhtZTZCODAzUVhLSGcKLT4gWDI1NTE5IDc3M3RkU0xNa2M2THpLOHc0UGVTMXdVSzk3RncyMzFCNzdhU3RiT0d4RUEKcElSQTR1bmxWL2lnWHNrM01tTnZ0R3JpUmtGTnMxUjFlQXRHaElSRU5RQQotPiBgai1ncmVhc2UKYU1GaFVZWWdqcUhwMlc2Wm9SOWFkaUttYVowCi0tLSBlSjZUTTJIVVUwc3A1RXlXcjQ3Y1k1MWNHcC9hMGwyd2VldFZSMk85bmZNCnFqBNMnNMz41iBP8bjWCi5vKoF5WpcA0Jmq5o/zBZ/d+QhIVjJi4IU0POvdJpSkjUD2S4JIe5RQ8I5SQ1SVcQE+zF7If7Cx++Qxsel3LgRBnnEn4lkAhJHPXXxSjT7ewn2QkksdFhgKceg=]";
+        let content = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBMcGJUdk1JRGRONXJvVXp1RFhMdlp5d1VDaTYzTEFwUnUvRWhiUzdQczJRCk5zVG5ZTTRWdEFSWFdSdWtLQmEwR0xpT1NObk9iRlpVelAyNG41QTY0bDgKLT4gWDI1NTE5IE5vMlVLL3hIbEVrSmN6NzVuQUJiM0daNFFyYmh0VUxZSEdJNjhKY2FLRmcKVVZDOU4wN2o4UnhaVDZMTkdreGwzaU14RjVEd1N0Sk1wTG5UQjNWaFFNVQotPiBoUnxELWdyZWFzZQpjR25OUTgrK3VaSm1kUllqUGlsTmFzWldoTUZFa2FDSFR3NUttZ0NSQ2hZS1NvQ1ZidFJFelkyYWF3UlJOTnNsCnJqYWxLQQotLS0gbmpNMk1pWFEzRjJEdWVuVUN3c01TaS9tR0lLeVpkSnVPMHRTL1YyQkd5TQq3prgMHZ5PNGGcxK7ahj6GJBzkcdJ/jR7WSdO8eo+1gV/i/vU+6Zfy1sY16PmhSntWxDymLFxO+WkrNSYkAbj7HnoyelXsWWgh+H4rf5TJhdOyFIURahrRyuqaYBPHf4iJhmJeaVJhYTkE]";
         let scanned = scanner.scan_and_replace(content, |name, secret| {
             eprintln!("Match found: {} -> {}", name, secret);
             format!("[MATCHED:{}]", name)
@@ -1392,8 +1388,8 @@ API_KEY=original"#;
     #[test]
     fn test_github_token_patterns_accept_variable_length() {
         let scanner = SecretScanner::new_without_age_keys().unwrap();
-        let short = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBOTjg5V2xxcGZHRjJCeENoTXNpZGRtb051U1hPc1FNUFpNT0dISVFIbDJ3CmR4bEhqZnp3RWptOFA3b1RhN0wrMTZnTDBTMjJqbitVNHQxK0xVRXhXTjQKLT4gWDI1NTE5IDdFbWp4MUYwcHhXNms5R1NpeDRwYUEvSmd6TStSV1p1Zjd5ZUFZaUFhRDQKaGg0VHNpQno2UXVKNWI3SFE2bE9vQnBybmRQVi9SRnZ3NmN4c1NBc0tuYwotPiBUV0VgZVwtZ3JlYXNlIE01Sm12LyBCRS9FNmMKRE5tQ3dObmp6TEN2UmhqZHZoVzFTNjEwcVpUazV3ak1zc214S3YwUGFuWEFjMyt5ajZYNXdRY2Q3TlJFalRVdQpDZklZL0VJZmkrRnZyRXdERWx3OWVsUFZNTXZaaGEvZXRITGpEQXBFd0EKLS0tIGp3djJab0lPK3hJQlpJbU1FMDRReGQrek9sby81K3hPVzFVSmZjdlB4NjAKIm1vsC6SwJydxYOG3N7J4o+2D1H/QPJSbxqaM9P92wgaxkMaUPhlosN4AHi6smDQP4GaBOULYhiCJNIenMOkp6Q4]";
-        let long = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBKWjNlclV1Ukh4OXZ4NXZTcjlpcUlJREUvLzQ5U2NPYXFJZWh2UkZYdkYwCm5aYS94ZDVJT3k0dm5BUHYyYmxNUTZyQWx2dW8yUTVNcnc3b2FuQ0Z5QTAKLT4gWDI1NTE5IDZDLzJDakd3cTlhNEdJZExPdWhQd0hyVEVZdUs0Mm5uVHJjZ1FGVzFmVHcKNXNtNUtOZWR2RUxDY0ZCWFhYSXJoaTRXWG53WmxHblNwU0k3MWQydXF3WQotPiBhcn1PJlotZ3JlYXNlIGtzUV9pdyB6CllUM3U5QmcKLS0tIGlacHZVNit2cHEzcTA5NTEvQ0h2NWJqUmhqQS83MDNKTlFMUzBQRkJqT2MKfYCao5Q4A1Pdc8LT2t1zXi/Db7w4DN6wwZSzCQVniar7LaDbx70c3KvX0EpJd6dDEHaEo+DCR/EQL9F1rHOPF8eNUCenFGkyCQ6oIQ==]";
+        let short = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA5TXIyTENKSHdERXRlaUxGQ3pIaXUwejhCaFluejhTZmpxd2tqNFgzNTJzClNreElKTjgzVnZUSTBBNTJSOGQwKzJnd0JqVXZRNEF0Vk9FWTNiaG9zY2cKLT4gWDI1NTE5IC91ckQ1SkJocmw5UDNmeFpEWVk1NUVUalBWeCtSSm02OG9EOVVkZXREeDgKSUk1K1Avb2VqbTY0eUk2aUUxdE5YTTJZdVZKcUg3aEVuZDBKMTlpL2VGZwotPiAiSHdVLX0tZ3JlYXNlIGEkQQpkMFl4SVhkcUxjY3MrQVlIU3RLY05BCi0tLSB1SzIxaEVBQ0RIOGJ0djF3WUxIOEVwelVGUDhlUkVzRTBPQXB0ZEVhQnhNCsI9I5/0x3CLb2O7Bj4jLLvdyajXJBqCBwfqvAwAgLzJn0p70J+tujb0Z3HmJmNtB4fZSI5sXrx5JoVv9HMGyg5PAQ==]";
+        let long = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBMbC9nYi9Sc293S3RTcVltTXEyY2dYUmkvNnV5SmhuQk96MTFybSsxYjNvCjF4QytQbGp5anZ6SCt2V1NLV052dzNMQkRkdFQyVm1HVFVFYXYwaEtmQ1kKLT4gWDI1NTE5IHRaM0FCNmIrOWxUWjN5aU8wKzUxOXlENVExYWNUQ1ZmU0lPdHVTNVExVFEKcWJjM2t6bSthMkpEM28xb0F1eXh2WmtTWmh6OUROZEFWeWJJSzZPci93VQotPiB3PFUtdUhTLWdyZWFzZSA+Lj04PCVXIG8gY2AKcXczclVVTzF3dEVvSXpiMUZrQXdCdwotLS0gL3Zmd2VHTEZMZVRFdE9CYmJqQmg1NytUOFNFeWNhWTZLWW5rVkVIQVVzTQr3u+whq8/7J2UlwLV66SGMlm/wczlClALOPjFadwzTD2AVrOQ4zUiAuGsdg5/MqWYwbUaBnRIgaVLFK10IGC71nDft8rk/w7u08p9u]";
         let found_short = scanner.scan(short);
         let found_long = scanner.scan(long);
         assert!(
@@ -1415,8 +1411,8 @@ API_KEY=original"#;
     #[test]
     fn test_mailgun_key_accepts_variable_length() {
         let scanner = SecretScanner::new_without_age_keys().unwrap();
-        let short = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBlditEQlV5WCswMzk1Q29NVERBc0Zvd2dqeVRLRmZhMzU1eWJkWTVYZHdzCnkwQmxIMTg2RldqVVJsYm15Nm9ZeWtLYjV4aE5HM0Q0L1B4U21INVVvVlEKLT4gWDI1NTE5IElJaWYvZ1lsMnY5VVBrZ0tVWDBBNmVxWkNidU5JTGpYcEZ6ZXU3dVd4MEUKZnp1cjFndHMrd3RWbFJXa0laOU1ubHViZ1JWYkl2QXhCU090ZVhMdTNrdwotPiA5XXFAJi1ncmVhc2UgfCBNQGJQIFBDOV45IG9UYgpjYkhUV0hpYW5scWlJOEdxKzRGT1hFKzR2TE1rS1plL1BhbzNxY283eFZpL0xLZ0RyZwotLS0gT1lmbUZrNkNyUnRVQ0xVcDhDaHRZeHRXaElIMVlnWmc4TkllOFRNUnJFVQoJObbhifvifPOoZBdZxvstKEBunZ/gcRHfx7UfD79Ns7QokNUOccTMVf+EgbVLLAPD3u+ENuxBMHq+7q58EWTewA==]";
-        let long = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB5QzFSVkdMWmF3ck1hRFQwVVhzeXN1R0VjSXNFVXVTamJzMForakN6ZTMwCkpqS1FBKzJDdjZodTJEOFBEd0xRV0N0NkZkTlFDNmpMVHFhaFMzSHhjVkUKLT4gWDI1NTE5IFN2R3JaLzhub0dFSE5EcDgrU1BYWnhuWEEvM2dsZURXVVVIaGhWRHZNVmsKY091ejFqVWVTMzV3c21YN3FlM3NCa21XMVB2UEMvUmYxZlRtckJ0S2JDZwotPiB4JUI6Qi8tZ3JlYXNlIHsvZwpGeFNnQUZpanJWSTFDSE51YjVyNHBaQVljTm51eEwzM0Y2VnZPUVZ5ZVNoN05OZm9vVE8rR3NIRWRxZ2tYOWJaCnFoUzFxV0szbnN3UGllTWJXQ3QzbC9QWjJIQlpPRFdxcXdkRUFQQjVDWGcvVldLSkQveXdrSW1JbmcKLS0tIGZQdHFXVEJNM1M4Wm1ZeS9raTBFeVUzMllOanB1Nm9PZk1ndFYyU2d4NUEKDvCpAssDbUAjKdXvdUUhbUjgt3LdxyzXWTEhk9D69othH/9YyBxgV+RbkVM52kMhB+XXOsOOKRko/CYYexNBFlh8h1vW]";
+        let short = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBIQlBDVWYrSWdtRXNUbzNBM3ZoMTZ0eWdIV1R0UStWei9PVk03THdlSW1zCnY4VG1oT0h3MFBKc0xQa0c1aTVMeExXaGpxWnZkV2d5eVlwMVE1TXBlR2MKLT4gWDI1NTE5IEx1OVJRUFZDZzA1ZHZwY1g0cXJSMG9MVEFjOVl0REl6TDU4K1Y3QTB5VEUKUER3ZlErSXQzMEVFcFdmb3RBT2xHdkdGd3c4bExlOVd1L0NsVytHenBIMAotPiB8NDQkOHEtZ3JlYXNlCnRPNHB5RTB1SjdBVHJVT0x0YTJwTUVpcUF3Nk5rQ0lscTlEaGhQbThnVWMKLS0tIFYyMmtEL3hQcStoNWNvTXFIVnJaZmhUMDdaL3RGbGxKaXZhYlBzLy9LUTQKJdSirD3cDT9E81FMCFvQjTpPswLKTb0MRFckdwC5JjMShCRXKEHgoxgjXVMSH6pR+dEcWxB1DYNZsaUYX2t0Kds=]";
+        let long = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBib1B2Zlg1ZUUvWU0xRHpGak40dlkwU0VkdTBsMVFwaHdGY1VyaXR1bWtjCmdUK21GTW9aNllBWE0rejJHMjVKcGtVclBnSExyd1JkQkpQR2g1SFl3ZEEKLT4gWDI1NTE5IGlBUFRKTExQT1NUQmZvMHZiUmRwTmJPM3c1VkxYS2k5TE5nNDBPa0dqUVUKN2VsSVN0amlQNzBmOTMxdTJNV29TbXFLYThRdkdLMWJML2R4dlNKbmxVRQotPiBYTmYwWi1ncmVhc2UgWiA+SjA/djkgPz5VdSBQcChOaEI6CmppUzUzMG52aXd4QVBsTmdPbCtGdnlIWTNROGxTYnh0ZmlhRFJJcEd1VGZiaFM1QU5VMVpWUFU3WGlVV0FncwotLS0gUm56T3VpenhmOTNZSjJNV0sxYzc4ekpmOGlySUsxR1ZRUzNBMVQzcGk4MAoFDU0+vUnzeZbESuET3JfrGFX92OqBQCHI0L5pNy/OsbCEmClZ/CeGu3jjMyIv/mzxbk6uwxMmr1vpgU8MmC/dq7Hz46I=]";
         let found_short = scanner.scan(short);
         let found_long = scanner.scan(long);
         assert!(
@@ -1434,7 +1430,7 @@ API_KEY=original"#;
     #[test]
     fn test_slack_bot_token_compact() {
         let scanner = SecretScanner::new_without_age_keys().unwrap();
-        let [DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBPTXZCdWI2eSs3S0N3NUJrOEtIWjlhWEJabVl2bTErZUtiR2FqR1dUUkJJCm16UkhhdG1leHpYd25ISndZVHF3a08vWHlHc1FGQUpNaVE3SzYzVDNaeDQKLT4gWDI1NTE5IEJxVzB1SkJqQmsrWnV4amlPcE1QT2ZONkNtM0JwREJocmkzcUZoOTBpQ0kKTWd4bllKWDR3TXJwdHhFMlozWEpDN0NLT01hQndhTmRBVms0RkhRMzJsQQotPiAxMWEwVklTLWdyZWFzZQpERTFSOE9PcEJwaFNGc0tLQWNGZUZraHI2K2R6MC9CbDNBU2VJNjVqREc4VmhDdkZHNTZFdXlXazVLL1JpQ1VaCm50cjFYWnNBTGg3SnlsVmZiV0RXbjdWdG5PVDJZb0ZlZjdYZnVKNXkKLS0tIE52cHFZbm9Ya09udC9GN0szc0N5RnVoZmNrdFBwaWNWakg5dGxmMnhpNWsKuZ2ym9jmddbDWTfHQ5GnuX2vwBWIvzQPawncsszHQ2UdCFXgZmNbeAtYt35kE9zfvN150vF6fUyJpBg8qszm2s2ubvf6tIrWig==];
+        let [DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB4TnI4aVRrei9jOGo4dGhjdkFJMmhIblRZclp0TFlmM0ZKMnJ6MDdJb21BCmFqOGU4VlJPQlV1ZURMZVlFK2hQYkV4Q0ZmRWRLQ1lXMWxMSm5QZE5ZWDgKLT4gWDI1NTE5IHFudjMzd2QrUnFxeUhXd0pzWDNxUDFvZkd2WlF1WmRxYWh1azZsenA2U1UKMGxMOEw1b1Uxcjdob3RpaGpKUlVZZjJrbml6dWdjWjJXbktZL3ZHaUxrYwotPiBoQ2xkZDx0LWdyZWFzZSBZIG1xIEJlaE8kYWYKQ3pIT3RZRkFaR09yc2VkeWdReTBpSHhIUGtvdklsbGVQRW1XZ2tTRHo3TWZMeHc1THdVNUwrWEV2THE1dldFQQoKLS0tIGhXbkVXWk9XbDU1Rm5PU2FDZE4zdGx3MEJNR3hNME1BeU1rSmZGR1BXY00Kg7HUy4CZPIZPX/I3vqq/WUod84rucriA3ag8xCZKqTRVYjuyphSi+cfkwl55YgGTe+K1B18S/4RorXRemVpxCD/w6CG8peVgVg==];
         let found = scanner.scan(token);
         assert!(
             found.iter().any(|f| f.name == "Slack Bot Token (Compact)"),
@@ -1446,7 +1442,7 @@ API_KEY=original"#;
     #[test]
     fn test_slack_bot_token_compact_has_length_cap() {
         let scanner = SecretScanner::new_without_age_keys().unwrap();
-        let reasonable = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBSL2FDL2IwSGhMcm51dDVhM2VFenRpcG15SDcxZEFhRDNCMk9QTW45YWs0CjFnaG9IaEVieXFLT0RydE9QcVdFTllIbmQ5WFVBWHBXQ3lLVU40L0IyTm8KLT4gWDI1NTE5IG5QbGtFeDZaazlQSnZnQ3JuMjVlTTZPaXFKQ0pRQ1pwNmZGRllmSjZxbUEKRGNZQVhXZ0tQRU5jWEhrd29sQmpQZVpwSTM5RStvVUF4cGt2eWttcGJhVQotPiBpJFEtZ3JlYXNlIEVGXCpiIDtSYT1aIE9DIwpKZFlIRGw3UmNlbGJrenh3ckJpWDdRM29yWElzUmJmc2FGTWNST3hURS95WmhIcG9LdXMrYkZ3dW5kcXRtQ3RyCkx5MEkybWcrZDFvUnlmTlVzd3pScFowKzhxM25NYjBNWVJqSllKckhrclJHdE94cEpkK2k4K0p0Ci0tLSB2Umt2eEtDSVJScWpZWExFVmoxM2FFYXdFaGlNNVFWUzZTd1hibnRzaU5FClFDkv3cYVhaJeTxAoth0t8IHTXer3kdr9o+v/4u3LqPVAs5a3hGN7PJBnAJtuCccN6gXATuCL2nFAugNTpYQSTGCSHFveC4NpJGNWv4OhvYub+AmtfVH3jpLXhdIbyCpr6xT6vq]";
+        let reasonable = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBWYS95bXFQbCsydUdsQTl4U1pETnJVWGdRQ1kySW9UK1JFUDFWZmh1dlQ4CjdUZFNWWEJMN3BGNFR2N2p2a0RBYXdjc21HMXNUOG5rWFMzUVNueEFqRUkKLT4gWDI1NTE5IE9JeGQyc3pLYW42dlpDZ3ViMDVYZFpIZG54emNUU0pLcmZ2b09nWXBvMGsKVFJ6d01mLzBnZGlhZGp0RkhrSDM5eEhGQm9hc2M2U0FxS1hYL21nSXB1MAotPiBZfWBNNlItZ3JlYXNlIEtsCk40Q1FGS1lqNXdOVlcxcGxTMHN1SkN0MVJ6LzFOd2sxbml1cXVmYUZvd0xlWWdXWVlTYVUvSGF6SXlUTDRiZ3MKQ1dndDNBCi0tLSBtdHczNVNVcG5PdHJVSkxVU0JCZnV5azB6TnlFMUNDeG9UVFk5Zml5TmJFClWx7jhPrGLVplJ/QTYd1FYmFvKPQJI2EK5P2rE5mGnhSETfxWAgqBu07zBmaO+qi9LTUZUByYgEq7yfOJ1eVlavS3CsDvsAqWiiqI77i2ehtzOGIHf82SuW6qfmESD5h8AdxF87]";
         let found = scanner.scan(reasonable);
         assert!(
             found.iter().any(|f| f.name == "Slack Bot Token (Compact)"),
@@ -1458,7 +1454,7 @@ API_KEY=original"#;
     #[test]
     fn test_hex_secret_quoted_requires_context() {
         let scanner = SecretScanner::new_without_age_keys().unwrap();
-        let with_context = r#"[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBPMmcxYlRjL2pxaDIzaFNPRHpUY1JTNzRmaWFiK3VDMGV3ZFU1OEJManlvCklabkdURDYvQjFaUVp5Y0ZKc3loNjh0L2o1bzVRVjlnL2hXM2lLYXhZMDgKLT4gWDI1NTE5IGRiTEhYaXp1L3c3alZGdlo2clZIRlBDbFRFWkUrOGZUYVJMYmhrb3BDVm8KOGJkOVZHcExzUitZWGlMY2QvWS90VldJaUdMRnBNNkhyclp6Y2pjNk96YwotPiBbJn1xZC1ncmVhc2UgRF8KNmhFCi0tLSAyTkhQankzcnVldlJ4WlhWTEZBSGMxS2VWeTcyK1ZPVDhuME4va2E3c204Cn+5E3+aIuYJCn7VBqFB94sSYfzbSp1rNd/10fplH7/F6gyK1RtNmExK8E621HeAy6bPaz5n2GYId1mW5iwcADLSE1P3BkkCuwhW3kk+M0A=]"#;
+        let with_context = r#"[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB4UG1NZFIzWDVDTnBGdFZUaTZGekhwUlI4L01DVlMzcTBSR21ZZmxjbHpBCjBOK1FYdFhTZzR2YStCT3lIQjdxdVdKOVl3MjVLckNDbFpSVVY1d0xvQ2cKLT4gWDI1NTE5IEZ5a0NMTXdadk1rUTdodUI1WUNnak9NdEdkMzlvZlJXL3A4ZHNnaS9vQ28KR2NwMXovNFM4OWNDVkZWYW5QNGJ6VDZBc0FrNmtVVjBXT1ZVdXpGTk9jdwotPiBWWVstZ3JlYXNlIDhKMWkKRWlpaElWZwotLS0gVkxUMWVtZFpPY3J2N1ZrQm9SK2lvUTlOWi9sQzdod2tGSFo1Rm9iemZsbwrDl5bciMPRMgFzMl0wOAZ+L9boC0xLJMnaRl7kPYIRGBOo7mhGnOIhl2v4qu7kqmiotOtQZ+fM9Au6bv8oLG8P8yooo4VlEPgAbjAtsWeB]"#;
         let without_context = r#"label = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4""#;
         let found_with = scanner.scan(with_context);
         let found_without = scanner.scan(without_context);
@@ -1479,7 +1475,7 @@ API_KEY=original"#;
     #[test]
     fn test_high_entropy_secret_quoted_requires_context() {
         let scanner = SecretScanner::new_without_age_keys().unwrap();
-        let with_context = r#"[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBwVm9hMGUzdWZ1TGFMT1dKaFRNcHo4VnR4Q0VZN1A3R3B1eWhLRmwvN2lvCkIrOVpYdGlpSjBYaTRicDRtUlZVNGVlZEJsTTJpakZxQjNSejJDRitWNkkKLT4gWDI1NTE5IGtiajZLU0YvSlYvN2tNdnJWUlFyNVhGMEVCc3JsU1FvaWl2VFNMWTlMejgKRHBLODBFRXRLWndLY1B4UEcvcGtoa0lKN1ZURTliNlNPNFJULzEySVAzdwotPiBhby1ncmVhc2UgNCAmUSB9JzU+c1Egek0KYVdkOXBtVzhsa05Uazd6LzdzM0FDRUNoUWdudGNLbWMzZFA1VzNHSmNGbUxsVXE5UUg4Ci0tLSBsdGFjcjY2SE5rb1RCN0liOXBGVUdvUU91UmdkUDhUOC9WSVpCZFY0dmRrCj6CXdzhPnAt/WKZvtj4j1ooYMUz0Qcuhe+hStsr9XemfbghfQxMW2RYAEe6yJxgSBVMpUyYNAdUxBfdnIyJ9Zqy+A==]"#;
+        let with_context = r#"[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB2azVuQU9YTmVMV1RYNTdiQWJqSmpEazBlZUZSL08xNXlmZHJZTHRNR3lnCnBxUDRxaXBiUmlpLzZuZTNQSEwrbEJabUxoanFkQkY3SWJOWEQ1K2w4NWMKLT4gWDI1NTE5IHo2b2Q1dTl1WFI2SER1UkdNNUwvQ0U5NjMycjFnZkgvOEZGdFNTQVd3bUUKczZCZW92RzJnOUg2SUpBMitaZmVEWldFY1dkNlJKSFFONWJKaHdLRWJsNAotPiAlOS1ncmVhc2UKdXl3ZlhlSXZFTlY4NksrUHdiNlZHUkUvMkh4eWR4b1lsSjVHZk1EU21Bc0YyU0I3YlJtZFVXVE1CQ0RtOEN4agpVbGFJejVoSkROekxlNmhxcWgyV3d5R0ZReWdsU0xLQVdReWExM3FLeXoyY3ZzbGxDdlUKLS0tIDFXdzBmSEJyakdReEhXdXN0M3I3UW41cGFnN0tSL3RyeUxMR1QxcENON1UKdCkxZDFis1H5Ksu/3f2GFp06vBsKyTFJSV/d2Yl3vMcTTdnBf9kyeHZ1K0U0RVPCRhfd/bkM58Mudd6XY7xJiAaV]"#;
         let without_context = r#"class_name = "aBcDeFgHiJkLmNoPqRsTuVwX""#;
         let found_with = scanner.scan(with_context);
         let found_without = scanner.scan(without_context);
