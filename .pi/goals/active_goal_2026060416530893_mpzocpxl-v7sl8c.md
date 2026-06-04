@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 1379142,
-    "activeSeconds": 241
+    "tokensUsed": 1455806,
+    "activeSeconds": 254
   },
   "sisyphus": false,
   "createdAt": "2026-06-04T15:53:08.937Z",
-  "updatedAt": "2026-06-04T15:57:22.333Z",
+  "updatedAt": "2026-06-04T15:57:36.880Z",
   "activePath": ".pi/goals/active_goal_2026060416530893_mpzocpxl-v7sl8c.md"
 }
 
@@ -23,5 +23,5 @@ Unpause the dracon-sync daemon, verify the 3 CONCERN repos recover to OK, and do
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 4m01s
-- Tokens used: 1.4M (1,379,142) tokens
+- Time spent: 4m14s
+- Tokens used: 1.5M (1,455,806) tokens
