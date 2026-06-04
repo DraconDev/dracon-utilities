@@ -259,7 +259,7 @@ mod daemon_tests {
             .unwrap();
         
         // Get status should work and return clean repo with ahead=0
-        let svc = crate::git::GitService::new(&repo).unwrap();
+        let svc = GitService::new(&repo).unwrap();
         let status = svc.get_status().await.unwrap();
         assert!(status.is_clean, "repo should be clean");
         assert_eq!(status.ahead, 0, "ahead should be 0");
@@ -316,7 +316,7 @@ mod daemon_tests {
             .status()
             .unwrap();
         
-        let svc = crate::git::GitService::new(&repo).unwrap();
+        let svc = GitService::new(&repo).unwrap();
         let status = svc.get_status().await.unwrap();
         assert_eq!(status.ahead, 1, "should detect 1 unpushed commit");
         assert!(!status.is_clean || status.ahead > 0, "repo should not be fully synced");
@@ -375,7 +375,7 @@ mod daemon_tests {
             .status()
             .unwrap();
         
-        let svc = crate::git::GitService::new(&repo).unwrap();
+        let svc = GitService::new(&repo).unwrap();
         let status = svc.get_status().await.unwrap();
         assert_eq!(status.ahead, 0, "ahead should be 0 after push");
         assert!(status.is_clean, "repo should be clean after push");
