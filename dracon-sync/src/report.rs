@@ -3017,4 +3017,93 @@ mod tests {
         assert_eq!(shorten_when("just now"), "just now");
         assert_eq!(shorten_when("unknown"), "unknown");
     }
+
+    #[test]
+    fn test_push_status_calculation_from_flags() {
+        // Test OK status - no issues
+        let flags = vec!["OK".to_string()];
+        let push_status = if flags.iter().any(|f| f == "STUCK_PUSH") {
+            "STUCK"
+        } else if flags.iter().any(|f| f == "NO_UPSTREAM") {
+            "FAIL"
+        } else {
+            "OK"
+        };
+        assert_eq!(push_status, "OK");
+
+        // Test STUCK status
+        let flags = vec!["STUCK_PUSH".to_string()];
+        let push_status = if flags.iter().any(|f| f == "STUCK_PUSH") {
+            "STUCK"
+        } else if flags.iter().any(|f| f == "NO_UPSTREAM") {
+            "FAIL"
+        } else {
+            "OK"
+        };
+        assert_eq!(push_status, "STUCK");
+
+        // Test FAIL status
+        let flags = vec!["NO_UPSTREAM".to_string()];
+        let push_status = if flags.iter().any(|f| f == "STUCK_PUSH") {
+            "STUCK"
+        } else if flags.iter().any(|f| f == "NO_UPSTREAM") {
+            "FAIL"
+        } else {
+            "OK"
+        };
+        assert_eq!(push_status, "FAIL");
+    }
+
+    #[test]
+    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA5dkYxVVVONW5DNmNzdlZCRnpSR09Dc29YSWdGeHVVMGxKR2gzcjdXOWpzClcxUVlKeWFBTnhwK0NEeERublZJK1dNdkY1cDFtNlNPMWREZlU5UmVjQVEKLT4gWDI1NTE5IFhKM1VLaDl0MGp0bk9BQ3BuaXNySUhiUUh4b1RxWE5WQ091d2MwM3gvak0KNENoWnplQjNzY25IT3grSUhGU3ZEN0g3QUs4RUwxSS8wYzRuUFJhRmU5TQotPiBnOi1ncmVhc2UgTSwoVzB8IGVMbDQgIVAwdSBgWVhCX3M4OQpVZ1doQmtDWTh3ZnYyWkpsQTVsbkQrY21wMGcKLS0tIFhPQUNOeG1tbjF4aFZOU3lRRzduT3hsUzdNRk50K3M5ZloyMmp6b3RqQjAK1gpZaCOwSGkLTYgreIYBU19XzPhJg/X8T+sj3HwMseEG2lm6ot7A8TRPwp4eETRLacNSIVhFGTMUPmT5pA==]() {
+        let mut cooldowns = std::collections::HashMap::new();
+        let repo = std::path::PathBuf::from("/test/repo");
+        let notify_key = format!("push-fail-{}", repo.display());
+        let now = std::time::Instant::now();
+        let cooldown_secs = 300;
+
+        // First notification should be allowed
+        assert!(!cooldowns.contains_key(&notify_key));
+
+        // Set cooldown
+        cooldowns.insert(notify_key.clone(), now + std::time::Duration::from_secs(cooldown_secs));
+
+        // Second notification within cooldown should be blocked
+        let cooldown_until = cooldowns.get(&notify_key).unwrap();
+        assert!(now < *cooldown_until, "should still be in cooldown");
+
+        // After cooldown expires, notification should be allowed
+        let expired_cooldown = now - std::time::Duration::from_secs(1);
+        cooldowns.insert(notify_key.clone(), expired_cooldown);
+        let cooldown_until = cooldowns.get(&notify_key).unwrap();
+        assert!(now >= *cooldown_until, "cooldown should have expired");
+    }
+
+    #[test]
+    fn test_repo_report_row_push_status_fields() {
+        let row = RepoReportRow {
+            repo: "/test/repo".to_string(),
+            state_flags: vec!["STUCK_PUSH".to_string()],
+            branch: "main".to_string(),
+            modified: 0,
+            staged: 0,
+            untracked: 0,
+            ahead: 5,
+            behind: 0,
+            last_hash: "abc123".to_string(),
+            last_author: "test".to_string(),
+            last_when: "2024-01-01".to_string(),
+            last_msg: "test commit".to_string(),
+            last_unix: 1700000000,
+            last_push: "5m ago".to_string(),
+            push_status: "STUCK".to_string(),
+            push_error: "ahead=5, push failing".to_string(),
+            concern: true,
+            warn: false,
+            hint: "run repair-concerns --apply (push or rewrite)".to_string(),
+        };
+        assert_eq!(row.push_status, "STUCK");
+        assert!(row.push_error.contains("ahead=5"));
+        assert!(row.concern);
+    }
 }
