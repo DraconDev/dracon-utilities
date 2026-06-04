@@ -88,6 +88,17 @@ for cmd in cargo systemctl; do
     fi
 done
 
+# Set git default branch to main (consistent with GitHub convention)
+CURRENT_DEFAULT=$(git config --global init.defaultBranch 2>/dev/null || echo "")
+if [ "$CURRENT_DEFAULT" != "main" ]; then
+    if [ "$DRY_RUN" = true ]; then
+        echo "Would set git default branch to main (currently: ${CURRENT_DEFAULT:-master})"
+    else
+        git config --global init.defaultBranch main
+        echo "✅ Set git default branch to main (was: ${CURRENT_DEFAULT:-master})"
+    fi
+fi
+
 # Stop services if upgrading
 if [ "$UPGRADE" = true ]; then
     echo "Stopping services for upgrade..."
