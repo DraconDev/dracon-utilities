@@ -887,7 +887,7 @@ pub(crate) async fn run_repos_report(
             Cell::new(row.ahead),
             Cell::new(row.behind),
             Cell::new(shorten_when(&row.last_when)),
-            Cell::new(&row.last_push),
+            Cell::new(shorten_when(&row.last_push)),
             Cell::new(&row.last_author),
         ]);
     }
