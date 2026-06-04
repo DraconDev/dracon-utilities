@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 130841,
-    "activeSeconds": 331
+    "tokensUsed": 133148,
+    "activeSeconds": 344
   },
   "sisyphus": false,
   "createdAt": "2026-06-04T18:53:11.691Z",
-  "updatedAt": "2026-06-04T18:58:58.395Z",
+  "updatedAt": "2026-06-04T18:59:12.338Z",
   "activePath": ".pi/goals/active_goal_2026060419531169_mpzus9e3-dddb8g.md",
   "taskList": {
     "tasks": [
@@ -25,7 +25,9 @@
       {
         "id": "task-2",
         "title": "Auto-resolve stuck pushes that are actually pushed (ahead count stale)",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-04T18:59:05.861Z",
+        "evidence": "Added git update-index --refresh to get_status() in dracon-git/src/lib.rs. This forces a git index refresh before reading status, preventing stale state. Also added stale ahead detection in daemon.rs ",
         "verificationContract": "Repos with stale AHEAD count are automatically corrected to AHEAD=0 and PUSH=OK"
       },
       {
@@ -49,12 +51,12 @@ Make the daemon resilient to stale state by refreshing git status before reporti
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 5m31s
-- Tokens used: 131K (130,841) tokens
+- Time spent: 5m44s
+- Tokens used: 133K (133,148) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
 - [x] task-1: Add status refresh before daemon reports repos (re-check actual git status, not cached) — evidence: Added stale ahead count detection in daemon.rs: before marking a repo as stuck, does git fetch --dry-run and re-checks status. If ahead count was stale (now 0), clears failure count and updates status
-- [ ] task-2: Auto-resolve stuck pushes that are actually pushed (ahead count stale) — contract: Repos with stale AHEAD count are automatically corrected to AHEAD=0 and PUSH=OK
+- [x] task-2: Auto-resolve stuck pushes that are actually pushed (ahead count stale) — evidence: Added git update-index --refresh to get_status() in dracon-git/src/lib.rs. This forces a git index refresh before reading status, preventing stale state. Also added stale ahead detection in daemon.rs 
 - [ ] task-3: Add tests for stale state detection and resolution — contract: New tests verify that stale state is detected and corrected
 
