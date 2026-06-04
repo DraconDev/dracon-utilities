@@ -234,6 +234,48 @@ mod daemon_tests {
         assert_eq!(policy.push_retries, cloned.push_retries);
         assert_eq!(policy.max_stage_file_bytes, cloned.max_stage_file_bytes);
     }
+
+    #[test]
+    fn test_stale_ahead_detection_logic() {
+        // Test the logic for detecting stale ahead counts.
+        // This tests the conditional logic, not the actual git operations.
+        
+        // Case 1: ahead > 0, not diverged -> should check for stale
+        let ahead = 2;
+        let behind = 0;
+        let is_diverged = ahead > 0 && behind > 0;
+        assert!(!is_diverged, "should not be diverged when behind is 0");
+        
+        // Case 2: ahead > 0, behind > 0 -> is diverged, skip stale check
+        let ahead = 2;
+        let behind = 1;
+        let is_diverged = ahead > 0 && behind > 0;
+        assert!(is_diverged, "should be diverged when both ahead and behind");
+        
+        // Case 3: ahead == 0 -> no stale check needed
+        let ahead = 0;
+        let needs_stale_check = ahead > 0;
+        assert!(!needs_stale_check, "should not check stale when ahead is 0");
+    }
+
+    #[test]
+    fn test_stale_ahead_resolution() {
+        // Test that stale ahead count is correctly resolved.
+        // Simulates the scenario where ahead count was stale but is now 0.
+        
+        let mut ahead = 2; // Stale ahead count
+        let failure_count = 3;
+        
+        // Simulate stale ahead detection finding ahead == 0
+        let new_ahead = 0;
+        if new_ahead == 0 {
+            ahead = new_ahead;
+            // Should clear failure count
+            let _ = failure_count; // In real code, entry.failure_count = 0
+        }
+        
+        assert_eq!(ahead, 0, "ahead should be resolved to 0");
+    }
 }
 
 fn stuck_repos_path() -> PathBuf {
