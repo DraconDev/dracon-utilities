@@ -5,19 +5,21 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 215401,
-    "activeSeconds": 794
+    "tokensUsed": 217643,
+    "activeSeconds": 818
   },
   "sisyphus": false,
   "createdAt": "2026-06-04T17:59:55.860Z",
-  "updatedAt": "2026-06-04T18:14:01.116Z",
+  "updatedAt": "2026-06-04T18:14:26.304Z",
   "activePath": ".pi/goals/active_goal_2026060418595586_mpzsvrh0-yjeamn.md",
   "taskList": {
     "tasks": [
       {
         "id": "task-1",
         "title": "Add push status column to dracon-sync repos output showing OK/FAIL/STUCK with last error",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-04T18:14:26.301Z",
+        "evidence": "Added push_status and push_error fields to RepoReportRow struct in report.rs. Calculated push status (OK/PENDING/FAIL/STUCK) from flags. Added PUSH column to table with color coding (Green=OK, Yellow=",
         "verificationContract": "dracon-sync repos shows a PUSH STATUS column per repo indicating OK (green), FAIL (red with error message), or STUCK (after N consecutive failures)"
       },
       {
@@ -47,12 +49,12 @@ Add desktop notification on persistent push failure and enhance dracon-sync repo
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 13m14s
-- Tokens used: 215K (215,401) tokens
+- Time spent: 13m38s
+- Tokens used: 218K (217,643) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
-- [ ] task-1: Add push status column to dracon-sync repos output showing OK/FAIL/STUCK with last error — contract: dracon-sync repos shows a PUSH STATUS column per repo indicating OK (green), FAIL (red with error message), or STUCK (after N consecutive failures)
+- [x] task-1: Add push status column to dracon-sync repos output showing OK/FAIL/STUCK with last error — evidence: Added push_status and push_error fields to RepoReportRow struct in report.rs. Calculated push status (OK/PENDING/FAIL/STUCK) from flags. Added PUSH column to table with color coding (Green=OK, Yellow=
 - [ ] task-2: Add desktop notification via notify-send when push fails persistently — contract: After push_op_timeout_secs * push_retries failures, a desktop notification fires via notify-send showing repo name + error. Should be rate-limited (max 1 per repo per 5 minutes) to avoid notification spam.
 - [ ] task-3: Add tests for new notification and status features — contract: New unit tests for push status calculation and notification rate limiting. All existing tests pass.
 
