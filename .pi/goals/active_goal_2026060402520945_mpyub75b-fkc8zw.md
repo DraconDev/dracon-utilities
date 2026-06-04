@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 143559,
-    "activeSeconds": 778
+    "tokensUsed": 144445,
+    "activeSeconds": 797
   },
   "sisyphus": false,
   "createdAt": "2026-06-04T01:52:09.455Z",
-  "updatedAt": "2026-06-04T02:05:40.941Z",
+  "updatedAt": "2026-06-04T02:06:00.308Z",
   "activePath": ".pi/goals/active_goal_2026060402520945_mpyub75b-fkc8zw.md",
   "taskList": {
     "tasks": [
@@ -41,7 +41,9 @@
       {
         "id": "fix-apply",
         "title": "Apply fix and verify with sync-now (no daemon restart)",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-04T02:06:00.306Z",
+        "evidence": "Fix applied to `sync.rs` partition_gitignored function. Old code: tracked-but-ignored files went to normal_paths (where `git add` refused them). New code: tracked files always go to force_paths (uses ",
         "verificationContract": "Fix applied; `dracon-sync sync-now` on each skipped repo succeeds; git status clean; new incidents in ledger"
       },
       {
@@ -91,14 +93,14 @@ If blocked: stop and ask the user before adding new debugging output or making i
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 12m58s
-- Tokens used: 144K (143,559) tokens
+- Time spent: 13m17s
+- Tokens used: 144K (144,445) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
 - [x] investigate-1: Confirm current state: which WARN repos are daemon-skipped vs daemon-working — evidence: Confirmed which repos are daemon-skipped. `dracon-sync repos` consulted + ledger parsed. State per WARN repo: dracon-platform (1m ago, working - cat/mouse with my edits), cli-file-manager (2m ago, wor
 - [x] investigate-2: Trace daemon's main loop to find what gate skips repos — evidence: Read daemon.rs lines 440-1100. Main loop has 7 skip gates: freeze marker, repo.exists, is_repo_ready, .git/index.lock, pending_repos grace, stuck_push_repos (5 min cooldown), has_both_main_and_master/
 - [x] investigate-3: Identify root cause for browser-extensions-shared + Junk-Runner-bevy — evidence: ROOT CAUSE for browser-extensions-shared: `partition_gitignored` in sync.rs has a logic bug. `git check-ignore` returns "not ignored" for tracked files (gitignore doesn't apply to tracked files), so t
-- [ ] fix-apply: Apply fix and verify with sync-now (no daemon restart) — contract: Fix applied; `dracon-sync sync-now` on each skipped repo succeeds; git status clean; new incidents in ledger
+- [x] fix-apply: Apply fix and verify with sync-now (no daemon restart) — evidence: Fix applied to `sync.rs` partition_gitignored function. Old code: tracked-but-ignored files went to normal_paths (where `git add` refused them). New code: tracked files always go to force_paths (uses 
 - [ ] fix-verify: Final daemon verification: restart once, run repos, confirm ≤2 WARNs — contract: Daemon restarted, `dracon-sync repos` shows ≤2 WARNs, previously-skipped repos now committed, 18 OK repos still OK
 
