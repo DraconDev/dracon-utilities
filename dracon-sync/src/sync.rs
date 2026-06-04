@@ -621,36 +621,17 @@ async fn stage_existing_files(repo: &Path, existing: &[String], dry_run: bool) -
 }
 
 /// Partition paths into (force_add, normal_add) based on .gitignore.
-/// - Paths gitignored AND already tracked in git → force_add (git add -f)
+/// - Paths already tracked in git → force_add (git add -f). Tracked files
+///   that match a gitignore rule (e.g. `**/.wxt/types/`) still get refused
+///   by `git add <path>` even though `git check-ignore` reports them as
+///   "not ignored" (gitignore is bypassed for tracked files in check-ignore,
+///   but `git add <path>` re-evaluates the rule and refuses without -f).
+/// - Untracked + gitignored → skip (respect .gitignore intent)
 /// - All others → normal_add (git add, respects .gitignore)
 async fn partition_gitignored(repo: &Path, paths: &[String]) -> (Vec<String>, Vec<String>) {
     if paths.is_empty() {
         return (Vec::new(), Vec::new());
     }
-
-    // Run `git check-ignore` to find gitignored paths
-    let ignored: std::collections::HashSet<String> = {
-        let mut check_args = vec!["check-ignore"];
-        for p in paths {
-            check_args.push(p.as_str());
-        }
-        let output = crate::policy::tokio_git_command()
-            .args(&check_args)
-            .current_dir(repo)
-            .output()
-            .await;
-        match output {
-            Ok(o) if o.status.success() || o.status.code() == Some(1) => {
-                // Exit 0 = some ignored, exit 1 = none ignored
-                String::from_utf8_lossy(&o.stdout)
-                    .lines()
-                    .filter(|l| !l.is_empty())
-                    .map(|l| l.to_string())
-                    .collect()
-            }
-            _ => std::collections::HashSet::new(),
-        }
-    };
 
     // Get list of already-tracked paths (git ls-files)
     let tracked: std::collections::HashSet<String> = {
@@ -669,17 +650,53 @@ async fn partition_gitignored(repo: &Path, paths: &[String]) -> (Vec<String>, Ve
         }
     };
 
+    // Run `git check-ignore` to find gitignored paths (only for untracked ones)
+    let ignored: std::collections::HashSet<String> = {
+        let untracked: Vec<&str> = paths
+            .iter()
+            .filter(|p| !tracked.contains(*p))
+            .map(|p| p.as_str())
+            .collect();
+        if untracked.is_empty() {
+            std::collections::HashSet::new()
+        } else {
+            let mut check_args = vec!["check-ignore"];
+            for p in &untracked {
+                check_args.push(*p);
+            }
+            let output = crate::policy::tokio_git_command()
+                .args(&check_args)
+                .current_dir(repo)
+                .output()
+                .await;
+            match output {
+                Ok(o) if o.status.success() || o.status.code() == Some(1) => {
+                    // Exit 0 = some ignored, exit 1 = none ignored
+                    String::from_utf8_lossy(&o.stdout)
+                        .lines()
+                        .filter(|l| !l.is_empty())
+                        .map(|l| l.to_string())
+                        .collect()
+                }
+                _ => std::collections::HashSet::new(),
+            }
+        }
+    };
+
     let mut force_paths = Vec::new();
     let mut normal_paths = Vec::new();
 
     for p in paths {
-        if ignored.contains(p) {
-            // Gitignored — only force-add if already tracked
-            if tracked.contains(p) {
-                force_paths.push(p.clone());
-            }
-            // Untracked + gitignored = skip (respect .gitignore)
+        if tracked.contains(p) {
+            // Tracked file: always force-add with `git add -f`. `git add <path>`
+            // re-evaluates gitignore and refuses for tracked files that match
+            // a rule; `-f` bypasses the check. gitignore intent doesn't apply
+            // here because the file is already in the index.
+            force_paths.push(p.clone());
+        } else if ignored.contains(p) {
+            // Untracked + gitignored = skip (respect .gitignore intent)
         } else {
+            // Not ignored and not tracked = normal add
             normal_paths.push(p.clone());
         }
     }
@@ -2922,7 +2939,7 @@ push_url = "git@nonexistent.example.com:repo.git"
     }
 
     #[tokio::test]
-    async fn test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBxd3FLSkRXdnhpcHg0cnlxVllRWTc5eG1rMHE5cG9YcVpjN3dqaFhsVmdzCm5LeUlUOEQ4UDl1VVBrbCt5RC9Jd3FFSnArYXFFbkp6eWFPYitNaENmQTAKLT4gWDI1NTE5IG11R2NpTThxWk53Q05wQmZ2dE9rUjR3VDdlUHptUDY5R1pVdm5MVUVEenMKV243Y1pmK3UrTGxicXpUUU5sUnFoQ0x3NHYxc0R3YkcrL3VndlNsYkRQbwotPiB5dVxQLWdyZWFzZSA6ICNsZGhzKlghIDN6XHptIGN+RTxgNDsKcUFURFVuWDA4a1FJSWM5cEFZVE5jUE1WTllSZkp2ZThUcnU5RFcrTWFBCi0tLSBjOGdGclpvc3BqbmxrTk1YZWVwbUJKVDFlTUJucnA0WDJEMjVIVnl4RVVnCp9hvtaThjvSYQM+d0c6AwOG9PjgwCYPE1Oyn+ZXC3lIhnTraHQdZfW9hRpbvqlM2LKqDHc8feEg5A==]() {
+    async fn test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB0cjVIaU5MeFkzVWgrWE9pNDNiT2laSGlaWXdJSTJyeVFLWkt1QXRWZ25rCk5WcXUycVhFbm1VNmJ1MzBJeDl2VFZ6K01LenZlMlR4WHoreTlhK2NSeFkKLT4gWDI1NTE5IHFMVm9SZzM0d1k1dGIzL3NyWDE5RXg3K0s5aFJ6akt1Tmw4Vy9hZTEzbWsKb3Z4MUtLVW9Kc0dSQmR3elJaamt6aHMvUHZnOWh0dFp2ZHBrY3hHSERURQotPiA2XzY8LWdyZWFzZSAyKSA9JApGc0hhK0hBVmtSSzQ0NUM2dHZ5Mm9ubHNHa2hxeTg0clJJUFlLSkRic0pDcWVkM21LbUpiVUpEQkxkUjQvcEhhCllXRQotLS0gT0gra1dxSCtRb0cvU05lVjFYSmRnSWMyNUYzbDU5eE0vSlI1ZVlFbVdpYwoqTuv5o8lx9tXqTPBRfeHN0FI1vuadH2L1+mIBgWQX7vk2LIZ+OuAKVVZ80ero7/r5YG/R9kLaqHM=]() {
         let tmp = tempfile::tempdir().unwrap();
         let origin_bare = tmp.path().join("origin.git");
         std::process::Command::new("git")
@@ -3278,7 +3295,7 @@ push_url = "{}"
     }
 
     #[tokio::test]
-    async fn test_sync_repo_exac[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAwR280MjFmSDljcXlpZjR1eG9RSE9lazNEOWxvSC9WWThZc0VtMWJwUG40CmVIRVV4NmNhdUtDMC85TmJUUkF6VkFHWHJhQUdCNWorWWUxUlpkazVsaUUKLT4gWDI1NTE5IDZRbm1rUndqV0huSDB4Z2hnRGNHOVBIdnFQZUE4c1FRZm5yNm9sK2J0eDAKaTFOTmhBRXAzVGxJcE9jRyswcHFmeWFsdTJtUUx1Q24yUXpQczliT1h5TQotPiBDc28tZ3JlYXNlIGdLVCAiVGYzIGt2KStgIEBGLEkKalB3TjN0UVFUemtjakQ1bkRqWnpmZXZQKytoWnJka0RHdTk3MnF4V0RSemJNUnV1b0ZwdE80a25lR0IvTVJOMQp3NGtJTEdjLzRCNEo2UQotLS0gV2hMN0pad2ZOZnkwL3NLdHVlM2d4eEpnSGExcGVQYmJUUUxwb3ZiZWNzNArXkkUtbenPmracMCsEyPZOII1ZIdXagio+8K6yt9NRIwjx9bOsPqW869zxejzXpdR2g7uVVu5Dmc0kib//i7o=]() {
+    async fn test_sync_repo_exac[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBoVDFxZDdrdy9yVDc4eXQ3b0VsUjAwaVdZZkRzZmtZcThFbUpFbHVCTENzCndTamJTTzhScG1pelMwSW1FblVqRzVSdDZKczExSTVMMmg1QkNJdFpMRDQKLT4gWDI1NTE5IE1EZStMUnFKYjVsckwzRmJVb2Q4TUtUZjZnL3VMLzN4VkEwYzN6V0JmVlkKQzhrUmZ2cVFSUzkwZ0ptNVpGLzIrMzJtZm94NUJQYWpEWXhZQVJFb2dwawotPiBDR2E7elgtZ3JlYXNlIHtwTSBMClhuQ3hDcVkKLS0tIHNTRkJQTFdJK0QwT0FJR3JkRXFJWXVOVk5JUm9JSS8zeWhZd1RuUzJPRzAKxMXnZ6K82k0uWYOIdhMDtY7uXjR+fBSp3b18euHNLTQi5hJrYMyFGLP+XA29ZrZr3LuwY21iKVDu5MkgGO5D]() {
         let tmp = tempfile::tempdir().unwrap();
         let repo = init_test_repo(&tmp, "exact-50-del-repo");
 
