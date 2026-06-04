@@ -158,12 +158,13 @@ pub(crate) async fn push_with_retries(
                 last_err = Some(e);
 
                 // On the first failure that looks like a non-fast-forward
-                // (e.g. `! [rejected] HEAD -> main (fetch first)`), run
+                // (e.g. `! [rejected] HEAD -> main (non-fast-forward)` or
+                // `! [rejected] HEAD -> main (fetch first)`), run
                 // `git pull --no-rebase origin HEAD` once and let the
                 // outer loop retry. This handles the common case where
                 // the local branch is behind origin (e.g. a mirror
                 // pushed while this repo was idle).
-                if !tried_pull && is_push_rejected(&err_msg) && err_msg.contains("fetch first") {
+                if !tried_pull && is_push_rejected(&err_msg) {
                     tried_pull = true;
                     eprintln!(
                         "🔄 push rejected (fetch first) for {} — pulling origin HEAD and retrying",
