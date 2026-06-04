@@ -5,19 +5,21 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 118355,
-    "activeSeconds": 128
+    "tokensUsed": 120023,
+    "activeSeconds": 138
   },
   "sisyphus": false,
   "createdAt": "2026-06-04T18:53:11.691Z",
-  "updatedAt": "2026-06-04T18:55:24.481Z",
+  "updatedAt": "2026-06-04T18:55:34.492Z",
   "activePath": ".pi/goals/active_goal_2026060419531169_mpzus9e3-dddb8g.md",
   "taskList": {
     "tasks": [
       {
         "id": "task-1",
         "title": "Add status refresh before daemon reports repos (re-check actual git status, not cached)",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-04T18:55:34.490Z",
+        "evidence": "Added stale ahead count detection in daemon.rs: before marking a repo as stuck, does git fetch --dry-run and re-checks status. If ahead count was stale (now 0), clears failure count and updates status",
         "verificationContract": "dracon-sync repos shows accurate MODIFIED/AHEAD/BEHIND counts matching actual git status"
       },
       {
@@ -47,12 +49,12 @@ Make the daemon resilient to stale state by refreshing git status before reporti
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 2m08s
-- Tokens used: 118K (118,355) tokens
+- Time spent: 2m18s
+- Tokens used: 120K (120,023) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
-- [ ] task-1: Add status refresh before daemon reports repos (re-check actual git status, not cached) — contract: dracon-sync repos shows accurate MODIFIED/AHEAD/BEHIND counts matching actual git status
+- [x] task-1: Add status refresh before daemon reports repos (re-check actual git status, not cached) — evidence: Added stale ahead count detection in daemon.rs: before marking a repo as stuck, does git fetch --dry-run and re-checks status. If ahead count was stale (now 0), clears failure count and updates status
 - [ ] task-2: Auto-resolve stuck pushes that are actually pushed (ahead count stale) — contract: Repos with stale AHEAD count are automatically corrected to AHEAD=0 and PUSH=OK
 - [ ] task-3: Add tests for stale state detection and resolution — contract: New tests verify that stale state is detected and corrected
 
