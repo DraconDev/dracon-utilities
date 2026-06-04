@@ -29,6 +29,53 @@ pub(crate) fn send_sync_conflict_notification(repo_path: &Path, reason: &str, de
     });
 }
 
+/// Send a desktop notification when a push operation fails persistently.
+/// Rate-limited to max 1 notification per repo per 5 minutes.
+pub(crate) fn notify_push_failure(
+    repo_path: &Path,
+    remote: &str,
+    error: &str,
+    consecutive_failures: usize,
+    cooldowns: &mut std::collections::HashMap<String, std::time::Instant>,
+) {
+    let repo_name = repo_path
+        .file_name()
+        .map(|s| s.to_string_lossy().to_string())
+        .unwrap_or_else(|| repo_path.display().to_string());
+
+    let notify_key = format!("push-fail-{}", repo_path.display());
+    let now = std::time::Instant::now();
+    let cooldown_secs = 300; // 5 minutes
+
+    // Check cooldown
+    if let Some(cooldown_until) = cooldowns.get(&notify_key) {
+        if now < *cooldown_until {
+            return; // still in cooldown
+        }
+        cooldowns.remove(&notify_key);
+    }
+
+    let title = "Dracon Sync: Push Failed";
+    let body = format!(
+        "Repository '{}' failed to push to {}.\nConsecutive failures: {}\nError: {}",
+        repo_name, remote, consecutive_failures, error
+    );
+
+    // Set cooldown before spawning to prevent race conditions
+    cooldowns.insert(notify_key, now + std::time::Duration::from_secs(cooldown_secs));
+
+    // Spawn in background to avoid blocking the daemon loop
+    tokio::spawn(async move {
+        if let Err(e) = notify_rust::Notification::new()
+            .summary(title)
+            .body(&body)
+            .show()
+        {
+            eprintln!("⚠️ failed to send desktop notification: {}", e);
+        }
+    });
+}
+
 use crate::exclude::{
     excluded_dir_names_set, has_sync_relevant_dirty_entries, is_excluded_dir_name,
 };
