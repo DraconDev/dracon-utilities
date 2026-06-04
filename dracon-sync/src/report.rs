@@ -3021,7 +3021,7 @@ mod tests {
     #[test]
     fn test_push_status_calculation_from_flags() {
         // Test OK status - no issues
-        let flags = vec!["OK".to_string()];
+        let flags = ["OK".to_string()];
         let push_status = if flags.iter().any(|f| f == "STUCK_PUSH") {
             "STUCK"
         } else if flags.iter().any(|f| f == "NO_UPSTREAM") {
@@ -3032,7 +3032,7 @@ mod tests {
         assert_eq!(push_status, "OK");
 
         // Test STUCK status
-        let flags = vec!["STUCK_PUSH".to_string()];
+        let flags = ["STUCK_PUSH".to_string()];
         let push_status = if flags.iter().any(|f| f == "STUCK_PUSH") {
             "STUCK"
         } else if flags.iter().any(|f| f == "NO_UPSTREAM") {
@@ -3043,7 +3043,7 @@ mod tests {
         assert_eq!(push_status, "STUCK");
 
         // Test FAIL status
-        let flags = vec!["NO_UPSTREAM".to_string()];
+        let flags = ["NO_UPSTREAM".to_string()];
         let push_status = if flags.iter().any(|f| f == "STUCK_PUSH") {
             "STUCK"
         } else if flags.iter().any(|f| f == "NO_UPSTREAM") {
@@ -3055,7 +3055,7 @@ mod tests {
     }
 
     #[test]
-    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA5dkYxVVVONW5DNmNzdlZCRnpSR09Dc29YSWdGeHVVMGxKR2gzcjdXOWpzClcxUVlKeWFBTnhwK0NEeERublZJK1dNdkY1cDFtNlNPMWREZlU5UmVjQVEKLT4gWDI1NTE5IFhKM1VLaDl0MGp0bk9BQ3BuaXNySUhiUUh4b1RxWE5WQ091d2MwM3gvak0KNENoWnplQjNzY25IT3grSUhGU3ZEN0g3QUs4RUwxSS8wYzRuUFJhRmU5TQotPiBnOi1ncmVhc2UgTSwoVzB8IGVMbDQgIVAwdSBgWVhCX3M4OQpVZ1doQmtDWTh3ZnYyWkpsQTVsbkQrY21wMGcKLS0tIFhPQUNOeG1tbjF4aFZOU3lRRzduT3hsUzdNRk50K3M5ZloyMmp6b3RqQjAK1gpZaCOwSGkLTYgreIYBU19XzPhJg/X8T+sj3HwMseEG2lm6ot7A8TRPwp4eETRLacNSIVhFGTMUPmT5pA==]() {
+    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBmMGpFVGNCTGNWT2pGS3daWkM3SFRDSVhKT2lZWlNhaEk1R1Jmd3p1TUdFCmZwRlZWNmpxTU1ydUV1c1psaHBza0VwVDN1RjZYRTdVYmhESDdIREMwQzQKLT4gWDI1NTE5IEtZNDduZUFHdlc2SUhSUktjNkQ1LzYxS05pamtLZzRMeCtzd01BSno0eTgKLy9seWFjSEd6VHRpKzhpaTFZY28wUVNpY2N6MmNaYUNIU0IvYnFqY3kxawotPiBJIVonNFBdTS1ncmVhc2Ugez5SKSBUPApGcGpuUzNpazJ6cUxFdTlTRHFmN3UvWmVnL3ZlSG5uN1dHTzdobmR0ZVBNWVppNHJOTkhHenl4Wko4UVVrU1FkCmgxRkVYUnltYVBVZFdnQTgKLS0tIDhZQWIrN3liUnpUUWMzYmVqTFU0T0ZqVzduTnpnUHVVRlZRVnV4L1RoaUEKhKRwIh2O5ZKyMb96oLNaHRkPsu4gvwYiTLYdW19vU2FPfRWMRLhgIRHCWHu5O2vxIXyeQ6gqYVZBxjyHuw==]() {
         let mut cooldowns = std::collections::HashMap::new();
         let repo = std::path::PathBuf::from("/test/repo");
         let notify_key = format!("push-fail-{}", repo.display());
