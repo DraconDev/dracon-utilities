@@ -2941,7 +2941,7 @@ push_url = "git@nonexistent.example.com:repo.git"
     }
 
     #[tokio::test]
-    async fn test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBZd2xDSzZLb0pTSTdGMWlwSW5NajFtZWVmYmxjYnQvU1lUbTJLemgvcGp3CkM0R1dvdkcwcVp6TXArdXBxS0JwL2p2ZmZDZmNKOVNodGJYbHl0SDI3RDgKLT4gWDI1NTE5IDU3a041eWw3VXV0a2ExQUdyalRHVkFYaE5tSFZYRUZVZmVLQkxZQjM0MmcKMmIyamlRWEJoWjhqZlRlalRPelVPdDJQc3crdDY3OXR6VEZhYUkwdFBNbwotPiBJcXxXL0otZ3JlYXNlClg2amdSY3ZVOW5tRXFBK0IwMjk0R0U0aEt1aC9SbEJGbFlTVHpXWGx0S3J2aThHV0VvK0poZU0wbE9vbi9SV2cKYVkrUGJyWEJYak5VY2VaNjBRa2YwVmNvYkRrNjBDNEtLZzNjZE5tWkZZWUZqL3RKL1g0Nis0M0pNK1EKLS0tIEVZQ0FWbU5PNGVqamRCL3BtN2dnWE03U0xMZVpmTjA1Z09tSTQxbVJxTTAKohJBEqN4vIuKuEn0MUi6KGcKO9E6yNFxSmbNxG5ppL7lNl9yW31qAJOGfc8HqLP3TmDA6qpnA8zK]() {
+    async fn test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB0U0NFRDVHcCtHSVppTGRwVEI5S3Y1T0JmQWpIZTFSNGlaMFM3eCtrTUFRCnJJSmJST2RrRTJSaGZtc2RCbnFoSUtKTy92Y0U2YWpxREFlU2dvc0xVeW8KLT4gWDI1NTE5IFpKQU9WTUduRlFXNEM0WVFJd1ZTUWJWYlpWZWxqYWNIN0xkRXRGLzRoVzAKU0I4M2ZkOXdwbkcrOTF4Q0YrSGtTWFdxSkZkTXQ0YkN0Uk5XZkZ1c3MycwotPiBJLWdyZWFzZQp3OVNoVXpuK3dMTjdXenVMY2RQL3pRL1pNeFpCNlFaWjBHaWN6SGVBSUk0dXA3cmpyY0M2cHVwK0ZrcVRFcnZuCmxvZGhYSm91ZG9sVFJyY1pHOWc0V1E3RWM5WQotLS0gcXZmOHkrVVd2eDcrWDhCZmQ1UkNlRlRyTGw5VmFOWW03TWFONXFYSzNiOAo0PDMh6lOMZXYDgYVjaQpwTMvEFpA//Vn9oflWKruOf37AqLfQLk7KFjrnyyuwdGWUrs2c1WxbhcU=]() {
         let tmp = tempfile::tempdir().unwrap();
         let origin_bare = tmp.path().join("origin.git");
         std::process::Command::new("git")
@@ -3297,7 +3297,7 @@ push_url = "{}"
     }
 
     #[tokio::test]
-    async fn test_sync_repo_exac[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBwaUxTUlNycmdBY0x2RVhiZVNBOHlENk5SZGh5ZFhWOU9nMWhuVmRaMnowCnB3SXRYOWdTWHZBMFFKQ1c2SCtRaWpsWUZvaXN1MHF4dnU0OHpqWjRaK2sKLT4gWDI1NTE5IFRSRU9NQm9nOVg4YWUvbGJEOUI5dUJ0WkxGZnRoaThNWlg3SUdyRTRnZ2cKVnpBbTZnWS82VnZUN3BkVHpRTzU5cE9QMVZweWVBUFNjSFBLbkgrc0ZpMAotPiBcMV1jdFk6XS1ncmVhc2UgXDEiQAo1ZGVEeWE3RTlwTEVadGxRbFpsVUlSbk0vTFZJR2hhU05yOUNHOWhqMXRXYXJvSVlBZU1kU281NThoK2dIeHh4CgotLS0gUUJXNXI3NUNoaVNHMHVLR3czYzV5dWlqNWY1cVZmenpDRDFlMEtkNkpHcwolniWpXLk5KAFTMR7/RmoD2g/0H9fZ5ZraNwRduMEd1MHWNsGxlie5Y8TD7GJ+G9CRrWOsF4dB2E6+1btlvuo=]() {
+    async fn test_sync_repo_exac[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB3M1ZFeUV1RTVBZWhVanhvMy9welRvNm1DMk4xT210QytKWitPMmV3WUNnCm1MckljWUhyOE1Ca2ttcmdkcG9GVkpwOVlxaGR0ekNHRjhOYTVwR3R6TGsKLT4gWDI1NTE5IGJHZ2d6S2EwTmRUQUNudzA0dHJKb2JHalVYWG9RZmV0ZjVrelg0UzIvR2MKdlFPNTdXaVdFTTQ2NW8zaHYzbWQ4Qjc2VHdzaXB2MkYyNDh5R2dhSTlIOAotPiBlLWdyZWFzZSBdb3UxPiBwLEUgQGdGJQpLWUxsd0c3QnpiWUF4QQotLS0gQTBTQUxSSG1VQkl2VjloY1NnUWNLcGtVbVMvcjA0WU9ocGlKMnhRdzhNbwojjVzCr11N8WX9twi8KybgwCSfEDq1pX78sQlHLODbEx28B43a++fQZMjStKrt0NAfn6FVAtTBEUHzM5X2/Po=]() {
         let tmp = tempfile::tempdir().unwrap();
         let repo = init_test_repo(&tmp, "exact-50-del-repo");
 
@@ -3921,9 +3921,10 @@ auto_bump_versions = false
         );
     }
 
-    /// Regression test for `partition_gitignored`: tracked files that match a
-    /// gitignore rule must be sent to `force_paths` (uses `git add -f`), not
-    /// `normal_paths` (where plain `git add` would refuse them).
+    /// Regression test for `partition_gitignored`: tracked files whose
+    /// **parent directory** matches a gitignore rule (e.g. `**/.wxt/types/`)
+    /// must be sent to `force_paths` (uses `git add -f`), not `normal_paths`
+    /// (where plain `git add` would refuse them).
     ///
     /// Original bug: `git check-ignore` reports tracked files as "not ignored"
     /// (gitignore is bypassed for tracked files), so a naive partition sent
@@ -3946,18 +3947,17 @@ auto_bump_versions = false
             .args(["-C", &repo.to_string_lossy(), "config", "user.name", "t"])
             .output()
             .unwrap();
-        // Switch to main branch (init may have created master on older git)
         test_git_cmd()
             .args(["-C", &repo.to_string_lossy(), "checkout", "-q", "-b", "main"])
             .output()
             .unwrap();
 
-        // Create a file, track it, commit it
-        std::fs::create_dir_all(repo.join("subdir")).unwrap();
-        let tracked_path = repo.join("subdir/types.d.ts");
+        // Create a tracked file inside a directory that will later be gitignored
+        std::fs::create_dir_all(repo.join("subdir/types")).unwrap();
+        let tracked_path = repo.join("subdir/types/imports.d.ts");
         std::fs::write(&tracked_path, "original\n").unwrap();
         test_git_cmd()
-            .args(["-C", &repo.to_string_lossy(), "add", "subdir/types.d.ts"])
+            .args(["-C", &repo.to_string_lossy(), "add", "subdir/types/imports.d.ts"])
             .output()
             .unwrap();
         test_commit_cmd()
@@ -3965,8 +3965,9 @@ auto_bump_versions = false
             .output()
             .unwrap();
 
-        // Now add a gitignore rule that matches the tracked file
-        std::fs::write(repo.join(".gitignore"), "**/types.d.ts\n").unwrap();
+        // Now add a gitignore rule that matches the directory containing the tracked file
+        // (this is the exact pattern that triggered the original bug in browser-extensions-shared)
+        std::fs::write(repo.join(".gitignore"), "**/types/\n").unwrap();
         test_git_cmd()
             .args(["-C", &repo.to_string_lossy(), "add", ".gitignore"])
             .output()
@@ -3979,14 +3980,15 @@ auto_bump_versions = false
         // Modify the tracked file
         std::fs::write(&tracked_path, "modified\n").unwrap();
 
-        // Sanity check: plain `git add <path>` would fail on this tracked-but-ignored file
+        // Sanity check: plain `git add <path>` should fail because the
+        // file's parent directory matches a gitignore rule
         let plain_add = test_git_cmd()
-            .args(["-C", &repo.to_string_lossy(), "add", "subdir/types.d.ts"])
+            .args(["-C", &repo.to_string_lossy(), "add", "subdir/types/imports.d.ts"])
             .output()
             .unwrap();
         assert!(
             !plain_add.status.success(),
-            "precondition: plain `git add` should refuse tracked file matching gitignore rule; stderr: {}",
+            "precondition: plain `git add` should refuse tracked file whose parent dir matches gitignore; stderr: {}",
             String::from_utf8_lossy(&plain_add.stderr)
         );
         // Reset any state
@@ -3996,17 +3998,17 @@ auto_bump_versions = false
             .unwrap();
 
         // Call partition_gitignored — tracked file must go to force_paths
-        let paths = vec!["subdir/types.d.ts".to_string()];
+        let paths = vec!["subdir/types/imports.d.ts".to_string()];
         let (force, normal) = partition_gitignored(&repo, &paths).await;
         assert!(
-            force.contains(&"subdir/types.d.ts".to_string()),
-            "tracked-but-ignored file must be in force_paths, got force={:?} normal={:?}",
+            force.contains(&"subdir/types/imports.d.ts".to_string()),
+            "tracked file (parent dir gitignored) must be in force_paths, got force={:?} normal={:?}",
             force,
             normal
         );
         assert!(
-            !normal.contains(&"subdir/types.d.ts".to_string()),
-            "tracked-but-ignored file must NOT be in normal_paths, got force={:?} normal={:?}",
+            !normal.contains(&"subdir/types/imports.d.ts".to_string()),
+            "tracked file (parent dir gitignored) must NOT be in normal_paths, got force={:?} normal={:?}",
             force,
             normal
         );
