@@ -896,7 +896,7 @@ pub(crate) async fn run_repos_report(
     );
     println!();
 
-    use comfy_table::{presets::UTF8_FULL_CONDENSED, Cell, Color, Table, Attribute, ContentArrangement};
+    use comfy_table::{presets::UTF8_FULL_CONDENSED, Cell, Color, Table, ContentArrangement};
 
     let mut table = Table::new();
     table.load_preset(UTF8_FULL_CONDENSED);
@@ -985,25 +985,6 @@ pub(crate) async fn run_repos_report(
     }
 
     println!("{table}");
-    println!();
-    println!(
-        "{} repos: {} {}  {} {}  {} {}  ❌ {}{}",
-        rows.len(),
-        ansi("32", "OK"),
-        ok_count,
-        ansi("33", "WARN"),
-        warn_count,
-        ansi("31", "CONCERN"),
-        concern_count,
-        init_or_status_failures,
-        match filter {
-            RepoFilter::All => String::new(),
-            RepoFilter::Concern | RepoFilter::Warn => format!(
-                "  (all: OK {} WARN {} CONCERN {})",
-                ok_count_all, warn_count_all, concern_count_all
-            ),
-        }
-    );
 
     Ok(())
 }
@@ -3081,7 +3062,7 @@ mod tests {
     }
 
     #[test]
-    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBuOFExWnM0VWZnQjM3aWNkaEFVY09GK0Y2cWoxZTFOa0lmQ2UwdjFDVTBzCjdBUmd1K2dBcy9GWGJ0TFBjODI3NjFZbklDdHFuMlk1RUozTFEzQ0dNK00KLT4gWDI1NTE5IEZHK2Z4cmtxMnhSTjV3Z0NzWG5mRm9zM3JGZ0ZhZXFXRlZLSndlMmErRUkKMUd5eml4L2RKWnV0MFpGbDVwaWR1M2VSMkN3QUdSTnAzTDBLR0xSTFlEdwotPiBzRy1ncmVhc2UgVW18W1tyIFogYjsocEV8eSA9XiFzISIKUG05ODhzZkNGbXI5TWd2V3BRMW9UNDRmcVNOY2xneUFrOHg2SGo4VW9iNHRTNmQ4OWcKLS0tIGVPdFpBaUVtUUh6aWZ3ak9QcnJRSDVxSEwzTE1OdjBVNDNlRU0wR21hYTQK+tw+EgPuyd0mAYz0Zjurl/Aq9kHPrJOpODP0jWYOBPYbuM5JTmFl5jlLiiy/w7lFChAwQebEsZdDdoHxgw==]() {
+    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBSb1pTd2xSTDN5cU8vdlhvbjczczNaYTRaakhtbytTaE5aejRYWXVPWFdzCjVBRTZyQnhxbDZmUUowNmZmbThRcitsdldFRG5PNHMzbHhOY016SWhRV0kKLT4gWDI1NTE5IExiaXdyQXlIMllHTmpRZFNzR0NQZHBSWTllcUNQTG9yZlU4a2xMaVFIQ0EKRHZLY25LVE1RR0NkVENBbzYyNzRqVHBIaEIwQUlJWEsvYlBtbUlSbGtFYwotPiBiLWdyZWFzZSBFVnAhPwpRd0pQQWIwR3RQM0g4MnhzQ2ZQeXJFd0NXRlUKLS0tIEsyNGFVaHNHWndZd1laT3RKYUpTeFdIWG1VV2hvQ2IwY0x3MHFhcFBQMXMKmjAyObf13EjqTN4bBrum3Kog1V3donAnBLewTll9amCTrSj9nubjMHqrgjVuWv8ujktfQeFCFr0mlnS0Xw==]() {
         let mut cooldowns = std::collections::HashMap::new();
         let repo = std::path::PathBuf::from("/test/repo");
         let notify_key = format!("push-fail-{}", repo.display());
