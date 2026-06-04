@@ -887,6 +887,13 @@ pub(crate) async fn run_repos_report(
                 .unwrap_or_else(|| row.repo.clone())
         };
 
+        let push_color = match row.push_status.as_str() {
+            "OK" => Color::Green,
+            "PENDING" => Color::Yellow,
+            "FAIL" | "STUCK" => Color::Red,
+            _ => Color::White,
+        };
+
         table.add_row(vec![
             Cell::new(idx + 1),
             Cell::new(status_text).fg(status_color),
@@ -897,7 +904,7 @@ pub(crate) async fn run_repos_report(
             Cell::new(row.untracked),
             Cell::new(row.ahead),
             Cell::new(row.behind),
-            Cell::new(&row.push_status),
+            Cell::new(&row.push_status).fg(push_color),
             Cell::new(shorten_when(&row.last_when)),
             Cell::new(shorten_when(&row.last_push)),
             Cell::new(&row.last_author),
