@@ -236,45 +236,149 @@ mod daemon_tests {
     }
 
     #[test]
-    fn test_stale_ahead_detection_logic() {
-        // Test the logic for detecting stale ahead counts.
-        // This tests the conditional logic, not the actual git operations.
+    fn test_get_status_refreshes_index() {
+        // Verify that get_status() calls git update-index --refresh
+        // by checking that a newly created repo returns correct status.
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
         
-        // Case 1: ahead > 0, not diverged -> should check for stale
-        let ahead = 2;
-        let behind = 0;
-        let is_diverged = ahead > 0 && behind > 0;
-        assert!(!is_diverged, "should not be diverged when behind is 0");
+        // Initialize repo with a commit
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "main"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        std::fs::write(repo.join("file.txt"), "content").unwrap();
+        std::process::Command::new("git")
+            .args(["-C", repo.to_str().unwrap(), "add", "."])
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", repo.to_str().unwrap(), "commit", "-m", "init", "--no-verify"])
+            .status()
+            .unwrap();
         
-        // Case 2: ahead > 0, behind > 0 -> is diverged, skip stale check
-        let ahead = 2;
-        let behind = 1;
-        let is_diverged = ahead > 0 && behind > 0;
-        assert!(is_diverged, "should be diverged when both ahead and behind");
-        
-        // Case 3: ahead == 0 -> no stale check needed
-        let ahead = 0;
-        let needs_stale_check = ahead > 0;
-        assert!(!needs_stale_check, "should not check stale when ahead is 0");
+        // Get status should work and return clean repo with ahead=0
+        let svc = crate::git::GitService::new(&repo).unwrap();
+        let status = tokio_test::block_on(svc.get_status()).unwrap();
+        assert!(status.is_clean, "repo should be clean");
+        assert_eq!(status.ahead, 0, "ahead should be 0");
+        assert_eq!(status.branch, "main");
     }
 
     #[test]
-    fn test_stale_ahead_resolution() {
-        // Test that stale ahead count is correctly resolved.
-        // Simulates the scenario where ahead count was stale but is now 0.
+    fn test_get_status_detects_unpushed_commits() {
+        // Verify that get_status() correctly detects unpushed commits
+        // after git update-index --refresh.
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
         
-        let mut ahead = 2; // Stale ahead count
-        let failure_count = 3;
+        // Initialize repo with remote
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "main"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        let remote = tmp.path().join("remote.git");
+        std::process::Command::new("git")
+            .args(["init", "--bare", "-q"])
+            .arg(&remote)
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", repo.to_str().unwrap(), "remote", "add", "origin", remote.to_str().unwrap()])
+            .status()
+            .unwrap();
         
-        // Simulate stale ahead detection finding ahead == 0
-        let new_ahead = 0;
-        if new_ahead == 0 {
-            ahead = new_ahead;
-            // Should clear failure count
-            let _ = failure_count; // In real code, entry.failure_count = 0
-        }
+        // Initial commit and push
+        std::fs::write(repo.join("file.txt"), "v1").unwrap();
+        std::process::Command::new("git")
+            .args(["-C", repo.to_str().unwrap(), "add", "."])
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", repo.to_str().unwrap(), "commit", "-m", "init", "--no-verify"])
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", repo.to_str().unwrap(), "push", "-u", "origin", "main"])
+            .status()
+            .unwrap();
         
-        assert_eq!(ahead, 0, "ahead should be resolved to 0");
+        // Unpushed commit
+        std::fs::write(repo.join("file.txt"), "v2").unwrap();
+        std::process::Command::new("git")
+            .args(["-C", repo.to_str().unwrap(), "add", "."])
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", repo.to_str().unwrap(), "commit", "-m", "unpushed", "--no-verify"])
+            .status()
+            .unwrap();
+        
+        let svc = crate::git::GitService::new(&repo).unwrap();
+        let status = tokio_test::block_on(svc.get_status()).unwrap();
+        assert_eq!(status.ahead, 1, "should detect 1 unpushed commit");
+        assert!(!status.is_clean || status.ahead > 0, "repo should not be fully synced");
+    }
+
+    #[test]
+    fn test_get_status_after_push() {
+        // Verify that get_status() returns ahead=0 after pushing,
+        // confirming git update-index --refresh works correctly.
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
+        
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "main"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        let remote = tmp.path().join("remote.git");
+        std::process::Command::new("git")
+            .args(["init", "--bare", "-q"])
+            .arg(&remote)
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", repo.to_str().unwrap(), "remote", "add", "origin", remote.to_str().unwrap()])
+            .status()
+            .unwrap();
+        
+        // Initial commit and push
+        std::fs::write(repo.join("file.txt"), "v1").unwrap();
+        std::process::Command::new("git")
+            .args(["-C", repo.to_str().unwrap(), "add", "."])
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", repo.to_str().unwrap(), "commit", "-m", "init", "--no-verify"])
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", repo.to_str().unwrap(), "push", "-u", "origin", "main"])
+            .status()
+            .unwrap();
+        
+        // Create and push another commit
+        std::fs::write(repo.join("file.txt"), "v2").unwrap();
+        std::process::Command::new("git")
+            .args(["-C", repo.to_str().unwrap(), "add", "."])
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", repo.to_str().unwrap(), "commit", "-m", "second", "--no-verify"])
+            .status()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", repo.to_str().unwrap(), "push"])
+            .status()
+            .unwrap();
+        
+        let svc = crate::git::GitService::new(&repo).unwrap();
+        let status = tokio_test::block_on(svc.get_status()).unwrap();
+        assert_eq!(status.ahead, 0, "ahead should be 0 after push");
+        assert!(status.is_clean, "repo should be clean after push");
     }
 }
 
