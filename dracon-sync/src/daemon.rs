@@ -1215,10 +1215,46 @@ pub(crate) async fn run_daemon(
                 // regardless of dirty state - mark as stuck immediately.
                 // This prevents the repo from blocking other syncs.
                 let is_diverged = status.ahead > 0 && status.behind > 0;
+                
+                // Check if ahead count is stale: fetch upstream refs and re-check.
+                // This handles the case where commits were actually pushed but the
+                // local refs haven't been updated yet.
+                let stale_ahead = if status.ahead > 0 && !is_diverged {
+                    // Try a lightweight fetch to update upstream refs
+                    let fetch_ok = std::process::Command::new("git")
+                        .args(["-C", repo.to_str().unwrap_or(""), "fetch", "--dry-run"])
+                        .output()
+                        .map(|o| o.status.success())
+                        .unwrap_or(false);
+                    if fetch_ok {
+                        // Re-check status after fetch
+                        if let Ok(new_status) = svc.get_status().await {
+                            if new_status.ahead == 0 {
+                                eprintln!(
+                                    "🔄 {} stale ahead count resolved: was {}, now 0",
+                                    repo.display(), status.ahead
+                                );
+                                status = new_status;
+                                // Clear failure count since push actually worked
+                                entry.failure_count = 0;
+                                false // not stuck
+                            } else {
+                                status.ahead > 0 // still ahead
+                            }
+                        } else {
+                            status.ahead > 0
+                        }
+                    } else {
+                        status.ahead > 0
+                    }
+                } else {
+                    status.ahead > 0
+                };
+                
                 // If repo is clean but has ahead commits and push keeps failing,
                 // it's permanently stuck (permission error, deleted remote, etc).
                 // Skip it entirely to unblock other repos.
-                if is_diverged || (!effective_dirty && status.ahead > 0 && entry.failure_count >= 3)
+                if is_diverged || (!effective_dirty && stale_ahead && entry.failure_count >= 3)
                 {
                     let reason = if is_diverged {
                         format!(
