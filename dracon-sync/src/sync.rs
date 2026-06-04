@@ -1055,10 +1055,6 @@ async fn push_with_blob_check(ctx: &mut SyncContext<'_>, ahead: usize) -> Result
     Ok(true)
 }
 
-
-
-
-
 /// Task state transitions extracted from a markdown diff.
 #[derive(Debug, Default)]
 struct TaskTransitions {
@@ -2961,7 +2957,7 @@ push_url = "git@nonexistent.example.com:repo.git"
     }
 
     #[tokio::test]
-    async fn test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBHb0NlODNNbjNiRGFGVjJuUmtvOFUwVWNVSnhraUo0dnFzZWFmZUF0bVRzCnc3NEVtRnliZnpsVUlzUFRzTHBSMk0yYUsvcUlhRm5nd29rZUEzZlI0V00KLT4gWDI1NTE5IDBHMWFCYTJXTnR2TkNMMHBLaUMzcnJtaW83bVAyWmJQR2lTYlNnQnBPQXcKVGtCQURIcHJtTCtaQmE3SW90TVNOSlJZSmRtRzducHJzYnRGVms4VC9hRQotPiBjdlF8Q3QtZ3JlYXNlCkd1dUZiTk1PTFQzbjFIVGdIRTNXeVp5QlVKYkx4UQotLS0gcnNiemRTRGk0dU10NHRIYkpxV3Zsa09SSlNJRXJvL25kcWdCZGRDNElvUQrE0DI/II74bMKz0xll0lqyeaDMcsKNbyXc7AGFz22muskaqCeteNOJdgQ+Tkrj5FbX9dLd+/YvyN8=]() {
+    async fn test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAreXArRndzUkFBbmpSekswVGlMQ3Z5M3QxVDZmYjNuT01RR05EUzBUSnlNCjdGOW51S3pMYzNkYzB5bDJOLzhKQXNOTy9ieUV6UjZlTjA4eGp2cGlpbDgKLT4gWDI1NTE5IHhJZmpuUWxxL0FoclRva1pPT2ROL3d5U0xZYm1yVEZOUzNGdGltQ2taR2MKZFpiZUJlVEJGQXJxdXZKNXlueGUzNEVNdzFWdGZoTUcyWlFta2FPQjk1RQotPiBrfTdqPS1ncmVhc2UKbEdYWHcvTStJTlQrK0kzMmtTeHVXZjI0R25lVi9vZHl1WUFRMEZYazdLR0JSL3RKUCsrdmJzbW5lV09TM2ZNbAppZmdSK2N2Y29TeHhrdwotLS0gMXFROHVGMmhPZGtGV0tsc05QVzBKZ25SZFlkbStVVmZBck9KeTZlZlZmOAoj+0S2iWkjJ20cXCsAVB+SCvKU2Lgnlwl4ZuFgLREbVpm1Tn1WFAmcP+JZ4Eluz40nRDkAdu4qNJM=]() {
         let tmp = tempfile::tempdir().unwrap();
         let origin_bare = tmp.path().join("origin.git");
         std::process::Command::new("git")
@@ -3317,7 +3313,7 @@ push_url = "{}"
     }
 
     #[tokio::test]
-    async fn test_sync_repo_exac[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBtc1E4ZVRmc2NzZjJWL2xISTJ5cjZuS3pXMWNMSk1lRzNIcXUwZ3pHMkY4CkZZQXp0eE5rQ3FPdGgxbnFHSzJlZlpSWThtTWZQQnVEMVNWK0xYSHVYdk0KLT4gWDI1NTE5IDZYNzhvemVwTjFXR0xMZm9wOHMyMWZxTmJsOVphS1hXbmpoeUpGSEc3ajAKZFB3eWVYVmxJWXJYa3NHL2RwSzZNQ1hmSXRidXQ2YTBlODF5OUgzaHI2dwotPiA5S0JzXGNnLWdyZWFzZSBrVzxfUXoKUXZoYzFTbG9URVZyM0llTEdYTGpmcldxclVZQWlmUUh5ZTVUMXEyZ3l2STV0QU0reFVIblVmaUtmTU1tcVl1ZApIby9kMlJlcnJTbTBZTEsxZUEwZk5USWpvM1dRaVBMdXNNYjV0UQotLS0gS2F5YXR5dWVIU1ZBU0xJWU4ya3ZYNVIwSVhucjZLRVl6MCtQa1lzQ1hkWQooUsXZRbiCNntrMpza8OghFaargoxV3Ldquhz1mmANjBB7aUCWnWLX0tAPilevaeYA7Gxstwuc9XzR7fwKyZc=]() {
+    async fn test_sync_repo_exac[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBJRUZ1eGFoTjlBRFRENC9SU1RqSSttOExveWpGRmJEbjRWdTcxWHZqdW5RCmcwTWttL0NwYkhQYzFxUkdPVDRUbnZIc2ZNOHJ0d1FZTWNKMGVzSGN5YTgKLT4gWDI1NTE5IFhrR05oTUVSa0EzTHhERkdZVDc4c3pSRndNZnRBRXZodktPNDg4Z1dJRWsKUlE1YUJMK0RrWkNPa0VoNXVLc2R5NzQzUWNlNkxLbGJVNStaZnhSUjlNSQotPiBTKS1ncmVhc2UKR1phKzR1bi92U0pqNDRMWDViQU9RWmlpVHZLWjhESmg4cHI3aDduai9TYUwzV0p5cFFhQ1NsQmJsU1Q0YUZMbgpKSWI0T0EKLS0tIHdMaEJUbHJhRVBpTHNEQVpObmNUVHQ0QzIwQ3JOeUVreHF4UXpzK0lEVDgKu4W52DbBPVRnJSq2aucbt9Wf7B9Gs7yHZUWBDpbQVsEzJo91TIYZV/DrrDt/sao2YBV7nAuxVUXV4OmjC5RL]() {
         let tmp = tempfile::tempdir().unwrap();
         let repo = init_test_repo(&tmp, "exact-50-del-repo");
 
