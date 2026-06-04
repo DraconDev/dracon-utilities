@@ -877,9 +877,18 @@ async fn run_release_pipeline_if_bumped(repo: &Path, policy: &SyncPolicy, versio
     }
 }
 
-/// Background push — owned values, no lifetime constraints.
-/// Pushes to origin + all mirror remotes. Returns true if all succeeded.
-async fn push_background(repo: &std::path::Path, policy: &SyncPolicy) -> Result<bool> {
+/// Push to origin + all mirror remotes. Returns true if all succeeded.
+///
+/// Updates `remote_failures` (if Some) to track consecutive failures per
+/// remote. On a successful mirror push, the entry is removed. This is the
+/// only path that should update `remote_failures`; the previous design had
+/// a separate `push_with_blob_check` function that did this but was never
+/// called from the live code path.
+async fn push_background(
+    repo: &std::path::Path,
+    policy: &SyncPolicy,
+    remote_failures: Option<&mut HashMap<String, usize>>,
+) -> Result<bool> {
     // Push to origin
     match push_with_retries(
         repo,
@@ -911,10 +920,21 @@ async fn push_background(repo: &std::path::Path, policy: &SyncPolicy) -> Result<
         if !all_ok {
             for (name, result) in &push_results {
                 if let Err(e) = result {
-                    eprintln!("⚠️ background push to {} failed for {}: {}", name, repo.display(), e);
+                    log_warn!("push to {} failed for {}: {}", name, repo.display(), e);
+                    if let Some(ref url) = policy.webhook_url {
+                        notify_webhook_failure(url, repo, name, &e.to_string());
+                    }
+                    if let Some(rf) = remote_failures.as_deref_mut() {
+                        *rf.entry(name.clone()).or_insert(0) += 1;
+                    }
                 }
             }
             return Ok(false);
+        } else if let Some(rf) = remote_failures.as_deref_mut() {
+            // Successful push — clear any prior failure count for these remotes.
+            for name in policy.remotes.iter().map(|r| r.name.clone()) {
+                rf.remove(&name);
+            }
         }
     }
     Ok(true)
@@ -2941,7 +2961,7 @@ push_url = "git@nonexistent.example.com:repo.git"
     }
 
     #[tokio::test]
-    async fn test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBFRkJSYVBJWlVDWUxXdThrampQVENFN0JOOEhTZE9MUHl5NlFKdmdvMlZVCks0YVhweGYwK0Yzb3pIMzFTbmc5YzN6NXQ5a1JBTlZ0ZG80Nkw3WVRLODgKLT4gWDI1NTE5IFZWajNaSHBvcGJGV0lWL29lS1UzUVlBeEtWVWNTaWs0MjB0MVVqOUtBeUUKUnkzbFpXby9YNDAxcUpPa1NXaFpYOUc0OW5Ndzd6V2piZXg3cUFILzRQTQotPiBLLWdyZWFzZSBEXApNZXc0STByenBNVEdVbllVVEZ4d3NNM2pWQllXenB0Ti8wNk0zVk1KUFAwb0ZoSnZ0UncKLS0tIElReU9jVFB5d0o5ZXE4YU8wTE1tanBXR05xNXFBOWtwdk5wUXJDcGdpZ3MKH+vKn7yi5cndH7b1Q6haaA0Dyztcg+EJ+yiYDRlAQmvyMUn4sYUwvEQOp9JkOcw99PUZtkQ2sywK]() {
+    async fn test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBHb0NlODNNbjNiRGFGVjJuUmtvOFUwVWNVSnhraUo0dnFzZWFmZUF0bVRzCnc3NEVtRnliZnpsVUlzUFRzTHBSMk0yYUsvcUlhRm5nd29rZUEzZlI0V00KLT4gWDI1NTE5IDBHMWFCYTJXTnR2TkNMMHBLaUMzcnJtaW83bVAyWmJQR2lTYlNnQnBPQXcKVGtCQURIcHJtTCtaQmE3SW90TVNOSlJZSmRtRzducHJzYnRGVms4VC9hRQotPiBjdlF8Q3QtZ3JlYXNlCkd1dUZiTk1PTFQzbjFIVGdIRTNXeVp5QlVKYkx4UQotLS0gcnNiemRTRGk0dU10NHRIYkpxV3Zsa09SSlNJRXJvL25kcWdCZGRDNElvUQrE0DI/II74bMKz0xll0lqyeaDMcsKNbyXc7AGFz22muskaqCeteNOJdgQ+Tkrj5FbX9dLd+/YvyN8=]() {
         let tmp = tempfile::tempdir().unwrap();
         let origin_bare = tmp.path().join("origin.git");
         std::process::Command::new("git")
@@ -3297,7 +3317,7 @@ push_url = "{}"
     }
 
     #[tokio::test]
-    async fn test_sync_repo_exac[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB2aTRKa0thRjc4Slo0OTc0UE5ZcE4rY0x1aXlzUkhNbGtIRnUvRWg3ZHhrCmpudFltTi9LUitxbFpBMCt0aVpYSC9hbkhnVW9SWW40OGFRQTVIUUtFUTQKLT4gWDI1NTE5IEliSExoWjBmcDVOdzdOakRucjJlNXV4dXhFaXlCM29TZHI3azRzRG9ZemMKRnlYcHl6YWFqWHBCb29iLzVNcHJtaUpmSFU2ZTZIWTNIUTUycGNLck1KSQotPiByeyVPLWdyZWFzZSBjL0RKTwp1bmxxVm9SZ09KcWtqNVJUOUxNelFCSG1vR1dQUUE0N2lEWUduK0pJKzh6ckJnCi0tLSBZVDRobzJ4VkcrUC9IeGJjTkZkTkNFQXB0MlZlRkNjSHRjQjZEUlltSnNzCjWbHDikj6duv4jNfc+0aZcUMT6JK1ibgBJO0BLC5h8zBVpYfUXTSj8vt2HboBmz+NWHEuRGciyOjx1V7Gq+8w==]() {
+    async fn test_sync_repo_exac[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBtc1E4ZVRmc2NzZjJWL2xISTJ5cjZuS3pXMWNMSk1lRzNIcXUwZ3pHMkY4CkZZQXp0eE5rQ3FPdGgxbnFHSzJlZlpSWThtTWZQQnVEMVNWK0xYSHVYdk0KLT4gWDI1NTE5IDZYNzhvemVwTjFXR0xMZm9wOHMyMWZxTmJsOVphS1hXbmpoeUpGSEc3ajAKZFB3eWVYVmxJWXJYa3NHL2RwSzZNQ1hmSXRidXQ2YTBlODF5OUgzaHI2dwotPiA5S0JzXGNnLWdyZWFzZSBrVzxfUXoKUXZoYzFTbG9URVZyM0llTEdYTGpmcldxclVZQWlmUUh5ZTVUMXEyZ3l2STV0QU0reFVIblVmaUtmTU1tcVl1ZApIby9kMlJlcnJTbTBZTEsxZUEwZk5USWpvM1dRaVBMdXNNYjV0UQotLS0gS2F5YXR5dWVIU1ZBU0xJWU4ya3ZYNVIwSVhucjZLRVl6MCtQa1lzQ1hkWQooUsXZRbiCNntrMpza8OghFaargoxV3Ldquhz1mmANjBB7aUCWnWLX0tAPilevaeYA7Gxstwuc9XzR7fwKyZc=]() {
         let tmp = tempfile::tempdir().unwrap();
         let repo = init_test_repo(&tmp, "exact-50-del-repo");
 
