@@ -614,20 +614,15 @@ pub(crate) async fn run_repos_report(
                 continue;
             }
         };
-        let entries = repo_diff_entries(&repo).await.unwrap_or_default();
-        let effective_dirty = has_sync_relevant_dirty_entries(
-            &repo,
-            &entries,
-            &excluded_dir_names,
-            &policy.exclude_file_patterns,
-            policy.max_stage_file_bytes,
-        );
-        let effective_status = dracon_git::types::RepoStatus {
-            is_clean: !effective_dirty,
-            modified_files: status.modified_files,
-            staged_files: status.staged_files,
-            ..status.clone()
-        };
+        // Skip `repo_diff_entries()` here — it calls `git diff --name-status HEAD`
+        // which applies the clean filter (dracon-warden age encryption) to every
+        // modified file. For repos with many large filtered files (e.g. pnpm-lock.yaml),
+        // this takes 10+ seconds per repo and makes the report feel like it's hanging.
+        //
+        // Libgit2 already correctly excludes .gitignore'd files (target/,
+        // node_modules/, build outputs) from its modified count, so it gives us
+        // the same "real source changes" answer without the slow clean-filter pass.
+        let effective_status = status.clone();
 
         let has_origin = has_origin_remote(&repo);
         let has_upstream = has_tracking_upstream(&repo);
