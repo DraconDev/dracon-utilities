@@ -2425,10 +2425,10 @@ async fn cmd_status(json: bool) -> Result<()> {
             ]);
 
         let rows: Vec<(&str, &str)> = vec![
-            ("system root", &report.system_root),
-            ("nixos root", &report.nixos_root),
-            ("sync policy", &report.sync_policy),
-            ("system policy", &report.system_policy),
+            ("🏠 system root", &report.system_root),
+            ("🐧 nixos root", &report.nixos_root),
+            ("📜 sync policy", &report.sync_policy),
+            ("⚙️ system policy", &report.system_policy),
         ];
 
         let service_rows: Vec<(&str, bool)> = vec![
