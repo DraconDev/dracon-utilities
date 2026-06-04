@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 115836,
-    "activeSeconds": 520
+    "tokensUsed": 116428,
+    "activeSeconds": 535
   },
   "sisyphus": false,
   "createdAt": "2026-06-04T01:52:09.455Z",
-  "updatedAt": "2026-06-04T02:01:12.109Z",
+  "updatedAt": "2026-06-04T02:01:27.698Z",
   "activePath": ".pi/goals/active_goal_2026060402520945_mpyub75b-fkc8zw.md",
   "taskList": {
     "tasks": [
@@ -25,7 +25,9 @@
       {
         "id": "investigate-2",
         "title": "Trace daemon's main loop to find what gate skips repos",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-04T02:01:27.695Z",
+        "evidence": "Read daemon.rs lines 440-1100. Main loop has 7 skip gates: freeze marker, repo.exists, is_repo_ready, .git/index.lock, pending_repos grace, stuck_push_repos (5 min cooldown), has_both_main_and_master/",
         "verificationContract": "Read daemon.rs and identify every gate (cooldown, filter, fingerprint, ready check, etc.) that could cause a dirty repo to be silently skipped"
       },
       {
@@ -87,13 +89,13 @@ If blocked: stop and ask the user before adding new debugging output or making i
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 8m40s
-- Tokens used: 116K (115,836) tokens
+- Time spent: 8m55s
+- Tokens used: 116K (116,428) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
 - [x] investigate-1: Confirm current state: which WARN repos are daemon-skipped vs daemon-working — evidence: Confirmed which repos are daemon-skipped. `dracon-sync repos` consulted + ledger parsed. State per WARN repo: dracon-platform (1m ago, working - cat/mouse with my edits), cli-file-manager (2m ago, wor
-- [ ] investigate-2: Trace daemon's main loop to find what gate skips repos — contract: Read daemon.rs and identify every gate (cooldown, filter, fingerprint, ready check, etc.) that could cause a dirty repo to be silently skipped
+- [x] investigate-2: Trace daemon's main loop to find what gate skips repos — evidence: Read daemon.rs lines 440-1100. Main loop has 7 skip gates: freeze marker, repo.exists, is_repo_ready, .git/index.lock, pending_repos grace, stuck_push_repos (5 min cooldown), has_both_main_and_master/
 - [ ] investigate-3: Identify root cause for browser-extensions-shared + Junk-Runner-bevy — contract: Concrete root cause identified for each skipped repo, with code location + log evidence
 - [ ] fix-apply: Apply fix and verify with sync-now (no daemon restart) — contract: Fix applied; `dracon-sync sync-now` on each skipped repo succeeds; git status clean; new incidents in ledger
 - [ ] fix-verify: Final daemon verification: restart once, run repos, confirm ≤2 WARNs — contract: Daemon restarted, `dracon-sync repos` shows ≤2 WARNs, previously-skipped repos now committed, 18 OK repos still OK
