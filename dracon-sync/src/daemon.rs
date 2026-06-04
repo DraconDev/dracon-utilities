@@ -235,8 +235,8 @@ mod daemon_tests {
         assert_eq!(policy.max_stage_file_bytes, cloned.max_stage_file_bytes);
     }
 
-    #[test]
-    fn test_get_status_refreshes_index() {
+    #[tokio::test]
+    async fn test_get_status_refreshes_index() {
         // Verify that get_status() calls git update-index --refresh
         // by checking that a newly created repo returns correct status.
         let tmp = tempfile::tempdir().unwrap();
@@ -260,14 +260,14 @@ mod daemon_tests {
         
         // Get status should work and return clean repo with ahead=0
         let svc = crate::git::GitService::new(&repo).unwrap();
-        let status = tokio_test::block_on(svc.get_status()).unwrap();
+        let status = svc.get_status().await.unwrap();
         assert!(status.is_clean, "repo should be clean");
         assert_eq!(status.ahead, 0, "ahead should be 0");
         assert_eq!(status.branch, "main");
     }
 
-    #[test]
-    fn test_get_status_detects_unpushed_commits() {
+    #[tokio::test]
+    async fn test_get_status_detects_unpushed_commits() {
         // Verify that get_status() correctly detects unpushed commits
         // after git update-index --refresh.
         let tmp = tempfile::tempdir().unwrap();
@@ -317,13 +317,13 @@ mod daemon_tests {
             .unwrap();
         
         let svc = crate::git::GitService::new(&repo).unwrap();
-        let status = tokio_test::block_on(svc.get_status()).unwrap();
+        let status = svc.get_status().await.unwrap();
         assert_eq!(status.ahead, 1, "should detect 1 unpushed commit");
         assert!(!status.is_clean || status.ahead > 0, "repo should not be fully synced");
     }
 
-    #[test]
-    fn test_get_status_after_push() {
+    #[tokio::test]
+    async fn test_get_status_after_push() {
         // Verify that get_status() returns ahead=0 after pushing,
         // confirming git update-index --refresh works correctly.
         let tmp = tempfile::tempdir().unwrap();
@@ -376,7 +376,7 @@ mod daemon_tests {
             .unwrap();
         
         let svc = crate::git::GitService::new(&repo).unwrap();
-        let status = tokio_test::block_on(svc.get_status()).unwrap();
+        let status = svc.get_status().await.unwrap();
         assert_eq!(status.ahead, 0, "ahead should be 0 after push");
         assert!(status.is_clean, "repo should be clean after push");
     }
