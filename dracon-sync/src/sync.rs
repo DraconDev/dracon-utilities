@@ -1708,10 +1708,14 @@ async fn stage_commit_and_push(
 
     if committed_entries.is_empty() {
         if let Err(e) = run_git_with_timeout(repo, &["reset", "HEAD", "--"], 10, "reset").await {
-            return Err(anyhow::anyhow!(
-                "sync_repo: failed to reset HEAD after filter-only commit: {}",
+            // Non-fatal: the staging area will be cleaned up on the next sync cycle.
+            // The most common cause is index.lock contention from a concurrent process
+            // (sync-now CLI, warden daemon) holding the lock on the same repo.
+            eprintln!(
+                "⚠️ {} filter-only commit: git reset failed (non-fatal, will retry next cycle): {}",
+                repo.display(),
                 e
-            ));
+            );
         }
         if debug_enabled() {
             eprintln!(
@@ -1771,7 +1775,7 @@ async fn stage_commit_and_push(
         // `ctx.remote_failures` (the caller passes a `&mut HashMap`).
         // The `tokio::spawn` fire-and-forget pattern was removed because
         // it bypassed the failure-tracking needed by callers like
-        // `test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSArZ1hqeU0xQ0JvZFVPenppeWp5UlF0R1JrclF3ZUowclhESk5VV2RTTFdvCmJ0RHI4eFF2L1FZbzhTRHp5Rkg5amQ3QkFYQTlLTlpjZlJVRmd2YmxMcFEKLT4gWDI1NTE5IGpTb2UyV1N2NGt0RllDaE1GanRNZnhWSU5MOFlPUDM0VnlpV0ppYWw0VlkKSTRNelFudXQ0OEhJeVVzMDlWV1MrMS9TdUtFd2tnSEI1bytlZkJvMWxIZwotPiByeDxSVHAtZ3JlYXNlIHJxWG0qXgpTaXYrbUtBN1BXKzdYT092WitNQXlYVTl5L1JjWlFqcmJncDRVYlV4VFhUOEh4S0lrQVFOZHZ6amN3Ci0tLSBqTTZtVkREcmdHeTVScmVSb1QyS0QrR0dNc0NxUnhFTGphRGI1VVJxbXZZCqpYIXqLvccQxp4ad7soqxscJujuSAogFrn758zk2leGiwUvnHlLBKUkgiZyqFZQpAlqKFaCJpKG1A==]`.
+        // `test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBZMmlXVnArRW05MFBCVTllKzNvQmJRSXM3WHRNUlMrYVJmMkhhNThYN3lnCmkwSFNhNndWMFdkTHVraFVsaW5KMUhQNlZ2N1FxcXlyMll1M2dTU1E2MlUKLT4gWDI1NTE5IG0waXgxdmpkTEt0RllmeU1LaWswb1o4cUNwczVwNFNpaThLdjlhTXZDbVEKUGlmUWE3Umc3UTN6MEY5TVNDRE5NTC9hNW5laGNvOGtQVHAvT3J4T2tOWQotPiBXX2QudnlILWdyZWFzZSAmIXp4aWFQRCB5XFggLkM2KyNxCnlQOHgxYm1qTnNQcGx2UWdjbGYrazRhdTI0Q1RTSWhDYm5vc2c0WjNqbitiem1rQUtEUlpDSWZVTmRpVU1ncW4Ka1ZNWHpYMnczV3VRWlU2THdnazhuNXpxdTI5eTZGa1RtTFVCVkRwVkJRQ1MzWnlDNXVXOVpsQWtXdwotLS0gWjIzVFZxS2lBTytFcTFzTGdWZ1VTTDZsSG1VRnpDN1NxZnhyRCtsbnVLNApJZjkw/66G6FlImX/o0WBj4PHdNuUhX4ENk0U/EdFuQIxYZ2MwwFNGj37WzanQS8FGPJg+Kxw5ZKg=]`.
         match push_background(repo, policy, ctx.remote_failures.as_deref_mut()).await {
             Ok(true) => {}
             Ok(false) => eprintln!("⚠️ push failed for {}", repo.display()),
@@ -1992,7 +1996,7 @@ async fn handle_ahead_push(ctx: &mut SyncContext<'_>, svc: &GitService) -> Resul
         // Push synchronously so mirror failures are tracked in
         // `ctx.remote_failures`. Previously this used `tokio::spawn`
         // (fire-and-forget), which made the failure tracking unreachable
-        // for callers like the test `test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB6emliUDN6RnZFekpWNTBQcjcxeVlHV2tITXc0U2dqTUl5d3g3TUc2M1NrClRjbXA1NWhPYlVpbXRqbDJab3JIQjVkNWpJdWV4M1hMM3RUYU9VMGlVZ0EKLT4gWDI1NTE5IDFYaCtabTJsM0NJZjFDLy9GRGF1WXNnbmZuaG9MbjdTV2ttTVg5eUwyRVUKL2FpODFGQmYyT2ZaVjBsbGJvUHFqeVp3OWt6NHZjR3dvY3FHQ0trMkpFMAotPiBnXFdsTSktZ3JlYXNlCkZBeWoxS3NSUGdzY1hLVnovZDI1dkFoY2NPcmp3QUJoc210ZXg5bzk2R2QrSHYzTGNxZnRVVTd5aVNjCi0tLSAyQXhmeGZyYjJnaHZEa25vcHU2SVhBK2pFVlQzV3RVTjlycldibjdDOUFvCqcvEnPznXkbN3had3RJ7frsQLHrbzgs4JEIr/KdhYyUKWFOn8MU9jZd6l/d10z01FcxNKUZt9M49g==]`.
+        // for callers like the test `test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBsYk9PeHNkVXloTUlFZzVQWU5LeURTbjNobzdIbXpQb09RNkRqNzdFSGljCjZNdFVncFJIeDNGZmk4T0UwOWJ4OFROcFNIRTdqcFc5SU5XUi84NXVVdmMKLT4gWDI1NTE5IHFyUEE0MldwMnM2VVhKWmNzZFgrT1lLMnlkVVEyd2J4NkgyY3NyNTdybFEKU3lBaEhJM2tic01GMElKZExiUExOOHFSNi9lVXF4SHdlUDhPKytFb01LYwotPiA5OGJAQy1ncmVhc2UgXEUmIE0gWU1QYEQveFMKNy9iWFJFZGJtbHJPQndQMUwrNHNhSXVVNU45Y2JOd0sKLS0tIFo0a0o4WG9JZGdoMEh1Skh4THB1TVZLeXlRYnRXRENlVU9LSzVSazVtRXMKZPYwWuuTE3lYn8v6Mcrk5EhmMXJO8BJsI6X3isyayFrSmFGBs0SByCxnBi37ddIIafTtLJyle4tG]`.
         match push_background(ctx.repo, ctx.policy, ctx.remote_failures.as_deref_mut()).await {
             Ok(true) => {}
             Ok(false) => eprintln!("⚠️ push failed for {}", ctx.repo.display()),
@@ -2835,7 +2839,7 @@ push_url = "git@nonexistent.example.com:repo.git"
     }
 
     #[tokio::test]
-    async fn test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAvbHVxMmIrcnNEMmgzTlpTZ0F3N1gyNW9kc2FyTURIYTY0NHM0ZDQzSG4wCjhuNGNpK2xHQVRPZWdKSDV1RitEaEsxTUFVSDlpQjNmekt6ZUtuUzR3VDgKLT4gWDI1NTE5IFlycmcyczFyQiswNTFBVlBNQmpwQ3NvV2dwbVZic2RVQm5YTGJwLzVYRGsKTHROL1MydmxEYk5xNDk1Zy9Wd1pEL1h0QTRVQ0NKU3BXZTJNZTd6NFZmYwotPiArWn1pKXVnfi1ncmVhc2UgZlMKZHpGSmtZemlNQQotLS0gMmZVZ2ROWk1UdVl2RHU1Qnd4akZmWGoyUzZzYXRuaGhTSzdId09LOEJrbwoIAZP3b4lw7mZJCeiABqMZU+pLNCRmhtmRo6xcJpu4zNZDpfJNvIMuJwb47xmM1AvBrg1elB47HXk=]() {
+    async fn test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAvRjRFR1RoZ3lpNnc2b3dMbzNpSTA1QllGVS9aOS9BUFcvQjZZV1lWcWhZCk5HWFV2OFNFZXdHVzUxdnBhWHJxTWMxRTdFMG1vYTZ5aitrNTh3SDVpOTgKLT4gWDI1NTE5IFNzYWdONFFMUW56Z3h1SEdXT2xDcloxUjg3OWZWSGdUUjJaY3l6cDRXeU0KaGZWNjFSTjhpdG5SOGQxT3RGTjdLcVFsWExiSHpYeUtiWXVlRkc1UFNZNAotPiBgViNzKnVecy1ncmVhc2UgJDlxICdlUQpNd3NGdklVaEEzSUh0STN6L05odmllYlZoMjI4VkpzL2ZuUHF2YlUKLS0tIHVvZ1NaMG5seTBPejdvem5ObEhRSW9VSGtFOEFNSGxVdU55SDVSejltaHMK2OvO1stzu1tR+BKBzeQNKTvHyAm5RnR3gfuv2eIsAf0Tq0hMexrFQ5pkbbm0kZ4VbSHNaiNm+BUo]() {
         let tmp = tempfile::tempdir().unwrap();
         let origin_bare = tmp.path().join("origin.git");
         std::process::Command::new("git")
@@ -3191,7 +3195,7 @@ push_url = "{}"
     }
 
     #[tokio::test]
-    async fn test_sync_repo_exac[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBxckdHNk9hb3dTcGYrWVB1TDhNL2ZUMHJCRm5TVlljZmxVNWtkR1A4RUFZCklLRFlnakNadmlrcnNKdjVlMy9OVzlITGN6YXdyaXpzVmxVR0tTY3krVTAKLT4gWDI1NTE5IG5CQnd3cE81MWtlSlYyM2pQRG5xczIyNk4zWmYraHcvRktQc1ZNQkw2bUEKUTV0VWlrQllZWm9DM3gxRFgyZnY4U2x2SmYvTHhBNnBnWlNicm5xNWprbwotPiBCVHZaLWdyZWFzZSBkZDVNNCYgfSNbPWRdVgpYRHg2a0pNR1Nha3FlVGkraVFLT2pSVlFPSEd5NnVCSAotLS0gR0gxYjZhaWdRaG9peEc5eklIOHZPNU1CdXJNK2FNTmpsYjFBd2FiTWczRQofFidR4Kz1XzfFsS20g9hP64PrZrhu7RsOC8HQ0kuEzYCSpGX6ZcpWCyKabd6VTBytENoH3SsSBCoSBNuFjYA=]() {
+    async fn test_sync_repo_exac[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBJUFRFYXBoWjI1Q2NLOFNzZ3U5K0NvRXJyTkZGNjFRaTZzTTFHVmdlNDFNClMxNWppby9QaGErRWtFTzNCcjZ1WjFObUlvQkY2UVQ2aGY5WEMrMDZKN2cKLT4gWDI1NTE5IG8vS3R4b3g2WmV4c0lJSkt0T1R0MGRSd0JySGpSdU9jcmY5Zk5RbzZrQmcKVmNmUi9zYVlpbHVDdG1JOWVVd2JwWnZ0Yjc2YU5oRWFxUTM5UWQ3M1RMWQotPiAsZklALWdyZWFzZSB2LD5uKiA4XXIgP1Q8ID09NGsKTlpXM1RUOS8xdzRhUVdNaU4vcnRRc0tFRTNkV2RzMmF6ZVFIdy9NeWd3dWNhYmdDT2w0Rng1MXBsdWJaUkVxMQo0UCtKdndLcEl3Ci0tLSBMZGtObnIvQ2dZTVhFRldoS2t6endJQ3MyNWR5UVBWMUs0cURlZEwzMEdFCgrQkWTVzd3jZOt+NhaPsobr6OnINLY0gIIkIUq1H2O8kQUkkmYkzkN3c7fQD/8BmgB62uwoJqGacAHR31ifuw==]() {
         let tmp = tempfile::tempdir().unwrap();
         let repo = init_test_repo(&tmp, "exact-50-del-repo");
 
@@ -3714,6 +3718,53 @@ auto_bump_versions = false
             staged_str.trim().is_empty(),
             "nothing should be staged for filter-only repo"
         );
+    }
+
+    /// Regression: when all staged entries are filter-only (committed_entries
+    /// is empty) and `git reset HEAD` fails due to index.lock contention from
+    /// a concurrent process, sync_repo should return NothingToDo instead of
+    /// propagating the error. The staging area is cleaned up on the next cycle.
+    #[tokio::test]
+    async fn test_filter_only_reset_failure_is_non_fatal() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "filter-only-reset-fail-repo");
+
+        // Create .gitignore and commit it
+        std::fs::write(repo.join(".gitignore"), "*.log\n").unwrap();
+        git_cmd(&repo, &["add", ".gitignore"]);
+        git_cmd(&repo, &["commit", "--no-verify", "-m", "add gitignore"]);
+
+        // Create a tracked file that matches the gitignore rule
+        std::fs::write(repo.join("debug.log"), "v1").unwrap();
+        git_cmd(&repo, &["add", "-f", "debug.log"]);
+        git_cmd(&repo, &["commit", "--no-verify", "-m", "add debug.log"]);
+
+        // Modify the tracked+gitignored file (dirty)
+        std::fs::write(repo.join("debug.log"), "v2").unwrap();
+
+        // Create a fake index.lock to simulate concurrent git process
+        std::fs::write(repo.join(".git").join("index.lock"), "concurrent").unwrap();
+
+        let toml_str = r#"
+        auto_github_private = false
+        auto_commit = true
+        auto_pull = false
+        auto_push = false
+        auto_bump_versions = false
+        "#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        // sync_repo should NOT fail — the filter-only reset failure is non-fatal.
+        // Before the fix, this returned Err ("failed to reset HEAD after filter-only commit").
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(
+            matches!(result, Ok(SyncOutcome::NothingToDo) | Ok(SyncOutcome::Synced)),
+            "filter-only reset failure should be non-fatal, got {:?}",
+            result
+        );
+
+        // Clean up the fake index.lock so the test teardown doesn't hang
+        let _ = std::fs::remove_file(repo.join(".git").join("index.lock"));
     }
 
     #[tokio::test]
