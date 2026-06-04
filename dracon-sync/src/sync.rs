@@ -2939,7 +2939,7 @@ push_url = "git@nonexistent.example.com:repo.git"
     }
 
     #[tokio::test]
-    async fn test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBBbTRJN2tQZFFsZzFNOTBoTm9JeFltR28wSnR3aWhBd2ZOcVdFZmQ3VHhZCmRDSGxKd3NnaDJUSkwxMFlVd3g4MmQ1eWdRVnprY1BJeUNyMlZ5US81KzAKLT4gWDI1NTE5IDUyaGYwaEVGc0oxcmFWekdaL2RSM1FpWitkeVNYeHhaZFgvbXI1VkFOakEKNW9VSjNoMDV6Z0hXNWVBRGdBVDZZWExyaXpJMzNKQjA4R2VnMkNRUVVrWQotPiBJVy1ncmVhc2UgT1svbC8uc2UKVjYreUVhVlFtb1RsR3d3cllEaC9nS0dRaVEKLS0tIHVpeVZMZ0ZnZEJkVkpSZ01FYmxrMGh2c0xPanQ0bWhyWmkveGJGaDB3RE0KXSvCBos1js55oZo2XkHkQFr9XCRp7BWlOzL+wEY7GSn6RPfoQvPETBZITiFrHezmkWZna1EpFkiV]() {
+    async fn test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBaZ0N1cHQ4SkNKOWI4cmVsb3kvOFl5b3BlYWNMRjBBTzNNNzVoaS9yaUU0CnZDbStvMjVHcXNvNmFvWXdNbTNmb2hFenE4WGNPMDY2ZW5WeXJEK1hUMVkKLT4gWDI1NTE5IElGNWtwcS84b09JK2NwZlNWUEpXL1huR1FQbVM4Rnh1eHB6US9qTTR1em8KdmRzaTVGSEJwL29wbGowTU1yd3NsRmlrdkV6bUtmTWp6UnJjOEVOYzF1NAotPiB9SCpaQSQtZ3JlYXNlIHctPihQZE0gLX01WSYgWSgzOwprUGJWOVJHNDREZ0xzdXdKS21SSFpzc3hnb2JRQnA1eGlsMnFQdTJUNjZLczAyWnQ3akJ1anU0bW56elYKLS0tIHJycVNTTGRRcTBoZ3RlSTNyWVdwR01KOFZyN21ydnVYdG5NN0k1MEs1VTgKdsbSMh24W9ndZzPlnDgXB7mvaRQVkRNIOqSK6Y/IFzecfhLZndIpaKVmNM1iz9UFjPG/rAW6jWhY]() {
         let tmp = tempfile::tempdir().unwrap();
         let origin_bare = tmp.path().join("origin.git");
         std::process::Command::new("git")
@@ -3295,7 +3295,7 @@ push_url = "{}"
     }
 
     #[tokio::test]
-    async fn test_sync_repo_exac[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBDMnFGMFgrb21YanhKSmNSNTQ5QnRyMitmdE4zL1pKUVltM1M2d2c1bG1rCmc4cjBMMkRaemx5R3FJeHk4cTRrZGI5UGpRY2pCam1MNFpZVzhqNU0xWmcKLT4gWDI1NTE5IGo3cnUxZjkxdDFabmNleE5FSEJYM0o5MXhwZHhzWTkzMWJwRFgvNU5UaEEKQTJLVytoeXVjWFkxTk5rTkprQXVCd096ZjBaZWZnTU44Q0NZUG9GR3oxTQotPiAuKHM+ImUtZ3JlYXNlIG82UFVXKwpPKysrOWRHZXdLa1o2MGttcnFkUjY1cjlEanQrCi0tLSBOWURLbWRMUGhURFhrWk1TSGZEbCtteFNFc3NpUFpUSlNPUm05c2pab0lvCnT0wCbAEbAC7ivHpu28o1PsAKAZq8PWv7M3mbV4gfUJanjbw+3IiybbgRqUMLdNrfIKGrDC5E25DW7WPxDeww==]() {
+    async fn test_sync_repo_exac[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAvd0NpU0tEKythaGFDbCtsdXBFZERkU3pMUEJodzRiZktiS3ZEYmk2NTF3CjI4aFpaRk1ZNGdHSzBMRndYSXBNanNwc2tuNUMrQTQ2Nm05ZXlWalhnVEkKLT4gWDI1NTE5IHBiQWlkQTBNQW5wMEpQL255a3h3U0JjVE9DdUVLeEtmTlI1cU9LYTVnV1UKZTFNZDloQ2hSSmIyd1ZySVdFRUNvaGJPZjNCQm81cys1S2dWcVowTFU5awotPiBhWEd5P28tZ3JlYXNlICxrYmEgP08gZVJCXyR4RSA3TCUkCmkzS21GVy85anl4dDBHL1NDekZoUkE0STBZN0ZrL1UvWDBxVllwNE0KLS0tIDZKbzlKZFlCQTNva3piVHIwdEZ5NFBhTnFtOGwxMkdNWDBwRWZNVGZCMEUKCG0gKlMfd+imsBpZrVEy71FbyS7U17urNd6MajNWrwIy9QYv23I48HAs9MwqVTMw75KnUgeVOag03c2ex5f6]() {
         let tmp = tempfile::tempdir().unwrap();
         let repo = init_test_repo(&tmp, "exact-50-del-repo");
 
@@ -3932,74 +3932,65 @@ auto_bump_versions = false
     async fn test_partition_gitignored_tracked_file_with_gitignore_rule() {
         let tmp = tempfile::tempdir().unwrap();
         let repo = tmp.path().join("repo");
-        std::process::Command::new("git")
-            .args(["init", "-q", "-b", "main"])
-            .arg(&repo)
-            .status()
+        test_git_cmd()
+            .args(["init", "-q", &repo.to_string_lossy()])
+            .output()
             .unwrap();
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["-C", &repo.to_string_lossy(), "config", "user.email", "t@t"])
-            .status()
+            .output()
             .unwrap();
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["-C", &repo.to_string_lossy(), "config", "user.name", "t"])
-            .status()
+            .output()
+            .unwrap();
+        // Switch to main branch (init may have created master on older git)
+        test_git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "checkout", "-q", "-b", "main"])
+            .output()
             .unwrap();
 
         // Create a file, track it, commit it
         std::fs::create_dir_all(repo.join("subdir")).unwrap();
         let tracked_path = repo.join("subdir/types.d.ts");
         std::fs::write(&tracked_path, "original\n").unwrap();
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["-C", &repo.to_string_lossy(), "add", "subdir/types.d.ts"])
-            .status()
+            .output()
             .unwrap();
-        std::process::Command::new("git")
-            .args([
-                "-C",
-                &repo.to_string_lossy(),
-                "commit",
-                "-q",
-                "-m",
-                "init",
-            ])
-            .status()
+        test_commit_cmd()
+            .args(["-C", &repo.to_string_lossy(), "-m", "init"])
+            .output()
             .unwrap();
 
         // Now add a gitignore rule that matches the tracked file
         std::fs::write(repo.join(".gitignore"), "**/types.d.ts\n").unwrap();
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["-C", &repo.to_string_lossy(), "add", ".gitignore"])
-            .status()
+            .output()
             .unwrap();
-        std::process::Command::new("git")
-            .args([
-                "-C",
-                &repo.to_string_lossy(),
-                "commit",
-                "-q",
-                "-m",
-                "add gitignore",
-            ])
-            .status()
+        test_commit_cmd()
+            .args(["-C", &repo.to_string_lossy(), "-m", "add gitignore"])
+            .output()
             .unwrap();
 
         // Modify the tracked file
         std::fs::write(&tracked_path, "modified\n").unwrap();
 
         // Sanity check: plain `git add <path>` would fail on this tracked-but-ignored file
-        let plain_add = std::process::Command::new("git")
+        let plain_add = test_git_cmd()
             .args(["-C", &repo.to_string_lossy(), "add", "subdir/types.d.ts"])
             .output()
             .unwrap();
         assert!(
             !plain_add.status.success(),
-            "precondition: plain `git add` should refuse tracked file matching gitignore rule"
+            "precondition: plain `git add` should refuse tracked file matching gitignore rule; stderr: {}",
+            String::from_utf8_lossy(&plain_add.stderr)
         );
         // Reset any state
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["-C", &repo.to_string_lossy(), "reset", "-q", "HEAD"])
-            .status()
+            .output()
             .unwrap();
 
         // Call partition_gitignored — tracked file must go to force_paths
@@ -4025,28 +4016,31 @@ auto_bump_versions = false
     async fn test_partition_gitignored_untracked_gitignored_is_skipped() {
         let tmp = tempfile::tempdir().unwrap();
         let repo = tmp.path().join("repo");
-        std::process::Command::new("git")
-            .args(["init", "-q", "-b", "main"])
-            .arg(&repo)
-            .status()
+        test_git_cmd()
+            .args(["init", "-q", &repo.to_string_lossy()])
+            .output()
             .unwrap();
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["-C", &repo.to_string_lossy(), "config", "user.email", "t@t"])
-            .status()
+            .output()
             .unwrap();
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["-C", &repo.to_string_lossy(), "config", "user.name", "t"])
-            .status()
+            .output()
+            .unwrap();
+        test_git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "checkout", "-q", "-b", "main"])
+            .output()
             .unwrap();
         // Make initial commit so HEAD exists
         std::fs::write(repo.join("README"), "x").unwrap();
-        std::process::Command::new("git")
+        test_git_cmd()
             .args(["-C", &repo.to_string_lossy(), "add", "."])
-            .status()
+            .output()
             .unwrap();
-        std::process::Command::new("git")
-            .args(["-C", &repo.to_string_lossy(), "commit", "-q", "-m", "init"])
-            .status()
+        test_commit_cmd()
+            .args(["-C", &repo.to_string_lossy(), "-m", "init"])
+            .output()
             .unwrap();
         // gitignore a path
         std::fs::write(repo.join(".gitignore"), "ignored.log\n").unwrap();
