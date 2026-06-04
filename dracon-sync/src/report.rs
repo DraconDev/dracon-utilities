@@ -2706,6 +2706,8 @@ mod tests {
             last_msg: "test commit".to_string(),
             last_unix: 1700000000,
             last_push: "5m ago".to_string(),
+            push_status: "OK".to_string(),
+            push_error: String::new(),
             concern: false,
             warn: false,
             hint: "healthy".to_string(),
