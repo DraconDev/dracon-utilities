@@ -641,6 +641,17 @@ pub(crate) async fn run_repos_report(
         let flags = repo_state_flags(&effective_status, has_origin, has_upstream);
         let hint = repo_hint(&flags, warn, concern);
 
+        // Calculate push status from flags
+        let (push_status, push_error) = if flags.iter().any(|f| f == "STUCK_PUSH") {
+            ("STUCK".to_string(), format!("ahead={}, push failing", effective_status.ahead))
+        } else if flags.iter().any(|f| f == "NO_UPSTREAM") {
+            ("FAIL".to_string(), "no upstream set".to_string())
+        } else if effective_status.ahead > 0 && has_origin && has_upstream {
+            ("PENDING".to_string(), format!("{} unpushed commits", effective_status.ahead))
+        } else {
+            ("OK".to_string(), String::new())
+        };
+
         let last_hash = status
             .last_commit_hash
             .as_deref()
@@ -723,6 +734,8 @@ pub(crate) async fn run_repos_report(
             last_msg,
             last_unix,
             last_push,
+            push_status,
+            push_error,
             concern,
             warn,
             hint,
