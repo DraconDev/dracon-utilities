@@ -5,19 +5,20 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 650924,
-    "activeSeconds": 75
+    "tokensUsed": 748026,
+    "activeSeconds": 85
   },
   "sisyphus": false,
   "createdAt": "2026-06-05T23:48:25.932Z",
-  "updatedAt": "2026-06-05T23:49:45.441Z",
+  "updatedAt": "2026-06-05T23:49:55.823Z",
   "activePath": ".pi/goals/active_goal_2026060600482593_mq1krsgc-wjnshs.md",
   "taskList": {
     "tasks": [
       {
         "id": "audit-current-state",
         "title": "Audit current docs and root clutter",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-05T23:49:55.821Z",
         "verificationContract": "Output a list of: (1) all md files with line counts, (2) all top-level clutter files, (3) every fact-claim that disagrees with AGENTS.md."
       },
       {
@@ -118,12 +119,12 @@ If blocked: stop and ask the user.
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 1m15s
-- Tokens used: 651K (650,924) tokens
+- Time spent: 1m25s
+- Tokens used: 748K (748,026) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
-- [ ] audit-current-state: Audit current docs and root clutter — contract: Output a list of: (1) all md files with line counts, (2) all top-level clutter files, (3) every fact-claim that disagrees with AGENTS.md.
+- [x] audit-current-state: Audit current docs and root clutter
 - [ ] update-gitignore: Update .gitignore to prevent re-clutter — contract: .gitignore contains patterns for: pi-session-*.html, /rust_out, autoresearch.jsonl, debug.log, *.html.tmp. dracon-sync pause issued, no auto-commits during cleanup.
 - [ ] create-docs-dir: Create docs/ directory structure — contract: docs/ exists with ROADMAP.md, ARCHITECTURE.md, OPERATIONS.md, archive/ subdir.
 - [ ] move-archive-docs: Move dated planning docs to docs/archive/ — contract: MASTER_ROADMAP_2026-06-01.md, STUCK_PUSH_TRIAGE_2026-06-02.md, REPOS_CLEANUP_PLAN_2026-06-01.md, REFACTORING_BLOCKER_ANALYSIS.md, AUDIT_2026-05-29.md, audit.md, AUDIT.md, AUDIT_CHECKLIST.md, todo.md, TODO.md, tasks.md, SPEC.md all either deleted or moved to docs/archive/.
