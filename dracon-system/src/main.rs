@@ -183,6 +183,17 @@ enum Commands {
         #[command(subcommand)]
         cmd: LinkCommands,
     },
+    /// Scan filesystem for broken symlinks (report-only).
+    Symlinks {
+        /// Optional root paths to scan. Defaults to ~/Dev, ~/.dracon, ~/.local/bin, ~/.config.
+        roots: Vec<PathBuf>,
+        /// Emit machine-readable JSON.
+        #[arg(long)]
+        json: bool,
+        /// Maximum depth to descend (default: 4).
+        #[arg(long, default_value_t = 4)]
+        max_depth: usize,
+    },
     /// Zram management: show stats and generate NixOS config for tuning.
     Zram {
         /// Show current zram statistics.
@@ -3383,6 +3394,11 @@ async fn main() -> Result<()> {
             .await
         }
         Commands::Link { cmd } => cmd_link(cmd),
+        Commands::Symlinks {
+            roots,
+            json,
+            max_depth,
+        } => crate::links::cmd_symlinks(roots, json, max_depth),
         Commands::Guard { cmd } => cmd_guard(cmd).await,
         Commands::Events {
             tail,
