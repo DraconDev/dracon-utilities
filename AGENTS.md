@@ -90,13 +90,13 @@ Services are in `~/.config/systemd/user/`:
 |---------|--------|---------|
 | dracon-sync.service | dracon-sync daemon | Git sync automation |
 | dracon-system-guard.service | dracon-system guard daemon | Disk/process protection |
-| dracon-warden.service | dracon-warden daemon | Security hardening (optional — hooks are primary) |
+
+> **Note:** `dracon-warden` has no systemd service — git hooks (installed via `setup-hooks --global`) are the primary security enforcement layer.
 
 ```bash
 # Restart after install (install.sh does this automatically)
 systemctl --user restart dracon-sync.service
 systemctl --user restart dracon-system-guard.service
-systemctl --user restart dracon-warden.service  # optional
 ```
 
 ## Systemd Service Files
@@ -143,33 +143,7 @@ Service files are installed to `~/.config/systemd/user/` by `install.sh`.
 | `RestartPreventExitStatus` | `2 78` | Don't restart on config/argument errors |
 | `ReadWritePaths` | `~/.dracon, ~/Dev, ~/.local/state/dracon, ~/.local/share/Trash, ~/.cargo, ~/.cache, ~/.npm` | Writable directories |
 
-### dracon-warden.service
 
-| Setting | Value | Purpose |
-|---------|-------|---------|
-| `ExecStart` | `dracon-warden daemon` | Runs warden daemon |
-| `Restart` | `always` | Restarts on any exit (clean or crash) |
-| `RestartSec` | `3` | Wait 3s before restart |
-| `Nice` | `10` | Lower CPU priority |
-| `CPUQuota` | `10%` | Max 10% CPU usage |
-| `MemoryMax` | `1G` | Max 1GB RAM |
-| `MemoryHigh` | `384M` | Soft memory limit |
-| `TasksMax` | `64` | Max 64 threads |
-| `NoNewPrivileges` | `true` | Security hardening |
-| `ProtectSystem` | `strict` | Read-only system fs |
-| `ProtectHome` | `read-only` | Read-only home (except allowed paths) |
-| `ReadWritePaths` | `~/.dracon, ~/Dev, ~/.local/state/dracon` | Writable directories |
-| `PrivateTmp` | `true` | Isolated /tmp |
-| `RestartPreventExitStatus` | `2 78` | Don't restart on config/argument errors |
-
-> **⚠️ `Restart=always` behavior**: Unlike `Restart=on-failure` (which only restarts after crashes),
-> `Restart=always` restarts the daemon **on any exit** — including `systemctl stop`.
-> This means `systemctl --user stop <service>` alone will NOT keep the daemon stopped;
-> systemd will restart it within `RestartSec` seconds.
->
-> - **To restart**: use `systemctl --user restart <service>` (single command, not stop+start)
-> - **To permanently stop**: use `systemctl --user disable <service>` first, then stop
-> - **To check**: `systemctl --user status <service>` shows `Active: active (running)` or `Active: activating (auto-restart)`
 
 ## Policy Files
 
@@ -515,7 +489,7 @@ auto_publish = false  # master toggle (default: off)
 [[publish_targets]]
 name = "crates-io"
 registry = "crates-io"    # crates-io | npm | pypi
-[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBEZ0lCSEtNSVd2RzJKTFBYN2Y4UUs3U0JVdGVuNUZzRGQ3cTBQQndDVzJvCk01My9XTWZQTTM2RmdtWStZc3UxeEtHL1lHUVBSdy9zUUxxVW4xb3E1UXcKLT4gWDI1NTE5IGtzZkpsb0U1c0Y1cDdHWnJxUlcwUHlPcmFVSWVTWHQyY1RSUGl2bDNGbFkKQm15TkJiT2t5Q0FLdTlHcndpQVYwTVFYdHpad3pqY1dmK0puWE1TaXJTTQotPiAvNlJ3flstZ3JlYXNlClN6a0VPb25zOGR3U3BpWHN6aTJNMlhxZGZKU0padFlJUkRMOU8wUQotLS0gRnhEcEVrQ3hXbE1aSHJJWUZFU2FvL2YrZ0MxMXZDTmFoWStXOTdkcyt2NAoZhQh63J1LBbjesz2HjVIsTAhDJTrvUIykQYvkuWnJ+fLjCACU9x3MEoub+M4ipUZvTqernNr90Kn02rZCOCzSLrf9qr4=]
+[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB0aFpncER0WlZEUWVaeTVoVkpEVlVjbER6MTEzNWlZNkFtenJpT1J6aDA0CnFiblBGcHpYdW54NmlBeGtmWTF0dkxtZGJEejJUNlBxOVhSNU5OcFdjODgKLT4gWDI1NTE5IGpNUW5pNzY4Ykt5YXVmTXFnblhMKy9YTms3K0ZmRmRrWGUrYjZpVGM4Mk0KV0RWcDhCeHBIUCs4TVVkdFBObkdUSFVicEIxOHVZem11dmZWa2FiSXBUVQotPiB2cUtyLWdyZWFzZSA3bFBtTVkoCmtLMGNlSFJiV0srNQotLS0geEl5RWpiT0dDR2VLdEUzR3JHck5NMjNqdVJYdDdaK1ZLNkE2M2dnT0dQZwqWXRB6Vx27fyQryc7F/gEwhl67pvZI3gv/XSt4MTLdqAnTxc/uadBhgB+cXjF0B5kdraENTb3Wm3I32kZQZj46WcX+jP8=]
 publish_timeout_secs = 300
 ```
 
@@ -589,9 +563,8 @@ Commands:
 ```
 dracon-warden [OPTIONS] <COMMAND>
 Commands:
-  daemon         [DEPRECATED] Run forever with filesystem event debounce
-  once           Run one hardening pass [repo]
   status         Show resolved policy path and watch roots
+  once           Run one hardening pass [repo]
   filter-clean   Git filter clean (stdin -> stdout)
   filter-smudge  Git filter smudge (stdin -> stdout)
   scrub-markers  Scan DRACON_SECRET markers [--apply] [repo]
