@@ -918,7 +918,7 @@ async fn main() -> Result<()> {
             } => {
                 let policy = SyncPolicy::load(&policy_path)?;
                 if !policy.auto_publish {
-                    anyhow::bail!("auto_publish is disabled in config. Enable it or use `dracon-sync publish run` with --force.");
+                    anyhow::bail!("auto_publish is disabled in config. Enable it in your sync policy.");
                 }
                 let repo_targets = if targets.is_empty() {
                     policy

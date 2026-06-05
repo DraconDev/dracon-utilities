@@ -1970,7 +1970,7 @@ async fn stage_commit_and_push(
         // `ctx.remote_failures` (the caller passes a `&mut HashMap`).
         // The `tokio::spawn` fire-and-forget pattern was removed because
         // it bypassed the failure-tracking needed by callers like
-        // `test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBsN3ZsU01WWDZOWTFoNHFaYXRvbWdmNlYxVkQzcjYzVWhKN1orN0JSdlJBClRuMTJ2VXFMMHJRSU5wL28zSkZzVnRwNDZQbGNTaDhscWVNZVZKWTh4MnMKLT4gWDI1NTE5IDFWMmpaelIyRjB5YldVbDVydDllTmM2bmFrclZ1VHNKYUpDbm9aUllqMk0KU08yaVJSYUMvTnduK3NNTnZBVTZtRGEycGYySENYamdzQXRJOFdRVkVCTQotPiA6WGZxKEkhUi1ncmVhc2UKVVM3U3VkUmh1Tk9FZEo0Nkd4a2lTcmV0ajBBVGNEM0Z2K29ICi0tLSBzRlk4Rno3bUwvaHlMMklKRGlZZDdubSs3c0h5eVZVRjk3S0NuZCswRmFZCtCVvDThGsgAnYUbZWinnx20BXP/+NiW3D01x0D6qxJuDv8JgUlaF8KtHRR72cIVkj2BfmSaG9Hb0Q==]`.
+        // `test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBIZ1ZMeTV3MVlqa0srbnZGM2dtcFBnRFRJV0pESGg3UjJoMHRwMHM4UzNnCkN1a0V4NmdQRDQ1NDBKQkdWdDN6andYSDdYdlgrZ1lpZU5RdksxV3Q3Tk0KLT4gWDI1NTE5IGlET3lNT2g2dWV6b1hUVkFrWmRyYUV0UUk5SFFWMUlRb3dtdTZrVlBJU3cKaE5ObmdvbzdOVmFTTHp0cXMzZEdLeFhQQlU5NFpKN2FyZEJSNk1TUTVmNAotPiBtXU1jOGxrLWdyZWFzZSBINmkgZWo0ICMhd3snIGFya3xLY3pRCnNaWmxwU0lhRE84UGZJMXFNYmljUVVRcGY4N0VrSUUKLS0tIFVQTFM5eFllTnljK3RTNDJzMFQzWnpUeEVWcThCd0NDcHdTOWRwZjFtT0UKLZhmgPh4uiyFpHkYi9sGyYHO/m8PY94eP/p3hIrfr6zz5oWHHwusr7petv7PyWDWOLKuMSAFJkrV]`.
         match push_background(repo, policy, ctx.remote_failures.as_deref_mut()).await {
             Ok(true) => {}
             Ok(false) => eprintln!("⚠️ push failed for {}", repo.display()),
@@ -2191,7 +2191,7 @@ async fn handle_ahead_push(ctx: &mut SyncContext<'_>, svc: &GitService) -> Resul
         // Push synchronously so mirror failures are tracked in
         // `ctx.remote_failures`. Previously this used `tokio::spawn`
         // (fire-and-forget), which made the failure tracking unreachable
-        // for callers like the test `test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB6b3ZzaEc1S2NLZWp5eUR5bnRCNUc4cW1QZUh3UWNtZGI1ajVRQ0RHMjFFCjY5UXRSVGhZK28xZWNOZzhFaEQ4ZjRmUmRkVTNWUzVLMXhmTUlZbWt4bDAKLT4gWDI1NTE5IGl6L05UYm1GcW92NExuaWlvdHB6SDhkdFA4ZFQ4Wjg1Z0dxMHJFRUNjaVkKLzBvMVd4Nmk1RG0zWWJnR0FUWDVibnc1c1hXdkRDQ2E5b0R6Mkpmcnl0bwotPiB3ITUtZ3JlYXNlIFYwaS94ciArCmtPYzhTZmlGQjcrQzkxWWZSSzZSRU1GRTdJa0hFWnFMVWpPZm54cGZMY0tXRGcKLS0tIEtmcW9idUc2U2Q3dkEzRFNNVmd4ak1hVVB6RTNtalJBWlFhdDJwOWxueEkKii4DxM9Uy3k8AgLrMnEgWU3kq8FdcAKVLIuwXwhB2Bzpw0ZVYGSNRmUHr/rEwm+3R0FqbDrgdvEr]`.
+        // for callers like the test `test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBGTGpNU3NpaUdwQ0g3Z0JPaXlOcHIrTEFVblg0L0VBSFB5NG1scXBHTlU4CnlOZkI0ZXVEdHpDWkRteC85dS8vRVJ0SExscGRTVU5kTlRIYmpoWlQza00KLT4gWDI1NTE5IFZ5Y2h0cWQza01jWlcyeXQyVUN3YUpRWWpZbGV3Q1doaDlEMGhZVlpuakEKUW50bGUwcHVaUXhqUUM5Z3ZLclVXcmtuOWhwbmxJQTlickZVdlpnZDM4ZwotPiBDOVczY0FObi1ncmVhc2UgJ3IgKj9lIHNtUUdMZCAjJgpGTytZeWdySmFodE51Mm4wZVFzUXdyUHBYaTJuYld3bWsyWVBsbStvQUlIeUl5M2xCVnBSaFhXN0J3Q2sxM0NyCm85MTA5VHI3aVhJT0RLY1Z2RzEwR0Fqa0pib1QKLS0tIHhjQitIZURMTEVkN0Jza29CM2pHa3krdG5Ba2RvWFplWWZGZXdlN3FMeFEKLXdx+oTiXTE7h1JkKIuQiH09wCOCdB8Lj1DAVcctDU4SozYeb1qAx4sq3f6OOoyegWL5tW5L7tua]`.
         match push_background(ctx.repo, ctx.policy, ctx.remote_failures.as_deref_mut()).await {
             Ok(true) => {}
             Ok(false) => eprintln!("⚠️ push failed for {}", ctx.repo.display()),
@@ -3034,7 +3034,7 @@ push_url = "git@nonexistent.example.com:repo.git"
     }
 
     #[tokio::test]
-    async fn test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBhNmFUZDJLMElMMVVOa0VjZWE0cVRGYlJUVUJFeXBnMjIyUXZjN0NRSFJnCnBmRUJjWnhHcGVFb08rWkFrZlVEZHFybnc0akcxZXE0TjVYQkFZRGNqQUkKLT4gWDI1NTE5IHMyckJ1bUpyRTIrcFhZNTdEUzVucmRpT1JQbmU3OEczTjlFTHVUL2NYQlUKYTdhU21QOWU3eWRoVU9VSldJY21lY1BNNFh4WXpONDVNWFkwa0hvR2NicwotPiBeLWdyZWFzZSBoIFRZKyBFaSA/CmxKZwotLS0gbnlvNGI5ZWRhb21Ic2c2bjBWalpUanhnN0VtZXdmT1J2WEJ1b2NqQS9nbwqWFockPY140Fc/3ccTAXDqz9OohKMz8e3zq7oYZJQSu+NBOkfj737RuGB4V7Fex7li6WmNtP51D/k=]() {
+    async fn test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA0emo5ZFpjQ0toek8zZDlWcVpCaHRNaWdSTHZ3UVIvN0RldE15Z0d5YzNBCnVNOVBuWGcxeG8wYmFDNEpOZnZndmxhUkZKbDc4ZUtLQmErWlZ2OVlaRzAKLT4gWDI1NTE5IE4zbVIyVVFSclhKekxTSXhnc0J1TVNFMDVDQjFJb1B2bDArcHV3aHNLaXcKV0w4VTVsRHphVmQxZWZDV1ZyK09kV29YKzkyVkhzRi9kQkUwdGE4ekRPdwotPiBsJGgtZ3JlYXNlIHFSID84CkppTmhwSGRKVWdzV091MGhJUk1qTnZhOWphR291RlczNm5GbDJSRi9hSzh0UFU5MTB5NitDQmkwL1NibE92Rm0KQ0grUFVlL2FTVHArSGNsSG5KUG9abThFbkpPUmhWS2s4SFUKLS0tIFlmcnh4YjJ3cnp1L3JRLyt4WUo0QmUveUU3YWJwcVNXc3BldWxGWXRDN2cKiZ7KUexVKCC7PkcGkDQVcxE8eQZ3UqXWM95/MfbHMwCj4xgvh1ebDcMXMN1o9SO5UfZOaGRGHDRr]() {
         let tmp = tempfile::tempdir().unwrap();
         let origin_bare = tmp.path().join("origin.git");
         std::process::Command::new("git")
@@ -3390,7 +3390,7 @@ push_url = "{}"
     }
 
     #[tokio::test]
-    async fn test_sync_repo_exac[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA2TDFMNld5WEVZUFNyaDB5V05TMklXRXp6aGh4UmhyZ3RGODM0ek5vOGtrCjlZaDlVYjZTczFKQ3luZXlLakJPaTdoVEhwR01lWFdGNUxvWTFjLzBjMWsKLT4gWDI1NTE5IG9WOEhnUEgyaSszcDlEUFUxbmxqcW5zN2RMYW9qelYxUkVRd0Fsbit2MUUKUnl3Mi9VLzBvcGhEeHRRbGtTdTh2NVRSeWwvZCtXZWt3RHVvWURQb05zOAotPiBcJS1ncmVhc2UgKUU+ICE2IGQlfGIxdD4KCi0tLSBwbzN3SFVzN0FEaSs2b1ZKeFFiTjlBZm1neTMrWUdFYXJYNGl4VE40UlNNCt7a1fHcnmizzEopysxg/Ogl0ItOcKcBKTPD2RnNy66JYvkiQYYge8Xq9BAaKzsbtTdB+sasZGd5hO4heI3oNQ==]() {
+    async fn test_sync_repo_exac[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBuN2lNcC9yaStkckpZemw1S3NmdUFxREdtZDlQY2J2WkhXTmV6Y3RRaGdnCjlsS0JET0s5ejZkNGFhMFRYYTRaUS9aTzl6SDRRNzU5V0w2ak0xNWcxelEKLT4gWDI1NTE5IFZZc1Rha0NxQWVkNXh1dEZwQXVOcFNWYjcxV3FDRTdzdnc5S1BkRTc2UUkKTmY3UjZxSTJIcmszSDAwbkVkNE5PYW9qNWdvSXZML3orTnFNZmVYUEd5dwotPiA9LWdyZWFzZQo5anBGeFU3T3dzL1FsQU8zU3JMWEFETXNFbGJaU0RJbXJyT3pCS1ViSWxuWWh4OTlXSzFYZzliQlRmdWJDUQotLS0gbGR3MTQzQlNWVFZmSlZ3VUgyaWdZNW02ODFQR0E1cVhPcHdqQ0hpOENmMAqBBXxU63nE94U12HPTGkuL//LMDW5xe1KomnVW0EJkrLKg43RY2G6p5EZUqV77GIz3dfEj/GaWFwAvuR0irG4=]() {
         let tmp = tempfile::tempdir().unwrap();
         let repo = init_test_repo(&tmp, "exact-50-del-repo");
 
@@ -3799,29 +3799,7 @@ auto_bump_versions = false
         assert!(result.is_ok(), "sync_repo should succeed");
     }
 
-    // Property-based test: verify safety guard logic for arbitrary deletion percentages
-    #[test]
-    fn test_safety_guard_property() {
-        use proptest::prelude::*;
 
-        proptest!(|(total in 1usize..100, delete_count in 0usize..100)| {
-            let missing_count = delete_count.min(total);
-            let is_mass_deletion = total > 0 && (missing_count * 100) / total >= 85;
-
-            // Verify the guard blocks at ≥85% deletion, never below
-            if (missing_count * 100) / total < 85 {
-                prop_assert!(!is_mass_deletion, "guard should NOT block partial deletion: {} of {} ({}%)", missing_count, total, (missing_count * 100) / total);
-            }
-
-            if missing_count * 100 / total >= 85 && total > 0 {
-                prop_assert!(is_mass_deletion, "guard SHOULD block mass deletion: {} of {} ({}%)", missing_count, total, (missing_count * 100) / total);
-            }
-        });
-    }
-
-    /// CR-1 regression test: when mass-deletion guard blocks, the index must be
-    /// reset so that pre-existing modifications are not left staged uncommitted.
-    #[tokio::test]
     async fn test_deletions_committed_when_intentional() {
         let tmp = tempfile::tempdir().unwrap();
         let repo = init_test_repo(&tmp, "deletion-commit-repo");

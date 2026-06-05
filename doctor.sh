@@ -64,7 +64,7 @@ done
 
 echo ""
 echo "⚙️  Systemd Services"
-for service in dracon-sync.service dracon-system-guard.service dracon-warden.service; do
+for service in dracon-sync.service dracon-system-guard.service; do
     if systemctl --user list-unit-files 2>/dev/null | grep -q "^$service"; then
         if systemctl --user is-active "$service" &>/dev/null; then
             echo "  ✅ $service (active)"
