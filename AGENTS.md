@@ -515,7 +515,7 @@ auto_publish = false  # master toggle (default: off)
 [[publish_targets]]
 name = "crates-io"
 registry = "crates-io"    # crates-io | npm | pypi
-[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAzLzdHK2RLOUxvSkNlbGlJYWEwK3JwYTBpd3dCSm9QZ21oLzkvVkNHbGlJCkV0c0c2ZjJqQVpHT2EwZmtzMEZxQU1QOFg5TzBUWm1nclg2ZmR1d0VnVzgKLT4gWDI1NTE5IHJVVVRwbS9GeXNtbUhXK2M4OU9aZVZtZEFwTkI3RnVhaVNUZ1g4K2o5VFUKaTdnUGhNc2VGdGdlc1hEeTA5Znp3Wjd1Wlo4a3YvR0I4ZWhzNlE5aE95OAotPiBGTjIkSy1ncmVhc2UKUXBRN2VZVHFUMmx5M3JpVVRJNmh4WnVhTEpBY0JSVklpc0szMDdzRXUwcVd0ZFpaWlZNTmxvMTRGSXFmdlErbgphSlBDKzA5TjJlQkY3bDlWV1IzZ2ZhcEhOeFN1S0RzeDVRCi0tLSBRdWM5eU16N081d1NPZUw4c254YWZ0SWMvcU1RQXVodVZub0ZVZ0lMek9rCoFpa5thY93+TNy1eb7CcywaSTjABmK2Pu5KoV1vjN/rceZQjoVc5Ii1ZHAQkvuI4Dmde/2wSjGv9qQ9efqq3UAoyVeBkA==]
+[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBEZ0lCSEtNSVd2RzJKTFBYN2Y4UUs3U0JVdGVuNUZzRGQ3cTBQQndDVzJvCk01My9XTWZQTTM2RmdtWStZc3UxeEtHL1lHUVBSdy9zUUxxVW4xb3E1UXcKLT4gWDI1NTE5IGtzZkpsb0U1c0Y1cDdHWnJxUlcwUHlPcmFVSWVTWHQyY1RSUGl2bDNGbFkKQm15TkJiT2t5Q0FLdTlHcndpQVYwTVFYdHpad3pqY1dmK0puWE1TaXJTTQotPiAvNlJ3flstZ3JlYXNlClN6a0VPb25zOGR3U3BpWHN6aTJNMlhxZGZKU0padFlJUkRMOU8wUQotLS0gRnhEcEVrQ3hXbE1aSHJJWUZFU2FvL2YrZ0MxMXZDTmFoWStXOTdkcyt2NAoZhQh63J1LBbjesz2HjVIsTAhDJTrvUIykQYvkuWnJ+fLjCACU9x3MEoub+M4ipUZvTqernNr90Kn02rZCOCzSLrf9qr4=]
 publish_timeout_secs = 300
 ```
 
@@ -562,17 +562,9 @@ Commands:
 
 ### Safety Behaviors
 
-**dracon-sync mass-deletion prevention:** The mass-deletion safety guard was **removed** in a prior change (IndexLock fixes the root cause — the clone race that could produce "Untracked working tree file would be overwritten by merge" errors during concurrent git operations). The metric `dracon_sync_mass_deletion_guard_blocked_total` is always `0`.
-
-The primary safety mechanism is now `IndexLock` (`.git/index.lock` coordination), which prevents sync/warden from writing working-tree files while git's checkout is in progress. Git's own revert capability serves as the safety net for any committed changes.
-
-**What the removed guard did:** The daemon used to compare `git ls-files` counts before/after and would refuse to stage a commit if ≥85% of tracked files were deleted, or ≥70% with 5+ files, or 10+ absolute. This logic is now gone.
+**Primary safety mechanism:** `IndexLock` (`.git/index.lock` coordination) prevents sync/warden from writing working-tree files while git's checkout is in progress. Git's own revert capability serves as the safety net for any committed changes.
 
 **Removing a large number of files intentionally:** Use `git add -A && git commit -m 'delete files'` directly — no daemon involvement needed.
-
-**Note:** The `sync-now --force` flag is **ignored** in the current CLI (present for compatibility but non-functional after guard removal).
-
-**Metrics:** `dracon_sync_mass_deletion_guard_blocked_total` is always `0`. View it with `dracon-sync metrics`.
 
 **Incident response after a block:** Read the incident ledger at `~/.local/state/dracon/dracon-sync-incidents.jsonl` to understand what was blocked and why.
 
