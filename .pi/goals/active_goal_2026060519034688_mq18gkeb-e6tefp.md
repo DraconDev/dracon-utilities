@@ -5,19 +5,20 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 651768,
-    "activeSeconds": 36
+    "tokensUsed": 816713,
+    "activeSeconds": 44
   },
   "sisyphus": false,
   "createdAt": "2026-06-05T18:03:46.883Z",
-  "updatedAt": "2026-06-05T18:04:24.977Z",
+  "updatedAt": "2026-06-05T18:04:33.320Z",
   "activePath": ".pi/goals/active_goal_2026060519034688_mq18gkeb-e6tefp.md",
   "taskList": {
     "tasks": [
       {
         "id": "task-1",
         "title": "Add disclaimer to .dracon/secret-audit-report.md noting all findings are placeholders for private in-development projects",
-        "status": "pending"
+        "status": "complete",
+        "completedAt": "2026-06-05T18:04:33.319Z"
       }
     ],
     "blockCompletion": false,
@@ -34,10 +35,10 @@ Update the secret audit report to clarify that the findings are placeholder valu
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 36s
-- Tokens used: 652K (651,768) tokens
+- Time spent: 44s
+- Tokens used: 817K (816,713) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
-- [ ] task-1: Add disclaimer to .dracon/secret-audit-report.md noting all findings are placeholders for private in-development projects
+- [x] task-1: Add disclaimer to .dracon/secret-audit-report.md noting all findings are placeholders for private in-development projects
 
