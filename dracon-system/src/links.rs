@@ -242,3 +242,168 @@ pub(crate) fn cmd_link(cmd: LinkCommands) -> Result<()> {
     }
     Ok(())
 }
+
+/// Default roots to scan for broken symlinks.
+fn default_symlink_scan_roots() -> Vec<PathBuf> {
+    let home = match dirs::home_dir() {
+        Some(h) => h,
+        None => return Vec::new(),
+    };
+    let candidates = [
+        home.join("Dev"),
+        home.join(".dracon"),
+        home.join(".local/bin"),
+        home.join(".config"),
+    ];
+    candidates
+        .into_iter()
+        .filter(|p| p.exists())
+        .collect()
+}
+
+/// Information about a single broken symlink.
+#[derive(Debug, Serialize)]
+pub(crate) struct BrokenSymlink {
+    pub(crate) path: String,
+    pub(crate) target: String,
+    pub(crate) target_exists: bool,
+}
+
+/// Report of broken symlinks found during scan.
+#[derive(Debug, Serialize)]
+pub(crate) struct BrokenSymlinkReport {
+    pub(crate) roots_scanned: Vec<String>,
+    pub(crate) total_scanned: usize,
+    pub(crate) broken: Vec<BrokenSymlink>,
+}
+
+/// Recursively scan a directory for broken symlinks.
+fn scan_broken_symlinks(root: &Path, max_depth: usize) -> (usize, Vec<BrokenSymlink>) {
+    use std::os::unix::fs::MetadataExt;
+
+    let mut count = 0usize;
+    let mut broken = Vec::new();
+
+    let entries = match fs::read_dir(root) {
+        Ok(e) => e,
+        Err(_) => return (0, Vec::new()),
+    };
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let meta = match fs::symlink_metadata(&path) {
+            Ok(m) => m,
+            Err(_) => continue,
+        };
+
+        if meta.file_type().is_symlink() {
+            count += 1;
+            // For symlinks, check if the target exists using stat (not following the link)
+            let target = match fs::read_link(&path) {
+                Ok(t) => t,
+                Err(_) => continue,
+            };
+            // Resolve target relative to symlink's parent
+            let resolved = if target.is_absolute() {
+                target.clone()
+            } else {
+                path.parent()
+                    .map(|p| p.join(&target))
+                    .unwrap_or(target.clone())
+            };
+            // Use stat to check existence (doesn't follow symlinks)
+            let target_exists = fs::metadata(&resolved).is_ok();
+            if !target_exists {
+                broken.push(BrokenSymlink {
+                    path: path.display().to_string(),
+                    target: target.display().to_string(),
+                    target_exists: false,
+                });
+            }
+        } else if meta.is_dir() && max_depth > 0 {
+            // Skip system dirs that are noisy / dangerous to walk
+            let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+            if matches!(
+                name,
+                "target"
+                    | "node_modules"
+                    | ".git"
+                    | ".cache"
+                    | ".venv"
+                    | "dist"
+                    | "build"
+                    | "archives"
+            ) {
+                continue;
+            }
+            let (sub_count, sub_broken) = scan_broken_symlinks(&path, max_depth - 1);
+            count += sub_count;
+            broken.extend(sub_broken);
+        }
+    }
+    (count, broken)
+}
+
+/// Command handler for `dracon-system symlinks`.
+pub(crate) fn cmd_symlinks(roots: Vec<PathBuf>, json: bool, max_depth: usize) -> Result<()> {
+    use comfy_table::{presets::UTF8_FULL_CONDENSED, Cell, Color, ContentArrangement, Table};
+
+    let roots = if roots.is_empty() {
+        default_symlink_scan_roots()
+    } else {
+        roots
+    };
+
+    let mut total_scanned = 0usize;
+    let mut all_broken: Vec<BrokenSymlink> = Vec::new();
+    let mut root_strings: Vec<String> = Vec::new();
+
+    for root in &roots {
+        root_strings.push(path_display(root));
+        let (count, broken) = scan_broken_symlinks(root, max_depth);
+        total_scanned += count;
+        all_broken.extend(broken);
+    }
+
+    if json {
+        let report = BrokenSymlinkReport {
+            roots_scanned: root_strings,
+            total_scanned,
+            broken: all_broken,
+        };
+        println!("{}", serde_json::to_string_pretty(&report)?);
+    } else {
+        if all_broken.is_empty() {
+            println!(
+                "\u{2705} Scanned {} symlinks across {} root(s) — no broken links found",
+                total_scanned,
+                root_strings.len()
+            );
+        } else {
+            let mut table = Table::new();
+            table
+                .load_preset(UTF8_FULL_CONDENSED)
+                .set_content_arrangement(ContentArrangement::Dynamic)
+                .set_header(vec![
+                    Cell::new("STATUS"),
+                    Cell::new("BROKEN LINK"),
+                    Cell::new("TARGET"),
+                ]);
+            for item in &all_broken {
+                table.add_row(vec![
+                    Cell::new("\u{274c}").fg(Color::Red),
+                    Cell::new(&item.path),
+                    Cell::new(&item.target),
+                ]);
+            }
+            println!("{table}");
+            println!(
+                "\u{274c} Found {} broken symlink(s) out of {} scanned across {} root(s)",
+                all_broken.len(),
+                total_scanned,
+                root_strings.len()
+            );
+        }
+    }
+    Ok(())
+}
