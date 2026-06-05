@@ -102,13 +102,12 @@ fi
 # Stop services if upgrading
 if [ "$UPGRADE" = true ]; then
     echo "Stopping services for upgrade..."
-    for service in dracon-sync.service dracon-system-guard.service dracon-warden.service; do
+    for service in dracon-sync.service dracon-system-guard.service; do
         # Map service name to binary name
         _bin=""
         case "$service" in
             dracon-sync.service)   _bin=dracon-sync ;;
             dracon-system-guard.service) _bin=dracon-system ;;
-            dracon-warden.service)  _bin=dracon-warden ;;
         esac
 
         if [ "$DRY_RUN" = true ]; then
@@ -346,7 +345,6 @@ if [ "$DRY_RUN" = true ]; then
 else
     cp dracon-sync/dracon-sync.service ~/.config/systemd/user/dracon-sync.service 2>/dev/null || true
     cp dracon-system/dracon-system-guard.service ~/.config/systemd/user/dracon-system-guard.service 2>/dev/null || true
-    cp dracon-warden/dracon-warden.service ~/.config/systemd/user/dracon-warden.service 2>/dev/null || true
     systemctl --user daemon-reload 2>/dev/null || true
     # Wait for systemd to settle after daemon-reload
     sleep 1
@@ -425,11 +423,8 @@ restart_service() {
 
 restart_service dracon-sync.service
 restart_service dracon-system-guard.service
-# Warden daemon is optional — hooks are the primary enforcement layer.
-# Only restart if the service is already running.
-if systemctl --user is-active dracon-warden.service &>/dev/null; then
-    restart_service dracon-warden.service
-fi
+# Warden has no daemon — git hooks (pre-commit + pre-push) are the primary
+# enforcement layer and are installed above via `dracon-warden setup-hooks --global`.
 
 echo ""
 echo "✅ Installation complete!"
