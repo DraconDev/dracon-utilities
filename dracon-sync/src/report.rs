@@ -591,24 +591,6 @@ pub(crate) fn truncate(value: &str, max_chars: usize) -> String {
     format!("{}…", shortened)
 }
 
-pub(crate) async fn git_log_field(repo: &Path, format: &str) -> Option<String> {
-    let output = tokio_git_command()
-        .args(["log", "-1", &format!("--pretty=format:{}", format)])
-        .current_dir(repo)
-        .output()
-        .await
-        .ok()?;
-    if !output.status.success() {
-        return None;
-    }
-    let value = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    if value.is_empty() {
-        None
-    } else {
-        Some(value)
-    }
-}
-
 /// Single `git log` call that extracts all commit metadata in one process.
 /// Returns (hash, author, relative_time, unix_timestamp, subject).
 /// Previously the report called this 3 times per repo (hash via libgit2,
@@ -3057,7 +3039,7 @@ mod tests {
     }
 
     #[test]
-    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA0UjIzTG5lekJKdVFybFRUcmtjbDJtZy9wWjc3dUUrS1BTeU5zQmhHekFjCnhZbjQ1cmN6YmR6bHFXcS9EbjVKRmVPMG5nUzRSb0o2aDk2alY3ay81K1kKLT4gWDI1NTE5IG40NjJmOE1WSEhsd3JvVm1LdHJXdnhpK2JrZnBURXN0a1RTaHZnZkVrMzgKc3ErR1FxNklHckYwbHQ5L2xxak8yNXpTeW5tbzNVL3pKblBRNzJ5ZVNabwotPiBiejZPXC1ncmVhc2UKNGNHakthNy9PeTk3OVJCdGlMdWgvZWsKLS0tIGNySWhIUjJXTVZzdHpacnM2TmYxcTFuTlp0c05Hc2NONCtiRnN1RjgzSUUKgyIDzTkogxjrgMgYHOz3JNGQiao4N9z8/nh6CEZ6PeUjU8NU4g5hTeidwC5xq1TPYWjAm2Ka6ySHXG8+hQ==]() {
+    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBlNjRvNnR1VXdhS2Ribm9UOFg3NktBUjBKZ3owemo4OGdDenZkbTRuSTJJCk1XWUl6cVppVUFpNWRSUWoyaWxRSlJGemFPWXcyWHQvejNUTyt5K0U3ZUEKLT4gWDI1NTE5IG4vS2V5SlhlWTlkdmR5RDdZNWMwUXpPYktYTFM3L1ZGanFScXc2YVc2d3MKdlI0Z3ozZVlpUERVRWlQQzM5Q2dvek14OWRwNmtlUDVhUXNjTzZ6MHpMYwotPiBPX2o/VC1ncmVhc2UgQ016Z01gPEcgMkp9VQp6a2xKNHAzei9KVmhlWHpnSE9ZM0NvRWRrT3dMOVNuZ3I0c2dFWUlSRE9UY2VRQU9IRXpSbWpoYUozZ2tZMXQyCnRVRk1JV0M1aWtiTW80dXFCZDArZXd2QldhdFhGcllzOU00cVFaZjhjVDYzcWtyaWg3bXJDZWRKbDBjCi0tLSBEUUJqTDdoK3hCZlQwa3QyVHFRMDNaNWl2ckdkZWIvc0hRNnMwL0F6Ky9vCk9TSD78XsLLfpDsqtA7+pdF6CO5uWhELP6T5UugGAV21Py1qF+wnLphAw6AOGgGjT+aKd0VeuFEox2hIrQ=]() {
         let mut cooldowns = std::collections::HashMap::new();
         let repo = std::path::PathBuf::from("/test/repo");
         let notify_key = format!("push-fail-{}", repo.display());
