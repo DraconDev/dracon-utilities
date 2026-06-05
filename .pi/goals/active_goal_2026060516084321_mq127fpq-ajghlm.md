@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 714,
-    "activeSeconds": 0
+    "tokensUsed": 130331,
+    "activeSeconds": 47
   },
   "sisyphus": false,
   "createdAt": "2026-06-05T15:08:43.214Z",
-  "updatedAt": "2026-06-05T15:08:43.219Z",
+  "updatedAt": "2026-06-05T15:09:33.795Z",
   "activePath": ".pi/goals/active_goal_2026060516084321_mq127fpq-ajghlm.md",
   "taskList": {
     "tasks": [
@@ -47,8 +47,8 @@ Polish CLI output across all three dracon utilities — remove stale status fiel
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 0s
-- Tokens used: 714 tokens
+- Time spent: 47s
+- Tokens used: 130K (130,331) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
