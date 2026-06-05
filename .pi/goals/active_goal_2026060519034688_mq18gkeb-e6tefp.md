@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 159328,
-    "activeSeconds": 0
+    "tokensUsed": 651768,
+    "activeSeconds": 36
   },
   "sisyphus": false,
   "createdAt": "2026-06-05T18:03:46.883Z",
-  "updatedAt": "2026-06-05T18:03:46.886Z",
+  "updatedAt": "2026-06-05T18:04:24.977Z",
   "activePath": ".pi/goals/active_goal_2026060519034688_mq18gkeb-e6tefp.md",
   "taskList": {
     "tasks": [
@@ -34,8 +34,8 @@ Update the secret audit report to clarify that the findings are placeholder valu
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 0s
-- Tokens used: 159K (159,328) tokens
+- Time spent: 36s
+- Tokens used: 652K (651,768) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
