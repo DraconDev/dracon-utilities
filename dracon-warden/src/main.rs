@@ -203,11 +203,6 @@ enum Command {
         /// Optional repo path to harden. If omitted, hardens repos in warden discovery scope.
         repo: Option<PathBuf>,
     },
-    /// [DEPRECATED] Run forever with filesystem event debounce.
-    ///
-    /// Deprecated: Hook-based enforcement (pre-commit + pre-push) is now the
-    /// primary security layer. The daemon is optional for proactive hardening.
-    Daemon,
     /// Scan plaintext JSON files for DRACON_SECRET markers and optionally scrub them.
     ScrubMarkers {
         /// Apply edits in-place. Without this flag, the command is a dry-run report.
@@ -1343,13 +1338,6 @@ async fn main() -> Result<()> {
             } else {
                 harden_all(&policy, true)?;
             }
-        }
-        Command::Daemon => {
-            eprintln!("⚠️  The 'daemon' command is deprecated.");
-            eprintln!("    Hook-based enforcement (pre-commit + pre-push) is now the primary security layer.");
-            eprintln!("    Use 'dracon-warden setup-hooks' to install hooks globally.");
-            eprintln!("    Use 'dracon-warden once <repo>' for one-time hardening.");
-            std::process::exit(0);
         }
         Command::ScrubMarkers { apply, repo } => {
             let policy_path = resolve_policy_path_local()?;
