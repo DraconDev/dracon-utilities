@@ -1313,20 +1313,40 @@ async fn main() -> Result<()> {
             let policy_path = resolve_policy_path_local()?;
             let policy = WardenPolicy::load(&policy_path)?;
             policy.validate()?;
-            println!("📜 Policy: {}", policy_path.display());
-            println!("🛡️  Watch roots: {:?}", effective_watch_roots(&policy));
-            if !policy.discover_roots.is_empty() {
-                println!(
-                    "🧭 Discovery roots: {:?}",
-                    effective_discovery_roots(&policy)
-                );
+            let watch = effective_watch_roots(&policy);
+            let discover = effective_discovery_roots(&policy);
+            let pubkey = resolve_local_pubkey_path()
+                .map(|p| p.display().to_string())
+                .unwrap_or_else(|| "NOT_FOUND (set DRACON_OWNER_PUBKEY)".to_string());
+
+            use comfy_table::{presets::UTF8_FULL_CONDENSED, Cell, ContentArrangement, Table};
+            let mut table = Table::new();
+            table
+                .load_preset(UTF8_FULL_CONDENSED)
+                .set_content_arrangement(ContentArrangement::Dynamic)
+                .set_header(vec![
+                    Cell::new("KEY"),
+                    Cell::new("VALUE"),
+                ]);
+            table.add_row(vec![
+                Cell::new("📜 Policy"),
+                Cell::new(policy_path.display().to_string()),
+            ]);
+            table.add_row(vec![
+                Cell::new("🛡️  Watch roots"),
+                Cell::new(format!("{} root(s): {}", watch.len(), watch.iter().map(|p| p.display().to_string()).collect::<Vec<_>>().join(", "))),
+            ]);
+            if !discover.is_empty() {
+                table.add_row(vec![
+                    Cell::new("🧭 Discovery roots"),
+                    Cell::new(format!("{} root(s): {}", discover.len(), discover.iter().map(|p| p.display().to_string()).collect::<Vec<_>>().join(", "))),
+                ]);
             }
-            println!(
-                "🔑 Pubkey source: {}",
-                resolve_local_pubkey_path()
-                    .map(|p| p.display().to_string())
-                    .unwrap_or_else(|| "NOT_FOUND (set DRACON_OWNER_PUBKEY)".to_string())
-            );
+            table.add_row(vec![
+                Cell::new("🔑 Pubkey source"),
+                Cell::new(&pubkey),
+            ]);
+            println!("{table}");
         }
         Command::Once { repo } => {
             let policy_path = resolve_policy_path_local()?;
