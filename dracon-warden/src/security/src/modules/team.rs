@@ -14,7 +14,7 @@ impl DemonSecurity {
     pub fn load_team_key(&self, team_name: &str) -> Result<TeamKey> {
         let home = dirs::home_dir().context("Could not find home directory")?;
         let team_key_path = home
-            .join(".demon")
+            .join(".dracon")
             .join("teams")
             .join(format!("{}.key", team_name));
 
@@ -64,7 +64,7 @@ impl DemonSecurity {
         }
 
         let home = dirs::home_dir().context("Could not find home directory")?;
-        let team_dir = home.join(".demon").join("teams");
+        let team_dir = home.join(".dracon").join("teams");
         fs::create_dir_all(&team_dir)?;
 
         let team_key_path = team_dir.join(format!("{}.key", team_name));
@@ -146,7 +146,7 @@ impl DemonSecurity {
         // Generate a random invite ID
         let invite_id = uuid::Uuid::new_v4().to_string();
 
-        let invites_dir = repo_root.join(".demon").join("invites").join(team_name);
+        let invites_dir = repo_root.join(".dracon").join("invites").join(team_name);
         fs::create_dir_all(&invites_dir)?;
 
         let invite_path = invites_dir.join(format!("{}.age", invite_id));
@@ -189,7 +189,7 @@ impl DemonSecurity {
             return Err(anyhow::anyhow!("Invalid invite content"));
         }
 
-        // Determine team name from path: demon/invites/<team_name>/...
+        // Determine team name from path: dracon/invites/<team_name>/...
         let team_name = invite_path
             .parent()
             .and_then(|p| p.file_name())
@@ -198,7 +198,7 @@ impl DemonSecurity {
 
         // Save to key chain
         let home = dirs::home_dir().context("Could not find home directory")?;
-        let team_dir = home.join(".demon").join("teams");
+        let team_dir = home.join(".dracon").join("teams");
         fs::create_dir_all(&team_dir)?;
 
         let team_key_path = team_dir.join(format!("{}.key", team_name));
@@ -254,7 +254,7 @@ impl DemonSecurity {
 
         let repo_root = self.get_repo_root()?;
         let search_paths = vec![
-            repo_root.join(".demon").join("data").join("keys"),
+            repo_root.join(".dracon").join("data").join("keys"),
             repo_root.join(".git").join("arcane").join("keys"),
         ];
 
@@ -297,7 +297,7 @@ impl DemonSecurity {
         let mut seen = std::collections::HashSet::new();
 
         let search_paths = vec![
-            repo_root.join(".demon").join("data").join("keys"),
+            repo_root.join(".dracon").join("data").join("keys"),
             repo_root.join(".git").join("arcane").join("keys"),
         ];
 

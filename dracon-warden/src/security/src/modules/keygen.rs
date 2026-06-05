@@ -12,9 +12,9 @@ use crate::DemonSecurity;
 impl DemonSecurity {
     pub fn generate_master_identity(&mut self) -> Result<()> {
         let home = dirs::home_dir().context("Could not find home directory")?;
-        let identity_path = home.join(".demon").join("identity.age");
+        let identity_path = home.join(".dracon").join("identity.age");
         // Protection: Check legacy path too
-        let legacy_path = home.join(".demon").join("identity.txt");
+        let legacy_path = home.join(".dracon").join("identity.txt");
 
         // PROTECTION: Scan for ANY existing identity files (backups, corrupted, legacy)
         // We refuse to init if there is ANY trace of an identity to prevent data loss.
@@ -74,7 +74,7 @@ impl DemonSecurity {
         writeln!(writer, "{}", key.to_string().expose_secret())?;
 
         // Save Public Key for sharing
-        let pub_path = home.join(".demon").join("identity.pub");
+        let pub_path = home.join(".dracon").join("identity.pub");
         fs::write(&pub_path, key.to_public().to_string())?;
 
         // Auto-Backup Master Identity
@@ -82,7 +82,7 @@ impl DemonSecurity {
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
             .as_secs();
-        let backup_dir = home.join(".demon").join("backups");
+        let backup_dir = home.join(".dracon").join("backups");
         if let Err(e) = fs::create_dir_all(&backup_dir) {
             eprintln!(
                 "⚠️ failed to create backup dir {}: {}",
@@ -161,7 +161,7 @@ impl DemonSecurity {
         let safe_id = pub_key_str.chars().take(8).collect::<String>();
         let filename = format!("owner_{}.pub", safe_id);
 
-        let keys_dir = repo_root.join(".demon").join("data").join("keys");
+        let keys_dir = repo_root.join(".dracon").join("data").join("keys");
         fs::create_dir_all(&keys_dir)?;
 
         let key_path = keys_dir.join(&filename);
