@@ -6,11 +6,11 @@
   "autoContinue": true,
   "usage": {
     "tokensUsed": 165580,
-    "activeSeconds": 200
+    "activeSeconds": 249
   },
   "sisyphus": false,
   "createdAt": "2026-06-05T18:56:57.869Z",
-  "updatedAt": "2026-06-05T19:00:24.096Z",
+  "updatedAt": "2026-06-05T19:01:14.460Z",
   "activePath": ".pi/goals/active_goal_2026060519565786_mq1acyku-2sxf1i.md",
   "taskList": {
     "tasks": [
@@ -44,7 +44,7 @@ Audit all dracon-* repos and DraconDev meta repo to confirm the `.demon` → `.d
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 3m20s
+- Time spent: 4m09s
 - Tokens used: 166K (165,580) tokens
 ## Tasks
 
