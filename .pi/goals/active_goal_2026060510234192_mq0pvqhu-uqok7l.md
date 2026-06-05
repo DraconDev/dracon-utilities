@@ -2,16 +2,17 @@
   "version": 3,
   "id": "mq0pvqhu-uqok7l",
   "objective": "Clean up deprecated/relic commands across all three dracon utilities and add broken symlink detection to dracon-system.\n\nThis goal thoroughly audits and modernizes the CLI surface area:\n\n1. **Remove deprecated `daemon` command from dracon-warden** — it has been deprecated since hooks became the primary security layer. Currently the installed systemd service still runs `dracon-warden daemon` which immediately exits with a deprecation warning, causing an infinite restart loop and making the service functionally dead. Fix the service file to use a no-op or remove the service entry from install.sh entirely.\n\n2. **Audit all utilities for relic commands/flags** — review every subcommand and flag across dracon-sync, dracon-system, and dracon-warden to identify anything that:\n   - Is no longer needed (e.g. `force` flag on `sync-now` kept \"for CLI compatibility\" with removed mass-deletion guard)\n   - Is broken/non-functional (e.g. `mass_deletion_guard_blocked_total` metric that is always 0)\n   - Is misleading or vestigial\n   - Has a newer/better replacement\n\n3. **Add broken symlink detection to dracon-system** — implement a `dracon-system symlinks` (or `links doctor --broken`) command that scans key locations (`~/Dev`, `~/.dracon`, `~/.local/bin`, `~/.config`) for broken symlinks and reports them. Should be a report-only command (no auto-fix) that the AI can use to surface when things break.\n\n4. **Clean up obsolete metric/field references** — the `dracon_sync_mass_deletion_guard_blocked_total` metric should be removed entirely rather than kept as an \"obsolete, always 0\" stub. AGENTS.md and CHANGELOG.md references to removed features should be reviewed for accuracy.\n\n**Scope:** All three utilities (dracon-warden, dracon-system, dracon-sync) and the install.sh + service files. Documentation in AGENTS.md/CHANGELOG.md updated to reflect removals.",
-  "status": "active",
-  "autoContinue": true,
+  "status": "paused",
+  "autoContinue": false,
   "usage": {
     "tokensUsed": 7341478,
-    "activeSeconds": 1075
+    "activeSeconds": 1091
   },
   "sisyphus": false,
   "createdAt": "2026-06-05T09:23:41.922Z",
-  "updatedAt": "2026-06-05T09:42:35.097Z",
+  "updatedAt": "2026-06-05T09:42:57.229Z",
   "activePath": ".pi/goals/active_goal_2026060510234192_mq0pvqhu-uqok7l.md",
+  "stopReason": "user",
   "taskList": {
     "tasks": [
       {
@@ -50,10 +51,10 @@ This goal thoroughly audits and modernizes the CLI surface area:
 
 ## Progress
 
-- Status: running
-- Auto-continue: on
+- Status: paused
+- Auto-continue: off
 - Sisyphus mode: no
-- Time spent: 17m55s
+- Time spent: 18m11s
 - Tokens used: 7.3M (7,341,478) tokens
 ## Tasks
 
