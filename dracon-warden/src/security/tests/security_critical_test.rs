@@ -476,7 +476,7 @@ fn test_load_repo_key_team_key() {
 
     let _home_guard = HomeGuard::new();
     let home = std::env::var("HOME").map(std::path::PathBuf::from).unwrap();
-    let team_dir = home.join(".demon").join("teams");
+    let team_dir = home.join(".dracon").join("teams");
     fs::create_dir_all(&team_dir).expect("create team dir");
 
     let encrypted_team = encrypt_for_recipient(
@@ -544,8 +544,8 @@ fn test_generate_master_identity_refuses_existing_identity() {
     security.add_memory_identity(age::x25519::Identity::generate());
 
     let home = std::env::var("HOME").map(std::path::PathBuf::from).unwrap();
-    let identity_dir = home.join(".demon");
-    fs::create_dir_all(&identity_dir).expect("create .demon dir");
+    let identity_dir = home.join(".dracon");
+    fs::create_dir_all(&identity_dir).expect("create .dracon dir");
     fs::write(identity_dir.join("identity.age"), "age1xxxxx").expect("create fake identity");
 
     let result = security.generate_master_identity();
@@ -563,8 +563,8 @@ fn test_generate_master_identity_refuses_legacy_identity() {
     security.add_memory_identity(age::x25519::Identity::generate());
 
     let home = std::env::var("HOME").map(std::path::PathBuf::from).unwrap();
-    let identity_dir = home.join(".demon");
-    fs::create_dir_all(&identity_dir).expect("create .demon dir");
+    let identity_dir = home.join(".dracon");
+    fs::create_dir_all(&identity_dir).expect("create .dracon dir");
     fs::write(identity_dir.join("identity.txt"), "age1xxxxx").expect("create legacy identity");
 
     let result = security.generate_master_identity();
@@ -618,10 +618,10 @@ fn test_encrypt_for_node_uses_disk_master_identities() {
 
     let _home_guard = HomeGuard::new();
     let home = std::env::var("HOME").map(std::path::PathBuf::from).unwrap();
-    let demon_dir = home.join(".demon");
-    fs::create_dir_all(&demon_dir).expect("create .demon dir");
+    let dracon_dir = home.join(".dracon");
+    fs::create_dir_all(&dracon_dir).expect("create .dracon dir");
     fs::write(
-        demon_dir.join("identity.age"),
+        dracon_dir.join("identity.age"),
         disk_identity.to_string().expose_secret().as_bytes(),
     )
     .expect("write disk identity");
