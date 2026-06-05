@@ -145,7 +145,7 @@ encryption_version = 2
 allow_v1_fallback = false
 
 # Team keys (for shared access)
-team_[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBRRDY2Z1gxeEFyRVZWVzcvaVZrcDhoRjB3MFVFNEpibUtPakFoZStmSkRzCjBqL3BzSUlrQmdYMkYrQmt2NlBORUVvbUxuMThKMXNIcnFwNXRKYW9LekEKLT4gWDI1NTE5IHhQeDJxT09mS09VQTRwS0RjRFArWjQvQ1NvSGlKRVlEVHJvRG55ajB1d0kKUHBKd042YU1zSHQrVFVaQ0lTU2o1UUtBVUlUTWdrYms3c3lhZ3h0emU3ZwotPiB7LWdyZWFzZSBiVmYuID9jbEF+IFcsb2c7IGtFWTReRDhvCnJHOXgvNVVidUQ1eDl0STM0VGhZR0d1eEdCTlpoZ29UeFdzCi0tLSA4OEdIdG1FTVhTSFEzVmR2cS9OVStJOFFKclVWbzQ1anVzdUhoZ3NvTUZvCjlgpRjZQwM4iyBt0SPNnsGLeRgSGNP6AURWdsMZzQBEijNXBjL3HCGX6kDmzZ5mcITU3A0gQ2ChPowxqU5OHZwGVxnc1upT0u/4RqT8KAq6t46zg8wr0j0ai1h2K/y+/n60cDf74BRJ7FshXyI=],
+team_[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAxb1RYVXVLWUVIeUQ4RlF4eE0raE1XaXJCeE5Vb1IxV2F0ekJHckdPZzBzClpaVUUvcjFwZEcrMTZWMUdpQVJFbFpYNXZmN0k5RzJDN25DRWM4MFM1VVkKLT4gWDI1NTE5IGh5OStkaSs0eDdTaTZkeHhrZERKMVV3QVEvVmpWUE16RGtVd0tTYlllMU0KUk9Iem0yUlVZejJraysxSUJTejd3SHdLVGNmNjcxVGhFQ2Ywc0xoLzQ4ZwotPiAiVEo0UTRBNS1ncmVhc2UKVHVOZ2ovcVdBakJ4V1YvWVZ4NEp1WGs0cUd5MTU2Rmt2WFNBaWZnMzhNYThXV2xBWjl4eEg1Vy9xZmMKLS0tIGNRa1ZJUlZGRTFrT0o0dGpvRGdLMFJBcHJCbnJrbjNSNWErZ2NzRFJONkUKs/hIHlRGJn27aw4Pz9rq9ns92M+h1wrZZb9MCkK9MsprWEItqzL8yHomiJLObhJ6+1agoEUEb2yu//bHxanLX4fNdG61LvFVS6Tuy8MVrPoJIyR2Bnn4kNPwo5xDxUu/z+OJk8tvuNjaG+uFKg==],
 ]
 
 # Registry credentials
@@ -169,11 +169,11 @@ owner_key = "~/.dracon/keys/owner.age"
 ### Key Hierarchy
 
 ```
-~/.demon/identity.age          — Master x25519 private key
-~/.demon/master.age           — Sovereign master key  
-~/.demon/keys/*.age           — Additional identities
-~/.dracon/keys/machine_*.age   — Machine-level secret keys
-~/.dracon/keys/owner.age       — Owner key for repo authorization
+~/.dracon/identity.age          — Master x25519 private key
+~/.dracon/master.age           — Sovereign master key  
+~/.dracon/keys/*.age           — Additional identities
+~/.dracon/data/keys/machine_*.age — Machine-level secret keys
+~/.dracon/data/keys/owner_*.pub  — Owner key for repo authorization
 ```
 
 ### Key Generation
@@ -282,7 +282,7 @@ dracon-warden repair --strict
 - Configuration files without secrets
 
 ### Key Storage
-- Private keys stored in `~/.demon/` and `~/.dracon/`
+- Private keys stored in `~/.dracon/`
 - Keys are never committed to git
 - Backup your keys! Loss means permanent data loss
 
