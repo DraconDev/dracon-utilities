@@ -1,6 +1,6 @@
 # Dracon-System Blueprint
 
-## Enhanced Disk Space Monitoring (v0.2.0)
+## Enhanced Disk Space Monitoring
 
 ### New Features
 
