@@ -304,7 +304,7 @@ mod tests {
         std::fs::create_dir_all(&secrets_dir).expect("create secrets dir");
         std::fs::write(
             secrets_dir.join("weird.env"),
-            "# This is a comment\n\[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBMc2RqaU12WTMzN1hheWd6MExIdG5Va1lvVkRHbDJpeFVkOWl0N0tLK3hrCkpGZ3N4ZEI3bHlBajdqUUppTVVVQis5VnU5Y1dBUDQ3bWR5Z3FCZ25MSW8KLT4gWDI1NTE5IFZiM3pLUjhCMmNWa1hmcnNxNVEwS2N5ZHZCOCtZNFhBbW5SMnJaL3FQamcKNHlGZ0liQ1dJNXBYdEZjOGJpaWorcy91bURXN3E0UHdpRUNLUUphckJXawotPiAhTlpJOT9fLWdyZWFzZSBgIjkKM0VPbXVTMDF6MVJUVzBSY0FCcy84bDhYSXcKLS0tIEJuUW9IQStjSnFvUUVyOUJiVXBxQ2V5TW12MFhiMW1mWDhUSEpsenpla2MKVVt3x+Xwtr0HEKdC9AunFbJgUmfQhTAnfoXKzIU3Y7xrTwbJncnp7V5gmLL0pUSEItc3O6zRb5igtMiHu6a9nzAaoI6FsGGbh9wI8duGK3ioOQI0QHtTOrTzru63AAWOX0CFuPhL0I3U38c=] Another comment\nTOKEN_AFTER=value_after\n",
+            "# This is a comment\n\[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB2c0VBS3BKSHh4YmN3VUpXYVBNU0Zqb0lBemxvM0U2UlR2ODZ3ZFN3VFNNCkxDZ21vcUVQeERvRkZXRVJPY2FjNm1MUlRpWE4zNDgrVXQrNGlyODR6eTgKLT4gWDI1NTE5IGVONGh1MjAwRlBtc0VkbUtidVpLNHdoS0o1NEppS0Yzbk1wTnNjK2pOMzgKV0kyQUxtN2NKdHhFdHFNT0NZMnZFaGU2RmlTSkpTMDkxM2JvYVZheXZNMAotPiBSREFJPy1ncmVhc2Ugcgp4dHJraExFNkFjWEU4bnZZRm1HOGVmTFhkUGhiMEEKLS0tIHQwRFhxcUlQK1doWVRHRGoxZHJzRnhJWmF4QWlPcnJpSXEyZzJ2dmErZnMKnSbm6J0qUGGHAsw+NkdpDtCqrzMb8YPAGS9yO87B7odoJOuyHHGiVhWtqlv7CrvFiDrRX3sjx+tvFBfmjdomXyPPQbZSxrp889ey8yZPkd9w7k1vYkb1hBO0RIj5zWwUMmEsks45s2Lt22Q=] Another comment\nTOKEN_AFTER=value_after\n",
         )
         .expect("write env file");
         let result = load_secret("COMMENTED_SECRET_TOKEN");
@@ -380,7 +380,7 @@ mod tests {
         assert_eq!(url, Some("git@github.com:Test/repo.git".to_string()));
     }
     #[test]
-    fn test_ensu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBWSUJOZzhXbEJUaDNvelllSDFzYjBjMk81K1R2M05qZDBJellsaWRNczI4CjFzWkJKdmxvYmJCUHRvcENEc1pQWlpUV2hacTZlWE5OR2IrK2F2RkZSemMKLT4gWDI1NTE5IGtIbHdjR2V6bkVRUGRQejJPQXZ3dGFmNDFndkNKdERTd3dJVDBNU2pqVTAKbWJDK1NXZWtsblpYZDllUEkvcnVnUitOL2k3ZkVqdzA0UTJOVTlNdWYzawotPiAnL3Z0TWYtZ3JlYXNlIGwnIXkgYnY9KTEwIElAciB4Nz1fIQo4UUFuSUdrckpOWkQ2TXArc1lDN0VidjVVVUVIVzJOMVZwcEcvc1NjZXFKdlpsUSs0Ykk0WUcwL1VFQ2ZqcFgxCjRwU240ZkZUUjNzcU5GY04zSHVIeHU5bkh5SkxkN3libmlGRUZvOHl3Y3laaFRaSmlVMFU5ZFEKLS0tIEQ4K1dBTytqdmFBdXZRaEtUcXg5dzFPTVNoRnR0K0xRTGRaaWowL1JIZDQKJtH5ZQ0xCXOD2u1NvLudatmPZASM/l7RUmJTsqj+zuYhnZO/jRLRH57+cWTXxlGjWgBWlXVJLqEVpg==]() {
+    fn test_ensu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB3elJNdVJ4V0d0NVIwdnk5bjF3bHRuUzdYcTZzRzBWWkZYY0poWTF3dGdVCm54dHhFdTRnY2RaSlIwMjEvU3o2azczR2ZXN0dIRk9BT0d2eUxSa2FWRlkKLT4gWDI1NTE5IFZ6SFViYlFQU1c4VUlQZVpCMkgxVDBSRENDTnhDampTdmhQME1UUWpqbjgKd080dzk5MnhQclJCMGN0U09iR0djS0NhS3pQcTFCVEpZait1d1g5aUkwSQotPiBVZn41ZGstZ3JlYXNlIHhkQWZURyBWXn1abEogPid3cyB2LHRnJSxWCitUVFFmUGpoM01Pc0RzL1Q1SXFDcEw4d2JTMXoyN2RIYkh6eUVWOVphY3N4dTZMNkFqUFJqUUhDTExRbE8yeE8KU3hvQ3htNk5VNzFrZ21xYWoxT0pyZWNBV3cKLS0tIGtLVkZEcmFVMVNrNjZpQm1VQWJVeEoxWTEzWGJQM3N6Z3IyT1NPUTVtd3cKjJvuzw0iv+m4AiSBrXLftNMLNVOSBgKFFZKSXqKGCzNnvEgMMFsO+Y8//nGcsx8JL3x4sfIX2jwvzg==]() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("test-repo");
         test_git_cmd()
@@ -516,7 +516,7 @@ mod tests {
         assert_eq!(remotes, vec!["origin"]);
     }
     #[test]
-    fn test_configu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBIbW4rZXZjSGdmSENYNmVYVHpTUFhSb0Y5OURLaWo3Nlh4dDVyNjVGUVg0Ck1aMi9MVnI3Y01zREtvdVo2WUFXR2xWMTFXMDFweHI2SjcrR09vMk1NK2MKLT4gWDI1NTE5IENsVkFaNFo5Zkx0cnJIS2JZNDFQSjByOUpMeGdYRGhlSmRDVGpNOWtKVVkKd2hBOHplR2NCWEx6a0NhRlhzWDFiSkxDdkZ5Vjh2SU9jZUJlNll2Z1crbwotPiBqS2MtZ3JlYXNlIC17YHoociAkQStpIDQ1IEUKeHEwd0dOMkV3THNwT24zdVJWOGlLcnRDMVdWZFRBVU1vc2FURCtINTRQdEVQeXpmL0xRNTNRbEhDdHVFNDVVcQoyOFQvWnp2bgotLS0gNXcrUitvUDJLZVFFdXBGTTFKalJxaW5OeWZTcEJ6dVVsSGQ5dWZtVzJUbwr5rQRC0qwy6yUfvxE0mPomHCHxaRvFimczAVAax9xtvQk0GJoy8wjfn5FP3hh1szrdGM/UwafLdlZC62k=]() {
+    fn test_configu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBSNmJOalE0RzExTGVjaDBwTHpjNGtUM2x1TUNzeG81akVCYVZSQkkrMVhNClMzTW1Gem0rc1B0bURQK20wdFRwUHp4NDVhRDlDREVIbUQrQXcxdTRZcEEKLT4gWDI1NTE5IHdYTmx4QWpabG9RcUVCYUcvZEJ3N0VXSXpyYmFhMkVoWjVIcDdQZkIwRFEKa1kycSttczZaUlFIdGErOThOWS9YSTViUmZLaDZTOXlRcVBsRjRKVDhVTQotPiAzJV0tZ3JlYXNlID59dU0gSD8zO0NHay4KbEYrYkhaQmJIRHBuZ1BPa0lxc1lYNWowOTRQcTY5cVVFRXRDaENxcmZFbWEvazJnSzl2eEhZY1BidUUKLS0tIGUrTWNUREdQajhkUkNsUlUvNVFsMTJMNkNITzRSNTMrZWplTEFSSmVJaXMKtjsYXWevK2TJ9InkhSjMcNcvmCVnCUGsagcYAb3WcTYqVOTd5D8oi30tz8BQpsIkjvOMoqw+g1TYmGht]() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("test-repo");
         test_git_cmd()
@@ -544,7 +544,7 @@ mod tests {
         );
     }
     #[test]
-    fn test_configu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAvb2xLUDIxVENBV1FGLzEzeERzb0RkT3pFMG9ldmJ3OEF2a0hEQi9ySzBBCnNlTFZiWjg5c3pkb0I1T2Q5bXZFUmc4cEdHZXRJajlVdUprQ2xKMEJvSlEKLT4gWDI1NTE5IFZEdU85NGNENnJTemZkcHlCa2l4S0cxY2ZpOW5FNThQM1NaMFBaajNSVEEKbHVraEluZndHMXo3RVp0dFdWVUZPYmFpTjJBZ0o1aER6dnRETVJ2WjJsSQotPiA5bls6LWdyZWFzZQpQY3UvY1pqZHFrY3d1KzhObU5xdFlEbHdnUGZ2ajMyaG5NbUtjSGJ0eHNkcGV0cE1SRWM1ZUJqMlpxQU5OeFg5ClpKS1UxZwotLS0gQURvSTNXbHRUZ0tTdUtYTHVUYjVBbDNVUGhPby93MXNrK3hTcHFsdTVOOAqp8PvyZtST4Tofv9wKQ2+loARMliIWAsNHEhKVaCfCg23s07CMj05RGs98LdeguKr9njF/LIIgdkPqauhiOng=]() {
+    fn test_configu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBuYzFlbC9nemdteGhzTUI0YmY4bFhaVFBDZE1MM2VYemx5ZlprUzdmNlVnCjNRTXUwNGZ4T1pybFpmYzltYldSQmFHQmRieTJkUUYwUmI3MThhT2Zhd2MKLT4gWDI1NTE5IHQwTTVxeFZkZFlMOWdKZ1JSOEY4SWFnLzR2UHkyMEQvd2xpc1g0SFdQUU0KWVNwMFNxcm1sTjlVSEZSNEdkME9ianU4RXlYY3A3RG5Ud3ozUVVqM0FDNAotPiBlLlRsZ0JcLWdyZWFzZQo4WHp1RzJSeXJWaGFvWUt2U2tnbmo2bGlkeUV4cUFKY2o1SWx0STdUTjV2azR1UFV0cUc2UE51MGQ4dkRBN1B1ClBJRzZUMUtNRS9xRDY0VElYYXN4NElhN29FRFdjMTUrM2ovSHc3RFQKLS0tIHZqdTVDTVozT21iSGI3ZlR5cWVweTI5dFlrajlsNXgrdVVjZHFGZXVLSlkKKo9UuQOTTCIe+rU252TW48gXJG4moI54hVsjoSsXWXv0ayiWjQ1y7r9azoBjFZ7nNmHB1z2jGXMHSS9IvbmB]() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("test-repo");
         test_git_cmd()
@@ -591,7 +591,7 @@ mod tests {
         );
     }
     #[test]
-    fn test_configu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBid1JZMmRBd0RnbWcwUmY0MUdEa045Vm9aTWtheExhbTJIM3NxQitpNER3CnNVWXFKZ0UrbXpCdldOWEhkc05KVVpRM0g4aGZPN2tIVENPV2RWM1drbGsKLT4gWDI1NTE5IGRrcXl2MTVvakNYbWJ3L3FvZTZ4Z2xCRzRFRVdKbjk4b0g3c1VEK0Z2aU0KVjhobmxhWkRjd0t5ZmZudXJpWFlJYjRaOHNwK0p5QklUdEpRR2pLckZ5QQotPiBNQV4tZ3JlYXNlIFQgNVYgenIKdUg1bk1OQ0dPbEtIQndSOXFENlNaR3IvN2cKLS0tIHkwWFlxVFBDRTZMWFZ2NkMwZ0RXZWNLSzJhb0pFN0hiakJPcHFlam9wUncKMkrqW4uaQgaiJ734zBMw2p5KrzuuPy7ynhp2loIB2ZSe5hOl04amAS6hfUbT3+LDuAsy3olPN63t]() {
+    fn test_configu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB2Qjk3Vk96MlZYa2hzWm9Oa3E0OFFBQTNGRXA3ZDVBQklvaUU4bWFJNndFCnhNZTNjcTZaemhHWm9uQjFZNHhjTTFISExsZzdybis4N2hLK1dhWlJKZ1EKLT4gWDI1NTE5IHlERHpzRjZlNU13Uk1zaUd6WWlsdXFyNjM2WDlEd2NYRGgwMCs2eHZsSGMKKytybTVsa0ZPbWNENU84TlQwZzRGUTgrMW5FV0VBLzdCV1NmZWhWREw0ZwotPiB8RXh+LWdyZWFzZSAlUzcgPFJxYTdIZwp4VEh5ajRaR2ZxckRCd3N2NE41S1dNNkRlZERLU3N5UkJUUXNpeXl2OXdTWDhYMXBzejd4VDQ2NHRxSGw3akZDCkRQUVNVVVhha1hNcEhyKzJTQ2MKLS0tIG9YZ3NubHJKQ3ptRXRGYXpKR1pZK3lIeC95M1ZoVHNkMkZUS2JKdlNoZjQKK25nziTk0OwoX3S+6l3eJEAV90iSHL/0tdkTAvr04kqaVAwtAV9rCQtH/qLE710t0Wo5EKhfuClF]() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("test-repo");
         test_git_cmd()
@@ -1710,7 +1710,7 @@ mod tests {
         );
     }
     #[tokio::test]
-    async fn test_resto[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBaZVkyYktDZXdXSklHK3Vma09xUWpwandZNWs4c2VzNjcwYW9wNzc1aW5jCnZtRHFKZldKTnNBWTZ0TlFJL2d0dGM4R3h3WGhkRzRVODRMQWM3RkQ3SDgKLT4gWDI1NTE5IC83c3lyQXdqN0hhQTdlYWFrU1V3TVY1WHVvdDFLUlo0U0ZxSWs3amtybVUKbTkrMXI4aHdQSnlEUmNnTk9mVy8zSE8zWkJ4YmJXWVdQcW50c0Y1YU9WSQotPiBuezdvdy4tZ3JlYXNlIF5gWnMwQiBtY10xVlYgQmBuRDdYIGtGSzZOfWM+CnRWUmF2Y2RSWFhhdmhwZFRIOWw4L3hRMkk4SXk5NFJ3Mks2eUw4bG1pMHBaQnp6ZmJTK2ROZ1Nna2FJYTlMcFcKKzZoM3p5N3RSYTZMeGhzdm1tYWs0YTNPUXZoN0xEMGJhN0RRZUYwNFVmMmxkZwotLS0gWUxrTEtsTE85VnEyOXRrTWlpNEJWSE5uRk4zUWdaL1k0aE9ZcFZuV05FdwqJCoNf1b4mqRVFhSY7cbUcg6YKboyuSFNjDxDw0AYvHjWLcRVtiRCPPOcBEyfmCDgnnfNcpmkm7zpNSNSrnotJv6yYd9aCNAE=]() {
+    async fn test_resto[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBLYlRKNlA0cW5VZVBIaGlzQ2hFMTFUUjcwYXpqOHdUeHFxckpwQ2twSFhVCjFqUTYyMGxXMDEwK0ZNb3pnaTg2NWtFSUZ2ZWdrTXpLUEtJc3ZIQ2Z3dUUKLT4gWDI1NTE5IHlqR210QmhjNkJlOEl4M1RxdU8vdEpSVmt0Y0h0S0ZBMFJlejNSN1REaTQKM1pyZldmNUZWN09lN2hmdmY0dW5PRzlIdXM1Z2h3TytxYU5GdWFkb3pENAotPiAzLWdyZWFzZSB4Z0ZcemMgQzxgJUsKbHRMeTcxRmJwTC83RlkwTnpUcm5VVXFSc0RzQ1B1OHpPZnAySlBZQjBXNDVBQkdPWUdKa2RNUQotLS0gMXVMa2Nwdzl4NG8xay9pNXBjcjB2MHBlSkVQL0ZtOEFmZEY2QnFTQ204NAo0Unnoc1qTQZKNFVD7yXfwpL8TatpZ6pGPrjsrzyR1yoYmxmkkhqHpX79OhAyWDr05x1Lmiwt1rdUYMgPopM5NM9yfhPP2GZw=]() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("test-repo");
         test_git_cmd()
@@ -2343,8 +2343,10 @@ mod tests {
     fn test_has_only_master_branch_detects_master_only() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path();
+        // Use -b master to ensure the initial branch is master regardless of
+        // the user's global init.defaultBranch config.
         test_git_cmd()
-            .args(["init", "-q"])
+            .args(["init", "-q", "-b", "master"])
             .current_dir(repo)
             .status()
             .expect("git init");
@@ -2359,11 +2361,6 @@ mod tests {
             .current_dir(repo)
             .status()
             .expect("git commit");
-        test_git_cmd()
-            .args(["checkout", "-b", "master"])
-            .current_dir(repo)
-            .status()
-            .expect("git checkout master");
         let result = has_only_master_branch(repo);
         assert!(result, "should detect master-only repo");
     }
