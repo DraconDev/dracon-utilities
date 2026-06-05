@@ -909,10 +909,6 @@ async fn main() -> Result<()> {
             );
 
             // Mass deletion guard removed — IndexLock fixes the clone race
-            // that was the root cause. Git revert is the safety net now.
-            println!("# HELP dracon_sync_mass_deletion_guard_blocked_total Obsolete (guard removed, always 0)");
-            println!("# TYPE dracon_sync_mass_deletion_guard_blocked_total counter");
-            println!("dracon_sync_mass_deletion_guard_blocked_total 0");
         }
         Command::Publish { cmd } => match cmd {
             PublishCommands::Run {
