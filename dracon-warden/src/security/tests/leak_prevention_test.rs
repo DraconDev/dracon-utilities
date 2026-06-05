@@ -22,7 +22,7 @@ fn sensitive_paths() -> impl Strategy<Value = String> {
         Just(".ssh/config".to_string()),
         Just(".aws/credentials".to_string()),
         Just(".kube/config".to_string()),
-        Just("demon/keys/master.age".to_string()),
+        Just("dracon/keys/master.age".to_string()),
         Just("dummy_repo/.gnupg/trustdb.gpg".to_string()),
     ]
 }
@@ -72,9 +72,9 @@ proptest! {
             "Some normal text content\n".as_bytes().to_vec()
         };
 
-        let secret_str = "sk-or-v1-abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890";
+        let [DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA3a3lPNk5LRFJncloxU1JsRVRXc01kYWM2OVV0bEdDM05ta1dTbmd3RUdZCnIxdmFKZUtrZUlrU0Q4RHkrUnptWGZNNzNLNXBVRHRIOVpsMEI1RkI1alkKLT4gWDI1NTE5IFRnMGRPRmhsNjhYakNsZEVOMHBMOW5lY2QyMCtTZjF4QzBsclo3a213QzQKbjZ4NXZMdmd4SjVlUGZObTF4WHdIQlc2NVVkaVlubEFaMHlSMVhadEpjZwotPiBpbC1ncmVhc2Ugc3JiOE1wIF4KR0Nla3pnCi0tLSB4cGdQZ2J3dlJxRDBlbWFjMVhWT3BydUFIcnh5ZENteHpTU0d5TkJaMUJ3Cn3dh9ntICBRD0o9iPAhZrDBuhuPdOsC4lVCTlosWvN1WlD26+vNHzsa9LwlSsIEHD5XpJQX5TY1ogxd4nSyYOG7RFpVt5UicEIWStyq9VXXuf81QGkQS0j4HQmT6Iqe5miSB+juyCa+CD16CSH3UQItGRF5+sWlgA==];
         // Header for PEM keys to test content detection
-        let pem_content = "-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEA75...\n-----END RSA PRIVATE KEY-----";
+        let pem_content = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBLUlZJTXBLZlo0bko1TjEwaVVsTnlTR3JFM3RKcGlqVnJEbWdiMkowZGo4CnE2Qzk1b21JdkgvZmhFTzdDeTFyNHNlK25ubXV3U1Urc2Y5VVZNaUFNYm8KLT4gWDI1NTE5IGY3UjJnVnJUZGZsckc2MlFGZlg4WGlSYUFOZkdhRHc5YnZ1dVJyU1pQVUUKaW40TFRyR1ZtTlFUVlFKdUptWUQzMUlXTnNMY1Q2T28wbHRvTHppb2dWUQotPiA0LWdyZWFzZSBdSm5WXVRZOCAuTFV6fHhyViBeY2N7PCBYXDkKZXpTblMzNnFCbk1qb0p0RCtnUDVRd2tnaFptYkpyUXhsR2RqeWszM1N3MVlZRDNYVTU2ZHRJNDZ3bkxMYjRPdQo2K21DWjlYejQ5YmVlQ2R0TWs4Ym13Ci0tLSBETWJzblZTRk03WVJTRlZVV1ZyOXlJbmNuclJaaXNZeG93WDlvWlNuRWtNCn/qLmPDGRasDfAhdAA3d66T7Ge7Hhsx+BGWy1gsGaxS28AnEkuKmZLe8I5V4/MV5/88QvjCmUr0cj/N9DJy7JvHjCgHVBv/5zhoUsYo7apHmWRGL9W/kF06tBJkcibUr5sxx/uGl+3KxNy+3v1eXFfdXNefUQ==]";
 
         if has_secret && !is_binary {
             // Test both an API key and a PEM header
@@ -95,9 +95,9 @@ proptest! {
         }
 
         // 2. Decide Policy: Should it be Nuclear?
-        let sensitive_dirs = [".ssh", "demon/keys", ".aws", ".kube", ".gnupg", ".azure", ".config/gcloud"];
+        let sensitive_dirs = [".ssh", "dracon/keys", ".aws", ".kube", ".gnupg", ".azure", ".config/gcloud"];
         let sensitive_exts = [".age", ".key", ".p12", ".pfx", ".pem", ".crt", ".der", ".asc"];
-        let sensitive_names = ["id_rsa", "id_ed25519", "id_ecdsa", "id_dsa", "id_xmss", "master.age", "identity.age", "owner.age", "demon-key"];
+        let sensitive_names = ["id_rsa", "id_ed25519", "id_ecdsa", "id_dsa", "id_xmss", "master.age", "identity.age", "owner.age", "dracon-key"];
 
         let is_sensitive_path = sensitive_dirs.iter().any(|d| path.contains(d));
         let is_sensitive_ext = sensitive_exts.iter().any(|e| path.ends_with(e));

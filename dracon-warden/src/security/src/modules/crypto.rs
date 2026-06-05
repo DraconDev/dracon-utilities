@@ -157,7 +157,7 @@ impl DemonSecurity {
             }
         }
 
-        // 3. Drunk guy with keychain (brute force all keys in ~/demon/keys)
+        // 3. Drunk guy with keychain (brute force all keys in ~/.dracon/keys)
         if let Some(plaintext) = self.try_keychain_bruteforce(encrypted_data) {
             return Ok(plaintext);
         }
