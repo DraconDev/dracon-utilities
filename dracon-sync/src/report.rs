@@ -889,6 +889,7 @@ pub(crate) async fn run_repos_report(
         Cell::new("LAST COMMIT"),
         Cell::new("PUSHED"),
         Cell::new("AUTHOR"),
+        Cell::new("HINT"),
     ]);
 
     for (idx, row) in rows.iter().enumerate() {
@@ -957,6 +958,7 @@ pub(crate) async fn run_repos_report(
             Cell::new(commit_summary),
             Cell::new(shorten_when(&row.last_push)),
             Cell::new(&row.last_author),
+            Cell::new(&row.hint).fg(if row.concern { Color::Red } else if row.warn { Color::Yellow } else { Color::Green }),
         ]);
     }
 
@@ -3038,7 +3040,7 @@ mod tests {
     }
 
     #[test]
-    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBXK3h5NzdQVEtjUXVGSzJNMnRIdUI5UEhpUnBuc2pKTjJPRWhsY3p0cGd3Clo5K0crL0htalc0UFlabVFZUkdTTUxXaEthNHVaV0R4VGNIR0d3MlhhNHMKLT4gWDI1NTE5IGJLQjZaOHVUc0ZWRkpqL0RCUXVSd2RsQXhuN0pQUzkweGxTL0ROem1DRWcKQ3VVKyt0SmVOL3dPbzd5SFJPNnB5Wm9nMmFMdnZ1YjdKb3FFQnViY1BnUQotPiBoLlA2KCctZ3JlYXNlIGFyLVlwIHVJcQpvZ081S3YybUlzWCtwSitGbFEKLS0tICtRWkNscmlHUzhjV3QzZ0V4TlJac3BuYVMvLzYwb0x5VGk0SldNTmEyQk0K3YPPh8Hi/7yMkvswfbA3g5xbXiW2CG0VyKrkfg7weivarL4cJIXI/6nLWqtOHpH6BXeH7PHq8p4MCGUWGw==]() {
+    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAreUord1pUN2pQb3VsQkRuc0diKzNzTzJPN0FsRjF3a2JhUllOOE1aYUg4CkFISWJiMGh2Y1Q1RFBwYjl0Q2FxRVh4RnBPMUJMOGg0L2tFSXJBcFlJbzAKLT4gWDI1NTE5IFVKMmxIN3hrd0o3bHZYWUJGYVc3MkVONzRVZzh0YWhIMHFGMnFHTklqeHMKVEp4QjRXRXYwTHJIWEU3U0gwUXdyMkJCYXBSZ283cmgxMmxES0twNzZpVQotPiBGeXxEc2EzdC1ncmVhc2UgXEBWR2V8cCB7dDViMjx+WApEK3NLOXFISUR1RzNmNXdYNVpsTFRQNWo5cnBYVi96NnVaLzZ5S1Y4eE5GRi9WK3ZOTkcwdU41UXIzZlFRTjVYCkx6TUt6QkkxcjFjdVdMQThFdG1KdGRqdnVISmFZK3RsMHgxRUF1aC9yRmRDUExObDlCVm4KLS0tIGpmcEQwb0tpVmFSRUpKUXYxNENTRG9qcnRnYmllRXpoampXSTgyNGh2RlUKoPloyz0PGW17duFN59LI9QbpH7GpYnxvrUHCIRwVR629GqpqEu3S7skTRwLSq3el+QZIvv2pwfDyaT5jxA==]() {
         let mut cooldowns = std::collections::HashMap::new();
         let repo = std::path::PathBuf::from("/test/repo");
         let notify_key = format!("push-fail-{}", repo.display());
