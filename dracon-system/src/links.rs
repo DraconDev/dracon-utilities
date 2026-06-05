@@ -280,8 +280,6 @@ pub(crate) struct BrokenSymlinkReport {
 
 /// Recursively scan a directory for broken symlinks.
 fn scan_broken_symlinks(root: &Path, max_depth: usize) -> (usize, Vec<BrokenSymlink>) {
-    use std::os::unix::fs::MetadataExt;
-
     let mut count = 0usize;
     let mut broken = Vec::new();
 
