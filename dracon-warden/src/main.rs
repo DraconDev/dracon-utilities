@@ -769,7 +769,6 @@ fn resolve_local_pubkey_path() -> Option<PathBuf> {
     let home = dirs::home_dir()?;
     let owner_candidates = [
         home.join(".dracon/data/keys"),
-        home.join(".demon/keys"),
         home.join(".dracon/keys"),
     ]
     .into_iter()
@@ -801,7 +800,7 @@ fn resolve_local_pubkey_path() -> Option<PathBuf> {
         };
         if validate_owner_age_pubkey_bytes(p, &bytes).is_ok() {
             let p_str = p.to_string_lossy();
-            if p_str.contains("/.demon/") || p_str.contains("/.dracon/keys/") {
+            if p_str.contains("/.dracon/keys/") {
                 eprintln!(
                     "ℹ️ using owner pubkey from legacy path: {} (consider migrating to ~/.dracon/data/keys/)",
                     p.display()

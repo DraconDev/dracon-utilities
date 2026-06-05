@@ -93,7 +93,7 @@ impl DemonSecurity {
         if let Ok(repo_root) = self.get_repo_root() {
             // Check BOTH new committed path (V2 Standard) and legacy path
             let search_paths = vec![
-                repo_root.join(".demon").join("data").join("keys"), // V2 Standard
+                repo_root.join(".dracon").join("data").join("keys"), // V2 Standard
                 repo_root.join(".git").join("arcane").join("keys"), // Legacy
             ];
 

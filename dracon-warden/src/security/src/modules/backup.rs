@@ -10,7 +10,7 @@ use crate::DemonSecurity;
 impl DemonSecurity {
     pub fn backup_file(&self, file_path: &Path, content: &[u8]) -> Result<PathBuf> {
         let path_str = file_path.to_string_lossy();
-        if path_str.contains("demon/backups") || path_str.contains("arcane/backups") {
+        if path_str.contains("dracon/backups") || path_str.contains("arcane/backups") {
             return Err(anyhow::anyhow!(
                 "Recursion guard: Skipping backup of backup file"
             ));
@@ -19,7 +19,7 @@ impl DemonSecurity {
         // Auto-ensure our key is in the repo before we do anything that might rely on it later
 
         let home = self.get_home()?;
-        let backup_dir = home.join(".demon").join("backups");
+        let backup_dir = home.join(".dracon").join("backups");
         fs::create_dir_all(&backup_dir)?;
 
         // Hash the path to create a deterministic but safe filename
@@ -47,7 +47,7 @@ impl DemonSecurity {
 
     pub fn restore_file(&self, file_path: &Path) -> Result<PathBuf> {
         let home = self.get_home()?;
-        let backup_dir = home.join(".demon").join("backups");
+        let backup_dir = home.join(".dracon").join("backups");
 
         if !backup_dir.exists() {
             return Err(anyhow::anyhow!(
@@ -102,7 +102,7 @@ impl DemonSecurity {
 
     pub fn list_backups(&self, file_path: &Path) -> Result<Vec<PathBuf>> {
         let home = self.get_home()?;
-        let backup_dir = home.join(".demon").join("backups");
+        let backup_dir = home.join(".dracon").join("backups");
 
         if !backup_dir.exists() {
             return Ok(Vec::new());
