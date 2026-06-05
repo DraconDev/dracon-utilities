@@ -715,8 +715,7 @@ pub(crate) async fn run_repos_report(
             ("OK".to_string(), String::new())
         };
 
-        // Single git log call extracts all commit fields — previously this was
-        // three separate processes (git_log_field x2 + git_log_unix_timestamp).
+        // Single git log call extracts all commit fields in one process.
         let last_meta = git_log_meta(&repo).await;
         let (last_hash, last_author, last_when, last_unix, last_msg) = match last_meta {
             Some((h, a, w, u, m)) => (
@@ -3039,7 +3038,7 @@ mod tests {
     }
 
     #[test]
-    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBlNjRvNnR1VXdhS2Ribm9UOFg3NktBUjBKZ3owemo4OGdDenZkbTRuSTJJCk1XWUl6cVppVUFpNWRSUWoyaWxRSlJGemFPWXcyWHQvejNUTyt5K0U3ZUEKLT4gWDI1NTE5IG4vS2V5SlhlWTlkdmR5RDdZNWMwUXpPYktYTFM3L1ZGanFScXc2YVc2d3MKdlI0Z3ozZVlpUERVRWlQQzM5Q2dvek14OWRwNmtlUDVhUXNjTzZ6MHpMYwotPiBPX2o/VC1ncmVhc2UgQ016Z01gPEcgMkp9VQp6a2xKNHAzei9KVmhlWHpnSE9ZM0NvRWRrT3dMOVNuZ3I0c2dFWUlSRE9UY2VRQU9IRXpSbWpoYUozZ2tZMXQyCnRVRk1JV0M1aWtiTW80dXFCZDArZXd2QldhdFhGcllzOU00cVFaZjhjVDYzcWtyaWg3bXJDZWRKbDBjCi0tLSBEUUJqTDdoK3hCZlQwa3QyVHFRMDNaNWl2ckdkZWIvc0hRNnMwL0F6Ky9vCk9TSD78XsLLfpDsqtA7+pdF6CO5uWhELP6T5UugGAV21Py1qF+wnLphAw6AOGgGjT+aKd0VeuFEox2hIrQ=]() {
+    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBXK3h5NzdQVEtjUXVGSzJNMnRIdUI5UEhpUnBuc2pKTjJPRWhsY3p0cGd3Clo5K0crL0htalc0UFlabVFZUkdTTUxXaEthNHVaV0R4VGNIR0d3MlhhNHMKLT4gWDI1NTE5IGJLQjZaOHVUc0ZWRkpqL0RCUXVSd2RsQXhuN0pQUzkweGxTL0ROem1DRWcKQ3VVKyt0SmVOL3dPbzd5SFJPNnB5Wm9nMmFMdnZ1YjdKb3FFQnViY1BnUQotPiBoLlA2KCctZ3JlYXNlIGFyLVlwIHVJcQpvZ081S3YybUlzWCtwSitGbFEKLS0tICtRWkNscmlHUzhjV3QzZ0V4TlJac3BuYVMvLzYwb0x5VGk0SldNTmEyQk0K3YPPh8Hi/7yMkvswfbA3g5xbXiW2CG0VyKrkfg7weivarL4cJIXI/6nLWqtOHpH6BXeH7PHq8p4MCGUWGw==]() {
         let mut cooldowns = std::collections::HashMap::new();
         let repo = std::path::PathBuf::from("/test/repo");
         let notify_key = format!("push-fail-{}", repo.display());
