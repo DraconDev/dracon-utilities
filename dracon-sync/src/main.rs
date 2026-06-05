@@ -101,9 +101,6 @@ enum Command {
         /// Preview what would be done without making any changes.
         #[arg(long)]
         dry_run: bool,
-        /// No-op (mass deletion guard removed; kept for CLI compatibility).
-        #[arg(long, hide = true)]
-        force: bool,
     },
     /// Pause sync (creates freeze marker).
     Pause,
@@ -497,7 +494,6 @@ async fn main() -> Result<()> {
         Command::SyncNow {
             repos,
             dry_run,
-            force: _,
         } => {
             if let Some(reason) = freeze_reason(&policy_path) {
                 println!("⏸️ sync frozen ({})", reason);
