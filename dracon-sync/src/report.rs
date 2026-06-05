@@ -905,9 +905,8 @@ pub(crate) async fn run_repos_report(
         Cell::new("↑"),
         Cell::new("↓"),
         Cell::new("PUSH"),
-        Cell::new("COMMIT"),
-        Cell::new("PUSH"),
-        Cell::new("SIZE"),
+        Cell::new("LAST COMMIT"),
+        Cell::new("PUSHED"),
         Cell::new("AUTHOR"),
     ]);
 
@@ -948,15 +947,19 @@ pub(crate) async fn run_repos_report(
         let staged_color = if row.staged > 0 { Color::Cyan } else { Color::White };
         let ahead_color = if row.ahead > 0 { Color::Yellow } else { Color::White };
         let behind_color = if row.behind > 0 { Color::Red } else { Color::White };
-        
-        // Format repo size on disk
-        let repo_size = get_repo_size(&row.repo);
-        
+
         // Color branches: main/master in bold, others in cyan
         let branch_color = if row.branch == "main" || row.branch == "master" {
             Color::White
         } else {
             Color::Cyan
+        };
+
+        // Compose a one-line commit summary: "<short-hash> <subject>"
+        let commit_summary = if row.last_hash == "-" {
+            "-".to_string()
+        } else {
+            format!("{} {}", row.last_hash, row.last_msg)
         };
 
         table.add_row(vec![
@@ -970,9 +973,8 @@ pub(crate) async fn run_repos_report(
             Cell::new(row.ahead).fg(ahead_color),
             Cell::new(row.behind).fg(behind_color),
             Cell::new(&row.push_status).fg(push_color),
-            Cell::new(shorten_when(&row.last_when)),
+            Cell::new(commit_summary),
             Cell::new(shorten_when(&row.last_push)),
-            Cell::new(repo_size),
             Cell::new(&row.last_author),
         ]);
     }
@@ -3055,7 +3057,7 @@ mod tests {
     }
 
     #[test]
-    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSByNlo3eFM3clZRWmlDUGM1dThQTStaeE5zMENmaElQdlRYV2lERFFIS2tZCjcwSXNPUy9MZmF6Skc1c3NiU2l5dlFtREpyZ2RnZ3NOczdUV1lnaEo4STQKLT4gWDI1NTE5IGpSdUxpdVpSNHRTcW1wdkk1djJjNUFLa0lualJIUFk1bHhFb3ZsU1lBUXMKWDdtVXZPWHExbGpLMmxyODd0WGVhVzNGSDc4ZHRzK2VDYkU4R3BzSTc0YwotPiAlLXhjRkBGLWdyZWFzZQozbE03WVdpR0NQRUExMzA4MEExUnhHSEVqZW9GdmhabGhsQUptYUEyRjdrL2I0cEJVZ1gwTmwvbFM1dHliZHlyCkF4eUo4OEh2aXFRdnptT01mOW1neGhTYklrbW04V24vT1EKLS0tIENlUFYrQXhEV2FORytlSDYvR1F2cmpjRUYwc2dMSStDNTkwV0VML29keDgKo76QHBKjEGJwncYycmYkIuzUyqGOEJEsrYuVX4ESlNML4E7iclJQ+sZ/i/27ECSxOIFVZ9Z1F4k3ywTKww==]() {
+    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA0UjIzTG5lekJKdVFybFRUcmtjbDJtZy9wWjc3dUUrS1BTeU5zQmhHekFjCnhZbjQ1cmN6YmR6bHFXcS9EbjVKRmVPMG5nUzRSb0o2aDk2alY3ay81K1kKLT4gWDI1NTE5IG40NjJmOE1WSEhsd3JvVm1LdHJXdnhpK2JrZnBURXN0a1RTaHZnZkVrMzgKc3ErR1FxNklHckYwbHQ5L2xxak8yNXpTeW5tbzNVL3pKblBRNzJ5ZVNabwotPiBiejZPXC1ncmVhc2UKNGNHakthNy9PeTk3OVJCdGlMdWgvZWsKLS0tIGNySWhIUjJXTVZzdHpacnM2TmYxcTFuTlp0c05Hc2NONCtiRnN1RjgzSUUKgyIDzTkogxjrgMgYHOz3JNGQiao4N9z8/nh6CEZ6PeUjU8NU4g5hTeidwC5xq1TPYWjAm2Ka6ySHXG8+hQ==]() {
         let mut cooldowns = std::collections::HashMap::new();
         let repo = std::path::PathBuf::from("/test/repo");
         let notify_key = format!("push-fail-{}", repo.display());
