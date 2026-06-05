@@ -1,6 +1,7 @@
 //! Symlink ownership management — deterministic link reconciliation.
 
 use anyhow::Result;
+use serde::Serialize;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
