@@ -5,31 +5,37 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 142651,
-    "activeSeconds": 237
+    "tokensUsed": 143593,
+    "activeSeconds": 249
   },
   "sisyphus": false,
   "createdAt": "2026-06-05T15:08:43.214Z",
-  "updatedAt": "2026-06-05T15:12:52.924Z",
+  "updatedAt": "2026-06-05T15:13:04.946Z",
   "activePath": ".pi/goals/active_goal_2026060516084321_mq127fpq-ajghlm.md",
   "taskList": {
     "tasks": [
       {
         "id": "task-1",
         "title": "Remove stale warden service row from dracon-system status",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-05T15:13:04.942Z",
+        "evidence": "Removed warden service row from dracon-system status. Verified via installed binary.",
         "verificationContract": "dracon-system status no longer shows 'warden service' row. Builds and tests pass."
       },
       {
         "id": "task-2",
         "title": "Upgrade dracon-warden status to table format matching dracon-system style",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-05T15:13:04.944Z",
+        "evidence": "Upgraded dracon-warden status from plain println to comfy-table format.",
         "verificationContract": "dracon-warden status outputs a comfy-table with emoji headers, same visual style as dracon-system status. Builds."
       },
       {
         "id": "task-3",
         "title": "Add hint column to repos table showing actionable info per repo",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-05T15:13:04.945Z",
+        "evidence": "Added HINT column to repos table with color-coded actionable advice.",
         "verificationContract": "repos table shows a HINT column with per-repo actionable text (e.g. 'push pending', 'no upstream', 'merge conflict'). Builds and repos command runs under 1s."
       }
     ],
@@ -47,12 +53,12 @@ Polish CLI output across all three dracon utilities — remove stale status fiel
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 3m57s
-- Tokens used: 143K (142,651) tokens
+- Time spent: 4m09s
+- Tokens used: 144K (143,593) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
-- [ ] task-1: Remove stale warden service row from dracon-system status — contract: dracon-system status no longer shows 'warden service' row. Builds and tests pass.
-- [ ] task-2: Upgrade dracon-warden status to table format matching dracon-system style — contract: dracon-warden status outputs a comfy-table with emoji headers, same visual style as dracon-system status. Builds.
-- [ ] task-3: Add hint column to repos table showing actionable info per repo — contract: repos table shows a HINT column with per-repo actionable text (e.g. 'push pending', 'no upstream', 'merge conflict'). Builds and repos command runs under 1s.
+- [x] task-1: Remove stale warden service row from dracon-system status — evidence: Removed warden service row from dracon-system status. Verified via installed binary.
+- [x] task-2: Upgrade dracon-warden status to table format matching dracon-system style — evidence: Upgraded dracon-warden status from plain println to comfy-table format.
+- [x] task-3: Add hint column to repos table showing actionable info per repo — evidence: Added HINT column to repos table with color-coded actionable advice.
 
