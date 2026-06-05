@@ -583,21 +583,6 @@ pub(crate) fn push_large_blob_threshold_bytes(policy: &SyncPolicy) -> u64 {
         .min(DEFAULT_GIT_HOST_BLOB_LIMIT_BYTES)
 }
 
-pub(crate) fn get_repo_size(repo_path: &str) -> String {
-    use std::process::Command;
-    let output = Command::new("du")
-        .args(["-sh", repo_path])
-        .output();
-    
-    match output {
-        Ok(o) if o.status.success() => {
-            let stdout = String::from_utf8_lossy(&o.stdout);
-            stdout.split_whitespace().next().unwrap_or("-").to_string()
-        }
-        _ => "-".to_string()
-    }
-}
-
 pub(crate) fn truncate(value: &str, max_chars: usize) -> String {
     if value.chars().count() <= max_chars {
         return value.to_string();
@@ -714,71 +699,45 @@ pub(crate) async fn run_repos_report(
             ("OK".to_string(), String::new())
         };
 
-        let last_hash = status
-            .last_commit_hash
-            .as_deref()
-            .map(|h| truncate(h, 12))
-            .unwrap_or_else(|| "-".to_string());
-        let last_msg = status
-            .last_commit_msg
-            .as_deref()
-            .map(|m| truncate(m, 72))
-            .unwrap_or_else(|| "-".to_string());
-        let last_author = git_log_field(&repo, "%an")
-            .await
-            .unwrap_or_else(|| "-".to_string());
-        let last_when = git_log_field(&repo, "%ar")
-            .await
-            .unwrap_or_else(|| "-".to_string());
-        let last_unix = git_log_unix_timestamp(&repo).await.unwrap_or(0);
-        // Get last push time from reflog — scan all remote branches and pick the most recent
+        // Single git log call extracts all commit fields — previously this was
+        // three separate processes (git_log_field x2 + git_log_unix_timestamp).
+        let last_meta = git_log_meta(&repo).await;
+        let (last_hash, last_author, last_when, last_unix, last_msg) = match last_meta {
+            Some((h, a, w, u, m)) => (
+                truncate(&h, 12),
+                a,
+                w,
+                u,
+                truncate(&m, 72),
+            ),
+            None => (
+                "-".to_string(),
+                "-".to_string(),
+                "-".to_string(),
+                0i64,
+                "-".to_string(),
+            ),
+        };
+        // Get last push time from reflog for the current branch only.
+        // Scanning all origin/* branches was the second-biggest cost; we only
+        // care about the branch we're on.
         let last_push = {
             use std::process::Command;
             let repo_str = repo.to_str().unwrap_or("").to_string();
             let current_branch = effective_status.branch.clone();
-            // Collect candidate refs: origin/<current>, plus all origin/* branches
-            let mut candidates: Vec<String> = vec![format!("origin/{}", current_branch)];
-            // List all origin/* branches
-            if let Ok(br_out) = Command::new("git")
-                .args(["-C", &repo_str, "for-each-ref", "--format=%(refname:short)", "refs/remotes/origin/"])
+            let out = Command::new("git")
+                .args([
+                    "-C", &repo_str,
+                    "reflog", "show", &format!("origin/{}", current_branch),
+                    "--format=%cr", "-1",
+                ])
                 .output()
-            {
-                if let Ok(s) = String::from_utf8(br_out.stdout) {
-                    for line in s.lines() {
-                        let t = line.trim().to_string();
-                        if !t.is_empty() && !candidates.contains(&t) {
-                            candidates.push(t);
-                        }
-                    }
-                }
-            }
-            let mut best: Option<String> = None;
-            let mut best_unix: i64 = 0;
-            for cand in &candidates {
-                let out = Command::new("git")
-                    .args([
-                        "-C", &repo_str,
-                        "reflog", "show", cand,
-                        "--format=%ct %cr", "-1",
-                    ])
-                    .output()
-                    .ok()
-                    .and_then(|o| String::from_utf8(o.stdout).ok());
-                if let Some(s) = out {
-                    if let Some(line) = s.lines().next() {
-                        let mut parts = line.splitn(2, ' ');
-                        if let (Some(ts), Some(rel)) = (parts.next(), parts.next()) {
-                            if let Ok(u) = ts.parse::<i64>() {
-                                if u > best_unix {
-                                    best_unix = u;
-                                    best = Some(rel.trim().to_string());
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            best.filter(|s| !s.is_empty()).unwrap_or_else(|| "-".to_string())
+                .ok()
+                .and_then(|o| String::from_utf8(o.stdout).ok())
+                .and_then(|s| s.lines().next().map(|l| l.trim().to_string()))
+                .filter(|s| !s.is_empty())
+                .unwrap_or_else(|| "-".to_string());
+            out
         };
 
         rows.push(RepoReportRow {
@@ -3062,7 +3021,7 @@ mod tests {
     }
 
     #[test]
-    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBSb1pTd2xSTDN5cU8vdlhvbjczczNaYTRaakhtbytTaE5aejRYWXVPWFdzCjVBRTZyQnhxbDZmUUowNmZmbThRcitsdldFRG5PNHMzbHhOY016SWhRV0kKLT4gWDI1NTE5IExiaXdyQXlIMllHTmpRZFNzR0NQZHBSWTllcUNQTG9yZlU4a2xMaVFIQ0EKRHZLY25LVE1RR0NkVENBbzYyNzRqVHBIaEIwQUlJWEsvYlBtbUlSbGtFYwotPiBiLWdyZWFzZSBFVnAhPwpRd0pQQWIwR3RQM0g4MnhzQ2ZQeXJFd0NXRlUKLS0tIEsyNGFVaHNHWndZd1laT3RKYUpTeFdIWG1VV2hvQ2IwY0x3MHFhcFBQMXMKmjAyObf13EjqTN4bBrum3Kog1V3donAnBLewTll9amCTrSj9nubjMHqrgjVuWv8ujktfQeFCFr0mlnS0Xw==]() {
+    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAyUVpEYjdsWjlCcWUrc3lnZFZ0T2d3STh3NHlLQ1YyZTEwVytqY1ZhMmp3CkViL0NFT21xMFFpTzhmMDlISnBQNkdMSUZvWDBMVURXT080VUtkU3Z2NE0KLT4gWDI1NTE5IHdFVWIwNURkZVRkQUJ1V1JQR043RHR2NWJMckdaR2prT1FkSkZXQ0hIZ3MKTUJYb0lSRDRtVFNaVEJCVjNwNjFCYVcvUjB0azNhYjFNclZZM1Z4K0FNOAotPiBhKW0heFQ+LWdyZWFzZSAzJiFTbkUKSXhSYVljaDdPbGsva2p2V1VDRm1DQUNhV1hoV3RFVVVKQkFGV3dJbC9NWGI2K25ISnlOZVduVDE2OG85TE5NVwo0ZkdjV0RQQWRTT2NENENMVllKYXd1T1JrU2JIV2R0ajFkZ28yQQotLS0gTVJxV2VpTm4ydGh0RzBLUHg5SEg0Yy9Nc3dlTGNQSmxtUGdKRkE2YXh2cwpPDT8t9jtwHgzbpRc7eOKnQgvgj56cReFrKLjbn7p7IZnRtZJ26yOitrgc0fIHW8KaCIboL+cM65dVxN14]() {
         let mut cooldowns = std::collections::HashMap::new();
         let repo = std::path::PathBuf::from("/test/repo");
         let notify_key = format!("push-fail-{}", repo.display());
