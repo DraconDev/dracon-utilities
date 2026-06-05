@@ -72,10 +72,10 @@ dracon-system guard daemon  # Run continuous monitoring
 
 ### dracon-warden
 
-**Git filter + repo hardening daemon.** Encrypts secrets at rest in git while keeping plaintext in your working tree.
+**Git filter + repo hardening tool.** Encrypts secrets at rest in git while keeping plaintext in your working tree. Uses git hooks (not a daemon) as the primary enforcement layer.
 
 **Key Features:**
-- Age-based encryption for .env files
+- Age-based encryption for secrets
 - Secret scanning and detection
 - Clean/smudge git filter pipeline
 - Repo hardening and key management
@@ -91,34 +91,13 @@ dracon-warden setup-hooks --global  # Install git hooks (primary enforcement)
 
 **Documentation:** [dracon-warden/README.md](dracon-warden/README.md)
 
-### dracon-ai
-
-**AI CLI for Dracon tools.** Thin wrapper around the dracon-libs AI runtime for coding assistance and command analysis.
-
-**Key Features:**
-- Interactive `do` mode for computer tasks
-- Single-prompt `chat` mode
-- Command analysis with `cmd`
-- Intent-based routing (coding, fast, general)
-
-**Quick Commands:**
-```bash
-dracon-ai                   # Start interactive do mode
-dracon-ai chat "Say ok"     # Single prompt
-dracon-ai cmd "ls -la"      # Analyze command output
-dracon-ai status            # Show AI runtime status
-```
-
-**Documentation:** [dracon-ai/README.md](dracon-ai/README.md)
-
 ## Architecture
 
 ```
 dracon-utilities/           <- CLI binaries (this repo)
 ├── dracon-sync/            -> ~/.local/bin/dracon-sync
 ├── dracon-system/          -> ~/.local/bin/dracon-system
-├── dracon-warden/          -> ~/.local/bin/dracon-warden
-└── dracon-ai/              -> ~/.local/bin/dracon-ai
+└── dracon-warden/          -> ~/.local/bin/dracon-warden
 
 dracon-libs/                <- Shared libraries (REQUIRED for building)
 ├── services/ai/            <- AI adapters, router, lanes
@@ -193,46 +172,26 @@ Each utility has its own configuration file:
 
 ## Environment Variables
 
-### dracon-sync
-
-| Variable | Purpose | Example |
+| Variable | Utility | Purpose |
 |----------|---------|---------|
-| `DRACON_SYNC_GIT_BIN` | Override path to git binary | `/run/current-system/sw/bin/git` |
-| `DRACON_SYNC_POLICY` | Custom sync policy file path | `~/.dracon/utilities/sync/dracon-sync.toml` |
-
-### dracon-system
-
-| Variable | Purpose | Example |
-|----------|---------|---------|
-| `DRACON_AI_CONFIG` | Override dracon-ai config file path | `~/.dracon/utilities/ai/dracon-ai.toml` |
-| `DRACON_AI_APPLY` | Set to `0` for plan-only mode | `0` |
-| `DRACON_AI_DANGEROUS` | Set to `1` to allow dangerous commands | `1` |
-| `DRACON_AI_ALLOW_CMD` | Set to `1` to enable `/cmd` tool execution | `1` |
+| `DRACON_SYNC_GIT_BIN` | dracon-sync | Override path to git binary |
+| `DRACON_SYNC_POLICY` | dracon-sync | Custom sync policy file path |
+| `DRACON_SYSTEM_POLICY` | dracon-system | Custom system policy file path |
 
 ## Testing
-
-### dracon-sync
 
 ```bash
 export DRACON_SYNC_GIT_BIN=/run/current-system/sw/bin/git
 
-# Reliable (serial execution — no flaky race conditions):
-cargo test -- --test-threads=1
+# dracon-sync (serial for reliability):
+cargo test -p dracon-sync -- --test-threads=1
 
-# Fast but may have ~10-20 flaky failures from shared global state:
-cargo test
-```
-
-### dracon-system & dracon-warden
-
-```bash
+# dracon-system & dracon-warden:
 cargo test -p dracon-system
 cargo test -p dracon-warden
 ```
 
 ## Development
-
-### Building
 
 ```bash
 # Build all utilities
@@ -242,28 +201,23 @@ cargo build --release
 cargo build --release -p dracon-sync
 cargo build --release -p dracon-system
 cargo build --release -p dracon-warden
-cargo build --release -p dracon-ai
-```
 
-### Code Quality
-
-```bash
-# Run clippy
+# Code quality
 cargo clippy --all-targets --all-features
-
-# Check formatting
 cargo fmt --check
-
-# Run deny checks
 cargo deny check
 ```
 
-## Related Documentation
+## Documentation
 
-- [AGENTS.md](AGENTS.md) — AI agent guidelines and operational details
-- [CHANGELOG.md](CHANGELOG.md) — Version history and release notes
-- [CONTRIBUTING.md](CONTRIBUTING.md) — Development workflow and contribution guidelines
-- [dracon-sync-architecture.md](dracon-sync-architecture.md) — Detailed sync architecture
+| Document | Purpose |
+|----------|---------|
+| [docs/ROADMAP.md](docs/ROADMAP.md) | Where to find everything |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Service architecture and commit protocol |
+| [docs/OPERATIONS.md](docs/OPERATIONS.md) | Systemd, troubleshooting, incident response |
+| [AGENTS.md](AGENTS.md) | AI agent guidelines |
+| [CHANGELOG.md](CHANGELOG.md) | Version history |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Development workflow |
 
 ## License
 

@@ -21,7 +21,7 @@ dracon-sync is **invisible infrastructure** for an AI coder. The AI works on one
 - Auto-commit on every change
 - Auto-push with HTTPS/PAT (GitHub) + SSH (GitLab/Codeberg) with retries and fallback
 - Multi-provider mirroring (GitHub + GitLab + Codeberg simultaneously)
-- AI-generated commit messages from diffs
+- Deterministic commit messages from diffs (no AI)
 - Freeze toggle for pausing sync during delicate operations
 - Incident ledger for debugging
 - Visibility sync (mirror GitHub public/private status to GitLab/Codeberg)
@@ -242,8 +242,7 @@ dracon-sync test-ai   # Test all AI providers
 ```
 
 ### Features (compile-time)
-- `scribe` (default): Enables AI commit message generation
-- `ai-bumper` (default): Enables AI version bumping
+- All features are compiled in by default
 
 ### Commit Message Format
 ```
@@ -276,8 +275,7 @@ scope: scope
 ```
 
 ### Status
-- [x] AI scribe integrated (calls AI directly, no subprocess)
-- [x] AI bumper integrated (decides major/minor/patch/none)
 - [x] Configurable provider order (fallback chain)
 - [x] API keys loaded from secrets files
 - [x] `test-ai` command for provider verification
+- [x] AI scribe removed (was not useful for AI workflows)

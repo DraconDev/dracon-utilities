@@ -1,6 +1,6 @@
 # dracon-sync
 
-**Invisible git sync for AI-powered development.** An auto-commit, multi-mirror daemon that watches your repos, commits every change with AI-generated messages, and pushes to GitHub, GitLab, and Codeberg simultaneously.
+**Invisible git sync for AI-powered development.** An auto-commit, multi-mirror daemon that watches your repos, commits every change with deterministic, facts-based messages, and pushes to GitHub, GitLab, and Codeberg simultaneously.
 
 ## Why This Exists
 
@@ -17,7 +17,7 @@ Other tools solve parts of the problem:
 | Auto-commit on change | ✅ | ❌ | ❌ | ✅ | ✅ |
 | Multi-repo watch | ❌ | ✅ | ✅ | ❌ | ✅ |
 | Multi-provider mirror | ❌ | ✅ (→1) | ✅ | ❌ | ✅ (3+) |
-| AI commit messages | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Deterministic commit messages | ❌ | ❌ | ❌ | ❌ | ✅ |
 | Version bump + release | ❌ | ❌ | ❌ | ❌ | ✅ |
 | Safety guards | ❌ | ❌ | ❌ | ❌ | ✅ |
 | Visibility sync | ❌ | ❌ | ❌ | ❌ | ✅ |
@@ -30,7 +30,7 @@ The AI (or human) works on one repo at a time, makes changes, and sync handles t
 
 1. You edit files
 2. Sync detects changes within seconds
-3. After a brief inactivity delay (5s default), sync commits with an AI-generated message
+3. After a brief inactivity delay (5s default), sync commits with a deterministic message
 4. Pushes to origin (GitHub) and all mirror remotes (GitLab, Codeberg)
 5. Done — no manual git commands needed
 
@@ -237,10 +237,10 @@ auto_create = false  # Codeberg/Forgejo doesn't support push-to-create
 Store PATs for HTTPS fallback and API operations:
 ```bash
 # GitLab
-echo "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBSUEJFVUlFU3dWWU1RWUZSR0EzbVd6TmFraFNKMDlqUCtDV0dtWkljMUNJCm9tSXovN2pFMnVBT3ByaUx1a1U1eEd2VVZtQXJIbGJSMXdIY3FQVDZwWHcKLT4gWDI1NTE5IFE1QUp5WVlxWUhGUWRVTFd3UWYxQW9URVZrV2FTL0FiK0F2OVFtVjA4MDAKWmJ3VWZFelVLeEpxbFE0cVlacUdhdnM5cXYyK3A4Y0dhRkdreXNDUFVmVQotPiBaNFBAbS1ncmVhc2UgbEpoUX0xfgpEWldXVk1WUndDMjNUY1BsSU5oU1NLSm5CbVFPc1N0QXdLU3Jhb3lWR2dIYlhyYXBjVUN4Qkg2NGRSTFJpZFJsCnlBYmlGcStyRkhIeGR5KzRBNUUvU1JZK2ZTOGlrb0pnCi0tLSBkZHVuRmk2eXhqODQ3OXUvOEJiTG1JdVRHbGxsMU1QR1VUMWJGaWlrT25VCqghMf7kVGa0kHq6tramFWVlvNeFaxn4xjfoQonHJMXfKfzR/lbCCLOAjWYhpyTrqXeWW3oXgz4+wjI6H1KF2CD1OMvoh0WL]" > ~/.dracon/utilities/sync/secrets/gitlab.env
+echo "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBuOTUrbEtmRFozUGNtb3FNWFlEdHoxWVdkTmcxVmV3TS83alB3QTB3M1dBClBqOXdrM1dhQUoyOUdvYXZnbzRIOWR1aEtLZ2dtd2YrN01kRkRRTXFDSDAKLT4gNlcwLWdyZWFzZSBeJldbbSJoLSBYZCwuIGg2OlppXk8gfnFwCjJrbGFXZElVOEUrNUg5QktOL2hmCi0tLSBQR2RGeW45NXM1ajF0cXN2a2xpMlJUOUhEWUN6RjFhd3B6cVRwVU1Zc0pRCqoKYEAW2FZb7lfts3LIkISjo5TBKsRt/MuG/FBbcJ5wnfEwwO6oVVM8ntJ+RET9FU/qsbAzLxXuEFjqP4ydQXX01we5sBI/]" > ~/.dracon/utilities/sync/secrets/gitlab.env
 
 # Codeberg
-echo "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBEVHNHejVFeUt3cWlRRVdyVWMxaDVHdTVIMUZsK3NqRUNoWnVHcGZwMFFFCjBBUVp6M1JTSVBScHczNGR4YkJmQW4zNGZwTGFRNFh4SWhRRXIwYVhtUnMKLT4gWDI1NTE5IGlNNzRtdGwzam1DYWlaYjNGbDR1SVpCdngyU3BpOW5XbUI3a1JSRmpDUTAKOTExcUpoRkk0ZndsWWM0WTMvTjNjVTJzUWk4Y2FDQnJ6OEVMT3RidVZrVQotPiApU1t0fXwrRS1ncmVhc2UgKCg7VUJnVzMgcigiIDF4RyBzCmJ3bTY5NXhtYVFYNHVOdmZBQ1cxdjgydmlCbXVRWk5Feko4RGFtOFJ3ZnNVUXYwcnFlYlZCSFJ3ZG41RlY2a2oKWUFRaWN2WENnRkowbkd5T2ZZTXZIZwotLS0gTzlKbnpPbThKNEI5MmtoVUE2MHZEL2xabmJ1MUVNQW93b2toZlBtZGVLSQqIM2DSCpItpMa5G2ttGM4lVgm09ikFT3nNG+dQ/dQ6zODjulnnW6uB8GOFSSY0TNvLVAghauWGUSbpQn9sEBWxRtdbSoLN8A==]" > ~/.dracon/utilities/sync/secrets/codeberg.env
+echo "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBNWjVTdUFVUytWdjRueFFyUmZ3aUpTcW44dWdqckl3c0hrRW1ScFFSWGtFCkxVeWlZY3JqTzJnR1dKZVRTYmxJcS9GcDM0bjlwalQyYTBwWW1NbjZEWWMKLT4gVWAudyttQnUtZ3JlYXNlCm5jcGt6NGZkYjFFNytnb1YyZ1FIK2RzZ0tSaEZrR3pPMi9wU01rclNmSjNNdEYvbVZVbGFnblBIZktOOWtXNAotLS0geDZ1ZUhHczRuamxYS0tHb0VqQkVaVFJCa2FKRzVoYXdTTEREOTZNbll4OAp600/m9eRKE03Ty2OIlUHpUf/fH9lIKEHHc6JT/0GnTzO9Js3+BG07ad3X+dzjZzv9rM1A/Zujf1ZO/3fp6w6sFpT8uzPaMA==]" > ~/.dracon/utilities/sync/secrets/codeberg.env
 ```
 
 ### AI Providers
