@@ -16,7 +16,7 @@ fn test_restore_workflow() -> Result<()> {
     fs::write(&file_path, original_content)?;
 
     // 3. Backup the file
-    // Note: This writes to real ~/demon/backups
+    // Note: This writes to real ~/.dracon/backups
     let result = demon.backup_file(&file_path, original_content);
     assert!(result.is_ok(), "Backup failed: {:?}", result.err());
     let backup_path = result.unwrap();

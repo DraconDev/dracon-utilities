@@ -27,8 +27,8 @@ fn test_backup_and_restore() {
 
     assert!(backup_path.exists(), "Backup file should exist");
     assert!(
-        backup_path.to_string_lossy().contains("demon/backups"),
-        "Backup should be in demon/backups"
+        backup_path.to_string_lossy().contains("dracon/backups"),
+        "Backup should be in dracon/backups"
     );
 
     let backup_content = fs::read(&backup_path).expect("Failed to read backup");
