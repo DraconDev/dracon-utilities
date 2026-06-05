@@ -28,7 +28,6 @@ pub(crate) async fn build_doctor_report() -> crate::DoctorReport {
         sync_policy_exists: policy.exists(),
         legacy_config_dracon_exists: legacy_cfg.exists(),
         sync_service_active: is_user_service_active("dracon-sync.service").await,
-        warden_service_active: is_user_service_active("dracon-warden.service").await,
     }
 }
 
@@ -66,7 +65,6 @@ pub(crate) async fn cmd_doctor(json: bool, strict: bool) -> Result<()> {
         ("sync policy", report.sync_policy_exists),
         ("legacy config", !report.legacy_config_dracon_exists),
         ("sync service", report.sync_service_active),
-        ("warden service", report.warden_service_active),
     ];
 
     let mut has_failures = false;

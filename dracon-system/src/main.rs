@@ -293,7 +293,6 @@ struct StatusReport {
     system_policy: String,
     system_policy_exists: bool,
     sync_service_active: bool,
-    warden_service_active: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -305,7 +304,6 @@ pub(crate) struct DoctorReport {
     pub(crate) sync_policy_exists: bool,
     pub(crate) legacy_config_dracon_exists: bool,
     pub(crate) sync_service_active: bool,
-    pub(crate) warden_service_active: bool,
 }
 
 impl DoctorReport {
@@ -317,7 +315,6 @@ impl DoctorReport {
             && self.sync_policy_exists
             && !self.legacy_config_dracon_exists
             && self.sync_service_active
-            && self.warden_service_active
     }
 }
 
@@ -2325,7 +2322,6 @@ async fn build_status_report() -> Result<StatusReport> {
         system_policy: system_policy_path.display().to_string(),
         system_policy_exists: system_policy_path.exists(),
         sync_service_active: is_user_service_active("dracon-sync.service").await,
-        warden_service_active: is_user_service_active("dracon-warden.service").await,
     })
 }
 
@@ -2444,7 +2440,6 @@ async fn cmd_status(json: bool) -> Result<()> {
 
         let service_rows: Vec<(&str, bool)> = vec![
             ("sync service", report.sync_service_active),
-            ("warden service", report.warden_service_active),
         ];
 
         for (label, detail) in &rows {
