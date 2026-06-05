@@ -38,4 +38,4 @@
 ```
 
 Binary: `/home/dracon/.local/bin/dracon-warden`
-Commands: `status`, `once`, `daemon`, `scrub-markers`, `resmudge`, `repair`, `keygen`
+Commands: `status`, `once`, `scrub-markers`, `resmudge`, `repair`, `keygen`, `setup-hooks`
