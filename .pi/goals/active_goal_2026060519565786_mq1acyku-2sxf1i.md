@@ -5,19 +5,20 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 2092606,
-    "activeSeconds": 442
+    "tokensUsed": 2269911,
+    "activeSeconds": 452
   },
   "sisyphus": false,
   "createdAt": "2026-06-05T18:56:57.869Z",
-  "updatedAt": "2026-06-05T19:04:48.376Z",
+  "updatedAt": "2026-06-05T19:04:59.173Z",
   "activePath": ".pi/goals/active_goal_2026060519565786_mq1acyku-2sxf1i.md",
   "taskList": {
     "tasks": [
       {
         "id": "task-1",
         "title": "Scan all 8 dracon-* repos + DraconDev for any remaining `.demon/` path references in code, docs, and configs",
-        "status": "pending"
+        "status": "complete",
+        "completedAt": "2026-06-05T19:04:59.171Z"
       },
       {
         "id": "task-2",
@@ -44,12 +45,12 @@ Audit all dracon-* repos and DraconDev meta repo to confirm the `.demon` → `.d
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 7m22s
-- Tokens used: 2.1M (2,092,606) tokens
+- Time spent: 7m32s
+- Tokens used: 2.3M (2,269,911) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
-- [ ] task-1: Scan all 8 dracon-* repos + DraconDev for any remaining `.demon/` path references in code, docs, and configs
+- [x] task-1: Scan all 8 dracon-* repos + DraconDev for any remaining `.demon/` path references in code, docs, and configs
 - [ ] task-2: Fix or remove any legacy `.demon/` references found
 - [ ] task-3: Write a migration status report to .dracon/demon-migration-audit.md confirming the migration is complete
 
