@@ -64,7 +64,7 @@ fi
 BINARIES="dracon-sync dracon-system dracon-warden"
 
 # Service files to remove
-SERVICES="dracon-sync.service dracon-system-guard.service dracon-warden.service"
+SERVICES="dracon-sync.service dracon-system-guard.service"
 
 # Remove binaries
 echo ""

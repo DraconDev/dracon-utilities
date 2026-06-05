@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 9475451,
-    "activeSeconds": 2319
+    "tokensUsed": 10134769,
+    "activeSeconds": 2616
   },
   "sisyphus": false,
   "createdAt": "2026-06-05T09:23:41.922Z",
-  "updatedAt": "2026-06-05T10:04:25.612Z",
+  "updatedAt": "2026-06-05T10:09:25.667Z",
   "activePath": ".pi/goals/active_goal_2026060510234192_mq0pvqhu-uqok7l.md",
   "taskList": {
     "tasks": [
@@ -53,8 +53,8 @@ This goal thoroughly audits and modernizes the CLI surface area:
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 38m39s
-- Tokens used: 9.5M (9,475,451) tokens
+- Time spent: 43m36s
+- Tokens used: 10M (10,134,769) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->

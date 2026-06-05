@@ -15,7 +15,6 @@ cd dracon-utilities
 # Restart services after installation
 systemctl --user restart dracon-sync.service
 systemctl --user restart dracon-system-guard.service
-systemctl --user restart dracon-warden.service
 ```
 
 ## Utilities
@@ -86,8 +85,8 @@ dracon-system guard daemon  # Run continuous monitoring
 ```bash
 dracon-warden status        # Show resolved policy path and watch roots
 dracon-warden once          # Run one hardening pass
-dracon-warden daemon        # Run forever with filesystem event debounce
 dracon-warden keygen        # Generate new age keypair
+dracon-warden setup-hooks --global  # Install git hooks (primary enforcement)
 ```
 
 **Documentation:** [dracon-warden/README.md](dracon-warden/README.md)
@@ -165,23 +164,21 @@ The install script will:
 |---------|--------|---------|
 | dracon-sync.service | dracon-sync daemon | Git sync automation |
 | dracon-system-guard.service | dracon-system guard daemon | Disk/process protection |
-| dracon-warden.service | dracon-warden daemon | Security hardening |
+
+> **Note:** `dracon-warden` has no systemd service — git hooks (installed via `setup-hooks --global`) are the primary security enforcement layer.
 
 ```bash
 # Check status
 systemctl --user status dracon-sync.service
 systemctl --user status dracon-system-guard.service
-systemctl --user status dracon-warden.service
 
 # View logs
 journalctl --user -u dracon-sync -f
 journalctl --user -u dracon-system-guard -f
-journalctl --user -u dracon-warden -f
 
 # Restart after config changes
 systemctl --user restart dracon-sync.service
 systemctl --user restart dracon-system-guard.service
-systemctl --user restart dracon-warden.service
 ```
 
 ## Configuration
