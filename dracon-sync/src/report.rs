@@ -609,10 +609,44 @@ pub(crate) async fn git_log_field(repo: &Path, format: &str) -> Option<String> {
     }
 }
 
-pub(crate) async fn git_log_unix_timestamp(repo: &Path) -> Option<i64> {
-    git_log_field(repo, "%ct")
-        .await
-        .and_then(|s| s.parse::<i64>().ok())
+/// Single `git log` call that extracts all commit metadata in one process.
+/// Returns (hash, author, relative_time, unix_timestamp, subject).
+/// Previously the report called this 3 times per repo (hash via libgit2,
+/// author via `%an`, time via `%ar`, timestamp via `%ct`) which tripled
+/// the wall-clock time on repos with many entries.
+pub(crate) async fn git_log_meta(repo: &Path) -> Option<(String, String, String, i64, String)> {
+    use std::process::Command;
+    let repo_str = repo.to_str()?;
+    // %H = hash, %an = author, %ar = relative, %ct = unix, %s = subject
+    // Separator `\x1f` (unit separator) is unlikely in commit fields.
+    let out = Command::new("git")
+        .args([
+            "-C", repo_str,
+            "log", "-1",
+            "--format=%H%x1f%an%x1f%ar%x1f%ct%x1f%s",
+        ])
+        .output()
+        .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    let line = String::from_utf8_lossy(&out.stdout);
+    let line = line.trim();
+    if line.is_empty() {
+        return None;
+    }
+    let parts: Vec<&str> = line.split('\x1f').collect();
+    if parts.len() < 5 {
+        return None;
+    }
+    let unix = parts[3].parse::<i64>().unwrap_or(0);
+    Some((
+        parts[0].to_string(),
+        parts[1].to_string(),
+        parts[2].to_string(),
+        unix,
+        parts[4].to_string(),
+    ))
 }
 
 pub(crate) async fn run_repos_report(
@@ -3021,7 +3055,7 @@ mod tests {
     }
 
     #[test]
-    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAyUVpEYjdsWjlCcWUrc3lnZFZ0T2d3STh3NHlLQ1YyZTEwVytqY1ZhMmp3CkViL0NFT21xMFFpTzhmMDlISnBQNkdMSUZvWDBMVURXT080VUtkU3Z2NE0KLT4gWDI1NTE5IHdFVWIwNURkZVRkQUJ1V1JQR043RHR2NWJMckdaR2prT1FkSkZXQ0hIZ3MKTUJYb0lSRDRtVFNaVEJCVjNwNjFCYVcvUjB0azNhYjFNclZZM1Z4K0FNOAotPiBhKW0heFQ+LWdyZWFzZSAzJiFTbkUKSXhSYVljaDdPbGsva2p2V1VDRm1DQUNhV1hoV3RFVVVKQkFGV3dJbC9NWGI2K25ISnlOZVduVDE2OG85TE5NVwo0ZkdjV0RQQWRTT2NENENMVllKYXd1T1JrU2JIV2R0ajFkZ28yQQotLS0gTVJxV2VpTm4ydGh0RzBLUHg5SEg0Yy9Nc3dlTGNQSmxtUGdKRkE2YXh2cwpPDT8t9jtwHgzbpRc7eOKnQgvgj56cReFrKLjbn7p7IZnRtZJ26yOitrgc0fIHW8KaCIboL+cM65dVxN14]() {
+    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSByNlo3eFM3clZRWmlDUGM1dThQTStaeE5zMENmaElQdlRYV2lERFFIS2tZCjcwSXNPUy9MZmF6Skc1c3NiU2l5dlFtREpyZ2RnZ3NOczdUV1lnaEo4STQKLT4gWDI1NTE5IGpSdUxpdVpSNHRTcW1wdkk1djJjNUFLa0lualJIUFk1bHhFb3ZsU1lBUXMKWDdtVXZPWHExbGpLMmxyODd0WGVhVzNGSDc4ZHRzK2VDYkU4R3BzSTc0YwotPiAlLXhjRkBGLWdyZWFzZQozbE03WVdpR0NQRUExMzA4MEExUnhHSEVqZW9GdmhabGhsQUptYUEyRjdrL2I0cEJVZ1gwTmwvbFM1dHliZHlyCkF4eUo4OEh2aXFRdnptT01mOW1neGhTYklrbW04V24vT1EKLS0tIENlUFYrQXhEV2FORytlSDYvR1F2cmpjRUYwc2dMSStDNTkwV0VML29keDgKo76QHBKjEGJwncYycmYkIuzUyqGOEJEsrYuVX4ESlNML4E7iclJQ+sZ/i/27ECSxOIFVZ9Z1F4k3ywTKww==]() {
         let mut cooldowns = std::collections::HashMap::new();
         let repo = std::path::PathBuf::from("/test/repo");
         let notify_key = format!("push-fail-{}", repo.display());
