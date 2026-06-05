@@ -5,19 +5,21 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 1135476,
-    "activeSeconds": 83
+    "tokensUsed": 1283250,
+    "activeSeconds": 160
   },
   "sisyphus": false,
   "createdAt": "2026-06-05T09:23:41.922Z",
-  "updatedAt": "2026-06-05T09:25:12.403Z",
+  "updatedAt": "2026-06-05T09:26:30.291Z",
   "activePath": ".pi/goals/active_goal_2026060510234192_mq0pvqhu-uqok7l.md",
   "taskList": {
     "tasks": [
       {
         "id": "audit-clis",
         "title": "Audit all CLI subcommands and flags for relic/deprecated status",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-05T09:26:30.289Z",
+        "evidence": "Wrote comprehensive audit to .dracon/audit-cli.md covering all 3 utilities. Found: 1 deprecated subcommand (warden daemon), 1 dead service file, 1 hidden no-op flag (sync-now --force), 1 obsolete metr",
         "verificationContract": "For each utility (dracon-warden, dracon-system, dracon-sync): list every subcommand + flag, mark as KEEP/REMOVE/REPLACE with justification. Findings written to .dracon/audit-cli.md."
       }
     ],
@@ -51,10 +53,10 @@ This goal thoroughly audits and modernizes the CLI surface area:
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 1m23s
-- Tokens used: 1.1M (1,135,476) tokens
+- Time spent: 2m40s
+- Tokens used: 1.3M (1,283,250) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
-- [ ] audit-clis: Audit all CLI subcommands and flags for relic/deprecated status — contract: For each utility (dracon-warden, dracon-system, dracon-sync): list every subcommand + flag, mark as KEEP/REMOVE/REPLACE with justification. Findings written to .dracon/audit-cli.md.
+- [x] audit-clis: Audit all CLI subcommands and flags for relic/deprecated status — evidence: Wrote comprehensive audit to .dracon/audit-cli.md covering all 3 utilities. Found: 1 deprecated subcommand (warden daemon), 1 dead service file, 1 hidden no-op flag (sync-now --force), 1 obsolete metr
 
