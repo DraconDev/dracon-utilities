@@ -256,7 +256,7 @@ install_binary() {
         case "$binary" in
             dracon-sync)   svc_name=dracon-sync.service ;;
             dracon-system) svc_name=dracon-system-guard.service ;;
-            dracon-warden)  svc_name=dracon-warden.service ;;
+            # Warden has no daemon — hooks are the primary enforcement layer
         esac
 
         # Stop service + kill all processes — always, no check
