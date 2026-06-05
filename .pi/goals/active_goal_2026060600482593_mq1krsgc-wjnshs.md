@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 845248,
-    "activeSeconds": 92
+    "tokensUsed": 6296424,
+    "activeSeconds": 501
   },
   "sisyphus": false,
   "createdAt": "2026-06-05T23:48:25.932Z",
-  "updatedAt": "2026-06-05T23:50:03.370Z",
+  "updatedAt": "2026-06-05T23:57:16.158Z",
   "activePath": ".pi/goals/active_goal_2026060600482593_mq1krsgc-wjnshs.md",
   "taskList": {
     "tasks": [
@@ -24,37 +24,43 @@
       {
         "id": "update-gitignore",
         "title": "Update .gitignore to prevent re-clutter",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-05T23:51:05.417Z",
         "verificationContract": ".gitignore contains patterns for: pi-session-*.html, /rust_out, autoresearch.jsonl, debug.log, *.html.tmp. dracon-sync pause issued, no auto-commits during cleanup."
       },
       {
         "id": "create-docs-dir",
         "title": "Create docs/ directory structure",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-05T23:53:19.388Z",
         "verificationContract": "docs/ exists with ROADMAP.md, ARCHITECTURE.md, OPERATIONS.md, archive/ subdir."
       },
       {
         "id": "move-archive-docs",
         "title": "Move dated planning docs to docs/archive/",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-05T23:53:46.582Z",
         "verificationContract": "MASTER_ROADMAP_2026-06-01.md, STUCK_PUSH_TRIAGE_2026-06-02.md, REPOS_CLEANUP_PLAN_2026-06-01.md, REFACTORING_BLOCKER_ANALYSIS.md, AUDIT_2026-05-29.md, audit.md, AUDIT.md, AUDIT_CHECKLIST.md, todo.md, TODO.md, tasks.md, SPEC.md all either deleted or moved to docs/archive/."
       },
       {
         "id": "remove-root-clutter",
         "title": "Remove non-md clutter from repo root",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-05T23:51:13.149Z",
         "verificationContract": "pi-session-*.html, /rust_out, autoresearch.jsonl, debug.log removed. Repo root matches canonical list."
       },
       {
         "id": "rewrite-readmes",
         "title": "Rewrite 4 READMEs to be accurate and presentable",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-05T23:55:54.157Z",
         "verificationContract": "All 4 READMEs are fact-aligned with AGENTS.md. Root README links to docs/ROADMAP.md, docs/ARCHITECTURE.md, docs/OPERATIONS.md. No mention of removed dracon-ai binary. No \"AI commit messages\" claim."
       },
       {
         "id": "polish-blueprints",
         "title": "Polish 3 BLUEPRINTs to reflect current state",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-05T23:56:40.023Z",
         "verificationContract": "All 3 BLUEPRINTs match current behavior, no aspirational features claimed."
       },
       {
@@ -119,17 +125,17 @@ If blocked: stop and ask the user.
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 1m32s
-- Tokens used: 845K (845,248) tokens
+- Time spent: 8m21s
+- Tokens used: 6.3M (6,296,424) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
 - [x] audit-current-state: Audit current docs and root clutter
-- [ ] update-gitignore: Update .gitignore to prevent re-clutter — contract: .gitignore contains patterns for: pi-session-*.html, /rust_out, autoresearch.jsonl, debug.log, *.html.tmp. dracon-sync pause issued, no auto-commits during cleanup.
-- [ ] create-docs-dir: Create docs/ directory structure — contract: docs/ exists with ROADMAP.md, ARCHITECTURE.md, OPERATIONS.md, archive/ subdir.
-- [ ] move-archive-docs: Move dated planning docs to docs/archive/ — contract: MASTER_ROADMAP_2026-06-01.md, STUCK_PUSH_TRIAGE_2026-06-02.md, REPOS_CLEANUP_PLAN_2026-06-01.md, REFACTORING_BLOCKER_ANALYSIS.md, AUDIT_2026-05-29.md, audit.md, AUDIT.md, AUDIT_CHECKLIST.md, todo.md, TODO.md, tasks.md, SPEC.md all either deleted or moved to docs/archive/.
-- [ ] remove-root-clutter: Remove non-md clutter from repo root — contract: pi-session-*.html, /rust_out, autoresearch.jsonl, debug.log removed. Repo root matches canonical list.
-- [ ] rewrite-readmes: Rewrite 4 READMEs to be accurate and presentable — contract: All 4 READMEs are fact-aligned with AGENTS.md. Root README links to docs/ROADMAP.md, docs/ARCHITECTURE.md, docs/OPERATIONS.md. No mention of removed dracon-ai binary. No "AI commit messages" claim.
-- [ ] polish-blueprints: Polish 3 BLUEPRINTs to reflect current state — contract: All 3 BLUEPRINTs match current behavior, no aspirational features claimed.
+- [x] update-gitignore: Update .gitignore to prevent re-clutter
+- [x] create-docs-dir: Create docs/ directory structure
+- [x] move-archive-docs: Move dated planning docs to docs/archive/
+- [x] remove-root-clutter: Remove non-md clutter from repo root
+- [x] rewrite-readmes: Rewrite 4 READMEs to be accurate and presentable
+- [x] polish-blueprints: Polish 3 BLUEPRINTs to reflect current state
 - [ ] final-verification: Final verification: clean tree, accurate docs, presentable repo — contract: git status clean. ls matches canonical list. All 7 verification checks from goal pass. dracon-sync resumed.
 
