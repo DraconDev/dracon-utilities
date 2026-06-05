@@ -17,7 +17,7 @@ fn init_with_temp_home() -> (DemonSecurity, HomeGuard) {
 fn test_backup_file_recursion_guard_rejects_backups_dir() {
     let (security, _guard) = init_with_temp_home();
     let temp_home = std::env::var("HOME").map(PathBuf::from).unwrap();
-    let bad_path = temp_home.join(".demon").join("backups").join("self.backup");
+    let bad_path = temp_home.join(".dracon").join("backups").join("self.backup");
 
     let result = security.backup_file(&bad_path, b"sensitive data");
     assert!(
@@ -43,7 +43,7 @@ fn test_backup_file_recursion_guard_rejects_arcane_backups() {
 }
 
 #[test]
-fn test_restore_file_error_when_no_backups() {
+fn test_resto[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBxbzVkNGNQNDJHNGlveWR2emZDNFViR3RJR1VZazdjMDlVZ1VuamY0Wm5FCkorOXVreG9vdUVqYktMNlVtTEhFTS9FTmkrTVZreTJnRWhRaEF6TzFFeUkKLT4gWDI1NTE5IDh1K2Q4YytyTUtyZEUxWktOcDJwOW5KVmNINFdYeWxCWkgxSkRjNGt4VnMKaFFnNm9qSU1SaEVOVWx6VnhuV2FjSGxETHdVQkJONXVoSFhPeVpQNVZVawotPiBTfi1ncmVhc2UgfiApLQo0UWdkODdNTGljd1hpN1Z2K0ZKQVZIand6OW9WM2RFCi0tLSBTWmVxLy94eko5TXppbDRYSHdFdHBZVUg5VmxQenpob0lTKzRqZTJ4bDY0Ci80Fm/7qRfLWDIbkKjJQnJaTNolrfLQLs4OvJym8ZmiAbwR5V8nSemVLjYm7va+rDOdKp/3r/+twVZHjpw=]() {
     let (security, _guard) = init_with_temp_home();
     let temp_home = std::env::var("HOME").map(PathBuf::from).unwrap();
     let file_path = temp_home.join("nonexistent_file.txt");
