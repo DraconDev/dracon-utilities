@@ -24,8 +24,8 @@ impl DemonSecurity {
         // 1. Definition of Sensitive Paths (Still used for binary detection)
         let sensitive_dirs = [
             ".ssh",
-            "demon/keys",
-            "demon/secrets",
+            "dracon/keys",
+            "dracon/secrets",
             ".aws",
             ".kube",
             ".gnupg",
@@ -50,7 +50,7 @@ impl DemonSecurity {
             "master.age",
             "identity.age",
             "owner.age",
-            "demon-key",
+            "dracon-key",
             "id_rsa.pub",
             "id_ed25519.pub",
             "credentials",
