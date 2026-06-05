@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 6418415,
-    "activeSeconds": 509
+    "tokensUsed": 6540745,
+    "activeSeconds": 519
   },
   "sisyphus": false,
   "createdAt": "2026-06-05T23:48:25.932Z",
-  "updatedAt": "2026-06-05T23:57:25.103Z",
+  "updatedAt": "2026-06-05T23:57:35.895Z",
   "activePath": ".pi/goals/active_goal_2026060600482593_mq1krsgc-wjnshs.md",
   "taskList": {
     "tasks": [
@@ -66,7 +66,8 @@
       {
         "id": "final-verification",
         "title": "Final verification: clean tree, accurate docs, presentable repo",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-05T23:57:35.892Z",
         "verificationContract": "git status clean. ls matches canonical list. All 7 verification checks from goal pass. dracon-sync resumed."
       }
     ],
@@ -125,8 +126,8 @@ If blocked: stop and ask the user.
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 8m29s
-- Tokens used: 6.4M (6,418,415) tokens
+- Time spent: 8m39s
+- Tokens used: 6.5M (6,540,745) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
@@ -137,5 +138,5 @@ If blocked: stop and ask the user.
 - [x] remove-root-clutter: Remove non-md clutter from repo root
 - [x] rewrite-readmes: Rewrite 4 READMEs to be accurate and presentable
 - [x] polish-blueprints: Polish 3 BLUEPRINTs to reflect current state
-- [ ] final-verification: Final verification: clean tree, accurate docs, presentable repo — contract: git status clean. ls matches canonical list. All 7 verification checks from goal pass. dracon-sync resumed.
+- [x] final-verification: Final verification: clean tree, accurate docs, presentable repo
 
