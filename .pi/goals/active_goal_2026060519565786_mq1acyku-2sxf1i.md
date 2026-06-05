@@ -2,17 +2,16 @@
   "version": 3,
   "id": "mq1acyku-2sxf1i",
   "objective": "Audit all dracon-* repos and DraconDev meta repo to confirm the `.demon` → `.dracon` migration is complete, document any remaining legacy references, and fix them.",
-  "status": "paused",
-  "autoContinue": false,
+  "status": "active",
+  "autoContinue": true,
   "usage": {
-    "tokensUsed": 165580,
-    "activeSeconds": 281
+    "tokensUsed": 510822,
+    "activeSeconds": 308
   },
   "sisyphus": false,
   "createdAt": "2026-06-05T18:56:57.869Z",
-  "updatedAt": "2026-06-05T19:01:59.978Z",
+  "updatedAt": "2026-06-05T19:02:30.007Z",
   "activePath": ".pi/goals/active_goal_2026060519565786_mq1acyku-2sxf1i.md",
-  "stopReason": "user",
   "taskList": {
     "tasks": [
       {
@@ -42,11 +41,11 @@ Audit all dracon-* repos and DraconDev meta repo to confirm the `.demon` → `.d
 
 ## Progress
 
-- Status: paused
-- Auto-continue: off
+- Status: running
+- Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 4m41s
-- Tokens used: 166K (165,580) tokens
+- Time spent: 5m08s
+- Tokens used: 511K (510,822) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
