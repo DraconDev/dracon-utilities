@@ -92,7 +92,7 @@ fn test_sync_repo_push_to_bare() {
     );
 
     // Verify remote has the commit
-    let log = git_cmd(&bare, &["log", "--oneline"]);
+    let log = git_cmd(&bare, &["log", "--oneline", "master"]);
     let log_str = String::from_utf8_lossy(&log.stdout);
     assert!(log_str.contains("init"), "remote should have the commit");
 }
