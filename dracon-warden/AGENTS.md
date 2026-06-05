@@ -2,7 +2,7 @@
 
 ## What This Project Does
 
-`dracon-warden` is a Git filter + repo hardening daemon. It encrypts secrets at rest in git while keeping plaintext in your working tree.
+`dracon-warden` is a Git filter + repo hardening tool. It encrypts secrets at rest in git while keeping plaintext in your working tree.
 
 - **Working tree** = plaintext (your app reads normal `.env` files)
 - **Git blobs** = ciphertext (stored as `[DRACON_SECRET:base64_age_ciphertext]`)

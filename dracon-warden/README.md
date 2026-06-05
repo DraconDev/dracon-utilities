@@ -1,6 +1,6 @@
 # dracon-warden
 
-**Git filter + repo hardening daemon.** Encrypts secrets at rest in git while keeping plaintext in your working tree.
+**Git filter + repo hardening tool.** Encrypts secrets at rest in git while keeping plaintext in your working tree. Uses git hooks (not a daemon) as the primary enforcement layer.
 
 ## Mental Model (Important)
 
@@ -50,7 +50,7 @@ in the `git show` output (even though your working tree file is plaintext).
 
 ## Installation
 
-### Quick Install (User Service)
+### Quick Install
 
 ```bash
 cd dracon-warden
@@ -60,7 +60,7 @@ cd dracon-warden
 This will:
 1. Build the release binary
 2. Install to `~/.local/bin/dracon-warden`
-3. Set up systemd user service
+3. Install git hooks globally via `dracon-warden setup-hooks --global`
 
 ### Manual Install
 
@@ -71,12 +71,8 @@ cargo build --release
 # Copy binary
 cp target/release/dracon-warden ~/.local/bin/
 
-# Install systemd service
-mkdir -p ~/.config/systemd/user
-cp dracon-warden.service ~/.config/systemd/user/
-systemctl --user daemon-reload
-systemctl --user enable dracon-warden.service
-systemctl --user start dracon-warden.service
+# Install git hooks globally
+dracon-warden setup-hooks --global
 ```
 
 ## Usage
@@ -89,9 +85,6 @@ dracon-warden status
 
 # Run one hardening pass and exit
 dracon-warden once
-
-# Run forever with filesystem event debounce
-dracon-warden daemon
 
 # Generate new age keypair
 dracon-warden keygen
@@ -112,19 +105,9 @@ dracon-warden resmudge --apply
 dracon-warden repair
 dracon-warden repair --dry-run
 dracon-warden repair --strict
-```
 
-### Systemd Service Management
-
-```bash
-# Check status
-systemctl --user status dracon-warden.service
-
-# View logs
-journalctl --user -u dracon-warden -f
-
-# Restart after config changes
-systemctl --user restart dracon-warden.service
+# Install git hooks globally (primary enforcement layer)
+dracon-warden setup-hooks --global
 ```
 
 ## Configuration
@@ -162,8 +145,7 @@ encryption_version = 2
 allow_v1_fallback = false
 
 # Team keys (for shared access)
-team_keys = [
-    "age1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+team_[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBRRDY2Z1gxeEFyRVZWVzcvaVZrcDhoRjB3MFVFNEpibUtPakFoZStmSkRzCjBqL3BzSUlrQmdYMkYrQmt2NlBORUVvbUxuMThKMXNIcnFwNXRKYW9LekEKLT4gWDI1NTE5IHhQeDJxT09mS09VQTRwS0RjRFArWjQvQ1NvSGlKRVlEVHJvRG55ajB1d0kKUHBKd042YU1zSHQrVFVaQ0lTU2o1UUtBVUlUTWdrYms3c3lhZ3h0emU3ZwotPiB7LWdyZWFzZSBiVmYuID9jbEF+IFcsb2c7IGtFWTReRDhvCnJHOXgvNVVidUQ1eDl0STM0VGhZR0d1eEdCTlpoZ29UeFdzCi0tLSA4OEdIdG1FTVhTSFEzVmR2cS9OVStJOFFKclVWbzQ1anVzdUhoZ3NvTUZvCjlgpRjZQwM4iyBt0SPNnsGLeRgSGNP6AURWdsMZzQBEijNXBjL3HCGX6kDmzZ5mcITU3A0gQ2ChPowxqU5OHZwGVxnc1upT0u/4RqT8KAq6t46zg8wr0j0ai1h2K/y+/n60cDf74BRJ7FshXyI=],
 ]
 
 # Registry credentials
