@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 6546286,
-    "activeSeconds": 572
+    "tokensUsed": 7242865,
+    "activeSeconds": 627
   },
   "sisyphus": false,
   "createdAt": "2026-06-06T13:23:31.046Z",
-  "updatedAt": "2026-06-06T13:33:31.744Z",
+  "updatedAt": "2026-06-06T13:34:29.887Z",
   "activePath": ".pi/goals/active_goal_2026060614233104_mq2dvzvq-fx3mua.md",
   "taskList": {
     "tasks": [
@@ -38,7 +38,8 @@
       {
         "id": "check-test-coverage",
         "title": "Check test coverage per binary using tarpaulin reports",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-06T13:34:29.885Z",
         "verificationContract": "Coverage % per binary, untested modules listed"
       },
       {
@@ -62,14 +63,14 @@ Perform a full audit of the dracon-utilities project covering code quality (clip
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 9m32s
-- Tokens used: 6.5M (6,546,286) tokens
+- Time spent: 10m27s
+- Tokens used: 7.2M (7,242,865) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
 - [x] scan-code-quality: Run cargo clippy, cargo deny check, find dead code, count unwrap/panic in production code
 - [x] scan-security: Scan for hardcoded secrets, unsafe blocks, input validation gaps
 - [x] check-docs-drift: Cross-check AGENTS.md, READMEs, BLUEPRINTs against actual code for drift
-- [ ] check-test-coverage: Check test coverage per binary using tarpaulin reports — contract: Coverage % per binary, untested modules listed
+- [x] check-test-coverage: Check test coverage per binary using tarpaulin reports
 - [ ] write-audit-report: Write prioritized audit report to docs/audit/audit-2026-06-06.md with all findings, severity, and recommended fixes — contract: Report file exists, has all sections, findings are prioritized P0/P1/P2
 
