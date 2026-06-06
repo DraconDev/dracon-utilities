@@ -888,6 +888,7 @@ pub(crate) async fn run_repos_report(
         Cell::new("PUSH"),
         Cell::new("LAST COMMIT"),
         Cell::new("PUSHED"),
+        Cell::new("ACTIVITY"),
         Cell::new("AUTHOR"),
         Cell::new("HINT"),
     ]);
@@ -957,6 +958,7 @@ pub(crate) async fn run_repos_report(
             Cell::new(&row.push_status).fg(push_color),
             Cell::new(commit_summary),
             Cell::new(shorten_when(&row.last_push)),
+            Cell::new(shorten_when(&row.last_when)),
             Cell::new(&row.last_author),
             Cell::new(&row.hint).fg(if row.concern { Color::Red } else if row.warn { Color::Yellow } else { Color::Green }),
         ]);
@@ -3040,7 +3042,7 @@ mod tests {
     }
 
     #[test]
-    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAreUord1pUN2pQb3VsQkRuc0diKzNzTzJPN0FsRjF3a2JhUllOOE1aYUg4CkFISWJiMGh2Y1Q1RFBwYjl0Q2FxRVh4RnBPMUJMOGg0L2tFSXJBcFlJbzAKLT4gWDI1NTE5IFVKMmxIN3hrd0o3bHZYWUJGYVc3MkVONzRVZzh0YWhIMHFGMnFHTklqeHMKVEp4QjRXRXYwTHJIWEU3U0gwUXdyMkJCYXBSZ283cmgxMmxES0twNzZpVQotPiBGeXxEc2EzdC1ncmVhc2UgXEBWR2V8cCB7dDViMjx+WApEK3NLOXFISUR1RzNmNXdYNVpsTFRQNWo5cnBYVi96NnVaLzZ5S1Y4eE5GRi9WK3ZOTkcwdU41UXIzZlFRTjVYCkx6TUt6QkkxcjFjdVdMQThFdG1KdGRqdnVISmFZK3RsMHgxRUF1aC9yRmRDUExObDlCVm4KLS0tIGpmcEQwb0tpVmFSRUpKUXYxNENTRG9qcnRnYmllRXpoampXSTgyNGh2RlUKoPloyz0PGW17duFN59LI9QbpH7GpYnxvrUHCIRwVR629GqpqEu3S7skTRwLSq3el+QZIvv2pwfDyaT5jxA==]() {
+    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBTSTI3WXd1enFjZzNCN1pNdDM2Tk8zSmdoOVFlR1RQZVM4RHdtTlpKS2lzCkYvTEtPNTZzM1lJUU5VYTUvSUxwZGxlcVpJS2JjSUtjZ2E2c0lrNjFhTHMKLT4gclEtTi1ncmVhc2UKRXplUWRlUm5aUmtaaEJrN01VaGJ1S2g5NjFCY0N3MFdjOHVSVW5OS1NtRzFVcEN2aUNRcVJ1WTRmeFFvCi0tLSA4ZVYvQzYxaGUzbGc4U1hOcXcvUnZuZy9MaWljSHNCSnlmaE10L1ZvTlNvCpKXN1EJsMo2BV3vlKuDuaIKxeG8a04/+uGt5qnbwDeIxbYbtM+t8COSDavcDwhTZkcMQSfDicRx67nKc7k=]() {
         let mut cooldowns = std::collections::HashMap::new();
         let repo = std::path::PathBuf::from("/test/repo");
         let notify_key = format!("push-fail-{}", repo.display());
