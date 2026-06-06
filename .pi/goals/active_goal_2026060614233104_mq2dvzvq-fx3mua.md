@@ -6,11 +6,11 @@
   "autoContinue": true,
   "usage": {
     "tokensUsed": 7722397,
-    "activeSeconds": 758
+    "activeSeconds": 804
   },
   "sisyphus": false,
   "createdAt": "2026-06-06T13:23:31.046Z",
-  "updatedAt": "2026-06-06T13:36:45.766Z",
+  "updatedAt": "2026-06-06T13:37:34.018Z",
   "activePath": ".pi/goals/active_goal_2026060614233104_mq2dvzvq-fx3mua.md",
   "taskList": {
     "tasks": [
@@ -64,7 +64,7 @@ Perform a full audit of the dracon-utilities project covering code quality (clip
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 12m38s
+- Time spent: 13m24s
 - Tokens used: 7.7M (7,722,397) tokens
 ## Tasks
 
