@@ -318,14 +318,8 @@ pub(crate) async fn push_to_all_remotes(
         let name = remote.name.clone();
         let force_push = remote.force_push_when_behind;
         handles.push(tokio::spawn(async move {
-            let result = push_to_named_remote(
-                &repo,
-                &name,
-                timeout_secs,
-                retries,
-                force_push,
-            )
-            .await;
+            let result =
+                push_to_named_remote(&repo, &name, timeout_secs, retries, force_push).await;
             (name, result)
         }));
     }
@@ -363,7 +357,14 @@ pub(crate) fn create_repo_on_github(account: &str, repo_name: &str) -> Result<St
 
     // Set default branch to main via API (gh CLI doesn't support --default-branch)
     let mut patch = std::process::Command::new("gh");
-    patch.args(["api", "-X", "PATCH", &format!("repos/{}/{}", account, repo_name), "--field", "default_branch=main"]);
+    patch.args([
+        "api",
+        "-X",
+        "PATCH",
+        &format!("repos/{}/{}", account, repo_name),
+        "--field",
+        "default_branch=main",
+    ]);
     if let Some(token) = load_secret("GH_TOKEN") {
         patch.env("GH_TOKEN", token);
     }
@@ -459,14 +460,7 @@ pub(crate) async fn auto_create_repo(
                 .api_endpoint
                 .as_deref()
                 .unwrap_or("https://codeberg.org/api/v1/user/repos");
-            create_repo_on_codeberg(
-                &token,
-                &account,
-                repo_name,
-                endpoint,
-                private,
-            )
-            .await
+            create_repo_on_codeberg(&token, &account, repo_name, endpoint, private).await
         }
         AuthType::Generic => anyhow::bail!("Generic auth cannot auto-create repos"),
     }

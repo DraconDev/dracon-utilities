@@ -887,7 +887,14 @@ mod tests {
             .status()
             .unwrap();
         std::process::Command::new("git")
-            .args(["commit", "--no-verify", "-m", "init", "--author", "test <test@test.com>"])
+            .args([
+                "commit",
+                "--no-verify",
+                "-m",
+                "init",
+                "--author",
+                "test <test@test.com>",
+            ])
             .current_dir(dir.path())
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
@@ -953,7 +960,14 @@ mod tests {
             .status()
             .unwrap();
         std::process::Command::new("git")
-            .args(["commit", "--no-verify", "-m", "init", "--author", "test <test@test.com>"])
+            .args([
+                "commit",
+                "--no-verify",
+                "-m",
+                "init",
+                "--author",
+                "test <test@test.com>",
+            ])
             .current_dir(dir.path())
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
@@ -1007,7 +1021,14 @@ mod tests {
             .status()
             .unwrap();
         std::process::Command::new("git")
-            .args(["commit", "--no-verify", "-m", "init", "--author", "test <test@test.com>"])
+            .args([
+                "commit",
+                "--no-verify",
+                "-m",
+                "init",
+                "--author",
+                "test <test@test.com>",
+            ])
             .current_dir(dir.path())
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
@@ -1063,7 +1084,14 @@ mod tests {
             .status()
             .unwrap();
         std::process::Command::new("git")
-            .args(["commit", "--no-verify", "-m", "init", "--author", "test <test@test.com>"])
+            .args([
+                "commit",
+                "--no-verify",
+                "-m",
+                "init",
+                "--author",
+                "test <test@test.com>",
+            ])
             .current_dir(dir.path())
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())

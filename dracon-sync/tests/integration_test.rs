@@ -65,7 +65,10 @@ fn test_sync_repo_commit() {
 fn test_sync_repo_push_to_bare() {
     let tmp = tempfile::tempdir().unwrap();
     let bare = tmp.path().join("bare.git");
-    git_cmd(&tmp.path().to_path_buf(), &["init", "--bare", bare.to_str().unwrap()]);
+    git_cmd(
+        &tmp.path().to_path_buf(),
+        &["init", "--bare", bare.to_str().unwrap()],
+    );
 
     let repo = tmp.path().join("repo");
     git_cmd(&tmp.path().to_path_buf(), &["init", "-q", "-b", "master"]);
@@ -73,10 +76,7 @@ fn test_sync_repo_push_to_bare() {
     git_cmd(&repo, &["init", "-q", "-b", "master"]);
     git_cmd(&repo, &["config", "user.email", "test@test.com"]);
     git_cmd(&repo, &["config", "user.name", "Test"]);
-    git_cmd(
-        &repo,
-        &["remote", "add", "origin", &bare.to_string_lossy()],
-    );
+    git_cmd(&repo, &["remote", "add", "origin", &bare.to_string_lossy()]);
 
     // Create initial commit
     std::fs::write(repo.join("file.txt"), "content").unwrap();
@@ -139,7 +139,10 @@ fn test_sync_repo_branch_operations() {
     // Verify branch exists
     let branches = git_cmd(&repo, &["branch"]);
     let branches_str = String::from_utf8_lossy(&branches.stdout);
-    assert!(branches_str.contains("feature"), "feature branch should exist");
+    assert!(
+        branches_str.contains("feature"),
+        "feature branch should exist"
+    );
 }
 
 #[test]
@@ -171,7 +174,10 @@ fn test_sync_repo_merge() {
     let log = git_cmd(&repo, &["log", "--oneline"]);
     let log_str = String::from_utf8_lossy(&log.stdout);
     // The merge commit should exist (might be "Merge branch 'feature'" or similar)
-    assert!(log_str.lines().count() >= 3, "should have at least 3 commits (init, feature, merge)");
+    assert!(
+        log_str.lines().count() >= 3,
+        "should have at least 3 commits (init, feature, merge)"
+    );
 }
 
 #[test]
@@ -193,17 +199,11 @@ fn test_sync_repo_conflict_detection() {
 
     // Try to merge - should fail with conflict
     let merge = git_cmd(&repo, &["merge", "feature", "--no-edit"]);
-    assert!(
-        !merge.status.success(),
-        "merge should fail with conflict"
-    );
+    assert!(!merge.status.success(), "merge should fail with conflict");
 
     // Verify conflict markers exist
     let content = std::fs::read_to_string(repo.join("file.txt")).unwrap();
-    assert!(
-        content.contains("<<<<<<<"),
-        "should have conflict markers"
-    );
+    assert!(content.contains("<<<<<<<"), "should have conflict markers");
 }
 
 #[test]

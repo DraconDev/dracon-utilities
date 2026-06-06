@@ -287,7 +287,6 @@ pub(crate) struct WardenPolicy {
 }
 
 impl WardenPolicy {
-
     pub(crate) fn load(path: &Path) -> Result<Self> {
         let content = fs::read_to_string(path)
             .with_context(|| format!("failed to read policy {}", path.display()))?;
@@ -767,13 +766,10 @@ fn resolve_local_pubkey_path() -> Option<PathBuf> {
     }
 
     let home = dirs::home_dir()?;
-    let owner_candidates = [
-        home.join(".dracon/data/keys"),
-        home.join(".dracon/keys"),
-    ]
-    .into_iter()
-    .flat_map(|dir| owner_pubkeys_in(&dir))
-    .collect::<Vec<_>>();
+    let owner_candidates = [home.join(".dracon/data/keys"), home.join(".dracon/keys")]
+        .into_iter()
+        .flat_map(|dir| owner_pubkeys_in(&dir))
+        .collect::<Vec<_>>();
 
     // Prefer newest valid owner pubkey; break ties by path for determinism.
     // Keys in ~/.dracon/data/keys/ sort before legacy dirs due to path order,
@@ -1128,8 +1124,6 @@ where
     Ok(())
 }
 
-
-
 pub(crate) fn run_keygen() -> Result<()> {
     let home = dirs::home_dir().context("home directory not found")?;
 
@@ -1295,7 +1289,6 @@ fn find_git_repo(path: &Path) -> Option<PathBuf> {
     None
 }
 
-
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
@@ -1323,28 +1316,38 @@ async fn main() -> Result<()> {
             table
                 .load_preset(UTF8_FULL_CONDENSED)
                 .set_content_arrangement(ContentArrangement::Dynamic)
-                .set_header(vec![
-                    Cell::new("KEY"),
-                    Cell::new("VALUE"),
-                ]);
+                .set_header(vec![Cell::new("KEY"), Cell::new("VALUE")]);
             table.add_row(vec![
                 Cell::new("📜 Policy"),
                 Cell::new(policy_path.display().to_string()),
             ]);
             table.add_row(vec![
                 Cell::new("🛡️  Watch roots"),
-                Cell::new(format!("{} root(s): {}", watch.len(), watch.iter().map(|p| p.display().to_string()).collect::<Vec<_>>().join(", "))),
+                Cell::new(format!(
+                    "{} root(s): {}",
+                    watch.len(),
+                    watch
+                        .iter()
+                        .map(|p| p.display().to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )),
             ]);
             if !discover.is_empty() {
                 table.add_row(vec![
                     Cell::new("🧭 Discovery roots"),
-                    Cell::new(format!("{} root(s): {}", discover.len(), discover.iter().map(|p| p.display().to_string()).collect::<Vec<_>>().join(", "))),
+                    Cell::new(format!(
+                        "{} root(s): {}",
+                        discover.len(),
+                        discover
+                            .iter()
+                            .map(|p| p.display().to_string())
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    )),
                 ]);
             }
-            table.add_row(vec![
-                Cell::new("🔑 Pubkey source"),
-                Cell::new(&pubkey),
-            ]);
+            table.add_row(vec![Cell::new("🔑 Pubkey source"), Cell::new(&pubkey)]);
             println!("{table}");
         }
         Command::Once { repo } => {
@@ -1421,7 +1424,11 @@ async fn main() -> Result<()> {
         Command::Keygen => {
             run_keygen()?;
         }
-        Command::SetupHooks { global: _, local, repo } => {
+        Command::SetupHooks {
+            global: _,
+            local,
+            repo,
+        } => {
             let mode = if local {
                 HookMode::Local
             } else {
@@ -2091,7 +2098,12 @@ fn run_setup_hooks(mode: HookMode, repo: Option<&Path>) -> Result<()> {
     match mode {
         HookMode::Global => {
             let output = std::process::Command::new("git")
-                .args(["config", "--global", "core.hooksPath", &dir.to_string_lossy()])
+                .args([
+                    "config",
+                    "--global",
+                    "core.hooksPath",
+                    &dir.to_string_lossy(),
+                ])
                 .output()
                 .context("failed to run git config")?;
             if !output.status.success() {

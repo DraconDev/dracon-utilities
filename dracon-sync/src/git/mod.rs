@@ -304,7 +304,7 @@ mod tests {
         std::fs::create_dir_all(&secrets_dir).expect("create secrets dir");
         std::fs::write(
             secrets_dir.join("weird.env"),
-            "# This is a comment\n\[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB2c0VBS3BKSHh4YmN3VUpXYVBNU0Zqb0lBemxvM0U2UlR2ODZ3ZFN3VFNNCkxDZ21vcUVQeERvRkZXRVJPY2FjNm1MUlRpWE4zNDgrVXQrNGlyODR6eTgKLT4gWDI1NTE5IGVONGh1MjAwRlBtc0VkbUtidVpLNHdoS0o1NEppS0Yzbk1wTnNjK2pOMzgKV0kyQUxtN2NKdHhFdHFNT0NZMnZFaGU2RmlTSkpTMDkxM2JvYVZheXZNMAotPiBSREFJPy1ncmVhc2Ugcgp4dHJraExFNkFjWEU4bnZZRm1HOGVmTFhkUGhiMEEKLS0tIHQwRFhxcUlQK1doWVRHRGoxZHJzRnhJWmF4QWlPcnJpSXEyZzJ2dmErZnMKnSbm6J0qUGGHAsw+NkdpDtCqrzMb8YPAGS9yO87B7odoJOuyHHGiVhWtqlv7CrvFiDrRX3sjx+tvFBfmjdomXyPPQbZSxrp889ey8yZPkd9w7k1vYkb1hBO0RIj5zWwUMmEsks45s2Lt22Q=] Another comment\nTOKEN_AFTER=value_after\n",
+            "# This is a comment\n\[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA4ZkJvd0dMMVNhanNSRmVhdmlHRGc4YWI2UjBxQXhhUUlvL0xCbjJsSURnCjBmdWw5MjZuckJ4R0ZLMXB3YTZCaXBuUlc4Z0k0SWp3bkhaaTNwK0ZKWk0KLT4gWTRZVD1hYkotZ3JlYXNlIDlLIDA9KCpYegpZL3pVbHIzQ3RzeWJUS1dvVUV6RTBxeHJOblEwTTNiN09XWEpwdTM1cnEwOWc2M0dxZkJwcmdOVHVRCi0tLSBxQWk1RDQrRVBhVnhyWjJ1dCtYT2FydzNPSW9Lcml5cHU5bVNJNERkVEMwCv9vu6oiH42QHnxqx6IIXbMJQIsbcwRdpU/UAvjmR1I8y8TWJbkHXLHou/NHNBbvGj76VVfDHc/bD3Bli6/f9zBeBNhDje4RBUOHFB6XwCWJ8orR890U02dlNs5f3A3xLQb2ddO9mtuJ4HJt] Another comment\nTOKEN_AFTER=value_after\n",
         )
         .expect("write env file");
         let result = load_secret("COMMENTED_SECRET_TOKEN");
@@ -380,7 +380,7 @@ mod tests {
         assert_eq!(url, Some("git@github.com:Test/repo.git".to_string()));
     }
     #[test]
-    fn test_ensu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB3elJNdVJ4V0d0NVIwdnk5bjF3bHRuUzdYcTZzRzBWWkZYY0poWTF3dGdVCm54dHhFdTRnY2RaSlIwMjEvU3o2azczR2ZXN0dIRk9BT0d2eUxSa2FWRlkKLT4gWDI1NTE5IFZ6SFViYlFQU1c4VUlQZVpCMkgxVDBSRENDTnhDampTdmhQME1UUWpqbjgKd080dzk5MnhQclJCMGN0U09iR0djS0NhS3pQcTFCVEpZait1d1g5aUkwSQotPiBVZn41ZGstZ3JlYXNlIHhkQWZURyBWXn1abEogPid3cyB2LHRnJSxWCitUVFFmUGpoM01Pc0RzL1Q1SXFDcEw4d2JTMXoyN2RIYkh6eUVWOVphY3N4dTZMNkFqUFJqUUhDTExRbE8yeE8KU3hvQ3htNk5VNzFrZ21xYWoxT0pyZWNBV3cKLS0tIGtLVkZEcmFVMVNrNjZpQm1VQWJVeEoxWTEzWGJQM3N6Z3IyT1NPUTVtd3cKjJvuzw0iv+m4AiSBrXLftNMLNVOSBgKFFZKSXqKGCzNnvEgMMFsO+Y8//nGcsx8JL3x4sfIX2jwvzg==]() {
+    fn test_ensu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBPSDZkM253dGV2bXQxLzU4a2ROSVp1WGN5anZMQmFmbXpzZ2ppeng3Y0NvCkRqc1BmZ1luaHlOT3RrMnhZWnBPSklWaVppMWMzSGQ3ZlRTazVuMFNDRmcKLT4gbC1ncmVhc2UgSmdRTjUgcmBrTykgPiNtWWUgIgpmOEV0UnhtNjd1WQotLS0gQmdRQU11amlBNWhlSUt3cWFmRi9IOUpIMktuYUxicUkvaml2VU9lUFdtawqH7nyhWmlvG0ByL8UHkNiwapek/IV+Ox4g0ZK/v5TFncuD/rsJf3qrS1P2Jh9FAX5DvzXImJwcl9bV]() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("test-repo");
         test_git_cmd()
@@ -516,7 +516,7 @@ mod tests {
         assert_eq!(remotes, vec!["origin"]);
     }
     #[test]
-    fn test_configu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBSNmJOalE0RzExTGVjaDBwTHpjNGtUM2x1TUNzeG81akVCYVZSQkkrMVhNClMzTW1Gem0rc1B0bURQK20wdFRwUHp4NDVhRDlDREVIbUQrQXcxdTRZcEEKLT4gWDI1NTE5IHdYTmx4QWpabG9RcUVCYUcvZEJ3N0VXSXpyYmFhMkVoWjVIcDdQZkIwRFEKa1kycSttczZaUlFIdGErOThOWS9YSTViUmZLaDZTOXlRcVBsRjRKVDhVTQotPiAzJV0tZ3JlYXNlID59dU0gSD8zO0NHay4KbEYrYkhaQmJIRHBuZ1BPa0lxc1lYNWowOTRQcTY5cVVFRXRDaENxcmZFbWEvazJnSzl2eEhZY1BidUUKLS0tIGUrTWNUREdQajhkUkNsUlUvNVFsMTJMNkNITzRSNTMrZWplTEFSSmVJaXMKtjsYXWevK2TJ9InkhSjMcNcvmCVnCUGsagcYAb3WcTYqVOTd5D8oi30tz8BQpsIkjvOMoqw+g1TYmGht]() {
+    fn test_configu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA5VWtIRjAxQ2FyM050T2xSL1UrZDJHQ29la2dpOFlnOXZSWlQvTWFYaFFvCmt1Wi9VaUxndnZ6RDAzNDdFOFNWU3QwVkR6OGhwMGYzRE8vY0NvaklDdXcKLT4gUU9wIz8tZ3JlYXNlIGY8Z0FDNSVzCm5lS2VsZFBody9ka2RZdHpXcTc1MWhPYmRXSWVjU2RRdE1iTHpoellJTjRoemFFRGI0bWhITmYreHptRkZMNk8KWkZGdUVVQTlQVzF4Z1FURzBaa2hSdXFqMTBRbmhPK1NxOWMKLS0tIDFVOCs0b2NMazFZL2gvclFSNlZYdm5qMUJYdGdsYTJ3TE1OWmFDR3YxR2sKQFpPskVQngwHP8GoZoUtaMc3baPDs7vd3DSY7vFNPtpRoVI64zLCtqNcTt2q4yufMIenEEsQzkuqgp43]() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("test-repo");
         test_git_cmd()
@@ -544,7 +544,7 @@ mod tests {
         );
     }
     #[test]
-    fn test_configu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBuYzFlbC9nemdteGhzTUI0YmY4bFhaVFBDZE1MM2VYemx5ZlprUzdmNlVnCjNRTXUwNGZ4T1pybFpmYzltYldSQmFHQmRieTJkUUYwUmI3MThhT2Zhd2MKLT4gWDI1NTE5IHQwTTVxeFZkZFlMOWdKZ1JSOEY4SWFnLzR2UHkyMEQvd2xpc1g0SFdQUU0KWVNwMFNxcm1sTjlVSEZSNEdkME9ianU4RXlYY3A3RG5Ud3ozUVVqM0FDNAotPiBlLlRsZ0JcLWdyZWFzZQo4WHp1RzJSeXJWaGFvWUt2U2tnbmo2bGlkeUV4cUFKY2o1SWx0STdUTjV2azR1UFV0cUc2UE51MGQ4dkRBN1B1ClBJRzZUMUtNRS9xRDY0VElYYXN4NElhN29FRFdjMTUrM2ovSHc3RFQKLS0tIHZqdTVDTVozT21iSGI3ZlR5cWVweTI5dFlrajlsNXgrdVVjZHFGZXVLSlkKKo9UuQOTTCIe+rU252TW48gXJG4moI54hVsjoSsXWXv0ayiWjQ1y7r9azoBjFZ7nNmHB1z2jGXMHSS9IvbmB]() {
+    fn test_configu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB5bTdKeVV0bWdlMmhac2U5S040cHJ4b0JuVFZ6a3VlKy9mUktrWTJoNmdvClZKdlVtb2RGTWRCd0RSNWZmQmtkREdLVW9JUWM3SFpFN2JNaTlDbitLbTgKLT4gQFx6K3xkSy1ncmVhc2UKU3EyZmhYNVZvKzNKK2JxdnBKR1kxcDV3ZFhOMkV6TUNOMTZyQkdPbWVyd3R3RGg0ZVdNdEU2YWVjMVhEZisrRQovRldXUjk0T2JuMWdNUDcwbTBRSlJxRnFjaDdxbzVTNUVIM1B4alFBb1BzQjl0SklsN0NRMWpvL0FFTzVxUDZ1CjdBCi0tLSBreXpnUUM4QzNRVm02WDVDK0xvT3VKZFhKUWVSQnozVlYxQ1lZY2ZXN0MwCs2fbsMkQ4jWafi825wcmvqIkcDr9DOU+2xJAVfkv9+nsJiLgXocHck+nL11kmXvR+tegXbsTAu0WuOhKSwGhA==]() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("test-repo");
         test_git_cmd()
@@ -591,7 +591,7 @@ mod tests {
         );
     }
     #[test]
-    fn test_configu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB2Qjk3Vk96MlZYa2hzWm9Oa3E0OFFBQTNGRXA3ZDVBQklvaUU4bWFJNndFCnhNZTNjcTZaemhHWm9uQjFZNHhjTTFISExsZzdybis4N2hLK1dhWlJKZ1EKLT4gWDI1NTE5IHlERHpzRjZlNU13Uk1zaUd6WWlsdXFyNjM2WDlEd2NYRGgwMCs2eHZsSGMKKytybTVsa0ZPbWNENU84TlQwZzRGUTgrMW5FV0VBLzdCV1NmZWhWREw0ZwotPiB8RXh+LWdyZWFzZSAlUzcgPFJxYTdIZwp4VEh5ajRaR2ZxckRCd3N2NE41S1dNNkRlZERLU3N5UkJUUXNpeXl2OXdTWDhYMXBzejd4VDQ2NHRxSGw3akZDCkRQUVNVVVhha1hNcEhyKzJTQ2MKLS0tIG9YZ3NubHJKQ3ptRXRGYXpKR1pZK3lIeC95M1ZoVHNkMkZUS2JKdlNoZjQKK25nziTk0OwoX3S+6l3eJEAV90iSHL/0tdkTAvr04kqaVAwtAV9rCQtH/qLE710t0Wo5EKhfuClF]() {
+    fn test_configu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBCL0oybzhOakZScDgvRmtwY1NiRUhubFNDbmxobGZNZS9reWU4WHhiamlVCmpSRmVJZGxpQlYxaDdvN3FNMXRETFhybWN0b0ZNTVFQMER1b0FUbm9ZTlEKLT4gPH1bejxKLWdyZWFzZSAmOXFIMiV5IGgwCjM4NHRIRmE3TnZpcGxXUUNBZ2FQREh3bEd3RjRVYWdsSEZrdWtBTkg4MzlubjN1Rjk0aisKLS0tIDk0R0t4RzIwNGhTbDJ3TW9wOWlURU55UEMzZWszcmZ0UWNkUlNqL3BINW8Kl5IA/xfwSRM6gQ8JChI5tm0kfFs8FESZq0DPSv58Sh53egjWL/38ZY2J2epRwwqHWkMTOM6TBK3H]() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("test-repo");
         test_git_cmd()
@@ -1710,7 +1710,7 @@ mod tests {
         );
     }
     #[tokio::test]
-    async fn test_resto[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBLYlRKNlA0cW5VZVBIaGlzQ2hFMTFUUjcwYXpqOHdUeHFxckpwQ2twSFhVCjFqUTYyMGxXMDEwK0ZNb3pnaTg2NWtFSUZ2ZWdrTXpLUEtJc3ZIQ2Z3dUUKLT4gWDI1NTE5IHlqR210QmhjNkJlOEl4M1RxdU8vdEpSVmt0Y0h0S0ZBMFJlejNSN1REaTQKM1pyZldmNUZWN09lN2hmdmY0dW5PRzlIdXM1Z2h3TytxYU5GdWFkb3pENAotPiAzLWdyZWFzZSB4Z0ZcemMgQzxgJUsKbHRMeTcxRmJwTC83RlkwTnpUcm5VVXFSc0RzQ1B1OHpPZnAySlBZQjBXNDVBQkdPWUdKa2RNUQotLS0gMXVMa2Nwdzl4NG8xay9pNXBjcjB2MHBlSkVQL0ZtOEFmZEY2QnFTQ204NAo0Unnoc1qTQZKNFVD7yXfwpL8TatpZ6pGPrjsrzyR1yoYmxmkkhqHpX79OhAyWDr05x1Lmiwt1rdUYMgPopM5NM9yfhPP2GZw=]() {
+    async fn test_resto[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBYUWVNK1ZZOUpPMGRnTityZm5TMnIydlZiVXRtbFNKVHJEZVppMlVZK0RRClNTdmdzbU1WdHVzN0xtNmxQb2d2bDJvczNtQjdMaVphbXp1bHRoQitvK0kKLT4gWXJHSUktZ3JlYXNlIDhgIEszcycubElmIGMuNH4KTUlIVVVTam91dEY3dzhiTGU3L2h1akhIYjYzR204alpocm9FbUo2N0dCTzJFQUx0VS9WUHpoZEJGMVdPQUphaQphaEFQaE8vMHFqL1M5WHczT0p0aUZWaDU5R0NwS3h2amJ3Ci0tLSBuK1hYTWx5YmxVQmw4UkF5QVprYUVZZVhLSXZEWUxKdW96c1ZXRzZSaFBBChECZ4nX93xlZH8mpvbHlNHOPvWf3BOheOWLu3uCh/CLVpjUSKvMzcA6A3EAqxqncchlz38DqvjQdCm1lVIxVmdDtRfRZ/Vx0w==]() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("test-repo");
         test_git_cmd()
@@ -1818,7 +1818,13 @@ mod tests {
                 .stdout;
             let local = String::from_utf8_lossy(&local).trim().to_string();
             test_git_cmd()
-                .args(["commit", "--no-verify", "--allow-empty", "-m", "other commit"])
+                .args([
+                    "commit",
+                    "--no-verify",
+                    "--allow-empty",
+                    "-m",
+                    "other commit",
+                ])
                 .current_dir(&repo)
                 .status()
                 .expect("git commit --allow-empty");
@@ -1881,7 +1887,13 @@ mod tests {
             .output()
             .expect("git commit");
         std::process::Command::new(real_git.as_path())
-            .args(["commit", "--no-verify", "--allow-empty", "-m", "other commit"])
+            .args([
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "other commit",
+            ])
             .current_dir(&repo)
             .output()
             .expect("git commit");
@@ -1944,7 +1956,13 @@ mod tests {
                 .expect("git rev-parse");
             let _local = String::from_utf8_lossy(&local.stdout).trim().to_string();
             test_git_cmd()
-                .args(["commit", "--no-verify", "--allow-empty", "-m", "other commit"])
+                .args([
+                    "commit",
+                    "--no-verify",
+                    "--allow-empty",
+                    "-m",
+                    "other commit",
+                ])
                 .current_dir(&repo)
                 .status()
                 .expect("git commit");
@@ -2000,7 +2018,13 @@ mod tests {
             .status()
             .expect("git remote add");
         test_git_cmd()
-            .args(["commit", "--no-verify", "--allow-empty", "-m", "other commit"])
+            .args([
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "other commit",
+            ])
             .current_dir(&repo)
             .status()
             .expect("git commit");

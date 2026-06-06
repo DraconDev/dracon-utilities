@@ -17,10 +17,10 @@ use crate::exclude::{
 use crate::git::multi_remote::push_mirror_remotes;
 use crate::git::origin_url;
 use crate::git::{
-    cli_diff_entries, git_name_status_entries, has_origin_remote,
-    has_tracking_upstream, is_cherry_pick_in_progress, is_merge_in_progress, is_rebase_in_progress,
-    is_repo_ready, prune_other_default_branch, push_with_retries, restore_paths,
-    run_git_capture_output, run_git_with_timeout, unstage_excluded_paths, unstage_oversized_paths,
+    cli_diff_entries, git_name_status_entries, has_origin_remote, has_tracking_upstream,
+    is_cherry_pick_in_progress, is_merge_in_progress, is_rebase_in_progress, is_repo_ready,
+    prune_other_default_branch, push_with_retries, restore_paths, run_git_capture_output,
+    run_git_with_timeout, unstage_excluded_paths, unstage_oversized_paths,
 };
 use crate::policy::{debug_enabled, load_repo_override, SyncPolicy};
 use crate::visibility::{
@@ -898,7 +898,11 @@ async fn push_background(
     {
         Ok(()) => {}
         Err(e) => {
-            eprintln!("⚠️ background push to origin failed for {}: {}", repo.display(), e);
+            eprintln!(
+                "⚠️ background push to origin failed for {}: {}",
+                repo.display(),
+                e
+            );
             return Ok(false);
         }
     }
@@ -992,14 +996,11 @@ struct TaskDetail {
 /// This is deterministic — no LLM, no inference. Just regex on the diff.
 fn extract_task_transitions(repo: &Path) -> TaskTransitions {
     // Get the diff for ALL files (not just markdown)
-    let output = match run_git_capture_output(
-        repo,
-        &["diff", "--cached", "--unified=0"],
-        "task-diff",
-    ) {
-        Ok(o) => o,
-        Err(_) => return TaskTransitions::default(),
-    };
+    let output =
+        match run_git_capture_output(repo, &["diff", "--cached", "--unified=0"], "task-diff") {
+            Ok(o) => o,
+            Err(_) => return TaskTransitions::default(),
+        };
 
     let mut transitions = TaskTransitions::default();
 
@@ -1013,7 +1014,9 @@ fn extract_task_transitions(repo: &Path) -> TaskTransitions {
 
         // Check for completed tasks: [x] or [X]
         // Matches: `- [x]`, `* [x]`, `// [x]`, `# [x]`, plain `[x]`
-        if let Some(rest) = extract_checkbox_text(trimmed, 'x').or_else(|| extract_checkbox_text(trimmed, 'X')) {
+        if let Some(rest) =
+            extract_checkbox_text(trimmed, 'x').or_else(|| extract_checkbox_text(trimmed, 'X'))
+        {
             let task = sanitize_task_name(rest);
             if !task.is_empty() {
                 transitions.closed.push(task);
@@ -1045,7 +1048,7 @@ fn extract_task_transitions(repo: &Path) -> TaskTransitions {
 fn extract_checkbox_text(line: &str, marker: char) -> Option<&str> {
     // Build the marker pattern: `[x]`, `[~]`, etc.
     let pattern = format!("[{}]", marker);
-    
+
     // Try common text/markdown prefixes only
     let prefixes = ["- ", "* ", ""];
     for prefix in &prefixes {
@@ -1054,7 +1057,7 @@ fn extract_checkbox_text(line: &str, marker: char) -> Option<&str> {
             return Some(rest.trim());
         }
     }
-    
+
     None
 }
 
@@ -1086,15 +1089,16 @@ fn sanitize_task_name(name: &str) -> String {
             }
         }
     }
-    
+
     // Fallback: general sanitization
-    let sanitized = name.replace('|', "/")
+    let sanitized = name
+        .replace('|', "/")
         .replace("**", "")
         .replace("__", "")
         .replace('*', "")
         .replace('[', "(")
         .replace(']', ")")
-        .replace('`', "")  // Strip backticks (code in task names)
+        .replace('`', "") // Strip backticks (code in task names)
         .trim()
         .to_string();
     truncate_task(&sanitized)
@@ -1148,57 +1152,58 @@ fn truncate_task(name: &str) -> String {
 /// Returns None if no goal files changed or parsing fails.
 fn extract_goal_metadata(repo: &Path) -> Option<GoalMetadata> {
     // Get list of staged files
-    let files_output = run_git_capture_output(
-        repo,
-        &["diff", "--cached", "--name-only"],
-        "goal-files",
-    ).ok()?;
-    
+    let files_output =
+        run_git_capture_output(repo, &["diff", "--cached", "--name-only"], "goal-files").ok()?;
+
     // Find goal files that changed
-    let goal_files: Vec<&str> = files_output.lines()
+    let goal_files: Vec<&str> = files_output
+        .lines()
         .filter(|f| f.starts_with(".pi/goals/") && f.ends_with(".md"))
         .collect();
-    
+
     if goal_files.is_empty() {
         return None;
     }
-    
+
     // Read the first goal file (most recent)
     let goal_path = repo.join(goal_files[0]);
     let content = std::fs::read_to_string(&goal_path).ok()?;
-    
+
     // Parse JSON - goal files have JSON at the top, markdown at the bottom
     // Find the end of JSON by counting braces
     let mut depth = 0;
     let mut json_end = 0;
     for (i, c) in content.chars().enumerate() {
-        if c == '{' { depth += 1; }
-        else if c == '}' { depth -= 1; }
+        if c == '{' {
+            depth += 1;
+        } else if c == '}' {
+            depth -= 1;
+        }
         if depth == 0 && i > 0 {
             json_end = i + 1;
             break;
         }
     }
-    
+
     if json_end == 0 {
         return None;
     }
-    
+
     let json_str = &content[..json_end];
     let value: serde_json::Value = serde_json::from_str(json_str).ok()?;
-    
+
     let mut metadata = GoalMetadata {
         status: value["status"].as_str().map(String::from),
         pause_reason: value["pauseReason"].as_str().map(String::from),
         stop_reason: value["stopReason"].as_str().map(String::from),
         ..Default::default()
     };
-    
+
     if let Some(usage) = value["usage"].as_object() {
         metadata.tokens_used = usage["tokensUsed"].as_u64();
         metadata.active_seconds = usage["activeSeconds"].as_u64();
     }
-    
+
     // Extract task details
     if let Some(tasks) = value["taskList"]["tasks"].as_array() {
         for task in tasks {
@@ -1212,7 +1217,7 @@ fn extract_goal_metadata(repo: &Path) -> Option<GoalMetadata> {
             metadata.task_details.push(detail);
         }
     }
-    
+
     Some(metadata)
 }
 
@@ -1283,7 +1288,7 @@ fn detect_dependency_changes(repo: &Path) -> Option<String> {
     if !any_changed {
         return None;
     }
-    
+
     // If we couldn't parse any actual deps, skip the DEPS indicator
     // (e.g., version bump in package.json has no actual dependency changes)
     if added_deps.is_empty() && removed_deps.is_empty() {
@@ -1324,7 +1329,11 @@ fn parse_cargo_dep(line: &str) -> Option<String> {
     // Look for `name = ` pattern
     if let Some(eq_pos) = trimmed.find('=') {
         let name = trimmed[..eq_pos].trim();
-        if !name.is_empty() && name.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-') {
+        if !name.is_empty()
+            && name
+                .chars()
+                .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
+        {
             return Some(name.to_string());
         }
     }
@@ -1338,7 +1347,7 @@ fn parse_npm_dep(line: &str) -> Option<String> {
     if let Some(colon_pos) = trimmed.find(':') {
         let key_part = trimmed[..colon_pos].trim();
         if key_part.starts_with('"') && key_part.ends_with('"') {
-            let name = &key_part[1..key_part.len()-1];
+            let name = &key_part[1..key_part.len() - 1];
             // Skip non-dependency fields
             if !name.is_empty() && !name.starts_with('_') && name != "name" && name != "version" {
                 return Some(name.to_string());
@@ -1356,7 +1365,8 @@ fn parse_pip_dep(line: &str) -> Option<String> {
         return None;
     }
     // Split on version specifiers
-    let name = trimmed.split(&['=', '>', '<', '!', '~', ';', '['][..])
+    let name = trimmed
+        .split(&['=', '>', '<', '!', '~', ';', '['][..])
         .next()
         .unwrap_or("")
         .trim();
@@ -1388,14 +1398,11 @@ fn parse_go_dep(line: &str) -> Option<String> {
 ///
 /// Returns (new_files, deleted_files) as vectors of file paths.
 fn extract_new_deleted_files(repo: &Path) -> (Vec<String>, Vec<String>) {
-    let output = match run_git_capture_output(
-        repo,
-        &["diff", "--cached", "--name-status"],
-        "name-status",
-    ) {
-        Ok(o) => o,
-        Err(_) => return (Vec::new(), Vec::new()),
-    };
+    let output =
+        match run_git_capture_output(repo, &["diff", "--cached", "--name-status"], "name-status") {
+            Ok(o) => o,
+            Err(_) => return (Vec::new(), Vec::new()),
+        };
 
     let mut new_files = Vec::new();
     let mut deleted_files = Vec::new();
@@ -1407,14 +1414,14 @@ fn extract_new_deleted_files(repo: &Path) -> (Vec<String>, Vec<String>) {
         }
         let status = parts[0];
         let path = parts[1];
-        
+
         // Only track source files, not lock files or generated files
-        let should_track = !path.ends_with(".lock") 
+        let should_track = !path.ends_with(".lock")
             && !path.ends_with(".sum")
             && !path.contains("/target/")
             && !path.contains("/node_modules/")
             && !path.contains("/__pycache__/");
-        
+
         if !should_track {
             continue;
         }
@@ -1447,8 +1454,10 @@ fn is_test_file(path: &str) -> bool {
     }
 
     // Suffix patterns (before extension)
-    if basename_lower.contains("_test.") || basename_lower.contains("_tests.")
-        || basename_lower.contains(".test.") || basename_lower.contains(".spec.")
+    if basename_lower.contains("_test.")
+        || basename_lower.contains("_tests.")
+        || basename_lower.contains(".test.")
+        || basename_lower.contains(".spec.")
     {
         return true;
     }
@@ -1471,21 +1480,19 @@ fn get_current_tag(repo: &Path) -> Option<String> {
         repo,
         &["describe", "--tags", "--always", "--exact-match"],
         "tag-exact",
-    ).ok()?;
-    
+    )
+    .ok()?;
+
     let tag = exact.trim();
     if !tag.is_empty() && !tag.contains('-') {
         // Got an exact tag (no commit count suffix)
         return Some(tag.to_string());
     }
-    
+
     // Fall back to --all (check all refs for this commit)
-    let all_tags = run_git_capture_output(
-        repo,
-        &["tag", "--points-at", "HEAD"],
-        "tag-points-at",
-    ).ok()?;
-    
+    let all_tags =
+        run_git_capture_output(repo, &["tag", "--points-at", "HEAD"], "tag-points-at").ok()?;
+
     // Return the first lightweight tag (ignore annotated ones for simplicity)
     for line in all_tags.lines() {
         let tag = line.trim();
@@ -1493,7 +1500,7 @@ fn get_current_tag(repo: &Path) -> Option<String> {
             return Some(tag.to_string());
         }
     }
-    
+
     None
 }
 
@@ -1507,22 +1514,16 @@ fn get_current_tag(repo: &Path) -> Option<String> {
 /// Returns true if any env-like files changed.
 fn has_env_changes(repo: &Path) -> bool {
     let env_patterns = [
-        ".env",
-        ".env.",  // .env.local, .env.production, etc.
-        ".envrc",
-        ".secrets",
-        "secrets.",
+        ".env", ".env.", // .env.local, .env.production, etc.
+        ".envrc", ".secrets", "secrets.",
     ];
-    
-    let output = match run_git_capture_output(
-        repo,
-        &["diff", "--cached", "--name-only"],
-        "env-check",
-    ) {
-        Ok(o) => o,
-        Err(_) => return false,
-    };
-    
+
+    let output =
+        match run_git_capture_output(repo, &["diff", "--cached", "--name-only"], "env-check") {
+            Ok(o) => o,
+            Err(_) => return false,
+        };
+
     for line in output.lines() {
         let path = line.trim();
         // Check if file name matches any env pattern
@@ -1533,7 +1534,7 @@ fn has_env_changes(repo: &Path) -> bool {
             }
         }
     }
-    
+
     false
 }
 
@@ -1648,7 +1649,12 @@ fn compute_blast_radius(repo: &Path) -> String {
         const MAX_TASKS: usize = 10;
         let mut parts = Vec::new();
         if !transitions.closed.is_empty() {
-            let shown: Vec<&str> = transitions.closed.iter().take(MAX_TASKS).map(|s| s.as_str()).collect();
+            let shown: Vec<&str> = transitions
+                .closed
+                .iter()
+                .take(MAX_TASKS)
+                .map(|s| s.as_str())
+                .collect();
             let suffix = if transitions.closed.len() > MAX_TASKS {
                 format!(" +{}more", transitions.closed.len() - MAX_TASKS)
             } else {
@@ -1657,7 +1663,12 @@ fn compute_blast_radius(repo: &Path) -> String {
             parts.push(format!("CLOSED: {}{}", shown.join(", "), suffix));
         }
         if !transitions.progress.is_empty() {
-            let shown: Vec<&str> = transitions.progress.iter().take(MAX_TASKS).map(|s| s.as_str()).collect();
+            let shown: Vec<&str> = transitions
+                .progress
+                .iter()
+                .take(MAX_TASKS)
+                .map(|s| s.as_str())
+                .collect();
             let suffix = if transitions.progress.len() > MAX_TASKS {
                 format!(" +{}more", transitions.progress.len() - MAX_TASKS)
             } else {
@@ -1676,7 +1687,10 @@ fn compute_blast_radius(repo: &Path) -> String {
     let dirs_str = if dirs.is_empty() {
         String::new()
     } else {
-        format!(" in {}", dirs.iter().take(3).cloned().collect::<Vec<_>>().join(","))
+        format!(
+            " in {}",
+            dirs.iter().take(3).cloned().collect::<Vec<_>>().join(",")
+        )
     };
 
     // 3. Top changed files
@@ -1694,16 +1708,18 @@ fn compute_blast_radius(repo: &Path) -> String {
     if binary_count > 0 {
         metrics.push(format!("BIN:{}", binary_count));
     }
-    
+
     // 5. New/deleted files
     let (new_files, deleted_files) = extract_new_deleted_files(repo);
     if !new_files.is_empty() {
         // Show top 10 new files (searchable), abbreviate nested paths
-        let display: Vec<String> = new_files.iter().take(10)
+        let display: Vec<String> = new_files
+            .iter()
+            .take(10)
             .map(|f| {
                 let parts: Vec<&str> = f.split('/').collect();
                 if parts.len() > 2 {
-                    parts[parts.len()-2..].join("/")
+                    parts[parts.len() - 2..].join("/")
                 } else {
                     f.clone()
                 }
@@ -1717,11 +1733,13 @@ fn compute_blast_radius(repo: &Path) -> String {
         metrics.push(format!("NEW:{}{}", display.join(","), suffix));
     }
     if !deleted_files.is_empty() {
-        let display: Vec<String> = deleted_files.iter().take(10)
+        let display: Vec<String> = deleted_files
+            .iter()
+            .take(10)
             .map(|f| {
                 let parts: Vec<&str> = f.split('/').collect();
                 if parts.len() > 2 {
-                    parts[parts.len()-2..].join("/")
+                    parts[parts.len() - 2..].join("/")
                 } else {
                     f.clone()
                 }
@@ -1734,12 +1752,12 @@ fn compute_blast_radius(repo: &Path) -> String {
         };
         metrics.push(format!("DEL:{}{}", display.join(","), suffix));
     }
-    
+
     // 6. Dependency changes
     if let Some(dep_info) = detect_dependency_changes(repo) {
         metrics.push(format!("DEPS:{}", dep_info));
     }
-    
+
     // 7. Merge/revert detection
     if repo.join(".git/MERGE_HEAD").exists() {
         metrics.push("MERGE:".to_string());
@@ -1747,27 +1765,39 @@ fn compute_blast_radius(repo: &Path) -> String {
     if repo.join(".git/REVERT_HEAD").exists() {
         metrics.push("REVERT:".to_string());
     }
-    
+
     // 8. Tag detection — if this commit is tagged, include the tag
     if let Some(tag) = get_current_tag(repo) {
         metrics.push(format!("TAG:{}", tag));
     }
-    
+
     // 9. Test-only detection — if ALL changed files are test files
     if !file_changes.is_empty() && file_changes.iter().all(|(_, path)| is_test_file(path)) {
-        let test_files: Vec<String> = file_changes.iter().take(5).map(|(_, p)| {
-            let parts: Vec<&str> = p.split('/').collect();
-            if parts.len() > 2 { parts[parts.len()-2..].join("/") } else { p.clone() }
-        }).collect();
-        let suffix = if file_changes.len() > 5 { format!("+{}more", file_changes.len() - 5) } else { String::new() };
+        let test_files: Vec<String> = file_changes
+            .iter()
+            .take(5)
+            .map(|(_, p)| {
+                let parts: Vec<&str> = p.split('/').collect();
+                if parts.len() > 2 {
+                    parts[parts.len() - 2..].join("/")
+                } else {
+                    p.clone()
+                }
+            })
+            .collect();
+        let suffix = if file_changes.len() > 5 {
+            format!("+{}more", file_changes.len() - 5)
+        } else {
+            String::new()
+        };
         metrics.push(format!("TESTONLY:{}{}", test_files.join(","), suffix));
     }
-    
+
     // 10. Env file detection — if any env files changed
     if has_env_changes(repo) {
         metrics.push("ENV:".to_string());
     }
-    
+
     // 11. Goal metadata — extract richer context from .pi/goals/ JSON files
     if let Some(ref goal_meta) = transitions.goal_metadata {
         // Goal status change
@@ -1778,7 +1808,7 @@ fn compute_blast_radius(repo: &Path) -> String {
                 metrics.push("GOAL:paused".to_string());
             }
         }
-        
+
         // Pause reason (abbreviated)
         if let Some(ref reason) = goal_meta.pause_reason {
             let short_reason = if reason.len() > 50 {
@@ -1788,27 +1818,30 @@ fn compute_blast_radius(repo: &Path) -> String {
             };
             metrics.push(format!("PAUSE:{}", short_reason));
         }
-        
+
         // Token usage
         if let Some(tokens) = goal_meta.tokens_used {
             if tokens > 100_000 {
                 metrics.push(format!("TOKENS:{}K", tokens / 1000));
             }
         }
-        
+
         // Active time
         if let Some(seconds) = goal_meta.active_seconds {
             if seconds > 60 {
                 metrics.push(format!("TIME:{}m", seconds / 60));
             }
         }
-        
+
         // Task evidence (completed tasks with evidence)
-        let tasks_with_evidence: Vec<&TaskDetail> = goal_meta.task_details.iter()
+        let tasks_with_evidence: Vec<&TaskDetail> = goal_meta
+            .task_details
+            .iter()
             .filter(|t| t.status == "complete" && t.evidence.is_some())
             .collect();
         if !tasks_with_evidence.is_empty() {
-            let evidence_summary: Vec<String> = tasks_with_evidence.iter()
+            let evidence_summary: Vec<String> = tasks_with_evidence
+                .iter()
                 .take(3)
                 .map(|t| {
                     let ev = t.evidence.as_ref().unwrap();
@@ -1826,13 +1859,16 @@ fn compute_blast_radius(repo: &Path) -> String {
             };
             metrics.push(format!("EVIDENCE:{}{}", evidence_summary.join("|"), suffix));
         }
-        
+
         // Skipped tasks with reasons
-        let skipped_tasks: Vec<&TaskDetail> = goal_meta.task_details.iter()
+        let skipped_tasks: Vec<&TaskDetail> = goal_meta
+            .task_details
+            .iter()
             .filter(|t| t.status == "skipped" && t.skip_reason.is_some())
             .collect();
         if !skipped_tasks.is_empty() {
-            let skip_summary: Vec<String> = skipped_tasks.iter()
+            let skip_summary: Vec<String> = skipped_tasks
+                .iter()
                 .take(3)
                 .map(|t| {
                     let reason = t.skip_reason.as_ref().unwrap();
@@ -1851,7 +1887,7 @@ fn compute_blast_radius(repo: &Path) -> String {
             metrics.push(format!("SKIPPED:{}{}", skip_summary.join("|"), suffix));
         }
     }
-    
+
     let metrics_str = if metrics.is_empty() {
         String::new()
     } else {
@@ -1970,7 +2006,7 @@ async fn stage_commit_and_push(
         // `ctx.remote_failures` (the caller passes a `&mut HashMap`).
         // The `tokio::spawn` fire-and-forget pattern was removed because
         // it bypassed the failure-tracking needed by callers like
-        // `test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBuV2VITU82cW52ZEtLRSt3bUxQcHQxRDVlaHhBSVFRcEcwTmc5MFNWOFdrCkErbXIyeFdtbW1OZ3ZzTVFZM01oWWt3cDY0N05oWlVHVGl1Y3ZsZGlhbGsKLT4gRTR2e0pfLWdyZWFzZSA5Pm5rNikpfCBLICI2YyZoCnJCV2U1RlNFZVovaDdRNzQxSDN1UVpUU3YyZkNzeHhweVJyMjNVOAotLS0gemRZY3JNd21tUUJVdUI1NWk1YlVuWTZURFpTUlZpV1lYZlZIS3kwNnJhMArxl49Qi9rOex3QsL3E9ceNxYRLy9FKj1seKhyjOUTdyDnP+lauQobZR8EMB6wQ4QZiVnTrg/wbj5g=]`.
+        // `test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBmcTc3WWtPcVFPTEVYQXFXWDBpNkx3WkdMY040MkVyNE02WGl3UHJYaTNnCnVrMmlZY2o3U1VNdjBvTjZaSWdYbzQrcmZzRU5JWkNlZk5ScE9NcnJhQ3MKLT4gVCkxLWdyZWFzZSB0eFVMT0ArNCBGaGxzXS4gZXQwKAoyN1hYZDk4SzFCL1RTdWJRSUVkTFFhUmhESjluVDhNVDl3MVJrdm9YeTJSRkMxc3F1enBGN3BNdVdjcVA0QWc5Cno0OXh6dG9vCi0tLSBNdktyakZxM3UxTFpLbDR3SEY5WGhFZUR4N1RPbmRMSVJDcm81MGN1dWZNCncLbnaVABvJv8EzblneNVhBkzfMa6dtLCG/ofFKvLq8ROh2A3f6kt01NouSw1zy/gKv0FG6wLt16Q==]`.
         match push_background(repo, policy, ctx.remote_failures.as_deref_mut()).await {
             Ok(true) => {}
             Ok(false) => eprintln!("⚠️ push failed for {}", repo.display()),
@@ -2191,7 +2227,7 @@ async fn handle_ahead_push(ctx: &mut SyncContext<'_>, svc: &GitService) -> Resul
         // Push synchronously so mirror failures are tracked in
         // `ctx.remote_failures`. Previously this used `tokio::spawn`
         // (fire-and-forget), which made the failure tracking unreachable
-        // for callers like the test `test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAxNXpNTVhMdktMcG1UT3ZacWdzK1ZJVEVSTkpxSXZBVEhMV0l5SzFvZFFrCk5QM2xXZHdsTng4VmhMR282Tk1idmlxUmQrejRBbUtCczhFOWYrKzZKRzAKLT4gPS1ncmVhc2UgP2F2SFZMcCBzSCBhdgpMUWdmTjVoQThpUExPZHlIRFpyRFpSbjY3REdqbjNHWENmVFBvWVM2S2pOdVZWa2JqTHU2TFVkV2ZRV1J3c2QrCkpUelh2aUwrZlBSaXljak1QYmxESTNnbGhKaTNuME5MdSsyaVRaNnVnMWpuUy9KU2ovQVZraW82cTFRODBaREYKclJOUQotLS0gMzNPZFB1VTNkcTFyQ2U4N2QvME4xaEhmWU5SaDB5YzlDeVpBTTJVRTBFSQoo+fcPGqEpFzGlo4iVHrMLFUiMyE0ifYW6/koZW7Bd7KqgKqFVQffpjxlUs9Bi6HQ6cJttsOuhMFw=]`.
+        // for callers like the test `test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBrRVpqZGlweU9jKzMrNk93N0ZzOFBMbDZGczZGUGgrbFFGb25sUEF0YkZNCkY3QSthZUFJQXZLOTZxd21xenIxNnB6dUsrYmErdkhNME55ZVNSK3krM1UKLT4gXy1ncmVhc2UgMGRKMiMgLwpZWnREakxZbGxvVGNCd0p4UlpqcC96aHVnTkFPckljCi0tLSA4dWZzMEJrMzBxcFBKdFJsbzNHNnErS2RxUWtQT3JOMnZ0WnU5cm5vTnA4Cl0uWaGcaR9OhXrC2FXysR2YJv4LhPMBwKiwz0XRB6a3GtwxOpne5kpZ1gSEaCsi8g0SI515cF4QsQ==]`.
         match push_background(ctx.repo, ctx.policy, ctx.remote_failures.as_deref_mut()).await {
             Ok(true) => {}
             Ok(false) => eprintln!("⚠️ push failed for {}", ctx.repo.display()),
@@ -2215,7 +2251,7 @@ mod tests {
         let result = truncate_task(input);
         assert!(result.len() <= 64); // 60 + "..."
         assert!(!result.ends_with('\u{200B}')); // no broken chars
-        // Should cut at the em dash boundary
+                                                // Should cut at the em dash boundary
         assert!(result.contains('—') || result.ends_with("..."));
     }
 
@@ -3034,7 +3070,7 @@ push_url = "git@nonexistent.example.com:repo.git"
     }
 
     #[tokio::test]
-    async fn test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSArWkkxdGVjcmtEK2FjN0dCejF0emtWaDlzVncyaHNDWnVoUWdaZHU5YlU0CnNXQWovc0d4QjJNaERnclByMGFTUGpYekFtZ2FkUEEyZWowVXRyL0lYVVEKLT4geWE1LWdyZWFzZSBBYT0KSXlWYWRpZXBsSVdkdGVyckcrNW8zQzRvV1dQRitXNC9FVTZGUkN3YmpteW52ckxEajNLS2lwVmpSN1hYU3pqNgpxK05jTWJuZHR4T3JPZ1p2djQ4MURINUhuUVgzNncKLS0tIGpITHBMMm1qN3dBc283OXhhbkFDTkk5UTVGYzRSaUpIY3V2bUdFWlU1TWMKPVFy26t5pywVTAv3H9m/nrO9PRtU3arW5O14SOkMFviLXbf3amKFPW0dNju9O+YoYLA4/HAoqpMh]() {
+    async fn test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBkSHpvWnJjMEF4MUxZSUgxSmFzaExjejFMUWFINXFmb2hqclU3Yk4yMlJVClZWTzVzV0RuT0ZEQzhkTmJtcXo2bmdIMGIvVHpJQW1aQTV1WWtWYXlQa1kKLT4gSS1ncmVhc2UKYWpWOFFnM2ZPcGFKNXBtdXF6QQotLS0gNWF3a2lCc2RaajJVaDJXemJNWmZsTjNGZFIrcXMrbzZ0cmRicXZLR3NZdwq+6rdEfUCc0EPqZQ6VoK8tsVAG91o4tBwaBmcA3jatv/Q51lIeXsv9UxteaG2Pf2oirdU9Wt0uOBo=]() {
         let tmp = tempfile::tempdir().unwrap();
         let origin_bare = tmp.path().join("origin.git");
         std::process::Command::new("git")
@@ -3390,7 +3426,7 @@ push_url = "{}"
     }
 
     #[tokio::test]
-    async fn test_sync_repo_exac[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBWMkl6SmlmVUpyUTZsM1ZNTjcxbndnTWN5STU1Y2ZPZkRmekl3SkFLQjFRCnZybmV1b1ZlVzQ2eFl5OFEwYktWVlgrT05HRzNiNmtTZ1VQN2xsNlRPQW8KLT4gWU5FKU1ULWdyZWFzZSBSLmExenJEIG9RQT5vCmlzNmJJQVg3Tm5KTWtUTzE1TFJnZEIzMUtZQnA2MlAyOEEKLS0tIFVGMEx2dlg3SkVpaTNEOHBleDFscmJwYTgzb3crOXkxQmZ0dkIwOTJ5VVkKCD8YmpYrve25de+gLqjox3N0u/bt6uUrwtUKVX6oDgveQ6e4U3NgalBYcJyNPoWc2dYX1f2i43r6vHlk0Q8P]() {
+    async fn test_sync_repo_exac[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBNcGx2S2JvWDB4dU1rb1dwaTR4SW5IZzBlR1JUSlE4RmhZN3IyNDM0dVIwCmFsZzFWcnVBb0kxUW16aERZblRWdmpLR2Y0M0N1N25ESTZ2VGtaT2lneUEKLT4gIUl3fS1ncmVhc2UKSkNnb3ZLdlAycHlFUW85TG1TUGFGN2RXRkF4RVY3WjI5cjVEZE5Wb3p0MDl2amNXVyszMTZHNmRRc3NnVFZ3RAo4b1djMXFaM01SaHF5bk5QbWUwTnZvZHJvRWg4VUZLSTRjNjN0cVF6RU5uTnRhTQotLS0gRzNlTkhDRnhYbzFaeWZmeGMzTUM2dmJKV2c4TW5QODJYT1NpTUNhYmZhOAqrqg2DlJLtsmbKzGNSMUKJgPFoAhFEUhV7Z/x+P67eEtfkY6SesO1drSFXhD3AahGTn4TCfrHOV38U420DNm8=]() {
         let tmp = tempfile::tempdir().unwrap();
         let repo = init_test_repo(&tmp, "exact-50-del-repo");
 
@@ -3755,7 +3791,10 @@ auto_bump_versions = false
             let fname = format!("file{}.txt", i);
             std::fs::write(repo.join(&fname), format!("content{}\n", i)).unwrap();
             git_cmd(&repo, &["add", &fname]);
-            git_cmd(&repo, &["commit", "--no-verify", "-m", &format!("add {}", fname)]);
+            git_cmd(
+                &repo,
+                &["commit", "--no-verify", "-m", &format!("add {}", fname)],
+            );
         }
 
         // Set threshold to 2 — should trigger alert since we have 3 unpushed commits
@@ -3798,7 +3837,6 @@ auto_bump_versions = false
         let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
         assert!(result.is_ok(), "sync_repo should succeed");
     }
-
 
     async fn test_deletions_committed_when_intentional() {
         let tmp = tempfile::tempdir().unwrap();
@@ -3931,7 +3969,10 @@ auto_bump_versions = false
         // Before the fix, this returned Err ("failed to reset HEAD after filter-only commit").
         let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
         assert!(
-            matches!(result, Ok(SyncOutcome::NothingToDo) | Ok(SyncOutcome::Synced)),
+            matches!(
+                result,
+                Ok(SyncOutcome::NothingToDo) | Ok(SyncOutcome::Synced)
+            ),
             "filter-only reset failure should be non-fatal, got {:?}",
             result
         );
@@ -4066,7 +4107,14 @@ auto_bump_versions = false
             .output()
             .unwrap();
         test_git_cmd()
-            .args(["-C", &repo.to_string_lossy(), "checkout", "-q", "-b", "main"])
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "checkout",
+                "-q",
+                "-b",
+                "main",
+            ])
             .output()
             .unwrap();
 
@@ -4075,7 +4123,12 @@ auto_bump_versions = false
         let tracked_path = repo.join("subdir/types/imports.d.ts");
         std::fs::write(&tracked_path, "original\n").unwrap();
         test_git_cmd()
-            .args(["-C", &repo.to_string_lossy(), "add", "subdir/types/imports.d.ts"])
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "add",
+                "subdir/types/imports.d.ts",
+            ])
             .output()
             .unwrap();
         test_commit_cmd()
@@ -4101,7 +4154,12 @@ auto_bump_versions = false
         // Sanity check: plain `git add <path>` should fail because the
         // file's parent directory matches a gitignore rule
         let plain_add = test_git_cmd()
-            .args(["-C", &repo.to_string_lossy(), "add", "subdir/types/imports.d.ts"])
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "add",
+                "subdir/types/imports.d.ts",
+            ])
             .output()
             .unwrap();
         assert!(
@@ -4151,7 +4209,14 @@ auto_bump_versions = false
             .output()
             .unwrap();
         test_git_cmd()
-            .args(["-C", &repo.to_string_lossy(), "checkout", "-q", "-b", "main"])
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "checkout",
+                "-q",
+                "-b",
+                "main",
+            ])
             .output()
             .unwrap();
         // Make initial commit so HEAD exists
@@ -4170,8 +4235,16 @@ auto_bump_versions = false
 
         let paths = vec!["ignored.log".to_string()];
         let (force, normal) = partition_gitignored(&repo, &paths).await;
-        assert!(force.is_empty(), "untracked+ignored should not be in force_paths, got {:?}", force);
-        assert!(normal.is_empty(), "untracked+ignored should not be in normal_paths, got {:?}", normal);
+        assert!(
+            force.is_empty(),
+            "untracked+ignored should not be in force_paths, got {:?}",
+            force
+        );
+        assert!(
+            normal.is_empty(),
+            "untracked+ignored should not be in normal_paths, got {:?}",
+            normal
+        );
     }
 
     /// Regression test for audit-4: when push is rejected with `fetch first`
@@ -4184,7 +4257,13 @@ auto_bump_versions = false
         let origin_bare = tmp.path().join("origin.git");
         let origin_bare_str = origin_bare.canonicalize().unwrap_or(origin_bare.clone());
         test_git_cmd()
-            .args(["init", "--bare", "-b", "main", &origin_bare_str.to_string_lossy()])
+            .args([
+                "init",
+                "--bare",
+                "-b",
+                "main",
+                &origin_bare_str.to_string_lossy(),
+            ])
             .output()
             .unwrap();
         let repo = tmp.path().join("repo");
@@ -4202,15 +4281,37 @@ auto_bump_versions = false
             .unwrap();
         // Initial commit + push to set up origin as upstream
         test_git_cmd()
-            .args(["-C", &repo.to_string_lossy(), "commit", "--no-verify", "--allow-empty", "-m", "init"])
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
             .output()
             .unwrap();
         test_git_cmd()
-            .args(["-C", &repo.to_string_lossy(), "remote", "add", "origin", &origin_bare_str.to_string_lossy()])
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "remote",
+                "add",
+                "origin",
+                &origin_bare_str.to_string_lossy(),
+            ])
             .output()
             .unwrap();
         test_git_cmd()
-            .args(["-C", &repo.to_string_lossy(), "push", "-u", "origin", "main"])
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "push",
+                "-u",
+                "origin",
+                "main",
+            ])
             .output()
             .unwrap();
 
@@ -4221,7 +4322,14 @@ auto_bump_versions = false
             .output()
             .unwrap();
         test_git_cmd()
-            .args(["-C", &repo.to_string_lossy(), "commit", "--no-verify", "-m", "extra"])
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "-m",
+                "extra",
+            ])
             .output()
             .unwrap();
         test_git_cmd()
@@ -4244,7 +4352,13 @@ auto_bump_versions = false
 
         // Verify origin has 2 commits
         let origin_log = test_git_cmd()
-            .args(["--git-dir", &origin_bare_str.to_string_lossy(), "log", "--oneline", "--all"])
+            .args([
+                "--git-dir",
+                &origin_bare_str.to_string_lossy(),
+                "log",
+                "--oneline",
+                "--all",
+            ])
             .output()
             .unwrap();
         let origin_log_str = String::from_utf8_lossy(&origin_log.stdout).to_string();
@@ -4262,7 +4376,11 @@ auto_bump_versions = false
             .args(["-C", &repo.to_string_lossy(), "reset", "--hard", "HEAD~1"])
             .output()
             .unwrap();
-        assert!(reset_out.status.success(), "reset failed: {}", String::from_utf8_lossy(&reset_out.stderr));
+        assert!(
+            reset_out.status.success(),
+            "reset failed: {}",
+            String::from_utf8_lossy(&reset_out.stderr)
+        );
 
         // Verify local is at init (1 commit)
         let local_log_after_reset = test_git_cmd()
@@ -4272,7 +4390,8 @@ auto_bump_versions = false
         let local_log_str = String::from_utf8_lossy(&local_log_after_reset.stdout).to_string();
         let local_lines: Vec<&str> = local_log_str.trim().lines().collect();
         assert_eq!(
-            local_lines.len(), 1,
+            local_lines.len(),
+            1,
             "local should have 1 commit after reset, got {}:\n{}",
             local_lines.len(),
             local_log_str
@@ -4286,7 +4405,14 @@ auto_bump_versions = false
             .output()
             .unwrap();
         test_git_cmd()
-            .args(["-C", &repo.to_string_lossy(), "commit", "--no-verify", "-m", "local"])
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "-m",
+                "local",
+            ])
             .output()
             .unwrap();
 
@@ -4309,9 +4435,12 @@ auto_bump_versions = false
             .unwrap();
         let plain_stderr = String::from_utf8_lossy(&plain_push.stderr).to_string();
         assert!(
-            !plain_push.status.success() || plain_stderr.contains("rejected") || plain_stderr.contains("fetch first"),
+            !plain_push.status.success()
+                || plain_stderr.contains("rejected")
+                || plain_stderr.contains("fetch first"),
             "precondition: plain push should fail with fetch-first; status={} stderr={}",
-            plain_push.status, plain_stderr
+            plain_push.status,
+            plain_stderr
         );
 
         // Reset local again for the real test (undo the failed push)

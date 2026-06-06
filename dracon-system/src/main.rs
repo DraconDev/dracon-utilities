@@ -2438,9 +2438,7 @@ async fn cmd_status(json: bool) -> Result<()> {
             ("⚙️ system policy", &report.system_policy),
         ];
 
-        let service_rows: Vec<(&str, bool)> = vec![
-            ("sync service", report.sync_service_active),
-        ];
+        let service_rows: Vec<(&str, bool)> = vec![("sync service", report.sync_service_active)];
 
         for (label, detail) in &rows {
             table.add_row(vec![Cell::new(" "), Cell::new(*label), Cell::new(*detail)]);

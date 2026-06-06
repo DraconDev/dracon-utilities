@@ -241,7 +241,7 @@ mod daemon_tests {
         // by checking that a newly created repo returns correct status.
         let tmp = tempfile::tempdir().unwrap();
         let repo = tmp.path().join("test-repo");
-        
+
         // Initialize repo with a commit
         std::process::Command::new("git")
             .args(["init", "-q", "-b", "main"])
@@ -254,10 +254,17 @@ mod daemon_tests {
             .status()
             .unwrap();
         std::process::Command::new("git")
-            .args(["-C", repo.to_str().unwrap(), "commit", "-m", "init", "--no-verify"])
+            .args([
+                "-C",
+                repo.to_str().unwrap(),
+                "commit",
+                "-m",
+                "init",
+                "--no-verify",
+            ])
             .status()
             .unwrap();
-        
+
         // Get status should work and return clean repo with ahead=0
         let svc = GitService::new(&repo).unwrap();
         let status = svc.get_status().await.unwrap();
@@ -272,7 +279,7 @@ mod daemon_tests {
         // after git update-index --refresh.
         let tmp = tempfile::tempdir().unwrap();
         let repo = tmp.path().join("test-repo");
-        
+
         // Initialize repo with remote
         std::process::Command::new("git")
             .args(["init", "-q", "-b", "main"])
@@ -286,10 +293,17 @@ mod daemon_tests {
             .status()
             .unwrap();
         std::process::Command::new("git")
-            .args(["-C", repo.to_str().unwrap(), "remote", "add", "origin", remote.to_str().unwrap()])
+            .args([
+                "-C",
+                repo.to_str().unwrap(),
+                "remote",
+                "add",
+                "origin",
+                remote.to_str().unwrap(),
+            ])
             .status()
             .unwrap();
-        
+
         // Initial commit and push
         std::fs::write(repo.join("file.txt"), "v1").unwrap();
         std::process::Command::new("git")
@@ -297,14 +311,21 @@ mod daemon_tests {
             .status()
             .unwrap();
         std::process::Command::new("git")
-            .args(["-C", repo.to_str().unwrap(), "commit", "-m", "init", "--no-verify"])
+            .args([
+                "-C",
+                repo.to_str().unwrap(),
+                "commit",
+                "-m",
+                "init",
+                "--no-verify",
+            ])
             .status()
             .unwrap();
         std::process::Command::new("git")
             .args(["-C", repo.to_str().unwrap(), "push", "-u", "origin", "main"])
             .status()
             .unwrap();
-        
+
         // Unpushed commit
         std::fs::write(repo.join("file.txt"), "v2").unwrap();
         std::process::Command::new("git")
@@ -312,14 +333,24 @@ mod daemon_tests {
             .status()
             .unwrap();
         std::process::Command::new("git")
-            .args(["-C", repo.to_str().unwrap(), "commit", "-m", "unpushed", "--no-verify"])
+            .args([
+                "-C",
+                repo.to_str().unwrap(),
+                "commit",
+                "-m",
+                "unpushed",
+                "--no-verify",
+            ])
             .status()
             .unwrap();
-        
+
         let svc = GitService::new(&repo).unwrap();
         let status = svc.get_status().await.unwrap();
         assert_eq!(status.ahead, 1, "should detect 1 unpushed commit");
-        assert!(!status.is_clean || status.ahead > 0, "repo should not be fully synced");
+        assert!(
+            !status.is_clean || status.ahead > 0,
+            "repo should not be fully synced"
+        );
     }
 
     #[tokio::test]
@@ -328,7 +359,7 @@ mod daemon_tests {
         // confirming git update-index --refresh works correctly.
         let tmp = tempfile::tempdir().unwrap();
         let repo = tmp.path().join("test-repo");
-        
+
         std::process::Command::new("git")
             .args(["init", "-q", "-b", "main"])
             .arg(&repo)
@@ -341,10 +372,17 @@ mod daemon_tests {
             .status()
             .unwrap();
         std::process::Command::new("git")
-            .args(["-C", repo.to_str().unwrap(), "remote", "add", "origin", remote.to_str().unwrap()])
+            .args([
+                "-C",
+                repo.to_str().unwrap(),
+                "remote",
+                "add",
+                "origin",
+                remote.to_str().unwrap(),
+            ])
             .status()
             .unwrap();
-        
+
         // Initial commit and push
         std::fs::write(repo.join("file.txt"), "v1").unwrap();
         std::process::Command::new("git")
@@ -352,14 +390,21 @@ mod daemon_tests {
             .status()
             .unwrap();
         std::process::Command::new("git")
-            .args(["-C", repo.to_str().unwrap(), "commit", "-m", "init", "--no-verify"])
+            .args([
+                "-C",
+                repo.to_str().unwrap(),
+                "commit",
+                "-m",
+                "init",
+                "--no-verify",
+            ])
             .status()
             .unwrap();
         std::process::Command::new("git")
             .args(["-C", repo.to_str().unwrap(), "push", "-u", "origin", "main"])
             .status()
             .unwrap();
-        
+
         // Create and push another commit
         std::fs::write(repo.join("file.txt"), "v2").unwrap();
         std::process::Command::new("git")
@@ -367,14 +412,21 @@ mod daemon_tests {
             .status()
             .unwrap();
         std::process::Command::new("git")
-            .args(["-C", repo.to_str().unwrap(), "commit", "-m", "second", "--no-verify"])
+            .args([
+                "-C",
+                repo.to_str().unwrap(),
+                "commit",
+                "-m",
+                "second",
+                "--no-verify",
+            ])
             .status()
             .unwrap();
         std::process::Command::new("git")
             .args(["-C", repo.to_str().unwrap(), "push"])
             .status()
             .unwrap();
-        
+
         let svc = GitService::new(&repo).unwrap();
         let status = svc.get_status().await.unwrap();
         assert_eq!(status.ahead, 0, "ahead should be 0 after push");
@@ -1361,7 +1413,7 @@ pub(crate) async fn run_daemon(
                 // regardless of dirty state - mark as stuck immediately.
                 // This prevents the repo from blocking other syncs.
                 let is_diverged = status.ahead > 0 && status.behind > 0;
-                
+
                 // Check if ahead count is stale: fetch upstream refs and re-check.
                 // This handles the case where commits were actually pushed but the
                 // local refs haven't been updated yet.
@@ -1378,7 +1430,8 @@ pub(crate) async fn run_daemon(
                             if new_status.ahead == 0 {
                                 eprintln!(
                                     "🔄 {} stale ahead count resolved: was {}, now 0",
-                                    repo.display(), status.ahead
+                                    repo.display(),
+                                    status.ahead
                                 );
                                 status = new_status;
                                 // Clear failure count since push actually worked
@@ -1396,12 +1449,11 @@ pub(crate) async fn run_daemon(
                 } else {
                     status.ahead > 0
                 };
-                
+
                 // If repo is clean but has ahead commits and push keeps failing,
                 // it's permanently stuck (permission error, deleted remote, etc).
                 // Skip it entirely to unblock other repos.
-                if is_diverged || (!effective_dirty && stale_ahead && entry.failure_count >= 3)
-                {
+                if is_diverged || (!effective_dirty && stale_ahead && entry.failure_count >= 3) {
                     let reason = if is_diverged {
                         format!(
                             "(diverged: ahead={}, behind={})",

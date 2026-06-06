@@ -58,7 +58,8 @@ fn test_warden_keygen() {
 
     // Should succeed or fail gracefully (key might already exist)
     assert!(
-        output.status.success() || String::from_utf8_lossy(&output.stderr).contains("already exists"),
+        output.status.success()
+            || String::from_utf8_lossy(&output.stderr).contains("already exists"),
         "keygen should succeed or report existing key: {}",
         String::from_utf8_lossy(&output.stderr)
     );
@@ -209,8 +210,14 @@ fn test_warden_cli_help() {
 
     assert!(output.status.success(), "help should succeed");
     let help = String::from_utf8_lossy(&output.stdout);
-    assert!(help.contains("dracon-warden"), "help should mention binary name");
-    assert!(help.contains("setup-hooks"), "help should list setup-hooks command");
+    assert!(
+        help.contains("dracon-warden"),
+        "help should mention binary name"
+    );
+    assert!(
+        help.contains("setup-hooks"),
+        "help should list setup-hooks command"
+    );
 }
 
 #[test]

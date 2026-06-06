@@ -256,10 +256,7 @@ fn default_symlink_scan_roots() -> Vec<PathBuf> {
         home.join(".local/bin"),
         home.join(".config"),
     ];
-    candidates
-        .into_iter()
-        .filter(|p| p.exists())
-        .collect()
+    candidates.into_iter().filter(|p| p.exists()).collect()
 }
 
 /// Information about a single broken symlink.

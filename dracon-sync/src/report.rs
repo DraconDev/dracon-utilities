@@ -62,7 +62,10 @@ pub(crate) fn notify_push_failure(
     );
 
     // Set cooldown before spawning to prevent race conditions
-    cooldowns.insert(notify_key, now + std::time::Duration::from_secs(cooldown_secs));
+    cooldowns.insert(
+        notify_key,
+        now + std::time::Duration::from_secs(cooldown_secs),
+    );
 
     // Spawn in background to avoid blocking the daemon loop
     tokio::spawn(async move {
@@ -79,13 +82,13 @@ pub(crate) fn notify_push_failure(
 use crate::exclude::{
     excluded_dir_names_set, has_sync_relevant_dirty_entries, is_excluded_dir_name,
 };
+use crate::git::multi_remote::push_mirror_remotes;
 use crate::git::{
     current_branch, detect_large_blobs_ahead, discover_git_repos, has_origin_remote,
     has_tracking_upstream, push_with_retries, remote_branch_exists, repo_diff_entries,
     rewrite_ahead_paths, run_git_capture_output, run_git_with_timeout, set_upstream_to_branch,
     top_level_dir,
 };
-use crate::git::multi_remote::push_mirror_remotes;
 use crate::policy::{
     timestamp_secs, tokio_git_command, SyncPolicy, DEFAULT_GIT_HOST_BLOB_LIMIT_BYTES,
 };
@@ -603,8 +606,10 @@ pub(crate) async fn git_log_meta(repo: &Path) -> Option<(String, String, String,
     // Separator `\x1f` (unit separator) is unlikely in commit fields.
     let out = Command::new("git")
         .args([
-            "-C", repo_str,
-            "log", "-1",
+            "-C",
+            repo_str,
+            "log",
+            "-1",
             "--format=%H%x1f%an%x1f%ar%x1f%ct%x1f%s",
         ])
         .output()
@@ -706,11 +711,17 @@ pub(crate) async fn run_repos_report(
 
         // Calculate push status from flags
         let (push_status, push_error) = if flags.iter().any(|f| f == "STUCK_PUSH") {
-            ("STUCK".to_string(), format!("ahead={}, push failing", effective_status.ahead))
+            (
+                "STUCK".to_string(),
+                format!("ahead={}, push failing", effective_status.ahead),
+            )
         } else if flags.iter().any(|f| f == "NO_UPSTREAM") {
             ("FAIL".to_string(), "no upstream set".to_string())
         } else if effective_status.ahead > 0 && has_origin && has_upstream {
-            ("PENDING".to_string(), format!("{} unpushed commits", effective_status.ahead))
+            (
+                "PENDING".to_string(),
+                format!("{} unpushed commits", effective_status.ahead),
+            )
         } else {
             ("OK".to_string(), String::new())
         };
@@ -718,13 +729,7 @@ pub(crate) async fn run_repos_report(
         // Single git log call extracts all commit fields in one process.
         let last_meta = git_log_meta(&repo).await;
         let (last_hash, last_author, last_when, last_unix, last_msg) = match last_meta {
-            Some((h, a, w, u, m)) => (
-                truncate(&h, 12),
-                a,
-                w,
-                u,
-                truncate(&m, 72),
-            ),
+            Some((h, a, w, u, m)) => (truncate(&h, 12), a, w, u, truncate(&m, 72)),
             None => (
                 "-".to_string(),
                 "-".to_string(),
@@ -742,9 +747,13 @@ pub(crate) async fn run_repos_report(
             let current_branch = effective_status.branch.clone();
             let out = Command::new("git")
                 .args([
-                    "-C", &repo_str,
-                    "reflog", "show", &format!("origin/{}", current_branch),
-                    "--format=%cr", "-1",
+                    "-C",
+                    &repo_str,
+                    "reflog",
+                    "show",
+                    &format!("origin/{}", current_branch),
+                    "--format=%cr",
+                    "-1",
                 ])
                 .output()
                 .ok()
@@ -870,7 +879,7 @@ pub(crate) async fn run_repos_report(
     );
     println!();
 
-    use comfy_table::{presets::UTF8_FULL_CONDENSED, Cell, Color, Table, ContentArrangement};
+    use comfy_table::{presets::UTF8_FULL_CONDENSED, Cell, Color, ContentArrangement, Table};
 
     let mut table = Table::new();
     table.load_preset(UTF8_FULL_CONDENSED);
@@ -926,10 +935,26 @@ pub(crate) async fn run_repos_report(
         };
 
         // Color-code numeric columns based on severity
-        let modified_color = if row.modified > 0 { Color::Yellow } else { Color::White };
-        let staged_color = if row.staged > 0 { Color::Cyan } else { Color::White };
-        let ahead_color = if row.ahead > 0 { Color::Yellow } else { Color::White };
-        let behind_color = if row.behind > 0 { Color::Red } else { Color::White };
+        let modified_color = if row.modified > 0 {
+            Color::Yellow
+        } else {
+            Color::White
+        };
+        let staged_color = if row.staged > 0 {
+            Color::Cyan
+        } else {
+            Color::White
+        };
+        let ahead_color = if row.ahead > 0 {
+            Color::Yellow
+        } else {
+            Color::White
+        };
+        let behind_color = if row.behind > 0 {
+            Color::Red
+        } else {
+            Color::White
+        };
 
         // Color branches: main/master in bold, others in cyan
         let branch_color = if row.branch == "main" || row.branch == "master" {
@@ -960,7 +985,13 @@ pub(crate) async fn run_repos_report(
             Cell::new(shorten_when(&row.last_push)),
             Cell::new(shorten_when(&row.last_when)),
             Cell::new(&row.last_author),
-            Cell::new(&row.hint).fg(if row.concern { Color::Red } else if row.warn { Color::Yellow } else { Color::Green }),
+            Cell::new(&row.hint).fg(if row.concern {
+                Color::Red
+            } else if row.warn {
+                Color::Yellow
+            } else {
+                Color::Green
+            }),
         ]);
     }
 
@@ -1235,7 +1266,8 @@ async fn handle_ahead(
                         push_timeout_secs,
                         push_retries,
                         true,
-                    ).await;
+                    )
+                    .await;
                     for (name, result) in &mirror_results {
                         if let Err(e) = result {
                             if human {
@@ -1435,7 +1467,14 @@ async fn handle_ahead(
                                     // Also push to mirror remotes
                                     if let Ok(policy) = SyncPolicy::load(policy_path) {
                                         if !policy.remotes.is_empty() {
-                                            push_mirror_remotes(repo, &policy.remotes, push_timeout_secs, push_retries, true).await;
+                                            push_mirror_remotes(
+                                                repo,
+                                                &policy.remotes,
+                                                push_timeout_secs,
+                                                push_retries,
+                                                true,
+                                            )
+                                            .await;
                                         }
                                     }
                                 }
@@ -1526,7 +1565,14 @@ async fn handle_ahead(
                                     // Also push to mirror remotes
                                     if let Ok(policy) = SyncPolicy::load(policy_path) {
                                         if !policy.remotes.is_empty() {
-                                            push_mirror_remotes(repo, &policy.remotes, push_timeout_secs, push_retries, true).await;
+                                            push_mirror_remotes(
+                                                repo,
+                                                &policy.remotes,
+                                                push_timeout_secs,
+                                                push_retries,
+                                                true,
+                                            )
+                                            .await;
                                         }
                                     }
                                 }
@@ -3042,7 +3088,7 @@ mod tests {
     }
 
     #[test]
-    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBTSTI3WXd1enFjZzNCN1pNdDM2Tk8zSmdoOVFlR1RQZVM4RHdtTlpKS2lzCkYvTEtPNTZzM1lJUU5VYTUvSUxwZGxlcVpJS2JjSUtjZ2E2c0lrNjFhTHMKLT4gclEtTi1ncmVhc2UKRXplUWRlUm5aUmtaaEJrN01VaGJ1S2g5NjFCY0N3MFdjOHVSVW5OS1NtRzFVcEN2aUNRcVJ1WTRmeFFvCi0tLSA4ZVYvQzYxaGUzbGc4U1hOcXcvUnZuZy9MaWljSHNCSnlmaE10L1ZvTlNvCpKXN1EJsMo2BV3vlKuDuaIKxeG8a04/+uGt5qnbwDeIxbYbtM+t8COSDavcDwhTZkcMQSfDicRx67nKc7k=]() {
+    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAyRys1eTBwQVNiN3BockZ3RlNWQjdQcW1GbUhDQThnOWRkcGFzalE5UkhJCjJTZHBUcDQrdHkzYktjNjg1QW52elk0bG56dnpUTDZvVGdWaDgrMjFONm8KLT4gLC1ncmVhc2UgQEFRQ0FJci4gXX1edHYKb1FmNDJ3QzlSNHRjWHY0ZGhPaGJycUZwbXB0R0lLQktMc1pzNG01bjk2Ty82VERoZm0rMVdMRTJDdFZCU2xuQgpSZwotLS0gckcrTUdPeC84V1Z2NmlaRmMvMnFCS2dndUprUUxBSEg1Z29GUEVwc05NYwre2d6irz4BrhyatO6Bj4El+QNL7sHqdlqqbrcO7cR/mB8V8VJcID++1jx6xnQj5DRWgB7bz1NKLTN2ZdXW]() {
         let mut cooldowns = std::collections::HashMap::new();
         let repo = std::path::PathBuf::from("/test/repo");
         let notify_key = format!("push-fail-{}", repo.display());
@@ -3053,7 +3099,10 @@ mod tests {
         assert!(!cooldowns.contains_key(&notify_key));
 
         // Set cooldown
-        cooldowns.insert(notify_key.clone(), now + std::time::Duration::from_secs(cooldown_secs));
+        cooldowns.insert(
+            notify_key.clone(),
+            now + std::time::Duration::from_secs(cooldown_secs),
+        );
 
         // Second notification within cooldown should be blocked
         let cooldown_until = cooldowns.get(&notify_key).unwrap();

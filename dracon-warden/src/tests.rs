@@ -3,8 +3,8 @@
 mod tests {
     use crate::*;
     use std::sync::atomic::{AtomicU64, Ordering};
-    use std::time::Duration;
     use std::sync::Mutex;
+    use std::time::Duration;
 
     static NEXT_ID: AtomicU64 = AtomicU64::new(1);
     static HOME_MUTEX: Mutex<()> = Mutex::new(());
@@ -98,7 +98,7 @@ mod tests {
     }
 
     #[test]
-    fn build_gitigno[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBiRWNWV0x0eThsTDRtYzg3Lzg5c3ZnUWJmYjZSYkRSRjJlTzFicXpNTkZZCnR2dlpvbkxyRC9rYnpHdm4reVBwcU9lZjgvOFZnOFJ2UDVrNjFSQm8xZ1EKLT4gWDI1NTE5IGFnUWlGQkNLWnhuUzIwWldnLzRrdlh2VmhnbXJzNG51ODQwNDRTU2dDZ3MKVGJNdTlYYzdRdzdSUStKNlFIa1JkNlB4QWUzVVk1a0hpZXVXSlNmZDdJNAotPiB2SmotZ3JlYXNlCnQwdTdiU3gwL3pTSXV0THZ4M2xaUWEybFFReWxkczNsS1krMDNRTVl5WUxrQ29ralkzWEU1cmRxQTQ4STRueFIKRVBIRwotLS0gU0dWNDJNaCtJZTZWbFBBZmJFSzRkRU1tTnBkN0VjOGJlTjhocHFIT3hqTQqhrWnhY93RHoUeAIxRflLHNAkJdnvLCOORakLWN8r8pEcp/fhSIfmIHoEs2vOrD5dqezqVJmmpBFzQ0d8bH43B]() {
+    fn build_gitigno[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBsUEtlUHY1b1B2QjI0bk91ZUxZUlU1TUtwWEdGTDRuZnZucFk0bGtXMVRzCk9zNHFSaTUzNHN2NTl3bEk4SkM2aEdIRGdoTnVybUVBNi9ZdG9uVm15SXMKLT4gWy1ncmVhc2UKb3k3WW9VSkFlekZNUG5zKzQwaEZXem9YMVppaFNQam1TcTMrMGJCeUZxY3NaU1BTVysvSVU3U2MydnMwQ2xkYQpXZUUKLS0tIC81RmMwdEtiNmt2Q1UxbXVPSit1cXg4eUt4TmdQc0RmdzE2T2tpbGo3RFkKwmSkhHTltKBvgieIB0D6FdodUlE4e51ypMajStLKmqfgmb1CWOGatnh1B8QRNw1+nRukWo4sP13Ii5dfKJDSlw==]() {
         let block = build_gitignore_block(&sample_policy()).expect("block");
         assert!(block.contains(BLOCK_BEGIN));
         assert!(block.contains("target/"));
@@ -133,8 +133,6 @@ mod tests {
         };
         assert!(build_gitattributes_block(&policy).is_err());
     }
-
-
 
     #[test]
     fn owner_pubkeys_in_filters_only_owner_pub() {
@@ -455,7 +453,7 @@ watch_roots = ["/tmp/test"]
     }
 
     #[test]
-    fn build_gitigno[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBPTXJpc2JEMDlIeHl6VHBva1ErSW01d1ZwcWJobkx4S1pudmdrZHEyd1VvClZYNHZhMjVROCtCcTZwYmJHd05iVzc4UkFsd3kzRzFnTHU5MHVqbnNvNVEKLT4gWDI1NTE5IE9sTm1qVDZCbVFjdGF1L1dWQXA5VUpORFI4VkFibGhmbGJLd2NTRkYzeFUKbUJRTHU3bmRXd3BySE1pMk0vYWlBMnd2V281eVdBcEc4aW15R21TSyt2bwotPiBbWW4tZ3JlYXNlIGBBUjdyRiAmCnBjSndKS01OTnFOZTFZSFdlVkVQM20xWlV1Z1Nyekg3cmYyalp1MVNWZzhQcVliMzkyeWkKLS0tIE8zeUdGdG5xVDBKZDZJclhTZnY3a3Q1dGR2WWNZK0liYlk3N0F0Sk5QSlUKcnEzGuDerNfQZPKteeS3A5xp9tBe4nUE6OCkmsh5JCw36eDIMl0d6IKUKR/IbEeV9qCKga7yeWMGLfla5CM0ffhO]() {
+    fn build_gitigno[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBkc29YZDVhNURaUWVRSmhKeEJLNUdsTU1aUWsxZGZKVnRrTmNreEp6WUh3Ck5qQXBNeXBxaDBBMlUzcGRGbVR3T0F0RGVuUXVQNWozTExoWVoybDZ0Q2sKLT4gRT40J3I0I3YtZ3JlYXNlIG9tWSEpM1wKaVJxbHlZY0c3US8vOG9xSE5kaWlTU1B1c0F6eU9pczV3QmZPc0tzRVBvWTNhRWNvTlVNcDhHOURHTnUvCi0tLSArWE1GcitDZDUzL0FRZWVsdVNPcUlSTnpvZ2hwWWpFeHE1WnBKZXY3bncwCvOoqBAfJpi+b0mSbZaeDwkVZk2ewc/gsg8XjNTQxGvQZ3fLvi1QfMQbt6GX3oFVsfrqdLtBskL8lygXrr7GnsVpEQ==]() {
         let block = build_gitignore_block(&sample_policy()).expect("block");
         assert!(block.contains("# --- BEGIN DRACON MANAGED BLOCK ---"));
         assert!(block.contains("target/"));
@@ -1113,7 +1111,7 @@ watch_roots = ["/tmp/test"]
 
     #[test]
     fn filter_clean_encrypts_content_with_secret_marker() {
-        let content = b"[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBnVTJySnlVQ0FlZGV2bkcvaWVkTmhtamNtSm5KeGV6QXpPZlpxSHZnaDBrClh5RU5zQXZuREFNS3pJL3pBOHBwcElTcEtOWE42Q1ovaEFpTS9aWCtMR3cKLT4gWDI1NTE5IDJOQ0ZZRmdZN0tDTXRYTTFVY2w2NzBYWE44YmVlWnlUaVM1S09JUW5ZazQKUHJDblNLdnVhK0dhN2RoSyszd0hHRjk5VnBFcllibDFJdlVGUzg4MlBqTQotPiBCRikjKlstZ3JlYXNlCjkrK2c5dkh1UUFqaEJlWlBzWG9KVi90ZXVnNlVFZkZCdlJMVGZ0d0ZPNXNTMEI4dU5pa3grWDhzeGxHUU95NCsKWERGVWN6NnEvbDIvNWVvWXdRdWJWa040eDhtVCtnCi0tLSBtdnhlU1dqZVcwRktVcHU1VmcrcmJ2bmlTSlpBQ2x0WXpYeWhMSDA2NHc0CmyIgFXpwwdDztYHz+UrgNSP/SpBoWHiITZrgdFZNdK9vMjcfzAj5IdhA5EOlS/UatIbWvKde0gBMAsTdb8VsNRXhirBzWlV/GcX7oYa]\n";
+        let content = b"[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBNRUkvdTh6Wmd6c0o0TENESjhPNnowZUJTSWFUWXVjYmgyY25MNVVFSzBVCktZaTNRaU5WSm5vaVN4TXVlYjlMRWNrZmkvWWJhUE0wSlRoV1BSYlhsRGcKLT4gNy1ncmVhc2UgN1osWnwgT1UnIFc+RGpmZU4KbzI4eFZuZDFDaHdKS0JOMXM4dGxMMFRQN0JtWmJFWGp6MmRweGVZMlBkUlFML3Fsa1paNlZtU01IREpMT0laOApncGtXRUxHUjBBUkhrMnpzZCtVWFA5a3RoRTFCTUZIdS9YTW01V3Y4OUN1dmZHTFRPb3VrVncKLS0tIEEvRkF4UFJocEYwRlFNUXZLb2pka1dOVGs1TEpwcHRtWmJtVTFSc0dtTWsK82J+v8VY/mfHEdCIxF5ByZFxf7bagyD7xdVJa+CMZPtoHqAaCkrS01DuMS5ja2Si6mDKJk6tghBCEplvdRJm2ThMDaCuudEtlKKrqAQ=]\n";
         let warden = DraconWarden::new().expect("create warden");
         let result = warden.clean(content, Some("config.env")).expect("clean");
         // Clean should either encrypt or pass through; result should be valid bytes
