@@ -11,7 +11,7 @@ CLI binaries for dracon system services. These install to `~/.local/bin/` and ru
 6. [Services](#services)
 7. [Systemd Service Files](#systemd-service-files)
 8. [Policy Files](#policy-files)
-9. [AI Configuration](#ai-configuration)
+9. [Tokens & Secrets](#tokens--secrets)
 10. [CLI Reference](#cli-reference)
 11. [Environment Variables](#environment-variables)
 12. [Commit Messages](#commit-messages)
@@ -489,7 +489,7 @@ auto_publish = false  # master toggle (default: off)
 [[publish_targets]]
 name = "crates-io"
 registry = "crates-io"    # crates-io | npm | pypi
-[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBqR0RZV2NDM3grM3gvVGxxZFFZeUhjRXAyRndtbi9SQnhJS3psRmgyVkJ3CkdGZWhOZ1ptMU9TM09RU3JJNW1sS3JXRmxZZnY0Vm92Z255Mkh3Qk54Wm8KLT4gWDI1NTE5IExTa3FLNmlxWTJWckhjZ0ZDYmdEbjBKSGxmSHpXODFlZ29VNnhISnowMGcKKzRCa0I2aFVpZDE1WHVvM1JmRUhIbzR2cmJkOU9VdllvTU85YmVyRWdxbwotPiBkeS1ncmVhc2UgPjA7PSsgRCBbIDMoJgpYTHIwUlVpeFJFQStOb1JhR1BiVGoydThEUjhBVGw1MWZ3SktVQzM4bkt0aFJNWmVhbFNNYWRxc0NvZ3g1UmdWCnNveHc1R0V2bloxOFhVRkRJS05waXpHK08wdUJ4a1pFCi0tLSBvSWxKQmtIT3FtVy9aUUJxRSthTkkxRmNMek1GWVpkL1YyQzRhUnE1OFh3CjR+7YbP8AFjoUq+K8bynC9qzHqEpnxmcaaXevrFhabYyX6kduoBmVg/YPW5MO/8y74hV+rPtrlbACwnjs6Qi/KPKQKq8w==]
+[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBpSDlEaXFqM0dVYkFoU2xtSzRFUGZBcUQ4NENnNURvOE56cVdKOG5paDJzClhHVUh6ck5FMzhPRSsremxXaW5VWm55VHRLeWlYM3cvT2FwZG8zei9JUG8KLT4gV0J3LWdyZWFzZSBuTD9TZQoKLS0tIEdld0FzTGFBNEh6K1JxNHJiV2hCTHpCcnh0eFl4RkUvVGhuOGZxdXVIbkEKBpiq4fQ+d4wf5CApNxnBllapqlxpmZhPV2xd1wiAVG2+zf37jhcIPst0IjL1YLGErQAea00aCUG1AGEO4rI3LZBLL6gp]
 publish_timeout_secs = 300
 ```
 
@@ -578,47 +578,9 @@ Commands:
 - `pre-commit`: Blocks commits if warden filter is not configured
 - `pre-push`: Scans for plaintext secrets as defense-in-depth (catches `--no-verify` bypass)
 
-## AI Configuration
+## Tokens & Secrets
 
-dracon-sync uses AI for version bumping. Configure providers in `~/.dracon/utilities/sync/ai.toml`:
-
-```toml
-[[providers]]
-name = "mistral"
-env = "MISTRAL_API_KEY"
-endpoint = "https://codestral.mistral.ai/v1"
-model = "codestral-latest"
-
-[[providers]]
-name = "nvidia"
-env = "NVIDIA_API_KEY"
-endpoint = "https://integrate.api.nvidia.com/v1"
-model = "stepfun-ai/step-3.5-flash"
-
-[[providers]]
-name = "openrouter"
-env = "OPENROUTER_API_KEY"
-endpoint = "https://openrouter.ai/api/v1"
-model = "nvidia/nemotron-3-super-120b-a12b:free"
-
-[[providers]]
-name = "openrouter"
-env = "OPENROUTER_API_KEY"
-endpoint = "https://openrouter.ai/api/v1"
-model = "openrouter/free"
-```
-
-### API Keys
-
-Store keys in `~/.dracon/utilities/sync/ai/secrets/*.env`:
-- `mistral.env` → `MISTRAL_API_KEY=...`
-- `nvidia.env` → `NVIDIA_API_KEY=...`
-- `openrouter.env` → `OPENROUTER_API_KEY=...`
-
-### All Tokens & Secrets
-
-All secrets are stored in `~/.dracon/utilities/sync/secrets/*.env` (sync) and
-`~/.dracon/utilities/sync/ai/secrets/*.env` (AI). See the secrets directory
+All secrets are stored in `~/.dracon/utilities/sync/secrets/*.env` (sync). See the secrets directory
 README for the full inventory and creation instructions.
 
 | Token | File | Purpose | Source |
@@ -632,12 +594,6 @@ README for the full inventory and creation instructions.
 
 **Token resolution**: `load_secret("NAME")` checks env var first, then scans
 `*.env` files in the secrets directory. Missing tokens are skipped gracefully.
-
-### Test AI Providers
-
-```bash
-dracon-sync test-ai
-```
 
 ## Commit Messages
 
