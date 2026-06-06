@@ -215,6 +215,9 @@ cargo deny check
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Where to find everything |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Service architecture and commit protocol |
 | [docs/OPERATIONS.md](docs/OPERATIONS.md) | Systemd, troubleshooting, incident response |
+| [dracon-sync/README.md](dracon-sync/README.md) | Sync daemon usage and configuration |
+| [dracon-system/README.md](dracon-system/README.md) | System guard usage and configuration |
+| [dracon-warden/README.md](dracon-warden/README.md) | Repo encryption usage and configuration |
 | [AGENTS.md](AGENTS.md) | AI agent guidelines |
 | [CHANGELOG.md](CHANGELOG.md) | Version history |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Development workflow |
