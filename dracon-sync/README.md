@@ -237,10 +237,10 @@ auto_create = false  # Codeberg/Forgejo doesn't support push-to-create
 Store PATs for HTTPS fallback and API operations:
 ```bash
 # GitLab
-echo "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBuOTUrbEtmRFozUGNtb3FNWFlEdHoxWVdkTmcxVmV3TS83alB3QTB3M1dBClBqOXdrM1dhQUoyOUdvYXZnbzRIOWR1aEtLZ2dtd2YrN01kRkRRTXFDSDAKLT4gNlcwLWdyZWFzZSBeJldbbSJoLSBYZCwuIGg2OlppXk8gfnFwCjJrbGFXZElVOEUrNUg5QktOL2hmCi0tLSBQR2RGeW45NXM1ajF0cXN2a2xpMlJUOUhEWUN6RjFhd3B6cVRwVU1Zc0pRCqoKYEAW2FZb7lfts3LIkISjo5TBKsRt/MuG/FBbcJ5wnfEwwO6oVVM8ntJ+RET9FU/qsbAzLxXuEFjqP4ydQXX01we5sBI/]" > ~/.dracon/utilities/sync/secrets/gitlab.env
+echo "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBWcm9ySzE1Z0o2ZnBXR3loaWJYdzZqNTl1SUNUTEtEaHRLR2ltcEpkL0M0CjhZdEdzY1lyREQ1MnZ3a1MzTHQ2MGFlbm42NGd4RzQ5b1AxbGxrR2UyV0kKLT4gLn1kLWdyZWFzZSAkeTQ8V0tIIEI4IDVgLiAiCllaY0kzZ09qTjhyVTFDTnMzNy9xeEhJeWkzN1hhbUo0TDZzbERzb2dUU1FPeG1xSVZQb1MyQQotLS0gZWt1TWZJdk1VYXoxN1dwOHcramFJbnIxbWdVcENpQlBISEZkWC9INEo0Zwq9184oirsn4pWo9E8AJI+LeTwwCrnGRtd76OdhlN3G3KMiA5PWLIXuU/bPc/GjZgZinY4oaXu9IsoCShvD6wmxkIwwrQVpRQ==]" > ~/.dracon/utilities/sync/secrets/gitlab.env
 
 # Codeberg
-echo "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBNWjVTdUFVUytWdjRueFFyUmZ3aUpTcW44dWdqckl3c0hrRW1ScFFSWGtFCkxVeWlZY3JqTzJnR1dKZVRTYmxJcS9GcDM0bjlwalQyYTBwWW1NbjZEWWMKLT4gVWAudyttQnUtZ3JlYXNlCm5jcGt6NGZkYjFFNytnb1YyZ1FIK2RzZ0tSaEZrR3pPMi9wU01rclNmSjNNdEYvbVZVbGFnblBIZktOOWtXNAotLS0geDZ1ZUhHczRuamxYS0tHb0VqQkVaVFJCa2FKRzVoYXdTTEREOTZNbll4OAp600/m9eRKE03Ty2OIlUHpUf/fH9lIKEHHc6JT/0GnTzO9Js3+BG07ad3X+dzjZzv9rM1A/Zujf1ZO/3fp6w6sFpT8uzPaMA==]" > ~/.dracon/utilities/sync/secrets/codeberg.env
+echo "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA4MjZrSXVTdC8yOXJ4TTQzdEpwU004QlJycVNLYWxHdzkrZmFTNzdrNGpvCnp4OXcydm5zM05UR1ZpTmJOcEw2OVl6ZFdHcG0xWGRXNFhxaHZZeTA4TzAKLT4geX1GLWdyZWFzZSB5azIgIThmYEpjaSB2L2h8TyNCTiBuZCx+CmxKMjFVbHpYcllQUDY4enZxZwotLS0gTGRXYmVKMDZZRGJSalQ5MWduek5ySXQ0a2FGcVU5ZTVXbWVVYzdDWGFlbwqcyt7jDD2VjkbZvV6CPtinRMAH/rTaqMOAJRjHzwDOHrqzUeYsUhmLqJf7FtrOJ30ici+VPfiViofkmW6KvZT/1vVdCVSE7A==]" > ~/.dracon/utilities/sync/secrets/codeberg.env
 ```
 
 ### AI Providers
@@ -282,7 +282,7 @@ Commit messages are deterministic facts extracted from the diff — no AI, no in
 
 ### Why Mechanical Messages?
 
-AI-generated commit messages were removed — they hallucinated context and AI reads the diff anyway. Mechanical facts are searchable (`git log --grep="JWT"`), honest, and compact.
+LLM-scribed commit messages were removed — they hallucinated context and the AI reads the diff anyway. Mechanical facts are searchable (`git log --grep="JWT"`), honest, and compact.
 
 ## Startup Cleanup
 

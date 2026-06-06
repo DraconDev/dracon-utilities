@@ -106,3 +106,4 @@ tasks*.json
 # Project-specific ignores (not warden-managed)
 pi-session-*.html
 /rust_out
+/doctor.sh
