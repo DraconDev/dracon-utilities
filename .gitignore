@@ -19,6 +19,7 @@
 *.sqlite
 *.sqlite3
 .DS_Store
+.cache/
 .direnv/
 .dracon/*
 .git/
@@ -102,8 +103,3 @@ tasks*.json
 !rust-toolchain.toml
 !rustfmt.toml
 # --- END DRACON MANAGED BLOCK ---
-
-# Project-specific ignores (not warden-managed)
-pi-session-*.html
-/rust_out
-/doctor.sh
