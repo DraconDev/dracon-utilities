@@ -26,7 +26,6 @@ dracon-utilities/           <- CLI binaries (this repo)
 └── dracon-warden/          -> ~/.local/bin/dracon-warden
 
 dracon-libs/                <- Shared libraries (REQUIRED for building)
-├── services/ai/            <- AI adapters, router, lanes
 └── tools/sync/dracon-git/  <- git operations library
 ```
 
@@ -489,7 +488,7 @@ auto_publish = false  # master toggle (default: off)
 [[publish_targets]]
 name = "crates-io"
 registry = "crates-io"    # crates-io | npm | pypi
-[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBpSDlEaXFqM0dVYkFoU2xtSzRFUGZBcUQ4NENnNURvOE56cVdKOG5paDJzClhHVUh6ck5FMzhPRSsremxXaW5VWm55VHRLeWlYM3cvT2FwZG8zei9JUG8KLT4gV0J3LWdyZWFzZSBuTD9TZQoKLS0tIEdld0FzTGFBNEh6K1JxNHJiV2hCTHpCcnh0eFl4RkUvVGhuOGZxdXVIbkEKBpiq4fQ+d4wf5CApNxnBllapqlxpmZhPV2xd1wiAVG2+zf37jhcIPst0IjL1YLGErQAea00aCUG1AGEO4rI3LZBLL6gp]
+[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA4T1NGNlMwWHZ2UisyeXgxUllCQTd0SEdKc2FMdStPT2pMZS93bU4vOEQ4CmhWQXRFb1ZVbFZpTlcwL0l6R0pmeWd5VDI3bjVLRCtmVDAyOXRDb0lDaHcKLT4gdi9oXy1ncmVhc2UgP0FTVy4qCmV4VGlncXFxT0x6OThUY3lXaFNqQnFFdlU2bwotLS0gQWUvcm5kWnhVM1UydnVhdlM3a21ZZktHWlVBckFlRCtJSXZUbzZraXlTbwoSreJxDDd3grNA4zGR9nDXz0cFo5QzMlI1fCTjxLUtD8uVI1iCwDoQ3YoyDux3W2AgAwKLyGzesi26jNbai6GNeMxQOKU=]
 publish_timeout_secs = 300
 ```
 
@@ -504,33 +503,41 @@ All binaries support `-V, --version` and `-v, --verbose` (repeatable up to 2x fo
 ```
 dracon-sync [OPTIONS] <COMMAND>
 Commands:
-  status           Show resolved policy path and sync scope
-  validate-config  Validate the sync policy for errors and warnings
-  repos            One-off report across discovered repositories
-  repair-concerns  Repair concern repos (dry-run by default; use --apply to execute)
-  repair-warns     Repair warn repos [--apply] [--repo <path>] [--json]
-  once             Run one sync pass
-  daemon           Run continuous sync loop [--interval-secs override]
-  sync-now         Sync one or more repositories now [--dry-run] [repos...]
-  pause            Pause sync (creates freeze marker)
-  resume           Resume sync (removes freeze marker)
-  edit-config      Open sync policy in the system editor
-  test-ai          Test AI providers connectivity
-  health           Check daemon health [--json]
-  metrics          Print Prometheus-style metrics
-  stuck            Manage repos permanently stuck on push
-  dual-branch      Manage repos with both main and master branches
-  repair-origins   Detect and repair orphan origin URLs [--apply]
-  publish          Manually publish a repo to configured registries [--dry-run]
-  publish-status   Check current version and registry publish status
-  scaffold         Scaffold standard files (LICENSE) into repos [--repo] [--files] [--overwrite] [--dry-run]
+  status    Show resolved policy path and sync scope
+  repos     One-off report across discovered repositories
+  health    Check daemon health (policy valid, daemon responsive, repos healthy)
+  metrics   Print Prometheus-style metrics
+  once      Run one sync pass
+  daemon    Run continuous sync loop
+  sync-now  Sync one or more repositories now
+  pause     Pause sync (creates freeze marker)
+  resume    Resume sync (removes freeze marker)
+  config    Manage sync configuration
+  repair    Repair and manage repositories (concerns, warns, origins, stuck repos, dual-branch)
+  publish   Publish to package registries and check publish status
+  scaffold  Scaffold standard files (LICENSE) into repositories
 ```
 
-**Nested subcommands:**
-- `dracon-sync repair stuck-list` — list stuck repos
+**Subcommands of `config`:**
+- `dracon-sync config edit` — open sync policy in the system editor
+- `dracon-sync config validate` — validate the sync policy for errors and warnings
+
+**Subcommands of `repair` (all dry-run by default; pass `--apply` to execute):**
+- `dracon-sync repair concerns` — repair concern repos
+- `dracon-sync repair warns` — repair warn repos (dirty-only triage)
+- `dracon-sync repair origins` — detect and repair origin URLs pointing to orphan `-N` suffixed repos
+- `dracon-sync repair stuck-list` — list repos that are permanently stuck on push
 - `dracon-sync repair stuck-unstuck <repo>` — unstuck a specific repo
 - `dracon-sync repair dual-branch-list` — list repos with dual main/master
 - `dracon-sync repair dual-branch-repair <repo>` — consolidate to main
+
+**Subcommands of `publish`:**
+- `dracon-sync publish run <repo>` — publish a repo to configured registries
+- `dracon-sync publish status <repo>` — show publish status across configured registries
+
+**Subcommands of `scaffold`:**
+- `dracon-sync scaffold` — scaffold into all discovered repos (or `--repo <path>`)
+- Options: `--files <NAMES>`, `--overwrite`, `--dry-run`
 
 **Global flags:** `-v` / `-vv` increase verbosity; `-V` prints version.
 
