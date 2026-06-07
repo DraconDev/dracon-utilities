@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **`dracon-sync` system-repo path bug**: The example template's
+  `system_repo` default was `/home/dracon/dracon` (a non-git directory that
+  holds `utilities/` and `backups/`). The actual git repo (where the
+  sync daemon's state lives) is at `~/.dracon`. The example template and
+  the installed `dracon-sync.toml` are now both set to the correct path.
+
+### Changed
+- **CLI print style**: All three binaries (`dracon-sync`, `dracon-warden`,
+  `dracon-system`) now use a consistent visual language for human-facing
+  output. The `status` tables include a summary one-liner and grouped
+  sections; byte counts and timeouts are formatted as human-readable
+  (e.g. `50.0 MiB`, `1m 30s`); freeze/doctor indicators are coloured
+  (suppressed when `NO_COLOR` is set). `dracon-system doctor` now emits
+  per-check remediation hints. Design note:
+  `docs/design/cli-print-style.md`.
+
 ### Added
 - **Warden plaintext-sibling escape hatch**: `dracon-warden` now supports an
   opt-in escape hatch for files that should be stored verbatim (not encrypted).
