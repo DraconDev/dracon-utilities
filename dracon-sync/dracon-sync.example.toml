@@ -12,9 +12,11 @@
 #  SECTION 1: THE SOVEREIGN CORE
 # =============================================================================
 # [system_repo]
-# The primary repository for your machine laws and state (~/dracon).
+# The primary repository for your machine laws and state (~/.dracon).
 # The daemon ensures this repo is ALWAYS healthy and synchronized.
-# system_repo = "/home/dracon/dracon"
+# This must be a git repository (or a directory that will be turned into one).
+# Defaults to ~/.dracon when unset.
+# system_repo = "/home/dracon/.dracon"
 
 # =============================================================================
 #  SECTION 2: THE RHYTHM (Sync Logic)
@@ -189,7 +191,7 @@ auto_create = false
 # [[publish_targets]]
 # name = "crates-io"
 # registry = "crates-io"          # crates-io | npm | pypi
-# token_secret = "CARGO_REGISTRY_TOKEN"   # env var name (token in secrets/cratesio.env)
+# [DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBWNDl5YnkvbmcrdGxDUDB2OHJnZFpYTkhhVGprRjBaUnU2bCsxWEtPSzBrClNEek01VFZLTVVIZWtKMTZFUUtYa3RkT1dXNDlNUm9CVGFUcHV2d1JUazAKLT4gWDI1NTE5IGpHczNPbHpDcnBxQ1g1by83VVFjYWk2dGVZd3BxdzlrdXQ3eTVDdnpTbHMKZmUyY2ZpZVdBYjhBaU9aQVNRdGFCbFVNbWlCcTZ0d0pUc3c1ZXlhTzZtRQotPiBYMjU1MTkgbU5Jb2xmVnpNeGJLZXpyT0d5RVd2UlhYS08venZlOTQxNVdubFFPc3YyYwpWVjJjZFNKT3FLMnhZRC9FZUEzeGJJaGZFdVRPV2FwMjBvVE04TXp5aXR3Ci0+IFgyNTUxOSBjZ3A2UGg1dk1YNW1keThsVlF3NFRJRmpySC9paGZmZGYxL0JZM0oxY2lnClJuZjNLaThWOStEYk1XMjRiWnUwWTFZREhDb2tGZ2JMWFYydjMrR2NGbWsKLT4gWDI1NTE5IEx1Q01XbUlyUThabFpHa2RocUhxbjFHV3N5b3UveVhwY3lXSkZhdHAxbG8KeHVJaEJDL0NWRkx5cTdwK2xWSXRpZGppYzF0S3M0eXFhbEpVT2VES0NMVQotPiBYMjU1MTkgTFdWczNmR2t4WEVwdzVWMjVEWW43dVNPU1V1MVIxZ0prNmlKbzNoVmQzbwo5VkN1cWhmWjBTQ3ZEN0lhUElFdExqdHJuWUVOMXQrK2NMMmw3NXEvYkQ0Ci0+ICxfcyJeLWdyZWFzZSBmai1DXXouIyAxQnQgI20zQH1GRAorbmE4YU03Z000ZVdSa2toem9wd0s0dnlMNVpFaGxQVjhiODVST2FMQ1hVSmFsWFlyMGUrYUR6M2k3N1hGSHlDCjdWUDJwTFRGV1BXQ2Y4VTE1U21pU0srN3BYRWtyeUYxR3dkRkdRS08ya0EKLS0tIGFTaEhCYmZ4RmUwRDJhUVlkR3BXMFRBVzZWK1YzcldBZUJYK0U2c1gwcU0KuKMPaRvQ3YaC73Wn4ynEFmz5LAD0La7LiOqcaiYJMXh2fNLyfHewNHbRHcVr6KNxLlY0rSbTf5thtziXwl8dR4siYlB7]   # env var name (token in secrets/cratesio.env)
 # publish_timeout_secs = 300
 #
 # [[publish_targets]]
