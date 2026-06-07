@@ -739,15 +739,9 @@ pub(crate) fn validate_config(policy_path: &Path) -> ValidateResult {
         }
 
         if remote.auto_create {
-            if remote.auto_create_account.is_empty() {
-                // Downgraded to warning: resolve_account() extracts the account
-                // from the push_url (e.g. git@host:account/{repo}.git → account).
-                result.warn(format!(
-                    "remote[{}] '{}': auto_create=true with empty auto_create_account \
-                     (account will be extracted from push_url via resolve_account())",
-                    idx, remote.name
-                ));
-            }
+            // Empty auto_create_account is intentionally silent: resolve_account()
+            // extracts the account from the push_url (e.g. git@host:account/{repo}.git
+            // → account). This is a working default that has shipped for years.
 
             if let Some(token_var) = &remote.auto_create_token_var {
                 if token_var.is_empty() {
@@ -784,10 +778,8 @@ pub(crate) fn validate_config(policy_path: &Path) -> ValidateResult {
                         ));
                     }
                 } else {
-                    result.warn(format!(
-                        "remote[{}] '{}': auth_type=codeberg but no api_endpoint set (will use default)",
-                        idx, remote.name
-                    ));
+                    // No api_endpoint set → fall back to the Codeberg default
+                    // (https://codeberg.org). Working default, intentionally silent.
                 }
             }
         } else if !remote.push_url.contains("{repo}") && !remote.push_url.contains("{account}") {
@@ -1561,7 +1553,10 @@ push_url = ""
     }
 
     #[test]
-    fn test_validate_config_missing_auto_create_account_is_warning() {
+    fn test_validate_config_empty_auto_create_account_is_silent() {
+        // Empty auto_create_account is silently accepted: resolve_account() extracts
+        // the account from the push_url. The config is valid AND the warning is
+        // intentionally suppressed (it was noise — see policy.rs).
         let tmp = tempfile::TempDir::new().unwrap();
         let content = r#"
 auto_github_private = false
@@ -1576,14 +1571,12 @@ auto_create_account = ""
         let result = validate_config(tmp.path().join("policy.toml").as_path());
         assert!(
             result.is_valid(),
-            "auto_create=true with empty account is now valid (account extracted from push_url)"
+            "auto_create=true with empty account is valid (account extracted from push_url)"
         );
         assert!(
-            result
-                .warnings
-                .iter()
-                .any(|w| w.contains("auto_create_account")),
-            "should have a warning about empty auto_create_account"
+            !result.warnings.iter().any(|w| w.contains("auto_create_account")),
+            "empty auto_create_account should not warn (resolve_account() handles it), got: {:?}",
+            result.warnings
         );
     }
 
