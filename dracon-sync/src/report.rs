@@ -94,6 +94,9 @@ use crate::policy::{
 };
 
 fn ansi(color: &str, text: &str) -> String {
+    if !crate::print::should_color() {
+        return text.to_string();
+    }
     let codes = match color {
         "31" => "31",
         "32" => "32",
@@ -3088,7 +3091,7 @@ mod tests {
     }
 
     #[test]
-    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAyRys1eTBwQVNiN3BockZ3RlNWQjdQcW1GbUhDQThnOWRkcGFzalE5UkhJCjJTZHBUcDQrdHkzYktjNjg1QW52elk0bG56dnpUTDZvVGdWaDgrMjFONm8KLT4gLC1ncmVhc2UgQEFRQ0FJci4gXX1edHYKb1FmNDJ3QzlSNHRjWHY0ZGhPaGJycUZwbXB0R0lLQktMc1pzNG01bjk2Ty82VERoZm0rMVdMRTJDdFZCU2xuQgpSZwotLS0gckcrTUdPeC84V1Z2NmlaRmMvMnFCS2dndUprUUxBSEg1Z29GUEVwc05NYwre2d6irz4BrhyatO6Bj4El+QNL7sHqdlqqbrcO7cR/mB8V8VJcID++1jx6xnQj5DRWgB7bz1NKLTN2ZdXW]() {
+    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBweXlJVFpDbHl4YTRDQyt4bW56U0M3VDFSZGdIL3R1UlAxcW1oSE1lYmdzCnREYU5IRWxlSGJkTjM2cHdjMmdYR281ekl2OTc2MzJjTEVVeHpHOHVsMXcKLT4gWDI1NTE5IFFYNnlxcTdDQll5SzRuemVMYXRxYzl2VGJxU0hWamEvUSt4MGZjd0FzWFEKbHl3MHVDdVFXSWhkOEFsUWF4ZTNydGZ5QXBRcUJVMU4ybTgrTzhZY3c5QQotPiBYMjU1MTkgNTZpcFdTMFVSd25DQWcydzJkSW1WNEVMUGNJZ2FlM3JXN3dERjlIM0dqUQp6RStmaHl1cEducGtmeHEwZCtxZll5MSt6Si9iQUhzd0lscFBXQnVySk1RCi0+IFgyNTUxOSBrYUM5TnFKTlJKTUNrUzh1M3lVYWJ2dXEyTnNqVGZsYmxXYk5WeHVnRVRnClBtRlozd0laUnd1QlA5eGFjdmprNlNNNDRHSWtORlBRNHFJS2VzUU5pMXMKLT4gWDI1NTE5IHRidUVJMFI0MDRmd1RNVDVsTFhHbU16Y3FKRUtsdUlvTTZEME0rZE9UUzAKUFdhU0ppUlc3aUF1OWJjb1BhdEc2Ui9kb1lsYlZHVEpMbFFEcFVIL01NdwotPiBYMjU1MTkgVkJKNE54OWdkTERaVkVkOW1KTEpYR2h4YllKY2VaWGVTRlRsSHByeTBCQQpqVTVzckd5Y2hSYkF6c1BTdHZqTDdrZDBUdVVNTlB3RWw4QWRBakJVR0s0Ci0+IC41P1wmdXktZ3JlYXNlID83OyBUIFoqZjYvClRSYmpWL2ttU3J2WkwxaEZFQUNVZHBVTzI5OEQrcnJnQXBCU3JyVER6RDlqSWZMK215ZWpDejZyQXphbHJaR2kKWkRFZS9DWjdMbm1QNGk5UWpnendPSTJBazVaZTdjUk9aZ1FvVmgvQytMaVVaQU1GTmIvb3lmQzhKdi9oSEtvRQpKQQotLS0gQXY0M2NZaFBITm51QXRhS1hmYWhKdUF0dmo5R2VsR0xsSW94T0lWTkR2MAqM6N5qiLzfxubASr7mFbhO84HEufyDqesrKTG1tY8k48btGZvG1TA2AuTRZZSnaqizFbS4kNMROi/c2OEP]() {
         let mut cooldowns = std::collections::HashMap::new();
         let repo = std::path::PathBuf::from("/test/repo");
         let notify_key = format!("push-fail-{}", repo.display());
