@@ -2182,8 +2182,16 @@ fn run_setup_hooks(mode: HookMode, repo: Option<&Path>) -> Result<()> {
                     stderr.trim()
                 ));
             }
-            println!("✅ Global hooks installed to {}", dir.display());
-            println!("   core.hooksPath set to {}", dir.display());
+            // ---- 3-line summary ----
+            println!(
+                "🪝 setup-hooks (global) · installed to {}",
+                dir.display()
+            );
+            println!("   core.hooksPath  = {}", dir.display());
+            println!("   pre-commit hook = blocks commits if warden filter is missing");
+            println!("   pre-push hook   = scans for plaintext secrets (defense-in-depth)");
+            println!();
+            println!("   Next: commit a file with secrets to test the encryption filter");
         }
         HookMode::Local => {
             let repo_path = repo.context("--local requires a repo path")?;
@@ -2200,16 +2208,20 @@ fn run_setup_hooks(mode: HookMode, repo: Option<&Path>) -> Result<()> {
                     stderr.trim()
                 ));
             }
+            // ---- 3-line summary ----
             println!(
-                "✅ Local hooks installed to {} for {}",
+                "🪝 setup-hooks (local) · installed to {} for {}",
                 dir.display(),
                 repo_path.display()
             );
+            println!("   core.hooksPath  = {}", dir.display());
+            println!("   pre-commit hook = blocks commits if warden filter is missing");
+            println!("   pre-push hook   = scans for plaintext secrets (defense-in-depth)");
+            println!();
+            println!("   Next: commit a file with secrets to test the encryption filter");
         }
     }
 
-    println!("   pre-commit: blocks commits if warden filter is missing");
-    println!("   pre-push:   scans for plaintext secrets (defense-in-depth)");
     Ok(())
 }
 
