@@ -22,7 +22,11 @@ mod visibility;
 
 /// Render a boolean as a compact on/off string for tables and flags rows.
 fn onoff(b: bool) -> &'static str {
-    if b { "on" } else { "off" }
+    if b {
+        "on"
+    } else {
+        "off"
+    }
 }
 
 use anyhow::Result;

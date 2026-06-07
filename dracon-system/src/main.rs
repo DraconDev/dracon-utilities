@@ -2438,7 +2438,11 @@ async fn cmd_status(json: bool) -> Result<()> {
         let summary = format!(
             "{} · sync service {}",
             &report.system_root,
-            if report.sync_service_active { "active" } else { "inactive" }
+            if report.sync_service_active {
+                "active"
+            } else {
+                "inactive"
+            }
         );
         table.add_row(vec![
             Cell::new("📋 Summary"),

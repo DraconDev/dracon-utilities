@@ -1330,7 +1330,11 @@ async fn main() -> Result<()> {
                     "Policy resolved · {} watch root(s) · {} discovery root(s) · pubkey {}",
                     watch.len(),
                     discover.len(),
-                    if pubkey.starts_with("NOT_FOUND") { "MISSING" } else { "found" }
+                    if pubkey.starts_with("NOT_FOUND") {
+                        "MISSING"
+                    } else {
+                        "found"
+                    }
                 )),
             ]);
             // ---- Section: Roots ----
