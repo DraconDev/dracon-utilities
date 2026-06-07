@@ -111,8 +111,8 @@ cargo clippy
 ## Design Principles
 
 1. **Deterministic daemons**: Sync, system, and warden must run without AI dependencies
-2. **AI utilities**: dracon-ai is the only utility that talks to AI providers
-3. **Invisible infrastructure**: Sync should be invisible to the AI coder
+2. **No AI in this repo**: All commit messages, version bumps, and other decisions are deterministic (extracted from diffs)
+3. **Invisible infrastructure**: Sync should be invisible to whatever tool edits the repo
 4. **Safety first**: All destructive operations require `--apply` flag
 5. **Persistent state**: Operational state lives outside the git tree (`~/.local/state/dracon/`)
 
