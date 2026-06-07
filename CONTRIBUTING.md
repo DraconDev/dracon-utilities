@@ -139,7 +139,7 @@ When adding config options to a utility:
 
 ## Commit Messages
 
-Since this repo uses dracon-sync for auto-commit, you don't need to worry about commit messages if sync is running. The AI scribe generates commit messages directly from diffs (with local file-pattern fallback).
+Since this repo uses dracon-sync for auto-commit, you don't need to worry about commit messages if sync is running. The daemon generates deterministic commit messages directly from diffs (see AGENTS.md § Commit Messages).
 
 For manual commits, use conventional commits:
 ```
