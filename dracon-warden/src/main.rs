@@ -274,7 +274,7 @@ enum Command {
     },
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Default, Deserialize, Clone)]
 pub(crate) struct WardenPolicy {
     #[serde(default)]
     protected_patterns: Vec<String>,
@@ -429,6 +429,14 @@ impl WardenPolicy {
                 "warning: both 'watch_roots' and 'repo_roots' are set; using 'repo_roots' (the other is deprecated)"
             )),
             _ => None,
+        }
+    }
+
+    /// Prints the deprecation warning to stderr (if any). Used by commands
+    /// that load the policy to do work (not just display).
+    fn print_deprecation_to_stderr(&self) {
+        if let Some(msg) = self.deprecation_message() {
+            eprintln!("{msg}");
         }
     }
 }
@@ -1421,6 +1429,7 @@ async fn main() -> Result<()> {
             let policy_path = resolve_policy_path_local()?;
             let policy = WardenPolicy::load(&policy_path)?;
             policy.validate()?;
+            policy.print_deprecation_to_stderr();
             if let Some(r) = repo {
                 scrub_markers(&policy, std::slice::from_ref(&r), true)?;
                 harden_repos(&policy, vec![r], true)?;
@@ -1432,6 +1441,7 @@ async fn main() -> Result<()> {
             let policy_path = resolve_policy_path_local()?;
             let policy = WardenPolicy::load(&policy_path)?;
             policy.validate()?;
+            policy.print_deprecation_to_stderr();
             let roots = effective_discovery_roots(&policy);
             let repos = if let Some(r) = repo {
                 vec![r]
@@ -1444,6 +1454,7 @@ async fn main() -> Result<()> {
             let policy_path = resolve_policy_path_local()?;
             let policy = WardenPolicy::load(&policy_path)?;
             policy.validate()?;
+            policy.print_deprecation_to_stderr();
             let roots = effective_discovery_roots(&policy);
             let repos = if let Some(r) = repo {
                 vec![r]
@@ -1460,6 +1471,7 @@ async fn main() -> Result<()> {
             let policy_path = resolve_policy_path_local()?;
             let policy = WardenPolicy::load(&policy_path)?;
             policy.validate()?;
+            policy.print_deprecation_to_stderr();
             let roots = effective_discovery_roots(&policy);
             let repos = if let Some(r) = repo {
                 vec![r]

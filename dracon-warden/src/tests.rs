@@ -72,6 +72,7 @@ mod tests {
             hygiene_patterns: vec!["target/".into(), "*.log".into()],
             repo_roots: vec![],
             discover_roots: vec![],
+            ..Default::default()
         }
     }
 
@@ -98,7 +99,7 @@ mod tests {
     }
 
     #[test]
-    fn build_gitigno[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBRS0pBS1UrdWxhZ2o4dXRNYlg4Tit0ay9WeVZmVFkrSmpRS0FaaC9qNG5NClYwYzZHVHp0WG1WTThOSll1ODBCZFBPQjJOK0FnN3F6enFPZTBvWTBaZlkKLT4gWDI1NTE5IEFKa1JLcGgwVkd0bElweUlDZFpjMU9USFFKKzJjYmladGxpRmVCSlFlVU0KQmZiR2tmblNubXlCdHZQUnZreUI4djBndHZ5MHJBQ0hpZHR0V2llY2wyawotPiBYMjU1MTkgemx6QVB5akw1eVVkVmZTYkZHZ3ZUSkJONnYzdUVTZTQ0Zkc1UHFldzRsWQpuYy9qYUd3RlUxUkxOOG40eVFKQnpPK3gxdm4xQ2FDOG9GSjVwQi9La0VrCi0+IFgyNTUxOSB3aUxqdytCN2l4OURzSHVqRmtPVld5V3ZTcE16UURET05KbURmdUV0UnljCkRKRGJPUmk1Y0xtRFhkZnBZN2gyaW1NV2gwMlpLeW5EVnhYNGh1MG1KQ1kKLT4gWDI1NTE5IE8xMm9oTnpOaGhWaEs4V210WllVaUYyVW9veXRKMnUrZ0tzSkMwQnJHZ0EKT09BMStlTC80MTQ0WHZydFArcGUraFBUR1V4QzdUc3UxcG42VDUrV01tSQotPiBYMjU1MTkgQlFzcVFvN3E1MkdxeHNKUFE1NWoxSG5nVGdTSEI4UTdFREVucFlnU0tUMApaWGUxTnlFQVFJbUdJM1BJeW1oTVNOdW1CSVducFY5Z0hnSmtTYldFQjJjCi0+IE9qYWstZ3JlYXNlIFhebyNnIGxrMFIud1dLIHYgLzN6CkxVM1FuWjFBT2dNV3lEdm45QVlaUytCa3I2SXpRSE9Iamk3eXV2TXFEYmRGTUhrc1FNcU5BYTRvQmRuTFlwM2IKVmlOZ2xFTE8KLS0tIGNhUzdsN2hCSXpYSldsbUdvQyt0N3loQWhBQ2QrbGE2SWhjWGlhT0s0L28K7ghtpxhizlsfJ9VnSVrYNEcIXx7v/PYVCxfzpw4k48F4GnpfG2Rwih8ZC0wuoYKILvKiaZbkWJqbWMIYjLnvVQ==]() {
+    fn build_gitigno[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBiSldSRmprUjRFYmM0N0U3dDJmUkdFWEFzVHp5K0tOYVlCSjE5RmR1UlFNCk5Ha3F4STVOa2RubXdzQlQ0aWV2TE1JUFlkRnRwVmdmUkZYNklXTlZ3VnMKLT4gWDI1NTE5IG1ocjJNakFxUnV4SXRITWVkT1p3eXhpM0NWK2xmak1MaWp6Uk92cVM3RUkKemVseVFCVDBiVGhzR3ByWU1aV0lWNHptNFBjRDh4aXoydDF6SXhwc0JtRQotPiBYMjU1MTkgQWdWSTNDeDB2WHNmRi9qRmZOVk5mR2xMK0pENy9WVjIxL3ZzWEJGRWZ4NAp4THdPaHR6V0d0bm5aOGtFTTY5OTgvbFcxL05ndkNIVHRKQk51Y2pONndNCi0+IFgyNTUxOSBNbzV2endEQVJnQzQxVlpTWCtXWTFBNHNxU2ZBdTNpd3JWdzdBV2RGcEFJCkpOYUVKZDg4R241b1cwM2QvQ2VQY1lqWXYvSHc0bDhweDRCdW1WQjh2YTQKLT4gWDI1NTE5IHRJREJxMWoxc3RSclNJYXdraW9TdEF1TTdNUkcyeE85NlJMWXhjeE1GM3MKMlhrYUtkd3pNSEdJZDN4enovS3lObXlOOGlFbExVaGRaQTlUTDdNbGw1ZwotPiBYMjU1MTkgb0R0d3NFSG11a2FvRGFNNG5nQ2dBeHp6SG1CT25nOG1NMnd1cHUweDB6MApOTVNzeFIvVGVlVXFDOXVZTlR5UUpkcUJWWS9Oam5RUmNzT3VzQTVRSktzCi0+IF1nLWdyZWFzZSAxe1RVbl8tNgpvemUvVkJScmFiR1BUak1ndEJZNGtRCi0tLSBWcWF6dENMUFRIK2RvOVRGUFB3VlJFbzkrOTNyMTRJT3NnOTVTQkhmeFh3CuLBMFS7HaniZl8GdiY8WgERZ3VOXv61wbVqsU/QoyCnhL9rfMrV65k+1NR1zuoBM5SAOOj+C8R7LoveaMclloc=]() {
         let block = build_gitignore_block(&sample_policy()).expect("block");
         assert!(block.contains(BLOCK_BEGIN));
         assert!(block.contains("target/"));
@@ -130,6 +131,7 @@ mod tests {
             hygiene_patterns: vec![],
             repo_roots: vec![],
             discover_roots: vec![],
+            ..Default::default()
         };
         assert!(build_gitattributes_block(&policy).is_err());
     }
@@ -323,6 +325,7 @@ mod tests {
             hygiene_patterns: vec![],
             repo_roots: vec![p1.display().to_string(), p1.display().to_string()],
             discover_roots: vec![],
+            ..Default::default()
         };
         let merged = effective_repo_roots(&policy);
         assert_eq!(merged.len(), 1);
@@ -343,6 +346,7 @@ mod tests {
             hygiene_patterns: vec![],
             repo_roots: vec![p1.display().to_string()],
             discover_roots: vec![p1.display().to_string(), p2.display().to_string()],
+            ..Default::default()
         };
         let merged = effective_discovery_roots(&policy);
         assert_eq!(merged.len(), 2);
@@ -453,7 +457,7 @@ watch_roots = ["/tmp/test"]
     }
 
     #[test]
-    fn build_gitigno[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBkTVF4TmQ2L3R0V0doaDI2dFltZjJPMjBVZVoyZThoZ3h3V3ZGNk4xVEd3CjBqTm5zTmhWb1UyaHNicWVnY050SlZUQVFaVVB5MGFRRXVMWng2cUFGSmsKLT4gWDI1NTE5IEl4Z0dtTWRpY21ObjJrenZlK08vLzNkK0lsdEZ5b1g0ak4wWDZGODc5bEkKVlRYZXVlY2RlcGVxbWl2dm0rejY0YjlWTmUvTythYjh5MWlrUEZpNm55dwotPiBYMjU1MTkgWXFMTDFpZ0w0VTZBSzFPallVeEQzVnVLbzNYODVaaTFCd0R6amplTHhWUQpBWTRNdjcxc3pXSzNIRjVDbC9SUVArR21ZV1J1N0NsTkNuNFV4ak93V0lRCi0+IFgyNTUxOSBhWkhsbGozc0RyYzNoeUxZalBLSFlIWTlvc3p5OThFaVZTRXdaNUJmaVhrCjhJY0czNTcxWkpCaFRLY3NjUFJSTGRwNlVjUjU2NnBFL21BSC9kZmxNQlUKLT4gWDI1NTE5IEduUzFsYktSdmN3TkVETjFLRW9EeHhtSUFucDBQOW9EbjF2ckJadlpiakEKb2NmbmxuY1VqSUNCU1Bqb2JpNWxTcTI1S1RSa1c5TVJqM3dmSnlwbWNISQotPiBYMjU1MTkgcGtOeVFNVmFybUpYYThCNUYwblB5QlY4RVF6bTZzOFBIT3hyckZ1RDZ5cwpTVVFnL21XYjl5anc2ZFhkNkR6amp5akpKV2MyV0VZNnBpVExFMkJ0RnFjCi0+IEB7eS1ncmVhc2Ugclpgd0hlKVIgLi9WeCg8LSAyVGMyeiBLIVt6e1UKQUt6VDZtM0lFMG1EdmtoOVZEaUUwQ21mcmFpenJ0anFzOFpObTlDS3dnZmJ5d01ZZGs4aTVudzdJQU52U3cKLS0tIDAzV2VJbkZLczRId3E0bENrcWNlTDA0MmZwT2lFWVNHSVRxWjQveGxuN3MKwlL2V8oyMIQPkyJTq4VMuHNUVnyM8ADJEWgnF8Es/FisKRMUtheprru6PhCIdwe93UtcFwW/eAKw8nqf5JCDz7vR]() {
+    fn build_gitigno[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBTS0kyS2ljdG9RRGg0anZIdDRVaGM2SkQ3akVFemU0OVJHOTZHcjJRZkE4CjJhTDRVK3VwVVJnaFJzYjgrVTN3VGt6amNNbFRNaHl0b2lBaTZTV0JVZU0KLT4gWDI1NTE5IEZJVTVKU2xML2dhMHpmdU5DUkwzcFRRLy9JZnlIY3oxWjlLT2xHK2hrRk0KQ1VxZTZtRmVBYU1DTVgxamsxdTBiU1dWY2lVWVlQOWVoWERuTU1nWGpOYwotPiBYMjU1MTkgZ05FeXIyQmtYS0JtSi8vVTVDQlk4Y3orc1RZaGo1aWZoZ3I5Z2NZMHdtUQp3ejlKRUhtekJpaTcvZ1NrcEJrQklGR3BIRXJBa0xkVkZLNG53TjNMRzlrCi0+IFgyNTUxOSBvcGpmMHgyQW9PemdiaFgxbmM2SU40dEsxWGIyckd4UFhCWmMxUTU5eDFJCjZ4dVdNWWU4TlhEK0htNXViNzYvNlJ2cFhNRHVmV2FLT3EvclE2V01OU2MKLT4gWDI1NTE5IFNZSmRuNEZvditkNVZIR1BkMW5vdThscitybTlLNmc5UTRSZWRKV1VlRHcKdWFVVjBxa054VXlCUll4ZGY4NmFrYnc4eUtPY1Z4dW9LWUVyajUrYVNzdwotPiBYMjU1MTkgUG9RbUk0YVhrNytrNzdwbFA5R2R4cmN5NXAvcitqZkIveTJIUElnZnFXZwpzVVNXOFJ2c0hWK0tuVGQwcUdTU0h2ZlNnT0dTTUhWQ3l4bGo5K3hSRlRZCi0+IGsvInhOLWdyZWFzZSBLdiR7IFBIIHMKR21mZFVQMFdLZXpCVHAzUDk5dDBUZE9WelVMVlhFTjZqSHZnanVKZDhKbGpGTWF2V01FTjd6ZFUzZ3ZRaEI4Ci0tLSAzMmJLeDR3WHFIV2VTSUI4V2M0dDRvTWtkUGVqTEFKdEUzZWVta0NHd0s0CtutCYcVV1sUL8nwJDg3qfIjnYu8MBLz+oJTO6UDWkqlr/0i+jDRhT80CHJCYBbSe5ilJP85kzafDV/lAsSbRJE/NQ==]() {
         let block = build_gitignore_block(&sample_policy()).expect("block");
         assert!(block.contains("# --- BEGIN DRACON MANAGED BLOCK ---"));
         assert!(block.contains("target/"));
@@ -694,9 +698,107 @@ watch_roots = ["/tmp/test"]
             hygiene_patterns: vec![],
             repo_roots: vec![],
             discover_roots: vec![],
+            ..Default::default()
         };
         let roots = effective_repo_roots(&policy);
         assert!(roots.is_empty());
+    }
+
+    #[test]
+    fn test_deprecation_warning_for_watch_roots() {
+        // When ONLY the legacy 'watch_roots' key is set, the policy still
+        // resolves correctly (backwards compat) AND emits a deprecation warning.
+        let td = TestDir::new("warden_deprecation_warning");
+        let p1 = td.path().join("one");
+        fs::create_dir_all(&p1).expect("p1");
+
+        let policy = WardenPolicy {
+            protected_patterns: vec![],
+            plaintext_patterns: vec![],
+            hygiene_patterns: vec![],
+            repo_roots: vec![],
+            watch_roots: vec![p1.display().to_string()],
+            discover_roots: vec![],
+            ..Default::default()
+        };
+
+        // Effective roots still includes p1 (backwards compat)
+        let merged = effective_repo_roots(&policy);
+        assert_eq!(merged.len(), 1);
+        assert!(merged.contains(&p1));
+
+        // Deprecation message is present
+        let msg = policy
+            .deprecation_message()
+            .expect("deprecation_message should be Some when only watch_roots is set");
+        assert!(
+            msg.contains("'watch_roots' is deprecated"),
+            "expected deprecation message, got: {msg}"
+        );
+        assert!(
+            msg.contains("'repo_roots'"),
+            "expected hint to use repo_roots, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn test_repo_roots_takes_precedence() {
+        // When BOTH keys are set, repo_roots wins and the deprecation
+        // message indicates both are set.
+        let td = TestDir::new("warden_precedence");
+        let p_new = td.path().join("new");
+        let p_old = td.path().join("old");
+        fs::create_dir_all(&p_new).expect("p_new");
+        fs::create_dir_all(&p_old).expect("p_old");
+
+        let policy = WardenPolicy {
+            protected_patterns: vec![],
+            plaintext_patterns: vec![],
+            hygiene_patterns: vec![],
+            repo_roots: vec![p_new.display().to_string()],
+            watch_roots: vec![p_old.display().to_string()],
+            discover_roots: vec![],
+            ..Default::default()
+        };
+
+        // Effective roots uses p_new (the canonical key), not p_old
+        let merged = effective_repo_roots(&policy);
+        assert_eq!(merged.len(), 1);
+        assert!(merged.contains(&p_new));
+        assert!(!merged.contains(&p_old));
+
+        // Deprecation message indicates BOTH were set
+        let msg = policy
+            .deprecation_message()
+            .expect("deprecation_message should be Some when both are set");
+        assert!(
+            msg.contains("both 'watch_roots' and 'repo_roots' are set"),
+            "expected both-keys message, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn test_no_deprecation_when_only_repo_roots_set() {
+        // Sanity: when only the canonical key is in use, no deprecation
+        // message is emitted (i.e. deprecation_message() returns None).
+        let td = TestDir::new("warden_no_deprecation");
+        let p1 = td.path().join("one");
+        fs::create_dir_all(&p1).expect("p1");
+
+        let policy = WardenPolicy {
+            protected_patterns: vec![],
+            plaintext_patterns: vec![],
+            hygiene_patterns: vec![],
+            repo_roots: vec![p1.display().to_string()],
+            watch_roots: vec![],
+            discover_roots: vec![],
+            ..Default::default()
+        };
+
+        assert!(
+            policy.deprecation_message().is_none(),
+            "expected no deprecation message when only repo_roots is set"
+        );
     }
 
     #[test]
@@ -707,6 +809,7 @@ watch_roots = ["/tmp/test"]
             hygiene_patterns: vec![],
             repo_roots: vec![],
             discover_roots: vec![],
+            ..Default::default()
         };
         let roots = effective_discovery_roots(&policy);
         assert!(roots.is_empty());
@@ -851,6 +954,7 @@ watch_roots = ["/tmp/test"]
             hygiene_patterns: vec![],
             repo_roots: vec![],
             discover_roots: vec![],
+            ..Default::default()
         };
         assert!(policy.validate().is_ok());
     }
@@ -863,6 +967,7 @@ watch_roots = ["/tmp/test"]
             hygiene_patterns: vec![],
             repo_roots: vec![],
             discover_roots: vec![],
+            ..Default::default()
         };
         let result = policy.validate();
         assert!(result.is_err(), "should reject overlapping patterns");
@@ -878,6 +983,7 @@ watch_roots = ["/tmp/test"]
             hygiene_patterns: vec![],
             repo_roots: vec![],
             discover_roots: vec![],
+            ..Default::default()
         };
         let result = policy.validate();
         assert!(
@@ -894,6 +1000,7 @@ watch_roots = ["/tmp/test"]
             hygiene_patterns: vec![],
             repo_roots: vec![],
             discover_roots: vec![],
+            ..Default::default()
         };
         assert!(policy.validate().is_ok());
     }
@@ -906,6 +1013,7 @@ watch_roots = ["/tmp/test"]
             hygiene_patterns: vec![],
             repo_roots: vec![],
             discover_roots: vec![],
+            ..Default::default()
         };
         let result = policy.validate();
         assert!(
@@ -1111,7 +1219,7 @@ watch_roots = ["/tmp/test"]
 
     #[test]
     fn filter_clean_encrypts_content_with_secret_marker() {
-        let content = b"[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA5VDFGcHZLQmcveG0wWmV5alJyRzlSN2RobUlrYll1SDZZVTFueVh0WEJBCkRlNFBBeC9mbnl5ZUthMmdNR09PTFR3OWYzL1lKVXZTWHRuZk1laGhrQjQKLT4gWDI1NTE5IGIybjVZQlpuU1Q2WlBJbGhxU3N0L1o1WnpoUnhvQVFLUUMyK3dWd3lNRTAKa2UzM3ZiVWdtaVo4M2hsaHpCSFZtT21OUVdQMUZDbjJvcWI2WWZYajY1VQotPiBYMjU1MTkgcnhIYVBiQ3BmVXFMcmVsQXQ3OXZJd1kvcGtqaDRJckFPT2RoR01PZ0RpOApQSzdaVktQaE9oZ2ZIY0FzWnpyNHhzcnZxaHRiTVp6OVJRS1dQWUZmTmRBCi0+IFgyNTUxOSBPMm1qQm01ZHczR2l0VS9WOGQwTUhTdDZlb25IQ0VkaXhFckM1ckU4SHdJCjkzTGxDZ09nRlZrdThNTy93NXNvZ3dobk5vM0NLQUtMSXB5UXJMbTdQT0kKLT4gWDI1NTE5IDhqS2QrZW0ra3prdU1nVUJIeTQyd2VkMklEUEkxYkpVZVJ3ZlEzQmd2U3cKNll5QU4rMGg4bEtZTUFreEtLV3ltUmR2cDJueTVPcG4rSUpvb3BwM1lQVQotPiBYMjU1MTkgeHJ5ajNkaHcyc1F2ZDFXZUpWZzJNVHA1Yi9RZnpMUjhSNG9zQ3VRSnhIawpnOVFxdklwVWpSMXJYM2JqRTI0d1RqT1lteHdnSUdROTFGeGNWMnhFdjVJCi0+IFpLK3ZyMy1ncmVhc2UgJSAhI2l1KCA+ZUE9IDkKZTlRWVMxVDZRY2FubnlNc3lKY3hIRi9ncGtaVzJTNjFVWGQrL2JVcy9ZNHRyVTZaWTRkWmZmZUs2TlVMdlFUYwpoazQ5QjVVYURkZTh2ZEJIa0xEUQotLS0gSEY2RExUUFFtT3YxdnNIdDBpYStlTVZQcUk1ZFI4VXNFbjE3T2ZOUnBoWQo5G8kyNvNZqiKDS1ZRsmNinSfLgLKsdiPpN7jIwbCTsk5tLZ1SLqfRDiB0Es0Fw4Gh+INo8v9Via6bgGkJPGYPPx3v7Qz2JhTZV48S4Q==]\n";
+        let content = b"[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB4cHNXeG94ZXNuL2dKOWNBcExWOEROZXlDWlNKemN4MElzU3h4c0Q5eFFzCkFwdWVrUm9MN0FjK2VDd0p1WTU4WVRod2lpbkdubE0yUktWbWh3SDBZRTAKLT4gWDI1NTE5IGh3UGwzOHQ4L2o1YWVQVDVLeUp5ODZhL1BqYUJUZjZSUlpuTlNnVG90VVUKdmxtcG9RR2Q5dTZwY0RYQm9Xclc2MmhBY0dzeVdZa0p5RGxwZXVOZDIwawotPiBYMjU1MTkgNUhKRzVwQ244WlQraGJNcDFFNlR5a0tqTm9BYzhLRGVHLy9GZUpHczcwTQp5WUxLN25tM1ppSWhnbW1RbDRRbXhvVHNudDE0dlkyRVJSVnRpbDZCbVlBCi0+IFgyNTUxOSBhVUF5U3lucytway9pVjBmZmRiUTVZcDZTZm0vakMyVkJUUjZpcEFxSVQ4Ckx2ajhBS3dJMVdVQWhrYWRKTDd2Z1dxYm9SU0JRcURXclJ6ZWU3bHNDNncKLT4gWDI1NTE5IGx2aWJjbCtBMmpycUpQU1lGWm9VY0Naa0t0RzM0aWN2YVlEcUdlMU5XVHMKcWxOUmltUDhyS2RMeFV5RVJLOHduancwUUpTWnR0eXYwcnZPd0M2U3B3bwotPiBYMjU1MTkgc2NuaWJEa1htUGxERFpmS29KWnZQb0tGSjR1anZpeTRGYU5PbHRoc1BsZwplTHRnL1BsWUEvUm1kdG9tT3Q4djljd0g5TnlvSHRQMXN6ZWJidE5MTFpvCi0+ICp1fC1ncmVhc2UgVVBpVWpoIHQ+S2AKanFHM3ZRMkgvSGhvN1VtUAotLS0gaXd6OVJBTWxrT0hYRWVFWEQ4UWE4dERKNWgzL1p5VzM2ZTJTbDF1LzRZSQrKU80ZfepSwTJmmGkoSNhiKK1RWUsYMiN2bE3PwDcrmYMaXi7Wp+JVvKJRM6uJCSk80ptiSE0T0fm3PNY2KtWw6K5fzpfZ/45JMY3yCQ==]\n";
         let warden = DraconWarden::new().expect("create warden");
         let result = warden.clean(content, Some("config.env")).expect("clean");
         // Clean should either encrypt or pass through; result should be valid bytes
