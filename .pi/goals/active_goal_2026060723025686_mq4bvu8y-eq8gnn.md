@@ -1,0 +1,134 @@
+{
+  "version": 3,
+  "id": "mq4bvu8y-eq8gnn",
+  "objective": "=== Goal ===\nObjective: Produce a fresh \"delta audit\" of dracon-utilities that re-runs the 2026-06-06 baseline audit, marks each prior finding as Resolved / Still Open / Regressed, surfaces regressions and new findings, and ends with a prioritized top-10 improvement list for the project.\nSuccess criteria:\n- All 3 binaries build (`cargo check --workspace --all-targets`) with 0 errors\n- `cargo clippy` is re-run and its output is recorded (warnings/errors counted per binary)\n- `cargo fmt --check` is re-run and its status is recorded\n- `cargo test -p dracon-system -p dracon-warden` runs serially with 0 failures\n- `cargo test -p dracon-sync` runs serially (--test-threads=1) and flaky parallel failures are isolated/recorded\n- `cargo deny check` is re-run and its output recorded\n- Each of the ~9 P1 / P2 / P3 findings in `docs/audit/audit-2026-06-06.md` and the ~25 findings in `audit-2026-06-06-full.md` is re-evaluated as Resolved / Still Open / Regressed\n- New findings (anything not in the prior audits) are tagged separately and given fresh file:line references\n- A final \"Top 10 Improvements\" list is produced, prioritized by impact/effort, with concrete next-action steps\n- The output is written to `docs/audit/audit-2026-06-07-delta.md` and a short summary to `docs/audit/audit-2026-06-07-delta-summary.md`\nBoundaries:\nIn scope:\n- Code quality (clippy, fmt, dead code, unwrap/expect in production)\n- Test reliability (sync parallel-test noise, serial baseline)\n- CI status (lint/docs/deny/test jobs — read `.github/workflows/`)\n- Doc-vs-code drift (CLI subcommand paths, test-ai, AI Integration section, etc.)\n- Cargo.lock / deny.toml hygiene (duplicate crates, unused licenses, unmatched sources)\n- Repo hygiene (`.pi/goals/archived/*.md` in git, leftover `note.md`, etc.)\n- Operational state files (`~/.local/state/dracon/*.jsonl`) for incident-ledger sanity\nOut of scope:\n- Implementing any fixes (this is a read-only audit + report)\n- Modifying code, policy, or config files\n- Refactoring, dependency upgrades, or new feature work\n- Re-running tarpaulin (out of scope unless quick)\nConstraints:\n- Read-only — no source, policy, or config files are modified\n- All commands are run with the same flags CI uses (per `audit-2026-06-06-full.md`)\n- Test commands use `cargo test -p <crate> -- --test-threads=1` to get a deterministic baseline\n- Each finding must reference file:line; each prior finding must reference its prior file:line\n- Report is committed to `docs/audit/audit-2026-06-07-delta.md` (the file path is the deliverable)\n- The audit must NOT propose to change behavior the user has explicitly chosen (e.g. the `unwrap()` count is acceptable for an AI-only tool; the existence of `~/.local/state/dracon` is documented as out-of-`.dracon` per AGENTS.md)\nVerification contract:\n- `docs/audit/audit-2026-06-07-delta.md` exists and is <100 KB\n- It contains a \"Status of 2026-06-06 findings\" table that covers every P1/P2/P3 from both prior audit files\n- It contains a \"New findings\" section\n- It contains a \"Top 10 Improvements\" section\n- All `cargo` commands and their outputs are referenced (with paths to logs in `/tmp/`)\n- No code, policy, or config files in the repo were modified by this audit (verifiable via `git status` clean post-audit)\nIf blocked: Stop and ask the user.",
+  "status": "active",
+  "autoContinue": true,
+  "usage": {
+    "tokensUsed": 35602,
+    "activeSeconds": 6
+  },
+  "sisyphus": false,
+  "createdAt": "2026-06-07T22:02:56.866Z",
+  "updatedAt": "2026-06-07T22:03:03.644Z",
+  "activePath": ".pi/goals/active_goal_2026060723025686_mq4bvu8y-eq8gnn.md",
+  "taskList": {
+    "tasks": [
+      {
+        "id": "recon",
+        "title": "Recon: read both prior audits fully + read the .github/workflows CI configs + record baseline `git status`/`git log`",
+        "status": "pending",
+        "verificationContract": "`git status` clean, both `audit-2026-06-06*.md` files fully read, all CI yaml files inventoried, summary in working notes."
+      },
+      {
+        "id": "cargo-checks",
+        "title": "Run all cargo quality gates: `cargo check`, `cargo clippy` (CI flags), `cargo fmt --check`, `cargo doc` with strict RUSTDOCFLAGS, `cargo deny check`. Record outputs in /tmp/audit-2026-06-07/.",
+        "status": "pending",
+        "verificationContract": "All 5 commands executed; logs saved; pass/fail status recorded per command."
+      },
+      {
+        "id": "tests-baseline",
+        "title": "Establish serial-test baseline: run `cargo test -p dracon-system -p dracon-warden -p dracon-sync -- --test-threads=1` and record pass/fail counts. Compare to the documented `~10-20 flaky parallel failures` claim.",
+        "status": "pending",
+        "verificationContract": "Serial test result recorded per crate; any new failures (not in the parallel-noise set) flagged."
+      },
+      {
+        "id": "delta-evaluation",
+        "title": "Walk every P1/P2/P3 from both prior audits. For each, mark Resolved / Still Open / Regressed with file:line evidence. Compile into a single table.",
+        "status": "pending",
+        "verificationContract": "Delta table covers all 9 findings from `audit-2026-06-06.md` AND all findings from `audit-2026-06-06-full.md` (top 10 actions + corrections)."
+      },
+      {
+        "id": "new-findings",
+        "title": "Identify new findings: anything surfaced by the cargo runs above that wasn't in the prior audit, plus opportunistic improvements (dead-code warnings, the 35 archived `.pi/goals/*.md` files, leftover `note.md`, etc.).",
+        "status": "pending",
+        "verificationContract": "Each new finding has file:line, severity (P0/P1/P2/P3), and a concrete next-step."
+      },
+      {
+        "id": "repo-hygiene",
+        "title": "Repo hygiene sweep: count `.pi/goals/archived/*.md` files committed, check `git log` for stale commits referencing removed features, verify `~/.local/state/dracon/*.jsonl` paths exist as documented, scan for any leftover todo/audit/scratch files.",
+        "status": "pending",
+        "verificationContract": "List of hygiene items with file paths and recommended action."
+      },
+      {
+        "id": "top10",
+        "title": "Compose the \"Top 10 Improvements\" list, prioritized by impact and effort. Each item: title, current state, proposed action, effort estimate, risk.",
+        "status": "pending",
+        "verificationContract": "10 items, each with all 5 fields filled; effort estimates in min/h ranges."
+      },
+      {
+        "id": "write-report",
+        "title": "Write the full report to `docs/audit/audit-2026-06-07-delta.md` and a short summary to `docs/audit/audit-2026-06-07-delta-summary.md`. Both committed via `dracon-sync` (or directly if not committable).",
+        "status": "pending",
+        "verificationContract": "Both files exist; `git status` shows them as added/modified; file sizes recorded."
+      }
+    ],
+    "blockCompletion": false,
+    "proposedAt": "2026-06-07T22:02:56.874Z"
+  }
+}
+
+# Goal Prompt
+
+=== Goal ===
+Objective: Produce a fresh "delta audit" of dracon-utilities that re-runs the 2026-06-06 baseline audit, marks each prior finding as Resolved / Still Open / Regressed, surfaces regressions and new findings, and ends with a prioritized top-10 improvement list for the project.
+Success criteria:
+- All 3 binaries build (`cargo check --workspace --all-targets`) with 0 errors
+- `cargo clippy` is re-run and its output is recorded (warnings/errors counted per binary)
+- `cargo fmt --check` is re-run and its status is recorded
+- `cargo test -p dracon-system -p dracon-warden` runs serially with 0 failures
+- `cargo test -p dracon-sync` runs serially (--test-threads=1) and flaky parallel failures are isolated/recorded
+- `cargo deny check` is re-run and its output recorded
+- Each of the ~9 P1 / P2 / P3 findings in `docs/audit/audit-2026-06-06.md` and the ~25 findings in `audit-2026-06-06-full.md` is re-evaluated as Resolved / Still Open / Regressed
+- New findings (anything not in the prior audits) are tagged separately and given fresh file:line references
+- A final "Top 10 Improvements" list is produced, prioritized by impact/effort, with concrete next-action steps
+- The output is written to `docs/audit/audit-2026-06-07-delta.md` and a short summary to `docs/audit/audit-2026-06-07-delta-summary.md`
+Boundaries:
+In scope:
+- Code quality (clippy, fmt, dead code, unwrap/expect in production)
+- Test reliability (sync parallel-test noise, serial baseline)
+- CI status (lint/docs/deny/test jobs — read `.github/workflows/`)
+- Doc-vs-code drift (CLI subcommand paths, test-ai, AI Integration section, etc.)
+- Cargo.lock / deny.toml hygiene (duplicate crates, unused licenses, unmatched sources)
+- Repo hygiene (`.pi/goals/archived/*.md` in git, leftover `note.md`, etc.)
+- Operational state files (`~/.local/state/dracon/*.jsonl`) for incident-ledger sanity
+Out of scope:
+- Implementing any fixes (this is a read-only audit + report)
+- Modifying code, policy, or config files
+- Refactoring, dependency upgrades, or new feature work
+- Re-running tarpaulin (out of scope unless quick)
+Constraints:
+- Read-only — no source, policy, or config files are modified
+- All commands are run with the same flags CI uses (per `audit-2026-06-06-full.md`)
+- Test commands use `cargo test -p <crate> -- --test-threads=1` to get a deterministic baseline
+- Each finding must reference file:line; each prior finding must reference its prior file:line
+- Report is committed to `docs/audit/audit-2026-06-07-delta.md` (the file path is the deliverable)
+- The audit must NOT propose to change behavior the user has explicitly chosen (e.g. the `unwrap()` count is acceptable for an AI-only tool; the existence of `~/.local/state/dracon` is documented as out-of-`.dracon` per AGENTS.md)
+Verification contract:
+- `docs/audit/audit-2026-06-07-delta.md` exists and is <100 KB
+- It contains a "Status of 2026-06-06 findings" table that covers every P1/P2/P3 from both prior audit files
+- It contains a "New findings" section
+- It contains a "Top 10 Improvements" section
+- All `cargo` commands and their outputs are referenced (with paths to logs in `/tmp/`)
+- No code, policy, or config files in the repo were modified by this audit (verifiable via `git status` clean post-audit)
+If blocked: Stop and ask the user.
+
+## Progress
+
+- Status: running
+- Auto-continue: on
+- Sisyphus mode: no
+- Time spent: 6s
+- Tokens used: 36K (35,602) tokens
+## Tasks
+
+<!-- blockCompletion: false -->
+- [ ] recon: Recon: read both prior audits fully + read the .github/workflows CI configs + record baseline `git status`/`git log` — contract: `git status` clean, both `audit-2026-06-06*.md` files fully read, all CI yaml files inventoried, summary in working notes.
+- [ ] cargo-checks: Run all cargo quality gates: `cargo check`, `cargo clippy` (CI flags), `cargo fmt --check`, `cargo doc` with strict RUSTDOCFLAGS, `cargo deny check`. Record outputs in /tmp/audit-2026-06-07/. — contract: All 5 commands executed; logs saved; pass/fail status recorded per command.
+- [ ] tests-baseline: Establish serial-test baseline: run `cargo test -p dracon-system -p dracon-warden -p dracon-sync -- --test-threads=1` and record pass/fail counts. Compare to the documented `~10-20 flaky parallel failures` claim. — contract: Serial test result recorded per crate; any new failures (not in the parallel-noise set) flagged.
+- [ ] delta-evaluation: Walk every P1/P2/P3 from both prior audits. For each, mark Resolved / Still Open / Regressed with file:line evidence. Compile into a single table. — contract: Delta table covers all 9 findings from `audit-2026-06-06.md` AND all findings from `audit-2026-06-06-full.md` (top 10 actions + corrections).
+- [ ] new-findings: Identify new findings: anything surfaced by the cargo runs above that wasn't in the prior audit, plus opportunistic improvements (dead-code warnings, the 35 archived `.pi/goals/*.md` files, leftover `note.md`, etc.). — contract: Each new finding has file:line, severity (P0/P1/P2/P3), and a concrete next-step.
+- [ ] repo-hygiene: Repo hygiene sweep: count `.pi/goals/archived/*.md` files committed, check `git log` for stale commits referencing removed features, verify `~/.local/state/dracon/*.jsonl` paths exist as documented, scan for any leftover todo/audit/scratch files. — contract: List of hygiene items with file paths and recommended action.
+- [ ] top10: Compose the "Top 10 Improvements" list, prioritized by impact and effort. Each item: title, current state, proposed action, effort estimate, risk. — contract: 10 items, each with all 5 fields filled; effort estimates in min/h ranges.
+- [ ] write-report: Write the full report to `docs/audit/audit-2026-06-07-delta.md` and a short summary to `docs/audit/audit-2026-06-07-delta-summary.md`. Both committed via `dracon-sync` (or directly if not committable). — contract: Both files exist; `git status` shows them as added/modified; file sizes recorded.
+
