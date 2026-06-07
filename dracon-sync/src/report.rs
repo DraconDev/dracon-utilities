@@ -2738,10 +2738,29 @@ mod tests {
 
     #[test]
     fn test_ansi_colors() {
+        // Force color on for this test (NO_COLOR may be set in the env).
+        let saved = std::env::var_os("NO_COLOR");
+        // SAFETY: this is a single-threaded test that owns the NO_COLOR slot.
+        unsafe {
+            std::env::remove_var("NO_COLOR");
+        }
+        let saved_force = std::env::var_os("DRACON_FORCE_COLOR");
+        unsafe {
+            std::env::set_var("DRACON_FORCE_COLOR", "1");
+        }
         assert_eq!(ansi("31", "error"), "\x1b[31merror\x1b[0m");
         assert_eq!(ansi("32", "ok"), "\x1b[32mok\x1b[0m");
         assert_eq!(ansi("1", "bold"), "\x1b[1mbold\x1b[0m");
         assert_eq!(ansi("unknown", "default"), "\x1b[0mdefault\x1b[0m");
+        // restore
+        match saved {
+            Some(v) => unsafe { std::env::set_var("NO_COLOR", v) },
+            None => unsafe { std::env::remove_var("NO_COLOR") },
+        }
+        match saved_force {
+            Some(v) => unsafe { std::env::set_var("DRACON_FORCE_COLOR", v) },
+            None => unsafe { std::env::remove_var("DRACON_FORCE_COLOR") },
+        }
     }
 
     #[test]
@@ -3094,7 +3113,7 @@ mod tests {
     }
 
     #[test]
-    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBNTnlHUDhoY1ZFUjZQZWhGK0wxd1VXbGk0QW1EODd3NFc2NFlWL1pyaGhJCjhkcjdxQ1JLdk5TZWNjYkt3dVdIRmNNenlGZFNWSzZtUm9NSE9DVk80Sk0KLT4gWDI1NTE5IENJa0ZMS3l6N1diMFRiMXVFQ2ZFMFk1eVVwSWczbVowSDFRbWI5SFh1VmsKVEtGdlU0TmNHSzdSdTZVVW5RYnRVVmo3WWhjL0lZRmpNbnZndDFTNVNCUQotPiBYMjU1MTkgUlNwalZXY2RrVXVBT2pIOVY1UHpnR0xLclE5cEdvM25DN1RkbDczZTZ4ZwptZ3BTU1ZzTXNrUi9KeW54dkdPRWpXd1NkS3FnZXZZZ2NrS0hoVC9aN0s0Ci0+IFgyNTUxOSBaWUV0bmhCNC8yUUdqYVUvZkRnNGhXNytQV3dSbXg4aDErQ1BWU01pdkdRCjJvRXMzVUdtbzVMdit4andoc2hkdEs0ZENBNmVzNk1FQ2VKNDJEaFQvTGsKLT4gWDI1NTE5IGZaTHNZYldtdVcwRUpDSVZRMExYZ0Rpd2VvcEZxUDN1TU1qNTZMNjI1QjQKdy9jZElhdUxocUJPYmJRbVlpcjM0VGJ2MHRwTWJNeWM1NFpFL0kzUFhiNAotPiBYMjU1MTkgVmRoUC91WjZISEVaWnhVY0pwak1uamNkTWUrU0NXR0xSVHpGVTJ3cnQySQo2TTFMZCtkelhEQjhrVTFEVG5XZTlzeHR3Z3ptU0hPVGhBbTRud2VBbjJvCi0+IGc3VXNeLWdyZWFzZSBZIDlgJSA7bncgci8vMgpLRTdtRTJnTHpxaWtBVkNwd25ROWJlRXpPK3RJUjNtNkRSUGFOWnNoUXNXb2kxUmxseHcKLS0tIGJzOCtWUU94eVd3cExxZFErS3ZCQTJ1aDk4NGEwSngwWGcvR0NGbHRYRmsKRV6M4us+VQnulm3m88tt0LThqfeQOu86/ZY94LKQVpsxQit+j3Bx81iJPXHrhiIWg2TG3PbtOGq53Zg3WQ==]() {
+    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBLUFNoOTVUY1R2cGRWRWU1aGhNL1BRYWVHb3JRNkNDR2N4QVZ5MUhRb1M4Cm5oTDUvczlsWEhhSmtoN0tuTGxtYUV0MVd1eHpWZWc4NEdmSUNaalVlMDAKLT4gWDI1NTE5IGRmdVVlcnNvMEVQcXRSeENPVUQyZ0xLSEozMTIxeWZDTTlLMzFQT1hrMWcKaEw5NUNiaHI1MHFNai9WSUFZOVN1Z0gzR1gxK0t3eUg0ZFd0Qnk5ZXhxWQotPiBYMjU1MTkgRHlKdEJacnZ0RjRYR0Q1UDNjaHQ2UTN1Ukx3SjZ2YUdZWmFBQW1VcnFSdwp2cVlqaDM4U3gza1JrODdYdjBjWWlRYURIMVRHTTAzVGhzSUVLdXB2OE1NCi0+IFgyNTUxOSB4R0hhWEdsRVp1OHo5bFJTZ3IwR0RFQjNzemg5Vk5JcjVDZXV6VXRRZ1dzCjZTUjBJaTJWdDJWTWpESXN3emx6dFFTMk5jVlVtbFh5amh2bzE2bzIyaU0KLT4gWDI1NTE5IHMxOU4wY3NxUXBrRXpDOHlxL3dXR2hVK0VvbWpJdDVSWnJMMDU3VzhFeHMKb1M4Q05vL3RDNXl6MU1QTWxiT2drOUpOWWgzQXBkT1RSZW5rQ0hKQ2RTUQotPiBYMjU1MTkgS1l4OStNeEU3RzN6WmdWN2d0WXZ6d0NGTzIwWE1weVJhZ1N0TVVPbDFqawpmZ05lQmREQ3VHQ1h1a3I5elFaZEpZMVlIMVU3ZlJVVkV4ZWp4YmMzZldvCi0+IE9QLWdyZWFzZSA3Wn0yeXpPViBxOVNEIHM6TgpNK1paSHcKLS0tIDBRU1pFWGo4Sm5wSUYzYVNJOHBYSTFRS09KWndLT3gxY2taWWVNajlTd1UKWTb4SJ2I79Fx+RdlfBls3ai2Ntk2W7KHCXZk6GcymUiHnO5lSTLv2SBhF3tDMeTvPkzk0vbQxAwU5G0Elw==]() {
         let mut cooldowns = std::collections::HashMap::new();
         let repo = std::path::PathBuf::from("/test/repo");
         let notify_key = format!("push-fail-{}", repo.display());
