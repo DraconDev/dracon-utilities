@@ -1,6 +1,7 @@
 use anyhow::{Context, Result};
 use clap::{ArgAction, Parser, Subcommand};
 use fs2::FileExt;
+use print as dr_print;
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 use std::fs::{self, File};
@@ -2413,6 +2414,8 @@ async fn is_git_tracked_dir(path: &Path) -> Result<bool> {
 #[cfg(test)]
 #[allow(clippy::items_after_test_module)]
 mod tests;
+
+mod print;
 
 async fn cmd_status(json: bool) -> Result<()> {
     let report = build_status_report().await?;
