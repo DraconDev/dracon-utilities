@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 3120299,
-    "activeSeconds": 386
+    "tokensUsed": 3283340,
+    "activeSeconds": 414
   },
   "sisyphus": false,
   "createdAt": "2026-06-07T22:02:56.866Z",
-  "updatedAt": "2026-06-07T22:09:51.701Z",
+  "updatedAt": "2026-06-07T22:10:21.186Z",
   "activePath": ".pi/goals/active_goal_2026060723025686_mq4bvu8y-eq8gnn.md",
   "taskList": {
     "tasks": [
@@ -41,7 +41,9 @@
       {
         "id": "delta-evaluation",
         "title": "Walk every P1/P2/P3 from both prior audits. For each, mark Resolved / Still Open / Regressed with file:line evidence. Compile into a single table.",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-07T22:10:12.541Z",
+        "evidence": "Walked every P1/P2/P3 finding from audit-2026-06-06.md (9 findings: P1-1 test-ai, P1-2 CLI paths, P1-3 AI Integration section, P2-1 cargo dedupe, P2-2 deny.git URL, P2-3 deny unused licenses, P2-4 tar",
         "verificationContract": "Delta table covers all 9 findings from `audit-2026-06-06.md` AND all findings from `audit-2026-06-06-full.md` (top 10 actions + corrections)."
       },
       {
@@ -124,15 +126,15 @@ If blocked: Stop and ask the user.
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 6m26s
-- Tokens used: 3.1M (3,120,299) tokens
+- Time spent: 6m54s
+- Tokens used: 3.3M (3,283,340) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
 - [x] recon: Recon: read both prior audits fully + read the .github/workflows CI configs + record baseline `git status`/`git log` — evidence: git status was checked: shows clean tree with only untracked .pi/ directory. Both prior audit files (audit-2026-06-06.md and audit-2026-06-06-full.md) were fully read - confirmed by reading all sectio
 - [x] cargo-checks: Run all cargo quality gates: `cargo check`, `cargo clippy` (CI flags), `cargo fmt --check`, `cargo doc` with strict RUSTDOCFLAGS, `cargo deny check`. Record outputs in /tmp/audit-2026-06-07/. — evidence: All 5 cargo quality gates run with CI-equivalent flags. Logs saved in /tmp/audit-2026-06-07/ (cargo-check.log, cargo-clippy.log, cargo-fmt.log, cargo-doc.log, cargo-deny.log). Results: cargo check exi
 - [x] tests-baseline: Establish serial-test baseline: run `cargo test -p dracon-system -p dracon-warden -p dracon-sync -- --test-threads=1` and record pass/fail counts. Compare to the documented `~10-20 flaky parallel failures` claim. — evidence: Serial test runs all PASS. /tmp/audit-2026-06-07/test-system-warden.log: 83 + 69 + 10 = 162 tests pass serially (system + warden + integration). /tmp/audit-2026-06-07/test-sync.log: 418 + 10 = 428 tes
-- [ ] delta-evaluation: Walk every P1/P2/P3 from both prior audits. For each, mark Resolved / Still Open / Regressed with file:line evidence. Compile into a single table. — contract: Delta table covers all 9 findings from `audit-2026-06-06.md` AND all findings from `audit-2026-06-06-full.md` (top 10 actions + corrections).
+- [x] delta-evaluation: Walk every P1/P2/P3 from both prior audits. For each, mark Resolved / Still Open / Regressed with file:line evidence. Compile into a single table. — evidence: Walked every P1/P2/P3 finding from audit-2026-06-06.md (9 findings: P1-1 test-ai, P1-2 CLI paths, P1-3 AI Integration section, P2-1 cargo dedupe, P2-2 deny.git URL, P2-3 deny unused licenses, P2-4 tar
 - [ ] new-findings: Identify new findings: anything surfaced by the cargo runs above that wasn't in the prior audit, plus opportunistic improvements (dead-code warnings, the 35 archived `.pi/goals/*.md` files, leftover `note.md`, etc.). — contract: Each new finding has file:line, severity (P0/P1/P2/P3), and a concrete next-step.
 - [ ] repo-hygiene: Repo hygiene sweep: count `.pi/goals/archived/*.md` files committed, check `git log` for stale commits referencing removed features, verify `~/.local/state/dracon/*.jsonl` paths exist as documented, scan for any leftover todo/audit/scratch files. — contract: List of hygiene items with file paths and recommended action.
 - [ ] top10: Compose the "Top 10 Improvements" list, prioritized by impact and effort. Each item: title, current state, proposed action, effort estimate, risk. — contract: 10 items, each with all 5 fields filled; effort estimates in min/h ranges.
