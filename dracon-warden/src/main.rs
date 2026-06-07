@@ -1418,6 +1418,8 @@ async fn main() -> Result<()> {
                 discover_git_repos_local(&roots)
             };
 
+            println!("🛠️  repair (dry_run={dry_run}, strict={strict}) · {} repo(s) in scope", repos.len());
+
             if !dry_run {
                 // Hardening (managed blocks + marker scrub)
                 scrub_markers(&policy, &repos, true)?;
@@ -1432,6 +1434,16 @@ async fn main() -> Result<()> {
             let (found, _changed) = resmudge_repos(&policy, &repos, false)?;
             // Always report .env files missing headers (even in dry_run).
             let (_, _) = backfill_env_headers_repos(&repos, false)?;
+
+            // ---- Summary line ----
+            if found == 0 {
+                println!("✅ repair complete · no remaining ciphertext in working tree");
+            } else {
+                println!(
+                    "⚠️ repair complete · {found} ciphertext file(s) remain in working tree (pass without --dry-run to resmudge)"
+                );
+            }
+
             if strict && found > 0 {
                 return Err(anyhow::anyhow!(
                     "ciphertext markers remain in working tree (count={})",
