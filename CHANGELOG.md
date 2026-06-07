@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Warden plaintext-sibling escape hatch**: `dracon-warden` now supports an
+  opt-in escape hatch for files that should be stored verbatim (not encrypted).
+  Touch a `<file>.plaintext` sibling next to any tracked file to opt it in.
+  The clean filter returns the file unchanged, the pre-push hook silently
+  skips it, and `scrub-markers` / `resmudge` leave it alone. Threat model,
+  revocation story, and what the hatch does NOT protect against are in
+  `docs/design/warden-plaintext-sibling.md`. Default install behaviour is
+  unchanged: no hatch, no plaintext.
 - **CI/CD pipeline**: `.github/workflows/ci.yml` — fmt check, clippy, build, serial tests
 - **Lint gates**: `#![warn(missing_docs)]` on all 4 crate roots
 - **dracon-libs docs**: Fixed all 95 missing-doc warnings in dracon-git
