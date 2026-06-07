@@ -406,7 +406,11 @@ impl WardenPolicy {
         } else {
             &self.watch_roots
         };
-        chosen.iter().map(PathBuf::from).filter(|p| p.exists()).collect()
+        chosen
+            .iter()
+            .map(PathBuf::from)
+            .filter(|p| p.exists())
+            .collect()
     }
 
     fn discover_root_paths(&self) -> Vec<PathBuf> {
@@ -422,12 +426,14 @@ impl WardenPolicy {
     /// Returns `None` if only the canonical `repo_roots` is in use.
     fn deprecation_message(&self) -> Option<String> {
         match (self.repo_roots.is_empty(), self.watch_roots.is_empty()) {
-            (true, false) => Some(format!(
+            (true, false) => Some(
                 "warning: 'watch_roots' is deprecated, use 'repo_roots' instead (will be removed in a future release)"
-            )),
-            (false, false) => Some(format!(
+                    .to_string(),
+            ),
+            (false, false) => Some(
                 "warning: both 'watch_roots' and 'repo_roots' are set; using 'repo_roots' (the other is deprecated)"
-            )),
+                    .to_string(),
+            ),
             _ => None,
         }
     }
@@ -1375,7 +1381,10 @@ async fn main() -> Result<()> {
             let discover_note = if explicit_discover.is_empty() {
                 String::new()
             } else {
-                format!(" · {} additional discovery root(s)", explicit_discover.len())
+                format!(
+                    " · {} additional discovery root(s)",
+                    explicit_discover.len()
+                )
             };
             table.add_row(vec![
                 Cell::new("📋 Summary"),
