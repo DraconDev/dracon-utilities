@@ -48,6 +48,18 @@ in the `git show` output (even though your working tree file is plaintext).
 - Registry credentials management
 - Key rotation support
 
+### Plaintext-Sibling Escape Hatch (Opt-In)
+- Some files contain values that should never be encrypted (public example
+  keys, fixture data, benchmark datasets)
+- Touch a `<file>.plaintext` sibling to opt a specific file in to plaintext
+  storage — the clean filter returns it unchanged, the pre-push hook
+  silently skips it
+- Revocation: `rm <file>.plaintext` and the next commit re-encrypts
+- The hatch is per-file; the rest of the repo is unaffected
+- See `docs/design/warden-plaintext-sibling.md` for threat model and
+  what the hatch does NOT protect against
+- Default install behaviour is unchanged: no `.plaintext` sibling → encryption
+
 ## Installation
 
 ### Quick Install
@@ -145,7 +157,7 @@ encryption_version = 2
 allow_v1_fallback = false
 
 # Team keys (for shared access)
-team_[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAxb1RYVXVLWUVIeUQ4RlF4eE0raE1XaXJCeE5Vb1IxV2F0ekJHckdPZzBzClpaVUUvcjFwZEcrMTZWMUdpQVJFbFpYNXZmN0k5RzJDN25DRWM4MFM1VVkKLT4gWDI1NTE5IGh5OStkaSs0eDdTaTZkeHhrZERKMVV3QVEvVmpWUE16RGtVd0tTYlllMU0KUk9Iem0yUlVZejJraysxSUJTejd3SHdLVGNmNjcxVGhFQ2Ywc0xoLzQ4ZwotPiAiVEo0UTRBNS1ncmVhc2UKVHVOZ2ovcVdBakJ4V1YvWVZ4NEp1WGs0cUd5MTU2Rmt2WFNBaWZnMzhNYThXV2xBWjl4eEg1Vy9xZmMKLS0tIGNRa1ZJUlZGRTFrT0o0dGpvRGdLMFJBcHJCbnJrbjNSNWErZ2NzRFJONkUKs/hIHlRGJn27aw4Pz9rq9ns92M+h1wrZZb9MCkK9MsprWEItqzL8yHomiJLObhJ6+1agoEUEb2yu//bHxanLX4fNdG61LvFVS6Tuy8MVrPoJIyR2Bnn4kNPwo5xDxUu/z+OJk8tvuNjaG+uFKg==],
+team_[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBaaFBMb1hVZUV6cGxJemNBV1F4bDE0OFV2RjRhMy9UVnRsb3Z3TXhueTFBCmJqT2QwWUszZXYvV2oyUWJpSkVmbldnbnRJei9CbGtVLzFpcTN6VzNDRXcKLT4gWDI1NTE5IE9wMzZ2ZUk4TktBOElPQlFNZ05tNVBFKzdSMDN6QVp5TmdkZk5iVU1CbncKVzhGNGMydUNQdXdydG44cE43OGxnblA0VUVpWWw4UGJTL1dWTGtRRzMzWQotPiBYMjU1MTkgTW5kMkcxWjBKVGhNQW5WZjFJNVJrck1QbkVkYzBwZEJtN3hzRjNqVmZRZwpORXNnQ1NFVXVuZnFCUTE2WjhNaklCQ1BrMytRYnZaVU12R1UxODZyNjRzCi0+IFgyNTUxOSBxNndzelk0NGFGR2FERFlkNnU0VmNETkRzYW5Lcmt6NTFjUmtoU2t5eEM4CjBFRkhDVXJNMTdFVi9zc3NLN0x6MlZEWDBiTUxlQ1NxOVB3ZDQ4MGZ1akEKLT4gWDI1NTE5IFdyc1paWFVvTUhzc0kyRlRRUnVDVEhERUtyZGNVVzZUYzg2R2RheUxOQkUKR0tYQm5nTy94cEg5cm13MVovN3lxcUhxU0JXb2RBQTRMOXlwS3hFMi84WQotPiBYMjU1MTkgTVFDM0hzR3c0c3NHelJEaS9tMTBsdU1IbktKbVFBeTU0L1Z4aDVua1RVZwpKcDlZdGtHQitwUW5FV2R2N2RmZmtmMXZKZ0VVd0FPVHpuU3BtMk5nSVE4Ci0+IFdRUGwzJS1ncmVhc2UgZ2RdS35cXn0gLCNvVC5fOwovNWs3Q1U0eU1laGNJWjlkSFdxSGs2TW1tbzFtdWtSMHJvN1FhZ3RTL2k2QUFKbVlIQzBOTG1NbFNqV29tOTNrCjhvUGN2UXVNCi0tLSBtTEpWRjRZaUdMVXprRm84QkU4Z2VVUmhWSlZhRU5CRkM4ZHFRYi9GUThFCvlT84GOM20VC7IMUonkn/ReQkdXrSRLIdmxTGlBZb5vF2yJcH1bZWsonLCYUG16BXSLYYhIjeaHu8jKb6JBxMV/pdrt4pYtYFQisq60OASpxJ3i2j5QpK+NMCYhiuBmogGFSx3ppPqdWFpRXk4=],
 ]
 
 # Registry credentials
