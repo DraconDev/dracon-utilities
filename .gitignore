@@ -107,3 +107,5 @@ tasks*.json
 pi-session-*.html
 /rust_out
 /doctor.sh
+# Archived pi goal files (kept on disk for reference, not in repo)
+.pi/goals/archived/

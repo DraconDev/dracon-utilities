@@ -11,12 +11,12 @@ Working through todo.md items. System/main.rs modularization in progress.
 - [x] Item 2: sync.rs tests — 39 tests, good coverage
 - [x] Item 5: CI/CD pipeline — `.github/workflows/ci.yml`
 - [x] Item 6: missing-doc warnings — 0 in own code
-- [x] Item 7: dracon-ai docs — activation path noted
+- [x] Item 7: AI removal — all AI features, configs, and docs cut in favor of deterministic commits
 - [x] Item 8: `#![warn(missing_docs)]` lint gates on all 4 crate roots
 - [x] Item 12: incident ledger rotation — already implemented
 - [x] Events module extraction — `dracon-system/src/events.rs` (260 lines)
 - [x] Links module extraction — `dracon-system/src/links.rs` (233 lines)
-- [x] All 706 tests passing after both extractions
+- [x] All 575 tests passing after both extractions and AI removal
 
 ## In Progress
 - Item 4: system/main.rs split — 3,926 → 3,484 lines. Remaining: guard, storage, zram, doctor, safety
@@ -47,5 +47,5 @@ All 3 CONCERN repos recovered to OK. 0 CONCERN remaining.
 
 **Prevention**: `dracon-sync pause` should always be paired with `dracon-sync resume`. Consider
 adding an auto-expiry to the freeze marker (e.g., 24h TTL) so paused sync doesn't accumulate
-stale state indefinitely.
+stale state indefinitely. (See policy.rs `freeze_marker_paths` and the `dracon-sync pause` handler.)
 # final test 1780477840
