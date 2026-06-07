@@ -23,6 +23,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (suppressed when `NO_COLOR` is set). `dracon-system doctor` now emits
   per-check remediation hints. Design note:
   `docs/design/cli-print-style.md`.
+- **CLI print polish (round 2)**: Four specific surfaces that were still
+  weak have been upgraded. `dracon-sync repos` now has a legend line,
+  multi-line icon+label headers, ✅/⚠️/❌ status cells, and a color-aware
+  summary (no raw ANSI when piped). `dracon-sync health` now uses a single
+  table with a summary one-liner; warnings are grouped into their own
+  block with a count. `dracon-warden scrub-markers`/`resmudge`/`repair`/
+  `keygen`/`setup-hooks` each print a 2-3 line informative summary, even
+  when nothing was changed. `dracon-system events` shows a severity-counts
+  footer and a one-line summary before the table. See the
+  `docs/design/cli-print-style.md` design note for the full set of
+  conventions.
 
 ### Added
 - **Warden plaintext-sibling escape hatch**: `dracon-warden` now supports an
