@@ -384,8 +384,6 @@ copy_config "dracon-warden/dracon-warden.example.toml" "$HOME/.dracon/utilities/
 # Create secrets directories with correct permissions
 mkdir -p "$HOME/.dracon/utilities/sync/secrets"
 chmod 700 "$HOME/.dracon/utilities/sync/secrets" 2>/dev/null || true
-mkdir -p "$HOME/.dracon/utilities/sync/ai/secrets"
-chmod 700 "$HOME/.dracon/utilities/sync/ai/secrets" 2>/dev/null || true
 
 if [ "$NO_RESTART" = true ]; then
     echo ""
