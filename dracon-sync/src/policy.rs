@@ -956,6 +956,16 @@ pub(crate) fn freeze_marker_paths(_policy_path: &Path) -> Vec<PathBuf> {
     paths
 }
 
+/// Default freeze-marker TTL: 24 hours. Markers older than this are auto-cleared
+/// and a warning is logged to prevent indefinite pause from a forgotten `pause`.
+///
+/// The 2026-06-04 incident (1h23m of stale freeze, 3 CONCERN repos) is the
+/// motivating example. See `.dracon/project-state.md` for details.
+pub(crate) const FREEZE_MARKER_TTL_SECS: u64 = 24 * 60 * 60;
+
+/// If a freeze marker exists but is older than `FREEZE_MARKER_TTL_SECS`,
+/// auto-clear it and log a warning. Returns `Some(reason)` if sync should
+/// still be frozen (marker is fresh or no marker).
 pub(crate) fn freeze_reason(policy_path: &Path) -> Option<String> {
     if env_freeze_enabled() {
         return Some("env DRACON_SYNC_FREEZE".to_string());
@@ -963,6 +973,23 @@ pub(crate) fn freeze_reason(policy_path: &Path) -> Option<String> {
 
     for marker in freeze_marker_paths(policy_path) {
         if marker.exists() {
+            // Check TTL — auto-expire stale markers
+            if let Ok(meta) = std::fs::metadata(&marker) {
+                if let Ok(modified) = meta.modified() {
+                    if let Ok(age) = modified.elapsed() {
+                        if age.as_secs() > FREEZE_MARKER_TTL_SECS {
+                            eprintln!(
+                                "⚠️ freeze marker at {} is stale ({:.0}h old, TTL {}s); auto-clearing to prevent indefinite pause",
+                                marker.display(),
+                                age.as_secs() as f64 / 3600.0,
+                                FREEZE_MARKER_TTL_SECS
+                            );
+                            let _ = std::fs::remove_file(&marker);
+                            continue;
+                        }
+                    }
+                }
+            }
             return Some(format!("marker {}", marker.display()));
         }
     }
