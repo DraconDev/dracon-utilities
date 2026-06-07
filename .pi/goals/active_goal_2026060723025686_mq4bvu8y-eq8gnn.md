@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 1249524,
-    "activeSeconds": 164
+    "tokensUsed": 1458474,
+    "activeSeconds": 246
   },
   "sisyphus": false,
   "createdAt": "2026-06-07T22:02:56.866Z",
-  "updatedAt": "2026-06-07T22:05:54.408Z",
+  "updatedAt": "2026-06-07T22:07:18.315Z",
   "activePath": ".pi/goals/active_goal_2026060723025686_mq4bvu8y-eq8gnn.md",
   "taskList": {
     "tasks": [
@@ -33,7 +33,9 @@
       {
         "id": "tests-baseline",
         "title": "Establish serial-test baseline: run `cargo test -p dracon-system -p dracon-warden -p dracon-sync -- --test-threads=1` and record pass/fail counts. Compare to the documented `~10-20 flaky parallel failures` claim.",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-07T22:07:18.312Z",
+        "evidence": "Serial test runs all PASS. /tmp/audit-2026-06-07/test-system-warden.log: 83 + 69 + 10 = 162 tests pass serially (system + warden + integration). /tmp/audit-2026-06-07/test-sync.log: 418 + 10 = 428 tes",
         "verificationContract": "Serial test result recorded per crate; any new failures (not in the parallel-noise set) flagged."
       },
       {
@@ -122,14 +124,14 @@ If blocked: Stop and ask the user.
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 2m44s
-- Tokens used: 1.2M (1,249,524) tokens
+- Time spent: 4m06s
+- Tokens used: 1.5M (1,458,474) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
 - [x] recon: Recon: read both prior audits fully + read the .github/workflows CI configs + record baseline `git status`/`git log` — evidence: git status was checked: shows clean tree with only untracked .pi/ directory. Both prior audit files (audit-2026-06-06.md and audit-2026-06-06-full.md) were fully read - confirmed by reading all sectio
 - [x] cargo-checks: Run all cargo quality gates: `cargo check`, `cargo clippy` (CI flags), `cargo fmt --check`, `cargo doc` with strict RUSTDOCFLAGS, `cargo deny check`. Record outputs in /tmp/audit-2026-06-07/. — evidence: All 5 cargo quality gates run with CI-equivalent flags. Logs saved in /tmp/audit-2026-06-07/ (cargo-check.log, cargo-clippy.log, cargo-fmt.log, cargo-doc.log, cargo-deny.log). Results: cargo check exi
-- [ ] tests-baseline: Establish serial-test baseline: run `cargo test -p dracon-system -p dracon-warden -p dracon-sync -- --test-threads=1` and record pass/fail counts. Compare to the documented `~10-20 flaky parallel failures` claim. — contract: Serial test result recorded per crate; any new failures (not in the parallel-noise set) flagged.
+- [x] tests-baseline: Establish serial-test baseline: run `cargo test -p dracon-system -p dracon-warden -p dracon-sync -- --test-threads=1` and record pass/fail counts. Compare to the documented `~10-20 flaky parallel failures` claim. — evidence: Serial test runs all PASS. /tmp/audit-2026-06-07/test-system-warden.log: 83 + 69 + 10 = 162 tests pass serially (system + warden + integration). /tmp/audit-2026-06-07/test-sync.log: 418 + 10 = 428 tes
 - [ ] delta-evaluation: Walk every P1/P2/P3 from both prior audits. For each, mark Resolved / Still Open / Regressed with file:line evidence. Compile into a single table. — contract: Delta table covers all 9 findings from `audit-2026-06-06.md` AND all findings from `audit-2026-06-06-full.md` (top 10 actions + corrections).
 - [ ] new-findings: Identify new findings: anything surfaced by the cargo runs above that wasn't in the prior audit, plus opportunistic improvements (dead-code warnings, the 35 archived `.pi/goals/*.md` files, leftover `note.md`, etc.). — contract: Each new finding has file:line, severity (P0/P1/P2/P3), and a concrete next-step.
 - [ ] repo-hygiene: Repo hygiene sweep: count `.pi/goals/archived/*.md` files committed, check `git log` for stale commits referencing removed features, verify `~/.local/state/dracon/*.jsonl` paths exist as documented, scan for any leftover todo/audit/scratch files. — contract: List of hygiene items with file paths and recommended action.
