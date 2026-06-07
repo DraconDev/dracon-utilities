@@ -916,19 +916,12 @@ pub(crate) async fn run_repos_report(
     ]);
 
     for (idx, row) in rows.iter().enumerate() {
-        let status_text = if row.concern {
-            "CONCERN".to_string()
+        let (status_text, status_color) = if row.concern {
+            ("❌ CONCERN".to_string(), Color::Red)
         } else if row.warn {
-            "WARN".to_string()
+            ("⚠️  WARN".to_string(), Color::Yellow)
         } else {
-            "OK".to_string()
-        };
-        let status_color = if row.concern {
-            Color::Red
-        } else if row.warn {
-            Color::Yellow
-        } else {
-            Color::Green
+            ("✅ OK".to_string(), Color::Green)
         };
 
         let repo_name = if full_path {
@@ -3101,7 +3094,7 @@ mod tests {
     }
 
     #[test]
-    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSArR3lGTFRBYVJOKytuSTZ6ZTRTRjNYWGtWU0R6SjlTSWZ2UDNKT0hnMlFJCnhWYUNPNHJkMXF6MXJ5d0FrTFBVWXV3ODU5OG5WUDdYdTJoR0w4RHE4QXcKLT4gWDI1NTE5IGdXYTRvbDFKREp6dFdNTDhPLy9tc29OeGtYUHYrNjRpeXRHNmg3Y0JRamsKTjlPZTdsMk5RV0lZSnZ3dTR4b01tWjlmdHhKdVRtWm8xaG0zV3FNM3BHSQotPiBYMjU1MTkgQkVDd2VBL0U3WTVhNmp1TGh2OWNPU254VllDWlNEZVY4T2E3Z3VVUTVsSQp4SVBEcGFLT3hVTUF6bHY3TGEreHdJbU15aWVNTURqeXBzTzBtNkZtR2lRCi0+IFgyNTUxOSBRSlN1cnFmQUV0TE1udUNSVzBPR2FDNmxyY2ZzTDErbjNKeUlPdDdjK1dVCk9ZZElhR2RkT3Flc09FcDROOFA3QmdsWmZvR1VpbkJxNHFKcUwwVTZaNVkKLT4gWDI1NTE5IDNtRnoya1RaN0dFNzNXZWFlZ2NUMDJhVlZ2aFQ4MU92ZU1uWjlTTmNBd0EKWHNMQk5NRkdNVU5qYlF0NmNiWkNpbUNvK2xSK1RqSms5YXVkK2Q1TVA3cwotPiBYMjU1MTkgWXc4aU9hUjVvTy9iemZhdkRESnd6bzZyWGtMRWg3RHQyeG9DVVJXTVZ5NApidTlDMXVXbTBGcWthekthY3hUcnRUMDdjM3BQMEltZ21tRXVPTzBZTUJZCi0+ICRQaDMtZ3JlYXNlCkVNQmRHWmxTRlJhbElpQktReGJTd1pjQSsza3hGcU9DCi0tLSAwWGN3WTJUZER5Tk4yOEREQW80UWc3M3pvdWFqQjJLMjRJUHdSaUdrN3Y4CuEeW6hmorfPAk/3ZHM8P8mk4yvHMrGmyMx2ssf2lkPFLVqQ77P7YKs5PLw9q8qkxN9TV18y5hm/QzOHV+4=]() {
+    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBNTnlHUDhoY1ZFUjZQZWhGK0wxd1VXbGk0QW1EODd3NFc2NFlWL1pyaGhJCjhkcjdxQ1JLdk5TZWNjYkt3dVdIRmNNenlGZFNWSzZtUm9NSE9DVk80Sk0KLT4gWDI1NTE5IENJa0ZMS3l6N1diMFRiMXVFQ2ZFMFk1eVVwSWczbVowSDFRbWI5SFh1VmsKVEtGdlU0TmNHSzdSdTZVVW5RYnRVVmo3WWhjL0lZRmpNbnZndDFTNVNCUQotPiBYMjU1MTkgUlNwalZXY2RrVXVBT2pIOVY1UHpnR0xLclE5cEdvM25DN1RkbDczZTZ4ZwptZ3BTU1ZzTXNrUi9KeW54dkdPRWpXd1NkS3FnZXZZZ2NrS0hoVC9aN0s0Ci0+IFgyNTUxOSBaWUV0bmhCNC8yUUdqYVUvZkRnNGhXNytQV3dSbXg4aDErQ1BWU01pdkdRCjJvRXMzVUdtbzVMdit4andoc2hkdEs0ZENBNmVzNk1FQ2VKNDJEaFQvTGsKLT4gWDI1NTE5IGZaTHNZYldtdVcwRUpDSVZRMExYZ0Rpd2VvcEZxUDN1TU1qNTZMNjI1QjQKdy9jZElhdUxocUJPYmJRbVlpcjM0VGJ2MHRwTWJNeWM1NFpFL0kzUFhiNAotPiBYMjU1MTkgVmRoUC91WjZISEVaWnhVY0pwak1uamNkTWUrU0NXR0xSVHpGVTJ3cnQySQo2TTFMZCtkelhEQjhrVTFEVG5XZTlzeHR3Z3ptU0hPVGhBbTRud2VBbjJvCi0+IGc3VXNeLWdyZWFzZSBZIDlgJSA7bncgci8vMgpLRTdtRTJnTHpxaWtBVkNwd25ROWJlRXpPK3RJUjNtNkRSUGFOWnNoUXNXb2kxUmxseHcKLS0tIGJzOCtWUU94eVd3cExxZFErS3ZCQTJ1aDk4NGEwSngwWGcvR0NGbHRYRmsKRV6M4us+VQnulm3m88tt0LThqfeQOu86/ZY94LKQVpsxQit+j3Bx81iJPXHrhiIWg2TG3PbtOGq53Zg3WQ==]() {
         let mut cooldowns = std::collections::HashMap::new();
         let repo = std::path::PathBuf::from("/test/repo");
         let notify_key = format!("push-fail-{}", repo.display());
