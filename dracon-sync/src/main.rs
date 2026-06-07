@@ -796,47 +796,158 @@ async fn main() -> Result<()> {
                 };
                 println!("{}", serde_json::to_string_pretty(&payload)?);
             } else {
-                println!("🏥 Health Check");
-                println!(
-                    "   Status: {}",
-                    if status == "healthy" {
-                        "✅ healthy"
+                use comfy_table::{
+                    presets::UTF8_FULL_CONDENSED, Cell, Color, ContentArrangement, Table,
+                };
+                let color = print::should_color();
+                let mk = |s: &str, c: Color| -> Cell {
+                    if color {
+                        Cell::new(s).fg(c)
                     } else {
-                        "❌ unhealthy"
+                        Cell::new(s)
                     }
-                );
-                println!(
-                    "   Daemon: {}",
-                    if daemon_ok {
-                        "✅ running"
-                    } else {
-                        "❌ not running"
-                    }
-                );
-                if let Some(reason) = &freeze {
-                    println!("   Freeze: ⏸️ {}", reason);
+                };
+
+                // ---- Summary line (one-liner) ----
+                let summary_icon = if status == "healthy" {
+                    "✅"
                 } else {
-                    println!("   Freeze: off");
-                }
+                    "❌"
+                };
+                let daemon_str = if daemon_ok {
+                    "running"
+                } else {
+                    "not running"
+                };
+                let freeze_str = freeze
+                    .as_ref()
+                    .map(|r| format!("⏸️ on ({})", r))
+                    .unwrap_or_else(|| "off".to_string());
+                let policy_str = if policy_ok {
+                    "valid"
+                } else {
+                    "invalid"
+                };
                 println!(
-                    "   Policy: {}",
-                    if policy_ok {
-                        "✅ valid"
+                    "🏥 Health · {summary_icon} {status} · daemon {daemon_str} · freeze {freeze_str} · policy {policy_str}"
+                );
+
+                // ---- Main status table ----
+                let mut table = Table::new();
+                table
+                    .load_preset(UTF8_FULL_CONDENSED)
+                    .set_content_arrangement(ContentArrangement::Dynamic)
+                    .set_header(vec![Cell::new(" "), Cell::new("KEY"), Cell::new("VALUE")]);
+
+                let status_color = if status == "healthy" {
+                    Color::Green
+                } else {
+                    Color::Red
+                };
+                table.add_row(vec![
+                    mk(
+                        if status == "healthy" {
+                            "✅"
+                        } else {
+                            "❌"
+                        },
+                        status_color,
+                    ),
+                    Cell::new("Status"),
+                    mk(status, status_color),
+                ]);
+
+                let daemon_color = if daemon_ok {
+                    Color::Green
+                } else {
+                    Color::Red
+                };
+                table.add_row(vec![
+                    mk(
+                        if daemon_ok {
+                            "✅"
+                        } else {
+                            "❌"
+                        },
+                        daemon_color,
+                    ),
+                    Cell::new("Daemon"),
+                    if daemon_ok {
+                        mk("running", Color::Green)
                     } else {
-                        "❌ invalid"
+                        mk(
+                            "not running · systemctl --user start dracon-sync.service",
+                            Color::Red,
+                        )
+                    },
+                ]);
+
+                if let Some(reason) = &freeze {
+                    table.add_row(vec![
+                        mk("⏸️", Color::Yellow),
+                        Cell::new("Freeze"),
+                        mk(&format!("on ({})", reason), Color::Yellow),
+                    ]);
+                } else {
+                    table.add_row(vec![Cell::new("  "), Cell::new("Freeze"), Cell::new("off")]);
+                }
+
+                let policy_color = if policy_ok {
+                    Color::Green
+                } else {
+                    Color::Red
+                };
+                table.add_row(vec![
+                    mk(
+                        if policy_ok {
+                            "✅"
+                        } else {
+                            "❌"
+                        },
+                        policy_color,
+                    ),
+                    Cell::new("Policy"),
+                    mk(policy_str, policy_color),
+                ]);
+
+                table.add_row(vec![
+                    Cell::new("📦"),
+                    Cell::new("Repos"),
+                    Cell::new(format!(
+                        "{} discovered across {} roots",
+                        repos.len(),
+                        roots.len()
+                    )),
+                ]);
+
+                println!("{table}");
+
+                // ---- Errors block (if any) ----
+                if !validate_result.errors.is_empty() {
+                    println!();
+                    println!("❌ Policy errors ({}):", validate_result.errors.len());
+                    for e in &validate_result.errors {
+                        println!("   ❌ {e}");
                     }
-                );
-                for e in &validate_result.errors {
-                    println!("      ERROR: {}", e);
                 }
-                for w in &validate_result.warnings {
-                    println!("      WARNING: {}", w);
+
+                // ---- Warnings block (grouped) ----
+                if !validate_result.warnings.is_empty() {
+                    println!();
+                    println!(
+                        "⚠️  Policy warnings ({}):",
+                        validate_result.warnings.len()
+                    );
+                    for w in &validate_result.warnings {
+                        println!("   ⚠️  {w}");
+                    }
                 }
-                println!(
-                    "   Repos: {} discovered across {} roots",
-                    repos.len(),
-                    roots.len()
-                );
+
+                // ---- Tip line ----
+                if !daemon_ok || !policy_ok || !validate_result.errors.is_empty() {
+                    println!();
+                    println!("💡 Tip: run `dracon-sync config validate` for full diagnostics");
+                }
             }
         }
         Command::Metrics => {
