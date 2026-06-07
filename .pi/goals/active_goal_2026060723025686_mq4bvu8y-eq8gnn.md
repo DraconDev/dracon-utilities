@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 4093788,
-    "activeSeconds": 615
+    "tokensUsed": 4282138,
+    "activeSeconds": 649
   },
   "sisyphus": false,
   "createdAt": "2026-06-07T22:02:56.866Z",
-  "updatedAt": "2026-06-07T22:13:47.542Z",
+  "updatedAt": "2026-06-07T22:14:21.768Z",
   "activePath": ".pi/goals/active_goal_2026060723025686_mq4bvu8y-eq8gnn.md",
   "taskList": {
     "tasks": [
@@ -49,25 +49,33 @@
       {
         "id": "new-findings",
         "title": "Identify new findings: anything surfaced by the cargo runs above that wasn't in the prior audit, plus opportunistic improvements (dead-code warnings, the 35 archived `.pi/goals/*.md` files, leftover `note.md`, etc.).",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-07T22:14:21.763Z",
+        "evidence": "Identified 6 new findings not in prior audits: (N-1 P3) 8 new clippy dead-code warnings on print.rs helpers in system+warden (yesterday 0, today 3+5), (N-2 P3) system main.rs 3412->3445 and warden mai",
         "verificationContract": "Each new finding has file:line, severity (P0/P1/P2/P3), and a concrete next-step."
       },
       {
         "id": "repo-hygiene",
         "title": "Repo hygiene sweep: count `.pi/goals/archived/*.md` files committed, check `git log` for stale commits referencing removed features, verify `~/.local/state/dracon/*.jsonl` paths exist as documented, scan for any leftover todo/audit/scratch files.",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-07T22:14:21.765Z",
+        "evidence": "Repo hygiene sweep complete. .pi/goals/archived/ has 36 files on disk, 0 tracked in git (correctly gitignored). Active goal file (this session's 14.2K) tracked, will be auto-committed by sync. goal_ev",
         "verificationContract": "List of hygiene items with file paths and recommended action."
       },
       {
         "id": "top10",
         "title": "Compose the \"Top 10 Improvements\" list, prioritized by impact and effort. Each item: title, current state, proposed action, effort estimate, risk.",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-07T22:14:21.766Z",
+        "evidence": "Top 10 Improvements list composed in §7 of the full report. Each item has all 5 required fields: title, current state, proposed action, effort estimate, risk. Effort estimates: 10 min, 1 min, 10 min, ",
         "verificationContract": "10 items, each with all 5 fields filled; effort estimates in min/h ranges."
       },
       {
         "id": "write-report",
         "title": "Write the full report to `docs/audit/audit-2026-06-07-delta.md` and a short summary to `docs/audit/audit-2026-06-07-delta-summary.md`. Both committed via `dracon-sync` (or directly if not committable).",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-07T22:14:21.767Z",
+        "evidence": "Both files exist and are committed. docs/audit/audit-2026-06-07-delta.md = 25.8K, 430 lines (committed in b5139e89 by sync daemon). docs/audit/audit-2026-06-07-delta-summary.md = 3.1K, 70 lines (commi",
         "verificationContract": "Both files exist; `git status` shows them as added/modified; file sizes recorded."
       }
     ],
@@ -126,8 +134,8 @@ If blocked: Stop and ask the user.
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 10m15s
-- Tokens used: 4.1M (4,093,788) tokens
+- Time spent: 10m49s
+- Tokens used: 4.3M (4,282,138) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
@@ -135,8 +143,8 @@ If blocked: Stop and ask the user.
 - [x] cargo-checks: Run all cargo quality gates: `cargo check`, `cargo clippy` (CI flags), `cargo fmt --check`, `cargo doc` with strict RUSTDOCFLAGS, `cargo deny check`. Record outputs in /tmp/audit-2026-06-07/. — evidence: All 5 cargo quality gates run with CI-equivalent flags. Logs saved in /tmp/audit-2026-06-07/ (cargo-check.log, cargo-clippy.log, cargo-fmt.log, cargo-doc.log, cargo-deny.log). Results: cargo check exi
 - [x] tests-baseline: Establish serial-test baseline: run `cargo test -p dracon-system -p dracon-warden -p dracon-sync -- --test-threads=1` and record pass/fail counts. Compare to the documented `~10-20 flaky parallel failures` claim. — evidence: Serial test runs all PASS. /tmp/audit-2026-06-07/test-system-warden.log: 83 + 69 + 10 = 162 tests pass serially (system + warden + integration). /tmp/audit-2026-06-07/test-sync.log: 418 + 10 = 428 tes
 - [x] delta-evaluation: Walk every P1/P2/P3 from both prior audits. For each, mark Resolved / Still Open / Regressed with file:line evidence. Compile into a single table. — evidence: Walked every P1/P2/P3 finding from audit-2026-06-06.md (9 findings: P1-1 test-ai, P1-2 CLI paths, P1-3 AI Integration section, P2-1 cargo dedupe, P2-2 deny.git URL, P2-3 deny unused licenses, P2-4 tar
-- [ ] new-findings: Identify new findings: anything surfaced by the cargo runs above that wasn't in the prior audit, plus opportunistic improvements (dead-code warnings, the 35 archived `.pi/goals/*.md` files, leftover `note.md`, etc.). — contract: Each new finding has file:line, severity (P0/P1/P2/P3), and a concrete next-step.
-- [ ] repo-hygiene: Repo hygiene sweep: count `.pi/goals/archived/*.md` files committed, check `git log` for stale commits referencing removed features, verify `~/.local/state/dracon/*.jsonl` paths exist as documented, scan for any leftover todo/audit/scratch files. — contract: List of hygiene items with file paths and recommended action.
-- [ ] top10: Compose the "Top 10 Improvements" list, prioritized by impact and effort. Each item: title, current state, proposed action, effort estimate, risk. — contract: 10 items, each with all 5 fields filled; effort estimates in min/h ranges.
-- [ ] write-report: Write the full report to `docs/audit/audit-2026-06-07-delta.md` and a short summary to `docs/audit/audit-2026-06-07-delta-summary.md`. Both committed via `dracon-sync` (or directly if not committable). — contract: Both files exist; `git status` shows them as added/modified; file sizes recorded.
+- [x] new-findings: Identify new findings: anything surfaced by the cargo runs above that wasn't in the prior audit, plus opportunistic improvements (dead-code warnings, the 35 archived `.pi/goals/*.md` files, leftover `note.md`, etc.). — evidence: Identified 6 new findings not in prior audits: (N-1 P3) 8 new clippy dead-code warnings on print.rs helpers in system+warden (yesterday 0, today 3+5), (N-2 P3) system main.rs 3412->3445 and warden mai
+- [x] repo-hygiene: Repo hygiene sweep: count `.pi/goals/archived/*.md` files committed, check `git log` for stale commits referencing removed features, verify `~/.local/state/dracon/*.jsonl` paths exist as documented, scan for any leftover todo/audit/scratch files. — evidence: Repo hygiene sweep complete. .pi/goals/archived/ has 36 files on disk, 0 tracked in git (correctly gitignored). Active goal file (this session's 14.2K) tracked, will be auto-committed by sync. goal_ev
+- [x] top10: Compose the "Top 10 Improvements" list, prioritized by impact and effort. Each item: title, current state, proposed action, effort estimate, risk. — evidence: Top 10 Improvements list composed in §7 of the full report. Each item has all 5 required fields: title, current state, proposed action, effort estimate, risk. Effort estimates: 10 min, 1 min, 10 min, 
+- [x] write-report: Write the full report to `docs/audit/audit-2026-06-07-delta.md` and a short summary to `docs/audit/audit-2026-06-07-delta-summary.md`. Both committed via `dracon-sync` (or directly if not committable). — evidence: Both files exist and are committed. docs/audit/audit-2026-06-07-delta.md = 25.8K, 430 lines (committed in b5139e89 by sync daemon). docs/audit/audit-2026-06-07-delta-summary.md = 3.1K, 70 lines (commi
 
