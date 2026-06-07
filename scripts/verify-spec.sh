@@ -28,9 +28,10 @@ else
   echo "PASS: No blocking TODO comments"
 fi
 
-# Invariant 3: Core unit tests pass (library tests only, no network integration tests)
+# Invariant 3: Core unit tests pass
+# (--workspace because these crates are binaries, not libraries, so --lib would fail)
 echo "--- Invariant 3: Core unit tests pass ---"
-output=$(cargo test --lib --quiet 2>&1)
+output=$(cargo test --workspace --bins -- --test-threads=1 2>&1)
 if echo "$output" | grep -q "test result:.*FAILED"; then
   echo "FAIL: Some unit tests failed"
   failures=$((failures + 1))
