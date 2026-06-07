@@ -67,7 +67,7 @@ chmod 600 ~/.dracon/utilities/sync/secrets/codeberg.env
 
 ## Secrets File Format
 
-Secrets files live at `~/.dracon/utilities/sync/secrets/` (same directory used by AI provider secrets at `~/.dracon/utilities/sync/ai/secrets/`).
+Secrets files live at `~/.dracon/utilities/sync/secrets/`.
 
 ```
 VARIABLE_NAME=token_value

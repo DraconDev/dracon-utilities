@@ -108,11 +108,6 @@ cargo clippy
 - **Key files**: `src/main.rs`, `src/security/`
 - **Config**: `~/.dracon/utilities/warden/dracon-warden.toml`
 
-### dracon-ai
-- **Purpose**: AI CLI interface
-- **Key files**: `src/main.rs`
-- **Config**: `~/.dracon/utilities/ai/dracon-ai.toml`
-
 ## Design Principles
 
 1. **Deterministic daemons**: Sync, system, and warden must run without AI dependencies
