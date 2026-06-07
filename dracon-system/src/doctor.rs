@@ -58,17 +58,43 @@ pub(crate) async fn cmd_doctor(json: bool, strict: bool) -> Result<()> {
             Cell::new("STATUS"),
         ]);
 
-    let checks: Vec<(&str, bool)> = vec![
-        ("~/.dracon/nixos", report.nixos_root_exists),
-        ("dracon-libs (sibling)", report.canonical_libs_exists),
-        ("dracon-utilities (self)", report.canonical_utils_exists),
-        ("sync policy", report.sync_policy_exists),
-        ("legacy config", !report.legacy_config_dracon_exists),
-        ("sync service", report.sync_service_active),
+    // (label, ok, remediation hint when failing)
+    let checks: Vec<(&str, bool, &str)> = vec![
+        (
+            "~/.dracon/nixos",
+            report.nixos_root_exists,
+            "Clone or symlink your NixOS config under ~/.dracon/nixos",
+        ),
+        (
+            "dracon-libs (sibling)",
+            report.canonical_libs_exists,
+            "git clone https://github.com/your-org/dracon-libs.git ../dracon-libs",
+        ),
+        (
+            "dracon-utilities (self)",
+            report.canonical_utils_exists,
+            "This binary should live at ~/Dev/dracon-utilities (or its install.sh target)",
+        ),
+        (
+            "sync policy",
+            report.sync_policy_exists,
+            "Copy dracon-sync.example.toml to ~/.dracon/utilities/sync/dracon-sync.toml",
+        ),
+        (
+            "legacy config",
+            !report.legacy_config_dracon_exists,
+            "Move or remove the legacy ~/dracon configuration",
+        ),
+        (
+            "sync service",
+            report.sync_service_active,
+            "systemctl --user enable --now dracon-sync.service",
+        ),
     ];
 
     let mut has_failures = false;
-    for (label, ok) in &checks {
+    let mut remediation_lines: Vec<String> = Vec::new();
+    for (label, ok, hint) in &checks {
         let (icon, color) = if *ok {
             ("\u{2705}", Color::Green)
         } else {
@@ -76,6 +102,7 @@ pub(crate) async fn cmd_doctor(json: bool, strict: bool) -> Result<()> {
         };
         if !ok {
             has_failures = true;
+            remediation_lines.push(format!("  \u{274c} {}: {}", label, hint));
         }
         table.add_row(vec![
             Cell::new(icon).fg(color),
@@ -86,10 +113,18 @@ pub(crate) async fn cmd_doctor(json: bool, strict: bool) -> Result<()> {
 
     println!("{table}");
     if has_failures {
-        eprintln!("\n\u{26a0}\u{fe0f} Some checks failed. Run with --json for details.");
+        eprintln!();
+        eprintln!("\u{26a0}\u{fe0f}  Some checks failed. Remediation:");
+        for line in &remediation_lines {
+            eprintln!("{line}");
+        }
+        eprintln!();
+        eprintln!("Run with --json for machine-readable details.");
         if strict {
             std::process::exit(1);
         }
+    } else {
+        eprintln!("\u{2705}  All checks passed.");
     }
     Ok(())
 }
