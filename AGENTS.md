@@ -488,7 +488,7 @@ auto_publish = false  # master toggle (default: off)
 [[publish_targets]]
 name = "crates-io"
 registry = "crates-io"    # crates-io | npm | pypi
-[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBsd3U3QXdVZEZFMnZuUzV4OThxTS93MG5yNHJDNjU4OWtVd05NVE9sVnhFCnptcElMZTg4NlhoUTBRNkQrVElEZUhYeWxXdzVBUVN2YVl2bHNXdzZkRE0KLT4gPlY6di1ncmVhc2UgISBRY1teQWQKQVdqc0ZjMkFpVmRzWTMxWmlNQklMeGxreTlSVU9pWG9sSWMKLS0tIG0zdnA1aEtMbkg2YVpjeE5tNkxjTEg4UFBDUE01WEF0K1lMYmhnejNUaE0KsfdOfRl+YeTlxFs/i4zOdNAg1J6Ak8JcqFstxfa9yXGbJGgTwirtg377Z8fHvJ5HSlAiVV1pakl+fIoTq84WGIAFgMG4]
+[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBUSEY1dis5bXZ5bjFySkpsTlM2VzJ4eUZpaEdqRCtsVWpVMnBTanowdng4Ck5Sc3dsQklYdU1mL2lnOXBYd3J3cXRESW1aa2xmL3JqbG1TUWVSaXE1MGMKLT4gMSMvLWdyZWFzZSBjfitNd3UgbVpkLmszIF5LJlhoaApyRHFGSG9KTXd5V3huN1ltNTVqc3JISDRHeTFCRWI5WVpBZWhKTi9UeWJLa3VlWHR4ZHR2WmkvQmtNNHZnQk9zCjloaWx4TFVGQTVqSjZGSmEKLS0tIEQrME14TzF5Q3hEZ1NlWHUxcWxFNjVVVkg1c2x5T2d4OG1MSHNQemNZcFEKyCq7nPE0WBoud/wDBW0++SuxRI/jko8ClOALuYVcori8S83HMpWq5NiwgDTMPkWzol/dRW0mbz+pnOurI+GUmJBqmpni]
 publish_timeout_secs = 300
 ```
 
@@ -769,7 +769,9 @@ let _guard = EnvRestorer::remove("VAR_NAME");
 
 ### dracon-sync
 
-**420 tests** in `src/` (git.rs, sync.rs, report.rs, policy.rs, main.rs, visibility.rs, release.rs, bump.rs, secrets.rs) plus 10 integration tests in `tests/integration_test.rs`. Tests use `tempfile::TempDir` for isolation.
+**410 unit tests** in `src/` (git.rs, sync.rs, report.rs, policy.rs, main.rs, visibility.rs, release.rs, bump.rs, secrets.rs) + 10 integration tests in `tests/integration_test.rs` = **420 total** for sync. Tests use `tempfile::TempDir` for isolation.
+
+Whole-workspace: **575 tests** (sync 420 + system 81 + warden 64 + integration 10).
 
 ```bash
 export DRACON_SYNC_GIT_BIN=/run/current-system/sw/bin/git
