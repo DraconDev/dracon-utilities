@@ -1338,8 +1338,17 @@ async fn main() -> Result<()> {
             let policy_path = resolve_policy_path_local()?;
             let policy = WardenPolicy::load(&policy_path)?;
             policy.validate()?;
-            let watch = effective_watch_roots(&policy);
+            let repo_roots = effective_repo_roots(&policy);
             let discover = effective_discovery_roots(&policy);
+            // Explicit (user-set) discovery roots only — i.e. those that
+            // extend the repo_roots set. Empty if user didn't set discover_roots.
+            let explicit_discover: Vec<PathBuf> = policy
+                .discover_roots
+                .iter()
+                .map(PathBuf::from)
+                .filter(|p| p.exists())
+                .filter(|p| !repo_roots.contains(p))
+                .collect();
             let pubkey = resolve_local_pubkey_path()
                 .map(|p| p.display().to_string())
                 .unwrap_or_else(|| "NOT_FOUND (set DRACON_OWNER_PUBKEY)".to_string());
@@ -1355,12 +1364,17 @@ async fn main() -> Result<()> {
                 Cell::new(policy_path.display().to_string()),
             ]);
             // ---- Summary row (one-liner for quick scanning) ----
+            let discover_note = if explicit_discover.is_empty() {
+                String::new()
+            } else {
+                format!(" · {} additional discovery root(s)", explicit_discover.len())
+            };
             table.add_row(vec![
                 Cell::new("📋 Summary"),
                 Cell::new(format!(
-                    "Policy resolved · {} watch root(s) · {} discovery root(s) · pubkey {}",
-                    watch.len(),
-                    discover.len(),
+                    "Policy resolved · {} repo root(s){} · pubkey {}",
+                    repo_roots.len(),
+                    discover_note,
                     if pubkey.starts_with("NOT_FOUND") {
                         "MISSING"
                     } else {
@@ -1368,32 +1382,36 @@ async fn main() -> Result<()> {
                     }
                 )),
             ]);
-            // ---- Section: Roots ----
+            // ---- Section: Roots (single row in the common case) ----
             table.add_row(vec![
-                Cell::new("🛡️  Watch roots"),
+                Cell::new("🔍 Repo roots"),
                 Cell::new(format!(
                     "{} root(s): {}",
-                    watch.len(),
-                    watch
+                    repo_roots.len(),
+                    repo_roots
                         .iter()
                         .map(|p| p.display().to_string())
                         .collect::<Vec<_>>()
                         .join(", ")
                 )),
             ]);
-            if !discover.is_empty() {
+            if !explicit_discover.is_empty() {
                 table.add_row(vec![
-                    Cell::new("🧭 Discovery roots"),
+                    Cell::new("🧭 Discovery roots (additional)"),
                     Cell::new(format!(
                         "{} root(s): {}",
-                        discover.len(),
-                        discover
+                        explicit_discover.len(),
+                        explicit_discover
                             .iter()
                             .map(|p| p.display().to_string())
                             .collect::<Vec<_>>()
                             .join(", ")
                     )),
                 ]);
+            }
+            // ---- Deprecation indicator (if old key in use) ----
+            if let Some(msg) = policy.deprecation_message() {
+                table.add_row(vec![Cell::new("⚠ Deprecated key"), Cell::new(msg)]);
             }
             // ---- Section: Identity ----
             table.add_row(vec![Cell::new("🔑 Pubkey source"), Cell::new(&pubkey)]);
