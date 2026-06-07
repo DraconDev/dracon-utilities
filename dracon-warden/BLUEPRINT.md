@@ -97,3 +97,26 @@ dracon-warden is a Git filter + repository hardening daemon:
 - **Fix:** Added warning message on failure
 - **Priority:** Low
 - **Status:** [x]
+
+---
+
+## Field Naming: `watch_roots` → `repo_roots` (v0.2.0)
+
+### 7. Misleading field name
+- **Location:** `WardenPolicy::watch_roots` in `dracon-warden/src/main.rs`
+- **Problem:** The field was named `watch_roots`, which suggested filesystem
+  watching (inotify-style events). Warden has no daemon mode and does NOT
+  watch filesystems in real-time — it only acts on git operations via hooks
+  (pre-commit, pre-push) and scans repos on demand when `once`, `repair`,
+  or `setup-hooks` is invoked. The old name was misleading.
+- **Fix:**
+  - Renamed the canonical field to `repo_roots` (it really is a list of
+    directories to scan for git repos)
+  - Kept `watch_roots` as a deprecated alias that is still accepted, with
+    a deprecation warning to stderr AND a yellow ⚠ row in
+    `dracon-warden status`
+  - When both keys are set, `repo_roots` wins
+- **Backwards compat:** The old key works in 0.2.0 and emits a warning;
+  it will be removed in a future major release.
+- **Priority:** Medium (semantic clarity, not a bug)
+- **Status:** [x]

@@ -5,6 +5,42 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-06-07
+
+### Breaking
+- **`dracon-warden` `watch_roots` field renamed to `repo_roots`**: The old
+  name was misleading (warden has no daemon mode and does not watch
+  filesystems; the field is a list of directories to scan for git repos
+  on demand). The canonical field is now `repo_roots`. The example toml,
+  user guide, and BLUEPRINT all use the new name.
+
+### Deprecated
+- **`watch_roots` is still accepted** for backwards compatibility. When
+  the old key is set (alone or alongside `repo_roots`), the policy still
+  loads, but:
+  - A deprecation warning is logged to stderr:
+    `warning: 'watch_roots' is deprecated, use 'repo_roots' instead`
+  - A yellow ⚠ row appears in `dracon-warden status`
+  - When both keys are set, `repo_roots` wins and a different message
+    indicates the conflict
+  This alias will be removed in a future major release.
+
+### Fixed
+- **`dracon-warden` status no longer shows two identical root rows**:
+  Previously the status table showed `🛡️ Watch roots` and
+  `🧭 Discovery roots` as separate rows that were identical when
+  `discover_roots` was unset. The status is now consolidated to a single
+  `🔍 Repo roots` row, with an explicit `🧭 Discovery roots (additional)`
+  row only when the user has set a non-empty `discover_roots` that
+  extends the `repo_roots` set.
+
+### Changed
+- **`dracon-warden` legacy path removed from default config**: The
+  example toml and the installed user config no longer include
+  `/home/dracon/dracon` (a legacy non-git directory holding `backups/`
+  and `utilities/`). The directory itself is not deleted; the user can
+  decide what to do with its contents.
+
 ## [Unreleased]
 
 ### Fixed
