@@ -160,21 +160,3 @@ Mutable runtime files live outside the `.dracon` git tree:
 ├── dracon-system-guard.log            # Guard log (auto-rotated)
 └── visibility-sync/                   # Per-repo metadata sync timestamps
 ```
-
-## AI Provider Configuration
-
-For AI-based version bumping:
-
-```toml
-# ~/.dracon/utilities/sync/ai.toml
-[[providers]]
-name = "mistral"
-env = "MISTRAL_API_KEY"
-endpoint = "https://codestral.mistral.ai/v1"
-model = "codestral-latest"
-```
-
-Test connectivity:
-```bash
-dracon-sync test-ai
-```

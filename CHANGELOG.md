@@ -16,7 +16,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Startup cleanup**: Sync daemon prunes stale state on every start/restart — stuck repos, incident ledger retention, visibility cache orphans, guard log rotation
 - **Broken tracking repair**: `repair_broken_tracking()` detects `origin/master: gone` refs and re-points to `origin/{branch}` — runs at daemon startup
 - **GitHub orphan cleanup script**: `scripts/cleanup-github-orphans.sh` — lists and deletes 83 suffixed orphan + test repos (needs `delete_repo` scope)
-- **AI max_tokens**: ChatRequest now sends `max_tokens: 256` to fix nvidia API `max_tokens must be at least 1` error
 - **dracon-libs get_diff fallback**: `get_diff()` now falls back to CLI on libgit2 errors (binary blobs, nul bytes)
 
 ### Changed
@@ -24,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Scratch file cleanup**: Removed `test1.md`, `notes.md`, `todo.md`, `.ralph/`, `plan/`, `plans/` from git tracking; added to `.gitignore`
 - **Service restart policy**: All 3 services changed from `Restart=on-failure` to `Restart=always` — daemons now restart even after clean exits, preventing 5+ hour outages
 - **CLI output style**: All status commands now use Title Case keys (`Policy:` not `POLICY:`) for consistency with JSON output and health check format
-- **Daemon log noise**: Silent when healthy — concern/warn summaries only print when `found > 0`, AI provider status logs only at startup
+- **Daemon log noise**: Silent when healthy — concern/warn summaries only print when `found > 0`
 - **Structured logging**: `log.rs` now prints human-readable `⚠️ message` to stderr instead of raw JSON — JSON incident records stay in the ledger file only
 - **Link status**: Prints "No configured links" instead of empty table when 0 links exist
 - **dracon-sync**: Scribe refactor — commit messages from diffs, not `project-state.md`

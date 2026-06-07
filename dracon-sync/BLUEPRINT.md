@@ -213,7 +213,7 @@ Why this change is being made
 - [x] Completed work items
 
 ## In Progress
-- [x] Items being worked on
+- [~] Items being worked on
 
 ## Blockers
 - What's stopping progress

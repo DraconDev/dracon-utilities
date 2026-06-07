@@ -52,8 +52,9 @@ When `auto_github_private = true`, newly initialized repos without an origin rem
 - Manages permanently stuck repos
 - Prunes stale operational state on daemon restart (stuck repos, incident ledger, visibility cache)
 
-### AI Scribe Integration
-Generates meaningful commit messages using AI when providers are configured. Falls back to local file-pattern messages when AI is unavailable.
+### Commit Messages
+Deterministic facts extracted from the diff. No AI, no LLM, no prose. Routing
+keys are grep-searchable via `git log --grep=`.
 
 ## Installation
 
@@ -107,10 +108,10 @@ dracon-sync daemon --interval-secs 30
 dracon-sync sync-now ~/Dev/my-project
 
 # Edit the sync policy
-dracon-sync edit-config
+dracon-sync config edit
 
-# Test AI provider connectivity
-dracon-sync test-ai
+# Validate the sync policy
+dracon-sync config validate
 
 # Report across all repos
 dracon-sync repos
@@ -237,10 +238,10 @@ auto_create = false  # Codeberg/Forgejo doesn't support push-to-create
 Store PATs for HTTPS fallback and API operations:
 ```bash
 # GitLab
-echo "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBWcm9ySzE1Z0o2ZnBXR3loaWJYdzZqNTl1SUNUTEtEaHRLR2ltcEpkL0M0CjhZdEdzY1lyREQ1MnZ3a1MzTHQ2MGFlbm42NGd4RzQ5b1AxbGxrR2UyV0kKLT4gLn1kLWdyZWFzZSAkeTQ8V0tIIEI4IDVgLiAiCllaY0kzZ09qTjhyVTFDTnMzNy9xeEhJeWkzN1hhbUo0TDZzbERzb2dUU1FPeG1xSVZQb1MyQQotLS0gZWt1TWZJdk1VYXoxN1dwOHcramFJbnIxbWdVcENpQlBISEZkWC9INEo0Zwq9184oirsn4pWo9E8AJI+LeTwwCrnGRtd76OdhlN3G3KMiA5PWLIXuU/bPc/GjZgZinY4oaXu9IsoCShvD6wmxkIwwrQVpRQ==]" > ~/.dracon/utilities/sync/secrets/gitlab.env
+echo "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBOR3NjTGhRMlJDTWdWUHlCL003bkoxa3ZBU1UzTE8yd1dUVGsrOGlQS0NRCjU5bkNrc3FLbW9qTVpzUEhCOGFBbjhCY29kWFpWZ0w0Tm9oWUFkejJld1EKLT4gSidLLWdyZWFzZSA/SGshPT1pCkVXZ3JSMmE2OVdVOTFqT1Z3UmtJYkJ6MHhRUWR2ZwotLS0gKzFZNFplcTJSTjlRZTl6MUUxWUwvSjN1dS82NGQxa3ZZSVdFTkk4ODU1YwoEXyaef857lB+2K9m2/E8PGWn5v51F4g4DSMTMzTqWlC2Wj6JkqSbE1lmBPYgp0oNsUPraenWyG1HmWnMMBkO7B1r48lZerA==]" > ~/.dracon/utilities/sync/secrets/gitlab.env
 
 # Codeberg
-echo "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA4MjZrSXVTdC8yOXJ4TTQzdEpwU004QlJycVNLYWxHdzkrZmFTNzdrNGpvCnp4OXcydm5zM05UR1ZpTmJOcEw2OVl6ZFdHcG0xWGRXNFhxaHZZeTA4TzAKLT4geX1GLWdyZWFzZSB5azIgIThmYEpjaSB2L2h8TyNCTiBuZCx+CmxKMjFVbHpYcllQUDY4enZxZwotLS0gTGRXYmVKMDZZRGJSalQ5MWduek5ySXQ0a2FGcVU5ZTVXbWVVYzdDWGFlbwqcyt7jDD2VjkbZvV6CPtinRMAH/rTaqMOAJRjHzwDOHrqzUeYsUhmLqJf7FtrOJ30ici+VPfiViofkmW6KvZT/1vVdCVSE7A==]" > ~/.dracon/utilities/sync/secrets/codeberg.env
+echo "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBzNWZ4bm9IdUhTVTR4SzJHZGtURGNTOFFkSGhoWUtXeDNGUjR4YVc1S0NRCmRTTHJqN2tocVpyQ2FoSEk1dnFFTGw2K0d4bE5iNEc1UDhmdHllOHVPVmMKLT4gP1U6WzAtRi1ncmVhc2UKQkF1clhPRXRzUndSZm1tZk1xcXh6UlRqVUhhTXNTYS9sZXZNaWgwUmhxZzNrNlZJaHNsSGR2T3NkSFpnZ0I3bAovQnV4aVpIcmlUU0RwZmRWV3plQVQ3UXNZWXFVNVFOTGFQUUUxQTVCbjdoUUZSbzJ0dDgKLS0tIHZ1em5nakU5dEtKckNYNktYWjhncXlSMWtTaUl6MkFZZDFpbVY3TXFXbE0KM2HuXIL1DdiwDfoVm5/YiZ3lUHNYKk2JqJHJbnnAHSD2G7J4FWS4YKuMnr+1EHqoAp4hq9rNFQBShwGrKNnkkBFZWwU28hQ=]" > ~/.dracon/utilities/sync/secrets/codeberg.env
 ```
 
 ### AI Providers
