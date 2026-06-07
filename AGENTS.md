@@ -488,7 +488,7 @@ auto_publish = false  # master toggle (default: off)
 [[publish_targets]]
 name = "crates-io"
 registry = "crates-io"    # crates-io | npm | pypi
-[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA4T1NGNlMwWHZ2UisyeXgxUllCQTd0SEdKc2FMdStPT2pMZS93bU4vOEQ4CmhWQXRFb1ZVbFZpTlcwL0l6R0pmeWd5VDI3bjVLRCtmVDAyOXRDb0lDaHcKLT4gdi9oXy1ncmVhc2UgP0FTVy4qCmV4VGlncXFxT0x6OThUY3lXaFNqQnFFdlU2bwotLS0gQWUvcm5kWnhVM1UydnVhdlM3a21ZZktHWlVBckFlRCtJSXZUbzZraXlTbwoSreJxDDd3grNA4zGR9nDXz0cFo5QzMlI1fCTjxLUtD8uVI1iCwDoQ3YoyDux3W2AgAwKLyGzesi26jNbai6GNeMxQOKU=]
+[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBWamtXenNwNFg2cGJsMFIwNnFGTURiMk9iZ1EweXJXZGNxbjZJclhsdlJBCjBRV0dJeE02bHFRaXR2ODgySlBqTHY5UzAwQW95aDJaOEJyT0p4U3kwRjgKLT4gLFg1fistZ3JlYXNlIHtnMWFtOVYgUiVXOj5KPyAnXix8N1YgJgpCUG9LK2hBalk2MHBtWnFsNnRHQi9ZY2VkMVdGdXUwdXVEa0F0alVrS0srSlh2V0haVytKY1pOYzJuNTFYRDI4ClE2QVZrM0NVNkxOcExhTWM5a3krNE1tVnYwbwotLS0ga0pGS01xOUtCaDdaaTJHUTU1dVZLd1FVTmwxYmFTZ3FtM0RvR2hISjFadwrT1Dh5IkkkvcpQhda1kj0gvVDdo16x2wLpklgRUc0Y339k/sqyao21EHOTuZqoM5C4yR/y9wKQDeJ8ZSSZn0p9R/jFQII=]
 publish_timeout_secs = 300
 ```
 
@@ -549,21 +549,37 @@ Commands:
 
 **Incident response after a block:** Read the incident ledger at `~/.local/state/dracon/dracon-sync-incidents.jsonl` to understand what was blocked and why.
 
-**dracon-sync commit message generation:** Commit messages are now simple mechanical messages (e.g., "update 3 file(s)"). AI scribe was removed as AI-generated messages were not useful for AI workflows. No task scanning or blast radius calculation is performed.
+**dracon-sync commit message generation:** Commit messages are simple mechanical facts (e.g., "update 3 file(s)") extracted from the diff. No AI, no LLM, no prose.
 
 ### dracon-system
 
 ```
 dracon-system [OPTIONS] <COMMAND>
 Commands:
-  status   Show core path and service status
-  doctor   Run deterministic diagnostics
-  storage  Analyze storage hotspots [--cleanup] [--apply]
-  link     Manage symlink ownership (status | doctor | apply)
-  guard    Guard runtime (once | daemon | prune | clean)
-  events   Show recent events [-t N] [-s source] [-s severity]
-  zram     Zram stats [--status] [--gen-config]
+  status    Show core path and service status
+  doctor    Run deterministic diagnostics for canonical dracon setup
+  events    Show recent events from the shared event stream
+  storage   Analyze storage hotspots and optionally clean safe build/cache dirs
+  link      Manage deterministic symlink ownership for system setup
+  symlinks  Scan filesystem for broken symlinks (report-only)
+  zram      Zram management: show stats and generate NixOS config for tuning
+  guard     Guard runtime: monitor disk/process pressure and notify/mitigate
 ```
+
+**Subcommands of `link`:**
+- `dracon-system link status` — show link reconciliation status from policy
+- `dracon-system link doctor` — diagnose link drift and invalid targets
+- `dracon-system link apply` — apply link policy by creating/fixing symlinks
+
+**Subcommands of `guard` (destructive ones default to dry-run; pass `--apply` to execute):**
+- `dracon-system guard once` — run one guard evaluation pass
+- `dracon-system guard daemon` — run continuous guard loop (systemd)
+- `dracon-system guard prune` — prune system caches and Docker resources
+- `dracon-system guard clean` — clean all reclaimable space (targets, trash, nix, caches, node_modules)
+
+**Subcommands of `zram`:**
+- `dracon-system zram --status` — show current zram stats
+- `dracon-system zram --gen-config` — generate NixOS config for tuning
 
 ### dracon-warden
 
@@ -571,14 +587,14 @@ Commands:
 dracon-warden [OPTIONS] <COMMAND>
 Commands:
   status         Show resolved policy path and watch roots
-  once           Run one hardening pass [repo]
-  filter-clean   Git filter clean (stdin -> stdout)
-  filter-smudge  Git filter smudge (stdin -> stdout)
-  scrub-markers  Scan DRACON_SECRET markers [--apply] [repo]
-  resmudge       Fix ciphertext stuck in working tree [--apply] [repo]
-  repair         System-wide repair pass [--dry-run] [--strict] [repo]
-  keygen         Generate new age keypair
-  setup-hooks    Install git hooks for encryption enforcement [--global|--local] [repo]
+  once           Run one hardening pass and exit
+  scrub-markers  Scan plaintext JSON files for DRACON_SECRET markers and optionally scrub them
+  resmudge       Fix working-tree files that are still ciphertext (contain DRACON_SECRET markers)
+  repair         System-wide repair pass for secret-related corruption
+  filter-clean   Git filter clean operation (stdin -> stdout). Called by git, not for direct use
+  filter-smudge  Git filter smudge operation (stdin -> stdout). Called by git, not for direct use
+  keygen         Generate a new age keypair for this machine
+  setup-hooks    Install git hooks globally for warden encryption enforcement
 ```
 
 **Git hooks (installed by `setup-hooks`):**
