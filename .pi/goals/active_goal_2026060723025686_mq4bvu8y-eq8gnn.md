@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 443994,
-    "activeSeconds": 58
+    "tokensUsed": 706791,
+    "activeSeconds": 89
   },
   "sisyphus": false,
   "createdAt": "2026-06-07T22:02:56.866Z",
-  "updatedAt": "2026-06-07T22:04:00.400Z",
+  "updatedAt": "2026-06-07T22:04:34.396Z",
   "activePath": ".pi/goals/active_goal_2026060723025686_mq4bvu8y-eq8gnn.md",
   "taskList": {
     "tasks": [
@@ -120,8 +120,8 @@ If blocked: Stop and ask the user.
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 58s
-- Tokens used: 444K (443,994) tokens
+- Time spent: 1m29s
+- Tokens used: 707K (706,791) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
