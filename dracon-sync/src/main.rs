@@ -809,25 +809,13 @@ async fn main() -> Result<()> {
                 };
 
                 // ---- Summary line (one-liner) ----
-                let summary_icon = if status == "healthy" {
-                    "✅"
-                } else {
-                    "❌"
-                };
-                let daemon_str = if daemon_ok {
-                    "running"
-                } else {
-                    "not running"
-                };
+                let summary_icon = if status == "healthy" { "✅" } else { "❌" };
+                let daemon_str = if daemon_ok { "running" } else { "not running" };
                 let freeze_str = freeze
                     .as_ref()
                     .map(|r| format!("⏸️ on ({})", r))
                     .unwrap_or_else(|| "off".to_string());
-                let policy_str = if policy_ok {
-                    "valid"
-                } else {
-                    "invalid"
-                };
+                let policy_str = if policy_ok { "valid" } else { "invalid" };
                 println!(
                     "🏥 Health · {summary_icon} {status} · daemon {daemon_str} · freeze {freeze_str} · policy {policy_str}"
                 );
@@ -845,32 +833,14 @@ async fn main() -> Result<()> {
                     Color::Red
                 };
                 table.add_row(vec![
-                    mk(
-                        if status == "healthy" {
-                            "✅"
-                        } else {
-                            "❌"
-                        },
-                        status_color,
-                    ),
+                    mk(if status == "healthy" { "✅" } else { "❌" }, status_color),
                     Cell::new("Status"),
                     mk(status, status_color),
                 ]);
 
-                let daemon_color = if daemon_ok {
-                    Color::Green
-                } else {
-                    Color::Red
-                };
+                let daemon_color = if daemon_ok { Color::Green } else { Color::Red };
                 table.add_row(vec![
-                    mk(
-                        if daemon_ok {
-                            "✅"
-                        } else {
-                            "❌"
-                        },
-                        daemon_color,
-                    ),
+                    mk(if daemon_ok { "✅" } else { "❌" }, daemon_color),
                     Cell::new("Daemon"),
                     if daemon_ok {
                         mk("running", Color::Green)
@@ -892,20 +862,9 @@ async fn main() -> Result<()> {
                     table.add_row(vec![Cell::new("  "), Cell::new("Freeze"), Cell::new("off")]);
                 }
 
-                let policy_color = if policy_ok {
-                    Color::Green
-                } else {
-                    Color::Red
-                };
+                let policy_color = if policy_ok { Color::Green } else { Color::Red };
                 table.add_row(vec![
-                    mk(
-                        if policy_ok {
-                            "✅"
-                        } else {
-                            "❌"
-                        },
-                        policy_color,
-                    ),
+                    mk(if policy_ok { "✅" } else { "❌" }, policy_color),
                     Cell::new("Policy"),
                     mk(policy_str, policy_color),
                 ]);
@@ -934,10 +893,7 @@ async fn main() -> Result<()> {
                 // ---- Warnings block (grouped) ----
                 if !validate_result.warnings.is_empty() {
                     println!();
-                    println!(
-                        "⚠️  Policy warnings ({}):",
-                        validate_result.warnings.len()
-                    );
+                    println!("⚠️  Policy warnings ({}):", validate_result.warnings.len());
                     for w in &validate_result.warnings {
                         println!("   ⚠️  {w}");
                     }

@@ -169,7 +169,10 @@ pub(crate) fn cmd_events(
     let mut sev_counts: std::collections::BTreeMap<String, usize> =
         std::collections::BTreeMap::new();
     for ev in &parsed {
-        let sev = ev.get("severity").and_then(|v| v.as_str()).unwrap_or("info");
+        let sev = ev
+            .get("severity")
+            .and_then(|v| v.as_str())
+            .unwrap_or("info");
         *sev_counts.entry(sev.to_lowercase()).or_insert(0) += 1;
     }
     let total = parsed.len();
@@ -192,9 +195,7 @@ pub(crate) fn cmd_events(
     } else {
         String::new()
     };
-    println!(
-        "📒 Events{filter_note}: {total} total{sev_summary}",
-    );
+    println!("📒 Events{filter_note}: {total} total{sev_summary}",);
 
     let mut table = Table::new();
     table

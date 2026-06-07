@@ -1418,7 +1418,10 @@ async fn main() -> Result<()> {
                 discover_git_repos_local(&roots)
             };
 
-            println!("🛠️  repair (dry_run={dry_run}, strict={strict}) · {} repo(s) in scope", repos.len());
+            println!(
+                "🛠️  repair (dry_run={dry_run}, strict={strict}) · {} repo(s) in scope",
+                repos.len()
+            );
 
             if !dry_run {
                 // Hardening (managed blocks + marker scrub)
@@ -1733,11 +1736,11 @@ pub(crate) fn scrub_markers(policy: &WardenPolicy, repos: &[PathBuf], apply: boo
             );
         }
     } else if found == 0 {
-        println!("✅ scrub-markers · nothing to do · no DRACON_SECRET markers found in watched files");
-    } else {
         println!(
-            "🔍 scrub-markers · found {found} marker(s) (dry-run, pass --apply to scrub)"
+            "✅ scrub-markers · nothing to do · no DRACON_SECRET markers found in watched files"
         );
+    } else {
+        println!("🔍 scrub-markers · found {found} marker(s) (dry-run, pass --apply to scrub)");
     }
     Ok(())
 }
@@ -1862,9 +1865,7 @@ pub(crate) fn resmudge_repos(
 
     if apply {
         if total_changed == 0 {
-            println!(
-                "✅ resmudge complete · no changes needed (found: {total_found}, changed: 0)"
-            );
+            println!("✅ resmudge complete · no changes needed (found: {total_found}, changed: 0)");
         } else {
             println!(
                 "✅ resmudge complete · {total_changed} file(s) resmudged (found: {total_found})"
@@ -2195,10 +2196,7 @@ fn run_setup_hooks(mode: HookMode, repo: Option<&Path>) -> Result<()> {
                 ));
             }
             // ---- 3-line summary ----
-            println!(
-                "🪝 setup-hooks (global) · installed to {}",
-                dir.display()
-            );
+            println!("🪝 setup-hooks (global) · installed to {}", dir.display());
             println!("   core.hooksPath  = {}", dir.display());
             println!("   pre-commit hook = blocks commits if warden filter is missing");
             println!("   pre-push hook   = scans for plaintext secrets (defense-in-depth)");
