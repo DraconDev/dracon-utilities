@@ -1257,8 +1257,8 @@ pub(crate) fn run_keygen() -> Result<()> {
     }
 
     println!("🔐 Generated age keypair:");
-    println!("   Secret: {}", secret_path.display());
-    println!("   Public: {}", pubkey_path.display());
+    println!("   Secret:    {}", secret_path.display());
+    println!("   Public:    {}", pubkey_path.display());
     println!("   Recipient: {}", recipient);
 
     if let Some(repo) = &current_repo {
