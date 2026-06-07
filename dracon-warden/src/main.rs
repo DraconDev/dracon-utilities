@@ -1598,6 +1598,11 @@ pub(crate) fn scrub_markers(policy: &WardenPolicy, repos: &[PathBuf], apply: boo
             if !rel_norm.ends_with(".json") {
                 continue;
             }
+            // Plaintext-sibling escape hatch: skip files with a `.plaintext` sibling.
+            // Such files are intentionally plaintext; their markers (if any) stay.
+            if std::path::Path::new(&format!("{}.plaintext", rel_norm)).exists() {
+                continue;
+            }
 
             let path = repo.join(rel);
             let Ok(content) = fs::read_to_string(&path) else {
@@ -1741,6 +1746,11 @@ fn resmudge_repo(repo: &Path, policy: &WardenPolicy, apply: bool) -> Result<(usi
     for rel in files {
         let rel_norm = rel.replace("\\", "/");
         if !protected.is_match(&rel_norm) {
+            continue;
+        }
+        // Plaintext-sibling escape hatch: skip files that are intentionally plaintext.
+        // Such files are not encrypted and do not need decryption.
+        if std::path::Path::new(&format!("{}.plaintext", rel_norm)).exists() {
             continue;
         }
 
@@ -2045,6 +2055,10 @@ const PRE_PUSH_HOOK: &str = r#"#!/bin/sh
 # Defense-in-depth: scans push for plaintext secrets.
 # Catches --no-verify bypass of pre-commit hook.
 # Installed by: dracon-warden setup-hooks
+#
+# Plaintext-sibling escape hatch: a file with a `<path>.plaintext` sibling
+# is treated as intentionally plaintext. Such files are excluded from the
+# scan (silent allow). See docs/design/warden-plaintext-sibling.md.
 
 # Read push info from stdin (remote URL and branch refs)
 while read local_ref local_sha remote_ref remote_sha; do
@@ -2056,13 +2070,29 @@ while read local_ref local_sha remote_ref remote_sha; do
     # Determine the diff range to scan
     if [ "$remote_sha" = "0000000000000000000000000000000000000000" ]; then
         # New branch — scan entire local commit history being pushed
-        DIFF=$(git diff "$remote_ref".."$local_sha" 2>/dev/null)
+        RANGE="$remote_ref..$local_sha"
     else
         # Existing branch — scan commits being pushed
-        DIFF=$(git diff "$remote_sha".."$local_sha" 2>/dev/null)
+        RANGE="$remote_sha..$local_sha"
     fi
 
-    # Scan for common plaintext secret patterns
+    # Collect non-hatched files (skip files with a `.plaintext` sibling)
+    SCAN_FILES=""
+    for f in $(git diff --name-only "$RANGE" 2>/dev/null); do
+        if [ -f "$f.plaintext" ]; then
+            # Hatched file — silently allow
+            continue
+        fi
+        SCAN_FILES="$SCAN_FILES $f"
+    done
+
+    # Nothing left to scan — push is safe
+    if [ -z "$SCAN_FILES" ]; then
+        continue
+    fi
+
+    # Scan only the non-hatched files for common plaintext secret patterns
+    DIFF=$(git diff "$RANGE" -- $SCAN_FILES 2>/dev/null)
     if echo "$DIFF" | grep -qE '(AKIA[A-Z0-9]{16}|-----BEGIN [A-Z]+ PRIVATE KEY|password\s*=\s*["\x27][^"\x27]+|secret\s*=\s*["\x27][^"\x27]+|api_key\s*=\s*["\x27][^"\x27]+)'; then
         echo "⚠️  Possible plaintext secrets detected in push."
         echo "   The warden filter may have been bypassed."
