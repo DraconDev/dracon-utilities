@@ -11,6 +11,7 @@ mod helpers;
 mod log;
 mod nix;
 mod policy;
+mod print;
 mod release;
 mod report;
 mod secrets;
