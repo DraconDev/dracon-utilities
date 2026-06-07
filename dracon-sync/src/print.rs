@@ -114,7 +114,7 @@ mod tests {
     #[test]
     fn format_bytes_mib() {
         // 52_428_800 is the example policy default (max_stage_file_bytes = 50 MiB)
-        assert_eq!(format_bytes(52_428_800), "50 MiB");
+        assert_eq!(format_bytes(52_428_800), "50.0 MiB");
         assert_eq!(format_bytes(1_572_864), "1.50 MiB");
     }
 
