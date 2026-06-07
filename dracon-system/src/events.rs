@@ -165,6 +165,37 @@ pub(crate) fn cmd_events(
         return Ok(());
     }
 
+    // ---- Severity count buckets (for the summary line) ----
+    let mut sev_counts: std::collections::BTreeMap<String, usize> =
+        std::collections::BTreeMap::new();
+    for ev in &parsed {
+        let sev = ev.get("severity").and_then(|v| v.as_str()).unwrap_or("info");
+        *sev_counts.entry(sev.to_lowercase()).or_insert(0) += 1;
+    }
+    let total = parsed.len();
+    let mut sev_parts: Vec<String> = Vec::new();
+    for (name, n) in &sev_counts {
+        if *n > 0 {
+            sev_parts.push(format!("{} {}", n, name));
+        }
+    }
+    let sev_summary = if sev_parts.is_empty() {
+        String::new()
+    } else {
+        format!(" · {}", sev_parts.join(" · "))
+    };
+
+    // ---- Summary line (one-liner with count + severity mix) ----
+    let filter_note = if source.is_some() || severity.is_some() {
+        let total_all = lines.len();
+        format!(" (showing {} of {} events)", total, total_all)
+    } else {
+        String::new()
+    };
+    println!(
+        "📒 Events{filter_note}: {total} total{sev_summary}",
+    );
+
     let mut table = Table::new();
     table
         .load_preset(UTF8_FULL_CONDENSED)
@@ -204,7 +235,12 @@ pub(crate) fn cmd_events(
     }
 
     println!("{table}");
-    println!("{} events", parsed.len());
+    // Footer with severity mix (only non-zero buckets)
+    if !sev_parts.is_empty() {
+        println!("Total: {} event(s){}", total, sev_summary);
+    } else {
+        println!("Total: {} event(s)", total);
+    }
     Ok(())
 }
 
