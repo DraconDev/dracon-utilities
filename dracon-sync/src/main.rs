@@ -373,11 +373,19 @@ async fn main() -> Result<()> {
                 // Limits
                 table.add_row(vec![
                     Cell::new("📏 Max stage file"),
-                    Cell::new(format!("{}", policy.max_stage_file_bytes)),
+                    Cell::new(format!(
+                        "{} ({})",
+                        crate::print::format_bytes(policy.max_stage_file_bytes),
+                        policy.max_stage_file_bytes
+                    )),
                 ]);
                 table.add_row(vec![
                     Cell::new("🧱 Push blob threshold"),
-                    Cell::new(format!("{}", push_large_blob_threshold_bytes(&policy))),
+                    Cell::new(format!(
+                        "{} ({})",
+                        crate::print::format_bytes(push_large_blob_threshold_bytes(&policy)),
+                        push_large_blob_threshold_bytes(&policy)
+                    )),
                 ]);
 
                 // Exclude
