@@ -1321,6 +1321,17 @@ async fn main() -> Result<()> {
                 Cell::new("📜 Policy"),
                 Cell::new(policy_path.display().to_string()),
             ]);
+            // ---- Summary row (one-liner for quick scanning) ----
+            table.add_row(vec![
+                Cell::new("📋 Summary"),
+                Cell::new(format!(
+                    "Policy resolved · {} watch root(s) · {} discovery root(s) · pubkey {}",
+                    watch.len(),
+                    discover.len(),
+                    if pubkey.starts_with("NOT_FOUND") { "MISSING" } else { "found" }
+                )),
+            ]);
+            // ---- Section: Roots ----
             table.add_row(vec![
                 Cell::new("🛡️  Watch roots"),
                 Cell::new(format!(
@@ -1347,6 +1358,7 @@ async fn main() -> Result<()> {
                     )),
                 ]);
             }
+            // ---- Section: Identity ----
             table.add_row(vec![Cell::new("🔑 Pubkey source"), Cell::new(&pubkey)]);
             println!("{table}");
         }
