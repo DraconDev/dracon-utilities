@@ -2,6 +2,8 @@
 
 //! Dracon Warden — security hardening and encryption daemon.
 
+mod print;
+
 use anyhow::{Context, Result};
 use clap::{ArgAction, Parser, Subcommand};
 pub(crate) use dracon_security_kit::DraconWarden;
