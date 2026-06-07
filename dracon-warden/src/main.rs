@@ -2069,8 +2069,10 @@ while read local_ref local_sha remote_ref remote_sha; do
 
     # Determine the diff range to scan
     if [ "$remote_sha" = "0000000000000000000000000000000000000000" ]; then
-        # New branch — scan entire local commit history being pushed
-        RANGE="$remote_ref..$local_sha"
+        # New branch — scan the entire local commit history being pushed.
+        # Use the empty-tree SHA so `git diff` always has a valid left side,
+        # even if the remote ref hasn't been created yet.
+        RANGE="4b825dc642cb6eb9a060e54bf8d69288fbee4904..$local_sha"
     else
         # Existing branch — scan commits being pushed
         RANGE="$remote_sha..$local_sha"
