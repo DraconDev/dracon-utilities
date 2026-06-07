@@ -356,18 +356,18 @@ async fn main() -> Result<()> {
 
                 // Flags
                 let flags = [
-                    format!("auto_commit={}", policy.auto_commit),
-                    format!("auto_pull={}", policy.auto_pull),
-                    format!("auto_push={}", policy.auto_push),
-                    format!("auto_bump_versions={}", policy.auto_bump_versions),
-                    format!("auto_repair_concerns={}", policy.auto_repair_concerns),
-                    format!("auto_repair_warns={}", policy.auto_repair_warns),
+                    format!("commit={}", onoff(policy.auto_commit)),
+                    format!("pull={}", onoff(policy.auto_pull)),
+                    format!("push={}", onoff(policy.auto_push)),
+                    format!("bump={}", onoff(policy.auto_bump_versions)),
+                    format!("repair_concerns={}", onoff(policy.auto_repair_concerns)),
+                    format!("repair_warns={}", onoff(policy.auto_repair_warns)),
                     format!(
-                        "auto_rewrite_large_blobs={}",
-                        policy.auto_rewrite_large_blobs
+                        "rewrite_large_blobs={}",
+                        onoff(policy.auto_rewrite_large_blobs)
                     ),
                 ]
-                .join(" ");
+                .join("  ");
                 table.add_row(vec![Cell::new("⚙️ Flags"), Cell::new(flags)]);
 
                 // Limits
@@ -404,24 +404,32 @@ async fn main() -> Result<()> {
 
                 // Timeouts
                 table.add_row(vec![
-                    Cell::new("⏱️ Timeouts"),
-                    Cell::new(format!(
-                        "pull={}s push={}s repo={}s retries={}",
-                        policy.pull_op_timeout_secs,
-                        policy.push_op_timeout_secs,
-                        policy.repo_sync_timeout_secs,
-                        policy.push_retries
-                    )),
+                    Cell::new("⏱️ Pull timeout"),
+                    Cell::new(crate::print::format_secs(policy.pull_op_timeout_secs)),
+                ]);
+                table.add_row(vec![
+                    Cell::new("⏱️ Push timeout"),
+                    Cell::new(crate::print::format_secs(policy.push_op_timeout_secs)),
+                ]);
+                table.add_row(vec![
+                    Cell::new("⏱️ Repo sync timeout"),
+                    Cell::new(crate::print::format_secs(policy.repo_sync_timeout_secs)),
+                ]);
+                table.add_row(vec![
+                    Cell::new("🔁 Push retries"),
+                    Cell::new(policy.push_retries),
                 ]);
 
                 // Repair
                 table.add_row(vec![
-                    Cell::new("🧯 Repair"),
+                    Cell::new("🧯 Repair cooldown"),
+                    Cell::new(crate::print::format_secs(policy.repair_cooldown_secs)),
+                ]);
+                table.add_row(vec![
+                    Cell::new("📒 Incident ledger"),
                     Cell::new(format!(
-                        "cooldown={}s ledger_max_lines={} ledger_max_age_days={}",
-                        policy.repair_cooldown_secs,
-                        policy.incident_ledger_max_lines,
-                        policy.incident_ledger_max_age_days
+                        "{} lines · {}d retention",
+                        policy.incident_ledger_max_lines, policy.incident_ledger_max_age_days
                     )),
                 ]);
 
