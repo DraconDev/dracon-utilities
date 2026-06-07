@@ -1574,7 +1574,10 @@ auto_create_account = ""
             "auto_create=true with empty account is valid (account extracted from push_url)"
         );
         assert!(
-            !result.warnings.iter().any(|w| w.contains("auto_create_account")),
+            !result
+                .warnings
+                .iter()
+                .any(|w| w.contains("auto_create_account")),
             "empty auto_create_account should not warn (resolve_account() handles it), got: {:?}",
             result.warnings
         );
