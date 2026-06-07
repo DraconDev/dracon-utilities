@@ -1711,11 +1711,21 @@ pub(crate) fn scrub_markers(policy: &WardenPolicy, repos: &[PathBuf], apply: boo
     }
 
     if apply {
-        println!(
-            "scrub complete (found: {found}, changed: {changed}, skipped_invalid_json: {skipped})"
-        );
+        if changed == 0 {
+            println!(
+                "✅ scrub-markers complete · no changes needed (found: {found}, changed: 0, skipped: {skipped})"
+            );
+        } else {
+            println!(
+                "✅ scrub-markers complete · {changed} file(s) updated (found: {found}, skipped: {skipped})"
+            );
+        }
+    } else if found == 0 {
+        println!("✅ scrub-markers · nothing to do · no DRACON_SECRET markers found in watched files");
     } else {
-        println!("scrub report complete (found: {found})");
+        println!(
+            "🔍 scrub-markers · found {found} marker(s) (dry-run, pass --apply to scrub)"
+        );
     }
     Ok(())
 }
