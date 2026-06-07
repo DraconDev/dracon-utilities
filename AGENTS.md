@@ -488,7 +488,7 @@ auto_publish = false  # master toggle (default: off)
 [[publish_targets]]
 name = "crates-io"
 registry = "crates-io"    # crates-io | npm | pypi
-[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBUSEY1dis5bXZ5bjFySkpsTlM2VzJ4eUZpaEdqRCtsVWpVMnBTanowdng4Ck5Sc3dsQklYdU1mL2lnOXBYd3J3cXRESW1aa2xmL3JqbG1TUWVSaXE1MGMKLT4gMSMvLWdyZWFzZSBjfitNd3UgbVpkLmszIF5LJlhoaApyRHFGSG9KTXd5V3huN1ltNTVqc3JISDRHeTFCRWI5WVpBZWhKTi9UeWJLa3VlWHR4ZHR2WmkvQmtNNHZnQk9zCjloaWx4TFVGQTVqSjZGSmEKLS0tIEQrME14TzF5Q3hEZ1NlWHUxcWxFNjVVVkg1c2x5T2d4OG1MSHNQemNZcFEKyCq7nPE0WBoud/wDBW0++SuxRI/jko8ClOALuYVcori8S83HMpWq5NiwgDTMPkWzol/dRW0mbz+pnOurI+GUmJBqmpni]
+[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBsVlhURGpYT1hwYi9ISjBYV0E3M2lUWXQzZm5wYU9VQVh2NkxkeGl6SWc0Cm53VEhCOGU1eSsyQ2ZZR1dRTVhqOEhhN0xMR0t6UXpNY1IwTmxIZXE1VkkKLT4gWDI1NTE5IFNlbCtVRFp3ZXc2Sld3Sk5yNjhXTEVac2p3WGE0dWNTYitDL2ZDdTRnSGMKM2x1VkRGZkJ6VVRBR2xqNWIza3pTY1orczZPczJBWkQzQWxLa3Y2T1pGcwotPiBYMjU1MTkgNURPQmZZRWZZYXE3TUVMUzdVLzJ0UFdsZnBmU2o0SlR3dko3SCtrSStXYwpucHcveXBEVDJsajRvSWYrbXBiM2ZhTkF6bit2QkRzc3JjRkErVVRxMkFNCi0+IFgyNTUxOSAxdXR2UExmaTNDTzRaZ2NZTk04RzdacmdDM0hiVm1OVi9Pc05qUjhPMXk0CkJOT24yRmxVZGZ0UEV1anNFcXlKekdFVnUzMGVuMFZFNDNpMHp5dHJ4NGMKLT4gWDI1NTE5IEtsZHB6RjM2NXZrOWpWSDNFUHA2dnJXTWNrWm82bDEwNjZXbXluZEdGVmsKUHlzVlJ2NFdEcW9FQThCcHgvSU1xZVRBT053WTl6aTVTVHpLSjhHR1dsdwotPiBYMjU1MTkgVWhRQnZMaHVEcnZuYXc3b3RmZTNxdGw5aWp0aTFocThPZXFhRS9sMDFTWQpKU0dMZ2dMa3psZm4zUVJsQzg2TWdrclI3UTQ3aXBqVU5ITEZUbjdVRnd3Ci0+IF1PYEAtZ3JlYXNlIFBmIEx2IDcKbVNqQ3h2MEE1MFJrZW41MVlTWFhwUnJVRVhlZnU3S2Z4eXI5YVFOd01RdnBHVmxaYmNIMjhHbVVqR0VYeUpuTAp5Z0FaTnZsakZxd1RRTmt3bTcwVENSR1daaWliUU9SWkhXYWNOOWt1cXBWaDNGWlFGSXc2a3NDSTg2R3ExdFEKLS0tIEVtMUFDb094L0ZLMUczOHpraUhlZGRHcmdPYk92bnVsNldFWkdGdkp1WkkKfjtu5J37FnJ8+b99wGS49v1R/VLa+wo7jKx2Y54gzM5ZK4xlYHNBeJjfFjBBjw/2Bz0YFQ1gLp2Aa24wLqISfxrWy7hW]
 publish_timeout_secs = 300
 ```
 
@@ -771,7 +771,7 @@ let _guard = EnvRestorer::remove("VAR_NAME");
 
 **410 unit tests** in `src/` (git.rs, sync.rs, report.rs, policy.rs, main.rs, visibility.rs, release.rs, bump.rs, secrets.rs) + 10 integration tests in `tests/integration_test.rs` = **420 total** for sync. Tests use `tempfile::TempDir` for isolation.
 
-Whole-workspace: **575 tests** (sync 420 + system 81 + warden 64 + integration 10).
+Whole-workspace: **674 tests** (sync 420 + system 81 + warden 64 + integration 10 + dracon-security 99). The 99 in `dracon-security` includes 8 new tests in `tests/plaintext_sibling_test.rs` for the plaintext-sibling escape hatch (see `docs/design/warden-plaintext-sibling.md`).
 
 ```bash
 export DRACON_SYNC_GIT_BIN=/run/current-system/sw/bin/git
