@@ -891,14 +891,16 @@ pub(crate) async fn run_repos_report(
 
     let mut table = Table::new();
     table.load_preset(UTF8_FULL_CONDENSED);
-    table.set_content_arrangement(ContentArrangement::DynamicFullWidth);
-    // Multi-line header cells: icon on top, label below
+    table.set_content_arrangement(ContentArrangement::Dynamic);
+    // Single-line header cells: icon + space + label (no newline)
     let mk_h = |icon: &str, label: &str| -> Cell {
-        Cell::new(format!("{icon}\n{label}")).add_attribute(Attribute::Bold)
+        Cell::new(format!("{icon} {label}")).add_attribute(Attribute::Bold)
     };
+    // Set fixed column widths so the table doesn't wrap rows on 100+ col terminals
+    // and truncates gracefully on narrower ones.
     table.set_header(vec![
         Cell::new("#"),
-        mk_h("🏷️", "STATUS"),
+        mk_h("🏷", "STATUS"),
         mk_h("📦", "REPO"),
         mk_h("🌿", "BRANCH"),
         mk_h("📝", "MOD"),
@@ -3112,7 +3114,7 @@ mod tests {
     }
 
     #[test]
-    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBITEowcTRCdUNURkk2cjE5RE1kV3Zxa25hQVBaVUNsa1YvT01aNHp4WWpjCkx2ZFpXTm1RaEhnOXlRVjUyY3QwNlA5N2J5ek8zc0xtK0hONzJERmF0ejgKLT4gWDI1NTE5IFJSM1ArRk5IUEM3NnU0NzRsYUh5NGdsLzE0Wnl4RW00QnJiT3NpaEl1VkUKK1lQZ3FRMVBYSkQ3RXBSeUs2OUQ1dTQyVGRjNmZjSnJ0UzlCcDF5M3hJdwotPiBYMjU1MTkgd3VDNzU1WFVLSjJzMHl4U1hVdGFWbFBraHFmV1Y4VUhOQWs5SUJhSGJWawozZ2tVOCtBZUgrOWZURnplV3JaeDJkQkI5NEJrRG9hRkR6bW52eDIzclFJCi0+IFgyNTUxOSA5ZlFKWFVSbE5sWUgvbVRpcC9vck9TU3JvdWQxdnpVK1NQa2F2eFpUZXgwCnFVREkvTCtPWTYvbVl3clRYVkE5emtUZVdQOURkZUUxRkxxc0RXZkMrODAKLT4gWDI1NTE5IG5iOXozdjBDRVV0dXp1Y0V5ZW5aQ2g4Rm1LM3dFOXFZZUptRmdRaG9FaGsKdGQyQ0RRRWRrZG0wRi9ZbUw4SHNIWDRBd0dSUGRiNDJDb0JVQzU0eTZBNAotPiBYMjU1MTkgNzdxNDdQNjhTcmhFV0VIUncwQksxcVhMakFDNE9qS0Zmb2FrMFhON2NtWQplZXE4NGt1S0I3b2dPalY5SE9QY0VYcjNoSk5peDRFUmJDdlpJVlpxeGJ3Ci0+IFxIZV9aT2stZ3JlYXNlICswUnxRIFNRfDMKcVQxbjhOUFd1Q1FoakJ2bEdHL2J0SUM4RGNmcnZnOE1BdHZEckFmUkhmd2NsUW80YUVIWWdkUFdwaGJVTXVVcgpTUjQvTmZmNmZYOVZ4cXZ6MWozRWZKdG1HVUNvd2l0WEFqUTJCWm9XSkZXcmpRCi0tLSBHZmRWVENOVHdwNWlkN2hocjNBSVdwMFhwMmREVHI4UVp1Qk1xNExRQ3FjClgiLg3N60SRxqvw9LO2jDOY1TY4EDkOX15PlPB9Qxt4z9vc2xOJ6O/6j+nNybFnZ7gU7ZRHQR5Eg458kdE=]() {
+    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBTWG1XWlZGRU56ZVFIbVFUVkpxbmQzN3BhZmR2TFZ2T2x6OHROKzNjR1JBCkZDdnZuTmhoOXhxNStuUUpTK0NMTTZQTjR0Q0JrOFFsRGpZMDdCSnpsaWsKLT4gWDI1NTE5IGVuK0UxUFhZcjVkMkQ4K0lWK2ZLRWJUcENHWk5EcWtJOVhjQkx0NkF3VkkKR2ovalJFSk5VajZxVER4TEhtc3hweDVqYmJMT3ZUbXpWOVdPS1JFSy9iQQotPiBYMjU1MTkgMHBVTjNrcDhEQWM4UUgwSzJvVUJNV0lseWVHNklIaWljNm50TFlxNWZBcwpub0RqUEN1ako1alBwcWNRQlNZKzNrYlRTZVN1cHNob09kcXhyWVBZeDZJCi0+IFgyNTUxOSBYYlVhY2VWNGNPSlFYd3pZdU00M0RwNEVVTVBvSFJCSFVaUUZvNzNHNVJJClNqZm81U1pRNTZFNTBQOEVRUUEvL3l2djViT1FCT2pCaXdzK2drQUMzT3cKLT4gWDI1NTE5IFZFL2Y1dFcrL2RabWs5bnpYem5keFpVQklkSGN2TFlrNVhCTjFNRGxLaHcKMWJsb3BTZTlBT0RSNlBnZVI0aXVKbG9UcThialYrSmxsZ3NRaFQ5U1A2ZwotPiBYMjU1MTkgemxEMGlIWEIwaFdadnJmR3Mra1JZMlIzMytyVm1oODYzc0xwRWZ5ZUVGRQpJNFhJeFJQZllZZldieG42Z1ZUZGVXR3VBcGtYUmhaNURJN2NPTy9rRjJBCi0+ICJ3RVQ2WnNNLWdyZWFzZSAjTEU3UyI8LQpETmRLUmtzdVFSbmVnRG9RT08yVDZqd3dSaytFczU2cktkTFBRL28vYmZpVFpVM294NzRsOERtRFBuSGQ2bTY1ClBhdFM1dG5XeG1lOG9XbDRzaGVJUkVDcExNYnZpSEJsdldtakUwcFJuczBhL0EwQXF4UGNJQQotLS0gemgvbVVnTzZ5aUt3QUk0a1BSYXE0aytwWlBzamtSWFhRd2gwWkpWR0RmbwojMm4Som4XrCek9Bw1C0cCTD6Y4QMyw2ycDX/qviq0BN8LUfa2NkFhYVuvwUfO5G2mJBafE2bZ1VwiQhYb]() {
         let mut cooldowns = std::collections::HashMap::new();
         let repo = std::path::PathBuf::from("/test/repo");
         let notify_key = format!("push-fail-{}", repo.display());
