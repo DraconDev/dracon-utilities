@@ -2434,30 +2434,58 @@ async fn cmd_status(json: bool) -> Result<()> {
                 Cell::new("VALUE"),
             ]);
 
-        let rows: Vec<(&str, &str)> = vec![
-            ("🏠 system root", &report.system_root),
-            ("🐧 nixos root", &report.nixos_root),
-            ("📜 sync policy", &report.sync_policy),
-            ("⚙️ system policy", &report.system_policy),
-        ];
+        // ---- Summary row (one-liner for quick scanning) ----
+        let summary = format!(
+            "{} · sync service {}",
+            &report.system_root,
+            if report.sync_service_active { "active" } else { "inactive" }
+        );
+        table.add_row(vec![
+            Cell::new("📋 Summary"),
+            Cell::new(summary.clone()),
+            Cell::new(""),
+        ]);
 
-        let service_rows: Vec<(&str, bool)> = vec![("sync service", report.sync_service_active)];
+        // ---- Section: Roots ----
+        table.add_row(vec![
+            Cell::new(" "),
+            Cell::new("🏠 system root"),
+            Cell::new(&report.system_root),
+        ]);
+        table.add_row(vec![
+            Cell::new(" "),
+            Cell::new("🐧 nixos root"),
+            Cell::new(&report.nixos_root),
+        ]);
 
-        for (label, detail) in &rows {
-            table.add_row(vec![Cell::new(" "), Cell::new(*label), Cell::new(*detail)]);
-        }
-        for (label, active) in &service_rows {
-            let (icon, color) = if *active {
-                ("\u{2705}", Color::Green)
+        // ---- Section: Policies ----
+        table.add_row(vec![
+            Cell::new(" "),
+            Cell::new("📜 sync policy"),
+            Cell::new(&report.sync_policy),
+        ]);
+        table.add_row(vec![
+            Cell::new(" "),
+            Cell::new("⚙️ system policy"),
+            Cell::new(&report.system_policy),
+        ]);
+
+        // ---- Section: Services ----
+        let (icon, color) = if report.sync_service_active {
+            ("\u{2705}", Color::Green)
+        } else {
+            ("\u{274c}", Color::Red)
+        };
+        let _ = dr_print::onoff; // currently used by future commands
+        table.add_row(vec![
+            Cell::new(icon).fg(color),
+            Cell::new("sync service"),
+            Cell::new(if report.sync_service_active {
+                "active"
             } else {
-                ("\u{274c}", Color::Red)
-            };
-            table.add_row(vec![
-                Cell::new(icon).fg(color),
-                Cell::new(*label),
-                Cell::new(if *active { "active" } else { "inactive" }),
-            ]);
-        }
+                "inactive"
+            }),
+        ]);
 
         println!("{table}");
     }
