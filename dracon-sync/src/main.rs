@@ -333,18 +333,20 @@ async fn main() -> Result<()> {
                 // Pulse & Inactivity
                 table.add_row(vec![
                     Cell::new("⏱️ Pulse"),
-                    Cell::new(format!("{}s", policy.pulse_interval_secs)),
+                    Cell::new(crate::print::format_secs(policy.pulse_interval_secs)),
                 ]);
                 table.add_row(vec![
                     Cell::new("⏳ Inactivity"),
-                    Cell::new(format!("{}s", policy.inactivity_push_delay_secs)),
+                    Cell::new(crate::print::format_secs(policy.inactivity_push_delay_secs)),
                 ]);
 
                 // Freeze
                 let freeze_str = freeze
                     .map(|r| format!("ON ({})", r))
                     .unwrap_or_else(|| "OFF".to_string());
-                let freeze_color = if freeze_str == "OFF" {
+                let freeze_color = if !print::should_color() {
+                    Color::Reset
+                } else if freeze_str == "OFF" {
                     Color::Green
                 } else {
                     Color::Red
