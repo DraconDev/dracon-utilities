@@ -326,6 +326,16 @@ async fn main() -> Result<()> {
                     Cell::new("📜 Policy"),
                     Cell::new(policy_path.display().to_string()),
                 ]);
+                // Summary one-liner for quick scanning
+                table.add_row(vec![
+                    Cell::new("📋 Summary"),
+                    Cell::new(format!(
+                        "{} repos · {} watch root(s) · pulse {}",
+                        repos.len(),
+                        roots.len(),
+                        crate::print::format_secs(policy.pulse_interval_secs)
+                    )),
+                ]);
 
                 // Roots
                 let roots_str: Vec<String> =
