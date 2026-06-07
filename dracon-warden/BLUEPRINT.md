@@ -100,7 +100,7 @@ dracon-warden is a Git filter + repository hardening daemon:
 
 ---
 
-## Field Naming: `watch_roots` → `repo_roots` (v0.2.0)
+## Field Naming: `watch_roots` → `repo_roots` (v0.3.0)
 
 ### 7. Misleading field name
 - **Location:** `WardenPolicy::watch_roots` in `dracon-warden/src/main.rs`
