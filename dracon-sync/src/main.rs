@@ -234,6 +234,11 @@ enum ConfigCommands {
 }
 
 #[tokio::main]
+/// Render a boolean as a compact on/off string for tables and flags rows.
+fn onoff(b: bool) -> &'static str {
+    if b { "on" } else { "off" }
+}
+
 async fn main() -> Result<()> {
     // If output is piped (e.g. `dracon-sync repos | head`), stdout can become a broken pipe.
     // Rust's default printing panics on write errors; convert that specific panic into a clean exit.
