@@ -56,6 +56,12 @@ dracon-warden is a Git filter + repository hardening daemon:
 
 5. **Daemon Mode**: Watches filesystem with debouncing for auto-hardening
 
+6. **Plaintext-sibling escape hatch** (opt-in): A file with a `<path>.plaintext`
+   sibling is intentionally plaintext. The clean filter returns the file
+   unchanged, the pre-push hook skips it, and `scrub-markers` / `resmudge`
+   leave it alone. See `docs/design/warden-plaintext-sibling.md` for the
+   full design, threat model, and revocation story.
+
 ---
 
 ## Key Files
