@@ -14,6 +14,21 @@ use crate::SecretScanner;
 
 const HEADER_V2_MAGIC: &[u8] = b"age-encryption.org/v1";
 
+/// Returns true if a `.plaintext` sibling exists next to `path` in the
+/// working tree. Presence of `<path>.plaintext` is the documented opt-in
+/// for leaving a file unencrypted. See
+/// `docs/design/warden-plaintext-sibling.md`.
+///
+/// `path` may be relative to the repo root (as passed by git's filter
+/// protocol) or absolute. An empty path returns false (no information).
+pub fn is_hatched(path: &str) -> bool {
+    if path.is_empty() {
+        return false;
+    }
+    let sibling = format!("{}.plaintext", path);
+    std::path::Path::new(&sibling).exists()
+}
+
 impl DemonSecurity {
     pub fn smart_clean(&self, content: &str) -> Result<String> {
         let scanner = SecretScanner::new()?;
@@ -21,6 +36,14 @@ impl DemonSecurity {
     }
 
     pub fn smart_clean_with_path(&self, content: &[u8], path_str: &str) -> Result<Vec<u8>> {
+        // 0. Plaintext-sibling escape hatch: if `<path>.plaintext` exists in
+        // the working tree, the user has explicitly opted this file in to
+        // plaintext storage. Return content unchanged. See
+        // `docs/design/warden-plaintext-sibling.md`.
+        if is_hatched(path_str) {
+            return Ok(content.to_vec());
+        }
+
         // 1. Definition of Sensitive Paths (Still used for binary detection)
         let sensitive_dirs = [
             ".ssh",
