@@ -177,69 +177,22 @@ They're intentionally both set to 50MB to keep things simple, but could be confi
 
 ---
 
-## AI Integration (Scribe + AI Bumper)
+## Deterministic Commit Protocol
 
-### Overview
-dracon-sync has integrated AI for generating commit messages (scribe) and deciding version bumps.
-
-**The scribe generates commit messages from diffs.** The AI receives the current diff + 10 previous diffs + recent commit subjects, then returns a single subject line in conventional commit format. This produces unique, specific messages every cycle.
-
-### Features
-- **Scribe:** AI generates commit subjects from diffs (not project-state.md)
-- **AI Bumper:** AI decides semver bump level (major/minor/patch/none) based on changes
-- **Fallback Chain:** Multiple AI providers tried in order until one succeeds
-- **Local Fallback:** File-pattern fallback when no AI providers available (e.g., `update auth, jwt and 2 files`)
+dracon-sync has **no AI dependencies**. Commit messages are deterministic facts
+extracted from the diff (see AGENTS.md § Commit Messages). No scribe, no
+bumper, no provider calls.
 
 ### Why Frequent Commits?
-- The AI reads git history to understand past work
-- Every commit is a checkpoint the AI can recover to
-- More commits = better context for the AI's "what was I doing?"
+- Every commit is a checkpoint that downstream tools (and humans) can recover to
+- More commits = more granular routing keys for `git log --grep=`
 - Commits are cheap; context is valuable
 
 ### Manual project-state.md
 
-The AI can still maintain `.dracon/project-state.md` manually for its own working memory across sessions. Sync no longer auto-generates, stages, or commits this file. If the AI wants it tracked, it must `git add` it explicitly.
-
-### Configuration
-AI providers are configured in `~/.dracon/utilities/sync/ai.toml`:
-
-```toml
-[[providers]]
-name = "mistral"
-env = "MISTRAL_API_KEY"
-endpoint = "https://codestral.mistral.ai/v1"
-model = "codestral-latest"
-
-[[providers]]
-name = "nvidia"
-env = "NVIDIA_API_KEY"
-endpoint = "https://integrate.api.nvidia.com/v1"
-model = "stepfun-ai/step-3.5-flash"
-
-[[providers]]
-name = "openrouter"
-env = "OPENROUTER_API_KEY"
-endpoint = "https://openrouter.ai/api/v1"
-model = "nvidia/nemotron-3-super-120b-a12b:free"
-```
-
-### Provider Details
-| Provider | API Key Env | Model | Notes |
-|----------|-------------|-------|-------|
-| mistral | MISTRAL_API_KEY | codestral-latest | Fast code generation model |
-| nvidia | NVIDIA_API_KEY | stepfun-ai/step-3.5-flash | NVIDIA's flash model |
-| openrouter | OPENROUTER_API_KEY | nvidia/nemotron-3-super-120b-a12b:free | Free tier via OpenRouter |
-
-### API Keys
-Store keys in `~/.dracon/utilities/sync/ai/secrets/*.env`:
-- `~/.dracon/utilities/sync/ai/secrets/mistral.env` → `MISTRAL_API_KEY=...`
-- `~/.dracon/utilities/sync/ai/secrets/nvidia.env` → `NVIDIA_API_KEY=...`
-- `~/.dracon/utilities/sync/ai/secrets/openrouter.env` → `OPENROUTER_API_KEY=...`
-
-### Testing
-```bash
-dracon-sync test-ai   # Test all AI providers
-```
+`.dracon/project-state.md` can be maintained manually for working memory across
+sessions. Sync does not auto-generate, stage, or commit this file. To track it,
+`git add` it explicitly.
 
 ### Features (compile-time)
 - All features are compiled in by default
@@ -275,7 +228,5 @@ scope: scope
 ```
 
 ### Status
-- [x] Configurable provider order (fallback chain)
-- [x] API keys loaded from secrets files
-- [x] `test-ai` command for provider verification
-- [x] AI scribe removed (was not useful for AI workflows)
+- [x] Deterministic commit messages (no AI)
+- [x] Routing-key format (grep-searchable)
