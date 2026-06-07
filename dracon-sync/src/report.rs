@@ -862,47 +862,57 @@ pub(crate) async fn run_repos_report(
             );
         }
     }
+    // ---- Summary one-liner (color-aware, no raw ANSI when piped) ----
+    let ok_str = ansi("32", &format!("✅ OK {ok_count}"));
+    let warn_str = ansi("33", &format!("⚠️  WARN {warn_count}"));
+    let concern_str = ansi("31", &format!("❌ CONCERN {concern_count}"));
+    let filter_note = match filter {
+        RepoFilter::All => String::new(),
+        RepoFilter::Concern | RepoFilter::Warn => format!(
+            "  (all: OK {} WARN {} CONCERN {})",
+            ok_count_all, warn_count_all, concern_count_all
+        ),
+    };
     println!(
-        "📦 {} repos  {} {}  {} {}  {} {}  ❌ {}{}",
-        rows.len(),
-        ansi("32", "OK"),
-        ok_count,
-        ansi("33", "WARN"),
-        warn_count,
-        ansi("31", "CONCERN"),
-        concern_count,
-        init_or_status_failures,
-        match filter {
-            RepoFilter::All => String::new(),
-            RepoFilter::Concern | RepoFilter::Warn => format!(
-                "  (all: OK {} WARN {} CONCERN {})",
-                ok_count_all, warn_count_all, concern_count_all
-            ),
-        }
+        "📦 {total} repos  {ok_str}  {warn_str}  {concern_str}  ⛔ init/status failed: {init_or_status_failures}{filter_note}",
+        total = rows.len(),
     );
     println!();
 
-    use comfy_table::{presets::UTF8_FULL_CONDENSED, Cell, Color, ContentArrangement, Table};
+    // ---- Legend line (one-liner mapping column codes to their meaning) ----
+    println!(
+        "ℹ️  Legend: MOD = modified tracked · STG = staged · UT = untracked · ↑ = ahead of upstream · ↓ = behind upstream · PUSH = push status"
+    );
+    println!();
+
+    use comfy_table::{
+        presets::UTF8_FULL_CONDENSED, Attribute, Cell, Color, ContentArrangement, Table,
+    };
 
     let mut table = Table::new();
     table.load_preset(UTF8_FULL_CONDENSED);
     table.set_content_arrangement(ContentArrangement::DynamicFullWidth);
+    // Multi-line header cells: icon on top, label below
+    let mk_h = |icon: &str, label: &str| -> Cell {
+        Cell::new(format!("{icon}\n{label}"))
+            .add_attribute(Attribute::Bold)
+    };
     table.set_header(vec![
         Cell::new("#"),
-        Cell::new("STATUS"),
-        Cell::new("REPO"),
-        Cell::new("BRANCH"),
-        Cell::new("MOD"),
-        Cell::new("STG"),
-        Cell::new("UT"),
-        Cell::new("↑"),
-        Cell::new("↓"),
-        Cell::new("PUSH"),
-        Cell::new("LAST COMMIT"),
-        Cell::new("PUSHED"),
-        Cell::new("ACTIVITY"),
-        Cell::new("AUTHOR"),
-        Cell::new("HINT"),
+        mk_h("🏷️", "STATUS"),
+        mk_h("📦", "REPO"),
+        mk_h("🌿", "BRANCH"),
+        mk_h("📝", "MOD"),
+        mk_h("📥", "STG"),
+        mk_h("❓", "UT"),
+        mk_h("↑", "AHEAD"),
+        mk_h("↓", "BEHIND"),
+        mk_h("🚀", "PUSH"),
+        mk_h("📜", "LAST COMMIT"),
+        mk_h("📤", "PUSHED"),
+        mk_h("⏰", "ACTIVITY"),
+        mk_h("👤", "AUTHOR"),
+        mk_h("💡", "HINT"),
     ]);
 
     for (idx, row) in rows.iter().enumerate() {
@@ -3091,7 +3101,7 @@ mod tests {
     }
 
     #[test]
-    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBweXlJVFpDbHl4YTRDQyt4bW56U0M3VDFSZGdIL3R1UlAxcW1oSE1lYmdzCnREYU5IRWxlSGJkTjM2cHdjMmdYR281ekl2OTc2MzJjTEVVeHpHOHVsMXcKLT4gWDI1NTE5IFFYNnlxcTdDQll5SzRuemVMYXRxYzl2VGJxU0hWamEvUSt4MGZjd0FzWFEKbHl3MHVDdVFXSWhkOEFsUWF4ZTNydGZ5QXBRcUJVMU4ybTgrTzhZY3c5QQotPiBYMjU1MTkgNTZpcFdTMFVSd25DQWcydzJkSW1WNEVMUGNJZ2FlM3JXN3dERjlIM0dqUQp6RStmaHl1cEducGtmeHEwZCtxZll5MSt6Si9iQUhzd0lscFBXQnVySk1RCi0+IFgyNTUxOSBrYUM5TnFKTlJKTUNrUzh1M3lVYWJ2dXEyTnNqVGZsYmxXYk5WeHVnRVRnClBtRlozd0laUnd1QlA5eGFjdmprNlNNNDRHSWtORlBRNHFJS2VzUU5pMXMKLT4gWDI1NTE5IHRidUVJMFI0MDRmd1RNVDVsTFhHbU16Y3FKRUtsdUlvTTZEME0rZE9UUzAKUFdhU0ppUlc3aUF1OWJjb1BhdEc2Ui9kb1lsYlZHVEpMbFFEcFVIL01NdwotPiBYMjU1MTkgVkJKNE54OWdkTERaVkVkOW1KTEpYR2h4YllKY2VaWGVTRlRsSHByeTBCQQpqVTVzckd5Y2hSYkF6c1BTdHZqTDdrZDBUdVVNTlB3RWw4QWRBakJVR0s0Ci0+IC41P1wmdXktZ3JlYXNlID83OyBUIFoqZjYvClRSYmpWL2ttU3J2WkwxaEZFQUNVZHBVTzI5OEQrcnJnQXBCU3JyVER6RDlqSWZMK215ZWpDejZyQXphbHJaR2kKWkRFZS9DWjdMbm1QNGk5UWpnendPSTJBazVaZTdjUk9aZ1FvVmgvQytMaVVaQU1GTmIvb3lmQzhKdi9oSEtvRQpKQQotLS0gQXY0M2NZaFBITm51QXRhS1hmYWhKdUF0dmo5R2VsR0xsSW94T0lWTkR2MAqM6N5qiLzfxubASr7mFbhO84HEufyDqesrKTG1tY8k48btGZvG1TA2AuTRZZSnaqizFbS4kNMROi/c2OEP]() {
+    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSArR3lGTFRBYVJOKytuSTZ6ZTRTRjNYWGtWU0R6SjlTSWZ2UDNKT0hnMlFJCnhWYUNPNHJkMXF6MXJ5d0FrTFBVWXV3ODU5OG5WUDdYdTJoR0w4RHE4QXcKLT4gWDI1NTE5IGdXYTRvbDFKREp6dFdNTDhPLy9tc29OeGtYUHYrNjRpeXRHNmg3Y0JRamsKTjlPZTdsMk5RV0lZSnZ3dTR4b01tWjlmdHhKdVRtWm8xaG0zV3FNM3BHSQotPiBYMjU1MTkgQkVDd2VBL0U3WTVhNmp1TGh2OWNPU254VllDWlNEZVY4T2E3Z3VVUTVsSQp4SVBEcGFLT3hVTUF6bHY3TGEreHdJbU15aWVNTURqeXBzTzBtNkZtR2lRCi0+IFgyNTUxOSBRSlN1cnFmQUV0TE1udUNSVzBPR2FDNmxyY2ZzTDErbjNKeUlPdDdjK1dVCk9ZZElhR2RkT3Flc09FcDROOFA3QmdsWmZvR1VpbkJxNHFKcUwwVTZaNVkKLT4gWDI1NTE5IDNtRnoya1RaN0dFNzNXZWFlZ2NUMDJhVlZ2aFQ4MU92ZU1uWjlTTmNBd0EKWHNMQk5NRkdNVU5qYlF0NmNiWkNpbUNvK2xSK1RqSms5YXVkK2Q1TVA3cwotPiBYMjU1MTkgWXc4aU9hUjVvTy9iemZhdkRESnd6bzZyWGtMRWg3RHQyeG9DVVJXTVZ5NApidTlDMXVXbTBGcWthekthY3hUcnRUMDdjM3BQMEltZ21tRXVPTzBZTUJZCi0+ICRQaDMtZ3JlYXNlCkVNQmRHWmxTRlJhbElpQktReGJTd1pjQSsza3hGcU9DCi0tLSAwWGN3WTJUZER5Tk4yOEREQW80UWc3M3pvdWFqQjJLMjRJUHdSaUdrN3Y4CuEeW6hmorfPAk/3ZHM8P8mk4yvHMrGmyMx2ssf2lkPFLVqQ77P7YKs5PLw9q8qkxN9TV18y5hm/QzOHV+4=]() {
         let mut cooldowns = std::collections::HashMap::new();
         let repo = std::path::PathBuf::from("/test/repo");
         let notify_key = format!("push-fail-{}", repo.display());
