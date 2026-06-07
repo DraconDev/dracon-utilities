@@ -23,9 +23,9 @@ skip = [
 [sources]
 unknown-registry = "deny"
 unknown-git = "deny"
-allow-git = [
-    "https://github.com/DraconDev/dracon-libs",
-]
+allow-git = []
+# Note: previously listed "https://github.com/DraconDev/dracon-libs" but the
+# workspace depends on it via a local path, not git. Removed as dead config.
 
 [licenses]
 confidence-threshold = 0.80
@@ -36,17 +36,10 @@ allow = [
     "BSD-2-Clause",
     "BSD-3-Clause",
     "ISC",
-    "Zlib",
-    "0BSD",
-    "CC0-1.0",
     "Unlicense",
     "MPL-2.0",
     "CDLA-Permissive-2.0",
-    "AGPL-3.0",
     "AGPL-3.0-only",
-    "AGPL-3.0-or-later",
-    "Unicode-DFS-2016",
-    "Unicode-3.0",
 ]
 private = { ignore = true }
 exceptions = [
