@@ -1849,12 +1849,21 @@ pub(crate) fn resmudge_repos(
     }
 
     if apply {
-        println!(
-            "✅ resmudge complete (found: {}, changed: {})",
-            total_found, total_changed
-        );
+        if total_changed == 0 {
+            println!(
+                "✅ resmudge complete · no changes needed (found: {total_found}, changed: 0)"
+            );
+        } else {
+            println!(
+                "✅ resmudge complete · {total_changed} file(s) resmudged (found: {total_found})"
+            );
+        }
+    } else if total_found == 0 {
+        println!("✅ resmudge · nothing to do · no ciphertext working-tree files found");
     } else {
-        println!("✅ resmudge report complete (found: {})", total_found);
+        println!(
+            "🔍 resmudge · found {total_found} ciphertext file(s) (dry-run, pass --apply to resmudge)"
+        );
     }
 
     Ok((total_found, total_changed))
