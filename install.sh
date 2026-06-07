@@ -303,7 +303,6 @@ install_binary() {
 install_binary dracon-sync "" "dracon-sync"
 install_binary dracon-system "" "dracon-system"
 install_binary dracon-warden "" "dracon-warden"
-# dracon-ai removed — superseded by dracon-code (when available)
 
 echo ""
 
