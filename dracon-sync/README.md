@@ -238,33 +238,11 @@ auto_create = false  # Codeberg/Forgejo doesn't support push-to-create
 Store PATs for HTTPS fallback and API operations:
 ```bash
 # GitLab
-echo "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBOR3NjTGhRMlJDTWdWUHlCL003bkoxa3ZBU1UzTE8yd1dUVGsrOGlQS0NRCjU5bkNrc3FLbW9qTVpzUEhCOGFBbjhCY29kWFpWZ0w0Tm9oWUFkejJld1EKLT4gSidLLWdyZWFzZSA/SGshPT1pCkVXZ3JSMmE2OVdVOTFqT1Z3UmtJYkJ6MHhRUWR2ZwotLS0gKzFZNFplcTJSTjlRZTl6MUUxWUwvSjN1dS82NGQxa3ZZSVdFTkk4ODU1YwoEXyaef857lB+2K9m2/E8PGWn5v51F4g4DSMTMzTqWlC2Wj6JkqSbE1lmBPYgp0oNsUPraenWyG1HmWnMMBkO7B1r48lZerA==]" > ~/.dracon/utilities/sync/secrets/gitlab.env
+echo "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAvRkI1OXY3VzZPM24xdWdjeGwxZytja1cvY0QwRTdOdEVvNUQ5OHFyT213CitjTXJrWjRlWm8vR285bzgwZmpRbDhuVTRxYi9nMXNsODl4SmtURG1xbG8KLT4geCtGUElEam0tZ3JlYXNlIGdFfWhlODBgCkhnYmdMRVBuUWNwUXdja0FrZmp0M1k4MmJRQ1pZZEtHUTBmaUJ6TGZERldkMThPTWI2WURZdlljcFdUVGZLWDkKQnpYalVZM3ZUZ05JL1dwYWlGQlp4U010NWYwWAotLS0gdUYyWkFPSExFaFpOOGJDdVd6c2ZmaHZnSXZpRVBIZnhlMFo3L29iV3o0cwrKDdUtSPWkhC+j1LPYeHM++X2HvemVvc1sObKwdxnqTywJP96SBrATzbG6kl7eXOmNqYseKPXcZpyjHlKnJufcf+dme0khTQ==]" > ~/.dracon/utilities/sync/secrets/gitlab.env
 
 # Codeberg
-echo "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBzNWZ4bm9IdUhTVTR4SzJHZGtURGNTOFFkSGhoWUtXeDNGUjR4YVc1S0NRCmRTTHJqN2tocVpyQ2FoSEk1dnFFTGw2K0d4bE5iNEc1UDhmdHllOHVPVmMKLT4gP1U6WzAtRi1ncmVhc2UKQkF1clhPRXRzUndSZm1tZk1xcXh6UlRqVUhhTXNTYS9sZXZNaWgwUmhxZzNrNlZJaHNsSGR2T3NkSFpnZ0I3bAovQnV4aVpIcmlUU0RwZmRWV3plQVQ3UXNZWXFVNVFOTGFQUUUxQTVCbjdoUUZSbzJ0dDgKLS0tIHZ1em5nakU5dEtKckNYNktYWjhncXlSMWtTaUl6MkFZZDFpbVY3TXFXbE0KM2HuXIL1DdiwDfoVm5/YiZ3lUHNYKk2JqJHJbnnAHSD2G7J4FWS4YKuMnr+1EHqoAp4hq9rNFQBShwGrKNnkkBFZWwU28hQ=]" > ~/.dracon/utilities/sync/secrets/codeberg.env
+echo "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB4OFN5Qm1yOHdkYmxvc3B3MnBSakJsMlBXTzIvM1cxUTVVa09ISXRabFdFCngzcFZxcDFTRlFybFd4cUtld2lvbGZYVmZDMUhJRUZkdVNMSFVPRnhwSFEKLT4gXm5xSkxJIy1ncmVhc2UgOEtvSWYKUFhlRVhFdG9UQ3AzK3d0eGEzOHVtTE5FMllZK2wwaFlaMENxdFNFZEwybjYyWlNhUXQra2ZvNG1CSW5Gd0E0Ci0tLSBEcEVtL2c2UTNBNnlMWkgzN1kzKzMreCtHRlNJb1FKMFVaL1pEbkR0bW5FChwnf7521Ns0IizNq+SbhRPTL1j885CXGFWgChm82qHqPjAN6mSZSoRipplhdHgN7UybyxxUT92J31MddUhgapq7ui9h/ewP]" > ~/.dracon/utilities/sync/secrets/codeberg.env
 ```
-
-### AI Providers
-
-dracon-sync uses AI for commit messages and version bumping. Configure in `~/.dracon/utilities/sync/ai.toml`:
-
-```toml
-[[providers]]
-name = "mistral"
-env = "MISTRAL_API_KEY"
-endpoint = "https://codestral.mistral.ai/v1"
-model = "codestral-latest"
-
-[[providers]]
-name = "nvidia"
-env = "NVIDIA_API_KEY"
-endpoint = "https://integrate.api.nvidia.com/v1"
-model = "stepfun-ai/step-3.5-flash"
-```
-
-Store API keys in `~/.dracon/utilities/sync/ai/secrets/`:
-- `mistral.env` → `MISTRAL_API_KEY=...`
-- `nvidia.env` → `NVIDIA_API_KEY=...`
 
 ## Commit Messages
 
