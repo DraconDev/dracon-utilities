@@ -14,12 +14,12 @@ GitHub and GitLab use their CLIs (`gh` and `glab`) which handle token management
 
 ## Token Storage
 
-All tokens are loaded via the same pattern used by AI providers:
+All tokens are loaded via the same `load_secret()` pattern:
 
 1. **Environment variable** (checked first)
 2. **Secrets file**: `~/.dracon/utilities/sync/secrets/<name>.env`
 
-File format (same as AI secrets):
+File format:
 ```
 VARIABLE_NAME=token_value_here
 ```
