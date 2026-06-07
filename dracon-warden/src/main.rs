@@ -282,6 +282,13 @@ pub(crate) struct WardenPolicy {
     plaintext_patterns: Vec<String>,
     #[serde(default)]
     hygiene_patterns: Vec<String>,
+    /// Canonical: list of directories to scan for git repos.
+    #[serde(default)]
+    repo_roots: Vec<String>,
+    /// **Deprecated alias** for `repo_roots`. Accepted for backwards
+    /// compatibility; will be removed in a future release. When set
+    /// (and `repo_roots` is empty), `repo_root_paths()` falls back to
+    /// this list and a deprecation warning is surfaced.
     #[serde(default)]
     watch_roots: Vec<String>,
     #[serde(default)]
@@ -385,12 +392,21 @@ impl WardenPolicy {
         Ok(())
     }
 
-    fn watch_root_paths(&self) -> Vec<PathBuf> {
-        self.watch_roots
-            .iter()
-            .map(PathBuf::from)
-            .filter(|p| p.exists())
-            .collect()
+    /// Returns the active repo roots.
+    ///
+    /// Precedence:
+    /// 1. `repo_roots` (canonical)
+    /// 2. `watch_roots` (deprecated alias) — only used when `repo_roots` is empty
+    /// 3. `discover_roots` (separate field, used to extend the search set)
+    ///
+    /// Non-existent paths are filtered out.
+    fn repo_root_paths(&self) -> Vec<PathBuf> {
+        let chosen: &[String] = if !self.repo_roots.is_empty() {
+            &self.repo_roots
+        } else {
+            &self.watch_roots
+        };
+        chosen.iter().map(PathBuf::from).filter(|p| p.exists()).collect()
     }
 
     fn discover_root_paths(&self) -> Vec<PathBuf> {
@@ -399,6 +415,21 @@ impl WardenPolicy {
             .map(PathBuf::from)
             .filter(|p| p.exists())
             .collect()
+    }
+
+    /// Returns a deprecation message if the user is using the legacy
+    /// `watch_roots` key (either exclusively or alongside `repo_roots`).
+    /// Returns `None` if only the canonical `repo_roots` is in use.
+    fn deprecation_message(&self) -> Option<String> {
+        match (self.repo_roots.is_empty(), self.watch_roots.is_empty()) {
+            (true, false) => Some(format!(
+                "warning: 'watch_roots' is deprecated, use 'repo_roots' instead (will be removed in a future release)"
+            )),
+            (false, false) => Some(format!(
+                "warning: both 'watch_roots' and 'repo_roots' are set; using 'repo_roots' (the other is deprecated)"
+            )),
+            _ => None,
+        }
     }
 }
 
@@ -421,9 +452,9 @@ pub(crate) fn discover_git_repos_local(roots: &[PathBuf]) -> Vec<PathBuf> {
     discover_git_repos(roots, &excluded)
 }
 
-pub(crate) fn effective_watch_roots(policy: &WardenPolicy) -> Vec<PathBuf> {
+pub(crate) fn effective_repo_roots(policy: &WardenPolicy) -> Vec<PathBuf> {
     let mut roots = BTreeSet::new();
-    for root in policy.watch_root_paths() {
+    for root in policy.repo_root_paths() {
         roots.insert(root);
     }
     roots.into_iter().collect()
@@ -434,7 +465,7 @@ pub(crate) fn effective_discovery_roots(policy: &WardenPolicy) -> Vec<PathBuf> {
     for root in policy.discover_root_paths() {
         roots.insert(root);
     }
-    for root in policy.watch_root_paths() {
+    for root in policy.repo_root_paths() {
         roots.insert(root);
     }
     roots.into_iter().collect()
