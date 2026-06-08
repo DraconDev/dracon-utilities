@@ -10,7 +10,7 @@
   },
   "sisyphus": false,
   "createdAt": "2026-06-08T20:20:46.406Z",
-  "updatedAt": "2026-06-08T20:23:35.718Z",
+  "updatedAt": "2026-06-08T20:46:07.126Z",
   "activePath": ".pi/goals/active_goal_2026060821204640_mq5noame-g3yfxg.md",
   "stopReason": "agent",
   "pauseReason": "The private key for `age162n5w0v0y3dxyddqvlaywt9gmyfr0e5rft6kcunnf58ceqhycdxq42vmzt` does NOT exist on this machine. The .env files were encrypted with this old key, and it was replaced by `age1z4a...` (machine_nixos.age) at some point. All 14 old timestamped machine_*.age files in `~/.dracon/keys/` are themselves encrypted, and none of the 3 current unencrypted keys match. The key must be recovered from another source (backup, another machine, or the AI lib you mentioned) before the .env files can be decrypted.",
