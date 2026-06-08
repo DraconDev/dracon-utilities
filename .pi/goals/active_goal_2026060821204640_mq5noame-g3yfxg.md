@@ -10,10 +10,9 @@
   },
   "sisyphus": false,
   "createdAt": "2026-06-08T20:20:46.406Z",
-  "updatedAt": "2026-06-08T20:50:51.439Z",
+  "updatedAt": "2026-06-08T21:15:09.758Z",
   "activePath": ".pi/goals/active_goal_2026060821204640_mq5noame-g3yfxg.md",
   "stopReason": "agent",
-  "skipAuditor": false,
   "taskList": {
     "tasks": [
       {
