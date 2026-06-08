@@ -5,6 +5,42 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.112.4] - 2026-06-07
+
+### Fixed
+- `dracon-sync/README.md` and `docs/OPERATIONS.md`: replaced flat CLI paths
+  (`repair-concerns`, `repair-warns`, `stuck list`, `dual-branch list`,
+  `publish-status`, `repair-origins`) with the correct nested subcommand
+  syntax (`repair concerns`, `repair stuck-list`, `publish run`, etc.).
+  Resolves audit-2026-06-07 P1-2.
+- `dracon-warden status` help text and README "Quick Commands" sections
+  now say "repo roots" (matching the v0.3.0 `watch_roots` → `repo_roots`
+  field rename). Resolves audit-2026-06-07 N-4.
+- `dracon-system/README.md` server-deployment systemd snippet: corrected
+  resource limits from `MemoryMax=100M CPUQuota=10%` to `MemoryMax=250M
+  CPUQuota=20%` (matching `dracon-system-guard.service`).
+- Removed `dracon-sync/note.md` (leftover investigation note from a May
+  incident). Added gitignore rule so future `note.md` files are not
+  tracked. Resolves audit-2026-06-07 P2-5.
+- Untracked 4 stale tarpaulin coverage reports (~1.6 MB) across all 3
+  binaries. Added `**/tarpaulin-report.*` to `.gitignore`. Resolves
+  audit-2026-06-07 P2-4.
+- Removed dead `let discover = effective_discovery_roots(&policy);`
+  binding in `dracon-warden/src/main.rs:1356` (the result was never
+  used; `explicit_discover` was built directly from `policy.discover_roots`).
+
+### Changed
+- Workspace version bumped 0.112.3 → 0.112.4 (hygiene-only release, no
+  per-crate version changes).
+- `dracon-system/src/print.rs` and `dracon-warden/src/print.rs`: added
+  module-level `#![allow(dead_code)]` with a doc comment explaining the
+  public-API intent (helpers for shared output formatting, awaiting
+  callers). Resolves audit-2026-06-07 N-1.
+
+### Audit
+- Full delta audit against the 2026-06-06 baseline is published at
+  `docs/audit/audit-2026-06-07-delta.md` and `docs/audit/audit-2026-06-07-delta-summary.md`.
+
 ## [0.3.0] - 2026-06-07
 
 ### Breaking
