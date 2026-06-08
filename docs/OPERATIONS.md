@@ -124,7 +124,7 @@ dracon-sync repair dual-branch-repair <repo>
 ### Origin Repair
 
 ```bash
-dracon-sync repair-origins [--apply]
+dracon-sync repair origins [--apply]
 ```
 
 ### Freezing Sync
