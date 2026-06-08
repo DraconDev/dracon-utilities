@@ -101,4 +101,7 @@ tasks*.json
 !flake.nix
 !rust-toolchain.toml
 !rustfmt.toml
+**/tarpaulin-report.*
+# Leftover investigation notes (resolves "obs-wayland-hotkey" todo from 2026-05)
+/**/note.md
 # --- END DRACON MANAGED BLOCK ---
