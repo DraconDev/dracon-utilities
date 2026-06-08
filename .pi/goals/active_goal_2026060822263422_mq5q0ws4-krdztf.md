@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 351352,
-    "activeSeconds": 37
+    "tokensUsed": 431552,
+    "activeSeconds": 43
   },
   "sisyphus": false,
   "createdAt": "2026-06-08T21:26:34.228Z",
-  "updatedAt": "2026-06-08T21:28:36.316Z",
+  "updatedAt": "2026-06-08T21:28:42.583Z",
   "activePath": ".pi/goals/active_goal_2026060822263422_mq5q0ws4-krdztf.md",
   "taskList": {
     "tasks": [
@@ -138,8 +138,8 @@ Stop and ask the user for the .env values (API keys, database URLs, ports, etc.)
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 37s
-- Tokens used: 351K (351,352) tokens
+- Time spent: 43s
+- Tokens used: 432K (431,552) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
