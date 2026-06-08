@@ -106,9 +106,9 @@ dracon-sync is **invisible infrastructure** for an AI coder. The AI works on one
 ### 20. Auto-add large untracked files to .gitignore
 - **Status:** [x]
 - **Problem:** Large untracked files (> max_stage_file_bytes, default 50MB) were perpetually detected but never handled, causing repeated warnings
-- **Fix:** Added `is_large_untracked()` and `append_to_gitignore()` functions. Large untracked files are now automatically added to .gitignore after the managed block
+- **Fix:** Added `is_large_untracked()` and `append_to_gitignore()` in `dracon-sync/src/exclude.rs`; `sync.rs` calls the large-file handler before auto-staging. Large untracked files are now automatically added to .gitignore after the managed block
 - **Priority:** High
-- **Location:** `main.rs:925-980, 2175-2270`
+- **Location:** `dracon-sync/src/exclude.rs:567-637, 679-696, 784-828; dracon-sync/src/sync.rs:795-805`
 
 ---
 
@@ -119,7 +119,7 @@ dracon-sync is **invisible infrastructure** for an AI coder. The AI works on one
 - **Problem:** Temp directories (`.tmp-*`) pollute repo listings with false CONCERNs
 - **Fix:** Added `.tmp-*` to default excludes, enhanced `is_excluded_dir_name()` to support glob-like patterns (`prefix*`)
 - **Priority:** Medium
-- **Location:** `main.rs:594, 877-893`
+- **Location:** `dracon-sync/src/policy.rs:497-509`
 - **Default excludes:** `target`, `node_modules`, `.cache`, `.direnv`, `.venv`, `dist`, `build`, `archives`, `.tmp-*`
 
 ---
