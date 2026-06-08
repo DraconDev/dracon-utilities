@@ -1353,7 +1353,6 @@ async fn main() -> Result<()> {
             let policy = WardenPolicy::load(&policy_path)?;
             policy.validate()?;
             let repo_roots = effective_repo_roots(&policy);
-            let discover = effective_discovery_roots(&policy);
             // Explicit (user-set) discovery roots only — i.e. those that
             // extend the repo_roots set. Empty if user didn't set discover_roots.
             let explicit_discover: Vec<PathBuf> = policy
