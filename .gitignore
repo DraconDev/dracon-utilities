@@ -102,15 +102,3 @@ tasks*.json
 !rust-toolchain.toml
 !rustfmt.toml
 # --- END DRACON MANAGED BLOCK ---
-
-# Project-specific ignores (not warden-managed)
-pi-session-*.html
-/rust_out
-/doctor.sh
-# Archived pi goal files (kept on disk for reference, not in repo)
-.pi/goals/archived/
-# Tarpaulin coverage reports are generated artifacts; CI uploads them as artifacts
-**/tarpaulin-report.*
-# Leftover investigation notes (resolves "obs-wayland-hotkey" todo from 2026-05)
-/**/note.md
-
