@@ -42,7 +42,7 @@
 
 ## What Warden Does
 
-dracon-warden is a Git filter + repository hardening daemon:
+dracon-warden is a Git filter + repository hardening CLI:
 
 1. **Git Filter Operations**: Implements `clean` (encrypt on commit) and `smudge` (decrypt on checkout) using age encryption
    - Working tree remains plaintext (developers see normal config)
@@ -54,9 +54,7 @@ dracon-warden is a Git filter + repository hardening daemon:
 
 4. **Recovery Tools**: Commands for scrubbing leaked markers and re-decrypting stuck files
 
-5. **Daemon Mode**: Watches filesystem with debouncing for auto-hardening
-
-6. **Plaintext-sibling escape hatch** (opt-in): A file with a `<path>.plaintext`
+5. **Plaintext-sibling escape hatch** (opt-in): A file with a `<path>.plaintext`
    sibling is intentionally plaintext. The clean filter returns the file
    unchanged, the pre-push hook skips it, and `scrub-markers` / `resmudge`
    leave it alone. See `docs/design/warden-plaintext-sibling.md` for the
