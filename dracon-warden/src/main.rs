@@ -198,7 +198,7 @@ struct Cli {
 
 #[derive(Subcommand, Debug)]
 enum Command {
-    /// Show resolved policy path and watch roots.
+    /// Show resolved policy path and repo roots.
     Status,
     /// Run one hardening pass and exit.
     Once {

@@ -114,8 +114,8 @@ User=root
 # Group=dracon-guard
 
 # Resource limits
-MemoryMax=100M
-CPUQuota=10%
+MemoryMax=250M
+CPUQuota=20%
 
 [Install]
 WantedBy=multi-user.target

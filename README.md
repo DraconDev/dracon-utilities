@@ -83,7 +83,7 @@ dracon-system guard daemon  # Run continuous monitoring
 
 **Quick Commands:**
 ```bash
-dracon-warden status        # Show resolved policy path and watch roots
+dracon-warden status        # Show resolved policy path and repo roots
 dracon-warden once          # Run one hardening pass
 dracon-warden keygen        # Generate new age keypair
 dracon-warden setup-hooks --global  # Install git hooks (primary enforcement)
