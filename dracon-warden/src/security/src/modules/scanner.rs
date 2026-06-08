@@ -1,7 +1,7 @@
 //! Secret scanning patterns and detection.
 
-use regex::Regex;
 use anyhow::Result;
+use regex::Regex;
 
 use crate::is_inside_secret_tag;
 
@@ -11,7 +11,6 @@ pub struct SecretFinding {
     pub line: usize,
     pub snippet: String,
 }
-
 
 pub struct SecretScanner {
     patterns: Vec<(String, Regex)>,
@@ -565,11 +564,11 @@ mod tests {
     fn test_scanner_with_custom_patterns() {
         let custom = vec![("Custom Secret", r"CUSTOM_SECRET_[A-Z0-9]{16}")];
         let scanner = SecretScanner::new_with_custom_patterns(&custom).unwrap();
-        
+
         // Should find custom pattern
         let findings = scanner.scan("CUSTOM_SECRET_ABCDEF1234567890");
         assert!(findings.iter().any(|f| f.name == "Custom Secret"));
-        
+
         // Should also find built-in patterns
         let findings = scanner.scan("AKIAIOSFODNN7EXAMPLE");
         assert!(findings.iter().any(|f| f.name == "AWS Access Key ID"));

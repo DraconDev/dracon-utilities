@@ -109,7 +109,9 @@ fn clean_with_plaintext_sibling_preserves_binary_content() {
     let path = dir.path().join("blob.bin");
     let sibling = dir.path().join("blob.bin.plaintext");
     // Real binary content (PNG header)
-    let bytes: Vec<u8> = vec![0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d];
+    let bytes: Vec<u8> = vec![
+        0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
+    ];
 
     fs::write(&path, &bytes).unwrap();
     fs::write(&sibling, "").unwrap();

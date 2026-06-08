@@ -358,5 +358,4 @@ impl DemonSecurity {
         }
         Ok(members)
     }
-
 }

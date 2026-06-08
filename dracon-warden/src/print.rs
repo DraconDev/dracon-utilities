@@ -13,7 +13,6 @@
 // are intentionally `pub` so future commands can use them without re-export.
 #![allow(dead_code)]
 
-
 /// Format a byte count as a human-readable string (binary units, 2 decimals max).
 pub fn format_bytes(n: u64) -> String {
     const UNITS: &[&str] = &["B", "KiB", "MiB", "GiB", "TiB", "PiB"];

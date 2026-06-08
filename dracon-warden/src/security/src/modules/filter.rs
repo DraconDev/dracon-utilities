@@ -6,8 +6,8 @@ use std::fs;
 use std::path::Path;
 
 use crate::make_env_version_header;
-use crate::strip_env_version_header;
 use crate::normalize_secret_marker;
+use crate::strip_env_version_header;
 use crate::DemonSecurity;
 use crate::MarkerMigrationStats;
 use crate::SecretScanner;
@@ -478,5 +478,4 @@ impl DemonSecurity {
         std::io::stdout().write_all(&buffer)?;
         Ok(())
     }
-
 }

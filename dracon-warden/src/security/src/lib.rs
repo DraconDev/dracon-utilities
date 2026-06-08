@@ -15,15 +15,14 @@ use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
-
 pub mod modules;
 
-pub use modules::scanner::SecretScanner;
-pub use modules::scanner::SecretFinding;
-pub use modules::filter::is_hatched;
 pub use modules::environment::EnvironmentManager;
+pub use modules::filter::is_hatched;
 pub use modules::keys::RepoKey;
 pub use modules::keys::TeamKey;
+pub use modules::scanner::SecretFinding;
+pub use modules::scanner::SecretScanner;
 
 const DEFAULT_SECRET_MARKER: &str = "DRACON_SECRET";
 
@@ -414,7 +413,9 @@ impl DemonSecurity {
         let keys_dir = repo_root.join(".git").join("arcane").join("keys");
 
         if !keys_dir.exists() {
-            return Err(anyhow::anyhow!("No keys found. Run 'dracon-warden' to initialize."));
+            return Err(anyhow::anyhow!(
+                "No keys found. Run 'dracon-warden' to initialize."
+            ));
         }
 
         // 0. Try Machine Key (Env Var) - Priority for CI/CD
@@ -1099,7 +1100,8 @@ mod tests {
             patterns.contains(&"Age Secret Key".to_string())
         );
 
-        let content = "AGE-SECRET-KEY-1QPZRY9X8GF2TVDW0S3JN54KHCE6MUA7LQPZRY9X8GF2TVDW0S3JN54KHCE6MUA7L";
+        let content =
+            "AGE-SECRET-KEY-1QPZRY9X8GF2TVDW0S3JN54KHCE6MUA7LQPZRY9X8GF2TVDW0S3JN54KHCE6MUA7L";
         let scanned = scanner.scan_and_replace(content, |name, secret| {
             eprintln!("Match found: {} -> {}", name, secret);
             format!("[MATCHED:{}]", name)

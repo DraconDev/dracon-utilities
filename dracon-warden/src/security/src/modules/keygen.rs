@@ -181,5 +181,4 @@ impl DemonSecurity {
         }
         Ok(())
     }
-
 }
