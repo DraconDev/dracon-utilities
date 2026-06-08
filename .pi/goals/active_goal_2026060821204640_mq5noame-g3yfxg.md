@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 111456,
-    "activeSeconds": 12
+    "tokensUsed": 169369,
+    "activeSeconds": 54
   },
   "sisyphus": false,
   "createdAt": "2026-06-08T20:20:46.406Z",
-  "updatedAt": "2026-06-08T20:20:58.689Z",
+  "updatedAt": "2026-06-08T20:21:41.203Z",
   "activePath": ".pi/goals/active_goal_2026060821204640_mq5noame-g3yfxg.md",
   "taskList": {
     "tasks": [
@@ -59,8 +59,8 @@ Fix the encryption key mismatch across all dracon repos and recover/recreate the
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 12s
-- Tokens used: 111K (111,456) tokens
+- Time spent: 54s
+- Tokens used: 169K (169,369) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
