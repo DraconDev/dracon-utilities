@@ -3,6 +3,13 @@
 //! NO_COLOR spec: <https://no-color.org/> — if the env var is set (to anything,
 //! including empty), colour MUST be disabled.
 
+// Allow dead code on this module: the helpers below are part of the binary's
+// public API surface for shared output formatting. Callers are added
+// incrementally as commands adopt the standardised formatting; the helpers
+// are intentionally `pub` so future commands can use them without re-export.
+#![allow(dead_code)]
+
+
 /// Format a byte count as a human-readable string (binary units, 2 decimals max).
 pub fn format_bytes(n: u64) -> String {
     const UNITS: &[&str] = &["B", "KiB", "MiB", "GiB", "TiB", "PiB"];

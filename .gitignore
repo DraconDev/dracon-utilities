@@ -109,3 +109,8 @@ pi-session-*.html
 /doctor.sh
 # Archived pi goal files (kept on disk for reference, not in repo)
 .pi/goals/archived/
+# Tarpaulin coverage reports are generated artifacts; CI uploads them as artifacts
+**/tarpaulin-report.*
+# Leftover investigation notes (resolves "obs-wayland-hotkey" todo from 2026-05)
+/**/note.md
+
