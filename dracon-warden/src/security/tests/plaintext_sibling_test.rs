@@ -39,7 +39,7 @@ fn clean_skips_encryption_when_plaintext_sibling_exists() {
     let dir = TempDir::new().unwrap();
     let path = dir.path().join("example.env");
     let sibling = dir.path().join("example.env.plaintext");
-    let [DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBsVUExRkprdkFNYWo5Q3dJMGVpb0xmUlBKbk9CNkM0OVRvd0JsUTRYOHlZCmYweC9vZ2NCU29RTDJFRVgzbVZ0TTF6S3NDQzYzRkJiMlRBRm9KS1VraEUKLT4gcUtgLWdyZWFzZSBqPnEKMmMzWjNtbEVIQnUwSEQxYXpEYm82dkZqCi0tLSA3SS9OK2RvRGN2ZHZ5TmdWZm9nT2xyNGdjTVl6NFYyQnphYlBsZjFhT2dNCiYzQ58Fv8C2/8/G0D7/5/c3OF2BNTpMWpXSGWUW4rUvnSYwhalwLEoJzMwa3JcwLmk+L+Qmh9k38JtqQjhaSul5p2pURlhYjrjUEZfu7TZKyZ9TugSKwjtWr7s=];
+    let secret = "AGE-SECRET-KEY-1QPZRY9X8GF2TVDW0S3JN54KHCE6MUA7LQPZRY9X8GF2TVDW0S3JN54KHCE6MUA7L";
 
     fs::write(&path, secret).unwrap();
     fs::write(&sibling, "").unwrap();
@@ -59,7 +59,7 @@ fn clean_encrypts_normally_without_plaintext_sibling() {
     // encrypts the file (this proves the hatch is a real opt-in, not a no-op).
     let dir = TempDir::new().unwrap();
     let path = dir.path().join("secrets.env");
-    let [DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBFaXRyUXJnZ2YyME5GRTNqeDRKVmxSQmZId2s3dlkzUUJSdzBwbHlYWkdnCm5xRFBuN1Nka3hNRE5ZamNKb201RWNxNUhkYWtVcE9sM3U1elhyVkVDdGcKLT4gLE8oN1R1LWdyZWFzZQp6U0RqbWFSbENNYVNuWWtEdnNYUEFLRDZaOHVBdEdsUU04ZDZrL0FDQ1BNYWFVMVRwNzFrOGN6Z29sYklraE5GClBpdVZuTFErSmp2UzRXNlhlaUh1eHZpc3dBCi0tLSBZcXVUVnFBVU1tdlpyYTl6TmhQWW5DNi82WnpSRlF2V2VYZmNmZzVkRmRZCrR4v6kWNlwIJm+lIACwK5WXsIEJz77HcppfAwtyX9GbQircNX7xA8YFzsVNDpj1p+3UlVMJmTbk6ckVDLQTwS3k];
+    let secret = "AGE-SECRET-KEY-1QPZRY9X8GF2TVDW0S3JN54KHCE6MUA7LQPZRY9X8GF2TVDW0S3JN54KHCE6MUA7L";
 
     fs::write(&path, secret).unwrap();
     // No `.plaintext` sibling
@@ -85,7 +85,7 @@ fn clean_with_plaintext_sibling_does_not_add_env_version_header() {
     let dir = TempDir::new().unwrap();
     let path = dir.path().join(".env");
     let sibling = dir.path().join(".env.plaintext");
-    let [DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBKVWVxaFN0WWNGVjFvUmFBbHBIazZPNURuT0EwZXpONW01eit1NStzY213CnhlQlI5YWloZjRSWFRIdzdsQkhlT2NVekZyZVdGQ2w5WVUvdllrWEtNUDQKLT4gUC1ncmVhc2UgXCNNMCIKN2t5M0xvME5xNmpGRUxKYUd1MElLaXpwSGtQcXZ4ZEV4Sy9ZWHZBbW05MmcKLS0tICtRRmdrZGN3WnRlUE1sMWE4VHJSakVrTmhTbzEyRjh2Y01GL09VYnBUY0EKpkiGfIczaVvLEcVzSQaYde5sOBZwjKx/J1gLIEB1wdQ1IymxOCU7GFXnYQ5HB1FIqYgW4xw2bnGesnaerA==];
+    let secret = "AGE-SECRET-KEY-1QPZRY9X8GF2TVDW0S3JN54KHCE6MUA7LQPZRY9X8GF2TVDW0S3JN54KHCE6MUA7L";
 
     fs::write(&path, secret).unwrap();
     fs::write(&sibling, "").unwrap();
@@ -128,7 +128,7 @@ fn clean_with_empty_sibling_path_is_a_noop() {
     // and accidentally skip encryption. The hatch is opt-in: empty path = no
     // hatch decision.
     let security = DemonSecurity::new(None).unwrap();
-    let [DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBNTDFWY0FmaWs1Z0MxS20rMEd0ZUFldS84YjVNSDFkM1JoY2dVbW9jQmtZCjZIK3hWNnlhTmVsbzh4Qy9oMFoyR0FJc0FJQnpmS2hiZ0dPbWdtU0I5Z00KLT4gTkF2OFoiPS1ncmVhc2UgYmQjCm03UDI2dHRNWUVEOWFuREhkSkdHcTduY3NiQU1mcFB2WkVBM1ZRa3BhWUQ1Qk80RUw3bUlwamJDTm1HK1FlVEUKeEpaQVY5VysKLS0tIGhWZ05GampsbnArdHEyOTNQMmNzbmZyNlFpUUE0SGszbU9zUUFOU1FPclEKX3scBW0tdexxiRd+z/YtF4cB1z7tukWL+D2ysTE32+9vdqzVRMJSwNNBQBFY4urZ2Hbi4UlTkaNB7y06pCG7P0M=];
+    let secret = "AGE-SECRET-KEY-1QPZRY9X8GF2TVDW0S3JN54KHCE6MUA7LQPZRY9X8GF2TVDW0S3JN54KHCE6MUA7L";
     let cleaned = security
         .smart_clean_with_path(secret.as_bytes(), "")
         .expect("clean should succeed");

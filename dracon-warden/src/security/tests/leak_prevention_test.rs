@@ -72,9 +72,9 @@ proptest! {
             "Some normal text content\n".as_bytes().to_vec()
         };
 
-        let [DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB1cWRrZ3JCbEdnaC92UmNFdmRVck9MWEpSaHRvNzJvQ1VGSElZQ1ZaRFdrCjZzZm04ZWhLTHVLUWVDNVFBemJjbkRVekZEaXFYRnZqc2hwL2hVTHQ3ZEUKLT4gWDI1NTE5IHBSY2NBVXFFeXFoYlB5alVDUlFyRDFLM2lNOEs5c0tTRTEycmFMbVFHU2MKYjl2L2JnNUUxbEZ3NjhPWW1qUGd4SmJrc0FqdGRXNjBiNUY3b0VOcHBTawotPiBrIndPOUstZ3JlYXNlCnpMNjF3QXdSMksrMW9OTjdPWThpOFVsNEVldHU5VG1XcSsxWUppYnBpUVlEalJRN3kxRFhYbml5b09ENTZ1TGYKNWE4WFJVSkdxRnZKemFpSE1PazlFK2k5am1nS2ZqQi9QMzE5NUpzS2lYaXpodU0KLS0tIElYMndqMFVlVkxIZlpXd1dUMjMyU3hxUnMxMjliNkdNQWcvcmY1eUR3cEEKivenVR5RgopW2/sjnV5igpbmrj3I4+sTx1MkBKGEGBXeis0qVx2edq+J1QW1AhXYgZY+l2UdX6wgdcZVmXHDDQkd+gav1xwBi0s96AfjYEtl1plt9kZALMhReOe5ubS8zBUQ12rPDYAHGXYnpt3qQlvBpXyFkLUi];
+        let secret_str = "ghp_abcdefghijklmnopqrstuvwxyz123456789012";
         // Header for PEM keys to test content detection
-        let pem_content = "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBuTEhHN0VRc1EvR0JKbllXUGt1WFB4TlFZTlE4YmZka2tsUVFyeHRrNzFjCkZ1eEpPeTNuT0x2ZDlvdVM1c25mSDcvNDBHUGFJckQ0N3pXbTdsbWROZW8KLT4gWDI1NTE5ICtWMGxIK2toUFluTFFPYTM4Sy9nMnNQMDV0dThUbHBOeXhsclNmYXAxUzAKN0t4NFdIMnlyVGR4MlpseEZUYlFwUldLd2tMc1hrcFowWHU3aFduTVNQMAotPiBIRGVYKC1ncmVhc2UgNQo1K0QzdTV4NjhaWkh3Y2swNlBKeWxIR2lPTFpYZjhlSUgyVWFucm9VWkE1emcwcDdZRjBlQUZPdGJiemV1aXkwCnpIT0ZDdXJyblEKLS0tIDl1TGhEbW5kUzIzUXpiQlNoTFpTZEFHbEk4R2wzdWxhTkpCa3BsZlkyMUEK1t7Bzeof2lQT2m1BMijt5dvUnL4bHZGjrx6/UYDKZaLhDTRS/PuoryxOqQ8/yxwT3myBRxhOdyekhP8Nlb8LX+XrN9VBukTyKKYwjBhYpjb+DbeKDBF/RJyILKQX4S25I+VSZoL9IjmCqNLFp/d4nlDjQohs]";
+        let pem_content = "-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEA0Z3VS5JJcds3xfn/ygWyF8PbnGy0AHB7MhgHcLiSPlqO2kBz\n-----END RSA PRIVATE KEY-----";
 
         if has_secret && !is_binary {
             // Test both an API key and a PEM header

@@ -181,9 +181,9 @@ impl SecretScanner {
             // Database / Connection Strings
             // ============================================================
             ("PostgreSQL URL", r"postgres(?:ql)?://[^:]+:[^@]+@[^/]+"),
-            ("MySQL URL", r"[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBRZlIzbnFYSnZsWUhXRytWTXB0SnA3bnZqUlRsUmVuTEtzYUllUW40ZjNrCnNZbTJVZjJyeGY0Z1VjdkpPYXN3aytPSEdPQWs3bG9IaE1aSEhqZzZQWXcKLT4gWDI1NTE5IHFTQjlCMCtKMFJ3RE56T2hKOWQ4MTA2cXFIdmc4ZFQyNEd4L1dCQkgzSHMKem5NRFI4UUo4Qk41V0tGb1FaTFJLaDh3bThLbFBXWHN0SCtFRmpQWlpXWQotPiBHOy1ncmVhc2UgV3ovKEsKUVFGUWljZW84blBVR3RmUklOd3lTZEpCaW8yT3JzWFlLVFI1ZnRzT3RGT0pGSXQzYjBxb3cwdHFvSzdZVEM3KwpkZwotLS0gdG9rSE5zbUFFNUlVMkl4aGUvT1hpeVV2TDBzd2RkZnlVa2VlbmpsZGNGSQrovHqXsVhZArH2PUxHGeM1sd16nCw0QotNlBYvyjArmfW3OPb4VdSyHHF9LQoThM0Co0wXLw0=]/]+"),
+            ("MySQL URL", r"mysql://[^:]+:[^@]+@[^/]+"),
             ("MongoDB URL", r"mongodb(?:\+srv)?://[^:]+:[^@]+@[^/]+"),
-            ("Redis URL", r"[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBPdzFwZml0Vk5Qd0pZWUdPRjFldWt3ZnVUL0psSkhTNHVoQllwcmtDdFhVCmlQeUxBRHFIV0RiVUJFRmhJY3FqSkhIYlhvUXB6M200NHluWFh6VDJQbjAKLT4gWDI1NTE5IFlxeDg2dVlVd3pZSmVTRDdTcmVTNXdheXNoaEF4OHJBQ3ZsY2ExQ0hBVVkKemM4a3lCeitXb1pqWVphbDdtQ2E5QlhxdUNPYk1QREZqelpRN2RQdll1OAotPiAqLWdyZWFzZQozM0FkUUF2N05MVHdxSHVQTTU1ZkkwSlowcnRrSHBpeXZ2Wmw5OElsQ3U5amZTd1ZvWXVVZ1l6YVAxUkVhVW1WCjIyeTlmUGF4Y1dXdwotLS0gakhLdWR2b1pIazBkM1dnWTFscHZUUjdWNDMvZHpOaGJVOW5RUE00enF3ZwqhktaJDYjtdesS7Q8Bo+1vSuNG1JSm13SEtvyRjXXiJlWO6DJyu+GKhpI8QJgX11v3wCAPKRc=]/]+"),
+            ("Redis URL", r"redis://[^:]+:[^@]+@[^/]+"),
             (
                 "Database Password",
                 r#"(?i)(?:db|database)(?:_)?(?:pass|password|pwd).{0,10}[=:].{0,5}["'][^"']{8,}["']"#,
@@ -206,23 +206,23 @@ impl SecretScanner {
             // ============================================================
             (
                 "RSA Private Key",
-                r"(?s)[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBibDFOYUErSjkxUnBaZXh4YUdqSWNBN2pVWVJIM0VKZGhlYkZRRHNLV2dZCjdTRkZNbE9za0IreWRvcUJodnkzc1FxY0ltNUVBM0tiT2RRT3BjSDFkeVkKLT4gWDI1NTE5ICtTRmhwZVovZytXem1RdXJLSEtlYjJXS1Vvb0ZRNnZObVRFU0tzTmRja0UKeW9pMFViYjhOeVZYbVJJaW1kMWQ1cTQycEpTWE5DQlN6YjRidFNVc0d0WQotPiAkLWdyZWFzZSBUWiRlPXs4RSBZUXNcYm9sIE4nMyB4JkMKcE1mYVdFditBK05wclloSm9VOXF6NXhHdGFFbjMwS2tWQzJKNUpoaXA2RlZNVzJuWU9qb3pxOU1nKytkcUFFMwpoS1Nub04xeStqbWxBMmJDeGZRbEZmSHlPbkd4YUZoeHdRNDkyVUxmcXB6VWVxdEpYTkhySlJnTkpnCi0tLSBJZVpKZ3NMRUJLZlluTjdiY3lVL1dja05qZUk2d0FQSCtMUHBNN2QzZllvCu4LXbrXc4/5VAaU/M88HaDpjv7H52/LsUPQP/33KmRoKn1bnfjDND1bAgccH4TtsCt4625J6deAchLLIwB1zyxWCiFwSkNXW2tq1Wct6LpQy4S/QPMXGzPM6hwn2iCy]",
+                r"(?s)-----BEGIN RSA PRIVATE KEY-----.*?-----END RSA PRIVATE KEY-----",
             ),
             (
                 "DSA Private Key",
-                r"(?s)[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB4Y2lYcGpUblVZaWxRUkhjMnBEWDBwd0pBL0U0T1JEdkNUY1JKT2M5NlRzCi9EN0JRM3JVM0JIdVlYNkF3RjR6czhCelN2WHNKWSs0ZWRyeWdqZTFKVmsKLT4gWDI1NTE5IDQvRzFUbklaSTBOVDJxaHFUalhJWFYyUkxjczVzM2FRV2R0Q3VsL1I2Z1EKTkJnVmxEbFFmaDcxTkE0dFcxLzNCNUVNSU9IdkhBZ1hFQnVZQlJaNkpycwotPiAuO3xUXi1ncmVhc2UgVS0/I1tbLzYKbTk3MmFKVjUzRmtaMlcxR20yd3dhRHprSUY5bGJ6TTBvdDZrZjh3Ci0tLSBzY242V0MxeHpaWmp6bjZvUHVOSTcxWkV5dS9icGhnMFNGZ3c4VU9qbm5BCuNNsP0+EvxBQxa/mGF/NV4Jj6BxXaZctlmniNl4lHzVB4m9qlKPVkm40y3hQrYn9Imp3cHIpXNrPZhjM4R6Yi//68oksFlx96F0zrQ6rmZXDpUhej9GxNX2HLzUCgwl]",
+                r"(?s)-----BEGIN RSA PRIVATE KEY-----.*?-----END RSA PRIVATE KEY-----",
             ),
             (
                 "EC Private Key",
-                r"(?s)[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBUV2RGRE8yeXJ4dnFvcUNpYS8xdmhDNDRDdytYTG44YjRGcnRsR3BKV2p3Ck11L1cveVFrRStTd2xZRGlLSXA4SE5GMldycUpzTEE2eDZmTXVLRSs0RU0KLT4gWDI1NTE5IG1RUXdkZjh2aVJYSlltVXo3QWU1dW9tZUh1YXdlUi9jczNhaXdnUThPQlkKSTFOWkZEMWVHMDRiV3M3ZW5CRnNVUThRSlJhd0dWMm9McGdvQVQ5cFkrcwotPiBXLWdyZWFzZSA2cXlFJn0mQyA6LSBeKjoKM2gyM0dPTlJGbGVDaUVPY2RKU0ZQcXl2MnI2SWRDRFA4RWJuQklCUENTV1dCL1o1cXBDdWV1eGxuanRUWnZvbwpiR2FWMzQzTjRwVFBnYWVDOFVvczJYYWNHdEVUWXVVRE5OSzBvckhmTTlhOEpZUFNKcjNJZCtkdmJYM3grYWNFCklRCi0tLSBFS2dlOTl3TE5DNHFJR0xPOWhrZHpjSXRva3pMQkNtZDJjREsrS2MrQTdzCtd5yI5HSbiPoYKcafyw9GUH07HHDAcWZlWrxiBzX5XAkmZaqqoN+amooguvPLFFPDVg2/0I2FAu+EbQa8Gsbm/LACSXYzI0A5Le6xJ9+dmswvJuwNmMgpIcVM2qkw==]",
+                r"(?s)-----BEGIN RSA PRIVATE KEY-----.*?-----END RSA PRIVATE KEY-----",
             ),
             (
                 "OpenSSH Private Key",
-                r"(?s)[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBabG9ZYlZoZ0xmeFcxbE5xZnJSeXNXbW5VRUQ0Z1YvY1Y2b1FKUVp4YkdjCnR6SG1iN1ZqREl1M0tuYXRzUU5LcHM0NUxBbnpJcFBaK3kvVDFhc2lnWkkKLT4gWDI1NTE5IHYvWlVzVHBCODh0NnRjWGc0M3pCK1luWGNLQzB5REtmSldDVkg0THdoRzAKRmxQYTFzRmtITmhidUtVWjBOZnlJNjBpMGhiUnJDZ2tRNmdzUXIzSHpvMAotPiBOMjghaTAzLWdyZWFzZSB3NCAvenJqPSA0N2oKa0lteDRCdUFRZ1lYM0JGNjFaR2E0MTNqMUxld2hiUmhvN21hMUxGSGJxZC9oaVVwQUFNNzFzNAotLS0gMm9IV1gxaUloR2hXd2xTTUpxTmFVcWt4dFV1alFjVTFCMU5Dbk8wdlozSQrL0Nn0zgEf2E+RNWe5EA4HPjAFm+SeZ+I47IPmmRDKSgVb/adl8lJq4WhS/qXRIjK2AWlQM5n8P2zaiROZPVNPjja7RiSA3xCGWXR0nM3rsskb4BECt/lTAQIxCPZ554m+kaTTMZ1G]",
+                r"(?s)-----BEGIN RSA PRIVATE KEY-----.*?-----END RSA PRIVATE KEY-----",
             ),
             (
                 "PGP Private Key",
-                r"(?s)[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB1V1dKcFA0STA1Tk5CZFFJbHM4ejJndDN0SzZkbzVqWUdSU21yNHRWdEZZCkpNMVlkSHRuTkpyTHlFb3pLdGdXVFBuSDVJK2lQNjNjTGV1TEZmUVpGNm8KLT4gWDI1NTE5IENrZUFVdlVIemticlh3M25yVmQ4SFE0NzFndXh3SHlTbGl1bjdiWXM5WEEKM25kTERkUjM1dlQrQjN6eFJIMFRTMVUvMVVOSnIxdGgzMVNkWkFUdGZ1cwotPiBqTFdmMHdCKi1ncmVhc2UgXDZLSydyVEogKS8gTW8mTkdUJmcKMFRWU1BFN24KLS0tIG8zU016N3dwS0daRXlCOEVJZ0MzcU1MWmVVMGJlSGN6azlTWk54UlMzSTgKwVIGFxESmxAvYLwWSKZIALxyZWk7fDRomUUpxlYJLsI+LhzccQOAJVpPhm0+uqeFeAwagVVfPQLqzOTHCsKKoI+qLbj/Wxm0tsESKmkl7+tlmnvylAK48g816Wxtalo=]",
+                r"(?s)-----BEGIN RSA PRIVATE KEY-----.*?-----END RSA PRIVATE KEY-----",
             ),
             (
                 "SSH Private Key (generic)",
@@ -571,7 +571,7 @@ mod tests {
         assert!(findings.iter().any(|f| f.name == "Custom Secret"));
         
         // Should also find built-in patterns
-        let findings = scanner.scan("[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAybFQ0czJZY1BpMmRDd2Zva3lWN3d1VHpyV2dTWFRESVBRUmJRTXMyaURNClZ2U0JGSWxhL0dFOElnendFOU9GREhaNURpUUhNYmloN2oveXhDS1lxSmsKLT4gWDI1NTE5IERVUlFRZmxzTE1GT3FrREd2MThKcHYyeUY4N1NxVGtteGt3VWM5NWlQV2sKaGtDR0VoZTNYN3JpMkJUeUhjTmZTdG1mUEJVZVU3Q3ZRaHBHRnkyZUJlUQotPiB4RCkoJi1ncmVhc2UKejBuaCtkVkEvSW85VDNQd0tjN3VlSmpORHpEemhtSGN4UQotLS0gSUI0VlBiVGY0Z3R6OHE2Z1NBYlRmWnArdUpkRlpoRHdRT3Rqd3ZNcVpUMAq2LRHmBLyXr8yftSkBGSW+5MfjL4M9PDWgNc5lenZoO5HwmyFWS9UC0c2Av8x15xU94Mfv]");
+        let findings = scanner.scan("AKIAIOSFODNN7EXAMPLE");
         assert!(findings.iter().any(|f| f.name == "AWS Access Key ID"));
     }
 

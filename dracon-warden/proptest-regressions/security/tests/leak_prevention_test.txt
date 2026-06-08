@@ -5,3 +5,5 @@
 # It is recommended to check this file in to source control so that
 # everyone who runs the test benefits from these saved cases.
 cc 1e6d0f184ae160726d0e9bf53c7eac33d6b317b10ebfd5b47b513472dff18c9f # shrinks to is_binary = false, path = ".aws/credentials", has_secret = false
+cc b102972f6f45b317e9005d6d6c94cb163e0edd16ab0097dd89f2ef8ffbfadf87 # shrinks to is_binary = false, path = ".ssh/id_rsa", has_secret = true
+cc 505e91992e21d86d499d0a4203e56545f8bb4937fbbe87028c35c9d9b93e8e24 # shrinks to is_binary = false, path = "master.age", has_secret = true
