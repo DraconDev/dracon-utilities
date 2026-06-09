@@ -1,8 +1,76 @@
 use anyhow::{Context, Result};
 use serde::{Deserialize, Deserializer};
+use std::ops::{Deref, DerefMut};
 use std::path::{Path, PathBuf};
 use std::process::Command as StdCommand;
 use tokio::process::Command as TokioCommand;
+
+pub(crate) static GIT_COMMAND_LOCK: parking_lot::Mutex<()> = parking_lot::Mutex::new(());
+pub(crate) static GIT_ENV_LOCK: parking_lot::RwLock<()> = parking_lot::RwLock::new(());
+
+pub(crate) struct GitCommand {
+    inner: StdCommand,
+    _env_guard: parking_lot::RwLockReadGuard<'static, ()>,
+    _command_guard: parking_lot::MutexGuard<'static, ()>,
+}
+
+impl GitCommand {
+    pub(crate) fn new() -> Self {
+        let env_guard = GIT_ENV_LOCK.read();
+        let command_guard = GIT_COMMAND_LOCK.lock();
+        Self {
+            inner: StdCommand::new(git_binary()),
+            _env_guard: env_guard,
+            _command_guard: command_guard,
+        }
+    }
+}
+
+impl Deref for GitCommand {
+    type Target = StdCommand;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl DerefMut for GitCommand {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
+}
+
+pub(crate) struct TokioGitCommand {
+    inner: TokioCommand,
+    _env_guard: parking_lot::RwLockReadGuard<'static, ()>,
+    _command_guard: parking_lot::MutexGuard<'static, ()>,
+}
+
+impl TokioGitCommand {
+    pub(crate) fn new() -> Self {
+        let env_guard = GIT_ENV_LOCK.read();
+        let command_guard = GIT_COMMAND_LOCK.lock();
+        Self {
+            inner: TokioCommand::new(git_binary()),
+            _env_guard: env_guard,
+            _command_guard: command_guard,
+        }
+    }
+}
+
+impl Deref for TokioGitCommand {
+    type Target = TokioCommand;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl DerefMut for TokioGitCommand {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
+}
 
 pub(crate) const DEFAULT_GIT_HOST_BLOB_LIMIT_BYTES: u64 = 100 * 1024 * 1024;
 
