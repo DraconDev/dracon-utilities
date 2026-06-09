@@ -21,9 +21,10 @@
 /// # Parallel Test Constraints
 ///
 /// Parallel tests mutate shared globals such as `HOME`, `PATH`, and `DRACON_SYNC_GIT_BIN`.
-/// Tests that need a mock git binary must use `GitBinRestorer` so git command wrappers
-/// block until the mock env is cleared. Tests that mutate `PATH` for external tool mocks
-/// must still use `acquire_path_lock()` + `EnvRestorer`.
+/// The workspace defaults tests to one thread via `.cargo/config.toml` because these mocks use
+/// process-global state. Tests that need a mock git binary must still use `GitBinRestorer` so
+/// git command wrappers serialize and block until the mock env is cleared. Tests that mutate
+/// `PATH` for external tool mocks must still use `acquire_path_lock()` + `EnvRestorer`.
 ///
 /// # Git Command Helper
 ///

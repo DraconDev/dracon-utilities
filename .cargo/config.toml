@@ -1,2 +1,5 @@
+# dracon-sync tests use process-global mocks for git, gh, glab, HOME, and PATH.
+# Keep the Rust test harness serial so `cargo test --workspace --no-fail-fast`
+# is deterministic without requiring callers to remember `--test-threads=1`.
 [env]
 RUST_TEST_THREADS = "1"
