@@ -3,11 +3,10 @@ use serde::{Deserialize, Deserializer};
 use std::ops::{Deref, DerefMut};
 use std::path::{Path, PathBuf};
 use std::process::Command as StdCommand;
-use std::sync::{Mutex, RwLock};
+use std::sync::Mutex;
 use tokio::process::Command as TokioCommand;
 
 pub(crate) static GIT_COMMAND_LOCK: Mutex<()> = Mutex::new(());
-pub(crate) static GIT_ENV_LOCK: RwLock<()> = RwLock::new(());
 
 pub(crate) struct GitCommand {
     inner: StdCommand,
@@ -15,7 +14,6 @@ pub(crate) struct GitCommand {
 
 impl GitCommand {
     pub(crate) fn new() -> Self {
-        let _env_guard = GIT_ENV_LOCK.read().expect("git env lock poisoned");
         let _command_guard = GIT_COMMAND_LOCK.lock().expect("git command lock poisoned");
         Self {
             inner: StdCommand::new(git_binary()),
@@ -43,7 +41,6 @@ pub(crate) struct TokioGitCommand {
 
 impl TokioGitCommand {
     pub(crate) fn new() -> Self {
-        let _env_guard = GIT_ENV_LOCK.read().expect("git env lock poisoned");
         let _command_guard = GIT_COMMAND_LOCK.lock().expect("git command lock poisoned");
         Self {
             inner: TokioCommand::new(git_binary()),
