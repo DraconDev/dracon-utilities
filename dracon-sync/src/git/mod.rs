@@ -377,7 +377,7 @@ mod tests {
         std::fs::create_dir_all(&secrets_dir).expect("create secrets dir");
         std::fs::write(
             secrets_dir.join("weird.env"),
-            "# This is a comment\n\[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBHM0hmc0VCejEwTy92VWVUR0RERU1qZG9FTWljQi8xZGFnMGRub3ZFOVE4CnF2T09ZYm1OaTB0aGhLUXlxQWhkaDk5cWJMZlZVVWJidFVOODE4U05IMWcKLT4gWDI1NTE5IHcyRCtmV0hSQVNZdzc1UmFVdGtTK1krNVR4WFdtSGNUVzRRQVZSdXBqU1EKNUhaeEZPU1J1dXNuNWFZejRYVTlKRzlhbTI5VzhsK1dROGo0Z3hRcGxoNAotPiBYMjU1MTkgeW1LY1Q4QndEdUIzZUsvTVZnV0xyZVlzZkZ3NVRhSDZDMEQ0R3Y1U0Z4OAo1Zkk2TWRVZG9HL1ozaStBdDF3NkhaNU52K2lLRVo4MnZuNHFSTVlkSEFrCi0+IFgyNTUxOSBza000V0JvRDJ4ZnQ0eVVmRG41Rzlad1F6WXdUVnRFL2NSMGcvNzNnZG1JCjlUTXk5RlpCVFh2b0hMWFdHOVg2VnJ1QktpMkVFczdIRFNoUU5aMDdmaHMKLT4gWDI1NTE5IE1qWDU2cWYvQXlITGV2K3VzcmJwVEdMNVEyT3lDakFUODM2RVNnMVJKSGsKVnFBdUgveGJNMXhGMFdCelUrVjBlS2Z6ZU8xZU0xNE4wKzVyRXlYZUIzMAotPiBYMjU1MTkgZXBPdWNkWmdvVGNUUTJ3RGFPSHRwZGJLdTRTOVJZMDluc2Z1MkxCV2trVQo5YXllVmxhVGJQbzJ5bzlZR214VXdNTDRqQnVsSHlkMjdXNlppeGV6aElFCi0+ICl9ZXdbLWdyZWFzZSBaMTcwY1wgXUlGXyA1NWZMMyNfCktXak5iSmZKWnFJM0ZoV21Ud1JMd0ZxeGRLSUlxem12aTZlZzN5VUpXNnI0SmxmL1NIRW9xL0ZkQTRPM1FVOFEKdlNUWDlpdFROYkpXK0FCenU3NXEyb2JtTnk0UWFCaGI3K0NyL0Q4Ci0tLSBpZnBGMC8zbW5rejRVY2hIL3hEYytvSUsrd0JHUmFQWE0ycUlhQTVuTEpvCpiZNT7I8DFDYPmSvu4JrQ4o3EEW9tm4y75wODv+6IpgzeSzm6c7qzyJHM2uJKziAN3aNzOCso5ePSFK8wXQ5EO50EnrXPYljBhL10DyNUtciss8Mm1ph8dmZ9DQV1PjP6xODDFyUF1j1Kb9] Another comment\nTOKEN_AFTER=value_after\n",
+            "# This is a comment\n\[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBNSmJ2WjhiMWw4K3NUTjd6dUoydUlFUHJXUEpVdy8waE5YQzlESHdkZUZrCnlzc2FwWjVYSXd0MXdxQnVKdzBnakliQjdvdi9URGZURFZFMmYxMS9vL0kKLT4gWDI1NTE5IDVseXNPZDBpOTRmYVExZWluWlp5aDVhUVJUVUE4WFlwOEpEcTZiRDU5d0kKK0UyU0hIZW1MTnF4N3IwWURESjdITGVMTVRkN2p5NEhtVXdtNlhOaDlKVQotPiBYMjU1MTkgYUdpRmUzc1ZiZ0tWZHdGQTY0blB4dkRHbHRvbEpMK3RtRkk3VDZFaXl4ZwpJNDRMNmplZlptQzl1dk5mOWlOR3lPS2NtT1dmL1ZzMUt1ODJoVzNBczJJCi0+IFgyNTUxOSA1SUMrL2x3TXErdS9kcWkxSmE0QXZFQXBabkhTMXZQRmNVWHQ1MVRBSnljCmRGejVKdTlmZ0ExSFNWbHlHK2svZWpQeEFYMG5LSkN4OC9pN3N3TXV2MlkKLT4gWDI1NTE5IExVeW9EQXc5ejhyTTkxdXhkRkVuQlM2TUhuQnVwZmI0amxPS003RUR1RW8KYWo2ODJBVGlUdUVSSFdMSjJrazM5TWxXWWErc0ttWFFBUE00ZUFwUFJ3VQotPiBYMjU1MTkgZFFndXJoQW5mQURYQVY4d3hxdXhFUndlWGxnb25TeTZSS1RnY29maVloVQpVR0RHdHFSc04vTHI1OTJoUHAxRjF6WFo3dUxtVHptS1lPSWsvdU9TeFlFCi0+IG9xWS1ncmVhc2UgKys8Mzt4WFcgQi8hOHUKNGNPbDdpZFJ2a1J0Q0krNWtxZkI0RXlHeDNLNFNmTlBqMHJLVjhuamtoZEVvQ0V6WVM3ZHpGbUtTM1RCRFVNCi0tLSA1TktoUE9nczMxYnlQdnR4RG9PQVlua2wvcEsxd0pOSGp1WjlrZ1BuRVBRCuZucnQen7vVr7Pj5v4tgXzraUCavSES78ZrYHEQdYyAcLQl1FwmHlNAMo/uDTRzkCY0gdvN1mlJjhP7nI3YohTqcqAGM6IiEqJly1bT118RhTVQd2sf0/kf+nnJuSSnlsvdzgm+tz/1JA/L] Another comment\nTOKEN_AFTER=value_after\n",
         )
         .expect("write env file");
         let result = load_secret("COMMENTED_SECRET_TOKEN");
@@ -453,7 +453,7 @@ mod tests {
         assert_eq!(url, Some("git@github.com:Test/repo.git".to_string()));
     }
     #[test]
-    fn test_ensu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBjSUdKSVVXZXFyNXhHSmZLdExsbDJ0aVFsUW9GTFdYRlFsWkVUZ0tMU0hzCmVQeDhab3JoWUVtOENNMER0dEhCajdGOE1lYWxmUCsrVm56WE11bjdJOWMKLT4gWDI1NTE5IE5WamZFY2orZnl6eE50WHR2dm9ndmlKTW9JQml0blduTkxqR2JvaWJ2VncKUnV0WWp1ZDRFdlI3VEhhVjkzMjc3WkZnTUNYVkdXKzJJc0Y4ZjlBUUh1QQotPiBYMjU1MTkgNjJieFhFb0dpMmdra0RZK0RqU1grb3h1eEVBZVJVQWZqcnZRRWs3MUxtRQpjd0FXYVVVOGN0dHI4NWc0U2xJQUMraG1OOHMvaVdnZTIwM1FFTEdkOHRrCi0+IFgyNTUxOSBmRHVBdmdiQlY3d01nVHM1d2ovM0hXTXQ1cldRMmw2V2lWbkFtT2tPclZRCmNsNG9PdzQreGdYTjlScE5ra1V1eFE0aHVvVnd5ZmZzR2ZlcVhmZ0t2SEEKLT4gWDI1NTE5IDlFc3ZST3E4UFVNa0FZTzNrcnFzUWZpT0hLMUhYSFJXK0tYUi9teVZFbE0KclhzcWZmTU9ieDNQd2M5TXNqMTlTYlAwdXR3VXA1d2kxY3ZnQXZsaC9HVQotPiBYMjU1MTkgOUxKRVpGakEwTHlZdGRuUzNITUJVd0ViU0FXbzJnVnk0Ym1MdFlUdkNYRQpyS1cxcTJkRUE3SXIwb0JTWnd6QXVFamxZM2ZlamlmODY3VFRPS1J0M1pRCi0+IC5dIkN7IS1ncmVhc2UgOSBWW0xTXiBqPn5ZIHVfZkQKUzVyMFg1S3dBRDhLQkZYUGl6OGFQTTJvUDBIYTNhZDR0Ymc1V09GWmQrQjBoUHVINytUanlNYXpUV0FaR3pNbQpvRjdlR3hUK2xMYlVpeG5jQlFGVXRjdEF6VVZid0EKLS0tIDhrQ05Na28ydXZsbnlsbDF1c1Z3U0ZtNTVlUUVSeUN1bmFaSWZuNnVuK1UKPcnBu6kWT4aQJjms+U7lYkE3ODrzHKJgeLfjE9kIVyuwFDD8MnbDGidVv7+ZseBSBZcITgOLEuU4mg==]() {
+    fn test_ensu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBOOFRJWkthMHd3aFhpcTJSTWIrYzJVRWtUWmt3NWJhcXlMd2RVcUJ0K2lNCjkxaHI3SzhRaXRPVHZCdUN6VnhMN1kveGlqTHBvOFdLNE5VRFNJMEI3d0EKLT4gWDI1NTE5IDdiL25oWENXT05URkM3YUJ1MGUzZE5kZkpKcDBUd3RMVlRVUkNEMEp0RDgKOVRmcEhzT0hNR3VTdmJuT3F6aU5adTZROHRieEVnZjA2cWo1bDhoclYyYwotPiBYMjU1MTkgOHhCZkJjSG9MdzJ2akxpaFRjbUEvZ0M2K3cvNUZERTRLbVNxRTBLa3hoWQp0RTVpRm9oUEZJRG5nZFFTcEZIeDMvbVdkZi9xcHliY2xBQlhoSTVSWXdrCi0+IFgyNTUxOSAwdmJTUkp4bmVKL3hWUS93VGhyYlQ4ZzUyVTR1aGl6NXpiMjc2M1VrczBVCllSdUVDdG5PUDI4d0xzTmZhZ2NobjZCaGIxN1FrdDlueXpHbHZrK0xVY3MKLT4gWDI1NTE5IFJhNUhLYmJPc3dyZ2VGenNJZC9KcDNXWHQ0a3FTYnhSRXFaRWUwUktpQTgKWmpVVnZQYlE1TFRBZWJRb0VDWTZWeXVNemFLUmdUUlVETi94UjNUalZpTQotPiBYMjU1MTkgQUNYdERXYlI4NG9haVZ2cTVPTTIrWVRBeDdFV3BtQ3haMjVCbGpGdXVHZwpOS0ZPbkRrZi9GWEpJQlc5ckxZSVd4S25qN3UrS3dZb2xlRmF4UDNPeVdrCi0+IHg2OD95MFZULWdyZWFzZQpSYnZXemZSOWZja0FGdTBlZzVURnpPdkZxdzMrY2VlTFhxS0lqREtxdkROTDBYV1BNQzJEWEZPa0JZaUNXc29ICldYSjFyMEdDbVVoWVdUWDkxaGdQblNnCi0tLSBSWmVOLzRzdXZabnY1QmJiU1M4VVR4TlUzNXA0Z2xBTHA4eTFVV01tTi9ZCg2mjMFQb61PexT8QGGZWXXqWPVtDQU7gg7z5mwCGW0PuiH0sq4R63dUDH9GWlPKviwt/7uwBBzbPOk=]() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("test-repo");
         test_git_cmd()
@@ -589,7 +589,7 @@ mod tests {
         assert_eq!(remotes, vec!["origin"]);
     }
     #[test]
-    fn test_configu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB1elRaMWQvYm4wa0d1K1VLKzY4bEJHTkxiSjkrSWRMb0V1bEsrT0o0aVNnCkt5TzIvcXZFMmxRVUFMNDcyK0NzUWs4MTN2czJyU0R4WklzL2hkRjNBcnMKLT4gWDI1NTE5IEpyUlk3TVI3RGU2VW8yNThWYnhLeDNyYXplSm5tbWQ1RHYzUkRRSGd6akkKQ2JlaXFCSzZFcVZDVGxwbDkwTWZoa1ZNOU5ScVYvRVdGczdobndlZzRZdwotPiBYMjU1MTkgQ0lwdmNEdHlPSVpneTJRcklvQlRrWk1vMEpSQnVUTlUrMW1ZQm1WMit4bwplWXhKTWM2Y09XNXJoTUZIWENQUXVmWFFxQUVVcmVLbGRtbXpnTmgxVkVBCi0+IFgyNTUxOSBySHlGbzVNWXJWMWZ6WHZaSEVlaG50eVJ6VXo2dmxKMlRHbWEzSkdoNlRVCmEveDN5U1M3SmVGN0l5OXRpL0VQMXg4dVlsTEtiaHBtb1ZEUVZBNllFOG8KLT4gWDI1NTE5IEtCbXEwWGxxeU5tUVRRS0p3RkxObGRRRDhQU0dzdGpGVGNOd1RmZ1FHWGcKaHVoUU42VXZZWWNqbWhjck5Xc2dTT2c1eE1vRWR3aS9hcEUrNUNqSUVPVQotPiBYMjU1MTkgWmJGWjlGdUJWSkRlVEtNcTNxbXdKVlFlRXEvTjVLbVRGSFN4RHEyVitDUQpHNEdhNGxTcFY5UldlSWthNENkTEVnbW5iaElLcURWUjVkYjRvNVRaYzF3Ci0+ID8tZ3JlYXNlIHJMYUYgVmonWCA4fmoiTWkgJQpWOXVSWGlXaUpZMHp5UUI1bUZMTnJ2VU95ODR5ajNYM0c0clB4NUQySUpERE9PeXk5NnFQWHU0TWltcjJ6eXNkClNCTUtBei9UK0crK0l1WW43ZwotLS0gV3VaT3JxUmtzOFkzS2hla0pEYUNOT00rVEQ0WU9jV09YZ3l2QWEvc2M5awpF3r3UuKrgmRUj1MPORj1B5GjHhJeyCzj4IqinEnNAWH01o+PEw43x/Wx/G06lAO9o8uT4oVsD+JH11Tc=]() {
+    fn test_configu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA4L3h6T1I2WjNOZUpxT29BWGJvUXBJRzdvQVRvcy9GTUhockJyNTZ4VlY4CmRZWGtnMEhFbWo2YUZoZWljVmtCTmtjZkZ5VnR6N0pPQllORWlaTzlLekUKLT4gWDI1NTE5IDNjNXQ2K0JhZnpodCtNNUszTEo1a2xodmFvcThEbG9pd0NXM3lsZ2Y2ekEKbm16ZnBjYmk5N0lxZVE4UUN4ZWdoekFMSzhZRnhMdlkvSHE1aU55NzZnawotPiBYMjU1MTkgVDFPUk5vMk94L0lJcENWNE84NTJEeUgrM1RZbFE0N2FMRm5waWNyRFhrcwo2UUprK1VJYXRnSmdwaUd6a2doWXE3cUtHTVNpamJWb1QxWWI0b3QycEV3Ci0+IFgyNTUxOSBGZnJ5MFV2RGlncWpQTEVTdHlJdmRGSTBwU0pwRWRER3F4dXdHSGVPRkVVClEyRVFIQmw1eWtWa2NCZmxjV3daTlBnUXFWOWVVdVMvQW54RTZGZWZ5WHcKLT4gWDI1NTE5IHN6OEtKaENiellxOTZPU0FiZzN4ZWt0Nm5oZXR6ckpHUzcvTkt5SGJNeVUKNWY2ZzVtK1NBTUFjbFo0ekczQmhQMlphcEswWVpxZGVlVy9odEZMTXMyTQotPiBYMjU1MTkgbXZrL1JmYk5QSWRDS0hxNHlvdFlSYTJ3TzdPc2ZRY2lwYlZxQ3BEVTZSbwpkbVZjUWVxeERxMnJXdUU1dHpXQlc5RzM0T2Q3b2dlUU1nQlU5bVdEN044Ci0+IGdQbFVSRnBGLWdyZWFzZSAhSjlPdHdSXCAtIGo3IHhebW5aCldNTXZnY2hQYkt4Mm0valVMY0ZVZ0hJQ3R3SU9YaUEwQWZ4R3VxV3hDSE5WUXBCUnpQRUNzZ0V6MHFIWUJaS0kKeGZnbVVyaXJlUFEKLS0tIGdhTDlPNVY1OGlmVG15dWMrdXY2REp3ZFpJRWVvTTJHQVF1VDFSUlZYSU0K5RiOCHtM3THek5mN2ZASb26zN+1irjFhYxfgUh5me2oDBoiVV17V3IXZ1lIHUkcIC1+byHsut5gNJqy1]() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("test-repo");
         test_git_cmd()
@@ -617,7 +617,7 @@ mod tests {
         );
     }
     #[test]
-    fn test_configu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBMQVRwUUlSc2w2R1c4QWtFL3FVV1A4eDJ5c00vbmlJeEZ1TTJpcGw3QlRjCi9rQzZGL0YvdTU5K0pOM1RaY0hEWXdYVXJheCt1QlczaGtaQUFEMmp4VzAKLT4gWDI1NTE5IExOaEtxYkU1RXhGbE5VZ3JZNVpRZ3NnZEdVbUF3Z2YxcWFvK2JGdi92eHcKWTVxYk9iT21wSldwcEFHdExwN0pLenFEeURydU8wVllROWhubkdtODJ5YwotPiBYMjU1MTkgV3l3cmVnblc0OWdqWi8xNUl1QnY5anhRWEVqU1UrOVlnbW9RcEYySVBrVQpXZG45cHlrdWxxNjBiQ2IzbXN0a21kS0xxc21HeE9hRXNwMW9oUmNPZGlnCi0+IFgyNTUxOSBzeGx2V0JGS1ZESUVtWTZWUnlReExBd1RmK0tBNzZVTEtCWk44ZWl2MkZnCjE0Z1BVd1dEcjhwQ21FMTJ4SXZVdHYwcnRnNTNDMUQ3QlNSTnFVaWxLdkUKLT4gWDI1NTE5IEcwOEY3eDNXWDdvdHUwcUVYSGhnSy9Ub2YweFp3allyM0tMTVgzTGZGVEkKczkvdDRISnI1WjNEQ1BMZVI3ZEZsSkVHSUxmeXBJblh4NHNuLzY0QUxmTQotPiBYMjU1MTkgNm83Z0dpbi83eUI2a3loUHZpajhHSTFJejdZdjZIQ29qeHVOS1lLaWVHdwoyWkhxaHNCcGREM3lCUkJBbWVjQUZJRnlHL29GZXJ2azNGd1dKdE5PQXZVCi0+ICciJF4tZ3JlYXNlClluZmtOSzl4ZzlJT1FycjJoQzFzakhlNDh4RTBsUDUrNERFS2xaYW80THdlRkJtNXJIUnB5MGdRT2Z5ellVNGQKV3dlRnRtWQotLS0gNVptb0RmUTUxWEE3bm0xakg3ZFEyNmQrdEt2MFhqVGNCT2s5bHc0enV4NArXtCPTj5L1IFzL7c7lRThNlEGnya/DyN9/y/PuyD0F5f3Qop0tEhh6ZS5Qz+BqWGlySNpdeexJMYDZJpiHr1I=]() {
+    fn test_configu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA4cHViNnM3dVlIejBKcmVydGhnczZIR2ltb0VkSCt3NFhETkZ5UE1kRlR3CkJkMVdhVll5dVVSOG5JL0lVSFpzQTlWSzdKNHJMa2ZYRGkyL0phb29LNUUKLT4gWDI1NTE5IHoyM243MmZKR21xSy82djVhQXMwY1N2cVpzNVZmcDZDUks5TXJjbzl2QVUKQnc5WFlORVhiaEVraU5zZG9LVDZKTFB1Qm9xbU1uV0N3RWozNEw3Y3c1RQotPiBYMjU1MTkga2thVHM0U0pkSDU3eVBPNEtSTUViRlhLVHFpdzNkcnR1UEZaeTVOMjF5QQpXSTZnM01JcUQwWkw0WXNHTkYxbTJCL0V6Z0tVRmp4b2l0MjhZWVZNUHJnCi0+IFgyNTUxOSBBeFpxa0VOTElXTWIvd1grLysrSStPaFoyRXA0Y2N4NmxhbVNkT1Q3WkYwClJVTlhkSFFHdjFIbHdxS3hWeHczdlBCYTMrQjhlV0g4MmZaWFJJNmh1am8KLT4gWDI1NTE5IHZtVEZ5UytRdjlTaGkzVm5GK1dhdkljTkFmVHVWWTFsMkIzVk9rb0FVUWsKdmpTTEEyTndRRHFJSkxXb2xQdUF1T0NVMGJ5RngvTW5jVm12VjgzckZPawotPiBYMjU1MTkgWEtOYjNMQmlmYUFZTVBRblUrQ1JxcjVMdVdwQkcxQmlyTzFCRGJKbVlpWQpaenB0SndVTGduMWVWQUx1ZFlmSSs3VXk4WFg1R3pvUXhSUDh1K2tRK2NzCi0+IFc+b2shLWdyZWFzZSArcipXICk5eVggRCBqTHxMUD1YRgp4SUNrT1FUQWs3Q1oxUGlSQmp5M2pndDM4SklEVVNaVWRkY2hNZEx2REJaM245emtMSkNRTStPY3RESWtyS3lsCi9XM1pSd1BWL21hYWE0RkFpTkFQZ1JFeVJYajk1VjRoVFh6RwotLS0gdlp3aWhWc1c3cDgwaTZGOFdsVlBBVkFIM2N3b0xJbnpBeEg4bFlUcW5kZwr8SbrYAkmGzUe8h2I3IHtPHkeUgLaVp1QjXZhp4u8PCyb+0hkRZOoG1m45MGeQlU90+XLhK7g8iCI+PlfXnMM=]() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("test-repo");
         test_git_cmd()
@@ -664,7 +664,7 @@ mod tests {
         );
     }
     #[test]
-    fn test_configu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAxUTBnRWdrUHVTaVd2Ujg4ZitMbU56YUZ4QVdWK2NPNGFYRjNycWVyeXcwCnBCV3dVNEhicXh6ZWZpajUxbGswTGNuMmp6RHgxWmNXaW5EYitZZFdQdVkKLT4gWDI1NTE5IENyU0w0YkJyL2pwTlJxMUs0SEJqUGRRaUVvU25TbEN0OGdVcFhHR2wrVU0KbWdmSVRwUFJlZXgrdUtNSVVLU2VHVm9RRTVaQTQ1L3hyTWNhcWVrWURhdwotPiBYMjU1MTkgRUx0ZXpPRFFpaVpqeHcwQnNvTUIrb2taS0VIY3dSTys4bldxM2JIay9GMApzTGN4T2dtOHZNVWNuMXZaTzhKQ3BjaXJra1pvMngrdG85M05EbjZheHpzCi0+IFgyNTUxOSBDTkNYTS9qeVZjSzZ3ZnpsekpoU2V2ZHl5UWN6STUvRDVkY2RoUWppRUcwCmlOSytXZkYxa3V1NFp2UG5TZ254b3FlYWxlak5RV2VMZUVNQmkyY1VFeXcKLT4gWDI1NTE5IHVIN01sTW1HSW44dlpRNjBwQWZyam91L0lCT3dROWo4NlZLK2pXQ09paE0KdThFTk1GbUoyMGxwd2ludlFNdUl6UG9BR21uaHB2SzZYUHgxT3lqOGhzcwotPiBYMjU1MTkgUTRxc1F1Q2h1SC9CTE8rMHo2ajhwQ3VxdlJCMmxlL2hYWWozc1p4VXFGawpkcTdXZ29yTmsva0hQUzN5eXc0cFZKSnhyTEVCSFRXVFZXWmJZY2tMbVlNCi0+IFN8LWdyZWFzZSBbN3J3fE4hfCA1IEAgdWg/PHIKeFZPbDBOS0xnQzUzbTlUU1F4ZktqZGNCcFVoZjFpZVEyYXBnQUhVMGpJa1duNHIveDY1VWdIZDhsbk1xMVFyagoKLS0tIGpWUXNQeERZcURzMjRCeFRIa29wb1Mza290N3JTaUtrczJ1cUNTSThEZk0KG3B/NMotKw+takA/MKR+xdSAik7apaX7imcVbqcmJvTv8WU4naojHJCwZ/eDmbpFWO1z1hQPB/Ll]() {
+    fn test_configu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBrOUJzRktFRU1uRytaTGlnYm1lSllzK1BwVlRLMGo2MldVdGFqMnJ3NlFvCjV4S3hNcVJKWUt1R25ZZ1p6bFZrSVZFNXBwVEhBaGhLUTZ5U25VYjVxYTgKLT4gWDI1NTE5IFFlS3h1Y0tJSElYeTZ0dncvZmEvL3M2RERnWmszUFpIRzhmSktCNkFva0UKMU0wOHpVb1B3UU9sTFdjSFpvOWc3VjQ3eFIzRHI4bkVFM0ZxWTFQVWoxWQotPiBYMjU1MTkgVEJ6T1l0Wno0aytVemc1SWNkbjN5WG1ENDVTQUtDMkpMZzRlSUJWTUx6TQo2NmNLT2hDT2IwSW1CWGFGV0xSVSsrOUpNcWdya2VXVCs4RUwrM0t6K2E4Ci0+IFgyNTUxOSBWTHdFd2FkZ1NNQjNGUlVzVGhKSGhacWxLbjNSUk11NHcvcDBXc2t5NWxvCmZvK29ndkg2WlB5ajhINlZqZlppaEpGa21DNW5peVNyVTBtOWNnNGx2UFUKLT4gWDI1NTE5IFp1NVl6WG9WVmdDMHdFTEVRZzgxOHkvdWMrQWFLeE1SaTV1azFpalpJMXcKT0JOalF6SDZWbjI2VkNyQ29DdDJialcyRGNDd1hyWWFFSkIwcXRQMUZGTQotPiBYMjU1MTkgYkZVVTBsL2VoK3J0OE9CRS9xTGxJS2dFY0VZeFlWVE5DV01zMXl2SXFVYwprYUwvTDJIYnNOVzJEUzNRY1EwNno1MTIxeFNodnYwUUVlcGVCTzBTa1E4Ci0+IDwtZ3JlYXNlIGEKNVFhbHVGLzhMdUFxU2xJS2lPRFZjSVJ1RFpqd01MYkxkK2RDKzlSeXp3RTJmeVJRN1VvTnIrWWNWcDkrTlJLVworbUNQa2tWRjNOTENUdUkvYTNnSEk1TFpTNFUrMytBaklybjA1SldpWHFzNnhZRkVaUDlVeHpTamN2eG5IdXRPCjBTbwotLS0gZGVVcVV0VHBXWkZrM2tCcVZkdCsyZjBrREJGS0I2U2ZjS2g3YS9Ub1ZnOAoe5yS6mEhfaE7FxTU/6/tFX7GAZa6aKKEuhO525+9mmjJ011LtaoA12j4KsIYFLJKvDZliLvY5hw0=]() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("test-repo");
         test_git_cmd()
@@ -1040,6 +1040,15 @@ mod tests {
         let gh_mock = tmp.path().join("gh");
         std::fs::write(&gh_mock, "#!/bin/sh\nexit 0\n").expect("write gh mock");
         std::fs::set_permissions(&gh_mock, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+        let _path_lock = acquire_path_lock();
+        let _path_guard = EnvRestorer::new(
+            "PATH",
+            &format!(
+                "{}:{}",
+                tmp.path().to_string_lossy(),
+                std::env::var("PATH").unwrap_or_default()
+            ),
+        );
         let result = multi_remote::create_repo_on_github("testuser", "my-repo");
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "https://github.com/testuser/my-repo.git");
@@ -1071,6 +1080,15 @@ mod tests {
         .expect("write gh mock");
         std::fs::set_permissions(&gh_mock, std::fs::Permissions::from_mode(0o755)).expect("chmod");
         let _gh_guard = EnvRestorer::new("GH_TOKEN", "test_pat_from_env");
+        let _path_lock = acquire_path_lock();
+        let _path_guard = EnvRestorer::new(
+            "PATH",
+            &format!(
+                "{}:{}",
+                tmp.path().to_string_lossy(),
+                std::env::var("PATH").unwrap_or_default()
+            ),
+        );
         let result = multi_remote::create_repo_on_github("testuser", "test-repo");
         assert!(result.is_ok());
     }
@@ -1081,6 +1099,15 @@ mod tests {
         std::fs::write(&glab_mock, "#!/bin/sh\nexit 0\n").expect("write glab mock");
         std::fs::set_permissions(&glab_mock, std::fs::Permissions::from_mode(0o755))
             .expect("chmod");
+        let _path_lock = acquire_path_lock();
+        let _path_guard = EnvRestorer::new(
+            "PATH",
+            &format!(
+                "{}:{}",
+                tmp.path().to_string_lossy(),
+                std::env::var("PATH").unwrap_or_default()
+            ),
+        );
         let result = multi_remote::create_repo_on_gitlab("testuser", "my-repo", true);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "git@gitlab.com:testuser/my-repo.git");
@@ -1113,6 +1140,15 @@ mod tests {
         .expect("write glab mock");
         std::fs::set_permissions(&glab_mock, std::fs::Permissions::from_mode(0o755))
             .expect("chmod");
+        let _path_lock = acquire_path_lock();
+        let _path_guard = EnvRestorer::new(
+            "PATH",
+            &format!(
+                "{}:{}",
+                tmp.path().to_string_lossy(),
+                std::env::var("PATH").unwrap_or_default()
+            ),
+        );
         let result = multi_remote::create_repo_on_gitlab("testuser", "test-repo", true);
         assert!(result.is_err());
     }
@@ -1128,6 +1164,15 @@ mod tests {
         std::fs::set_permissions(&glab_mock, std::fs::Permissions::from_mode(0o755))
             .expect("chmod");
         let _glab_guard = EnvRestorer::new("GITLAB_TOKEN", "test_gitlab_token");
+        let _path_lock = acquire_path_lock();
+        let _path_guard = EnvRestorer::new(
+            "PATH",
+            &format!(
+                "{}:{}",
+                tmp.path().to_string_lossy(),
+                std::env::var("PATH").unwrap_or_default()
+            ),
+        );
         let result = multi_remote::create_repo_on_gitlab("testuser", "test-repo", true);
         assert!(result.is_ok());
     }
@@ -1674,7 +1719,7 @@ mod tests {
         );
     }
     #[tokio::test]
-    async fn test_resto[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBCcTg2OGlrMCtqZ0hjNDN6L2dkVmFKbW9VV2hic1A0d3dNNkw5dEFBRnlrClFnS1VmNU9qcUhjZmZNV1F3bVpVTHUxUlBuVmwyWVRTMjBLSjExWURtckkKLT4gWDI1NTE5IEtmekNCbG1mN1RoSjd2emRJanBuSFVTUnRnd1BhUUxTRHVackVhbjJnaHMKcUM2dDNJOTJWK0RyaWVPUi9ESzgwdERJdGY3dnVFakJHMVZEalNoUi9DMAotPiBYMjU1MTkgcTVVL1FJWkVqeUo1eWFsUHM0OGdnQmxZRFRCWGdhZTJRRVR1eEgycmYwbwpwNkNoZDRBa2F6TTk2ZjZKZys2QXNuN2g3bm1naW9jTzY5WWJVUEcrWHNRCi0+IFgyNTUxOSB2WHZEL1drVXZTUDAzeEE3L3c3aWpMSXpQbmdlOWRaeCtVWE1pUC9HQWdVCkRiV3RySEh3UERNWGFWMnROK1M3bmZ6MlR6QjUrZWlsb1ZJR29qenpJNW8KLT4gWDI1NTE5IG9HRjlCT09BTFNHVjUvYWRLZGxsTVBzTEFYYmdpQTY1Uyt4dk91d0o4eTQKLzcvQWsrT2lxUHF4L1grZFlrQzRPSlVKVTF1SGwzODZYQlNBblpDM0pRawotPiBYMjU1MTkgdDlBd2JMQ05UOEt6RUl6VnR0ZjZUNjczQzRUblVka0lOVm5LcjMrMHhnUQpZNHpGS0NGZ29TcDI2eUFrWExQWTl1Y2JsVU10UVV1Z05obUVyKzdBWUU0Ci0+IC8jPy1ncmVhc2UgTD14SWhtOCB3SitIfSBMCmRGRWtnK0IxeXVXTkJYTW5OdWlKcFJTWmp1aSthWng2WkVvbjlRaHZNNjI3cFVDSTZ4V1BOcVZpZ1RSZ0trK1IKa1BLYTNWeFZ1cUdHbFVZYzR6N1lqUjV4aVlET09CV0cKLS0tIENDOXFIOU1sdXJBOUtnS0FZcHJJWHBkbHl0ZWJ1QnFWYkNBSFgvaS8vVlUKd4H2l8nzdiazUNxlZBsqqvdrvaGepVG1hxl/VrUH/k2pJBwB0Jx5Kyw7ZVJNpnP0sLeI1ZeeaFXiCgh4iGG2E8vDRBbmFutB]() {
+    async fn test_resto[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBWeWZSMFV5MXN3MDVDdk5ZY3ZGWkdOSTZWSVRKV2xqQkNwei9iUU5zTVdZCk1wdmlnRDVuRjJ0N29DSkd1TU82UVlBeWNqOVdGdnBQYmMrTm1ieFNmTFkKLT4gWDI1NTE5IG1vcktLakNwek5lM2xqQm5qUkNSY3J1TXFGYTk4RHBkdjJEM0Y2Zk90MVkKaE84bFlrTmY3VGpNWGh6bGhmQXhwem1YSHFwUmVqWVNlYmtBbEEwSlJVVQotPiBYMjU1MTkgblRqMzBPcktJa2ZucWUrU29YTE1UcjBqMStwU0NpS0o2VEpqRk04THF6MAo4S2JZWGdUVGZVRlBlMjZZVGJqQkJSM0lnZUVSS0RtdEpQbUZpRVBWSWprCi0+IFgyNTUxOSBwRWNGcG5UYkZvTmlwK0k5bTcwSEhzUDZBTGRsazd0SmdkVVc4bUFRemdJCldZRVBLcWJZcGNiNHRXOFVDaW44R21nSnpkNWN6VkRTVExNclhIdTFUeVkKLT4gWDI1NTE5IERDK1NjSFFhcGFXRGkwOFV4SlloTWpsSlRoK1p2U0JpQ3JJdDVVd0Fld1kKMy81UG4yTnNVL25aamhZZkJGSExoQ2loYlZXRHA3aFFzcHVRYVo0bFVGNAotPiBYMjU1MTkgcllPQ045bm5OQVNzOHJ0TjNkTkxVZ0U4bnlrcDRoUnF4Q0xPU3BHVWltSQpsSzl3eFY0a0tyU3luRjMxeXJjajdldkxQMSs0NFk0UXdhN3BYQk9IRGRRCi0+IGVyTFktZ3JlYXNlCmtkdm44OEw1cmVWVi80MkZYWVhEZ1NHRGpvdExodkM2QkRMMHZ2OEptc0hLZncvY2JyTEpWc1dBSE1tYgotLS0gM1oyYUh0a1lyZUlKcks4RDA5QUtWTm9vUFR6SFBJS21INzRjTUVHb3VIcwpfg8/yuakfpDQZ8Sf5H62N4mxndSUOVsp25VRBq+QYPqslDd5z4KcMI4N61IfoLF3wsnxsbhMrbfYGpAq1g9f64O/hre0eHbo=]() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("test-repo");
         test_git_cmd()
