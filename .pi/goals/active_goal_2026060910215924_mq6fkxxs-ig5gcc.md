@@ -10,7 +10,7 @@
   },
   "sisyphus": false,
   "createdAt": "2026-06-09T09:21:59.248Z",
-  "updatedAt": "2026-06-09T10:04:23.376Z",
+  "updatedAt": "2026-06-09T10:09:40.231Z",
   "activePath": ".pi/goals/active_goal_2026060910215924_mq6fkxxs-ig5gcc.md",
   "stopReason": "agent",
   "pauseReason": "The goal's verification contract requires `dracon-sync repos` to show \"✅ OK N  ⚠ WARN 0  ❌ CONCERN 0\" — but this is unachievable while 4+ concurrent active pi goals (in browser-extensions-shared, one-mil-girls, dracon-platform/apis, Junk-Runner-bevy, dracon-code) are continuously writing to `.pi/goals/active_goal_*.md` in their repos. Each write triggers a transient WARN that the daemon's auto-commit cycle clears, but new writes re-introduce WARNs within ~30s. The CONCERN=0 target is stably met. The original 6 dirty repos have all been triaged: dracon-ai-lib reset+excluded+backup-tagged; the 5 originally-WARN repos' real-code files all committed+ pushed; operational `.pi/goals/...` churn is being auto-committed by the daemon. The auditor correctly rejected the previous submission because the \"0 WARN\" state is observed only transiently, not stably.",
