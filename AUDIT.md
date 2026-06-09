@@ -608,7 +608,7 @@ Running tests/redos_stress_test.rs   (target/debug/deps/redos_stress_test-57cf4f
 test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.34s
 Running tests/registry_credentials_test.rs (target/debug/deps/registry_credentials_test-ace9cea3db44a222)
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-Running tests/restore_test.rs        (target/debug/deps/resto[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBmSXBEUHBPMjRSQXZKRGFVQUg4bC9wZUxmZEVLYXJYZFFrZXVsRTJNd0g0CllaYmhwL0NRUUtpRXFqU3Z5cU1oaU0wSEkxeUJ3RU5VeVpJcmd3YzRmOXcKLT4gWDI1NTE5IG5odUdqNm9kMWN2OHdBdFRaQTlCS29UbHMvYkRHRUhuT3pmdE5rWU9lMk0KQUljNGFVR2xpa2lVTFBFWHh6V3VTV1g1djhYbmFxcjRKSnhSeUhuNG1KOAotPiBYMjU1MTkgbDNnRlhjNm5kMTg5UDRCVXpjRVVJK3oySlpGYllqRFhtSUY5R0kxdlhWNApZWmwxUGlVMDJSOGc1anRFVHRSOENRMkUyUWRxZXUvWXM4OThOQWpveGdzCi0+IFgyNTUxOSBZWkJ5UjNGVkl2WWdDWnJKeXRlN3dQWXI2V1N6K2lLTWlwOUp1K3RMV0UwCnNqRWRwOWMzT3pOR3RXaGs1ZmVSVlAvNGVPamM4QTMvVzFzY2c0LzlMWTQKLT4gWDI1NTE5IG1MdHhydnpMMzdPbW10U083WmRqazZHTGQ1ZUpZL3RtV3ErbTFMU1F0MmsKc2pCRi9uK05wNGRqeXVZdjdIMDdmdi9MSTBKdDkrNlRESWZpT1BGbDkrMAotPiBYMjU1MTkgbWJvdXpOb1c4WWtXY3Q1TklNWG1QNEowUFJsY2J6NFB2N2Nra2NaclVCRQpzNTNlajEremJqK2xrNGl3VGhvTFFjdUFWRWp5UFA0UVR1L3RRV3I5b3Q4Ci0+ID1MVzUtZ3JlYXNlIDQkNDggV2d2UiNkCmtSem5hNGJNNTVXdHR0S0pjM2c5aGFiazA0cVkKLS0tIHI0NldOb1hsUVEvN1lObk8vbkJkN05mdXdsUVFqeXVxbUplQ1g5MmU2YlUKeIo37ThR7qy//uD83G8YSIHI6Y/pn6S0HDDPwwFbLYWE8PLy733ZRMHKdA2UWxxe/Fls+DhKIaQ=])
+Running tests/restore_test.rs        (target/debug/deps/resto[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBKQWUrVkVoTkQxWGgwY2psTXl2Y3FNR000M1V4S3hKSDRvd0NsejFRL1M0CnpkSVZaM1FuYUJtdmRwVmp5TDhXWjQ3WWhCM29WVk8xUjlDV29INGhNVFEKLT4gWDI1NTE5IDVvb0VTbHZJV2Q1ZzNUU3I1WkpDUFo3bjZwVzBzeTltNDV2Z281V1R4bTgKWmhSM2cwU3ovdnN2My9vUklMamFwWFZ1a1FDMFdkREVQZU1yMkdNNmxGcwotPiBYMjU1MTkgUmM5amxuU0lqMDBsZVdVY3pZMThmQ0cvN09kMnA4VTNXQWFCWEtCUm9HRQp5cytBTkI2bGYzVHUxSWNnK0J2bjMzOGdFTmhhdGp1ZFZQMWlBWkFnbnJBCi0+IFgyNTUxOSBhczIyaTR4WnhRT20wb01QbE9zdllqQzN1dnV3bE50YmNxNldyVU1OclM0CjZTMUMrUHhqMVYwSkduNEx5aHUycVNQczJDV1Z1MEtUMzFzRENpS0cwYWcKLT4gWDI1NTE5IGxjZS9WWE1wL0c2Q2NLK2l5RkpVL3BKcDFHN29hTVpaMUMxOHJaeUlLUkEKaEM5U1RaREwxbFlZc1pST1haUjA3Y1JTZW00ZzN3QzkrMW1ETTBEZTlMZwotPiBYMjU1MTkgTUJzaE5YNjgzTCs0ZjNRNXBGOE00OFdzRmpBVTk3UnFGajA3Mk9lbjFEOApDN3V5cmhHMTVVZTJjeUhZd3RWY05WczIzN3laVXFFRitYa29PY1VLb3lFCi0+IHxCc0gtZ3JlYXNlIC5BP2ggSFxqc1V7WDIgcQorSjl1QmVvL0JzWVNhN0xhWHp6ZTdFSnpEODAvWnh5RnJxSUhLejQvMUZ6V1Z6cXl3eWFPcituRHU1MzRJRDFSCk9RCi0tLSBxa0pmQ1h6NTBNd0RMRlJHbFc2dGNiRi9TQ0hrSUM1VzlrQ0JKQVJyTFJrCvDbVkyf17Z6WqvNbRVeDgN3Ja1fQ7TlXTPsVo2sbEDznfE49UdsJjdB0MUbIoQblZowD6hvc7he])
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 Running tests/scanner_edge_cases_test.rs (target/debug/deps/scanner_edge_cases_test-3466ac1207bcfea4)
 test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.59s
@@ -685,5 +685,34 @@ The only new file is `AUDIT.md` (this report). No tracked files were modified. `
 - ✅ `dracon-warden` deprecated `watch_roots` alias is still accepted for backwards compat (CHANGELOG 0.3.0).
 
 ---
+
+---
+
+## Closure: actionable findings addressed
+
+This closure records the post-audit repair pass. User-owned local state was restored to tracking before continuing; I did not mass-untrack `.demon/`, `.pi/goals/archived/`, `.ralph/`, or `.sisyphus/` after the user objected.
+
+### Completed fixes
+
+- Removed stale/dead artifacts: `dracon-warden/dracon-warden.service`, `dracon-sync/src/scribe.rs`, `dracon-sync/src/simple_ai.rs`, `dracon-sync/src/git.rs.test`, `dracon-warden/src/tests.rs.plaintext`, the tracked `pi-session-*.html`, and tracked `rust_out`.
+- Fixed the 4 `cargo build` warnings in `dracon-sync`: removed dead `stop_reason` / task `title` metadata fields, removed unused `format_relative`, and removed the unused `tokio_git_command` import.
+- Removed unsafe env-var wrappers from 2021-edition tests and kept env mutation scoped to guarded helpers.
+- Migrated shared crate dependencies to root `workspace.dependencies` with `workspace = true` in the three workspace crates.
+- Updated `deny.toml` so `cargo deny check` passes; remaining transitive duplicate-version exceptions are documented rather than forced into risky upgrades.
+- Updated `scripts/verify-spec.sh` and CI test jobs to run full workspace tests instead of `--bins` only.
+- Updated `AGENTS.md` test counts, test helper guidance, systemd hardening tables, local-state policy, and commit-message guidance.
+- Hardened commit-message generation: task names are compacted to route-key fragments, and merge/revert commits now start with `MERGE: | ...` / `REVERT: | ...`.
+
+### Final validation evidence
+
+- `cargo fmt -p dracon-sync -p dracon-system -p dracon-warden -- --check` — passed.
+- `cargo build --workspace` — passed with 0 warnings.
+- `cargo clippy --workspace --all-targets --no-deps` — passed with 0 warnings.
+- `cargo test --workspace -- --test-threads=1` — passed: **692 passed, 6 ignored** across 22 suites.
+- Per-crate counts: `dracon-sync` 431 passed, `dracon-system` 83 passed, `dracon-warden` 79 passed, `dracon-security` 99 passed + 6 ignored.
+- `cargo deny check` — passed: advisories/bans/licenses/sources all ok.
+- `scripts/verify-spec.sh` — passed all invariants.
+- `cargo tree -d` — still reports 35 transitive duplicate package/version pairs; these are documented in `AGENTS.md` and allowed by explicit `deny.toml` skip entries where cargo-deny warns.
+- `git status --short --untracked-files=no` — clean after the closure commit.
 
 *End of audit.*
