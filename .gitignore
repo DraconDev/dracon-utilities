@@ -109,9 +109,4 @@ pi-session-*.html
 rust_out
 **/git.rs.test
 **/tests.rs.plaintext
-# Local task/session state; active pi goals may be auto-synced, archived history is local-only.
-.demon/
-.ralph/
-.sisyphus/
-.pi/goals/archived/
 # --- END DRACON MANAGED BLOCK ---

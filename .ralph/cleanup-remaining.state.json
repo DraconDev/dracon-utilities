@@ -1,0 +1,14 @@
+{
+  "name": "cleanup-remaining",
+  "taskFile": ".ralph/cleanup-remaining.md",
+  "iteration": 1,
+  "maxIterations": 30,
+  "itemsPerIteration": 0,
+  "reflectEvery": 3,
+  "reflectInstructions": "REFLECTION CHECKPOINT\n\nPause and reflect on your progress:\n1. What has been accomplished so far?\n2. What's working well?\n3. What's not working or blocking progress?\n4. Should the approach be adjusted?\n5. What are the next priorities?\n\nUpdate the task file with your reflection, then continue working.",
+  "active": false,
+  "status": "completed",
+  "startedAt": "2026-05-17T17:46:35.505Z",
+  "lastReflectionAt": 0,
+  "completedAt": "2026-05-17T18:05:55.621Z"
+}
