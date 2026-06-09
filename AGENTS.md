@@ -276,7 +276,7 @@ The `repos` command reflects this split:
 | `.dracon/data/keys/*.pub` | dracon-warden | Warden publishes on harden |
 | `.pi/goals/*.md` | pi (auto-sync) | Sync daemon auto-commits active goal files |
 
-Local task/session state directories (`.demon/`, `.ralph/`, `.sisyphus/`, and `.pi/goals/archived/`) are ignored and should remain local-only. `.dracon/` remains the repo metadata tree; public key files under `.dracon/data/keys/*.pub` and `.dracon/keys/*.pub` are intentionally unignored when they need to be published or reviewed.
+Local task/session state directories (`.demon/`, `.ralph/`, `.sisyphus/`, and `.pi/goals/archived/`) may already be tracked from earlier sessions. Do not mass-untrack or delete them without user approval; if the repo should stop tracking future local state, first get explicit approval and back up any existing files.
 
 If you need to modify a daemon-managed file, either:
 1. Edit the **source template** in `~/.dracon/utilities/sync/templates/` or `~/.dracon/utilities/warden/`
@@ -520,7 +520,7 @@ auto_publish = false  # master toggle (default: off)
 [[publish_targets]]
 name = "crates-io"
 registry = "crates-io"    # crates-io | npm | pypi
-[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBES2ZYczkyeVNlTXlBNGNUeXh1RWViemE0bStPZlM4ZjYwYVljc0V3RWpBCnhlVEJxRk9IL1Ntc1QwQ0ZFdFhzZTJiZEJsWCtQZ0d0NUpDdFpwZ0R1STgKLT4gWDI1NTE5IGpwTEZDQjg4dm1jVE45V0Jvdno3YW00S0ZvNkNJQTdza1ZtYlRlcnZsQXcKTW1USXdMTXl5ai9WbnlQYWpkNWg1NnBqazRuRHdrZFY4NVBxSEJOZEU1cwotPiBYMjU1MTkgOUsvNmFYSkwrdDhTbE1RVTZOdnlsUHdIOTZsc3BpZm5VOGp2R2pmaXV4RQoxcGtuK1RhY0lmSjA2NzFsM0pXQlpPRDNhZFFDNzA5TUhrNmRRMzZiSVl3Ci0+IFgyNTUxOSBxM2gzQ0hwcHRIQWZXcHVHQ0xEbm40dHRlelJlTmpCYlI5ZkxuTmNGOERZClpjcWVmMHF2eG5DZERjV2ptU0xRWnpSWFBXblVjcXd6NWRkSW9jRWcreDgKLT4gWDI1NTE5IFd2MWtyeGpZUkZqeTc0MG9BUk9GMjZXM3NhVTdoTnAwZjN6cXpwUnBjMVUKY1VKczRub0RVZWdTK1lOemNiSW1jZU1kd2dpSkJxelJmQmlDWVlwT3prNAotPiBYMjU1MTkgZjBzZXVxM1VjQjQ1SkFucWhTeHJSbGVGeWljSGhyays2OUp5VWJVeHNGNAoyQmJGTk1qSlpWbWhVcit4enYxRURYNEg2L0RxNnRnVFE4TW1iYmNpZ2NFCi0+IHQweylcMkotZ3JlYXNlIDBDIE0gJ30/QUAgei4hdQpSTmhpKzdTZlFoV0l6REJBK2t2enlkNmM2OHR3cGdzSVkvNUtBeVcvOVo1d2R6MG5FRXc5WWhSbVdrM2x1U3UwCmRucmVmcmQ5bW8xRlJ1Lzg2NmErQ21XVE1ZNzRDNGFYYklVS2dJKzA0aVZjdUQwSU5NUHRNNG8KLS0tIGliWUtQN3ZLd0pLQjRNVmF4bWZLS1lNZFJwWkFMcEF5Q0ZRTXFGYXdrcUUKOhy1w3wrD3vAxm3u8PMonQsuKF5hojF1lRYbWU6BufMMQsr4o5SVcCwMTCce+iVsJY16ZDKkredm1wzFOnlJBnHVZar+]
+[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBhS2ZyNWc2Z1FhbERub2ZmdGdwZjM0c05SQVpTNTdNNDRqVytoaHRTM0VFCk56cU5Sc0x0ekprVDBHM2s3dVdhQnFYdk0rWHhvNmVhRFFzekFZTzdCYzgKLT4gWDI1NTE5IGVCNkRkaWlJdWxhNi9XaTVYU0kzUm1RdThEMFdsSUEvVkN4dnB3cDdwa0UKK2tpVm1oYWJyTjE3Umh3YTV3M0lXYTUvTGVRUCsrL3B6VTNITENjRG11OAotPiBYMjU1MTkgUkE3dmN4UHB2NldCMDRldE1rbmVQNEFjczNaaW43SjFhK3IzYnltWW9TNAo0djl6dksrYWhCTjVleXpyT2ZtREhhUU1JWnVOdlNHdTJ4ME1LUWdneE4wCi0+IFgyNTUxOSBiK25xMTgxNUhjS1kyUmZObHdveTVMK3JPb0h2bm80Z1BSaStvOW9NZkg0Ckg2eElESlJpQUlBNVVhSVZFV2ltUkdBdnEwR05TVG1rWFkvZU1LRmQ2TjQKLT4gWDI1NTE5IHRHNkd1YmRJYSsxOWsvaVRVYWxlTmtnankxRnFBb0w1akRFQlM5SEoxblEKQVJLSGVWL1FrM3ZUclAxQTJHai9iU29iZm5kY1MreFNrYnhpcno5MnRJcwotPiBYMjU1MTkgV1pyVjEyUWFRcVdLZGR1Y3ZFZDZhMUh2c0hha2hSTlVFK0UvVURjcTUwMAppSmdaZzNtOTlnd2JqdWExYmZ4UXpaVE5kR282NjlvS29TTTFNSmMvWU84Ci0+IHY5KmknYFAtZ3JlYXNlIFBULCBDZEpjeTFUIC4wLwpRdjd5dVR5cWxIUW5NMlNLSmZWc3MzYjJHT1JmUmJrZHBHa2xiVTRHWjhmL01SenBjTzJra25BM0ZIeFRLM0R4CmhQblpvRzJSL0N6aDYybXlvRGVwQWkvUFFObGFOTmMKLS0tIHdaQ3JCRTdoOHJiakFMeDVtOGdQeEQybkVJUjYrTHp0M2hCRUxqWmhlNm8KXf4vMjYmJqYuSF1qonWXH/MWxgLXfsKDVEBQC45BcSWKMZVid+aTb0Z5AeeoboNoiOm264U6bkSpFhlOp/NGxb4VQGgm]
 publish_timeout_secs = 300
 ```
 
