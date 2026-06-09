@@ -15,7 +15,8 @@ CLI binaries for dracon system services. These install to `~/.local/bin/` and ru
 10. [CLI Reference](#cli-reference)
 11. [Environment Variables](#environment-variables)
 12. [Commit Messages](#commit-messages)
-13. [Testing](#testing)
+13. [Dependency Hygiene](#dependency-hygiene)
+14. [Testing](#testing)
 
 ## Architecture
 
@@ -520,7 +521,7 @@ auto_publish = false  # master toggle (default: off)
 [[publish_targets]]
 name = "crates-io"
 registry = "crates-io"    # crates-io | npm | pypi
-[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBhS2ZyNWc2Z1FhbERub2ZmdGdwZjM0c05SQVpTNTdNNDRqVytoaHRTM0VFCk56cU5Sc0x0ekprVDBHM2s3dVdhQnFYdk0rWHhvNmVhRFFzekFZTzdCYzgKLT4gWDI1NTE5IGVCNkRkaWlJdWxhNi9XaTVYU0kzUm1RdThEMFdsSUEvVkN4dnB3cDdwa0UKK2tpVm1oYWJyTjE3Umh3YTV3M0lXYTUvTGVRUCsrL3B6VTNITENjRG11OAotPiBYMjU1MTkgUkE3dmN4UHB2NldCMDRldE1rbmVQNEFjczNaaW43SjFhK3IzYnltWW9TNAo0djl6dksrYWhCTjVleXpyT2ZtREhhUU1JWnVOdlNHdTJ4ME1LUWdneE4wCi0+IFgyNTUxOSBiK25xMTgxNUhjS1kyUmZObHdveTVMK3JPb0h2bm80Z1BSaStvOW9NZkg0Ckg2eElESlJpQUlBNVVhSVZFV2ltUkdBdnEwR05TVG1rWFkvZU1LRmQ2TjQKLT4gWDI1NTE5IHRHNkd1YmRJYSsxOWsvaVRVYWxlTmtnankxRnFBb0w1akRFQlM5SEoxblEKQVJLSGVWL1FrM3ZUclAxQTJHai9iU29iZm5kY1MreFNrYnhpcno5MnRJcwotPiBYMjU1MTkgV1pyVjEyUWFRcVdLZGR1Y3ZFZDZhMUh2c0hha2hSTlVFK0UvVURjcTUwMAppSmdaZzNtOTlnd2JqdWExYmZ4UXpaVE5kR282NjlvS29TTTFNSmMvWU84Ci0+IHY5KmknYFAtZ3JlYXNlIFBULCBDZEpjeTFUIC4wLwpRdjd5dVR5cWxIUW5NMlNLSmZWc3MzYjJHT1JmUmJrZHBHa2xiVTRHWjhmL01SenBjTzJra25BM0ZIeFRLM0R4CmhQblpvRzJSL0N6aDYybXlvRGVwQWkvUFFObGFOTmMKLS0tIHdaQ3JCRTdoOHJiakFMeDVtOGdQeEQybkVJUjYrTHp0M2hCRUxqWmhlNm8KXf4vMjYmJqYuSF1qonWXH/MWxgLXfsKDVEBQC45BcSWKMZVid+aTb0Z5AeeoboNoiOm264U6bkSpFhlOp/NGxb4VQGgm]
+[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBYeEpOeVNZakJXOEVvTWF2cmFqOFZaSWdEUlJMMzM4TUVYdUF0U0g0UFMwCjV3cjdWdStnSVFjNXB4SzgyWnliVXRITGNkMy9tN3g5WDg0bEVzVlhXcncKLT4gWDI1NTE5IElkR1FuTHFtZ2kxc01UMUVTTjNLVW1SbmxXeENNODF5K0lSY2FpeklkZzgKdnhjb1hyNWRzTEI0eTYvZXZQaHZ6N2sxNEFnRGZaeGxnZUtOeEdJNmtOWQotPiBYMjU1MTkgMENIUmNuM05PaXh4czl6WmFxdFl0Qm9YSzJrVzI4SGhBTWVacXI4ckZDUQo0SzVkK2hweWtZaitCdFRZazZTUE5DR05xN09sYi9hR3p0NFpPeTVPTjZnCi0+IFgyNTUxOSA1NDhwUWxjWjY1c3pidC9Eb2FVRm5PWnpRZ0hWRjMrV3RBb2ludDJGWG5jCjVMd08zNFRKUUYxNmlraEwzd3ErU1NNbzVPUVNaSysyWlV1d0w0VzV3RzAKLT4gWDI1NTE5IElLR3I3dVh0d2h1SU9NSWdHaUJGTFFLNWFjRXp1Snora0NtZkhSNjJQaTQKYWhJUHNodDM0UWxhK1gycy81eU1uRmMvZGg5OTBJK0VJaVpHOElOL0xYRQotPiBYMjU1MTkgNDZOSm0xTElyYnRmNmFvWFlJR21MaDloN1c5ejJOL0t1TjFMRkJud2xVMAowRHExaHRHMFN1aXRpOXl6M1R6SE9ZcmwzaktnVnM0bDAyWmUxN01xbi80Ci0+ICx+cHh9LWdyZWFzZSBhcCB6XElEMntyIERaYXggYWRaInliRW8KSFF3Ci0tLSB3QUtwSTd2T0cvRWtwb3NSWksrbE5yZEFrYU84THU4dmhJU1lHcFJNcTZFCkEsP8CxCtUCa80FblEEOfBXWEJDmhQehV4S7Oc36eHZhMG2pm7qc6a27kHzwAXRUR+FlBGKAeDe8+NL621E9BY9eoHRKQ==]
 publish_timeout_secs = 300
 ```
 
@@ -669,6 +670,7 @@ From the diff, we deterministically extract:
    - `[x]` → `CLOSED: task name`
    - `[~]` → `WIP: task name`
    - Works in: `- [x]`, `* [x]`, `[x]` (markdown/text only, not code comments)
+   - Task names are compacted to short route-key fragments; explanatory clauses after `:`, `;`, `—`, or `–` are dropped to avoid prose-like subjects
 
 2. **Blast radius** (from `git diff --numstat`)
    - `FILES:N` — total files changed
@@ -682,8 +684,8 @@ From the diff, we deterministically extract:
    - `NEW:file1,file2` — newly created files (searchable)
    - `DEL:file1,file2` — deleted files (searchable)
    - `DEPS:+reqwest,-serde` — specific dependencies added/removed
-   - `MERGE:` — merge commit (has two parents)
-   - `REVERT:` — revert commit (has REVERT_HEAD)
+   - `MERGE:` — merge commit prefix; merge commits start with `MERGE: | ...`
+   - `REVERT:` — revert commit prefix; revert commits start with `REVERT: | ...`
    - `TAG:v1.2.0` — this commit is tagged (release milestone)
    - `TESTONLY:` — all changed files are test files (no production code)
    - `ENV:` — env files changed (`.env`, `.envrc`, etc.)
@@ -805,26 +807,31 @@ let _guard = EnvRestorer::remove("VAR_NAME");
 
 ### dracon-sync
 
-**410 unit tests** in `src/` (git.rs, sync.rs, report.rs, policy.rs, main.rs, visibility.rs, release.rs, bump.rs, secrets.rs) + 10 integration tests in `tests/integration_test.rs` = **420 total** for sync. Tests use `tempfile::TempDir` for isolation.
+**430 tests** across 2 suites (`cargo test -p dracon-sync -- --test-threads=1`). Tests use `tempfile::TempDir` for isolation.
 
-Whole-workspace: **686 tests** (sync 428 + system 81 + warden 64 + integration 10 + dracon-security 103). The 103 in `dracon-security` includes 8 new tests in `tests/plaintext_sibling_test.rs` for the plaintext-sibling escape hatch (see `docs/design/warden-plaintext-sibling.md`). The sync crate includes 8 new tests in `src/print.rs` for human-readable byte/time formatting (see `docs/design/cli-print-style.md`).
+Whole-workspace: **691 passed, 6 ignored** across 22 suites (`cargo test --workspace -- --test-threads=1`). Per-crate latest counts:
+
+- `dracon-sync`: 430 passed, 2 suites.
+- `dracon-system`: 83 passed, 1 suite.
+- `dracon-warden`: 79 passed, 2 suites.
+- `dracon-security` (`dracon-warden/src/security`): 99 passed, 6 ignored, 17 suites.
 
 ```bash
 export DRACON_SYNC_GIT_BIN=/run/current-system/sw/bin/git
 
 # Reliable (serial execution — no flaky race conditions):
-cargo test -- --test-threads=1
+cargo test --workspace -- --test-threads=1
 
-# Fast but may have ~10-20 flaky failures from shared global state:
-cargo test
+# Fast but may have flaky failures from shared global state:
+cargo test --workspace
 ```
 
-**Known parallel-test issues:** ~10-20 tests fail unpredictably when running with default parallelism. Root causes:
+**Known parallel-test issues:** some tests can fail unpredictably when running with default parallelism. Root causes:
 1. `std::process::Command::new("git")` resolves from `PATH`, which concurrent tests modify for mock binaries
 2. `acquire_path_lock()` only serializes the subset of tests that explicitly acquire it
 3. Some sync tests start TCP listeners on fixed ports for mock registries
 
-**Env var hygiene:** All env var mutations in tests should use `EnvRestorer` (from `crate::test_helpers::EnvRestorer`) to prevent leakage between tests. Use `EnvRestorer::new("VAR", "value")` to set, or `EnvRestorer::remove("VAR")` to clear. The guard restores on drop.
+**Env var hygiene:** `dracon-sync` uses `crate::test_helpers::EnvRestorer`; `dracon-security` integration tests use `crate::tests::common::EnvRestorer`. Use the scoped guard for any env mutation, or avoid mutating process environment when possible. The guard restores on drop.
 
 **Key env vars:**
 - `DRACON_SYNC_GIT_BIN` — overrides git binary path (checked every call, not cached)
