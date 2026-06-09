@@ -58,15 +58,19 @@
 
 ### Quick Install (User Service)
 
+Run the repository installer from the repository root:
+
 ```bash
-cd dracon-system
+cd dracon-utilities
 ./install.sh
 ```
 
 This will:
 1. Build the release binary
 2. Install to `~/.local/bin/dracon-system`
-3. Set up systemd user service
+3. Set up and start the systemd user service
+
+The per-utility directories do not contain standalone installers; use the root `install.sh` for all utilities.
 
 ### Manual Install
 
