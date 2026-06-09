@@ -7,12 +7,12 @@ license = "AGPL-3.0-only"
 [dependencies]
 log = "0.4"
 walkdir = "2.5"
-age = "0.10"
+age = "0.11"
 aes-gcm = "0.10"
 anyhow = "1.0"
 rand = "0.8"
 regex = "1.10"
-secrecy = { version = "0.8", features = ["serde"] }
+secrecy = { version = "0.10", features = ["serde"] }
 serde = { version = "1.0", features = ["derive"] }
 zeroize = { version = "1.7", features = ["derive"] }
 dirs = "6.0"
@@ -28,6 +28,6 @@ rayon = "1.10"
 
 
 [dev-dependencies]
-age = "0.10"
+age = "0.11"
 proptest = "1.9.0"
 tempfile = "3.8"
