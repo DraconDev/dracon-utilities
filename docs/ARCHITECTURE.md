@@ -80,7 +80,7 @@ Every metric is regex-extracted from the diff. No LLM, no guessing.
 
 | Metric | Source | Example |
 |--------|--------|---------|
-| Task transitions | `git diff` on `TODO.md` / checkboxes | `CLOSED:`, `WIP:` |
+| Task transitions | Markdown/text checkbox diffs, usually task notes or local task state | `CLOSED:`, `WIP:` |
 | File counts | `git diff --numstat` | `3 file(s)` |
 | Changed dirs | Top-level directories | `in src,tests` |
 | Line deltas | `git diff --numstat` | `DELTA:+140/-12` |

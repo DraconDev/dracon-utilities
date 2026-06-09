@@ -26,17 +26,19 @@ Where to find everything in the dracon-utilities repository.
 | **Operations** | [OPERATIONS.md](OPERATIONS.md) | Systemd services, incident response, troubleshooting |
 | **AI Agent Guide** | [AGENTS.md](../AGENTS.md) | Guidelines for AI agents working in this repo |
 
-## Superseded Documents
+## Historical / Superseded Documents
 
-The following root-level documents have been superseded by the docs above:
+The following documents are historical references, archived documents, or older drafts. Use the current docs above for implementation and operation details.
 
-| Former Document | Superseded By |
-|-----------------|---------------|
-| `dracon-sync-architecture.md` | [docs/ARCHITECTURE.md](ARCHITECTURE.md) |
-| `MASTER_ROADMAP_2026-06-01.md` | Completed — archived at [archive/](archive/) |
-| `REPOS_CLEANUP_PLAN_2026-06-01.md` | Completed — archived at [archive/](archive/) |
-| `STUCK_PUSH_TRIAGE_2026-06-02.md` | Completed — archived at [archive/](archive/) |
-| `REFACTORING_BLOCKER_ANALYSIS.md` | Completed — archived at [archive/](archive/) |
-| `SPEC.md` | Superseded by per-utility BLUEPRINTs |
-| `tasks.md` / `TODO.md` / `todo.md` | Resolved — deleted |
-| `audit.md` / `AUDIT.md` / `AUDIT_2026-05-29.md` / `AUDIT_CHECKLIST.md` | Completed — deleted |
+| Former Document | Current Status |
+|-----------------|----------------|
+| `dracon-sync-architecture.md` | Archived in [archive/](archive/); use [docs/ARCHITECTURE.md](ARCHITECTURE.md) for current architecture. |
+| `MASTER_ROADMAP_2026-06-01.md` | Archived in [archive/](archive/); use this roadmap for current documentation navigation. |
+| `REPOS_CLEANUP_PLAN_2026-06-01.md` | Archived in [archive/](archive/); cleanup work is complete. |
+| `STUCK_PUSH_TRIAGE_2026-06-02.md` | Archived in [archive/](archive/); use `dracon-sync repair stuck-list` for current stuck-push triage. |
+| `REFACTORING_BLOCKER_ANALYSIS.md` | Archived in [archive/](archive/); use per-utility blueprints for current design work. |
+| `SPEC.md` | Superseded by per-utility BLUEPRINTs. |
+| `tasks.md` / `TODO.md` | Superseded by pi goals and current task workflow; no root TODO file is canonical. |
+| `todo.md` | Non-canonical lightweight task scratchpad; do not treat it as project documentation. |
+| `audit.md` / `AUDIT_2026-05-29.md` / `AUDIT_CHECKLIST.md` | Superseded by [AUDIT.md](../AUDIT.md) and `docs/audit/`. |
+| `docs/audit/audit-2026-06-06*.md` and `docs/audit/audit-2026-06-07*.md` | Historical audit records; use [AUDIT.md](../AUDIT.md) for the current full audit and closure evidence. |
