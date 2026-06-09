@@ -12,8 +12,8 @@ failures=0
 
 # Invariant 1: Project compiles
 echo "--- Invariant 1: Project compiles ---"
-if ! cargo check --quiet 2>&1; then
-  echo "FAIL: cargo check failed"
+if ! cargo check --workspace --quiet 2>&1; then
+  echo "FAIL: cargo check --workspace failed"
   failures=$((failures + 1))
 else
   echo "PASS: Project compiles"
@@ -31,7 +31,7 @@ fi
 # Invariant 3: Core unit tests pass
 # (--workspace because these crates are binaries, not libraries, so --lib would fail)
 echo "--- Invariant 3: Core unit tests pass ---"
-output=$(cargo test --workspace --bins -- --test-threads=1 2>&1)
+output=$(cargo test --workspace -- --test-threads=1 2>&1)
 if echo "$output" | grep -q "test result:.*FAILED"; then
   echo "FAIL: Some unit tests failed"
   failures=$((failures + 1))

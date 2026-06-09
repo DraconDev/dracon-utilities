@@ -78,10 +78,10 @@ jobs:
         run: cargo build -p dracon-sync -p dracon-system -p dracon-warden
 
       - name: Test (serial)
-        run: cargo test -p dracon-sync -p dracon-system -p dracon-warden -- --test-threads=1
+        run: cargo test --workspace -- --test-threads=1
 
       - name: Test (release profile)
-        run: cargo test --release -p dracon-sync -p dracon-system -p dracon-warden -- --test-threads=1
+        run: cargo test --workspace --release -- --test-threads=1
 
   release-build:
     name: Release Build
@@ -171,7 +171,7 @@ jobs:
         run: cargo clippy -p dracon-sync -p dracon-system -p dracon-warden -- -D clippy::all -D clippy::correctness
 
       - name: Test
-        run: cargo test -p dracon-sync -p dracon-system -p dracon-warden -- --test-threads=1
+        run: cargo test --workspace -- --test-threads=1
 
       - name: Clippy (MSRV)
         run: cargo clippy -p dracon-sync -p dracon-system -p dracon-warden -- -D clippy::all -D clippy::correctness
