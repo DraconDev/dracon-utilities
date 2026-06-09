@@ -128,15 +128,12 @@ mod tests {
         // SAFETY: test runs single-threaded for these env var calls in practice.
         // The actual binary uses should_color() per-call.
         let saved = std::env::var_os("NO_COLOR");
-        // SAFETY: this is a test; concurrent tests must not mutate NO_COLOR
-        // (they don't — this is the only test in this file).
-        unsafe {
-            std::env::set_var("NO_COLOR", "1");
-        }
+        // This test owns the NO_COLOR slot and runs with serial tests.
+        std::env::set_var("NO_COLOR", "1");
         assert!(!should_color());
         match saved {
-            Some(v) => unsafe { std::env::set_var("NO_COLOR", v) },
-            None => unsafe { std::env::remove_var("NO_COLOR") },
+            Some(v) => std::env::set_var("NO_COLOR", v),
+            None => std::env::remove_var("NO_COLOR"),
         }
     }
 }
