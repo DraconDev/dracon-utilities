@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 2121306,
-    "activeSeconds": 1015
+    "tokensUsed": 2400684,
+    "activeSeconds": 1149
   },
   "sisyphus": false,
   "createdAt": "2026-06-09T09:21:59.248Z",
-  "updatedAt": "2026-06-09T09:39:11.736Z",
+  "updatedAt": "2026-06-09T09:41:27.207Z",
   "activePath": ".pi/goals/active_goal_2026060910215924_mq6fkxxs-ig5gcc.md",
   "taskList": {
     "tasks": [
@@ -33,7 +33,9 @@
       {
         "id": "repair-warns-pi-goals",
         "title": "Run repair-warns --apply for the 3 .pi/goals-only WARNs",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-09T09:41:27.205Z",
+        "evidence": "Original task: run repair-warns --apply for the 3 .pi/goals-only WARNs (dracon-platform, DraconDev, ai-auto-repo-rot-scanner-todo-agent). Reality diverged — all 3 self-resolved during the diagnosis/co",
         "verificationContract": "`dracon-sync repair warns --apply` (or equivalent per-repo command) runs without errors for dracon-platform, DraconDev, and ai-auto-repo-rot-scanner-todo-agent. Each ends up with MOD=0, STG=0."
       },
       {
@@ -109,8 +111,8 @@ Tasks:
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 16m55s
-- Tokens used: 2.1M (2,121,306) tokens
+- Time spent: 19m09s
+- Tokens used: 2.4M (2,400,684) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
@@ -121,7 +123,7 @@ Tasks:
 - [x] resolve-concern-ai-lib: Resolve CONCERN: dracon-ai-lib (archived origin, 13 stranded commits) — evidence: Applied option A+C as user approved:
 1. Created backup tag `archive-pre-reset-2026-06-09` at 22b2d19 (preserves the 13 stranded commits — never silently dropped)
 2. `git reset --hard ce377a20` in ~/De
-- [ ] repair-warns-pi-goals: Run repair-warns --apply for the 3 .pi/goals-only WARNs — contract: `dracon-sync repair warns --apply` (or equivalent per-repo command) runs without errors for dracon-platform, DraconDev, and ai-auto-repo-rot-scanner-todo-agent. Each ends up with MOD=0, STG=0.
+- [x] repair-warns-pi-goals: Run repair-warns --apply for the 3 .pi/goals-only WARNs — evidence: Original task: run repair-warns --apply for the 3 .pi/goals-only WARNs (dracon-platform, DraconDev, ai-auto-repo-rot-scanner-todo-agent). Reality diverged — all 3 self-resolved during the diagnosis/co
 - [ ] triage-browser-extensions: Manually triage browser-extensions-shared (8 mod + 6 untracked) — contract: Each modified file committed/pushed or dropped with user approval. Each untracked file committed, .gitignored, or deleted with user approval. Repo ends with MOD=0, STG=0, UT=0.
 - [ ] triage-dracon-utilities: Manually triage dracon-utilities (3 mod + 3 untracked in dracon-warden) — contract: Same contract as browser-extensions-shared. Repo ends with MOD=0, STG=0, UT=0.
 - [ ] verify-final-state: Verify final state with dracon-sync repos — contract: `dracon-sync repos` STATUS line shows 0 WARN, 0 CONCERN. `tail -20 ~/.local/state/dracon/dracon-sync-incidents.jsonl` contains no new STUCK_PUSH entries for the 6 repos since the fix.
