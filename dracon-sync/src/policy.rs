@@ -3,7 +3,7 @@ use serde::{Deserialize, Deserializer};
 use std::ops::{Deref, DerefMut};
 use std::path::{Path, PathBuf};
 use std::process::Command as StdCommand;
-use std::sync::{Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use std::sync::{Mutex, RwLock};
 use tokio::process::Command as TokioCommand;
 
 pub(crate) static GIT_COMMAND_LOCK: Mutex<()> = Mutex::new(());
@@ -11,18 +11,14 @@ pub(crate) static GIT_ENV_LOCK: RwLock<()> = RwLock::new(());
 
 pub(crate) struct GitCommand {
     inner: StdCommand,
-    _env_guard: RwLockReadGuard<'static, ()>,
-    _command_guard: MutexGuard<'static, ()>,
 }
 
 impl GitCommand {
     pub(crate) fn new() -> Self {
-        let env_guard = GIT_ENV_LOCK.read();
-        let command_guard = GIT_COMMAND_LOCK.lock();
+        let _env_guard = GIT_ENV_LOCK.read().expect("git env lock poisoned");
+        let _command_guard = GIT_COMMAND_LOCK.lock().expect("git command lock poisoned");
         Self {
             inner: StdCommand::new(git_binary()),
-            _env_guard: env_guard,
-            _command_guard: command_guard,
         }
     }
 }
@@ -43,18 +39,14 @@ impl DerefMut for GitCommand {
 
 pub(crate) struct TokioGitCommand {
     inner: TokioCommand,
-    _env_guard: RwLockReadGuard<'static, ()>,
-    _command_guard: MutexGuard<'static, ()>,
 }
 
 impl TokioGitCommand {
     pub(crate) fn new() -> Self {
-        let env_guard = GIT_ENV_LOCK.read();
-        let command_guard = GIT_COMMAND_LOCK.lock();
+        let _env_guard = GIT_ENV_LOCK.read().expect("git env lock poisoned");
+        let _command_guard = GIT_COMMAND_LOCK.lock().expect("git command lock poisoned");
         Self {
             inner: TokioCommand::new(git_binary()),
-            _env_guard: env_guard,
-            _command_guard: command_guard,
         }
     }
 }

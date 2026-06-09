@@ -135,7 +135,7 @@ pub(crate) use crate::policy::GIT_ENV_LOCK;
 
 #[allow(dead_code)]
 pub(crate) struct GitBinRestorer {
-    _guard: parking_lot::RwLockWriteGuard<'static, ()>,
+    _guard: std::sync::RwLockWriteGuard<'static, ()>,
     inner: EnvRestorer,
 }
 
@@ -143,7 +143,7 @@ impl GitBinRestorer {
     #[allow(dead_code)]
     pub(crate) fn new(new_value: &str) -> Self {
         Self {
-            _guard: GIT_ENV_LOCK.write(),
+            _guard: GIT_ENV_LOCK.write().expect("git env lock poisoned"),
             inner: EnvRestorer::new("DRACON_SYNC_GIT_BIN", new_value),
         }
     }
@@ -151,7 +151,7 @@ impl GitBinRestorer {
     #[allow(dead_code)]
     pub(crate) fn remove() -> Self {
         Self {
-            _guard: GIT_ENV_LOCK.write(),
+            _guard: GIT_ENV_LOCK.write().expect("git env lock poisoned"),
             inner: EnvRestorer::remove("DRACON_SYNC_GIT_BIN"),
         }
     }
