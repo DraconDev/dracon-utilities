@@ -20,44 +20,15 @@
 ///
 /// # Parallel Test Constraints
 ///
-/// Tests pass reliably with `--test-threads=1` (458/458 pass as of 2026-05-22). In parallel mode,
-/// ~10-20 tests fail unpredictably due to these shared global states:
-///
-/// 1. **PATH**: Tests that add mock binary dirs to PATH (for gh/glab mocking)
-///    use `acquire_path_lock()` + `EnvRestorer::new("PATH", ...)`. But other
-///    tests that call `crate::git::git_cmd()` directly resolve `git`
-///    from PATH and can race with concurrent PATH modifications.
-///
-/// 2. **`DRACON_SYNC_GIT_BIN`**: Some tests set this env var to mock the git binary.
-///    While `git_binary()` no longer caches the value, tests using
-///    `crate::git::git_cmd()` directly (not through `git_binary()`)
-///    don't check this env var at all. Use `test_git_cmd()` from this module
-///    instead of `crate::git::git_cmd()` to ensure consistency.
-///
-/// 3. **Registry/port state**: Integration-style tests `test_create_repo_on_github_*`,
-///    `test_create_repo_on_gitlab_*` that start local TCP listeners can conflict.
-///
-/// ## Mitigations already in place
-///
-/// - `git_binary()` in `policy.rs` and `real_git_path()` in `git.rs`: no longer use
-///   `OnceLock` caching for `DRACON_SYNC_GIT_BIN` — checked every call
-/// - All env var mutations in tests are now gated behind `EnvRestorer` to prevent leaks
-/// - `acquire_path_lock()` (parking_lot Mutex) serializes PATH-modifying tests
-///
-/// ## Running tests
-///
-/// ```bash
-/// # Reliable (serial):
-/// cargo test -- --test-threads=1
-///
-/// # Fast but may have flaky failures:
-/// cargo test
-/// ```
+/// Parallel tests mutate shared globals such as `HOME`, `PATH`, and `DRACON_SYNC_GIT_BIN`.
+/// Tests that need a mock git binary must use `GitBinRestorer` so git command wrappers
+/// block until the mock env is cleared. Tests that mutate `PATH` for external tool mocks
+/// must still use `acquire_path_lock()` + `EnvRestorer`.
 ///
 /// # Git Command Helper
 ///
-/// Use `test_git_cmd()` instead of `crate::git::git_cmd()` in tests.
-/// This respects `DRACON_SYNC_GIT_BIN` and prevents PATH resolution races in parallel runs.
+/// Use `test_git_cmd()` instead of direct process construction in tests.
+/// This respects `DRACON_SYNC_GIT_BIN`, serializes git invocations, and avoids PATH races in parallel runs.
 ///
 /// ```ignore
 /// let output = test_git_cmd().current_dir(&repo).args(["status"]).output()?;
@@ -169,6 +140,7 @@ pub(crate) struct GitBinRestorer {
 }
 
 impl GitBinRestorer {
+    #[allow(dead_code)]
     pub(crate) fn new(new_value: &str) -> Self {
         Self {
             _guard: GIT_ENV_LOCK.write(),
@@ -176,6 +148,7 @@ impl GitBinRestorer {
         }
     }
 
+    #[allow(dead_code)]
     pub(crate) fn remove() -> Self {
         Self {
             _guard: GIT_ENV_LOCK.write(),

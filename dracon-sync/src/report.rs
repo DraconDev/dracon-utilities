@@ -742,7 +742,7 @@ pub(crate) async fn run_repos_report(
         // Scanning all origin/* branches was the second-biggest cost; we only
         // care about the branch we're on.
         let last_push = {
-                    let repo_str = repo.to_str().unwrap_or("").to_string();
+            let repo_str = repo.to_str().unwrap_or("").to_string();
             let current_branch = effective_status.branch.clone();
             let out = crate::git::git_cmd()
                 .args([
@@ -3108,7 +3108,7 @@ mod tests {
     }
 
     #[test]
-    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBBREtlUkZ2N0ZpQ1R3SzNyUFlrOUlYekZDRUJXdE9GK0doZkl5QzY1M0JFCjVjVnRudzhlZEZ5V3NCdDNXMVhGMHpYL1ZocXRPVkVmUGRCTHMvVXRGMncKLT4gWDI1NTE5IGdLbUJUSktla253NEw0RzRtY015MWFOUmJNTEpvMHQ0ZTRETmhqQ0xKMnMKeGVRdzVBakI5ak1MNTVWaFVjaHhMYTErbVVab1VkUTVwYVNobWlOanVCQQotPiBYMjU1MTkgak8vaTkwZkUxK3l6MzVtNHdDUnVOaVBlODVQZlJBTDRvd3R4cG1hNU0yQQpPWk1raVFOUDlDSmphaSsvUTJNZk1nbjZlOFZiT21wYjJtZ0JzZW8xNlZrCi0+IFgyNTUxOSBSTitRUTgrZUtqNTAwUHBSTzhxRnF1ZXRpWnFoSGhhSEs0ZTdPL25BS0NvCm5rbDZoaE51c212RjB2ZXREYlJRK2V1T2JHSUEvc0ovTyswZlFtdXVFWGMKLT4gWDI1NTE5IG9GWjJRN0VscXZMYTJvWlBrSnQvMVN4TzlvOUNaZUUvREhndHloU0JwemsKZ2huRk1QQWx2MkZIRXhWVEUzVlZnaWgvYnJWcm1CUE9McW9TYzkzeURhOAotPiBYMjU1MTkgc0pHcVREanI3NmRXdnVENWM3cDVxb2h6Tmxha2FmSVhEcVd2M1AvdUN3Ywp0eU44MEpZOEk4cDdORjZsMFFTVjY2d0JmdnJxTTZkZEpkNW9xYk1sSWdFCi0+IEMyQjQ6LWdyZWFzZSBjIFpaNUQ5Sk18ICddekwgaUJVam53ClBkL0FwUlBheFgzMHpRCi0tLSBYelA1UE5pWWVDSEJqNEYyRDFUTEFXV2VicDBSd3BDYVdlbnNRT0Uza0gwChaSX4JxgEv509YXzPaZjjDdrgAUY7RRUnYMBWzcH7LOTwwIgUti0G3qA0/od8/TfPdnnsA3NTpJgcWIHSY=]() {
+    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBWNWZwYjdVZUQ2T2ZlN0dPUUNDNDArTXNUQnNZeGRCS2dXVkZwenMrNEZzCi8wTldBNlVtSG5kVW9xT1VJMTY5UE00dHlHcEkxRGVnUFFnaDZJSnBPRTQKLT4gWDI1NTE5IFlXK01DVUx2VENpaEx3Z05CdFhxMGh0clE1MXFLcTJjcCtrUXhxc2U0UXMKMFRpYVFNQWNVM3AwYURHRXlOeW1sdVVsUjJrQzdQb2dHVG5tYmtJM1lnOAotPiBYMjU1MTkgaGlCdms2aTR1eElmUlFCVnQvWkpZSW5GczV3dWk1UGU4ZmdwVjJZbmdoawpLYTBadXg2dHRvcDlEK25ZRGtzUm5MQjVpMVVzVTBzTGtHZWFQWWVLZzh3Ci0+IFgyNTUxOSBzWkpmMGg4Vk1XWmdRaFFuMmd5SUI5WXNTSU9tZTUzbkVUVlZOZVpFNmdnCjRPUjQyazVYUXVNK1hDWklVT2QvdUxLbHlKTVdsSHk1MGFyQnlYRGpJOEkKLT4gWDI1NTE5IEx6cGJ3Y1o5Umd0cGI1UXpBZlI0c05ZT0NjV0w4U3BrajFpNDRqd0YrRE0KSVYwUkxVbnRHZnk1blBsbTZBUWRUVzFPd1VYUkI3TGhNamNoNmRhZjRxMAotPiBYMjU1MTkgdmI4Uy9ob1lXT1V1ZG5DYlVXdlZSSUdUQ3BiSm5TOEp2Vk9pQUI2RHlTOApBYUpFNElQQXlVSStQT3NjZnoyOHNvcStSbEFqeFRPUUM4RS9zSHBxeHQ4Ci0+ID9uJz50LWdyZWFzZSBgdkx1NSkgRFQgKzcgQiYKTE55UXc1Y24zWk0yZ0pjNHNzQWEvZ0xKajZSdXRzeWZDY2wwU1lsSVdrbTJyRytVUFlMS2hrbwotLS0gQm04c0E4dlBGK0hPL1k1M1FMeTR4TS9ZSkhDczRWa28wNVpFc0pjcFR2awpF1xpkwuxQH3DCmGwNiO5kCOSr7LK+/RUbMD3wnQy9NsR969xnmwWrdEpa9gAawjAah5ik+Sp+ZXPwofJM]() {
         let mut cooldowns = std::collections::HashMap::new();
         let repo = std::path::PathBuf::from("/test/repo");
         let notify_key = format!("push-fail-{}", repo.display());
