@@ -5,23 +5,23 @@ version = "0.3.0"
 edition = "2021"
 
 [dependencies]
-age = "0.10"
-anyhow = "1.0"
-chrono = "0.4"
-comfy-table = "7"
-clap = { version = "4.5", features = ["derive"] }
-globset = "0.4"
-hostname = "0.4"
-rand = "0.8"
-secrecy = "0.8"
-zeroize = "1"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-toml = "0.8"
-walkdir = "2.5"
-dirs = "6.0"
-tokio = { version = "1", features = ["rt-multi-thread", "signal", "macros", "time"] }
-dracon-security-kit = { package = "dracon-security", path = "src/security" }
+age = { workspace = true }
+anyhow = { workspace = true }
+chrono = { workspace = true }
+comfy-table = { workspace = true }
+clap = { workspace = true }
+globset = { workspace = true }
+hostname = { workspace = true }
+rand = { workspace = true }
+secrecy = { workspace = true }
+zeroize = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }
+walkdir = { workspace = true }
+dirs = { workspace = true }
+tokio = { workspace = true }
+dracon-security-kit = { workspace = true }
 
 [dev-dependencies]
-tempfile = "3"
+tempfile = { workspace = true }

@@ -5,15 +5,15 @@ version = "0.2.0"
 edition = "2021"
 
 [dependencies]
-anyhow = "1.0"
-clap = { version = "4.5", features = ["derive"] }
-dirs = "6.0"
-fs2 = "0.4"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-toml = "0.8"
-tokio = { version = "1", features = ["full"] }
-walkdir = "2"
-chrono = "0.4"
-comfy-table = "7"
-dracon-system-lib = { path = "../../dracon-libs/tools/system/dracon-system" }
+anyhow = { workspace = true }
+clap = { workspace = true }
+dirs = { workspace = true }
+fs2 = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
+walkdir = { workspace = true }
+chrono = { workspace = true }
+comfy-table = { workspace = true }
+dracon-system-lib = { workspace = true }
