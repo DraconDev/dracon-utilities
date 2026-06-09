@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 2498028,
-    "activeSeconds": 1170
+    "tokensUsed": 2795780,
+    "activeSeconds": 1316
   },
   "sisyphus": false,
   "createdAt": "2026-06-09T09:21:59.248Z",
-  "updatedAt": "2026-06-09T09:41:48.696Z",
+  "updatedAt": "2026-06-09T09:44:15.518Z",
   "activePath": ".pi/goals/active_goal_2026060910215924_mq6fkxxs-ig5gcc.md",
   "taskList": {
     "tasks": [
@@ -49,7 +49,9 @@
       {
         "id": "triage-dracon-utilities",
         "title": "Manually triage dracon-utilities (3 mod + 3 untracked in dracon-warden)",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-09T09:42:13.894Z",
+        "evidence": "Original task: Manually triage dracon-utilities (originally 3 mod + 3 untracked in dracon-warden). Reality diverged — the dirty state was almost entirely .pi/goals operational churn, not real source c",
         "verificationContract": "Same contract as browser-extensions-shared. Repo ends with MOD=0, STG=0, UT=0."
       },
       {
@@ -113,8 +115,8 @@ Tasks:
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 19m30s
-- Tokens used: 2.5M (2,498,028) tokens
+- Time spent: 21m56s
+- Tokens used: 2.8M (2,795,780) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
@@ -129,6 +131,6 @@ Tasks:
 - [x] triage-browser-extensions: Manually triage browser-extensions-shared (8 mod + 6 untracked) — evidence: Original task: Manually triage browser-extensions-shared (originally 8 mod + 6 untracked). Reality diverged — the daemon auto-committed all real-code changes during the work window.
 
 **Manual actions 
-- [ ] triage-dracon-utilities: Manually triage dracon-utilities (3 mod + 3 untracked in dracon-warden) — contract: Same contract as browser-extensions-shared. Repo ends with MOD=0, STG=0, UT=0.
+- [x] triage-dracon-utilities: Manually triage dracon-utilities (3 mod + 3 untracked in dracon-warden) — evidence: Original task: Manually triage dracon-utilities (originally 3 mod + 3 untracked in dracon-warden). Reality diverged — the dirty state was almost entirely .pi/goals operational churn, not real source c
 - [ ] verify-final-state: Verify final state with dracon-sync repos — contract: `dracon-sync repos` STATUS line shows 0 WARN, 0 CONCERN. `tail -20 ~/.local/state/dracon/dracon-sync-incidents.jsonl` contains no new STUCK_PUSH entries for the 6 repos since the fix.
 
