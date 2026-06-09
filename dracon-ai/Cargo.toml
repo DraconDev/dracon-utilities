@@ -20,4 +20,6 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "rus
 
 ai-routing-runtime = { path = "../../dracon-libs/services/crates/ai/ai-routing-runtime" }
 ai-runtime-adapters = { path = "../../dracon-libs/services/crates/ai/ai-runtime-adapters" }
-dracon-ai-runtime-contracts = { path = "../../dracon-libs/contracts/crates/ai/dracon-ai-runtime-contracts" }
+ai-runtime-config = { path = "../../dracon-libs/services/crates/ai/ai-runtime-config" }
+dracon-ai-contracts = "94.7"
+dracon-ai-runtime-contracts = "94.7"

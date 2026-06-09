@@ -1,9 +1,9 @@
+use ai_runtime_config::resolve_ai_runtime_config;
 use anyhow::{anyhow, Context, Result};
 use clap::{Parser, Subcommand};
-use dracon_ai_runtime_contracts::routing::{RoutingTask, SelectionConstraints};
-use dracon_ai_runtime_contracts::models::{ChatMessage, ChatRequest, UsageStats};
+use dracon_ai_contracts::{RoutingTask, SelectionConstraints};
+use dracon_ai_runtime_contracts::models::{ChatMessage, ChatRequest};
 use dracon_ai_runtime_contracts::traits::AiProvider;
-use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use std::io::{IsTerminal, Read};
 #[cfg(unix)]
@@ -408,9 +408,9 @@ Captured output:\n```\n{}\n```",
             Ok(())
         }
         Cmd::Status => {
-            let resolved = ai_runtime_adapters::resolve_ai_runtime_config();
+            let resolved = resolve_ai_runtime_config();
             println!("📜 AI_RUNTIME: dracon-libs policy + secrets (ai-runtime-config)");
-            println!("📦 PROVIDERS: {} OpenAI + {} Bedrock", resolved.openai_providers.len(), resolved.bedrock_providers.len());
+            println!("📦 PROVIDERS: {} OpenAI", resolved.openai_providers.len());
             println!("✅ ACTIVE_MODELS: {}", resolved.active_model_ids.len());
             for id in &resolved.active_model_ids {
                 println!("  - {}", id);
@@ -441,7 +441,7 @@ struct AiCliResponse {
     lane: String,
     selected_model: String,
     content: String,
-    usage: Option<UsageStats>,
+    usage: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -486,11 +486,19 @@ fn normalize_intent(intent: &str) -> String {
 
 fn intent_to_lane(intent: &str) -> RoutingTask {
     match intent {
-        "commit" | "engineer" | "coding" => RoutingTask::Coding,
-        "writing" | "write" | "docs" | "documentation" => RoutingTask::Writing,
-        "verify" | "fast" | "summary" => RoutingTask::Fast,
-        "general" => RoutingTask::General,
-        other => RoutingTask::Custom(other.to_string()),
+        "commit" | "engineer" | "coding" | "code" => RoutingTask::Code,
+        "writing" | "write" | "docs" | "documentation" | "creative" => RoutingTask::Creative,
+        "research" | "analysis" => RoutingTask::Research,
+        _ => RoutingTask::General,
+    }
+}
+
+fn lane_key(lane: &RoutingTask) -> &'static str {
+    match lane {
+        RoutingTask::General => "general",
+        RoutingTask::Code => "code",
+        RoutingTask::Research => "research",
+        RoutingTask::Creative => "creative",
     }
 }
 
@@ -520,15 +528,7 @@ fn set_title(title: &str) {
 
 fn prompt_label(lane: &RoutingTask) -> String {
     let tool = ansi("1;36", "dracon-ai"); // bold cyan
-    let lane_txt = match lane {
-        RoutingTask::General => "general",
-        RoutingTask::Coding => "coding",
-        RoutingTask::Writing => "writing",
-        RoutingTask::Fast => "fast",
-        RoutingTask::Custom(v) => v.as_str(),
-        RoutingTask::Dev => "dev",
-        RoutingTask::Free => "free",
-    };
+    let lane_txt = lane_key(lane);
     let lane = ansi("33", lane_txt); // yellow
     format!("{}[{}]", tool, lane)
 }
@@ -586,7 +586,7 @@ fn history_path() -> Option<PathBuf> {
 }
 
 fn build_router() -> Result<ai_routing_runtime::SmartRouter<dyn AiProvider>> {
-    let resolved = ai_runtime_adapters::resolve_ai_runtime_config();
+    let resolved = resolve_ai_runtime_config();
 
     let mut registry: ai_routing_runtime::ProviderRegistry<dyn AiProvider> =
         ai_routing_runtime::ProviderRegistry::new();
@@ -1291,27 +1291,7 @@ Write ONLY the markdown, nothing else."#
     );
 
     // Build router
-    let resolved = ai_runtime_adapters::resolve_ai_runtime_config();
-    let mut registry: ai_routing_runtime::ProviderRegistry<dyn AiProvider> =
-        ai_routing_runtime::ProviderRegistry::new();
-    for spec in &resolved.openai_providers {
-        let provider: std::sync::Arc<dyn AiProvider> =
-            std::sync::Arc::new(ai_runtime_adapters::GenericOpenAIAdapter::new_with_auth(
-                spec.api_keys.first().cloned().unwrap_or_default(),
-                spec.endpoint.clone(),
-                spec.payload_model.clone(),
-                spec.auth_header_name.clone(),
-                spec.auth_header_prefix.clone(),
-            ));
-        registry.register(&spec.model_id, provider);
-    }
-
-    let router = ai_routing_runtime::SmartRouter::new(
-        registry,
-        resolved.active_model_ids.clone(),
-        resolved.dev_model_ids,
-        resolved.lane_model_policy,
-    );
+    let router = build_router()?;
 
     let messages = vec![ai_routing_runtime::RoutingMessage {
         role: "user".to_string(),
@@ -1321,7 +1301,7 @@ Write ONLY the markdown, nothing else."#
     let (provider, _trace) = router
         .route_with_trace(
             "scribe",
-            Some(RoutingTask::Free),
+            Some(RoutingTask::General),
             None,
             &messages,
             SelectionConstraints::default(),
@@ -1334,9 +1314,10 @@ Write ONLY the markdown, nothing else."#
             role: "user".to_string(),
             content: messages[0].content.clone(),
         }],
-        client_intent: Some(RoutingTask::Free),
-        routing_constraints: SelectionConstraints::default(),
-        resolved_service_level: None,
+        client_intent: Some(RoutingTask::General),
+        max_tokens: None,
+        temperature: None,
+        stream: false,
     };
 
     let (text, _usage) = provider.ask_and_collect(req).await?;
@@ -1367,15 +1348,16 @@ async fn agent_next(
     let req = ChatRequest {
         project_id: "default".to_string(),
         messages: messages.to_vec(),
-        client_intent: Some(RoutingTask::Custom("system".to_string())),
-        routing_constraints: SelectionConstraints::default(),
-        resolved_service_level: None,
+        client_intent: Some(RoutingTask::General),
+        max_tokens: None,
+        temperature: None,
+        stream: false,
     };
     let (text, selected_model) = {
         let (provider, trace) = router
             .route_with_trace(
                 "default",
-                Some(RoutingTask::Custom("system".to_string())),
+                Some(RoutingTask::General),
                 None,
                 &messages
                     .iter()
@@ -1853,67 +1835,24 @@ async fn ask_with_messages(
         project_id: "default".to_string(),
         messages: messages.clone(),
         client_intent: Some(lane.clone()),
-        routing_constraints: constraints,
-        resolved_service_level: None,
+        max_tokens: constraints.max_tokens,
+        temperature: constraints.temperature,
+        stream: false,
     };
 
-    if out.json {
-        // JSON output must be deterministic and self-contained; collect fully.
-        let (content, usage) = provider.ask_and_collect(req).await?;
-        return Ok(AiCliResponse {
-            lane: lane.as_task_key().to_string(),
-            selected_model: trace.selected_model,
-            content,
-            usage,
-        });
+    let (content, usage) = provider.ask_and_collect(req).await?;
+    if out.stream {
+        let mut stdout = tokio::io::stdout();
+        stdout.write_all(content.as_bytes()).await?;
+        stdout.flush().await?;
     }
 
-    if !out.stream {
-        let (content, usage) = provider.ask_and_collect(req).await?;
-        return Ok(AiCliResponse {
-            lane: lane.as_task_key().to_string(),
-            selected_model: trace.selected_model,
-            content,
-            usage,
-        });
-    }
-
-    // Streaming: stdout only, no extra decoration.
-    let mut stream = provider.ask(req).await?;
-    let mut buf = String::new();
-    let mut usage: Option<UsageStats> = None;
-    let mut stdout = tokio::io::stdout();
-    let interrupt = tokio::signal::ctrl_c();
-    tokio::pin!(interrupt);
-
-    loop {
-        tokio::select! {
-            _ = &mut interrupt => {
-                // Treat Ctrl-C as "stop streaming" not "crash the whole CLI".
-                // Return what we have so far.
-                break;
-            }
-            next = stream.next() => {
-                let Some(item) = next else { break; };
-                let chunk = item?;
-        if !chunk.token.is_empty() {
-            stdout.write_all(chunk.token.as_bytes()).await?;
-            stdout.flush().await?;
-            buf.push_str(&chunk.token);
-        }
-        if chunk.usage.is_some() {
-            usage = chunk.usage;
-        }
-            }
-        }
-    }
-
-    Ok(AiCliResponse {
-        lane: lane.as_task_key().to_string(),
+    return Ok(AiCliResponse {
+        lane: lane_key(&lane).to_string(),
         selected_model: trace.selected_model,
-        content: buf,
+        content,
         usage,
-    })
+    });
 }
 
 async fn run_shell_capture(

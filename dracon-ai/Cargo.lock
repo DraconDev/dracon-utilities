@@ -35,6 +35,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ai-runtime-config"
+version = "94.7.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "anstream"
 version = "0.6.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -278,6 +287,7 @@ version = "0.2.9"
 dependencies = [
  "ai-routing-runtime",
  "ai-runtime-adapters",
+ "ai-runtime-config",
  "anyhow",
  "clap",
  "dirs",
