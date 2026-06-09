@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 796608,
-    "activeSeconds": 584
+    "tokensUsed": 1617611,
+    "activeSeconds": 799
   },
   "sisyphus": false,
   "createdAt": "2026-06-09T09:21:59.248Z",
-  "updatedAt": "2026-06-09T09:31:52.390Z",
+  "updatedAt": "2026-06-09T09:35:32.511Z",
   "activePath": ".pi/goals/active_goal_2026060910215924_mq6fkxxs-ig5gcc.md",
   "taskList": {
     "tasks": [
@@ -25,7 +25,9 @@
       {
         "id": "resolve-concern-ai-lib",
         "title": "Resolve CONCERN: dracon-ai-lib (archived origin, 13 stranded commits)",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-09T09:33:34.647Z",
+        "evidence": "Applied option A+C as user approved:\n1. Created backup tag `archive-pre-reset-2026-06-09` at 22b2d19 (preserves the 13 stranded commits — never silently dropped)\n2. `git reset --hard ce377a20` in ~/De",
         "verificationContract": "User-approved strategy (drop / re-point / unarchive / exclude) is applied. `git ls-remote` on the chosen remote (or `git status` if local-only) shows no stranded ahead commits. Incident ledger entry for the resolution is recorded."
       },
       {
@@ -107,8 +109,8 @@ Tasks:
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 9m44s
-- Tokens used: 797K (796,608) tokens
+- Time spent: 13m19s
+- Tokens used: 1.6M (1,617,611) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
@@ -116,7 +118,9 @@ Tasks:
 
 | # | Repo | Status | Branch | Ahead | Mod | UT | Last Commit | Remotes | Recent Incidents |
 |---|------|--------|--------|--
-- [ ] resolve-concern-ai-lib: Resolve CONCERN: dracon-ai-lib (archived origin, 13 stranded commits) — contract: User-approved strategy (drop / re-point / unarchive / exclude) is applied. `git ls-remote` on the chosen remote (or `git status` if local-only) shows no stranded ahead commits. Incident ledger entry for the resolution is recorded.
+- [x] resolve-concern-ai-lib: Resolve CONCERN: dracon-ai-lib (archived origin, 13 stranded commits) — evidence: Applied option A+C as user approved:
+1. Created backup tag `archive-pre-reset-2026-06-09` at 22b2d19 (preserves the 13 stranded commits — never silently dropped)
+2. `git reset --hard ce377a20` in ~/De
 - [ ] repair-warns-pi-goals: Run repair-warns --apply for the 3 .pi/goals-only WARNs — contract: `dracon-sync repair warns --apply` (or equivalent per-repo command) runs without errors for dracon-platform, DraconDev, and ai-auto-repo-rot-scanner-todo-agent. Each ends up with MOD=0, STG=0.
 - [ ] triage-browser-extensions: Manually triage browser-extensions-shared (8 mod + 6 untracked) — contract: Each modified file committed/pushed or dropped with user approval. Each untracked file committed, .gitignored, or deleted with user approval. Repo ends with MOD=0, STG=0, UT=0.
 - [ ] triage-dracon-utilities: Manually triage dracon-utilities (3 mod + 3 untracked in dracon-warden) — contract: Same contract as browser-extensions-shared. Repo ends with MOD=0, STG=0, UT=0.
