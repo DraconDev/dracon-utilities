@@ -18,6 +18,23 @@ wildcards = "allow"
 highlight = "all"
 skip = [
     { crate = "base64@0.21", reason = "age (encryption) uses old version" },
+    { crate = "bech32@0.9", reason = "age 0.10 uses the older Bech32 API while dracon-security uses 0.11" },
+    { crate = "getrandom@0.2", reason = "age/rand 0.8 crypto stack requires getrandom 0.2" },
+    { crate = "getrandom@0.4", reason = "tempfile 3.27 and uuid 1.23 use the newest getrandom API" },
+    { crate = "hashbrown@0.14", reason = "age/i18n-embed-fl 0.7 pulls dashmap 5" },
+    { crate = "hashbrown@0.17", reason = "reqwest/zbus stack pulls newer indexmap 2" },
+    { crate = "rustc-hash@1.1", reason = "fluent/i18n-embed-fl 0.7 dependency chain" },
+    { crate = "rustc-hash@2.1", reason = "fluent/intl-memoizer dependency chain" },
+    { crate = "strsim@0.10", reason = "i18n-embed-fl 0.7 dependency chain" },
+    { crate = "strsim@0.11", reason = "clap 4 dependency chain" },
+    { crate = "syn@1.0", reason = "proc-macro-error/i18n-embed-fl 0.7 dependency chain" },
+    { crate = "toml@0.5", reason = "i18n-embed-fl/find-crate dependency chain" },
+    { crate = "toml_datetime@0.6", reason = "toml 0.8 dependency chain" },
+    { crate = "toml_datetime@1.1", reason = "zbus/proc-macro-crate dependency chain" },
+    { crate = "toml_edit@0.22", reason = "toml 0.8 dependency chain" },
+    { crate = "toml_edit@0.25", reason = "zbus/proc-macro-crate dependency chain" },
+    { crate = "winnow@0.7", reason = "toml_edit 0.22/toml 0.8 dependency chain" },
+    { crate = "winnow@1.0", reason = "zbus/toml_edit 0.25 dependency chain" },
 ]
 
 [sources]
