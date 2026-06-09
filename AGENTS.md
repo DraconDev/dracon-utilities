@@ -521,7 +521,7 @@ auto_publish = false  # master toggle (default: off)
 [[publish_targets]]
 name = "crates-io"
 registry = "crates-io"    # crates-io | npm | pypi
-[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBXYnBKRUZMeVcvM2VPREhJTWwyUEppa2dZVzNGNkJaWGVyaUlvT0VRb1I0Ck9nanhNV3hwOTFBc0pvYkFZVWRERVJ5NUN5alRZa1lMSndUek9XU3krTmMKLT4gWDI1NTE5IGY5N0hwU3pUaE9kTzBRZEkydjYrNnVPdTNKOHJDVlBCZmF0VTNHaWgvbFEKVVhubTU3ZTRHa1N0KzlHcGhxOWJlRnZIelpDL3FUb3Q3NUxRa2NKU2k1UQotPiBYMjU1MTkgY3U5MDV6Y1I3TXFKdm5oRjJVK1BGejR6Q1R5TEdJc2lRUlYvbUZHVTRuawp4dk9nclpwRkRLSUpyVTVQUGIzTk9uZ0xzckRpeURCV3FBZEg4QXFUWCt3Ci0+IFgyNTUxOSAveHhKUEJpOXhVWVJEWGlNaHRHelBZdC82aXNHOUtFQ016MDMwU2VUbEFnCnJ2eklmVUovaTRRWENCcW1CS0JzZklDYzVXRTFBZDFhbWowcWNUd3ZKMzQKLT4gWDI1NTE5IE1kZ1BzUmJQWkJURVJ0bTE5WVBkakxha0J6cFdsOE5Pd01UWFNJQ1prQjAKa01ZOUZFc0tsNVFsQ0pEWXJqS2NYQTQxSm5vWC9USktSTkpjRHlFTFVRYwotPiBYMjU1MTkganFheGRjVU96VUMybitmaFhtdHAzc0krNEdicHF6M29MME1HU1hyTnl5TQpNM2syQzZmRW0yTlIzdTZqTFc1TG1XYTZpWHREU3czWjRxRUVGZzFKWjVVCi0+IEVLPi1ncmVhc2UKNk5ib3ZQNFZneVlBZDB1WFRsbVExcnVNRURFOFgveDZjSGNJdzVoUXg2OHh0dzJ6bEZkZ2lxOElIOXJGUVNYWApHV3pKMUw1Zm1MTDd1RnRKbXowcUJXeDAzN1RxRWcKLS0tIFJBL1QyUUZQa09KQm9mWng0cnV6RGVETCtzTDVrQVR2K2dHTXhpOXBNRGsKHEIhDn9YUIW+OkOHcSRGprI+k9jb2s0zhzHBGB10mI/tCRdljFnmZ7Bdt2n3K+YnOKPtPRNPiw8bU/ltCMzhhL5uUeps]
+[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB0TzFjWmU2VEdwanNlMlNVQWhYZ3ZEdlQ3ZnFJR2pFN3UrQWR2TEVSQ0ZzClZENU1QeUErZThaUkxiWkVoSWZ5bHJ0Y09OaysrcGVHZXptaFF0eXZ4M2sKLT4gWDI1NTE5IDVZSWtVcy9KOEVkczQveVNUYWNvWEVYQlphVGJTN1VpQ1phTkdlVm0weWcKVmpoakQ2SUxrVEZPQ1NqcE1YVDVqeEljRWgxNHEzampPZTk5UEpUdkxEVQotPiBYMjU1MTkgU2tycDh6TWpHWFhqV0JtU2huTUxmTDBFWWxuelZYRWVnb3JPaTJjV1NpVQpaQ2tOOUlwbmVkcEd6V1BTYnducmp5MmhDNW9NMkNzZks5dlphMWphR01JCi0+IFgyNTUxOSA1ZUlxcVFodks2ZitzVWIyTW9KbGNMem1Ha1NxWXBuL3JXTFEybC9HdjNFCjhPdnZtVUVrNjduQ3YzS1Y5ZXdQdjJiOUJ4SHRxSldldHNsWkpHQzN4SWMKLT4gWDI1NTE5IGdNUkI0Z0FEbnpMMmhjVE1tbm5LQXNXZ25zVEFUVHFNMGZrZ0FLMjlNQ2cKdC9aOTlXRldHd2tiM0Y1dVVuTERaNWlhVHhrUzdCM24zR292NDVIbU1ISQotPiBYMjU1MTkgd0hqUGtLRVlEQmtXdUt6Wk5XbG5EYlNqaUhRblo3bTRYSkEzTVgycFVXcwpBRE0yTjFlZHRQdFJFL2dwdG1LaE1wUXQ3TWI1U3lpQ24rU0l2OWJ0SHE4Ci0+IGJPLWdyZWFzZSA2dTh3MSUKQ0VmR1NJYmFmbGJXUFZIc0NUS3U5TjJ3ejJ1QVFtRlIyNUhJZGp3dWJkU29oWk53M2ZRWnNMcUx4YzBCUzM0cQo2bEJEOHBOblAzQ2pVb2hpQlJyd1BhUHlnZmMKLS0tIFoxWHVvdThpTjFuOWNQWTVSRDhkaDgzdUdXLy9aRVJhKy9aZFZtZEpkVVkKOhLmwoZkfrfQjjKyvgGQSAo6V390/n0lsBhyKNpVrYR3TtEy+H5NxAsi7tKtWpe0+TN9ZS1hINN8PtU4eQ245xyKoyac]
 publish_timeout_secs = 300
 ```
 
@@ -813,11 +813,11 @@ let _guard = EnvRestorer::remove("VAR_NAME");
 
 ### dracon-sync
 
-**430 tests** across 2 suites (`cargo test -p dracon-sync -- --test-threads=1`). Tests use `tempfile::TempDir` for isolation.
+**431 tests** across 2 suites (`cargo test -p dracon-sync -- --test-threads=1`). Tests use `tempfile::TempDir` for isolation.
 
-Whole-workspace: **691 passed, 6 ignored** across 22 suites (`cargo test --workspace -- --test-threads=1`). Per-crate latest counts:
+Whole-workspace: **692 passed, 6 ignored** across 22 suites (`cargo test --workspace -- --test-threads=1`). Per-crate latest counts:
 
-- `dracon-sync`: 430 passed, 2 suites.
+- `dracon-sync`: 431 passed, 2 suites.
 - `dracon-system`: 83 passed, 1 suite.
 - `dracon-warden`: 79 passed, 2 suites.
 - `dracon-security` (`dracon-warden/src/security`): 99 passed, 6 ignored, 17 suites.
