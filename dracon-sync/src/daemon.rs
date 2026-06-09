@@ -243,17 +243,17 @@ mod daemon_tests {
         let repo = tmp.path().join("test-repo");
 
         // Initialize repo with a commit
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["init", "-q", "-b", "main"])
             .arg(&repo)
             .status()
             .unwrap();
         std::fs::write(repo.join("file.txt"), "content").unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["-C", repo.to_str().unwrap(), "add", "."])
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args([
                 "-C",
                 repo.to_str().unwrap(),
@@ -281,18 +281,18 @@ mod daemon_tests {
         let repo = tmp.path().join("test-repo");
 
         // Initialize repo with remote
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["init", "-q", "-b", "main"])
             .arg(&repo)
             .status()
             .unwrap();
         let remote = tmp.path().join("remote.git");
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["init", "--bare", "-q"])
             .arg(&remote)
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args([
                 "-C",
                 repo.to_str().unwrap(),
@@ -306,11 +306,11 @@ mod daemon_tests {
 
         // Initial commit and push
         std::fs::write(repo.join("file.txt"), "v1").unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["-C", repo.to_str().unwrap(), "add", "."])
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args([
                 "-C",
                 repo.to_str().unwrap(),
@@ -321,18 +321,18 @@ mod daemon_tests {
             ])
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["-C", repo.to_str().unwrap(), "push", "-u", "origin", "main"])
             .status()
             .unwrap();
 
         // Unpushed commit
         std::fs::write(repo.join("file.txt"), "v2").unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["-C", repo.to_str().unwrap(), "add", "."])
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args([
                 "-C",
                 repo.to_str().unwrap(),
@@ -360,18 +360,18 @@ mod daemon_tests {
         let tmp = tempfile::tempdir().unwrap();
         let repo = tmp.path().join("test-repo");
 
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["init", "-q", "-b", "main"])
             .arg(&repo)
             .status()
             .unwrap();
         let remote = tmp.path().join("remote.git");
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["init", "--bare", "-q"])
             .arg(&remote)
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args([
                 "-C",
                 repo.to_str().unwrap(),
@@ -385,11 +385,11 @@ mod daemon_tests {
 
         // Initial commit and push
         std::fs::write(repo.join("file.txt"), "v1").unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["-C", repo.to_str().unwrap(), "add", "."])
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args([
                 "-C",
                 repo.to_str().unwrap(),
@@ -400,18 +400,18 @@ mod daemon_tests {
             ])
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["-C", repo.to_str().unwrap(), "push", "-u", "origin", "main"])
             .status()
             .unwrap();
 
         // Create and push another commit
         std::fs::write(repo.join("file.txt"), "v2").unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["-C", repo.to_str().unwrap(), "add", "."])
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args([
                 "-C",
                 repo.to_str().unwrap(),
@@ -422,7 +422,7 @@ mod daemon_tests {
             ])
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["-C", repo.to_str().unwrap(), "push"])
             .status()
             .unwrap();
@@ -1419,7 +1419,7 @@ pub(crate) async fn run_daemon(
                 // local refs haven't been updated yet.
                 let stale_ahead = if status.ahead > 0 && !is_diverged {
                     // Try a lightweight fetch to update upstream refs
-                    let fetch_ok = std::process::Command::new("git")
+                    let fetch_ok = crate::git::git_cmd()
                         .args(["-C", repo.to_str().unwrap_or(""), "fetch", "--dry-run"])
                         .output()
                         .map(|o| o.status.success())

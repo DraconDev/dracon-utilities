@@ -25,14 +25,14 @@
 ///
 /// 1. **PATH**: Tests that add mock binary dirs to PATH (for gh/glab mocking)
 ///    use `acquire_path_lock()` + `EnvRestorer::new("PATH", ...)`. But other
-///    tests that call `std::process::Command::new("git")` directly resolve `git`
+///    tests that call `crate::git::git_cmd()` directly resolve `git`
 ///    from PATH and can race with concurrent PATH modifications.
 ///
 /// 2. **`DRACON_SYNC_GIT_BIN`**: Some tests set this env var to mock the git binary.
 ///    While `git_binary()` no longer caches the value, tests using
-///    `std::process::Command::new("git")` directly (not through `git_binary()`)
+///    `crate::git::git_cmd()` directly (not through `git_binary()`)
 ///    don't check this env var at all. Use `test_git_cmd()` from this module
-///    instead of `std::process::Command::new("git")` to ensure consistency.
+///    instead of `crate::git::git_cmd()` to ensure consistency.
 ///
 /// 3. **Registry/port state**: Integration-style tests `test_create_repo_on_github_*`,
 ///    `test_create_repo_on_gitlab_*` that start local TCP listeners can conflict.
@@ -56,16 +56,15 @@
 ///
 /// # Git Command Helper
 ///
-/// Use `test_git_cmd()` instead of `std::process::Command::new("git")` in tests.
+/// Use `test_git_cmd()` instead of `crate::git::git_cmd()` in tests.
 /// This respects `DRACON_SYNC_GIT_BIN` and prevents PATH resolution races in parallel runs.
 ///
 /// ```ignore
 /// let output = test_git_cmd().current_dir(&repo).args(["status"]).output()?;
 /// ```
 #[allow(dead_code)]
-pub(crate) fn test_git_cmd() -> std::process::Command {
-    let git_path = crate::policy::git_binary();
-    std::process::Command::new(git_path)
+pub(crate) fn test_git_cmd() -> crate::git::GitCommand {
+    crate::git::git_cmd()
 }
 
 /// Create a git commit command with `--no-verify` to bypass warden hooks.
@@ -77,7 +76,7 @@ pub(crate) fn test_git_cmd() -> std::process::Command {
 /// test_commit_cmd().current_dir(&repo).args(["-m", "init"]).output()?;
 /// ```
 #[allow(dead_code)]
-pub(crate) fn test_commit_cmd() -> std::process::Command {
+pub(crate) fn test_commit_cmd() -> crate::git::GitCommand {
     let mut cmd = test_git_cmd();
     cmd.args(["commit", "--no-verify"]);
     cmd
@@ -159,6 +158,30 @@ pub(crate) fn create_test_repo_with_remote() -> (std::path::PathBuf, std::path::
     // Prevent TempDir from being dropped
     std::mem::forget(tmp);
     (repo, bare)
+}
+
+pub(crate) static GIT_ENV_LOCK: parking_lot::RwLock<()> = parking_lot::RwLock::new(());
+
+#[allow(dead_code)]
+pub(crate) struct GitBinRestorer {
+    _guard: parking_lot::RwLockWriteGuard<'static, ()>,
+    inner: EnvRestorer,
+}
+
+impl GitBinRestorer {
+    pub(crate) fn new(new_value: &str) -> Self {
+        Self {
+            _guard: GIT_ENV_LOCK.write(),
+            inner: EnvRestorer::new("DRACON_SYNC_GIT_BIN", new_value),
+        }
+    }
+
+    pub(crate) fn remove() -> Self {
+        Self {
+            _guard: GIT_ENV_LOCK.write(),
+            inner: EnvRestorer::remove("DRACON_SYNC_GIT_BIN"),
+        }
+    }
 }
 
 #[allow(dead_code)]

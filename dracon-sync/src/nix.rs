@@ -240,7 +240,7 @@ async fn run_git_for_nix_pr(
 }
 
 fn extract_repo_name(repo: &Path) -> anyhow::Result<String> {
-    let output = std::process::Command::new("git")
+    let output = crate::git::git_cmd()
         .args(["remote", "get-url", "origin"])
         .current_dir(repo)
         .stdout(std::process::Stdio::piped())
@@ -270,7 +270,7 @@ fn extract_repo_name(repo: &Path) -> anyhow::Result<String> {
 }
 
 fn detect_default_branch(repo: &Path) -> Option<String> {
-    let output = std::process::Command::new("git")
+    let output = crate::git::git_cmd()
         .args(["symbolic-ref", "refs/remotes/origin/HEAD"])
         .current_dir(repo)
         .stdout(std::process::Stdio::piped())

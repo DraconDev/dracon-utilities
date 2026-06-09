@@ -37,7 +37,7 @@ pub(crate) async fn tag_exists(repo: &Path, tag: &str) -> Result<bool> {
     let repo = repo.to_path_buf();
     let tag_owned = tag.to_string();
     let result = tokio::task::spawn_blocking(move || {
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["tag", "--list", &tag_owned])
             .current_dir(&repo)
             .stdout(std::process::Stdio::piped())
@@ -161,7 +161,7 @@ pub(crate) async fn create_github_release(repo: &Path, tag: &str) -> Result<Rele
 
 /// Extract the repository name (owner/repo) from the git remote URL.
 fn extract_repo_name(repo: &Path) -> Result<String> {
-    let output = std::process::Command::new("git")
+    let output = crate::git::git_cmd()
         .args(["remote", "get-url", "origin"])
         .current_dir(repo)
         .stdout(std::process::Stdio::piped())
@@ -872,21 +872,21 @@ mod tests {
         .unwrap();
 
         // Init git repo so tag commands work
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["init"])
             .current_dir(dir.path())
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["add", "-A"])
             .current_dir(dir.path())
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args([
                 "commit",
                 "--no-verify",
@@ -945,21 +945,21 @@ mod tests {
         )
         .unwrap();
 
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["init"])
             .current_dir(dir.path())
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["add", "-A"])
             .current_dir(dir.path())
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args([
                 "commit",
                 "--no-verify",
@@ -1006,21 +1006,21 @@ mod tests {
         )
         .unwrap();
 
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["init"])
             .current_dir(dir.path())
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["add", "-A"])
             .current_dir(dir.path())
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args([
                 "commit",
                 "--no-verify",
@@ -1069,21 +1069,21 @@ mod tests {
         )
         .unwrap();
 
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["init"])
             .current_dir(dir.path())
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["add", "-A"])
             .current_dir(dir.path())
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args([
                 "commit",
                 "--no-verify",

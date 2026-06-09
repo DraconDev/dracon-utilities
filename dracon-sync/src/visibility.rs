@@ -180,12 +180,17 @@ const GITLAB_API_PROJECTS: &str = "https://gitlab.com/api/v4/projects/{}%2F{}";
 const CODEBERG_API_REPOS: &str = "https://codeberg.org/api/v1/repos/{}/{}";
 
 /// Set GitLab repo visibility using `curl` with PRIVATE-TOKEN.
+/// The token is passed via stdin (`-H @-`) so it never appears in the
+/// process command line (visible to other local users via /proc).
 /// `private=true` means private, `private=false` means public.
 fn set_gitlab_visibility(owner: &str, repo: &str, token: &str, private: bool) -> Result<()> {
+    use std::io::Write;
     let visibility = if private { "private" } else { "public" };
     let encoded = format!("{}%2F{}", owner, repo);
     let url = GITLAB_API_PROJECTS.replace("{}", &encoded);
-    let output = std::process::Command::new("curl")
+    let body = format!("visibility={}", visibility);
+    let header = format!("PRIVATE-TOKEN: {}\r\n", token);
+    let mut child = std::process::Command::new("curl")
         .args([
             "-s",
             "-o",
@@ -193,15 +198,30 @@ fn set_gitlab_visibility(owner: &str, repo: &str, token: &str, private: bool) ->
             "-w",
             "%{http_code}",
             "-H",
-            &format!("PRIVATE-TOKEN: {}", token),
+            "@-",
             "-X",
             "PUT",
-            "-d",
-            &format!("visibility={}", visibility),
+            "--data-binary",
+            &body,
             &url,
         ])
-        .output()
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .spawn()
         .with_context(|| "curl failed to run for GitLab visibility update")?;
+    {
+        let stdin = child
+            .stdin
+            .as_mut()
+            .ok_or_else(|| anyhow::anyhow!("curl stdin not available"))?;
+        stdin
+            .write_all(header.as_bytes())
+            .with_context(|| "failed to write GitLab PRIVATE-TOKEN header to curl stdin")?;
+    }
+    let output = child
+        .wait_with_output()
+        .with_context(|| "curl wait_with_output failed for GitLab visibility update")?;
 
     let code = String::from_utf8_lossy(&output.stdout).trim().to_string();
     match code.as_str() {
@@ -220,11 +240,18 @@ fn set_gitlab_visibility(owner: &str, repo: &str, token: &str, private: bool) ->
 }
 
 /// Set Codeberg repo visibility using `curl` with Authorization token.
+/// The token is passed via stdin (`-H @-`) so it never appears in the
+/// process command line (visible to other local users via /proc).
 /// `private=true` means private, `private=false` means public.
 fn set_codeberg_visibility(owner: &str, repo: &str, token: &str, private: bool) -> Result<()> {
+    use std::io::Write;
     let url = CODEBERG_API_REPOS.replace("{}", &format!("{}/{}", owner, repo));
     let json = format!("{{\"private\":{}}}", private);
-    let output = std::process::Command::new("curl")
+    let headers = format!(
+        "Authorization: token {}\r\nContent-Type: application/json\r\n",
+        token
+    );
+    let mut child = std::process::Command::new("curl")
         .args([
             "-s",
             "-o",
@@ -232,17 +259,30 @@ fn set_codeberg_visibility(owner: &str, repo: &str, token: &str, private: bool) 
             "-w",
             "%{http_code}",
             "-H",
-            &format!("Authorization: token {}", token),
-            "-H",
-            "Content-Type: application/json",
+            "@-",
             "-X",
             "PATCH",
-            "-d",
+            "--data-binary",
             &json,
             &url,
         ])
-        .output()
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .spawn()
         .with_context(|| "curl failed to run for Codeberg visibility update")?;
+    {
+        let stdin = child
+            .stdin
+            .as_mut()
+            .ok_or_else(|| anyhow::anyhow!("curl stdin not available"))?;
+        stdin
+            .write_all(headers.as_bytes())
+            .with_context(|| "failed to write Codeberg Authorization header to curl stdin")?;
+    }
+    let output = child
+        .wait_with_output()
+        .with_context(|| "curl wait_with_output failed for Codeberg visibility update")?;
 
     let code = String::from_utf8_lossy(&output.stdout).trim().to_string();
     match code.as_str() {
@@ -415,7 +455,10 @@ struct RepoMetadataJson {
 }
 
 /// Set GitLab repo description and topics using `curl` with PRIVATE-TOKEN.
+/// The token is passed via stdin (`-H @-`) so it never appears in the
+/// process command line (visible to other local users via /proc).
 fn set_gitlab_metadata(owner: &str, repo: &str, token: &str, meta: &RepoMetadata) -> Result<()> {
+    use std::io::Write;
     let encoded = format!("{}%2F{}", owner, repo);
     let url = GITLAB_API_PROJECTS.replace("{}", &encoded);
     let mut form_data = vec![format!(
@@ -426,8 +469,8 @@ fn set_gitlab_metadata(owner: &str, repo: &str, token: &str, meta: &RepoMetadata
         form_data.push(format!("tag_list[]={}", urlencoding::encode(topic)));
     }
     let form_body = form_data.join("&");
-
-    let output = std::process::Command::new("curl")
+    let header = format!("PRIVATE-TOKEN: {}\r\n", token);
+    let mut child = std::process::Command::new("curl")
         .args([
             "-s",
             "-o",
@@ -435,15 +478,30 @@ fn set_gitlab_metadata(owner: &str, repo: &str, token: &str, meta: &RepoMetadata
             "-w",
             "%{http_code}",
             "-H",
-            &format!("PRIVATE-TOKEN: {}", token),
+            "@-",
             "-X",
             "PUT",
-            "-d",
+            "--data-binary",
             &form_body,
             &url,
         ])
-        .output()
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .spawn()
         .with_context(|| "curl failed to run for GitLab metadata update")?;
+    {
+        let stdin = child
+            .stdin
+            .as_mut()
+            .ok_or_else(|| anyhow::anyhow!("curl stdin not available"))?;
+        stdin
+            .write_all(header.as_bytes())
+            .with_context(|| "failed to write GitLab PRIVATE-TOKEN header to curl stdin")?;
+    }
+    let output = child
+        .wait_with_output()
+        .with_context(|| "curl wait_with_output failed for GitLab metadata update")?;
 
     let code = String::from_utf8_lossy(&output.stdout).trim().to_string();
     match code.as_str() {
@@ -462,14 +520,20 @@ fn set_gitlab_metadata(owner: &str, repo: &str, token: &str, meta: &RepoMetadata
 }
 
 /// Set Codeberg repo description and topics using `curl` with Authorization token.
+/// The token is passed via stdin (`-H @-`) so it never appears in the
+/// process command line (visible to other local users via /proc).
 fn set_codeberg_metadata(owner: &str, repo: &str, token: &str, meta: &RepoMetadata) -> Result<()> {
+    use std::io::Write;
     let url = CODEBERG_API_REPOS.replace("{}", &format!("{}/{}", owner, repo));
     let json = serde_json::json!({
         "description": if meta.description.is_empty() { serde_json::Value::Null } else { serde_json::Value::String(meta.description.clone()) },
         "topics": meta.topics,
     });
-
-    let output = std::process::Command::new("curl")
+    let headers = format!(
+        "Authorization: token {}\r\nContent-Type: application/json\r\n",
+        token
+    );
+    let mut child = std::process::Command::new("curl")
         .args([
             "-s",
             "-o",
@@ -477,17 +541,30 @@ fn set_codeberg_metadata(owner: &str, repo: &str, token: &str, meta: &RepoMetada
             "-w",
             "%{http_code}",
             "-H",
-            &format!("Authorization: token {}", token),
-            "-H",
-            "Content-Type: application/json",
+            "@-",
             "-X",
             "PATCH",
-            "-d",
+            "--data-binary",
             &json.to_string(),
             &url,
         ])
-        .output()
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .spawn()
         .with_context(|| "curl failed to run for Codeberg metadata update")?;
+    {
+        let stdin = child
+            .stdin
+            .as_mut()
+            .ok_or_else(|| anyhow::anyhow!("curl stdin not available"))?;
+        stdin
+            .write_all(headers.as_bytes())
+            .with_context(|| "failed to write Codeberg Authorization header to curl stdin")?;
+    }
+    let output = child
+        .wait_with_output()
+        .with_context(|| "curl wait_with_output failed for Codeberg metadata update")?;
 
     let code = String::from_utf8_lossy(&output.stdout).trim().to_string();
     match code.as_str() {

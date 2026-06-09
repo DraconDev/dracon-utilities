@@ -4,6 +4,79 @@ use crate::policy::{AuthType, RemoteConfig};
 use dracon_git::types::FileStatus;
 #[cfg(test)]
 use std::path::PathBuf;
+use std::ops::{Deref, DerefMut};
+use std::process::Command as StdCommand;
+use tokio::process::Command as TokioCommand;
+
+static GIT_COMMAND_LOCK: parking_lot::Mutex<()> = parking_lot::Mutex::new(());
+
+pub(crate) struct GitCommand {
+    inner: StdCommand,
+    _guard: parking_lot::MutexGuard<'static, ()>,
+}
+
+impl GitCommand {
+    pub(crate) fn new() -> Self {
+        let _env_guard = crate::test_helpers::GIT_ENV_LOCK.read();
+        let guard = GIT_COMMAND_LOCK.lock();
+        Self {
+            inner: StdCommand::new(crate::policy::git_binary()),
+            _guard: guard,
+        }
+    }
+}
+
+impl Deref for GitCommand {
+    type Target = StdCommand;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl DerefMut for GitCommand {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
+}
+
+pub(crate) fn git_cmd() -> GitCommand {
+    GitCommand::new()
+}
+
+pub(crate) struct TokioGitCommand {
+    inner: TokioCommand,
+    _guard: parking_lot::MutexGuard<'static, ()>,
+}
+
+impl TokioGitCommand {
+    pub(crate) fn new() -> Self {
+        let _env_guard = crate::test_helpers::GIT_ENV_LOCK.read();
+        let guard = GIT_COMMAND_LOCK.lock();
+        Self {
+            inner: TokioCommand::new(crate::policy::git_binary()),
+            _guard: guard,
+        }
+    }
+}
+
+impl Deref for TokioGitCommand {
+    type Target = TokioCommand;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl DerefMut for TokioGitCommand {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
+}
+
+pub(crate) fn tokio_git_cmd() -> TokioGitCommand {
+    TokioGitCommand::new()
+}
 
 mod branch;
 pub(crate) use branch::*;
@@ -40,7 +113,7 @@ pub(crate) use staging::*;
 mod tests {
     use super::*;
     use crate::git::multi_remote::{diagnose_divergence, push_to_named_remote, Divergence};
-    use crate::test_helpers::{test_git_cmd, EnvRestorer};
+    use crate::test_helpers::{test_git_cmd, EnvRestorer, GitBinRestorer};
     use std::os::unix::fs::PermissionsExt;
     #[test]
     fn test_strip_url_credentials_https_with_creds() {
@@ -304,7 +377,7 @@ mod tests {
         std::fs::create_dir_all(&secrets_dir).expect("create secrets dir");
         std::fs::write(
             secrets_dir.join("weird.env"),
-            "# This is a comment\n\[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBqVzVjZ1VsY1ZRQkNpL3RYRHhrZHBqRHFpL2ZvYnQzbTFONTNWazlubEhFCk1VaFA3MG5wMjh1ZjNESDZvYmRVd3o5bVZCMzByblVPTGFjcmlxREl2TzAKLT4gWDI1NTE5IFpCWko4WHhoQUpIZUF6OFArdGxITGJsL3NWYnVvOXFyNFNqalFFWG5BaU0KVHBFMHRPdFpWeHc5ZnM5Uy9yTG12TS9RSjltb3diZTBHcHp4Yk5qendmMAotPiBYMjU1MTkgKzloTTZkZDU4dlpPUXNCUFBxS1lHd0RGTkVSdk1ZZzBpUDlYUFhoQTZ4MApTS0ErVDN3TE5FOHEwOGpXQkFDV1RtVWp0S1hhcGxBbWtGOHU5dlJ5dHc0Ci0+IFgyNTUxOSBYZHozeDRTZk9iU3B1c3pYcjNEaVdKdEdvZWlyOU9tdG1TNkh3K3lBdGc0ClYxMGRjU3VON3JCZjZBV1JNd3pnNWFwVXFEejE5bVhlWEZlQUN5SVozd2cKLT4gWDI1NTE5IEpuUW9kK2l4MXc4Y0prMHRxQ084WnVsSmdMVE4xSEYyRUp1OWo1bFhzQlUKM2cvV28rS0VSOFR3WTcwVC9qQmVzc1dDQ3BNUlhRT201MExXM1UrUDNRZwotPiBYMjU1MTkgMUFvNUJONzdZK25iajhPN3Bldkxmb3puc2tib2c4QThaamVOdDlSdE96dwpWQnRvVnpyNUd5OGhIZEx4NEQzS2grZG5JRlgvbzR6eGVudlJzWkZmNllzCi0+IGg4MCRCXjVwLWdyZWFzZSAvcUAgNThNCmNJTlRTZFJYVjV5SFZoUTRiVUdwCi0tLSBSRDVud2lBa3NYckYvWmpWK3dSL0FuTWwwTUt6bXFJdjJ6czQ1T0R5cHZNCuFvIl+LFJTflR1IMnWqV5ckEpa4gaWTcy+SfWGNpiRD5WfnzdO02tUxfSGwGs9A4t4h2vQbEg/KJbW0zhLXOx0zfSujmZCze4iKfP6csPDLplklsaeG6l0Az8SwCwDsGhBcTkKQ63Ie1982] Another comment\nTOKEN_AFTER=value_after\n",
+            "# This is a comment\n\[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBFMTIzMm95Wm4rQURZNklOT3pxNVpaYWRBckxHbDdSSjJSKzFJbG1jR0FNCmVZMG5kTVNPSEErSkFGYTNKTzBmYXV3T1ZlMGpjQmtFWVZidTdCbVdqZHMKLT4gWDI1NTE5IEtCZGpsMjBZczFJVXVnSmdYQS9xWmZtbGo5d2ZPa1BNMG0wUnZjWXViQzQKcFdNZXFJZDl1UnRhcDRsRG9yYnI5WUdleGRYWlJaWE9oWFE3VkxuaklEUQotPiBYMjU1MTkgY0tNckN1ZUEzZDVmeGYvYmJvSGZSZDg0ckFsRUw3MVRIMk1HSlVYYXIycworWTYxaTFIVkNiSzE4ZGlISURSckFra2JNOW0rUFREVlNYV0J0VnZBTjJjCi0+IFgyNTUxOSBMNFc5Y1ZXWXkva2kzeUhiUThlQUIrTFlWM0Y2OVZvVXFiaHBrQ2k2d200Clp3SDRabVlVLzFwaWwzb0NqL1RLa1FaeVRFZUttYU0zOEc5b0xRODcvM2MKLT4gWDI1NTE5IHRKaVRCN2JHQWJETVFjMkY2di84cnJlSXBUYzlrRnpMUUZ2Qk0rNHIxWDQKRXdlUittOVovVFF4VVJJVC9nNnNRL0ZTbzg0T25nVTl5eEczMDNKcGQzawotPiBYMjU1MTkgcWJJSHFlQ00wbGlVUmZlOG5vSFE5c3h0R3hoOVFhWVlsSWhCd0FDTzkzUQpFa2x5anhDVlp2bWhNeXdmbmo4bGpaT0pMaTZjOXVBYi9uT2Zra3lCOHRvCi0+ICMtZ3JlYXNlCjVWeklXUHowdzVzWmZuUWtiU25CQWdXYgotLS0gSzY1ZkI3R1BlS2xhK0lOZ25BbG0wcExHODhYV3NnaEx6T0ZvajZGaVhwbwrXm+DijOiQ9YduwrZp8nfvnvdO8TJiUOir8eGoWYm8+t3L+CSuIGxxSswnBrpexYuPsoz3N/vPL1BCfpGlajZADfDDqBQegoJrYfUxAsA8sGELjCTH2vcLwlhcOODn1v08fxuoyI2v2CrEBw==] Another comment\nTOKEN_AFTER=value_after\n",
         )
         .expect("write env file");
         let result = load_secret("COMMENTED_SECRET_TOKEN");
@@ -380,7 +453,7 @@ mod tests {
         assert_eq!(url, Some("git@github.com:Test/repo.git".to_string()));
     }
     #[test]
-    fn test_ensu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA2UDJyUyszNGJMVXRwWDBnTVlPVEFGNHZqbTh5OW5wcnFhVXlHM1M5UDNZCkJjNEtKeWRVK0k1c2lqV2VVUXdsS3VwSjdxRzdEMWUyTEU0SFpnMGhVZXMKLT4gWDI1NTE5IFVhZXNabWhEWTV5VG44K2YwVnBoaXlYYWNGNFRTMXhvUjY5QTVZYVdiUnMKNXVZZ0JTM1psSmpFSlk5NlBnVlNMZVRaTXpNMisyR2liNm0vQ2VVUVVvZwotPiBYMjU1MTkgTGdOTW5yY0FsakNEcngwbHVGRHFGSjFNdlovVEV2TlMxVktsVmlsRDlBYwp3NjhKTVk0TEZYa05xSWxHOFVlZU9qUTQxOWNBZGVUZ043Q0VWM3dBRGtRCi0+IFgyNTUxOSBYSUlmL3RwdDB1ZDQ0Y0xGZjRXNk1NdWtEMGgrUGNTeVhBUThqZG12SkE4CkNNdll4T2RldWVCMFlpMzczWURlYTJZR3VzbE1ESS9Ka2RJNGZMeElaTUUKLT4gWDI1NTE5IC9RNTcvMGZBcGl2TXY2L25NK2tZbnMxSW56MXJKMXQ0RHJMdE5IUDA4V2MKYVF3Qm85N2d0SEhaejhjbnlFS2M0SUkrZlZUOFVWaGx0ZGRaTTIxY2tadwotPiBYMjU1MTkgV1NzSmFCUXhWYUtJWjVJeHJTQ283MGZlL012a2RKaXZWcEdYQ3FtTFZXNApaZElOQXpTbjlyRnlrUlFzaktjQ3p5WWUzb0NOYUlRL1kwZ0V1cmUxbDBnCi0+IDFnT2NZLWdyZWFzZSBAXCB0eFFZRlJFfQpiYlBseW9ONklHK01ka2tXVFlwTU9QMG1CTzI3cFpNTHJSQXNTdUhnck1OSXZEb1NxSjU4enRJZTBjdTNoNWFuCkpxSTdtZmRqbENieXpPTi91R05OTUpYUVVLcjc0Y2dPN1lNd096dkRTOFVia3cKLS0tIEpPa1k4OFFnS0FtZW01Z3JQL0E2aEY5bFAxRHdhWFlKemkxTFpHMDJ0czgKmZ2fL6amRFQdSOPm54lxH2nB5HpU6qE9TmU9Da9eiE6WDHiRIeXbPr6+IhH5NwrmcZkbNIrPe0KIDA==]() {
+    fn test_ensu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBLQWFUaFU2WlNxUXRLejNZZHNCeUpoSTI3TjhJQ3dLRThlU0g4R1AvUFE0CmVLczRlNVpSSmhTcWtSL1F2TEEvY2lXT2VGbE5jYWdsN096RWZ1ektBQ00KLT4gWDI1NTE5IEpzSU8ybjdGZGpGNGFOWW8wOVg0Q1FOZDArMDJsTlQ0QkNIQVNDZ21mZ0UKMGRqVFZCR3B2a3N4NldVUVE1L29jdGJwaExUZmZuM3B4UWQwNGxBTkhZVQotPiBYMjU1MTkgdUJlamtJcy9lSkpqTW1UYThCZkhDUWRtZHZNSHZPc0t2cmVPZ0NBYWlEbwpLTG11MnRzZ0RJRU1zL3RQUGtCSE9OQU5zQi9SSkwzKzI1cFl3dmdPdHIwCi0+IFgyNTUxOSA1STFxWDVDSnJsZ0dwRWp2OGUyNzNoYzIxUDlDZ05BQm1LU0hJWHUzOGk0ClFoVVNnTUVFb1VidG1PcmppbEFCd1ZUSzVqQ0plc3ZYY0lFL1Nyakl5MVkKLT4gWDI1NTE5IHJGUkFrdThnanN6L3lFVHVGNGRiU04vSlJENVhha0ZMYjBURDg3YWR0UmcKc25GYWppdW5ESUpaM241VEdBZXlNdFdiamppMWtINnI2V2JWMUNxMXgzSQotPiBYMjU1MTkgaWV2Q3hnV2tLaDRWbHlMUVhsSGZ0MGZqZG9MVkxYSmlEWTZDaTVMQ2JrcwpNTG9BeEtHbG5abGdMM1h5L2FUSnRkakVteUlDZy93VU9BN3dWR0Yvck9NCi0+IDg/WGotZ3JlYXNlCmNkRFBEd25lb2VOOXZZa0RxcCtEWDd1Wk1DNWpueE5tTGJnODVBVytVSWZXSVhBYTlyV1VSVnY0WGxseUZKN28KZ3YxTFZWeGg5QUxYU2o0TkJaeUl5SnJJMndqMEFMZjdBdGFNSTAxSwotLS0gY3Jja1JobnptZytQdFlBWTVkUTJzZDdac1NnN1Z3Y24zb1NDa05FSVJkOAqDvgYU6COGd+7gteCKREFwZSg7xWdkvWVGOMUxEvzJVduyY0UMwHONfGZv/+X9jLp1Ju4Dsti3PYev]() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("test-repo");
         test_git_cmd()
@@ -516,7 +589,7 @@ mod tests {
         assert_eq!(remotes, vec!["origin"]);
     }
     #[test]
-    fn test_configu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBzZzdLTjFqNUVWb2llb2VoOHl3ODV4UWx1QlBQNWpRSUU1Q3JQMjlTWkJrCklwSUNSdFJsMUVWNlBJSFJuanlmd21lUzJhSFJxVnZ3Y2FHOXBjSFh4VXMKLT4gWDI1NTE5IEhlZE9aUVI3S0RBdzUrbkx6VnFIKzBYZnI4UktDWHBzUDZXQmd2Z3gzVEUKV0M5ay9HSno2dG8zeHdDdlVGRnFZbEpWSjZ5QUFLTWp2enVobE56OXFEVQotPiBYMjU1MTkgNlRMQ2tBc3VrTnB6R1A2NGNWWVhoT3pRa1VvU2hONmtqT0NNMFllUDIwRQpTQThDQlIyWTh6Y25ONmE2WjBvSzVzK0RmSFg4RnQ2Q25XMXd2dEczSXI4Ci0+IFgyNTUxOSB0UkFlVzVIckE1TmxUeWtYZzhacGlaUzYrK1poVlU4QjA1eFFIOWU2TjNRCnhDMkZDbkVGT1lld04xczNNYTJXcXJFZUN1Z2tQZGs1aVR0akRMWDNkTGsKLT4gWDI1NTE5IGl4YnFwcnFJMTloMTFqOEl3VEN4dVM2VWtHWXZNUEM2WTBzNXo4MEpFaVUKQ3luSnpHRXR2NTFxMnN4ZmxSaW5EWUY2a28wYzB4dUhHNGFIV2IwcFo5UQotPiBYMjU1MTkgbDNSMUduaVlidDBEU1RoYUVlZEU1M1pRekRaWE54ekdDQlJiekFXYzRIWQpKTWlXdndzbnBrRGRCVG9KYXRlRlBCdko1bXdkY0dzdGhmUUNjTWYxSEFRCi0+IDQrN3VnbS1ncmVhc2UKQ25teHcrRDI5MUxFWnJKbXB6WTB6blZmUURRQmc5QWt4YkxvbFdldUFwSVZQQ1djV3dIRUxwUEdaZkhBZzI1MwpGNnBoVUZ1UzhaejZzUnJ2NHdYdXN3Q3VCUDRGMTdUL1RqSHNqV0Vqd0VuWmVEbGFSVlEKLS0tIGg5VXBweDB4aGFuRU5ueXlWYUg3NUN0NHAvOFpuSU9kazhDMU5tL3M0Q2cK1z7t7MpYyFEeHcQWmsTuwwxv7/OLQCmkBlK9lJiTmym8Bv1XGNEdqLP6j4e+H7IidQUQU961YQL4jeKN]() {
+    fn test_configu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBYcDZPNExsK21FUUpRT1QrSVNEUjZFNmFrTEM2MjFZYjZtbnJrTmNqS0V3ClRBRnl0dlo3VTdkQ1B0Sm4vUnRaR0FpelVpc1JLRlMzeEVKbzNFbFlxbm8KLT4gWDI1NTE5IGg0c1BPRDdQU09nbWFNWmx5REdwc2RENkJMUUtYanpoOFRLWFhLQWR2VVkKUUxWaXlJdEY1YmxML0UwNnRqREx5ZkFpNllNalgrVlhDdTZEQW4ySWMyVQotPiBYMjU1MTkgQnREYVdRZ1ZVSVBpVi9TUmFhZFFvQUFyREJuVzJQQUVUbjFDQkg4dllUSQpIN05tUjNncWdSMkhibC8vTU1ZNjBHS0JZQjVpWEcxSmtiTlJJc1ZBOTdzCi0+IFgyNTUxOSBocmRsOE1iR1R0bndMdTNvMGFyT1VaTHZzSUppd3ozOVR1dDVrQzNNd2w0CkYzY1QzeFhhUlNrZ1d2TWlrZ0tNWGU5VktZeW81UWRubzIxbFZYUDkzLzAKLT4gWDI1NTE5ICtBd0Zwa0hpU1V3cGFHS0xEYVQwVlBidzYrU1R2K0k0UmJOdzlhd3k5MmcKZk5Zc1lKR21TTk1nYUh3UngrMGpQSUtxemw0WStGK0JnQkNHbFRLK0VyWQotPiBYMjU1MTkgbTVOaUt3clJ2V0R3NloxaDVOZDFJK3VWckRPRGZ1d3JjUWxvTy9yVlpCQQo2a1UwRGpsWVFzbG44c281YWtFWjc5d0dLaUtVRytTTXJ4cktpNjBrbGdvCi0+IF55LWdyZWFzZSAkSU11fCB+SDYobC4gNVg7ciJSIGs8U3cKSUFCN0dMdjhMdHMKLS0tIDBSUi9ldHBQM1kyQUhNSWptZ25vRnlZbUhZVDlKSERsd2F2dTNiUUpSK0EKbFX70TlpyiCdJbqmDvZWFG28EAE0dvO9i6UcCt3OddKg3ovwUeN/B4ViqUV/MILEJ9HE7qhzQWbvkMNr]() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("test-repo");
         test_git_cmd()
@@ -544,7 +617,7 @@ mod tests {
         );
     }
     #[test]
-    fn test_configu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB1U2JFREU3TDh3YVJsWVM2a3pZVVUwUmtxb2xjQWZHei90cXc3ejRoN2xnCjNyV0tXaHpwUnVVZDR2ajNLWTM1cWFxRk0wUUtGbThoMWtLTHR2MURkU28KLT4gWDI1NTE5IGJaWE9FQzI0aTIwQnh0NWV4eE0wVTd2YWN2QjZWSUltKzJLVzdjWU5KRXMKbHgxaVVhSHFQc3BKeXhzWWVtc1BJTmcwUVhJRE91SVJPMkpHbHZKM050MAotPiBYMjU1MTkgMFl1aDNsK3JybmdPUC9RWmRYcTQxV2ZXRDR6UzJ2R3A1UXFDTHMydjQyOAp0Tm43ajBxNW5yb2NZWFhTbXN1QVJyaVMzWndoTlVZMmk1KzBxeWltaEVBCi0+IFgyNTUxOSB3L2FDUjg3OHp0Z2t0SnNEY082QzhrOFhxVHozT3d6MlMxYk0zSEZHYVZjCmtmSDNxZi8yT0IwVDlGZmNBV1dIRGhmc3JyRDRzdWM2ZlQxVzRBeGZjMEEKLT4gWDI1NTE5IDNhM3hFakZUdEhIb051enJuUDI5UlZTa1FVZWtGNmpOM1NHWkowdEdzRkkKMWd6akJLM2FkWDBlcDJyUklreWdpTWs1OXEzM3JQMDVGaDJEUVNKa1p6MAotPiBYMjU1MTkgQjlKWUJCTitxVHpFRXZoZ0NQUjFRTUJLZ2xPZ1hrK2JFcFBBZDhaS1lrcwo1STVkRmY1Vm1LdktiaDJTRVdtaTJhRStMalNTZ1BEY0VFWTgzVDh2MXdJCi0+IHZ8LWdyZWFzZSBOWwp5Zy9mNDg1ajZwUWNOT0JSdVhTeGwxbEVJV3ZtVVNOU00vWXVJTjJFTEQ2bUg2NGNlOUdaUG1XZTBmYzRGWGtsCnpMdjBsUDB6Ci0tLSBITnQwejZXOEZBQ2pWWkZNVTZSTDZZMlJ6ZnZNVU5pemZHRWZWc1V2bXdrCrfo9fK/hQrfSiaN4MWs5HRNoka6193SaeH81FNO3n9jldJqZ38FA9JVV6NMO0oM6rkomsu+wOTAsU3OnmRB3g==]() {
+    fn test_configu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBCUDNGU3RsVFlPVDd2VGRSWlo3VU5qTUszdnJQTVpKWG55aExpc3FoM25NCitYVUJEaEhUSWRWK3pyS2h1L2dXY2w1N2llTW5IeGZRbURqUUFhc1p6OVkKLT4gWDI1NTE5IGthUGhZQStzdVVpKzkzMktiVUViUWQ4QWxCVS9vSjQ4OWNNK1hiVlM1eEUKQjhXaGN4bXZFc0g1Y0U4VnIzUVFzRlF5aTVsZ0tzWjd3YWl5cENuTnRsUQotPiBYMjU1MTkgejdRdnhYc2IyU0c3YXdTWFUyc3B6b3Z0UCtVVlFTV05ZbUxtYnNzM3dTcwpoak5HbzluTnZaTkg3Tm9hT2hzZGJNTVRTZ2pOa0pSODkvd2lsRSs0ZFBNCi0+IFgyNTUxOSBtaFJSSUlzdDdCUWtscC9reXZDR3B4NlExSll6eFBKRS9RM3U3Sk5CaTFRCjN6c1I0aXhkMGRDNWhlRFNGdFFOOUJvVWtQRTdCa3orWkNmdFZzZGl5amsKLT4gWDI1NTE5IFU5SWJYdU81NS8zc1FWbmFnbjZDeGhkSjFtMXcyREFwWW5qbDFmU0hqbVUKNjFyZENyWWV4a3pvVGt6UnNRSDVBd29kR3lMUEFjNXM0R3VIbFRSQmo5WQotPiBYMjU1MTkgMURNOEVpa3o2REUyZXNOV2p4dlVNQkZVUUtyWFk4TTF2aURtL2tsRERnTQpKbGxUOGU5Zml3M2ZvR2FEcDFTVkhCK25HWkVaYU9XZGxqdXh1UC93UjZnCi0+IGF+ViclZU8tZ3JlYXNlIF9uPVE9PVAgKT5rJ1VkRG8KeWFuRjE0R0dpMTdHN0w5cmM3ZkdNQQotLS0gUW1tUUJpNUNCYVBLbUUzTnc2ZE5wZ2VWOWVCZjlRdFJsN0tSdGVqcG8xawqH1JwAcVXqyreQ4hmqHLeAC0BemA6iJOaLOUFw/IX4cmOU9l7SZPlndtW7Ou/sSPklCJrMQPCM96Q3EJ8OpBc=]() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("test-repo");
         test_git_cmd()
@@ -591,7 +664,7 @@ mod tests {
         );
     }
     #[test]
-    fn test_configu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBvZDZJSWR2Wkdhc1hPUGtvbWl1MzNZSDN4aHYvOW4vMWI5Q3hZU01abkdBCnVKUzZWWEZwUGl5bXdMYzFaTGlyRmpnVkJ3ZGZxK0JYTlZjTUZJZVNLSTgKLT4gWDI1NTE5IEJXWVQxaFNDdytTMDI3V3dETFNTN2hQZTRxTGRHbW9kRk53ZEpNTnJjd1kKY2J3TGdHV3QzM0h2VHJIK0NZYXc5NzJhNEhSamxQQkRBT2VaQlBxMlcwOAotPiBYMjU1MTkgek96STM1R0U3MWpsRzNzY2RKMEJTdUJoKzlwaWF5aU1oK2xUVVBQK3dDawpSRzVwZ2ZzQ0ZPSzRLa1o1aEtFWWVhU1o3QkRIRlhUWmVGc3NpSzFnUkU4Ci0+IFgyNTUxOSBia2ZCbk1JN3VpcjZQY2V2SjU1VHFYNVQ3c2NING81T0RDMlZEUXJrMG1nCnlXRHNBZXZJbG5tdUF0a3REWEFva0VlbE03cDAzS0hoTTN0S2RHUHlCbGsKLT4gWDI1NTE5IHRYS1BlT1hBMmd4cjcrNjJjcm9XRm5tOEJ3TE01dDBScDFkTTUwMXd0aVUKYzhGL1ByRjFWZWRTSnhoZFhlSmdxRnpnNUdjUllrRnd2S0RWMTJrazBPRQotPiBYMjU1MTkgbTVkMDhMUVB3VjM0bmVDemhyczhXK3RMdWI0bzdOK3B6RWhZaDVKZThUcwpMaFFZaVcxVkNOelIzb21yODVGVzhXOTNTeGNRc3cxR3pGZ3hVSXJuaWpZCi0+IH07LWdyZWFzZQpLdlE4a3VyNEQ3OVlkTUEwSkMrZ2xSUU1GMHU4YVBuRE02OGJvMWRZSXhONmJ0NnhyUTZQZzluYU5FOFpWMTE1ClhUQm53NDJRQngyVkZRTFVFS2duYXVLR0RTMUJoNkt2MENxNUxCVFhHVjhOS1dXaE5yVkgKLS0tIDNqRXlPRHhIaW5LS0xEVnh2bHB3MUhIKzhVdU1HNzgxZnY4ZmZBNHFYUDgKTVtrR8/3O4yWlGvTbH5OlFDNlsYRvsTpP5Xhl+9aoylPHTtwbYMkgK/NXQcpCBA9Zpms+rMgwvOK]() {
+    fn test_configu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA1bHRoVkhnZVh0NzJKRzI4RE9JYXVrSkxKcUFnaWxZOEhGdjVkamI5MFY4Cm5VZHNMRGNuYWRUSVY5U0h1bC9ZR1VZVEc5ZFVIK200cFZxMFNEQ0d1TnMKLT4gWDI1NTE5IHJtQnNkNGNMWi8yZ0JHeG5VY1V4aEgxcjVqN1U0RWpwY2RsdlRLSnlNaDgKSlFmbkFoZmRKYUJIOG4vRk5zMW9SMEpSSmliTGEzNGVIQlZLckc5b1ZNVQotPiBYMjU1MTkgcVB4bGlaTUVJY2FaekNObjVnbm9ZS1B5YjdYNjJWU3VuTFNxZTBFTVpWYwpJUjJOR3krV292SVVlMGw2VWNCbVdxUDlmRDBjazgvYnJtdWVYYS9YaFVZCi0+IFgyNTUxOSBhaUxYdzR3VGg4VGlCdStQN2ZtMEI1cDV1MFhndXplQjFuMXc5TkNpVnc0CnJZY2pWZE5xQUdFWE5SdFd3NHpSeUttcnh0aTNhSk1EaWhBYkxLOTZMbjAKLT4gWDI1NTE5IHlJcGYwWFFxeVhjNkVrOUZNVWZQOU4xUGVuM2R0eElqbDNialYvOTZBRjgKa2hyK3N4SkJ0THBCZGFGYThWWWpaWTVRTWwvL0xOOTJpeWRqVzJ0Z1d2dwotPiBYMjU1MTkgZUVmd2VrYWFpRjBtM2NYUjNNaHpSanl5QitmcU5ESWsvZndDK0w5STBDSQpWOXdtZlVmVlVkSW0yV2N2ald5YnZlUVNwaXZlckV3YkJlOGRIaDh6UHpJCi0+IHktZ3JlYXNlIH4gfCFUMHpOIHhcUCcgSUUjPENSekoKSGFac3NRbDlFOW5KNlEKLS0tIHQ5WVFxWERlVVo4YjJUVElib2hRalB0VWpNa2ZRcW1mYlFNakhxWGxIZ3MKP2Jnexzf4tCTiXzxl2lHyubUGhXMfVP3qum/Yr2gXLcUcLzttesG9UmWzxxRqlXDZF9m+Spc/D42]() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("test-repo");
         test_git_cmd()
@@ -715,12 +788,6 @@ mod tests {
         std::fs::write(&gh_mock, "#!/bin/sh\nexit 0\n").expect("write gh mock");
         std::fs::set_permissions(&gh_mock, std::fs::Permissions::from_mode(0o755))
             .expect("chmod gh");
-        let _lock = acquire_path_lock();
-        let orig_path = std::env::var("PATH").unwrap_or_default();
-        let _guard = EnvRestorer::new(
-            "PATH",
-            &format!("{}:{}", tmp.path().to_string_lossy(), orig_path),
-        );
         let remotes = vec![RemoteConfig {
             name: "origin".to_string(),
             push_url: "https://github.com/{account}/{repo}.git".to_string(),
@@ -747,12 +814,6 @@ mod tests {
         std::fs::write(&glab_mock, "#!/bin/sh\nexit 0\n").expect("write glab mock");
         std::fs::set_permissions(&glab_mock, std::fs::Permissions::from_mode(0o755))
             .expect("chmod glab");
-        let _lock = acquire_path_lock();
-        let orig_path = std::env::var("PATH").unwrap_or_default();
-        let _guard = EnvRestorer::new(
-            "PATH",
-            &format!("{}:{}", tmp.path().to_string_lossy(), orig_path),
-        );
         let remotes = vec![RemoteConfig {
             name: "origin".to_string(),
             push_url: "git@gitlab.com:{account}/{repo}.git".to_string(),
@@ -979,12 +1040,6 @@ mod tests {
         let gh_mock = tmp.path().join("gh");
         std::fs::write(&gh_mock, "#!/bin/sh\nexit 0\n").expect("write gh mock");
         std::fs::set_permissions(&gh_mock, std::fs::Permissions::from_mode(0o755)).expect("chmod");
-        let _lock = acquire_path_lock();
-        let orig_path = std::env::var("PATH").unwrap_or_default();
-        let _guard = EnvRestorer::new(
-            "PATH",
-            &format!("{}:{}", tmp.path().to_string_lossy(), orig_path),
-        );
         let result = multi_remote::create_repo_on_github("testuser", "my-repo");
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "https://github.com/testuser/my-repo.git");
@@ -999,12 +1054,6 @@ mod tests {
         )
         .expect("write gh mock");
         std::fs::set_permissions(&gh_mock, std::fs::Permissions::from_mode(0o755)).expect("chmod");
-        let _lock = acquire_path_lock();
-        let orig_path = std::env::var("PATH").unwrap_or_default();
-        let _guard = EnvRestorer::new(
-            "PATH",
-            &format!("{}:{}", tmp.path().to_string_lossy(), orig_path),
-        );
         let result = multi_remote::create_repo_on_github("testuser", "dracon-demons");
         assert!(result.is_ok());
         let url = result.unwrap();
@@ -1021,12 +1070,6 @@ mod tests {
         )
         .expect("write gh mock");
         std::fs::set_permissions(&gh_mock, std::fs::Permissions::from_mode(0o755)).expect("chmod");
-        let _lock = acquire_path_lock();
-        let orig_path = std::env::var("PATH").unwrap_or_default();
-        let _guard = EnvRestorer::new(
-            "PATH",
-            &format!("{}:{}", tmp.path().to_string_lossy(), orig_path),
-        );
         let _gh_guard = EnvRestorer::new("GH_TOKEN", "test_pat_from_env");
         let result = multi_remote::create_repo_on_github("testuser", "test-repo");
         assert!(result.is_ok());
@@ -1038,12 +1081,6 @@ mod tests {
         std::fs::write(&glab_mock, "#!/bin/sh\nexit 0\n").expect("write glab mock");
         std::fs::set_permissions(&glab_mock, std::fs::Permissions::from_mode(0o755))
             .expect("chmod");
-        let _lock = acquire_path_lock();
-        let orig_path = std::env::var("PATH").unwrap_or_default();
-        let _guard = EnvRestorer::new(
-            "PATH",
-            &format!("{}:{}", tmp.path().to_string_lossy(), orig_path),
-        );
         let result = multi_remote::create_repo_on_gitlab("testuser", "my-repo", true);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "git@gitlab.com:testuser/my-repo.git");
@@ -1059,12 +1096,6 @@ mod tests {
         .expect("write glab mock");
         std::fs::set_permissions(&glab_mock, std::fs::Permissions::from_mode(0o755))
             .expect("chmod");
-        let _lock = acquire_path_lock();
-        let orig_path = std::env::var("PATH").unwrap_or_default();
-        let _guard = EnvRestorer::new(
-            "PATH",
-            &format!("{}:{}", tmp.path().to_string_lossy(), orig_path),
-        );
         let result = multi_remote::create_repo_on_gitlab("testuser", "dracon-demons", true);
         assert!(result.is_ok());
         let url = result.unwrap();
@@ -1082,12 +1113,6 @@ mod tests {
         .expect("write glab mock");
         std::fs::set_permissions(&glab_mock, std::fs::Permissions::from_mode(0o755))
             .expect("chmod");
-        let _lock = acquire_path_lock();
-        let orig_path = std::env::var("PATH").unwrap_or_default();
-        let _guard = EnvRestorer::new(
-            "PATH",
-            &format!("{}:{}", tmp.path().to_string_lossy(), orig_path),
-        );
         let result = multi_remote::create_repo_on_gitlab("testuser", "test-repo", true);
         assert!(result.is_err());
     }
@@ -1102,12 +1127,6 @@ mod tests {
         .expect("write glab mock");
         std::fs::set_permissions(&glab_mock, std::fs::Permissions::from_mode(0o755))
             .expect("chmod");
-        let _lock = acquire_path_lock();
-        let orig_path = std::env::var("PATH").unwrap_or_default();
-        let _guard = EnvRestorer::new(
-            "PATH",
-            &format!("{}:{}", tmp.path().to_string_lossy(), orig_path),
-        );
         let _glab_guard = EnvRestorer::new("GITLAB_TOKEN", "test_gitlab_token");
         let result = multi_remote::create_repo_on_gitlab("testuser", "test-repo", true);
         assert!(result.is_ok());
@@ -1176,12 +1195,6 @@ mod tests {
         .expect("write fail script");
         std::fs::set_permissions(&fail_script, std::fs::Permissions::from_mode(0o755))
             .expect("chmod");
-        let _lock = acquire_path_lock();
-        let orig_path = std::env::var("PATH").unwrap_or_default();
-        let _guard = EnvRestorer::new(
-            "PATH",
-            &format!("{}:{}", tmp.path().to_string_lossy(), orig_path),
-        );
         let bare = tmp.path().join("bare.git");
         std::process::Command::new(real_git.as_path())
             .args(["init", "--bare", &bare.to_string_lossy()])
@@ -1232,12 +1245,6 @@ mod tests {
         .expect("write fail git");
         std::fs::set_permissions(&always_fail, std::fs::Permissions::from_mode(0o755))
             .expect("chmod");
-        let _lock = acquire_path_lock();
-        let orig_path = std::env::var("PATH").unwrap_or_default();
-        let _guard = EnvRestorer::new(
-            "PATH",
-            &format!("{}:{}", tmp.path().to_string_lossy(), orig_path),
-        );
         let bare = tmp.path().join("bare.git");
         std::process::Command::new(real_git.as_path())
             .args(["init", "--bare", &bare.to_string_lossy()])
@@ -1264,10 +1271,7 @@ mod tests {
             .current_dir(&repo)
             .output()
             .expect("git commit");
-        drop(_guard);
-        drop(_lock);
-        let _git_bin_guard =
-            EnvRestorer::new("DRACON_SYNC_GIT_BIN", &always_fail.to_string_lossy());
+        let _git_bin_guard = GitBinRestorer::new(&always_fail.to_string_lossy());
         let result = crate::git::push_with_retries(&repo, 1, 2, "test-push-fail").await;
         assert!(result.is_err(), "push should fail after exhausting retries");
     }
@@ -1286,12 +1290,6 @@ mod tests {
         .expect("write fail git");
         std::fs::set_permissions(&always_fail, std::fs::Permissions::from_mode(0o755))
             .expect("chmod");
-        let _lock = acquire_path_lock();
-        let orig_path = std::env::var("PATH").unwrap_or_default();
-        let _guard = EnvRestorer::new(
-            "PATH",
-            &format!("{}:{}", tmp.path().to_string_lossy(), orig_path),
-        );
         let bare = tmp.path().join("bare.git");
         std::process::Command::new(real_git.as_path())
             .args(["init", "--bare", &bare.to_string_lossy()])
@@ -1318,10 +1316,7 @@ mod tests {
             .current_dir(&repo)
             .output()
             .expect("git commit");
-        drop(_guard);
-        drop(_lock);
-        let _git_bin_guard =
-            EnvRestorer::new("DRACON_SYNC_GIT_BIN", &always_fail.to_string_lossy());
+        let _git_bin_guard = GitBinRestorer::new(&always_fail.to_string_lossy());
         let result = crate::git::push_with_retries(&repo, 1, 1, "test-push-stderr").await;
         assert!(result.is_err(), "push should fail");
         let err_msg = format!("{}", result.unwrap_err());
@@ -1384,12 +1379,6 @@ mod tests {
         )
         .expect("write fail git");
         std::fs::set_permissions(&fail_git, std::fs::Permissions::from_mode(0o755)).expect("chmod");
-        let _lock = acquire_path_lock();
-        let orig_path = std::env::var("PATH").unwrap_or_default();
-        let _guard = EnvRestorer::new(
-            "PATH",
-            &format!("{}:{}", tmp.path().to_string_lossy(), orig_path),
-        );
         let bare = tmp.path().join("bare.git");
         std::process::Command::new(real_git.as_path())
             .args(["init", "--bare", &bare.to_string_lossy()])
@@ -1417,7 +1406,7 @@ mod tests {
             .current_dir(&repo)
             .output()
             .expect("git commit");
-        drop(_lock);
+        let _git_bin_guard = GitBinRestorer::new(&fail_git.to_string_lossy());
         let result = crate::git::push_with_transport_fallbacks(&repo, 5, "test-push-fb").await;
         assert!(
             result.is_ok(),
@@ -1434,12 +1423,6 @@ mod tests {
             .expect("write fail git");
         std::fs::set_permissions(&always_fail, std::fs::Permissions::from_mode(0o755))
             .expect("chmod");
-        let _lock = acquire_path_lock();
-        let orig_path = std::env::var("PATH").unwrap_or_default();
-        let _guard = EnvRestorer::new(
-            "PATH",
-            &format!("{}:{}", tmp.path().to_string_lossy(), orig_path),
-        );
         let bare = tmp.path().join("bare.git");
         std::process::Command::new(real_git.as_path())
             .args(["init", "--bare", &bare.to_string_lossy()])
@@ -1467,10 +1450,7 @@ mod tests {
             .current_dir(&repo)
             .output()
             .expect("git commit");
-        drop(_guard);
-        drop(_lock);
-        let _git_bin_guard =
-            EnvRestorer::new("DRACON_SYNC_GIT_BIN", &always_fail.to_string_lossy());
+        let _git_bin_guard = GitBinRestorer::new(&always_fail.to_string_lossy());
         let result =
             crate::git::push_with_transport_fallbacks(&repo, 1, "test-push-both-fail").await;
         assert!(result.is_err(), "both SSH and HTTPS should fail");
@@ -1533,12 +1513,6 @@ mod tests {
         )
         .expect("write fail git");
         std::fs::set_permissions(&fail_git, std::fs::Permissions::from_mode(0o755)).expect("chmod");
-        let _lock = acquire_path_lock();
-        let orig_path = std::env::var("PATH").unwrap_or_default();
-        let _guard = EnvRestorer::new(
-            "PATH",
-            &format!("{}:{}", tmp.path().to_string_lossy(), orig_path),
-        );
         let bare = tmp.path().join("bare.git");
         std::process::Command::new(real_git.as_path())
             .args(["init", "--bare", &bare.to_string_lossy()])
@@ -1566,7 +1540,7 @@ mod tests {
             .current_dir(&repo)
             .output()
             .expect("git commit");
-        drop(_lock);
+        let _git_bin_guard = GitBinRestorer::new(&fail_git.to_string_lossy());
         let result = multi_remote::push_to_named_remote(&repo, "mirror", 5, 0, false).await;
         assert!(
             result.is_ok(),
@@ -1586,12 +1560,6 @@ mod tests {
         .expect("write fail git");
         std::fs::set_permissions(&always_fail, std::fs::Permissions::from_mode(0o755))
             .expect("chmod");
-        let _lock = acquire_path_lock();
-        let orig_path = std::env::var("PATH").unwrap_or_default();
-        let _guard = EnvRestorer::new(
-            "PATH",
-            &format!("{}:{}", tmp.path().to_string_lossy(), orig_path),
-        );
         let bare = tmp.path().join("bare.git");
         std::process::Command::new(real_git.as_path())
             .args(["init", "--bare", &bare.to_string_lossy()])
@@ -1624,17 +1592,14 @@ mod tests {
             .current_dir(&repo)
             .output()
             .expect("git commit");
-        drop(_guard);
-        drop(_lock);
-        let _git_bin_guard =
-            EnvRestorer::new("DRACON_SYNC_GIT_BIN", &always_fail.to_string_lossy());
+        let _git_bin_guard = GitBinRestorer::new(&always_fail.to_string_lossy());
         let result = multi_remote::push_to_named_remote(&repo, "mirror", 1, 0, false).await;
         assert!(result.is_err(), "push should fail");
     }
     #[tokio::test]
     async fn test_run_child_includes_stderr_on_failure() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
-        let child = tokio::process::Command::new("git")
+        let child = crate::git::tokio_git_cmd()
             .args(["push", "nonexistent-remote", "nonexistent-branch"])
             .current_dir(tmp.path())
             .stderr(std::process::Stdio::piped())
@@ -1710,7 +1675,7 @@ mod tests {
         );
     }
     #[tokio::test]
-    async fn test_resto[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAzMTN2MU53REhNSUdXYndhRXcvblU2QU9DWGU1dUV0N1AxaHFHdUY1SXpJCmhFWEZKWXF3T2RONVJHdDhkSThZZDdYbm1XdWdtQ3cxVzI4MFpwb2NMSGsKLT4gWDI1NTE5IHZySGQyeS83eXIwTnRRazNkVXF5dGxrdkRIMmZ2cUI1KzRiNUtvRmg1QnMKT0hVZ1ZFRUtSYnlHYUk0VlZZcmx4a0U4b0pOWU5JdjB6MkZHK1VDb3I5RQotPiBYMjU1MTkgOGRpKzdTR1MvdE1BNU55M05FVlc2RXN5Vmh4OWRIOVo0aVNwKzI4ZE5GQQpMT3lYRm1VQzVmcHY5aTF3cXJieCtyNzFydzd1Q3JnbzB6ZC9TemFocWZFCi0+IFgyNTUxOSBMZ2UvSmROSHdqUVZlK3N1NDZxdTR6d0F5Z3NKdFdVamZvZnZTRi90TnpVCnZoSVlRSTMrdGoxaDZaYzcrTHoxdUNpVm1WRHMvVzJQQjJqb1pyS2FoWDQKLT4gWDI1NTE5IDlEcndCRzJ5MXlicnJGWXUvMTZOV3lIMkd5SWcyRFhSc2kwMTdiaFhYM0UKeFE3bTUxeHFtOWgveFRGc2EzRTl5NDFPNTFZWDlXbDBpdmpmWlFOaHVzbwotPiBYMjU1MTkgc05jUDRwSkNROTdDSWVUTUJ5b3dVeTJiT3A1a216VzVMTUlsSk95eDFtOApmQUFPYTZyTkl3eldoZWRBV3AvcjVPMk1uS09hbnR3ajl6eldoRE5OYUxrCi0+IGk8VzNpUnYpLWdyZWFzZSBuel9qdFwgZzkrX1lyClJkRFVkQ2drCi0tLSBLZ1lTWUZVOE1jbmVLTXZhMUJXV00rOVQzTnFycGF5RUhaTGEzWDVZSng0Cq76e2bG0Vedtlv13Erc875RGNrsBEG7JsyWyJxJ6eiT2Iufsm3p5wcrRq/tZtqn0rk8ebFq4NGLC1vnWk5vkUF1f+cbjEfwfQ==]() {
+    async fn test_resto[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAvd1hqQWdnczFyMDlRRkdvMllOUmpPeVpPVHd0VTlxUEFVK1BrK0lUQUJvCnZha29GdndlZWVyemtXdTgzSW0vY0J1cXI0RmRGZW5Lb0pZSHhjOENZcEkKLT4gWDI1NTE5IHAyU1JHQVR2RUQ2MitMVXFUaWtVSEpWakxOWjNoSWVzQkdNTlBOR3VGbWsKWG41SDYvR0ZrQ0lMWnFJVE40QkZWdWx4YSs0c3h4ZnFrekkwV1NDVitPcwotPiBYMjU1MTkgY05UTnRlTHVYbTRXN3JrMlkzdkt2S0FNR3ZGOFJFa3RGeFZzWkFlN2pHUQprK2Fydk9BUU5uN1pFTXZIV2libG52K1ZhYk1xclRZbVdXajc5dXRUcHVRCi0+IFgyNTUxOSBIY1F4Uk9GU2YvYmpXYldHdGJSQ1JkYWhRRVM3SGNkUlg5ZERFNXZDZmtZCnd5TVY1d2pqRktyZFE0TjJKTmpmbDF3c0QwL0huTDlGUW5WbHJOdXh6WjAKLT4gWDI1NTE5IDdkbHgzNUZrSVkxV09PS0tQQjVGWEhaT1BLMXFXVDJNeXVZcWJLazdLVEUKZEQwaENaMzJYVERvb3g5ZU5rRzNBYWE5aTJOYlMwWkZvQnpkaTVFaGRVRQotPiBYMjU1MTkgc1pPV2dUL1UwTVpHdlEweWEvb0ZUY1BqM01hQjZ0b3pTOFNtTzN6WVdYVQowVDBaK2R2Lzl3d2FSMng1dlVpWlpVR3Q1eXBrdGtnU1ZoeTl0bGhFSTJjCi0+IFdyT2Uidi1ncmVhc2UgOURFIk90IDdjUG4gRCAtCnI3czlnUGJxelNqNWVYeElqY1hoVU0xVmoyc0RpeTV3alBqM3EwVFpjWlhDNUEKLS0tIDA5WUx3UW13c3l6aVg3ZE9PSDJyWWNiSkY0aWxNVVNoeCthM3BPeU5td28KXDM5Z9+jE4QWBnfYvShbJ0J07ERxH+brioB45lIEVY3WODhe/f3YSa7VVuXSVjYn/011osUbbPGyHMPWJiCPsYoXBCFDv8gN]() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("test-repo");
         test_git_cmd()

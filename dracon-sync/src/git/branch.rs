@@ -241,7 +241,7 @@ pub(crate) fn set_upstream_to_branch(repo: &Path, branch: &str) -> Result<()> {
 pub(crate) fn repair_broken_tracking(repos: &[PathBuf]) -> usize {
     let mut repaired = 0;
     for repo in repos {
-        let output = match std::process::Command::new("git")
+        let output = match crate::git::git_cmd()
             .args(["branch", "-vv"])
             .current_dir(repo)
             .output()

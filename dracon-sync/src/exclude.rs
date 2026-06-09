@@ -288,18 +288,18 @@ mod tests {
     fn test_remove_tracked_excluded_paths_none_found() {
         let tmp = tempfile::tempdir().unwrap();
         let repo = tmp.path();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["init", "-q", "-b", "master"])
             .current_dir(repo)
             .output()
             .unwrap();
         std::fs::write(repo.join("test.txt"), "content\n").unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["add", "."])
             .current_dir(repo)
             .output()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["commit", "-q", "-m", "init"])
             .current_dir(repo)
             .output()
@@ -472,7 +472,7 @@ pub(crate) fn is_excluded_file(file_path: &Path, excluded_patterns: &[String]) -
 /// matches what the parent repo tracks, meaning the "dirty" state is just
 /// the submodule's own working tree being dirty (not a pointer change).
 pub(crate) fn is_gitlink_unchanged(repo: &Path, path: &Path) -> bool {
-    let output = std::process::Command::new("git")
+    let output = crate::git::git_cmd()
         .current_dir(repo)
         .args(["ls-tree", "HEAD", "--"])
         .arg(path)
@@ -487,7 +487,7 @@ pub(crate) fn is_gitlink_unchanged(repo: &Path, path: &Path) -> bool {
         return false;
     };
     // Check if the submodule's current HEAD matches the tracked sha
-    let sub_output = std::process::Command::new("git")
+    let sub_output = crate::git::git_cmd()
         .current_dir(repo.join(path))
         .args(["rev-parse", "HEAD"])
         .output();
@@ -717,7 +717,7 @@ pub(crate) fn remove_tracked_excluded_paths(
     repo: &Path,
     excluded_dir_names: &BTreeSet<String>,
 ) -> Result<Option<Vec<String>>> {
-    let output = std::process::Command::new("git")
+    let output = crate::git::git_cmd()
         .current_dir(repo)
         .args(["ls-files", "-z"])
         .output()?;
@@ -788,7 +788,7 @@ pub(crate) fn remove_tracked_excluded_paths(
         for f in chunk {
             args.push(f);
         }
-        let status = std::process::Command::new("git")
+        let status = crate::git::git_cmd()
             .current_dir(repo)
             .args(&args)
             .status()?;

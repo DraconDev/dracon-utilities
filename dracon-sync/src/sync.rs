@@ -108,7 +108,7 @@ async fn get_bump_info(repo: &Path) -> Option<(String, String, String)> {
         let repo_pb = repo.to_path_buf();
         let file_s = file.to_string();
         let output = tokio::task::spawn_blocking(move || {
-            std::process::Command::new("git")
+            crate::git::git_cmd()
                 .args(["show", &format!("HEAD~1:{}", file_s)])
                 .current_dir(&repo_pb)
                 .stdout(std::process::Stdio::piped())
@@ -427,7 +427,7 @@ mod diff_tests {
         std::fs::create_dir_all(&repo_path).unwrap();
 
         // Initialize git repo
-        let output = std::process::Command::new("git")
+        let output = crate::git::git_cmd()
             .args(["init"])
             .current_dir(&repo_path)
             .output()
@@ -435,12 +435,12 @@ mod diff_tests {
         assert!(output.status.success(), "git init failed: {:?}", output);
 
         // Configure git user
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["config", "user.email", "test@test.com"])
             .current_dir(&repo_path)
             .output()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["config", "user.name", "Test"])
             .current_dir(&repo_path)
             .output()
@@ -448,12 +448,12 @@ mod diff_tests {
 
         // Create initial commit
         std::fs::write(repo_path.join("README.md"), "initial").unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["add", "README.md"])
             .current_dir(&repo_path)
             .output()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["commit", "--no-verify", "-m", "initial"])
             .current_dir(&repo_path)
             .output()
@@ -461,7 +461,7 @@ mod diff_tests {
 
         // Now add a new file (staged)
         std::fs::write(repo_path.join("new_file.rs"), "fn main() {}").unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["add", "new_file.rs"])
             .current_dir(&repo_path)
             .output()
@@ -2033,7 +2033,7 @@ async fn stage_commit_and_push(
         // `ctx.remote_failures` (the caller passes a `&mut HashMap`).
         // The `tokio::spawn` fire-and-forget pattern was removed because
         // it bypassed the failure-tracking needed by callers like
-        // `test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSArN2Z0azRQQkpWblczeGtvb1BhVXRaS0hSM3BjaFU4S3pPREpZVDhHem5nCnh3aVEyVndma0Niai94OXNOWnJ5YzZKLzJKSHdET25WeG9TTE9pSlpVZEUKLT4gWDI1NTE5IEZzYlVIdjVUWk1DbC8xYmFQMHNpOU5rWnpiRDFoUjRDSkFld29ReFVoQ0EKbjdqZlN0WWNyWkZwenRlTzRJUDBmNmZEWi9UdkdqLzBjTTBnby90WWtlTQotPiBYMjU1MTkgRDVGeHN4Um9mZWtXaVV0NktrSWVNZWhUOXF3cWdReDJtWkw5dzdpVGt5ZworcmRvQS9Ec3pQV25mVjBPUXJ6TnlZVC9jVkcvNE5pS01WL2VKdjVPZjJjCi0+IFgyNTUxOSBzaGcvN3R2b0dKN1VlZ3Z0U0FYeERyWndsenNRQ1N4OVlFQ1lqSDBGMVNBCmVRNUU2Z0QzS1FkWlArcHVBN0Q4UURLcWJtUnEzbmZMaWJKS3FYWS9EMncKLT4gWDI1NTE5IG82UkVtQ0VNanBrTDVWdjF5cS9BNktjNG5nRjF1ZVhJMllzZWRpWnhZeHcKTER1c2lITTJvbHh6VWNnbEJFVi9lL2RLb2cyNmVPd0hYU203ckRJTXlpNAotPiBYMjU1MTkgQmkwQjFURFdtZXlyaWJoeW5zeEhXTnVzTFBDeWU4U0MrbXZjNy9haHdHQQo0Wk93MWhDWVYzVXZUYS9lSkF1Y21scHZacTZObnJpSUllWEhlWXJHY0FBCi0+IEVWT1ssVCdWLWdyZWFzZSBtLmxQXiA2YF9TcXF1KSBKJApaK3VvSlpIRzR4VFZFMTdCeEpFVk1ZeEpFZU5MY3BIR1MvK2RIZ0UKLS0tIGE4MHpFN01uOVcvRUloWmp6c2txRlNvd1Nyb0NkQ0laYmNGbVVUQjQwYkkK/rYISjNind4j/pca/qPQxZlU7B26VVBUarOFogTKVePX0dBohlAzyTTziNvGTT6oU4L/MiZLhUBg]`.
+        // `test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAwSDV2d2xDRG9FSjk3TlRtRnhWdFBnaHd2cXR3b3VqT0o0Rm1RU1hSRnhBCk96UGYxck9qK0k0S282YmhnNnVwQjN1citLZEpIdFRoV01BcFQyOG4vR3cKLT4gWDI1NTE5IC94YjZxTGg5b2E0RFc0QW5aaklKdTM5MlJORWxkb3pnODlZRDhIcnhsek0KcUF0RWRlMDEySStTZWJKOW1YVktsTm8xWTVqdWEyd2o5YWVhREVuNHNzbwotPiBYMjU1MTkgcGo0dHJGcVo0Q29SeXpocWM1S0ltUGhpOHl1bnlqUkh3ZEZWNExWUG1rVQpUTWFiUzBzNlFGY2dab2lvU3Buc2ZHZVh1aTMyekdxNUhhcUlCRXdReEw0Ci0+IFgyNTUxOSByTVk3eVJtOVBqQUR3ejFWSFVleUl4RmhlNWhHRnNJVGNCQm4yaEh5QmxrClVFWVZYVHJaYzAwcnJFRzdPVURWWWtCUHNyU0tReVZaU2NMTmRXc2lTSk0KLT4gWDI1NTE5IGxObEtNci8yMjZnTytQWFVYMC9lTlIrMUttZDJzRC9hYmkzK1Y5djZ2WFEKWHNVUXRBSkc0VzdUc1l4WlpxM3Q0bER0cTlhekVTaUEwRnBvd1J0NXVCcwotPiBYMjU1MTkgZFlEdU9vd0pIejZiUitRUkFFM3ZPdldFeWJZUnJIaEZjUkdjRThQM2h5YwpEdjQvZHhsektiOGgzV3dQYjlXMnB2dEc2bWRqbGQrb1BxQUJpUnc5ZzljCi0+IDR5VTYyVCstZ3JlYXNlIH1lCjBvWWRNR1Vvd3JxcG9OdEJQaEVCV0hPU1llRllLd29xU2ROY0d6cwotLS0gSVN1d0ZDeXZEbEFWTUZhWGlCVmpHemhEYllBK2JXa1JRUjA0SkhnZ21iQQoXP06cZ7xsXR4Ep//BnS10wLQptje2ejVZjqE6LL8Tk6MZ5KaaBTK4JWJ2X0h7QOlnT7/24BPY0Ms=]`.
         match push_background(repo, policy, ctx.remote_failures.as_deref_mut()).await {
             Ok(true) => {}
             Ok(false) => eprintln!("⚠️ push failed for {}", repo.display()),
@@ -2254,7 +2254,7 @@ async fn handle_ahead_push(ctx: &mut SyncContext<'_>, svc: &GitService) -> Resul
         // Push synchronously so mirror failures are tracked in
         // `ctx.remote_failures`. Previously this used `tokio::spawn`
         // (fire-and-forget), which made the failure tracking unreachable
-        // for callers like the test `test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBFQXkzbVpLZmhZeW9abWtIcHhpWEg3OU5tSEhxYUVpNHZCSTd0ZVVQTnh3CmkveDB1NmRaYTlLNnVWaFRPNmo2eWcwWTZYWVIxSVlKMHJYVEVFNFY2UGsKLT4gWDI1NTE5IEQ3Y2M3K081ZEozOGlhalF2MitBdUdGUEdyTHU4eDZTQjJSQjJnSXdTMVEKK2Vzc2Qva0tKKzEwSmRHYkk0V09hbmsycG1FVUtEdzZrSFU2QTRJTjlmYwotPiBYMjU1MTkgM21mM04raGNMN0FpOXZZOVVHd3drcFlZZ1ZCdkNGdDl2amFRbm1EMDdsRQo5bEMzOTZhRWdNMVhkY3JvVFZURENyajFKWDhCRlphZVRLbFhOOTlJSDlvCi0+IFgyNTUxOSBtS0lnL1g5NjdzSUk3T2E0dUdCNTBFQi9MYnhOUUhkczFBK3pvelo0UXhzCnhMazNhcmdMYVVER1EydUUyRXd0bHA5QlB3UU5oSm9zaXhCYlMrR0c4NmcKLT4gWDI1NTE5IEdRTm5iZjROcWxTRWUwZFR1WEtiQ1dmVVh2NDRrN2hDRkg3MkVSbmhSVzAKVEdOWmNFR1NDZE14V0JJemNBcjJBSjVZUmJqVnB5dkdabTRnaklDanR4YwotPiBYMjU1MTkgc3ZQTFFmYVVKMHhndE44UW5xSzE2UFRxMUs4cWJWUUF6UTAzUkRGK1IwOApPdDBtN3YzYWt0V3JsL0Q0UVpmQ1M2bDROS01JblZLWGZqM2l2RE9nbENFCi0+IDMxMFh3ImJ2LWdyZWFzZSB1PGIhZT1hIFVoUSA5b0t4VyBrOXA9KmcuXQpaVG4wVksvQW5OUXZKR1IxWWNzU2gwbGQyNWo5WE5OV1ZkZ1UyMkUKLS0tIHprSFNYcGZERFdYK1k5YzhxWTFtYWZ6akhxbHJGTmlkZWxpbGErck5OL0UKi11ocr4r243B5Gfdxcx+al9zUISMdtqyuObjWmtBWdUyyAIEHPntWz4cfjffTEmbMVuqWkIEMdiF]`.
+        // for callers like the test `test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBHWlNkVzdIQ3hCTDBqOUI4enN5a0Y5b3ExQ0VyVzJlWWg4Zlk5ZEZZeUIwCm40dmp0aHVlbHF4SXd5UU5xTGhtN05LaFZyaDVJYTkzUERsRno5Wi9VaDQKLT4gWDI1NTE5IEpRajVnKzU3ZkZwT1N2dTlEQXZ2Q0lSQVc1TmlvWHgreDBmVmJ1a3JMbVUKUGpVVnNkbS9TUU1OejBnYXZiMmF2ZVZKUFF2bEJKRmpSZm1TaXBMbG9FTQotPiBYMjU1MTkgeGlrWjFvYzJ0Y1JXcWREc2NvQW42eTFvWUJBMkpVT09SMmhLTndINEVXUQpYTy94enZmMjFiUHlWZGdhaGUwYU40V3RpRDdLQnRrTXFWaTVzdXpScHdNCi0+IFgyNTUxOSBudG52UTQyWHI5WVAzSjgyN2ZuVDFUam9jYUxxQ2tnMUFvWUlDTFJKT1JZCkJHVGsrM1RJbUE1dFI2Y2puV2wvZm1Qc3BGNXpWeUpHMjd3RTZmUHQyc00KLT4gWDI1NTE5IHNOelEyYmtMaGJRM3B4b3h1WEFyaG02dWdpZ3l2UzRENHRiUmtUT2hFenMKWGo2bFY5VDlyNmM5WW1KamFJcWg0QVE4VUVYL2FES1AyU25taFVmbUdwQQotPiBYMjU1MTkgMlYvRVVuSlY5NDBEZHlPUTMwNTBMendhTGNPTjN3Y0tIZjF0VU5GY09pYwpSOVIzY090RWwrSnltNXYzT1BlVWFHVVJmaExINk43bXI5aXJLWmRGeUF3Ci0+IHEtZ3JlYXNlIF1qKlNMSWhGIFVqUCBFbF5SdTRhIHRRJzQ3awpndGZLTEgvMWxabmJkZjJNY1JnNVF0d01EQmtUMU9yU3ZxL0ZoT3pnYU12dWxHeEoKLS0tIGp1TWJKSjRDeHNEQXVQb09BUTU5WmxKRUhsQ1Iveit3d1ZEaUpiZGVVSTgKeJ/epzYVbYLV2zMa5m0g1qhPAkgipLz9QdCd8h68XwZ8wPeReaygKWPgx+4443Gr1iZLcpBZlBWP]`.
         match push_background(ctx.repo, ctx.policy, ctx.remote_failures.as_deref_mut()).await {
             Ok(true) => {}
             Ok(false) => eprintln!("⚠️ push failed for {}", ctx.repo.display()),
@@ -2298,13 +2298,13 @@ mod tests {
     fn test_compute_blast_radius_merge_prefix() {
         let tmp = tempfile::tempdir().unwrap();
         let repo = tmp.path();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["init", "-q", "-b", "main"])
             .arg(repo)
             .status()
             .unwrap();
         std::fs::write(repo.join("file.txt"), "change").unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["-C", &repo.to_string_lossy(), "add", "file.txt"])
             .status()
             .unwrap();
@@ -2353,12 +2353,12 @@ mod tests {
     async fn test_sync_repo_auto_github_private_graceful_on_no_gh() {
         let tmp = tempfile::tempdir().unwrap();
         let repo = tmp.path().join("test-repo");
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["init", "-q", "-b", "master"])
             .arg(&repo)
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args([
                 "-C",
                 &repo.to_string_lossy(),
@@ -2368,11 +2368,11 @@ mod tests {
             ])
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args([
                 "-C",
                 &repo.to_string_lossy(),
@@ -2403,12 +2403,12 @@ auto_github_private_account = "TestAccount"
     async fn test_sync_repo_auto_commit_creates_commit() {
         let tmp = tempfile::tempdir().unwrap();
         let repo = tmp.path().join("test-repo");
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["init", "-q", "-b", "master"])
             .arg(&repo)
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args([
                 "-C",
                 &repo.to_string_lossy(),
@@ -2418,11 +2418,11 @@ auto_github_private_account = "TestAccount"
             ])
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args([
                 "-C",
                 &repo.to_string_lossy(),
@@ -2438,13 +2438,13 @@ auto_github_private_account = "TestAccount"
         // Create and stage a modified file
         let file_path = repo.join("test.txt");
         std::fs::write(&file_path, "hello world").unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["-C", &repo.to_string_lossy(), "add", "test.txt"])
             .status()
             .unwrap();
 
         // Count commits before sync
-        let commits_before = std::process::Command::new("git")
+        let commits_before = crate::git::git_cmd()
             .args(["-C", &repo.to_string_lossy(), "rev-list", "--count", "HEAD"])
             .output()
             .unwrap()
@@ -2467,7 +2467,7 @@ auto_bump_versions = false
         assert!(result.is_ok(), "sync_repo should succeed: {:?}", result);
 
         // Verify a commit was created
-        let commits_after = std::process::Command::new("git")
+        let commits_after = crate::git::git_cmd()
             .args(["-C", &repo.to_string_lossy(), "rev-list", "--count", "HEAD"])
             .output()
             .unwrap()
@@ -2489,12 +2489,12 @@ auto_bump_versions = false
     async fn test_sync_repo_skips_rebase_in_progress() {
         let tmp = tempfile::tempdir().unwrap();
         let repo = tmp.path().join("test-repo");
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["init", "-q", "-b", "master"])
             .arg(&repo)
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args([
                 "-C",
                 &repo.to_string_lossy(),
@@ -2504,11 +2504,11 @@ auto_bump_versions = false
             ])
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args([
                 "-C",
                 &repo.to_string_lossy(),
@@ -2548,12 +2548,12 @@ auto_bump_versions = false
     async fn test_sync_repo_skips_merge_in_progress() {
         let tmp = tempfile::tempdir().unwrap();
         let repo = tmp.path().join("test-repo");
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["init", "-q", "-b", "master"])
             .arg(&repo)
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args([
                 "-C",
                 &repo.to_string_lossy(),
@@ -2563,11 +2563,11 @@ auto_bump_versions = false
             ])
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args([
                 "-C",
                 &repo.to_string_lossy(),
@@ -2604,12 +2604,12 @@ auto_bump_versions = false
     async fn test_sync_repo_skips_cherry_pick_in_progress() {
         let tmp = tempfile::tempdir().unwrap();
         let repo = tmp.path().join("test-repo");
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["init", "-q", "-b", "master"])
             .arg(&repo)
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args([
                 "-C",
                 &repo.to_string_lossy(),
@@ -2619,11 +2619,11 @@ auto_bump_versions = false
             ])
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args([
                 "-C",
                 &repo.to_string_lossy(),
@@ -2663,12 +2663,12 @@ auto_bump_versions = false
     async fn test_sync_repo_auto_commit_creates_commit_for_dirty_repo() {
         let tmp = tempfile::tempdir().unwrap();
         let repo = tmp.path().join("test-repo");
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["init", "-q", "-b", "master"])
             .arg(&repo)
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args([
                 "-C",
                 &repo.to_string_lossy(),
@@ -2678,11 +2678,11 @@ auto_bump_versions = false
             ])
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args([
                 "-C",
                 &repo.to_string_lossy(),
@@ -2715,7 +2715,7 @@ auto_bump_versions = false
         );
 
         // Verify commit was made
-        let output = std::process::Command::new("git")
+        let output = crate::git::git_cmd()
             .args(["-C", &repo.to_string_lossy(), "log", "--oneline"])
             .output()
             .unwrap();
@@ -2730,12 +2730,12 @@ auto_bump_versions = false
     async fn test_sync_repo_clean_repo_returns_false() {
         let tmp = tempfile::tempdir().unwrap();
         let repo = tmp.path().join("test-repo");
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["init", "-q", "-b", "master"])
             .arg(&repo)
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args([
                 "-C",
                 &repo.to_string_lossy(),
@@ -2745,11 +2745,11 @@ auto_bump_versions = false
             ])
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args([
                 "-C",
                 &repo.to_string_lossy(),
@@ -2783,12 +2783,12 @@ auto_bump_versions = false
     async fn test_sync_repo_stages_and_commits_untracked_file() {
         let tmp = tempfile::tempdir().unwrap();
         let repo = tmp.path().join("test-repo");
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["init", "-q", "-b", "master"])
             .arg(&repo)
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args([
                 "-C",
                 &repo.to_string_lossy(),
@@ -2798,11 +2798,11 @@ auto_bump_versions = false
             ])
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args([
                 "-C",
                 &repo.to_string_lossy(),
@@ -2835,7 +2835,7 @@ auto_bump_versions = false
         );
 
         // Verify file is tracked
-        let output = std::process::Command::new("git")
+        let output = crate::git::git_cmd()
             .args(["-C", &repo.to_string_lossy(), "ls-files"])
             .output()
             .unwrap();
@@ -2850,12 +2850,12 @@ auto_bump_versions = false
     async fn test_sync_repo_skip_pull_when_not_behind() {
         let tmp = tempfile::tempdir().unwrap();
         let repo = tmp.path().join("test-repo");
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["init", "-q", "-b", "master"])
             .arg(&repo)
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args([
                 "-C",
                 &repo.to_string_lossy(),
@@ -2865,11 +2865,11 @@ auto_bump_versions = false
             ])
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args([
                 "-C",
                 &repo.to_string_lossy(),
@@ -2903,12 +2903,12 @@ auto_bump_versions = false
     async fn test_sync_repo_skip_pull_when_dirty() {
         let tmp = tempfile::tempdir().unwrap();
         let repo = tmp.path().join("test-repo");
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["init", "-q", "-b", "master"])
             .arg(&repo)
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args([
                 "-C",
                 &repo.to_string_lossy(),
@@ -2918,11 +2918,11 @@ auto_bump_versions = false
             ])
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args([
                 "-C",
                 &repo.to_string_lossy(),
@@ -2958,12 +2958,12 @@ auto_bump_versions = false
     async fn test_sync_repo_skip_push_when_no_origin() {
         let tmp = tempfile::tempdir().unwrap();
         let repo = tmp.path().join("test-repo");
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["init", "-q", "-b", "master"])
             .arg(&repo)
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args([
                 "-C",
                 &repo.to_string_lossy(),
@@ -2973,11 +2973,11 @@ auto_bump_versions = false
             ])
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args([
                 "-C",
                 &repo.to_string_lossy(),
@@ -3007,12 +3007,12 @@ auto_bump_versions = false
     async fn test_sync_repo_skip_push_when_no_upstream() {
         let tmp = tempfile::tempdir().unwrap();
         let repo = tmp.path().join("test-repo");
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["init", "-q", "-b", "master"])
             .arg(&repo)
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args([
                 "-C",
                 &repo.to_string_lossy(),
@@ -3022,11 +3022,11 @@ auto_bump_versions = false
             ])
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args([
                 "-C",
                 &repo.to_string_lossy(),
@@ -3056,19 +3056,19 @@ auto_bump_versions = false
     async fn test_sync_repo_mirror_push_failure_returns_false() {
         let tmp = tempfile::tempdir().unwrap();
         let origin_bare = tmp.path().join("origin.git");
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["init", "--bare", "-q", "-b", "master"])
             .arg(&origin_bare)
             .status()
             .unwrap();
 
         let repo = tmp.path().join("test-repo");
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["init", "-q", "-b", "master"])
             .arg(&repo)
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args([
                 "-C",
                 &repo.to_string_lossy(),
@@ -3078,11 +3078,11 @@ auto_bump_versions = false
             ])
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args([
                 "-C",
                 &repo.to_string_lossy(),
@@ -3094,7 +3094,7 @@ auto_bump_versions = false
             ])
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args([
                 "-C",
                 &repo.to_string_lossy(),
@@ -3108,7 +3108,7 @@ auto_bump_versions = false
 
         // Point mirror to non-existent path so push fails
         let bad_mirror = tmp.path().join("nonexistent-mirror.git");
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args([
                 "-C",
                 &repo.to_string_lossy(),
@@ -3142,22 +3142,22 @@ push_url = "git@nonexistent.example.com:repo.git"
     }
 
     #[tokio::test]
-    async fn test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBOTUlNSzc4azdBZ3BjWXNjSkFnR0g0UEdudXdVN2lTNG55a0M0YXk4enhRCmJzRnoyZkVwdnRYamp1MGNDRlB5UTc2MiswTjFpekNhYkl5SFdlVzdRV3cKLT4gWDI1NTE5IEZFZ0dIQTNGa1E1UEdtM1RFRldpN1FxT0lyb01obGN5R0ZhY3hPa0N1QWsKOTZRWWxjem1yRHF4ekNaTTJ6c29DdEdRbW9xN3k4SzRxUXZKVldJWXE3SQotPiBYMjU1MTkgci9vMkdzWHN2alI1UXRUc1lORTRwa2ppUzhNMjNETld5YWh3alVLc3h4VQpGcStNcDNHay8rVG9rT2lTcFJSL1FSMnFWYVZSTkFTSStDZWlMaEpkOW5rCi0+IFgyNTUxOSBnZnN5bWIxM1JPT2NmZFJ1VlBrTG5RSlhGbHovMGorekcxUzhXcTJYMkJBCjF3ZDd0NGkxSTRDU1hKWHI1dCtDeGluNCs3aTJMVHRpNjNrQWp4T3I0c2sKLT4gWDI1NTE5IERFTXBPdS94SFU3TFk0UDdQTWNIUGNVMCtTK3FHUHdONVdpRjdCaG91bkkKMXpNbUtmNnJpOEJyTFdMNExZT0pPb3lZZFNRc3ZicXp4TDlhYXBLa2tCYwotPiBYMjU1MTkgOEFvWkc3MVdvMTArdjdYVi96WkU1a0t0THdqcmFOMDNJY21GbkVRT0VXTQpkNEY2NU5wdXA4WlJpbEE5QTAyRGtnUTNFVHJmSUw3S3ZKOEowTEdtSWRjCi0+IFVAOCxBdDlZLWdyZWFzZSBwIC0/KyBwXiJ1NHMKSHNVS2lKYnhtdDdhbVVRa1JLLzAyL0F3VHVySms3WGhLbEI0K1FISAotLS0geFhNVXpROWJzUXRIZnR2MWptUEZiQ3BQZGRKRGJHQy9vNC9na0Z6TVlKYwq9rUBUJ2nW7Xi9fmFkheEcAbNO5RFP0WlRvkv6lI3UzjmMSeVh242U8sdnSATcZDzuFI0Fh7wEd/M=]() {
+    async fn test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBqY05OMUlBM3g2QW4zUVgvVUhBaVUrbXFFbTFyZ25QY3RuQjVHbDFpbmdVCnVNSysxd1o1U2R6MERoTEw3QXg4S09GU1NWOUtQT3Blamg0Y1NITkw4aUkKLT4gWDI1NTE5IEd6aE94ajd1eFI4QnY1Qm1jeVFaYjZBUUFUN21Pd2N5bzEzVmFjdGtxZ2cKd0F2a05vY2Z0RFJrSzl3THVpMEFzNzFDWW1lNUE4SkQvRE53RmdSRFVuMAotPiBYMjU1MTkgczlZQWRERkM5MGE3Q0FERHVpZkZSenU1V2tXWWZzK1Vod3JFTEt6VGRtbwp3U0ZjOEVkcUEzQ29QdVp2Z0Z0cjdrRFR4c2UvQ2Rob0xzNHRiQU03Y2ZFCi0+IFgyNTUxOSBmR3kyTVRTendaMkNXWmdhUVZZNEhUZ0liTkpnVkd0UFpVSnBDYlQ4MFJjClhodjhvQXRROUNSSS9yOWhBMVlKYW9UTitFb1RKVWN0ZGZMV0Z4bkdWVVEKLT4gWDI1NTE5IDlGaVJCS2JybUQ0TVpwbkNMcmFIRFR1Z2E4UWJRbW5ObjZUby9qSjhMMHcKSFhMemxTTS9rUUE0Yi9hSHVjditIV2pWNlBuc0VaSytuZ0s2aEFjNEJ6SQotPiBYMjU1MTkgTW04VVdOcEs3aytiT2JTa1l2czFhTUJrT3BYSEpUL1U4Ui9pUm1NRXUybwoxWE50REdoQWJ6WFdpd0w0dzhmOU5SU0UzK3JOK1Q2c1lGZ1A3eWRFc2RjCi0+IGtJU3N3K3gjLWdyZWFzZSBRcmdeYFAiCkpzaUEyK1FjS1RITDMvc1g2a2E1YTZiZUtaK0N4ZndzazZkRlhHd3ZSaUJzS1VOZGpkQWtaRlBZVmpaSzRhTG8Kd1FmT005YjBZajAwREdsWjRnRmpjUXZiRmU4RTlEYjYybktCCi0tLSBjdDlkSjUzMW1SYUl5aVN6aWNCWVRDUUZtaXVvcGhkdENKb1UxcmRGZnlZChRnQ4hIi118Pple+OkrzWtVjs98H4YCOTuAr0Q9nr4lt5e4JYgDlZ36XRCuSa6JAuE375cWJ89bbg==]() {
         let tmp = tempfile::tempdir().unwrap();
         let origin_bare = tmp.path().join("origin.git");
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["init", "--bare", "-q", "-b", "master"])
             .arg(&origin_bare)
             .status()
             .unwrap();
 
         let repo = tmp.path().join("test-repo");
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["init", "-q", "-b", "master"])
             .arg(&repo)
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args([
                 "-C",
                 &repo.to_string_lossy(),
@@ -3167,11 +3167,11 @@ push_url = "git@nonexistent.example.com:repo.git"
             ])
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args([
                 "-C",
                 &repo.to_string_lossy(),
@@ -3183,7 +3183,7 @@ push_url = "git@nonexistent.example.com:repo.git"
             ])
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args([
                 "-C",
                 &repo.to_string_lossy(),
@@ -3194,7 +3194,7 @@ push_url = "git@nonexistent.example.com:repo.git"
             ])
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args([
                 "-C",
                 &repo.to_string_lossy(),
@@ -3249,24 +3249,24 @@ push_url = "git@nonexistent.example.com:repo.git"
         let tmp = tempfile::tempdir().unwrap();
         let origin_bare = tmp.path().join("origin.git");
         let mirror_bare = tmp.path().join("mirror.git");
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["init", "--bare", "-q", "-b", "master"])
             .arg(&origin_bare)
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["init", "--bare", "-q", "-b", "master"])
             .arg(&mirror_bare)
             .status()
             .unwrap();
 
         let repo = tmp.path().join("test-repo");
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["init", "-q", "-b", "master"])
             .arg(&repo)
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args([
                 "-C",
                 &repo.to_string_lossy(),
@@ -3276,11 +3276,11 @@ push_url = "git@nonexistent.example.com:repo.git"
             ])
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args([
                 "-C",
                 &repo.to_string_lossy(),
@@ -3292,7 +3292,7 @@ push_url = "git@nonexistent.example.com:repo.git"
             ])
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args([
                 "-C",
                 &repo.to_string_lossy(),
@@ -3304,7 +3304,7 @@ push_url = "git@nonexistent.example.com:repo.git"
             .status()
             .unwrap();
         // Push initial commit to origin so upstream is set
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args([
                 "-C",
                 &repo.to_string_lossy(),
@@ -3345,12 +3345,12 @@ push_url = "{}"
 
     fn init_test_repo(tmp: &tempfile::TempDir, name: &str) -> std::path::PathBuf {
         let repo = tmp.path().join(name);
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["init", "-q", "-b", "master"])
             .arg(&repo)
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args([
                 "-C",
                 &repo.to_string_lossy(),
@@ -3360,11 +3360,11 @@ push_url = "{}"
             ])
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args([
                 "-C",
                 &repo.to_string_lossy(),
@@ -3381,7 +3381,7 @@ push_url = "{}"
 
     fn git_cmd(repo: &Path, args: &[&str]) -> std::process::Output {
         let repo_str = repo.to_string_lossy().to_string();
-        let mut cmd = std::process::Command::new("git");
+        let mut cmd = crate::git::git_cmd();
         cmd.arg("-C").arg(&repo_str);
         for a in args {
             cmd.arg(a);
@@ -3498,7 +3498,7 @@ push_url = "{}"
     }
 
     #[tokio::test]
-    async fn test_sync_repo_exac[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSByTE0wVXFqUVcrQi9YZVY4ZEgyN0JGQU5MbmJaVUV4eWJBcFk1bnNaUmxRCnRLTW1ld21lY1dyWkVvb24zdFNWdzBhdWY5b3dsY05DWUJQOGsyN3dvQVEKLT4gWDI1NTE5IEhXL1h5L0wyS1lqREFRTDhkd0NNb0MwMnNVTEx2MG9MZG9aMXhycmFlUncKaUJIdzNrN1FOWEpCbitqUzNqczIyTU1ic0xwU0hERlQxc3NLZG5wUGVzdwotPiBYMjU1MTkgdnlDTzA2QmZyOXBuUFR2ZjhoVmFhdVpZTDFOdEtzZU9sVGZucXJBZU4zZwpwcVJZS2pGSnRhVmNGOFo1dWZWYW9BR2xpUHR3N1ZsWnBTWlZZVjBDd1BJCi0+IFgyNTUxOSBYci9UZ3IxdllvRDV5Nk9jNFhSb01IaE9JbFdLWCtxZHJYV041WFNlVEM4CjcxMFBLUm1kMU9HYjNzd09pVjJCcGRuYjRQT2VrNWxZV3NGU1FSVVpsWmsKLT4gWDI1NTE5IFI2T3ZkT1UyZHNyN015MUU1OU9BaFk4TjcrVVM5N1MyQkE4ZUNHVnNEaTQKY3J3N1lUU2VDWkJuWE5YUHVpRld4ZDVOazNITkFQWmgzakRQdm5mTUdudwotPiBYMjU1MTkgUGZCQWttVWdyOE8xL2JXdlRRcGlpWS9hSElrVFJNanZoVzBOWE1hbWhRTQpyL0paVlcySWI2U0pDVFdvMk1xVldQOXJQd1NrLzdacmoyRUprbEhwR0M0Ci0+IDduRFAtZ3JlYXNlCmUrTkpyY3JHNW05UmhtaXZKMEUxNnBQQUo4MGVQNkFoS1lVdXZOUnUwY1JscGVMMkk3YXFnZldvK3Z4bGdyYy8KZ1F1YkFBVlBRUEEzalVXQUNIc2lVdkRybWFFUm5yK0RxR0R1bTZZS0VlZmdKUjNXM0M5S09GUlgrY2VVZEEKLS0tIDFmS2xHczNxaTliNEg2Mk9EOGtvRldJdy9uUlhpUUlxKzQrWnJqZlNKenMKywWb+l7aOR9BcmmC7/Ii2FuwwJ92Q6wJO1iu6nsVfSiEZBmORDj8tU4cXZK0d6MAogXntQ9ub5lOdsFJhX2f]() {
+    async fn test_sync_repo_exac[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBlODVldjRZYlh0K3l4M0VOOC9QNVM4aXl0cTZ1TEEzbWNQMHpuVnlYV0I4ClpWMWc5RlpQc1M1eE1qOVRaRm9kVVpMcFJhVkJOOXNKWWpmR1JYSXF1Qm8KLT4gWDI1NTE5IG14a0IxRFRwbm1uQkZvNmZRZjhGdEo5NlBqSXp2RE9mMStaSUt0NlpGMnMKbndVZWdNTG5OdmhkSEFXMkhmTlA0cklOMzM3YzVUTm9MNFlaR1pjbjRjWQotPiBYMjU1MTkgaFdvM3JmN3A0U0hza1YzaWtuak5XRTFnTWVpUEJaeXgxeTZIeEw2eFJESQpwVlEwcG5ydzZCdXFLeTFRTEV1VFlueVp6K3FtWHYxRHBTTE16U1Z2dFdFCi0+IFgyNTUxOSBldE4yZng3S0c2VUQweitjTzhqc3Juclh5K3k5S3ErU3VQMlRtQkIwRGhjCjlDa09SdXZXR3VNWENZRjgvaVJldTY4eWIvMHI4enkyalRha0ZVK1RQVnMKLT4gWDI1NTE5IG9XOHRHWHNlYmt6NVVoYStVNlFydXd6Q1BmaDk2NlE3dC81aUJmOUtrQXcKb3UxUkJCeWFhRXQyUWErUzVZUGFXWmdrNUd1MnJYek02WFJnczN1NCtNNAotPiBYMjU1MTkgbGlTVVZDd2pTY2FCbVBsd1FmTk56MFhLWFJjU3lpblZHSVNUOGdlYjkxawpZUlQ0M1VlbXZDMWhqN2czR2VHQVZQcGxtbmJtVVR1ejRnait1T0EzTEpZCi0+IHx2ZDEsdE0tZ3JlYXNlCkZMdzVYanIrVVdOU2ttWGVjMmFLOC9RZHFrUVZtOFQ1ZXJnYzVHQk1wTm4vaGZzMDBPNjJGS1owMXcKLS0tIGVSTkFWaE5WR01JYXFlOCtneDdlb1NkMmkycDMweHlicFlHZWNaQUdKejAK+YNP7+zGJXgAjku5p3rQ98iQSByUzhQVlxKdJhxmgaBbmJSLpMUsvzDnuOwrw7asvxnHNkKPwSwn3MVNmOGz]() {
         let tmp = tempfile::tempdir().unwrap();
         let repo = init_test_repo(&tmp, "exact-50-del-repo");
 
@@ -4090,12 +4090,12 @@ auto_bump_versions = false
     async fn test_sync_repo_new_branch_auto_push_attempted() {
         let tmp = tempfile::tempdir().unwrap();
         let repo = tmp.path().join("new-branch-repo");
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["init", "-q", "-b", "main"])
             .arg(&repo)
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args([
                 "-C",
                 &repo.to_string_lossy(),
@@ -4105,11 +4105,11 @@ auto_bump_versions = false
             ])
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
             .status()
             .unwrap();
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args([
                 "-C",
                 &repo.to_string_lossy(),
@@ -4142,7 +4142,7 @@ auto_bump_versions = false
         );
 
         // Verify that a commit was created
-        let output = std::process::Command::new("git")
+        let output = crate::git::git_cmd()
             .args(["-C", &repo.to_string_lossy(), "log", "--oneline", "-1"])
             .output()
             .unwrap();

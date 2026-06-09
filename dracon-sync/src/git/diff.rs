@@ -7,7 +7,6 @@ use dracon_git::{
 };
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
-use tokio::process::Command as TokioCommand;
 
 /// Get the list of files that actually differ from HEAD (filter-aware).
 /// Unlike `git status`, `git diff HEAD` applies clean filters and correctly
@@ -17,7 +16,7 @@ pub(crate) async fn git_diff_head_files(repo: &Path) -> Result<HashSet<PathBuf>>
     let outcome = tokio::time::timeout(
         std::time::Duration::from_secs(30),
         tokio::task::spawn_blocking(move || -> anyhow::Result<HashSet<PathBuf>> {
-            let output = std::process::Command::new("git")
+            let output = crate::git::git_cmd()
                 .current_dir(&r)
                 .args(["diff", "HEAD", "--name-only", "-z"])
                 .output()?;
@@ -72,7 +71,7 @@ pub(crate) async fn git_name_status_entries(
     repo: &Path,
     args: &[&str],
 ) -> Result<Vec<(PathBuf, FileStatus)>> {
-    let output = TokioCommand::new("git")
+    let output = crate::git::tokio_git_cmd()
         .args(args)
         .current_dir(repo)
         .stdout(std::process::Stdio::piped())
@@ -105,7 +104,7 @@ pub(crate) fn fallback_status_rank(status: &FileStatus) -> u8 {
 
 /// Get diff entries via `git diff` CLI (fallback when libgit2 fails).
 pub(crate) async fn cli_diff_entries(repo: &Path) -> Result<Vec<DiffFile>> {
-    let output = TokioCommand::new("git")
+    let output = crate::git::tokio_git_cmd()
         .args(["diff", "--name-status", "HEAD"])
         .current_dir(repo)
         .stdout(std::process::Stdio::piped())
@@ -124,7 +123,7 @@ pub(crate) async fn cli_diff_entries(repo: &Path) -> Result<Vec<DiffFile>> {
 
 /// Get untracked file entries via `git ls-files --others --exclude-standard`.
 pub(crate) async fn untracked_entries(repo: &Path) -> Result<Vec<DiffFile>> {
-    let output = TokioCommand::new("git")
+    let output = crate::git::tokio_git_cmd()
         .args(["ls-files", "--others", "--exclude-standard", "-z"])
         .current_dir(repo)
         .stdout(std::process::Stdio::piped())
@@ -178,7 +177,7 @@ pub(crate) async fn repo_diff_entries(repo: &Path) -> Result<Vec<DiffFile>> {
 
 /// Get staged file paths from `git diff --cached --name-only`.
 pub(crate) async fn staged_paths(repo: &Path) -> Result<HashSet<PathBuf>> {
-    let output = TokioCommand::new("git")
+    let output = crate::git::tokio_git_cmd()
         .args(["diff", "--cached", "--name-only", "-z"])
         .current_dir(repo)
         .stdout(std::process::Stdio::piped())

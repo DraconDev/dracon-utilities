@@ -601,11 +601,10 @@ pub(crate) fn truncate(value: &str, max_chars: usize) -> String {
 /// author via `%an`, time via `%ar`, timestamp via `%ct`) which tripled
 /// the wall-clock time on repos with many entries.
 pub(crate) async fn git_log_meta(repo: &Path) -> Option<(String, String, String, i64, String)> {
-    use std::process::Command;
     let repo_str = repo.to_str()?;
     // %H = hash, %an = author, %ar = relative, %ct = unix, %s = subject
     // Separator `\x1f` (unit separator) is unlikely in commit fields.
-    let out = Command::new("git")
+    let out = crate::git::git_cmd()
         .args([
             "-C",
             repo_str,
@@ -743,10 +742,9 @@ pub(crate) async fn run_repos_report(
         // Scanning all origin/* branches was the second-biggest cost; we only
         // care about the branch we're on.
         let last_push = {
-            use std::process::Command;
-            let repo_str = repo.to_str().unwrap_or("").to_string();
+                    let repo_str = repo.to_str().unwrap_or("").to_string();
             let current_branch = effective_status.branch.clone();
-            let out = Command::new("git")
+            let out = crate::git::git_cmd()
                 .args([
                     "-C",
                     &repo_str,
@@ -2192,7 +2190,7 @@ pub(crate) fn create_github_private_remote(
     if output.status.success() {
         let remote_url = format!("https://github.com/{}/{}.git", account, repo_name);
 
-        let add_result = std::process::Command::new("git")
+        let add_result = crate::git::git_cmd()
             .args(["remote", "add", "origin", &remote_url])
             .current_dir(repo)
             .output();
@@ -2205,7 +2203,7 @@ pub(crate) fn create_github_private_remote(
             crate::git::current_branch(repo).unwrap_or_else(|| "main".to_string());
 
         if current_branch == "master" {
-            if let Err(e) = std::process::Command::new("git")
+            if let Err(e) = crate::git::git_cmd()
                 .args(["branch", "-m", "master", "main"])
                 .current_dir(repo)
                 .output()
@@ -2220,7 +2218,7 @@ pub(crate) fn create_github_private_remote(
             }
         }
 
-        let push_result = std::process::Command::new("git")
+        let push_result = crate::git::git_cmd()
             .args([
                 "push",
                 "-u",
@@ -2247,7 +2245,7 @@ pub(crate) fn create_github_private_remote(
         }
 
         if !crate::git::has_tracking_upstream(repo) {
-            let _ = std::process::Command::new("git")
+            let _ = crate::git::git_cmd()
                 .args(["branch", "--set-upstream-to=origin/main", &current_branch])
                 .current_dir(repo)
                 .output();
@@ -2260,7 +2258,7 @@ pub(crate) fn create_github_private_remote(
     let remote_url = format!("https://github.com/{}/{}.git", account, repo_name);
 
     // Check if origin already exists locally before adding
-    let has_origin = std::process::Command::new("git")
+    let has_origin = crate::git::git_cmd()
         .args(["remote", "get-url", "origin"])
         .current_dir(repo)
         .output()
@@ -2268,7 +2266,7 @@ pub(crate) fn create_github_private_remote(
         .unwrap_or(false);
 
     if !has_origin {
-        let add_result = std::process::Command::new("git")
+        let add_result = crate::git::git_cmd()
             .args(["remote", "add", "origin", &remote_url])
             .current_dir(repo)
             .output();
@@ -2281,7 +2279,7 @@ pub(crate) fn create_github_private_remote(
     let mut current_branch = crate::git::current_branch(repo).unwrap_or_else(|| "main".to_string());
 
     if current_branch == "master" {
-        if let Err(e) = std::process::Command::new("git")
+        if let Err(e) = crate::git::git_cmd()
             .args(["branch", "-m", "master", "main"])
             .current_dir(repo)
             .output()
@@ -2296,7 +2294,7 @@ pub(crate) fn create_github_private_remote(
         }
     }
 
-    let _ = std::process::Command::new("git")
+    let _ = crate::git::git_cmd()
         .args([
             "push",
             "-u",
@@ -2307,7 +2305,7 @@ pub(crate) fn create_github_private_remote(
         .output();
 
     if !crate::git::has_tracking_upstream(repo) {
-        let _ = std::process::Command::new("git")
+        let _ = crate::git::git_cmd()
             .args(["branch", "--set-upstream-to=origin/main", &current_branch])
             .current_dir(repo)
             .output();
@@ -2346,7 +2344,7 @@ fn create_private_remote(repo: &Path) -> Option<String> {
 
     let bare_name = final_path.file_name()?.to_str()?;
 
-    let output = std::process::Command::new("git")
+    let output = crate::git::git_cmd()
         .args(["init", "--bare", bare_name])
         .current_dir(&private_remotes_dir)
         .output()
@@ -2354,7 +2352,7 @@ fn create_private_remote(repo: &Path) -> Option<String> {
 
     if !output.status.success() {
         std::fs::create_dir_all(&final_path).ok()?;
-        let output = std::process::Command::new("git")
+        let output = crate::git::git_cmd()
             .args(["init", "--bare"])
             .current_dir(&final_path)
             .output()
@@ -2366,7 +2364,7 @@ fn create_private_remote(repo: &Path) -> Option<String> {
 
     let remote_url = format!("file://{}", final_path.display());
 
-    let add_result = std::process::Command::new("git")
+    let add_result = crate::git::git_cmd()
         .args(["remote", "add", "origin", &remote_url])
         .current_dir(repo)
         .output();
@@ -2930,7 +2928,7 @@ mod tests {
     fn test_create_github_private_remote_success() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("my-repo");
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["init", "-q", "-b", "master"])
             .arg(&repo)
             .status()
@@ -2961,7 +2959,7 @@ mod tests {
     fn test_create_github_private_remote_already_exists_reuses_without_suffix() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("dracon-demons");
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["init", "-q", "-b", "master"])
             .arg(&repo)
             .status()
@@ -2995,12 +2993,12 @@ mod tests {
     fn test_create_github_private_remote_origin_already_exists_does_not_add_duplicate() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("existing-remote-repo");
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["init", "-q", "-b", "master"])
             .arg(&repo)
             .status()
             .expect("git init");
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["remote", "add", "origin", "git@github.com:old/old.git"])
             .current_dir(&repo)
             .status()
@@ -3029,7 +3027,7 @@ mod tests {
     fn test_create_github_private_remote_no_gh_installed_returns_none() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let repo = tmp.path().join("no-gh-repo");
-        std::process::Command::new("git")
+        crate::git::git_cmd()
             .args(["init", "-q", "-b", "master"])
             .arg(&repo)
             .status()
@@ -3110,7 +3108,7 @@ mod tests {
     }
 
     #[test]
-    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBGUkRkT2l2N2Z2K0JTWGhGOTJIamphUTNWa1JVanV6ZlJUODVnelEzTUZRCkhzT3dJQUEwN21SL2RqSUNzcG5VQVBtTExwbXJLNzBsNzdQeDVSMGpBNG8KLT4gWDI1NTE5IGdwV2VTZHBkS0RaaGs3UVM2clR1WURUR0R2d3RhZzJ1clpXSE9pSXczaUkKUmh2blU0OFdSRlAwSFBzNlc4ekxIUytuWEhnbll6bjBIQ0tUSVFuUi9lQQotPiBYMjU1MTkgY2NtWVlpdi9zQW14aG1MZmNZbmxnaitIMmNsaENPdnJuN0JaNm5UU1lqWQpmbnU0a0sxOG5wQWJNRnRpZktPUmtmQ2xJSk9tTlN3Q1pkMVgzc2FuUWtjCi0+IFgyNTUxOSBLZHNtQ2RHeVFoc2dvSE5CM1lBVlQ2VkJKYkNVVTk3MXV6RXZNMUhCT3pFCjdvYXZZZy9PSDFsY0JsNDY0NFcyWVlxUFRLOVNuSnR3Qk5LZjNkWE04eFUKLT4gWDI1NTE5IFZIT1VuTlZJeDRIR2p2bkRFZnI1Rk5MUUJ2T0dpM0JGeDhtdHhLSXBRaU0KSVpYd2pqYTJXTzBlTm1Ldk45Z3BmbzN0c1ErNzBCd0RRYm5GRXhNNzRHQQotPiBYMjU1MTkgdENZb3BKYnlvejQ2M0lUK3d1TEtKSUdlVmNxK0tEOXNuQTFFOVRmS0kxYwp4SWVYQjM0eGE5OXgveUxaSmlBOVNqYkJTbkZDYXFNc3ZmTHgxK1dCU0FBCi0+IDk/LWdyZWFzZSBlLlwgcFtoVzAgbjNsIlY+JyA5ClFoRFNGeFNBMkdnQ0gvNkpGeW5BM3BZb1BwYWpWQXN4OTZjRkoxd0VEclZJajg3ejNreGJKL0RKQno4ajdQc2QKazI5RE41TUlmZmlUTXptVi9PcWFNa1NqYTMrVTNaZURnTEMzeTc2Q0N2NUUwRXpGZnJOM1NUeUN1Q29KRncKLS0tIFRUUTRSSnQrYjdOTXNMdWVRS3IxSkhUWjhPUVEzUkZOamMwK1dVWGVUS28KK0oyRK/EJRTIbeneUxx51sEgjEI55fC0clYG+9QH4ij7dtP5jI8WMc4MDAV6ksThaEMDRequWgAvRXZPog==]() {
+    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBBREtlUkZ2N0ZpQ1R3SzNyUFlrOUlYekZDRUJXdE9GK0doZkl5QzY1M0JFCjVjVnRudzhlZEZ5V3NCdDNXMVhGMHpYL1ZocXRPVkVmUGRCTHMvVXRGMncKLT4gWDI1NTE5IGdLbUJUSktla253NEw0RzRtY015MWFOUmJNTEpvMHQ0ZTRETmhqQ0xKMnMKeGVRdzVBakI5ak1MNTVWaFVjaHhMYTErbVVab1VkUTVwYVNobWlOanVCQQotPiBYMjU1MTkgak8vaTkwZkUxK3l6MzVtNHdDUnVOaVBlODVQZlJBTDRvd3R4cG1hNU0yQQpPWk1raVFOUDlDSmphaSsvUTJNZk1nbjZlOFZiT21wYjJtZ0JzZW8xNlZrCi0+IFgyNTUxOSBSTitRUTgrZUtqNTAwUHBSTzhxRnF1ZXRpWnFoSGhhSEs0ZTdPL25BS0NvCm5rbDZoaE51c212RjB2ZXREYlJRK2V1T2JHSUEvc0ovTyswZlFtdXVFWGMKLT4gWDI1NTE5IG9GWjJRN0VscXZMYTJvWlBrSnQvMVN4TzlvOUNaZUUvREhndHloU0JwemsKZ2huRk1QQWx2MkZIRXhWVEUzVlZnaWgvYnJWcm1CUE9McW9TYzkzeURhOAotPiBYMjU1MTkgc0pHcVREanI3NmRXdnVENWM3cDVxb2h6Tmxha2FmSVhEcVd2M1AvdUN3Ywp0eU44MEpZOEk4cDdORjZsMFFTVjY2d0JmdnJxTTZkZEpkNW9xYk1sSWdFCi0+IEMyQjQ6LWdyZWFzZSBjIFpaNUQ5Sk18ICddekwgaUJVam53ClBkL0FwUlBheFgzMHpRCi0tLSBYelA1UE5pWWVDSEJqNEYyRDFUTEFXV2VicDBSd3BDYVdlbnNRT0Uza0gwChaSX4JxgEv509YXzPaZjjDdrgAUY7RRUnYMBWzcH7LOTwwIgUti0G3qA0/od8/TfPdnnsA3NTpJgcWIHSY=]() {
         let mut cooldowns = std::collections::HashMap::new();
         let repo = std::path::PathBuf::from("/test/repo");
         let notify_key = format!("push-fail-{}", repo.display());

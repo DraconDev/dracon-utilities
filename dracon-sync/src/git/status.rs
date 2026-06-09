@@ -128,8 +128,7 @@ pub(crate) fn is_repo_ready(repo: &Path) -> bool {
     } else {
         return false;
     }
-    let git_bin = std::env::var("DRACON_SYNC_GIT_BIN").unwrap_or_else(|_| "git".to_string());
-    let output = std::process::Command::new(&git_bin)
+    let output = super::git_cmd()
         .args(["rev-parse", "HEAD"])
         .current_dir(repo)
         .output()
