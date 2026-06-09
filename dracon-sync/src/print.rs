@@ -62,22 +62,6 @@ pub fn format_secs(secs: u64) -> String {
     format!("{}d {}h", d, h)
 }
 
-/// Format a unix timestamp as a relative-time string ("5s ago", "2h ago", "3d ago").
-/// Returns "never" for `None`. Returns "just now" for < 2s.
-pub fn format_relative(unix_ts: Option<u64>, now_unix: u64) -> String {
-    let Some(ts) = unix_ts else {
-        return "never".to_string();
-    };
-    if ts > now_unix {
-        return "in the future".to_string();
-    }
-    let diff = now_unix - ts;
-    if diff < 2 {
-        return "just now".to_string();
-    }
-    format!("{} ago", format_secs(diff))
-}
-
 /// Should ANSI colour codes be emitted? Honours the `NO_COLOR` env var and tty detection.
 pub fn should_color() -> bool {
     if std::env::var_os("NO_COLOR").is_some() {
@@ -137,15 +121,6 @@ mod tests {
         assert_eq!(format_secs(3900), "1h 5m");
         assert_eq!(format_secs(86_400), "1d");
         assert_eq!(format_secs(90_000), "1d 1h");
-    }
-
-    #[test]
-    fn format_relative_works() {
-        let now: u64 = 1_000_000;
-        assert_eq!(format_relative(None, now), "never");
-        assert_eq!(format_relative(Some(now - 1), now), "just now");
-        assert_eq!(format_relative(Some(now - 5), now), "5s ago");
-        assert_eq!(format_relative(Some(now - 3700), now), "1h 1m ago");
     }
 
     #[test]
