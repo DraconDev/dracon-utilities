@@ -10,7 +10,7 @@
   },
   "sisyphus": false,
   "createdAt": "2026-06-09T09:21:59.248Z",
-  "updatedAt": "2026-06-09T10:36:14.835Z",
+  "updatedAt": "2026-06-09T10:37:51.995Z",
   "activePath": ".pi/goals/active_goal_2026060910215924_mq6fkxxs-ig5gcc.md",
   "stopReason": "agent",
   "pauseReason": "The verification contract's per-repo `git status` (excluding `.pi/goals/...`) is not stably met for `dracon-platform` and `browser-extensions-shared` because active pi goals are running INSIDE those repos and continuously modifying real-source files (CHANGELOG.md, RELEASE_NOTES.md, test-results/.last-run.json, apis/docs/audits/2026-06-09-apis.md, etc.). The current contract excludes \"active-goal churn in repos not in the original 6\" but the active goals in the original-6 repos are in-scope, so the per-repo `git status` check cannot be stably satisfied. The substantive triage is done (CONCERN resolved, real-code WARNs committed/pushed, audit file triaged mid-verification), but the strict state-based verification requires either pausing the in-flight active goals (out of my authority) or excluding active-goal churn in any repo.",
