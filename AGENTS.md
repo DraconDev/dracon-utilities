@@ -106,6 +106,7 @@ Service files are installed to `~/.config/systemd/user/` by `install.sh`.
 
 | Setting | Value | Purpose |
 |---------|-------|---------|
+| `ExecStartPre` | `-/run/current-system/sw/bin/pkill -x -f "dracon-git pulse"` | Clears stale sync helper processes before startup |
 | `ExecStart` | `dracon-sync daemon` | Runs sync daemon |
 | `Restart` | `always` | Restarts on any exit (clean or crash) |
 | `RestartSec` | `5` | Wait 5s before restart |
@@ -119,9 +120,24 @@ Service files are installed to `~/.config/systemd/user/` by `install.sh`.
 | `ProtectHome` | `read-only` | Read-only home (except allowed paths) |
 | `ReadWritePaths` | `~/.dracon, ~/Dev, ~/.local/state/dracon, ~/.ssh` | Writable directories |
 | `PrivateTmp` | `true` | Isolated /tmp |
+| `PrivateDevices` | `true` | No device access |
+| `ProtectKernelTunables` | `true` | Read-only kernel tunables |
+| `ProtectKernelLogs` | `true` | No kernel log access |
+| `ProtectClock` | `true` | No clock changes |
+| `ProtectHostname` | `true` | No hostname changes |
+| `ProtectControlGroups` | `true` | No cgroup writes |
+| `LockPersonality` | `true` | Lock execution personality |
+| `MemoryDenyWriteExecute` | `true` | No writable executable mappings |
+| `RestrictRealtime` | `true` | No realtime scheduling |
+| `RestrictSUIDSGID` | `true` | No setuid/setgid |
+| `RemoveIPC` | `true` | Remove IPC on service stop |
+| `CapabilityBoundingSet` | empty | No Linux capabilities |
+| `RestrictNamespaces` | `true` | No namespace creation |
+| `SystemCallFilter` | `@system-service` | Syscall allowlist for service work |
 | `RestartPreventExitStatus` | `2 78` | Don't restart on config/argument errors |
 | `Environment` | `DRACON_SYNC_POLICY` | Points to config file |
 | `Environment` | `GIT_TERMINAL_PROMPT=0` | Disables interactive git prompts |
+| `PassEnvironment` | `SSH_AUTH_SOCK` | Forward SSH agent socket for git over SSH |
 
 **Pre-start cleanup:** Kills stale `dracon-git pulse` processes to prevent lockups.
 
@@ -138,9 +154,23 @@ Service files are installed to `~/.config/systemd/user/` by `install.sh`.
 | `NoNewPrivileges` | `true` | Security hardening |
 | `ProtectSystem` | `strict` | Read-only system fs |
 | `ProtectHome` | `read-only` | Read-only home (except allowed paths) |
-| `PrivateTmp` | `true` | Isolated /tmp |
-| `RestartPreventExitStatus` | `2 78` | Don't restart on config/argument errors |
 | `ReadWritePaths` | `~/.dracon, ~/Dev, ~/.local/state/dracon, ~/.local/share/Trash, ~/.cargo, ~/.cache, ~/.npm` | Writable directories |
+| `PrivateTmp` | `true` | Isolated /tmp |
+| `PrivateDevices` | `true` | No device access |
+| `ProtectKernelTunables` | `true` | Read-only kernel tunables |
+| `ProtectKernelLogs` | `true` | No kernel log access |
+| `ProtectClock` | `true` | No clock changes |
+| `ProtectHostname` | `true` | No hostname changes |
+| `ProtectControlGroups` | `true` | No cgroup writes |
+| `LockPersonality` | `true` | Lock execution personality |
+| `MemoryDenyWriteExecute` | `true` | No writable executable mappings |
+| `RestrictRealtime` | `true` | No realtime scheduling |
+| `RestrictSUIDSGID` | `true` | No setuid/setgid |
+| `RemoveIPC` | `true` | Remove IPC on service stop |
+| `CapabilityBoundingSet` | empty | No Linux capabilities |
+| `RestrictNamespaces` | `true` | No namespace creation |
+| `SystemCallFilter` | `@system-service` | Syscall allowlist for service work |
+| `RestartPreventExitStatus` | `2 78` | Don't restart on config/argument errors |
 
 
 
@@ -488,7 +518,7 @@ auto_publish = false  # master toggle (default: off)
 [[publish_targets]]
 name = "crates-io"
 registry = "crates-io"    # crates-io | npm | pypi
-[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA3M2NQbG9lYXJibzk1K0IxamJPa08rd1UwdnIrQ2gycHZjZmsxMHQ3MVhNCm9kcWtLNjBabEFOMGlwRDhrZldzKzNLNWlMMEwzQ0IzelAzZ203cTRVTWcKLT4gWDI1NTE5IGVJaUN5NEtrMUR6VnBVZXdhdG02RzRFbURZeTVpaHA0OVJIQVNnZlozVmsKV2hoN0dkbUQ1Nk5vN1l0UE9aZkZBdVloaFBnTnNuSGZ6c2RBVjUrR1hKUQotPiBYMjU1MTkgU2dSckk4UzR6RDFBWkY4c2JZSGNGMjNDaDlqTG1KRVJZV3VnaTArc2kyawpiTXdmNVZhTHJHMUlXU1A4NTJJTVNnSDQxb3ZuOEFXWkdBa3pNaU5xTk1vCi0+IFgyNTUxOSAzNUNsZUpXS2djNmpiSmY1RWdWTHpMeWN1QWlHbnhpd1FUeVkvbS9HcG1nCmVkRGtueDMySlZMVTVaZkJPdTRhdnZYRGlkekhMWk9YTm5laHczUTM1MmMKLT4gWDI1NTE5IGpDVHhsQ3I3dTBya1NnQVdDbWswekNHRlhWelRQVlRTVE9aOUdiQ2VEQlUKakhKL3lhK1krRDNZQXo4MTE1UTVYQW41bDNkaCt4YjN2VDc0VW9WeVhsYwotPiBYMjU1MTkgc0RzMzJvQWFSV1ZSbHdIdXNGdHNwTC9Fd0JXOStxakNtK1Y1ak1kWjVndwpyNUNuTnFBcDhEOVMxZGtLSkhyZ1lWT21LYUxaL1ZKT3RkUnpadGZ0dlVjCi0+IFl5RnJZaC1ncmVhc2UgRz9gLDgufgpXTkcreGNlNENKVm1WajdpbHUzU1g2bkcyQQotLS0gU2JRUGhxeGFZNVFxWGEvanFTeHE2Sk4wVG45dCtmVEVDM05GM3dTVWdhZwoAwW1E/Nuq/IFDkhs6YLAmQ69TweD/PYnZrLfXetqCLYhi7+2XiNIPAmyLOejZKZuESen+qmQeBs9UDJ1cTrYVPsPuDA4=]
+[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBlOWluN08zTlZsSU9JRS9zQVJqYk43NWJKU3dRLzVCbHY2M01qRTMxaFhnCjJLcDJ4dmNRMFpOYmFnanBTVzhmNG1jWWxYejgrZzFGdUVGZGg4cHBvS2cKLT4gWDI1NTE5IHRNdVRjZjJQeGdDNE5pWHZQYXJMaXUyckt6VHJ2YVRZWnRTTVkyeGdOQTgKbHpvOHhDRzVmYjZucmlObjRGZTdNeEJDR01mcXpWZ2N6dnBQaStpWTBobwotPiBYMjU1MTkgVis2SzBSQVVtRTI2SmhHK3JIemo3bzFqdVFuZ2NnZEkrakNqVjVCMXlFSQpjSytXUmpDcDV2Zjd6aGtHVnVZNU94UjZKMDJPaXlIM1JXN0x3WXdXUCtvCi0+IFgyNTUxOSBMdmxTUi9PelFneWh0Ukt5N0lOMm1HSjA0R1NHVmlNWXBXbFc0RitjcWpnClFqZVV0ci9xbmFsOXZISUNUOHNLTCsrcVNYQmxhRmRFdDJQanV3MEtERTgKLT4gWDI1NTE5IFNGYjc1aFB3UXlLU2lJckV6SzJiUGpEYUw0K1RUZm1VVGdXcitYbVRwSE0KMk80aXpUdW9hMzZ4QlpGejR0UGwxdzNFbENHelE4OVlyeS9rMkpPK2tsQQotPiBYMjU1MTkgdllGYm1aRnl3MVJ4ZnR2dzBwSjN1TUVZazUwODZiN1lGUnNMSGM3amgxOApscGRqMFE1YndHQ0FaUnlBcytxTzROMGdrdVdYOU50UlFLellwWlpmUzkwCi0+IGl8elk0PmEtZ3JlYXNlIGQ5JHt8LXlCIG5rIjVxcldOIDtiQiBvbXNILyV5Ck5oejBIeEV2cjJqRHJvOTY4eDA4a1E0N0tJbUNmK1JZM29ZNnZKa2JXVENtQmZKVHVUNk5mTmg1VVJDQng3TEcKWisvUk8vWWFyVDlESjE5OEhxS2dkTzJvYS85dU5LRU5RSDBTTjRJd1ZzNEptcjl5Y2cKLS0tIHVRWGxhSktQOHVmclZvZmlHa1pkTU9WNlZka1F0WHhRVHowd0JFUHlpQUEK/Uh4WvcQKv25l6v6uRmiFHtFVP3PFkBsUBGIHDQHZWFf7iXZuV6G5+SC/a3RcOH41qBPFJE2Q+bGzEUbjB5ElOjkf4Ko]
 publish_timeout_secs = 300
 ```
 

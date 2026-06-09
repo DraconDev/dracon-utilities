@@ -1060,13 +1060,18 @@ fn extract_checkbox_text(line: &str, marker: char) -> Option<&str> {
 
 /// Sanitize a task name for use in the routing key.
 ///
+/// Commit subjects are indexes, not summaries. Keep task fragments short and
+/// route-key-like so generated messages do not become multi-clause prose.
+///
 /// Removes:
 /// - Markdown formatting: `**`, `__`, `*`, `_`
 /// - Pipe characters: `|`
 /// - Square brackets: `[`, `]`
+/// - Explanatory clauses after `:`, `;`, `—`, or `–`
 ///
-/// If the name starts with `**identifier**` (common pattern), extracts only the identifier.
-/// Truncates to 60 chars to keep commit subjects compact.
+/// If the name starts with `**identifier** description` (common pattern),
+/// extracts only the identifier plus the first descriptive word. Truncates to
+/// 60 chars to keep commit subjects compact.
 fn sanitize_task_name(name: &str) -> String {
     // Common pattern: `**F-reframe** description` → extract just `F-reframe`
     if name.starts_with("**") {
@@ -1076,13 +1081,13 @@ fn sanitize_task_name(name: &str) -> String {
                 // If there's description after, include first meaningful word
                 let rest = &name[end + 2..];
                 if rest.is_empty() {
-                    return truncate_task(identifier);
+                    return compact_task_phrase(identifier);
                 }
                 let first_word = rest.split_whitespace().next().unwrap_or("");
                 if first_word.is_empty() {
-                    return truncate_task(identifier);
+                    return compact_task_phrase(identifier);
                 }
-                return truncate_task(&format!("{} {}", identifier, first_word));
+                return compact_task_phrase(&format!("{} {}", identifier, first_word));
             }
         }
     }
@@ -1098,7 +1103,28 @@ fn sanitize_task_name(name: &str) -> String {
         .replace('`', "") // Strip backticks (code in task names)
         .trim()
         .to_string();
-    truncate_task(&sanitized)
+    compact_task_phrase(&sanitized)
+}
+
+/// Compact a task phrase before it enters a commit routing key.
+///
+/// Drops explanatory clauses and limits plain text to three words. This keeps
+/// generated commit subjects searchable without turning them into natural
+/// language summaries.
+fn compact_task_phrase(name: &str) -> String {
+    let clause = name
+        .split([':', ';', '—', '–'])
+        .next()
+        .unwrap_or(name)
+        .trim();
+    let clause = if clause.is_empty() { name } else { clause };
+    let words: Vec<&str> = clause.split_whitespace().collect();
+    let compact = if words.len() > 3 {
+        words[..3].join(" ")
+    } else {
+        clause.to_string()
+    };
+    truncate_task(&compact)
 }
 
 /// Truncate a task name to a reasonable length for commit subjects.
@@ -1640,7 +1666,13 @@ fn compute_blast_radius(repo: &Path) -> String {
 
     // 1. Task intent (from markdown diff) — cap at 10 tasks per category
     let transitions = extract_task_transitions(repo);
-    let intent_prefix = {
+    let is_merge = repo.join(".git/MERGE_HEAD").exists();
+    let is_revert = repo.join(".git/REVERT_HEAD").exists();
+    let intent_prefix = if is_merge {
+        "MERGE: | ".to_string()
+    } else if is_revert {
+        "REVERT: | ".to_string()
+    } else {
         const MAX_TASKS: usize = 10;
         let mut parts = Vec::new();
         if !transitions.closed.is_empty() {
@@ -1753,11 +1785,11 @@ fn compute_blast_radius(repo: &Path) -> String {
         metrics.push(format!("DEPS:{}", dep_info));
     }
 
-    // 7. Merge/revert detection
-    if repo.join(".git/MERGE_HEAD").exists() {
+    // 7. Merge/revert detection — merge/revert commits start with MERGE:/REVERT:
+    if !is_merge && repo.join(".git/MERGE_HEAD").exists() {
         metrics.push("MERGE:".to_string());
     }
-    if repo.join(".git/REVERT_HEAD").exists() {
+    if !is_revert && repo.join(".git/REVERT_HEAD").exists() {
         metrics.push("REVERT:".to_string());
     }
 
@@ -2001,7 +2033,7 @@ async fn stage_commit_and_push(
         // `ctx.remote_failures` (the caller passes a `&mut HashMap`).
         // The `tokio::spawn` fire-and-forget pattern was removed because
         // it bypassed the failure-tracking needed by callers like
-        // `test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA0NzgzUVU4M3BTaHc3UWxhRTA1a1RqSks0Ukt2UEdDRi82NGVLMnlrNUZZCmttVnFzREtXQSsrZmEwdVFsOSs5NWlLKzVIcEo5SjR4TTg3eHhoZUdya2sKLT4gWDI1NTE5IFIzcHRIcThNMWpFWUNuejhTWkgyUkY1ZUVHakhPT29uMEdnejY1NVpjeVUKa3pYRXpyWk5XdzNsdU4rSHhPUHVUc3RyZGUxMXFEZDJSenBlT0xNb3FDTQotPiBYMjU1MTkga1FER0RDQkxVSXc5RnQzNzZQM2FxNVlzVDBhNlJ4MVBycDNjR3E1Y1VGMAoyc0c5NXRWcGxnV2dxaXc2dk9WYURiYXlsWkljaCtxb1BuNEdiMGVxRFBNCi0+IFgyNTUxOSB3R0tSTHVrbUsza3NYN01WWDE1R0twSzRyV0dhWThvYnJwZ01ZQUxhcVgwCkxWeVljSDNac05wdml3YThjVDJlc1dVNUN2YndTRVM2eThuQjc4RlM5UXMKLT4gWDI1NTE5IER5ekdxYXJIQnVyWmY0SCtFTTRzSS84R21raXgxNDFpbWdjbTVqWUFZQ0EKMm1ia1BmSVplUkFHb2w1Mmpha2ozeldqc2w2dWlHV3Bja0JrZ0hoWjZCWQotPiBYMjU1MTkgY2dadWZrRXhucEV6RUxIOE1Cd0xnNUlLYlNxTjZCL1kwTmxKeXR2aEdtcwpIdnJQRnA3V0E1UVArS0p2dk5CMGxEY3lXdXJsTzI5WmpRZzRuajMvOXZrCi0+IEYtZ3JlYXNlIGMsTworbXBjR3dobAotLS0gSjl6MmpNS3JUR1dLc3RJY1hMY0E3ZS9SQU1TaklTODZlTnBkYzFHV3d4NAqsym4DDhnFvd7hlxl3jqW2bJhDLyfW4UUSkxfNgBxwjJh8buavga5/waZy82G7NRnSSR5t/thDzWY=]`.
+        // `test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAwMkpUR01uT1FxVm5QRC9TU0ZJUDNFMitIN0lHUXdqVWFjM1NGaHBFbVZ3Cnc4N210WUk1SndzS2UvT0puKzN6QmhJRlJ4Vk11SFdoZ2F4VDB0eUp2bTAKLT4gWDI1NTE5IG1OQ0kwL1RIR2tSbkRFVUkrVTVTQU16RFdJTExlUjB2b1hLYUVhLzkxa00KWE5WYTlPNUR4SENzcGUxRFBucU1rNFU5L0VFRDJZUm9MNG9tbVZjUllGWQotPiBYMjU1MTkgSHZhWVoxbnF4SjhBTmExZXNhYlB0eWFBa1JFeFdMMjYwTnFUTExwTHZ4RQpkVUZpYUdrejlsN3JTQ2NBQ0dzbUYyTXJ5UFJwZmZ5OXFkZFBRSTdRWHpzCi0+IFgyNTUxOSBncUZUTXgwN0ZrUmM0T2grbkozaVE2WXlXLzE3cnBpYTgzM0trMmMrQkdzCkgxU0RwbVpnd3U1K0MyZzN2TEkxMytpSWRxaE9tZG5mS2xiaUxVbEQ5Nk0KLT4gWDI1NTE5IEtqcVArOXJKUENaWS9oRGtsMGJOVHpNTTJLV1dxOHdlVk9wTUpNditFVlkKcjZXQjRnMVVoL1ZnSzNFUUt1TUdMTEl3RENKODBZNTg1VURTZm1RRGJCZwotPiBYMjU1MTkgMkw1TDFuK29TRW00aFcrOE0vWkJRWXREalB3SFhGVzdmREZkUmRWbE9tYwpYUUJKZVpqNUVFQTRMaUV5Z2xjVE1jVWoyOEkwYlFkb3ZWNWdHWDRyaWV3Ci0+IF04ci1ncmVhc2UgZnxwWSBpdQozQm5ka05aMwotLS0gWVc4azMzdlNLdStiUm5nWUJlU2t3YkdLL2VaNUVnK1ZDcmU3RVQwUytpYwrbbR8X2M72SdFCjd1G9rE4DbuSFx6DZSM0m/pYJUVAdv1l0bZNgzpMRv25Q6vElT3bO6DUNy37k1k=]`.
         match push_background(repo, policy, ctx.remote_failures.as_deref_mut()).await {
             Ok(true) => {}
             Ok(false) => eprintln!("⚠️ push failed for {}", repo.display()),
@@ -2222,7 +2254,7 @@ async fn handle_ahead_push(ctx: &mut SyncContext<'_>, svc: &GitService) -> Resul
         // Push synchronously so mirror failures are tracked in
         // `ctx.remote_failures`. Previously this used `tokio::spawn`
         // (fire-and-forget), which made the failure tracking unreachable
-        // for callers like the test `test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBCVzVvbzZZRFR0ZEtKcnd2SEpIWVU3Z2dVZTBJY2EvSDdobjlLemgvaEhVCmlxU1RjNmlOWHk0UkxMUW93cWtBbGZxdHBaaFRlMWs3OEY2Z2Z6N0RpT1UKLT4gWDI1NTE5IDgxRmJybkVEbDlremhnaXZxakZleEE0UnNMTFdjZ1Z2eUxDMzJVWlovMW8KSlJYZmVWdDFuWTNUKzZEeG1rYUNDY0VGK0NEdFl0aFFYV3VXTytjWEs1QQotPiBYMjU1MTkgMWZYaTFBdnFuZGp6UVg2Q2FLQklVVTZ5Y1NNdVdNNW02Ynp0QXBRRHlSSQorYmR5RFBkUW84SVlDTkN4aGJGSEZUMzRRRUxlYUM2dUhnNHlhVEVnTG00Ci0+IFgyNTUxOSB3TTFWWm1WY0pHSnJ4OWR2dk4rZ0ZCdTBwZ1pLSnh3UkljclArTnBmN0hjCkNXamhSYnFXMWMxTmRnTUhNRzV0NWh5SVRsVlh1d1o3UWh3cU1hQnFPdG8KLT4gWDI1NTE5IDhrVFl2NjJpOFpzdFgrbFRXbm04M1QxR29qcGtMeTk3MkVXVVJOMDhoVlUKVWJTUWxhODRCWFRsT29Oei9qc2U4eDkxMTljQlVnb1dVZ05XdjNySU5iVQotPiBYMjU1MTkgc3lpd1VKeEJFMFRUNHBHZTI0a1hTRGh3Z1RYNStvTzVFeVdXUEFPcisyNApmL1o2aXcxZi9lTllUcE5WeEdCdnUzUHBlYnNpa044anpnbjU4THl0TFZJCi0+IH4tZ3JlYXNlIFdqbS4gTWIgbWwpCjVkTUdBR1hGWVdqRG1ha0FvY2lXTTFZTXhTdlpXRmZRWU13eFdnCi0tLSByOTRBK2t2ODlLL1JhWHFDYkNyK1R5bVJCakI2Vi8rRnVJNlZuNUNpMm5zCoCmoQLtTyxGsUEMl7Y4m1VzbDaf7s3zeaYcC7lg1EtWtE2yQe6bmw55nVBzHOtRjKOIHXdOgeaPnw==]`.
+        // for callers like the test `test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBqclBPTmNOcDhEQ056SnFoTkxDZFJVTk8vbHFVNU1WTExTOHRaV2QyQ1RBCi95N1ZyZk5pZFJTZVhhU21ad0xlaXpoZmszY0FrRFhDTnFkOEdFWWlyaFUKLT4gWDI1NTE5IGFOczNYQnVJVTNUaVhxb25rNEpFMEdtNjBydFlVbnYrVkxsSG9EeDV2VW8KOFVybjVvWExxRXJiOVUwZTRHMFFsT1ErN0l0NG02VHkzUlBleDRCeStJZwotPiBYMjU1MTkgL04rYS8xUEJETCtzdmU4clBzbnhjQStwSzRyaTEreURuRnduWlhRNE5HRQpVNjRkZnAzMzJpSjJweG5KMWVaSnpvRllyMzMrQkhpZjczbFNEc3pzaXY4Ci0+IFgyNTUxOSBkNkNocGQ0dWl6ZDFvQlJQbElVbjE1aXNEdDVpZStOZDcwaEZCWkJhOEJvCi8vazVtOS95MEZVUTd4NThHa3RiRTU5SG5scGJZQjJka3JwYmlLNzZha1UKLT4gWDI1NTE5IGg2Qk9JZDkrSk44MlFUY2ZaNitYMHphNWlrZzYyQUxidjZDcU1IQWhiemMKZjU1a1ppWDZSenFXWHR5aDZoMkR0d05QWVpNOFFxMmpqWkI0cTg2S3VmSQotPiBYMjU1MTkgNlUzYzVXQ2krU0t1TG0yakxvU2tQR3lMWHZYMUY0NjIxVTJBb1V6ZEV4MAp2am03VmZlNmJ5dEJONzNvWG94R0I4QTJqeXc5TkpLRmhKQnF4dWJ3eVVrCi0+IC9LMi1ncmVhc2UgNGU7Cm03WkxtM2p2RzJmMFFRZndhTE1OU1NaL0h2ZzQvNVd4TVlERXB3K1VJc0FsK2htd00rc3YwcEJoR3V4ZzYvS1EKMmxZCi0tLSB4eHU1QTFLSStrY3lDb3lSOGVkZU5VbSsxVmM1bE9kUDlxSEZIazBvNEZFCjNJHaWJY4XgavYMRGiWYQ16hrPJ2tv9gIwa7EPbJGutxftXapEZVqw6fpvG/uNB4sy5LuNYb1Slxw==]`.
         match push_background(ctx.repo, ctx.policy, ctx.remote_failures.as_deref_mut()).await {
             Ok(true) => {}
             Ok(false) => eprintln!("⚠️ push failed for {}", ctx.repo.display()),
@@ -2237,6 +2269,51 @@ async fn handle_ahead_push(ctx: &mut SyncContext<'_>, svc: &GitService) -> Resul
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_sanitize_task_name_drops_explanatory_clauses() {
+        assert_eq!(
+            sanitize_task_name("Fix A: Added .dracon/ and .pub to NOISE_PATTERNS in bump.rs"),
+            "Fix A"
+        );
+        assert_eq!(
+            sanitize_task_name("Stale focus detection — details were noisy"),
+            "Stale focus detection"
+        );
+        assert_eq!(
+            sanitize_task_name("merge: resolve conflicts from parallel sessions"),
+            "merge"
+        );
+    }
+
+    #[test]
+    fn test_sanitize_task_name_limits_plain_text() {
+        assert_eq!(
+            sanitize_task_name("Added .dracon/ and .pub to NOISE_PATTERNS in bump.rs"),
+            "Added .dracon/ and"
+        );
+    }
+
+    #[test]
+    fn test_compute_blast_radius_merge_prefix() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path();
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "main"])
+            .arg(repo)
+            .status()
+            .unwrap();
+        std::fs::write(repo.join("file.txt"), "change").unwrap();
+        std::process::Command::new("git")
+            .args(["-C", &repo.to_string_lossy(), "add", "file.txt"])
+            .status()
+            .unwrap();
+        std::fs::create_dir(repo.join(".git")).ok();
+        std::fs::write(repo.join(".git/MERGE_HEAD"), "abc123").unwrap();
+
+        let msg = compute_blast_radius(repo);
+        assert!(msg.starts_with("MERGE: | "));
+    }
 
     #[test]
     fn test_truncate_task_multibyte_utf8() {
@@ -3065,7 +3142,7 @@ push_url = "git@nonexistent.example.com:repo.git"
     }
 
     #[tokio::test]
-    async fn test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBBWVFkbTh5V2xHNzNYcE9Ndm81eVZmS0E0SnFTS2I5WXQ0aHpwVkJMQUNBCm50am9mWmpxTzlkUytrREVHK3JjUlIyZlp0YTZhdDlScVFma2wrdDlheU0KLT4gWDI1NTE5IGhKVXhxSmZOZmUvaWFUaFRma1hKWUVBanlBcFhkTCsvNTJwajlmOTNBeG8KazZmUjhtWFk0YkJpa0JwSWs0RllxWTBnWFp3OGlCUVV5SXFHbUM2VlcvMAotPiBYMjU1MTkgSFo5amhwSmdHYjRkSlVEWTQwV2tiRWVCRERIZUNzeDZ1MHYweURZREVuTQpyLzlDcFRsQ1pMekhBTlRlYUNoQWVVaGQyMUtPc1ZhbWw2VnQ0T2txN0QwCi0+IFgyNTUxOSBwdno4UVd5cmNQaWF4cE1hQmtLcUhxK1FZZENwa01RaWd5R1B1L3JhWEVJCklhWXdwVWlEb2dDVTJkYVRrL2E5eG5Id1JhNGtvN1dZb2RtMXpsdnRUaVEKLT4gWDI1NTE5IFFqM2l4V1FQSUszTnhLYzhmZ3ptM3RHSXlZT3UzdEJyaG0yYkg0VkFLa28KZWJ2N3R0QzJJWGRDYURpUGkxc05KT1I5NzBvRkdqMC85OC96YUlGTk1DcwotPiBYMjU1MTkgbnoxWm56b0tQT0hlRU9xRktreURVU1pranZDTExUZmRIeWhXWllVaTJrawprR2Nubk5wY3hrWmIwUGsvbVhQVHU3eG1ySm9XRVZtUjFvZDR3eHk4bEw4Ci0+IHd0LSp4R2wtZ3JlYXNlIDdlY2tbWwphOWExTW9lU3lNZndneXRQQ3l1OWVueVlLS0xFMzhrVVpMakVoK3FHakh6RzlDcVgwbW9VMGE3dVN6WXhwbDBZCkE3Z04xVFEwajJYSlQ2a1lJTGRzcXlha1l3TGoKLS0tIFZ3UW1zaFNkeW5TSS82RDJnMzEvZm1hUG5tc1JTS1RhVW9wT3FmOCtSZTgK3Gz6+c0rLsBIXDHzPyy3GlPfyIGiWA0OuLDhb4TnF7uiKcZ9mxUEuWZNcn1ODUZmtWmVrkAR1gu1]() {
+    async fn test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBxV2FzRmJqYThxVDRmSVoycDVTK0wxSGppTkwrSS96bzQxbUl4MXpENXlFClZ6aEhVdER3RkkxNS9oRXp5SjJBNkRsQjd0c00xVVlHRjBheXA2Q0REZ28KLT4gWDI1NTE5IDcwREtWWkM0WkNFQ2xpUUpQR2VRc1dmTUxhbjIzTEVWVzEzZkt2L1B4ZzQKdDl4OFUyRS9PaGJKcEtTV2s3cHNYUUxjVXVyaGZ6cEhHZzZiNjJhRFNrOAotPiBYMjU1MTkgTldmM0hZTjByZDA2Vld4eVdRdEMyc1JlTmtFeU52MzNJUDBBQUNGVkVDWQpkN2o3OFZjU3VyTm9mdUVnT2hBTDh1RCtQVWIrcTdhbnZqSWUxQkwvTkU4Ci0+IFgyNTUxOSAzV1krRFlBc25WZWVwMTFxREgzbmpLUmRUVG1VViswWEVpczV2TWsrVGhrCkRkdVdLeXd6RTZIc3N5M0NON3Y5bzFzV0JlWXhyeHg4eG9mOXhQamF6U0EKLT4gWDI1NTE5IFM1LzFhdDFLRGhQTng0eG8rK1FCdWpFeFcyRm9QUWd6N2RCUDBYYWFueTQKSlJMQUJmVk1FUzVzUjg4eE9XU05WbnZXUU5iVkpTZ2FrblJJdjFFbnkvVQotPiBYMjU1MTkgeTduaFA3enpSemZvU2dPanRPL01oK1dFcXJ4N1NWbUp1RXkvVEtRWVZ3VQpkZ1QyR2RBeTVxNHpVTVlZRXErYlkyM28xOXBYeTZHQXNxQ0NNMDhKWno0Ci0+IE1KVV9ALWdyZWFzZSByaiAiRGpDNFQ6Cm1GckU0aTNWZm9ZV01tWkM1akJWdTFscUFWajNxVHZRRWdnSXVQWUtjV2Y5TGp4SWlKRzEzN2lxWUZRSEJEM3cKSDUrdmV0NjJqZ1lkd2hKOVk3Y2sKLS0tIDNpTTBxZm9ZYXRKTGZVOUhjTEN3dGNXeFNQS01USWwzdlJ2RlMvUjJDT1EKMrDJaFQWqRVZvGKhCEjBuCOAF73X0zdjXftIHRBSrg0qgn4ZAeGvcJuiHGrkUcfcjmo4oVyhYiCl]() {
         let tmp = tempfile::tempdir().unwrap();
         let origin_bare = tmp.path().join("origin.git");
         std::process::Command::new("git")
@@ -3421,7 +3498,7 @@ push_url = "{}"
     }
 
     #[tokio::test]
-    async fn test_sync_repo_exac[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBEcCt5bC8rNzc3ZHhpR0tra1cwVGJNczk2Wkl4V0dITVhpaEFLcGltTVFBCjA1WXhCWVFPdVgwcDVtSkpzQWE0R2g0UkxsOWFMV0VicTlWcTBsdFlFeDgKLT4gWDI1NTE5ICszWUphU2cvSkNPeXMydDZ0Sk5Ob2s2bzZ4eUJPdnRURVE2RktOVndrelEKS2ZzcFVTcHVmbEZvbGl2WWVhbng5NWJOeVJiWk5HZWFMZ0FaUEo5RVNqTQotPiBYMjU1MTkgREhsM1piZlZRTU9VUDZTaW81dU8vZ3hjZ3E4R1djdUVnZFhUcXdKTzRoYwpCODluL2UrejdpNExqb2RiMnQvY25iSHlCZGRyTFZveWd6aW9Ld1R4enJrCi0+IFgyNTUxOSBDQlR5SHA4a2pMWS9ielZuT1JpSnJ1VmxBZllkRGxRWHFwVHdTeVlFVkNBCi9LWHdpRG05dXluNUpMeUtIR3RkVFA1eFVFMHN5bThMNmNvNlQ4Umg4UGcKLT4gWDI1NTE5IHA4Q1F3aXFSWXltT1M2UjkrRXBQNjhNRnBzQm9wM3h4UTVSQ3RIRnlGQkkKSFdXbk9BSmp5b2ZpTjgybC9zWGpLaVo2a0ZWbzIvUHpLK2xSNkN1dU1xSQotPiBYMjU1MTkgTnBkM1o0NjhFU0htdG9vTXk2bzB6MEU4a1drSkp2RUw4YUNMYmlHS2h3RQpKOG5WMFFEUlBzY25YdzNPL0tCWm5qQWRJMXVVV2NDdkkwVzhzSlBhUkpnCi0+IDRdXy1ncmVhc2UgPS0gZ0QrXiEgT3Q6CjNEbVVFSkxuQ1VCaU1KS3d3aktIdEdMbCtCZ2s1OGNzWWVwaVNPZG5uYmV1UVlJRDhzdmc3aW1qMW5NZFgvVUsKSGlIcmJvZTl5Z25GNXFqRy9nCi0tLSAxRTFSSGNNZFpiRlcxblVNenIyR3VYNFA3NlBlSk5QOHlxbzloemxGWEVVCiGe2qhU7FWNmqxStwhGrYH5RvIA1tAbTZyo4ZEFQsVWdZGbeLqYPRkbzWDTjpajzEH8xqa+lBw+Pt1WkkGrdA==]() {
+    async fn test_sync_repo_exac[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBRNjJ5NHpJZmZpNkhTbjBOZEFNWW45ZXI0NWZyekkyWFNsU0poRS9lVFgwCk1CVEUxV29mQ2JneFBqYjFkOS92bDdXVy83U3kzc3NmTHQ0UHBwbytEencKLT4gWDI1NTE5IE9aRkcvSlJNNkNreEY4RkoxRVRNdzRJS1RDZzdWT2tSTU40UWdaUW1waHcKSHdMN2ZaMmpFR2czaFB2T0dXN3N6eG9VRHZtY2VPT0k4MHJZTFExU2htUQotPiBYMjU1MTkgdHdQdGkwdFlHQnc5OFN3OW5ZT1NETkNkdDFoVGZSL0tUeVNxcFdXSXBHVQpRMTgzSjAzOGNGeUlVeEQ3ejQzSGFTdEZWeWdhY1FZV0ZMeDA2NFl0WjVjCi0+IFgyNTUxOSBITWErek1WNkZ4MzhLVXA4bU5icjg4SXhsWlJHR001K045UTBlaHNLdzFvCnUvdml0VFVFdy9xaGhOQ2RQRnVwVG9CVGF3K0ErR1dLd3dKTjdiR1pWMGsKLT4gWDI1NTE5IElHd2I5SE9wbFpyZnhTT0xyamhjR0tXTjJOcCtHNWJudEhra2FSSUhtRjAKMUlWL1E5MXNYbXJ3ejZQaTdGSFNaTHVUbU0vSGIvZmgwOWltUjBjZkJJcwotPiBYMjU1MTkgaHZvQXFnc0ZLMmpxYnpaKzlzekZsYTB4VUNSWXFyc1hodjRIL2VDaXRGTQpPVmR1M3ByR1g3QUJ4bEhzNSsyckpRZkFTTEUxWmNFUjlzYzZKbmZiQk1BCi0+IG43LWdyZWFzZSB8MzhvIUFbCk9lT2JwbE9xbmN2OXd6dWZ5d0tpcmFyQnJ0LzlyS1dtYXBWY0orMk42eUgxb3BERXVRNzA5THZ2RktNaG9iUk0KLzBFeUxRCi0tLSBGK3hCemF3M3RHbFRhL2JwS25GdC9DN0M3ekNUbWNQazJteWFlV3IybU93Ci1oJjzEsP0Lm9V4f+QfaC7RlwdajvmXPn+GOSplm5nrUCqfVrrvHPUvr8mafiXhNBbfsJA2RNLjxxO3IESrRg==]() {
         let tmp = tempfile::tempdir().unwrap();
         let repo = init_test_repo(&tmp, "exact-50-del-repo");
 
