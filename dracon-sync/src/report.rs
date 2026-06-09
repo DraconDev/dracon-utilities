@@ -90,7 +90,7 @@ use crate::git::{
     top_level_dir,
 };
 use crate::policy::{
-    timestamp_secs, tokio_git_command, SyncPolicy, DEFAULT_GIT_HOST_BLOB_LIMIT_BYTES,
+    timestamp_secs, SyncPolicy, DEFAULT_GIT_HOST_BLOB_LIMIT_BYTES,
 };
 
 fn ansi(color: &str, text: &str) -> String {
@@ -2746,21 +2746,19 @@ mod tests {
             std::env::remove_var("NO_COLOR");
         }
         let saved_force = std::env::var_os("DRACON_FORCE_COLOR");
-        unsafe {
             std::env::set_var("DRACON_FORCE_COLOR", "1");
-        }
         assert_eq!(ansi("31", "error"), "\x1b[31merror\x1b[0m");
         assert_eq!(ansi("32", "ok"), "\x1b[32mok\x1b[0m");
         assert_eq!(ansi("1", "bold"), "\x1b[1mbold\x1b[0m");
         assert_eq!(ansi("unknown", "default"), "\x1b[0mdefault\x1b[0m");
         // restore
         match saved {
-            Some(v) => unsafe { std::env::set_var("NO_COLOR", v) },
-            None => unsafe { std::env::remove_var("NO_COLOR") },
+            Some(v) => std::env::set_var("NO_COLOR", v),
+            None => std::env::remove_var("NO_COLOR"),
         }
         match saved_force {
-            Some(v) => unsafe { std::env::set_var("DRACON_FORCE_COLOR", v) },
-            None => unsafe { std::env::remove_var("DRACON_FORCE_COLOR") },
+            Some(v) => std::env::set_var("DRACON_FORCE_COLOR", v),
+            None => std::env::remove_var("DRACON_FORCE_COLOR"),
         }
     }
 
@@ -3114,7 +3112,7 @@ mod tests {
     }
 
     #[test]
-    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBiVzVNc21WSXVXRTE5MDNBbGY2MDdXRWYrYTB4RytkSkM5VHp3NXJ5R1J3CldadkYzU2E5b0x3dDh0S3RxUEE3T0gzcHplWUJ6emFBN3d3SkRKOEVUQmcKLT4gWDI1NTE5IDdXZFo0RFYrU0N0Q2RaTEplNlcrVkFUZmhtYjNKME5OejJJYVRSUGJUVFkKekVpQXNVUnVpWkdSUDJsdnorVHFEZEhZRDRNYnFnbEY1VGpwbnorV3UvNAotPiBYMjU1MTkgZkVFYzcyN3VoMzRFa210TXdKeGN5Q2hZVHdIMTJDMUF1YWNvR3FXMDdBawphcXFkVzFScWJhbGMrc01ZUG1zVG1YMDcyZ2pObnAyelNDTkN0dEwwQUhBCi0+IFgyNTUxOSBTM1picTdXbTdNUGEwdFM0Ym9GdHBOMjBFdXdrelpXZkpjTSsxQ3huRUZrClV0R3IwSWpqK3hsRjdnbE00eitITFU0TSsvWUh3bEtWb0V2TFFVdGdibnMKLT4gWDI1NTE5IExVQTRBRk8wMDdpNlhjUTliWVpYWUs2KzFNMkhVN0puQUhtbEJlckNjR3MKdFhxeXBTcndEVDV4Y0luMHlWNjhnSU0ya05FQ2dtQWlDZVk4QUhsbkdQUQotPiBYMjU1MTkgV3Q5MkdWaytjWjlwKzROT2dlS2t3SmEwUDMvZGgwd3A3eFlnbXFQYTAwawpKZ0taQXFMYlZDTzdOTkhyNzNzN0VYb2dmYSt3VjBOSGw0bFhKb3luVEQwCi0+IDk0OXAqSy1ncmVhc2UgZmRRL3IgYl5pZyBybjcKKzhKeFYvU1hySlZZTVJ3YStzRkh4cmlndFgzWlg2WFZyM0o1ZVljRAotLS0gZkx4amtENTNJZXBpR1cvTEFpUHpHbmJJL0NNRlAyYjl1cVA3Y0JKbWMrOArCqtfF5m7dm57+7zNeNxC4gV2EZKfFMy1hn9fFs/yrcaWRIBoV0lYCJA3vz8SP5IRBcLyy88kHAJLfTO04]() {
+    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBURUVlUjFWQ1dWY2U1WlExNU1ZVm51c3VyQm1UWEt3YlQxdUFZM0hJSGdRCnlLTXppMGZDWFlRU0hkWWVDYWNyMUdkWUlpbkF3WWh2YXVLUzFvRlhPeTQKLT4gWDI1NTE5IDhKQ24zTnRuaEhESkRyZHBMS0NNRXJlZ1ZobnU3eFloNWtRdTRrTHBvWDQKTE0vL0FzK2hXcVE3UUs2NXhNQzNuRldpbUIwVXQvRThTTDZaYmkwV0s5cwotPiBYMjU1MTkgbUdFMWpMUXVGWnlLNlZkNDVMVDlNdzdrYWUrK21sSVJuREtNNTliV20xawpZNDlTMUprREhscndGTklyRWgrVDludDFnZXk2cHNJWnR6VWJHeTVteGJvCi0+IFgyNTUxOSBPZk1Hd3FoSHRrOXErc2VEdTVwekpTL3FDcDIwN3VGamljSkorOE5RRDFFCmIySnQ1a1lJa1FnQmZydFh3M2FvZXl4bUZnTEg2MEhHanJKVzIycHkxTTQKLT4gWDI1NTE5IFVESHZzYVhPL0NsbDlUVHQ5WjZ0dG45TmZuRzVYTEllUCtaS0Q3YUhuelUKN1Z6UHhDWElXNDFGN0ZyVllvcVhJNHRPd1JwZ1kyVGpGK3JFOTVFQ29NUQotPiBYMjU1MTkgenJBblRybFoxNXA4ZEdra1ZIbDRNVW15SVFqWXpUYW1RdUFxbmNFUDhXbwpTTHlUdmdoNVFMd1pINUkwNU9NMVQzTzlRNitQWHBYY21PUDNPSG1ydUYwCi0+IFwlNCYtZ3JlYXNlIGsKL1JPak91eVk4N2VOdE92TAotLS0gVDVQMEsrVk0vYmttSE9tK0dqZDZrbTA4R0lmclVXZWFOejNwbDdQenZ0RQq0z9UZVTiy6e9HnHcU8ZZvCjQSZOMwrvgBlH/EkrrwRE440Ud2IF32ad1hpddaGH0aSBoPHuZtHYEfRFOx]() {
         let mut cooldowns = std::collections::HashMap::new();
         let repo = std::path::PathBuf::from("/test/repo");
         let notify_key = format!("push-fail-{}", repo.display());

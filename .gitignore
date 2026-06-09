@@ -104,4 +104,9 @@ tasks*.json
 **/tarpaulin-report.*
 # Leftover investigation notes (resolves "obs-wayland-hotkey" todo from 2026-05)
 /**/note.md
+# Local/session artifacts from previous audits
+pi-session-*.html
+rust_out
+**/git.rs.test
+**/tests.rs.plaintext
 # --- END DRACON MANAGED BLOCK ---
