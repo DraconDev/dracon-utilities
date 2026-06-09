@@ -131,7 +131,7 @@ pub(crate) fn create_test_repo_with_remote() -> (std::path::PathBuf, std::path::
     (repo, bare)
 }
 
-pub(crate) static GIT_ENV_LOCK: parking_lot::RwLock<()> = parking_lot::RwLock::new(());
+pub(crate) use crate::policy::GIT_ENV_LOCK;
 
 #[allow(dead_code)]
 pub(crate) struct GitBinRestorer {

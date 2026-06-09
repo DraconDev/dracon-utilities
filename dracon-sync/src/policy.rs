@@ -349,12 +349,12 @@ pub(crate) fn git_binary() -> PathBuf {
     PathBuf::from("git")
 }
 
-pub(crate) fn std_git_command() -> StdCommand {
-    StdCommand::new(git_binary())
+pub(crate) fn std_git_command() -> GitCommand {
+    GitCommand::new()
 }
 
-pub(crate) fn tokio_git_command() -> TokioCommand {
-    TokioCommand::new(git_binary())
+pub(crate) fn tokio_git_command() -> TokioGitCommand {
+    TokioGitCommand::new()
 }
 
 pub(crate) fn timestamp_secs() -> u64 {
