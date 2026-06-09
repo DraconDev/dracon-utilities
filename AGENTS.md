@@ -274,7 +274,9 @@ The `repos` command reflects this split:
 | `.gitignore` (DRACON MANAGED BLOCK) | dracon-warden | Warden overwrites on next harden pass |
 | `.gitattributes` (DRACON MANAGED BLOCK) | dracon-warden | Warden overwrites on next harden pass |
 | `.dracon/data/keys/*.pub` | dracon-warden | Warden publishes on harden |
-| `.pi/goals/*.md` | pi (auto-sync) | Sync daemon auto-commits |
+| `.pi/goals/*.md` | pi (auto-sync) | Sync daemon auto-commits active goal files |
+
+Local task/session state directories (`.demon/`, `.ralph/`, `.sisyphus/`, and `.pi/goals/archived/`) are ignored and should remain local-only. `.dracon/` remains the repo metadata tree; public key files under `.dracon/data/keys/*.pub` and `.dracon/keys/*.pub` are intentionally unignored when they need to be published or reviewed.
 
 If you need to modify a daemon-managed file, either:
 1. Edit the **source template** in `~/.dracon/utilities/sync/templates/` or `~/.dracon/utilities/warden/`
@@ -518,7 +520,7 @@ auto_publish = false  # master toggle (default: off)
 [[publish_targets]]
 name = "crates-io"
 registry = "crates-io"    # crates-io | npm | pypi
-[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBlOWluN08zTlZsSU9JRS9zQVJqYk43NWJKU3dRLzVCbHY2M01qRTMxaFhnCjJLcDJ4dmNRMFpOYmFnanBTVzhmNG1jWWxYejgrZzFGdUVGZGg4cHBvS2cKLT4gWDI1NTE5IHRNdVRjZjJQeGdDNE5pWHZQYXJMaXUyckt6VHJ2YVRZWnRTTVkyeGdOQTgKbHpvOHhDRzVmYjZucmlObjRGZTdNeEJDR01mcXpWZ2N6dnBQaStpWTBobwotPiBYMjU1MTkgVis2SzBSQVVtRTI2SmhHK3JIemo3bzFqdVFuZ2NnZEkrakNqVjVCMXlFSQpjSytXUmpDcDV2Zjd6aGtHVnVZNU94UjZKMDJPaXlIM1JXN0x3WXdXUCtvCi0+IFgyNTUxOSBMdmxTUi9PelFneWh0Ukt5N0lOMm1HSjA0R1NHVmlNWXBXbFc0RitjcWpnClFqZVV0ci9xbmFsOXZISUNUOHNLTCsrcVNYQmxhRmRFdDJQanV3MEtERTgKLT4gWDI1NTE5IFNGYjc1aFB3UXlLU2lJckV6SzJiUGpEYUw0K1RUZm1VVGdXcitYbVRwSE0KMk80aXpUdW9hMzZ4QlpGejR0UGwxdzNFbENHelE4OVlyeS9rMkpPK2tsQQotPiBYMjU1MTkgdllGYm1aRnl3MVJ4ZnR2dzBwSjN1TUVZazUwODZiN1lGUnNMSGM3amgxOApscGRqMFE1YndHQ0FaUnlBcytxTzROMGdrdVdYOU50UlFLellwWlpmUzkwCi0+IGl8elk0PmEtZ3JlYXNlIGQ5JHt8LXlCIG5rIjVxcldOIDtiQiBvbXNILyV5Ck5oejBIeEV2cjJqRHJvOTY4eDA4a1E0N0tJbUNmK1JZM29ZNnZKa2JXVENtQmZKVHVUNk5mTmg1VVJDQng3TEcKWisvUk8vWWFyVDlESjE5OEhxS2dkTzJvYS85dU5LRU5RSDBTTjRJd1ZzNEptcjl5Y2cKLS0tIHVRWGxhSktQOHVmclZvZmlHa1pkTU9WNlZka1F0WHhRVHowd0JFUHlpQUEK/Uh4WvcQKv25l6v6uRmiFHtFVP3PFkBsUBGIHDQHZWFf7iXZuV6G5+SC/a3RcOH41qBPFJE2Q+bGzEUbjB5ElOjkf4Ko]
+[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBES2ZYczkyeVNlTXlBNGNUeXh1RWViemE0bStPZlM4ZjYwYVljc0V3RWpBCnhlVEJxRk9IL1Ntc1QwQ0ZFdFhzZTJiZEJsWCtQZ0d0NUpDdFpwZ0R1STgKLT4gWDI1NTE5IGpwTEZDQjg4dm1jVE45V0Jvdno3YW00S0ZvNkNJQTdza1ZtYlRlcnZsQXcKTW1USXdMTXl5ai9WbnlQYWpkNWg1NnBqazRuRHdrZFY4NVBxSEJOZEU1cwotPiBYMjU1MTkgOUsvNmFYSkwrdDhTbE1RVTZOdnlsUHdIOTZsc3BpZm5VOGp2R2pmaXV4RQoxcGtuK1RhY0lmSjA2NzFsM0pXQlpPRDNhZFFDNzA5TUhrNmRRMzZiSVl3Ci0+IFgyNTUxOSBxM2gzQ0hwcHRIQWZXcHVHQ0xEbm40dHRlelJlTmpCYlI5ZkxuTmNGOERZClpjcWVmMHF2eG5DZERjV2ptU0xRWnpSWFBXblVjcXd6NWRkSW9jRWcreDgKLT4gWDI1NTE5IFd2MWtyeGpZUkZqeTc0MG9BUk9GMjZXM3NhVTdoTnAwZjN6cXpwUnBjMVUKY1VKczRub0RVZWdTK1lOemNiSW1jZU1kd2dpSkJxelJmQmlDWVlwT3prNAotPiBYMjU1MTkgZjBzZXVxM1VjQjQ1SkFucWhTeHJSbGVGeWljSGhyays2OUp5VWJVeHNGNAoyQmJGTk1qSlpWbWhVcit4enYxRURYNEg2L0RxNnRnVFE4TW1iYmNpZ2NFCi0+IHQweylcMkotZ3JlYXNlIDBDIE0gJ30/QUAgei4hdQpSTmhpKzdTZlFoV0l6REJBK2t2enlkNmM2OHR3cGdzSVkvNUtBeVcvOVo1d2R6MG5FRXc5WWhSbVdrM2x1U3UwCmRucmVmcmQ5bW8xRlJ1Lzg2NmErQ21XVE1ZNzRDNGFYYklVS2dJKzA0aVZjdUQwSU5NUHRNNG8KLS0tIGliWUtQN3ZLd0pLQjRNVmF4bWZLS1lNZFJwWkFMcEF5Q0ZRTXFGYXdrcUUKOhy1w3wrD3vAxm3u8PMonQsuKF5hojF1lRYbWU6BufMMQsr4o5SVcCwMTCce+iVsJY16ZDKkredm1wzFOnlJBnHVZar+]
 publish_timeout_secs = 300
 ```
 
@@ -783,7 +785,11 @@ git log --grep="ENV:"
 
 ### Test Environment
 
-All env var mutations in tests should use `EnvRestorer` (from `crate::test_helpers::EnvRestorer`) to prevent leakage between tests.
+Use scoped environment guards when a test mutates process environment:
+
+- `dracon-sync`: `crate::test_helpers::EnvRestorer`.
+- `dracon-security` integration tests: `crate::tests::common::EnvRestorer`.
+- `dracon-system`: no shared env-mutating helper is needed because system tests do not mutate global process environment.
 
 ```rust
 use crate::test_helpers::EnvRestorer;
