@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 2400684,
-    "activeSeconds": 1149
+    "tokensUsed": 2498028,
+    "activeSeconds": 1170
   },
   "sisyphus": false,
   "createdAt": "2026-06-09T09:21:59.248Z",
-  "updatedAt": "2026-06-09T09:41:27.207Z",
+  "updatedAt": "2026-06-09T09:41:48.696Z",
   "activePath": ".pi/goals/active_goal_2026060910215924_mq6fkxxs-ig5gcc.md",
   "taskList": {
     "tasks": [
@@ -41,7 +41,9 @@
       {
         "id": "triage-browser-extensions",
         "title": "Manually triage browser-extensions-shared (8 mod + 6 untracked)",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-09T09:41:48.694Z",
+        "evidence": "Original task: Manually triage browser-extensions-shared (originally 8 mod + 6 untracked). Reality diverged — the daemon auto-committed all real-code changes during the work window.\n\n**Manual actions ",
         "verificationContract": "Each modified file committed/pushed or dropped with user approval. Each untracked file committed, .gitignored, or deleted with user approval. Repo ends with MOD=0, STG=0, UT=0."
       },
       {
@@ -111,8 +113,8 @@ Tasks:
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 19m09s
-- Tokens used: 2.4M (2,400,684) tokens
+- Time spent: 19m30s
+- Tokens used: 2.5M (2,498,028) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
@@ -124,7 +126,9 @@ Tasks:
 1. Created backup tag `archive-pre-reset-2026-06-09` at 22b2d19 (preserves the 13 stranded commits — never silently dropped)
 2. `git reset --hard ce377a20` in ~/De
 - [x] repair-warns-pi-goals: Run repair-warns --apply for the 3 .pi/goals-only WARNs — evidence: Original task: run repair-warns --apply for the 3 .pi/goals-only WARNs (dracon-platform, DraconDev, ai-auto-repo-rot-scanner-todo-agent). Reality diverged — all 3 self-resolved during the diagnosis/co
-- [ ] triage-browser-extensions: Manually triage browser-extensions-shared (8 mod + 6 untracked) — contract: Each modified file committed/pushed or dropped with user approval. Each untracked file committed, .gitignored, or deleted with user approval. Repo ends with MOD=0, STG=0, UT=0.
+- [x] triage-browser-extensions: Manually triage browser-extensions-shared (8 mod + 6 untracked) — evidence: Original task: Manually triage browser-extensions-shared (originally 8 mod + 6 untracked). Reality diverged — the daemon auto-committed all real-code changes during the work window.
+
+**Manual actions 
 - [ ] triage-dracon-utilities: Manually triage dracon-utilities (3 mod + 3 untracked in dracon-warden) — contract: Same contract as browser-extensions-shared. Repo ends with MOD=0, STG=0, UT=0.
 - [ ] verify-final-state: Verify final state with dracon-sync repos — contract: `dracon-sync repos` STATUS line shows 0 WARN, 0 CONCERN. `tail -20 ~/.local/state/dracon/dracon-sync-incidents.jsonl` contains no new STUCK_PUSH entries for the 6 repos since the fix.
 
