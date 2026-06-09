@@ -5,19 +5,21 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 114332,
-    "activeSeconds": 88
+    "tokensUsed": 215125,
+    "activeSeconds": 192
   },
   "sisyphus": false,
   "createdAt": "2026-06-09T09:21:59.248Z",
-  "updatedAt": "2026-06-09T09:23:29.482Z",
+  "updatedAt": "2026-06-09T09:25:15.110Z",
   "activePath": ".pi/goals/active_goal_2026060910215924_mq6fkxxs-ig5gcc.md",
   "taskList": {
     "tasks": [
       {
         "id": "diagnose-6-dirty",
         "title": "Diagnose all 6 dirty repos (status, log, remotes, incidents)",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-09T09:25:15.109Z",
+        "evidence": "Per-repo diagnosis (current up-to-the-minute state, not the stale table):\n\n| # | Repo | Status | Branch | Ahead | Mod | UT | Last Commit | Remotes | Recent Incidents |\n|---|------|--------|--------|--",
         "verificationContract": "Per-repo summary table covering: repo, branch, ahead/behind, last commit, dirty file breakdown, remote health, recent incidents. Output before any fix is applied."
       },
       {
@@ -105,12 +107,15 @@ Tasks:
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 1m28s
-- Tokens used: 114K (114,332) tokens
+- Time spent: 3m12s
+- Tokens used: 215K (215,125) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
-- [ ] diagnose-6-dirty: Diagnose all 6 dirty repos (status, log, remotes, incidents) — contract: Per-repo summary table covering: repo, branch, ahead/behind, last commit, dirty file breakdown, remote health, recent incidents. Output before any fix is applied.
+- [x] diagnose-6-dirty: Diagnose all 6 dirty repos (status, log, remotes, incidents) — evidence: Per-repo diagnosis (current up-to-the-minute state, not the stale table):
+
+| # | Repo | Status | Branch | Ahead | Mod | UT | Last Commit | Remotes | Recent Incidents |
+|---|------|--------|--------|--
 - [ ] resolve-concern-ai-lib: Resolve CONCERN: dracon-ai-lib (archived origin, 13 stranded commits) — contract: User-approved strategy (drop / re-point / unarchive / exclude) is applied. `git ls-remote` on the chosen remote (or `git status` if local-only) shows no stranded ahead commits. Incident ledger entry for the resolution is recorded.
 - [ ] repair-warns-pi-goals: Run repair-warns --apply for the 3 .pi/goals-only WARNs — contract: `dracon-sync repair warns --apply` (or equivalent per-repo command) runs without errors for dracon-platform, DraconDev, and ai-auto-repo-rot-scanner-todo-agent. Each ends up with MOD=0, STG=0.
 - [ ] triage-browser-extensions: Manually triage browser-extensions-shared (8 mod + 6 untracked) — contract: Each modified file committed/pushed or dropped with user approval. Each untracked file committed, .gitignored, or deleted with user approval. Repo ends with MOD=0, STG=0, UT=0.
