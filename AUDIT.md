@@ -608,7 +608,7 @@ Running tests/redos_stress_test.rs   (target/debug/deps/redos_stress_test-57cf4f
 test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.34s
 Running tests/registry_credentials_test.rs (target/debug/deps/registry_credentials_test-ace9cea3db44a222)
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-Running tests/restore_test.rs        (target/debug/deps/resto[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBKQWUrVkVoTkQxWGgwY2psTXl2Y3FNR000M1V4S3hKSDRvd0NsejFRL1M0CnpkSVZaM1FuYUJtdmRwVmp5TDhXWjQ3WWhCM29WVk8xUjlDV29INGhNVFEKLT4gWDI1NTE5IDVvb0VTbHZJV2Q1ZzNUU3I1WkpDUFo3bjZwVzBzeTltNDV2Z281V1R4bTgKWmhSM2cwU3ovdnN2My9vUklMamFwWFZ1a1FDMFdkREVQZU1yMkdNNmxGcwotPiBYMjU1MTkgUmM5amxuU0lqMDBsZVdVY3pZMThmQ0cvN09kMnA4VTNXQWFCWEtCUm9HRQp5cytBTkI2bGYzVHUxSWNnK0J2bjMzOGdFTmhhdGp1ZFZQMWlBWkFnbnJBCi0+IFgyNTUxOSBhczIyaTR4WnhRT20wb01QbE9zdllqQzN1dnV3bE50YmNxNldyVU1OclM0CjZTMUMrUHhqMVYwSkduNEx5aHUycVNQczJDV1Z1MEtUMzFzRENpS0cwYWcKLT4gWDI1NTE5IGxjZS9WWE1wL0c2Q2NLK2l5RkpVL3BKcDFHN29hTVpaMUMxOHJaeUlLUkEKaEM5U1RaREwxbFlZc1pST1haUjA3Y1JTZW00ZzN3QzkrMW1ETTBEZTlMZwotPiBYMjU1MTkgTUJzaE5YNjgzTCs0ZjNRNXBGOE00OFdzRmpBVTk3UnFGajA3Mk9lbjFEOApDN3V5cmhHMTVVZTJjeUhZd3RWY05WczIzN3laVXFFRitYa29PY1VLb3lFCi0+IHxCc0gtZ3JlYXNlIC5BP2ggSFxqc1V7WDIgcQorSjl1QmVvL0JzWVNhN0xhWHp6ZTdFSnpEODAvWnh5RnJxSUhLejQvMUZ6V1Z6cXl3eWFPcituRHU1MzRJRDFSCk9RCi0tLSBxa0pmQ1h6NTBNd0RMRlJHbFc2dGNiRi9TQ0hrSUM1VzlrQ0JKQVJyTFJrCvDbVkyf17Z6WqvNbRVeDgN3Ja1fQ7TlXTPsVo2sbEDznfE49UdsJjdB0MUbIoQblZowD6hvc7he])
+Running tests/restore_test.rs        (target/debug/deps/resto[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBjM1VPVXM4NEhKbndYMlNMOEJVMXRXYnc3cmpKTXdXYStQSFo2Z3U2ckNjCjBuZG1VcFNUMFJjTnBlWEV0SUR3a2lBVUsxQ2FHVGpCb3hBWldqcXU1MVkKLT4gWDI1NTE5IG5tSHM1TGs5cmVLL1JrUmJFemhXSEhBWnpuZmM3Q2lFc0MwUVhjbjdPbXcKVDZ6ZkZTRStoMUZmYWlURXlKQnhFNzRGdU8vTnhhT0JQd25Qek1iektqbwotPiBYMjU1MTkgMnljMDByTkVqMTJ5RUZiSmJYUHlyVWhQOWlWNjRjdGx5QTVoc1E1N1dDcwpPV2dMQXZIMndKcnVibkFpU3RFRlBNZlVWY0VieUl6c0RvdFJhM0EyQU5BCi0+IFgyNTUxOSArUVdrUHBPL2hENjNnclJ6M3RBc2hycE8rdnl2TnNDSUdsZTZoNUVjOFZjClJhcUdYdG1xQmNUZUlBNnZnVUJZVlo3UzdqZDlpSTN2MXp4cWVYdm1SelEKLT4gWDI1NTE5IEZmVDhlcnZIZlMvRVNUTHAwYU94QkVNeGE3NDd5L2NVV3B2c2RnMHJsRTQKVUpReENjemlxTjRpck00TmN6aHJ4d01CcHljOVY2dzErMytSRVRvQ09wZwotPiBYMjU1MTkgV25FNHZnMGdzTThlVHA4N3VFYStZOGJvWmVUUTNMS1BuZGc5elA5QmhTNAo5bXdLRVBEQm9ZbXVyRzJ0d3grUlRYK2w3cmZuL0JnQTJGcTNocFBDaFVnCi0+IHQ+Oy1ncmVhc2UKYm5Ub2cvQmFvalVEMTRocEpOSS9iSGwweVVnQXlYL0NwTFBnRmJIV3hQOUk4TmZuOTdQTHJTa3ZuazJleWpuUQpRaUxBNFlvQm1RVE5BTGxjWGhXOXR2djY3RmFYNUMvOVpXUmtjNERVcW80MG5xek9xaE1HV1EKLS0tIGVWQlNhMk96ZHN2NmJ2aDlYNzQ5UmIzQTZDOHVYSmNJbmpyN2k0VGEwaFUKaDmNI86S2+VQd/BDhJy0ZbYB41Vo4Tb6GFkIeAyvF6dNyPsY2hh8nIvlVIn95tUfY0PY2JzNpe0=])
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 Running tests/scanner_edge_cases_test.rs (target/debug/deps/scanner_edge_cases_test-3466ac1207bcfea4)
 test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.59s
@@ -700,8 +700,9 @@ This closure records the post-audit repair pass. User-owned local state was rest
 - Migrated shared crate dependencies to root `workspace.dependencies` with `workspace = true` in the three workspace crates.
 - Updated `deny.toml` so `cargo deny check` passes; remaining transitive duplicate-version exceptions are documented rather than forced into risky upgrades.
 - Updated `scripts/verify-spec.sh` and CI test jobs to run full workspace tests instead of `--bins` only.
-- Updated `AGENTS.md` test counts, test helper guidance, systemd hardening tables, local-state policy, and commit-message guidance.
+- Updated `AGENTS.md` test counts, test helper guidance, systemd hardening tables, local-state policy, `dracon-ai/` standalone validation policy, and commit-message guidance.
 - Hardened commit-message generation: task names are compacted to route-key fragments, and merge/revert commits now start with `MERGE: | ...` / `REVERT: | ...`.
+- Fixed `dracon-ai/` standalone dependency paths and updated it to the current `dracon-libs` AI runtime contracts so it validates separately from the main workspace.
 
 ### Final validation evidence
 
@@ -709,10 +710,11 @@ This closure records the post-audit repair pass. User-owned local state was rest
 - `cargo build --workspace` — passed with 0 warnings.
 - `cargo clippy --workspace --all-targets --no-deps` — passed with 0 warnings.
 - `cargo test --workspace -- --test-threads=1` — passed: **692 passed, 6 ignored** across 22 suites.
-- Per-crate counts: `dracon-sync` 431 passed, `dracon-system` 83 passed, `dracon-warden` 79 passed, `dracon-security` 99 passed + 6 ignored.
+- Per-crate counts: `dracon-sync` 431 passed, `dracon-system` 83 passed, `dracon-warden` 79 passed, `dracon-security` 99 passed + 6 ignored, `dracon-ai` standalone 7 passed.
+- `cargo test --manifest-path dracon-ai/Cargo.toml -- --test-threads=1` — passed: **7 passed**, 1 suite.
 - `cargo deny check` — passed: advisories/bans/licenses/sources all ok.
 - `scripts/verify-spec.sh` — passed all invariants.
 - `cargo tree -d` — still reports 35 transitive duplicate package/version pairs; these are documented in `AGENTS.md` and allowed by explicit `deny.toml` skip entries where cargo-deny warns.
-- `git status --short --untracked-files=no` — clean after the closure commit.
+- `git status --short --untracked-files=no` — clean after the final closure commit.
 
 *End of audit.*

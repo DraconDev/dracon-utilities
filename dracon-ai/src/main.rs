@@ -421,12 +421,8 @@ Captured output:\n```\n{}\n```",
             }
             Ok(())
         }
-        Cmd::Scribe { repo } => {
-            run_scribe(&repo).await
-        }
-        Cmd::Setup { refresh } => {
-            run_setup(refresh)
-        }
+        Cmd::Scribe { repo } => run_scribe(&repo).await,
+        Cmd::Setup { refresh } => run_setup(refresh),
     }
 }
 
@@ -504,16 +500,28 @@ fn lane_key(lane: &RoutingTask) -> &'static str {
 
 fn ansi(color: &str, text: &str) -> String {
     let codes = match color {
-        "31" => "31", "32" => "32", "33" => "33", "34" => "34",
-        "35" => "35", "36" => "36", "37" => "37", "1" => "1",
+        "31" => "31",
+        "32" => "32",
+        "33" => "33",
+        "34" => "34",
+        "35" => "35",
+        "36" => "36",
+        "37" => "37",
+        "1" => "1",
         _ => "0",
     };
     format!("\x1b[{}m{}\x1b[0m", codes, text)
 }
 
-fn dim(s: &str) -> String { ansi("2", s) }
-fn cyan(s: &str) -> String { ansi("36", s) }
-fn magenta_bold(s: &str) -> String { ansi("35;1", s) }
+fn dim(s: &str) -> String {
+    ansi("2", s)
+}
+fn cyan(s: &str) -> String {
+    ansi("36", s)
+}
+fn magenta_bold(s: &str) -> String {
+    ansi("35;1", s)
+}
 
 fn stderr_is_tty() -> bool {
     std::io::stderr().is_terminal()
@@ -598,7 +606,7 @@ fn build_router() -> Result<ai_routing_runtime::SmartRouter<dyn AiProvider>> {
                 spec.payload_model.clone(),
                 spec.auth_header_name.clone(),
                 spec.auth_header_prefix.clone(),
-            ));
+            )?);
         registry.register(&spec.model_id, provider);
     }
 
@@ -821,7 +829,7 @@ fn extract_first_json_object(s: &str) -> Option<&str> {
     let mut depth = 0i32;
     let mut in_str = false;
     let mut esc = false;
-    
+
     for (i, ch) in s[start..].char_indices() {
         if in_str {
             if esc {
@@ -896,14 +904,22 @@ fn strip_trailing_commas(json: &str) -> String {
 /// Redact common secret patterns from command output before sending to AI provider.
 fn redact_output(output: &str) -> String {
     let secret_patterns = [
-        "password", "passwd", "secret", "token", "api_key", "apikey",
-        "authorization", "bearer", "private_key", "ssh_key",
+        "password",
+        "passwd",
+        "secret",
+        "token",
+        "api_key",
+        "apikey",
+        "authorization",
+        "bearer",
+        "private_key",
+        "ssh_key",
     ];
-    
+
     // Collect lines first to avoid borrow issues
     let lines: Vec<&str> = output.lines().collect();
     let mut result = String::with_capacity(output.len());
-    
+
     for line in &lines {
         let lower = line.to_ascii_lowercase();
         let mut redacted = false;
@@ -920,7 +936,7 @@ fn redact_output(output: &str) -> String {
             result.push('\n');
         }
     }
-    
+
     // Truncate very long outputs to limit token usage and accidental leak
     if result.len() > 20_000 {
         result.truncate(20_000);
@@ -1009,7 +1025,10 @@ fn run_setup(refresh: bool) -> Result<()> {
     }
 
     println!();
-    println!("🔍 Discovering models from {} provider(s)...", all_keys.len());
+    println!(
+        "🔍 Discovering models from {} provider(s)...",
+        all_keys.len()
+    );
 
     let mut all_providers = Vec::new();
     let mut all_active_ids = Vec::new();
@@ -1031,7 +1050,11 @@ fn run_setup(refresh: bool) -> Result<()> {
                     };
 
                     all_providers.push(build_provider_entry(
-                        provider_id, endpoint, env_name, model_id, *provider,
+                        provider_id,
+                        endpoint,
+                        env_name,
+                        model_id,
+                        *provider,
                     ));
                     all_active_ids.push(full_id);
                 }
@@ -1059,7 +1082,12 @@ fn run_setup(refresh: bool) -> Result<()> {
 
     let policy_path = ai_dir.join("routing-policy.json");
     std::fs::write(&policy_path, serde_json::to_string_pretty(&policy)?)?;
-    println!("✅ {} providers, {} models → {}", all_keys.len(), all_active_ids.len(), policy_path.display());
+    println!(
+        "✅ {} providers, {} models → {}",
+        all_keys.len(),
+        all_active_ids.len(),
+        policy_path.display()
+    );
     println!();
     println!("Run 'dracon-ai status' to verify.");
 
@@ -1068,10 +1096,22 @@ fn run_setup(refresh: bool) -> Result<()> {
 
 fn provider_info(provider: &DetectedProvider) -> (&str, &str, &str) {
     match provider {
-        DetectedProvider::OpenRouter => ("openrouter", "https://openrouter.ai/api/v1", "OPENROUTER_API_KEY"),
+        DetectedProvider::OpenRouter => (
+            "openrouter",
+            "https://openrouter.ai/api/v1",
+            "OPENROUTER_API_KEY",
+        ),
         DetectedProvider::OpenAI => ("openai", "https://api.openai.com/v1", "OPENAI_API_KEY"),
-        DetectedProvider::Google => ("google", "https://generativelanguage.googleapis.com/v1beta", "GOOGLE_API_KEY"),
-        DetectedProvider::NVIDIA => ("nvidia", "https://integrate.api.nvidia.com/v1", "NVIDIA_API_KEY"),
+        DetectedProvider::Google => (
+            "google",
+            "https://generativelanguage.googleapis.com/v1beta",
+            "GOOGLE_API_KEY",
+        ),
+        DetectedProvider::NVIDIA => (
+            "nvidia",
+            "https://integrate.api.nvidia.com/v1",
+            "NVIDIA_API_KEY",
+        ),
         DetectedProvider::Unknown => ("custom", "", "CUSTOM_API_KEY"),
     }
 }
@@ -1105,7 +1145,13 @@ fn load_all_keys(secrets_dir: &Path) -> Vec<(String, String, String, String, Det
                 let provider = detect_provider(key);
                 let (pid, endpoint, env_name) = provider_info(&provider);
                 if !endpoint.is_empty() {
-                    keys.push((pid.to_string(), endpoint.to_string(), env_name.to_string(), key.to_string(), provider));
+                    keys.push((
+                        pid.to_string(),
+                        endpoint.to_string(),
+                        env_name.to_string(),
+                        key.to_string(),
+                        provider,
+                    ));
                 }
             }
         }
@@ -1225,7 +1271,11 @@ async fn run_scribe(repo: &Path) -> Result<()> {
 
     // Collect context
     let git_log = StdCommand::new("git")
-        .args(["log", "--format=%s%n  files: %(trailers:key=file,valueonly)", "-20"])
+        .args([
+            "log",
+            "--format=%s%n  files: %(trailers:key=file,valueonly)",
+            "-20",
+        ])
         .current_dir(repo)
         .output()
         .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
@@ -1817,15 +1867,11 @@ async fn ask_with_messages(
         .collect::<Vec<_>>();
 
     let mut constraints = SelectionConstraints::default();
-    if let Some(model) = pinned_model {
-        constraints.allowed_model_ids = vec![model.to_string()];
-    }
-
     let (provider, trace) = router
         .route_with_trace(
             "default",
             Some(lane.clone()),
-            None,
+            pinned_model.map(str::to_string),
             &routing_msgs,
             constraints.clone(),
         )
