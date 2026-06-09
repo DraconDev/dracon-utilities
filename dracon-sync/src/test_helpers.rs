@@ -34,7 +34,7 @@
 /// let output = test_git_cmd().current_dir(&repo).args(["status"]).output()?;
 /// ```
 #[allow(dead_code)]
-pub(crate) fn test_git_cmd() -> crate::git::GitCommand {
+pub(crate) fn test_git_cmd() -> crate::policy::GitCommand {
     crate::git::git_cmd()
 }
 
@@ -47,7 +47,7 @@ pub(crate) fn test_git_cmd() -> crate::git::GitCommand {
 /// test_commit_cmd().current_dir(&repo).args(["-m", "init"]).output()?;
 /// ```
 #[allow(dead_code)]
-pub(crate) fn test_commit_cmd() -> crate::git::GitCommand {
+pub(crate) fn test_commit_cmd() -> crate::policy::GitCommand {
     let mut cmd = test_git_cmd();
     cmd.args(["commit", "--no-verify"]);
     cmd

@@ -3,15 +3,16 @@ use serde::{Deserialize, Deserializer};
 use std::ops::{Deref, DerefMut};
 use std::path::{Path, PathBuf};
 use std::process::Command as StdCommand;
+use std::sync::{Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use tokio::process::Command as TokioCommand;
 
-pub(crate) static GIT_COMMAND_LOCK: parking_lot::Mutex<()> = parking_lot::Mutex::new(());
-pub(crate) static GIT_ENV_LOCK: parking_lot::RwLock<()> = parking_lot::RwLock::new(());
+pub(crate) static GIT_COMMAND_LOCK: Mutex<()> = Mutex::new(());
+pub(crate) static GIT_ENV_LOCK: RwLock<()> = RwLock::new(());
 
 pub(crate) struct GitCommand {
     inner: StdCommand,
-    _env_guard: parking_lot::RwLockReadGuard<'static, ()>,
-    _command_guard: parking_lot::MutexGuard<'static, ()>,
+    _env_guard: RwLockReadGuard<'static, ()>,
+    _command_guard: MutexGuard<'static, ()>,
 }
 
 impl GitCommand {
@@ -42,8 +43,8 @@ impl DerefMut for GitCommand {
 
 pub(crate) struct TokioGitCommand {
     inner: TokioCommand,
-    _env_guard: parking_lot::RwLockReadGuard<'static, ()>,
-    _command_guard: parking_lot::MutexGuard<'static, ()>,
+    _env_guard: RwLockReadGuard<'static, ()>,
+    _command_guard: MutexGuard<'static, ()>,
 }
 
 impl TokioGitCommand {
