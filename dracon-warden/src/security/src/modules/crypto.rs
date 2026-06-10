@@ -8,8 +8,10 @@ use age::x25519;
 use anyhow::{Context, Result};
 use cfb_mode::cipher::{AsyncStreamCipher, KeyIvInit};
 use sha2::{Digest, Sha256};
+use std::collections::HashSet;
 use std::fs;
 use std::io::{Read, Write};
+use std::path::Path;
 
 use crate::is_v1_fallback_allowed;
 use crate::WardenSecurity;
@@ -67,20 +69,69 @@ impl WardenSecurity {
         }
     }
 
+    fn load_public_recipients_from_dir(
+        &self,
+        keys_dir: &Path,
+        seen_keys: &mut HashSet<String>,
+        recipients: &mut Vec<x25519::Recipient>,
+    ) {
+        if !keys_dir.exists() {
+            return;
+        }
+
+        let Ok(entries) = fs::read_dir(keys_dir) else {
+            return;
+        };
+
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let ext = path.extension().and_then(|s| s.to_str()).unwrap_or("");
+            if ext != "pub" && ext != "key" {
+                continue;
+            }
+
+            let Ok(pub_str) = fs::read_to_string(&path) else {
+                continue;
+            };
+
+            for line in pub_str.lines() {
+                let line = line.trim();
+                if line.is_empty() || line.starts_with('#') {
+                    continue;
+                }
+                if !seen_keys.insert(line.to_string()) {
+                    continue;
+                }
+                if let Ok(recipient) = line.parse::<x25519::Recipient>() {
+                    recipients.push(recipient);
+                }
+            }
+        }
+    }
+
     pub fn gather_all_recipients(&self) -> Result<Vec<x25519::Recipient>> {
-        let master = self
-            .master_identities
-            .first()
-            .context("Master identity required to gathering recipients")?;
-        let mut seen_keys = std::collections::HashSet::new();
+        let mut seen_keys = HashSet::new();
         let mut recipients = Vec::new();
 
-        // 1. Self (Master)
-        let master_pub = master.to_public();
-        seen_keys.insert(master_pub.to_string());
-        recipients.push(master_pub);
+        // 1. Local master identity, when the private key is available on this machine.
+        if let Some(master) = self.master_identities.first() {
+            let master_pub = master.to_public();
+            seen_keys.insert(master_pub.to_string());
+            recipients.push(master_pub);
+        }
 
-        // 2. Imported Heritage Identities
+        // 2. Canonical mesh recipients from ~/.dracon/data/keys/*.pub. This keeps
+        // encryption aligned with the documented mesh even when the owner/master
+        // private key is stored off-box and only the public recipient is present.
+        if let Some(home) = dirs::home_dir() {
+            self.load_public_recipients_from_dir(
+                &home.join(".dracon").join("data").join("keys"),
+                &mut seen_keys,
+                &mut recipients,
+            );
+        }
+
+        // 3. Imported Heritage Identities
         for id in &self.imported_identities {
             let pub_key = id.to_public();
             let pub_str = pub_key.to_string();
@@ -89,7 +140,7 @@ impl WardenSecurity {
             }
         }
 
-        // 3. Authorized Machine & Team Keys from the current repo
+        // 4. Authorized Machine & Team Keys from the current repo
         if let Ok(repo_root) = self.get_repo_root() {
             // Check BOTH new committed path (V2 Standard) and legacy path
             let search_paths = vec![
@@ -98,33 +149,18 @@ impl WardenSecurity {
             ];
 
             for keys_dir in search_paths {
-                if keys_dir.exists() {
-                    if let Ok(entries) = fs::read_dir(keys_dir) {
-                        for entry in entries.flatten() {
-                            let path = entry.path();
-                            // Accept .pub files (standard) and .key files (legacy pubkeys sometimes named .key)
-                            let ext = path.extension().and_then(|s| s.to_str()).unwrap_or("");
-                            if ext == "pub" || ext == "key" {
-                                if let Ok(pub_str) = fs::read_to_string(&path) {
-                                    // Parse potential multiple keys per file or single key
-                                    for line in pub_str.lines() {
-                                        let line = line.trim();
-                                        if !line.is_empty()
-                                            && !line.starts_with('#')
-                                            && seen_keys.insert(line.to_string())
-                                        {
-                                            if let Ok(recipient) = line.parse::<x25519::Recipient>()
-                                            {
-                                                recipients.push(recipient);
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+                self.load_public_recipients_from_dir(
+                    &keys_dir,
+                    &mut seen_keys,
+                    &mut recipients,
+                );
             }
+        }
+
+        if recipients.is_empty() {
+            return Err(anyhow::anyhow!(
+                "No master identity or public recipients found for encryption"
+            ));
         }
 
         Ok(recipients)

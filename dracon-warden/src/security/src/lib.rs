@@ -295,10 +295,9 @@ impl WardenSecurity {
 
         // Path Priority List.
         //
-        // There is no dedicated `master.age` file in the current layout.
-        // `keys/identity.age` is a legacy local identity: it is loaded here
-        // for local decrypt/encrypt compatibility, but it is not the owner
-        // master key and it is not a warden mesh recipient.
+        // `keys/master.age` is the dedicated owner/master private key when the
+        // operator has it locally. It is loaded through the general keys scan
+        // below and is not the only possible master identity.
         let candidate_paths = vec![
             // 1. Sovereign Master (not present in the current layout)
             home.join(".dracon").join("master.age"),

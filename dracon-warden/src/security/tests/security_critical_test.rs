@@ -359,6 +359,55 @@ fn test_encrypt_with_repo_key_random_nonce_per_call() {
     assert_ne!(ct1, ct2, "random nonce should produce different ciphertext");
 }
 
+#[test]
+fn test_gather_all_recipients_includes_global_mesh_pub_without_master_identity() {
+    let _guard = HomeGuard::new();
+    let home = std::env::var("HOME").expect("HOME");
+    let mesh_dir = std::path::Path::new(&home).join(".dracon/data/keys");
+    fs::create_dir_all(&mesh_dir).expect("create mesh dir");
+
+    let mesh_recipient = age::x25519::Identity::generate().to_public();
+    fs::write(mesh_dir.join("master.pub"), mesh_recipient.to_string())
+        .expect("write mesh pub");
+
+    let security = dracon_security::WardenSecurity::new(None).expect("init security");
+    let recipients = security.gather_all_recipients().expect("gather recipients");
+
+    assert!(
+        recipients
+            .iter()
+            .any(|recipient| recipient.to_string() == mesh_recipient.to_string()),
+        "global mesh public recipient should be included even without a local master private key"
+    );
+}
+
+#[test]
+fn test_encrypt_v2_for_all_uses_global_mesh_pub_without_master_identity() {
+    let _guard = HomeGuard::new();
+    let home = std::env::var("HOME").expect("HOME");
+    let mesh_dir = std::path::Path::new(&home).join(".dracon/data/keys");
+    fs::create_dir_all(&mesh_dir).expect("create mesh dir");
+
+    let mesh_identity = age::x25519::Identity::generate();
+    let mesh_recipient = mesh_identity.to_public();
+    fs::write(mesh_dir.join("master.pub"), mesh_recipient.to_string())
+        .expect("write mesh pub");
+
+    let security = dracon_security::WardenSecurity::new(None).expect("init security");
+    let encrypted = security
+        .encrypt_v2_for_all(b"mesh recipient check")
+        .expect("encrypt with global mesh recipient");
+
+    let decryptor = age::Decryptor::new(std::io::Cursor::new(&encrypted)).expect("decryptor");
+    let mut reader = decryptor
+        .decrypt(std::iter::once(&mesh_identity as &dyn age::Identity))
+        .expect("decrypt with mesh identity");
+    let mut decrypted = Vec::new();
+    reader.read_to_end(&mut decrypted).expect("read plaintext");
+
+    assert_eq!(decrypted, b"mesh recipient check");
+}
+
 // =============================================================================
 // unlock_payload tests
 // =============================================================================
