@@ -3,7 +3,7 @@ mod common;
 use common::{EnvRestorer, HomeGuard};
 use secrecy::ExposeSecret;
 use std::fs;
-use std::io::Write;
+use std::io::{Read, Write};
 
 fn init_security() -> (dracon_security::WardenSecurity, HomeGuard) {
     let _guard = HomeGuard::new();
