@@ -293,13 +293,18 @@ impl DemonSecurity {
         let home = dirs::home_dir().context("cannot determine home directory")?;
         let mut identities = Vec::new();
 
-        // Path Priority List
+        // Path Priority List.
+        //
+        // There is no dedicated `master.age` file in the current layout.
+        // `keys/identity.age` is a legacy local identity: it is loaded here
+        // for local decrypt/encrypt compatibility, but it is not the owner
+        // master key and it is not a warden mesh recipient.
         let candidate_paths = vec![
-            // 1. Sovereign Master (The active key)
+            // 1. Sovereign Master (not present in the current layout)
             home.join(".dracon").join("master.age"),
-            // 2. Standard Identity
+            // 2. Standard Identity (not present in the current layout)
             home.join(".dracon").join("identity.age"),
-            // 3. Fallback/Backups
+            // 3. Legacy local identity used by this box
             home.join(".dracon").join("keys").join("identity.age"),
         ];
 

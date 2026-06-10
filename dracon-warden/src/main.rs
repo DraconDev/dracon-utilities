@@ -820,6 +820,11 @@ fn resolve_local_pubkey_path() -> Option<PathBuf> {
         .collect::<Vec<_>>();
 
     // Prefer newest valid owner pubkey; break ties by path for determinism.
+    // This is only the file warden publishes to repo `.dracon/data/keys/`;
+    // it is not the owner private key. The current layout has legacy names
+    // such as `owner_nixos.pub`, which is actually the public half of the
+    // machine_nixos identity, so docs must describe the ambiguity instead of
+    // treating this file as a dedicated main key.
     // Keys in ~/.dracon/data/keys/ sort before legacy dirs due to path order,
     // so when mtimes are equal the canonical location wins.
     let mut owners = owner_candidates;
