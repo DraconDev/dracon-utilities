@@ -432,6 +432,7 @@ fn guard_safe_delete_rejects_exact_system_roots() {
 #[test]
 fn check_safe_to_delete_rejects_log_symlink_before_truncate() {
     let tmp = guard_test_tmp("log_symlink");
+    std::fs::create_dir_all(&tmp).unwrap();
     let real = tmp.join("real.log");
     let link = tmp.join("link.log");
     std::fs::write(&real, "line1\nline2\nline3\n").unwrap();
