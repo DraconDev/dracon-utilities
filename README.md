@@ -2,6 +2,10 @@
 
 CLI binaries for dracon system services. These install to `~/.local/bin/` and run as systemd user services.
 
+## Public Readiness
+
+Current public-readiness assessment: [docs/public-readiness.md](docs/public-readiness.md).
+
 ## Quick Start
 
 ```bash
