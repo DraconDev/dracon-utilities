@@ -187,14 +187,6 @@ impl WardenSecurity {
         let filename = format!("owner_{}.pub", safe_id);
 
         let keys_dir = repo_root.join(".dracon").join("data").join("keys");
-        if keys_dir.join("master.pub").exists() || keys_dir.join("master.age").exists() {
-            anyhow::bail!(
-                "refusing to publish a repo owner key while a dedicated master key exists in {}; \
-                 use the explicit master-key rotation procedure instead",
-                keys_dir.display()
-            );
-        }
-
         fs::create_dir_all(&keys_dir)?;
 
         let key_path = keys_dir.join(&filename);
