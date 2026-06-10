@@ -398,10 +398,13 @@ fn test_encrypt_v2_for_all_uses_global_mesh_pub_without_master_identity() {
         .encrypt_v2_for_all(b"mesh recipient check")
         .expect("encrypt with global mesh recipient");
 
-    let decryptor = age::Decryptor::new(std::io::Cursor::new(&encrypted)).expect("decryptor");
-    let mut reader = decryptor
-        .decrypt(std::iter::once(&mesh_identity as &dyn age::Identity))
-        .expect("decrypt with mesh identity");
+    let decryptor = age::Decryptor::new(std::io::Cursor::new(encrypted)).expect("decryptor");
+    let mut reader = match decryptor {
+        age::Decryptor::Recipients(d) => d
+            .decrypt(std::iter::once(&mesh_identity as &dyn age::Identity))
+            .expect("decrypt with mesh identity"),
+        age::Decryptor::Passphrase(_) => panic!("unexpected passphrase encryption"),
+    };
     let mut decrypted = Vec::new();
     reader.read_to_end(&mut decrypted).expect("read plaintext");
 
