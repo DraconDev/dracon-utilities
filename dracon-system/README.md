@@ -274,24 +274,22 @@ When disk hits action level (90%):
 
 1. Scan configured directories for Rust `target/` dirs
 2. Detect active `cargo`/`rustc` processes
-3. Protect target dirs:
-   - In active build working directories
-   - Modified within `protect_recent_minutes`
+3. Protect target dirs in active build working directories
 4. Delete unprotected target dirs ≥ `cleanup_min_size_mb`
-5. Send notification with cleanup summary
+5. Also clean safe trash, package caches, Nix garbage, stale `node_modules/`, and Docker resources when those policy toggles are enabled
+6. Send notification with cleanup summary
 
 ### Proactive Cleanup
 
 When disk usage is above `proactive_cleanup_percent` (default 50%) but below `disk_action_percent`:
 
-1. Only target dirs older than `rust_target_max_age_days` (default 14) are removed
-2. Recently-used build artifacts are preserved
-3. Active builds (running cargo/rustc) are always protected
-4. Runs every `proactive_cleanup_interval_cycles` guard cycles
+1. Only target dirs older than `rust_target_max_age_days` (default 14) and ≥ `cleanup_min_size_mb` are removed
+2. Active builds (running cargo/rustc) are always protected
+3. Runs every `proactive_cleanup_interval_cycles` guard cycles
 
 ### Process Monitoring
 
-The guard monitors processes using >`process_cpu_percent`% CPU for >`process_sustain_secs` seconds:
+The guard monitors processes using ≥`process_cpu_percent`% CPU or ≥`process_rss_mb` MiB RSS for >`process_sustain_secs` seconds:
 
 1. All heavy processes are logged to persistent JSONL file
 2. When `auto_renice = true`, heavy processes are reniced with graduated values
@@ -302,6 +300,11 @@ The guard monitors processes using >`process_cpu_percent`% CPU for >`process_sus
 ### Trend Prediction
 
 The guard tracks disk usage over time and uses linear regression to predict when the disk will fill. If the predicted time is within `trend_warn_hours`, it sends an early warning.
+
+### Safety Boundaries
+
+The guard never kills processes; process mitigation is limited to `renice`.
+Destructive cleanup paths are canonicalized first, symlinks are rejected, and configured protected paths are honored. Log truncation uses the same safety check before modifying files, so system-protected or user-protected log paths are skipped.
 
 ## Binary Size
 

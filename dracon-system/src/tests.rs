@@ -419,6 +419,38 @@ fn guard_safe_delete_rejects_symlink() {
 }
 
 #[test]
+fn guard_safe_delete_rejects_exact_system_roots() {
+    for prot in SYSTEM_PROTECTED {
+        let result = check_safe_to_delete_guard(Path::new(prot), &[]);
+        assert!(
+            result.is_err(),
+            "guard safe delete should reject exact protected system root {prot}"
+        );
+    }
+}
+
+#[test]
+fn check_safe_to_delete_rejects_log_symlink_before_truncate() {
+    let tmp = guard_test_tmp("log_symlink");
+    let real = tmp.join("real.log");
+    let link = tmp.join("link.log");
+    std::fs::write(&real, "line1\nline2\nline3\n").unwrap();
+    std::os::unix::fs::symlink(&real, &link).unwrap();
+
+    let result = check_safe_to_delete(&link, &[]);
+    assert!(
+        result.is_err(),
+        "symlink log should be rejected before truncate"
+    );
+    assert_eq!(
+        std::fs::read_to_string(&real).unwrap(),
+        "line1\nline2\nline3\n"
+    );
+
+    let _ = std::fs::remove_dir_all(&tmp);
+}
+
+#[test]
 fn proactive_cleanup_defaults() {
     assert_eq!(default_proactive_cleanup_percent(), 50);
     assert_eq!(default_rust_target_max_age_days(), 14);
