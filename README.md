@@ -5,6 +5,7 @@ CLI binaries for dracon system services. These install to `~/.local/bin/` and ru
 ## Public Readiness
 
 Current public-readiness assessment: [docs/public-readiness.md](docs/public-readiness.md).
+Explicit public-release steps: [docs/public-release-plan.md](docs/public-release-plan.md).
 
 ## Quick Start
 

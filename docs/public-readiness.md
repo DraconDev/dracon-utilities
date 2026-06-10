@@ -6,6 +6,8 @@ Generated: 2026-06-10
 
 `dracon-utilities` is **not safe to publish as-is**. It is a plausible public candidate after a dedicated public-release cleanup branch, but the current tree and reachable history still contain local agent/task state, audit artifacts, operational logs, and secret-shaped fixture strings that should not be exposed without review.
 
+Explicit public-release steps: [docs/public-release-plan.md](docs/public-release-plan.md).
+
 ## Current-tree evidence
 
 Evidence collected in:
