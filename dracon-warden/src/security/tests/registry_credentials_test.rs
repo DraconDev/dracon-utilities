@@ -1,12 +1,12 @@
 mod common;
 
-use dracon_security::DemonSecurity;
+use dracon_security::WardenSecurity;
 
 use common::HomeGuard;
 
-fn init_with_temp_home() -> (DemonSecurity, HomeGuard) {
+fn init_with_temp_home() -> (WardenSecurity, HomeGuard) {
     let _guard = HomeGuard::new();
-    let mut security = DemonSecurity::new(None).expect("init security");
+    let mut security = WardenSecurity::new(None).expect("init security");
     let identity = age::x25519::Identity::generate();
     security.add_memory_identity(identity);
     (security, _guard)

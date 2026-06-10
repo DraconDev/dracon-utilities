@@ -1,12 +1,12 @@
-use dracon_security::DemonSecurity;
+use dracon_security::WardenSecurity;
 use proptest::prelude::*;
 use std::sync::OnceLock;
 
-static TEST_SECURITY: OnceLock<DemonSecurity> = OnceLock::new();
+static TEST_SECURITY: OnceLock<WardenSecurity> = OnceLock::new();
 
-fn get_test_security() -> &'static DemonSecurity {
+fn get_test_security() -> &'static WardenSecurity {
     TEST_SECURITY.get_or_init(|| {
-        let mut security = DemonSecurity::new(None).expect("Failed to init security");
+        let mut security = WardenSecurity::new(None).expect("Failed to init security");
         if !security.has_master_identity() {
             let key = age::x25519::Identity::generate();
             security.add_memory_identity(key);

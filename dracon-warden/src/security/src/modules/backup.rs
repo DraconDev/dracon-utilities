@@ -5,9 +5,9 @@ use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::DemonSecurity;
+use crate::WardenSecurity;
 
-impl DemonSecurity {
+impl WardenSecurity {
     pub fn backup_file(&self, file_path: &Path, content: &[u8]) -> Result<PathBuf> {
         let path_str = file_path.to_string_lossy();
         if path_str.contains("dracon/backups") || path_str.contains("arcane/backups") {

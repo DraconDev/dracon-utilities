@@ -1,7 +1,7 @@
 mod common;
 
 use age::x25519::Identity;
-use dracon_security::DemonSecurity;
+use dracon_security::WardenSecurity;
 use std::fs;
 
 use common::HomeGuard;
@@ -12,7 +12,7 @@ fn test_backup_and_restore() {
 
     let home_path = std::env::var("HOME").map(std::path::PathBuf::from).unwrap();
 
-    let mut security = DemonSecurity::new(None).expect("Failed to init DemonSecurity");
+    let mut security = WardenSecurity::new(None).expect("Failed to init WardenSecurity");
 
     let identity = Identity::generate();
     security.add_memory_identity(identity);

@@ -7,9 +7,9 @@ use std::fs;
 use std::io::Write;
 use std::os::unix::fs::OpenOptionsExt;
 
-use crate::DemonSecurity;
+use crate::WardenSecurity;
 
-impl DemonSecurity {
+impl WardenSecurity {
     pub fn generate_master_identity(&mut self) -> Result<()> {
         let home = dirs::home_dir().context("Could not find home directory")?;
         let identity_path = home.join(".dracon").join("identity.age");
@@ -28,7 +28,7 @@ impl DemonSecurity {
                     if file_name.starts_with("identity") {
                         return Err(anyhow::anyhow!(
                             "🛡️ SAFETY TRIGGERED: Found existing identity artifact '{:?}'.\n\n\
-                             CRITICAL: Demon refuses to overwrite, modify, or delete Master Identity files.\n\
+                             CRITICAL: warden refuses to overwrite, modify, or delete Master Identity files.\n\
                              This ensures you can NEVER be locked out of your secrets by an automated process.\n\n\
                              To generate a NEW identity, you must MANUALLY move or delete all 'identity*' files in {:?}.",
                             file_name,

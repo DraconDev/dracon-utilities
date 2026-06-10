@@ -26,7 +26,7 @@ pub use modules::scanner::SecretScanner;
 
 const DEFAULT_SECRET_MARKER: &str = "DRACON_SECRET";
 
-static DEFAULT_SECURITY_CACHE: OnceCell<DemonSecurity> = OnceCell::new();
+static DEFAULT_SECURITY_CACHE: OnceCell<WardenSecurity> = OnceCell::new();
 
 static ALLOW_V1_FALLBACK: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
@@ -139,7 +139,7 @@ pub struct MarkerMigrationStats {
 }
 
 #[derive(Clone)]
-pub struct DemonSecurity {
+pub struct WardenSecurity {
     master_identities: Vec<x25519::Identity>,
     imported_identities: Vec<x25519::Identity>,
     managed_patterns: Vec<String>,
@@ -149,7 +149,7 @@ pub struct DemonSecurity {
     pub dev_mode: bool,
 }
 
-impl DemonSecurity {
+impl WardenSecurity {
     pub fn master_identities(&self) -> &[x25519::Identity] {
         &self.master_identities
     }
@@ -170,9 +170,9 @@ impl DemonSecurity {
         &self.secret_marker
     }
 
-    pub fn get_or_init() -> Result<&'static DemonSecurity> {
+    pub fn get_or_init() -> Result<&'static WardenSecurity> {
         DEFAULT_SECURITY_CACHE.get_or_try_init(|| {
-            let mut security = DemonSecurity::new(None)?;
+            let mut security = WardenSecurity::new(None)?;
             if let Ok(ids) = security.load_master_identities() {
                 security.master_identities = ids;
             }
@@ -1033,7 +1033,7 @@ impl Warden {
             return Ok(bytes.to_vec());
         }
         let content = String::from_utf8_lossy(bytes);
-        let smudged = DemonSecurity::new(None)?.smart_smudge(&content)?;
+        let smudged = WardenSecurity::new(None)?.smart_smudge(&content)?;
         Ok(smudged.into_bytes())
     }
 }
@@ -1050,13 +1050,13 @@ impl DraconWarden {
             return Ok(bytes.to_vec());
         }
         let content = String::from_utf8_lossy(bytes);
-        let security = DemonSecurity::get_or_init()?;
+        let security = WardenSecurity::get_or_init()?;
         let smudged = security.smart_smudge(&content)?;
         Ok(smudged.into_bytes())
     }
 
     pub fn clean(&self, bytes: &[u8], path: Option<&str>) -> Result<Vec<u8>> {
-        let security = DemonSecurity::get_or_init()?;
+        let security = WardenSecurity::get_or_init()?;
         let cleaned = security.smart_clean_with_path(bytes, path.unwrap_or(""))?;
         Ok(cleaned)
     }
@@ -1068,7 +1068,7 @@ mod tests {
 
     #[test]
     fn test_smudge_robustness() {
-        let security = DemonSecurity::new(None).unwrap();
+        let security = WardenSecurity::new(None).unwrap();
         assert_eq!(
             security.smart_smudge("[DRACON_SECRET:]").unwrap(),
             "[DRACON_SECRET:]"
@@ -1113,7 +1113,7 @@ mod tests {
         });
         eprintln!("Scanned result: {}", scanned);
 
-        let security = DemonSecurity::new(None).unwrap();
+        let security = WardenSecurity::new(None).unwrap();
         let result = security
             .smart_clean_with_path(content.as_bytes(), "master.age")
             .unwrap();
@@ -1127,7 +1127,7 @@ mod tests {
 
     #[test]
     fn test_marker_migration_in_place() {
-        let security = DemonSecurity::new(None).unwrap();
+        let security = WardenSecurity::new(None).unwrap();
         let dir = tempfile::tempdir().unwrap();
         let file = dir.path().join("sample.env");
         std::fs::write(&file, "A=[OLD_SECRET:abc]\nB=[OLD_SECRET:def]\nC=plain\n").unwrap();
@@ -1198,7 +1198,7 @@ API_KEY=secret"#;
 
     #[test]
     fn test_env_versioning_increment_flow() {
-        let security = DemonSecurity::new(None).unwrap();
+        let security = WardenSecurity::new(None).unwrap();
 
         let v1_content = r#"# =============================================================================
 # Dracon Warden Encrypted Environment File
@@ -1225,16 +1225,16 @@ API_KEY=original"#;
 
     #[test]
     fn test_demon_security_once_cell_caching() {
-        let s1 = DemonSecurity::get_or_init().unwrap();
-        let s2 = DemonSecurity::get_or_init().unwrap();
+        let s1 = WardenSecurity::get_or_init().unwrap();
+        let s2 = WardenSecurity::get_or_init().unwrap();
         assert_eq!(
             s1 as *const _ as usize, s2 as *const _ as usize,
             "get_or_init should return the same cached instance"
         );
     }
 
-    fn test_security_with_identity() -> DemonSecurity {
-        let mut security = DemonSecurity::new(None).unwrap();
+    fn test_security_with_identity() -> WardenSecurity {
+        let mut security = WardenSecurity::new(None).unwrap();
         let key = x25519::Identity::generate();
         security.master_identities.push(key);
         security
@@ -1297,13 +1297,13 @@ API_KEY=original"#;
     #[test]
     fn test_decrypt_v2_fails_with_wrong_identity() {
         let tempdir = tempfile::tempdir().unwrap();
-        let mut security1 = DemonSecurity::new(None).unwrap();
+        let mut security1 = WardenSecurity::new(None).unwrap();
         security1.set_mock_home(tempdir.path().to_path_buf());
         security1.master_identities.clear();
         let key1 = x25519::Identity::generate();
         security1.master_identities.push(key1);
 
-        let mut security2 = DemonSecurity::new(None).unwrap();
+        let mut security2 = WardenSecurity::new(None).unwrap();
         security2.set_mock_home(tempdir.path().to_path_buf());
         security2.master_identities.clear();
         let key2 = x25519::Identity::generate();
@@ -1321,7 +1321,7 @@ API_KEY=original"#;
 
     #[test]
     fn test_decrypt_v2_requires_master_identity() {
-        let security = DemonSecurity::new(None).unwrap();
+        let security = WardenSecurity::new(None).unwrap();
         let result = security.decrypt_v2(b"some encrypted data");
         assert!(
             result.is_err(),

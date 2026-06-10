@@ -1,11 +1,11 @@
 use anyhow::Result;
-use dracon_security::DemonSecurity;
+use dracon_security::WardenSecurity;
 use std::fs;
 
 #[test]
 fn test_restore_workflow() -> Result<()> {
     // 1. Setup Security
-    let mut demon = DemonSecurity::new(None)?;
+    let mut demon = WardenSecurity::new(None)?;
     let key = age::x25519::Identity::generate();
     demon.add_memory_identity(key);
 

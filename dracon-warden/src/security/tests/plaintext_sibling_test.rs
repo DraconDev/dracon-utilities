@@ -5,7 +5,7 @@
 //! never sees it. See `docs/design/warden-plaintext-sibling.md`.
 
 use dracon_security::modules::filter::is_hatched;
-use dracon_security::DemonSecurity;
+use dracon_security::WardenSecurity;
 use std::fs;
 use tempfile::TempDir;
 
@@ -44,7 +44,7 @@ fn clean_skips_encryption_when_plaintext_sibling_exists() {
     fs::write(&path, secret).unwrap();
     fs::write(&sibling, "").unwrap();
 
-    let security = DemonSecurity::new(None).unwrap();
+    let security = WardenSecurity::new(None).unwrap();
     let cleaned = security
         .smart_clean_with_path(secret.as_bytes(), path.to_str().unwrap())
         .expect("clean should succeed");
@@ -64,7 +64,7 @@ fn clean_encrypts_normally_without_plaintext_sibling() {
     fs::write(&path, secret).unwrap();
     // No `.plaintext` sibling
 
-    let security = DemonSecurity::new(None).unwrap();
+    let security = WardenSecurity::new(None).unwrap();
     let cleaned = security
         .smart_clean_with_path(secret.as_bytes(), path.to_str().unwrap())
         .expect("clean should succeed");
@@ -90,7 +90,7 @@ fn clean_with_plaintext_sibling_does_not_add_env_version_header() {
     fs::write(&path, secret).unwrap();
     fs::write(&sibling, "").unwrap();
 
-    let security = DemonSecurity::new(None).unwrap();
+    let security = WardenSecurity::new(None).unwrap();
     let cleaned = security
         .smart_clean_with_path(secret.as_bytes(), path.to_str().unwrap())
         .expect("clean should succeed");
@@ -116,7 +116,7 @@ fn clean_with_plaintext_sibling_preserves_binary_content() {
     fs::write(&path, &bytes).unwrap();
     fs::write(&sibling, "").unwrap();
 
-    let security = DemonSecurity::new(None).unwrap();
+    let security = WardenSecurity::new(None).unwrap();
     let cleaned = security
         .smart_clean_with_path(&bytes, path.to_str().unwrap())
         .expect("clean should succeed");
@@ -129,7 +129,7 @@ fn clean_with_empty_sibling_path_is_a_noop() {
     // Defensive: empty path_str must NOT match `<empty>.plaintext` at CWD
     // and accidentally skip encryption. The hatch is opt-in: empty path = no
     // hatch decision.
-    let security = DemonSecurity::new(None).unwrap();
+    let security = WardenSecurity::new(None).unwrap();
     let secret = "AGE-SECRET-KEY-1QPZRY9X8GF2TVDW0S3JN54KHCE6MUA7LQPZRY9X8GF2TVDW0S3JN54KHCE6MUA7L";
     let cleaned = security
         .smart_clean_with_path(secret.as_bytes(), "")

@@ -8,7 +8,7 @@ use std::path::Path;
 use crate::make_env_version_header;
 use crate::normalize_secret_marker;
 use crate::strip_env_version_header;
-use crate::DemonSecurity;
+use crate::WardenSecurity;
 use crate::MarkerMigrationStats;
 use crate::SecretScanner;
 
@@ -29,7 +29,7 @@ pub fn is_hatched(path: &str) -> bool {
     std::path::Path::new(&sibling).exists()
 }
 
-impl DemonSecurity {
+impl WardenSecurity {
     pub fn smart_clean(&self, content: &str) -> Result<String> {
         let scanner = SecretScanner::new()?;
         self.smart_clean_with_scanner(content, &scanner)

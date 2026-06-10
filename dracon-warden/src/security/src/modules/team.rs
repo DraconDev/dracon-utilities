@@ -7,10 +7,10 @@ use std::fs;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
-use crate::DemonSecurity;
+use crate::WardenSecurity;
 use crate::TeamKey;
 
-impl DemonSecurity {
+impl WardenSecurity {
     pub fn load_team_key(&self, team_name: &str) -> Result<TeamKey> {
         let home = dirs::home_dir().context("Could not find home directory")?;
         let team_key_path = home

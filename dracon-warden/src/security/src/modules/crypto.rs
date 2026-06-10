@@ -12,12 +12,12 @@ use std::fs;
 use std::io::{Read, Write};
 
 use crate::is_v1_fallback_allowed;
-use crate::DemonSecurity;
+use crate::WardenSecurity;
 use crate::RepoKey;
 
 const HEADER_V2_MAGIC: &[u8] = b"age-encryption.org/v1";
 
-impl DemonSecurity {
+impl WardenSecurity {
     pub fn encrypt_v2(
         &self,
         data: &[u8],

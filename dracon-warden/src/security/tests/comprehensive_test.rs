@@ -1,7 +1,7 @@
 mod common;
 
 use anyhow::Result;
-use dracon_security::DemonSecurity;
+use dracon_security::WardenSecurity;
 use proptest::prelude::*;
 use std::fs;
 use std::sync::OnceLock;
@@ -9,12 +9,12 @@ use std::sync::OnceLock;
 use common::HomeGuard;
 
 #[allow(dead_code)]
-static TEST_SECURITY: OnceLock<DemonSecurity> = OnceLock::new();
+static TEST_SECURITY: OnceLock<WardenSecurity> = OnceLock::new();
 
 #[allow(dead_code)]
-fn get_test_security() -> &'static DemonSecurity {
+fn get_test_security() -> &'static WardenSecurity {
     TEST_SECURITY.get_or_init(|| {
-        let mut security = DemonSecurity::new(None).expect("Failed to init security");
+        let mut security = WardenSecurity::new(None).expect("Failed to init security");
         if !security.has_master_identity() {
             let key = age::x25519::Identity::generate();
             security.add_memory_identity(key);
@@ -188,7 +188,7 @@ const CORPUS: &[SecretExample] = &[
 
 #[test]
 fn test_corpus_roundtrip() {
-    let mut security = DemonSecurity::new(None).expect("Security init failed");
+    let mut security = WardenSecurity::new(None).expect("Security init failed");
     if !security.has_master_identity() {
         let key = age::x25519::Identity::generate();
         security.add_memory_identity(key);
@@ -243,7 +243,7 @@ proptest! {
 fn test_backup_functionality() -> Result<()> {
     let _guard = HomeGuard::new();
 
-    let mut demon = DemonSecurity::new(None)?;
+    let mut demon = WardenSecurity::new(None)?;
     let key = age::x25519::Identity::generate();
     demon.add_memory_identity(key);
 
@@ -266,7 +266,7 @@ fn test_auto_key_generation() -> Result<()> {
     fs::create_dir(&git_dir)?;
 
     // Pass repo path directly instead of mutating global CWD
-    let mut demon = DemonSecurity::new(Some(temp_repo.path()))?;
+    let mut demon = WardenSecurity::new(Some(temp_repo.path()))?;
     // Inject a memory identity so we have a current user key to save
     let key = age::x25519::Identity::generate();
     demon.add_memory_identity(key);
@@ -286,7 +286,7 @@ fn test_auto_key_generation() -> Result<()> {
 
 #[test]
 fn test_encrypt_decrypt_multiple_recipients() -> Result<()> {
-    let mut demon = DemonSecurity::new(None)?;
+    let mut demon = WardenSecurity::new(None)?;
     let key = age::x25519::Identity::generate();
     demon.add_memory_identity(key.clone());
 
@@ -312,8 +312,8 @@ fn test_encrypt_decrypt_multiple_recipients() -> Result<()> {
 
 #[test]
 fn test_dracon_security_singleton_same_instance() -> Result<()> {
-    let s1 = DemonSecurity::get_or_init()?;
-    let s2 = DemonSecurity::get_or_init()?;
+    let s1 = WardenSecurity::get_or_init()?;
+    let s2 = WardenSecurity::get_or_init()?;
     assert_eq!(
         s1 as *const _ as usize, s2 as *const _ as usize,
         "get_or_init should return the same instance"

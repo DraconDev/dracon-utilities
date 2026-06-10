@@ -5,9 +5,9 @@ use secrecy::ExposeSecret;
 use std::fs;
 use std::io::Write;
 
-fn init_security() -> (dracon_security::DemonSecurity, HomeGuard) {
+fn init_security() -> (dracon_security::WardenSecurity, HomeGuard) {
     let _guard = HomeGuard::new();
-    let mut security = dracon_security::DemonSecurity::new(None).expect("init security");
+    let mut security = dracon_security::WardenSecurity::new(None).expect("init security");
     let identity = age::x25519::Identity::generate();
     security.add_memory_identity(identity);
     (security, _guard)
@@ -15,9 +15,9 @@ fn init_security() -> (dracon_security::DemonSecurity, HomeGuard) {
 
 fn init_security_with_repo(
     repo_root: &std::path::Path,
-) -> (dracon_security::DemonSecurity, HomeGuard) {
+) -> (dracon_security::WardenSecurity, HomeGuard) {
     let _guard = HomeGuard::new();
-    let mut security = dracon_security::DemonSecurity::new(Some(repo_root)).expect("init security");
+    let mut security = dracon_security::WardenSecurity::new(Some(repo_root)).expect("init security");
     let identity = age::x25519::Identity::generate();
     security.add_memory_identity(identity);
     (security, _guard)
@@ -285,7 +285,7 @@ fn test_load_repo_key_with_master_identity_in_keys_dir() {
 
 fn make_repo_with_master(
     repo_root: &std::path::Path,
-) -> (dracon_security::DemonSecurity, [u8; 32], HomeGuard) {
+) -> (dracon_security::WardenSecurity, [u8; 32], HomeGuard) {
     let keys_dir = make_keys_dir(repo_root);
     fs::create_dir_all(&keys_dir).expect("create keys dir");
 
@@ -391,7 +391,7 @@ fn test_unlock_payload_empty() {
     let master_identity = age::x25519::Identity::generate();
     let _repo_key_bytes = setup_repo_with_age_key(repo_root, &master_identity);
 
-    let mut security = dracon_security::DemonSecurity::new(Some(repo_root)).expect("init security");
+    let mut security = dracon_security::WardenSecurity::new(Some(repo_root)).expect("init security");
     security.add_memory_identity(master_identity);
 
     let result = security.unlock_payload(b"");
@@ -509,7 +509,7 @@ fn test_unlock_payload_v1_format() {
     let master_identity = age::x25519::Identity::generate();
     let _repo_key_bytes = setup_repo_with_age_key(repo_root, &master_identity);
 
-    let mut security = dracon_security::DemonSecurity::new(Some(repo_root)).expect("init security");
+    let mut security = dracon_security::WardenSecurity::new(Some(repo_root)).expect("init security");
     security.add_memory_identity(master_identity);
 
     let loaded_key = security.load_repo_key().expect("load repo key");
