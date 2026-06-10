@@ -5,9 +5,9 @@ use std::fs;
 #[test]
 fn test_restore_workflow() -> Result<()> {
     // 1. Setup Security
-    let mut demon = WardenSecurity::new(None)?;
+    let mut security = WardenSecurity::new(None)?;
     let key = age::x25519::Identity::generate();
-    demon.add_memory_identity(key);
+    security.add_memory_identity(key);
 
     // 2. Create a dummy file in a temp dir
     let temp_dir = tempfile::tempdir()?;
@@ -17,7 +17,7 @@ fn test_restore_workflow() -> Result<()> {
 
     // 3. Backup the file
     // Note: This writes to real ~/.dracon/backups
-    let result = demon.backup_file(&file_path, original_content);
+    let result = security.backup_file(&file_path, original_content);
     assert!(result.is_ok(), "Backup failed: {:?}", result.err());
     let backup_path = result.unwrap();
 
@@ -25,7 +25,7 @@ fn test_restore_workflow() -> Result<()> {
     fs::write(&file_path, b"SECRET=corrupted_data")?;
 
     // 5. Restore it
-    let restored_path = demon.restore_file(&file_path)?;
+    let restored_path = security.restore_file(&file_path)?;
 
     // 6. Verify content matches original
     let restored_content = fs::read(&file_path)?;

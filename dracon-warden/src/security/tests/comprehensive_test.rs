@@ -243,9 +243,9 @@ proptest! {
 fn test_backup_functionality() -> Result<()> {
     let _guard = HomeGuard::new();
 
-    let mut demon = WardenSecurity::new(None)?;
+    let mut security = WardenSecurity::new(None)?;
     let key = age::x25519::Identity::generate();
-    demon.add_memory_identity(key);
+    security.add_memory_identity(key);
 
     let temp_home = std::env::var("HOME").map(std::path::PathBuf::from).unwrap();
     let file_path = temp_home.join("secret.env");
@@ -253,7 +253,7 @@ fn test_backup_functionality() -> Result<()> {
 
     fs::write(&file_path, content)?;
 
-    let res = demon.backup_file(&file_path, content);
+    let res = security.backup_file(&file_path, content);
     assert!(res.is_ok());
 
     Ok(())
@@ -266,12 +266,12 @@ fn test_auto_key_generation() -> Result<()> {
     fs::create_dir(&git_dir)?;
 
     // Pass repo path directly instead of mutating global CWD
-    let mut demon = WardenSecurity::new(Some(temp_repo.path()))?;
+    let mut security = WardenSecurity::new(Some(temp_repo.path()))?;
     // Inject a memory identity so we have a current user key to save
     let key = age::x25519::Identity::generate();
-    demon.add_memory_identity(key);
+    security.add_memory_identity(key);
 
-    demon.ensure_current_user_key()?;
+    security.ensure_current_user_key()?;
 
     let keys_dir = temp_repo.path().join(".dracon").join("data").join("keys");
     assert!(keys_dir.exists());
@@ -286,21 +286,21 @@ fn test_auto_key_generation() -> Result<()> {
 
 #[test]
 fn test_encrypt_decrypt_multiple_recipients() -> Result<()> {
-    let mut demon = WardenSecurity::new(None)?;
+    let mut security = WardenSecurity::new(None)?;
     let key = age::x25519::Identity::generate();
-    demon.add_memory_identity(key.clone());
+    security.add_memory_identity(key.clone());
 
     let plaintext = b"multi-recipient secret data";
 
     let recipient1 = key.to_public();
     let recipient2 = age::x25519::Identity::generate().to_public();
 
-    let encrypted = demon.encrypt_v2(
+    let encrypted = security.encrypt_v2(
         plaintext,
         vec![Box::new(recipient1.clone()), Box::new(recipient2.clone())],
     )?;
 
-    let decrypted = demon.decrypt_v2(&encrypted)?;
+    let decrypted = security.decrypt_v2(&encrypted)?;
     assert_eq!(
         &decrypted[..],
         plaintext,
