@@ -621,6 +621,52 @@ fn test_generate_master_identity_refuses_legacy_identity() {
     assert!(result.unwrap_err().to_string().contains("SAFETY TRIGGERED"));
 }
 
+#[test]
+fn test_generate_master_identity_refuses_dedicated_master_private() {
+    let (mut security, _guard) = init_security();
+    security.add_memory_identity(age::x25519::Identity::generate());
+
+    let home = std::env::var("HOME").map(std::path::PathBuf::from).unwrap();
+    let master_dir = home.join(".dracon").join("keys");
+    fs::create_dir_all(&master_dir).expect("create master dir");
+    fs::write(master_dir.join("master.age"), "AGE-SECRET-KEY-1\n").expect("create master private");
+
+    let result = security.generate_master_identity();
+    assert!(
+        result.is_err(),
+        "should refuse legacy master identity while dedicated master exists"
+    );
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("dedicated master key exists")
+    );
+}
+
+#[test]
+fn test_generate_master_identity_refuses_dedicated_master_public() {
+    let (mut security, _guard) = init_security();
+    security.add_memory_identity(age::x25519::Identity::generate());
+
+    let home = std::env::var("HOME").map(std::path::PathBuf::from).unwrap();
+    let mesh_dir = home.join(".dracon").join("data").join("keys");
+    fs::create_dir_all(&mesh_dir).expect("create mesh dir");
+    fs::write(mesh_dir.join("master.pub"), "age1xxxxx\n").expect("create master pub");
+
+    let result = security.generate_master_identity();
+    assert!(
+        result.is_err(),
+        "should refuse legacy master identity while dedicated master exists"
+    );
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("dedicated master key exists")
+    );
+}
+
 // =============================================================================
 // TeamKey tests — use the public API (create_team, load_team_key)
 // =============================================================================

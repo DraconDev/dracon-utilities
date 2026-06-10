@@ -1179,6 +1179,7 @@ where
 
 pub(crate) fn run_keygen() -> Result<()> {
     let home = dirs::home_dir().context("home directory not found")?;
+    refuse_dedicated_master_overwrite(&home)?;
 
     let keys_dir = home.join(".dracon/data/keys");
     let hostname_raw = hostname::get()
@@ -1323,6 +1324,30 @@ pub(crate) fn run_keygen() -> Result<()> {
             Err(e) => {
                 eprintln!("   ⚠️ Failed to publish to repo: {}", e);
             }
+        }
+    }
+
+    Ok(())
+}
+
+fn refuse_dedicated_master_overwrite(home: &Path) -> Result<()> {
+    let dracon_dir = home.join(".dracon");
+    let legacy_master_private = dracon_dir.join("master.age");
+    let canonical_master_private = dracon_dir.join("keys").join("master.age");
+    let canonical_master_public = dracon_dir.join("data").join("keys").join("master.pub");
+
+    for protected in [
+        legacy_master_private.as_path(),
+        canonical_master_private.as_path(),
+        canonical_master_public.as_path(),
+    ] {
+        if protected.exists() {
+            anyhow::bail!(
+                "refusing to run dracon-warden keygen while the dedicated master key exists at {}; \
+                 keygen only creates machine_<hostname>.age / owner_<hostname>.pub and must never \
+                 overwrite the master recipient; use the explicit master-key rotation procedure instead",
+                protected.display()
+            );
         }
     }
 

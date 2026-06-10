@@ -9,12 +9,37 @@ use std::os::unix::fs::OpenOptionsExt;
 
 use crate::WardenSecurity;
 
+fn refuse_dedicated_master_overwrite(home: &std::path::Path) -> anyhow::Result<()> {
+    let dracon_dir = home.join(".dracon");
+    let legacy_master_private = dracon_dir.join("master.age");
+    let canonical_master_private = dracon_dir.join("keys").join("master.age");
+    let canonical_master_public = dracon_dir.join("data").join("keys").join("master.pub");
+
+    for protected in [
+        legacy_master_private.as_path(),
+        canonical_master_private.as_path(),
+        canonical_master_public.as_path(),
+    ] {
+        if protected.exists() {
+            anyhow::bail!(
+                "refusing to generate a legacy master identity while the dedicated master key exists at {}; \
+                 use the explicit master-key rotation procedure instead",
+                protected.display()
+            );
+        }
+    }
+
+    Ok(())
+}
+
 impl WardenSecurity {
     pub fn generate_master_identity(&mut self) -> Result<()> {
         let home = dirs::home_dir().context("Could not find home directory")?;
-        let identity_path = home.join(".dracon").join("identity.age");
+        refuse_dedicated_master_overwrite(&home)?;
+        let dracon_dir = home.join(".dracon");
+        let identity_path = dracon_dir.join("identity.age");
         // Protection: Check legacy path too
-        let legacy_path = home.join(".dracon").join("identity.txt");
+        let legacy_path = dracon_dir.join("identity.txt");
 
         // PROTECTION: Scan for ANY existing identity files (backups, corrupted, legacy)
         // We refuse to init if there is ANY trace of an identity to prevent data loss.
@@ -74,7 +99,7 @@ impl WardenSecurity {
         writeln!(writer, "{}", key.to_string().expose_secret())?;
 
         // Save Public Key for sharing
-        let pub_path = home.join(".dracon").join("identity.pub");
+        let pub_path = dracon_dir.join("identity.pub");
         fs::write(&pub_path, key.to_public().to_string())?;
 
         // Auto-Backup Master Identity
@@ -82,7 +107,7 @@ impl WardenSecurity {
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
             .as_secs();
-        let backup_dir = home.join(".dracon").join("backups");
+        let backup_dir = dracon_dir.join("backups");
         if let Err(e) = fs::create_dir_all(&backup_dir) {
             eprintln!(
                 "⚠️ failed to create backup dir {}: {}",
@@ -162,6 +187,14 @@ impl WardenSecurity {
         let filename = format!("owner_{}.pub", safe_id);
 
         let keys_dir = repo_root.join(".dracon").join("data").join("keys");
+        if keys_dir.join("master.pub").exists() || keys_dir.join("master.age").exists() {
+            anyhow::bail!(
+                "refusing to publish a repo owner key while a dedicated master key exists in {}; \
+                 use the explicit master-key rotation procedure instead",
+                keys_dir.display()
+            );
+        }
+
         fs::create_dir_all(&keys_dir)?;
 
         let key_path = keys_dir.join(&filename);

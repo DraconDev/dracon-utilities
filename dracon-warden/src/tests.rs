@@ -99,7 +99,7 @@ mod tests {
     }
 
     #[test]
-    fn build_gitigno[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBHSzVlTWJJdFR4SENRYi9vanU1NEZBMWhlaVdPZ1hIUTVNL0hhN0Q1dzBRClpXbEsrdElUaVlVSDdIZlFXTk5EK3JOQXpkQlpDY2pOYVBhQU5vd2RjSVEKLT4gWDI1NTE5IE5UdUUzbk5LVkl6aGJqWDB4YjFlQk10dUI2RGpIdW9SUUNlV0txeVFUeWsKbitpb3dMTDcrK2NGeE1vSUErQ3lPQ1pSd20ycFhuR2NrM3pGZ1oxYXk4ZwotPiBYMjU1MTkgczJYYlp3VGNOU3lnNnRDSnI3dHprV3dNdzV2RndscFBZWkRUYVNHSXdrTQpEajJvRzJwTjNjMm5OY3h2VDgvWS9aVUJJRW44d3UyQWtKWm1yd254aGpFCi0+IFgyNTUxOSBOak9Ib2ZxNC9GK1YvY2JNKzUwTTNzV2VTNENjbEVyWFQ1UFZFSFltTUd3CkN1a2xIakNLVnhPb2NTQ25WbUNDUjZ0Z2x2b3NUU1V2MUxzS205OVozYVEKLT4gWDI1NTE5ICtLWnVKeWhpTWpwbURoY2hyRFJNT3JLZ1ZrY0hicTJXd1FtYi9jQlZWSFUKL1BMUVkyM3FPaGxwaEtyemV5SkMwMFdyeXlzdzI4a0I0bklTT2k1Sm1BQQotPiAhKC4tZ3JlYXNlIGVzQFJyIEI5L2ckXwo2WDhFdzk0dHhGVUEreHdPZHdXakpxNVhQSjJEcW4vd013ZwotLS0gcDVUdzE4SWlmQkdpZGFGSHg5Qk9tOXV2SHRzU3V0RW1adFBqQkQrN0Z2TQrHn7NsXXcKWfoWLOpnC6Elc8sdYfXnCScYPN3dl7HAAFo/t+PPWNwYvoXGkQO9Y8Yz+2mzeT7lbBg4cRRqbTG+]() {
+    fn build_gitigno[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBaTVNQQ3M2UUtPSmM2elZwMmtDTGNBeVNqeWNoVTl6YzBkZVdsRk1yR2xrCnNhL2hUdG1KODBCUy8rR0YyMXZqRllOSytuTGphdlNGQ1kwUXRKd3k0ZWMKLT4gWDI1NTE5IDZueGFITkViZklVY0xnaFFBbm0raUtQK3drTzVoYzgzU0toTHF3Qm5obkkKQUVLKy9rRlJXZU1YeHRKM2VEbytSSzRLTXh6YTNtRWplTVlFWDNxdmd3cwotPiBYMjU1MTkgd25Cd01mbGpuaUJUelY1NlhhMzB1ZnJaVE5HV3VFTTl2RU82c0cySi9oWQp5OXF4ZHpDWFdHd2thSVVyMUFaak8wNExsUWJVYmw5QVdrYlJlQnlHMXNBCi0+IFgyNTUxOSBtalREUTZHUEtzQmJGWW1taWhWUjkzYmllVFRLRVBxVnpHY29kYlo1dFNVCmNOcUNPUDhwc1lEZjU0T1lXVjJudVllUXFLT1V5ZytrR0dWdFRTMnQyYW8KLT4gWDI1NTE5IE5RbWd1Y0ROZW5oQUdJSWx2UWYxNmJBNnI4MzZmanp3UG15WlRNNGY4VVUKQWt2VE1wYXNpalZJWUw5eHc5a2QwTHFmTjlpcVcyQmJ1TmFlcnpzL3hCZwotPiBYMjU1MTkgRlVMSWUzWmVqdEVWTTkxSzllb3M1ODFBdmNsQkJoWi9hMEtxQ1JkN1kzYwowY01YYVdLdTJHcDNXQU5UY3E3b05zY0ZDUTIzbHU5WFZidEZ0Vityb21NCi0+IFgyNTUxOSBPOE5YOHMvekV0VmZETHljVXoxWUd4TS8zS1JXWE5JK1B2dEJiQjdaSXl3ClFaS2lReTVub0pFTHhUVXVDNlNWYTU2NGZMQ1MyUEZUYnVOdEVkRldETU0KLT4gZ31QbGUsXC1ncmVhc2UgWl15a10sIDtEKyo3OApXR3pQeUZLdjZMMEZWWkxoaURKUlU2TG9ZSzJCNVg3N3Z2QTBpSVhnUHl3TjBtaHI5TS9jV2ExMzB0dlM2ZVR4Ck9HVTdxYmQxTFNMazZvTDYySmZJcXcKLS0tIGtidXhIcXZVTk5oN2dNSkw1UWNjRVlLZFl2V2xQd0pnYytGTlFWY09zb28K0fZfnz8l0lhVAkEgxrUDm3bHI9KjX3O67ivilnTtqd0LBjdFwzAYimv9/S5bBFH/DxW4Q4QTQvmlu1DbEjLmvA==]() {
         let block = build_gitignore_block(&sample_policy()).expect("block");
         assert!(block.contains(BLOCK_BEGIN));
         assert!(block.contains("target/"));
@@ -457,7 +457,7 @@ watch_roots = ["/tmp/test"]
     }
 
     #[test]
-    fn build_gitigno[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBXbEVlVVp0YmhOaXAwaHBnMXRSSk0yZlFIQnhDZytMemw0TXBWV3lKaGxRClM2RmtNckNvNFNac0E1Q3hSN3FPZjRMVWtKRy91TzZOTTB3cFo4VGVCM1EKLT4gWDI1NTE5IFVRN3IxMnJCVFZ6b2tTWGRNTzFITEF1anp1M1lHT3pSUVlvNGRFeXVLeFkKOGc1RGNtYk5mem5rTnRwRkdtanhPaUZQdzBEazhDYUQ1dE1CZEk0OUpGbwotPiBYMjU1MTkgTS9tOVQvSldwL3oxenoyQXl3UWI5eTVCZlpwM2UyOXRtWWhYc1d5NUhXawpzL014TUhEcFlFTnlXYk9RcnpRdWxsNy96MTRablJtOWU1d2ltYm45YUNvCi0+IFgyNTUxOSBwU3I3ejhJNUlUbktSMlJWdndyRk8rWENzOFNVaUZLRUpXcDB1SWdHTDNZCk0zd0tKVk5ydzBrS28rRE5ac3NJWWJGQXN0bHloRE5KaFp4V0p3cmIvRW8KLT4gWDI1NTE5IEZVdEtpS1dvbWVDZjIyK29lNDZ2bnpONUhTeFdORWVTYStuTytBOFRXd28KNm9hQ25BMFBPRXZQRVM4NnJXMDNoVjFlbW5EVEdwenhVM1YzTmZqNzdIWQotPiBcUC1ncmVhc2UgNiBAPUYgOjkkMnUzIHtWXXl+NGtFCitjQ2Z2NEhtUVVmeFRYa203QkVhKzFhL2V5Vm1IRjRseEVPZnd4OWVsTVlnUnFqQVFDeEJVamtBamhRSHdNZkoKY3dLdW9FdkoKLS0tIHRhcnhKYVVwa2RZQmRUOEZmMDdpM3pPc3RSVm5nNVBLSm9UMDdvRHN1bWsKDMheb2j1pJJYPgoeM+cGL3Lo5QaNBBKkxp5x4gr72B0B8hec0zW3GlAyxThPohF9ZBNE9d6pnb7jXXwjRgvi7bHM]() {
+    fn build_gitigno[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAza1ZzZ0NSZE44WmR2cFdJd1ZCU01PeSswaS9qOW9teWJnTkRpT2VPQTIwCkN2anZBSzlyK3hXU0M5NjBLdENTb2hWZkhJUEhMbnlhalkyYW9VYlNlbEkKLT4gWDI1NTE5IGRnTmF2TTlOeGV4ZWNBamNKOUtBME9acTFZeWg5T08yYlFCeHg0UmJEbmsKSk84UjIvc1hOWWpuaEljRCtoY3B5WnVaeUJXcVhUL2hIblF5aDd4aGxUNAotPiBYMjU1MTkgY2c1bzdPRlBjNGZEWHBEU0V2NlBNNmJ1dlRwTkVjS2Q2cUZyRXdFQzMxVQpBR2t3Y3U0SlBIaVdlc1BkblhtSGNScDhvLzllcVZ2R0hiZVFnYUtUdTRBCi0+IFgyNTUxOSBCbkhaNS9zbkp3VEZsSXE1UlhsTEFIb05xbHNkNi96aEF4bE1tdUQ1RWhFCkpDNk9IOGppZE5MU2FPYi82NW40dktrUzB2NkFrL0xzRUlQY1N3N0RaMG8KLT4gWDI1NTE5IDIzaTQvMFFqRzE5YnNwSU5QdGZwRzhlbmpvcWxLV2QwNjVGZ2ZkM1ZsMG8KWGZFYW55UWxua1RTODhqMS83b1lLdGN4dkdzaVJ1SUdQU3ZpTFp0ZnNWVQotPiBYMjU1MTkgdms2MDY2RWFScTM5NlJtaGpGbzJrcU9nblMyMnp4TmxEUkpML1RYaEhndwpKbUd4ZlNtaS81Ry80OTZ4dnZxOVdLUXVtMkF1U01pSnhlNmI2UGFEQ2VNCi0+IFgyNTUxOSA4VWVkQjV4WVJjZm1zWmlEVXF0YmRkOU9wdUxLTTdVYW1mVGFBZFAwZjNzCitOdVlRWnRiNWdqdUUvV1gvejRqVWtpYU81aERWdnp5MWZML2xNTU03aGcKLT4gI1A6LWdyZWFzZSApICogZ28ga0VMTQpTOEoraDNOZjhVNTNLR2xRMHVCbGhMNDlYKzRLM0xLM1E2S2JmUFVCdlBTTkxKWnVvNTVRT3FzaklPdEZNbHVlClBYeU9SNFpzZm9JQmxxMlVBejEvVTBqTAotLS0gM2hnZzR6ZVFvRnNkeVBzL2REVGhYek1OemZrbGI3MVU0NlhBb3NLUmlOWQrti+ELshk7WdZeNU4Q5NZCuXY4ZkpbNrKurjp/XHu8aBcRBOePnnvKTIdWQHmt/vmRFL49Ih25Wcpv1IhifklOzmI=]() {
         let block = build_gitignore_block(&sample_policy()).expect("block");
         assert!(block.contains("# --- BEGIN DRACON MANAGED BLOCK ---"));
         assert!(block.contains("target/"));
@@ -944,6 +944,57 @@ watch_roots = ["/tmp/test"]
     }
 
     #[test]
+    fn run_keygen_refuses_when_dedicated_master_pub_exists() {
+        let td = TestDir::new("warden_keygen_master_pub_guard");
+        let keys_dir = td.path().join(".dracon").join("data").join("keys");
+        std::fs::create_dir_all(&keys_dir).unwrap();
+
+        let _guard = HomeGuard::new(td.path().to_str().unwrap());
+        std::fs::write(keys_dir.join("master.pub"), "age1xxxxx\n").unwrap();
+
+        let result = run_keygen();
+
+        assert!(result.is_err(), "should refuse while master.pub exists");
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("dedicated master key exists")
+                && err_msg.contains("explicit master-key rotation procedure"),
+            "error should explain the master guard: {}",
+            err_msg
+        );
+        let hostname_raw = hostname::get().unwrap().to_string_lossy().to_string();
+        let hostname: String = hostname_raw
+            .chars()
+            .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
+            .collect();
+        assert!(!keys_dir.join(format!("machine_{}.age", hostname)).exists());
+    }
+
+    #[test]
+    fn run_keygen_refuses_when_dedicated_master_private_exists() {
+        let td = TestDir::new("warden_keygen_master_private_guard");
+        let master_dir = td.path().join(".dracon").join("keys");
+        std::fs::create_dir_all(&master_dir).unwrap();
+
+        let _guard = HomeGuard::new(td.path().to_str().unwrap());
+        std::fs::write(master_dir.join("master.age"), "AGE-SECRET-KEY-1\n").unwrap();
+
+        let result = run_keygen();
+
+        assert!(
+            result.is_err(),
+            "should refuse while keys/master.age exists"
+        );
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("dedicated master key exists")
+                && err_msg.contains("explicit master-key rotation procedure"),
+            "error should explain the master guard: {}",
+            err_msg
+        );
+    }
+
+    #[test]
     fn warden_policy_validate_accepts_valid_policy() {
         let policy = WardenPolicy {
             protected_patterns: vec!["*.env".into(), "secrets/**".into()],
@@ -1220,7 +1271,7 @@ watch_roots = ["/tmp/test"]
 
     #[test]
     fn filter_clean_encrypts_content_with_secret_marker() {
-        let content = b"[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB0ZVV5UkVCREJTMU9laEFqSFVVeFl4cThKaFlDMjZYUGpNQ1oxM1lINUFJCjNUaU9JNFo3SFZHWjRFSXEwVHpCdm5rVGM2QnExL212a2ZtdUZjc2FLTzAKLT4gWDI1NTE5IEZYQldmU3p0cW1HaFBoWUdQNGxaOGxDOXdQQ1ZPSnVuRzFQSGFoclV0eGsKamR6MnRpSWV5MzJRR0lDYW9ZQXViTW9Oc3llMk1yUXdkOVBQdnczS0VBOAotPiBYMjU1MTkgZjAzaWVFL284ZG9sWW0wdHdGVXlNc1ZmWjQ3N1Z3UnE4aGpsZm1hM0h3TQo2bjFwL1VaZzZqVUx1eG1kTHpobHd3M1ptUW42VEtTYmFIR3BkM0gvQ2kwCi0+IFgyNTUxOSBBdUE3K1d5Z2VuUVhtNnF0SitjK0JCODdYZW03ZDBlL3B1WStYQWd0Y0hZCkxKWHBnTHZrQS94bFBaekk4WWlxRWxKMWEwaVA1dk00RnlTSmRwQXZCMUUKLT4gWDI1NTE5IHRCcEkzYUdpSCtOL2cyWGZ1c0VQRW1IR0FURmljeCtScTEvdlJyU3lMQVEKL0xvZVdKQVMycWgyYVdIM2o5cDBpQ0d6WDlDVDV2c2pUZXZHcU5IbDlBYwotPiA0NmYxdCNiTy1ncmVhc2Ugaj5JWHdMIG5iCk1GQXdscGFWdjRxNWZWTlF3L1FpYiszSXc2Zzh4cHRQRFEzbVROVlU1ZwotLS0gQUVnTEZncFdvT0RWclRLUGp5MkFMYk1TSFBDc1huVkNEMUQ0TU5uY1E0QQrn4Kv8djPu5nLA37E6KeZo5K4RrmizzGNje9UtCx20Q/41sRqYqEgySm0fUTRU/1za4et+Ca7kKnyAvPAquvl3pqdX1mRG9lVDC0/W0A==]\n";
+        let content = b"[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBtK00xbEJSbE5VRXBxUWlyRUg2TEFGMmxyeTFVWmZjelZIVjc5Wm04dVd3CnpUcy90NDUzS2hqL0dTano5VW1SRjR6VHFhS0R6T1ROVk9kTVlkK1c3V1kKLT4gWDI1NTE5IHVST1R3a2M0cFhzN05vNlVoWm5EQlIySmw4aFpZZ3RzQ3JiU0xaMGpiRHMKbWU4N0RSdjhNU2crVXZTb2l2cmVYT3lTS2I3VnptSytBNnhGQW1JeVNYOAotPiBYMjU1MTkgbW1FMUdvU3ZTSUJVakUwNzBOTUMyc2ZwcUE4VEhyRTZQRW85M092RkEwMAp1M1loeXQzMUJJTXpINmpnZUtOOEpVbGlnOEs3RzZGdUVGNTBRczB4MVF3Ci0+IFgyNTUxOSBVUVBvWCtVWGtTZXJZNVpMMXNIYUNJYTJHTmhUOW9ldzY0SGYvWGJZRVh3Ck5nU01mQjA2VXNTSjhFSG81UFJkaWRxYXNqNmtqQk5VcVRFVmpLc3FreHcKLT4gWDI1NTE5IDAyZExaaUcxM1JuQ3kxdXRrMVI4T1pLdElOSDlvYmpRNUs1RWUra0NVazgKREU3eTBaUmtVaC9sMTJQQ3ZVaEZIa2llUWNwZlMzZWNwNW9NVXNQcmNiSQotPiBYMjU1MTkgRWhGaVZTRFVTZlRwTVhqOERMRlkzZ1ZoWEVwWFRzeWdERUJwRDRaRTFRWQpMemVPNWpLTm9EekFCbXpza1NIa1lnY2pPOVY5ek1UVjlSN0MwMmhPU1NVCi0+IFgyNTUxOSBrRHZvNW5MRU95REdubkZET0xQQ1FMM2I5UEQrdC9hOWx4MFEyajVBQkhJCjhjNUw3V29oK2xQMHNPWVNsY0VTaDVNVXFtT1RveVNzRW5oeTlFRWVsTjQKLT4gQXdsLWdyZWFzZQoxNDcwMWVySS9Qd2dWVWpXTEw1U2pMVkpjSUVwd3BqeFRoSGx0TjZOVDdEcm1CWnVVeGFxZ0JpYndndEsKLS0tIHY4R01YbUY2THNXMmhLb1hqN0IxczkzSDdpWC80MFdSWVBhdUI1d3RhZzgKSrpS5cNzWNltjsX1PXMOP65yJGnIV5WNwHTHJ3abxv2rjjLlqzetko4Gu0Nx4vdlNsx2+WB1GnhCozkUB96PFeZqlWiFdF1IyW8Isqw=]\n";
         let warden = DraconWarden::new().expect("create warden");
         let result = warden.clean(content, Some("config.env")).expect("clean");
         // Clean should either encrypt or pass through; result should be valid bytes
