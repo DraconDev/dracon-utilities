@@ -319,6 +319,7 @@ impl WardenPolicy {
                     | "flake.nix"
                     | "flake.lock"
                     | "events.jsonl"
+                    | "state/events/*.jsonl"
                     | "*.events.jsonl"
                     | ".dracon/data/"
                     | ".dracon/data/keys/"
