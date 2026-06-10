@@ -72,10 +72,11 @@ pub(crate) fn check_safe_to_delete(path: &Path, user_protected: &[String]) -> Re
     Ok(canon)
 }
 
-/// Guard-specific safety check — skips SYSTEM_PROTECTED check because the guard
-/// only deletes known artifact/cache directories (~/Dev/*/target, ~/.cache/*,
-/// ~/.local/share/Trash/*) which are legitimately under /home.
-/// Still checks user-protected paths, symlinks, and canonicalization.
+/// Guard-specific safety check — skips descendant checks for SYSTEM_PROTECTED
+/// because the guard only deletes known artifact/cache directories (~/Dev/*/target,
+/// ~/.cache/*, ~/.local/share/Trash/*) which are legitimately under /home.
+/// Still rejects exact system roots, user-protected paths, symlinks, and
+/// canonicalization failures.
 pub(crate) fn check_safe_to_delete_guard(
     path: &Path,
     user_protected: &[String],
@@ -104,7 +105,16 @@ pub(crate) fn check_safe_to_delete_guard(
 
     let canon_str = canon.display().to_string();
 
-    // Only check user-protected paths, not SYSTEM_PROTECTED
+    for prot in SYSTEM_PROTECTED {
+        if canon_str == *prot {
+            anyhow::bail!(
+                "refusing guard cleanup of protected system path {}",
+                canon.display()
+            );
+        }
+    }
+
+    // Only check user-protected paths, not SYSTEM_PROTECTED descendants
     for user_prot in user_protected {
         let prot_canon = match Path::new(user_prot).canonicalize() {
             Ok(p) => p.display().to_string(),

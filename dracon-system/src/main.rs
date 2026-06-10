@@ -2104,7 +2104,14 @@ async fn check_large_logs(guard: &GuardPolicy, state: &mut GuardRuntimeState) {
                 let preserve = guard.log_preserve_header_lines;
                 let mut total_reclaimed = 0u64;
                 for (path, original_size) in &logs {
-                    match truncate_log_file(path, max_size, preserve) {
+                    let safe_path = match check_safe_to_delete(path, &guard.protected_paths) {
+                        Ok(p) => p,
+                        Err(e) => {
+                            eprintln!("⚠️ skipping log truncate {}: {}", path.display(), e);
+                            continue;
+                        }
+                    };
+                    match truncate_log_file(&safe_path, max_size, preserve) {
                         Ok(reclaimed) if reclaimed > 0 => {
                             eprintln!(
                                 "📝 truncated {}: {} -> {} (reclaimed {})",
