@@ -1,0 +1,211 @@
+--- pre inventory ---
+repo	branch	modified	staged	untracked	ahead	behind	state_flags	push_status	hint
+/home/dracon/Dev/dracon-ai-lib	main	0	0	0	30	0	AHEAD:30,STUCK_PUSH	STUCK	run repair-concerns --apply (push or rewrite)
+--- gh repo view before ---
+{"archivedAt":"2026-06-08T20:06:42Z","createdAt":"2026-05-31T20:31:51Z","defaultBranchRef":{"name":"main"},"description":"","isArchived":true,"updatedAt":"2026-06-08T20:06:42Z","url":"https://github.com/DraconDev/dracon-ai-lib","visibility":"PRIVATE"}
+--- gh api before ---
+{"archived":true,"archived_at":null,"default_branch":"main","description":null,"full_name":"DraconDev/dracon-ai-lib","html_url":"https://github.com/DraconDev/dracon-ai-lib","permissions":{"admin":true,"maintain":true,"pull":true,"push":true,"triage":true},"visibility":"private"}
+--- git status ---
+--- git remote -v ---
+origin	https://github.com/DraconDev/dracon-ai-lib.git (fetch)
+origin	https://github.com/DraconDev/dracon-ai-lib.git (push)
+--- git branch -vv ---
+* main 5d0ae6c [origin/main: ahead 30] 2 file(s) [pi-session-2026-06-04T15-35-11-680Z_019e9346-3240-7a0b-9c26-bb1652ca26ac.html, pi-session-2026-05-31T19-29-49-863Z_019e7f83-9327-77f1-ba62-393dabbf8696.html] DELTA:+0/-8499 | DEL:pi-session-2026-05-31T19-29-49-863Z_019e7f83-9327-77f1-ba62-393dabbf8696.html,pi-session-2026-06-04T15-35-11-680Z_019e9346-3240-7a0b-9c26-bb1652ca26ac.html
+--- rev-list count ---
+30
+--- archive-related log ---
+1709b7b docs: mark legacy crates as deprecated, not current contract
+9cb5103 docs: fix stale ai-lib release tag wording
+4b70129 4 file(s) in docs [docs/archive/legacy-key-management-design.md, docs/consumer-getting-started.md, README.md] DELTA:+26/-8
+210c250 1 file(s) in docs [docs/{key-management-design.md => archive/legacy-key-management-design.md}] DELTA:+0/-0
+6882198 simplify: drop the dracon-ai/* cutover theater; use the real repo URL
+ce377a2 (origin/main, origin/HEAD) 5 file(s) in .pi [.pi/goals/archived/goal_2026060813080905_mq53j6wk-tc1udv.md, .pi/goals/archived/goal_2026060816375771_mq5ckllx-58ktk5.md, .pi/goals/archived/goal_2026060817103628_mq5ebocf-8c0p11.md] DELTA:+405/-9 | NEW:archived/goal_2026060813080905_mq53j6wk-tc1udv.md,archived/goal_2026060816375771_mq5ckllx-58ktk5.md,archived/goal_2026060817103628_mq5ebocf-8c0p11.md TAG:v0.2.0-archived GOAL:complete TOKENS:55388K TIME:588m
+14397af archive: fix remaining dracon-ai-sdk references to ai-api-sdk
+4fc7206 archive: mark lib as archived, redirect to ai-api-sdk
+097e58c 2 file(s) in .pi [.pi/goals/{active_goal_2026060723260708_mq4cpmy6-srv0bj.md => archived/goal_2026060723330028_mq4cpmy6-srv0bj.md}, .pi/goals/goal_events.jsonl] DELTA:+8/-5
+2481512 2 file(s) in .pi [.pi/goals/{active_goal_2026060617133698_mq2jyqty-gznsws.md => archived/goal_2026060621301132_mq2jyqty-gznsws.md}, .pi/goals/goal_events.jsonl] DELTA:+7/-6
+0b0af3a 2 file(s) in .pi [.pi/goals/{active_goal_2026060612292128_mq29t6kn-pno183.md => archived/goal_2026060614351979_mq29t6kn-pno183.md}, .pi/goals/goal_events.jsonl] DELTA:+8/-5
+a95c574 2 file(s) in .pi [ARCHIVED.md, .pi/goals/active_goal_2026060612292128_mq29t6kn-pno183.md] DELTA:+71/-5 | NEW:ARCHIVED.md
+8fb00a6 2 file(s) in .pi [.pi/goals/{active_goal_2026060600024592_mq1j5294-ibcxfd.md => archived/goal_2026060600082972_mq1j5294-ibcxfd.md}, .pi/goals/goal_events.jsonl] DELTA:+8/-5
+ba5aa22 2 file(s) in .pi [.pi/goals/{active_goal_2026060519063827_mq18k8nb-8z83jr.md => archived/goal_2026060519131616_mq18k8nb-8z83jr.md}, .pi/goals/goal_events.jsonl] DELTA:+8/-5
+5a4144d 2 file(s) in .pi [.pi/goals/{active_goal_2026060516404027_mq13cixj-o88468.md => archived/goal_2026060517130651_mq13cixj-o88468.md}, .pi/goals/goal_events.jsonl] DELTA:+8/-5
+9ae35ab 2 file(s) in .pi [.pi/goals/{active_goal_2026060510473404_mq0qqfj2-7mdgp7.md => archived/goal_2026060511014963_mq0qqfj2-7mdgp7.md}, .pi/goals/goal_events.jsonl] DELTA:+8/-5
+5249be1 1 file(s) in .pi [.pi/goals/{active_goal_2026060500405718_mq052bj9-1hi21x.md => archived/goal_2026060500465297_mq052bj9-1hi21x.md}] DELTA:+5/-5
+92ee117 1 file(s) in .pi [.pi/goals/{active_goal_2026060422271068_mq00aa8p-q78q3b.md => archived/goal_2026060422553256_mq00aa8p-q78q3b.md}] DELTA:+5/-5
+c63f73a 2 file(s) in .pi [.pi/goals/{active_goal_2026060421242489_mpzy1kjm-7ooplq.md => archived/goal_2026060421392982_mpzy1kjm-7ooplq.md}, .pi/goals/goal_events.jsonl] DELTA:+8/-5
+2c4f4c6 2 file(s) in .pi [.pi/goals/{active_goal_2026060419532880_mpzusmll-tkuavh.md => archived/goal_2026060420041353_mpzusmll-tkuavh.md}, .pi/goals/goal_events.jsonl] DELTA:+8/-5
+23e6baf 9 file(s) in .pi,crates,docs [docs/key-management-design.md, crates/core/src/vault.rs, crates/client/src/lib.rs] DELTA:+1006/-12 | NEW:archived/goal_2026060416554220_mpzm5wwy-4v5mkd.md,docs/key-management-design.md
+ced15ba 2 file(s) in .pi [.pi/goals/{active_goal_2026060413565358_mpzi21xo-6k45hv.md => archived/goal_2026060415231066_mpzi21xo-6k45hv.md}, .pi/goals/goal_events.jsonl] DELTA:+8/-5
+86bd4bd 2 file(s) in .pi [.pi/goals/{active_goal_2026060315140705_mpy5dihe-174b31.md => archived/goal_2026060317495547_mpy5dihe-174b31.md}, .pi/goals/goal_events.jsonl] DELTA:+8/-5
+d5b03c7 5 file(s) in .pi [FREE_TIER_RESEARCH.md, FREE_TIER_RANKING.md, .pi/goals/archived/goal_2026060218052396_mpwvp55w-mf378w.md] DELTA:+388/-33 | NEW:archived/goal_2026060218052396_mpwvp55w-mf378w.md
+66a237d 4 file(s) in .pi [pi-session-2026-05-31T19-29-49-863Z_019e7f83-9327-77f1-ba62-393dabbf8696.html, .pi/goals/active_goal_2026060217135872_mpwu7sxu-c5e4um.md, .pi/goals/{active_goal_2026060214340130_mpwoi3iu-3qlf61.md => archived/goal_2026060215052605_mpwoi3iu-3qlf61.md}] DELTA:+4343/-11 | NEW:goals/active_goal_2026060217135872_mpwu7sxu-c5e4um.md,pi-session-2026-05-31T19-29-49-863Z_019e7f83-9327-77f1-ba62-393dabbf8696.html
+e19884f 2 file(s) in .pi [.pi/goals/{active_goal_2026060212443534_mpwkld79-u6b4c0.md => archived/goal_2026060212521240_mpwkld79-u6b4c0.md}, .pi/goals/goal_events.jsonl] DELTA:+16/-11 | TAG:v0.1.21
+cce0dbd 4 file(s) in .pi [.pi/goals/archived/goal_2026060123165134_mpvrmjhm-pknz4m.md, CONSUMER-AUDIT.md, .pi/goals/goal_events.jsonl] DELTA:+125/-0 | NEW:.env,archived/goal_2026060123165134_mpvrmjhm-pknz4m.md,CONSUMER-AUDIT.md TAG:v0.1.15 ENV:
+814a441 3 file(s) in .pi [.gitattributes, .pi/goals/{active_goal_2026060112451264_mpv56bb9-1tm2an.md => archived/goal_2026060121193146_mpv56bb9-1tm2an.md}, .pi/goals/goal_events.jsonl] DELTA:+39/-16 | TAG:v0.1.0
+b3d0830 2 file(s) in .pi [.pi/goals/{active_goal_2026060101231508_mpugtb4f-82ryaq.md => archived/goal_2026060102321437_mpugtb4f-82ryaq.md}, .pi/goals/goal_events.jsonl] DELTA:+8/-5
+f960293 2 file(s) in .pi [.pi/goals/{active_goal_2026053121180925_mpu8240y-aobl2r.md => archived/goal_2026053121495992_mpu8240y-aobl2r.md}, .pi/goals/goal_events.jsonl] DELTA:+8/-5
+--- archive commit details ---
+commit 4fc7206ea7ab2e7f93b7265de2c68fd266795ef6
+Author:     DraconDev <dracsharp@gmail.com>
+AuthorDate: Mon Jun 8 12:49:09 2026 +0100
+Commit:     DraconDev <dracsharp@gmail.com>
+CommitDate: Mon Jun 8 12:49:09 2026 +0100
+
+    archive: mark lib as archived, redirect to ai-api-sdk
+
+ CHANGELOG.md | 2 ++
+ CONSUMERS.md | 2 ++
+ README.md    | 2 ++
+ 3 files changed, 6 insertions(+)
+
+commit 14397afd771d8078fe2f0269a3fb821e9aeae0af
+Author:     DraconDev <dracsharp@gmail.com>
+AuthorDate: Mon Jun 8 13:00:42 2026 +0100
+Commit:     DraconDev <dracsharp@gmail.com>
+CommitDate: Mon Jun 8 13:00:42 2026 +0100
+
+    archive: fix remaining dracon-ai-sdk references to ai-api-sdk
+
+ ARCHIVED.md       |  6 +++---
+ CONSUMER-AUDIT.md | 16 ++++++++--------
+ 2 files changed, 11 insertions(+), 11 deletions(-)
+
+commit ce377a20fa8b911f3201777c120779ebd56ff903
+Author:     DraconDev <dracsharp@gmail.com>
+AuthorDate: Mon Jun 8 20:39:02 2026 +0100
+Commit:     DraconDev <dracsharp@gmail.com>
+CommitDate: Mon Jun 8 20:39:02 2026 +0100
+
+    5 file(s) in .pi [.pi/goals/archived/goal_2026060813080905_mq53j6wk-tc1udv.md, .pi/goals/archived/goal_2026060816375771_mq5ckllx-58ktk5.md, .pi/goals/archived/goal_2026060817103628_mq5ebocf-8c0p11.md] DELTA:+405/-9 | NEW:archived/goal_2026060813080905_mq53j6wk-tc1udv.md,archived/goal_2026060816375771_mq5ckllx-58ktk5.md,archived/goal_2026060817103628_mq5ebocf-8c0p11.md TAG:v0.2.0-archived GOAL:complete TOKENS:55388K TIME:588m
+
+ .../goal_2026060811353888_mq4gszze-8rib4x.md}      |  19 ++-
+ .../goal_2026060813080905_mq53j6wk-tc1udv.md       | 181 +++++++++++++++++++++
+ .../goal_2026060816375771_mq5ckllx-58ktk5.md       |  83 ++++++++++
+ .../goal_2026060817103628_mq5ebocf-8c0p11.md       |  78 +++++++++
+ .pi/goals/goal_events.jsonl                        |  53 ++++++
+ 5 files changed, 405 insertions(+), 9 deletions(-)
+ rename .pi/goals/{active_goal_2026060801204241_mq4gszze-8rib4x.md => archived/goal_2026060811353888_mq4gszze-8rib4x.md} (89%)
+ create mode 100644 .pi/goals/archived/goal_2026060813080905_mq53j6wk-tc1udv.md
+ create mode 100644 .pi/goals/archived/goal_2026060816375771_mq5ckllx-58ktk5.md
+ create mode 100644 .pi/goals/archived/goal_2026060817103628_mq5ebocf-8c0p11.md
+--- docs status readme snippets ---
+docs/audit/2026-06-11-full-repo-audit/per-repo/ai-auto-repo-rot-scanner-todo-agent.git.txt:14:* main 90c4433 [origin/main] refactor(ai): migrate from archived dracon-ai-lib to ai-api-sdk
+docs/audit/2026-06-11-full-repo-audit/per-repo/ai-auto-repo-rot-scanner-todo-agent.git.txt:16:90c4433 refactor(ai): migrate from archived dracon-ai-lib to ai-api-sdk
+docs/audit/2026-06-11-full-repo-audit/per-repo/dracon-platform.git.txt:18:  archive/azumi-final                      8d7373e59 [origin/archive/azumi-final] docs(migration): phase 0 snapshot doc for Svelte migration
+docs/audit/2026-06-11-full-repo-audit/per-repo/avid.git.txt:13:  backup/pre-sync-largeblob-fix-1780417168 332a456 10 file(s) in .pi,models,src [models/parakeet-ctc/onnx/tokenizer.json, research-longevity.md, research-longevity-deep.md] DELTA:+7542/-5 | BIN:2 NEW:goals/active_goal_2026060216174443_mpws7hbo-xraahs.md,archived/goal_2026060214172244_mpwnc4lz-isvg6v.md,onnx/model_int8.onnx,onnx/model_int8.onnx_data,onnx/tokenizer.json,research-longevity-deep.md,research-longevity.md,test-output-longevity.md
+docs/audit/2026-06-11-full-repo-audit/post-funding/per-repo/ai-auto-repo-rot-scanner-todo-agent.git.txt:16:90c4433 refactor(ai): migrate from archived dracon-ai-lib to ai-api-sdk
+docs/audit/2026-06-11-full-repo-audit/post-funding/per-repo/dracon-platform.git.txt:13:  archive/azumi-final                      8d7373e59 [origin/archive/azumi-final] docs(migration): phase 0 snapshot doc for Svelte migration
+docs/audit/2026-06-11-full-repo-audit/post-funding/per-repo/browser-extensions-shared.git.txt:20:* main 337c73a3d [origin/main] 2 file(s) in auto-form-filler,wxt-shared [wxt-shared/src/byok/BYOKSettings.tsx, auto-form-filler/entrypoints/options/App.tsx] DELTA:+17/-6
+docs/audit/2026-06-11-full-repo-audit/post-funding/per-repo/browser-extensions-shared.git.txt:22:337c73a3d 2 file(s) in auto-form-filler,wxt-shared [wxt-shared/src/byok/BYOKSettings.tsx, auto-form-filler/entrypoints/options/App.tsx] DELTA:+17/-6
+docs/audit/2026-06-11-full-repo-audit/post-funding/per-repo/avid.git.txt:13:  backup/pre-sync-largeblob-fix-1780417168 332a456 10 file(s) in .pi,models,src [models/parakeet-ctc/onnx/tokenizer.json, research-longevity.md, research-longevity-deep.md] DELTA:+7542/-5 | BIN:2 NEW:goals/active_goal_2026060216174443_mpws7hbo-xraahs.md,archived/goal_2026060214172244_mpwnc4lz-isvg6v.md,onnx/model_int8.onnx,onnx/model_int8.onnx_data,onnx/tokenizer.json,research-longevity-deep.md,research-longevity.md,test-output-longevity.md
+docs/audit/2026-06-11-full-repo-audit/post-funding/validation-logs/youtube-video-uploader.test.log:151:test test_http_redirect_307_followed ... ok
+docs/audit/2026-06-11-full-repo-audit/post-funding/validation-logs/ai-auto-repo-rot-scanner-todo-agent.test.log:298:test output::sarif::tests::test_sarif_format_deprecated ... ok
+docs/audit/2026-06-11-full-repo-audit/post-funding/validation-logs/ai-auto-repo-rot-scanner-todo-agent.test.log:577:test test_check_deprecated_configurable ... ok
+docs/audit/2026-06-11-full-repo-audit/post-funding/validation-logs/ai-auto-repo-rot-scanner-todo-agent.test.log:578:test test_check_deprecated_default ... ok
+docs/audit/2026-06-11-full-repo-audit/post-funding/validation-logs/dracon-code.test.log:206:test executive::ledger::tests::blueprint_archive_add_entry ... ok
+docs/audit/2026-06-11-full-repo-audit/post-funding/validation-logs/dracon-code.test.log:207:test executive::ledger::tests::blueprint_archive_find_similar ... ok
+docs/audit/2026-06-11-full-repo-audit/post-funding/validation-logs/dracon-code.test.log:208:test executive::ledger::tests::blueprint_archive_search ... ok
+docs/audit/2026-06-11-full-repo-audit/post-funding/validation-logs/video-uploader.test.log:144:test test_http_redirect_307_followed ... ok
+docs/audit/2026-06-11-full-repo-audit/post-funding/validation-logs/dracon-platform.test.log:4:  --> apis/services/ai-api/ai-api-sdk/tests/sdk.rs:66:4
+docs/audit/2026-06-11-full-repo-audit/post-funding/validation-logs/dracon-platform.test.log:11:warning: `ai-api-sdk` (test "sdk") generated 1 warning
+docs/audit/2026-06-11-full-repo-audit/post-funding/validation-logs/dracon-platform.test.log:349:test crypto::tests::test_is_safe_redirect_url ... ok
+docs/audit/2026-06-11-full-repo-audit/post-funding/validation-logs/dracon-platform.test.log:443:test apis/services/ai-api/ai-api-sdk/src/lib.rs - (line 8) ... ignored
+docs/audit/2026-06-11-full-repo-audit/post-funding/validation-logs/dracon-platform.test.log:444:test apis/services/ai-api/ai-api-sdk/src/lib.rs - DraconAi::chat_stream (line 139) ... ignored
+docs/audit/2026-06-11-full-repo-audit/post-funding/validation-logs/pully-fully-pull-based-fleet-reconciler.test.log:1207:test health::checker::tests::test_parse_health_response_301_redirect ... ok
+docs/audit/2026-06-11-full-repo-audit/post-funding/validation-logs/pully-fully-pull-based-fleet-reconciler.test.log:1208:test health::checker::tests::test_parse_health_response_302_redirect ... ok
+docs/audit/2026-06-11-full-repo-audit/post-funding/deps/dracon-code.tree.log:23:        ├── ai-api-sdk v0.2.0 (/home/dracon/Dev/dracon-platform/apis/services/ai-api/ai-api-sdk)
+docs/audit/2026-06-11-full-repo-audit/post-funding/deps/dracon-code.tree.log:60:    ├── ai-api-sdk v0.2.0 (/home/dracon/Dev/dracon-platform/apis/services/ai-api/ai-api-sdk) (*)
+docs/audit/2026-06-11-full-repo-audit/post-funding/deps/dracon-code.deny.log:16:11 │ ai-api-sdk = { workspace = true }
+docs/audit/2026-06-11-full-repo-audit/post-funding/deps/dracon-code.deny.log:29:11 │ ai-api-sdk = { workspace = true }
+docs/audit/2026-06-11-full-repo-audit/post-funding/deps/dracon-platform.tree.log:43:│   │       ├── ai-api-sdk v0.2.0 (/home/dracon/Dev/dracon-platform/apis/services/ai-api/ai-api-sdk)
+docs/audit/2026-06-11-full-repo-audit/post-funding/deps/dracon-platform.tree.log:229:│           ├── ai-api-sdk v0.2.0 (/home/dracon/Dev/dracon-platform/apis/services/ai-api/ai-api-sdk)
+docs/audit/2026-06-11-full-repo-audit/post-funding/deps/dracon-platform.tree.log:316:│   ├── ai-api-sdk v0.2.0 (/home/dracon/Dev/dracon-platform/apis/services/ai-api/ai-api-sdk)
+docs/audit/2026-06-11-full-repo-audit/post-funding/deps/dracon-platform.tree.log:365:│   ├── ai-api-sdk v0.2.0 (/home/dracon/Dev/dracon-platform/apis/services/ai-api/ai-api-sdk)
+docs/audit/2026-06-11-full-repo-audit/post-funding/deps/dracon-platform.tree.log:392:    ├── ai-api-sdk v0.2.0 (/home/dracon/Dev/dracon-platform/apis/services/ai-api/ai-api-sdk)
+docs/audit/2026-06-11-full-repo-audit/post-funding/deps/dracon-platform.tree.log:470:│   ├── ai-api-sdk v0.2.0 (/home/dracon/Dev/dracon-platform/apis/services/ai-api/ai-api-sdk)
+docs/audit/2026-06-11-full-repo-audit/public-readiness-funding/per-repo/dracon-platform.git.txt:13:  archive/azumi-final                      8d7373e59 [origin/archive/azumi-final] docs(migration): phase 0 snapshot doc for Svelte migration
+docs/audit/2026-06-11-full-repo-audit/public-readiness-funding/per-repo/avid.git.txt:13:  backup/pre-sync-largeblob-fix-1780417168 332a456 10 file(s) in .pi,models,src [models/parakeet-ctc/onnx/tokenizer.json, research-longevity.md, research-longevity-deep.md] DELTA:+7542/-5 | BIN:2 NEW:goals/active_goal_2026060216174443_mpws7hbo-xraahs.md,archived/goal_2026060214172244_mpwnc4lz-isvg6v.md,onnx/model_int8.onnx,onnx/model_int8.onnx_data,onnx/tokenizer.json,research-longevity-deep.md,research-longevity.md,test-output-longevity.md
+docs/audit/2026-06-11-full-repo-audit/public-readiness-funding/per-repo/dracon-ai-lib.git.txt:7:* main d8846da [origin/main: ahead 21] docs: make crate docs explicit BYOK-library contract
+docs/audit/2026-06-11-full-repo-audit/public-readiness-funding/per-repo/dracon-ai-lib.git.txt:9:d8846da docs: make crate docs explicit BYOK-library contract
+docs/audit/2026-06-11-full-repo-audit/public-readiness-funding/per-repo/dracon-ai-lib.git.txt:10:4b70129 4 file(s) in docs [docs/archive/legacy-key-management-design.md, docs/consumer-getting-started.md, README.md] DELTA:+26/-8
+docs/audit/2026-06-11-full-repo-audit/public-readiness-funding/per-repo/dracon-ai-lib.git.txt:11:210c250 1 file(s) in docs [docs/{key-management-design.md => archive/legacy-key-management-design.md}] DELTA:+0/-0
+docs/audit/2026-06-11-full-repo-audit/public-readiness-funding/validation-logs/youtube-video-uploader.test.log:151:test test_http_redirect_307_followed ... ok
+docs/audit/2026-06-11-full-repo-audit/public-readiness-funding/validation-logs/ai-auto-repo-rot-scanner-todo-agent.test.log:297:test output::sarif::tests::test_sarif_format_deprecated ... ok
+docs/audit/2026-06-11-full-repo-audit/public-readiness-funding/validation-logs/ai-auto-repo-rot-scanner-todo-agent.test.log:576:test test_check_deprecated_configurable ... ok
+docs/audit/2026-06-11-full-repo-audit/public-readiness-funding/validation-logs/ai-auto-repo-rot-scanner-todo-agent.test.log:577:test test_check_deprecated_default ... ok
+docs/audit/2026-06-11-full-repo-audit/public-readiness-funding/validation-logs/dracon-code.test.log:222:test executive::ledger::tests::blueprint_archive_add_entry ... ok
+docs/audit/2026-06-11-full-repo-audit/public-readiness-funding/validation-logs/dracon-code.test.log:223:test executive::ledger::tests::blueprint_archive_find_similar ... ok
+docs/audit/2026-06-11-full-repo-audit/public-readiness-funding/validation-logs/dracon-code.test.log:224:test executive::ledger::tests::blueprint_archive_search ... ok
+docs/audit/2026-06-11-full-repo-audit/public-readiness-funding/validation-logs/video-uploader.test.log:144:test test_http_redirect_307_followed ... ok
+docs/audit/2026-06-11-full-repo-audit/public-readiness-funding/validation-logs/dracon-platform.test.log:5:  --> apis/services/ai-api/ai-api-sdk/tests/sdk.rs:66:4
+docs/audit/2026-06-11-full-repo-audit/public-readiness-funding/validation-logs/dracon-platform.test.log:12:warning: `ai-api-sdk` (test "sdk") generated 1 warning
+docs/audit/2026-06-11-full-repo-audit/public-readiness-funding/validation-logs/dracon-platform.test.log:351:test crypto::tests::test_is_safe_redirect_url ... ok
+docs/audit/2026-06-11-full-repo-audit/public-readiness-funding/validation-logs/dracon-platform.test.log:445:test apis/services/ai-api/ai-api-sdk/src/lib.rs - (line 8) ... ignored
+docs/audit/2026-06-11-full-repo-audit/public-readiness-funding/validation-logs/dracon-platform.test.log:446:test apis/services/ai-api/ai-api-sdk/src/lib.rs - DraconAi::chat_stream (line 139) ... ignored
+docs/audit/2026-06-11-full-repo-audit/public-readiness-funding/validation-logs/pully-fully-pull-based-fleet-reconciler.test.log:1207:test health::checker::tests::test_parse_health_response_301_redirect ... ok
+docs/audit/2026-06-11-full-repo-audit/public-readiness-funding/validation-logs/pully-fully-pull-based-fleet-reconciler.test.log:1208:test health::checker::tests::test_parse_health_response_302_redirect ... ok
+docs/audit/2026-06-11-full-repo-audit/public-readiness-funding/inventory.json:117:      "last_msg": "docs: make crate docs explicit BYOK-library contract",
+docs/audit/2026-06-11-full-repo-audit/public-readiness-funding/PUBLIC_READINESS.md:36:3. **`dracon-ai-lib`**: decide remote strategy. It is still AHEAD:21 and push is blocked by the archived remote.
+docs/audit/2026-06-11-full-repo-audit/public-readiness-funding/PUBLIC_READINESS.md:60:- `dracon-ai-lib`: local validation passes, but push is blocked (AHEAD:21, archived remote).
+docs/audit/2026-06-11-full-repo-audit/public-readiness-funding/deps/dracon-code.tree.log:23:        ├── ai-api-sdk v0.2.0 (/home/dracon/Dev/dracon-platform/apis/services/ai-api/ai-api-sdk)
+docs/audit/2026-06-11-full-repo-audit/public-readiness-funding/deps/dracon-code.tree.log:60:    ├── ai-api-sdk v0.2.0 (/home/dracon/Dev/dracon-platform/apis/services/ai-api/ai-api-sdk) (*)
+docs/audit/2026-06-11-full-repo-audit/public-readiness-funding/deps/dracon-code.deny.log:18:11 │ ai-api-sdk = { workspace = true }
+docs/audit/2026-06-11-full-repo-audit/public-readiness-funding/deps/dracon-code.deny.log:31:11 │ ai-api-sdk = { workspace = true }
+docs/audit/2026-06-11-full-repo-audit/public-readiness-funding/deps/dracon-platform.tree.log:43:│   │       ├── ai-api-sdk v0.2.0 (/home/dracon/Dev/dracon-platform/apis/services/ai-api/ai-api-sdk)
+docs/audit/2026-06-11-full-repo-audit/public-readiness-funding/deps/dracon-platform.tree.log:229:│           ├── ai-api-sdk v0.2.0 (/home/dracon/Dev/dracon-platform/apis/services/ai-api/ai-api-sdk)
+docs/audit/2026-06-11-full-repo-audit/public-readiness-funding/deps/dracon-platform.tree.log:316:│   ├── ai-api-sdk v0.2.0 (/home/dracon/Dev/dracon-platform/apis/services/ai-api/ai-api-sdk)
+docs/audit/2026-06-11-full-repo-audit/public-readiness-funding/deps/dracon-platform.tree.log:365:│   ├── ai-api-sdk v0.2.0 (/home/dracon/Dev/dracon-platform/apis/services/ai-api/ai-api-sdk)
+docs/audit/2026-06-11-full-repo-audit/public-readiness-funding/deps/dracon-platform.tree.log:392:    ├── ai-api-sdk v0.2.0 (/home/dracon/Dev/dracon-platform/apis/services/ai-api/ai-api-sdk)
+docs/audit/2026-06-11-full-repo-audit/public-readiness-funding/deps/dracon-platform.tree.log:470:│   ├── ai-api-sdk v0.2.0 (/home/dracon/Dev/dracon-platform/apis/services/ai-api/ai-api-sdk)
+docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/per-repo/before.dracon-platform.git.txt:15:  archive/azumi-final                      8d7373e59 [origin/archive/azumi-final] docs(migration): phase 0 snapshot doc for Svelte migration
+docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/per-repo/before.dracon-platform.git.txt:19:* main                                     928216dbd [origin/main] 8 file(s) in apis,web [apis/services/ai-api/tests/happy_path.rs, apis/services/ai-api/tests/common/mod.rs, apis/services/ai-api/ai-api-sdk/tests/sdk.rs] DELTA:+160/-120 | TEST:276 BIN:2
+docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/per-repo/before.dracon-platform.git.txt:29:928216dbd 8 file(s) in apis,web [apis/services/ai-api/tests/happy_path.rs, apis/services/ai-api/tests/common/mod.rs, apis/services/ai-api/ai-api-sdk/tests/sdk.rs] DELTA:+160/-120 | TEST:276 BIN:2
+docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/per-repo/before.dracon-ai-lib.git.txt:9:* main d8846da [origin/main: ahead 21] docs: make crate docs explicit BYOK-library contract
+docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/per-repo/before.dracon-ai-lib.git.txt:11:d8846da docs: make crate docs explicit BYOK-library contract
+docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/per-repo/before.dracon-ai-lib.git.txt:12:4b70129 4 file(s) in docs [docs/archive/legacy-key-management-design.md, docs/consumer-getting-started.md, README.md] DELTA:+26/-8
+docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/per-repo/before.dracon-ai-lib.git.txt:13:210c250 1 file(s) in docs [docs/{key-management-design.md => archive/legacy-key-management-design.md}] DELTA:+0/-0
+docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/per-repo/after.dracon-ai-lib.git.txt:17:d8846da docs: make crate docs explicit BYOK-library contract
+docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/per-repo/after.dracon-ai-lib.git.txt:18:4b70129 4 file(s) in docs [docs/archive/legacy-key-management-design.md, docs/consumer-getting-started.md, README.md] DELTA:+26/-8
+docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/per-repo/after.avid.git.txt:13:  backup/pre-sync-largeblob-fix-1780417168 332a456 10 file(s) in .pi,models,src [models/parakeet-ctc/onnx/tokenizer.json, research-longevity.md, research-longevity-deep.md] DELTA:+7542/-5 | BIN:2 NEW:goals/active_goal_2026060216174443_mpws7hbo-xraahs.md,archived/goal_2026060214172244_mpwnc4lz-isvg6v.md,onnx/model_int8.onnx,onnx/model_int8.onnx_data,onnx/tokenizer.json,research-longevity-deep.md,research-longevity.md,test-output-longevity.md
+docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/per-repo/after.dracon-platform.git.txt:13:  archive/azumi-final                      8d7373e59 [origin/archive/azumi-final] docs(migration): phase 0 snapshot doc for Svelte migration
+docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/per-repo/after.dracon-platform.git.txt:30:928216dbd 8 file(s) in apis,web [apis/services/ai-api/tests/happy_path.rs, apis/services/ai-api/tests/common/mod.rs, apis/services/ai-api/ai-api-sdk/tests/sdk.rs] DELTA:+160/-120 | TEST:276 BIN:2
+docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/per-repo/before.avid.git.txt:13:  backup/pre-sync-largeblob-fix-1780417168 332a456 10 file(s) in .pi,models,src [models/parakeet-ctc/onnx/tokenizer.json, research-longevity.md, research-longevity-deep.md] DELTA:+7542/-5 | BIN:2 NEW:goals/active_goal_2026060216174443_mpws7hbo-xraahs.md,archived/goal_2026060214172244_mpwnc4lz-isvg6v.md,onnx/model_int8.onnx,onnx/model_int8.onnx_data,onnx/tokenizer.json,research-longevity-deep.md,research-longevity.md,test-output-longevity.md
+docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/pi-proof/after.dracon-platform.pi-files.txt:1:.pi/goals/archived/goal_2026060114151559_mpubve1l-w1065r.md
+docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/pi-proof/after.dracon-platform.pi-files.txt:2:.pi/goals/archived/goal_2026060117160715_mpvcloes-ugifjr.md
+docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/pi-proof/after.dracon-platform.pi-files.txt:3:.pi/goals/archived/goal_2026060200020178_mpvq4an0-3di7bv.md
+docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/pi-proof/after.dracon-platform.pi-files.txt:4:.pi/goals/archived/goal_2026060217031663_mpwehw9r-kss6ab.md
+docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/pi-proof/after.dracon-platform.pi-files.txt:5:.pi/goals/archived/goal_2026060221320645_mpwvbdsm-magn47.md
+docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/pi-proof/after.dracon-platform.pi-files.txt:6:.pi/goals/archived/goal_2026060317523791_mpx9agxd-ywk8fy.md
+docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/pi-proof/after.dracon-platform.pi-files.txt:7:.pi/goals/archived/goal_2026060318340417_mpx71kih-yjzm9s.md
+docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/pi-proof/after.dracon-platform.pi-files.txt:8:.pi/goals/archived/goal_2026060319165680_mpydotwe-vku9gu.md
+docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/pi-proof/after.dracon-platform.pi-files.txt:9:.pi/goals/archived/goal_2026060319592447_mpyfcukw-pwq8c3.md
+docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/pi-proof/after.dracon-platform.pi-files.txt:10:.pi/goals/archived/goal_2026060320323996_mpyfxron-umsm65.md
+docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/pi-proof/after.dracon-platform.pi-files.txt:11:.pi/goals/archived/goal_2026060401193447_mpyixusx-iv2ask.md
+docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/pi-proof/after.dracon-platform.pi-files.txt:12:.pi/goals/archived/goal_2026060401584341_mpyrdcut-epfiho.md
+docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/pi-proof/after.dracon-platform.pi-files.txt:13:.pi/goals/archived/goal_2026060414212846_mpyssfxs-k93992.md
+docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/pi-proof/after.dracon-platform.pi-files.txt:14:.pi/goals/archived/goal_2026060417153469_mpzlejp1-1sfiym.md
+docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/pi-proof/after.dracon-platform.pi-files.txt:15:.pi/goals/archived/goal_2026060419015216_mpzpldbh-qfs1ph.md
+docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/pi-proof/after.dracon-platform.pi-files.txt:16:.pi/goals/archived/goal_2026060419445268_mpzucq90-3abltf.md
+docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/pi-proof/after.dracon-platform.pi-files.txt:17:.pi/goals/archived/goal_2026060420552695_mpzwoefy-v2klb7.md
+docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/pi-proof/after.dracon-platform.pi-files.txt:18:.pi/goals/archived/goal_2026060421103793_mpzxg9sa-q1yaxw.md
+docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/pi-proof/after.dracon-platform.pi-files.txt:19:.pi/goals/archived/goal_2026060421261744_mpzxy6j6-gxi78x.md
+docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/pi-proof/after.dracon-platform.pi-files.txt:20:.pi/goals/archived/goal_2026060421310492_mpzy6y8e-ddoafw.md
+docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/pi-proof/after.dracon-platform.pi-files.txt:21:.pi/goals/archived/goal_2026060421465998_mpzyj9bk-tspzma.md
+docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/pi-proof/after.dracon-platform.pi-files.txt:22:.pi/goals/archived/goal_2026060422320484_mpzzqjcr-fimub6.md
+docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/pi-proof/after.dracon-platform.pi-files.txt:23:.pi/goals/archived/goal_2026060423144976_mq01kmmq-pfx4sn.md
+docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/pi-proof/after.dracon-platform.pi-files.txt:24:.pi/goals/archived/goal_2026060500110859_mq037rv5-z9akf8.md
+docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/pi-proof/after.dracon-platform.pi-files.txt:25:.pi/goals/archived/goal_2026060500405280_mq04r39z-lm7j10.md
+docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/pi-proof/after.dracon-platform.pi-files.txt:26:.pi/goals/archived/goal_2026060502045188_mq078jjs-yjg1kx.md
+docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/pi-proof/after.dracon-platform.pi-files.txt:27:.pi/goals/archived/goal_2026060502360449_mq08ku6g-sl1cqd.md
+docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/pi-proof/after.dracon-platform.pi-files.txt:28:.pi/goals/archived/goal_2026060510433600_mq0ps5q3-t57izk.md
+docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/pi-proof/after.dracon-platform.pi-files.txt:29:.pi/goals/archived/goal_2026060511240559_mq0qwr9y-qt5m2m.md
+docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/pi-proof/after.dracon-platform.pi-files.txt:30:.pi/goals/archived/goal_2026060516155073_mq0xxk94-qfwcpo.md
+docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/pi-proof/after.dracon-platform.pi-files.txt:31:.pi/goals/archived/goal_2026060520190320_mq16g8lk-d0xs4t.md
+docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/pi-proof/after.dracon-platform.pi-files.txt:32:.pi/goals/archived/goal_2026060522563050_mq1g9wak-2y0fgu.md
+docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/pi-proof/after.dracon-platform.pi-files.txt:33:.pi/goals/archived/goal_2026060523415402_mq1i2cjb-c2gnhj.md
+docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/pi-proof/after.dracon-platform.pi-files.txt:34:.pi/goals/archived/goal_2026060606430551_mq1k264c-16fl01.md
+docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/pi-proof/after.dracon-platform.pi-files.txt:35:.pi/goals/archived/goal_2026060718570984_mq2ases3-evm2gy.md
+docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/pi-proof/after.dracon-platform.pi-files.txt:36:.pi/goals/archived/goal_2026060719532924_mq44gy4a-fmk83s.md
+docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/pi-proof/after.dracon-platform.pi-files.txt:37:.pi/goals/archived/goal_2026060720335316_mq463pvs-s7u4jr.md
+docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/pi-proof/after.dracon-platform.pi-files.txt:38:.pi/goals/archived/goal_2026060810401645_mq4b1i97-1hfoml.md
+docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/pi-proof/after.dracon-platform.pi-files.txt:39:.pi/goals/archived/goal_2026060811193837_mq51z8qu-6ny2q3.md

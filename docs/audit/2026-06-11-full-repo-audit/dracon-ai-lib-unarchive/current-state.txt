@@ -1,0 +1,354 @@
+--- current README head/snippets ---
+# dracon-ai-lib
+
+Standalone Rust workspace for an importable BYOK AI client library.
+
+This is a library others import. Downstream applications provide their own
+provider API keys, base URLs, and models. `ai-lib` does not read `.env`, does
+not auto-load keys, does not store keys, does not own lanes, does not route or
+fail over, does not enforce quotas, and is not the `ai-api` gateway.
+
+## [`crates/ai-lib`](crates/ai-lib/)
+
+Super-simple Rust client for direct AI provider access.
+
+**Bring your own keys. No defaults. No auto-config. No gateway.**
+
+A thin async client that calls OpenAI, OpenRouter, NVIDIA, Mistral, DeepSeek,
+Apertis, and other OpenAI-compatible providers **directly** from your Rust
+code. Also speaks the Anthropic Messages API directly.
+
+For the complete BYO-key getting-started guide, see
+[`docs/consumer-getting-started.md`](docs/consumer-getting-started.md).
+
+### When to use `ai-lib` directly vs. `ai-api` gateway
+
+| Need | Use |
+|---|---|
+| Bring your own OpenAI/OpenRouter/NVIDIA/etc. API key | `ai-lib` simple consumer API |
+| Bring your own Anthropic API key | `ai-lib` Anthropic API |
+| Dracon user auth, per-tier quota, rate limits, dashboard billing | `ai-api` HTTP gateway |
+| Pooled provider keys owned by dracon | `ai-api` key vault |
+| Lane routing / failover / per-tier model selection | `ai-api` lane router |
+
+### Lane ownership
+
+`ai-lib` does **not** own lanes, routing, failover, quotas, or key pools.
+`Lane` is only an opaque request tag on engine-level `AiRequest` values so a
+gateway such as `ai-api` can carry the caller's selected lane into the provider
+engine. The gateway owns lane definitions, lane-to-provider/model mapping,
+system prompts, failover, and key lookup.
+
+For direct consumers, the simple API is still one thing: create `AiClient`,
+pass `ChatRequest::new(api_key, base_url, model)`, and call `chat()`. No lane
+setup, no config files, no env reads, no key pool.
+
+```toml
+[dependencies]
+ai-lib = { git = "https://github.com/DraconDev/dracon-ai-lib", tag = "v0.2.0" }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+```
+
+```rust
+use ai_lib::{AiClient, ChatRequest, Message, Role};
+
+let client = AiClient::new();
+let request = ChatRequest::new(
+    "sk-...".into(),
+    "https://api.openai.com/v1".into(),
+    "gpt-4o".into(),
+    vec![Message {
+        role: Role::User,
+        content: "Hello, world!".into(),
+    }],
+);
+let response = client.chat(request).await?;
+```
+
+## [`crates/ai-models-catalog`](crates/ai-models-catalog/)
+
+models.dev-backed provider catalog and BYOK config types.
+
+A pure data crate for parsing `models.dev/api.json` and opencode/Kilo-style
+JSONC config files. No HTTP, no env reads, no provider adapters.
+
+## Release tracking
+
+Provider/model release tracking is documented in
+[`docs/release-tracking.md`](docs/release-tracking.md).
+
+In short: `models.dev` is the external release metadata aggregator, `ai-models-catalog`
+is the local typed mirror, and `ai-api` owns lane/routing decisions.
+
+## Setup
+
+This repo is a Cargo workspace. Build and test everything:
+
+```sh
+cargo build --workspace
+cargo test --workspace
+```
+
+## Current tag
+
+The current frozen library tag is `v0.2.0`:
+
+```toml
+ai-lib = { git = "https://github.com/DraconDev/dracon-ai-lib", tag = "v0.2.0" }
+```
+
+The repo is archived on GitHub. Do not create or push new tags unless you
+intentionally un-archive the repo and explicitly cut a new release.
+
+## License
+
+AGPL-3.0. See [LICENSE](LICENSE).
+--- current STATUS ---
+--- current CONSUMERS ---
+# dracon-ai-lib — Consumer Guide
+
+> **⚠️ ARCHIVED — Use [`ai-api-sdk`](https://github.com/DraconDev/dracon-ai-platform/tree/main/crates/ai-api-sdk) in the `dracon-ai-platform` repo instead. This lib is frozen at v0.2.0.**
+
+The lib is a pure AI engine — Rust code that talks directly to OpenAI, Anthropic, Gemini, etc. It does **not** run a server. It does **not** ship a key vault. It does **not** auto-load secrets.
+
+## The decision rule
+
+| Situation | Use |
+|---|---|
+| **One consumer, one set of keys, no sharing** (solo dev) | The lib directly (`dracon-ai-client`) |
+| **Two or more consumers sharing the same provider keys** | `ai-api` HTTP gateway via `ai-api-sdk` |
+| **Cross-language or cross-network consumers** | `ai-api` HTTP gateway via `ai-api-sdk` |
+
+**Why this rule?** The lib model breaks down the moment two consumers share a key:
+
+1. **Quota collisions** — if `avid` and `ai-auto-writer` both hit `AI_KEY_OPENROUTER`, you burn through rate limits twice as fast.
+2. **No central rotation** — rotate a key, every consumer's `.env` needs updating.
+3. **Disk-wipe fragility** — five consumers, five `.env` files, five backups. ai-api = one place.
+4. **No per-consumer auth** — the lib is in-process, no consumer identity. ai-api can issue per-consumer API keys.
+5. **No BYOK without a server** — if a user wants to upload their own key without your code seeing it, you need an HTTP endpoint.
+
+`ai-api` solves all of these. The lib is fine for solo dev. The moment you go multi-consumer, go gateway.
+
+---
+
+## The two paths
+
+| Path | Mechanism | When to use |
+|------|-----------|-------------|
+| **Direct — `dracon-ai-client` (this lib)** | `AiClient::from_env()` reads `AI_KEY_*` from your env | Solo dev. One consumer, one key set, no sharing. |
+| **HTTP gateway — `ai-api-sdk` (in the platform repo)** | HTTP client to an `ai-api` server | Two or more consumers sharing keys. Cross-language. Cross-network. BYOK. |
+
+### What ai-api gives you (that the lib doesn't)
+
+- **Per-consumer API keys** — each consumer gets a unique `AI_API_KEY`. Revoke one, others keep working.
+- **BYOK (Bring Your Own Key)** — consumers upload their own provider keys to ai-api via `POST /v1/keys`. Their key is stored encrypted, used only for their requests.
+- **Central quota tracking** — one provider key, many consumers, but ai-api throttles per consumer so one consumer can't starve the others.
+- **Central rotation** — rotate the platform's provider key in one place, all consumers benefit immediately.
+- **Cross-language** — anything that can speak HTTP (Python, JS, Go, shell) can use ai-api.
+
+### What you give up going through ai-api
+
+- One network hop per request (a few ms).
+- ai-api becomes a hard dependency — it must be running for the consumer to work.
+- You trust whoever runs ai-api with the keys (BYOK mitigates this if users upload their own).
+
+---
+
+## Which path is right for you?
+
+**One consumer, one machine, one set of provider keys — and you control all of it?**
+→ Use the lib directly. Paste your provider keys into your project's `.env`. Done.
+
+**Two or more consumers sharing the same provider keys?**
+→ Run `ai-api` somewhere. Have each consumer point at it via `ai-api-sdk`. BYOK is optional — consumers can use the platform's central key pool.
+
+**Shipping a consumer to external users who have their own provider keys?**
+→ Run `ai-api`. External users upload their own keys via the BYOK endpoint. They get a consumer API key, never see provider keys directly. The consumer (your binary) uses `ai-api-sdk`.
+
+**Cross-network or cross-language consumers?**
+→ `ai-api-sdk` (or any HTTP client) over `ai-api`. The lib is in-process and Rust-only.
+
+**Solo dev, no sharing?**
+→ Lib direct. No need for a server.
+
+---
+
+## Three patterns (implementation details)
+
+The lib supports three patterns for loading keys. Pick the one that matches your situation.
+
+| Pattern | When to use | What you do |
+|---------|-------------|-------------|
+| **A. Consumer provides keys (default for solo dev)** | You want to manage your own keys | Set `AI_KEY_*` env vars yourself |
+| **B. Opt-in to lib's keys** | You want the lib's default keys (dev convenience) | Call `load_lib_env()` explicitly |
+| **C. Copy keys to your own setup** | You want keys in your own .env | Run `extract-keys` to get them |
+
+> **Going multi-consumer? Skip these patterns.** Use `ai-api-sdk` against an `ai-api` server with BYOK instead. See the [ai-api-sdk README](https://github.com/DraconDev/dracon-ai-platform) for the BYOK flow.
+
+---
+
+## Pattern A — Consumer provides keys (default)
+
+The lib does NOT auto-load its `.env`. You must provide your own keys.
+
+Add the lib to your `Cargo.toml` (use a git tag, **not** a path dep — the lib is moving to remote-only):
+
+```toml
+[dependencies]
+dracon-ai-client = { git = "https://github.com/DraconDev/dracon-ai-lib.git", tag = "v0.2.0" }
+```
+
+If you also need the contracts crate:
+
+```toml
+dracon-ai-contracts = { git = "https://github.com/DraconDev/dracon-ai-lib.git", tag = "v0.2.0" }
+```
+
+Set your own `AI_KEY_*` env vars (or use a `.env` file in your project):
+
+```bash
+# .env (in your project root, not the lib's)
+AI_KEY_OPENAI=sk-your-key-here
+AI_KEY_ANTHROPIC=sk-ant-your-key
+```
+
+Then in your code:
+
+```rust
+use dracon_ai_client::AiClient;
+use dracon_ai_contracts::ChatMessage;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Reads AI_KEY_* from YOUR environment, not the lib's
+    let client = AiClient::from_env()?;
+
+    let response = client.chat("default", vec![
+        ChatMessage::user("Hello!"),
+    ]).await?;
+
+    println!("{}", response);
+    Ok(())
+}
+```
+
+If you don't set any keys, `from_env()` will fail with: `no AI_KEY_* environment variables found`.
+
+---
+
+## Pattern B — Opt-in to lib's keys
+
+If you want to use the lib's default keys (the ones in `dracon-ai-lib/.env`), you must explicitly opt in by calling `load_lib_env()`:
+
+```rust
+use dracon_ai_client::{AiClient, load_lib_env};
+use dracon_ai_contracts::ChatMessage;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // EXPLICITLY load the lib's .env into the process environment
+    let _ = load_lib_env();
+
+    // Now from_env() can find the lib's keys
+    let client = AiClient::from_env()?;
+
+    let response = client.chat("default", vec![
+        ChatMessage::user("Hello!"),
+    ]).await?;
+
+    Ok(())
+}
+```
+
+**What `load_lib_env()` does:**
+- Finds the lib's `.env` (via `DRACON_AI_LIB_ENV` env var, manifest dir, or `./dracon-ai-lib/.env`)
+- Reads it
+- Sets each `KEY=value` as a process env var (only if not already set)
+- Returns the number of vars loaded
+
+**Consumer keys always win** — if you set `AI_KEY_OPENAI` before calling `load_lib_env()`, your key is kept.
+
+**This is deliberate.** The lib's keys are a convenience for dev/testing, but production consumers should manage their own keys. You have to ask for the lib's keys explicitly.
+
+---
+
+## Pattern C — Copy keys to your own .env
+
+If you want the lib's keys in your own setup (not loading them at runtime), extract them:
+
+```bash
+# From the lib directory
+cargo run --bin extract-keys -- --output .env.keys
+```
+
+This produces a plain `KEY=value` file with all the lib's keys. Copy it into your project:
+
+```bash
+# Your project's .env
+AI_KEY_OPENAI=sk-...
+AI_KEY_ANTHROPIC=sk-ant-...
+...
+```
+
+Then use Pattern A (consumer provides keys).
+
+You can also pipe it directly:
+
+```bash
+cargo run --bin extract-keys > .env.keys
+```
+
+Or get just the apertis key:
+
+```bash
+cargo run --bin extract-keys | grep APERTIS
+```
+
+---
+
+## Why this design?
+
+The lib has the logic AND the keys. But:
+
+1. **By default, consumers use their own keys** — they have to set `AI_KEY_*` themselves. The lib doesn't touch their env.
+2. **The lib's keys are available** — they're in `.env` at the repo root. Consumers can opt in (`load_lib_env()`) or copy them (`extract-keys`).
+3. **No auto-loading, no surprises** — `from_env()` does exactly what it says: reads env vars. Nothing else.
+4. **Warden encrypts the lib's `.env` in git** — the keys are safe in version control, but available in the working tree.
+
+This is the simplest possible model. No magic, no embedded plaintext, no key distribution problems.
+
+---
+
+## Migration from the old auto-load model
+
+Older versions of the lib (≤ 0.1.21) auto-loaded `.env` from the working tree via `load_env()`. That meant every consumer got the lib's default keys without asking. The current version (≥ 0.1.22) does NOT auto-load — it's opt-in.
+
+### If you were using the lib before
+
+--- archive diff 4fc7206 ---
+commit 4fc7206ea7ab2e7f93b7265de2c68fd266795ef6
+Author:     DraconDev <dracsharp@gmail.com>
+AuthorDate: Mon Jun 8 12:49:09 2026 +0100
+Commit:     DraconDev <dracsharp@gmail.com>
+CommitDate: Mon Jun 8 12:49:09 2026 +0100
+
+    archive: mark lib as archived, redirect to ai-api-sdk
+
+ CHANGELOG.md | 2 ++
+ CONSUMERS.md | 2 ++
+ README.md    | 2 ++
+ 3 files changed, 6 insertions(+)
+--- archive commit README patch ---
+commit 4fc7206ea7ab2e7f93b7265de2c68fd266795ef6
+Author: DraconDev <dracsharp@gmail.com>
+
+    archive: mark lib as archived, redirect to ai-api-sdk
+
+--- current Cargo workspace packages ---
+ai-lib
+ai-models-catalog
+dracon-ai-client
+dracon-ai-contracts
+dracon-ai-core
+dracon-ai-providers
+extract-keys
