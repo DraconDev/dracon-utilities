@@ -1,0 +1,89 @@
+working porcelain lines: 1
+history local-state matches: 4921
+secret-shaped current matches: 42
+
+first 40 working risk paths:
+
+first 40 history local-state paths:
+1:docs/audit/2026-06-11-full-repo-audit/pre-release-all-three-utilities/evidence/cargo-build-release.exit
+2:docs/audit/2026-06-11-full-repo-audit/pre-release-all-three-utilities/evidence/cargo-clippy.exit
+3:docs/audit/2026-06-11-full-repo-audit/pre-release-all-three-utilities/evidence/dracon-sync-config-validate.exit
+4:docs/audit/2026-06-11-full-repo-audit/pre-release-all-three-utilities/evidence/dracon-sync-scaffold-dry-run.exit
+5:docs/audit/2026-06-11-full-repo-audit/pre-release-all-three-utilities/evidence/install-dry-run.exit
+6:docs/audit/2026-06-11-full-repo-audit/pre-release-all-three-utilities/evidence/verify-spec.exit
+8:docs/audit/2026-06-11-full-repo-audit/pre-release-all-three-utilities/evidence/cargo-deny-check.exit
+9:docs/audit/2026-06-11-full-repo-audit/pre-release-all-three-utilities/evidence/cargo-fmt-check.exit
+10:docs/audit/2026-06-11-full-repo-audit/pre-release-all-three-utilities/evidence/cargo-test.exit
+11:docs/audit/2026-06-11-full-repo-audit/pre-release-all-three-utilities/evidence/dracon-sync-health.exit
+12:docs/audit/2026-06-11-full-repo-audit/pre-release-all-three-utilities/evidence/dracon-sync-health.txt
+13:docs/audit/2026-06-11-full-repo-audit/pre-release-all-three-utilities/evidence/dracon-sync-repos.exit
+14:docs/audit/2026-06-11-full-repo-audit/pre-release-all-three-utilities/evidence/dracon-sync-repos.json
+15:docs/audit/2026-06-11-full-repo-audit/pre-release-all-three-utilities/evidence/dracon-sync-repos.stderr
+16:docs/audit/2026-06-11-full-repo-audit/pre-release-all-three-utilities/evidence/dracon-sync-status.exit
+17:docs/audit/2026-06-11-full-repo-audit/pre-release-all-three-utilities/evidence/dracon-sync-status.txt
+18:docs/audit/2026-06-11-full-repo-audit/pre-release-all-three-utilities/evidence/dracon-system-status.exit
+19:docs/audit/2026-06-11-full-repo-audit/pre-release-all-three-utilities/evidence/dracon-system-status.txt
+20:docs/audit/2026-06-11-full-repo-audit/pre-release-all-three-utilities/evidence/dracon-warden-status.exit
+21:docs/audit/2026-06-11-full-repo-audit/pre-release-all-three-utilities/evidence/dracon-warden-status.txt
+22:docs/audit/2026-06-11-full-repo-audit/pre-release-all-three-utilities/evidence/git-branches.txt
+23:docs/audit/2026-06-11-full-repo-audit/pre-release-all-three-utilities/evidence/git-log-all-20.txt
+24:docs/audit/2026-06-11-full-repo-audit/pre-release-all-three-utilities/evidence/git-remotes.txt
+25:docs/audit/2026-06-11-full-repo-audit/pre-release-all-three-utilities/evidence/git-status.txt
+26:docs/audit/2026-06-11-full-repo-audit/pre-release-all-three-utilities/evidence/service-install-inventory.txt
+27:docs/audit/2026-06-11-full-repo-audit/pre-release-all-three-utilities/evidence/utility-cargo-versions.txt
+29:docs/audit/2026-06-11-full-repo-audit/untracked-artifacts-policy/evidence/final-dracon-sync-repos.json
+30:docs/audit/2026-06-11-full-repo-audit/untracked-artifacts-policy/evidence/final-dracon-sync-repos.stderr
+31:docs/audit/2026-06-11-full-repo-audit/untracked-artifacts-policy/evidence/final-fmt.txt
+32:docs/audit/2026-06-11-full-repo-audit/untracked-artifacts-policy/evidence/final-focused-repos.md
+33:docs/audit/2026-06-11-full-repo-audit/untracked-artifacts-policy/evidence/final-focused-test.txt
+34:docs/audit/2026-06-11-full-repo-audit/untracked-artifacts-policy/evidence/final-validation-exits.txt
+35:docs/audit/2026-06-11-full-repo-audit/untracked-artifacts-policy/evidence/final-workspace-test.txt
+37:docs/audit/2026-06-11-full-repo-audit/untracked-artifacts-policy/evidence/policy-diff.patch
+39:docs/audit/2026-06-11-full-repo-audit/untracked-artifacts-policy/evidence/policy-diff.patch
+41:docs/audit/2026-06-11-full-repo-audit/untracked-artifacts-policy/evidence/policy-diff.patch
+43:docs/audit/2026-06-11-full-repo-audit/untracked-artifacts-policy/evidence/cargo-fmt-check.txt
+44:docs/audit/2026-06-11-full-repo-audit/untracked-artifacts-policy/evidence/cargo-test.txt
+45:docs/audit/2026-06-11-full-repo-audit/untracked-artifacts-policy/evidence/post-commit-cargo-fmt-check.txt
+46:docs/audit/2026-06-11-full-repo-audit/untracked-artifacts-policy/evidence/post-commit-cargo-test.txt
+
+first 40 secret-shaped matches:
+./CHANGELOG.md:147:  - Added "Slack Bot Token (Compact)" pattern: catches `xoxb-` tokens without numeric ID segments
+./AUDIT.md:151:- No production secrets (verified by `rg` for `sk-`, `AKIA`, `ghp_`, `xoxb-`, `glpat-`): all matches are in `dracon-warden/src/security/tests/*` and `dracon-warden/src/security/src/lib.rs:1388+` — these are test fixtures / secret-scanner self-tests, not real tokens.
+./dracon-sync/README.md:247:echo "GITLAB_TOKEN=glpat-xxxxxxxxxxxxxxxxxxxx" > ~/.dracon/utilities/sync/secrets/gitlab.env
+./docs/public-release-plan.md:199:ghp_PUBLIC_EXAMPLE_DO_NOT_USE_00000000000000000000
+./docs/public-release-plan.md:201:xoxb-PUBLIC_EXAMPLE_DO_NOT_USE
+./docs/public-release-plan.md:207:rg -n 'AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9_]{36,}|glpat-[A-Za-z0-9_-]{20,}|xox[baprs]-|AGE-SECRET-KEY-' .
+./docs/public-release-plan.md:247:rg -n 'AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9_]{36,}|glpat-[A-Za-z0-9_-]{20,}|xox[baprs]-|AGE-SECRET-KEY-' .
+./docs/public-release-branch/PUBLIC_RELEASE_PREP.md:115:rg -n 'AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9_]{36,}|glpat-[A-Za-z0-9_-]{20,}|xox[baprs]-|AGE-SECRET-KEY-' .
+./docs/public-release-branch/PUBLIC_RELEASE_PREP.md:175:rg -n 'AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9_]{36,}|glpat-[A-Za-z0-9_-]{20,}|xox[baprs]-|AGE-SECRET-KEY-' .
+./dracon-warden/src/security/tests/security_critical_test.rs:636:    fs::write(master_dir.join("master.age"), "AGE-SECRET-KEY-1\n").expect("create master private");
+./dracon-warden/src/security/tests/leak_prevention_test.rs:75:        let secret_str = "ghp_abcdefghijklmnopqrstuvwxyz123456789012";
+./dracon-warden/src/security/tests/plaintext_sibling_test.rs:42:    let secret = "AGE-SECRET-KEY-1QPZRY9X8GF2TVDW0S3JN54KHCE6MUA7LQPZRY9X8GF2TVDW0S3JN54KHCE6MUA7L";
+./dracon-warden/src/security/tests/plaintext_sibling_test.rs:62:    let secret = "AGE-SECRET-KEY-1QPZRY9X8GF2TVDW0S3JN54KHCE6MUA7LQPZRY9X8GF2TVDW0S3JN54KHCE6MUA7L";
+./dracon-warden/src/security/tests/plaintext_sibling_test.rs:88:    let secret = "AGE-SECRET-KEY-1QPZRY9X8GF2TVDW0S3JN54KHCE6MUA7LQPZRY9X8GF2TVDW0S3JN54KHCE6MUA7L";
+./dracon-warden/src/security/tests/plaintext_sibling_test.rs:133:    let secret = "AGE-SECRET-KEY-1QPZRY9X8GF2TVDW0S3JN54KHCE6MUA7LQPZRY9X8GF2TVDW0S3JN54KHCE6MUA7L";
+./dracon-warden/src/security/tests/redos_stress_test.rs:100:        "ghp_1234567890abcdef1234567890abcdef1234",
+./dracon-warden/src/security/tests/redos_stress_test.rs:102:        "AKIAIOSFODNN7EXAMPLE",
+./dracon-warden/src/security/tests/redos_stress_test.rs:103:        "xoxb-123456789012-1234567890123-AbCdEfGhIjKlMnOpQrStUvWx",
+./dracon-warden/src/main.rs:789:    if s.contains("AGE-SECRET-KEY-") {
+./dracon-warden/src/security/tests/comprehensive_test.rs:43:        raw: "ghp_1234567890abcdef1234567890abcdef1234",
+./dracon-warden/src/security/tests/comprehensive_test.rs:48:        raw: "xoxb-123456789012-1234567890123-AbCdEfGhIjKlMnOpQrStUvWx",
+./dracon-warden/src/security/tests/comprehensive_test.rs:63:        raw: "AKIAIOSFODNN7EXAMPLE",
+./dracon-warden/src/security/tests/comprehensive_test.rs:124:        raw: "xoxb-123456789012-123456789012-abcdef123456",
+./dracon-warden/src/security/tests/scanner_edge_cases_test.rs:57:    let content = "ghp_1234567890abcdef1234567890abcdef1234";
+./dracon-warden/src/security/tests/scanner_edge_cases_test.rs:81:    let content = "AKIAIOSFODNN7EXAMPLE";
+./dracon-warden/src/tests.rs:272:        fs::write(&secret, "AGE-SECRET-KEY-1XXXX").expect("write");
+./dracon-warden/src/tests.rs:980:        std::fs::write(master_dir.join("master.age"), "AGE-SECRET-KEY-1\n").unwrap();
+./dracon-warden/src/security/tests/massive_secret_scan.rs:177:        "xoxb-83UfzF1Ov3uWRTL5A0krt6s38Thuw6",
+./dracon-warden/src/security/tests/massive_secret_scan.rs:178:        "xoxb-PfmnwKDUpxH6TWLHSM8Bs9VEtOB26x",
+./dracon-warden/src/security/tests/massive_secret_scan.rs:179:        "xoxb-7eGh7Pq2Iyd3QPD6NLt8fAyVdLAByF",
+./dracon-warden/src/security/tests/massive_secret_scan.rs:180:        "xoxb-ZsQeunnoA93QuVySqqyUseZN0N8AZz",
+./dracon-warden/src/security/tests/massive_secret_scan.rs:181:        "xoxb-i8uApDfjzOmTEak0YS3Zl6kcMozIwT",
+./dracon-warden/src/security/src/lib.rs:1108:            "AGE-SECRET-KEY-1QPZRY9X8GF2TVDW0S3JN54KHCE6MUA7LQPZRY9X8GF2TVDW0S3JN54KHCE6MUA7L";
+./dracon-warden/src/security/src/lib.rs:1392:        let long = "ghp_abcdefghijklmnopqrstuvwxyz123456789012";
+./dracon-warden/src/security/src/lib.rs:1433:        let token = "xoxb-abcdefghijklmnopqrstuvwxyz1234567890abcdefghijklmnop";
+./dracon-warden/src/security/src/lib.rs:1445:        let reasonable = "xoxb-abcdefghijklmnopqrstuvwxyz1234567890abcdefghijklmnop";
+./dracon-warden/src/security/src/lib.rs:1449:            "should match slack bot token up to 68 chars after xoxb-, found: {:?}",
+./dracon-warden/src/security/src/modules/scanner.rs:156:                r"xoxb-[0-9]{11}-[0-9]{11}-[a-zA-Z0-9]{24}",
+./dracon-warden/src/security/src/modules/scanner.rs:158:            ("Slack Bot Token (Compact)", r"xoxb-[A-Za-z0-9]{24,68}"),
+./dracon-warden/src/security/src/modules/scanner.rs:296:                r"AGE-SECRET-KEY-1[QPZRY9X8GF2TVDW0S3JN54KHCE6MUA7L]{58}",
