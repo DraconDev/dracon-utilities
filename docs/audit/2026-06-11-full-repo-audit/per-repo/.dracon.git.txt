@@ -1,0 +1,19 @@
+REPO=/home/dracon/.dracon
+--- git status porcelain=v2 ---
+--- git remote -v ---
+codeberg	git@codeberg.org:dracondev/.dracon.git (fetch)
+codeberg	git@codeberg.org:dracondev/.dracon.git (push)
+github	git@github.com:DraconDev/.dracon.git (fetch)
+github	git@github.com:DraconDev/.dracon.git (push)
+gitlab	git@gitlab.com:dracondev/.dracon.git (fetch)
+gitlab	git@gitlab.com:dracondev/.dracon.git (push)
+origin	git@github.com:DraconDev/dracon-home.git (fetch)
+origin	git@github.com:DraconDev/dracon-home.git (push)
+--- git branch -vv ---
+* main 2433df49b [origin/main] 1 file(s) in memory [memory/rag/rag_index.json] DELTA:+1/-1
+--- git log -5 ---
+2433df49b 1 file(s) in memory [memory/rag/rag_index.json] DELTA:+1/-1
+3f7d9228b 1 file(s) in memory [memory/rag/rag_index.json] DELTA:+1/-1
+d5ec427de 1 file(s) in utilities [utilities/sync/dracon-sync.toml] DELTA:+1/-1
+b318e5725 1 file(s) in memory [memory/rag/rag_index.json] DELTA:+1/-1
+399dfbbcd Merge github.com:DraconDev/dracon-home

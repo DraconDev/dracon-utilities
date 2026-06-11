@@ -1,0 +1,22 @@
+REPO=/home/dracon/Dev/Junk-Runner-bevy
+--- git status porcelain=v2 ---
+--- git remote -v ---
+codeberg	git@codeberg.org:dracondev/Junk-Runner-bevy.git (fetch)
+codeberg	git@codeberg.org:dracondev/Junk-Runner-bevy.git (push)
+github	git@github.com:DraconDev/Junk-Runner-bevy.git (fetch)
+github	git@github.com:DraconDev/Junk-Runner-bevy.git (push)
+gitlab	git@gitlab.com:dracondev/Junk-Runner-bevy.git (fetch)
+gitlab	git@gitlab.com:dracondev/Junk-Runner-bevy.git (push)
+origin	https://github.com/DraconDev/Junk-Runner-bevy.git (fetch)
+origin	https://github.com/DraconDev/Junk-Runner-bevy.git (push)
+--- git branch -vv ---
+  bevy-legacy e198f1000 [origin/bevy-legacy] test(cargo.lock to): Updated Cargo.lock to reflect latest dependency versions
+  main        e1894697f [origin/main] Added SOLID_VS_SVELTE.md
+* tauri2      7412b84d2 [origin/tauri2] 1 file(s) [CHANGELOG.md] DELTA:+8/-0
+  temp_fix    2fd47876a [origin/temp_fix] chore(sync): update Cargo
+--- git log -5 ---
+7412b84d2 1 file(s) [CHANGELOG.md] DELTA:+8/-0
+b891cfea1 2 file(s) in web [BEVY-PARITY-PLAN.md, web/src/lib/screens/Combat.svelte] DELTA:+15/-9
+e664069f7 1 file(s) in web [web/src/lib/game/combat.ts] DELTA:+1/-0
+39eee370f 2 file(s) in web [web/src/lib/game/combat.ts, web/src/lib/game/combat.test.ts] DELTA:+36/-4 | TEST:19
+ca64c7148 1 file(s) in web [web/src/lib/screens/Combat.svelte] DELTA:+9/-3

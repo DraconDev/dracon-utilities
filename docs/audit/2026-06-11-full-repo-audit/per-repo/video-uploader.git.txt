@@ -1,0 +1,19 @@
+REPO=/home/dracon/Dev/video-uploader
+--- git status porcelain=v2 ---
+--- git remote -v ---
+codeberg	git@codeberg.org:dracondev/video-uploader.git (fetch)
+codeberg	git@codeberg.org:dracondev/video-uploader.git (push)
+github	git@github.com:DraconDev/video-uploader.git (fetch)
+github	git@github.com:DraconDev/video-uploader.git (push)
+gitlab	git@gitlab.com:dracondev/video-uploader.git (fetch)
+gitlab	git@gitlab.com:dracondev/video-uploader.git (push)
+origin	https://github.com/DraconDev/video-uploader.git (fetch)
+origin	https://github.com/DraconDev/video-uploader.git (push)
+--- git branch -vv ---
+* main a084400 [origin/main] Merge https://github.com/DraconDev/video-uploader
+--- git log -5 ---
+a084400 Merge https://github.com/DraconDev/video-uploader
+b630d5f 4 file(s) in youtube-uploader,youtube-uploader-cli [youtube-uploader/src/youtube.rs, youtube-uploader/src/config.rs, youtube-uploader-cli/src/main.rs] DELTA:+80/-40
+4d095e6 Enable GitHub Sponsors button
+3e676bd 2 file(s) rotated to new dedicated master
+7911806 2 file(s) [.env, .env.test] DELTA:+2/-2 | ENV:

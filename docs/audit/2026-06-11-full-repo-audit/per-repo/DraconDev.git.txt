@@ -1,0 +1,22 @@
+REPO=/home/dracon/Dev/DraconDev
+--- git status porcelain=v2 ---
+1 .M N... 100644 100644 100644 5ad665c06122b09f6ddc87fde88a1ad64643e59f 5ad665c06122b09f6ddc87fde88a1ad64643e59f README.md
+1 .M N... 100644 100644 100644 5ad665c06122b09f6ddc87fde88a1ad64643e59f 5ad665c06122b09f6ddc87fde88a1ad64643e59f README_DRAFT.md
+? REPO_PRESENTATION_AUDIT.md
+--- git remote -v ---
+codeberg	git@codeberg.org:dracondev/DraconDev.git (fetch)
+codeberg	git@codeberg.org:dracondev/DraconDev.git (push)
+github	git@github.com:DraconDev/DraconDev.git (fetch)
+github	git@github.com:DraconDev/DraconDev.git (push)
+gitlab	git@gitlab.com:dracondev/DraconDev.git (fetch)
+gitlab	git@gitlab.com:dracondev/DraconDev.git (push)
+origin	https://github.com/DraconDev/DraconDev.git (fetch)
+origin	https://github.com/DraconDev/DraconDev.git (push)
+--- git branch -vv ---
+* main 1cd5819 [origin/main] 1 file(s) [GITHUB_SPONSORS_PROFILE_COPY.txt] DELTA:+17/-16
+--- git log -5 ---
+1cd5819 1 file(s) [GITHUB_SPONSORS_PROFILE_COPY.txt] DELTA:+17/-16
+87508e7 1 file(s) [GITHUB_SPONSORS_PROFILE_COPY.txt] DELTA:+12/-12
+b6165b2 1 file(s) [GITHUB_SPONSORS_PROFILE_COPY.txt] DELTA:+62/-0 | NEW:GITHUB_SPONSORS_PROFILE_COPY.txt
+05bc38c 1 file(s) [SPONSORS_EDIT_LOG.md] DELTA:+7/-1
+fa342ed 1 file(s) [SPONSORS_EDIT_LOG.md] DELTA:+83/-0

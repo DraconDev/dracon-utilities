@@ -1,0 +1,19 @@
+REPO=/home/dracon/Dev/video-factory
+--- git status porcelain=v2 ---
+--- git remote -v ---
+codeberg	git@codeberg.org:dracondev/video-factory.git (fetch)
+codeberg	git@codeberg.org:dracondev/video-factory.git (push)
+github	git@github.com:DraconDev/video-factory.git (fetch)
+github	git@github.com:DraconDev/video-factory.git (push)
+gitlab	git@gitlab.com:dracondev/video-factory.git (fetch)
+gitlab	git@gitlab.com:dracondev/video-factory.git (push)
+origin	https://github.com/DraconDev/video-factory.git (fetch)
+origin	https://github.com/DraconDev/video-factory.git (push)
+--- git branch -vv ---
+* main 698a658 [origin/main] 14 file(s) in crates [crates/api/src/routes.rs, crates/core/src/config.rs, crates/worker/src/ffmpeg.rs] DELTA:+225/-162
+--- git log -5 ---
+698a658 14 file(s) in crates [crates/api/src/routes.rs, crates/core/src/config.rs, crates/worker/src/ffmpeg.rs] DELTA:+225/-162
+81b5eb7 Merge https://github.com/DraconDev/video-factory
+4215e5f 1 file(s) in src [src/main.rs] DELTA:+3/-3
+9884139 Enable GitHub Sponsors button
+9f00d3c Revert "1 file(s) [.gitignore] DELTA:+1/-0"

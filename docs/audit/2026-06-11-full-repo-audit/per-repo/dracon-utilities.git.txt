@@ -1,0 +1,35 @@
+REPO=/home/dracon/Dev/dracon-utilities
+--- git status porcelain=v2 ---
+? docs/audit/2026-06-11-full-repo-audit/inventory.json
+? docs/audit/2026-06-11-full-repo-audit/inventory.tsv
+? docs/audit/2026-06-11-full-repo-audit/per-repo/ai-auto-writer.git.txt
+? docs/audit/2026-06-11-full-repo-audit/per-repo/browser-extensions-shared.git.txt
+? docs/audit/2026-06-11-full-repo-audit/per-repo/dracon-code.git.txt
+? docs/audit/2026-06-11-full-repo-audit/per-repo/dracon-platform.git.txt
+? docs/audit/2026-06-11-full-repo-audit/per-repo/dracon-utilities.git.txt
+? docs/audit/2026-06-11-full-repo-audit/per-repo/folder-auto-banner.git.txt
+? docs/audit/2026-06-11-full-repo-audit/per-repo/one-mil-girls.git.txt
+? docs/audit/2026-06-11-full-repo-audit/per-repo/pully-fully-pull-based-fleet-reconciler.git.txt
+? docs/audit/2026-06-11-full-repo-audit/per-repo/repos.tsv
+? docs/audit/2026-06-11-full-repo-audit/per-repo/rust-ai-web-auto.git.txt
+? docs/audit/2026-06-11-full-repo-audit/per-repo/video-factory.git.txt
+? docs/audit/2026-06-11-full-repo-audit/per-repo/video-uploader.git.txt
+--- git remote -v ---
+codeberg	git@codeberg.org:dracondev/dracon-utilities.git (fetch)
+codeberg	git@codeberg.org:dracondev/dracon-utilities.git (push)
+github	git@github.com:DraconDev/dracon-utilities.git (fetch)
+github	git@github.com:DraconDev/dracon-utilities.git (push)
+gitlab	git@gitlab.com:dracondev/dracon-utilities.git (fetch)
+gitlab	git@gitlab.com:dracondev/dracon-utilities.git (push)
+origin	https://github.com/DraconDev/dracon-utilities.git (fetch)
+origin	https://github.com/DraconDev/dracon-utilities.git (push)
+--- git branch -vv ---
+  backup/pre-merge-abort 846192c3 1 file(s) in .pi [.pi/goals/active_goal_2026060801061404_mq4gady8-2jker2.md] DELTA:+5/-5 | TOKENS:14531K TIME:573m EVIDENCE:quickwins-1:Fixed 2 docs. docs/OPERATIONS.md line|quickwins-2:Executed: `git rm dracon-sync/note.md|quickwins-3:Added `#![allow(dead_code)]` to draco+3more
+* main                   313de3cb [origin/main] 4 file(s) in dracon-warden [dracon-warden/src/security/tests/security_critical_test.rs, dracon-warden/src/security/src/modules/crypto.rs, dracon-warden/src/security/src/modules/filter.rs] DELTA:+20/-27 | TEST:35
+  scribe-version         fbe2a48c Modified dracon-warden/src/security/tests/common.rs
+--- git log -5 ---
+313de3cb 4 file(s) in dracon-warden [dracon-warden/src/security/tests/security_critical_test.rs, dracon-warden/src/security/src/modules/crypto.rs, dracon-warden/src/security/src/modules/filter.rs] DELTA:+20/-27 | TEST:35
+eefd07a2 3 file(s) in docs [docs/public-release-plan.md, docs/public-readiness.md, README.md] DELTA:+289/-0 | NEW:docs/public-release-plan.md
+4541daa4 Merge https://github.com/DraconDev/dracon-utilities
+2971de79 2 file(s) in docs [docs/public-readiness.md, README.md] DELTA:+116/-0 | NEW:docs/public-readiness.md
+9e55f92d Enable GitHub Sponsors button

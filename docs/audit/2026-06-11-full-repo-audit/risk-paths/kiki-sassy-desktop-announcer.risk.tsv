@@ -1,0 +1,5 @@
+section	path
+tracked	.dracon/data/keys/owner_age1f7y5.pub
+tracked	.dracon/data/keys/owner_nixos.pub
+tracked	.env
+tracked	.env.example

@@ -1,0 +1,36 @@
+REPO=/home/dracon/Dev/dracon-platform
+--- git status porcelain=v2 ---
+1 .M N... 100644 100644 100644 d7ed0401c309f871c7f829c4fb5d57ab8cb4a886 d7ed0401c309f871c7f829c4fb5d57ab8cb4a886 apis/services/ai-api/src/ai/client/mod.rs
+1 .M N... 100644 100644 100644 29e0ee4c208daddb54b5dfebb259b5af3709a730 29e0ee4c208daddb54b5dfebb259b5af3709a730 apis/services/auth-api/.env.prod
+? apis/services/ai-api/tests/streaming.rs
+? web/ai-hub-browser-probe.mjs
+? web/ai-hub-signed-browser-probe.mjs
+--- git remote -v ---
+codeberg	git@codeberg.org:dracondev/dracon-platform.git (fetch)
+codeberg	git@codeberg.org:dracondev/dracon-platform.git (push)
+github	git@github.com:DraconDev/dracon-platform.git (fetch)
+github	git@github.com:DraconDev/dracon-platform.git (push)
+gitlab	git@gitlab.com:dracondev/dracon-platform.git (fetch)
+gitlab	git@gitlab.com:dracondev/dracon-platform.git (push)
+origin	https://github.com/DraconDev/dracon-platform.git (fetch)
+origin	https://github.com/DraconDev/dracon-platform.git (push)
+--- git branch -vv ---
+  archive/azumi-final                      8d7373e59 [origin/archive/azumi-final] docs(migration): phase 0 snapshot doc for Svelte migration
+  autoresearch/http-client-reuse           e60a46390 [origin/autoresearch/http-client-reuse] chore(sync): update AGENTS
+  azumi-ver                                11f588f8d chore(goal): ai-hub-audit goal complete (6/6 tasks)
+  f-01-test                                96392860b F-01 local test artifact
+* main                                     9d330e811 [origin/main] 1 file(s) in apis [apis/services/ai-api/src/ai/client/mod.rs] DELTA:+5/-0
+  phase-0/pre-deploy-safety                4591cdf36 [origin/phase-0/pre-deploy-safety] 2 file(s) in libs [libs/api-core/src/validate.rs, libs/api-core/src/error.rs] DELTA:+15/-3
+  phase-1-reorg/api-core-and-ship-blockers 4bf3ad7dd [origin/phase-1-reorg/api-core-and-ship-blockers] 1 file(s) in web [web/PAGE-AUDIT.md] DELTA:+3/-2
+  phase-1/api-core-lift                    0f5e8e22b [origin/phase-1/api-core-lift] 1 file(s) in apis [apis/ai-api/.env] DELTA:+1/-1 | ENV:
+  phase-2/high-cluster                     7ad8ecca9 [origin/phase-2/high-cluster] 3 file(s) in web [web/ai-hub/src/lib/chrome.config.ts, web/ai-hub/src/routes/+layout.svelte, web/packages/chrome/src/lib/SiteSubNav.svelte] DELTA:+9/-19
+  phase-3/auth-key-rotation                48c8c4e37 [origin/phase-3/auth-key-rotation] 11 file(s) in web [web/tests/dashboard/dashboard-protected.spec.ts] DELTA:+15/-16 | TEST:31 BIN:10 NEW:chrome-fixes/desktop-dashboard-dropdown-hover-signout.png,chrome-fixes/desktop-dashboard-overview.png,chrome-fixes/desktop-home-signed-in.png TESTONLY:dashboard/dashboard-protected.spec.ts
+  phase-4/god-file-split                   732573472 [origin/phase-4/god-file-split: ahead 46, behind 1] Track Phase 4 split closes in CHANGES.md
+  phase-4/god-file-split-clean             0c98e5197 Phase 4: structural god-file splits (F-24/F-25/F-26)
+  phase-4/specta-metrics                   d8f6a56e2 [origin/phase-4/specta-metrics] 1 file(s) in web [web/ai-hub/src/lib/icons.ts] DELTA:+4/-2
+--- git log -5 ---
+9d330e811 1 file(s) in apis [apis/services/ai-api/src/ai/client/mod.rs] DELTA:+5/-0
+e88dbd7ec 19 file(s) in apis,web [apis/services/ai-api/src/handlers/middleware.rs, apis/docs/audits/audit-2026-06-08-findings-status.md, apis/services/ai-api/src/handlers/tests.rs] DELTA:+168/-16 | TEST:13 BIN:7 NEW:audits/audit-2026-06-08-findings-status.md ENV:
+6ac243d15 docs(audit): add auth/key audit report for 2026-06-12
+bb39684e6 8 file(s) in apis [apis/services/ai-api/src/specta_export.rs, apis/services/ai-api/src/ai/client/mod.rs, apis/services/ai-api/src/handlers/chat.rs] DELTA:+13/-22
+890f16c27 4 file(s) in web [Cargo.lock, web/games-hosted/games/junk-runner/assets/{index-opid_xS0.js => index-D5SsmMYq.js}, web/games-hosted/games/junk-runner/index.html] DELTA:+5/-5 | BIN:1
