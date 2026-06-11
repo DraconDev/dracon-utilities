@@ -17,7 +17,7 @@ version = "94.7.0"
 dependencies = [
  "anyhow",
  "async-trait",
- "dracon-ai-contracts 94.7.0",
+ "dracon-ai-contracts",
  "dracon-ai-runtime-contracts",
  "serde",
 ]
@@ -291,7 +291,7 @@ dependencies = [
  "anyhow",
  "clap",
  "dirs",
- "dracon-ai-contracts 94.7.0",
+ "dracon-ai-contracts",
  "dracon-ai-runtime-contracts",
  "env_logger",
  "futures",
@@ -312,21 +312,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "dracon-ai-contracts"
-version = "94.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "56e350fa4f6d9e4750a15aece2a732202fda6b111c9e202f07d01d82abf0122e"
-dependencies = [
- "serde",
-]
-
-[[package]]
 name = "dracon-ai-runtime-contracts"
 version = "94.7.0"
 dependencies = [
  "anyhow",
  "async-trait",
- "dracon-ai-contracts 94.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "dracon-ai-contracts",
  "serde",
  "serde_json",
 ]
