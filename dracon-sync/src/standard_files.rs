@@ -337,6 +337,61 @@ mod tests {
     }
 
     #[test]
+    fn test_funding_yml_in_dot_github_subdir() {
+        // GitHub discovers FUNDING.yml at .github/FUNDING.yml. The standard
+        // files flow must allow long-form entries that target subdirectories
+        // like .github/ while pulling the source from templates/FUNDING.yml.
+        let dir = TempDir::new().unwrap();
+        let repo_dir = dir.path();
+        let template_dir = dir.path().join("templates");
+        std::fs::create_dir(&template_dir).unwrap();
+        std::fs::write(template_dir.join("FUNDING.yml"), "github: []\n").unwrap();
+        let sync_path = dir.path().join("sync.toml");
+        let sync_dir = sync_path.parent().unwrap();
+
+        let policy = make_policy(vec![StandardFileConfig {
+            source: "templates/FUNDING.yml".to_string(),
+            target: ".github/FUNDING.yml".to_string(),
+            overwrite: false,
+        }]);
+
+        let repo_override = make_override(vec![]);
+        let result =
+            ensure_standard_files(repo_dir, &policy, &repo_override, Some(sync_dir), false);
+        assert!(result.is_ok());
+        let copied = result.unwrap();
+        assert_eq!(copied.len(), 1);
+        assert!(repo_dir.join(".github/FUNDING.yml").exists());
+        assert_eq!(
+            std::fs::read_to_string(repo_dir.join(".github/FUNDING.yml")).unwrap(),
+            "github: []\n"
+        );
+    }
+
+    #[test]
+    fn test_funding_yml_skip_standard_files_optout() {
+        // Per-repo skip_standard_files must opt out FUNDING.yml cleanly.
+        let dir = TempDir::new().unwrap();
+        let repo_dir = dir.path();
+        let template_dir = dir.path().join("templates");
+        std::fs::create_dir(&template_dir).unwrap();
+        std::fs::write(template_dir.join("FUNDING.yml"), "github: []\n").unwrap();
+
+        let policy = make_policy(vec![StandardFileConfig {
+            source: "templates/FUNDING.yml".to_string(),
+            target: ".github/FUNDING.yml".to_string(),
+            overwrite: false,
+        }]);
+
+        let repo_override = make_override(vec![".github/FUNDING.yml".to_string()]);
+        let result = ensure_standard_files(repo_dir, &policy, &repo_override, None, false);
+        assert!(result.is_ok());
+        let copied = result.unwrap();
+        assert!(copied.is_empty());
+        assert!(!repo_dir.join(".github/FUNDING.yml").exists());
+    }
+
+    #[test]
     fn test_short_form_source_resolution() {
         let dir = TempDir::new().unwrap();
         let repo_dir = dir.path();

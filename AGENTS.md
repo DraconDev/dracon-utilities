@@ -197,19 +197,34 @@ Service files are installed to `~/.config/systemd/user/` by `install.sh`.
 
 **AGPL v3 LICENSE is auto-copied during every sync cycle.** New repos always get it. Existing files are never overwritten.
 
+`FUNDING.yml` is the GitHub Sponsors / community funding configuration file. `dracon-sync` also auto-copies it (in long form, to `.github/FUNDING.yml`) so every Dracon repo ships with an empty funding config that the operator can fill in. New repos always get it. Existing files are never overwritten.
+
 ```toml
+# AGPL v3 LICENSE at repo root
 standard_files = ["LICENSE"]
-standard_files_auto = true
+
+# FUNDING.yml at .github/FUNDING.yml (long form because GitHub requires
+# the .github/ subdir). The default template has no funding destinations
+# so a freshly-scaffolded repo advertises nothing until the operator
+# explicitly fills in github:, patreon:, open_collective:, etc.
+[[standard_files]]
+source = "templates/FUNDING.yml"
+target = ".github/FUNDING.yml"
+overwrite = false
+
+standard_files_auto = true  # Auto-copy ensures new repos always get these
 ```
 
 Per-repo opt-out via `.dracon/dracon-sync.toml`:
 ```toml
-skip_standard_files = ["LICENSE"]
+skip_standard_files = ["LICENSE", ".github/FUNDING.yml"]
 ```
 
 Templates live in `~/.dracon/utilities/sync/templates/`. Source path resolution: absolute paths used as-is, `~/` expanded to home directory, relative paths resolved from `~/.dracon/utilities/sync/`.
 
 **Important:** In TOML, top-level fields like `standard_files` must appear BEFORE any section headers (`[...]` or `[[...]]`). If placed after a section header, they will be silently parsed as belonging to that section and ignored by the policy loader.
+
+**FUNDING.yml is public and version-controlled.** Do not place API keys, tokens, account passwords, or any other secret material in it. The Warden key-management layer treats `FUNDING.yml` as plain text.
 
 ## Operational State
 
@@ -533,7 +548,7 @@ auto_publish = false  # master toggle (default: off)
 [[publish_targets]]
 name = "crates-io"
 registry = "crates-io"    # crates-io | npm | pypi
-[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBMRi9HSVpJTWlLT3NMeWxUM05yZjNkZGpXK1cvV3lhRC9jU0dOcGx0b2xVClluM0M1dk9jb0JTTUx3RURwTm9GS2cvNE9xQTRFYzJrWlFQeStDNlBpRUUKLT4gWDI1NTE5IC8vdVpLUS9oMXVOam1FWFJVOTVzdWUrNkxKVEpKUG0vZHFIZjBEd1dwUlEKcElNK3czc2hMQy9BZUJ0NVQvR2NUYWd0UVNkRGRvZjlqRjloRGswVVhLOAotPiBYMjU1MTkgNkJzQWJUOFgxNElFcHNTTHNTSzk1SFFHOWpDdktUOVU0dGV2YUowdmtGSQozNnBjaCs0VzI0eGJCLzhQWUVyRzhjY0V5YTMvdE1HUXVkQXdualFSanJjCi0+IFgyNTUxOSBic1gxb2VRalZLUWFuS2tIbHlxNHZYY25KMVZHamwxREptTTk5cHpxNnpNCjdhTzRwN0wxZ2hKSTZMWmtwWTJxeU9DK0dKeUJEbG53Y0FtVzZSRjJTdjAKLT4gWDI1NTE5IDEyM1FYNFFhdmdLamNPYnJNK1l3NXJZNTFNYS9OYjFtWWpkd1RHZlpzakEKZnFjMUt0c2dOcmkzWFRHc3FMZVZXYVY5Qzl3em5Ud0NCTlI4cENoNVVlcwotPiBYMjU1MTkgSEFHQ2UwVEZ2bUFQZXFJNVAzL3d2emNib1g1N0gxZjBIejhLRnZ6VU9nSQo4R1FPbnUxWlBMcDV6Y3dSeXlZU3QybFhqR1BKM0lDdnFKVlJRMnRXZUxBCi0+IDVVLWdyZWFzZSBnajcgS2YsNzl5IV0gQwpRaHQzdFpiKzJZQ1psWmhFajcwWWs2ZzUxaDJ5YnZhcEZaZUdZWUVWWlBTc3UwL2RsaXI4bWdXYjVsZ2gvL3IxCmVZcFZFVzlBNmw3MWY2UEIKLS0tIGRtUkhKdkgvUzA1ZUpQYlRpY0lubFl5R0c5STI3aHU0SVl3QkgxWXYyOTgKV0U8Ve8APv+1r+aV2ZaUcyq0AnWhI+STYiNXCKW6ezm9QCS0KfpGZPyYtzaMcMqqoZu7/prrfEs0uXV/gioS+SzPJrpv]
+[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBGSGlmWjlPQnk2REFDYlFCa2FPTXQyb2NlVU9vSkY0R1JLeEZDcjd5d3g0Cjg0T3EyNUVuaVdlZGJicmxHeWhYN0RzYk5mQTFocmtTNFNYRU1ERGx5dVUKLT4gWDI1NTE5IEcyVDJPVE1EdzZNdXNqRmE1eko5cks3ZEhIQzZLUkJJZ2hBYVNpbTRaQUEKWm9sTVVxdkt4NURaUFd5M0gxVDJGaFdkTG1pem1FekZ1WlZwaGhKdkhaWQotPiBYMjU1MTkgZjh3cUEzSXU5cS9QR1BYQ1MxbnRieFQzTmcrWVQ1bjZCWFZuUHN5RkwwQQpvNU0ySVlNdXVQSnZmVm84c09Hajk2ZldCWEJlUm13cXY0NStuTHpzUzZjCi0+IFgyNTUxOSBKNS9ud2hmV0Z4QUFFeGY3eThVN1dPNGN5dFB3YURDcnVwb2RFTHpjRDJvCnRKN1dIRWtEQXI5Um9tY2Fka0x0UFg4OTlFaGpsNEFHU0d3UTdpREo1R0UKLT4gWDI1NTE5IG9sNW9lT0ZOd2F4cGhYdE5RQjZKekEzalN2RUVmWFQ1b3JJNVNFdEl6d2MKa2JTMTFXNk9iaS9YaEYxSzNmRy9QSkFqenpJWERiMWV1QUlpV2x4eGhWRQotPiBYMjU1MTkgV3IwZ1FGbU05SExQRDNSRUlBdmdpcFBJTis2b3NHbitRTjV2bTNVTU8xbwp4VlhvbVdTcXV0UmJBRlJ1M2I1amN2M0c4eGZHWFgzbWNDaWNlS1pqWEVNCi0+IFgyNTUxOSBFTHQycXNvQy9oa1NWc2d4Q1ZFNHcyakNvdEVvRUllN1lhMS9yUW90S2xFCmc5ci9BcVpaSktZWHpDajNFYWIyT3J2N3JIbERvdmtGOEFialZLSHlJL1kKLT4gQi1ncmVhc2UgJTgqIDI0awphRzhsdTkzUG1GWnlJUGh2V1l1YWRmeWtkWlFtMC9iV0YyTWI4QzJ2M1lXNjhFc2NsK1RYRE5neHhJcW54SVdKCitSR0JPWXl1QkQwSAotLS0geGNKUGNUM09tSUhCcnhiQWJHTEtWdnBjT0xneURQL1lXVzhzaDAvZUZPSQqxZB4zjx6WCkSD6VxP+U6vSGDWCnI4kTy9PJni9UOFBjW/ZGmDpvcEW8XXYgTPlnSWzUYi39OSZNFZOz+da0Op2OoEccw=]
 publish_timeout_secs = 300
 ```
 

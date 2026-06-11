@@ -191,7 +191,7 @@ auto_create = false
 # [[publish_targets]]
 # name = "crates-io"
 # registry = "crates-io"          # crates-io | npm | pypi
-# [DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBBZFZCM2F2M0x3ZXlnZDFOL3pvSThpa2tWTjdCQjNLWDZ1cnR0WGpKaDI4CkcreDRBcDFYZ05pQXZVbGdHL0xJYTBxSzErMlRLYXRQKzZtWnRuWEovWmMKLT4gWDI1NTE5IDF6UlJoUmpMdGhkZ0tpWWJ3cVBsc2FLZStpdkt5U2U1eHdwZ2FpdDFIVWcKaVlrSWtiZEtHZ013YjlmMVNYZXhscVZWdUVNRENkY0ZIdmpBaUJlVm9ydwotPiBYMjU1MTkgWFYybDJoS3JySThKTnNIdTB3Z2o2NFQ5OFlKYjgzUjhrcytXSzIrT05oYwpINjM4WEQ2eG1pZXFpQmdNL0lQa3NqRFc4K2NCL0JRcDF3NkcxWTkwVGV3Ci0+IFgyNTUxOSBNakxuckZ1dUpFenE2d2N5ejZ1aFA3V3UybHBhR2JGZjdiYittOHJac0djCmkvekRiTFFsV2lFRHl3K1BObk1PWVAvMUczYU1NYzdxbTlKUUg0SDR4djQKLT4gWDI1NTE5IE84RGtXRzJ1ODJLYStlY0lyeEVLdVMybGNMSlpZN01VbDV3MmxPVlYrSHMKaXhmTW01YUx2QWRLL3d4WUxuMVdjSEdsZDl3Sk55RHBKL2RTM0xzekhNOAotPiBYMjU1MTkgMHVtcC9PaUhrWjhPV2dqVG5QS1hla1JZeXEzaER0NU9rWjUrNEpKRlpsMAppUHRXRm9ERWVnSmJHY2VzeWppYVRmOU4zS2ZuN0JpRXFndm1Rb2duS0RZCi0+IDY6OS1ncmVhc2UgIUs3QV0gZyBVfG8rbnhGcCB6X0pIJFIKd0ppWgotLS0gS2RyREV0bkNuQW1DdHlERThjRzlEazVyeDlTNlpnK0wzY01NZlE5WFlycwrrw/WQi1keDPdC/7kwm2cIjFOtANY34Bi6VJ2E72cJ56bjOVBWq780oymAMczYVHxB2XHYF9ggyKlLHImzgFfVazZpLxw=]   # env var name (token in secrets/cratesio.env)
+# [DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSArR0JuRUhQK0E4UjlTd2dqaW1zRHRhN3ZkZG5QVkpWY2pGanUrbUcweWhnCkxxYWZXdEh0bEVaeGQvS213QWhwUXkxbW16SzdMTmxnR1g1OENCMElKZkkKLT4gWDI1NTE5IEZtbHJId1gxNTN3Q3N6ZEp4WWdEcmpUanVvdmIxZnpWTTdXekpCQmZwR2cKanFueWZXODdGUEN5T0EyWlo3bUR1dGNXMHpwRjE0NE45bEdnMDhzUEJtRQotPiBYMjU1MTkgSCswN0N1K2lJUlZYc2RxUEx5QTZLTStZbVUwU2wrSnJpNll6cEFLWkFGRQpLZXNlNVhWVU5wZ3dJTm1obXdWZUpLTlJmSWFYNTJJR2VMdzVMcnF1dTNrCi0+IFgyNTUxOSA1K3hpbUpBb2RZMVE4V2hSK0dmNTBxK0xqN1htNHdWd2JYTXE3OEZ2SUgwCmcxc2Y5bU9KWFhqRlJmSmViRFg1MjF3L1ZwTzlBa2hCWTBiYmZkK2J0enMKLT4gWDI1NTE5IEJxWG9xb3VBekNCTEk2THNuUHVORTJ6UHNOelhzNUhGU211L2UxUzAxd1EKVVlHNGNpRmtDSXNzZE9KSENHVDBwdW5QSzVYYzdnRXJySXBJQ3NFMEpQOAotPiBYMjU1MTkgR3N1ZFJnRm8zRUNEOTh0bGxJOEtMSGJCUE1FZ0FFNW1Cbk13aGZqTGR3NAoreXNqVXRRT1BUVk93K2ZWb3JXYmphV3U0Umo5S1lZWk5ONVVER212NmJRCi0+IFgyNTUxOSAzb212TWI4ejM3b00xTXAySzJDblkrTVUzRE9OOVFTbnhPVE43bVhJS3dFCmRraE5KTC9lenZIN3dYSGlzT0lXR1YrWThuaU9aTi91UDlsYmZvVGJMeVkKLT4gUVJeUC1ncmVhc2UgdApCeS84a2dLVkpKTmVNaG5yWG0rMmhlYU94ajdjOUVWNjR1eFVHOW81ZjV3TmRsWEFCYWduZXZmcDNmMloweVBFCmd0Z0YyVEhaOThRMkV4QU52RUhxCi0tLSBXeUVuYUhDQ3dUdytLZlA3ZlR5SnRuQTN6anVBcXp5Q01tRDlQakZuOHhVComisV3XLCOixeCbkbFTfOVWlDBb8e7zJ1nwcaHYPRGA31fF8SliafIeZMjC89JXMrQySAsvTCJua9clidg64e4Jrdmfzg==]   # env var name (token in secrets/cratesio.env)
 # publish_timeout_secs = 300
 #
 # [[publish_targets]]
@@ -275,10 +275,17 @@ auto_create = false
 # Files are only copied if the target does not exist (overwrite = false, the default).
 #
 # Short form — filename only (resolves to templates/{name}):
-# standard_files = ["LICENSE"]
+# standard_files = ["LICENSE", "FUNDING.yml"]
 #
 # Auto-copy during sync (default: true — ensures new repos always get AGPL):
 # standard_files_auto = true
+#
+# GitHub discovers FUNDING.yml at .github/FUNDING.yml (not the repo root).
+# To scaffold it there, use the long form:
+# [[standard_files]]
+# source = "templates/FUNDING.yml"
+# target = ".github/FUNDING.yml"
+# overwrite = false
 #
 # Long form — for explicit source path or overwrite behavior:
 # [[standard_files]]
@@ -287,7 +294,7 @@ auto_create = false
 # overwrite = false   # default: false (never overwrites existing files)
 #
 # Per-repo opt-out (via .dracon/dracon-sync.toml in repo root):
-#   skip_standard_files = ["LICENSE"]
+#   skip_standard_files = ["LICENSE", ".github/FUNDING.yml"]
 #
 # Template path resolution:
 #   - Absolute paths: used as-is
@@ -295,6 +302,13 @@ auto_create = false
 #   - Relative paths: resolved relative to sync config dir (~/.dracon/utilities/sync/)
 #
 # If a template file is missing, a warning is printed but sync continues.
+#
+# FUNDING.yml is the GitHub Sponsors / community funding configuration file.
+# The default template ships with no funding destinations (github: [], etc.) so
+# a freshly-scaffolded repo advertises nothing until the operator fills it in.
+# The file is public and version-controlled; never place API keys, tokens, or
+# any other secret material in it. The Warden key-management layer treats it
+# as plain text.
 
 # =============================================================================
 #  SECTION 10: WEBHOOK

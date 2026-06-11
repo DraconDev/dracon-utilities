@@ -1688,6 +1688,45 @@ standard_files = ["LICENSE"]
     }
 
     #[test]
+    fn test_standard_files_short_form_funding_yml() {
+        // FUNDING.yml is the second default standard file. The short form must
+        // resolve its source to templates/FUNDING.yml and target to the repo
+        // root name. Repos that need the GitHub-required .github/ subdir must
+        // use the long form.
+        let toml = r#"
+standard_files = ["LICENSE", "FUNDING.yml"]
+"#;
+        let policy: SyncPolicy = toml::from_str(toml).unwrap();
+        assert_eq!(policy.standard_files.len(), 2);
+        assert_eq!(policy.standard_files[1].source, "templates/FUNDING.yml");
+        assert_eq!(policy.standard_files[1].target, "FUNDING.yml");
+        assert!(!policy.standard_files[1].overwrite);
+    }
+
+    #[test]
+    fn test_standard_files_funding_yml_github_subdir_long_form() {
+        // GitHub discovers FUNDING.yml at .github/FUNDING.yml. The long form
+        // is required to install the file in that subdirectory while still
+        // pulling the template from templates/FUNDING.yml.
+        let toml = r#"
+[[standard_files]]
+source = "templates/LICENSE"
+target = "LICENSE"
+
+[[standard_files]]
+source = "templates/FUNDING.yml"
+target = ".github/FUNDING.yml"
+overwrite = false
+"#;
+        let policy: SyncPolicy = toml::from_str(toml).unwrap();
+        assert_eq!(policy.standard_files.len(), 2);
+        let funding = &policy.standard_files[1];
+        assert_eq!(funding.source, "templates/FUNDING.yml");
+        assert_eq!(funding.target, ".github/FUNDING.yml");
+        assert!(!funding.overwrite);
+    }
+
+    #[test]
     fn test_standard_files_long_form() {
         let toml = r#"
 [[standard_files]]
