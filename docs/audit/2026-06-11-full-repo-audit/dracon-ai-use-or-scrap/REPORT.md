@@ -13,7 +13,7 @@ Rationale:
 - It was not referenced by the sync policy, install path, or active utility runtime.
 - It had its own stale config at `~/.dracon/utilities/ai/dracon-ai.toml` pointing at `/home/dracon/dracon`, not this `~/Dev/dracon-utilities` tree.
 - It had real functionality, but also stale integration debt: `cargo test` and fmt passed, while clippy failed under `-D warnings` with 12 existing lint errors.
-- The shared AI runtime crates in `dracon-libs` still validate cleanly and are useful independently, so they were not removed.
+- The shared AI runtime crates in `dracon-libs` still validate cleanly in focused validation and are useful independently, so they were not removed.
 
 ## Actions taken
 
@@ -49,8 +49,13 @@ Rationale:
    - `ai-runtime-config`
    - `dracon-ai-contracts`
    - `dracon-ai-runtime-contracts`
-   - Validation: `cargo test -p ai-routing-runtime -p ai-runtime-adapters -p ai-runtime-config -p dracon-ai-contracts -p dracon-ai-runtime-contracts -- --test-threads=1` → passed.
-   - Evidence: `evidence/ai-runtime-cargo-test.log`.
+   - Focused validation: `cargo test -p dracon-system-lib -p ai-routing-runtime -p ai-runtime-adapters -p ai-runtime-config -p dracon-ai-contracts -p dracon-ai-runtime-contracts -- --test-threads=1` → passed.
+   - Evidence: `evidence/final-focused-dracon-libs-cargo-test.log`.
+
+7. Fixed an incidental compile error discovered during validation in `dracon-libs/tools/system/dracon-system/src/lib.rs`:
+   - The helper used `tokio::process::Command` in a synchronous context and had an async/sync ordering issue.
+   - `run_command_checked` is now synchronous and uses `std::process::Command`; `run_command` remains `pub async unsafe fn`.
+   - Commit: `e62742d`.
 
 ## Final verification
 
@@ -71,9 +76,11 @@ Historical audit/goal documents still mention `dracon-ai` or `dracon-ai-lib`; th
 
 ### Workspace validation
 
-- `cargo fmt --check` → passed.
-- `cargo test --workspace -- --test-threads=1` → passed.
-- `cargo test -p ai-routing-runtime -p ai-runtime-adapters -p ai-runtime-config -p dracon-ai-contracts -p dracon-ai-runtime-contracts -- --test-threads=1` in `dracon-libs` → passed.
+- `cargo fmt --check` in `dracon-utilities` → passed.
+- `cargo test --workspace -- --test-threads=1` in `dracon-utilities` → passed.
+- `cargo fmt --check` in `dracon-libs` → passed.
+- Focused `dracon-libs` validation for affected crates → passed.
+- Full `dracon-libs` workspace test remains blocked by a system dependency: linker cannot find `-lsqlite3` while compiling `dracon-memory-runtime`. This is unrelated to the Dracon AI scrap and is documented in `evidence/final-dracon-memory-runtime-blocker.log`.
 
 ### Final evidence
 
@@ -83,6 +90,8 @@ Historical audit/goal documents still mention `dracon-ai` or `dracon-ai-lib`; th
 - `evidence/dracon-ai-cargo-fmt-check.log`
 - `evidence/dracon-ai-cargo-clippy.log`
 - `evidence/ai-runtime-cargo-test.log`
+- `evidence/final-focused-dracon-libs-cargo-test.log`
+- `evidence/final-dracon-memory-runtime-blocker.log`
 
 ## Constraints respected
 
@@ -94,4 +103,4 @@ Historical audit/goal documents still mention `dracon-ai` or `dracon-ai-lib`; th
 
 ## Result
 
-The orphaned `dracon-ai` CLI wrapper is gone from `dracon-utilities`. The Dracon AI runtime remains available as shared `dracon-libs` crates and validates independently. The workspace now accurately documents the three active utilities only: `dracon-sync`, `dracon-warden`, and `dracon-system`.
+The orphaned `dracon-ai` CLI wrapper is gone from `dracon-utilities`. The Dracon AI runtime remains available as shared `dracon-libs` crates and validates independently in focused tests. The workspace now accurately documents the three active utilities only: `dracon-sync`, `dracon-warden`, and `dracon-system`.
