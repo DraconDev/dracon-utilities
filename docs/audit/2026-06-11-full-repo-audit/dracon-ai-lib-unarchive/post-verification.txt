@@ -1,0 +1,25 @@
+--- gh repo view after ---
+{"archivedAt":null,"createdAt":"2026-05-31T20:31:51Z","defaultBranchRef":{"name":"main"},"description":"Standalone Rust workspace for an importable BYOK AI client library.","isArchived":false,"updatedAt":"2026-06-11T13:11:47Z","url":"https://github.com/DraconDev/dracon-ai-lib","visibility":"PRIVATE"}
+--- gh api after ---
+{"archived":false,"default_branch":"main","description":"Standalone Rust workspace for an importable BYOK AI client library.","full_name":"DraconDev/dracon-ai-lib","html_url":"https://github.com/DraconDev/dracon-ai-lib","visibility":"private"}
+--- inventory after ---
+repo	branch	modified	staged	untracked	ahead	behind	state_flags	push_status	hint
+/home/dracon/Dev/dracon-ai-lib	main	0	0	0	0	0	OK	OK	healthy
+--- git status ---
+--- git branch -vv ---
+* main 32ccd9f [origin/main] 3 file(s) [README.md, CHANGELOG.md, CONSUMERS.md] DELTA:+3/-4
+--- rev-list count ---
+0
+--- log -10 ---
+32ccd9f 3 file(s) [README.md, CHANGELOG.md, CONSUMERS.md] DELTA:+3/-4
+5d0ae6c 2 file(s) [pi-session-2026-06-04T15-35-11-680Z_019e9346-3240-7a0b-9c26-bb1652ca26ac.html, pi-session-2026-05-31T19-29-49-863Z_019e7f83-9327-77f1-ba62-393dabbf8696.html] DELTA:+0/-8499 | DEL:pi-session-2026-05-31T19-29-49-863Z_019e7f83-9327-77f1-ba62-393dabbf8696.html,pi-session-2026-06-04T15-35-11-680Z_019e9346-3240-7a0b-9c26-bb1652ca26ac.html
+b87f979 1 file(s) in crates [crates/ai-lib/src/providers/minimax.rs] DELTA:+4/-4
+dd14038 docs: tidy current tag section
+1709b7b docs: mark legacy crates as deprecated, not current contract
+fff5e43 3 file(s) in crates [crates/contracts/src/lib.rs, crates/extract-keys/src/main.rs, crates/providers/src/lib.rs] DELTA:+13/-5
+89353bd 7 file(s) in crates [crates/client/src/lib.rs, crates/core/src/lib.rs, crates/client/Cargo.toml] DELTA:+17/-10
+a87ab96 2 file(s) in crates [crates/ai-models-catalog/README.md, crates/ai-lib/README.md] DELTA:+12/-7
+4eccdcc 2 file(s) in crates [crates/ai-lib/src/providers/minimax.rs, crates/ai-lib/src/providers/openai.rs] DELTA:+15/-15
+9cb5103 docs: fix stale ai-lib release tag wording
+--- push dry-run ---
+Everything up-to-date
