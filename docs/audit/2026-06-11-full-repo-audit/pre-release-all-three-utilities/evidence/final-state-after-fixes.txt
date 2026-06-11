@@ -1,0 +1,486 @@
+== final sync repos json ==
+{
+  "policy": "/home/dracon/.dracon/utilities/sync/dracon-sync.toml",
+  "filter": "all",
+  "repos": 16,
+  "ok": 11,
+  "warn": 4,
+  "concern": 1,
+  "failures": 0,
+  "rows": [
+    {
+      "repo": "/home/dracon/Dev/dracon-platform",
+      "state_flags": [
+        "OK"
+      ],
+      "branch": "main",
+      "modified": 0,
+      "staged": 0,
+      "untracked": 0,
+      "ahead": 0,
+      "behind": 0,
+      "last_hash": "cbf97795b84…",
+      "last_author": "DraconDev",
+      "last_when": "10 seconds ago",
+      "last_msg": "2 file(s) in apis,web [apis/services/email-api/src/lib.rs] DELTA:+1/-3 …",
+      "last_unix": 1781213745,
+      "last_push": "10 seconds ago",
+      "push_status": "OK",
+      "push_error": "",
+      "concern": false,
+      "warn": false,
+      "hint": "healthy"
+    },
+    {
+      "repo": "/home/dracon/Dev/browser-extensions-shared",
+      "state_flags": [
+        "DIRTY"
+      ],
+      "branch": "main",
+      "modified": 6,
+      "staged": 0,
+      "untracked": 2,
+      "ahead": 0,
+      "behind": 0,
+      "last_hash": "67440470179…",
+      "last_author": "DraconDev",
+      "last_when": "29 seconds ago",
+      "last_msg": "4 file(s) in ai-ats,auto-form-filler [auto-form-filler/entrypoints/opti…",
+      "last_unix": 1781213726,
+      "last_push": "29 seconds ago",
+      "push_status": "OK",
+      "push_error": "",
+      "concern": false,
+      "warn": true,
+      "hint": "run repair-warns --apply"
+    },
+    {
+      "repo": "/home/dracon/Dev/dracon-utilities",
+      "state_flags": [
+        "DIRTY",
+        "AHEAD:3",
+        "STUCK_PUSH"
+      ],
+      "branch": "main",
+      "modified": 0,
+      "staged": 0,
+      "untracked": 2,
+      "ahead": 3,
+      "behind": 0,
+      "last_hash": "48bd61bac07…",
+      "last_author": "DraconDev",
+      "last_when": "60 seconds ago",
+      "last_msg": "1 file(s) [install.sh] DELTA:+8/-2",
+      "last_unix": 1781213695,
+      "last_push": "12 minutes ago",
+      "push_status": "STUCK",
+      "push_error": "ahead=3, push failing",
+      "concern": true,
+      "warn": false,
+      "hint": "run repair-concerns --apply (push or rewrite)"
+    },
+    {
+      "repo": "/home/dracon/Dev/ai-auto-repo-rot-scanner-todo-agent",
+      "state_flags": [
+        "DIRTY"
+      ],
+      "branch": "main",
+      "modified": 4,
+      "staged": 0,
+      "untracked": 1,
+      "ahead": 0,
+      "behind": 0,
+      "last_hash": "3525e468201…",
+      "last_author": "DraconDev",
+      "last_when": "2 minutes ago",
+      "last_msg": "5 file(s) in src [src/scanner.rs, src/main.rs, src/cli/mod.rs] DELTA:+6…",
+      "last_unix": 1781213658,
+      "last_push": "2 minutes ago",
+      "push_status": "OK",
+      "push_error": "",
+      "concern": false,
+      "warn": true,
+      "hint": "run repair-warns --apply"
+    },
+    {
+      "repo": "/home/dracon/Dev/rust-ai-web-auto",
+      "state_flags": [
+        "DIRTY"
+      ],
+      "branch": "main",
+      "modified": 3,
+      "staged": 0,
+      "untracked": 0,
+      "ahead": 0,
+      "behind": 0,
+      "last_hash": "c661a6c1533…",
+      "last_author": "DraconDev",
+      "last_when": "2 minutes ago",
+      "last_msg": "1 file(s) in src [src/agent/recipe.rs] DELTA:+9/-6",
+      "last_unix": 1781213640,
+      "last_push": "2 minutes ago",
+      "push_status": "OK",
+      "push_error": "",
+      "concern": false,
+      "warn": true,
+      "hint": "run repair-warns --apply"
+    },
+    {
+      "repo": "/home/dracon/Dev/Junk-Runner-bevy",
+      "state_flags": [
+        "OK"
+      ],
+      "branch": "tauri2",
+      "modified": 0,
+      "staged": 0,
+      "untracked": 0,
+      "ahead": 0,
+      "behind": 0,
+      "last_hash": "404136b8464…",
+      "last_author": "DraconDev",
+      "last_when": "4 minutes ago",
+      "last_msg": "4 file(s) in docs [docs/performance-webgpu.md, CHANGELOG.md, todolist.m…",
+      "last_unix": 1781213513,
+      "last_push": "4 minutes ago",
+      "push_status": "OK",
+      "push_error": "",
+      "concern": false,
+      "warn": false,
+      "hint": "healthy"
+    },
+    {
+      "repo": "/home/dracon/Dev/pully-fully-pull-based-fleet-reconciler",
+      "state_flags": [
+        "OK"
+      ],
+      "branch": "main",
+      "modified": 0,
+      "staged": 0,
+      "untracked": 0,
+      "ahead": 0,
+      "behind": 0,
+      "last_hash": "82231941486…",
+      "last_author": "DraconDev",
+      "last_when": "12 minutes ago",
+      "last_msg": "7 file(s) in docs,fully,scripts [docs/AI_OPERATOR_TEST_SCENARIOS.md, do…",
+      "last_unix": 1781213015,
+      "last_push": "12 minutes ago",
+      "push_status": "OK",
+      "push_error": "",
+      "concern": false,
+      "warn": false,
+      "hint": "healthy"
+    },
+    {
+      "repo": "/home/dracon/Dev/dracon-ai-lib",
+      "state_flags": [
+        "OK"
+      ],
+      "branch": "main",
+      "modified": 0,
+      "staged": 0,
+      "untracked": 0,
+      "ahead": 0,
+      "behind": 0,
+      "last_hash": "e7a27653aff…",
+      "last_author": "Dracon",
+      "last_when": "19 minutes ago",
+      "last_msg": "docs: clarify ai-api-sdk ownership boundary",
+      "last_unix": 1781212632,
+      "last_push": "19 minutes ago",
+      "push_status": "OK",
+      "push_error": "",
+      "concern": false,
+      "warn": false,
+      "hint": "healthy"
+    },
+    {
+      "repo": "/home/dracon/Dev/kiki-sassy-desktop-announcer",
+      "state_flags": [
+        "OK"
+      ],
+      "branch": "main",
+      "modified": 0,
+      "staged": 0,
+      "untracked": 0,
+      "ahead": 0,
+      "behind": 0,
+      "last_hash": "f2d2aa05af7…",
+      "last_author": "DraconDev",
+      "last_when": "35 minutes ago",
+      "last_msg": "2 file(s) [SPEC_archive.md, reconcile.sh] DELTA:+13/-17",
+      "last_unix": 1781211667,
+      "last_push": "35 minutes ago",
+      "push_status": "OK",
+      "push_error": "",
+      "concern": false,
+      "warn": false,
+      "hint": "healthy"
+    },
+    {
+      "repo": "/home/dracon/Dev/DraconDev",
+      "state_flags": [
+        "OK"
+      ],
+      "branch": "main",
+      "modified": 0,
+      "staged": 0,
+      "untracked": 0,
+      "ahead": 0,
+      "behind": 0,
+      "last_hash": "3836e0fcb7b…",
+      "last_author": "DraconDev",
+      "last_when": "2 hours ago",
+      "last_msg": "2 file(s) [README.md, README_DRAFT.md] DELTA:+2/-2",
+      "last_unix": 1781205874,
+      "last_push": "2 hours ago",
+      "push_status": "OK",
+      "push_error": "",
+      "concern": false,
+      "warn": false,
+      "hint": "healthy"
+    },
+    {
+      "repo": "/home/dracon/.dracon",
+      "state_flags": [
+        "OK"
+      ],
+      "branch": "main",
+      "modified": 0,
+      "staged": 0,
+      "untracked": 0,
+      "ahead": 0,
+      "behind": 0,
+      "last_hash": "081ddba35b9…",
+      "last_author": "DraconDev",
+      "last_when": "3 hours ago",
+      "last_msg": "1 file(s) in memory [memory/rag/rag_index.json] DELTA:+1/-1",
+      "last_unix": 1781203578,
+      "last_push": "3 hours ago",
+      "push_status": "OK",
+      "push_error": "",
+      "concern": false,
+      "warn": false,
+      "hint": "healthy"
+    },
+    {
+      "repo": "/home/dracon/Dev/avid",
+      "state_flags": [
+        "OK"
+      ],
+      "branch": "main",
+      "modified": 0,
+      "staged": 0,
+      "untracked": 0,
+      "ahead": 0,
+      "behind": 0,
+      "last_hash": "0dc6aae140c…",
+      "last_author": "DraconDev",
+      "last_when": "3 hours ago",
+      "last_msg": "2 file(s) in src [TODO.md, src/ai_gen.rs] DELTA:+4/-4",
+      "last_unix": 1781202702,
+      "last_push": "3 hours ago",
+      "push_status": "OK",
+      "push_error": "",
+      "concern": false,
+      "warn": false,
+      "hint": "healthy"
+    },
+    {
+      "repo": "/home/dracon/Dev/ai-auto-writer",
+      "state_flags": [
+        "OK"
+      ],
+      "branch": "main",
+      "modified": 0,
+      "staged": 0,
+      "untracked": 0,
+      "ahead": 0,
+      "behind": 0,
+      "last_hash": "cb6e0783aa4…",
+      "last_author": "DraconDev",
+      "last_when": "3 hours ago",
+      "last_msg": "5 file(s) in src [AUDIT.md, src/services/dracon.rs, .env.example] DELTA…",
+      "last_unix": 1781202610,
+      "last_push": "3 hours ago",
+      "push_status": "OK",
+      "push_error": "",
+      "concern": false,
+      "warn": false,
+      "hint": "healthy"
+    },
+    {
+      "repo": "/home/dracon/Dev/dracon-libs",
+      "state_flags": [
+        "OK"
+      ],
+      "branch": "main",
+      "modified": 0,
+      "staged": 0,
+      "untracked": 0,
+      "ahead": 0,
+      "behind": 0,
+      "last_hash": "da2aaa85003…",
+      "last_author": "DraconDev",
+      "last_when": "3 hours ago",
+      "last_msg": "2 file(s) in tools [tools/system/dracon-system/src/lib.rs, tools/sync/d…",
+      "last_unix": 1781202109,
+      "last_push": "3 hours ago",
+      "push_status": "OK",
+      "push_error": "",
+      "concern": false,
+      "warn": false,
+      "hint": "healthy"
+    },
+    {
+      "repo": "/home/dracon/Dev/dracon-code",
+      "state_flags": [
+        "OK"
+      ],
+      "branch": "main",
+      "modified": 0,
+      "staged": 0,
+      "untracked": 0,
+      "ahead": 0,
+      "behind": 0,
+      "last_hash": "03e7856247a…",
+      "last_author": "DraconDev",
+      "last_when": "3 hours ago",
+      "last_msg": "1 file(s) in crates [crates/dracon-core/src/config.rs] DELTA:+7/-6",
+      "last_unix": 1781201788,
+      "last_push": "3 hours ago",
+      "push_status": "OK",
+      "push_error": "",
+      "concern": false,
+      "warn": false,
+      "hint": "healthy"
+    },
+    {
+      "repo": "/home/dracon/Dev/one-mil-girls",
+      "state_flags": [
+        "DIRTY"
+      ],
+      "branch": "main",
+      "modified": 3,
+      "staged": 0,
+      "untracked": 6,
+      "ahead": 0,
+      "behind": 0,
+      "last_hash": "6bf75d98a6b…",
+      "last_author": "DraconDev",
+      "last_when": "4 hours ago",
+      "last_msg": "3 file(s) in src [src/lib/engine/characters.test.ts, src/lib/engine/sav…",
+      "last_unix": 1781199019,
+      "last_push": "4 hours ago",
+      "push_status": "OK",
+      "push_error": "",
+      "concern": false,
+      "warn": true,
+      "hint": "run repair-warns --apply"
+    }
+  ]
+}
+== final git status ==
+## main...origin/main [ahead 3]
+?? docs/audit/2026-06-11-full-repo-audit/pre-release-all-three-utilities/evidence/final-state-after-fixes.txt
+?? docs/audit/2026-06-11-full-repo-audit/pre-release-all-three-utilities/evidence/final-validation/combined-final.exit
+== final git log ==
+48bd61ba 1 file(s) [install.sh] DELTA:+8/-2
+83f04d8b 4 file(s) in docs [CHANGELOG.md, docs/audit/2026-06-11-full-repo-audit/pre-release-all-three-utilities/evidence/changelog-fix-validation.txt, docs/audit/2026-06-11-full-repo-audit/pre-release-all-three-utilities/evidence/changelog-fix-validation.exit] DELTA:+146/-0 | NEW:evidence/changelog-fix-validation.exit,evidence/changelog-fix-validation.txt,final-validation/combined.exit
+b7dc0ea9 8 file(s) in docs [docs/audit/2026-06-11-full-repo-audit/pre-release-all-three-utilities/evidence/history-paths-current.txt, docs/audit/2026-06-11-full-repo-audit/pre-release-all-three-utilities/evidence/history-local-state-paths.tsv, docs/audit/2026-06-11-full-repo-audit/pre-release-all-three-utilities/evidence/public-readiness-current-summary.txt] DELTA:+44741/-0 | NEW:evidence/current-working-risk-paths.tsv,evidence/git-status-porcelain-v2-all.exit,evidence/git-status-porcelain-v2-all.txt,evidence/history-local-state-paths.tsv,evidence/history-paths-current.exit,evidence/history-paths-current.txt,evidence/public-readiness-current-summary.txt,evidence/secret-shaped-current.tsv
+d8c5c31c 6 file(s) in docs [docs/audit/2026-06-11-full-repo-audit/pre-release-all-three-utilities/evidence/cargo-build-release.exit, docs/audit/2026-06-11-full-repo-audit/pre-release-all-three-utilities/evidence/cargo-clippy.exit, docs/audit/2026-06-11-full-repo-audit/pre-release-all-three-utilities/evidence/dracon-sync-config-validate.exit] DELTA:+6/-0 | NEW:evidence/cargo-build-release.exit,evidence/cargo-clippy.exit,evidence/dracon-sync-config-validate.exit,evidence/dracon-sync-scaffold-dry-run.exit,evidence/install-dry-run.exit,evidence/verify-spec.exit
+44c17025 20 file(s) in docs [docs/audit/2026-06-11-full-repo-audit/pre-release-all-three-utilities/evidence/dracon-sync-repos.json, docs/audit/2026-06-11-full-repo-audit/pre-release-all-three-utilities/evidence/dracon-sync-status.txt, docs/audit/2026-06-11-full-repo-audit/pre-release-all-three-utilities/evidence/git-log-all-20.txt] DELTA:+505/-0 | NEW:evidence/cargo-deny-check.exit,evidence/cargo-fmt-check.exit,evidence/cargo-test.exit,evidence/dracon-sync-health.exit,evidence/dracon-sync-health.txt,evidence/dracon-sync-repos.exit,evidence/dracon-sync-repos.json,evidence/dracon-sync-repos.stderr,evidence/dracon-sync-status.exit,evidence/dracon-sync-status.txt+10more
+ac00db9f 7 file(s) in docs [docs/audit/2026-06-11-full-repo-audit/untracked-artifacts-policy/evidence/final-dracon-sync-repos.json] DELTA:+0/-0 | NEW:evidence/final-dracon-sync-repos.json,evidence/final-focused-repos.md,evidence/final-focused-test.txt,evidence/final-fmt.txt,evidence/final-validation-exits.txt,evidence/final-workspace-test.txt
+53688730 1 file(s) in docs [docs/audit/2026-06-11-full-repo-audit/untracked-artifacts-policy/evidence/policy-diff.patch] DELTA:+4/-4
+6db321f8 1 file(s) in docs [docs/audit/2026-06-11-full-repo-audit/untracked-artifacts-policy/evidence/policy-diff.patch] DELTA:+6/-6
+4376e13c 1 file(s) in docs [docs/audit/2026-06-11-full-repo-audit/untracked-artifacts-policy/evidence/policy-diff.patch] DELTA:+50/-0
+eb015d2d 6 file(s) in docs [docs/audit/2026-06-11-full-repo-audit/untracked-artifacts-policy/evidence/cargo-fmt-check.txt] DELTA:+0/-0 | NEW:evidence/cargo-fmt-check.txt,evidence/cargo-test.txt,evidence/post-commit-cargo-fmt-check.txt,evidence/post-commit-cargo-test.txt,evidence/report.txt
+70c8dd8c 3 file(s) in .,dracon-sync/src,docs [AGENTS.md, dracon-sync/src/report.rs, docs/audit/2026-06-11-full-repo-audit/untracked-artifacts-policy/REPORT.md] DELTA:+46/-5 | NEW:untracked-artifacts-policy/REPORT.md
+31075086 2 file(s) in dracon-sync [dracon-sync/src/report.rs, AGENTS.md] DELTA:+27/-5
+d0777645 1 file(s) in docs [docs/audit/2026-06-11-full-repo-audit/full-audit-cleanups/REPORT.md] DELTA:+7/-0
+5b523e6a 2 file(s) in docs [docs/audit/2026-06-11-full-repo-audit/full-audit-cleanups/evidence/final-dracon-sync-repos-last2.json] DELTA:+0/-0 | NEW:evidence/final-dracon-sync-repos-last2.json,evidence/final-dracon-sync-repos-last2.stderr
+ef133285 2 file(s) in docs [docs/audit/2026-06-11-full-repo-audit/full-audit-cleanups/evidence/final-dracon-sync-repos-last.json] DELTA:+0/-0 | NEW:evidence/final-dracon-sync-repos-last.json,evidence/final-dracon-sync-repos-last.stderr
+a447bbb5 3 file(s) in docs [docs/audit/2026-06-11-full-repo-audit/full-audit-cleanups/evidence/final-dracon-sync-repos.json] DELTA:+0/-0 | NEW:evidence/final-dracon-sync-repos-after-catchup.json,evidence/final-dracon-sync-repos-after-catchup.stderr
+6b16080d 1 file(s) in docs [docs/audit/2026-06-11-full-repo-audit/full-audit-cleanups/REPORT.md] DELTA:+205/-0
+52e90587 2 file(s) in docs [docs/audit/2026-06-11-full-repo-audit/full-audit-cleanups/evidence/final-dracon-sync-repos.json, docs/audit/2026-06-11-full-repo-audit/full-audit-cleanups/evidence/final-dracon-sync-repos.stderr] DELTA:+379/-0 | NEW:evidence/final-dracon-sync-repos.json,evidence/final-dracon-sync-repos.stderr
+6e834400 CLOSED: Clone race bug, Global git filter.dracon, Mass deletion guard, repo_diff_entries root cause, Status reporting honesty, GitHub transport, Push timeouts, AI provider timeouts, AI skip for, dirty_since tracking +14more | 5 file(s) in .dracon,docs,todo.md => docs [docs/audit/2026-06-11-full-repo-audit/full-audit-cleanups/evidence/root-todo-removal/after.md, docs/audit/2026-06-11-full-repo-audit/full-audit-cleanups/evidence/root-todo-removal/before.md, .dracon/project-state.md] DELTA:+47/-4 | NEW:root-todo-removal/after.md,root-todo-removal/before.md
+71cb0ba4 5 file(s) in docs [docs/audit/2026-06-11-full-repo-audit/full-audit-cleanups/evidence/baseline-docs-audit-inventory.tsv, docs/audit/2026-06-11-full-repo-audit/full-audit-cleanups/evidence/baseline-dracon-sync-repos.json, docs/audit/2026-06-11-full-repo-audit/full-audit-cleanups/evidence/baseline-branch-ref-snapshots.md] DELTA:+1336/-0 | NEW:evidence/baseline-branch-ref-snapshots.md,evidence/baseline-docs-audit-inventory.tsv,evidence/baseline-dracon-sync-repos.json,evidence/baseline-dracon-sync-repos.stderr,evidence/baseline-reference-searches.md
+== final branches ==
+  backup/pre-merge-abort
+* main
+  scribe-version
+  remotes/codeberg/HEAD -> codeberg/master
+  remotes/codeberg/main
+  remotes/codeberg/master
+  remotes/codeberg/scribe-version
+  remotes/github/main
+  remotes/github/scribe-version
+  remotes/gitlab/HEAD -> gitlab/master
+  remotes/gitlab/main
+  remotes/gitlab/master
+  remotes/gitlab/scribe-version
+  remotes/origin/HEAD -> origin/main
+  remotes/origin/main
+  remotes/origin/scribe-version
+== final remotes ==
+codeberg	git@codeberg.org:dracondev/dracon-utilities.git (fetch)
+codeberg	git@codeberg.org:dracondev/dracon-utilities.git (push)
+github	git@github.com:DraconDev/dracon-utilities.git (fetch)
+github	git@github.com:DraconDev/dracon-utilities.git (push)
+gitlab	git@gitlab.com:dracondev/dracon-utilities.git (fetch)
+gitlab	git@gitlab.com:dracondev/dracon-utilities.git (push)
+origin	https://github.com/DraconDev/dracon-utilities.git (fetch)
+origin	https://github.com/DraconDev/dracon-utilities.git (push)
+== final service inventory ==
+-- dracon-sync.service
+● dracon-sync.service - Dracon Sync (deterministic sync runtime)
+     Loaded: loaded (/home/dracon/.config/systemd/user/dracon-sync.service; enabled; preset: ignored)
+     Active: active (running) since Thu 2026-06-11 14:42:56 BST; 7h ago
+ Invocation: 0217776ad44a4c71bce0cc07780277b5
+       Docs: https://github.com/DraconDev/dracon-utilities
+    Process: 613126 ExecStartPre=/run/current-system/sw/bin/pkill -x -f dracon-git pulse (code=exited, status=1/FAILURE)
+   Main PID: 613136 (dracon-sync)
+      Tasks: 7 (limit: 96)
+     Memory: 200.7M (high: 768M, max: 2G, available: 567.2M, peak: 768.9M, swap: 9.3M, swap peak: 72.2M)
+        CPU: 45min 54.218s
+     CGroup: /user.slice/user-1000.slice/user@1000.service/app.slice/dracon-sync.service
+             ├─ 613136 /home/dracon/.local/bin/dracon-sync daemon
+             ├─3742183 /run/current-system/sw/bin/git push codeberg HEAD:refs/heads/main
+             └─3742194 ssh -o BatchMode=yes -F /home/dracon/.dracon/secrets/ssh/config -o ConnectTimeout=10 -o ConnectionAttempts=1 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 git@codeberg.org "git-receive-pack 'dracondev/dracon-platform.git'"
+
+Jun 11 22:35:22 nixos dracon-sync[613136]: ✅ Concern management summary
+Jun 11 22:35:22 nixos dracon-sync[613136]:    concerns_found: 1
+Jun 11 22:35:22 nixos dracon-sync[613136]:    operations_planned: 1
+Jun 11 22:35:22 nixos dracon-sync[613136]:    operations_succeeded: 0
+Jun 11 22:35:22 nixos dracon-sync[613136]:    manual_only: 0
+Jun 11 22:35:22 nixos dracon-sync[613136]:    concerns_resolved_now: 0
+Jun 11 22:35:22 nixos dracon-sync[613136]:    ledger: /home/dracon/.local/state/dracon/dracon-sync-incidents.jsonl
+Jun 11 22:35:26 nixos dracon-sync[613136]: 📝 committed 4 file(s) in /home/dracon/Dev/browser-extensions-shared
+Jun 11 22:35:38 nixos dracon-sync[613136]: 🔁 synced /home/dracon/Dev/browser-extensions-shared
+Jun 11 22:35:45 nixos dracon-sync[613136]: 📝 committed 2 file(s) in /home/dracon/Dev/dracon-platform
+-- dracon-system-guard.service
+● dracon-system-guard.service - Dracon System Guard - Proactive disk space monitoring and cleanup
+     Loaded: loaded (/home/dracon/.config/systemd/user/dracon-system-guard.service; disabled; preset: ignored)
+     Active: active (running) since Thu 2026-06-11 14:43:16 BST; 7h ago
+ Invocation: 320090fab5674f9487387623267e9312
+       Docs: https://github.com/DraconDev/dracon-utilities
+   Main PID: 614392 (dracon-system)
+      Tasks: 3 (limit: 64)
+     Memory: 14.2M (max: 250M, available: 235.7M, peak: 250M, swap: 340K, swap peak: 8.1M)
+        CPU: 1h 34min 22.596s
+     CGroup: /user.slice/user-1000.slice/user@1000.service/app.slice/dracon-system-guard.service
+             ├─ 614392 /home/dracon/.local/bin/dracon-system guard daemon
+             └─3742767 ps -eo stat=
+
+Jun 11 17:46:25 nixos dracon-system[614392]: 🔧 reniced active: [pid=1932080:nice=5]
+Jun 11 17:46:25 nixos dracon-system[614392]: 🔧 reniced active: [pid=1932080:nice=5]
+Jun 11 17:46:25 nixos dracon-system[614392]: 🔧 reniced active: [pid=1932080:nice=5]
+Jun 11 17:46:25 nixos dracon-system[614392]: 🔧 reniced active: [pid=1932080:nice=5]
+Jun 11 17:46:26 nixos dracon-system[614392]: 🔧 reniced active: [pid=1932080:nice=5]
+Jun 11 17:46:26 nixos dracon-system[614392]: 🔧 reniced active: [pid=1932080:nice=5]
+Jun 11 17:46:26 nixos dracon-system[614392]: 🔧 reniced active: [pid=1932080:nice=5]
+Jun 11 17:46:26 nixos dracon-system[614392]: 🔧 reniced active: [pid=1932080:nice=5]
+Jun 11 17:46:27 nixos dracon-system[614392]: 🔧 reniced active: [pid=1932080:nice=5]
+Jun 11 17:46:27 nixos dracon-system[614392]: 🔧 skip un-renice pid=1932080 — PID recycled (was fabd, now different)
+-- dracon-warden.service
+Unit dracon-warden.service could not be found.

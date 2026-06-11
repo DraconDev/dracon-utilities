@@ -1,0 +1,26 @@
+== service files tracked ==
+ls: cannot access 'dracon-warden/dracon-warden.service': No such file or directory
+-rw-r--r-- 1 dracon users 1670 May 18 10:58 dracon-sync/dracon-sync.service
+-rw-r--r-- 1 dracon users 1690 May 18 10:58 dracon-system/dracon-system-guard.service
+== installed service files ==
+ls: cannot access '/home/dracon/.config/systemd/user/dracon-warden.service': No such file or directory
+-rw-r--r-- 1 dracon users 1670 Jun  7 17:57 /home/dracon/.config/systemd/user/dracon-sync.service
+-rw-r--r-- 1 dracon users 1690 Jun  7 17:57 /home/dracon/.config/systemd/user/dracon-system-guard.service
+== unit files ==
+UNIT FILE                   STATE    PRESET
+dracon-ai-daemon.service    disabled ignored
+dracon-code.service         disabled ignored
+dracon-sync.service         enabled  ignored
+dracon-system-guard.service disabled ignored
+
+4 unit files listed.
+== active units ==
+  UNIT                        LOAD   ACTIVE SUB     DESCRIPTION
+  dracon-sync.service         loaded active running Dracon Sync (deterministic sync runtime)
+  dracon-system-guard.service loaded active running Dracon System Guard - Proactive disk space monitoring and cleanup
+
+Legend: LOAD   → Reflects whether the unit definition was properly loaded.
+        ACTIVE → The high-level unit activation state, i.e. generalization of SUB.
+        SUB    → The low-level unit activation state, values depend on unit type.
+
+2 loaded units listed.

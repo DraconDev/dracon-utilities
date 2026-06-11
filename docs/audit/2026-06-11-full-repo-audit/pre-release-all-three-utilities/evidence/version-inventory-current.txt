@@ -1,0 +1,5 @@
+dracon-warden/src/security/Cargo.toml:3:version = "0.3.0"
+dracon-warden/Cargo.toml:4:version = "0.3.0"
+dracon-system/Cargo.toml:4:version = "0.2.0"
+dracon-sync/Cargo.toml:4:version = "0.1.5"
+Cargo.toml:11:version = "0.112.4"
