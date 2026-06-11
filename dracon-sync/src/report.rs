@@ -30,7 +30,7 @@ fn sync_alert_ledger_path() -> PathBuf {
         .join("dracon-sync-alerts.jsonl")
 }
 
-fn record_sync_alert(repo_path: &Path, reason: &str, details: &str) {
+pub(crate) fn record_sync_alert(repo_path: &Path, reason: &str, details: &str) {
     let repo = repo_path
         .to_string_lossy()
         .trim_end_matches('/')
@@ -51,7 +51,11 @@ fn record_sync_alert(repo_path: &Path, reason: &str, details: &str) {
     let path = sync_alert_ledger_path();
     if let Some(parent) = path.parent() {
         if let Err(e) = std::fs::create_dir_all(parent) {
-            eprintln!("⚠️ failed to create sync alert dir {}: {}", parent.display(), e);
+            eprintln!(
+                "⚠️ failed to create sync alert dir {}: {}",
+                parent.display(),
+                e
+            );
             return;
         }
     }
@@ -2492,7 +2496,10 @@ mod tests {
     fn test_sync_alert_ledger_path_uses_state_dir() {
         let _guard = EnvRestorer::new("DRACON_SYNC_STATE_DIR", "/tmp/dracon-sync-test-state");
         let path = sync_alert_ledger_path();
-        assert_eq!(path, PathBuf::from("/tmp/dracon-sync-test-state/dracon-sync-alerts.jsonl"));
+        assert_eq!(
+            path,
+            PathBuf::from("/tmp/dracon-sync-test-state/dracon-sync-alerts.jsonl")
+        );
     }
 
     #[test]
@@ -3196,7 +3203,7 @@ mod tests {
     }
 
     #[test]
-    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAvVVVkNHIxVEJ5cDVPMWRlSkNWZnpOVlZOU1hLcUJmald4OGdLMW13WWw4CngrL0tMTVlXRzV1Tkw2d20wRGdaNnhNV1o0TXRPcnd2bDhIWnh3WnlES0kKLT4gWDI1NTE5IGVQd2hJVVFDWU53K2txbW9SeElNRjFwQWtQeW84VnArN3VFM2VKeVBrUjQKVXFBanR3T05CYUFiWXhRR3JCakt6c3g2SmJDQ0VqcFY2amp2Q1Y3SFNsSQotPiBYMjU1MTkgZVd2NDJSSnN2MUh2d25LRVJtaE5oZ2tYck9tRkdVYVJ3WGhNb3VScDJnOApLWjdYYS95T01HSDBoK1BjT0h5T2h0VUUwRWRXcTE4VE83L3czZTJVSFkwCi0+IFgyNTUxOSBpdGNSdlRWcHM0T052NVNIZWdjVkpoWi94WWF2emFXRWg0aGN4aWs0ZUFrCldPazJHUVFZajY2NWR5dzRwV002bGF6RGp2bzd3ZE1Ya01VaDZWZWQ5U2cKLT4gWDI1NTE5IGhlZjA1cCtZMFJvTUZ3a1pTcldsYjVZV1diaTZYUU9EODlYUThkb1VBVncKd25VaVVqb0VYSzJ1NzA2R2VlUGg4Y01SOXJLQ2x5V05uYUpYSVlXNGczawotPiBYMjU1MTkgbG12eENJSEdxREMvdWliTnFTek5ITEN2OEdMeTVwdVhNZEJWaHRtRUxuQQpiS0pBd1h6cVZIL1R0aWhyck45QVN3VkJBMEdad1k4bFQvZlpxSWlIcUk0Ci0+IFgyNTUxOSAwQ0dQYk5YVVFyUFdFTkhFd2VwT0FYUVpZV0pTaXVUU2lUeWdxbmhPbW5vCm9yVHF3ZEUvbTY2NGViTWtuR29QZ2lrR21kcWJ2VTRtQS9HRWlOTUdsTDgKLT4gbmRlWyw3Zi1ncmVhc2UgK3ZbY2ogNCleZjB9WwpNb0JrVjlpKytXN0k3a3FwdUMvRlhxRGg5bHU0Nitjc1ZoempzOHFMTEJBa0hBbHBtd3VqKzl5NmFFdFgzVGFaClRBNEcxSVVlQXZXNU5Ybm51RkI2SHpwUmlTUkdPdmFBbVFzCi0tLSA0Z2RtRGJHa1NSY0QxUSsybVI3dGY3WmNlY1Z0WXZUcm9FN2UxeWR0Mks0CvcA/pKntrpufetCeZiI4JeeF+qCXdm2jDkzafaFCzaH17xrg45JWVZFkc1fxRyy63QdhNJlmu7WneK5O88=]() {
+    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA3aWgxQmRKdUZEa2lqZzFLSmxXdnNuM2p6cDdhaW1xMXA0VUgzNGUzNDNNCjdJNFl1cE9xSjBzMVloRXBHejk0VGIwS3ZjVDBlUEJVRmR0bzFtOFpMa28KLT4gWDI1NTE5IGt6RHhXUHlZN1FxWHUzbUFELzJtUlNBdnRyaU55M0oyNVYzdWJ6Y0V3RlkKUFNmNlMyZmFUanhuOFpqQ0VKeGc2L1BNelRLUDZLVWhjYUZvYUsveERkcwotPiBYMjU1MTkgT3NGbDRuYTR1bnJ4NXp6amxabFBFOU4vekFXaWgwTS94NWpWWlZHTk1tTQpySFkrR1pDcXc3Ly9Wa1p3ZHlscEtsbzA0eHh6TGFidWxLYjRVSmc4eUNZCi0+IFgyNTUxOSA5VnhLMnZkd3RNUDBzRE5XRnJmT1NNMXp3bWxkVS9vV0FqTStPOGVLSEVVCkxRQzdhbU9QWTl1V2U1aFhzZFN0bWxzTXk4T254WHRESFZVU3c3TSs5eW8KLT4gWDI1NTE5IHV0WmxQR3dJelg1OFNjQVIxUVVYUktONmZRdE9ZRmFyZ3B3Z0pCU01nd0kKMjdWSXBjUllDR3RzSTZHSFlZVlpscVpETE9lS01nV2NObzArVUd4NVppcwotPiBYMjU1MTkgWUl5NVVSUkJKbU1vVC9Sa2xyVVVzSitYajlvQ3YrQXkrUTRwdjhnU2ZWVQpOdWxGMkdLQnUrTUZJeVdzSGswVTg1eG1POUIydVVFczk0cXFwUXB6NHJFCi0+IFgyNTUxOSBiZlh6WkV1a0VxM01xc3RJTlcrK09UZHFkRHVDcDFUVk04TkI1NUlTL1ZzCjU5VDNMTGZld0JIclg3SWx0VEtNamtaRUxjYVRXd2NTVm9ibkI1eEdqR0UKLT4gYC1ncmVhc2UgeFdPIEkgUDNSVDkvIFhaeCMKeHlDK3h0MFJPRm9pRnJIZHVrM29HQmluZkRKUHJxUWloWjAwMnhISWdXVU11VTRZT1RkTGFySGdnM1M0cjVLZApWZjlyZ1BMOGdOZU5zZk04eUkzaVFtVWEyYTlNMjRzV2hrOU5uTnJSS1NNCi0tLSBzVFMrRUFEQVVIWVlUa21WeXJOSnF0czF0OHJlS1krQzZPNXZIOTh3QUxrCnyEtx6cKJ98s+UuO4BGVYJRKZoAxpaoFDMQ0uW3ubE6cDvoudVb5I5l/QgA8CPRO0WCJaqb80Ou0auLYRM=]() {
         let mut cooldowns = std::collections::HashMap::new();
         let repo = std::path::PathBuf::from("/test/repo");
         let notify_key = format!("push-fail-{}", repo.display());
