@@ -141,11 +141,14 @@ Findings:
 2. The daemon only attempted desktop notifications through `notify_rust`. There was no persistent alert ledger that an operator could inspect after the fact.
 3. Stuck repos can be removed from active sync processing and retried later. That retry path did not create a fresh alert, so a repo could remain stuck without a visible repeated notification.
 4. No `webhook_url` is configured in `~/.dracon/utilities/sync/dracon-sync.toml`, so webhook notification was not available for this environment.
-5. The latest daemon run now produced an alert-ledger entry for a separate transient timeout:
+5. The latest daemon run produced alert-ledger entries for `one-mil-girls` timeouts. Direct GitLab SSH push is blocked by GitLab protected-branch policy, and the API confirms `main` has `push_access_levels.access_level = 0` (`No one`). The daemon's HTTPS fallback has also timed out, so this is a mirror-policy blocker rather than a local repo problem:
 
-```json
-{"ts_unix":1781185784,"repo":"/home/dracon/Dev/one-mil-girls","reason":"Sync Timeout","details":"exceeded 120s limit"}
+```text
+remote: GitLab: You are not allowed to push code to protected branches on this project.
+ ! [remote rejected] main -> main (pre-receive hook declined)
 ```
+
+Evidence: `one-mil-girls-gitlab-push.log`, `one-mil-girls-gitlab-protected-branch.json`.
 
 ## Notification Fix
 
@@ -200,7 +203,7 @@ Current status includes a generated/working-tree change:
  M .svelte-kit/ambient.d.ts
 ```
 
-Action: preserve user/generated change unless explicitly approved. Push is OK after fetch; the earlier timeout was transient and produced a new alert-ledger entry.
+Action: preserve user/generated change unless explicitly approved. GitHub push is OK after fetch. GitLab mirror push is currently blocked by protected-branch policy and needs an operator decision: unprotect/adjust GitLab `main` push access, push to an unprotected mirror branch, or remove the GitLab mirror remote for this repo.
 
 ### `dracon-platform`
 
@@ -283,16 +286,17 @@ git -C /home/dracon/Dev/one-mil-girls push --dry-run origin main       Everythin
 git -C /home/dracon/Dev/browser-extensions-shared push --dry-run origin main  Everything up-to-date
 git -C /home/dracon/Dev/rust-ai-web-auto push --dry-run origin main    Everything up-to-date
 git -C /home/dracon/Dev/dracon-utilities push --dry-run origin main    Everything up-to-date
+git -C /home/dracon/Dev/one-mil-girls push gitlab main                 blocked by GitLab protected branch policy
 ```
 
 ## Conclusion
 
-The remaining sync concerns are explained and either fixed or intentionally preserved:
+The remaining sync concerns are explained and either fixed, surfaced by the new alert path, or intentionally preserved:
 
 - `rust-ai-web-auto`: no sync blocker; WARNs are user changes.
 - `dracon-platform`: push blocker fixed by updating Warden hooks and adding `.plaintext` marker.
 - `dracon-ai-lib`: archived-remote blocker was handled in the prior investigation; current push is OK.
-- `one-mil-girls`: transient push timeout resolved.
+- `one-mil-girls`: GitHub push is OK; GitLab mirror push is blocked by GitLab protected-branch policy, and the daemon now surfaces timeout/retry alerts.
 - Notification gap: fixed with persistent alert ledger, critical desktop notifications, stderr alert lines, and stuck-retry alerts.
 
 I did not delete, rebase, force-push, rewrite history, rotate secrets, or discard user changes.
