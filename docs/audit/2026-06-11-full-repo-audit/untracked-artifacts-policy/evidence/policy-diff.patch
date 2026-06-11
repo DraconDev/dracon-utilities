@@ -25,8 +25,8 @@ index 780fb648..82c5a207 100644
  [[publish_targets]]
  name = "crates-io"
  registry = "crates-io"    # crates-io | npm | pypi
--[DRACON_SECRET:[redacted]]
-+[DRACON_SECRET:[redacted]]
+-[[redacted-secret]]
++[[redacted-secret]]
  publish_timeout_secs = 300
  ```
  
@@ -74,8 +74,8 @@ index 1998a9e2..44bf1277 100644
      }
  
      #[test]
--    fn test_push_failu[DRACON_SECRET:[redacted]]() {
-+    fn test_push_failu[DRACON_SECRET:[redacted]]() {
+-    fn test_push_failu[[redacted-secret]]() {
++    fn test_push_failu[[redacted-secret]]() {
          let mut cooldowns = std::collections::HashMap::new();
          let repo = std::path::PathBuf::from("/test/repo");
          let notify_key = format!("push-fail-{}", repo.display());
