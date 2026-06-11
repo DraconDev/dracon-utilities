@@ -1782,6 +1782,33 @@ pulse_interval_secs = 1
     }
 
     #[test]
+    fn test_default_policy_does_not_force_funding_yml() {
+        // FUNDING.yml is Dracon-specific. External users must opt in explicitly;
+        // the default policy must not force it.
+        let policy = SyncPolicy::default();
+        assert!(policy.standard_files.is_empty());
+        assert!(!policy
+            .standard_files
+            .iter()
+            .any(|cfg| cfg.target == "FUNDING.yml" || cfg.target == ".github/FUNDING.yml"));
+    }
+
+    #[test]
+    fn test_license_only_policy_does_not_force_funding_yml() {
+        // A generic external user can keep the starter policy with only LICENSE.
+        let toml = r#"
+standard_files = ["LICENSE"]
+"#;
+        let policy: SyncPolicy = toml::from_str(toml).unwrap();
+        assert_eq!(policy.standard_files.len(), 1);
+        assert_eq!(policy.standard_files[0].target, "LICENSE");
+        assert!(!policy
+            .standard_files
+            .iter()
+            .any(|cfg| cfg.target == "FUNDING.yml" || cfg.target == ".github/FUNDING.yml"));
+    }
+
+    #[test]
     fn test_standard_files_auto_default_true() {
         let toml = r#"
 pulse_interval_secs = 1
