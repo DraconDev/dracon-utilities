@@ -1,0 +1,18 @@
+REPO=/home/dracon/Dev/dracon-ai-lib
+--- git status porcelain=v2 ---
+1 .M N... 100644 100644 100644 d7021b6f6dd839461c252e511c500e3cc71b30e4 d7021b6f6dd839461c252e511c500e3cc71b30e4 crates/client/Cargo.toml
+1 .M N... 100644 100644 100644 98b3b55c45d05bbbc565fb5f287bafeabeddb960 98b3b55c45d05bbbc565fb5f287bafeabeddb960 crates/contracts/Cargo.toml
+1 .M N... 100644 100644 100644 2782597a11c8397761fcb9e64a242bc45ce00275 2782597a11c8397761fcb9e64a242bc45ce00275 crates/core/Cargo.toml
+1 .M N... 100644 100644 100644 16ae0a36403836f0a6effd2dc1eb4756687178a4 16ae0a36403836f0a6effd2dc1eb4756687178a4 crates/extract-keys/Cargo.toml
+1 .M N... 100644 100644 100644 ec0ef287d47576abc4b6b2b77cd0b9fa2b0694ef ec0ef287d47576abc4b6b2b77cd0b9fa2b0694ef crates/providers/Cargo.toml
+--- git remote -v ---
+origin	https://github.com/DraconDev/dracon-ai-lib.git (fetch)
+origin	https://github.com/DraconDev/dracon-ai-lib.git (push)
+--- git branch -vv ---
+* main a87ab96 [origin/main: ahead 24] 2 file(s) in crates [crates/ai-models-catalog/README.md, crates/ai-lib/README.md] DELTA:+12/-7
+--- git log -5 ---
+a87ab96 2 file(s) in crates [crates/ai-models-catalog/README.md, crates/ai-lib/README.md] DELTA:+12/-7
+4eccdcc 2 file(s) in crates [crates/ai-lib/src/providers/minimax.rs, crates/ai-lib/src/providers/openai.rs] DELTA:+15/-15
+9cb5103 docs: fix stale ai-lib release tag wording
+d8846da docs: make crate docs explicit BYOK-library contract
+4b70129 4 file(s) in docs [docs/archive/legacy-key-management-design.md, docs/consumer-getting-started.md, README.md] DELTA:+26/-8

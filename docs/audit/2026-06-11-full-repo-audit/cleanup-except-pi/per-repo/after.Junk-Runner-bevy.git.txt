@@ -1,0 +1,22 @@
+REPO=/home/dracon/Dev/Junk-Runner-bevy
+--- git status porcelain=v2 ---
+--- git remote -v ---
+codeberg	git@codeberg.org:dracondev/Junk-Runner-bevy.git (fetch)
+codeberg	git@codeberg.org:dracondev/Junk-Runner-bevy.git (push)
+github	git@github.com:DraconDev/Junk-Runner-bevy.git (fetch)
+github	git@github.com:DraconDev/Junk-Runner-bevy.git (push)
+gitlab	git@gitlab.com:dracondev/Junk-Runner-bevy.git (fetch)
+gitlab	git@gitlab.com:dracondev/Junk-Runner-bevy.git (push)
+origin	https://github.com/DraconDev/Junk-Runner-bevy.git (fetch)
+origin	https://github.com/DraconDev/Junk-Runner-bevy.git (push)
+--- git branch -vv ---
+  bevy-legacy e198f1000 [origin/bevy-legacy] test(cargo.lock to): Updated Cargo.lock to reflect latest dependency versions
+  main        e1894697f [origin/main] Added SOLID_VS_SVELTE.md
+* tauri2      337f4e5d4 [origin/tauri2] 1 file(s) in web [web/src/lib/screens/Map.svelte] DELTA:+4/-1
+  temp_fix    2fd47876a [origin/temp_fix] chore(sync): update Cargo
+--- git log -5 ---
+337f4e5d4 1 file(s) in web [web/src/lib/screens/Map.svelte] DELTA:+4/-1
+ef332438b 1 file(s) in web [web/src/lib/screens/Map.svelte] DELTA:+1/-0
+c911a481c 1 file(s) in web [web/src/lib/screens/Map.svelte] DELTA:+7/-1
+0e5f31da7 1 file(s) in web [web/src/lib/screens/Map.svelte] DELTA:+38/-12
+2550d7173 1 file(s) [CHANGELOG.md] DELTA:+12/-0

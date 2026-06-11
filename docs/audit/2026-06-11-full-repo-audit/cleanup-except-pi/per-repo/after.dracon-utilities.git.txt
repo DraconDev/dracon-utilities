@@ -1,0 +1,28 @@
+REPO=/home/dracon/Dev/dracon-utilities
+--- git status porcelain=v2 ---
+? docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/after/inventory.json
+? docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/after/inventory.tsv
+? docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/per-repo/after.Junk-Runner-bevy.git.txt
+? docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/per-repo/after.dracon-code.git.txt
+? docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/per-repo/after.dracon-utilities.git.txt
+? docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/per-repo/after.one-mil-girls.git.txt
+? docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/per-repo/after.pully-fully-pull-based-fleet-reconciler.git.txt
+--- git remote -v ---
+codeberg	git@codeberg.org:dracondev/dracon-utilities.git (fetch)
+codeberg	git@codeberg.org:dracondev/dracon-utilities.git (push)
+github	git@github.com:DraconDev/dracon-utilities.git (fetch)
+github	git@github.com:DraconDev/dracon-utilities.git (push)
+gitlab	git@gitlab.com:dracondev/dracon-utilities.git (fetch)
+gitlab	git@gitlab.com:dracondev/dracon-utilities.git (push)
+origin	https://github.com/DraconDev/dracon-utilities.git (fetch)
+origin	https://github.com/DraconDev/dracon-utilities.git (push)
+--- git branch -vv ---
+  backup/pre-merge-abort 846192c3 1 file(s) in .pi [.pi/goals/active_goal_2026060801061404_mq4gady8-2jker2.md] DELTA:+5/-5 | TOKENS:14531K TIME:573m EVIDENCE:quickwins-1:Fixed 2 docs. docs/OPERATIONS.md line|quickwins-2:Executed: `git rm dracon-sync/note.md|quickwins-3:Added `#![allow(dead_code)]` to draco+3more
+* main                   6f1ac538 [origin/main] 82 file(s) in .demon,docs [docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/pi-proof/after.dracon-platform.pi-files.txt, docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/CLEANUP_MANIFEST.md, docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/pi-proof/after.Junk-Runner-bevy.pi-files.txt] DELTA:+364/-1 | NEW:cleanup-except-pi/CLEANUP_MANIFEST.md,pi-proof/.dracon.pi-files.diff,pi-proof/.dracon.pi-untracked.diff,pi-proof/DraconDev.pi-files.diff,pi-proof/DraconDev.pi-untracked.diff,pi-proof/Junk-Runner-bevy.pi-files.diff,pi-proof/Junk-Runner-bevy.pi-untracked.diff,pi-proof/after..dracon.pi-files.txt,pi-proof/after..dracon.pi-untracked.txt,pi-proof/after.DraconDev.pi-files.txt+71more DEL:keys/owner_age1wz5p.pub
+  scribe-version         fbe2a48c Modified dracon-warden/src/security/tests/common.rs
+--- git log -5 ---
+6f1ac538 82 file(s) in .demon,docs [docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/pi-proof/after.dracon-platform.pi-files.txt, docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/CLEANUP_MANIFEST.md, docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/pi-proof/after.Junk-Runner-bevy.pi-files.txt] DELTA:+364/-1 | NEW:cleanup-except-pi/CLEANUP_MANIFEST.md,pi-proof/.dracon.pi-files.diff,pi-proof/.dracon.pi-untracked.diff,pi-proof/DraconDev.pi-files.diff,pi-proof/DraconDev.pi-untracked.diff,pi-proof/Junk-Runner-bevy.pi-files.diff,pi-proof/Junk-Runner-bevy.pi-untracked.diff,pi-proof/after..dracon.pi-files.txt,pi-proof/after..dracon.pi-untracked.txt,pi-proof/after.DraconDev.pi-files.txt+71more DEL:keys/owner_age1wz5p.pub
+250bc181 64 file(s) in docs [docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/candidates/cleanup-candidates.tsv, docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/before/inventory.json, docs/audit/2026-06-11-full-repo-audit/cleanup-except-pi/pi-proof/before.dracon-platform.pi-files.txt] DELTA:+3508/-0 | NEW:before/inventory.json,before/inventory.tsv,candidates/cleanup-candidates.tsv,per-repo/before..dracon.git.txt,per-repo/before.DraconDev.git.txt,per-repo/before.Junk-Runner-bevy.git.txt,per-repo/before.ai-auto-repo-rot-scanner-todo-agent.git.txt,per-repo/before.ai-auto-writer.git.txt,per-repo/before.avid.git.txt,per-repo/before.browser-extensions-shared.git.txt+54more
+e7bf4d0e 4 file(s) in docs [docs/audit/2026-06-11-full-repo-audit/public-readiness-funding/inventory.json, docs/audit/2026-06-11-full-repo-audit/public-readiness-funding/PUBLIC_READINESS.md, docs/audit/2026-06-11-full-repo-audit/public-readiness-funding/inventory.tsv] DELTA:+185/-106 | NEW:public-readiness-funding/PUBLIC_READINESS.md
+adf34aea 27 file(s) in docs [docs/audit/2026-06-11-full-repo-audit/public-readiness-funding/inventory.json, docs/audit/2026-06-11-full-repo-audit/public-readiness-funding/per-repo/browser-extensions-shared.git.txt, docs/audit/2026-06-11-full-repo-audit/public-readiness-funding/per-repo/dracon-platform.git.txt] DELTA:+1206/-0 | NEW:deps/deps.tsv,public-readiness-funding/hygiene.tsv,public-readiness-funding/inventory.json,public-readiness-funding/inventory.tsv,non-rust/non-rust.tsv,per-repo/.dracon.git.txt,per-repo/DraconDev.git.txt,per-repo/Junk-Runner-bevy.git.txt,per-repo/ai-auto-repo-rot-scanner-todo-agent.git.txt,per-repo/ai-auto-writer.git.txt+17more
+184c5c33 4 file(s) in dracon-sync [dracon-sync/src/policy.rs, dracon-sync/dracon-sync.example.toml, dracon-sync/README.md] DELTA:+47/-12
