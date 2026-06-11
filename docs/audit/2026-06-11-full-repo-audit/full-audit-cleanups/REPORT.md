@@ -140,4 +140,8 @@ Key files:
 - Current docs updated to reflect pi goals as canonical.
 - `dracon-utilities` validation passes.
 - No destructive cleanup beyond the approved root TODO removal.
-- Remaining WARNs are documented as active user work or approval-required mirror pushes.
+- Remaining WARNs/CONCERNs at final inventory are audit churn or active user work:
+  - `dracon-utilities`: transient `STUCK_PUSH` while the daemon lagged behind audit evidence commits; validation passes and the final evidence commits are recorded.
+  - `one-mil-girls`: documented generated `.svelte-kit` churn plus preserved user audit screenshots/research docs; no cleanup applied without approval.
+- `dracon-platform` remains an approval-required mirror push of one binary screenshot commit.
+- `dracon-ai-lib` appeared as WARN during the final inventory with one tracked docs change; it was not part of the approved cleanup set and is documented as active user work.
