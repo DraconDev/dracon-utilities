@@ -1,0 +1,136 @@
+PWD=/home/dracon/Dev/dracon-utilities
+--- dracon-sync inventory row ---
+repo	branch	modified	staged	untracked	ahead	behind	state_flags	push_status	hint
+/home/dracon/Dev/dracon-ai-lib	main	0	0	0	28	0	AHEAD:28,STUCK_PUSH	STUCK	run repair-concerns --apply (push or rewrite)
+--- git status porcelain=v2 ---
+--- git remote -v ---
+origin	https://github.com/DraconDev/dracon-ai-lib.git (fetch)
+origin	https://github.com/DraconDev/dracon-ai-lib.git (push)
+--- git branch -vv ---
+* main dd14038 [origin/main: ahead 28] docs: tidy current tag section
+--- upstream ---
+origin/main
+--- log -20 ---
+dd14038 docs: tidy current tag section
+1709b7b docs: mark legacy crates as deprecated, not current contract
+fff5e43 3 file(s) in crates [crates/contracts/src/lib.rs, crates/extract-keys/src/main.rs, crates/providers/src/lib.rs] DELTA:+13/-5
+89353bd 7 file(s) in crates [crates/client/src/lib.rs, crates/core/src/lib.rs, crates/client/Cargo.toml] DELTA:+17/-10
+a87ab96 2 file(s) in crates [crates/ai-models-catalog/README.md, crates/ai-lib/README.md] DELTA:+12/-7
+4eccdcc 2 file(s) in crates [crates/ai-lib/src/providers/minimax.rs, crates/ai-lib/src/providers/openai.rs] DELTA:+15/-15
+9cb5103 docs: fix stale ai-lib release tag wording
+d8846da docs: make crate docs explicit BYOK-library contract
+4b70129 4 file(s) in docs [docs/archive/legacy-key-management-design.md, docs/consumer-getting-started.md, README.md] DELTA:+26/-8
+210c250 1 file(s) in docs [docs/{key-management-design.md => archive/legacy-key-management-design.md}] DELTA:+0/-0
+4da3538 docs: add STATUS.md with honest per-consumer + lib state
+6882198 simplify: drop the dracon-ai/* cutover theater; use the real repo URL
+e4a60aa 1 file(s) in .github [.github/FUNDING.yml] DELTA:+43/-0 | NEW:.github/FUNDING.yml
+3acafd9 docs: stage consumer cutover plan and align README to dracon-ai org
+195fbc3 1 file(s) in docs [docs/cutover-plan-2026-06-10.md] DELTA:+207/-0 | NEW:docs/cutover-plan-2026-06-10.md
+cd8bc7f 1 file(s) in crates [crates/ai-lib/src/providers/minimax.rs] DELTA:+48/-37
+209cff3 1 file(s) in crates [crates/ai-lib/src/providers/minimax.rs] DELTA:+1/-1
+d70cf8a 1 file(s) in crates [crates/ai-lib/src/providers/minimax.rs] DELTA:+16/-13
+5fec442 17 file(s) in crates [Cargo.lock, crates/client/src/lib.rs, crates/providers/src/openai.rs] DELTA:+1415/-589
+2b7b045 1 file(s) [Cargo.toml] DELTA:+7/-2
+--- tags ---
+v0.2.0
+v0.1.22
+v0.1.21
+v0.1.4-fresh
+v0.1.1-remote
+--- show-ref heads/remotes/tags ---
+error: unknown option `remotes'
+usage: git show-ref [--head] [-d | --dereference]
+                    [-s | --hash[=<n>]] [--abbrev[=<n>]] [--branches] [--tags]
+                    [--] [<pattern>...]
+   or: git show-ref --verify [-q | --quiet] [-d | --dereference]
+                    [-s | --hash[=<n>]] [--abbrev[=<n>]]
+                    [--] [<ref>...]
+   or: git show-ref --exclude-existing[=<pattern>]
+   or: git show-ref --exists <ref>
+
+    --[no-]tags           only show tags (can be combined with --branches)
+    --[no-]branches       only show branches (can be combined with --tags)
+    --[no-]exists         check for reference existence without resolving
+    --[no-]verify         stricter reference checking, requires exact ref path
+    --[no-]head           show the HEAD reference, even if it would be filtered out
+    -d, --[no-]dereference
+                          dereference tags into object IDs
+    -s, --[no-]hash[=<n>] only show SHA1 hash using <n> digits
+    --[no-]abbrev[=<n>]   use <n> digits to display object names
+    -q, --[no-]quiet      do not print results to stdout (useful with --verify)
+    --exclude-existing[=<pattern>]
+                          show refs from stdin that aren't in local repository
+
+--- config branch/main ---
+branch.main.remote origin
+branch.main.merge refs/heads/main
+--- config remote.origin ---
+remote.origin.url https://github.com/DraconDev/dracon-ai-lib.git
+remote.origin.fetch +refs/heads/*:refs/remotes/origin/*
+--- push dry-run ---
+remote: This repository was archived so it is read-only.
+fatal: unable to access 'https://github.com/DraconDev/dracon-ai-lib.git/': The requested URL returned error: 403
+--- git show-ref heads/tags ---
+dd14038e194c34b3279784efeafa01fbb64ac4f3 refs/heads/main
+228c900e4d96e1dead1de1d2b5425dc77783df2f refs/tags/v0.1.1-remote
+d967cbfc007942d15b1c9c1e6d8ef80408082d35 refs/tags/v0.1.21
+34341f656ee7f09c65b7e0bc8ecbc9ed11d9c0d3 refs/tags/v0.1.22
+4a593b9b3405c2daab2b83a22637826d9f886586 refs/tags/v0.1.4-fresh
+1c29f354dc0aad62b743a9bfcfacb1ac530ef809 refs/tags/v0.2.0
+--- git ls-remote origin main refs/tags/v0.2.0 ---
+ce377a20fa8b911f3201777c120779ebd56ff903	refs/heads/main
+1c29f354dc0aad62b743a9bfcfacb1ac530ef809	refs/tags/v0.2.0
+--- gh repo view ---
+{"defaultBranchRef":{"name":"main"},"description":"","isArchived":true,"url":"https://github.com/DraconDev/dracon-ai-lib","visibility":"PRIVATE"}
+--- gh api repo ---
+{"archived":true,"default_branch":"main","full_name":"DraconDev/dracon-ai-lib","permissions":{"admin":true,"maintain":true,"pull":true,"push":true,"triage":true},"visibility":"private"}
+--- merge-base main origin/main ---
+ce377a20fa8b911f3201777c120779ebd56ff903
+--- rev-list count main ^origin/main ---
+28
+--- rev-list count origin/main ^main ---
+0
+--- local HEAD ---
+dd14038e194c34b3279784efeafa01fbb64ac4f3
+--- origin/main ---
+ce377a20fa8b911f3201777c120779ebd56ff903
+--- origin/main log -10 ---
+ce377a2 5 file(s) in .pi [.pi/goals/archived/goal_2026060813080905_mq53j6wk-tc1udv.md, .pi/goals/archived/goal_2026060816375771_mq5ckllx-58ktk5.md, .pi/goals/archived/goal_2026060817103628_mq5ebocf-8c0p11.md] DELTA:+405/-9 | NEW:archived/goal_2026060813080905_mq53j6wk-tc1udv.md,archived/goal_2026060816375771_mq5ckllx-58ktk5.md,archived/goal_2026060817103628_mq5ebocf-8c0p11.md TAG:v0.2.0-archived GOAL:complete TOKENS:55388K TIME:588m
+14397af archive: fix remaining dracon-ai-sdk references to ai-api-sdk
+4fc7206 archive: mark lib as archived, redirect to ai-api-sdk
+f9ffee1 1 file(s) in .pi [.pi/goals/active_goal_2026060801204241_mq4gszze-8rib4x.md] DELTA:+5/-5 | TOKENS:54174K TIME:587m
+8676c55 1 file(s) in .pi [.pi/goals/active_goal_2026060801204241_mq4gszze-8rib4x.md] DELTA:+5/-5 | TOKENS:51688K TIME:583m
+39b2664 1 file(s) in .pi [.pi/goals/active_goal_2026060801204241_mq4gszze-8rib4x.md] DELTA:+5/-5 | TOKENS:49270K TIME:580m
+389d58e 1 file(s) in .pi [.pi/goals/active_goal_2026060801204241_mq4gszze-8rib4x.md] DELTA:+5/-5 | TOKENS:47980K TIME:578m
+776bd9a 1 file(s) in .pi [.pi/goals/active_goal_2026060801204241_mq4gszze-8rib4x.md] DELTA:+5/-5 | TOKENS:47673K TIME:578m
+cbe97cc 1 file(s) in .pi [.pi/goals/active_goal_2026060801204241_mq4gszze-8rib4x.md] DELTA:+5/-5 | TOKENS:47552K TIME:578m
+9eca1a1 1 file(s) in .pi [.pi/goals/active_goal_2026060801204241_mq4gszze-8rib4x.md] DELTA:+5/-5 | TOKENS:47432K TIME:577m
+--- local main commits not on origin/main -28 ---
+dd14038 docs: tidy current tag section
+1709b7b docs: mark legacy crates as deprecated, not current contract
+fff5e43 3 file(s) in crates [crates/contracts/src/lib.rs, crates/extract-keys/src/main.rs, crates/providers/src/lib.rs] DELTA:+13/-5
+89353bd 7 file(s) in crates [crates/client/src/lib.rs, crates/core/src/lib.rs, crates/client/Cargo.toml] DELTA:+17/-10
+a87ab96 2 file(s) in crates [crates/ai-models-catalog/README.md, crates/ai-lib/README.md] DELTA:+12/-7
+4eccdcc 2 file(s) in crates [crates/ai-lib/src/providers/minimax.rs, crates/ai-lib/src/providers/openai.rs] DELTA:+15/-15
+9cb5103 docs: fix stale ai-lib release tag wording
+d8846da docs: make crate docs explicit BYOK-library contract
+4b70129 4 file(s) in docs [docs/archive/legacy-key-management-design.md, docs/consumer-getting-started.md, README.md] DELTA:+26/-8
+210c250 1 file(s) in docs [docs/{key-management-design.md => archive/legacy-key-management-design.md}] DELTA:+0/-0
+4da3538 docs: add STATUS.md with honest per-consumer + lib state
+6882198 simplify: drop the dracon-ai/* cutover theater; use the real repo URL
+e4a60aa 1 file(s) in .github [.github/FUNDING.yml] DELTA:+43/-0 | NEW:.github/FUNDING.yml
+3acafd9 docs: stage consumer cutover plan and align README to dracon-ai org
+195fbc3 1 file(s) in docs [docs/cutover-plan-2026-06-10.md] DELTA:+207/-0 | NEW:docs/cutover-plan-2026-06-10.md
+cd8bc7f 1 file(s) in crates [crates/ai-lib/src/providers/minimax.rs] DELTA:+48/-37
+209cff3 1 file(s) in crates [crates/ai-lib/src/providers/minimax.rs] DELTA:+1/-1
+d70cf8a 1 file(s) in crates [crates/ai-lib/src/providers/minimax.rs] DELTA:+16/-13
+5fec442 17 file(s) in crates [Cargo.lock, crates/client/src/lib.rs, crates/providers/src/openai.rs] DELTA:+1415/-589
+2b7b045 1 file(s) [Cargo.toml] DELTA:+7/-2
+b04f5db 5 file(s) in crates,docs [docs/release-tracking.md, crates/ai-lib/src/providers/minimax.rs, crates/ai-lib/tests/anthropic.rs] DELTA:+147/-12 | TEST:10 NEW:docs/release-tracking.md
+524b5b3 2 file(s) in crates [crates/ai-lib/src/providers/minimax.rs, crates/ai-lib/tests/integration.rs] DELTA:+41/-35 | TEST:14
+168b8d6 11 file(s) in crates [crates/ai-lib/src/lib.rs, crates/ai-models-catalog/tests/catalog.rs, crates/ai-lib/tests/anthropic.rs] DELTA:+90/-52 | TEST:70
+192fb31 docs: add BYO-key consumer guide and README decision matrix
+0ef4c35 docs: clarify lane ownership boundary
+af66a06 feat: lift ai-api provider engine into ai-lib
+92d4f2b chore: rename repo to dracon-ai-lib
+43cdd4d chore: initial import of ai-lib and ai-models-catalog
