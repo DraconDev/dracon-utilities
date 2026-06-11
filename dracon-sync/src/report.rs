@@ -621,7 +621,9 @@ pub(crate) fn repo_is_warn(
     has_upstream: bool,
 ) -> bool {
     // WARN: has TRACKED modifications or staged changes, but not a concern.
-    // Untracked files (build artifacts) do NOT count as warn.
+    // Untracked files remain visible in the UT column, but they are not
+    // sync-relevant by themselves. This keeps audit/research artifacts visible
+    // without turning build artifacts, screenshots, or local evidence into WARNs.
     !repo_is_concern(status, has_origin, has_upstream)
         && (status.modified_files > 0 || status.staged_files > 0)
 }
@@ -2652,6 +2654,24 @@ mod tests {
     }
 
     #[test]
+    fn test_repo_is_warn_untracked_only_is_not_warn() {
+        let status = RepoStatus {
+            branch: String::new(),
+            is_clean: false,
+            modified_files: 0,
+            untracked_files: 5,
+            staged_files: 0,
+            ahead: 0,
+            behind: 0,
+            last_commit_hash: None,
+            last_commit_msg: None,
+        };
+
+        assert!(!repo_is_warn(&status, true, true));
+        assert_eq!(repo_state_flags(&status, true, true), vec!["DIRTY"]);
+    }
+
+    #[test]
     fn test_repo_hint_healthy() {
         let hint = repo_hint(&["OK".into()], false, false);
         assert_eq!(hint, "healthy");
@@ -3203,7 +3223,7 @@ mod tests {
     }
 
     #[test]
-    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA3aWgxQmRKdUZEa2lqZzFLSmxXdnNuM2p6cDdhaW1xMXA0VUgzNGUzNDNNCjdJNFl1cE9xSjBzMVloRXBHejk0VGIwS3ZjVDBlUEJVRmR0bzFtOFpMa28KLT4gWDI1NTE5IGt6RHhXUHlZN1FxWHUzbUFELzJtUlNBdnRyaU55M0oyNVYzdWJ6Y0V3RlkKUFNmNlMyZmFUanhuOFpqQ0VKeGc2L1BNelRLUDZLVWhjYUZvYUsveERkcwotPiBYMjU1MTkgT3NGbDRuYTR1bnJ4NXp6amxabFBFOU4vekFXaWgwTS94NWpWWlZHTk1tTQpySFkrR1pDcXc3Ly9Wa1p3ZHlscEtsbzA0eHh6TGFidWxLYjRVSmc4eUNZCi0+IFgyNTUxOSA5VnhLMnZkd3RNUDBzRE5XRnJmT1NNMXp3bWxkVS9vV0FqTStPOGVLSEVVCkxRQzdhbU9QWTl1V2U1aFhzZFN0bWxzTXk4T254WHRESFZVU3c3TSs5eW8KLT4gWDI1NTE5IHV0WmxQR3dJelg1OFNjQVIxUVVYUktONmZRdE9ZRmFyZ3B3Z0pCU01nd0kKMjdWSXBjUllDR3RzSTZHSFlZVlpscVpETE9lS01nV2NObzArVUd4NVppcwotPiBYMjU1MTkgWUl5NVVSUkJKbU1vVC9Sa2xyVVVzSitYajlvQ3YrQXkrUTRwdjhnU2ZWVQpOdWxGMkdLQnUrTUZJeVdzSGswVTg1eG1POUIydVVFczk0cXFwUXB6NHJFCi0+IFgyNTUxOSBiZlh6WkV1a0VxM01xc3RJTlcrK09UZHFkRHVDcDFUVk04TkI1NUlTL1ZzCjU5VDNMTGZld0JIclg3SWx0VEtNamtaRUxjYVRXd2NTVm9ibkI1eEdqR0UKLT4gYC1ncmVhc2UgeFdPIEkgUDNSVDkvIFhaeCMKeHlDK3h0MFJPRm9pRnJIZHVrM29HQmluZkRKUHJxUWloWjAwMnhISWdXVU11VTRZT1RkTGFySGdnM1M0cjVLZApWZjlyZ1BMOGdOZU5zZk04eUkzaVFtVWEyYTlNMjRzV2hrOU5uTnJSS1NNCi0tLSBzVFMrRUFEQVVIWVlUa21WeXJOSnF0czF0OHJlS1krQzZPNXZIOTh3QUxrCnyEtx6cKJ98s+UuO4BGVYJRKZoAxpaoFDMQ0uW3ubE6cDvoudVb5I5l/QgA8CPRO0WCJaqb80Ou0auLYRM=]() {
+    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBoN2RlaU5QdGJsWlhyZjJvUXF6QjVyTUpCNWg0T2YxcFZtK0x2RUlVVW1JCkJLaVE2Zk5qWFZ4YTY4OE1xK3pmbit1UDdIT214cjdzdUNYYWZjQk5KcHcKLT4gWDI1NTE5IGxESnN3K0lyRGplK3F2eTFiUVg0SHVORHZyZG1NUkEvY1dDUFFSRGMzU0EKMWtMRWFqUkdlaUVBTUpTTnhJNUplZGdBOFJuMDF4dStuOGg1V3hQKzAyVQotPiBYMjU1MTkgYnY1cGRPQzhBTVJFek9TQmU0c3hQZTlTcGVOcHdlUEx1MTM2OXpCYjJUbwp6cmZiODByL0R3UkxWdStqK3BRZ29KS3hSdHJmcUJ3N1NVbU51ekF2YmJZCi0+IFgyNTUxOSB0VUlIYmpWaFExbkNKQ2RVM1lxbmtYaGtJclNsRG9BUnNxTnhzcGcvdVNJCmM4eklMRktxVlUwajZJandwVS9CRjdiS0RzZkFBOWkvWFlBVU5zSTh4ZTAKLT4gWDI1NTE5IFJjd2NPQWt4aXBaOWZSaEFzM1k5N2lvN29ZN2VGT0tacE1ES00zL2E5d0EKZzFkWFJPbG53VVZMMXNnQkJGSWlPcjJFQVgwbEovZkpiUXBuMVRodWtDNAotPiBYMjU1MTkgNWhEUGdzcXNBdmg0YXUxcjJZYlNUZWQxeGxUakcvZER3Qk9vVzcxRVNYawpoMXo4VHU0T3FFYkdlQjE5OUJxK0xIdWFVWHhFa2cxeEtKR2RENEtHQUswCi0+IFgyNTUxOSBYaU5yOTBuUXhzc05aTzBoZThJTi9uaDcxRTZDcktFV3RQd0hyZFI3Y1R3CmVEOHV0eE9RR1Rab0VjTFZwTGJZdnM5bDJhN09pRVdEeUdKcGROV1d5cWcKLT4gVW4mNmN3ZUotZ3JlYXNlIDR0IFUqIHgjCnV4YWljd3Y2VTZKaU5PeEFRZHVVb3BYT0JpN1orakROUUxyVTZzRlUwREgyODliNU1vU05YV0hycm1QWFkxS0cKazBjQ0lwUjZDSzMwbWZ5WVY0bEdTUTVVTzBHaFZ2clkKLS0tIGpKVXFmZ3BOclA3U3dyWSt5b3VkS3ZIc3N0N2pUMXgvWWtxcE5uRlA1NXMKR4boI1rEoqKnDayWZbeG3l+VA0+8SO0xXd4EWyalemdy960R0WaldmZzlo2oY0g1hZ/PKLlZCf/P1swMJQ==]() {
         let mut cooldowns = std::collections::HashMap::new();
         let repo = std::path::PathBuf::from("/test/repo");
         let notify_key = format!("push-fail-{}", repo.display());

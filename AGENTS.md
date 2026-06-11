@@ -261,13 +261,15 @@ The guard daemon rotates its log file if oversized at startup.
 **Critical concept:** `git status` groups files into "Changes not staged" (modified tracked files) and "Untracked files" (files git doesn't know about). The sync daemon treats these very differently:
 
 - **Modified tracked files** (`M` in git status): Real code changes. The daemon commits and pushes these.
-- **Untracked files** (`??` in git status): Build artifacts (`target/`, `node_modules/`), caches, generated data. The daemon ignores these for sync purposes.
+- **Untracked files** (`??` in git status): Build artifacts (`target/`, `node_modules/`), caches, generated data, and audit/research evidence. The daemon ignores these for sync purposes.
 
 The `repos` command reflects this split:
 - **MOD column** shows modified tracked files (real changes)
 - **STG column** shows staged files
-- **Untracked files** are counted separately and do NOT trigger WARN status
+- **UT column** shows untracked files and directories; these are intentionally visible, not filtered out of the report
 - The OK/WARN/CONCERN status only considers **sync-relevant** dirty entries (tracked modifications), not untracked build artifacts
+
+Untracked audit/research artifacts such as screenshots, smoke-test evidence, research reports, and local validation logs should remain visible in the UT count when present. Do not delete, ignore, hide, or commit them without explicit approval. They stay **OK** unless there is also tracked modification, staged content, ahead/behind state, or missing remote/upstream state.
 
 ### !target/ Policy
 
@@ -545,7 +547,7 @@ auto_publish = false  # master toggle (default: off)
 [[publish_targets]]
 name = "crates-io"
 registry = "crates-io"    # crates-io | npm | pypi
-[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB5dmdRTldSeXJRc1hWV2pYaTUvR1NaaWdBOXFiWHEyMVJ3b1p4VXE0OEdZCkoxaXZQOTIzREYyMzZRZmlzYjc4anRGNXp0R09LUjV5YW4xM1dOc3NyQzAKLT4gWDI1NTE5IGk0d0N3dDg5L0g0dVRCYWlvaDViVmpUTnVlbml3WHFZdTZyQko2R3BQaUkKSWQ3NjhHTGpjRHErbEZGakR0OXZpS0ppNERIc3F2ZEV4RWJ3QVBLZzgwZwotPiBYMjU1MTkgRi9mZlBIdWI5b2dKbFBSQ3E3UTRRQ2g4V2Fxc2pxODlta1VEcmYyVldUOAphcG5TektTbzZPQVo5c2c4WGhpckIvc2xRQWZ1NFJoNWI0aDVHa01iUWN3Ci0+IFgyNTUxOSBLVTdqMlltOUtTK2dpNnVoYSsxSy9mWFJ2anA1MVBLWHZqYUdTenF1Z0RrCjdncGdwMm9HTUdBQ2hBV2VlU2hzeEtOTm85Z2p4U2JzbDY5Ny9GZXlQVEkKLT4gWDI1NTE5IEoxNXVRNjNvSDVjd2poTG9udkdtZm1JWGhPVnIvTVVrWDNsQm5IZDB1M0kKWnJsUStpbTFPc0hRZG9CakpwdTJXMXp1aVJSbnIrOEt6bFpnTW1idUpQNAotPiBYMjU1MTkgRlN3ZFJyU0JzVExjejlTVlQ4RVZYczZQY2wwcGIrZVZEUDhselRYMmdSOApXVy9IVkw2VDZ3YjE5bWxBcWtJVnhDeHJnZ0ZlM1hVczVBdlVQRy96bHRFCi0+IFgyNTUxOSBsVkowa0FtN0Fsa1UvcXJqb1ZkWlQ5Z0Vwd0lzTC80TzIxaXhQQkZNYndZCjBna042TGNZRXBhYWZ1Z0Y3NnhiSnNaUzhRMEhYMmVsNWt2RVBFQXdiSjAKLT4gK01OV0I3UnQtZ3JlYXNlIFl0UGFNIQpvTVBsbEpXbUlnYWVhcFV0NnRrdVJqU1c4RlNUbDhxZzNjSEdqRnYzRjE1MFJHdHc1MFgxVXNNbDRyQ0N0N2Q5CmkxR3lXQUFhYkt6TFdJUkFyU0JxTElkSDFNYnhqM2NIMGptaAotLS0gaitvclF5aGIxYlhkWlExV1BpeVJuTHZ1Wm1sWkdPbEFXOElOQVF5emlwSQpPu17NDMyf7duPXPzi990NzhzniTN8P53DVgMtfOerXOcaS3heQN3GVvAMOrTX4C0iubQYn5Cbt+zwA/wtYRlE7r9ZkdY=]
+[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAwczRkdzNaVW9IaHU3Vi9teTV2NnpRaC9zS2pIZlQvQUZhaHJSVVVwZFFvCm4rMEJ6aGI2SDZTRUdpaGlzN3hnWVpWWFBGQU5kZ0FZckc2YzFKMnRCRHcKLT4gWDI1NTE5IDUydVNsbFh6eGJBVzF6cjFjY2ZTV0NtUkhjMUpNQy9kaFBwR3VDSjVnaG8KcllxYzMyTXdXTDhRY3B1NlZQVGdiclp3NWU5QzJUc0FMd0Eza3ppa2NpZwotPiBYMjU1MTkgZVh0YlNzQ2RwaHcyQTNXSGJTc09lV2JoUUM2U0tZbklkaDhOcE50QzR6YwoyODVmQ3lvOTRoVjhOcXpQVXgwS1M2dGw5UEdEVkxKOUR4VUpwSWptb1RRCi0+IFgyNTUxOSAvQW5DcjZuSVp6SlJkQmRLRjgzUERLWEJOMTl0SmVyeEpvUTJRVmc4aW5RCmNONkZQdy9NdEtZVlkyaFJIV3hxSVVXRFIwM2RnbWlGM0JqNEppUnNGUHcKLT4gWDI1NTE5IGYrTXVsTkhsL012dldaOXlHekpRK1pKdlRYSnB4ZkdJNUZWMmdzblo4bGsKK1V6a3dCQXFFSGR2eWV6ZUpnUDZFZWRSVDd4OGlnMEVBd2RSeVlhcHFmdwotPiBYMjU1MTkgRFA5ZlI2RnIxblk4MFo3eGxkQ1FvLzlPQ3BLaE1wQnpqbFNzcDZNSFUxVQpJYzNBWUhBV09BdU5NSVd4MlV1OG1IcktMbXQvZFNUZUkrNXo2NWtpM0lRCi0+IFgyNTUxOSBaQ1dMVzMrblV3S2pjZ3pDbTZNR0x1cWFscUx1RG9TNW02M0Q0Vit6R0ZzCkxZSCtveThtbVd2MURUUGo2RGZybytoR0o4anppSEUvWmNWTnhMMkJBL0kKLT4gUi1ncmVhc2UgLHcsYmIgYEBnMApzTkFpM0hmOFg2VGZ5T01iVkZObzEwV2NTYU41Ukp5M3pGTWNEaWczNG9HU05xNmxLR1pBek9kVThVQQotLS0gYTBGUkZFZ1YxTHV6TTI2M1NHVU0rV0lHQ0V1b3NtSkoyZ3c3SzBNY0tTMApqMWjMDH+JIPM392d9Q6clbZs8j592E0flO1SfxnZGeo9qXKt2IMQDYK+uTj2Y7v1zcWKdEkLn/zAxPAHheueennzB+vc=]
 publish_timeout_secs = 300
 ```
 
