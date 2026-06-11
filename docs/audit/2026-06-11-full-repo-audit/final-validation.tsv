@@ -1,0 +1,10 @@
+repo	fmt_check	cargo_test	clippy_exit	notes
+dracon-platform	1	101	101	see /tmp/test.log
+folder-auto-banner	1	101	101	see /tmp/test.log
+ai-auto-repo-rot-scanner-todo-agent	1	0	0	
+kiki-sassy-desktop-announcer	0	0	0	
+dracon-code	1	0	0	
+avid	1	0	0	
+ai-auto-writer	0	0	0	
+video-factory	0	0	0	
+rust-ai-web-auto	0	0	0	
