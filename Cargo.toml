@@ -4,9 +4,7 @@ members = [
     "dracon-system",
     "dracon-warden",
 ]
-exclude = [
-    "dracon-ai",
-]
+exclude = []
 resolver = "2"
 
 [workspace.package]
