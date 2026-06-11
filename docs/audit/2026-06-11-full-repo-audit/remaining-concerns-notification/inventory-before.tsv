@@ -1,8 +1,0 @@
-repo	branch	modified	staged	untracked	ahead	behind	state_flags	push_status	hint
-/home/dracon/Dev/dracon-platform	main	1	0	0	2	0	DIRTY,AHEAD:2,STUCK_PUSH	STUCK	run repair-concerns --apply (push or rewrite)
-/home/dracon/Dev/browser-extensions-shared	main	1	0	2	0	0	DIRTY	OK	run repair-warns --apply
-/home/dracon/Dev/dracon-code	main	8	0	0	0	0	DIRTY	OK	run repair-warns --apply
-/home/dracon/Dev/rust-ai-web-auto	main	2	0	0	0	0	DIRTY	OK	run repair-warns --apply
-/home/dracon/Dev/dracon-utilities	main	1	0	1	0	0	DIRTY	OK	run repair-warns --apply
-/home/dracon/.dracon	main	1	0	0	0	0	DIRTY	OK	run repair-warns --apply
-/home/dracon/Dev/pully-fully-pull-based-fleet-reconciler	main	1	0	0	0	0	DIRTY	OK	run repair-warns --apply

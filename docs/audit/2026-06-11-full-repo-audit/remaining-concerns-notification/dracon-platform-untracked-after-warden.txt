@@ -1,2 +1,0 @@
-web/games-hosted/games/junk-runner/assets/event_theme_1-Df1CmMTU.mp3
-web/games-hosted/games/junk-runner/assets/index-GbO9GnXv.js

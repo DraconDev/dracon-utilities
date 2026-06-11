@@ -1,5 +1,0 @@
-repo	script	status	duration_secs
-one-mil-girls	bun test	0	1
-one-mil-girls	bun run check	0	3
-Junk-Runner-bevy-web	bun run build	0	2
-Junk-Runner-bevy-web	bun run check	0	3
