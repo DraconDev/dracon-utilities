@@ -1,0 +1,81 @@
+diff --git a/AGENTS.md b/AGENTS.md
+index 780fb648..82c5a207 100644
+--- a/AGENTS.md
++++ b/AGENTS.md
+@@ -261,14 +261,16 @@ The guard daemon rotates its log file if oversized at startup.
+ **Critical concept:** `git status` groups files into "Changes not staged" (modified tracked files) and "Untracked files" (files git doesn't know about). The sync daemon treats these very differently:
+ 
+ - **Modified tracked files** (`M` in git status): Real code changes. The daemon commits and pushes these.
+-- **Untracked files** (`??` in git status): Build artifacts (`target/`, `node_modules/`), caches, generated data. The daemon ignores these for sync purposes.
++- **Untracked files** (`??` in git status): Build artifacts (`target/`, `node_modules/`), caches, generated data, and audit/research evidence. The daemon ignores these for sync purposes.
+ 
+ The `repos` command reflects this split:
+ - **MOD column** shows modified tracked files (real changes)
+ - **STG column** shows staged files
+-- **Untracked files** are counted separately and do NOT trigger WARN status
++- **UT column** shows untracked files and directories; these are intentionally visible, not filtered out of the report
+ - The OK/WARN/CONCERN status only considers **sync-relevant** dirty entries (tracked modifications), not untracked build artifacts
+ 
++Untracked audit/research artifacts such as screenshots, smoke-test evidence, research reports, and local validation logs should remain visible in the UT count when present. Do not delete, ignore, hide, or commit them without explicit approval. They stay **OK** unless there is also tracked modification, staged content, ahead/behind state, or missing remote/upstream state.
++
+ ### !target/ Policy
+ 
+ `.gitignore` is managed by `dracon-warden` (marked with `# --- BEGIN DRACON MANAGED BLOCK ---`). The warden manages a blocklist/allowlist pattern:
+@@ -545,7 +547,7 @@ auto_publish = false  # master toggle (default: off)
+ [[publish_targets]]
+ name = "crates-io"
+ registry = "crates-io"    # crates-io | npm | pypi
+-[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB5dmdRTldSeXJRc1hWV2pYaTUvR1NaaWdBOXFiWHEyMVJ3b1p4VXE0OEdZCkoxaXZQOTIzREYyMzZRZmlzYjc4anRGNXp0R09LUjV5YW4xM1dOc3NyQzAKLT4gWDI1NTE5IGk0d0N3dDg5L0g0dVRCYWlvaDViVmpUTnVlbml3WHFZdTZyQko2R3BQaUkKSWQ3NjhHTGpjRHErbEZGakR0OXZpS0ppNERIc3F2ZEV4RWJ3QVBLZzgwZwotPiBYMjU1MTkgRi9mZlBIdWI5b2dKbFBSQ3E3UTRRQ2g4V2Fxc2pxODlta1VEcmYyVldUOAphcG5TektTbzZPQVo5c2c4WGhpckIvc2xRQWZ1NFJoNWI0aDVHa01iUWN3Ci0+IFgyNTUxOSBLVTdqMlltOUtTK2dpNnVoYSsxSy9mWFJ2anA1MVBLWHZqYUdTenF1Z0RrCjdncGdwMm9HTUdBQ2hBV2VlU2hzeEtOTm85Z2p4U2JzbDY5Ny9GZXlQVEkKLT4gWDI1NTE5IEoxNXVRNjNvSDVjd2poTG9udkdtZm1JWGhPVnIvTVVrWDNsQm5IZDB1M0kKWnJsUStpbTFPc0hRZG9CakpwdTJXMXp1aVJSbnIrOEt6bFpnTW1idUpQNAotPiBYMjU1MTkgRlN3ZFJyU0JzVExjejlTVlQ4RVZYczZQY2wwcGIrZVZEUDhselRYMmdSOApXVy9IVkw2VDZ3YjE5bWxBcWtJVnhDeHJnZ0ZlM1hVczVBdlVQRy96bHRFCi0+IFgyNTUxOSBsVkowa0FtN0Fsa1UvcXJqb1ZkWlQ5Z0Vwd0lzTC80TzIxaXhQQkZNYndZCjBna042TGNZRXBhYWZ1Z0Y3NnhiSnNaUzhRMEhYMmVsNWt2RVBFQXdiSjAKLT4gK01OV0I3UnQtZ3JlYXNlIFl0UGFNIQpvTVBsbEpXbUlnYWVhcFV0NnRrdVJqU1c4RlNUbDhxZzNjSEdqRnYzRjE1MFJHdHc1MFgxVXNNbDRyQ0N0N2Q5CmkxR3lXQUFhYkt6TFdJUkFyU0JxTElkSDFNYnhqM2NIMGptaAotLS0gaitvclF5aGIxYlhkWlExV1BpeVJuTHZ1Wm1sWkdPbEFXOElOQVF5emlwSQpPu17NDMyf7duPXPzi990NzhzniTN8P53DVgMtfOerXOcaS3heQN3GVvAMOrTX4C0iubQYn5Cbt+zwA/wtYRlE7r9ZkdY=]
++[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAwczRkdzNaVW9IaHU3Vi9teTV2NnpRaC9zS2pIZlQvQUZhaHJSVVVwZFFvCm4rMEJ6aGI2SDZTRUdpaGlzN3hnWVpWWFBGQU5kZ0FZckc2YzFKMnRCRHcKLT4gWDI1NTE5IDUydVNsbFh6eGJBVzF6cjFjY2ZTV0NtUkhjMUpNQy9kaFBwR3VDSjVnaG8KcllxYzMyTXdXTDhRY3B1NlZQVGdiclp3NWU5QzJUc0FMd0Eza3ppa2NpZwotPiBYMjU1MTkgZVh0YlNzQ2RwaHcyQTNXSGJTc09lV2JoUUM2U0tZbklkaDhOcE50QzR6YwoyODVmQ3lvOTRoVjhOcXpQVXgwS1M2dGw5UEdEVkxKOUR4VUpwSWptb1RRCi0+IFgyNTUxOSAvQW5DcjZuSVp6SlJkQmRLRjgzUERLWEJOMTl0SmVyeEpvUTJRVmc4aW5RCmNONkZQdy9NdEtZVlkyaFJIV3hxSVVXRFIwM2RnbWlGM0JqNEppUnNGUHcKLT4gWDI1NTE5IGYrTXVsTkhsL012dldaOXlHekpRK1pKdlRYSnB4ZkdJNUZWMmdzblo4bGsKK1V6a3dCQXFFSGR2eWV6ZUpnUDZFZWRSVDd4OGlnMEVBd2RSeVlhcHFmdwotPiBYMjU1MTkgRFA5ZlI2RnIxblk4MFo3eGxkQ1FvLzlPQ3BLaE1wQnpqbFNzcDZNSFUxVQpJYzNBWUhBV09BdU5NSVd4MlV1OG1IcktMbXQvZFNUZUkrNXo2NWtpM0lRCi0+IFgyNTUxOSBaQ1dMVzMrblV3S2pjZ3pDbTZNR0x1cWFscUx1RG9TNW02M0Q0Vit6R0ZzCkxZSCtveThtbVd2MURUUGo2RGZybytoR0o4anppSEUvWmNWTnhMMkJBL0kKLT4gUi1ncmVhc2UgLHcsYmIgYEBnMApzTkFpM0hmOFg2VGZ5T01iVkZObzEwV2NTYU41Ukp5M3pGTWNEaWczNG9HU05xNmxLR1pBek9kVThVQQotLS0gYTBGUkZFZ1YxTHV6TTI2M1NHVU0rV0lHQ0V1b3NtSkoyZ3c3SzBNY0tTMApqMWjMDH+JIPM392d9Q6clbZs8j592E0flO1SfxnZGeo9qXKt2IMQDYK+uTj2Y7v1zcWKdEkLn/zAxPAHheueennzB+vc=]
+ publish_timeout_secs = 300
+ ```
+ 
+diff --git a/dracon-sync/src/report.rs b/dracon-sync/src/report.rs
+index 1998a9e2..44bf1277 100644
+--- a/dracon-sync/src/report.rs
++++ b/dracon-sync/src/report.rs
+@@ -621,7 +621,9 @@ pub(crate) fn repo_is_warn(
+     has_upstream: bool,
+ ) -> bool {
+     // WARN: has TRACKED modifications or staged changes, but not a concern.
+-    // Untracked files (build artifacts) do NOT count as warn.
++    // Untracked files remain visible in the UT column, but they are not
++    // sync-relevant by themselves. This keeps audit/research artifacts visible
++    // without turning build artifacts, screenshots, or local evidence into WARNs.
+     !repo_is_concern(status, has_origin, has_upstream)
+         && (status.modified_files > 0 || status.staged_files > 0)
+ }
+@@ -2651,6 +2653,24 @@ mod tests {
+         assert_eq!(hint, "run repair-concerns --apply (pull/merge)");
+     }
+ 
++    #[test]
++    fn test_repo_is_warn_untracked_only_is_not_warn() {
++        let status = RepoStatus {
++            branch: String::new(),
++            is_clean: false,
++            modified_files: 0,
++            untracked_files: 5,
++            staged_files: 0,
++            ahead: 0,
++            behind: 0,
++            last_commit_hash: None,
++            last_commit_msg: None,
++        };
++
++        assert!(!repo_is_warn(&status, true, true));
++        assert_eq!(repo_state_flags(&status, true, true), vec!["DIRTY"]);
++    }
++
+     #[test]
+     fn test_repo_hint_healthy() {
+         let hint = repo_hint(&["OK".into()], false, false);
+@@ -3203,7 +3223,7 @@ mod tests {
+     }
+ 
+     #[test]
+-    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA3aWgxQmRKdUZEa2lqZzFLSmxXdnNuM2p6cDdhaW1xMXA0VUgzNGUzNDNNCjdJNFl1cE9xSjBzMVloRXBHejk0VGIwS3ZjVDBlUEJVRmR0bzFtOFpMa28KLT4gWDI1NTE5IGt6RHhXUHlZN1FxWHUzbUFELzJtUlNBdnRyaU55M0oyNVYzdWJ6Y0V3RlkKUFNmNlMyZmFUanhuOFpqQ0VKeGc2L1BNelRLUDZLVWhjYUZvYUsveERkcwotPiBYMjU1MTkgT3NGbDRuYTR1bnJ4NXp6amxabFBFOU4vekFXaWgwTS94NWpWWlZHTk1tTQpySFkrR1pDcXc3Ly9Wa1p3ZHlscEtsbzA0eHh6TGFidWxLYjRVSmc4eUNZCi0+IFgyNTUxOSA5VnhLMnZkd3RNUDBzRE5XRnJmT1NNMXp3bWxkVS9vV0FqTStPOGVLSEVVCkxRQzdhbU9QWTl1V2U1aFhzZFN0bWxzTXk4T254WHRESFZVU3c3TSs5eW8KLT4gWDI1NTE5IHV0WmxQR3dJelg1OFNjQVIxUVVYUktONmZRdE9ZRmFyZ3B3Z0pCU01nd0kKMjdWSXBjUllDR3RzSTZHSFlZVlpscVpETE9lS01nV2NObzArVUd4NVppcwotPiBYMjU1MTkgWUl5NVVSUkJKbU1vVC9Sa2xyVVVzSitYajlvQ3YrQXkrUTRwdjhnU2ZWVQpOdWxGMkdLQnUrTUZJeVdzSGswVTg1eG1POUIydVVFczk0cXFwUXB6NHJFCi0+IFgyNTUxOSBiZlh6WkV1a0VxM01xc3RJTlcrK09UZHFkRHVDcDFUVk04TkI1NUlTL1ZzCjU5VDNMTGZld0JIclg3SWx0VEtNamtaRUxjYVRXd2NTVm9ibkI1eEdqR0UKLT4gYC1ncmVhc2UgeFdPIEkgUDNSVDkvIFhaeCMKeHlDK3h0MFJPRm9pRnJIZHVrM29HQmluZkRKUHJxUWloWjAwMnhISWdXVU11VTRZT1RkTGFySGdnM1M0cjVLZApWZjlyZ1BMOGdOZU5zZk04eUkzaVFtVWEyYTlNMjRzV2hrOU5uTnJSS1NNCi0tLSBzVFMrRUFEQVVIWVlUa21WeXJOSnF0czF0OHJlS1krQzZPNXZIOTh3QUxrCnyEtx6cKJ98s+UuO4BGVYJRKZoAxpaoFDMQ0uW3ubE6cDvoudVb5I5l/QgA8CPRO0WCJaqb80Ou0auLYRM=]() {
++    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBoN2RlaU5QdGJsWlhyZjJvUXF6QjVyTUpCNWg0T2YxcFZtK0x2RUlVVW1JCkJLaVE2Zk5qWFZ4YTY4OE1xK3pmbit1UDdIT214cjdzdUNYYWZjQk5KcHcKLT4gWDI1NTE5IGxESnN3K0lyRGplK3F2eTFiUVg0SHVORHZyZG1NUkEvY1dDUFFSRGMzU0EKMWtMRWFqUkdlaUVBTUpTTnhJNUplZGdBOFJuMDF4dStuOGg1V3hQKzAyVQotPiBYMjU1MTkgYnY1cGRPQzhBTVJFek9TQmU0c3hQZTlTcGVOcHdlUEx1MTM2OXpCYjJUbwp6cmZiODByL0R3UkxWdStqK3BRZ29KS3hSdHJmcUJ3N1NVbU51ekF2YmJZCi0+IFgyNTUxOSB0VUlIYmpWaFExbkNKQ2RVM1lxbmtYaGtJclNsRG9BUnNxTnhzcGcvdVNJCmM4eklMRktxVlUwajZJandwVS9CRjdiS0RzZkFBOWkvWFlBVU5zSTh4ZTAKLT4gWDI1NTE5IFJjd2NPQWt4aXBaOWZSaEFzM1k5N2lvN29ZN2VGT0tacE1ES00zL2E5d0EKZzFkWFJPbG53VVZMMXNnQkJGSWlPcjJFQVgwbEovZkpiUXBuMVRodWtDNAotPiBYMjU1MTkgNWhEUGdzcXNBdmg0YXUxcjJZYlNUZWQxeGxUakcvZER3Qk9vVzcxRVNYawpoMXo4VHU0T3FFYkdlQjE5OUJxK0xIdWFVWHhFa2cxeEtKR2RENEtHQUswCi0+IFgyNTUxOSBYaU5yOTBuUXhzc05aTzBoZThJTi9uaDcxRTZDcktFV3RQd0hyZFI3Y1R3CmVEOHV0eE9RR1Rab0VjTFZwTGJZdnM5bDJhN09pRVdEeUdKcGROV1d5cWcKLT4gVW4mNmN3ZUotZ3JlYXNlIDR0IFUqIHgjCnV4YWljd3Y2VTZKaU5PeEFRZHVVb3BYT0JpN1orakROUUxyVTZzRlUwREgyODliNU1vU05YV0hycm1QWFkxS0cKazBjQ0lwUjZDSzMwbWZ5WVY0bEdTUTVVTzBHaFZ2clkKLS0tIGpKVXFmZ3BOclA3U3dyWSt5b3VkS3ZIc3N0N2pUMXgvWWtxcE5uRlA1NXMKR4boI1rEoqKnDayWZbeG3l+VA0+8SO0xXd4EWyalemdy960R0WaldmZzlo2oY0g1hZ/PKLlZCf/P1swMJQ==]() {
+         let mut cooldowns = std::collections::HashMap::new();
+         let repo = std::path::PathBuf::from("/test/repo");
+         let notify_key = format!("push-fail-{}", repo.display());
