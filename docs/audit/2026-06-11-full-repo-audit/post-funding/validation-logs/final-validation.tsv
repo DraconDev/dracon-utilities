@@ -1,0 +1,15 @@
+repo	fmt_status	fmt_log	test_status	test_log	clippy_status	clippy_log
+dracon-platform	0	dracon-platform.fmt.log	0	dracon-platform.test.log	101	dracon-platform.clippy.log
+folder-auto-banner	0	folder-auto-banner.fmt.log	0	folder-auto-banner.test.log	0	folder-auto-banner.clippy.log
+ai-auto-repo-rot-scanner-todo-agent	0	ai-auto-repo-rot-scanner-todo-agent.fmt.log	0	ai-auto-repo-rot-scanner-todo-agent.test.log	101	ai-auto-repo-rot-scanner-todo-agent.clippy.log
+kiki-sassy-desktop-announcer	0	kiki-sassy-desktop-announcer.fmt.log	0	kiki-sassy-desktop-announcer.test.log	0	kiki-sassy-desktop-announcer.clippy.log
+dracon-code	0	dracon-code.fmt.log	0	dracon-code.test.log	0	dracon-code.clippy.log
+avid	0	avid.fmt.log	0	avid.test.log	101	avid.clippy.log
+ai-auto-writer	0	ai-auto-writer.fmt.log	0	ai-auto-writer.test.log	101	ai-auto-writer.clippy.log
+video-factory	0	video-factory.fmt.log	0	video-factory.test.log	101	video-factory.clippy.log
+rust-ai-web-auto	0	rust-ai-web-auto.fmt.log	0	rust-ai-web-auto.test.log	0	rust-ai-web-auto.clippy.log
+dracon-utilities	0	dracon-utilities.fmt.log	0	dracon-utilities.test.log	0	dracon-utilities.clippy.log
+pully-fully-pull-based-fleet-reconciler	1	pully-fully-pull-based-fleet-reconciler.fmt.log	0	pully-fully-pull-based-fleet-reconciler.test.log	101	pully-fully-pull-based-fleet-reconciler.clippy.log
+youtube-video-uploader	0	youtube-video-uploader.fmt.log	0	youtube-video-uploader.test.log	101	youtube-video-uploader.clippy.log
+video-uploader	0	video-uploader.fmt.log	0	video-uploader.test.log	101	video-uploader.clippy.log
+dracon-ai-lib	0	dracon-ai-lib.fmt.log	0	dracon-ai-lib.test.log	101	dracon-ai-lib.clippy.log

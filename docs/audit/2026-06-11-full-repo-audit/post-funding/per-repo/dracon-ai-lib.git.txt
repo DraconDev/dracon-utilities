@@ -1,0 +1,18 @@
+REPO=/home/dracon/Dev/dracon-ai-lib
+--- git status porcelain=v2 ---
+? .github/FUNDING.yml
+--- git remote -v ---
+dracon-ai	https://github.com/dracon-ai/dracon-ai-lib.git (fetch)
+dracon-ai	https://github.com/dracon-ai/dracon-ai-lib.git (push)
+origin	https://github.com/DraconDev/dracon-ai-lib.git (fetch)
+origin	https://github.com/DraconDev/dracon-ai-lib.git (push)
+--- git branch -vv ---
+* main 3acafd9 [origin/main: ahead 15] docs: stage consumer cutover plan and align README to dracon-ai org
+--- git log -5 ---
+3acafd9 docs: stage consumer cutover plan and align README to dracon-ai org
+195fbc3 1 file(s) in docs [docs/cutover-plan-2026-06-10.md] DELTA:+207/-0 | NEW:docs/cutover-plan-2026-06-10.md
+cd8bc7f 1 file(s) in crates [crates/ai-lib/src/providers/minimax.rs] DELTA:+48/-37
+209cff3 1 file(s) in crates [crates/ai-lib/src/providers/minimax.rs] DELTA:+1/-1
+d70cf8a 1 file(s) in crates [crates/ai-lib/src/providers/minimax.rs] DELTA:+16/-13
+--- funding yml status ---
+PRESENT (size=1569)

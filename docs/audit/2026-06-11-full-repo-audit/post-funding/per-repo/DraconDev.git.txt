@@ -1,0 +1,25 @@
+REPO=/home/dracon/Dev/DraconDev
+--- git status porcelain=v2 ---
+1 .M N... 100644 100644 100644 49c4e3043841ae5309e74c47e712d4e4a1e0960e 49c4e3043841ae5309e74c47e712d4e4a1e0960e README.md
+1 .M N... 100644 100644 100644 49c4e3043841ae5309e74c47e712d4e4a1e0960e 49c4e3043841ae5309e74c47e712d4e4a1e0960e README_DRAFT.md
+? PROFILE_REFINEMENT_AGREEMENT.md
+--- git remote -v ---
+codeberg	git@codeberg.org:dracondev/DraconDev.git (fetch)
+codeberg	git@codeberg.org:dracondev/DraconDev.git (push)
+github	git@github.com:DraconDev/DraconDev.git (fetch)
+github	git@github.com:DraconDev/DraconDev.git (push)
+gitlab	git@gitlab.com:dracondev/DraconDev.git (fetch)
+gitlab	git@gitlab.com:dracondev/DraconDev.git (push)
+origin	https://github.com/DraconDev/DraconDev.git (fetch)
+origin	https://github.com/DraconDev/DraconDev.git (push)
+--- git branch -vv ---
+* main f9a2e70 [origin/main] Merge https://github.com/DraconDev/DraconDev
+--- git log -5 ---
+f9a2e70 Merge https://github.com/DraconDev/DraconDev
+eea8b0e 3 file(s) [REPO_PRESENTATION_AUDIT.md, README.md, README_DRAFT.md] DELTA:+121/-2 | NEW:REPO_PRESENTATION_AUDIT.md
+a34723d Enable GitHub Sponsors button
+1cd5819 1 file(s) [GITHUB_SPONSORS_PROFILE_COPY.txt] DELTA:+17/-16
+87508e7 1 file(s) [GITHUB_SPONSORS_PROFILE_COPY.txt] DELTA:+12/-12
+--- funding yml status ---
+PRESENT (size=20)
+a34723d Enable GitHub Sponsors button

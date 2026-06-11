@@ -1,0 +1,21 @@
+repo	branch	modified	staged	untracked	ahead	behind	state_flags	push_status	hint
+/home/dracon/Dev/one-mil-girls	main	0	0	0	0	0	OK	OK	healthy
+/home/dracon/Dev/browser-extensions-shared	main	7	0	2	0	0	DIRTY	OK	run repair-warns --apply
+/home/dracon/Dev/dracon-utilities	main	0	0	1	0	0	DIRTY	OK	healthy
+/home/dracon/Dev/pully-fully-pull-based-fleet-reconciler	main	2	0	0	0	0	DIRTY	OK	run repair-warns --apply
+/home/dracon/Dev/rust-ai-web-auto	main	1	0	0	0	0	DIRTY	OK	run repair-warns --apply
+/home/dracon/Dev/dracon-platform	main	0	0	0	0	0	OK	OK	healthy
+/home/dracon/Dev/Junk-Runner-bevy	tauri2	0	0	0	0	0	OK	OK	healthy
+/home/dracon/.dracon	main	0	0	0	0	0	OK	OK	healthy
+/home/dracon/Dev/dracon-ai-lib	main	0	0	1	15	0	DIRTY,AHEAD:15,STUCK_PUSH	STUCK	run repair-concerns --apply (push or rewrite)
+/home/dracon/Dev/folder-auto-banner	main	0	0	0	0	0	OK	OK	healthy
+/home/dracon/Dev/dracon-code	main	0	0	0	0	0	OK	OK	healthy
+/home/dracon/Dev/ai-auto-writer	main	0	0	0	0	0	OK	OK	healthy
+/home/dracon/Dev/video-uploader	main	0	0	0	0	0	OK	OK	healthy
+/home/dracon/Dev/ai-auto-repo-rot-scanner-todo-agent	main	0	0	0	0	0	OK	OK	healthy
+/home/dracon/Dev/DraconDev	main	2	0	1	0	0	DIRTY	OK	run repair-warns --apply
+/home/dracon/Dev/video-factory	main	0	0	0	0	0	OK	OK	healthy
+/home/dracon/Dev/avid	main	0	0	0	0	0	OK	OK	healthy
+/home/dracon/Dev/youtube-video-uploader	main	0	0	0	0	0	OK	OK	healthy
+/home/dracon/Dev/dracon-libs	main	0	0	0	0	0	OK	OK	healthy
+/home/dracon/Dev/kiki-sassy-desktop-announcer	main	0	0	0	0	0	OK	OK	healthy

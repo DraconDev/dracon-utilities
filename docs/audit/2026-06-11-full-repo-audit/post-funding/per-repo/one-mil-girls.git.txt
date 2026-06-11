@@ -1,0 +1,22 @@
+REPO=/home/dracon/Dev/one-mil-girls
+--- git status porcelain=v2 ---
+--- git remote -v ---
+codeberg	git@codeberg.org:dracondev/one-mil-girls.git (fetch)
+codeberg	git@codeberg.org:dracondev/one-mil-girls.git (push)
+github	git@github.com:DraconDev/one-mil-girls.git (fetch)
+github	git@github.com:DraconDev/one-mil-girls.git (push)
+gitlab	git@gitlab.com:dracondev/one-mil-girls.git (fetch)
+gitlab	git@gitlab.com:dracondev/one-mil-girls.git (push)
+origin	git@github.com:DraconDev/one-mil-girls.git (fetch)
+origin	git@github.com:DraconDev/one-mil-girls.git (push)
+--- git branch -vv ---
+* main a70be75 [origin/main] 5 file(s) in .svelte-kit,docs [.svelte-kit/ambient.d.ts, docs/audit/2026-06-11-full-audit/dialogue-icon/state.json, docs/audit/2026-06-11-full-audit/validation-after-dialogue.txt] DELTA:+628/-189 | BIN:1 NEW:dialogue-icon/01-dialogue.png,dialogue-icon/state.json,2026-06-11-full-audit/validation-after-dialogue.txt
+--- git log -5 ---
+a70be75 5 file(s) in .svelte-kit,docs [.svelte-kit/ambient.d.ts, docs/audit/2026-06-11-full-audit/dialogue-icon/state.json, docs/audit/2026-06-11-full-audit/validation-after-dialogue.txt] DELTA:+628/-189 | BIN:1 NEW:dialogue-icon/01-dialogue.png,dialogue-icon/state.json,2026-06-11-full-audit/validation-after-dialogue.txt
+fbda936 2 file(s) in .svelte-kit,src [src/lib/components/DialogueBox.svelte, .svelte-kit/ambient.d.ts] DELTA:+24/-285
+15193c9 1 file(s) in src [src/lib/components/DialogueBox.svelte] DELTA:+52/-45
+3a39629 1 file(s) in .svelte-kit [.svelte-kit/ambient.d.ts] DELTA:+0/-4
+c016882 1 file(s) in .svelte-kit [.svelte-kit/ambient.d.ts] DELTA:+190/-192
+--- funding yml status ---
+PRESENT (size=20)
+ad881ac Enable GitHub Sponsors button

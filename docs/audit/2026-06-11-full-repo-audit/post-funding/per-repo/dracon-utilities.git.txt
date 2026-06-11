@@ -1,0 +1,30 @@
+REPO=/home/dracon/Dev/dracon-utilities
+--- git status porcelain=v2 ---
+? docs/audit/2026-06-11-full-repo-audit/post-funding/inventory.json
+? docs/audit/2026-06-11-full-repo-audit/post-funding/inventory.tsv
+? docs/audit/2026-06-11-full-repo-audit/post-funding/per-repo/browser-extensions-shared.git.txt
+? docs/audit/2026-06-11-full-repo-audit/post-funding/per-repo/dracon-utilities.git.txt
+? docs/audit/2026-06-11-full-repo-audit/post-funding/per-repo/one-mil-girls.git.txt
+? docs/audit/2026-06-11-full-repo-audit/post-funding/per-repo/repos.tsv
+--- git remote -v ---
+codeberg	git@codeberg.org:dracondev/dracon-utilities.git (fetch)
+codeberg	git@codeberg.org:dracondev/dracon-utilities.git (push)
+github	git@github.com:DraconDev/dracon-utilities.git (fetch)
+github	git@github.com:DraconDev/dracon-utilities.git (push)
+gitlab	git@gitlab.com:dracondev/dracon-utilities.git (fetch)
+gitlab	git@gitlab.com:dracondev/dracon-utilities.git (push)
+origin	https://github.com/DraconDev/dracon-utilities.git (fetch)
+origin	https://github.com/DraconDev/dracon-utilities.git (push)
+--- git branch -vv ---
+  backup/pre-merge-abort 846192c3 1 file(s) in .pi [.pi/goals/active_goal_2026060801061404_mq4gady8-2jker2.md] DELTA:+5/-5 | TOKENS:14531K TIME:573m EVIDENCE:quickwins-1:Fixed 2 docs. docs/OPERATIONS.md line|quickwins-2:Executed: `git rm dracon-sync/note.md|quickwins-3:Added `#![allow(dead_code)]` to draco+3more
+* main                   b27b5210 [origin/main] 5 file(s) in dracon-sync [dracon-sync/src/standard_files.rs, dracon-sync/src/policy.rs, AGENTS.md] DELTA:+133/-9
+  scribe-version         fbe2a48c Modified dracon-warden/src/security/tests/common.rs
+--- git log -5 ---
+b27b5210 5 file(s) in dracon-sync [dracon-sync/src/standard_files.rs, dracon-sync/src/policy.rs, AGENTS.md] DELTA:+133/-9
+8ac5a5a4 1 file(s) in docs [docs/audit/2026-06-11-full-repo-audit/final/hygiene.tsv] DELTA:+21/-0
+d20bdd85 8 file(s) in docs [docs/audit/2026-06-11-full-repo-audit/final/per-repo/browser-extensions-shared.git.txt, docs/audit/2026-06-11-full-repo-audit/final/hygiene.tsv, docs/audit/2026-06-11-full-repo-audit/final/per-repo/dracon-utilities.git.txt] DELTA:+26/-227
+858f1abc 3 file(s) in docs [docs/audit/2026-06-11-full-repo-audit/final/REPORT.md, docs/audit/2026-06-11-full-repo-audit/final/inventory.json, docs/audit/2026-06-11-full-repo-audit/final/inventory.tsv] DELTA:+152/-20 | NEW:final/REPORT.md
+e1ffdd6b 2 file(s) in docs [docs/audit/2026-06-11-full-repo-audit/final/inventory.json, docs/audit/2026-06-11-full-repo-audit/final/inventory.tsv] DELTA:+86/-86
+--- funding yml status ---
+PRESENT (size=20)
+9e55f92d Enable GitHub Sponsors button

@@ -1,0 +1,24 @@
+REPO=/home/dracon/Dev/pully-fully-pull-based-fleet-reconciler
+--- git status porcelain=v2 ---
+1 .M N... 100644 100644 100644 2dfd57111be297676ef62f004948b156b4b8edaf 2dfd57111be297676ef62f004948b156b4b8edaf fully/crates/fully-core/src/fleet_status.rs
+1 .M N... 100644 100644 100644 f88c0f7c005499377d01ed8eaade3d55b81b4fcc f88c0f7c005499377d01ed8eaade3d55b81b4fcc pully/bins/pully/src/main.rs
+--- git remote -v ---
+codeberg	git@codeberg.org:dracondev/pully-fully-pull-based-fleet-reconciler.git (fetch)
+codeberg	git@codeberg.org:dracondev/pully-fully-pull-based-fleet-reconciler.git (push)
+github	git@github.com:DraconDev/pully-fully-pull-based-fleet-reconciler.git (fetch)
+github	git@github.com:DraconDev/pully-fully-pull-based-fleet-reconciler.git (push)
+gitlab	git@gitlab.com:dracondev/pully-fully-pull-based-fleet-reconciler.git (fetch)
+gitlab	git@gitlab.com:dracondev/pully-fully-pull-based-fleet-reconciler.git (push)
+origin	https://github.com/DraconDev/pully-fully-pull-based-fleet-reconciler.git (fetch)
+origin	https://github.com/DraconDev/pully-fully-pull-based-fleet-reconciler.git (push)
+--- git branch -vv ---
+* main 23a92627 [origin/main] 5 file(s) in fully,pully [fully/crates/fully-core/src/fleet_status.rs, fully/bins/fully/src/main.rs, pully/crates/pully-core/src/service_reconciler/mod.rs] DELTA:+148/-39
+--- git log -5 ---
+23a92627 5 file(s) in fully,pully [fully/crates/fully-core/src/fleet_status.rs, fully/bins/fully/src/main.rs, pully/crates/pully-core/src/service_reconciler/mod.rs] DELTA:+148/-39
+929b8d02 1 file(s) [AUDIT_REPORT.md] DELTA:+42/-0
+63f464c0 17 file(s) in dracon-fleet,fully,pully [scripts/test-local-pully.sh, scripts/deploy.sh, pully-fleet-template/README.md] DELTA:+327/-481 | TEST:216
+d5d9bf53 Merge https://github.com/DraconDev/pully-fully-pull-based-fleet-reconciler
+f7737b44 1 file(s) [AUDIT_REPORT.md] DELTA:+32/-0
+--- funding yml status ---
+PRESENT (size=20)
+574c2947 Enable GitHub Sponsors button

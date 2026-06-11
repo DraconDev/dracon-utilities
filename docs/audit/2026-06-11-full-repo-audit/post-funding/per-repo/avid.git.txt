@@ -1,0 +1,23 @@
+REPO=/home/dracon/Dev/avid
+--- git status porcelain=v2 ---
+--- git remote -v ---
+codeberg	git@codeberg.org:dracondev/avid.git (fetch)
+codeberg	git@codeberg.org:dracondev/avid.git (push)
+github	git@github.com:DraconDev/avid.git (fetch)
+github	git@github.com:DraconDev/avid.git (push)
+gitlab	git@gitlab.com:dracondev/avid.git (fetch)
+gitlab	git@gitlab.com:dracondev/avid.git (push)
+origin	https://github.com/DraconDev/avid.git (fetch)
+origin	https://github.com/DraconDev/avid.git (push)
+--- git branch -vv ---
+  backup/pre-sync-largeblob-fix-1780417168 332a456 10 file(s) in .pi,models,src [models/parakeet-ctc/onnx/tokenizer.json, research-longevity.md, research-longevity-deep.md] DELTA:+7542/-5 | BIN:2 NEW:goals/active_goal_2026060216174443_mpws7hbo-xraahs.md,archived/goal_2026060214172244_mpwnc4lz-isvg6v.md,onnx/model_int8.onnx,onnx/model_int8.onnx_data,onnx/tokenizer.json,research-longevity-deep.md,research-longevity.md,test-output-longevity.md
+* main                                     8d1f698 [origin/main] 19 file(s) in examples,src,tests [src/cli.rs, src/ai_gen.rs, src/analyzer.rs] DELTA:+1034/-453 | TEST:81
+--- git log -5 ---
+8d1f698 19 file(s) in examples,src,tests [src/cli.rs, src/ai_gen.rs, src/analyzer.rs] DELTA:+1034/-453 | TEST:81
+9ffe135 Merge https://github.com/DraconDev/avid
+3fa6f5f 1 file(s) [Cargo.toml] DELTA:+1/-1
+d1658d9 Enable GitHub Sponsors button
+28063ee 1 file(s) rotated to new dedicated master
+--- funding yml status ---
+PRESENT (size=20)
+d1658d9 Enable GitHub Sponsors button
