@@ -14,8 +14,8 @@ use std::io::{Read, Write};
 use std::path::Path;
 
 use crate::is_v1_fallback_allowed;
-use crate::WardenSecurity;
 use crate::RepoKey;
+use crate::WardenSecurity;
 
 const HEADER_V2_MAGIC: &[u8] = b"age-encryption.org/v1";
 
@@ -149,11 +149,7 @@ impl WardenSecurity {
             ];
 
             for keys_dir in search_paths {
-                self.load_public_recipients_from_dir(
-                    &keys_dir,
-                    &mut seen_keys,
-                    &mut recipients,
-                );
+                self.load_public_recipients_from_dir(&keys_dir, &mut seen_keys, &mut recipients);
             }
         }
 

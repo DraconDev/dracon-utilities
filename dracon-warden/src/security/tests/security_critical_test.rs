@@ -17,7 +17,8 @@ fn init_security_with_repo(
     repo_root: &std::path::Path,
 ) -> (dracon_security::WardenSecurity, HomeGuard) {
     let _guard = HomeGuard::new();
-    let mut security = dracon_security::WardenSecurity::new(Some(repo_root)).expect("init security");
+    let mut security =
+        dracon_security::WardenSecurity::new(Some(repo_root)).expect("init security");
     let identity = age::x25519::Identity::generate();
     security.add_memory_identity(identity);
     (security, _guard)
@@ -367,8 +368,7 @@ fn test_gather_all_recipients_includes_global_mesh_pub_without_master_identity()
     fs::create_dir_all(&mesh_dir).expect("create mesh dir");
 
     let mesh_recipient = age::x25519::Identity::generate().to_public();
-    fs::write(mesh_dir.join("master.pub"), mesh_recipient.to_string())
-        .expect("write mesh pub");
+    fs::write(mesh_dir.join("master.pub"), mesh_recipient.to_string()).expect("write mesh pub");
 
     let security = dracon_security::WardenSecurity::new(None).expect("init security");
     let recipients = security.gather_all_recipients().expect("gather recipients");
@@ -390,8 +390,7 @@ fn test_encrypt_v2_for_all_uses_global_mesh_pub_without_master_identity() {
 
     let mesh_identity = age::x25519::Identity::generate();
     let mesh_recipient = mesh_identity.to_public();
-    fs::write(mesh_dir.join("master.pub"), mesh_recipient.to_string())
-        .expect("write mesh pub");
+    fs::write(mesh_dir.join("master.pub"), mesh_recipient.to_string()).expect("write mesh pub");
 
     let security = dracon_security::WardenSecurity::new(None).expect("init security");
     let encrypted = security
@@ -443,7 +442,8 @@ fn test_unlock_payload_empty() {
     let master_identity = age::x25519::Identity::generate();
     let _repo_key_bytes = setup_repo_with_age_key(repo_root, &master_identity);
 
-    let mut security = dracon_security::WardenSecurity::new(Some(repo_root)).expect("init security");
+    let mut security =
+        dracon_security::WardenSecurity::new(Some(repo_root)).expect("init security");
     security.add_memory_identity(master_identity);
 
     let result = security.unlock_payload(b"");
@@ -561,7 +561,8 @@ fn test_unlock_payload_v1_format() {
     let master_identity = age::x25519::Identity::generate();
     let _repo_key_bytes = setup_repo_with_age_key(repo_root, &master_identity);
 
-    let mut security = dracon_security::WardenSecurity::new(Some(repo_root)).expect("init security");
+    let mut security =
+        dracon_security::WardenSecurity::new(Some(repo_root)).expect("init security");
     security.add_memory_identity(master_identity);
 
     let loaded_key = security.load_repo_key().expect("load repo key");
@@ -639,12 +640,10 @@ fn test_generate_master_identity_refuses_dedicated_master_private() {
         result.is_err(),
         "should refuse legacy master identity while dedicated master exists"
     );
-    assert!(
-        result
-            .unwrap_err()
-            .to_string()
-            .contains("dedicated master key exists")
-    );
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("dedicated master key exists"));
 }
 
 #[test]
@@ -662,12 +661,10 @@ fn test_generate_master_identity_refuses_dedicated_master_public() {
         result.is_err(),
         "should refuse legacy master identity while dedicated master exists"
     );
-    assert!(
-        result
-            .unwrap_err()
-            .to_string()
-            .contains("dedicated master key exists")
-    );
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("dedicated master key exists"));
 }
 
 // =============================================================================

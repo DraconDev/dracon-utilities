@@ -8,9 +8,9 @@ use std::path::Path;
 use crate::make_env_version_header;
 use crate::normalize_secret_marker;
 use crate::strip_env_version_header;
-use crate::WardenSecurity;
 use crate::MarkerMigrationStats;
 use crate::SecretScanner;
+use crate::WardenSecurity;
 
 const HEADER_V2_MAGIC: &[u8] = b"age-encryption.org/v1";
 

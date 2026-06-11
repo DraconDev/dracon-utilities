@@ -7,8 +7,8 @@ use std::fs;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
-use crate::WardenSecurity;
 use crate::TeamKey;
+use crate::WardenSecurity;
 
 impl WardenSecurity {
     pub fn load_team_key(&self, team_name: &str) -> Result<TeamKey> {
