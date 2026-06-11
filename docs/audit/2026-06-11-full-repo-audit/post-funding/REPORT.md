@@ -46,7 +46,7 @@ Evidence: `docs/audit/2026-06-11-full-repo-audit/post-funding/validation-logs/fi
 |---|---:|---:|---:|---|
 | `dracon-platform` | 0 | 0 | 0 | pass |
 | `folder-auto-banner` | 0 | 0 | 0 | pass |
-| `ai-auto-repo-rot-scanner-todo-agent` | 0 | 0 | 0 | pass (fmt drift fixed during this audit) |
+| `ai-auto-repo-rot-scanner-todo-agent` | 0 | 0 | 0 | pass (fmt drift fixed during this audit; verified after fix) |
 | `kiki-sassy-desktop-announcer` | 0 | 0 | 0 | pass (with ALSA env) |
 | `dracon-code` | 0 | 0 | 0 | pass |
 | `avid` | 0 | 0 | 0 | pass |

@@ -1,7 +1,7 @@
 repo	fmt_status	fmt_log	test_status	test_log	clippy_status	clippy_log
 dracon-platform	0	dracon-platform.fmt.log	0	dracon-platform.test.log	0	dracon-platform.clippy.log
 folder-auto-banner	0	folder-auto-banner.fmt.log	0	folder-auto-banner.test.log	0	folder-auto-banner.clippy.log
-ai-auto-repo-rot-scanner-todo-agent	1	ai-auto-repo-rot-scanner-todo-agent.fmt.log	0	ai-auto-repo-rot-scanner-todo-agent.test.log	0	ai-auto-repo-rot-scanner-todo-agent.clippy.log
+ai-auto-repo-rot-scanner-todo-agent	0	ai-auto-repo-rot-scanner-todo-agent.fmt.log	0	ai-auto-repo-rot-scanner-todo-agent.test.log	0	ai-auto-repo-rot-scanner-todo-agent.clippy.log
 kiki-sassy-desktop-announcer	0	kiki-sassy-desktop-announcer.fmt.log	0	kiki-sassy-desktop-announcer.test.log	0	kiki-sassy-desktop-announcer.clippy.log
 dracon-code	0	dracon-code.fmt.log	0	dracon-code.test.log	0	dracon-code.clippy.log
 avid	0	avid.fmt.log	0	avid.test.log	0	avid.clippy.log
