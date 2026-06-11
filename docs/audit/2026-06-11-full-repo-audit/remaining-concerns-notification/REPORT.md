@@ -21,13 +21,15 @@ DRACON_SYNC_GIT_BIN=${DRACON_SYNC_GIT_BIN:-/run/current-system/sw/bin/git} \
 
 Evidence: `inventory-final.json`, `inventory-final.tsv`.
 
-Current non-OK rows:
+Current non-OK rows from the latest run:
 
 ```text
 repo                         modified staged untracked ahead push_status state_flags hint
+one-mil-girls                1        0      0         0     OK          DIRTY     run repair-warns --apply
+dracon-platform              2        0      0         0     OK          DIRTY     run repair-warns --apply
+browser-extensions-shared    0        0      2         0     OK          DIRTY     healthy
 dracon-utilities             1        0      0         0     OK          DIRTY     run repair-warns --apply
-browser-extensions-shared    1        0      2         0     OK          DIRTY     run repair-warns --apply
-dracon-code                  23       0      0         0     OK          DIRTY     run repair-warns --apply
+dracon-code                  1        0      0         0     OK          DIRTY     run repair-warns --apply
 ```
 
 No `CONCERN` or `STUCK_PUSH` remains.
@@ -190,12 +192,33 @@ The active `dracon-sync.service` is running the installed binary and emitted the
 
 These are not push blockers. They are preserved user changes with `push_status=OK`.
 
-### `dracon-utilities`
+### `one-mil-girls`
 
-Current status includes audit output files being added by this investigation:
+Current status includes a generated/working-tree change:
 
 ```text
-?? docs/audit/2026-06-11-full-repo-audit/remaining-concerns-notification/inventory-post-tests.json
+ M .svelte-kit/ambient.d.ts
+```
+
+Action: preserve user/generated change unless explicitly approved. Push is OK after fetch; the earlier timeout was transient and produced a new alert-ledger entry.
+
+### `dracon-platform`
+
+Current status includes user changes under `web/ai-hub/`:
+
+```text
+ M web/ai-hub/src/routes/ai-hub/+page.server.ts
+ M web/ai-hub/src/routes/ai-hub/+page.svelte
+```
+
+Action: preserve user changes unless explicitly approved. Push is OK.
+
+### `dracon-utilities`
+
+Current status includes the live audit inventory file:
+
+```text
+ M docs/audit/2026-06-11-full-repo-audit/remaining-concerns-notification/inventory-final.json
 ```
 
 Action: preserve; sync will commit once fingerprint stabilizes.
@@ -205,24 +228,20 @@ Action: preserve; sync will commit once fingerprint stabilizes.
 Current status:
 
 ```text
- D debug.log
+?? <two untracked files>
 ```
 
-Action: preserve user deletion unless the user explicitly asks to restore or delete it.
+Action: preserve user files unless explicitly approved.
 
 ### `dracon-code`
 
-Current status includes many user deletions under `crates/dracon-ai/src/provider/` plus dependency changes:
+Current status includes a user change under `crates/dracon-ai/src/ai_client.rs`:
 
 ```text
- M Cargo.lock
- M crates/dracon-ai/Cargo.toml
- D crates/dracon-ai/src/provider/anthropic.rs
- D crates/dracon-ai/src/provider/config.rs
- ...
+ M crates/dracon-ai/src/ai_client.rs
 ```
 
-Action: preserve user refactor/deletion unless explicitly approved. `git push --dry-run origin main` is up-to-date because these are local changes.
+Action: preserve user refactor/change unless explicitly approved. `git push --dry-run origin main` is up-to-date because this is a local change.
 
 ## Validation Evidence
 
