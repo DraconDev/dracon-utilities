@@ -1,0 +1,7 @@
+repo	command	exit
+one-mil-girls	bun test	0
+one-mil-girls	bun run check	0
+Junk-Runner-bevy	bun run build	0
+Junk-Runner-bevy	bun run check	0
+browser-extensions-shared	no root package scripts; hygiene blocker	0
+DraconDev	no documented local build/test command	0

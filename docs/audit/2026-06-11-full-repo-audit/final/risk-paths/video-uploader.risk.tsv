@@ -1,0 +1,10 @@
+section	path
+tracked	.dracon/data/keys/owner_age15xjl.pub
+tracked	.dracon/data/keys/owner_age1f7y5.pub
+tracked	.dracon/data/keys/owner_nixos.pub
+tracked	.env
+tracked	.env.test
+tracked	fuzz/tests/credential_decrypt.rs
+tracked	youtube-uploader/src/auth/refresh_token.rs
+tracked	youtube-uploader/src/profile.rs
+tracked	youtube-uploader/tests/fixtures/minimal.mp4

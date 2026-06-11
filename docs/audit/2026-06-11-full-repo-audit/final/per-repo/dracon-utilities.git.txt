@@ -1,0 +1,31 @@
+REPO=/home/dracon/Dev/dracon-utilities
+--- git status porcelain=v2 ---
+? docs/audit/2026-06-11-full-repo-audit/final/inventory.json
+? docs/audit/2026-06-11-full-repo-audit/final/inventory.tsv
+? docs/audit/2026-06-11-full-repo-audit/final/per-repo/.dracon.git.txt
+? docs/audit/2026-06-11-full-repo-audit/final/per-repo/browser-extensions-shared.git.txt
+? docs/audit/2026-06-11-full-repo-audit/final/per-repo/dracon-code.git.txt
+? docs/audit/2026-06-11-full-repo-audit/final/per-repo/dracon-platform.git.txt
+? docs/audit/2026-06-11-full-repo-audit/final/per-repo/dracon-utilities.git.txt
+? docs/audit/2026-06-11-full-repo-audit/final/per-repo/folder-auto-banner.git.txt
+? docs/audit/2026-06-11-full-repo-audit/final/per-repo/one-mil-girls.git.txt
+? docs/audit/2026-06-11-full-repo-audit/final/per-repo/repos.tsv
+--- git remote -v ---
+codeberg	git@codeberg.org:dracondev/dracon-utilities.git (fetch)
+codeberg	git@codeberg.org:dracondev/dracon-utilities.git (push)
+github	git@github.com:DraconDev/dracon-utilities.git (fetch)
+github	git@github.com:DraconDev/dracon-utilities.git (push)
+gitlab	git@gitlab.com:dracondev/dracon-utilities.git (fetch)
+gitlab	git@gitlab.com:dracondev/dracon-utilities.git (push)
+origin	https://github.com/DraconDev/dracon-utilities.git (fetch)
+origin	https://github.com/DraconDev/dracon-utilities.git (push)
+--- git branch -vv ---
+  backup/pre-merge-abort 846192c3 1 file(s) in .pi [.pi/goals/active_goal_2026060801061404_mq4gady8-2jker2.md] DELTA:+5/-5 | TOKENS:14531K TIME:573m EVIDENCE:quickwins-1:Fixed 2 docs. docs/OPERATIONS.md line|quickwins-2:Executed: `git rm dracon-sync/note.md|quickwins-3:Added `#![allow(dead_code)]` to draco+3more
+* main                   db8be694 [origin/main] 1 file(s) in docs [docs/audit/2026-06-11-full-repo-audit/final-validation.tsv] DELTA:+5/-0
+  scribe-version         fbe2a48c Modified dracon-warden/src/security/tests/common.rs
+--- git log -5 ---
+db8be694 1 file(s) in docs [docs/audit/2026-06-11-full-repo-audit/final-validation.tsv] DELTA:+5/-0
+bc1fab64 1 file(s) in docs [docs/audit/2026-06-11-full-repo-audit/final-validation.tsv] DELTA:+1/-0
+dbb1fea2 1 file(s) in docs [docs/audit/2026-06-11-full-repo-audit/final-validation.tsv] DELTA:+10/-0 | NEW:2026-06-11-full-repo-audit/final-validation.tsv
+873c1a9c 44 file(s) in docs [docs/audit/2026-06-11-full-repo-audit/risk-paths/browser-extensions-shared.risk.tsv, docs/audit/2026-06-11-full-repo-audit/inventory.json, docs/audit/2026-06-11-full-repo-audit/risk-paths/dracon-platform.risk.tsv] DELTA:+3473/-0 | NEW:2026-06-11-full-repo-audit/hygiene.tsv,2026-06-11-full-repo-audit/inventory.json,2026-06-11-full-repo-audit/inventory.tsv,per-repo/.dracon.git.txt,per-repo/DraconDev.git.txt,per-repo/Junk-Runner-bevy.git.txt,per-repo/ai-auto-repo-rot-scanner-todo-agent.git.txt,per-repo/ai-auto-writer.git.txt,per-repo/avid.git.txt,per-repo/browser-extensions-shared.git.txt+34more
+313de3cb 4 file(s) in dracon-warden [dracon-warden/src/security/tests/security_critical_test.rs, dracon-warden/src/security/src/modules/crypto.rs, dracon-warden/src/security/src/modules/filter.rs] DELTA:+20/-27 | TEST:35

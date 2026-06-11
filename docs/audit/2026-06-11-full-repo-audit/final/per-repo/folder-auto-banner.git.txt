@@ -1,0 +1,20 @@
+REPO=/home/dracon/Dev/folder-auto-banner
+--- git status porcelain=v2 ---
+1 .M N... 100644 100644 100644 9df659bc6314f3ec93d3e58aefed75da73a2a3a3 9df659bc6314f3ec93d3e58aefed75da73a2a3a3 src/daemon.rs
+--- git remote -v ---
+codeberg	git@codeberg.org:dracondev/folder-auto-banner.git (fetch)
+codeberg	git@codeberg.org:dracondev/folder-auto-banner.git (push)
+github	git@github.com:DraconDev/folder-auto-banner.git (fetch)
+github	git@github.com:DraconDev/folder-auto-banner.git (push)
+gitlab	git@gitlab.com:dracondev/folder-auto-banner.git (fetch)
+gitlab	git@gitlab.com:dracondev/folder-auto-banner.git (push)
+origin	https://github.com/DraconDev/folder-auto-banner (fetch)
+origin	https://github.com/DraconDev/folder-auto-banner (push)
+--- git branch -vv ---
+* main 546da5f [origin/main] 3 file(s) in src [src/fs/mod.rs, src/daemon.rs, src/git/mod.rs] DELTA:+0/-101
+--- git log -5 ---
+546da5f 3 file(s) in src [src/fs/mod.rs, src/daemon.rs, src/git/mod.rs] DELTA:+0/-101
+074ab6c 1 file(s) in src [src/daemon.rs] DELTA:+1/-1
+2eca580 1 file(s) in src [src/daemon.rs] DELTA:+3/-3
+06ff744 2 file(s) in src [src/daemon_client.rs, src/daemon.rs] DELTA:+26/-20
+7811136 2 file(s) in src [src/daemon_client.rs, src/daemon.rs] DELTA:+32/-31

@@ -1,0 +1,7 @@
+section	path
+tracked	.dracon/data/keys/owner_nixos.pub
+tracked	.ralph/video-factory-critical-bugs.md
+tracked	.ralph/video-factory-critical-bugs.state.json
+tracked	.ralph/video-factory-critical-fixes.md
+tracked	.ralph/video-factory-critical-fixes.state.json
+tracked	web/src/lib/Publish.svelte
