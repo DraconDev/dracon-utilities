@@ -2,16 +2,79 @@ use anyhow::Result;
 use dracon_git::GitService;
 use serde::Serialize;
 use std::collections::BTreeSet;
+use std::fs::OpenOptions;
+use std::io::Write as IoWrite;
 use std::path::{Path, PathBuf};
 use tokio::time::Duration;
 
+#[derive(Serialize)]
+struct SyncAlertEntry {
+    ts_unix: u64,
+    repo: String,
+    reason: String,
+    details: String,
+}
+
+fn sync_alert_ledger_path() -> PathBuf {
+    if let Ok(state_dir) = std::env::var("DRACON_SYNC_STATE_DIR") {
+        if !state_dir.is_empty() {
+            return PathBuf::from(state_dir).join("dracon-sync-alerts.jsonl");
+        }
+    }
+    std::env::var_os("HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join(".local")
+        .join("state")
+        .join("dracon")
+        .join("dracon-sync-alerts.jsonl")
+}
+
+fn record_sync_alert(repo_path: &Path, reason: &str, details: &str) {
+    let repo = repo_path
+        .to_string_lossy()
+        .trim_end_matches('/')
+        .to_string();
+    let entry = SyncAlertEntry {
+        ts_unix: crate::policy::timestamp_secs(),
+        repo,
+        reason: reason.to_string(),
+        details: details.to_string(),
+    };
+    let line = match serde_json::to_string(&entry) {
+        Ok(line) => line,
+        Err(e) => {
+            eprintln!("⚠️ failed to serialize sync alert: {}", e);
+            return;
+        }
+    };
+    let path = sync_alert_ledger_path();
+    if let Some(parent) = path.parent() {
+        if let Err(e) = std::fs::create_dir_all(parent) {
+            eprintln!("⚠️ failed to create sync alert dir {}: {}", parent.display(), e);
+            return;
+        }
+    }
+    match OpenOptions::new().create(true).append(true).open(&path) {
+        Ok(mut file) => {
+            if let Err(e) = writeln!(file, "{line}") {
+                eprintln!("⚠️ failed to write sync alert {}: {}", path.display(), e);
+            }
+        }
+        Err(e) => eprintln!("⚠️ failed to open sync alert {}: {}", path.display(), e),
+    }
+    eprintln!("🔔 sync alert: {} — {}: {}", entry.repo, reason, details);
+}
+
 pub(crate) fn send_sync_conflict_notification(repo_path: &Path, reason: &str, details: &str) {
+    record_sync_alert(repo_path, reason, details);
+
     let repo_name = repo_path
         .file_name()
         .map(|s| s.to_string_lossy().to_string())
         .unwrap_or_else(|| repo_path.display().to_string());
 
-    let title = "Dracon Sync: Manual Action Required";
+    let title = format!("Dracon Sync: {}", reason);
     let body = format!(
         "Repository '{}' needs manual resolution.\nReason: {}\nDetails: {}",
         repo_name, reason, details
@@ -20,8 +83,9 @@ pub(crate) fn send_sync_conflict_notification(repo_path: &Path, reason: &str, de
     // Spawn in background to avoid blocking the daemon loop
     tokio::spawn(async move {
         if let Err(e) = notify_rust::Notification::new()
-            .summary(title)
+            .summary(&title)
             .body(&body)
+            .urgency(notify_rust::Urgency::Critical)
             .show()
         {
             eprintln!("⚠️ failed to send desktop notification: {}", e);
@@ -2425,6 +2489,30 @@ mod tests {
     }
 
     #[test]
+    fn test_sync_alert_ledger_path_uses_state_dir() {
+        let _guard = EnvRestorer::new("DRACON_SYNC_STATE_DIR", "/tmp/dracon-sync-test-state");
+        let path = sync_alert_ledger_path();
+        assert_eq!(path, PathBuf::from("/tmp/dracon-sync-test-state/dracon-sync-alerts.jsonl"));
+    }
+
+    #[test]
+    fn test_record_sync_alert_appends_jsonl() {
+        let tmp = tempfile::tempdir().unwrap();
+        let _guard = EnvRestorer::new(
+            "DRACON_SYNC_STATE_DIR",
+            tmp.path().to_string_lossy().as_ref(),
+        );
+        let repo = tmp.path().join("repo");
+        record_sync_alert(&repo, "Stuck on Push", "ahead=3, clean");
+        let ledger = tmp.path().join("dracon-sync-alerts.jsonl");
+        let content = std::fs::read_to_string(ledger).unwrap();
+        assert!(content.contains("\"reason\":\"Stuck on Push\""));
+        assert!(content.contains("\"details\":\"ahead=3, clean\""));
+        assert!(content.contains("\"repo\":\""));
+        assert!(content.contains("repo\""));
+    }
+
+    #[test]
     fn test_repo_state_flags_ok() {
         let status = make_status(true, 0, 0);
         let flags = repo_state_flags(&status, true, true);
@@ -3108,7 +3196,7 @@ mod tests {
     }
 
     #[test]
-    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBWNWZwYjdVZUQ2T2ZlN0dPUUNDNDArTXNUQnNZeGRCS2dXVkZwenMrNEZzCi8wTldBNlVtSG5kVW9xT1VJMTY5UE00dHlHcEkxRGVnUFFnaDZJSnBPRTQKLT4gWDI1NTE5IFlXK01DVUx2VENpaEx3Z05CdFhxMGh0clE1MXFLcTJjcCtrUXhxc2U0UXMKMFRpYVFNQWNVM3AwYURHRXlOeW1sdVVsUjJrQzdQb2dHVG5tYmtJM1lnOAotPiBYMjU1MTkgaGlCdms2aTR1eElmUlFCVnQvWkpZSW5GczV3dWk1UGU4ZmdwVjJZbmdoawpLYTBadXg2dHRvcDlEK25ZRGtzUm5MQjVpMVVzVTBzTGtHZWFQWWVLZzh3Ci0+IFgyNTUxOSBzWkpmMGg4Vk1XWmdRaFFuMmd5SUI5WXNTSU9tZTUzbkVUVlZOZVpFNmdnCjRPUjQyazVYUXVNK1hDWklVT2QvdUxLbHlKTVdsSHk1MGFyQnlYRGpJOEkKLT4gWDI1NTE5IEx6cGJ3Y1o5Umd0cGI1UXpBZlI0c05ZT0NjV0w4U3BrajFpNDRqd0YrRE0KSVYwUkxVbnRHZnk1blBsbTZBUWRUVzFPd1VYUkI3TGhNamNoNmRhZjRxMAotPiBYMjU1MTkgdmI4Uy9ob1lXT1V1ZG5DYlVXdlZSSUdUQ3BiSm5TOEp2Vk9pQUI2RHlTOApBYUpFNElQQXlVSStQT3NjZnoyOHNvcStSbEFqeFRPUUM4RS9zSHBxeHQ4Ci0+ID9uJz50LWdyZWFzZSBgdkx1NSkgRFQgKzcgQiYKTE55UXc1Y24zWk0yZ0pjNHNzQWEvZ0xKajZSdXRzeWZDY2wwU1lsSVdrbTJyRytVUFlMS2hrbwotLS0gQm04c0E4dlBGK0hPL1k1M1FMeTR4TS9ZSkhDczRWa28wNVpFc0pjcFR2awpF1xpkwuxQH3DCmGwNiO5kCOSr7LK+/RUbMD3wnQy9NsR969xnmwWrdEpa9gAawjAah5ik+Sp+ZXPwofJM]() {
+    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAvVVVkNHIxVEJ5cDVPMWRlSkNWZnpOVlZOU1hLcUJmald4OGdLMW13WWw4CngrL0tMTVlXRzV1Tkw2d20wRGdaNnhNV1o0TXRPcnd2bDhIWnh3WnlES0kKLT4gWDI1NTE5IGVQd2hJVVFDWU53K2txbW9SeElNRjFwQWtQeW84VnArN3VFM2VKeVBrUjQKVXFBanR3T05CYUFiWXhRR3JCakt6c3g2SmJDQ0VqcFY2amp2Q1Y3SFNsSQotPiBYMjU1MTkgZVd2NDJSSnN2MUh2d25LRVJtaE5oZ2tYck9tRkdVYVJ3WGhNb3VScDJnOApLWjdYYS95T01HSDBoK1BjT0h5T2h0VUUwRWRXcTE4VE83L3czZTJVSFkwCi0+IFgyNTUxOSBpdGNSdlRWcHM0T052NVNIZWdjVkpoWi94WWF2emFXRWg0aGN4aWs0ZUFrCldPazJHUVFZajY2NWR5dzRwV002bGF6RGp2bzd3ZE1Ya01VaDZWZWQ5U2cKLT4gWDI1NTE5IGhlZjA1cCtZMFJvTUZ3a1pTcldsYjVZV1diaTZYUU9EODlYUThkb1VBVncKd25VaVVqb0VYSzJ1NzA2R2VlUGg4Y01SOXJLQ2x5V05uYUpYSVlXNGczawotPiBYMjU1MTkgbG12eENJSEdxREMvdWliTnFTek5ITEN2OEdMeTVwdVhNZEJWaHRtRUxuQQpiS0pBd1h6cVZIL1R0aWhyck45QVN3VkJBMEdad1k4bFQvZlpxSWlIcUk0Ci0+IFgyNTUxOSAwQ0dQYk5YVVFyUFdFTkhFd2VwT0FYUVpZV0pTaXVUU2lUeWdxbmhPbW5vCm9yVHF3ZEUvbTY2NGViTWtuR29QZ2lrR21kcWJ2VTRtQS9HRWlOTUdsTDgKLT4gbmRlWyw3Zi1ncmVhc2UgK3ZbY2ogNCleZjB9WwpNb0JrVjlpKytXN0k3a3FwdUMvRlhxRGg5bHU0Nitjc1ZoempzOHFMTEJBa0hBbHBtd3VqKzl5NmFFdFgzVGFaClRBNEcxSVVlQXZXNU5Ybm51RkI2SHpwUmlTUkdPdmFBbVFzCi0tLSA0Z2RtRGJHa1NSY0QxUSsybVI3dGY3WmNlY1Z0WXZUcm9FN2UxeWR0Mks0CvcA/pKntrpufetCeZiI4JeeF+qCXdm2jDkzafaFCzaH17xrg45JWVZFkc1fxRyy63QdhNJlmu7WneK5O88=]() {
         let mut cooldowns = std::collections::HashMap::new();
         let repo = std::path::PathBuf::from("/test/repo");
         let notify_key = format!("push-fail-{}", repo.display());
