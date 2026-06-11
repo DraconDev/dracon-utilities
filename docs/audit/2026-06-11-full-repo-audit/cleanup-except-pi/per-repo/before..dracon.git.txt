@@ -1,0 +1,19 @@
+REPO=/home/dracon/.dracon
+--- git status porcelain=v2 ---
+--- git remote -v ---
+codeberg	git@codeberg.org:dracondev/.dracon.git (fetch)
+codeberg	git@codeberg.org:dracondev/.dracon.git (push)
+github	git@github.com:DraconDev/.dracon.git (fetch)
+github	git@github.com:DraconDev/.dracon.git (push)
+gitlab	git@gitlab.com:dracondev/.dracon.git (fetch)
+gitlab	git@gitlab.com:dracondev/.dracon.git (push)
+origin	git@github.com:DraconDev/dracon-home.git (fetch)
+origin	git@github.com:DraconDev/dracon-home.git (push)
+--- git branch -vv ---
+* main f3daf8503 [origin/main] 3 file(s) in memory,utilities [utilities/sync/dracon-sync.toml, utilities/sync/templates/FUNDING.yml, memory/rag/rag_index.json] DELTA:+8/-7
+--- git log -5 ---
+f3daf8503 3 file(s) in memory,utilities [utilities/sync/dracon-sync.toml, utilities/sync/templates/FUNDING.yml, memory/rag/rag_index.json] DELTA:+8/-7
+76c0ad856 1 file(s) in memory [memory/rag/rag_index.json] DELTA:+1/-1
+409641b6e 1 file(s) in memory [memory/rag/rag_index.json] DELTA:+1/-1
+fb749047c 2 file(s) in utilities [utilities/sync/templates/FUNDING.yml, utilities/sync/dracon-sync.toml] DELTA:+60/-2 | NEW:templates/FUNDING.yml
+675c27dc4 1 file(s) in memory [memory/rag/rag_index.json] DELTA:+1/-1

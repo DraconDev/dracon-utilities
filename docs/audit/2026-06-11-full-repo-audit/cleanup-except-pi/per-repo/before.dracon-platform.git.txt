@@ -1,0 +1,33 @@
+REPO=/home/dracon/Dev/dracon-platform
+--- git status porcelain=v2 ---
+1 .M N... 100644 100644 100644 eefde8c443ba243fd7ad46e2b4017d57a4faef74 eefde8c443ba243fd7ad46e2b4017d57a4faef74 apis/services/ai-api/src/ai/client/mod.rs
+? apis/libs/api-core/src/request_id.rs
+--- git remote -v ---
+codeberg	git@codeberg.org:dracondev/dracon-platform.git (fetch)
+codeberg	git@codeberg.org:dracondev/dracon-platform.git (push)
+github	git@github.com:DraconDev/dracon-platform.git (fetch)
+github	git@github.com:DraconDev/dracon-platform.git (push)
+gitlab	git@gitlab.com:dracondev/dracon-platform.git (fetch)
+gitlab	git@gitlab.com:dracondev/dracon-platform.git (push)
+origin	https://github.com/DraconDev/dracon-platform.git (fetch)
+origin	https://github.com/DraconDev/dracon-platform.git (push)
+--- git branch -vv ---
+  archive/azumi-final                      8d7373e59 [origin/archive/azumi-final] docs(migration): phase 0 snapshot doc for Svelte migration
+  autoresearch/http-client-reuse           e60a46390 [origin/autoresearch/http-client-reuse] chore(sync): update AGENTS
+  azumi-ver                                11f588f8d chore(goal): ai-hub-audit goal complete (6/6 tasks)
+  f-01-test                                96392860b F-01 local test artifact
+* main                                     928216dbd [origin/main] 8 file(s) in apis,web [apis/services/ai-api/tests/happy_path.rs, apis/services/ai-api/tests/common/mod.rs, apis/services/ai-api/ai-api-sdk/tests/sdk.rs] DELTA:+160/-120 | TEST:276 BIN:2
+  phase-0/pre-deploy-safety                4591cdf36 [origin/phase-0/pre-deploy-safety] 2 file(s) in libs [libs/api-core/src/validate.rs, libs/api-core/src/error.rs] DELTA:+15/-3
+  phase-1-reorg/api-core-and-ship-blockers 4bf3ad7dd [origin/phase-1-reorg/api-core-and-ship-blockers] 1 file(s) in web [web/PAGE-AUDIT.md] DELTA:+3/-2
+  phase-1/api-core-lift                    0f5e8e22b [origin/phase-1/api-core-lift] 1 file(s) in apis [apis/ai-api/.env] DELTA:+1/-1 | ENV:
+  phase-2/high-cluster                     7ad8ecca9 [origin/phase-2/high-cluster] 3 file(s) in web [web/ai-hub/src/lib/chrome.config.ts, web/ai-hub/src/routes/+layout.svelte, web/packages/chrome/src/lib/SiteSubNav.svelte] DELTA:+9/-19
+  phase-3/auth-key-rotation                48c8c4e37 [origin/phase-3/auth-key-rotation] 11 file(s) in web [web/tests/dashboard/dashboard-protected.spec.ts] DELTA:+15/-16 | TEST:31 BIN:10 NEW:chrome-fixes/desktop-dashboard-dropdown-hover-signout.png,chrome-fixes/desktop-dashboard-overview.png,chrome-fixes/desktop-home-signed-in.png TESTONLY:dashboard/dashboard-protected.spec.ts
+  phase-4/god-file-split                   732573472 [origin/phase-4/god-file-split: ahead 46, behind 1] Track Phase 4 split closes in CHANGES.md
+  phase-4/god-file-split-clean             0c98e5197 Phase 4: structural god-file splits (F-24/F-25/F-26)
+  phase-4/specta-metrics                   d8f6a56e2 [origin/phase-4/specta-metrics] 1 file(s) in web [web/ai-hub/src/lib/icons.ts] DELTA:+4/-2
+--- git log -5 ---
+928216dbd 8 file(s) in apis,web [apis/services/ai-api/tests/happy_path.rs, apis/services/ai-api/tests/common/mod.rs, apis/services/ai-api/ai-api-sdk/tests/sdk.rs] DELTA:+160/-120 | TEST:276 BIN:2
+bdb138e70 1 file(s) in web DELTA:+0/-0 | BIN:1
+5f289c062 6 file(s) in web [web/games-hosted/games/junk-runner/assets/index-CBI8raa8.js, web/games-hosted/games/junk-runner/assets/index-JzpFklxP.js, web/games-hosted/games/junk-runner/index.html] DELTA:+14/-14 | BIN:2 NEW:assets/index-CBI8raa8.js DEL:assets/index-JzpFklxP.js
+3999023d8 docs(audit): 2026-06-13 full review of all 4 Rust API services
+1ea8a4ae6 6 file(s) in .data,web [web/games-hosted/games/junk-runner/index.html, .data/ai_rankings_cache.json, web/games-hosted/games/junk-runner/assets/{index-Bo_QmhmO.css => index-Dijw7Gvv.css}] DELTA:+5/-5 | BIN:2
