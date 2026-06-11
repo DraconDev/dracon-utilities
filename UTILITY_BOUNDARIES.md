@@ -6,14 +6,12 @@ Canonical library ownership is defined in `dracon-libs/docs/capability-boundarie
 
 ## Canonical runtime owners
 
-- Core utilities in this repository are exactly four:
+- Core utilities in this repository are exactly three:
   - `dracon-sync`
   - `dracon-warden`
   - `dracon-system`
-  - `dracon-ai`
 - Utility classes:
   - Always-on service utilities: `dracon-sync`, `dracon-warden`, `dracon-system`
-  - Interactive utility: `dracon-ai`
 - `dracon-sync`
   - Owns git sync automation (watch roots, pull/commit/push, deterministic commit payloads, freeze toggle).
   - Commit generation is deterministic only; AI commit generation is out-of-scope.
@@ -36,24 +34,16 @@ Canonical library ownership is defined in `dracon-libs/docs/capability-boundarie
 - `dracon-system`
   - Owns system diagnostics + storage analysis/cleanup + service health checks.
   - Owns setup symlink reconciliation via explicit `[links]` policy in `/home/dracon/dracon/utilities/system/dracon-system.toml` (default: no legacy compatibility links and no `~/.config/dracon` linkage).
-- `dracon-ai`
-  - Owns interactive machine-task assistance (planning + command execution loop and AI query UX).
-  - Is not a deterministic background daemon.
-  - Consumes AI routing/runtime/secrets from `dracon-libs`; does not own provider wiring.
-  - Must not own sync/warden/system daemon responsibilities.
-
 ## Utility roles (non-overlapping)
 
 - `dracon-security` (removed runtime utility)
   - Legacy transitional utility removed from canonical runtime.
 - `dracon-persistence` (removed runtime utility)
   - Legacy transitional utility removed from canonical runtime.
-- `dracon-ai`
-  - Interactive utility, separate from sync/warden/system deterministic runtime loops.
 - `dracon-code`
   - Optional coding workflow utility (repo scaffolding + context persistence).
   - Owns `do.md` + `plan/` conventions for "git as AI version control".
-  - May consume `dracon-ai`, but does not own sync/warden/system runtime roles.
+  - May consume AI runtime crates from `dracon-libs`, but does not own sync/warden/system runtime roles.
   - Is not part of `dracon-utilities` ownership/runtime.
 
 ## De-dup policy
@@ -68,6 +58,7 @@ Canonical library ownership is defined in `dracon-libs/docs/capability-boundarie
 ## Naming + transition policy
 
 - old branding prefixes are legacy and should not be used for new binaries/crates.
-- Active utility binaries are `dracon-sync`, `dracon-warden`, `dracon-system`, and `dracon-ai`.
+- Active utility binaries are `dracon-sync`, `dracon-warden`, and `dracon-system`.
 - Always-on services are `dracon-sync`, `dracon-warden`, and `dracon-system`.
+- `dracon-ai` was removed from this repo as an orphaned CLI wrapper; AI runtime crates remain in `dracon-libs`.
 - `dracon-security` and `dracon-persistence` are removed runtime artifacts, not runtime owners.

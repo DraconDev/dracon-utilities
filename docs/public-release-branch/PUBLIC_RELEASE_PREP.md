@@ -154,7 +154,7 @@ cargo test --workspace -- --test-threads=1
 cargo tree -d
 cargo deny check
 ./scripts/verify-spec.sh
-cargo test --manifest-path dracon-ai/Cargo.toml -- --test-threads=1
+Former `dracon-ai/` CLI wrapper removed from this repo; validate `dracon-libs` AI runtime crates separately when touched.
 ```
 
 Additional sync/config checks:

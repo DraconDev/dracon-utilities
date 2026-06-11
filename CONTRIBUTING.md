@@ -28,8 +28,7 @@ This repo contains **CLI binaries** that install to `~/.local/bin/` and run as s
 dracon-utilities/           <- CLI binaries (this repo)
 ├── dracon-sync/
 ├── dracon-system/
-├── dracon-warden/
-└── dracon-ai/
+└── dracon-warden/
 
 dracon-libs/                <- Shared libraries (required for building)
 ├── services/ai/

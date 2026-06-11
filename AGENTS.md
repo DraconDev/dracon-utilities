@@ -32,13 +32,7 @@ dracon-libs/                <- Shared libraries (REQUIRED for building)
 
 **Key point:** `dracon-utilities` contains the CLI wrappers. `dracon-libs` contains shared library code. Only the CLI binaries get installed.
 
-**Workspace policy:** the root Cargo workspace intentionally includes `dracon-sync`, `dracon-system`, and `dracon-warden` only. `dracon-ai/` is a standalone subcrate and must be validated separately when touched; do not fold it into the main workspace without a separate compatibility review.
-
-Standalone validation for `dracon-ai/`:
-
-```bash
-cargo test --manifest-path dracon-ai/Cargo.toml -- --test-threads=1
-```
+**Workspace policy:** the root Cargo workspace intentionally includes `dracon-sync`, `dracon-system`, and `dracon-warden` only. The former `dracon-ai/` CLI wrapper was removed from this repo; AI runtime crates live in `dracon-libs` and are validated with that sibling workspace.
 
 **Warden ↔ Sync are completely independent.** Sync never calls warden. Warden never calls sync. Encryption is enforced by git hooks installed by warden, not by sync.
 
@@ -551,7 +545,7 @@ auto_publish = false  # master toggle (default: off)
 [[publish_targets]]
 name = "crates-io"
 registry = "crates-io"    # crates-io | npm | pypi
-[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAzR25KMXRqQ09nSFlibnpYcTJKd1JFbEZJM3ZpZGI4Rjg3YlQxNm9UckQwCkZ6YUlEMWhBNGg1VFppdjhUWWpWNFlLVy9YWjVRY2NURXVtSm1ZMlZKMVkKLT4gWDI1NTE5IG5zdEV4OVBjdG5FN3BoZVZwdzdJQTZNeFFnVVFuNDVMNzhpSUN1RDZhaFkKd0xxdHpEQllza2RqWTRvNE80TUExNmhjL0ZxN051cnNWWW9nR0dqUkFIUQotPiBYMjU1MTkgYytQcHpCTWJiblhYR2JqanQvVnVlemJtSGtoZDJoZldvZnYwdDhKbWZETQpjT1NYcEh2MHV6K0FMUnpTandGTVV2NXdIOGtZNFZieThjV0NadVdsNnZNCi0+IFgyNTUxOSB1UlBNVXF2YzNjVEhNQXJWN2NzekY0UkI3MmVFZWFTYi9sOVZEYmZ6RVFrCkFRMUtyTWxFc1JqeXQyY2ZQdkVkVGdOZHkxNGVYTmkxbGJDdUJuRlk1ZHMKLT4gWDI1NTE5IG82QVhOL0tKam1OUExQZXc4Um91WGdFSGMrOXhXT05GeTM4K1FIUnRTaTAKUWlpTDBRWjgrbXFGZ1piYnE0S2JLZHhwMEN6MHcxTHRLbVJmZGJQYXBJUQotPiBYMjU1MTkgRzFNalZGSVZ5Rzkvc2diWW4xOE5QSzY5ZWMrR1F5eU5mVzZTb281eVIzOApXTHloLzhYRFQxWVhWakZOZnJ3S0hTQ2NGMHY1aUU1NGxMQjJ4RlFHakNrCi0+IFgyNTUxOSBLQTNJZzdGdWJjTzg5VXJTd1RrR3R5Y21FNEp5cEkxRDl4aEFvQ0NrYmlZCmxLM3dPdE53aTdUdWRPSHE0WHpiVkNhZ2lXT2x0Slg2Ni9nbzBFTWptU1UKLT4gQSFeJXglfC1ncmVhc2UgO25VUks3KCBafF9Na1V7IFs7SDhICjJwdlBsOHBBcmpOTjdFSlFRdwotLS0gbVZWRU5hekNuUGNGUHEzR2tENXVOWlVQOFpnUTNzclZURjJReDF5MHJ2NArIZUXqryxGO2qwb9ieE5n+/3wlgAvACyEUDKO78+k+nlPwc1uOIsZhe2wiZv73ACknL+VbqZ2jfSDMWo77zc8AVgtAI2U=]
+[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB5dmdRTldSeXJRc1hWV2pYaTUvR1NaaWdBOXFiWHEyMVJ3b1p4VXE0OEdZCkoxaXZQOTIzREYyMzZRZmlzYjc4anRGNXp0R09LUjV5YW4xM1dOc3NyQzAKLT4gWDI1NTE5IGk0d0N3dDg5L0g0dVRCYWlvaDViVmpUTnVlbml3WHFZdTZyQko2R3BQaUkKSWQ3NjhHTGpjRHErbEZGakR0OXZpS0ppNERIc3F2ZEV4RWJ3QVBLZzgwZwotPiBYMjU1MTkgRi9mZlBIdWI5b2dKbFBSQ3E3UTRRQ2g4V2Fxc2pxODlta1VEcmYyVldUOAphcG5TektTbzZPQVo5c2c4WGhpckIvc2xRQWZ1NFJoNWI0aDVHa01iUWN3Ci0+IFgyNTUxOSBLVTdqMlltOUtTK2dpNnVoYSsxSy9mWFJ2anA1MVBLWHZqYUdTenF1Z0RrCjdncGdwMm9HTUdBQ2hBV2VlU2hzeEtOTm85Z2p4U2JzbDY5Ny9GZXlQVEkKLT4gWDI1NTE5IEoxNXVRNjNvSDVjd2poTG9udkdtZm1JWGhPVnIvTVVrWDNsQm5IZDB1M0kKWnJsUStpbTFPc0hRZG9CakpwdTJXMXp1aVJSbnIrOEt6bFpnTW1idUpQNAotPiBYMjU1MTkgRlN3ZFJyU0JzVExjejlTVlQ4RVZYczZQY2wwcGIrZVZEUDhselRYMmdSOApXVy9IVkw2VDZ3YjE5bWxBcWtJVnhDeHJnZ0ZlM1hVczVBdlVQRy96bHRFCi0+IFgyNTUxOSBsVkowa0FtN0Fsa1UvcXJqb1ZkWlQ5Z0Vwd0lzTC80TzIxaXhQQkZNYndZCjBna042TGNZRXBhYWZ1Z0Y3NnhiSnNaUzhRMEhYMmVsNWt2RVBFQXdiSjAKLT4gK01OV0I3UnQtZ3JlYXNlIFl0UGFNIQpvTVBsbEpXbUlnYWVhcFV0NnRrdVJqU1c4RlNUbDhxZzNjSEdqRnYzRjE1MFJHdHc1MFgxVXNNbDRyQ0N0N2Q5CmkxR3lXQUFhYkt6TFdJUkFyU0JxTElkSDFNYnhqM2NIMGptaAotLS0gaitvclF5aGIxYlhkWlExV1BpeVJuTHZ1Wm1sWkdPbEFXOElOQVF5emlwSQpPu17NDMyf7duPXPzi990NzhzniTN8P53DVgMtfOerXOcaS3heQN3GVvAMOrTX4C0iubQYn5Cbt+zwA/wtYRlE7r9ZkdY=]
 publish_timeout_secs = 300
 ```
 
@@ -851,7 +845,7 @@ Whole-workspace: **692 passed, 6 ignored** across 22 suites (`cargo test --works
 - `dracon-system`: 83 passed, 1 suite.
 - `dracon-warden`: 79 passed, 2 suites.
 - `dracon-security` (`dracon-warden/src/security`): 99 passed, 6 ignored, 17 suites.
-- `dracon-ai` standalone: 7 passed, 1 suite (`cargo test --manifest-path dracon-ai/Cargo.toml -- --test-threads=1`).
+- `dracon-ai` standalone: removed from this repo; validate `dracon-libs` AI runtime crates separately when touched.
 
 ```bash
 export DRACON_SYNC_GIT_BIN=/run/current-system/sw/bin/git
