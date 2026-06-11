@@ -1,11 +1,5 @@
 REPO=/home/dracon/Dev/one-mil-girls
 --- git status porcelain=v2 ---
-? docs/audit/2026-06-11-full-audit/menu/00-title.png
-? docs/audit/2026-06-11-full-audit/menu/01-main-menu.png
-? docs/audit/2026-06-11-full-audit/menu/02-save-screen.png
-? docs/audit/2026-06-11-full-audit/menu/03-pause-menu.png
-? docs/audit/2026-06-11-full-audit/menu/04-settings.png
-? docs/audit/2026-06-11-full-audit/menu/state.json
 --- git remote -v ---
 codeberg	git@codeberg.org:dracondev/one-mil-girls.git (fetch)
 codeberg	git@codeberg.org:dracondev/one-mil-girls.git (push)
@@ -16,10 +10,10 @@ gitlab	git@gitlab.com:dracondev/one-mil-girls.git (push)
 origin	git@github.com:DraconDev/one-mil-girls.git (fetch)
 origin	git@github.com:DraconDev/one-mil-girls.git (push)
 --- git branch -vv ---
-* main 2250517 [origin/main] 3 file(s) in .svelte-kit,src [.svelte-kit/ambient.d.ts, src/lib/components/SettingsScreen.svelte, src/lib/components/MainMenu.svelte] DELTA:+292/-200
+* main c016882 [origin/main] 1 file(s) in .svelte-kit [.svelte-kit/ambient.d.ts] DELTA:+190/-192
 --- git log -5 ---
+c016882 1 file(s) in .svelte-kit [.svelte-kit/ambient.d.ts] DELTA:+190/-192
+ddee8ea 1 file(s) in docs [docs/audit/2026-06-11-full-audit/REPORT.md] DELTA:+27/-2
+212ebcf 8 file(s) in .svelte-kit,docs,src [.svelte-kit/ambient.d.ts, docs/audit/2026-06-11-full-audit/validation-after-menu.txt, docs/audit/2026-06-11-full-audit/menu/state.json] DELTA:+431/-258 | BIN:4 NEW:2026-06-11-full-audit/validation-after-menu.txt
+0fcf39c 6 file(s) in docs [docs/audit/2026-06-11-full-audit/menu/state.json] DELTA:+901/-0 | BIN:5 NEW:menu/00-title.png,menu/01-main-menu.png,menu/02-save-screen.png,menu/03-pause-menu.png,menu/04-settings.png,menu/state.json
 2250517 3 file(s) in .svelte-kit,src [.svelte-kit/ambient.d.ts, src/lib/components/SettingsScreen.svelte, src/lib/components/MainMenu.svelte] DELTA:+292/-200
-9d12b9e 3 file(s) in src [src/lib/components/MainMenu.svelte, src/lib/components/SaveScreen.svelte, src/lib/components/TitleScreen.svelte] DELTA:+170/-0
-b817615 1 file(s) in docs [docs/audit/2026-06-11-full-audit/REPORT.md] DELTA:+158/-0 | NEW:2026-06-11-full-audit/REPORT.md
-ce34ae8 12 file(s) in docs [docs/audit/2026-06-11-full-audit/day5/state.json, docs/audit/2026-06-11-full-audit/grep.txt] DELTA:+178/-0 | BIN:10 NEW:day5/00-day5-menu.png,day5/01-day5-save-screen.png,day5/02-day5-after-load.png,day5/choice-1.png,day5/choice-2.png,day5/choice-3.png,day5/choice-4.png,day5/choice-5.png,day5/choice-6.png,day5/state.json+2more
-9a0a598 8 file(s) in docs [docs/audit/2026-06-11-full-audit/day1/state.json, docs/audit/2026-06-11-full-audit/audio.txt] DELTA:+118/-0 | BIN:6 NEW:2026-06-11-full-audit/audio.txt,day1/00-title.png,day1/01-day1-chapter-card.png,day1/02-pause-menu.png,day1/03-first-impression.png,day1/04-first-choice.png,day1/05-choice-confirmed.png,day1/state.json
