@@ -1,0 +1,25 @@
+┌────────────────────────┬───────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ KEY                    ┆ VALUE                                                                                             │
+╞════════════════════════╪═══════════════════════════════════════════════════════════════════════════════════════════════════╡
+│ 📜 Policy              ┆ /home/dracon/.dracon/utilities/sync/dracon-sync.toml                                              │
+│ 📋 Summary             ┆ 16 repos · 3 watch root(s) · pulse 1s                                                             │
+│ 🔁 Roots               ┆ /home/dracon/.dracon, /home/dracon/Dev, /home/dracon/dracon                                       │
+│ 📦 Repos               ┆ 16                                                                                                │
+│ ⏱️ Pulse               ┆ 1s                                                                                                │
+│ ⏳ Inactivity          ┆ 5s                                                                                                │
+│ ⏸️ Freeze              ┆ OFF                                                                                               │
+│ ⚙️ Flags               ┆ commit=on  pull=on  push=on  bump=on  repair_concerns=on  repair_warns=on  rewrite_large_blobs=on │
+│ 📏 Max stage file      ┆ 50.0 MiB (52428800)                                                                               │
+│ 🧱 Push blob threshold ┆ 50.0 MiB (52428800)                                                                               │
+│ 🚫 Exclude dirs        ┆ target, node_modules, .cache, .venv, dist, build, archives, .tmp-*                                │
+│ 🚫 Exclude patterns    ┆ *.log, nohup.out                                                                                  │
+│ ⏱️ Pull timeout        ┆ 30s                                                                                               │
+│ ⏱️ Push timeout        ┆ 1m                                                                                                │
+│ ⏱️ Repo sync timeout   ┆ 2m                                                                                                │
+│ 🔁 Push retries        ┆ 3                                                                                                 │
+│ 🧯 Repair cooldown     ┆ 1m                                                                                                │
+│ 📒 Incident ledger     ┆ 10000 lines · 30d retention                                                                       │
+│ 🏛️ System repo         ┆ /home/dracon/.dracon                                                                              │
+│ 🧰 Backup              ┆ policy=Bundle dir=/home/dracon/dracon/backups                                                     │
+│ 🌐 Remotes             ┆ 3                                                                                                 │
+└────────────────────────┴───────────────────────────────────────────────────────────────────────────────────────────────────┘

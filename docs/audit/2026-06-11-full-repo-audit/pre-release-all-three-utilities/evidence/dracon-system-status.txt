@@ -1,0 +1,10 @@
+┌────────────┬────────────────────────────────────────────┬──────────────────────────────────────────────────────────┐
+│ STATUS     ┆ KEY                                        ┆ VALUE                                                    │
+╞════════════╪════════════════════════════════════════════╪══════════════════════════════════════════════════════════╡
+│ 📋 Summary ┆ /home/dracon/.dracon · sync service active ┆                                                          │
+│            ┆ 🏠 system root                             ┆ /home/dracon/.dracon                                     │
+│            ┆ 🐧 nixos root                              ┆ /home/dracon/.dracon/nixos                               │
+│            ┆ 📜 sync policy                             ┆ /home/dracon/.dracon/utilities/sync/dracon-sync.toml     │
+│            ┆ ⚙️ system policy                           ┆ /home/dracon/.dracon/utilities/system/dracon-system.toml │
+│ ✅         ┆ sync service                               ┆ active                                                   │
+└────────────┴────────────────────────────────────────────┴──────────────────────────────────────────────────────────┘

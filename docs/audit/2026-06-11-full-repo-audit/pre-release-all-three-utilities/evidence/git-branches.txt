@@ -1,0 +1,16 @@
+  backup/pre-merge-abort
+* main
+  scribe-version
+  remotes/codeberg/HEAD -> codeberg/master
+  remotes/codeberg/main
+  remotes/codeberg/master
+  remotes/codeberg/scribe-version
+  remotes/github/main
+  remotes/github/scribe-version
+  remotes/gitlab/HEAD -> gitlab/master
+  remotes/gitlab/main
+  remotes/gitlab/master
+  remotes/gitlab/scribe-version
+  remotes/origin/HEAD -> origin/main
+  remotes/origin/main
+  remotes/origin/scribe-version

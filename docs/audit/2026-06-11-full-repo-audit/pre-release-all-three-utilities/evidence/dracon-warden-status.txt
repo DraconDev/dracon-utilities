@@ -1,0 +1,8 @@
+┌──────────────────┬──────────────────────────────────────────────────────────┐
+│ KEY              ┆ VALUE                                                    │
+╞══════════════════╪══════════════════════════════════════════════════════════╡
+│ 📜 Policy        ┆ /home/dracon/.dracon/utilities/warden/dracon-warden.toml │
+│ 📋 Summary       ┆ Policy resolved · 2 repo root(s) · pubkey found          │
+│ 🔍 Repo roots    ┆ 2 root(s): /home/dracon/.dracon, /home/dracon/Dev        │
+│ 🔑 Pubkey source ┆ /home/dracon/.dracon/data/keys/owner_nixos.pub           │
+└──────────────────┴──────────────────────────────────────────────────────────┘
