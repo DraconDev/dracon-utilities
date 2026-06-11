@@ -951,6 +951,20 @@ pub(crate) async fn run_daemon(
                     repo.display(),
                     stuck_age_secs
                 );
+                let notify_key = format!("stuck-retry-{}", repo.display());
+                if let std::collections::hash_map::Entry::Vacant(e) =
+                    remote_notify_cooldowns.entry(notify_key)
+                {
+                    crate::report::record_sync_alert(
+                        &repo,
+                        "Stuck Push Retry",
+                        &format!(
+                            "retrying after {}s; stuck since unix {}",
+                            stuck_age_secs, stuck_since
+                        ),
+                    );
+                    e.insert(Instant::now() + Duration::from_secs(1800));
+                }
                 stuck_push_repos.remove(&repo);
                 save_stuck_push_repos(&stuck_push_repos);
             }
