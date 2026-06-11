@@ -13,3 +13,4 @@ pully-fully-pull-based-fleet-reconciler	1	pully-fully-pull-based-fleet-reconcile
 youtube-video-uploader	0	youtube-video-uploader.fmt.log	0	youtube-video-uploader.test.log	101	youtube-video-uploader.clippy.log
 video-uploader	0	video-uploader.fmt.log	0	video-uploader.test.log	101	video-uploader.clippy.log
 dracon-ai-lib	0	dracon-ai-lib.fmt.log	0	dracon-ai-lib.test.log	101	dracon-ai-lib.clippy.log
+dracon-libs	0	dracon-libs.fmt.log	0	dracon-libs.test.log	101	dracon-libs.clippy.log
