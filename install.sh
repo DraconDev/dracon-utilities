@@ -437,14 +437,20 @@ done
 # Verify running daemons are using the installed binary
 VERIFY_OK=true
 for bin in dracon-sync dracon-system dracon-warden; do
-    pid=$(pgrep -x "$bin" 2>/dev/null | head -1)
+    pid=$(pgrep -x "$bin" 2>/dev/null | head -1 || true)
     [ -n "$pid" ] || continue
     running=$(readlink /proc/$pid/exe 2>/dev/null)
     expected="$HOME/.local/bin/$bin"
     if [ -n "$running" ] && [ "$running" != "$expected" ]; then
         echo "⚠️  WARNING: $bin (PID $pid) running from $running, not $expected"
         echo "   This means a stale version is still active. Restart the service:"
-        echo "   systemctl --user restart $(systemctl --user list-units --type=service --state=running | grep -o "$bin[^ ]*\.service" | head -1)"
+        local svc=""
+        svc=$(systemctl --user list-units --type=service --state=running | grep -o "$bin[^ ]*\.service" | head -1 || true)
+        if [ -n "$svc" ]; then
+            echo "   systemctl --user restart $svc"
+        else
+            echo "   systemctl --user restart <service-name>"
+        fi
         VERIFY_OK=false
     fi
 done
