@@ -199,3 +199,11 @@ Before public release, create or use a dedicated public-release branch and requi
 3. Pushing public mirrors / creating tags / publishing releases.
 
 The three utilities themselves are locally healthy after the two low-risk fixes above, but the current repository state is not yet public-release-ready.
+
+## Required next input
+
+The next concrete step is **approval to execute the public-release branch cleanup plan**:
+
+`PUBLIC_RELEASE_BRANCH_PLAN.md`
+
+No further release work should happen until approval is explicit for branch cleanup, sanitization scope, and public push/tag/publish actions.
