@@ -38,7 +38,6 @@ The following documents are historical references, archived documents, or older 
 | `STUCK_PUSH_TRIAGE_2026-06-02.md` | Archived in [archive/](archive/); use `dracon-sync repair stuck-list` for current stuck-push triage. |
 | `REFACTORING_BLOCKER_ANALYSIS.md` | Archived in [archive/](archive/); use per-utility blueprints for current design work. |
 | `SPEC.md` | Superseded by per-utility BLUEPRINTs. |
-| `tasks.md` / `TODO.md` | Superseded by pi goals and current task workflow; no root TODO file is canonical. |
-| `todo.md` | Non-canonical lightweight task scratchpad; do not treat it as project documentation. |
+| `tasks.md` / `TODO.md` / `todo.md` | Removed; pi goals and current task workflow are canonical. |
 | `audit.md` / `AUDIT_2026-05-29.md` / `AUDIT_CHECKLIST.md` | Superseded by [AUDIT.md](../AUDIT.md) and `docs/audit/`. |
 | `docs/audit/audit-2026-06-06*.md` and `docs/audit/audit-2026-06-07*.md` | Historical audit records; use [AUDIT.md](../AUDIT.md) for the current full audit and closure evidence. |

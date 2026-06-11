@@ -1,10 +1,10 @@
 # Project State
 
 ## Current Focus
-TODO sprint — iteration 3: events + links modules extracted from system/main.rs
+Pi-goal-driven sprint — events + links modules extracted from system/main.rs
 
 ## Context
-Working through todo.md items. System/main.rs modularization in progress.
+Working through current pi goals and task workflow. System/main.rs modularization in progress.
 
 ## Completed This Sprint
 - [x] Item 1: unwrap audit — 0 production unwraps
