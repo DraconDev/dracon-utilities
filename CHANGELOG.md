@@ -56,7 +56,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - **Dead code cleanup**: Removed `git_list_paths` (zero callers), `Level::as_str`/`Event`/`timestamp_secs` from log.rs (unused after JSON→human refactor), gated `fallback_status_rank`/`acquire_path_lock` with `#[cfg(test)]`, fixed all clippy unused-import/never-constructed warnings across all 3 crates
-- **Scratch file cleanup**: Removed `test1.md`, `notes.md`, `todo.md`, `.ralph/`, `plan/`, `plans/` from git tracking; added to `.gitignore`
+- **Scratch file cleanup**: Removed local task/scratch files and stale task directories from git tracking; added matching `.gitignore` rules.
 - **Service restart policy**: All 3 services changed from `Restart=on-failure` to `Restart=always` — daemons now restart even after clean exits, preventing 5+ hour outages
 - **CLI output style**: All status commands now use Title Case keys (`Policy:` not `POLICY:`) for consistency with JSON output and health check format
 - **Daemon log noise**: Silent when healthy — concern/warn summaries only print when `found > 0`
