@@ -6,7 +6,7 @@ CLI binaries for dracon system services. These install to `~/.local/bin/` and ru
 
 ```bash
 # Clone the repository
-git clone https://github.com/DraconDev/dracon-utilities.git
+git clone https://github.com/DraconDev/dracon-utilities-public.git
 cd dracon-utilities
 
 # Install all utilities
