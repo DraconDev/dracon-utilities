@@ -27,9 +27,9 @@ clap = { version = "4.5", features = ["derive"] }
 comfy-table = "7"
 dirs = "6.0"
 dracon-ai-runtime-contracts = { path = "../dracon-libs/contracts/crates/ai/dracon-ai-runtime-contracts" }
-dracon-git = { path = "../dracon-libs/tools/sync/dracon-git" }
-dracon-security-kit = { package = "dracon-security", path = "dracon-warden/src/security" }
-dracon-system-lib = { path = "../dracon-libs/tools/system/dracon-system" }
+dracon-git = { version = "94.2.7", path = "../dracon-libs/tools/sync/dracon-git" }
+dracon-security-kit = { package = "dracon-security", version = "0.3.0", path = "dracon-warden/src/security" }
+dracon-system-lib = { version = "94.2.7", path = "../dracon-libs/tools/system/dracon-system" }
 env_logger = "0.10"
 fs2 = "0.4"
 futures = "0.3"

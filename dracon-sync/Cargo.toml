@@ -1,8 +1,13 @@
 [package]
-license = "AGPL-3.0-only"
 name = "dracon-sync"
 version = "0.1.5"
 edition = "2021"
+license = "AGPL-3.0-only"
+description = "Invisible git sync daemon for deterministic AI-assisted development"
+readme = "README.md"
+repository = "https://github.com/DraconDev/dracon-utilities"
+homepage = "https://github.com/DraconDev/dracon-utilities"
+documentation = "https://docs.rs/dracon-sync/0.1.5"
 
 [dependencies]
 anyhow = { workspace = true }
