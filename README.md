@@ -1,12 +1,12 @@
 # Dracon Utilities
 
-CLI binaries for dracon system services. These install to `~/.local/bin/` and run as systemd user services.
+Public release repository for the Dracon system service CLI utilities. These install to `~/.local/bin/` and run as systemd user services.
 
 ## Quick Start
 
 ```bash
 # Clone the repository
-git clone https://github.com/DraconDev/dracon-utilities-public.git
+git clone https://github.com/DraconDev/dracon-utilities.git
 cd dracon-utilities
 
 # Install all utilities
