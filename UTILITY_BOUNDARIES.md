@@ -1,64 +1,67 @@
 # Dracon Utilities Boundaries
 
-Deterministic by default. No AI runtime responsibilities in these tools unless explicitly stated.
+Deterministic by default. These tools do not depend on AI runtimes for commit messages, release decisions, or safety enforcement.
 
 Canonical library ownership is defined in `dracon-libs/docs/capability-boundaries.md`.
 
 ## Canonical runtime owners
 
-- Core utilities in this repository are exactly three:
-  - `dracon-sync`
-  - `dracon-warden`
-  - `dracon-system`
-- Utility classes:
-  - Always-on service utilities: `dracon-sync`, `dracon-warden`, `dracon-system`
-- `dracon-sync`
-  - Owns git sync automation (watch roots, pull/commit/push, deterministic commit payloads, freeze toggle).
-  - Commit generation is deterministic only; AI commit generation is out-of-scope.
-  - Policy path: `~/.dracon/utilities/sync/dracon-sync.toml`.
-  - Incident ledger: defaults to `~/.local/state/dracon/dracon-sync-incidents.jsonl` (kept out of repos to avoid perpetual DIRTY state). Override with `DRACON_SYNC_LEDGER`.
-  - Operating model doc: `/home/dracon/dracon/utilities/sync/AI_SYNC_MODEL.md`.
-  - Required policy controls:
-    - `exclude_dir_names` for repo discovery + staging exclusions.
-    - `max_stage_file_bytes` (default 52428800 / 50 MiB) for large-file staging guard.
-    - `pull_op_timeout_secs`, `push_op_timeout_secs`, `repo_sync_timeout_secs` for remote latency tolerance without false "stuck" signals.
-- `dracon-warden`
-  - Owns security hardening/watcher behavior (managed `.gitignore`/`.gitattributes`, protected paths).
-  - Policy path: `/home/dracon/dracon/utilities/warden/dracon-warden.toml`.
-  - Secret invariants:
-    - Files on `protected_patterns` are encrypted-at-rest in git (via filter), but plaintext on disk via smudge.
-    - Tracked plaintext JSON must never contain `[DRACON_SECRET:...]` markers (they indicate a secret leak path).
-  - Auto-repair:
-    - `dracon-warden once` and `dracon-warden daemon` automatically run the marker scrub pass before hardening.
-    - Manual command: `dracon-warden scrub-markers --apply`.
-- `dracon-system`
-  - Owns system diagnostics + storage analysis/cleanup + service health checks.
-  - Owns setup symlink reconciliation via explicit `[links]` policy in `/home/dracon/dracon/utilities/system/dracon-system.toml` (default: no legacy compatibility links and no `~/.config/dracon` linkage).
-## Utility roles (non-overlapping)
+The public release owns exactly three utilities:
 
-- `dracon-security` (removed runtime utility)
-  - Legacy transitional utility removed from canonical runtime.
-- `dracon-persistence` (removed runtime utility)
-  - Legacy transitional utility removed from canonical runtime.
-- `dracon-code`
-  - Optional coding workflow utility (repo scaffolding + context persistence).
-  - Owns `do.md` + `plan/` conventions for "git as AI version control".
-  - May consume AI runtime crates from `dracon-libs`, but does not own sync/warden/system runtime roles.
-  - Is not part of `dracon-utilities` ownership/runtime.
+- `dracon-sync`
+- `dracon-warden`
+- `dracon-system`
+
+Each utility has a narrow runtime role:
+
+### `dracon-sync`
+
+- Owns git sync automation: watch roots, pull/commit/push, deterministic commit payloads, freeze toggle, and mirror pushes.
+- Commit generation is deterministic only; AI commit generation is out of scope.
+- Policy path: `~/.dracon/utilities/sync/dracon-sync.toml`.
+- Incident ledger: defaults to `~/.local/state/dracon/dracon-sync-incidents.jsonl` and stays out of repos to avoid perpetual dirty state. Override with `DRACON_SYNC_LEDGER`.
+- Required policy controls include:
+  - `exclude_dir_names` for repo discovery and staging exclusions.
+  - `max_stage_file_bytes` for large-file staging guard.
+  - `pull_op_timeout_secs` and `push_op_timeout_secs` for remote latency tolerance without false stuck signals.
+
+### `dracon-warden`
+
+- Owns security hardening and git filter enforcement.
+- Policy path: `~/.dracon/utilities/warden/dracon-warden.toml`.
+- Secret invariants:
+  - Files matched by secret patterns are encrypted at rest in git via filter, while the working tree remains plaintext through smudge.
+  - Tracked plaintext JSON must never contain `[DRACON_SECRET:...]` markers; those indicate a leak path.
+- Recovery commands:
+  - `dracon-warden once`
+  - `dracon-warden scrub-markers --apply`
+  - `dracon-warden resmudge --apply`
+
+### `dracon-system`
+
+- Owns system diagnostics, storage analysis/cleanup, link reconciliation, zram reporting, and guard health checks.
+- Policy path: `~/.dracon/utilities/system/dracon-system.toml`.
+- Link reconciliation is opt-in through `[links]` policy. The public default does not assume legacy compatibility links or `~/.config/dracon` linkage.
+
+## Utility roles are non-overlapping
+
+- `dracon-security` was a transitional artifact and is not a runtime utility.
+- `dracon-persistence` was a transitional artifact and is not a runtime utility.
+- `dracon-code` is a separate coding-workflow product. It may consume AI runtime crates from `dracon-libs`, but it does not own sync, warden, or system runtime roles.
 
 ## De-dup policy
 
 - Do not introduce another daemon that auto-commits repos outside `dracon-sync`.
 - Do not introduce another watcher that enforces protected path policy outside `dracon-warden`.
-- Keep system cleanup/health logic in `dracon-system`.
-- Keep reusable capability logic in `dracon-libs`; utilities are wrappers/orchestrators.
-- Protected branches should use one commit voice (`dracon-sync`) with deterministic JSON payloads.
-- Do not move `dracon-code` concerns into `dracon-utilities`; `dracon-code` remains a separate product.
+- Keep system cleanup and health logic in `dracon-system`.
+- Keep reusable capability logic in `dracon-libs`; utilities are wrappers and orchestrators.
+- Protected branches should use one deterministic commit voice: `dracon-sync`.
+- Do not move `dracon-code` concerns into `dracon-utilities`.
 
-## Naming + transition policy
+## Naming and transition policy
 
-- old branding prefixes are legacy and should not be used for new binaries/crates.
+- Old branding prefixes are legacy and should not be used for new binaries or crates.
 - Active utility binaries are `dracon-sync`, `dracon-warden`, and `dracon-system`.
-- Always-on services are `dracon-sync`, `dracon-warden`, and `dracon-system`.
+- User services are `dracon-sync.service` and `dracon-system-guard.service`.
+- `dracon-warden` has no daemon service; git hooks are the primary enforcement layer.
 - `dracon-ai` was removed from this repo as an orphaned CLI wrapper; AI runtime crates remain in `dracon-libs`.
-- `dracon-security` and `dracon-persistence` are removed runtime artifacts, not runtime owners.

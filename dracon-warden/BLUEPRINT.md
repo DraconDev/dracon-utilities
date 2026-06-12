@@ -66,35 +66,29 @@ dracon-warden is a Git filter + repository hardening CLI:
 
 | File | Purpose |
 |------|---------|
-| `dracon-warden/src/main.rs` | CLI entry point, daemon, hardening logic |
-| `dracon-security/src/filter.rs` | clean/smudge filter implementations |
-| `dracon-security/src/crypto.rs` | age encryption/decryption |
-| `dracon-security/src/scanner.rs` | Secret pattern detection |
-| `dracon-security/src/identity.rs` | KeyRing management |
+| `dracon-warden/src/main.rs` | CLI entry point, hardening logic, hooks |
+| `dracon-warden/src/security/src/filter.rs` | clean/smudge filter implementations |
+| `dracon-warden/src/security/src/crypto.rs` | age encryption/decryption |
+| `dracon-warden/src/security/src/scanner.rs` | Secret pattern detection |
+| `dracon-warden/src/security/src/keys.rs` | KeyRing and key management |
 
 ---
 
-## Remaining (Low Priority)
+## Future Improvements
+
+These are implementation notes for maintainers, not release blockers for the current public release.
 
 ### 4. Missing context on file write
 - **Location:** `main.rs:1041`
-- **Problem:** `fs::write()` lacked `.with_context()` unlike other file operations
-- **Fix:** Added `.with_context(|| format!("failed writing {}", path.display()))`
-- **Priority:** Low
-- **Status:** [x]
+- **Status:** [x] Added `.with_context(|| format!("failed writing {}", path.display()))`.
 
 ### 5. Inconsistent error handling
 - **Location:** `main.rs:393, 403`
-- **Problem:** `.unwrap_or_default()` used for reading files - acceptable for "create if missing" pattern
-- **Priority:** Low
-- **Status:** [x] (documented as intentional - these are "create if missing" reads)
+- **Status:** [x] Documented as intentional for create-if-missing reads.
 
 ### 6. Silent git command failure
 - **Location:** `main.rs:979-980`
-- **Problem:** Git command failures silently skip
-- **Fix:** Added warning message on failure
-- **Priority:** Low
-- **Status:** [x]
+- **Status:** [x] Added warning message on failure.
 
 ---
 

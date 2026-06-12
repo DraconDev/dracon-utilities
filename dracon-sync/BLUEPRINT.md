@@ -151,18 +151,21 @@ dracon-sync is **invisible infrastructure** for an AI coder. The AI works on one
 
 ## Config Notes
 
-### Current dracon-sync.toml values (all valid):
-- `pulse_interval_secs = 1` - OK (minimum 1)
-- `inactivity_push_delay_secs = 5` - OK (minimum 1)
-- `pull_op_timeout_secs = 10` - OK (minimum 5)
-- `push_op_timeout_secs = 60` - Reduced from 300 (a hanging push blocks the entire daemon for 5 min)
-- `repo_sync_timeout_secs = 900` - OK (must be > push + 30)
-- `push_retries = 3` - OK
-- `repair_cooldown_secs = 60` - OK (minimum 1)
-- `max_push_blob_bytes = 52428800` (50MB) - OK (below 100MB host limit)
-- `max_stage_file_bytes = 52428800` (50MB) - OK (below 100MB default)
-- `incident_ledger_max_lines = 10000` - OK
-- `incident_ledger_max_age_days = 30` - OK
+### Example dracon-sync policy values
+
+These are example values from the public documentation, not a requirement to copy a local machine path or policy.
+
+- `pulse_interval_secs = 1` — OK (minimum 1)
+- `inactivity_push_delay_secs = 5` — OK (minimum 1)
+- `pull_op_timeout_secs = 10` — OK (minimum 5)
+- `push_op_timeout_secs = 60` — progress-aware timeout for active pack transfers
+- `repo_sync_timeout_secs = 120` — retained for status/compatibility; network work is controlled by per-operation progress-aware timeouts
+- `push_retries = 3` — OK
+- `repair_cooldown_secs = 60` — OK (minimum 1)
+- `max_push_blob_bytes = 52428800` (50 MiB) — OK (below common host limits)
+- `max_stage_file_bytes = 52428800` (50 MiB) — OK (large-file staging guard)
+- `incident_ledger_max_lines = 10000` — OK
+- `incident_ledger_max_age_days = 30` — OK
 
 ### Note on "duplicate" file limits:
 The config has TWO separate size limits that happen to have the same value:

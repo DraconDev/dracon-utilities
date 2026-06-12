@@ -315,4 +315,4 @@ The release binary is approximately 2.9MB, making it suitable for:
 
 ## License
 
-MIT
+AGPL-3.0-only — see the root [LICENSE](../LICENSE) for details.

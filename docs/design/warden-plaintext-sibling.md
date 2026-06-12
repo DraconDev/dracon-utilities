@@ -70,7 +70,7 @@ from the repo with `git rm <path>.plaintext`.
   The hatch is the wrong tool for those — keep them encrypted, distribute
   the decryption keys via the normal `dracon-warden keygen` / team-key flow.
 
-## Files changed (planned)
+## Files changed
 
 - `dracon-warden/src/main.rs` — clean filter, pre-push hook, scrub-markers,
   resmudge

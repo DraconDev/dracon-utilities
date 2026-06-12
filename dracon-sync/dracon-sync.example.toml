@@ -195,7 +195,7 @@ auto_create = false
 # [[publish_targets]]
 # name = "crates-io"
 # registry = "crates-io"          # crates-io | npm | pypi
-# [DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBGQ2pZSituL3doOTNKc2FqemJTcmRPMytvZTk0bmMwTktzREIyNGJrOXdZCmZod2dZUm85M1hYOEtmZkdpcStIUTNvdFJRRksxWnd3bjRkdlV1cm5wd0kKLT4gWDI1NTE5IFRFRHRRaC8xdGdkemFiVmNqV25Oc21OYk5hQ0hJcEhTSHdpb2hQVHdyaW8KSGN6Qnh5TDA2WXlYblBVWjV2RStidDZVODdOK25MM0pKdDhONEFGait6dwotPiBYMjU1MTkgdnNlT0R4VURZWjN1TlRhdk5kYWROcXVhbkpVUk4rZTNDV3QySFdCL09FQQo1ZEVQZFVFZk1ZMTlpV3JzNmRPcElmNm1zZmZoNVRPYUhFQ3J4bkE0VGhVCi0+IFgyNTUxOSA0WldDMis3YVUyQTlDME1MZHNSdXBwNVhpTk1hRW1rbVVQRk5LQmVoZ3c0Ci9xZWZFYlFua0lVcDhoU2hyeFZwcGwwN1FraFhaV2tzcVB5OThFeDdpeGcKLT4gWDI1NTE5IFRYeTd4K2JkU0RhMDVwRFkwWjJvQXFvc1czWEwvK29UVnpqbzBLSkxXeFEKdnp5MW44Qm9LNVAvZzVhYUlLSyt6U1VxeVZOSktLdHRxMFE0bWxzc3VYRQotPiBYMjU1MTkgTEdiY0dUNHQ5VkVFOTltNHUvc0hDSkFBOUxwVTBCeTJoUGE1eUYxeGZIOApYWldnbEFqNmdJbHYwQU0zQTFhbTJhSVlINHl5RVFTT0xaRklOS0hMVVJrCi0+IFowOzY2KSxJLWdyZWFzZSBKMVJsVXFGICF+Wk5yIDF+RCBwSwozMWprVkFNVklEclVwTVRvS2pUTms2OUtReEdUMGJJVGNrZVhxbFNOdFp0ckp0QWNTTmYvZnBFSldKQlJLbHNOCmVMVWJpWjNreTliWEx3OGtSU0ZhNTlmTlFiaTRhRi9GcU9KTGp1ZnFGc2d0b0EKLS0tIGE1L1p3dEZJNXdoVGNWeUptYTA4OHo1RXNTbXEvcDcrdGdaZXVuazlWb1kKrEjtZg9VIlIVF9y4gzZtqALsHqt8PTj6nkCkz+tEmbaA8IEv3nCxcTsRaJFq7z4SFGDeufdXirhtT1wEkogi1vvNYvUW]   # env var name (token in secrets/cratesio.env)
+# [DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBKYkIwVEwyNXB5ckFuVnBGRTUrRDFvSkZGdzgwM3huUU9hU3YzQjZXcWdFCk9HKzhXWmZ3MWE0bmhVRFMzYzBJc2hRcjJ3RUZQbHZGSHhZbWpwQzFCSnMKLT4gWDI1NTE5IEtka2Y2NE5KL0Q0YVNrT1Y1b1RJa09ib2FNUURXRldRaDNRTG5WUDhiRUEKY2QySklZSWJZbGhDTktLci92bHpWZlV5ZUoxclFYVUNSamlTVkN3bHdMbwotPiBYMjU1MTkgbHlzTGxOODJlMVo4N0w5QzB1VGErVjVleDZFZEJiZ0pLd3cxMCtmZE9BMApzWGN0b21udG5wWWkzR1kydXRIZlBCRFprTWhZcTlWdTRpYVgxMW1rK0pjCi0+IFgyNTUxOSBkWkFoMTF4QUJvMlBlQllCWkd0UlUzWGV3TG9oeGlraEx1R0o2elZZd2dzCkF3dlNoSElTM2lzdXo1S1lmYlFJZWpWZ21GWHFyU2R1Y3JNa0M0SjVzWW8KLT4gWDI1NTE5IFJPRWxwMythdXdZSHpEUitIVGliamZxTG93a29Gb3FuT1hObEZMUDBoRlkKSzR6N0NmMlpsOXgzbFlFSmdsNDR1L1BzQTVFU3ZTbiswRzhPdjBIMjZTbwotPiBEKy5xOS0tZ3JlYXNlCmJTcUlxQVE3NjRQaVpSVVBEeG12Snl1ZElTNGpXM3NhZDh4bTNiTnd3bllPcTFuQ3AvSVcvTDFiMEVLNFdiYkcKM2h2eUhOUmxPSmNpZmNpMUNCTGpUZnBXZEZUbmVQUVhTc1hSbUtNRGNzUlhycnh4OEJZCi0tLSA3OFg3WmVLL0xHa2E1WDgwODdXd05TTyt5eUl4RTJWMTY0SC81YjN4L3VnCvMjPAQpJOCgJ+ZwcEaa/YWJDpS3mgp5xDEJs9mVL2N4OWX7wpMDW5SIUwcewk/jwoGd+EvaIRgp7dxeO4ZIwBVTj5bLLQ==]   # env var name (token in secrets/cratesio.env)
 # publish_timeout_secs = 300
 #
 # [[publish_targets]]
@@ -318,7 +318,7 @@ auto_create = false
 # above. The default template ships with no funding destinations (github: [],
 # etc.) so a freshly-scaffolded repo advertises nothing until the operator
 # fills it in. The file is public and version-controlled; never place API keys,
-# tokens, or any other secret material in it. The Warden key-management layer
+# tokens, or any other secret material in it. The Warden key management layer
 # treats it as plain text.
 
 # =============================================================================

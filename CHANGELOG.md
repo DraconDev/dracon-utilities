@@ -9,10 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **`dracon-sync` system-repo path bug**: The example template's
-  `system_repo` default was `/home/dracon/dracon` (a non-git directory that
-  holds `utilities/` and `backups/`). The actual git repo (where the
-  sync daemon's state lives) is at `~/.dracon`. The example template and
-  the installed `dracon-sync.toml` are now both set to the correct path.
+  `system_repo` default pointed at a non-git legacy directory. The actual git
+  repo where the sync daemon's state lives is `~/.dracon`. The example
+  template and the installed `dracon-sync.toml` are now both set to the
+  correct path.
 
 ### Changed
 - **CLI print style**: All three binaries (`dracon-sync`, `dracon-warden`,
@@ -180,8 +180,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   callers). Resolves audit-2026-06-07 N-1.
 
 ### Audit
-- Full delta audit against the 2026-06-06 baseline is published at
-  `docs/audit/audit-2026-06-07-delta.md` and `docs/audit/audit-2026-06-07-delta-summary.md`.
+- **Audit hygiene**: internal audit artifacts were reviewed during release prep and are not included in the public tree. User-facing release notes and operational docs now carry the public guidance.
 
 ## [0.3.0] - 2026-06-07
 
@@ -214,9 +213,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - **`dracon-warden` legacy path removed from default config**: The
-  example toml and the installed user config no longer include
-  `/home/dracon/dracon` (a legacy non-git directory holding `backups/`
-  and `utilities/`). The directory itself is not deleted; the user can
+  example toml and the installed user config no longer include a legacy
+  non-git directory. The directory itself is not deleted; the user can
   decide what to do with its contents.
 
 ## [0.2.0] - 2024-05-03

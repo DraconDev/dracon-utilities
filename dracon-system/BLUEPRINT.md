@@ -113,8 +113,10 @@ trend_warn_hours = 24
 
 ---
 
-## Remaining Low Priority
+## Future Improvements
 
-- No graceful shutdown handling (Guard daemon uses infinite loop)
-- No signal handling for cleanup on termination
-- Storage cleanup could benefit from progress indication for large operations
+These are not release blockers for the current public release; they are candidate follow-ups if operators request them.
+
+- Add graceful shutdown handling for the guard daemon.
+- Add signal handling for cleanup on termination.
+- Add progress indication for very large storage cleanup operations.

@@ -244,10 +244,10 @@ auto_create = false  # Codeberg/Forgejo doesn't support push-to-create
 Store PATs for HTTPS fallback and API operations:
 ```bash
 # GitLab
-echo "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAxUTRhWGo2cWtqaVdYMDVEd1VmZGtqT25Caisyb254UUZrM05OaEJGQVhvCmRqN3h6djJUR01kU1JrMzZUNWZQRGJrb1hIRTFvQTFaRlNLU25DTmlob1EKLT4gWDI1NTE5IGJvbUZWaWpKdWFkb1haTzFqV3NrRmlXRVZiREpIRTZVREFNV3dEQVFrRzgKekJoYmtNZTZDWDg1VmxmUlhGMG1ETERGaFZLWmJQYWhEUjJNWWZiQlptawotPiBYMjU1MTkgRnRHdGtyVnJkdExway8xSDdTbGJBdGpGcWxtbU1BUmdId2Flb2Z4Q0FYTQovUEhrRzBwUml1VnJZT1Z1Nnh0K0Jyc3RXdDhzbC9oY1pwdWtZSEkyVDZBCi0+IFgyNTUxOSA1bUZoejlQdm1nOWo4cDF5YWQvSkRFdlpoejlyZXlUWVlGS3AzNEZwdGpVCjZ2bGhTaUpMbFhORDI4U1lYSjdxOVJVOEQyWEN4NExJVXUzazR1U0N0emMKLT4gWDI1NTE5IGhuL0JMN1ZGZ2NUZElockg2RkxrUWU5WmZuRURVRzdFazV2SytJVzBOSG8KN29WRzhxT3d4UFVoYXJKYUZaaEo5WmtoNllsUEcyVGVOQUlKeDlyQ1NzMAotPiBYMjU1MTkgdDJYNzJWTlg0YVhJOUZhdVhTWUFqQzFsNThlM041QUZBUW1FSDAyWmJYUQo3TllmclNmNDI5SU5KTHl0bDlzY2E0UGRWaFdhVzhyczNsZWZHTFlzajg0Ci0+IHlqLWdyZWFzZSBrWEJiCjYvOVRuQzhwTnZaQUcvanNWTnVxSHlYU3I0dHNEczdsK0svcDdrRkhsOTRha1RSSnp6dU1yOUxyb3J6ZVZLL1cKNTQ3YkhabXNZd21rNlJXR0tZWklRR3puRWZpMXBxbXZ6cmFSQWd6RTdFSkkxZlkwCi0tLSBhUks4SHdhMGZxbU5oMDlSYm82bEdCbWdLbzZUQ2l2QVJGa2hsQVFIY0ZZCnck6m0OTf3TiCm/R2ChbyPTywgU7QhDUrhvDYkf4TUgaZvPV9/vj2qRggGMyfuj8PNpU6JMGNOuIK1jeQMqFmWZ6fiTwQ==]" > ~/.dracon/utilities/sync/secrets/gitlab.env
+echo "GITLAB_TOKEN=<token>" > ~/.dracon/utilities/sync/secrets/gitlab.env
 
 # Codeberg
-echo "[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB0VlBpZHJTZW93MjVYSHVIeXV4eSs4ZktVbHV2SlBvSyt0YTVOa3pmeTFZCktXcHg2MkVrL1RzU1VhNVRPenhTT1JLRU9rcElnbldGZWhFS04wTzN1VW8KLT4gWDI1NTE5IHZTZ053dGtsVjRDYnpXYkV2bXkyWEhxTEUwZ0d0VXdNeFJkNmJ3V1hjWEkKUkN4Z21SUzcwblJML2ZzZ0RGU2xRRjN5azl4U29rYUF5ZWlHVXhzVGd4RQotPiBYMjU1MTkgQkhHcE1uL01vdzNkbE41OS9FdWNvbzNDS2JJc0FZbGw4bkE0cWt6THdISQp5ZCs3QzR0MjRCbWxhc2s5OUxvTnJCUXRBc1VqSm1qL0haOFVNL28vTmZJCi0+IFgyNTUxOSBRMGpWZmQraDVUYkJqQmxWaWZwWTJtUTZueWdGKzlJMTljZjMxdEtNbm5VClhQMU9kNHYvRkZyVk1ONVJlV25aNWFtdGNCeEZteFpKdWtLTVA0MGFPMDQKLT4gWDI1NTE5IGd4NDdJcHY4VjV6OVhRS2RvVWppOUZRYm9HWFpiTkdTZTVCQmNHajVoUkUKdTI4RXNrL0tNV09JWHk0dTRDcEFwYm9wM0p2a2lZS2ZaNXhLV054WFM2ZwotPiBYMjU1MTkgR1h5T1VuSG5meWdaWjVGdmR0NmU2aVVSZlNXS0Jwd1NSTEZOOGJHN08yYwpvYzBOMnFHYzd0TVIxaGdweGthOEhwckFWdHNQbFhHcnFPbFZXVkgxWjl3Ci0+IH5ULWdyZWFzZSBLISc7CnE3d3Jaa2Z5aFY4V1hPT3ZreGoza1lDZ1Bqa2FqbE1OajRFWlpPVFRrUGpMNXBZWTFKc1I2RW1vSGVDSU8vUHgKSFJ5cENXUGxoRVlpbUdvK1NHcVZodDNiQWExNFgwY0U5OHZpcUIwWkhXT2R5ZwotLS0gQ3BEZnZnbm9hbDhKL1ZDYzJKZDRTRzFCci90QU5EUi9ycXdwSm52WHpQdwo+FKL4uVTKSTlI/dqAYr/3lYUW4TRuA+4yk/nY4kxW9VBFKMsEC9wChh1K/0FnBrPn1fac8FJtoxevezdvzWLOX3JiThUKuQ==]" > ~/.dracon/utilities/sync/secrets/codeberg.env
+echo "CODEBERG_TOKEN=<token>" > ~/.dracon/utilities/sync/secrets/codeberg.env
 ```
 
 ## Commit Messages
@@ -321,10 +321,10 @@ Push Attempt
 | **SSH timeout** | Network issue, SSH agent not running | HTTPS fallback, retry |
 | **SSH auth failed** | Expired key, permission denied | HTTPS fallback with PAT |
 | **HTTPS auth failed** | Expired/missing PAT | Check token in secrets/ |
-| **Non-fast-forward** | Remote has diverged | Auto-force if `force_when_behind` and remote is purely behind |
+| **Non-fast-forward** | Remote has diverged | Merge/pull or manual resolution; stuck tracking prevents repeated failed pushes |
 | **Rejected** | Branch protection, permission denied | Manual intervention needed |
 | **Network unreachable** | DNS failure, firewall | Retry with backoff |
-| **Timeout** | Hanging connection, large repo | Reduce `push_op_timeout_secs` |
+| **Timeout** | Hanging connection, large repo | Progress-aware push/pull timeout; failed operations retry or surface in `repos`/`health` |
 
 ### Stuck Push Detection
 
@@ -341,11 +341,12 @@ dracon-sync repair stuck-unstuck /path/to/repo
 
 | Setting | Default | Purpose |
 |---------|---------|---------|
-| `push_op_timeout_secs` | 60s | Per-push timeout (SSH or HTTPS) |
+| `push_op_timeout_secs` | 60s | Per-push timeout for SSH or HTTPS; active pack-transfer progress extends the idle deadline |
+| `pull_op_timeout_secs` | 10s | Per-pull timeout with the same progress-aware behavior |
 | `push_retries` | 3 | Number of SSH retry attempts |
-| `repo_sync_timeout_secs` | 120s | Total timeout per repo (all pushes) |
+| `repo_sync_timeout_secs` | 120s | Compatibility/status field retained for policy visibility; per-operation progress-aware timeouts control network work |
 
-With defaults, a single repo can block the daemon for at most 120s (2 minutes). With 3 mirrors, worst case is 3 × 60s = 180s, but parallel pushes reduce this.
+With defaults, each network operation uses a progress-aware timeout so active transfers are not killed while idle/stalled operations are. Mirror push failures are retried and surfaced through repo reports, health checks, and incident logs.
 
 ## Report Accuracy
 
