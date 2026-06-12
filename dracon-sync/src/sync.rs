@@ -1,0 +1,4542 @@
+use std::collections::{BTreeSet, HashMap};
+use std::io::Write;
+use std::path::Path;
+use std::time::Duration;
+
+use crate::log_warn;
+#[cfg(test)]
+use crate::test_helpers::{test_commit_cmd, test_git_cmd};
+
+use anyhow::Result;
+use dracon_git::GitService;
+
+use crate::exclude::{
+    can_restore_entry, handle_large_untracked, is_large_untracked, remove_tracked_excluded_paths,
+    should_stage_entry,
+};
+use crate::git::multi_remote::push_mirror_remotes;
+use crate::git::origin_url;
+use crate::git::{
+    cli_diff_entries, git_name_status_entries, has_origin_remote, has_tracking_upstream,
+    is_cherry_pick_in_progress, is_merge_in_progress, is_rebase_in_progress, is_repo_ready,
+    prune_other_default_branch, push_with_retries, restore_paths, run_git_capture_output,
+    run_git_with_timeout, unstage_excluded_paths, unstage_oversized_paths,
+};
+use crate::policy::{debug_enabled, load_repo_override, SyncPolicy};
+use crate::visibility::{
+    get_github_visibility, parse_github_owner_repo, sync_mirror_metadata, sync_mirror_visibility,
+};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SyncOutcome {
+    Synced,
+    NothingToDo,
+    Blocked,
+}
+
+impl SyncOutcome {
+    pub fn has_changes(&self) -> bool {
+        matches!(self, SyncOutcome::Synced)
+    }
+}
+
+struct SyncContext<'a> {
+    repo: &'a Path,
+    policy: &'a SyncPolicy,
+    excluded_dir_names: &'a BTreeSet<String>,
+    dry_run: bool,
+    #[allow(dead_code)]
+    idle_seconds: u64,
+    #[allow(dead_code)]
+    policy_path: Option<&'a Path>,
+    has_origin: bool,
+    has_upstream: bool,
+    #[allow(dead_code)]
+    auto_bump_versions: bool,
+    remote_failures: Option<&'a mut HashMap<String, usize>>,
+}
+
+fn notify_webhook_failure(webhook_url: &str, repo: &Path, remote: &str, error: &str) {
+    let payload = serde_json::json!({
+        "event": "push_failure",
+        "repo": repo.display().to_string(),
+        "remote": remote,
+        "error": error,
+        "timestamp": crate::policy::timestamp_secs(),
+    });
+    let url = webhook_url.to_string();
+    std::thread::spawn(move || {
+        if let Ok(client) = reqwest::blocking::Client::builder()
+            .timeout(Duration::from_secs(5))
+            .build()
+        {
+            if let Err(e) = client.post(&url).json(&payload).send() {
+                eprintln!("⚠️ webhook notification failed: {}", e);
+            }
+        }
+    });
+}
+
+async fn get_bump_info(repo: &Path) -> Option<(String, String, String)> {
+    let new_ver = crate::release::detect_project_version(repo)?.0;
+
+    let version_files = if repo.join("Cargo.toml").exists() {
+        &["Cargo.toml"][..]
+    } else if repo.join("package.json").exists() {
+        &["package.json"][..]
+    } else if repo.join("pyproject.toml").exists() {
+        &["pyproject.toml"][..]
+    } else if repo.join("pubspec.yaml").exists() {
+        &["pubspec.yaml"][..]
+    } else if repo.join("version.txt").exists() {
+        &["version.txt"][..]
+    } else if repo.join("VERSION").exists() {
+        &["VERSION"][..]
+    } else {
+        &[
+            "Cargo.toml",
+            "package.json",
+            "pyproject.toml",
+            "pubspec.yaml",
+            "version.txt",
+            "VERSION",
+        ][..]
+    };
+
+    let mut old_ver = String::new();
+    for file in version_files.iter() {
+        let repo_pb = repo.to_path_buf();
+        let file_s = file.to_string();
+        let output = tokio::task::spawn_blocking(move || {
+            crate::git::git_cmd()
+                .args(["show", &format!("HEAD~1:{}", file_s)])
+                .current_dir(&repo_pb)
+                .stdout(std::process::Stdio::piped())
+                .stderr(std::process::Stdio::null())
+                .output()
+                .ok()
+        })
+        .await
+        .ok()
+        .flatten();
+
+        if let Some(output) = output {
+            if !output.status.success() {
+                continue;
+            }
+            let content = String::from_utf8_lossy(&output.stdout);
+            if let Some(v) = match *file {
+                "Cargo.toml" => content
+                    .lines()
+                    .map(|l| l.trim())
+                    .find(|l| l.starts_with("version") && !l.starts_with("version_prefix"))
+                    .and_then(|l| l.split('=').nth(1))
+                    .map(|v| v.trim().trim_matches('"').trim())
+                    .filter(|v| !v.is_empty() && !v.starts_with("workspace"))
+                    .map(|v| v.to_string()),
+                "package.json" => content
+                    .lines()
+                    .map(|l| l.trim())
+                    .find(|l| l.starts_with("\"version\""))
+                    .and_then(|l| l.split(':').nth(1))
+                    .map(|v| v.trim().trim_matches('"').trim_matches(',').trim())
+                    .filter(|v| !v.is_empty())
+                    .map(|v| v.to_string()),
+                "pyproject.toml" => content
+                    .lines()
+                    .map(|l| l.trim())
+                    .find(|l| l.starts_with("version") && !l.starts_with("version_prefix"))
+                    .and_then(|l| l.split('=').nth(1))
+                    .map(|v| v.trim().trim_matches('"').trim_matches(',').trim())
+                    .filter(|v| !v.is_empty())
+                    .map(|v| v.to_string()),
+                "pubspec.yaml" => content
+                    .lines()
+                    .map(|l| l.trim())
+                    .find(|l| l.starts_with("version:"))
+                    .and_then(|l| l.split(':').nth(1))
+                    .map(|v| v.trim().split('+').next().unwrap_or("").trim())
+                    .filter(|v| !v.is_empty())
+                    .map(|v| v.to_string()),
+                "version.txt" | "VERSION" => {
+                    let v = content.trim();
+                    if !v.is_empty() && v.contains('.') {
+                        Some(v.to_string())
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            } {
+                old_ver = v;
+                break;
+            }
+        }
+    }
+
+    let level = if old_ver.is_empty() {
+        "patch"
+    } else {
+        let old_parts: Vec<u32> = old_ver.split('.').filter_map(|s| s.parse().ok()).collect();
+        let new_parts: Vec<u32> = new_ver.split('.').filter_map(|s| s.parse().ok()).collect();
+        if old_parts.len() >= 3 && new_parts.len() >= 3 {
+            if new_parts[0] > old_parts[0] {
+                "major"
+            } else if new_parts[1] > old_parts[1] {
+                "minor"
+            } else {
+                "patch"
+            }
+        } else {
+            "patch"
+        }
+    };
+
+    Some((old_ver, new_ver, level.to_string()))
+}
+
+fn maybe_sync_visibility_and_metadata(ctx: &SyncContext<'_>) {
+    if ctx.dry_run || (!ctx.policy.sync_visibility && !ctx.policy.sync_metadata) {
+        return;
+    }
+    if let Some(origin_url) = crate::git::multi_remote::get_remote_url(ctx.repo, "origin") {
+        if ctx.policy.sync_metadata {
+            sync_mirror_metadata(
+                &origin_url,
+                &ctx.policy.remotes,
+                ctx.repo,
+                ctx.policy.sync_visibility_interval_hours,
+            );
+        }
+        if ctx.policy.sync_visibility {
+            sync_mirror_visibility(
+                &origin_url,
+                &ctx.policy.remotes,
+                ctx.repo,
+                ctx.policy.sync_visibility_interval_hours,
+            );
+        }
+    }
+}
+
+fn check_conflict_state(repo: &Path) -> Option<SyncOutcome> {
+    if is_rebase_in_progress(repo) {
+        eprintln!(
+            "⚠️ {} has rebase in progress, skipping (manual intervention required)",
+            repo.display()
+        );
+        return Some(SyncOutcome::Blocked);
+    }
+    if is_merge_in_progress(repo) {
+        eprintln!(
+            "⚠️ {} has merge in progress, skipping (manual intervention required)",
+            repo.display()
+        );
+        return Some(SyncOutcome::Blocked);
+    }
+    if is_cherry_pick_in_progress(repo) {
+        eprintln!(
+            "⚠️ {} has cherry-pick in progress, skipping (manual intervention required)",
+            repo.display()
+        );
+        return Some(SyncOutcome::Blocked);
+    }
+    None
+}
+
+fn ensure_origin_remote(repo: &Path, policy: &SyncPolicy) -> bool {
+    let has_origin = has_origin_remote(repo);
+    if !has_origin && policy.auto_github_private {
+        let private = if policy.sync_visibility {
+            if let Some(url) = origin_url(repo) {
+                if let Some((owner, repo_name)) = parse_github_owner_repo(&url) {
+                    get_github_visibility(&owner, &repo_name)
+                } else {
+                    true
+                }
+            } else {
+                true
+            }
+        } else {
+            true
+        };
+        if let Some(url) = crate::report::create_github_private_remote(
+            repo,
+            &policy.auto_github_private_account,
+            private,
+        ) {
+            println!("🔗 created remote for {}: {}", repo.display(), url);
+            true
+        } else {
+            eprintln!("⚠️ failed to create GitHub remote for {}", repo.display());
+            false
+        }
+    } else {
+        has_origin
+    }
+}
+
+async fn auto_pull_merge(
+    svc: &GitService,
+    ctx: &SyncContext<'_>,
+    initial_status: &dracon_git::types::RepoStatus,
+) -> Result<()> {
+    let repo = ctx.repo;
+    let policy = ctx.policy;
+    if policy.auto_pull
+        && ctx.has_origin
+        && ctx.has_upstream
+        && initial_status.behind > 0
+        && initial_status.is_clean
+    {
+        if ctx.dry_run {
+            println!(
+                "🔽 Would pull/merge {} commit(s) from upstream in {}",
+                initial_status.behind,
+                repo.display()
+            );
+        } else {
+            match tokio::time::timeout(
+                Duration::from_secs(policy.pull_op_timeout_secs),
+                svc.pull_merge(),
+            )
+            .await
+            {
+                Ok(Ok(())) => {}
+                Ok(Err(dracon_git::error::GitError::MergeConflict)) => {
+                    eprintln!(
+                        "⚠️ pull/merge conflict in {} (manual intervention required)",
+                        repo.display()
+                    );
+                    return Err(anyhow::anyhow!("pull/merge conflict"));
+                }
+                Ok(Err(e)) => {
+                    eprintln!(
+                        "⚠️ pull/merge failed for {}: {} - aborting sync pass",
+                        repo.display(),
+                        e
+                    );
+                    return Err(anyhow::anyhow!("pull/merge failed: {}", e));
+                }
+                Err(_) => {
+                    eprintln!(
+                        "⚠️ pull/merge timeout for {} after {}s - aborting sync pass",
+                        repo.display(),
+                        policy.pull_op_timeout_secs
+                    );
+                    return Err(anyhow::anyhow!("pull/merge timeout"));
+                }
+            }
+        }
+    } else if policy.auto_pull && ctx.has_origin && ctx.has_upstream && initial_status.behind == 0 {
+        if debug_enabled() {
+            eprintln!(
+                "🐛 skip pull/merge for {} (branch not behind upstream)",
+                repo.display()
+            );
+        }
+    } else if policy.auto_pull && ctx.has_origin && ctx.has_upstream && !initial_status.is_clean {
+        if debug_enabled() {
+            eprintln!(
+                "🐛 skip pull/merge for {} (dirty repo, commit first)",
+                repo.display()
+            );
+        }
+    } else if policy.auto_pull && !ctx.has_origin {
+        eprintln!(
+            "ℹ️ skip pull/merge for {} (no origin remote)",
+            repo.display()
+        );
+    } else if policy.auto_pull && ctx.has_origin && !ctx.has_upstream {
+        eprintln!(
+            "ℹ️ skip pull/merge for {} (no tracking upstream on current branch)",
+            repo.display()
+        );
+    }
+    Ok(())
+}
+
+async fn clean_staged_paths(ctx: &SyncContext<'_>) -> Result<()> {
+    let repo = ctx.repo;
+    let policy = ctx.policy;
+    let excluded_dir_names = ctx.excluded_dir_names;
+    let dry_run = ctx.dry_run;
+    let unstaged = if dry_run {
+        0
+    } else {
+        unstage_excluded_paths(repo, excluded_dir_names).await?
+    };
+    if unstaged > 0 {
+        eprintln!(
+            "🧹 removed {} staged excluded paths in {}",
+            unstaged,
+            repo.display()
+        );
+    }
+    let unstaged_oversized = if dry_run {
+        0
+    } else {
+        unstage_oversized_paths(repo, policy.max_stage_file_bytes).await?
+    };
+    if unstaged_oversized > 0 {
+        eprintln!(
+            "🧹 removed {} oversized staged paths in {}",
+            unstaged_oversized,
+            repo.display()
+        );
+    }
+
+    if let Some(removed_dirs) = if dry_run {
+        None
+    } else {
+        remove_tracked_excluded_paths(repo, excluded_dir_names)?
+    } {
+        if !removed_dirs.is_empty() {
+            eprintln!(
+                "🧹 removed {} tracked excluded dir(s) from {}: {:?}",
+                removed_dirs.len(),
+                repo.display(),
+                removed_dirs
+            );
+        }
+    }
+
+    Ok(())
+}
+
+struct DiffResult {
+    status: dracon_git::types::RepoStatus,
+    entries: Vec<dracon_git::types::DiffFile>,
+    #[allow(dead_code)]
+    filter_only_cleared: bool,
+}
+
+#[cfg(test)]
+mod diff_tests {
+
+    #[test]
+    fn test_fallback_entries_recalculate_staged_files() {
+        // When cli_diff_entries fallback is used, staged_files must be
+        // recalculated from actual staged paths rather than leaving the
+        // (potentially stale) libgit2 count.
+        use crate::git::staged_paths;
+
+        // Create a temp repo with a staged file
+        let tmp = tempfile::tempdir().unwrap();
+        let repo_path = tmp.path().join("test-repo");
+        std::fs::create_dir_all(&repo_path).unwrap();
+
+        // Initialize git repo
+        let output = crate::git::git_cmd()
+            .args(["init"])
+            .current_dir(&repo_path)
+            .output()
+            .expect("git init failed");
+        assert!(output.status.success(), "git init failed: {:?}", output);
+
+        // Configure git user
+        crate::git::git_cmd()
+            .args(["config", "user.email", "test@test.com"])
+            .current_dir(&repo_path)
+            .output()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["config", "user.name", "Test"])
+            .current_dir(&repo_path)
+            .output()
+            .unwrap();
+
+        // Create initial commit
+        std::fs::write(repo_path.join("README.md"), "initial").unwrap();
+        crate::git::git_cmd()
+            .args(["add", "README.md"])
+            .current_dir(&repo_path)
+            .output()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["commit", "--no-verify", "-m", "initial"])
+            .current_dir(&repo_path)
+            .output()
+            .unwrap();
+
+        // Now add a new file (staged)
+        std::fs::write(repo_path.join("new_file.rs"), "fn main() {}").unwrap();
+        crate::git::git_cmd()
+            .args(["add", "new_file.rs"])
+            .current_dir(&repo_path)
+            .output()
+            .unwrap();
+
+        // staged_paths should find the staged file
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let staged = rt.block_on(staged_paths(&repo_path)).unwrap();
+        assert_eq!(staged.len(), 1, "expected 1 staged file, got {:?}", staged);
+        assert!(staged.contains(&std::path::PathBuf::from("new_file.rs")));
+
+        // The fallback code path: cli_diff_entries should find it
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let entries = rt
+            .block_on(crate::git::cli_diff_entries(&repo_path))
+            .unwrap();
+        assert!(
+            !entries.is_empty(),
+            "cli_diff_entries should find the staged file"
+        );
+    }
+}
+
+async fn compute_diff_entries(svc: &GitService, repo: &Path) -> Result<DiffResult> {
+    let mut status = svc.get_status().await?;
+    let mut entries = svc.get_diff_entries().await?;
+    let mut filter_only_cleared = false;
+
+    {
+        let diff_output = crate::git::git_diff_head_files(repo)
+            .await
+            .unwrap_or_default();
+        if diff_output.is_empty() && !entries.is_empty() {
+            let has_non_modified = entries
+                .iter()
+                .any(|e| !matches!(e.status, dracon_git::types::FileStatus::Modified));
+            if !has_non_modified {
+                entries.clear();
+                status.is_clean = true;
+                filter_only_cleared = true;
+            }
+        } else {
+            entries.retain(|e| {
+                if !matches!(e.status, dracon_git::types::FileStatus::Modified) {
+                    return true;
+                }
+                diff_output.contains(&e.path)
+            });
+        }
+    }
+
+    if debug_enabled() {
+        eprintln!(
+            "🐛 {} status: clean={} modified={} staged={} entries(libgit2)={}",
+            repo.display(),
+            status.is_clean,
+            status.modified_files,
+            status.staged_files,
+            entries.len()
+        );
+    }
+    if entries.is_empty() && !filter_only_cleared {
+        let fallback_entries = cli_diff_entries(repo).await?;
+        if !fallback_entries.is_empty() {
+            status.is_clean = false;
+            status.modified_files = fallback_entries.len();
+            // Recalculate staged_files from actual staged paths when using
+            // fallback CLI entries, since the libgit2 count may be stale
+            // (libgit2 returned 0 entries but CLI found changes).
+            if let Ok(staged) = crate::git::staged_paths(repo).await {
+                status.staged_files = staged.len();
+            }
+            entries = fallback_entries;
+            if debug_enabled() {
+                eprintln!(
+                    "🐛 {} fallback entries(cli)={} staged={} => forcing dirty",
+                    repo.display(),
+                    status.modified_files,
+                    status.staged_files,
+                );
+            }
+        }
+    }
+
+    Ok(DiffResult {
+        status,
+        entries,
+        filter_only_cleared,
+    })
+}
+
+async fn stage_existing_files(repo: &Path, existing: &[String], dry_run: bool) -> Result<()> {
+    if existing.is_empty() {
+        return Ok(());
+    }
+    if dry_run {
+        println!(
+            "📝 Would stage {} file(s) in {}: {:?}",
+            existing.len(),
+            repo.display(),
+            &existing[..existing.len().min(5)]
+        );
+        if existing.len() > 5 {
+            println!("  ... and {} more", existing.len() - 5);
+        }
+    } else {
+        // Filter out gitignored paths to avoid "The following paths are ignored
+        // by one of your .gitignore files" errors. Without this, a single
+        // gitignored path in the list causes the entire `git add` to fail,
+        // blocking ALL files from being committed.
+        //
+        // We use `git check-ignore` to detect gitignored paths, then split:
+        // - Non-ignored paths: `git add -A -- <paths>` (respects .gitignore)
+        // - Ignored but already-tracked paths: `git add -A -f -- <paths>` (force
+        //   re-stage; git already tracks these so gitignore shouldn't block updates)
+        // - Ignored and untracked: skip entirely (.gitignore is intentional)
+        let (force_paths, normal_paths) = partition_gitignored(repo, existing).await;
+
+        if !normal_paths.is_empty() {
+            let mut add_args = vec!["add", "-A", "--"];
+            for p in &normal_paths {
+                add_args.push(p.as_str());
+            }
+            if let Err(e) = run_git_with_timeout(repo, &add_args, 30, "add").await {
+                eprintln!(
+                    "⚠️ {} git add failed for {} paths: {:?}",
+                    repo.display(),
+                    normal_paths.len(),
+                    &normal_paths[..normal_paths.len().min(5)]
+                );
+                return Err(e);
+            }
+        }
+
+        // Force-add already-tracked gitignored files (git tracks them already,
+        // so .gitignore shouldn't prevent staging updates to tracked content)
+        if !force_paths.is_empty() {
+            let mut add_args = vec!["add", "-A", "-f", "--"];
+            for p in &force_paths {
+                add_args.push(p.as_str());
+            }
+            if run_git_with_timeout(repo, &add_args, 30, "add (force-tracked)")
+                .await
+                .is_err()
+            {
+                eprintln!(
+                    "⚠️ {} git add -f failed for {} tracked gitignored paths: {:?}",
+                    repo.display(),
+                    force_paths.len(),
+                    &force_paths[..force_paths.len().min(5)]
+                );
+                // Non-fatal: tracked gitignored files can be re-attempted next cycle
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Partition paths into (force_add, normal_add) based on .gitignore.
+/// - Paths already tracked in git → force_add (git add -f). Tracked files
+///   that match a gitignore rule (e.g. `**/.wxt/types/`) still get refused
+///   by `git add <path>` even though `git check-ignore` reports them as
+///   "not ignored" (gitignore is bypassed for tracked files in check-ignore,
+///   but `git add <path>` re-evaluates the rule and refuses without -f).
+/// - Untracked + gitignored → skip (respect .gitignore intent)
+/// - All others → normal_add (git add, respects .gitignore)
+async fn partition_gitignored(repo: &Path, paths: &[String]) -> (Vec<String>, Vec<String>) {
+    if paths.is_empty() {
+        return (Vec::new(), Vec::new());
+    }
+
+    // Get list of already-tracked paths (git ls-files)
+    let tracked: std::collections::HashSet<String> = {
+        let output = crate::policy::tokio_git_command()
+            .args(["ls-files"])
+            .current_dir(repo)
+            .output()
+            .await;
+        match output {
+            Ok(o) if o.status.success() => String::from_utf8_lossy(&o.stdout)
+                .lines()
+                .filter(|l| !l.is_empty())
+                .map(|l| l.to_string())
+                .collect(),
+            _ => std::collections::HashSet::new(),
+        }
+    };
+
+    // Run `git check-ignore` to find gitignored paths (only for untracked ones)
+    let ignored: std::collections::HashSet<String> = {
+        let untracked: Vec<&str> = paths
+            .iter()
+            .filter(|p| !tracked.contains(*p))
+            .map(|p| p.as_str())
+            .collect();
+        if untracked.is_empty() {
+            std::collections::HashSet::new()
+        } else {
+            let mut check_args = vec!["check-ignore"];
+            for p in &untracked {
+                check_args.push(*p);
+            }
+            let output = crate::policy::tokio_git_command()
+                .args(&check_args)
+                .current_dir(repo)
+                .output()
+                .await;
+            match output {
+                Ok(o) if o.status.success() || o.status.code() == Some(1) => {
+                    // Exit 0 = some ignored, exit 1 = none ignored
+                    String::from_utf8_lossy(&o.stdout)
+                        .lines()
+                        .filter(|l| !l.is_empty())
+                        .map(|l| l.to_string())
+                        .collect()
+                }
+                _ => std::collections::HashSet::new(),
+            }
+        }
+    };
+
+    let mut force_paths = Vec::new();
+    let mut normal_paths = Vec::new();
+
+    for p in paths {
+        if tracked.contains(p) {
+            // Tracked file: always force-add with `git add -f`. `git add <path>`
+            // re-evaluates gitignore and refuses for tracked files that match
+            // a rule; `-f` bypasses the check. gitignore intent doesn't apply
+            // here because the file is already in the index.
+            force_paths.push(p.clone());
+        } else if ignored.contains(p) {
+            // Untracked + gitignored = skip (respect .gitignore intent)
+        } else {
+            // Not ignored and not tracked = normal add
+            normal_paths.push(p.clone());
+        }
+    }
+
+    (force_paths, normal_paths)
+}
+
+async fn git_rm_missing(repo: &Path, missing: &[String], dry_run: bool) -> Result<()> {
+    if missing.is_empty() {
+        return Ok(());
+    }
+    let mut rm_args = vec!["rm", "--ignore-unmatch", "--"];
+    for p in missing {
+        rm_args.push(p);
+    }
+    if dry_run {
+        println!(
+            "🗑️  Would delete (git rm) {} file(s) from {}: {:?}",
+            missing.len(),
+            repo.display(),
+            &missing[..missing.len().min(5)]
+        );
+        if missing.len() > 5 {
+            println!("  ... and {} more", missing.len() - 5);
+        }
+    } else if let Err(e) = run_git_with_timeout(repo, &rm_args, 30, "rm").await {
+        eprintln!(
+            "⚠️ {} git rm failed for {} paths: {:?}",
+            repo.display(),
+            missing.len(),
+            missing
+        );
+        return Err(e);
+    }
+    Ok(())
+}
+
+async fn post_commit_pull(svc: &GitService, repo: &Path, policy: &SyncPolicy) {
+    if !policy.auto_pull {
+        return;
+    }
+    let post_commit_status = match svc.get_status().await {
+        Ok(s) => s,
+        Err(_) => return,
+    };
+    if post_commit_status.behind > 0 && post_commit_status.is_clean {
+        eprintln!(
+            "📥 post-commit pull for {} ({} behind)",
+            repo.display(),
+            post_commit_status.behind
+        );
+        match tokio::time::timeout(
+            Duration::from_secs(policy.pull_op_timeout_secs),
+            svc.pull_merge(),
+        )
+        .await
+        {
+            Ok(Ok(())) => {
+                eprintln!("✅ post-commit pull succeeded for {}", repo.display());
+            }
+            Ok(Err(dracon_git::error::GitError::MergeConflict)) => {
+                eprintln!(
+                    "⚠️ post-commit pull conflict in {} (manual intervention required)",
+                    repo.display()
+                );
+            }
+            Ok(Err(e)) => {
+                eprintln!(
+                    "⚠️ post-commit pull failed for {}: {} - will still attempt push",
+                    repo.display(),
+                    e
+                );
+            }
+            Err(_) => {
+                eprintln!(
+                    "⚠️ post-commit pull timeout for {} after {}s - will still attempt push",
+                    repo.display(),
+                    policy.pull_op_timeout_secs
+                );
+            }
+        }
+    }
+}
+
+async fn restore_excluded_paths(
+    ctx: &SyncContext<'_>,
+    to_restore: &[dracon_git::types::DiffFile],
+) -> Result<()> {
+    let repo = ctx.repo;
+    let policy = ctx.policy;
+    let restorable: Vec<_> = to_restore
+        .iter()
+        .filter(|e| can_restore_entry(repo, e))
+        .filter(|e| {
+            !repo.join(&e.path).is_dir() || !crate::exclude::is_gitlink_unchanged(repo, &e.path)
+        })
+        .collect();
+
+    handle_large_untracked(repo, to_restore, policy)?;
+
+    let other_untracked: Vec<_> = to_restore
+        .iter()
+        .filter(|e| {
+            !can_restore_entry(repo, e) && !is_large_untracked(e, repo, policy.max_stage_file_bytes)
+        })
+        .collect();
+
+    if !other_untracked.is_empty() {
+        eprintln!(
+            "ℹ️ {} has {} small untracked excluded file(s)",
+            repo.display(),
+            other_untracked.len()
+        );
+    }
+
+    if !restorable.is_empty() {
+        let excluded_paths: Vec<String> = restorable
+            .iter()
+            .map(|e| e.path.to_string_lossy().to_string())
+            .collect();
+        eprintln!(
+            "🧹 restoring {} excluded path(s) in {} after commit",
+            excluded_paths.len(),
+            repo.display()
+        );
+        restore_paths(repo, &excluded_paths).await?;
+    }
+
+    Ok(())
+}
+
+async fn run_release_pipeline_if_bumped(repo: &Path, policy: &SyncPolicy, version_bumped: bool) {
+    if !version_bumped {
+        return;
+    }
+    if let Some((old_ver, new_ver, level)) = get_bump_info(repo).await {
+        let repo_override = crate::policy::load_repo_override(repo);
+        let repo_auto_tag = repo_override.auto_tag.unwrap_or(policy.auto_tag);
+        let repo_auto_release = repo_override.auto_release.unwrap_or(policy.auto_release);
+        let repo_publish_targets = repo_override.auto_publish;
+        let repo_nix_auto_update = repo_override
+            .nix_auto_update
+            .unwrap_or(policy.nix_auto_update);
+        let steps = crate::release::run_release_pipeline(
+            repo,
+            &old_ver,
+            &new_ver,
+            level.as_str(),
+            policy,
+            repo_auto_tag,
+            repo_auto_release,
+            &repo_publish_targets,
+            repo_nix_auto_update,
+        )
+        .await;
+        for step in &steps {
+            match step {
+                crate::release::ReleaseStep::TagCreated(tag) => eprintln!("🏷️  {tag}"),
+                crate::release::ReleaseStep::GitHubReleaseCreated(tag) => eprintln!("🚀 {tag}"),
+                crate::release::ReleaseStep::Published { registry, version } => {
+                    eprintln!("📦 published to {registry} v{version}")
+                }
+                crate::release::ReleaseStep::NixFlakePRCreated(url) => {
+                    eprintln!("📄 flake PR created: {url}")
+                }
+                crate::release::ReleaseStep::Skipped(reason) => {
+                    if debug_enabled() {
+                        eprintln!("🐛 release skipped: {reason}");
+                    }
+                }
+                crate::release::ReleaseStep::Failed { step: s, error } => {
+                    eprintln!("⚠️ release failed: {s} — {error}")
+                }
+            }
+        }
+    }
+}
+
+/// Push to origin + all mirror remotes. Returns true if all succeeded.
+///
+/// Updates `remote_failures` (if Some) to track consecutive failures per
+/// remote. On a successful mirror push, the entry is removed. This is the
+/// only path that should update `remote_failures`; the previous design had
+/// a separate `push_with_blob_check` function that did this but was never
+/// called from the live code path.
+async fn push_background(
+    repo: &std::path::Path,
+    policy: &SyncPolicy,
+    mut remote_failures: Option<&mut HashMap<String, usize>>,
+) -> Result<bool> {
+    // Push to origin
+    match push_with_retries(
+        repo,
+        policy.push_op_timeout_secs,
+        policy.push_retries,
+        "push",
+    )
+    .await
+    {
+        Ok(()) => {}
+        Err(e) => {
+            eprintln!(
+                "⚠️ background push to origin failed for {}: {}",
+                repo.display(),
+                e
+            );
+            return Ok(false);
+        }
+    }
+
+    // Push to mirror remotes
+    if !policy.remotes.is_empty() {
+        let private = true;
+        let push_results = push_mirror_remotes(
+            repo,
+            &policy.remotes,
+            policy.push_op_timeout_secs,
+            policy.push_retries,
+            private,
+        )
+        .await;
+        let all_ok = push_results.iter().all(|(_, r)| r.is_ok());
+        if !all_ok {
+            for (name, result) in &push_results {
+                if let Err(e) = result {
+                    log_warn!("push to {} failed for {}: {}", name, repo.display(), e);
+                    if let Some(ref url) = policy.webhook_url {
+                        notify_webhook_failure(url, repo, name, &e.to_string());
+                    }
+                    if let Some(rf) = remote_failures.as_deref_mut() {
+                        *rf.entry(name.clone()).or_insert(0) += 1;
+                    }
+                }
+            }
+            return Ok(false);
+        } else if let Some(rf) = remote_failures {
+            // Successful push — clear any prior failure count for these remotes.
+            for name in policy.remotes.iter().map(|r| r.name.clone()) {
+                rf.remove(&name);
+            }
+        }
+    }
+    Ok(true)
+}
+
+/// Task state transitions extracted from a markdown diff.
+#[derive(Debug, Default)]
+struct TaskTransitions {
+    /// Tasks marked `[x]` (completed)
+    closed: Vec<String>,
+    /// Tasks marked `[~]` (in-progress)
+    progress: Vec<String>,
+    /// Goal metadata extracted from .pi/goals/ JSON files
+    goal_metadata: Option<GoalMetadata>,
+}
+
+/// Metadata extracted from goal file JSON.
+/// Provides richer context about goal lifecycle for AI consumption.
+#[derive(Debug, Default)]
+struct GoalMetadata {
+    /// Goal status (active, complete, paused)
+    status: Option<String>,
+    /// Why the goal was paused/aborted
+    pause_reason: Option<String>,
+    /// Tokens used by the goal
+    tokens_used: Option<u64>,
+    /// Active seconds spent on the goal
+    active_seconds: Option<u64>,
+    /// Tasks with their evidence and skip reasons
+    task_details: Vec<TaskDetail>,
+}
+
+/// Detail about a single task from goal metadata.
+#[derive(Debug, Default)]
+struct TaskDetail {
+    id: String,
+    status: String,
+    evidence: Option<String>,
+    skip_reason: Option<String>,
+}
+
+/// Extract task state transitions from the staged diff.
+///
+/// Scans ALL staged files for:
+/// - `- [x]` or `// [x]` additions → task completed (CLOSED)
+/// - `- [~]` or `// [~]` additions → task in-progress (WIP)
+///
+/// Works in any file:
+/// - Markdown: `- [x] Fix bug`
+/// - Code comments: `// [x] Implemented JWT`
+/// - Text files: `[x] Done`
+/// - Any file with checkbox syntax
+///
+/// This is deterministic — no LLM, no inference. Just regex on the diff.
+fn extract_task_transitions(repo: &Path) -> TaskTransitions {
+    // Get the diff for ALL files (not just markdown)
+    let output =
+        match run_git_capture_output(repo, &["diff", "--cached", "--unified=0"], "task-diff") {
+            Ok(o) => o,
+            Err(_) => return TaskTransitions::default(),
+        };
+
+    let mut transitions = TaskTransitions::default();
+
+    for line in output.lines() {
+        // Only look at ADDED lines (start with `+` but not `+++`)
+        if !line.starts_with('+') || line.starts_with("+++") {
+            continue;
+        }
+        let content = &line[1..]; // Remove leading `+`
+        let trimmed = content.trim();
+
+        // Check for completed tasks: [x] or [X]
+        // Matches: `- [x]`, `* [x]`, `// [x]`, `# [x]`, plain `[x]`
+        if let Some(rest) =
+            extract_checkbox_text(trimmed, 'x').or_else(|| extract_checkbox_text(trimmed, 'X'))
+        {
+            let task = sanitize_task_name(rest);
+            if !task.is_empty() {
+                transitions.closed.push(task);
+            }
+        }
+        // Check for in-progress tasks: [~]
+        else if let Some(rest) = extract_checkbox_text(trimmed, '~') {
+            let task = sanitize_task_name(rest);
+            if !task.is_empty() {
+                transitions.progress.push(task);
+            }
+        }
+    }
+
+    // Also extract goal metadata from JSON files
+    transitions.goal_metadata = extract_goal_metadata(repo);
+
+    transitions
+}
+
+/// Extract text after a checkbox marker like `[x]`, `[~]`, etc.
+///
+/// Handles common text/markdown prefixes:
+/// - `- [x] task` (markdown list)
+/// - `* [x] task` (markdown list)
+/// - `[x] task` (plain text)
+///
+/// Does NOT match code comments (`//`, `#`) — nobody puts checkmarks in code.
+fn extract_checkbox_text(line: &str, marker: char) -> Option<&str> {
+    // Build the marker pattern: `[x]`, `[~]`, etc.
+    let pattern = format!("[{}]", marker);
+
+    // Try common text/markdown prefixes only
+    let prefixes = ["- ", "* ", ""];
+    for prefix in &prefixes {
+        let full_prefix = format!("{}{}", prefix, pattern);
+        if let Some(rest) = line.strip_prefix(&full_prefix) {
+            return Some(rest.trim());
+        }
+    }
+
+    None
+}
+
+/// Sanitize a task name for use in the routing key.
+///
+/// Commit subjects are indexes, not summaries. Keep task fragments short and
+/// route-key-like so generated messages do not become multi-clause prose.
+///
+/// Removes:
+/// - Markdown formatting: `**`, `__`, `*`, `_`
+/// - Pipe characters: `|`
+/// - Square brackets: `[`, `]`
+/// - Explanatory clauses after `:`, `;`, `—`, or `–`
+///
+/// If the name starts with `**identifier** description` (common pattern),
+/// extracts only the identifier plus the first descriptive word. Truncates to
+/// 60 chars to keep commit subjects compact.
+fn sanitize_task_name(name: &str) -> String {
+    // Common pattern: `**F-reframe** description` → extract just `F-reframe`
+    if name.starts_with("**") {
+        if let Some(end) = name.find("**") {
+            if end >= 2 {
+                let identifier = &name[2..end];
+                // If there's description after, include first meaningful word
+                let rest = &name[end + 2..];
+                if rest.is_empty() {
+                    return compact_task_phrase(identifier);
+                }
+                let first_word = rest.split_whitespace().next().unwrap_or("");
+                if first_word.is_empty() {
+                    return compact_task_phrase(identifier);
+                }
+                return compact_task_phrase(&format!("{} {}", identifier, first_word));
+            }
+        }
+    }
+
+    // Fallback: general sanitization
+    let sanitized = name
+        .replace('|', "/")
+        .replace("**", "")
+        .replace("__", "")
+        .replace('*', "")
+        .replace('[', "(")
+        .replace(']', ")")
+        .replace('`', "") // Strip backticks (code in task names)
+        .trim()
+        .to_string();
+    compact_task_phrase(&sanitized)
+}
+
+/// Compact a task phrase before it enters a commit routing key.
+///
+/// Drops explanatory clauses and limits plain text to three words. This keeps
+/// generated commit subjects searchable without turning them into natural
+/// language summaries.
+fn compact_task_phrase(name: &str) -> String {
+    let clause = name
+        .split([':', ';', '—', '–'])
+        .next()
+        .unwrap_or(name)
+        .trim();
+    let clause = if clause.is_empty() { name } else { clause };
+    let words: Vec<&str> = clause.split_whitespace().collect();
+    let compact = if words.len() > 3 {
+        words[..3].join(" ")
+    } else {
+        clause.to_string()
+    };
+    truncate_task(&compact)
+}
+
+/// Truncate a task name to a reasonable length for commit subjects.
+/// Cuts at sentence boundary (`.`, `—`, `–`) or 60 chars, whichever comes first.
+fn truncate_task(name: &str) -> String {
+    const MAX_LEN: usize = 60;
+    // Find the char boundary at or before MAX_LEN bytes
+    let truncated_at_max = if name.len() <= MAX_LEN {
+        return name.to_string();
+    } else {
+        // Walk chars to find the last valid boundary <= MAX_LEN
+        let mut last_boundary = 0;
+        for (i, _) in name.char_indices() {
+            if i > MAX_LEN {
+                break;
+            }
+            last_boundary = i;
+        }
+        last_boundary
+    };
+    // Try to cut at sentence boundary within the first MAX_LEN bytes
+    let mut last_boundary_pos = None;
+    for (i, c) in name.char_indices() {
+        if i >= truncated_at_max {
+            break;
+        }
+        if c == '.' || c == '—' || c == '–' {
+            last_boundary_pos = Some(i + c.len_utf8());
+        }
+    }
+    if let Some(pos) = last_boundary_pos {
+        let truncated = &name[..pos];
+        if truncated.len() >= 10 {
+            return truncated.to_string();
+        }
+    }
+    // Hard truncate at char boundary
+    format!("{}...", &name[..truncated_at_max])
+}
+
+/// Extract goal metadata from .pi/goals/ JSON files in the staged diff.
+///
+/// When a goal file changes, reads the full file and extracts:
+/// - Goal status, pause/stop reasons
+/// - Token usage and active time
+/// - Per-task evidence and skip reasons
+///
+/// Returns None if no goal files changed or parsing fails.
+fn extract_goal_metadata(repo: &Path) -> Option<GoalMetadata> {
+    // Get list of staged files
+    let files_output =
+        run_git_capture_output(repo, &["diff", "--cached", "--name-only"], "goal-files").ok()?;
+
+    // Find goal files that changed
+    let goal_files: Vec<&str> = files_output
+        .lines()
+        .filter(|f| f.starts_with(".pi/goals/") && f.ends_with(".md"))
+        .collect();
+
+    if goal_files.is_empty() {
+        return None;
+    }
+
+    // Read the first goal file (most recent)
+    let goal_path = repo.join(goal_files[0]);
+    let content = std::fs::read_to_string(&goal_path).ok()?;
+
+    // Parse JSON - goal files have JSON at the top, markdown at the bottom
+    // Find the end of JSON by counting braces
+    let mut depth = 0;
+    let mut json_end = 0;
+    for (i, c) in content.chars().enumerate() {
+        if c == '{' {
+            depth += 1;
+        } else if c == '}' {
+            depth -= 1;
+        }
+        if depth == 0 && i > 0 {
+            json_end = i + 1;
+            break;
+        }
+    }
+
+    if json_end == 0 {
+        return None;
+    }
+
+    let json_str = &content[..json_end];
+    let value: serde_json::Value = serde_json::from_str(json_str).ok()?;
+
+    let mut metadata = GoalMetadata {
+        status: value["status"].as_str().map(String::from),
+        pause_reason: value["pauseReason"].as_str().map(String::from),
+        ..Default::default()
+    };
+
+    if let Some(usage) = value["usage"].as_object() {
+        metadata.tokens_used = usage["tokensUsed"].as_u64();
+        metadata.active_seconds = usage["activeSeconds"].as_u64();
+    }
+
+    // Extract task details
+    if let Some(tasks) = value["taskList"]["tasks"].as_array() {
+        for task in tasks {
+            let detail = TaskDetail {
+                id: task["id"].as_str().unwrap_or("").to_string(),
+                status: task["status"].as_str().unwrap_or("").to_string(),
+                evidence: task["evidence"].as_str().map(String::from),
+                skip_reason: task["skipReason"].as_str().map(String::from),
+            };
+            metadata.task_details.push(detail);
+        }
+    }
+
+    Some(metadata)
+}
+
+/// Detect dependency changes from the staged diff.
+///
+/// Parses Cargo.toml, package.json, requirements.txt, go.mod diffs
+/// to extract specific dependency names that were added or removed.
+///
+/// Returns: `+dep1,+dep2,-dep3` or None if no dep files changed.
+fn detect_dependency_changes(repo: &Path) -> Option<String> {
+    let dep_files: &[(&str, &str)] = &[
+        ("Cargo.toml", "toml"),
+        ("package.json", "json"),
+        ("requirements.txt", "txt"),
+        ("go.mod", "gomod"),
+    ];
+
+    let mut added_deps = Vec::new();
+    let mut removed_deps = Vec::new();
+    let mut any_changed = false;
+
+    for (file, format) in dep_files {
+        // Get the diff for this file
+        let output = match run_git_capture_output(
+            repo,
+            &["diff", "--cached", "--unified=0", "--", file],
+            &format!("dep-diff-{}", file),
+        ) {
+            Ok(o) => o,
+            Err(_) => continue,
+        };
+
+        if output.trim().is_empty() {
+            continue;
+        }
+        any_changed = true;
+
+        // Parse based on format
+        for line in output.lines() {
+            if !line.starts_with('+') && !line.starts_with('-') {
+                continue;
+            }
+            if line.starts_with("+++") || line.starts_with("---") {
+                continue;
+            }
+
+            let is_add = line.starts_with('+');
+            let content = &line[1..].trim();
+
+            let dep_name = match *format {
+                "toml" => parse_cargo_dep(content),
+                "json" => parse_npm_dep(content),
+                "txt" => parse_pip_dep(content),
+                "gomod" => parse_go_dep(content),
+                _ => None,
+            };
+
+            if let Some(name) = dep_name {
+                if is_add {
+                    added_deps.push(name);
+                } else {
+                    removed_deps.push(name);
+                }
+            }
+        }
+    }
+
+    if !any_changed {
+        return None;
+    }
+
+    // If we couldn't parse any actual deps, skip the DEPS indicator
+    // (e.g., version bump in package.json has no actual dependency changes)
+    if added_deps.is_empty() && removed_deps.is_empty() {
+        return None;
+    }
+
+    // Format output
+    let mut parts = Vec::new();
+    for dep in &added_deps {
+        parts.push(format!("+{}", dep));
+    }
+    for dep in &removed_deps {
+        parts.push(format!("-{}", dep));
+    }
+
+    if parts.is_empty() {
+        // Dep file changed but we couldn't parse specific deps
+        Some("changed".to_string())
+    } else {
+        // Limit to top 5 to keep title manageable
+        let display: Vec<String> = parts.iter().take(5).cloned().collect();
+        let suffix = if parts.len() > 5 {
+            format!("+{}more", parts.len() - 5)
+        } else {
+            String::new()
+        };
+        Some(format!("{}{}", display.join(","), suffix))
+    }
+}
+
+/// Parse a Cargo.toml dependency line like `serde = "1.0"` or `tokio = { version = "1" }`
+fn parse_cargo_dep(line: &str) -> Option<String> {
+    let trimmed = line.trim();
+    // Skip section headers and comments
+    if trimmed.starts_with('[') || trimmed.starts_with('#') || trimmed.is_empty() {
+        return None;
+    }
+    // Look for `name = ` pattern
+    if let Some(eq_pos) = trimmed.find('=') {
+        let name = trimmed[..eq_pos].trim();
+        if !name.is_empty()
+            && name
+                .chars()
+                .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
+        {
+            return Some(name.to_string());
+        }
+    }
+    None
+}
+
+/// Parse a package.json dependency line like `"express": "^4.18.0"`
+fn parse_npm_dep(line: &str) -> Option<String> {
+    let trimmed = line.trim();
+    // Look for `"name":` pattern
+    if let Some(colon_pos) = trimmed.find(':') {
+        let key_part = trimmed[..colon_pos].trim();
+        if key_part.starts_with('"') && key_part.ends_with('"') {
+            let name = &key_part[1..key_part.len() - 1];
+            // Skip non-dependency fields
+            if !name.is_empty() && !name.starts_with('_') && name != "name" && name != "version" {
+                return Some(name.to_string());
+            }
+        }
+    }
+    None
+}
+
+/// Parse a requirements.txt line like `requests==2.31.0` or `flask>=2.0`
+fn parse_pip_dep(line: &str) -> Option<String> {
+    let trimmed = line.trim();
+    // Skip comments and empty lines
+    if trimmed.starts_with('#') || trimmed.is_empty() {
+        return None;
+    }
+    // Split on version specifiers
+    let name = trimmed
+        .split(&['=', '>', '<', '!', '~', ';', '['][..])
+        .next()
+        .unwrap_or("")
+        .trim();
+    if !name.is_empty() {
+        return Some(name.to_string());
+    }
+    None
+}
+
+/// Parse a go.mod require line like `github.com/gin-gonic/gin v1.9.1`
+fn parse_go_dep(line: &str) -> Option<String> {
+    let trimmed = line.trim();
+    // Skip comments and empty lines
+    if trimmed.starts_with("//") || trimmed.is_empty() || trimmed == "require" || trimmed == ")" {
+        return None;
+    }
+    // Split on whitespace, take first part (module path)
+    let parts: Vec<&str> = trimmed.split_whitespace().collect();
+    if !parts.is_empty() && parts[0].contains('.') {
+        // Return just the last component of the module path
+        let module = parts[0];
+        let name = module.rsplit('/').next().unwrap_or(module);
+        return Some(name.to_string());
+    }
+    None
+}
+
+/// Extract newly added and deleted files from the staged diff.
+///
+/// Returns (new_files, deleted_files) as vectors of file paths.
+fn extract_new_deleted_files(repo: &Path) -> (Vec<String>, Vec<String>) {
+    let output =
+        match run_git_capture_output(repo, &["diff", "--cached", "--name-status"], "name-status") {
+            Ok(o) => o,
+            Err(_) => return (Vec::new(), Vec::new()),
+        };
+
+    let mut new_files = Vec::new();
+    let mut deleted_files = Vec::new();
+
+    for line in output.lines() {
+        let parts: Vec<&str> = line.split('\t').collect();
+        if parts.len() < 2 {
+            continue;
+        }
+        let status = parts[0];
+        let path = parts[1];
+
+        // Only track source files, not lock files or generated files
+        let should_track = !path.ends_with(".lock")
+            && !path.ends_with(".sum")
+            && !path.contains("/target/")
+            && !path.contains("/node_modules/")
+            && !path.contains("/__pycache__/");
+
+        if !should_track {
+            continue;
+        }
+
+        match status {
+            "A" => new_files.push(path.to_string()),
+            "D" => deleted_files.push(path.to_string()),
+            _ => {} // Modified, renamed, etc.
+        }
+    }
+
+    (new_files, deleted_files)
+}
+
+/// Check if a file path looks like a test file.
+///
+/// Common patterns:
+/// - tests/, test/, __tests__/
+/// - *_test.rs, *_test.py, *_test.go
+/// - *.test.ts, *.test.js, *.spec.ts
+/// - test_*.py, test_*.rs
+fn is_test_file(path: &str) -> bool {
+    let lower = path.to_ascii_lowercase();
+    let basename = path.rsplit('/').next().unwrap_or(path);
+    let basename_lower = basename.to_ascii_lowercase();
+
+    // Directory patterns
+    if lower.contains("/test") || lower.contains("/tests") || lower.contains("/__tests__") {
+        return true;
+    }
+
+    // Suffix patterns (before extension)
+    if basename_lower.contains("_test.")
+        || basename_lower.contains("_tests.")
+        || basename_lower.contains(".test.")
+        || basename_lower.contains(".spec.")
+    {
+        return true;
+    }
+
+    // Prefix patterns
+    if basename_lower.starts_with("test_") {
+        return true;
+    }
+
+    false
+}
+
+/// Get the tag pointing to the current HEAD commit.
+///
+/// Returns the tag name if this commit is tagged, otherwise None.
+/// Uses `git describe --tags --always --exact-match` for exact tag match.
+fn get_current_tag(repo: &Path) -> Option<String> {
+    // First try exact match (HEAD is exactly on a tag)
+    let exact = run_git_capture_output(
+        repo,
+        &["describe", "--tags", "--always", "--exact-match"],
+        "tag-exact",
+    )
+    .ok()?;
+
+    let tag = exact.trim();
+    if !tag.is_empty() && !tag.contains('-') {
+        // Got an exact tag (no commit count suffix)
+        return Some(tag.to_string());
+    }
+
+    // Fall back to --all (check all refs for this commit)
+    let all_tags =
+        run_git_capture_output(repo, &["tag", "--points-at", "HEAD"], "tag-points-at").ok()?;
+
+    // Return the first lightweight tag (ignore annotated ones for simplicity)
+    for line in all_tags.lines() {
+        let tag = line.trim();
+        if !tag.is_empty() && !tag.contains('^') {
+            return Some(tag.to_string());
+        }
+    }
+
+    None
+}
+
+/// Check if any environment files were changed in the staged diff.
+///
+/// Looks for:
+/// - .env, .env.*, .envrc
+/// - .secrets, secrets.*
+/// - config/settings files with secrets patterns
+///
+/// Returns true if any env-like files changed.
+fn has_env_changes(repo: &Path) -> bool {
+    let env_patterns = [
+        ".env", ".env.", // .env.local, .env.production, etc.
+        ".envrc", ".secrets", "secrets.",
+    ];
+
+    let output =
+        match run_git_capture_output(repo, &["diff", "--cached", "--name-only"], "env-check") {
+            Ok(o) => o,
+            Err(_) => return false,
+        };
+
+    for line in output.lines() {
+        let path = line.trim();
+        // Check if file name matches any env pattern
+        let basename = path.rsplit('/').next().unwrap_or(path);
+        for pattern in &env_patterns {
+            if basename.starts_with(pattern) || basename == *pattern {
+                return true;
+            }
+        }
+    }
+
+    false
+}
+
+/// Compute commit message from staged diff.
+///
+/// Returns a structured message with task state + blast radius.
+///
+/// Format: `\[INTENT\] | FILES:N DIRS:X DELTA:+A/-B [TEST:T] [BIN:B]`
+///
+/// INTENT (from markdown diff):
+/// - `CLOSED: task1, task2` — tasks marked `\[x\]`
+/// - `WIP: task1` — tasks marked `\[~\]`
+/// - Omitted if no task transitions found
+///
+/// BLAST RADIUS (from git diff --numstat):
+/// - FILES:N — total files changed
+/// - DIRS:X,Y — top-level directories touched
+/// - DELTA:+A/-B — lines added/removed
+///
+/// METRICS (also from diff):
+/// - TEST:T — lines changed in test files
+/// - BIN:B — binary files changed (context window warning)
+///
+/// # Why mechanical messages?
+///
+/// AI-generated commit messages are bad for AI workflows:
+/// - They hallucinate context and intent
+/// - They try to summarize but AI reads the diff anyway
+/// - They're verbose, inconsistent, and noisy
+///
+/// Simple mechanical facts work better:
+/// - Searchable: `git log --grep="JWT"` finds commits touching that task
+/// - Honest: no interpretation, just data
+/// - Compact: fits in `git log --oneline`
+/// - The AI gets its understanding from the actual diff, not the commit message
+///
+/// The commit message is an INDEX, not a description.
+fn compute_blast_radius(repo: &Path) -> String {
+    let output = match run_git_capture_output(repo, &["diff", "--cached", "--numstat"], "numstat") {
+        Ok(o) => o,
+        Err(_) => return "0 file(s) DELTA:+0/-0".to_string(),
+    };
+
+    let mut files = 0usize;
+    let mut added = 0i64;
+    let mut removed = 0i64;
+    let mut dirs: BTreeSet<String> = BTreeSet::new();
+    let mut file_changes: Vec<(i64, String)> = Vec::new();
+    let mut test_lines = 0i64;
+    let mut binary_count = 0usize;
+
+    for line in output.lines() {
+        let parts: Vec<&str> = line.split('\t').collect();
+        if parts.len() < 3 {
+            continue;
+        }
+        let a = parts[0];
+        let r = parts[1];
+        let path = parts[2];
+
+        // Binary files show as "-" in numstat
+        if a == "-" || r == "-" {
+            binary_count += 1;
+            files += 1;
+            // Still track the directory
+            if let Some(first_component) = path.split('/').next() {
+                if !first_component.is_empty() && first_component != "." {
+                    dirs.insert(first_component.to_string());
+                }
+            }
+            continue;
+        }
+
+        let a_val = a.parse::<i64>().unwrap_or(0);
+        let r_val = r.parse::<i64>().unwrap_or(0);
+
+        added += a_val;
+        removed += r_val;
+        files += 1;
+
+        // Track test file lines separately
+        if is_test_file(path) {
+            test_lines += a_val + r_val;
+        }
+
+        // Extract top-level directory for scope (skip root-level files)
+        if path.contains('/') {
+            if let Some(first_component) = path.split('/').next() {
+                if !first_component.is_empty() && first_component != "." {
+                    dirs.insert(first_component.to_string());
+                }
+            }
+        }
+
+        // Track files for listing (sorted by lines changed)
+        file_changes.push((a_val + r_val, path.to_string()));
+    }
+
+    // Sort by lines changed descending, take top 3
+    file_changes.sort_by_key(|b| std::cmp::Reverse(b.0));
+    let top_files: Vec<String> = file_changes
+        .iter()
+        .take(3)
+        .map(|(_, path)| path.clone())
+        .collect();
+
+    // Build routing key components
+
+    // 1. Task intent (from markdown diff) — cap at 10 tasks per category
+    let transitions = extract_task_transitions(repo);
+    let is_merge = repo.join(".git/MERGE_HEAD").exists();
+    let is_revert = repo.join(".git/REVERT_HEAD").exists();
+    let intent_prefix = if is_merge {
+        "MERGE: | ".to_string()
+    } else if is_revert {
+        "REVERT: | ".to_string()
+    } else {
+        const MAX_TASKS: usize = 10;
+        let mut parts = Vec::new();
+        if !transitions.closed.is_empty() {
+            let shown: Vec<&str> = transitions
+                .closed
+                .iter()
+                .take(MAX_TASKS)
+                .map(|s| s.as_str())
+                .collect();
+            let suffix = if transitions.closed.len() > MAX_TASKS {
+                format!(" +{}more", transitions.closed.len() - MAX_TASKS)
+            } else {
+                String::new()
+            };
+            parts.push(format!("CLOSED: {}{}", shown.join(", "), suffix));
+        }
+        if !transitions.progress.is_empty() {
+            let shown: Vec<&str> = transitions
+                .progress
+                .iter()
+                .take(MAX_TASKS)
+                .map(|s| s.as_str())
+                .collect();
+            let suffix = if transitions.progress.len() > MAX_TASKS {
+                format!(" +{}more", transitions.progress.len() - MAX_TASKS)
+            } else {
+                String::new()
+            };
+            parts.push(format!("WIP: {}{}", shown.join(", "), suffix));
+        }
+        if parts.is_empty() {
+            String::new()
+        } else {
+            format!("{} | ", parts.join(" | "))
+        }
+    };
+
+    // 2. File count and dirs
+    let dirs_str = if dirs.is_empty() {
+        String::new()
+    } else {
+        format!(
+            " in {}",
+            dirs.iter().take(3).cloned().collect::<Vec<_>>().join(",")
+        )
+    };
+
+    // 3. Top changed files
+    let files_str = if top_files.is_empty() {
+        String::new()
+    } else {
+        format!(" [{}]", top_files.join(", "))
+    };
+
+    // 4. Metrics suffix
+    let mut metrics = Vec::new();
+    if test_lines > 0 {
+        metrics.push(format!("TEST:{}", test_lines));
+    }
+    if binary_count > 0 {
+        metrics.push(format!("BIN:{}", binary_count));
+    }
+
+    // 5. New/deleted files
+    let (new_files, deleted_files) = extract_new_deleted_files(repo);
+    if !new_files.is_empty() {
+        // Show top 10 new files (searchable), abbreviate nested paths
+        let display: Vec<String> = new_files
+            .iter()
+            .take(10)
+            .map(|f| {
+                let parts: Vec<&str> = f.split('/').collect();
+                if parts.len() > 2 {
+                    parts[parts.len() - 2..].join("/")
+                } else {
+                    f.clone()
+                }
+            })
+            .collect();
+        let suffix = if new_files.len() > 10 {
+            format!("+{}more", new_files.len() - 10)
+        } else {
+            String::new()
+        };
+        metrics.push(format!("NEW:{}{}", display.join(","), suffix));
+    }
+    if !deleted_files.is_empty() {
+        let display: Vec<String> = deleted_files
+            .iter()
+            .take(10)
+            .map(|f| {
+                let parts: Vec<&str> = f.split('/').collect();
+                if parts.len() > 2 {
+                    parts[parts.len() - 2..].join("/")
+                } else {
+                    f.clone()
+                }
+            })
+            .collect();
+        let suffix = if deleted_files.len() > 10 {
+            format!("+{}more", deleted_files.len() - 10)
+        } else {
+            String::new()
+        };
+        metrics.push(format!("DEL:{}{}", display.join(","), suffix));
+    }
+
+    // 6. Dependency changes
+    if let Some(dep_info) = detect_dependency_changes(repo) {
+        metrics.push(format!("DEPS:{}", dep_info));
+    }
+
+    // 7. Merge/revert detection — merge/revert commits start with MERGE:/REVERT:
+    if !is_merge && repo.join(".git/MERGE_HEAD").exists() {
+        metrics.push("MERGE:".to_string());
+    }
+    if !is_revert && repo.join(".git/REVERT_HEAD").exists() {
+        metrics.push("REVERT:".to_string());
+    }
+
+    // 8. Tag detection — if this commit is tagged, include the tag
+    if let Some(tag) = get_current_tag(repo) {
+        metrics.push(format!("TAG:{}", tag));
+    }
+
+    // 9. Test-only detection — if ALL changed files are test files
+    if !file_changes.is_empty() && file_changes.iter().all(|(_, path)| is_test_file(path)) {
+        let test_files: Vec<String> = file_changes
+            .iter()
+            .take(5)
+            .map(|(_, p)| {
+                let parts: Vec<&str> = p.split('/').collect();
+                if parts.len() > 2 {
+                    parts[parts.len() - 2..].join("/")
+                } else {
+                    p.clone()
+                }
+            })
+            .collect();
+        let suffix = if file_changes.len() > 5 {
+            format!("+{}more", file_changes.len() - 5)
+        } else {
+            String::new()
+        };
+        metrics.push(format!("TESTONLY:{}{}", test_files.join(","), suffix));
+    }
+
+    // 10. Env file detection — if any env files changed
+    if has_env_changes(repo) {
+        metrics.push("ENV:".to_string());
+    }
+
+    // 11. Goal metadata — extract richer context from .pi/goals/ JSON files
+    if let Some(ref goal_meta) = transitions.goal_metadata {
+        // Goal status change
+        if let Some(ref status) = goal_meta.status {
+            if status == "complete" {
+                metrics.push("GOAL:complete".to_string());
+            } else if status == "paused" {
+                metrics.push("GOAL:paused".to_string());
+            }
+        }
+
+        // Pause reason (abbreviated)
+        if let Some(ref reason) = goal_meta.pause_reason {
+            let short_reason = if reason.len() > 50 {
+                format!("{}...", &reason[..47])
+            } else {
+                reason.clone()
+            };
+            metrics.push(format!("PAUSE:{}", short_reason));
+        }
+
+        // Token usage
+        if let Some(tokens) = goal_meta.tokens_used {
+            if tokens > 100_000 {
+                metrics.push(format!("TOKENS:{}K", tokens / 1000));
+            }
+        }
+
+        // Active time
+        if let Some(seconds) = goal_meta.active_seconds {
+            if seconds > 60 {
+                metrics.push(format!("TIME:{}m", seconds / 60));
+            }
+        }
+
+        // Task evidence (completed tasks with evidence)
+        let tasks_with_evidence: Vec<&TaskDetail> = goal_meta
+            .task_details
+            .iter()
+            .filter(|t| t.status == "complete" && t.evidence.is_some())
+            .collect();
+        if !tasks_with_evidence.is_empty() {
+            let evidence_summary: Vec<String> = tasks_with_evidence
+                .iter()
+                .take(3)
+                .map(|t| {
+                    let ev = t.evidence.as_ref().unwrap();
+                    if ev.len() > 40 {
+                        format!("{}:{}", t.id, &ev[..37])
+                    } else {
+                        format!("{}:{}", t.id, ev)
+                    }
+                })
+                .collect();
+            let suffix = if tasks_with_evidence.len() > 3 {
+                format!("+{}more", tasks_with_evidence.len() - 3)
+            } else {
+                String::new()
+            };
+            metrics.push(format!("EVIDENCE:{}{}", evidence_summary.join("|"), suffix));
+        }
+
+        // Skipped tasks with reasons
+        let skipped_tasks: Vec<&TaskDetail> = goal_meta
+            .task_details
+            .iter()
+            .filter(|t| t.status == "skipped" && t.skip_reason.is_some())
+            .collect();
+        if !skipped_tasks.is_empty() {
+            let skip_summary: Vec<String> = skipped_tasks
+                .iter()
+                .take(3)
+                .map(|t| {
+                    let reason = t.skip_reason.as_ref().unwrap();
+                    if reason.len() > 40 {
+                        format!("{}:{}", t.id, &reason[..37])
+                    } else {
+                        format!("{}:{}", t.id, reason)
+                    }
+                })
+                .collect();
+            let suffix = if skipped_tasks.len() > 3 {
+                format!("+{}more", skipped_tasks.len() - 3)
+            } else {
+                String::new()
+            };
+            metrics.push(format!("SKIPPED:{}{}", skip_summary.join("|"), suffix));
+        }
+    }
+
+    let metrics_str = if metrics.is_empty() {
+        String::new()
+    } else {
+        format!(" | {}", metrics.join(" "))
+    };
+
+    format!(
+        "{}{} file(s){}{} DELTA:+{}/-{}{}",
+        intent_prefix, files, dirs_str, files_str, added, removed, metrics_str
+    )
+}
+
+async fn stage_commit_and_push(
+    svc: &GitService,
+    ctx: &mut SyncContext<'_>,
+    _status: &dracon_git::types::RepoStatus,
+    to_stage: &[dracon_git::types::DiffFile],
+    to_restore: &[dracon_git::types::DiffFile],
+) -> Result<Option<SyncOutcome>> {
+    let repo = ctx.repo;
+    let policy = ctx.policy;
+    let dry_run = ctx.dry_run;
+    let has_origin = ctx.has_origin;
+    let _idle_seconds = ctx.idle_seconds;
+
+    let stage_paths: Vec<String> = to_stage
+        .iter()
+        .map(|e| e.path.to_string_lossy().to_string())
+        .collect();
+
+    let (existing, missing): (Vec<_>, Vec<_>) =
+        stage_paths.into_iter().partition(|p| repo.join(p).exists());
+
+    stage_existing_files(repo, &existing, dry_run).await?;
+
+    if !missing.is_empty() {
+        git_rm_missing(repo, &missing, dry_run).await?;
+    }
+
+    let staged = git_name_status_entries(repo, &["diff", "--cached", "--name-status"]).await?;
+    let committed_entries: Vec<dracon_git::types::DiffFile> = staged
+        .into_iter()
+        .map(|(path, status)| dracon_git::types::DiffFile::new(path, status))
+        .collect();
+
+    let blast_radius = compute_blast_radius(repo);
+
+    let version_bumped = false;
+
+    if committed_entries.is_empty() {
+        if let Err(e) = run_git_with_timeout(repo, &["reset", "HEAD", "--"], 10, "reset").await {
+            // Non-fatal: the staging area will be cleaned up on the next sync cycle.
+            // The most common cause is index.lock contention from a concurrent process
+            // (sync-now CLI, warden daemon) holding the lock on the same repo.
+            eprintln!(
+                "⚠️ {} filter-only commit: git reset failed (non-fatal, will retry next cycle): {}",
+                repo.display(),
+                e
+            );
+        }
+        if debug_enabled() {
+            eprintln!(
+                "🐛 {} skipped commit: all changes were filter-only (smudge/clean)",
+                repo.display()
+            );
+        }
+        maybe_sync_visibility_and_metadata(ctx);
+        return Ok(Some(SyncOutcome::NothingToDo));
+    }
+
+    // Use blast radius as commit message
+    let msg = blast_radius;
+
+    if dry_run {
+        println!(
+            "📝 Would commit {} file(s) in {}:",
+            committed_entries.len(),
+            repo.display()
+        );
+        for entry in committed_entries.iter().take(10) {
+            println!("  {:?}: {}", entry.status, entry.path.display());
+        }
+        if committed_entries.len() > 10 {
+            println!("  ... and {} more", committed_entries.len() - 10);
+        }
+        println!("  message: {}", msg.lines().next().unwrap_or("(empty)"));
+    } else {
+        svc.commit(&msg).await?;
+        eprintln!(
+            "📝 committed {} file(s) in {}",
+            committed_entries.len(),
+            repo.display()
+        );
+        // Flush so journald captures commit activity in real-time
+        let _ = std::io::stderr().flush();
+    }
+
+    prune_other_default_branch(repo).await;
+
+    post_commit_pull(svc, repo, policy).await;
+
+    let alert_status = svc.get_status().await?;
+    if alert_status.ahead > policy.alert_unpushed_threshold {
+        eprintln!(
+            "🚨 ALERT: {} has {} unpushed commits (threshold: {}). Something may be wrong with push.",
+            repo.display(),
+            alert_status.ahead,
+            policy.alert_unpushed_threshold
+        );
+    }
+
+    restore_excluded_paths(ctx, to_restore).await?;
+
+    if policy.auto_push && has_origin {
+        // Push synchronously so mirror failures can be tracked in
+        // `ctx.remote_failures` (the caller passes a `&mut HashMap`).
+        // The `tokio::spawn` fire-and-forget pattern was removed because
+        // it bypassed the failure-tracking needed by callers like
+        // `test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBaNHdTUjk5dkkvRk1keEp4VkYvL0tPWi9ha2JoaEZUZzFDc3BIajVkQTM4CnQzdGZpN0hrUjFuaDRIMU53eUVWT1BpWU5qLzgwRHl1YXprMXY4UnAxWGsKLT4gWDI1NTE5IHp3dUxVMm9GcnZEUFRuUWhsVnYvZy9hMkxvdjVISHVSRVNkblZaNFRxVDAKTmVNMFZTZ1dBR3RmV3ZWR3pGZTIrbEsxd3d3Ukx3OHJXaVlKYVk2dDU4YwotPiBYMjU1MTkgU1VYaGxVZWZCTk5NWWVJK24zcDNRckV2MWRUVGFZSTBKUXFyVjZ2am5Bbwpsay9KODJKVGdqWnZqS09ON3lxcm9aNTZDQkpOMmNNMWZLV0ZBUWxZYnlVCi0+IFgyNTUxOSArUEE1Z2tFcDNhalNSRGNLWElpTnJNKzlqdEI2Q0c2WFQ5ZXZSN2RiQm00CnhPd2FJRFNqM2g1c3JkMlRjR21Da2hxVldkZ0xBWGNaTmRyWU9kZkJUaUEKLT4gWDI1NTE5IGFsbUV0RXFIdG5uMEovc0JVemtxems0Q1VkKzVaMVZBNGRuUUNXbXZWMVUKSUFaSW5SM1lEZXh0WnZ3MmZwQ0FjVDlZOE9wR2JwNmxQYVZ2eGtvVElTMAotPiBYMjU1MTkgOXJmWGZ5Sko4TTRZZVFWMmh3aWQzdVhVUk9STTFmTWUzTDlkVElCOHlVZwpUVlF6RjZ4K0xDQmgrZ3ByZ2Q3ZFIvZ29URzRKVkhHcmxpMWY0VS9heGNRCi0+IHshLi1ncmVhc2UgNipgVWk7eU8gPm9VIFEpLVRJClZodGJ0ODRpNHRIT3JMakJHbmZHeUxmK2VWVVcxV3NLYWcKLS0tIG5RSEFtSnNHRlF1MG9hMGZkQWdnOFlGQ2RpbHZ0dEJ3aGo5YVV4MUYxaTQKPITHUppq876MbTuiGEpdhB5XshTOoS5t5XZXri/JNS1uylDo81Ey7I+5dXmEV2BeQnEa6XobGD0P]`.
+        match push_background(repo, policy, ctx.remote_failures.as_deref_mut()).await {
+            Ok(true) => {}
+            Ok(false) => eprintln!("⚠️ push failed for {}", repo.display()),
+            Err(e) => eprintln!("⚠️ push error for {}: {}", repo.display(), e),
+        }
+    }
+
+    run_release_pipeline_if_bumped(repo, policy, version_bumped).await;
+
+    Ok(None)
+}
+
+pub(crate) async fn sync_repo(
+    repo: &Path,
+    policy: &SyncPolicy,
+    excluded_dir_names: &BTreeSet<String>,
+    idle_seconds: u64,
+    remote_failures: Option<&mut HashMap<String, usize>>,
+    dry_run: bool,
+    policy_path: Option<&Path>,
+) -> Result<SyncOutcome> {
+    let svc = GitService::new(repo)?;
+    if !svc.is_git_repo().await? {
+        if debug_enabled() {
+            eprintln!("🐛 {} is not recognized as git repo", repo.display());
+        }
+        let ctx = SyncContext {
+            repo,
+            policy,
+            excluded_dir_names,
+            dry_run,
+            idle_seconds,
+            policy_path,
+            has_origin: false,
+            has_upstream: false,
+            auto_bump_versions: false,
+            remote_failures: None,
+        };
+        maybe_sync_visibility_and_metadata(&ctx);
+        return Ok(SyncOutcome::NothingToDo);
+    }
+
+    if let Some(blocked) = check_conflict_state(repo) {
+        let ctx = SyncContext {
+            repo,
+            policy,
+            excluded_dir_names,
+            dry_run,
+            idle_seconds,
+            policy_path,
+            has_origin: false,
+            has_upstream: false,
+            auto_bump_versions: false,
+            remote_failures: None,
+        };
+        maybe_sync_visibility_and_metadata(&ctx);
+        return Ok(blocked);
+    }
+
+    if !is_repo_ready(repo) {
+        // Empty repo (no commits) — create initial commit so auto-create can push
+        if !dry_run {
+            let git_bin = crate::policy::git_binary();
+            let has_files = std::fs::read_dir(repo)
+                .map(|mut dirs| dirs.any(|e| e.ok().is_some_and(|e| e.file_name() != ".git")))
+                .unwrap_or(false);
+            if has_files {
+                let _ = std::process::Command::new(&git_bin)
+                    .args(["add", "-A"])
+                    .current_dir(repo)
+                    .output();
+                let _ = std::process::Command::new(&git_bin)
+                    .args(["commit", "--no-verify", "-m", "initial"])
+                    .current_dir(repo)
+                    .output();
+                eprintln!("📝 {} created initial commit (empty repo)", repo.display());
+            } else {
+                eprintln!(
+                    "⏳ {} not ready (mid-clone or empty repo), skipping",
+                    repo.display()
+                );
+                return Ok(SyncOutcome::NothingToDo);
+            }
+        } else {
+            return Ok(SyncOutcome::NothingToDo);
+        }
+    }
+
+    let has_origin = ensure_origin_remote(repo, policy);
+    let has_upstream = has_tracking_upstream(repo);
+    let initial_status = svc.get_status().await?;
+
+    let repo_override = load_repo_override(repo);
+    let auto_bump_versions = repo_override
+        .auto_bump_versions
+        .unwrap_or(policy.auto_bump_versions);
+
+    let mut ctx = SyncContext {
+        repo,
+        policy,
+        excluded_dir_names,
+        dry_run,
+        idle_seconds,
+        policy_path,
+        has_origin,
+        has_upstream,
+        auto_bump_versions,
+        remote_failures,
+    };
+
+    let copied_standard_files = if policy.standard_files_auto {
+        // Acquire git's index.lock before writing standard files to the working tree.
+        // This prevents conflicting with git's own checkout during clone — if git
+        // holds the lock, we skip; if we hold it, git waits. No heuristics needed.
+        match crate::git::IndexLock::acquire(repo) {
+            Ok(_lock) => crate::standard_files::ensure_standard_files(
+                repo,
+                policy,
+                &repo_override,
+                policy_path.map(|p| p.parent().unwrap_or(p)),
+                dry_run,
+            )?,
+            Err(e) => {
+                if crate::policy::debug_enabled() {
+                    eprintln!("⏳ {}", e);
+                }
+                vec![] // skip standard files this cycle
+            }
+        }
+    } else {
+        vec![]
+    };
+
+    if !copied_standard_files.is_empty() && !dry_run {
+        let paths: Vec<String> = copied_standard_files
+            .iter()
+            .map(|p| p.to_string_lossy().to_string())
+            .collect();
+        stage_existing_files(repo, &paths, dry_run).await?;
+    }
+
+    auto_pull_merge(&svc, &ctx, &initial_status).await?;
+
+    clean_staged_paths(&ctx).await?;
+
+    let DiffResult {
+        status,
+        entries,
+        filter_only_cleared,
+    } = compute_diff_entries(&svc, repo).await?;
+
+    // filter_only_cleared: changes present but all filtered out by clean/smudge.
+    // Don't stage/commit — return NothingToDo so the daemon applies a cooldown.
+    if filter_only_cleared {
+        if debug_enabled() {
+            eprintln!(
+                "🐛 {} filter-only dirty, returning NothingToDo for cooldown",
+                repo.display(),
+            );
+        }
+        return Ok(SyncOutcome::NothingToDo);
+    }
+
+    if !status.is_clean && policy.auto_commit {
+        let (to_stage, to_restore): (Vec<_>, Vec<_>) = entries
+            .into_iter()
+            .filter(|e| {
+                if repo.join(&e.path).is_dir()
+                    && crate::exclude::is_gitlink_unchanged(repo, &e.path)
+                {
+                    return false;
+                }
+                true
+            })
+            .partition(|e| {
+                should_stage_entry(
+                    repo,
+                    e,
+                    excluded_dir_names,
+                    &policy.exclude_file_patterns,
+                    policy.max_stage_file_bytes,
+                )
+            });
+        if debug_enabled() {
+            eprintln!(
+                "🐛 {} to_stage={} to_restore={}",
+                repo.display(),
+                to_stage.len(),
+                to_restore.len()
+            );
+        }
+        if !to_stage.is_empty() {
+            if let Some(outcome) =
+                stage_commit_and_push(&svc, &mut ctx, &status, &to_stage, &to_restore).await?
+            {
+                return Ok(outcome);
+            }
+        } else if policy.auto_push && !has_origin {
+            eprintln!("ℹ️ skip push for {} (no origin remote)", repo.display());
+        }
+
+        return Ok(SyncOutcome::Synced);
+    }
+
+    maybe_sync_visibility_and_metadata(&ctx);
+
+    handle_ahead_push(&mut ctx, &svc).await?;
+
+    maybe_sync_visibility_and_metadata(&ctx);
+    Ok(SyncOutcome::NothingToDo)
+}
+
+async fn handle_ahead_push(ctx: &mut SyncContext<'_>, svc: &GitService) -> Result<()> {
+    let current_status = svc.get_status().await?;
+    let branch_has_upstream = super::git::has_tracking_upstream(ctx.repo);
+    let should_push = current_status.ahead > 0 || !branch_has_upstream;
+    if ctx.policy.auto_push && should_push && ctx.has_origin {
+        // Push synchronously so mirror failures are tracked in
+        // `ctx.remote_failures`. Previously this used `tokio::spawn`
+        // (fire-and-forget), which made the failure tracking unreachable
+        // for callers like the test `test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB4UUl1M0xCNUJCN29TZlNYcmR1ZkhRdmdmWkN3NWZjYysxcDVxanNvODJnCkFvZ1NaOGpMSWxubnFhNlBxTW1HZDd0NW4zd0tkOFJ3dmM5UFkxbnplN3MKLT4gWDI1NTE5IHVQV3VNam5vbUx0ZnVtUUJFaThtTk9raHlwMDBQQU80Wlh0Q0Q0RFF3SHMKUnljNit0RVpNRGVLaG9JdHhscnF3dTZVL3JtajRUK0c3Zk9OWStwTkpCMAotPiBYMjU1MTkgdGZRVHdBZ2lHSS9BajRicE9RMENON3dtMGtvNEZuMndHVVVWK0QyTHcyNAppLzZiWm1VSGhvRXFLMDhXTXROL0R0MEpWLzI5VmlIenNnUGErZWRjYWQ4Ci0+IFgyNTUxOSBEQkZuQkVtVE5CUU15UmJySXM4S3lRSVJ6Y2ZGUnR4MTVqN0pCNHU5aHhVCmxaQ3BZOWpCTVNWM0hvZkVrOE91bkZ4bCtLcStudkhHaVNxWmh5VXZwRk0KLT4gWDI1NTE5IDFSRjZqMjlZeFBnSmNtS292K21KcXZ3dkROUXg2dmRveVY3Y0J1d2Z1aUEKb3k2Y2lvU255RS9EOHRENHQ5QzJXYSthTTJkYys1czhLZk82dEpuTnBkSQotPiBYMjU1MTkgWG12MnVxRU44REExU1YyakMvODJoaGI4NjVIUEMvVzk1anV2NHRUYkJGUQpZMWJRc2VUNk94cXcvV3R4WHpEcktMZWVNWlY0NVJrRVhyc2UweWRCUVVVCi0+IE1CQlcqLWdyZWFzZSBIKD5SU35DCnpGZFFUS2RxQXFEV2tpaGZSTHZUeVVzMXdybXlrSmlNbVprS3hXMVMvUHlXOVFLdFNLODhsQnZML015V3YrU3UKUW5YRFZYOHRCbkF1Ylc3UWI3V2VOZ3hadDlWMGhzVEVOUDdOCi0tLSBCNnVkVTFRc2RqSkRjUjcrRDB2QmxLQzE4ZEdLLzdJbFpDZ1JzS09wOHVRCvV8Ba3RZybzr/hEU5M9F2rJ5EwtkbMh9nknPN+Ti33xsBe+6jJ2DGL5d65GfK5Cb/zVSm/L7DjYpQ==]`.
+        match push_background(ctx.repo, ctx.policy, ctx.remote_failures.as_deref_mut()).await {
+            Ok(true) => {}
+            Ok(false) => eprintln!("⚠️ push failed for {}", ctx.repo.display()),
+            Err(e) => eprintln!("⚠️ push error for {}: {}", ctx.repo.display(), e),
+        }
+    } else if ctx.policy.auto_push && should_push && !ctx.has_origin {
+        eprintln!("ℹ️ skip push for {} (no origin remote)", ctx.repo.display());
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sanitize_task_name_drops_explanatory_clauses() {
+        assert_eq!(
+            sanitize_task_name("Fix A: Added .dracon/ and .pub to NOISE_PATTERNS in bump.rs"),
+            "Fix A"
+        );
+        assert_eq!(
+            sanitize_task_name("Stale focus detection — details were noisy"),
+            "Stale focus detection"
+        );
+        assert_eq!(
+            sanitize_task_name("merge: resolve conflicts from parallel sessions"),
+            "merge"
+        );
+    }
+
+    #[test]
+    fn test_sanitize_task_name_limits_plain_text() {
+        assert_eq!(
+            sanitize_task_name("Added .dracon/ and .pub to NOISE_PATTERNS in bump.rs"),
+            "Added .dracon/ and"
+        );
+    }
+
+    #[test]
+    fn test_compute_blast_radius_merge_prefix() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path();
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "main"])
+            .arg(repo)
+            .status()
+            .unwrap();
+        std::fs::write(repo.join("file.txt"), "change").unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "add", "file.txt"])
+            .status()
+            .unwrap();
+        std::fs::create_dir(repo.join(".git")).ok();
+        std::fs::write(repo.join(".git/MERGE_HEAD"), "abc123").unwrap();
+
+        let msg = compute_blast_radius(repo);
+        assert!(msg.starts_with("MERGE: | "));
+    }
+
+    #[test]
+    fn test_truncate_task_multibyte_utf8() {
+        // Regression: em dash (—) is 3 bytes. Truncating at byte boundary
+        // inside it caused "not a char boundary" panic.
+        let input = "T-001 Set Tauri CSP — Replaced \"csp\": null with strict policy including wasm-unsafe-eval";
+        let result = truncate_task(input);
+        assert!(result.len() <= 64); // 60 + "..."
+        assert!(!result.ends_with('\u{200B}')); // no broken chars
+                                                // Should cut at the em dash boundary
+        assert!(result.contains('—') || result.ends_with("..."));
+    }
+
+    #[test]
+    fn test_truncate_task_short() {
+        let input = "short task";
+        assert_eq!(truncate_task(input), "short task");
+    }
+
+    #[test]
+    fn test_truncate_task_at_sentence_boundary() {
+        let input = "Fix the bug. Now add tests for the fix and update documentation.";
+        let result = truncate_task(input);
+        assert!(result.ends_with('.'));
+        assert!(result.len() <= 64);
+    }
+
+    #[test]
+    fn test_truncate_task_hard_cutoff() {
+        let input = "This is a very long task name that has no sentence boundaries and just keeps going and going and going";
+        let result = truncate_task(input);
+        assert!(result.ends_with("..."));
+        assert!(result.len() <= 64);
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_auto_github_private_graceful_on_no_gh() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+
+        let toml_str = r#"
+auto_github_private = true
+auto_github_private_account = "TestAccount"
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(
+            result.is_ok(),
+            "sync_repo should handle missing gh gracefully: {:?}",
+            result
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_auto_commit_creates_commit() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+
+        // Create and stage a modified file
+        let file_path = repo.join("test.txt");
+        std::fs::write(&file_path, "hello world").unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "add", "test.txt"])
+            .status()
+            .unwrap();
+
+        // Count commits before sync
+        let commits_before = crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "rev-list", "--count", "HEAD"])
+            .output()
+            .unwrap()
+            .stdout;
+        let count_before: usize = String::from_utf8_lossy(&commits_before)
+            .trim()
+            .parse()
+            .unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = true
+auto_pull = false
+auto_push = false
+auto_bump_versions = false
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(result.is_ok(), "sync_repo should succeed: {:?}", result);
+
+        // Verify a commit was created
+        let commits_after = crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "rev-list", "--count", "HEAD"])
+            .output()
+            .unwrap()
+            .stdout;
+        let count_after: usize = String::from_utf8_lossy(&commits_after)
+            .trim()
+            .parse()
+            .unwrap();
+        assert_eq!(
+            count_after,
+            count_before + 1,
+            "sync_repo should have created one new commit (before={}, after={})",
+            count_before,
+            count_after
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_skips_rebase_in_progress() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+
+        // Simulate rebase in progress
+        std::fs::create_dir_all(repo.join(".git/rebase-merge")).unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = true
+auto_pull = false
+auto_push = false
+auto_bump_versions = false
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(
+            result.is_ok(),
+            "sync_repo should succeed even during rebase"
+        );
+        assert!(
+            matches!(result, Ok(SyncOutcome::Blocked)),
+            "rebase should cause early return (nothing synced)"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_skips_merge_in_progress() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+
+        // Simulate merge in progress
+        std::fs::write(repo.join(".git/MERGE_HEAD"), "abc123\n").unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = true
+auto_pull = false
+auto_push = false
+auto_bump_versions = false
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(result.is_ok(), "sync_repo should succeed even during merge");
+        assert!(
+            matches!(result, Ok(SyncOutcome::Blocked)),
+            "merge should cause early return (nothing synced)"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_skips_cherry_pick_in_progress() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+
+        // Simulate cherry-pick in progress
+        std::fs::write(repo.join(".git/CHERRY_PICK_HEAD"), "abc123\n").unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = true
+auto_pull = false
+auto_push = false
+auto_bump_versions = false
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(
+            result.is_ok(),
+            "sync_repo should succeed even during cherry-pick"
+        );
+        assert!(
+            matches!(result, Ok(SyncOutcome::Blocked)),
+            "cherry-pick should cause early return (nothing synced)"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_auto_commit_creates_commit_for_dirty_repo() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+
+        // Create a dirty file
+        std::fs::write(repo.join("dirty.txt"), "modified content\n").unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = true
+auto_pull = false
+auto_push = false
+auto_bump_versions = false
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(result.is_ok(), "sync_repo should succeed: {:?}", result);
+        assert!(
+            matches!(result, Ok(SyncOutcome::Synced)),
+            "dirty repo with auto_commit should sync"
+        );
+
+        // Verify commit was made
+        let output = crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "log", "--oneline"])
+            .output()
+            .unwrap();
+        let log = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            log.lines().count() >= 2,
+            "should have at least 2 commits (init + auto-commit)"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_clean_repo_returns_false() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = true
+auto_pull = false
+auto_push = false
+auto_bump_versions = false
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(result.is_ok(), "sync_repo should succeed");
+        assert!(
+            matches!(result, Ok(SyncOutcome::NothingToDo)),
+            "clean repo should return false (nothing to sync)"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_stages_and_commits_untracked_file() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+
+        // Create untracked file
+        std::fs::write(repo.join("newfile.txt"), "new content\n").unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = true
+auto_pull = false
+auto_push = false
+auto_bump_versions = false
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(result.is_ok(), "sync_repo should succeed: {:?}", result);
+        assert!(
+            matches!(result, Ok(SyncOutcome::Synced)),
+            "untracked file should be staged and committed"
+        );
+
+        // Verify file is tracked
+        let output = crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "ls-files"])
+            .output()
+            .unwrap();
+        let tracked = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            tracked.contains("newfile.txt"),
+            "newfile.txt should be tracked"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_skip_pull_when_not_behind() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = false
+auto_pull = true
+auto_push = false
+auto_bump_versions = false
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(result.is_ok(), "sync_repo should succeed");
+        assert!(
+            matches!(result, Ok(SyncOutcome::NothingToDo)),
+            "not behind should return false (nothing to pull)"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_skip_pull_when_dirty() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+
+        std::fs::write(repo.join("dirty.txt"), "modified\n").unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = false
+auto_pull = true
+auto_push = false
+auto_bump_versions = false
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(result.is_ok(), "sync_repo should succeed with dirty repo");
+        assert!(
+            matches!(result, Ok(SyncOutcome::NothingToDo)),
+            "dirty repo should skip pull and return false"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_skip_push_when_no_origin() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = false
+auto_pull = false
+auto_push = true
+auto_bump_versions = false
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(result.is_ok(), "sync_repo should succeed without origin");
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_skip_push_when_no_upstream() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = false
+auto_pull = false
+auto_push = true
+auto_bump_versions = false
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(result.is_ok(), "sync_repo should succeed without upstream");
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_mirror_push_failure_returns_false() {
+        let tmp = tempfile::tempdir().unwrap();
+        let origin_bare = tmp.path().join("origin.git");
+        crate::git::git_cmd()
+            .args(["init", "--bare", "-q", "-b", "master"])
+            .arg(&origin_bare)
+            .status()
+            .unwrap();
+
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "remote",
+                "add",
+                "origin",
+                &origin_bare.to_string_lossy(),
+            ])
+            .status()
+            .unwrap();
+
+        // Point mirror to non-existent path so push fails
+        let bad_mirror = tmp.path().join("nonexistent-mirror.git");
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "remote",
+                "add",
+                "mirror",
+                &bad_mirror.to_string_lossy(),
+            ])
+            .status()
+            .unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = false
+auto_pull = false
+auto_push = true
+auto_bump_versions = false
+
+[[remotes]]
+name = "mirror"
+push_url = "git@nonexistent.example.com:repo.git"
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(result.is_ok(), "sync_repo should not error");
+        assert!(
+            matches!(result, Ok(SyncOutcome::NothingToDo)),
+            "mirror push failure should return false (hard fail)"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBsSUs2L2o1akEyMGRpbkQwTUtIbFFNUlhhN2RLcVpOTFVxalFWVXF4RWljCmRFYllRZ2t3ZXJpY1IwM3ZrTkZIbEs0L1lLNkVLalRxWVpxVnd3Y3BLQ1kKLT4gWDI1NTE5IDR2b1h6cEpxL3RLUk1JdmFwWWptMzh2bUVlM0d4blg0UDNqNmlCOW5heEkKL2xsYmhBbW9UUVVKa3dhMUZsMktjUUJuSXZPMS9sQmtHTFAva1Y2ZzhhOAotPiBYMjU1MTkgc3V6MDBxc2tSMVBPdUFYWTVkL3dtanc0TUdUUHBhUlR0RFAzdGZndHdqMApFUGoxenE5THRubEsxajZCVDNocDg0QlJYWXFON2tweVI1dk02ZlhiSDE0Ci0+IFgyNTUxOSBkWDBWTjN2SXNVbVQwNGNIaE1hUDNzWEpZK1ZwRGxkcHRzdmdNc3lCZkJ3CmdEcmxIc2NSbmtsbWxRYmVLeWVwL1lTYkRPazFLcS9LTldpVFZyaU0yK2sKLT4gWDI1NTE5IERaK2hhWFlKWEFZcURxdFVuUi9TSjdIMllUbFJmUzErTnprSTJMVzlKVWMKdnNPcmViNGtqOW40TU0rdi9ZM1Q2d3ZwNS9Dem8zajdxZ0RLUE9YcE9GVQotPiBYMjU1MTkgdnZ4WGtraXB6bEFMMFRvVit2VnRURjVXUVNjZWhuK0dUbDIyT21VTVV5dwpTY0l4c0N0QXRNcFl1eEpoY3I2M3dXUTVROTFZWGZSUlZHR3h1bTZqUzhjCi0+IExILWdyZWFzZSAjRCB8UF8KVCtzOVlCdUNXNHJ6Q2RCK2RtZmpkTjgKLS0tIHdRVWNCS2hxaE5WMW5iNjFqY0I3VG96UjVXcWVFakxTT1NpVGVxRVpkamMKNKEb5kdEogltHwk1PUCzYyA5etjltY1Q2DrPEiwohZMuvaLXGwNZV0/8Hvc52BxJXxueP1q3vnA3]() {
+        let tmp = tempfile::tempdir().unwrap();
+        let origin_bare = tmp.path().join("origin.git");
+        crate::git::git_cmd()
+            .args(["init", "--bare", "-q", "-b", "master"])
+            .arg(&origin_bare)
+            .status()
+            .unwrap();
+
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "remote",
+                "add",
+                "origin",
+                &origin_bare.to_string_lossy(),
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "push",
+                "-u",
+                "origin",
+                "master",
+            ])
+            .status()
+            .unwrap();
+
+        std::fs::write(repo.join("change.txt"), "changed\n").unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = true
+auto_pull = false
+auto_push = true
+auto_bump_versions = false
+
+[[remotes]]
+name = "bad-mirror"
+push_url = "git@nonexistent.example.com:repo.git"
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let mut remote_failures = HashMap::new();
+        let result = sync_repo(
+            &repo,
+            &policy,
+            &BTreeSet::new(),
+            0,
+            Some(&mut remote_failures),
+            false,
+            None,
+        )
+        .await;
+        assert!(result.is_ok());
+        assert!(
+            matches!(result.unwrap(), SyncOutcome::Synced),
+            "mirror push failure should still return Synced (origin push succeeded)"
+        );
+        assert_eq!(
+            remote_failures.get("bad-mirror"),
+            Some(&1),
+            "bad-mirror failure should be tracked"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_mirror_push_success_returns_true() {
+        let tmp = tempfile::tempdir().unwrap();
+        let origin_bare = tmp.path().join("origin.git");
+        let mirror_bare = tmp.path().join("mirror.git");
+        crate::git::git_cmd()
+            .args(["init", "--bare", "-q", "-b", "master"])
+            .arg(&origin_bare)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["init", "--bare", "-q", "-b", "master"])
+            .arg(&mirror_bare)
+            .status()
+            .unwrap();
+
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "remote",
+                "add",
+                "origin",
+                &origin_bare.to_string_lossy(),
+            ])
+            .status()
+            .unwrap();
+        // Push initial commit to origin so upstream is set
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "push",
+                "-u",
+                "origin",
+                "master",
+            ])
+            .status()
+            .unwrap();
+
+        // Make repo dirty so sync creates a commit and pushes
+        std::fs::write(repo.join("change.txt"), "changed\n").unwrap();
+
+        let toml_str = format!(
+            r#"
+auto_github_private = false
+auto_commit = true
+auto_pull = false
+auto_push = true
+auto_bump_versions = false
+
+[[remotes]]
+name = "mirror"
+push_url = "{}"
+"#,
+            mirror_bare.to_string_lossy().replace("\\", "/")
+        );
+        let policy: SyncPolicy = toml::from_str(&toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(result.is_ok(), "sync_repo should not error: {:?}", result);
+        assert!(
+            matches!(result, Ok(SyncOutcome::Synced)),
+            "mirror push success should return true"
+        );
+    }
+
+    fn init_test_repo(tmp: &tempfile::TempDir, name: &str) -> std::path::PathBuf {
+        let repo = tmp.path().join(name);
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+        repo
+    }
+
+    fn git_cmd(repo: &Path, args: &[&str]) -> std::process::Output {
+        let repo_str = repo.to_string_lossy().to_string();
+        let mut cmd = crate::git::git_cmd();
+        cmd.arg("-C").arg(&repo_str);
+        for a in args {
+            cmd.arg(a);
+        }
+        cmd.output().unwrap()
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_not_git_repo_returns_false() {
+        let tmp = tempfile::tempdir().unwrap();
+        let not_repo = tmp.path().join("not-a-repo");
+        std::fs::create_dir_all(&not_repo).unwrap();
+
+        let toml_str = r#"
+        auto_github_private = false
+        auto_commit = true
+        auto_pull = false
+        auto_push = false
+        auto_bump_versions = false
+        "#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&not_repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(result.is_ok(), "sync_repo should not error on non-git dir");
+        assert!(
+            matches!(result, Ok(SyncOutcome::NothingToDo)),
+            "non-git dir should return false"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_single_deleted_file_committed() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "single-del-repo");
+
+        std::fs::write(repo.join("keep.txt"), "keep\n").unwrap();
+        std::fs::write(repo.join("remove.txt"), "remove\n").unwrap();
+        git_cmd(&repo, &["add", "-A"]);
+        git_cmd(&repo, &["commit", "--no-verify", "-m", "add files"]);
+
+        std::fs::remove_file(repo.join("remove.txt")).unwrap();
+
+        let toml_str = r#"
+        auto_github_private = false
+        auto_commit = true
+        auto_pull = false
+        auto_push = false
+        auto_bump_versions = false
+        "#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(result.is_ok(), "sync_repo should succeed");
+        assert!(
+            matches!(result, Ok(SyncOutcome::Synced)),
+            "single deletion should be committed"
+        );
+
+        let output = git_cmd(&repo, &["ls-files"]);
+        let tracked = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            tracked.contains("keep.txt"),
+            "keep.txt should still be tracked"
+        );
+        assert!(
+            !tracked.contains("remove.txt"),
+            "remove.txt should be removed from index"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_partial_deletion_allowed() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "partial-del-repo");
+
+        std::fs::write(repo.join("a.txt"), "a\n").unwrap();
+        std::fs::write(repo.join("b.txt"), "b\n").unwrap();
+        std::fs::write(repo.join("c.txt"), "c\n").unwrap();
+        git_cmd(&repo, &["add", "-A"]);
+        git_cmd(&repo, &["commit", "--no-verify", "-m", "add files"]);
+
+        // Delete 2 of 3 files (66% — should be ALLOWED, only 100% wipe is blocked)
+        std::fs::remove_file(repo.join("a.txt")).unwrap();
+        std::fs::remove_file(repo.join("b.txt")).unwrap();
+
+        let toml_str = r#"
+        auto_github_private = false
+        auto_commit = true
+        auto_pull = false
+        auto_push = false
+        auto_bump_versions = false
+        "#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(result.is_ok(), "sync_repo should succeed");
+        assert!(
+            matches!(result, Ok(SyncOutcome::Synced)),
+            "partial deletion should be committed (not blocked)"
+        );
+
+        // Verify deleted files are removed from tracking (deletion WAS committed)
+        let output = git_cmd(&repo, &["ls-files"]);
+        let tracked = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            !tracked.contains("a.txt"),
+            "a.txt should be removed after partial deletion commit"
+        );
+        assert!(
+            !tracked.contains("b.txt"),
+            "b.txt should be removed after partial deletion commit"
+        );
+        assert!(tracked.contains("c.txt"), "c.txt should still be tracked");
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_exac[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAyUzQ4VTJLRVlReE5GSHBwa3pYMThjYk9iM0t5T1lvUUd2bVdueld2UVV3Cm1LK0t0SjRVTWJpdy9sWEVqcE1QeVN2MXhXM0xXTGJUbkdPanBYZW1sVkkKLT4gWDI1NTE5IFZVeVA3R0tINU9POHZWbVVnV2RFdXB0WG80Z0tUbWFmNmZTTHhYNW1KeHcKZFFCMDBaSzdCVnNsbzFOZ2dxQnRmdkU4S1dSSmxzS1VIOVptaVZ4ZDJSdwotPiBYMjU1MTkgWW51cUpsVU81aEYwSzgwNVVVdndlQXpvSVNGUG9hTVE2WUhFOXJLQjJIWQpYaVJ3L2NIWUJOVThFTWdGV3l5Mm95Z29wc0lrQ2pSQlFCcVZIZ2toM0tvCi0+IFgyNTUxOSBtVlg1ME12T2xnTFR6KzRCMW9weE5XeUJtcGFmbXVweEY4ejBpQWFMVmlFCk1rbDFxcWI4OXplYzhTMHRnTWtXcU5tNXFsOCtuNGwxUVUyYjM1QWI4K1kKLT4gWDI1NTE5IFI4anl6eFhyNysyelA2WDZWV0RxbkFHeU5iZjFhcWZhTk9iaVY3RHNvRDgKZ0ZkZDczNmtjV1JxRHVJM2grczg5RWVjajVHMEpKZ1dBZVZEYVFjdTd6awotPiBYMjU1MTkgSXVBTm9CRERuM01ZWWl5RkxEOEg4Tld6ODBxVm1jblMxYnUvamNxbGdBMAplRnVLV013UnpjWUZjUmw2dmJ3ZTNhMkZTY1k4TU10ZmdqWVFEaTNvT0M4Ci0+IERkIjloLWdyZWFzZSBPdl9nfnYkTSA5YTFhJiFkPiB6UkEqVXxtCmJGckw3RzVKam9VVHF4VTgvRFFCL0YxcHUxSU9sWHlGL1NnM0NzV3RZVkcyY0Z2c0U4ci9MUnN5b1h6N2N6eHoKcWNXWm00UGo2S1Z4VE1Hd0VHckt1dwotLS0gOTVYdENCbksxU2szc29SWmNwOWcyMHFLbU9ZS0h0NkxIRWRNZlBRQlNRNAoRs/mbBzR1Bt0QqeLKa7O79vPOF5UFivcSToq3trFVW/uK705GRGQcoAoap/H+SjABZSMoO8p0JIvWplmLVLc=]() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "exact-50-del-repo");
+
+        std::fs::write(repo.join("a.txt"), "a\n").unwrap();
+        std::fs::write(repo.join("b.txt"), "b\n").unwrap();
+        git_cmd(&repo, &["add", "-A"]);
+        git_cmd(&repo, &["commit", "--no-verify", "-m", "add files"]);
+
+        // Delete exactly 1 of 2 files (50% — at threshold, should be ALLOWED)
+        std::fs::remove_file(repo.join("a.txt")).unwrap();
+
+        let toml_str = r#"
+        auto_github_private = false
+        auto_commit = true
+        auto_pull = false
+        auto_push = false
+        auto_bump_versions = false
+        "#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(result.is_ok(), "sync_repo should succeed");
+        assert!(
+            matches!(result, Ok(SyncOutcome::Synced)),
+            "exactly 50% deletion should be committed (not blocked)"
+        );
+
+        let output = git_cmd(&repo, &["ls-files"]);
+        let tracked = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            !tracked.contains("a.txt"),
+            "a.txt should be removed after 50% deletion commit"
+        );
+        assert!(tracked.contains("b.txt"), "b.txt should still be tracked");
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_empty_repo_no_panic() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "empty-repo");
+
+        // Repo has only the empty initial commit, no tracked files
+        let toml_str = r#"
+        auto_github_private = false
+        auto_commit = true
+        auto_pull = false
+        auto_push = false
+        auto_bump_versions = false
+        "#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(result.is_ok(), "sync_repo should not panic on empty repo");
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_unstages_excluded_dir_paths() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "exclude-dir-repo");
+
+        std::fs::create_dir_all(repo.join("node_modules/pkg")).unwrap();
+        std::fs::write(
+            repo.join("node_modules/pkg/index.js"),
+            "module.exports = {};\n",
+        )
+        .unwrap();
+        std::fs::create_dir_all(repo.join("src")).unwrap();
+        std::fs::write(repo.join("src/main.rs"), "fn main() {}\n").unwrap();
+        git_cmd(&repo, &["add", "-A"]);
+        git_cmd(&repo, &["commit", "--no-verify", "-m", "initial"]);
+
+        std::fs::write(repo.join("node_modules/pkg/index.js"), "updated\n").unwrap();
+        std::fs::write(
+            repo.join("src/main.rs"),
+            "fn main() { println!(\"hello\"); }\n",
+        )
+        .unwrap();
+        git_cmd(&repo, &["add", "-A"]);
+
+        let mut excluded = BTreeSet::new();
+        excluded.insert("node_modules".to_string());
+
+        let toml_str = r#"
+        auto_github_private = false
+        auto_commit = true
+        auto_pull = false
+        auto_push = false
+        auto_bump_versions = false
+        "#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &excluded, 0, None, false, None).await;
+        assert!(result.is_ok(), "sync_repo should succeed");
+
+        let output = git_cmd(&repo, &["log", "--oneline", "-1"]);
+        let last_commit = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            !last_commit.is_empty(),
+            "should have committed the non-excluded change"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_unstages_oversized_file() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "oversized-repo");
+
+        std::fs::write(repo.join("small.txt"), "small content\n").unwrap();
+        git_cmd(&repo, &["add", "-A"]);
+        git_cmd(&repo, &["commit", "--no-verify", "-m", "initial"]);
+
+        let big_content = vec![b'X'; 1024];
+        std::fs::write(repo.join("bigfile.bin"), &big_content).unwrap();
+        std::fs::write(repo.join("small2.txt"), "another small\n").unwrap();
+        git_cmd(&repo, &["add", "-A"]);
+
+        let toml_str = r#"
+        auto_github_private = false
+        auto_commit = true
+        auto_pull = false
+        auto_push = false
+        auto_bump_versions = false
+        max_stage_file_bytes = 512
+        "#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(
+            result.is_ok(),
+            "sync_repo should succeed with oversized file"
+        );
+
+        let output = git_cmd(&repo, &["ls-files"]);
+        let tracked = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            tracked.contains("small2.txt"),
+            "small file should be tracked"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_mixed_tracked_and_untracked() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "mixed-repo");
+
+        std::fs::write(repo.join("existing.txt"), "original\n").unwrap();
+        git_cmd(&repo, &["add", "-A"]);
+        git_cmd(&repo, &["commit", "--no-verify", "-m", "initial"]);
+
+        std::fs::write(repo.join("existing.txt"), "modified\n").unwrap();
+        std::fs::write(repo.join("brand_new.txt"), "new file\n").unwrap();
+
+        let toml_str = r#"
+        auto_github_private = false
+        auto_commit = true
+        auto_pull = false
+        auto_push = false
+        auto_bump_versions = false
+        "#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(result.is_ok(), "sync_repo should succeed");
+        assert!(
+            matches!(result, Ok(SyncOutcome::Synced)),
+            "mixed changes should be committed"
+        );
+
+        let output = git_cmd(&repo, &["ls-files"]);
+        let tracked = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            tracked.contains("existing.txt"),
+            "existing.txt should be tracked"
+        );
+        assert!(
+            tracked.contains("brand_new.txt"),
+            "brand_new.txt should be tracked"
+        );
+
+        let show = git_cmd(&repo, &["show", "HEAD:existing.txt"]);
+        assert_eq!(String::from_utf8_lossy(&show.stdout), "modified\n");
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_pull_skip_when_no_origin() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "no-origin-pull-repo");
+
+        let toml_str = r#"
+        auto_github_private = false
+        auto_commit = false
+        auto_pull = true
+        auto_push = false
+        auto_bump_versions = false
+        "#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(result.is_ok(), "sync_repo should succeed without origin");
+        assert!(
+            matches!(result, Ok(SyncOutcome::NothingToDo)),
+            "no origin should skip pull and return false"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_auto_commit_disabled_skips_commit() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "no-autocommit-repo");
+
+        std::fs::write(repo.join("dirty.txt"), "dirty content\n").unwrap();
+
+        let toml_str = r#"
+        auto_github_private = false
+        auto_commit = false
+        auto_pull = false
+        auto_push = false
+        auto_bump_versions = false
+        "#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(result.is_ok(), "sync_repo should succeed");
+        assert!(
+            matches!(result, Ok(SyncOutcome::NothingToDo)),
+            "auto_commit=false should not commit dirty files"
+        );
+
+        let output = git_cmd(&repo, &["status", "--porcelain"]);
+        let status = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            status.contains("dirty.txt"),
+            "file should still be untracked/unstaged"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_dry_run_does_not_commit() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "dry-run-test");
+
+        std::fs::write(repo.join("new_file.txt"), "new content\n").unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = true
+auto_pull = false
+auto_push = false
+auto_bump_versions = false
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let commits_before = git_cmd(&repo, &["rev-list", "--count", "HEAD"]);
+        let commits_count_before: usize = String::from_utf8_lossy(&commits_before.stdout)
+            .trim()
+            .parse()
+            .unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, true, None).await;
+        assert!(result.is_ok(), "dry-run should succeed");
+
+        let commits_after = git_cmd(&repo, &["rev-list", "--count", "HEAD"]);
+        let commits_count_after: usize = String::from_utf8_lossy(&commits_after.stdout)
+            .trim()
+            .parse()
+            .unwrap();
+        assert_eq!(
+            commits_count_before, commits_count_after,
+            "dry-run should not create any commits"
+        );
+
+        let status = git_cmd(&repo, &["status", "--porcelain"]);
+        let status_output = String::from_utf8_lossy(&status.stdout);
+        assert!(
+            status_output.contains("new_file.txt"),
+            "file should still appear as untracked in working tree"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_dry_run_does_not_push() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "dry-run-push-test");
+
+        std::fs::write(repo.join("file.txt"), "change\n").unwrap();
+        git_cmd(&repo, &["add", "."]);
+        git_cmd(&repo, &["commit", "--no-verify", "-m", "add file"]);
+
+        let commits_before = git_cmd(&repo, &["rev-list", "--count", "HEAD"]);
+        let count_before: usize = String::from_utf8_lossy(&commits_before.stdout)
+            .trim()
+            .parse()
+            .unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = false
+auto_pull = false
+auto_push = true
+auto_bump_versions = false
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, true, None).await;
+        assert!(result.is_ok(), "dry-run should succeed");
+
+        let commits_after = git_cmd(&repo, &["rev-list", "--count", "HEAD"]);
+        let count_after: usize = String::from_utf8_lossy(&commits_after.stdout)
+            .trim()
+            .parse()
+            .unwrap();
+        assert_eq!(
+            count_before, count_after,
+            "dry-run should not change commit count"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_dry_run_does_not_modify_working_tree() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "dry-run-wt-test");
+
+        std::fs::write(repo.join("tracked.txt"), "tracked\n").unwrap();
+        git_cmd(&repo, &["add", "tracked.txt"]);
+        git_cmd(&repo, &["commit", "--no-verify", "-m", "add tracked"]);
+
+        std::fs::write(repo.join("modified.txt"), "modified\n").unwrap();
+        std::fs::write(repo.join("untracked.txt"), "untracked\n").unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = true
+auto_pull = false
+auto_push = false
+auto_bump_versions = false
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, true, None).await;
+        assert!(result.is_ok(), "dry-run should succeed");
+
+        let output = git_cmd(&repo, &["status", "--porcelain"]);
+        let status = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            status.contains("modified.txt"),
+            "modified.txt should still be modified"
+        );
+        assert!(
+            status.contains("untracked.txt"),
+            "untracked.txt should still be untracked"
+        );
+    }
+
+    /// Comprehensive boundary test for the mass-deletion safety guard.
+    #[tokio::test]
+    async fn test_alert_unpushed_threshold() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "alert-threshold-repo");
+
+        // Create and commit multiple files to build up unpushed commits
+        for i in 0..3 {
+            let fname = format!("file{}.txt", i);
+            std::fs::write(repo.join(&fname), format!("content{}\n", i)).unwrap();
+            git_cmd(&repo, &["add", &fname]);
+            git_cmd(
+                &repo,
+                &["commit", "--no-verify", "-m", &format!("add {}", fname)],
+            );
+        }
+
+        // Set threshold to 2 — should trigger alert since we have 3 unpushed commits
+        let toml_str = r#"
+        auto_github_private = false
+        auto_commit = false
+        auto_pull = false
+        auto_push = false
+        auto_bump_versions = false
+        alert_unpushed_threshold = 2
+        "#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        // No origin remote, so no push attempt — just check alert fires
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(result.is_ok(), "sync_repo should succeed");
+    }
+
+    #[tokio::test]
+    async fn test_alert_unpushed_threshold_not_triggered() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "alert-threshold-ok-repo");
+
+        // Create and commit 1 file — below threshold
+        std::fs::write(repo.join("file.txt"), "content\n").unwrap();
+        git_cmd(&repo, &["add", "file.txt"]);
+        git_cmd(&repo, &["commit", "--no-verify", "-m", "add file"]);
+
+        // Set threshold to 5 — should NOT trigger alert
+        let toml_str = r#"
+        auto_github_private = false
+        auto_commit = false
+        auto_pull = false
+        auto_push = false
+        auto_bump_versions = false
+        alert_unpushed_threshold = 5
+        "#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(result.is_ok(), "sync_repo should succeed");
+    }
+
+    #[tokio::test]
+    async fn test_deletions_committed_when_intentional() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "deletion-commit-repo");
+
+        // Create 7 tracked files — 6 will be deleted
+        for i in 0..7 {
+            std::fs::write(repo.join(format!("file{i}.txt")), format!("content{i}")).unwrap();
+        }
+        git_cmd(&repo, &["add", "."]);
+        git_cmd(&repo, &["commit", "--no-verify", "-m", "init"]);
+
+        // Modify file0 so there's a real change that would be staged
+        std::fs::write(repo.join("file0.txt"), "modified").unwrap();
+
+        let toml_str = r#"
+        auto_github_private = false
+        auto_commit = true
+        auto_pull = false
+        auto_push = false
+        auto_bump_versions = false
+        "#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        // Delete 6 files — no guard, daemon commits everything
+        for i in 1..7 {
+            std::fs::remove_file(repo.join(format!("file{i}.txt"))).unwrap();
+        }
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(
+            matches!(result, Ok(SyncOutcome::Synced)),
+            "deletions should be committed, not blocked"
+        );
+
+        // Verify the deleted files are gone from tracking
+        let ls = git_cmd(&repo, &["ls-files"]);
+        let ls_str = String::from_utf8_lossy(&ls.stdout);
+        assert!(
+            ls_str.trim() == "file0.txt",
+            "only file0 should remain, got: {:?}",
+            ls_str
+        );
+    }
+
+    /// CR-2 regression test: filter-only changes must NOT be re-detected by
+    /// cli_diff_entries fallback, which would cause encrypted files to be
+    /// committed as decrypted plaintext.
+    #[tokio::test]
+    async fn test_filter_only_skips_cli_diff_fallback() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "filter-only-repo");
+
+        // Create a file that looks like a filter-only change
+        std::fs::write(repo.join("secret.txt"), "plaintext").unwrap();
+        git_cmd(&repo, &["add", "."]);
+        git_cmd(&repo, &["commit", "--no-verify", "-m", "init"]);
+
+        // Simulate a filter-only state: working tree differs from index
+        // but git diff HEAD shows no changes (all changes are filter artifacts).
+        // We achieve this by writing the same content but with a different
+        // line ending that the clean filter would normalize.
+        std::fs::write(repo.join("secret.txt"), "plaintext\r\n").unwrap();
+
+        let toml_str = r#"
+        auto_github_private = false
+        auto_commit = false
+        auto_pull = false
+        auto_push = false
+        auto_bump_versions = false
+        "#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        // sync_repo should see filter-only changes, skip them, and NOT
+        // fall back to cli_diff_entries which would see the CRLF difference.
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(
+            matches!(
+                result,
+                Ok(SyncOutcome::NothingToDo) | Ok(SyncOutcome::Synced)
+            ),
+            "filter-only repo should produce NothingToDo or Synced without changes, got {:?}",
+            result
+        );
+
+        // Verify nothing was staged
+        let staged = git_cmd(&repo, &["diff", "--cached", "--name-only"]);
+        let staged_str = String::from_utf8_lossy(&staged.stdout);
+        assert!(
+            staged_str.trim().is_empty(),
+            "nothing should be staged for filter-only repo"
+        );
+    }
+
+    /// Regression: when all staged entries are filter-only (committed_entries
+    /// is empty) and `git reset HEAD` fails due to index.lock contention from
+    /// a concurrent process, sync_repo should return NothingToDo instead of
+    /// propagating the error. The staging area is cleaned up on the next cycle.
+    #[tokio::test]
+    async fn test_filter_only_reset_failure_is_non_fatal() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "filter-only-reset-fail-repo");
+
+        // Create .gitignore and commit it
+        std::fs::write(repo.join(".gitignore"), "*.log\n").unwrap();
+        git_cmd(&repo, &["add", ".gitignore"]);
+        git_cmd(&repo, &["commit", "--no-verify", "-m", "add gitignore"]);
+
+        // Create a tracked file that matches the gitignore rule
+        std::fs::write(repo.join("debug.log"), "v1").unwrap();
+        git_cmd(&repo, &["add", "-f", "debug.log"]);
+        git_cmd(&repo, &["commit", "--no-verify", "-m", "add debug.log"]);
+
+        // Modify the tracked+gitignored file (dirty)
+        std::fs::write(repo.join("debug.log"), "v2").unwrap();
+
+        // Create a fake index.lock to simulate concurrent git process
+        std::fs::write(repo.join(".git").join("index.lock"), "concurrent").unwrap();
+
+        let toml_str = r#"
+        auto_github_private = false
+        auto_commit = true
+        auto_pull = false
+        auto_push = false
+        auto_bump_versions = false
+        "#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        // sync_repo should NOT fail — the filter-only reset failure is non-fatal.
+        // Before the fix, this returned Err ("failed to reset HEAD after filter-only commit").
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(
+            matches!(
+                result,
+                Ok(SyncOutcome::NothingToDo) | Ok(SyncOutcome::Synced)
+            ),
+            "filter-only reset failure should be non-fatal, got {:?}",
+            result
+        );
+
+        // Clean up the fake index.lock so the test teardown doesn't hang
+        let _ = std::fs::remove_file(repo.join(".git").join("index.lock"));
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_with_duplicate_subjects_succeeds() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = init_test_repo(&tmp, "stale-focus-repo");
+
+        let toml_str = r#"
+        auto_github_private = false
+        auto_commit = true
+        auto_pull = false
+        auto_push = false
+        auto_bump_versions = false
+        "#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        // Manually commit twice with same subject
+        std::fs::write(repo.join("a.txt"), "a").unwrap();
+        git_cmd(&repo, &["add", "."]);
+        git_cmd(&repo, &["commit", "--no-verify", "-m", "duplicate subject"]);
+
+        std::fs::write(repo.join("b.txt"), "b").unwrap();
+        git_cmd(&repo, &["add", "."]);
+        git_cmd(&repo, &["commit", "--no-verify", "-m", "duplicate subject"]);
+
+        // sync_repo should succeed — no dedup guard blocking legitimate work
+        std::fs::write(repo.join("c.txt"), "c").unwrap();
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(
+            result.is_ok(),
+            "sync_repo should succeed with duplicate subjects in history"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_new_branch_auto_push_attempted() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("new-branch-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "main"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+
+        // Create a file to make the repo dirty
+        std::fs::write(repo.join("test.txt"), "content").unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = true
+auto_pull = false
+auto_push = true
+auto_bump_versions = false
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        // sync_repo should succeed and attempt to push (even without upstream)
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(
+            result.is_ok(),
+            "sync_repo should succeed for new branch without upstream"
+        );
+
+        // Verify that a commit was created
+        let output = crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "log", "--oneline", "-1"])
+            .output()
+            .unwrap();
+        let log = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            !log.contains("init") || log.contains("update"),
+            "should have new commit after sync"
+        );
+    }
+
+    /// Regression test for `partition_gitignored`: tracked files whose
+    /// **parent directory** matches a gitignore rule (e.g. `**/.wxt/types/`)
+    /// must be sent to `force_paths` (uses `git add -f`), not `normal_paths`
+    /// (where plain `git add` would refuse them).
+    ///
+    /// Original bug: `git check-ignore` reports tracked files as "not ignored"
+    /// (gitignore is bypassed for tracked files), so a naive partition sent
+    /// tracked-but-ignored files to `normal_paths`, causing `git add` to fail
+    /// for the whole batch. This test ensures tracked files always go to
+    /// `force_paths` regardless of gitignore state.
+    #[tokio::test]
+    async fn test_partition_gitignored_tracked_file_with_gitignore_rule() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("repo");
+        test_git_cmd()
+            .args(["init", "-q", &repo.to_string_lossy()])
+            .output()
+            .unwrap();
+        test_git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.email", "t@t"])
+            .output()
+            .unwrap();
+        test_git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "t"])
+            .output()
+            .unwrap();
+        test_git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "checkout",
+                "-q",
+                "-b",
+                "main",
+            ])
+            .output()
+            .unwrap();
+
+        // Create a tracked file inside a directory that will later be gitignored
+        std::fs::create_dir_all(repo.join("subdir/types")).unwrap();
+        let tracked_path = repo.join("subdir/types/imports.d.ts");
+        std::fs::write(&tracked_path, "original\n").unwrap();
+        test_git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "add",
+                "subdir/types/imports.d.ts",
+            ])
+            .output()
+            .unwrap();
+        test_commit_cmd()
+            .args(["-C", &repo.to_string_lossy(), "-m", "init"])
+            .output()
+            .unwrap();
+
+        // Now add a gitignore rule that matches the directory containing the tracked file
+        // (this is the exact pattern that triggered the original bug in browser-extensions-shared)
+        std::fs::write(repo.join(".gitignore"), "**/types/\n").unwrap();
+        test_git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "add", ".gitignore"])
+            .output()
+            .unwrap();
+        test_commit_cmd()
+            .args(["-C", &repo.to_string_lossy(), "-m", "add gitignore"])
+            .output()
+            .unwrap();
+
+        // Modify the tracked file
+        std::fs::write(&tracked_path, "modified\n").unwrap();
+
+        // Sanity check: plain `git add <path>` should fail because the
+        // file's parent directory matches a gitignore rule
+        let plain_add = test_git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "add",
+                "subdir/types/imports.d.ts",
+            ])
+            .output()
+            .unwrap();
+        assert!(
+            !plain_add.status.success(),
+            "precondition: plain `git add` should refuse tracked file whose parent dir matches gitignore; stderr: {}",
+            String::from_utf8_lossy(&plain_add.stderr)
+        );
+        // Reset any state
+        test_git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "reset", "-q", "HEAD"])
+            .output()
+            .unwrap();
+
+        // Call partition_gitignored — tracked file must go to force_paths
+        let paths = vec!["subdir/types/imports.d.ts".to_string()];
+        let (force, normal) = partition_gitignored(&repo, &paths).await;
+        assert!(
+            force.contains(&"subdir/types/imports.d.ts".to_string()),
+            "tracked file (parent dir gitignored) must be in force_paths, got force={:?} normal={:?}",
+            force,
+            normal
+        );
+        assert!(
+            !normal.contains(&"subdir/types/imports.d.ts".to_string()),
+            "tracked file (parent dir gitignored) must NOT be in normal_paths, got force={:?} normal={:?}",
+            force,
+            normal
+        );
+    }
+
+    /// Companion test: untracked + gitignored files should be SKIPPED (not in
+    /// either list), so the daemon respects `.gitignore` intent for new files.
+    #[tokio::test]
+    async fn test_partition_gitignored_untracked_gitignored_is_skipped() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("repo");
+        test_git_cmd()
+            .args(["init", "-q", &repo.to_string_lossy()])
+            .output()
+            .unwrap();
+        test_git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.email", "t@t"])
+            .output()
+            .unwrap();
+        test_git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "t"])
+            .output()
+            .unwrap();
+        test_git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "checkout",
+                "-q",
+                "-b",
+                "main",
+            ])
+            .output()
+            .unwrap();
+        // Make initial commit so HEAD exists
+        std::fs::write(repo.join("README"), "x").unwrap();
+        test_git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "add", "."])
+            .output()
+            .unwrap();
+        test_commit_cmd()
+            .args(["-C", &repo.to_string_lossy(), "-m", "init"])
+            .output()
+            .unwrap();
+        // gitignore a path
+        std::fs::write(repo.join(".gitignore"), "ignored.log\n").unwrap();
+        std::fs::write(repo.join("ignored.log"), "x").unwrap();
+
+        let paths = vec!["ignored.log".to_string()];
+        let (force, normal) = partition_gitignored(&repo, &paths).await;
+        assert!(
+            force.is_empty(),
+            "untracked+ignored should not be in force_paths, got {:?}",
+            force
+        );
+        assert!(
+            normal.is_empty(),
+            "untracked+ignored should not be in normal_paths, got {:?}",
+            normal
+        );
+    }
+
+    /// Regression test for audit-4: when push is rejected with `fetch first`
+    /// (local branch behind origin), `push_with_retries` should auto-pull
+    /// once and retry. Without the fix, the daemon would loop on the same
+    /// rejection (e.g. `azumi-live-ssr-framework` had 598 such failures).
+    #[tokio::test]
+    async fn test_push_with_retries_fetches_first_on_rejection() {
+        let tmp = tempfile::tempdir().unwrap();
+        let origin_bare = tmp.path().join("origin.git");
+        let origin_bare_str = origin_bare.canonicalize().unwrap_or(origin_bare.clone());
+        test_git_cmd()
+            .args([
+                "init",
+                "--bare",
+                "-b",
+                "main",
+                &origin_bare_str.to_string_lossy(),
+            ])
+            .output()
+            .unwrap();
+        let repo = tmp.path().join("repo");
+        test_git_cmd()
+            .args(["init", "-q", "-b", "main", &repo.to_string_lossy()])
+            .output()
+            .unwrap();
+        test_git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.email", "t@t"])
+            .output()
+            .unwrap();
+        test_git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "t"])
+            .output()
+            .unwrap();
+        // Initial commit + push to set up origin as upstream
+        test_git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .output()
+            .unwrap();
+        test_git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "remote",
+                "add",
+                "origin",
+                &origin_bare_str.to_string_lossy(),
+            ])
+            .output()
+            .unwrap();
+        test_git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "push",
+                "-u",
+                "origin",
+                "main",
+            ])
+            .output()
+            .unwrap();
+
+        // Push a second commit to origin (so origin has 2 commits).
+        std::fs::write(repo.join("extra.txt"), "extra\n").unwrap();
+        test_git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "add", "extra.txt"])
+            .output()
+            .unwrap();
+        test_git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "-m",
+                "extra",
+            ])
+            .output()
+            .unwrap();
+        test_git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "push", "origin", "main"])
+            .output()
+            .unwrap();
+
+        // Verify local has 2 commits
+        let local_log_after_extra = test_git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "log", "--oneline"])
+            .output()
+            .unwrap();
+        let local_log_str = String::from_utf8_lossy(&local_log_after_extra.stdout).to_string();
+        assert!(
+            local_log_str.contains("extra"),
+            "local should contain 'extra' commit, got:\n{}\nstderr: {}",
+            local_log_str,
+            String::from_utf8_lossy(&local_log_after_extra.stderr)
+        );
+
+        // Verify origin has 2 commits
+        let origin_log = test_git_cmd()
+            .args([
+                "--git-dir",
+                &origin_bare_str.to_string_lossy(),
+                "log",
+                "--oneline",
+                "--all",
+            ])
+            .output()
+            .unwrap();
+        let origin_log_str = String::from_utf8_lossy(&origin_log.stdout).to_string();
+        let origin_log_lines: Vec<&str> = origin_log_str.trim().lines().collect();
+        assert!(
+            origin_log_lines.len() >= 2,
+            "origin should have >=2 commits after extra push, got {}:\n{}",
+            origin_log_lines.len(),
+            origin_log_str
+        );
+
+        // Reset local back to init (simulating the local repo being idle
+        // while origin moved forward via a mirror push).
+        let reset_out = test_git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "reset", "--hard", "HEAD~1"])
+            .output()
+            .unwrap();
+        assert!(
+            reset_out.status.success(),
+            "reset failed: {}",
+            String::from_utf8_lossy(&reset_out.stderr)
+        );
+
+        // Verify local is at init (1 commit)
+        let local_log_after_reset = test_git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "log", "--oneline"])
+            .output()
+            .unwrap();
+        let local_log_str = String::from_utf8_lossy(&local_log_after_reset.stdout).to_string();
+        let local_lines: Vec<&str> = local_log_str.trim().lines().collect();
+        assert_eq!(
+            local_lines.len(),
+            1,
+            "local should have 1 commit after reset, got {}:\n{}",
+            local_lines.len(),
+            local_log_str
+        );
+
+        // Now make a local commit. Pushing this will be rejected with
+        // "fetch first" because origin/main has 2 commits but local only has 1.
+        std::fs::write(repo.join("local.txt"), "local change\n").unwrap();
+        test_git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "add", "local.txt"])
+            .output()
+            .unwrap();
+        test_git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "-m",
+                "local",
+            ])
+            .output()
+            .unwrap();
+
+        // Verify local has 2 commits (init + local)
+        let local_log_final = test_git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "log", "--oneline"])
+            .output()
+            .unwrap();
+        let local_final_str = String::from_utf8_lossy(&local_log_final.stdout).to_string();
+        assert!(
+            local_final_str.contains("local"),
+            "local should contain 'local' commit, got:\n{}",
+            local_final_str
+        );
+
+        // Sanity: a plain `git push` would fail with fetch-first
+        let plain_push = test_git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "push", "origin", "HEAD"])
+            .output()
+            .unwrap();
+        let plain_stderr = String::from_utf8_lossy(&plain_push.stderr).to_string();
+        assert!(
+            !plain_push.status.success()
+                || plain_stderr.contains("rejected")
+                || plain_stderr.contains("fetch first"),
+            "precondition: plain push should fail with fetch-first; status={} stderr={}",
+            plain_push.status,
+            plain_stderr
+        );
+
+        // Reset local again for the real test (undo the failed push)
+        test_git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "reset", "--hard", "HEAD~1"])
+            .output()
+            .unwrap();
+        std::fs::write(repo.join("local.txt"), "local change\n").unwrap();
+        test_git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "add", "local.txt"])
+            .output()
+            .unwrap();
+        test_commit_cmd()
+            .args(["-C", &repo.to_string_lossy(), "-m", "local"])
+            .output()
+            .unwrap();
+
+        // Now call push_with_retries — it should auto-pull then succeed
+        let result = push_with_retries(&repo, 30, 1, "test").await;
+        assert!(
+            result.is_ok(),
+            "push_with_retries should auto-pull + succeed: {:?}",
+            result
+        );
+    }
+}

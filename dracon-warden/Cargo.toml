@@ -1,0 +1,27 @@
+[package]
+license = "AGPL-3.0-only"
+name = "dracon-warden"
+version = "0.3.0"
+edition = "2021"
+
+[dependencies]
+age = { workspace = true }
+anyhow = { workspace = true }
+chrono = { workspace = true }
+comfy-table = { workspace = true }
+clap = { workspace = true }
+globset = { workspace = true }
+hostname = { workspace = true }
+rand = { workspace = true }
+secrecy = { workspace = true }
+zeroize = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }
+walkdir = { workspace = true }
+dirs = { workspace = true }
+tokio = { workspace = true }
+dracon-security-kit = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

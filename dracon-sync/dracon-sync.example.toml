@@ -1,0 +1,329 @@
+# Dracon Sync Policy
+# Path: ~/.dracon/utilities/sync/dracon-sync.toml
+#
+# This controls how dracon-sync watches and syncs your repos.
+#
+# ⚠️  TOML FIELD ORDERING: Top-level fields (like standard_files) must appear
+# BEFORE any section headers ([...] or [[...]]). Fields after a section header
+# are silently parsed as belonging to that section and will be ignored by the
+# policy loader.
+
+# =============================================================================
+#  SECTION 1: THE SOVEREIGN CORE
+# =============================================================================
+# [system_repo]
+# The primary repository for your machine laws and state (~/.dracon).
+# The daemon ensures this repo is ALWAYS healthy and synchronized.
+# This must be a git repository (or a directory that will be turned into one).
+# Defaults to ~/.dracon when unset.
+# system_repo = "/home/dracon/.dracon"
+
+# =============================================================================
+#  SECTION 2: THE RHYTHM (Sync Logic)
+# =============================================================================
+# How often (seconds) to scan repos for activity while daemon is running.
+pulse_interval_secs = 1
+
+# Push only after this many quiet seconds since last detected repo change.
+inactivity_push_delay_secs = 5
+
+# [auto_commit] - Automatically stage and commit local changes.
+auto_commit = true
+
+# If true, bump patch versions before auto-commits (best-effort).
+# Applies when these files exist at repo root:
+# - Rust: Cargo.toml (+ keep Cargo.lock aligned for root package)
+# - Node/TS: package.json (+ align package-lock.json root version when applicable)
+# - Generic: VERSION
+auto_bump_versions = true
+
+# [auto_pull]   - Pull remote changes before committing (uses merge, not rebase).
+auto_pull = true
+
+# [auto_push]   - Propagate local commits to all configured remotes.
+auto_push = true
+
+# [auto_repair_concerns] - Run concern repair logic after each sync pass.
+auto_repair_concerns = true
+
+# [auto_repair_warns] - Run dirty-only warn triage after each sync pass.
+auto_repair_warns = true
+
+# [auto_rewrite_large_blobs] - Aggressive rewrite when large blobs are detected.
+# Keep false for safe default behavior.
+auto_rewrite_large_blobs = false
+
+# Git operation idle timeouts (seconds). Git push/pull commands are progress-aware:
+# a stalled operation is killed after this idle window, while active pack
+# transfer progress extends the deadline so large repos are not aborted early.
+# repo_sync_timeout_secs is retained for status/compatibility; per-operation
+# timeouts now enforce push/pull safety.
+pull_op_timeout_secs = 30
+push_op_timeout_secs = 60
+repo_sync_timeout_secs = 120
+
+# Retry count for push operations before fallback transport logic.
+push_retries = 3
+
+# Cooldown between failed auto-repair attempts on the same repo.
+repair_cooldown_secs = 60
+
+# Hard push guardrail for blob size; keep <= 100 MiB host limit.
+max_push_blob_bytes = 52428800
+
+# Incident ledger retention policy.
+incident_ledger_max_lines = 10000
+incident_ledger_max_age_days = 30
+
+# =============================================================================
+#  SECTION 3: THE VAULT (Backup Strategy)
+# =============================================================================
+# 'Bundle' creates air-gapped git-bundle files in the backup_dir before every
+# sync attempt. This is your insurance against failed rebases or data loss.
+backup_policy = "Bundle"
+backup_dir = "/home/dracon/dracon/backups"
+
+# =============================================================================
+#  SECTION 4: THE SCOPE
+# =============================================================================
+# Roots recursively patrolled for .git repositories to sync.
+watch_roots = ["/home/dracon/Dev"]
+
+# Exclude heavy/generated trees from repo discovery and auto-staging.
+exclude_dir_names = [
+    "target",
+    "node_modules",
+    ".cache",
+    ".direnv",
+    ".venv",
+    "dist",
+    "build",
+    "archives",
+    ".tmp-*"
+]
+
+# Exclude specific file patterns from auto-staging.
+exclude_file_patterns = [
+    "*.log",
+    "nohup.out"
+]
+
+# Skip staging files larger than 50 MiB during auto-commit.
+max_stage_file_bytes = 52428800
+
+# =============================================================================
+#  SECTION 5: SAFETY
+# =============================================================================
+# Mass-deletion prevention: if >= 85% of tracked files are missing from the
+# working tree, dracon-sync will refuse to auto-commit. This guards against
+# accidental wipes from filesystem issues or destructive operations.
+#
+# To bypass for intentional total wipes:
+#   dracon-sync sync-now --force <repo>
+
+# =============================================================================
+#  SECTION 6: REMOTES
+# =============================================================================
+# Origin remote is always pushed first. Mirror remotes are pushed after.
+# The {repo} placeholder is replaced with the repo directory name.
+
+# GitHub (origin)
+[[remotes]]
+name = "github"
+push_url = "https://github.com/DraconDev/{repo}.git"
+auto_create = true
+
+# GitLab (with PAT-based HTTPS fallback)
+[[remotes]]
+name = "gitlab"
+push_url = "git@gitlab.com:dracondev/{repo}.git"
+auto_create = true
+
+# Codeberg (push-to-create disabled in Forgejo)
+[[remotes]]
+name = "codeberg"
+push_url = "git@codeberg.org:dracondev/{repo}.git"
+auto_create = false
+
+# Per-remote repo name mapping (e.g. for dot-prefixed dirs on GitLab)
+# [[remotes]]
+# name = "gitlab"
+# push_url = "git@gitlab.com:myorg/{repo}.git"
+# auto_create = true
+# [remotes.repo_name_map]
+# ".dracon" = "dracon-home"
+
+# =============================================================================
+#  SECTION 7: MIRROR VISIBILITY & METADATA
+# =============================================================================
+# When true, mirrors (GitLab, Codeberg) match GitHub's public/private status.
+# When false (default), all auto-created mirrors are private.
+# Checked at most once per repo per sync_visibility_interval_hours.
+# sync_visibility = false
+# sync_visibility_interval_hours = 24
+
+# When true, mirror repos also inherit the GitHub repo's description and topics.
+# This makes mirrors discoverable via topic search on GitLab/Codeberg.
+# Uses the same interval cache as visibility sync.
+# sync_metadata = false
+
+# =============================================================================
+#  SECTION 8: RELEASE PIPELINE (Tags, Releases, Publishing)
+# =============================================================================
+# Three separate toggles control the release pipeline per repo.
+# All three default to "off" at the repo level — nothing happens unless
+# the repo explicitly opts in via .dracon/dracon-sync.toml.
+#
+# ┌──────────────┬─────────────┬──────────┬────────────────────────────────┐
+# │ Toggle       │ Default     │ Risk     │ Purpose                       │
+# ├──────────────┼─────────────┼──────────┼────────────────────────────────┤
+# │ auto_tag     │ true        │ Low      │ Git tag on every version bump  │
+# │ auto_release │ false       │ Medium   │ GitHub Release on major bumps │
+# │ auto_publish │ [] (empty)  │ High     │ Publish to package registries │
+# └──────────────┴─────────────┴──────────┴────────────────────────────────┘
+#
+# Tags are cheap, reversible, and universally useful — on by default.
+# Releases are public milestones — opt-in per repo.
+# Publishing is IRREVERSIBLE (crates.io/npm/PyPI are immutable) — explicit list.
+#
+# auto_publish = false          # global master toggle (default: off)
+#
+# Each publish target needs a token_secret — the env var name that holds the
+# registry API key. Store the actual token in ~/.dracon/utilities/sync/secrets/*.env.
+# See that directory's README for how to create each token.
+#
+# [[publish_targets]]
+# name = "crates-io"
+# registry = "crates-io"          # crates-io | npm | pypi
+# [DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBGQ2pZSituL3doOTNKc2FqemJTcmRPMytvZTk0bmMwTktzREIyNGJrOXdZCmZod2dZUm85M1hYOEtmZkdpcStIUTNvdFJRRksxWnd3bjRkdlV1cm5wd0kKLT4gWDI1NTE5IFRFRHRRaC8xdGdkemFiVmNqV25Oc21OYk5hQ0hJcEhTSHdpb2hQVHdyaW8KSGN6Qnh5TDA2WXlYblBVWjV2RStidDZVODdOK25MM0pKdDhONEFGait6dwotPiBYMjU1MTkgdnNlT0R4VURZWjN1TlRhdk5kYWROcXVhbkpVUk4rZTNDV3QySFdCL09FQQo1ZEVQZFVFZk1ZMTlpV3JzNmRPcElmNm1zZmZoNVRPYUhFQ3J4bkE0VGhVCi0+IFgyNTUxOSA0WldDMis3YVUyQTlDME1MZHNSdXBwNVhpTk1hRW1rbVVQRk5LQmVoZ3c0Ci9xZWZFYlFua0lVcDhoU2hyeFZwcGwwN1FraFhaV2tzcVB5OThFeDdpeGcKLT4gWDI1NTE5IFRYeTd4K2JkU0RhMDVwRFkwWjJvQXFvc1czWEwvK29UVnpqbzBLSkxXeFEKdnp5MW44Qm9LNVAvZzVhYUlLSyt6U1VxeVZOSktLdHRxMFE0bWxzc3VYRQotPiBYMjU1MTkgTEdiY0dUNHQ5VkVFOTltNHUvc0hDSkFBOUxwVTBCeTJoUGE1eUYxeGZIOApYWldnbEFqNmdJbHYwQU0zQTFhbTJhSVlINHl5RVFTT0xaRklOS0hMVVJrCi0+IFowOzY2KSxJLWdyZWFzZSBKMVJsVXFGICF+Wk5yIDF+RCBwSwozMWprVkFNVklEclVwTVRvS2pUTms2OUtReEdUMGJJVGNrZVhxbFNOdFp0ckp0QWNTTmYvZnBFSldKQlJLbHNOCmVMVWJpWjNreTliWEx3OGtSU0ZhNTlmTlFiaTRhRi9GcU9KTGp1ZnFGc2d0b0EKLS0tIGE1L1p3dEZJNXdoVGNWeUptYTA4OHo1RXNTbXEvcDcrdGdaZXVuazlWb1kKrEjtZg9VIlIVF9y4gzZtqALsHqt8PTj6nkCkz+tEmbaA8IEv3nCxcTsRaJFq7z4SFGDeufdXirhtT1wEkogi1vvNYvUW]   # env var name (token in secrets/cratesio.env)
+# publish_timeout_secs = 300
+#
+# [[publish_targets]]
+# name = "npm"
+# registry = "npm"
+# token_secret = "NPM_TOKEN"             # env var name (token in secrets/npm.env)
+#   Create npm token at: https://www.npmjs.com/settings/tokens/create
+#   Use "Automation" type (never expires, bypasses 2FA for CI/CD)
+#   Note: `npm token create --automation` is deprecated in npm v11+
+# publish_timeout_secs = 120
+#
+# [[publish_targets]]
+# name = "pypi"
+# registry = "pypi"
+# token_secret = "TWINE_PASSWORD"        # env var name (token in secrets/pypi.env)
+# publish_timeout_secs = 120
+#
+# PER-REPO OPT-IN (required even when auto_publish = true globally):
+# Create .dracon/dracon-sync.toml in the repo root:
+#
+#   # Tag every bump (default: true, safe to omit)
+#   auto_tag = true
+#
+#   # Create GitHub Releases for major bumps (default: false)
+#   auto_release = true
+#
+#   # Publish to specific registries (default: empty = no publishing)
+#   auto_publish = ["crates-io"]
+#
+# Example configurations for different project types:
+#
+#   Rust library:
+#     auto_tag = true
+#     auto_release = true
+#     auto_publish = ["crates-io"]
+#
+#   CLI binary (app, not a library):
+#     auto_tag = true
+#     auto_release = false
+#     auto_publish = []
+#
+#   Mixed Rust+JS library:
+#     auto_tag = true
+#     auto_release = true
+#     auto_publish = ["crates-io", "npm"]
+#
+#   Internal daemon (private, no publish):
+#     auto_tag = true
+#     auto_release = false
+#     auto_publish = []
+#
+# Without auto_publish targets, no publishing happens.
+# Without auto_release = true, no GitHub Releases are created.
+# Tags are created by default for every version bump unless auto_tag = false.
+
+# nix_auto_update = false            # global master toggle (default: off)
+#
+# When true and a version bump occurs in a repo with flake.nix, dracon-sync:
+#   1. Updates the version field in flake.nix (inside [package] block)
+#   2. Creates a PR via `gh` with the flake.nix change
+#
+# This is independent of tagging and publishing — it only applies to repos
+# that have a flake.nix file AND are connected to GitHub (gh CLI required).
+#
+# Per-repo opt-in (via .dracon/dracon-sync.toml):
+#   nix_auto_update = true
+#
+# Nix flake version update (if enabled globally and repo has flake.nix):
+#   auto_tag = true
+#   nix_auto_update = true
+#
+# Without nix_auto_update, flake.nix version fields are NOT updated automatically.
+#
+# =============================================================================
+#  SECTION 9: STANDARD FILES
+# =============================================================================
+# AGPL v3 LICENSE is auto-copied to every new repo during sync.
+# This ensures all Dracon repos carry the same copyleft license.
+# You own the copyright → you're the only one who can sell commercial licenses.
+# Templates live in ~/.dracon/utilities/sync/templates/ (auto-resolved from short form).
+# Files are only copied if the target does not exist (overwrite = false, the default).
+#
+# Short form — filename only (resolves to templates/{name}):
+# This is the generic starter for external users: only AGPL LICENSE is added.
+# standard_files = ["LICENSE"]
+#
+# Auto-copy during sync (default: true — ensures new repos always get AGPL):
+# standard_files_auto = true
+#
+# Dracon-specific optional file: FUNDING.yml is not part of the generic
+# dracon-sync default. Only add this if you intentionally want GitHub Sponsors
+# configuration scaffolded into your repos.
+#
+# GitHub discovers FUNDING.yml at .github/FUNDING.yml (not the repo root).
+# To scaffold it there, use the long form:
+# [[standard_files]]
+# source = "templates/FUNDING.yml"
+# target = ".github/FUNDING.yml"
+# overwrite = false
+#
+# Long form — for explicit source path or overwrite behavior:
+# [[standard_files]]
+# source = "templates/CUSTOM"
+# target = "CUSTOM_NOTICE"
+# overwrite = false   # default: false (never overwrites existing files)
+#
+# Per-repo opt-out (via .dracon/dracon-sync.toml in repo root):
+#   skip_standard_files = ["LICENSE", ".github/FUNDING.yml"]
+#
+# Template path resolution:
+#   - Absolute paths: used as-is
+#   - ~/ paths: expanded to home directory
+#   - Relative paths: resolved relative to sync config dir (~/.dracon/utilities/sync/)
+#
+# If a template file is missing, a warning is printed but sync continues.
+#
+# FUNDING.yml is the GitHub Sponsors / community funding configuration file.
+# It is Dracon-specific in this policy: external users of dracon-sync do not
+# receive it unless they explicitly add the long-form standard_files entry
+# above. The default template ships with no funding destinations (github: [],
+# etc.) so a freshly-scaffolded repo advertises nothing until the operator
+# fills it in. The file is public and version-controlled; never place API keys,
+# tokens, or any other secret material in it. The Warden key-management layer
+# treats it as plain text.
+
+# =============================================================================
+#  SECTION 10: WEBHOOK
+# =============================================================================
+# On push failures (origin or mirror remotes), dracon-sync can send a
+# fire-and-forget HTTP POST to a configured webhook URL:
+# webhook_url = "https://your-webhook-endpoint.example/notify"

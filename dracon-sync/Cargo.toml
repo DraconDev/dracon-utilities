@@ -1,0 +1,27 @@
+[package]
+license = "AGPL-3.0-only"
+name = "dracon-sync"
+version = "0.1.5"
+edition = "2021"
+
+[dependencies]
+anyhow = { workspace = true }
+clap = { workspace = true }
+comfy-table = { workspace = true }
+dirs = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+reqwest = { workspace = true }
+toml = { workspace = true }
+dracon-git = { workspace = true }
+notify-rust = { workspace = true }
+parking_lot = { workspace = true }
+urlencoding = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+proptest = { workspace = true }
+
+[features]
+default = []

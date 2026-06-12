@@ -1,0 +1,19 @@
+[run]
+ignore-panics = true
+fail-under = 10
+
+[report]
+output-dir = "coverage"
+html = true
+
+[[crates]]
+name = "dracon-sync"
+threshold = 15
+
+[[crates]]
+name = "dracon-system"
+threshold = 15
+
+[[crates]]
+name = "dracon-warden"
+threshold = 20

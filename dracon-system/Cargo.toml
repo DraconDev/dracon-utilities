@@ -1,0 +1,19 @@
+[package]
+license = "AGPL-3.0-only"
+name = "dracon-system"
+version = "0.2.0"
+edition = "2021"
+
+[dependencies]
+anyhow = { workspace = true }
+clap = { workspace = true }
+dirs = { workspace = true }
+fs2 = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
+walkdir = { workspace = true }
+chrono = { workspace = true }
+comfy-table = { workspace = true }
+dracon-system-lib = { workspace = true }
