@@ -13,6 +13,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   repo where the sync daemon's state lives is `~/.dracon`. The example
   template and the installed `dracon-sync.toml` are now both set to the
   correct path.
+- **`dracon-sync` `STUCK_PUSH` flag now requires a recorded push failure**:
+  The flag used to fire on any `ahead > 0`, including repos the daemon
+  had not yet tried to push in the current cycle. It now consults the
+  incident ledger for a recent `result: "fail"` entry within the last
+  10 minutes. Repos with unpushed commits but no recorded failure show
+  as `PENDING` instead. This is a logic defect, not a behavioural
+  change to the daemon's actual sync work. Refined in commits
+  `1135d6bb8` and `bac8316cc`.
+- **`dracon-sync` multi-remote push no longer retries permanent rejections**:
+  Pushing to a GitLab/Codeberg protected branch, or any server-side
+  `pre-receive hook declined` rejection, used to burn the full
+  `push_retries` budget on an outcome that cannot change. The new
+  `is_permanent_push_rejection()` classifier detects five canonical
+  error patterns (`pre-receive hook declined`, `protected branch`,
+  `not allowed to push`, `deny updating`, `hook declined`) and returns
+  immediately on match, logging one incident per cycle. This is a
+  logic defect, not a change to which remotes are pushed. Added in
+  commit `fd93b943f`.
+- **`dracon-sync` `repair concerns` aligned with `repos` table**: The
+  repair command used the old `ahead > 0 → concern` rule after the
+  `repos` table had been refined, so the two surfaces disagreed on
+  which repos were concerns. Both now use
+  `repo_is_concern_with_push_failure()`: a repo is a concern when it
+  has no origin/upstream, or is `behind > 0`, or is `ahead > 0` AND has
+  a recent push failure in the incident ledger. This is a logic
+  defect (inconsistency between two views of the same data). Fixed in
+  commit `bac8316cc`.
+- **`dracon-system` doctor "dracon-libs" check is now correctly labeled
+  dev-only**: The check used to say "dracon-libs (sibling)" with no
+  hint that it is optional for installed binaries. It is now labeled
+  `dracon-libs (dev sibling)` and the remediation explains that the
+  sibling is required only for `cargo build` from source. This is a
+  logic defect (mislabeling an optional check as required). Fixed in
+  commit `fd93b943f`.
+
+### Added
+- **`dracon-sync` `stage_op_timeout_secs` policy field**: Configurable
+  idle timeout (default 60s, min 10s) for `git add -A` and other
+  staging operations on a single repo. The previous hardcoded 30s
+  timeout was too tight for large repos (e.g.,
+  `browser-extensions-shared` with 2500+ dirty paths took 88s) and
+  caused the daemon to log a "staging timeout" incident on every
+  cycle. The default of 60s gives headroom for typical work without
+  making the daemon feel stuck. Added in commit `1135d6bb8`.
+- **`dracon-sync` `stage_cooldown_secs` policy field**: When
+  `git add` exceeds `stage_op_timeout_secs`, the daemon pauses
+  further staging attempts on that repo for the configured duration
+  (default 3600s = 1 hour). The point is to stop incident-ledger
+  spam: a single repo that consistently times out will otherwise log
+  a new incident every cycle. After the cooldown elapses, the daemon
+  tries `git add` again; if it times out once more, the cooldown
+  resets. The cooldown is per-repo; other repos are unaffected. Added
+  in commit `00bba440d`.
+- **`dracon-sync` push-rejection classification design note**:
+  `docs/design/sync-push-classification.md` documents the
+  `STUCK_PUSH` vs `PENDING` semantics, the 10-minute
+  `recent_push_failure` window derived from the incident ledger, the
+  `is_permanent_push_rejection` regex set, the retry policy, and the
+  `repos` ↔ `repair concerns` invariant. Added in this release.
+
 
 ### Changed
 - **CLI print style**: All three binaries (`dracon-sync`, `dracon-warden`,

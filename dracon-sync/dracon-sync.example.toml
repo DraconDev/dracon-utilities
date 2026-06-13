@@ -60,10 +60,37 @@ auto_rewrite_large_blobs = false
 # timeouts now enforce push/pull safety.
 pull_op_timeout_secs = 30
 push_op_timeout_secs = 60
+# Idle timeout (seconds) for `git add -A` and other staging operations on a
+# single repo. Large repos (thousands of dirty files) can take 60-90s to
+# stage; the default of 60s gives headroom for typical work without making
+# the daemon feel stuck. The minimum accepted value is 10s — values below
+# are clamped and a warning is logged. See docs/OPERATIONS.md and
+# docs/design/sync-push-classification.md for the full rationale.
+stage_op_timeout_secs = 60
 repo_sync_timeout_secs = 120
+
+# When `git add` exceeds stage_op_timeout_secs, the daemon pauses further
+# attempts on that repo for this many seconds (default 1h). The point is to
+# stop incident-ledger spam: a single repo that consistently takes longer
+# than the timeout to stage will otherwise log a new "staging timeout"
+# incident on every cycle. After the cooldown elapses, the daemon will
+# try `git add` again; if it times out once more, the cooldown resets.
+stage_cooldown_secs = 3600
 
 # Retry count for push operations before fallback transport logic.
 push_retries = 3
+
+# Push rejection classification
+# ----------------------------
+# When a remote rejects a push, the daemon classifies the error before
+# deciding whether to retry. Permanent rejections (e.g., GitLab/Codeberg
+# protected branch, server-side hook declined) are NOT retried — retrying
+# would burn the full push_retries budget on an outcome that cannot
+# change. The daemon logs one incident per cycle and surfaces the repo
+# in `dracon-sync repos` with a `STUCK_PUSH` flag so the operator can
+# resolve the server-side configuration. See
+# docs/design/sync-push-classification.md for the full regex set and the
+# relationship to the `recent_push_failure` 10-minute window.
 
 # Cooldown between failed auto-repair attempts on the same repo.
 repair_cooldown_secs = 60
@@ -195,7 +222,7 @@ auto_create = false
 # [[publish_targets]]
 # name = "crates-io"
 # registry = "crates-io"          # crates-io | npm | pypi
-# [DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBKYkIwVEwyNXB5ckFuVnBGRTUrRDFvSkZGdzgwM3huUU9hU3YzQjZXcWdFCk9HKzhXWmZ3MWE0bmhVRFMzYzBJc2hRcjJ3RUZQbHZGSHhZbWpwQzFCSnMKLT4gWDI1NTE5IEtka2Y2NE5KL0Q0YVNrT1Y1b1RJa09ib2FNUURXRldRaDNRTG5WUDhiRUEKY2QySklZSWJZbGhDTktLci92bHpWZlV5ZUoxclFYVUNSamlTVkN3bHdMbwotPiBYMjU1MTkgbHlzTGxOODJlMVo4N0w5QzB1VGErVjVleDZFZEJiZ0pLd3cxMCtmZE9BMApzWGN0b21udG5wWWkzR1kydXRIZlBCRFprTWhZcTlWdTRpYVgxMW1rK0pjCi0+IFgyNTUxOSBkWkFoMTF4QUJvMlBlQllCWkd0UlUzWGV3TG9oeGlraEx1R0o2elZZd2dzCkF3dlNoSElTM2lzdXo1S1lmYlFJZWpWZ21GWHFyU2R1Y3JNa0M0SjVzWW8KLT4gWDI1NTE5IFJPRWxwMythdXdZSHpEUitIVGliamZxTG93a29Gb3FuT1hObEZMUDBoRlkKSzR6N0NmMlpsOXgzbFlFSmdsNDR1L1BzQTVFU3ZTbiswRzhPdjBIMjZTbwotPiBEKy5xOS0tZ3JlYXNlCmJTcUlxQVE3NjRQaVpSVVBEeG12Snl1ZElTNGpXM3NhZDh4bTNiTnd3bllPcTFuQ3AvSVcvTDFiMEVLNFdiYkcKM2h2eUhOUmxPSmNpZmNpMUNCTGpUZnBXZEZUbmVQUVhTc1hSbUtNRGNzUlhycnh4OEJZCi0tLSA3OFg3WmVLL0xHa2E1WDgwODdXd05TTyt5eUl4RTJWMTY0SC81YjN4L3VnCvMjPAQpJOCgJ+ZwcEaa/YWJDpS3mgp5xDEJs9mVL2N4OWX7wpMDW5SIUwcewk/jwoGd+EvaIRgp7dxeO4ZIwBVTj5bLLQ==]   # env var name (token in secrets/cratesio.env)
+# [DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAxUTd5SHZCWGpUV2kxeGlQRmg0aUN5K2hXU09uaG8wRjF2eXZxZmw1R0NzCkFGYzRyOUwrV3pIU09XNTZpamhkUmJZQVovUi9FV3F0OHowTlNKV0hweGsKLT4gWDI1NTE5IFpFYTd5RlRyNUlaZldtUDdPS3ViM1VWdVRaYjhFUWQ2cWR1bHhTdkJxUVkKb3FUZkhQSnVmdlJWMFlza1FSa3RuK2NDeGhzRjNqTXI2VUpYQThHUUY3RQotPiBYMjU1MTkgU1BDRzJaVlBFaGpZNk5USmR3aTg3TW5FS2VFY2QyMnljNmhVamJha3BEMApSSVArYkNYS3NFVGJzVWliYjQ2L09KUGJYRnZKc3FtMVo2YjFNbGxsYlJBCi0+IFgyNTUxOSBFSGN1SEczMEd1elE5S1FQd3VYV3JUakhUdDdJbFRxbDRuZjkzbThtKzAwCmtKSlg0RExaZlFxWENGdTBGUm13akw0cGRIdFE3Umpnc1VHYmdVbUN1WXMKLT4gWDI1NTE5IDdmQXJCUU9sZjRJS0pQdUNVMXcrNExWNFNmbXpIdTh6NUdlQ216Wit3QzAKdHphaktWb0xCaDFLWnR4OS91ZjdTZDZQQXlnUGlHcjEvQUorVXVQaUNjNAotPiBmJlEtZ3JlYXNlIEFwVChOdiBiCi9MVUdmcmtiaC9BYitady9GU1JVNjFuN3lMWFl4dzBQNFpqQThHTkJMNFVHbC8yajRoeThlQ2VMaEQwYndRRQotLS0gdUhxMEpvdnMwVjg4dG51SXpacHZQSDZPOC90NmovamdoM1ArSGM4bUdVNArDxI36tjzu4XgVssAfQj9H7Xp9Pm574IqYIkZsv5Y51KQPaoOLEvZs4CdPzOTyVbtNhWWa4AbRk/cMF2SNtKumKjU6WD0=]   # env var name (token in secrets/cratesio.env)
 # publish_timeout_secs = 300
 #
 # [[publish_targets]]

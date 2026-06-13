@@ -114,6 +114,49 @@ dracon-sync repair stuck-list
 dracon-sync repair stuck-unstuck <repo>
 ```
 
+A repo shows up as `STUCK_PUSH` only when the daemon has actually recorded
+a recent push failure for it (within the last 10 minutes, checked against
+the incident ledger). AHEAD repos with no recorded failure show as
+`PENDING` instead — they're "has unpushed commits" without an error, and
+the daemon is working through the queue. See
+`docs/design/sync-push-classification.md` for the full classification rules.
+
+Permanent push rejections (GitLab/Codeberg protected branch, pre-receive
+hook declined, etc.) are detected up front and are NOT retried. One
+incident is logged per cycle and the repo is flagged `STUCK_PUSH` until
+the server-side policy is resolved.
+
+### Large-Repo Staging Cooldown
+
+`git add -A` on a repo with thousands of dirty files can take 60–90s,
+longer than the per-operation idle timeout. To prevent the daemon from
+logging a "staging timeout" incident on every cycle, the policy supports:
+
+```toml
+# Idle timeout (seconds) for `git add` and other staging operations
+# on a single repo. Default: 60. Minimum accepted: 10.
+stage_op_timeout_secs = 60
+
+# When `git add` exceeds stage_op_timeout_secs, the daemon pauses
+# further attempts on that repo for this many seconds. Default: 3600
+# (1 hour). The point is to stop incident-ledger spam.
+stage_cooldown_secs = 3600
+```
+
+After the cooldown elapses, the daemon tries `git add` again; if it
+times out once more, the cooldown resets. This is a per-repo gate — one
+large repo on cooldown does not affect any other repo's sync.
+
+### Repair Concerns vs `repos` Table
+
+`dracon-sync repair concerns` and `dracon-sync repos` use the same
+concern-classification logic: a repo is a CONCERN when it has no
+origin/upstream, or is `behind > 0`, or is `ahead > 0` AND has a recent
+push failure recorded in the incident ledger. The `dracon-sync repos`
+table is the user-visible view; the `repair concerns` command is the
+operator's repair action against that same set. Their counts must agree
+at all times.
+
 ### Dual Branches
 
 ```bash
