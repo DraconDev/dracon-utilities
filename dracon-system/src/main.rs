@@ -600,20 +600,24 @@ pub(crate) fn graduated_nice_value(cpu_percent: f32, rss_mb: u64, base_nice: i32
     cpu_nice.max(mem_nice).clamp(0, 19)
 }
 
-async fn renice_process(pid: i32, value: i32) -> Result<()> {
-    let output = Command::new("renice")
+async fn renice_process_with_bin(bin: &Path, pid: i32, value: i32) -> Result<()> {
+    let output = Command::new(bin)
         .args(["-n", &value.to_string(), "-p", &pid.to_string()])
         .output()
         .await
-        .context("failed to invoke renice")?;
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-        if stderr.is_empty() {
-            anyhow::bail!("renice exited with status {}", output.status);
-        }
-        anyhow::bail!("renice exited with status {}: {}", output.status, stderr);
+        .with_context(|| format!("failed to invoke {}", bin.display()))?;
+    if output.status.success() {
+        return Ok(());
     }
-    Ok(())
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    if stderr.trim().is_empty() {
+        anyhow::bail!("renice exited with status {}", output.status);
+    }
+    anyhow::bail!("renice exited with status {}: {}", output.status, stderr);
+}
+
+async fn renice_process(pid: i32, value: i32) -> Result<()> {
+    renice_process_with_bin(Path::new("renice"), pid, value).await
 }
 
 /// Detect active cargo/rustc processes and return their PIDs and working directories

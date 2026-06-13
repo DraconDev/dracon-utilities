@@ -1,9 +1,46 @@
 use super::*;
 
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
+
 #[test]
 fn defaults_are_expected() {
     assert_eq!(default_min_size_mb(), 512);
     assert_eq!(default_kinds(), "rust-build,node-deps,build-output,cache");
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn renice_process_with_bin_reports_success_and_failure() {
+    let tmp = std::env::temp_dir().join(format!(
+        "dracon_system_renice_test_{}_{}",
+        std::process::id(),
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("time")
+            .as_nanos()
+    ));
+    fs::create_dir_all(&tmp).expect("temp dir");
+    let success = tmp.join("renice-success");
+    fs::write(&success, "#!/bin/sh\necho 'ok' >&2\nexit 0\n").expect("write success script");
+    fs::set_permissions(&success, fs::Permissions::from_mode(0o755)).expect("chmod");
+
+    let failure = tmp.join("renice-failure");
+    fs::write(
+        &failure,
+        "#!/bin/sh\necho 'permission denied' >&2\nexit 1\n",
+    )
+    .expect("write failure script");
+    fs::set_permissions(&failure, fs::Permissions::from_mode(0o755)).expect("chmod");
+
+    renice_process_with_bin(&success, 123, 5)
+        .await
+        .expect("success renice");
+    let err = renice_process_with_bin(&failure, 123, 5)
+        .await
+        .expect_err("failure renice");
+    assert!(err.to_string().contains("permission denied"));
+    let _ = fs::remove_dir_all(&tmp);
 }
 
 #[test]
