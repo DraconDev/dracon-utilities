@@ -57,9 +57,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   retry loop. The retry loop now runs after fallback failure, so transient
   SSH failures can still recover.
 - **`dracon-sync` origin push stops immediately on permanent rejections**:
-  `push_with_retries()` now checks `is_permanent_push_rejection()` before
-  auto-pull/retry/fallback, matching the multi-remote push path and
-  avoiding retry-budget burn on protected branches.
+  `push_with_retries()` and the lower-level transport fallback path now
+  check `is_permanent_push_rejection()` before auto-pull/retry/fallback,
+  matching the multi-remote push path and avoiding retry-budget burn on
+  protected branches.
 - **`dracon-sync` config validation now warns on unsafe timing/ledger
   values**: `stage_cooldown_secs`, `pull_op_timeout_secs`,
   `push_op_timeout_secs`, `repo_sync_timeout_secs`,

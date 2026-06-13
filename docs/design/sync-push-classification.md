@@ -36,9 +36,11 @@ recently and failed", and the four code sites are forced to consult it.
    CONCERN in the `repos` table, `dracon-sync repair concerns` (in
    dry-run) must list it. The dry-run count and the table count must
    be equal.
-2. **No retry on permanent rejections.** A push error matching the
-   permanent-rejection regex set returns immediately from
-   `multi_remote::push_to_named_remote` without consuming a retry slot.
+2. **No retry or transport fallback on permanent rejections.** A push
+   error matching the permanent-rejection regex set returns immediately
+   from `multi_remote::push_to_named_remote`, `push_with_retries()`, and
+   the lower-level `push_with_transport_fallbacks()` path without
+   consuming a retry slot or trying HTTPS fallback.
 3. **One incident per (repo, cycle) for permanent rejections.** The
    daemon logs a single `permanent_push_rejection` incident per cycle;
    the next cycle may log another only if the daemon attempted the

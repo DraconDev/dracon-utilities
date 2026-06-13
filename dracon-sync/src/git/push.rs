@@ -107,6 +107,10 @@ pub(crate) async fn push_with_transport_fallbacks(
     {
         Ok(()) => Ok(()),
         Err(e) => {
+            let err_msg = e.to_string();
+            if is_permanent_push_rejection(&err_msg) {
+                return Err(e);
+            }
             let origin = super::origin_url(repo).unwrap_or_default();
             let branch = super::current_branch(repo).unwrap_or_else(|| "main".to_string());
             if !super::is_safe_branch_name(&branch) {
