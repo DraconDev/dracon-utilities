@@ -414,6 +414,13 @@ pub(crate) struct SyncPolicy {
     /// Default: 60s.
     #[serde(default = "default_stage_op_timeout_secs")]
     pub(crate) stage_op_timeout_secs: u64,
+    /// When `git add` times out for a repo, the daemon applies a per-repo
+    /// cooldown of this many seconds before retrying. This prevents the
+    /// incident ledger from being spammed every ~70s with the same timeout
+    /// for repos whose working tree is too large to stage automatically.
+    /// Default: 3600s (1 hour).
+    #[serde(default = "default_stage_cooldown_secs")]
+    pub(crate) stage_cooldown_secs: u64,
     #[serde(default = "default_push_retries")]
     pub(crate) push_retries: u32,
     #[serde(default = "default_repair_cooldown_secs")]
@@ -611,6 +618,10 @@ pub(crate) fn default_stage_op_timeout_secs() -> u64 {
     60
 }
 
+pub(crate) fn default_stage_cooldown_secs() -> u64 {
+    3600
+}
+
 pub(crate) fn default_push_retries() -> u32 {
     3
 }
@@ -705,6 +716,9 @@ impl SyncPolicy {
                 policy.stage_op_timeout_secs
             );
             policy.stage_op_timeout_secs = 10;
+        }
+        if policy.stage_cooldown_secs == 0 {
+            policy.stage_cooldown_secs = default_stage_cooldown_secs();
         }
         policy.max_push_blob_bytes = policy
             .max_push_blob_bytes
@@ -1145,6 +1159,7 @@ pub(crate) fn test_sync_policy() -> SyncPolicy {
         push_op_timeout_secs: 300,
         repo_sync_timeout_secs: 420,
         stage_op_timeout_secs: 60,
+        stage_cooldown_secs: 3600,
         push_retries: 3,
         repair_cooldown_secs: 60,
         max_push_blob_bytes: 100 * 1024 * 1024,
@@ -1224,6 +1239,22 @@ mod tests {
     fn test_default_repair_cooldown_secs() {
         let secs = default_repair_cooldown_secs();
         assert_eq!(secs, 60);
+    }
+
+    #[test]
+    fn test_default_stage_op_timeout_secs() {
+        let secs = default_stage_op_timeout_secs();
+        assert_eq!(secs, 60);
+        assert!(secs >= 10, "stage timeout must be at least 10s");
+    }
+
+    #[test]
+    fn test_default_stage_cooldown_secs() {
+        let secs = default_stage_cooldown_secs();
+        // 1 hour default — long enough to stop the incident ledger from
+        // being spammed every ~70s by repos whose working tree is too
+        // large to stage within stage_op_timeout_secs.
+        assert_eq!(secs, 3600);
     }
 
     #[test]

@@ -369,6 +369,7 @@ pub(crate) struct StatusJson {
     pub(crate) push_op_timeout_secs: u64,
     pub(crate) repo_sync_timeout_secs: u64,
     pub(crate) stage_op_timeout_secs: u64,
+    pub(crate) stage_cooldown_secs: u64,
     pub(crate) push_retries: u32,
     pub(crate) repair_cooldown_secs: u64,
     pub(crate) incident_ledger_max_lines: usize,
@@ -2884,6 +2885,7 @@ mod tests {
             push_op_timeout_secs: 300,
             repo_sync_timeout_secs: 420,
             stage_op_timeout_secs: 60,
+            stage_cooldown_secs: 3600,
             push_retries: 3,
             repair_cooldown_secs: 60,
             max_push_blob_bytes: 100 * 1024 * 1024,
@@ -3059,6 +3061,7 @@ mod tests {
             push_op_timeout_secs: 300,
             repo_sync_timeout_secs: 420,
             stage_op_timeout_secs: 60,
+            stage_cooldown_secs: 3600,
             push_retries: 3,
             repair_cooldown_secs: 60,
             incident_ledger_max_lines: 10000,
@@ -3311,7 +3314,7 @@ mod tests {
     }
 
     #[test]
-    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAzb3B1TkJaQ2FheWJ2SkZjVi9BTHhwZklTNjBCM3FUSkpGODZUU1lCM0NzClhzeFNpUmtFa3pkRTNndUFQcWxCeTgwVzlzYmxqR29NNEpESGlhSkxteDAKLT4gWDI1NTE5IE5sZm0vcTBjbGtwenUzY1VkVHlLZG01RllNdkwzeTdqOFplbFJFRFBWZzQKblllSzhlNjl3aHFRcFFiUncybmNHaWRmUVJlc2NEWGZUOHN5RUxtMGJ1NAotPiBYMjU1MTkgMzJNNnVxTWxoNmlKNU1UYzFRdjU5c2RsL2wrcDlYUDV3MEVnSjN1YVpFNApOdzdPVVEvR0U3YjBRemdHV2EwZU5EWER4d0RObVY1bmtVelNQUVoyd0NVCi0+IFgyNTUxOSBKNHlQUm9xSDJscEcvU25TUGFkS3J6V3NBRmkrZmRxY25xTmNnUlBxN0VNCnBSdXJrcXlsNE95K09ZNUxNRnA2UFdIR21MdE1rZW5mRHdydU4zYU5BRE0KLT4gWDI1NTE5IGFtNzZnNGNGVUdKNUF0YnlrMVF0ZkFkeVF4Q3p0ZEZIVXp3Nm9jRCs2azQKK0RmOC8yZ2xUbWE0T2U2eERNa04za3loWVd3UEtGUkVBYzdQbGJveXhnNAotPiBZWC1ncmVhc2UgYUIgVFw/ICdWVHFUSQpXaU1FbHZxYVVCTi9BVlV5Y2NVCi0tLSBmd083QnNoRWpXOEtLcWRDL0lhUGJYL2QrR2IrcTVpbGtuY0hGVG82VGtzCoeATuLQntWaF5pFgpf3wCYTKcSzhkK/yas3oFHXQIZEB9SFLiqvKfEVe2jgwtrOz/kF4wVnIZePQp3UlfY=]() {
+    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAvMHdkeWJwWDQ3UDhMRWpHTGN2VTJSMUtQR21aVDNaOWoySnViK1hDWkg4Ckw2d3ZIdFdPYS9GNnNKQXdudzF0dUMvRzA3elgrZy95TWdtUzdjQkJXNFUKLT4gWDI1NTE5IFljSm9wRXQyM1Q4ME1iYW9kdFQ1VVZrTWZHeTlldGFrWWhqclRQbDk5V00KdWJlS3BmaHJqRHplM0l1cWowSmxReDV1QnQ4WUp6akxVaWZSaVNRd2ZCVQotPiBYMjU1MTkgMEJzejZZRjJKVWlmTUpYajNDVHp2NmFwS0VnOEdwVVVTVGFUaXEzOVdCYwpQMU9uWVplWXo5RkYxOXJ1akZZV2Jnd2tLcHUwRmRLVmE3WTNDdTRaR1V3Ci0+IFgyNTUxOSBuYm1yWWx0bytzdEpFT0pDQ0Rpbk5GUEJFcklHdXNwREdUL0NxOEh2d3pzCmVkNjVYK1AxbDd3WjVKMnpnUVJoSVZIN3dNY1RwMHVuWDdybmFTK3B1QUUKLT4gWDI1NTE5IFdraGFYTkxRUVgrVW5RMnJkVDZudjNSeEhaUllDWHVzVzhpSUFHM1NuZ28KNUdUdmJlR1lQLzgwMS9NUStXdTU1enhoVFQ5bndrem5xVUxsaWtESVhyRQotPiBmMi1ncmVhc2UgflUgOS02NSBzfVUvWDogd0s/Jj5rJApVdGY3MUJ5aHVDMGNhZU92VGJ3MVpIaGlpSUVsQnp4VkJDSGpCbGdxNFo2YnNEMFpqdlMzZ2pyOGgxY2tJOEpMCjJ1bXNkUWxtVkRJM2l5NmdkaFY1aG11SFovaU9ocjMyMEJITEJSaGpMamxycjZvUzlzV0pyZDRacGNQbWl0WncKdGNYZwotLS0gdDBJSldBL2JHaVlYMmlyZS9sNUJyVjZKSWJOR1hLeE14Mko1d3Foczc1TQpdf1kPgTGnogShtyCEwNi2V2QZveuHLJXdl2urWjaJBl+ZLk5+VlnNvatepr2R/LxYBBNZHH2zghewZVYX]() {
         let mut cooldowns = std::collections::HashMap::new();
         let repo = std::path::PathBuf::from("/test/repo");
         let notify_key = format!("push-fail-{}", repo.display());

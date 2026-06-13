@@ -735,6 +735,7 @@ pub(crate) async fn run_daemon(
     let mut initial_repos: HashSet<PathBuf>; // populated after first scan
     let mut repair_cooldowns: HashMap<PathBuf, Instant> = HashMap::new();
     let mut filter_cooldowns: HashMap<PathBuf, Instant> = HashMap::new();
+    let mut stage_cooldowns: HashMap<PathBuf, Instant> = HashMap::new();
     let mut stuck_push_repos = load_stuck_push_repos();
     let mut remote_notify_cooldowns: HashMap<String, Instant> = HashMap::new();
     let mut cycle_count: u64 = 0;
@@ -793,6 +794,7 @@ pub(crate) async fn run_daemon(
                     activity.clear();
                     repair_cooldowns.clear();
                     filter_cooldowns.clear();
+                    stage_cooldowns.clear();
                 }
                 Err(e) => eprintln!("sync: SIGHUP policy reload failed: {}", e),
             }
@@ -1213,6 +1215,20 @@ pub(crate) async fn run_daemon(
                 Err(e) => {
                     eprintln!("⚠️ sync failed for {}: {}", repo.display(), e);
                     let err_str = e.to_string();
+                    // `git add` timeout: the working tree is too large to
+                    // stage within stage_op_timeout_secs. Apply a long
+                    // per-repo cooldown so we don't spam the incident
+                    // ledger every ~70s with the same timeout.
+                    if err_str.contains("git add timeout") {
+                        let cooldown = policy.stage_cooldown_secs.max(60);
+                        stage_cooldowns
+                            .insert(repo.clone(), Instant::now() + Duration::from_secs(cooldown));
+                        eprintln!(
+                            "⏸️  {} staging paused for {}s (working tree too large to stage); manual `git add` may be required",
+                            repo.display(),
+                            cooldown
+                        );
+                    }
                     if err_str.contains("push") || err_str.contains("remote") {
                         // Rate-limit: notify at most once per repo per 30 min
                         let notify_key = format!("pushfail-{}", repo.display());

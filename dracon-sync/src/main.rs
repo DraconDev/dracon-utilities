@@ -296,6 +296,7 @@ async fn main() -> Result<()> {
                     push_op_timeout_secs: policy.push_op_timeout_secs,
                     repo_sync_timeout_secs: policy.repo_sync_timeout_secs,
                     stage_op_timeout_secs: policy.stage_op_timeout_secs,
+                    stage_cooldown_secs: policy.stage_cooldown_secs,
                     push_retries: policy.push_retries,
                     repair_cooldown_secs: policy.repair_cooldown_secs,
                     incident_ledger_max_lines: policy.incident_ledger_max_lines,
@@ -440,6 +441,10 @@ async fn main() -> Result<()> {
                 table.add_row(vec![
                     Cell::new("⏱️ Stage timeout"),
                     Cell::new(crate::print::format_secs(policy.stage_op_timeout_secs)),
+                ]);
+                table.add_row(vec![
+                    Cell::new("⏸️  Stage cooldown"),
+                    Cell::new(crate::print::format_secs(policy.stage_cooldown_secs)),
                 ]);
                 table.add_row(vec![
                     Cell::new("🔁 Push retries"),
