@@ -155,6 +155,13 @@ pub(crate) async fn push_with_retries(
             Ok(()) => return Ok(()),
             Err(e) => {
                 let err_msg = e.to_string();
+                // Server-side policy errors (protected branch, hook declined,
+                // etc.) cannot be fixed by retries, pull, or HTTPS fallback.
+                // Return immediately so the caller logs one incident per
+                // cycle instead of burning the retry budget.
+                if is_permanent_push_rejection(&err_msg) {
+                    return Err(e);
+                }
                 last_err = Some(e);
 
                 // On the first failure that looks like a non-fast-forward

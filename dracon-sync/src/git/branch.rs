@@ -269,12 +269,20 @@ pub(crate) fn repair_broken_tracking(repos: &[PathBuf]) -> usize {
             if branch.is_empty() || !is_safe_branch_name(&branch) {
                 continue;
             }
+            // Extract the old remote tracking ref inside the `[...]` so the
+            // log message shows the actual change, not a fake branch/branch.
+            // Old line: `* main abc [origin/master: gone] ...` → old="origin/master"
+            // Default to "origin/<branch>" if we can't parse for any reason.
+            let old_tracking = trimmed
+                .find('[')
+                .and_then(|start| trimmed[start..].find(']').map(|end| start + end))
+                .map(|end| trimmed[1..end].to_string()) // drop the leading '['
+                .unwrap_or_else(|| format!("origin/{}", branch));
             if set_upstream_to_branch(repo, &branch).is_ok() {
                 eprintln!(
-                    "🧹 startup: fixed broken tracking in {} ({}/{} -> origin/{}",
+                    "🧹 startup: fixed broken tracking in {} ({} -> origin/{})",
                     repo.display(),
-                    branch,
-                    branch,
+                    old_tracking,
                     branch
                 );
                 repaired += 1;

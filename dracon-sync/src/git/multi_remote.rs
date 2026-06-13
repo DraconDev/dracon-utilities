@@ -176,12 +176,16 @@ pub(crate) async fn push_to_named_remote(
     let remote_url = get_remote_url(repo, remote_name)
         .ok_or_else(|| anyhow::anyhow!("remote {} not found", remote_name))?;
 
+    let mut last_err = None;
     if is_safe_branch_name(&branch) {
         let fallback_label = format!("push-to-{}", remote_name);
-        push_https_fallback(repo, &remote_url, &refspec, timeout_secs, &fallback_label).await?;
+        match push_https_fallback(repo, &remote_url, &refspec, timeout_secs, &fallback_label).await
+        {
+            Ok(()) => return Ok(()),
+            Err(e) => last_err = Some(e),
+        }
     }
 
-    let mut last_err = None;
     for attempt in 1..=retries.max(1) {
         match run_git_with_timeout_env_progress(
             repo,

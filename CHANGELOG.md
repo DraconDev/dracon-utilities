@@ -47,6 +47,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   sibling is required only for `cargo build` from source. This is a
   logic defect (mislabeling an optional check as required). Fixed in
   commit `fd93b943f`.
+- **`dracon-sync` stage cooldowns are now enforced**: The daemon previously
+  inserted a `stage_cooldowns` entry after `git add` timeout but never
+  consulted it on later cycles. It now skips repos with active cooldowns
+  and removes expired entries, preventing repeated timeout attempts while
+  the cooldown is active.
+- **`dracon-sync` multi-remote push retries after HTTPS fallback failure**:
+  A failed HTTPS fallback used to return immediately and skip the SSH
+  retry loop. The retry loop now runs after fallback failure, so transient
+  SSH failures can still recover.
+- **`dracon-sync` origin push stops immediately on permanent rejections**:
+  `push_with_retries()` now checks `is_permanent_push_rejection()` before
+  auto-pull/retry/fallback, matching the multi-remote push path and
+  avoiding retry-budget burn on protected branches.
+- **`dracon-sync` config validation now warns on unsafe timing/ledger
+  values**: `stage_cooldown_secs`, `pull_op_timeout_secs`,
+  `push_op_timeout_secs`, `repo_sync_timeout_secs`,
+  `inactivity_push_delay_secs`, `repair_cooldown_secs`, and ledger
+  retention values now warn before they cause incident-ledger spam or
+  misleading push-failure windows.
+- **`dracon-sync` recent-push-failure lookup now reads the ledger tail**:
+  The `STUCK_PUSH` classification no longer scans the entire append-only
+  incident ledger on every `repos` call. It reads a bounded tail window
+  (500 lines) and still uses the same 10-minute `recent_push_failure`
+  semantics.
+- **`dracon-sync` broken-tracking repair log now shows the real old
+  tracking ref**: The startup repair used to print a fake
+  `branch/branch -> origin/branch` message. It now parses the actual
+  `[origin/master: gone]` ref and prints the real old/new mapping.
+- **`dracon-warden` plaintext-sibling hatch checks now use the repo path**:
+  `scrub-markers` and `resmudge` previously checked for `<file>.plaintext`
+  relative to the current working directory. They now check under the repo
+  being scanned, so the hatch works when the command is run from outside
+  the repo.
+- **`dracon-system` renice state now updates only after `renice` succeeds**:
+  The guard used to record a PID as reniced even if the external `renice`
+  command failed. It now treats renice failure as a failed action and does
+  not update in-memory state.
+- **Cargo.lock refreshed for the current dependency graph**: `cargo build
+  --locked` failed because the committed lockfile was stale. Refreshing it
+  keeps CI/build validation reproducible without requiring lockfile writes
+  during validation.
 
 ### Added
 - **`dracon-sync` `stage_op_timeout_secs` policy field**: Configurable

@@ -14,6 +14,8 @@ pub(crate) struct GitCommand {
 
 impl GitCommand {
     pub(crate) fn new() -> Self {
+        // Poisoned means a previous git-command thread panicked while holding
+        // the lock; continuing would risk overlapping git operations.
         let _command_guard = GIT_COMMAND_LOCK.lock().expect("git command lock poisoned");
         Self {
             inner: StdCommand::new(git_binary()),
@@ -41,6 +43,8 @@ pub(crate) struct TokioGitCommand {
 
 impl TokioGitCommand {
     pub(crate) fn new() -> Self {
+        // Poisoned means a previous git-command thread panicked while holding
+        // the lock; continuing would risk overlapping git operations.
         let _command_guard = GIT_COMMAND_LOCK.lock().expect("git command lock poisoned");
         Self {
             inner: TokioCommand::new(git_binary()),
@@ -942,6 +946,54 @@ pub(crate) fn validate_config(policy_path: &Path) -> ValidateResult {
             policy.stage_op_timeout_secs
         ));
     }
+    if policy.stage_cooldown_secs < 60 {
+        result.warn(format!(
+            "stage_cooldown_secs {} below recommended minimum 60s; very short cooldowns can flood the incident ledger",
+            policy.stage_cooldown_secs
+        ));
+    }
+    if policy.pull_op_timeout_secs < 5 {
+        result.warn(format!(
+            "pull_op_timeout_secs {} below recommended minimum 5s",
+            policy.pull_op_timeout_secs
+        ));
+    }
+    if policy.push_op_timeout_secs < 10 {
+        result.warn(format!(
+            "push_op_timeout_secs {} below recommended minimum 10s",
+            policy.push_op_timeout_secs
+        ));
+    }
+    let min_repo_sync_timeout = policy
+        .push_op_timeout_secs
+        .saturating_add(30)
+        .max(policy.pull_op_timeout_secs.saturating_add(30));
+    if policy.repo_sync_timeout_secs < min_repo_sync_timeout {
+        result.warn(format!(
+            "repo_sync_timeout_secs {} below recommended minimum {}s (push/pull timeout + 30s safety margin)",
+            policy.repo_sync_timeout_secs, min_repo_sync_timeout
+        ));
+    }
+    if policy.inactivity_push_delay_secs == 0 {
+        result.warn("inactivity_push_delay_secs = 0 means the daemon may commit partial changes before quiet time elapses".to_string());
+    }
+    if policy.repair_cooldown_secs < 10 {
+        result.warn(format!(
+            "repair_cooldown_secs {} below recommended minimum 10s; very short cooldowns can flood the incident ledger",
+            policy.repair_cooldown_secs
+        ));
+    }
+    if policy.incident_ledger_max_lines < 100 {
+        result.warn(format!(
+            "incident_ledger_max_lines {} below recommended minimum 100; recent-push-failure classification may lose context",
+            policy.incident_ledger_max_lines
+        ));
+    }
+    if policy.incident_ledger_max_age_days == 0 {
+        result.warn(
+            "incident_ledger_max_age_days = 0 disables age-based ledger retention".to_string(),
+        );
+    }
 
     if let Some(ref url) = policy.webhook_url {
         if !url.starts_with("http://") && !url.starts_with("https://") {
@@ -1617,6 +1669,45 @@ remotes = []
             "valid policy should pass: {:?}",
             result.errors
         );
+    }
+
+    #[test]
+    fn test_validate_config_warns_on_short_stage_cooldown_and_timeouts() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let content = r#"
+auto_github_private = false
+watch_roots = ["/tmp"]
+remotes = []
+stage_op_timeout_secs = 5
+stage_cooldown_secs = 10
+pull_op_timeout_secs = 1
+push_op_timeout_secs = 5
+repo_sync_timeout_secs = 5
+inactivity_push_delay_secs = 0
+repair_cooldown_secs = 1
+incident_ledger_max_lines = 10
+incident_ledger_max_age_days = 0
+"#;
+        std::fs::write(tmp.path().join("policy.toml"), content).unwrap();
+        let result = validate_config(tmp.path().join("policy.toml").as_path());
+        assert!(result.is_valid(), "short values warn but remain valid");
+        for expected in [
+            "stage_op_timeout_secs 5",
+            "stage_cooldown_secs 10",
+            "pull_op_timeout_secs 1",
+            "push_op_timeout_secs 5",
+            "repo_sync_timeout_secs 5",
+            "inactivity_push_delay_secs = 0",
+            "repair_cooldown_secs 1",
+            "incident_ledger_max_lines 10",
+            "incident_ledger_max_age_days = 0",
+        ] {
+            assert!(
+                result.warnings.iter().any(|w| w.contains(expected)),
+                "missing warning for {expected}: {:?}",
+                result.warnings
+            );
+        }
     }
 
     #[test]

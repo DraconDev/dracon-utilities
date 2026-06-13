@@ -34,6 +34,19 @@ use crate::sync::{sync_repo, SyncOutcome};
 
 const STUCK_REPO_EXPIRY_SECS: u64 = 24 * 60 * 60; // 24 hours
 
+fn stage_cooldown_remaining(
+    stage_cooldowns: &mut HashMap<PathBuf, Instant>,
+    repo: &Path,
+    now: Instant,
+) -> Option<Duration> {
+    let until = stage_cooldowns.get(repo).copied()?;
+    if now >= until {
+        stage_cooldowns.remove(repo);
+        return None;
+    }
+    Some(until.duration_since(now))
+}
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 struct StuckRepoEntry {
     path: PathBuf,
@@ -77,6 +90,30 @@ mod tests {
     #[allow(clippy::assertions_on_constants)]
     fn test_stuck_repo_expiry_not_zero() {
         assert!(STUCK_REPO_EXPIRY_SECS > 0);
+    }
+
+    #[test]
+    fn test_stage_cooldown_remaining_removes_expired_and_keeps_active() {
+        let repo = PathBuf::from("/tmp/repo");
+        let now = Instant::now();
+        let mut cooldowns = HashMap::new();
+        cooldowns.insert(repo.clone(), now + Duration::from_secs(60));
+        let active = stage_cooldown_remaining(&mut cooldowns, &repo, now).expect("active");
+        assert!(active <= Duration::from_secs(60));
+        assert!(cooldowns.contains_key(&repo));
+
+        let expired =
+            stage_cooldown_remaining(&mut cooldowns, &repo, now + Duration::from_secs(61));
+        assert!(expired.is_none());
+        assert!(!cooldowns.contains_key(&repo));
+    }
+
+    #[test]
+    fn test_stage_cooldown_remaining_missing_is_none() {
+        let repo = PathBuf::from("/tmp/repo");
+        let mut cooldowns = HashMap::new();
+        let remaining = stage_cooldown_remaining(&mut cooldowns, &repo, Instant::now());
+        assert!(remaining.is_none());
     }
 
     #[test]
@@ -990,6 +1027,16 @@ pub(crate) async fn run_daemon(
                     continue;
                 }
                 filter_cooldowns.remove(&repo);
+            }
+            if let Some(remaining) = stage_cooldown_remaining(&mut stage_cooldowns, &repo, now) {
+                if debug_enabled() {
+                    eprintln!(
+                        "⏸️  {} staging cooldown active; skipping for {}s",
+                        repo.display(),
+                        remaining.as_secs()
+                    );
+                }
+                continue;
             }
             let svc = match GitService::new(&repo) {
                 Ok(svc) => svc,

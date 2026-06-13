@@ -119,7 +119,7 @@ Every push attempt (success or failure) MUST log to
 `~/.local/state/dracon/dracon-sync-incidents.jsonl`. Successful pushes
 log a `result: "ok"` entry; failures log `result: "fail"` with the
 error message in `details`. The `recent_push_failure` window scans the
-last N lines (the ledger is read tail-first) for entries matching the
+last 500 lines (the ledger is read tail-first) for entries matching the
 repo path. Operators pruning the ledger should keep at least the last
 10 minutes of entries or the `STUCK_PUSH` signal will lag.
 
@@ -130,7 +130,8 @@ the configured duration after a `git add` timeout. This is independent
 of the push classification: a repo in stage cooldown is not flagged
 `STUCK_PUSH` (it never got to the push step), but it is invisible to
 the rest of the sync loop until the cooldown elapses. The cooldown
-is per-repo; other repos are unaffected.
+is per-repo; other repos are unaffected. The daemon loop enforces this
+cooldown directly, so the repo is skipped until the timer expires.
 
 ## Out of scope (intentionally not changed)
 
