@@ -11,8 +11,9 @@ use crate::helpers::is_repo_already_exists;
 use crate::policy::{std_git_command, AuthType, RemoteConfig};
 
 use super::{
-    current_branch, gh_cmd, git_ssh_hardening, is_push_rejected, is_safe_branch_name, load_secret,
-    push_https_fallback, run_git_capture_output, run_git_with_timeout_env_progress,
+    current_branch, gh_cmd, git_ssh_hardening, is_permanent_push_rejection, is_push_rejected,
+    is_safe_branch_name, load_secret, push_https_fallback, run_git_capture_output,
+    run_git_with_timeout_env_progress,
 };
 
 /// Configure a remote URL. Adds if missing, updates if URL differs.
@@ -196,7 +197,15 @@ pub(crate) async fn push_to_named_remote(
         {
             Ok(()) => return Ok(()),
             Err(e) => {
-                let is_rejected = is_push_rejected(&e.to_string());
+                let err_str = e.to_string();
+                let is_rejected = is_push_rejected(&err_str);
+                // Permanent server-side rejection (protected branch, hook
+                // declined, etc.) — retrying will not fix it. Return the
+                // error immediately so the caller can log it once instead
+                // of burning retries and flooding the incident ledger.
+                if is_permanent_push_rejection(&err_str) {
+                    return Err(e);
+                }
                 if is_rejected && force_when_behind {
                     match diagnose_divergence(repo, remote_name, &branch).await {
                         Ok(Divergence::RemotePurelyBehind) => {

@@ -66,9 +66,9 @@ pub(crate) async fn cmd_doctor(json: bool, strict: bool) -> Result<()> {
             "Clone or symlink your NixOS config under ~/.dracon/nixos",
         ),
         (
-            "dracon-libs (sibling)",
+            "dracon-libs (dev sibling)",
             report.canonical_libs_exists,
-            "git clone https://github.com/your-org/dracon-libs.git ../dracon-libs",
+            "Optional for installed binaries. Required only for `cargo build` from source: git clone https://github.com/DraconDev/dracon-libs.git ../dracon-libs",
         ),
         (
             "dracon-utilities (self)",

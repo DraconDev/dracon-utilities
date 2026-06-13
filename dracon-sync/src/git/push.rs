@@ -226,3 +226,50 @@ pub(crate) fn is_push_rejected(err_msg: &str) -> bool {
         || err_msg.contains("fetch first")
         || err_msg.contains("[rejected]")
 }
+
+/// Check if an error message indicates a permanent push rejection that
+/// retrying will not fix. These are server-side policy errors (protected
+/// branches, required reviews, deny rules) that the daemon should
+/// acknowledge once and stop retrying per cycle.
+pub(crate) fn is_permanent_push_rejection(err_msg: &str) -> bool {
+    err_msg.contains("pre-receive hook declined")
+        || err_msg.contains("protected branch")
+        || err_msg.contains("not allowed to push")
+        || err_msg.contains("deny updating")
+        || err_msg.contains("hook declined")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_permanent_push_rejection_recognises_gitlab_protected_branch() {
+        let msg = "GitLab: You are not allowed to push code to protected branches on this project.\npre-receive hook declined";
+        assert!(is_permanent_push_rejection(msg));
+    }
+
+    #[test]
+    fn test_is_permanent_push_rejection_recognises_github_protected_branch() {
+        let msg = "remote: error: GH006: Protected branch update failed for main.\n! [remote rejected] main -> main (protected branch hook declined)";
+        assert!(is_permanent_push_rejection(msg));
+    }
+
+    #[test]
+    fn test_is_permanent_push_rejection_ignores_transient_errors() {
+        // A non-fast-forward is recoverable via rebase/fetch, not permanent.
+        let msg = "non-fast-forward";
+        assert!(!is_permanent_push_rejection(msg));
+        // A network timeout is transient, not permanent.
+        let msg = "connection timed out";
+        assert!(!is_permanent_push_rejection(msg));
+    }
+
+    #[test]
+    fn test_is_push_rejected_still_works() {
+        assert!(is_push_rejected(
+            "[rejected] main -> main (non-fast-forward)"
+        ));
+        assert!(!is_push_rejected("connection timed out"));
+    }
+}
