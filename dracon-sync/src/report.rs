@@ -586,15 +586,25 @@ fn build_recent_push_failure_map(policy_path: &Path) -> Option<HashMap<String, b
     use std::time::{SystemTime, UNIX_EPOCH};
 
     let path = incident_ledger_path(policy_path);
-    let content = std::fs::read_to_string(&path).ok()?;
+    // The ledger is append-only and can grow to thousands of lines. We only
+    // care about the most recent ~10 minutes, so reading the whole file on
+    // every `repos` call is O(ledger_size) and wasteful. Read the last
+    // `RECENT_LINES_WINDOW` lines instead — a tight window that still
+    // covers any plausible 10-minute push-failure rate.
+    const RECENT_LINES_WINDOW: usize = 500;
+    const PUSH_WINDOW_SECS: u64 = 600; // 10 minutes
+    let recent = read_tail_lines(&path, RECENT_LINES_WINDOW).ok()?;
+    if recent.is_empty() {
+        return Some(HashMap::new());
+    }
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_secs())
         .unwrap_or(0);
-    let cutoff = now.saturating_sub(600); // 10 minutes
+    let cutoff = now.saturating_sub(PUSH_WINDOW_SECS);
     let mut map: HashMap<String, bool> = HashMap::new();
-    for line in content.lines() {
-        let entry: serde_json::Value = match serde_json::from_str(line) {
+    for line in recent {
+        let entry: serde_json::Value = match serde_json::from_str(&line) {
             Ok(v) => v,
             Err(_) => continue,
         };
@@ -619,6 +629,68 @@ fn build_recent_push_failure_map(policy_path: &Path) -> Option<HashMap<String, b
         }
     }
     Some(map)
+}
+
+/// Read up to `max_lines` trailing lines from a file, returning them in
+/// chronological order (oldest first). Streams the file in chunks from the
+/// end so the operation is O(tail-size) regardless of total file size.
+///
+/// If the file is smaller than `max_lines`, returns the whole file. If the
+/// file cannot be read (missing, permission denied, etc.), returns the
+/// underlying IO error so the caller can decide whether to surface it.
+fn read_tail_lines(path: &Path, max_lines: usize) -> std::io::Result<Vec<String>> {
+    use std::io::{Read, Seek, SeekFrom};
+    const CHUNK_SIZE: usize = 16 * 1024;
+    let mut file = std::fs::File::open(path)?;
+    let len = file.metadata()?.len() as usize;
+    if len == 0 {
+        return Ok(Vec::new());
+    }
+    // Read from the end in CHUNK_SIZE pieces until we have at least
+    // `max_lines` newlines or hit the start of the file.
+    let mut buf: Vec<u8> = Vec::new();
+    let mut remaining = len;
+    let mut pos = len;
+    while remaining > 0 && buf.iter().filter(|&&b| b == b'\n').count() <= max_lines {
+        let take = remaining.min(CHUNK_SIZE);
+        pos -= take;
+        file.seek(SeekFrom::Start(pos as u64))?;
+        let mut chunk = vec![0u8; take];
+        file.read_exact(&mut chunk)?;
+        // Prepend because we're reading backwards.
+        let mut new_buf = chunk;
+        new_buf.append(&mut buf);
+        buf = new_buf;
+        remaining = pos;
+    }
+    // Split into lines. If the read window started mid-line, the first
+    // parsed entry will be a partial line; drop it after checking the byte
+    // immediately before the window.
+    let text = match std::str::from_utf8(&buf) {
+        Ok(s) => s,
+        Err(_) => return Ok(Vec::new()),
+    };
+    let mut lines: Vec<&str> = text.lines().collect();
+    if pos > 0 {
+        // A newline immediately before the window means we started at a
+        // line boundary. Any other byte means the first parsed line is
+        // only the tail of a longer line and must be dropped.
+        let mut probe = std::fs::File::open(path)?;
+        probe.seek(SeekFrom::Start((pos - 1) as u64))?;
+        let mut byte = [0u8; 1];
+        if probe.read_exact(&mut byte).is_ok() && byte[0] != b'\n' {
+            // We started mid-line, drop the first partial.
+            if !lines.is_empty() {
+                lines.remove(0);
+            }
+        }
+    }
+    // Keep only the last `max_lines` lines.
+    if lines.len() > max_lines {
+        let drop = lines.len() - max_lines;
+        lines.drain(..drop);
+    }
+    Ok(lines.into_iter().map(|s| s.to_string()).collect())
 }
 
 pub(crate) fn repo_state_flags(
@@ -3380,7 +3452,7 @@ mod tests {
     }
 
     #[test]
-    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBCNzFLdTNQR2dpT2tOY3VyZzFvOGh6cGVOc2JiQ3pDMjI3RWZ2Zkpud2xzCkJVT3VQeDRlNUcxTDF4eC9MbS9BUHFUZEl3aGhrTzAzRnFiRTRFS1RnckUKLT4gWDI1NTE5IHVlV3RXOXlicUxTSVc3NHRaYi9URGt4dTNQY0FLcWVJS202Uzd2QTZVbmsKT3Z6QmRIRFR1RDhSUVpOK3RWTzROVElIOXZiTDJlQ0ZpL2tVa2I3S2lnRQotPiBYMjU1MTkgeWRxanQvZy9iRkNCMlZtUVNXMkNLeEhwVXh0N0hMMGprcDhPcE9lODRSVQp6dndQUnQ0bzZaOVhEa2FZancyQmtnRzExV2h5Q1VtUlZzakd0TWtRSklFCi0+IFgyNTUxOSAwUTgrSTI4Y3FzNUE2SFFqTFNUR0RZTGFKU3MwOWo0K2gvcktZeEVpZHlBCk0xYVI5K25CUzdPcWJsTkVNWUZTd25xYmpsQ3pnSmxUd0NxR2M1NWNpVzgKLT4gWDI1NTE5IFZzNzRzbTZJY3IzYloxZ0I3MjJNN0J5Q3ZjR3U4ekhoTm9BS0gyOGMyVWMKdWE0YXcrUUFPZFpjSXllcUlMTG9WOXhLNlFDVSs2RmU0elF0Y01pSmpBUQotPiB3QGFUeihrLWdyZWFzZSBpc3VwRiBQRzZqIG84CkJUay92M2Q4MkZiaUJxWFp3SXZzLzhtQ0NuWmZpUGNQS3cKLS0tIEsrbGgwL0JWcFlabGR3WlpYRHp5L3d6bWR3YzZPTW1xcGk3WU84RU5ITk0K1MMEY1Z6CUDScOw269Tgaqsm9zsFodGT8NApvlUAJcfiFv5NqHNVVFkCvKxGsewBxmCx2eVyKxtZhA+mkQ==]() {
+    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB1QkFDTlo3K3R4OC9YWi9RZ3VONi9LWVR4NnpuMXhvdFg0WFd4MjhUZUZBClZzeHloV0YyeForMXRiK29yemMxTmt5Q1hIbTRmaHl4SmFUUStNSjlmUXMKLT4gWDI1NTE5IEhYTDhWNVB1VkpYMWwzbHowTDQ0cUY2WWRyWkt6MVVWTnc1SVVIMkpyUm8KWkVYWU1HaGtxZU91c1RNNEMyMFkzOS9xdXgveDFicHZCSjJvVGZwREM2SQotPiBYMjU1MTkgZ0ZIbElqZy9WQ28wbGMzTUxDOVJEMHkyeStRYWRvSFFKK3Fxd21qV1ZBZwpUMHB4OS9qSEJ5Ry81MVNxcWlLS3hSM3dSZ3pYYk9zNExzWlkrR3pHODVZCi0+IFgyNTUxOSA4ZTVlWTd1S1dySXBWbnYreDFqVTlRMUlMQUIvL3lvMDdycGdqVjgzaVZRCmdINFZrZXZNa1hLbXhtRGRRbXZ3UUpQeXMwa2hJS05FVk5ERGREemxNWGsKLT4gWDI1NTE5IHc4Zk9sWVduZFA2WWlhSFh4UnFkR2ZIdERYSnVtN21iYlJ2bXBrOWp3bncKREtyZmJmTEVBYkZBcmJUd1dxUG42OG5GWjFHeklTT1k5bkhzWHk0Z01GYwotPiAkdnkwXV4qfC1ncmVhc2UgYSpAZXhjCnZIbElTZzBuWHU3VUhHbW1QUkxnR1JUcFE5ZnBzNGlpclF1Tmtpb1BLcHNoYzczVXFtcTFpUitZczJVR1RoVXgKR3k1UERNVitBVWt2RjhrTDRrMTQKLS0tIE54MmhTamhvZG1KMHAvNTNXbkdJbHlhazRycGJicFdPeGNVQUx6YTI2WmsKy2EESBBDdPousfJXBmREjwY8vXxB3/pdcBAjjngzcZHIcyWDE/wr2jlqv20hfz/zvPRfwMFXfFxY+CPQog==]() {
         let mut cooldowns = std::collections::HashMap::new();
         let repo = std::path::PathBuf::from("/test/repo");
         let notify_key = format!("push-fail-{}", repo.display());
@@ -3433,5 +3505,122 @@ mod tests {
         assert_eq!(row.push_status, "STUCK");
         assert!(row.push_error.contains("ahead=5"));
         assert!(row.concern);
+    }
+
+    // -------------------------------------------------------------------
+    // read_tail_lines tests — used by build_recent_push_failure_map so
+    // the incident-ledger scan is O(tail) instead of O(ledger_size).
+    // -------------------------------------------------------------------
+
+    #[test]
+    fn read_tail_lines_empty_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("ledger.jsonl");
+        std::fs::write(&path, b"").unwrap();
+        let lines = read_tail_lines(&path, 100).unwrap();
+        assert!(lines.is_empty());
+    }
+
+    #[test]
+    fn read_tail_lines_small_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("ledger.jsonl");
+        std::fs::write(&path, "line1\nline2\nline3\n").unwrap();
+        let lines = read_tail_lines(&path, 100).unwrap();
+        assert_eq!(lines, vec!["line1", "line2", "line3"]);
+    }
+
+    #[test]
+    fn read_tail_lines_respects_window() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("ledger.jsonl");
+        let body: String = (0..2000)
+            .map(|i| format!("line{}", i))
+            .collect::<Vec<_>>()
+            .join("\n")
+            + "\n";
+        std::fs::write(&path, body).unwrap();
+        let lines = read_tail_lines(&path, 50).unwrap();
+        assert_eq!(lines.len(), 50);
+        // Last 50 lines are line1950..line1999
+        assert_eq!(lines.first().unwrap(), "line1950");
+        assert_eq!(lines.last().unwrap(), "line1999");
+    }
+
+    #[test]
+    fn read_tail_lines_handles_oversized_line() {
+        // A single 20 KiB line should not confuse the chunk reader.
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("ledger.jsonl");
+        let big = "x".repeat(20_000);
+        std::fs::write(&path, format!("{}\nshort\n", big)).unwrap();
+        let lines = read_tail_lines(&path, 5).unwrap();
+        assert_eq!(lines.len(), 2);
+        assert_eq!(lines[0].len(), 20_000);
+        assert_eq!(lines[1], "short");
+    }
+
+    #[test]
+    fn read_tail_lines_handles_trailing_newline() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("ledger.jsonl");
+        std::fs::write(&path, "a\nb\nc\n").unwrap();
+        let lines = read_tail_lines(&path, 5).unwrap();
+        // Trailing newline means three lines, no empty fourth.
+        assert_eq!(lines, vec!["a", "b", "c"]);
+    }
+
+    // -------------------------------------------------------------------
+    // build_recent_push_failure_map integration test.
+    // -------------------------------------------------------------------
+
+    #[test]
+    fn build_recent_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBrS0U5U1lzYXhQY002UWJJVjNsRXdHNnNKVXA2QkpGT0h1eUtJdVVITW5FCnFnSnZRVTMxcG5ITWR0R3VySW9tRGtXZndaejZFNzZpME15ay9iL3RFZjgKLT4gWDI1NTE5IDVLRHA2Z09ZRTVrN0tLVFJDREhiNUFlRXllWUYrZy9jTWh5d3k4Tk1xeXcKQm8xY01LczE4N2o2K3RkQWE5ZC9ObHZVNW1tdVRRMWUxNFE0cDdJWUlYWQotPiBYMjU1MTkgM3FwZ3dmbVdiZmNvcGx2ZU9oMDdtZm8ydkE0a043Rm9Xa1pHNXJOSEdGUQo2QzdaWVlnZ2syTDkxVXpjeDVvaWZDK1BOdjBKUmpyU1FNMGpaTHpvNk9FCi0+IFgyNTUxOSA1M2ZtdC85dnhFVzZVZTJTMUM0SElQbkFOUGxMT2pIQmo1Ty9vd1AwZFU4CnNhelNYZ0gyLzBlOGU5Yi8vUjdUaTBxZ3pOVGVLeitlOGFlNkZLVGg2NEUKLT4gWDI1NTE5IGxId1BVZkc0cE11REp1blU2Z09JU3V6cXFPK0p5RHlWZVFhc0hZVzNsVWcKZVFuM2JZYjNQUzFYajJPenlTU21FRzNxS2FyeDNrb09qMjhGc1NvS1piSQotPiB1bj97Kyt5ei1ncmVhc2UgYT80Y28gVTpKLVoxa3wKV015emFIUEVHK3h4UkhLN0UwQyt0R1hZM3hnSFFGdHZzSDhkT2phOHFkeVBqblpSdjRqNEdOQXZhaUpFdk8wVApvcWdpZnh0ZG53Ci0tLSBvQ1pseGNocUtNQUlQRzdCanlRV0VnTkcyUmFOLzdZWjZRU2E1V1ZlZkhjCtxtr3yrtTGcVXIr0zyq30eV6ik6BJ+QsR30hsYRL2UU28b0CMwu7ykCKh14oRCn/DGmEFj/ss4Lq35ipMVv]() {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        let dir = tempfile::tempdir().unwrap();
+        let policy_path = dir.path().join("dracon-sync.toml");
+        let ledger_path = dir.path().join("ledger.jsonl");
+        std::fs::write(
+            &policy_path,
+            "pulse_interval_secs = 1\nwatch_roots = [\"/tmp\"]\n",
+        )
+        .unwrap();
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        let recent_ts = now - 30; // 30s ago, well within 10-min window
+        let old_ts = now - 3600; // 1h ago, outside the window
+        std::fs::write(
+            &ledger_path,
+            format!(
+                "{{\"ts_unix\":{recent_ts},\"scope\":\"sync\",\"repo\":\"/tmp/recent-fail\",\"result\":\"fail\",\"reason\":\"push rejected\"}}\n\
+                 {{\"ts_unix\":{old_ts},\"scope\":\"sync\",\"repo\":\"/tmp/old-fail\",\"result\":\"fail\",\"reason\":\"push rejected\"}}\n\
+                 {{\"ts_unix\":{recent_ts},\"scope\":\"sync\",\"repo\":\"/tmp/recent-ok\",\"result\":\"ok\",\"reason\":\"pushed\"}}\n"
+            ),
+        )
+        .unwrap();
+        let ledger_str = ledger_path.to_string_lossy().to_string();
+        let _ledger = EnvRestorer::new("DRACON_SYNC_LEDGER", &ledger_str);
+        let map = build_recent_push_failure_map(&policy_path).unwrap();
+        assert!(map.contains_key("/tmp/recent-fail"));
+        assert!(!map.contains_key("/tmp/old-fail"));
+        assert!(!map.contains_key("/tmp/recent-ok"));
+    }
+
+    #[test]
+    fn build_recent_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA2TzBuYnJLOWE4UGhrOUVQU2lKZForMzZHTjBodzViVFVVSkVxWml1eDFBCm9maWRpck1yQ0I1M3BzeHBVNDZZWGs2NnlVdDZIS3M5a0o2b2xxWDBvakEKLT4gWDI1NTE5IEk5bUlPRjZTTTZxZHNldUxLQVhtRlE1RnlSb1dZNHdPNU5ld3BoZGpsMHMKUEFJM3pKVFlOWHpHTnVHRU9nak84anlDZlM4RXBoQnpwYVhEU1E0aDNENAotPiBYMjU1MTkgZWlGRTd0TDFnK291SWlXUUFWYTdZbGhMVXpsNWFGTXBDSzhBV3h4QW4xSQpvdkx2b1BUSnFMSmtrSDk3YlUyOHJ5dkd5MzVsZFNNTnBqaW5rU000WDQ4Ci0+IFgyNTUxOSBuNTJFSVJrQjBSMVZDOG9IZ0Q5ZHdnVXdySHBNclNEWkd1dDFYTzRtQ2c0ClZyRTNEeXJlSmNiLzlVMTRkajRqRzRiRi80QzdRTGJZaHZCV0tmd1FrSFUKLT4gWDI1NTE5IFF0Yk55WEhscjZaTXVyais3alhYTncrUG9FaUxRTGdNb2lvdC9ZTkhqVEkKV3FEVEhyeEYyYXcyNW9HMHgxZy9DSmZ1MGROMjN4Qk1IVEVkY2lDaVZ5VQotPiB9LWdyZWFzZSAmfVhwfTpjNCAhXiBsPlYgLyxTb2BASQpnZFU3d0NPT2MvaGtBSmYvN2dnT1lqVWtLT3UxdWhtdHFRZzN2UQotLS0gSGwzSE5Id3hqamI4eFJNWkdlSHFvaUU1N2VWWW1JTmxIdXIyaTJMeDdHNAqqC+jdrnOn63Lcdr1pGf+Db5xNe6k2NF6yI/BMtXKuAVqCIYPOBkXmb/3nxFYi5VDbbXO+yR6Yj59bnn2w1i15Op0=]() {
+        let dir = tempfile::tempdir().unwrap();
+        let policy_path = dir.path().join("dracon-sync.toml");
+        let ledger_path = dir.path().join("missing-ledger.jsonl");
+        std::fs::write(
+            &policy_path,
+            "pulse_interval_secs = 1\nwatch_roots = [\"/tmp\"]\n",
+        )
+        .unwrap();
+        let ledger_str = ledger_path.to_string_lossy().to_string();
+        let _ledger = EnvRestorer::new("DRACON_SYNC_LEDGER", &ledger_str);
+        let map = build_recent_push_failure_map(&policy_path);
+        assert!(map.is_none());
     }
 }

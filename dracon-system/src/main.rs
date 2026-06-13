@@ -600,14 +600,20 @@ pub(crate) fn graduated_nice_value(cpu_percent: f32, rss_mb: u64, base_nice: i32
     cpu_nice.max(mem_nice).clamp(0, 19)
 }
 
-async fn renice_process(pid: i32, value: i32) {
-    if let Err(e) = Command::new("renice")
+async fn renice_process(pid: i32, value: i32) -> Result<()> {
+    let output = Command::new("renice")
         .args(["-n", &value.to_string(), "-p", &pid.to_string()])
         .output()
         .await
-    {
-        eprintln!("⚠️ renice failed: {}", e);
+        .context("failed to invoke renice")?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        if stderr.is_empty() {
+            anyhow::bail!("renice exited with status {}", output.status);
+        }
+        anyhow::bail!("renice exited with status {}: {}", output.status, stderr);
     }
+    Ok(())
 }
 
 /// Detect active cargo/rustc processes and return their PIDs and working directories
@@ -1882,17 +1888,28 @@ async fn check_heavy_processes(
             let already_niced = state.reniced_pids.get(&p.pid).map(|(n, _)| *n);
             let nice_val = graduated_nice_value(p.cpu_percent, p.rss_mb, guard.renice_value);
             if already_niced != Some(nice_val) {
-                renice_process(p.pid, nice_val).await;
-                state
-                    .reniced_pids
-                    .insert(p.pid, (nice_val, p.command.clone()));
-                eprintln!(
-                    "🔧 renice pid={} cmd={} -> nice {} (cpu={:.1}% rss={}MiB)",
-                    p.pid, p.command, nice_val, p.cpu_percent, p.rss_mb
-                );
+                match renice_process(p.pid, nice_val).await {
+                    Ok(()) => {
+                        state
+                            .reniced_pids
+                            .insert(p.pid, (nice_val, p.command.clone()));
+                        eprintln!(
+                            "🔧 renice pid={} cmd={} -> nice {} (cpu={:.1}% rss={}MiB)",
+                            p.pid, p.command, nice_val, p.cpu_percent, p.rss_mb
+                        );
+                    }
+                    Err(e) => {
+                        eprintln!(
+                            "⚠️ renice failed for pid={} cmd={} nice={} ({}); leaving state unchanged",
+                            p.pid, p.command, nice_val, e
+                        );
+                    }
+                }
             }
-            nice_applied = nice_val;
-            action = format!("renice:{}", nice_val);
+            if state.reniced_pids.get(&p.pid).map(|(n, _)| *n) == Some(nice_val) {
+                nice_applied = nice_val;
+                action = format!("renice:{}", nice_val);
+            }
         }
 
         let key = format!("proc-{}", p.pid);
@@ -1973,7 +1990,7 @@ async fn check_heavy_processes(
                 continue;
             }
         }
-        renice_process(pid, 0).await;
+        let _ = renice_process(pid, 0).await;
         eprintln!("🔧 un-renice pid={} -> nice 0 (pressure released)", pid);
         state.reniced_pids.remove(&pid);
         state.cooled_since.remove(&pid);
@@ -3032,7 +3049,7 @@ async fn cmd_guard_daemon(guard: &mut GuardPolicy) -> Result<()> {
                             );
                             continue;
                         }
-                        renice_process(pid, 0).await;
+                        let _ = renice_process(pid, 0).await;
                     }
                     runtime = GuardRuntimeState::default();
                     interval = guard.interval_secs;

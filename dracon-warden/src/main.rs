@@ -1733,7 +1733,7 @@ pub(crate) fn scrub_markers(policy: &WardenPolicy, repos: &[PathBuf], apply: boo
             }
             // Plaintext-sibling escape hatch: skip files with a `.plaintext` sibling.
             // Such files are intentionally plaintext; their markers (if any) stay.
-            if std::path::Path::new(&format!("{}.plaintext", rel_norm)).exists() {
+            if repo.join(format!("{}.plaintext", rel_norm)).exists() {
                 continue;
             }
 
@@ -1893,7 +1893,7 @@ fn resmudge_repo(repo: &Path, policy: &WardenPolicy, apply: bool) -> Result<(usi
         }
         // Plaintext-sibling escape hatch: skip files that are intentionally plaintext.
         // Such files are not encrypted and do not need decryption.
-        if std::path::Path::new(&format!("{}.plaintext", rel_norm)).exists() {
+        if repo.join(format!("{}.plaintext", rel_norm)).exists() {
             continue;
         }
 

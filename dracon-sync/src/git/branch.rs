@@ -236,6 +236,18 @@ pub(crate) fn set_upstream_to_branch(repo: &Path, branch: &str) -> Result<()> {
     }
 }
 
+fn old_tracking_from_status_line(line: &str) -> Option<String> {
+    let start = line.find('[')?;
+    let end = line[start..].find(']')? + start;
+    let inside = line[start + 1..end].trim();
+    let tracking = inside.split(':').next()?.trim();
+    if tracking.is_empty() {
+        None
+    } else {
+        Some(tracking.to_string())
+    }
+}
+
 /// Detect and repair broken upstream tracking references (e.g. `origin/master: gone`).
 /// Returns the number of repos repaired.
 pub(crate) fn repair_broken_tracking(repos: &[PathBuf]) -> usize {
@@ -269,12 +281,17 @@ pub(crate) fn repair_broken_tracking(repos: &[PathBuf]) -> usize {
             if branch.is_empty() || !is_safe_branch_name(&branch) {
                 continue;
             }
+            // Extract the old remote tracking ref inside the `[...]` so the
+            // log message shows the actual change, not a fake branch/branch.
+            // Old line: `* main abc [origin/master: gone] ...` → old="origin/master"
+            // Default to "origin/<branch>" if we can't parse for any reason.
+            let old_tracking = old_tracking_from_status_line(trimmed)
+                .unwrap_or_else(|| format!("origin/{branch}"));
             if set_upstream_to_branch(repo, &branch).is_ok() {
                 eprintln!(
-                    "🧹 startup: fixed broken tracking in {} ({}/{} -> origin/{}",
+                    "🧹 startup: fixed broken tracking in {} ({} -> origin/{})",
                     repo.display(),
-                    branch,
-                    branch,
+                    old_tracking,
                     branch
                 );
                 repaired += 1;
@@ -282,4 +299,33 @@ pub(crate) fn repair_broken_tracking(repos: &[PathBuf]) -> usize {
         }
     }
     repaired
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_old_tracking_from_status_line_parses_real_ref() {
+        assert_eq!(
+            old_tracking_from_status_line("* main abc123 [origin/master: gone] behind 1"),
+            Some("origin/master".to_string())
+        );
+    }
+
+    #[test]
+    fn test_old_tracking_from_status_line_handles_missing_marker() {
+        assert_eq!(
+            old_tracking_from_status_line("* main abc123 [gone] behind 1"),
+            Some("gone".to_string())
+        );
+    }
+
+    #[test]
+    fn test_old_tracking_from_status_line_rejects_empty_ref() {
+        assert_eq!(
+            old_tracking_from_status_line("* main abc123 [: gone] behind 1"),
+            None
+        );
+    }
 }

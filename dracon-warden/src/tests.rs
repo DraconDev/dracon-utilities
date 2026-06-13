@@ -195,7 +195,7 @@ mod tests {
     const EMPTY_TREE: &str = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
 
     #[test]
-    fn p[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBwR05zb3M5UDRoZG5sVTJSdHhVN3dQWHFBMkFMWFc1dThUdDlYY1RRdVJVCkVVa3RGd3pNU0JxN2hxUXVDWWFtTUVnTDNvMVpyUXQ5Z2lhTzV2Nkl6RGcKLT4gWDI1NTE5IENlSEZ6NkNqYktuTXhXK1EwbXAxa1BqUm4wSFFZMytNallEbGhyN2E1WGMKWXR5blZOeVY2d3N4dUppVXkyUEpBMUd1MkJDSndLNzhWaUt5M1hVL2VyUQotPiBYMjU1MTkgMGVOY01FazlwUndBNlFnVTFYcUhFbWxTTnRyemNaRS8vVW9iTE5XRytrVQpqTFJhTWhFYWdvSXVlRU9FSHNKS0NwZjZYeGlKYzF2Qlk1aXFzRmwzT3BnCi0+IFgyNTUxOSBXK0M0QnZtQVNTR3cwcWUwUmw0OWhndG9pZkl6cHBta0lKTjM3RDBjbGpzCjZsYU9RKzB4SmpSSUZFMXVlNGZoT2F6aVdwSFFvN0hudUlJcGxYQTdMQzQKLT4gWDI1NTE5IHV4NUdOQVlNRzZKUlJ2ZDNwR25OOWZ6K0c0b2kzTHZGYnNzc3ZmVlJCaGsKUXJNV1VsdldmRXZLN2xLNDZxaXJFS0dGeGlIMlkvY01mME5HRysvQjVXNAotPiBYMjU1MTkgeDR1bjZRcnNjQzc2VUNxUEFna2Jsb2NsRWJLaDJDRnlwZWFuRGoxaW93bwpyanRTVWFDWi80NjhzMlJtTGZBc25WbVNpa0JrSzg0TTRodGt0dGFLak5zCi0+IDYxUSojJkUtZ3JlYXNlIFg8VHcKbm02NmFnc3FWcWlqcW9BV3M0eUtDVnIzWTZnVTBHektxV2NxbXR5d3lMamJhdjFyNW55SwotLS0gS0Q2TldsTERIOXY2T2JSS21lb2hocjNXNHBpclJWdUlHdFRxc2VQb1Q0MAr6CRuj0tksKlCvV0auWnvLfIsVUKrXczdAPohyoiHpVix2YZnGGyhvxfGlWxShzghjSXl2xjcl0aNWNptDm8uhQw==]() {
+    fn p[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAwY0xBVjFDbDJmaG1POVN6dVFXS1VDR1RMbnEyNTZSYzVsV2xkQS9PalNFCllpcU41clQweXBwZjQvcS9uR0VkY2tMNWN0bCtJTUFXcmNXQzNlSEcrWG8KLT4gWDI1NTE5IEJIQVRlRXg2aXFrRXI0aUhhSG4yeUhDMWF6WkNxcU5tU2lPbzZrRFlKSHMKamFoQVpRbUlUOXc0N25JQnQxTVNKcnpNbXNHNTNZZUZNSHIzY0hDQloyZwotPiBYMjU1MTkgZ3MxRGtVcVNnQW1EK3FIRmVpRUxOa3FxQ05NM3ZnVFNwV255MHZKWkp5RQpWMDZkcFB3Wmh6dWQzVnFLeEFuS1J0YXFrL0cyTmtyRkNuY3ZvUEJ0Qm1FCi0+IFgyNTUxOSB5U1RKZ3FIaHBoek80Wk9oSHZON1cvcWdacTJ5OEI1QTVPNW9uZ2ovbFVzCmpkaFR4S2w2dHRNYVN6U1hNNzJpTWpzN2I2Z1YwSnNmS2pJQlZSQlhUekUKLT4gWDI1NTE5IGVFQjJQTWoyZjNYVkhTUVhXVDBOME5ZQnh6SnJlNjVGQWQ3QnRyR2pFZ00KQ1pRdGlNWHFRUDlienQwT1dzYWZVSDhCaWVvYXZmeXk1WXBEOXJ4THd4RQotPiBcSC8tZ3JlYXNlIH5VLFB5KH4gfmVMN0IjClBSTW11UGlmCi0tLSB4Qi9sMDZKeldrZ3ovOGxZZ1Q3K0JDM3ZDZzkwbnRxK3o5M0FicnBqVERVCvShLnrMhSsCFwSt1X5G12c1v2PKH5bQ8SAFJbuwWiaFpFk3op/OyrP+gHUhcZc1WBWMq8sll5g2W84BGxqnAapu]() {
         let (td, hook_path) = make_repo_with_pre_push_hook("hook_clean");
         let repo = td.path();
 
@@ -216,7 +216,7 @@ mod tests {
     }
 
     #[test]
-    fn p[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBxYUc2WmZNMWVUek14UEVuWXhCU245akwraENYSWNVM3dhWmxNTGhwbUVRCng3REJJb3pvY3lWUS9PajNYWXhUbzJYalZERVl1blZwUUZMR1FreUZQdG8KLT4gWDI1NTE5IFNlSzIraytrK1pybUtjMlFWMGFxaXYxTWNKMjA2N0xOMVc4aUdMa3pTVG8KTHk0MVR4akp2WUJ4S2x2bFkyTUc3N0YxZEhMeG5ZbGdXVTVyYmFOcjA0QQotPiBYMjU1MTkgOXVqclJ4LzkySEFBSU03R1h2UlFQN2tLN1pqSnF4dU1LL3MrRVlHUk1GNAplN0hyRUVXZmtKQTJCWGNGS0FKSHdveDBQeXhxcXk0aU5OVE5ValJGa3RRCi0+IFgyNTUxOSBvM2ltbzhtWEhzWmw4Rysyc3RRWFllV2xDd0ZOdlNmU3hZbzdQTHFDUG1jCmpZcjUzVi9IZkdBS2lnbUMvWXRnTVFXT25CY2NtclM2eDVqOGRXaUEwbTgKLT4gWDI1NTE5IG81bWQ5M0NrUFQvSk12R2lvSGZTOFV4K0VhSzVyOUE5RHkvaUVUcUVDemsKdXJiUkdvT2krRjQxdGRpOVY0MnRQeUdnUGFqcTA3MU5yekU0MXFQcjJEOAotPiBYMjU1MTkgZEwxVk8rcTdyd0NDT1RBVWV3RHVSWElOb1ZTdlU4WjB4elFaMmpZRHJudwpReVRpK295US85azJuQUpuTDQwTUZ2bUVpV3o3TWU5WlYyOWJMcWN0elJjCi0+IC8pQ2FUcl9pLWdyZWFzZSB6SWxVYGR9fSA6U11wT3IgLVMKc0R6L2ovczZBbHcwdnBDVG9BCi0tLSA0SHlpVFRSeHRXNDN6RHpEejVwZzRNay9aQ0RzVkEvakV6L1RacFJnYkFRCmucgLiImzudFXzNH/G/yoWL6u7dHH6hbwyBHlW6br7HOAxj64ti3f0RrHgY9eV1GDH+yItLzhD20fMrwZR/zjlH2Isoy5D9]() {
+    fn p[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBSd1ZDTXNGT3JiUnl2VmROSGxrdEt1VXdWVE16NWhWNENUeUFMNDZ0WGljClB1ZGhuRHh5V3hYRmM2cDRkVDUySGhUNUtzSmNEZE9CVWVwZzZCVUF5QVkKLT4gWDI1NTE5IFZ4SktwMWEvM0xhRStlSWQwT3hQd0MwM0hDdERhcnQ5VFA5Ymh3Q2doMm8KeXNOWitFbzZMeDZFcVlUdjRIcnNFckRDaEpjcXh3Y1VEQzI5V0doLzBVcwotPiBYMjU1MTkgUGhWbVNHWVVxWEJoT0FYcHBvcThRY0NRRlJ3TFJYMHM2a0hSTG5UblJTMAo5VXpXNmJCSHM2SEozV0hUUEhJdW5RQk5hc3VHNWtSZFlCNFJkaVRjTG9nCi0+IFgyNTUxOSB0MTZ0dVUvMWIzblhINTN6U1owMDlBUVJuQnBrRUZQbVVlV0JhUkw3bFRrCmR3UTQ4cnJxbXNCS0VGY3ozaC9nYThOdGxlWjBJcVp6NGhma2kvaWgwTW8KLT4gWDI1NTE5IGxVcVJST2t6eGZ3NTNNUFg4aTdWMTdreGFWdk11TDNodWFvVUQzK1FSM2cKTkkwc2JXVUZtNUl1aUQ4T2U2OCtiN2Y5VDJsUzkzcVZHSUxjNjVlektXcwotPiB1Wz5lLWdyZWFzZSA/Y0EgLzRfUnE+RG0gJz8/aQo3WG16QTZEbmEwbE9zc3lwQXdxTXJ4eHlUN2Frc2NiOVlDcStONTVaQStwaEJ1TjZsdmpwaTdPSDlLRWxyTm1HCktOVlNaUFFkckhaOEQzbDNpa0pkCi0tLSBQcWZsV3A4bTA2RjJaL2Jjb1h4OXJTeVRrU0FSTFlnOG5BamprUnhPMlhRCiLHtCj2+ptKYOZatQGIp7H8S9rDxCLJxWUhl/4g+cgvj0JgpsUwZmsir8RTbgf1J7vXnOnNu+tR90KLdzP2XCDjvAbdVUsL]() {
         let (td, hook_path) = make_repo_with_pre_push_hook("hook_added_secret");
         let repo = td.path();
 
@@ -244,7 +244,7 @@ mod tests {
     }
 
     #[test]
-    fn p[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBNUEw3Z0RDWDN6RXdnTHRGUUZXengrblU4RzlzQ05LdXBVL2l6SStUVlJRCmdtcjcvNXBWaEh2bzhHM0RDOHhxUGJJVCtNam5VQlJXeThqTTh1aVNOeHMKLT4gWDI1NTE5IHBoQVdMbEQwZkh3ak02NmxPYllneHRma2hVdFZiNjcxanpOcHNCOTdNdzQKUXVQYktvQUFCb0lqSFpBcWNaMlhPM016SGpSOUF1WkhWSG00VFd1UklWdwotPiBYMjU1MTkgc3EwUktmOGFzSkZsZTVXZzZKUUc1VEJCS1kvaldIWGRtK0szM0s0dTBVQQpab3NGN0RtejMwUnJpNXA5QWR3a0NCTkhYY3ppMHZxRVdpMUIzNHhIaTN3Ci0+IFgyNTUxOSB2bnpGSkVJeUJ5Z3l1bmhFbkVRY1lHS0tOVXZnWXVQN0I3d3pxeGh5UkRvClI5UDFVNXZWUGkrc3BRcUhZY0pOZDVweE8yQld0WHBpOFNwbHRGWVB0VjQKLT4gWDI1NTE5IHJVcExDKzJKYlBYay81ckFwazFMMVlzVlhINHpCU1FvNzhJbksxZ1hBVE0KL1JZalRNMlluZXl2bjBhMHRFM3NVSC8wU3Q4ZDkzNTl0Q3N1dVozclhpbwotPiBYMjU1MTkgWWtIbmIzS1U1RGdCL1V3bk1rZDNCNHZQMElOeFhaU28veGRHKzlvVGZ5cwpkR0Jkbjd2cndWK3FOa3hzaWNLQmQ4RHhyU2V2R095dTFrOFFhTDE1SU04Ci0+IE9YR3wkby1ncmVhc2UgXCBUdDlUXF9DCkpROVJEdmJCUG8xQmtaU1Z4NjJFWHRHa3ZjdGZheXB0M0dhSFY4eElzZlhvbUlTeU5ycVBkeGtYamdHU2ExSG8KRkNrbU9MOVN3QQotLS0gRkdQcHRFWmZqaWpWWHgwOUNDN3dhb1luWXI2dktVVzhxM1JwN0JYR1FJRQptJLRs+76v3/eBfmHNM5PTdbTAKIiXiaVphm09CLA4xEnVGcnCnUS6JVP/2ziTUCMMGaAuIhJOlS/mUdcT7SOfaiHJ71ark5i0]() {
+    fn p[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBwN01PbkZoNUMvSlI5OVdDdXhFQThXZnJKcXFjSnNEUDhyR1RNWUJHWEFjClFHWTdoclZLczJsUXYxSUp1QmVtU2lmbEwzM2UzcGN0MnFzNFkxYXQ2UXcKLT4gWDI1NTE5IDB4NTl0bFdvNXMxY0FWRnRXaGoyeS80TDd6YjVvYmlRYXYzeERaZ29uU2cKbW5mdk9CRTUrRHJxSzFua0xZM1F5eXBzVmZwU0dMakNSYVNGNUdZaEs0NAotPiBYMjU1MTkgV3BCcDVoeFlVaFowa0pleGJYWnBpZGhjTVIxU2pLYUhuOGZCbDJhaGlSWQpTQmJpTVd0T21hZ0lVRjNkVlFJWkZYditsWFFqb3lYSXFIRmNpeVR3NHlrCi0+IFgyNTUxOSAvQ2NHZjhuZ01XZlYyNFJwMHFRL1NBVTZ3SGd1ekI0ckZZTlZ2eHVyNkNnCkFqd0ZEQWFMSWZ4aXVubEZHZXc3UW5WTzB2ODBha1lpVmVNczRmb2VGQ3MKLT4gWDI1NTE5IGp4MnhybFBEZ3VqWVNmUUxDUDFpNjFYcVJBQ0p5bUJYbDNvNXBreGl5WDAKa3RIcDg4UVI1T2NSUWhMOGRCUHdNZEtOQkdhNmx5OC92NlFUVXlmYzNpdwotPiBuI2pCbi1ncmVhc2UKRzdTRFV2OUQ3RzIwYWZNZ29mWGE4SXk2YlFoZGEyMEladwotLS0gQXpoSFNZdlNHeXM0TzJDZU5zVitHRXBnanhIckdKbjFTSWxoTWpnUDgwQQpQ3KY+ytO7jlZ1tbY+nazbpFSVIXRrsZJDcPhVGSWkSa58CuWuYEpP18lIXedJqzxIftDSKEBZk+2Pem3KP5icW7imhfxfQ37m]() {
         // This is the core regression guard for the `--unified=0` change:
         // a push that only REMOVES a legacy secret-shaped fixture line
         // must not be blocked, because deletions are safe.
@@ -305,7 +305,7 @@ mod tests {
     }
 
     #[test]
-    fn build_gitigno[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBnOGF2MUFwanJ1ZUI0MnNmcCt6TVc2RURwYXl5OGphaW1Ca1RzN1FON0hZCklmcmRaNmJ1eVU3a3g3eXpjYUNKSDRieWpFV2xtbXNOWVdNQXYvbEVuaGMKLT4gWDI1NTE5IHkvZkQ3bURGL0lLem4xT1c3SCtSNGl0TG1PVkRKbkxrN0hXU1B2OEVmWEkKK2drZzZWd20yV1o1RUFESFJlOXhoUDZ5bGpBVi9DQkQwMzErMm5pc1hWNAotPiBYMjU1MTkgR1U3ekhxbVBKMThjQ1RXLzFJSitFTm9aakNRSDNCTjJQazMzRys3NldqdwpCSDBWK0xoYjRndWpaTVE2WXJ4MVlkVjJKZGFoVVdPdDN1V05ya1FYZlRRCi0+IFgyNTUxOSBJNGh6MXduNWRGUk5MSGFXWS83UlRseEVVcUhqN01OUVhHKzE4NFpORzBZCno5WUpqRGI1TVBDQjAwS04rM1VBZmwwai9uaHpCSWhqak8xQzNXMlZrWE0KLT4gWDI1NTE5IDJqYnhZZjh0TVJoWlY5bVFaYmxqQ0o3QW9rTmdiVU5PUkQwTWd4N0ZqazQKVVZ1YVI0cEtOV2tGVjZqSTR5cS9OQWpZSGR1ZnZMTHZMOVFVZ1UzUFhkQQotPiBYMjU1MTkgYzNRZjJBL0s0QkJNODBrRUV0MDNkdTNMYmtPcHJSM21GMEpSZWpBSmlWdwpuVHh4MS8wWlVGM2t0ZWFJcHZTVG52Vm1QNExPaml2UGF0WXFJL1VEZ013Ci0+IGZwWmktZ3JlYXNlIFJOOmAyUjYgcllrYCsKbWo0VWIzeVd3dW8wV21NdTBWV3ZxZEJzWFRPNWhVQQotLS0gY25yUHFQVkpOVkdmTGJrK2FWNGN6V1FmTWVHVWFBTWtmb0RPUlo5Zm9JWQpxPF2sebAwdQAk2yvJ8kFXOcQEpnPSynwBbYc6xbRsLIUbpzai44zes9TzrsZsG9XBKHJKDM+N5J5DylqbQjX0]() {
+    fn build_gitigno[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBPUFBjakgzZU9EcFZTb1FWY3lWRXZwOUVGSERjUmlJa1hjSkF4TGtwRVJzCjlFbElibnIxQ1VXU3Y1OVZXdHZnWXQ3cjVoWGJLU3BkYUpRVDl6UjNmOUEKLT4gWDI1NTE5IHJJelBaWHU0QnhaRnQ0azZud21yZDlHdGJVL0l6UFprRDFmZVFybnVFbmcKclZjWDVISzNXQWdMMEcyY3lyY0UvQVl5ZGI5WXd0ZFNxbjBlMDRzZDhaSQotPiBYMjU1MTkgRFZEZVRvZUxqaHZEVWxvWklXQ0ZBNDlOZDViQUd2VDZ3WXlYY1VaT2UwMApjbGlyL1NtbUIydVVwcm1aQnNIUU1lRVlXSmg3d3RSUHkzbHJzc2pIblM0Ci0+IFgyNTUxOSBQb1hlc1c5dC96bHJHbkI0K2g3QVFKU2d0NlFrQVBVWmlKTGlSTjdqTkcwCndDOGpod0NNNGQxRlVtTU1PVDlEampVMnVDVkhkVDBWT0YzL0NyMUlnRXMKLT4gWDI1NTE5IGJrT2pvdVdSNkZvVTRLaXZwejg3bFpja2tiMjZGWDFZVDdTeE5XNDE0VzAKZVpOaDZIL2xlRi84a0RDc21GNUFiSERpdHBoV0NWd2ZDaGR1enBwNXFtYwotPiA4RWFFSC1ncmVhc2UgQSBwXCB4MydSYQpQWHZCOVJJcW9hWXNZSmJDUWtiTXl1RWpQR2tZc2cKLS0tIGo2dGJqbVAxenFsZGpvYnlzQzY4V3ZRTk1WVlpNWWE5RWtlUHkzQ1d2Q1kKImzCUqlWvN90/ssbqr7+qRk4AgUlFrX1OEs3d0zYRJ/YWNFo1lveevwtAH3+II50e3xmrje77vFGaKalUJw1ag==]() {
         let block = build_gitignore_block(&sample_policy()).expect("block");
         assert!(block.contains(BLOCK_BEGIN));
         assert!(block.contains("target/"));
@@ -663,7 +663,7 @@ watch_roots = ["/tmp/test"]
     }
 
     #[test]
-    fn build_gitigno[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBZeFhjaExFcTFRRmFwRFdCdFJvcHpRYzZGdXBHTS9ncmUvSTJZMGlGRndFClVnR2hBMW0rK0l0amNjNTdMRUl3Mzhvdkp5QldXUERCV1ZrVUdNOExBUGMKLT4gWDI1NTE5IG5FbXQzaWQzZEh1d2tXNXhrMDF5aEM0dmIvTEsvaHIraVM1QTJwQXBvWGcKMDM3OTg1ZEtUcEtmM1BKUUFKTFVyOXRBUlRqdlRwdk1JK1lqbWRTaVhhbwotPiBYMjU1MTkgYUdNNW1NaVFtdmNKMzkzOVNoNjFkM3VHQkZObjlvczJscFJIVUhJTjJ5cwo0aXpLVzdQVDR5UUhkTTVBVXFZYnhTQkJGZTVka3JVVTg3MkJuUXluaEZzCi0+IFgyNTUxOSBkSit2Z01TQkpSVTVFWGVjdXkvT0tYaUxRWFRnNldBS2M1UDlRSk0yNkhvClo0cm13Y0ViUHYvWkM1QlMzek90enprZW1MYjZ6ODUyYWFrUmtROWNXSjgKLT4gWDI1NTE5IERNZ1BYdlpHT1MvQVROUGNCWlBNQ1E5TU1zeitsMENlK0xYZmRGVXJpd1UKVGp1c0ZRa2c5MzhqMnVuODdmTEM2K3d1eU05c2dsMnZacHBzV3U3NEszRQotPiBYMjU1MTkgMlNKTzY1bUh6Y01mcWVnRXlHV3lnWkR4Y1BqdU44WThJS3V3V21LYm1VRQo3Q0drR2daampVb3Yxblo3M2FEMjJ1WXJFTFl5Zm1IWDgxWi92dHlqeUpnCi0+IFEpRC1ncmVhc2UgMDF0dkJdTTUgPE9zeksgcGspZyZPSSYgNiMKaER6QnVmcDhKQWNkUTZoZ016cytoYTAwZlpxS20wc0tnMGx0RnpwVkp2a3poUGE2bjIvc01rYVNHbGdxa0xiTQpmbFBrCi0tLSB1cFF2VDcwREplc1JtVjVFMkphbTVOVlRmTDhQMExyZE4wRVEzWXI4MTFjCjg4mIV2bLfqoBcp71P4gpZR0G1/ARttg2QUzBhGeBRWAI1TeOgzkyIr8mcpf34Y+0RI0sa58NZ2qrYCwaXxwFlwgQ==]() {
+    fn build_gitigno[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBHWHVEa1EwRjlWa2w0RVowdEN4S1FITFBUZXVoeEUvV2FrOXQ2ZHpvV0ZRCjN4RU5sS1VNT3lrVEJUalpMcGszL0x1ZEtPYWhWUFkyM0YveTBaRFpITjgKLT4gWDI1NTE5IGliOFNYQzNGV3kwbUcvdzN5M1dTazkxQkZ0QkhaRGZJZWsvVlJsWTdwQm8KNldldXg4TndjOS82VTJlb0pQbzZraTBqUS9rUUowd280Qlc3anoza3FNMAotPiBYMjU1MTkgRUIxcFVvNWxUMFFPa2V1bmZVV21QMTE2T0d1VUYvNmdleHlmTUdWUFpuMApvT2lieHpWN216N2tXVldkREtBZ1ZJb3NRalRCdG9NUnZrdGxkbzZVWGM4Ci0+IFgyNTUxOSA4cjZRanloOGNTODBMYVVTbU1VN0VzdXYyT1ZqMTBqOHNNaVpkaDZMRHdFCnRUbmdoc2VOMUtMYzFhNVNSZUdpb3hKOVJ2bkdldjFWczRhVHZBTlhLdkkKLT4gWDI1NTE5ICsrV24wSkpiVUYvNExqYUdla1pHVnVMcW43QkNicUhsUDQvSm5kQzEzSFkKMEN6L3pNSHBHZDhKbkVGYmgxeUgzblNvQTdNSGxiRE5OUWxIU2JXWXhtdwotPiBVQDEqaVMyby1ncmVhc2UgKitfSCBrdHV9I2ExClRRNFlKZ2ZNR2cKLS0tIFNSVmNpZTBqUkEwcW5WdC8zeW9PY1NqWW1veUtBN1l5K2lHOEZIbURBWFUK+wT1Azb4EMEPjiKLaFA5CFHfEQuapeJz+qfBRRhEbpRyoRof76qQn+0Aa11oQKfBluxiG+fkRxnmOisFbq7MS97C]() {
         let block = build_gitignore_block(&sample_policy()).expect("block");
         assert!(block.contains("# --- BEGIN DRACON MANAGED BLOCK ---"));
         assert!(block.contains("target/"));
@@ -1481,7 +1481,7 @@ watch_roots = ["/tmp/test"]
 
     #[test]
     fn filter_clean_encrypts_content_with_secret_marker() {
-        let content = b"[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBKS2dXTHVoTjhEaWVTRWNTaEVablZVbi9hTXVxWmg5VkpvUmJkV21KU213ClBDODRXSnJZRGJmNi8vK1VqQzNNeTZaQ240aUhXV010QUErSE9LQTE0WTgKLT4gWDI1NTE5IDU5amgyR05GcTZoT3NiUHFHd3hDYzhiNm15RkpTd0swamg4OS9NWVNUWDQKb2RZUEFva3Yyc2RKSWd1b0w2cDNmbFlNRnJwSWVLRGNhZ1M0dGF5ckxnTQotPiBYMjU1MTkgeVl6RmZLeFBNM2g5RjU2eG1oWFRZdU5Jd1V6Y0g0RmtQU1dwZXZ5WkFRQQpTRTJER3RWdzJnUlBqeEFqT3lFYUplQjZHNmtXSzhRSWl0MHpVb3RzL29RCi0+IFgyNTUxOSBBTXYrZk1iYU12TDNhaldFZEJmZEZVZCttOWVNM0w5MUErYklEellUY3p3CjJVb0ZFQ2pVY2lpMWdvTDlBZVJXeWFlNzZqWDNaaUVjejFMMGt0eVZkNGsKLT4gWDI1NTE5IGdNR000VnprdnJNZ1BUMmQvbDhoUGVOS3ZYenBIR2x6SStrREo3N211bGMKV21zSEJLWWhnY2taYXNrcmFHak1BVWt1V0k0cXUrVmVzSForUmJaWW8vUQotPiBYMjU1MTkgQklsOXRaOHdRanpCNGE3QVowbEV0SVJSQStPak5hTkhQbXB5VzF5bmRCawpIYUdrejFQTHA0Y2RwMThiVmE0Q0k3MUdkc01DdjJDSXNSV1FHTHlYYmJzCi0+IHQtZ3JlYXNlCnB3Ci0tLSBRaXZ2Qm83VVM1WUprbmZFYmtQTXdUUjlqK2V6c3EwMitiMmNSRlFEcXFjCgKC6oAgv3ZFgWUBh3bQ65b1AJDXBfVQQN83bOqyRrU/Dm4LdjHzkpwOUEtTPR+xVLEpfbUS8qhSQphwNl/v4OHRfsjqIoEaBevBa/v1]\n";
+        let content = b"[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB6YzFwUlkyNzN0S2VBMXhOd0JpVG1laVE4dTl4WXJMMnhsK3BoeTc2QkJ3CmhXS0hlUzBvOUprYnJJSERFaHh3dkVjU3JBQ3V6WEk1dXJYVlRBNlRCVE0KLT4gWDI1NTE5IC93OURvVW1sMzNmMXg4TmVhK0ZoT3VlalNiVnZRV1BVMldYbEtpRTVKQXcKTVcwL09rWTZKcTJpdTNmYlVrVTFjOTM3eGlpcnliNTBFdWxDZ3YrRHRWbwotPiBYMjU1MTkgMFh2M3V2YWk1OE1CalJyTDR4QTlhRWxRRnpQWUd1OC8xaW1rL0FHQWhsUQplU1FuemNKeFJxenJMMjIweUcvNzVXOHRSR2Y2KzRCb0RPYXZCblpLYTlBCi0+IFgyNTUxOSBOMUNaMU13aEJGbUJ5Q096VTk4ZnVtNkMrQkNLMXYxMUlKZVhlcFdzMlc0CmpZdk1Qcy9XOHd5OEpnY1p2U1V3ZHdBbytaYjl2dzh2S1lHYnVTNFk5M2MKLT4gWDI1NTE5IGhLY0RUL2RVWUZnVXpPTFVQd2Jid0IySWhSTmFUYm9jT01abXlwb1JkbWMKeXRyVmtYcmRyTmV3OFRPYURJcGQxVXZEYmFLZWNuYlhuNGRvdzFJNG1rSQotPiBmLWdyZWFzZSBKIy85LHEKWkNjUkhCQkxOcTA4R29yd1FLRldXL0JCMDUvNlRoQ1VYNzh1MzdJZWNjZmJGR0NRVjdKWHVZMS9oeEg4Zm9sQwpnczk5c01JL2ZxUE9KUW0xL05URTV4dWVmUQotLS0gVGRTOUZWWm5oL3J6Q093aVpSOFhxSnZuRG00VGxXYVFXRnNZS1pvQ2tDYwrmNp9qSqnShvLJ5gMVG+84zLjglMH98J1LGgRNZuyPrsNHlb5aQGzcDthVwZr9o/tNdSt1Gm8eNyKvW8bx9jZfFY09PPoqPpGQLOVqQg==]\n";
         let warden = DraconWarden::new().expect("create warden");
         let result = warden.clean(content, Some("config.env")).expect("clean");
         // Clean should either encrypt or pass through; result should be valid bytes
@@ -1543,6 +1543,52 @@ watch_roots = ["/tmp/test"]
     }
 
     #[test]
+    fn cli_scrub_markers_skips_plaintext_sibling_outside_cwd() {
+        let td = TestDir::new("warden_scrub_plaintext_sibling");
+        let repo = td.path().join("repo");
+        fs::create_dir_all(&repo).expect("repo");
+
+        let status = ProcessCommand::new("git")
+            .arg("init")
+            .arg(&repo)
+            .status()
+            .expect("git init");
+        assert!(status.success(), "git init should succeed");
+
+        let json_file = repo.join("secrets.json");
+        fs::write(
+            &json_file,
+            r#"{"api_key": "[DRACON_SECRET:abc123]", "name": "test"}"#,
+        )
+        .expect("write json");
+        fs::write(repo.join("secrets.json.plaintext"), "opt-in").expect("write hatch");
+
+        let config_dir = td.path().join(".dracon").join("utilities").join("warden");
+        fs::create_dir_all(&config_dir).expect("config dir");
+        let config_path = config_dir.join("dracon-warden.toml");
+        fs::write(
+            &config_path,
+            r#"
+[watch]
+watch_roots = ["/tmp/test"]
+"#,
+        )
+        .expect("write config");
+
+        let _env_guard = EnvGuard::set("DRACON_WARDEN_POLICY", config_path.to_str().unwrap());
+        let policy = WardenPolicy::load(&config_path).expect("load policy");
+        policy.validate().expect("valid policy");
+
+        // Run from outside the repo. The old implementation checked the cwd
+        // instead of the repo, so it would fail to honor the hatch.
+        let original = std::env::current_dir().expect("cwd");
+        std::env::set_current_dir(td.path()).expect("set cwd");
+        let result = scrub_markers(&policy, std::slice::from_ref(&repo), false);
+        std::env::set_current_dir(&original).expect("restore cwd");
+        assert!(result.is_ok(), "scrub dry-run should succeed: {:?}", result);
+    }
+
+    #[test]
     fn cli_resmudge_reports_on_plaintext_repo() {
         let td = TestDir::new("warden_resmudge_plain");
         let repo = td.path().join("repo");
@@ -1576,6 +1622,49 @@ watch_roots = ["/tmp/test"]
         let repos = vec![repo.clone()];
         let (found, changed) = resmudge_repos(&policy, &repos, false).expect("resmudge report");
         assert_eq!(found, 0, "plaintext repo should have no ciphertext markers");
+        assert_eq!(changed, 0, "dry-run should not change anything");
+    }
+
+    #[test]
+    fn cli_resmudge_skips_plaintext_sibling_outside_cwd() {
+        let td = TestDir::new("warden_resmudge_plaintext_sibling");
+        let repo = td.path().join("repo");
+        fs::create_dir_all(&repo).expect("repo");
+
+        let status = ProcessCommand::new("git")
+            .arg("init")
+            .arg(&repo)
+            .status()
+            .expect("git init");
+        assert!(status.success(), "git init should succeed");
+
+        let protected_file = repo.join("secrets.json");
+        fs::write(&protected_file, r#"[DRACON_SECRET:abc123]"#).expect("write protected marker");
+        fs::write(repo.join("secrets.json.plaintext"), "opt-in").expect("write hatch");
+
+        let config_dir = td.path().join(".dracon").join("utilities").join("warden");
+        fs::create_dir_all(&config_dir).expect("config dir");
+        let config_path = config_dir.join("dracon-warden.toml");
+        fs::write(
+            &config_path,
+            r#"
+[watch]
+watch_roots = ["/tmp/test"]
+protected_patterns = ["secrets.json"]
+"#,
+        )
+        .expect("write config");
+
+        let _env_guard = EnvGuard::set("DRACON_WARDEN_POLICY", config_path.to_str().unwrap());
+        let policy = WardenPolicy::load(&config_path).expect("load policy");
+        policy.validate().expect("valid policy");
+
+        let original = std::env::current_dir().expect("cwd");
+        std::env::set_current_dir(td.path()).expect("set cwd");
+        let (found, changed) =
+            resmudge_repos(&policy, std::slice::from_ref(&repo), false).expect("resmudge");
+        std::env::set_current_dir(&original).expect("restore cwd");
+        assert_eq!(found, 0, "plaintext sibling should skip resmudge");
         assert_eq!(changed, 0, "dry-run should not change anything");
     }
 }

@@ -145,7 +145,9 @@ stage_cooldown_secs = 3600
 
 After the cooldown elapses, the daemon tries `git add` again; if it
 times out once more, the cooldown resets. This is a per-repo gate — one
-large repo on cooldown does not affect any other repo's sync.
+large repo on cooldown does not affect any other repo's sync. The daemon
+also enforces the cooldown in the main loop, so a repo on cooldown is
+skipped until the timer expires.
 
 ### Repair Concerns vs `repos` Table
 
