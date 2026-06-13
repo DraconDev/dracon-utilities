@@ -408,6 +408,12 @@ pub(crate) struct SyncPolicy {
     pub(crate) push_op_timeout_secs: u64,
     #[serde(default = "default_repo_sync_timeout_secs")]
     pub(crate) repo_sync_timeout_secs: u64,
+    /// Timeout for `git add` staging operations during a sync cycle.
+    /// Repos with very large working trees (thousands of dirty paths) may
+    /// need a higher value than the legacy 30s hardcoded default.
+    /// Default: 60s.
+    #[serde(default = "default_stage_op_timeout_secs")]
+    pub(crate) stage_op_timeout_secs: u64,
     #[serde(default = "default_push_retries")]
     pub(crate) push_retries: u32,
     #[serde(default = "default_repair_cooldown_secs")]
@@ -601,6 +607,10 @@ pub(crate) fn default_repo_sync_timeout_secs() -> u64 {
     420
 }
 
+pub(crate) fn default_stage_op_timeout_secs() -> u64 {
+    60
+}
+
 pub(crate) fn default_push_retries() -> u32 {
     3
 }
@@ -654,6 +664,9 @@ impl SyncPolicy {
         if policy.repo_sync_timeout_secs == 0 {
             policy.repo_sync_timeout_secs = default_repo_sync_timeout_secs();
         }
+        if policy.stage_op_timeout_secs == 0 {
+            policy.stage_op_timeout_secs = default_stage_op_timeout_secs();
+        }
         if policy.push_retries == 0 {
             policy.push_retries = default_push_retries();
         }
@@ -685,6 +698,13 @@ impl SyncPolicy {
                 policy.push_op_timeout_secs
             );
             policy.push_op_timeout_secs = 10;
+        }
+        if policy.stage_op_timeout_secs < 10 {
+            eprintln!(
+                "⚠️ stage_op_timeout_secs {} below minimum 10s, adjusting",
+                policy.stage_op_timeout_secs
+            );
+            policy.stage_op_timeout_secs = 10;
         }
         policy.max_push_blob_bytes = policy
             .max_push_blob_bytes
@@ -902,6 +922,13 @@ pub(crate) fn validate_config(policy_path: &Path) -> ValidateResult {
         result.error("max_stage_file_bytes must be > 0".to_string());
     }
 
+    if policy.stage_op_timeout_secs < 10 {
+        result.warn(format!(
+            "stage_op_timeout_secs {} below recommended minimum 10s",
+            policy.stage_op_timeout_secs
+        ));
+    }
+
     if let Some(ref url) = policy.webhook_url {
         if !url.starts_with("http://") && !url.starts_with("https://") {
             result.error(format!(
@@ -1117,6 +1144,7 @@ pub(crate) fn test_sync_policy() -> SyncPolicy {
         pull_op_timeout_secs: 30,
         push_op_timeout_secs: 300,
         repo_sync_timeout_secs: 420,
+        stage_op_timeout_secs: 60,
         push_retries: 3,
         repair_cooldown_secs: 60,
         max_push_blob_bytes: 100 * 1024 * 1024,

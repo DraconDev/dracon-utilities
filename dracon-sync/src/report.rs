@@ -1,7 +1,7 @@
 use anyhow::Result;
 use dracon_git::GitService;
 use serde::Serialize;
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 use std::fs::OpenOptions;
 use std::io::Write as IoWrite;
 use std::path::{Path, PathBuf};
@@ -368,6 +368,7 @@ pub(crate) struct StatusJson {
     pub(crate) pull_op_timeout_secs: u64,
     pub(crate) push_op_timeout_secs: u64,
     pub(crate) repo_sync_timeout_secs: u64,
+    pub(crate) stage_op_timeout_secs: u64,
     pub(crate) push_retries: u32,
     pub(crate) repair_cooldown_secs: u64,
     pub(crate) incident_ledger_max_lines: usize,
@@ -575,10 +576,68 @@ pub(crate) fn enforce_retention_at_startup(policy_path: &Path, policy: &SyncPoli
     Ok(())
 }
 
+/// Build a map of repo path -> "did the daemon record a push failure in the
+/// last 10 minutes?". Used by the report to distinguish "has unpushed
+/// commits" (normal, daemon is working through the queue) from "push is
+/// genuinely stuck" (daemon tried and failed). Returns `None` if the ledger
+/// is missing or unreadable so the report still works.
+fn build_recent_push_failure_map(policy_path: &Path) -> Option<HashMap<String, bool>> {
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    let path = incident_ledger_path(policy_path);
+    let content = std::fs::read_to_string(&path).ok()?;
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let cutoff = now.saturating_sub(600); // 10 minutes
+    let mut map: HashMap<String, bool> = HashMap::new();
+    for line in content.lines() {
+        let entry: serde_json::Value = match serde_json::from_str(line) {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+        let scope = entry.get("scope").and_then(|v| v.as_str()).unwrap_or("");
+        let result = entry.get("result").and_then(|v| v.as_str()).unwrap_or("");
+        let ts = entry.get("ts_unix").and_then(|v| v.as_u64()).unwrap_or(0);
+        // Push-related failures: any scope mentioning push/mirror with a
+        // non-ok result, or an explicit "push" reason.
+        let is_push_failure = result != "ok"
+            && (scope.contains("push")
+                || scope.contains("mirror")
+                || entry
+                    .get("reason")
+                    .and_then(|v| v.as_str())
+                    .map(|r| r.contains("push"))
+                    .unwrap_or(false));
+        if !is_push_failure || ts < cutoff {
+            continue;
+        }
+        if let Some(repo) = entry.get("repo").and_then(|v| v.as_str()) {
+            map.insert(repo.to_string(), true);
+        }
+    }
+    Some(map)
+}
+
 pub(crate) fn repo_state_flags(
     status: &dracon_git::types::RepoStatus,
     has_origin: bool,
     has_upstream: bool,
+) -> Vec<String> {
+    repo_state_flags_with_push_failure(status, has_origin, has_upstream, false)
+}
+
+/// Like [`repo_state_flags`], but only emits `STUCK_PUSH` when the daemon
+/// has actually recorded a recent push failure for this repo. Without that
+/// signal, an `AHEAD:N` repo is just "has unpushed commits waiting" and
+/// should not be flagged as stuck — the daemon may be waiting for the
+/// inactivity delay or for a multi-remote round to finish.
+pub(crate) fn repo_state_flags_with_push_failure(
+    status: &dracon_git::types::RepoStatus,
+    has_origin: bool,
+    has_upstream: bool,
+    recent_push_failure: bool,
 ) -> Vec<String> {
     let mut flags = Vec::new();
     if !status.is_clean {
@@ -596,7 +655,7 @@ pub(crate) fn repo_state_flags(
     if has_origin && !has_upstream {
         flags.push("NO_UPSTREAM".to_string());
     }
-    if status.ahead > 0 && has_origin && has_upstream {
+    if status.ahead > 0 && has_origin && has_upstream && recent_push_failure {
         flags.push("STUCK_PUSH".to_string());
     }
     if status.behind > 0 && has_origin && has_upstream {
@@ -728,6 +787,12 @@ pub(crate) async fn run_repos_report(
     let mut rows: Vec<RepoReportRow> = Vec::new();
     let mut init_or_status_failures = 0usize;
 
+    // Read the incident ledger once and build a per-repo map of "did the
+    // daemon record a push failure in the last 10 minutes?". This lets the
+    // report distinguish "has unpushed commits" (normal, daemon is working)
+    // from "push is genuinely stuck" (daemon tried and failed).
+    let recent_push_failures = build_recent_push_failure_map(policy_path);
+
     for repo in repos {
         let svc = match GitService::new(&repo) {
             Ok(svc) => svc,
@@ -777,8 +842,25 @@ pub(crate) async fn run_repos_report(
         let concern = repo_is_concern(&effective_status, has_origin, has_upstream);
         let warn = !concern && real_is_dirty;
 
-        // Flags still use effective_status for ahead/behind/origin detection
-        let flags = repo_state_flags(&effective_status, has_origin, has_upstream);
+        // Flags still use effective_status for ahead/behind/origin detection.
+        // Only mark STUCK_PUSH when the daemon has actually recorded a recent
+        // push failure for this repo (checked against the incident ledger
+        // below). Without that signal, an AHEAD repo is just "has unpushed
+        // commits" — the daemon may be in its inactivity delay or mid-cycle.
+        let recent_push_failure = recent_push_failures
+            .as_ref()
+            .map(|m| {
+                m.get(repo.to_string_lossy().as_ref())
+                    .copied()
+                    .unwrap_or(false)
+            })
+            .unwrap_or(false);
+        let flags = repo_state_flags_with_push_failure(
+            &effective_status,
+            has_origin,
+            has_upstream,
+            recent_push_failure,
+        );
         let hint = repo_hint(&flags, warn, concern);
 
         // Calculate push status from flags
@@ -2567,8 +2649,13 @@ mod tests {
     #[test]
     fn test_repo_state_flags_stuck_push() {
         let status = make_status(false, 5, 0);
-        let flags = repo_state_flags(&status, true, true);
+        // STUCK_PUSH now requires an explicit recent push failure signal.
+        // Without it, an AHEAD repo is just "has unpushed commits".
+        let flags = repo_state_flags_with_push_failure(&status, true, true, true);
         assert!(flags.contains(&"STUCK_PUSH".to_string()));
+        let flags_no_failure = repo_state_flags(&status, true, true);
+        assert!(!flags_no_failure.contains(&"STUCK_PUSH".to_string()));
+        assert!(flags_no_failure.contains(&"AHEAD:5".to_string()));
     }
 
     #[test]
@@ -2796,6 +2883,7 @@ mod tests {
             pull_op_timeout_secs: 30,
             push_op_timeout_secs: 300,
             repo_sync_timeout_secs: 420,
+            stage_op_timeout_secs: 60,
             push_retries: 3,
             repair_cooldown_secs: 60,
             max_push_blob_bytes: 100 * 1024 * 1024,
@@ -2970,6 +3058,7 @@ mod tests {
             pull_op_timeout_secs: 30,
             push_op_timeout_secs: 300,
             repo_sync_timeout_secs: 420,
+            stage_op_timeout_secs: 60,
             push_retries: 3,
             repair_cooldown_secs: 60,
             incident_ledger_max_lines: 10000,
@@ -3222,7 +3311,7 @@ mod tests {
     }
 
     #[test]
-    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA1dFZlVnJTT2gzNkZ1TTdoTEJpTEZnUnB0cmdqOENsQ3hqZVc3TUVNUFNRCnQ0VitBUElrdDJZNndoZHlPS0g1bHdLa2txZXdFNXJGaXR5a2JaVkprSW8KLT4gWDI1NTE5IEo2S0VYUXZLdWpSZUlXQk5KeHFNUnpJYUhPUkRWaDgwckUxQXdQbExQbG8KV0N2NFhJTmZWWFFZYk5YTVpYQkpoeVFpRXBwZFlzUUtOWVFGVkJLNW56SQotPiBYMjU1MTkgTFV5RUhiV1ZtOEE5WEwxc0t2VUFtK2Nza3BqNDAyYWVrZ3FuYkVpdkNRZwpaZVNSUjF0OWJRV0dtcmo2aUFueUpGcldtbkFXT1NKSCt0d2tCNlVTdkhRCi0+IFgyNTUxOSB2NnI1SkpPM3Z2enVNbDFoNjY2YmxGUGRjZ285bHUxbTdOelJ4RkJPdWtnCkFRdkVLRnkyQy9UNHY1bU02cFIyZGtyRm5BbnlNK2YySGNBOXUzelZYbzQKLT4gWDI1NTE5IHp2cnUyNS81clJVMnc2ejVWWGE0MG1CYmNpUUZnTHpCd3JvZnRGRUJDVEkKZzN6TnUwODBQWWJtb3FDaVVJOE0yK2toZHRHR0pKdkMzVkpnZVlpckxnTQotPiBYMjU1MTkgL1lzNVh1bHp3OGh6SlR1UGEzUXhNRFZFRkxRUEVRcW5pTmp5cTEva0ZrbwpDMGloK2xWUnJQdVd0d0VFbjkzd3VwWkVxMk9JSnY5SVdKc0hScU1uRzBvCi0+IDdoLWdyZWFzZSBSdyFaNi8zIGouIX0gN3UgRzwKWG42L2Z0akdocEY2QnNHN0Nsc2Fhb0V4b1BlUkIyUXRtSFIvODduMzFMT09kTXNjSXJYUnJySUd6djJFWGlPbQphV1hBS2FaWDl1Z3BLUUpncnpBdkdiR3BscUZwZWFxWEFqN1pJUHd3Q3ovdzNoM0xFei9ZM0dTTkdTOWpob0JsCkp3Ci0tLSAyb05QQnJ0dkREMVNNRVp6TE1Kejd6UlRlOXhHWGM3Ym9pWVZVVSs1ZjhBCgOdsKgP5bAKglc7QHBnADGKj7Q2XM2dvOOvZDlcp6le9uWQoelHj3CEuCYv1hyPpt9hxgIe9O2h00mL8QA=]() {
+    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAzb3B1TkJaQ2FheWJ2SkZjVi9BTHhwZklTNjBCM3FUSkpGODZUU1lCM0NzClhzeFNpUmtFa3pkRTNndUFQcWxCeTgwVzlzYmxqR29NNEpESGlhSkxteDAKLT4gWDI1NTE5IE5sZm0vcTBjbGtwenUzY1VkVHlLZG01RllNdkwzeTdqOFplbFJFRFBWZzQKblllSzhlNjl3aHFRcFFiUncybmNHaWRmUVJlc2NEWGZUOHN5RUxtMGJ1NAotPiBYMjU1MTkgMzJNNnVxTWxoNmlKNU1UYzFRdjU5c2RsL2wrcDlYUDV3MEVnSjN1YVpFNApOdzdPVVEvR0U3YjBRemdHV2EwZU5EWER4d0RObVY1bmtVelNQUVoyd0NVCi0+IFgyNTUxOSBKNHlQUm9xSDJscEcvU25TUGFkS3J6V3NBRmkrZmRxY25xTmNnUlBxN0VNCnBSdXJrcXlsNE95K09ZNUxNRnA2UFdIR21MdE1rZW5mRHdydU4zYU5BRE0KLT4gWDI1NTE5IGFtNzZnNGNGVUdKNUF0YnlrMVF0ZkFkeVF4Q3p0ZEZIVXp3Nm9jRCs2azQKK0RmOC8yZ2xUbWE0T2U2eERNa04za3loWVd3UEtGUkVBYzdQbGJveXhnNAotPiBZWC1ncmVhc2UgYUIgVFw/ICdWVHFUSQpXaU1FbHZxYVVCTi9BVlV5Y2NVCi0tLSBmd083QnNoRWpXOEtLcWRDL0lhUGJYL2QrR2IrcTVpbGtuY0hGVG82VGtzCoeATuLQntWaF5pFgpf3wCYTKcSzhkK/yas3oFHXQIZEB9SFLiqvKfEVe2jgwtrOz/kF4wVnIZePQp3UlfY=]() {
         let mut cooldowns = std::collections::HashMap::new();
         let repo = std::path::PathBuf::from("/test/repo");
         let notify_key = format!("push-fail-{}", repo.display());
