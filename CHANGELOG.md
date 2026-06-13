@@ -73,6 +73,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   incident ledger on every `repos` call. It reads a bounded tail window
   (500 lines) and still uses the same 10-minute `recent_push_failure`
   semantics.
+- **`dracon-sync repos --json` keeps stdout machine-readable on repo failures**:
+  Repo init/status failures are still counted and reported, but in JSON
+  mode their human failure lines are sent to stderr so stdout remains valid
+  JSON.
 - **`dracon-sync` broken-tracking repair log now shows the real old
   tracking ref**: The startup repair used to print a fake
   `branch/branch -> origin/branch` message. It now parses the actual
