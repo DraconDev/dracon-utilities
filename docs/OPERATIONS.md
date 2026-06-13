@@ -124,7 +124,9 @@ the daemon is working through the queue. See
 Permanent push rejections (GitLab/Codeberg protected branch, pre-receive
 hook declined, etc.) are detected up front and are NOT retried. One
 incident is logged per cycle and the repo is flagged `STUCK_PUSH` until
-the server-side policy is resolved.
+the server-side policy is resolved. A dirty repo that is merely ahead
+without a recent push failure remains `WARN`; its hint says the daemon will
+push after changes settle rather than suggesting concern repair.
 
 ### Large-Repo Staging Cooldown
 

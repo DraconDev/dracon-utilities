@@ -49,6 +49,10 @@ recently and failed", and the four code sites are forced to consult it.
 4. **AHEAD without a recorded push failure is PENDING, not STUCK.** The
    `recent_push_failure` window is exactly 10 minutes (600s) and is
    checked against the incident ledger, not against in-memory state.
+5. **Hints must match the row classification.** A dirty repo with unpushed
+   commits but no recent push failure is still a `WARN` row, so its hint
+   says the daemon will push after changes settle instead of suggesting
+   `repair-concerns`.
 
 ## Classification rules
 

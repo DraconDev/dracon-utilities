@@ -78,6 +78,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   wrapper while individual git operations are still making progress. Warn
   repair now delegates to `sync_repo`'s per-operation timeouts instead of
   aborting the whole triage pass with a synthetic timeout.
+- **`dracon-sync repos` hint text now matches WARN vs CONCERN semantics**:
+  A dirty repo with unpushed commits but no recent push failure is still
+  `WARN`, so its hint now says the daemon will push after changes settle
+  instead of suggesting `repair-concerns`.
 - **`dracon-sync repos --json` keeps stdout machine-readable on repo failures**:
   Repo init/status failures are still counted and reported, but in JSON
   mode their human failure lines are sent to stderr so stdout remains valid
