@@ -668,12 +668,39 @@ pub(crate) fn repo_state_flags_with_push_failure(
     flags
 }
 
+/// Kept for backward-compatible test coverage. New code should use
+/// [`repo_is_concern_with_push_failure`] which also considers recent
+/// push failures and the behind-count.
+#[allow(dead_code, unused_variables)]
 pub(crate) fn repo_is_concern(
-    status: &dracon_git::types::RepoStatus,
+    _status: &dracon_git::types::RepoStatus,
     has_origin: bool,
     has_upstream: bool,
 ) -> bool {
-    status.ahead > 0 || status.behind > 0 || !has_origin || !has_upstream
+    !has_origin || !has_upstream
+}
+
+/// Like [`repo_is_concern`], but also flags a repo as a concern when it has
+/// unpushed commits (ahead > 0) **and** a recent push failure was recorded
+/// in the incident ledger. Without the push-failure signal, an AHEAD repo
+/// is just "has unpushed commits" and the daemon is working through the
+/// queue; that should be a WARN, not a CONCERN.
+///
+/// `behind > 0` remains a concern unconditionally: the local is older
+/// than the remote and risks losing history if the divergence grows.
+pub(crate) fn repo_is_concern_with_push_failure(
+    status: &dracon_git::types::RepoStatus,
+    has_origin: bool,
+    has_upstream: bool,
+    recent_push_failure: bool,
+) -> bool {
+    if !has_origin || !has_upstream {
+        return true;
+    }
+    if status.behind > 0 {
+        return true;
+    }
+    status.ahead > 0 && recent_push_failure
 }
 
 #[cfg(test)]
@@ -839,15 +866,10 @@ pub(crate) async fn run_repos_report(
         // staged changes. Untracked files (e.g., target/, node_modules/) are
         // NOT counted — they are build artifacts that shouldn't trigger
         // WARN. A repo with only untracked build artifacts is OK.
+        // The `recent_push_failure` signal is computed once and used for
+        // both the `concern` classification and the `STUCK_PUSH` flag so
+        // they stay in sync with the user-visible `repos` table.
         let real_is_dirty = status.modified_files > 0 || status.staged_files > 0;
-        let concern = repo_is_concern(&effective_status, has_origin, has_upstream);
-        let warn = !concern && real_is_dirty;
-
-        // Flags still use effective_status for ahead/behind/origin detection.
-        // Only mark STUCK_PUSH when the daemon has actually recorded a recent
-        // push failure for this repo (checked against the incident ledger
-        // below). Without that signal, an AHEAD repo is just "has unpushed
-        // commits" — the daemon may be in its inactivity delay or mid-cycle.
         let recent_push_failure = recent_push_failures
             .as_ref()
             .map(|m| {
@@ -856,6 +878,19 @@ pub(crate) async fn run_repos_report(
                     .unwrap_or(false)
             })
             .unwrap_or(false);
+        let concern = repo_is_concern_with_push_failure(
+            &effective_status,
+            has_origin,
+            has_upstream,
+            recent_push_failure,
+        );
+        let warn = !concern && real_is_dirty;
+
+        // Flags still use effective_status for ahead/behind/origin detection.
+        // Only mark STUCK_PUSH when the daemon has actually recorded a recent
+        // push failure for this repo. Without that signal, an AHEAD repo is
+        // just "has unpushed commits" — the daemon may be in its inactivity
+        // delay or mid-cycle.
         let flags = repo_state_flags_with_push_failure(
             &effective_status,
             has_origin,
@@ -1923,6 +1958,9 @@ pub(crate) async fn run_repair_concerns(
         push_ok: false,
     };
     let mut resolved = 0usize;
+    // Use the same refined concern logic as the `repos` command: an
+    // AHEAD repo is only a concern if a recent push failure was recorded.
+    let recent_push_failures = build_recent_push_failure_map(policy_path);
 
     for repo in repos {
         let svc = match GitService::new(&repo) {
@@ -1942,7 +1980,24 @@ pub(crate) async fn run_repair_concerns(
 
         state.has_origin = has_origin_remote(&repo);
         state.has_upstream = has_tracking_upstream(&repo);
-        let is_concern = repo_is_concern(&status, state.has_origin, state.has_upstream);
+        // Use the same refined concern logic as the `repos` command:
+        // an AHEAD repo is only a concern if a recent push failure was
+        // recorded. This keeps `repair concerns` consistent with the
+        // user-visible `repos` table.
+        let recent_push_failure = recent_push_failures
+            .as_ref()
+            .map(|m| {
+                m.get(repo.to_string_lossy().as_ref())
+                    .copied()
+                    .unwrap_or(false)
+            })
+            .unwrap_or(false);
+        let is_concern = repo_is_concern_with_push_failure(
+            &status,
+            state.has_origin,
+            state.has_upstream,
+            recent_push_failure,
+        );
         if !is_concern {
             continue;
         }
@@ -2689,20 +2744,31 @@ mod tests {
 
     #[test]
     fn test_repo_is_concern_ahead() {
+        // Old behavior: any ahead was a concern. The new
+        // repo_is_concern_with_push_failure requires a recent push
+        // failure signal; without it, ahead is just "has unpushed
+        // commits" and is a WARN, not a CONCERN.
         let status = make_status(false, 5, 0);
-        assert!(repo_is_concern(&status, true, true));
+        assert!(repo_is_concern_with_push_failure(&status, true, true, true));
+        assert!(!repo_is_concern_with_push_failure(
+            &status, true, true, false
+        ));
     }
 
     #[test]
     fn test_repo_is_concern_behind() {
         let status = make_status(false, 0, 3);
-        assert!(repo_is_concern(&status, true, true));
+        assert!(repo_is_concern_with_push_failure(
+            &status, true, true, false
+        ));
     }
 
     #[test]
     fn test_repo_is_concern_clean_healthy() {
         let status = make_status(true, 0, 0);
-        assert!(!repo_is_concern(&status, true, true));
+        assert!(!repo_is_concern_with_push_failure(
+            &status, true, true, false
+        ));
     }
 
     #[test]
@@ -3314,7 +3380,7 @@ mod tests {
     }
 
     #[test]
-    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAvMHdkeWJwWDQ3UDhMRWpHTGN2VTJSMUtQR21aVDNaOWoySnViK1hDWkg4Ckw2d3ZIdFdPYS9GNnNKQXdudzF0dUMvRzA3elgrZy95TWdtUzdjQkJXNFUKLT4gWDI1NTE5IFljSm9wRXQyM1Q4ME1iYW9kdFQ1VVZrTWZHeTlldGFrWWhqclRQbDk5V00KdWJlS3BmaHJqRHplM0l1cWowSmxReDV1QnQ4WUp6akxVaWZSaVNRd2ZCVQotPiBYMjU1MTkgMEJzejZZRjJKVWlmTUpYajNDVHp2NmFwS0VnOEdwVVVTVGFUaXEzOVdCYwpQMU9uWVplWXo5RkYxOXJ1akZZV2Jnd2tLcHUwRmRLVmE3WTNDdTRaR1V3Ci0+IFgyNTUxOSBuYm1yWWx0bytzdEpFT0pDQ0Rpbk5GUEJFcklHdXNwREdUL0NxOEh2d3pzCmVkNjVYK1AxbDd3WjVKMnpnUVJoSVZIN3dNY1RwMHVuWDdybmFTK3B1QUUKLT4gWDI1NTE5IFdraGFYTkxRUVgrVW5RMnJkVDZudjNSeEhaUllDWHVzVzhpSUFHM1NuZ28KNUdUdmJlR1lQLzgwMS9NUStXdTU1enhoVFQ5bndrem5xVUxsaWtESVhyRQotPiBmMi1ncmVhc2UgflUgOS02NSBzfVUvWDogd0s/Jj5rJApVdGY3MUJ5aHVDMGNhZU92VGJ3MVpIaGlpSUVsQnp4VkJDSGpCbGdxNFo2YnNEMFpqdlMzZ2pyOGgxY2tJOEpMCjJ1bXNkUWxtVkRJM2l5NmdkaFY1aG11SFovaU9ocjMyMEJITEJSaGpMamxycjZvUzlzV0pyZDRacGNQbWl0WncKdGNYZwotLS0gdDBJSldBL2JHaVlYMmlyZS9sNUJyVjZKSWJOR1hLeE14Mko1d3Foczc1TQpdf1kPgTGnogShtyCEwNi2V2QZveuHLJXdl2urWjaJBl+ZLk5+VlnNvatepr2R/LxYBBNZHH2zghewZVYX]() {
+    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBCNzFLdTNQR2dpT2tOY3VyZzFvOGh6cGVOc2JiQ3pDMjI3RWZ2Zkpud2xzCkJVT3VQeDRlNUcxTDF4eC9MbS9BUHFUZEl3aGhrTzAzRnFiRTRFS1RnckUKLT4gWDI1NTE5IHVlV3RXOXlicUxTSVc3NHRaYi9URGt4dTNQY0FLcWVJS202Uzd2QTZVbmsKT3Z6QmRIRFR1RDhSUVpOK3RWTzROVElIOXZiTDJlQ0ZpL2tVa2I3S2lnRQotPiBYMjU1MTkgeWRxanQvZy9iRkNCMlZtUVNXMkNLeEhwVXh0N0hMMGprcDhPcE9lODRSVQp6dndQUnQ0bzZaOVhEa2FZancyQmtnRzExV2h5Q1VtUlZzakd0TWtRSklFCi0+IFgyNTUxOSAwUTgrSTI4Y3FzNUE2SFFqTFNUR0RZTGFKU3MwOWo0K2gvcktZeEVpZHlBCk0xYVI5K25CUzdPcWJsTkVNWUZTd25xYmpsQ3pnSmxUd0NxR2M1NWNpVzgKLT4gWDI1NTE5IFZzNzRzbTZJY3IzYloxZ0I3MjJNN0J5Q3ZjR3U4ekhoTm9BS0gyOGMyVWMKdWE0YXcrUUFPZFpjSXllcUlMTG9WOXhLNlFDVSs2RmU0elF0Y01pSmpBUQotPiB3QGFUeihrLWdyZWFzZSBpc3VwRiBQRzZqIG84CkJUay92M2Q4MkZiaUJxWFp3SXZzLzhtQ0NuWmZpUGNQS3cKLS0tIEsrbGgwL0JWcFlabGR3WlpYRHp5L3d6bWR3YzZPTW1xcGk3WU84RU5ITk0K1MMEY1Z6CUDScOw269Tgaqsm9zsFodGT8NApvlUAJcfiFv5NqHNVVFkCvKxGsewBxmCx2eVyKxtZhA+mkQ==]() {
         let mut cooldowns = std::collections::HashMap::new();
         let repo = std::path::PathBuf::from("/test/repo");
         let notify_key = format!("push-fail-{}", repo.display());
