@@ -35,7 +35,8 @@ recently and failed", and the four code sites are forced to consult it.
 1. **`repos` table and `repair concerns` agree.** If a repo is a
    CONCERN in the `repos` table, `dracon-sync repair concerns` (in
    dry-run) must list it. The dry-run count and the table count must
-   be equal.
+   be equal. The `stuck-push` repair filter uses the same recent-push-
+   failure requirement as the table's `STUCK_PUSH` flag.
 2. **No retry or transport fallback on permanent rejections.** A push
    error matching the permanent-rejection regex set returns immediately
    from `multi_remote::push_to_named_remote`, `push_with_retries()`, and

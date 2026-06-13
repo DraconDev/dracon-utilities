@@ -37,9 +37,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   which repos were concerns. Both now use
   `repo_is_concern_with_push_failure()`: a repo is a concern when it
   has no origin/upstream, or is `behind > 0`, or is `ahead > 0` AND has
-  a recent push failure in the incident ledger. This is a logic
-  defect (inconsistency between two views of the same data). Fixed in
-  commit `bac8316cc`.
+  a recent push failure in the incident ledger. The `stuck-push`
+  repair filter also uses the same recent-push-failure requirement as
+  the table's `STUCK_PUSH` flag. This is a logic defect (inconsistency
+  between two views of the same data). Fixed in commit `bac8316cc`.
 - **`dracon-system` doctor "dracon-libs" check is now correctly labeled
   dev-only**: The check used to say "dracon-libs (sibling)" with no
   hint that it is optional for installed binaries. It is now labeled
