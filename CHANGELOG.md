@@ -73,6 +73,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   incident ledger on every `repos` call. It reads a bounded tail window
   (500 lines) and still uses the same 10-minute `recent_push_failure`
   semantics.
+- **`dracon-sync repair-warns` no longer uses a coarse sync timeout**:
+  Large but healthy repos can exceed the legacy `repo_sync_timeout_secs`
+  wrapper while individual git operations are still making progress. Warn
+  repair now delegates to `sync_repo`'s per-operation timeouts instead of
+  aborting the whole triage pass with a synthetic timeout.
 - **`dracon-sync repos --json` keeps stdout machine-readable on repo failures**:
   Repo init/status failures are still counted and reported, but in JSON
   mode their human failure lines are sent to stderr so stdout remains valid
@@ -96,6 +101,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   during validation.
 
 ### Added
+- **GitHub utility feature façade scaffolding**: Added
+  `scripts/scaffold_feature_repos.py` and
+  `docs/design/github-feature-repos.md` so `dracon-sync`,
+  `dracon-system`, and `dracon-warden` can be presented as separate GitHub
+  feature surfaces without duplicating or moving implementation code out of
+  the monorepo.
 - **`dracon-sync` `stage_op_timeout_secs` policy field**: Configurable
   idle timeout (default 60s, min 10s) for `git add -A` and other
   staging operations on a single repo. The previous hardcoded 30s

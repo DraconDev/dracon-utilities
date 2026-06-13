@@ -147,6 +147,7 @@ cargo deny check
 | [docs/OPERATIONS.md](docs/OPERATIONS.md) | Systemd, incident response, troubleshooting |
 | [docs/design/cli-print-style.md](docs/design/cli-print-style.md) | Human-facing CLI output conventions |
 | [docs/design/warden-plaintext-sibling.md](docs/design/warden-plaintext-sibling.md) | Warden plaintext escape hatch threat model |
+| [docs/design/github-feature-repos.md](docs/design/github-feature-repos.md) | GitHub façade repos for feature-focused utility surfaces |
 | [dracon-sync/README.md](dracon-sync/README.md) | Sync daemon usage and configuration |
 | [dracon-system/README.md](dracon-system/README.md) | System guard usage and configuration |
 | [dracon-warden/README.md](dracon-warden/README.md) | Repo encryption usage and configuration |

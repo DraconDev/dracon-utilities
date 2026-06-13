@@ -149,6 +149,12 @@ large repo on cooldown does not affect any other repo's sync. The daemon
 also enforces the cooldown in the main loop, so a repo on cooldown is
 skipped until the timer expires.
 
+`repair-warns` does not wrap the whole sync triage pass in the legacy
+`repo_sync_timeout_secs` value. Large repos can still spend longer than
+that on otherwise healthy staging, commit, push, or mirror operations; the
+individual git operations keep their own progress-aware or idle timeouts
+instead.
+
 ### Repair Concerns vs `repos` Table
 
 `dracon-sync repair concerns` and `dracon-sync repos` use the same
