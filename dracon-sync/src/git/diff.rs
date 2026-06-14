@@ -189,3 +189,22 @@ pub(crate) async fn staged_paths(repo: &Path) -> Result<HashSet<PathBuf>> {
         .map(PathBuf::from)
         .collect())
 }
+
+/// Get the set of all currently-tracked file paths in the index.
+/// Used to distinguish untracked (new) files from freshly-staged
+/// tracked files when `auto_stage_untracked = false` is set.
+pub(crate) async fn tracked_paths(repo: &Path) -> Result<HashSet<PathBuf>> {
+    let output = crate::git::tokio_git_cmd()
+        .args(["ls-files", "-z"])
+        .current_dir(repo)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .output()
+        .await?;
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    Ok(stdout
+        .split('\0')
+        .filter(|s| !s.is_empty())
+        .map(PathBuf::from)
+        .collect())
+}

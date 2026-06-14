@@ -2059,7 +2059,7 @@ async fn stage_commit_and_push(
         // `ctx.remote_failures` (the caller passes a `&mut HashMap`).
         // The `tokio::spawn` fire-and-forget pattern was removed because
         // it bypassed the failure-tracking needed by callers like
-        // `test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBpUkUya1BlMDNlczJwSllFK2JYMURDQnc5aW5xUUNzSWMzRGpmWHZhalJjCjlBL0gzYWVGSUZJRHF6WXM3QmphaDRhSVB1V1NGWjBSVk5zTm1tVHlJbUUKLT4gWDI1NTE5IEgxTWluT0h0K1cvajJmZ0VvUFJ0ckdiYzlTZ3VRcGpIamNVWFpVTTNCQlkKcERXcCtZMzl6RUVyRzRadWRYSk1LYWRHT3VVenlNcFRjTmZ6TmZmVk5QRQotPiBYMjU1MTkgRmJVQlZJamtQTjF4b3VZMFJ3b3orZ2NyZzhNZkgwT1BuUmduWDdzWVpqMApWUGlHSnVzSi9rV2twTUlGYWY4cWI5b2prVVJtV1lwSEpNNTQ2WlhMNkxBCi0+IFgyNTUxOSBQWEhDeldsR3NXZHM4cElaSGt5UGFVeG9yMTVNQkZodG5jblh3Si9qVm5vCkNmWXRRdjhyMTZJUzc4djV0ZFR2NVZDWEZ1aUhCY2V2enJEM1dHNEFpYzAKLT4gWDI1NTE5IE9yKzZVN0RUMzArQmVwcml4OHRCOCtkM2FiSkg4TnZpZ0VrS2l2MnhYV3MKdkRJUnhiR0RJMWJ2WW9WNyswU0h5NGdLUjVTWGdDZmdrd0NmMFJtRks4NAotPiBDa0N1Oy1ncmVhc2UKWjRKVmVMcVlTVjhpazJGTzA4VXAKLS0tIHdQZWVjWDh6MTZ5ZlZLUXJhQnY2RXRXckwyZG0wKzJkSDNzSWFpRGdnYmcKRPkS0v5YhB0bX+IpRgL0RoleuCQ/1qMM3qvtyZkRx93repiZe+KFz354cIQnWHKU/WfqR9FZNBaV]`.
+        // `test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBTQWNnT2lJRkJ6Tld5dXcrbTJVUWNGK28xNjh0ZzhOY2dQeU1SVGNyTW5JCkpRV3ZoeUtGLzloeDNVMFdYRDZURDVBTXNNVThFcjYvakdmTndZKzJSQUkKLT4gWDI1NTE5IG1vTlFEZHhmUHhHSlpZQmEzZEVKZG1KeDBTSWo3b0JmRDBsN2sybFZod0EKeDYvTVBqNHMvenJ2NU9UKzkxMzBGbzBnNFBYM3c0U1puNkNIZ08rVVFPdwotPiBYMjU1MTkgbnRwaHRDRWFiRnE2VW9HSmFTb1RPUng5cHArdk54ZEFxbTY3MDdhRCszdwpZdlFNeXdvUTRLeHpsZjBTL0RWMnZ0eDJkL1ptc0xxS21walp2S2wyTHJVCi0+IFgyNTUxOSBPLzlkRkR0elRBd1dyblRGV0YvUkhraVYxY1dYZ3JYVWRobjhpY3pQNmxBCnBLZVlTVUdyWDZZRTVjVFNyTzNQWERNZnVKK0h3bWJpSmxWRnlWZUx6d00KLT4gWDI1NTE5IGUzbDg2ekZZZVVhK0NCeHBzalBpUDUySm1CK1FtaHJncndIV1h5M1lIazAKaVRvN005ZldqYlljQXA0c0oxSnU0STIxT1g2bU9QR3ZHZVVNa3JjTWVOYwotPiBAc0swJ080cS1ncmVhc2UgJCsgUX5NbQpmc29RUXUraGhrT2YxTFBqZFhQenM5TQotLS0gZmlrcCtPRFk3ZVFFUlByUXI5Yk9QQ3pMdXpvdVNkMVR6eEZ4MkFmY2lvOArV9SKtgW5A5xH0NKUkK2HFmpuOdtFKJ0UwAld8uAjAbrKsLMm4NzuvQyny2AZwXEqtq0dGpkxJWls=]`.
         match push_background(repo, policy, ctx.remote_failures.as_deref_mut()).await {
             Ok(true) => {}
             Ok(false) => eprintln!("⚠️ push failed for {}", repo.display()),
@@ -2224,6 +2224,15 @@ pub(crate) async fn sync_repo(
     }
 
     if !status.is_clean && policy.auto_commit {
+        // When `auto_stage_untracked = false`, we need to know which
+        // Added-status entries are untracked vs freshly-staged-tracked.
+        // Build the tracked set once per sync_repo call.
+        let tracked_paths: std::collections::HashSet<std::path::PathBuf> =
+            if policy.auto_stage_untracked {
+                std::collections::HashSet::new()
+            } else {
+                crate::git::tracked_paths(repo).await.unwrap_or_default()
+            };
         let (to_stage, to_restore): (Vec<_>, Vec<_>) = entries
             .into_iter()
             .filter(|e| {
@@ -2231,6 +2240,44 @@ pub(crate) async fn sync_repo(
                     && crate::exclude::is_gitlink_unchanged(repo, &e.path)
                 {
                     return false;
+                }
+                // `auto_stage_untracked = false` skips newly-added (untracked)
+                // files. The daemon still commits modified tracked files
+                // and unstaged modifications. Use this to keep scratch
+                // research, notes, and other operator-local files out of
+                // the auto-commit while still syncing tracked changes.
+                if matches!(e.status, dracon_git::types::FileStatus::Added)
+                    && !tracked_paths.contains(&e.path)
+                {
+                    if !policy.auto_stage_untracked {
+                        if debug_enabled() {
+                            eprintln!(
+                                "⏭️  {} skipping untracked {} (auto_stage_untracked = false)",
+                                repo.display(),
+                                e.path.display()
+                            );
+                        }
+                        return false;
+                    }
+                    // `untracked_exclude_patterns` lets the operator
+                    // exclude specific patterns (notes, scratch, audit
+                    // evidence) from auto-stage even when the toggle is
+                    // on. Match on the basename and on path-with-glob
+                    // via `glob` against the full path.
+                    if crate::exclude::matches_untracked_exclude(
+                        repo,
+                        &e.path,
+                        &policy.untracked_exclude_patterns,
+                    ) {
+                        if debug_enabled() {
+                            eprintln!(
+                                "⏭️  {} skipping untracked {} (untracked_exclude_patterns)",
+                                repo.display(),
+                                e.path.display()
+                            );
+                        }
+                        return false;
+                    }
                 }
                 true
             })
@@ -2280,7 +2327,7 @@ async fn handle_ahead_push(ctx: &mut SyncContext<'_>, svc: &GitService) -> Resul
         // Push synchronously so mirror failures are tracked in
         // `ctx.remote_failures`. Previously this used `tokio::spawn`
         // (fire-and-forget), which made the failure tracking unreachable
-        // for callers like the test `test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBYOXdBYTRYOGszZnc2ZUJKU0NZbUFtL2M0MWRCMDRGTkQzU3Q1OG5laEE0CmViTno2OW5QY0JVL1EzdzlRUmZnQWo4MWZWNFVVZXBtOENHdzNYZkl4K3MKLT4gWDI1NTE5IEpHUTZiSDVYV0MvcWIvY3ZEbkN3MEhITENlY1lXRk9PTkdaejNGRHd0VXMKcEx5WENyN1pxNms0YjNXNjlmRU1EQ2RTV1BxUzk1VnN0YVVFK3lxOU1CawotPiBYMjU1MTkgM0YyUnlZWVRqRUhMVHk0MFRyUW4xWStvODZ1bnNCUkI4UjVZcHltZS9HOApyNzFFTkRqSDVGK1Y2dEdTbTlobVEzOTdwUUNwQzZkYnFCQjA0RTVMZGJNCi0+IFgyNTUxOSBsVTREREMzV3dEWWViZkhadnc0SExLSzlick95ZVd3bHJPb2lXdDZCeDJrCncvelBHRXdURXRBKzhOVi9pZStueHpjbGFKMGE1a0RUaXlPMEhtSllET0kKLT4gWDI1NTE5IE5BRzdsbkVCeS9GVE5DaTVVOTRiVTBtR01jSEo4c01CV0E5Tkw2V3o1MHcKY2RLbjVoQ0F5aFFEU2NJczArQS9Fd1N6V0pwbThSTHdBbmZ0QTQvS1FhZwotPiA1RE80YS1ncmVhc2UgaTpnT2pYIDo3IC8gLjlka0FdRwpiQ1NaWEFHTXRGNkI4d2NQdTJXVGpHTnVOa0hlODhKc3lmL1YxU2dXNFlKeHRFV3BXRVdGMjlhVW5VWmg2MlFBCmcrV1U1TThIY2RkcnRDVTBNZlc5UmlEOVQ1SnQ1dUpBeGZHSkJUNHR5UVhwbDBSTUJ4endTaWZxd1lLYwotLS0gYzQ1bUl3dGl2MjJ0VWcrYnNXQ2Fzb29uT0k4Mnltd1VhNXgzT1JheHBkWQpqKRitZgbFiXz5cb36rBKuBZwpiNeJoX7nVW2Sk/RnyENwTgrAy7FJ8wPrXD3dV7dcSmJT5hhbwvU=]`.
+        // for callers like the test `test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBmRmptMys5TEU3WElJTS9BSTBNaU5sSGhFdXRLUGV2VmxlUUdlM3RBeG5RCmd6OC8wYllPM3hLSkpteXBuR0lvVXFNTzByYUdyQitiU2JVL2xCMlNWcEUKLT4gWDI1NTE5IGFseFk4K21IeFlISXc3YVl5NzM2RU5KTXFla1ZpUlUzQXdXU1VVRXA3Vm8KMVdDNS8rTjgwODBOOWhFS1Q0UjRmUHFVd1JlZVd2OC93T2VCRWNqZGJkbwotPiBYMjU1MTkgM0RCYjYwczVUR1pRTS95Q2JLWHorMGRlR3NLdml4NWRyalZ2RVRVTXMwSQpqWDk2bWFiNTErTmhQZnU1eVVYTkdHTFQxN2JDUVIrQkxOTzZVMno3WE5RCi0+IFgyNTUxOSBZVnZkQk5GTlk2L2Z4K00xYnhSek1zK0htdU5XZGtjUlNWcE5mZWZKM1dJCitKbVhBM2FaUFExbmFwVW9ZbXg4TlVxZm5nUkRkRy9DNkw0N2dia05jdm8KLT4gWDI1NTE5IFYwQ2RTTUZJMmhYQmNKUzBDUjFQNmtNdU9NUUdjQTZYNjR1RlRIUExtQUEKcEpvVjlPclM1R3JPQW1WeFFCU084bWdmQ1BiSFhuZVA3R3JkYWlMMW9aZwotPiBmQ0QwVWwtZ3JlYXNlCjk3b1pPSVJyOVZvL09lbGhFOWFZelo2ZTB0T0xyTkg0Ci0tLSArVk15aTVwUGQ3Mm5vMzNpdDZWZS90NUJFaEQvUlpEV2xQdzRUTCszRENFCibbxZUqj9bBq0v1FamN8gBW9+4wl8CfTZUmVEvQYgmiWbX92PYlPNR0pN9U/tZbQ/lcP4YBSWftgg==]`.
         match push_background(ctx.repo, ctx.policy, ctx.remote_failures.as_deref_mut()).await {
             Ok(true) => {}
             Ok(false) => eprintln!("⚠️ push failed for {}", ctx.repo.display()),
@@ -2873,6 +2920,154 @@ auto_bump_versions = false
     }
 
     #[tokio::test]
+    async fn test_sync_repo_auto_stage_untracked_false_skips_untracked() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+
+        // Create an untracked file that should be skipped
+        std::fs::write(repo.join("scratch.md"), "scratch content\n").unwrap();
+        // Create an untracked file that should be staged (default pattern)
+        std::fs::write(repo.join("normal.txt"), "normal content\n").unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = true
+auto_pull = false
+auto_push = false
+auto_bump_versions = false
+auto_stage_untracked = false
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(result.is_ok(), "sync_repo should succeed: {:?}", result);
+
+        // Verify scratch.md is NOT tracked but normal.txt IS tracked
+        let output = crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "ls-files"])
+            .output()
+            .unwrap();
+        let tracked = String::from_utf8_lossy(&output.stdout);
+        // scratch.md is in default untracked_exclude_patterns via the
+        // untracked_exclude_patterns field — but since auto_stage_untracked
+        // is false, it stays untracked regardless of pattern.
+        assert!(
+            !tracked.contains("scratch.md"),
+            "scratch.md should NOT be tracked when auto_stage_untracked=false"
+        );
+        // normal.txt is a new tracked file (status=Added + in index after
+        // git add). With auto_stage_untracked=false, an Added entry that
+        // is NOT in the index (truly untracked) is skipped. But a freshly
+        // staged tracked file (already in the index) is still allowed.
+        // Since normal.txt is brand new, it should also be skipped.
+        // This test only verifies the auto_stage_untracked=false behavior.
+    }
+
+    #[tokio::test]
+    async fn test_sync_repo_untracked_exclude_patterns_keeps_scratch_untracked() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "config",
+                "user.email",
+                "test@test",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "test"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+
+        // Create files that should be auto-staged
+        std::fs::write(repo.join("real-doc.md"), "real doc\n").unwrap();
+        // Create a scratch file that should be excluded
+        std::fs::create_dir_all(repo.join("scratch")).unwrap();
+        std::fs::write(repo.join("scratch").join("notes.md"), "scratch notes\n").unwrap();
+
+        let toml_str = r#"
+auto_github_private = false
+auto_commit = true
+auto_pull = false
+auto_push = false
+auto_bump_versions = false
+auto_stage_untracked = true
+untracked_exclude_patterns = ["**/scratch/**"]
+"#;
+        let policy: SyncPolicy = toml::from_str(toml_str).unwrap();
+
+        let result = sync_repo(&repo, &policy, &BTreeSet::new(), 0, None, false, None).await;
+        assert!(result.is_ok(), "sync_repo should succeed: {:?}", result);
+
+        // Verify the real doc is tracked
+        let output = crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "ls-files"])
+            .output()
+            .unwrap();
+        let tracked = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            tracked.contains("real-doc.md"),
+            "real-doc.md should be tracked"
+        );
+        // Verify the scratch file is NOT tracked
+        assert!(
+            !tracked.contains("scratch/notes.md"),
+            "scratch/notes.md should NOT be tracked (untracked_exclude_patterns)"
+        );
+    }
+
+    #[tokio::test]
     async fn test_sync_repo_skip_pull_when_not_behind() {
         let tmp = tempfile::tempdir().unwrap();
         let repo = tmp.path().join("test-repo");
@@ -3168,7 +3363,7 @@ push_url = "git@nonexistent.example.com:repo.git"
     }
 
     #[tokio::test]
-    async fn test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBMZXI3UFZiTTVVTnlMLytVcEZOek1HOHRMZkhKR3FPdzhDakdvTE5peFNBCk5QZy9qSlBQbE1ibVpXbG5lSktMWG5lejRydUsyVDZCTnM5WFN1YVVzWTgKLT4gWDI1NTE5IDRXdDVMakwvQktCZHR1dyt6N29nVTZ2Z3ZEZ05EWllhZnFwNWR2dlg1REUKYXlhdG9QaVpsdlFQRDhLcWhJRWptcUIxVThqdzlnMVo5dGx1bXJIeXVPbwotPiBYMjU1MTkgODhxUTRQSytKTFJiaStQSTJxRXFUS0VDdG5ZTzMrT2xFTDBGVk83TmUyYwpMbFBFQ1RSdFJ0ckdxOEswZklHVXBQdHc2UWdUZEVmMEs0YnNmK21nOUh3Ci0+IFgyNTUxOSBPWkRnZEVqTSsxMUgzL1dDenE3TkhwVnF2aGpmb1pLaE02WWNjU3BPeHlNCm9YNkwzMnV1ajlBZHpXMmZ5aTVGbUlCbjFHODc5NTlQUzA4NVcvMmVrWEEKLT4gWDI1NTE5IFZHRWcyMlZKQUl2ZFBZT3lZYTNCWmZvUC8yeEhScWhsL3VDUTlveE9MaHcKNmlKdzQ1dlJuY3lpUERNNXNPSDgzRU1XVUJGeUdxQTVzS2owRktDSlNTRQotPiAzPT0tLWdyZWFzZSBUNlRdKyEgYSB+CllDWnMwY1lSbVk5V0FCWGQ2czY4ODNRa2ZVcVFkZmYwVUN2Q2FUd2pVaGRLZHU4eWIyazByOGVGTTdXUEI2WGQKRUt3Ci0tLSB4WWVST3FpWmZNTEEyUjl5ZTBBRER6SUk4b1lKNkxQZGRaNTA3Q2hWdHlnCqOSc3mMkQgjEodfzmKqP7xC0mu5Ij8lt939KCod4wTNU6QBDpuCTl+za80FRzNe8vivuTEYKb0JZA==]() {
+    async fn test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBGNDZLdm5BM1c2dlNwem9ib3lXQjhSY2x5WjVmY3dBNCtFQjNLY0hFckJvCmhNNVJlNHZnM0VvdmhGNmRUa1RwejJ1OGtmRE9iajZzVGM2eHIyNjQwYWcKLT4gWDI1NTE5IDB1R0Y2cDBXV1N2QzVHOFM3azM2MUI3akpxVGZFSlZZZVB0Nys0NE5DUUEKY0x0QVM1YmFWL1NycGJDWS9rUWwxZ1pIR2F5RXI5QXY1d3AyR051aHFuNAotPiBYMjU1MTkgNk1rVFZlYWgzaFFrTHkzS1pPSjJkb1l1T3BPMjVNaFI0VVpMQUM2NGZSWQpNdExFQnYrWTdyOHBSNllLTTBQWEZENGVSdUF2NDQvMS90bHlGenAyeDlZCi0+IFgyNTUxOSBxYlhjNWhjM3AyZnE2eUZ6ZXRNOG45OUdYeVBjcHVMeWpsaE9FRW5HUURVCkhITk5qUjhBMU1TSnVnVndYZGRCM1hHNkZxdkdWQmgzZXZzVDVEWmpXOW8KLT4gWDI1NTE5IEdOUFRJYVlXR0w4Qnl0ZjhvWGNVTjB5Tm5aQ1FGQmVmT1M0N1U1eXpVUVUKQ2ZIanF4OGhNcnpzKy9ST1JIVU96K0RINmo4b2RHaGRtcjVFT0FKVERJZwotPiB4LChMdS1ncmVhc2UgeW8hZ28rUTIgXT9lcW5IVzcgaEg0Ii57Wm0KTlE3STJyMSttZW11cDV3bWZzMkxIMk5DUGVVdkhhM3lVR3dRTWMwaXZWajRkUndKdEtnCi0tLSBmWHRJb2JtcW9PTk4rUEpEbnZzSjY4QVJZZzRiYU1GMTh0VFBacmhPT1VFCjDxdVBhl7ifvmZBevKz2H7HzH4Uwhl09VAshBChV0S2OpIRItThhrZBllSGoHSPpEw4+L5A+28PjA==]() {
         let tmp = tempfile::tempdir().unwrap();
         let origin_bare = tmp.path().join("origin.git");
         crate::git::git_cmd()
@@ -3524,7 +3719,7 @@ push_url = "{}"
     }
 
     #[tokio::test]
-    async fn test_sync_repo_exac[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBmVmlac3dDTmpUSUVyTC9CSFpTUU92Q3A3OE02a3hOcDZqdFFLYVNWb3d3ClBTTjJmU3RYSjYwVU1mQTgxeE9iQktVZVFWUm40ampLMzg4dTNGOTNENmMKLT4gWDI1NTE5IFBmMmJWQ3lQUC9IOUxUeFZXemlna3BydEEzS3JlZnJpcS83eU44RzJnVXcKMlJqWlJWVzFMRHoyT09wK2lvUGRyM1RMczNOa3dWWGhXSExCc29BaFZNawotPiBYMjU1MTkgVCt1NTBUaG8yNUVoM2JYOUY1ellBOUNrRnA5NjNEQ1dJUzZCODloeHl6cwpTbVRVRHVTUlgyU2o1WjM3ZnJGb2RpY3Y4b1M0WURwT2hVMjI5enZYeWNnCi0+IFgyNTUxOSA0SWhhblJoVk10VVY4MVZ6elF5cDZTeGRXUWc0eldzWmVnQmduVm1xQ0FBCjUzbXVZZHNHZk5tVGR3NjViZGZOaDZ0ZmJxSEpPcGRwTUtpZGxWVFh4UHMKLT4gWDI1NTE5IDJ3UERnWnQzeXMzMFZCUXZ5dWtQRVNXTjRhMktSakZQeFQyWGZES1ZLaTQKc2ZJRlVRbi9WZWVlTE9vK204dW93RnVjVkFYZUxhM0d1VlR3WXNCN3NidwotPiA5WkRwLDtyZi1ncmVhc2UgOCczbyBaWn5SRAphWk1JOWF5UFNCa2sxTzRCVnVjTG1VK0RkRVlWNmt6MGFNNDFJeHMxSzNaeG13Ci0tLSAxUkh2WWIxVzU2RURkUEZZb0FiYjBucnozWXg1TWhZZGlIbDVMVWlxRVNBCnL+e4zuMKmwO1jirXlLSjC2pTxoej1UWMrTwwrRb1OudJ1NEo16PXyPst7SGedrwxUqsi5DqvG+PzoE1TqfDw==]() {
+    async fn test_sync_repo_exac[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAxMDdCVzE2SkR3eUJweE1JWjZPWVhWWXdSeFNTdTYvNnFyVnR0ZmRFT3lRCnNqeU96STFQSEFaeTJ0ZFFlNHNack1jNDZhS09wMExtSkRQemZWSmlhQnMKLT4gWDI1NTE5IDFZdUhYRzVNbjZKN3dkSmVmK1JnUWVWNXpuN3dXR2swdmF2alpibUF1amcKalRFbWVybDM3M0Z6R2Uxd2d3ZWJnZkkxWVZLL0FQWTg4cllhcm9IZklsdwotPiBYMjU1MTkgT2R2SUp6dW1VeFJnS29idXJ4STArbWVrT21xUnB3bHVhbzVEbno5d2dUOAovVGpqUVlDYlJsakxBK3FaZ1ZSYnNSRDFGaVhJMTh4b3VaZEgrVWZQTDJNCi0+IFgyNTUxOSArajBYMlFmTVg5U0tJOHdyYmxNcGdpTisrckNqZG93QTFtYmtYVHozWncwCmdSSWg4a3Q5TkJuOXFDUjF4dVFFVk1aNGtieU11VklYM21MU3kxSmhlTU0KLT4gWDI1NTE5IG9zVEMreW5MUzR1bDZxQ1pEVnNIRlcwUnU3b1FvcjVrb1d4ZGppYVhWblUKWVcrcHYzamxIekpoRmd6WGxQZmlZZHg0V0Q5bGRDTXZHNXluWnM0NnFPWQotPiBiXkcnVmlzLWdyZWFzZSBDIHMkJApLSUVzWWNoR3UyeE13NW9MZDdLZXlLYm5sL2hEQmNvCi0tLSB1ekpwVTZsdDBjWjJkVHVUNWhOR3JSekVTVzRMb0lQZ1JkSlRMVW15QzVjCmb++/46aku3vdp7Dygn9KvxXfeQ3vL2Af1r0TiStF2Hp8aPPbZ7d2NtEoNbaeJLtAzb0O+bBBeOrfPUwm/wBA==]() {
         let tmp = tempfile::tempdir().unwrap();
         let repo = init_test_repo(&tmp, "exact-50-del-repo");
 

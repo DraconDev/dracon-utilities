@@ -449,6 +449,53 @@ pub(crate) fn is_excluded_file(file_path: &Path, excluded_patterns: &[String]) -
     false
 }
 
+/// Match an untracked file path against `untracked_exclude_patterns`.
+/// Supports two pattern styles:
+/// 1. Simple basename match (e.g. `note.md` matches `subdir/note.md`)
+/// 2. Glob match against the full path relative to repo (e.g.
+///    `**/scratch/**` matches `foo/scratch/bar.txt`).
+/// Used by the `untracked_exclude_patterns` policy field to keep user
+/// notes, scratch research, and audit evidence out of auto-stage.
+pub(crate) fn matches_untracked_exclude(
+    repo: &Path,
+    file_path: &Path,
+    patterns: &[String],
+) -> bool {
+    let file_name = file_path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+    // Path relative to repo, with forward slashes for cross-platform glob match
+    let rel = file_path
+        .strip_prefix(repo)
+        .unwrap_or(file_path)
+        .to_string_lossy()
+        .replace('\\', "/");
+
+    for pattern in patterns {
+        // Basename-only patterns (e.g. `note.md`, `*.png`)
+        if !pattern.contains('/') {
+            if matches_file_pattern(file_name, pattern) {
+                return true;
+            }
+        }
+        // Path-glob patterns (e.g. `**/scratch/**`, `.demon/**`)
+        if pattern.starts_with("**/") || pattern.contains("/**") {
+            if rel == pattern.trim_start_matches("**/").trim_end_matches("/**")
+                || rel.starts_with(pattern.trim_end_matches("/**"))
+                || rel.contains(pattern.trim_start_matches("**/").trim_end_matches("/**"))
+            {
+                return true;
+            }
+            // Fall back to substring match for `**/<name>` style patterns
+            if let Some(tail) = pattern.strip_prefix("**/") {
+                let tail = tail.trim_end_matches("/**");
+                if rel.split('/').any(|seg| matches_file_pattern(seg, tail)) {
+                    return true;
+                }
+            }
+        }
+    }
+    false
+}
+
 /// Check if a path is a gitlink (mode 160000) with an unchanged pointer.
 /// Returns true if the entry is a submodule-like directory whose HEAD commit
 /// matches what the parent repo tracks, meaning the "dirty" state is just

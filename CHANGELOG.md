@@ -8,6 +8,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`owner_nixos.pub` is now tracked in `dracon-utilities`**: the warden
+  public key at `.dracon/data/keys/owner_nixos.pub` is committed and
+  pushed to all three public remotes. Operators can recover the
+  encryption key from git history if the local `.dracon/data/keys/`
+  is ever lost. The `!.dracon/data/keys/*.pub` allowlist in the
+  warden-managed `.gitignore` correctly force-tracks pub keys while
+  keeping the private key (`*.key`, `id_age`) out of tracking.
+
+- **`auto_stage_untracked` policy field**: a new `auto_stage_untracked`
+  boolean (default `true`) and `untracked_exclude_patterns` list
+  (default safe patterns for notes, scratch, audit, screenshots, etc.)
+  in `dracon-sync.toml`. Together they make the daemon auto-stage
+  newly-created untracked working files on the next sync cycle while
+  keeping user notes, scratch research, and audit evidence
+  permanently untracked. Set `auto_stage_untracked = false` to opt
+  out completely. See `docs/design/dirty-files-investigation.md`
+  for the per-file classification and the known cases where the
+  dirty state persists longer than `inactivity_push_delay_secs`.
+
 - **`dracon-sync repos` `STATE` column**: The `repos` table now includes a
   derived "STATE" column that combines last-commit time, last-push time,
   dirty state, ahead/behind, and push status into a small fixed

@@ -135,6 +135,43 @@ exclude_file_patterns = [
     "nohup.out"
 ]
 
+# Auto-stage newly-created untracked files on the next sync cycle.
+# Defaults to true. The daemon stages untracked files (status=Added in
+# git status --porcelain) when they don't match `untracked_exclude_patterns`.
+# Set to false if you want to keep brand-new files out of the auto-commit
+# (e.g. while writing research notes, scratch docs, or one-off scripts
+# that you don't want committed).
+auto_stage_untracked = true
+
+# Patterns for untracked files that should NEVER be auto-staged, even
+# when `auto_stage_untracked = true`. Defaults to safe patterns that
+# protect user notes, scratch research, local task state, and audit
+# evidence from accidental commits. Glob-style patterns with `**` are
+# supported (e.g. `**/scratch/**`, `**/note.md`).
+untracked_exclude_patterns = [
+    "**/note.md",
+    "**/notes.md",
+    "**/scratch/**",
+    "**/scratch-*",
+    "**/scratch_*",
+    "**/tmp/**",
+    "**/tmp-*",
+    "**/research/scratch/**",
+    ".demon/**",
+    ".sisyphus/**",
+    ".ralph/**",
+    "**/audit/**",
+    "**/evidence/**",
+    "**/screenshots/**",
+    "*.png",
+    "*.jpg",
+    "*.jpeg",
+    "*.gif",
+    "*.webp",
+    "*.mp4",
+    "*.mov",
+]
+
 # Skip staging files larger than 50 MiB during auto-commit.
 max_stage_file_bytes = 52428800
 
@@ -222,7 +259,7 @@ auto_create = false
 # [[publish_targets]]
 # name = "crates-io"
 # registry = "crates-io"          # crates-io | npm | pypi
-# [DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB3SU1jeU12Z01yQmtVRHZYQzdWeFlGbTZNZHJTdVdnUTcxRjRjaWY2bmhNCmZNWDU1aXpaaWFOWUo1T1pIOVhRaWpDQ0V5OHRidGx5cHMrVWkzdmgrdUEKLT4gWDI1NTE5IDBQUlZBTWR0ZVN3cjFQbHF2TDRnYVV6V2t4Q2ZlSHlNNkVJU3BuWEpEMTAKbldFZ2czYk0xb01yYVpIS1pydGY2czdkNDNzNmVSaFpraVpIYkVGaFovawotPiBYMjU1MTkgVy8vK3JncUMrTWhnaVdYYVFLZTcxWkFPV21melFJaENDVEhZR0h1R1lESQpJQk1ONUlmWk9zYzkyQ0MwbjZWYzN6SXFWYVdYNzBveCs3OVByU1pqbkRvCi0+IFgyNTUxOSBJMDk3TUZGd3JuUTJlWnozUEUvemVpWFZvR0xGdUxpMXZtdHQ4UjJBeHpzClp3L1RTUjdJQ0NtYkRwZVM5THNHWGxoRXVVOUQ4OUxHaHU2dzhaeGpPUWcKLT4gWDI1NTE5IDlubU9KRVZDeTh3dTZidmRTMEFyR3h6RWFIK3FJY0RhbTZDeWR1b0tsV0EKVHNJN3hRb1pxei9JeVNiZDMwVXZVZDk5VHpjcy9PbVVvMUExOTM1eTdkWQotPiAlNS1ncmVhc2UgcDdbTCBsdH5ULHAKRjhIVkp4OWhnVW5xSkFIT3RWZWtKUQotLS0gd1QwS3RkRDROL2dyRTltM05kZmlkbFo3bHZNeVppdHo1eVViWTYxQkNtMAqZZuIrjw4j1GN5UUBHSlPwQ/6C+OBluHlUCe/LtrGk7PojgvsPMd6V4yCwZMLxHRLGoZShO/oEi6At9ps+5vD/EBj4JrY=]   # env var name (token in secrets/cratesio.env)
+# [DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB3bGxxeXlGZlprSEN1cmlEQUc1b1ZUWmwyV2J5Zi9laTI0K1JZUjVyQkh3CjFvcEkwNDZTQ1cvWDVFYm9obktEQWJkRUQ1Z0N1M0NBY3VjMVg2UlFkbTAKLT4gWDI1NTE5IG9wcUQzdklOTjJnWnhOOGFjcTVRSFhRSU16UHlNV2Z4QjVlaTFUcVo4MHMKNytqV2ZlU3FsRFFXNGFoMXo4emduODZ5Rk1icEg4bnp0TVVhMmFTMU0rZwotPiBYMjU1MTkgMkhoUHVqMnBlOTdOd2kzNHYyZy9ac1BzVnBuZ2JZSkxmZHVBUnNmWEsyVQp2ZGwzVW5jU3Z4VzgrUVphK0RIT29ERDFBU1A1aWlPN1R3cmU4WG1DMTZzCi0+IFgyNTUxOSBKbWlkQlcxOG9ja3JtOW14V2dWYkUxZTlGZ1NsNURBcFNrTGtLYW5wQ3hVCjdtUnB4YlFKdHVaS2ZhOWwyMythMTBhbVo2OFhGbktTZkFBNmxIZXlzQXcKLT4gWDI1NTE5IFhFUzNoVFRaUUd4NTdWKzN0YXlxQ3Qrck44THhqdHJRMFFKNWVFZUxTQ2sKT0NEdWRGaGEzRElNMmprSXJ4eFhIWEJBZ2s4YUVmQ214K3hvTmNPV3FsVQotPiBqNy1ncmVhc2UKcEU4Q0lsZjJNbE04S0E1bjFHcERGTHpaNXJiZllJbGZUQU1IbGZudHVZWjVvWllkU01wa2M3ci9VVjgrTWtDTwpUaWlkazdOOTJzeW5INDUreFEKLS0tIEQ2SGFJeUEvSFByeElKZWdQK0VwdDZTcFhGeHNJWHlGVklnM0M1UXlhNWsKf+j/RFPGvJDzI0f9yhrPjAVbMT00hE6Rd1coDDfFFzdH21Z/pLmhm6amQV+hS1Y6xrvMB0LyH0/vtDyciTnTKxV2apfh]   # env var name (token in secrets/cratesio.env)
 # publish_timeout_secs = 300
 #
 # [[publish_targets]]

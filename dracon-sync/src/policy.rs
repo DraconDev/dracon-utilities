@@ -1315,6 +1315,8 @@ pub(crate) fn test_sync_policy() -> SyncPolicy {
         auto_repair_concerns: true,
         auto_repair_warns: true,
         auto_rewrite_large_blobs: true,
+        auto_stage_untracked: true,
+        untracked_exclude_patterns: default_untracked_exclude_patterns(),
         watch_roots: vec![],
         remotes: vec![],
         auto_github_private: false,
