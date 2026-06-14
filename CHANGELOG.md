@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`dracon-sync` per-repo `intentional_no_upstream` opt-out**: A repo
+  whose `.dracon/dracon-sync.toml` sets `intentional_no_upstream = true`
+  is now recognized as intentionally isolated (e.g., a legacy private
+  mirror that the operator no longer wants auto-tracked). The
+  `repos` table replaces the `NO_UPSTREAM` flag with the explicit
+  `INTENTIONAL_NO_UPSTREAM` flag, the `PUSHED` column shows
+  `INTENTIONAL` (rendered green), and the hint says
+  `"intentional legacy isolation, no upstream configured"`. The
+  `dracon-sync repair concerns` command skips the repo entirely and
+  the auto-repair path never runs `git push -u origin HEAD` for it.
+  This is a logic defect (the previous "run repair-concerns --apply
+  (set upstream)" hint was misleading for repos the operator has
+  intentionally left unconnected). Documented as invariant #6 in
+  `docs/design/sync-push-classification.md`.
+
 ### Fixed
 - **`dracon-sync` system-repo path bug**: The example template's
   `system_repo` default pointed at a non-git legacy directory. The actual git

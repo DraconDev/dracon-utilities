@@ -53,6 +53,14 @@ recently and failed", and the four code sites are forced to consult it.
    commits but no recent push failure is still a `WARN` row, so its hint
    says the daemon will push after changes settle instead of suggesting
    `repair-concerns`.
+6. **Intentional isolation is not a hidden concern.** A repo whose
+   `.dracon/dracon-sync.toml` sets `intentional_no_upstream = true` is
+   recognized as intentionally untracked by any remote. The
+   `repos` table replaces `NO_UPSTREAM` with the explicit
+   `INTENTIONAL_NO_UPSTREAM` flag, the `PUSHED` column shows
+   `INTENTIONAL` (rendered green), and `dracon-sync repair concerns`
+   skips the repo entirely. The auto-repair path must never run
+   `git push -u origin HEAD` for these repos.
 
 ## Classification rules
 
@@ -66,6 +74,7 @@ For a repo with a valid `origin` and a tracking `upstream` branch:
 | Behind remote (behind > 0) | `STUCK_PULL` | Yes |
 | No `origin` remote | `NO_ORIGIN` | Yes |
 | No tracking `upstream` branch | `NO_UPSTREAM` | Yes |
+| No tracking `upstream` branch, repo flagged `intentional_no_upstream = true` | `INTENTIONAL_NO_UPSTREAM` | No (skipped) |
 
 `recent_push_failure` is true when the incident ledger contains an
 entry for this repo with `scope = "sync"` or `scope = "mirror"` and

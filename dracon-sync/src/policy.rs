@@ -544,6 +544,24 @@ pub(crate) struct RepoPolicyOverride {
     /// Use the target filename (e.g., "LICENSE") not the source path.
     #[serde(default)]
     pub(crate) skip_standard_files: Vec<String>,
+    /// When true, the daemon recognizes this repo as intentionally
+    /// untracked by any remote (for example, a local working tree that
+    /// mirrors a different public clone, or a legacy-isolated repo).
+    /// With this flag set:
+    ///
+    /// - `NO_UPSTREAM` is replaced by the explicit `INTENTIONAL_NO_UPSTREAM`
+    ///   flag in `repos` output, so the row is not classified as a
+    ///   hidden concern.
+    /// - `repair concerns` skips the repo entirely.
+    /// - The auto-repair path never runs `git push -u origin HEAD`, so the
+    ///   daemon will not attempt to wire the local branch to a remote the
+    ///   operator has explicitly chosen to leave unconnected.
+    /// - The hint for the row says
+    ///   `"intentional legacy isolation, no upstream configured"`.
+    ///
+    /// Default: false. Set in `<repo>/.dracon/dracon-sync.toml`.
+    #[serde(default)]
+    pub(crate) intentional_no_upstream: bool,
 }
 
 pub(crate) fn default_true() -> bool {
@@ -1395,6 +1413,35 @@ mod tests {
         let repo = std::path::Path::new("/nonexistent/path/for/test");
         let override_ = load_repo_override(repo);
         assert!(override_.auto_bump_versions.is_none());
+    }
+
+    #[test]
+    fn test_load_repo_override_intentional_no_upstream() {
+        // A repo's per-repo `.dracon/dracon-sync.toml` setting
+        // `intentional_no_upstream = true` must round-trip through
+        // `load_repo_override`. Default when the file is absent must
+        // remain `false` so the existing concern classification path
+        // is unchanged for any repo that has not opted in.
+        let dir = tempfile::tempdir().unwrap();
+        let repo = dir.path();
+        std::fs::create_dir_all(repo.join(".dracon")).unwrap();
+        std::fs::write(
+            repo.join(".dracon/dracon-sync.toml"),
+            "intentional_no_upstream = true\n",
+        )
+        .unwrap();
+        let override_ = load_repo_override(repo);
+        assert!(override_.intentional_no_upstream);
+    }
+
+    #[test]
+    fn test_load_repo_override_intentional_no_upstream_default_false() {
+        // When the per-repo override file is absent, the field must
+        // default to false so the new opt-in is non-breaking.
+        let dir = tempfile::tempdir().unwrap();
+        let repo = dir.path();
+        let override_ = load_repo_override(repo);
+        assert!(!override_.intentional_no_upstream);
     }
 
     static POLICY_ENV_GUARD: std::sync::Mutex<()> = std::sync::Mutex::new(());

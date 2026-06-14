@@ -739,6 +739,25 @@ pub(crate) fn repo_state_flags_with_push_failure(
     flags
 }
 
+/// Apply per-repo `intentional_no_upstream` semantics to a row of flags.
+///
+/// When the operator has flagged a repo as intentionally isolated
+/// (`.dracon/dracon-sync.toml` sets `intentional_no_upstream = true`),
+/// the `NO_UPSTREAM` flag is replaced by the explicit
+/// `INTENTIONAL_NO_UPSTREAM` flag and the row is no longer classified
+/// as a hidden concern. The intent of the original `NO_UPSTREAM` flag
+/// (i.e. "this branch is untracked") is preserved, but the operator
+/// has already said it does not want it remediated.
+pub(crate) fn apply_intentional_no_upstream(mut flags: Vec<String>) -> Vec<String> {
+    if flags.iter().any(|f| f == "NO_UPSTREAM") {
+        flags.retain(|f| f != "NO_UPSTREAM");
+        if !flags.iter().any(|f| f == "INTENTIONAL_NO_UPSTREAM") {
+            flags.push("INTENTIONAL_NO_UPSTREAM".to_string());
+        }
+    }
+    flags
+}
+
 /// Kept for backward-compatible test coverage. New code should use
 /// [`repo_is_concern_with_push_failure`] which also considers recent
 /// push failures and the behind-count.
@@ -805,7 +824,17 @@ pub(crate) fn repo_is_warn(
         && (status.modified_files > 0 || status.staged_files > 0)
 }
 
+/// Compute the user-visible hint for a row of state flags.
+///
+/// When the operator has flagged a repo as intentionally isolated
+/// (see [`crate::policy::RepoPolicyOverride::intentional_no_upstream`]),
+/// the row builder appends the explicit `INTENTIONAL_NO_UPSTREAM`
+/// flag. That flag is checked first here so the row reports the
+/// operator's intent instead of a misleading "set upstream" hint.
 pub(crate) fn repo_hint(flags: &[String], warn: bool, concern: bool) -> String {
+    if flags.iter().any(|f| f == "INTENTIONAL_NO_UPSTREAM") {
+        return "intentional legacy isolation, no upstream configured".to_string();
+    }
     if flags.iter().any(|f| f == "NO_ORIGIN") {
         return "set origin remote".to_string();
     }
@@ -984,6 +1013,11 @@ pub(crate) async fn run_repos_report(
                 continue;
             }
         };
+        // Per-repo opt-out: when a repo declares itself intentionally
+        // isolated (e.g. a legacy private mirror that the operator no
+        // longer wants auto-tracked), suppress the implicit concern and
+        // surface the intent explicitly.
+        let repo_override = crate::policy::load_repo_override(&repo);
         // Skip `repo_diff_entries()` here — it calls `git diff --name-status HEAD`
         // which applies the clean filter (dracon-warden age encryption) to every
         // modified file. For repos with many large filtered files (e.g. pnpm-lock.yaml),
@@ -1013,12 +1047,21 @@ pub(crate) async fn run_repos_report(
                     .unwrap_or(false)
             })
             .unwrap_or(false);
-        let concern = repo_is_concern_with_push_failure(
+        let mut concern = repo_is_concern_with_push_failure(
             &effective_status,
             has_origin,
             has_upstream,
             recent_push_failure,
         );
+        // Repos that the operator has flagged as intentionally isolated
+        // (`.dracon/dracon-sync.toml` -> `intentional_no_upstream = true`)
+        // are not a hidden concern: the operator has explicitly chosen
+        // not to wire the local branch to a remote. The flag below also
+        // reclassifies the row so the user sees the explicit intent
+        // instead of the implicit "set upstream" hint.
+        if repo_override.intentional_no_upstream && concern && !has_upstream {
+            concern = false;
+        }
         let warn = !concern && real_is_dirty;
 
         // Flags still use effective_status for ahead/behind/origin detection.
@@ -1026,12 +1069,15 @@ pub(crate) async fn run_repos_report(
         // push failure for this repo. Without that signal, an AHEAD repo is
         // just "has unpushed commits" — the daemon may be in its inactivity
         // delay or mid-cycle.
-        let flags = repo_state_flags_with_push_failure(
+        let mut flags = repo_state_flags_with_push_failure(
             &effective_status,
             has_origin,
             has_upstream,
             recent_push_failure,
         );
+        if repo_override.intentional_no_upstream {
+            flags = apply_intentional_no_upstream(flags);
+        }
         let hint = repo_hint(&flags, warn, concern);
 
         // Calculate push status from flags
@@ -1039,6 +1085,11 @@ pub(crate) async fn run_repos_report(
             (
                 "STUCK".to_string(),
                 format!("ahead={}, push failing", effective_status.ahead),
+            )
+        } else if flags.iter().any(|f| f == "INTENTIONAL_NO_UPSTREAM") {
+            (
+                "INTENTIONAL".to_string(),
+                "intentional legacy isolation, no upstream configured".to_string(),
             )
         } else if flags.iter().any(|f| f == "NO_UPSTREAM") {
             ("FAIL".to_string(), "no upstream set".to_string())
@@ -1238,7 +1289,7 @@ pub(crate) async fn run_repos_report(
         };
 
         let push_color = match row.push_status.as_str() {
-            "OK" => Color::Green,
+            "OK" | "INTENTIONAL" => Color::Green,
             "PENDING" => Color::Yellow,
             "FAIL" | "STUCK" => Color::Red,
             _ => Color::White,
@@ -2094,6 +2145,21 @@ pub(crate) async fn run_repair_concerns(
                 continue;
             }
         };
+        // Repos the operator has flagged as intentionally isolated are
+        // not a hidden concern: skip them entirely so `repair concerns`
+        // does not propose `git push -u origin HEAD` against a remote
+        // the operator has explicitly chosen to leave unconnected.
+        let repo_override = crate::policy::load_repo_override(&repo);
+        if repo_override.intentional_no_upstream
+            && !has_tracking_upstream(&repo)
+            && only_repo.is_none()
+        {
+            out!(
+                "ℹ️  {}  skipped: intentional_no_upstream set in .dracon/dracon-sync.toml",
+                repo.display()
+            );
+            continue;
+        }
 
         state.has_origin = has_origin_remote(&repo);
         state.has_upstream = has_tracking_upstream(&repo);
@@ -2711,7 +2777,7 @@ mod tests {
     }
 
     #[test]
-    fn test_repo_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBqTTlNb1lZcVRHekVadmpJTUYrRVdCTEcxLytFZXI1VEM2Zk9KNHk4OUJRCnQ2OG91eVVrUGMwS3N4Y2V1Ynp4STFYK2puK2FNQk41UzRGTzRGVnBxem8KLT4gWDI1NTE5IFdkSGptVDR2YW5pK3I0ckM4T3NkN3ZXRTlRVUFlOTllaDZoOUFSTURDSGMKYXd6Q0FwMkwwRnRaN2dBRk1BVmNnWkE5T1RMSUlvT0Q1c05YbzA5dll5NAotPiBYMjU1MTkgbkJnU1ZQYUVkanF4QmltWWhaYXQzQUZFRXR1eDc2L08vR0FSUmxHajNsWQpVOEV4MEw1OFRZeXNGTWpCRmlXL2FlankzL2JMT0pHa0tiVkd3OVl4dExjCi0+IFgyNTUxOSBZVVlOcE5TdlZVQVMvYk9nV2dKczVPeDhwVzRHNXp6UUwzV0MxbCtmbkd3CndmWUdYVkowRUhnTlpVT1gxaXd4ck16ckREdk16R3JyT09lY0Q3L1NHZTAKLT4gWDI1NTE5IEtQQnRlSmoxeXhvTGMwY251TjQrdHAyTldHSC9acllRK1NkRllFbnRkVE0KTEVDYktwdmlieGpoVkhBYit6bi9DYzA1M1p3WXpDaG94Vm5GRHNnSk1VdwotPiBiZF80bC1ncmVhc2UgR2EmUU1JCno5dG8xSk9jNWIvVTVWTzF5dwotLS0gMXQ4SXNDVytsTVE5UXVCZ0xvbFplaW1NaWt0NVg2RUovQTBZQWRWRHhqUQoXeOr9nEgFgGzVpdqxKTT22G/ERyxSJlk9UP3m1zRP3F9FlPBgM77AaHpJ+XXBZ+Psmiun0vAAh32BxSq/SiuQmwGCTg==]() {
+    fn test_repo_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSByZjJLR2wzTVhYUkhWOWVUUG95eHd4RXNkd0cwczFsdytWV00wY05KOEZNCjJEWnlyVkhZWXJUdXB2bWZMRktDTEJ4VU1ZYkh6L01VYjRXZ3dCWHZ0Q00KLT4gWDI1NTE5IHZCN0V2OVB2cjJoY1pOVDJpZm10ZWRsMm4yTDFWa0JFZEZac2VaeFFlQnMKUlZzZEliQ2haRnlYWlN3UUpaczh2YUFwN1dYMXVsUDBJR0h2NHlMV0hxbwotPiBYMjU1MTkgRXRsbXJFM2lNRW5lZkxFd214VENWUUx1VyswQ0NZb1hVN0dVUWFSdDVUMApZNVdFTEU1aGtFNTZPNks5UEExbzBGbjdqUE16V0MrbFNEaUx5bGQrTzhvCi0+IFgyNTUxOSA5SFlKdllGWkMvcWwzalIxN2JnQjJOYno5WlNzUnZrR2ZFUlRCdzM5bFc4ClQ4VmhNVXNKc09HSHl1VUZFMmlWWlo4ekNCYXRoeE11YU5hcFU5NXFydzQKLT4gWDI1NTE5IHVjdzlRVlBVS3BpNVpRVjROZ3VXZWtRYTFLbTJKQUNrYUNEZnhKcGxMVWcKc2owVzlKcFIvNEU0dlFWbllVempPUjNaR0F4clZzQ2N3Z0FuMzdNeGlCMAotPiB4Zi1ncmVhc2UgXXhib1IgMiA1MApGZTVlMFBDZ3hLWG0zVFpnQjNzdnNyc1VLWVA2Z3RtdWVvSFVnZVdwWjV3MnIzUVkxNHJNQXZkeFY0bEYrTWlWClRlMW1vSUhlcmxNTDduQkJ2eVNYUFNTTjdES2FHa0tINnZGcXA5ZDM3MVFSSnEyOXA0a2tmeUUKLS0tIGk3Um1mQldaYnVWa1hsOEZGWElIRE9Bcjh3ay9BWjJOZ0xFc0wvcHdFTHMKpl4q+RUdVFczgShcldorqIyFZSVxGt3928sgXJ0fW+RQEgo7/Qq7tywSMav/osu/S1JTlKt7/uZCV7k2t+DiYcVytR4=]() {
         let msg = repo_failure_message("init_failed", Path::new("/tmp/repo"), "boom");
         assert!(msg.contains("init_failed"));
         assert!(msg.contains("/tmp/repo"));
@@ -2719,7 +2785,7 @@ mod tests {
     }
 
     #[test]
-    fn test_repo_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA1T2lRQUF2bEMvZ29HNXAwZmFJUDk4aFd3TzVkYmZadFl6bG8vaFRRRTJ3CjZ2QktPWEU3WmtMRjFXVExNVEhGMUxqTTg0RzJ5V3k2WXhlMWd0cVFtWFkKLT4gWDI1NTE5IFM4RFU4YjlrNTNXRjB2TzJxRE9KdXpYSDl3YmZDVXh6QXFsaFpGS1ZRSFEKQ2VGckhNYUUwallOdVJHRVl5eTFCZjNvNGp3OXdiM2hyWGNHd3J5bVRwTQotPiBYMjU1MTkgUURlRzArRC9mTjlYNHkyTi9kZGVzak1rTWxKL3ZxTXkyUnJ4MHd1TVppYwpHSE02dkZlWHluMUE3VDRzTVJpT3BoTGdKUlc4ZUZtanoySzVSSmx2RitnCi0+IFgyNTUxOSBENXY2cFlTejF3a0VMUVdqTUx5VmlNekIwUUpkcG9jQjVjRkw4NDRQQlhjCllCZndqTGVGcFBJKy8zNlNDWlBZTzdaaGJaZ3owMHpJSUVpWDlua3BVeTAKLT4gWDI1NTE5IGkwQWpQMXRWVGkyOTdyRkltT3RDTEt0K3ZJeGZhL0wyZXQ5cDNIVFVFWHcKMCszZmloRVhGQUZSVGFFWVNENWswcjRsYlFZVFdYWFFGQlN1cmR2N3EvawotPiAlOzgtZ3JlYXNlIFVnNUc1CmpCTmVLVnBIRGhSb0xPSUVjNHNPTDhBRTZZNkJabU1BeFRkL1h2RzJ0cjczbFNaTzdCOGk2ZUZ3MVlPcVl6aTYKMkgzVDcyY3d5b3BFdnRlODBtUUh0dwotLS0gSUNwMGVWNjh0ZXM5cDZsMEdvdUkybS9LNFJ2YWcrQWlETVhYYVkyUzZVQQoqlB/xGIhImHUoj4WitCNTusPeavhgzDJfmVJlTZL7KoQd+c8RDRJDjAfDOummw101d64nimOnavUh82XMc9q6Aw==]() {
+    fn test_repo_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAyTlFXSmJuNkVoc0VrbUhnc2FPc0J1aHlvU1cwWi96RUs1UHh0QWYyUXpzCk5obDdFc0h5eG9MWlR6Znl0YVhORjVVbFlQZjFTM2N3Tm1qRk14Z09vTGcKLT4gWDI1NTE5IFhaSGdBN29tOTk1Mm1LZkg3ODkvelpqT1hwcWxTTkV0SGdIYU4vOFoxZzAKcyt0YlFYMVlyc2FoeThsZFlZaGZPSUY1UDBxb1JXaFZ2Tnp5b1RjelFTMAotPiBYMjU1MTkgWlFFZ0svZ1lWR3g4d1RRM3JCSGtGeStwSzUzZ1ZCQ2IzTDhNOE05YzRSZwp0Mm84aUJSVE4weTRsYWRLYnh1YnVnNDhnSWVIamVaQU9LZEk0SzBzN09jCi0+IFgyNTUxOSB4ZjZzSEZWUmhRSDdlcktoSjlZL3k2OHlrR1g0YUgwUlJOeW0zejVVaXp3CitKT3JRZlJYTDFUcjBldWdIZzJtT3RPU1lBN2swaGJubzk4Q3ZUb2RwNUkKLT4gWDI1NTE5IDZYTTEzQWFPZ1U3cmdzK2Q5eEIwN3lRWU9Qb0dTNGlpcUhRWEVNamlZMUEKQ21RYkxLcWZVaktEYjRibmRESG12RTlYZ29vaUw1S3lUVDBIbGhlU3hONAotPiBNX347LWdyZWFzZSAuTjxATCBaIQpvRUtJR0krcUJlZVAvUnVKem9QVUR0UUlTeWxYRjdaTDV4eXlsaWgxN0w1TmJjZwotLS0gM254MDYvbXliMzBnN0RpS3Brci9PaHNwZGxSK1o1RWZjNDBseWpGd2Nscwp05InXFcTudOI02WVNtyXJEmQmV2IWCoYE4brjv1ekmkfHnGMY4G9pz5kt/09UMc27P6Cb7Zt2LKMjhBeieGreNg==]() {
         let msg = repo_failure_message("status_failed", Path::new("/tmp/repo"), "status boom");
         assert!(msg.contains("status_failed"));
         assert!(msg.contains("status boom"));
@@ -2937,7 +3003,7 @@ mod tests {
     }
 
     #[test]
-    fn test_repo_stuck_filters_requi[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBZWlZiNEZDK1RYZ3VGcE0waEh2M2ZOb2VmRlFIVWN4M08yU2ZscTN5blF3CmV2YWFLRy91cDlEU2hvRHRYcnF3cnMzTlhueWZCZGRzd2k5WmU0aC9YOTQKLT4gWDI1NTE5IHFtbmdOQUZRS0M3a2drbGV2bHJqU29JOGFSS3pDcjhzNzdydzN5eVJrUk0Ka0J1aXp0WExBRkNPVGN4SEpxSGdkOGlkNE1zQU02czltUlZNVnZuWVN4awotPiBYMjU1MTkgd1A0VEhPbnlQVEZydk9CQWJiVDVucmNaQTRiVlBmU1IyMXl4Z0kvMCtXWQpSd0dyWGwreHo4Y0hwRFJwbXpOd3VteTZtR2xIb3RqaXdvMFRwcFJEYm0wCi0+IFgyNTUxOSBXNllMbC9wZVUwYjRNbFZhaDhXYTdLcDlqRFNva1RseXgzdWRKR1VDOVI0CmJDb0lPSGVCNFFlZ0pJN3lleTJ1S0lEOUVmdUVMU0c4cnJFM21oL0VsNTAKLT4gWDI1NTE5IGlvQ2lrL3owRDVRQlRNd01YblE4Q3lOdWt6U25sdFovMTBRdlJqakpBbkkKaTdYYUQyY1NQNXNGNTArN0xheHpKSU9tNEtpemNtOGdvYmN3ZkN5U0hRcwotPiBpXDV7LWdyZWFzZSB7Clk4Rk85MWk5ajlWb2NvbmZ2ZwotLS0gR0FaajZZejV3cGJJdlVQc0VuRjZRR2c3emtSUklwWE1PbFc0RnVjNFY2MAohgB7kzpN5RFbCtubDPo9W41JZXlq/2du1ttM8eA5evHqcOLfpL50DmzRF+f/rcx52tlDclP6qqw==]() {
+    fn test_repo_stuck_filters_requi[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBLMnRTb3doV3ZPWk5CQWtNV0tQdVJHNGJoSTcxNTFadmpOL0ROZkthRUFjCkYvaldnTGJCVVpxeWc0ZWUvWW5IcTVPSHIvc1JQM2lodHFpNXBhM0ExM3MKLT4gWDI1NTE5IDFNYk0rYUhSRVlhMjZhaHNUQThNdlBpZG9RVmhSdDlxRVB0RENxamxtSHcKQXE1WnJ4eTB0bDlsZFh5anNpVmtBQ2hHNk8yVWMzRy9hR294Yk1jbVd6awotPiBYMjU1MTkgT1EyZXZNYU1jdzltOHpmbzBtaW9leVA1SU9XNmZnS3V1emJHak9taUptWQo2blZZUkRVZUJoY0JmWWdqM3Foay9tYklNeld3d2tSRENyNm5IY1hZV25FCi0+IFgyNTUxOSAzYk56MXNyNXAxR1ZlZFZ2TlpNaU1YNDF4bytBd3FUeFlMa2ZkMUVwVnhRClF0bE9Rd1RzNkhKQ2JuQU1GMzdUa1hteU43aUdrZDZkRTlZYlphRWRDUWsKLT4gWDI1NTE5IHBIQlRqbFpvYWU2OWs3aEZ0VlZwRE5YdXZIQnhPRGxBLzYvdFBBNUVWeHMKMWhTaUpuUEpRS2xoUkpTWmk0aHUyYnkrMVdyd2hUbnc4Yk0rb0N6bXFOcwotPiB3OVktZ3JlYXNlIH1OayBiS0Q4WVYoIDEqMAp4NjJKVDJtMmtjdnFrQTlVZFk2MFZwNWtHaW0xTlV6cThvb0d1MzNoS2FrRncyYmdiZHUyaHFyZ2xXdXpQOHlJCmlFVFNGUDUza3dKQml4TlRScmRoSjJZMThieXZGRE82OUdPbC95cndGRUdCaVg5dWEyOFI3Q0FkWncKLS0tIFlZZFFuVjdXWjAwR2lmWGM0ZkQrM0NKTHVVeU5EMENEa3UwNkVrUURXLzQKGr7Hwk4c+D+56XHAbkMvxLAIIuG+Z6yeq53eZP8BYwSWApxj7lhJHIt3PpfOyrEaFg1BZtDHvIg=]() {
         let ahead = make_status(false, 5, 0);
         let behind = make_status(false, 0, 3);
         assert!(!repo_is_stuck_push(&ahead, true, true, false));
@@ -2979,6 +3045,50 @@ mod tests {
     fn test_repo_hint_no_upstream() {
         let hint = repo_hint(&["NO_UPSTREAM".into()], false, false);
         assert_eq!(hint, "run repair-concerns --apply (set upstream)");
+    }
+
+    #[test]
+    fn test_repo_hint_intentional_no_upstream() {
+        // INTENTIONAL_NO_UPSTREAM must take precedence over NO_UPSTREAM
+        // so the operator never sees a misleading "set upstream" hint
+        // for a repo they have explicitly flagged as intentionally
+        // isolated.
+        let hint = repo_hint(&["INTENTIONAL_NO_UPSTREAM".into()], false, false);
+        assert_eq!(hint, "intentional legacy isolation, no upstream configured");
+    }
+
+    #[test]
+    fn test_apply_intentional_no_upstream_replaces_flag() {
+        // NO_UPSTREAM must be replaced (not duplicated) by
+        // INTENTIONAL_NO_UPSTREAM, and other flags must be preserved.
+        let flags = vec!["DIRTY".to_string(), "NO_UPSTREAM".to_string()];
+        let result = apply_intentional_no_upstream(flags);
+        assert!(!result.contains(&"NO_UPSTREAM".to_string()));
+        assert!(result.contains(&"INTENTIONAL_NO_UPSTREAM".to_string()));
+        assert!(result.contains(&"DIRTY".to_string()));
+    }
+
+    #[test]
+    fn test_apply_intentional_no_upstream_idempotent() {
+        // Calling the helper twice on a row that already has
+        // INTENTIONAL_NO_UPSTREAM must not duplicate the flag.
+        let once = apply_intentional_no_upstream(vec!["NO_UPSTREAM".into()]);
+        let twice = apply_intentional_no_upstream(once.clone());
+        assert_eq!(
+            twice
+                .iter()
+                .filter(|f| *f == "INTENTIONAL_NO_UPSTREAM")
+                .count(),
+            1
+        );
+    }
+
+    #[test]
+    fn test_apply_intentional_no_upstream_no_op_when_absent() {
+        // Repos without NO_UPSTREAM should not be touched.
+        let flags = vec!["OK".to_string()];
+        let result = apply_intentional_no_upstream(flags.clone());
+        assert_eq!(result, flags);
     }
 
     #[test]
@@ -3572,7 +3682,7 @@ mod tests {
     }
 
     #[test]
-    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBZNmlOS3hEcjNpNjJUbGRyRGdseWtQZG5UU1lzZlFPNFAwNUh6WXV5bFI0CkVacVJhVWJXWUY0N3BBeWlLb2hJaVEwZVVvUWZYazJFdlpla0ZBejFpMUEKLT4gWDI1NTE5IGZ1T0VzcTQ1eVNoell5YndmSnoyK1E1NTlUUzRMODNGc25weHExQ25PaG8KU0drL3ZkMWZZK0NQVU9ianNsSDZtcWlLUGNndXVmQjB1WnU3U0VrMVdKNAotPiBYMjU1MTkgOWJ3T3RWeE9PNHNpSTcrTmtTNnJEVHJrYlYzT01vaWhJRlMyNVZRTVBsYwpRcG1IWmwxeTlXU3o3eTJjZnErbWpxcTlTL0hKUExWR0c2WFduV015YWFrCi0+IFgyNTUxOSB3NkF6SU1aaTdvUlFBdTFBV2VySjh6elAzUFllUTFGaVBRM1o3UXN2Wmx3CjIyZkxlSEIvYkFMMC83ZmEvWjRVK2Z4ejlOSERVRmVnSkxYN054VUJadVEKLT4gWDI1NTE5IC9wa2FOTnhhQkxKaC81VFEwYjczbGYzKytLeE9VVVgvWU9XcFhxWHVIRTgKc0pkNzY0UkZyY0ovcnZUZXYrY1NGdXExRXdFVzFZbFNjamt0T1ZrV2V5SQotPiB3SmN+N0wtZ3JlYXNlIDVYdDx6SXNkIC0qZCBfalJbJSB0LWo7J2kuSwp6MlpQYVc0Wml6RDJXa2JETml4TjFpWVV0dEtQc3FhNnRGYXlKTkdjT2psTCtYSnFkczk5N2tNQ2dBCi0tLSBKU09HQW8xcStrZVJFNmpsRURQcDdwRkNvNGp2UTc3N0E3VFJEQU9yaUU0CsUEzyFRNOQDzlWkTSLRRiltJePnqR3A00InwFii8P6qJNwIbkEzOkjsEilq6WSw53xGea5MXxtrtt1iRUA=]() {
+    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBzbTYyMTJwOG1XaVRmaU40S21FZGliVlIzMWh4dVNvSHRiVFhpOG1UK1NRClc5QlR5Z3pObHBMSm9RakJNWkFYKzVPMitra3h1OVdhQ0JrNHpoUmlIQWcKLT4gWDI1NTE5IGxZZmFwN1FYWUJ3VW5SNVl3N3I0RHUyQzFxUkJhSTl0cUMvTHF6bG01MjgKR1FPbmZPQmxxTnNGYkVET3Z4SFNCaCs3WVJvdEd0Y2E3SFF0OENLMDA5cwotPiBYMjU1MTkgMHdYRG9lbUZ0WnhONTQ3dFpQVFMxRkZuSFN5d2s1S1BLL0ZCaTdJQXhFawpaSDJ6aFlBUm5LZDdvYkszOTdKQTdPTnA4MkswRUk5VGpxSnVDUkxPd1F3Ci0+IFgyNTUxOSBKWTV6b0d1OFZQU3Jvc052YnJGMGw5ZTkwN1RVbllMR1pLZ0lwUzlWeFZRCnF6V29PQmRTaUpSSlg0czFTWFcvVGtrZ25XVG5Odmwyb0h0K3A0dzVGS1EKLT4gWDI1NTE5IGIwZEVWRGFHYUJRaTJIUCtzaXlwUWsyL0hISEpOcno3c2R5L0g2SjEwWGcKK0pDVGpFaVNmdmJ0MlpJY1NjaU5qdlloUEJjSEwrdU1EcEgyeEJFbi82SQotPiBMRS1ncmVhc2UgQGsgYj5la3pKZWAgXlImIFVfU0hAYHUKaW4vbDZBaU1wenM3RTN5V3g1dGYrdVpHSVJLUTBucDFwSHlBZXJ6QnEvaDJ2YkU2cUdCWmdkYlozYnZ4Ci0tLSB5RDlMQUNIQUV6dk9pVU9tTE02ZUVmczB0Q3g3amY1WURyTE81U2R4bkJJClVvhkaqAviHPKSzwUB2E0N58kR+0VitQMDztVwNtzT57ubUXTeGiq50DJNQPQItIXcFMo0hlnGueBtdHmc=]() {
         let mut cooldowns = std::collections::HashMap::new();
         let repo = std::path::PathBuf::from("/test/repo");
         let notify_key = format!("push-fail-{}", repo.display());
@@ -3695,7 +3805,7 @@ mod tests {
     // -------------------------------------------------------------------
 
     #[test]
-    fn build_recent_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBxcWd5MXBnenVrMWUvZUo4RU9rQnR3a0E0dzNmZDB3Q1NCbXlxekdvRlFNCnFUajErcFdSRmpUN0RjWHpEWldWR2RyTnRTak90TDF1VFlGa0xOZlUwRWsKLT4gWDI1NTE5IEdvYU00VFdDaUxneWxhY2pXZGNXNzF0bDRaNERId01PTFRod0VZUGZ0RTgKUkgyM3F3WlgrNjM5Q2JNbWRVU08zaDZ4Z3BCRHN0cE1qVXBnUmd0SklWUQotPiBYMjU1MTkgaVpqQkpGVGoxTFZqcVl2VGF2dVRrYmJ2QzVZRUNsWUtwVGtockRJZHlTSQprbElyRmJUcFBONG5lUVBncjg4cXhiMUJIaDRqV0tsbDJMVjR1RmRYNXNNCi0+IFgyNTUxOSAvd2RMdEY3NkhEVjgxMURlTnUwN3dscVVHNExKRG82b20vTVVDT3I0WDBrCnYxYjN2by95ejkyRkFlckx3ZXkwZDdoelBsSGdJQnNpRWMxeXZzbjdOZDgKLT4gWDI1NTE5IHVZWCtIRW8vMGExbFI5MFlvVHhWN1ptU1cvSHpUYkFON01VZUxZSlRFSGMKWjVzRlpSRFZxVmxVa3VhanNHdzNncjRMcitiMDh1eElGbWJ0bnk1eEJCZwotPiBsaDAtZ3JlYXNlCkJyOEhvZE94RU53TVFrL0srWm9QNTRnRFJqR1l2OWxrUU1vRHZLYjlkZitOT20ydmJkRQotLS0gdE56SFVLc2dsUFlTZmI5d1FjWWU4aTVrRlYzRk9ERk1ZYlJQdUgyL3QxNAqXwqrAbRuEfrkYLIawBZytx/vJN0OEZbVaThMWM+Kt0rcNJC0dXC7biypKCKFaA0GnNkKO/Ip/CU4+Z/cwCQ==]() {
+    fn build_recent_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA3NXVaRVVZU1lNZjNBRUU5Y3IxbHcwaVF5azhWWkZJc3JmOS9rKzBqSUdNClYxK3ozMnlOd3M1YTl6MkhBMGdnNDIwcFZUNUx3aTRtWVNEeXROb3Bvc1kKLT4gWDI1NTE5IE5lTThDbHduMzVrK252VVRheDQzazd3MUQzeUJOSTIxUlZDQ2R4eFlnRmMKakk3WkR1L0dZWUE5UWpLdElMWUhkL3FJL0Z4OHdydFRucWVxT3hXVjI4bwotPiBYMjU1MTkgaTBsTHU3cDR6dldXNU5qUld0NU0yUTNuWW5rVHdBWEo3bXZaeVltczgxUQpyMHpHRGZaRlhPcENVVTlNMW5vbnNBOTJmQUVyRS9pYlBvd2xwS2pubmRJCi0+IFgyNTUxOSBRSTVPd1pWYTMyMGc4RkJvUlVDbFhhRFFsallDUWY2M1BiT1ZhS08velhNCkczWjFteDZ4MGJPeVlibTVrWnlsV2dvZ3QwK1hDcnlEMUJvRmtZL2hUcEUKLT4gWDI1NTE5IEdBSGUvbkI2TjZqT0RhNkg2SDNURzZKdnd1dGFMYWNQMWhKbjl0dHY3bXcKTzJzcnVsYUQvU2VHY2FMNzRZSVhzSU1hTEpmOEtUNXhXQ1JRSzV2aXdiSQotPiBcSC0tZ3JlYXNlIGogZS8rMSolPkAKNTkrVU5nZ0RWMTZNYU5mRwotLS0gREpkUWZUbGNRZ0tWejJaaERiUHVqNVVtRG95YTQxWUw5b3dhUlM1ZXZxQQq/OLPQZFQPeR7WMgvRtKknj6EYopgXoYlFZgk6fhd8mHEsEpaN7cUz9Lq8EkHuSr2WgBz2+B6wrBDgul8EEw==]() {
         use std::time::{SystemTime, UNIX_EPOCH};
         let dir = tempfile::tempdir().unwrap();
         let policy_path = dir.path().join("dracon-sync.toml");
@@ -3729,7 +3839,7 @@ mod tests {
     }
 
     #[test]
-    fn build_recent_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBmT0ZWMGxaVm5ERnhGZFQ5bUM1T2pvK2FYdE5FT0Z6NzJQSTB0QnErS0FrCk42VUhKalpKUExadGRSUGhIUzJSRjV4VjNGWDdHY1l3NmdSUC83YnpRSXMKLT4gWDI1NTE5IFl0QVU5dHF5UkxNdDJaejJxN2dvUUFqTGRhZ21SYnNCOFUxUCtjTTFQQ1UKMmtwSzJKSWk0Qnk4SUVrZlhyU2xyZUorVk8vQzY1dGtjdWtHcUtpRUUwUQotPiBYMjU1MTkgNFBmU25xV3VUZW1WYlhBWDhvWGJJSEd5VHI3ODdXSmZQZDVIdXpUbFl4bwowMk5WNXFuazJDWHhOc0tnYzhuZkREczdEaGgvMCtIZW5GQXlMcEZ6UWZVCi0+IFgyNTUxOSBEUnlWR3VRZG4yd0gvT2ZEUXZMc29Qb1Y3T3lid3llTVZWTno4OVpSVFFRClV1Z2RQbzdaMEpOS1hyRGpHYmp2amVnQzM2a0JzUm1lbldYSDIxQmJjZ0UKLT4gWDI1NTE5IGVMekVPRkMwbThGZ3BHb1YxZ1ExMlY2ZUhjY25ta2t0R0hUMVVIZzNnSGcKamgrV1NhVE8vbDg1VmFkTGFOY2VObSt1ODZBR3Q5OFk1cktOR1Z5ZWZvOAotPiA/PzxcVy1ncmVhc2UgfGQmJmkgUUR8IGR8IF9CSmohbCMKd1FmSkk4bDd1c0RoeVR1ejhVNXpnRklKUnVjWjRyS1BDZjNoMmtkVDNMZXRmWTNNeHg0a2k1MGw2M0d3VEtvWQpVNzljMkJqTGNHZEZmWVdIbHcKLS0tIGJWQXJwTUE0aXFIZ1BOK1Z5T3QwK2tObzBsNkFqbEZPVEVNVEk0QjZIZDgKpCS0aa744egw/Qz6KRUlBAnDR5mhR+PrYKI7P+ncMK0QsLUkBTvGKSyHTQR/sJCnTwaItYyQKMcAK8vvVp3dzbfw]() {
+    fn build_recent_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBmbnRwNDgrN3U4OUV3Y1JVcGFhaUlab0VmN0RPODN5dXF0U3NIN0tNL0dJCi9qaEJFYS92R0dyMXRPL3l1SjlaTGVXdmFWK3BhaUdqbGs3d1BheStMUzgKLT4gWDI1NTE5IDgyOEFTOVdwRWdZbFVOZWIrNW9EaWwzeEY3cWc5TUdVMWdoQWh2dmdOU3MKbUlSYkRDaHpWUkhHL0lGamI4WElmc0o0MFhxZG8vd1NFdnJxeUg1VkJhVQotPiBYMjU1MTkgbEZIa01ldUJITWVrQ2pMVTU5R2YyTmtOZEpTZWxsQy9NRllGYjRremFoOApQSFNZdGFUdmM5Y25yTnU2ZkdTaW9ieHFHY3pLd0FrMWhOczY1NWpHZjZFCi0+IFgyNTUxOSBBMnl0K0F5SXRnTjYzK0JHZFhQSjN6TEJyZTdLZGRoV2xsa2dBbDhCekhrCnJRMWd3SlJ0SlNRdGdMa2l4Wjg4VTMxQTN5YzZ3V2k2RCtjSWRDbFhrd1UKLT4gWDI1NTE5IExIVWt0UTBMYXNPSXFxQUZ0dkxJdlJ4K3N0eTlLWUN4L2svWjhBY2hNU3cKeWNOSytCUWxNeWV4VWk4bjdtNWVJbXVML2Y0bjBMOStHZHdMWTFRKzVpbwotPiA0bW9eTnstZ3JlYXNlIElHQlhSIE5oPAo3OVNiTFF0VnBCbUlyaTFJbDJkLzBUaHF4LzdUdzM1NjZ2c0d4VTQKLS0tIEVsem5SMEQxeHlDQ1c2dXJLdkZGQnYxNlhKOVNRVFRKazFreEMwTklDRjQKV0FjO1+hHVpubCs93yVJDGv4eNizhZYr4p2kEjscFpgIvW1sxPOFaFTwAAD2iSTYEzcLtwVukpBeMZzWyHjdkhnq]() {
         let dir = tempfile::tempdir().unwrap();
         let policy_path = dir.path().join("dracon-sync.toml");
         let ledger_path = dir.path().join("missing-ledger.jsonl");
