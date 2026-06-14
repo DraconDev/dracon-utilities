@@ -80,7 +80,7 @@ struct SyncJob {
 /// uses its own `GitService` inside `sync_repo`). A fresh fetch in
 /// the apply phase re-derives the `Status` for the post-sync
 /// divergence check.
-async fn svc_for_recheck(repo: &Path) -> Result<dracon_git::Status> {
+async fn svc_for_recheck(repo: &Path) -> Result<Status> {
     let svc = GitService::new(repo)?;
     svc.get_status().await
 }
