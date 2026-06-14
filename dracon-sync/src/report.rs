@@ -601,6 +601,59 @@ pub(crate) fn enforce_retention_at_startup(policy_path: &Path, policy: &SyncPoli
 }
 
 /// Build a map of repo path -> "did the daemon record a push failure in the
+/// last 10 minutes?". Used by the report to distinguish "has unpushed
+/// commits" (normal, daemon is working through the queue) from "push is
+/// genuinely stuck" (daemon tried and failed). Returns `None` if the ledger
+/// is missing or unreadable so the report still works in degraded mode.
+fn build_recent_push_failure_map(policy_path: &Path) -> Option<HashMap<String, bool>> {
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    let path = incident_ledger_path(policy_path);
+    // The ledger is append-only and can grow to thousands of lines. We only
+    // care about the most recent ~10 minutes, so reading the whole file on
+    // every `repos` call is O(ledger_size) and wasteful. Read the last
+    // `RECENT_LINES_WINDOW` lines instead — a tight window that still
+    // covers any plausible 10-minute push-failure rate.
+    const RECENT_LINES_WINDOW: usize = 500;
+    const PUSH_WINDOW_SECS: u64 = 600; // 10 minutes
+    let recent = read_tail_lines(&path, RECENT_LINES_WINDOW).ok()?;
+    if recent.is_empty() {
+        return Some(HashMap::new());
+    }
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let cutoff = now.saturating_sub(PUSH_WINDOW_SECS);
+    let mut map: HashMap<String, bool> = HashMap::new();
+    for line in recent {
+        let entry: serde_json::Value = match serde_json::from_str(&line) {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+        let scope = entry.get("scope").and_then(|v| v.as_str()).unwrap_or("");
+        let result = entry.get("result").and_then(|v| v.as_str()).unwrap_or("");
+        let ts = entry.get("ts_unix").and_then(|v| v.as_u64()).unwrap_or(0);
+        // Push-related failures: any scope mentioning push/mirror with a
+        // non-ok result, or an explicit "push" reason.
+        let is_push_failure = result != "ok"
+            && (scope.contains("push")
+                || scope.contains("mirror")
+                || entry
+                    .get("reason")
+                    .and_then(|v| v.as_str())
+                    .map(|r| r.contains("push"))
+                    .unwrap_or(false));
+        if !is_push_failure || ts < cutoff {
+            continue;
+        }
+        if let Some(repo) = entry.get("repo").and_then(|v| v.as_str()) {
+            map.insert(repo.to_string(), true);
+        }
+    }
+    Some(map)
+}
+
 /// Build a per-repo map of the daemon's last recorded action (timestamp
 /// + action label + result) from the incident ledger. Used by the report
 /// to show the user that the daemon IS actively working through dirty
@@ -651,53 +704,6 @@ fn build_daemon_last_action_map(
                     }
                 })
                 .or_insert(entry_data);
-        }
-    }
-    Some(map)
-}
-    use std::time::{SystemTime, UNIX_EPOCH};
-
-    let path = incident_ledger_path(policy_path);
-    // The ledger is append-only and can grow to thousands of lines. We only
-    // care about the most recent ~10 minutes, so reading the whole file on
-    // every `repos` call is O(ledger_size) and wasteful. Read the last
-    // `RECENT_LINES_WINDOW` lines instead — a tight window that still
-    // covers any plausible 10-minute push-failure rate.
-    const RECENT_LINES_WINDOW: usize = 500;
-    const PUSH_WINDOW_SECS: u64 = 600; // 10 minutes
-    let recent = read_tail_lines(&path, RECENT_LINES_WINDOW).ok()?;
-    if recent.is_empty() {
-        return Some(HashMap::new());
-    }
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
-    let cutoff = now.saturating_sub(PUSH_WINDOW_SECS);
-    let mut map: HashMap<String, bool> = HashMap::new();
-    for line in recent {
-        let entry: serde_json::Value = match serde_json::from_str(&line) {
-            Ok(v) => v,
-            Err(_) => continue,
-        };
-        let scope = entry.get("scope").and_then(|v| v.as_str()).unwrap_or("");
-        let result = entry.get("result").and_then(|v| v.as_str()).unwrap_or("");
-        let ts = entry.get("ts_unix").and_then(|v| v.as_u64()).unwrap_or(0);
-        // Push-related failures: any scope mentioning push/mirror with a
-        // non-ok result, or an explicit "push" reason.
-        let is_push_failure = result != "ok"
-            && (scope.contains("push")
-                || scope.contains("mirror")
-                || entry
-                    .get("reason")
-                    .and_then(|v| v.as_str())
-                    .map(|r| r.contains("push"))
-                    .unwrap_or(false));
-        if !is_push_failure || ts < cutoff {
-            continue;
-        }
-        if let Some(repo) = entry.get("repo").and_then(|v| v.as_str()) {
-            map.insert(repo.to_string(), true);
         }
     }
     Some(map)
@@ -1484,29 +1490,33 @@ pub(crate) async fn run_repos_report(
         // from the incident ledger. The map is keyed by the same canonical
         // repo path string we use everywhere else.
         let repo_key = repo.to_string_lossy().to_string();
-        let (daemon_last_action_unix, daemon_last_action, daemon_last_result, daemon_last_action_when) =
-            match daemon_last_actions.as_ref().and_then(|m| m.get(&repo_key)) {
-                Some((ts, action, result)) if *ts > 0 => {
-                    let now_secs = std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .map(|d| d.as_secs() as i64)
-                        .unwrap_or(0);
-                    let delta = now_secs.saturating_sub(*ts);
-                    let when = if delta < 1 {
-                        "1s".to_string()
-                    } else if delta < 60 {
-                        format!("{}s ago", delta)
-                    } else if delta < 3600 {
-                        format!("{}m ago", delta / 60)
-                    } else if delta < 86400 {
-                        format!("{}h ago", delta / 3600)
-                    } else {
-                        format!("{}d ago", delta / 86400)
-                    };
-                    (*ts, action.clone(), result.clone(), shorten_when(&when))
-                }
-                _ => (0, String::new(), String::new(), "none".to_string()),
-            };
+        let (
+            daemon_last_action_unix,
+            daemon_last_action,
+            daemon_last_result,
+            daemon_last_action_when,
+        ) = match daemon_last_actions.as_ref().and_then(|m| m.get(&repo_key)) {
+            Some((ts, action, result)) if *ts > 0 => {
+                let now_secs = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_secs() as i64)
+                    .unwrap_or(0);
+                let delta = now_secs.saturating_sub(*ts);
+                let when = if delta < 1 {
+                    "1s".to_string()
+                } else if delta < 60 {
+                    format!("{}s ago", delta)
+                } else if delta < 3600 {
+                    format!("{}m ago", delta / 60)
+                } else if delta < 86400 {
+                    format!("{}h ago", delta / 3600)
+                } else {
+                    format!("{}d ago", delta / 86400)
+                };
+                (*ts, action.clone(), result.clone(), shorten_when(&when))
+            }
+            _ => (0, String::new(), String::new(), "none".to_string()),
+        };
 
         rows.push(RepoReportRow {
             repo: repo.display().to_string(),
@@ -3200,7 +3210,7 @@ mod tests {
     }
 
     #[test]
-    fn test_repo_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBQYSs4RXlVRGoyQ3NTRkNzYTRaWjJnVzA3U0Fxb2gxaTQrcjBJUEVUTFU0Cm1oVzVBSGxzZncxS0FrZWw0cG9tWFVsdnc5ZDV0dFhwTE5JajJpdTBwTGMKLT4gWDI1NTE5IEpjYnpnNXNPYmFORTFjSnowSDBjTGpQUmgrVkcwc1NHc2M5aWNTTzVYVjgKdFlKUWh2T3gyYjA5elFNZldpM3pmL2pCV3ludUIrWGlLamtWV2YyWkFyOAotPiBYMjU1MTkgcTJUR3hpOFkxdkQwTWVzZ2haa0RuMUkwMFFiV0ErMXBPbVZQeU5zaTBSYwpTNk9EQWMyNWZTaVVjVVpjeG96SmUvZVY2WFlvaEtyOU5NZ3Jjbzd2b1RZCi0+IFgyNTUxOSBUZ2FIcXcyUmJ4OFJWY0RkbDY0SXBEZUZVaFdHV05qNEFGWWtyaVloWWg0Cm1uTlpxUVYvNnJmN2kvWjcwVXNMMENQZmM5QmozaUZURlpvb1lQUFEyYTgKLT4gWDI1NTE5IE5uaWNyUU15R0dNMW1xUlpaZDAxcWVQc0QrQkZQT01ZRlRZelpLbXc5Q0kKNnVEbnZFMm82anlvQ0xqTXU5NjBXK2x2OU1YK0pOd2RVcS8yY2RHMjIyTQotPiAmblpxIS1ncmVhc2UKcnRGZ0JSWVdYeW9JWTZNa2J5VnhUdHlrVnpaT3RHeTV0UlNNcGhJZFZqMGxaRk9KV0pkMzZhdThnK005a1dVTwpFSzhLQXd3VEJjV1IyQjd6V0ZGN2VvMEYrOHAwVFFrT1BnCi0tLSB2TEJRamdtc0JONkZrb3VxK3JMUU11UXlNUTg0akhKeExmVDQ3K0Z5TTg0CqRIpT5BEt7iAEms8i6+RvRKSvz/7qUbk9kiBXkHvpP62BDGHu8GUoB4UPYZG9NSzm5tYInIe4lyS1tENPbnNatH/tRD]() {
+    fn test_repo_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBqMTUzU1FmTkhiaVFrVCt2L2E4YnN4WldjRm4yMlBPaHJ0Q0N3WVVhYWxrCmlJcUE0d2pRQWpMS1c1SFdHZDNiWFVCZHpqOUl1T3JCckhHRnhGK1BoVGsKLT4gWDI1NTE5IEpjd2RCRjJGbDl4T09WdDZNclRwenEweXVLRG9XalhGUjM3ZVRUK2FaRWcKdFVsTDRBQ3l6MXVET3IrMFBjdXFYY0RnaWhQa29hTU9uYTZiUWZHNG9ZawotPiBYMjU1MTkgZWVtNXg1UlhwLzJjQ3FVNzF0cXQrMmlJTk0xYU1OR0xsckI3NlQzdC9HYwoxcEJNMVVPSm0wRjFnNWJrbWhrOWgzdWZUS2tKM3Rqbk5YSHM3WTJCakFFCi0+IFgyNTUxOSBUbU9kcERZNklOTmlTdTJGKzR3VUpOOVZHeWo0T1NkSFFESmwvVUVWTTNNClUvYmJkNDc1YlVPUi9sdVQ0OVk2cWEraFhBODlKd3NMVDgzMmFma1FWdGMKLT4gWDI1NTE5IGtXWXFWdmpWVHp3aTVITjVjUGc4aVNKaHZ4T0ZyWW94NU5VTEUxY3VrUmcKbTNWYldqTlFzalFZM0lHOHowaFJTRGhnbVExYlVDaTZmaGw0MGJEQ1NobwotPiAlLWdyZWFzZSBMR34gU3l0d2UubCBlV2BjMU5ACkNlQVRLdEpPNlljTVJUdnRVWTdoU0hjOUNKdkFSVEdsajU4RFBPK1JHcDU3bDYvQ2V2Z0t6TDRyTk1nSlpteFUKSkEwT3B6Yk01RGtMMkFtYUpRa2RaREVZZXVjd003Ri8ydHhzCi0tLSBRM3lxWDFWYTh5T0VXV0hhbWdTVGhLMjNVRVZHQkp6SVNGbUFqV0hpejA4CogoPHJcMbn7Ks/tNDp7ya6fd3sXCD+QjmtUF363yNCJ7w5YXLljoma7Dh0C5KaTbsKgz64PS9unB4JrUpbt9F0Cm3Xa]() {
         let msg = repo_failure_message("init_failed", Path::new("/tmp/repo"), "boom");
         assert!(msg.contains("init_failed"));
         assert!(msg.contains("/tmp/repo"));
@@ -3208,7 +3218,7 @@ mod tests {
     }
 
     #[test]
-    fn test_repo_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBxODRLRnI1TDA3RDRUTXRkMUM2M20zM01tNFRnTk50OGl6OGtwZkxLNTNvCmNhdTBCS0tROVVuQ1JQckhRa3pZVUtrK1dYTkdkR1I1OFFyWUNzeUIvLzAKLT4gWDI1NTE5IDFEbXZRVjkzdGRwV1J4NTJxak9pK2pPL0E3YlVkcllDaXJ0WHk1ZVNreVEKellnaVBhZmkrQzBUZEFUN0JNdUl6ekFsaE1ZcTUvQWlpMjhCUllCVkphYwotPiBYMjU1MTkgQjc5UWlpaHB3V2V2UkNYbEJ1V2Z3aCtPaVgwakZsbHViUDg5TmlyRzAwTQpNZXJHYjlKb3JjZVVGS042NXNUYVF4OWVkQUFpRm03U0RRZ0N0VDNINVJBCi0+IFgyNTUxOSBhYTVHUzBFN0NpS3NtZUpTN1FoSFdnVCtCeGdDWGF2eEx5TzRYZlMrQmtBCjg5Vm41dGFTTGJ0dGFQalBBaW9nTC9xbDQvYXgxMis4MFRhcE1IU2F4Z1UKLT4gWDI1NTE5IDczdXFsVDZvSFRVQk1JUjh3YzdONlBqUVdrUUJLai9uUzA2SGZ5N245azQKTVVMT2xxQStZamFuODRYY1dmVk9SbTZBTkhUcWE0VnJZS2NrT01SRHN6YwotPiAwL1w7LWdyZWFzZSBxYm5fbApWY3VZdXI0ZTBjR0h5WkF2QUJUd0FoRE9NT3lKeUR5K0hXU1ZaRVA0V003RDd1N3F1ZUhICi0tLSBtSU9TWFJVRVdrSmpCRjZhMGFFQUZBMjhaMElJUnpoa0lmNWlCRm41S1dJCmsJT4B46WBQAC7u8j1cphAHKgigih3l68lbuV3g4bxbwhaGa+qzXpBHUHpKeN9NcZTMGb6ubhw+Qqi6DHDqWdBW]() {
+    fn test_repo_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBzM3JNRzY3djZHZVpvOVNIVFlNeFFUUmRLaFVTb21JaHlmc3E0WWQxeldBCkcyU0JGNS92blY4Q0dmZGdJc0hobGJoTGo1YUVhMVNqYkl5YUk2bkJyWE0KLT4gWDI1NTE5IHI0S1dCWE5peGpjZFpYdHBnbDI4SFpuWDNONFIwM21jb2g4SjNJUkVXemMKbjl6TDV0bEpLTk5aMWdzd0hJN3NyeTNrSE1XV29oT0lBNWtvYkJtSUlQawotPiBYMjU1MTkgRHgyZVoyUTU5RnRyTlcxaTN0aGJTRzJoQlhjVVo4UEQrS1I2YU9wSW1RdwpyNW5DNzI0Wmp6Vk94Zmt1NDAzdld3UlJGckpjTkNyMlkvVnpLMEg2cmZ3Ci0+IFgyNTUxOSBUWnhZYmI3aEVYZDdickI2WEhacjdva1FmM1lkZ2dJMC9WVEVTSFF4VWxrCmFTU1lZSm8xVFhSYTNrTUh5QVduZ3AzRU0vUnc3ZmV1SWppQnA5Vit3RmMKLT4gWDI1NTE5IHduUHpDWC9RVTI1WHFVRVlSUlVGN3hwL05FWk1lejlBZUNtS3lCaTVQRHcKRGF2ZG5kZ3M2V1VZWXVCMmpxUnhRbjVhUm1qSmVmYStYaVRHOHZlamZZcwotPiAtYmRBLWdyZWFzZSA+JHhrZzBoIHMsNAprYXZKMzZhL05EU0ZpRFRxSTR2VzZwZzRjSUNCQ3loMzBjcGZ3NkxoakZac280MmFEbThqd3FpWVFZMk5DRHRSCmlhejlPcytCSGdScWdOWXRCeE55OXk3RAotLS0gek5XNDY5N2ZNbGtPUHpyTWRqUlhwYW12VzlCVGtFNHBXNEtnOVEwekJPdwqWTMIzaMkfTrTsCvRiotwWkClJmP+SVgwY8uzAy88CFOT2RuwoBu2L1EzkRfuBLoJvWvN4c55OXRlQgVt/QfOejg==]() {
         let msg = repo_failure_message("status_failed", Path::new("/tmp/repo"), "status boom");
         assert!(msg.contains("status_failed"));
         assert!(msg.contains("status boom"));
@@ -3523,7 +3533,7 @@ mod tests {
     }
 
     #[test]
-    fn test_repo_stuck_filters_requi[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBpQ3IvVHJxWXE1cU4veU0wQktJQjVCbXhwTEJTV2JQYUJZM29pSnV2bmdjCmxqTUY4WHJGeU1RRU1CWmxZWW9iejdUTUhuU0FuSFlYWm5xcCtLRERuM2cKLT4gWDI1NTE5IFdVNFAxRStIQ09Ib0VnRks1ZTBjeHgvQXgxbU52cTM0bHlNOGNxbmJDRU0KNXo0U21vQ2xkNmMrN2NhRG0wZ0xPNmxwK0l2eFZVd0kwNStDSWJuT1R3WQotPiBYMjU1MTkgdms4dnZNeTk0Mm4xVUNTMEMybm0rMlIzcmhrVFA3Q1RFNmtlQTR3cGJVawpxcjhNaGZocGExSHhZYk1oWWpKTkFYcEx1RWpjNEtGcVlhQ2JRMllJY0YwCi0+IFgyNTUxOSBBb1BxZzZLS0lHSHhQcHNMdndsSDhHa0ViTFI1aktHMGROTGlLMmdZeENVCkpZRWoyRlNtaWxpd3NsRnllWlA5TjhqT0Ywb1ZBOExRaWZ4Q1Z6VnpiMGcKLT4gWDI1NTE5IGpUeklqRXc0NTh5UitORyt0Z1ozSy9VeXJKYk9ncXkxQTY4Z0ZnZXpnQ1EKMnFYbGk5YlhyZWxqczRVMGZkM0VTWk0wWlhkRzcxWDEvelJOcHZ5ZDdoUQotPiBefS1ncmVhc2UgQTdgMlJMbQpJTCtHTmZsUXpkaG8yUjBmc3ZSVHFGUHZSS3YvVUZqbDFQVEV6bzJBOVcxb2xhcjdMeUloa2d3cDdJMVhTMmtoCjlrRGY2c3VQYnZDRTYzemFHSWcrejF3NzhHelpHYW5QSWJ6c3B0SWxiZwotLS0gbU1VUTAzK1M2SHg5cjFvSTllKzlDUmFCWEVMQzVlVXA0RUtzTUtaVVJRdwo9ZP+J6fmQd5F+HBVMec5Vqx8k8phNuLI/UQSzEzem8H3NDsXCH58jy61xYlUdeMEkWg7WCPQ2fQ==]() {
+    fn test_repo_stuck_filters_requi[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBwcGlhU044WlpKeTZJUCtWUGhxUlhZbmc2V1o5d2hsUjBvZU4zdE5GWDJJClB5WGp2TUFCSFd5REVzQW1QUm1Kdyt5aks3dENUQnA5RmZCczVqN2lXY1kKLT4gWDI1NTE5IGRqSjZkMjhseTNUL1dVaVNkOFF5YVNQd0o3cVZ2OTdXd1FFcVJZa005bUEKZVVRMWRMRU56SjdXVXJ5NUl0RGxhNTVDS0dGem1iMksxeVNDTXE2TEsvQQotPiBYMjU1MTkgdjJ5WmNMMzZtTHV3bGR5VlpIa3pYbVlWTHRyWGNTUE5JRlVWd01qc2FFOAovUzh1akc0U2M0RkJsRlM2cUd4Q2praHVONEp1ZUl0Ni9hWmZHU09PejNVCi0+IFgyNTUxOSBSRTd3VVhnTW1UUVlVTHd2MDhaYmpJUDM5ODU4cmw2OTRreEJWeGZOUzA0Cmk5ZzBxTXlLUkxCTHFVaTU2TytydHpXeTArMDJDT3RCV3ZNQXhabEhVVWcKLT4gWDI1NTE5IHlsNENIOTFVNFdIZ2tWU3VRc3dFMDZJUG5USzJaV25GWk9WRTNEdzNqa1EKdzl5akpNdnBzVCtSZ1dENHZjNXZUUitiYjh6Y0k3KzRFSkhNdUhpQ2NGawotPiBxLWdyZWFzZSBpIHU5TCB7YT1vClhyMU5INjVDNEF3Ly9ZREkxRFU4ZWdSK3dVYnN5K241QXhYeGtldVBkVjZITExCRjR1MVZxRkNmeHhvenJlVUYKTHBOcEs3NkJVWEZjdlQveEhWcVFGNmR1Ci0tLSA5Vk9wbXhXMmdVOGZZd3lxSS9td083aHFMVXhxTDBDcWpJYWc5eS9CWlhnCk0CoFLgNOWcxfBC2KENAyoognUSzYst9+2XMluFi/S62razsfXvrXcA1ur4ZtPwycIH1gtDqeIf]() {
         let ahead = make_status(false, 5, 0);
         let behind = make_status(false, 0, 3);
         assert!(!repo_is_stuck_push(&ahead, true, true, false));
@@ -4543,7 +4553,7 @@ mod tests {
     }
 
     #[test]
-    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBhMkhrT1FDQ044MjZ0RzNXMFpBOTd4Y0pkdE1xNFdOM3cyRXN1QWFHYkNZClM1SmRrSEpPU05VcndGd2dzS1dtQzgxNlJ0UGpDSGFpcUJwZlZmLzNMdUEKLT4gWDI1NTE5IFRjREEyeVBNUHBLT3BFOC9pbW9wRFFGUkZkVHh3T0o5WTI3WkRBRFJQbU0KaWN6UFpHODJBanJZdWorTkN0V0VLS2VVL2lvQVBUVENOMGFaSjZXQWtsVQotPiBYMjU1MTkgWTl6VWpKRHRPTTBTb1JjTVhwWit6YUJEbmpLNTdGWE9PVDJmSWJzQlVYRQpBTDFzamx2T1BSbGRQaVI2RFcyN0hBWmkvRmlmL2VuTk9MV1NoSlVMdXpBCi0+IFgyNTUxOSBSUGxTQ1U3d3RjNThjS0dtbS8yTmVHU1RWejg0NEhQVmJpUXA3WlZERUhFCmhQOFQwU0VXSjVkQ011bDNYdmlzMTFSZU4zNGowRjBuQmFYbU9mTkZXdWcKLT4gWDI1NTE5IFlab1VnVUZKaEo0M1hmd2J6SlJ3N2J3OUppSzBTZitKTFNHZzArbnhxanMKaUhrbjZYc3ZLN2RVWkJsL1crUE52enNyNmhxVGhKNndDZEtxUk1LYzFTWQotPiBGLWdyZWFzZSBmLz1qTDRkdCBBOXJqa2AlCklubU9UWUUKLS0tIHJ2Wm1MTHQ0dDJabUF5VE50N2xKRExEbzZDNkI0NUwwZERDa2Z1NzFCWUkK3Pe1gD0VGe7ULdrHIoJUA19KNRWXXAckP/ScuhaneYvrVdrwBsH1gpnDzWR0IsaimaR+4VDMBPmB8eAoWA==]() {
+    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBlSXY3eXIzcnRMeDVITmlNa256eXpDclFwZDI2NDRnSlBCRWVCcENyL0VVCktNV1BGbFpLOGlUVkg2cnFVc01tSEdRSnRwN2UzQlZER2JKN3ppUjBqYTgKLT4gWDI1NTE5IHFWeFR2d294VklTbk1Ka25ydG5sUURBQjZYZFQzMWRkeFRtRkVpdlg1a2MKQzZWaVRqaXN1N3ZPSS9yWEw1VVFaOXJTOE02TUswb0FZVE9zdThTeEZKNAotPiBYMjU1MTkgZ25uRmZWVWgyTFN3bGFTNUQrdVQ2RW84RlVBNnErWGk5cC9PZzRRektFMAprV0dmL3JwOUNRdk9VU3haQlFmSTZRTGZhRFNvR2Z3eVRtZkplZmVnb28wCi0+IFgyNTUxOSBXem9wSEtnaCtjTUVLWnlRdm9UWExObERaV0IrRVY2Q1hJdGFiK0ZYd1VrCmxTT2VOTHlkVW56SVNMcndlZmpaSzJGWmsrdzJzR3lhMnE2T3NqdDIrVWMKLT4gWDI1NTE5IHJERHpUcEtkVmdMdTFuS0JPWEd0S3A1UVYwdVIzUDBWUmdta3dCN24xWDQKWWNsbXhIaC9TTmxIeW9TVVRrZm91ODBQcTdzMSsyNGRGRkF6YUpOSDhXSQotPiBMPi1ncmVhc2UgPCBaMyBPbD0sWXF+IHRZPlYKcCtiR0RkWVBxVjNQTEZwSGxZYnhodlZpZVF4dTNEb3hmazRCb0pJMndqcWNBR082NlE1N2JBaVRQZ2tTYVo2cwpSR2hHSndSeDhqY01SOW9KK20zdFVqL1dKZnBsCi0tLSBvY1VqeDRSMHNQSk1rQnlVckdoY1BjWFEweHc1aXRxSkxtTjZlMGpmQXNzCqx5SHAtWUi9i1Q612N/QToyILiqIEKoR7mo+USa59yoVQx1b3PDdwMoXcBhGMO2Yqn/ya23NL+0vNi7OLw=]() {
         let mut cooldowns = std::collections::HashMap::new();
         let repo = std::path::PathBuf::from("/test/repo");
         let notify_key = format!("push-fail-{}", repo.display());
@@ -4672,7 +4682,7 @@ mod tests {
     // -------------------------------------------------------------------
 
     #[test]
-    fn build_recent_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA1bytOMUd6L05tNjJuOWIrd1FldW1HSkcvWWlGSU1lKzJGTzVlMWNrZ1M0CmJibjlreXVKQWUreDNpU2lRYU03MUp6QnNNemsyRDJoN1cvazhmR3BSWmcKLT4gWDI1NTE5IGJNZG5EMjlHTmRuMHFlaVpxTnVwSXluY29oVG1KWEpCVXArS2hZaWdEVlkKbEZmbTMyZ1dKcWNtN0J0UzlNcmJPWE9FU2NVSXI4UWVNbXFIbWdkZ3kvbwotPiBYMjU1MTkgdnRwNUMrblZ5YXdGeTNnWnRjcXNSWk5CZDFraHRhWGVpSXpGOGFFcUpEVQozaVBsOEFmblQrVE5qMG9WUkVIYUR4T2ZJbXpWZjZ6QjRialZHcVZaZUZ3Ci0+IFgyNTUxOSBpMDkxSTBVeXJCSjg0bUc0N0hFOGVjSjBMNlN6YWt4NlZPaStqSGZtWENzClRFM1UyVE1pVzNFZGJTNEl5OWFCVUFZYWEySytsNlo0Q1IxdUZINFpLdlUKLT4gWDI1NTE5IHZZZ0w5VGpZSGpVOVI5OGIyWFlaV2xhSzk2V3FGOFJNdkpSWlBIUDNkaTgKNS9sTzNtY1FJMnUyT2ZtVnVMMlpiaDVQRjlPVFREdUx6RHVPVXhsL3NkRQotPiA1Uy1ncmVhc2UgWzJ1IF1Obnk+CnI5K3lOb2o5QXcKLS0tIHBYN3pEWmVMSjZVaUhRdkNuYzBYQ2dWY21pUjZRdEtlTTdoVHU1OG1ITXcKlGv+WHUQCpFHzXwlhT2s2wLF+oPllSJONfn9dD/NpqYYLRIQ6XNnHIo3FwJ7zlfsWycz2YZIRs9o9ojWJws=]() {
+    fn build_recent_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBGTFJwVHFEdmJ4ZFFHZ1dCektBSlc0U0dZQVBrdXl3bzk3bTE5NnVRdEJnCmZmazhqcnpmVG9EY1gyR1JGOFZJZkZTcFlLSVJYZnhmaG1MalRCeEZMSWcKLT4gWDI1NTE5IHVLL2hId0lMRjQ4TDA0WlNsOGZyV0dFamhPZEhMd2hKWThKUnlDOWJtUWsKREZsNCtFZXJ3bUhtUmc0ZWkwaXZYKzA2V3dGaUlWNmhhS0tua0QrZnlVawotPiBYMjU1MTkgcFVaUVByTTYwNWtuVnFId1hUVjFCQW1CT2h2QWcrMDE5VDlEaVMzeHpINAp0a0xFRkRpNysyNHR4M1BvTGIrNS9NTmNzLzludTBhcmVuZXZ0OXdhWGZZCi0+IFgyNTUxOSBoSTRRdmR4S0luSGI4OEt0NlZzNEpIck9wMlNPNHlnMThCNjVuMGZ3cGlJClh3SGUyNDYxeHVpTkI3a1Jid0RjYVNMdG0wcUJoeitCYlc1Sk1TOEtPd1EKLT4gWDI1NTE5IFZta29Eb212SDhycXFHQnZ1aGt2cUtWUFBwWlA0ZHFIVG5tc0pYK2taQVEKNkZ1RFEyQklQK1JMdmhOaisxdVNiTjNRMVVnMmFuT0xGcGJGeEZXbFZENAotPiA+JS1ncmVhc2UKRVBIMG5LMXZUVlF0UHZYbzlyemMrZms5dUFFOEpjV2NqSlRlNEFLY2srclQrbXduU3J5aldkcDMwcEM0emk5UApQT3pNbHVkVlZ2VTJXdUVOUzdnbkordDN5YTdIUXQycTVhNjZxQWZsejNZCi0tLSBGRzhVMGZuSkhrR3dFRGV6OFVsNy9mVFpmY0lreFBwR3VkMmoyNUZlcmdzCv+7K941K9wQGE9k114r4ZUrQTDlT6q6GsWmZ03T6ahG8SkxRiQlT1Wpy7RL5LAm16Zn6YyXqIxE2dfJ8HSL]() {
         use std::time::{SystemTime, UNIX_EPOCH};
         let dir = tempfile::tempdir().unwrap();
         let policy_path = dir.path().join("dracon-sync.toml");
@@ -4706,7 +4716,7 @@ mod tests {
     }
 
     #[test]
-    fn build_recent_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBnS0l3RTEvM0lOTU1WQjBmM3JyenR2OVZRNEhISmk5c1pwTi94YUtHS1ZjCmh3a1ZWOVpjNUJEQ291VFBreXp1RVZzRG1hV2xDT0VYOERIVzJ5aFV2STgKLT4gWDI1NTE5IHAvUDZOZU8xM3drc0VmZXdlY1NWT2Iza1kwT2Y2d2hSbkFlbXBjcldQRDAKVW9mRnpQYTNiT2J4ajNjenFackdma0FWN3cyT0IzZ3VzL0NqV3pibmo3dwotPiBYMjU1MTkgbTFvSTQzdzhPbzFDWExaTWZlZ1lpTHpUUjFrM0hMT3RmMXFCTGxZbWgxMAp2ZXZ1cXBvRGVnRWFhZ05qZWNBQURBSWhyZ0tuUDQvZUF4U2ZLTmhtMnZBCi0+IFgyNTUxOSB5RmhLbndJNE1KaG9HYmthNTFXQjFkS3FjZEF3QU40OXBsU2RYdlVLUlZvClpiTU9YRDV3UmdXR3BWeDBmWUUzeDhMajU1MlJ2SEVBQkhQc3BvTlduMnMKLT4gWDI1NTE5IGtVUlg1dlBqeE1IRjRYanBucU1aSitCQ1JESjI3ZUFDN2h3M3p6SUxtd2sKUCtoRC94QUVydU40eWJ3V0RtaWZiY0pwR0ZSbFMrY0pHdzNkKzZBc2k3OAotPiBraFBeZi1ncmVhc2UgKm4nK1glIikgVHo1IFBdYCBsamEKZ1BCRURCZVpMRkI5Zk5mL2daWGJJMDhmVGZEY281cWNwT0pWWUR1dFphdy9FQ2RwcSs1TlZPZFMzd2Zwc2xVaAptUkkKLS0tIDBUN1FuSGZadHFIVGprOXIzbEo5eGVwZEdXUS9WY0o3RkoxVTFaOWxRU28K3RSYh71jJlGlcqQdyI6B2Fx5Eso+xvycNAYTI0uSZJEVZp5UN7gLSBULT5Vdcm9BmFSaZgfwGq2tACI97Ro/q8jO]() {
+    fn build_recent_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBPVXd0ZVp3T1RiNXhSYStiQzcxQ2VRSVpCeVVPNS9XR1YxL3VZcFRqVW5rCkE0VXdjQWloekl5eWZMdHRnTkp6cEY1dGFSdzBWOFpsL1Q3RU1DUGhYd1kKLT4gWDI1NTE5IEdvWUpGYjhTbW1hczhZa3ZFeDJHckVyTnpKWmZaV1R0ZmNjcjY0RXg2a3cKSHR3a3dPenRiRXA2OWxrcnc2aDR4RXAxYmJyYU9pNFN5LzFDQWdjS2NEYwotPiBYMjU1MTkgeGV3b1dIdGk4SHg4aVU4TmJDYjRvZXNkMVpMTVk1UjJ1SkVtY1dVRjgwbwpSOXN2TG03NDAxR2J4SVNvVFkvVHZIZjdCdVFhMUtIVVBKWWo3eVpJa0t3Ci0+IFgyNTUxOSA1aVlKbFp2amg1Q2lwZVR0OTF0d3lQQ0pOS213VHIxakRXTFNoOWJ4cG5NCkYxY0dSTFV1eFJDLzRpYXk3MVZ1MTJTWFBnZjFCSlpTK09Od0dvS0I4c1kKLT4gWDI1NTE5IEROQW1MbFZlenNrUVQ5K2swOTdnMXpUa2VzQjNCVlo4Z1JGd3ZuRUZSQVUKTTl0UkJKT3ZhU25hODJmeGx5bDhTQ3k5WTdvZVc5NW40UVdTZ29uRXd1SQotPiB8LWdyZWFzZQp2bmJpMGJCMDNVQnAzOVV3TURpTVE0TEFjYk5scGRWcW9URmlSQ3o4cllqUVhFNW5qS0RWWitvRWhDelRETjB0CndwUmJ5NHdqUzN5ZTFVMVNMekZsaDJhZlQrd3BlRUEKLS0tIGY4ejhBbUVzSTdvZFh6NTVYYzJqbGw5QnFlS0NhaXprN0VORDI4UUh6bWMKfr652420xO1GCufJ3WU7gbEnVaXe25YHeopP2+mjPaLkHKuZZwfStJLq4qrfDBCxi1Er0wukMHHrBS5GYvZFdysB]() {
         let dir = tempfile::tempdir().unwrap();
         let policy_path = dir.path().join("dracon-sync.toml");
         let ledger_path = dir.path().join("missing-ledger.jsonl");
