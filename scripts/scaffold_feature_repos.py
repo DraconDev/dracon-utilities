@@ -254,13 +254,13 @@ def main(argv: list[str]) -> int:
     parser.add_argument(
         "--target-root",
         type=Path,
-        default=Path.cwd().parent / "dracon-feature-repos",
+        default=Path(__file__).resolve().parent.parent / "dracon-feature-repos",
         help="Directory that will contain generated façade repos.",
     )
     parser.add_argument(
         "--monorepo-root",
         type=Path,
-        default=Path.cwd(),
+        default=Path(__file__).resolve().parent.parent,
         help="Path to the dracon-utilities monorepo root.",
     )
     parser.add_argument(
