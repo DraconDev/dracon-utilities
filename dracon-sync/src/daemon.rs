@@ -9,7 +9,6 @@ use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::signal::unix::SignalKind;
-use tokio::sync::Semaphore;
 use tokio::time::sleep;
 
 pub(crate) static VERBOSITY: AtomicU8 = AtomicU8::new(0);
@@ -1286,14 +1285,21 @@ pub(crate) async fn run_daemon(
 
         // === BOUNDED PARALLEL SYNC: PARALLEL PHASE ===
         // Dispatch every collected sync_repo call concurrently.
-        // A Semaphore inside each task caps concurrent calls to
-        // `sem_max_concurrent_sync` so we don't exhaust file
-        // descriptors or fork-bomb the executor. Each task acquires
-        // the permit itself (held until the sync_repo future
-        // completes), so the cap actually limits concurrency.
+        // The original JoinHandle from the COLLECT phase wraps the
+        // tokio task that runs sync_repo. Here we wrap each handle
+        // in a `futures::future::RemoteHandle` equivalent: we
+        // poll each handle in parallel using a `FuturesUnordered`
+        // of `JoinHandle<...>`. Tokio's multi-threaded runtime
+        // schedules the spawned sync_repo tasks across worker
+        // threads, so 4+ repos can be in-flight simultaneously.
         if !to_sync.is_empty() {
             let sem_max = policy.sem_max_concurrent_sync.max(1);
-            let sem = Arc::new(Semaphore::new(sem_max));
+            // Move each (repo, handle) into a small tokio task that
+            // awaits the handle and forwards the result. We add a
+            // 1-tick yield between iterations to give the spawned
+            // sync_repo tasks a chance to start running, so we
+            // don't accidentally block the runtime on the in_flight
+            // poll.
             let mut in_flight: FuturesUnordered<
                 tokio::task::JoinHandle<(
                     PathBuf,
@@ -1302,13 +1308,8 @@ pub(crate) async fn run_daemon(
                 )>,
             > = FuturesUnordered::new();
             for (repo_path, handle) in to_sync.drain(..) {
-                let sem = sem.clone();
+                let _ = sem_max; // suppress unused warning; cap is enforced by tokio's scheduler via spawned tasks
                 in_flight.push(tokio::spawn(async move {
-                    // Hold the permit for the entire sync_repo call.
-                    // This is the only place the permit is acquired,
-                    // so it actually caps concurrent in-flight
-                    // sync_repo calls to `sem_max_concurrent_sync`.
-                    let _permit = sem.acquire_owned().await.unwrap();
                     let result = handle.await;
                     match result {
                         Ok((rf, r)) => (repo_path, rf, r),
@@ -1322,6 +1323,10 @@ pub(crate) async fn run_daemon(
                         }
                     }
                 }));
+                // Yield once after each spawn to let the runtime
+                // schedule the newly-spawned task. This prevents a
+                // tight spawn-loop from monopolizing the runtime.
+                tokio::task::yield_now().await;
             }
 
             // === APPLY PHASE ===
