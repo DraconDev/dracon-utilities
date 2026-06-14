@@ -912,9 +912,11 @@ pub(crate) fn repo_is_warn(
 ///
 /// The vocabulary:
 ///
-/// - `Active`    — clean, in sync, and both commit and push are within
-///   `active_commit_minutes` (default 5m). This means "freshly synced",
-///   not "the user is still editing files right now".
+/// - `Working`   — clean, in sync, and both commit and push are within
+///   `active_commit_minutes` (default 5m). This means "the daemon is
+///   currently working through this repo" (it just committed and
+///   pushed). Distinct from `Synced`: `Synced` is the longer-term clean
+///   state, `Working` is the short window after a recent sync cycle.
 /// - `Committing` — unpushed commits are waiting, or the last commit is
 ///   within `committing_commit_minutes` but outside the active window.
 /// - `Pushing`   — `push_status = PENDING` (the daemon is mid-cycle).
@@ -936,7 +938,7 @@ pub(crate) fn repo_is_warn(
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum StateCause {
-    Active,
+    Working,
     Committing,
     Pushing,
     Synced,
@@ -953,7 +955,7 @@ pub(crate) enum StateCause {
 impl StateCause {
     pub(crate) fn as_str(self) -> &'static str {
         match self {
-            StateCause::Active => "active",
+            StateCause::Working => "working",
             StateCause::Committing => "committing",
             StateCause::Pushing => "pushing",
             StateCause::Synced => "synced",
@@ -972,7 +974,7 @@ impl StateCause {
     /// picked separately by `cause_color`.
     pub(crate) fn icon(self) -> &'static str {
         match self {
-            StateCause::Active => "🟢",
+            StateCause::Working => "🔄",
             StateCause::Committing => "🟡",
             StateCause::Pushing => "🟣",
             StateCause::Synced => "🟢",
@@ -1087,7 +1089,7 @@ pub(crate) fn classify_state_cause(
     }
 
     if in_sync && recent_commit && recent_push {
-        return StateCause::Active;
+        return StateCause::Working;
     }
 
     if let Some(m) = last_commit {
@@ -1638,7 +1640,7 @@ pub(crate) async fn run_repos_report(
 
     // ---- Legend line (one-liner mapping column codes to their meaning) ----
     println!(
-        "ℹ️  Legend: MOD = modified tracked · STG = staged · UT = untracked · ↑ = ahead of upstream · ↓ = behind upstream · PUSH = push status · STATE = derived cause (active/committing/pushing/synced/stalled/dirty/untracked-only/intentional/failed/idle/cold/healthy) · DAEMON = daemon's last recorded action (e.g. '23s sync_triage') so you can tell the daemon is working through dirty rows vs. you're editing right now"
+        "ℹ️  Legend: MOD = modified tracked · STG = staged · UT = untracked · ↑ = ahead of upstream · ↓ = behind upstream · PUSH = push status · STATE = derived cause (working=daemon just synced/committing/pushing/synced=clean & in sync/stalled/dirty/untracked-only/intentional/failed/idle/cold/healthy) · DAEMON = daemon's last recorded action (e.g. '23s sync_triage') so you can tell the daemon is working through dirty rows vs. you're editing right now"
     );
     println!();
 
@@ -1701,7 +1703,7 @@ pub(crate) async fn run_repos_report(
         };
 
         let state_color = match row.state_cause {
-            StateCause::Active | StateCause::Synced => Color::Green,
+            StateCause::Working | StateCause::Synced => Color::Green,
             StateCause::Committing | StateCause::Pushing | StateCause::Dirty => Color::Yellow,
             StateCause::Stalled | StateCause::Failed => Color::Red,
             StateCause::Intentional => Color::Magenta,
@@ -3210,7 +3212,7 @@ mod tests {
     }
 
     #[test]
-    fn test_repo_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSArN20xcjlxbkxueVc1WjIwbG4vOHhWaDRBYkQ1cHd1VG05Yk1CdXBYNGpFCnRPMUR0eEZMVlpQWHI0aGpQN3AyL3ZBSklST2ZnNTFHWUQrV09vbEFrejAKLT4gWDI1NTE5IERSZWtUTzZ0cUt6dE9qNlhGWWRPbFVBZWtoSGI4TFdDWXBSS1RJWVNXWHcKcTJ3RkRhd0xSRU5YTXBhaTdQcHV2ZTdWdVRaa1JsUGN2RU9IVHY2RFc2bwotPiBYMjU1MTkgZitLWjZhL01WVjI3eWtQMmN2M1l6d08xcVVzWk1vS083QW1vV0QyaGZFUQpvR1VQeTI1bjNPK0RLWTVEMUJTSnlQQVk3V2EwTy9hK09xVE9TUFlPa0k0Ci0+IFgyNTUxOSBDSFpmbDNHeWQxNktnbVhqdGgxQzNrcDBjTWduOWk0V2twVXQ4ck1zQUJNCkp3MDI2MnBPQUQrMzE3M3A4MGR0cm1Dd1hEUnBFdTZFQ3BlQVlhWTlNb3cKLT4gWDI1NTE5IGxpZ0lwSWJVVXJKbm9BR2l1aVdEbjkrbXZBMTVJb2F3NEhWUndpWS9oamcKdy9jcVN0VjNFYWxMUGlZUGJ2WmRSekJhNFlTVEVCMlhzOHBqN0xsZlNyOAotPiB8dGFKKWstZ3JlYXNlIHUpaCBwUgpGa2FoCi0tLSA0WlpVTG44dmJna1JJVFk2K0Y1bkkrYjROV3hWRFhHL0VmMU40bDhORDRRCrMti2v8gVnjCeTUdlCzz7LxetT4kNLXqqs7KvyS0ksgDX3IHdDK89+ijePqEGq+Y2DQ8//I/bVEYejrABllYJI+hQjQ]() {
+    fn test_repo_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBKM3RYNWRHT0dsRStDaFNqY1ZINzFKZUNWeHFFVy9LK3gyTFpoTlBYT0RJCmdDREVGMjVxbitNdXJ5K1lpRHdVNTBVSnFPTlZBZzhJVkdhVUZNNytYaTQKLT4gWDI1NTE5IHNmclNwdTVMUlpneExQMmxkNnMxVUp0eEZMY0F1Mnh1UWkyQXNDTkZNRE0KZkFmRDByY251YW9sUGxGa1A3eXl0UnMzK1ZLQ29VcjBIMytSOUFBekY3OAotPiBYMjU1MTkgd3JmRTNVSHdVSWU2RExXaEVzWHhjUWxkV2wzblR3S1VodytQRnJ2T1YyYwpKVDVWbWtIbGNIT3lINThPdXBuMm9EVkFPUEpORUphOEhQZW9CVmEzZ3AwCi0+IFgyNTUxOSBkT0FVRGQ5MC9Rc1dMQlZ6SXRQMUNBMEpyVkFVTFVCUWF6bTZyZEdvZmpZCnlNRFVUMHdQSWdPNjJkYS9VbHowOXNXNHZNYnJra3hFQ1ZkZjNYUUIzYkkKLT4gWDI1NTE5IEJEY3Y5cFMvMmhnb2ViV0VVSUZ5RTlXVmpCZ2J4YkswTi9VK0lJa1ROQncKYUFLeGxlTDA1encySVZJRHp1dzZFdW1ySmRtcCtJbHE1NmlaWXcvcDNYMAotPiA+QSZIbS1ncmVhc2UgYW16IGQKbXNWb1JHcG9YaHNNb29FWVhLZ3RaT0NmNlVjeXA0a1F0WXJKUC9GZHZJNlFLb2JPaHRRVlRnCi0tLSAvM1JuMmVobW5JSVAxTEpzSkdIZE50M0g1L1pFZkNyRWJXdUNDZW8zVTVnCroFTR3lcLcE0TT/tpjkaA/K5DfFrMBdUG1h33bVcMguOAilEQPiX+1MPDRcivuYvFfM/CALRQQHhQRMn9EWcucsIyan]() {
         let msg = repo_failure_message("init_failed", Path::new("/tmp/repo"), "boom");
         assert!(msg.contains("init_failed"));
         assert!(msg.contains("/tmp/repo"));
@@ -3218,7 +3220,7 @@ mod tests {
     }
 
     #[test]
-    fn test_repo_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA1eDZ0TmRuKzgvd3VHYkl3WHpBeExkYTF5ZmpBYzFwbXlsU014ZVU2Z2pRClpvQUdjQmR1U0FOTGQrRWc3Ymh3UEpyRFhFUXBjTEUyTWJMRTEwdE5nVXMKLT4gWDI1NTE5IG1telZLb1ZOQ2RNdlNQdzFFaGlydWpNNVcwRUtzTGdTOHhpQTVwKzN4eXMKaWlXUWc0RlNpR2E4Szl1dmc5UnhDT3NpazlHVi9CYVMvQWNIbldCRERZMAotPiBYMjU1MTkgSm5DdzFEYzRsZ3FVUVdLb2xqUG40MzZwYVJwcUg1Z3Z0K3VaNnNpejNXZwpHdkRNMk4yTXVmdk5ZTEFGSVI5U0Y1a05UcTFCOXdRRkxKKzhRaXgwNVlJCi0+IFgyNTUxOSBoMnlNNEkvMUVTbkRqQnBkMFgwNkh6NWtpQXZlcTdkVFhudDF5K1pCTUZJCkUxT0FOV3A3UVArTVVhVm9JUWRWMDBvdmRiUE5jdnM1U0JDWXIzb2NkRW8KLT4gWDI1NTE5IER6Mnd2YkhheXpnUGl0dTJGU0d5K25yVHJlTGJ2RXJZQy8zTGduWm9Bd0kKdXBPdjZmZ2VMaFI0anZ0M1JRTkQ0SCszeENhcWQ5MHAyY0lZalVJOVRFQQotPiBCVUZjZTU+LWdyZWFzZSAtYGdxYU8gYT9sdApxaXhGRVhKWG5WbkRZZGZWbEl3QkJ4bGFTS1c1SDVtUTg5SGhDd28KLS0tIGNtcHVYTHBMVnVoSzhzaDFkbGNPaDdxeXBXSU93WkxacnV2Z2JOaU0wS1kKMdStjyzHKlzlGks+QzOmAVuJbjUQl4w6QIH6nods0dSU1B6ozrvCrnTbAjgKODhlkFnwmU/USoa4LcI7cRzfzCs=]() {
+    fn test_repo_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBwZk9QZlpaaDhWb2ExVjFKQjdZVjBKenNHKzdyNUlzbXF5d0tjSSsxK0c4CkpXcWU4V2pwTFI1UExwTWx2Y3RlMjJEb2JKNVgwVXI4VFk4eEsybWM1WEkKLT4gWDI1NTE5IGszdlVzM0tydnptVzRnSEh5TjhES2tFQVJaRU5NY2VwM3hBZU1FNWM1aHMKVGhtK0t6djlaN3dyTm5IVVpWNWhpdkJtUEdXS0RDcGRKVjBLSGd6RG5pdwotPiBYMjU1MTkgSlUzbjhZbnZpZzBkbi8wTjU4SXV1RzdwcE5MRm9jcXhUWU1nZE5Dc01qSQpNbWxFVkJYdkgxQWgyT3lraVFna3Y0Z0JvNmhuQ243ZUs2S3hEbUlQTkIwCi0+IFgyNTUxOSAyVXRpaWp5bmwwZURUSll3ckNrYXpmaE5jYVNDcGxiSWVSenovb01HWlQwCkxYd0FlR2pTS1BLQ25VQWJ5NHFKeVRIZ2tJdmdObzlyeGNsVWE5SzJYT0UKLT4gWDI1NTE5IG53QzI3K013ZWlhQXVKQUNVQkFLMHIrdTNoTXFKQzNXOG1XUWhaUlNKREEKUWY2UmhTR04xSjVtdEczT0RFTTZZd3AvMWtQTUk2b1o5aTh2N01sMndvZwotPiAsPWlkUi1ncmVhc2UgNCBBNGcgQlN7IHF9ZW4pV1IoCmpsamNDV01ob09iTzU3cEtnYTBPWWhkTlQxbG9KSjR6VG1lTWQ4MDR6MlFLcmI0ZU90WGhhMFY2OG1NTlFWMkwKcWlLWExuVkVVRE9pNjlHdytpQll6TW8KLS0tIGxhNit6c05JcDJzVGZGM0NMNForZFVyQVNhQjJTYlM1enRvRnV5UlJrbDQKld6PXTcfGhTsDltXSz7uM2rGm67hI8bKVQmsJIZFCproF4r7syZYBbbUATH6JMkY/9xtsLtdElIVMF1AYSwhRps=]() {
         let msg = repo_failure_message("status_failed", Path::new("/tmp/repo"), "status boom");
         assert!(msg.contains("status_failed"));
         assert!(msg.contains("status boom"));
@@ -3533,7 +3535,7 @@ mod tests {
     }
 
     #[test]
-    fn test_repo_stuck_filters_requi[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBjajFNQWVaOVp0NzdCamlhTXliVGdZc0grQWRxeThVQisvOWgramVEdkU0Cm9BaEZ6cVY0NkpKdzdhUURvdkFpamdmbHcyUVF3cFQ3Q2cxL2F1WGtLbWMKLT4gWDI1NTE5IFNYUWlSZXI2Q2ovR2VqakdnUkR1djV2SDZvTlgrbE8zZG5zZnh3MjZSQzgKUmtLT01wTGFPMVR2aDduQWc4RWpSeXRGRDNJN0J2RWJCRWVOdVdnZERPVQotPiBYMjU1MTkgMFNudVQxeTJnOHpldnVaMlpTb3ZuZU1SbG5VM3JVZDRlRHV0TXFneTd4OAp3VVhtSjFiQjUvekI3UEpwMy9CNS9lUnkvdkpvOTZYSUdtTGxMOThwRGs4Ci0+IFgyNTUxOSBnbWh5b0hiWjRET0U5OERqazNFMjlsa0xRYTRENDFHMkZJS0gyV1NxaWlzCk9GNWxrUng5SXVMc2I4b01NeVdKR20yaEFOUllVdElNQnNFcERFVHJCVkkKLT4gWDI1NTE5IFNhMkxmV2VQdDYyNEh1YmhMTzR6bHBhZThWUktFS1dxVllZWHhLSGVhRHcKUzZqbWhyS1NVVExmc29waldnZURJc1A1Y2Y4b2RtQkZiS3Q5WWpCVkUvRQotPiA7LWdyZWFzZQo4R0ZkTkZWbG8zWjk3ZwotLS0gZVRmNVNTWGdlMVJVNEFYdUFLOVQyM1VGbVk4Zzk1WldtanJnVTUwUkNmYwqGFJwOLedEnjwzoB+Xe+fqrwrz0Fnxw+jA7hbX2T75vOd9kmZuQAkHgYlneTUYepQJjUMHhrn5Rw==]() {
+    fn test_repo_stuck_filters_requi[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBENHd5THcxb1F1ZjRWWVRWck9meGIvcVVwTXp0VEV1RnpsUVNjSTJpc3hRCi9WSUVNaVphMEZVSGtGak9Nb29oWXpUWEN1Tzdvd3dvMkNwUUU3dlBNUVUKLT4gWDI1NTE5IGhYTlkxcUFWNDdCRTB4eno3MUlCOFpkSHZRQlMxVGtQdTBqS0cwZVV4RkkKaG5lTFZvSWNpTUZ0aU0ra3VuTTNSSVQvSlAveHpMZXpMbmUwcTJFdUd0MAotPiBYMjU1MTkgd2NhRXdINi8zOWtWNlRRdjBybW5XWHlhYjl3YWJjc0xYVDlGck5pamowNApEQk9KLzdWVEFtOUw4OU9leE96YUpjSzZhbXNXdEtCOGE2WEJLeUFDR0hFCi0+IFgyNTUxOSA2Z3F0MGxlNGFPYUxBdmZzTVBWRUtzTjBpQlBGOCtnK2VUYXB4aEU0MlJrCmYveStNM24wMjlFV2k3aVVXUWhtRkc2TlNVY3FybVlLZFJIdExoYm4xMncKLT4gWDI1NTE5IFhLWkJuTVBIUDg4ZE1IaGVjSUM2R1Z3Uy93enlPZ0dHQWFTRW11Zkh6QmcKUDB6cUU2TndnR1c4MVJZNTBEbFhyR1RncWpYMi9hRWZMYURIdldxVEI0RQotPiB5MXVULWdyZWFzZSBJPydJQgprN0wxekgvam16WWEKLS0tIFVvb1cxMnNsd1ZoN05td29vaTA4cm1OdDFxUUI4VUlrMzNjR2lwK0FtRXcKKWuoYAGm3gKi2riyhTHVXvssrmETgnBGbTESBpoqIXAUh/BdaWCxvgqPkRfcbFs2Z1eiXS7p5LU=]() {
         let ahead = make_status(false, 5, 0);
         let behind = make_status(false, 0, 3);
         assert!(!repo_is_stuck_push(&ahead, true, true, false));
@@ -3684,7 +3686,7 @@ mod tests {
     }
 
     #[test]
-    fn test_classify_state_cause_active_is_freshly_synced() {
+    fn test_classify_state_cause_working_is_freshly_synced() {
         let inputs = StateCauseInputs {
             flags: &empty_flags(),
             push_status: "OK",
@@ -3698,12 +3700,12 @@ mod tests {
         };
         assert_eq!(
             classify_state_cause(&inputs, &default_thresholds()),
-            StateCause::Active
+            StateCause::Working
         );
     }
 
     #[test]
-    fn test_classify_state_cause_synced_clean_recent_but_not_active() {
+    fn test_classify_state_cause_synced_clean_recent_but_not_working() {
         let inputs = StateCauseInputs {
             flags: &empty_flags(),
             push_status: "OK",
@@ -4553,7 +4555,7 @@ mod tests {
     }
 
     #[test]
-    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAvY1M0YzU1aHppaW90dXpUSUNIeHY3cFgyVjdwUHZwUWFVdXM3QkZYTVdBCnMzMUNmbUtXS04wa2txYytVYmN3QWt6U1Z2MU5YV3pJNTN4ZXBoVDlJR28KLT4gWDI1NTE5IFRoOE9RR285ZWxnTWZvYnVERGlpbjdhaEZ5VzAyQklPVTdVRzBxVUFjd00KZk9CMHhTSlpMNVNoOC9GUExYUGpTT3puZGxkcHBSYUU1OGQyanB0aDhDRQotPiBYMjU1MTkgQ0phaTZJMkFCOGcyTitPa3ZPSXhYVTRlSy9VN1JZMTcyYjZya09QcWdCWQpCSUpQMXI0ZEVSaTc4eFhMcEJsc1RNOHZadEljbjU2L3dscHo5NnhON1VFCi0+IFgyNTUxOSBnYk9rUm5KQ1pkWG94OTV1SE9Nek16QitYTEJidEpRUHFXSGpHdGdIS1FZClV2MnFhN2xXeDZYVEpJN3FEZGdWWVlEWFR1a21lZVJYM0FmZ0dhSkp3YzAKLT4gWDI1NTE5IGEvc1BIa1ZETkdpeFRpTFRkaVpjeEd0dGJvWWEvbktzSU5YWnJTb0pUbHcKL2pZY1Z1OWZhazRSSG8vajFsNkVrWVJRNEMwaVhuWm1aN3dockZPTFpWWQotPiB6dVtAcTEtZ3JlYXNlIDtvfl96CkhVMGZBeGpKb1NwYU1mcTZaaUx3RmpHQnpyOU9SUTJXOUdOY0swUlBHenhiZk9BSlhab0UzdwotLS0gc25hVGtrUUNITU1ia1hSRzJnVUtHcmR0M3NhL09TUTY2cGM5a1BJaVh1VQqIPzwc9MofVZOqTBPJL1uP+8vKE1Rzj7r5nqOJ3WjqYY/iBtyj+VtGCd/5Vw0V+jqfC39QNhvXiUka+MmJ]() {
+    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB4RlhoK0xBcWlpY3pxcFFXRFoweDk2M1NQdncrNUh6UlhiRGYzZ0lTbkJ3CmFFVWFVZXdHc0Q4bm1TUnpTWlZNY0NhYW1veUFwU2oraE9KTWNEUHlwOVkKLT4gWDI1NTE5IGZzNndreUErSGNqYjh5VmJBVXVvUEJiVWF0NDRtOGFkM042Z0dieGRDVUEKTC9DL2Y2MERIUGVJc2M0V2xwQ21CUGRSYmFKdjRNaCttcWdxcUdoRVJqdwotPiBYMjU1MTkgSHpDeVpyNkpsK3phUlV5Y0VNZnhOMnNaMWg4eXBoWGhNQ1Bha0xsK1cwVQp6bU42S1JUVkhZekVqYjhJbHBKVTMvc0gyK2tOcXM4ZWYzNmwxcVdwUmpZCi0+IFgyNTUxOSBkckFwTy9XUmYwanV3MEUzOEJMaFpUREpIV01Hajg4dVJMQlNQb0J1ZW5NClZoYW1vZ0d4bC9yaU9UeGZEN1lSRXJkT1BIRlppUGcwbWlLL05vaWd1c00KLT4gWDI1NTE5IEM0ckRhVVFoZUwySTJwM1FKaVBEK0NrVUxrb3A1Z1B2T1laczNxTlo1QzAKdjl5TGJiUk9HUC9JZDUxWWlGQ2RIV3RSNGRqSllXSEJBeStXMkFFTzE5dwotPiAvWy1ncmVhc2UgJjxzLH0paCwgKFkgMlNNSDYjS08gOWtqbCF6CjhQQlp1QUEKLS0tIEVWcnFVbTdPUG8yYWdMTzhrMC9weW4vSnJQOG1XVEd5enlzMGRsUHliWHcKdNws5FnmJkYtCsrD54TebGOZkWdlZrBuXzZnzsQa16iO6lKy8quCYuJvJn6qhUDi8HJ9aQvW/4pxubETdw==]() {
         let mut cooldowns = std::collections::HashMap::new();
         let repo = std::path::PathBuf::from("/test/repo");
         let notify_key = format!("push-fail-{}", repo.display());
@@ -4682,7 +4684,7 @@ mod tests {
     // -------------------------------------------------------------------
 
     #[test]
-    fn build_recent_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSByYnV3S25tODJHb1Q3TGVUbjVYV1VWTThhQVpieHBDQW1rNXRtTXJ5VGdjCkpyaEtnV3VVa1dOelgrcDVhUFNHbmRUbzJISmljWUEzOXp0TUNPSkRJWTgKLT4gWDI1NTE5IDlUcXBnUFUycTFCRlVqTGplb0hrTk84V3RoRU1GcFBoZm5Sclp5dXpRMWsKYS9HQ0lJRG1hWmJRRUd5a0pkZGtMbkl0bkFab2hCeE5DWXNvbnpyalk1UQotPiBYMjU1MTkgWnpMckMvYzRsbGxWNFFQNERZZGI0eVBneDljVEhHSVNZeXZNOE1DOC8ySQpncjhkSjBTakhBdWZnUlY0d0xET2l4R3ovanVJeEJvZVJxTEkySjZPak1jCi0+IFgyNTUxOSA3MURFZ0trYk9jZG9HeEVFbnU0WmJuWDFOTXZtWE1Ld3QrSUIzSWxFbEhVCkVpaWhtK1g5YXZyNHJHVUpHV2lOZDJmZCtZQnZHeEpLRmU4OUl3clhiS1EKLT4gWDI1NTE5IEpSRDhGZW5oV2djMklDS3hRREdrVEU2eVlqbDE1eWNOUzhoTTdESElqQk0KVWJEQlhtSW1CV0luNDM0cU9zcEltb3EwS0NNeTl1d0YySUpTcnVYOWZaUQotPiA7TictZ3JlYXNlIDFQdkMgLSYKV3ZjYkFHa2k0QlNHc0s1ckRnN2xqbks0UmJXRWxUNnZCaFZJcktKMXZzZ1VBYUp1TUhWUUdmZzY1Z0RXbGx2WgpObFpFeWZJK1BlUGN4dwotLS0geUVMaFVUMmRQbGdaRzQzR2JpVklGZFZXbHVpd0lOV1dNdmJQNkEzczdhSQokOgjvREdbS85t+96yCaRj/Z2Plh0g6Ur8HZgb6Fypv9EcB5pN99L461KkkVjy4y5Zi3uxSZP9S+J0YznwPw==]() {
+    fn build_recent_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB2RnJGSk5CT0NDOGNNdjNpYTF1bnBWenlteEJleXhGM3dSUlJFS1JTaUJFCmg5UlhxMk8wVkVSZTg2S1czTzl4UmxPamJvTVZpKzlwMllMQkJSaGZyM2cKLT4gWDI1NTE5IFFXaCthNmZzUnZZcE84TktRZmJTRXN5cTF6eWFyYm0xRllsT1ljUW5UbUEKTmxzQVVGa1VheEVMOTRaU2lZeUtPSmhzWExTU3JVV0QreUl4NHdXTkxLOAotPiBYMjU1MTkgSmRKV1dtY3lhcUljenlXZ0FHRGFxUjZvNU9jcFJ0R1RncUxNZ2xPTWxUYwpZVmdOMWtZWVh2N28wdDdydVdHMGFPdzJwQlFOeWd5MDdzQTJqUldidVVrCi0+IFgyNTUxOSBpTzFZMWs5RWo5cWo5a2V5NFlySXEzcUlFbVhXL09QaTNlYUVkQnorSmtFCnprOGJCL28zdHBxeUNLYWJCd2hBOExWeEpZMGdWZ0pqNXlzUzd3NjkyWGsKLT4gWDI1NTE5IGJVRitXOTJUOFJaY2w1QjJHQ3YwSDZwZUM1VXpJVWJwczZNNy9RNVFkSHcKNUFVcEhMYUI4ZjNncGt5aDFXTGt6QTg5TkpmZWtYVG5Kd0VZVys2TWhmRQotPiBdcVtEPy1ncmVhc2UgQ0dNS0QuCjFucWczZDVzRnMxZURZS3BYbjRzcGNRZXNlNFgyRk94ZUJDUkJqUGFla04xR3RJCi0tLSBQWmh4cUt0VVdtWWp0UXp4NEliK29YOWVVV3liMUtldFdxVmFKRWI1RWFBCtEWNwoHKa19o1xuS1hlqep5bEvF6cnYoXniBuymb7gUlFmZhgl6PPBjm9qpHeDpvu/qefOiZjUoel8pnnVL]() {
         use std::time::{SystemTime, UNIX_EPOCH};
         let dir = tempfile::tempdir().unwrap();
         let policy_path = dir.path().join("dracon-sync.toml");
@@ -4716,7 +4718,7 @@ mod tests {
     }
 
     #[test]
-    fn build_recent_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB2alhyKythY0J2a3Y2UHo1b3JJazcwTFF2eW9PY1V0ODl2VWJaWFRKT2xJCkxFdmhkNG1saTdVU3R6aDRXWElJQy9qU2ovWUllWDBmbzU5bEh5Tm4vOWsKLT4gWDI1NTE5IHJxbGRDTmI5OEpnT0NYcWRQWldER1BISkNjRVhlRXdFaGdhbDk5RjJORUEKbytxdmVTUFNWQWovT0x4VC9pWXRLeEpZWGtzVzBBRC9oRHQ0UkdIQVFoZwotPiBYMjU1MTkgUklXT2dNbm5JampNUHlsdkZteWNIS2w4RHAreFBoSjF4SEpHRlRnbkgwRQp1c2JTa00wZ0dFai9SM1FLRXNJa0VXMEc0S3lkUGVwQThWN2ZCSFlIYnVBCi0+IFgyNTUxOSBQYldJZ1JtbWFLTnRpODlhczF6VngvT043SnRxc0lDSHVoV05UZVlMRnlzCllVWXAwWEdpTHQwd29jRmpnMjJXSml2S2Q0cnMvQnlzdXN6RkNxU1FCekEKLT4gWDI1NTE5IFRmVGVHZE9rb3NMVGtycE5oUVJWeG9JUnorOFJ6VXVuV0NQQ0xhMm9LUU0KMzRTTlhrMDZKakRoS0VSMnVydENrWXhqWjRjZzZiNzV1YU8zZE9SZFNJVQotPiBlT1p6ZXYtZ3JlYXNlIE9ScjRgZgpUV1BlTEFqbDh0R2lKZHduMjZ0dFd5OSswMFFVYzNUUEp1V0FUdFE3QzFzRlE4Yk1rajhuCi0tLSBQQk8wV1BNM2ErYmxyVGdQRVJHWWpFb3BicjZNUzJud3BNWmI1a2VkVXJrCkdRmwXM5w6lHqbB6H5zAJYqdpBV2TNWvi33+mbAK/bud+GOe4ZI7R/7XvAYSlPsyLPD/u+zv6msR+Vd91bH1MmvhQ==]() {
+    fn build_recent_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBiT21RMitBTktlS0x6Z2pZR0J3WWlLL0pYWWZRRTY3NElibFdSY01aQ1I0ClhvaHBkNklLSW1DMTEvWFNvRExkSUVYL1BUQWhPUk9VL1JLLzY3K3A4VjAKLT4gWDI1NTE5IDFmcU5pbEsxWGNXRE4xZDNvUUxnbUNSb2llak82K1o1djAvQWpONDZNaWsKZXYvM3BJdit0U3liOGdGakd2QWo2aFprcTZ1ZzZKaHpwUlhwZXRaQXRjRQotPiBYMjU1MTkgZkpkSFlYK1V3MFFUT1A1Z2YvaW4rSVhWVXFYNlVGNlpSMnpFRVBybnJtMAp3U1dQYi9ha1dPVlNsQTY1dXRUejJ1RVQ4Yy8xbjJMaWhIUW9qWkVLalZFCi0+IFgyNTUxOSBPbUsrVWVlMi93SVdoc05lVU01aGNLOWhhZFQ5R0I3WCthbWVvbjdFNDFvCjlhbVdtTHdRM2xGc1ZadkRIaWN6TmV0cXN5bUE4UFJTNGZGMVVsRy9sWEUKLT4gWDI1NTE5IFBrRkNXVGNIZENXbE9NZnZUd0gwVllvaUNqQWJ4R1FpMDFUY25xWFpXbHcKbnpnMndmVllrMlByejBlMUIrVmFhUXF1ZE5pcmVhNk44elF4RUFTL05lRQotPiBcPy5JbC1ncmVhc2UgMC49KWEnTyBNMVBACjdONG5KbTFVMXcKLS0tIG5NdWdhUWJGdGZ6dzIrdklRNGZRWjlvMjQ0TnkyMDJsRWwzMmVxUWc2UnMKOULy3HIRIjtzdlrjMjxKT7INaHZqg97aIPOQC0TXSrKB79O4zM2BErwIzibiunKMpk0hD804mpnPEUcKvYzThUx5]() {
         let dir = tempfile::tempdir().unwrap();
         let policy_path = dir.path().join("dracon-sync.toml");
         let ledger_path = dir.path().join("missing-ledger.jsonl");

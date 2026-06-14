@@ -17,10 +17,10 @@ The classifier returns exactly one of these labels per repo:
 
 | Label | Trigger | Colour | Icon |
 |-------|---------|--------|------|
-| `active` | clean, in sync, and both commit and push are within `active_commit_minutes` (default 5m) | green | 🟢 |
+| `working` | clean, in sync, and both commit and push are within `active_commit_minutes` (default 5m). The daemon is currently working through this repo (just committed + pushed). Distinct from `synced`. | green | 🔄 |
 | `committing` | unpushed commits are waiting, or the last commit is within `committing_commit_minutes` but outside the active window | yellow | 🟡 |
 | `pushing` | `push_status = PENDING` (the daemon is mid-cycle) | yellow | 🟣 |
-| `synced` | clean, in sync, commit/push within `committing_commit_minutes` but outside the active window | green | 🟢 |
+| `synced` | clean, in sync, commit/push within `committing_commit_minutes` but outside the active window. Longer-term clean state, not just synced. | green | 🟢 |
 | `stalled` | dirty tracked/staged work sitting longer than `committing_commit_minutes` with no push progress | red | 🔴 |
 | `dirty` | recent dirty tracked/staged work expected to be picked up by normal sync; force immediately with `sync-now --warns` | yellow | 🟠 |
 
@@ -59,8 +59,9 @@ labels take precedence over computed fallbacks:
 5. `untracked-only` is reported as such even when the last commit is
    recent, because the operator's question is "do I have uncommitted
    work?" and untracked files do not count.
-5. `active` fires only for clean, in-sync repos whose commit and push
-   are both inside the active window. It means "freshly synced", not
+5. `working` fires only for clean, in-sync repos whose commit and push
+   are both inside the active window. It means "the daemon is currently
+   working through this repo" (it just committed and pushed), not
    "the user is still editing files right now".
 6. `synced` is the clean + in-sync case whose commit/push is within
    the committing window but outside the active window.
