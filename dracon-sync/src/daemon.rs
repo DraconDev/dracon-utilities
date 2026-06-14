@@ -1285,9 +1285,12 @@ pub(crate) async fn run_daemon(
         }
 
         // === BOUNDED PARALLEL SYNC: PARALLEL PHASE ===
-        // Dispatch every collected sync_repo call. A Semaphore caps
-        // concurrent calls to `sem_max_concurrent_sync` so we don't
-        // exhaust file descriptors or fork-bomb the executor.
+        // Dispatch every collected sync_repo call concurrently.
+        // A Semaphore inside each task caps concurrent calls to
+        // `sem_max_concurrent_sync` so we don't exhaust file
+        // descriptors or fork-bomb the executor. Each task acquires
+        // the permit itself (held until the sync_repo future
+        // completes), so the cap actually limits concurrency.
         if !to_sync.is_empty() {
             let sem_max = policy.sem_max_concurrent_sync.max(1);
             let sem = Arc::new(Semaphore::new(sem_max));
@@ -1299,8 +1302,13 @@ pub(crate) async fn run_daemon(
                 )>,
             > = FuturesUnordered::new();
             for (repo_path, handle) in to_sync.drain(..) {
-                let _permit = sem.clone().acquire_owned().await.unwrap();
+                let sem = sem.clone();
                 in_flight.push(tokio::spawn(async move {
+                    // Hold the permit for the entire sync_repo call.
+                    // This is the only place the permit is acquired,
+                    // so it actually caps concurrent in-flight
+                    // sync_repo calls to `sem_max_concurrent_sync`.
+                    let _permit = sem.acquire_owned().await.unwrap();
                     let result = handle.await;
                     match result {
                         Ok((rf, r)) => (repo_path, rf, r),
