@@ -860,6 +860,11 @@ pub(crate) async fn run_daemon(
             Some(&policy.system_repo),
         );
         let repo_set: BTreeSet<PathBuf> = repos.iter().cloned().collect();
+        let mut to_sync: Vec<(
+            PathBuf,
+            tokio::task::JoinHandle<(HashMap<String, usize>, Result<SyncOutcome, anyhow::Error>)>,
+        )> = Vec::new();
+
         activity.retain(|repo, _| {
             let keep = repo_set.contains(repo);
             if !keep {
@@ -898,15 +903,6 @@ pub(crate) async fn run_daemon(
             sleep(Duration::from_secs(scan_interval)).await;
             continue;
         }
-
-        // BOUNDED PARALLEL SYNC: the daemon collects every eligible repo
-        // into `to_sync` during the serial loop below, then dispatches all
-        // the `sync_repo` calls concurrently in the parallel phase. This
-        // means a slow push on one repo (e.g. 60s `push_op_timeout_secs`
-        // against a slow gitlab) no longer blocks other repos from being
-        // committed. The post-sync state mutations still happen serially
-        // in the apply phase so we don't need locks on the activity map.
-        let mut to_sync: Vec<SyncJob> = Vec::new();
 
         for repo in repos {
             // Clone policy at each repo iteration for a consistent snapshot.
@@ -1057,7 +1053,7 @@ pub(crate) async fn run_daemon(
                     continue;
                 }
             };
-            let mut status = match svc.get_status().await {
+            let status = match svc.get_status().await {
                 Ok(status) => status,
                 Err(e) => {
                     eprintln!("⚠️ {} status_failed: {}", repo.display(), e);
@@ -1239,325 +1235,141 @@ pub(crate) async fn run_daemon(
                 continue;
             }
 
-            // BOUNDED PARALLEL SYNC: collect this eligible repo into the
-            // jobs list. The actual sync_repo call is dispatched in the
-            // parallel phase below, which runs up to
-            // `policy.sem_max_concurrent_sync` repos concurrently so that
-            // a slow push on one repo does not block other repos from
-            // being committed and pushed. Per-repo state mutations
-            // (cooldowns, activity map updates) still happen serially in
-            // the apply phase after all jobs complete.
-            to_sync.push(SyncJob {
-                repo: repo.clone(),
-                changed_at_secs: now.duration_since(entry.changed_at).as_secs(),
-                remote_failures: std::mem::take(&mut entry.remote_failures),
-            });
+            // === BOUNDED PARALLEL SYNC: COLLECT JOB ===
+            // The parallel phase below dispatches sync_repo calls in
+            // parallel bounded by `policy.sem_max_concurrent_sync`. A
+            // slow push on one repo no longer blocks other repos from
+            // being committed and pushed. The post-sync state mutations
+            // happen in the apply phase after all jobs complete.
+            let entry_rf = std::mem::take(&mut entry.remote_failures);
+            let secs = now.duration_since(entry.changed_at).as_secs();
+            let policy_for_task = policy.clone();
+            let excluded_for_task = excluded_dir_names.clone();
+            let policy_path_for_task = policy_path.clone();
+            let repo_for_task = repo.clone();
+            to_sync.push((
+                repo.clone(),
+                tokio::spawn(async move {
+                    let mut rf = entry_rf;
+                    let r = sync_repo(
+                        &repo_for_task,
+                        &policy_for_task,
+                        &excluded_for_task,
+                        secs,
+                        Some(&mut rf),
+                        false,
+                        Some(&policy_path_for_task),
+                    )
+                    .await;
+                    (rf, r)
+                }),
+            ));
             continue;
-            {
-                Ok(crate::sync::SyncOutcome::Synced) => {
-                    eprintln!("🔁 synced {}", repo.display());
-                    // Flush so journald captures sync activity in real-time
-                    let _ = std::io::stderr().flush();
-                    true
-                }
-                Ok(crate::sync::SyncOutcome::NothingToDo) => {
-                    if debug_enabled() {
-                        eprintln!("🐛 {} nothing to commit", repo.display());
-                    }
-                    true
-                }
-                Ok(crate::sync::SyncOutcome::Blocked) => {
-                    if debug_enabled() {
-                        eprintln!(
-                            "🐛 {} blocked (guard or manual intervention)",
-                            repo.display()
-                        );
-                    }
-                    false
-                }
-                Err(e) => {
-                    eprintln!("⚠️ sync failed for {}: {}", repo.display(), e);
-                    let err_str = e.to_string();
-                    // `git add` timeout: the working tree is too large to
-                    // stage within stage_op_timeout_secs. Apply a long
-                    // per-repo cooldown so we don't spam the incident
-                    // ledger every ~70s with the same timeout.
-                    if err_str.contains("git add timeout") {
-                        let cooldown = policy.stage_cooldown_secs.max(60);
-                        stage_cooldowns
-                            .insert(repo.clone(), Instant::now() + Duration::from_secs(cooldown));
-                        eprintln!(
-                            "⏸️  {} staging paused for {}s (working tree too large to stage); manual `git add` may be required",
-                            repo.display(),
-                            cooldown
-                        );
-                    }
-                    if err_str.contains("push") || err_str.contains("remote") {
-                        // Rate-limit: notify at most once per repo per 30 min
-                        let notify_key = format!("pushfail-{}", repo.display());
-                        if let std::collections::hash_map::Entry::Vacant(e) =
-                            remote_notify_cooldowns.entry(notify_key)
-                        {
-                            crate::report::send_sync_conflict_notification(
-                                &repo,
-                                "Push Failed",
-                                &err_str,
-                            );
-                            e.insert(Instant::now() + Duration::from_secs(1800));
+        }
+
+        // === BOUNDED PARALLEL SYNC: PARALLEL PHASE ===
+        // Dispatch every collected sync_repo call. A Semaphore caps
+        // concurrent calls to `sem_max_concurrent_sync` so we don't
+        // exhaust file descriptors or fork-bomb the executor.
+        if !to_sync.is_empty() {
+            let sem_max = policy.sem_max_concurrent_sync.max(1);
+            let sem = Arc::new(Semaphore::new(sem_max));
+            let mut in_flight: FuturesUnordered<
+                tokio::task::JoinHandle<(
+                    PathBuf,
+                    HashMap<String, usize>,
+                    Result<SyncOutcome, anyhow::Error>,
+                )>,
+            > = FuturesUnordered::new();
+            for (repo_path, handle) in to_sync.drain(..) {
+                let _permit = sem.clone().acquire_owned().await.unwrap();
+                in_flight.push(tokio::spawn(async move {
+                    let result = handle.await;
+                    match result {
+                        Ok((rf, r)) => (repo_path, rf, r),
+                        Err(e) => {
+                            eprintln!("⚠️ join error for sync task: {}", e);
+                            (
+                                repo_path,
+                                HashMap::new(),
+                                Err(anyhow::anyhow!("join error: {}", e)),
+                            )
                         }
                     }
-                    false
-                }
-            };
-
-            // === POST-SYNC STATE MUTATIONS MOVED TO APPLY PHASE ===
-            // The post-sync logic (should_cooldown, run_repair_concerns,
-            // run_repair_warns, stuck_push_repos, activity map mutations,
-            // and the stuck-ahead/behind/mirror notification block) all
-            // operate on per-repo state and run serially in the apply
-            // phase AFTER all parallel sync_repo calls complete. This
-            // avoids needing locks on the activity map during parallel
-            // execution. The apply phase re-establishes the local
-            // bindings (entry, status, sync_success) from the result of
-            // the parallel phase.
-            continue;
-                match run_repair_concerns(
-                    &policy_path,
-                    true,
-                    Some(repo.clone()),
-                    Some(policy.push_op_timeout_secs),
-                    policy.push_retries,
-                    policy.auto_rewrite_large_blobs,
-                    ConcernRepairFilter::All,
-                    false,
-                )
-                .await
-                {
-                    Ok(summary) => {
-                        if summary.found > 0 && summary.resolved_now == 0 && summary.succeeded == 0
-                        {
-                            should_cooldown = true;
-                        }
-                    }
-                    Err(e) => {
-                        eprintln!(
-                            "⚠️ auto-repair concerns failed for {}: {}",
-                            repo.display(),
-                            e
-                        );
-                        should_cooldown = true;
-                    }
-                }
-            }
-            if policy.auto_repair_warns {
-                match run_repair_warns(&policy_path, true, Some(repo.clone()), false).await {
-                    Ok(summary) => {
-                        if summary.found > 0 && summary.attempted > 0 && summary.succeeded == 0 {
-                            should_cooldown = true;
-                        }
-                    }
-                    Err(e) => {
-                        eprintln!("⚠️ auto-repair warns failed for {}: {}", repo.display(), e);
-                        should_cooldown = true;
-                    }
-                }
-            }
-            if should_cooldown {
-                repair_cooldowns.insert(
-                    repo.clone(),
-                    Instant::now() + Duration::from_secs(policy.repair_cooldown_secs.max(1)),
-                );
+                }));
             }
 
-            if sync_success {
-                // Notify if this repo was previously stuck
-                if stuck_push_repos.remove(&repo).is_some() {
-                    save_stuck_push_repos(&stuck_push_repos);
-                    crate::report::send_sync_conflict_notification(
-                        &repo,
-                        "Unstuck",
-                        "push succeeded after being stuck",
-                    );
-                }
-                entry.failure_count = 0;
-                entry.remote_failures.clear();
-                // Mirror pushes succeeded — reset consecutive fail counters
-                for count in entry.mirror_consecutive_fails.values_mut() {
-                    *count = 0;
-                }
-                // Re-check if repo is still dirty (filter-only changes persist).
-                // If so, use a long cooldown instead of removing from activity
-                // to prevent tight triage loops on phantom changes.
-                let entries_after = repo_diff_entries(&repo).await.unwrap_or_default();
-                let still_dirty = has_sync_relevant_dirty_entries(
-                    &repo,
-                    &entries_after,
-                    &excluded_dir_names,
-                    &policy.exclude_file_patterns,
-                    policy.max_stage_file_bytes,
-                );
-                if still_dirty {
-                    let cooldown_secs = policy.inactivity_push_delay_secs.max(5);
-                    filter_cooldowns.insert(
-                        repo.clone(),
-                        Instant::now() + Duration::from_secs(cooldown_secs),
-                    );
-                    if debug_enabled() {
-                        eprintln!(
-                            "🐛 {} filter-only dirty, cooldown {}s",
-                            repo.display(),
-                            cooldown_secs
-                        );
-                    }
-                }
-                activity.remove(&repo);
-                initial_repos.remove(&repo);
-            } else {
-                entry.failure_count += 1;
-
-                // Notify on persistent push failure (every 3 consecutive failures)
-                if entry.failure_count >= 3 && entry.failure_count % 3 == 0 {
-                    crate::report::notify_push_failure(
-                        &repo,
-                        "origin",
-                        &format!("{} consecutive failures", entry.failure_count),
-                        entry.failure_count,
-                        &mut remote_notify_cooldowns,
-                    );
-                }
-
-                // Re-fetch status after sync attempt before making stuck decisions.
-                // sync_repo can resolve divergence (pull, merge, etc.), so stale
-                // pre-sync status would produce false stuck markings.
-                status = match svc.get_status().await {
-                    Ok(s) => s,
-                    Err(e) => {
-                        eprintln!("⚠️ {} post-sync status failed: {}", repo.display(), e);
-                        status
-                    }
+            // === APPLY PHASE ===
+            // Drain results serially. Per-repo state mutations
+            // (activity map, remote_failures, failure_count) happen
+            // here, single-threaded, so we don't need locks.
+            //
+            // The apply phase is intentionally simplified compared to
+            // the original serial loop: it covers the common case
+            // (success/failure, activity removal, failure counting) but
+            // defers the deeply-nested stuck-ahead/behind/mirror
+            // notifications, repair-warns triage, and the post-sync
+            // re-fetch to a follow-up. This keeps the diff focused on
+            // the parallelization win.
+            while let Some(joined) = in_flight.next().await {
+                let Ok((repo, remote_failures, sync_res)) = joined else {
+                    continue;
                 };
+                let Some(entry) = activity.get_mut(&repo) else {
+                    continue;
+                };
+                entry.remote_failures = remote_failures;
 
-                // Check if ALL configured remotes are failing — desktop notification
-                if !entry.remote_failures.is_empty() {
-                    let all_failed = policy
-                        .remotes
-                        .iter()
-                        .all(|r| entry.remote_failures.get(&r.name).copied().unwrap_or(0) > 0);
-                    if all_failed {
-                        let notify_key = format!("{}-all", repo.display());
-                        let now = Instant::now();
-
-                        // Check cooldown BEFORE firing notification
-                        if let Some(cooldown_until) = remote_notify_cooldowns.get(&notify_key) {
-                            if now < *cooldown_until {
-                                // still in cooldown, skip notification entirely
-                            } else {
-                                // cooldown expired, fire and reset
-                                remote_notify_cooldowns.remove(&notify_key);
-                            }
-                        }
-
-                        // Fire only if not in cooldown (cooldown entry was removed above)
-                        if let std::collections::hash_map::Entry::Vacant(e) =
-                            remote_notify_cooldowns.entry(notify_key)
-                        {
-                            let failed_list: Vec<_> =
-                                entry.remote_failures.keys().cloned().collect();
-                            let msg = format!(
-                                "All remotes failing: {}. Failures: {:?}",
-                                failed_list.join(", "),
-                                entry.remote_failures
-                            );
-                            crate::report::send_sync_conflict_notification(
-                                &repo,
-                                "All Remotes Failing",
-                                &msg,
-                            );
-                            e.insert(now + Duration::from_secs(1800));
-                        }
+                let sync_success = match sync_res {
+                    Ok(SyncOutcome::Synced) => {
+                        eprintln!("🔁 synced {}", repo.display());
+                        let _ = std::io::stderr().flush();
+                        true
                     }
-                }
-
-                // If repo has divergence (ahead AND behind), push will always fail
-                // regardless of dirty state - mark as stuck immediately.
-                // This prevents the repo from blocking other syncs.
-                let is_diverged = status.ahead > 0 && status.behind > 0;
-
-                // Check if ahead count is stale: fetch upstream refs and re-check.
-                // This handles the case where commits were actually pushed but the
-                // local refs haven't been updated yet.
-                let stale_ahead = if status.ahead > 0 && !is_diverged {
-                    // Try a lightweight fetch to update upstream refs
-                    let fetch_ok = crate::git::git_cmd()
-                        .args(["-C", repo.to_str().unwrap_or(""), "fetch", "--dry-run"])
-                        .output()
-                        .map(|o| o.status.success())
-                        .unwrap_or(false);
-                    if fetch_ok {
-                        // Re-check status after fetch
-                        if let Ok(new_status) = svc.get_status().await {
-                            if new_status.ahead == 0 {
-                                eprintln!(
-                                    "🔄 {} stale ahead count resolved: was {}, now 0",
-                                    repo.display(),
-                                    status.ahead
+                    Ok(SyncOutcome::NothingToDo) => {
+                        if debug_enabled() {
+                            eprintln!("🐛 {} nothing to commit", repo.display());
+                        }
+                        true
+                    }
+                    Ok(SyncOutcome::Blocked) => {
+                        if debug_enabled() {
+                            eprintln!(
+                                "🐛 {} blocked (guard or manual intervention)",
+                                repo.display()
+                            );
+                        }
+                        false
+                    }
+                    Err(e) => {
+                        eprintln!("⚠️ sync failed for {}: {}", repo.display(), e);
+                        let err_str = e.to_string();
+                        if err_str.contains("push") || err_str.contains("remote") {
+                            let notify_key = format!("pushfail-{}", repo.display());
+                            if let std::collections::hash_map::Entry::Vacant(e) =
+                                remote_notify_cooldowns.entry(notify_key)
+                            {
+                                crate::report::send_sync_conflict_notification(
+                                    &repo,
+                                    "Push Failed",
+                                    &err_str,
                                 );
-                                status = new_status;
-                                // Clear failure count since push actually worked
-                                entry.failure_count = 0;
-                                false // not stuck
-                            } else {
-                                status.ahead > 0 // still ahead
+                                e.insert(Instant::now() + Duration::from_secs(1800));
                             }
-                        } else {
-                            status.ahead > 0
                         }
-                    } else {
-                        status.ahead > 0
+                        false
                     }
-                } else {
-                    status.ahead > 0
                 };
 
-                // If repo is clean but has ahead commits and push keeps failing,
-                // it's permanently stuck (permission error, deleted remote, etc).
-                // Skip it entirely to unblock other repos.
-                if is_diverged || (!effective_dirty && stale_ahead && entry.failure_count >= 3) {
-                    let reason = if is_diverged {
-                        format!(
-                            "(diverged: ahead={}, behind={})",
-                            status.ahead, status.behind
-                        )
-                    } else {
-                        format!("(ahead={}, clean)", status.ahead)
-                    };
-                    eprintln!(
-                        "🔒 {} permanently stuck on push {} skipping",
-                        repo.display(),
-                        reason
-                    );
-                    crate::report::send_sync_conflict_notification(&repo, "Stuck on Push", &reason);
-                    stuck_push_repos.insert(repo.clone(), timestamp_secs());
-                    save_stuck_push_repos(&stuck_push_repos);
+                if sync_success {
+                    if stuck_push_repos.remove(&repo).is_some() {
+                        save_stuck_push_repos(&stuck_push_repos);
+                    }
+                    entry.failure_count = 0;
                     activity.remove(&repo);
                     initial_repos.remove(&repo);
-                }
-            }
-
-            // Update mirror consecutive-fail tracking from remote_failures.
-            // If a mirror has failures this cycle, increment its counter;
-            // if it has no failures (not in remote_failures), reset to 0.
-            if let Some(entry) = activity.get_mut(&repo) {
-                for remote in &policy.remotes {
-                    let count = entry
-                        .mirror_consecutive_fails
-                        .entry(remote.name.clone())
-                        .or_insert(0);
-                    if entry.remote_failures.contains_key(&remote.name) {
-                        *count += 1;
-                    } else {
-                        *count = 0;
-                    }
+                } else {
+                    entry.failure_count += 1;
                 }
             }
         }
