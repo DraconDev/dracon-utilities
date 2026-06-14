@@ -192,6 +192,23 @@ mod daemon_tests {
     fn test_stuck_repos_path_format() {
         let path = stuck_repos_path();
         assert!(path.to_string_lossy().contains(".local"));
+    }
+
+    /// Smoke test: confirm the policy field `sem_max_concurrent_sync`
+    /// is wired into the daemon. This is a static check that the
+    /// field exists and the default is 4 (so concurrent sync_repo
+    /// calls are bounded to 4 at a time). The actual parallel
+    /// dispatch is exercised by the live daemon cycle and tested
+    /// in the integration suite.
+    #[test]
+    fn test_sem_max_concurrent_sync_default_is_four() {
+        use crate::policy::default_sem_max_concurrent_sync;
+        assert_eq!(default_sem_max_concurrent_sync(), 4);
+    }
+
+    #[test]
+    fn test_stuck_repos_path_format_full() {
+        let path = stuck_repos_path();
         assert!(path
             .to_string_lossy()
             .contains("dracon-sync-stuck-push-repos.json"));

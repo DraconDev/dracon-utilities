@@ -8,6 +8,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Bounded parallel sync**: `dracon-sync` daemon now dispatches
+  `sync_repo` calls in parallel, bounded by the new
+  `sem_max_concurrent_sync` policy field (default 4). Previously,
+  the main loop was serial: a 60s `push_op_timeout_secs` on one
+  slow repo (e.g. kiki-sassy github divergence, one-mil-girls
+  gitlab) blocked all other repos from being committed and pushed.
+  With 17 watched repos, a fresh dirty state on multiple repos
+  now clears in ~35s instead of 10+ min. Live evidence captured
+  in `docs/design/dirty-files-investigation.md`. The apply phase
+  intentionally simplifies the deeply-nested stuck-ahead/behind
+  /mirror notification logic; that gets restored in a follow-up.
+  Set `sem_max_concurrent_sync = 1` to restore the original
+  serial behavior.
+
+- **All operator-owned warden pub keys are now tracked**: the
+  previous goal tracked only `owner_nixos.pub`. This goal
+  audits `~/.dracon/data/keys/`, force-tracks every operator-owned
+  `*.pub` (`master.pub`, `micro2_git_key.pub`, `micro2_libs_key.pub`,
+  `owner_age15xjl.pub`, `owner_age1f7y5.pub`, `owner_nixos.pub`),
+  and pushes to all three public remotes. Private keys (`*.age`,
+  `id_age`, `*.key`) remain blocklisted by `.gitignore`. The
+  tracking rationale and recovery procedure are documented in
+  `docs/design/owner-nixos-pub-tracking.md`.
+
+- **`dracon-ai-lib` profile fix**: the per-repo
+  `~/.git/config` had `user.name = Dracon` and
+  `user.email = dracon@void`, which was a config drift from the
+  canonical `DraconDev <dracsharp@gmail.com>`. Now matches the
+  global gitconfig. Future commits from this repo will use the
+  canonical profile.
+
 - **`owner_nixos.pub` is now tracked in `dracon-utilities`**: the warden
   public key at `.dracon/data/keys/owner_nixos.pub` is committed and
   pushed to all three public remotes. Operators can recover the

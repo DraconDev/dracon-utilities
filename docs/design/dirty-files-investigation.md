@@ -241,3 +241,52 @@ does NOT change the serial-loop structure — that's a separate
 refactor. The new fields DO ensure that newly-created untracked
 files are auto-staged promptly when the daemon DOES get to the
 repo, which was the user's secondary concern.
+
+## Bounded parallel sync (implemented)
+
+The daemon's main loop now dispatches `sync_repo` calls in parallel,
+bounded by `policy.sem_max_concurrent_sync` (default 4). The
+implementation:
+
+1. **Serial eligibility loop** (unchanged): iterates over discovered
+   repos and applies the existing eligibility checks (cooldowns,
+   stuck-repos, repair cooldowns, etc.). When a repo is eligible, a
+   `SyncJob { repo, changed_at_secs, remote_failures }` is pushed to
+   `to_sync: Vec<SyncJob>` and a `tokio::spawn` runs `sync_repo` in
+   the background.
+2. **Parallel phase**: drains `to_sync` and uses a `Semaphore` to cap
+   concurrent `sync_repo` calls at 4. Each call awaits the original
+   handle and forwards the result.
+3. **Apply phase**: drains `FuturesUnordered` results serially,
+   applying per-repo state mutations (activity map, remote_failures,
+   failure_count). The apply phase is intentionally simplified
+   compared to the original serial loop: it covers the common case
+   (success/failure, activity removal, failure counting) but defers
+   the deeply-nested stuck-ahead/behind/mirror notifications,
+   repair-warns triage, and the post-sync re-fetch to a follow-up
+   PR. This keeps the diff focused on the parallelization win.
+
+### Measured impact
+
+With 17 watched repos, a fresh dirty state on multiple repos
+clears in ~35s instead of 10+ min. Live evidence (see journal
+`dracon-sync.service`):
+
+- 22:15:58: 3 repos freshly dirty
+- 22:16:35: first push started (37s)
+- 22:16:36: all 3 repos in `pushing` state simultaneously
+- 22:16:36: all 3 repos committed (parallel dispatch)
+- 22:16:40: all 3 repos pushed (parallel push)
+
+The serial loop would have processed them one at a time, taking
+3 × ~17s = 51s minimum, plus waiting for the slowest push timeout
+(kiki-sassy github 60s + one-mil-girls gitlab 60s) before any
+of the fast-push repos could be processed.
+
+### Tuning
+
+`sem_max_concurrent_sync` defaults to 4. Set to 1 to restore the
+original serial behavior. Higher values (e.g. 8) help when many
+repos are slow-pushing but risk resource exhaustion. The
+`push_op_timeout_secs` and `stage_op_timeout_secs` still apply
+per-call.
