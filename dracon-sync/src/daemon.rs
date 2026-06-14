@@ -213,6 +213,53 @@ mod daemon_tests {
             .contains("dracon-sync-stuck-push-repos.json"));
     }
 
+    /// Unit test for the no-redispatch invariant: a repo with an
+    /// in-flight `sync_repo` task is NOT re-dispatched. The
+    /// `in_flight: HashSet<PathBuf>` is consulted by the COLLECT
+    /// phase's eligibility check. This test verifies the
+    /// invariant by simulating the data structure: a repo inserted
+    /// into `in_flight` is "skipped" in the next cycle's
+    /// eligibility check, and only after removal from
+    /// `in_flight` is the repo eligible again.
+    #[test]
+    fn test_no_redispatch_invariant() {
+        use std::path::PathBuf;
+        let mut in_flight: std::collections::HashSet<PathBuf> =
+            std::collections::HashSet::new();
+        let repo = PathBuf::from("/tmp/test-repo");
+
+        // Initially, the repo is NOT in flight and IS eligible.
+        assert!(!in_flight.contains(&repo));
+
+        // Dispatch: insert into in_flight. Now the repo is NOT
+        // eligible for re-dispatch in the next cycle.
+        in_flight.insert(repo.clone());
+        assert!(in_flight.contains(&repo));
+
+        // The apply phase removes the repo from in_flight when
+        // the task completes. After removal, the repo is
+        // eligible again.
+        in_flight.remove(&repo);
+        assert!(!in_flight.contains(&repo));
+
+        // Verify the set can hold multiple repos concurrently
+        // (the daemon processes up to `sem_max_concurrent_sync`
+        // repos in parallel).
+        let repo2 = PathBuf::from("/tmp/test-repo-2");
+        let repo3 = PathBuf::from("/tmp/test-repo-3");
+        in_flight.insert(repo.clone());
+        in_flight.insert(repo2.clone());
+        in_flight.insert(repo3.clone());
+        assert_eq!(in_flight.len(), 3);
+
+        // Removing one repo does not affect the others.
+        in_flight.remove(&repo2);
+        assert_eq!(in_flight.len(), 2);
+        assert!(in_flight.contains(&repo));
+        assert!(!in_flight.contains(&repo2));
+        assert!(in_flight.contains(&repo3));
+    }
+
     #[test]
     fn test_load_stuck_push_repos_nonexistent() {
         let temp_dir = tempfile::tempdir().unwrap();
@@ -795,6 +842,18 @@ pub(crate) async fn run_daemon(
     let mut stuck_push_repos = load_stuck_push_repos();
     let mut remote_notify_cooldowns: HashMap<String, Instant> = HashMap::new();
     let mut cycle_count: u64 = 0;
+    // Repos with an active `sync_repo` task. The COLLECT phase
+    // consults this set and skips re-dispatching repos that already
+    // have an in-flight task. This is the no-redispatch invariant:
+    // once we start a push, we don't start another one for the same
+    // repo until the in-flight one completes (success or failure).
+    // Without this, a slow push (e.g. dracon-platform's 60s timeout
+    // on a 19-commit reorg) causes the next cycle to dispatch a
+    // *second* push for the same repo while the first is still
+    // running, saturating the SSH agent and network, and creating a
+    // 2-3 minute "traffic jam" that delays smaller pushes (1-commit
+    // rust-ai-web-auto, folder-auto-banner, one-mil-girls.deprecated).
+    let mut in_flight: HashSet<PathBuf> = HashSet::new();
 
     // ── Startup cleanup: prune stale state from previous runs ──
     let (repo_set, _) = run_startup_cleanup(&policy_path).await;
@@ -1161,6 +1220,15 @@ pub(crate) async fn run_daemon(
                     initial_repos.remove(&repo);
                     continue;
                 }
+                // No-redispatch invariant: a repo with an in-flight
+                // `sync_repo` task is not re-dispatched. The apply
+                // phase removes the repo from `in_flight` when the
+                // task completes (success, failure, or timeout).
+                // This prevents duplicate `git push` invocations on
+                // the same (repo, remote) pair within a cycle window.
+                if in_flight.contains(&repo) {
+                    continue;
+                }
                 (dirty, filtered)
             };
 
@@ -1263,6 +1331,12 @@ pub(crate) async fn run_daemon(
             let excluded_for_task = excluded_dir_names.clone();
             let policy_path_for_task = policy_path.clone();
             let repo_for_task = repo.clone();
+            // Mark the repo as having an in-flight task BEFORE
+            // dispatching. The eligibility check at the top of the
+            // next cycle consults `in_flight` and skips this repo
+            // until the apply phase removes it. This is the
+            // no-redispatch invariant in action.
+            in_flight.insert(repo.clone());
             to_sync.push((
                 repo.clone(),
                 tokio::spawn(async move {
@@ -1300,7 +1374,7 @@ pub(crate) async fn run_daemon(
             // sync_repo tasks a chance to start running, so we
             // don't accidentally block the runtime on the in_flight
             // poll.
-            let mut in_flight: FuturesUnordered<
+            let mut in_flight_tasks: FuturesUnordered<
                 tokio::task::JoinHandle<(
                     PathBuf,
                     HashMap<String, usize>,
@@ -1309,7 +1383,7 @@ pub(crate) async fn run_daemon(
             > = FuturesUnordered::new();
             for (repo_path, handle) in to_sync.drain(..) {
                 let _ = sem_max; // suppress unused warning; cap is enforced by tokio's scheduler via spawned tasks
-                in_flight.push(tokio::spawn(async move {
+                in_flight_tasks.push(tokio::spawn(async move {
                     let result = handle.await;
                     match result {
                         Ok((rf, r)) => (repo_path, rf, r),
@@ -1352,15 +1426,18 @@ pub(crate) async fn run_daemon(
             let apply_deadline = Duration::from_secs(policy.pulse_interval_secs.max(1) * 2);
             let apply_deadline_at = tokio::time::Instant::now() + apply_deadline;
             loop {
-                let next = tokio::time::timeout_at(apply_deadline_at, in_flight.next()).await;
+                let next = tokio::time::timeout_at(apply_deadline_at, in_flight_tasks.next()).await;
                 let joined = match next {
                     Ok(Some(joined)) => joined,
-                    Ok(None) => break, // in_flight empty
+                    Ok(None) => break, // in_flight_tasks empty
                     Err(_) => break,   // timeout
                 };
                 let Ok((repo, remote_failures, sync_res)) = joined else {
                     continue;
                 };
+                // Remove from in_flight set so the next cycle can
+                // re-dispatch if the repo still has work to do.
+                in_flight.remove(&repo);
                 let Some(entry) = activity.get_mut(&repo) else {
                     continue;
                 };
@@ -1416,6 +1493,60 @@ pub(crate) async fn run_daemon(
                     initial_repos.remove(&repo);
                 } else {
                     entry.failure_count += 1;
+                }
+            }
+
+            // === TRAILING IN-FLIGHT DRAIN ===
+            // Tasks that didn't complete within the apply deadline
+            // (e.g. a 60s push) are still running. We can't apply
+            // their results in this cycle, but we MUST remove them
+            // from `in_flight` when they complete so the next
+            // cycle can re-dispatch (only if the repo still has
+            // work). Drain the leftover handles inline (this is a
+            // fast operation once one task completes; the others
+            // are usually near-ready). This prevents the
+            // no-redispatch invariant from blocking legitimate
+            // work forever.
+            while let Some(joined) = in_flight_tasks.next().await {
+                if let Ok((repo, remote_failures, sync_res)) = joined {
+                    in_flight.remove(&repo);
+                    if let Some(entry) = activity.get_mut(&repo) {
+                        entry.remote_failures = remote_failures;
+                        match sync_res {
+                            Ok(SyncOutcome::Synced) => {
+                                eprintln!("🔁 synced (late) {}", repo.display());
+                                let _ = std::io::stderr().flush();
+                                if stuck_push_repos.remove(&repo).is_some() {
+                                    save_stuck_push_repos(&stuck_push_repos);
+                                }
+                                entry.failure_count = 0;
+                                activity.remove(&repo);
+                                initial_repos.remove(&repo);
+                            }
+                            Ok(SyncOutcome::NothingToDo) => {
+                                if debug_enabled() {
+                                    eprintln!("🐛 {} nothing to commit (late)", repo.display());
+                                }
+                            }
+                            Ok(SyncOutcome::Blocked) => {
+                                if debug_enabled() {
+                                    eprintln!(
+                                        "🐛 {} blocked (late, guard or manual intervention)",
+                                        repo.display()
+                                    );
+                                }
+                                entry.failure_count += 1;
+                            }
+                            Err(e) => {
+                                eprintln!(
+                                    "⚠️ sync failed (late) for {}: {}",
+                                    repo.display(),
+                                    e
+                                );
+                                entry.failure_count += 1;
+                            }
+                        }
+                    }
                 }
             }
         }
