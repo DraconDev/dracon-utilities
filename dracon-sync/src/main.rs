@@ -557,6 +557,11 @@ async fn main() -> Result<()> {
             }
             if warns {
                 run_repair_warns(&policy_path, !dry_run, None, false).await?;
+                if dry_run {
+                    println!(
+                        "ℹ️ invoked via sync-now --dry-run; rerun `dracon-sync sync-now --warns` to execute"
+                    );
+                }
                 return Ok(());
             }
             let policy = SyncPolicy::load(&policy_path)?;
