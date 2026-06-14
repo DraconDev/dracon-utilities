@@ -479,14 +479,15 @@ pub(crate) struct SyncPolicy {
     /// When false, use `dracon-sync scaffold` to apply on demand.
     #[serde(default = "default_true")]
     pub(crate) standard_files_auto: bool,
-    /// `dracon-sync repos` "active" threshold (in minutes). A repo whose
-    /// last commit is more recent than this is labelled `active` in the
-    /// derived state column. Default: 5 minutes.
+    /// `dracon-sync repos` "active" threshold (in minutes). A repo is
+    /// labelled `active` only when it is clean, in sync, and both commit
+    /// and push are within this window. Default: 5 minutes.
     #[serde(default = "default_active_commit_minutes")]
     pub(crate) active_commit_minutes: u64,
     /// `dracon-sync repos` "committing" threshold (in minutes). A repo
-    /// whose last commit is between `active_commit_minutes` and this
-    /// value is labelled `committing`. Default: 60 minutes.
+    /// with unpushed commits, or whose last commit is between
+    /// `active_commit_minutes` and this value, is labelled `committing`.
+    /// Default: 60 minutes.
     #[serde(default = "default_committing_commit_minutes")]
     pub(crate) committing_commit_minutes: u64,
     /// `dracon-sync repos` "cold" threshold (in minutes). A repo whose

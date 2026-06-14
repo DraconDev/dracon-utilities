@@ -444,7 +444,7 @@ for bin in dracon-sync dracon-system dracon-warden; do
     if [ -n "$running" ] && [ "$running" != "$expected" ]; then
         echo "⚠️  WARNING: $bin (PID $pid) running from $running, not $expected"
         echo "   This means a stale version is still active. Restart the service:"
-        local svc=""
+        svc=""
         svc=$(systemctl --user list-units --type=service --state=running | grep -o "$bin[^ ]*\.service" | head -1 || true)
         if [ -n "$svc" ]; then
             echo "   systemctl --user restart $svc"

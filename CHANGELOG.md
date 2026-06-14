@@ -15,8 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `active`, `committing`, `pushing`, `synced`, `stalled`, `dirty`,
   `untracked-only`, `intentional`, `failed`, `idle`, `cold`, and
   `healthy`. The `stalled` label specifically surfaces the
-  "stalling for minutes" case the user asked about: dirty AND no
-  recent commit AND no recent push. Thresholds
+  "we changed files but then stopped" case the user asked about:
+  dirty tracked/staged work with no unpushed commits. Thresholds
   (`active_commit_minutes`, `committing_commit_minutes`,
   `cold_commit_minutes`) live in the global policy with optional
   per-repo overrides in `RepoPolicyOverride`. The `--json` output
@@ -24,6 +24,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   every row. Documented in `docs/design/repos-state-cause.md`.
 
 ### Fixed
+- **`dracon-sync` `STATE` semantics**: A dirty tracked/staged repo with
+  no unpushed commits now classifies as `stalled` even when the previous
+  HEAD commit was recent. The `active` label now means "freshly synced"
+  (clean, in sync, commit and push both within `active_commit_minutes`),
+  not "the user is still editing right now". Documented in
+  `docs/design/repos-state-cause.md`.
+
 - **`dracon-sync` `PUSHED` column missing for freshly-cloned repos**:
   The `last_push_for_branch` helper used `git reflog show origin/<branch>
   --format=%cr -1`, which returns empty output for repos whose
@@ -50,6 +57,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (set upstream)" hint was misleading for repos the operator has
   intentionally left unconnected). Documented as invariant #6 in
   `docs/design/sync-push-classification.md`.
+
+- **`install.sh` dry-run daemon verification**: The running-daemon
+  verification block used `local` at top level, which broke
+  `./install.sh --dry-run` under shells where `local` is only valid
+  inside functions. The service-name variable is now plain shell state.
 
 ### Fixed
 - **`dracon-sync` system-repo path bug**: The example template's

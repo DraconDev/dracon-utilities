@@ -7,7 +7,7 @@
 The `dracon-sync repos` table used to expose the raw signals (last-commit
 time, last-push time, dirty count, ahead/behind, push status) without any
 synthesis. The user could not tell at a glance whether a repo was
-"actively being worked on", "stalling", or "cold idle". The `STATE`
+freshly synced, waiting on the daemon, stalled, or cold idle. The `STATE`
 column combines those signals into a small fixed vocabulary the user can
 scan without thinking.
 
@@ -17,12 +17,12 @@ The classifier returns exactly one of these labels per repo:
 
 | Label | Trigger | Colour | Icon |
 |-------|---------|--------|------|
-| `active` | last commit in the last `active_commit_minutes` (default 5m) | green | 🟢 |
-| `committing` | last commit in the last `committing_commit_minutes` (default 60m) but not active; clean | yellow | 🟡 |
+| `active` | clean, in sync, and both commit and push are within `active_commit_minutes` (default 5m) | green | 🟢 |
+| `committing` | unpushed commits are waiting, or the last commit is within `committing_commit_minutes` but outside the active window | yellow | 🟡 |
 | `pushing` | `push_status = PENDING` (the daemon is mid-cycle) | yellow | 🟣 |
-| `synced` | clean, in sync (`ahead=0, behind=0`), last commit recent | green | 🟢 |
-| `stalled` | dirty (modified > 0 or staged > 0) AND no recent commit AND no recent push | red | 🔴 |
-| `dirty` | has uncommitted changes but otherwise in good shape | yellow | 🟠 |
+| `synced` | clean, in sync, commit/push within `committing_commit_minutes` but outside the active window | green | 🟢 |
+| `stalled` | dirty tracked/staged work, or behind/upstream state, is sitting with no push progress | red | 🔴 |
+| `dirty` | dirty tracked/staged work that does not fit the stalled/committing cases | yellow | 🟠 |
 | `untracked-only` | only untracked files, no modified/staged | white | ⚪ |
 | `intentional` | repo flagged `intentional_no_upstream = true` | magenta | 🟣 |
 | `failed` | `push_status = FAIL` or `STUCK` | red | ⛔ |
@@ -42,22 +42,25 @@ labels take precedence over computed fallbacks:
    wins over the computed staleness labels.
 3. `stalled` is the user's "stalling for minutes" pain case, so it
    fires before the looser `committing` and `dirty` fallbacks. The
-   `stalled` label is *narrow* by design: it requires both
-   `modified > 0` and *no* recent activity, so a repo with active
-   commits in the last 5 minutes never looks stalled.
-4. `active` fires when the last commit is within the active window
-   and the row is not already classified.
-5. `synced` is the "clean + recent + in-sync" case and renders
-   green, distinguished from `active` by `ahead=0, behind=0`.
-6. `committing` covers the case where the last commit is in the
-   committing window but the row did not match `active` or `synced`.
-7. `untracked-only` is reported as such even when the last commit
-   is recent, because the operator's question is "do I have
-   uncommitted work?" and untracked files do not count.
-8. `dirty` is the broad fallback for "I have uncommitted changes
-   but the classifier did not match any more specific case".
-9. `cold` fires when the last commit is older than the cold
-   threshold and the row is otherwise clean.
+   `stalled` label is *not* based on the age of the previous HEAD
+   commit: if tracked/staged work is sitting in the working tree with
+   no unpushed commits, the repo is stalled even when the last commit
+   was only a few minutes ago.
+4. `untracked-only` is reported as such even when the last commit is
+   recent, because the operator's question is "do I have uncommitted
+   work?" and untracked files do not count.
+5. `active` fires only for clean, in-sync repos whose commit and push
+   are both inside the active window. It means "freshly synced", not
+   "the user is still editing files right now".
+6. `synced` is the clean + in-sync case whose commit/push is within
+   the committing window but outside the active window.
+7. `committing` covers unpushed commits waiting to settle, or a clean
+   repo whose last commit is in the committing window but outside the
+   active window.
+8. `dirty` is the broad fallback for dirty tracked/staged work that
+   does not match the stalled/committing cases.
+9. `cold` fires when the last commit is older than the cold threshold
+   and the row is otherwise clean.
 10. `idle` is the final "clean, no recent activity" label, and
     `healthy` is the universal fallback.
 
@@ -100,7 +103,7 @@ implementation note.
 
 ## Verification
 
-The classifier has 12 unit tests covering each label plus the per-repo
+The classifier has 13 unit tests covering each label plus the per-repo
 override path. The `last_push_for_branch` fix has its own regression
 test that constructs a freshly-cloned repo with an empty reflog for
 `origin/main` and asserts the helper returns a real date.
