@@ -1496,18 +1496,31 @@ pub(crate) async fn run_daemon(
                 }
             }
 
-            // === TRAILING IN-FLIGHT DRAIN ===
+            // === TRAILING IN-FLIGHT DRAIN (bounded) ===
             // Tasks that didn't complete within the apply deadline
             // (e.g. a 60s push) are still running. We can't apply
             // their results in this cycle, but we MUST remove them
             // from `in_flight` when they complete so the next
             // cycle can re-dispatch (only if the repo still has
-            // work). Drain the leftover handles inline (this is a
-            // fast operation once one task completes; the others
-            // are usually near-ready). This prevents the
-            // no-redispatch invariant from blocking legitimate
-            // work forever.
-            while let Some(joined) = in_flight_tasks.next().await {
+            // work). Drain the leftover handles with a bounded
+            // deadline so a single slow push doesn't block the
+            // main loop indefinitely. We use the same deadline
+            // policy as the apply phase (`pulse_interval_secs * 2`)
+            // so the cycle time is bounded to ~2-3× pulse interval
+            // regardless of how many slow pushes are in flight.
+            let trailing_deadline = Duration::from_secs(policy.pulse_interval_secs.max(1) * 2);
+            let trailing_deadline_at = tokio::time::Instant::now() + trailing_deadline;
+            loop {
+                let next = tokio::time::timeout_at(
+                    trailing_deadline_at,
+                    in_flight_tasks.next(),
+                )
+                .await;
+                let joined = match next {
+                    Ok(Some(joined)) => joined,
+                    Ok(None) => break,  // all drained
+                    Err(_) => break,    // trailing deadline hit
+                };
                 if let Ok((repo, remote_failures, sync_res)) = joined {
                     in_flight.remove(&repo);
                     if let Some(entry) = activity.get_mut(&repo) {
