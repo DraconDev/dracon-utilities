@@ -111,6 +111,10 @@ dracon-sync daemon --interval-secs 30
 # Sync a specific repository now
 dracon-sync sync-now ~/Dev/my-project
 
+# Sync repos currently reported as WARN (dirty-only triage)
+dracon-sync sync-now --warns
+dracon-sync sync-now --warns --dry-run
+
 # Edit the sync policy
 dracon-sync config edit
 

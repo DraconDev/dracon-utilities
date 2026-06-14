@@ -68,8 +68,10 @@ recently and failed", and the four code sites are forced to consult it.
    window passes without push progress. This is the "we changed files
    but then stopped" case the operator asked about. The previous HEAD
    commit timestamp is not treated as proof that someone is still
-   editing. Clean quiet repos become `idle` after the committing window
-   and `cold` after the cold window. The thresholds
+   editing. Dirty rows are handled by normal sync after the configured
+   settling delay, and `sync-now --warns` forces the same dirty-only
+   triage immediately. Clean quiet repos become `idle` after the
+   committing window and `cold` after the cold window. The thresholds
    (`active_commit_minutes`, `committing_commit_minutes`,
    `cold_commit_minutes`) live in the global policy with optional
    per-repo overrides in `RepoPolicyOverride`.

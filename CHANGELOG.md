@@ -17,8 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `healthy`. The `stalled` label specifically surfaces the
   "we changed files but then stopped" case the user asked about:
   dirty tracked/staged work older than `committing_commit_minutes`.
-  Recent dirty work is labelled `dirty` so normal sync/repair-warns
-  triage can pick it up without a red stalled alarm. Thresholds
+  Recent dirty work is labelled `dirty` so normal sync can pick it up
+  after the configured settling delay without a red stalled alarm;
+  `sync-now --warns` forces the same dirty-only triage immediately.
+  Thresholds
   (`active_commit_minutes`, `committing_commit_minutes`,
   `cold_commit_minutes`) live in the global policy with optional
   per-repo overrides in `RepoPolicyOverride`. The `--json` output

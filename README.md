@@ -48,6 +48,7 @@ dracon-sync repos           # One-shot repo report
 dracon-sync health          # Daemon health check
 dracon-sync daemon          # Run continuous sync loop
 dracon-sync sync-now ~/Dev/my-project
+dracon-sync sync-now --warns       # handle current WARN rows now
 dracon-sync config validate
 ```
 

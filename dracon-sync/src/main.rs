@@ -546,7 +546,11 @@ async fn main() -> Result<()> {
         Command::Daemon { interval_secs } => {
             run_daemon(policy_path, interval_secs).await?;
         }
-        Command::SyncNow { repos, warns, dry_run } => {
+        Command::SyncNow {
+            repos,
+            warns,
+            dry_run,
+        } => {
             if let Some(reason) = freeze_reason(&policy_path) {
                 println!("⏸️ sync frozen ({})", reason);
                 return Ok(());

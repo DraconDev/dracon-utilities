@@ -222,7 +222,7 @@ auto_create = false
 # [[publish_targets]]
 # name = "crates-io"
 # registry = "crates-io"          # crates-io | npm | pypi
-# [DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB5UVBmU1E4YWpQZHExaDNZYmV4Zm0xS2tseTZwUE4zV0lHYzh0RGZhUkVZCi9Vd0hNWHdMa01peHZoTjIrQUhSMnlRR0Z2a2JRbnE0c3ZnMDczQjVHbjgKLT4gWDI1NTE5IHBsWC8wMTE2eVdiOTloeTd1RGhlZU9OdUJseU41QW02Nzg5Mnh4NGJRa1kKYklFK1M2L3A1YTlHZDBBY2lidWkva0krZnZDOG5qMTZJbkZDRW1nQTNCYwotPiBYMjU1MTkgRkRCMGx1KzVha3pId3dQTkdzOFlnWDlFMFNEOXZaZHpRckVIUmNFc3FuawpyQml6d0tLVFNtTEg3TVVJV092QXEydVRUWGVLT25iU2hpK3RqV2hnOUxJCi0+IFgyNTUxOSB3am5SbjROeWRvNUVxdjEyRlo3QUNqMi8xSHRDUEpQeGU4S2dvd2dYZVhBCmRUZFowUzZ3aXlaU3kxaHBPZWxPczQvNzdHclZXRlJuSGhiSG5Wa1pQdFEKLT4gWDI1NTE5IDJSS2Y0YitIajZUSUtuaWhQL0J4WXlnd0ExUXlEQnI5MGVRcWFmczJIQjAKTXBLR3ZudUE3bXBwRTVsRUYvRklVRlU4am9MdjNJQUp6ZHBtQjgrREFyVQotPiBYMjU1MTkgbHlJSVRQZXhYbEVWd3g0ZWwxcjBmUzZNMmI0azkyZ0lRTWFJYzVqN3lDRQpmNGxFQ1NGc0dvZ2RpUlNXUU40TjgxYnFnaldQdkkvMWNlWWtnM09IMEZzCi0+IFIiWn06TTJnLWdyZWFzZSAqRlE+RSBeQ3I/LiYvIDFFL2wgYEFiaF52CnFUQk16OWd0TmhZMml4ZnBWVTEvcDRCODBCUVRab0hCMk1pRTBoaHVSRTRScmQwVjM0UjlwQQotLS0gcTRrM2tqZ2g0NE96S0dPb0Y2Q1ExVEZBcnNkQUppQjFkYVNGUFFSSy9KRQoB+ohk7k4wgC+xix3yoblGrIuKjNrmj2C8oGOINrK2TByGJeVsUI+FqUshl+43qwI29R2SH1fcSqvJgMfQGalnbhAV9/0=]   # env var name (token in secrets/cratesio.env)
+# [DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBTUUZsbUZUY3Y5V3pDY0FhdUFjUkpaYUNzM21CK1AveFRvb0pPR00rMzIwCkRyaU0vcHVzdGdjQTNGeHJmbFBNejBWVEJEQ1NyZnFWemZOSlB2SWM4Q00KLT4gWDI1NTE5IDhrM3hyakpFV2s2UmpiN1BibkE0aFdIRjBPOWV6MXJDVHVSeHFXUkZKMVkKRGZ2Zm5aVnhoZEhnVnBiTWNXUFdQbWcxZE84T1c3djZlY0daZk1CRGNINAotPiBYMjU1MTkgVStoenFVRHJHNDZHT2x2ajNDQTdPTmhLaG44Zk5FaEtJWG1FYXgrSE1pTQpocXBEenBMQUtlYzd6QUQ4Q0NqTEpzN3FacS9TZU1rcWp0S2hmMjhKN1B3Ci0+IFgyNTUxOSBYem9ndUZPd2xrbEhPcmJwQll4c2NSc1VQU2V2TGxXS25WeFAyVWlYUGtvCjdvWjFyZU8vV1JUOTBXaW9RUHhZUUF4eEZUOUtva1lBaVVuNFRyWlgrcVUKLT4gWDI1NTE5IG5pbVlqMkxXbmQ3VVlYVlQ3UXRYakswa3dYYXZ5bTJjZXRDd1dQSlBla2sKMzFiUkU3TS8zWTFyblZscXFyc1pCWHRiSGpibTZtMXJWWXBmZ3QwZnM0QQotPiBEQC1ncmVhc2UgUT4gNy08UDQgWkwgOyM0Zn4qCjBMRFU0OXFJSVpLbmJoNUdObzRBT1dpb29xS2I0UQotLS0gZlV6d1NIdmpwZ01rbVdKZE9EZForV0NIUWd0YnRHQWpLUk5CZk1RTXh1awpCb/r4qnih4sRQX2SnFcb2k8COZvundXS8q+/tQOYmitUO2P7g9BJrlAg/4dwH5R70BIm7Q5cYmFOanuBBlpKZSZvOL0E=]   # env var name (token in secrets/cratesio.env)
 # publish_timeout_secs = 300
 #
 # [[publish_targets]]
@@ -368,7 +368,7 @@ auto_create = false
 #   synced    — clean, in sync, commit/push within `committing_commit_minutes` but outside active
 #   stalled   — dirty tracked/staged work older than `committing_commit_minutes`
 #               (this is the "we changed files but then stopped" case)
-#   dirty     — recent dirty tracked/staged work expected to be picked up by normal sync
+#   dirty     — recent dirty tracked/staged work; auto-handled after settle or force with `sync-now --warns`
 #   untracked-only — only untracked files, no modified/staged
 #   intentional — repo flagged `intentional_no_upstream = true`
 #   failed    — push_status = FAIL or STUCK
