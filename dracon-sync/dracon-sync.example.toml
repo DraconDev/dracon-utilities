@@ -222,7 +222,7 @@ auto_create = false
 # [[publish_targets]]
 # name = "crates-io"
 # registry = "crates-io"          # crates-io | npm | pypi
-# [DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBQVS9zNmtUTkU5RXVqczVxTnBBVDcxMElPSVQramwvVkZqZ2dSTkF5MGdzClVEakFYVTdkWFBXNi9FTDc4VUc5WEV5TElBZ3lMOUlvenZhQ3k5N1lMajAKLT4gWDI1NTE5IDZKYldIZU5rOE1acmRiTmVmeGR4dDJIZDRGTFhXclhCQjl6eW9WL1ZvU1UKakVBNnZaMGpCZndGckpYaFhCQmNoNi94SkI3U0wwUllLR0grdktjZ3ZDQQotPiBYMjU1MTkgbGc1TUhSdHB5R1BEMmRORi9Oa0h5QklkU3F6OVJuMUczcHlwMUltNnF4cwpna0M1UTBwajI2dGtORy9OOXhaSVdrZlhuK1JFYVJ4R0ZNK2NUNDlTWk9VCi0+IFgyNTUxOSB1TE9LeUpqdjUzcTRuRVI2a1FIaEMrRG15d3B4U3c3ZkhLMndFYUFkeFEwCm8xNCtMZXluS1diT2l0OXBwOFBnWThHbGVpK0NIYThqZGlXaDBUYU5taHcKLT4gWDI1NTE5IDZPVlpSc0djejhkVGJqSlNMTjAxVTJmVmFjWUZjNERxZEVESS9tQ2lpbDQKT1dFUDM3QnVRTGh4RjM0Q3o1VVorajBuNUhqR0xWQ3I1bmdhR3F1K29vWQotPiBRRlN4XC1ncmVhc2UKYjEwCi0tLSBkTFY1NmV3R0dKY0RxeGhBSDNDUjJaeFgzaWdaUW9JVGpwVTVSODlzWmdRCr3Imv0RT923ofikZZdp9YVF+R+ABKGJXD2FxDazHUKrKL6Q/2fTaKeRKIH9/YxbEtWhfmVK9sHnmYwC0wfxx8+gZI2aHg==]   # env var name (token in secrets/cratesio.env)
+# [DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB3SU1jeU12Z01yQmtVRHZYQzdWeFlGbTZNZHJTdVdnUTcxRjRjaWY2bmhNCmZNWDU1aXpaaWFOWUo1T1pIOVhRaWpDQ0V5OHRidGx5cHMrVWkzdmgrdUEKLT4gWDI1NTE5IDBQUlZBTWR0ZVN3cjFQbHF2TDRnYVV6V2t4Q2ZlSHlNNkVJU3BuWEpEMTAKbldFZ2czYk0xb01yYVpIS1pydGY2czdkNDNzNmVSaFpraVpIYkVGaFovawotPiBYMjU1MTkgVy8vK3JncUMrTWhnaVdYYVFLZTcxWkFPV21melFJaENDVEhZR0h1R1lESQpJQk1ONUlmWk9zYzkyQ0MwbjZWYzN6SXFWYVdYNzBveCs3OVByU1pqbkRvCi0+IFgyNTUxOSBJMDk3TUZGd3JuUTJlWnozUEUvemVpWFZvR0xGdUxpMXZtdHQ4UjJBeHpzClp3L1RTUjdJQ0NtYkRwZVM5THNHWGxoRXVVOUQ4OUxHaHU2dzhaeGpPUWcKLT4gWDI1NTE5IDlubU9KRVZDeTh3dTZidmRTMEFyR3h6RWFIK3FJY0RhbTZDeWR1b0tsV0EKVHNJN3hRb1pxei9JeVNiZDMwVXZVZDk5VHpjcy9PbVVvMUExOTM1eTdkWQotPiAlNS1ncmVhc2UgcDdbTCBsdH5ULHAKRjhIVkp4OWhnVW5xSkFIT3RWZWtKUQotLS0gd1QwS3RkRDROL2dyRTltM05kZmlkbFo3bHZNeVppdHo1eVViWTYxQkNtMAqZZuIrjw4j1GN5UUBHSlPwQ/6C+OBluHlUCe/LtrGk7PojgvsPMd6V4yCwZMLxHRLGoZShO/oEi6At9ps+5vD/EBj4JrY=]   # env var name (token in secrets/cratesio.env)
 # publish_timeout_secs = 300
 #
 # [[publish_targets]]
@@ -362,10 +362,12 @@ auto_create = false
 # last-commit time, last-push time, dirty state, ahead/behind, and push
 # status into a single label the user can scan at a glance:
 #
-#   active    — clean, in sync, commit and push both within `active_commit_minutes`
+#   working   — clean, in sync, commit and push both within `active_commit_minutes`
+#               (the daemon is currently working through this repo)
 #   committing — unpushed commits waiting, or last commit within `committing_commit_minutes`
 #   pushing   — push_status = PENDING (the daemon is mid-cycle)
 #   synced    — clean, in sync, commit/push within `committing_commit_minutes` but outside active
+#               (longer-term clean state, not just synced)
 #   stalled   — dirty tracked/staged work older than `committing_commit_minutes`
 #               (this is the "we changed files but then stopped" case)
 #   dirty     — recent dirty tracked/staged work; auto-handled after settle or force with `sync-now --warns`
