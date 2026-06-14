@@ -222,7 +222,7 @@ auto_create = false
 # [[publish_targets]]
 # name = "crates-io"
 # registry = "crates-io"          # crates-io | npm | pypi
-# [DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAxUTd5SHZCWGpUV2kxeGlQRmg0aUN5K2hXU09uaG8wRjF2eXZxZmw1R0NzCkFGYzRyOUwrV3pIU09XNTZpamhkUmJZQVovUi9FV3F0OHowTlNKV0hweGsKLT4gWDI1NTE5IFpFYTd5RlRyNUlaZldtUDdPS3ViM1VWdVRaYjhFUWQ2cWR1bHhTdkJxUVkKb3FUZkhQSnVmdlJWMFlza1FSa3RuK2NDeGhzRjNqTXI2VUpYQThHUUY3RQotPiBYMjU1MTkgU1BDRzJaVlBFaGpZNk5USmR3aTg3TW5FS2VFY2QyMnljNmhVamJha3BEMApSSVArYkNYS3NFVGJzVWliYjQ2L09KUGJYRnZKc3FtMVo2YjFNbGxsYlJBCi0+IFgyNTUxOSBFSGN1SEczMEd1elE5S1FQd3VYV3JUakhUdDdJbFRxbDRuZjkzbThtKzAwCmtKSlg0RExaZlFxWENGdTBGUm13akw0cGRIdFE3Umpnc1VHYmdVbUN1WXMKLT4gWDI1NTE5IDdmQXJCUU9sZjRJS0pQdUNVMXcrNExWNFNmbXpIdTh6NUdlQ216Wit3QzAKdHphaktWb0xCaDFLWnR4OS91ZjdTZDZQQXlnUGlHcjEvQUorVXVQaUNjNAotPiBmJlEtZ3JlYXNlIEFwVChOdiBiCi9MVUdmcmtiaC9BYitady9GU1JVNjFuN3lMWFl4dzBQNFpqQThHTkJMNFVHbC8yajRoeThlQ2VMaEQwYndRRQotLS0gdUhxMEpvdnMwVjg4dG51SXpacHZQSDZPOC90NmovamdoM1ArSGM4bUdVNArDxI36tjzu4XgVssAfQj9H7Xp9Pm574IqYIkZsv5Y51KQPaoOLEvZs4CdPzOTyVbtNhWWa4AbRk/cMF2SNtKumKjU6WD0=]   # env var name (token in secrets/cratesio.env)
+# [DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBKcjFQNzc0YWVrRUY4UUdGaS9FWTF4NU1jVVZaUStLd1lNT2lkTlNxMVQwCnY0SmpKTjlicjdyVDY1ek5va3Q0YmdFT3M0TzV6eHN3TjhMZEVyRENBSjgKLT4gWDI1NTE5IGNlNjFQeW1EeHlYR2ZVOEVFdEtsUk5LbDZsWCtJOFdXYmtITWM1bzlObE0KMGcxOWpncGxNV3l1NDBScWxPSlRmYmtYclpDS1BIWkdSMVVncU05aWg0WQotPiBYMjU1MTkgbGJqRStBYjFBYnFaYTJIVjNIZTNncDhXSVRaclFkdnFyUkFua3ZPUi9UTQpWWnNwb0NBN1R3Q0wzVUZwaVRIM1BjcVVya01BaTRHaGc5U1N5Nm94bTlzCi0+IFgyNTUxOSBKd1VEMzZOUnFCR2JSdVNLTkVHZTZZT1VwbXlyak9lNUJaaktoOGtsZEhBCkdIWGZzS2dPandXUy9SL3VyT1h4c3J3cytYQVBhLzJDMEZyY25lTXlGajAKLT4gWDI1NTE5IER3ZTZDbVNlVW4yN2NmK25PU1Zxdmhja1dpbVRmK2VuWHFwcmE1SkZmRWMKWVJqNnNDZU1IWnVVVzJ6WURCRFZLOVVmSGxUQkNjTzlMeU1qWVV5SlRpMAotPiBba0x6LVstZ3JlYXNlIDlQOHRSZ2MKTC82em56MDVNRkR4UDVVQXJoMVlTb0pVeTdscG56S25aamFmV2k4U2YvVmVibmUyCi0tLSBGNnptL1UxNzBBVFEwZE53RDhudFdjbHlPZVN3dmF5YnM2c2FUNzlxL0xvCjHxMqJAgFjuW4mMzb24JQlLfEIMgxf0zRkyVn4S66YGCrD6d3RCw0dy+eZfipKU32qve4AwmsFyEqIr1tw4XGnFAdKjpQ==]   # env var name (token in secrets/cratesio.env)
 # publish_timeout_secs = 300
 #
 # [[publish_targets]]
@@ -354,3 +354,34 @@ auto_create = false
 # On push failures (origin or mirror remotes), dracon-sync can send a
 # fire-and-forget HTTP POST to a configured webhook URL:
 # webhook_url = "https://your-webhook-endpoint.example/notify"
+
+# =============================================================================
+#  SECTION 11: `repos` STATE COLUMN THRESHOLDS
+# =============================================================================
+# The `repos` table includes a derived `STATE` column that combines
+# last-commit time, last-push time, dirty state, ahead/behind, and push
+# status into a single label the user can scan at a glance:
+#
+#   active    — last commit in the last `active_commit_minutes`
+#   committing — last commit in the last `committing_commit_minutes`, not active
+#   pushing   — push_status = PENDING (the daemon is mid-cycle)
+#   synced    — clean, in sync, recent push
+#   stalled   — dirty AND no recent commit AND no recent push
+#               (this is the "stalling for minutes" case the operator
+#                usually wants to see flagged)
+#   dirty     — has uncommitted changes, otherwise in good shape
+#   untracked-only — only untracked files, no modified/staged
+#   intentional — repo flagged `intentional_no_upstream = true`
+#   failed    — push_status = FAIL or STUCK
+#   idle      — clean, no recent activity, last commit within `cold_commit_minutes`
+#   cold      — last commit older than `cold_commit_minutes`
+#   healthy   — fallback when nothing else matches
+#
+# Defaults: 5m / 60m / 24h. Per-repo overrides are supported in
+# <repo>/.dracon/dracon-sync.toml:
+#   active_commit_minutes = 30
+#
+# active_commit_minutes = 5
+# committing_commit_minutes = 60
+# cold_commit_minutes = 1440
+

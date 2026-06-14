@@ -1,6 +1,6 @@
 use anyhow::Result;
 use dracon_git::GitService;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::{BTreeSet, HashMap};
 use std::fs::OpenOptions;
 use std::io::Write as IoWrite;
@@ -158,7 +158,9 @@ use crate::git::{
     rewrite_ahead_paths, run_git_capture_output, run_git_with_timeout, set_upstream_to_branch,
     top_level_dir,
 };
-use crate::policy::{timestamp_secs, SyncPolicy, DEFAULT_GIT_HOST_BLOB_LIMIT_BYTES};
+use crate::policy::{
+    timestamp_secs, RepoPolicyOverride, SyncPolicy, DEFAULT_GIT_HOST_BLOB_LIMIT_BYTES,
+};
 
 fn ansi(color: &str, text: &str) -> String {
     if !crate::print::should_color() {
@@ -323,6 +325,14 @@ pub(crate) struct RepoReportRow {
     concern: bool,
     warn: bool,
     hint: String,
+    /// Derived "rough cause" of the row's current state. Combines the
+    /// last-commit time, last-push time, dirty state, ahead/behind, and
+    /// push status into a single small vocabulary the user can scan at
+    /// a glance. See [`StateCause`].
+    state_cause: StateCause,
+    /// `state_cause` as a string, for downstream tools that want the
+    /// label without having to enumerate the enum.
+    state_cause_label: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -824,6 +834,227 @@ pub(crate) fn repo_is_warn(
         && (status.modified_files > 0 || status.staged_files > 0)
 }
 
+/// Coarse "what is this repo doing right now?" classification derived
+/// from the existing signals — last-commit time, last-push time, dirty
+/// state, ahead/behind, and push status. The vocabulary is intentionally
+/// small so the user can scan the table at a glance and tell apart
+/// "actively working on this" from "stalled" from "cold idle".
+///
+/// The vocabulary:
+///
+/// - `Active`    — last commit in the last `active_commit_minutes` (default 5m).
+/// - `Committing` — last commit in the last `committing_commit_minutes` (default 60m),
+///   but not active. May be dirty.
+/// - `Pushing`   — `push_status = PENDING` (the daemon is mid-cycle).
+/// - `Synced`    — clean, `ahead=0, behind=0`, recent push (last `active_commit_minutes`).
+/// - `Stalled`   — dirty (modified or staged > 0) with no recent commit
+///   AND no recent push, AND not in any of the above. This
+///   is the case the user described as "stalling for minutes".
+/// - `Dirty`     — has uncommitted changes but otherwise in good shape.
+/// - `Untracked` — only untracked files (no modified, no staged, no commits needed).
+/// - `Intentional` — repo flagged `intentional_no_upstream = true`.
+/// - `Failed`    — `push_status = FAIL` or `STUCK`.
+/// - `Idle`      — clean, no recent push, last commit within `cold_commit_minutes`.
+/// - `Cold`      — last commit older than `cold_commit_minutes` (default 24h).
+/// - `Healthy`   — fallback when nothing else matches.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum StateCause {
+    Active,
+    Committing,
+    Pushing,
+    Synced,
+    Stalled,
+    Dirty,
+    Untracked,
+    Intentional,
+    Failed,
+    Idle,
+    Cold,
+    Healthy,
+}
+
+impl StateCause {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            StateCause::Active => "active",
+            StateCause::Committing => "committing",
+            StateCause::Pushing => "pushing",
+            StateCause::Synced => "synced",
+            StateCause::Stalled => "stalled",
+            StateCause::Dirty => "dirty",
+            StateCause::Untracked => "untracked-only",
+            StateCause::Intentional => "intentional",
+            StateCause::Failed => "failed",
+            StateCause::Idle => "idle",
+            StateCause::Cold => "cold",
+            StateCause::Healthy => "healthy",
+        }
+    }
+
+    /// Icon used in the human-readable table. The colour of the row is
+    /// picked separately by `cause_color`.
+    pub(crate) fn icon(self) -> &'static str {
+        match self {
+            StateCause::Active => "🟢",
+            StateCause::Committing => "🟡",
+            StateCause::Pushing => "🟣",
+            StateCause::Synced => "🟢",
+            StateCause::Stalled => "🔴",
+            StateCause::Dirty => "🟠",
+            StateCause::Untracked => "⚪",
+            StateCause::Intentional => "🟣",
+            StateCause::Failed => "⛔",
+            StateCause::Idle => "⚪",
+            StateCause::Cold => "⚫",
+            StateCause::Healthy => "✅",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct StateCauseThresholds {
+    pub(crate) active_minutes: u64,
+    pub(crate) committing_minutes: u64,
+    pub(crate) cold_minutes: u64,
+}
+
+impl StateCauseThresholds {
+    pub(crate) fn from_policy(policy: &SyncPolicy, override_: &RepoPolicyOverride) -> Self {
+        Self {
+            active_minutes: override_
+                .active_commit_minutes
+                .unwrap_or(policy.active_commit_minutes),
+            committing_minutes: override_
+                .committing_commit_minutes
+                .unwrap_or(policy.committing_commit_minutes),
+            cold_minutes: override_
+                .cold_commit_minutes
+                .unwrap_or(policy.cold_commit_minutes),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct StateCauseInputs<'a> {
+    pub(crate) flags: &'a [String],
+    pub(crate) push_status: &'a str,
+    pub(crate) modified: usize,
+    pub(crate) staged: usize,
+    pub(crate) untracked: usize,
+    pub(crate) ahead: usize,
+    pub(crate) behind: usize,
+    /// Last commit age in minutes, if known. None means we could not read it.
+    pub(crate) last_commit_minutes: Option<i64>,
+    /// Last push age in minutes, if known. None means we could not read it.
+    pub(crate) last_push_minutes: Option<i64>,
+}
+
+/// Classify a single repo's "rough cause" given the current signals.
+///
+/// The classification is order-dependent: more specific states are
+/// checked first. The intent is that the user can read the column
+/// top-to-bottom and trust the first matching label.
+pub(crate) fn classify_state_cause(
+    inputs: &StateCauseInputs,
+    thresholds: &StateCauseThresholds,
+) -> StateCause {
+    let last_commit = inputs.last_commit_minutes;
+    let last_push = inputs.last_push_minutes;
+
+    if inputs.push_status == "PENDING" {
+        return StateCause::Pushing;
+    }
+    if inputs.push_status == "FAIL" || inputs.push_status == "STUCK" {
+        return StateCause::Failed;
+    }
+    if inputs.flags.iter().any(|f| f == "INTENTIONAL_NO_UPSTREAM") {
+        return StateCause::Intentional;
+    }
+
+    let has_dirty = inputs.modified > 0 || inputs.staged > 0;
+    let no_recent_commit = last_commit
+        .map(|m| m > thresholds.active_minutes as i64)
+        .unwrap_or(true);
+    let no_recent_push = last_push
+        .map(|m| m > thresholds.active_minutes as i64)
+        .unwrap_or(true);
+    if has_dirty && no_recent_commit && no_recent_push {
+        return StateCause::Stalled;
+    }
+
+    if let Some(m) = last_commit {
+        if m <= thresholds.active_minutes as i64 {
+            if !has_dirty && inputs.ahead == 0 && inputs.behind == 0 {
+                return StateCause::Synced;
+            }
+            return StateCause::Active;
+        }
+    }
+
+    if let Some(m) = last_commit {
+        if m <= thresholds.committing_minutes as i64 {
+            if inputs.modified == 0 && inputs.staged == 0 && inputs.untracked > 0 {
+                return StateCause::Untracked;
+            }
+            if has_dirty {
+                return StateCause::Dirty;
+            }
+            return StateCause::Committing;
+        }
+    }
+
+    if inputs.modified == 0 && inputs.staged == 0 && inputs.untracked > 0 {
+        return StateCause::Untracked;
+    }
+
+    if has_dirty {
+        return StateCause::Dirty;
+    }
+
+    if let Some(m) = last_commit {
+        if m > thresholds.cold_minutes as i64 {
+            return StateCause::Cold;
+        }
+    }
+
+    if last_commit.is_some() {
+        return StateCause::Idle;
+    }
+
+    StateCause::Healthy
+}
+
+/// Parse a git-style relative time string ("5 minutes ago", "2 days ago",
+/// "1 hour ago", "8 hours ago", "29 minutes ago") into minutes.
+///
+/// Returns None for input we cannot parse, including:
+/// - the sentinel "-" the daemon emits when no time is available;
+/// - any string without a recognizable number + unit.
+/// - special "weird" forms like "yesterday", "a week ago" (treated as None).
+pub(crate) fn parse_relative_minutes(text: &str) -> Option<i64> {
+    let trimmed = text.trim();
+    if trimmed.is_empty() || trimmed == "-" {
+        return None;
+    }
+    let body = trimmed.strip_suffix(" ago").unwrap_or(trimmed);
+    let mut iter = body.split_whitespace();
+    let n_str = iter.next()?;
+    let n: i64 = n_str.parse().ok()?;
+    let unit = iter.next()?;
+    let minutes = match unit {
+        "second" | "seconds" => 0,
+        "minute" | "minutes" => n,
+        "hour" | "hours" => n * 60,
+        "day" | "days" => n * 24 * 60,
+        "week" | "weeks" => n * 7 * 24 * 60,
+        "month" | "months" => n * 30 * 24 * 60,
+        "year" | "years" => n * 365 * 24 * 60,
+        _ => return None,
+    };
+    Some(minutes)
+}
+
 /// Compute the user-visible hint for a row of state flags.
 ///
 /// When the operator has flagged a repo as intentionally isolated
@@ -937,27 +1168,46 @@ fn repo_failure_message(prefix: &str, repo: &Path, error: impl std::fmt::Display
 /// Resolve the human-readable "last pushed N ago" string for a single repo's
 /// current branch. Returns "-" when the branch is empty (detached HEAD) or
 /// otherwise unsafe for use in a `git reflog show origin/{branch}` argument.
+/// Resolve the human-readable "last pushed N ago" string for a single repo's
+/// current branch. Returns "-" when the branch is empty (detached HEAD) or
+/// otherwise unsafe for use in a `git log -1 --format=%cr origin/{branch}`
+/// argument, when the remote-tracking branch does not exist, or when git
+/// itself fails / returns empty output.
+///
+/// Implementation note: an earlier version used
+/// `git reflog show origin/{branch} --format=%cr -1`. That works on repos
+/// whose remote-tracking reflog has multiple entries (a `FETCH_HEAD` with
+/// periodic fetches), but for repos that were freshly cloned and never
+/// fetched again, `git reflog show origin/<branch>` returns empty output
+/// even though the ref is perfectly valid. `git log -1 --format=%cr
+/// origin/<branch>` returns the committer date of the current
+/// remote-tracking tip in both cases, so it is the right primitive.
 fn last_push_for_branch(repo: &Path, branch: &str) -> String {
     if branch.is_empty() || !crate::git::is_safe_branch_name(branch) {
         return "-".to_string();
     }
     let repo_str = repo.to_str().unwrap_or("").to_string();
-    crate::git::git_cmd()
+    let out = crate::git::git_cmd()
         .args([
             "-C",
             &repo_str,
-            "reflog",
-            "show",
-            &format!("origin/{}", branch),
-            "--format=%cr",
+            "log",
             "-1",
+            "--format=%cr",
+            &format!("origin/{}", branch),
         ])
-        .output()
-        .ok()
-        .and_then(|o| String::from_utf8(o.stdout).ok())
-        .and_then(|s| s.lines().next().map(|l| l.trim().to_string()))
-        .filter(|s| !s.is_empty())
-        .unwrap_or_else(|| "-".to_string())
+        .output();
+    match out {
+        Ok(o) if o.status.success() => {
+            let s = String::from_utf8_lossy(&o.stdout);
+            s.lines()
+                .next()
+                .map(|l| l.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .unwrap_or_else(|| "-".to_string())
+        }
+        _ => "-".to_string(),
+    }
 }
 
 fn emit_repo_failure(json: bool, prefix: &str, repo: &Path, error: impl std::fmt::Display) {
@@ -1121,6 +1371,26 @@ pub(crate) async fn run_repos_report(
         // to avoid `git reflog show origin/` (ambiguous argument) errors.
         let last_push = last_push_for_branch(&repo, &effective_status.branch);
 
+        // Derive the "rough cause" classification that combines all the
+        // signals above into a single small-vocabulary label. This is the
+        // field the user actually reads to decide whether a repo is
+        // actively being worked on, stalling, or cold-idle.
+        let thresholds = StateCauseThresholds::from_policy(&policy, &repo_override);
+        let last_commit_minutes = parse_relative_minutes(&last_when);
+        let last_push_minutes = parse_relative_minutes(&last_push);
+        let inputs = StateCauseInputs {
+            flags: &flags,
+            push_status: &push_status,
+            modified: effective_status.modified_files,
+            staged: effective_status.staged_files,
+            untracked: effective_status.untracked_files,
+            ahead: effective_status.ahead,
+            behind: effective_status.behind,
+            last_commit_minutes,
+            last_push_minutes,
+        };
+        let state_cause = classify_state_cause(&inputs, &thresholds);
+
         rows.push(RepoReportRow {
             repo: repo.display().to_string(),
             state_flags: flags,
@@ -1141,6 +1411,8 @@ pub(crate) async fn run_repos_report(
             concern,
             warn,
             hint,
+            state_cause,
+            state_cause_label: state_cause.as_str().to_string(),
         });
     }
 
@@ -1235,7 +1507,7 @@ pub(crate) async fn run_repos_report(
 
     // ---- Legend line (one-liner mapping column codes to their meaning) ----
     println!(
-        "ℹ️  Legend: MOD = modified tracked · STG = staged · UT = untracked · ↑ = ahead of upstream · ↓ = behind upstream · PUSH = push status"
+        "ℹ️  Legend: MOD = modified tracked · STG = staged · UT = untracked · ↑ = ahead of upstream · ↓ = behind upstream · PUSH = push status · STATE = derived cause (active/committing/pushing/synced/stalled/dirty/untracked-only/intentional/failed/idle/cold)"
     );
     println!();
 
@@ -1267,6 +1539,7 @@ pub(crate) async fn run_repos_report(
         mk_h("📤", "PUSHED"),
         mk_h("⏰", "ACTIVITY"),
         mk_h("👤", "AUTHOR"),
+        mk_h("🩺", "STATE"),
         mk_h("💡", "HINT"),
     ]);
 
@@ -1293,6 +1566,15 @@ pub(crate) async fn run_repos_report(
             "PENDING" => Color::Yellow,
             "FAIL" | "STUCK" => Color::Red,
             _ => Color::White,
+        };
+
+        let state_color = match row.state_cause {
+            StateCause::Active | StateCause::Synced => Color::Green,
+            StateCause::Committing | StateCause::Pushing | StateCause::Dirty => Color::Yellow,
+            StateCause::Stalled | StateCause::Failed => Color::Red,
+            StateCause::Intentional => Color::Magenta,
+            StateCause::Untracked | StateCause::Idle => Color::White,
+            StateCause::Cold | StateCause::Healthy => Color::DarkGrey,
         };
 
         // Color-code numeric columns based on severity
@@ -1346,6 +1628,12 @@ pub(crate) async fn run_repos_report(
             Cell::new(shorten_when(&row.last_push)),
             Cell::new(shorten_when(&row.last_when)),
             Cell::new(&row.last_author),
+            Cell::new(format!(
+                "{} {}",
+                row.state_cause.icon(),
+                row.state_cause.as_str()
+            ))
+            .fg(state_color),
             Cell::new(&row.hint).fg(if row.concern {
                 Color::Red
             } else if row.warn {
@@ -2777,7 +3065,7 @@ mod tests {
     }
 
     #[test]
-    fn test_repo_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSByZjJLR2wzTVhYUkhWOWVUUG95eHd4RXNkd0cwczFsdytWV00wY05KOEZNCjJEWnlyVkhZWXJUdXB2bWZMRktDTEJ4VU1ZYkh6L01VYjRXZ3dCWHZ0Q00KLT4gWDI1NTE5IHZCN0V2OVB2cjJoY1pOVDJpZm10ZWRsMm4yTDFWa0JFZEZac2VaeFFlQnMKUlZzZEliQ2haRnlYWlN3UUpaczh2YUFwN1dYMXVsUDBJR0h2NHlMV0hxbwotPiBYMjU1MTkgRXRsbXJFM2lNRW5lZkxFd214VENWUUx1VyswQ0NZb1hVN0dVUWFSdDVUMApZNVdFTEU1aGtFNTZPNks5UEExbzBGbjdqUE16V0MrbFNEaUx5bGQrTzhvCi0+IFgyNTUxOSA5SFlKdllGWkMvcWwzalIxN2JnQjJOYno5WlNzUnZrR2ZFUlRCdzM5bFc4ClQ4VmhNVXNKc09HSHl1VUZFMmlWWlo4ekNCYXRoeE11YU5hcFU5NXFydzQKLT4gWDI1NTE5IHVjdzlRVlBVS3BpNVpRVjROZ3VXZWtRYTFLbTJKQUNrYUNEZnhKcGxMVWcKc2owVzlKcFIvNEU0dlFWbllVempPUjNaR0F4clZzQ2N3Z0FuMzdNeGlCMAotPiB4Zi1ncmVhc2UgXXhib1IgMiA1MApGZTVlMFBDZ3hLWG0zVFpnQjNzdnNyc1VLWVA2Z3RtdWVvSFVnZVdwWjV3MnIzUVkxNHJNQXZkeFY0bEYrTWlWClRlMW1vSUhlcmxNTDduQkJ2eVNYUFNTTjdES2FHa0tINnZGcXA5ZDM3MVFSSnEyOXA0a2tmeUUKLS0tIGk3Um1mQldaYnVWa1hsOEZGWElIRE9Bcjh3ay9BWjJOZ0xFc0wvcHdFTHMKpl4q+RUdVFczgShcldorqIyFZSVxGt3928sgXJ0fW+RQEgo7/Qq7tywSMav/osu/S1JTlKt7/uZCV7k2t+DiYcVytR4=]() {
+    fn test_repo_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBldWdnMmV0RmdaVm53WTk5UXZsN2VEMXJvTEJWeGdPcElYY3FOZ1RPQ1VBCnNJKzJ4UmNibFUxclEyRVJNRmJaMlJjaUJLYVh1K3MwcTdla2QyQUNZMmcKLT4gWDI1NTE5IFU1M2Y1ZXhTUWpkclBUdVoyY2lSOGxiWmR6K3c1VEJPWGhrMytaYnRpQ0UKMXY0aHVEU3g1L1R5ejZyTi9ObzY5Yy9YTnM5RUxISUVzSHNuSDNvMEFhSQotPiBYMjU1MTkgM0Y1cmo0SkF4SlVBNDg3SW9rQXZHNlJxNmp2MEphbGFNNm5MYm93clV3QQpIbHlJTHNIUmlRaEk2RmhIUk9yNjd0MXlmRkVDMmdLOTZBcnJXVzZ0QUVZCi0+IFgyNTUxOSBwOHRxdXdrRVRqeGNpaFJUWTdwUVJjTFlqa1g4Y21VUEhVVGsyUStKVDFJCmRBSVdBUXBSMmNRMndhaXdYUlE2cG5rRWljMnIzZmNETkordllmeTEwUnMKLT4gWDI1NTE5IGphc0VoUnk5aDNYbjZmNjdNNDE4dTkycTZSR3RwclVESVMwdzNDT2tMbTgKamZ3TlZTYmhWNlcvMmFQMEQzWFBqbXk1MXpMeUg1RzY4OVlKQ2lqVE9SQQotPiBQQCItZ3JlYXNlIGV5Jk4gd10vYy5vegpGS29hR0s0LzBhWUFnODhtSlBuQy9hbWlXeFQzaUR1QmR0aDdYZy95UitIODkxcHBKYmMKLS0tIEtWOFVlbEFpeUppR0xLajJ5bmxmT1oxajhUK2c2Mm1MckNkZFdSUnlKWlUKCbuq0J6yZbrmGGw6BsIqp5uUl3Ct+eu7O8dLJwZO8uckRuR/FqG3mZueRGT5wMtMPt69ehRA8H7mdoyIJnQk4t8aohQ=]() {
         let msg = repo_failure_message("init_failed", Path::new("/tmp/repo"), "boom");
         assert!(msg.contains("init_failed"));
         assert!(msg.contains("/tmp/repo"));
@@ -2785,7 +3073,7 @@ mod tests {
     }
 
     #[test]
-    fn test_repo_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAyTlFXSmJuNkVoc0VrbUhnc2FPc0J1aHlvU1cwWi96RUs1UHh0QWYyUXpzCk5obDdFc0h5eG9MWlR6Znl0YVhORjVVbFlQZjFTM2N3Tm1qRk14Z09vTGcKLT4gWDI1NTE5IFhaSGdBN29tOTk1Mm1LZkg3ODkvelpqT1hwcWxTTkV0SGdIYU4vOFoxZzAKcyt0YlFYMVlyc2FoeThsZFlZaGZPSUY1UDBxb1JXaFZ2Tnp5b1RjelFTMAotPiBYMjU1MTkgWlFFZ0svZ1lWR3g4d1RRM3JCSGtGeStwSzUzZ1ZCQ2IzTDhNOE05YzRSZwp0Mm84aUJSVE4weTRsYWRLYnh1YnVnNDhnSWVIamVaQU9LZEk0SzBzN09jCi0+IFgyNTUxOSB4ZjZzSEZWUmhRSDdlcktoSjlZL3k2OHlrR1g0YUgwUlJOeW0zejVVaXp3CitKT3JRZlJYTDFUcjBldWdIZzJtT3RPU1lBN2swaGJubzk4Q3ZUb2RwNUkKLT4gWDI1NTE5IDZYTTEzQWFPZ1U3cmdzK2Q5eEIwN3lRWU9Qb0dTNGlpcUhRWEVNamlZMUEKQ21RYkxLcWZVaktEYjRibmRESG12RTlYZ29vaUw1S3lUVDBIbGhlU3hONAotPiBNX347LWdyZWFzZSAuTjxATCBaIQpvRUtJR0krcUJlZVAvUnVKem9QVUR0UUlTeWxYRjdaTDV4eXlsaWgxN0w1TmJjZwotLS0gM254MDYvbXliMzBnN0RpS3Brci9PaHNwZGxSK1o1RWZjNDBseWpGd2Nscwp05InXFcTudOI02WVNtyXJEmQmV2IWCoYE4brjv1ekmkfHnGMY4G9pz5kt/09UMc27P6Cb7Zt2LKMjhBeieGreNg==]() {
+    fn test_repo_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA0SVpOYnQwcWxIWmdKN1BzdWpnWmZFR1Azbkg5Q0EzSkwvWEpwUVJQcFFRClZub1dPMFl4djNXUlhnYmJ6Z1V2MXpzVkE5dG5zcnFMc0wydGRUaElkNlUKLT4gWDI1NTE5IEVWMDc5NDYvVTdaaUlkV2hLOUREeW1VRVpzeUFVeTg0elJTNUUwSDd3WFUKYlYzMmN2Y0xYUTV0RzF4Wi9yNDY1WkxkZmFsSFY0YndOSnhxYkZ1ZGVPMAotPiBYMjU1MTkgN2NDaFRRTHVoQ2g3a3NSSnllRGhLeVhQZ3dFVVNuRlNWZDQrMWtWd0xtSQoydkwrWThybjVuWkdEOWN4aWpLZHhMcERCMDhvYWgxWnFqNzhOSFFSRkpBCi0+IFgyNTUxOSBzbGhlc0g2cVczUXhrSDdUUWoyVFh3MkdycU93OVhQS0xBOExBWGR4aW1JCjdKN2JpR3o4b1g2R1E3SDdOUEp0b2NxcFJFQmlFK0pxSTI1QTNlUjBscDgKLT4gWDI1NTE5IEx6YS9aNWsrc1JObHV3Yy9yWWdqbTI5RXRpWG41bkx5dlUxYVB6WitieTAKVCtra24rQkZqQXl3dUliWlI0RjdWdGRtMTMvSFFUMmIzQnIzRmJIMG9RcwotPiA8RGZNLWdyZWFzZQp4NHVKSVhQZHlxbS90dGZtSmRpS283MmNtRzB6ZTBtMmJQVXJWaU5uaWhXSFRhRDZMSzBxR3JqUHN1QktHL1czCmEwblNDV0t2MlQxVgotLS0gbWtHdkVqSHVabjZ4WVRTVWV0ZmJjUU93R1A4am12cDAyQlNtSHVab2Z2RQrimYqi5ZHTRIJFrjlkrYdaUM6RGVC+rUT06i3JDYnkSttWv67dyFjK9zVetLnnVz++hTWAj1/V99LvLHNAyZo1iQ==]() {
         let msg = repo_failure_message("status_failed", Path::new("/tmp/repo"), "status boom");
         assert!(msg.contains("status_failed"));
         assert!(msg.contains("status boom"));
@@ -2842,6 +3130,103 @@ mod tests {
                 "branch {bad:?} should be skipped"
             );
         }
+    }
+
+    #[test]
+    fn test_last_push_for_branch_uses_log_not_reflog() {
+        // Regression: a freshly-cloned repo with no further fetches has
+        // an empty reflog for `origin/<branch>`. The old helper used
+        // `git reflog show origin/main --format=%cr -1`, which returned
+        // empty output in that state and surfaced as a misleading "-"
+        // in the PUSHED column even though the remote-tracking ref was
+        // valid. The helper now uses
+        // `git log -1 --format=%cr origin/main`, which returns the
+        // committer date of the remote tip in both cases.
+        let parent = tempfile::tempdir().unwrap();
+        let bare = parent.path().join("bare.git");
+        let repo = parent.path().join("repo");
+        std::fs::create_dir_all(&bare).unwrap();
+        std::fs::create_dir_all(&repo).unwrap();
+        let run = |args: &[&str]| {
+            std::process::Command::new("git")
+                .args(args)
+                .current_dir(&repo)
+                .output()
+                .unwrap()
+        };
+        let run_bare = |args: &[&str]| {
+            std::process::Command::new("git")
+                .args(args)
+                .current_dir(&bare)
+                .output()
+                .unwrap()
+        };
+        // Seed an initial commit in the bare repo via a working tree.
+        run_bare(&["init", "--bare", "--initial-branch=main"]);
+        let seed = parent.path().join("seed");
+        std::fs::create_dir_all(&seed).unwrap();
+        let run_seed = |args: &[&str]| {
+            std::process::Command::new("git")
+                .args(args)
+                .current_dir(&seed)
+                .output()
+                .unwrap()
+        };
+        run_seed(&["init", "-b", "main"]);
+        run_seed(&["config", "user.email", "ops@dracon.uk"]);
+        run_seed(&["config", "user.name", "DraconDev"]);
+        run_seed(&["config", "commit.gpgsign", "false"]);
+        run_seed(&["config", "core.hooksPath", "/dev/null"]);
+        std::fs::write(seed.join("README.md"), "seed\n").unwrap();
+        run_seed(&["add", "README.md"]);
+        run_seed(&["commit", "--no-verify", "-m", "seed"]);
+        run_seed(&["remote", "add", "origin", bare.to_str().unwrap()]);
+        let push_seed = run_seed(&["push", "origin", "main"]);
+        assert!(
+            push_seed.status.success(),
+            "seed push failed: stdout={} stderr={}",
+            String::from_utf8_lossy(&push_seed.stdout),
+            String::from_utf8_lossy(&push_seed.stderr),
+        );
+        // Clone the bare repo so the local reflog for origin/main starts
+        // empty (no subsequent fetches, no pushes).
+        let clone = std::process::Command::new("git")
+            .args(["clone", bare.to_str().unwrap(), repo.to_str().unwrap()])
+            .output()
+            .unwrap();
+        assert!(
+            clone.status.success(),
+            "clone failed: stdout={} stderr={}",
+            String::from_utf8_lossy(&clone.stdout),
+            String::from_utf8_lossy(&clone.stderr),
+        );
+        run(&["config", "user.email", "ops@dracon.uk"]);
+        run(&["config", "user.name", "DraconDev"]);
+        // Sanity: `git reflog show origin/main` is empty for a freshly-
+        // cloned repo with no subsequent fetches, so the old helper
+        // would have returned "-" here.
+        let reflog_out = run(&["reflog", "show", "origin/main", "--format=%cr", "-1"]);
+        let reflog_str = String::from_utf8_lossy(&reflog_out.stdout);
+        assert!(
+            reflog_str.trim().is_empty(),
+            "test setup precondition: reflog must be empty in this scenario, got {:?}",
+            reflog_str,
+        );
+        // `git log -1 --format=%cr origin/main` must return a real
+        // date (this is what the helper now uses).
+        let log_out = run(&["log", "-1", "--format=%cr", "origin/main"]);
+        let log_str = String::from_utf8_lossy(&log_out.stdout);
+        assert!(
+            !log_str.trim().is_empty(),
+            "test setup precondition: `git log` must return a real date for origin/main, got {:?}",
+            log_str,
+        );
+        let pushed = last_push_for_branch(&repo, "main");
+        assert_ne!(
+            pushed, "-",
+            "last_push_for_branch must not return '-' for a valid remote-tracking ref even when the reflog is empty (got {:?})",
+            pushed
+        );
     }
 
     #[test]
@@ -3003,7 +3388,7 @@ mod tests {
     }
 
     #[test]
-    fn test_repo_stuck_filters_requi[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBLMnRTb3doV3ZPWk5CQWtNV0tQdVJHNGJoSTcxNTFadmpOL0ROZkthRUFjCkYvaldnTGJCVVpxeWc0ZWUvWW5IcTVPSHIvc1JQM2lodHFpNXBhM0ExM3MKLT4gWDI1NTE5IDFNYk0rYUhSRVlhMjZhaHNUQThNdlBpZG9RVmhSdDlxRVB0RENxamxtSHcKQXE1WnJ4eTB0bDlsZFh5anNpVmtBQ2hHNk8yVWMzRy9hR294Yk1jbVd6awotPiBYMjU1MTkgT1EyZXZNYU1jdzltOHpmbzBtaW9leVA1SU9XNmZnS3V1emJHak9taUptWQo2blZZUkRVZUJoY0JmWWdqM3Foay9tYklNeld3d2tSRENyNm5IY1hZV25FCi0+IFgyNTUxOSAzYk56MXNyNXAxR1ZlZFZ2TlpNaU1YNDF4bytBd3FUeFlMa2ZkMUVwVnhRClF0bE9Rd1RzNkhKQ2JuQU1GMzdUa1hteU43aUdrZDZkRTlZYlphRWRDUWsKLT4gWDI1NTE5IHBIQlRqbFpvYWU2OWs3aEZ0VlZwRE5YdXZIQnhPRGxBLzYvdFBBNUVWeHMKMWhTaUpuUEpRS2xoUkpTWmk0aHUyYnkrMVdyd2hUbnc4Yk0rb0N6bXFOcwotPiB3OVktZ3JlYXNlIH1OayBiS0Q4WVYoIDEqMAp4NjJKVDJtMmtjdnFrQTlVZFk2MFZwNWtHaW0xTlV6cThvb0d1MzNoS2FrRncyYmdiZHUyaHFyZ2xXdXpQOHlJCmlFVFNGUDUza3dKQml4TlRScmRoSjJZMThieXZGRE82OUdPbC95cndGRUdCaVg5dWEyOFI3Q0FkWncKLS0tIFlZZFFuVjdXWjAwR2lmWGM0ZkQrM0NKTHVVeU5EMENEa3UwNkVrUURXLzQKGr7Hwk4c+D+56XHAbkMvxLAIIuG+Z6yeq53eZP8BYwSWApxj7lhJHIt3PpfOyrEaFg1BZtDHvIg=]() {
+    fn test_repo_stuck_filters_requi[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBEczB1ei9aUWhORTdIU051dGRPMUU4TEd3QXNjdFFSR2ptQVh4YUJDSGdvCklxRXZqUmN0SkRBL3R2eFcrdHFHSVVoY1N1VXYxS2FKQktTdE9HRlh0cGcKLT4gWDI1NTE5IHRMR284T3V2SC80R1VkZUpWK3ZYK0VqcGdUMHFpd3IzVEtlVFlveFkvVUUKbmFuSHFuUU12cnEvclN1L3NhZzJLU3pKMitkeW1DRms1RXFLSGFFeDUzYwotPiBYMjU1MTkgbm8xRGc3aXlaOFVwN1k2T25MMkZXNUNZYzEzRngxWmx4ZUZEejZJRFlFWQp2VmJjNnlwbjBVbmJNRG54d3FuaVZTT0xPUnU2QVZMcTg1U2RGRGd0WHFBCi0+IFgyNTUxOSBrRUVUWG1xVHJBTWpjR2FBWHQxTGZ2dHlDNm9qRnA0VnkraC8rSTIzT1dFClJoNzRuOExOaHVZRGMxRm1RWnJiY1hyc0FjRCtQalhwUFhBcGhLNXI1T1UKLT4gWDI1NTE5IHAramlNL0EvenRNQ0JkcG5xK3MwMU1aSXNkZGNVWmpWZDdGYkE2Z1lRZ1kKQng4b0x3ajVhSkw3QnA1cjNSZ3FxTjdLUDB4bXplbEdhU1gvVUVPQkdTcwotPiB5Ri8tZ3JlYXNlIFIsXGIgV3RSQyZkWQo1d0FQKzhjazV0Q2VDMlZnWE9SeTZraUk1c0lJVmFTZ3FOa2ZUN3FVTm9Udm9ZaG5xbExCb2FReUdiVGtZSzFTCgotLS0gRWorYWJjUHFSQmpCbTFlQnJaN2c5Y2dLbVhPKzdTdjE5cjRjYmFlMkpBNArTp96rsnHhuizM87lsbfQKemZ1VmpVhrqVl57pkw80uI6PIYYMYbDiEg9ShjWpsUe6kbNK+thPdQ==]() {
         let ahead = make_status(false, 5, 0);
         let behind = make_status(false, 0, 3);
         assert!(!repo_is_stuck_push(&ahead, true, true, false));
@@ -3107,6 +3492,295 @@ mod tests {
     fn test_repo_hint_behind() {
         let hint = repo_hint(&["BEHIND:2".into()], false, false);
         assert_eq!(hint, "run repair-concerns --apply (pull/merge)");
+    }
+
+    // -------------------------------------------------------------------
+    // parse_relative_minutes tests
+    // -------------------------------------------------------------------
+
+    #[test]
+    fn test_parse_relative_minutes_units() {
+        assert_eq!(parse_relative_minutes("0 seconds ago"), Some(0));
+        assert_eq!(parse_relative_minutes("23 seconds ago"), Some(0));
+        assert_eq!(parse_relative_minutes("5 minutes ago"), Some(5));
+        assert_eq!(parse_relative_minutes("1 minute ago"), Some(1));
+        assert_eq!(parse_relative_minutes("2 hours ago"), Some(120));
+        assert_eq!(parse_relative_minutes("8 hours ago"), Some(480));
+        assert_eq!(parse_relative_minutes("2 days ago"), Some(2 * 24 * 60));
+        assert_eq!(parse_relative_minutes("3 weeks ago"), Some(3 * 7 * 24 * 60));
+        assert_eq!(parse_relative_minutes("1 month ago"), Some(30 * 24 * 60));
+        assert_eq!(parse_relative_minutes("1 year ago"), Some(365 * 24 * 60));
+    }
+
+    #[test]
+    fn test_parse_relative_minutes_sentinel() {
+        // The daemon emits "-" as a sentinel when no time is available.
+        // The parser must return None, not 0, so the classifier treats
+        // it as "unknown" rather than "0 minutes ago".
+        assert_eq!(parse_relative_minutes("-"), None);
+        assert_eq!(parse_relative_minutes(""), None);
+        assert_eq!(parse_relative_minutes("unknown"), None);
+    }
+
+    // -------------------------------------------------------------------
+    // classify_state_cause tests
+    // -------------------------------------------------------------------
+
+    fn default_thresholds() -> StateCauseThresholds {
+        StateCauseThresholds {
+            active_minutes: 5,
+            committing_minutes: 60,
+            cold_minutes: 1440,
+        }
+    }
+
+    fn empty_flags() -> Vec<String> {
+        vec!["OK".to_string()]
+    }
+
+    #[test]
+    fn test_classify_state_cause_active() {
+        let inputs = StateCauseInputs {
+            flags: &empty_flags(),
+            push_status: "OK",
+            modified: 0,
+            staged: 0,
+            untracked: 0,
+            ahead: 1,
+            behind: 0,
+            last_commit_minutes: Some(2),
+            last_push_minutes: Some(2),
+        };
+        assert_eq!(
+            classify_state_cause(&inputs, &default_thresholds()),
+            StateCause::Active
+        );
+    }
+
+    #[test]
+    fn test_classify_state_cause_synced_clean_recent() {
+        let inputs = StateCauseInputs {
+            flags: &empty_flags(),
+            push_status: "OK",
+            modified: 0,
+            staged: 0,
+            untracked: 0,
+            ahead: 0,
+            behind: 0,
+            last_commit_minutes: Some(2),
+            last_push_minutes: Some(1),
+        };
+        assert_eq!(
+            classify_state_cause(&inputs, &default_thresholds()),
+            StateCause::Synced
+        );
+    }
+
+    #[test]
+    fn test_classify_state_cause_pushing_takes_precedence() {
+        let pushing_flags: Vec<String> = vec!["DIRTY".to_string(), "AHEAD:3".to_string()];
+        let inputs = StateCauseInputs {
+            flags: &pushing_flags,
+            push_status: "PENDING",
+            modified: 5,
+            staged: 0,
+            untracked: 0,
+            ahead: 3,
+            behind: 0,
+            last_commit_minutes: Some(2),
+            last_push_minutes: Some(8),
+        };
+        assert_eq!(
+            classify_state_cause(&inputs, &default_thresholds()),
+            StateCause::Pushing
+        );
+    }
+
+    #[test]
+    fn test_classify_state_cause_stalled_is_the_users_pain() {
+        let dirty_flags: Vec<String> = vec!["DIRTY".to_string()];
+        let inputs = StateCauseInputs {
+            flags: &dirty_flags,
+            push_status: "OK",
+            modified: 3,
+            staged: 0,
+            untracked: 0,
+            ahead: 0,
+            behind: 0,
+            last_commit_minutes: Some(20),
+            last_push_minutes: Some(45),
+        };
+        assert_eq!(
+            classify_state_cause(&inputs, &default_thresholds()),
+            StateCause::Stalled
+        );
+    }
+
+    #[test]
+    fn test_classify_state_cause_dirty_within_committing_window_is_stalled() {
+        let dirty_flags: Vec<String> = vec!["DIRTY".to_string()];
+        let inputs = StateCauseInputs {
+            flags: &dirty_flags,
+            push_status: "OK",
+            modified: 3,
+            staged: 0,
+            untracked: 0,
+            ahead: 0,
+            behind: 0,
+            last_commit_minutes: Some(30),
+            last_push_minutes: Some(45),
+        };
+        assert_eq!(
+            classify_state_cause(&inputs, &default_thresholds()),
+            StateCause::Stalled
+        );
+    }
+
+    #[test]
+    fn test_classify_state_cause_intentional_flag() {
+        let intentional_flags: Vec<String> = vec!["INTENTIONAL_NO_UPSTREAM".to_string()];
+        let inputs = StateCauseInputs {
+            flags: &intentional_flags,
+            push_status: "INTENTIONAL",
+            modified: 0,
+            staged: 0,
+            untracked: 0,
+            ahead: 0,
+            behind: 0,
+            last_commit_minutes: Some(60 * 8),
+            last_push_minutes: None,
+        };
+        assert_eq!(
+            classify_state_cause(&inputs, &default_thresholds()),
+            StateCause::Intentional
+        );
+    }
+
+    #[test]
+    fn test_classify_state_cause_failed_takes_precedence() {
+        let upstream_flags: Vec<String> = vec!["NO_UPSTREAM".to_string()];
+        let inputs = StateCauseInputs {
+            flags: &upstream_flags,
+            push_status: "FAIL",
+            modified: 0,
+            staged: 0,
+            untracked: 0,
+            ahead: 0,
+            behind: 0,
+            last_commit_minutes: Some(60),
+            last_push_minutes: None,
+        };
+        assert_eq!(
+            classify_state_cause(&inputs, &default_thresholds()),
+            StateCause::Failed
+        );
+    }
+
+    #[test]
+    fn test_classify_state_cause_idle_within_cold_window() {
+        let inputs = StateCauseInputs {
+            flags: &empty_flags(),
+            push_status: "OK",
+            modified: 0,
+            staged: 0,
+            untracked: 0,
+            ahead: 0,
+            behind: 0,
+            last_commit_minutes: Some(4 * 60),
+            last_push_minutes: Some(4 * 60),
+        };
+        assert_eq!(
+            classify_state_cause(&inputs, &default_thresholds()),
+            StateCause::Idle
+        );
+    }
+
+    #[test]
+    fn test_classify_state_cause_cold_beyond_threshold() {
+        let inputs = StateCauseInputs {
+            flags: &empty_flags(),
+            push_status: "OK",
+            modified: 0,
+            staged: 0,
+            untracked: 0,
+            ahead: 0,
+            behind: 0,
+            last_commit_minutes: Some(2 * 24 * 60),
+            last_push_minutes: Some(2 * 24 * 60),
+        };
+        assert_eq!(
+            classify_state_cause(&inputs, &default_thresholds()),
+            StateCause::Cold
+        );
+    }
+
+    #[test]
+    fn test_classify_state_cause_untracked_only() {
+        let dirty_flags: Vec<String> = vec!["DIRTY".to_string()];
+        let inputs = StateCauseInputs {
+            flags: &dirty_flags,
+            push_status: "OK",
+            modified: 0,
+            staged: 0,
+            untracked: 5,
+            ahead: 0,
+            behind: 0,
+            last_commit_minutes: Some(60),
+            last_push_minutes: Some(60),
+        };
+        assert_eq!(
+            classify_state_cause(&inputs, &default_thresholds()),
+            StateCause::Untracked
+        );
+    }
+
+    #[test]
+    fn test_classify_state_cause_uses_per_repo_overrides() {
+        let over = RepoPolicyOverride {
+            active_commit_minutes: Some(30),
+            ..Default::default()
+        };
+        let policy = test_sync_policy();
+        let thresholds = StateCauseThresholds::from_policy(&policy, &over);
+        assert_eq!(thresholds.active_minutes, 30);
+        let inputs = StateCauseInputs {
+            flags: &empty_flags(),
+            push_status: "OK",
+            modified: 0,
+            staged: 0,
+            untracked: 0,
+            ahead: 1,
+            behind: 0,
+            last_commit_minutes: Some(20),
+            last_push_minutes: Some(20),
+        };
+        assert_eq!(
+            classify_state_cause(&inputs, &thresholds),
+            StateCause::Active
+        );
+    }
+
+    #[test]
+    fn test_classify_state_cause_uses_global_when_no_override() {
+        let over = RepoPolicyOverride::default();
+        let policy = test_sync_policy();
+        let thresholds = StateCauseThresholds::from_policy(&policy, &over);
+        assert_eq!(thresholds.active_minutes, 5);
+        let inputs = StateCauseInputs {
+            flags: &empty_flags(),
+            push_status: "OK",
+            modified: 0,
+            staged: 0,
+            untracked: 0,
+            ahead: 0,
+            behind: 0,
+            last_commit_minutes: Some(20),
+            last_push_minutes: Some(20),
+        };
+        assert_eq!(
+            classify_state_cause(&inputs, &thresholds),
+            StateCause::Committing
+        );
     }
 
     #[test]
@@ -3271,6 +3945,9 @@ mod tests {
             nix_auto_update: false,
             standard_files: vec![],
             standard_files_auto: true,
+            active_commit_minutes: 5,
+            committing_commit_minutes: 60,
+            cold_commit_minutes: 1440,
         }
     }
 
@@ -3383,6 +4060,8 @@ mod tests {
             concern: false,
             warn: false,
             hint: "healthy".to_string(),
+            state_cause: StateCause::Healthy,
+            state_cause_label: "healthy".to_string(),
         };
         assert_eq!(row.repo, "/test/repo");
         assert_eq!(row.branch, "main");
@@ -3682,7 +4361,7 @@ mod tests {
     }
 
     #[test]
-    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBzbTYyMTJwOG1XaVRmaU40S21FZGliVlIzMWh4dVNvSHRiVFhpOG1UK1NRClc5QlR5Z3pObHBMSm9RakJNWkFYKzVPMitra3h1OVdhQ0JrNHpoUmlIQWcKLT4gWDI1NTE5IGxZZmFwN1FYWUJ3VW5SNVl3N3I0RHUyQzFxUkJhSTl0cUMvTHF6bG01MjgKR1FPbmZPQmxxTnNGYkVET3Z4SFNCaCs3WVJvdEd0Y2E3SFF0OENLMDA5cwotPiBYMjU1MTkgMHdYRG9lbUZ0WnhONTQ3dFpQVFMxRkZuSFN5d2s1S1BLL0ZCaTdJQXhFawpaSDJ6aFlBUm5LZDdvYkszOTdKQTdPTnA4MkswRUk5VGpxSnVDUkxPd1F3Ci0+IFgyNTUxOSBKWTV6b0d1OFZQU3Jvc052YnJGMGw5ZTkwN1RVbllMR1pLZ0lwUzlWeFZRCnF6V29PQmRTaUpSSlg0czFTWFcvVGtrZ25XVG5Odmwyb0h0K3A0dzVGS1EKLT4gWDI1NTE5IGIwZEVWRGFHYUJRaTJIUCtzaXlwUWsyL0hISEpOcno3c2R5L0g2SjEwWGcKK0pDVGpFaVNmdmJ0MlpJY1NjaU5qdlloUEJjSEwrdU1EcEgyeEJFbi82SQotPiBMRS1ncmVhc2UgQGsgYj5la3pKZWAgXlImIFVfU0hAYHUKaW4vbDZBaU1wenM3RTN5V3g1dGYrdVpHSVJLUTBucDFwSHlBZXJ6QnEvaDJ2YkU2cUdCWmdkYlozYnZ4Ci0tLSB5RDlMQUNIQUV6dk9pVU9tTE02ZUVmczB0Q3g3amY1WURyTE81U2R4bkJJClVvhkaqAviHPKSzwUB2E0N58kR+0VitQMDztVwNtzT57ubUXTeGiq50DJNQPQItIXcFMo0hlnGueBtdHmc=]() {
+    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBjcGRkc3RvVVBybS9ZVGhlTytUaDRRSGRGcFlWekVkZVBkQ1lZbFVRcVhjCndza2xHSHdGQ1ZJSy9mR25Fa2hNSmhFS2NpbTVxUXNxUHRYMDZCR1JxMjAKLT4gWDI1NTE5IFhPZHh6VGJub0NBVkZsdk4rdDdTNnNweFlHSjg5YWNVNVBPS1g1Y20zejgKVU5hOXY0bld0dGszeGttdFQvb0Q4aFdCUnJHVVlCd3Ixc3dYYXZ4bFdCOAotPiBYMjU1MTkgV0dCQjVUUzRlaHlXUlFQODkwdVVoVk9oNW9tbUJNb0R5OGJCb0Rld2FBMApwV1JCdURkWCs2cFpjRGxvcVM5aE1FN0l5MlRHRDBOSFAvSS9TUk05UlgwCi0+IFgyNTUxOSBRWVpIR3hydEFwUm9jREJveXJCMzcxMGNuS0dTZVlIeVpWNGJWazhEbVdJCjcydUtab2lzV2xLNXhYZlBvSVROK2J0YmpQN20vd29rNW9zUHV4UDBBZFkKLT4gWDI1NTE5IEJuNy9YRmVtWTdBeEtsRGh6VUZZRTNDY0YwRU5Zb3R3SXhJYmYzNlBJWHcKYTFiK0k4dkV3YWdpTmprOS9KNHUxbDFaLzhGRmlDQ3BrVFRSRzlmUWpQdwotPiAyZj9lYkYqLWdyZWFzZSAiIGktIHdRaiAqXTJhOgpRY1dBM2l4akRwbENBZ2h4aU9zdkNQSDRhNldUMkJIZzRsNm5vYzgxUkpUOE1ESU9uYVp2RC9YZFpDcHM1a054CklGclhFUlZkRk1FUnh4NnBzR3dnNFJJQmN2Q0F3SWdBMEFTQlREWUxxYUwrQmdVenZXeHVNSG1JZHNwVwotLS0gWEV5NVJtQUJhSGduRGZra3NlZHo4U3YxRUI3dU8vS3hkeExjdzl2aWxKVQqd8h/6k/NAUGQcAiRQbBiH8391IWByH36GZp6k0FBKBb6yPj5LxKjRhREsiA1vJE3wAoZNyRHyZKz7SSy6]() {
         let mut cooldowns = std::collections::HashMap::new();
         let repo = std::path::PathBuf::from("/test/repo");
         let notify_key = format!("push-fail-{}", repo.display());
@@ -3731,6 +4410,8 @@ mod tests {
             concern: true,
             warn: false,
             hint: "run repair-concerns --apply (push or rewrite)".to_string(),
+            state_cause: StateCause::Failed,
+            state_cause_label: "failed".to_string(),
         };
         assert_eq!(row.push_status, "STUCK");
         assert!(row.push_error.contains("ahead=5"));
@@ -3805,7 +4486,7 @@ mod tests {
     // -------------------------------------------------------------------
 
     #[test]
-    fn build_recent_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA3NXVaRVVZU1lNZjNBRUU5Y3IxbHcwaVF5azhWWkZJc3JmOS9rKzBqSUdNClYxK3ozMnlOd3M1YTl6MkhBMGdnNDIwcFZUNUx3aTRtWVNEeXROb3Bvc1kKLT4gWDI1NTE5IE5lTThDbHduMzVrK252VVRheDQzazd3MUQzeUJOSTIxUlZDQ2R4eFlnRmMKakk3WkR1L0dZWUE5UWpLdElMWUhkL3FJL0Z4OHdydFRucWVxT3hXVjI4bwotPiBYMjU1MTkgaTBsTHU3cDR6dldXNU5qUld0NU0yUTNuWW5rVHdBWEo3bXZaeVltczgxUQpyMHpHRGZaRlhPcENVVTlNMW5vbnNBOTJmQUVyRS9pYlBvd2xwS2pubmRJCi0+IFgyNTUxOSBRSTVPd1pWYTMyMGc4RkJvUlVDbFhhRFFsallDUWY2M1BiT1ZhS08velhNCkczWjFteDZ4MGJPeVlibTVrWnlsV2dvZ3QwK1hDcnlEMUJvRmtZL2hUcEUKLT4gWDI1NTE5IEdBSGUvbkI2TjZqT0RhNkg2SDNURzZKdnd1dGFMYWNQMWhKbjl0dHY3bXcKTzJzcnVsYUQvU2VHY2FMNzRZSVhzSU1hTEpmOEtUNXhXQ1JRSzV2aXdiSQotPiBcSC0tZ3JlYXNlIGogZS8rMSolPkAKNTkrVU5nZ0RWMTZNYU5mRwotLS0gREpkUWZUbGNRZ0tWejJaaERiUHVqNVVtRG95YTQxWUw5b3dhUlM1ZXZxQQq/OLPQZFQPeR7WMgvRtKknj6EYopgXoYlFZgk6fhd8mHEsEpaN7cUz9Lq8EkHuSr2WgBz2+B6wrBDgul8EEw==]() {
+    fn build_recent_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBKM1ViUHlNV0traG1wcmdqU2VJaHhaWWlFdC9sKzIveEdidnd3M0FISVgwCjhyUEtiOFQ0R3FBamdmUHBPdlF1RkNRcTNtSEJoQWJlSEVCdEIxbWladE0KLT4gWDI1NTE5IGRUYnZpSWlPbkM1SnNwd0hSUUlUWWNnV2orMTkzNWRpblVab0tzb0VhaVUKK2tzcEZCRS9RTXUwTlRXQkhTNUx3THI3M2RNejhYS2ZOcFFHOG16UDNtOAotPiBYMjU1MTkgekdRelJqN3RJdjFXL1Rib1BQbjlBTmtLUHYwOUVqMUxXZXFFQ00vN1BXMApaeERucmRTTHRGQmxHUVBoRFFQZ2M3MHdRbFJBREcvcmZsRHcyc2cvaktvCi0+IFgyNTUxOSAvVXJZeE5zaytEcDBBUUliRkNzNGQ2NzFJc1pGRlNrRE40bDROSXNNV2xnCnhscFVZWDVQa3h0ck9JdGVKZzVrRFdwKzNqK0QyNStmcU1EYXd5YVNyWHcKLT4gWDI1NTE5IGJldkRYajR2ekRFMHB5UjJzYkthMkdCeHVobjFJeHpFazdBQWhmdGZTRDAKeEp6RjE3OFJTWDIvMFlMb3VROFRpZ1grZUJCa0lKSGprelFsQ29VNkIvQQotPiAnfnE3Rm05LWdyZWFzZSBkUTl3LVdKQCBlKWsyYlkKdncKLS0tIEQrRVEvUEVERTdJQ0pvN3pTMVZ3VEZYckwydDJMMTMwcHJxNWNvTDVIZW8KjNMoLQmKT9askY1H/2OZrSOaR6Ma5lhrDQMt3saf8a2gsSeIwJ9XhEv+S8EmPb8qVVigO6/WLf7c0kw3Srs=]() {
         use std::time::{SystemTime, UNIX_EPOCH};
         let dir = tempfile::tempdir().unwrap();
         let policy_path = dir.path().join("dracon-sync.toml");
@@ -3839,7 +4520,7 @@ mod tests {
     }
 
     #[test]
-    fn build_recent_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBmbnRwNDgrN3U4OUV3Y1JVcGFhaUlab0VmN0RPODN5dXF0U3NIN0tNL0dJCi9qaEJFYS92R0dyMXRPL3l1SjlaTGVXdmFWK3BhaUdqbGs3d1BheStMUzgKLT4gWDI1NTE5IDgyOEFTOVdwRWdZbFVOZWIrNW9EaWwzeEY3cWc5TUdVMWdoQWh2dmdOU3MKbUlSYkRDaHpWUkhHL0lGamI4WElmc0o0MFhxZG8vd1NFdnJxeUg1VkJhVQotPiBYMjU1MTkgbEZIa01ldUJITWVrQ2pMVTU5R2YyTmtOZEpTZWxsQy9NRllGYjRremFoOApQSFNZdGFUdmM5Y25yTnU2ZkdTaW9ieHFHY3pLd0FrMWhOczY1NWpHZjZFCi0+IFgyNTUxOSBBMnl0K0F5SXRnTjYzK0JHZFhQSjN6TEJyZTdLZGRoV2xsa2dBbDhCekhrCnJRMWd3SlJ0SlNRdGdMa2l4Wjg4VTMxQTN5YzZ3V2k2RCtjSWRDbFhrd1UKLT4gWDI1NTE5IExIVWt0UTBMYXNPSXFxQUZ0dkxJdlJ4K3N0eTlLWUN4L2svWjhBY2hNU3cKeWNOSytCUWxNeWV4VWk4bjdtNWVJbXVML2Y0bjBMOStHZHdMWTFRKzVpbwotPiA0bW9eTnstZ3JlYXNlIElHQlhSIE5oPAo3OVNiTFF0VnBCbUlyaTFJbDJkLzBUaHF4LzdUdzM1NjZ2c0d4VTQKLS0tIEVsem5SMEQxeHlDQ1c2dXJLdkZGQnYxNlhKOVNRVFRKazFreEMwTklDRjQKV0FjO1+hHVpubCs93yVJDGv4eNizhZYr4p2kEjscFpgIvW1sxPOFaFTwAAD2iSTYEzcLtwVukpBeMZzWyHjdkhnq]() {
+    fn build_recent_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBXL09HK2NhbEVDWTA0ZmdiQm1nNVA4dE9tRmZjZWpqaDNBYmczRS9HdVZ3CncrbmxWNzJsbTFmb1RlOGJ4bUwxTUdTUnYrRU52dE5jQkY3cjVLbmZCdWsKLT4gWDI1NTE5IDFqc05xT0tmbXFnby9LS1dQTE1TZ2tVakRUMFpBRVhoUFhmZHAwb1FhQkEKalR2QVU0Zm1ITmdrWDd3Q25MYk5QamhBTDk1cXNHNHpyUXYwZkFBb2wyZwotPiBYMjU1MTkgV2h1RXpkb1ZlZEVJcW5WODNOT1ZCQVVzak5PTjNuVnlJMUNCaE9GcUJGbwpwRzFVTWVTSmU1UEFZTGQ2VXFSLy91T28wZFRKOXpOZ1I0d044RVowUmRnCi0+IFgyNTUxOSBBRUFlTDVQNXgvUm5ScmdGSUwvL3dRdW5Oam44cHZYcU5KQ3JvN1lITlZRCjFmcC9aWGZnYXVkVG9xWjRZaTFLNzVKMlBBelBVMWxKbGk5YzR4U0RPK3cKLT4gWDI1NTE5ICsvQUtpMXFCRHBSeEtoWDNkUHBXQjZncFZpWVo5UERUazBERkM4bktXbGsKemd3RHE0Vm9EdlZJaWtsMnlwMTRRWGtFRmpzSmRhRERJSXE4TUxteGJMUQotPiB1dF9FVy1ncmVhc2UgUlQ1IHBTLQpDOE10TlhhcWZKRTVBNGRkTUpUNWxqWkZCMHVXWUxiRk5XOE9aQ3c1VSsvTjVMTEgKLS0tIDNEcnZuVUY0cTdFZnlIM2hhcytuOG83eHlUSkcxb0M2d0pETTVBUEUzLzQKZwO6SZByXYf9UW5DPSbJSHgXFdp1zk59VD8X8cVzRyR7QlWEbx2CfUls8rj00A1Lmyqm67ISJM7Zf2Th/G+lxBA6]() {
         let dir = tempfile::tempdir().unwrap();
         let policy_path = dir.path().join("dracon-sync.toml");
         let ledger_path = dir.path().join("missing-ledger.jsonl");

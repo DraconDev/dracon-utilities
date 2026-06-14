@@ -1,0 +1,111 @@
+# Repos `STATE` Column
+
+**Status:** Approved · **Date:** 2026-06-14
+
+## Purpose
+
+The `dracon-sync repos` table used to expose the raw signals (last-commit
+time, last-push time, dirty count, ahead/behind, push status) without any
+synthesis. The user could not tell at a glance whether a repo was
+"actively being worked on", "stalling", or "cold idle". The `STATE`
+column combines those signals into a small fixed vocabulary the user can
+scan without thinking.
+
+## Vocabulary
+
+The classifier returns exactly one of these labels per repo:
+
+| Label | Trigger | Colour | Icon |
+|-------|---------|--------|------|
+| `active` | last commit in the last `active_commit_minutes` (default 5m) | green | 🟢 |
+| `committing` | last commit in the last `committing_commit_minutes` (default 60m) but not active; clean | yellow | 🟡 |
+| `pushing` | `push_status = PENDING` (the daemon is mid-cycle) | yellow | 🟣 |
+| `synced` | clean, in sync (`ahead=0, behind=0`), last commit recent | green | 🟢 |
+| `stalled` | dirty (modified > 0 or staged > 0) AND no recent commit AND no recent push | red | 🔴 |
+| `dirty` | has uncommitted changes but otherwise in good shape | yellow | 🟠 |
+| `untracked-only` | only untracked files, no modified/staged | white | ⚪ |
+| `intentional` | repo flagged `intentional_no_upstream = true` | magenta | 🟣 |
+| `failed` | `push_status = FAIL` or `STUCK` | red | ⛔ |
+| `idle` | clean, no recent activity, last commit within `cold_commit_minutes` | white | ⚪ |
+| `cold` | last commit older than `cold_commit_minutes` (default 24h) | dark grey | ⚫ |
+| `healthy` | fallback when nothing else matches | dark grey | ✅ |
+
+## Why the order matters
+
+The classifier is order-dependent. More specific / operator-explicit
+labels take precedence over computed fallbacks:
+
+1. `failed` (push failure) and `pushing` (daemon mid-cycle) are
+   operator-explicit signals, so they win over every other label.
+2. `intentional` (per-repo opt-in flag) is the user's explicit
+   declaration that "this repo is intentionally isolated", so it
+   wins over the computed staleness labels.
+3. `stalled` is the user's "stalling for minutes" pain case, so it
+   fires before the looser `committing` and `dirty` fallbacks. The
+   `stalled` label is *narrow* by design: it requires both
+   `modified > 0` and *no* recent activity, so a repo with active
+   commits in the last 5 minutes never looks stalled.
+4. `active` fires when the last commit is within the active window
+   and the row is not already classified.
+5. `synced` is the "clean + recent + in-sync" case and renders
+   green, distinguished from `active` by `ahead=0, behind=0`.
+6. `committing` covers the case where the last commit is in the
+   committing window but the row did not match `active` or `synced`.
+7. `untracked-only` is reported as such even when the last commit
+   is recent, because the operator's question is "do I have
+   uncommitted work?" and untracked files do not count.
+8. `dirty` is the broad fallback for "I have uncommitted changes
+   but the classifier did not match any more specific case".
+9. `cold` fires when the last commit is older than the cold
+   threshold and the row is otherwise clean.
+10. `idle` is the final "clean, no recent activity" label, and
+    `healthy` is the universal fallback.
+
+## Thresholds
+
+The thresholds live in the global policy:
+
+```toml
+# /etc/dracon-sync.toml or ~/.dracon/utilities/sync/dracon-sync.toml
+active_commit_minutes = 5         # default 5
+committing_commit_minutes = 60    # default 60
+cold_commit_minutes = 1440        # default 1440 (24h)
+```
+
+Per-repo overrides are supported via
+`<repo>/.dracon/dracon-sync.toml`:
+
+```toml
+# Wider active window for a repo with a long build cycle.
+active_commit_minutes = 30
+committing_commit_minutes = 180
+```
+
+The override path uses the same mechanism as
+`intentional_no_upstream` — the per-repo TOML is loaded by
+`load_repo_override` and merged into the row builder at
+classification time.
+
+## `last_push_for_branch` regression
+
+The `PUSHED` column (the relative time of the most recent push) used
+to call `git reflog show origin/<branch> --format=%cr -1`. For repos
+that were freshly cloned and never fetched again, the remote-tracking
+reflog has no entries and the command returns empty output, which
+surfaced as a misleading `-` in the `PUSHED` column. The helper now
+uses `git log -1 --format=%cr origin/<branch>`, which returns the
+committer date of the remote-tracking tip regardless of the reflog
+state. The fix is documented in the source as an explicit
+implementation note.
+
+## Verification
+
+The classifier has 12 unit tests covering each label plus the per-repo
+override path. The `last_push_for_branch` fix has its own regression
+test that constructs a freshly-cloned repo with an empty reflog for
+`origin/main` and asserts the helper returns a real date.
+
+The full validation suite (fmt, clippy, test, build, deny,
+verify-spec, install --dry-run, repos JSON, repair concerns/warns,
+doctor, warden, secret scans, three-remote SHA alignment) must stay
+green after any change to this classification.

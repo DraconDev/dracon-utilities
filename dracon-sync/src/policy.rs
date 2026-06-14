@@ -479,6 +479,21 @@ pub(crate) struct SyncPolicy {
     /// When false, use `dracon-sync scaffold` to apply on demand.
     #[serde(default = "default_true")]
     pub(crate) standard_files_auto: bool,
+    /// `dracon-sync repos` "active" threshold (in minutes). A repo whose
+    /// last commit is more recent than this is labelled `active` in the
+    /// derived state column. Default: 5 minutes.
+    #[serde(default = "default_active_commit_minutes")]
+    pub(crate) active_commit_minutes: u64,
+    /// `dracon-sync repos` "committing" threshold (in minutes). A repo
+    /// whose last commit is between `active_commit_minutes` and this
+    /// value is labelled `committing`. Default: 60 minutes.
+    #[serde(default = "default_committing_commit_minutes")]
+    pub(crate) committing_commit_minutes: u64,
+    /// `dracon-sync repos` "cold" threshold (in minutes). A repo whose
+    /// last commit is older than this is labelled `cold`. Default:
+    /// 1440 minutes (24 hours).
+    #[serde(default = "default_cold_commit_minutes")]
+    pub(crate) cold_commit_minutes: u64,
 }
 
 /// Package registry type for auto-publish.
@@ -518,6 +533,18 @@ pub(crate) struct PublishTarget {
 
 fn default_publish_timeout_secs() -> u64 {
     300
+}
+
+fn default_active_commit_minutes() -> u64 {
+    5
+}
+
+fn default_committing_commit_minutes() -> u64 {
+    60
+}
+
+fn default_cold_commit_minutes() -> u64 {
+    1440
 }
 
 #[derive(Debug, Deserialize, Default, Clone)]
@@ -562,6 +589,18 @@ pub(crate) struct RepoPolicyOverride {
     /// Default: false. Set in `<repo>/.dracon/dracon-sync.toml`.
     #[serde(default)]
     pub(crate) intentional_no_upstream: bool,
+    /// Per-repo override for `active_commit_minutes`. None means inherit
+    /// the global value. See [`SyncPolicy::active_commit_minutes`].
+    #[serde(default)]
+    pub(crate) active_commit_minutes: Option<u64>,
+    /// Per-repo override for `committing_commit_minutes`. None means
+    /// inherit the global value.
+    #[serde(default)]
+    pub(crate) committing_commit_minutes: Option<u64>,
+    /// Per-repo override for `cold_commit_minutes`. None means inherit
+    /// the global value.
+    #[serde(default)]
+    pub(crate) cold_commit_minutes: Option<u64>,
 }
 
 pub(crate) fn default_true() -> bool {
@@ -1247,6 +1286,9 @@ pub(crate) fn test_sync_policy() -> SyncPolicy {
         nix_auto_update: false,
         standard_files: vec![],
         standard_files_auto: true,
+        active_commit_minutes: 5,
+        committing_commit_minutes: 60,
+        cold_commit_minutes: 1440,
     }
 }
 

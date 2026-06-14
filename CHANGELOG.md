@@ -8,6 +8,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`dracon-sync repos` `STATE` column**: The `repos` table now includes a
+  derived "STATE" column that combines last-commit time, last-push time,
+  dirty state, ahead/behind, and push status into a small fixed
+  vocabulary the user can scan at a glance. The vocabulary covers
+  `active`, `committing`, `pushing`, `synced`, `stalled`, `dirty`,
+  `untracked-only`, `intentional`, `failed`, `idle`, `cold`, and
+  `healthy`. The `stalled` label specifically surfaces the
+  "stalling for minutes" case the user asked about: dirty AND no
+  recent commit AND no recent push. Thresholds
+  (`active_commit_minutes`, `committing_commit_minutes`,
+  `cold_commit_minutes`) live in the global policy with optional
+  per-repo overrides in `RepoPolicyOverride`. The `--json` output
+  includes the new `state_cause` and `state_cause_label` fields on
+  every row. Documented in `docs/design/repos-state-cause.md`.
+
+### Fixed
+- **`dracon-sync` `PUSHED` column missing for freshly-cloned repos**:
+  The `last_push_for_branch` helper used `git reflog show origin/<branch>
+  --format=%cr -1`, which returns empty output for repos whose
+  remote-tracking reflog has no entries (i.e. freshly cloned and
+  never re-fetched). The PUSHED column showed `-` for those repos
+  even though the remote-tracking ref was perfectly valid. The helper
+  now uses `git log -1 --format=%cr origin/<branch>`, which returns
+  the committer date of the remote tip in both the populated-reflog
+  and empty-reflog cases. Regression test added: builds a bare repo,
+  seeds a commit, clones it, and asserts the helper returns a real
+  date.
+
 - **`dracon-sync` per-repo `intentional_no_upstream` opt-out**: A repo
   whose `.dracon/dracon-sync.toml` sets `intentional_no_upstream = true`
   is now recognized as intentionally isolated (e.g., a legacy private

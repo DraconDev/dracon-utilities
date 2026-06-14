@@ -61,6 +61,13 @@ recently and failed", and the four code sites are forced to consult it.
    `INTENTIONAL` (rendered green), and `dracon-sync repair concerns`
    skips the repo entirely. The auto-repair path must never run
    `git push -u origin HEAD` for these repos.
+7. **The `STATE` column is the user-readable summary of the row.** A
+   repo with `modified > 0` (or `staged > 0`) AND no recent commit AND
+   no recent push is `stalled` — this is the "stalling for minutes"
+   case the operator asked about. The thresholds
+   (`active_commit_minutes`, `committing_commit_minutes`,
+   `cold_commit_minutes`) live in the global policy with optional
+   per-repo overrides in `RepoPolicyOverride`.
 
 ## Classification rules
 
