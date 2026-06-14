@@ -27,6 +27,22 @@ pulse_interval_secs = 1
 # Push only after this many quiet seconds since last detected repo change.
 inactivity_push_delay_secs = 5
 
+# Apply-phase deadline (seconds) is derived from `pulse_interval_secs * 2`
+# (with a 2s minimum). It bounds the time the daemon's main loop waits for
+# in-flight `sync_repo` calls to finish. A slow push on one repo cannot
+# block the next cycle beyond this deadline. Unfinished sync_repo calls
+# remain in the in-flight queue and are drained in subsequent cycles.
+# (This is an internal policy of the daemon — no user-tunable field.)
+
+# Maximum number of `sync_repo` calls dispatched in parallel per daemon
+# cycle. With 17+ watched repos, a serial loop blocks all other repos
+# on the slowest push (e.g. 60s `push_op_timeout_secs` for a slow
+# gitlab). Bounded parallelism (default 4 concurrent) lets the daemon
+# process multiple repos simultaneously. Each `sync_repo` call still
+# has its own timeout; the cap just bounds how many run at once.
+# Set to 1 to restore the original serial behavior.
+sem_max_concurrent_sync = 4
+
 # Maximum number of `sync_repo` calls dispatched in parallel per daemon
 # cycle. With 17+ watched repos, a serial loop blocks all other repos
 # on the slowest push (e.g. 60s `push_op_timeout_secs` for a slow
@@ -268,7 +284,7 @@ auto_create = false
 # [[publish_targets]]
 # name = "crates-io"
 # registry = "crates-io"          # crates-io | npm | pypi
-# [DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBuQ1d0RHYzZ1Yvajh4R2tHc0ozRU9wVUlTZlM3eU1wZkhCZVhpTHBxeGlnClhwM2k5RDR5djUzTzVkU3YybmFCMjNXOGlmQUpTUDEvcU1iM2pCakREN1UKLT4gWDI1NTE5IEdpQ05pTXZNL29rYlBwVkdlamsveFhqTnVIdndxcjRmNHJVRFRCMWRJQlkKUDY5c3dSTWVlcnBDY1JZUDRWL2VKTHJiN0pxZ1hNWE52ZVNldXowZllqawotPiBYMjU1MTkgYjZtSXo4cERvdnNiT1doSFE3U0hvS1RpcVZEUENNV2xJMFdKeHJSQS9GQQpjeWlvY1g0MU12ZXRGSXF2Z1E3c28xWDBYVlF6OTd4em81WXZMaXFNakl3Ci0+IFgyNTUxOSBjb2x4RWZhZ0JmVnRyUEVJbzl0ZFZDVHNlbWkvZlFJN2NBSkFmd3NxbUEwCnlDUzFpZnNkc3VCeTNVbEZIckdQeUdMU0VyTUtydzBFVGk2OEFTQWhpNEEKLT4gWDI1NTE5IFd2MjJvTUEzdzJZQ3dlK3ROL0VtQ1dScVNFZGZHRFg0TlBzQUtXeXEweTQKeHRXdHRIWGRueTUyVTRNNnRXR2dMcDh1d0x1VngxcTFFR2lPVHQxSitubwotPiBZcFokU3xoLWdyZWFzZQpnakRxZ2YwNitOdzE5Q3lsNFhON0sydTFpTStDZ3JWREFBdwotLS0gVmF2K0cycFlPeVkrTFdFdGhJNitkVTVHc3diNFhLMUJ2ZEN2aUhMby9NOAryZRRT7LXUenY+MVUsKjdP90PeH9abSrNVu5aAaUSr/biH9OgHeblhzg0YUHaFj2JkrHNafjTvud9lR0XSCI9jSIG2CVs=]   # env var name (token in secrets/cratesio.env)
+# [DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSByUVNqczg1Z2hZdjUyOHErSkxnc2txMmpNQlpJU3NIRnFleVM1TS83UldzCkJWUDVBSEhJQzU4QmVUanpqOHdHZkFzOHpZaXUxODMrcVVjYWhVQVh0aUEKLT4gWDI1NTE5IFZoRTQ2Y1hicFlxMzk4T0lSUnEwY2VwTXlrTzE3eCtuL0x5R2ZoYWcxVU0KZlhpZjc3YVY5UXQ1WDNTSEtmZElNTXhXNWRibGJqQkppaUZiZUVzMkJLTQotPiBYMjU1MTkgUVRqN0tHSW5MaTRMOWVBWjVDcXIva2FnQkpsT2ZBc3lGRWkzbXd0RkxqYwo3QTZzUEpsQkdCSDhyZS9MTHB1UHo2NmFOcDN0ajFWdG8xekhIa0V1eEo0Ci0+IFgyNTUxOSBvM1pCK3N0MUR4UktxSWVqSlM1V29ONmxrbC8yYVR6Y1p0Vzh0OGlSc1M4CndZcUxtWm1WOXNrRHBYcU9wSyt6NWVDemZObE92QnA4N1JYSFRBZlA4aHcKLT4gWDI1NTE5IFBNMzdqTnJJMDc3WmxjRnhGd09kODMrdHNPMzlOcVZLdUhuTjZlL3NwRFkKRWRSQ3NBaUl5STFHcENDbFpCL01vaXkrKzUrK2JMUTM1TXVBVHV2dWdBbwotPiAyQnAmLWdyZWFzZSBCdUlpTHAKZURJQlJnWms2KzBZVUxYWDlJd0FIZytHREdYNUJtUVlVQXNHOHZ5aldmWmZQVERyWDk4Ci0tLSBhcE9vRE5wbjEwMEVjTmZSSW1xL3ZBWWFsV3RmWG01Qkd5WDFqNTFibFpjCt2M5RDG/LQq5w3vR0HCxdQ1aytC5ons9e+9EWU1GDxkxwrW1JnOpJiKS/w1pnREVnnXEAfW17gWmTXgIrP3d32vGOj6Dg==]   # env var name (token in secrets/cratesio.env)
 # publish_timeout_secs = 300
 #
 # [[publish_targets]]
@@ -436,3 +452,29 @@ auto_create = false
 # committing_commit_minutes = 60
 # cold_commit_minutes = 1440
 
+# =============================================================================
+#  SECTION 12: CANONICAL GIT IDENTITY
+# =============================================================================
+# The daemon auto-commits using the git identity configured in:
+#   1. The per-repo `.git/config` `[user]` section, if set.
+#   2. The global `~/.gitconfig` `[user]` section as a fallback.
+#
+# The canonical operator profile for Dracon services is:
+#   user.name  = DraconDev
+#   user.email = dracsharp@gmail.com
+#
+# To set the global profile:
+#   git config --global user.name  "DraconDev"
+#   git config --global user.email "dracsharp@gmail.com"
+#
+# To set a per-repo override (rarely needed):
+#   git -C /path/to/repo config user.name  "DraconDev"
+#   git -C /path/to/repo config user.email "dracsharp@gmail.com"
+#
+# A drift to `user.name = Dracon` (no surname) is a known config bug —
+# search with:
+#   grep -RIn 'user\.name' ~/.gitconfig ~/.dracon/ /home/dracon/*/.git/config
+# If any result shows `name = Dracon` (without "Dev"), correct it.
+# The daemon does NOT rewrite the git identity at runtime; auto-commits
+# always use whatever the local config resolves to. Operators should
+# keep their profile consistent.

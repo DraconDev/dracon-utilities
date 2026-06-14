@@ -1349,16 +1349,14 @@ pub(crate) async fn run_daemon(
             // responsive: a new dirty file in repo A is processed
             // in the next cycle, not after the slowest push on
             // repo B finishes.
-            let apply_deadline = Duration::from_secs(
-                policy.pulse_interval_secs.max(1) * 2,
-            );
+            let apply_deadline = Duration::from_secs(policy.pulse_interval_secs.max(1) * 2);
             let apply_deadline_at = tokio::time::Instant::now() + apply_deadline;
             loop {
                 let next = tokio::time::timeout_at(apply_deadline_at, in_flight.next()).await;
                 let joined = match next {
                     Ok(Some(joined)) => joined,
-                    Ok(None) => break,    // in_flight empty
-                    Err(_) => break,       // timeout
+                    Ok(None) => break, // in_flight empty
+                    Err(_) => break,   // timeout
                 };
                 let Ok((repo, remote_failures, sync_res)) = joined else {
                     continue;

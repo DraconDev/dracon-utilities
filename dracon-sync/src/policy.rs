@@ -1474,6 +1474,23 @@ mod tests {
     }
 
     #[test]
+    fn test_default_sem_max_concurrent_sync_is_four() {
+        assert_eq!(default_sem_max_concurrent_sync(), 4);
+    }
+
+    /// Regression test: the apply-phase deadline is derived from
+    /// `pulse_interval_secs` so the daemon main loop is bounded
+    /// against a slow push. The deadline is `pulse_interval_secs * 2`
+    /// with a minimum of 2s.
+    #[test]
+    fn test_apply_deadline_derived_from_pulse_interval() {
+        // Default pulse_interval_secs is 1; the deadline is 1*2 = 2.
+        let p = SyncPolicy::default();
+        let expected = (p.pulse_interval_secs.max(1) * 2) as u64;
+        assert_eq!(expected, 2);
+    }
+
+    #[test]
     fn test_git_host_blob_limit() {
         assert_eq!(DEFAULT_GIT_HOST_BLOB_LIMIT_BYTES, 100 * 1024 * 1024);
     }

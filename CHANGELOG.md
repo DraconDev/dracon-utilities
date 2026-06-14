@@ -20,7 +20,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   intentionally simplifies the deeply-nested stuck-ahead/behind
   /mirror notification logic; that gets restored in a follow-up.
   Set `sem_max_concurrent_sync = 1` to restore the original
-  serial behavior.
+  serial behavior. The apply phase is also bounded by a
+  per-cycle deadline (`pulse_interval_secs * 2`, min 2s) so a
+  slow push on one repo cannot block the next cycle indefinitely;
+  unfinished tasks remain in the in-flight queue and are drained
+  in subsequent cycles.
+
+- **Canonical git identity section in `dracon-sync.example.toml`**: a
+  new SECTION 12 documents the canonical `DraconDev <dracsharp@gmail.com>`
+  profile, the global/per-repo resolution order, the search command
+  to detect drift, and a note that the daemon does not rewrite
+  identity at runtime. Operators should keep their profile consistent
+  across `~/.gitconfig` and per-repo `.git/config` files.
 
 - **All operator-owned warden pub keys are now tracked**: the
   previous goal tracked only `owner_nixos.pub`. This goal
