@@ -23,6 +23,13 @@ The classifier returns exactly one of these labels per repo:
 | `synced` | clean, in sync, commit/push within `committing_commit_minutes` but outside the active window | green | 🟢 |
 | `stalled` | dirty tracked/staged work sitting longer than `committing_commit_minutes` with no push progress | red | 🔴 |
 | `dirty` | recent dirty tracked/staged work expected to be picked up by normal sync; force immediately with `sync-now --warns` | yellow | 🟠 |
+
+The report also shows a `DAEMON` column (sourced from the incident
+ledger) that reports the daemon's most recent recorded action per
+repo, e.g. `32s ago sync_commit ok` or `5m ago sync_triage ok`. This
+is the user's "is the daemon still working through dirty rows?" signal
+that the `last_when` / `last_push` columns cannot give on their own
+(both reset to the moment of the daemon's own commit).
 | `untracked-only` | only untracked files, no modified/staged | white | ⚪ |
 | `intentional` | repo flagged `intentional_no_upstream = true` | magenta | 🟣 |
 | `failed` | `push_status = FAIL` or `STUCK` | red | ⛔ |

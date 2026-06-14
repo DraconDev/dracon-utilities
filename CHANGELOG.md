@@ -20,6 +20,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Recent dirty work is labelled `dirty` so normal sync can pick it up
   after the configured settling delay without a red stalled alarm;
   `sync-now --warns` forces the same dirty-only triage immediately.
+- **`dracon-sync repos` shows daemon activity**: added a new `DAEMON`
+  column to the live `repos` table that shows the daemon's most recent
+  recorded action per repo (e.g. `32s ago sync_commit ok`,
+  `5m ago sync_triage ok`, `none`). This is sourced from the incident
+  ledger and is wired into `sync_repo` so every auto-commit is recorded.
+  The `last_when` / `last_push` columns reset to the moment of the
+  daemon's own commit, so the `DAEMON` column closes the gap between
+  "is the user still editing" and "is the daemon actively syncing".
   Thresholds
   (`active_commit_minutes`, `committing_commit_minutes`,
   `cold_commit_minutes`) live in the global policy with optional
