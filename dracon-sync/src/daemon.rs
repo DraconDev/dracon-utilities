@@ -1,5 +1,5 @@
 use anyhow::Result;
-use dracon_git::{GitService, RepoStatus as Status};
+use dracon_git::{GitService, Status};
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
 use std::collections::{BTreeSet, HashMap, HashSet};
@@ -55,34 +55,6 @@ struct StuckRepoEntry {
     path: PathBuf,
     stuck_since: u64,
 }
-
-/// A unit of work in the bounded-parallel sync phase. Each eligible
-/// repo gets a `SyncJob` populated during the serial eligibility loop;
-/// the parallel phase dispatches one `sync_repo` per `SyncJob` into a
-/// tokio task and the apply phase processes the results.
-struct SyncJob {
-    repo: PathBuf,
-    changed_at_secs: u64,
-    remote_failures: HashMap<String, usize>,
-}
-
-/// Re-fetch a fresh `RepoStatus` for a repo in the apply phase. The
-/// original serial loop kept a `GitService` and `RepoStatus` in scope,
-/// but those are not safe to share across the parallel phase. A fresh
-/// fetch in the apply phase re-derives the status for the post-sync
-/// divergence check.
-async fn svc_for_recheck(repo: &Path) -> Result<Status> {
-    let svc = GitService::new(repo)?;
-    Ok(svc.get_status().await?)
-}
-
-/// Threshold durations used by the apply phase to fire desktop
-/// notifications for stuck-ahead/stuck-behind repos. The original
-/// inline constants inside the for-loop body moved here so the
-/// apply phase can reference them.
-const STUCK_AHEAD_THRESHOLD: Duration = Duration::from_secs(600); // 10 min
-const STUCK_BEHIND_THRESHOLD: Duration = Duration::from_secs(1800); // 30 min
-const MIRROR_DEGRADED_THRESHOLD: usize = 3; // 3 consecutive fails
 
 /// Threshold durations used by the apply phase to fire desktop
 /// notifications for stuck-ahead/stuck-behind repos. The previous
