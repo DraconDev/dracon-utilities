@@ -390,6 +390,19 @@ pub(crate) struct SyncPolicy {
     pub(crate) exclude_dir_names: Vec<String>,
     #[serde(default = "default_exclude_file_patterns")]
     pub(crate) exclude_file_patterns: Vec<String>,
+    /// If true, the daemon will stage newly-created untracked working
+    /// files on the next sync cycle. Defaults to `true` so brand-new
+    /// working files (research docs, source files, etc.) get
+    /// committed promptly. Excluded by `untracked_exclude_patterns`.
+    #[serde(default = "default_true")]
+    pub(crate) auto_stage_untracked: bool,
+    /// Glob patterns for untracked files that should NOT be
+    /// auto-staged by `auto_stage_untracked`. Defaults to common
+    /// safe patterns: user notes, scratch files, audit/research
+    /// evidence, and dotfile/scratch dirs. Edit in
+    /// `dracon-sync.toml` to extend.
+    #[serde(default = "default_untracked_exclude_patterns")]
+    pub(crate) untracked_exclude_patterns: Vec<String>,
     #[serde(default = "default_true")]
     pub(crate) auto_repair_concerns: bool,
     #[serde(default = "default_true")]
@@ -654,6 +667,48 @@ pub(crate) fn default_exclude_file_patterns() -> Vec<String> {
         "*.db-journal",
         "*.db-wal",
         "*.db-shm",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect()
+}
+
+/// Default exclude patterns for `auto_stage_untracked`. The daemon
+/// will NOT auto-stage untracked files matching any of these
+/// patterns. Defaults are conservative: user notes, scratch files,
+/// local task state, and audit evidence stay untracked.
+pub(crate) fn default_untracked_exclude_patterns() -> Vec<String> {
+    [
+        // User notes — NEVER auto-stage
+        "**/note.md",
+        "**/notes.md",
+        "**/NOTE.md",
+        "**/NOTES.md",
+        "**/scratch.md",
+        "**/scratch.txt",
+        // Scratch / research dirs — keep evidence local
+        "**/scratch/**",
+        "**/scratch-*",
+        "**/scratch_*",
+        "**/tmp/**",
+        "**/tmp-*",
+        "**/research/scratch/**",
+        // Local task / session state — never auto-stage
+        ".demon/**",
+        ".sisyphus/**",
+        ".ralph/**",
+        // Audit / evidence — never auto-stage by default
+        "**/audit/**",
+        "**/evidence/**",
+        "**/screenshots/**",
+        // Screenshot / image files dropped in working tree
+        "*.png",
+        "*.jpg",
+        "*.jpeg",
+        "*.gif",
+        "*.webp",
+        "*.mp4",
+        "*.mov",
     ]
     .into_iter()
     .map(String::from)
