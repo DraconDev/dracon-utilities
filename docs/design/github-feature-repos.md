@@ -41,8 +41,15 @@ feature metadata only, while `dracon-utilities` owns code and releases.
 ## Maintenance
 
 ```bash
-cd /path/to/dracon-utilities
+# Just regenerate the files (no git)
 ./scripts/scaffold_feature_repos.py --apply
+
+# Regenerate, init a local git repo, commit, and set the origin remote
+./scripts/scaffold_feature_repos.py --apply --init-git --target-root ../dracon-feature-repos
+
+# After the GitHub repo exists:
+cd ../dracon-feature-repos/dracon-sync
+git push -u origin main
 ```
 
 The scaffold writes only these files in each façade repo:
@@ -54,6 +61,12 @@ The scaffold writes only these files in each façade repo:
 - `.github/ISSUE_TEMPLATE/feature-or-problem.md`
 - `.github/CODEOWNERS`
 - `docs/SOURCE_OF_TRUTH.md`
+
+With `--init-git`, the script also runs `git init -b main`, makes an initial
+commit (`--no-verify`, because the warden pre-commit hook rejects repos that
+do not yet have the warden filter configured), and adds the
+`DraconDev/<name>` origin remote. Pushing is left to the operator so that the
+GitHub-side decision (visibility, description, topics) stays explicit.
 
 Push the generated façade repo normally after reviewing the diff. Do not push
 implementation code into the façade.

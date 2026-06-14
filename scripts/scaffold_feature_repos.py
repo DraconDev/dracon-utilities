@@ -283,6 +283,11 @@ def main(argv: list[str]) -> int:
         action="store_true",
         help="Run an internal generation self-test and exit.",
     )
+    parser.add_argument(
+        "--init-git",
+        action="store_true",
+        help="Initialize a git repo at the target path, commit the generated files, and add a local origin remote pointing at DraconDev/<name> on GitHub. Pushing is left to the operator.",
+    )
     args = parser.parse_args(argv)
 
     monorepo_root = args.monorepo_root.resolve()
@@ -301,6 +306,8 @@ def main(argv: list[str]) -> int:
         repo_root = args.target_root.resolve() / spec.name
         if args.apply:
             write_tree(repo_root, spec, monorepo_root)
+            if args.init_git:
+                _init_local_git_repo(repo_root, spec)
         payload.append(
             {
                 "name": spec.name,
@@ -316,6 +323,50 @@ def main(argv: list[str]) -> int:
     else:
         print(json.dumps(payload, indent=2, sort_keys=True))
     return 0
+
+
+def _init_local_git_repo(repo_root: Path, spec: RepoSpec) -> None:
+    """Initialize a local git repo for the generated façade and commit.
+
+    Adds a `DraconDev/<name>` `origin` remote so the operator only has to
+    `git push -u origin main` after the GitHub repository exists.
+    """
+    import subprocess
+
+    subprocess.run(["git", "init", "-b", "main", str(repo_root)], check=True)
+    subprocess.run(
+        ["git", "-C", str(repo_root), "config", "user.email", "ops@dracon.uk"],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(repo_root), "config", "user.name", "DraconDev"],
+        check=True,
+    )
+    subprocess.run(["git", "-C", str(repo_root), "add", "."], check=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(repo_root),
+            "commit",
+            "--no-verify",
+            "-m",
+            f"docs: scaffold GitHub feature surface for {spec.name}",
+        ],
+        check=True,
+    )
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(repo_root),
+            "remote",
+            "add",
+            "origin",
+            f"https://github.com/DraconDev/{spec.name}.git",
+        ],
+        check=True,
+    )
 
 
 if __name__ == "__main__":

@@ -78,6 +78,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   wrapper while individual git operations are still making progress. Warn
   repair now delegates to `sync_repo`'s per-operation timeouts instead of
   aborting the whole triage pass with a synthetic timeout.
+- **`scripts/scaffold_feature_repos.py` `--init-git` flag for self-contained
+  workflow**: Generates the façade files, initializes a local git repo,
+  commits them with `--no-verify`, and adds `DraconDev/<name>` as the
+  `origin` remote. The operator only has to `git push -u origin main` after
+  the GitHub repository exists.
+- **`scripts/scaffold_feature_repos.py` `--monorepo-root` defaults to the
+  script's own directory**: The previous default of `Path.cwd()` only
+  worked when the operator ran the script from the monorepo root. The new
+  default is `--monorepo-root` resolves to the directory that contains
+  `scripts/`, so the script behaves the same regardless of cwd. CLI flags
+  still take precedence.
 - **`dracon-sync repos` last-push query skips unsafe branch names**:
   `last_push_for_branch()` now short-circuits when the current branch is
   empty (detached HEAD) or contains shell-special characters that would
