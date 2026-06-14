@@ -1,5 +1,7 @@
 use anyhow::Result;
 use dracon_git::GitService;
+use futures::stream::FuturesUnordered;
+use futures::StreamExt;
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -7,6 +9,7 @@ use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::signal::unix::SignalKind;
+use tokio::sync::Semaphore;
 use tokio::time::sleep;
 
 pub(crate) static VERBOSITY: AtomicU8 = AtomicU8::new(0);
