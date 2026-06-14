@@ -78,6 +78,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   wrapper while individual git operations are still making progress. Warn
   repair now delegates to `sync_repo`'s per-operation timeouts instead of
   aborting the whole triage pass with a synthetic timeout.
+- **`dracon-sync repos` last-push query skips unsafe branch names**:
+  `last_push_for_branch()` now short-circuits when the current branch is
+  empty (detached HEAD) or contains shell-special characters that would
+  break the `git reflog show origin/{branch}` argument. Previously the
+  command was run unconditionally and the column silently showed "-".
+- **`dracon-sync repos` `git log` subject parser preserves unit separators**:
+  `parse_git_log_meta_line()` rejoins any extra unit-separated fields back
+  into the subject, so a commit subject that itself contains `\x1f` is
+  reconstructed verbatim instead of being truncated at the first extra
+  field.
 - **`dracon-sync repos` hint text now matches WARN vs CONCERN semantics**:
   A dirty repo with unpushed commits but no recent push failure is still
   `WARN`, so its hint now says the daemon will push after changes settle
