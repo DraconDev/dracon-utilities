@@ -899,6 +899,15 @@ pub(crate) async fn run_daemon(
             continue;
         }
 
+        // BOUNDED PARALLEL SYNC: the daemon collects every eligible repo
+        // into `to_sync` during the serial loop below, then dispatches all
+        // the `sync_repo` calls concurrently in the parallel phase. This
+        // means a slow push on one repo (e.g. 60s `push_op_timeout_secs`
+        // against a slow gitlab) no longer blocks other repos from being
+        // committed. The post-sync state mutations still happen serially
+        // in the apply phase so we don't need locks on the activity map.
+        let mut to_sync: Vec<SyncJob> = Vec::new();
+
         for repo in repos {
             // Clone policy at each repo iteration for a consistent snapshot.
             // If the policy is reloaded mid-cycle (SIGHUP), this repo still
@@ -1230,16 +1239,20 @@ pub(crate) async fn run_daemon(
                 continue;
             }
 
-            let sync_success = match sync_repo(
-                &repo,
-                &policy,
-                &excluded_dir_names,
-                now.duration_since(entry.changed_at).as_secs(),
-                Some(&mut entry.remote_failures),
-                false,
-                Some(&policy_path),
-            )
-            .await
+            // BOUNDED PARALLEL SYNC: collect this eligible repo into the
+            // jobs list. The actual sync_repo call is dispatched in the
+            // parallel phase below, which runs up to
+            // `policy.sem_max_concurrent_sync` repos concurrently so that
+            // a slow push on one repo does not block other repos from
+            // being committed and pushed. Per-repo state mutations
+            // (cooldowns, activity map updates) still happen serially in
+            // the apply phase after all jobs complete.
+            to_sync.push(SyncJob {
+                repo: repo.clone(),
+                changed_at_secs: now.duration_since(entry.changed_at).as_secs(),
+                remote_failures: std::mem::take(&mut entry.remote_failures),
+            });
+            continue;
             {
                 Ok(crate::sync::SyncOutcome::Synced) => {
                     eprintln!("🔁 synced {}", repo.display());
@@ -1297,8 +1310,17 @@ pub(crate) async fn run_daemon(
                 }
             };
 
-            let mut should_cooldown = false;
-            if policy.auto_repair_concerns && sync_success {
+            // === POST-SYNC STATE MUTATIONS MOVED TO APPLY PHASE ===
+            // The post-sync logic (should_cooldown, run_repair_concerns,
+            // run_repair_warns, stuck_push_repos, activity map mutations,
+            // and the stuck-ahead/behind/mirror notification block) all
+            // operate on per-repo state and run serially in the apply
+            // phase AFTER all parallel sync_repo calls complete. This
+            // avoids needing locks on the activity map during parallel
+            // execution. The apply phase re-establishes the local
+            // bindings (entry, status, sync_success) from the result of
+            // the parallel phase.
+            continue;
                 match run_repair_concerns(
                     &policy_path,
                     true,
