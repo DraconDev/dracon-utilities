@@ -8,6 +8,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **No-redispatch invariant for parallel sync**: the daemon now
+  tracks an `in_flight: HashSet<PathBuf>` consulted by the COLLECT
+  phase's eligibility check. A repo with an active `sync_repo`
+  task is not re-dispatched, even if the apply-phase deadline
+  breaks out before the task completes. The APPLY phase removes
+  repos from `in_flight` when their tasks complete; a bounded
+  trailing drain (`pulse_interval_secs * 2`) clears the rest.
+  This prevents duplicate `git push` invocations on the same
+  `(repo, remote)` pair within a cycle window, which was causing
+  a 2-3 minute "traffic jam" when 4 parallel pushes were
+  competing for the SSH agent and network bandwidth. Live test:
+  3 fresh dirty repos all commit+push in ~38s with no duplicate
+  push attempts. New unit test `test_no_redispatch_invariant`
+  in `dracon-sync/src/daemon.rs`. Documented in
+  `docs/design/dirty-files-investigation.md`.
+
 - **Bounded parallel sync**: `dracon-sync` daemon now dispatches
   `sync_repo` calls in parallel, bounded by the new
   `sem_max_concurrent_sync` policy field (default 4). Previously,

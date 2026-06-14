@@ -224,8 +224,7 @@ mod daemon_tests {
     #[test]
     fn test_no_redispatch_invariant() {
         use std::path::PathBuf;
-        let mut in_flight: std::collections::HashSet<PathBuf> =
-            std::collections::HashSet::new();
+        let mut in_flight: std::collections::HashSet<PathBuf> = std::collections::HashSet::new();
         let repo = PathBuf::from("/tmp/test-repo");
 
         // Initially, the repo is NOT in flight and IS eligible.
@@ -1511,15 +1510,12 @@ pub(crate) async fn run_daemon(
             let trailing_deadline = Duration::from_secs(policy.pulse_interval_secs.max(1) * 2);
             let trailing_deadline_at = tokio::time::Instant::now() + trailing_deadline;
             loop {
-                let next = tokio::time::timeout_at(
-                    trailing_deadline_at,
-                    in_flight_tasks.next(),
-                )
-                .await;
+                let next =
+                    tokio::time::timeout_at(trailing_deadline_at, in_flight_tasks.next()).await;
                 let joined = match next {
                     Ok(Some(joined)) => joined,
-                    Ok(None) => break,  // all drained
-                    Err(_) => break,    // trailing deadline hit
+                    Ok(None) => break, // all drained
+                    Err(_) => break,   // trailing deadline hit
                 };
                 if let Ok((repo, remote_failures, sync_res)) = joined {
                     in_flight.remove(&repo);
@@ -1551,11 +1547,7 @@ pub(crate) async fn run_daemon(
                                 entry.failure_count += 1;
                             }
                             Err(e) => {
-                                eprintln!(
-                                    "⚠️ sync failed (late) for {}: {}",
-                                    repo.display(),
-                                    e
-                                );
+                                eprintln!("⚠️ sync failed (late) for {}: {}", repo.display(), e);
                                 entry.failure_count += 1;
                             }
                         }

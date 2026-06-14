@@ -290,3 +290,69 @@ original serial behavior. Higher values (e.g. 8) help when many
 repos are slow-pushing but risk resource exhaustion. The
 `push_op_timeout_secs` and `stage_op_timeout_secs` still apply
 per-call.
+
+## Parallel-push pipeline audit (follow-up)
+
+After the bounded parallel sync was deployed, a second traffic-jam
+pattern emerged: 4 repos in `🟣 pushing` state simultaneously, with
+3 small-push repos (1 commit each) stuck PENDING for 4 minutes while
+a 4th large-push repo (19 unpushed commits, 60s `push_op_timeout_secs`)
+dominated the cycle. The daemon log showed:
+- 00:22:50: dracon-platform push TIMEOUT (60s)
+- 00:23:32-35: 3 small-push repos committed
+- 00:24:16-25:19: 3 retry storms for dracon-platform
+- 00:26:18: 3 small-push repos finally synced (2-3 min after commit)
+
+The root cause was duplicate `git push` invocations on the same
+`(repo, remote)` pair within a cycle window. The apply-phase deadline
+(2s) broke out before the in-flight pushes completed, so the next
+cycle saw the same repos as still "ahead" and re-dispatched new
+`sync_repo` tasks for them. Each re-dispatch spawned another push
+attempt, saturating the SSH agent and github/gitlab rate limits.
+
+### Fix: no-redispatch invariant
+
+The daemon now tracks an `in_flight: HashSet<PathBuf>` set:
+
+1. **COLLECT phase** consults `in_flight` and skips re-dispatching
+   any repo with an active `sync_repo` task. This is the
+   no-redispatch invariant.
+2. When a repo is dispatched, it is inserted into `in_flight` BEFORE
+   the `tokio::spawn` so the next cycle's eligibility check sees it.
+3. The APPLY phase removes repos from `in_flight` when their tasks
+   complete (success, failure, or timeout).
+4. The TRAILING drain (also bounded by `pulse_interval_secs * 2`)
+   removes repos from `in_flight` for tasks that didn't complete
+   within the apply deadline.
+
+### Trade-off
+
+The bounded trailing drain keeps the main loop responsive: even
+if a slow push is in flight, the next cycle can start after
+`pulse_interval_secs * 2`. The repo with the in-flight push is
+simply not re-dispatched until the in-flight one completes.
+
+### Evidence of the fix
+
+Live test (3 fresh dirty repos, 1-commit each, started 00:40:18):
+- 00:40:46-47: 3 commits (28s after test)
+- 00:41:24: 3 syncs (66s after test) - no duplicates
+- 00:42:48: late sync for one repo that was still pushing
+
+Daemon log shows each repo's "synced" message exactly once per
+push attempt. No "git push failed" retry storms for the test repos.
+The 4-minute traffic-jam pattern is gone.
+
+### Remaining limitation
+
+The `push_background` function inside `sync_repo` is synchronous
+(blocks on `push_with_retries`), even though its name implies
+background. With 4 parallel `sync_repo` calls, all 4 hit
+github/gitlab/codeberg simultaneously. The no-redispatch invariant
+prevents the worst symptom (duplicate pushes to the same repo), but
+the underlying SSH agent / network bandwidth saturation is still a
+factor for slow-push scenarios. A more invasive refactor would
+parallelize the 3 remotes inside `push_background` (origin + gitlab
++ codeberg in parallel) and/or switch from `push_background` to a
+truly fire-and-forget push that records the result in a side
+channel. Both are deferred to a follow-up.
