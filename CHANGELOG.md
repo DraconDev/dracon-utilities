@@ -31,6 +31,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   not "the user is still editing right now". Documented in
   `docs/design/repos-state-cause.md`.
 
+- **`dracon-sync repos` `STATE` docs clarified**: The design docs and
+  example config now explain the live table meanings in user-facing
+  terms: `idle` is the normal clean quiet state, `cold` is the
+  >24h quiet state, `stalled` is dirty tracked/staged work with no
+  unpushed commits, and `intentional` is the per-repo no-upstream
+  opt-out.
+
 - **`dracon-sync` `PUSHED` column missing for freshly-cloned repos**:
   The `last_push_for_branch` helper used `git reflog show origin/<branch>
   --format=%cr -1`, which returns empty output for repos whose

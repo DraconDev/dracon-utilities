@@ -64,6 +64,28 @@ labels take precedence over computed fallbacks:
 10. `idle` is the final "clean, no recent activity" label, and
     `healthy` is the universal fallback.
 
+## Reading the live table
+
+`idle` is the normal/default-looking state for a clean, in-sync repo
+that has not had a commit or push in the last `committing_commit_minutes`
+(default 60m) but is not old enough to be cold. It does **not** mean
+something is wrong.
+
+`cold` means the repo is clean and in sync, but the last commit/push is
+older than `cold_commit_minutes` (default 1440m / 24h). In other words:
+yes, a repo with no change for more than a day is `cold` unless the
+threshold is changed.
+
+`stalled` means there is tracked or staged work sitting in the working
+tree with no unpushed commits for the daemon to push. The previous HEAD
+commit age does not matter: a repo can have committed something 3
+minutes ago and still be `stalled` if the user then made new tracked
+changes and stopped.
+
+`intentional` means the repo has opted out of upstream tracking via
+`intentional_no_upstream = true`. In the operator's tree this is the
+legacy-isolated `dracon-utilities` clone; it is not a daemon failure.
+
 ## Thresholds
 
 The thresholds live in the global policy:

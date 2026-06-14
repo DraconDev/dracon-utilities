@@ -222,7 +222,7 @@ auto_create = false
 # [[publish_targets]]
 # name = "crates-io"
 # registry = "crates-io"          # crates-io | npm | pypi
-# [DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBucWJNOVJmdzJxZVNpRGxja1M3ZExWRGxMdGVlNGNJOERic1d6TERlZ0FVCkU5VEVKV0Q2eHl3cWFGWnJCK1pWOGJtWk5vVFY0a28vSzJwYVlHR0VHWVkKLT4gWDI1NTE5IDhTRFEwOGlNSUNpRjhmMWFRSVNac3ZiWDJ1bU4xSHVFelZNM3JXRGJ6M2cKeExpU0hiWkE5VHdxNkk2TGhCRXNTaUtBTTQwRG1Db3YvYnVkZ2diNG5XcwotPiBYMjU1MTkgQ3lMYTljNHhscWIwQ295Yzl3bWRqL3BlaG5SNGRtWXhIaENXNTR5ejJTMAp1VjNaTE5NRWJ1Y3RTejJobVM0VG9xV3FWVWRyV25VRkgyMk1rdWlUbStJCi0+IFgyNTUxOSBNWHNQQXZIU2hZRGZJTHMwRlZzdWZpVjFwc09abVQ1MFlQeGRHNkZQVzJ3ClZtb0dMNHVHZUd2VVQzTlh4amhXWjZNblN3T3ZmZ0tLeVdReVlyVkVPcGsKLT4gWDI1NTE5IEIzS2xzVVR0N1dIWDU0emR5QUp6QlpuT01zWitZQ2xYNlNmVkxPWE9MbWsKUGJTb3o4eFhneHZ1bjdHT2F3aHNqTDlHQmNJVGMvWFpidlM2L3h2YWUzcwotPiBFflNiLWdyZWFzZSBaYFQyNVVoTQp5V3BET1dpeDk0L0xUbU9rb1FXZ2NYWjhteHYybkg0Tk5reGVybnRQQ1B5YUFxbXNLaisyWm5rWGhZOElDNUVpCm9iMldPU2wwY2pkL3ozQURmOENBQS9JMkU4YkVJUmxXRWd2Z3JlSlY2bDErZXF2L2NxN2I5Q0IrVTVBCi0tLSBNdnA3K0lKNGhITnBQeVA2b09KN0NENUJ5UTFZTS9kZyswT01KMklwNWhFCg8UYbrx7a8h1Rqs2ac1JSM/Wtb+9hpUKIYh/Sa8PtjacW4Zw1aftXzT3q+9lyykxgykEs85rhJaKQRnvGvlAc6VsKPtYw==]   # env var name (token in secrets/cratesio.env)
+# [DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBRa29HS05jdWErVkFGalVLbVhuRjhOeWhNK2RrcFdzVURWZTRqbmlYUWlzCmlpRGw3eFVIWWZmcnBtNFE0U1VBb3Y1b1UxSjRvMU1yN2MvNy9DbCsrdmsKLT4gWDI1NTE5IFlhVGJMV3dpNjdGT21kV3FMSkxFZnBOYWxNQjNKWjc4SENtY1VjcnR4d1EKRDFxU0F3ZVUxZHpvbXZUM1kyTjYxL1BMU0NkRHoxZzd2Z1FoWjNCcEVoRQotPiBYMjU1MTkgMElPRnBHSWpQR2k0SkVYbWlBT1lCcUwwQklraTU2WDNYL1NmQjEyaStDVQpFcmp3N1Jseldpa2FWL1dDbHNkTnFHdjRCNXZEUzF1UXROaWRrdUJ5d2hRCi0+IFgyNTUxOSBlcmRpT2VlcEF2VklvZG04bThwZFQ4QWxsZ3pjZDZjWnNDd3ROanhGdHhVCjRJeHFGWVlrU09yYW1zVU53aEhCM0tBY0tqWTBacTRzNjRqWW1neUo3UEUKLT4gWDI1NTE5IFJXSk5xeFZIZDNzcytPUTMySHBEcjlQdWFXRmpOYkJEdmIwOHkyak1XUWMKNDFLWW5NVTFZdTR5ZXN3cTJJOFBnb0NGcnEyOGxUVGV6OVZkTVJ1YkJRTQotPiB0VlpIRnBoZi1ncmVhc2UKMHM0eUNvL21xWVlpZDBsVlNVajQyL2RuCi0tLSBhR0hxaW1leGg2d3VjRC94UnhHYzljaEhqVXhPdHlOaFc2czBZTnNnb3JzCr9ui+oaj31LU8yDX06tMxBJ516cqFR/tNdRpSq6Vh93qqu9ZEp0t414URs3w1tAm11FqhBQ0onl2XmajEFPIWth+OMyJA==]   # env var name (token in secrets/cratesio.env)
 # publish_timeout_secs = 300
 #
 # [[publish_targets]]
@@ -372,8 +372,9 @@ auto_create = false
 #   untracked-only — only untracked files, no modified/staged
 #   intentional — repo flagged `intentional_no_upstream = true`
 #   failed    — push_status = FAIL or STUCK
-#   idle      — clean, no recent activity, last commit within `cold_commit_minutes`
-#   cold      — last commit older than `cold_commit_minutes`
+#   idle      — clean, in sync, older than `committing_commit_minutes` but not yet cold
+#               (this is the normal/default-looking state for quiet repos)
+#   cold      — clean, in sync, last commit older than `cold_commit_minutes`
 #   healthy   — fallback when nothing else matches
 #
 # Defaults: 5m / 60m / 24h. Per-repo overrides are supported in
