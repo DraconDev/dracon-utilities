@@ -830,7 +830,6 @@ dependencies = [
  "comfy-table",
  "dirs",
  "dracon-git",
- "futures",
  "notify-rust",
  "parking_lot",
  "proptest",
