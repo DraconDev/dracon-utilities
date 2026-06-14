@@ -16,7 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `untracked-only`, `intentional`, `failed`, `idle`, `cold`, and
   `healthy`. The `stalled` label specifically surfaces the
   "we changed files but then stopped" case the user asked about:
-  dirty tracked/staged work with no unpushed commits. Thresholds
+  dirty tracked/staged work older than `committing_commit_minutes`.
+  Recent dirty work is labelled `dirty` so normal sync/repair-warns
+  triage can pick it up without a red stalled alarm. Thresholds
   (`active_commit_minutes`, `committing_commit_minutes`,
   `cold_commit_minutes`) live in the global policy with optional
   per-repo overrides in `RepoPolicyOverride`. The `--json` output
@@ -24,12 +26,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   every row. Documented in `docs/design/repos-state-cause.md`.
 
 ### Fixed
-- **`dracon-sync` `STATE` semantics**: A dirty tracked/staged repo with
-  no unpushed commits now classifies as `stalled` even when the previous
-  HEAD commit was recent. The `active` label now means "freshly synced"
-  (clean, in sync, commit and push both within `active_commit_minutes`),
-  not "the user is still editing right now". Documented in
-  `docs/design/repos-state-cause.md`.
+- **`dracon-sync` `STATE` semantics**: Recent dirty tracked/staged work
+  now classifies as `dirty`, not `stalled`, so normal sync or
+  `repair warns --apply` can pick it up without a red alarm. A repo only
+  becomes `stalled` when tracked/staged work has sat longer than
+  `committing_commit_minutes` without push progress. The `active` label
+  means "freshly synced" (clean, in sync, commit and push both within
+  `active_commit_minutes`), not "the user is still editing right now".
+  Documented in `docs/design/repos-state-cause.md`.
 
 - **`dracon-sync repos` `STATE` docs clarified**: The design docs and
   example config now explain the live table meanings in user-facing

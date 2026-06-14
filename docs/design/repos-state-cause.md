@@ -21,8 +21,8 @@ The classifier returns exactly one of these labels per repo:
 | `committing` | unpushed commits are waiting, or the last commit is within `committing_commit_minutes` but outside the active window | yellow | 🟡 |
 | `pushing` | `push_status = PENDING` (the daemon is mid-cycle) | yellow | 🟣 |
 | `synced` | clean, in sync, commit/push within `committing_commit_minutes` but outside the active window | green | 🟢 |
-| `stalled` | dirty tracked/staged work, or behind/upstream state, is sitting with no push progress | red | 🔴 |
-| `dirty` | dirty tracked/staged work that does not fit the stalled/committing cases | yellow | 🟠 |
+| `stalled` | dirty tracked/staged work sitting longer than `committing_commit_minutes` with no push progress | red | 🔴 |
+| `dirty` | recent dirty tracked/staged work expected to be picked up by normal sync/repair-warns triage | yellow | 🟠 |
 | `untracked-only` | only untracked files, no modified/staged | white | ⚪ |
 | `intentional` | repo flagged `intentional_no_upstream = true` | magenta | 🟣 |
 | `failed` | `push_status = FAIL` or `STUCK` | red | ⛔ |
@@ -40,13 +40,15 @@ labels take precedence over computed fallbacks:
 2. `intentional` (per-repo opt-in flag) is the user's explicit
    declaration that "this repo is intentionally isolated", so it
    wins over the computed staleness labels.
-3. `stalled` is the user's "stalling for minutes" pain case, so it
-   fires before the looser `committing` and `dirty` fallbacks. The
-   `stalled` label is *not* based on the age of the previous HEAD
-   commit: if tracked/staged work is sitting in the working tree with
-   no unpushed commits, the repo is stalled even when the last commit
-   was only a few minutes ago.
-4. `untracked-only` is reported as such even when the last commit is
+3. `dirty` is the recent dirty-work case: tracked/staged changes exist,
+   but the last commit or push is still within `committing_commit_minutes`
+   (default 60m). This means normal sync or `repair warns --apply` should
+   pick it up; it is not the red "stalled" alarm.
+4. `stalled` is the user's "stalling for minutes" pain case: tracked/staged
+   work has been sitting longer than `committing_commit_minutes` without
+   push progress. The previous HEAD commit age alone is not enough; recent
+   dirty work is `dirty`, not `stalled`.
+5. `untracked-only` is reported as such even when the last commit is
    recent, because the operator's question is "do I have uncommitted
    work?" and untracked files do not count.
 5. `active` fires only for clean, in-sync repos whose commit and push
