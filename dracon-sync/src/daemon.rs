@@ -1341,7 +1341,25 @@ pub(crate) async fn run_daemon(
             // notifications, repair-warns triage, and the post-sync
             // re-fetch to a follow-up. This keeps the diff focused on
             // the parallelization win.
-            while let Some(joined) = in_flight.next().await {
+            // Apply-phase deadline: stop awaiting in_flight after
+            // `apply_deadline_secs` so a slow push on one repo does
+            // not block the main loop from starting the next cycle.
+            // The unfinished tasks remain in `in_flight` and are
+            // drained in subsequent cycles. This keeps the daemon
+            // responsive: a new dirty file in repo A is processed
+            // in the next cycle, not after the slowest push on
+            // repo B finishes.
+            let apply_deadline = Duration::from_secs(
+                policy.pulse_interval_secs.max(1) * 2,
+            );
+            let apply_deadline_at = tokio::time::Instant::now() + apply_deadline;
+            loop {
+                let next = tokio::time::timeout_at(apply_deadline_at, in_flight.next()).await;
+                let joined = match next {
+                    Ok(Some(joined)) => joined,
+                    Ok(None) => break,    // in_flight empty
+                    Err(_) => break,       // timeout
+                };
                 let Ok((repo, remote_failures, sync_res)) = joined else {
                     continue;
                 };
