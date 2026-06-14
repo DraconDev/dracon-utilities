@@ -22,7 +22,7 @@ The classifier returns exactly one of these labels per repo:
 | `pushing` | `push_status = PENDING` (the daemon is mid-cycle) | yellow | 🟣 |
 | `synced` | clean, in sync, commit/push within `committing_commit_minutes` but outside the active window | green | 🟢 |
 | `stalled` | dirty tracked/staged work sitting longer than `committing_commit_minutes` with no push progress | red | 🔴 |
-| `dirty` | recent dirty tracked/staged work expected to be picked up by normal sync/repair-warns triage | yellow | 🟠 |
+| `dirty` | recent dirty tracked/staged work expected to be picked up by normal sync; force immediately with `sync-now --warns` | yellow | 🟠 |
 | `untracked-only` | only untracked files, no modified/staged | white | ⚪ |
 | `intentional` | repo flagged `intentional_no_upstream = true` | magenta | 🟣 |
 | `failed` | `push_status = FAIL` or `STUCK` | red | ⛔ |
@@ -42,8 +42,9 @@ labels take precedence over computed fallbacks:
    wins over the computed staleness labels.
 3. `dirty` is the recent dirty-work case: tracked/staged changes exist,
    but the last commit or push is still within `committing_commit_minutes`
-   (default 60m). This means normal sync or `repair warns --apply` should
-   pick it up; it is not the red "stalled" alarm.
+   (default 60m). This means normal sync should pick it up after the
+   configured settling delay; `sync-now --warns` forces the same
+   dirty-only triage immediately. It is not the red "stalled" alarm.
 4. `stalled` is the user's "stalling for minutes" pain case: tracked/staged
    work has been sitting longer than `committing_commit_minutes` without
    push progress. The previous HEAD commit age alone is not enough; recent

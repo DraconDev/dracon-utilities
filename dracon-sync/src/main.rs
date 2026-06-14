@@ -108,6 +108,9 @@ enum Command {
     SyncNow {
         /// The repository path(s) to sync immediately.
         repos: Vec<PathBuf>,
+        /// Sync repos currently reported as WARN (dirty-only triage).
+        #[arg(long, conflicts_with = "repos")]
+        warns: bool,
         /// Preview what would be done without making any changes.
         #[arg(long)]
         dry_run: bool,
@@ -543,9 +546,13 @@ async fn main() -> Result<()> {
         Command::Daemon { interval_secs } => {
             run_daemon(policy_path, interval_secs).await?;
         }
-        Command::SyncNow { repos, dry_run } => {
+        Command::SyncNow { repos, warns, dry_run } => {
             if let Some(reason) = freeze_reason(&policy_path) {
                 println!("⏸️ sync frozen ({})", reason);
+                return Ok(());
+            }
+            if warns {
+                run_repair_warns(&policy_path, !dry_run, None, false).await?;
                 return Ok(());
             }
             let policy = SyncPolicy::load(&policy_path)?;
