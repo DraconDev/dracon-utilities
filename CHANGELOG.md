@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   derived "STATE" column that combines last-commit time, last-push time,
   dirty state, ahead/behind, and push status into a small fixed
   vocabulary the user can scan at a glance. The vocabulary covers
-  `active`, `committing`, `pushing`, `synced`, `stalled`, `dirty`,
+  `working`, `committing`, `pushing`, `synced`, `stalled`, `dirty`,
   `untracked-only`, `intentional`, `failed`, `idle`, `cold`, and
   `healthy`. The `stalled` label specifically surfaces the
   "we changed files but then stopped" case the user asked about:
@@ -40,9 +40,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   now classifies as `dirty`, not `stalled`, so normal sync or
   `repair warns --apply` can pick it up without a red alarm. A repo only
   becomes `stalled` when tracked/staged work has sat longer than
-  `committing_commit_minutes` without push progress. The `active` label
-  means "freshly synced" (clean, in sync, commit and push both within
-  `active_commit_minutes`), not "the user is still editing right now".
+  `committing_commit_minutes` without push progress. The `working` label
+  means "the daemon is currently working through this repo" (clean, in
+  sync, commit and push both within `active_commit_minutes`), not
+  "the user is still editing right now". The `synced` label is the
+  longer-term clean state (commit/push within `committing_commit_minutes`
+  but outside the active window); the `working` vs `synced` split
+  means the user can see at a glance which repos the daemon is
+  currently working through versus which are merely in a long-term
+  clean state.
   Documented in `docs/design/repos-state-cause.md`.
 
 - **`dracon-sync repos` `STATE` docs clarified**: The design docs and
