@@ -444,6 +444,8 @@ pub(crate) struct SyncPolicy {
     pub(crate) repair_cooldown_secs: u64,
     #[serde(default = "default_max_push_blob_bytes")]
     pub(crate) max_push_blob_bytes: u64,
+    #[serde(default = "default_sem_max_concurrent_sync")]
+    pub(crate) sem_max_concurrent_sync: usize,
     #[serde(default = "default_incident_ledger_max_lines")]
     pub(crate) incident_ledger_max_lines: usize,
     #[serde(default = "default_incident_ledger_max_age_days")]
@@ -749,6 +751,10 @@ pub(crate) fn default_repair_cooldown_secs() -> u64 {
 
 pub(crate) fn default_max_push_blob_bytes() -> u64 {
     DEFAULT_GIT_HOST_BLOB_LIMIT_BYTES
+}
+
+pub(crate) fn default_sem_max_concurrent_sync() -> usize {
+    4
 }
 
 pub(crate) fn default_incident_ledger_max_lines() -> usize {
