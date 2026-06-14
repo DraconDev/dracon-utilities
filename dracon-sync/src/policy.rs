@@ -1336,6 +1336,7 @@ pub(crate) fn test_sync_policy() -> SyncPolicy {
         push_retries: 3,
         repair_cooldown_secs: 60,
         max_push_blob_bytes: 100 * 1024 * 1024,
+        sem_max_concurrent_sync: default_sem_max_concurrent_sync(),
         incident_ledger_max_lines: 10_000,
         incident_ledger_max_age_days: 30,
         webhook_url: None,
