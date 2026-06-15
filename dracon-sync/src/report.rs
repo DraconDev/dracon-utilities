@@ -1561,6 +1561,131 @@ fn emit_repo_failure(json: bool, prefix: &str, repo: &Path, error: impl std::fmt
     }
 }
 
+/// Count tracked modified files in `repo` that are NOT covered by
+/// the effective per-repo `auto_commit_exclude_patterns`.
+///
+/// **Why this exists** (goal `1fe80684`, 2026-06-15):
+/// the WARN classification originally used the library's
+/// `RepoStatus::modified_files` (count only). That count
+/// included files the operator has explicitly told the daemon
+/// not to auto-commit (e.g. `**/test-results/**` in
+/// Junk-Runner-bevy, `**/.pi-tmp/**` in dracon-platform).
+/// When Playwright or some periodic updater keeps regenerating
+/// those excluded files, the live report was stuck at WARN
+/// forever even though the daemon was correctly NOT touching
+/// them. The 14-repo live report was "not all green and white"
+/// for this reason.
+///
+/// **Resolution**: a tracked file that matches
+/// `auto_commit_exclude_patterns` (per-repo override → global
+/// policy) does not contribute to the WARN signal. The MOD
+/// column in the report still shows the unfiltered count so
+/// the operator can see what's dirty; only the WARN/OK decision
+/// uses the filtered count.
+///
+/// **Implementation notes**:
+/// - Uses `git status --porcelain` (NOT `git diff --name-only`)
+///   to avoid the slow clean-filter pass on every modified file.
+///   Porcelain lists working-tree state without reading contents.
+/// - On any error, returns 0 (defensive: don't WARN if we can't
+///   determine the file list — better to underreport than to
+///   block the operator with a false WARN).
+/// - Patterns use the existing `matches_untracked_exclude` matcher
+///   so the operator's existing per-repo patterns work as-is
+///   for both staging and WARN classification.
+pub(crate) async fn count_non_excluded_modified_files(
+    repo: &Path,
+    policy: &SyncPolicy,
+    repo_override: &RepoPolicyOverride,
+) -> usize {
+    // Resolve effective patterns: per-repo override (Some) takes
+    // precedence over global policy. If both are empty, no
+    // filtering happens and the returned count equals the
+    // unfiltered `status.modified_files`.
+    let effective_patterns: &[String] = repo_override
+        .auto_commit_exclude_patterns
+        .as_ref()
+        .map(|v| v.as_slice())
+        .unwrap_or(&policy.auto_commit_exclude_patterns);
+
+    if effective_patterns.is_empty() {
+        // No per-repo or global exclusion patterns — return the
+        // library's count (fast path, no porcelain call needed).
+        // We re-query via the library to avoid trusting stale data.
+        if let Ok(svc) = GitService::new(repo) {
+            if let Ok(status) = svc.get_status().await {
+                return status.modified_files;
+            }
+        }
+        return 0;
+    }
+
+    // Get the list of modified file paths via porcelain. This
+    // does NOT apply the clean filter (so it's fast even on
+    // repos with many large filtered files like pnpm-lock.yaml).
+    let output = crate::git::git_cmd()
+        .args(["status", "--porcelain"])
+        .current_dir(repo)
+        .output();
+    let Ok(o) = output else {
+        return 0;
+    };
+    if !o.status.success() {
+        return 0;
+    }
+    let stdout = String::from_utf8_lossy(&o.stdout);
+    let mut non_excluded = 0usize;
+    for line in stdout.lines() {
+        if line.len() < 3 {
+            continue;
+        }
+        // Porcelain v1 format: "XY path" where X is index status
+        // and Y is working-tree status. Skip untracked entries
+        // (??) and clean entries (no flag in either column).
+        let bytes = line.as_bytes();
+        let x = bytes[0];
+        let y = bytes[1];
+        if x == b'?' && y == b'?' {
+            // Untracked: never contributes to WARN, skip.
+            continue;
+        }
+        if x == b' ' && y == b' ' {
+            // Clean: skip.
+            continue;
+        }
+        // Path is everything from byte 3 onwards. Rename/copy
+        // entries can include "old_path -> new_path"; in that
+        // case the new path is what the operator cares about.
+        let path_str = &line[3..];
+        // For renames (R) and copies (C), the format is
+        // "old -> new" in the name. Use the new path.
+        let new_path = if let Some(idx) = path_str.find(" -> ") {
+            &path_str[idx + 4..]
+        } else {
+            path_str
+        };
+        if new_path.is_empty() {
+            continue;
+        }
+        // Quote handling: porcelain wraps paths with special
+        // chars in quotes and escapes inner quotes. For our
+        // pattern matching, the simple case is the common one
+        // (paths without quotes); we don't try to handle quoted
+        // paths perfectly here. A quoted path that matches an
+        // exclude pattern will still match because the pattern
+        // substring is preserved in the quoted form for the
+        // common case of paths with spaces inside.
+        let unquoted = new_path.trim_matches('"');
+        let path = std::path::Path::new(unquoted);
+        // If the path matches any exclusion pattern, skip it.
+        if crate::exclude::matches_untracked_exclude(repo, path, effective_patterns) {
+            continue;
+        }
+        non_excluded += 1;
+    }
+    non_excluded
+}
+
 pub(crate) async fn run_repos_report(
     policy_path: &Path,
     filter: RepoFilter,
@@ -1642,7 +1767,20 @@ pub(crate) async fn run_repos_report(
         // 94.7.0 which fixed the `is_wt_new()` double-count bug. Junk-Runner-bevy
         // is the canonical case: 3 untracked test-results/ PNGs were
         // being counted as 91 "modified".
-        let real_is_dirty = status.modified_files > 0 || status.staged_files > 0;
+        //
+        // CHANGED 2026-06-15 (goal 1fe80684): the WARN classification now
+        // filters out tracked files that match the per-repo
+        // `auto_commit_exclude_patterns` (per-repo override or global
+        // policy). Without this, a repo whose only modifications are in
+        // per-repo excluded paths (e.g. Junk-Runner-bevy's test-results/
+        // PNGs that Playwright keeps regenerating) was stuck at WARN
+        // forever even though the daemon was correctly NOT auto-committing
+        // them. The MOD column still shows the unfiltered count so the
+        // operator can see what's dirty; only the WARN/OK decision uses
+        // the filtered count.
+        let non_excluded_modified =
+            count_non_excluded_modified_files(&repo, &policy, &repo_override).await;
+        let real_is_dirty = non_excluded_modified > 0 || status.staged_files > 0;
         let recent_push_failure = recent_push_failures
             .as_ref()
             .map(|m| {
@@ -3239,7 +3377,16 @@ pub(crate) async fn run_repair_warns(
         // Use real dirty state for classification — a repo with TRACKED
         // modified files is WARN even if the daemon wouldn't auto-commit them.
         // Untracked files (build artifacts) do NOT count as dirty.
-        let real_is_dirty = status.modified_files > 0 || status.staged_files > 0;
+        //
+        // CHANGED 2026-06-15 (goal 1fe80684): filter per-repo excluded
+        // paths from the WARN count. A repo whose only modifications are
+        // in per-repo `auto_commit_exclude_patterns` paths is not
+        // actually a WARN from the daemon's perspective — the daemon
+        // explicitly does NOT auto-commit those files.
+        let repo_override = crate::policy::load_repo_override(&repo);
+        let non_excluded_modified =
+            count_non_excluded_modified_files(&repo, &policy, &repo_override).await;
+        let real_is_dirty = non_excluded_modified > 0 || status.staged_files > 0;
         if !real_is_dirty {
             continue;
         }
@@ -3597,7 +3744,7 @@ mod tests {
     }
 
     #[test]
-    fn test_repo_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB0OTY4VG9naS9BdC9kaVowK0FZdlRKNklOTFdySnYxZWV3QVhJUFFaUDFBCm9DNDgrMENzdmtZYk93ZlNMbUdQelc2c0pOZGZ1UGdnblZOTFB5MnE4ZTAKLT4gWDI1NTE5IE8yZUpuKzhDTG4yYUFuOGdCVmdwcC8wekhyVGlDWm9IRUFZUlJVcm0zUlEKM2FvZnc4aFlRSkxlTERkY2QxbTFUZ1BrWmwzTG9IWlJlU0Y1Vko3KzloMAotPiBYMjU1MTkgcmIvd0d4UzZ3Y1MwMW5aNXBpV1NzSUU4eUZrTzBnYzloZnRmWUNOQjRYSQpvOG93WWpaSmgrRDJqVzB5R3BUcEtSQ1lKV25qb3dQU2VGNDNud0tQaVZnCi0+IFgyNTUxOSBCbmNuYTd0QzVKQzZQNm9rRkJFRzFTVDBsMDdJRXlzQXc1eGx3YUlabjJBCjQzWTg2OC9DL01YTjhiWUJOMGxib01BZm9RaWoreGxZY3U1L3ZtQTBCMXMKLT4gWDI1NTE5IEJ3Y285Tk9zcGpVNzZZSUtCRUhYN2ZtTTRuY0swZjkvREgrZ05BcXVSSGsKenlYY2tPZTRGcVI3MzNyNVRZUjlWRk5sVUdrdnRQOGZxczFldEpSOGt6MAotPiBPLWdyZWFzZSBBOnB+bSByVV96dnZ7OiA4SGRyIGdcXV5HCnBKRlM1NDlQclY4TTg4MXFqN1dOSTZzYmZOZWxCa2F6eFlNTVpGZ0FlNEtqRlh4WHRFcWJzWWUxSVRvWm10c2QKY2krb2FMaTRRSHVuZ3NYS09hQkNvbVpwdEVRVUJjWTBhMUxmbEFnY0daVU4KLS0tIHNyWXpULzZSdURQVEkvQ0pqT2s3ay8wUHcyRnh0L2tQTTdUVVFqeHB5cHMKER0hN7mW+ow88mLl6kGhiqYlzGCoGARVKWDKaFk4kV1iLpkUSD6BC8YUQzOBff3j/Urs55e79hhovvw82oaEAum2pUU=]() {
+    fn test_repo_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBoVEE4SnpSYlR3VjlZNnVQSGZFWHFlSHRYZ2g0UmRpdkNOUGg5MjA3dUc0CmpWSTdmUVBnN0lTZW0vUHUwYmp0N2tJNkJCMWZJck8xeHRYZDhuZ3VqY1EKLT4gWDI1NTE5IFdoQWJFeFd4RFhTMkduYW5GWSszMWhBWVJSOEVyYlExQUFJMitUYVlPaW8KWTFPZUlWMll3K2tLVHZxdDNPeThGTHB6QjFXOEVsa0w5NzE2RW5ESDlUcwotPiBYMjU1MTkgUVhIenBTUW94byt5dFJJQ2pzT0g4MWFTV0lBK3BDS29UOFRuM0ZicmdsMApPQi90cXZOTDhDczdSQ1M4QUU2QzZLQ2FQZmowMUxvaVRadGRxZTFiOFE0Ci0+IFgyNTUxOSBabzg3emxmckFVc3ZaN1N0TEZZOHArWnF0V2Z0OHlzRW16NXRqWjhwczNzClhrMUwyaUpCbC8vQ0h6ZmhkUWJDZnpOMFVLc2k2TXQrMEVnWlJPUHdDcFUKLT4gWDI1NTE5IEt4Z0h1ckdwK2NZUkFvRkNlSmhJOTgxZUZwK3loRkp1TmlZTlRwMno1ZzAKT2F5U2FHSW4vNlNGRGpXSUY3V3lGVUl4NVhvTVQ1b2FOZXlxbUhYU3BZQQotPiAkVDptbEZKLWdyZWFzZSBaJiBScXlOQSB4XSZtV18oNiAjIz0KR1plVHhyUTA5S1I5eWpmTXNPbG1hb1p1Sk42Q01OVEducTVIZjN5eGZxZnBaMklNZkc1OUQ0b0FaVnBZcWs4TwpLZlJaeFNpY2V1T2ozSk5vaU52bUNUdEg2ZUloWlJ5ZnV3Ci0tLSAzT2xnUWJoRm5HcVVCcCtDOVVCMkhSUDgwSDVncjIyNE5JYkZvekk1UzdFCoYmcNG2ztL3ZFqlfwh2uWjoA/R8xLOhRwzWV2mh7kEHZDdwcTMZHuMzGYlHvoIXDhb73dNiMstk9uROVPbxSNWwyNli]() {
         let msg = repo_failure_message("init_failed", Path::new("/tmp/repo"), "boom");
         assert!(msg.contains("init_failed"));
         assert!(msg.contains("/tmp/repo"));
@@ -3605,7 +3752,7 @@ mod tests {
     }
 
     #[test]
-    fn test_repo_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAyOFRhZFllZE5sRWFJZXVRZEZLcXhHS283ZkFJT25RWU94dzU0RnNEdXgwCndrcmk5d3lSMjZSOXJCZU9EQXQvREdXbWt0VE9RTEpyMThNRTRubCtZMTgKLT4gWDI1NTE5IDhEbGhQck0yS1czNEtmWDVQMEFpQVNJYUZsR1lqMkozQjZNdGViOVRhbmMKc1AvRXlKM25qazdqRWVmQ0xBWk00TWhhbm9aVWt2bWd5WFV2d3FoKzlPZwotPiBYMjU1MTkgemNuUFhDR0k2NkppdjBLMTRseGtuQUpHZHVLeDNLbkZIK3JlSFFnbmJSZwprSTYxc1Q4Z3dpN3lUb2FxSmt3ZzZTYXBpTTZUeC9LNndmWVQwaTRNWmMwCi0+IFgyNTUxOSA3YkE0VkltZVZkQXBKMWNvVzB0dkdoUGVtYm12Z2NtVUNod0UwMDZMSzA0CmVNbjZhbTUwU2dLTXA5UlNFaWxxR1Byemx1VW9ZdTFBeVZsZGhUeXdtK1kKLT4gWDI1NTE5IHo2MHVNSklPTTdBWFlCc0xXdWh0UEE4NnY4aFNKOENzbk5Vb0NJTlNPMHcKYXg1MDBCQzJzZFFtNVk2czk3aG1HclBFUXFQYXRCcWpLY0ZnTjllYUE1bwotPiBycjtyLWdyZWFzZSBtSn5dCmdpaWYzSnIvajlUR1cxVEorQy90aEc0c0ovb3U1RmJqN2lmMmlJZTNFZDNMWW5PdlJCVE81WWFac09rUW40NG0KcWRLWlMzdHlVSkkyRHBsL0gwTGlUYVBnVUEKLS0tIDFIY0ZNTFZUQTJvdUs3N1ZYRUJtQTRwS3Z2eFRvM0FQbkFDVWEyMFVWQWsKjsYhOIIllAYYigGAcBxzijGA85VcOP22ZyRAEyBwQDC4/qZMnqhFQry+pQdOkL0eg/U1YYrQbk+qIgil4P8FB6E=]() {
+    fn test_repo_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBnMTMxc0E4dnRGNlpMWWZWRWVKeUFaKytkcjcwYTR0TGFqK3pDeHA4RUdRCmRMNU41ZkE1THlKMDg5VFRXY1VFa3F3TGdGUFBHb0lPSkIvZlY4UnV6MjgKLT4gWDI1NTE5IFIzdXlJa00vdkZ4bHl2S2xEOCtFdHVaQ01KNWNBUm0vd2ZleWQxK1dzejgKQkNXTWoyTFFLN2RRcTJlRTBGeVlIUDVPY2ZjWXh4T2FncDNNczMyVzdiZwotPiBYMjU1MTkgT0ZTN1RZdStHMGZlcDl5ck84eE43aHF4c1RzbzdLZW5UdThkcEd3QUpCYwp5N1paVWQ2QU9CK3JBMWsxdFdPVFlyNzFHT3NmM21kUndOblJRNFNjajlFCi0+IFgyNTUxOSA3d2NMcGJhdGM3T2ZlNTN6ZHZIZ2pBVjllV210KzBHbnVjdXV0c0xSZ1N3CkJzalJmUUxzb1k0MHFDbGc1dUg2V2N4MGpYWkhIc21ESTMvZUtTUnAvN1kKLT4gWDI1NTE5IEJWTTlVQUQwa2FSRjgrL3FNZ3pFT29hY2w2ejE4aCtyWlluejY0a05iWGsKbWFFK2t5ZjgydWFNdGN5bm5mUVk4bUg1Q3lTNldwc1NzNUNqU3luY2pEdwotPiBELWdyZWFzZSAxY147ciAqWiVNRSB9dlp+IHJjMEM+KXYKQjh5Y2hMaXJoM0RTMWpTTEova0EKLS0tIHVNM0lkU3ppSWwweHNYRU5NRTlaNHQ0TkVFLzFFbFNBb1VuMmhQQ00zakUKjWg7uQ08wIDw8sS8tZLpku9BVrLCGBMkuHrtXnLe2Bw/+/astPgFtSTlwP4Yu87XkQ4rPAJQYKpEskyaB0IqNUE=]() {
         let msg = repo_failure_message("status_failed", Path::new("/tmp/repo"), "status boom");
         assert!(msg.contains("status_failed"));
         assert!(msg.contains("status boom"));
@@ -3920,7 +4067,7 @@ mod tests {
     }
 
     #[test]
-    fn test_repo_stuck_filters_requi[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBZL3ROV1R0bUJjQWtNakZ5ekk4ODc2Y3VUNTdURE9Ocy92V3VhSkxmQ0hzCm9EdjNVblpvOFFjUTk5TDhHRUEyNVdzQ0ZkdUt3VWRXOXFjVXcveDZtME0KLT4gWDI1NTE5IGVrZldLQzIwODVTSjRKdlNKOFJSWU5OTE5rZDdMWUNNTStHdTI4eU5teVkKNmJMbFVVMFlUVTJGSHRMaXhPQ3poUDRCVmJxaGJoYm9aVmI4Si9nbldPMAotPiBYMjU1MTkgYjBEYm9Ua05zK0dqR21ZM1NSNGtVTkVuMEFOYzNoa1hoTWJxQW0xczJSRQpBbDA2QnQ4a3Zyb05qRHBFVzBxNlhib0ZmbmpWNE4wWXB3aDNUdEdpVVU0Ci0+IFgyNTUxOSBUWDBFTFp6eVE5MGFxM1AxdWlZa3VlcGlqTUczSElITE43ZG5oRkZDYTI4ClI2bXdranJ3aXRwTUlJUThXUmo0N2hZMFd2UHBXTmk0ZTFXcGpBUmU3WmMKLT4gWDI1NTE5IGViWlFNZEJXQ09tbGZuaUxaV0pmNHovVVhpRGFTRWMwa2EraVVNREFJVE0KVUwvQWY2bXA1ZjZOdXBuVGZkcytCeEVPTEFRVEloUlhDTzVKYm81Vm85cwotPiBpPX1xKlFVLWdyZWFzZSAodSBjUD9ZXiAoeUE3ITogKyE2PEU/CjFMSjFrRUdXaXFVd2lVWVA4Z2xYOURFNnRMdnVuNE9HZks5WGFwawotLS0gV05LVTVhOFJQUk9WNVM4VTVQdDNsNSswb1NCT1B3YktjaEozQ2xPTWNCQQqz+smRBIvpaxl0PR11JDNmtP0PVs3ooq4BlXpjfu2IL09pINNCLrh5/xldpEVoU4qiHwbDBL3YPw==]() {
+    fn test_repo_stuck_filters_requi[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBUdTQ4KzdIY2NzcnZXTDBLWEV5ejcrM1VMR1Z6bFlHMi9yUWxwNithZkhFCk1jelNZcDZPZUpyWStiWXhsRGlxc0RYRXdaT2RQUEJ6QTBkbmRibzBROXMKLT4gWDI1NTE5IEoyUFBaWUxoKzNoWmt5OWtNQlNaTHEvYXQvZ3dtYTBjeStYanh0cVFtRjAKWHFmM3VVUnJibnBNc3hzRjUwVjZhWTZVZGhjbGlnTUNRY3dzL3p0NVp1dwotPiBYMjU1MTkgTEttNDFIQ1gzZTNpSWpHdisyR09WaUZrWXIvd25NMVhFSERJNzJRTnVDcwpSZWUxQUEyOWhYNWpkOWJ1amJ0WlhhazlyWkVHOFdLcThocFNpeHMrSU1VCi0+IFgyNTUxOSAySUpvN3pHeFN6a3NFR3dwbG1HYjJYQVZlZlFBTzViYzZmM2duT3B1bjFnCk5XK0ZsbUMvZHdXRndXcmU2R1J4c0hDaXhDeEZ2V00xazFmNGVsWkJMTzAKLT4gWDI1NTE5IGJtTmlTNFBtc21HczY2QXo5cDI4UUJPbDBkNHZ1VmxVaEhSN3lpdjVqVTAKYTF3aTVremFlOE5ZUy9RN296QVJBMGplMEtyVFBuTTd5dUVOWmsvbzgyMAotPiA6LWdyZWFzZSBaSVBDIFU/JFtkCklLcEgxQWx2bWJ4bXl2QVpsUTgKLS0tIG11dDUxclZvcU5ySGcvNlBsbE0rSExhU1pYWmR3UmpCVVR4ejNMdVJFL0EKm/Fe47wPRx3AAyQqXKGhRX5zDckx3/lC3kx/PdS+k3dmELQzfmbCRKWbDXI27k47J2xOdpcfKlU=]() {
         let ahead = make_status(false, 5, 0);
         let behind = make_status(false, 0, 3);
         assert!(!repo_is_stuck_push(&ahead, true, true, false));
@@ -4353,6 +4500,158 @@ mod tests {
             classify_state_cause(&inputs, &thresholds),
             StateCause::Synced
         );
+    }
+
+    #[test]
+    fn test_count_non_excluded_modified_files_no_excludes_returns_modified_count() {
+        // No per-repo or global exclude patterns. The function should
+        // return the same number the library reports as modified.
+        use crate::test_helpers::create_test_repo;
+        let repo = create_test_repo();
+        // Modify one tracked file
+        std::fs::write(repo.join("f"), "modified").expect("write");
+        // Add a second tracked file and modify it too
+        std::fs::write(repo.join("g"), "new").expect("write");
+        test_git_cmd()
+            .args(["add", "g"])
+            .current_dir(&repo)
+            .output()
+            .expect("git add");
+        test_commit_cmd()
+            .args(["-m", "add g"])
+            .current_dir(&repo)
+            .output()
+            .expect("git commit");
+        std::fs::write(repo.join("g"), "modified-g").expect("write");
+        // Now `f` and `g` are both modified (2 modified).
+        // Build a minimal policy with empty auto_commit_exclude_patterns.
+        let policy = SyncPolicy::default();
+        let override_ = RepoPolicyOverride::default();
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let count = rt.block_on(count_non_excluded_modified_files(
+            &repo, &policy, &override_,
+        ));
+        assert_eq!(count, 2, "should count both modified files when no excludes");
+    }
+
+    #[test]
+    fn test_count_non_excluded_modified_files_per_repo_excludes_filter() {
+        // Per-repo `auto_commit_exclude_patterns` should filter out
+        // matching paths from the WARN count, even when the file is
+        // tracked and modified. This is the Junk-Runner-bevy case:
+        // a Playwright run regenerates test-results/ PNGs that the
+        // per-repo policy explicitly excludes from auto-commit.
+        use crate::test_helpers::create_test_repo;
+        let repo = create_test_repo();
+        // Create test-results/ PNG files and commit them so they're tracked
+        std::fs::create_dir_all(repo.join("test-results")).expect("mkdir");
+        for name in ["a.png", "b.png", "c.png"] {
+            std::fs::write(
+                repo.join("test-results").join(name),
+                "fake-png-content",
+            )
+            .expect("write");
+        }
+        std::fs::write(repo.join("important.rs"), "fn main() {}").expect("write");
+        test_git_cmd()
+            .args(["add", "-A"])
+            .current_dir(&repo)
+            .output()
+            .expect("git add");
+        test_commit_cmd()
+            .args(["-m", "add test results and code"])
+            .current_dir(&repo)
+            .output()
+            .expect("git commit");
+        // Now modify all 4 files (3 PNGs + 1 source file)
+        for name in ["a.png", "b.png", "c.png"] {
+            std::fs::write(
+                repo.join("test-results").join(name),
+                "regenerated",
+            )
+            .expect("write");
+        }
+        std::fs::write(repo.join("important.rs"), "fn main() { changed }").expect("write");
+        // Build a policy with the Junk-Runner-bevy-style per-repo exclude
+        let mut policy = SyncPolicy::default();
+        policy.auto_commit_exclude_patterns =
+            vec!["**/test-results/**".to_string(), "**/e2e/screenshots/**".to_string()];
+        let override_ = RepoPolicyOverride::default();
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let count = rt.block_on(count_non_excluded_modified_files(
+            &repo, &policy, &override_,
+        ));
+        assert_eq!(
+            count, 1,
+            "should only count important.rs; test-results/ PNGs filtered out"
+        );
+    }
+
+    #[test]
+    fn test_count_non_excluded_modified_files_per_repo_override_takes_precedence() {
+        // If the per-repo override sets `auto_commit_exclude_patterns`,
+        // it should take precedence over the global policy. (Per-repo
+        // overrides are the more specific source of truth.)
+        use crate::test_helpers::create_test_repo;
+        let repo = create_test_repo();
+        std::fs::write(repo.join("src").join("main.rs"), "v1").expect("write");
+        std::fs::write(repo.join("scratch").join("note.md"), "v1").expect("write");
+        test_git_cmd()
+            .args(["add", "-A"])
+            .current_dir(&repo)
+            .output()
+            .expect("git add");
+        test_commit_cmd()
+            .args(["-m", "init"])
+            .current_dir(&repo)
+            .output()
+            .expect("git commit");
+        std::fs::write(repo.join("src").join("main.rs"), "v2").expect("write");
+        std::fs::write(repo.join("scratch").join("note.md"), "v2").expect("write");
+        // Global policy excludes only main.rs
+        let mut policy = SyncPolicy::default();
+        policy.auto_commit_exclude_patterns = vec!["src/**".to_string()];
+        // Per-repo override excludes only scratch/**
+        let mut override_ = RepoPolicyOverride::default();
+        override_.auto_commit_exclude_patterns = Some(vec!["scratch/**".to_string()]);
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let count = rt.block_on(count_non_excluded_modified_files(
+            &repo, &policy, &override_,
+        ));
+        assert_eq!(
+            count, 1,
+            "per-repo override should win: scratch/ excluded, src/ counted"
+        );
+    }
+
+    #[test]
+    fn test_count_non_excluded_modified_files_handles_untracked() {
+        // Untracked files should never contribute to the WARN count.
+        use crate::test_helpers::create_test_repo;
+        let repo = create_test_repo();
+        // Add a few untracked files
+        std::fs::write(repo.join("new1.md"), "u1").expect("write");
+        std::fs::write(repo.join("new2.md"), "u2").expect("write");
+        // No tracked file modifications
+        let policy = SyncPolicy::default();
+        let override_ = RepoPolicyOverride::default();
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let count = rt.block_on(count_non_excluded_modified_files(
+            &repo, &policy, &override_,
+        ));
+        assert_eq!(count, 0, "untracked files should not contribute to count");
     }
 
     #[test]
@@ -5293,7 +5592,7 @@ mod tests {
     }
 
     #[test]
-    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBkdGMwQnJqUkNOQ1NCQ1RUWDNCQjh2a3pXN0xEYTgrVjU1TytCK3ZmYlI4ClovdzhyOVpHb1lvVnJPQnJoYmNkTzFEajVVZzhLRVJsZm5YNHFyYW9iTncKLT4gWDI1NTE5IE5nVVg5UHdVNnlwNk5adzNIWlNKcitxNys3RWhMUTdxbVVLeWhjelN4anMKeUZxbk5ZWEpDRHExbzhDaENPSmk5MFFLWmd2dnZZcFIzVG1hMDhxZEMyVQotPiBYMjU1MTkgb1RrVEVJakFQM3hXc3FnY0FDYlZySEFYbTd2YkdvUy9OY2R2NHNNUi9tRQo4cE53QnhiVjlYWXI5TWFLRGJpWEZsOG4rQTVuY1BzQytBYTd5cGhpbEZnCi0+IFgyNTUxOSA1UjM3bzVJbnVWZEpmZEJuUmhPekkyT1U3aU9nOHd0d282NkJ6SU9SbVJZCm1yMTBwelYzN1A4Q1NRNkhwOTJHZGhKNjNxSkttVXl4dTBzODF5bFRQZTAKLT4gWDI1NTE5IDhZcXZ6a1cyTTl4WFdRanNMR0F2dlpFMkMveTNhSmZGbUhkZFRXOGZGSHMKS0Z0L2tqUlU1N0JzMDhvbk5zNGpWVmsvaEhhT3ZyNG5SSk1TYVhMVXV5NAotPiB3W0w1ZXp4LC1ncmVhc2UgeCx5NCAoOHdsTk8qID13O0FxYmIKN01iRytWajlVeTRic1JnaWd6NXh6NElVQ1ZSdEFXMFVOOUVkNDA2Q2o4NWtLWGR0OCtxS0JZUmVYaGhPN0FZdQo5WTVzOTF4NHdnCi0tLSBiLzJDQXk2MFlSUU5jbk9GZmR1elVLSXJYNEpKdFRDaTFqRzZhNzBqWlFvCkBluk05bCT9OONlbwf+EjYBDFxoFlGZwNpflj1r2YyTG3dC+PIZXp0MgfGbsqOkz/TvdMMKoPC5Wf7leAw=]() {
+    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB2OWlXTk52YTZEa3FNbVVsWUIyVHRjOCtvdCt6cDZnNkZqVXpjKzdhNUdBCmJNQzRCcWVIWThQNFhVYzNUUnBqQnY4bm1hd0hPQ3FRT2JvaHpYY2wrS2sKLT4gWDI1NTE5IFpyQmx1WGJ1YXNjcW1DQXFNTzFlQThYNnlzRWFINXRWRzhxWEgwaTdKQlEKTFFONXJad1gxU0o1UmlxV3dMY2FFVmxqanhrdHhlM2tmWEdLM1JMMDQrYwotPiBYMjU1MTkgeGhpMzBJcnpyeHVUVHZrQmZsV05Cdkp3d1hUTU1Mdm5nMDhZN05uVE5SUQpNa0grM2x0UklJNzhnbEE3S0JNbTA1NnBZWklBMTJndFdMV2F0WTh6dHZzCi0+IFgyNTUxOSBYSUJSSmVSMmZWQjNHRGJWOXFMTFl2dDVURHUyWERaOTVqMjBJKzV4aERzCnJBQmNObFQ1Ym9QSktxZE5pVHRXSXYxbU81VkhzK1U4MmVneG9tUlhJdjgKLT4gWDI1NTE5IGw3L1dOVWxkbjdBODBNem5yVWhucS9QOVg4SFV3ejJrS21IaERTdGYzQW8KSmlmSW1SM0RTMTRsSVpOUEhFd3RBYTcxcVJNMWZMOTVOYTJ6Q3hwakVZRQotPiBgfDgxMGEpLWdyZWFzZSBde0MKcSt4SHRZS2FiWXlwcVpZVwotLS0gU3JPaFhUbkRiaHlIbkx4N2tteUlhYjBOSHJRaWVVOE40NENtS0djYktKUQpgK1WRRBt6s5C3WXTkBH5Nnjh8Q+iEbZ8Vu2qT12AeGXUQavexWv7eaoYuqPLcmlUviS7c01lUnmGUDjtk]() {
         let mut cooldowns = std::collections::HashMap::new();
         let repo = std::path::PathBuf::from("/test/repo");
         let notify_key = format!("push-fail-{}", repo.display());
@@ -5422,7 +5721,7 @@ mod tests {
     // -------------------------------------------------------------------
 
     #[test]
-    fn build_recent_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBOSXoxRC85UWx5STRGOEY2dGd6S0grei9WeStxK1NmODhZemxNcnV1WW1nCm1vSy9FeGpLelZhc0puWWtjdHJhbVFKOU1WajFwSGpaWjR4NFdmK1J3R2MKLT4gWDI1NTE5IGdsNkVQUXByM1N1RGdkeWI4c24wZU5vd0xRbVJ6OVJVcGpBeFNOaWpCbFEKUVM2Z2cyaWQ0K2VJL1VCQW9KN2tzNXhPbjNsdTFETVQwKzYrYUVEUGUwVQotPiBYMjU1MTkgTE90WXhRSHZFQXdFbVkxM2dlR3EwTWRCaHdjM2ljOGx0OGMzNThDSXNCRQppek9HK2twR25NSU9qR2lrek9SaXVmTXlGa0gzbktkcERyZ0lJZmVzZzVVCi0+IFgyNTUxOSBJSFhJREFKaDYxWEpLdnhucjl4cmdqZkpXdWlEWUlPam9TZitob3VhTFdZCjk2dGNjeC9zamFyY2h0T1cvQ1JCTnAyemhXSjBNaFBZakNPaGt6OEczWTAKLT4gWDI1NTE5IG1IdW40TTdKSFFQRnlLdXBuRWRaODZCS2JzZFg1a1V0RGVCTURheWFqRk0KeG1WTkhMdEgvUjVCSmxsRlFiMHdaemhXdnJLNDRCOCs0bkhJRk05TGZCOAotPiAlMkJlJVJjdC1ncmVhc2UgNyFDciBvXic9PyY8ICs3VSIvICpZLAp6Q2o2SSs5dGhveDd6ZmNjTTFJZUdVa244blQzbnd6eGNxVGNQZnlWbUJXUTY1QXZvNThPCi0tLSBkK1lUcldvcVJrdVUrWHJCejRmNUxQUnd1b3ZXWDVoQ1lJTU9Xa21XNnI0Cj1SmQfetOjiphYgsr9UqOrI4wUmOo+mrCxrQ3ai0uyi/u9Ig5Ew2WctBZRdkc7ZUsZuyPAwu5FXQwB2zz43]() {
+    fn build_recent_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBJd0dyZWF6OVpKMzFVVTRsalREeGpFR2F3VEc4eHBDYUtrcXlEeXRuYmp3CkhXZGg3ZXI1UEYxUEdhTmR1TWorKy9EVE1CbXF0Y1pwdzVDa21VdkVnZDQKLT4gWDI1NTE5IFpYay81Q2VDMFp6ZWptejdNN1BKM2I1RVBwS0hPRHp1QkpNNGkyNFcxd28KZG8rSDRTdE1rRml4RWMvclgySDdoUWd6U0tINi81cEUweXlTTld5SkxCawotPiBYMjU1MTkgUVVBVFpBZk1lUTZDU0J5NGhlZlNIWWdjOWFZcWZCb09OTzNTejdrWGFIYwpwcjRSUmpPZW1IR0crUFF6ZmNzMlluL1lDTEZsb3BseXRpVjg0NXpaZFRFCi0+IFgyNTUxOSBtY0dHbnJoMDVKSG5PdUhTSjhKM1BPOGdKV0UraFJjK25hZk5xZzJxQkJvCmRGMlpOd3JjY0ozME11Smk3cWJZRXhPR200aXZBaTdkRlplTkpGVktxZUkKLT4gWDI1NTE5IG93ZE5uWGQweG9FYkdLOVMwK3FTYzNIdjZxNVpocnVON1Q1VFlSNTlNR00KL2JuRFpSbVh0cWZ0eVpIdHJUUStoeVN0UmwvWTZnNSsyUmszdUFDN2dBYwotPiAxd3g6QC1ncmVhc2UgfUkgV2FmazhkZgo2a1dFdVkvMTdETDV0WkhPQ1p2RGk0YUE0VTlNZFFpVW9Id29rNXlhWkY4dVh1Wnk0YVUyVjcvNEhOcWtVUHlKCmphZDRXQkVJd2xCU3o1MkROeUJ0SVdTN0pPVFFYQmdNQTJsSVEweTdVenlOTlozd3FRCi0tLSBVYkFjdWdjNjU2dlp2bW9PQTBBQmFEczI0VmZQSFZRZVJNSTBDN0RJbmtNCihfa9gBD1iXkckp2CPoNSU8KBzdcHhqbS0glblG3QGuVskiCLX0QFWTEvQ6IyDNo9hVQrF/5RifNptRXJdz]() {
         use std::time::{SystemTime, UNIX_EPOCH};
         let dir = tempfile::tempdir().unwrap();
         let policy_path = dir.path().join("dracon-sync.toml");
@@ -5456,7 +5755,7 @@ mod tests {
     }
 
     #[test]
-    fn build_recent_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBqWlFSRTJUaWd5c1lYWkpTWnVNaXBaRUNYZVRVSWp6QnhsQWt4RWYyNzJnCktrMi9QREU4RnBrRFFrYlVkK3FIYkRsbFFkMW9iVUlweXNxT3FSQW8rN1EKLT4gWDI1NTE5IGJNcmNCSGlLeU04TEpwckRsdnYvQWNvamtYbkg0UktyeVpLd2k2WjFZa0EKTDA5SVVkWTlEby9EREdBNUxPZEJkbS8rNnUyNzQ3WkpYMFhpL0hPeU02SQotPiBYMjU1MTkgZW5uMFZKRTROaStGT2xSekJ1OUIrR0dDMUZZR3QwV0ZyNlpvdG5VZzh4MAp3VXI1RXFpWHpRS2MvNVpJbUZsREhabWhTOHJhM2czcTBKWlVVSEJhUWxVCi0+IFgyNTUxOSBPNXlKUStBNURxVFh6TzZGaElGNU9CSmovSFZYWG9MRHRTc1hXTUFXdWdRCjBicWMyQVRjaU1sZ1ZPUlpDd1lZY2p5U29GMzEvNzBDMXdHalovYmdHMEUKLT4gWDI1NTE5IEpzRzVMc1JkY09vY1hEU1ZLU1NYbE16K0ZEKzhKYjM5bUF6VExveko2bU0KWDdGQ3dsQlFoVlA0aUZUTVR1aEZkWjhza0NWR3M1ZnJueFJvN3ltRmd2WQotPiBiSy1ncmVhc2UKK21ZbGlVcjIyN2dhYjZjaTk0TnQ5bThBbk9kL2JaWmZ0dWVHanVHZUpycytxZ1RuTE8rOFE5NllFa3hjRitpUQpDOXRYUnQwY3dzc2FkaEFzYU81U2xZVjVkK0F6SVEKLS0tIEMySnZIcUZ1dVVobWJYQWVWNmF6Q2VlaTVqMTlTbzZoVHNCTk5lVWd3ckkKZNyrmmc5oqfnkhGjklaxp3nQLFQDx+I+CTdEkkNTWlg+7MAGXoXR1oYoiOdeq7isdngfgIn74ZzSc7XndwwmJmOT]() {
+    fn build_recent_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB2ME1vYm02MHJnSEtVZ3djM2ZGYUZEMldTOFdwbzAxNjIycnRUWEdVSmpZCllYWk0vQmJrNlAwTWs0ZjVUMXhYYkc3TDdDSlRqdm51NENHNFJOZW1odzAKLT4gWDI1NTE5IElNTHg0Z29pZ0prTGNqeHQwN0tPa0NNRFZyei9WamExcXk5QUpLWG1lVFkKSlVKMm5zZ2d2OEtwRE5pV2JXOXZJbmUrL0VyNG94QlZOdVk2MnpIS1lkOAotPiBYMjU1MTkgbjQ4OTRHTGN1dGNPTEJ1UEZFSFRGTkpSR29zdVpZaC9JMkU5QmVRZGN5ZwoveHFJQk00R1NWUk9MKytCUFF2L1hYWjBFT2VZZU1HYWVMcWk4WlN5c3h3Ci0+IFgyNTUxOSB2NThkSlNsck81YW1vTUtlcUtHU0FMOFMrWk9qSEY2QThxZlB2NjZXMno0Cjc3aWtLQ0hvdjNISHBPdDVCTnFBbWROdGxhN0N5RkVESnQ3cmdyd3NVaGsKLT4gWDI1NTE5IFJnMGN0cnNpMDBsQm1mbE1lQWo4L1hUUjhCMktwemlHNkNHMFBSY2JKamMKZTFNSFd3V0xzdEhzYjVnRG5vMWlCdDdZZWpuQ0UwWUxqTzlwMmQ1ekd5awotPiB2VkE2LX5wLWdyZWFzZSBuM2VUZyA2CkxVbDRVYzZJdTg0ZFUzVTk0V3EyMnIvc3lrRHExWDE4a085NHhtdzd5Ymw1Vk5OcnVJSGw2VC9FRmZMS3hnODUKeHNqaUlpc28zK2JGMFJ4QkROdXg0cXB6QUNoMWV1Z0NkMVZzYVdJc3NMbStMbkdQNFppaWJTMAotLS0gT0thODlCdllkUnJHU00vV2lKZ1JmOEdWUFg2OVhOd0JERW1GL0hDNEtRWQrEHg6Q1TQnuJ45h/sOgg6NCxWyNNa99t4zRopxkL+poekGWkTwSSF8SSxpxHaNdrdym1rhAXOzqy5UXPIV7iGCRF0=]() {
         let dir = tempfile::tempdir().unwrap();
         let policy_path = dir.path().join("dracon-sync.toml");
         let ledger_path = dir.path().join("missing-ledger.jsonl");
