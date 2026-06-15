@@ -29,6 +29,92 @@ pub fn is_hatched(path: &str) -> bool {
     std::path::Path::new(&sibling).exists()
 }
 
+/// Returns true if `path_str` matches ANY of the glob patterns in
+/// `protected_patterns`. This is the gate that determines whether
+/// the SecretScanner is allowed to run on a file.
+///
+/// The matching rules are:
+///   1. Exact filename match (e.g. `master.age` matches `master.age`).
+///   2. Suffix match on the basename: a pattern like `*.env` matches
+///      any path whose basename ends with `.env` (so `.env`,
+///      `.env.local`, `prod.env` all match).
+///   3. Path-prefix match: a pattern like `secrets/**` matches any
+///      path that starts with `secrets/`. Patterns ending in `/**`
+///      match the directory and everything under it.
+///   4. Multi-component `**` glob: a pattern like `**/audit/**`
+///      matches any path that contains `/audit/` as a component.
+///
+/// If `protected_patterns` is empty, the function returns true
+/// (legacy: an empty protected list means "scan everything"). This
+/// preserves backward compatibility for any operator who hasn't
+/// configured `protected_patterns`.
+///
+/// The matching is deliberately conservative — a path that doesn't
+/// match ANY pattern is treated as "not protected" (return false),
+/// so the file is passed through unchanged. This is the
+/// "default-deny" posture: the operator must explicitly add a file
+/// pattern to `protected_patterns` to opt it in to encryption.
+pub fn path_is_protected(path_str: &str, protected_patterns: &[String]) -> bool {
+    if protected_patterns.is_empty() {
+        return true; // empty list = scan everything (legacy)
+    }
+    if path_str.is_empty() {
+        return false; // empty path = no information
+    }
+    let basename = std::path::Path::new(path_str)
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("");
+    for pat in protected_patterns {
+        let pat = pat.trim();
+        if pat.is_empty() {
+            continue;
+        }
+        // 1. Exact filename match.
+        if basename == pat || path_str == pat {
+            return true;
+        }
+        // 2. Suffix match: `*.env` matches `.env`, `.env.local`, `prod.env`.
+        if let Some(stripped) = pat.strip_prefix("*.") {
+            if basename.ends_with(&format!(".{}", stripped)) {
+                return true;
+            }
+        }
+        // 3. Path-prefix match: `secrets/**` matches any path under `secrets/`.
+        if let Some(prefix) = pat.strip_suffix("/**") {
+            if path_str.starts_with(&format!("{}/", prefix))
+                || path_str == prefix
+            {
+                return true;
+            }
+        }
+        if let Some(prefix) = pat.strip_suffix("**") {
+            // `secrets**` (without slash) also matches paths starting with
+            // `secrets/`. Less common but harmless to support.
+            if path_str.starts_with(&format!("{}/", prefix)) {
+                return true;
+            }
+        }
+        // 4. Multi-component `**`: `**/audit/**` matches any path with
+        //    `/audit/` as a component.
+        if pat.starts_with("**/") {
+            let needle = pat.trim_start_matches("**");
+            // `**/audit/**` -> check for `/audit/` or `audit/`
+            if path_str.contains(&needle.trim_start_matches("/")) {
+                return true;
+            }
+        }
+        // 5. Substring match for any other pattern (last resort). This
+        //    handles ad-hoc patterns like `config/services.json` that
+        //    the operator may add. The match is on the full path OR
+        //    the basename, so the operator can write either form.
+        if path_str.contains(pat) || basename.contains(pat) {
+            return true;
+        }
+    }
+    false
+}
+
 impl WardenSecurity {
     pub fn smart_clean(&self, content: &str) -> Result<String> {
         let scanner = SecretScanner::new()?;
@@ -41,6 +127,35 @@ impl WardenSecurity {
         // plaintext storage. Return content unchanged. See
         // `docs/design/warden-plaintext-sibling.md`.
         if is_hatched(path_str) {
+            return Ok(content.to_vec());
+        }
+
+        // 0a. Protected-patterns gate: the `protected_patterns` field in
+        // `dracon-warden.toml` enumerates the file globs that are allowed
+        // to be scanned / encrypted by the warden. ANY file whose path
+        // does NOT match a `protected_patterns` glob is passed through
+        // unchanged. This is the "default-skip" for non-protected
+        // files and prevents the SecretScanner from encrypting source
+        // code (e.g. `*.rs`, `*.ts`, `*.py` test fixtures whose
+        // function names or model IDs happen to match a scanner
+        // pattern like `mistral-[A-Za-z0-9_-]{20,}`).
+        //
+        // The matching is glob-based. Each entry in `protected_patterns`
+        // can be a literal filename (`master.age`), a directory
+        // prefix (`secrets/**`), an extension glob (`*.env`), or a
+        // path glob (`config/services.json`). For each pattern we try:
+        //   1. Exact filename match (e.g. `master.age`).
+        //   2. Suffix match on the basename (e.g. `*.env` matches
+        //      `.env` and `.env.local`).
+        //   3. Path-prefix or `**` glob match (e.g. `secrets/**`
+        //      matches any path starting with `secrets/`).
+        //
+        // If NONE of the `protected_patterns` match `path_str`, the
+        // file is passed through unchanged and the SecretScanner is
+        // NEVER invoked. This is the "default-deny" posture: the
+        // operator must explicitly add a file pattern to
+        // `protected_patterns` to opt it in to encryption.
+        if !path_is_protected(path_str, &self.managed_patterns) {
             return Ok(content.to_vec());
         }
 

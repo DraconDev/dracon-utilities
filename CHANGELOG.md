@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **dracon-warden was encrypting source code**: the active
+  `dracon-warden.toml` config had `protected_patterns` that
+  included `*.rs`, `*.ts`, `*.py`, etc. (source code files).
+  The SecretScanner's `Mistral API Key` regex
+  (`mistral-[A-Za-z0-9_-]{20,}`) matched a public model ID
+  `mistralai/[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBLZVlsd2FwNTNwaG9WdFJMNDJQdmZjNVR5b0ZVZHk5Mjc3K2lYVTdVWHlFCnBOV1BTWmJjNk5SOGM1dFdiUWUrejlhUTlHQkxudWtWTyt2VWxJQmNEZk0KLT4gWDI1NTE5IGJFcDhlVHRjcmNPOU9HTzZEUGZadFVRZUh2cDZ5emFVMTR6WU03ZG4wUWcKd2pBazVDbFRnbmo5RWlZc1FtMXdFNHFlL25iMjh6ZkZQeFdaNHBHK1Y2WQotPiBYMjU1MTkgQVZDRjkzOHRaWEExS2RLUFNzdmJGaVNhcGt1TG53VU1nU0N5dTdkYVZFZwp3VUtPVVI5TFFFQ3QrM2ttdmNhSHBoTzcvWXZXMVQxai9JWkZsV2dnUTFBCi0+IFgyNTUxOSBrVWNrSHhPTkkvZW5XNVB6RTZPVTdsWkQ2dG9nQWdjOUlaSDNXQkJnZFFFCml6U1VHSjFVNHFrdWVhYUUwK0lHdW13NlcvSit1OHAvNTRkOEtPdlpHU3MKLT4gWDI1NTE5IHArSDJJeHNnSG9PdHJDNkpiRzBvSmlBYUdOQkVpdkFJWkUraUZSQXBRUnMKUWNkSUVQYUR0K2V4d0xUaDVaU2ZmbDhDUEdudXdxc3hyK05tL3pTR0ljbwotPiAsPy1ncmVhc2UgeDk5anlnIC5jbEAgaFNQIHkyVDkKS1JKYmFpYyt5L3M0QTRTQjFjNWVvdEEKLS0tIDF6dEhLTjNMTFdnMjJaNFVFVE4rZHZkK01jdEQrQ2xoemVDdG1nMFhTbmMKpnt41BAfCTOUHEhBTisBSz5HVb+L4pFcBHrWd89eQB+5hqdpMnuSSc31+AvohHmWOog+K32WIDfRm5X68bnU]` in a
+  TypeScript test file and encrypted it. The user reported
+  this as a no-go via gibuardien: "we are encrypting code".
+  Two-part fix:
+  1. New `path_is_protected` helper in
+     `dracon-warden/src/security/src/modules/filter.rs`
+     implements glob-based matching of file paths against
+     `protected_patterns`. Files that don't match any
+     pattern are passed through unchanged — the scanner
+     is NEVER invoked on them. The check is added to
+     `smart_clean_with_path` BEFORE the existing
+     sensitive-location logic.
+  2. Removed all source code patterns from
+     `~/.dracon/utilities/warden/dracon-warden.toml`'s
+     `protected_patterns`. The list is now scoped to data
+     files (`.env`, `*.pem`, `secrets/**`, etc.). A
+     comment in the config explains the rationale.
+  Restored the corrupted
+  `browser-extensions-shared/extensions/vidpro-extension/test/components.test.ts`
+  by replacing the encrypted blob with the original
+  model ID `mistralai/[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA0aFNvMk9iOFNFYklSQ0tJVEpnbXJlaHNYaWlHSjJFYnZlRHYzZVJWR3k4CmE3ZWpQRkVZMGkySy9BNnpCaURDbjhDaWxnUUEzK2I5QldUVHNWSUxpclEKLT4gWDI1NTE5IDZoa0lWSFMrWDBqa1B6bEFYeGZ1RUpvV1VUeEcwMFpFMGNYZThEMEVrRVEKOHVCeExNM2xnVnUxdU9pSTUzY25NOEROVDZVNkhiM05URVcwYk1CMWFjawotPiBYMjU1MTkgQUozK3RVcG1UN0NtOC9NcUJSTmtJR1JFbTRTdFo5ZXBuOStqTlpEMEdBWQovc09OdUdPQURLTVdxazdwaGxZQU9TR1JnWUUrc2JNREpKVk80c2RrWkY0Ci0+IFgyNTUxOSBvaVltMWNBQ2RHMVluVytOZjFMM1E0dXZVV281UTlmUjhuWUUwMHVEUnpFCmF3UkE1NFZpb3ZtcHpXcmlybC9DL3VQaEVBNFJ0WTY5WHl6YnpQUk9tSmMKLT4gWDI1NTE5IHgwUURxSVhLVWI2akRUT2FDY1JhNVI3OGt2UXh4ZWovRUcvNjdvVkFFeU0KdnppblkrQ01XWjcwSUJJWURoZVBUTW5JTjlaYjlzRUU2WWhxcVIrK3pJQQotPiBzT0R4LWdyZWFzZQpjNitQRE4zMWovSDM4UlF4Z1ZmV2lkYmUxQQotLS0gOFNIeHBDNDFHMzRnb3VqMTI5WHdVcll4bHVESXljNEI1d3B5WitWSXd2cwpeR9BEU/xTjuKG1OW0DPum7TN8/+TKh6OP3zLUmK5ArFIpgu3m+CW3CyMuRXQTVqWNq1mwetStm3WH2fI0hIg=]`
+  (verified via the sibling
+  `utils/byokAdapter.ts` file). 6 new unit tests in
+  `dracon-security`: `test_path_is_protected_*` (5) and
+  `test_smart_clean_with_path_skips_unprotected_source_code`
+  (1). Documented in
+  `docs/design/source-encryption-incident-2026-06-15.md`.
+  Audit of all 14 watched repos for source-code
+  `DRACON_SECRET:YWdl` corruption returned only intentional
+  test fixtures (warden's own encryption tests use
+  encrypted blobs as test data).
+
 ### Added
 - **Per-repo `owned` override investigation** (2026-06-15):
   after the operator asked to "default-skip non-owned repos"

@@ -1064,6 +1064,159 @@ impl DraconWarden {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::modules::filter::path_is_protected;
+
+    #[test]
+    fn test_path_is_protected_legacy_empty_passes_everything() {
+        // Empty protected_patterns list = scan everything (legacy).
+        let patterns: Vec<String> = vec![];
+        assert!(path_is_protected("src/main.rs", &patterns));
+        assert!(path_is_protected(".env", &patterns));
+    }
+
+    #[test]
+    fn test_path_is_protected_env_pattern() {
+        // `*.env` matches any path whose basename ends with `.env`
+        // (standard glob semantics: `foo.env`, `prod.env`, etc.).
+        // Note: `.env.local` does NOT match `*.env` per glob
+        // semantics — it would need a different pattern. The
+        // `warden.toml` config uses BOTH `*.env` (for files
+        // literally ending in `.env`) AND `.env` (for the
+        // hidden `.env` file) to cover all common variants.
+        let patterns: Vec<String> = vec!["*.env".to_string(), ".env".to_string()];
+        assert!(path_is_protected(".env", &patterns));
+        assert!(path_is_protected("foo.env", &patterns));
+        assert!(path_is_protected("prod.env", &patterns));
+        // Does NOT match a non-env file.
+        assert!(!path_is_protected("src/main.rs", &patterns));
+        assert!(!path_is_protected("Cargo.toml", &patterns));
+    }
+
+    #[test]
+    fn test_path_is_protected_source_code_excluded() {
+        // The user's `dracon-warden.toml` had `*.rs`, `*.ts`, etc. in
+        // `protected_patterns`. After the fix the operator cleans up
+        // the config to only list data files (`.env`, `*.pem`, etc.),
+        // so source code paths are NOT in `protected_patterns` and
+        // `path_is_protected` returns false.
+        let patterns: Vec<String> = vec![
+            "*.env".to_string(),
+            "*.pem".to_string(),
+            "*.key".to_string(),
+            "secrets/**".to_string(),
+        ];
+        // Source code is NOT protected.
+        assert!(!path_is_protected("src/main.rs", &patterns));
+        assert!(!path_is_protected(
+            "extensions/vidpro/test/components.test.ts",
+            &patterns
+        ));
+        assert!(!path_is_protected("tests/alias_test.rs", &patterns));
+        // Data files ARE protected.
+        assert!(path_is_protected(".env", &patterns));
+        assert!(path_is_protected("secrets/master.key", &patterns));
+        assert!(path_is_protected("certs/server.pem", &patterns));
+    }
+
+    #[test]
+    fn test_path_is_protected_directory_prefix() {
+        // `secrets/**` matches any path under `secrets/`.
+        let patterns: Vec<String> = vec!["secrets/**".to_string()];
+        assert!(path_is_protected("secrets/master.key", &patterns));
+        assert!(path_is_protected("secrets/api/openai.key", &patterns));
+        // Not under secrets/.
+        assert!(!path_is_protected("src/main.rs", &patterns));
+        assert!(!path_is_protected("notsecrets/master.key", &patterns));
+    }
+
+    #[test]
+    fn test_path_is_protected_substring_fallback() {
+        // `config/services.json` matches by substring as a last-resort
+        // fallback (rules 1-4 don't match a literal path component).
+        let patterns: Vec<String> = vec!["config/services.json".to_string()];
+        assert!(path_is_protected("config/services.json", &patterns));
+        assert!(path_is_protected(
+            "apps/web/config/services.json",
+            &patterns
+        ));
+        // A different file under config/ is not protected.
+        assert!(!path_is_protected("config/licenses.json", &patterns));
+    }
+
+    #[test]
+    fn test_smart_clean_with_path_skips_unprotected_source_code() {
+        // Regression: previously the SmartScanner would encrypt a
+        // model ID inside a `*.ts` test file when the model name
+        // happened to match one of the 50+ scanner patterns. After
+        // the protected-patterns gate, source code files are passed
+        // through unchanged.
+        //
+        // We test:
+        //   1. Source code paths -> scanner NEVER runs -> content
+        //      unchanged even if it would have matched a pattern.
+        //   2. A protected path (.pem) -> the scanner IS allowed to
+        //      run (it will match a known-secret pattern like
+        //      `sk-XXX` for OpenAI keys; we don't assert encryption
+        //      here because the model-id content doesn't always
+        //      match the strict Mistral regex).
+        let security = WardenSecurity::new(None).unwrap()
+            .with_managed_patterns(vec![
+                "*.env".to_string(),
+                "*.pem".to_string(),
+                "*.key".to_string(),
+            ]);
+        // A fake OpenAI-style key that the OpenAI regex matches
+        // (`sk-` followed by 20+ chars). This is guaranteed to be
+        // encrypted by the scanner when invoked.
+        let openai_key = b"sk-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        // A model ID that triggered the original incident.
+        let model_id = br#"id: "mistralai/mistral-small-3.1-24b-instruct""#;
+
+        // 1. Source code path -> unchanged. The OpenAI key in a
+        // `.ts` file is NOT encrypted, even though it matches a
+        // scanner pattern.
+        let result = security
+            .smart_clean_with_path(openai_key, "test/components.test.ts")
+            .unwrap();
+        assert_eq!(
+            result, openai_key,
+            "source code (.ts) should not be encrypted even with OpenAI key"
+        );
+        // Another source code path.
+        let result = security
+            .smart_clean_with_path(openai_key, "src/main.rs")
+            .unwrap();
+        assert_eq!(
+            result, openai_key,
+            "source code (.rs) should not be encrypted even with OpenAI key"
+        );
+        // A non-source, non-protected file (e.g. plain text) is also
+        // unchanged because it's not in protected_patterns.
+        let result = security
+            .smart_clean_with_path(openai_key, "notes.txt")
+            .unwrap();
+        assert_eq!(
+            result, openai_key,
+            "non-protected plain text should not be encrypted"
+        );
+        // The model_id that was incorrectly encrypted in the
+        // original incident. It's unchanged in any unprotected path.
+        let result = security
+            .smart_clean_with_path(model_id, "test/components.test.ts")
+            .unwrap();
+        assert_eq!(result, model_id, "model_id in .ts should not be encrypted");
+
+        // 2. Protected path (.pem) -> scanner IS allowed to run.
+        //    The OpenAI key matches the OpenAI regex, so it WILL be
+        //    encrypted.
+        let result = security
+            .smart_clean_with_path(openai_key, "certs/server.pem")
+            .unwrap();
+        assert_ne!(
+            result, openai_key,
+            ".pem file should still scan and encrypt OpenAI key"
+        );
+    }
 
     #[test]
     fn test_smudge_robustness() {
