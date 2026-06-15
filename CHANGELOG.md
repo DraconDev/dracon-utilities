@@ -8,6 +8,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Auto-commit backstop for moving-target repos**: when a repo
+  has more than `auto_commit_backstop_threshold` (default 20)
+  unpushed commits AND the push has been pending
+  (`ahead_since`) for more than
+  `auto_commit_backstop_min_age_secs` (default 300s = 5 min),
+  the daemon stops auto-committing and logs
+  `⏸️ daemon backstop: N unpushed commits pending push >Xs,
+  skipping auto-commit for <repo>`. This prevents the daemon
+  from creating a moving target while a push is failing
+  repeatedly (e.g. Junk-Runner-bevy had 2986 unpushed commits
+  + 376 tracked test-result PNGs being committed every cycle,
+  creating an infinite retry loop). Manual `git add`/`git
+  commit` from the operator still works. Set
+  `auto_commit_backstop_threshold = 0` in the policy to
+  disable the backstop entirely. 5 new unit tests cover
+  the below-threshold, above-threshold-but-recent, fully
+  active, no-ahead-since, and threshold-zero (disabled)
+  cases. Documented in
+  `docs/design/dirty-files-investigation.md`.
+
+- **Per-repo `auto_commit_exclude_patterns`**: a new
+  per-repo TOML field that lets operators opt specific
+  TRACKED file patterns out of auto-commit. Unlike
+  `untracked_exclude_patterns` (which only applies to
+  newly-added files), this applies to MODIFICATIONS of
+  already-tracked files. Use case: a repo has 372
+  Playwright screenshots force-tracked by `.gitignore`'s
+  `!*.png` allowlist. Every test run regenerates them,
+  and the daemon auto-commits each regeneration, creating
+  a moving target the push can never resolve. Setting
+  `auto_commit_exclude_patterns = ["**/test-results/**"]`
+  in the repo's `.dracon/dracon-sync.toml` tells the
+  daemon to skip those files. Default is empty (opt-in).
+  Wired into `should_stage_entry` and
+  `has_sync_relevant_dirty_entries`. 3 new unit tests
+  cover the excluded-by-pattern, no-match, and
+  empty-patterns cases. Documented in
+  `docs/design/dirty-files-investigation.md` and
+  `dracon-sync.example.toml`.
+
+- **in_flight file staleness filter**: the on-disk
+  `dracon-sync-in-flight.json` file used to make the
+  ACTIVITY column show `🔄 now` could persist across
+  cycles when a slow push from the previous cycle kept
+  a repo in `in_flight` past the trailing-drain deadline.
+  The `repos` command would then show `🔄 now` for repos
+  whose pushes had completed (or stalled) while the daemon
+  had moved on. The fix: `load_in_flight_for_path` now
+  checks the file's `written_at` epoch and treats entries
+  older than 30s as "stale → treat as empty". 2 new unit
+  tests cover the stale and fresh cases. This complements
+  the `⏸ stalled` and `🟣 pushing` labels so the ACTIVITY
+  column always reflects ground truth.
+
 - **Push stall fixes for `dracon-platform` (and similar)**:
   two related fixes that prevent the daemon from getting stuck
   in a "commit 1 file → push 28 commits → fail at 60s → HTTPS

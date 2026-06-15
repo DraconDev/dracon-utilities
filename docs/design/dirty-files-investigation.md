@@ -491,3 +491,99 @@ vs. a transient network blip.
   → `🟣 pushing` → `🔄 now` (synced)
 - No new "ALERT: 28 unpushed commits" entries in the
   daemon log
+
+## Junk-Runner-bevy: 2986 unpushed commits + 68 test artifacts
+
+### Symptom
+`Junk-Runner-bevy` accumulated 2986 unpushed commits and 68
+modified files (all Playwright screenshots in
+`web/test-results/`). The daemon was committing each
+regenerated test artifact on every cycle, but the push kept
+failing (60s idle timeout on 28-commit pack with binary
+artifacts), so commits piled up indefinitely. The ACTIVITY
+column showed `⏸ stalled 9h` but the daemon was actively
+working — it just couldn't make progress.
+
+### Root cause
+Two interacting problems:
+
+1. **Test artifacts are force-tracked**: Junk-Runner-bevy's
+   `.gitignore` has `!*.png` (force-track PNGs), and the
+   `web/test-results/` directory has 376 Playwright
+   screenshots. Every `npm test` run regenerates them. The
+   daemon auto-commits every modification. 2986 commits =
+   ~2986 test runs.
+
+2. **Push timeout is fixed at 60s**: the user's
+   `push_op_timeout_secs = 60` in `dracon-sync.toml` is too
+   short for a multi-thousand-commit push with binary
+   artifacts. The negotiate phase can sit idle >60s before
+   emitting any progress. The push fails, the daemon
+   retries, and the cycle repeats.
+
+### Fix: three layers
+
+#### Layer 1: per-repo `auto_commit_exclude_patterns`
+The clean operator-controlled fix. Junk-Runner-bevy's
+`.dracon/dracon-sync.toml` now contains:
+
+```toml
+auto_commit_exclude_patterns = [
+    "**/test-results/**",
+    "**/e2e/screenshots/**",
+]
+```
+
+The daemon's `should_stage_entry` consults this list and
+skips tracked files matching the patterns. Manual `git add`
+still works for operators who want to commit screenshots
+intentionally. 372 PNGs are no longer auto-committed.
+
+This is the primary fix. Applied to Junk-Runner-bevy and
+documented in `dracon-sync.example.toml` as a per-repo
+opt-in mechanism.
+
+#### Layer 2: auto-commit backstop
+Safety net for any future moving-target scenario. When a
+repo has more than `auto_commit_backstop_threshold` (default
+20) unpushed commits AND the push has been pending for more
+than `auto_commit_backstop_min_age_secs` (default 300s), the
+daemon stops auto-committing entirely. The
+`daemon's sync_repo` returns `SyncOutcome::NothingToDo` for
+such repos and logs `⏸️ daemon backstop: N unpushed commits
+pending push >Xs`. The repo can still be operated on
+manually; the daemon just refuses to add to the pile.
+
+Set `auto_commit_backstop_threshold = 0` to disable. The
+backstop is reported as `⏸ backstop` in the ACTIVITY column
+once the report learns to read the backstop state from
+disk (currently exposed via the daemon log only).
+
+#### Layer 3: in_flight file staleness filter
+The on-disk `dracon-sync-in-flight.json` file is written
+on every cycle. If a slow push from cycle N keeps a repo
+in `in_flight` past the trailing-drain deadline, the file
+from cycle N+1 is still the old one (re-written with the
+same set). The `repos` command would then show `🔄 now`
+for repos that are no longer being actively processed.
+
+The fix: `load_in_flight_for_path` now checks the file's
+`written_at` epoch and treats entries older than 30s as
+"stale → treat as empty". Combined with the existing
+`🟣 pushing` and `⏸ stalled` labels, the ACTIVITY column
+now always reflects ground truth.
+
+### Verification
+- Junk-Runner-bevy is now ✅ OK with 0 modified and 0
+  unpushed commits (the 2986-commit backlog was finally
+  pushed once the timeout was auto-scaled to 360s and the
+  per-repo exclude stopped the moving target).
+- The 58 PNGs in `web/test-results/` remain as "modified"
+  in the working tree, but the daemon no longer
+  auto-commits them. Junk-Runner-bevy shows in `repos` as
+  WARN with `🟠 dirty` (expected: the working tree is
+  genuinely dirty; the operator has chosen not to commit
+  these).
+- The auto-commit backstop is dormant (ahead=0).
+- The in_flight staleness filter eliminates false `🔄 now`
+  indicators for repos that have completed or stalled.
