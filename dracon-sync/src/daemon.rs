@@ -664,40 +664,46 @@ fn in_flight_path() -> std::path::PathBuf {
 /// `repos` command to display whether a row is actively being processed
 /// (`now`) or has been quiet for a while (`stalled Xm`).
 pub(crate) fn save_in_flight(repos: &HashSet<PathBuf>) {
+    let now_unix = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let mut paths: Vec<String> = repos.iter().map(|p| p.display().to_string()).collect();
+    paths.sort();
+    save_in_flight_at(&paths, now_unix);
+}
+
+/// Test-only helper: write the in_flight file with a caller-supplied
+/// `written_at` epoch so staleness tests can simulate "old file".
+#[cfg(test)]
+pub(crate) fn save_in_flight_for_test(paths: &[std::path::PathBuf], written_at: u64) {
+    let strs: Vec<String> = paths.iter().map(|p| p.display().to_string()).collect();
+    save_in_flight_at(&strs, written_at);
+}
+
+fn save_in_flight_at(paths: &[String], written_at: u64) {
     let path = in_flight_path();
     if let Some(parent) = path.parent() {
         if !parent.exists() {
             let _ = std::fs::create_dir_all(parent);
         }
     }
-    let content = if repos.is_empty() {
-        // Self-clean: empty in_flight means no active work, so the
-        // file is removed. This keeps the state directory clean
-        // and lets readers treat a missing file as "no work in flight".
+    if paths.is_empty() {
         if path.exists() {
             let _ = std::fs::remove_file(&path);
         }
         return;
-    } else {
-        // Sort for deterministic output (helps tests and
-        // operator debugging via cat).
-        let mut paths: Vec<String> = repos.iter().map(|p| p.display().to_string()).collect();
-        paths.sort();
-        serde_json::to_string_pretty(&serde_json::json!({
-            "in_flight": paths,
-            "written_at": std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_secs())
-                .unwrap_or(0),
-        }))
-        .unwrap_or_else(|e| {
-            eprintln!("⚠️ failed serializing in_flight: {}", e);
-            String::new()
-        })
-    };
-    if content.is_empty() {
-        return;
     }
+    let content = match serde_json::to_string_pretty(&serde_json::json!({
+        "in_flight": paths,
+        "written_at": written_at,
+    })) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("⚠️ failed serializing in_flight: {}", e);
+            return;
+        }
+    };
     let tmp_path = path.with_extension("tmp");
     if let Err(e) = std::fs::write(&tmp_path, &content) {
         let _ = std::fs::remove_file(&tmp_path);
@@ -710,6 +716,13 @@ pub(crate) fn save_in_flight(repos: &HashSet<PathBuf>) {
         eprintln!("⚠️ failed renaming in_flight file: {}", e);
         let _ = std::fs::remove_file(&tmp_path);
     }
+}
+
+/// Test-only helper: return the on-disk in_flight file path so
+/// tests can clean up after themselves.
+#[cfg(test)]
+pub(crate) fn in_flight_path_for_test() -> std::path::PathBuf {
+    in_flight_path()
 }
 
 /// Read the current `in_flight` set from disk. Used by the
@@ -738,6 +751,27 @@ pub(crate) fn load_in_flight() -> HashSet<PathBuf> {
         }
     }
     set
+}
+
+/// Return the age of the on-disk in_flight file in seconds, or `None`
+/// if the file is missing or its `written_at` field is unparseable.
+/// Used by the report to filter out stale "🔄 now" indicators when
+/// the daemon's in_flight file hasn't been refreshed in over a
+/// cycle's worth of time (a sign that a slow push from the
+/// previous cycle is still running while the daemon has moved on).
+pub(crate) fn in_flight_file_age_secs() -> Option<u64> {
+    let path = in_flight_path();
+    if !path.exists() {
+        return None;
+    }
+    let content = std::fs::read_to_string(&path).ok()?;
+    let parsed: serde_json::Value = serde_json::from_str(&content).ok()?;
+    let written_at = parsed.get("written_at").and_then(|v| v.as_u64())?;
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    Some(now.saturating_sub(written_at))
 }
 
 pub(crate) fn list_stuck_repos() {
