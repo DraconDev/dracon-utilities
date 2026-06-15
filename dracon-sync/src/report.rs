@@ -1639,7 +1639,14 @@ pub(crate) async fn run_repos_report(
         // The `recent_push_failure` signal is computed once and used for
         // both the `concern` classification and the `STUCK_PUSH` flag so
         // they stay in sync with the user-visible `repos` table.
-        let real_is_dirty = status.modified_files > 0 || status.staged_files > 0;
+        //
+        // CHANGED 2026-06-15 (goal 0ab367b5): use `actual_modified` from
+        // `count_dirty_files_porcelain` (the correct count, not the
+        // library-bug-inflated `status.modified_files`). Junk-Runner-bevy
+        // is the canonical case: 3 untracked test-results/ PNGs were
+        // being counted as 91 "modified".
+        let actual_modified_for_concern = count_dirty_files_porcelain(&repo).0;
+        let real_is_dirty = actual_modified_for_concern > 0 || status.staged_files > 0;
         let recent_push_failure = recent_push_failures
             .as_ref()
             .map(|m| {
@@ -3223,12 +3230,23 @@ pub(crate) async fn run_repair_warns(
         let has_upstream = has_tracking_upstream(&repo);
         let mut effective_status = status.clone();
         effective_status.is_clean = !effective_dirty;
-        effective_status.modified_files = status.modified_files;
+        // CHANGED 2026-06-15 (goal 0ab367b5 / Junk-Runner-bevy WARN fix):
+        // `status.modified_files` from the `dracon-git` library double-counts
+        // untracked files (it treats `is_wt_new()` as modified). Query git
+        // directly via `count_dirty_files_porcelain` to get the correct
+        // modified and untracked split. This is the workaround for the
+        // library bug. See `dracon-sync/src/git/status.rs`.
+        let (actual_modified, actual_untracked) = count_dirty_files_porcelain(&repo);
+        effective_status.modified_files = actual_modified;
         effective_status.staged_files = status.staged_files;
+        // Backfill the missing `untracked_files` field on the library's
+        // `RepoStatus` (it doesn't have one). Without this, the row's
+        // UT column is always 0.
+        effective_status.untracked_files = actual_untracked;
         // Use real dirty state for classification — a repo with TRACKED
         // modified files is WARN even if the daemon wouldn't auto-commit them.
         // Untracked files (build artifacts) do NOT count as dirty.
-        let real_is_dirty = status.modified_files > 0 || status.staged_files > 0;
+        let real_is_dirty = actual_modified > 0 || status.staged_files > 0;
         if !real_is_dirty {
             continue;
         }
@@ -3586,7 +3604,7 @@ mod tests {
     }
 
     #[test]
-    fn test_repo_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBUbHFWSFJ5aGhoaUhLUnJoRmZFRy9GY2RXcDk1dTgxYlN1NGJwSGJ0UnpNCk1zRzNvdmFsK08rblNCM3hYNUFSdlZQc04rbzI5UG51NzJZM1hOWjZXT00KLT4gWDI1NTE5IHhSOG8rZlhMTkJ5Ylk3aExaajQydGkwTEZGQUlpQkhYZHNhUDZzY1NvR0EKSUI3NTJxNUVtYzVCdkU1NU9pYzMvQjE2dHJjMkRFTm5rVUJnZGVrSWI3UQotPiBYMjU1MTkgQThnZnZlSlpPY3lWZ0cvcld0c0xOM3RjT3FvbGc3YUhlZEwwZXpOaWV4VQpoNlBDUEVqY2FsRHZGVjJEdjRkWlF0b1g3a3J6RjJ5alN4L3RxNnI2d0VRCi0+IFgyNTUxOSBLcjhtUVJzbU9KZXFNMy9BWHdxMnFKQ3JtU05SZWFRb0xuMkN2V3BrTUNjCi9lNXFURUU4SnEzM2R6cDl3OHE1YWVQVjRTSWJDSkRTcDRNUlBhR1BFVzgKLT4gWDI1NTE5IEpqVHMra0pNaE8wc0FvT014bW80aEZ5dEhkMnhZaEMrSVI1TzhmRzJqRDQKK1Y3Rk1hVEFIZmlxN3E5K2hlM2JFYnJRMEFXWjVPQ2dZWjZkdDByVTdjUQotPiAjL1VsY28tZ3JlYXNlIC5yMW9rKGQgYShmIGNkQ0JecEIvCjFmUzM0UXZqcU5RSVQ4Ukt4bGxZTXdTMXNNWGIrbjlDaXN2TmFTVU1GQzhhdXloMERLek51SitDelY1QmRrTU8KeU1jaitqdXBtWXk4RTlQeGVaREFBVXI4cHptdTExOFJqK0VnaURZbENDUFVCN2FoUDBEbFNuSlZGcGE5MzdKMgp5ZwotLS0galBDUHZlT0dmZWxWbXlDNDlibkc5elBwMHV5MlZ5UTJoWWwxNEo2Y2s4QQrYKR/zdyEP2Bh+8GoTDM9XNQW0OKrKFCnqZLAqEYVk30xpHURF9HnLbunDFCyoSuRWhSrx3uyUs2eyhqa5IjxewYTHqw==]() {
+    fn test_repo_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBZcXUvT0hPUXl3c0tHTUVRYnRuNkpzb1FVbEYzT25QUWdaaWUwcWdUblg4CjhwcnVCVzdmU1VROWFORk9xU0dEWlBWY2RaVURBVUV0RktsejRNaVl3M0kKLT4gWDI1NTE5IEh2TDRaaGlWVHZ1RlovS3ZGWnZFc1VtTjdNWkhZdHJldGwzWC82OGZ4a2sKdlBRUjBJd2NXZEFzd1Y1YlhIRDcxVW5ISi9RK09xZnUyb1c5RWwvMktGZwotPiBYMjU1MTkgOU9nSnRnS3diUmRDRndrT3F2T1ZGdGhUS3JSR09pWXBuTVc5M0ZqWmRqMApxS2tpeElwYXZ1YldHcmRhWUNucWNvQ3pkaUxSelVQWmlINGxrNXY0Y3VjCi0+IFgyNTUxOSBFUWtVUmM4SVhSSksyWlZxUEd1SEtEMmI4SEdpMC85VUhlWlZYNGlVWVd3ClBkaVJoUStZb2Q0c0hSd1pzY2E1dWJsWXgzYm1RZFAreWZ0VVVUREFjbUEKLT4gWDI1NTE5IGFleVgyZkZvM29xZ3Y3aTQzSGsvUzJwaHZQVTJjYnJ0bGJZcXk1M3QxSG8KNzNNSnJGMUlEbmJNNW9kbU55SkUrZTlZMy9UZkswUGVxcXNORGZWcEVQOAotPiBwWytPU04tZ3JlYXNlICtzbCRBaCA+ZWhsTD8KdmRKcU5OdVpTUy81b1JoK3N1MGc4NEkzCi0tLSBhUVdtdFVIQllJM09rcXZkYi80ZmVMemtoRnE5UlpnZGtQcHFjWllUQ2cwCsTcH3eL1PtJJaGYhUqjvFHrvUoN9JWyk7ilqzMuCPmMThZJxqjs0QmLrSXKOOcRZx/FOcCyshKOe7xVXknqpknwEycO]() {
         let msg = repo_failure_message("init_failed", Path::new("/tmp/repo"), "boom");
         assert!(msg.contains("init_failed"));
         assert!(msg.contains("/tmp/repo"));
@@ -3594,7 +3612,7 @@ mod tests {
     }
 
     #[test]
-    fn test_repo_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBLZjNwRmd2NXo2SUJMMjhlV2NOWU5ETEpFSVN3VVhRdVF4N2FsanZ0U1RFClljMUNjS0N6TjlLSlVHUjh4YjlIWWNXR1J2cHhmQ1EvSnJNc3dFcDQ0V3MKLT4gWDI1NTE5IGxkNVlEZEtNdjdONkwvV0tsNG9yQ0R3WTFyWmhrS2VRbUxsdnRyZHEvak0KVWEwRkRZcU5jMXl0NnZSZlp3ZnhXL3NZQzJFOVRrbGlxdENNYUU5bk1DdwotPiBYMjU1MTkgMTRJM2llRFR5cEhoa2pFaDc0QmpBOWFXOEJrUDA2RXpFK3lIWjNpdlBpawpkNUZZMGxScnR2VTc3b05vckMra1hEUWs3MXBkWmxxQzIzcGtjZWhhc0VjCi0+IFgyNTUxOSBjNkRtNDB6YTNqN29qMFp0TWtJMlA2RUJYSG9DYjllUFFlVk04WDVWakdjClk1S2tPcENJNXhLTEI5dlNoVjZkSmVHbWRnTXpIUVZ0WWVSNzNaZ3lQNWcKLT4gWDI1NTE5IFBTZURzczRsSXJYZGhDU0xING8rbm4vY29CMWFVQW1Jei9BeDNWNDBzd1kKVlRyeEtFS05TUDNXT0wvYnhHaVZsNyt5d1FHekhXemNnYVVJUHFFSEhGWQotPiBhSz9TUX4yci1ncmVhc2UgJkgqTyBmOy9IT1lKZQptZVkKLS0tIFlHUDJNclNCcmszOW5oalVTUmhTVGxqS1VJY2FJYVRLcnVmeUF1aS9oUjAK1EF5Yr2atWfHdsNgrpm1KNv5U6V5icbuzbF1gWh+5joY6T46dY3y2oK0E1mELlJbzFsytKvZtSnmVpGvLg5YDSo=]() {
+    fn test_repo_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBtSGhaQ1ZZcjRIZlBxZjZOdnlyQXI5VEhSVTM4ZnVVVFVmNDJoSHFVeUQ4CkxiZzNicWlqcEt4b3R6ZmNtSlBOMGFCWTVhUFRNU1BLUzUxRXRwVTNTQlUKLT4gWDI1NTE5IDE0R045eVZsRGRLVmhMdGx5ZzZhT1FMVmJCU3F3YW9ZSlpMVGJUNnhYR3MKSm5TaFlEbm1MUXd0VjgyWjJUWWhoVWtjKzYwV1RRendMMFRSK1I2N2dsQQotPiBYMjU1MTkgemY3NnFoUEl1YlhjbG9oSDhaMEFsTDFadm4yRlAvTmFGMkNyZkVNRjVrcwpmZWNrYnRqa3JBUEZSUEtua3NrUWo2NTRScFJ3RkVrSlMzaW1WeDRjL0hFCi0+IFgyNTUxOSBrNytFZWNEYVc5SWx4Rm5QT0ZYODVuMGxRcCtnV2VHcUpFbStBeXI2MmxFCnl5dDdDV1JRMTVGTFVISXJQKzZNQWRCelROWG5IY3BUcDlOWmJwUkZVajgKLT4gWDI1NTE5IDFPakxLUW1GeUxMbml0eFQydXZXWjVwd0wxVE9jZ09wUE5yVnhjVUI0dzQKSWhDYWxPY1g4SW9ZV3dpeXJrc3NpMzdqUTRqV2hYT29qdUIwNDZtVURzSQotPiBnfXg6fS1ncmVhc2UKeXEzajVNa0hCNjdUUHlQRXFXaXVqUjB1T21RWVpFVWNiWjAxMDdUVTBDWkhabE81c1U4Vzk2WXVaQlFwak5mNgo3a3hMTXQxRFR6c0kKLS0tIDNuUXJkeHdtMXhVYTQ1RW5RZHozNUlOekNqWW9pWTdwYlNpOGVUWUN4ejQKz0KDp7VCEDA7b68nc0UK2ZsoEXTDVJbSwseIFf8Vc1TzUT4/cuvYf0Axcq9UgmkPcIl4FHtsZ8ow0tL5YUiFURo=]() {
         let msg = repo_failure_message("status_failed", Path::new("/tmp/repo"), "status boom");
         assert!(msg.contains("status_failed"));
         assert!(msg.contains("status boom"));
@@ -3909,7 +3927,7 @@ mod tests {
     }
 
     #[test]
-    fn test_repo_stuck_filters_requi[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBveXNpVTFIWmZla2x2L1BNU2xKQkN1ckhveGxqOG4xU3dCWWs3empvdlFNCklZMlhWbWF5YkRUN01vajVWZ1dJd3hLWWswYVJ1dWRiWGx0Qk55bGNnZmcKLT4gWDI1NTE5IGs1NWRJTjkxdGhGZ2NYdXJneXlhbUxUaUE5L1JUK0hkNk9wb0R1amhBMWcKbGR1bFBwSjBSN2Zub0x1YUluRWRTT2ZYbTR1bDYxdGMwNXdMTFRsNHpvbwotPiBYMjU1MTkgYjQ3aVhhQVlCZmUzRVo3Si9YTzE1MzZrMkZOMndoSUZYaFVKVlJkZlAyZwpSSlZ6djU4Q0tyU3kwM3NZT1FLMDNsSUV1QnJGTkFxMzkyZHpkN3h2dDlFCi0+IFgyNTUxOSBxY0IzU2gvZjFycFZ0YzROY3MxZ09vYzRJSkdhS3Z2VUQzeHBtWEZIRDBRCkg0aGVvN0ExaUFYWnliaDZFeWd2dkdicThYWWR3bmVXM1BnbEduY3pjR0EKLT4gWDI1NTE5IFBUZXVlcjFNK0JVZWhzZEMyWDk5bEduNkJjN2ZMMWk0cHBTOUFQdlVwU2sKLzVBTkp6dlg2eldsaEc4K3JBOVJzT1psWXBmQk1hQTFrcHFtTGNFVFpTZwotPiA5OmYtZ3JlYXNlICggWEhVPjJ7WXcKSXFCTjBGRG5SeW5DYjhadHByVHA1UndDVVRMQnJqd0htZW4xZ3lJMVhnWjkzOWNSMHRYdmZoazRsM2xQdk9GcQpSNFAyancxbWkzYWdzRUE4Ci0tLSBod1hCMW9HSmlqTmVNUzVWcjI4dW5TVmMrVHNXajY1ZGN0MEZXR0ZEVzEwCuFipmrGdL3ZXKPh0I6K6ZwdfOBQcorwmDrNF8bXZqg3hJ6cBlXFZoHKWYC44fgsRpXWMLl7v9df]() {
+    fn test_repo_stuck_filters_requi[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBZVjhmamhZUEtFZklubHBVbFRaaXJPSnlUOHhtY0tUenNtMkw2WTNjeUJRCitSYTkwc3k1SjgweFZLVmR3QkM1d2dZSXd2by9naVIwVHpEc0pNYXh1RjQKLT4gWDI1NTE5IG1QanQvbTA5aVhpMXA1WmtNR3p1dm1yRFRqYWRUVlVlaVlHdEpFK3RtSFUKU29DNHR2QTFSQUErQTdyalM3dWFET0Q0ZEVLRlpZYkJaWWwwUnMzMVYrbwotPiBYMjU1MTkgM1V4UTgvT0ZHbmc3dmhLdEFFaVlIc2NwSzRlMFpGWDdNWW1sV3NPU0IwdwpEWHpWekhzYlM5RFpsQ1lvdkYvZDZZSmhpaDNGYkVwVU1yK04xQzhKdno4Ci0+IFgyNTUxOSBObmhyM3dGN2RaRW5EYjhzTmQwUmQrcEwyKzlPZTRDMmx4VjZMQ1kxU0VNClpRZWJXd3JVNTNLU1luOWZvTVZHVWtPSHpWbzk3U1RDdEFmNGNybFhqdUUKLT4gWDI1NTE5IGJTbTRRb2Z0VWhWNlJhblJ3V25qWk1ITXQ3bWljcVdCZmozeUlNUGxCbXMKTmpLR3FxaHg4RCtkd014eURHOVRxMytxNDZ6WC9UL2U2eWIzVEZLUEtCNAotPiBMNDZxOy1ncmVhc2UgWDtWaAphbkNWZGVvK1c4TGNqdTFqeEx0L3BkNmoyVUdXY09hSWQ5QSt3bU1waDB2OEdPcUc5TzRQN2pNWlREb2ZGYjUrCnJtVVBKaWM5ZjNhY2RiaVhPakxpMkFPa2plS09xYXVDa0lFbWJKY2s5UGtubmRTZGtwRnpRaXZxVmFaVFNKcWoKS012MAotLS0gS0RMZ0xwUkxuS2NqM0lRU0ExTFF0bnU2aFM3M2JVU3ozdXl3a2FnbXlibwp/A3vFR1oCoGvVMXQmJmXO2lCFlXt4Mcr8Za5BvutHBUfrY/UF/cZCP5QyTVOEjbFKpPBc5vknhQ==]() {
         let ahead = make_status(false, 5, 0);
         let behind = make_status(false, 0, 3);
         assert!(!repo_is_stuck_push(&ahead, true, true, false));
@@ -5282,7 +5300,7 @@ mod tests {
     }
 
     #[test]
-    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBCbURPM0dLU0RLUTFSTHZGTTVUUzZJeUVWTlB0djgra05iT281eTRhSXlrCndVY0NTTHl5Q2Y2ekQrZmZUWFFvcHFWUVc0am9Pdko3Q2Fnb1VIdi9idkEKLT4gWDI1NTE5IHdxYys1NEdzb0h3a3oyREZOKytmV3VHdWVGanN3WFR2NlVYRkJyalcxRncKVEpmRkl3UytEcmFjSjRxVEx0ZUF3QkdBNHZPZGJycUdoWXNHamJsREVqYwotPiBYMjU1MTkgWktnZ0MzT3BuZWdJZHZScTVjS3JHY1pPV1Y0RzhxNjFNbkp3TU9HeS9DcwpmTldSSGJGb25SQjVRRWlOTk5Cb1R0aVkreWhkSEoyM012aE8xMUFHTjJvCi0+IFgyNTUxOSBUY0hnYWJsYmxhN20xRmh0eHkzczF2ekMzNytTMDA5c1R3K2ZhcWk4V1FBCnpCbC9BQmdzcFllNVZmYkU1MUc3S0NDVFBlbHluZFdQZjlINDhKQTBlQ00KLT4gWDI1NTE5IGduRzludVFnOXhwMEZRUEY4R21iZkJ1cWR4WG9qNVdxV0FVMVNFUGViMlEKbysyVnFQdUhlU2F1TDhSMXMxaUYrS0V0YXd2NkpRNUFvR0w5WElJYVZvMAotPiBubW40YC1ncmVhc2UgQSFQdj8gI2N4WjsgYEMKcHFreWR5blhlL2s5NVZITDViY1RrT3lSQ0RzNTlnCi0tLSA2VENGNVVOaHk3N0xJOW4yZHpOQlJJUXJWQXB4dU9qMmdlSG9FNHliU0YwCj5Spbsi+VG+QO1fd8/Nu0y8elUbkuAIa6RXzCgKNBWXHMb5GlQIlhKDdcl6IxxIrLxaZgEK8rLKgSWVzGo=]() {
+    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBXM0FtMFBLdTVQQ1UwVSthTXU4c1gyQlRNdXkwb0l2aGNCYWQrb0xTWVVzClhWeGZsUUZBaTJoQTJLQmdTaTlyTXMxWGk4c055K3pzNEFjQjNXTXdxcEEKLT4gWDI1NTE5IFFERmZTY1ZUcGVoVDcydFlVK3hQK2NkeGRqbG51UHRCd2FYVFZmL2ZDSGMKU3h4NXNhVE9SR3Y2bEhLMDcyUTQ3Y05sZENWUVV1MHZWKzZYQzN3VytWTQotPiBYMjU1MTkgSWw0ZG5ZaVZKT3FMeWhoQXl0eEFoUDBrT0N3UmVaaDVzU0xMcjN6ZUlHcwpHQUFTaHRBZ1IvdDVORW1BWW9EZ3VOeXFFYkF2b1dwYTk5Q0x1bDBLMXJFCi0+IFgyNTUxOSAySWk5ZTkxdUtzd1k0UjhtZ2tMZDNyekdQM0NIYVhsY3VZWlpQREc4M2xVCnpHRFVPZVR4NUV2M1hkYWRRNW5ySWZlNTZqd1ZqS1QxOXp0Q2d4WjlkSW8KLT4gWDI1NTE5IDIwbWRLZTV3VG96SHhBaFdQbHpja25OMnlUTnE4MnZvazVTNmYrYm5vbWMKb2p1NjVqZ2kydkszTm5TMFJrMkNvNk9vLyttV2paMm9TUlc1Mi9zZUpvNAotPiBLJFJLamQtZ3JlYXNlIFJkVDRyblx4IG5ufCoveUUsCnR0L2VzTlh3cC9tVGxsNTMzRFZpaXBvCi0tLSAvc3dXN3FXSnFLYlFRcHZOS3ljK3d4MFJTN1B1aHZaZWsveXE3bTVGVFFrCm3mDNZkPoggdDov95hdET73r0+cubZSfUQKKHt9hpsPgtKWqGzr3cobfP6JZ8vfseT05eRRYBc1jVEvm2U=]() {
         let mut cooldowns = std::collections::HashMap::new();
         let repo = std::path::PathBuf::from("/test/repo");
         let notify_key = format!("push-fail-{}", repo.display());
@@ -5411,7 +5429,7 @@ mod tests {
     // -------------------------------------------------------------------
 
     #[test]
-    fn build_recent_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA3N2JuRGcrSExEaDg1TEEzeDVWWjZHSFdrazJvTWVkQlJZQjJVb2hEZlVrCkZaNDZIdVNBekJkNnlFeDhvS2xJaWd5NitvNWREMmh6YmVmaDZvUkYwSlEKLT4gWDI1NTE5IDA2QnlHbWdSTDFBS1VwTUlSbXhrNW1GcVJHaG95SWhJRk1XeUVIeWpTRGsKSlNqTG9oaWRzeWVwcGVHQzNuVHhHRDN2L0VVaXNkUzZuQ3I5MWFJcGt6QQotPiBYMjU1MTkgd3hvU1ZzSStyUStuQkZ5QWxLTXBoTWxNTTZYdTNBVTdIWWN4amJOcTNqVQpVNEUvQ1Bjb3ZUN2RRMzNiL05SU252YnpCdk0zbHB5eGNBLzFKV0VwZUNvCi0+IFgyNTUxOSB0OGNmWmtiQ0J4YUZIQ0FSQ1J2VnpKVUd1dWRnSG81cWJIdUp0Mld4L1FnCkc3SDVTYWJ2ZTBjcTBZbloxYmJuWjBobUlHNWpPZk5xcDlEaVZrVEwxOEkKLT4gWDI1NTE5IEpyQW9NMTJ5d1FFNXlzQ1VGR3pWZHZGK1pvV2dZcExpZkM2V3FaNkhxV28KdXZKWkJBcEwzUkc1TTNraS9EdER3bjBPdUE1cFo1cnpxcEp0TTdySndTUQotPiBDKk8yLWdyZWFzZSBEWjE8RDQvTApsT09hNnFsaTByWS9ZckMzREZnVGFqWlYxK1NIT1BEa3hOZDNtZ3AyU2U1VzNycDVybmdtU0gzYUk2UWJCUVhJCgotLS0gaUhiUHBHWHdFUDRBUC85VzJhODVZdENxMS82Qm9kWEw1dU5JVjhKUlhmQQrDSrqXQmHsGEdBRcjhH6oGJCFw6dYTFju2jQFCoaktnzUvgdhBPthIdC+siI1DUHihtMwFWFtmjxLFIZs+WA==]() {
+    fn build_recent_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBXdExlbHBWeGxTTXdzQlZFM0NzNUZsZ3BVcUczL1NMMXBLWTZXU0VwaWdrCnRDU0lkY1hBaTJHdEpEblhmSld1Zm0vdERCUTIrNEE2ZHRlSktZa3UrK3cKLT4gWDI1NTE5IHZDeUhCOWdQZzl2ZjBBWEFPMmtqMStjaHN6QVZkNUZ3WDkzZ1JtZnd4SFUKMDVzUVozWEthcXlkcnViam1iMkZ6TjExVGt1M3RRdW4zWkRlSU0wd3pPcwotPiBYMjU1MTkgMy9sclRWcys0dHNLemVNTk1KK2dZWEhVYkJEeHRncGg3NXhPM09Sei9IYwpCUlFrNnZFL1JrWGxCSkN5WDNoV3BvaG1ERVFYUTN4R0RnSUlORXVUaFQ4Ci0+IFgyNTUxOSBpU1h5OEwwRGxKVWRhcWx2ZTlrSlBYWld6MVpiS1ZTYXd3NlJ3ZHRSNXpJCnFLY1UwWkpXeXRLWGVEZkt5L3VLdjhBY2VlOHl6UTgxSndROC9CYkF0MXMKLT4gWDI1NTE5IHhrRW5IWmxxcW03cnBoRFhubk1VSTlMSitzM0U0S2RZbDFKNmR0YzJMazgKK2xVOHovWURrdytVMzMydHRTcFBqbktBaWhaVVF2MFdDbWhuOE5LMG1BdwotPiAqalxFXG5NLWdyZWFzZSBiIGUKZXkxRTl6aDlMbWVwdktibGJMWTM5dDJ5QUVTWnZHOU5ud0IzQ05uRXAyUU9iVm5rVE5LU1NxSTRTdmhEa1h0QwpzTDUzQmNoSWdUd2VyTG1TOUVCcWswOWQzNEtZU1BpRDlmUjNFYitmYTd6Mm14cy8zb0w4aFVvVkZKMXV5aEZpClc3RkIKLS0tIGt6b0RJZUp3ZS9pcDB0VDR4eXFFNU5mLytqY3U4OXEvSFcySnZ0ZmNmVHcKDG7Dckl0ujOY8G49TvOEDWR/gutcJkUXd5dNjUsl3rxUGouBK4vGG/GrTBYWkcxjfT5t2P7rKRasiGVLX4o=]() {
         use std::time::{SystemTime, UNIX_EPOCH};
         let dir = tempfile::tempdir().unwrap();
         let policy_path = dir.path().join("dracon-sync.toml");
@@ -5445,7 +5463,7 @@ mod tests {
     }
 
     #[test]
-    fn build_recent_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBrYjRoUVBzQVN1d2tVc1hUSFFJOTVvVGZaT3dOSCsyN2VSTHROWC9vWWd3CnFneVdrclZHbStrNjhQWjI3aUkwaWNib3NkWHZxTUREa3dXRlFGT29uM0kKLT4gWDI1NTE5IDZncnlIYTcza3hVamZWQktxZlVadXY3MTBPM21qZU5haU13dDFrbm9Pd0UKai9VdFJkalFpZlIzdnN3YzlBK0c1VEs1WkVUZ214OWphb2cwc08vVDBqWQotPiBYMjU1MTkgN0xnbDhQSWM1cFBIMmV4L251VER0RkZsbWVJb2prd29hc1BlUDFxV3ZHZwpEdDZSMGJuMWg0Nmc4UXgwTkMxUU05SitreGoyc2tVbktEY2phSThDUEx3Ci0+IFgyNTUxOSBOZzRwWmoyajFWQzdBZ003enJiUzFRMEMyVEw2UEhORlpySjBHKzk3ZTNrCjB3aUdYL3RzKzN5K2VjZkFVblBtZ2VzTXNiZmN4RU5pRC9lRUdkckh2ZHcKLT4gWDI1NTE5IGVJY3NFQmpOZVZ2TGNmN0s1aFpCTkV3N1NtbEQxN1gyaDN4elZBYllYV0EKalFDaVRLa0JKaDhJRWJtVkIrTHpuemZiNTd1cnNEQUdPRUJpZlFkN1FUdwotPiBZPXxfXy1ncmVhc2UKWnM1Z1FZYjNvRXNyK0dkVzNZQlZNMEg2S1dsbHRRVFNFZUsxUjVIYkd0NUw5NnduCi0tLSBZRTdjT2VWV3BFbEhkOXVBRmFPTTNaUnRWRDhmcEUvSGJlZmx5YlRmZlBnCixefPgbN6wnAwCSrwdBsyYHWqO50gGQgISESguxWcxfZmB2ulBR7C2bSXFv7UmBkTraah6PTNyYItLLuofQbK0l7g==]() {
+    fn build_recent_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBlQllneklocmk5dVZhZ1l0eVp5OXdIcHZ4SElmd3drbDVHa2t1YWQ2dmhjCnovNXlKWERmRFZYUyt4Yi84SnJhZWs3TFd4WEt6OGs4Y25qbVFNUjRtWW8KLT4gWDI1NTE5IFA1WUQ3U3FpRENJdXBxRHlCcXV3SUlsNkdHQVAwbzZFenhIb0RrazQ2VVEKT0ZGMXdkcDg4Z2Z2cTVxL0V4TXBYQjJHSzg4L0d6SGdDNmxFVDBjTkE5bwotPiBYMjU1MTkgVkVmWit6WmF4TEw1TzcwTCtlcU1JRmptMEdnMWV6ajNMMC9qeTdMdXpGVQpMVUpwcEpKY2d0OERheDU3RXdzK3JrTEpDd01FWXBPUC80WHlodkQ1aHhJCi0+IFgyNTUxOSBWYU1NUkQ4eE9mU28xR0Zhd0FGeXdCTWtpTy96V3hkNlMxSHc1UG1LOGtrCld4bmVQK1NzaCs5TXU3NUlMZnIyYU1VMnpHVDlmbGI5K2JtbWNhTGFLS0kKLT4gWDI1NTE5IHU5QWNGbE5rV2Q1UHJ2bm5kOXpDcDMySzNJL3VrUnBtSTNFRDFOSzNmMmsKWU1KSWpuUUs4ZUkxQTNEdVk3MTRka0liMnVrQ0xoaU8vMDBTcS84ZVRXSQotPiBdLWdyZWFzZSAvXyBrR09BXEJHIGJUfipoCmhJYVNpU2tvRUtjCi0tLSBycWhZdUIyS3hrNE1rL1N3clVQOGRpZ2ZTeVRFU0RMbngrK3VwYUEzNTBRCnGQW/RPpD1LPPbp5NgEqR2H/3RFD+7fHcYGi7GJ3oy+1AJ/uln+0fbwqoMTGCh6gl9E+KxsG3Ap9du4d+R5j8r73A==]() {
         let dir = tempfile::tempdir().unwrap();
         let policy_path = dir.path().join("dracon-sync.toml");
         let ledger_path = dir.path().join("missing-ledger.jsonl");
