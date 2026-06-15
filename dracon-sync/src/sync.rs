@@ -34,6 +34,53 @@ pub(crate) enum SyncOutcome {
     Blocked,
 }
 
+/// Count the number of unpushed commits on `origin/main..HEAD` for the
+/// given repo. Used by `push_background` to scale the push timeout so a
+/// large 28-commit push with binary blobs doesn't get killed at the
+/// 60s default. Returns 0 if `git rev-list` fails (e.g. no origin/main).
+pub(crate) async fn count_ahead_commits(repo: &Path) -> Result<u64> {
+    let output = crate::policy::tokio_git_command()
+        .args(["rev-list", "--count", "origin/main..HEAD"])
+        .current_dir(repo)
+        .output()
+        .await?;
+    if !output.status.success() {
+        // origin/main may not exist (e.g. never pushed yet) — treat as 0.
+        return Ok(0);
+    }
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    Ok(stdout.trim().parse::<u64>().unwrap_or(0))
+}
+
+/// Scale the configured `push_op_timeout_secs` with the local ahead
+/// count so a large 28-commit push doesn't time out at 60s.
+///
+/// Formula:
+///   ahead ≤ 5  →  base timeout
+///   ahead ≤ 20 →  base × 2
+///   ahead ≤ 50 →  base × 4
+///   ahead > 50 →  base × 6 (capped at 600s = 10 min)
+///
+/// Example with base = 60s:
+///   ahead =  3 →  60s
+///   ahead = 10 → 120s
+///   ahead = 28 → 240s
+///   ahead = 60 → 360s
+///
+/// Cap at 600s so a runaway push doesn't block the daemon forever.
+pub(crate) fn scale_push_timeout(base: u64, ahead: u64) -> u64 {
+    let multiplier: u64 = if ahead <= 5 {
+        1
+    } else if ahead <= 20 {
+        2
+    } else if ahead <= 50 {
+        4
+    } else {
+        6
+    };
+    (base * multiplier).min(600)
+}
+
 impl SyncOutcome {
     pub fn has_changes(&self) -> bool {
         matches!(self, SyncOutcome::Synced)
@@ -562,6 +609,32 @@ async fn stage_existing_files(
     if existing.is_empty() {
         return Ok(());
     }
+    // Filter out paths that no longer exist on disk. Build tools like vite
+    // create timestamp-suffixed temp files (e.g.
+    // `vite.config.ts.timestamp-1781483278562-7a994a6fc1011.mjs`) and delete
+    // them within milliseconds. If `get_status()` lists such a path as
+    // untracked, but the file is gone by the time we run `git add`, the
+    // whole `git add` fails with `fatal: unable to stat ...`, blocking
+    // every other file in the commit. We re-check existence right before
+    // staging and drop the missing ones. We also drop directory paths
+    // (`git add -A <dir>` would recurse, but a bare directory entry in a
+    // list of files is not what we want).
+    let existing: Vec<String> = existing
+        .iter()
+        .filter(|p| {
+            let full = repo.join(p);
+            if full.is_dir() {
+                // Skip bare directory entries; git add -A would recurse
+                // but we want explicit file paths in the staging list.
+                return false;
+            }
+            full.exists()
+        })
+        .cloned()
+        .collect();
+    if existing.is_empty() {
+        return Ok(());
+    }
     if dry_run {
         println!(
             "📝 Would stage {} file(s) in {}: {:?}",
@@ -583,7 +656,7 @@ async fn stage_existing_files(
         // - Ignored but already-tracked paths: `git add -A -f -- <paths>` (force
         //   re-stage; git already tracks these so gitignore shouldn't block updates)
         // - Ignored and untracked: skip entirely (.gitignore is intentional)
-        let (force_paths, normal_paths) = partition_gitignored(repo, existing).await;
+        let (force_paths, normal_paths) = partition_gitignored(repo, &existing).await;
 
         if !normal_paths.is_empty() {
             let mut add_args = vec!["add", "-A", "--"];
@@ -892,10 +965,30 @@ async fn push_background(
     policy: &SyncPolicy,
     mut remote_failures: Option<&mut HashMap<String, usize>>,
 ) -> Result<bool> {
+    // Scale the push idle timeout with the local ahead count. A 60s
+    // timeout is fine for a small push, but a 28-commit push with
+    // binary test artifacts can sit in the negotiate phase for >60s
+    // before emitting any progress. Without scaling, the first attempt
+    // times out, the daemon burns its 3-attempt retry budget, falls
+    // through to the 4-remote HTTPS fallback chain, and the operator
+    // sees "pushing 4m" — a stall that the new ACTIVITY column will
+    // surface, but that we should prevent. Capped at 600s (10 min) so
+    // a runaway push can't block the daemon forever.
+    let ahead_count = count_ahead_commits(repo).await.unwrap_or(0);
+    let scaled_timeout = scale_push_timeout(policy.push_op_timeout_secs, ahead_count);
+    if scaled_timeout != policy.push_op_timeout_secs {
+        eprintln!(
+            "⏫ {} scaling push timeout {}s → {}s ({} commits ahead)",
+            repo.display(),
+            policy.push_op_timeout_secs,
+            scaled_timeout,
+            ahead_count
+        );
+    }
     // Push to origin
     match push_with_retries(
         repo,
-        policy.push_op_timeout_secs,
+        scaled_timeout,
         policy.push_retries,
         "push",
     )
@@ -2059,7 +2152,7 @@ async fn stage_commit_and_push(
         // `ctx.remote_failures` (the caller passes a `&mut HashMap`).
         // The `tokio::spawn` fire-and-forget pattern was removed because
         // it bypassed the failure-tracking needed by callers like
-        // `test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBTQWNnT2lJRkJ6Tld5dXcrbTJVUWNGK28xNjh0ZzhOY2dQeU1SVGNyTW5JCkpRV3ZoeUtGLzloeDNVMFdYRDZURDVBTXNNVThFcjYvakdmTndZKzJSQUkKLT4gWDI1NTE5IG1vTlFEZHhmUHhHSlpZQmEzZEVKZG1KeDBTSWo3b0JmRDBsN2sybFZod0EKeDYvTVBqNHMvenJ2NU9UKzkxMzBGbzBnNFBYM3c0U1puNkNIZ08rVVFPdwotPiBYMjU1MTkgbnRwaHRDRWFiRnE2VW9HSmFTb1RPUng5cHArdk54ZEFxbTY3MDdhRCszdwpZdlFNeXdvUTRLeHpsZjBTL0RWMnZ0eDJkL1ptc0xxS21walp2S2wyTHJVCi0+IFgyNTUxOSBPLzlkRkR0elRBd1dyblRGV0YvUkhraVYxY1dYZ3JYVWRobjhpY3pQNmxBCnBLZVlTVUdyWDZZRTVjVFNyTzNQWERNZnVKK0h3bWJpSmxWRnlWZUx6d00KLT4gWDI1NTE5IGUzbDg2ekZZZVVhK0NCeHBzalBpUDUySm1CK1FtaHJncndIV1h5M1lIazAKaVRvN005ZldqYlljQXA0c0oxSnU0STIxT1g2bU9QR3ZHZVVNa3JjTWVOYwotPiBAc0swJ080cS1ncmVhc2UgJCsgUX5NbQpmc29RUXUraGhrT2YxTFBqZFhQenM5TQotLS0gZmlrcCtPRFk3ZVFFUlByUXI5Yk9QQ3pMdXpvdVNkMVR6eEZ4MkFmY2lvOArV9SKtgW5A5xH0NKUkK2HFmpuOdtFKJ0UwAld8uAjAbrKsLMm4NzuvQyny2AZwXEqtq0dGpkxJWls=]`.
+        // `test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBFL2hLWWxKT3lBdkdmRmtwRlVpZ2s3QjYwTEREaFpRVEdZVmFhZHVzYTE0Ci96bXIvZEVJdmoycWxTakNsMmZHclB3QWVMYkNkS0VsMXNGbGp5bDRTbFkKLT4gWDI1NTE5IHNkYjFFSi9BTUNoR3BMK2NnQUpYNjBlNVd2SkErZGh4eG1CS1ZpYW9kazAKZldMWkxSQ0s4SGV4Z2FQTWt0KytOL3crL3NRMW8xQ1F4clJoR21DMmNpUQotPiBYMjU1MTkgc0o0VVo0T2kwbTlIQXpiRTgzVDViTHl0cG8rSERtanNrdjJUM2NKYk5FNAo5ZWhpbUV5SlhESmdGWDIyOUFQNmlxamVlZmtoR2Z4a2EyZENXYUF0cXUwCi0+IFgyNTUxOSBaZE9BMzBPTkdXMmlNVGhZd01BVEJwQ2VrajF4Z2dkTTlxWFY5RmZEd0NNCmIyZjgyenhvQzBxbnNadS9NRHpETjlCMU9xUUQ2N1UycjF6bTFtQUpFZDQKLT4gWDI1NTE5IDNvTVYrT2tBVzVhQzF2b0JXTHVZQWZHNW44a2J0VS9yUG8wK3ZudXdLUU0Ka2QwUVM0MXdiZU1mbzd4dEZadUdqQWlBNGxsRzcxNFRvdG5LV0NrNlhJVQotPiBYSEs/YTktZ3JlYXNlIGpeLE8gQDpmcCBIawpjZmszdmZWZlRGRTZlN3Q0ZzhhZkpHaE4vc2hXczJYa1pTbFNwYU84UFdJeTFySHlHT09ydTV1QTRpWGtlcVNKCk9TMXNtMmJBTjg0Slc0WU8ydE1JWGJlUjMxaFNIeHRXCi0tLSB5U2lhbzdZa0tOT3VMRytubklER3RZZ0NxTG91RVBDQkJhcEpKVHRqTDZrCvubXife7oihomZuPbaFtCxk0XmRnv2Hr5RrLpym5+NsumgIoajGZkXvz3y1xHNCaZfYBQfR3o+nzQ==]`.
         match push_background(repo, policy, ctx.remote_failures.as_deref_mut()).await {
             Ok(true) => {}
             Ok(false) => eprintln!("⚠️ push failed for {}", repo.display()),
@@ -2327,7 +2420,7 @@ async fn handle_ahead_push(ctx: &mut SyncContext<'_>, svc: &GitService) -> Resul
         // Push synchronously so mirror failures are tracked in
         // `ctx.remote_failures`. Previously this used `tokio::spawn`
         // (fire-and-forget), which made the failure tracking unreachable
-        // for callers like the test `test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBmRmptMys5TEU3WElJTS9BSTBNaU5sSGhFdXRLUGV2VmxlUUdlM3RBeG5RCmd6OC8wYllPM3hLSkpteXBuR0lvVXFNTzByYUdyQitiU2JVL2xCMlNWcEUKLT4gWDI1NTE5IGFseFk4K21IeFlISXc3YVl5NzM2RU5KTXFla1ZpUlUzQXdXU1VVRXA3Vm8KMVdDNS8rTjgwODBOOWhFS1Q0UjRmUHFVd1JlZVd2OC93T2VCRWNqZGJkbwotPiBYMjU1MTkgM0RCYjYwczVUR1pRTS95Q2JLWHorMGRlR3NLdml4NWRyalZ2RVRVTXMwSQpqWDk2bWFiNTErTmhQZnU1eVVYTkdHTFQxN2JDUVIrQkxOTzZVMno3WE5RCi0+IFgyNTUxOSBZVnZkQk5GTlk2L2Z4K00xYnhSek1zK0htdU5XZGtjUlNWcE5mZWZKM1dJCitKbVhBM2FaUFExbmFwVW9ZbXg4TlVxZm5nUkRkRy9DNkw0N2dia05jdm8KLT4gWDI1NTE5IFYwQ2RTTUZJMmhYQmNKUzBDUjFQNmtNdU9NUUdjQTZYNjR1RlRIUExtQUEKcEpvVjlPclM1R3JPQW1WeFFCU084bWdmQ1BiSFhuZVA3R3JkYWlMMW9aZwotPiBmQ0QwVWwtZ3JlYXNlCjk3b1pPSVJyOVZvL09lbGhFOWFZelo2ZTB0T0xyTkg0Ci0tLSArVk15aTVwUGQ3Mm5vMzNpdDZWZS90NUJFaEQvUlpEV2xQdzRUTCszRENFCibbxZUqj9bBq0v1FamN8gBW9+4wl8CfTZUmVEvQYgmiWbX92PYlPNR0pN9U/tZbQ/lcP4YBSWftgg==]`.
+        // for callers like the test `test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBtLzBkc2EzejBBTEw3S2MzYWNZbmZDNUozdGJTRFFaaExDUnE1UkkxQm1FClhRWU1aUmdXMFpMOXk0dkRUbGZzS1l5ZkVzRU1WMkxnejBsV1dmdVRabG8KLT4gWDI1NTE5IEdGMjE2ZE9YMFkyeTNnV21PUTRuMEEyeEFoYld0d2pHb1FvOGVHQjNHWFUKbmxOWDN4d3l6cXExdnJwajEzM0kvazNJdldqaDNLblVRNWtXa1J6dUZhQQotPiBYMjU1MTkga1FnWG9oOW1EMjBrYWZBMXZZazMvd2hZVGVrV3llTWI5VXZIWUlRcTJRNAphWHc1clN3UXBURlQrVTV6bmxEWHAvYS9uYnlGR0NDanRISUlIenUvaXhJCi0+IFgyNTUxOSByeHRyZC8yVUlzUDEvVGRNNFpWREF1N0xsZWVXZWRFU0YzYS9FbHpNZWh3CjQ4cEs0NjFDY0RUeUlVV1FTSENFZkFxRTRCczRqN0RWVHRxZjhDYjUxSEEKLT4gWDI1NTE5IEx4SmtBZFhDV1RBOFJyeWU2S0Exa1g5ZGh5eTJ5VFV4ZFp2bURiM2hoaGMKdG1CWVVZM2wvUUY5Ync2UGdxbXJGcERGUFVBK254a0k1ek1abkkyNDQ3NAotPiBQd1lBLWdyZWFzZSB7ZQpvdzlod2ZLeForNHpjNTJKRkt5aHFxODJHUQotLS0gK3hVT0paeVQ2SElpd0tJVXd2RlRralhmN3dQQkhpQXpqd01CN0QvVGExbwrLEk1AlKaI2MnMspDuB0mtRyuIgevNKSN0IFdcbxEPWPJAGtGizdkCHMzz9H8hX4l4BFwhcyEs0kQ=]`.
         match push_background(ctx.repo, ctx.policy, ctx.remote_failures.as_deref_mut()).await {
             Ok(true) => {}
             Ok(false) => eprintln!("⚠️ push failed for {}", ctx.repo.display()),
@@ -3363,7 +3456,7 @@ push_url = "git@nonexistent.example.com:repo.git"
     }
 
     #[tokio::test]
-    async fn test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBGNDZLdm5BM1c2dlNwem9ib3lXQjhSY2x5WjVmY3dBNCtFQjNLY0hFckJvCmhNNVJlNHZnM0VvdmhGNmRUa1RwejJ1OGtmRE9iajZzVGM2eHIyNjQwYWcKLT4gWDI1NTE5IDB1R0Y2cDBXV1N2QzVHOFM3azM2MUI3akpxVGZFSlZZZVB0Nys0NE5DUUEKY0x0QVM1YmFWL1NycGJDWS9rUWwxZ1pIR2F5RXI5QXY1d3AyR051aHFuNAotPiBYMjU1MTkgNk1rVFZlYWgzaFFrTHkzS1pPSjJkb1l1T3BPMjVNaFI0VVpMQUM2NGZSWQpNdExFQnYrWTdyOHBSNllLTTBQWEZENGVSdUF2NDQvMS90bHlGenAyeDlZCi0+IFgyNTUxOSBxYlhjNWhjM3AyZnE2eUZ6ZXRNOG45OUdYeVBjcHVMeWpsaE9FRW5HUURVCkhITk5qUjhBMU1TSnVnVndYZGRCM1hHNkZxdkdWQmgzZXZzVDVEWmpXOW8KLT4gWDI1NTE5IEdOUFRJYVlXR0w4Qnl0ZjhvWGNVTjB5Tm5aQ1FGQmVmT1M0N1U1eXpVUVUKQ2ZIanF4OGhNcnpzKy9ST1JIVU96K0RINmo4b2RHaGRtcjVFT0FKVERJZwotPiB4LChMdS1ncmVhc2UgeW8hZ28rUTIgXT9lcW5IVzcgaEg0Ii57Wm0KTlE3STJyMSttZW11cDV3bWZzMkxIMk5DUGVVdkhhM3lVR3dRTWMwaXZWajRkUndKdEtnCi0tLSBmWHRJb2JtcW9PTk4rUEpEbnZzSjY4QVJZZzRiYU1GMTh0VFBacmhPT1VFCjDxdVBhl7ifvmZBevKz2H7HzH4Uwhl09VAshBChV0S2OpIRItThhrZBllSGoHSPpEw4+L5A+28PjA==]() {
+    async fn test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBWYWNNVEtKL2dtU0cwMjFHeXRKQzdTa1AyWkhndHJyZHNoSzBSNEMySEJrCkNVS0d2SzRXSndPdlVUWC9IT29MYXZuNmN0THVuM0RYeGRMWEw4cUtodXcKLT4gWDI1NTE5IG16Ym9COFA5SlNmMEtNVmRuYzZ0cFJhM25QeUR6UzI3MTk3aW1iNDhOMlEKckYxYU1jZGpYbkh0VW4wNlg1VE5TcVNPbkljM2NZU2JOUFRlTUpIdFFDUQotPiBYMjU1MTkgeVVoM0FtV0E4M21jdm1YS0JubFZ5cGt3YVlWMlc4ZTA2eEVNZGVhTGxRYwpmM21yRGhVeWVmYkFSZ3pFMnF6eTNoRGxUUExFZFhhbDFOd014TiswUEhBCi0+IFgyNTUxOSBnNGpaL1MzeThHVjIvTlkyYXRqMHBMMjFvRElCZVVrSWkwRmdMUlE2NURNCk56enIrWUZKTkEwWnZCUGduMU5ialAwa3ZLaUxKMXFzRm9iS0NVWnpJOGcKLT4gWDI1NTE5IE1ZTnVOU1ozYnNaVGVSWEh1M3prN0Fuck1rOFJ2UG5EVENQU2puQVZqRkEKME5zSWYxRG0wK1F5bTFITjY1OCtHeVNkQVpaUHBjL2ZPL0V0Y0VqODgrMAotPiB0THotZ3JlYXNlIGdjMCtUczIgKXdYNkYgNTtYCmtFYkNuL0RLK1lQZEI4WXpobytrSVdFOTBNSlBzcEhXOWVTRW9zNDN5SUV6OHZ5SHUrYXdydmJCcXJ6OAotLS0gUmRwdlZtRmN6eTZTMm1VVGpCUnJVdXpxYTliNUx1b1FBd2lYQTVKUWxWawr9nO/i4zsjRZgwtDsKfh+ENijteLr2gcy4+aa23Xj5BnLCJOa4rdpKyzk5IH0xohV5gnTW4ljRTwo=]() {
         let tmp = tempfile::tempdir().unwrap();
         let origin_bare = tmp.path().join("origin.git");
         crate::git::git_cmd()
@@ -3719,7 +3812,7 @@ push_url = "{}"
     }
 
     #[tokio::test]
-    async fn test_sync_repo_exac[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAxMDdCVzE2SkR3eUJweE1JWjZPWVhWWXdSeFNTdTYvNnFyVnR0ZmRFT3lRCnNqeU96STFQSEFaeTJ0ZFFlNHNack1jNDZhS09wMExtSkRQemZWSmlhQnMKLT4gWDI1NTE5IDFZdUhYRzVNbjZKN3dkSmVmK1JnUWVWNXpuN3dXR2swdmF2alpibUF1amcKalRFbWVybDM3M0Z6R2Uxd2d3ZWJnZkkxWVZLL0FQWTg4cllhcm9IZklsdwotPiBYMjU1MTkgT2R2SUp6dW1VeFJnS29idXJ4STArbWVrT21xUnB3bHVhbzVEbno5d2dUOAovVGpqUVlDYlJsakxBK3FaZ1ZSYnNSRDFGaVhJMTh4b3VaZEgrVWZQTDJNCi0+IFgyNTUxOSArajBYMlFmTVg5U0tJOHdyYmxNcGdpTisrckNqZG93QTFtYmtYVHozWncwCmdSSWg4a3Q5TkJuOXFDUjF4dVFFVk1aNGtieU11VklYM21MU3kxSmhlTU0KLT4gWDI1NTE5IG9zVEMreW5MUzR1bDZxQ1pEVnNIRlcwUnU3b1FvcjVrb1d4ZGppYVhWblUKWVcrcHYzamxIekpoRmd6WGxQZmlZZHg0V0Q5bGRDTXZHNXluWnM0NnFPWQotPiBiXkcnVmlzLWdyZWFzZSBDIHMkJApLSUVzWWNoR3UyeE13NW9MZDdLZXlLYm5sL2hEQmNvCi0tLSB1ekpwVTZsdDBjWjJkVHVUNWhOR3JSekVTVzRMb0lQZ1JkSlRMVW15QzVjCmb++/46aku3vdp7Dygn9KvxXfeQ3vL2Af1r0TiStF2Hp8aPPbZ7d2NtEoNbaeJLtAzb0O+bBBeOrfPUwm/wBA==]() {
+    async fn test_sync_repo_exac[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBMWmw4Q0ZONlJaNUZKblQ3QXV3UWs5TFByQURIeEEzMTBkc3hHVythQWljCmdpYmhvL2I3Wkh2OTJibDg5ZlZ5RVBYbm5uM1VlS1A4QzFFVlZ5M0V6UUEKLT4gWDI1NTE5IEZwSXRtcFRNWnZraS9sUHY5QmFjU2RFcEZnbUFNTHZlaFR2OU9oT0prbW8KdkZ3V2E4eWVaU2lZcWFZd0p0WGhRQy9YMGtzb1VlaTlXYTZZdEFQQjFCWQotPiBYMjU1MTkgSlJONHg1QVJyY1RpUngyWW9VTjVOblJpeUxFcmxQSmRLSlo3MkNUQnJVOAoxelQwZnBZSDBJRnoxMVlWd2t0ck9TaDI5bkhCaEVpWHN4THdyMkM1ZFpvCi0+IFgyNTUxOSBtdW5ZODVpOG9pQ0lMcm9hV2VEdXpYZElpRWtZVnhBSkpqUTdKZ2VBeG5jCnpUcUp3b1NNQTFidDBFRjN4d3gyaTNRVHBsTmcyWWYwMnVJZXhNd25CVkEKLT4gWDI1NTE5IDQyaURoY2pOSVlta0VUNG9VSU13QWM0YTNHUC9oMXJDVW1KY1V0YlF5RGMKeUdFTVJjYXBCcmp6ZkZjckc2MklCbk10VUQ3U2oyQkM5ODVaWWZhaTVUZwotPiAlZmchUTZzPi1ncmVhc2UgXSBGdHNBNydTCjA4ZEtKUGd5eXdmRmEyQm9lZnJSRWtMUlZPOEFrNTBOVkZJWU50RTdaOXJnU1Yrc2ovN3ZwYWhSOGhvbXVZRmQKQjlaNlFibkxLNkdHZWR2MDhINm1Uc3ZyaFJMNG5sMmsKLS0tIC9rMGFvNFNEMSsvb1Z6cTlKSDk5NzVGcHdBQytqbnBVMHhRUFpiWmxnVncK/QlE9QIr1Fg4+LvQT5COhTcJorkpLZKEhg2c9OMlicMa5sANVVDsf1TyL1HDpFFxUC0IoBYvLFX+Xpqgl5kQ]() {
         let tmp = tempfile::tempdir().unwrap();
         let repo = init_test_repo(&tmp, "exact-50-del-repo");
 
@@ -4759,5 +4852,240 @@ auto_bump_versions = false
             "push_with_retries should auto-pull + succeed: {:?}",
             result
         );
+    }
+
+    // ============================================================
+    // scale_push_timeout tests
+    // ============================================================
+
+    #[test]
+    fn test_scale_push_timeout_small_push_uses_base() {
+        // 5 or fewer ahead commits → no scaling
+        assert_eq!(scale_push_timeout(60, 0), 60);
+        assert_eq!(scale_push_timeout(60, 1), 60);
+        assert_eq!(scale_push_timeout(60, 5), 60);
+    }
+
+    #[test]
+    fn test_scale_push_timeout_medium_push_doubles() {
+        // 6-20 ahead → 2x base
+        assert_eq!(scale_push_timeout(60, 6), 120);
+        assert_eq!(scale_push_timeout(60, 10), 120);
+        assert_eq!(scale_push_timeout(60, 20), 120);
+    }
+
+    #[test]
+    fn test_scale_push_timeout_large_push_quadruples() {
+        // 21-50 ahead → 4x base
+        assert_eq!(scale_push_timeout(60, 21), 240);
+        assert_eq!(scale_push_timeout(60, 28), 240);
+        assert_eq!(scale_push_timeout(60, 50), 240);
+    }
+
+    #[test]
+    fn test_scale_push_timeout_huge_push_sextuples_capped() {
+        // >50 ahead → 6x base, capped at 600s
+        assert_eq!(scale_push_timeout(60, 51), 360);
+        assert_eq!(scale_push_timeout(60, 100), 360);
+        // With a larger base, the cap kicks in
+        assert_eq!(scale_push_timeout(300, 100), 600);
+        assert_eq!(scale_push_timeout(500, 200), 600);
+    }
+
+    #[test]
+    fn test_scale_push_timeout_zero_base_stays_zero() {
+        // Edge case: zero base timeout stays zero
+        assert_eq!(scale_push_timeout(0, 28), 0);
+    }
+
+    // ============================================================
+    // count_ahead_commits tests
+    // ============================================================
+
+    #[tokio::test]
+    async fn test_count_ahead_commits_no_origin() {
+        // A fresh repo with no origin has 0 ahead commits (no error).
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "main"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        // No commits, no origin → should return 0, not error.
+        let count = count_ahead_commits(&repo).await.unwrap();
+        assert_eq!(count, 0, "no-origin repo should report 0 ahead");
+    }
+
+    #[tokio::test]
+    async fn test_count_ahead_commits_returns_zero_when_synced() {
+        // Repo with one commit, no origin → 0 ahead (origin/main doesn't exist).
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "main"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.email", "t@t"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "t"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+        let count = count_ahead_commits(&repo).await.unwrap();
+        assert_eq!(count, 0);
+    }
+
+    // ============================================================
+    // stage_existing_files race-condition tests
+    // ============================================================
+
+    #[tokio::test]
+    async fn test_stage_existing_files_skips_vanished_files() {
+        // Reproduce the race where get_status() lists a file as
+        // untracked, but the file disappears before git add runs (vite
+        // timestamp-suffixed temp files, inotify lag, etc.). The
+        // function must drop the missing file from the staging list
+        // and succeed for the remaining files.
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "main"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.email", "t@t"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "t"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+
+        // Create one real file and a phantom path that doesn't exist
+        std::fs::write(repo.join("real.txt"), "real content\n").unwrap();
+        let phantom = "vite.config.ts.timestamp-1781483278562-7a994a6fc1011.mjs";
+        assert!(!repo.join(phantom).exists(), "phantom should not exist on disk");
+
+        // Stage the mixed list (real + phantom). Should succeed
+        // because the phantom is filtered out before git add runs.
+        let paths = vec!["real.txt".to_string(), phantom.to_string()];
+        let result = stage_existing_files(&repo, &paths, false, 30).await;
+        assert!(
+            result.is_ok(),
+            "stage_existing_files should filter out vanished files: {:?}",
+            result
+        );
+
+        // The real file should now be staged
+        let output = crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "ls-files", "--stage"])
+            .output()
+            .unwrap();
+        let staged = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            staged.contains("real.txt"),
+            "real.txt should be staged, got: {}",
+            staged
+        );
+        // The phantom should NOT be in the index
+        assert!(
+            !staged.contains("vite.config.ts.timestamp"),
+            "phantom should not be staged, got: {}",
+            staged
+        );
+    }
+
+    #[tokio::test]
+    async fn test_stage_existing_files_skips_directory_entries() {
+        // If get_status returns a bare directory path (some libgit2
+        // versions do this), `git add -A <dir>` would recurse. We
+        // want explicit file paths only, so the function should
+        // drop directory entries from the list.
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "main"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.email", "t@t"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "t"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+
+        // Create a real file and a directory
+        std::fs::write(repo.join("real.txt"), "content\n").unwrap();
+        std::fs::create_dir(repo.join("subdir")).unwrap();
+
+        // Stage with directory in the list
+        let paths = vec!["real.txt".to_string(), "subdir".to_string()];
+        let result = stage_existing_files(&repo, &paths, false, 30).await;
+        assert!(
+            result.is_ok(),
+            "stage_existing_files should skip directory entries: {:?}",
+            result
+        );
+    }
+
+    #[tokio::test]
+    async fn test_stage_existing_files_empty_after_filter_returns_ok() {
+        // If every path in the input list vanishes between status
+        // and add, the function should return Ok(()) (nothing to do),
+        // not bail with an error.
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "main"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        let paths = vec!["nonexistent1.txt".to_string(), "nonexistent2.txt".to_string()];
+        let result = stage_existing_files(&repo, &paths, false, 30).await;
+        assert!(result.is_ok(), "all-vanished list should be a no-op");
     }
 }
