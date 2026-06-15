@@ -3744,7 +3744,7 @@ mod tests {
     }
 
     #[test]
-    fn test_repo_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBmcXMzMkVIYy8wOHY3YmQzR0hRQ1dlT2V4dHVmcERoNzM3ZjlHVlZ1QXhBCitCNDFYODdHaEJJb2laV0krWHFHMkVENVNTK21GL2pOWm45RkxGOWF3M2MKLT4gWDI1NTE5IHArRHMyZEJMREQyRkNKdDRMVXc5Y1psbHUxSXZaRmJteTdZWVJxQUlHVGcKTzh3a3VSVzVWLzlXNlZia0FncTlPQnF2ZjFaMXUyRjl2R1dXK3ZKZ212YwotPiBYMjU1MTkgZnNVTlRTcEVkcDBiQUJKaHZUODR3Z2V4NkhUVW1abHhTZUxaRXlnVUFuWQpheHEwRysrblQ0OFRDMytZa2FwV0w0cE1aZXRzVW5meWx0NkR4SkRUd0hBCi0+IFgyNTUxOSBRWll2ZUlzemRJaFVsR3JpekRkOXR0UlB1VmxNUFdETnV5LzlPckJVaWo4ClFaZ0tpU05YNE9KYzJqclNZc05hc2M5SUNDcVR5Z1N6QzIwNGxReU5ZMkEKLT4gWDI1NTE5IHV4RDMxa1ZMUnBUNGplamJ1NUFndEpLR3phWjBDWVJ4WjRYbnNta1BlbFkKQitFQWQzZmR3akJ1SFRmUDRMejU5TzYySFYxd2c5UDd0TXdaMHpsNFpxQQotPiB+Onp2Y1FqLi1ncmVhc2UgXy1iMEIgeEo5VzIgakVUVlgKbGt6YgotLS0gTVBXbGdkR2loUnlqT2RLSmtOQmMrSHB3TTJMQUNvWlE1c05peWdEN25wTQrpzEO8M9jTEhde1orYu+L9lsSxkEzOL5F3DkXZuj5TQAHfh+cFq+H/EtQJzkFMQcK0ApgwGsah3bXLWeAHIIX9mWs+uw==]() {
+    fn test_repo_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA4T2lXRXo2TEEvV05UaXJSRHJldHk4UDhCeGVvZVIxZnRTeXp4RUl4aFh3Cis2ZGl6Vy9oaVI5L0RGcXAvRUVYN3V2K1Z6czRDQmlXbm1KRytjeU1zUncKLT4gWDI1NTE5IG9xNExzY2twMzRIU2FNSXBLWkpXLzB1enp5QnVQNVgvV3l4Wm9CN2VIQzgKTWpUNWZQMlg5UHpLeDFBN3FzQ2N2WklqbzBGY2piRi91TkNDdVJkMCs3UQotPiBYMjU1MTkgZjhnYjEvZEZxMGJXN2RmM2RUY0pZRUp2SHpTd0Y4WmNRSE1QMnZaMy9YTQp5SXVWZ0VzanAxeDZDd2ZLTlNxWWQ2WnR2WnNRN2ZRTDJ3YmE0RnhnMlp3Ci0+IFgyNTUxOSArcEl2SnNIZmJaanBYYUJ2Nyt5TVhDUzFadS9YQ3Bhb1dmQjM2aVNpZkFBCnJJK2RYbXRJZlF2aUxydDN1ZmFwSzZNWVBCV2hNU2huR1J4QUVFY0czdEEKLT4gWDI1NTE5IERuV0dPRWh3Z0N1RTlqWnV6cUt4VTFQZkR1MXIrdkxaVllRcFNBaytUbnMKcWg5NHVEa2JKZ3V3M1F1ZVdHem5iMEh2eTM3YVE0eS8wb0hnSGpZV3ZDdwotPiBCOm5TO3cmLWdyZWFzZSAjIGRGcHsKUDY3amxjUnVDUTNzL1pKUk10d00rK3E2ZkxkWElHVW84TmYvZGtqZFlsYi9FYW9yMDBVUzJud2RIaDRDeEY1ZwpuK0RNelBwQVdxeW5SM0h0SW5iVVh2azJYSjVIT0EKLS0tICs1Z1JnY1loVU4vbDRocHlOSFhURXUwOXNzM2dsUEtiKzVwb0I1Sk5kU3MKoGImiVR9t51utyNUYoY8lIz4Ii9rjsogpyM7aR2yz7NnEQYUJo0VKDUk51rOND6HsZWBM6XBAdK/1uMsuFdCtx5T8lc=]() {
         let msg = repo_failure_message("init_failed", Path::new("/tmp/repo"), "boom");
         assert!(msg.contains("init_failed"));
         assert!(msg.contains("/tmp/repo"));
@@ -3752,7 +3752,7 @@ mod tests {
     }
 
     #[test]
-    fn test_repo_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAvcDBGL0JpWW5OZWgyaE01UmZZaUhMd3FpTFRZVFdqVW10MGlLYjFMM2dBCldPMUdsRXZuWm9kUzh3RU01Y1hKQlVRcm5TeEhzczlvSThFd2M5ZnVGREEKLT4gWDI1NTE5IHlmU1U1YTE2T3F0a2Jsd2YzdlNtR0VpcyswbExXUlNHUk9FR3V0am9vd0kKRDI5THZWSGVYU012bGRVUCsxS1VMTlFyeWtuS2hScGdtbEEyMGM3VTh6VQotPiBYMjU1MTkgQmJ0NjJ1blNnL1o5d1p1cmxvTnEzL2diSTM4NWJ0Q25YSzl5UkxGSHBINApmQ1JSM1pIWjFZdVhnWGE2S2VvMTFTMnVwbFh6bzdOSDV4UXNsV1lQb3JvCi0+IFgyNTUxOSAvdTBZZ080M2JISFQ0ZU9lOXhZenYwQk5MTGxqeWZ5eTR3RWhOWThaenp3CnJ6MmtxZmNrTkFLNU95SC83aEhRbnQrL1VGbGZrR0dUYys2cnp2d1VjeUEKLT4gWDI1NTE5IGlFZU9NNExaaEhYQWxMR3hLMk5Db2ZwcVVNL2hGdXA3SVZEMllzeUpYMmsKeWRDYWdOQnNvcU5aVkY4a1VNV2ErenRBSU9BeG4wZzRlVWpjalczSWxlZwotPiBgeipiSmJPLWdyZWFzZSA2UHJjfEkgYSMyIVQuMVYgaTggWWdWCm00c0JrRUQ4Uk56bk15ei9CMVZtU09YRWZxQlkvZGJTUkdqNGl5bEV6aEg2TzFpRUp5S1llbjIrWXFRbk1hRDYKM2xNWGtDQQotLS0gME1qY3JQaVV3TFNmTjlja3pRZ0FjVnFxVkJDRjhRRmFtTlBzOW9tMVkwWQoy0PimH2b2CRcpDfzmmcjAkmx0xuOyty8hKjFC5n8al+FRMJ/2qyUX2d6gjmaAxGZbxOppqHJYSa7jOsF4WaiKOg==]() {
+    fn test_repo_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB1V21RMVMydHphRWllaFVNcXVZZ0gvUkFnV2QwZlNtMklkN2ZxeUNTZ2xBCjBhcUFNdWN5eUV4blhxSmRqMCsxT0hLOVprS2FIcUlTcy9vZzhRelB6aDQKLT4gWDI1NTE5IHMrT2pseFRMU3ZJd3diMTRUVk9QRFJ4YUJOMmFQUGt5dUFTVzlKd2RRVmcKSk9lUmhnYXE0MHlDZ0cvc0UzOWdGWTBzOTkrNmRibVlJdW1RaUVjWHZHMAotPiBYMjU1MTkgVHcwNUtLMmJGTUpGQkhySXc3T0dKSVNHbFY4Z0xtNlpMdVVpMlZ1VERERQpzUEZ2OFF0bGZ2Q2NXZVcyeTJDQjFUcmlOTUt4YWhHSW1IM0YzTlN1cFRBCi0+IFgyNTUxOSBZY1BzZjBSMWpyMWZRbVdPTGY0MzBIVHN1R3ZzcTRtUjRFTnR3enFyTldnCndyMUJLUzU2K3ZIckNtVUJKNlFNYXM2Z1hiTWNTUVN2cUtGRTZaZ1VGZ0UKLT4gWDI1NTE5IHNXbUpyUVpvWWRZZTJ0VlB4WWFRMElQeGZjcEVWLzVHZEFkOFNBZTBlV3cKb3RiSER5eU85R3Y2eFZndXExYVVwUW9FNnZZbVk1UHR6alpkZjRKcDZRawotPiBvLWdyZWFzZSA3LTE7IylqRSArJSxvCmdJTjhoOXBjcWk1dmR2RFRXTzVwcU15Sk52VmxsYmNHM1FIcWRKZ1RIV1JxWmgvdFhkS3M5eXNUbFk5VnEzUm4KanBYWFFWbnZGemlGRFhzZGJPUnRaWU9EU3BXV3VmaUhSNWsKLS0tIGttd25BQ3FVZlQrcHc5TEtlRFlYSG04V0tNb1FLcnlyejVCSm1YWXlOMUUK8NHBJQKLJK82RfPDNyGuJLS6OlUOzf7lTygDRqpc9D3PbnyOyD/O805W9UKpmFGXygJsoabyxpbzLcXpcIsQRNg=]() {
         let msg = repo_failure_message("status_failed", Path::new("/tmp/repo"), "status boom");
         assert!(msg.contains("status_failed"));
         assert!(msg.contains("status boom"));
@@ -4067,7 +4067,7 @@ mod tests {
     }
 
     #[test]
-    fn test_repo_stuck_filters_requi[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBDWU5CUTVOSVkzRmF4WFRtNnkrQnNGRTh1WUlWUEt0emdqV1Q1SjdlY25FCmdKdkFVbHhsM2VzazVkS1BxS3QyaWIyUStFc1Eway8ra0lsTWR5M205T3cKLT4gWDI1NTE5IFJUUGdUUWV5S29Cc2ordlovazJzeit1TWQ0RXpsdWJNbnNDTE81MklHMUUKY3pBSHNRWmx0RzRDUjM0L3VsZTdFRGN4M0xwSDJWb0xheTBHcWtrSjN0OAotPiBYMjU1MTkgdXBYZ2dsYTcvd0RVNFl3QVJXamlTOS83WXYreWpYY1R3Q0JMbnMwQ25CTQp1WXNibENvOWh0dmMrajZuSnR0K0xSSzg5eVdVSDB5eEQ0TjkwTkxISGtzCi0+IFgyNTUxOSBrMG5UaWdIYVYzY052dUJ4ZVVTZXY4VGNFbTRoMGVkTHk1R3RoUEtWS0hFCmMrZUVGbWViem13ckRtYjJ6d3R1UGd5V2xpb2dDSzEvV1ZuZy9lTWNKWkkKLT4gWDI1NTE5IGhPbVVZRkRDU0ZpZDJDQ2EwcEdJL1FsZTUxa0ozOTNMekpCQkZRQWZCR0EKWFdnUHFkWUhITVRHZExMSC9CaWhXRDlWaS9NNXROUlZaVFZFVFdaZWNJUQotPiBLQlFXaC1ncmVhc2UKYXlzQ2pja3JMSXdla053bUExbjg1bTd3SCtCV1ExS0ZnNzZ6TS84T1VteTBCN0l6Nlh1NXVUb3dhNFZmT2t2Wgp0VHZHeUVIQTl4N2gxcjdaU283WXR4OTVTUHpzUDdMamJTRy9Ndk1YVjF2K2hGS2t3Vk0KLS0tIGdxaUhzbG84TkZjNVd6QWY3YnJwR09BZHVhTTJvRzFrRE02aDhuVjhxcFEKVK5ELmmk2lCViZZClVM3djiXkE/zYqYLo4HgAy675SByrNryqPzkLIsk7ZPmWm2rrbXUxtlGCc4=]() {
+    fn test_repo_stuck_filters_requi[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBSVmE2Z1pCNGFRUWNDTWRjMU0xM3p3TUtEWXdvMy9qS2JSakZXQmRxSmdFCjEwQnMrQTBqSmVTb0lqMFZURWNDOS9RVURXaHhmd2FZZXhoWXNQUkFvSGsKLT4gWDI1NTE5IHlIazBWclg0UHpyTFVBTGdxZ1N3WHNDZndqd3VFVkVuaDhRVWhySnlOQk0KOUlSbWZQbkwreUgyNzA2eW0vTk52MDdJM3NJbzZIeDcxTHVtZUxIcXZ0cwotPiBYMjU1MTkgZXVzSVRlZHBPVEFLbjl6OFBiVkZCL3NqZm8xVlBWTmNqbzJVVXFPNmhEbwpQclRob0cyejhmUzJkaXJEem9EZmlHUWVRbU9QSTZqRFpFcSs2alhGQkdRCi0+IFgyNTUxOSBBdkhDNmlzRFA1ejBoaFNENUlDZFVlL2hrdHJBRGdsejlRZVh1L1BYZFJJClhqYUJZVHdOc2VWSW91UExDb095UGF0ZmJSWnFNb2dVOUt2dzY1QVhUSGsKLT4gWDI1NTE5IDdVeWplOHNmaGJjL2NrYkhwSm9pelJka043WG5xbTZUQTVRRTV5R1NCamcKV2NnYnVGVFVVeW9vejBvcitkbWtWeStpdmZGMzRvQ3JoYUFBVlFIZy9KdwotPiBUdmUtZ3JlYXNlIGpLTUYKbUh3NDR6QVgzVXlTbm1SVDR1c1FzY3lzSjcvNmVYUk8KLS0tIElWY0VmVm5vczJCYVd6LytwWGJJYllxYitLM1k2QXZkbzNYZjBrTSsrOWcKqEyxgiHwhDjUhrq6EVPOgN3R59muIX/oaRkjU7pJLcjSotk0EzlS/Y/pWI2v+6KnzxdN3VXlRNA=]() {
         let ahead = make_status(false, 5, 0);
         let behind = make_status(false, 0, 3);
         assert!(!repo_is_stuck_push(&ahead, true, true, false));
@@ -4590,6 +4590,68 @@ mod tests {
         assert_eq!(
             count, 1,
             "should only count important.rs; test-results/ PNGs filtered out"
+        );
+    }
+
+    #[test]
+    fn test_count_non_excluded_modified_files_dir_prefix_glob_pattern() {
+        // Goal 1fe80684: the per-repo `auto_commit_exclude_patterns`
+        // `reports/kdp-live-*.md` was NOT being matched by
+        // `matches_untracked_exclude` because the function only
+        // supported `**/...` and `.../**` style patterns. The
+        // rust-ai-web-auto WARN persisted because of this.
+        //
+        // Fix: extended `matches_untracked_exclude` to also match
+        // `dir/<glob>` patterns where the directory prefix is
+        // matched literally against the rel path's directory
+        // segments, and the basename segment is matched with
+        // `matches_file_pattern`. This is the rust-ai-web-auto
+        // case: `reports/kdp-live-*.md` should match
+        // `reports/kdp-live-blocked-final.md`.
+        use crate::test_helpers::create_test_repo;
+        let repo = create_test_repo();
+        std::fs::create_dir_all(repo.join("reports")).expect("mkdir");
+        for name in ["kdp-live-blocked-final.md", "kdp-live-blocker-summary.md", "kdp-live-goal-audit.md"] {
+            std::fs::write(
+                repo.join("reports").join(name),
+                "audit notes v1",
+            )
+            .expect("write");
+        }
+        std::fs::write(repo.join("important.rs"), "fn main() {}").expect("write");
+        crate::test_helpers::test_git_cmd()
+            .args(["add", "-A"])
+            .current_dir(&repo)
+            .output()
+            .expect("git add");
+        crate::test_helpers::test_commit_cmd()
+            .args(["-m", "init"])
+            .current_dir(&repo)
+            .output()
+            .expect("git commit");
+        for name in ["kdp-live-blocked-final.md", "kdp-live-blocker-summary.md", "kdp-live-goal-audit.md"] {
+            std::fs::write(
+                repo.join("reports").join(name),
+                "audit notes v2 (budget snapshot updated)",
+            )
+            .expect("write");
+        }
+        std::fs::write(repo.join("important.rs"), "fn main() { changed }").expect("write");
+        // The rust-ai-web-auto per-repo policy
+        let mut policy = SyncPolicy::default();
+        policy.auto_commit_exclude_patterns =
+            vec!["reports/kdp-live-*.md".to_string()];
+        let override_ = RepoPolicyOverride::default();
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let count = rt.block_on(count_non_excluded_modified_files(
+            &repo, &policy, &override_,
+        ));
+        assert_eq!(
+            count, 1,
+            "should only count important.rs; reports/kdp-live-*.md should match the 3 kdp files"
         );
     }
 
@@ -5594,7 +5656,7 @@ mod tests {
     }
 
     #[test]
-    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBZV0ZidStMdXJlVUFNSlJTNjc5MEdiTTdxeGdTWVJRZ1RJenl1cExyaGhFCkwxdFlySmw3b1g5TXY5aHczSFZVZXUyeExpaWcyVWlrSzZoWms3MkZhYkUKLT4gWDI1NTE5IFBnQTJEdXRENEE0QU9ORjZsNHdueDhiY3VqNldicVRnTGxDbGR0SmVSRDQKV0tMRndYT1pSZTNISlpqb1RGS2oxWVI4OHJPRTU3RzJsZG9qMDBWWEVDawotPiBYMjU1MTkgSDNudVBjeFpDSHh4TFN3WGkrelVoMG5ZQURKL1lkTzgxSSswQy9mQ3BWcworRXU0U3FGbUY4Wkt3SjdEZnYrM0ZybWU2M3JqOHdPWXdmcmwyMno0MklrCi0+IFgyNTUxOSBad29DZHBZUm0vRkoxL0NWbHo1WVpkZ0h3NEsrNEtTNFAwNnp5cDRWVndVCklOTzRMa0JEcGFwWUp6TFZYRURoNGRJSTd5TnJuVjhpK0FsUFgwbmRTK3MKLT4gWDI1NTE5IHE1R2dsbHFUQ0R6SW9od1o0dkhVWlJLNmVjYk5VeGh3dE5xS053UDkrUmcKWDVZRUU3c2RKd0ZjREJRdmhPT3VBU2ZJVlVPR3ZoaVhTVlE2LzQ0S1RGQQotPiB2MHFuIXMpOi1ncmVhc2UgaWdaeWFRISAmXElyOCJgIDU9JW5jCml6WFhsTjkxK2Q4OGhzRVN6K1IvL2IvOGRNVDdYak9Zd25CMGZiVUYvNVd3SjlueklIQ3Urbmc0WWRKeld1VDUKQWw0RFBhVFAwSXJ1RnNjVUo3T0dQU3J4S0JQR3Q0bXdrTXJxL0FTM21JS3pFUEg1MW1rCi0tLSBvRjFSOGVRdU9VY2ExcTRBQmIrWW9MWlBHNjB4czhQWkhLdm5iUExFTXVvCuTqDYzr2zGUAy1NCF+FsM1dmWP9yRJ1nfBB6R2RoaLFFWGjmwebFDc8qieIgfekvWwrF3Y3SZa2YmFUuQc=]() {
+    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBlR3RlZHNvekJSQnlObGJkVDlRTFhOdnRua1F0bVdveHJNZ0VGVkNRV0UwCkpzOWVRSHhOWG9aRGZtaUJDREFQWE1HVDljYi8wUzNxdEhDZjZSVW5WeWMKLT4gWDI1NTE5IEVDbXJsRUdHWThhTjdLMWZjM1pFaG9zYUh6aU9YdlN6MDlvNDBGTUNzaVEKbzRJTlVPc2VYM2JyZ0Ura3JjN3VwREdUMmNhNUNBWDRLWGV0REJWZjR5bwotPiBYMjU1MTkgejV5WmxoQUdiYTNDejhDTHlLTFRyRjRHNXZWN3VNS2x1eUdEcE4zZVUzRQpqZ21TVWtaNnZVKzQvQWVSWHllZUl0R2dIRFJQZFdQNlcrdG9sTk1mdkJZCi0+IFgyNTUxOSA2RHoyam5CZWVDbTZiQnljYWhCTUdycEk5WnBKMWxqcDIvV0ZFKys3UW5jCkJLQnJnS3g0WWs3aTdJZ3BTSk1mb2N3QnpiNUlFS1Z1SnNkYm1qL1ZVbFEKLT4gWDI1NTE5IGFmcHd1R2dMWlV6VzhVMGZDUlF3ZWYrSVBDV2xaUVhSN1p6aGVFVXRPanMKdXQvdHZNRklUL3FHb0JsbU1oazZQOXNTckVMUnhQME5yTEJGVTluUWxEMAotPiBwUzYtZ3JlYXNlICI4CjNha28yaXRCSUhiUi9HNDBSMDJqRm1IOVowNm1qQmRaOXkvNkFvL2NjeldVdmVSV2xXTktCQ3RWCi0tLSBnZmlXT3ZiTFExcXZxVWFGajVSYXh5dW8zWFRNR2ZtZ1cyditqZ1o5UDlnCuyYDrGLSMKUoYSR6QDVTtTSjXulbQOAr8Vsya7K7hvRC4JuiqGLf/c5mW8Xr0HN3rJO4S8iPRCkPGiG85s=]() {
         let mut cooldowns = std::collections::HashMap::new();
         let repo = std::path::PathBuf::from("/test/repo");
         let notify_key = format!("push-fail-{}", repo.display());
@@ -5723,7 +5785,7 @@ mod tests {
     // -------------------------------------------------------------------
 
     #[test]
-    fn build_recent_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBITVA4ZFZwVGxibWptOWVONnpvUXUwY0VsQTVaTWd0WFU0UjNQSUtrc3k0ClZMQkFNdTM1NC8rRjZBdmpGN1JmaE1CUW5FSmo0Ni9DQTAxTy8wck16SG8KLT4gWDI1NTE5IDIyMVlMTWtHWm1SVGxIcmY1ZnVlZGhzenpRMnkweTRrUVN2b29JWEVxMDQKSjdoQXNFTEVaYnNCaWRrb25rLzE1WlRUVzF2R3g5aUlZd2tSZUVXVUhIUQotPiBYMjU1MTkgZzdFQkRzeER4UnZuVXNkODVmYm9PSS8wUjIra3ZVbFZsWlNTMnFQQndRYwpKV3VJa1hscGFlMVZaaU9QQlRFYkVwNjgwcTAxdDBRbkZYMTA5Q2lKOUlJCi0+IFgyNTUxOSBBaGxkUXJlaVNpNXI2QjMzc1ZpWXZZaXFZUUlwa0IyQU1vRUVjQkZhbWxZCk11aDFuSnhyZmJsb1hucWQxUmZTV3hVRXNuem9qTTVZaXNCcUVYdFNKYm8KLT4gWDI1NTE5IC9iWVJjV0VvVHFJcFcrOHNPM2hTOXN3ZVFlNUNtaWNlUEdmdlgzcjJaR2MKVWhua1d3YkRMNUViZjlic3k1emtRb2JsK3dCWVBLVG5Ta3dPRnhmRWRXSQotPiBcWHQtZ3JlYXNlIDp9fkxhCi9XTkthbjhZWTZqcnR3dzJudnNBc2cxNSt6YVppUE1DZ1VCMmtaV1IKLS0tIG15R1ZER1FyQmE1WCtQVTh3cW1mRStjUFpQRDhDd0tRTmNtMW5hSEdpWGcK9ijDaNEGAiz6HHV7Bzipm6dUufziVcDV4ssm4+nJdS+6wFSXWi9h02doDTPYkuYQL+goyF3KGSiVS5Lmwrc=]() {
+    fn build_recent_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB6UllrRHJSZWZNNEFxd1JEdUhHYkNueGZwekZWaDZkaGJva1BwOGN5bmtnCjRkNVNJL2hLOWIraTJlR3NYZ3poWklhZDVtcVNObFluKzZNK1FXWTZ1TEkKLT4gWDI1NTE5IHJDT0RTRlc1YUlNVEFtSFJ3VkMrdEVhZDNiN3Q4NTd5ZnQwaVZIWk1obVEKWjA2MHUzSkJEWUZteTQyYTZIODhwWXo2cFhHYkk5cVdvWkJwSXYvbDdmYwotPiBYMjU1MTkgN2puYlhBTVo3K0tFVlUyVlZESGROeUwrUEVWeXBmK0xrSkJuNzFWeDBHWQovQ2t5SnM0M3JSUDFYOG1UZHJMYUREKzhoM2dwYUQ5c3dnTkJCZVEyOURZCi0+IFgyNTUxOSAyWWtZZGxaRTZtaC85NzJXTnRRZ3RMVU9zRnA5WjU1SUxyN0NyTHUzbVFvCk95clU5dm5lSzZvWC8ydUdQdUk5WWdBeWhTVWVQK1A4dU1sdGNlTFVlNVEKLT4gWDI1NTE5IDRITzNROTJodkJNSm05OUZJcXJvd1JtbDVvSTZMQmpWZENzZzhpYm9TMlEKeEIvMHZ3TFcwS2x2ZzlvWnM4RHhIRU9BYlo0d3RYMmZOcTZmK3VlL2dPRQotPiBScy1ncmVhc2UgU3g8IisgUj9ZClFKb1RSTlRwcnVrY0ZWaW1PL3V0QnpubzZaSm0zTW1CZDNlSGZyTnZWQTNFR1JBUUg4VQotLS0gMVhzRTJhZ0pLVTQ4TDczdkV0WDRjVTNROEdrd2h3emVRWUdhTzh5NFdydwr095H+7d2InfHDp5/1InnwrNHik/X9SbFQty6ewMiBjWG586R2Q9vu172SjOYg5OiPWoztT8x42GY42mGx7A==]() {
         use std::time::{SystemTime, UNIX_EPOCH};
         let dir = tempfile::tempdir().unwrap();
         let policy_path = dir.path().join("dracon-sync.toml");
@@ -5757,7 +5819,7 @@ mod tests {
     }
 
     #[test]
-    fn build_recent_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBNb21xQXlra2RiUXBiS1NaN0NBTlpLNVI0Z29WYjBGTVNwK1A1RWVyaFhNCjVxV2l2VGpFVDJhZG90SFo3MDM2VTZ0QytSSW1SV0RVc2FYbGdqWkovL1EKLT4gWDI1NTE5IFdheStVU3lXb2tieExxMk9yaDUrWU50QUh0UElpRGgzZkhQajlVbCtybG8KVG9nS0RXMDhVT1ZGa0FYL0VQMDBKWndXZ2piYU91SzZxU0s0cldsTFlPVQotPiBYMjU1MTkgemZYRDNKQ2RVVEtpaittZ1JvdTV5cG9BenlVQVZLZTkvZ2Y3eWpiQ3NsNApndVBkRTNySTg0Mk02QkNmZWRsL09PRkptNHU0dTUvU3FZOFZKbm1lZ1prCi0+IFgyNTUxOSBiei9wV3JBZGJtQkN2ZG5ua3pmY0FqZTl4aERWSU1ialVnZndGNSs1WEdZCnl1Zkd5RGdqNDMrZEdQY2VLczlMaVhZODE5M3pkU1Y5QitBOWVTV0paS3cKLT4gWDI1NTE5IHJiOHI1ZkdIMU1pK1VMQndBTktockREdDljZWVKcitLMXNyMU5qNldDM3MKTXBha05VTy94L1F4VC93NWltLzRobEpqRGh6dXpMNVJ6NnY3WEV0L0hBOAotPiBzZkEtZ3JlYXNlCkE3amZFRytLdmxpaAotLS0gekJyOFdET3RtMlhQWUpkYjBEQ1NubnNQdTF6UVRMZlpBYnljY080QXNqNAp+LB3RHt1ro5IHn1ljazphV+bE6sfzp3By/LZXec+EFl0IpEWWsRi7j/mjGh5Q+Jl9waG0kwzcMK3FgEmA+qt8bMY=]() {
+    fn build_recent_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBHcGlpSk9uWGZMTHRPTnNqdVpZZDFmSThhdDdpNzhpYmliWUx3SU1YRURRCkxyMWhJV0ZNdG1rNS96ZjgyaER3WU5XOEwwNkcySGRXYUdVODV2WXdKUmcKLT4gWDI1NTE5IEF0MVJXczV1OGhkbDd6K0doWk43b3ExYkZDdlJDcENuMDdRZXJEYjBZUzQKTW91U3VqSGROSFdxbFNWMmJRTmtteUx2T0JFWm1JMW41UUl5VXpHUDFsUQotPiBYMjU1MTkgWXVEckZPOXlEMHRPRVJITmlSTTllV01ZOEdnbWM2YmlpdzFFSlZUai9HSQpzRkcyanI5aEF4dXRSdmJTd1V5NGF0bG8vT09DbkR6dEs4ZVViRGY5RVNrCi0+IFgyNTUxOSBTbHhMQzFLc2J0djdEZG1YSEZRQUVjV2s1Z20rQ0tRL0pWS0c2QnJLOXdVCmVjNEpYbGtEdjd2bjJpV3NzcDIwOVZYdkEyNWhJeTMvTVFSckgreUJHMHcKLT4gWDI1NTE5IGlrSFovMjlHejZOYkxCZ3NJUWFnaStiS3lKWUk5RlY4QjNjVWNiMjgwRGsKaTEzS2FsbWU2WVF4MEpwdFBmK0V5aWxiWE5QL2ExYTdpZUJFaDIwRW1hRQotPiBOVSJJKmVidi1ncmVhc2UKMzk0bmhjemFQYlgvVlhNNEtHNHlzek5oZVVUWlBzOS9weUpob2N0TFlneDhXK1VwR2NxSW9sZmVQRHB3Nk9RMAorT095OUkzWHBTVlQ1K2NEVkFaeUJuS2JzcHhJdENTQld2cDdDT1IvTmNTV2lFNXlWOU1VWUoxVVkzdDNRMHNwCmlBCi0tLSB0NkQwb3ZuRmhJTXovNzIvU2VYaUZhQWpjSmNJUC9uUlZCZ2tzaVMxY1FNClDj5XEMznSEn4qfVATCCW+jfX6LjU7NOABDxCCswalXWkfNHN404BA2vBmnNbGtjYJn8aSlO+l+mhbtL8lBDhA6Kw==]() {
         let dir = tempfile::tempdir().unwrap();
         let policy_path = dir.path().join("dracon-sync.toml");
         let ledger_path = dir.path().join("missing-ledger.jsonl");
