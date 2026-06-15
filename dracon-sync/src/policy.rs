@@ -2552,4 +2552,77 @@ auto_github_private = false
             result.warnings
         );
     }
+
+    /// Goal 546d4f9c: durability check. The `dracon-sync.example.toml`
+    /// must stay in sync with the code defaults. If a future change
+    /// updates one but not the other, the operator's "commit all
+    /// unless super-good reason" policy silently regresses on fresh
+    /// installs. This test catches that drift.
+    ///
+    /// Date: 2026-06-15 (goal 9aaf0b08 / 546d4f9c).
+    #[test]
+    fn test_example_toml_matches_policy_defaults() {
+        use std::path::PathBuf;
+        // `dracon-sync.example.toml` lives at
+        // <workspace>/dracon-sync/dracon-sync.example.toml.
+        // CARGO_MANIFEST_DIR points at <workspace>/dracon-sync
+        // for the dracon-sync crate, so the file is at
+        // $CARGO_MANIFEST_DIR/dracon-sync.example.toml.
+        let example_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("dracon-sync.example.toml");
+        let content = std::fs::read_to_string(&example_path)
+            .unwrap_or_else(|e| panic!(
+                "could not read example config at {}: {}",
+                example_path.display(), e
+            ));
+        // Parse the example config into a `SyncPolicy` so the
+        // comparison exercises the same loader a real daemon uses.
+        let example: SyncPolicy = toml::from_str(&content)
+            .expect("dracon-sync.example.toml must parse as SyncPolicy");
+
+        // 1. `exclude_file_patterns` in the example must be
+        //    empty, matching the code default of
+        //    `default_exclude_file_patterns() = Vec::new()`.
+        //    Logs and DBs are committed by default under the
+        //    operator's "commit all unless super-good reason"
+        //    policy.
+        let example_excluded_files = &example.exclude_file_patterns;
+        assert!(
+            example_excluded_files.is_empty(),
+            "example.toml exclude_file_patterns must be empty \
+             (commit logs/DBs by default), got: {:?}",
+            example_excluded_files
+        );
+        assert_eq!(
+            example_excluded_files,
+            &default_exclude_file_patterns(),
+            "example.toml exclude_file_patterns must match code \
+             default (drift = silent regression)"
+        );
+
+        // 2. `untracked_exclude_patterns` in the example must
+        //    match the code default
+        //    `default_untracked_exclude_patterns()`. The example
+        //    is the recommended config; if it diverges from the
+        //    code default, fresh installs get a different policy
+        //    than expected.
+        let example_untracked = &example.untracked_exclude_patterns;
+        let default_untracked = default_untracked_exclude_patterns();
+        assert_eq!(
+            example_untracked, &default_untracked,
+            "example.toml untracked_exclude_patterns must match \
+             code default (drift = silent regression on fresh \
+             install).\n  example: {:?}\n  default: {:?}",
+            example_untracked, default_untracked
+        );
+
+        // 3. `max_stage_file_bytes` in the example must equal the
+        //    code default (100 MiB).
+        let example_max = example.max_stage_file_bytes;
+        assert_eq!(
+            example_max, default_max_stage_file_bytes(),
+            "example.toml max_stage_file_bytes must match code \
+             default (drift = silent regression)"
+        );
+    }
 }
