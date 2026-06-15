@@ -136,13 +136,13 @@ policy.
 
 ### kiki-sassy-desktop-announcer (🛑 push-stuck)
 
-**Status**: 6 consecutive push failures to `github`
-remote.
+**Status**: 10 consecutive push failures to `github`
+remote (was 6, accumulated after restart).
 
 **Root cause**: divergent history on `github` remote.
 
 ```
-local:    3bdc64b (1,211 commits ahead of merge-base)
+local:    08924a9 (785 commits ahead of merge-base)
 github:   a80dc09 (436 commits ahead of merge-base)
 ```
 
@@ -159,35 +159,68 @@ commits each. The push fails with
 local's new commits.
 
 The other 3 remotes (origin, gitlab, codeberg) are
-all at `3bdc64b` (same as local). Only `github` is
+all at `08924a9` (same as local). Only `github` is
 divergent.
 
-**Options** (NEEDS OPERATOR INPUT — kiki-sassy is
-operator-owned):
+#### Deep investigation: what's actually on github?
 
-1. **Re-link github to current repo** (if the
-   github repo is empty or was abandoned): the
-   operator can re-create the github repo and re-add
-   the remote. Quickest fix.
-2. **Pull from github and merge**: brings in the
-   436 github-only commits to local. May create
-   conflicts.
-3. **Stop pushing to github**: edit
-   `~/.dracon/utilities/sync/dracon-sync.toml`
-   to remove the github remote for this repo (or
-   set `push_github = false` in the repo's
-   per-repo policy). Other 3 remotes still sync.
-4. **Force-push local to github** (loses 436
-   github-only commits): NOT recommended without
-   careful review.
-5. **Inspect the 436 github-only commits** to see
-   if they're meaningful work (some look like
-   "sync: N added" daemon commits, possibly from
-   the OLD daemon syncing the OLD repo name).
+The 436 github-only commits are NOT just daemon
+sync noise. They contain substantial feature work:
 
-**Default action**: do nothing. Wait for operator
-input. The daemon will keep trying to push and
-failing, but that's safe (just logs).
+| File | Type | Notes |
+|------|------|-------|
+| `MESSAGES.md` | docs | 600+ lines cataloging AI message types, prompts, and analysis |
+| `.github/FUNDING.yml` | config | GitHub Sponsors button |
+| `scripts/test-messages.sh` | script | 66 lines for AI message testing |
+| `src/daemon.rs` | code | message truncation (9 lines) |
+| `src/config.rs` | code | truncation config defaults (4 lines) |
+| `src/main.rs` | code | truncation integration (2 lines) |
+| `audit.md` | docs | notification truncation section (55 lines) |
+| 19 `.md` files | docs | docs, audits, summaries |
+| 14 `.rs` files | code | Rust source |
+| 8 `.sh` files | scripts | shell scripts |
+| 6 `.nix` files | config | NixOS configuration |
+| 4 `.toml` files | config | Cargo.toml + workspace |
+| 4 `.json` files | data | state files |
+
+Total: 69 files changed in the github-only commits.
+
+**Last commit on github**:
+`2026-06-10 22:59:14 Enable GitHub Sponsors button`
+
+**Time range**: 2026-02-28 to 2026-06-10 (about
+3.5 months of work, including a real feature
+release that adds notifications, AI message
+cataloging, and GitHub Sponsors button).
+
+**Author analysis**:
+- 432 commits by `DraconDev <dracsharp@gmail.com>`
+- 3 commits by `Test User <test@test.com>`
+- 1 commit by `DraconDev <DraconDev@users.noreply.github.com>`
+
+This is the operator's own work. Not random
+contributor commits. Not automated forks.
+
+#### Options (NEEDS OPERATOR INPUT)
+
+| Option | What it does | Cost |
+|--------|--------------|------|
+| **(a) Re-link github** | Recreate github repo, re-add remote | **LOSES 436 commits** of feature work (Notifications, MESSAGES.md, GitHub Sponsors button). NOT recommended. |
+| **(b) Pull from github and merge** | Brings in the 436 github-only commits | **BEST**: gets the operator's own work into local. May have merge conflicts in the 69 changed files. |
+| **(c) Stop pushing to github** | Remove `github` from daemon config | github stays frozen at `a80dc09` (June 10). Local diverges from github forever. |
+| **(d) Force-push local to github** | Loses the 436 github-only commits | **LOSES 436 commits** of feature work. NOT recommended. |
+| **(e) Inspect manually** | Operator reviews the 436 commits | Operator time. |
+
+**Default if unanswered**: do nothing. The daemon
+keeps trying and failing safely (no data loss).
+Documented in design doc.
+
+**Recommendation**: option (b) — pull from
+github and merge. The github work is the
+operator's own and is recent (June 10). Bringing
+it in keeps the repo whole. But this requires
+operator approval (operator-owned repo) and the
+operator should resolve any merge conflicts.
 
 ## Verification
 
