@@ -254,7 +254,20 @@ mod tests {
     }
 
     #[test]
-    fn test_record_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBWd002ZjRkRWpyZCtQcHFCUmc4Yy9jQWlhaHd2WG56VXNnR3FURitWalFNCmZTQTlVMnVzVEpJNFZrVkNoeFdsd3lFMFlOWCs0dXRjZjY4VkxxREhVWkEKLT4gWDI1NTE5IDdpZis3cmI1NFFmSFN5OXhkUlJlVEhxeHNYYWVBcVhwcU5mZGNmVVVCQ1UKQktNeTFMQWFLZnFwSFA4bUI4d1BnSUZYSGlLd2I3Y3lDL1ZnbXJVcU9EVQotPiBYMjU1MTkgSW1vTVBKZ1hGOGp2cmZPNkxxcXd0N2pVWVJMeTh5eFZmT1Mzc1Fpcm93TQpidzd5TGRiUlZzT2pXZzRJL1UyQWFhcDJrQ09IKzBsbE90b1VEd1MwbXowCi0+IFgyNTUxOSBiSHRnK1FhVDI0Qi8vV3RJbkVvQU9hcTFJQUY5YW53UG4zV2N3NzNYMG1NCjNxVzdlWG5FWmZmMDBKenpPM1BLRUNLR1p6b0d4Y3dpeElYNG9VQ0YvS28KLT4gWDI1NTE5IG5idFphTWNWZVRJYm13MGpzNEFGQSt6anMvWmd1WVYyRG5oTHpLQkhWdzAKeHhYNXVCTjNrc2MwalhnQTdmejFldjZqcDZ4cEUzMlJtWTJGM2lNcjlsZwotPiAnWi1ncmVhc2UgJCBYQiUlSQpMd3BLR0hoK0dRRXJZemdUUDZXUFFpNnpBMEpsTmIyZ3NhU0sxRkVoK3k3ZERncDVYams0bG5lclpTSkNOUnM1Cmlub0lsMmR3Y0pWcFV6NzVja0hGamU0MjdwbFhkQXBobUk4cVJ1bzAKLS0tIHJub3ZhZkpKb1l3VFVoZUR5eTBiN1B6MXNRaVh1MFlMcmZBRjZBWno4M3MK7NLhn2XfCK0Nqy0pORaCFZQa5ppikvejcdpOV4xYxVkXIfawlY2pjq6UymvcHtgPj4qLOhEQ+CoNKXDtTevcUxYe]() {
+    fn test_record_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAyenM1b3o0R2U4Tll6QkRBdHBFOHJycU05eDJtZlJMKzJDT1ZPSFhxSzNjCnlRbzJVOUQ4NVlZMFV2TURaaWViRkRkdWhWM0VVckJZWnVrVlBFMm9LOGsKLT4gWDI1NTE5IEpjcmhjTktOODJRMjdQYXpMTUM5ekNIM3VzTkRJaHI3U1haN2xXaXlJUk0KQmd0dG9BdVN6VlVPYXhqZzNueHczZ2Z2bnM3ZHNvYzhKaDFDeUE0YnhGTQotPiBYMjU1MTkgR09GTkJIZTZKVVY4MWJ2eldKTnVxWVEwZG81RGp0TWxhb3NXeHRzWkZTQQpGVXcrcFI5T1NJZjhaRVY4RjVvNGVlRGczckVJaEpNejhSejJpQkVhQWJnCi0+IFgyNTUxOSBJa1RNYUhQdzFiSVNvcEZHdjhmREhISE1wWmVzTlJJeFVQbmNuOVFqWUIwCmpRNVIrMGQ5RmJmVFpVbnUvVmhGKzJoRjk1eklvMWZMMldGSmxVYTJ4TkkKLT4gWDI1NTE5IHZXZDlLZjRRV2pqYllhMHh6WE9WUUpVSStFMTcvd2orRSs1cmg2MEwwd1EKekFWYm1xNm04M0U4eDA3dUl2N0xmYmxNeW55M2M1QU1PYlRlMjI1LzROZwotPiBxPG07fUtZMi1ncmVhc2UgIVIgVVRBIFZGX0hTeCAnCjRJLzNvTG9lUjFQZ3ZFd2N3RStKNXo0VWlkMlVlUzlYbU80RFZkQ0w5SG8KLS0tIC80VHpNSWNLT1QzUUtPWmtCUVdKeXp2QjdJYnA4YXY2dzBMTzFsemJCVXMKuprG8AZH4Yiz040EHPZTG26zOcWd98k9Yjm1b+LHlMf/ND0anFGhcTUNx11mcBD1pbDyJfUtMrcglGMKcA3rZfhg]() {
+        // Use a temp state dir so this test does NOT pollute the
+        // real stuck-push ledger at
+        // ~/.local/state/dracon/dracon-sync-stuck-push-repos.json.
+        // Regression: previously this test wrote to the real
+        // ledger with the fake repo path
+        // `/tmp/dracon-sync-test-failure-increments-{pid}`, which
+        // then appeared as a junk entry in the live daemon's
+        // `dracon-sync repos` report.
+        let temp_dir = tempfile::tempdir().unwrap();
+        let _state_guard = crate::test_helpers::EnvRestorer::new(
+            "DRACON_SYNC_STATE_DIR",
+            temp_dir.path().to_string_lossy().as_ref(),
+        );
         let repo = make_test_repo_path("failure-increments");
         // Ensure clean state
         let _ = crate::daemon::unstuck_repo(&repo);
@@ -275,6 +288,13 @@ mod tests {
 
     #[test]
     fn test_record_push_success_clears_entry() {
+        // See `test_record_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSByWnBvbXhITW5va0grZjllL1kxMGFXWjZTeFJkSFNvZHp6Z3h3S0ZqaWx3CnFpdDdvUENxVGFrblQ5aHF5ZENlcHNFYzVveGxLR3BFUmVwOTg3QzQ4NGcKLT4gWDI1NTE5IGFqN0dsNUpoUTJEcCt5ZHErbGxXVFJBWHpRRG9TdEdXSHg4Y2RFblRmaGMKQnRsNEdNU05Kdy81N1gxOXVzQnVwSzZwamtiL09EMUFKUTNjRFNVSFYrbwotPiBYMjU1MTkgamsvTHhUOXJVWEVBdmo4SkxiY1NOcjFNTW9zNGd0Ymx4QVpOYTQ1dG9GNApHalBTL2ErNHNYNHdRb3hjK0FqMWgwcmN6UkRzSWVjLzNLUXQ0VU9jQ05vCi0+IFgyNTUxOSBlci9Nci9DK1Z1NVZCVGtiTFVIcC9tVkdZcFFPUzJ3Rm9wQ0daMGhmL2gwCnVBZE9WdFh4cXZnZ0xpTGpBcTRaUld6NlluNk44Y3djVE1SZ3RLcVB2bm8KLT4gWDI1NTE5IHN6T0tieTliT3FCQ0NLaU96QUFYTHpYZDhkREh4Ulg3WWQ5blp0cVEyUjAKb3lVeWNDMkhvbVdUYVFOTWtmS1k2QVgxSTUyTlJ0THpkRXlvNjZ4Q0FPOAotPiA5aFJ3LWdyZWFzZQpTMHNJdDRIOVlVd0hUWm1Ea3hnSHhLeGRsTmtkU1VFeXhDa29XSDAvQ1pBMXNGaXdlRllZcUhJc21iRGt6blQrCmlrUmMwNXd5QTgvYUlEWE1CVXZxZ3VPaC9xT1NmNnBuZmlTWHYyZTBwNEpyc0hnCi0tLSBWUkhxUUpMdGUxUDJWV09jNlFvWHFSNXYzS21nMkJFUW9aNVNiYmZtN1I4CjQGC3feELVV+cXwNMdn/CBjhCBl3ryUqV62xIqpDmol+PFAUGI9Sel89+Nbu7/TliK93KNnO0ru+s2pfvbYcQGPyw==]`
+        // for the rationale on using a temp state dir.
+        let temp_dir = tempfile::tempdir().unwrap();
+        let _state_guard = crate::test_helpers::EnvRestorer::new(
+            "DRACON_SYNC_STATE_DIR",
+            temp_dir.path().to_string_lossy().as_ref(),
+        );
         let repo = make_test_repo_path("success-clears");
         let _ = crate::daemon::unstuck_repo(&repo);
 
@@ -289,7 +309,14 @@ mod tests {
     }
 
     #[test]
-    fn test_record_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBFc01RTGlkaGpnSFpzL01BVUorWCsvVzBDd085MHNOTlpTTEpMUEpwK2tjClkvblE5d3g3WU9nck9hNCtqUk5lMVFZY3lhU0p3V3gyVCtIYUVYeWU4YUEKLT4gWDI1NTE5IE5hNU8xM1RsekdNbHIzVzVIWStMZWtIYTAzcUQ1QmVSdXJrRExGWWthR1kKZ1J0V3pieVhnTUZmNmMxRlVXWlphN0JPZXIyekNURE4ySTFnVkwrL09qTQotPiBYMjU1MTkgZlI2ZzF5ZUgwQ01KYzhYWnZjTDJMdkk5TGlLanFCaWNnTEFVUFd1allGSQprbTExakRCRXdXVmc0Yk5FeU9pUG9KbVJFWDZ3UmhTdmFkUFZXenlybFFVCi0+IFgyNTUxOSBVeDhNbTJzY1JpdFNGc3BMaEdqdTJiait6Q2haWThlaWtLU05idHZOUVY0CmdEQXF0YWdjYTRpenB5TlF5dEZ4WEs4S0dWcnFqL3o2eU90R1dQRFNaTFkKLT4gWDI1NTE5IDNoMHRnZlIxZW0waG84ZGE5TFFjTFJKc1hIcXhnS1JoUHlKalR6a2RBeEkKQUZ3c1hyTm9NNU4zTzBSMzl0RXhNbDJHR1VINlpaRXVHMmlpamZ1cHB1MAotPiBaWj9NentrLWdyZWFzZSBVUDIrL2V1OCBPNWkgMUgvaEBrYiBKZAplZFU1VUo1c0N1T3dUYUs0RENyRHpPd0tJemZDQjhISUQ2d2hCc2pUSlZRSVVRQktFRng1emJ0VXRvYmVUZ0l2ClFFMDVhSUs5aXpENHN5RzRsM3VKUDYwWEVFN3MrZwotLS0gcm9LZHlEblNtUDA4bWZwa0tQa0U5THppWVlrR0xBTVRucE5IZ0tlME1VcwoGEbDZVi4DKf4LSf/QZZn5IZy7IRJ63d9asvzTUW/rHNbsRMog1+sqvWeWrn0x56pcOmiuLzCRd96TaG+bNw==]() {
+    fn test_record_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBYQ2F5SVBMUGszdUlRVEdIdjdEOW1oaFlPd1dvUnAvbVNOSlFVUGR5RzJBCmdGdFJnZ0tTb0tleE43SG9HQTdPZTVvZDJBVVIxQ3lGZEdqWXRJc2VKVVUKLT4gWDI1NTE5IGFHR0htOWlDYWY3TUNXN0VCZW5ySmR2Q2o3MnRLZUlpZjcyZUJsU2RWRFEKbVBhbmlwbTI0S1VTVXB4SzJybXJiQUpCL09YbTd5TFlxOTZpeDI3MVNxRQotPiBYMjU1MTkgdW9XbndNcXU0cVlFUEkwVFJkbzF5RUJoK0RPQTZ1TDhUZDlucE1iYjJDcwpmNTAwT21KM1FDMUxyaFArdnRpcDNvaVFQT2toNitmbktzUW1vcnp1UVdNCi0+IFgyNTUxOSBsNm1YbXRQYlBiR05sUDhadjFvNzQrYnJkVGp5ODhpVEFPdnBZTW43a0YwCll2dm52YmEzeVlDTTdlQitWN1FCZExRUmNQamtTMVYvV1IzWWpoZytnckEKLT4gWDI1NTE5IHBQQ2E0cFp1c3dPOFpFV2dSVUlqZUVQcGt6T01MYkdNenZLazhPU0lEQncKa2Z5OWZJMEJOTkw3UXJIYm5oaEUwbTByTmVsREttRE9TZzhSRDZ4Q0lQZwotPiBaKy1ncmVhc2UgaFggSm1EW01uXgpvN0VMVVVBVHdxWTBOczE4SjRXR3VOMFJqbkgvZVNrSUpVK2tXUQotLS0gcFlxdC9QbDN5K081WTYxclNEemt4RmtaQVRaUkdqUldpcFFGZXVPdnBJYwrfsAzwhf/ZmqzjKyMYI8BH2yexZc3gFU14/J+TUyAWXSru0kmK/GGJFgE4DRweYumm0sBtkr5BD+Px0BYBMg==]() {
+        // See `test_record_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBna3dOZHpGUjVGSEJlZlZyRkU3aW44eldaTW5la3NJaXVock1ZNXJYTW5jCit1aUdDL1grVWlvV3NWSGZXWkJXNHVYRkUxRk9FNlZ2UllGY0tUdSs0Wk0KLT4gWDI1NTE5IGpsVUphNzV1VmdYSVhNd21lM20zVlZOR3JmMUN0WjRvaG9yR1FmbnNOejQKNjJHdmI2Y2FlZlc3UmZBL3pncGMvZm9vNWFaTk1HTDVybzZqaTNvcmZZdwotPiBYMjU1MTkgcmErZXdFYk1mek8zWVFwcE9DZVEzK01wdjBhREtrY21KUURMODREM1BucwptVWJqcVJSU1FLeVpiYksxU2pob2tZNWF0VkNOd2gvc1MxbGtOcCt6cEhZCi0+IFgyNTUxOSBxRU51bzBGUEdkRjVPUE5pWDNPMlo1Mll1c05rMWRXaDc2YlpCaFliZjE4ClcxOU9aRW0xREVaUGFBWCtRTktsc1d3WWFubzVCTUIyMmVDcmN2ZDFPbnMKLT4gWDI1NTE5IGlLR1JvYmMzMUxVVG1xUis5RnNxUHo2UDZaWWFjS3BudDJtWU1XWWxBbGMKdUY3MG9NMUx1RUpPNFdVeThZVWJnRWZUV3BYeHVZbnFncHNPL294YlNLTQotPiBeJi1zLDJyLWdyZWFzZSBJQS1LCkNJMnNuZDRTdkpQdUhqVHJTYU9IQlJiMWxnNHNrQXVRdUJWRVRRNHUzaTRBYWhaSzBwdlpnc3VycUlrMVUzNAotLS0gcWJpc2I5T1I4czJCOHVITFVBWXdXSjh2Mk9meXUwUHlSN3labFNOMy9IVQomQyt2I3TOqoIk19qU8CXkeeMd3EQwycNWa9onvBXr3vlUKcPz1IcTPZxrjlQmk7QVR92nxOmP5VyoNIu3OTBzkNo=]`
+        // for the rationale on using a temp state dir.
+        let temp_dir = tempfile::tempdir().unwrap();
+        let _state_guard = crate::test_helpers::EnvRestorer::new(
+            "DRACON_SYNC_STATE_DIR",
+            temp_dir.path().to_string_lossy().as_ref(),
+        );
         let repo = make_test_repo_path("first-call-stuck-since");
         let _ = crate::daemon::unstuck_repo(&repo);
 
