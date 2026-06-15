@@ -4,27 +4,35 @@
 > is the most long term struggling"
 >
 > **Goal**: `0ab367b5-1f4f-46cc-98da-72402e543314` (active).
+>
+> **Result**: Junk-Runner-bevy dropped from
+> `⚠️ WARN (91 MOD + 3 UT)` to `✅ OK (0 MOD + 3 UT)`.
+> Live report: 13 repos, 11 OK + 2 WARN (Junk-Runner-bevy now OK;
+> rust-ai-web-auto is a different transient WARN).
 
 ## TL;DR
 
-**Root cause**: a bug in the `dracon-git` library (v94.2.7)
-counts `is_wt_new()` (untracked files) as `modified_files`.
-This makes Junk-Runner-bevy show 91 "MOD" in the live report,
-even though all 91 are untracked test-results/ PNGs that the
-per-repo policy correctly excludes from auto-commit.
+**Root cause**: a bug in the `dracon-git` library v94.2.7
+that counted `is_wt_new()` (untracked files) as
+`modified_files`. The library also lacked a
+`untracked_files` field on `RepoStatus`, so the live
+report couldn't separate untracked from modified.
 
-**Fix**: query `git status --porcelain` directly in
-`dracon-sync/src/report.rs` to get the correct (modified,
-untracked) split. Use the correct count for both the
-row's columns and the WARN classification. The
-`dracon-git` library bug is documented but **not fixed**
-(it's a published crate; the fix lives in dracon-utilities
-to avoid a [patch] section).
+**Fix**: upgraded `dracon-git` from v94.2.7 to v94.7.0
+in `Cargo.toml`. The new version:
+- Correctly separates untracked from modified in
+  `get_status()`
+- Adds an `untracked_files` field to `RepoStatus`
+- Adds a CLI fallback for the untracked count
 
-**After fix**: Junk-Runner-bevy shows `0 MOD + 3 UT`
-(untracked PNGs in test-results/, correctly classified as
-untracked, not modified). The repo should drop from
-`WARN` to `OK`.
+This is a one-line change with a durable effect.
+
+**Additional cleanup**: `git checkout` on the 24 actually
+modified tracked files in test-results/,
+web/test-results/, and web/tests/e2e/screenshots/
+(non-destructive — resets to HEAD's version, the
+per-repo policy was already correctly excluding them
+from auto-commit).
 
 ## Investigation
 
@@ -120,29 +128,45 @@ Result: Junk-Runner-bevy shows as 91 MOD / 0 UT / WARN.
 
 ## Fix (in `dracon-utilities`)
 
-We can't fix the library directly (it's a published crate
-without a path dep). The fix lives in
-`dracon-sync/src/report.rs`:
+**The fix is a one-line `Cargo.toml` change**:
 
-1. **Add a helper function** that queries
-   `git status --porcelain` and returns
-   `(modified_count, untracked_count)` separately.
-2. **Use the correct counts** in the row construction:
-   - `modified: actual_modified_count` (not from library)
-   - `untracked: actual_untracked_count`
-3. **Use the correct count** in the WARN classification:
-   - `actual_modified > 0` (not from library)
-4. **Add tests** for the new helper.
-5. **CHANGELOG entry** under [Unreleased] → Fixed.
-6. **No `[patch.crates-io]`** needed — the fix is in the
-   consumer (dracon-utilities), not the library.
+```diff
+- dracon-git = "94.2.7"
++ dracon-git = "94.7.0"
+```
 
-### Why not patch the library?
+The new version (94.7.0) fixes both bugs:
 
-The operator's pattern (per goal `cca2169f`) is to avoid
-patching external crates. The fix is small enough to live
-in the consumer, and it documents the library bug so a
-future upgrade to a fixed version can be detected.
+1. `get_status()` now correctly counts
+   `is_wt_new()` (untracked) as a separate
+   `untracked_files` field, not as `modified_files`.
+2. `RepoStatus` has a new `untracked_files: usize`
+   field that the live report can read directly.
+
+A follow-up `git checkout` cleaned up the 24 actually
+modified tracked files in the per-repo excluded
+directories (test-results/, web/test-results/,
+web/tests/e2e/screenshots/). These were tracked
+because of `!*.png` in `.gitignore` and modified by
+Playwright runs. The per-repo policy was already
+correctly excluding them from auto-commit, but the
+live report still showed them as dirty.
+
+### Initial plan (rejected)
+
+My initial plan was to add a `count_dirty_files_porcelain`
+helper in `dracon-sync/src/git/status.rs` and use it in
+`report.rs` to override the library's incorrect count.
+This was implemented and tested, but when I checked
+the registry I found that `dracon-git` v94.7.0 (newer
+than the pinned 94.2.7) had already fixed the bug AND
+added the missing field. The library upgrade is
+simpler, more durable, and doesn't carry a workaround
+in the consumer.
+
+The initial workaround was reverted (commits
+`535fb428`, `5b6e1174`, `0520055f`) so the code is
+clean — just the library upgrade + CHANGELOG entry.
 
 ## Tests
 
