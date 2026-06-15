@@ -785,6 +785,8 @@ dependencies = [
 [[package]]
 name = "dracon-git"
 version = "94.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "35e4afb998aff705adc5be212564e67887db127b114ecc7087de4ebbd72d4126"
 dependencies = [
  "anyhow",
  "git2",
@@ -864,6 +866,8 @@ dependencies = [
 [[package]]
 name = "dracon-system-lib"
 version = "94.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "95368cfed194cd8e3b303adbc7fbce22d19f7714997d458454dc4ceeab78baa9"
 dependencies = [
  "anyhow",
  "dirs",
