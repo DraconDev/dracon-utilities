@@ -254,7 +254,7 @@ mod tests {
     }
 
     #[test]
-    fn test_record_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAvLzlrSG5LbDBnWnR5anpDSEtISFBCWmpUTlV4ajlldjBGc0xqRWFsazJRCkEwV2Z2K3R0bU0raG45bkpMbnlFeHhkMEEzcEJTQWtxWUFWbXdGU1UyaDQKLT4gWDI1NTE5IFRBZ3BOOHc3ZFM2ZC9ZTkpWSHhBbHdWOEdKZEdJbDdBWk83VG90eTllM0kKeFYwcVRKZXlpT25RUXoxNUVVTzJBZzBTQk54clBxSG81ZzdORTdkaEtWUQotPiBYMjU1MTkgQ09lVXZFMlgyT2d1SHlmUVFpdktMejdLVEZudDlpeitFdm5xRjg1NDlYZwozSkxNNFlvSjJDSFAvNENBU0NSMk5xWWgzYmhJSjBWVGhlcFQvZFFPZi9ZCi0+IFgyNTUxOSBuV0lqOTIwaFYrOHNiSEIyazVpOTFGV09RSk5nT2NFSWJLNDFsUHlFMlQ4Cm5wdER6WTdrZ0ZXRWZlN1RtWUhXM2d5Q01SU2x2WVVZdzdZRGZGMStiajAKLT4gWDI1NTE5IElacGp1K0NWZk50YlZrNjVxZW5rcWVwN2gzS0h6YVZQMUhrbXN5RHovR00KUkVLYUpmd2ozaFRrRENhc1dzQWkwWEtVSzludVI3dEN3Wit0ZFUzaE9ncwotPiAwQX1KLWdyZWFzZSBXIChZa2BQa11YCks2UDlDemlSWUlYamc0d0pvbWdjOGRycHcwNzU1aUplNTI3emJ3ZllTNTYyRWR2a0dQUWYxdFlkdnFETwotLS0gcWhsVm52K2dmR1pkTmxmQ0lWM0YvbEpseWJWN1RGQmhYWDZveVZTaEs0Zwon0BXOETxEg8oXE65NYyHUb02vQoyzg+ZUczdL/qeXufJskOi1N6qEHWta9U9nxaqG3qz0GS9q/flLMZiNxek+oIw=]() {
+    fn test_record_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBKWWZad0REY09PY2dXUWdYcC8wWllLTXptYUEyVjBtVkFvUGlsQ3cySWprCmhLQWc5T0FyK2R6WTRmLzRFeEJlNWN3QkRiN2dmZnVQTndDVUZoWk9rQlkKLT4gWDI1NTE5IHlKMkw4SVpKTUIvSGhyNTllQmxqY1BZTzcxWit6dXJJTXhoNjc3NEVKencKTm5OUXVYaHlkdzd4LzY0cDd5OEJZYndoSzNNN2VHZ3Q0MC94QkxCUTFqdwotPiBYMjU1MTkgcmdtcjdkcVBiY3orOHlRb2RVOExiRFF2RjRoZmQ4TlZzdjBBd3N5R1NuVQp2S3Z1N1kvU1RyWmdNUFU3RHZjRUFXL2tMenphOWQ2N25kemZ3MnRWcHo0Ci0+IFgyNTUxOSBTVnhnVGw3aWM2ajlWbjAzOW9jNmdod29kYy9ydUE1ODcxUWR2dmQ0aTFRClJUa3p5R1d2aUVnMG1TMjJGc3NvVldYTzMzMnR3K2hpNHNxa25OZmlaS0EKLT4gWDI1NTE5IEFNQy9xUXY2cE5aN2E2My9FUkRqTld5cUNBY1Fxb3FjVFpPQ0JFNWdBV1EKTjBvM2d0QlVTbDJ2cVhhWWdqQjBOWGo4b3RvVVdUZDhhdXNQdXgyeXRVbwotPiAjWy1ncmVhc2UgQUMmYFogOi9hRiFNIiBTLWxnCnJBNzNmUTkrYWVGdmhoNHBkZE5Wa1pXNDZTQ2pWUzVZUFNYSDBXTStpNDZ5aWNZbgotLS0gTWUyVzJGa3gvdmd3YTFaYlc3ck1BMDdROTQzZEplblhRK0NsMk1FZEVPSQq0GgGjzxKPtXLQg90sbdwo/LpQsftnegJPEzg42mcUxe87hZIJH6m+4i0InRAX3sdG7MjJU75HUZQQObQBLdOb7Bs=]() {
         let repo = make_test_repo_path("failure-increments");
         // Ensure clean state
         let _ = crate::daemon::unstuck_repo(&repo);
@@ -289,7 +289,7 @@ mod tests {
     }
 
     #[test]
-    fn test_record_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBIYUJtYkMrTEhDSkNOcUw4K3JSTkN4ODQrL3hPL1lEYkxYcm8wWTREM0RrCk5PdEFBRTZhK2NhOFpzcVhheFBpaXVMNGh3V2lNcjJJUWE4Nld6Z1B3K0UKLT4gWDI1NTE5IGRNYWpLUVdmQ29hNDVUS0Z4N25WbGI4dy9sa25IcFErcFRqVkhYbE96MDAKaFlPTUZ1Tmg1Z2pDOFpHbzU1R2VXV1ZoWDJTc3lxSHNRYU03ckFNSWxPdwotPiBYMjU1MTkgNGMva1VVS3VQSUM0d0JPMnZnMms1UlliYm4wRTBPMW9oN2RpTklzaFIyVQpjOTZKTlJGRlY5S2RLZVFSTkNNZXM4em51MXB1ZmN1eEl5akdmNTRIYVlRCi0+IFgyNTUxOSAxNmc4aDA1ZHV0NmhWcGlzN2Qwa09XY29ZWkZDNXRhdXZZZUZESWU5TzNrCldYdy9vV2NPQlJBQWJtaE5xajBwMGozc1NiSXQvdzMwQWdDdlZJVm56WUEKLT4gWDI1NTE5IG9jZ284KzUxckIzUWMzRDRaOXFVWnR5NVd4VE5jWUcvTnBtWmNIKy9TVjQKaVhURFlUOWZpeDhEeW1lQ1l1MGJVQUpUbG81Si8rQ3RMUVVtdHlXbkR1WQotPiByRH1YNS1ncmVhc2UKRFlKVk9PZXJCN3hjNG80VFJOU2tYQ2huLzJTNlVOdUdTVitNZ01SNm5sOWxwNE1JS3JJaVRmUFkzSDF0SnFxUQpOVEtHZXNZYllLRU9EUno2MzlkOEVad0JxaHp1YkloRDd4K1Ixb0VleDVlRFlQOEg4UQotLS0gYlptVGQvbjZkNmhsN2c0cldKTHVQZDB4RXdMNEhBUmF6M0hXcEpwSDhOYwppJUg/MQzFj30p2KnY9EnyjKdL8NpO3cN+jPtbgp+BJArB60uEykakjuthZ/AK6Tje+hAI6uOUOi2Dc9g0AQ==]() {
+    fn test_record_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBvZUtPTkRiZmxRc0hEL1BNYXBiNWwvTzFxNHh0bDh4UVl5Vlo5K2FPaTJvCldya3lGbkRXZlROajZaUmluREdIMk8zc3JTbXFHT3pzVytZT1FBaUZ3QXMKLT4gWDI1NTE5IFBjUlQ4QldEWkJWSlZneDhheXkrOHoyM0xCVzlNckluZ0wrQldYVVd0eWsKVW1EbEdjeExDMFJVSk1JWFR0Q2g0SW9HK29RaEVpL2tQNmVVSFhiZFBjYwotPiBYMjU1MTkgblhsQ1A0ZWQ0Um0wR2gyZ1ZJY2FMaENSWWJKU1hiREFDSFNtaHZZVUlVOApoQ3FES2hyOXRJcFRpTUV2NisxYldHUXVoUG5tSUUrU1h1bFVGQklQVVdFCi0+IFgyNTUxOSBrSXJ6Q3NzYkZSbjNlZEdpOHdkZnRkSUVkdGExcGdVTlZyM1V2ZDRhK1dzCjYyVzFOQzVyWmZoYjBITXIxMTFXYjM1aEVkQVVPZ2RoQTVodG9NRkxncUUKLT4gWDI1NTE5IEJFL01Ma25XS2tVZjhYamlnamFwVm03OHduaXdUK0phN1o1a0xjM2NkR1UKR0NXVWJReHRjcFFtK2tXcXR2Z0RTdm54S2NUTkNlc1dzZ2FwS2lHVjdCNAotPiBEXi1ncmVhc2UgLzQ3OgpJcnNGTnhFVjJXbU5XTHlJdUpUVnRvamFWWVBVWVRKZDZwWlQxYmFDT21mbHlZNHo3UVQrcy93cFVTdjVjaGh0CllaNEdkbXNwNzZEbVNWQ3IrcmVaVGRKUWtkYjhmemFWNXcKLS0tIHBrTFlMUTgvMkptekhXSTJ6WkFETllqU1IrZFgzWDNpbVpIcHI2ZDhLOGMKbPPJ3w4TQQ8YX1M7C9a6OnvpC0YJ+UGP8H4enpqvVSycbS3gXRs97NxDHmbM8ASwNL18B1DZJkHMprqZg4U=]() {
         let repo = make_test_repo_path("first-call-stuck-since");
         let _ = crate::daemon::unstuck_repo(&repo);
 
@@ -1151,6 +1151,13 @@ pub(crate) async fn run_daemon(
         mirror_consecutive_fails: HashMap<String, usize>,
         failure_count: usize,
         remote_failures: HashMap<String, usize>,
+        /// Cached ownership report for this repo. Re-computed
+        /// once per cycle when missing; never re-computed during
+        /// the same cycle. The daemon uses this to skip
+        /// auto-commit / auto-push for repos classified as
+        /// `Unowned` or `Unknown` (when `auto_skip_unowned = true`).
+        /// `None` means not yet classified this cycle.
+        ownership: Option<crate::ownership::OwnershipReport>,
     }
 
     let mut activity: HashMap<PathBuf, RepoActivity> = HashMap::new();
@@ -1338,6 +1345,73 @@ pub(crate) async fn run_daemon(
                         "⏳ {} has index.lock (mid-checkout), skipping",
                         repo.display()
                     );
+                }
+                continue;
+            }
+            // ── Ownership safety guard ─────────────────────────
+            // Default-skip auto-commit and auto-push for repos
+            // that are not clearly owned by the operator. This
+            // protects against repos whose origin points to
+            // someone else's account (e.g. zerostack-reference
+            // → gi-dellav/zerostack.git) or whose HEAD author is
+            // a historical bad config (e.g. dracon-ai-lib →
+            // `Dracon <dracon@void>`). Cached per cycle in
+            // RepoActivity.ownership; the git invocations only
+            // run when the cache is None.
+            let repo_override = crate::policy::load_repo_override(&repo);
+            let effective_auto_skip_unowned = repo_override
+                .auto_skip_unowned
+                .unwrap_or(policy.auto_skip_unowned);
+            let entry_for_ownership = activity.entry(repo.clone()).or_insert_with(|| RepoActivity {
+                fingerprint: String::new(),
+                changed_at: now,
+                dirty_since: None,
+                ahead_since: None,
+                behind_since: None,
+                mirror_consecutive_fails: HashMap::new(),
+                failure_count: 0,
+                remote_failures: HashMap::new(),
+                ownership: None,
+            });
+            if entry_for_ownership.ownership.is_none() {
+                let trusted = crate::ownership::TrustedSet {
+                    emails: policy.trusted_emails.clone(),
+                    authors: policy.trusted_authors.clone(),
+                    remote_hosts: policy.trusted_remote_hosts.clone(),
+                };
+                entry_for_ownership.ownership = Some(
+                    crate::ownership::detect_ownership(
+                        &repo,
+                        &trusted,
+                        repo_override.owned,
+                    ),
+                );
+            }
+            let ownership = entry_for_ownership.ownership.as_ref().unwrap();
+            let is_owned = matches!(ownership, crate::ownership::OwnershipReport::Owned { .. });
+            if effective_auto_skip_unowned && !is_owned {
+                // Log once per cycle per repo (guard with a
+                // cycle-relative counter to avoid spamming every
+                // cycle).
+                let notify_key = format!("ownership-skip-{}", repo.display());
+                if let std::collections::hash_map::Entry::Vacant(e) =
+                    remote_notify_cooldowns.entry(notify_key)
+                {
+                    eprintln!(
+                        "🚫 {} skipping ({}): {}",
+                        repo.display(),
+                        match ownership {
+                            crate::ownership::OwnershipReport::Unowned { reason, .. } => reason,
+                            crate::ownership::OwnershipReport::Unknown { .. } => "unknown",
+                            _ => "not-owned",
+                        },
+                        match ownership {
+                            crate::ownership::OwnershipReport::Unowned { detail, .. } => detail,
+                            crate::ownership::OwnershipReport::Unknown { detail } => detail,
+                            _ => "",
+                        }
+                    );
+                    e.insert(Instant::now() + Duration::from_secs(1800));
                 }
                 continue;
             }
@@ -1574,6 +1648,7 @@ pub(crate) async fn run_daemon(
                         mirror_consecutive_fails: HashMap::new(),
                         failure_count: 0,
                         remote_failures: HashMap::new(),
+                        ownership: None,
                     },
                 );
                 continue;

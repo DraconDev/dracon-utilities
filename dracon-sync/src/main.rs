@@ -10,6 +10,7 @@ mod git;
 mod helpers;
 mod log;
 mod nix;
+mod ownership;
 mod policy;
 mod print;
 mod release;
@@ -148,6 +149,20 @@ enum Command {
         /// Preview what would be done without making any changes.
         #[arg(long)]
         dry_run: bool,
+    },
+    /// Detect and report repository ownership (safety guard for
+    /// auto-commit/auto-push).
+    Ownership {
+        /// Repository path. Defaults to all discovered repos.
+        #[arg(long)]
+        repo: Option<PathBuf>,
+        /// Show the raw signals checked (git config, HEAD author, origin URL)
+        /// in addition to the classified report.
+        #[arg(long, conflicts_with = "json")]
+        explain: bool,
+        /// Emit machine-readable JSON.
+        #[arg(long, conflicts_with = "explain")]
+        json: bool,
     },
 }
 
@@ -1159,6 +1174,13 @@ async fn main() -> Result<()> {
         } => {
             cmd_scaffold(&policy_path, repo, files, overwrite, dry_run).await?;
         }
+        Command::Ownership {
+            repo,
+            explain,
+            json,
+        } => {
+            cmd_ownership(&policy_path, repo.as_deref(), explain, json)?;
+        }
     }
 
     Ok(())
@@ -1314,6 +1336,144 @@ async fn cmd_scaffold(
         repos.len()
     );
 
+    Ok(())
+}
+
+fn cmd_ownership(
+    policy_path: &std::path::Path,
+    repo: Option<&std::path::Path>,
+    explain: bool,
+    json: bool,
+) -> Result<()> {
+    use crate::ownership::{
+        detect_ownership, read_signals, OwnershipInputs, OwnershipReport, TrustedSet,
+    };
+    use crate::policy::{load_repo_override, SyncPolicy};
+    use comfy_table::{presets::UTF8_FULL_CONDENSED, Cell, Color, ContentArrangement, Table};
+
+    let policy = SyncPolicy::load(policy_path)?;
+    let trusted = TrustedSet {
+        emails: policy.trusted_emails.clone(),
+        authors: policy.trusted_authors.clone(),
+        remote_hosts: policy.trusted_remote_hosts.clone(),
+    };
+    let repos: Vec<PathBuf> = if let Some(p) = repo {
+        vec![p.to_path_buf()]
+    } else {
+        let roots: Vec<PathBuf> = policy.watch_roots.iter().map(PathBuf::from).collect();
+        let excluded: std::collections::BTreeSet<String> =
+            policy.exclude_dir_names.iter().cloned().collect();
+        git::discover_git_repos(&roots, &excluded, &policy.exclude_repos, None)
+    };
+
+    struct Row {
+        repo: String,
+        report: OwnershipReport,
+        inputs: OwnershipInputs,
+        override_owned: Option<bool>,
+    }
+    let mut rows: Vec<Row> = Vec::new();
+    for repo_path in &repos {
+        let inputs = read_signals(repo_path);
+        let override_ = load_repo_override(repo_path);
+        let override_owned = override_.owned;
+        let report = detect_ownership(repo_path, &trusted, override_owned);
+        rows.push(Row {
+            repo: repo_path.display().to_string(),
+            report,
+            inputs,
+            override_owned,
+        });
+    }
+
+    if json {
+        #[derive(serde::Serialize)]
+        struct Out {
+            policy: String,
+            trusted_emails: Vec<String>,
+            trusted_authors: Vec<String>,
+            trusted_remote_hosts: Vec<String>,
+            results: Vec<RepoJson>,
+        }
+        #[derive(serde::Serialize)]
+        struct RepoJson {
+            repo: String,
+            report: OwnershipReport,
+            user_email: Option<String>,
+            head_author_email: Option<String>,
+            head_author_name: Option<String>,
+            origin_url: Option<String>,
+            override_owned: Option<bool>,
+        }
+        let out = Out {
+            policy: policy_path.display().to_string(),
+            trusted_emails: policy.trusted_emails.clone(),
+            trusted_authors: policy.trusted_authors.clone(),
+            trusted_remote_hosts: policy.trusted_remote_hosts.clone(),
+            results: rows
+                .into_iter()
+                .map(|r| RepoJson {
+                    repo: r.repo,
+                    report: r.report,
+                    user_email: r.inputs.user_email,
+                    head_author_email: r.inputs.head_author_email,
+                    head_author_name: r.inputs.head_author_name,
+                    origin_url: r.inputs.origin_url,
+                    override_owned: r.override_owned,
+                })
+                .collect(),
+        };
+        println!("{}", serde_json::to_string_pretty(&out)?);
+        return Ok(());
+    }
+
+    let mut table = Table::new();
+    table.load_preset(UTF8_FULL_CONDENSED);
+    table.set_content_arrangement(ContentArrangement::DynamicFullWidth);
+    if explain {
+        table.set_header(vec![
+            Cell::new("📦 REPO"),
+            Cell::new("🩺 OWNERSHIP"),
+            Cell::new("📧 user.email"),
+            Cell::new("👤 HEAD author"),
+            Cell::new("🌐 origin"),
+            Cell::new("🔧 override"),
+        ]);
+    } else {
+        table.set_header(vec![Cell::new("📦 REPO"), Cell::new("🩺 OWNERSHIP")]);
+    }
+    for r in &rows {
+        let (label, color) = match &r.report {
+            OwnershipReport::Owned { reason } => (format!("✓ owned ({})", reason), Color::Green),
+            OwnershipReport::Unowned { reason, .. } => {
+                (format!("🚫 unowned: {}", reason), Color::Red)
+            }
+            OwnershipReport::Unknown { .. } => ("❓ unknown".to_string(), Color::Yellow),
+        };
+        let label_cell = Cell::new(label).fg(color);
+        if explain {
+            table.add_row(vec![
+                Cell::new(&r.repo),
+                label_cell,
+                Cell::new(r.inputs.user_email.as_deref().unwrap_or("—")),
+                Cell::new(match (&r.inputs.head_author_name, &r.inputs.head_author_email) {
+                    (Some(n), Some(e)) => format!("{} <{}>", n, e),
+                    (Some(n), None) => n.clone(),
+                    (None, Some(e)) => format!("<{}>", e),
+                    (None, None) => "—".to_string(),
+                }),
+                Cell::new(r.inputs.origin_url.as_deref().unwrap_or("—")),
+                Cell::new(
+                    r.override_owned
+                        .map(|b| if b { "owned=true" } else { "owned=false" })
+                        .unwrap_or("—"),
+                ),
+            ]);
+        } else {
+            table.add_row(vec![Cell::new(&r.repo), label_cell]);
+        }
+    }
+    println!("{table}");
     Ok(())
 }
 

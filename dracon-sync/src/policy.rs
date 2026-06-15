@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use serde::{Deserialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::ops::{Deref, DerefMut};
 use std::path::{Path, PathBuf};
 use std::process::Command as StdCommand;
@@ -494,6 +494,61 @@ pub(crate) struct SyncPolicy {
     /// `push_retries` still applies per-attempt).
     #[serde(default = "default_push_max_retries")]
     pub(crate) push_max_retries: u32,
+    /// Safety guard rail: when true (default), the daemon skips
+    /// auto-commit AND auto-push for repos classified as
+    /// `Unowned` or `Unknown` by `ownership::detect_ownership`.
+    /// This prevents the daemon from committing/pushing into a
+    /// repo whose `origin` remote points to someone else's
+    /// GitHub/GitLab account (e.g. `zerostack-reference`'s
+    /// `gi-dellav/zerostack.git`) or whose HEAD author is a
+    /// historical bad config (e.g. `dracon-ai-lib`'s
+    /// `Dracon <dracon@void>`). Set to false to re-enable
+    /// auto-handling for unowned repos (NOT recommended).
+    /// Per-repo override: `RepoPolicyOverride.auto_skip_unowned`.
+    #[serde(default = "default_true")]
+    pub(crate) auto_skip_unowned: bool,
+    /// Trusted git `user.email` values. A repo is classified as
+    /// Owned when its local `git config user.email` matches one
+    /// of these. Default: `["dracsharp@gmail.com"]`. This is the
+    /// strongest ownership signal — a repo with the wrong
+    /// `user.email` will be classified `Unowned` with reason
+    /// `untrusted_email`.
+    #[serde(default = "default_trusted_emails")]
+    pub(crate) trusted_emails: Vec<String>,
+    /// Trusted git author name values. A repo is classified as
+    /// Owned when its HEAD commit author name matches one of
+    /// these (e.g. when the operator's commit name was changed
+    /// in the global git config but historical commits still
+    /// have the old name). Default: `["DraconDev"]`.
+    #[serde(default = "default_trusted_authors")]
+    pub(crate) trusted_authors: Vec<String>,
+    /// Trusted `origin` remote URL substrings. A repo is
+    /// classified as Owned when its `origin` URL contains one of
+    /// these (matched as a substring, e.g.
+    /// `github.com/DraconDev`). Default: the three DraconDev
+    /// hosts on GitHub, GitLab, and Codeberg.
+    #[serde(default = "default_trusted_remote_hosts")]
+    pub(crate) trusted_remote_hosts: Vec<String>,
+    /// When a repo has been dirty continuously for longer than
+    /// this many seconds, the daemon commits REGARDLESS of
+    /// whether the fingerprint is still changing. Prevents the
+    /// "⏸ stalled Xm" pileup the operator sees when many repos
+    /// have stale dirty state from previous sessions. Default
+    /// 60s. Set to 0 to disable (back to 5s fingerprint wait).
+    #[serde(default = "default_settling_max_delay_secs")]
+    pub(crate) settling_max_delay_secs: u64,
+    /// Action to take when a dirty repo exceeds
+    /// `settling_max_delay_secs`. `Commit` (default) force-
+    /// commits the current state; `Warn` logs a warning but
+    /// does not commit; `Ignore` does nothing.
+    #[serde(default = "default_dirty_max_age_action")]
+    pub(crate) dirty_max_age_action: DirtyMaxAgeAction,
+    /// Minimum time between consecutive auto-commits for the
+    /// same repo. Prevents thrashing when the operator is
+    /// actively editing. Default 5s. Setting this too high will
+    /// make the daemon appear to "stall" on dirty repos.
+    #[serde(default = "default_min_commit_interval_secs")]
+    pub(crate) min_commit_interval_secs: u64,
     #[serde(default)]
     pub(crate) sync_visibility: bool,
     #[serde(default = "default_sync_visibility_interval_hours")]
@@ -664,6 +719,29 @@ pub(crate) struct RepoPolicyOverride {
     /// (e.g. `"**/test-results/**"` or `"*.log"`).
     #[serde(default)]
     pub(crate) auto_commit_exclude_patterns: Option<Vec<String>>,
+    /// Per-repo override for `auto_skip_unowned`. Some(true)
+    /// forces the repo to be classified as Owned (the daemon
+    /// will commit and push even if its origin or author isn't
+    /// trusted). Some(false) forces Unowned (skip regardless of
+    /// signals). None inherits the global policy.
+    #[serde(default)]
+    pub(crate) owned: Option<bool>,
+    /// Per-repo override for `auto_skip_unowned`. Some(false)
+    /// re-enables the daemon for a specific unowned repo (the
+    /// operator has confirmed they want to push into it). Some
+    /// (true) overrides to skip. None inherits the global
+    /// policy.
+    #[serde(default)]
+    pub(crate) auto_skip_unowned: Option<bool>,
+    /// Per-repo override for `settling_max_delay_secs`. None
+    /// inherits the global value. See
+    /// [`SyncPolicy::settling_max_delay_secs`].
+    #[serde(default)]
+    pub(crate) settling_max_delay_secs: Option<u64>,
+    /// Per-repo override for `dirty_max_age_action`. None
+    /// inherits the global value.
+    #[serde(default)]
+    pub(crate) dirty_max_age_action: Option<DirtyMaxAgeAction>,
 }
 
 pub(crate) fn default_true() -> bool {
@@ -830,6 +908,55 @@ fn default_auto_commit_backstop_min_age_secs() -> u64 {
 
 fn default_push_max_retries() -> u32 {
     5
+}
+
+pub(crate) fn default_trusted_emails() -> Vec<String> {
+    vec!["dracsharp@gmail.com".to_string()]
+}
+
+pub(crate) fn default_trusted_authors() -> Vec<String> {
+    vec!["DraconDev".to_string()]
+}
+
+pub(crate) fn default_trusted_remote_hosts() -> Vec<String> {
+    vec![
+        "github.com/DraconDev".to_string(),
+        "gitlab.com/dracondev".to_string(),
+        "codeberg.org/dracondev".to_string(),
+    ]
+}
+
+fn default_settling_max_delay_secs() -> u64 {
+    60
+}
+
+fn default_min_commit_interval_secs() -> u64 {
+    5
+}
+
+fn default_dirty_max_age_action() -> DirtyMaxAgeAction {
+    DirtyMaxAgeAction::Commit
+}
+
+/// What the daemon should do when a dirty repo has been dirty
+/// continuously for longer than `settling_max_delay_secs`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum DirtyMaxAgeAction {
+    /// Force-commit the current working tree state, regardless of
+    /// fingerprint stability. Default.
+    Commit,
+    /// Log a warning to stderr but do NOT commit. The operator
+    /// must intervene.
+    Warn,
+    /// Do nothing. Same as `Warn` but with no log line.
+    Ignore,
+}
+
+impl Default for DirtyMaxAgeAction {
+    fn default() -> Self {
+        DirtyMaxAgeAction::Commit
+    }
 }
 
 fn default_sync_visibility_interval_hours() -> u64 {
@@ -1404,6 +1531,13 @@ pub(crate) fn test_sync_policy() -> SyncPolicy {
         auto_commit_backstop_threshold: 20,
         auto_commit_backstop_min_age_secs: 300,
         push_max_retries: 5,
+        auto_skip_unowned: true,
+        trusted_emails: default_trusted_emails(),
+        trusted_authors: default_trusted_authors(),
+        trusted_remote_hosts: default_trusted_remote_hosts(),
+        settling_max_delay_secs: 60,
+        dirty_max_age_action: DirtyMaxAgeAction::Commit,
+        min_commit_interval_secs: 5,
         sync_visibility: false,
         sync_visibility_interval_hours: 24,
         sync_metadata: false,

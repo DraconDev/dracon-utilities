@@ -366,6 +366,12 @@ pub(crate) fn activity_label(row: &RepoReportRow) -> String {
         return format!("🛑 push-stuck{}{}", duration, ahead_suffix);
     }
 
+    // 2c. Unowned = "🚫 unowned: <reason>" so the operator
+    // knows the daemon is intentionally not touching this repo.
+    if let StateCause::Unowned { reason, detail } = &row.state_cause {
+        return format!("🚫 unowned: {}", truncate(detail, 40));
+    }
+
     let has_dirty = row.modified > 0 || row.staged > 0;
 
     // 3. dirty + recent commit (within settle threshold) = "settling"
@@ -1129,7 +1135,7 @@ pub(crate) fn repo_is_warn(
 ///   `cold_commit_minutes`.
 /// - `Cold`      — last commit older than `cold_commit_minutes` (default 24h).
 /// - `Healthy`   — fallback when nothing else matches.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum StateCause {
     Working,
@@ -1144,10 +1150,17 @@ pub(crate) enum StateCause {
     Idle,
     Cold,
     Healthy,
+    /// Repo is not owned by the operator (per the
+    /// `auto_skip_unowned` ownership guard). The daemon skips
+    /// auto-commit and auto-push for this repo. `reason` is
+    /// the stable kebab-case classifier (e.g. `untrusted_origin`,
+    /// `untrusted_author`); `detail` is the human-readable
+    /// explanation (e.g. the actual bad origin URL).
+    Unowned { reason: String, detail: String },
 }
 
 impl StateCause {
-    pub(crate) fn as_str(self) -> &'static str {
+    pub(crate) fn as_str(&self) -> &'static str {
         match self {
             StateCause::Working => "working",
             StateCause::Committing => "committing",
@@ -1161,12 +1174,16 @@ impl StateCause {
             StateCause::Idle => "idle",
             StateCause::Cold => "cold",
             StateCause::Healthy => "healthy",
+            // For Unowned, the label is computed separately
+            // (it's a dynamic String, not a &'static str). See
+            // `state_cause_label_string` for the dynamic case.
+            StateCause::Unowned { .. } => "unowned",
         }
     }
 
     /// Icon used in the human-readable table. The colour of the row is
     /// picked separately by `cause_color`.
-    pub(crate) fn icon(self) -> &'static str {
+    pub(crate) fn icon(&self) -> &'static str {
         match self {
             StateCause::Working => "🔄",
             StateCause::Committing => "🟡",
@@ -1180,7 +1197,42 @@ impl StateCause {
             StateCause::Idle => "⚪",
             StateCause::Cold => "⚫",
             StateCause::Healthy => "✅",
+            StateCause::Unowned { .. } => "🚫",
         }
+    }
+}
+
+/// Compute the state_cause_label string. For most variants this
+/// is just `state_cause.as_str()`, but `Unowned` carries a
+/// dynamic reason string that needs to be returned as the label
+/// (e.g. `unowned:untrusted_origin` for machine parsing, or just
+/// the reason for the table cell).
+pub(crate) fn state_cause_label_string(cause: &StateCause) -> String {
+    match cause {
+        StateCause::Unowned { reason, .. } => format!("unowned:{}", reason),
+        other => other.as_str().to_string(),
+    }
+}
+
+/// Borrowed `as_str` for a `&StateCause`. Required because we
+/// dropped `Copy` from `StateCause` (it now carries String
+/// fields in the Unowned variant). Most call sites are
+/// refactored to use this.
+pub(crate) fn state_cause_as_str(cause: &StateCause) -> &'static str {
+    match cause {
+        StateCause::Working => "working",
+        StateCause::Committing => "committing",
+        StateCause::Pushing => "pushing",
+        StateCause::Synced => "synced",
+        StateCause::Stalled => "stalled",
+        StateCause::Dirty => "dirty",
+        StateCause::Untracked => "untracked-only",
+        StateCause::Intentional => "intentional",
+        StateCause::Failed => "failed",
+        StateCause::Idle => "idle",
+        StateCause::Cold => "cold",
+        StateCause::Healthy => "healthy",
+        StateCause::Unowned { .. } => "unowned",
     }
 }
 
@@ -1635,7 +1687,17 @@ pub(crate) async fn run_repos_report(
             })
             .unwrap_or(false);
 
-        let hint = if push_budget_exhausted {
+        let hint = if let Some(reason) = &unowned_reason {
+            // Override the hint for unowned repos. The
+            // operator needs to know WHY the daemon isn't
+            // touching this repo, and what to do about it
+            // (run `ownership --explain` to see the raw
+            // signals).
+            format!(
+                "🚫 unowned: {} — run ownership --explain",
+                reason
+            )
+        } else if push_budget_exhausted {
             let info = stuck_info.as_ref().unwrap();
             let error_summary = if info.last_error.is_empty() {
                 format!("{} consecutive push failures", info.consecutive_failures)
@@ -1727,6 +1789,51 @@ pub(crate) async fn run_repos_report(
         };
         let state_cause = classify_state_cause(&inputs, &thresholds);
 
+        // ── Ownership override ─────────────────────────
+        // If the policy says to skip unowned repos
+        // (`auto_skip_unowned = true`) and this repo is
+        // classified as Unowned or Unknown by
+        // `ownership::detect_ownership`, override the
+        // state_cause to `Unowned { reason, detail }`. The
+        // ACTIVITY column shows `🚫 unowned: <reason>` and
+        // the HINT column points the operator at
+        // `ownership --explain <repo>`. Per-repo override
+        // `auto_skip_unowned = false` re-enables the daemon
+        // for a specific repo.
+        let repo_override_for_ownership = crate::policy::load_repo_override(&repo);
+        let effective_skip = repo_override_for_ownership
+            .auto_skip_unowned
+            .unwrap_or(policy.auto_skip_unowned);
+        let mut unowned_reason: Option<String> = None;
+        let state_cause = if effective_skip {
+            let trusted = crate::ownership::TrustedSet {
+                emails: policy.trusted_emails.clone(),
+                authors: policy.trusted_authors.clone(),
+                remote_hosts: policy.trusted_remote_hosts.clone(),
+            };
+            let ownership = crate::ownership::detect_ownership(
+                &repo,
+                &trusted,
+                repo_override_for_ownership.owned,
+            );
+            match ownership {
+                crate::ownership::OwnershipReport::Owned { .. } => state_cause,
+                crate::ownership::OwnershipReport::Unowned { reason, detail } => {
+                    unowned_reason = Some(reason.clone());
+                    StateCause::Unowned { reason, detail }
+                }
+                crate::ownership::OwnershipReport::Unknown { detail } => {
+                    unowned_reason = Some("unknown".to_string());
+                    StateCause::Unowned {
+                        reason: "unknown".to_string(),
+                        detail,
+                    }
+                }
+            }
+        } else {
+            state_cause
+        };
+
         // Look up the daemon's most recent recorded action for this repo
         // from the incident ledger. The map is keyed by the same canonical
         // repo path string we use everywhere else.
@@ -1779,8 +1886,8 @@ pub(crate) async fn run_repos_report(
             concern,
             warn,
             hint,
-            state_cause,
-            state_cause_label: state_cause.as_str().to_string(),
+            state_cause: state_cause.clone(),
+            state_cause_label: state_cause_label_string(&state_cause),
             daemon_last_action_unix,
             daemon_last_action,
             daemon_last_result,
@@ -1948,6 +2055,9 @@ pub(crate) async fn run_repos_report(
             StateCause::Intentional => Color::Magenta,
             StateCause::Untracked | StateCause::Idle => Color::White,
             StateCause::Cold | StateCause::Healthy => Color::DarkGrey,
+            // Unowned: red — the daemon is intentionally not
+            // touching this repo, the operator must intervene.
+            StateCause::Unowned { .. } => Color::Red,
         };
 
         // Color-code numeric columns based on severity
@@ -3452,7 +3562,7 @@ mod tests {
     }
 
     #[test]
-    fn test_repo_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBhR0lOT1E4QmE1cWtMcGJrck1valdWS0VKUzI1TEhsMW9yOEZHVDhCZ3dnCmtJSGlJUlBRdWZaSmlzTVZQSklQTk1KRjRkRGRoTFh4YmhLOXFEc0ZVKzQKLT4gWDI1NTE5IDg5SVNuMWVnbHdWUWduMEpueG5LM0VkUDkwdEJEN2dmNGJ3MFd4a2JnUUkKK2w4OW9kaWt6SmhVdk1kTWJKU3VXcndxc0ovS0Rka00xNE0rQkNHOU1QMAotPiBYMjU1MTkgNGVWVlhwUWo5TmtickJwL3VEaTJJOGU5SnJseEg3YklsM2hBellFZ01VVQo3dmdYR0tzd0lzNCtFUklwd2FYN0RCWEVJT0lwZEFjYVIwV0lhZ01IWENrCi0+IFgyNTUxOSBkMVNyNHpsMkhiaW9oV1BmajNyTklaMjBKQytoZ1lnbWtwbWdyUkNST1Z3Ck5zclBVRDBWam0xZjRWQkY3Q0FtNy9NeGYvUHJRMkMzTk5MN3h2blRPN0EKLT4gWDI1NTE5IHZyYndKR3gxdXExeVY3SVhBU3RQRVJYZFlicFBHazR1blBCV2V0UXJnRDAKVEZ3SXRnZi90SGNlMDAyVzBOOXBVYkZVSFBMNXJIa2lmSjBxa1FzOW5CWQotPiBecXQtZ3JlYXNlICoiVz1EfCBwTyAoIGVeZz1XSgpkWkMwVXdMMFNjVUM2d0VWV0ZPdmdCMjdRaVo3YWNZTldBdm1sNXAxUURxRk1OZ1o1aDBLSGFRTXFCM2VBdjBtCmg3djF0OVVvamUvdHExR3NHQjNibzgrZEhUU2hxZ2hrYjdwRDB6Qm90dwotLS0gRnh3cjNLTVFYQzRJUGxzUE9VWXdxV29uekZVeWphYmViTlZPd1R4am1IawqVmLAUHy0LpmNCdtsd/urgeXd1PcCoM7YRo/YKRGkChOLgWtynRVK2J5QSZJ44V3kokePL1hG/jkTcA7aOp+bYWh7uOw==]() {
+    fn test_repo_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBHdys0RTdiR3hNR0RqR1p6TmJnTjlZNFltUFJjdzlyUGsxcHpUczg4aFZVCmlobHl2QnVmZ1hnbFAwdy9MNGVzV2hOM1hGczBuLy9zQVdpN21ueVoxT1UKLT4gWDI1NTE5IFpPSHhRTDV2MHM1c1A1dzFrVmp1S2RFRDM0VitHSVhrbno1Rmc1MW9yajQKUW9nSnJweTVDSmtjWW9ISEZtcUU1eC9TYm9XWmhOVEpEWXJTVjdyRmc3dwotPiBYMjU1MTkgdTdudDFscHVFK3lIWUFTckxxYVk2UTNkMlJrRlF3Q2JyalFlRTZKVnlGUQpKVWJtWTVtbTJiR1JjQ01kWVNvWVdBSGdDdHVWSmM5Q0x5UG9UWlo0eUNzCi0+IFgyNTUxOSBJc0xkRVR0VVVGN29TSytiR1VYeWg1NndzQVkxOG1hbTBiTDBxRjlibGdNCmtFMUt3YmdJam1LOTYwRWR6a1Zra0w4NHdLVHo1OWpMdzdFcVNnK1habmMKLT4gWDI1NTE5IDdITm55NHVkc2tucU8xWEZhckpDV1ZtMVVFRzBUeDNBMnIzK2hmMjRsbDQKczk4ZHVTVUtDd09YS2ZOQ2xZM09zNzJINy96Q21UbUJVZENDTE9BOGdMUQotPiA9MHwxUi1ncmVhc2UKN3JlNDhmRWZ5ejJma1hsV0FVTnlrZDdIdlNQQUo5b2NtMndqdXFhRk1XRFBoR3RjCi0tLSBYQStPWlN0MFZSMVZuSncyZVZZaXdZZ2t5VWsxbWFsdzREUWM3M01WWnkwCncdeCzsl+yn6MA1496AWJgCoRa4EPJrS7P2qIkfiVYP1sCVwSMU6Mz+eOWpvfocB53fOAFOsAxMMWbNqlcGY2Ye4Wdp]() {
         let msg = repo_failure_message("init_failed", Path::new("/tmp/repo"), "boom");
         assert!(msg.contains("init_failed"));
         assert!(msg.contains("/tmp/repo"));
@@ -3460,7 +3570,7 @@ mod tests {
     }
 
     #[test]
-    fn test_repo_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBkeEE2dlZCVTFMM1V2UGxJQ2d0ektPd05QZW1rc1RhMCtJeDBkelNIWWhZCm5FZVdBdWJ0ODZWSzYwbUFOTGZQWnZ6TlpYKy9EU0ZuN1VTNHVMaHJzM1UKLT4gWDI1NTE5IG9PdGxrZktyTVJLcUFOMDY2UDhiUnQvRjJIK21NR294L3RnaWxzR3R1REUKcXVZSndCWktWS3hpSVB0R3dDRGtBRHY2T3pJQUh6OXdEWVhDSXJJanFPRQotPiBYMjU1MTkgQ0M3S0Y3dFRTSitpRm9XV0RQQVd6dTR0Vm9TMXdrbFFKZm44WHBYS1JVOAoyVGNId01NalNrWVdxUSt0WXE1MWhER2ZyRktySzRlZGVJUWg1SS85eVRRCi0+IFgyNTUxOSBDcFZDVFdWbjNKVW4yQkJaR2J3RGYvbzQxOW4zZlJVSWdTelNjN0xlaEdBCmJEK1QzQk9qTU9yaDJ1TCtaQWphSklZNTNJOGIwZjUxWkZwb2ZTMThjWTAKLT4gWDI1NTE5IHhKclp6bmhjV3JVUmF1Zy9ycSt2SlZ6WXhCeWN6OUFQVng3K3ZGUDhrbTAKQXNDOXRDTzRhS2tmbUk1aC9VcjNITEZRMzRJdHlrQlVMU2ljb0RGSzV6cwotPiBWaWYtZ3JlYXNlIGJpPyUhIFNqSikgUCMgQ1psCnN6VkR0bEhHYnViYUxhL3JMeGt0VllZMmRrTlF3dwotLS0gL1NDWDREMTNhWmZ5ZmNiSFY3TUIrVld1M0wzWU05Uys4SWJTNFJJU3B6UQrI8brTVT7mxeTv0Gq5AJw8zxbF9oQnBJ4e2pDJ1h+LMudnJxecdL/a1JAVDPkc4EM+MO0KDCGKPVMIfHSehdoJBw==]() {
+    fn test_repo_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBWSGV4dU1ybEkzYUxRYjg0WCtkTkZhV0RQekpGcDV5ODhZcTRQNE5TS25BCnBoaWtqZWRjcFFab05FR3M2dUcwaGpOSWVQdHltL0xkSWUwYlFwOVFiSU0KLT4gWDI1NTE5IGROSGlIZlBJYW5UQ014bTJJRjVMc1BuRENKd3ptSGtoWS9URFBpK2hEbUUKN1F2YlZHa1JYZ2g1Mi82QVlHSkJRRWJxVzFyQmFtRXpSSC9CRVViTzVZWQotPiBYMjU1MTkgRjM1WXlyakxRSW01V0IzNUIvK0N3R05SdmQrd0E3MHZEQTBJcW5QOHh3OApXbWFjVjhOQ25Jb3hMUFhEa1ZxTTF5UmJkQS91SGxqTmFwSDkxcmJQQndRCi0+IFgyNTUxOSBxTGVST0RSSHBXS3FtVHJYdWp5TDd2N2NmU05MZnFIWFB0WlNNNXBqVm5FCkRrV0lNdEIyNjlQazN4aXkwQWl4WEFKRzFRM3FGNjd4RHM4MG9NemRrejQKLT4gWDI1NTE5IGNqcVFpSE9wYlR3YWsyZ2JJdnZCdEt1YThud3kyTGVHRGJ1aDVZUkowQ1kKWGdKQ01TZW04RldFN2tJV0E1QWRCTmZQR1MxczNodTlNQU03amEyYmJvRQotPiApI2BeVi8tZ3JlYXNlClJmNWJSdHBwcmMxY24xeWc4NDk3TjFOVG55QlVuNjV3anJyVzBWeUI2L2VRa3VnN2swZmtOSHRxZ0gzRTJHVkEKVU0vTjVYKy9NY0tZY0dneWd5WjVIQ2JvOWhCNHFBdkVKc1kKLS0tIER3Uk4zZktmclRDMzhoL0JBYjhUM0pzbHU2Y0pnRTM2MzhpcVA1VHRnQlkKk2ovvBR6+Ka4AgGDmULK0Wb08gqcfslQa2zeGwl7aubEfgBE6og41c0l95XiGKssxdhDVa+dX/dOk03W4uQHG7U=]() {
         let msg = repo_failure_message("status_failed", Path::new("/tmp/repo"), "status boom");
         assert!(msg.contains("status_failed"));
         assert!(msg.contains("status boom"));
@@ -3775,7 +3885,7 @@ mod tests {
     }
 
     #[test]
-    fn test_repo_stuck_filters_requi[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBIclJSdElQeHRWTUc4NDBUckMzV2hNN28vU1BZR1VyUFRQSEFIa1UyRkN3Cm5pT3JnTDM2ald5eUhIUDRTY3ZHRkZ3R2VzUnh0c3RyaloyUW5hR0JBRjQKLT4gWDI1NTE5IDB5TW5HVTRjYVZOT2JFdWZYRGE0bjAyeis3dHVaVDFqVnFCdkFHYUgxd28KbmxqWDlQVGRtazV4WE1ZWW5oRjNIY1J0dlRWYVMwSVNIeXpiYWZpOEs3OAotPiBYMjU1MTkgLzJITCtWemNyZmNXdzFSMXR5dDdvM2k3MEp1SlBRVC83US9vZXd6dzcwSQo4a3oySkxLVlIxQTB2WnBTNS9rSHNveTBvVHpaSDBSS0RacE5DQ2cwNlpNCi0+IFgyNTUxOSBRMSttS255NkovREJTSHZyZ2k5RVF6ZVZwOE9OcFNvSGNqM0lmdGZ5VjJzCmxBeC9vVmkySWppR2N2UEs5M0kzK25yYzJXNExCS1VmS1QxbitvQ0xjZGMKLT4gWDI1NTE5IGtOQllId1VTbFFicWxiajViaFI2RlZOUkFqQ2JuRnlKZjB5czBTUmFzaDgKWUsxR2lOeG1ONmtabjBaTitPR3FuVWh5MktWaEx0SUZvbmR6TTVJLzRPYwotPiB2fi1ncmVhc2Ugb3NsJCAxTC8rdwpaUDdWY2RmWFVxS1VISXpMQkNCSm1ISjJoZWo1K3ovKy9mVGQ1M2dpVjQwc3hvUy9ZaDREVzQyYzNQdmRlUmhyClFqSXJyUnNPeHBRYS9paXcwaXJrZVEKLS0tIDJxQkNkUEFWWlpVY0xGMmhvbTRPejkxNDdKZC85RG00OW9hbEtIQVlMTG8KVKNvbwCfVeYLfqgzcu6HczFlzv2063vCC3sMnPdYkuSrT4GkUI+YkZgDHuWH01PBmp1qagSUw6k=]() {
+    fn test_repo_stuck_filters_requi[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB2d1ZpMEVDUXk3UFZneWR1azU4c01sYUhDbVZWY0E2QkJlZnhEVVg3YUFjCjQ0Wk51S1VxRGx6Si9aNUt6NzV1dXBsOXBHT1NQa2RJb1ZVOTBPRDBwV2cKLT4gWDI1NTE5IEZmVmU3cVE2eTZDeHM1cUEvT09RalhrYWg1Wi9LMnl5ZS9jVWJnS1oxQkEKRGVzdGYzZlgwWTNBbkV0SXRWNFFWalpCLzlRNGNKZ2t4LzlxQmp3M2t4WQotPiBYMjU1MTkgUlVnd3hQMThqc2lJa1plT2IyUEdZY20wQ1Zrc1ExMzArYjJWWGJCUFZFOAp2Y2ZOMEYveXlXODBVWDkrSnl6dlMwYWt5MklmYnFXdWpVemtpTkVyTjVzCi0+IFgyNTUxOSBHVDBhWm1CNWZOUHdNTndURU1vcVJUbERncVQzMGRmdmxqc2h6V2pVaUNVCitXRkJ1azN4bVBhcEVUYU1MUzR6UzNhTTBYVkdnRVdPaklCMzBSd3NTdFkKLT4gWDI1NTE5IFprYmhOL3ZGZThTZ3NCQ3VRWXIza1JKNjNtenBTOERrYzhJY0JRT3hTZ3MKd2xnaTFoSUcrWkJjOVdMckxEck80am4veUtGVTE2bE9xQ01URGtrSE9XcwotPiA5alEobC1ncmVhc2UgQnIKeWhKTHJKRHpFVkdvRktaaTQ2T0ZmcnU4MEo0Zk9RbHVKMVZteC8ydzRHY054NlNtWFNBCi0tLSBmL0UwdnArY2EwQUJLQ21Na1h3VXRsbHlwMVFxSmZmUTdNQkhId2NJdVZNChNoAN9BFEVHtW8VAZklmCIrLm5C8aJ52qaergrKonnJTKSgRctyekxM/fbkbMJZDlKE343O8kmE]() {
         let ahead = make_status(false, 5, 0);
         let behind = make_status(false, 0, 3);
         assert!(!repo_is_stuck_push(&ahead, true, true, false));
@@ -4371,6 +4481,13 @@ mod tests {
             auto_commit_backstop_threshold: 20,
             auto_commit_backstop_min_age_secs: 300,
             push_max_retries: 5,
+            auto_skip_unowned: true,
+            trusted_emails: crate::policy::default_trusted_emails(),
+            trusted_authors: crate::policy::default_trusted_authors(),
+            trusted_remote_hosts: crate::policy::default_trusted_remote_hosts(),
+            settling_max_delay_secs: 60,
+            dirty_max_age_action: crate::policy::DirtyMaxAgeAction::Commit,
+            min_commit_interval_secs: 5,
             auto_commit_exclude_patterns: vec![],
             sync_visibility: false,
             sync_visibility_interval_hours: 24,
@@ -5141,7 +5258,7 @@ mod tests {
     }
 
     #[test]
-    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBTKy9GZ1N6NnV6RG5XdTYrdFVNcUp0UWRhRDRGTk80UlJhMnFhT0VGR1V3CnM1SjRjUW1QTlpPR2VaRU1QUjl2Rmg4aUQ2SWhYbWpSNGpaeWlVQXdIeGMKLT4gWDI1NTE5IFh3MnkxT2JkRzROdHYrbzVWU0gzbXVtdXVpM011YWdjY3VlZWE4UmltRUkKMnA2a3JxZXFMbVRrUzJPUzQyV2IyanJrMFYrLzlzQm44MGhMc2VSa0lNNAotPiBYMjU1MTkgNFBaQTBwV2JId21tL1o1Y0trc3VhaVpxSHJvSHdvUnJBWlNaTkRYK2pnQQpaV1kyYzh6Q1k4Uk8rV2o4YmZCa0ROdzR3d1daK3NaOGNGdGprbFNnSVJVCi0+IFgyNTUxOSBXcVZxekZ3UVo2YU53amtMdDlhQVlaa1c3Vk42SjRFaDBsRVNOLzI2eTJFCkFoNXVFWnZyRHR1WE11RzkvMWVmWjFXZkcxcE5sTExlYjg2bVlLSkxUamMKLT4gWDI1NTE5IEVhZjFFZWZDdklZWkhkSG5xc1FUaHpmSWRnNHNxWXBEUXczRkNYajhlMWsKS3UzbGY4aVRoaVh1V1dIY0wxZ0V0VDc1YnVZaHhIR2tLNTBTNTM4Q0NnNAotPiBdP3B7V2YtZ3JlYXNlIGogbSIrIDFoIHEpKSY0WFNyCmo5RTg1NTVRTTRvdmFTTUl3d05hdXZ6MlduVytpUFZUN2N4YUhXdGJSSUtHWEJLODVvcFlJNVZVQnFkdHRPeS8KcEZUalJpdGVNbXhCVmRzQ3RQeXd4cWdWb0dLTjlDS2NjZFRBMWFiQ3lKcUlvYVJETE9HbDlFL1gxM25ICi0tLSBLUHc3aS95R3A1dmR2R0lPQ0puUkFjd0NMTmFUaDJDUWxGeCtsbGJ5N0pzCitE0UKKwBJ8dgg6T7mtmfT+sIcRjvLzvgsoJ4MioY0BMh2cDmkBuHugl65/5TqrEmQJFxJNcGZ7nTaIl9A=]() {
+    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBaUnBzSnVUd29PdlRRNHFsSTBMcjBiRmlnWE1ZUnh5RzJuZHlxTWFkRmlrCk5EbWM1NXBmK01pN0U1UUs3YWR4VCtiR0xtYTdibUJsT2IxYnJsUk1URE0KLT4gWDI1NTE5IDZLdm1nN1BTc21IUzVmd1E0RGpWQzFBbjhTOGMrdnlQVTNhcGlIcEFUMG8KaUU0TmRRN25ZSmVUYzRSMitDbUdoQ250UkRNTmtzTEp0dkhyWUM0NzFmRQotPiBYMjU1MTkgWUREWTFVT3hQZDRza3RZYW82WVlSbVpBdk9qSHRqQVNwYVhVYlo4SDUxNApubHJNc3c5R0k0bFNBQnAxZzcrdUhLMnZsZVBDN2RFNEIxSFRYbDYrNnJJCi0+IFgyNTUxOSAwa09iZVZFbGF6bVdnMGVGTjExSm5rZU55dDRwY0hkSytzbzFBOEprOXhZCkpyN0c0S2FqcWRlOFBHcUtLUmt6MzQvQ1N2NFRTQTAwanZscGF1MXowUGMKLT4gWDI1NTE5IHRnYjdFeDNUVGlFc3NiTHZLN1JqeXZxVVFwVnU4dzhNNE4wTXJCNlJnZ1kKR1ByZit0TW5NOW12ejdtYlZSVnN5RFZsK3NjMGJWWVBHT01kNDBzem5FMAotPiAwN29zLWdyZWFzZQpVMGdXcnd3MDRrUnYyZjhNcW9FQVorT284dEJOCi0tLSBNMUxJV05wZVlCb2ZnejU4NHQ0MXMwZDFuRE5nZEppZFNhcjZWajRmclc0CvSfKBrHzB1Ciq0pYV6bJB3T9cDd5kScBgHZlsNKi0uvZZCoUV1B2Pt/cIgCFM+B+E4ymuM2gudh8tpLihM=]() {
         let mut cooldowns = std::collections::HashMap::new();
         let repo = std::path::PathBuf::from("/test/repo");
         let notify_key = format!("push-fail-{}", repo.display());
@@ -5270,7 +5387,7 @@ mod tests {
     // -------------------------------------------------------------------
 
     #[test]
-    fn build_recent_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB1dlptbTErT0ZablhMWUIwVDgxemtDeXVEUFZjQ044YnN3REUzWlNjeFhZCjZWV0tUZExwTGk2WnhOa2grMncrZFlSaldwZTYrVjBSVEJQYU0vbTdhUGcKLT4gWDI1NTE5IG1Ha0dia2pCem11eUpsTGNqbEdCZEZ1dFJBTGk1K3R2T2dYdU8yeHg3VkkKQWJRc0pORzVBUE10a08wV1RMUzZYcVcyc1FBdS9GcmQyaUM5a0FRbUxtNAotPiBYMjU1MTkgKzBwSGJVbHhQN29kNXFNME1Lblo4K3V3MU9oQXhkenRLRUpkMGdRYnVHUQpIai9ZY2tKWHZ1TXYwcXAvV0w4QWpPMmxTVHhVcktsTmxwZWtvcnd2c3NZCi0+IFgyNTUxOSA3eGQ3SlB3RmJ2K2RXM2hKaC91Y2hnWVhmeHBFaHB5bUVMcFNRS0F2bTJVCmxwM3lMQ1d5SXQzWHdYNDRjUUdtbko3Rks2NnpoM3FrTStFUVNmZXBmaWMKLT4gWDI1NTE5IGdISWNrL2dhTWV1TmFtSnpHbCs1OVZHQUFNcW1nNWxJRS9yRm1nTW9GU0kKMWhBb1JMY2liS0drd2Urc0dkUXpldFI1QjZxRlVqL0FvVm9SM1JkWGpSdwotPiBJLWdyZWFzZSBmLCBLIGUkJwpPUjlSbjR1T3lraDdyNnBxN29oTkh5ZjNPb1E1eFlMK1RBVDRLN3lFRmJVTVZ1VFRSMHFzeW5PSWxJWEExU2VjCmN0dXB1cy8vSmFSWFh1QksybUdEaTFvMkMzOFBKbnhzVEEKLS0tIGZuTHFTandwQW9Yai9yZThlQWxkWElpaVcxNkR4M2ZBRW5RM0NlTDFpdUEKvD15CD+kCp3kFqSv90lV11qtNdAotmzEq274KSdD97WTksR7dn2NGxConbRjfKM7ecHPchR+9yAmBxhdlns=]() {
+    fn build_recent_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBpWGJ1NmpyZ0dzbk1tSVdWcTlFS1VZY3diV3JhZmcvbGxSVlM0SHljN0E0Cmx5MUc3S0l2cW1RYjVQNlo0SUZ3Smcyd0J0VE9GS0FXcDQwQzUxY09pS28KLT4gWDI1NTE5IHdMVGlYNHlCcCtTMTVEK1BzNjE0eVBqcFBqWk8rNUl1VW9ZeXR3YUVTVDAKeG14Q0pmZzVMSXVqWGhUU0lMUW9VUHVrZ0lRMHN6VjNUZllPUXZFbUhoMAotPiBYMjU1MTkgUUNJQWFLL3MxcGdNWkVvazVJdjQ3MU5QRXBVNW02MVNNU3cxTWplNGQwVQpqYUQvaFpLRlBtRm1Ha0k0M2w5eTBUNU9SeFkrUURjVldzRGE5SnRCSkJBCi0+IFgyNTUxOSA0MlFLVlNjdFdrMU1ONVUvQ05WN3hodFlSeXlKdjNweTBKTDdRWkRDUFNZCmRhTnh6RFFtVHk1bVZKbm5jWDMvKzM1UlBHVDJXK0htTW5rMHhVMkdMM3cKLT4gWDI1NTE5IE1JOEliVHNobjNHZHppQk1ZaXRsbjZ5TTg3Njg2bWlQUUwwekVIZ0NEQ3cKOTQrUXpMdng0TENHM0JVajlsbnFVNE5Odk5hOVFpc0hEc0hwOEVvdU5GbwotPiBsRjdbdVlMXi1ncmVhc2UgQjIlYnIxCll5WFhranVIeHl1K3VmSWtoUThzSEJOS21KMHoreXR4NlVKQndCOExkWEdUeEJMMmRaTkJtelZXM29hdG5OTDYKVDVqWTRWV0p0ZwotLS0gcTloL0JBZjMvdU5PMmhoMStKMWN5RkpVN09mK0owM3AvaHlZZGdCUWdBZwqBsxn4QUSln/EowMwOPeE/8vBi+s3Kl4COwP8eKONs1nTtjlPaQf6nQneEIFejBuCoGSCIKu+Rt5n7XvnbLQ==]() {
         use std::time::{SystemTime, UNIX_EPOCH};
         let dir = tempfile::tempdir().unwrap();
         let policy_path = dir.path().join("dracon-sync.toml");
@@ -5304,7 +5421,7 @@ mod tests {
     }
 
     #[test]
-    fn build_recent_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBEZkFlcEhDYXgzWDljcEtkWHNzTG5BdU9GeWxGakxQUTB2TGlnaTMzRlJnCkhYcjE4andpV0QzTFhjV1ZkcUtZb2RVUkQvMjBVTFczaDNVWWNxSHNYeHcKLT4gWDI1NTE5IHgzZnRsdFQyRS9VR1NHUGdGemNYeWdhdFFSRHJMVk9STCtpMWYyaFhxRWcKMTF0Zm9vMG9xZ24wdWMyVmN2OHRta08vYjBWOC95VU1YeTdVSXJSQUI4QQotPiBYMjU1MTkgT2V2TUlhZktBS09YTWVSOFM4d043cWR4QXgxS3pkQTA3WDhDWEtPeSswRQpEK2drWk5WTkR6aHVwdmg1VTBoOWFqb2FPamY4cDNSTG13V3B3NW9Tc3Q0Ci0+IFgyNTUxOSBpc1NUNnNQVzRqdTRGd3ZoSDZ6QmxYM0l0clhJaHhnM0lhV2FWWGtwdjJBCjFUR1d1RW9Rby9neW50SW9Yck5seUQ5QjJWZ2wzZFhYK05SeEIxL1o1YjAKLT4gWDI1NTE5IG05UzExbkVMSEYyZWorZVlCT2tZQW1YLzEybmdwanoyRktQMmhQNGNUaWMKRVQ5ZkhuQzNXOTM0eHNtTnBhWWdKWW5UNDNxTVJTVm1BWWpiUG1sQVg5VQotPiBnfi1ncmVhc2UgTF96LFtmIHQjb0EgcHRhCkR4ejZ2U1BXYjFnVGVrVFpGRmUzdSthTDd6cXlUbVkKLS0tIDBENGk0Z2dYU3Jabk42THg1TlVZWWdUUkt0d2FuRjJ0UkY1cUcxYXIvUE0K3wptMgpGYzd+3L5+lOviGI5D2Mk1NlaV060t5VStoFv/lopMkpf747SPqTfJp2UTXDIllHAV3kTpGFL6I4tMj6TP]() {
+    fn build_recent_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBzd2NnVjdTTFRUWUJLMGNzK3VBbXArNFBUOVI3SnRncUk4Z3FoeUpaeENnCnZPdklveTNDdUJ2V0VHbWNRQ09ENTFSSEpndEIydHAvRDcvcGoxK09nVUkKLT4gWDI1NTE5IEVtN0dTeCtmRFZDaThPeWFJMUFrUU00NE13Ukd0dWNDbm1yS1ByVS80RUUKb3o5KzdQZ3V4WDd2VlRBTkJ2REtZZkVvYzF6K24rM2djMkE3d2tiV2prZwotPiBYMjU1MTkgdmhwNm5YbThuOWwxTlNZdnZpeDR2OFREQTVVcXBsditMYzB1MmFxbENBRQpuODlBak8zNEgxalFhWEdEenhSeXZ0WGxZVTJ5MVBsRTdBMk40ZkMycXNVCi0+IFgyNTUxOSBLRzRYMDFqbVVmZCtoa0R5Nm5CWmQ2bmV1Z3A2d1ZPS0lHSnlYcXZlc0RZCnN0akJFRVVMbkNhQU9reU9VYnhPYW5URlgyYU4vajByYlYzWExZME54cFUKLT4gWDI1NTE5IDViMVRYSVJ4ejF4R2lxbTRBaEo3aWpsNklValh1VGhGakdPQTFlZTFUUVEKZDZVeDhCNGM2dXZCSmpsbkJncUcybndGYzJLeDVOOTEvbkUrT3Q0RXdtMAotPiAuLWdyZWFzZSAsIFZWWUJ+IDpMOElSQ3cxIG1tKjp4OkZHCi9UUVVpY0ZPL1c1elZ4cGZxWWZLTzNZakhkZUcxeUpiNjJRaDVOdGJkb0lxczV3VENuSXNiSHVFWVRLdFZ6RHEKeTVpR2FHOHJ0OWpNV29kZEUwUFpjc2wwWk5hZ3lhdwotLS0gVC9RVTNITTd5a3h3RHBuRnB6VFVSVWZZcmVNLzZJYXNIYVMvSmtmY0xhQQr9gmT2oI7wlIBpvXhbrSIJ2Sm8R1IJPUivmZPOBIU7SMYNmmwuJyjJBTHlVoYpPKNVSAOTjp0juXC9Kgi//pl6gOE=]() {
         let dir = tempfile::tempdir().unwrap();
         let policy_path = dir.path().join("dracon-sync.toml");
         let ledger_path = dir.path().join("missing-ledger.jsonl");
