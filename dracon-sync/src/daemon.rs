@@ -254,7 +254,7 @@ mod tests {
     }
 
     #[test]
-    fn test_record_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAxL3U2MDJENmQzdmVQRElMQUZhUkV1R21Ec29rdEx3RjYzaEp2WVdhQXlVCk9ZcTl1bVhQaUZ6cVpnaTNESlNmc3owVkFxSzZhd3YySnJSamk2SVFqSDAKLT4gWDI1NTE5IHZ1aS9tZTk3R2dPdXBxRmVRUEZVNDJldmd4NWY3Um0xTXZBM2sxMjRjbG8KdkNzZVpEVjVwdFdLRCtjSFdkRmY0aW9RMXJNOEh5dVpOUi85TFg2K3grVQotPiBYMjU1MTkgRFJpMmpLS29Ob2l1VEl6ZS9xakdXYkxTU2hjZXBTNVY1QTdrdVBSYmtFOApUSjNGUW84TUxlSGk2V2pxbVpYUEFRMk9BUGl6VWgwQms3WlNRUFJvVENnCi0+IFgyNTUxOSBGZXd3UGJBSHZhT2ZsZTZrcW9aQjR4d2FobEZ1UFpFd2RZN3UydW53K21jCmQ2VmJsOFc5NVNoT09iZVFzV0hUQlVDQkdlTXlMZFFHMVhFbmRQWUswSWMKLT4gWDI1NTE5IHduZGozdHhKM1JCdHhHNFV0SU8veGh5bHhrSHJHUWNPdGExWmNkL3gralUKWHBJdGpKWS9CcU96dGZqTEkxbDViQnpsNWFYd3FwbEo5SGFVVU04NnNCbwotPiB1LWdyZWFzZSBSIGx0TXU+ClZ3TkcrRTFLbGRNSnBVU2U3MTlYS2V5S1lNTWdmRkFsOURKZWdMeDA1MmRxZlVNZ3VnRTZ0S2R4UGlueTJncnQKWm9Gc2VLWE8ydEFDbncKLS0tIG1Tekw5ZFVRdXRJN1RuOEJnSU9IcUdxN0lpa0M3WHYwQUs2WVdYaHFWZkUKGxjdBJVpC2huFsIVvYUzCtp6GpYlhdltR2GiZCDx3QBexJO57W/iGTq5rU4HKzC+KIBHY4r6ZoOVj84IrXCoL3kF]() {
+    fn test_record_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBWd002ZjRkRWpyZCtQcHFCUmc4Yy9jQWlhaHd2WG56VXNnR3FURitWalFNCmZTQTlVMnVzVEpJNFZrVkNoeFdsd3lFMFlOWCs0dXRjZjY4VkxxREhVWkEKLT4gWDI1NTE5IDdpZis3cmI1NFFmSFN5OXhkUlJlVEhxeHNYYWVBcVhwcU5mZGNmVVVCQ1UKQktNeTFMQWFLZnFwSFA4bUI4d1BnSUZYSGlLd2I3Y3lDL1ZnbXJVcU9EVQotPiBYMjU1MTkgSW1vTVBKZ1hGOGp2cmZPNkxxcXd0N2pVWVJMeTh5eFZmT1Mzc1Fpcm93TQpidzd5TGRiUlZzT2pXZzRJL1UyQWFhcDJrQ09IKzBsbE90b1VEd1MwbXowCi0+IFgyNTUxOSBiSHRnK1FhVDI0Qi8vV3RJbkVvQU9hcTFJQUY5YW53UG4zV2N3NzNYMG1NCjNxVzdlWG5FWmZmMDBKenpPM1BLRUNLR1p6b0d4Y3dpeElYNG9VQ0YvS28KLT4gWDI1NTE5IG5idFphTWNWZVRJYm13MGpzNEFGQSt6anMvWmd1WVYyRG5oTHpLQkhWdzAKeHhYNXVCTjNrc2MwalhnQTdmejFldjZqcDZ4cEUzMlJtWTJGM2lNcjlsZwotPiAnWi1ncmVhc2UgJCBYQiUlSQpMd3BLR0hoK0dRRXJZemdUUDZXUFFpNnpBMEpsTmIyZ3NhU0sxRkVoK3k3ZERncDVYams0bG5lclpTSkNOUnM1Cmlub0lsMmR3Y0pWcFV6NzVja0hGamU0MjdwbFhkQXBobUk4cVJ1bzAKLS0tIHJub3ZhZkpKb1l3VFVoZUR5eTBiN1B6MXNRaVh1MFlMcmZBRjZBWno4M3MK7NLhn2XfCK0Nqy0pORaCFZQa5ppikvejcdpOV4xYxVkXIfawlY2pjq6UymvcHtgPj4qLOhEQ+CoNKXDtTevcUxYe]() {
         let repo = make_test_repo_path("failure-increments");
         // Ensure clean state
         let _ = crate::daemon::unstuck_repo(&repo);
@@ -289,7 +289,7 @@ mod tests {
     }
 
     #[test]
-    fn test_record_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA5L3dlVE9qbTFjNThrR1NTcy9VWFAxd0x4YTVYajh1VzhnWTdYS2NiMWhNCmxrbTk2UGxKUmhQL3BaVC9nSXcxbkR0Umc0ODJTejNRdVlkcEhYNS81VlUKLT4gWDI1NTE5IGFGdjdocDlCSXk1aTgvUG5SMTNBMXR0czE0cFZseHpKQXRCS0xhQWNpaXMKZnJuUkQwVUlpcTNZZTBQOTRHUnl3VllNMTh0cld3Y2FCV2xHcmlJY0J5bwotPiBYMjU1MTkgR2RoLzRZNnlvcWh6alovcWZrY1hqU2tkN0hkakd4azFzQWdtd2R5RWxUSQo2dWRmUk0yc2gwUVRuWERodUMxT1ZrYUVGUlRZVFZRSUcveUJ0RkN1MC8wCi0+IFgyNTUxOSB1NHJxZ2JmdXFWa2xaMjcwSW91d3F5c1kvRlJpMTMrZUZ6NmRTeGNUNmpBCjRwenlCdDQwM0J3MWtvR2pHTmc3SXFnYlB4ZHJpWVM0c1BQQzN6dXVVT1EKLT4gWDI1NTE5IDNLb3B3VENCaTVPbUM1U1BieHdEZElYTDZ6ZXM1MWxmVEVQYm5IZ2tpQVEKNGZEMUE3R1hLUCtwY3RPeUtPaThUcDcxbkU0bHZsSW9NaWhQU3RMY01XdwotPiB7bDt7LWdyZWFzZSBAWSxIJlJmcwpqZ2RLYWtLVVVxTlo2YkQwQUF2NExaTkdpaVhQdzdITFBnOFdpejIvZjhQTWhhOVRzVHVqdDlUeW1ML0piajN2CjVzcXNFQmFyOUZsMnFRNk9TNzJXN1d5SnY5dTNHK3BJaGcKLS0tIDFOYmw3ejRSUGMzNEwza01FRE9xNzJhc3NmWCtvVFExOEYrNi9XWGswbHcKciKZnRAtpArDPOMsI/1i5VR4Ocwa6w6bwKLjIKgHx3qqEDVikXwubkbO3PR6YMty2C3CwnIASiHxLNj0mYY=]() {
+    fn test_record_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBFc01RTGlkaGpnSFpzL01BVUorWCsvVzBDd085MHNOTlpTTEpMUEpwK2tjClkvblE5d3g3WU9nck9hNCtqUk5lMVFZY3lhU0p3V3gyVCtIYUVYeWU4YUEKLT4gWDI1NTE5IE5hNU8xM1RsekdNbHIzVzVIWStMZWtIYTAzcUQ1QmVSdXJrRExGWWthR1kKZ1J0V3pieVhnTUZmNmMxRlVXWlphN0JPZXIyekNURE4ySTFnVkwrL09qTQotPiBYMjU1MTkgZlI2ZzF5ZUgwQ01KYzhYWnZjTDJMdkk5TGlLanFCaWNnTEFVUFd1allGSQprbTExakRCRXdXVmc0Yk5FeU9pUG9KbVJFWDZ3UmhTdmFkUFZXenlybFFVCi0+IFgyNTUxOSBVeDhNbTJzY1JpdFNGc3BMaEdqdTJiait6Q2haWThlaWtLU05idHZOUVY0CmdEQXF0YWdjYTRpenB5TlF5dEZ4WEs4S0dWcnFqL3o2eU90R1dQRFNaTFkKLT4gWDI1NTE5IDNoMHRnZlIxZW0waG84ZGE5TFFjTFJKc1hIcXhnS1JoUHlKalR6a2RBeEkKQUZ3c1hyTm9NNU4zTzBSMzl0RXhNbDJHR1VINlpaRXVHMmlpamZ1cHB1MAotPiBaWj9NentrLWdyZWFzZSBVUDIrL2V1OCBPNWkgMUgvaEBrYiBKZAplZFU1VUo1c0N1T3dUYUs0RENyRHpPd0tJemZDQjhISUQ2d2hCc2pUSlZRSVVRQktFRng1emJ0VXRvYmVUZ0l2ClFFMDVhSUs5aXpENHN5RzRsM3VKUDYwWEVFN3MrZwotLS0gcm9LZHlEblNtUDA4bWZwa0tQa0U5THppWVlrR0xBTVRucE5IZ0tlME1VcwoGEbDZVi4DKf4LSf/QZZn5IZy7IRJ63d9asvzTUW/rHNbsRMog1+sqvWeWrn0x56pcOmiuLzCRd96TaG+bNw==]() {
         let repo = make_test_repo_path("first-call-stuck-since");
         let _ = crate::daemon::unstuck_repo(&repo);
 
@@ -707,6 +707,86 @@ fn load_stuck_push_repos() -> HashMap<PathBuf, StuckRepoEntry> {
         .map(|e| (e.path.clone(), e))
         .collect()
 }
+
+    // ── Tests for the new settling_max_delay_secs + DirtyMaxAgeAction + ownership ──
+
+    /// Verify the new policy fields default to safe values. A
+    /// regression here would mean a new release accidentally
+    /// changed the default for `auto_skip_unowned` (which MUST
+    /// stay `true` for safety) or `settling_max_delay_secs` (which
+    /// is the user-visible "auto-commit delay" knob).
+    #[test]
+    fn test_settling_max_delay_default_is_60() {
+        use crate::policy::{
+            default_dirty_max_age_action, default_min_commit_interval_secs,
+            default_settling_max_delay_secs,
+        };
+        assert_eq!(default_settling_max_delay_secs(), 60);
+        assert_eq!(default_min_commit_interval_secs(), 5);
+        assert_eq!(default_dirty_max_age_action(), crate::policy::DirtyMaxAgeAction::Commit);
+    }
+
+    /// Verify `auto_skip_unowned` defaults to `true` (safety
+    /// first). A regression here would silently disable the
+    /// ownership safety guard rail.
+    #[test]
+    fn test_auto_skip_unowned_default_is_true() {
+        use crate::policy::default_true;
+        assert!(default_true());
+    }
+
+    /// Verify the ownership detection works end-to-end on a real
+    /// test repo with an untrusted email.
+    #[test]
+    fn test_ownership_detection_end_to_end() {
+        use crate::ownership::{detect_ownership, OwnershipReport, TrustedSet};
+        use crate::test_helpers::create_test_repo;
+        let repo = create_test_repo();
+        let trusted = TrustedSet {
+            emails: vec!["dracsharp@gmail.com".to_string()],
+            authors: vec!["DraconDev".to_string()],
+            remote_hosts: vec!["github.com/DraconDev".to_string()],
+        };
+        // Override the trusted list to one the actual email
+        // is NOT in → expect Unowned with reason
+        // `untrusted_email`.
+        let mut untrusted = trusted.clone();
+        untrusted.emails = vec!["definitely-not-our-email@void".to_string()];
+        let report = detect_ownership(&repo, &untrusted, None);
+        match report {
+            OwnershipReport::Unowned { reason, .. } => {
+                assert_eq!(reason, "untrusted_email");
+            }
+            other => panic!("expected Unowned, got {:?}", other),
+        }
+        // With the right trusted list, the override path
+        // always returns Owned.
+        let owned_report = detect_ownership(&repo, &trusted, Some(true));
+        assert!(matches!(owned_report, OwnershipReport::Owned { .. }));
+    }
+
+    /// Verify the per-repo override `auto_skip_unowned = false`
+    /// forces Unowned even on a fully-trusted repo.
+    #[test]
+    fn test_ownership_per_repo_override_forces_unowned() {
+        use crate::ownership::{detect_ownership, OwnershipReport, TrustedSet};
+        use crate::test_helpers::create_test_repo;
+        let repo = create_test_repo();
+        let trusted = TrustedSet {
+            emails: vec!["dracsharp@gmail.com".to_string()],
+            authors: vec!["DraconDev".to_string()],
+            remote_hosts: vec!["github.com/DraconDev".to_string()],
+        };
+        // With `owned = false` override on a fully-trusted
+        // repo, the result is Unowned with reason `override`.
+        let report = detect_ownership(&repo, &trusted, Some(false));
+        match report {
+            OwnershipReport::Unowned { reason, .. } => {
+                assert_eq!(reason, "override");
+            }
+            other => panic!("expected Unowned, got {:?}", other),
+        }
+    }
 
 fn save_stuck_push_repos(repos: &HashMap<PathBuf, StuckRepoEntry>) {
     let path = stuck_repos_path();

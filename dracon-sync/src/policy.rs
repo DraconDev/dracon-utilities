@@ -926,15 +926,15 @@ pub(crate) fn default_trusted_remote_hosts() -> Vec<String> {
     ]
 }
 
-fn default_settling_max_delay_secs() -> u64 {
+pub(crate) fn default_settling_max_delay_secs() -> u64 {
     60
 }
 
-fn default_min_commit_interval_secs() -> u64 {
+pub(crate) fn default_min_commit_interval_secs() -> u64 {
     5
 }
 
-fn default_dirty_max_age_action() -> DirtyMaxAgeAction {
+pub(crate) fn default_dirty_max_age_action() -> DirtyMaxAgeAction {
     DirtyMaxAgeAction::Commit
 }
 
@@ -1716,19 +1716,19 @@ mod tests {
         // both ways. The TOML is "commit" (or
         // "warn" or "ignore") and the Rust enum is
         // `Commit` / `Warn` / `Ignore`.
-        let toml = "[section]\naction = \"warn\"\n";
         #[derive(serde::Deserialize)]
         struct Wrap {
             action: DirtyMaxAgeAction,
         }
+        let toml = "action = \"warn\"\n";
         let w: Wrap = toml::from_str(toml).expect("parse warn");
         assert_eq!(w.action, DirtyMaxAgeAction::Warn);
 
-        let toml = "[section]\naction = \"commit\"\n";
+        let toml = "action = \"commit\"\n";
         let w: Wrap = toml::from_str(toml).expect("parse commit");
         assert_eq!(w.action, DirtyMaxAgeAction::Commit);
 
-        let toml = "[section]\naction = \"ignore\"\n";
+        let toml = "action = \"ignore\"\n";
         let w: Wrap = toml::from_str(toml).expect("parse ignore");
         assert_eq!(w.action, DirtyMaxAgeAction::Ignore);
     }
