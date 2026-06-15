@@ -1271,6 +1271,7 @@ pub(crate) async fn run_daemon(
                     &excluded_dir_names,
                     &policy.exclude_file_patterns,
                     policy.max_stage_file_bytes,
+                    &policy.auto_commit_exclude_patterns,
                 );
                 if !dirty {
                     activity.remove(&repo);

@@ -229,7 +229,8 @@ mod tests {
             &entries,
             &excluded,
             &[],
-            100 * 1024 * 1024
+            100 * 1024 * 1024,
+            &[],
         ));
     }
 
@@ -246,7 +247,7 @@ mod tests {
         )];
         let excluded: BTreeSet<String> = ["target".to_string()].into_iter().collect();
         assert!(
-            !has_sync_relevant_dirty_entries(repo, &entries, &excluded, &[], 100 * 1024 * 1024),
+            !has_sync_relevant_dirty_entries(repo, &entries, &excluded, &[], 100 * 1024 * 1024, &[]),
             "untracked file in excluded dir should be ignored (not large, not restorable)"
         );
     }
@@ -262,7 +263,8 @@ mod tests {
             &entries,
             &excluded,
             &[],
-            100 * 1024 * 1024
+            100 * 1024 * 1024,
+            &[],
         ));
     }
 
