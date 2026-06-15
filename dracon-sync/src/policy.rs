@@ -649,6 +649,13 @@ pub(crate) struct RepoPolicyOverride {
     /// the global value.
     #[serde(default)]
     pub(crate) cold_commit_minutes: Option<u64>,
+    /// Per-repo list of glob patterns for TRACKED files the daemon
+    /// should NOT auto-commit. See
+    /// [`SyncPolicy::auto_commit_exclude_patterns`]. None means
+    /// inherit the global value. Each entry is a glob
+    /// (e.g. `"**/test-results/**"` or `"*.log"`).
+    #[serde(default)]
+    pub(crate) auto_commit_exclude_patterns: Option<Vec<String>>,
 }
 
 pub(crate) fn default_true() -> bool {

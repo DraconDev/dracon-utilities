@@ -197,6 +197,22 @@ untracked_exclude_patterns = [
     "*.mov",
 ]
 
+# Per-repo override for tracked files the daemon should NEVER auto-
+# commit. Like `untracked_exclude_patterns`, this is a glob-style list,
+# but it applies to MODIFICATIONS of already-tracked files too.
+#
+# Use case: a repo has 372 Playwright screenshots in
+# `web/test-results/` that are force-tracked by the `.gitignore`
+# allowlist (`!*.png`). Every test run modifies them, and the daemon
+# auto-commits each modification, creating a moving target the push
+# can never resolve. Setting this field in the repo's
+# `.dracon/dracon-sync.toml`:
+#
+#   auto_commit_exclude_patterns = ["**/test-results/**"]
+#
+# tells the daemon to skip those files entirely. Manual `git add`
+# still works. Default: empty (opt-in per repo).
+
 # Skip staging files larger than 50 MiB during auto-commit.
 max_stage_file_bytes = 52428800
 
@@ -284,7 +300,7 @@ auto_create = false
 # [[publish_targets]]
 # name = "crates-io"
 # registry = "crates-io"          # crates-io | npm | pypi
-# [DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSByUVNqczg1Z2hZdjUyOHErSkxnc2txMmpNQlpJU3NIRnFleVM1TS83UldzCkJWUDVBSEhJQzU4QmVUanpqOHdHZkFzOHpZaXUxODMrcVVjYWhVQVh0aUEKLT4gWDI1NTE5IFZoRTQ2Y1hicFlxMzk4T0lSUnEwY2VwTXlrTzE3eCtuL0x5R2ZoYWcxVU0KZlhpZjc3YVY5UXQ1WDNTSEtmZElNTXhXNWRibGJqQkppaUZiZUVzMkJLTQotPiBYMjU1MTkgUVRqN0tHSW5MaTRMOWVBWjVDcXIva2FnQkpsT2ZBc3lGRWkzbXd0RkxqYwo3QTZzUEpsQkdCSDhyZS9MTHB1UHo2NmFOcDN0ajFWdG8xekhIa0V1eEo0Ci0+IFgyNTUxOSBvM1pCK3N0MUR4UktxSWVqSlM1V29ONmxrbC8yYVR6Y1p0Vzh0OGlSc1M4CndZcUxtWm1WOXNrRHBYcU9wSyt6NWVDemZObE92QnA4N1JYSFRBZlA4aHcKLT4gWDI1NTE5IFBNMzdqTnJJMDc3WmxjRnhGd09kODMrdHNPMzlOcVZLdUhuTjZlL3NwRFkKRWRSQ3NBaUl5STFHcENDbFpCL01vaXkrKzUrK2JMUTM1TXVBVHV2dWdBbwotPiAyQnAmLWdyZWFzZSBCdUlpTHAKZURJQlJnWms2KzBZVUxYWDlJd0FIZytHREdYNUJtUVlVQXNHOHZ5aldmWmZQVERyWDk4Ci0tLSBhcE9vRE5wbjEwMEVjTmZSSW1xL3ZBWWFsV3RmWG01Qkd5WDFqNTFibFpjCt2M5RDG/LQq5w3vR0HCxdQ1aytC5ons9e+9EWU1GDxkxwrW1JnOpJiKS/w1pnREVnnXEAfW17gWmTXgIrP3d32vGOj6Dg==]   # env var name (token in secrets/cratesio.env)
+# [DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA2cVAyeUFTTDhDZWZkR00yY2t4eE5jYStLeWZlbWI1aTlpOUJrYkU5S3djCjRHby8yczJ4QVpTM2RLUmw3ZU9xUEhtWTdSSy8vS3ZCWnBDN29hakd2MzQKLT4gWDI1NTE5IHliZ2xyQ0YrRTNnVjBSaGJmaUFKbERjakswYjJlRlp2VE9jRUdPay9TaVkKeS84OFgvOUpJUC9EdytaZ3pSSUVSK1pyTHp2SFdheERjOTVnZWR2QjFsUQotPiBYMjU1MTkgVkpFMzNMZEFHZWZzV3VJTUxVMjRqakE5Rkw1QTczTWpNTkY1MCtPdlhUWQpMOW5ZYnBvMk00MXpPVHQ5UTEzblRVcjc5eVJqcjBJL2Uwam9JeFdBdVA4Ci0+IFgyNTUxOSBZNVFhTXk1eG5FbUI5T003cDVzbmlUc1piNWRHQVE2dy9mWkVEc2VkOFZrCjducHE5bXVMWkNzdHFDVWJZakN6a0ZQZy9BR0lyQk1nTFBlUjl3Q2g4Z3cKLT4gWDI1NTE5IGE0MCsxaWdnN0NKZWxhQjRpV09GT2daTVFGVHlGMzM2Z2R6eWVQTWxDUUUKYVZ1VkhZaWhNajF2ZDljdkZMeGI3UmFpalVlTmd4VmdkVHdaU2RVMFU1TQotPiBqekdZXC1ncmVhc2UgKWEKTVp6STZuNjRoTmNYTzFjS1czOW9hdGdyUE9sQnNZQzhBMXd6UjRCRkdJQklCVCtldldNU2UvVG1NYmVCb1JERQpmZGIzCi0tLSBtaFVmTUM4MVNqek9aYTNxWEJzbTBZQ2RJR0VaZXYweTgwTFF1OWV0d0hFCksPuBPeRaslwRLC3JoVRX57KWdKyxdIukrCWXyI7QdtQhOsUBKpRyDSkQsih/ve5qDICT5GzU/EGCSQN4Kyya8tmHc6hA==]   # env var name (token in secrets/cratesio.env)
 # publish_timeout_secs = 300
 #
 # [[publish_targets]]

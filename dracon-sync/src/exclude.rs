@@ -2,7 +2,7 @@ use anyhow::Result;
 use std::collections::BTreeSet;
 use std::path::Path;
 
-use crate::policy::SyncPolicy;
+use crate::policy::{debug_enabled, SyncPolicy};
 
 pub(crate) fn normalized_dir_name(value: &str) -> String {
     value.trim_matches('/').to_ascii_lowercase()
@@ -377,6 +377,80 @@ mod tests {
         let path3 = std::path::Path::new("data.rs");
         assert!(!is_excluded_file(path3, &patterns));
     }
+
+    // ============================================================
+    // should_stage_entry: auto_commit_exclude_patterns tests
+    // ============================================================
+
+    fn make_modified_entry(path: &str) -> dracon_git::types::DiffFile {
+        use dracon_git::types::{DiffFile, FileStatus};
+        DiffFile::new(PathBuf::from(path), FileStatus::Modified)
+    }
+
+    #[test]
+    fn test_should_stage_entry_tracked_modified_excluded_by_pattern() {
+        // A tracked, modified file matching the per-repo
+        // auto_commit_exclude_patterns should NOT be staged.
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path();
+        std::fs::create_dir_all(repo.join("web/test-results")).unwrap();
+        std::fs::write(repo.join("web/test-results/slice13.png"), b"PNGDATA").unwrap();
+        let entry = make_modified_entry("web/test-results/slice13.png");
+        let excluded: BTreeSet<String> = BTreeSet::new();
+        let patterns = vec!["**/test-results/**".to_string()];
+        assert!(
+            !should_stage_entry(
+                repo,
+                &entry,
+                &excluded,
+                &[],
+                100 * 1024 * 1024,
+                &patterns,
+            ),
+            "test-results PNG should be excluded by auto_commit_exclude_patterns"
+        );
+    }
+
+    #[test]
+    fn test_should_stage_entry_tracked_modified_no_match() {
+        // A tracked, modified file that does NOT match the pattern
+        // should still be staged.
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path();
+        std::fs::create_dir_all(repo.join("src")).unwrap();
+        std::fs::write(repo.join("src/main.rs"), b"fn main(){}").unwrap();
+        let entry = make_modified_entry("src/main.rs");
+        let excluded: BTreeSet<String> = BTreeSet::new();
+        let patterns = vec!["**/test-results/**".to_string()];
+        assert!(should_stage_entry(
+            repo,
+            &entry,
+            &excluded,
+            &[],
+            100 * 1024 * 1024,
+            &patterns,
+        ));
+    }
+
+    #[test]
+    fn test_should_stage_entry_empty_patterns_list() {
+        // Empty patterns list should behave the same as before the
+        // change: files are staged unless excluded by other means.
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path();
+        std::fs::create_dir_all(repo.join("src")).unwrap();
+        std::fs::write(repo.join("src/main.rs"), b"fn main(){}").unwrap();
+        let entry = make_modified_entry("src/main.rs");
+        let excluded: BTreeSet<String> = BTreeSet::new();
+        assert!(should_stage_entry(
+            repo,
+            &entry,
+            &excluded,
+            &[],
+            100 * 1024 * 1024,
+            &[],
+        ));
+    }
 }
 
 pub(crate) fn is_excluded_dir_name(name: &str, excluded_dir_names: &BTreeSet<String>) -> bool {
@@ -535,12 +609,33 @@ pub(crate) fn should_stage_entry(
     excluded_dir_names: &BTreeSet<String>,
     excluded_file_patterns: &[String],
     max_stage_file_bytes: u64,
+    auto_commit_exclude_patterns: &[String],
 ) -> bool {
     if is_excluded_change_path(&entry.path, excluded_dir_names) {
         return false;
     }
 
     if is_excluded_file(&entry.path, excluded_file_patterns) {
+        return false;
+    }
+
+    // Per-repo `auto_commit_exclude_patterns` lets the operator
+    // opt out of auto-commit for specific TRACKED file patterns
+    // (e.g. `web/test-results/*.png`). The matching is identical
+    // to `untracked_exclude_patterns` (basename + glob); it
+    // doesn't matter to the matcher whether the file is tracked
+    // or untracked. The key difference is this list applies to
+    // MODIFICATIONS too, not just newly-added files.
+    if !auto_commit_exclude_patterns.is_empty()
+        && matches_untracked_exclude(repo, &entry.path, auto_commit_exclude_patterns)
+    {
+        if debug_enabled() {
+            eprintln!(
+                "⏭️  {} skipping tracked {} (auto_commit_exclude_patterns)",
+                repo.display(),
+                entry.path.display()
+            );
+        }
         return false;
     }
 
@@ -840,6 +935,7 @@ pub(crate) fn has_sync_relevant_dirty_entries(
     excluded_dir_names: &BTreeSet<String>,
     excluded_file_patterns: &[String],
     max_stage_file_bytes: u64,
+    auto_commit_exclude_patterns: &[String],
 ) -> bool {
     entries.iter().any(|entry| {
         let full_path = repo.join(&entry.path);
@@ -855,6 +951,7 @@ pub(crate) fn has_sync_relevant_dirty_entries(
             excluded_dir_names,
             excluded_file_patterns,
             max_stage_file_bytes,
+            auto_commit_exclude_patterns,
         ) || can_restore_entry(repo, entry)
             || is_large_untracked(entry, repo, max_stage_file_bytes)
     })

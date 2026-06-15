@@ -1321,6 +1321,7 @@ pub(crate) async fn run_daemon(
                     &excluded_dir_names,
                     &policy.exclude_file_patterns,
                     policy.max_stage_file_bytes,
+                    &policy.auto_commit_exclude_patterns,
                 );
                 let has_local_or_pending_work =
                     dirty || status.ahead > 0 || status.behind > 0 || !has_origin || !has_upstream;
