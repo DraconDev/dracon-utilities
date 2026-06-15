@@ -155,10 +155,13 @@ exclude_dir_names = [
 ]
 
 # Exclude specific file patterns from auto-staging.
-exclude_file_patterns = [
-    "*.log",
-    "nohup.out"
-]
+# CHANGED 2026-06-15 (goal 9aaf0b08 / commit-all-policy): operator's
+# new policy is "commit all unless we have a super good reason to leave
+# it out like over 100 megs". Logs and DB files are now committed by
+# default. Use per-repo `auto_commit_exclude_patterns` if you need to
+# exclude patterns for a specific repo (e.g. Junk-Runner-bevy excludes
+# `**/test-results/**` to break a 2989-commit auto-commit loop).
+exclude_file_patterns = []
 
 # Auto-stage newly-created untracked files on the next sync cycle.
 # Defaults to true. The daemon stages untracked files (status=Added in
@@ -169,32 +172,27 @@ exclude_file_patterns = [
 auto_stage_untracked = true
 
 # Patterns for untracked files that should NEVER be auto-staged, even
-# when `auto_stage_untracked = true`. Defaults to safe patterns that
-# protect user notes, scratch research, local task state, and audit
-# evidence from accidental commits. Glob-style patterns with `**` are
-# supported (e.g. `**/scratch/**`, `**/note.md`).
+# when `auto_stage_untracked = true`.
+#
+# CHANGED 2026-06-15 (commit-all-policy): the default is now MINIMAL.
+# Only session-scratch patterns remain — everything else (audit
+# evidence, screenshots, media files, notes) is committed by default
+# under the operator's "commit all unless super-good reason" policy.
+# Glob-style patterns with `**` are supported (e.g. `**/scratch/**`).
+# To extend the list per-repo, use `.dracon/dracon-sync.toml` in the
+# repo root with `auto_commit_exclude_patterns = [...]`.
 untracked_exclude_patterns = [
-    "**/note.md",
-    "**/notes.md",
     "**/scratch/**",
     "**/scratch-*",
     "**/scratch_*",
     "**/tmp/**",
     "**/tmp-*",
+    "**/pi-tmp/**",
+    "**/.pi-tmp/**",
     "**/research/scratch/**",
     ".demon/**",
     ".sisyphus/**",
     ".ralph/**",
-    "**/audit/**",
-    "**/evidence/**",
-    "**/screenshots/**",
-    "*.png",
-    "*.jpg",
-    "*.jpeg",
-    "*.gif",
-    "*.webp",
-    "*.mp4",
-    "*.mov",
 ]
 
 # Per-repo override for tracked files the daemon should NEVER auto-
@@ -300,7 +298,7 @@ auto_create = false
 # [[publish_targets]]
 # name = "crates-io"
 # registry = "crates-io"          # crates-io | npm | pypi
-# [DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBmcEZyc0FxVEJYeFh2MXB6MUpoTWQreVNYeW42RUd5ZE94SkV0Sjl1RkcwCmExbm5WVVVPUzRPMlZQUkFiZEdNZHJRYlhBY3NjY1pZZDFucVRhenN4MUkKLT4gWDI1NTE5IEZZY0xDT3pLOW1sTHlBWlFDR0RNcUNrU2ZySjVCWS94OHdMZzJES0FHQ0kKdjBrTUgxd1RMYW95RjkwR2k2eFpTTm00MzRvNldoVytTclQ0eHJ6cy85TQotPiBYMjU1MTkgMTRXbW9VOTJYck9wK2NiTHNPVkltajdpZWhiMTVXV0Y0Vm00WnUwcmhVSQpuSzhWcm5FL0ZPMHJaYWY1ZUhDOTlsWE1NZXBueTdzdkJQWHVXbWkyc0lvCi0+IFgyNTUxOSB6MkZWM2R1TGJNcnliTHhnY0ZndWRIS2Y2RWUvUXhvTE8vcUNiaDROZWpjCm1VSVc2eTZZT3VvQWdRTzFrRXZraWJjSEpRU3VWRlRhZUFWQWdTOVRUM0kKLT4gWDI1NTE5IDVBMFljeE9SMm9HMmxGY0NhVlNSaTZtVkN4WWFrWm5aeHdsL1BUU3JqWDAKTzZRRHhqaU1Pc1gvVDhJVjcrSHJTYi9UQU9sYXBRM3ZQeWlYNU9MSm5ubwotPiBWSzhpKi1ncmVhc2UgciBSMDhwXi4KZ3FvenA1MHRWN2xla0RaUXJzZjZ1UnM4a2JHSHYydFduN24rRFhaaE1mQmJ4L2tyUkxVTU5YUWNGQ0RhN0NkVgoyUQotLS0gMExQYllnTDh0c1VYN3NiWkRhOElXaTM5MlQ4TkF1bFRTMzdiekxsMXZsTQrRR5B13SZGbQm/drMby9ag9ARqpERblAvmsVu8+Qlo6Ba3I2ibhkL/2rj/dXuPGkUdYESXkd9zExVAvQkSfBWTiQXkjqs=]   # env var name (token in secrets/cratesio.env)
+# [DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSArcGxzRmdnTXMxQTJma3E5d3dKUE1ldlFyWHBPaTIrY1pxUDIyQ0pxM0hRClg5Q3grY2E0dkxLTXY3bGNoUkNtZnJ0dmJTTjJwRDFaSmlOSC9PL1ZDYkUKLT4gWDI1NTE5IHAxamRJUFJHbEFOTnYwaTYzTU9uam9peTNHc3EzZGt6S2c0QnhxRG5rWHMKVThJQlBkaXNiZmFVUGRJQy9mTDExWURvVzJMMFcxSk5KdTBvOWMvZEhWZwotPiBYMjU1MTkgdFkrL09hb1U2UWhNbCswbGlJWHZkbWs3RUdNSU1paTRHL2hueHFBQ25RYwowZldWS0Vydys2OE8yeEhvcDduUU9TV1MzZFIxL2FkTWptMytGMzV6aS9jCi0+IFgyNTUxOSBVYkRKTWM3S0RaTDVCNHFGbVBnem4rY0JqSFpMYzQrcUFXcDd5a3RJNTI4ClJJU2o3Y3dSL2RiZzlJOWdPdlg4ZHVoeGVnaE1POWN5U2RkY0xJM1lVcDgKLT4gWDI1NTE5IDFmbG5URnROWHNacS9RVnNmQnlhUlljQk5iZmVwb3AwZmZuUzR5VXNNbVEKOW5jL004MXcyOEpMWnJQbHNkNnVzaEpDUnA0bk5uR1hKQy81enZMWTFEUQotPiBnclAsSi1ncmVhc2Ugc20/CmllRXVHckFuenBqenN2eDQ2dm8zdUhQN2l0dy9VcmsKLS0tIHR1ZmdNUGt1VWpZbTVhWHFHRkxLU05QQUUyK0EyUC9JRGorM0hBQW9RK0UKtmZjmsOCYT/9fs1Qpjrx4FhT5wo4Q9Yl/LaikkWoVgTnMJq2LSSdG4upe/RpkvEcm/HqfNIwBNIwxUDjaA2mQ1As4R9t]   # env var name (token in secrets/cratesio.env)
 # publish_timeout_secs = 300
 #
 # [[publish_targets]]
