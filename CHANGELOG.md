@@ -8,6 +8,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Push retry budget + push-stuck state**: the daemon now
+  tracks `consecutive_failures` and `last_error` per stuck
+  push repo in the on-disk
+  `dracon-sync-stuck-push-repos.json` ledger. When
+  `consecutive_failures >= push_max_retries` (default 5),
+  the ACTIVITY column shows `🛑 push-stuck Xm (N ahead)`
+  and the HINT column surfaces the actual `git push` error
+  message (e.g. "Permission to gi-dellav/zerostack.git
+  denied to DraconDev") with a `repair-concerns --apply`
+  hint. The previous behavior was an opaque `🟣 pushing Xm`
+  that could stay for days without telling the operator WHY
+  the push wasn't landing. 3 new unit tests for the
+  record/success/failure paths and 1 new ACTIVITY test
+  for the push-stuck label. 9 new field tests for the
+  `StuckRepoEntry` serde backward-compat (the new
+  `consecutive_failures` / `last_error` / `last_error_at`
+  fields default-fill from older JSON files).
+
+- **Tightened in_flight staleness filter**: the on-disk
+  `dracon-sync-in-flight.json` is now treated as stale
+  after 5 seconds (was 30 seconds). The 30s window was
+  leaking false `🔄 now` indicators on OK/idle/synced
+  repos because the daemon writes the file every 1s and
+  any entry from the past 30s was treated as "in flight".
+  Combined with a new state-based suppression
+  (`Synced`/`Idle`/`Cold`/`Untracked`/`Healthy` rows
+  never show `🔄 now` even if the in_flight file lists
+  them), the `🔄 now` indicator now reflects ground truth
+  (the repo is currently being processed by a tokio task).
+  3 new unit tests cover the 10s-old-stale case, the
+  state-suppression case (Synced/Idle/Cold states never
+  show `🔄 now`), and the Dirty state still showing
+  `🔄 now` when legitimately in flight.
+
 - **Auto-commit backstop for moving-target repos**: when a repo
   has more than `auto_commit_backstop_threshold` (default 20)
   unpushed commits AND the push has been pending
