@@ -403,6 +403,26 @@ pub(crate) struct SyncPolicy {
     /// `dracon-sync.toml` to extend.
     #[serde(default = "default_untracked_exclude_patterns")]
     pub(crate) untracked_exclude_patterns: Vec<String>,
+    /// Glob patterns for TRACKED files that should NOT be auto-
+    /// staged by the daemon. Unlike `untracked_exclude_patterns`
+    /// (which only applies to newly-added files), this list applies
+    /// to ANY file the daemon considers staging — including
+    /// modifications to already-tracked files.
+    ///
+    /// Use case: a repo's `web/test-results/` directory has 372
+    /// Playwright screenshots that are force-tracked by the
+    /// `.gitignore` allowlist (`!*.png`). Playwright regenerates
+    /// these on every test run, and the daemon auto-commits them
+    /// — creating a moving target the daemon can never push.
+    /// Setting `auto_commit_exclude_patterns = ["**/test-results/**"]`
+    /// in the repo's `.dracon/dracon-sync.toml` tells the daemon
+    /// to skip those files entirely (manual `git add` still works).
+    ///
+    /// Defaults to empty: this is an opt-in per-repo mechanism. The
+    /// global `untracked_exclude_patterns` still applies to new
+    /// files; this only filters modifications to tracked files.
+    #[serde(default)]
+    pub(crate) auto_commit_exclude_patterns: Vec<String>,
     #[serde(default = "default_true")]
     pub(crate) auto_repair_concerns: bool,
     #[serde(default = "default_true")]
@@ -454,6 +474,18 @@ pub(crate) struct SyncPolicy {
     pub(crate) webhook_url: Option<String>,
     #[serde(default = "default_alert_unpushed_threshold")]
     pub(crate) alert_unpushed_threshold: usize,
+    /// When a repo has more than this many unpushed commits AND the push
+    /// has been pending (ahead_since) for more than
+    /// `auto_commit_backstop_min_age_secs`, the daemon stops auto-
+    /// committing and logs the backstop. This prevents the daemon from
+    /// creating a moving target while a push is failing. Set to 0 to
+    /// disable the backstop entirely. The ACTIVITY column shows
+    /// `⏸ backstop` for repos in this state so the operator can see
+    /// the daemon is intentionally pausing.
+    #[serde(default = "default_auto_commit_backstop_threshold")]
+    pub(crate) auto_commit_backstop_threshold: usize,
+    #[serde(default = "default_auto_commit_backstop_min_age_secs")]
+    pub(crate) auto_commit_backstop_min_age_secs: u64,
     #[serde(default)]
     pub(crate) sync_visibility: bool,
     #[serde(default = "default_sync_visibility_interval_hours")]
@@ -771,6 +803,14 @@ fn default_github_account() -> String {
 
 fn default_alert_unpushed_threshold() -> usize {
     10
+}
+
+fn default_auto_commit_backstop_threshold() -> usize {
+    20
+}
+
+fn default_auto_commit_backstop_min_age_secs() -> u64 {
+    300
 }
 
 fn default_sync_visibility_interval_hours() -> u64 {
@@ -1323,6 +1363,7 @@ pub(crate) fn test_sync_policy() -> SyncPolicy {
         auto_rewrite_large_blobs: true,
         auto_stage_untracked: true,
         untracked_exclude_patterns: default_untracked_exclude_patterns(),
+        auto_commit_exclude_patterns: Vec::new(),
         watch_roots: vec![],
         remotes: vec![],
         auto_github_private: false,
@@ -1341,6 +1382,8 @@ pub(crate) fn test_sync_policy() -> SyncPolicy {
         incident_ledger_max_age_days: 30,
         webhook_url: None,
         alert_unpushed_threshold: 10,
+        auto_commit_backstop_threshold: 20,
+        auto_commit_backstop_min_age_secs: 300,
         sync_visibility: false,
         sync_visibility_interval_hours: 24,
         sync_metadata: false,

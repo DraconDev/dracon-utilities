@@ -32,7 +32,7 @@ use crate::git::{
 };
 use crate::policy::{debug_enabled, freeze_reason, timestamp_secs, SyncPolicy};
 use crate::report::{run_repair_concerns, run_repair_warns, ConcernRepairFilter};
-use crate::sync::{sync_repo, SyncOutcome};
+use crate::sync::{sync_repo, sync_repo_with_ahead_since, SyncOutcome};
 
 const STUCK_REPO_EXPIRY_SECS: u64 = 24 * 60 * 60; // 24 hours
 
@@ -1439,6 +1439,7 @@ pub(crate) async fn run_daemon(
             let excluded_for_task = excluded_dir_names.clone();
             let policy_path_for_task = policy_path.clone();
             let repo_for_task = repo.clone();
+            let ahead_since_for_task = entry.ahead_since;
             // Mark the repo as having an in-flight task BEFORE
             // dispatching. The eligibility check at the top of the
             // next cycle consults `in_flight` and skips this repo
@@ -1449,7 +1450,7 @@ pub(crate) async fn run_daemon(
                 repo.clone(),
                 tokio::spawn(async move {
                     let mut rf = entry_rf;
-                    let r = sync_repo(
+                    let r = sync_repo_with_ahead_since(
                         &repo_for_task,
                         &policy_for_task,
                         &excluded_for_task,
@@ -1457,6 +1458,7 @@ pub(crate) async fn run_daemon(
                         Some(&mut rf),
                         false,
                         Some(&policy_path_for_task),
+                        ahead_since_for_task,
                     )
                     .await;
                     (rf, r)

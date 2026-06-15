@@ -52,6 +52,38 @@ pub(crate) async fn count_ahead_commits(repo: &Path) -> Result<u64> {
     Ok(stdout.trim().parse::<u64>().unwrap_or(0))
 }
 
+/// Check if the daemon's auto-commit backstop is active for a given
+/// repo. The backstop fires when a repo has more than
+/// `threshold` unpushed commits AND the push has been pending
+/// (ahead_since) for at least `min_age_secs` seconds.
+///
+/// When the backstop is active, the daemon should:
+/// - NOT auto-commit new changes (prevents moving target)
+/// - Log a backstop message so the operator can see why
+/// - Mark the ACTIVITY column as `⏸ backstop` so the report
+///   reflects the intentional pause
+///
+/// The operator can disable the backstop by setting
+/// `auto_commit_backstop_threshold = 0` in the policy.
+pub(crate) fn is_backstop_active(
+    ahead_since: Option<std::time::Instant>,
+    now: std::time::Instant,
+    ahead_count: usize,
+    threshold: usize,
+    min_age_secs: u64,
+) -> bool {
+    if threshold == 0 {
+        return false;
+    }
+    if ahead_count <= threshold {
+        return false;
+    }
+    let Some(since) = ahead_since else {
+        return false;
+    };
+    now.duration_since(since).as_secs() >= min_age_secs
+}
+
 /// Scale the configured `push_op_timeout_secs` with the local ahead
 /// count so a large 28-commit push doesn't time out at 60s.
 ///
@@ -101,6 +133,13 @@ struct SyncContext<'a> {
     #[allow(dead_code)]
     auto_bump_versions: bool,
     remote_failures: Option<&'a mut HashMap<String, usize>>,
+    /// When true, the daemon's auto-commit backstop is active for this
+    /// repo. The backstop fires when `ahead > threshold` AND
+    /// `push pending > min_age_secs` — see `is_backstop_active`. While
+    /// active, `sync_repo` skips auto-commit (the daemon logs the
+    /// backstop and returns `SyncOutcome::NothingToDo`). Manual commits
+    /// are unaffected.
+    backstop_active: bool,
 }
 
 fn notify_webhook_failure(webhook_url: &str, repo: &Path, remote: &str, error: &str) {
@@ -2152,7 +2191,7 @@ async fn stage_commit_and_push(
         // `ctx.remote_failures` (the caller passes a `&mut HashMap`).
         // The `tokio::spawn` fire-and-forget pattern was removed because
         // it bypassed the failure-tracking needed by callers like
-        // `test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBFL2hLWWxKT3lBdkdmRmtwRlVpZ2s3QjYwTEREaFpRVEdZVmFhZHVzYTE0Ci96bXIvZEVJdmoycWxTakNsMmZHclB3QWVMYkNkS0VsMXNGbGp5bDRTbFkKLT4gWDI1NTE5IHNkYjFFSi9BTUNoR3BMK2NnQUpYNjBlNVd2SkErZGh4eG1CS1ZpYW9kazAKZldMWkxSQ0s4SGV4Z2FQTWt0KytOL3crL3NRMW8xQ1F4clJoR21DMmNpUQotPiBYMjU1MTkgc0o0VVo0T2kwbTlIQXpiRTgzVDViTHl0cG8rSERtanNrdjJUM2NKYk5FNAo5ZWhpbUV5SlhESmdGWDIyOUFQNmlxamVlZmtoR2Z4a2EyZENXYUF0cXUwCi0+IFgyNTUxOSBaZE9BMzBPTkdXMmlNVGhZd01BVEJwQ2VrajF4Z2dkTTlxWFY5RmZEd0NNCmIyZjgyenhvQzBxbnNadS9NRHpETjlCMU9xUUQ2N1UycjF6bTFtQUpFZDQKLT4gWDI1NTE5IDNvTVYrT2tBVzVhQzF2b0JXTHVZQWZHNW44a2J0VS9yUG8wK3ZudXdLUU0Ka2QwUVM0MXdiZU1mbzd4dEZadUdqQWlBNGxsRzcxNFRvdG5LV0NrNlhJVQotPiBYSEs/YTktZ3JlYXNlIGpeLE8gQDpmcCBIawpjZmszdmZWZlRGRTZlN3Q0ZzhhZkpHaE4vc2hXczJYa1pTbFNwYU84UFdJeTFySHlHT09ydTV1QTRpWGtlcVNKCk9TMXNtMmJBTjg0Slc0WU8ydE1JWGJlUjMxaFNIeHRXCi0tLSB5U2lhbzdZa0tOT3VMRytubklER3RZZ0NxTG91RVBDQkJhcEpKVHRqTDZrCvubXife7oihomZuPbaFtCxk0XmRnv2Hr5RrLpym5+NsumgIoajGZkXvz3y1xHNCaZfYBQfR3o+nzQ==]`.
+        // `test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA2U0JHUzZqMERIa2RDZ1RZY0Vrc2FyelBHd0VJcTRIY2xPRVBBb1FOVGtNCldCN1ZOeU9sOGVHTTRxdTd2UUJkdzJuQjJIZUY5WjViWGJ0elREbFRkK0EKLT4gWDI1NTE5IDhQVEkwSGNEYWcrL052WDhCT0FWU0lIMUQ5aWlzTThOaU9ENnN0Sk5hbkkKelcyQ1hlWEwzRTNSSlF5UUtUYUNlL1F1RHZCMVJ5VWkwSm45MGtCNVRmOAotPiBYMjU1MTkgT2d1enRPeFVvakYvT3U4UXRuWkxOcFZ0ZE1RdmNFbzJocGFXWlI4SW55TQphY3VnTUJnbmp0ZnhVYnpVUjlkNVI4UC8vZWlrSWtwUHNoaTlTUjZCM1lJCi0+IFgyNTUxOSBiYjhxSzhza1I4aFBmRDViU3BPcW9nUnlmYWZXalZMWk5WNWRValVGb1hrCkNBVHBodUp3NXFodmgrR1BiWTBYb0lESVRQcGh2SEp3dm83dFlEOFduQVEKLT4gWDI1NTE5IFNMWHEvSVNYRkRlNWJwbGFhM29KMGluVGlueDJPMm95SVB2eTROUUZKSHMKbGxTQ1NBOHFKRFZGSHVrM3UwRjUxdzlMSllkRGx0cmlJWUNmNlJ0eE9JcwotPiBlLWdyZWFzZSBSJyYsIH1cXyBwIFwKaTZPakJwVmh0Q2xDUU1oNm5WMFdUdnVZM0owU3NuUHdFQS85cVpzWWp2dllRNlZiSHpGZldsMEgwUQotLS0gM3NKd3JvNSt1TTJRMm45K0o3WWEzY3JPeTQ4THRYRW1GSW9tbUkycVhTSQpKOs5RcFGfP/pxiA990oZeVUNKf9MOf5lBqw9PfB9SnnjgCHxrjWJ5qRggCfeNVaPSQ0I3KWZbbwc=]`.
         match push_background(repo, policy, ctx.remote_failures.as_deref_mut()).await {
             Ok(true) => {}
             Ok(false) => eprintln!("⚠️ push failed for {}", repo.display()),
@@ -2174,6 +2213,23 @@ pub(crate) async fn sync_repo(
     dry_run: bool,
     policy_path: Option<&Path>,
 ) -> Result<SyncOutcome> {
+    sync_repo_with_ahead_since(repo, policy, excluded_dir_names, idle_seconds, remote_failures, dry_run, policy_path, None).await
+}
+
+/// Like `sync_repo` but also takes the `ahead_since` instant from the
+/// daemon's activity map, so the auto-commit backstop can be computed
+/// inside `sync_repo`. Pass `None` from one-off callers (e.g.
+/// `dracon-sync once`); the daemon passes the activity map's value.
+pub(crate) async fn sync_repo_with_ahead_since(
+    repo: &Path,
+    policy: &SyncPolicy,
+    excluded_dir_names: &BTreeSet<String>,
+    idle_seconds: u64,
+    remote_failures: Option<&mut HashMap<String, usize>>,
+    dry_run: bool,
+    policy_path: Option<&Path>,
+    ahead_since: Option<std::time::Instant>,
+) -> Result<SyncOutcome> {
     let svc = GitService::new(repo)?;
     if !svc.is_git_repo().await? {
         if debug_enabled() {
@@ -2190,6 +2246,7 @@ pub(crate) async fn sync_repo(
             has_upstream: false,
             auto_bump_versions: false,
             remote_failures: None,
+            backstop_active: false,
         };
         maybe_sync_visibility_and_metadata(&ctx);
         return Ok(SyncOutcome::NothingToDo);
@@ -2207,6 +2264,7 @@ pub(crate) async fn sync_repo(
             has_upstream: false,
             auto_bump_versions: false,
             remote_failures: None,
+            backstop_active: false,
         };
         maybe_sync_visibility_and_metadata(&ctx);
         return Ok(blocked);
@@ -2250,6 +2308,28 @@ pub(crate) async fn sync_repo(
         .auto_bump_versions
         .unwrap_or(policy.auto_bump_versions);
 
+    // Compute the auto-commit backstop. The backstop fires when
+    // a repo has more than `auto_commit_backstop_threshold`
+    // unpushed commits AND the push has been pending
+    // (`ahead_since`) for at least
+    // `auto_commit_backstop_min_age_secs`. We check it here so the
+    // SyncContext has the flag for the auto_commit block below.
+    let backstop_active = is_backstop_active(
+        ahead_since,
+        std::time::Instant::now(),
+        initial_status.ahead,
+        policy.auto_commit_backstop_threshold,
+        policy.auto_commit_backstop_min_age_secs,
+    );
+    if backstop_active {
+        eprintln!(
+            "⏸️  daemon backstop: {} unpushed commits pending push >{}s, skipping auto-commit for {}",
+            initial_status.ahead,
+            policy.auto_commit_backstop_min_age_secs,
+            repo.display(),
+        );
+    }
+
     let mut ctx = SyncContext {
         repo,
         policy,
@@ -2261,6 +2341,7 @@ pub(crate) async fn sync_repo(
         has_upstream,
         auto_bump_versions,
         remote_failures,
+        backstop_active,
     };
 
     let copied_standard_files = if policy.standard_files_auto {
@@ -2317,6 +2398,17 @@ pub(crate) async fn sync_repo(
     }
 
     if !status.is_clean && policy.auto_commit {
+        // Auto-commit backstop: when the daemon detects a repo with
+        // many unpushed commits and a long-pending push, it stops
+        // auto-committing to prevent the moving-target problem (each
+        // new commit forces the daemon to retry the entire push from
+        // scratch). The backstop logs a `⏸️ daemon backstop` line at
+        // the top of `sync_repo`; here we honour it by short-
+        // circuiting the auto-commit step. Manual `git add`/`git
+        // commit` from the operator still works.
+        if ctx.backstop_active {
+            return Ok(SyncOutcome::NothingToDo);
+        }
         // When `auto_stage_untracked = false`, we need to know which
         // Added-status entries are untracked vs freshly-staged-tracked.
         // Build the tracked set once per sync_repo call.
@@ -2420,7 +2512,7 @@ async fn handle_ahead_push(ctx: &mut SyncContext<'_>, svc: &GitService) -> Resul
         // Push synchronously so mirror failures are tracked in
         // `ctx.remote_failures`. Previously this used `tokio::spawn`
         // (fire-and-forget), which made the failure tracking unreachable
-        // for callers like the test `test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBtLzBkc2EzejBBTEw3S2MzYWNZbmZDNUozdGJTRFFaaExDUnE1UkkxQm1FClhRWU1aUmdXMFpMOXk0dkRUbGZzS1l5ZkVzRU1WMkxnejBsV1dmdVRabG8KLT4gWDI1NTE5IEdGMjE2ZE9YMFkyeTNnV21PUTRuMEEyeEFoYld0d2pHb1FvOGVHQjNHWFUKbmxOWDN4d3l6cXExdnJwajEzM0kvazNJdldqaDNLblVRNWtXa1J6dUZhQQotPiBYMjU1MTkga1FnWG9oOW1EMjBrYWZBMXZZazMvd2hZVGVrV3llTWI5VXZIWUlRcTJRNAphWHc1clN3UXBURlQrVTV6bmxEWHAvYS9uYnlGR0NDanRISUlIenUvaXhJCi0+IFgyNTUxOSByeHRyZC8yVUlzUDEvVGRNNFpWREF1N0xsZWVXZWRFU0YzYS9FbHpNZWh3CjQ4cEs0NjFDY0RUeUlVV1FTSENFZkFxRTRCczRqN0RWVHRxZjhDYjUxSEEKLT4gWDI1NTE5IEx4SmtBZFhDV1RBOFJyeWU2S0Exa1g5ZGh5eTJ5VFV4ZFp2bURiM2hoaGMKdG1CWVVZM2wvUUY5Ync2UGdxbXJGcERGUFVBK254a0k1ek1abkkyNDQ3NAotPiBQd1lBLWdyZWFzZSB7ZQpvdzlod2ZLeForNHpjNTJKRkt5aHFxODJHUQotLS0gK3hVT0paeVQ2SElpd0tJVXd2RlRralhmN3dQQkhpQXpqd01CN0QvVGExbwrLEk1AlKaI2MnMspDuB0mtRyuIgevNKSN0IFdcbxEPWPJAGtGizdkCHMzz9H8hX4l4BFwhcyEs0kQ=]`.
+        // for callers like the test `test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB3R1ZPbHp2dkZrOU0wRlNXZkhJUFVXOGEzd3ZZVWVvMjZjUjF6VnNscVhjCjBEQTNCd2YrN0JaMjAwN1JVZFJjaGYwcnh4WU5SVFVOMngycEFaUXAxZGsKLT4gWDI1NTE5IGhmU3NTblU5S01pRlg3SElwUnlNM2JrUnRFTWF6K0ZwRTd2d1ArS0NxekUKaytNeDNRRFMzTDlIUlFkQ3JFY3dzT05FaWJmMlptRHJEK1A2QlQvNFJVMAotPiBYMjU1MTkgaVYzbkZHTFB4Y0JqM2FNSUpMeGx0b3o2cWJHS2F6RVpFREhnL2dnMU9Rawp3WHZIYkVtK1F5Yk5HSVhMQ1lDQncxVmdITW00TDFnNnEramMxWVZReWVNCi0+IFgyNTUxOSBBMVUvWGNUUkdTNDdxN1FZdDdMQVQyd0RoRXlXeUZLRFppUFBRczUrUFdrCklEaW9EUEtqYSt0cEJ5S2psUGtzRW0rU1Y4MjN1d3Q0QTA3QnFHbW9NRDQKLT4gWDI1NTE5IHYwdDdKcXczbERqQUtHalJNRlJDOXZNSnhiTERxa0JsZDByUHFRcm0rbU0KRDR1bFh2Y2p0QkQ4dnJsajI0WkU5R3h0SjQvQ0VwbHczVXE1UWlvV2VRYwotPiBTLWdyZWFzZQp6akxEb3FwSU51a045ekh5VGR5UmlWV0pndnlqVWhxb0p4QnpicDEyTWZXNXlWK09sUXZWZkZ3R3dqejJRZFRMCmRjNDVobnM5UTA2ZkpZMzUybWl4MXNJL1VWZytKaVc1eGZ2QQotLS0gNnZ5ZHVFblNXR1hha01VanFlVWVUeFBsTzJIWkFwV0h2UVN1d0hKRnlDUQqIE/dbii3UmalbFv/PjPMEuE/S9aYifzAA/W8hhKrKi8tl0G58y3GpyWP4b4zCOXvTrPatyJ1aUPk=]`.
         match push_background(ctx.repo, ctx.policy, ctx.remote_failures.as_deref_mut()).await {
             Ok(true) => {}
             Ok(false) => eprintln!("⚠️ push failed for {}", ctx.repo.display()),
@@ -3456,7 +3548,7 @@ push_url = "git@nonexistent.example.com:repo.git"
     }
 
     #[tokio::test]
-    async fn test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBWYWNNVEtKL2dtU0cwMjFHeXRKQzdTa1AyWkhndHJyZHNoSzBSNEMySEJrCkNVS0d2SzRXSndPdlVUWC9IT29MYXZuNmN0THVuM0RYeGRMWEw4cUtodXcKLT4gWDI1NTE5IG16Ym9COFA5SlNmMEtNVmRuYzZ0cFJhM25QeUR6UzI3MTk3aW1iNDhOMlEKckYxYU1jZGpYbkh0VW4wNlg1VE5TcVNPbkljM2NZU2JOUFRlTUpIdFFDUQotPiBYMjU1MTkgeVVoM0FtV0E4M21jdm1YS0JubFZ5cGt3YVlWMlc4ZTA2eEVNZGVhTGxRYwpmM21yRGhVeWVmYkFSZ3pFMnF6eTNoRGxUUExFZFhhbDFOd014TiswUEhBCi0+IFgyNTUxOSBnNGpaL1MzeThHVjIvTlkyYXRqMHBMMjFvRElCZVVrSWkwRmdMUlE2NURNCk56enIrWUZKTkEwWnZCUGduMU5ialAwa3ZLaUxKMXFzRm9iS0NVWnpJOGcKLT4gWDI1NTE5IE1ZTnVOU1ozYnNaVGVSWEh1M3prN0Fuck1rOFJ2UG5EVENQU2puQVZqRkEKME5zSWYxRG0wK1F5bTFITjY1OCtHeVNkQVpaUHBjL2ZPL0V0Y0VqODgrMAotPiB0THotZ3JlYXNlIGdjMCtUczIgKXdYNkYgNTtYCmtFYkNuL0RLK1lQZEI4WXpobytrSVdFOTBNSlBzcEhXOWVTRW9zNDN5SUV6OHZ5SHUrYXdydmJCcXJ6OAotLS0gUmRwdlZtRmN6eTZTMm1VVGpCUnJVdXpxYTliNUx1b1FBd2lYQTVKUWxWawr9nO/i4zsjRZgwtDsKfh+ENijteLr2gcy4+aa23Xj5BnLCJOa4rdpKyzk5IH0xohV5gnTW4ljRTwo=]() {
+    async fn test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBlMmFFdEVzQXB5dFNtVUxUQXFFYk5mOGhuMDZCRk9jNWNzRWgyN25BbEMwCnU1NnBsNnFZVDZjamhnS1VrSzlDVThFY1FWWE9vM3czZ0Rzb1hHMFN4TjQKLT4gWDI1NTE5IFRyQ2s3WER2TWRGUmhtMlh0NlpJV0xUUm02TWRUWHZOazNKUTdHSzNSaTQKcUErZzFZdWZmR1RvS3NObjc1YWFqNnhJclh2eTlNMFFyaDB3RmpiNk0wWQotPiBYMjU1MTkgZ1RJZHY0dE45djBSUTQyZFhSaUFib0ZFT3pOVFhlNVBObFlXTDRIdHlBYwpqZ0g3Sit3LzR4b3FKdXpTck8xTGNDREFubjRxVFQybjBVV0JyNUt0TjIwCi0+IFgyNTUxOSBMdzloK0F4aEhMdVc1ZVNlU2pUaFg5YXJiTlpXSEVCTTFiWnB1cWk3UGhBCnhPN3dkYnRUcHo1YXg3b0hZRmdpa08rTDc3bVpHNDVya2dzK2I0anhxMFEKLT4gWDI1NTE5IE43dGRYaXhlT21CMnl6ejFwdm5wQVIxZWQ5YURuKzF5aDZaVDdDNThHWGMKSkpQeDRSQlc1NmlYSEdGUXU2TWc3czEzc0h2Uzh0Y0xwOHQ0SnhhUWJxRQotPiB9eVItZ3JlYXNlIENtRTggTV1FX1pzRCBcZyohMjE9biBYCnNFUG91SXVyeVA3MUxuSUJuZGxSTEw3dGcyVjZJYngvTlJPdjdLSXZzNWt0YThXNVVvbFBKbUVrU2pGaXNURjQKVGVyQU8wK0NnSHFpZ2k0QjE4YWJKdkE2azY5ZlFPYjVycmErc3hZNklCYnlCRUxGNGhzNGR6OFk0WlBmZktQcAoKLS0tIEZrejBhRytPWDk0K2M4a3FWUnpOa2dVRi9UdDJUNmZqN1RrMXozRVdHZlEKSbfazytDbmXLVpJfa+noSoQjz+KBYoF4c2lko8P9uCcSQwIrGMbE1otZsfzj7z95YUKnhQXVRCXg]() {
         let tmp = tempfile::tempdir().unwrap();
         let origin_bare = tmp.path().join("origin.git");
         crate::git::git_cmd()
@@ -3812,7 +3904,7 @@ push_url = "{}"
     }
 
     #[tokio::test]
-    async fn test_sync_repo_exac[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBMWmw4Q0ZONlJaNUZKblQ3QXV3UWs5TFByQURIeEEzMTBkc3hHVythQWljCmdpYmhvL2I3Wkh2OTJibDg5ZlZ5RVBYbm5uM1VlS1A4QzFFVlZ5M0V6UUEKLT4gWDI1NTE5IEZwSXRtcFRNWnZraS9sUHY5QmFjU2RFcEZnbUFNTHZlaFR2OU9oT0prbW8KdkZ3V2E4eWVaU2lZcWFZd0p0WGhRQy9YMGtzb1VlaTlXYTZZdEFQQjFCWQotPiBYMjU1MTkgSlJONHg1QVJyY1RpUngyWW9VTjVOblJpeUxFcmxQSmRLSlo3MkNUQnJVOAoxelQwZnBZSDBJRnoxMVlWd2t0ck9TaDI5bkhCaEVpWHN4THdyMkM1ZFpvCi0+IFgyNTUxOSBtdW5ZODVpOG9pQ0lMcm9hV2VEdXpYZElpRWtZVnhBSkpqUTdKZ2VBeG5jCnpUcUp3b1NNQTFidDBFRjN4d3gyaTNRVHBsTmcyWWYwMnVJZXhNd25CVkEKLT4gWDI1NTE5IDQyaURoY2pOSVlta0VUNG9VSU13QWM0YTNHUC9oMXJDVW1KY1V0YlF5RGMKeUdFTVJjYXBCcmp6ZkZjckc2MklCbk10VUQ3U2oyQkM5ODVaWWZhaTVUZwotPiAlZmchUTZzPi1ncmVhc2UgXSBGdHNBNydTCjA4ZEtKUGd5eXdmRmEyQm9lZnJSRWtMUlZPOEFrNTBOVkZJWU50RTdaOXJnU1Yrc2ovN3ZwYWhSOGhvbXVZRmQKQjlaNlFibkxLNkdHZWR2MDhINm1Uc3ZyaFJMNG5sMmsKLS0tIC9rMGFvNFNEMSsvb1Z6cTlKSDk5NzVGcHdBQytqbnBVMHhRUFpiWmxnVncK/QlE9QIr1Fg4+LvQT5COhTcJorkpLZKEhg2c9OMlicMa5sANVVDsf1TyL1HDpFFxUC0IoBYvLFX+Xpqgl5kQ]() {
+    async fn test_sync_repo_exac[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBmZk5yZVozVzZIc25Qb2VPY3ZaQXJjek1raVJDSCtycHVOcWNnTm4veFQ4CkFlVVc4cW82aWVjbDlZck4yTDBwQlh1TWREUTlJUzd2aEhOeFJiVEt6eEkKLT4gWDI1NTE5IE5hSWxPYjAxQ3cvdnVPa2tzeGlrQkRIcm92NUN6cFc0MDZoT09zZFZid28KNFJNZzlZQS9xT2xkWmd4d1dXK1dFMlFkU0NkOXNLQzBPK0pxdk9BRlVTYwotPiBYMjU1MTkgWGUzNFZzbisvRDlUWjNBNmZ6a2Yrd0ZFblZnSjlLUWV5TC9vS2NzOEJpRQpyd09mUisrOUFFckpSUXlUYnlxVmo2ZDhVcEVKTEhXQnM1T1JnMzQzMytBCi0+IFgyNTUxOSBGR0VocVcrNXVscDlGRmpnRkRpbWdwYXJxRjU3ZmdoNDU4RVJsNktDb0dRCnZxdVJDYzJ6TlhRMWtqUnJmNTg5Y1ZHa0hKV3VRY2NzSHdhQ1ZVM2NyMzAKLT4gWDI1NTE5IFFWRmJVTCtFUmYxRkt6QWgvMVRMZEgxUjBINlRxYXZpcVQvdW1MQVNqMEEKMXFpa01takRoS2g4Y1JNTGp6V0lwdzZIRndjc2Z5eHJib3ZRQytOazhJMAotPiBVXz4tZ3JlYXNlIEQrdyBjZjtgfmgKcFFhaWdkcFF6NWJ3K1FkVXU1dGMrVFE0RGFLS01Lc3E4NGJQSURqZ0tndWVxOEkrWU5JSQotLS0geVB0VXZsaHVuTU9xOUFzNklOREluTmFDSytMc1o4NXdjaUFRWmFlSDZ3Zwr4SBANHswR7Hcqa3bYVOadxvT4RVPtIwInSZutgh3hq01ex+LU5AC7gKOnlgmn+58JJpERA87PfNpOV33s7T0=]() {
         let tmp = tempfile::tempdir().unwrap();
         let repo = init_test_repo(&tmp, "exact-50-del-repo");
 
@@ -5087,5 +5179,53 @@ auto_bump_versions = false
         let paths = vec!["nonexistent1.txt".to_string(), "nonexistent2.txt".to_string()];
         let result = stage_existing_files(&repo, &paths, false, 30).await;
         assert!(result.is_ok(), "all-vanished list should be a no-op");
+    }
+
+    // ============================================================
+    // is_backstop_active tests
+    // ============================================================
+
+    #[test]
+    fn test_is_backstop_active_below_threshold() {
+        // ahead_count <= threshold → not active, regardless of time
+        let now = std::time::Instant::now();
+        let since = now - std::time::Duration::from_secs(600);
+        assert!(!is_backstop_active(Some(since), now, 0, 20, 300));
+        assert!(!is_backstop_active(Some(since), now, 20, 20, 300));
+    }
+
+    #[test]
+    fn test_is_backstop_active_above_threshold_but_recent() {
+        // ahead_count > threshold but not enough time has passed
+        // → not active
+        let now = std::time::Instant::now();
+        let since = now - std::time::Duration::from_secs(60);
+        assert!(!is_backstop_active(Some(since), now, 21, 20, 300));
+    }
+
+    #[test]
+    fn test_is_backstop_active_above_threshold_and_old() {
+        // ahead_count > threshold AND time elapsed >= min_age_secs
+        // → active
+        let now = std::time::Instant::now();
+        let since = now - std::time::Duration::from_secs(600);
+        assert!(is_backstop_active(Some(since), now, 28, 20, 300));
+        assert!(is_backstop_active(Some(since), now, 100, 20, 300));
+    }
+
+    #[test]
+    fn test_is_backstop_active_no_ahead_since() {
+        // No ahead_since means the repo has never been ahead during
+        // this activity window → not active (just got pushed)
+        let now = std::time::Instant::now();
+        assert!(!is_backstop_active(None, now, 50, 20, 300));
+    }
+
+    #[test]
+    fn test_is_backstop_active_threshold_zero_disables() {
+        // threshold = 0 means operator disabled the backstop
+        let now = std::time::Instant::now();
+        let since = now - std::time::Duration::from_secs(3600);
+        assert!(!is_backstop_active(Some(since), now, 100, 0, 300));
     }
 }
