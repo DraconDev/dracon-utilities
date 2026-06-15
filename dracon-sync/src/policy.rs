@@ -1671,6 +1671,121 @@ mod tests {
     }
 
     #[test]
+    fn test_default_trusted_emails() {
+        let emails = default_trusted_emails();
+        assert!(emails.contains(&"dracsharp@gmail.com".to_string()));
+    }
+
+    #[test]
+    fn test_default_trusted_authors() {
+        let authors = default_trusted_authors();
+        assert!(authors.contains(&"DraconDev".to_string()));
+    }
+
+    #[test]
+    fn test_default_trusted_remote_hosts_includes_three_platforms() {
+        let hosts = default_trusted_remote_hosts();
+        assert!(hosts.iter().any(|h| h.contains("github.com")));
+        assert!(hosts.iter().any(|h| h.contains("gitlab.com")));
+        assert!(hosts.iter().any(|h| h.contains("codeberg.org")));
+    }
+
+    #[test]
+    fn test_default_settling_max_delay_secs_is_60() {
+        assert_eq!(default_settling_max_delay_secs(), 60);
+    }
+
+    #[test]
+    fn test_default_min_commit_interval_secs_is_5() {
+        assert_eq!(default_min_commit_interval_secs(), 5);
+    }
+
+    #[test]
+    fn test_default_dirty_max_age_action_is_commit() {
+        assert_eq!(default_dirty_max_age_action(), DirtyMaxAgeAction::Commit);
+    }
+
+    #[test]
+    fn test_dirty_max_age_action_default_is_commit() {
+        assert_eq!(DirtyMaxAgeAction::default(), DirtyMaxAgeAction::Commit);
+    }
+
+    #[test]
+    fn test_dirty_max_age_action_serde_kebab_case() {
+        // Verify the serde rename_all = "kebab-case" works
+        // both ways. The TOML is "commit" (or
+        // "warn" or "ignore") and the Rust enum is
+        // `Commit` / `Warn` / `Ignore`.
+        let toml = "[section]\naction = \"warn\"\n";
+        #[derive(serde::Deserialize)]
+        struct Wrap {
+            action: DirtyMaxAgeAction,
+        }
+        let w: Wrap = toml::from_str(toml).expect("parse warn");
+        assert_eq!(w.action, DirtyMaxAgeAction::Warn);
+
+        let toml = "[section]\naction = \"commit\"\n";
+        let w: Wrap = toml::from_str(toml).expect("parse commit");
+        assert_eq!(w.action, DirtyMaxAgeAction::Commit);
+
+        let toml = "[section]\naction = \"ignore\"\n";
+        let w: Wrap = toml::from_str(toml).expect("parse ignore");
+        assert_eq!(w.action, DirtyMaxAgeAction::Ignore);
+    }
+
+    #[test]
+    fn test_test_sync_policy_has_new_fields() {
+        // Regression: the test fixture must be kept in sync
+        // with the SyncPolicy struct. If a new field is
+        // added, the test fixture will fail to compile
+        // (good — forces the author to think about the
+        // default).
+        let p = test_sync_policy();
+        assert!(p.auto_skip_unowned);
+        assert!(!p.trusted_emails.is_empty());
+        assert!(!p.trusted_authors.is_empty());
+        assert!(!p.trusted_remote_hosts.is_empty());
+        assert_eq!(p.settling_max_delay_secs, 60);
+        assert_eq!(p.dirty_max_age_action, DirtyMaxAgeAction::Commit);
+        assert_eq!(p.min_commit_interval_secs, 5);
+    }
+
+    #[test]
+    fn test_repo_override_parses_new_fields() {
+        // Per-repo override TOML should parse the new
+        // fields. Backward compat: missing fields
+        // default to None / inherit global.
+        let toml = r#"
+owned = true
+auto_skip_unowned = false
+settling_max_delay_secs = 30
+dirty_max_age_action = "warn"
+"#;
+        let parsed: RepoPolicyOverride =
+            toml::from_str(toml).expect("parse override");
+        assert_eq!(parsed.owned, Some(true));
+        assert_eq!(parsed.auto_skip_unowned, Some(false));
+        assert_eq!(parsed.settling_max_delay_secs, Some(30));
+        assert_eq!(parsed.dirty_max_age_action, Some(DirtyMaxAgeAction::Warn));
+    }
+
+    #[test]
+    fn test_repo_override_missing_new_fields_defaults_none() {
+        // Backward compat: an old override TOML without
+        // the new fields should parse with all new
+        // fields as None.
+        let toml = r#"
+auto_bump_versions = false
+"#;
+        let parsed: RepoPolicyOverride =
+            toml::from_str(toml).expect("parse old override");
+        assert_eq!(parsed.owned, None);
+        assert_eq!(parsed.auto_skip_unowned, None);
+        assert_eq!(parsed.settling_max_delay_secs, None);
+        assert_eq!(parsed.dirty_max_age_action, None);
+    }
+
+    #[test]
     fn test_default_sem_max_concurrent_sync_is_four() {
         assert_eq!(default_sem_max_concurrent_sync(), 4);
     }

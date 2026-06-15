@@ -254,7 +254,7 @@ mod tests {
     }
 
     #[test]
-    fn test_record_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBKWWZad0REY09PY2dXUWdYcC8wWllLTXptYUEyVjBtVkFvUGlsQ3cySWprCmhLQWc5T0FyK2R6WTRmLzRFeEJlNWN3QkRiN2dmZnVQTndDVUZoWk9rQlkKLT4gWDI1NTE5IHlKMkw4SVpKTUIvSGhyNTllQmxqY1BZTzcxWit6dXJJTXhoNjc3NEVKencKTm5OUXVYaHlkdzd4LzY0cDd5OEJZYndoSzNNN2VHZ3Q0MC94QkxCUTFqdwotPiBYMjU1MTkgcmdtcjdkcVBiY3orOHlRb2RVOExiRFF2RjRoZmQ4TlZzdjBBd3N5R1NuVQp2S3Z1N1kvU1RyWmdNUFU3RHZjRUFXL2tMenphOWQ2N25kemZ3MnRWcHo0Ci0+IFgyNTUxOSBTVnhnVGw3aWM2ajlWbjAzOW9jNmdod29kYy9ydUE1ODcxUWR2dmQ0aTFRClJUa3p5R1d2aUVnMG1TMjJGc3NvVldYTzMzMnR3K2hpNHNxa25OZmlaS0EKLT4gWDI1NTE5IEFNQy9xUXY2cE5aN2E2My9FUkRqTld5cUNBY1Fxb3FjVFpPQ0JFNWdBV1EKTjBvM2d0QlVTbDJ2cVhhWWdqQjBOWGo4b3RvVVdUZDhhdXNQdXgyeXRVbwotPiAjWy1ncmVhc2UgQUMmYFogOi9hRiFNIiBTLWxnCnJBNzNmUTkrYWVGdmhoNHBkZE5Wa1pXNDZTQ2pWUzVZUFNYSDBXTStpNDZ5aWNZbgotLS0gTWUyVzJGa3gvdmd3YTFaYlc3ck1BMDdROTQzZEplblhRK0NsMk1FZEVPSQq0GgGjzxKPtXLQg90sbdwo/LpQsftnegJPEzg42mcUxe87hZIJH6m+4i0InRAX3sdG7MjJU75HUZQQObQBLdOb7Bs=]() {
+    fn test_record_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAxL3U2MDJENmQzdmVQRElMQUZhUkV1R21Ec29rdEx3RjYzaEp2WVdhQXlVCk9ZcTl1bVhQaUZ6cVpnaTNESlNmc3owVkFxSzZhd3YySnJSamk2SVFqSDAKLT4gWDI1NTE5IHZ1aS9tZTk3R2dPdXBxRmVRUEZVNDJldmd4NWY3Um0xTXZBM2sxMjRjbG8KdkNzZVpEVjVwdFdLRCtjSFdkRmY0aW9RMXJNOEh5dVpOUi85TFg2K3grVQotPiBYMjU1MTkgRFJpMmpLS29Ob2l1VEl6ZS9xakdXYkxTU2hjZXBTNVY1QTdrdVBSYmtFOApUSjNGUW84TUxlSGk2V2pxbVpYUEFRMk9BUGl6VWgwQms3WlNRUFJvVENnCi0+IFgyNTUxOSBGZXd3UGJBSHZhT2ZsZTZrcW9aQjR4d2FobEZ1UFpFd2RZN3UydW53K21jCmQ2VmJsOFc5NVNoT09iZVFzV0hUQlVDQkdlTXlMZFFHMVhFbmRQWUswSWMKLT4gWDI1NTE5IHduZGozdHhKM1JCdHhHNFV0SU8veGh5bHhrSHJHUWNPdGExWmNkL3gralUKWHBJdGpKWS9CcU96dGZqTEkxbDViQnpsNWFYd3FwbEo5SGFVVU04NnNCbwotPiB1LWdyZWFzZSBSIGx0TXU+ClZ3TkcrRTFLbGRNSnBVU2U3MTlYS2V5S1lNTWdmRkFsOURKZWdMeDA1MmRxZlVNZ3VnRTZ0S2R4UGlueTJncnQKWm9Gc2VLWE8ydEFDbncKLS0tIG1Tekw5ZFVRdXRJN1RuOEJnSU9IcUdxN0lpa0M3WHYwQUs2WVdYaHFWZkUKGxjdBJVpC2huFsIVvYUzCtp6GpYlhdltR2GiZCDx3QBexJO57W/iGTq5rU4HKzC+KIBHY4r6ZoOVj84IrXCoL3kF]() {
         let repo = make_test_repo_path("failure-increments");
         // Ensure clean state
         let _ = crate::daemon::unstuck_repo(&repo);
@@ -289,7 +289,7 @@ mod tests {
     }
 
     #[test]
-    fn test_record_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBvZUtPTkRiZmxRc0hEL1BNYXBiNWwvTzFxNHh0bDh4UVl5Vlo5K2FPaTJvCldya3lGbkRXZlROajZaUmluREdIMk8zc3JTbXFHT3pzVytZT1FBaUZ3QXMKLT4gWDI1NTE5IFBjUlQ4QldEWkJWSlZneDhheXkrOHoyM0xCVzlNckluZ0wrQldYVVd0eWsKVW1EbEdjeExDMFJVSk1JWFR0Q2g0SW9HK29RaEVpL2tQNmVVSFhiZFBjYwotPiBYMjU1MTkgblhsQ1A0ZWQ0Um0wR2gyZ1ZJY2FMaENSWWJKU1hiREFDSFNtaHZZVUlVOApoQ3FES2hyOXRJcFRpTUV2NisxYldHUXVoUG5tSUUrU1h1bFVGQklQVVdFCi0+IFgyNTUxOSBrSXJ6Q3NzYkZSbjNlZEdpOHdkZnRkSUVkdGExcGdVTlZyM1V2ZDRhK1dzCjYyVzFOQzVyWmZoYjBITXIxMTFXYjM1aEVkQVVPZ2RoQTVodG9NRkxncUUKLT4gWDI1NTE5IEJFL01Ma25XS2tVZjhYamlnamFwVm03OHduaXdUK0phN1o1a0xjM2NkR1UKR0NXVWJReHRjcFFtK2tXcXR2Z0RTdm54S2NUTkNlc1dzZ2FwS2lHVjdCNAotPiBEXi1ncmVhc2UgLzQ3OgpJcnNGTnhFVjJXbU5XTHlJdUpUVnRvamFWWVBVWVRKZDZwWlQxYmFDT21mbHlZNHo3UVQrcy93cFVTdjVjaGh0CllaNEdkbXNwNzZEbVNWQ3IrcmVaVGRKUWtkYjhmemFWNXcKLS0tIHBrTFlMUTgvMkptekhXSTJ6WkFETllqU1IrZFgzWDNpbVpIcHI2ZDhLOGMKbPPJ3w4TQQ8YX1M7C9a6OnvpC0YJ+UGP8H4enpqvVSycbS3gXRs97NxDHmbM8ASwNL18B1DZJkHMprqZg4U=]() {
+    fn test_record_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA5L3dlVE9qbTFjNThrR1NTcy9VWFAxd0x4YTVYajh1VzhnWTdYS2NiMWhNCmxrbTk2UGxKUmhQL3BaVC9nSXcxbkR0Umc0ODJTejNRdVlkcEhYNS81VlUKLT4gWDI1NTE5IGFGdjdocDlCSXk1aTgvUG5SMTNBMXR0czE0cFZseHpKQXRCS0xhQWNpaXMKZnJuUkQwVUlpcTNZZTBQOTRHUnl3VllNMTh0cld3Y2FCV2xHcmlJY0J5bwotPiBYMjU1MTkgR2RoLzRZNnlvcWh6alovcWZrY1hqU2tkN0hkakd4azFzQWdtd2R5RWxUSQo2dWRmUk0yc2gwUVRuWERodUMxT1ZrYUVGUlRZVFZRSUcveUJ0RkN1MC8wCi0+IFgyNTUxOSB1NHJxZ2JmdXFWa2xaMjcwSW91d3F5c1kvRlJpMTMrZUZ6NmRTeGNUNmpBCjRwenlCdDQwM0J3MWtvR2pHTmc3SXFnYlB4ZHJpWVM0c1BQQzN6dXVVT1EKLT4gWDI1NTE5IDNLb3B3VENCaTVPbUM1U1BieHdEZElYTDZ6ZXM1MWxmVEVQYm5IZ2tpQVEKNGZEMUE3R1hLUCtwY3RPeUtPaThUcDcxbkU0bHZsSW9NaWhQU3RMY01XdwotPiB7bDt7LWdyZWFzZSBAWSxIJlJmcwpqZ2RLYWtLVVVxTlo2YkQwQUF2NExaTkdpaVhQdzdITFBnOFdpejIvZjhQTWhhOVRzVHVqdDlUeW1ML0piajN2CjVzcXNFQmFyOUZsMnFRNk9TNzJXN1d5SnY5dTNHK3BJaGcKLS0tIDFOYmw3ejRSUGMzNEwza01FRE9xNzJhc3NmWCtvVFExOEYrNi9XWGswbHcKciKZnRAtpArDPOMsI/1i5VR4Ocwa6w6bwKLjIKgHx3qqEDVikXwubkbO3PR6YMty2C3CwnIASiHxLNj0mYY=]() {
         let repo = make_test_repo_path("first-call-stuck-since");
         let _ = crate::daemon::unstuck_repo(&repo);
 
@@ -1695,6 +1695,64 @@ pub(crate) async fn run_daemon(
                     .is_some_and(|since| now.duration_since(since) >= MAX_DIRTY_DELAY);
                 if !dirty_long_enough {
                     continue;
+                }
+            }
+            // ── Settling max-delay ──────────────────────────
+            // The user requested that the daemon "should be very
+            // actively committing" so that stale dirty state from
+            // previous sessions is drained promptly. The 5s
+            // fingerprint-stability wait above is good for
+            // actively-edited repos, but for repos that have
+            // been dirty continuously for > settling_max_delay_secs
+            // (default 60s), the daemon commits REGARDLESS of
+            // fingerprint stability. This prevents the
+            // "⏸ stalled Xm" pileup the operator was seeing.
+            //
+            // Action is configurable via policy.dirty_max_age_action
+            // (`Commit` | `Warn` | `Ignore`). Per-repo override
+            // via `RepoPolicyOverride.settling_max_delay_secs` and
+            // `RepoPolicyOverride.dirty_max_age_action`.
+            let repo_override_for_dispatch = crate::policy::load_repo_override(&repo);
+            let effective_max_delay = repo_override_for_dispatch
+                .settling_max_delay_secs
+                .unwrap_or(policy.settling_max_delay_secs);
+            let effective_max_age_action = repo_override_for_dispatch
+                .dirty_max_age_action
+                .unwrap_or(policy.dirty_max_age_action);
+            if effective_max_delay > 0 {
+                if let Some(dirty_since) = entry.dirty_since {
+                    let dirty_age = now.duration_since(dirty_since);
+                    if dirty_age >= Duration::from_secs(effective_max_delay) {
+                        match effective_max_age_action {
+                            crate::policy::DirtyMaxAgeAction::Commit => {
+                                // Pass through to dispatch. We
+                                // don't bypass the in_flight /
+                                // failures checks below — we
+                                // just don't skip on the
+                                // fingerprint gate.
+                                if debug_enabled() {
+                                    eprintln!(
+                                        "⏰ {} max-age commit ({}s ≥ {}s, fingerprint may be changing)",
+                                        repo.display(),
+                                        dirty_age.as_secs(),
+                                        effective_max_delay
+                                    );
+                                }
+                            }
+                            crate::policy::DirtyMaxAgeAction::Warn => {
+                                eprintln!(
+                                    "⚠️ {} dirty for {}s (≥ {}s, fingerprint changing) — operator action required",
+                                    repo.display(),
+                                    dirty_age.as_secs(),
+                                    effective_max_delay
+                                );
+                                continue;
+                            }
+                            crate::policy::DirtyMaxAgeAction::Ignore => {
+                                continue;
+                            }
+                        }
+                    }
                 }
             }
 
