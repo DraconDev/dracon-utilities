@@ -486,6 +486,14 @@ pub(crate) struct SyncPolicy {
     pub(crate) auto_commit_backstop_threshold: usize,
     #[serde(default = "default_auto_commit_backstop_min_age_secs")]
     pub(crate) auto_commit_backstop_min_age_secs: u64,
+    /// Number of consecutive push failures before the daemon
+    /// stops auto-pushing a repo and surfaces a `🛑 push-stuck`
+    /// state in the ACTIVITY column with the actual error
+    /// message in the HINT. Default 5. Set to 0 to disable the
+    /// retry budget (never give up; the existing
+    /// `push_retries` still applies per-attempt).
+    #[serde(default = "default_push_max_retries")]
+    pub(crate) push_max_retries: u32,
     #[serde(default)]
     pub(crate) sync_visibility: bool,
     #[serde(default = "default_sync_visibility_interval_hours")]
@@ -818,6 +826,10 @@ fn default_auto_commit_backstop_threshold() -> usize {
 
 fn default_auto_commit_backstop_min_age_secs() -> u64 {
     300
+}
+
+fn default_push_max_retries() -> u32 {
+    5
 }
 
 fn default_sync_visibility_interval_hours() -> u64 {
@@ -1391,6 +1403,7 @@ pub(crate) fn test_sync_policy() -> SyncPolicy {
         alert_unpushed_threshold: 10,
         auto_commit_backstop_threshold: 20,
         auto_commit_backstop_min_age_secs: 300,
+        push_max_retries: 5,
         sync_visibility: false,
         sync_visibility_interval_hours: 24,
         sync_metadata: false,

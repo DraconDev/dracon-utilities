@@ -50,9 +50,27 @@ fn stage_cooldown_remaining(
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-struct StuckRepoEntry {
+pub(crate) struct StuckRepoEntry {
     path: PathBuf,
-    stuck_since: u64,
+    pub(crate) stuck_since: u64,
+    /// Number of consecutive push failures. Reset to 0 on
+    /// successful push. Used to detect when the retry budget
+    /// is exhausted and the daemon should stop auto-pushing
+    /// (the operator can then intervene via `repair-concerns`).
+    /// Defaults to 0 for entries written before this field
+    /// was added.
+    #[serde(default)]
+    pub(crate) consecutive_failures: u32,
+    /// Last error message from the failed `git push`. Surfaced
+    /// in the `repos` HINT column so the operator can see
+    /// WHY the push is stuck (auth, non-FF, network, etc.)
+    /// without grepping the daemon log.
+    #[serde(default)]
+    pub(crate) last_error: String,
+    /// Epoch seconds of the last push failure.
+    #[serde(default)]
+    pub(crate) last_error_at: u64,
+}
     /// Number of consecutive push failures. Reset to 0 on
     /// successful push. Used to detect when the retry budget
     /// is exhausted and the daemon should stop auto-pushing
@@ -1812,5 +1830,4 @@ pub(crate) async fn run_daemon(
     save_in_flight(&HashSet::new());
     Ok(())
 }
-))
-}
+
