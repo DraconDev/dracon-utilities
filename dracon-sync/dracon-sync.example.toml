@@ -300,7 +300,7 @@ auto_create = false
 # [[publish_targets]]
 # name = "crates-io"
 # registry = "crates-io"          # crates-io | npm | pypi
-# [DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA5ZDkzRlZ1QlRKUExQZ0J2SEtkU1drVUZtVStBWW90QzRlVUQ1S0hDZFhBCm1YOUthakR1Y3pyeXIxK1had1BYYWJhQktrbTRFSFErVGR1RFBMSSs2clUKLT4gWDI1NTE5IDBURm9UWmZwNGwwajdDSVNMTDROdEdreDBrdkppWEZGMlN4K0FPblRhV3MKUE1GcWZrMVFGZHVHK1BPdmNOSXlxS1VUS0hla0pzQXdZeHM4VVk2NldQOAotPiBYMjU1MTkgSzVRM0JTb1BOZk5iQ0l1c1QzUy94N1l2Y25IQlNxd05BT1FMb3h1OCtXWQpKOVNLdVNiaHhwUm9oRXFaeDhrUVlXQjJUOFFYOEhNclRYem5LalFPTWtBCi0+IFgyNTUxOSBQVk45ckRIRWZWZXl3Rlh2QjA2eWptUmMydWtMU1dSck1hdFA3QStUSlRvCmM4RFpJUmhINGt1djlxTytDWG5RNTJyaWZra0hQR3A1ZjlTNnVwcmZZa1kKLT4gWDI1NTE5IGcwQjdxZkcxcExINjFydnBhbEdGWE9KRERtNnpQVUhxZnFTUHo1bitRMWMKd2Z0Qk1kcWp2b3VNOFVNQTVVcFRYdzYzSlZ4S1k4c2RCMzFMcVNqc3MybwotPiBOX2MoNmk2NC1ncmVhc2Uga25fIDNAPUYtIHhoXWNGUgpCbzRxbWxtbVZnCi0tLSBEZG5idEg4OEszZHEwakJRZ3g1V0k4c3hqR0xaM2U0dDhveFpOK05jVlo0Cl+XAjHbGwj0ELkQUq4/EvumC2R3KR/uW03bJ8SSr758eXTPvG3zVt2tUw2o/DA6WlVS8x7FNkGUQC0vGEpLTcVxhzO56Q==]   # env var name (token in secrets/cratesio.env)
+# [DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBmcEZyc0FxVEJYeFh2MXB6MUpoTWQreVNYeW42RUd5ZE94SkV0Sjl1RkcwCmExbm5WVVVPUzRPMlZQUkFiZEdNZHJRYlhBY3NjY1pZZDFucVRhenN4MUkKLT4gWDI1NTE5IEZZY0xDT3pLOW1sTHlBWlFDR0RNcUNrU2ZySjVCWS94OHdMZzJES0FHQ0kKdjBrTUgxd1RMYW95RjkwR2k2eFpTTm00MzRvNldoVytTclQ0eHJ6cy85TQotPiBYMjU1MTkgMTRXbW9VOTJYck9wK2NiTHNPVkltajdpZWhiMTVXV0Y0Vm00WnUwcmhVSQpuSzhWcm5FL0ZPMHJaYWY1ZUhDOTlsWE1NZXBueTdzdkJQWHVXbWkyc0lvCi0+IFgyNTUxOSB6MkZWM2R1TGJNcnliTHhnY0ZndWRIS2Y2RWUvUXhvTE8vcUNiaDROZWpjCm1VSVc2eTZZT3VvQWdRTzFrRXZraWJjSEpRU3VWRlRhZUFWQWdTOVRUM0kKLT4gWDI1NTE5IDVBMFljeE9SMm9HMmxGY0NhVlNSaTZtVkN4WWFrWm5aeHdsL1BUU3JqWDAKTzZRRHhqaU1Pc1gvVDhJVjcrSHJTYi9UQU9sYXBRM3ZQeWlYNU9MSm5ubwotPiBWSzhpKi1ncmVhc2UgciBSMDhwXi4KZ3FvenA1MHRWN2xla0RaUXJzZjZ1UnM4a2JHSHYydFduN24rRFhaaE1mQmJ4L2tyUkxVTU5YUWNGQ0RhN0NkVgoyUQotLS0gMExQYllnTDh0c1VYN3NiWkRhOElXaTM5MlQ4TkF1bFRTMzdiekxsMXZsTQrRR5B13SZGbQm/drMby9ag9ARqpERblAvmsVu8+Qlo6Ba3I2ibhkL/2rj/dXuPGkUdYESXkd9zExVAvQkSfBWTiQXkjqs=]   # env var name (token in secrets/cratesio.env)
 # publish_timeout_secs = 300
 #
 # [[publish_targets]]
@@ -519,10 +519,23 @@ auto_create = false
 # hosts on GitHub/GitLab/Codeberg. To extend, override per-repository in
 # `<repo>/.dracon/dracon-sync.toml`:
 #
-#   # Force this specific repo to be Owned (overrides all signals):
+#   # Force this specific repo to be Owned (overrides all signals).
+#   # Use this when the signal-based detection is wrong (e.g. a
+#   # legitimate repo whose upstream HEAD has a historical bad-
+#   # config author that the daemon would otherwise flag as
+#   # untrusted_author).
 #   owned = true
 #
-#   # Re-enable the daemon for a specific Unowned repo (operator confirmed):
+#   # Force this specific repo to be Unowned (the daemon skips it
+#   # regardless of signals). Use this for repos you want the
+#   # daemon to leave alone (e.g. user-owned repos the operator
+#   # manages manually, or repos that should not be touched by
+#   # automated tooling).
+#   owned = false
+#   auto_skip_unowned = true
+#
+#   # Re-enable the daemon for a specific repo that the global
+#   # `auto_skip_unowned = true` would otherwise skip:
 #   auto_skip_unowned = false
 #
 # To disable the safety guard rail globally (NOT recommended):

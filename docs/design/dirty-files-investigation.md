@@ -714,3 +714,42 @@ Live table went from **5 OK / 9 WARN** (with 7+ rows stuck in
 30 seconds of enabling the new daemon. All the stale dirty
 state was force-committed and the operator can see clean status
 across all 14 owned repos.
+
+## Junk-Runner-bevy playwright artifact exclusion (added 2026-06-15)
+
+The `Junk-Runner-bevy` repo shows **87 modified + 1 untracked**
+in the live `dracon-sync repos` table. All 87 modified files
+are PNGs in `web/test-results/` and
+`web/tests/e2e/screenshots/` (Playwright test artifacts and
+visual regression baselines). The 1 untracked file is in
+`reports/` (an operator note).
+
+The per-repo override at
+`/home/dracon/Dev/Junk-Runner-bevy/.dracon/dracon-sync.toml`
+sets:
+
+```toml
+auto_commit_exclude_patterns = [
+    "**/test-results/**",
+    "**/e2e/screenshots/**",
+]
+```
+
+The daemon correctly **excludes these from auto-commit**
+(the daemon log shows `⏭️ ... skipping tracked
+web/test-results/...png (auto_commit_exclude_patterns)` for
+every PNG). The `repos` table still shows them as `🟠 dirty`
+for operator visibility, but the daemon's auto-commit never
+touches them. The operator can manually `git add` and commit
+them if intentional.
+
+This is the correct behavior — the operator explicitly chose
+to exclude these from auto-commit (the original 2989-commit
+backlog issue from the previous goal). The report's `🟠
+dirty` STATE is informational; the actual commit suppression
+works as designed.
+
+If the operator ever wants the daemon to re-engage with
+these files (e.g. after Playwright is no longer being run),
+remove the `auto_commit_exclude_patterns` block from the
+per-repo override.

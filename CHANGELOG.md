@@ -8,6 +8,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Per-repo `owned` override investigation** (2026-06-15):
+  after the operator asked to "default-skip non-owned repos"
+  and then said "we def own kiki and others need exploring
+  too", we ran `dracon-sync ownership --explain` on all 14
+  watched repos and documented the results in
+  `docs/design/ownership-investigation-2026-06-15.md`. All
+  14 repos are correctly classified — 13 by signal-based
+  detection, 1 by per-repo override (`dracon-ai-lib` whose
+  upstream HEAD has a historical bad-config author). The
+  per-repo `owned = true` override for
+  `kiki-sassy-desktop-announcer` was added to bypass the
+  earlier "Do not modify user-owned repos" constraint after
+  the operator explicitly confirmed ownership. No
+  misclassifications were found; no additional per-repo
+  overrides are needed. The example config
+  (`dracon-sync/dracon-sync.example.toml`) was updated with
+  documented `owned = true` and `owned = false` per-repo
+  override examples.
+
 - **Ownership detection + default-skip safety guard rail**:
   the daemon now classifies each repo as `Owned`, `Unowned`,
   or `Unknown` based on three configurable signals:
