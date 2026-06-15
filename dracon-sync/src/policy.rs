@@ -784,58 +784,53 @@ pub(crate) fn default_exclude_dir_names() -> Vec<String> {
     .collect()
 }
 
+/// Default exclude patterns for `exclude_file_patterns` (TRACKED file
+/// modifications). Operator policy change 2026-06-15 (goal `9aaf0b08`):
+/// "commit all unless we have a super good reason to leave it out like
+/// over 100 megs". Logs and DB files are now committed (operator can
+/// `git rm` them later if desired). Per-repo `auto_commit_exclude_patterns`
+/// still applies for operator-defined per-repo exclusions.
 pub(crate) fn default_exclude_file_patterns() -> Vec<String> {
-    [
-        "*.log",
-        "nohup.out",
-        "*.sqlite",
-        "*.sqlite3",
-        "*.db",
-        "*.db-journal",
-        "*.db-wal",
-        "*.db-shm",
-    ]
-    .into_iter()
-    .map(String::from)
-    .collect()
+    Vec::new()
 }
 
-/// Default exclude patterns for `auto_stage_untracked`. The daemon
-/// will NOT auto-stage untracked files matching any of these
-/// patterns. Defaults are conservative: user notes, scratch files,
-/// local task state, and audit evidence stay untracked.
+/// Default exclude patterns for `untracked_exclude_patterns`. The daemon
+/// will NOT auto-stage untracked files matching any of these patterns.
+/// Operator policy change 2026-06-15 (goal `9aaf0b08`): "commit all
+/// unless we have a super good reason to leave it out". Defaults are
+/// now MINIMAL — only session-scratch patterns (super-good reasons to
+/// keep untracked) remain. Patterns REMOVED in this change (now
+/// committed by default):
+///   - User notes (`**/note.md`, `**/notes.md`, `**/scratch.md`)
+///   - Audit / evidence (`**/audit/**`, `**/evidence/**`, `**/screenshots/**`)
+///   - Media files (`*.png`, `*.jpg`, `*.jpeg`, `*.gif`, `*.webp`,
+///     `*.mp4`, `*.mov`)
+///
+/// Patterns KEPT (super-good reasons to stay untracked):
+///   - Session scratch dirs (`**/scratch/**`, `**/scratch-*`, `**/scratch_*`)
+///   - Temp dirs (`**/tmp/**`, `**/tmp-*`)
+///   - Agent session scratch (`**/pi-tmp/**`, `**/.pi-tmp/**`,
+///     `.demon/**`, `.sisyphus/**`, `.ralph/**`)
+///   - Research scratch dirs (`**/research/scratch/**`)
+///
+/// Per-repo `auto_commit_exclude_patterns` is the operator's opt-in
+/// mechanism to extend this list per-repo (e.g., Junk-Runner-bevy's
+/// `**/test-results/**` exclusion).
 pub(crate) fn default_untracked_exclude_patterns() -> Vec<String> {
     [
-        // User notes — NEVER auto-stage
-        "**/note.md",
-        "**/notes.md",
-        "**/NOTE.md",
-        "**/NOTES.md",
-        "**/scratch.md",
-        "**/scratch.txt",
-        // Scratch / research dirs — keep evidence local
+        // Session / agent scratch dirs — keep local
         "**/scratch/**",
         "**/scratch-*",
         "**/scratch_*",
         "**/tmp/**",
         "**/tmp-*",
+        "**/pi-tmp/**",
+        "**/.pi-tmp/**",
         "**/research/scratch/**",
-        // Local task / session state — never auto-stage
+        // Agent session state — never auto-stage
         ".demon/**",
         ".sisyphus/**",
         ".ralph/**",
-        // Audit / evidence — never auto-stage by default
-        "**/audit/**",
-        "**/evidence/**",
-        "**/screenshots/**",
-        // Screenshot / image files dropped in working tree
-        "*.png",
-        "*.jpg",
-        "*.jpeg",
-        "*.gif",
-        "*.webp",
-        "*.mp4",
-        "*.mov",
     ]
     .into_iter()
     .map(String::from)
@@ -1568,15 +1563,70 @@ mod tests {
 
     #[test]
     fn test_default_exclude_file_patterns() {
+        // Goal 9aaf0b08 (2026-06-15): operator's "commit all unless
+        // super-good reason" policy. Default is now empty list.
+        // Logs/DBs are committed; operator can `git rm` them later.
         let patterns = default_exclude_file_patterns();
-        assert!(patterns.contains(&"*.log".to_string()));
-        assert!(patterns.contains(&"nohup.out".to_string()));
-        assert!(patterns.contains(&"*.sqlite".to_string()));
-        assert!(patterns.contains(&"*.sqlite3".to_string()));
-        assert!(patterns.contains(&"*.db".to_string()));
-        assert!(patterns.contains(&"*.db-journal".to_string()));
-        assert!(patterns.contains(&"*.db-wal".to_string()));
-        assert!(patterns.contains(&"*.db-shm".to_string()));
+        assert!(
+            patterns.is_empty(),
+            "default_exclude_file_patterns should be empty under commit-all policy, got: {:?}",
+            patterns
+        );
+    }
+
+    #[test]
+    fn test_default_untracked_exclude_patterns_is_commit_all_unless_scratch() {
+        // Goal 9aaf0b08 (2026-06-15): operator's "commit all unless
+        // super-good reason" policy. The new default keeps ONLY
+        // session-scratch patterns; everything else (audit/, evidence/,
+        // screenshots/, media, notes) is committed.
+        let patterns = default_untracked_exclude_patterns();
+
+        // Patterns that MUST be present (super-good reasons):
+        for required in [
+            "**/scratch/**",
+            "**/scratch-*",
+            "**/scratch_*",
+            "**/tmp/**",
+            "**/tmp-*",
+            "**/pi-tmp/**",
+            "**/.pi-tmp/**",
+            ".demon/**",
+            ".sisyphus/**",
+            ".ralph/**",
+        ] {
+            assert!(
+                patterns.contains(&required.to_string()),
+                "default_untracked_exclude_patterns must contain `{}` (super-good reason), got: {:?}",
+                required,
+                patterns
+            );
+        }
+
+        // Patterns that MUST NOT be present (operator wants committed):
+        for forbidden in [
+            "**/audit/**",     // intentional audit evidence
+            "**/evidence/**",  // intentional evidence
+            "**/screenshots/**", // intentional screenshots
+            "*.png",           // media
+            "*.jpg",
+            "*.jpeg",
+            "*.gif",
+            "*.webp",
+            "*.mp4",
+            "*.mov",
+            "**/note.md",      // notes
+            "**/notes.md",
+            "**/NOTE.md",
+            "**/scratch.md",
+        ] {
+            assert!(
+                !patterns.contains(&forbidden.to_string()),
+                "default_untracked_exclude_patterns must NOT contain `{}` (operator wants committed), got: {:?}",
+                forbidden,
+                patterns
+            );
+        }
     }
 
     #[test]
