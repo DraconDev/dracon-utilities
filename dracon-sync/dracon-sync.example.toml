@@ -300,7 +300,7 @@ auto_create = false
 # [[publish_targets]]
 # name = "crates-io"
 # registry = "crates-io"          # crates-io | npm | pypi
-# [DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA2cVAyeUFTTDhDZWZkR00yY2t4eE5jYStLeWZlbWI1aTlpOUJrYkU5S3djCjRHby8yczJ4QVpTM2RLUmw3ZU9xUEhtWTdSSy8vS3ZCWnBDN29hakd2MzQKLT4gWDI1NTE5IHliZ2xyQ0YrRTNnVjBSaGJmaUFKbERjakswYjJlRlp2VE9jRUdPay9TaVkKeS84OFgvOUpJUC9EdytaZ3pSSUVSK1pyTHp2SFdheERjOTVnZWR2QjFsUQotPiBYMjU1MTkgVkpFMzNMZEFHZWZzV3VJTUxVMjRqakE5Rkw1QTczTWpNTkY1MCtPdlhUWQpMOW5ZYnBvMk00MXpPVHQ5UTEzblRVcjc5eVJqcjBJL2Uwam9JeFdBdVA4Ci0+IFgyNTUxOSBZNVFhTXk1eG5FbUI5T003cDVzbmlUc1piNWRHQVE2dy9mWkVEc2VkOFZrCjducHE5bXVMWkNzdHFDVWJZakN6a0ZQZy9BR0lyQk1nTFBlUjl3Q2g4Z3cKLT4gWDI1NTE5IGE0MCsxaWdnN0NKZWxhQjRpV09GT2daTVFGVHlGMzM2Z2R6eWVQTWxDUUUKYVZ1VkhZaWhNajF2ZDljdkZMeGI3UmFpalVlTmd4VmdkVHdaU2RVMFU1TQotPiBqekdZXC1ncmVhc2UgKWEKTVp6STZuNjRoTmNYTzFjS1czOW9hdGdyUE9sQnNZQzhBMXd6UjRCRkdJQklCVCtldldNU2UvVG1NYmVCb1JERQpmZGIzCi0tLSBtaFVmTUM4MVNqek9aYTNxWEJzbTBZQ2RJR0VaZXYweTgwTFF1OWV0d0hFCksPuBPeRaslwRLC3JoVRX57KWdKyxdIukrCWXyI7QdtQhOsUBKpRyDSkQsih/ve5qDICT5GzU/EGCSQN4Kyya8tmHc6hA==]   # env var name (token in secrets/cratesio.env)
+# [DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA5ZDkzRlZ1QlRKUExQZ0J2SEtkU1drVUZtVStBWW90QzRlVUQ1S0hDZFhBCm1YOUthakR1Y3pyeXIxK1had1BYYWJhQktrbTRFSFErVGR1RFBMSSs2clUKLT4gWDI1NTE5IDBURm9UWmZwNGwwajdDSVNMTDROdEdreDBrdkppWEZGMlN4K0FPblRhV3MKUE1GcWZrMVFGZHVHK1BPdmNOSXlxS1VUS0hla0pzQXdZeHM4VVk2NldQOAotPiBYMjU1MTkgSzVRM0JTb1BOZk5iQ0l1c1QzUy94N1l2Y25IQlNxd05BT1FMb3h1OCtXWQpKOVNLdVNiaHhwUm9oRXFaeDhrUVlXQjJUOFFYOEhNclRYem5LalFPTWtBCi0+IFgyNTUxOSBQVk45ckRIRWZWZXl3Rlh2QjA2eWptUmMydWtMU1dSck1hdFA3QStUSlRvCmM4RFpJUmhINGt1djlxTytDWG5RNTJyaWZra0hQR3A1ZjlTNnVwcmZZa1kKLT4gWDI1NTE5IGcwQjdxZkcxcExINjFydnBhbEdGWE9KRERtNnpQVUhxZnFTUHo1bitRMWMKd2Z0Qk1kcWp2b3VNOFVNQTVVcFRYdzYzSlZ4S1k4c2RCMzFMcVNqc3MybwotPiBOX2MoNmk2NC1ncmVhc2Uga25fIDNAPUYtIHhoXWNGUgpCbzRxbWxtbVZnCi0tLSBEZG5idEg4OEszZHEwakJRZ3g1V0k4c3hqR0xaM2U0dDhveFpOK05jVlo0Cl+XAjHbGwj0ELkQUq4/EvumC2R3KR/uW03bJ8SSr758eXTPvG3zVt2tUw2o/DA6WlVS8x7FNkGUQC0vGEpLTcVxhzO56Q==]   # env var name (token in secrets/cratesio.env)
 # publish_timeout_secs = 300
 #
 # [[publish_targets]]
@@ -494,3 +494,74 @@ auto_create = false
 # The daemon does NOT rewrite the git identity at runtime; auto-commits
 # always use whatever the local config resolves to. Operators should
 # keep their profile consistent.
+
+# =============================================================================
+#  SECTION 13: OWNERSHIP DETECTION (SAFETY GUARD RAIL)
+# =============================================================================
+# The daemon classifies each repo as `Owned`, `Unowned`, or `Unknown` based
+# on three signals:
+#   1. `git config user.email` ∈ `trusted_emails`
+#   2. HEAD author name/email ∈ `trusted_authors` or `trusted_emails`
+#   3. `origin` remote URL host ∈ `trusted_remote_hosts`
+#
+# When `auto_skip_unowned = true` (the safety-first default) and a repo
+# is `Unowned` or `Unknown`, the daemon does NOT commit or push to it.
+# This protects against repos whose `origin` is someone else's account
+# (e.g. `zerostack-reference` → `gi-dellav/zerostack.git`) or whose HEAD
+# author is a historical bad config (e.g. `dracon-ai-lib` → `Dracon
+# <dracon@void>`).
+#
+# Use `dracon-sync ownership --explain <repo>` to diagnose why a repo
+# is or isn't owned.
+#
+# Defaults: auto_skip_unowned = true, trusted_emails = [dracsharp@gmail.com],
+# trusted_authors = [DraconDev], trusted_remote_hosts = the three DraconDev
+# hosts on GitHub/GitLab/Codeberg. To extend, override per-repository in
+# `<repo>/.dracon/dracon-sync.toml`:
+#
+#   # Force this specific repo to be Owned (overrides all signals):
+#   owned = true
+#
+#   # Re-enable the daemon for a specific Unowned repo (operator confirmed):
+#   auto_skip_unowned = false
+#
+# To disable the safety guard rail globally (NOT recommended):
+#   auto_skip_unowned = false
+#   trusted_emails = []
+#   trusted_authors = []
+#   trusted_remote_hosts = []
+# auto_skip_unowned = true
+# trusted_emails = ["dracsharp@gmail.com"]
+# trusted_authors = ["DraconDev"]
+# trusted_remote_hosts = [
+#     "github.com/DraconDev",
+#     "gitlab.com/dracondev",
+#     "codeberg.org/dracondev",
+# ]
+
+# =============================================================================
+#  SECTION 14: SETTLING MAX-DELAY (AGGRESSIVE AUTO-COMMIT)
+# =============================================================================
+# When a repo has been dirty continuously for > `settling_max_delay_secs`,
+# the daemon force-commits REGARDLESS of fingerprint stability. This
+# prevents the "⏸ stalled Xm" pileup the operator sees when many repos
+# have stale dirty state from previous sessions.
+#
+# The 5s fingerprint-stability wait is still used for actively-edited
+# repos, so the daemon doesn't commit on every keystroke.
+#
+# `dirty_max_age_action` controls what happens when the max-age is hit:
+#   - Commit (default): force-commit the current state
+#   - Warn: log a warning, do not commit (operator must intervene)
+#   - Ignore: do nothing
+#
+# `min_commit_interval_secs` is the minimum time between consecutive
+# auto-commits for the same repo. Prevents thrashing when the operator
+# is actively editing.
+#
+# To override per-repository, set in `<repo>/.dracon/dracon-sync.toml`:
+#   settling_max_delay_secs = 30  # be more aggressive for this repo
+#   dirty_max_age_action = "warn"  # never force-commit; just warn
+# settling_max_delay_secs = 60
+# dirty_max_age_action = "commit"  # or "warn" or "ignore"
+# min_commit_interval_secs = 5

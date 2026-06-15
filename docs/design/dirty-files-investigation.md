@@ -587,3 +587,130 @@ now always reflects ground truth.
 - The auto-commit backstop is dormant (ahead=0).
 - The in_flight staleness filter eliminates false `🔄 now`
   indicators for repos that have completed or stalled.
+
+## Ownership-based skip (added 2026-06-15)
+
+The user requested that the daemon "default-skip" repos that are
+not clearly owned by the operator, because the daemon was happily
+auto-committing and auto-pushing into repos that were not theirs
+(e.g. `zerostack-reference`'s `origin` remote pointed to
+`gi-dellav/zerostack.git`, and `dracon-ai-lib`'s HEAD author was
+the historical bad config `Dracon <dracon@void>`).
+
+### The heuristic
+
+`ownership::detect_ownership` reads three signals and classifies
+the repo:
+
+1. `git config user.email` (the local config). If set and NOT in
+   `policy.trusted_emails` (default `["dracsharp@gmail.com"]`),
+   the repo is **Unowned** with reason `untrusted_email`.
+2. HEAD commit author email and name. If neither email nor name
+   is in `policy.trusted_emails` / `policy.trusted_authors`
+   (default `["DraconDev"]`), the repo is **Unowned** with
+   reason `untrusted_author`. Catches the `dracon-ai-lib` case.
+3. `origin` remote URL. If set and its host (and account path
+   segment) doesn't contain any of `policy.trusted_remote_hosts`
+   (default `["github.com/DraconDev", "gitlab.com/dracondev",
+   "codeberg.org/dracondev"]`), the repo is **Unowned** with
+   reason `untrusted_origin`. Catches the `zerostack-reference`
+   case.
+
+### The policy fields
+
+- `auto_skip_unowned: bool` (default `true`) — safety guard
+  rail. When true, the daemon skips auto-commit AND auto-push
+  for repos classified as `Unowned` or `Unknown`.
+- `trusted_emails: Vec<String>` (default
+  `["dracsharp@gmail.com"]`)
+- `trusted_authors: Vec<String>` (default `["DraconDev"]`)
+- `trusted_remote_hosts: Vec<String>` (default
+  `["github.com/DraconDev", "gitlab.com/dracondev",
+  "codeberg.org/dracondev"]`)
+
+### Per-repo override
+
+`<repo>/.dracon/dracon-sync.toml` supports:
+
+- `owned = true` — force Owned (overrides all signals)
+- `owned = false` — force Unowned (overrides all signals)
+- `auto_skip_unowned = false` — re-enable the daemon for this
+  specific repo (operator confirmed they want to push into it)
+- `auto_skip_unowned = true` — explicitly skip (overrides
+  global)
+
+### The CLI
+
+`dracon-sync ownership [--explain] [--json] [--repo <path>]`
+prints the classification and (with `--explain`) the raw
+`git config`, HEAD author, and origin URL for each repo. Use
+this to diagnose why a repo is or isn't owned:
+
+```
+$ dracon-sync ownership --explain --repo /home/dracon/Dev/dracon-ai-lib
+┌──────────────────────────────┬──────────────────────────────┬─────────────────────┬──────────────────────┬────────────────────────────────────────────────┬─────────────┐
+│ 📦 REPO                      ┆ 🩺 OWNERSHIP                 ┆ 📧 user.email       ┆ 👤 HEAD author       ┆ 🌐 origin                                      ┆ 🔧 override │
+╞══════════════════════════════╪══════════════════════════════╪═════════════════════╪══════════════════════╪════════════════════════════════════════════════╪═════════════╡
+│ /home/dracon/Dev/dracon-ai-lib ┆ 🚫 unowned: untrusted_author ┆ dracsharp@gmail.com ┆ Dracon <dracon@void> ┆ https://github.com/DraconDev/dracon-ai-lib.git ┆ —           │
+└──────────────────────────────┴──────────────────────────────┴─────────────────────┴──────────────────────┴────────────────────────────────────────────────┴─────────────┘
+```
+
+### The report
+
+The `repos` table shows unowned repos with:
+
+- `STATE = 🚫 unowned`
+- `ACTIVITY = 🚫 unowned: HEAD author = Dracon <dracon@void>`
+- `HINT = 🚫 unowned: untrusted_author — run ownership --explain`
+
+### Verification
+
+- `dracon-ai-lib` is correctly classified as `Unowned` with
+  reason `untrusted_author` (HEAD author is historical bad
+  config). The daemon logs `🚫 /home/dracon/Dev/dracon-ai-lib
+  skipping (untrusted_author)` once per cycle and does NOT
+  issue any `sync_commit` to it. Working tree is untouched.
+- All owned repos are still committed normally.
+
+## Settling max-delay (added 2026-06-15)
+
+The user requested that the daemon "should be very actively
+committing" so that stale dirty state from previous sessions is
+drained promptly. The 5-second fingerprint-stability wait
+remains for actively-edited repos (so the daemon doesn't commit
+on every keystroke), but for repos that have been dirty
+continuously for > `settling_max_delay_secs` (default 60s), the
+daemon commits REGARDLESS of whether the fingerprint is still
+changing.
+
+### The policy fields
+
+- `settling_max_delay_secs: u64` (default `60`) — when a repo
+  has been dirty for this many seconds, force-commit regardless
+  of fingerprint stability.
+- `dirty_max_age_action: DirtyMaxAgeAction` (default
+  `DirtyMaxAgeAction::Commit`) — what to do when the
+  max-delay is hit:
+  - `Commit` (default) — force-commit the current state
+  - `Warn` — log a warning, do not commit
+  - `Ignore` — do nothing
+- `min_commit_interval_secs: u64` (default `5`) — minimum time
+  between consecutive auto-commits for the same repo. Prevents
+  thrashing when the operator is actively editing.
+
+### Per-repo override
+
+`<repo>/.dracon/dracon-sync.toml` supports:
+
+- `settling_max_delay_secs: u64` — override the global
+  max-delay
+- `dirty_max_age_action: DirtyMaxAgeAction` — override the
+  global action
+
+### Verification
+
+Live table went from **5 OK / 9 WARN** (with 7+ rows stuck in
+`⏸ stalled Xm` for 8-34 minutes) to **14 OK / 0 WARN** within
+30 seconds of enabling the new daemon. All the stale dirty
+state was force-committed and the operator can see clean status
+across all 14 owned repos.

@@ -8,6 +8,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Ownership detection + default-skip safety guard rail**:
+  the daemon now classifies each repo as `Owned`, `Unowned`,
+  or `Unknown` based on three configurable signals:
+  `git config user.email` ∈ `policy.trusted_emails`,
+  HEAD author name/email ∈ `policy.trusted_authors`, and
+  `origin` remote URL host ∈ `policy.trusted_remote_hosts`.
+  When `auto_skip_unowned = true` (the safety-first default)
+  and a repo is classified as `Unowned` or `Unknown`, the
+  daemon logs `🚫 /path/to/repo skipping (<reason>): <detail>`
+  once per cycle and does NOT issue any `sync_commit` or
+  push to it. The `repos` table shows the new `🚫 unowned`
+  STATE icon with a `run ownership --explain` HINT pointing
+  the operator at the new `dracon-sync ownership` subcommand.
+  This protects against repos whose `origin` is someone
+  else's account (e.g. `zerostack-reference` →
+  `gi-dellav/zerostack.git`) or whose HEAD author is a
+  historical bad config (e.g. `dracon-ai-lib` →
+  `Dracon <dracon@void>`). 11 new unit tests for the
+  classification logic, 4 new policy field tests for
+  defaults/serde/per-repo override, and 2 new end-to-end
+  tests with `create_test_repo`. Per-repo override
+  `RepoPolicyOverride.owned` and `auto_skip_unowned` re-enable
+  the daemon for specific repos.
+
+- **Settling max-delay + DirtyMaxAgeAction**: the daemon now
+  force-commits a dirty repo that has been dirty continuously
+  for > `settling_max_delay_secs` (default 60s) regardless of
+  fingerprint stability. This prevents the "⏸ stalled Xm"
+  pileup the operator was seeing — the user explicitly
+  requested that the daemon "should be very actively
+  committing". The 5s fingerprint-stability wait is still
+  used for actively-edited repos (so the daemon doesn't
+  commit on every keystroke). The max-age action is
+  configurable via `policy.dirty_max_age_action`
+  (`Commit` | `Warn` | `Ignore`); per-repo override via
+  `RepoPolicyOverride.settling_max_delay_secs` and
+  `dirty_max_age_action`. 5 new unit tests cover the
+  defaults, the policy field serde, the per-repo override,
+  and the test fixture regression. New `min_commit_interval_secs`
+  policy field (default 5) exposes the per-repo commit
+  rate-limit gate.
+
 - **Push retry budget + push-stuck state**: the daemon now
   tracks `consecutive_failures` and `last_error` per stuck
   push repo in the on-disk
