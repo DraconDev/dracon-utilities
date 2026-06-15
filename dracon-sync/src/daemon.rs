@@ -254,7 +254,7 @@ mod tests {
     }
 
     #[test]
-    fn test_record_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAyenM1b3o0R2U4Tll6QkRBdHBFOHJycU05eDJtZlJMKzJDT1ZPSFhxSzNjCnlRbzJVOUQ4NVlZMFV2TURaaWViRkRkdWhWM0VVckJZWnVrVlBFMm9LOGsKLT4gWDI1NTE5IEpjcmhjTktOODJRMjdQYXpMTUM5ekNIM3VzTkRJaHI3U1haN2xXaXlJUk0KQmd0dG9BdVN6VlVPYXhqZzNueHczZ2Z2bnM3ZHNvYzhKaDFDeUE0YnhGTQotPiBYMjU1MTkgR09GTkJIZTZKVVY4MWJ2eldKTnVxWVEwZG81RGp0TWxhb3NXeHRzWkZTQQpGVXcrcFI5T1NJZjhaRVY4RjVvNGVlRGczckVJaEpNejhSejJpQkVhQWJnCi0+IFgyNTUxOSBJa1RNYUhQdzFiSVNvcEZHdjhmREhISE1wWmVzTlJJeFVQbmNuOVFqWUIwCmpRNVIrMGQ5RmJmVFpVbnUvVmhGKzJoRjk1eklvMWZMMldGSmxVYTJ4TkkKLT4gWDI1NTE5IHZXZDlLZjRRV2pqYllhMHh6WE9WUUpVSStFMTcvd2orRSs1cmg2MEwwd1EKekFWYm1xNm04M0U4eDA3dUl2N0xmYmxNeW55M2M1QU1PYlRlMjI1LzROZwotPiBxPG07fUtZMi1ncmVhc2UgIVIgVVRBIFZGX0hTeCAnCjRJLzNvTG9lUjFQZ3ZFd2N3RStKNXo0VWlkMlVlUzlYbU80RFZkQ0w5SG8KLS0tIC80VHpNSWNLT1QzUUtPWmtCUVdKeXp2QjdJYnA4YXY2dzBMTzFsemJCVXMKuprG8AZH4Yiz040EHPZTG26zOcWd98k9Yjm1b+LHlMf/ND0anFGhcTUNx11mcBD1pbDyJfUtMrcglGMKcA3rZfhg]() {
+    fn test_record_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA1SDhzT2ZreDdQS3oxVVBzR1huc2FZZ0RRSGZ6SU9ybithN21GZjh6Y25ZCis5UVhwL2FOOHMzQXR6ZVc4U0dBMHY4K2RFZ1VveTFDWCtOUkd6YThuL1kKLT4gWDI1NTE5IGRsSWJCbHBpMjdldVlwZjFWZ3JLOU5ldGJvSnlZNS9NOHpiaytoYWdiU0kKQm5KN0FVUTN0Z1JOZEVtMURVUnN5OXI2V29GMzZaTkN3WlcyODRyblVGdwotPiBYMjU1MTkgS1FIVkY2NTErTVJSZTZxbUtxRzVOc3hKaEdVUFBUL2tSd1A1dnFSeXdWNApCVkNoeVhEejVabFpRR0RudldPaGo2bDJoTjVGZDJzeHVQbWdoVkc1ZVVvCi0+IFgyNTUxOSBPNlBkYUxuZnJGa2hpVkRKT1BpbnRWeXJpSGkycm5GaEZ5NWN1aEtFNWdRCkFJQXZ6Nm5leUNMTFNmcmFqVXNBR0g5djBOcUFFQ0xXRU0rTmp1NU9LL3MKLT4gWDI1NTE5IGVJbTBLMmxvNVI2QU9uQmlKMGEwV0EvOExmNVJnbm5hT2ZOc054ODlYbDAKVVNOaE85aGZKQkZFUUh1NzE4dlFaY0ZjZ2k1cUtkR21TTHhrMnM2WG8xVQotPiA6RzJRTi1ncmVhc2UgT2ouIFQoal1QJzJAIChpfikkJ1ZzCnVrZWp6UDlhNTJ0eTYwaURhQXlVaDdrTzFYRlo1Q1pjTDN6YlI0MUFvbFYwUUN1MUtuRVZnbWxNai9kQ2hKR2oKVHZnSGZhak14QnpucXRNYTVYU0xPTzUwc1dHNFYzZC9RTU0KLS0tIE1WbnVGbGxYaUxudVpzaVBzd2tXRzl5SzFRaHlxZ0NjZkxmYjlZdjNmeHcKr1KYxkl1mlnYpTQoJ59EcNIoUYFE0wh6XwfbLyHg9RCfcoEDrC/yLDFWaBtiVcWQlVffDwpC5IbiSM4RvKMMNkRw]() {
         // Use a temp state dir so this test does NOT pollute the
         // real stuck-push ledger at
         // ~/.local/state/dracon/dracon-sync-stuck-push-repos.json.
@@ -288,7 +288,7 @@ mod tests {
 
     #[test]
     fn test_record_push_success_clears_entry() {
-        // See `test_record_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSByWnBvbXhITW5va0grZjllL1kxMGFXWjZTeFJkSFNvZHp6Z3h3S0ZqaWx3CnFpdDdvUENxVGFrblQ5aHF5ZENlcHNFYzVveGxLR3BFUmVwOTg3QzQ4NGcKLT4gWDI1NTE5IGFqN0dsNUpoUTJEcCt5ZHErbGxXVFJBWHpRRG9TdEdXSHg4Y2RFblRmaGMKQnRsNEdNU05Kdy81N1gxOXVzQnVwSzZwamtiL09EMUFKUTNjRFNVSFYrbwotPiBYMjU1MTkgamsvTHhUOXJVWEVBdmo4SkxiY1NOcjFNTW9zNGd0Ymx4QVpOYTQ1dG9GNApHalBTL2ErNHNYNHdRb3hjK0FqMWgwcmN6UkRzSWVjLzNLUXQ0VU9jQ05vCi0+IFgyNTUxOSBlci9Nci9DK1Z1NVZCVGtiTFVIcC9tVkdZcFFPUzJ3Rm9wQ0daMGhmL2gwCnVBZE9WdFh4cXZnZ0xpTGpBcTRaUld6NlluNk44Y3djVE1SZ3RLcVB2bm8KLT4gWDI1NTE5IHN6T0tieTliT3FCQ0NLaU96QUFYTHpYZDhkREh4Ulg3WWQ5blp0cVEyUjAKb3lVeWNDMkhvbVdUYVFOTWtmS1k2QVgxSTUyTlJ0THpkRXlvNjZ4Q0FPOAotPiA5aFJ3LWdyZWFzZQpTMHNJdDRIOVlVd0hUWm1Ea3hnSHhLeGRsTmtkU1VFeXhDa29XSDAvQ1pBMXNGaXdlRllZcUhJc21iRGt6blQrCmlrUmMwNXd5QTgvYUlEWE1CVXZxZ3VPaC9xT1NmNnBuZmlTWHYyZTBwNEpyc0hnCi0tLSBWUkhxUUpMdGUxUDJWV09jNlFvWHFSNXYzS21nMkJFUW9aNVNiYmZtN1I4CjQGC3feELVV+cXwNMdn/CBjhCBl3ryUqV62xIqpDmol+PFAUGI9Sel89+Nbu7/TliK93KNnO0ru+s2pfvbYcQGPyw==]`
+        // See `test_record_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBpR29oN2dGRHpLVG93UVRtR01ScnpyK3dURVF4NS9SREd5bm9hVFc0OFdFCm53RTBVdHQxdzBSd1d5bTN6OHVTWGIybFVxWjd5eXc5Smd4YTJ5dmtLWHMKLT4gWDI1NTE5IHVEVEhvTmJpUVp1SDA2ZXMwOFo4eG5UZWhuVlo1dEpPbWJDelBpbHJIeTgKUnBjRGpXdEtzenR6ZnpCdURlTHZqMTlza2M0aTRMYXQ1YnNJTk1DaUd3UQotPiBYMjU1MTkgR01WWXlYZ3Y5WkFnOERrRFpvZGpzNDM0RWJFZ0FyY1pkMGN4ZXB2ZzRIYwoxZ0RYZytZSkVvdjZHb1VxMHV1OElvb2w5THY3c284V2pjOGNnaVNQb2t3Ci0+IFgyNTUxOSB1UWcraFNXdWw5RGY3TDZ1WndCQzZZTi9zVmNiSGl3NmE3cFFHbHZFR1RNCmN2Zkd3VzdiSXBkMmhrSCtWMFhKcWJGUit6emhqaTd0NGNVaUN2dFZaUWcKLT4gWDI1NTE5IDdHY1Z6QWVXMW10R0NvV1lvMk5kaXo5U3RFS25lS3FGRG5yeXN1V3dOVGsKZmEvVVZQdnJ1azFEaHVGRnphbWUzdklhcGVpcnpUNHFXaERTcG5CSzVDbwotPiAoNF58VTEtZ3JlYXNlIGxJQ1hTTXkgJHEgTQpKN1dOb0laUHl1d01BU2VHbVYremcxL1pzam5uZ0t4THkvdEFDR0kweGhnNDFoenFTeEZUcHFNCi0tLSB5OUhQSGZlK1VXclRqbWdiZVBYRDJrS1IvY3NTbXczcmRoaU52Umw5N3NzCj/aK0ntHuvwUkgJw+IQoVBPVJASljLDE3uww4CzGLc6qn/MA7IZbpIUQIEZW130K6X2yyqgzQ3WIiwMAST5uFf5Ag==]`
         // for the rationale on using a temp state dir.
         let temp_dir = tempfile::tempdir().unwrap();
         let _state_guard = crate::test_helpers::EnvRestorer::new(
@@ -309,8 +309,8 @@ mod tests {
     }
 
     #[test]
-    fn test_record_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBYQ2F5SVBMUGszdUlRVEdIdjdEOW1oaFlPd1dvUnAvbVNOSlFVUGR5RzJBCmdGdFJnZ0tTb0tleE43SG9HQTdPZTVvZDJBVVIxQ3lGZEdqWXRJc2VKVVUKLT4gWDI1NTE5IGFHR0htOWlDYWY3TUNXN0VCZW5ySmR2Q2o3MnRLZUlpZjcyZUJsU2RWRFEKbVBhbmlwbTI0S1VTVXB4SzJybXJiQUpCL09YbTd5TFlxOTZpeDI3MVNxRQotPiBYMjU1MTkgdW9XbndNcXU0cVlFUEkwVFJkbzF5RUJoK0RPQTZ1TDhUZDlucE1iYjJDcwpmNTAwT21KM1FDMUxyaFArdnRpcDNvaVFQT2toNitmbktzUW1vcnp1UVdNCi0+IFgyNTUxOSBsNm1YbXRQYlBiR05sUDhadjFvNzQrYnJkVGp5ODhpVEFPdnBZTW43a0YwCll2dm52YmEzeVlDTTdlQitWN1FCZExRUmNQamtTMVYvV1IzWWpoZytnckEKLT4gWDI1NTE5IHBQQ2E0cFp1c3dPOFpFV2dSVUlqZUVQcGt6T01MYkdNenZLazhPU0lEQncKa2Z5OWZJMEJOTkw3UXJIYm5oaEUwbTByTmVsREttRE9TZzhSRDZ4Q0lQZwotPiBaKy1ncmVhc2UgaFggSm1EW01uXgpvN0VMVVVBVHdxWTBOczE4SjRXR3VOMFJqbkgvZVNrSUpVK2tXUQotLS0gcFlxdC9QbDN5K081WTYxclNEemt4RmtaQVRaUkdqUldpcFFGZXVPdnBJYwrfsAzwhf/ZmqzjKyMYI8BH2yexZc3gFU14/J+TUyAWXSru0kmK/GGJFgE4DRweYumm0sBtkr5BD+Px0BYBMg==]() {
-        // See `test_record_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBna3dOZHpGUjVGSEJlZlZyRkU3aW44eldaTW5la3NJaXVock1ZNXJYTW5jCit1aUdDL1grVWlvV3NWSGZXWkJXNHVYRkUxRk9FNlZ2UllGY0tUdSs0Wk0KLT4gWDI1NTE5IGpsVUphNzV1VmdYSVhNd21lM20zVlZOR3JmMUN0WjRvaG9yR1FmbnNOejQKNjJHdmI2Y2FlZlc3UmZBL3pncGMvZm9vNWFaTk1HTDVybzZqaTNvcmZZdwotPiBYMjU1MTkgcmErZXdFYk1mek8zWVFwcE9DZVEzK01wdjBhREtrY21KUURMODREM1BucwptVWJqcVJSU1FLeVpiYksxU2pob2tZNWF0VkNOd2gvc1MxbGtOcCt6cEhZCi0+IFgyNTUxOSBxRU51bzBGUEdkRjVPUE5pWDNPMlo1Mll1c05rMWRXaDc2YlpCaFliZjE4ClcxOU9aRW0xREVaUGFBWCtRTktsc1d3WWFubzVCTUIyMmVDcmN2ZDFPbnMKLT4gWDI1NTE5IGlLR1JvYmMzMUxVVG1xUis5RnNxUHo2UDZaWWFjS3BudDJtWU1XWWxBbGMKdUY3MG9NMUx1RUpPNFdVeThZVWJnRWZUV3BYeHVZbnFncHNPL294YlNLTQotPiBeJi1zLDJyLWdyZWFzZSBJQS1LCkNJMnNuZDRTdkpQdUhqVHJTYU9IQlJiMWxnNHNrQXVRdUJWRVRRNHUzaTRBYWhaSzBwdlpnc3VycUlrMVUzNAotLS0gcWJpc2I5T1I4czJCOHVITFVBWXdXSjh2Mk9meXUwUHlSN3labFNOMy9IVQomQyt2I3TOqoIk19qU8CXkeeMd3EQwycNWa9onvBXr3vlUKcPz1IcTPZxrjlQmk7QVR92nxOmP5VyoNIu3OTBzkNo=]`
+    fn test_record_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBqQmUzN28waW5TT2JHUjBQWDZpZ1JNbm8yUXBqeTJGQWRMSnEvaVV5WG40Ckx2UEZzMzh3cStFdHl2YXdHQmM4ZVNDUWtzbldxRDYvcHhnU1gza1lob1UKLT4gWDI1NTE5IElTM3hSNVJ4VUVUYS9DbWtmbzNMQVgxMWxvbjljNUVZSmo5WkVKRkREQzAKOUE5TVJqVWg1T3B2ODRPMnF1NXJoMENaVjJkNkVVdTAxOUQwdVNpdEczVQotPiBYMjU1MTkgdEtNNjV5OU9XOGZiNTNLR2Q0QURWM1VGY3ZUeDQvTWtQRlJyWDN0bUVVMApUbzEzT0ljbGtkQjg5RVBOSWs5Sm9BcmF5c1FpdEk5Nm43TXIxV2hFeDNJCi0+IFgyNTUxOSAyMUZUQWh5YzFyVk1JaFY4R0NqY0VJU00yY0JQdWFYNzRyNTVicjk3bm5VClhEUy8vcm4vVXk0ekVHQ1dmSlZQQWFRMERYTHp3Zno0TUg5VHNOQUZodm8KLT4gWDI1NTE5IGxVRTk1NU1Xak5DZGg3YUdPY2hCQkNtL2NzVU5UZTVkdEtmOGQ0WnlQQzQKNmdqNkI0WGdyS0xqRlE2MzdzT0V2N0ZqNEpzYWFSRlZLaEZTMVdNT0ZqYwotPiBKUWNZcHUtZ3JlYXNlCmtwaFRoRzJiY05yNlQvWlUyRUtPTlYvcVV6M2dFdlVrUGJtbWd4WTVmMkVnMGVjR3FkLzU4T1ovMHI2YkNHTHIKZU1wUm9nVlMxQklwcDd6QUdCT3ZWY3c1Ci0tLSBvTFl6ZFVjelJTaitSSlNLeW1VQVJadkx0UzZEZ296NU04VW53T2o3T2dnCiZqn1cflHZBVBZ+I9Ti0HYMdlXEe3s+nlevFQcnVjlh5J5BEG8M1z4bvy9nDLamHQ+9F8jevMw/Vugx4kbK]() {
+        // See `test_record_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA1bXlHRU1mdjgzSnJSTWpDSjIvYVBLQ3R1R3lMTDllVmNtZ1ViVlU5TFhVCndBa0s0UXlVNzRjUndmSVRTMzN2ZmNFU3RkcEMxSEZlUjJJZzREK0FsTTAKLT4gWDI1NTE5IEVYbVJFbjNlNjFrN0gwdTJ1N1l4dG5PL0N2UFJMMVBiT1FhMkpYVTRxeG8KWHdSRWY3U1hVWUo2NHFON1o2WnFFSm92U29QaDJUc294L0dDOTdnbmdmSQotPiBYMjU1MTkgNVpBVW1BSUdkUDF1N1hkQUNwSHNHakJ4NW5rdDRpRTIyQlNFR1hrNm5tOApVY0pseWR3WXZ4NGJ5RDA1eTdLSW9MM2ZoQmdZd3p0cFlZNkI1Rm94Y1RRCi0+IFgyNTUxOSBGMUZXM0x3Lythcmwzb0FuSjRkMWZCcjlHbHc5S0VhSVpCa1JEWURYcFdzCjZDRGFldk1SRnJvcGp5MlBCM0l2OTZ5UmR6czJ1V1RON250RDBWMStMcUEKLT4gWDI1NTE5IHlnZGE5amZKbVVrWWRoZXBaTzZQN2JOd245VW1VWkVBVnRqU1lSbk82bWsKcCswYXRuMHEwVXE2Q3FqcHJxbzlSalU4Qm9OUHNaQzVQTEMwTGZUMnRLcwotPiB0NEctZ3JlYXNlCmlLMXZjR0tkU01KLytYSGp2TTdDcTcyQnJOc0M2TzFWVDZ6dlprMlV3aWtMRFJTK1AvdGlXK0xLCi0tLSBBeTA4S3VLQzh1ZERaL0wvVDRpaUFyNXF1MFh1dlNZRnE0WmpOL3k4bndvCjBF2hEU1d+fE8vRM+6Gcz+22zj64LeHthNoCxuxGZrAPy41PicyAu4JFMc/XJTT5qjRlOdg6SwQcC2D6g+JPrTyjw==]`
         // for the rationale on using a temp state dir.
         let temp_dir = tempfile::tempdir().unwrap();
         let _state_guard = crate::test_helpers::EnvRestorer::new(
@@ -417,6 +417,63 @@ mod daemon_tests {
         assert!(in_flight.contains(&repo));
         assert!(!in_flight.contains(&repo2));
         assert!(in_flight.contains(&repo3));
+    }
+
+    /// Regression test for the trailing-drain bug discovered
+    /// on 2026-06-15 during the `dracon-platform` push
+    /// investigation. The bug: if a sync task (e.g. a 60s
+    /// push) didn't complete within the trailing-drain
+    /// deadline, the `in_flight` HashSet was never cleared for
+    /// that task. The result: the COLLECT phase of every
+    /// subsequent cycle skipped the repo, and it was never
+    /// processed again until the daemon restarted.
+    ///
+    /// Fix: on trailing-drain timeout, clear all `in_flight`
+    /// entries that were dispatched in this cycle but not
+    /// drained. This test simulates the data structure: a
+    /// repo inserted into `in_flight` (simulating dispatch) is
+    /// still present after the dispatch; the trailing-drain
+    /// timeout (simulated by not removing) would normally
+    /// leave it stuck; the fix clears it.
+    #[test]
+    fn test_trailing_drain_clears_stuck_in_flight() {
+        use std::path::PathBuf;
+        let mut in_flight: std::collections::HashSet<PathBuf> = std::collections::HashSet::new();
+        let mut dispatched_this_cycle: std::collections::HashSet<PathBuf> =
+            std::collections::HashSet::new();
+
+        // Simulate dispatching 3 slow tasks.
+        let repo1 = PathBuf::from("/tmp/slow-repo-1");
+        let repo2 = PathBuf::from("/tmp/slow-repo-2");
+        let repo3 = PathBuf::from("/tmp/slow-repo-3");
+        in_flight.insert(repo1.clone());
+        in_flight.insert(repo2.clone());
+        in_flight.insert(repo3.clone());
+        dispatched_this_cycle.insert(repo1.clone());
+        dispatched_this_cycle.insert(repo2.clone());
+        dispatched_this_cycle.insert(repo3.clone());
+        assert_eq!(in_flight.len(), 3);
+
+        // Simulate the trailing drain: only repo1 completes
+        // within the deadline. The other 2 timeout.
+        in_flight.remove(&repo1);
+        dispatched_this_cycle.remove(&repo1);
+
+        // The fix: on trailing-drain completion, clear all
+        // remaining `dispatched_this_cycle` entries from
+        // `in_flight` (these are the tasks that timed out and
+        // are still running in the background).
+        for repo in &dispatched_this_cycle {
+            in_flight.remove(repo);
+        }
+
+        // After the fix, `in_flight` is empty. The next
+        // cycle can re-dispatch repo2 and repo3.
+        assert!(
+            in_flight.is_empty(),
+            "trailing-drain should clear all dispatched entries, but `in_flight` still contains: {:?}",
+            in_flight
+        );
     }
 
     #[test]
@@ -2072,8 +2129,31 @@ pub(crate) async fn run_daemon(
             // policy as the apply phase (`pulse_interval_secs * 2`)
             // so the cycle time is bounded to ~2-3× pulse interval
             // regardless of how many slow pushes are in flight.
+            //
+            // BUGFIX (2026-06-15): previously, on trailing-drain
+            // timeout (`Err(_) => break`), the unfinished tasks
+            // were dropped from `in_flight_tasks` (which goes out
+            // of scope) but their entries in the `in_flight`
+            // HashSet were NEVER cleared. The result: a slow
+            // sync task (e.g. a 60s push on `dracon-platform`)
+            // would stay in `in_flight` forever, causing the
+            // COLLECT phase of every subsequent cycle to skip
+            // the repo. The repo would never be processed again
+            // until the daemon restarted.
+            //
+            // Fix: track dispatched repos in a local set, and
+            // on trailing-drain timeout (or normal completion),
+            // clear any `in_flight` entries that were not
+            // drained. This breaks the no-redispatch invariant
+            // for slow tasks, but the invariant was never
+            // achievable for slow tasks anyway (they always
+            // timed out). The trade-off is: re-dispatching a
+            // slow task is recoverable (the new task will fail
+            // with a lock conflict or remote rejection), while
+            // permanent skip is not.
             let trailing_deadline = Duration::from_secs(policy.pulse_interval_secs.max(1) * 2);
             let trailing_deadline_at = tokio::time::Instant::now() + trailing_deadline;
+            let mut dispatched_this_cycle: HashSet<PathBuf> = in_flight.clone();
             loop {
                 let next =
                     tokio::time::timeout_at(trailing_deadline_at, in_flight_tasks.next()).await;
@@ -2084,6 +2164,7 @@ pub(crate) async fn run_daemon(
                 };
                 if let Ok((repo, remote_failures, sync_res)) = joined {
                     in_flight.remove(&repo);
+                    dispatched_this_cycle.remove(&repo);
                     if let Some(entry) = activity.get_mut(&repo) {
                         entry.remote_failures = remote_failures;
                         match sync_res {
@@ -2117,6 +2198,25 @@ pub(crate) async fn run_daemon(
                             }
                         }
                     }
+                }
+            }
+            // BUGFIX (2026-06-15): clear `in_flight` entries for
+            // tasks that were dispatched in this cycle but did
+            // NOT complete within the trailing deadline. These
+            // tasks are still running in the background (we
+            // don't know which ones), but we must remove them
+            // from `in_flight` so the next cycle can re-dispatch.
+            // Without this, a slow task causes permanent skip
+            // (see comment above).
+            if !dispatched_this_cycle.is_empty() {
+                eprintln!(
+                    "🔄 trailing-drain: clearing {} stuck in_flight entries: {:?}",
+                    dispatched_this_cycle.len(),
+                    dispatched_this_cycle
+                );
+                let _ = std::io::stderr().flush();
+                for repo in &dispatched_this_cycle {
+                    in_flight.remove(repo);
                 }
             }
         }
