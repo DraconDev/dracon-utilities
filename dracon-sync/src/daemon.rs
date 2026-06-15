@@ -681,8 +681,7 @@ pub(crate) fn save_in_flight(repos: &HashSet<PathBuf>) {
     } else {
         // Sort for deterministic output (helps tests and
         // operator debugging via cat).
-        let mut paths: Vec<String> =
-            repos.iter().map(|p| p.display().to_string()).collect();
+        let mut paths: Vec<String> = repos.iter().map(|p| p.display().to_string()).collect();
         paths.sort();
         serde_json::to_string_pretty(&serde_json::json!({
             "in_flight": paths,

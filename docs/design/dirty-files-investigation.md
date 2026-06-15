@@ -356,3 +356,63 @@ parallelize the 3 remotes inside `push_background` (origin + gitlab
 + codeberg in parallel) and/or switch from `push_background` to a
 truly fire-and-forget push that records the result in a side
 channel. Both are deferred to a follow-up.
+
+## ACTIVITY column redesign (follow-up)
+
+The `ACTIVITY` column in `dracon-sync repos` was previously a
+duplicate of the `LAST COMMIT` column: both showed the relative
+time of the last commit (e.g. "7m"). When 5+ rows had the same
+"7m" timestamp, the user could not tell whether they were:
+
+- (a) "the daemon is actively working on this right now" (would
+  explain the same-timestamp pattern: many rows being processed
+  in parallel all touched around the same time), or
+- (b) "the daemon committed something 7m ago and has been quiet
+  since" (also explains the same-timestamp pattern).
+
+The user correctly suspected the latter: 7 minutes of inactivity
+looks like a stall, not "super busy work".
+
+### New ACTIVITY column semantics
+
+The column now shows one of seven states:
+
+| Label             | Meaning                                                      |
+|-------------------|--------------------------------------------------------------|
+| `🔄 now`          | Daemon has an in-flight task for this repo                   |
+| `🟣 pushing Xm`   | `push_status=PENDING`, push has been in progress for X min   |
+| `⏳ settling`     | Dirty tracked work, fingerprint not yet stable (< 1 min)     |
+| `⏸ stalled Xm`    | Dirty tracked work, no daemon action for X min               |
+| `🟢 synced Xm`    | Clean, in sync, recent commit (within 1h)                   |
+| `⚪ idle Xh`      | Clean, no in-flight, last commit 1h-24h ago                  |
+| `⚫ cold Xd`      | Clean, no activity for > 24h                                 |
+
+### Implementation
+
+The daemon now writes its `in_flight: HashSet<PathBuf>` to
+`~/.local/state/dracon/dracon-sync-in-flight.json` on every
+cycle. The write is atomic (temp file + rename), self-cleaning
+(file removed when set is empty), and removed on daemon
+shutdown. The `repos` command reads this file to determine the
+`🔄 now` state for each row.
+
+This is a thin IPC layer: the file is ≤1KB (17 repo paths
+max), the write is one syscall per cycle, and the read is one
+syscall per `repos` invocation. No persistent state, no cleanup
+needed (file is self-cleaning).
+
+### Why this matters for operators
+
+The new column makes the daemon's work visible at a glance:
+
+- A row showing `🔄 now` is being actively processed — the
+  operator doesn't need to investigate.
+- A row showing `⏸ stalled Xm` is dirty but the daemon isn't
+  picking it up — the operator should investigate.
+- A row showing `🟣 pushing Xm` has been pushing for X
+  minutes — useful for catching stuck pushes early.
+- A row showing `⏳ settling` is dirty but the daemon is
+  intentionally waiting for fingerprint stability — normal.
+
+The previous `7m` value was ambiguous. The new column replaces
+ambiguity with intent.

@@ -8,6 +8,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **ACTIVITY column now distinguishes active from stalled**: the
+  `ACTIVITY` column in `dracon-sync repos` was previously a
+  duplicate of the `LAST COMMIT` column (just the relative
+  time of the last commit), which made it impossible to tell
+  whether a row was "actively being processed" or "stalled"
+  when many rows had the same timestamp. The new column shows
+  one of: `🔄 now` (daemon has an in-flight task for this repo),
+  `🟣 pushing Xm` (push in progress), `⏸ stalled Xm` (dirty &
+  no daemon action for X minutes), `⏳ settling` (dirty & waiting
+  for fingerprint stability), `🟢 synced Xm` (clean & recent),
+  `⚪ idle Xh` (clean & waiting), `⚫ cold Xd` (no activity > 24h).
+  The daemon now writes its `in_flight: HashSet<PathBuf>` to
+  `~/.local/state/dracon/dracon-sync-in-flight.json` on every
+  cycle, atomically (write-temp + rename), self-cleaning (file
+  removed when set is empty), and removed on daemon shutdown.
+  The `repos` command reads this file to render the new column.
+  7 new unit tests in `dracon-sync/src/report.rs` for each
+  ACTIVITY state. Legend updated to describe the new semantics.
+
 - **No-redispatch invariant for parallel sync**: the daemon now
   tracks an `in_flight: HashSet<PathBuf>` consulted by the COLLECT
   phase's eligibility check. A repo with an active `sync_repo`
