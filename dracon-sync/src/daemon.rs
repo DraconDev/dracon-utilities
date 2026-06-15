@@ -71,24 +71,6 @@ pub(crate) struct StuckRepoEntry {
     #[serde(default)]
     pub(crate) last_error_at: u64,
 }
-    /// Number of consecutive push failures. Reset to 0 on
-    /// successful push. Used to detect when the retry budget
-    /// is exhausted and the daemon should stop auto-pushing
-    /// (the operator can then intervene via `repair-concerns`).
-    /// Defaults to 0 for entries written before this field
-    /// was added.
-    #[serde(default)]
-    consecutive_failures: u32,
-    /// Last error message from the failed `git push`. Surfaced
-    /// in the `repos` HINT column so the operator can see
-    /// WHY the push is stuck (auth, non-FF, network, etc.)
-    /// without grepping the daemon log.
-    #[serde(default)]
-    last_error: String,
-    /// Epoch seconds of the last push failure.
-    #[serde(default)]
-    last_error_at: u64,
-}
 
 /// Default policy value: number of consecutive push failures
 /// before the daemon stops auto-pushing and surfaces a
@@ -107,6 +89,10 @@ mod tests {
         let entry = StuckRepoEntry {
             path: PathBuf::from("/test/repo"),
             stuck_since: 1000,
+            consecutive_failures: 0,
+            last_error: String::new(),
+            last_error_at: 0,
+            
         };
         let json = serde_json::to_string(&entry).unwrap();
         assert!(json.contains("\"/test/repo\""));
@@ -166,6 +152,10 @@ mod tests {
         let entry = StuckRepoEntry {
             path: PathBuf::from("/test/repo"),
             stuck_since: 1000,
+            consecutive_failures: 0,
+            last_error: String::new(),
+            last_error_at: 0,
+            
         };
         let debug = format!("{:?}", entry);
         assert!(debug.contains("/test/repo"));
@@ -177,6 +167,10 @@ mod tests {
         let entry = StuckRepoEntry {
             path: PathBuf::from("/test/repo"),
             stuck_since: 1000,
+            consecutive_failures: 0,
+            last_error: String::new(),
+            last_error_at: 0,
+            
         };
         let cloned = entry.clone();
         assert_eq!(cloned.path, entry.path);
@@ -188,14 +182,26 @@ mod tests {
         let entry1 = StuckRepoEntry {
             path: PathBuf::from("/test/repo"),
             stuck_since: 1000,
+            consecutive_failures: 0,
+            last_error: String::new(),
+            last_error_at: 0,
+            
         };
         let entry2 = StuckRepoEntry {
             path: PathBuf::from("/test/repo"),
             stuck_since: 1000,
+            consecutive_failures: 0,
+            last_error: String::new(),
+            last_error_at: 0,
+            
         };
         let entry3 = StuckRepoEntry {
             path: PathBuf::from("/other/repo"),
             stuck_since: 1000,
+            consecutive_failures: 0,
+            last_error: String::new(),
+            last_error_at: 0,
+            
         };
         assert_eq!(entry1.path, entry2.path);
         assert_ne!(entry1.path, entry3.path);
@@ -207,6 +213,10 @@ mod tests {
         let entry = StuckRepoEntry {
             path: path.clone(),
             stuck_since: 12345,
+            consecutive_failures: 0,
+            last_error: String::new(),
+            last_error_at: 0,
+            
         };
         assert_eq!(entry.path, path);
         assert_eq!(entry.path.to_string_lossy(), "/home/user/code/my-project");
@@ -217,12 +227,92 @@ mod tests {
         let old = StuckRepoEntry {
             path: PathBuf::from("/old"),
             stuck_since: 1000,
+            consecutive_failures: 0,
+            last_error: String::new(),
+            last_error_at: 0,
+            
         };
         let new = StuckRepoEntry {
             path: PathBuf::from("/new"),
             stuck_since: 2000,
+            consecutive_failures: 0,
+            last_error: String::new(),
+            last_error_at: 0,
+
         };
         assert!(old.stuck_since < new.stuck_since);
+    }
+
+    // ============================================================
+    // record_push_failure / record_push_success / get_stuck_push_info
+    // ============================================================
+
+    /// Use a unique fake repo path so tests don't interfere with
+    /// each other or with real daemon state.
+    fn make_test_repo_path(name: &str) -> std::path::PathBuf {
+        std::path::PathBuf::from(format!("/tmp/dracon-sync-test-{}-{}", name, std::process::id()))
+    }
+
+    #[test]
+    fn test_record_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAvLzlrSG5LbDBnWnR5anpDSEtISFBCWmpUTlV4ajlldjBGc0xqRWFsazJRCkEwV2Z2K3R0bU0raG45bkpMbnlFeHhkMEEzcEJTQWtxWUFWbXdGU1UyaDQKLT4gWDI1NTE5IFRBZ3BOOHc3ZFM2ZC9ZTkpWSHhBbHdWOEdKZEdJbDdBWk83VG90eTllM0kKeFYwcVRKZXlpT25RUXoxNUVVTzJBZzBTQk54clBxSG81ZzdORTdkaEtWUQotPiBYMjU1MTkgQ09lVXZFMlgyT2d1SHlmUVFpdktMejdLVEZudDlpeitFdm5xRjg1NDlYZwozSkxNNFlvSjJDSFAvNENBU0NSMk5xWWgzYmhJSjBWVGhlcFQvZFFPZi9ZCi0+IFgyNTUxOSBuV0lqOTIwaFYrOHNiSEIyazVpOTFGV09RSk5nT2NFSWJLNDFsUHlFMlQ4Cm5wdER6WTdrZ0ZXRWZlN1RtWUhXM2d5Q01SU2x2WVVZdzdZRGZGMStiajAKLT4gWDI1NTE5IElacGp1K0NWZk50YlZrNjVxZW5rcWVwN2gzS0h6YVZQMUhrbXN5RHovR00KUkVLYUpmd2ozaFRrRENhc1dzQWkwWEtVSzludVI3dEN3Wit0ZFUzaE9ncwotPiAwQX1KLWdyZWFzZSBXIChZa2BQa11YCks2UDlDemlSWUlYamc0d0pvbWdjOGRycHcwNzU1aUplNTI3emJ3ZllTNTYyRWR2a0dQUWYxdFlkdnFETwotLS0gcWhsVm52K2dmR1pkTmxmQ0lWM0YvbEpseWJWN1RGQmhYWDZveVZTaEs0Zwon0BXOETxEg8oXE65NYyHUb02vQoyzg+ZUczdL/qeXufJskOi1N6qEHWta9U9nxaqG3qz0GS9q/flLMZiNxek+oIw=]() {
+        let repo = make_test_repo_path("failure-increments");
+        // Ensure clean state
+        let _ = crate::daemon::unstuck_repo(&repo);
+
+        record_push_failure(&repo, "permission denied");
+        let info = get_stuck_push_info(&repo).expect("entry should exist");
+        assert_eq!(info.consecutive_failures, 1);
+        assert_eq!(info.last_error, "permission denied");
+
+        record_push_failure(&repo, "connection timeout");
+        let info = get_stuck_push_info(&repo).expect("entry should still exist");
+        assert_eq!(info.consecutive_failures, 2);
+        assert_eq!(info.last_error, "connection timeout");
+
+        // Cleanup
+        let _ = crate::daemon::unstuck_repo(&repo);
+    }
+
+    #[test]
+    fn test_record_push_success_clears_entry() {
+        let repo = make_test_repo_path("success-clears");
+        let _ = crate::daemon::unstuck_repo(&repo);
+
+        // First record some failures
+        record_push_failure(&repo, "err 1");
+        record_push_failure(&repo, "err 2");
+        assert!(get_stuck_push_info(&repo).is_some());
+
+        // Now record success
+        record_push_success(&repo);
+        assert!(get_stuck_push_info(&repo).is_none(), "success should clear the entry");
+    }
+
+    #[test]
+    fn test_record_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBIYUJtYkMrTEhDSkNOcUw4K3JSTkN4ODQrL3hPL1lEYkxYcm8wWTREM0RrCk5PdEFBRTZhK2NhOFpzcVhheFBpaXVMNGh3V2lNcjJJUWE4Nld6Z1B3K0UKLT4gWDI1NTE5IGRNYWpLUVdmQ29hNDVUS0Z4N25WbGI4dy9sa25IcFErcFRqVkhYbE96MDAKaFlPTUZ1Tmg1Z2pDOFpHbzU1R2VXV1ZoWDJTc3lxSHNRYU03ckFNSWxPdwotPiBYMjU1MTkgNGMva1VVS3VQSUM0d0JPMnZnMms1UlliYm4wRTBPMW9oN2RpTklzaFIyVQpjOTZKTlJGRlY5S2RLZVFSTkNNZXM4em51MXB1ZmN1eEl5akdmNTRIYVlRCi0+IFgyNTUxOSAxNmc4aDA1ZHV0NmhWcGlzN2Qwa09XY29ZWkZDNXRhdXZZZUZESWU5TzNrCldYdy9vV2NPQlJBQWJtaE5xajBwMGozc1NiSXQvdzMwQWdDdlZJVm56WUEKLT4gWDI1NTE5IG9jZ284KzUxckIzUWMzRDRaOXFVWnR5NVd4VE5jWUcvTnBtWmNIKy9TVjQKaVhURFlUOWZpeDhEeW1lQ1l1MGJVQUpUbG81Si8rQ3RMUVVtdHlXbkR1WQotPiByRH1YNS1ncmVhc2UKRFlKVk9PZXJCN3hjNG80VFJOU2tYQ2huLzJTNlVOdUdTVitNZ01SNm5sOWxwNE1JS3JJaVRmUFkzSDF0SnFxUQpOVEtHZXNZYllLRU9EUno2MzlkOEVad0JxaHp1YkloRDd4K1Ixb0VleDVlRFlQOEg4UQotLS0gYlptVGQvbjZkNmhsN2c0cldKTHVQZDB4RXdMNEhBUmF6M0hXcEpwSDhOYwppJUg/MQzFj30p2KnY9EnyjKdL8NpO3cN+jPtbgp+BJArB60uEykakjuthZ/AK6Tje+hAI6uOUOi2Dc9g0AQ==]() {
+        let repo = make_test_repo_path("first-call-stuck-since");
+        let _ = crate::daemon::unstuck_repo(&repo);
+
+        let before = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        record_push_failure(&repo, "first err");
+        let after = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+
+        let info = get_stuck_push_info(&repo).expect("entry should exist");
+        assert!(
+            info.stuck_since >= before && info.stuck_since <= after,
+            "stuck_since should be set to current time on first failure: {} not in [{}, {}]",
+            info.stuck_since,
+            before,
+            after
+        );
+
+        let _ = crate::daemon::unstuck_repo(&repo);
     }
 }
 
@@ -666,6 +756,52 @@ pub(crate) fn unstuck_repo(repo: &Path) -> bool {
         eprintln!("ℹ️ {} not in stuck repos", repo.display());
         false
     }
+}
+
+/// Record a successful push for `repo`. Resets
+/// `consecutive_failures` to 0 and removes the entry from
+/// the stuck repos file if present. Called from
+/// `push_background`'s callers when a push succeeds.
+pub(crate) fn record_push_success(repo: &Path) {
+    let mut repos = load_stuck_push_repos();
+    if repos.remove(repo).is_some() {
+        save_stuck_push_repos(&repos);
+        eprintln!("✅ push recovered for {}", repo.display());
+    }
+}
+
+/// Record a failed push for `repo` with the given error
+/// message. Increments `consecutive_failures` and updates
+/// `last_error` + `last_error_at`. If `consecutive_failures`
+/// reaches `push_max_retries`, the entry's `last_error` is
+/// preserved (so the operator can see WHY it's stuck) and the
+/// report will surface a `🛑 push-stuck` state.
+pub(crate) fn record_push_failure(repo: &Path, error: &str) {
+    let mut repos = load_stuck_push_repos();
+    let now = timestamp_secs();
+    let entry = repos.entry(repo.to_path_buf()).or_insert_with(|| StuckRepoEntry {
+        path: repo.to_path_buf(),
+        stuck_since: now,
+        consecutive_failures: 0,
+        last_error: String::new(),
+        last_error_at: 0,
+    });
+    entry.consecutive_failures = entry.consecutive_failures.saturating_add(1);
+    entry.last_error = error.to_string();
+    entry.last_error_at = now;
+    // If this is the first time the repo gets stuck, set the
+    // stuck_since timestamp so the 5-minute retry backoff works.
+    if entry.consecutive_failures == 1 {
+        entry.stuck_since = now;
+    }
+    save_stuck_push_repos(&repos);
+}
+
+/// Read-only access to the stuck repos map, for the report
+/// to surface `consecutive_failures` and `last_error` in the
+/// HINT column.
+pub(crate) fn get_stuck_push_info(repo: &Path) -> Option<StuckRepoEntry> {
+    load_stuck_push_repos().get(repo).cloned()
 }
 
 /// Path to the in-flight state file. The daemon writes the current
@@ -1256,7 +1392,7 @@ pub(crate) async fn run_daemon(
                         "Stuck Push Retry",
                         &format!(
                             "retrying after {}s; stuck since unix {}",
-                            stuck_age_secs, stuck_since
+                            stuck_age_secs, info.stuck_since
                         ),
                     );
                     e.insert(Instant::now() + Duration::from_secs(1800));
