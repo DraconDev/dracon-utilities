@@ -416,3 +416,78 @@ The new column makes the daemon's work visible at a glance:
 
 The previous `7m` value was ambiguous. The new column replaces
 ambiguity with intent.
+
+## Push-stall fixes (follow-up)
+
+After the ACTIVITY column redesign surfaced `dracon-platform`
+as `🟣 pushing 10m`, the operator confirmed the stall was real.
+Investigation revealed two interacting issues, both fixed in
+this iteration.
+
+### Issue 1: `git add` race condition with vanished files
+
+Build tools (vite, webpack, etc.) create timestamp-suffixed
+temp files like:
+
+```
+web/products/vite.config.ts.timestamp-1781483278562-7a994a6fc1011.mjs
+```
+
+…and delete them within milliseconds. If the daemon's
+`get_status()` lists such a path as untracked, but the file
+is gone by the time `git add` runs, the whole `git add` fails
+with `fatal: unable to stat ...`. This blocks every other
+file in the staging list, which is why the daemon could
+not commit anything for `dracon-platform` even though the
+working tree had 30+ valid modified files.
+
+**Fix**: `stage_existing_files` now re-checks file existence
+right before staging and drops vanished files. Bare directory
+entries are also filtered (libgit2 sometimes returns them
+in untracked lists; `git add -A <dir>` would recurse but
+we want explicit file paths).
+
+### Issue 2: Fixed 60s push timeout for large pushes
+
+The user has `push_op_timeout_secs = 60` in
+`~/.dracon/utilities/sync/dracon-sync.toml`. For a small push
+this is fine, but a 28-commit push with binary test artifacts
+in `web/games/` and `web/web/test-results/` can sit in the
+git negotiate phase for >60s before emitting any progress
+lines. The progress-aware idle timeout fires, the retry
+budget (3 attempts × 1-2s backoff) is exhausted, and the
+daemon falls through to the 4-remote HTTPS fallback chain
+(3 remotes × 60s = 180s) — the operator sees "pushing 4m"
+in the ACTIVITY column.
+
+**Fix**: the push timeout is now auto-scaled with the local
+ahead count:
+
+| ahead count | multiplier | example (base 60s) |
+|-------------|------------|---------------------|
+| 0-5         | 1x         | 60s                 |
+| 6-20        | 2x         | 120s                |
+| 21-50       | 4x         | 240s                |
+| >50         | 6x (capped at 600s) | 360s |
+
+Scaling is logged so operators can see when it kicks in
+(e.g. `⏫ Junk-Runner-bevy scaling push timeout 60s → 360s
+(2986 commits ahead)`). The cap at 600s (10 min) prevents
+a runaway push from blocking the daemon forever.
+
+### Issue 3: ACTIVITY column now shows ahead count
+
+The `pushing` label now includes the unpushed-commit count
+(e.g. `🟣 pushing 4m (28 ahead)`) so the operator can tell
+at a glance whether a stall is caused by a large backlog
+vs. a transient network blip.
+
+### Live verification on `dracon-platform`
+
+- Before fix: `🟣 pushing 10m` with 28 unpushed commits
+  and 3 retries failing at 60s
+- After fix: push completed in 4m for the 38-file batch,
+  ACTIVITY transitioned `⏸ stalled 11m` → `🔄 now`
+  → `🟣 pushing` → `🔄 now` (synced)
+- No new "ALERT: 28 unpushed commits" entries in the
+  daemon log

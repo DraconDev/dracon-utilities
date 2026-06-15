@@ -8,6 +8,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Push stall fixes for `dracon-platform` (and similar)**:
+  two related fixes that prevent the daemon from getting stuck
+  in a "commit 1 file → push 28 commits → fail at 60s → HTTPS
+  fallback → 3 min wait" loop.
+
+  1. **Race condition in `stage_existing_files`**: build tools
+     like vite create timestamp-suffixed temp files
+     (e.g. `vite.config.ts.timestamp-1781483278562-...mjs`) and
+     delete them within milliseconds. If `get_status()` lists
+     such a path as untracked but the file is gone by the time
+     `git add` runs, the whole `git add` fails with
+     `fatal: unable to stat ...`, blocking every other file in
+     the commit. The function now re-checks file existence
+     right before staging and drops vanished files. Bare
+     directory entries in the staging list are also filtered.
+     3 new unit tests cover vanished files, directory
+     entries, and the all-vanished no-op case.
+
+  2. **Auto-scaled push timeout**: a fixed 60s idle timeout
+     for `git push` is too short for a 28-commit push with
+     binary test artifacts — git can sit in the negotiate
+     phase for >60s before emitting any progress. The push
+     timeout is now scaled with the local ahead count:
+     `ahead ≤ 5` → base, `≤ 20` → 2x, `≤ 50` → 4x, `> 50`
+     → 6x (capped at 600s = 10 min). Scaling is logged so
+     operators can see when it kicks in (e.g.
+     `⏫ Junk-Runner-bevy scaling push timeout 60s → 360s
+     (2986 commits ahead)`). 5 new unit tests cover the
+     small/medium/large/huge/zero-base scaling buckets.
+
+  3. **ACTIVITY column now shows ahead count when pushing**:
+     the `pushing` label now includes the unpushed-commit
+     count (e.g. `🟣 pushing 4m (28 ahead)`) so operators
+     can tell at a glance whether a stall is caused by a
+     large backlog vs. a transient network blip.
+
 - **ACTIVITY column now distinguishes active from stalled**: the
   `ACTIVITY` column in `dracon-sync repos` was previously a
   duplicate of the `LAST COMMIT` column (just the relative
