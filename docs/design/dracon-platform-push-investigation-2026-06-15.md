@@ -193,3 +193,102 @@ working tree is preserved.
 These are tech-debt items, not blockers. The push issue
 is resolved. The operator can clean up the ledger and
 tune the daemon later.
+
+## RESOLUTION (FINAL — 2026-06-15)
+
+The investigation surfaced a real daemon bug that
+prevented `dracon-platform` (and any other slow-to-push
+repo) from being processed.
+
+### The trailing-drain bug
+
+The daemon's `in_flight: HashSet<PathBuf>` is supposed
+to prevent re-dispatching a repo while its `sync_repo`
+task is running. The design has two phases that drain
+the in_flight set:
+
+1. **Apply phase**: drains tasks that completed within
+   `apply_deadline_secs = pulse_interval_secs * 2`
+   (default 2s).
+2. **Trailing drain**: drains leftover tasks with the
+   same 2s deadline.
+
+**The bug**: on trailing-drain timeout, the unfinished
+tasks were dropped from `in_flight_tasks` (which goes
+out of scope) but their entries in `in_flight` were
+NEVER cleared. The result: a slow sync task (e.g. a
+60s push on `dracon-platform`) would stay in
+`in_flight` forever, causing the COLLECT phase of every
+subsequent cycle to skip the repo. The repo would never
+be processed again until the daemon restarted.
+
+### The fix
+
+The fix is in `daemon.rs`'s trailing-drain code:
+
+```rust
+// BUGFIX (2026-06-15): track dispatched repos in a
+// local set, and on trailing-drain completion or
+// timeout, clear any `in_flight` entries that were
+// not drained.
+let mut dispatched_this_cycle: HashSet<PathBuf> = in_flight.clone();
+loop {
+    // ... drain tasks as before ...
+    if let Ok((repo, ...)) = joined {
+        in_flight.remove(&repo);
+        dispatched_this_cycle.remove(&repo);
+    }
+}
+// BUGFIX: clear remaining dispatched entries
+if !dispatched_this_cycle.is_empty() {
+    eprintln!("🔄 trailing-drain: clearing {} stuck in_flight entries: {:?}",
+              dispatched_this_cycle.len(), dispatched_this_cycle);
+    for repo in &dispatched_this_cycle {
+        in_flight.remove(repo);
+    }
+}
+```
+
+This breaks the no-redispatch invariant for slow tasks,
+but the invariant was never achievable for slow tasks
+anyway (they always timed out). The trade-off is:
+re-dispatching a slow task is recoverable (the new task
+will fail with a lock conflict or remote rejection),
+while permanent skip is not.
+
+### Regression test
+
+`test_trailing_drain_clears_stuck_in_flight` in
+`daemon.rs` simulates the data structure: 3 repos are
+inserted into `in_flight`, 1 is drained, and 2 timeout.
+The fix clears the remaining 2 from `in_flight`. After
+the fix, `in_flight` is empty.
+
+### Verification
+
+After the fix was deployed and the daemon restarted:
+
+```
+Jun 15 18:40:27 dracon-sync[1737439]: 🔄 trailing-drain: clearing 2 stuck in_flight entries: {Junk-Runner-bevy, dracon-platform}
+Jun 15 18:41:23 dracon-sync[1737439]: 📝 committed 25 file(s) in /home/dracon/Dev/dracon-platform
+Jun 15 18:42:25 dracon-sync[1737439]: 🔄 trailing-drain: clearing 1 stuck in_flight entries: {Junk-Runner-bevy}
+Jun 15 18:43:00 dracon-sync[1737439]: 📝 committed 1 file(s) in /home/dracon/Dev/Junk-Runner-bevy
+```
+
+`dracon-platform` was committed (25 files: 18 modified
+tracked + 7 untracked that matched auto-commit
+patterns) and pushed to all 3 remotes at
+`391c44aec955`. The 39 remaining untracked files are
+scratch directories (`web/.pi-tmp/`, screenshots, audit
+dirs) that don't match the auto-commit patterns.
+
+Final live state:
+
+```
+📦 14 repos  ✅ OK 14  ⚠️  WARN 0  ❌ CONCERN 0  ⛔ init/status failed: 0
+
+│ 2  ┆ ✅ OK  ┆ dracon-platform  ┆ main  ┆ 0  ┆ 0  ┆ 39  ┆ 0  ┆ 0  ┆ OK  ┆ 391c44aec95… 25 file(s)  ┆ 2m  ┆ 🟢 synced 2m  ┆ DraconDev  ┆ ⚪ untracked-only  ┆ healthy │
+```
+
+All 14 repos are `✅ OK` and `healthy`. The goal is
+fully resolved.
