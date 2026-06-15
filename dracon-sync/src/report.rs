@@ -154,10 +154,10 @@ use crate::exclude::{
 };
 use crate::git::multi_remote::push_mirror_remotes;
 use crate::git::{
-    count_dirty_files_porcelain, current_branch, detect_large_blobs_ahead, discover_git_repos,
-    has_origin_remote, has_tracking_upstream, push_with_retries, remote_branch_exists,
-    repo_diff_entries, rewrite_ahead_paths, run_git_capture_output, run_git_with_timeout,
-    set_upstream_to_branch, top_level_dir,
+    current_branch, detect_large_blobs_ahead, discover_git_repos, has_origin_remote,
+    has_tracking_upstream, push_with_retries, remote_branch_exists, repo_diff_entries,
+    rewrite_ahead_paths, run_git_capture_output, run_git_with_timeout, set_upstream_to_branch,
+    top_level_dir,
 };
 use crate::policy::{
     timestamp_secs, RepoPolicyOverride, SyncPolicy, DEFAULT_GIT_HOST_BLOB_LIMIT_BYTES,
@@ -1101,12 +1101,10 @@ pub(crate) fn repo_is_warn(
     // without turning build artifacts, screenshots, or local evidence into WARNs.
     //
     // CHANGED 2026-06-15 (goal 0ab367b5 / Junk-Runner-bevy WARN fix):
-    // `status.modified_files` is inflated by the `dracon-git` library bug
-    // (it counts `is_wt_new()` as modified). For the test-only path
-    // we still use the library count, but production callers should
-    // use `actual_modified_count` from `count_dirty_files_porcelain`
-    // instead. See the WARN-classification section of the live-report
-    // loop for the production fix.
+    // upgraded `dracon-git` 94.2.7 → 94.7.0 which fixed the
+    // `is_wt_new()`-counted-as-modified bug and added `untracked_files`
+    // to `RepoStatus`. Junk-Runner-bevy 91 "MOD" was 3 untracked
+    // test-results/ PNGs.
     !repo_is_concern(status, has_origin, has_upstream)
         && (status.modified_files > 0 || status.staged_files > 0)
 }
@@ -1640,13 +1638,11 @@ pub(crate) async fn run_repos_report(
         // both the `concern` classification and the `STUCK_PUSH` flag so
         // they stay in sync with the user-visible `repos` table.
         //
-        // CHANGED 2026-06-15 (goal 0ab367b5): use `actual_modified` from
-        // `count_dirty_files_porcelain` (the correct count, not the
-        // library-bug-inflated `status.modified_files`). Junk-Runner-bevy
+        // CHANGED 2026-06-15 (goal 0ab367b5): upgraded `dracon-git` to
+        // 94.7.0 which fixed the `is_wt_new()` double-count bug. Junk-Runner-bevy
         // is the canonical case: 3 untracked test-results/ PNGs were
         // being counted as 91 "modified".
-        let actual_modified_for_concern = count_dirty_files_porcelain(&repo).0;
-        let real_is_dirty = actual_modified_for_concern > 0 || status.staged_files > 0;
+        let real_is_dirty = status.modified_files > 0 || status.staged_files > 0;
         let recent_push_failure = recent_push_failures
             .as_ref()
             .map(|m| {
@@ -3230,23 +3226,20 @@ pub(crate) async fn run_repair_warns(
         let has_upstream = has_tracking_upstream(&repo);
         let mut effective_status = status.clone();
         effective_status.is_clean = !effective_dirty;
-        // CHANGED 2026-06-15 (goal 0ab367b5 / Junk-Runner-bevy WARN fix):
-        // `status.modified_files` from the `dracon-git` library double-counts
-        // untracked files (it treats `is_wt_new()` as modified). Query git
-        // directly via `count_dirty_files_porcelain` to get the correct
-        // modified and untracked split. This is the workaround for the
-        // library bug. See `dracon-sync/src/git/status.rs`.
-        let (actual_modified, actual_untracked) = count_dirty_files_porcelain(&repo);
-        effective_status.modified_files = actual_modified;
+        effective_status.modified_files = status.modified_files;
         effective_status.staged_files = status.staged_files;
-        // Backfill the missing `untracked_files` field on the library's
-        // `RepoStatus` (it doesn't have one). Without this, the row's
-        // UT column is always 0.
-        effective_status.untracked_files = actual_untracked;
+        // CHANGED 2026-06-15 (goal 0ab367b5 / Junk-Runner-bevy WARN fix):
+        // `dracon-git` was upgraded 94.2.7 → 94.7.0. The new version
+        // correctly separates untracked from modified (the old version
+        // counted `is_wt_new()` as modified, causing 91 false MOD for
+        // Junk-Runner-bevy when 3 untracked test-results/ PNGs were
+        // involved). `RepoStatus` now has an `untracked_files` field
+        // so we copy it through.
+        effective_status.untracked_files = status.untracked_files;
         // Use real dirty state for classification — a repo with TRACKED
         // modified files is WARN even if the daemon wouldn't auto-commit them.
         // Untracked files (build artifacts) do NOT count as dirty.
-        let real_is_dirty = actual_modified > 0 || status.staged_files > 0;
+        let real_is_dirty = status.modified_files > 0 || status.staged_files > 0;
         if !real_is_dirty {
             continue;
         }
@@ -3604,7 +3597,7 @@ mod tests {
     }
 
     #[test]
-    fn test_repo_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBZcXUvT0hPUXl3c0tHTUVRYnRuNkpzb1FVbEYzT25QUWdaaWUwcWdUblg4CjhwcnVCVzdmU1VROWFORk9xU0dEWlBWY2RaVURBVUV0RktsejRNaVl3M0kKLT4gWDI1NTE5IEh2TDRaaGlWVHZ1RlovS3ZGWnZFc1VtTjdNWkhZdHJldGwzWC82OGZ4a2sKdlBRUjBJd2NXZEFzd1Y1YlhIRDcxVW5ISi9RK09xZnUyb1c5RWwvMktGZwotPiBYMjU1MTkgOU9nSnRnS3diUmRDRndrT3F2T1ZGdGhUS3JSR09pWXBuTVc5M0ZqWmRqMApxS2tpeElwYXZ1YldHcmRhWUNucWNvQ3pkaUxSelVQWmlINGxrNXY0Y3VjCi0+IFgyNTUxOSBFUWtVUmM4SVhSSksyWlZxUEd1SEtEMmI4SEdpMC85VUhlWlZYNGlVWVd3ClBkaVJoUStZb2Q0c0hSd1pzY2E1dWJsWXgzYm1RZFAreWZ0VVVUREFjbUEKLT4gWDI1NTE5IGFleVgyZkZvM29xZ3Y3aTQzSGsvUzJwaHZQVTJjYnJ0bGJZcXk1M3QxSG8KNzNNSnJGMUlEbmJNNW9kbU55SkUrZTlZMy9UZkswUGVxcXNORGZWcEVQOAotPiBwWytPU04tZ3JlYXNlICtzbCRBaCA+ZWhsTD8KdmRKcU5OdVpTUy81b1JoK3N1MGc4NEkzCi0tLSBhUVdtdFVIQllJM09rcXZkYi80ZmVMemtoRnE5UlpnZGtQcHFjWllUQ2cwCsTcH3eL1PtJJaGYhUqjvFHrvUoN9JWyk7ilqzMuCPmMThZJxqjs0QmLrSXKOOcRZx/FOcCyshKOe7xVXknqpknwEycO]() {
+    fn test_repo_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB0OTY4VG9naS9BdC9kaVowK0FZdlRKNklOTFdySnYxZWV3QVhJUFFaUDFBCm9DNDgrMENzdmtZYk93ZlNMbUdQelc2c0pOZGZ1UGdnblZOTFB5MnE4ZTAKLT4gWDI1NTE5IE8yZUpuKzhDTG4yYUFuOGdCVmdwcC8wekhyVGlDWm9IRUFZUlJVcm0zUlEKM2FvZnc4aFlRSkxlTERkY2QxbTFUZ1BrWmwzTG9IWlJlU0Y1Vko3KzloMAotPiBYMjU1MTkgcmIvd0d4UzZ3Y1MwMW5aNXBpV1NzSUU4eUZrTzBnYzloZnRmWUNOQjRYSQpvOG93WWpaSmgrRDJqVzB5R3BUcEtSQ1lKV25qb3dQU2VGNDNud0tQaVZnCi0+IFgyNTUxOSBCbmNuYTd0QzVKQzZQNm9rRkJFRzFTVDBsMDdJRXlzQXc1eGx3YUlabjJBCjQzWTg2OC9DL01YTjhiWUJOMGxib01BZm9RaWoreGxZY3U1L3ZtQTBCMXMKLT4gWDI1NTE5IEJ3Y285Tk9zcGpVNzZZSUtCRUhYN2ZtTTRuY0swZjkvREgrZ05BcXVSSGsKenlYY2tPZTRGcVI3MzNyNVRZUjlWRk5sVUdrdnRQOGZxczFldEpSOGt6MAotPiBPLWdyZWFzZSBBOnB+bSByVV96dnZ7OiA4SGRyIGdcXV5HCnBKRlM1NDlQclY4TTg4MXFqN1dOSTZzYmZOZWxCa2F6eFlNTVpGZ0FlNEtqRlh4WHRFcWJzWWUxSVRvWm10c2QKY2krb2FMaTRRSHVuZ3NYS09hQkNvbVpwdEVRVUJjWTBhMUxmbEFnY0daVU4KLS0tIHNyWXpULzZSdURQVEkvQ0pqT2s3ay8wUHcyRnh0L2tQTTdUVVFqeHB5cHMKER0hN7mW+ow88mLl6kGhiqYlzGCoGARVKWDKaFk4kV1iLpkUSD6BC8YUQzOBff3j/Urs55e79hhovvw82oaEAum2pUU=]() {
         let msg = repo_failure_message("init_failed", Path::new("/tmp/repo"), "boom");
         assert!(msg.contains("init_failed"));
         assert!(msg.contains("/tmp/repo"));
@@ -3612,7 +3605,7 @@ mod tests {
     }
 
     #[test]
-    fn test_repo_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBtSGhaQ1ZZcjRIZlBxZjZOdnlyQXI5VEhSVTM4ZnVVVFVmNDJoSHFVeUQ4CkxiZzNicWlqcEt4b3R6ZmNtSlBOMGFCWTVhUFRNU1BLUzUxRXRwVTNTQlUKLT4gWDI1NTE5IDE0R045eVZsRGRLVmhMdGx5ZzZhT1FMVmJCU3F3YW9ZSlpMVGJUNnhYR3MKSm5TaFlEbm1MUXd0VjgyWjJUWWhoVWtjKzYwV1RRendMMFRSK1I2N2dsQQotPiBYMjU1MTkgemY3NnFoUEl1YlhjbG9oSDhaMEFsTDFadm4yRlAvTmFGMkNyZkVNRjVrcwpmZWNrYnRqa3JBUEZSUEtua3NrUWo2NTRScFJ3RkVrSlMzaW1WeDRjL0hFCi0+IFgyNTUxOSBrNytFZWNEYVc5SWx4Rm5QT0ZYODVuMGxRcCtnV2VHcUpFbStBeXI2MmxFCnl5dDdDV1JRMTVGTFVISXJQKzZNQWRCelROWG5IY3BUcDlOWmJwUkZVajgKLT4gWDI1NTE5IDFPakxLUW1GeUxMbml0eFQydXZXWjVwd0wxVE9jZ09wUE5yVnhjVUI0dzQKSWhDYWxPY1g4SW9ZV3dpeXJrc3NpMzdqUTRqV2hYT29qdUIwNDZtVURzSQotPiBnfXg6fS1ncmVhc2UKeXEzajVNa0hCNjdUUHlQRXFXaXVqUjB1T21RWVpFVWNiWjAxMDdUVTBDWkhabE81c1U4Vzk2WXVaQlFwak5mNgo3a3hMTXQxRFR6c0kKLS0tIDNuUXJkeHdtMXhVYTQ1RW5RZHozNUlOekNqWW9pWTdwYlNpOGVUWUN4ejQKz0KDp7VCEDA7b68nc0UK2ZsoEXTDVJbSwseIFf8Vc1TzUT4/cuvYf0Axcq9UgmkPcIl4FHtsZ8ow0tL5YUiFURo=]() {
+    fn test_repo_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAyOFRhZFllZE5sRWFJZXVRZEZLcXhHS283ZkFJT25RWU94dzU0RnNEdXgwCndrcmk5d3lSMjZSOXJCZU9EQXQvREdXbWt0VE9RTEpyMThNRTRubCtZMTgKLT4gWDI1NTE5IDhEbGhQck0yS1czNEtmWDVQMEFpQVNJYUZsR1lqMkozQjZNdGViOVRhbmMKc1AvRXlKM25qazdqRWVmQ0xBWk00TWhhbm9aVWt2bWd5WFV2d3FoKzlPZwotPiBYMjU1MTkgemNuUFhDR0k2NkppdjBLMTRseGtuQUpHZHVLeDNLbkZIK3JlSFFnbmJSZwprSTYxc1Q4Z3dpN3lUb2FxSmt3ZzZTYXBpTTZUeC9LNndmWVQwaTRNWmMwCi0+IFgyNTUxOSA3YkE0VkltZVZkQXBKMWNvVzB0dkdoUGVtYm12Z2NtVUNod0UwMDZMSzA0CmVNbjZhbTUwU2dLTXA5UlNFaWxxR1Byemx1VW9ZdTFBeVZsZGhUeXdtK1kKLT4gWDI1NTE5IHo2MHVNSklPTTdBWFlCc0xXdWh0UEE4NnY4aFNKOENzbk5Vb0NJTlNPMHcKYXg1MDBCQzJzZFFtNVk2czk3aG1HclBFUXFQYXRCcWpLY0ZnTjllYUE1bwotPiBycjtyLWdyZWFzZSBtSn5dCmdpaWYzSnIvajlUR1cxVEorQy90aEc0c0ovb3U1RmJqN2lmMmlJZTNFZDNMWW5PdlJCVE81WWFac09rUW40NG0KcWRLWlMzdHlVSkkyRHBsL0gwTGlUYVBnVUEKLS0tIDFIY0ZNTFZUQTJvdUs3N1ZYRUJtQTRwS3Z2eFRvM0FQbkFDVWEyMFVWQWsKjsYhOIIllAYYigGAcBxzijGA85VcOP22ZyRAEyBwQDC4/qZMnqhFQry+pQdOkL0eg/U1YYrQbk+qIgil4P8FB6E=]() {
         let msg = repo_failure_message("status_failed", Path::new("/tmp/repo"), "status boom");
         assert!(msg.contains("status_failed"));
         assert!(msg.contains("status boom"));
@@ -3927,7 +3920,7 @@ mod tests {
     }
 
     #[test]
-    fn test_repo_stuck_filters_requi[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBZVjhmamhZUEtFZklubHBVbFRaaXJPSnlUOHhtY0tUenNtMkw2WTNjeUJRCitSYTkwc3k1SjgweFZLVmR3QkM1d2dZSXd2by9naVIwVHpEc0pNYXh1RjQKLT4gWDI1NTE5IG1QanQvbTA5aVhpMXA1WmtNR3p1dm1yRFRqYWRUVlVlaVlHdEpFK3RtSFUKU29DNHR2QTFSQUErQTdyalM3dWFET0Q0ZEVLRlpZYkJaWWwwUnMzMVYrbwotPiBYMjU1MTkgM1V4UTgvT0ZHbmc3dmhLdEFFaVlIc2NwSzRlMFpGWDdNWW1sV3NPU0IwdwpEWHpWekhzYlM5RFpsQ1lvdkYvZDZZSmhpaDNGYkVwVU1yK04xQzhKdno4Ci0+IFgyNTUxOSBObmhyM3dGN2RaRW5EYjhzTmQwUmQrcEwyKzlPZTRDMmx4VjZMQ1kxU0VNClpRZWJXd3JVNTNLU1luOWZvTVZHVWtPSHpWbzk3U1RDdEFmNGNybFhqdUUKLT4gWDI1NTE5IGJTbTRRb2Z0VWhWNlJhblJ3V25qWk1ITXQ3bWljcVdCZmozeUlNUGxCbXMKTmpLR3FxaHg4RCtkd014eURHOVRxMytxNDZ6WC9UL2U2eWIzVEZLUEtCNAotPiBMNDZxOy1ncmVhc2UgWDtWaAphbkNWZGVvK1c4TGNqdTFqeEx0L3BkNmoyVUdXY09hSWQ5QSt3bU1waDB2OEdPcUc5TzRQN2pNWlREb2ZGYjUrCnJtVVBKaWM5ZjNhY2RiaVhPakxpMkFPa2plS09xYXVDa0lFbWJKY2s5UGtubmRTZGtwRnpRaXZxVmFaVFNKcWoKS012MAotLS0gS0RMZ0xwUkxuS2NqM0lRU0ExTFF0bnU2aFM3M2JVU3ozdXl3a2FnbXlibwp/A3vFR1oCoGvVMXQmJmXO2lCFlXt4Mcr8Za5BvutHBUfrY/UF/cZCP5QyTVOEjbFKpPBc5vknhQ==]() {
+    fn test_repo_stuck_filters_requi[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBZL3ROV1R0bUJjQWtNakZ5ekk4ODc2Y3VUNTdURE9Ocy92V3VhSkxmQ0hzCm9EdjNVblpvOFFjUTk5TDhHRUEyNVdzQ0ZkdUt3VWRXOXFjVXcveDZtME0KLT4gWDI1NTE5IGVrZldLQzIwODVTSjRKdlNKOFJSWU5OTE5rZDdMWUNNTStHdTI4eU5teVkKNmJMbFVVMFlUVTJGSHRMaXhPQ3poUDRCVmJxaGJoYm9aVmI4Si9nbldPMAotPiBYMjU1MTkgYjBEYm9Ua05zK0dqR21ZM1NSNGtVTkVuMEFOYzNoa1hoTWJxQW0xczJSRQpBbDA2QnQ4a3Zyb05qRHBFVzBxNlhib0ZmbmpWNE4wWXB3aDNUdEdpVVU0Ci0+IFgyNTUxOSBUWDBFTFp6eVE5MGFxM1AxdWlZa3VlcGlqTUczSElITE43ZG5oRkZDYTI4ClI2bXdranJ3aXRwTUlJUThXUmo0N2hZMFd2UHBXTmk0ZTFXcGpBUmU3WmMKLT4gWDI1NTE5IGViWlFNZEJXQ09tbGZuaUxaV0pmNHovVVhpRGFTRWMwa2EraVVNREFJVE0KVUwvQWY2bXA1ZjZOdXBuVGZkcytCeEVPTEFRVEloUlhDTzVKYm81Vm85cwotPiBpPX1xKlFVLWdyZWFzZSAodSBjUD9ZXiAoeUE3ITogKyE2PEU/CjFMSjFrRUdXaXFVd2lVWVA4Z2xYOURFNnRMdnVuNE9HZks5WGFwawotLS0gV05LVTVhOFJQUk9WNVM4VTVQdDNsNSswb1NCT1B3YktjaEozQ2xPTWNCQQqz+smRBIvpaxl0PR11JDNmtP0PVs3ooq4BlXpjfu2IL09pINNCLrh5/xldpEVoU4qiHwbDBL3YPw==]() {
         let ahead = make_status(false, 5, 0);
         let behind = make_status(false, 0, 3);
         assert!(!repo_is_stuck_push(&ahead, true, true, false));
@@ -5300,7 +5293,7 @@ mod tests {
     }
 
     #[test]
-    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBXM0FtMFBLdTVQQ1UwVSthTXU4c1gyQlRNdXkwb0l2aGNCYWQrb0xTWVVzClhWeGZsUUZBaTJoQTJLQmdTaTlyTXMxWGk4c055K3pzNEFjQjNXTXdxcEEKLT4gWDI1NTE5IFFERmZTY1ZUcGVoVDcydFlVK3hQK2NkeGRqbG51UHRCd2FYVFZmL2ZDSGMKU3h4NXNhVE9SR3Y2bEhLMDcyUTQ3Y05sZENWUVV1MHZWKzZYQzN3VytWTQotPiBYMjU1MTkgSWw0ZG5ZaVZKT3FMeWhoQXl0eEFoUDBrT0N3UmVaaDVzU0xMcjN6ZUlHcwpHQUFTaHRBZ1IvdDVORW1BWW9EZ3VOeXFFYkF2b1dwYTk5Q0x1bDBLMXJFCi0+IFgyNTUxOSAySWk5ZTkxdUtzd1k0UjhtZ2tMZDNyekdQM0NIYVhsY3VZWlpQREc4M2xVCnpHRFVPZVR4NUV2M1hkYWRRNW5ySWZlNTZqd1ZqS1QxOXp0Q2d4WjlkSW8KLT4gWDI1NTE5IDIwbWRLZTV3VG96SHhBaFdQbHpja25OMnlUTnE4MnZvazVTNmYrYm5vbWMKb2p1NjVqZ2kydkszTm5TMFJrMkNvNk9vLyttV2paMm9TUlc1Mi9zZUpvNAotPiBLJFJLamQtZ3JlYXNlIFJkVDRyblx4IG5ufCoveUUsCnR0L2VzTlh3cC9tVGxsNTMzRFZpaXBvCi0tLSAvc3dXN3FXSnFLYlFRcHZOS3ljK3d4MFJTN1B1aHZaZWsveXE3bTVGVFFrCm3mDNZkPoggdDov95hdET73r0+cubZSfUQKKHt9hpsPgtKWqGzr3cobfP6JZ8vfseT05eRRYBc1jVEvm2U=]() {
+    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBkdGMwQnJqUkNOQ1NCQ1RUWDNCQjh2a3pXN0xEYTgrVjU1TytCK3ZmYlI4ClovdzhyOVpHb1lvVnJPQnJoYmNkTzFEajVVZzhLRVJsZm5YNHFyYW9iTncKLT4gWDI1NTE5IE5nVVg5UHdVNnlwNk5adzNIWlNKcitxNys3RWhMUTdxbVVLeWhjelN4anMKeUZxbk5ZWEpDRHExbzhDaENPSmk5MFFLWmd2dnZZcFIzVG1hMDhxZEMyVQotPiBYMjU1MTkgb1RrVEVJakFQM3hXc3FnY0FDYlZySEFYbTd2YkdvUy9OY2R2NHNNUi9tRQo4cE53QnhiVjlYWXI5TWFLRGJpWEZsOG4rQTVuY1BzQytBYTd5cGhpbEZnCi0+IFgyNTUxOSA1UjM3bzVJbnVWZEpmZEJuUmhPekkyT1U3aU9nOHd0d282NkJ6SU9SbVJZCm1yMTBwelYzN1A4Q1NRNkhwOTJHZGhKNjNxSkttVXl4dTBzODF5bFRQZTAKLT4gWDI1NTE5IDhZcXZ6a1cyTTl4WFdRanNMR0F2dlpFMkMveTNhSmZGbUhkZFRXOGZGSHMKS0Z0L2tqUlU1N0JzMDhvbk5zNGpWVmsvaEhhT3ZyNG5SSk1TYVhMVXV5NAotPiB3W0w1ZXp4LC1ncmVhc2UgeCx5NCAoOHdsTk8qID13O0FxYmIKN01iRytWajlVeTRic1JnaWd6NXh6NElVQ1ZSdEFXMFVOOUVkNDA2Q2o4NWtLWGR0OCtxS0JZUmVYaGhPN0FZdQo5WTVzOTF4NHdnCi0tLSBiLzJDQXk2MFlSUU5jbk9GZmR1elVLSXJYNEpKdFRDaTFqRzZhNzBqWlFvCkBluk05bCT9OONlbwf+EjYBDFxoFlGZwNpflj1r2YyTG3dC+PIZXp0MgfGbsqOkz/TvdMMKoPC5Wf7leAw=]() {
         let mut cooldowns = std::collections::HashMap::new();
         let repo = std::path::PathBuf::from("/test/repo");
         let notify_key = format!("push-fail-{}", repo.display());
@@ -5429,7 +5422,7 @@ mod tests {
     // -------------------------------------------------------------------
 
     #[test]
-    fn build_recent_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBXdExlbHBWeGxTTXdzQlZFM0NzNUZsZ3BVcUczL1NMMXBLWTZXU0VwaWdrCnRDU0lkY1hBaTJHdEpEblhmSld1Zm0vdERCUTIrNEE2ZHRlSktZa3UrK3cKLT4gWDI1NTE5IHZDeUhCOWdQZzl2ZjBBWEFPMmtqMStjaHN6QVZkNUZ3WDkzZ1JtZnd4SFUKMDVzUVozWEthcXlkcnViam1iMkZ6TjExVGt1M3RRdW4zWkRlSU0wd3pPcwotPiBYMjU1MTkgMy9sclRWcys0dHNLemVNTk1KK2dZWEhVYkJEeHRncGg3NXhPM09Sei9IYwpCUlFrNnZFL1JrWGxCSkN5WDNoV3BvaG1ERVFYUTN4R0RnSUlORXVUaFQ4Ci0+IFgyNTUxOSBpU1h5OEwwRGxKVWRhcWx2ZTlrSlBYWld6MVpiS1ZTYXd3NlJ3ZHRSNXpJCnFLY1UwWkpXeXRLWGVEZkt5L3VLdjhBY2VlOHl6UTgxSndROC9CYkF0MXMKLT4gWDI1NTE5IHhrRW5IWmxxcW03cnBoRFhubk1VSTlMSitzM0U0S2RZbDFKNmR0YzJMazgKK2xVOHovWURrdytVMzMydHRTcFBqbktBaWhaVVF2MFdDbWhuOE5LMG1BdwotPiAqalxFXG5NLWdyZWFzZSBiIGUKZXkxRTl6aDlMbWVwdktibGJMWTM5dDJ5QUVTWnZHOU5ud0IzQ05uRXAyUU9iVm5rVE5LU1NxSTRTdmhEa1h0QwpzTDUzQmNoSWdUd2VyTG1TOUVCcWswOWQzNEtZU1BpRDlmUjNFYitmYTd6Mm14cy8zb0w4aFVvVkZKMXV5aEZpClc3RkIKLS0tIGt6b0RJZUp3ZS9pcDB0VDR4eXFFNU5mLytqY3U4OXEvSFcySnZ0ZmNmVHcKDG7Dckl0ujOY8G49TvOEDWR/gutcJkUXd5dNjUsl3rxUGouBK4vGG/GrTBYWkcxjfT5t2P7rKRasiGVLX4o=]() {
+    fn build_recent_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBOSXoxRC85UWx5STRGOEY2dGd6S0grei9WeStxK1NmODhZemxNcnV1WW1nCm1vSy9FeGpLelZhc0puWWtjdHJhbVFKOU1WajFwSGpaWjR4NFdmK1J3R2MKLT4gWDI1NTE5IGdsNkVQUXByM1N1RGdkeWI4c24wZU5vd0xRbVJ6OVJVcGpBeFNOaWpCbFEKUVM2Z2cyaWQ0K2VJL1VCQW9KN2tzNXhPbjNsdTFETVQwKzYrYUVEUGUwVQotPiBYMjU1MTkgTE90WXhRSHZFQXdFbVkxM2dlR3EwTWRCaHdjM2ljOGx0OGMzNThDSXNCRQppek9HK2twR25NSU9qR2lrek9SaXVmTXlGa0gzbktkcERyZ0lJZmVzZzVVCi0+IFgyNTUxOSBJSFhJREFKaDYxWEpLdnhucjl4cmdqZkpXdWlEWUlPam9TZitob3VhTFdZCjk2dGNjeC9zamFyY2h0T1cvQ1JCTnAyemhXSjBNaFBZakNPaGt6OEczWTAKLT4gWDI1NTE5IG1IdW40TTdKSFFQRnlLdXBuRWRaODZCS2JzZFg1a1V0RGVCTURheWFqRk0KeG1WTkhMdEgvUjVCSmxsRlFiMHdaemhXdnJLNDRCOCs0bkhJRk05TGZCOAotPiAlMkJlJVJjdC1ncmVhc2UgNyFDciBvXic9PyY8ICs3VSIvICpZLAp6Q2o2SSs5dGhveDd6ZmNjTTFJZUdVa244blQzbnd6eGNxVGNQZnlWbUJXUTY1QXZvNThPCi0tLSBkK1lUcldvcVJrdVUrWHJCejRmNUxQUnd1b3ZXWDVoQ1lJTU9Xa21XNnI0Cj1SmQfetOjiphYgsr9UqOrI4wUmOo+mrCxrQ3ai0uyi/u9Ig5Ew2WctBZRdkc7ZUsZuyPAwu5FXQwB2zz43]() {
         use std::time::{SystemTime, UNIX_EPOCH};
         let dir = tempfile::tempdir().unwrap();
         let policy_path = dir.path().join("dracon-sync.toml");
@@ -5463,7 +5456,7 @@ mod tests {
     }
 
     #[test]
-    fn build_recent_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBlQllneklocmk5dVZhZ1l0eVp5OXdIcHZ4SElmd3drbDVHa2t1YWQ2dmhjCnovNXlKWERmRFZYUyt4Yi84SnJhZWs3TFd4WEt6OGs4Y25qbVFNUjRtWW8KLT4gWDI1NTE5IFA1WUQ3U3FpRENJdXBxRHlCcXV3SUlsNkdHQVAwbzZFenhIb0RrazQ2VVEKT0ZGMXdkcDg4Z2Z2cTVxL0V4TXBYQjJHSzg4L0d6SGdDNmxFVDBjTkE5bwotPiBYMjU1MTkgVkVmWit6WmF4TEw1TzcwTCtlcU1JRmptMEdnMWV6ajNMMC9qeTdMdXpGVQpMVUpwcEpKY2d0OERheDU3RXdzK3JrTEpDd01FWXBPUC80WHlodkQ1aHhJCi0+IFgyNTUxOSBWYU1NUkQ4eE9mU28xR0Zhd0FGeXdCTWtpTy96V3hkNlMxSHc1UG1LOGtrCld4bmVQK1NzaCs5TXU3NUlMZnIyYU1VMnpHVDlmbGI5K2JtbWNhTGFLS0kKLT4gWDI1NTE5IHU5QWNGbE5rV2Q1UHJ2bm5kOXpDcDMySzNJL3VrUnBtSTNFRDFOSzNmMmsKWU1KSWpuUUs4ZUkxQTNEdVk3MTRka0liMnVrQ0xoaU8vMDBTcS84ZVRXSQotPiBdLWdyZWFzZSAvXyBrR09BXEJHIGJUfipoCmhJYVNpU2tvRUtjCi0tLSBycWhZdUIyS3hrNE1rL1N3clVQOGRpZ2ZTeVRFU0RMbngrK3VwYUEzNTBRCnGQW/RPpD1LPPbp5NgEqR2H/3RFD+7fHcYGi7GJ3oy+1AJ/uln+0fbwqoMTGCh6gl9E+KxsG3Ap9du4d+R5j8r73A==]() {
+    fn build_recent_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBqWlFSRTJUaWd5c1lYWkpTWnVNaXBaRUNYZVRVSWp6QnhsQWt4RWYyNzJnCktrMi9QREU4RnBrRFFrYlVkK3FIYkRsbFFkMW9iVUlweXNxT3FSQW8rN1EKLT4gWDI1NTE5IGJNcmNCSGlLeU04TEpwckRsdnYvQWNvamtYbkg0UktyeVpLd2k2WjFZa0EKTDA5SVVkWTlEby9EREdBNUxPZEJkbS8rNnUyNzQ3WkpYMFhpL0hPeU02SQotPiBYMjU1MTkgZW5uMFZKRTROaStGT2xSekJ1OUIrR0dDMUZZR3QwV0ZyNlpvdG5VZzh4MAp3VXI1RXFpWHpRS2MvNVpJbUZsREhabWhTOHJhM2czcTBKWlVVSEJhUWxVCi0+IFgyNTUxOSBPNXlKUStBNURxVFh6TzZGaElGNU9CSmovSFZYWG9MRHRTc1hXTUFXdWdRCjBicWMyQVRjaU1sZ1ZPUlpDd1lZY2p5U29GMzEvNzBDMXdHalovYmdHMEUKLT4gWDI1NTE5IEpzRzVMc1JkY09vY1hEU1ZLU1NYbE16K0ZEKzhKYjM5bUF6VExveko2bU0KWDdGQ3dsQlFoVlA0aUZUTVR1aEZkWjhza0NWR3M1ZnJueFJvN3ltRmd2WQotPiBiSy1ncmVhc2UKK21ZbGlVcjIyN2dhYjZjaTk0TnQ5bThBbk9kL2JaWmZ0dWVHanVHZUpycytxZ1RuTE8rOFE5NllFa3hjRitpUQpDOXRYUnQwY3dzc2FkaEFzYU81U2xZVjVkK0F6SVEKLS0tIEMySnZIcUZ1dVVobWJYQWVWNmF6Q2VlaTVqMTlTbzZoVHNCTk5lVWd3ckkKZNyrmmc5oqfnkhGjklaxp3nQLFQDx+I+CTdEkkNTWlg+7MAGXoXR1oYoiOdeq7isdngfgIn74ZzSc7XndwwmJmOT]() {
         let dir = tempfile::tempdir().unwrap();
         let policy_path = dir.path().join("dracon-sync.toml");
         let ledger_path = dir.path().join("missing-ledger.jsonl");
