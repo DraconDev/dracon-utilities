@@ -20,10 +20,19 @@ in the live report.
   updated (new operators get the right policy)
 - Test added: `test_default_untracked_exclude_patterns_is_commit_all_unless_scratch`
 - Test updated: `test_default_exclude_file_patterns` (now asserts empty)
-- `dracon-sync.example.toml` updated to reflect new defaults
-- `AGENTS.md` created documenting the policy in plain English
-- 850 tests pass (was 849 + 1 new), release build clean, cargo deny clean
+- Test added: `test_example_toml_matches_policy_defaults`
+  (drift check between example.toml and code defaults)
+- `dracon-sync.example.toml` updated to reflect new
+  defaults (also fixed pre-existing duplicate
+  `sem_max_concurrent_sync` key and updated
+  `max_stage_file_bytes` from 50 MiB to 100 MiB
+  to match the new code default)
+- `AGENTS.md` created documenting the policy in
+  plain English
+- 851 tests pass (was 849 + 2 new), release build
+  clean, cargo deny clean
 - All daemon auto-commits pushed to 4 remotes
+  (final SHA: `0630d619`)
 
 **CONCERNS**:
 - dracon-platform 5 MOD: resolved by daemon (transient; new audit dir auto-committed)
