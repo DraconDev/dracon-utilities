@@ -43,15 +43,6 @@ inactivity_push_delay_secs = 5
 # Set to 1 to restore the original serial behavior.
 sem_max_concurrent_sync = 4
 
-# Maximum number of `sync_repo` calls dispatched in parallel per daemon
-# cycle. With 17+ watched repos, a serial loop blocks all other repos
-# on the slowest push (e.g. 60s `push_op_timeout_secs` for a slow
-# gitlab). Bounded parallelism (default 4 concurrent) lets the daemon
-# process multiple repos simultaneously. Each `sync_repo` call still
-# has its own timeout; the cap just bounds how many run at once.
-# Set to 1 to restore the original serial behavior.
-sem_max_concurrent_sync = 4
-
 # [auto_commit] - Automatically stage and commit local changes.
 auto_commit = true
 
@@ -211,8 +202,11 @@ untracked_exclude_patterns = [
 # tells the daemon to skip those files entirely. Manual `git add`
 # still works. Default: empty (opt-in per repo).
 
-# Skip staging files larger than 50 MiB during auto-commit.
-max_stage_file_bytes = 52428800
+# Skip staging files larger than 100 MiB during auto-commit.
+# CHANGED 2026-06-15 (goal 9aaf0b08 / commit-all-policy): was
+# 50 MiB. Now matches the code default of 100 MiB so the
+# example is self-consistent with the daemon.
+max_stage_file_bytes = 104857600
 
 # =============================================================================
 #  SECTION 5: SAFETY
@@ -298,7 +292,7 @@ auto_create = false
 # [[publish_targets]]
 # name = "crates-io"
 # registry = "crates-io"          # crates-io | npm | pypi
-# [DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSArcGxzRmdnTXMxQTJma3E5d3dKUE1ldlFyWHBPaTIrY1pxUDIyQ0pxM0hRClg5Q3grY2E0dkxLTXY3bGNoUkNtZnJ0dmJTTjJwRDFaSmlOSC9PL1ZDYkUKLT4gWDI1NTE5IHAxamRJUFJHbEFOTnYwaTYzTU9uam9peTNHc3EzZGt6S2c0QnhxRG5rWHMKVThJQlBkaXNiZmFVUGRJQy9mTDExWURvVzJMMFcxSk5KdTBvOWMvZEhWZwotPiBYMjU1MTkgdFkrL09hb1U2UWhNbCswbGlJWHZkbWs3RUdNSU1paTRHL2hueHFBQ25RYwowZldWS0Vydys2OE8yeEhvcDduUU9TV1MzZFIxL2FkTWptMytGMzV6aS9jCi0+IFgyNTUxOSBVYkRKTWM3S0RaTDVCNHFGbVBnem4rY0JqSFpMYzQrcUFXcDd5a3RJNTI4ClJJU2o3Y3dSL2RiZzlJOWdPdlg4ZHVoeGVnaE1POWN5U2RkY0xJM1lVcDgKLT4gWDI1NTE5IDFmbG5URnROWHNacS9RVnNmQnlhUlljQk5iZmVwb3AwZmZuUzR5VXNNbVEKOW5jL004MXcyOEpMWnJQbHNkNnVzaEpDUnA0bk5uR1hKQy81enZMWTFEUQotPiBnclAsSi1ncmVhc2Ugc20/CmllRXVHckFuenBqenN2eDQ2dm8zdUhQN2l0dy9VcmsKLS0tIHR1ZmdNUGt1VWpZbTVhWHFHRkxLU05QQUUyK0EyUC9JRGorM0hBQW9RK0UKtmZjmsOCYT/9fs1Qpjrx4FhT5wo4Q9Yl/LaikkWoVgTnMJq2LSSdG4upe/RpkvEcm/HqfNIwBNIwxUDjaA2mQ1As4R9t]   # env var name (token in secrets/cratesio.env)
+# [DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA0YmxyekZCZmpCMG9iSERaUG1zZmNYaFRWTkZDL01DdHpZS2NTNHpSQUJJClloWEhBRmo3NmtHVy81Ykw4QTJicysxT1ZzWWpPeVlIUGxFUWxGM3pldWcKLT4gWDI1NTE5IDMrZ3hPb2piekJzVmlicG1hTXh6amZJbzFzbkVLUjg4OWczK1Vza0hPMjAKZGZGTkpycCtnQ1REaTQvQUdHYlVuMVFHUXlvY0JUVk85OW9RMHV2VnJMbwotPiBYMjU1MTkgMnhJN3liVjVlZTlXOHNDdzlkb2dkSzRsYjhzNC8vSG84Q0FXYzZYd1JERQpwSTRwejlBSDVqeWlQVnU1MktQVW1TT3NRNk9MMFdOMXYydUxHN1FrY2NNCi0+IFgyNTUxOSBseVNzZHY5MVoycUdDd0owT25OM05OWUpsYkpCQkNFSWJqNC9ySSs5QjA0CjR1Wk5XTjJsd3V2M0hzdmJVb2lLUjJHNmRTME16cDZXQjRSalJSa1FQQUUKLT4gWDI1NTE5IDlydzIzSUZHVUVPRzd1cnkvVjhqV2txblhzdmJvQi94OWkvdFBMVDlMd0UKVmRIU2NDZm1CQmR2Smd5OGFqalFoVG1ZVWpSY2FNd3VJR1FITzhtamZHZwotPiBPa2lMLWdyZWFzZSAkLXhzIEVtIEgKOGhCbEU1Z2t6OUd4ZDJwVUlNS2NWT1JCSHFwOWNPNUtPT1JsUEFkSjF6RDhrdUV1UWM2alBUWjBsZFFpCi0tLSBxUTRhWWhEYURHTWRDeGpXV09EU2pYN1RoMzNkQXU4NXRYNG5zQVltK3lnCuJWLxTMnotm6q00uWddtsi70dL9pjyH83rMW2qH+To65OCh0V2O8haiGzSxN4d7vZNPKzufVdxGgJiroVOYv1sCsc9sSQ==]   # env var name (token in secrets/cratesio.env)
 # publish_timeout_secs = 300
 #
 # [[publish_targets]]
