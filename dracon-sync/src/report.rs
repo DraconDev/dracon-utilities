@@ -368,7 +368,7 @@ pub(crate) fn activity_label(row: &RepoReportRow) -> String {
 
     // 2c. Unowned = "🚫 unowned: <reason>" so the operator
     // knows the daemon is intentionally not touching this repo.
-    if let StateCause::Unowned { reason, detail } = &row.state_cause {
+    if let StateCause::Unowned { detail, .. } = &row.state_cause {
         return format!("🚫 unowned: {}", truncate(detail, 40));
     }
 
@@ -1672,6 +1672,35 @@ pub(crate) async fn run_repos_report(
             flags = apply_intentional_no_upstream(flags);
         }
 
+        // ── Ownership override (compute early) ─────────
+        // If the policy says to skip unowned repos
+        // (`auto_skip_unowned = true`) and this repo is
+        // classified as Unowned or Unknown by
+        // `ownership::detect_ownership`, override the
+        // state_cause to `Unowned { reason, detail }`. We
+        // compute this here (before the hint logic) so the
+        // HINT column can also surface the unowned reason.
+        // Per-repo override `auto_skip_unowned = false`
+        // re-enables the daemon for a specific repo.
+        let repo_override_for_ownership = crate::policy::load_repo_override(&repo);
+        let effective_skip = repo_override_for_ownership
+            .auto_skip_unowned
+            .unwrap_or(policy.auto_skip_unowned);
+        let trusted_for_ownership = crate::ownership::TrustedSet {
+            emails: policy.trusted_emails.clone(),
+            authors: policy.trusted_authors.clone(),
+            remote_hosts: policy.trusted_remote_hosts.clone(),
+        };
+        let ownership_report = if effective_skip {
+            Some(crate::ownership::detect_ownership(
+                &repo,
+                &trusted_for_ownership,
+                repo_override_for_ownership.owned,
+            ))
+        } else {
+            None
+        };
+
         // Pull the daemon's push-retry tracking (consecutive
         // failures + last error message). When the retry budget
         // is exhausted, override the push_status / push_error /
@@ -1687,16 +1716,26 @@ pub(crate) async fn run_repos_report(
             })
             .unwrap_or(false);
 
-        let hint = if let Some(reason) = &unowned_reason {
-            // Override the hint for unowned repos. The
-            // operator needs to know WHY the daemon isn't
-            // touching this repo, and what to do about it
-            // (run `ownership --explain` to see the raw
-            // signals).
-            format!(
+        // ── Unowned hint override ─────────────────────────
+        // If the ownership check above classified this repo
+        // as Unowned or Unknown (with auto_skip_unowned = true),
+        // surface that in the HINT column. The operator
+        // needs to know WHY the daemon isn't touching this
+        // repo, and what to do about it (run `ownership
+        // --explain` to see the raw signals).
+        let unowned_hint = match &ownership_report {
+            Some(crate::ownership::OwnershipReport::Unowned { reason, .. }) => Some(format!(
                 "🚫 unowned: {} — run ownership --explain",
                 reason
-            )
+            )),
+            Some(crate::ownership::OwnershipReport::Unknown { .. }) => Some(
+                "🚫 unowned: unknown — run ownership --explain".to_string(),
+            ),
+            _ => None,
+        };
+
+        let hint = if let Some(h) = unowned_hint {
+            h
         } else if push_budget_exhausted {
             let info = stuck_info.as_ref().unwrap();
             let error_summary = if info.last_error.is_empty() {
@@ -1789,49 +1828,26 @@ pub(crate) async fn run_repos_report(
         };
         let state_cause = classify_state_cause(&inputs, &thresholds);
 
-        // ── Ownership override ─────────────────────────
-        // If the policy says to skip unowned repos
-        // (`auto_skip_unowned = true`) and this repo is
-        // classified as Unowned or Unknown by
-        // `ownership::detect_ownership`, override the
-        // state_cause to `Unowned { reason, detail }`. The
-        // ACTIVITY column shows `🚫 unowned: <reason>` and
-        // the HINT column points the operator at
-        // `ownership --explain <repo>`. Per-repo override
-        // `auto_skip_unowned = false` re-enables the daemon
-        // for a specific repo.
-        let repo_override_for_ownership = crate::policy::load_repo_override(&repo);
-        let effective_skip = repo_override_for_ownership
-            .auto_skip_unowned
-            .unwrap_or(policy.auto_skip_unowned);
-        let mut unowned_reason: Option<String> = None;
-        let state_cause = if effective_skip {
-            let trusted = crate::ownership::TrustedSet {
-                emails: policy.trusted_emails.clone(),
-                authors: policy.trusted_authors.clone(),
-                remote_hosts: policy.trusted_remote_hosts.clone(),
-            };
-            let ownership = crate::ownership::detect_ownership(
-                &repo,
-                &trusted,
-                repo_override_for_ownership.owned,
-            );
-            match ownership {
-                crate::ownership::OwnershipReport::Owned { .. } => state_cause,
-                crate::ownership::OwnershipReport::Unowned { reason, detail } => {
-                    unowned_reason = Some(reason.clone());
-                    StateCause::Unowned { reason, detail }
-                }
-                crate::ownership::OwnershipReport::Unknown { detail } => {
-                    unowned_reason = Some("unknown".to_string());
-                    StateCause::Unowned {
-                        reason: "unknown".to_string(),
-                        detail,
-                    }
+        // ── Apply ownership override to state_cause ─────
+        // Use the precomputed `ownership_report` from
+        // earlier in this function. When the policy says
+        // to skip unowned repos AND the repo is classified
+        // as Unowned or Unknown, override state_cause to
+        // `Unowned { reason, detail }`. The ACTIVITY column
+        // shows `🚫 unowned: <reason>` and the HINT column
+        // points the operator at `ownership --explain
+        // <repo>`.
+        let state_cause = match ownership_report {
+            Some(crate::ownership::OwnershipReport::Unowned { reason, detail }) => {
+                StateCause::Unowned { reason, detail }
+            }
+            Some(crate::ownership::OwnershipReport::Unknown { detail }) => {
+                StateCause::Unowned {
+                    reason: "unknown".to_string(),
+                    detail,
                 }
             }
-        } else {
-            state_cause
+            _ => state_cause,
         };
 
         // Look up the daemon's most recent recorded action for this repo
@@ -3562,7 +3578,7 @@ mod tests {
     }
 
     #[test]
-    fn test_repo_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBHdys0RTdiR3hNR0RqR1p6TmJnTjlZNFltUFJjdzlyUGsxcHpUczg4aFZVCmlobHl2QnVmZ1hnbFAwdy9MNGVzV2hOM1hGczBuLy9zQVdpN21ueVoxT1UKLT4gWDI1NTE5IFpPSHhRTDV2MHM1c1A1dzFrVmp1S2RFRDM0VitHSVhrbno1Rmc1MW9yajQKUW9nSnJweTVDSmtjWW9ISEZtcUU1eC9TYm9XWmhOVEpEWXJTVjdyRmc3dwotPiBYMjU1MTkgdTdudDFscHVFK3lIWUFTckxxYVk2UTNkMlJrRlF3Q2JyalFlRTZKVnlGUQpKVWJtWTVtbTJiR1JjQ01kWVNvWVdBSGdDdHVWSmM5Q0x5UG9UWlo0eUNzCi0+IFgyNTUxOSBJc0xkRVR0VVVGN29TSytiR1VYeWg1NndzQVkxOG1hbTBiTDBxRjlibGdNCmtFMUt3YmdJam1LOTYwRWR6a1Zra0w4NHdLVHo1OWpMdzdFcVNnK1habmMKLT4gWDI1NTE5IDdITm55NHVkc2tucU8xWEZhckpDV1ZtMVVFRzBUeDNBMnIzK2hmMjRsbDQKczk4ZHVTVUtDd09YS2ZOQ2xZM09zNzJINy96Q21UbUJVZENDTE9BOGdMUQotPiA9MHwxUi1ncmVhc2UKN3JlNDhmRWZ5ejJma1hsV0FVTnlrZDdIdlNQQUo5b2NtMndqdXFhRk1XRFBoR3RjCi0tLSBYQStPWlN0MFZSMVZuSncyZVZZaXdZZ2t5VWsxbWFsdzREUWM3M01WWnkwCncdeCzsl+yn6MA1496AWJgCoRa4EPJrS7P2qIkfiVYP1sCVwSMU6Mz+eOWpvfocB53fOAFOsAxMMWbNqlcGY2Ye4Wdp]() {
+    fn test_repo_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBvN3dmRFFSYStLcnN4aU5mN2tiTGcwOVE0UVBYUWwzODkzYU4zNFdSOWo0Cll0SHFMeC8yaW1ZVVF2U1h3c2NheUhoTC9IeWRoZ2YzRCttdjh1TGtoL3MKLT4gWDI1NTE5IHBYMzQraTZubHBobDJ1cklsN3pVekVPNmlRN2RRK3NaZVRhaXUvaDlsaWsKNWNYRTJ3cml4QWg0VFYvR05Jek1jNDU4SHk5TU1OMkU0Q0lreFhvOHU3cwotPiBYMjU1MTkgNlJGb1RvUklmbi9hN0E4TDFzOHRQeVUwLzFqLy9LK2xDc1IwODRwR2VVZwpGQnRRWEpWMXVnQkE2MlZwL0hWVTNuY3RQOTRZSGhoSFoxV0RtQmRUYWZVCi0+IFgyNTUxOSBTTUZpWUEzbTl6bHFQOFJoOUFVUEVDaDNQYVB2UmxGZEhzK1diM2ZLYjFjClUwQXZZU2xGdFdFV29Lb0hrMS9NZ0M3aVh1RkxKMEtPcnA2K3QxMjd3cHMKLT4gWDI1NTE5IDVNclhHdk1lSmhoejVjR25QZlpQOG0wMHBUNGF1WTA0ODB2TFJFdmxIUmcKWUh6TkNtRWNPT3BmdDFNWHA0aWVHNzlkYS9ZM2dKV1EzMGE0WU1tR0FiZwotPiB0WXswLWdyZWFzZQp5Wld6WDVOZnh6UXc0cjFnRlBMVE4yYlFZSXVadUlqN1lzb0V4YXJNczIvTjBxbzFoM01EcXZBRXJLaTY1MHlzCmVna1pOcHQ3RlVZODc1cCsvZHhDMHd3czM1L21qWlBLTG9FTTRPVnpGMjlSVlM0cnorTW1VZVNyWEw1WEpnCi0tLSBZTENyL2FuUHVxcXhCV3BDTmZBL084ZnB4eXBUYlJLamRuRndsaHROSjFRCubxsi8ZFvaWP2ty3PTbqbOiGXDnUf6Z+mYVR2UT7INb8rIu0kQSSrqwOL2OaZIXnybzb9AipwQOa8oBJAamE42ryANy]() {
         let msg = repo_failure_message("init_failed", Path::new("/tmp/repo"), "boom");
         assert!(msg.contains("init_failed"));
         assert!(msg.contains("/tmp/repo"));
@@ -3570,7 +3586,7 @@ mod tests {
     }
 
     #[test]
-    fn test_repo_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBWSGV4dU1ybEkzYUxRYjg0WCtkTkZhV0RQekpGcDV5ODhZcTRQNE5TS25BCnBoaWtqZWRjcFFab05FR3M2dUcwaGpOSWVQdHltL0xkSWUwYlFwOVFiSU0KLT4gWDI1NTE5IGROSGlIZlBJYW5UQ014bTJJRjVMc1BuRENKd3ptSGtoWS9URFBpK2hEbUUKN1F2YlZHa1JYZ2g1Mi82QVlHSkJRRWJxVzFyQmFtRXpSSC9CRVViTzVZWQotPiBYMjU1MTkgRjM1WXlyakxRSW01V0IzNUIvK0N3R05SdmQrd0E3MHZEQTBJcW5QOHh3OApXbWFjVjhOQ25Jb3hMUFhEa1ZxTTF5UmJkQS91SGxqTmFwSDkxcmJQQndRCi0+IFgyNTUxOSBxTGVST0RSSHBXS3FtVHJYdWp5TDd2N2NmU05MZnFIWFB0WlNNNXBqVm5FCkRrV0lNdEIyNjlQazN4aXkwQWl4WEFKRzFRM3FGNjd4RHM4MG9NemRrejQKLT4gWDI1NTE5IGNqcVFpSE9wYlR3YWsyZ2JJdnZCdEt1YThud3kyTGVHRGJ1aDVZUkowQ1kKWGdKQ01TZW04RldFN2tJV0E1QWRCTmZQR1MxczNodTlNQU03amEyYmJvRQotPiApI2BeVi8tZ3JlYXNlClJmNWJSdHBwcmMxY24xeWc4NDk3TjFOVG55QlVuNjV3anJyVzBWeUI2L2VRa3VnN2swZmtOSHRxZ0gzRTJHVkEKVU0vTjVYKy9NY0tZY0dneWd5WjVIQ2JvOWhCNHFBdkVKc1kKLS0tIER3Uk4zZktmclRDMzhoL0JBYjhUM0pzbHU2Y0pnRTM2MzhpcVA1VHRnQlkKk2ovvBR6+Ka4AgGDmULK0Wb08gqcfslQa2zeGwl7aubEfgBE6og41c0l95XiGKssxdhDVa+dX/dOk03W4uQHG7U=]() {
+    fn test_repo_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBGZ1lxa0dsUytUMXdNTWFaQzVNZ1VjbE9sRnBFWjZ2UUNnQlhoMys1dkVFCkc4SENFc0FlMHYvK0tyckNQMm5QV1o3c2pPUi94VjFlYXFvU1AvZ1BTN1EKLT4gWDI1NTE5IHljKzh5YVR4WWVsS3B6WUFhb0hTY1MvRzJDOTZJMXJrR1F1VzQ4VEhyQkUKVDFCNTFWRzNPUXVtaDV2TDRzb1hRT3pxQzJ2dDd1MDhtNFc3TUhtanQ2VQotPiBYMjU1MTkgSDhVZEpwYkZSbHBPUUZHQzcvZVovSjkraXdrTFRsdXBWVTl5RDN2V2pDVQpDSXE1QzhBY1FvQzJXVmlvRHRYQUpRR3FyUVNLWVNkbThQL0JRbkFDS0ZBCi0+IFgyNTUxOSBickloODROdmpUaXB6eFp5RVNsMi96VGJ4N3Z0WExCY2drY3lvbHYzRERJCi9keU5uMTJXZnJUZTdINjdpRjQ5blIrNDUyL0xUQm12UDZLRHlhWGFJbGMKLT4gWDI1NTE5IEZrSXpzTFNjdjAzMktGVW40V2xqZytPb3RrTzZsZnpialAyY3ZpcWM1QVUKZktFL1VtNXZCb2NHMTUzL3N4QVFYaVBPaEdNZGdBa2NJbFJ6eDZGd0ZicwotPiBuLWdyZWFzZSBpUCA6JHohIGUoVnxNfUkgbGtmCnJpU2ltUlNPdXVTRlZOZkNzS0VGb0xhZ1M5bTVQZVNFZlNTbUxMVWVvek9VQm96a2oyakhjaUp5bDlrNFVCRmYKZTViT1Y1Q3M1aDRNNFpsVThRREgvTi9jUEVCMU9oWHcxcW1qSjlFZ2ZwZEh0Y3VEZ3FhR2RlbFlad0UKLS0tIEZiSEM0bnNQY3c5Q3hwUmNFNExDV0FuUDlncGE1eDNyMVNwT3ZBL24wU2cKjeP0dSH32dgyQsLl5D0JnvbCHWmYc3UfvaRIH3QGwrW9HcRkqtURZyPg9WfG/1y0cy2P9uKJHlQY52HPTLn7ggA=]() {
         let msg = repo_failure_message("status_failed", Path::new("/tmp/repo"), "status boom");
         assert!(msg.contains("status_failed"));
         assert!(msg.contains("status boom"));
@@ -3885,7 +3901,7 @@ mod tests {
     }
 
     #[test]
-    fn test_repo_stuck_filters_requi[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB2d1ZpMEVDUXk3UFZneWR1azU4c01sYUhDbVZWY0E2QkJlZnhEVVg3YUFjCjQ0Wk51S1VxRGx6Si9aNUt6NzV1dXBsOXBHT1NQa2RJb1ZVOTBPRDBwV2cKLT4gWDI1NTE5IEZmVmU3cVE2eTZDeHM1cUEvT09RalhrYWg1Wi9LMnl5ZS9jVWJnS1oxQkEKRGVzdGYzZlgwWTNBbkV0SXRWNFFWalpCLzlRNGNKZ2t4LzlxQmp3M2t4WQotPiBYMjU1MTkgUlVnd3hQMThqc2lJa1plT2IyUEdZY20wQ1Zrc1ExMzArYjJWWGJCUFZFOAp2Y2ZOMEYveXlXODBVWDkrSnl6dlMwYWt5MklmYnFXdWpVemtpTkVyTjVzCi0+IFgyNTUxOSBHVDBhWm1CNWZOUHdNTndURU1vcVJUbERncVQzMGRmdmxqc2h6V2pVaUNVCitXRkJ1azN4bVBhcEVUYU1MUzR6UzNhTTBYVkdnRVdPaklCMzBSd3NTdFkKLT4gWDI1NTE5IFprYmhOL3ZGZThTZ3NCQ3VRWXIza1JKNjNtenBTOERrYzhJY0JRT3hTZ3MKd2xnaTFoSUcrWkJjOVdMckxEck80am4veUtGVTE2bE9xQ01URGtrSE9XcwotPiA5alEobC1ncmVhc2UgQnIKeWhKTHJKRHpFVkdvRktaaTQ2T0ZmcnU4MEo0Zk9RbHVKMVZteC8ydzRHY054NlNtWFNBCi0tLSBmL0UwdnArY2EwQUJLQ21Na1h3VXRsbHlwMVFxSmZmUTdNQkhId2NJdVZNChNoAN9BFEVHtW8VAZklmCIrLm5C8aJ52qaergrKonnJTKSgRctyekxM/fbkbMJZDlKE343O8kmE]() {
+    fn test_repo_stuck_filters_requi[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBjV29KUjBJdXhib0xyU2FrWjJzaytUMkZDeWF3ejF5NVZqYWQ3NkMvZmhBCko5eHpIRjF0QndQQkZxb1BTV0k0ZWs0VGtNWXNYa1p6a0dpOExMQ3hlUFkKLT4gWDI1NTE5IFk2Wmt2R3FLdTBObkl2RFYyVk9yNElnUTNRbkJUUnd2VEtGa0VxZzJEREkKaFQ4T0xoaGtYV0k1bm13S2VabVpBTjc4L2pGTGdrL1d6aWl6MXprSjJtZwotPiBYMjU1MTkgQ1hDSUVOdlVhV2MxSWRvZ3ZjZVRpZGN3YWNCVGMycUZtQk9xbWJCNHRGYwozRmRxM2JGMlV3VmdPaEFncGFPUnlrVWgxU1JTT3RPQnMwbS9aWkN1RG5BCi0+IFgyNTUxOSBlbkFoMjN2RlFBeGtZcmtaTkdncVlqb0JLbzlXcXRqcTZrZEtDeDR0MVNFCkdVVzdTeEp6cDJCU1FWM01wRGhOSHF3V0NVZS94cXR5VVNkYVhJaFdNRDAKLT4gWDI1NTE5IFNpMTVURUdyT3IrTEpjTW84dkFxY0RKbnZic3IxZmhrU2JVRUc3WDYzQVEKb3BYdmZEWU43SlJkZHU1ZFZsREFLNFF2QzlMdFBqL2krSkU4RERvVjhPdwotPiAzLWdyZWFzZSB1IERrLHshIkVNICkrImYvdksKcFRXZm1PeFlqSVorY2hCYS9NeGFlUnV0a2NsU053Ci0tLSBXNEp4NHpicWREZXRrdzlWQXoxZnFsVHpITGNIZTYvODBlc0s0UXM3NHowCigi2BKXKxm225Bi61pKOdSa/WfAWAaEUuFiKKWH8j/s3kxM9WarSo7ntcIbYD7qJe44yCF1/7rh]() {
         let ahead = make_status(false, 5, 0);
         let behind = make_status(false, 0, 3);
         assert!(!repo_is_stuck_push(&ahead, true, true, false));
@@ -5258,7 +5274,7 @@ mod tests {
     }
 
     #[test]
-    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBaUnBzSnVUd29PdlRRNHFsSTBMcjBiRmlnWE1ZUnh5RzJuZHlxTWFkRmlrCk5EbWM1NXBmK01pN0U1UUs3YWR4VCtiR0xtYTdibUJsT2IxYnJsUk1URE0KLT4gWDI1NTE5IDZLdm1nN1BTc21IUzVmd1E0RGpWQzFBbjhTOGMrdnlQVTNhcGlIcEFUMG8KaUU0TmRRN25ZSmVUYzRSMitDbUdoQ250UkRNTmtzTEp0dkhyWUM0NzFmRQotPiBYMjU1MTkgWUREWTFVT3hQZDRza3RZYW82WVlSbVpBdk9qSHRqQVNwYVhVYlo4SDUxNApubHJNc3c5R0k0bFNBQnAxZzcrdUhLMnZsZVBDN2RFNEIxSFRYbDYrNnJJCi0+IFgyNTUxOSAwa09iZVZFbGF6bVdnMGVGTjExSm5rZU55dDRwY0hkSytzbzFBOEprOXhZCkpyN0c0S2FqcWRlOFBHcUtLUmt6MzQvQ1N2NFRTQTAwanZscGF1MXowUGMKLT4gWDI1NTE5IHRnYjdFeDNUVGlFc3NiTHZLN1JqeXZxVVFwVnU4dzhNNE4wTXJCNlJnZ1kKR1ByZit0TW5NOW12ejdtYlZSVnN5RFZsK3NjMGJWWVBHT01kNDBzem5FMAotPiAwN29zLWdyZWFzZQpVMGdXcnd3MDRrUnYyZjhNcW9FQVorT284dEJOCi0tLSBNMUxJV05wZVlCb2ZnejU4NHQ0MXMwZDFuRE5nZEppZFNhcjZWajRmclc0CvSfKBrHzB1Ciq0pYV6bJB3T9cDd5kScBgHZlsNKi0uvZZCoUV1B2Pt/cIgCFM+B+E4ymuM2gudh8tpLihM=]() {
+    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBIc3YxejZPS2xOMkRoMVRTTGVNbGpRdzZ0dVljWGs0cEZTb3NvbFZLNTBBCnRCWk9iZCtPbFdid1laeVZjWGxEeEExZE9NR2F0WmRUTG5wUnVqZnIwQ3cKLT4gWDI1NTE5IG41aDk1ZUhEb25HUys1RkZrUzFkMUxTdWJlRGQ5emhCYVN3OENPNkRJbmMKcmpxNHZVTVFYSDFtMDNiNy9xY29nWG5sR1lCd2dWYkpLRWM0SHdGN1BOWQotPiBYMjU1MTkgNEtPL3U5LzR4OW5Ha2FOSkF0Ump0bmdwVmhZRUxpZFdUc29yMlhtUDFuWQphS21taWtpbjE3WGhRZ1cxNTFLU2lqeWxKaTRTZmxmRDQ5UUdtYkJoMERjCi0+IFgyNTUxOSAycElvZGdKZzRxdXVSREUzZzI3ODFzcFRwYW5EVTNvM2doUlV1RllEK25RCjBiazRrMDBaRlRuNDNMSmxxNS9obVo5emxxK3dQcE9HVThaVERmZWo4cU0KLT4gWDI1NTE5IFJpQ0srNlJwa1RnZ3ZWbnZvaHVaMTJ5OFJBZitRS0NrR3dkQ0UvYmkvMzAKMUNOR2dMSWVPQU0reXBoQXdSeHdOUmJoQmVkQUVycEVJTXpoQjJEREFucwotPiBVJjVATS1ncmVhc2UgMkQvJW8yaCogZUozMTwgPyUheDwsXGMKTnFsSTdwVkpkRTltM1c4Z2JtN3R3ZwotLS0gZDVuUmR2WEtsODVCQ2hUV21GemZVa0I5N3MzdjRWV050N2JhN3NxUGNQRQq5AaHZMVRb5Hzo2oglvlX0rchIxZ/i9ztITdeBmI63VJTmHJsWLYybWiLfzcIMXez8B6WQ5hfvngaPuJl0]() {
         let mut cooldowns = std::collections::HashMap::new();
         let repo = std::path::PathBuf::from("/test/repo");
         let notify_key = format!("push-fail-{}", repo.display());
@@ -5387,7 +5403,7 @@ mod tests {
     // -------------------------------------------------------------------
 
     #[test]
-    fn build_recent_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBpWGJ1NmpyZ0dzbk1tSVdWcTlFS1VZY3diV3JhZmcvbGxSVlM0SHljN0E0Cmx5MUc3S0l2cW1RYjVQNlo0SUZ3Smcyd0J0VE9GS0FXcDQwQzUxY09pS28KLT4gWDI1NTE5IHdMVGlYNHlCcCtTMTVEK1BzNjE0eVBqcFBqWk8rNUl1VW9ZeXR3YUVTVDAKeG14Q0pmZzVMSXVqWGhUU0lMUW9VUHVrZ0lRMHN6VjNUZllPUXZFbUhoMAotPiBYMjU1MTkgUUNJQWFLL3MxcGdNWkVvazVJdjQ3MU5QRXBVNW02MVNNU3cxTWplNGQwVQpqYUQvaFpLRlBtRm1Ha0k0M2w5eTBUNU9SeFkrUURjVldzRGE5SnRCSkJBCi0+IFgyNTUxOSA0MlFLVlNjdFdrMU1ONVUvQ05WN3hodFlSeXlKdjNweTBKTDdRWkRDUFNZCmRhTnh6RFFtVHk1bVZKbm5jWDMvKzM1UlBHVDJXK0htTW5rMHhVMkdMM3cKLT4gWDI1NTE5IE1JOEliVHNobjNHZHppQk1ZaXRsbjZ5TTg3Njg2bWlQUUwwekVIZ0NEQ3cKOTQrUXpMdng0TENHM0JVajlsbnFVNE5Odk5hOVFpc0hEc0hwOEVvdU5GbwotPiBsRjdbdVlMXi1ncmVhc2UgQjIlYnIxCll5WFhranVIeHl1K3VmSWtoUThzSEJOS21KMHoreXR4NlVKQndCOExkWEdUeEJMMmRaTkJtelZXM29hdG5OTDYKVDVqWTRWV0p0ZwotLS0gcTloL0JBZjMvdU5PMmhoMStKMWN5RkpVN09mK0owM3AvaHlZZGdCUWdBZwqBsxn4QUSln/EowMwOPeE/8vBi+s3Kl4COwP8eKONs1nTtjlPaQf6nQneEIFejBuCoGSCIKu+Rt5n7XvnbLQ==]() {
+    fn build_recent_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBFQWlTWkg0dWkxdkdndmJ4NEU4WjdSTXo2M3lHTDBsdDduMlB5a0VZRGhrClBUVWRaSjVMNjZnN3NBMHN1WmxGZHg0L0h0UXdQMW1tQnE0UlNnQ2N6b1UKLT4gWDI1NTE5IG9KNlFtSzlmU0x1SW00RWR1bSttTW11L0lqUkxGYnJHcnQrRmpKbEZ4a2sKazZGZ3E2RkRxVVplR0VEM0ZFZzE5L3pyN3dvaVBNTkxQOS9HUy91OGR6dwotPiBYMjU1MTkgaUx4N21oeW8xNjE5VjNpYWI3b3BCMmJ3SkVlQXhNR3BERHdRTk1FSndVTQo1UHJ0YkUzUk1PS3A5cFh5NTVOTXpFSEJlMitIaEJZdlg3ZXIzcmFxTGRFCi0+IFgyNTUxOSAvdFhmYVZxWU5vcFZhUXh5ck9UQ2kyV0doMW1BTU1oNmtjdm45SG15SlFrCnVkVGdnQnl6aDJHaVZHMzJOM0VuUXlZYXhselZGQmZna3cvWGF2eUR4TzgKLT4gWDI1NTE5IGRMSG9EL1RJUitRazF5L1RJZnhGUDhld0tkY2RDSFBiL0Y2Kys4SVdiMzgKQW5ESTZDbkU1VDZrdTU1N3JsK1AydzNQa0p4TnFnRWlQTGxiWi9Icm82ZwotPiBJX0UtZ3JlYXNlIEkqXl9iJn0KT0FYZDdUQXA4WEpic0k4WmNSa0x3UQotLS0gNTVucit1UWF5UUdKd3d0QXVnaGh2WnB1WFhTbUJpVTlOekQ1U2lhL29IQQp9JKneMUOC7J1mMQRfY3OUhap1z5WYeRw3QMGyZYipv4QXQrc6U/9TY4PPgPSW2nhnqC5bj28VHmCtsr8iLQ==]() {
         use std::time::{SystemTime, UNIX_EPOCH};
         let dir = tempfile::tempdir().unwrap();
         let policy_path = dir.path().join("dracon-sync.toml");
@@ -5421,7 +5437,7 @@ mod tests {
     }
 
     #[test]
-    fn build_recent_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBzd2NnVjdTTFRUWUJLMGNzK3VBbXArNFBUOVI3SnRncUk4Z3FoeUpaeENnCnZPdklveTNDdUJ2V0VHbWNRQ09ENTFSSEpndEIydHAvRDcvcGoxK09nVUkKLT4gWDI1NTE5IEVtN0dTeCtmRFZDaThPeWFJMUFrUU00NE13Ukd0dWNDbm1yS1ByVS80RUUKb3o5KzdQZ3V4WDd2VlRBTkJ2REtZZkVvYzF6K24rM2djMkE3d2tiV2prZwotPiBYMjU1MTkgdmhwNm5YbThuOWwxTlNZdnZpeDR2OFREQTVVcXBsditMYzB1MmFxbENBRQpuODlBak8zNEgxalFhWEdEenhSeXZ0WGxZVTJ5MVBsRTdBMk40ZkMycXNVCi0+IFgyNTUxOSBLRzRYMDFqbVVmZCtoa0R5Nm5CWmQ2bmV1Z3A2d1ZPS0lHSnlYcXZlc0RZCnN0akJFRVVMbkNhQU9reU9VYnhPYW5URlgyYU4vajByYlYzWExZME54cFUKLT4gWDI1NTE5IDViMVRYSVJ4ejF4R2lxbTRBaEo3aWpsNklValh1VGhGakdPQTFlZTFUUVEKZDZVeDhCNGM2dXZCSmpsbkJncUcybndGYzJLeDVOOTEvbkUrT3Q0RXdtMAotPiAuLWdyZWFzZSAsIFZWWUJ+IDpMOElSQ3cxIG1tKjp4OkZHCi9UUVVpY0ZPL1c1elZ4cGZxWWZLTzNZakhkZUcxeUpiNjJRaDVOdGJkb0lxczV3VENuSXNiSHVFWVRLdFZ6RHEKeTVpR2FHOHJ0OWpNV29kZEUwUFpjc2wwWk5hZ3lhdwotLS0gVC9RVTNITTd5a3h3RHBuRnB6VFVSVWZZcmVNLzZJYXNIYVMvSmtmY0xhQQr9gmT2oI7wlIBpvXhbrSIJ2Sm8R1IJPUivmZPOBIU7SMYNmmwuJyjJBTHlVoYpPKNVSAOTjp0juXC9Kgi//pl6gOE=]() {
+    fn build_recent_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBYOHVUU2VnejVpSmcwV2g4T0ZheFo2YjVsOWlnbE5JOEJ1eHJnZ2FyNDMwCk9rMmdDdHVhclRwOWxyNnR0U3JrUHJ2RDZGdGtjclk0MWd2SE9VL1ZBajAKLT4gWDI1NTE5IGx2M2lLeFNkMEluaGJUd2d0VTlDZFV1blRkMC9OTkFnckdBemNqeXk3VFkKVldDUmFPdlVIRFM3SW5aallMOHRMNEhXUm5xNkhVd09XSm42NStETldHOAotPiBYMjU1MTkgRFl1Qy9NTm1ERXZJQ0JSRmcwV3dPaDk2NXlESGc2V3pNaGUxQ1RWazVFRQphRzlQNWtGMHhxcUZKTEpYVGUvWWRraWgzL2c4bzI0MmdRcnM0UEc1S2ZNCi0+IFgyNTUxOSBGMy9nNVRrQ0IwSDREQURyd0RhWkJ5TnNVR0djVkZVOElPNU1pTjhrN3hNClI0dnlCMWFmaXozSHdmTGYyTmU4R05EQm9LbXBJdzN1VmJyV0trODh3TmcKLT4gWDI1NTE5IE0zcUIzNS93Y2wwN3ladEtoeitZUnlhRG1hQlJxUFRJUThucHJOTkxqRTQKVFp2ZHVSbVpTNkczUTZJdC83Y0pHUDNDYmE2MWxETUp2ZGNGcUNkYUpoTQotPiBRfm4tZ3JlYXNlIHlGcwplbDJGZ1NlMWcrZDgKLS0tIElqTGpOWElSVVMyZnA5K3pJRXU2eVE0Q1M3ZndSc3RkZ2RhK1hRc1M4UXMKv5Sc7wyLxqH2eUqBLc/SGirUJYy1qhybw7HBp0VEun4Lfo0iH0ViD1vkBWhpIaw3suz0Tq1tRQs4IyaLYCXOf5be]() {
         let dir = tempfile::tempdir().unwrap();
         let policy_path = dir.path().join("dracon-sync.toml");
         let ledger_path = dir.path().join("missing-ledger.jsonl");
