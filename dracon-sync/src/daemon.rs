@@ -639,19 +639,25 @@ pub(crate) fn unstuck_repo(repo: &Path) -> bool {
 /// File location: `~/.local/state/dracon/dracon-sync-in-flight.json`.
 /// Self-cleaning: when `in_flight` is empty, the daemon removes the file.
 fn in_flight_path() -> std::path::PathBuf {
-    let state_dir = crate::report::incident_ledger_path_or_default();
-    // `incident_ledger_path_or_default` returns the path to a specific
-    // ledger file; we want the directory. Walk up.
-    state_dir
-        .parent()
-        .map(|p| p.to_path_buf())
-        .unwrap_or_else(|| {
-            std::path::PathBuf::from(format!(
-                "{}/.local/state/dracon",
-                std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string())
-            ))
-        })
-        .join("dracon-sync-in-flight.json")
+    // Locate the state directory. We use the same convention as
+    // `incident_ledger_path` in report.rs:
+    //   $DRACON_SYNC_LEDGER parent > ~/.local/state/dracon > /tmp/dracon
+    if let Ok(custom) = std::env::var("DRACON_SYNC_LEDGER") {
+        let p = std::path::PathBuf::from(custom);
+        if !p.as_os_str().is_empty() {
+            if let Some(parent) = p.parent() {
+                return parent.join("dracon-sync-in-flight.json");
+            }
+        }
+    }
+    if let Some(home) = dirs::home_dir() {
+        return home
+            .join(".local")
+            .join("state")
+            .join("dracon")
+            .join("dracon-sync-in-flight.json");
+    }
+    std::path::PathBuf::from("/tmp/dracon-sync-in-flight.json")
 }
 
 /// Atomically write the current `in_flight` set to disk. Used by the
@@ -687,7 +693,8 @@ pub(crate) fn save_in_flight(repos: &HashSet<PathBuf>) {
         }))
         .unwrap_or_else(|e| {
             eprintln!("⚠️ failed serializing in_flight: {}", e);
-            String::new())
+            String::new()
+        })
     };
     if content.is_empty() {
         return;

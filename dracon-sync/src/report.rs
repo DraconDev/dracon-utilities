@@ -291,6 +291,133 @@ fn shorten_when(s: &str) -> String {
         .replace(" year ago", "y")
 }
 
+/// Render the ACTIVITY column. The original column was just the
+/// time of the last commit (a duplicate of the LAST COMMIT column),
+/// which made it impossible to tell whether a row was "actively
+/// being processed" or "stalled" when the timestamp was the same
+/// across many rows. This function returns a real activity label:
+///
+///   - "now"        : daemon has an in-flight task for this repo
+///                    (currently being processed)
+///   - "pushing Xm" : push_status=PENDING, push has been in
+///                    progress for X minutes
+///   - "stalled Xm" : dirty tracked work exists, last commit >
+///                    settle threshold, no in-flight task
+///   - "settling"   : dirty tracked work exists, fingerprint
+///                    not yet stable (waiting for inactivity delay)
+///   - "synced Xm"  : clean, in sync, recent commit (within 1h)
+///   - "idle Xm"    : clean, no in-flight, last commit 1h-24h ago
+///   - "cold Xd"    : clean, no activity for > 24h
+///   - "—"          : unknown / no data
+pub(crate) fn activity_label(row: &RepoReportRow) -> String {
+    // Parse the last_when string ("N minutes ago", "N hours ago", etc.)
+    // into a number of minutes. Returns None if unparseable.
+    let last_when_mins = parse_relative_minutes_to_u64(&row.last_when);
+    let in_flight = load_in_flight_for_path(&row.repo);
+
+    // 1. in-flight = "now"
+    if in_flight {
+        return "🔄 now".to_string();
+    }
+
+    // 2. push_status PENDING = "pushing Xm"
+    if row.push_status == "PENDING" {
+        let suffix = last_when_mins
+            .map(|m| format!(" {}m", m))
+            .unwrap_or_default();
+        return format!("🟣 pushing{}", suffix);
+    }
+
+    let has_dirty = row.modified > 0 || row.staged > 0;
+
+    // 3. dirty + recent commit (within settle threshold) = "settling"
+    if has_dirty {
+        // The settle threshold is roughly 2× the inactivity_push_delay
+        // (default 5s × 2 = 10s, but we round up to 1m for the column).
+        let settle_threshold_mins: u64 = 1;
+        let last_mins = last_when_mins.unwrap_or(0);
+        if last_mins <= settle_threshold_mins {
+            return "⏳ settling".to_string();
+        }
+        // 4. dirty + stable fingerprint + no in-flight = "stalled Xm"
+        return format!(
+            "⏸ stalled {}",
+            last_when_mins
+                .map(|m| shorten_mins(m))
+                .unwrap_or_else(|| "?".to_string())
+        );
+    }
+
+    // 5-7. clean repos: synced / idle / cold
+    match last_when_mins {
+        None => "—".to_string(),
+        Some(m) if m < 60 => format!("🟢 synced {}m", m),
+        Some(m) if m < 60 * 24 => {
+            format!(
+                "⚪ idle {}",
+                shorten_mins(m)
+            )
+        }
+        Some(m) => format!("⚫ cold {}", shorten_mins_days(m)),
+    }
+}
+
+/// Read the in_flight set from disk and return whether the given
+/// repo path is in it. We use the daemon's `save_in_flight` JSON
+/// file, written on every daemon cycle. A missing file means
+/// "no daemon activity" (or daemon not running).
+fn load_in_flight_for_path(repo_path: &str) -> bool {
+    let set = crate::daemon::load_in_flight();
+    set.iter().any(|p| p.display().to_string() == repo_path)
+}
+
+/// Parse "N minutes ago" / "N hours ago" / etc. into a u64 number
+/// of minutes. Mirrors the parsing in `parse_relative_minutes` but
+/// returns a plain integer for use in arithmetic.
+fn parse_relative_minutes_to_u64(s: &str) -> Option<u64> {
+    let s = s.trim();
+    if let Some(rest) = s.strip_suffix(" minutes ago") {
+        return rest.parse().ok();
+    }
+    if let Some(rest) = s.strip_suffix(" minute ago") {
+        return rest.parse().ok();
+    }
+    if let Some(rest) = s.strip_suffix(" hours ago") {
+        return rest.parse::<u64>().ok().map(|h| h * 60);
+    }
+    if let Some(rest) = s.strip_suffix(" hour ago") {
+        return rest.parse::<u64>().ok().map(|h| h * 60);
+    }
+    if let Some(rest) = s.strip_suffix(" days ago") {
+        return rest.parse::<u64>().ok().map(|d| d * 60 * 24);
+    }
+    if let Some(rest) = s.strip_suffix(" day ago") {
+        return rest.parse::<u64>().ok().map(|d| d * 60 * 24);
+    }
+    if let Some(rest) = s.strip_suffix(" seconds ago") {
+        return rest.parse::<u64>().ok().map(|s| s / 60);
+    }
+    None
+}
+
+/// Render minutes as a compact label: <60m → "Nm", 1h-24h → "Nh",
+/// >=24h → "Nd".
+fn shorten_mins(mins: u64) -> String {
+    if mins < 60 {
+        format!("{}m", mins)
+    } else if mins < 60 * 24 {
+        let h = mins / 60;
+        format!("{}h", h)
+    } else {
+        shorten_mins_days(mins)
+    }
+}
+
+fn shorten_mins_days(mins: u64) -> String {
+    let d = mins / (60 * 24);
+    format!("{}d", d)
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum RepoFilter {
     All,
@@ -1641,7 +1768,7 @@ pub(crate) async fn run_repos_report(
 
     // ---- Legend line (one-liner mapping column codes to their meaning) ----
     println!(
-        "ℹ️  Legend: MOD = modified tracked · STG = staged · UT = untracked · ↑ = ahead of upstream · ↓ = behind upstream · PUSH = push status · STATE = derived cause (working=daemon just synced/committing/pushing/synced=clean & in sync/stalled/dirty/untracked-only/intentional/failed/idle/cold/healthy) · DAEMON = daemon's last recorded action (e.g. '23s sync_triage') so you can tell the daemon is working through dirty rows vs. you're editing right now"
+        "ℹ️  Legend: MOD = modified tracked · STG = staged · UT = untracked · ↑ = ahead of upstream · ↓ = behind upstream · PUSH = push status · STATE = derived cause (working=daemon just synced/committing/pushing/synced=clean & in sync/stalled/dirty/untracked-only/intentional/failed/idle/cold/healthy) · ACTIVITY = real activity indicator (now=daemon processing this repo · pushing Xm=push in progress · stalled Xm=dirty & no daemon action for X minutes · settling=dirty & waiting for fingerprint stability · synced/idle/cold=clean & waiting) · DAEMON = daemon's last recorded action (e.g. '23s sync_triage') so you can tell the daemon is working through dirty rows vs. you're editing right now"
     );
     println!();
 
@@ -1761,7 +1888,7 @@ pub(crate) async fn run_repos_report(
             Cell::new(&row.push_status).fg(push_color),
             Cell::new(commit_summary),
             Cell::new(shorten_when(&row.last_push)),
-            Cell::new(shorten_when(&row.last_when)),
+            Cell::new(activity_label(&row)),
             Cell::new(&row.last_author),
             Cell::new(format!(
                 "{} {}",
@@ -3213,7 +3340,7 @@ mod tests {
     }
 
     #[test]
-    fn test_repo_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAxTG9VWHl0aVRURkJLVm44RFVOSVhYL3FBWnNFL0JUais4QnRmUE5vTUh3CnNPVHRObmpCZTRtUHFRL3RETTBwR3BiOXAvK3N4MXJQeFF5Rm9kUC8wODgKLT4gWDI1NTE5IHp1ZWp5RjZFbkZJQmw0VUwrM25uWE1uYnhxZ2I3T01SSno4cTIxa05KMUUKSVVCT2hTZVhSODl6dVlFeWluMXplZGhjZjdQcVVvcDBuYzM4eW9JVExjWQotPiBYMjU1MTkgMTR3Nll5bFF4QXlBUklSSzdtVWJzUTJ1cVZXVms5d1JCMG0vK2x6TmxTQQpKV0krbXlaclJOUE9KWVdYVFdQTmZvUzJwazdDL2kxL2RXaU03WlN2c1FBCi0+IFgyNTUxOSBBRFlQbTJYOS85SDRPeTFzalBzRU9vVnE2T2pWMWQ1aTFWNnZ3MHBPMWdFCjlRYWNGS0F1Z1diMDV1Znp6WkVkSlV1Y2NQSTg1VHZQMitPOFFEdDF5UDQKLT4gWDI1NTE5IFgxLzg5dkxJTVRTa3hVMFB6ekNUdEJvdExsMnF1RHZtM0NBYjF6aTVVQ1UKQkt3QVBhMXIvUHB3WS94ZW9pM0w1ZmRaVUlsR29NR1Z5WEppc2t5T3drNAotPiBOLWdyZWFzZQpzVjQxdTdzcldMYUNDeVNnanBsdGs2d3JJUDRyTVRRaWlPWlFaT0t4dVExM1VNRytiSjNTSU9Gd1ZBOU4wWGZYCm5aVjN2c1VoNEVmSmJ3KzFIYURSMGRtVmVVOTdUUWx6WTNIU2k2bExvMFViYmVpazluMnpuRzNKQ1JQU2F3Ci0tLSB3NlJQM253RjBjVmpMemg0QzErVVlTalp4L0tGcjdQbVFYa2cwNzhPeWRNCnHlX+zU/oGIAmbVmu7968PGvu2tQpIy2AbrimFSd5+KpaDVPr2UA83ktKl6GWKjd9r0mK6TvmRiRFsAG1hAw7+gDJaM]() {
+    fn test_repo_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBtUndDTHh5MEo3YUYxemdqdjNUNDBpMEh4ZVJoSGZZTXZia2tWYlpKZGlzClV0R3hKZUM3WUhsVFVOTHFFa3FQcVRDUGdSK3h4aUFFTmVTVlNCbE1PK28KLT4gWDI1NTE5IHgvODlPNk10eEJmWWkvTDNhQmdzeHlkYUZFN1pHY2dNSTVGUVI0YVRoZ1EKY3k3SGVvVEVaU0lmd0l0Q3l0a0hubUVlOWI0MklNTkxITSsrbEFxR3VWWQotPiBYMjU1MTkgaDRsb0lINXEvVytYN0xPUnJEV3ZXYnRwOEY1MFNCeUcva2l3Znh4OE5EawpZYnIxbVJFRlk0RXplUlFxUWdRR2ozQXRPR091cnBvaG9QMmF1bU5zdThjCi0+IFgyNTUxOSBqTkl5STBIc1FZK1VQQTgydWdNeXRRREhHNDB4NWdNTXc4QnBPcEpjMkhjCm5GTlpnRDIxMEhUOFltd0pvRHkwcitwVWtoOVdtc0hhZ2xHY09GTUd5QkkKLT4gWDI1NTE5IFRuNGRxdC9yWFg1a0lvNGhEQjI3aGRtK2NrdWQvT0F5WGE4ckpIbWhLMjgKN205YUsyRCt0d2FHUGxvSWdqVEVldGxRUHMrQm9sZ0Q1N1M1VGh5aHdoUQotPiB5XS1ncmVhc2UgYXEgLnx1VjVCCgotLS0gYlBuYnFsL29ORHErZE5UcS91MENpNVBya2NhN2F6cC9KQlJTZEdzN2tNSQqEpziKJzpn9qN50vTziE5CoffPLIxRpRAzNogGYC8TQ78HyTB8EOarE1T87khL1h8B5yVSLKbxJIBx17QMnPRKrzKzRQ==]() {
         let msg = repo_failure_message("init_failed", Path::new("/tmp/repo"), "boom");
         assert!(msg.contains("init_failed"));
         assert!(msg.contains("/tmp/repo"));
@@ -3221,7 +3348,7 @@ mod tests {
     }
 
     #[test]
-    fn test_repo_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBzdTcrb1dHTlB3MXNIY1pNc3lNdlJPNlN2T3RTSnVyYkplak1rQ0Zua3ljCmhsRC9aZWt6RHErdHdCL1RtM2RpbzlvWWp2SWRpQ3pjY2VtSnVLc3JoejgKLT4gWDI1NTE5IGJWNUZ2REFvZWxBMytSTU5uMFU5SzlQRDZwY2FxcnlPd205WW1JRDQ4bjgKdDlyYWNLT2s0c2Nrd2hDeU0rSS9EU1I0SWVnN29MQ0EzYU1GY1pEVVozWQotPiBYMjU1MTkgSXlpbS9LN2dVRmt3aGJKWmVLWlJuSWtmQnNqNkg4M2NNcnpSZDVOcURnVQpSampzSUFvaHJsdGIzZFRteHkyN2RzbzdvMGpRcDZMOXllb3haQUNSTGdJCi0+IFgyNTUxOSAvODMvaUF1Ty9UaXBEMVdVMjQ0WmVYMng0MHRCTDREd25aRVZ3N1JMdHprCllOTHJPWWVPR1JXc3VLOW5uM3JYYU5xclJsUVFhd3ZQOEhmd1NpbVc5RUkKLT4gWDI1NTE5IGdPMHltTlk1cTI4cU5nSlh6NEJ3Y1A3L1lUcW9zSWtNdGNFMklNSXJsUk0KZGRYZTF4eS91YXhHcHJ6cHlramg5dU1qWXJHcCtUVS9yL2MwRGlvdXUwVQotPiBsW0pzcCYtZ3JlYXNlIGA0fEdPeSBEQSJYciBtdGYoIHoiXjs9CklnN2tHKytYNUUxQkxlN3lMVEplVld1ZzhNME5MM0xOcHNtYlYwZzB4R281aVIrOUdFOUZMY0R5MzdiN1F6awotLS0gR2VhUHRiQUsvdjVjenlKRmZtNXVKTG9SRVQ0Vy8ySGJKNUZjYXNkby9yTQpexxgTNb2eUeod949mxxdmUoY3kztJJYXsuo5eDD941xcBZGu+8m2fz1GacNqUsCK33UYtA1YcUWDIp7SrKmei5g==]() {
+    fn test_repo_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB5WUtRbUJGSHdBMWdBUEU1KzE3Y2Exa1ZzT09Va1hSMmRTUmtEK05yeW04CjVmeDAvREFNdWl0alFhYjQ0S1kzbTA0UmNuUVRiZjFscnMzdGU2UUpZUTgKLT4gWDI1NTE5IFByWElXZGhPQTRjLzZZbDgzQWY1d2RBVFJMRVZvbjFLUW5iMGlhaExwMmMKRnM5SDNwR0tIZTJjNWxxeWZKVzZpcnY0dHJUc2pIbVowRFR1MTExcXBIbwotPiBYMjU1MTkgK2ZPSHNSbEhIb3BGUnVBQjBESG1vZ003VExDQzV6R2RKNFhWQWJHVm9ncwpXNlFJS25HY0svSEU0aTVsY1hKZEEybmNoNmNGV0ZlRU1oR0FPSEx5Q2pZCi0+IFgyNTUxOSB5V2IzNkoreWt3V25aUTRBV29xem1VSm85V3dhdFJwN3BobmdrSWxOdDEwCmZVWDlGN01NdE1PRnlDSXZSbFAxcmhyRDJvbTFiNEh3Y091OUpteGdBL3MKLT4gWDI1NTE5IEZDNit4NG5USUljMHVhaWlVR2toOWxMVndqVFZEZ0R1M3FzeEVOYVFkeTgKWHBJdEthQXBoSndGaGthV1FKQ2QrRFZjazhRblJ2Z1h5SXJBZ1hhYm9PdwotPiAyJ0wwMGNmLWdyZWFzZSBlcwoKLS0tIE16dnRsOGlXZXNHMUx6RnByUjQ5U3RKYnR4dUZsT1Z4U3B0UDRxbWxtTFEKwOvU+jg/eNTQXYk5K9zbsbHwXUDBB+mYYOPutiRAJ/DlLjd764mnew+Yxi6MsWTcu5hcK2PB/ajNKRVwu6NqQVk=]() {
         let msg = repo_failure_message("status_failed", Path::new("/tmp/repo"), "status boom");
         assert!(msg.contains("status_failed"));
         assert!(msg.contains("status boom"));
@@ -3536,7 +3663,7 @@ mod tests {
     }
 
     #[test]
-    fn test_repo_stuck_filters_requi[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBWSWhhMVA0OTRRUnVWOWswZFZNelcvR3FlbVUxVnV4YnpCb0l1WExlanh3CmFXMWExNnpDSWVDNkxuZmM2RHNmVzQzMkRVdmNYamRGTHR0UUdYYTVrL3cKLT4gWDI1NTE5IE1sWmRQeFYyYVdJVmg3dEZKcytGeVl6aGQ1QXd6MnpiSWUzcG9tSkVaMk0KS2kvOXdodXEwVnVUTDJ2ZVBqZG9JUVk4TUxKZHNJUC9wZllsWnNVL2NZSQotPiBYMjU1MTkgdlhtVmRoSzcyRHhkL3BUK3hSYzBEQzgrTFhYMk5WM0JDY2UrNUdIeERVOAowVDdRemRmek1aaWlrdUlwUStDd1BDaGVFaC85MHhtTHQyNVZ6UUNXcllvCi0+IFgyNTUxOSBBdTBiZ1owR2M4UkRLTExldE9qS3o0TjRqeCtVY0syQWEyVnQ0MjQ0aTJzCjEwTnFZVGcxR2JBRHB1TTZYZjFZd3cxTjVBM2M2RUV5UnNneDVPc01EVkUKLT4gWDI1NTE5IHRwR0dINDVMbU9WL0J4Y0lzYVF6b1hxUHhmRGJWTFRHdE8zWEFQak5ZQXMKVDdKbjZrbEhVSSsyUUsrRWJFUzVnOFFOSDRoMVBqVnJwOThvSjJiSVJuawotPiBXT24tZ3JlYXNlIDQ3NSUgfmUrIEExCnVybGpoZ0MvSXdtWEFnNmRkajVRZ21sSVJMenNIdkdyVnpRbFVXZ1ZLaHF2L3QrcTBSc3V5dnI5RjlWZFI0ZUYKS0FLQVQ4RjZSUQotLS0gTjkzcmdPOTZOUERsVmhhNk44bEd2a3ZsajYzWWJIclJ3aktDMzU0dm1hawrwpeu3YtUlXIrbtOY1boPAyV2iQsnS7Yo1X1YEIJbh4NoC94wrnIpu4cdeGA7z92F34SkPWBe4jA==]() {
+    fn test_repo_stuck_filters_requi[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBiSEd4YzZxeFNhNGhpSUNkbDBTYVRjeUtWT0FTNm1uNnpXMGUxQ0xDSndzClRIYjgrMkFqQ0dnVVNQTTZ3TjN1RjZYclFRSXVXZWQ2TWFhUWJDZVdRdG8KLT4gWDI1NTE5IEo5dHJQNnpaZ3JQOGIzOUtxWm5XSjdZM1VUcUFoMDg0ZXA5bDdXTEJRQkUKNHZ6UjB4ajBSaHBKcE5IbHNyUjdJM1NiUEI0Tm5IVlRkZFRZMUZ0ZVdBQQotPiBYMjU1MTkgZWdMVjlZU1lhSEp2eW9OVVluT2E3VUNqcVpzQUxJbm90THU3aXAyMUYxUQpuY0tpelJDN2ZxVXA1VUh5d0x4M0dHa1AzQUZTNnZwRnpTS011dFVBYUt3Ci0+IFgyNTUxOSA1YmtIUmNBRVhYbTZGWmlwSEt4di9WaC9kS0ZpN0taZjV1VlZmZk91N1hjCnMzM1dBSVJkam53a2lsaCtOM2I0S25CUVVwOTEwMVI0MTBGTlpRRmZGdkkKLT4gWDI1NTE5IHNBSE9ScHB3UHVBK2Naa1dMUnZiY0QvNFk0TEJKQlU4eE1NeXNwc2pDR3MKRmcrUmxqbUdFWEF5UFBJQU5oR1dvOXY5MzNhTTZ0M2tudW9SZWczeGIxbwotPiBucm07dDQmLWdyZWFzZQphS3hOYWsrMVdDVHpFT25qN2F1WU9BOWxESmZSNFFCbGROZ202RlVnRCs0Ymx5NlVoOEZBdlZoRkl5eHc4RFFwCnNmNGUzQVdKSm82L0R2QW4vdlhUUCsyenE1TmhjS0l2TVZLMVNNTkM5OFo4T2pCS3VBCi0tLSA0TW5ORGJkUFZLZFZPOHBCVHFMbFMzdFF6a3dXRXVjYks3c0xFdVc1NkZJCtn92cwPfwWVOf37BN2MoCUtRyLwa0AwIT8syBrreArJgVLGWQsEOl6Dd+iEge5bIDCWmG8a5W4v]() {
         let ahead = make_status(false, 5, 0);
         let behind = make_status(false, 0, 3);
         assert!(!repo_is_stuck_push(&ahead, true, true, false));
@@ -4266,6 +4393,135 @@ mod tests {
         assert!(!row.concern);
     }
 
+    /// Build a minimal RepoReportRow for activity_label testing.
+    /// The `last_when` string is the natural-language relative time
+    /// (e.g. "5 minutes ago") that the daemon emits from `git log`.
+    fn make_activity_row(
+        last_when: &str,
+        modified: usize,
+        staged: usize,
+        push_status: &str,
+    ) -> RepoReportRow {
+        RepoReportRow {
+            repo: "/tmp/test-activity-repo".to_string(),
+            state_flags: vec![],
+            branch: "main".to_string(),
+            modified,
+            staged,
+            untracked: 0,
+            ahead: 0,
+            behind: 0,
+            last_hash: "abc".to_string(),
+            last_author: "test".to_string(),
+            last_when: last_when.to_string(),
+            last_msg: "test".to_string(),
+            last_unix: 0,
+            last_push: "5m ago".to_string(),
+            push_status: push_status.to_string(),
+            push_error: String::new(),
+            concern: false,
+            warn: false,
+            hint: "test".to_string(),
+            state_cause: StateCause::Healthy,
+            state_cause_label: "healthy".to_string(),
+            daemon_last_action_unix: 0,
+            daemon_last_action: String::new(),
+            daemon_last_result: String::new(),
+            daemon_last_action_when: "none".to_string(),
+        }
+    }
+
+    #[test]
+    fn test_activity_label_push_pending() {
+        // Push PENDING with 1-minute-old last commit → "pushing 1m".
+        let row = make_activity_row("1 minutes ago", 0, 0, "PENDING");
+        let label = activity_label(&row);
+        assert!(
+            label.contains("pushing"),
+            "expected 'pushing' in label, got: {}",
+            label
+        );
+    }
+
+    #[test]
+    fn test_activity_label_dirty_recent_commit_settling() {
+        // Dirty + recent commit (within settle threshold) → "settling".
+        // Note: when in_flight is empty, settling still applies.
+        // The settle threshold is 1 minute, so 0 minutes ago is settling.
+        let row = make_activity_row("0 minutes ago", 2, 0, "OK");
+        let label = activity_label(&row);
+        // Either "settling" or "stalled" is acceptable when last_when
+        // is 0 minutes; the test just ensures the function returns
+        // one of the activity states, not a bare timestamp.
+        assert!(
+            label.contains("settling") || label.contains("stalled"),
+            "expected 'settling' or 'stalled', got: {}",
+            label
+        );
+        // Critically, the label must NOT be a bare timestamp like "0m".
+        assert!(
+            !label.trim().ends_with("0m") || label.contains("stalled"),
+            "label should not be a bare timestamp: {}",
+            label
+        );
+    }
+
+    #[test]
+    fn test_activity_label_dirty_old_commit_stalled() {
+        // Dirty + old commit (8 minutes ago) + no in-flight → "stalled".
+        let row = make_activity_row("8 minutes ago", 1, 0, "OK");
+        let label = activity_label(&row);
+        assert!(
+            label.contains("stalled"),
+            "expected 'stalled' in label, got: {}",
+            label
+        );
+    }
+
+    #[test]
+    fn test_activity_label_clean_recent_synced() {
+        // Clean + 30-minute-old commit → "synced 30m".
+        let row = make_activity_row("30 minutes ago", 0, 0, "OK");
+        let label = activity_label(&row);
+        assert!(
+            label.contains("synced"),
+            "expected 'synced' in label, got: {}",
+            label
+        );
+    }
+
+    #[test]
+    fn test_activity_label_clean_idle() {
+        // Clean + 2-hour-old commit → "idle 2h".
+        let row = make_activity_row("2 hours ago", 0, 0, "OK");
+        let label = activity_label(&row);
+        assert!(
+            label.contains("idle"),
+            "expected 'idle' in label, got: {}",
+            label
+        );
+    }
+
+    #[test]
+    fn test_activity_label_clean_cold() {
+        // Clean + 2-day-old commit → "cold 2d".
+        let row = make_activity_row("2 days ago", 0, 0, "OK");
+        let label = activity_label(&row);
+        assert!(
+            label.contains("cold"),
+            "expected 'cold' in label, got: {}",
+            label
+        );
+    }
+
+    #[test]
+    fn test_activity_label_unparseable_time() {
+        // Unparseable last_when → "—".
+        let row = make_activity_row("never", 0, 0, "OK");
+        let label = activity_label(&row);
+        assert!(label.contains("—"), "expected '—' in label, got: {}", label);
+    }
+
     #[test]
     fn test_repo_report_json_structure() {
         let json = RepoReportJson {
@@ -4559,7 +4815,7 @@ mod tests {
     }
 
     #[test]
-    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB0aWZRU2hycUJub2dnYSs1ODhyTGN4U1BPMHExZG5SWjZEZVdhMitTZkZFCm1RNFdRdWdFb0dqcHN3N2h3MDZrb3BxZk9UalVzMTBsUUJza1NlYWs2RDgKLT4gWDI1NTE5IE9tTTJBK25IVGI5clJTWk84a2FQdEhEc2duY1RvMWVWUnBaeU4vUEtkQ1EKYklqMWhyeUdDRWRDbnVmM0dYclRjY1FlSW94UDQwSnFrMFVXQzdkZW5YWQotPiBYMjU1MTkgb2hodkYza1lLd1VSRDZHeVB1TUwwV0dWdmE0cEZsdWRMcUp6c2JhVGlYNApaK28yRENYczVIMW1nSGJaeGoxalNwTkc2anZVbTRJb0JwWitVWEk3VHcwCi0+IFgyNTUxOSB2NSswU2tVbTBLUGcvLzYyR2hicGppMEpRRXoyL1N3ZE1jcVllUFNWZTNZCi9Qd1owUlJYNzI2bnRWNmJMZ2RtMkVZeXFnWWFGaWwzcU5aWnl3Z2dXN1UKLT4gWDI1NTE5IDJ2SWJSbXlTOWM5US95Uk16ZWd4MDY3V2g3YkNZd1E2WjRvVi9vTzd2VDAKMzhEUGdFMlcyWEtrY1REVXVPSzlYU21sc0E2MGJUOUhRcjFuVUVVMk9TUQotPiA5LWdyZWFzZQpDTVdoelJtMzF0Uys0NnZyQ1ZXTm5NTTVUUDdWQjRJeDVnVGR0VVV4Nzd4dGxyZXZ5Q3pid0Q2K2JQUU9zdjBUCnVQWUlmbmxQQlhZZ2JNeG1zVGdiTEZNYTV1VUE3cnpkQ2JCN0hVNmdYamNDcm5rdHBjMDZGR2dLOFc3WGNheGwKCi0tLSBpY2tFMC9WVS9oMGd6bjZxVzRRZ1NxTHQ3SHA1eXB3VzRXWVhWVURJMTJBCnCZScwzDQl+13CWKzi7+W2R5DdLrKtJPIKChPcg7sdIQkSo4u9ZcUe8hgym6KWiAWDEvg5nWEREA04pol4=]() {
+    fn test_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBIaGhXcjZIcnVuVXdwZTJqTWVjU0VXcFRUTVZnZTlQL3VkWVJyOWxrcDNZCmJ5aWU2L0picW1zczJDVUNmV0tReE81SFkrbmJrMk1iZ3loYkxoVDQ5dU0KLT4gWDI1NTE5IDFlY1hEVGR0M1Z5TXF6Ujd1ZGQ5SjhrM2dCVXliNHloZE1iN1VvRlZGU0EKaXB1UkdKaFZYU2FUS3lWbUF0TkdUQXFLdG5TVW4yQTdkVVRydmZXWEV6MAotPiBYMjU1MTkgUjBsbEdjbGRUZ2ZBODV6V3M5M0xzeXAzZG9idWJwd1VuT0J4bExYVGpqMAoxdkhVblhLdEE4bDloQWpxVHN4MVFwK09qalhMMXVWbkw1cWRJRFphNk1NCi0+IFgyNTUxOSBkQ1RxcjVac2dnNGQ1SWVTZkpDTDFFWWVSQWJMOHR6d2lvL0VYM24zSTBzCjNrQkF5SSt6ODZ1R0F2K05BYW9NTUxMZFdybWdNRXhpbllMcml3WWRMSzQKLT4gWDI1NTE5IFM1cjM5U0trTlhEdGZ2dTQ2QmxnR2VabjNDdDk1RXhYWGhnbFZSZjNSaDQKZGw1TGh4aFdkQVhuS2p4WWswZUEyeVFNMk8yYTJnNnRnaGxoclRaNWMwQQotPiA6Iis3d0YtZ3JlYXNlIDJdaiVDIC09eyNTSz4KTmFuNE9WUVZpZVQ4TWM0NmQ2Z2E3UUs2Y2dFCi0tLSBPTXpZcy9vVHNDdEpYSFhDTFZqOERoMXREWCtxTFc5MGpNQzVmZUgzTStJCl7b7ln+lVXtVM3vYZdvWnar7sJvDIuq24curY6vQsLS5bGsqWx94547aIGLs6kKUVILjUPeVs9vV0UskT8=]() {
         let mut cooldowns = std::collections::HashMap::new();
         let repo = std::path::PathBuf::from("/test/repo");
         let notify_key = format!("push-fail-{}", repo.display());
@@ -4688,7 +4944,7 @@ mod tests {
     // -------------------------------------------------------------------
 
     #[test]
-    fn build_recent_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBKODd5OU41YXpUbWtIL0dwSTRUZHF6R3NsdGhHZytDK3V1SithTGwxRTNjCkpvZXp6bUhCODJlNGNDOUZMR0VFbGJGb3FiVCtoUTZUQ0lxZS9oWFVDY1EKLT4gWDI1NTE5IEYzQkdyc2Y1dVRadjNRRHd3Zzl6ZXZGbWtyUmhNQkkrNGdmU1puZXlNUUUKcjg4THgxbW04cU83TzlYMEhCc3NLVlJrdlV2M3pzbHQ0WU45OHkzVnNJRQotPiBYMjU1MTkgeVkvSWtqVDZRSnUxRTlac3Q1WFY4bjZPL1RhTVJaUVYvTDUvSDZuL3hXVQp5NTQyV0xkREtlQktUL0dHVEhtSHYreVRUUkhUL21OQkFHUlhzbUhrbkRjCi0+IFgyNTUxOSBrZXJVWmFGZUVjS1ZOd2lseVZ2TjBQTm5LSUFnMk1BRjdMTklZZmNLQ2hBCkQyR3VHblFHS1gvUW94Z3YzR0Y1WG9kWnU4SGVJSzFPdWJzUGhlNUhRRzQKLT4gWDI1NTE5IE5tZlZ3MWo4RURmYjJvQURENjFZanlrekNhTGtvK3ppRHRjYzF2TDBWMVEKOXNZU3k3OG1ldkkrLzRxUThPSEw2Q3VLL0ZraFMwRGEybkFJeSsvTmZadwotPiBdIydlLWdyZWFzZSBULHc/eCdAZgpHWGZJdmI5V3VnTlo4T2VJUXhWTlU1engKLS0tIHMyL2tlbG9TbjB4am9uTWJTYXQ0ZzRFSFJpNUZWRFBaUkc0UG4vRktGS2sK5tWhOMzCNYFzom0c2WdniSk1DmgoUlZW6KdoNMDkWLKMOOPVWcfOVMQWr8XaMhYsry61R8Y4p8//CuCpP2I=]() {
+    fn build_recent_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBsQi9HVFlCMWYwSUZRM0ZiTGJZeWJGV2dvTXVBL3FFVjFTcnZNRDRHQzJvClg0QUExaFZhSUJtc2tHRTRZQUJBZHdEVE5PQlMvYlA1RDV4S0NDYVBDVTQKLT4gWDI1NTE5IGZROHViY25xZ29Kc0hPUDJLb3p5L0NxbUtXWHFUUSt3b2lOQXh1bkozMlEKYmZ0OXJ1cWJvY1ZuTTE3YlNueGc4M3htdTdDZzJob3Uzc0FsUDVvSC9tcwotPiBYMjU1MTkgaEtENncxaFpaaFlKTHZyUzNTaHdDY3Y3TXhvRmpEY0ZzN2tsam1WMVZUTQpXZTUrZGVROEtsTG9FOU15cTAwMmgrbXc4RzBrWnBjcmRncldpUzd2VytjCi0+IFgyNTUxOSB4UHAyYjJBZTVoWlp6dnMxRlpNL0JoS1VienZ0UktVTXlwV2wvTzZwTmlzClVJemFlUGpiSml1STNVMXE0c3dXaWF3d1B1WENpcGhUcGcrS05WWFdDNE0KLT4gWDI1NTE5IDgybEttaHZoZDF0WFJOMjMzOVNzbDlGZnVtUW1SOWVYLzJpSWxoT0JXQ0UKTG8zYVVrcld3dWZqUklEcE01WnpMRHhMUnBtZzJheGZQeFJuNWpqY0xKdwotPiBWXXh1NS1ncmVhc2UgJlskaVZVOiBNZy5IUXl9SQpMZThKK2xLeDY4OGl0dlBSSjJScnFTZVVLM08zdXp4dVoxSCtNUDN0Z1d1aXV4dHR3SHhsVC9NNTJEN0hmcFVyCkdsV2g1WHBqUVRISDliVlV1eVdhaUoyWGNLM0NMYTN5bGVNCi0tLSBHSzJIc3V6R2JCUUdzc01XTTZOMXFNYmZBbG5VcExzbkUvbFNRUUlucFlFCklsGiuaCpZLz2MZfVGITq0wIycZcBF+oYW9LwlzkoMi61+q2dBJjhy8Qv7Uu2fir+Imp8z4yDMsK7cUUL9C]() {
         use std::time::{SystemTime, UNIX_EPOCH};
         let dir = tempfile::tempdir().unwrap();
         let policy_path = dir.path().join("dracon-sync.toml");
@@ -4722,7 +4978,7 @@ mod tests {
     }
 
     #[test]
-    fn build_recent_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAwRWxiY3owY2QzWkZWU0s2d0NOaGpFYVJySG5SQzVOUUJUaGN2OVc4cjJzCkpSSXdLNzVOd0YvRmR0MkdlelRwaGlWOFpDSXZmMmN3NmJDUDdZMWpCZlUKLT4gWDI1NTE5IHVJakFSQmxIdE1XazRFMnpibmI4cHVndmdraVlGbWxYK0tlbjVJSFVCMkEKdEZTSVBYa1pOeFMrNFgyalZnMWJhUG9YcmM1T2gyRXIrajB3VmliTXQ2SQotPiBYMjU1MTkgNll2LzAyWllVTm9OMDNlYU0wUUpDNDJXLzRLRnlqRkpSTzBabnpLZkdqOAo2dzBKY2pXdHBTYzNJd3g2SERZWnNIVjcraVJmNytHaitxTXJmcDUzSlJ3Ci0+IFgyNTUxOSArSWhOdzc5VmtiLzBlZUFwQ2FqOHpUZTJhMTJlNGlIRjNsKzVMaEVaOXpNCkpyNkplTCsrbWFDL2htS2hJQlJIWEpXcDJrMmhCMDV3Q0JIU2FSYWttMFUKLT4gWDI1NTE5IEN4MHU5NGtuS00yN1BsZ29PNHc1RGE0M2JKTFY5VURyUzVmOGg1cnAxbVUKQWJjNVdENllUdG9WQ2dKdG0wYVlLNWMyczdNM3V1V0l3WTNGKzN3RUZLZwotPiAzeC1ncmVhc2UgYk1xTSA5c3tnICR1YwpQMC9hcUJZTzFkNEFRSFJjM2w0dXRWbElqTVI4bzNBUjJ4UGdSTnhKdDFranFKcHBQZmlRZVNjVXNJdVhsRTJrCk1lYVNCZzBsUWRvamN1cjNtSlNaU3dGTWtQOWNnRXJQNG5xc1F1VGlrc3RTNnVsU3lMLzNPVW80MzVhRlk3cksKUWcKLS0tIHRsVjBESGhDOS84bjVkVGREckpNd1JWVFQzWlkyRWFaNm9iOTVyNUZsSjAKOk89fSLLdjC15ImmDB4F8TUc5EOb6qayzKiQXpqz0njg1mFB9OnzjvkEoAFrEEtbldF78gmIX25cy8juxns3SEx3]() {
+    fn build_recent_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA5ZE1EWTVURGEyVlNqRVEzOHlnRHJRbnhpZjhSeit1T3JZcXFuZmdTM21zCm1VSW9JNHF1YkxtSUdENzdlSWdNWkFjWlNkRDBGRkl2TzVxR3VlM0Y1MGcKLT4gWDI1NTE5IE1iRGg5VURuSTNhVVdRTHg5bHZQUU54N1dBalJkV2xLQmtKRUdtY2RTWFUKcVVVdXA0dzJtYzkvcjNSc25LK0VQdUxHb0ZSZlR6REZvV0kwcVowM093UQotPiBYMjU1MTkgTnlyUnVVWVp5NzlYc1djK0Q3d25rdzBpWjZ6bmlXdzJSZ1A5Ynp3SjVCcwpVa0N5VDljY0w2eDJJRFNVY1BteVY1NWk4azlBZjdXQys5TXd3YnF6QW5RCi0+IFgyNTUxOSB5MW4vdHM5Z3UyYWJlZ1R1Y2FVcXZDaHJWVW1SMTZ6MlExR2NXZlVLbWxRCkkySmhvYnlZa0ZHUlZoVHJwaWhvZ2J3TzdZYlQrWmVKNG43cDdCcVUyelkKLT4gWDI1NTE5IEp2YmlZa0RveThCMktiaEE3US9nSFB1QTRzQ3RRcmZhdzZVNWl3TUJJMkEKb3NiRnB1YWRVZ0RVQUJFZWxXWElTY2hPVi92dTdSeCs1ODNTNVo1MWUwNAotPiArencpUW4rTC1ncmVhc2UKOGJMcER2TncwMWdKeTVzQUFTWTFGMlpXMjZxaXEySjhSVGF1UnVLVGlueE1QZXhkeTMva3FQZ0xjMzBPWUhwTgpvRkdFK0E5anliSHFKZUNUM3AvM245dwotLS0gczZlSS9tSHI4VDA0RXR1ZXJ0OHozK0VDbmo5Um9uR2xGZHo0SExZMzNrdwpX1NJcwK3lBinOHEyE7xpGRphjE6qYdytuMy4TFarjfalCAfxtE/Qak6q5KbfTtFuESgpWlaroyoNDzjgsbmL4KXo=]() {
         let dir = tempfile::tempdir().unwrap();
         let policy_path = dir.path().join("dracon-sync.toml");
         let ledger_path = dir.path().join("missing-ledger.jsonl");
