@@ -8,31 +8,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
-- **dracon-sync: changed auto-commit policy to
-  "commit all unless >100 MiB"** (2026-06-15,
-  goal `9aaf0b08`): operator asked to stop
-  leaving files untracked by default. Config
-  changes to `~/.dracon/utilities/sync/dracon-sync.toml`:
-  - `max_stage_file_bytes`: 52428800 (50 MiB) →
-    104857600 (100 MiB, code default)
-  - `exclude_file_patterns`: `["*.log", "nohup.out"]`
-    → `[]` (logs/DBs now committed)
-  - Added explicit `untracked_exclude_patterns`
-    that keeps session-scratch patterns
-    (`**/scratch/**`, `**/tmp/**`, `**/pi-tmp/**`,
-    `.demon/**`, `.sisyphus/**`, `.ralph/**`)
-    but removes audit/screenshot/media patterns
-    (`**/audit/**`, `**/screenshots/**`, `*.png`,
-    `*.jpg`, etc.) so intentional audit work is
-    now auto-committed. Config backed up to
-    `dracon-sync.toml.bak-2026-06-15`. Per-repo
+- **dracon-sync: durable commit-all policy
+  (goal `546d4f9c` / 2026-06-15)**: operator asked
+  for the previous goal's policy change to be
+  permanent, not a one-time config edit. Code
+  defaults in `dracon-sync/src/policy.rs` updated:
+  - `default_exclude_file_patterns()`: was
+    `["*.log", "nohup.out", "*.sqlite", "*.db", ...]`
+    → `Vec::new()` (commit logs and DBs by default)
+  - `default_untracked_exclude_patterns()`: removed
+    audit/screenshot/media/note patterns
+    (`**/audit/**`, `**/evidence/**`,
+    `**/screenshots/**`, `*.png`, `*.jpg`, `*.mp4`,
+    `**/note.md`, etc.). Now only session-scratch
+    patterns remain (`**/scratch/**`, `**/tmp/**`,
+    `**/pi-tmp/**`, `.demon/**`, `.sisyphus/**`,
+    `.ralph/**`).
+  - Test updated: `test_default_exclude_file_patterns`
+    now asserts empty.
+  - Test added:
+    `test_default_untracked_exclude_patterns_is_commit_all_unless_scratch`
+    asserts the new defaults (session-scratch in,
+    audit/screenshot/media/note out).
+  - `dracon-sync/dracon-sync.example.toml` updated
+    to reflect new defaults.
+  - New `AGENTS.md` created with plain-English
+    documentation of the policy, daemon commands,
+    and forbidden actions.
+  - Result: 850 tests pass (was 849 + 1 new),
+    release build clean, cargo deny clean, all
+    4 remotes aligned at `34728f4d`. Per-repo
     `auto_commit_exclude_patterns` mechanism still
     works (Junk-Runner-bevy keeps its
-    `test-results/` exclusion per goal
-    `c794cf71`). Result: `DraconDev` 1 UT
-    (`full_audit.py`) and `dracon-platform` 1
-    new audit dir auto-resolved; live report
-    dropped from 2 WARN to 1 WARN.
+    `test-results/` exclusion). Concerns
+    investigated: kiki-sassy `github` push-stuck
+    (6 failures) is a divergent history issue
+    (436 github-only commits, 775 local-only
+    commits) — **NEEDS OPERATOR INPUT** to resolve
+    (operator-owned repo). Other 2 concerns
+    (dracon-platform 5 MOD, Junk-Runner-bevy
+    88 MOD) resolved or working as designed.
+    Documented in
+    `docs/design/commit-all-policy-durable-2026-06-15.md`.
 - **dracon-utilities: removed load-bearing symlink
   `~/Dev/dracon-libs`** (2026-06-15, goal
   `cca2169f`): `~/Dev/dracon-libs` was a symlink
@@ -153,10 +170,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   fake entries to the operator's live ledger. Fix: 7
   unit tests now use `EnvRestorer::new("DRACON_SYNC_STATE_DIR",
   temp_dir.path())` to redirect ledger writes to a temp
-  dir. Affected tests: `test_record_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBpRmFkREhIVS9qYXh1emdTbUJvLzdFMnBTc014Y0NJcDBuSm91K0k0bHhFCjNuRGNmQzRGdjBObWR2SHZpT214VUh1R3g5bTVodnZNSHhyUWNsUVE5aEEKLT4gWDI1NTE5IDlKR1hjMklUU3ZPZlJxSU10MTkwMTUxaXhhVE5HRHN4c3JBbEF4RDhDSGsKVHA2UTQ2Znl6MlZkVnJUYnAwd0ZMUERpSURnSHZyWEhZSDhRODZhUW9mOAotPiBYMjU1MTkgWVdCZEJabkJhVUsxeFJzdDEyd0lCMUlyaW1tVDZ6ZzZ0TVR6bnZLS0RDawo0SjJVNEZCdUZoZzd3Tm53K25ManZlaGtvR0lqWkRjWVF5RUxMb3ZXNXJNCi0+IFgyNTUxOSBSNGZRN2FaRGIreTdwMGdLalJuaGg5M3dCaXZCQ0NDazRSWWNTWWY4dWhjCkJQV3FycGpCN055SDJKb3BFTzZ0SE5jc3pKQnRBdjRlL09UU0RSQTZvSE0KLT4gWDI1NTE5IFlUS3dPdVFYdk9aMHdlS2NHNWE2MWE3eW81eS9xcGsvcVBkKzR2ek56QUUKUnI5YXJjZlMrTmNvUGlUZDJOM1ducy94aDJvWUpVUlBPcS84bjV6YnZwdwotPiB0PyZKLWdyZWFzZSBzIE85Oyl7QH0gSS8gUzdwKyFkJSwKVWdUOW1IbVJJSFZFM3FZcFNYRXNLMUdhV0NYVHkzMDI5YVM0a3doMzkwdExWVjAKLS0tIENlUzFIbCtxT3lHT3VNUENnQVdCYVMwbG1wRVNSMU16WGgxcTdKQ1FvNXcK9PTILRw8zfFpDBjSQnmT4XoKN+ICNA5TMA3Yomp4mfoYgBYFF1D/uS97q7nDUVDdWgJgYaOQgAb032oS/mAsocxH]`,
-  `test_record_push_success_clears_entry`, `test_record_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBCbUVUSVlMa3M4T0s5aE5jUExNdUdNV0VpRjBpVjNiMzFRUWZmdnpWOVRRCm0yM2FDL1BSVDFYb1FFS1RFa0tzZis5cnBROFdCZU4yUnNzOHBVTCtyd1kKLT4gWDI1NTE5IHBlSFdPTXZKaVQ1dDhqMTFWMjFoTzdPS2NMMzNja1FUZmlsMkxQOCtsV1EKNHZkTnFKdDczQjRJNWErTXMrM05qalBZVlhhQkZIKzhzOEZMUDVtTGFGdwotPiBYMjU1MTkgSHU1TnlsWXdVVUxpdm01Q2Z4STBvODhGU2dGcjRtdllrSkczWEdyOERpawpiczR1MzJib3h6MDR4bEJ0dWcxNll3QXFIdnZxdU1jVmZxS1lIbnZqOTJzCi0+IFgyNTUxOSAwRzdCLzNZSmlRN2d2Ni8wd1VOallQRHlhWFBidkFNNWFlTUQ1bnNOQXd3CjFGUTVPUDd6RjZqMEVNK2JEV1BTYWlmNlpFYXV2dlR3ZkZyUGdPTERNdTQKLT4gWDI1NTE5IE9SMGtxM29LZ1ZiMEU1TS9hUG1aYWtYMzVZMytlVFdRenRKTXkrQUdWVE0KOVk2b05ybVU0RStINHlsM1hXTmI2VnRWK2VCMEVpaVhCYmJTNDJkcjd5OAotPiBAfn1mOS1ncmVhc2UgSm4KMkRIRDRqZjZ6N3N0QmQ5OUtHMmpmZnovbms4eGFDbVB5WjdKK3NMelRoL2VCem5icExnRGhMMkZJYzR1dW96MApSN0lvb2dJUGVzM2pLUXU2cjY1aDlyNjN3V1RNZ0FLeHRnV1VEOENKUDJ2NE1zNDA1bDMvNmVWZEx3Ci0tLSBwaDJlazhBM2drWjg1blRaanRONjJwbHpqZzQ3cHpOQVljdTBLcCtoaDVJCp7bBTf6oi72PwkmpNsDfEvIbe1g0XEmRVnYQArR02wewdb3qd6Uec6gDjln1+gnKz8fr0Nk4xfg1Gfkc9oO]`
+  dir. Affected tests: `test_record_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBibDZ2OVhtTWRoYldOZjl4bVllQThiNFZFNTF0aFJMSThkcWZHRTFwSmpZCmY5eWJUZFppMzZlTG1tUnN3cE9ld3RZNU1VcVhZQVZIaGtqUGpJSko5RDAKLT4gWDI1NTE5IDk0Qmk1MUpzUW1lVTJRaXVmb0xKYzdMb09ZZXpMYTVKaU9kbWFpT1RieUkKR1hWc25jTDlqL0xrWmlkL0lOWWsxVGFIbUlPZUd3bm13TVJMdUEwZlpscwotPiBYMjU1MTkgZU9Gc2l2MUtjMU5CUmN2cTNleXJobm9NY1pqc0VYakpvcGJSOVd4UmJDQQpvNVNIRVhBSUlzWG1RMFdqdFBRRWFXZ2YxeDJVK3VuNXhwS0NRbjlseGxnCi0+IFgyNTUxOSBSVi9PWEdFNnE0aDdHUmFHekZ6ZGk2akVkbXp2U2w2U3ZWRzZXWDFHc2hFClhySEFkc29FRi9ROVpLMEY2NnlqUitxeFRiK2laWXNGSFdRRzhGV01qL2cKLT4gWDI1NTE5IGNBeWtXWGkvaTlMKzJ3dkYyWkFqcEErWldHbFlSa1FtNTZaZU5wMGNzbjgKemIrOE81S1hGeVJHb0NuLy9lY3FTcTF0WE14M2NQcDR1VXFZc0VxL3ZUbwotPiBPei1ncmVhc2UKVlhnbWVITDBrYmhnclRUUE1RMGd3aG5xMFdXUFYxWjRaaFpEUzJBVFROWERVVGRNUm5oeWtNSWY3eDJsNDUzQwpWQ3cKLS0tIEVCTjRqdkhjSEN2UExpcncySzlQOENlaXlxZWVOeE1GaFE5UGh5T2c2czQK7ZR0GDNx2GjSag6qE3XqPA9dPXuwE82NTrlJzduN5LgGh4cLCrDb57MH+pjYQIvbINv3WIW7qFkXROB5uoIIL3gI]`,
+  `test_record_push_success_clears_entry`, `test_record_push_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBWMXR6cUJBdGRiUU4zSU1jRzFablllYmFjU2NOWFljRzhnbGpGRXhCNFI4CmtyN0lZZXJDWkVrWkE1Zmp2TzQrcnllL3NCQWtycVMrWnlDWUFJWHY0WFEKLT4gWDI1NTE5IEY5SC9SazhTKzBOSmVmQ2loQkFnNU5FNit5NFA1SlBTemE0WURGdXhoVmMKZHIzQWZqQWMrSVVDdzAvSzRjVHlZTEhiQVdhZitwelNQbmtmRVVlMVh0SQotPiBYMjU1MTkgN0FQUEZ5SWIwZDRKTHMyQld3Ri96d1ZBaTJrR3FQdHhNWjRDWWtBTnlTWQo1MkNjcFVRZElWYnRGQlZDcmJhaTA3SndDVFRIb3BMc2Fnb1ZabFRkU3BjCi0+IFgyNTUxOSBSL0ZlN04rZjlDR2lWdm9JZ1F2eml6OExjRnNvU3M5NlBWZjYwNWdRWFVvCksyOENjMGEydG9XSG9TUHJKTXl1a2RnUjFhcWhCVFdnK2wzcysyVTFpWTgKLT4gWDI1NTE5IHc0eUNRMWRpRFlXL1hzWTZCV01rdFJLM2Q2KysvckluTjZqSGxNdHJSUWcKeGNmTHNTSjlnaG84eHVIMHlJY2RFVVNseHV4RjJ2a044SGMyUGJ5a0R3RQotPiAlan1LJVMtZ3JlYXNlCk5hUVhUdndxQmdMdmpPTk84UDVGSzRBdkJxUlVQbWs2M3pUV1ZWYS9PTmNKclVoNHI4WHR4eWwvCi0tLSAvamxmQnhIdlQ2QUFiUXlZdTh2RGNDRVRXNm9NeDU2Zkw3RC96V25ZazNnClHWARpNMNa8FVm4yUzeYzdUy2pUFciTUYpzBF3apEyO7llsUBRO9JsUmjnPIGiAdLJnWL1zBMah25D04xgH]`
   (in `daemon.rs`); `test_sync_repo_mirror_push_failure_returns_false`,
-  `test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBoSEowR3kyWGVucFAxanJINXNUWVprZHU3VHFRamRXWUVYbVJZUmFrbUVrCmxVVkZ3NlhlRXk0d2szSGpuMXF1MDMxVldpZzhTbVVSS04wc2lMd2sxTmcKLT4gWDI1NTE5IE9yczN5MXUwUm80V0lIZzJMSjVZZUFoQVZIK3lMRFMyUGhHWmgzc0N6elkKVktSa3NQLy9qQ1JwRlhRWmJyenllY2lLRUNUcHM2eGQxazQ0ZHZ4TGY5UQotPiBYMjU1MTkgVHRuVWN5YWpGRjBTUHdDWmVMZzN1Wm5hZ1lUaGg5UE9YM2cxOGNMQkZFdwpxN3hxWFVkcFIreHpkcngrK3l2R3E0YU5BaDRyWjRpOUMvOEVTUEE3VlhFCi0+IFgyNTUxOSBWeGVyZlhPbHZLcnNhK1BhUHlJSjdndkU3SFZwSVRkOEJkUzhqOWVjV3dJClZZZ0VQVzBoam56RnJ3cjlDWlpHZVU1ZFEwdXJjYUR5QXRFVnBXMjN2NDgKLT4gWDI1NTE5IHo4RVN1Qmg5eEtOZGtHVjFZaExjR2dRK2hES0lvZWhjZGZFYjgvcGtVR0kKbzZ6RTZ1aG5SNi9ESjBPbFduQ0V1RktpQTdvUkdxZFRaYU1uNFRZb2ExYwotPiBldC1ncmVhc2UgTW8KVm9zSElEOWFIOFpWTC9wVlBRMjhUZTBEREhHL2M4d0VIdmVFM3NoNmZ0ZXFaS3c0U3VVRnFqK0JIZk42QitrCi0tLSBNaFhRQXV2QndTc3J0d1VNS2pvazZMdHJUV0ZFQnpCU2tnY3o5dFNkMEhzCt3KD7GY1g0vWfJ2IMHV8IYu94LfQUy75O4ZNoKO1Rwj3CGtROZ/wTI8qz3DqmLGq8ULLxHFMAaa3g==]`,
+  `test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBaUlVWQStKbUNBc0xBVjdJZUs2a3p5UE5JNTNhbnRvbFdURWNKSlJPTFRrCkJsYTZFSURJT3NIdTRoRnhSd1o2RjBxOVNwM0dPbDc4U0JOOTFpc2hINTgKLT4gWDI1NTE5IDhUNnhPMHNLdmsxVVJ2NEpCeU5VQ2ErVEdMQmkvY2FJUW85ME9iWTI3VzgKRzJIczBtU3I0Z0lxNThEeis3TU80WWRDTWVWc3kxQnd0RUJldktCMGxodwotPiBYMjU1MTkgeFVlYm9MSjF6V3ZoWms0RkcxNFNUT0pnbUtqS0ZRVW5QWVl0UUJZRXFodwo4WHU4dkNmYzREcklVM0JEcWZHNG1nZHpmMnNPMm1laWRwNW5oZGFkOXdrCi0+IFgyNTUxOSBkaTh2R3BLb0IxL2FnT0d2Z3JEazMzenV2MjMrVEYyODFnaUtkOTIxZkVFCjNMY25xTjhwRE90a25kWDB1RjBMZC9vdG4yTU1Ba2NRUEthTTV5NmF4bWcKLT4gWDI1NTE5IFNrcTRJalpSU0NHUVZKb1A5OEh6Nko4WnpCZTNNY2xhcHhrU0RJSVQwaTQKT1gxdWpDdDBDTzVjT3Q3Q1QzaUtuQTF1TW0xNklvL2NqUHlMa3hvSHovYwotPiBETGZ9JWYtZ3JlYXNlIH5nJC1ULmAgem5uSTo3UDsKUWs0dDNzZkNWMlJOQW1yRkczT1ZNMWpkVmQ3cHlqZVFjUUFQU3cKLS0tIER2VkNMb3JMYUUxNUdBMHJlandub0UrQ0JOOGUxRFpjQXBTQXFteG9GRFEKmjuKG8YbQXvptpbyaBP08CssAmItLg965y563tBPiXGTCPldA/j6/g71J2Ny4HWl5wXUED7eNDhX]`,
   `test_sync_repo_mirror_push_success_returns_true`,
   `test_sync_repo_auto_github_private_graceful_on_no_gh`
   (in `sync.rs`). 19+ junk entries cleaned from the
@@ -169,7 +186,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   included `*.rs`, `*.ts`, `*.py`, etc. (source code files).
   The SecretScanner's `Mistral API Key` regex
   (`mistral-[A-Za-z0-9_-]{20,}`) matched a public model ID
-  `mistralai/[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBJNlJScjRsVXg0WUtGekt1WkhyZDNUNFBoRGN3L1ZGdWUzSjhRT1IzOVVnCjAxVzUxdjJkYzdqMkIreFNPdUtPc1RtTEtMS1V4OVBCek9zVjJOYTJvdVkKLT4gWDI1NTE5IEkreHJsR3lRa05ZZzZFZ0JjNGZEakZkbzBOa1VnaUNTUlhtV0pvTEtmME0KMXdqUUdhL3gyVkNmUFZnMFZSbk05NnVQNjFPdmhFVVpKdEZVN2dzbHpobwotPiBYMjU1MTkgT3EvTVFVb3VkYk15M3BkZHdVY04yVVEvcEJWUXRPK084NnhqWW9aQ1V5SQplZDFsOEVlSE9TTytLc1VCUTZjWWxjZElrd2dkMml3NlNqb3dkUW5ydVZrCi0+IFgyNTUxOSBic293N2tJSCtkc09wWXcraDRKRDJKZ0U4bmY3SzI0R0RCdE5lVlN2ZmlRCm8veE1ZR0Q3R0RqSFhBM0lTNXlHdDl1N0JCMlFKQkE4SFVLM1d4ZkZ6alEKLT4gWDI1NTE5IDByclpOMjFZdENVSEhZdVdtcUJ4bHlyWFBGSm1OY2dkRFFFRXBmeGMwbkkKeG42V1ZCeDlROThoLzRMRzVGbUhlZW5QY1ZoR0pybzNhdkFTc2RMUzhkNAotPiB4L096LWdyZWFzZSB7amE2M313KiBvR105IGo2QjppQV4KWGREMzVkT0E3Qm9nazc5aUxtcXhia0lIRXZ2V09BaE5MT29BNlNaWnhpY3pjcWw1eWZmMWRWd1ZyQQotLS0geCtjTDRaRjYxN0xXOFhYU0pQYlU0Mnd0ZWI0T3JqNFVPZWRqeFA0UWI3awqnSBapVaWQy06S7dZEACqNsoTw8K3Sh7ud1GG8ms7brfshNn4j+8Thldo7Ad9MKvNzAsZUDyPCR+51E596TJs=]` in a
+  `mistralai/[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBkOFV2aU5rM1g4VnRWZDhaUlllUGpqb3hkYmxZWWVWL2c5RjJyN0FrR1QwCkl6cFYyb0dMVGN2WDRVV2VIeXIwbkowTDdVNUdwSTl3RjZ0TVZWbVRrMDgKLT4gWDI1NTE5IHFvanpNaXFMd0NVcVJkbVhiQU9GOEc1WmtWYjNiQ2UvbDgwdXR5Z3B3bXMKSTJUa0N3dWNqdGtlSjl6VXBYN0NuOW9IL0VpTVJYQ2pnc3h0a1JOUmFFMAotPiBYMjU1MTkgN2hLd1R5blUySzNrRUdrVjVyWHZpNGsyNGZYeXEzaXdSRkVGRWp4MjRCUQpHSVJRbGx2QjRvN2lENHc1Y3Y5SE5neGNiZmJFRmhEc3NWQTZmOVcrSmxBCi0+IFgyNTUxOSBzTzFwV0ovdXFMY1UvcGgxR01oWnpLRnRFK2VGNS9WQnZrT05razlUZVgwCkdHWHlKRnJDM1prdCs1aU5uNndoN1Vla2FTd0hwaTNFWUFYWDZ3MlBQR3MKLT4gWDI1NTE5IGViNnJxZU1TM2ZSVnF5a3VaSHJYbGlvVVQ4aExTNEdpVm0vMUhHaWhjVEkKa2haajdlcGN5TVA2SFZlWXZFY2J4S1BydnBaUXlKQUJ6U2cyOXhSR3FlbwotPiBwLWdyZWFzZSA3NCMgKlggQC00CnpoTlJUQ0N6Y0JaKzJFTWVPbmpydlY5RjhIN1llTllqK3lzcHB2aW5oamM1N0xiWGJ3aGRZRm9SOWw0SEdLSDkKRm5JT3BJcHBZYjhUOGNHVkR3Um1pZEV0VG5JCi0tLSBhSWhXM201aHlRam1ObEQ4NDlnTnd1Rm1Wd0JUczB2VGkwSEdZeXZUa1BzCovumk5CzjhOpkcVXbqXrGDWYoHNm1eqcIrGNnxw0hCODblSk/sdYj+zEAw98Jfp2DeLldE+Pdb91FGJksXSpQ==]` in a
   TypeScript test file and encrypted it. The user reported
   this as a no-go via gibuardien: "we are encrypting code".
   Two-part fix:
@@ -189,7 +206,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Restored the corrupted
   `browser-extensions-shared/extensions/vidpro-extension/test/components.test.ts`
   by replacing the encrypted blob with the original
-  model ID `mistralai/[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB6SjI4dWgrWmMwK1F4aFJVSDB2UEhzMUZ5d1RaUE9vakRUUGRwNkRobno4CmxwQnV2MHc4NjV1ZWt5TjdFS0MvTS9WWVowaGtrRkUwb2kzQlZoZm5PdkEKLT4gWDI1NTE5IFBLRzhZK0JoVVBhTUx3b1BCUTRwUnk1Tm9pY3FPZ3ZXdEVjSGtqU2E3MXMKRGJwdlI5dkZGZ2cweW1waFdCRFZ2YXViTVQ3R3lxSUducEZZU0xOSUtzTQotPiBYMjU1MTkgRTRHbitoZXVQZUErZEhKbzVMajFXME0vaXN0N0dmanNNQTVIZXQxM0cycwpSL2lIZnNEQWhLL0JEbU5JdTZ1WlJ5RXhrU3N0a0xvKzRGS1V5TFYycU1NCi0+IFgyNTUxOSB0WDNTeG9mUktad2hNWFEyT0NmMndxbmpGRkE3b1p1d0s4cUI1RThWRkZZCm1zUGxYV1FnaXdFcXBhanIxTmFGemdzK2k0MjdGOUd0Q1Y3VUZUc1FUYzgKLT4gWDI1NTE5IGpzRTFCbWRqRWZiZ2hEaUUwTFBseHMvS0hvdW9DY3k5OEZaMVhycHV2MEUKMUp6dTBEbTV4TDNSaTUxQnU1ZUFURTc5L04rSW1VcjdVSXU4TEdqcndPOAotPiB+LWdyZWFzZSBbYnY2N3EgUS8nTV51ZHwgdms8YSsgZHxeS2k+CnByVG1VRTVRUUxoQnpKVmFCMDhFQmVyandPemhLYlNQaXVEaUdIT0MKLS0tIFQyVmV6Q2lTRFF0d1d0RzhYMzcxNUJkdjArVC9CempZNnNycG01bURWeXcKcgAjLvpV/wWW/GVtlmyIOXGR+m6pceNW+u/nKh22tt8VPWsu27jb8rcCH1hf3GM9l/YWNwshjvq4txQohtTk]`
+  model ID `mistralai/[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBscnJXMURiclY5dFY3Wi9zcmVlbXNQZ2hpRGw5N2xncm9wNGZCYnduOTNjCmVDLytIWXJkNEhWNEVySGRuc1d6TFArQmY3VFpGcE9PNURaN2tKeWJHR1UKLT4gWDI1NTE5IHdFdzhmMzEyNDhzUU5UOGFBdkRuSFZ4OURXSmllMCtXTWc4SU4zOWNla1kKZ3hZeHdYWldKSkh6bGsyNWNPYnNYMzdsbUNSRU5uTW5kLzVlcG9xbHFQawotPiBYMjU1MTkgUlRLYTRueDk0N1U1WUd1M25nTXpNaEQ0Qm1Uczh3TFd6WnM2Q0dIaGpscwpqcStzL1FMY1I0bjJQNUhJdld0NjVxeG1Ta2pNSEpqUWJlTFZBTWFzb1A4Ci0+IFgyNTUxOSB5akIzS3pSSlhmY2E4bTVBODBNNVJOOWFhenU5MU5JNnU4Nm5OQSsrQVFFCit3R2RlYi9sV3Q5aHJPcldWdHpGNVBsYnVCMkt4RE5JY2JGVkRrc3VuSGsKLT4gWDI1NTE5IC9scGZPSno4S2dXK1lvRThxZnVobGFGc0NxbkZNREZ3bWtyM0d6cW1kQlUKVUFhb2tkekpVc0xKNnZOSGl1Vno2NThCa0xVOXl2NXlDdTZkMVJqQjRGTQotPiAmLWdyZWFzZSAjIUlTSSBIMSw8T3kKeW44M2ZDQ2J2NGUrSGF4NGRFemxGK05oMGd1anBib2FaS3U0NVM4b0pSSDRxbzJvTWxhVS9heXRWQjRZYlFybApzNG8KLS0tIE0zOWpaVmpOY3JWVmluKzlwcCs4U1VDUmdPSXZUbjRPWXYzakt5M29VWjAKbhDcYlgmobj63hglTXpXMWza5+dw5lLC/WmrARbduEGZCArwuv/y9ayEF+henHVAjgdkZO69J6Jm6ufqhCeb]`
   (verified via the sibling
   `utils/byokAdapter.ts` file). 6 new unit tests in
   `dracon-security`: `test_path_is_protected_*` (5) and
