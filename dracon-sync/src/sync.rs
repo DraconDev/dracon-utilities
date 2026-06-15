@@ -2222,7 +2222,7 @@ async fn stage_commit_and_push(
         // `ctx.remote_failures` (the caller passes a `&mut HashMap`).
         // The `tokio::spawn` fire-and-forget pattern was removed because
         // it bypassed the failure-tracking needed by callers like
-        // `test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSByOEVIcEM2bXBwa1Y2dXM0RWt3MG1QWkJoOVNKSGlDcnlZdi9nVVhPZEhjCnNqUnA3aURYTFJYWk9RcXBPUTZMVFoxTjVGZTY5dVdlU0p6ZDVHSXlTdzgKLT4gWDI1NTE5IEh6ZjQ1QlEvNitSKzF3aUpDT2tPMm00TUszMkdEZW1aWGxSQ3ZLVDkzd1UKaFJXQlhKNkQ4OUIwYW4xUTg0OCsyWVpsOVJZbVlqRURkNzVMeUtNcUoxdwotPiBYMjU1MTkgQXdTSTRUWlRFdTl6TnYzN2crY3FCTHdyZkFycHBMSFI3OXJHUmZSSFNsZwpuNTBhdUZCMGNTRmpSem9nRnovVVl5UWVwRzBjLzlLUTJEOTVMVlhaeHdrCi0+IFgyNTUxOSBKMEtYTzB1TnI5UVU1OGpjQ2RqYVFKMjRzWDdhaHRobzRZdVZJVDFRdEVVCkgyc3dvTWFsUXFGb0NmdFdxMDBIM1llU2JWQUlDVXBuWk5IcklNbnR0SXcKLT4gWDI1NTE5IDFTY2haTTRBbWRzRnNCRlBxV3AvZU84eXgvRjZFeWFKcTlxUW15a3pIRDgKRGtYL3pZTlRuNjJ2UWtmUGtBMUl0TTJmUXNlT3VEaGtUNWRmcUFUeUxWZwotPiBLP2o8OFw9LWdyZWFzZSA0JU4tUyA5KUg2N30vIwpCU1FBRHdiVmg2bEJrOGRXblBCRHBTNG5UUnFtZDJRdHFJTUlMdEdOVU92VlYwT3JRUjVrcmQrUlNHbkVLV081CgotLS0gZ3VqQXN6b2VZOXV3cUVXSkczTm5mOW9SYldZeVZhTGlDQTIwZEVQVCtwUQrOAt4zcJMv5hY3GCJNNSBd62ocKGtA/jBMZtVEYFEx2keo7YK4SnNe0lL3h0/J7KN42MNSGBZS80s=]`.
+        // `test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBsWDZWSGsxajFPc1NEbjhMVmI4UEhraEw0SC9OWmxIOHVDS05zTEErODNVCmJqYTY1bk1QVVdzMHprelR1SVlzek5sMjRRcUxBZFhPaXN5VkxHamZ2MWsKLT4gWDI1NTE5IE80N3NnZHhqZ0tZclhCTk1ydlY1dk8vZGNyL2h1aTJyMnNDL3Q0NU5KbTgKN1EyUjJFOTU0YXJ0cW81VnZ1Q1QrMjVKd0loTCsxRER6TkVnUVRXYWNPbwotPiBYMjU1MTkgeHJrbW1oRDdMcGlOcGtKM1k5WWtoOGxUdnEyelRaaTQrWUFETFJOVUEycwppUkp4eTBtaERnZVZsU0kyTSt0cEZOci9DV0E0c3MvQlhiMVk3MzB5T05RCi0+IFgyNTUxOSBub3c4Vk0wUlZOR0hEK2xld1B4SG5kakRKc0F6K0pNNW5BYmpJT0J1Z0ZrClF4czhDOFRTa1paUnpCRjNEcTQ5KzIwRGp5VSsrYVlGN1NRSXh3ZEY1NkUKLT4gWDI1NTE5IGhXWFBqTUNEaUNxZUEzWWtlR3VtTVpSQzlMNW00LzJQZXFXUWloUTlid28KKzNTS1YwUm81Z3k2QU5WUjJWUndKekZaZkZpbURDbUFsS2RSa2xuUUF4RQotPiBQLWdyZWFzZSBFYXxlawp6UGZ1YzFScTRJVkl3ZnVrYnZ0dVppdU9MRVNpM2xKN1BrT3M0cngxSFRqUGxLSQotLS0gcThVbW93MTBCZzM3NVFtTnc3bjRMT3FSZnkzcmlnRGZyTUdtWjN4d0JWOAo+qcBlUeK4PhfjCAUjgKIwpTbp1NRyhh8MR/6h0+MPbnPTP38nyhZg39P8cvqtwOVfDPvaOnlFb3Q=]`.
         match push_background(repo, policy, ctx.remote_failures.as_deref_mut()).await {
             Ok(true) => {
                 crate::daemon::record_push_success(repo);
@@ -2558,7 +2558,7 @@ async fn handle_ahead_push(ctx: &mut SyncContext<'_>, svc: &GitService) -> Resul
         // Push synchronously so mirror failures are tracked in
         // `ctx.remote_failures`. Previously this used `tokio::spawn`
         // (fire-and-forget), which made the failure tracking unreachable
-        // for callers like the test `test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBHQXFxS0FGL1owVFJBMVlZN2lORVJGUzZkeEgweE9nempkSzdzUWhQWEdZCjFJdThoU1VJaHUzREdzczlaNEhDVEtLWmowTnRQMGpsZ3N5YmlZN2tyTjgKLT4gWDI1NTE5IDlzL1k2L05iT2ZLM1Uycm1YMGQ1T2pVMThUWTRRZDNEQzN2QWhISXJBMlUKazJrbGFFUkt4UmRpMG83NG5TeTA2TE5ZbldqNEV3M1JEQzNLcE9FOU9wRQotPiBYMjU1MTkgeDRTQ2J3Y3BycllldXJwL1dFZ3hWdi9kM2ErUkpjSXFsZmVMWmI1dzJ6ZwpBL3RlazBiRUQxWldyWXRhT21ManpRdDJib241YTB5dUEvR3duRzh0QXQ0Ci0+IFgyNTUxOSBqb2c0NFJrbU42ZzhsQUVMdXBJb3RnQUFhOUo5Z0I1WmtDT3VFamNTL1ZrCmVadEpKUkdzc2hqdVZUNDBPUU9hL2RFOVk3VGVyRWR0OFg5MTFDaitEbVUKLT4gWDI1NTE5IElPZktxWHV3MWVvTkR5a25XOUxRQUNob0VCNW4rOExyenE2VzBhaHd4MzgKUHlFVFU2c0tWcFhBNHd0VFppdnJST0ZCODgxMmkydE5SVUZjWDJTMFZpWQotPiBjLWdyZWFzZQpjYU1HSU9IR3YzdUVJWWM1T25JbFFBMnRManV5aExFVE5PNVh2ZGtOeVRUUjNIaGtCTmM0OFRTYzVYNFRnc05YCjNOUFJ6a3ZDR2p1VVpMQk1rZ2VmZW1NNTVxR3RHRHJ4cGRmb2tuOXZKM3BxeXpkSHF6MmJzT0JmdzhPRGhMcmoKeEEKLS0tIDlsL3Z6aVhwU0oydW5adU15a3dwTHVLNXhpTjNxQ3g2RURYK1NJUWtHaDAKytIJ09W9BZ55fDPmy3wEaHilJyufcw/qmTSB6kzxQthAnMiHXUW3v87VXuqKXD7EG6+s+RCVCjwX]`.
+        // for callers like the test `test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB4TDE0a3U5d3F3RFFaMEsvRnZCeWV6eXZ6QVFheFVVdXkzM3FhRTVkSmtNCldGMnZmbHFycXE3QWEvUCtCM2ZIbzZ3UXYrMUwzMktEK3RxVklvK0Q5R1EKLT4gWDI1NTE5IHJNN0pTWElPQjVUcjZydmN4UzhmbE01U2wydzZTbG05aG83UWNSZksyRncKY0FhZkZIR2lUUDAzR251ai9SMVBBVG9BNG02MWRaaC9aUWgvUmlzM3ZKZwotPiBYMjU1MTkgbENTSE96cmtLbVVJVmJDcHZQL0kyRzRHOHVZM3JkUWhiSGZWREdCYUJFOAo1YmxKT2lkcW9reEdDdVcwdFc0WCtqVE9aVU9ZNFNyUEVKR2tMTWZIR29VCi0+IFgyNTUxOSBMQ24wZXovT29FUWI5aFFuOTFMZEttUWljQ1dXYUVrSzlnTnFGWXZzZ2xNCklSL2xjQU5SOG8xVVNkQktpOFM5QU5nOVBVNExYREhzK1A3MnRDZGw3S1kKLT4gWDI1NTE5IE5IaDIxWXQ0ZTVTc1huUG15aGZ0VVlqdDBvWmJ0bXVvanI4T3daTUtYMGcKVytnVDBXMFQ2bU83Q2g3LzBsN1Rrd1Z3YnhqcXM5N0xZOFR6VnRTWGR3YwotPiBDbzFEOi1ncmVhc2UKVG8rclpzMk1zUHdCUVhZeS9ucWJFK2VnSmpROWhrUEVNMkxLTVFhQVJRCi0tLSBibkhWU08zOGlkUTVsSkh2dHc1YVVWdDlER1FsSmtDRGY2VDU1REg5Vms4CrtHYSnwvt7ono2zcN96GtSnzMVmuZ12bNSuQJe3fLfpPD26UncMbFa98uXRp7btMS/whBJ+lvUgQA==]`.
         match push_background(ctx.repo, ctx.policy, ctx.remote_failures.as_deref_mut()).await {
             Ok(true) => {
                 crate::daemon::record_push_success(ctx.repo);
@@ -3605,7 +3605,7 @@ push_url = "git@nonexistent.example.com:repo.git"
     }
 
     #[tokio::test]
-    async fn test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAwQURzY0JkS1lmcnhyQ1lPVk01VnU5Ti9KY0pyNGVHdEdzbnJDY0NleEVzCkJqOXhjTG1vT1VlMmpmR1hjdHM0UUVsYzFqZ21SSnR0cUJXdy9HRitrTWsKLT4gWDI1NTE5IG1iYlVQWHF6bWdyRStPWlZ1UENDWmtUZUh3WXdRU2ZsY2RGVllUMkVHamsKZ005eUlBKzhXc1J4Q1ZXdEFETmdVekR0dUFQcTQ3NWY4K2RUa1lLWmNxRQotPiBYMjU1MTkgWXBKUEkxY1BGdklzck94SXczVktBdVl3WEErbW1oQUQ5RXViQ0g2ZGRIVQpaUmR3VWNHMEdSenFxblErbGFMclE5RnBKc3BYOTUrdTNvRi9MQUhmTDljCi0+IFgyNTUxOSBQU2dOYnNEaHcvRnNyQ3RHOGw3RGxIcTg3Uk1HdWpwa0xkQWgwclVzbHdBCjRIRWxIbnFBbU1YbnpDZmVFZm1ESzdpZnl5bDdPbVN1MU1UVlgvTHc3MG8KLT4gWDI1NTE5IEdYRGZleWNib2VJM2xYb0gvNE0wRktDbGxNQU5iS1A4MGlKOUt3THQ0d2sKK3piT3ZyRnYvNmZPVHJ4K0VySURIYndDSjVrMmdyb2J6cnBPcXpIamQ5RQotPiA1SDhdK21fPC1ncmVhc2UgLSAqRGVuWiwgSSMlJjsvJwpUeEsvOUlWOVo1ZHN0UVZVdUJwblNEeE9uRnZNcEtGYlpHUE93Zm5DWEJXbUxTNG5kMExMUnZGS2lCUzlkM2RFCllQMGJkdFpFRUcvQndaREM0NGlRVFUxd1lUdWRkRHhaOEhuSEFDcjNHQUlpcGFmUkR2VFRxSDhPbmRTOWZWbwotLS0ga0xiTG0zTGJlVzQ3eEl0M3FNVW9uKzBSWVVodUd3T2hqeXgrd2J1b0s4UQpGS/A18WowAbmSxDCmbNBL6XGz6Z69yGtt0N4Bg22t8HgvBZTI6NEkVZ7cgtPIce9HVYhcyqgCVTM=]() {
+    async fn test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA0ZlRjenI5TWdPVmdBRUFWN0RaRkFmdzdERlpBNXFZWUlrQ0haall0THlJCm1XS0Y3K2NXYTg0cEtGWHh3NVBEc2g4ZkQzckh2R2VpNk5VVHR3OXFpQWMKLT4gWDI1NTE5IG5rTXE0UkZucG1NSDU3eFBZeWY0MVl1WEhnY3c4ckZBU3k5QlFqeDJiejgKYVU2WTZNZWhCTXhsM3dveEhLak1HU2Ura09xTUFnaWRXUFljTWZlVXpPawotPiBYMjU1MTkgOUVwYWlDUFpRMDI3cmVtSFE2VUNMOGVHUm9BU2p3YnA2T0NIcCsyWkZobwpTU0lLS2x1VVNiUTJucncwb0l4dW1DQ3lxUE9icUtmTytib08rNU9mSXlVCi0+IFgyNTUxOSBBQUFOTkJOL3ZNZG1kVkRFNW8rQkxZOVhvOW9CaG9wbTRsdWxKeVI4SWxNClVPWnZiUm9IREdHNHNuL3dJOExEanovMWx0Y05KYlpQMFpTSVM4RFpwYjAKLT4gWDI1NTE5IGh5bG00ZmxnLzVsZDF5R0FHK3hLRVZQQzFodHFPRmFrelNhbllXeGM0UmMKSUFiUEpiZVFOTHJqcnBlYUQvSlZZVVRRb2pHQ2ZpU0h5aUo2QlFydUZOSQotPiBRdi1ncmVhc2UgPUYKS0h4VkxmcG02elZPdGFhSnlEVy9CRGtrbzhpd2RiVlFiS0tEclBva0xBOTNHUmludFJSU3hUNTd5SnhaR09rdQpRc1VjU3RQU3ZFczNHcENBZEJqUW9jWjdkQTkySlFhSUQyYVFQZEpEeGgvOVhiSERoeFhoU2JnVng3dXlNNTgKLS0tIHNIQmRWQUdXQ29UcGR2OXdiUU4yeTR1Z1RjN1IrcS9obDdvV2VYQ2JMcTgKrgfDd2I6vMKOk1OhGAyP4Y2D/7pVnAvDvKBXa/l1eHrjla/SPqde96vCZvrnkGVWqH0+OK0HECDy]() {
         let tmp = tempfile::tempdir().unwrap();
         let origin_bare = tmp.path().join("origin.git");
         crate::git::git_cmd()
@@ -3961,7 +3961,7 @@ push_url = "{}"
     }
 
     #[tokio::test]
-    async fn test_sync_repo_exac[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA3T1ovS05iSU1EYmE4dVlUT0N0TTRwaHV2R2hNK2QxK2JBSHFXb1JiK2hRCm9aTHlUejMrZTNBL2dCaWJ5SUUrSjdSQzlvL0Y2VXhQWEZyL1RIcnloVkEKLT4gWDI1NTE5IGZRa1RiWHUwbSsvb0lyaFZheWl1SUh4ZDFNeEp3Zzc4QnJpS3B3WkRWRncKanpRcDBJNldQdnAvaEhIS0w0MWtsb3JVeVkvbWFNSzlHbW5YTmlPcU9tcwotPiBYMjU1MTkgNDA5VEw2N1Z3ek1QTzk2Tnk4Mm4zRXRjMWZpb3FCS3ZkT0FBWitQWXp5QQp6OFpQR1UrUjdmWVFpTG95VGQxT0kwNjBocXNtTTdHMDcvcjVuSFVMdXhvCi0+IFgyNTUxOSB3UHV4bXFmVVRlU0FKTGFWOS9tTEdjbHpQNmZZNnBGTWlMMlBocFpMTlZjCmNxR1l3VmR1QlU5M0Ezdi9GeDBkTEVWOGt0eEdkY0ttRTJrUXpvT0VJMGMKLT4gWDI1NTE5IEtraW5ZT3Y1WTVaNHhrUVNtcythTk1UTTNoY1VYR2FyZDE3dXhHVm1oaXMKcFJjK2dnaDBYdHlWK1c2VEw5bXZEbFZXckZ4djZWd1BpT0h4OTJwK1ByMAotPiA2UlVyMi1ncmVhc2UKRUwrakFtcHcxWGFGQmhtcDN3ZTl6MHVjLytPSkN6cWthSUI4cmxXZ3gxZDB1a01hQkVaU0M3clZDMkpSTU1jeAplcktpT0JVQ0NucFJyKzkrZlFnc2theWlYSGdNdWZSM05FbUVPUQotLS0gTGx4bVY0TDQwaC9EeWhEUm9sVmhKeVpXVFpIbU9zQ3VZRGMzYUtzUGNnbwqZ6GzVTtOS6pvTWc4IEHL5bow/91SgZ3XAZlSlmxC7ek7rr/u4QI6Rb8p9x2ik9I4RTXnRGhwmiWW7w1/yjVA=]() {
+    async fn test_sync_repo_exac[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB0RW5hd0prd2xNZ09uTlEyd3JyankyNzZYU0VzR3JDYWU4bXVqYzdQZlZnClBpZ08rRFlkSUd3c0kxZHg3ek8wQlQ4bzJ3bk9uV2oxRWQzWW1Keks3ZGMKLT4gWDI1NTE5IFdlNDBhREdFTFBYYUtOUHJ4bmxVTVhIVENhZS9XMldsd09qUTNwaFNiM00KOStjYXUyWVd3aWtrRmsrUVlkRmM3Nzg5T3F2L1NvdVF1ZmVFTExWbURCNAotPiBYMjU1MTkgdExpZ0xiN0h1amJXTyt5Um1KdzdmbHl4cXJacHBGTnFBdC9qb1Z3eGZ4TQpwblY4UWpFYm9iRDFyeGV2a1RueXdYbnplU3dFRzlaRlRiK1VlNm0xcHpNCi0+IFgyNTUxOSBLVnFyenBoUEZhVTBmOGJkejhvb0R5d2RwUkMzNW85WVRBTzVUbFFZSHlZCm5mT0tHTTlzMTlrM3NKRlJwREtLMTlKbzZyVVcxN3FMSlFKUHFpa2swVUkKLT4gWDI1NTE5IE1LUjlRYksyR0xYWGNkZlorK0pwSWtIUHUydHRLb0F5VTA3bHYvTEk5UVUKeml5OWxkay9Pak1TdGdoS214R0FWU3Y5R1JRZjEvRGpJb2dtU0p4UjlvSQotPiBpM0otZ3JlYXNlIEV1I31Tc0UKVU1ScjFCbktwUjVCN2xtUjJieTFzdUd0UzdFNTNaeUxoZ1pqQ1NjVHdjd2hXVGVsWkgvYXJzRlZvMmhxTXdwdApxVWlBQ0VOcDN6cFhHTmcyOEFyZU4wQ3RhY2JtcUZUMgotLS0gdnBnVUJQM204cXRpMW41WUk5MlJQK1lRcEwzYzFWN3h3UWtyK1ZWQWdZawrP06QYHP6Iyu/JYQuabBBLpzQ+Z0t4f40IY74vXgNDD6B1uqcrSQX6BEoqIQS5fnX1vt1AbE60/7ZG52z2J4E=]() {
         let tmp = tempfile::tempdir().unwrap();
         let repo = init_test_repo(&tmp, "exact-50-del-repo");
 
@@ -5218,6 +5218,98 @@ auto_bump_versions = false
             result.is_ok(),
             "stage_existing_files should skip directory entries: {:?}",
             result
+        );
+    }
+
+    #[tokio::test]
+    async fn test_stage_existing_files_expands_directory_with_files() {
+        // Regression: previously `stage_existing_files` filtered
+        // out directory entries silently, which meant a libgit2
+        // untracked dir like `docs/avid-research/02-foo/` was
+        // dropped from the staging list and the files inside
+        // were never committed. The new behavior recurses one
+        // level into bare directory entries and adds the file
+        // children to the staging list. This test creates a
+        // repo with a `docs/research/` dir containing 2 files
+        // and verifies that both files end up in the git index
+        // after a single `stage_existing_files` call.
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "main"])
+            .arg(&repo)
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.email", "t@t"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "config", "user.name", "t"])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "--allow-empty",
+                "-m",
+                "init",
+            ])
+            .status()
+            .unwrap();
+
+        // Create a tracked file, then a directory with 2 files inside
+        std::fs::write(repo.join("tracked.txt"), "init\n").unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "add",
+                "tracked.txt",
+            ])
+            .status()
+            .unwrap();
+        crate::git::git_cmd()
+            .args([
+                "-C",
+                &repo.to_string_lossy(),
+                "commit",
+                "--no-verify",
+                "-m",
+                "add tracked",
+            ])
+            .status()
+            .unwrap();
+        std::fs::create_dir_all(repo.join("docs/research")).unwrap();
+        std::fs::write(repo.join("docs/research/readme.md"), "# readme\n").unwrap();
+        std::fs::write(repo.join("docs/research/notes.md"), "# notes\n").unwrap();
+
+        // Simulate libgit2 returning the bare directory path
+        let paths = vec!["docs/research".to_string()];
+        let result = stage_existing_files(&repo, &paths, false, 30).await;
+        assert!(result.is_ok(), "stage_existing_files failed: {:?}", result);
+
+        // Verify both files are now in the index
+        let output = crate::git::tokio_git_cmd()
+            .args(["-C", &repo.to_string_lossy(), "diff", "--cached", "--name-only"])
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::null())
+            .output()
+            .await
+            .unwrap();
+        let staged = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            staged.contains("docs/research/readme.md"),
+            "expected readme.md to be staged, got: {}",
+            staged
+        );
+        assert!(
+            staged.contains("docs/research/notes.md"),
+            "expected notes.md to be staged, got: {}",
+            staged
         );
     }
 
