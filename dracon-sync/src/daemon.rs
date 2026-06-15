@@ -53,6 +53,31 @@ fn stage_cooldown_remaining(
 struct StuckRepoEntry {
     path: PathBuf,
     stuck_since: u64,
+    /// Number of consecutive push failures. Reset to 0 on
+    /// successful push. Used to detect when the retry budget
+    /// is exhausted and the daemon should stop auto-pushing
+    /// (the operator can then intervene via `repair-concerns`).
+    /// Defaults to 0 for entries written before this field
+    /// was added.
+    #[serde(default)]
+    consecutive_failures: u32,
+    /// Last error message from the failed `git push`. Surfaced
+    /// in the `repos` HINT column so the operator can see
+    /// WHY the push is stuck (auth, non-FF, network, etc.)
+    /// without grepping the daemon log.
+    #[serde(default)]
+    last_error: String,
+    /// Epoch seconds of the last push failure.
+    #[serde(default)]
+    last_error_at: u64,
+}
+
+/// Default policy value: number of consecutive push failures
+/// before the daemon stops auto-pushing and surfaces a
+/// `🛑 push-stuck` state in the ACTIVITY column. The operator
+/// can override via `push_max_retries` in the policy.
+fn default_push_max_retries() -> u32 {
+    5
 }
 
 #[cfg(test)]
@@ -550,7 +575,7 @@ fn stuck_repos_path() -> PathBuf {
         .join("dracon-sync-stuck-push-repos.json")
 }
 
-fn load_stuck_push_repos() -> HashMap<PathBuf, u64> {
+fn load_stuck_push_repos() -> HashMap<PathBuf, StuckRepoEntry> {
     let path = stuck_repos_path();
     if !path.exists() {
         return HashMap::new();
@@ -571,11 +596,11 @@ fn load_stuck_push_repos() -> HashMap<PathBuf, u64> {
     entries
         .into_iter()
         .filter(|e| e.stuck_since > cutoff)
-        .map(|e| (e.path, e.stuck_since))
+        .map(|e| (e.path.clone(), e))
         .collect()
 }
 
-fn save_stuck_push_repos(repos: &HashMap<PathBuf, u64>) {
+fn save_stuck_push_repos(repos: &HashMap<PathBuf, StuckRepoEntry>) {
     let path = stuck_repos_path();
     if let Some(parent) = path.parent() {
         if !parent.exists() {
@@ -585,13 +610,7 @@ fn save_stuck_push_repos(repos: &HashMap<PathBuf, u64>) {
             }
         }
     }
-    let entries: Vec<StuckRepoEntry> = repos
-        .iter()
-        .map(|(p, t)| StuckRepoEntry {
-            path: p.clone(),
-            stuck_since: *t,
-        })
-        .collect();
+    let entries: Vec<StuckRepoEntry> = repos.values().cloned().collect();
     let content = serde_json::to_string_pretty(&entries).unwrap_or_else(|e| {
         eprintln!("⚠️ failed serializing stuck repos: {}", e);
         String::new()
@@ -782,9 +801,14 @@ pub(crate) fn list_stuck_repos() {
     }
     eprintln!("🔒 stuck repos (expire after 24h):");
     let now = timestamp_secs();
-    for (path, since) in repos {
-        let age_hrs = (now.saturating_sub(since)) / 3600;
-        eprintln!("   {} ({}h ago)", path.display(), age_hrs);
+    for (path, info) in repos {
+        let age_hrs = (now.saturating_sub(info.stuck_since)) / 3600;
+        eprintln!(
+            "   {} ({}h ago, {} consecutive failures)",
+            path.display(),
+            age_hrs,
+            info.consecutive_failures
+        );
     }
 }
 
@@ -1193,8 +1217,8 @@ pub(crate) async fn run_daemon(
 
             // Skip repos that are stuck on push, but retry them every 5 minutes
             // to see if the issue resolved (e.g., remote was recreated, permissions fixed, etc.)
-            if let Some(stuck_since) = stuck_push_repos.get(&repo).copied() {
-                let stuck_age_secs = timestamp_secs().saturating_sub(stuck_since);
+            if let Some(info) = stuck_push_repos.get(&repo) {
+                let stuck_age_secs = timestamp_secs().saturating_sub(info.stuck_since);
                 if stuck_age_secs < 300 {
                     // Less than 5 minutes since stuck was recorded - skip
                     continue;
@@ -1787,4 +1811,6 @@ pub(crate) async fn run_daemon(
     // running, so no rows can be "actively being processed".
     save_in_flight(&HashSet::new());
     Ok(())
+}
+))
 }
