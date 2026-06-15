@@ -631,6 +631,109 @@ pub(crate) fn unstuck_repo(repo: &Path) -> bool {
     }
 }
 
+/// Path to the in-flight state file. The daemon writes the current
+/// `in_flight: HashSet<PathBuf>` to this file on every cycle, atomically
+/// (write-temp + rename). The `repos` command reads this file to
+/// distinguish between "actively being processed" and "stalled" rows.
+///
+/// File location: `~/.local/state/dracon/dracon-sync-in-flight.json`.
+/// Self-cleaning: when `in_flight` is empty, the daemon removes the file.
+fn in_flight_path() -> std::path::PathBuf {
+    let state_dir = crate::report::incident_ledger_path_or_default();
+    // `incident_ledger_path_or_default` returns the path to a specific
+    // ledger file; we want the directory. Walk up.
+    state_dir
+        .parent()
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| {
+            std::path::PathBuf::from(format!(
+                "{}/.local/state/dracon",
+                std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string())
+            ))
+        })
+        .join("dracon-sync-in-flight.json")
+}
+
+/// Atomically write the current `in_flight` set to disk. Used by the
+/// `repos` command to display whether a row is actively being processed
+/// (`now`) or has been quiet for a while (`stalled Xm`).
+pub(crate) fn save_in_flight(repos: &HashSet<PathBuf>) {
+    let path = in_flight_path();
+    if let Some(parent) = path.parent() {
+        if !parent.exists() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+    }
+    let content = if repos.is_empty() {
+        // Self-clean: empty in_flight means no active work, so the
+        // file is removed. This keeps the state directory clean
+        // and lets readers treat a missing file as "no work in flight".
+        if path.exists() {
+            let _ = std::fs::remove_file(&path);
+        }
+        return;
+    } else {
+        // Sort for deterministic output (helps tests and
+        // operator debugging via cat).
+        let mut paths: Vec<String> =
+            repos.iter().map(|p| p.display().to_string()).collect();
+        paths.sort();
+        serde_json::to_string_pretty(&serde_json::json!({
+            "in_flight": paths,
+            "written_at": std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0),
+        }))
+        .unwrap_or_else(|e| {
+            eprintln!("⚠️ failed serializing in_flight: {}", e);
+            String::new())
+    };
+    if content.is_empty() {
+        return;
+    }
+    let tmp_path = path.with_extension("tmp");
+    if let Err(e) = std::fs::write(&tmp_path, &content) {
+        let _ = std::fs::remove_file(&tmp_path);
+        if e.kind() != std::io::ErrorKind::NotFound {
+            eprintln!("⚠️ failed writing in_flight tmp: {}", e);
+        }
+        return;
+    }
+    if let Err(e) = std::fs::rename(&tmp_path, &path) {
+        eprintln!("⚠️ failed renaming in_flight file: {}", e);
+        let _ = std::fs::remove_file(&tmp_path);
+    }
+}
+
+/// Read the current `in_flight` set from disk. Used by the
+/// `repos` command to render the ACTIVITY column with the
+/// active/stalled distinction. Returns an empty set if the file
+/// does not exist (no daemon activity, or daemon not running).
+pub(crate) fn load_in_flight() -> HashSet<PathBuf> {
+    let path = in_flight_path();
+    if !path.exists() {
+        return HashSet::new();
+    }
+    let content = match std::fs::read_to_string(&path) {
+        Ok(s) => s,
+        Err(_) => return HashSet::new(),
+    };
+    let parsed: serde_json::Value = match serde_json::from_str(&content) {
+        Ok(v) => v,
+        Err(_) => return HashSet::new(),
+    };
+    let mut set = HashSet::new();
+    if let Some(arr) = parsed.get("in_flight").and_then(|v| v.as_array()) {
+        for v in arr {
+            if let Some(s) = v.as_str() {
+                set.insert(std::path::PathBuf::from(s));
+            }
+        }
+    }
+    set
+}
+
 pub(crate) fn list_stuck_repos() {
     let repos = load_stuck_push_repos();
     if repos.is_empty() {
@@ -1562,6 +1665,13 @@ pub(crate) async fn run_daemon(
         let _ = std::io::stderr().flush();
         let _ = std::io::stdout().flush();
 
+        // === Persist in-flight state ===
+        // Write the current `in_flight` set to a small JSON file so the
+        // `repos` command can distinguish between "actively being
+        // processed" and "stalled" rows. Self-cleaning: empty set
+        // removes the file. Atomic write: temp file + rename.
+        save_in_flight(&in_flight);
+
         // === Sustained-state notifications ===
         // Check for repos that have been in a concerning state for too long.
         // These fire once per repo per sustained incident, rate-limited to 30 min.
@@ -1628,5 +1738,9 @@ pub(crate) async fn run_daemon(
 
         sleep(Duration::from_secs(scan_interval)).await;
     }
+    // === Daemon shutdown: clean up the in-flight state file ===
+    // Removing the file signals to `repos` that the daemon is no
+    // running, so no rows can be "actively being processed".
+    save_in_flight(&HashSet::new());
     Ok(())
 }
