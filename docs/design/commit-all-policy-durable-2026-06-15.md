@@ -206,7 +206,7 @@ contributor commits. Not automated forks.
 | Option | What it does | Cost |
 |--------|--------------|------|
 | **(a) Re-link github** | Recreate github repo, re-add remote | **LOSES 436 commits** of feature work (Notifications, MESSAGES.md, GitHub Sponsors button). NOT recommended. |
-| **(b) Pull from github and merge** | Brings in the 436 github-only commits | **BEST**: gets the operator's own work into local. May have merge conflicts in the 69 changed files. |
+| **(b) Pull from github and merge** | Brings in the 436 github-only commits | **316 merge conflicts across 15 files** (6 Rust, 3 Nix, Cargo, encryption key, configs). Substantial effort. |
 | **(c) Stop pushing to github** | Remove `github` from daemon config | github stays frozen at `a80dc09` (June 10). Local diverges from github forever. |
 | **(d) Force-push local to github** | Loses the 436 github-only commits | **LOSES 436 commits** of feature work. NOT recommended. |
 | **(e) Inspect manually** | Operator reviews the 436 commits | Operator time. |
@@ -215,12 +215,45 @@ contributor commits. Not automated forks.
 keeps trying and failing safely (no data loss).
 Documented in design doc.
 
-**Recommendation**: option (b) — pull from
-github and merge. The github work is the
-operator's own and is recent (June 10). Bringing
-it in keeps the repo whole. But this requires
-operator approval (operator-owned repo) and the
-operator should resolve any merge conflicts.
+**Recommendation**: option (b) IF the operator
+values the github work and is willing to do the
+merge work. Option (c) if the operator wants to
+defer the decision. Option (a) and (d) are
+strongly NOT recommended (lose real work).
+
+#### Merge conflict breakdown for option (b)
+
+`git merge-tree` simulation (read-only) shows
+**316 conflict markers across 15 files**:
+
+| File | Type | Why it conflicts |
+|------|------|------------------|
+| `.dracon/data/keys/owner_nixos.pub` | age key | Different key on each side (rotation) |
+| `.gitattributes` | git config | Different filter lists |
+| `.gitignore` | ignore | Local added `*.db*` (commit-all policy); github removed them |
+| `Cargo.lock` | deps | Dependency tree diverged |
+| `Cargo.toml` | deps | Manifest changes |
+| `NIXOS_SETUP.md` | docs | Documentation updates |
+| `config.example.toml` | config | Template changes |
+| `nix/home-manager-module.nix` | nix | Module changes |
+| `nix/voice-notify-package.nix` | nix | Package changes |
+| `shell.nix` | nix | Shell config |
+| `src/config.rs` | code | Truncation code on github |
+| `src/daemon.rs` | code | Truncation + local daemon changes |
+| `src/ipc.rs` | code | IPC changes |
+| `src/main.rs` | code | Truncation integration |
+| `src/tts.rs` | code | TTS changes |
+| `tests/cli_tests.rs` | tests | New tests on github |
+
+Total: 6 Rust source conflicts, 3 Nix conflicts,
+2 Cargo conflicts, 1 encryption key, 1 docs, 1
+config, 1 tests. This is real work, not trivial
+whitespace.
+
+**Estimated merge effort**: 1-2 hours for an
+operator who knows the codebase. The encryption
+key conflict is the most sensitive (age key
+rotation should not be done casually).
 
 ## Verification
 
