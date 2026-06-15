@@ -160,6 +160,136 @@ We do **not** add `.pi-tmp/` to `.gitignore` because the
 operator may have intentional reasons to keep it visible
 (`git status` is a useful reminder of recent sessions).
 
-## RESOLUTION (FINAL — to be added after commits)
+## RESOLUTION (FINAL)
 
-_(To be filled in after commits are created and pushed.)_
+### Commits created
+
+The 4 logical commits created by the agent (in
+chronological order):
+
+1. `4d9b23346` — `chore(screenshots): commit 11 top-level
+   PNGs from in-progress work`
+2. `59863c49d` — `chore(screenshots): commit 17
+   audit-screenshot dirs from in-progress work`
+3. `dacc5d743` — `test(1mg): commit capture specs for
+   1mg screenshots`
+4. `7ad1b5a1a` — `chore(junk-runner): commit 2 new game
+   asset JPGs`
+
+### Daemon auto-commits (operator's intentional work)
+
+The daemon auto-committed 3 additional files (operator's
+in-progress source/test work that was untracked):
+
+5. `d6a90d560` — `3 file(s) in web [plans-tabs.spec.ts,
+   ai-hub.spec.ts, hegemon/src/routes/play/+page.svelte]`
+6. `b52549e41` — `1 file(s) in web
+   [ai-hub/docs/referral-codes-list-2026-06-15.md]`
+7. `99b7eedb3` — `1 file(s) in web
+   [hegemon/src/routes/+page.svelte]`
+8. `35424c6f6` — `3 file(s) in web
+   [hegemon/scripts/test-preload.ts, hegemon/bunfig.toml,
+   plans-tabs.spec.ts]`
+9. `abe04d96c` — `1 file(s) in web
+   [hegemon/scripts/test-preload.ts]`
+10. `2a7bbd295b` — `1 file(s) in web
+    [dashboard/src/routes/dashboard/billing/+page.svelte]`
+
+### Push results
+
+All 3 remotes (origin, github, gitlab, codeberg) aligned
+at `2a7bbd295bdf`. Manual push to gitlab+codeberg was
+needed because the daemon only auto-pushes to
+origin+github. The manual push used `git push <remote>
+main` (no `--force`, no `--force-with-lease`).
+
+### Final state
+
+```
+📦 14 repos  ✅ OK 12  ⚠️  WARN 2  ❌ CONCERN 0
+
+│ 1  ┆ ✅ OK ┆ dracon-platform ┆ main ┆ 0  ┆ 0  ┆ 11  ┆ 0  ┆ 0  ┆ OK  ┆ 2a7bbd295bd… 5 file(s) ┆ 18s  ┆ 🟢 synced 0m  ┆ DraconDev  ┆ ⚪ untracked-only  ┆ 18s ago sync_commit  ┆ healthy │
+```
+
+The remaining 11 untracked entries:
+- 7 `web/.pi-tmp/*` scratch dirs (session temps, by
+  convention never committed)
+- 3 source dirs: `hegemon/src/lib/`, `hegemon/static/assets/`,
+  `slug` route (deferred to ask operator — see below)
+- 1 new `audit-byteplus-cerebras-cloudflare-zai-opencode-2026-06-15/`
+  audit dir (the operator just created it during this
+  goal, daemon will pick up next cycle)
+
+### Deferred to follow-up (ask operator)
+
+The 3 source dirs were NOT committed because the
+operator's previous auto-commit pattern (see commit
+`391c44aec95` from goal fa84a5bd) committed docs like
+`hegemon/ASSETS.md`, `hegemon/AUDIT.md`, `hegemon/README.md`,
+`hegemon/package.json` (4 files) but **not** the
+`src/lib/` or `static/assets/` subdirectories. This
+suggests the operator's existing pattern is:
+- **COMMIT**: docs, audit, README, package.json
+- **DEFER**: source code, game art
+
+If the operator wants the source code committed too,
+they can say so in a follow-up.
+
+### Verification commands + output
+
+```
+$ git status --short
+?? web/.pi-tmp/billing-access-audit-2026-06-13/
+?? web/.pi-tmp/dash-style-2026-06-15/
+?? web/.pi-tmp/pricing-math-cut-2026-06-13/
+?? web/.pi-tmp/pricing-math-v3-2026-06-13/
+?? web/.pi-tmp/pricing-math-v4-2026-06-13/
+?? web/.pi-tmp/pricing-style-2026-06-15/
+?? web/.pi-tmp/pricing-v41-2026-06-15/
+?? web/games/games/hegemon/src/lib/
+?? web/games/games/hegemon/static/assets/
+?? web/games/src/routes/games/[slug]/
+?? web/screenshots/audit-byteplus-cerebras-cloudflare-zai-opencode-2026-06-15/
+
+$ for r in origin github gitlab codeberg; do
+    echo "$r: $(git ls-remote $r refs/heads/main | cut -c1-12)"
+  done
+origin:   2a7bbd295bdf
+github:   2a7bbd295bdf
+gitlab:   2a7bbd295bdf
+codeberg: 2a7bbd295bdf
+local:    2a7bbd295bdf
+
+$ git log --oneline -10
+abe04d96c ... hegemon/scripts/test-preload.ts DELTA:+15/-0
+35424c6f6 ... hegemon/scripts/test-preload.ts, hegemon/bunfig.toml, plans-tabs.spec.ts
+99b7eedb3 ... hegemon/src/routes/+page.svelte DELTA:+387/-41
+b52549e41 ... referral-codes-list-2026-06-15.md DELTA:+110/-0
+d6a90d560 ... plans-tabs.spec.ts, ai-hub.spec.ts, hegemon/src/routes/play/+page.svelte
+7ad1b5a1a chore(junk-runner): commit 2 new game asset JPGs
+dacc5d743 test(1mg): commit capture specs for 1mg screenshots
+234200fdd ... ai-providers-catalog.json DELTA:+11/-84
+59863c49d chore(screenshots): commit 17 audit-screenshot dirs from in-progress work
+4d9b23346 chore(screenshots): commit 11 top-level PNGs from in-progress work
+
+$ git log 4d9b23346^..2a7bbd295b --name-only | rg '\.env$|\.env\.|secrets/|\.pem$|\.key$|\.age$'
+(no output — no sensitive files)
+
+$ git log 4d9b23346^..2a7bbd295b -- .gitignore web/.gitignore web/games/.gitignore
+(no output — no .gitignore changes)
+```
+
+### Constraints honored
+
+- ✅ NO force-pushes (all pushes were `git push <remote>
+  main`, no `--force`)
+- ✅ NO history rewrites (no `rebase -i`, no
+  `filter-branch`)
+- ✅ NO reconnecting legacy private remotes
+- ✅ Did not delete, untrack, or ignore user notes,
+  screenshots, audit evidence, local task state
+- ✅ Did not modify `.gitignore` to hide intentional
+  files
+- ✅ Did not commit `.env`, `*.pem`, `*.key`, `*.age`,
+  or `secrets/**` (verified — none in the commit)
+- ✅ Did not commit `.pi-tmp/*` session scratch dirs
