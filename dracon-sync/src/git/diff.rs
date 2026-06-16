@@ -305,9 +305,9 @@ mod noteworthy_untracked_tests {
         let tmp = tempdir().unwrap();
         let repo = tmp.path();
         init_test_repo(repo);
-        // Write an untracked .md file
-        std::fs::write(repo.join("docs").join("research.md"), "# Research").unwrap();
+        // Create the docs/ dir FIRST, then write the file inside
         std::fs::create_dir_all(repo.join("docs")).unwrap();
+        std::fs::write(repo.join("docs").join("research.md"), "# Research").unwrap();
         let result = noteworthy_untracked(repo).await.unwrap();
         assert!(
             result.iter().any(|p| p.ends_with("research.md")),
