@@ -164,17 +164,6 @@ enum Command {
         #[arg(long, conflicts_with = "explain")]
         json: bool,
     },
-    /// Detect untracked `.md`/`.txt` files across watched repos
-    /// (defensive guard for the CWD-drift class of bug). Added in
-    /// goal `e680cfa9` (2026-06-16).
-    CheckUntrackedMd {
-        /// Repository path. Defaults to all discovered repos.
-        #[arg(long)]
-        repo: Option<PathBuf>,
-        /// Emit machine-readable JSON.
-        #[arg(long)]
-        json: bool,
-    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -1192,9 +1181,6 @@ async fn main() -> Result<()> {
         } => {
             cmd_ownership(&policy_path, repo.as_deref(), explain, json)?;
         }
-        Command::CheckUntrackedMd { repo, json } => {
-            cmd_check_untracked_md(&policy_path, repo.as_deref(), json).await?;
-        }
     }
 
     Ok(())
@@ -1488,104 +1474,6 @@ fn cmd_ownership(
         }
     }
     println!("{table}");
-    Ok(())
-}
-
-/// `dracon-sync check-untracked-md` — defensive guard for the
-/// CWD-drift class of bug. Walks watched repos (or a single repo)
-/// and reports any untracked `.md`/`.txt` files that are NOT
-/// gitignored. The daemon's commit-all policy intentionally does
-/// NOT auto-stage untracked content, so this command gives the
-/// operator visibility into the specific subset of untracked
-/// files that are most likely deliverables (docs, research,
-/// notes, design).
-///
-/// Added in goal `e680cfa9` (2026-06-16) after the
-/// `platform-free-extension-shortlist.md` incident where an
-/// AI agent launched from a repo subdirectory and wrote a file
-/// at a doubled path, leaving it untracked for 16 hours.
-async fn cmd_check_untracked_md(
-    policy_path: &std::path::Path,
-    repo: Option<&std::path::Path>,
-    json: bool,
-) -> Result<()> {
-    use crate::policy::SyncPolicy;
-
-    let policy = SyncPolicy::load(policy_path)?;
-    let repos: Vec<PathBuf> = if let Some(p) = repo {
-        vec![p.to_path_buf()]
-    } else {
-        let roots: Vec<PathBuf> = policy.watch_roots.iter().map(PathBuf::from).collect();
-        let excluded: std::collections::BTreeSet<String> =
-            policy.exclude_dir_names.iter().cloned().collect();
-        git::discover_git_repos(&roots, &excluded, &policy.exclude_repos, None)
-    };
-
-    struct Row {
-        repo: String,
-        files: Vec<String>,
-    }
-    let mut rows: Vec<Row> = Vec::new();
-    let mut total = 0usize;
-    for repo_path in &repos {
-        let files = git::noteworthy_untracked(repo_path).await.unwrap_or_default();
-        if !files.is_empty() {
-            total += files.len();
-        }
-        rows.push(Row {
-            repo: repo_path.display().to_string(),
-            files,
-        });
-    }
-    // Sort: repos with untracked files first, then by repo path
-    rows.sort_by(|a, b| {
-        b.files
-            .len()
-            .cmp(&a.files.len())
-            .then(a.repo.cmp(&b.repo))
-    });
-
-    if json {
-        #[derive(serde::Serialize)]
-        struct Out {
-            total: usize,
-            repos: Vec<RepoJson>,
-        }
-        #[derive(serde::Serialize)]
-        struct RepoJson {
-            repo: String,
-            files: Vec<String>,
-        }
-        let out = Out {
-            total,
-            repos: rows
-                .into_iter()
-                .map(|r| RepoJson {
-                    repo: r.repo,
-                    files: r.files,
-                })
-                .collect(),
-        };
-        println!("{}", serde_json::to_string_pretty(&out)?);
-        return Ok(());
-    }
-
-    if total == 0 {
-        println!("✅ No untracked .md/.txt files found across {} repo(s).", repos.len());
-        return Ok(());
-    }
-
-    println!("📝 Found {} untracked .md/.txt file(s) across {} repo(s):\n", total, rows.len());
-    for row in &rows {
-        if row.files.is_empty() {
-            continue;
-        }
-        println!("  📦 {}", row.repo);
-        for f in &row.files {
-            println!("    - {}", f);
-        }
-        println!();
-    }
     Ok(())
 }
 
