@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+- **dracon-code PUSH_STUCK (44 consecutive failures, 3h+) — resolved (goal `fc406135` / 2026-06-16)**: The operator saw `dracon-code` in PUSH_STUCK in the daemon's `repos` output. Investigation found a true divergence: local was 10 commits ahead of gitlab/codeberg, but gitlab/codeberg had 1 commit (`74c183107d`, the TUI brainstorm doc) not in local. The daemon's `force_push_when_behind = true` config (from goal `87c1bf4d`) only handles the "remote behind local" case, not true divergence. Resolution: chose **Option A** (merge remote into local, then push to all 4 remotes). 3 conflicts resolved by taking HEAD (local has more recent TUI work). All 4 remotes now aligned at `e53c4bd79`. PUSH_STUCK state cleared. No data loss. New design doc `docs/design/dracon-code-divergence-2026-06-16.md` captures the root cause, the resolution strategy, and a runbook for future PUSH_STUCK events. Option C (`pull_when_remote_ahead = true` daemon config) is deferred to a future daemon release.
+
 
 ## [0.112.9] - 2026-06-16
 ### Added
