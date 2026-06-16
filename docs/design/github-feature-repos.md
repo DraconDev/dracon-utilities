@@ -45,7 +45,7 @@ These rules are enforced in
 | Utility | Façade repo | Canonical monorepo path |
 |---------|-------------|-------------------------|
 | `dracon-sync` | `DraconDev/dracon-sync-background-auto-commit-multi-remote` | `dracon-sync/` |
-| `dracon-system` | `DraconDev/dracon-system-di[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBGaHdNYjYxZUpibSthT08xRHU2RmVNbEtwY3QyODFqKzFCMjVmeVZTWEJJCm1qS3o1cEI1eDVSQ00vblpMc25xS282ekczVUFnTUdUa2xLajNJUlp6RFkKLT4gWDI1NTE5IE92UVBYU1BUa2RFUkZHOW1hOGpIa1EvOXNpZHZrY3Q5SnlwdEJNYmIxbnMKZm8vaU5kMGp5TWl5MWdvRWV3WC9KQ1d6YmVnbDREV0MvRUNVVFF4LzdwUQotPiBYMjU1MTkgd0VTaTBoZHlNR3R5a0dCeUV3Nk1RemFZTEVUWjRYSzVZTkFxcUMyTzloYwprYWh3akIrcFZMcHQ3ME5kKzRlYkh3Mk5kOWxBc3ZybFpWRDBaSjNPd2dnCi0+IFgyNTUxOSBZOEJma2JRTVBteWRpVTZCbTlUdm5ISnlBM1FSY3BqaWZxMGplWGkrUWdnCkp6bWs3L3dFazZNMGRqb2FzQUlDYnR2dWUvNWRkWDV4dmZQdjZFZWhMNzQKLT4gWDI1NTE5IHQvVWQrTXVkaHJmVHl1U011b1F0K0xHYmR4MUZXUGtUWUNPU21QUnV1eWcKNnFiTmI2djJJTWJpYzVQejhkaHZiTGcxZzJ2QVZXWTdsWERvNjc3NW00bwotPiBPRyJtLWdyZWFzZQpEcm9ZY0EKLS0tIElyTzFMNno0b1FqNm1wbng5UUVhcytFUGdMTWd3Z2NveTkwdzcvam5PVWMKLXymqUqfXZQ4FLrWqlXI5qLhA/CmT++jdgL6Uu96EXNXVgfDffC/AUgGqTjiNLmpPpp/gS7JjQ==]` | `dracon-system/` |
+| `dracon-system` | `DraconDev/dracon-system-di[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBsdUFQMVpqUGJBMEd3MjNIY09EaG1yZXdzdDA3SU0xM2xHamc3VmdBRlR3CmVUR0cxR0N0U3Y4Y3hiUUdIekdEMldPZG1Bd3FaMmJBRFZsV3YwS3NJNjgKLT4gWDI1NTE5IHJpQmJUUDZEd2NwS0loNjExZks1RFRoS3NiNVVsbGFQSU1yMTN3SmxLbFkKQVI4OWM1SUVYb01QR3NGOFZPR05qVWs5SkgvT2R5TDBLT3gremZYOUdndwotPiBYMjU1MTkgQWFrbXdRRWpLbDdIQWkwYkVDQ1Zsd05BM0dZVDJUcytNT29ZTHdpRTgzTQpTdUE0cW84T2NURVJ3S1NER0NiTThEYUdOajB3NERMZzdPbVBnd0NSZXVVCi0+IFgyNTUxOSBnSFk4VmE5VVV4dVRhVWR6WU8wVXNQWmdsYzJDK0txN0pWNmplaXBHMmhNCmV0UVBYZzdsZldVOUJRUUEvdVR1ZTMvV2tFRWt0RFIwQS9FMjd2emcwVUUKLT4gWDI1NTE5IGRTVWcvVmZBMkkxYkwxc0YrYmhFbmFuS2ljYVlNWUsrRGV3Zk9majI5bG8KcFptcTJPZ29sYnpzWlQ4M21MZXR2VGc1UDFsdFRSQzVTeW9rcHhYV0ZCUQotPiB3LWdyZWFzZSB9UUUgeiB8Q3AlCklmR2QwUk1EWlZwNkNTQU9FVThPTlBsQ3gxbG9qSUg5Ci0tLSBwK21nWlY5YXZLRWJMbVpkNW55WE5Ha1hldW5MZms2bHZmczZONGFnYXJzCp0V/OSWhYk1006L2YxUv9YvHw4i6dNXI9d1t/u7ZDe5dTddsRSxVgGRnIjU9qX7CtOOI6zCQ0w=]` | `dracon-system/` |
 | `dracon-warden` | `DraconDev/dracon-warden-secret-encrypt-age-git-filter` | `dracon-warden/` |
 
 Mirrors exist on:
@@ -150,6 +150,38 @@ repos are not a workaround for sync state — they are a presentation surface.
   automatically regenerate the 3 façade repos when a utility's source
   files change in this monorepo. The 3 façade repo clones live at
   `/home/dracon/Dev/facade-repos/`, a path the daemon already watches.
+
+## Repository architecture
+
+This is a 4-repo system. Each repo has one job:
+
+| Repo | Role | Contains | Updated by |
+|------|------|----------|------------|
+| `DraconDev/dracon-utilities` | **Dev workspace / build source** | All 3 utilities' source code + monorepo build + `install.sh` + tests + docs | Operator (manual commits) + `dracon-sync` daemon (auto-commits to all 4 remotes) |
+| `DraconDev/dracon-sync-background-auto-commit-multi-remote` | **Façade main** for `dracon-sync` | README + LICENSE + SECURITY + .gitignore + .github/ + docs/SOURCE_OF_TRUTH.md | `post-commit` hook → `regenerate_facade_repos.py` → `dracon-sync` daemon |
+| `DraconDev/dracon-system-di[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBZcmgxYWEyZ0VMQ0I3cys5dnJyR1dRQllOeXZ4RnBPbzQvanFkd2tsSGxjCmxRRUlia0VBSUNVQ2cvNmFzeFVtaHM2L2VDNENJK1hPc0ltc2NlVFFVUmsKLT4gWDI1NTE5IHdxdkVaUTdXVitNSWRRK0FlTXM1a0NLaFo3VkZPbTQ3R0JWbEFHeVNMaTAKc1R1YkxTZUIrR2FWU3dNdE5rSHBMN2dJNUVRV1BrZXRlYXZwTndWN2VQSQotPiBYMjU1MTkgTlN6a3lKMUhXT0xBTW5oamthMmhLM2V6T1lwRklVVVhjeVErSmJjeHdSNApkc2lCQ2xSUVI4THdzZmx4SWxsb0VUSDg2MXM1Y2pRNjR2NW9heVp1dDhZCi0+IFgyNTUxOSA4MURYVTltZlJWVUJSRlYvMjFLa1NiRFlWVXpUdjFZc3hzVDhUelFvWkN3CjlZa3JRbTR0Mmw0SUJXZC9LaVl5WmM0eC9qSkFsYUFKbVIyQ2Npa0dINVUKLT4gWDI1NTE5IHppWEJMMUdtQmtwV251WWZMZmVYR2g0NTVJRDRkN1RMVzZobW1pNjg1VmMKMFNYVkhlZzdKZDZqQ055WlZrUStwNkFzTzZnbjd3YWFqK1BpNG5kQWl6RQotPiBsXV8tZ3JlYXNlICdrQm1mN10mIE1yJDwgIQpHT2R0TmlFbzJLbVE1cUphZjhoZktITWhESVZvVVBCb3F0VGJaRi8xMjVUeHc0ZXUyVFB0M1NQaVB6MDEyRkoxCkVORnM1elN5c3B2NmluTGVrUFp5V2Z1NC9kVHV0bHRUclZnRFFIMFlpSWhRRnB5dFpPZlVrM3JPdXcKLS0tIEk2TGVCNGNFNHVWeVV6TmNFZVVVRWFDR0RTZEkzMEFybXU4ellRNDJKOG8KEB0ozfuLTnKWqi5Mkim2Vs+QjzHmGHsP3lhPkxFfZgIjoMmj0supKzSZ7n+GwezdYIz3JZWQkw==]` | **Façade main** for `dracon-system` | Same 7 files as above | Same |
+| `DraconDev/dracon-warden-secret-encrypt-age-git-filter` | **Façade main** for `dracon-warden` | Same 7 files as above | Same |
+
+**The 3 façade repos are the canonical "mains" for users** (presentation +
+discoverability). The monorepo is the canonical "main" for builds
+(`./install.sh` clones the monorepo, not the façade repos — the façade repos
+contain only presentation content, not source code).
+
+**The flow is one-way**: operator edits code in the monorepo → commits trigger
+the `post-commit` hook → the hook runs `regenerate_facade_repos.py` for the
+affected utility → the script writes the new README + metadata to the 3 façade
+repo clones at `/home/dracon/Dev/facade-repos/` → the daemon (`dracon-sync`)
+sees the local change and auto-pushes to GitHub + GitLab + Codeberg.
+
+**Why the monorepo is the install target, not the façade repos**: the façade
+repos are deliberately tiny (7 files) so they render fast on Codeberg / Forgejo
+and don't expose the implementation. Cloning a façade repo would not give you
+a buildable source tree. The source lives in the monorepo + `dracon-libs`.
+
+**Why the façade repos exist at all**: search discoverability. On Codeberg /
+Forgejo, descriptive names get upvotes and free attention. The brutal-descriptive
+name is what makes someone click. Once they click, the README points them to
+the monorepo for the source and to `install.sh` for installation.
 
 ## Cross-references
 
