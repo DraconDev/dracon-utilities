@@ -275,6 +275,17 @@ for the same pattern:
      config edit + a new .bak would re-trigger the
      pattern.
 
+   **Resolution** (2026-06-15, same goal): option (b)
+   was the lowest-risk forward-only fix and was applied.
+   Added `*.bak-*` to `/home/dracon/.dracon/.gitignore`
+   outside the warden-managed block. The 2 existing
+   tracked `.bak` files are NOT affected (gitignore
+   patterns only apply to untracked files). The pattern
+   prevents the daemon from auto-committing any future
+   `.bak-*` files the operator or tooling drops in the
+   working tree. Daemon auto-committed the change in
+   commit `3f5988389`.
+
 2. **dracon-platform `.pi-tmp/*` untracked dirs (12
    entries)**:
    - These are session-scratch dirs from prior AI work
@@ -291,9 +302,20 @@ for the same pattern:
      c. Leave as-is (operator can `git clean` if
         desired).
 
-These are documented in the goal's "Blocked stop
-condition" section and will be handled in a follow-up
-goal after the operator makes the decision.
+   **Resolution** (2026-06-15, same goal): option (a)
+   was the lowest-risk fix and was applied. Added
+   `**/.pi-tmp/**` to
+   `/home/dracon/Dev/dracon-platform/.gitignore`
+   outside the warden-managed block. The daemon's
+   `untracked_exclude_patterns` config (in
+   `~/.dracon/utilities/sync/dracon-sync.toml`) had
+   `**/pi-tmp/**` and `**/.pi-tmp/**` already, but
+   those only affect daemon auto-staging — `git
+   status` still showed 13 untracked `.pi-tmp/`
+   entries as noise. The new `.gitignore` rule
+   makes the pattern visible to `git status` so the
+   untracked count dropped from 19 to 5. Daemon
+   auto-committed the change in commit `3ef345617`.
 
 ## Related design docs
 
