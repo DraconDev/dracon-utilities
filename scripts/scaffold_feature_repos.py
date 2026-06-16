@@ -48,11 +48,11 @@ UTILITIES: dict[str, dict[str, str]] = {
         # Short alias kept for backwards compatibility
         "short": "dracon-sync",
         # Brutally-descriptive canonical name (no filler, no "ai")
-        "name": "dracon-sync-watch-debounce-commit-push-mirror",
+        "name": "dracon-sync-background-auto-commit-multi-remote",
         "title": "Dracon Sync",
         "description": (
-            "File-watch, debounce, commit, push, mirror — invisible git sync "
-            "for multi-remote developer workspaces."
+            "Background, auto-commit, multi-remote — invisible git sync "
+            "for developer workspaces."
         ),
         "subdir": "dracon-sync",
         "service": "dracon-sync.service",
@@ -65,17 +65,18 @@ UTILITIES: dict[str, dict[str, str]] = {
             "Watches configured repositories, waits for changes to settle "
             "(fingerprint stability / debounce), commits deterministic "
             "diff-based messages, and pushes to origin plus configured "
-            "mirrors. Invisible: no user interaction required."
+            "mirrors. Invisible: runs in the background, no user interaction "
+            "required."
         ),
-        "keywords": ("watch", "debounce", "commit", "push", "mirror"),
+        "keywords": ("background", "auto-commit", "multi-remote"),
     },
     "dracon-system": {
         "short": "dracon-system",
-        "name": "dracon-system-di[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB4MGhRdmRPZnFVT2VGdjREOElCeEl3SmFQRS9nZTl4cEpwS1F1NzIzQ1NzCnN0REVCbXFCWWVSTTI4ZlB3cTNiZmd0V2ExQ01tVHkveHQyd2RUaWRJV1EKLT4gWDI1NTE5IHkzbmtFWnRvTVhXdkk5TTJRQWpxN0U4N2J1UklOWEljbFZwM1NrWGhqa1UKdk9Jdkd5ZmxSWnRUYzFscndiR3RxWU5XNHdKUGdYdzRGRmRqRUVocFJaTQotPiBYMjU1MTkgbFA3aDhoOFJRYmRMbHcxSUhrZkkvTW1lSnl5a2hOLzg2WTJ3U0I1UmptWQpaQ2xheExJcnhlUEgvNzZEY1BrNjRURmRQaVU2ZGE0UTJGWXYzdW1GbXZzCi0+IFgyNTUxOSBTUnBVT3ZXb3ZvMFhtbnhhNWFaQ0xzaWhIWW9hUGJUdW40RjlWNEVCSFdVCkpxV3MwZWdhZ2tab2RUL3gvdm5JSEN6cENFTlMxdXZyRkdSaE9GR2dVaVkKLT4gWDI1NTE5IFd1SFdsZmF6akR0UHBPZG9MQWh3VnZuZXJGUjUrTUltSmhKU29sa3FkVG8KRVhyeVZaOWxQem04Uks5OVpMYUttKzFkMWVCaDBwcEtYU3BXUHhZSTBqcwotPiBvLWdyZWFzZSBuIEc1MVFTPUQiCkN1SUQxYndDM0E5bUtIZGJweEZVUW1wNXpFM1E1bFFoVmlJQmt6UzR6QmhqeTViSHJDNk9uUVpVVFAyV3c5S1AKcWFpS3YyTEFudwotLS0gRWNIMGoySC90M0Y1czNVcmxKMWRacUYzY0xpemFIdlhLcmZ3bVdKTVBuSQreq3SJMPHygvwVMjEtSqZ7ZSbFtp9NOLoVJAW9RV1GQSoxt85LHuEMayE3gdzhcWkFu7AUi1HMbuGQC68x]",
+        "name": "dracon-system-di[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBJREJWTjk2N0VLZUs2WlVxcXA2aEQ5cWloaUtQbnZmZGRnd3FXNEhodGhBCitHRVVxTGJ4YkQ0UnVlQkhPTkdSUndvb1BDckZCQURUeTlKSWZmZ3VVa28KLT4gWDI1NTE5IHFBMGRHaGhnOCs2VE5zQVgyZUxKWEl1VlZXNnJ2cEoyTUUzZ2dySzI5ejAKRzhYVnZVL25JeGhSb0ovN1pZRllZVXp4RncrajlzL1FKUjJoc1loL0dSOAotPiBYMjU1MTkgenlINUpNc3JlSXFQMmp1WXg4RFdrdHRiNitRVnlVRmtuNG9EVmdROHAzSQpaY2tPcnROdDFsaGh3emg0N251R0FEVm5WSE1XbDVNeE9GWVZLdlp4N2FnCi0+IFgyNTUxOSBYLzh6cjBTaHE5UmRXa0Z3aGcyUHZTb3lqYkhmNkQ3Q1NDZE5vSXFvdFRnClp1WlJMZmhqaU9pZVB0SVJoTXlySmhVQ0YwU3l4QUtqOG9SNHJrZnNYUjgKLT4gWDI1NTE5IEsydDVjQmF6NEwxcVRQWW5Bb3BMRzJWYUEzSmN6ajBqWHQvYzNTU0x2aEEKdU5Ta0paL1JrNytVZmFkT3BleTlac0JBWlR0VEhWdFc2MDJNU2ZFZWFnQQotPiB7V19mIi1ncmVhc2UgYGdpY1pwSCBHagpEYTdxNHFreUdlYlhKZHZpR0RCeWYwU3pZZE9CCi0tLSBaUm5jWU9kZ1NpUnI2cFpSNThNZmhwZjZWaFh2ZFVGMjNKZmd2N3phcGljCjAsV99lwF5EMj8om8gNvwKV9E4eXUmVhdtZjVXZqEa/JvCkYwwbtVrUx8TA0mJSf/I69dkdqL4=]",
         "title": "Dracon System",
         "description": (
-            "Disk, zram, process, service, guard — local machine "
-            "diagnostics and watchdog for Dracon workspaces."
+            "Disk, process, guard, doctor — local machine diagnostics and "
+            "watchdog for Dracon workspaces."
         ),
         "subdir": "dracon-system",
         "service": "dracon-system-guard.service",
@@ -89,14 +90,14 @@ UTILITIES: dict[str, dict[str, str]] = {
             "deterministic diagnostics for storage, links, zram, events, "
             "and the guard daemon."
         ),
-        "keywords": ("disk", "zram", "process", "service", "guard"),
+        "keywords": ("disk", "process", "guard", "doctor"),
     },
     "dracon-warden": {
         "short": "dracon-warden",
-        "name": "dracon-warden-age-git-filter-secret-encrypt",
+        "name": "dracon-warden-secret-encrypt-age-git-filter",
         "title": "Dracon Warden",
         "description": (
-            "Age, git-filter, secret, encrypt — repository hardening and "
+            "Secret, encrypt, age, git-filter — repository hardening and "
             "smudge/clean encryption for Dracon workspaces."
         ),
         "subdir": "dracon-warden",
@@ -113,7 +114,7 @@ UTILITIES: dict[str, dict[str, str]] = {
             "and git smudge/clean filters plus a pre-commit hook for "
             "plaintext-secret prevention."
         ),
-        "keywords": ("age", "git-filter", "secret", "encrypt"),
+        "keywords": ("secret", "encrypt", "age", "git-filter"),
     },
 }
 
