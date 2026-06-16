@@ -7,10 +7,17 @@
 
 ## Commit policy (the most important section)
 
-**Default behavior (since 2026-06-15, goal
-`9aaf0b08` / `546d4f9c`)**: the daemon **commits all
-untracked files by default**. Only files matching
-genuine session-scratch patterns are kept untracked.
+**Default behavior (since 2026-06-17, after
+`pi-tmp-persist-policy-2026-06-16.md`)**: the daemon
+**commits ALL untracked files by default** —
+`untracked_exclude_patterns = []` in the global config.
+The only things the daemon refuses to auto-commit are:
+
+1. **Files larger than 100 MiB** (`max_stage_file_bytes`)
+2. **Things git already ignores** (`.gitignore` rules)
+3. **Per-repo opt-outs** (only when a specific repo
+   sets `untracked_exclude_patterns` in its
+   `.dracon/dracon-sync.toml`)
 
 ### What gets committed automatically
 
@@ -20,23 +27,34 @@ Everything else, including:
 - Media files (`*.png`, `*.jpg`, `*.mp4`, `*.mov`)
 - Logs and database files (`*.log`, `nohup.out`,
   `*.sqlite`, `*.db`)
+- Session-scratch files (`.pi-tmp/`, `scratch/`, `tmp/`,
+  `.demon/`, `.sisyphus/`, `.ralph/`)
 - Source code, docs, configs, scripts, tests
 
-### What stays untracked (super-good reasons)
+### Operator's framing (the why)
 
-These patterns are excluded from auto-staging:
+> "the most sensible thing is that we have a global
+> rule, and unless it's something that would be very
+> wrong to put on the repo we put it there. i think
+> all untracked excludes arguably are wrong. just
+> because they are short lived files doesn't mean
+> we shouldn't put them there."
 
-```text
-**/scratch/**, **/scratch-*, **/scratch_*
-**/tmp/**, **/tmp-*
-**/pi-tmp/**, **/.pi-tmp/**
-**/research/scratch/**
-.demon/**, .sisyphus/**, .ralph/**
-```
+The old list (`**/scratch/**`, `**/pi-tmp/**`, etc.)
+conflated "short-lived" with "very wrong to commit".
+They are not the same thing. Short-lived files are
+valid git content: the user/agent can `rm` them from
+the working tree when they're done, and the daemon
+will commit the deletion. If the user wants to
+recover, the file is in git history.
 
-These are session-scratch directories, agent session
-state, and temp directories. They are ephemeral by
-design.
+Things that ARE very wrong to commit (handled
+elsewhere, NOT by `untracked_exclude_patterns`):
+- **Secrets in plaintext** → warden owns the
+  encryption flow
+- **Files > 100 MiB** → `max_stage_file_bytes = 104857600`
+- **Build artifacts** (node_modules/, target/,
+  build/, dist/) → already in `.gitignore`
 
 ### Size limit
 

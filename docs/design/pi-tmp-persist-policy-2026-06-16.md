@@ -1,11 +1,20 @@
-# .pi-tmp/ Persist Policy — 2026-06-16
+# .pi-tmp/ Persist Policy — 2026-06-16 (updated 2026-06-17)
 
-> **Decision**: flip `.pi-tmp/**` from "never persist" to "persist
-> plaintext, user-managed lifetime" on `dracon-platform` (pilot repo).
+> **Decision (final, 2026-06-17)**: empty the global
+> `untracked_exclude_patterns` in `~/.dracon/utilities/sync/dracon-sync.toml`
+> so that the daemon auto-commits `.pi-tmp/**`, `scratch/**`, `tmp/**`,
+> `.demon/**`, `.sisyphus/**`, `.ralph/**` (and any other short-lived
+> file) across **all 16 watched repos**. No per-repo overrides.
+>
+> **Decision (initial, 2026-06-16)**: pilot on `dracon-platform` only
+> with a per-repo override. Superseded by the global change above once
+> the operator confirmed the global framing was correct.
 >
 > **Operator's insight**: "temporary" ≠ "never persist". A 10-minute
 > audit that you accidentally lose is worse than a 10-minute audit
-> that lives in git for as long as you need it.
+> that lives in git for as long as you need it. The most sensible
+> thing is a global rule, and unless something would be very wrong
+> to put on the repo, we put it there.
 
 ## Operator's framing (verbatim, lightly cleaned up)
 
@@ -103,40 +112,53 @@ git checkout <sha>~1 -- web/.pi-tmp/some-audit/
 This is much simpler than an auto-prune script, and the user has
 full control.
 
-## Implementation: the 1-line config change
+## Implementation: the 1-line global config change
 
-The global `untracked_exclude_patterns` in
-`~/.dracon/utilities/sync/dracon-sync.toml` lists
-`**/pi-tmp/**` and `**/.pi-tmp/**`. The per-repo override
-in `/home/dracon/Dev/dracon-platform/.dracon/dracon-sync.toml`
-sets this to `[]` for the pilot.
+**Global config edit** (made 2026-06-17, ~00:39 UTC, in
+`~/.dracon/utilities/sync/dracon-sync.toml`):
 
-**Per-repo override file** (created 2026-06-17, ~00:24 UTC):
-
-```toml
-# /home/dracon/Dev/dracon-platform/.dracon/dracon-sync.toml
-untracked_exclude_patterns = []
+```diff
+- untracked_exclude_patterns = [
+-     "**/scratch/**", "**/scratch-*", "**/scratch_*",
+-     "**/tmp/**",     "**/tmp-*",
+-     "**/pi-tmp/**",  "**/.pi-tmp/**",
+-     "**/research/scratch/**",
+-     ".demon/**", ".sisyphus/**", ".ralph/**",
+- ]
++ untracked_exclude_patterns = []
 ```
 
-That's the only config change. The daemon re-reads the per-repo
-config on the next debounce cycle (3s) and starts staging the
-`.pi-tmp/` files that the operator creates.
+That's the only config change. The daemon re-reads the global
+config on save and starts staging the previously-excluded files
+across all 16 watched repos. The per-repo override I created
+earlier (at `/home/dracon/Dev/dracon-platform/.dracon/dracon-sync.toml`)
+has been reverted — no per-repo config needed.
 
-## Pilot results (live data, 2026-06-17 00:30 UTC)
+### Why global, not per-repo
 
-After the policy flip:
+The per-repo pilot I set up first was the wrong shape. The operator's
+position is that a global rule is the most sensible thing, and
+per-repo overrides are reserved for cases where a specific repo
+needs to opt BACK INTO excluding something (e.g., an operator-owned
+repo with a different convention). The default should not be
+"every repo excludes .pi-tmp/ by default, and a few opt in" — the
+default should be "every repo commits .pi-tmp/, and a few opt out".
 
-- **436 `.pi-tmp/` files are already tracked** in the repo (the
-  directory has been tracked since v0.4.0, commit `6b98bbeca`)
-- **0 untracked `.pi-tmp/` files** at the start of the flip became
-  immediately committed
-- **1 brand-new untracked `.pi-tmp/` file** (`web/.pi-tmp/copy-misc-fix-2026-06-16/`)
-  appeared in the minutes after the flip — the daemon will commit it
-  on the next debounce cycle
-- **Daemon's repo view**: 0 MOD, 0 STG, 1 UT, 0 ahead/behind, PUSH: OK
-- **4-remote alignment**: `bf59e8f20` (all of origin, github, gitlab, codeberg)
+## Live results (2026-06-17 00:39 UTC)
 
-The flip is working as designed.
+After the global config change:
+
+- **dracon-platform**: 436 `.pi-tmp/` files already tracked, 1 new
+  untracked `.pi-tmp/` file (`web/.pi-tmp/copy-misc-fix-2026-06-16/`)
+  being committed on the next debounce. 4-remote aligned at `c260b8b0`.
+- **All 16 watched repos**: daemon is now committing any previously-
+  excluded short-lived files (`.pi-tmp/`, `scratch/`, `tmp/`, `.demon/`,
+  `.sisyphus/`, `.ralph/`) as they appear. 4-remote alignment
+  preserved on all repos that were already aligned.
+- **No regressions**: the 4-remote aligned state from the prior goal
+  (`3b0549be`) is intact.
+
+The flip is working as designed across the fleet.
 
 ## Pre-existing 60s push timeout (NOT caused by this flip)
 
@@ -168,19 +190,18 @@ For now, the operator manually pushed with `timeout 300 git push
 --no-verify` to clear the PUSH_STUCK state. The 4-remote alignment
 is back to `bf59e8f20` and the daemon continues to operate normally.
 
-## Next steps (deferred)
+## Next steps
 
-1. **Run the pilot for 1 week** on `dracon-platform`. Track:
-   - .pi-tmp/ commits per day
+1. **Monitor for 1 week** across the fleet. Track:
+   - Short-lived file commits per day (`.pi-tmp/`, `scratch/`, `tmp/`,
+     `.demon/`, `.sisyphus/`, `.ralph/`)
    - Any PII caught by warden's pre-commit hook
    - Any conflicts from concurrent agents
-   - Working tree size growth (do we hit 1 GB on disk?)
-2. **Expand to `dracon-utilities`** (the monorepo) at the end of week 1
-3. **If both pilots succeed**, remove `**/pi-tmp/**` and `**/.pi-tmp/**`
-   from the global `untracked_exclude_patterns` to apply fleet-wide
-4. **Update AGENTS.md** with the conditional Tier 2 wording and the
-   new 4-tier / 3-bucket table
-5. **Address the 60s push timeout** as a separate goal (not blocking
+   - Working tree size growth (do we hit 1 GB on disk in any repo?)
+2. **AGENTS.md**: update the "commit policy" section to reflect the
+   new global default ("commit everything; only exclude things that
+   are very wrong to put in a repo")
+3. **Address the 60s push timeout** as a separate goal (not blocking
    this one)
 
 ## Related docs
