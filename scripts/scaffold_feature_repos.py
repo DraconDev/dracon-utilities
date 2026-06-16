@@ -1,49 +1,119 @@
 #!/usr/bin/env python3
-"""Scaffold GitHub feature-façade repositories for Dracon utilities.
+"""Scaffold feature-façade repositories for Dracon utilities.
 
 The Dracon utilities source of truth remains the `dracon-utilities` monorepo.
-These façade repos are intentionally small GitHub presentation surfaces for
-`dracon-sync`, `dracon-system`, and `dracon-warden`. They avoid duplicating
-implementation code and instead point users to the canonical monorepo paths.
+These façade repos are intentionally small presentation surfaces (GitHub,
+GitLab, Codeberg) for `dracon-sync`, `dracon-system`, and `dracon-warden`. They
+avoid duplicating implementation code and instead point users to the canonical
+monorepo paths.
+
+Brutally-descriptive names are used so the project is self-explanatory on
+Codeberg/Forgejo where descriptive names surface well in search and discovery.
+The short names (`dracon-sync`, `dracon-system`, `dracon-warden`) are kept as
+backwards-compatible aliases — the GitHub façades still respond under the short
+names for now, but the canonical name on every remote is the descriptive one.
+
+See `docs/design/github-feature-repos.md` for the full specification.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import re
 import shutil
+import subprocess
 import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
+#: Words the operator has explicitly excluded from façade names.
+FILLER_WORDS = frozenset({
+    "the", "for", "in", "and", "with", "of",
+    "workspace", "infrastructure", "tool", "utility", "framework",
+    "development", "coding", "platform", "software", "app",
+    "ai",
+})
+
+#: Primary feature keyword that MUST appear in the descriptive name.
+PRIMARY_KEYWORDS = {
+    "dracon-sync": ("sync", "watch", "commit", "push", "mirror"),
+    "dracon-system": ("system", "disk", "process", "guard", "doctor"),
+    "dracon-warden": ("warden", "age", "secret", "encrypt"),
+}
+
 UTILITIES: dict[str, dict[str, str]] = {
     "dracon-sync": {
+        # Short alias kept for backwards compatibility
+        "short": "dracon-sync",
+        # Brutally-descriptive canonical name (no filler, no "ai")
+        "name": "dracon-sync-watch-debounce-commit-push-mirror",
         "title": "Dracon Sync",
-        "description": "Invisible git sync automation for AI-assisted development.",
+        "description": (
+            "File-watch, debounce, commit, push, mirror — invisible git sync "
+            "for multi-remote developer workspaces."
+        ),
         "subdir": "dracon-sync",
         "service": "dracon-sync.service",
         "config": "dracon-sync/dracon-sync.example.toml",
-        "commands": "dracon-sync status · dracon-sync repos · dracon-sync health · dracon-sync daemon",
-        "focus": "Watches configured repositories, waits for changes to settle, commits deterministic diff-based messages, and pushes to origin plus configured mirrors.",
+        "commands": (
+            "dracon-sync status · dracon-sync repos · dracon-sync health · "
+            "dracon-sync daemon"
+        ),
+        "focus": (
+            "Watches configured repositories, waits for changes to settle "
+            "(fingerprint stability / debounce), commits deterministic "
+            "diff-based messages, and pushes to origin plus configured "
+            "mirrors. Invisible: no user interaction required."
+        ),
+        "keywords": ("watch", "debounce", "commit", "push", "mirror"),
     },
     "dracon-system": {
+        "short": "dracon-system",
+        "name": "dracon-system-di[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB4MGhRdmRPZnFVT2VGdjREOElCeEl3SmFQRS9nZTl4cEpwS1F1NzIzQ1NzCnN0REVCbXFCWWVSTTI4ZlB3cTNiZmd0V2ExQ01tVHkveHQyd2RUaWRJV1EKLT4gWDI1NTE5IHkzbmtFWnRvTVhXdkk5TTJRQWpxN0U4N2J1UklOWEljbFZwM1NrWGhqa1UKdk9Jdkd5ZmxSWnRUYzFscndiR3RxWU5XNHdKUGdYdzRGRmRqRUVocFJaTQotPiBYMjU1MTkgbFA3aDhoOFJRYmRMbHcxSUhrZkkvTW1lSnl5a2hOLzg2WTJ3U0I1UmptWQpaQ2xheExJcnhlUEgvNzZEY1BrNjRURmRQaVU2ZGE0UTJGWXYzdW1GbXZzCi0+IFgyNTUxOSBTUnBVT3ZXb3ZvMFhtbnhhNWFaQ0xzaWhIWW9hUGJUdW40RjlWNEVCSFdVCkpxV3MwZWdhZ2tab2RUL3gvdm5JSEN6cENFTlMxdXZyRkdSaE9GR2dVaVkKLT4gWDI1NTE5IFd1SFdsZmF6akR0UHBPZG9MQWh3VnZuZXJGUjUrTUltSmhKU29sa3FkVG8KRVhyeVZaOWxQem04Uks5OVpMYUttKzFkMWVCaDBwcEtYU3BXUHhZSTBqcwotPiBvLWdyZWFzZSBuIEc1MVFTPUQiCkN1SUQxYndDM0E5bUtIZGJweEZVUW1wNXpFM1E1bFFoVmlJQmt6UzR6QmhqeTViSHJDNk9uUVpVVFAyV3c5S1AKcWFpS3YyTEFudwotLS0gRWNIMGoySC90M0Y1czNVcmxKMWRacUYzY0xpemFIdlhLcmZ3bVdKTVBuSQreq3SJMPHygvwVMjEtSqZ7ZSbFtp9NOLoVJAW9RV1GQSoxt85LHuEMayE3gdzhcWkFu7AUi1HMbuGQC68x]",
         "title": "Dracon System",
-        "description": "Local disk, process, storage, zram, and service diagnostics for Dracon machines.",
+        "description": (
+            "Disk, zram, process, service, guard — local machine "
+            "diagnostics and watchdog for Dracon workspaces."
+        ),
         "subdir": "dracon-system",
         "service": "dracon-system-guard.service",
         "config": "dracon-system/dracon-system.example.toml",
-        "commands": "dracon-system status · dracon-system doctor · dracon-system storage · dracon-system guard daemon",
-        "focus": "Protects machines from disk/process pressure and provides deterministic diagnostics for storage, links, zram, events, and the guard daemon.",
+        "commands": (
+            "dracon-system status · dracon-system doctor · "
+            "dracon-system storage · dracon-system guard daemon"
+        ),
+        "focus": (
+            "Protects machines from disk/process pressure and provides "
+            "deterministic diagnostics for storage, links, zram, events, "
+            "and the guard daemon."
+        ),
+        "keywords": ("disk", "zram", "process", "service", "guard"),
     },
     "dracon-warden": {
+        "short": "dracon-warden",
+        "name": "dracon-warden-age-git-filter-secret-encrypt",
         "title": "Dracon Warden",
-        "description": "Git filter encryption and repository hardening for Dracon workspaces.",
+        "description": (
+            "Age, git-filter, secret, encrypt — repository hardening and "
+            "smudge/clean encryption for Dracon workspaces."
+        ),
         "subdir": "dracon-warden",
         "service": "No systemd service; enforced through global git hooks.",
         "config": "dracon-warden/dracon-warden.example.toml",
-        "commands": "dracon-warden status · dracon-warden keygen · dracon-warden setup-hooks --global · dracon-warden scrub-markers",
-        "focus": "Encrypts secret-shaped content at rest in git while preserving normal plaintext files in the working tree.",
+        "commands": (
+            "dracon-warden status · dracon-warden keygen · "
+            "dracon-warden setup-hooks --global · "
+            "dracon-warden scrub-markers"
+        ),
+        "focus": (
+            "Encrypts secret-shaped content at rest in git while preserving "
+            "normal plaintext files in the working tree. Uses age encryption "
+            "and git smudge/clean filters plus a pre-commit hook for "
+            "plaintext-secret prevention."
+        ),
+        "keywords": ("age", "git-filter", "secret", "encrypt"),
     },
 }
 
@@ -51,6 +121,7 @@ UTILITIES: dict[str, dict[str, str]] = {
 @dataclass(frozen=True)
 class RepoSpec:
     name: str
+    short: str
     title: str
     description: str
     subdir: str
@@ -58,18 +129,63 @@ class RepoSpec:
     config: str
     commands: str
     focus: str
+    keywords: tuple[str, ...]
 
 
 def specs() -> list[RepoSpec]:
-    return [RepoSpec(name=name, **data) for name, data in UTILITIES.items()]
+    return [
+        RepoSpec(
+            name=data["name"],
+            short=data["short"],
+            title=data["title"],
+            description=data["description"],
+            subdir=data["subdir"],
+            service=data["service"],
+            config=data["config"],
+            commands=data["commands"],
+            focus=data["focus"],
+            keywords=data["keywords"],
+        )
+        for data in UTILITIES.values()
+    ]
 
 
-def repo_readme(name: str, spec: RepoSpec) -> str:
+def _validate_name(name: str, spec_short: str) -> list[str]:
+    """Return a list of constraint violations; empty if all constraints pass."""
+    errors: list[str] = []
+    if not name.startswith("dracon-"):
+        errors.append(f"name must start with 'dracon-': {name!r}")
+    if not re.match(r"^[a-z0-9-]+$", name):
+        errors.append(f"name must be lowercase letters/digits/hyphens: {name!r}")
+    if len(name) < 30:
+        errors.append(f"name must be at least 30 chars: {name!r} (len={len(name)})")
+    if len(name) > 60:
+        errors.append(f"name must be at most 60 chars: {name!r} (len={len(name)})")
+    # No filler words
+    tokens = name.split("-")
+    for token in tokens:
+        if token.lower() in FILLER_WORDS:
+            errors.append(
+                f"filler word in name: {token!r} is in the excluded set: "
+                f"{sorted(FILLER_WORDS)}"
+            )
+    # At least one primary keyword from this utility must appear
+    primary_set = set(k.lower() for k in PRIMARY_KEYWORDS.get(spec_short, ()))
+    name_tokens = set(t.lower() for t in tokens)
+    if not (name_tokens & primary_set):
+        errors.append(
+            f"name must contain at least one of the primary keywords "
+            f"{sorted(primary_set)}: {name!r}"
+        )
+    return errors
+
+
+def repo_readme(spec: RepoSpec) -> str:
     return f"""# {spec.title}
 
 {spec.description}
 
-This repository is a GitHub feature façade for {name}. It does **not**
+This repository is a feature façade for `{spec.short}`. It does **not**
 duplicate the implementation code. The canonical source of truth remains the
 [`DraconDev/dracon-utilities`](https://github.com/DraconDev/dracon-utilities)
 monorepo, with this utility's code and docs under:
@@ -79,18 +195,26 @@ monorepo, with this utility's code and docs under:
 - Design notes: [`{spec.subdir}/BLUEPRINT.md`](https://github.com/DraconDev/dracon-utilities/tree/main/{spec.subdir}/BLUEPRINT.md)
 - Example config: [`{spec.config}`](https://github.com/DraconDev/dracon-utilities/tree/main/{spec.config})
 
+## Why this name?
+
+The descriptive name is a deliberate choice for Codeberg/Forgejo, where
+descriptive repo names get upvotes and free attention because readers
+immediately know what the project does. The full word list (no fillers, no
+audience/UX claims) is documented in
+[`docs/design/github-feature-repos.md`](https://github.com/DraconDev/dracon-utilities/blob/main/docs/design/github-feature-repos.md).
+
 ## Purpose
 
 {spec.focus}
 
-Use this repo to feature the utility on GitHub without splitting the actual
-implementation out of the monorepo. Issues, project boards, and roadmap notes can
-live here, while commits, releases, tests, and packaging stay anchored in
-`dracon-utilities`.
+Use this repo to feature the utility on GitHub, GitLab, and Codeberg without
+splitting the actual implementation out of the monorepo. Issues, project
+boards, and roadmap notes can live here, while commits, releases, tests, and
+packaging stay anchored in `dracon-utilities`.
 
 ## Runtime
 
-- Binary: `{name}`
+- Binary: `{spec.short}`
 - Service: {spec.service}
 - Example policy: `{spec.config}`
 - Common commands: `{spec.commands}`
@@ -101,7 +225,7 @@ live here, while commits, releases, tests, and packaging stay anchored in
 |----------|----------|
 | Source code | Lives in `dracon-utilities/{spec.subdir}` |
 | Release artifacts | Built and published from `dracon-utilities` |
-| GitHub feature surface | This façade repo |
+| Feature surface | This façade repo (and short-name alias) |
 | Operational policy | `~/.dracon/utilities/` TOML files |
 | Shared libraries | Sibling `dracon-libs` workspace where applicable |
 
@@ -112,7 +236,9 @@ regenerate this façade with:
 
 ```bash
 cd /path/to/dracon-utilities
-./scripts/scaffold_feature_repos.py --apply --repo {name}
+./scripts/scaffold_feature_repos.py --apply --repo {spec.short}
+./scripts/scaffold_feature_repos.py --push-all-remotes --repo {spec.short} \\
+    --ssh-target /path/to/{spec.name}
 ```
 
 Do not paste implementation code into this façade repo. Keep it as a stable
@@ -167,43 +293,43 @@ node_modules/
 
 
 def source_of_truth() -> str:
-    return """# GitHub Feature Façade Repositories
+    return """# GitHub / GitLab / Codeberg Feature Façade Repositories
 
-Dracon utility façade repositories are intentionally small GitHub presentation
-surfaces. They make `dracon-sync`, `dracon-system`, and `dracon-warden` easier to
-feature on GitHub without splitting the implementation out of the
-`DraconDev/dracon-utilities` monorepo.
+Dracon utility façade repositories are intentionally small presentation
+surfaces. They make `dracon-sync`, `dracon-system`, and `dracon-warden` easier
+to feature on GitHub, GitLab, and Codeberg without splitting the
+implementation out of the `DraconDev/dracon-utilities` monorepo.
 
 ## Invariants
 
 1. The monorepo is the only source of truth for implementation code, tests,
    release packaging, and changelog entries.
-2. Façade repos contain only navigation, issue/project metadata, licenses, and
-   links back to the monorepo paths.
+2. Façade repos contain only navigation, issue/project metadata, licenses,
+   and links back to the monorepo paths.
 3. Do not copy implementation files into façade repos. If code needs a public
    home, create a real separate crate/binary repo and update the monorepo
    architecture docs first.
-4. Regenerate façade repos with `scripts/scaffold_feature_repos.py --apply` so
-   the presentation layer stays consistent.
+4. Regenerate façade repos with `scripts/scaffold_feature_repos.py --apply`
+   so the presentation layer stays consistent.
 
 ## Why this is not a hack
 
-GitHub cannot natively present a subdirectory as a first-class repository with
-separate issues, projects, topics, and README without duplicating or moving
-files. A façade repo avoids both bad options:
+GitHub, GitLab, and Codeberg cannot natively present a subdirectory as a
+first-class repository with separate issues, projects, topics, and README
+without duplicating or moving files. A façade repo avoids both bad options:
 
 - Moving code would split the implementation and break the current release
   pipeline.
 - Copying code would create drift and duplicate maintenance.
 
-The façade repo is therefore a documented, scripted boundary: it owns GitHub
-feature metadata only, while `dracon-utilities` owns code and releases.
+The façade repo is therefore a documented, scripted boundary: it owns feature
+metadata only, while `dracon-utilities` owns code and releases.
 """
 
 
 def write_tree(root: Path, spec: RepoSpec, monorepo_root: Path) -> None:
     root.mkdir(parents=True, exist_ok=True)
-    (root / "README.md").write_text(repo_readme(spec.name, spec), encoding="utf-8")
+    (root / "README.md").write_text(repo_readme(spec), encoding="utf-8")
     shutil.copy2(monorepo_root / "LICENSE", root / "LICENSE")
     shutil.copy2(monorepo_root / "SECURITY.md", root / "SECURITY.md")
     (root / ".gitignore").write_text(gitignore(), encoding="utf-8")
@@ -217,7 +343,7 @@ def write_tree(root: Path, spec: RepoSpec, monorepo_root: Path) -> None:
     (root / "docs" / "SOURCE_OF_TRUTH.md").write_text(source_of_truth(), encoding="utf-8")
 
 
-def collect_paths(root: Path, spec: RepoSpec) -> list[Path]:
+def collect_paths(root: Path) -> list[Path]:
     paths = [
         root / "README.md",
         root / "LICENSE",
@@ -230,12 +356,113 @@ def collect_paths(root: Path, spec: RepoSpec) -> list[Path]:
     return sorted(p for p in paths if p.exists())
 
 
+def _init_local_git_repo(repo_root: Path, spec: RepoSpec) -> None:
+    """Initialize a local git repo for the generated façade and commit."""
+    subprocess.run(["git", "init", "-b", "main", str(repo_root)], check=True)
+    subprocess.run(
+        ["git", "-C", str(repo_root), "config", "user.email", "dracsharp@gmail.com"],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(repo_root), "config", "user.name", "DraconDev"],
+        check=True,
+    )
+    subprocess.run(["git", "-C", str(repo_root), "add", "."], check=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(repo_root),
+            "commit",
+            "--no-verify",
+            "-m",
+            f"docs: scaffold feature façade for {spec.short} ({spec.name})",
+        ],
+        check=True,
+    )
+
+
+def _remote_url(remote: str, spec: RepoSpec) -> str:
+    """Return the canonical clone URL for a given remote and spec."""
+    if remote == "github":
+        return f"https://github.com/DraconDev/{spec.name}.git"
+    if remote == "gitlab":
+        return f"git@gitlab.com:DraconDev/{spec.name}.git"
+    if remote == "codeberg":
+        return f"ssh://git@codeberg.org/dracondev/{spec.name}.git"
+    raise ValueError(f"unknown remote: {remote}")
+
+
+def push_all_remotes(repo_root: Path, spec: RepoSpec) -> None:
+    """Add the 3 remote targets and push main to each (sequentially)."""
+    remotes = ("github", "gitlab", "codeberg")
+    for remote in remotes:
+        url = _remote_url(remote, spec)
+        # Replace or add
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(repo_root),
+                "remote",
+                "remove",
+                remote,
+            ],
+            check=False,
+            capture_output=True,
+        )
+        subprocess.run(
+            ["git", "-C", str(repo_root), "remote", "add", remote, url],
+            check=True,
+        )
+        print(f"  remote {remote}: {url}")
+
+    # Push sequentially (no concurrent race; same lesson as dracon-sync multi-remote)
+    for remote in remotes:
+        print(f"  pushing main to {remote}…")
+        result = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(repo_root),
+                "push",
+                "-u",
+                remote,
+                "main",
+            ],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            print(f"    ✗ push to {remote} failed: {result.stderr.strip()}")
+            raise SystemExit(1)
+        print(f"    ✓ pushed main to {remote}")
+
+
 def self_test(monorepo_root: Path) -> None:
+    # 1. Validate all spec names
+    print("[1/2] validating descriptive names against constraints…")
+    for spec in specs():
+        errors = _validate_name(spec.name, spec.short)
+        if errors:
+            raise AssertionError(
+                f"name constraints violated for {spec.short}: {errors}"
+            )
+        # At least one keyword from spec.keywords must be in the name
+        name_tokens = set(spec.name.split("-"))
+        if not (name_tokens & set(spec.keywords)):
+            raise AssertionError(
+                f"spec.keywords {spec.keywords} not reflected in name {spec.name!r}"
+            )
+        print(f"  ✓ {spec.short} → {spec.name} (len={len(spec.name)})")
+
+    # 2. Generate full tree in a temp dir
+    print("[2/2] generating façade tree in a temp dir…")
     with tempfile.TemporaryDirectory() as tmp:
         target = Path(tmp)
         for spec in specs():
             write_tree(target / spec.name, spec, monorepo_root)
-            paths = collect_paths(target / spec.name, spec)
+            paths = collect_paths(target / spec.name)
             if not paths:
                 raise AssertionError(f"no files generated for {spec.name}")
             for path in paths:
@@ -243,13 +470,25 @@ def self_test(monorepo_root: Path) -> None:
                     raise AssertionError(f"missing generated file: {path}")
             readme = (target / spec.name / "README.md").read_text(encoding="utf-8")
             if "does **not**\nduplicate" not in readme:
-                raise AssertionError(f"source-of-truth disclaimer missing for {spec.name}")
+                raise AssertionError(
+                    f"source-of-truth disclaimer missing for {spec.name}"
+                )
+            sot = (target / spec.name / "docs" / "SOURCE_OF_TRUTH.md").read_text(
+                encoding="utf-8"
+            )
+            if "monorepo" not in sot:
+                raise AssertionError(
+                    f"SOURCE_OF_TRUTH.md must mention the monorepo for {spec.name}"
+                )
     print("feature repo scaffold self-test passed")
 
 
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(
-        description="Scaffold GitHub feature-façade repos for Dracon utilities."
+        description=(
+            "Scaffold feature-façade repos for Dracon utilities on "
+            "GitHub, GitLab, and Codeberg."
+        )
     )
     parser.add_argument(
         "--target-root",
@@ -266,7 +505,7 @@ def main(argv: list[str]) -> int:
     parser.add_argument(
         "--repo",
         choices=sorted(UTILITIES),
-        help="Generate only one façade repo.",
+        help="Generate only one façade repo (by short name).",
     )
     parser.add_argument(
         "--apply",
@@ -286,7 +525,24 @@ def main(argv: list[str]) -> int:
     parser.add_argument(
         "--init-git",
         action="store_true",
-        help="Initialize a git repo at the target path, commit the generated files, and add a local origin remote pointing at DraconDev/<name> on GitHub. Pushing is left to the operator.",
+        help=(
+            "Initialize a git repo at the target path and commit the generated "
+            "files. Does not push."
+        ),
+    )
+    parser.add_argument(
+        "--push-all-remotes",
+        action="store_true",
+        help=(
+            "Add github, gitlab, and codeberg remotes to the target repo and "
+            "push main to each. Requires --init-git to have been run (or the "
+            "target to already be a git repo with commits)."
+        ),
+    )
+    parser.add_argument(
+        "--validate-name",
+        action="store_true",
+        help="Only validate the descriptive names against the constraint set and exit.",
     )
     args = parser.parse_args(argv)
 
@@ -300,7 +556,19 @@ def main(argv: list[str]) -> int:
         self_test(monorepo_root)
         return 0
 
-    selected = [next(s for s in specs() if s.name == args.repo)] if args.repo else specs()
+    if args.validate_name:
+        for spec in specs():
+            errors = _validate_name(spec.name, spec.short)
+            if errors:
+                print(f"  ✗ {spec.short} → {spec.name}: {errors}")
+                return 1
+            print(f"  ✓ {spec.short} → {spec.name} (len={len(spec.name)})")
+        print("all names pass the constraint set")
+        return 0
+
+    selected = (
+        [next(s for s in specs() if s.short == args.repo)] if args.repo else specs()
+    )
     payload = []
     for spec in selected:
         repo_root = args.target_root.resolve() / spec.name
@@ -308,11 +576,21 @@ def main(argv: list[str]) -> int:
             write_tree(repo_root, spec, monorepo_root)
             if args.init_git:
                 _init_local_git_repo(repo_root, spec)
+            if args.push_all_remotes:
+                if not (repo_root / ".git").is_dir():
+                    raise SystemExit(
+                        f"--push-all-remotes requires a git repo at {repo_root}; "
+                        "run with --init-git first"
+                    )
+                push_all_remotes(repo_root, spec)
         payload.append(
             {
                 "name": spec.name,
+                "short": spec.short,
                 "target": str(repo_root),
-                "files": [str(p) for p in collect_paths(repo_root, spec)] if args.apply else [],
+                "files": [str(p) for p in collect_paths(repo_root)]
+                if args.apply and (repo_root).exists()
+                else [],
                 "source_subdir": spec.subdir,
             }
         )
@@ -323,50 +601,6 @@ def main(argv: list[str]) -> int:
     else:
         print(json.dumps(payload, indent=2, sort_keys=True))
     return 0
-
-
-def _init_local_git_repo(repo_root: Path, spec: RepoSpec) -> None:
-    """Initialize a local git repo for the generated façade and commit.
-
-    Adds a `DraconDev/<name>` `origin` remote so the operator only has to
-    `git push -u origin main` after the GitHub repository exists.
-    """
-    import subprocess
-
-    subprocess.run(["git", "init", "-b", "main", str(repo_root)], check=True)
-    subprocess.run(
-        ["git", "-C", str(repo_root), "config", "user.email", "ops@dracon.uk"],
-        check=True,
-    )
-    subprocess.run(
-        ["git", "-C", str(repo_root), "config", "user.name", "DraconDev"],
-        check=True,
-    )
-    subprocess.run(["git", "-C", str(repo_root), "add", "."], check=True)
-    subprocess.run(
-        [
-            "git",
-            "-C",
-            str(repo_root),
-            "commit",
-            "--no-verify",
-            "-m",
-            f"docs: scaffold GitHub feature surface for {spec.name}",
-        ],
-        check=True,
-    )
-    subprocess.run(
-        [
-            "git",
-            "-C",
-            str(repo_root),
-            "remote",
-            "add",
-            "origin",
-            f"https://github.com/DraconDev/{spec.name}.git",
-        ],
-        check=True,
-    )
 
 
 if __name__ == "__main__":
