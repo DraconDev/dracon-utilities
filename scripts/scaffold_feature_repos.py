@@ -75,7 +75,7 @@ UTILITIES: dict[str, dict[str, str]] = {
     },
     "dracon-system": {
         "short": "dracon-system",
-        "name": "dracon-system-di[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBLbFg1UjY3cVJBeHZiTWpnVGhWSEZjcm1nV3pxRnBHWnpLL0VDKytjRzNZCmtoQ2hsTjFIbHlPejRqMnM5OHkvanBjbDh6Z0pMbnVnemY1VzBKMjFSM1EKLT4gWDI1NTE5IFhKT255cGdLc3BFSWxzeE9FTkZLTkJ6K3g1bEJPM3RkMG05QXFmRVg3QjQKMUk0U3ZWQlZ1TURGRzl6elRiOHBZdklDd2IwVTBkdHhVd0YxTHNOREgwRQotPiBYMjU1MTkgVzBYcUpIaEpURDIxQmpSNHRTWTBDbHRwWmcrS3FFdVY3UnBoRWVvWjNtYwpuOHQ1M1NoZHhqUTcvTUY0Sk56Y21tWVBxQlBoYnZtVUFLVlV5dG56UjJVCi0+IFgyNTUxOSB0cExUY1JLQlcvemk4QkZXMTR6Z2lqcEZoWFYzM1oxd0VqSjhMdUJMYzJFCnlUL1FuUHpuMHNEbytzVjY1NUJjS3l1U1dwQzF2MUl5QVlpNEU0a1RuN0kKLT4gWDI1NTE5IG1RUG5wYVpGeTEwZkhwUG0walN4MU1YRDBFYXAvSHhGSlBvNWk3MDNId2sKYkF6ODRWWktqUy9jSWpIcFptZDF6ajNLeXdmRlFLU1c4SDZwV3A1dWxWNAotPiBXaEUyRzdKLWdyZWFzZSAwNgpjWHVmU1I3N2NlcTZiQ2VvME43UnJXRWdsWVBFTm5HNEJWakdIZXZpd3h2QjEwTkJ4Y2ZJY0ZseHhnNWRjUzM1ClNjTjVkVml2K05xckI0Z2FublB0dVU5NHYyRWFyMDhNNDNubm1XcStBNElhUGhBVTZZVC9wSit4S054WmFRWWoKQWcKLS0tIEJraFRLcjNqamg4TlhvZDFRVjVDaVdjcHFncGJZdXpESGZDWVpxdE1hQlUKJjoZRcZDfYDvqv3ffY11VQbrHuy11+6LPGKd7zCfLJ48aq8dEt4XGRVOcnQSfj1O2Rf91VuElw==]",
+        "name": "dracon-system-di[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAyQ0FjcFN5eHN5bHZ0WEJkTkdpZFVucWZ6OGlrZXhaS0NXbnhhbVErc1RrCkN6RFVEQlBzcGdoZFFoanRMQWh4eWk5SDc2eWNyM2JsY0tlUG9acE1KTjgKLT4gWDI1NTE5IER6T0Q5ZElxWW05Q3pScHozTVdkT3dFcytOTDRoa1l4TDcwMFIvb1J6bUUKc0U5dTNXaDgxTVRhSk83eXFtZkFvN29yaERRRWxac1JzV3YxbHN0N2l3WQotPiBYMjU1MTkgUi84N1hkdlgxQk1CWVFmdllPSVcrNmN2SmYwcHhTdWljS0pjSjhqVWpsRQozYjR2U0JhTjIwNVNVSXlNUWd5N1BscGw5dEZNNVFJdjhyYkxIc2g0RUVzCi0+IFgyNTUxOSA0cXB0YXBRSEhjTzYrbjJydGxCcE9Yd2pzN3JNWFcrVVRMUVFWMHNoNG5BCjAwRCtocGF3YjlNMjZOM045TXNEQUZZWlF2R0RCeFVldUtmVUFrelQzMlUKLT4gWDI1NTE5IFROOVFKUzhpUCsxQ1JLbS9hVHdOM1U1aXpEcDNUL3IyMjFsMEJoVVVxVWsKV1lXS0w3Sm1mY25FUlM2OVdSMzhEc3B2OTBIT0ZscU9TRzIwck4xWnZtSQotPiAwWi1ncmVhc2UgUywtMVo4dyBWMHI8PSBRKjEKcXkxc1R2U0pTdVF6RHl3Ci0tLSBPQXgyRkhTcUdrbHVEM0JOVER0N2ZXSUFMblRUcFN6QjVScXVqUThtbTFNCs2iVN/RH7JQ3gLjOH3at38yNYCn/ytDUwz5N7ANGX5Fu1c/H6nUSezea/ahWfZc3CZ9UAlM8ug=]",
         "title": "Dracon System",
         "description": (
             "Disk, process, guard, doctor — local machine diagnostics and "
@@ -297,37 +297,54 @@ node_modules/
 
 
 def source_of_truth() -> str:
-    return """# GitHub / GitLab / Codeberg Feature Façade Repositories
+    return """# GitHub / GitLab / Codeberg Feature Façade Repositories (v0.112.7+)
 
-Dracon utility façade repositories are intentionally small presentation
-surfaces. They make `dracon-sync`, `dracon-system`, and `dracon-warden` easier
-to feature on GitHub, GitLab, and Codeberg without splitting the
-implementation out of the `DraconDev/dracon-utilities` monorepo.
+Dracon utility façade repositories are the **canonical "mains"** for each
+utility. They make `dracon-sync`, `dracon-system`, and `dracon-warden`
+discoverable on GitHub, GitLab, and Codeberg and provide an independently
+buildable install target for each.
+
+## Architecture (v0.112.7)
+
+- **Each façade repo contains real source code** (not just navigation
+  metadata). The source is mirrored from the `DraconDev/dracon-utilities`
+  monorepo's per-utility subdir by `scripts/regenerate_facade_repos.py` on
+  every monorepo commit.
+- **Each façade repo is independently buildable** with a sibling
+  `dracon-libs` repo (and, for `dracon-warden`, a sibling `dracon-utilities`
+  repo for the security kit). The `Cargo.toml` uses path deps to the
+  siblings.
+- **The monorepo is the dev workspace** — it owns the development workflow
+  and the source-of-truth content. The 3 façade repos are downstream
+  one-way mirrors.
+- **Auto-sync** is driven by a monorepo `post-commit` hook that calls
+  `scripts/regenerate_facade_repos.py`. The script detects which utility's
+  source files changed and regenerates that façade. The `dracon-sync` daemon
+  picks up the local change in the façade repo clone and auto-pushes to the
+  3 remotes (github, gitlab, codeberg).
 
 ## Invariants
 
-1. The monorepo is the only source of truth for implementation code, tests,
+1. The monorepo is the source of truth for implementation code, tests,
    release packaging, and changelog entries.
-2. Façade repos contain only navigation, issue/project metadata, licenses,
-   and links back to the monorepo paths.
-3. Do not copy implementation files into façade repos. If code needs a public
-   home, create a real separate crate/binary repo and update the monorepo
-   architecture docs first.
-4. Regenerate façade repos with `scripts/scaffold_feature_repos.py --apply`
-   so the presentation layer stays consistent.
+2. Each façade repo mirrors its utility's source code from the monorepo via
+   `regenerate_facade_repos.py`. The mirror is one-way (monorepo → façade).
+3. Each façade repo's `Cargo.toml` uses path deps to siblings
+   (`../dracon-libs` for `dracon-git` / `dracon-system-lib`,
+   `../dracon-utilities/dracon-warden/src/security` for the
+   `dracon-security` kit).
+4. The 3 façade repos are 4-remote aligned (github, gitlab, codeberg, + a
+   local clone at `/home/dracon/Dev/facade-repos/` that the daemon watches).
 
 ## Why this is not a hack
 
-GitHub, GitLab, and Codeberg cannot natively present a subdirectory as a
-first-class repository with separate issues, projects, topics, and README
-without duplicating or moving files. A façade repo avoids both bad options:
-
-- Moving code would split the implementation and break the current release
-  pipeline.
-- Copying code would create drift and duplicate maintenance.
-
-The façade repo is therefore a documented, scripted boundary: it owns feature
-metadata only, while `dracon-utilities` owns code and releases.
+The 3 façade repos give each utility a discoverable, installable home on
+GitHub, GitLab, and Codeberg. The auto-sync mechanism keeps them aligned
+with the monorepo's source of truth, so the duplication is mechanical (a
+scripted mirror) and never drifts. The alternative — keeping the
+implementation only in the monorepo — would mean each utility had no
+standalone install target, which is what the operator pushed back on:
+"are they mains? we are not pushing to them they are still shells".
 """
 
 
