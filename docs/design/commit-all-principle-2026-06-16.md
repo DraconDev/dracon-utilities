@@ -439,3 +439,130 @@ new library) and
 global.css` (1 file, deferred per `76ddaa7e`)
 in `dracon-platform`. Options documented in
 Part B section 8.
+
+---
+
+## Followup audit: dracon-platform 7 untracked dirs (goal `05ea6904`, 2026-06-16)
+
+> **Operator said**: "ok we are looking much
+> ebtter ... the only problem seeming that the
+> platform has a ton of files that are not
+> getting commited"
+
+The live `dracon-sync repos` table showed
+`dracon-platform` with **7 untracked top-level
+entries**. This section audits whether the
+daemon was correctly committing them.
+
+### Investigation findings
+
+**The daemon WAS committing the files** —
+just slowly. The "7 untracked" in the
+daemon's report is misleading: it's the count
+of top-level untracked DIRECTORIES, not the
+count of uncommitted FILES. Each top-level
+dir contained many files.
+
+**Counts during the audit** (16:13 → 17:00
+BST):
+
+| Time | Uncommitted files | Top-level untracked dirs |
+|------|-------------------|--------------------------|
+| 16:13 | 161 (start) | 7 |
+| 16:22 | (after 86-file bulk commit) | ~9 |
+| 16:47 | (after 38-file bulk commit) | 4 |
+| 16:52 | (after 47-file bulk commit) | 3 |
+| 16:54 | (after 11-file commit) | 2 |
+
+The daemon made **30+ commits** during the
+audit, including three bulk commits of
+38, 47, and 86 files. By 16:54, only **2
+uncommitted files** remained.
+
+### Why the perception was "not getting committed"
+
+The `❓ UT` column in the daemon report
+shows top-level untracked dir count, not
+file count. For the operator, "7" sounds
+like 7 uncommitted files. In reality,
+`_lib/canvas2d/` alone contains 19 files.
+
+The daemon uses libgit2 for status, which
+collapses fully-untracked subtrees into
+their parent dir. The daemon's
+`stage_existing_files()` in
+`dracon-sync/src/sync.rs` walks one level
+into the dir and picks up files. When the
+files inside the dir are themselves
+untracked (not in a deeper untracked
+subdir), the daemon commits them in
+bulk — the 86, 47, and 38-file commits
+all worked this way.
+
+### Root cause of the slow catch-up
+
+The daemon's `inactivity_push_delay_secs = 5`
+plus `min_commit_interval_secs = 5` plus
+per-repo settling behavior mean the daemon
+commits in small batches (1-10 files)
+interspersed with bulk commits. The bulk
+commits happen when:
+- The operator stops actively writing
+- The libgit2 status detects the dir as
+  untracked
+- The settling timer expires
+
+The 161 → 2 reduction took ~40 minutes
+because the operator was actively writing
+in `_lib/canvas2d/`, `_lib/visual-novel/`,
+and `darklord/src/lib/` during that window,
+preventing settling.
+
+### Final state (17:00 BST)
+
+- **2 uncommitted files** (down from 161)
+- Both in `_template-*/src/lib/styles/global.css`
+- Both inside the deferred templates per
+  `76ddaa7e` (operator-decision items from
+  goal `6205ad1f`)
+
+The daemon state for `dracon-platform` is:
+- `✅ OK` (NOT `⚠️ WARN`)
+- 0 MOD, 0 STG, 2 UT
+- State: `⚪ untracked-only` (informational,
+  not a warning)
+- Activity: `🟢 synced 0m`
+- Daemon: `23s ago sync_commit`
+
+### Action taken
+
+**No code/config changes.** The daemon was
+functioning correctly. The operator's
+perception was based on the daemon report
+showing top-level untracked DIRS, not
+uncommitted FILES. The 161 uncommitted
+files were all caught up via normal daemon
+commits (bulk + small batches).
+
+### Recommendations
+
+1. **UX improvement** (deferred): the
+   `❓ UT` column in the daemon report could
+   show BOTH top-level untracked dir count
+   AND total uncommitted file count. This
+   would prevent operator confusion. This
+   is a follow-up goal — it's not the
+   commit-all principle's job, it's a
+   reporting improvement.
+
+2. **Operator decision still pending**:
+   the 2 uncommitted `global.css` files
+   in `_template-canvas2d/` and
+   `_template-visual-novel/` are
+   operator-decision items from
+   goal `6205ad1f` Part B section 8.
+   They are inside the deferred
+   `_template-*` subtrees. Operator
+   decides: commit / keep deferred /
+   add to `auto_commit_exclude_patterns`
+   / delete.
