@@ -75,7 +75,7 @@ UTILITIES: dict[str, dict[str, str]] = {
     },
     "dracon-system": {
         "short": "dracon-system",
-        "name": "dracon-system-di[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAyQ0FjcFN5eHN5bHZ0WEJkTkdpZFVucWZ6OGlrZXhaS0NXbnhhbVErc1RrCkN6RFVEQlBzcGdoZFFoanRMQWh4eWk5SDc2eWNyM2JsY0tlUG9acE1KTjgKLT4gWDI1NTE5IER6T0Q5ZElxWW05Q3pScHozTVdkT3dFcytOTDRoa1l4TDcwMFIvb1J6bUUKc0U5dTNXaDgxTVRhSk83eXFtZkFvN29yaERRRWxac1JzV3YxbHN0N2l3WQotPiBYMjU1MTkgUi84N1hkdlgxQk1CWVFmdllPSVcrNmN2SmYwcHhTdWljS0pjSjhqVWpsRQozYjR2U0JhTjIwNVNVSXlNUWd5N1BscGw5dEZNNVFJdjhyYkxIc2g0RUVzCi0+IFgyNTUxOSA0cXB0YXBRSEhjTzYrbjJydGxCcE9Yd2pzN3JNWFcrVVRMUVFWMHNoNG5BCjAwRCtocGF3YjlNMjZOM045TXNEQUZZWlF2R0RCeFVldUtmVUFrelQzMlUKLT4gWDI1NTE5IFROOVFKUzhpUCsxQ1JLbS9hVHdOM1U1aXpEcDNUL3IyMjFsMEJoVVVxVWsKV1lXS0w3Sm1mY25FUlM2OVdSMzhEc3B2OTBIT0ZscU9TRzIwck4xWnZtSQotPiAwWi1ncmVhc2UgUywtMVo4dyBWMHI8PSBRKjEKcXkxc1R2U0pTdVF6RHl3Ci0tLSBPQXgyRkhTcUdrbHVEM0JOVER0N2ZXSUFMblRUcFN6QjVScXVqUThtbTFNCs2iVN/RH7JQ3gLjOH3at38yNYCn/ytDUwz5N7ANGX5Fu1c/H6nUSezea/ahWfZc3CZ9UAlM8ug=]",
+        "name": "dracon-system-di[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBobENiV2dMZHVjQ2ovMjNaZ3BXWm5QQUNZZ1dkZGZzQWJMSS9vU2tnSHhvCnlVbHJvZ3JhRGc2UWpqK3JKY3Y1dld1eTBWR203eDBNWjc5OGl6RFJmWGMKLT4gWDI1NTE5IGxycnBlK1JUcTQrRkwyUlV5VjNzb0FIakxBOHlGTTJSemhrTnFGekIrMlkKVmhUTkQ5YjE1cHY5YlR5SS9URjJhR08rWHM4WkEyUU0wT0VJcUFJcUludwotPiBYMjU1MTkgeThKZk1ENnhzY2U2aDRZYzNkV29YanB0S09GUGtmcVloc3FnZW1JazFrdwp4SzlMU1kycjFBSGhTUVV0d2MrNkRYL3d6R1ZvTTdmRXpCTHUrSkJLRndNCi0+IFgyNTUxOSA2Rk54WmFTcVd4cGcwQ2V1NEsxQTZBWWZtcUtwMnpZakgxZERyMG9BeVdvClI4QmtpWHJTV2JiTlQvSS9DWHF2VWdHY3hGamZPTVVPNExQTXFhUXBSY2cKLT4gWDI1NTE5IDFBMmxlN2lkc2svSzRvN1hVWFlmOWVnV1lLdVMyTlhSd2V1VXl0U2xrekUKNzByMVBoc2VSb3ZqZENkK1l6UWNnVUtiUGk4MnlseXA3YXhDejJkczNKQQotPiBwIj4tZ3JlYXNlIDZSTGogI3xqM0x7YSAwMj0KdjB3RitUZjduWjdhTE5hWEltWUJ3OWpUQXVkZG5Pb0k4UHB4NGRSL1dpVVpRTUpBT21OT1hOZk1GMWwrdHJPZwphS0N4Q3cKLS0tIFdpanVJMjM0T1F5eUUzN0I5UEFLVW94TU5xMzRyOWpRcVdYVGpud0RFZW8KHUSTlawAWViwonlhIvM+PsRKNc02SWJllhjhn2MK/qZTLGXytyt+RcUTNzly736/xBwhF5jAuQ==]",
         "title": "Dracon System",
         "description": (
             "Disk, process, guard, doctor — local machine diagnostics and "
@@ -189,15 +189,52 @@ def repo_readme(spec: RepoSpec) -> str:
 
 {spec.description}
 
-This repository is a feature façade for `{spec.short}`. It does **not**
-duplicate the implementation code. The canonical source of truth remains the
+This repository is the **canonical "main"** for `{spec.short}` on GitHub,
+GitLab, and Codeberg. It contains the actual source code (mirrored from the
 [`DraconDev/dracon-utilities`](https://github.com/DraconDev/dracon-utilities)
-monorepo, with this utility's code and docs under:
+monorepo), the `Cargo.toml`, tests, examples, and the per-utility README.
+You can build and install this utility directly from this repo.
 
-- Source: [`{spec.subdir}/`](https://github.com/DraconDev/dracon-utilities/tree/main/{spec.subdir})
-- User guide: [`{spec.subdir}/README.md`](https://github.com/DraconDev/dracon-utilities/tree/main/{spec.subdir}/README.md)
-- Design notes: [`{spec.subdir}/BLUEPRINT.md`](https://github.com/DraconDev/dracon-utilities/tree/main/{spec.subdir}/BLUEPRINT.md)
-- Example config: [`{spec.config}`](https://github.com/DraconDev/dracon-utilities/tree/main/{spec.config})
+## Quick start (standalone build)
+
+```bash
+# Clone this repo
+git clone https://github.com/DraconDev/{spec.name}.git
+cd {spec.name}
+
+# Clone required siblings (path-dep layout)
+git clone https://github.com/DraconDev/dracon-libs.git ../dracon-libs
+{ '# dracon-warden also needs the monorepo for the security kit' if spec.short == 'dracon-warden' else '' }
+{ 'git clone https://github.com/DraconDev/dracon-utilities.git ../dracon-utilities' if spec.short == 'dracon-warden' else '' }
+
+# Build
+cargo build --release
+
+# Install (binary lands in target/release/)
+sudo cp target/release/{spec.short} /usr/local/bin/
+```
+
+## What is in this repo
+
+- `src/` — utility source code
+- `tests/` — integration tests (if present)
+- `Cargo.toml` — standalone build manifest with path-dep siblings
+- `README.md` — this file (the per-utility README from the monorepo is at `monorepo-README.md`)
+- `BLUEPRINT.md` — design notes
+- `{spec.config.split('/')[-1]}` — example config
+- `{spec.service}` — systemd user-service unit
+- `LICENSE`, `SECURITY.md`, `.gitignore`, `.github/` — repo metadata
+- `docs/SOURCE_OF_TRUTH.md` — architecture + invariants
+
+## Relationship to the monorepo
+
+| Boundary | Decision |
+|----------|----------|
+| Source code | Mirrored from `dracon-utilities/{spec.subdir}` via `scripts/regenerate_facade_repos.py` on every monorepo commit |
+| Source of truth | `dracon-utilities` monorepo (the auto-sync is one-way) |
+| Feature surface | This repo (canonical main for `{spec.short}`) |
+| Shared libraries | Sibling `dracon-libs` workspace (`../dracon-libs`) |
+| Operational policy | `~/.dracon/utilities/` TOML files |
 
 ## Why this name?
 
@@ -211,11 +248,6 @@ audience/UX claims) is documented in
 
 {spec.focus}
 
-Use this repo to feature the utility on GitHub, GitLab, and Codeberg without
-splitting the actual implementation out of the monorepo. Issues, project
-boards, and roadmap notes can live here, while commits, releases, tests, and
-packaging stay anchored in `dracon-utilities`.
-
 ## Runtime
 
 - Binary: `{spec.short}`
@@ -223,31 +255,14 @@ packaging stay anchored in `dracon-utilities`.
 - Example policy: `{spec.config}`
 - Common commands: `{spec.commands}`
 
-## Relationship to the monorepo
-
-| Boundary | Decision |
-|----------|----------|
-| Source code | Lives in `dracon-utilities/{spec.subdir}` |
-| Release artifacts | Built and published from `dracon-utilities` |
-| Feature surface | This façade repo (and short-name alias) |
-| Operational policy | `~/.dracon/utilities/` TOML files |
-| Shared libraries | Sibling `dracon-libs` workspace where applicable |
-
 ## Maintenance
 
-When the monorepo changes the utility README, blueprint, or example config,
-regenerate this façade with:
-
-```bash
-cd /path/to/dracon-utilities
-./scripts/scaffold_feature_repos.py --apply --repo {spec.short}
-./scripts/scaffold_feature_repos.py --push-all-remotes --repo {spec.short} \\
-    --ssh-target /path/to/{spec.name}
-```
-
-Do not paste implementation code into this façade repo. Keep it as a stable
-navigation and feature surface so the monorepo remains the single source of
-truth.
+When the monorepo changes the utility source code, README, or example config,
+the monorepo's `post-commit` hook calls `scripts/regenerate_facade_repos.py`
+which mirrors the changes to this repo. The `dracon-sync` daemon picks up
+the local change in `/home/dracon/Dev/facade-repos/{spec.name}` and
+auto-pushes to the 3 remotes (github, gitlab, codeberg). No manual
+`--apply` or `--push-all-remotes` invocation is needed in the normal flow.
 
 ## License
 
