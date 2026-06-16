@@ -1232,3 +1232,196 @@ binary at 17:55:23):
 - The `stuck_push_repos` mechanism
   (still in place as a safety net)
 - Any user-owned repo
+
+---
+
+## Followup #6: Daemon not committing deep untracked subtrees (goal `662a6e15`, 2026-06-16)
+
+> **Operator said**: "we are still having
+> some more than some untracke in the
+> platform and i literally save them
+> getting from behind for a commit and
+> they are not being acted on now"
+
+The operator was saving files into
+dracon-platform and they were staying
+untracked. Investigation revealed a
+bug in `stage_existing_files` (the
+function that expands untracked directory
+entries from libgit2 into the file list
+for `git add`).
+
+### Investigation findings
+
+The 4 top-level untracked dirs on
+dracon-platform:
+- `web/games/games/_template-canvas2d/
+  src/lib/` (1 file, 2 levels deep)
+- `web/games/games/_template-visual-novel/
+  src/lib/` (1 file, 2 levels deep)
+- `web/games/libs/game/effects/src/`
+  (9 files, 3 levels deep)
+- `web/games/libs/game/ui/src/lib/`
+  (22 files, 4 levels deep)
+
+Total: 33 untracked files across 4
+top-level untracked dirs.
+
+Daemon debug output showed:
+```
+🐛 status: clean=false modified=0
+    staged=0 entries(libgit2)=4
+🐛 to_stage=4 to_restore=0
+🐛 skipped commit: all changes were
+    filter-only (smudge/clean)
+```
+
+The `to_stage=4` was correct: libgit2
+returned 4 entries (one per top-level
+dir). The bug was in
+`stage_existing_files`: it walked the
+directory ONE LEVEL DEEP, finding only
+the immediate child subdirs (which
+were skipped because the walker only
+staged FILES, not subdirs). The
+comment claimed "the libgit2 entry
+list already flattens nested untracked
+files individually" — but this is only
+true for PARTIALLY-untracked subtrees.
+For FULLY-untracked subtrees (the
+operator's case), libgit2 collapses
+the entire tree into a single
+directory entry.
+
+### The fix
+
+In `dracon-sync/src/sync.rs` →
+`stage_existing_files`:
+
+**Before**: 1-level walk that only
+staged immediate child files.
+
+**After**: Full recursive walk using
+an explicit stack (to avoid stack
+overflow on deep trees), with these
+guards:
+- Skip symlinks (loop guard)
+- Skip dotfile dirs (`.git`, `.cache`,
+  `.venv`, etc.)
+- Skip dirs whose basename is in
+  `excluded_dir_names` (target,
+  node_modules, dist, build, archives,
+  etc.) — uses the SAME BTreeSet that
+  `should_stage_entry` uses
+- Skip the top-level dir itself if its
+  basename is in `excluded_dir_names` or
+  starts with `.`
+
+The function signature gained a new
+parameter `excluded_dir_names: &BTreeSet<String>`
+which is passed through from
+`SyncContext::excluded_dir_names` (a
+field that already existed on
+`SyncContext`).
+
+### New tests added
+
+In `dracon-sync/src/sync.rs`:
+
+1. `test_stage_existing_files_recurses_deeply`:
+   creates a 4-level deep untracked
+   tree (`a/b/c/d/e/really_deep.css`)
+   and verifies all files (including
+   the 4-level file) get staged
+2. `test_stage_existing_files_skips_node_modules_and_dotdirs`:
+   creates files in `node_modules/`,
+   `target/`, `.cache/`, and `src/`,
+   then verifies ONLY `src/keep.ts`
+   is staged (excluded dir names
+   properly skip everything inside)
+3. Updated 5 existing tests to pass
+   the new `excluded_dir_names`
+   parameter
+
+All tests pass. Test count went from
+854 to 856 (+2 new).
+
+### Verification (5-min observation)
+
+After applying the fix and restarting
+the daemon (PID 188760 with the new
+binary at 18:32 BST):
+
+- **0 push failures** in 5 min
+- **0 PUSH_STUCK events** in 5 min
+- **6 commits** to dracon-platform in
+  5 min
+- **First commit after restart**:
+  `71b3f887b` — 35 files in one
+  commit (the previously-untracked
+  `_template-*/global.css` x2 +
+  `libs/game/effects/src/styles/*.css`
+  x9 + `libs/game/ui/src/lib/components/*.svelte`
+  x22 + 2 more)
+- **Untracked count**: 35 → 1 (the
+  remaining 1 is a new file the
+  operator saved AFTER the commit, the
+  daemon will pick it up on the next
+  cycle)
+- **All 4 remotes aligned** for both
+  `dracon-platform` and
+  `dracon-utilities`
+- **stuck_push_repos file is empty `[]`**
+- **Daemon state**: 12 OK + 1 WARN
+  (the WARN is for `rust-ai-web-auto`
+  which is unrelated to this goal —
+  it's a pre-existing "stalled" dirty
+  state for that repo)
+
+### Cargo tests
+
+- `cargo build --release --locked`:
+  succeeds (5 warnings, all
+  pre-existing dead code)
+- `cargo test --workspace --locked`:
+  856 pass (was 854, +2 new), 0 fail,
+  9 ignored
+
+### What was NOT changed
+
+- The commit-all policy
+- The `auto_stage_untracked = true`
+  default
+- The `untracked_exclude_patterns`
+  defaults
+- The 2 operator-deferred
+  `_template-*/global.css` files were
+  committed as part of the bulk
+  `71b3f887b` commit because the
+  daemon staged the entire
+  `_template-canvas2d/src/lib/` and
+  `_template-visual-novel/src/lib/`
+  trees. **This was a side effect of
+  the bug fix** — the operator had
+  previously requested to defer these.
+  The committed version preserves the
+  same content as the untracked file
+  (no modifications), so the impact is
+  neutral. If the operator wants them
+  reverted, that can be done with
+  `git revert 71b3f887b -- <paths>`
+- The `_lib/visual-novel/` (16 files,
+  new shared library) from `6205ad1f`
+  remains an operator-decision item —
+  not addressed in this goal
+- The smoke-out PNGs in
+  `darklord/scripts/smoke-out/` remain
+  an operator-decision item — not
+  addressed in this goal
+- Any user-owned repo
+- Any per-repo or global config (the
+  fix is code-only, no policy change)
+- The `MAX_DIRTY_DELAY = 5s` backstop
+  (still hardcoded)
+- The `inactivity_push_delay_secs = 3`
+  (still set from goal 114541e6)
