@@ -759,3 +759,164 @@ documented in the design doc for
 operator review. If the operator wants
 to apply any of the 4 options above,
 that's a separate goal.
+
+---
+
+## Followup #3: PUSH_STUCK on dracon-platform — divergent remotes (goal `42ea41d4`, 2026-06-16)
+
+> **Surprise during the cadence investigation**:
+> at 17:18, `dracon-sync repos` showed
+> `dracon-platform` as `PUSH_STUCK` with 11
+> consecutive push failures.
+
+### Root cause: race condition in concurrent multi-remote push
+
+The daemon pushes to all 4 remotes
+**concurrently** via `tokio::spawn` in
+`dracon-sync/src/git/multi_remote.rs`
+(`push_to_all_remotes`). The `force_push_
+when_behind` field defaults to `false`,
+so divergent pushes are rejected.
+
+The race scenario:
+
+```
+T+0s:  commit 3ccbc4093 (deletion) made
+T+0.5s: daemon push cycle starts
+T+0.5s: spawn 4 concurrent push tasks:
+  - origin:    pushes 3ccbc4093, success
+  - github:    pushes 3ccbc4093, success
+  - gitlab:    slow network, still pushing
+  - codeberg:  slow network, still pushing
+T+1.0s: commit e0583e564 (re-addition) made
+T+1.5s: daemon's next push cycle starts
+  - origin:    fast-forward to e0583e564, success
+  - github:    fast-forward to e0583e564, success
+  - gitlab:    finishes first push, then tries
+               to push e0583e564 to gitlab at
+               T+5s when gitlab is still at
+               3ccbc4093. But origin is at
+               e0583e564 already, and the local
+               is at e0583e564. Push succeeds.
+  - codeberg:  finishes first push, then tries
+               to push e0583e564. Push succeeds.
+T+30s: more commits made
+T+30.5s: daemon's next push cycle starts
+  - origin:    pushes new commits, success
+  - github:    pushes new commits, success
+  - gitlab:    new commits include
+               "deletion" of files gitlab
+               has. Tries to push.
+               BUT: gitlab's tip is
+               e0583e564 (still at the
+               re-addition commit), local
+               tip is past it. NOT a
+               fast-forward. REJECTED.
+  - codeberg:  same as gitlab. REJECTED.
+```
+
+After this, gitlab/codeberg are stuck at
+`e0583e564` while origin/github are at
+`2291e1702`. The daemon tries to push
+each new commit, gets rejected, retries
+3 times (per `push_retries`), then
+increments the failure counter. After
+`push_max_retries = 5` (default), the
+daemon marks the repo as `PUSH_STUCK`.
+
+### Evidence (17:18:52 journal)
+
+```
+⚠️ push to codeberg failed for
+   /home/dracon/Dev/dracon-platform:
+   non-fast-forward
+⚠️ push to gitlab failed for
+   /home/dracon/Dev/dracon-platform:
+   non-fast-forward
+```
+
+### Fix options (none applied)
+
+a) **Enable `force_push_when_behind = true`
+   on gitlab and codeberg remotes**:
+   the daemon's `force_push_when_behind`
+   field is per-remote. Setting it to
+   `true` for the slow remotes (gitlab,
+   codeberg) tells the daemon to use
+   `--force-with-lease` when the remote
+   is purely behind local. Safe because
+   `--force-with-lease` aborts if the
+   remote advanced (e.g. someone pushed
+   something). Operator-approval needed
+   for config change.
+
+b) **Sequential push** (slower but
+   safer): change `push_to_all_remotes`
+   from concurrent `tokio::spawn` to
+   sequential `for remote in sorted`.
+   Adds ~3-6s per commit (4 remotes × 1.5s
+   each) but eliminates the race. Code
+   change required.
+
+c) **Pre-push divergence check**:
+   before pushing to a remote, run
+   `git fetch` to check if the remote
+   has commits local doesn't. If yes,
+   either pull-and-merge or force-push.
+   More robust but more complex. Code
+   change required.
+
+d) **Per-remote daemon lock**: serialize
+   pushes to the same repo so only one
+   push cycle runs at a time. Simplest
+   fix but doubles the push latency.
+
+### Recommendation: ask operator for (a) vs (b)
+
+Option (a) is the lowest-effort fix and
+preserves the concurrent push. The
+`--force-with-lease` flag is safe (it
+aborts if the remote has new commits
+we don't know about). The trade-off is
+that we might overwrite work someone
+else pushed to gitlab/codeberg, but
+since the operator is the sole author
+on these repos, this is acceptable.
+
+Option (b) is the safest. No force-push
+needed, but pushes take 2-3x longer.
+
+**Operator decision needed.**
+
+### Action taken in this goal
+
+- **Did NOT** run `dracon-sync repair
+  stuck-unstuck` (would re-attempt
+  pushes that will fail again)
+- **Did NOT** force-push
+- **Did NOT** enable `force_push_when_
+  behind` in config
+- **Documented** the finding for
+  operator review
+- **Will mark goal complete** with the
+  fix options documented
+
+### Temporary unblock
+
+The operator can manually fix the
+divergence by running:
+
+```
+cd /home/dracon/Dev/dracon-platform
+git push --force-with-lease gitlab main
+git push --force-with-lease codeberg main
+```
+
+This is a one-time fix. After that,
+the daemon's concurrent push will work
+correctly for ~30s windows until the
+next divergence happens (if operator
+edits fast enough).
+
+A permanent fix requires one of the
+4 options above.
