@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.112.8] - 2026-06-16
+### Investigated
+- **Daemon push targets audit confirms "long-name only" (goal `d2837ddc` / 2026-06-16)**: The operator asked: "but make sure we are ignoring the previous ones now we are just directly pushing to the ones we marely with the long names right?" Verified:
+  - `dracon-sync repos` shows exactly 4 healthy repos: `dracon-utilities` + the 3 long-name façade repos (`dracon-sync-background-auto-commit-multi-remote`, `dracon-system-disk-process-guard-doctor`, `dracon-warden-secret-encrypt-age-git-filter`)
+  - No Set A short-name URL exists in any local clone's remotes
+  - No Set A URL exists in any active config/script/code (`scripts/`, `.git/hooks/`, `install.sh`, `~/.dracon/utilities/sync/dracon-sync.toml`)
+  - Set A URLs appear only in 3 historical documents (`CHANGELOG.md`, `docs/design/github-feature-repos.md`, `release-notes-v0.112.5.md`) that document the Set A → Set B rename event as history; they are not active references
+  - No local clone points to a `_deletion_scheduled` URL
+  - The post-commit hook + `regenerate_facade_repos.py` only target `/home/dracon/Dev/facade-repos/` (the long-name-only path)
+  - All 4 watched repos are 4-remote aligned (github, gitlab, codeberg)
+  - Monorepo tests: 856 passed, 0 failed, 9 ignored (no regression)
+  - See `docs/design/push-targets-audit-2026-06-16.md` for the full audit
+- **3 GitLab Set A repos: default `leave-as-is` (option A) per goal `83e42c15` / 2026-06-16**: The 3 Set A repos on GitLab are in `_deletion_scheduled` state and will be hard-deleted by GitLab automatically. The operator was offered a per-repo decision (A: leave-as-is / B: hard-delete now / C: archive + rename / D: deprecated README + archive) but did not specify a per-repo choice in the goal window; the default of `A` was applied because the repos are already effectively deprecated and invisible. To escalate any of these to `B` / `C` / `D`, the operator can reply to the goal `83e42c15` follow-up at any time and a follow-up release will cut.
+
+
 ## [0.112.7] - 2026-06-16
 ### Changed
 - **3 long-name façade repos are now real install targets, not navigation shells (goal `6a105c59` / 2026-06-16)**: The operator pushed back: "are they mains? we are not pushing to them they are still shells". The architecture has been flipped. Each façade repo (`dracon-sync-background-auto-commit-multi-remote`, `dracon-system-disk-process-guard-doctor`, `dracon-warden-secret-encrypt-age-git-filter`) now contains the actual source code (mirrored from the monorepo's per-utility subdir), a standalone `Cargo.toml` with path-dep siblings, the per-utility README, tests, examples, and the systemd service file. Each façade repo is independently buildable: `git clone <repo>; clone siblings per the README; cargo build --release` works. The auto-sync mechanism (`scripts/regenerate_facade_repos.py` + monorepo `post-commit` hook) keeps the per-utility source content in sync with the monorepo.
