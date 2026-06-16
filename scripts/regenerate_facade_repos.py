@@ -5,7 +5,7 @@ This is the auto-sync glue between `DraconDev/dracon-utilities` (the monorepo,
 source of truth) and the 3 façade repos:
 
   - dracon-dev/dracon-sync-background-auto-commit-multi-remote
-  - dracon-dev/dracon-system-di[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA1VFRZeXVQNVpzR2lTVndtSXVpMmkvRmRSeVNkK0o0MGZBNnh6VURNY2xjCkg2cUhCdllPS01EWTRxQitaazgvaDBuNkFhUHJWU0x6V2hXczFERWZiVzAKLT4gWDI1NTE5IHQxOTQybnd4dEh6Um9WMC9wN09oNk1NRFhBTHJvYXJkZ29qYzNhK0kzbTAKeEFxK09LaEpsSUpNUEptaDlUakRZNmt4S1ZaNEx1RnBEWG0wbU8zbVo4UQotPiBYMjU1MTkgVmZneGFPM3RjVHU2dFJveXdQQVdTd0hIanBYWTgwWmhWTkJQUWlFZEhpVQoxejBHZlZET0tRTTFKOEhTL09FeUpuUmdicHlzMURDZzJYRVhzWER4Z3B3Ci0+IFgyNTUxOSA0TWl0ajEyZ0hPY0NwM21lYkt5ejdDbUh1VE1JcFNTMkE1ZytDcjI4SHlRCjZ5dXZoaGdoTG9kb3prVHBIZ05hNVZxVWh6TzdRbDhJOHU1ejF5Z2pNUFkKLT4gWDI1NTE5IGsrNjVOVnorWGV4MTZTNXRyYnNyUE5JM25JZzNwZ3U4U2ZnWGhCMWhSU1UKOFl3SDcwRzQ5dGxLSnNyYXE3aDBtb3d2QU9lazdndmxKTlh4Skk5NTgvOAotPiA2MX1DLWdyZWFzZQpRcHJDSlYrN3hQNXJ4eGNaY0Z5d2w5aHBUcjMzWmhMQitnc1QKLS0tIHArQjNMN0h6d1VMUE1EUTRab255RG9DUm5XQTFkRUpZOFdjM1lXd3BJb3MKxRmZp4H5CT07jlB82QO1plSA7cBuOOYAZ4Vb90FViVPwvrCu5dRmInV4Kfw7bEQdISnSBxPpvg==]
+  - dracon-dev/dracon-system-di[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA3bmJFcjZyY2VUWHc2WFZVd002RXJXSFhQZWhhQWgvWDNRTURFVlB3V1FFCkJ6VDk3V0YrQzVDTWYyTU8yY0piK3VaUmMwcEhaMDNhMmJuZjF1MVd1NTAKLT4gWDI1NTE5IDdvWGMzR1dkbTdCcHZDU2dmb2JSaVZTeDJpbC9aUnltRHRXNCtzMkFOazgKMklUNnJ2aEhJOWd0RHlNU1ZGOEprenhqS1lrVUxDWFpzR0EwTTJlQjlLNAotPiBYMjU1MTkgM3dWTmVBWnpiL0VzaVRZUldWMVBkV0Ywb0VoS3VxSnNIYVNhRGtyTGxIYwpIVHovRWlLRXgvVjluYU1VajhnWkxDbC9SQjZ0dTFlVGg3RTFNMzdOTFFNCi0+IFgyNTUxOSBwSEY0eHdQNEdFQUFrdCs0NVRsT0lBWi82T0NPdEc1Y21hVkFzQjZHeGtVCjUyRTg4a1pUWDZjSEdxR1hyVldIcVQ4OFZJdFNUUVBCYU1JMWFOYVl6R0UKLT4gWDI1NTE5IG1HV1c3S25obXlmZmdTSDdNd0hzU3hoaFhJNnl4aElRcGM4eGRnU0h6aTgKRHFSUXJzOU1wNTc4UUhJWk1HNTdPWC9CTEtiSUF0Z1FSa1A2QllzajRhbwotPiBcLU4/flBmLWdyZWFzZSB9elJPTzYgP2EsSFokbgpRMUlIekZKRGEvVHJHN1VlOXd5czAzY0NjRzhMeUlWUHV5ZHJrVDY1NEliUnhsa2toVmJOQUw4V3lqTDJ4anBiCmVEWUpxb29kTjJYUUxzZFhNaENHaHM4VzVxK25HN0JwbTR4dVloNnFSaWdTOGsrTgotLS0gbDJZOUZkREdPQ08yMVk0ZStTQk5TNzFvQ29uREhZT0F3OWdEbkFVQkdUQQrwNM4IK0dS2jxNMSxA62UyCBz5yVxFrT8sPVRqJsHWGzGgedj/JTAgUM+7znQnH73hvQMl5fIk]
   - dracon-dev/dracon-warden-secret-encrypt-age-git-filter
 
 Each façade repo lives at `<target_root>/<name>` and is watched by
@@ -43,6 +43,16 @@ UTILITY_SOURCE_DIRS: dict[str, str] = {
     "dracon-sync": "dracon-sync",
     "dracon-system": "dracon-system",
     "dracon-warden": "dracon-warden",
+}
+
+#: Canonical long name per utility (mirrors UTILITIES in scaffold_feature_repos.py).
+#: Kept in sync manually; the scaffold script is the source of truth at runtime
+#: (this script invokes the scaffold for the actual regeneration, and the
+#: directory name is whatever the scaffold uses for the target).
+UTILITY_LONG_NAMES: dict[str, str] = {
+    "dracon-sync": "dracon-sync-background-auto-commit-multi-remote",
+    "dracon-system": "dracon-system-di[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBqU1JVckd2U2I5WC9NaTlzcUFwRTR1ZHYvOFVCUlVRdGN1cDB5aDRic0dVCjhRclRXTnJJdVVNU0dxcHZHamVsOUhzNE1kZUFBN25QOFp2UEZ2R010ek0KLT4gWDI1NTE5IFZWUWk4aGFYc2cwRjFqTUFqY1dqbHlUR3Z4dWNEdmc2R3ZHaTdzSEhaMm8KZFZWbXZZQ1pzRUcySUVHYzBSWnovKzQ3K3BJQ2NrcXY5TTg3V25WVEJ1awotPiBYMjU1MTkgaVZsdnY1eE1mMEdmdmE5dnQzTU9CYkkwNy90YWEzSUpGZnhCdm50emtuSQo0dFhwcWdrTUZPQkNESlNNeTJOZzRlYzhXT1U0a2JLN0VVbEhpUEtrK0g0Ci0+IFgyNTUxOSBMM2JZRmJodWErNGpHdXZXeGl4UEVJcEswMU14MzcwMWM5a2tMd1o0aWc0CkhVN0pHQmc5TTlBcjF3dnlpdVp2eDVhSFhHSkFIWlNvSmN0S2pEakxUNFUKLT4gWDI1NTE5IENuQUFYSXpCNUErV3g4eHFMUE1OcndtMkZNRzJtamxGaEI5MXcvY1NtRkkKYWxoRjQ2VW1rRXVwS2VVV09MWGNhc3hPOVlEdHp1MmtPTSs0K3FrNWh3bwotPiBocEQtZ3JlYXNlIDpFQ0o+QXtqIHdbIGFeU2kgZQpPb1lNL0JrTGpDQUpCSnVOaXcKLS0tIFNrUjlkLzNob0FXNkhGU2c2ZUdrdzZhY3pPZGJIb2Z6VWw0NVhuVXpLeWMK3UOn+qWXlEKTANdvU8h4Zpz7IAh+BdnPaigvKuETk9JhNQEGOImf6u6JZ0vSiQqEB2u65lD/Xw==]",
+    "dracon-warden": "dracon-warden-secret-encrypt-age-git-filter",
 }
 
 #: Default target root for the façade repo clones. The daemon's `watch_roots`
@@ -90,19 +100,7 @@ def _regenerate_one(
     utility: str,
 ) -> bool:
     """Regenerate one façade repo. Returns True if a change was committed."""
-    # Resolve the canonical long name by exec'ing the scaffold script in a
-    # sandboxed namespace (avoids dataclass module-registration issues with
-    # importlib).
-    ns: dict = {"__name__": "__scaffold__", "__file__": str(monorepo_root / "scripts" / "scaffold_feature_repos.py")}
-    exec(
-        compile(
-            (monorepo_root / "scripts" / "scaffold_feature_repos.py").read_text(encoding="utf-8"),
-            str(monorepo_root / "scripts" / "scaffold_feature_repos.py"),
-            "exec",
-        ),
-        ns,
-    )
-    long_name = ns["UTILITIES"][utility]["name"]
+    long_name = UTILITY_LONG_NAMES[utility]
     facade_dir = target_root / long_name
     scaffold = monorepo_root / "scripts" / "scaffold_feature_repos.py"
 
@@ -252,19 +250,8 @@ def main(argv: list[str]) -> int:
         )
 
     if args.dry_run:
-        # Resolve the long names for the dry-run output by exec'ing the
-        # scaffold script in a sandboxed namespace.
-        ns: dict = {"__name__": "__dry_run__", "__file__": str(monorepo_root / "scripts" / "scaffold_feature_repos.py")}
-        exec(
-            compile(
-                (monorepo_root / "scripts" / "scaffold_feature_repos.py").read_text(encoding="utf-8"),
-                str(monorepo_root / "scripts" / "scaffold_feature_repos.py"),
-                "exec",
-            ),
-            ns,
-        )
         for u in affected:
-            long_name = ns["UTILITIES"][u]["name"]
+            long_name = UTILITY_LONG_NAMES[u]
             print(f"  [dry-run] would regenerate {u} → {target_root / long_name}")
         return 0
 
