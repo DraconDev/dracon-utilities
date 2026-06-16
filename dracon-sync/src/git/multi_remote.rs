@@ -494,3 +494,124 @@ pub(crate) async fn auto_create_all_remotes(
     }
     results
 }
+
+// ============================================================================
+// Tests for push_to_all_remotes (goal 87c1bf4d, 2026-06-16)
+//
+// The concurrent → sequential refactor must preserve three invariants:
+//   1. Push order follows the `priority` field (lowest first)
+//   2. An empty `remotes` slice returns an empty Vec (no spurious entries)
+//   3. A failure on one remote does NOT abort subsequent pushes
+//      (the daemon continues to the next remote)
+//
+// These tests use a tiny local-only mock to avoid network and SSH. They
+// verify the *shape* of the returned Vec and the *order* of attempts, not
+// the wire-level push behavior. Wire-level push is exercised by the live
+// daemon and the integration tests.
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::policy::RemoteConfig;
+    use std::path::PathBuf;
+
+    /// Helper: build a minimal RemoteConfig for testing.
+    /// `name` and `priority` are the only fields that affect the sort.
+    fn make_remote(name: &str, priority: u32) -> RemoteConfig {
+        RemoteConfig {
+            name: name.to_string(),
+            push_url: format!("git@invalid.example.com:{}.git", name),
+            auto_create: false,
+            auto_create_account: String::new(),
+            auth_type: crate::policy::AuthType::GitHub,
+            priority,
+            api_endpoint: None,
+            auto_create_token_var: None,
+            repo_name_map: std::collections::HashMap::new(),
+            force_push_when_behind: false,
+        }
+    }
+
+    /// Test: empty remotes list returns empty Vec.
+    ///
+    /// Regression test for goal `87c1bf4d`: the sequential
+    /// implementation must handle the empty case without
+    /// panicking or returning a spurious empty Ok entry.
+    #[tokio::test]
+    async fn test_push_to_all_remotes_empty_list_returns_empty() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path().join("test-repo");
+        std::fs::create_dir_all(&repo).expect("create repo dir");
+        let results = push_to_all_remotes(&repo, &[], 1, 1).await;
+        assert!(
+            results.is_empty(),
+            "empty remotes should return empty Vec, got {:?}",
+            results
+        );
+    }
+
+    /// Test: remotes are attempted in priority order (lowest first).
+    ///
+    /// Regression test for goal `87c1bf4d`: the sort by `priority`
+    /// must apply to the input `remotes` slice before any push is
+    /// attempted. We don't verify the push actually succeeds (the
+    /// fake URL will fail), but we verify the *order of attempts*
+    /// by checking that all entries in the result Vec appear in
+    /// priority order. The exact error vs. success status is
+    /// implementation-dependent on the underlying git command,
+    /// so we just check ordering.
+    #[tokio::test]
+    async fn test_push_to_all_remotes_respects_priority_order() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path().join("test-repo");
+        std::fs::create_dir_all(&repo).expect("create repo dir");
+        // Intentionally out of priority order
+        let remotes = vec![
+            make_remote("z-high-priority", 100),
+            make_remote("a-low-priority", 1),
+            make_remote("m-mid-priority", 50),
+        ];
+        let results = push_to_all_remotes(&repo, &remotes, 1, 1).await;
+        assert_eq!(results.len(), 3, "should return one entry per remote");
+        let names: Vec<&str> = results.iter().map(|(n, _)| n.as_str()).collect();
+        assert_eq!(
+            names,
+            vec!["a-low-priority", "m-mid-priority", "z-high-priority"],
+            "remotes must be pushed in priority order (lowest first)"
+        );
+    }
+
+    /// Test: a failure on one remote does NOT abort the loop.
+    ///
+    /// Regression test for goal `87c1bf4d`: the sequential
+    /// implementation must NOT use `?` or early-return inside
+    /// the loop. All remotes must be attempted, with their
+    /// results collected in a Vec. The test uses three fake
+    /// remotes with invalid URLs; all three should appear in
+    /// the result Vec regardless of their success/failure.
+    #[tokio::test]
+    async fn test_push_to_all_remotes_continues_after_failure() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path().join("test-repo");
+        std::fs::create_dir_all(&repo).expect("create repo dir");
+        let remotes = vec![
+            make_remote("first-fails", 1),
+            make_remote("second-fails", 2),
+            make_remote("third-fails", 3),
+        ];
+        let results = push_to_all_remotes(&repo, &remotes, 1, 1).await;
+        assert_eq!(
+            results.len(),
+            3,
+            "all 3 remotes must be attempted (no early-return on failure)"
+        );
+        // The names must be in priority order
+        let names: Vec<&str> = results.iter().map(|(n, _)| n.as_str()).collect();
+        assert_eq!(
+            names,
+            vec!["first-fails", "second-fails", "third-fails"],
+            "order must be by priority even when all fail"
+        );
+    }
+}
