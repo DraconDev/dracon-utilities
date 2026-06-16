@@ -7,7 +7,10 @@ description = "Git filter encryption and repository hardening for secrets at res
 readme = "README.md"
 repository = "https://github.com/DraconDev/dracon-utilities"
 homepage = "https://github.com/DraconDev/dracon-utilities"
-documentation = "https://docs.rs/dracon-warden/0.3.0"
+documentation = "https://docs.rs/dracon-warden"
+keywords = ["git", "secret", "encrypt", "age", "filter", "encryption", "hardening", "security", "git-filter", "secret-management"]
+categories = ["command-line-utilities", "development-tools", "cryptography"]
+exclude = [".github/", "docs/", "*.md", "!README.md", "Cargo.lock", "target/"]
 
 [dependencies]
 age = { workspace = true }

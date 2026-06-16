@@ -7,7 +7,10 @@ description = "Invisible git sync daemon for deterministic AI-assisted developme
 readme = "README.md"
 repository = "https://github.com/DraconDev/dracon-utilities"
 homepage = "https://github.com/DraconDev/dracon-utilities"
-documentation = "https://docs.rs/dracon-sync/0.1.5"
+documentation = "https://docs.rs/dracon-sync"
+keywords = ["git", "sync", "daemon", "auto-commit", "auto-push", "multi-remote", "mirror", "background", "developer-tools", "ai-assisted"]
+categories = ["command-line-utilities", "development-tools::build-utils"]
+exclude = [".github/", "docs/", "*.md", "!README.md", "Cargo.lock", "target/"]
 
 [dependencies]
 anyhow = { workspace = true }
