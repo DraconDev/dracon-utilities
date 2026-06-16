@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.112.9] - 2026-06-16
+### Added
+- **3 sub-crates published to crates.io (goal `0ca7e640` / 2026-06-16)**: `dracon-sync v0.1.9`, `dracon-system v0.2.4`, `dracon-warden v0.3.4` are now available on https://crates.io. Users can install any utility with `cargo install dracon-{sync,system,warden}`. Each crate has proper metadata (5 keywords, `command-line-utilities` category, updated documentation URL pointing to the crate's docs.rs landing page, `exclude` to keep the published package minimal). docs.rs pages are auto-generated on publish. See `docs/design/crates-io-publish-2026-06-16.md` for the full publish workflow + lessons learned (including the 5-keyword limit that was caught at first publish).
+- **`docs/design/final-audit-2026-06-16.md`** (10,161 bytes) — the final state-of-the-workspace audit. 10 findings, all fixed. Reviews 30 design docs + 7 READMEs + source comments + crates.io publish-readiness.
+- **`docs/design/crates-io-publish-2026-06-16.md`** (9,244 bytes) — the crates.io publish workflow + operator runbook + lessons learned. Documents the account owner, token storage, release process, and 4 lessons from the 2026-06-16 first publish (5-keyword limit, category slugs, `--allow-dirty` flag, path-dep auto-rewrite, version-bump coordination).
+### Changed
+- **Root `README.md`**: v0.112.5 → v0.112.8 (was 3 releases stale); added "Install" section with `cargo install` paths; "Façade repos" section + "Repository architecture" table updated to reflect the v0.112.7 state (façade repos are real install targets, not navigation shells); "Utilities" table now links each utility to its crates.io page.
+- **3 per-utility READMEs** (`dracon-{sync,system,warden}/README.md`): added "Install" section near the top with the `cargo install <crate>` command + the façade repo alternative.
+- **3 sub-crate `Cargo.toml` files**: added `keywords` (5 per crate), `categories = ["command-line-utilities"]`, `exclude` to keep published package minimal, and updated `documentation` URLs to point to the crate's docs.rs landing page (no version).
+### Investigated
+- **`path = "dracon-warden/src/security"` dep in root `Cargo.toml` is NOT a publish blocker**: cargo auto-rewrites the path dep to a version dep (`dracon-security v0.3.0`, which is already on crates.io) when packaging for publish. Verified by inspecting the packaged `target/package/dracon-warden-<version>/Cargo.toml` — the path dep becomes `version = "0.3.0"`. No code change needed. Documented in `docs/design/crates-io-publish-2026-06-16.md` for posterity.
+
+
 ## [0.112.8] - 2026-06-16
 ### Investigated
 - **Daemon push targets audit confirms "long-name only" (goal `d2837ddc` / 2026-06-16)**: The operator asked: "but make sure we are ignoring the previous ones now we are just directly pushing to the ones we marely with the long names right?" Verified:
