@@ -44,18 +44,19 @@ These rules are enforced in
 
 | Utility | Façade repo | Canonical monorepo path |
 |---------|-------------|-------------------------|
-| `dracon-sync` | `DraconDev/dracon-sync-watch-debounce-commit-push-mirror` | `dracon-sync/` |
-| `dracon-system` | `DraconDev/dracon-system-di[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBiMmxXbUxhZG80d0VncUovYThicFRBd3dSN1VnS09wY0FvMy9uMk9pZkJrClJnZWtYUCtGenpUTUhncnJrWmpVVVZra1VITnhuN3FJQXFqdFpiWGd5ZW8KLT4gWDI1NTE5IEZsRlh3UkVxL1ZscEVXK3MzNWpkamFiaHRFbGFKdmkzam9IaWI1Wk01aGsKbDZlZXA1Uk9NTWZ6dFpHUHdkVWxmQkZuVzNyUTM1ZDY4OVdaSkwzZDRtYwotPiBYMjU1MTkgdys4dTA1T0JIZFlDcEJ4c3FjanhGbkZmdWkzZFd2UmxnRmNEMGxOclFucwpRbDZoTkhMQThLNlcvQVBxVzhoOVhpWktURVpwR1J5TTRuTzM2VTZZQWJzCi0+IFgyNTUxOSB2cUxBV1lycUpBelY3Y0R4WGxKVHN3Q0hOdHFaWHZxTXMvdjdTTUFKcmpFCmtlTktieUlUWU04YTlZTHhsNVVtM1F1RVhPZ1o1UTN1NWFMejlwWDVjUUUKLT4gWDI1NTE5IG94NXVOanREY3JJVWIvcjhpMGZYb3JnUllqWWRxRUJHcEk0YStTQkxhRWsKM2V5TUoxdmQwVXk0b0xkZEZ4R2YvSTlzYitCR2xMQnpSWW9FcmlQdEJtRQotPiAjLzlSLlEtZ3JlYXNlClB1VnYvOWtJNHFQbUVhckV0YmZiU0dqcko3L3FkSy9WQUR6cGxGSzJLeHR0YXZJZ0prdFNlMnMKLS0tIGtUaDY0QXErNDlzMFJBQ1NwNTdNNTVocitta2R6bzFHQ3AxL2xVZXVncGMKneTOfbIJP4fFvx4C3oIXv5z5ODBObpnwQAjotgzLW0ukXCfz2j+7oyda+ybF37SqmeFRiq7Y90lOJg+2Lg==]` | `dracon-system/` |
-| `dracon-warden` | `DraconDev/dracon-warden-age-git-filter-secret-encrypt` | `dracon-warden/` |
+| `dracon-sync` | `DraconDev/dracon-sync-background-auto-commit-multi-remote` | `dracon-sync/` |
+| `dracon-system` | `DraconDev/dracon-system-di[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBCTTNnTTRjTE04WGdnMExNajF4anRpa0NDSHU3YUVWS0QxbkM0V09CYm5nCnQ2cVdyRVNrNWU2dmZoVkRlK1FoY1ZXM3NTMENkRXFzOGpobk8rbFhnM0kKLT4gWDI1NTE5IDBZY2xxLzZYdTdXQmZoSTdBK3NJK0JTa2RqbXlwTjZsY3RyR3R0UmdVUncKRzVvbG9kOEpkMzloQzBxeG5FcGIvVVdSNTdJZHZ2SG1Xbkpua1dVdGhxYwotPiBYMjU1MTkga3ppK0RNNmJqVEpCYm9Zc1c2UElzdG9IZHNwQzJrb1hQTitFUGQ3MU1VUQpSVEQ0bFNDUytEZUJwVnMrb1dZWGJmYVZnZ0FTVnVGU3NQTVFpZ0kyV2VjCi0+IFgyNTUxOSBxdHMyRWpacmZkbVpWRE8wUlVwNlJ5UUpwbFdFMzVnMEt3aEpGa3dJNXdFClIxWUs2ckgyNVBKbW00YmVXOVVUbkxLR01iNzNuS2tJOHlGTHgzNGZ1SEkKLT4gWDI1NTE5IDlrK2Jpd2FjZDVnTEwzZ2dJN1V6Q0tBMTlxQlpNV0M5aS9pdHZrdUZCeWsKSUprQ1RpOUtIWGh6UEF2eXVIbWVPcmFFSDg5c29CdWowa0gwb2J6dVRqawotPiAqJ2VUJi1ncmVhc2Ugd0JGNW40fiBodngmKyBzfUNvfGsgbgoxZ0V0UENST25OaklmUHlzZURiQXFWU2h1OWl6cnlFR2U0NUNKVkRkK3F1M3IvYkxpSXhZSkpnRGtuUGR0SFk5CnRNQnNFczV2V252bERIaDJLUW84YnZpaFM1SzA4QjZXbG82dDJBYkplQnkrbXcKLS0tIDU5MWNmS3Raa0IvWUNFUFFiVlFKUHRTL0dybDlRZFpUVlc0OTBaVWpLSVEKCMJrwnJRndkR3QFuIKmNbP5Xw70rOkDHx/RCh2NATZ8Y218uTxflfMtn2uWgboknCJTk0Lc4+A==]` | `dracon-system/` |
+| `dracon-warden` | `DraconDev/dracon-warden-secret-encrypt-age-git-filter` | `dracon-warden/` |
 
 Mirrors exist on:
 
 - **GitLab**: `DraconDev/<descriptive-name>`
 - **Codeberg**: `dracondev/<descriptive-name>` (the primary discoverability target)
 
-The old short names (`DraconDev/dracon-sync`, etc.) on GitHub were renamed in
-place to the descriptive names — the rename preserves the git history and
-GitHub redirects from the old URL for a grace period.
+The first set of names deployed in 2026-06-16 (Set A — man-page-style, e.g.
+`dracon-sync-watch-debounce-commit-push-mirror`) was replaced the same day with
+Set B (this section's table) because the operator wanted names that read as
+sentences, not feature lists. See the [CHANGELOG] for the rename entry.
 
 ## Invariants
 
