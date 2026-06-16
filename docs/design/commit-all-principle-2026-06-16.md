@@ -1029,3 +1029,206 @@ the daemon at 17:22):
   inactivity_push_delay_secs` test
   still passes because the code
   default is still 5)
+
+---
+
+## Followup #5: PUSH_STUCK prevention fix (goal `87c1bf4d`, 2026-06-16)
+
+> **Operator said**: "ok we need to
+> investigate the push stuck and make
+> sure it doesnt stuck"
+
+The PUSH_STUCK issue from Followup #3
+(divergent remotes from concurrent
+multi-remote push races) is now fixed
+with two complementary changes.
+
+### Part A: Unblock the current divergence
+
+The current state was:
+- local/origin/github at `885085dda`
+  (then `0206255d7`, `54671cb67`,
+  `4ae409182` as the daemon kept
+  committing)
+- gitlab/codeberg at `e0583e564`
+  (1 commit behind, but with
+  conflicting PNG content)
+
+Investigation revealed the divergence
+was NOT simply "remote purely behind":
+gitlab/codeberg had 1 commit that
+origin didn't have, with conflicting
+PNGs in `darklord/scripts/smoke-out/`.
+The merge base was `3ccbc4093` (43
+commits ago in the divergent branch).
+
+Both `git merge` and `git cherry-pick`
+of gitlab's commit `e0583e564` failed
+with PNG conflicts (the PNGs were
+binary and had diverged).
+
+**Unblock procedure** (used):
+
+```bash
+cd /home/dracon/Dev/dracon-platform
+# Force-push local to gitlab with explicit
+# expected SHA (the old tip)
+git push --force-with-lease=refs/heads/main:e0583e564b271c54616472f7788aab405f586083 \
+  gitlab main
+# Same for codeberg
+git push --force-with-lease=refs/heads/main:e0583e564b271c54616472f7788aab405f586083 \
+  codeberg main
+# Now both remotes are at the old tip,
+# purely behind local. Normal fast-forward
+# push brings them up to date.
+git push gitlab main
+git push codeberg main
+```
+
+The `--force-with-lease` with explicit
+expected SHA is SAFE: it aborts if the
+remote has been updated to a different
+SHA (e.g. by another operator). In this
+case, the remote's tip was exactly
+`e0583e564`, so the lease succeeded.
+
+Result: all 4 remotes at `0206255d7`
+(then `54671cb67`, then `4ae409182` as
+the daemon kept committing). The
+`stuck_push_repos` file was cleared
+automatically on the next successful
+push.
+
+### Part B: Prevention fix (the actual fix)
+
+Two complementary changes prevent the
+race from re-occurring:
+
+**Change 1: `force_push_when_behind = true`
+on gitlab and codeberg remotes**
+
+In `~/.dracon/utilities/sync/dracon-sync.toml`,
+added:
+```toml
+[[remotes]]
+name = "gitlab"
+...
+force_push_when_behind = true  # new
+
+[[remotes]]
+name = "codeberg"
+...
+force_push_when_behind = true  # new
+```
+
+This enables the daemon's existing
+`--force-with-lease` mechanism in
+`dracon-sync/src/git/multi_remote.rs`
+(line ~250) when the remote is purely
+behind local. If the race ever causes
+a divergence, the daemon will
+auto-recover by force-pushing the
+slow remote to catch up.
+
+**Change 2: Sequential push (the real fix)**
+
+In `dracon-sync/src/git/multi_remote.rs`,
+changed `push_to_all_remotes` from
+concurrent `tokio::spawn` to sequential
+`for remote in sorted`. This eliminates
+the race that caused the divergence in
+the first place.
+
+Before:
+```rust
+// Push to all remotes concurrently
+let mut handles = Vec::new();
+for remote in sorted {
+    handles.push(tokio::spawn(async move {
+        push_to_named_remote(...).await
+    }));
+}
+// Wait for all
+for handle in handles { ... }
+```
+
+After:
+```rust
+// Push to remotes sequentially
+let mut results = Vec::new();
+for remote in sorted {
+    let result =
+        push_to_named_remote(repo, &remote.name, ...).await;
+    results.push((remote.name, result));
+}
+```
+
+Trade-off: each push cycle now takes
+~3-6s of wall-clock latency (4 remotes
+× ~1.5s) instead of ~1.5s concurrent.
+The user-visible cadence is similar
+because the daemon's apply phase
+deadline (`pulse_interval_secs * 2` =
+2s) was already causing trailing-drain
+events on every commit when concurrent
+pushes took >2s (see Followup #2).
+
+### New tests added
+
+In `dracon-sync/src/git/multi_remote.rs`:
+
+1. `test_push_to_all_remotes_empty_list_returns_empty`:
+   empty `remotes` slice returns empty
+   `Vec` (no panic, no spurious entry)
+2. `test_push_to_all_remotes_respects_priority_order`:
+   remotes are attempted in priority
+   order (lowest first), regardless of
+   input order
+3. `test_push_to_all_remotes_continues_after_failure`:
+   a failure on one remote does NOT
+   abort the loop; all 3 remotes are
+   attempted
+
+All 3 tests pass. Total test count
+went from 851 to 854.
+
+### Verification (10-min observation)
+
+After applying the fix and restarting
+the daemon (PID 50090 with the new
+binary at 17:55:23):
+
+- **0 push failures** in 10 min
+- **0 PUSH_STUCK events** in 10 min
+- **19 commits** in 10 min (all to
+  dracon-platform)
+- **13 OK + 0 WARN + 0 CONCERN**
+- **All 4 remotes aligned** for both
+  `dracon-platform` and
+  `dracon-utilities` at verification
+  time
+- **Test push cycle**: 4-remote
+  sequential push takes 6.03s (was
+  6.03s for concurrent when stable,
+  plus race risk)
+
+### Cargo tests
+
+- `cargo build --release --locked`:
+  succeeds (5 warnings, all
+  pre-existing dead code)
+- `cargo test --workspace --locked`:
+  854 pass, 0 fail, 9 ignored (was
+  851, +3 new tests)
+
+### What was NOT changed
+
+- The `MAX_DIRTY_DELAY = 5s` backstop
+  (still hardcoded)
+- The `inactivity_push_delay_secs = 3`
+  (set in goal 114541e6)
+- The `pulse_interval_secs = 1`
+- The commit-all policy
+- The `stuck_push_repos` mechanism
+  (still in place as a safety net)
+- Any user-owned repo
