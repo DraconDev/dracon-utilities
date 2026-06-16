@@ -45,7 +45,7 @@ These rules are enforced in
 | Utility | Façade repo | Canonical monorepo path |
 |---------|-------------|-------------------------|
 | `dracon-sync` | `DraconDev/dracon-sync-background-auto-commit-multi-remote` | `dracon-sync/` |
-| `dracon-system` | `DraconDev/dracon-system-di[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBCTTNnTTRjTE04WGdnMExNajF4anRpa0NDSHU3YUVWS0QxbkM0V09CYm5nCnQ2cVdyRVNrNWU2dmZoVkRlK1FoY1ZXM3NTMENkRXFzOGpobk8rbFhnM0kKLT4gWDI1NTE5IDBZY2xxLzZYdTdXQmZoSTdBK3NJK0JTa2RqbXlwTjZsY3RyR3R0UmdVUncKRzVvbG9kOEpkMzloQzBxeG5FcGIvVVdSNTdJZHZ2SG1Xbkpua1dVdGhxYwotPiBYMjU1MTkga3ppK0RNNmJqVEpCYm9Zc1c2UElzdG9IZHNwQzJrb1hQTitFUGQ3MU1VUQpSVEQ0bFNDUytEZUJwVnMrb1dZWGJmYVZnZ0FTVnVGU3NQTVFpZ0kyV2VjCi0+IFgyNTUxOSBxdHMyRWpacmZkbVpWRE8wUlVwNlJ5UUpwbFdFMzVnMEt3aEpGa3dJNXdFClIxWUs2ckgyNVBKbW00YmVXOVVUbkxLR01iNzNuS2tJOHlGTHgzNGZ1SEkKLT4gWDI1NTE5IDlrK2Jpd2FjZDVnTEwzZ2dJN1V6Q0tBMTlxQlpNV0M5aS9pdHZrdUZCeWsKSUprQ1RpOUtIWGh6UEF2eXVIbWVPcmFFSDg5c29CdWowa0gwb2J6dVRqawotPiAqJ2VUJi1ncmVhc2Ugd0JGNW40fiBodngmKyBzfUNvfGsgbgoxZ0V0UENST25OaklmUHlzZURiQXFWU2h1OWl6cnlFR2U0NUNKVkRkK3F1M3IvYkxpSXhZSkpnRGtuUGR0SFk5CnRNQnNFczV2V252bERIaDJLUW84YnZpaFM1SzA4QjZXbG82dDJBYkplQnkrbXcKLS0tIDU5MWNmS3Raa0IvWUNFUFFiVlFKUHRTL0dybDlRZFpUVlc0OTBaVWpLSVEKCMJrwnJRndkR3QFuIKmNbP5Xw70rOkDHx/RCh2NATZ8Y218uTxflfMtn2uWgboknCJTk0Lc4+A==]` | `dracon-system/` |
+| `dracon-system` | `DraconDev/dracon-system-di[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBGaHdNYjYxZUpibSthT08xRHU2RmVNbEtwY3QyODFqKzFCMjVmeVZTWEJJCm1qS3o1cEI1eDVSQ00vblpMc25xS282ekczVUFnTUdUa2xLajNJUlp6RFkKLT4gWDI1NTE5IE92UVBYU1BUa2RFUkZHOW1hOGpIa1EvOXNpZHZrY3Q5SnlwdEJNYmIxbnMKZm8vaU5kMGp5TWl5MWdvRWV3WC9KQ1d6YmVnbDREV0MvRUNVVFF4LzdwUQotPiBYMjU1MTkgd0VTaTBoZHlNR3R5a0dCeUV3Nk1RemFZTEVUWjRYSzVZTkFxcUMyTzloYwprYWh3akIrcFZMcHQ3ME5kKzRlYkh3Mk5kOWxBc3ZybFpWRDBaSjNPd2dnCi0+IFgyNTUxOSBZOEJma2JRTVBteWRpVTZCbTlUdm5ISnlBM1FSY3BqaWZxMGplWGkrUWdnCkp6bWs3L3dFazZNMGRqb2FzQUlDYnR2dWUvNWRkWDV4dmZQdjZFZWhMNzQKLT4gWDI1NTE5IHQvVWQrTXVkaHJmVHl1U011b1F0K0xHYmR4MUZXUGtUWUNPU21QUnV1eWcKNnFiTmI2djJJTWJpYzVQejhkaHZiTGcxZzJ2QVZXWTdsWERvNjc3NW00bwotPiBPRyJtLWdyZWFzZQpEcm9ZY0EKLS0tIElyTzFMNno0b1FqNm1wbng5UUVhcytFUGdMTWd3Z2NveTkwdzcvam5PVWMKLXymqUqfXZQ4FLrWqlXI5qLhA/CmT++jdgL6Uu96EXNXVgfDffC/AUgGqTjiNLmpPpp/gS7JjQ==]` | `dracon-system/` |
 | `dracon-warden` | `DraconDev/dracon-warden-secret-encrypt-age-git-filter` | `dracon-warden/` |
 
 Mirrors exist on:
@@ -137,3 +137,23 @@ The recurring `WARN` rows in `dracon-sync repos` are not solved by hiding rows
 or changing the table labels. They are a signal that tracked files changed and
 the daemon has not yet produced a pushed commit for that snapshot. The façade
 repos are not a workaround for sync state — they are a presentation surface.
+
+## Release history
+
+- **v0.112.5 (2026-06-16)** — Set B names deployed + auto-sync infrastructure
+  added. The 3 façade repos were renamed in place from Set A (man-page-style,
+  e.g. `dracon-sync-watch-debounce-commit-push-mirror`) to Set B
+  (sentence-style, e.g. `dracon-sync-background-auto-commit-multi-remote`).
+  See the [`CHANGELOG`](../../CHANGELOG.md) entry for `0.112.5` and
+  `release-notes-v0.112.5.md` for the full story. The
+  `scripts/regenerate_facade_repos.py` script + a `post-commit` hook
+  automatically regenerate the 3 façade repos when a utility's source
+  files change in this monorepo. The 3 façade repo clones live at
+  `/home/dracon/Dev/facade-repos/`, a path the daemon already watches.
+
+## Cross-references
+
+- [`CHANGELOG.md`](../../CHANGELOG.md) — release notes
+- [`release-notes-v0.112.5.md`](../../release-notes-v0.112.5.md) — full v0.112.5 release notes
+- [`scripts/scaffold_feature_repos.py`](../../scripts/scaffold_feature_repos.py) — generates the façade content
+- [`scripts/regenerate_facade_repos.py`](../../scripts/regenerate_facade_repos.py) — auto-sync glue
