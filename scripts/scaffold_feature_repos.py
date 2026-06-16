@@ -75,7 +75,7 @@ UTILITIES: dict[str, dict[str, str]] = {
     },
     "dracon-system": {
         "short": "dracon-system",
-        "name": "dracon-system-di[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBobENiV2dMZHVjQ2ovMjNaZ3BXWm5QQUNZZ1dkZGZzQWJMSS9vU2tnSHhvCnlVbHJvZ3JhRGc2UWpqK3JKY3Y1dld1eTBWR203eDBNWjc5OGl6RFJmWGMKLT4gWDI1NTE5IGxycnBlK1JUcTQrRkwyUlV5VjNzb0FIakxBOHlGTTJSemhrTnFGekIrMlkKVmhUTkQ5YjE1cHY5YlR5SS9URjJhR08rWHM4WkEyUU0wT0VJcUFJcUludwotPiBYMjU1MTkgeThKZk1ENnhzY2U2aDRZYzNkV29YanB0S09GUGtmcVloc3FnZW1JazFrdwp4SzlMU1kycjFBSGhTUVV0d2MrNkRYL3d6R1ZvTTdmRXpCTHUrSkJLRndNCi0+IFgyNTUxOSA2Rk54WmFTcVd4cGcwQ2V1NEsxQTZBWWZtcUtwMnpZakgxZERyMG9BeVdvClI4QmtpWHJTV2JiTlQvSS9DWHF2VWdHY3hGamZPTVVPNExQTXFhUXBSY2cKLT4gWDI1NTE5IDFBMmxlN2lkc2svSzRvN1hVWFlmOWVnV1lLdVMyTlhSd2V1VXl0U2xrekUKNzByMVBoc2VSb3ZqZENkK1l6UWNnVUtiUGk4MnlseXA3YXhDejJkczNKQQotPiBwIj4tZ3JlYXNlIDZSTGogI3xqM0x7YSAwMj0KdjB3RitUZjduWjdhTE5hWEltWUJ3OWpUQXVkZG5Pb0k4UHB4NGRSL1dpVVpRTUpBT21OT1hOZk1GMWwrdHJPZwphS0N4Q3cKLS0tIFdpanVJMjM0T1F5eUUzN0I5UEFLVW94TU5xMzRyOWpRcVdYVGpud0RFZW8KHUSTlawAWViwonlhIvM+PsRKNc02SWJllhjhn2MK/qZTLGXytyt+RcUTNzly736/xBwhF5jAuQ==]",
+        "name": "dracon-system-di[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBYRERYVnFLRTFuYkx0eVBuUjgzYTdZTklLREx1MnRaZDFZSm4wNkVWalIwClRnaUJ5N3BpUTNkMGRJUytVK3B2eE54R1plR3czSTFvMmEreHlCeDRHaUEKLT4gWDI1NTE5IFA5cXliWDRtOGVqUEVJRHI5WWVhTytCVzZNSnd4RmxMejVwSDJKMEVDMDQKeVRFMkQrazErVnVLRjFlSUl1emtYY01yM2wzcjlYV3dxQzBhZWN6SzNsWQotPiBYMjU1MTkgbU1ocmRINUpuSno3K1FldUs1TmkvN3RabEx0cjc1WWFUTnQ4bUdSSmNtUQpjclZaaHY1Rm1wMmE2RGphU0Q3MkM4ODZqWWppWDc2K0NoMWc2OHd2NllVCi0+IFgyNTUxOSBMbWxIZ1dSMFE2N3VLNGc1NW53V2E2K0ZEK2x5aHB5OWhsWUtqVSthajNRCmU3cW5ld1ZnYUpod3pPcTVscEloZFVSZjRqcXVnajNrcjRGQXRTNUk5Q0EKLT4gWDI1NTE5IDluM1QwSm80amJaR1NWa3doT01RNGhwK1BJaGhaNmlhOVRObldOU3Jwem8KNm1zdkF0ODdEbHJKOUFGUmI1UThOQzFoTkM2QXVLcURkZk4vL1d5UUtmMAotPiBkcExLLWdyZWFzZSBoUUxIMGUKTXl2Uzd3RGhGeUxTOC9jM1JTQVdDOWVVeVk0VnFXNWpqMFlwV2h2SzlRcThjVllCVXpvWHlWZUJZSXlBUWFZSQp4MVZiV0p2NjRGcnVPQXY5ZWlIM3l6WEorVHBpbTl1VHNQOUYvNGU5c1dhRgotLS0gdUZOY254NkdIc29NcnRoeUNLWGpML1RKSndPTGVQWFA3amFSYnJjU29MMAq+DvWU+pu+jgigNYTqGSMdZEJ0PhG4uEiF8ZzZjd2EFRf7jJiFtmhhF9Tp2+c3k0b2K9xPRitQ]",
         "title": "Dracon System",
         "description": (
             "Disk, process, guard, doctor — local machine diagnostics and "
@@ -363,6 +363,181 @@ standalone install target, which is what the operator pushed back on:
 """
 
 
+#: Internal crates that need path-dep rewrites in the standalone Cargo.toml.
+#: Maps the dep name (in the per-utility Cargo.toml) to the path-dep
+#: replacement (relative to the façade repo root).
+INTERNAL_CRATE_PATH_DEPS: dict[str, str] = {
+    "dracon-git": "../dracon-libs/tools/sync/dracon-git",
+    "dracon-system-lib": "../dracon-libs/tools/system/dracon-system",
+    "dracon-security-kit": "../dracon-utilities/dracon-warden/src/security",
+}
+
+#: Workspace crate to package name remapping (for `package = "..."` aliases).
+PACKAGE_REMAP: dict[str, str] = {
+    "dracon-security-kit": "dracon-security",
+}
+
+
+def _parse_workspace_deps(monorepo_root: Path) -> dict[str, str]:
+    """Parse `[workspace.dependencies]` from the monorepo's root Cargo.toml.
+
+    Returns a dict of dep-name -> stringified dep spec (e.g. 'anyhow = "1.0"',
+    'clap = { version = "4.5", features = ["derive"] }'). Used to inline
+    `workspace = true` deps in a standalone Cargo.toml.
+    """
+    cargo_toml = monorepo_root / "Cargo.toml"
+    text = cargo_toml.read_text(encoding="utf-8")
+    # Find the [workspace.dependencies] block
+    start = text.find("[workspace.dependencies]")
+    if start < 0:
+        return {}
+    # Find the end of the block (next [section] or EOF)
+    rest = text[start + len("[workspace.dependencies]"):]
+    end = rest.find("\n[")
+    if end < 0:
+        block = rest
+    else:
+        block = rest[:end]
+    # Parse each line: `name = "version"` or `name = { version = "X", features = [...] }`
+    deps: dict[str, str] = {}
+    for line in block.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if "=" not in line:
+            continue
+        name, _, value = line.partition("=")
+        name = name.strip()
+        value = value.strip()
+        if name:
+            deps[name] = value
+    return deps
+
+
+def _standalone_cargo_toml(
+    spec: RepoSpec, monorepo_root: Path
+) -> str:
+    """Generate a standalone Cargo.toml for the façade repo.
+
+    Starts from the per-utility Cargo.toml in the monorepo, then:
+    1. Inlines `workspace = true` deps using the monorepo's
+       `[workspace.dependencies]` block.
+    2. Rewrites internal crates (`dracon-git`, `dracon-system-lib`,
+       `dracon-security-kit`) to use `path = "..."` deps.
+    3. Strips the per-utility `[package]` `repository` / `homepage` /
+       `documentation` fields that point to the monorepo (replaces them
+       with this façade repo's URLs).
+    """
+    src_path = monorepo_root / spec.subdir / "Cargo.toml"
+    text = src_path.read_text(encoding="utf-8")
+    workspace_deps = _parse_workspace_deps(monorepo_root)
+
+    # In a tolerant way, parse the [package] + [dependencies] + [dev-dependencies]
+    # sections. We do a targeted text-rewrite to keep formatting deterministic.
+    lines = text.splitlines()
+    out: list[str] = []
+    in_workspace_dep = False
+    for line in lines:
+        stripped = line.strip()
+        # Detect a `name = { workspace = true }` line and rewrite it.
+        if "workspace = true" in line and "=" in line and not stripped.startswith("#"):
+            name_part, _, value_part = line.partition("=")
+            name = name_part.strip()
+            # Internal crate → path dep
+            if name in INTERNAL_CRATE_PATH_DEPS:
+                path = INTERNAL_CRATE_PATH_DEPS[name]
+                pkg = PACKAGE_REMAP.get(name)
+                if pkg:
+                    rewrite = f'{name} = {{ package = "{pkg}", path = "{path}" }}'
+                else:
+                    rewrite = f'{name} = {{ path = "{path}" }}'
+                # Preserve leading whitespace
+                indent = line[: len(line) - len(line.lstrip())]
+                out.append(indent + rewrite)
+                in_workspace_dep = True
+                continue
+            # Regular dep → inline version from [workspace.dependencies]
+            if name in workspace_deps:
+                indent = line[: len(line) - len(line.lstrip())]
+                out.append(f"{indent}{name} = {workspace_deps[name]}")
+                in_workspace_dep = True
+                continue
+            in_workspace_dep = True
+            # Unknown workspace dep — keep as-is (will likely fail at build
+            # time, which is the right behavior: it forces a fix)
+            out.append(line)
+            continue
+        # Rewrite repository / homepage / documentation in [package] to
+        # point at the façade repo.
+        if (
+            stripped.startswith("repository =")
+            or stripped.startswith("homepage =")
+        ):
+            indent = line[: len(line) - len(line.lstrip())]
+            if "github.com/DraconDev/dracon-utilities" in line:
+                out.append(
+                    f'{indent}repository = "https://github.com/DraconDev/{spec.name}"'
+                )
+                continue
+            if "github.com/DraconDev/dracon-utilities" in line:
+                out.append(
+                    f'{indent}homepage = "https://github.com/DraconDev/{spec.name}"'
+                )
+                continue
+        out.append(line)
+
+    out.append("")
+    out.append("# Auto-generated by scripts/scaffold_feature_repos.py")
+    out.append(f"# from {spec.subdir}/Cargo.toml in dracon-utilities monorepo.")
+    out.append(
+        f"# Source: https://github.com/DraconDev/dracon-utilities/blob/main/{spec.subdir}/Cargo.toml"
+    )
+    return "\n".join(out) + "\n"
+
+
+#: Files / directories in the per-utility subdir to NOT mirror (build
+#: artifacts, generated files, repo-specific config).
+EXCLUDE_FROM_MIRROR = {
+    "target",
+    "Cargo.lock",
+    ".git",
+    "proptest-regressions",
+    "node_modules",
+}
+
+
+def _copy_utility_source(root: Path, spec: RepoSpec, monorepo_root: Path) -> int:
+    """Copy the per-utility source code from the monorepo to the façade repo.
+
+    Returns the number of files copied. Excludes build artifacts and
+    generated files.
+    """
+    src_dir = monorepo_root / spec.subdir
+    if not src_dir.is_dir():
+        return 0
+    count = 0
+    for src in src_dir.rglob("*"):
+        if not src.is_file():
+            continue
+        rel = src.relative_to(src_dir)
+        # Skip excluded paths
+        parts = rel.parts
+        if any(p in EXCLUDE_FROM_MIRROR for p in parts):
+            continue
+        dst = root / rel
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        # Special-case Cargo.toml: rewrite to standalone
+        if src.name == "Cargo.toml" and rel == Path("Cargo.toml"):
+            dst.write_text(
+                _standalone_cargo_toml(spec, monorepo_root), encoding="utf-8"
+            )
+            count += 1
+            continue
+        shutil.copy2(src, dst)
+        count += 1
+    return count
+
+
 def write_tree(root: Path, spec: RepoSpec, monorepo_root: Path) -> None:
     root.mkdir(parents=True, exist_ok=True)
     (root / "README.md").write_text(repo_readme(spec), encoding="utf-8")
@@ -377,6 +552,10 @@ def write_tree(root: Path, spec: RepoSpec, monorepo_root: Path) -> None:
     (root / ".github" / "CODEOWNERS").write_text(codeowners(), encoding="utf-8")
     (root / "docs").mkdir(parents=True, exist_ok=True)
     (root / "docs" / "SOURCE_OF_TRUTH.md").write_text(source_of_truth(), encoding="utf-8")
+    # v0.112.7+: copy the per-utility source code so the façade repo is
+    # independently buildable, not a navigation shell.
+    n = _copy_utility_source(root, spec, monorepo_root)
+    print(f"  [scaffold] copied {n} source files from monorepo/{spec.subdir}")
 
 
 def collect_paths(root: Path) -> list[Path]:
@@ -505,7 +684,7 @@ def self_test(monorepo_root: Path) -> None:
                 if not path.exists():
                     raise AssertionError(f"missing generated file: {path}")
             readme = (target / spec.name / "README.md").read_text(encoding="utf-8")
-            if "does **not**\nduplicate" not in readme:
+            if "mirrored from the\n[`DraconDev/dracon-utilities`]" not in readme:
                 raise AssertionError(
                     f"source-of-truth disclaimer missing for {spec.name}"
                 )
