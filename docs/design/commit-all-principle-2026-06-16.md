@@ -920,3 +920,112 @@ edits fast enough).
 
 A permanent fix requires one of the
 4 options above.
+
+---
+
+## Followup #4: Lower `inactivity_push_delay_secs` from 5 to 3 (goal `114541e6`, 2026-06-16)
+
+> **Operator said**: "should we change the
+> defautl delay to 3 seconds ? cause this
+> way esp with ais around more unrelated
+> changes mgiht get chained up"
+
+### Change applied
+
+Config field
+`inactivity_push_delay_secs` lowered
+from 5 to 3 in
+`~/.dracon/utilities/sync/dracon-sync.toml`.
+
+The 5-line comment above the field was
+expanded to document the change and
+its rationale.
+
+### Why this is safe
+
+The daemon's commit debounce has TWO
+checks in `daemon.rs`:
+
+1. **`inactivity_delay`** (configurable):
+   the daemon commits if the last
+   fingerprint change was ≥ this many
+   seconds ago. The fingerprint updates
+   on every `git status` cycle that
+   detects a change.
+2. **`MAX_DIRTY_DELAY = 5s`** (hardcoded
+   backstop): the daemon commits if the
+   repo has been dirty continuously
+   for ≥ 5s, REGARDLESS of fingerprint
+   changes.
+
+These two checks work together. With
+`inactivity_push_delay_secs = 3`:
+
+- **Operator pauses for 3s**: daemon
+  commits (was 5s before)
+- **Operator edits continuously**:
+  fingerprint keeps changing, but
+  `MAX_DIRTY_DELAY=5s` fires at 5s
+  (same as before)
+- **Net effect**: 2s faster commit
+  when operator pauses; same as
+  before when continuously editing
+
+### Reasoning (operator's words)
+
+"With AI agents around, more unrelated
+changes might get chained up."
+
+AI agents edit the same repo
+asynchronously. With a 5s debounce,
+an agent's edit and a human's edit
+within 5s of each other get bundled
+into one commit. With 3s, they're
+more likely to be separate commits
+with better provenance.
+
+### Verification (5 min observation)
+
+After the change (SIGHUP reloaded
+the daemon at 17:22):
+
+- **8 commits in 10 min** for
+  dracon-platform (0.8/min) — but
+  most of the gap was the PUSH_STUCK
+  issue from Followup #3, not the
+  debounce
+- **First 6 commits (17:23-17:26) had
+  intervals of 29s, 24s, 28s, 28s, 67s
+  = avg 35s** — within the same range
+  as before (34.9s avg)
+- **File counts per commit**: 1, 3, 8,
+  4, 3, 1, 4, 3 — appropriately granular
+- **Build**: `cargo build --release
+  --locked` succeeds
+- **Daemon state**: `🟢 healthy` for
+  all 13 repos (PUSH_STUCK on
+  dracon-platform from Followup #3
+  is still WARN, separate issue)
+- **MAX_DIRTY_DELAY backstop verified**:
+  code path unchanged, hardcoded 5s
+  still applies
+
+### What we did NOT change
+
+- `MAX_DIRTY_DELAY` (hardcoded 5s in
+  `daemon.rs`) — the force-commit
+  backstop
+- `pulse_interval_secs` (1s) — the
+  scan cycle
+- `settling_max_delay_secs` (60s) —
+  the max settling window
+- Any per-repo overrides
+- Any user-owned repos
+- Code defaults (still 5s in
+  `default_inactivity_push_delay_secs`)
+  — only the operator's config is
+  changed
+- Any test (the `test_default_
+  inactivity_push_delay_secs` test
+  still passes because the code
+  default is still 5)
