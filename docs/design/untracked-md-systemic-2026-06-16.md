@@ -407,3 +407,37 @@ report-integration and daemon-loop-integration
 are nice-to-haves that can be added without
 risk of breaking the existing commit-all
 policy.
+
+## Reverted in goal `6205ad1f` (2026-06-16)
+
+The implementation described in this design doc
+(noteworthy_untracked(), the 6 unit tests, the
+check-untracked-md CLI subcommand, and the
+Command::CheckUntrackedMd enum variant) was
+**reverted** in goal `6205ad1f`.
+
+**Why**: Operator feedback after the implementation
+shipped:
+
+> "this seems like a hack git sync should not
+> handle it i think warden already down so that
+> is not good, git sync just has to make sure
+> that nothing left out unless we have a very
+> good reason to leave it out"
+
+The `check-untracked-md` subcommand is the wrong
+layer for this concern. Defensive guards against
+untracked content belong in **warden** (which has
+git hooks + the `DRACON_SECRET:` encryption flow),
+not in git-sync (a sync daemon). The proper
+treatment is for warden to auto-stage untracked
+.md/.txt files in its pre-commit hook so they
+never sit untracked in the first place.
+
+This design doc is preserved as the **systemic
+investigation** of the untracked .md issue (the
+scan across 14 repos, the CWD-drift root cause
+analysis from goal `c19d21b8`, the classification
+of findings). It is the design context for
+warden's eventual role. The actual code from
+`e680cfa9` is removed.
