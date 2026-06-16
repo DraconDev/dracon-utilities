@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Fixed
 - **dracon-code PUSH_STUCK (44 consecutive failures, 3h+) — resolved (goal `fc406135` / 2026-06-16)**: The operator saw `dracon-code` in PUSH_STUCK in the daemon's `repos` output. Investigation found a true divergence: local was 10 commits ahead of gitlab/codeberg, but gitlab/codeberg had 1 commit (`74c183107d`, the TUI brainstorm doc) not in local. The daemon's `force_push_when_behind = true` config (from goal `87c1bf4d`) only handles the "remote behind local" case, not true divergence. Resolution: chose **Option A** (merge remote into local, then push to all 4 remotes). 3 conflicts resolved by taking HEAD (local has more recent TUI work). All 4 remotes now aligned at `e53c4bd79`. PUSH_STUCK state cleared. No data loss. New design doc `docs/design/dracon-code-divergence-2026-06-16.md` captures the root cause, the resolution strategy, and a runbook for future PUSH_STUCK events. Option C (`pull_when_remote_ahead = true` daemon config) is deferred to a future daemon release.
+### Changed
+- **Global `untracked_exclude_patterns = []` (2026-06-17)**: the operator's position is "global rule, default = commit everything, unless something would be very wrong to put on the repo". The previous list (11 patterns: `**/scratch/**`, `**/tmp/**`, `**/pi-tmp/**`, `**/.pi-tmp/**`, `**/research/scratch/**`, `.demon/**`, `.sisyphus/**`, `.ralph/**`, plus the per-prefix variants) conflated "short-lived" with "very wrong to commit". They are not the same thing. Short-lived files are valid git content: the user/agent can `rm` them from the working tree when they're done, and the daemon will commit the deletion. If the user wants to recover, the file is in git history. Things that ARE very wrong to commit (secrets, files > 100 MiB, build artifacts) are handled elsewhere (warden encryption, `max_stage_file_bytes`, `.gitignore`). `AGENTS.md` updated with the new policy + operator's verbatim framing. Design doc: `docs/design/pi-tmp-persist-policy-2026-06-16.md`.
+
+
+## [0.112.10] - 2026-06-17
 
 
 ## [0.112.9] - 2026-06-16
