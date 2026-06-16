@@ -557,16 +557,8 @@ pub(crate) fn matches_untracked_exclude(
                 return true;
             }
         }
-        // Path-glob patterns (e.g. `**/scratch/**`, `.demon/**`,
-        // `reports/kdp-live-*.md`, `**/test-results/*.png`).
-        // Two sub-styles:
-        //   (a) `**/...` or `.../**`  — use the existing
-        //       starts-with/contains substring logic.
-        //   (b) `dir/<glob>` or `dir/<glob>/*`  — match against
-        //       the rel path using simple glob rules: the
-        //       pattern's directory prefix must match a
-        //       directory in rel, and the basename segment is
-        //       matched with `matches_file_pattern`.
+        // Path-glob patterns (e.g. `**/scratch/**`, `.demon/**`).
+        // Use the existing starts-with/contains substring logic.
         if pattern.starts_with("**/") || pattern.contains("/**") {
             if rel == pattern.trim_start_matches("**/").trim_end_matches("/**")
                 || rel.starts_with(pattern.trim_end_matches("/**"))
@@ -579,45 +571,6 @@ pub(crate) fn matches_untracked_exclude(
                 let tail = tail.trim_end_matches("/**");
                 if rel.split('/').any(|seg| matches_file_pattern(seg, tail)) {
                     return true;
-                }
-            }
-        }
-        // Path-with-glob patterns (e.g. `reports/kdp-live-*.md`,
-        // `web/test-results/*.png`, `src/**/*.tmp`). These are
-        // patterns with a directory prefix that is NOT `**/`, and
-        // a basename or sub-path glob segment. We match the
-        // directory prefix literally against the rel path's
-        // directory segments, then match the basename with
-        // `matches_file_pattern` (or, for `**` in the basename
-        // portion, recursively).
-        if !pattern.starts_with("**/") && !pattern.contains("/**") {
-            // Pattern looks like `dir[/dir]*/...` — split into
-            // directory prefix and basename glob.
-            if let Some(last_slash) = pattern.rfind('/') {
-                let dir_prefix = &pattern[..last_slash];
-                let basename_glob = &pattern[last_slash + 1..];
-                // Check the rel path's directory segments start
-                // with the dir_prefix.
-                let rel_dirs: Vec<&str> = rel
-                    .rsplit_once('/')
-                    .map(|(d, _)| d)
-                    .unwrap_or("")
-                    .split('/')
-                    .collect();
-                let pattern_dirs: Vec<&str> = dir_prefix.split('/').collect();
-                if rel_dirs.len() >= pattern_dirs.len() {
-                    let prefix_match = rel_dirs
-                        .iter()
-                        .take(pattern_dirs.len())
-                        .zip(pattern_dirs.iter())
-                        .all(|(rd, pd)| matches_file_pattern(rd, pd));
-                    if prefix_match {
-                        // Match the basename of rel against the
-                        // basename_glob.
-                        if matches_file_pattern(file_name, basename_glob) {
-                            return true;
-                        }
-                    }
                 }
             }
         }
