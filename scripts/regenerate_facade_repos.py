@@ -5,7 +5,7 @@ This is the auto-sync glue between `DraconDev/dracon-utilities` (the monorepo,
 source of truth) and the 3 façade repos:
 
   - dracon-dev/dracon-sync-background-auto-commit-multi-remote
-  - dracon-dev/dracon-system-di[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSByRXBPTHRhbjBxeHVkdXNlYjhWN3Nlbm1uQ1IwNndDcDFZQXJkb0lJSUFFCmdkemM2RU51V1l4MjkyR2prNnJtSnI0emFXcFlobDJKVUdGeWt4RENpZFkKLT4gWDI1NTE5IHo1cmpOSjk2eDVtcGRIb1IrNXJReHVFY3ZSWlhqdm5LbXpnRWFlQU5NUkUKSGVncnlWM2RGbm1vczQ5SkpDWE5JcXJLR1luQnlOaTNQWi9OVEx6Z0pYZwotPiBYMjU1MTkgandWMVU1c0U2WkNyNWN4WXpTOXVnMDBsZjlVY1d3UU5WcC91WmFRczVCSQoyYmZQb3k1bklZTWFyeVpmcGpHZ3Y4YUpPcWZPRTNCZUpBbUR3SzhDanlZCi0+IFgyNTUxOSB4OTZiNTRObStVY3VKMHB5SkI5dmdXVUpqN2NjZlB6VHJHbm1vbWdDaEJrCnY5Ykg3aXkzMEZnWE5YdnIvS2d3NFBya3VQVEtHZi9uQXRFeXJnTVptWkUKLT4gWDI1NTE5IHdpdFN5QUdGeHl1emRMVjdPREhIaHdNVW14WGQ4SjlPdE4yU2RQRWNkU2sKN0ZnTThhMnpMelBUaExOVzJMK3JXUnFOdGdzUTZHS2hwQWFudTlrQWI4MAotPiB0aistZ3JlYXNlIEMgN19eUFQgKj8KNEZTbkN0bXlzZwotLS0gaDRHTWtaN05DbGdHN2krbTRCMGZEdmZZQnhxVzJUd1YzMDRGbVYxQzF2MArGgsaqR4TznOIwJzJdcZ7IO88kk4KHyZg4/K58ZQgMkCYE+EePs4xfAttR4vr6ajwZGP4HWgXB]
+  - dracon-dev/dracon-system-di[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA1VFRZeXVQNVpzR2lTVndtSXVpMmkvRmRSeVNkK0o0MGZBNnh6VURNY2xjCkg2cUhCdllPS01EWTRxQitaazgvaDBuNkFhUHJWU0x6V2hXczFERWZiVzAKLT4gWDI1NTE5IHQxOTQybnd4dEh6Um9WMC9wN09oNk1NRFhBTHJvYXJkZ29qYzNhK0kzbTAKeEFxK09LaEpsSUpNUEptaDlUakRZNmt4S1ZaNEx1RnBEWG0wbU8zbVo4UQotPiBYMjU1MTkgVmZneGFPM3RjVHU2dFJveXdQQVdTd0hIanBYWTgwWmhWTkJQUWlFZEhpVQoxejBHZlZET0tRTTFKOEhTL09FeUpuUmdicHlzMURDZzJYRVhzWER4Z3B3Ci0+IFgyNTUxOSA0TWl0ajEyZ0hPY0NwM21lYkt5ejdDbUh1VE1JcFNTMkE1ZytDcjI4SHlRCjZ5dXZoaGdoTG9kb3prVHBIZ05hNVZxVWh6TzdRbDhJOHU1ejF5Z2pNUFkKLT4gWDI1NTE5IGsrNjVOVnorWGV4MTZTNXRyYnNyUE5JM25JZzNwZ3U4U2ZnWGhCMWhSU1UKOFl3SDcwRzQ5dGxLSnNyYXE3aDBtb3d2QU9lazdndmxKTlh4Skk5NTgvOAotPiA2MX1DLWdyZWFzZQpRcHJDSlYrN3hQNXJ4eGNaY0Z5d2w5aHBUcjMzWmhMQitnc1QKLS0tIHArQjNMN0h6d1VMUE1EUTRab255RG9DUm5XQTFkRUpZOFdjM1lXd3BJb3MKxRmZp4H5CT07jlB82QO1plSA7cBuOOYAZ4Vb90FViVPwvrCu5dRmInV4Kfw7bEQdISnSBxPpvg==]
   - dracon-dev/dracon-warden-secret-encrypt-age-git-filter
 
 Each façade repo lives at `<target_root>/<name>` and is watched by
@@ -90,16 +90,19 @@ def _regenerate_one(
     utility: str,
 ) -> bool:
     """Regenerate one façade repo. Returns True if a change was committed."""
-    # Resolve the canonical long name from the scaffold script's UTILITIES
-    import importlib.util
-    spec_path = monorepo_root / "scripts" / "scaffold_feature_repos.py"
-    spec = importlib.util.spec_from_file_location("scaffold_feature_repos", spec_path)
-    if spec is None or spec.loader is None:
-        print(f"  [{utility}] cannot import scaffold_feature_repos.py", file=sys.stderr)
-        return False
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    long_name = mod.UTILITIES[utility]["name"]
+    # Resolve the canonical long name by exec'ing the scaffold script in a
+    # sandboxed namespace (avoids dataclass module-registration issues with
+    # importlib).
+    ns: dict = {"__name__": "__scaffold__", "__file__": str(monorepo_root / "scripts" / "scaffold_feature_repos.py")}
+    exec(
+        compile(
+            (monorepo_root / "scripts" / "scaffold_feature_repos.py").read_text(encoding="utf-8"),
+            str(monorepo_root / "scripts" / "scaffold_feature_repos.py"),
+            "exec",
+        ),
+        ns,
+    )
+    long_name = ns["UTILITIES"][utility]["name"]
     facade_dir = target_root / long_name
     scaffold = monorepo_root / "scripts" / "scaffold_feature_repos.py"
 
@@ -249,19 +252,20 @@ def main(argv: list[str]) -> int:
         )
 
     if args.dry_run:
-        # Resolve the long names for the dry-run output
-        import importlib.util
-        spec_path = monorepo_root / "scripts" / "scaffold_feature_repos.py"
-        spec = importlib.util.spec_from_file_location("scaffold_feature_repos", spec_path)
-        if spec is not None and spec.loader is not None:
-            mod = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(mod)
-            for u in affected:
-                long_name = mod.UTILITIES[u]["name"]
-                print(f"  [dry-run] would regenerate {u} → {target_root / long_name}")
-        else:
-            for u in affected:
-                print(f"  [dry-run] would regenerate {u} → {target_root / u}")
+        # Resolve the long names for the dry-run output by exec'ing the
+        # scaffold script in a sandboxed namespace.
+        ns: dict = {"__name__": "__dry_run__", "__file__": str(monorepo_root / "scripts" / "scaffold_feature_repos.py")}
+        exec(
+            compile(
+                (monorepo_root / "scripts" / "scaffold_feature_repos.py").read_text(encoding="utf-8"),
+                str(monorepo_root / "scripts" / "scaffold_feature_repos.py"),
+                "exec",
+            ),
+            ns,
+        )
+        for u in affected:
+            long_name = ns["UTILITIES"][u]["name"]
+            print(f"  [dry-run] would regenerate {u} → {target_root / long_name}")
         return 0
 
     success = True
