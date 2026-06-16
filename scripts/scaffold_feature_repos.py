@@ -2,10 +2,13 @@
 """Scaffold feature-façade repositories for Dracon utilities.
 
 The Dracon utilities source of truth remains the `dracon-utilities` monorepo.
-These façade repos are intentionally small presentation surfaces (GitHub,
-GitLab, Codeberg) for `dracon-sync`, `dracon-system`, and `dracon-warden`. They
-avoid duplicating implementation code and instead point users to the canonical
-monorepo paths.
+Each façade repo is a **canonical "main"** for its utility: it contains the
+actual source code, `Cargo.toml`, tests, examples, and the per-utility README
+mirrored from the monorepo. It is **independently buildable** with a sibling
+`dracon-libs` repo (and, for `dracon-warden`, a sibling `dracon-utilities`
+repo for the security kit). The auto-sync mechanism
+(`scripts/regenerate_facade_repos.py` + monorepo `post-commit` hook) keeps
+the per-utility content in sync with the monorepo's per-utility subdirs.
 
 Brutally-descriptive names are used so the project is self-explanatory on
 Codeberg/Forgejo where descriptive names surface well in search and discovery.
@@ -72,7 +75,7 @@ UTILITIES: dict[str, dict[str, str]] = {
     },
     "dracon-system": {
         "short": "dracon-system",
-        "name": "dracon-system-di[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBJREJWTjk2N0VLZUs2WlVxcXA2aEQ5cWloaUtQbnZmZGRnd3FXNEhodGhBCitHRVVxTGJ4YkQ0UnVlQkhPTkdSUndvb1BDckZCQURUeTlKSWZmZ3VVa28KLT4gWDI1NTE5IHFBMGRHaGhnOCs2VE5zQVgyZUxKWEl1VlZXNnJ2cEoyTUUzZ2dySzI5ejAKRzhYVnZVL25JeGhSb0ovN1pZRllZVXp4RncrajlzL1FKUjJoc1loL0dSOAotPiBYMjU1MTkgenlINUpNc3JlSXFQMmp1WXg4RFdrdHRiNitRVnlVRmtuNG9EVmdROHAzSQpaY2tPcnROdDFsaGh3emg0N251R0FEVm5WSE1XbDVNeE9GWVZLdlp4N2FnCi0+IFgyNTUxOSBYLzh6cjBTaHE5UmRXa0Z3aGcyUHZTb3lqYkhmNkQ3Q1NDZE5vSXFvdFRnClp1WlJMZmhqaU9pZVB0SVJoTXlySmhVQ0YwU3l4QUtqOG9SNHJrZnNYUjgKLT4gWDI1NTE5IEsydDVjQmF6NEwxcVRQWW5Bb3BMRzJWYUEzSmN6ajBqWHQvYzNTU0x2aEEKdU5Ta0paL1JrNytVZmFkT3BleTlac0JBWlR0VEhWdFc2MDJNU2ZFZWFnQQotPiB7V19mIi1ncmVhc2UgYGdpY1pwSCBHagpEYTdxNHFreUdlYlhKZHZpR0RCeWYwU3pZZE9CCi0tLSBaUm5jWU9kZ1NpUnI2cFpSNThNZmhwZjZWaFh2ZFVGMjNKZmd2N3phcGljCjAsV99lwF5EMj8om8gNvwKV9E4eXUmVhdtZjVXZqEa/JvCkYwwbtVrUx8TA0mJSf/I69dkdqL4=]",
+        "name": "dracon-system-di[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBLbFg1UjY3cVJBeHZiTWpnVGhWSEZjcm1nV3pxRnBHWnpLL0VDKytjRzNZCmtoQ2hsTjFIbHlPejRqMnM5OHkvanBjbDh6Z0pMbnVnemY1VzBKMjFSM1EKLT4gWDI1NTE5IFhKT255cGdLc3BFSWxzeE9FTkZLTkJ6K3g1bEJPM3RkMG05QXFmRVg3QjQKMUk0U3ZWQlZ1TURGRzl6elRiOHBZdklDd2IwVTBkdHhVd0YxTHNOREgwRQotPiBYMjU1MTkgVzBYcUpIaEpURDIxQmpSNHRTWTBDbHRwWmcrS3FFdVY3UnBoRWVvWjNtYwpuOHQ1M1NoZHhqUTcvTUY0Sk56Y21tWVBxQlBoYnZtVUFLVlV5dG56UjJVCi0+IFgyNTUxOSB0cExUY1JLQlcvemk4QkZXMTR6Z2lqcEZoWFYzM1oxd0VqSjhMdUJMYzJFCnlUL1FuUHpuMHNEbytzVjY1NUJjS3l1U1dwQzF2MUl5QVlpNEU0a1RuN0kKLT4gWDI1NTE5IG1RUG5wYVpGeTEwZkhwUG0walN4MU1YRDBFYXAvSHhGSlBvNWk3MDNId2sKYkF6ODRWWktqUy9jSWpIcFptZDF6ajNLeXdmRlFLU1c4SDZwV3A1dWxWNAotPiBXaEUyRzdKLWdyZWFzZSAwNgpjWHVmU1I3N2NlcTZiQ2VvME43UnJXRWdsWVBFTm5HNEJWakdIZXZpd3h2QjEwTkJ4Y2ZJY0ZseHhnNWRjUzM1ClNjTjVkVml2K05xckI0Z2FublB0dVU5NHYyRWFyMDhNNDNubm1XcStBNElhUGhBVTZZVC9wSit4S054WmFRWWoKQWcKLS0tIEJraFRLcjNqamg4TlhvZDFRVjVDaVdjcHFncGJZdXpESGZDWVpxdE1hQlUKJjoZRcZDfYDvqv3ffY11VQbrHuy11+6LPGKd7zCfLJ48aq8dEt4XGRVOcnQSfj1O2Rf91VuElw==]",
         "title": "Dracon System",
         "description": (
             "Disk, process, guard, doctor — local machine diagnostics and "
