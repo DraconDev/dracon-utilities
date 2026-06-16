@@ -75,7 +75,7 @@ UTILITIES: dict[str, dict[str, str]] = {
     },
     "dracon-system": {
         "short": "dracon-system",
-        "name": "dracon-system-di[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBYRERYVnFLRTFuYkx0eVBuUjgzYTdZTklLREx1MnRaZDFZSm4wNkVWalIwClRnaUJ5N3BpUTNkMGRJUytVK3B2eE54R1plR3czSTFvMmEreHlCeDRHaUEKLT4gWDI1NTE5IFA5cXliWDRtOGVqUEVJRHI5WWVhTytCVzZNSnd4RmxMejVwSDJKMEVDMDQKeVRFMkQrazErVnVLRjFlSUl1emtYY01yM2wzcjlYV3dxQzBhZWN6SzNsWQotPiBYMjU1MTkgbU1ocmRINUpuSno3K1FldUs1TmkvN3RabEx0cjc1WWFUTnQ4bUdSSmNtUQpjclZaaHY1Rm1wMmE2RGphU0Q3MkM4ODZqWWppWDc2K0NoMWc2OHd2NllVCi0+IFgyNTUxOSBMbWxIZ1dSMFE2N3VLNGc1NW53V2E2K0ZEK2x5aHB5OWhsWUtqVSthajNRCmU3cW5ld1ZnYUpod3pPcTVscEloZFVSZjRqcXVnajNrcjRGQXRTNUk5Q0EKLT4gWDI1NTE5IDluM1QwSm80amJaR1NWa3doT01RNGhwK1BJaGhaNmlhOVRObldOU3Jwem8KNm1zdkF0ODdEbHJKOUFGUmI1UThOQzFoTkM2QXVLcURkZk4vL1d5UUtmMAotPiBkcExLLWdyZWFzZSBoUUxIMGUKTXl2Uzd3RGhGeUxTOC9jM1JTQVdDOWVVeVk0VnFXNWpqMFlwV2h2SzlRcThjVllCVXpvWHlWZUJZSXlBUWFZSQp4MVZiV0p2NjRGcnVPQXY5ZWlIM3l6WEorVHBpbTl1VHNQOUYvNGU5c1dhRgotLS0gdUZOY254NkdIc29NcnRoeUNLWGpML1RKSndPTGVQWFA3amFSYnJjU29MMAq+DvWU+pu+jgigNYTqGSMdZEJ0PhG4uEiF8ZzZjd2EFRf7jJiFtmhhF9Tp2+c3k0b2K9xPRitQ]",
+        "name": "dracon-system-di[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAxY2hRSDNDYnVSMlpkTFppWDhpRkV1M0FzYjFQTWduTXNwdkM1azV0RzBnCmN1Zkx3MzNkbTIvR216U21Tc3pDS3JHNEtUZ1pybXkwWlM5L0pVeElzMTQKLT4gWDI1NTE5IFJWSkxucHBJWklla1hrNUczTGFXMTlwUHp4R21KUHZQYm84WnRiSXRKMncKejJFTkdkN2ZiQlNvUWZCSzV2VlNFU09IRkJyTGpVQmFVenJUVnVDYUxqdwotPiBYMjU1MTkgeHdWSyt4ZUU4MGhPSk1nWE9NWEMxK1V5Vnh4UXJxNFdSZVFtbFo0aWJ4TQpCeHVCN09Tc2ZmRHYrazEvdVY1UFBEek1uL1M0TjBsMDhUeGFvR1BUTXlBCi0+IFgyNTUxOSB5WUhBVkJXdGtVZUdEMnJRVFBSN0NTU0kvNnY0WGwzQjlvclBTNEN0VjBFCmNlSFVmM0RtUldaK2Y0ODZGZmRDUXBHUnkxRFJ6M0ZVQWtrUGFlVmFNU1UKLT4gWDI1NTE5IFlMK2daRlRYUzZHL1R6SWJxMUJ6bGNTY1c0cFZiRjFIbTNTckpjSkFQenMKbGlaVFBEakRVYzdWVXIycEdtQWorcVRKNzFDWXZXV25QOU1mQVJqZGl5dwotPiA9OCpFLWdyZWFzZSAnb00kIFs+YF1NbwplWG1Na0Vjb01yMU8rOE1hVzljLwotLS0gaHRjbjhTZk9pMXlUUFU3NlBXTS82d0U4RTZ0MXJvUW51Y25LMjFzZEkzMAoUfhRcScqnOYSfVZx7Hy7tOd4UwSlKW9u9EOMHfwShxKfbLXZr7nAeLgyhkjxE5Lsuvc271IZc]",
         "title": "Dracon System",
         "description": (
             "Disk, process, guard, doctor — local machine diagnostics and "
@@ -469,21 +469,18 @@ def _standalone_cargo_toml(
             continue
         # Rewrite repository / homepage / documentation in [package] to
         # point at the façade repo.
-        if (
-            stripped.startswith("repository =")
-            or stripped.startswith("homepage =")
-        ):
+        if stripped.startswith("repository =") and "github.com/DraconDev/dracon-utilities" in line:
             indent = line[: len(line) - len(line.lstrip())]
-            if "github.com/DraconDev/dracon-utilities" in line:
-                out.append(
-                    f'{indent}repository = "https://github.com/DraconDev/{spec.name}"'
-                )
-                continue
-            if "github.com/DraconDev/dracon-utilities" in line:
-                out.append(
-                    f'{indent}homepage = "https://github.com/DraconDev/{spec.name}"'
-                )
-                continue
+            out.append(
+                f'{indent}repository = "https://github.com/DraconDev/{spec.name}"'
+            )
+            continue
+        if stripped.startswith("homepage =") and "github.com/DraconDev/dracon-utilities" in line:
+            indent = line[: len(line) - len(line.lstrip())]
+            out.append(
+                f'{indent}homepage = "https://github.com/DraconDev/{spec.name}"'
+            )
+            continue
         out.append(line)
 
     out.append("")
@@ -496,13 +493,16 @@ def _standalone_cargo_toml(
 
 
 #: Files / directories in the per-utility subdir to NOT mirror (build
-#: artifacts, generated files, repo-specific config).
+#: artifacts, generated files, repo-specific config, or files that would
+#: overwrite the façade's own generated content).
 EXCLUDE_FROM_MIRROR = {
     "target",
     "Cargo.lock",
     ".git",
     "proptest-regressions",
     "node_modules",
+    # The per-utility README is renamed below; the façade's main README is
+    # the generated `repo_readme()` which documents the sibling layout.
 }
 
 
@@ -510,7 +510,9 @@ def _copy_utility_source(root: Path, spec: RepoSpec, monorepo_root: Path) -> int
     """Copy the per-utility source code from the monorepo to the façade repo.
 
     Returns the number of files copied. Excludes build artifacts and
-    generated files.
+    generated files. The per-utility README is renamed to
+    `monorepo-README.md` so it does not overwrite the façade's own
+    navigation README.
     """
     src_dir = monorepo_root / spec.subdir
     if not src_dir.is_dir():
@@ -524,7 +526,12 @@ def _copy_utility_source(root: Path, spec: RepoSpec, monorepo_root: Path) -> int
         parts = rel.parts
         if any(p in EXCLUDE_FROM_MIRROR for p in parts):
             continue
-        dst = root / rel
+        # Special-case the per-utility README: rename so it does not
+        # overwrite the façade's main README (the navigation README).
+        if rel == Path("README.md"):
+            dst = root / "monorepo-README.md"
+        else:
+            dst = root / rel
         dst.parent.mkdir(parents=True, exist_ok=True)
         # Special-case Cargo.toml: rewrite to standalone
         if src.name == "Cargo.toml" and rel == Path("Cargo.toml"):
