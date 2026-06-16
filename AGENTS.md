@@ -60,6 +60,72 @@ This prevents the 2989-commit auto-commit loop that
 crashed the daemon originally. The override mechanism
 still works under the new global default.
 
+> **REMOVED 2026-06-15 (goal `76ddaa7e`)**:
+> The `auto_commit_exclude_patterns` for
+> `**/test-results/**` and `**/e2e/screenshots/**`
+> was removed from `Junk-Runner-bevy/.dracon/
+> dracon-sync.toml` and the `reports/kdp-live-*.md`
+> was removed from `rust-ai-web-auto/.dracon/
+> dracon-sync.toml`. The operator's new policy is
+> "commit all untracked" with NO per-repo
+> exceptions. Per-repo override mechanism still
+> works for future operator-set exceptions (with
+> a documented reason in the .toml file).
+
+## Commit-all principle (2026-06-16, goal `6205ad1f`)
+
+The operator's stated principle:
+
+> "git sync just has to make sure that nothing
+> left out unless we have a very good reason to
+> leave it out"
+
+This means: the daemon's commit-all policy is the
+correct default. **The ONLY valid reasons to leave
+a file untracked are:**
+
+1. **Scratch/temp dirs** (ephemeral by design):
+   `**/scratch/**`, `**/pi-tmp/**`, `.demon/**`,
+   `.sisyphus/**`, `.ralph/**`, etc.
+2. **Size limit**: files larger than 100 MiB are
+   not auto-staged
+3. **Sensitive files**: `.env`, `*.pem`, `*.key`,
+   `*.age`, `secrets/**` are NEVER auto-staged
+   (warden's job to encrypt or block; the
+   `.gitignore` rules in the daemon-managed block
+   enforce this)
+4. **Per-repo `auto_commit_exclude_patterns`**
+   only when the operator has explicitly set them
+   in `.dracon/dracon-sync.toml` with a documented
+   reason in the file
+
+Any file that is not in one of these categories
+should be auto-staged and committed. If the daemon
+sees an untracked file outside these categories,
+that is a bug or a misconfigured override.
+
+### What the daemon does NOT do
+
+The daemon does NOT auto-stage files inside
+gitignored directories (e.g., `target/`,
+`node_modules/`, `build/`, `dist/`, `archives/`).
+Those are already in `.gitignore` via the
+`hygiene_patterns` in warden's config, and the
+daemon respects `.gitignore` via
+`git add --others --exclude-standard`.
+
+### What the operator must NOT do
+
+- **NEVER add a "NEVER auto-stage" rule to a
+  per-repo `.dracon/dracon-sync.toml`** unless
+  the rule has a documented good reason. The
+  `browser-extensions-shared` "NEVER auto-stage
+  the untracked markdown" constraint (from goal
+  `76ddaa7e`) was REMOVED in goal `c19d21b8`
+  because it was based on a misunderstanding:
+  the untracked `.md` was a deliverable
+  cross-linked from a tracked file.
+
 ## Investigation-first discipline
 
 When investigating a state anomaly, **read all the
@@ -67,6 +133,9 @@ existing design docs first** before forming a hypothesis.
 Recent design docs (in `docs/design/`) cover:
 
 - `commit-all-policy-2026-06-15.md` — this policy
+- `commit-all-principle-2026-06-16.md` — the operator's
+  stated principle and the audit of every
+  "preserve untracked" exception
 - `dracon-libs-deletion-2026-06-15.md` — symlink deletion
 - `junk-runner-investigation-2026-06-15.md` — Junk-Runner-bevy policy drift
 - `dracon-platform-untracked-commit-2026-06-15.md` — what stays untracked in dracon-platform (and why)
