@@ -132,23 +132,29 @@ push timeout on the 12-commit batch with 384-file
 commits; subsequent commits were pushed by the daemon
 directly.
 
-### State after merge resolution
+### State after merge resolution (FINAL)
 
 | Field | Value |
 |-------|-------|
-| STATUS | ⚠️ WARN (not CONCERN) |
-| MOD | 28 (operator's active work) |
+| STATUS | ✅ OK (was ❌ CONCERN) |
+| MOD | 0 (operator's work settled) |
 | UT | 1 (`_template-visual-novel/src/lib/`) |
 | AHEAD | 0 |
 | BEHIND | 0 |
 | PUSH | OK (pushed to all 4 remotes) |
-| ACTIVITY | settling (operator's new screenshots) |
+| ACTIVITY | `synced 0m`, `untracked-only` |
+| 4-remote aligned | ✅ (origin + github + gitlab + codeberg at `0cc83abc7`) |
 
-The remaining 28 MOD are the operator's new active work
-(`home-*.png` re-audits, hellhunter `smoke-out/*.png`,
-`junk-runner/assets/index-LPMIlwPe.js`, etc.). The
-daemon is correctly waiting for 5s of inactivity
-before committing. This is **healthy** daemon behavior.
+The 1 UT (`_template-visual-novel/src/lib/`) is the
+operator's new template tree — the daemon does not
+auto-stage untracked content from `web/games/games/
+_template-visual-novel/` (per the 76ddaa7e constraint
+that requires operator approval for untracked content
+in this template). The operator is currently deciding
+whether to commit or gitignore it.
+
+All 4 remotes are now aligned at `0cc83abc7`. The CONCERN
+is FULLY RESOLVED.
 
 ## kiki-sassy-desktop-announcer: PUSH_STUCK (UNCHANGED — operator input needed)
 
@@ -210,18 +216,27 @@ is the same 24h+ push-stuck from previous goals.
 
 ## Verification evidence
 
-### Before vs after
+### Before vs after (FINAL)
 
 | Metric | Before | After |
 |--------|--------|-------|
-| dracon-platform STATUS | CONCERN | WARN (settling) |
+| dracon-platform STATUS | CONCERN | ✅ OK |
+| dracon-platform MOD | 100 | 0 |
+| dracon-platform UT | 11 | 1 (untracked-only, healthy) |
 | dracon-platform AHEAD | 3 | 0 |
 | dracon-platform BEHIND | 1 | 0 |
-| dracon-platform 4-remote aligned | NO (1 behind) | YES (`8e4cd8265`) |
-| dracon-platform merge in progress | YES (6 conflicts) | NO (resolved) |
-| dracon-platform push stuck time | 240m | 0m (pushed) |
-| kiki-sassy STATUS | PUSH_STUCK 24m | PUSH_STUCK 44m (unchanged) |
+| dracon-platform 4-remote aligned | NO (1 behind) | ✅ YES (`0cc83abc7`) |
+| dracon-platform merge in progress | YES (6 conflicts) | ✅ NO (resolved) |
+| dracon-platform push stuck time | 240m | ✅ 0m (pushed) |
+| kiki-sassy STATUS | PUSH_STUCK 24m | PUSH_STUCK 49m (unchanged) |
 | kiki-sassy github divergence | 804/436 | 804/436 (unchanged) |
+| Live report | 13 OK + 0 WARN + 1 CONCERN + 0 failed | 12 OK + 2 WARN + 0 CONCERN + 0 failed |
+
+The 2 WARN in the final state are:
+- `Junk-Runner-bevy`: 1 MOD (operator's active
+  `_debug-actual.spec.ts` work) — healthy settling
+- `kiki-sassy-desktop-announcer`: PUSH_STUCK 49m
+  (pre-existing, awaiting operator decision)
 
 ### Commands run
 
