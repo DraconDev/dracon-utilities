@@ -164,6 +164,17 @@ enum Command {
         #[arg(long, conflicts_with = "explain")]
         json: bool,
     },
+    /// Detect untracked `.md`/`.txt` files across watched repos
+    /// (defensive guard for the CWD-drift class of bug). Added in
+    /// goal `e680cfa9` (2026-06-16).
+    CheckUntrackedMd {
+        /// Repository path. Defaults to all discovered repos.
+        #[arg(long)]
+        repo: Option<PathBuf>,
+        /// Emit machine-readable JSON.
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -1180,6 +1191,9 @@ async fn main() -> Result<()> {
             json,
         } => {
             cmd_ownership(&policy_path, repo.as_deref(), explain, json)?;
+        }
+        Command::CheckUntrackedMd { repo, json } => {
+            cmd_check_untracked_md(&policy_path, repo.as_deref(), json).await?;
         }
     }
 
