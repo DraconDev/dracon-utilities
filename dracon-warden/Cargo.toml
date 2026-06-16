@@ -8,8 +8,8 @@ readme = "README.md"
 repository = "https://github.com/DraconDev/dracon-utilities"
 homepage = "https://github.com/DraconDev/dracon-utilities"
 documentation = "https://docs.rs/dracon-warden"
-keywords = ["git", "secret", "encrypt", "age", "filter", "encryption", "hardening", "security", "git-filter", "secret-management"]
-categories = ["command-line-utilities", "development-tools", "cryptography"]
+keywords = ["git", "secret", "encrypt", "age", "filter"]
+categories = ["command-line-utilities"]
 exclude = [".github/", "docs/", "*.md", "!README.md", "Cargo.lock", "target/"]
 
 [dependencies]
