@@ -8,8 +8,8 @@ readme = "README.md"
 repository = "https://github.com/DraconDev/dracon-utilities"
 homepage = "https://github.com/DraconDev/dracon-utilities"
 documentation = "https://docs.rs/dracon-sync"
-keywords = ["git", "sync", "daemon", "auto-commit", "auto-push", "multi-remote", "mirror", "background", "developer-tools", "ai-assisted"]
-categories = ["command-line-utilities", "development-tools::build-utils"]
+keywords = ["git", "sync", "daemon", "auto-commit", "multi-remote"]
+categories = ["command-line-utilities"]
 exclude = [".github/", "docs/", "*.md", "!README.md", "Cargo.lock", "target/"]
 
 [dependencies]

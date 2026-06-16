@@ -8,8 +8,8 @@ readme = "README.md"
 repository = "https://github.com/DraconDev/dracon-utilities"
 homepage = "https://github.com/DraconDev/dracon-utilities"
 documentation = "https://docs.rs/dracon-system"
-keywords = ["disk", "process", "service", "diagnostics", "doctor", "system", "monitoring", "zram", "guard", "developer-tools"]
-categories = ["command-line-utilities", "development-tools", "filesystem", "os"]
+keywords = ["disk", "process", "service", "diagnostics", "doctor"]
+categories = ["command-line-utilities"]
 exclude = [".github/", "docs/", "*.md", "!README.md", "Cargo.lock", "target/"]
 
 [dependencies]
