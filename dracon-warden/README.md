@@ -2,6 +2,20 @@
 
 **Git filter + repo hardening tool.** Encrypts secrets at rest in git while keeping plaintext in your working tree. Uses git hooks (not a daemon) as the primary enforcement layer.
 
+## Install
+
+```bash
+cargo install dracon-warden
+```
+
+The binary will be at `~/.cargo/bin/dracon-warden`. Or install from the long-name façade repo:
+
+```bash
+git clone https://github.com/DraconDev/dracon-warden-secret-encrypt-age-git-filter.git
+cd dracon-warden-secret-encrypt-age-git-filter
+cargo build --release
+```
+
 ## Mental Model (Important)
 
 - **Working tree is plaintext**: `filter.smudge` decrypts so your app can read normal config/secrets.
@@ -161,7 +175,8 @@ encryption_version = 2
 allow_v1_fallback = false
 
 # Team keys (for shared access)
-team_[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBCQWhuYXJQOGZieG1zMDFFdmhCNlo4RHBGNjg5OGpaQmhXbkI5cGpXTzNzCjVqbTBjcS9TeUJiYThYTUs1akVvNUVjS1VZQTFPQjFUc2FFclB1YTFZem8KLT4gWDI1NTE5IGVjclkwZldneU5lOTZ4cTBlYUNsemZGWTNlYjk2dFc2OGZDUVJpc3hvVjAKOU5HRlBtT2pybzU0cExNUUhWQXZxSXltKzhqOE1FTVJRbjFwZ1BnbHpoRQotPiBYMjU1MTkgLzBZY1lhTzBGTUNPN1lnQVJHVERwcVV0RG9vbFRKa0k2VXdPVVJHVlloZwptNmpoTjJRRkhNRHNCMnB6aWIvMlFJRWI3TUJnaE1ULzRDV1hYZytjVy9NCi0+IFgyNTUxOSA1SkJqNm5UV1hPbnFRSmRMaUlyM080MFVFV05YcmV1QmpPdHFVT1ZnN0FjCmpNVVJ2VG80bTNObktMUysraUp6TkQ4VDdsQVhXck5XaURpQ1RoTXV3T0UKLT4gWDI1NTE5IFN6U1Y5cTU1eFJFWjJjaUphTmR4Q3EzMmdyR3ArYStiY0JOYm94Ui85bHMKeXlvdDlpRiszaC9Yc3RlUUtrUkNaYWg4S1U3Z2pXYlJnRjZ0cnlHbDF6YwotPiBALWdyZWFzZSA5JWAvekUgeWkgUWtccyB5CkZOeXB0WVFqRGc4RkxaT2xyZnFvZWN0eTZ3Tk1pVFRGV2lHeXM2bTRXN3NmWXRLUnBVaHJuZ21sQzAvSGRzQ1cKWU5ONDFFUVpZZmQyUjl4SUs4MVVMWEhyT3hMRTVpZ3RmZHlRNEo3cwotLS0gS3poamhrbXpmMnRxb0FKclUvODNYMjBJY2JheGpNWExLdmsweTNMbEpHSQpuxBDnf9CYBRkhTIbPTrHISVhjHptNwPx09H4DEpSQaoiWRrQZQ2kqJ50lJbtSGUGMF4o8BDo1j6k+0qAI4Xy4zzl+EFEspo5l1Vjij+m3F13DRIyFMbEtz31zX+Cwg9KgnN4xm1tmIs2Uz5nP],
+team_keys = [
+    "age1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
 ]
 
 # Registry credentials
