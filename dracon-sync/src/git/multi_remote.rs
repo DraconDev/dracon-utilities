@@ -315,6 +315,22 @@ pub(crate) async fn diagnose_divergence(
 }
 
 /// Push to all remotes in priority order.
+///
+/// SEQUENTIAL (not concurrent) as of goal `87c1bf4d` (2026-06-16).
+/// The previous concurrent implementation via `tokio::spawn` had
+/// a race condition: when one remote (gitlab, codeberg) was
+/// slower on the network than another (origin, github), a
+/// subsequent fast-forward could land on the fast remote but be
+/// rejected by the slow remote (which was still at an older tip).
+/// After `push_max_retries` consecutive failures, the daemon
+/// marked the repo PUSH_STUCK.
+///
+/// Sequential push trades ~3-6s of total wall-clock latency per
+/// commit (4 remotes × ~1.5s each, instead of 1.5s in parallel)
+/// for ELIMINATION of the race. The user-visible cadence is
+/// similar because the daemon's apply phase deadline
+/// (`pulse_interval_secs * 2` = 2s) was already causing trailing-
+/// drain events on every commit when concurrent pushes took >2s.
 pub(crate) async fn push_to_all_remotes(
     repo: &Path,
     remotes: &[RemoteConfig],
@@ -324,27 +340,17 @@ pub(crate) async fn push_to_all_remotes(
     let mut sorted = remotes.to_vec();
     sorted.sort_by_key(|r| r.priority);
 
-    // Push to all remotes concurrently for faster sync
-    let mut handles = Vec::new();
-    for remote in sorted {
-        let repo = repo.to_path_buf();
-        let name = remote.name.clone();
-        let force_push = remote.force_push_when_behind;
-        handles.push(tokio::spawn(async move {
-            let result =
-                push_to_named_remote(&repo, &name, timeout_secs, retries, force_push).await;
-            (name, result)
-        }));
-    }
-
+    // Push to remotes sequentially, in priority order. A failure
+    // on one remote does NOT abort subsequent pushes: the daemon
+    // continues to the next remote and reports the failure in
+    // the returned Vec. The caller (sync_repo) handles per-remote
+    // failure tracking.
     let mut results = Vec::new();
-    for handle in handles {
-        match handle.await {
-            Ok(result) => results.push(result),
-            Err(e) => {
-                eprintln!("⚠️ push task failed: {}", e);
-            }
-        }
+    for remote in sorted {
+        let force_push = remote.force_push_when_behind;
+        let result =
+            push_to_named_remote(repo, &remote.name, timeout_secs, retries, force_push).await;
+        results.push((remote.name, result));
     }
     results
 }
