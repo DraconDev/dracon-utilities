@@ -288,3 +288,122 @@ itself.
 8. Re-run the scan to confirm the guard fires
    for the (now-fixed) browser-extensions-shared
    case AND for the deferred dracon-platform case
+
+## Implementation status (2026-06-16)
+
+Steps 1, 2, 3, 6, 7, 8 complete. Steps 4, 5 deferred
+(see "Deferred" section).
+
+### Code changes
+
+- **`dracon-sync/src/git/diff.rs`**: added
+  `noteworthy_untracked(repo: &Path) -> Result<Vec<String>>`
+  (lines after the existing `tracked_paths`). Runs
+  `git ls-files --others --exclude-standard -z`
+  (respects `.gitignore` re-include rules), filters
+  to `.md` and `.txt` extensions, sorts, returns
+  paths relative to the repo root. Includes a
+  15-second timeout and `spawn_blocking` to avoid
+  blocking the async runtime.
+- **`dracon-sync/src/git/diff.rs`**: added 6 unit
+  tests in a new `noteworthy_untracked_tests` mod:
+  - `test_noteworthy_untracked_empty_repo`
+  - `test_noteworthy_untracked_finds_md_files`
+  - `test_noteworthy_untracked_finds_txt_files`
+  - `test_noteworthy_untracked_ignores_gitignored`
+  - `test_noteworthy_untracked_excludes_other_extensions`
+  - `test_noteworthy_untracked_finds_doubled_path`
+    (the actual bug class from goal `c19d21b8`)
+- **`dracon-sync/src/main.rs`**: added
+  `CheckUntrackedMd` variant to the `Command` enum
+  with `--repo <path>` and `--json` flags.
+- **`dracon-sync/src/main.rs`**: added
+  `cmd_check_untracked_md()` handler that walks
+  watched repos (or a single repo), collects
+  untracked `.md`/`.txt`, and prints a table or
+  JSON output. Sorts repos by untracked count
+  (descending) then by path.
+
+### Test results
+
+```
+running 6 tests
+test git::diff::noteworthy_untracked_tests::test_noteworthy_untracked_empty_repo ... ok
+test git::diff::noteworthy_untracked_tests::test_noteworthy_untracked_excludes_other_extensions ... ok
+test git::diff::noteworthy_untracked_tests::test_noteworthy_untracked_finds_doubled_path ... ok
+test git::diff::noteworthy_untracked_tests::test_noteworthy_untracked_finds_md_files ... ok
+test git::diff::noteworthy_untracked_tests::test_noteworthy_untracked_finds_txt_files ... ok
+test git::diff::noteworthy_untracked_tests::test_noteworthy_untracked_ignores_gitignored ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored
+```
+
+Full workspace: **857 tests passed, 0 failed, 9
+ignored** (was 851 + 6 new = 857).
+
+### Live verification
+
+```
+$ dracon-sync check-untracked-md
+📝 Found 1 untracked .md/.txt file(s) across 14 repo(s):
+
+  📦 /home/dracon/Dev/dracon-platform
+    - web/games/games/_lib/visual-novel/README.md
+```
+
+The 1 untracked .md is the known-deferred
+`_template-visual-novel` project per goal
+`76ddaa7e`. The fix in goal `c19d21b8` (move
+`platform-free-extension-shortlist.md` to the
+correct path) is correctly detected as **clean**
+by the new guard.
+
+### JSON mode
+
+```
+$ dracon-sync check-untracked-md --json
+{
+  "total": 1,
+  "repos": [
+    {
+      "repo": "/home/dracon/Dev/dracon-platform",
+      "files": ["web/games/games/_lib/visual-novel/README.md"]
+    },
+    ...
+  ]
+}
+```
+
+### Single-repo mode
+
+```
+$ dracon-sync check-untracked-md --repo /home/dracon/Dev/browser-extensions-shared
+✅ No untracked .md/.txt files found across 1 repo(s).
+```
+
+The previously-broken `browser-extensions-shared`
+is now clean (the doubled-path file was moved and
+committed in goal `c19d21b8` followup).
+
+## Deferred (out of scope for this goal)
+
+- **Step 4 (periodic log line in daemon loop)**:
+  would require touching the daemon's main loop in
+  `daemon.rs`. Could be a follow-up goal. The CLI
+  subcommand already covers the "operator runs
+  this manually" use case.
+- **Step 5 (`untracked_md_txt` field in the
+  report)**: would require touching `report.rs`
+  and the live `dracon-sync repos` table. Could
+  be a follow-up. The CLI subcommand covers the
+  "I want to check now" use case.
+
+These were deferred because the operator's
+immediate concern was: "make sure some mds don't
+go around being untracked". The CLI subcommand
+achieves that goal (the operator can run it
+periodically or whenever suspicious). The
+report-integration and daemon-loop-integration
+are nice-to-haves that can be added without
+risk of breaking the existing commit-all
+policy.
