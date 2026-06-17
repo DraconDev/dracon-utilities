@@ -1,0 +1,19 @@
+UNTRACKED-ELIGIBLE: .pi/goals/goal_events.jsonl  (in /home/dracon/Dev/ai-auto-writer)
+TRACKED: .pi/goals/goal_events.jsonl
+UNTRACKED-ELIGIBLE: .pi/goals/goal_events.jsonl  (in /home/dracon/Dev/browser-extensions-shared)
+UNTRACKED-ELIGIBLE: extensions/ai-ats/.pi/goals/goal_events.jsonl  (in /home/dracon/Dev/browser-extensions-shared)
+UNTRACKED-ELIGIBLE: extensions/auto-form-filler/.pi/goals/goal_events.jsonl  (in /home/dracon/Dev/browser-extensions-shared)
+UNTRACKED-ELIGIBLE: extensions/job-finder/.pi/goals/goal_events.jsonl  (in /home/dracon/Dev/browser-extensions-shared)
+UNTRACKED-ELIGIBLE: extensions/lead-radar/.pi/goals/goal_events.jsonl  (in /home/dracon/Dev/browser-extensions-shared)
+UNTRACKED-ELIGIBLE: extensions/vidpro-extension/.pi/goals/goal_events.jsonl  (in /home/dracon/Dev/browser-extensions-shared)
+UNTRACKED-ELIGIBLE: docs/research/extension-research/.pi/goals/goal_events.jsonl  (in /home/dracon/Dev/browser-extensions-shared)
+TRACKED: .pi/goals/goal_events.jsonl
+TRACKED: .pi/goals/goal_events.jsonl
+TRACKED: .pi/goals/goal_events.jsonl
+UNTRACKED-ELIGIBLE: web/games/.pi/goals/goal_events.jsonl  (in /home/dracon/Dev/dracon-platform)
+UNTRACKED-ELIGIBLE: web/games/games/darklord/.pi/goals/goal_events.jsonl  (in /home/dracon/Dev/dracon-platform)
+UNTRACKED-ELIGIBLE: web/games/games/hegemon/.pi/goals/goal_events.jsonl  (in /home/dracon/Dev/dracon-platform)
+UNTRACKED-ELIGIBLE: web/games/games/one-mil-girls/.pi/goals/goal_events.jsonl  (in /home/dracon/Dev/dracon-platform/web/games/games/one-mil-girls)
+UNTRACKED-ELIGIBLE: .pi/goals/goal_events.jsonl  (in /home/dracon/Dev/dracon-utilities)
+TRACKED: .pi/goals/goal_events.jsonl
+TRACKED: .pi/goals/goal_events.jsonl
