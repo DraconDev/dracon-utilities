@@ -1,0 +1,19 @@
+=== /home/dracon/Dev/ai-auto-writer ===
+  Untracked files:
+.pi/goals/goal_events.jsonl
+=== /home/dracon/Dev/browser-extensions-shared ===
+  Untracked files:
+.pi/goals/goal_events.jsonl
+docs/research/extension-research/.pi/goals/goal_events.jsonl
+extensions/ai-ats/.pi/goals/goal_events.jsonl
+extensions/auto-form-filler/.pi/goals/goal_events.jsonl
+extensions/job-finder/.pi/goals/goal_events.jsonl
+extensions/lead-radar/.pi/goals/goal_events.jsonl
+extensions/vidpro-extension/.pi/goals/goal_events.jsonl
+=== /home/dracon/Dev/dracon-platform ===
+  (no untracked .pi/**/goal_events.jsonl files)
+=== /home/dracon/Dev/dracon-platform/web/games/games/one-mil-girls ===
+  (no untracked .pi/**/goal_events.jsonl files)
+=== /home/dracon/Dev/dracon-utilities ===
+  Untracked files:
+.pi/goals/goal_events.jsonl
