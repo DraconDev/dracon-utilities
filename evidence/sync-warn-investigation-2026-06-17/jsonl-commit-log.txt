@@ -1,0 +1,63 @@
+=== /home/dracon/Dev/ai-auto-writer ===
+6fea4c05 1 file(s) [.gitignore] DELTA:+1/-1
+fa24ae85 1 file(s) [.gitignore] DELTA:+3/-0
+46676693 2 file(s) [.gitignore, .gitattributes] DELTA:+18/-34
+bcd34840 11 file(s) in .pi,.vscode [audit-2026-05-23.md.save, .pi/goals/archived/goal_2026060612571315_mq17apdj-wbmnvk.md, .pi/goals/archived/goal_2026061200101288_mqa31b8a-px4rer.md] DELTA:+3/-651 | DEL:.env,.env.turso,archived/goal_2026053123023425_mpu9986z-0gjd1y.md,archived/goal_2026060102412538_mpugawjq-h83jg3.md,archived/goal_2026060122574314_mpvqtryd-ss97mr.md,archived/goal_2026060518174912_mq12fe7r-q4mpwa.md,archived/goal_2026060612571315_mq17apdj-wbmnvk.md,archived/goal_2026061200101288_mqa31b8a-px4rer.md,code-counter/code-counter.db,audit-2026-05-23.md.save ENV:
+3bf133c6 3 file(s) [Cargo.lock, .gitignore, Cargo.toml] DELTA:+323/-81
+
+=== /home/dracon/Dev/avid ===
+c67f043 1 file(s) [.gitignore] DELTA:+1/-1
+e10fbcf 2 file(s) in .pi [.pi/goals/goal_events.jsonl, .gitignore] DELTA:+210/-0 | NEW:goals/goal_events.jsonl
+4f0350c 3 file(s) [.gitignore, .gitattributes, .env] DELTA:+16/-33 | NEW:.env ENV:
+c740395 4 file(s) in tests [AUDIT.md, tests/integration_tests.rs, .gitignore] DELTA:+64/-17 | TEST:18 DEL:.env ENV:
+2470c2c 2 file(s) [.gitignore, .env] DELTA:+1/-3 | NEW:.env ENV:
+
+=== /home/dracon/Dev/browser-extensions-shared ===
+16c6baa0c 1 file(s) [.gitignore] DELTA:+1/-1
+fd5de79b8 1 file(s) [.gitignore] DELTA:+3/-0
+470446dba 2 file(s) [.gitignore, .gitattributes] DELTA:+32/-48
+aacb5b81e 6 file(s) in extensions [pnpm-lock.yaml, MIGRATION_GUIDE.md, .gitignore] DELTA:+4/-15 | DEL:SamAI/tsconfig.tsbuildinfo,api-debugger/tsconfig.tsbuildinfo,pnpm-lock.yaml
+7628c1ba9 Add stats-*.html to gitignore
+
+=== /home/dracon/Dev/dracon-code ===
+78a33ce22 3 file(s) in .pi,docs [.pi/goals/active_goal_2026061718340311_mqicok1a-3yds2e.md, docs/MEGALIST-2026-06-13.md, .gitignore] DELTA:+8/-7
+a015edcf9 CLOSED: wp-bo-31-recipe, wp-bo-31-script | 3 file(s) in .pi,scripts [.pi/goals/active_goal_2026061718340311_mqicok1a-3yds2e.md, scripts/printer.sh, .pi/goals/goal_events.jsonl] DELTA:+29/-9 | NEW:scripts/printer.sh
+b89335ff1 2 file(s) in .pi [.pi/goals/goal_events.jsonl, .gitignore] DELTA:+153/-0 | NEW:goals/goal_events.jsonl
+e46f6b54e 2 file(s) [.gitignore, .gitattributes] DELTA:+15/-30
+f2f328cab Revert "1 file(s) [.gitignore] DELTA:+1/-0"
+
+=== /home/dracon/Dev/DraconDev ===
+ac883a9 1 file(s) [.gitignore] DELTA:+1/-1
+9414f88 2 file(s) in .pi [.pi/goals/goal_events.jsonl, .gitignore] DELTA:+322/-0 | NEW:goals/goal_events.jsonl
+b94ffc3 2 file(s) [.gitignore, .gitattributes] DELTA:+15/-30
+b0f4562 Revert "1 file(s) [.gitignore] DELTA:+1/-0"
+3020679 1 file(s) [.gitignore] DELTA:+1/-0
+
+=== /home/dracon/Dev/dracon-platform ===
+5ee8cad6b CLOSED: audit-2-static | 3 file(s) in apis,web [web/games/games/junk-runner/MAP-DUPLICATE-2026-06-17.md, apis/.pi/goals/active_goal_2026061718291640_mqiciesw-2eevfu.md, apis/.pi/goals/goal_events.jsonl] DELTA:+47/-28
+17f23be60 CLOSED: regression-test | 3 file(s) in apis,web [web/.pi/goals/active_goal_2026061718281802_mqich5r8-nf9w1c.md, apis/.pi/goals/active_goal_2026061718291640_mqiciesw-2eevfu.md, web/.pi/goals/goal_events.jsonl] DELTA:+14/-15
+f60868813 6 file(s) in apis,web [web/.pi/goals/goal_events.jsonl, web/ai-hub/.pi/goals/goal_events.jsonl, apis/.pi/goals/goal_events.jsonl] DELTA:+309/-7 | NEW:goals/goal_events.jsonl,goals/goal_events.jsonl,goals/goal_events.jsonl
+2f401e6e8 11 file(s) in .pi,apis,web [.pi/goals/goal_events.jsonl, web/games/games/one-mil-girls/.pi/goals/goal_events.jsonl, web/games/games/darklord/src/lib/game/ortho.test.ts] DELTA:+1422/-982 | TEST:569 NEW:goals/goal_events.jsonl,goals/goal_events.jsonl DEL:game/iso.test.ts,game/iso.ts,game/ortho.test.ts,game/ortho.ts,game/orthoBirdseye.test.ts
+a1dbfd2ac 194 file(s) in apis,scripts,web [web/ai-hub/.cache.preserve2/openrouter-models.json, web/games/games/hegemon/src/lib/components/Map2D.svelte, web/games/games/darklord/DESIGN-VISUAL.md] DELTA:+7507/-811 | TEST:1289 BIN:109 NEW:docs/api-state-audit-2026-06-16.md,web/DASHBOARD-502-FIX-2026-06-16.md,docs/turn17-further-audit-2026-06-16.md,docs/PORT-REGISTRY.md,scripts/convert_jpeg_to_png.py,smoke-out/17-v03-about-dungeon-gallery.png,game/ortho.test.ts,game/ortho.ts,artifacts/artifact-sprite.jpg,artifacts/artifact-treasure.jpg+49more
+
+=== /home/dracon/Dev/dracon-utilities ===
+8cdbf244 2 file(s) in evidence [evidence/sync-warn-investigation-2026-06-17/gitignore-diffs.txt, .gitignore] DELTA:+91/-1 | NEW:sync-warn-investigation-2026-06-17/gitignore-diffs.txt
+2208d586 1 file(s) [.gitignore] DELTA:+3/-0
+53ce7041 2 file(s) [.gitattributes, .gitignore] DELTA:+0/-30
+8a490a19 prepare public release branch
+7ea180fe 51 file(s) in .demon,.pi,.ralph [.sisyphus/plans/multi-remote-test-suite.md, .pi/goals/archived/goal_2026060823450664_mq5q0ws4-krdztf.md, .pi/goals/archived/goal_2026060101425228_mpu5x2p8-gf5g0x.md] DELTA:+4535/-5 | NEW:keys/owner_age1wz5p.pub,archived/goal_2026060101425228_mpu5x2p8-gf5g0x.md,archived/goal_2026060112391305_mpuhonml-iu4vyd.md,archived/goal_2026060113214557_mpv55vx0-ly82en.md,archived/goal_2026060114444080_mpv8t5tf-4kja1i.md,archived/goal_2026060116410767_mpvafvt3-jx5ana.md,archived/goal_2026060121193403_mpvig51v-x013jf.md,archived/goal_2026060122023334_mpvoneju-0uop48.md,archived/goal_2026060122151934_mpvpc8ei-vrkajj.md,archived/goal_2026060209443449_mpvqvqvt-fd69qi.md+40more
+
+=== /home/dracon/Dev/pully-fully-pull-based-fleet-reconciler ===
+6071d9e3 1 file(s) [.gitignore] DELTA:+1/-1
+c4835c1c 3 file(s) in .pi [.pi/goals/goal_events.jsonl, .pi/goals/active_goal_2026061715533359_mqi6y5un-fpsmok.md, .gitignore] DELTA:+411/-5 | NEW:goals/goal_events.jsonl
+4c2f897b 4 file(s) in docs [AUDIT_REPORT.md, .gitignore, .gitattributes] DELTA:+50/-31
+ad13078f Revert "1 file(s) [.gitignore] DELTA:+1/-0"
+dcd2dbed 1 file(s) [.gitignore] DELTA:+1/-0
+
+=== /home/dracon/Dev/rust-ai-web-auto ===
+98823d4 1 file(s) [.gitignore] DELTA:+1/-1
+83f1446 3 file(s) in .pi [.pi/goals/goal_events.jsonl, .pi/goals/active_goal_2026061713404275_mqi27bi6-jx360t.md, .gitignore] DELTA:+576/-9 | NEW:goals/goal_events.jsonl
+b2bc7cf 2 file(s) [.gitignore, .gitattributes] DELTA:+15/-30
+eb616c6 Revert "1 file(s) [.gitignore] DELTA:+1/-0"
+a7d1364 1 file(s) [.gitignore] DELTA:+1/-0
+
