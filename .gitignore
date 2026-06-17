@@ -107,3 +107,6 @@ tasks*.json
 !rustfmt.toml
 !state/events/*.jsonl
 # --- END DRACON MANAGED BLOCK ---
+
+# Operator override 2026-06-17 (goal mqibwvpd-95h3al): unignore .pi/**/goal_events.jsonl
+!.pi/**/*.jsonl
