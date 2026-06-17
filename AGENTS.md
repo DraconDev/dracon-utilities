@@ -77,6 +77,30 @@ process kill, not via waiting. See
 `docs/design/push-timeout-fix-2026-06-17.md` for the full
 data, rationale, and runbook.
 
+### Debounce window (untracked files)
+
+The daemon has a **3-second debounce** before processing a
+file change, plus the time to `git add` + `git commit` + push
+(typically 3-6 seconds). This means **a file may appear
+untracked for 3-49 seconds** between creation and the
+daemon's auto-commit:
+
+- **Low churn** (no other files in the same repo): 3-9 seconds
+- **High churn** (many files committed in parallel, e.g., a
+  Playwright smoke-out PNG batch): up to 49 seconds
+
+This is **normal daemon behavior**, not a bug. The "untracked"
+status in `git status` during this window is the working tree
+state, not a daemon refusal to commit. If a file is untracked
+for **> 2 minutes**, investigate:
+1. `journalctl --user -u dracon-sync.service --since "2m ago"`
+2. Check `git status` and the per-repo `.gitignore`
+3. Check the global config: `untracked_exclude_patterns` (should be `[]`)
+4. Check the per-repo `.dracon/dracon-sync.toml` for
+   `auto_commit_exclude_patterns`
+
+Audit evidence: `docs/design/untracked-audit-2026-06-17.md`
+
 ### Per-repo overrides
 
 The per-repo `.dracon/dracon-sync.toml` can extend the
