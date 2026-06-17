@@ -61,6 +61,22 @@ elsewhere, NOT by `untracked_exclude_patterns`):
 Files larger than **100 MiB** (`104857600` bytes) are
 NOT auto-staged. This is the hard exclusion threshold.
 
+### Push timeouts
+
+`push_op_timeout_secs = 300` (CHANGED 2026-06-17 from 60).
+This matches the daemon's own code default
+(`default_push_op_timeout_secs` in `dracon-sync/src/policy.rs`)
+and gives a 5x safety margin over the v0.112.10 measured >60s
+push time for a 23-file PNG-heavy commit. Per-remote timeouts
+(e.g. 60s for github, 300s for gitlab/codeberg) would be more
+precise but require a daemon code change to add the field to
+`RemoteConfig`; deferred to a follow-up daemon release. The
+global 300s is wasteful for github (which never takes more
+than a few seconds) but harmless — the daemon times out via
+process kill, not via waiting. See
+`docs/design/push-timeout-fix-2026-06-17.md` for the full
+data, rationale, and runbook.
+
 ### Per-repo overrides
 
 The per-repo `.dracon/dracon-sync.toml` can extend the
