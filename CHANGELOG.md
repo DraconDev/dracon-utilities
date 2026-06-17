@@ -12,6 +12,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Global `untracked_exclude_patterns = []` (2026-06-17)**: the operator's position is "global rule, default = commit everything, unless something would be very wrong to put on the repo". The previous list (11 patterns: `**/scratch/**`, `**/tmp/**`, `**/pi-tmp/**`, `**/.pi-tmp/**`, `**/research/scratch/**`, `.demon/**`, `.sisyphus/**`, `.ralph/**`, plus the per-prefix variants) conflated "short-lived" with "very wrong to commit". They are not the same thing. Short-lived files are valid git content: the user/agent can `rm` them from the working tree when they're done, and the daemon will commit the deletion. If the user wants to recover, the file is in git history. Things that ARE very wrong to commit (secrets, files > 100 MiB, build artifacts) are handled elsewhere (warden encryption, `max_stage_file_bytes`, `.gitignore`). `AGENTS.md` updated with the new policy + operator's verbatim framing. Design doc: `docs/design/pi-tmp-persist-policy-2026-06-16.md`.
 
 
+## [0.112.11] - 2026-06-17
+### Changed
+- **`push_op_timeout_secs = 300` (CHANGED 2026-06-17, was 60)**: the v0.112.10 release surfaced a 60s `push_op_timeout_secs` that was too short for a 23-file PNG-heavy commit in `dracon-platform`. The daemon's own code default is 300s (`default_push_op_timeout_secs` in `dracon-sync/src/policy.rs`); the operator's 60s was an override-down from the default. 300s gives a 5x safety margin over the v0.112.10 measured >60s push time. Per-remote timeouts (60s for github, 300s for gitlab/codeberg) would be more precise but require a daemon code change to add the field to `RemoteConfig`; deferred to a follow-up daemon release. The global 300s is wasteful for github (which never takes more than a few seconds) but harmless — the daemon times out via process kill, not via waiting. `AGENTS.md` updated with a "Push timeouts" section. Design doc: `docs/design/push-timeout-fix-2026-06-17.md` with measured push duration data and a runbook.
+### Verified
+- **Stress test (61 files, ~1.5MB of PNG binaries)** at the new 300s timeout: github 2.35s, gitlab 2.57s, codeberg 10.51s, origin 0.64s. All 4 remotes well under the 300s budget. The v0.112.10 incident was network-related, not capacity-related.
+
+
+## [0.112.10] - 2026-06-17
+
+
 ## [0.112.10] - 2026-06-17
 
 

@@ -8,7 +8,7 @@ exclude = []
 resolver = "2"
 
 [workspace.package]
-version = "0.112.10"
+version = "0.112.11"
 edition = "2021"
 authors = ["DraconDev"]
 
