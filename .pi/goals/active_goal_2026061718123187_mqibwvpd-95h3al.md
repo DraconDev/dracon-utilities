@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 408925,
-    "activeSeconds": 1862
+    "tokensUsed": 417335,
+    "activeSeconds": 1961
   },
   "sisyphus": false,
   "createdAt": "2026-06-17T17:12:31.870Z",
-  "updatedAt": "2026-06-17T17:44:09.211Z",
+  "updatedAt": "2026-06-17T17:45:49.308Z",
   "activePath": ".pi/goals/active_goal_2026061718123187_mqibwvpd-95h3al.md",
   "taskList": {
     "tasks": [
@@ -57,13 +57,17 @@
       {
         "id": "edit-gitignore-if-unignore",
         "title": "If unignore chosen: edit .gitignore DRACON MANAGED BLOCK with ! negation",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-17T17:45:49.305Z",
+        "evidence": "All 10 affected repos' .gitignore files updated with `!**/.pi/**/*.jsonl` line after the END DRACON MANAGED BLOCK marker. Initially used `.pi/**/*.jsonl` (only matches root-level .pi/), corrected to `",
         "verificationContract": "Add a negation line (e.g., `!.pi/**/*.jsonl` or `!*.pi/**/*.jsonl`) inside the DRACON MANAGED BLOCK of each repo that has excluded `.pi/**/*.jsonl` files. Verify with `git check-ignore -v` that a previously-excluded `.pi/**/*.jsonl` file is no longer ignored. Save `git diff` output to evidence file. The diff must show ONLY the new negation line — no other changes."
       },
       {
         "id": "stage-and-commit-unignored",
         "title": "Stage and commit unignored .pi/**/*.jsonl files in affected repos",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-17T17:45:49.307Z",
+        "evidence": "Daemon auto-committed most .pi/**/goal_events.jsonl files alongside the .gitignore changes. Manually staged and committed the remaining 9 untracked files with explicit `git add <path>` and commit mess",
         "verificationContract": "For each affected repo, `git add <explicit .pi/**/*.jsonl paths>` and commit with a clear message. Verify with `git log --oneline -3` that the commits are clean. Capture `git status` showing the .pi files are now tracked."
       },
       {
@@ -126,8 +130,8 @@ If blocked: stop and ask the operator. The only decision I cannot make on my own
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 31m02s
-- Tokens used: 409K (408,925) tokens
+- Time spent: 32m41s
+- Tokens used: 417K (417,335) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
@@ -136,8 +140,8 @@ If blocked: stop and ask the operator. The only decision I cannot make on my own
 - [x] wait-re-triage: Wait for daemon to re-triage and confirm WARN clears — evidence: After `stuck-unstuck` + manual pushes to all 4 remotes (origin/github/gitlab/codeberg), `dracon-sync repos` now shows dracon-platform with PUSH=OK, AHEAD=0, BEHIND=0. The 23-failure PUSH_STUCK is gone
 - [x] audit-pi-jsonl: Audit .pi/**/*.jsonl exclusion across all 12 repos — evidence: Audited all 12 repos. Found 25 `.pi/**/*.jsonl` files across 10 repos, 24 excluded by `*.jsonl` in DRACON MANAGED BLOCK (lines 15/18/20), 1 not excluded (dracon-ai-lib — inconsistent with the rest). 2
 - [x] consult-operator: Consult operator on .pi/**/*.jsonl policy direction — evidence: Operator decision: Option A — unignore all 24 `.pi/**/*.jsonl` files. Will add `!`-negation line to each affected repo's .gitignore inside DRACON MANAGED BLOCK and edit the warden template so future r
-- [ ] edit-gitignore-if-unignore: If unignore chosen: edit .gitignore DRACON MANAGED BLOCK with ! negation — contract: Add a negation line (e.g., `!.pi/**/*.jsonl` or `!*.pi/**/*.jsonl`) inside the DRACON MANAGED BLOCK of each repo that has excluded `.pi/**/*.jsonl` files. Verify with `git check-ignore -v` that a previously-excluded `.pi/**/*.jsonl` file is no longer ignored. Save `git diff` output to evidence file. The diff must show ONLY the new negation line — no other changes.
-- [ ] stage-and-commit-unignored: Stage and commit unignored .pi/**/*.jsonl files in affected repos — contract: For each affected repo, `git add <explicit .pi/**/*.jsonl paths>` and commit with a clear message. Verify with `git log --oneline -3` that the commits are clean. Capture `git status` showing the .pi files are now tracked.
+- [x] edit-gitignore-if-unignore: If unignore chosen: edit .gitignore DRACON MANAGED BLOCK with ! negation — evidence: All 10 affected repos' .gitignore files updated with `!**/.pi/**/*.jsonl` line after the END DRACON MANAGED BLOCK marker. Initially used `.pi/**/*.jsonl` (only matches root-level .pi/), corrected to `
+- [x] stage-and-commit-unignored: Stage and commit unignored .pi/**/*.jsonl files in affected repos — evidence: Daemon auto-committed most .pi/**/goal_events.jsonl files alongside the .gitignore changes. Manually staged and committed the remaining 9 untracked files with explicit `git add <path>` and commit mess
 - [ ] write-design-doc: Write investigation design doc — contract: Create `dracon-utilities/docs/design/dracon-sync-warn-investigation-2026-06-17.md` covering: (1) WARN state captured from baseline, (2) rebase-in-progress window 16:24-16:32 with daemon log timestamps, (3) "destination not full refname" push error pattern and root cause analysis, (4) the "stalled Xm" UI confusion (not real staleness, just last-commit age), (5) .pi/**/*.jsonl audit table, (6) operator decision and rationale, (7) git diff of any .gitignore changes, (8) re-read of this goal's success criteria with one-line confirmation per item. The doc must reference `AGENTS.md` for the commit-all principle.
 - [ ] final-verify: Final verification: all success criteria met — contract: Re-run all success-criteria checks (dracon-sync repos = 12 OK, stuck-list empty, design doc exists with all required sections, .gitignore diffs are scoped to DRACON MANAGED BLOCK, no force-push, no history rewrite). Save a final-summary.txt to evidence directory with a yes/no for each criterion.
 
