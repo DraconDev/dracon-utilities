@@ -1,0 +1,90 @@
+=== /home/dracon/Dev/ai-auto-writer ===
+
+=== /home/dracon/Dev/avid ===
+diff --git a/.gitignore b/.gitignore
+index 09b4acc..f17257f 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -103,4 +103,4 @@ tasks*.json
+ # --- END DRACON MANAGED BLOCK ---
+
+ # Operator override 2026-06-17 (goal mqibwvpd-95h3al): unignore .pi/**/goal_events.jsonl
+-!.pi/**/*.jsonl
++!**/.pi/**/*.jsonl
+
+=== /home/dracon/Dev/browser-extensions-shared ===
+diff --git a/.gitignore b/.gitignore
+index 50bc0f1f6..f87e28d6b 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -127,4 +127,4 @@ wxt-shared/node_modules/
+ # --- END DRACON MANAGED BLOCK ---
+ 
+ # Operator override 2026-06-17 (goal mqibwvpd-95h3al): unignore .pi/**/goal_events.jsonl
+-!.pi/**/*.jsonl
++!**/.pi/**/*.jsonl
+
+=== /home/dracon/Dev/dracon-code ===
+diff --git a/.gitignore b/.gitignore
+index 20df7699a..a5deda435 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -105,4 +105,4 @@ tasks*.json
+ # --- END DRACON MANAGED BLOCK ---
+ 
+ # Operator override 2026-06-17 (goal mqibwvpd-95h3al): unignore .pi/**/goal_events.jsonl
+-!.pi/**/*.jsonl
++!**/.pi/**/*.jsonl
+
+=== /home/dracon/Dev/DraconDev ===
+diff --git a/.gitignore b/.gitignore
+index 09b4acc..f17257f 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -103,4 +103,4 @@ tasks*.json
+ # --- END DRACON MANAGED BLOCK ---
+ 
+ # Operator override 2026-06-17 (goal mqibwvpd-95h3al): unignore .pi/**/goal_events.jsonl
+-!.pi/**/*.jsonl
++!**/.pi/**/*.jsonl
+
+=== /home/dracon/Dev/dracon-platform ===
+
+=== /home/dracon/Dev/dracon-platform/web/games/games/one-mil-girls ===
+
+=== /home/dracon/Dev/dracon-utilities ===
+diff --git a/.gitignore b/.gitignore
+index 7dfeaf42..5a51f6f5 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -109,4 +109,4 @@ tasks*.json
+ # --- END DRACON MANAGED BLOCK ---
+ 
+ # Operator override 2026-06-17 (goal mqibwvpd-95h3al): unignore .pi/**/goal_events.jsonl
+-!.pi/**/*.jsonl
++!**/.pi/**/*.jsonl
+
+=== /home/dracon/Dev/pully-fully-pull-based-fleet-reconciler ===
+diff --git a/.gitignore b/.gitignore
+index f7ba6ca2..d90b8150 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -104,4 +104,4 @@ tasks*.json
+ # --- END DRACON MANAGED BLOCK ---
+ 
+ # Operator override 2026-06-17 (goal mqibwvpd-95h3al): unignore .pi/**/goal_events.jsonl
+-!.pi/**/*.jsonl
++!**/.pi/**/*.jsonl
+
+=== /home/dracon/Dev/rust-ai-web-auto ===
+diff --git a/.gitignore b/.gitignore
+index 09b4acc..f17257f 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -103,4 +103,4 @@ tasks*.json
+ # --- END DRACON MANAGED BLOCK ---
+ 
+ # Operator override 2026-06-17 (goal mqibwvpd-95h3al): unignore .pi/**/goal_events.jsonl
+-!.pi/**/*.jsonl
++!**/.pi/**/*.jsonl
+
