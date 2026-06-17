@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 417335,
-    "activeSeconds": 1961
+    "tokensUsed": 458201,
+    "activeSeconds": 2162
   },
   "sisyphus": false,
   "createdAt": "2026-06-17T17:12:31.870Z",
-  "updatedAt": "2026-06-17T17:45:49.308Z",
+  "updatedAt": "2026-06-17T17:49:11.813Z",
   "activePath": ".pi/goals/active_goal_2026061718123187_mqibwvpd-95h3al.md",
   "taskList": {
     "tasks": [
@@ -73,7 +73,9 @@
       {
         "id": "write-design-doc",
         "title": "Write investigation design doc",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-17T17:48:51.109Z",
+        "evidence": "Design doc created at `docs/design/dracon-sync-warn-investigation-2026-06-17.md` (19,299 bytes). Covers all 8 required sections: (1) baseline state, (2) rebase-in-progress window 16:24-16:32 with daem",
         "verificationContract": "Create `dracon-utilities/docs/design/dracon-sync-warn-investigation-2026-06-17.md` covering: (1) WARN state captured from baseline, (2) rebase-in-progress window 16:24-16:32 with daemon log timestamps, (3) \"destination not full refname\" push error pattern and root cause analysis, (4) the \"stalled Xm\" UI confusion (not real staleness, just last-commit age), (5) .pi/**/*.jsonl audit table, (6) operator decision and rationale, (7) git diff of any .gitignore changes, (8) re-read of this goal's success criteria with one-line confirmation per item. The doc must reference `AGENTS.md` for the commit-all principle."
       },
       {
@@ -130,8 +132,8 @@ If blocked: stop and ask the operator. The only decision I cannot make on my own
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 32m41s
-- Tokens used: 417K (417,335) tokens
+- Time spent: 36m02s
+- Tokens used: 458K (458,201) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
@@ -142,6 +144,6 @@ If blocked: stop and ask the operator. The only decision I cannot make on my own
 - [x] consult-operator: Consult operator on .pi/**/*.jsonl policy direction — evidence: Operator decision: Option A — unignore all 24 `.pi/**/*.jsonl` files. Will add `!`-negation line to each affected repo's .gitignore inside DRACON MANAGED BLOCK and edit the warden template so future r
 - [x] edit-gitignore-if-unignore: If unignore chosen: edit .gitignore DRACON MANAGED BLOCK with ! negation — evidence: All 10 affected repos' .gitignore files updated with `!**/.pi/**/*.jsonl` line after the END DRACON MANAGED BLOCK marker. Initially used `.pi/**/*.jsonl` (only matches root-level .pi/), corrected to `
 - [x] stage-and-commit-unignored: Stage and commit unignored .pi/**/*.jsonl files in affected repos — evidence: Daemon auto-committed most .pi/**/goal_events.jsonl files alongside the .gitignore changes. Manually staged and committed the remaining 9 untracked files with explicit `git add <path>` and commit mess
-- [ ] write-design-doc: Write investigation design doc — contract: Create `dracon-utilities/docs/design/dracon-sync-warn-investigation-2026-06-17.md` covering: (1) WARN state captured from baseline, (2) rebase-in-progress window 16:24-16:32 with daemon log timestamps, (3) "destination not full refname" push error pattern and root cause analysis, (4) the "stalled Xm" UI confusion (not real staleness, just last-commit age), (5) .pi/**/*.jsonl audit table, (6) operator decision and rationale, (7) git diff of any .gitignore changes, (8) re-read of this goal's success criteria with one-line confirmation per item. The doc must reference `AGENTS.md` for the commit-all principle.
+- [x] write-design-doc: Write investigation design doc — evidence: Design doc created at `docs/design/dracon-sync-warn-investigation-2026-06-17.md` (19,299 bytes). Covers all 8 required sections: (1) baseline state, (2) rebase-in-progress window 16:24-16:32 with daem
 - [ ] final-verify: Final verification: all success criteria met — contract: Re-run all success-criteria checks (dracon-sync repos = 12 OK, stuck-list empty, design doc exists with all required sections, .gitignore diffs are scoped to DRACON MANAGED BLOCK, no force-push, no history rewrite). Save a final-summary.txt to evidence directory with a yes/no for each criterion.
 
