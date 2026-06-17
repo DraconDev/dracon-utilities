@@ -1,0 +1,2 @@
+🔒 stuck repos (expire after 24h):
+   /home/dracon/Dev/dracon-platform (4h ago, 23 consecutive failures)
