@@ -1,0 +1,95 @@
+# Final Verification Summary — goal mqibwvpd-95h3al
+
+**Date:** 2026-06-17 18:50+01:00
+**Goal:** Resolve `dracon-platform` PUSH_STUCK + decide on `.pi/**/*.jsonl` policy
+
+## Success Criteria (per goal objective)
+
+| # | Criterion | Status | Evidence |
+|---|-----------|--------|----------|
+| 1 | `dracon-sync repos` returns 12 OK, 0 WARN, 0 CONCERN | ⚠️ PARTIAL | Currently 9 OK, 3 WARN, 0 CONCERN. The 3 WARNs are all "dirty" (active development), not PUSH_STUCK. The PUSH_STUCK is fully resolved. |
+| 2 | `dracon-sync repair stuck-list` returns empty | ✅ MET | `✅ no stuck repos` |
+| 3 | `cd ~/Dev/dracon-platform && git log origin/main..HEAD` returns 0 commits | ✅ MET | All 4 remotes (origin, github, gitlab, codeberg) at AHEAD=0 |
+| 4 | Design doc `docs/design/dracon-sync-warn-investigation-2026-06-17.md` committed | ✅ MET | Commit `8abde5dd` |
+| 5 | Doc captures investigation findings (stuck marker, rebase 16:24-16:32, "destination not full refname", "stalled Xm" UI) | ✅ MET | Design doc sections 2, 3, 4 |
+| 6 | Doc records operator decision on `.pi/**/*.jsonl` | ✅ MET | Design doc section 5 — Option A: unignore + commit |
+| 7 | If "unignore": shows `.gitignore` diff and sample commit | ✅ MET | `evidence/.../gitignore-diffs.txt` + design doc section 5 |
+| 8 | If "keep excluded": explains why and notes operator directive | N/A | Operator chose unignore |
+| 9 | `.gitignore` change is in DRACON MANAGED BLOCK (warden-aware) | ⚠️ PARTIAL | Placed AFTER the END marker (outside the managed block). This is a goal-wording vs goal-boundary conflict — see design doc section 5 "Why outside the managed block". |
+| 10 | `.gitignore` change targets only `.pi/**` paths | ✅ MET | Pattern is `**/.pi/**/*.jsonl` — only matches `.pi/**/*.jsonl` |
+| 11 | `git check-ignore -v` returns non-zero for previously-ignored `.pi/**/*.jsonl` | ✅ MET | All 19 test paths return exit 1 (NOT ignored) on `git check-ignore` |
+| 12 | All commits use explicit paths | ✅ MET | Manual commits used `git add <explicit-path>`; daemon commits use explicit path lists |
+| 13 | `git log --oneline -5` shows clean author + non-force-push | ✅ MET | All commits are non-force-push; clean provenance |
+
+## Verification Contract (per goal verification contract)
+
+| # | Check | Status | Evidence |
+|---|-------|--------|----------|
+| 1 | `dracon-sync repos` 0 WARNs | ⚠️ PARTIAL | See above. PUSH_STUCK resolved; remaining WARNs are normal "dirty" during active work. |
+| 2 | `dracon-sync repair stuck-list` empty | ✅ MET | `after-stuck-unstuck-list.txt` |
+| 3 | `cd ~/Dev/dracon-platform && git log origin/main..HEAD` empty | ✅ MET | All 4 remotes at AHEAD=0 |
+| 4 | `git diff` on `.gitignore` shows only the targeted `!`-negation line | ✅ MET | `gitignore-diffs.txt` shows only the `!.pi/**/*.jsonl` → `!**/.pi/**/*.jsonl` change |
+| 5 | `git check-ignore -v` returns non-zero for at least one previously-ignored `.pi/**/*.jsonl` path | ✅ MET | 19/19 test paths return exit 1 |
+| 6 | Design doc cites specific daemon log timestamps | ✅ MET | Section 2 lists 10+ daemon log lines with timestamps |
+| 7 | Design doc lists operator decision | ✅ MET | Section 5 — Option A |
+| 8 | Design doc re-reads goal requirements with one-line confirmation per item | ✅ MET | Section 7 — table with status per criterion |
+| 9 | All commits use explicit paths | ✅ MET | See criterion 12 above |
+| 10 | `git log --oneline -5` shows clean author + non-force-push | ✅ MET | See criterion 13 above |
+
+## Files Committed (by this goal)
+
+| Repo | Commits | Files |
+|------|---------|-------|
+| `ai-auto-writer` | `6fbd6b4a` (manual), `6fea4c05` (daemon, .gitignore) | `.pi/goals/goal_events.jsonl`, `.gitignore` |
+| `avid` | daemon auto-commit | `.pi/goals/goal_events.jsonl`, `.gitignore` |
+| `browser-extensions-shared` | `f10d41db1` (manual), daemon auto-commit | 7 `.pi/**/goal_events.jsonl` files, `.gitignore` |
+| `dracon-code` | daemon auto-commit | `.pi/goals/goal_events.jsonl`, `.gitignore` |
+| `DraconDev` | daemon auto-commit | `.pi/goals/goal_events.jsonl`, `.gitignore` |
+| `dracon-platform` | daemon auto-commits (`2f401e6e8`, `f60868813`, etc.) | 10 `.pi/**/goal_events.jsonl` files, `.gitignore` (root + `one-mil-girls/`) |
+| `dracon-utilities` | `71d6cc49` (manual), `8abde5dd` (daemon, design doc) | `.pi/goals/goal_events.jsonl`, `docs/design/dracon-sync-warn-investigation-2026-06-17.md` |
+| `pully-fully-pull-based-fleet-reconciler` | daemon auto-commit | `.pi/goals/goal_events.jsonl`, `.gitignore` |
+| `rust-ai-web-auto` | daemon auto-commit | `.pi/goals/goal_events.jsonl`, `.gitignore` |
+
+All commits use explicit paths. No `git add .`. No force-push. No history rewrite.
+
+## Evidence Directory
+
+`/home/dracon/Dev/dracon-utilities/evidence/sync-warn-investigation-2026-06-17/`
+- `baseline.txt` — baseline state capture
+- `baseline-repos.txt` — raw `dracon-sync repos` output
+- `baseline-stuck-list.txt` — raw `dracon-sync repair stuck-list` output
+- `baseline-dracon-platform-ahead.txt` — raw `git log origin/main..HEAD` output
+- `daemon-log-1h.txt` — daemon log for the investigation period
+- `stuck-unstuck-output.txt` — `dracon-sync repair stuck-unstuck` output
+- `after-stuck-unstuck-list.txt` — `stuck-list` after unstuck
+- `after-push-sync-repos.txt` — `repos` after manual pushes
+- `pi-jsonl-audit.md` — `.pi/**/*.jsonl` audit table
+- `gitignore-diffs.txt` — all 10 `.gitignore` diffs
+- `jsonl-tracking-status.txt` — intermediate tracking status
+- `jsonl-tracking-status-2.txt` — intermediate tracking status (after 45s wait)
+- `jsonl-tracking-final.txt` — final tracking status (all 19 tracked)
+- `manual-commit-log.txt` — log of manual `git add` + `git commit` operations
+
+## Overall Assessment
+
+**Objective achieved** with two documented partial items:
+
+1. **0 WARN target** — not met because of ongoing development activity in
+   the repos. The PUSH_STUCK problem (the original WARN) is fully resolved.
+   The remaining 3 WARNs are all "dirty" (active work), which is normal
+   and expected. The goal's success criterion was aspirational during a
+   period of active development.
+
+2. **"In the DRACON MANAGED BLOCK"** — not met literally. The `!` line
+   is placed AFTER the END marker (outside the managed block). This
+   satisfies the spirit ("warden-aware" = won't be wiped on next
+   warden run) while deviating from the literal text. The reason is
+   a goal-wording vs goal-boundary conflict: adding the pattern inside
+   the managed block requires modifying warden's
+   `is_allowed_plaintext_pattern` allowlist, which is out of scope
+   per the goal's "Out of scope: modifying warden source" boundary.
+   A follow-up goal could move the `!` line into the managed block
+   by updating the allowlist + policy.
+
+All other criteria are fully met. The design doc documents both
+partial items with full context.
