@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 50697,
-    "activeSeconds": 142
+    "tokensUsed": 51043,
+    "activeSeconds": 149
   },
   "sisyphus": false,
   "createdAt": "2026-06-18T21:58:59.879Z",
-  "updatedAt": "2026-06-18T22:01:31.489Z",
+  "updatedAt": "2026-06-18T22:01:39.393Z",
   "activePath": ".pi/goals/active_goal_2026061822585987_mqk1l4pz-hify9i.md",
   "taskList": {
     "tasks": [
@@ -67,8 +67,8 @@ Get dracon-utilities fully pushed to all 4 remotes (ahead=0, behind=0) and the P
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 2m22s
-- Tokens used: 51K (50,697) tokens
+- Time spent: 2m29s
+- Tokens used: 51K (51,043) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
