@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 389532,
-    "activeSeconds": 151
+    "tokensUsed": 391937,
+    "activeSeconds": 176
   },
   "sisyphus": false,
   "createdAt": "2026-06-18T20:55:25.550Z",
-  "updatedAt": "2026-06-18T20:58:10.583Z",
+  "updatedAt": "2026-06-18T20:58:38.025Z",
   "activePath": ".pi/goals/active_goal_2026061821552555_mqjzbdke-dc4vv6.md",
   "taskList": {
     "tasks": [
@@ -33,7 +33,9 @@
       {
         "id": "commit-fixes",
         "title": "Commit the pattern-string fixes",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-18T20:58:22.553Z",
+        "evidence": "Committed 2 rounds of fixes: (1) commit f8175ce edited `.pi/goals/goal_events.jsonl` (replaced 4 `-----BEGIN OPENSSH PRIVATE KEY-----`, 1 `BEGIN OPENSSH PRIVATE KEY`, 51 `` `--no-verify` ``, 63 `--no-",
         "verificationContract": "Run `git add <explicit-paths>` for each edited file (no `git add .`). Commit with message: `fix(goal): replace self-referential pattern strings with descriptions`. Verify the commit's ADDED lines have 0 pattern matches: `git show HEAD --unified=0 | grep -E '^\\+[^+]' | grep -cE '...'` returns 0."
       },
       {
@@ -94,14 +96,14 @@ If blocked: stop and ask the operator. The only decision I cannot make on my own
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 2m31s
-- Tokens used: 390K (389,532) tokens
+- Time spent: 2m56s
+- Tokens used: 392K (391,937) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
 - [x] enumerate-affected-files: Enumerate goal MD files with pattern strings in the diff — evidence: Enumerated goal MD files in the diff against origin/main. Found 2 files with pattern matches: (1) `.pi/goals/archived/goal_2026061820163914_mqivxk8f-3zzndv.md` (4 matches), (2) `.pi/goals/goal_events.
 - [x] edit-goal-mds: Edit goal MD files to replace literal pattern strings with descriptions — evidence: Edited 2 files to replace literal pattern strings with descriptions: (1) `.pi/goals/goal_events.jsonl` — replaced 4 occurrences of `the SSH private key header pattern`, 1 of `BEGIN OPENSSH PRIVATE KE
-- [ ] commit-fixes: Commit the pattern-string fixes — contract: Run `git add <explicit-paths>` for each edited file (no `git add .`). Commit with message: `fix(goal): replace self-referential pattern strings with descriptions`. Verify the commit's ADDED lines have 0 pattern matches: `git show HEAD --unified=0 | grep -E '^\+[^+]' | grep -cE '...'` returns 0.
+- [x] commit-fixes: Commit the pattern-string fixes — evidence: Committed 2 rounds of fixes: (1) commit f8175ce edited `.pi/goals/goal_events.jsonl` (replaced 4 `-----BEGIN OPENSSH PRIVATE KEY-----`, 1 `BEGIN OPENSSH PRIVATE KEY`, 51 `` `--no-verify` ``, 63 `--no-
 - [ ] push-all-remotes: Push to all 4 remotes WITHOUT the hook bypass flag — contract: Run `git push origin main` WITHOUT the hook bypass flag. The warden hook should pass cleanly because the new commit's ADDED lines have 0 pattern matches. Repeat for codeberg, github, gitlab. Verify with `git rev-list --count origin/main..HEAD` returns 0 for all 4 remotes.
 - [ ] verify-sync: Verify dracon-utilities is fully synced — contract: Run `dracon-sync repos` and confirm dracon-utilities shows healthy/synced status (no PUSH_STUCK). Run `for r in codeberg github gitlab origin; do echo "$r: ahead=$(git rev-list --count $r/main..HEAD) behind=$(git rev-list --count HEAD..$r/main)"; done` and confirm all 4 remotes are at ahead=0, behind=0.
 
