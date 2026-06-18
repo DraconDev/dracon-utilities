@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 545788,
-    "activeSeconds": 629
+    "tokensUsed": 936572,
+    "activeSeconds": 1243
   },
   "sisyphus": false,
   "createdAt": "2026-06-18T03:07:07.446Z",
-  "updatedAt": "2026-06-18T03:17:54.424Z",
+  "updatedAt": "2026-06-18T03:28:25.804Z",
   "activePath": ".pi/goals/active_goal_2026061804070744_mqix5j5i-rcksre.md",
   "taskList": {
     "tasks": [
@@ -52,7 +52,8 @@
       {
         "id": "recommit-plaintext",
         "title": "Re-commit REMOVED-pattern files in plaintext",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-18T03:27:04.956Z",
         "verificationContract": "For each file that was REMOVED from protected_patterns, in its respective repo, run `git add <explicit-path>` (no `git add .`) and commit. Run `git show HEAD -- <file> | head -10` and confirm the output shows plaintext content, NOT `[DRACON_SECRET:...]` markers."
       },
       {
@@ -113,8 +114,8 @@ If blocked: stop and ask the operator. The only decision I cannot make on my own
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 10m29s
-- Tokens used: 546K (545,788) tokens
+- Time spent: 20m43s
+- Tokens used: 937K (936,572) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
@@ -123,7 +124,7 @@ If blocked: stop and ask the operator. The only decision I cannot make on my own
 - [x] write-audit-doc: Write the audit design doc
 - [x] edit-policy: Edit the policy file based on audit recommendations
 - [x] run-warden: Run warden to update .gitattributes in all affected repos
-- [ ] recommit-plaintext: Re-commit REMOVED-pattern files in plaintext — contract: For each file that was REMOVED from protected_patterns, in its respective repo, run `git add <explicit-path>` (no `git add .`) and commit. Run `git show HEAD -- <file> | head -10` and confirm the output shows plaintext content, NOT `[DRACON_SECRET:...]` markers.
+- [x] recommit-plaintext: Re-commit REMOVED-pattern files in plaintext
 - [ ] push-all-repos: Push all affected repos to all remotes — contract: For each affected repo, push to origin, github, gitlab, codeberg. Run the sync check loop: `for r in origin github gitlab codeberg; do echo -n "$r: ahead=" && git rev-list --count $r/main..HEAD; done` and confirm all return 0.
 - [ ] write-summary: Write the audit summary at /tmp/protected-patterns-audit-summary.md — contract: Compose /tmp/protected-patterns-audit-summary.md with: (1) audit doc path, (2) policy diff (before/after), (3) list of repos that had files re-committed, (4) list of new commit SHAs, (5) push status for all 4 remotes across all affected repos, (6) summary of recommendations (how many KEEP/REMOVE/MODIFY).
 
