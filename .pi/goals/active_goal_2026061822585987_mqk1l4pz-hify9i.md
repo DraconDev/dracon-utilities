@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 47223,
-    "activeSeconds": 73
+    "tokensUsed": 49431,
+    "activeSeconds": 102
   },
   "sisyphus": false,
   "createdAt": "2026-06-18T21:58:59.879Z",
-  "updatedAt": "2026-06-18T22:00:19.810Z",
+  "updatedAt": "2026-06-18T22:00:50.413Z",
   "activePath": ".pi/goals/active_goal_2026061822585987_mqk1l4pz-hify9i.md",
   "taskList": {
     "tasks": [
@@ -27,7 +27,7 @@
         "title": "Edit goal MD files to replace literal pattern strings with descriptions",
         "status": "complete",
         "completedAt": "2026-06-18T21:59:50.344Z",
-        "evidence": "Edited `.pi/goals/goal_events.jsonl` to replace 3 occurrences: 2 of `-----BEGIN PRIVATE KEY-----` and 1 of `-----BEGIN EC PRIVATE KEY-----` (in backtick-quoted examples within the audit report). All r",
+        "evidence": "Edited `.pi/goals/goal_events.jsonl` to replace 3 occurrences: 2 of `the SSH private key header pattern` and 1 of `the EC private key header pattern` (in backtick-quoted examples within the audit report). All r",
         "verificationContract": "For each affected file from the enumeration step, edit it to replace: (1) the SSH private key header pattern → the SSH private key header pattern (description), (2) the api_key assignment pattern → the api_key assignment pattern (description), (3) the hook bypass flag → the hook bypass flag (description). Use Python for safe in-place editing. Verify each edit with `git diff -- <file> --unified=0 | grep -E '^\\+[^+]' | grep -cE '(AKIA[A-Z0-9]{16}|-----BEGIN [A-Z]+ PRIVATE KEY|password\\s*=\\s*[\"\\x27][^\"\\x27]+|secret\\s*=\\s*[\"\\x27][^\"\\x27]+|api_key\\s*=\\s*[\"\\x27][^\"\\x27]+)'` returns 0."
       },
       {
@@ -65,13 +65,13 @@ Get dracon-utilities fully pushed to all 4 remotes (ahead=0, behind=0) and the P
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 1m13s
-- Tokens used: 47K (47,223) tokens
+- Time spent: 1m42s
+- Tokens used: 49K (49,431) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
 - [x] enumerate-affected-files: Enumerate goal MD files with pattern strings in the diff — evidence: Enumerated goal MD files in the diff against origin/main. Found 2 files changed: (1) `.pi/goals/archived/goal_2026061822505334_mqk0xgo1-ehrcps.md` — 0 pattern matches in ADDED lines (references are in
-- [x] edit-goal-mds: Edit goal MD files to replace literal pattern strings with descriptions — evidence: Edited `.pi/goals/goal_events.jsonl` to replace 3 occurrences: 2 of `-----BEGIN PRIVATE KEY-----` and 1 of `-----BEGIN EC PRIVATE KEY-----` (in backtick-quoted examples within the audit report). All r
+- [x] edit-goal-mds: Edit goal MD files to replace literal pattern strings with descriptions — evidence: Edited `.pi/goals/goal_events.jsonl` to replace 3 occurrences: 2 of `the SSH private key header pattern` and 1 of `the EC private key header pattern` (in backtick-quoted examples within the audit report). All r
 - [x] commit-fixes: Commit the pattern-string fixes — evidence: Committed 2 rounds of fixes: (1) commit 3f9c5772 edited the audit report in goal_events.jsonl (3 replacements). (2) commit 466e2e6f edited the daemon's evidence text that was written between the first
 - [ ] push-all-remotes: Push to all 4 remotes WITHOUT the hook bypass flag — contract: Run `git push <remote> main` for each of codeberg, github, gitlab, origin. The warden hook must pass cleanly (0 pattern matches in ADDED lines). Do NOT use the hook bypass flag.
 - [ ] verify-sync: Verify dracon-utilities is fully synced with no PUSH_STUCK concern — contract: Run `git rev-list --count <remote>/main..HEAD` for all 4 remotes — all should return 0. Run `dracon-sync repos` and confirm dracon-utilities shows no PUSH_STUCK concern (status OK).
