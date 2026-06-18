@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 104545,
-    "activeSeconds": 338
+    "tokensUsed": 111051,
+    "activeSeconds": 412
   },
   "sisyphus": false,
   "createdAt": "2026-06-18T21:40:35.617Z",
-  "updatedAt": "2026-06-18T21:46:22.664Z",
+  "updatedAt": "2026-06-18T21:47:39.265Z",
   "activePath": ".pi/goals/active_goal_2026061822403561_mqk0xgo1-ehrcps.md",
   "taskList": {
     "tasks": [
@@ -77,8 +77,8 @@ Get dracon-code's audit/2026-06-18 branch fully pushed to all 4 remotes (ahead=0
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 5m38s
-- Tokens used: 105K (104,545) tokens
+- Time spent: 6m52s
+- Tokens used: 111K (111,051) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
