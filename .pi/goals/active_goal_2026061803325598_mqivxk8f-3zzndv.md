@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 2138828,
-    "activeSeconds": 750
+    "tokensUsed": 3010607,
+    "activeSeconds": 803
   },
   "sisyphus": false,
   "createdAt": "2026-06-18T02:32:55.983Z",
-  "updatedAt": "2026-06-18T15:33:18.748Z",
+  "updatedAt": "2026-06-18T15:34:14.028Z",
   "activePath": ".pi/goals/active_goal_2026061803325598_mqivxk8f-3zzndv.md",
   "taskList": {
     "tasks": [
@@ -59,7 +59,9 @@
       {
         "id": "commit-untracked-files",
         "title": "Investigate and resolve 16 untracked files in dracon-platform",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-18T15:33:58.686Z",
+        "evidence": "Committed 30+ untracked files across 4 commits (60bfd0020, 678a46b68, 093ac7386, f4bcc3ff0). All files: game assets (PNG 1-1.6MB), test scripts (.mjs), screenshots, goal MD files. All under 100MB, non",
         "verificationContract": "Run `cd /home/dracon/Dev/dracon-platform && git ls-files --others --exclude-standard` to enumerate the 16 untracked files. For each file: (a) determine if it should be committed (operator's commit-all policy: default to tracked, exclude only with good reason), (b) if yes, run `git add <explicit-path>` and commit with a descriptive message, (c) if no, add to `.gitignore` with a documented reason. The final verification: `cd /home/dracon/Dev/dracon-platform && git ls-files --others --exclude-standard` should return empty (or only files with a documented reason in `.gitignore`). All edits use explicit paths; no `git add .`."
       }
     ],
@@ -115,8 +117,8 @@ If blocked: stop and ask the operator. The only decision I cannot make on my own
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 12m30s
-- Tokens used: 2.1M (2,138,828) tokens
+- Time spent: 13m23s
+- Tokens used: 3M (3,010,607) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
@@ -127,5 +129,5 @@ If blocked: stop and ask the operator. The only decision I cannot make on my own
 - [ ] download-artifact: Download the scale-test-results artifact — contract: Run `gh run download <run-id> -n scale-test-results -D /tmp/scale-test-artifact`. Verify `docs/SCALE_TEST_RESULTS.md` was extracted. Read it and confirm it contains the 3 assertion outcomes (200/200, 600/600, 0 conflicts) and a PASS/FAIL verdict.
 - [ ] write-report: Write the Actions run report — contract: Compose `/tmp/scale-test-actions-run.md` with all 6 required fields: branch name, PR URL, run URL, build time, total wall time, the 3 assertion outcomes, PASS/FAIL verdict, and observations. Verify the file exists and contains all fields.
 - [ ] cleanup: Return to main branch and verify clean state — contract: Run `git checkout main`. Verify `git status` is clean (or only shows .pi/goals/ bookkeeping changes from this goal). The branch and PR stay on GitHub (do not delete).
-- [ ] commit-untracked-files: Investigate and resolve 16 untracked files in dracon-platform — contract: Run `cd /home/dracon/Dev/dracon-platform && git ls-files --others --exclude-standard` to enumerate the 16 untracked files. For each file: (a) determine if it should be committed (operator's commit-all policy: default to tracked, exclude only with good reason), (b) if yes, run `git add <explicit-path>` and commit with a descriptive message, (c) if no, add to `.gitignore` with a documented reason. The final verification: `cd /home/dracon/Dev/dracon-platform && git ls-files --others --exclude-standard` should return empty (or only files with a documented reason in `.gitignore`). All edits use explicit paths; no `git add .`.
+- [x] commit-untracked-files: Investigate and resolve 16 untracked files in dracon-platform — evidence: Committed 30+ untracked files across 4 commits (60bfd0020, 678a46b68, 093ac7386, f4bcc3ff0). All files: game assets (PNG 1-1.6MB), test scripts (.mjs), screenshots, goal MD files. All under 100MB, non
 
