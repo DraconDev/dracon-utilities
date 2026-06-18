@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 388574,
-    "activeSeconds": 142
+    "tokensUsed": 389532,
+    "activeSeconds": 151
   },
   "sisyphus": false,
   "createdAt": "2026-06-18T20:55:25.550Z",
-  "updatedAt": "2026-06-18T20:58:01.429Z",
+  "updatedAt": "2026-06-18T20:58:10.583Z",
   "activePath": ".pi/goals/active_goal_2026061821552555_mqjzbdke-dc4vv6.md",
   "taskList": {
     "tasks": [
@@ -94,8 +94,8 @@ If blocked: stop and ask the operator. The only decision I cannot make on my own
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 2m22s
-- Tokens used: 389K (388,574) tokens
+- Time spent: 2m31s
+- Tokens used: 390K (389,532) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
