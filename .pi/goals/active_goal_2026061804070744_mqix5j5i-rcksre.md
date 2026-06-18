@@ -10,7 +10,7 @@
   },
   "sisyphus": false,
   "createdAt": "2026-06-18T03:07:07.446Z",
-  "updatedAt": "2026-06-18T03:32:45.623Z",
+  "updatedAt": "2026-06-18T03:40:13.700Z",
   "activePath": ".pi/goals/active_goal_2026061804070744_mqix5j5i-rcksre.md",
   "stopReason": "agent",
   "pauseReason": "The audit goal's work is essentially complete: policy file edited, .gitattributes updated by warden, REMOVED-pattern files re-committed in plaintext across 6 repos, pushed to all remotes EXCEPT dracon-utilities. The dracon-utilities push is blocked by the warden pre-push hook due to a pre-existing self-referential false positive: the goal MD files (daemon auto-commits) contain the literal pattern strings the hook scans for. The goal says \"Do NOT use git push --no-verify\" and \"no history rewrites\", but the old commits on the local side contain the strings, and amending them would be a history rewrite. The audit goal's actual changes (policy file, design doc) are in ~/.dracon/ (outside repos) and in 6 other repos that ARE successfully pushed. Only the daemon's goal-bookkeeping commits remain in dracon-utilities.",
