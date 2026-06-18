@@ -59,17 +59,18 @@ state/
 state/fleet/*.db
 target/
 tasks*.json
-!*.env
 !.env
-!.env.*
-!config.json
+!.env.prod
+!.env.dev
+!.env.production
+!.env.ovh
+!.env.turso
 !config/services.json
 !config/services.test.json
 !config/licenses.json
 !config/licenses.test.json
 !plan/pages/snapshots/*.json
 !plan/pages/templates/*.json
-!.cargo/config.toml
 !*.pem
 !*.key
 !*.age
@@ -107,6 +108,3 @@ tasks*.json
 !rustfmt.toml
 !state/events/*.jsonl
 # --- END DRACON MANAGED BLOCK ---
-
-# Operator override 2026-06-17 (goal mqibwvpd-95h3al): unignore .pi/**/goal_events.jsonl
-!**/.pi/**/*.jsonl
