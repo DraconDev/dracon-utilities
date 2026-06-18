@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 235319,
-    "activeSeconds": 385
+    "tokensUsed": 238740,
+    "activeSeconds": 414
   },
   "sisyphus": false,
   "createdAt": "2026-06-18T03:07:07.446Z",
-  "updatedAt": "2026-06-18T03:13:45.123Z",
+  "updatedAt": "2026-06-18T03:14:15.652Z",
   "activePath": ".pi/goals/active_goal_2026061804070744_mqix5j5i-rcksre.md",
   "taskList": {
     "tasks": [
@@ -45,7 +45,8 @@
       {
         "id": "run-warden",
         "title": "Run warden to update .gitattributes in all affected repos",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-18T03:14:08.187Z",
         "verificationContract": "Run `dracon-warden` (or the appropriate command) to update `.gitattributes` in all watched repos. For each affected repo, run `grep -c 'filter=dracon' .gitattributes` and confirm the count decreased (or stayed the same if no entries were removed)."
       },
       {
@@ -112,8 +113,8 @@ If blocked: stop and ask the operator. The only decision I cannot make on my own
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 6m25s
-- Tokens used: 235K (235,319) tokens
+- Time spent: 6m54s
+- Tokens used: 239K (238,740) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
@@ -121,7 +122,7 @@ If blocked: stop and ask the operator. The only decision I cannot make on my own
 - [x] audit-content: Audit each pattern: does the matched content contain secrets?
 - [x] write-audit-doc: Write the audit design doc
 - [x] edit-policy: Edit the policy file based on audit recommendations
-- [ ] run-warden: Run warden to update .gitattributes in all affected repos — contract: Run `dracon-warden` (or the appropriate command) to update `.gitattributes` in all watched repos. For each affected repo, run `grep -c 'filter=dracon' .gitattributes` and confirm the count decreased (or stayed the same if no entries were removed).
+- [x] run-warden: Run warden to update .gitattributes in all affected repos
 - [ ] recommit-plaintext: Re-commit REMOVED-pattern files in plaintext — contract: For each file that was REMOVED from protected_patterns, in its respective repo, run `git add <explicit-path>` (no `git add .`) and commit. Run `git show HEAD -- <file> | head -10` and confirm the output shows plaintext content, NOT `[DRACON_SECRET:...]` markers.
 - [ ] push-all-repos: Push all affected repos to all remotes — contract: For each affected repo, push to origin, github, gitlab, codeberg. Run the sync check loop: `for r in origin github gitlab codeberg; do echo -n "$r: ahead=" && git rev-list --count $r/main..HEAD; done` and confirm all return 0.
 - [ ] write-summary: Write the audit summary at /tmp/protected-patterns-audit-summary.md — contract: Compose /tmp/protected-patterns-audit-summary.md with: (1) audit doc path, (2) policy diff (before/after), (3) list of repos that had files re-committed, (4) list of new commit SHAs, (5) push status for all 4 remotes across all affected repos, (6) summary of recommendations (how many KEEP/REMOVE/MODIFY).
