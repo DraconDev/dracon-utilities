@@ -1521,7 +1521,7 @@ pub(crate) fn test_sync_policy() -> SyncPolicy {
         auto_github_private: false,
         auto_github_private_account: "DraconDev".to_string(),
         max_stage_file_bytes: 100 * 1024 * 1024,
-    max_stage_batch_files: 100,
+        max_stage_batch_files: 100,
         pull_op_timeout_secs: 30,
         push_op_timeout_secs: 300,
         repo_sync_timeout_secs: 420,
