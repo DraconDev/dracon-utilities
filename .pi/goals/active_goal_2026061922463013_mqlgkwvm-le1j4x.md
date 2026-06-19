@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 181216,
-    "activeSeconds": 147
+    "tokensUsed": 182618,
+    "activeSeconds": 199
   },
   "sisyphus": false,
   "createdAt": "2026-06-19T21:46:30.130Z",
-  "updatedAt": "2026-06-19T21:49:07.632Z",
+  "updatedAt": "2026-06-19T21:50:01.953Z",
   "activePath": ".pi/goals/active_goal_2026061922463013_mqlgkwvm-le1j4x.md",
   "taskList": {
     "tasks": [
@@ -53,7 +53,9 @@
       {
         "id": "audit-gitignore-bypass",
         "title": "Fix the .gitignore bypass for .dracon/dracon-sync.toml systemically",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-19T21:49:57.381Z",
+        "evidence": "Added `!.dracon/dracon-sync.toml` to the .gitignore whitelist in 4 repos (ai-auto-writer, avid, dracon-ai-lib, rust-ai-web-auto). dracon-platform already had the entry. Committed and pushed to all 4 r",
         "verificationContract": "For each repo with `.dracon/dracon-sync.toml` force-added (ai-auto-writer, avid, dracon-ai-lib, dracon-platform, rust-ai-web-auto), add `!.dracon/dracon-sync.toml` to the `.gitignore` whitelist section (after the existing `!.dracon/data/keys/*.pub` line). This makes the file trackable without `git add -f`. Verify with `git check-ignore -v .dracon/dracon-sync.toml` returning the whitelist line.",
         "lightweightSubtasks": true
       },
@@ -79,8 +81,8 @@ Audit all 13 repos for hacky/manual solutions and replace them with systemic one
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 2m27s
-- Tokens used: 181K (181,216) tokens
+- Time spent: 3m19s
+- Tokens used: 183K (182,618) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
@@ -88,6 +90,6 @@ Audit all 13 repos for hacky/manual solutions and replace them with systemic one
 - [x] audit-plaintext-siblings: Audit the 20 .plaintext sibling files and document the pattern — evidence: Wrote 4751-byte audit to `/home/dracon/Dev/dracon-utilities/evidence/plaintext-sibling-audit-2026-06-19.md`. Audited all 20 .plaintext files. Categorized: 19 test fixtures (dracon-warden, dracon-sync,
 - [x] audit-pi-commits: Audit the 3 historical pi commits in 2 repos and document the decision — evidence: Wrote 4548-byte audit to `/home/dracon/Dev/dracon-utilities/evidence/pi-commit-audit-2026-06-19.md`. Documented all 3 pi commits: dracon-code c3159191d (7 deep, inert), da74bfd20 (10 deep, inert), dra
 - [x] audit-git-config: Audit the 9 repos missing local git config and fix systematically — evidence: Set `git config --local user.email "dracsharp@gmail.com"` and `git config --local user.name "DraconDev"` in all 9 repos: ai-auto-writer, avid, dracon-ai-lib, dracon-code, DraconDev, dracon-libs, draco
-- [ ] audit-gitignore-bypass: Fix the .gitignore bypass for .dracon/dracon-sync.toml systemically — contract: For each repo with `.dracon/dracon-sync.toml` force-added (ai-auto-writer, avid, dracon-ai-lib, dracon-platform, rust-ai-web-auto), add `!.dracon/dracon-sync.toml` to the `.gitignore` whitelist section (after the existing `!.dracon/data/keys/*.pub` line). This makes the file trackable without `git add -f`. Verify with `git check-ignore -v .dracon/dracon-sync.toml` returning the whitelist line.
+- [x] audit-gitignore-bypass: Fix the .gitignore bypass for .dracon/dracon-sync.toml systemically — evidence: Added `!.dracon/dracon-sync.toml` to the .gitignore whitelist in 4 repos (ai-auto-writer, avid, dracon-ai-lib, rust-ai-web-auto). dracon-platform already had the entry. Committed and pushed to all 4 r
 - [ ] commit-audit-docs: Commit all audit docs and push to all 4 remotes for dracon-utilities — contract: All audit findings committed as 3 separate docs in `dracon-utilities/evidence/`. Each doc committed with descriptive message. All 4 remotes (origin, github, codeberg, gitlab) at ahead=0, behind=0 for dracon-utilities.
 
