@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 129961,
-    "activeSeconds": 630
+    "tokensUsed": 131303,
+    "activeSeconds": 661
   },
   "sisyphus": false,
   "createdAt": "2026-06-19T18:22:09.850Z",
-  "updatedAt": "2026-06-19T18:33:14.760Z",
+  "updatedAt": "2026-06-19T18:33:45.875Z",
   "activePath": ".pi/goals/active_goal_2026061919220985_mql9a4sa-9wxrka.md",
   "taskList": {
     "tasks": [
@@ -79,8 +79,8 @@ Fix the author regression on dracon-platform (4 pi-authored commits at HEAD rewr
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 10m30s
-- Tokens used: 130K (129,961) tokens
+- Time spent: 11m01s
+- Tokens used: 131K (131,303) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
