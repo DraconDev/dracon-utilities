@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 417887,
-    "activeSeconds": 199
+    "tokensUsed": 420095,
+    "activeSeconds": 219
   },
   "sisyphus": false,
   "createdAt": "2026-06-19T06:31:56.167Z",
-  "updatedAt": "2026-06-19T07:43:53.005Z",
+  "updatedAt": "2026-06-19T07:44:14.624Z",
   "activePath": ".pi/goals/active_goal_2026061907315616_mqkjwruv-9wbkui.md",
   "taskList": {
     "tasks": [
@@ -71,8 +71,8 @@ Fix two divergence/merge conflict issues that the hook fix didn't resolve: (1) d
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 3m19s
-- Tokens used: 418K (417,887) tokens
+- Time spent: 3m39s
+- Tokens used: 420K (420,095) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
