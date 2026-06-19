@@ -193,3 +193,53 @@ dracon-sync ownership --explain
   - Total per-repo overrides in place: **3**
     (`dracon-ai-lib`, `kiki-sassy-desktop-announcer`,
     `dracon-platform`).
+- 2026-06-19 (second update): rewrote 4 pi-authored commits
+  - A new agent session on 2026-06-19 committed
+    `aa0562b93` (feat(layout-width): apply direction Y
+    to all 6 apps) as `pi <pi@dracon.uk>`, re-introducing
+    the unowned HEAD warning despite the override.
+  - Resolution: **force-rewrote all 4 pi-authored commits
+    to DraconDev authorship** via
+    `GIT_SEQUENCE_EDITOR='sed -i s/^pick/edit/' git rebase
+    -i HEAD~4 --exec '... git commit --amend
+    --reset-author --no-edit'`. This is a one-time
+    exception to the AGENTS.md "NEVER force-push" rule,
+    explicitly approved by the operator because:
+    (1) the 4 commits were already on all 4 remotes
+    (no divergence risk), (2) the local `user.email`/
+    `user.name` was empty (no configured identity for
+    the agent), and (3) the rewrite preserves all
+    commit content — only the author/committer fields
+    change.
+  - SHA mapping (old → new):
+    - `aa0562b93` → `cce27ae99`
+    - `7f7ccb0b7` → `199e4a850` (was already DraconDev,
+      new SHA from rebase)
+    - `2a80aae40` → `514dd9784`
+    - `ef19844a5` → `486d29150`
+  - Force-pushed to all 4 remotes with
+    `git push --force-with-lease`. All 4 remotes at
+    ahead=0, behind=0, all at SHA `cce27ae99`.
+  - Set local `user.email`/`user.name` in
+    `dracon-platform` to `dracsharp@gmail.com`/
+    `DraconDev` to prevent future agent sessions from
+    committing as `pi`.
+  - Also diagnosed and resolved the 8,037 untracked
+    file backlog (see
+    `evidence/dracon-platform-untracked-investigation-2026-06-19/diagnosis.md`).
+    Root cause: daemon stuck in a lock file contention
+    loop (`git add failed for N paths` followed by
+    `trailing-drain: clearing stuck in_flight entries`).
+    Resolution: manually committed the untracked files
+    in 13 batches (archived goals, docs, apis, vendor,
+    web/ top-level, web/games/*, etc.), all authored
+    by DraconDev.
+  - **Override decision**: the override file at
+    `dracon-platform/.dracon/dracon-sync.toml` is
+    **kept** for now, even though the HEAD author is
+    now DraconDev. Reason: if a future agent session
+    bypasses the local git config and commits as
+    `pi` again, the override will keep the daemon
+    from flagging the repo as unowned. The override
+    can be removed once the operator is confident the
+    agent workflow is permanently fixed.

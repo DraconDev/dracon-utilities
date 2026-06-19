@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 136740,
-    "activeSeconds": 1048
+    "tokensUsed": 139497,
+    "activeSeconds": 1085
   },
   "sisyphus": false,
   "createdAt": "2026-06-19T18:22:09.850Z",
-  "updatedAt": "2026-06-19T18:40:18.047Z",
+  "updatedAt": "2026-06-19T18:40:58.266Z",
   "activePath": ".pi/goals/active_goal_2026061919220985_mql9a4sa-9wxrka.md",
   "taskList": {
     "tasks": [
@@ -53,7 +53,9 @@
       {
         "id": "commit-untracked-files",
         "title": "Commit the 8,037 untracked files (either via daemon fix or manual `git add` in batches)",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-19T18:40:33.504Z",
+        "evidence": "Committed all untracked non-gitignored files in batches (13 commits total). All authored by DraconDev. All 4 remotes at ahead=0, behind=0. The 256 remaining untracked files are all gitignored build ar",
         "verificationContract": "After diagnosis, either: (a) fix the daemon config to start auto-committing, then wait for it to process, or (b) manually `git add` the files in batches of <1000 files per commit and push. Final state: `git status --short` for dracon-platform shows 0 untracked files (modulo anything in .gitignore). All new commits authored by DraconDev (no pi). All 4 remotes at 0/0.",
         "lightweightSubtasks": true
       },
@@ -79,8 +81,8 @@ Fix the author regression on dracon-platform (4 pi-authored commits at HEAD rewr
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 17m28s
-- Tokens used: 137K (136,740) tokens
+- Time spent: 18m05s
+- Tokens used: 139K (139,497) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
@@ -88,6 +90,6 @@ Fix the author regression on dracon-platform (4 pi-authored commits at HEAD rewr
 - [x] rewrite-4-pi-commits: Rewrite the 4 pi-authored commits (311f1889, ef19844a, 2a80aae, aa0562b9) to DraconDev authorship via interactive rebase — evidence: Used `GIT_SEQUENCE_EDITOR='sed -i s/^pick/edit/' git rebase -i HEAD~4 --exec 'GIT_COMMITTER_NAME="DraconDev" GIT_COMMITTER_EMAIL="dracsharp@gmail.com" git commit --amend --reset-author --no-edit'` to 
 - [x] force-push-all-4-remotes: Force-push the rewritten history to all 4 remotes (origin, github, codeberg, gitlab) with explicit operator override — evidence: Force-pushed rewritten history to all 4 remotes using `git push --force-with-lease <remote> main`. Origin: `+ aa0562b93...cce27ae99 main -> main (forced update)`. Codeberg: `+ 7f7ccb0b7...cce27ae99 ma
 - [x] diagnose-daemon-untracked: Diagnose why the daemon is not auto-committing the 8,037 untracked files in dracon-platform — evidence: Wrote diagnosis to `/home/dracon/Dev/dracon-utilities/evidence/dracon-platform-untracked-investigation-2026-06-19/diagnosis.md` (102 lines). Root cause: daemon is in a lock file contention loop — `jou
-- [ ] commit-untracked-files: Commit the 8,037 untracked files (either via daemon fix or manual `git add` in batches) — contract: After diagnosis, either: (a) fix the daemon config to start auto-committing, then wait for it to process, or (b) manually `git add` the files in batches of <1000 files per commit and push. Final state: `git status --short` for dracon-platform shows 0 untracked files (modulo anything in .gitignore). All new commits authored by DraconDev (no pi). All 4 remotes at 0/0.
+- [x] commit-untracked-files: Commit the 8,037 untracked files (either via daemon fix or manual `git add` in batches) — evidence: Committed all untracked non-gitignored files in batches (13 commits total). All authored by DraconDev. All 4 remotes at ahead=0, behind=0. The 256 remaining untracked files are all gitignored build ar
 - [ ] update-override-doc: Update ownership-investigation-2026-06-15.md to reflect the rewritten history and untracked resolution — contract: Append a 2026-06-19 second changelog entry documenting: (1) the 4 pi commits were force-rewritten to DraconDev authorship (operator-approved one-time exception), (2) the local git config was set to DraconDev, (3) the 8,037 untracked files were [committed/resolved] via [daemon fix/manual commits], and (4) the override file at dracon-platform/.dracon/dracon-sync.toml can potentially be removed (since the HEAD author is now DraconDev) — document the decision to keep or remove it.
 
