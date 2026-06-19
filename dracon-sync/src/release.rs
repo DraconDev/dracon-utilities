@@ -755,7 +755,7 @@ mod tests {
         std::fs::write(
             &gh_mock,
             "#!/bin/sh
-if [ \"$GH_TOKEN\" ]; then
+if [ -z \"$GH_TOKEN\" ]; then
   echo 'missing GH_TOKEN' >&2
   exit 20
 fi
