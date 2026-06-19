@@ -439,6 +439,13 @@ pub(crate) struct SyncPolicy {
     pub(crate) auto_github_private_account: String,
     #[serde(default = "default_max_stage_file_bytes")]
     pub(crate) max_stage_file_bytes: u64,
+    /// Maximum number of files to stage in a single commit batch.
+    /// When a repo has more untracked files than this limit, the daemon
+    /// commits them in multiple smaller batches (each ≤ this size) to
+    /// avoid lock contention and large commit overhead.
+    /// Default: 100 (matches goal mqli43u6-tg3lcf requirement of 50-100).
+    #[serde(default = "default_max_stage_batch_files")]
+    pub(crate) max_stage_batch_files: usize,
     #[serde(default = "default_pull_op_timeout_secs")]
     pub(crate) pull_op_timeout_secs: u64,
     #[serde(default = "default_push_op_timeout_secs")]
@@ -839,6 +846,10 @@ pub(crate) fn default_untracked_exclude_patterns() -> Vec<String> {
 
 pub(crate) fn default_max_stage_file_bytes() -> u64 {
     100 * 1024 * 1024
+}
+
+fn default_max_stage_batch_files() -> usize {
+    100
 }
 
 pub(crate) fn default_pull_op_timeout_secs() -> u64 {
@@ -1510,6 +1521,7 @@ pub(crate) fn test_sync_policy() -> SyncPolicy {
         auto_github_private: false,
         auto_github_private_account: "DraconDev".to_string(),
         max_stage_file_bytes: 100 * 1024 * 1024,
+    max_stage_batch_files: 100,
         pull_op_timeout_secs: 30,
         push_op_timeout_secs: 300,
         repo_sync_timeout_secs: 420,

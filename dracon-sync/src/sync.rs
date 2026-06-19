@@ -2168,6 +2168,22 @@ async fn stage_commit_and_push(
         .map(|e| e.path.to_string_lossy().to_string())
         .collect();
 
+    // FIX (2026-06-19, goal mqli43u6-tg3lcf): limit the number of files
+    // staged in a single commit batch to avoid lock contention and large
+    // commit overhead. When a repo has more untracked files than the
+    // batch limit, the daemon commits them in multiple smaller batches.
+    let max_batch = policy.max_stage_batch_files;
+    let stage_paths: Vec<String> = if stage_paths.len() > max_batch {
+        eprintln!(
+            "📦 batching {} files into chunks of {}",
+            stage_paths.len(),
+            max_batch
+        );
+        stage_paths.into_iter().take(max_batch).collect()
+    } else {
+        stage_paths
+    };
+
     let (existing, missing): (Vec<_>, Vec<_>) =
         stage_paths.into_iter().partition(|p| repo.join(p).exists());
 
