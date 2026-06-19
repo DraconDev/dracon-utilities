@@ -213,3 +213,5 @@
 {"type":"audit_result","goalId":"mqlgkwvm-le1j4x","verdict":"disapproved","report":"Auditor produced no output.","at":"2026-06-19T22:12:50.902Z"}
 {"type":"completion_requested","goalId":"mqlgkwvm-le1j4x","summary":"Completed comprehensive systemic audit of all 13 repos. Audited 3 per-repo override files, 23 .plaintext sibling scanner exemptions, 3 historical pi commits, set local git config in 9 repos, added .gitignore whitelist for .dracon/dracon-sync.toml (5 repos), .dracon/project-state.md (8 repos), and .dracon/inventory_check.json (1 repo). All 3 audit documents written to evidence/ and pushed to all 4 remotes. All affected repos at 0/0.","at":"2026-06-19T22:17:56.906Z"}
 {"type":"audit_started","goalId":"mqlgkwvm-le1j4x","provider":"opencode-go","model":"mimo-v2.5","thinkingLevel":"high","at":"2026-06-19T22:17:56.907Z"}
+{"type":"audit_skipped","goalId":"mqlgkwvm-le1j4x","reason":"user_aborted","provider":"opencode-go","model":"mimo-v2.5","thinkingLevel":"high","at":"2026-06-19T22:18:47.931Z"}
+{"type":"goal_paused","goalId":"mqlgkwvm-le1j4x","reason":"user","status":"paused","at":"2026-06-19T22:18:48.321Z"}

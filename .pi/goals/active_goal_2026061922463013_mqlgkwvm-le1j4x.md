@@ -2,16 +2,17 @@
   "version": 3,
   "id": "mqlgkwvm-le1j4x",
   "objective": "Audit all 13 repos for hacky/manual solutions and replace them with systemic ones: 3 per-repo override files, 20 .plaintext sibling scanner exemptions, 2 repos with historical pi commits, 9 repos missing local git config, and 5 force-added `.dracon/dracon-sync.toml` files bypassing `.gitignore`.",
-  "status": "active",
-  "autoContinue": true,
+  "status": "paused",
+  "autoContinue": false,
   "usage": {
     "tokensUsed": 406868,
     "activeSeconds": 1854
   },
   "sisyphus": false,
   "createdAt": "2026-06-19T21:46:30.130Z",
-  "updatedAt": "2026-06-19T22:17:47.676Z",
+  "updatedAt": "2026-06-19T22:18:48.321Z",
   "activePath": ".pi/goals/active_goal_2026061922463013_mqlgkwvm-le1j4x.md",
+  "stopReason": "user",
   "taskList": {
     "tasks": [
       {
@@ -80,8 +81,8 @@ Audit all 13 repos for hacky/manual solutions and replace them with systemic one
 
 ## Progress
 
-- Status: running
-- Auto-continue: on
+- Status: paused
+- Auto-continue: off
 - Sisyphus mode: no
 - Time spent: 30m54s
 - Tokens used: 407K (406,868) tokens
