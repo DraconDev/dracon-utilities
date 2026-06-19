@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 171712,
-    "activeSeconds": 34
+    "tokensUsed": 172047,
+    "activeSeconds": 50
   },
   "sisyphus": false,
   "createdAt": "2026-06-19T21:46:30.130Z",
-  "updatedAt": "2026-06-19T21:47:07.365Z",
+  "updatedAt": "2026-06-19T21:47:24.042Z",
   "activePath": ".pi/goals/active_goal_2026061922463013_mqlgkwvm-le1j4x.md",
   "taskList": {
     "tasks": [
@@ -73,8 +73,8 @@ Audit all 13 repos for hacky/manual solutions and replace them with systemic one
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 34s
-- Tokens used: 172K (171,712) tokens
+- Time spent: 50s
+- Tokens used: 172K (172,047) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
