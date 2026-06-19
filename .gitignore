@@ -71,6 +71,8 @@ tasks*.json
 !config/licenses.test.json
 !plan/pages/snapshots/*.json
 !plan/pages/templates/*.json
+!web/ai-hub/src/lib/data/voucher-research.json
+!web/ai-hub/src/lib/data/promo-codes.json
 !*.pem
 !*.key
 !*.age
