@@ -3694,7 +3694,7 @@ push_url = "git@nonexistent.example.com:repo.git"
     }
 
     #[tokio::test]
-    async fn test_sync_repo_mirror_push_failure_returns_false() {
+    async fn test_sync_repo_mirror_push_failure_second() {
         // See `test_sync_repo_mirror_push_failure_returns_false`
         // for the rationale on using a temp state dir.
         let state_dir = tempfile::tempdir().unwrap();
