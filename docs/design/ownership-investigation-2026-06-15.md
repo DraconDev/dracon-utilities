@@ -164,3 +164,32 @@ dracon-sync ownership --explain
   - 2 per-repo overrides in place
     (`dracon-ai-lib`, `kiki-sassy-desktop-announcer`)
   - No misclassifications found
+- 2026-06-19: added `dracon-platform` per-repo override
+  - 3 new commits on `main` (`2a80aae40`, `ef19844a5`,
+    `311f1889f`) authored by `pi <pi@dracon.uk>` from a
+    transient agent session working on the
+    `layout-width` design docs. The daemon correctly
+    flagged the repo as `untrusted_author` and showed
+    `🚫 unowned: HEAD author = pi <pi@dracon.uk>` in
+    the live `dracon-sync repos` table.
+  - Resolution: added `owned = true` override at
+    `/home/dracon/Dev/dracon-platform/.dracon/dracon-sync.toml`
+    (committed as `7f7ccb0b7`, force-added to bypass the
+    `.dracon/*` gitignore rule, same pattern as
+    `dracon-ai-lib` override at `c48671c`).
+  - The 3 pi-authored commits were already auto-committed
+    and auto-pushed to all 4 remotes by the daemon
+    during the agent's work session; they are not
+    rewritten (no history rewrite per `AGENTS.md`
+    constraints). The local `user.email`/`user.name`
+    are correct (`dracsharp@gmail.com`/`DraconDev`),
+    so all future commits will be authored by the
+    operator.
+  - After override: daemon reclassifies
+    `dracon-platform` as `✓ owned (override)`, the
+    `dracon-sync repos` table shows `🟢 synced` and
+    hint `healthy`, and the `untrusted_author` warning
+    is gone.
+  - Total per-repo overrides in place: **3**
+    (`dracon-ai-lib`, `kiki-sassy-desktop-announcer`,
+    `dracon-platform`).
