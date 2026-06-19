@@ -312,7 +312,7 @@ mod tests {
         std::fs::create_dir_all(&secrets_dir).expect("create secrets dir");
         std::fs::write(
             secrets_dir.join("weird.env"),
-            "# This is a comment\n# COMMENTED_SECRET_TOKEN=commented_token_xyz\n[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBOeXdvSTFVdEw3YnRGSW9jL1ZxL3JBbDdxR2JsMTRSenZFbnNMb24xdWhnCllwa0s5aDY0cVJrV0dTazFucVg4bnFrNnFmSjFoSXR4d2c1WHJJaGJ4RUkKLT4gWDI1NTE5IHUzVHhVSGFzajZJMEZkSnBqaFRpNVQvcUpwQnpLaUxaVXNKSFVXM21jd1kKNHZQYm9NMnU0WDQ1ZzRWVk5NNFl0LzFxdXJDbEJvcUFISks5U2h4N1lmYwotPiBYMjU1MTkgOVhtRDllMEVDMXpoWXBZYlFOMGFteE91ODBEV2F4RFp3eGVZd1FvS3R5RQovT1VzNXRtWjh4YTBxa3E5U2NkaGhUbjEweHpPM1gvTXhmYTR5UUM2YlNBCi0+IFgyNTUxOSA2SnhiTnBZbklnUmdzaURvS1N6SmlpTDJReFpYTHp6MXFJVVR3V3M0dGlvCkJ5TUNXYW1QcU9jVU5KOGlOWTZaNFRINWRENlBNN2lHN3ROY1FxOGpQbDQKLT4gWDI1NTE5IHVSVU52bFNNN0F0SVJzMW0rcTVpeisweDltQXFwWHNLWVBYRUo2d1M4RmcKMFpFcFVhNmZaeHBQdlZCZ1RPaWhUMzVhMlFZUEp4bWZBSTZPeTZPaG43MAotPiB1Q1c2cS1ncmVhc2UgT1UgQyBmIF07WyQ2CnNDWWZlRkJmdk9KMEJqL3VYSVJJM2dWblB2Y2wwaWxjc09mNzcvTVZiQQotLS0gNDM2NE92aWxGNzg1bGZwQnBuOVNQM2dRNXFCY1pYaGZXWWNReTdSZWJFcwq/vddm6ZcpHQ+NbNbTvDvq198GUNgjn6tapuoXLqJR+S9sbP6ZWmsMVwXzQFW8Tdn+bWaclNbS3MrRgXEMXHn5c4K/4ln8vwmwvasNf7VquvcDWXWkaMVzMmvBe4azjFLg7Q3btjLr/Aq50g==] Another comment\nTOKEN_AFTER=value_after\n",
+            "# This is a comment\nCOMMENTED_SECRET_TOKEN=commented_token_xyz\nTOKEN_AFTER=value_after\n",
         )
         .expect("write env file");
         let result = load_secret("COMMENTED_SECRET_TOKEN");
