@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 139497,
-    "activeSeconds": 1085
+    "tokensUsed": 141832,
+    "activeSeconds": 1114
   },
   "sisyphus": false,
   "createdAt": "2026-06-19T18:22:09.850Z",
-  "updatedAt": "2026-06-19T18:40:58.266Z",
+  "updatedAt": "2026-06-19T18:41:29.022Z",
   "activePath": ".pi/goals/active_goal_2026061919220985_mql9a4sa-9wxrka.md",
   "taskList": {
     "tasks": [
@@ -62,7 +62,9 @@
       {
         "id": "update-override-doc",
         "title": "Update ownership-investigation-2026-06-15.md to reflect the rewritten history and untracked resolution",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-19T18:41:21.504Z",
+        "evidence": "Appended 60-line 2026-06-19 changelog entry to ownership-investigation-2026-06-15.md documenting: (1) the 4 pi-authored commits force-rewritten to DraconDev, (2) local git config fix, (3) 8,037 untrac",
         "verificationContract": "Append a 2026-06-19 second changelog entry documenting: (1) the 4 pi commits were force-rewritten to DraconDev authorship (operator-approved one-time exception), (2) the local git config was set to DraconDev, (3) the 8,037 untracked files were [committed/resolved] via [daemon fix/manual commits], and (4) the override file at dracon-platform/.dracon/dracon-sync.toml can potentially be removed (since the HEAD author is now DraconDev) — document the decision to keep or remove it.",
         "lightweightSubtasks": true
       }
@@ -81,8 +83,8 @@ Fix the author regression on dracon-platform (4 pi-authored commits at HEAD rewr
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 18m05s
-- Tokens used: 139K (139,497) tokens
+- Time spent: 18m34s
+- Tokens used: 142K (141,832) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
@@ -91,5 +93,5 @@ Fix the author regression on dracon-platform (4 pi-authored commits at HEAD rewr
 - [x] force-push-all-4-remotes: Force-push the rewritten history to all 4 remotes (origin, github, codeberg, gitlab) with explicit operator override — evidence: Force-pushed rewritten history to all 4 remotes using `git push --force-with-lease <remote> main`. Origin: `+ aa0562b93...cce27ae99 main -> main (forced update)`. Codeberg: `+ 7f7ccb0b7...cce27ae99 ma
 - [x] diagnose-daemon-untracked: Diagnose why the daemon is not auto-committing the 8,037 untracked files in dracon-platform — evidence: Wrote diagnosis to `/home/dracon/Dev/dracon-utilities/evidence/dracon-platform-untracked-investigation-2026-06-19/diagnosis.md` (102 lines). Root cause: daemon is in a lock file contention loop — `jou
 - [x] commit-untracked-files: Commit the 8,037 untracked files (either via daemon fix or manual `git add` in batches) — evidence: Committed all untracked non-gitignored files in batches (13 commits total). All authored by DraconDev. All 4 remotes at ahead=0, behind=0. The 256 remaining untracked files are all gitignored build ar
-- [ ] update-override-doc: Update ownership-investigation-2026-06-15.md to reflect the rewritten history and untracked resolution — contract: Append a 2026-06-19 second changelog entry documenting: (1) the 4 pi commits were force-rewritten to DraconDev authorship (operator-approved one-time exception), (2) the local git config was set to DraconDev, (3) the 8,037 untracked files were [committed/resolved] via [daemon fix/manual commits], and (4) the override file at dracon-platform/.dracon/dracon-sync.toml can potentially be removed (since the HEAD author is now DraconDev) — document the decision to keep or remove it.
+- [x] update-override-doc: Update ownership-investigation-2026-06-15.md to reflect the rewritten history and untracked resolution — evidence: Appended 60-line 2026-06-19 changelog entry to ownership-investigation-2026-06-15.md documenting: (1) the 4 pi-authored commits force-rewritten to DraconDev, (2) local git config fix, (3) 8,037 untrac
 
