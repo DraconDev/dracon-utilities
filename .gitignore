@@ -99,6 +99,7 @@ tasks*.json
 !.dracon/data/keys/
 !.dracon/data/keys/*.pub
 !.dracon/keys/*.pub
+!.dracon/project-state.md
 !Cargo.lock
 !Cargo.toml
 !clippy.toml
