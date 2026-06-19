@@ -157,3 +157,6 @@
 {"type":"task_complete","goalId":"mqkyrvf9-c80z7g","taskId":"restore-function-names","evidence":"Replaced all 7 broken function names: tests.rs lines 198/219/247 (pre_push_hook_*), tests.rs lines 308/666 (build_gitignore_block_*), atomic_write_test.rs line 49 (test_restore_rejects_nonexistent_pat","at":"2026-06-19T13:29:54.035Z"}
 {"type":"task_complete","goalId":"mqkyrvf9-c80z7g","taskId":"commit-test-fixes","evidence":"Committed the test fixes in commit 7fc24c80 (daemon auto-committed). The .plaintext siblings are not tracked in git (gitignored by **/tests.rs.plaintext in the DRACON MANAGED BLOCK) but exist in the w","at":"2026-06-19T13:30:42.904Z"}
 {"type":"goal_resumed","goalId":"mqkyrvf9-c80z7g","reason":"user","at":"2026-06-19T13:46:34.533Z"}
+{"type":"task_complete","goalId":"mqkyrvf9-c80z7g","taskId":"verify-cargo-test-passes","evidence":"cargo test --workspace --locked: 856 passed, 9 ignored, 0 failed (22 suites, 88.17s)","at":"2026-06-19T14:30:35.038Z"}
+{"type":"task_complete","goalId":"mqkyrvf9-c80z7g","taskId":"verify-cargo-build-passes","evidence":"cargo build --release --locked: 0 errors, 5 warnings (1 crate)","at":"2026-06-19T14:30:39.788Z"}
+{"type":"task_complete","goalId":"mqkyrvf9-c80z7g","taskId":"verify-cargo-deny-passes","evidence":"cargo deny check: advisories ok, bans ok, licenses ok, sources ok","at":"2026-06-19T14:30:44.162Z"}
