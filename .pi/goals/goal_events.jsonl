@@ -219,3 +219,4 @@
 {"type":"task_list_set","goalId":"mqli43u6-tg3lcf","taskCount":6,"blockCompletion":false,"at":"2026-06-19T22:29:25.232Z"}
 {"type":"task_complete","goalId":"mqli43u6-tg3lcf","taskId":"diagnose-stalling","evidence":"evidence/stalling-diagnosis-2026-06-19.md (4970 bytes) written.","at":"2026-06-19T22:30:49.063Z"}
 {"type":"task_complete","goalId":"mqli43u6-tg3lcf","taskId":"design-fix","evidence":"Design doc at docs/design/daemon-staging-fix-2026-06-19.md (4429 bytes). Chose Option A: separate fingerprint for untracked files. Minimal change (1 line in fingerprint format, 1 field in status struc","at":"2026-06-19T22:31:37.688Z"}
+{"type":"task_complete","goalId":"mqli43u6-tg3lcf","taskId":"implement-fix","evidence":"Daemon code change applied to dracon-sync/src/daemon.rs: added untracked_files to fingerprint format string (6 components instead of 5). Daemon rebuilt (v0.1.12), installed at ~/.local/bin/dracon-sync","at":"2026-06-19T22:36:16.419Z"}
