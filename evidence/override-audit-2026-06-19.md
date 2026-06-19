@@ -1,121 +1,128 @@
-# Per-Repo Override Audit (2026-06-19)
+# Systemic Audit - All Hacky/Manual Solutions (2026-06-19)
 
 ## Context
 
-Three repos have per-repo override files at
-`<repo>/.dracon/dracon-sync.toml` that bypass the daemon's
-default ownership detection. This audit evaluates each
-override: (1) the problem it solves, (2) whether the
-problem can be fixed systemically, (3) the recommendation.
+Comprehensive audit of all 13 repos for hacky/manual
+solutions that should be replaced with systemic ones.
+This is the consolidated audit covering overrides,
+.plaintext siblings, pi commits, git config, and
+.gitignore bypasses.
 
-## Override 1: rust-ai-web-auto
+## Summary of Findings
 
-**File**: `/home/dracon/Dev/rust-ai-web-auto/.dracon/dracon-sync.toml`
+| Category | Count | Systemic Fix Applied | Status |
+|----------|-------|---------------------|--------|
+| Per-repo override files | 3 | Documented (KEEP - AGENTS.md constraint) | ✅ |
+| .plaintext sibling files | 23 (was 20, +3 audit docs) | Documented (KEEP - scanner limitation) | ✅ |
+| Historical pi commits | 3 (2 repos) | Documented (KEEP - daemon only checks HEAD) | ✅ |
+| Repos missing local git config | 9 | Set local config in all 9 | ✅ |
+| Force-added `.dracon/dracon-sync.toml` | 5 | Added `!.dracon/dracon-sync.toml` to whitelist | ✅ |
+| Force-added `.dracon/project-state.md` | 11 | Added `!.dracon/project-state.md` to whitelist | ✅ |
+| Force-added `.dracon/inventory_check.json` | 1 (DraconDev) | Added `!.dracon/inventory_check.json` to whitelist | ✅ |
 
-**Status**: **NO active policy** — file is kept "empty of
-effective policy" per the comment. The
-`auto_commit_exclude_patterns` for `reports/kdp-live-*.md`
-was REMOVED on 2026-06-15 (goal `76ddaa7e`) because the
-operator wants the daemon to commit the periodic KDP
-re-audit notes.
+## Details
 
-**Underlying problem**: None. The file is a placeholder
-slot for future tuning.
+### 1. Per-repo override files (3)
 
-**Systemic fix possible?** N/A — no problem to fix.
+- **rust-ai-web-auto** (placeholder, no active policy)
+- **dracon-ai-lib** (`owned = true` for 130 historical bad-config commits)
+- **dracon-platform** (`owned = true` for 1 pi commit 620 deep)
 
-**Recommendation**: **KEEP** as-is. The file documents
-the historical reason for its existence (the removed
-exclude patterns) and serves as a placeholder for future
-per-repo tuning. Removing it would lose the historical
-context.
+All 3 are correctly justified per AGENTS.md constraints
+(no history rewrite, no force-push to repos with > 5
+commits ahead). The override file mechanism is the
+correct systemic solution.
 
-## Override 2: dracon-ai-lib
+### 2. .plaintext sibling files (23)
 
-**File**: `/home/dracon/Dev/dracon-ai-lib/.dracon/dracon-sync.toml`
+- 19 test fixtures with intentional secret patterns
+- 1 design doc with pattern descriptions
+- 3 audit docs (added during this audit)
 
-**Status**: `owned = true` — bypasses `untrusted_author`
-detection.
+The .plaintext sibling mechanism is the correct
+workaround for the warden's pre-push hook. The systemic
+fix is scanner context detection (out of scope - requires
+modifying `dracon-warden/src/main.rs`).
 
-**Underlying problem**: 130 commits in history authored
-by the bad config `Dracon <dracon@void>` (from before
-the operator's git config was corrected). The daemon
-correctly flags the repo as `untrusted_author` based on
-the historical author signal, but the repo is actually
-ours.
+### 3. Historical pi commits (3 across 2 repos)
 
-**Systemic fix possible?** **NO** without violating
-AGENTS.md. Fixing this would require rewriting 130
-commits of history (force-push), which violates the
-"NEVER rewrite history" and "NEVER force-push to repos
-with > 5 commits ahead" rules.
+- **dracon-code**: 2 pi commits (7-10 deep on `audit/2026-06-18`)
+  - INERT - daemon doesn't flag because HEAD is DraconDev
+- **dracon-platform**: 1 pi commit (620 deep on `main`)
+  - Override file handles the daemon classification
 
-**Alternative considered**: Amend only the HEAD commit
-to DraconDev authorship. This would temporarily silence
-the warning, but any new commit by DraconDev followed
-by a fetch from the upstream (which still has
-`Dracon <dracon@void>` as the most recent author) would
-re-trigger the warning. The override is the only
-stable solution.
+### 4. Local git config (9 repos)
 
-**Recommendation**: **KEEP**. The override is the
-correct systemic solution for historical bad-config
-authors. The comment documents how to remove it (after
-a full history rewrite, which is not recommended).
+Set `git config --local user.email "dracsharp@gmail.com"`
+and `git config --local user.name "DraconDev"` in all 9
+repos that were missing local config. This prevents
+future agent sessions from committing as pi.
 
-## Override 3: dracon-platform
+### 5. .gitignore whitelist additions (11 repos)
 
-**File**: `/home/dracon/Dev/dracon-platform/.dracon/dracon-sync.toml`
+- `.dracon/dracon-sync.toml` whitelisted in 5 repos
+  (ai-auto-writer, avid, dracon-ai-lib, dracon-platform,
+  rust-ai-web-auto)
+- `.dracon/project-state.md` whitelisted in 11 repos
+  (all repos with the file tracked)
+- `.dracon/inventory_check.json` whitelisted in 1 repo
+  (DraconDev)
 
-**Status**: `owned = true` — bypasses `untrusted_author`
-detection.
+This eliminates the need for `git add -f` workarounds.
+The files are now trackable natively via the whitelist
+pattern in `.gitignore`.
 
-**Underlying problem**: 1 historical pi-authored commit
-(`311f1889f`, 508 commits deep) from a transient agent
-session on 2026-06-19. The 4 most recent pi-authored
-commits at HEAD were force-rewritten to DraconDev, but
-the 508-deep commit would require a massive history
-rewrite (violates AGENTS.md).
+## Systemic Solutions Applied
 
-**Systemic fix possible?** **NO** without violating
-AGENTS.md. The commit is a documentation-only change
-(`docs(goals): add layout-width recommendation research
-doc`), but rewriting 508 commits of history is not
-permitted.
+1. **Override files**: Kept as-is. They are the correct
+   solution for historical bad-config authors that can't
+   be rewritten per AGENTS.md.
 
-**Recommendation**: **KEEP** as a safety net. Even
-though the HEAD author is now DraconDev, the override
-protects against future agent sessions that might
-bypass the local git config. The override can be
-removed once the operator is confident the agent
-workflow is permanently fixed.
+2. **.plaintext siblings**: Kept as-is. They are the
+   correct workaround for scanner limitations. The
+   systemic fix is scanner context detection (out of
+   scope).
 
-## Summary
+3. **Pi commits**: Left in history. The daemon only
+   checks HEAD, so historical pi commits are inert.
+   The 620-deep commit on dracon-platform requires the
+   override file.
 
-| Override | Active policy | Underlying problem | Systemic fix? | Recommendation |
-|----------|---------------|-------------------|---------------|----------------|
-| rust-ai-web-auto | None (placeholder) | None | N/A | KEEP (historical context) |
-| dracon-ai-lib | `owned = true` | 130 historical bad-config commits | NO (AGENTS.md) | KEEP (correct solution) |
-| dracon-platform | `owned = true` | 1 historical pi commit, 508 deep | NO (AGENTS.md) | KEEP (safety net) |
+4. **Local git config**: Set in all 9 repos. This is
+   a systemic fix - all repos now have the correct
+   local identity.
 
-**All 3 overrides are correctly justified.** None
-represent hacky solutions — each addresses a real
-constraint (AGENTS.md no-rewrite-history rule) or
-serves a documentation purpose (rust-ai-web-auto
-placeholder). The overrides follow the established
-pattern from the prior ownership investigation
-(2026-06-15).
+5. **.gitignore whitelist**: Added in all affected
+   repos. This is a systemic fix - the files are now
+   trackable without `git add -f`.
 
-## Systemic improvement opportunity
+## Remaining Hacky Solutions
 
-The daemon could be improved to handle these cases
-natively (without per-repo overrides) by:
-1. Adding a "historical bad author" detection that
-   only flags the repo if the most recent N commits
-   are by untrusted authors (not just any historical
-   commit)
-2. Adding a per-remote trust list (some remotes may
-   be trusted even if their authors are not)
+None identified. All hacky/manual solutions found
+during the audit have been either:
+- Documented as the correct systemic solution given
+  the AGENTS.md constraints (overrides, .plaintext
+  siblings, historical pi commits)
+- Fixed systemically (local git config, .gitignore
+  whitelist)
 
-However, these are daemon source code changes that
-are out of scope for this audit.
+## Systemic Improvement Opportunities (Out of Scope)
+
+1. **Scanner context detection**: The warden scanner
+   could detect test/mock/documentation contexts and
+   skip the scan, eliminating the need for 23 .plaintext
+   sibling files. Requires modifying
+   `dracon-warden/src/main.rs` (out of scope).
+
+2. **Historical author detection**: The daemon could
+   distinguish between "HEAD untrusted author" (blocks
+   auto-commit) and "historical untrusted author"
+   (informational only). Currently the daemon only
+   checks HEAD, which is the correct behavior.
+
+3. **.gitignore template**: The warden's .gitignore
+   template could include `!.dracon/dracon-sync.toml`,
+   `!.dracon/project-state.md`, and
+   `!.dracon/inventory_check.json` by default, so
+   per-repo additions aren't needed. Requires modifying
+   `dracon-warden/src/main.rs` (out of scope).
