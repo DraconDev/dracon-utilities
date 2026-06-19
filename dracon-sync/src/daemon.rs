@@ -1792,13 +1792,19 @@ pub(crate) async fn run_daemon(
                 (dirty, filtered)
             };
 
+            // FIX (2026-06-19): include untracked_files in the fingerprint so
+            // untracked file additions don't trigger the fingerprint stability
+            // wait. Untracked file additions are atomic (new files appear all
+            // at once), so they don't need the 5s stability wait that tracked
+            // file edits need to avoid committing half-written files.
             let fingerprint = format!(
-                "{}:{}:{}:{}:{}",
+                "{}:{}:{}:{}:{}:{}",
                 status.branch,
                 effective_dirty as u8,
                 status.staged_files,
                 status.ahead,
-                status.behind
+                status.behind,
+                status.untracked_files
             );
             let Some(entry) = activity.get_mut(&repo) else {
                 activity.insert(
