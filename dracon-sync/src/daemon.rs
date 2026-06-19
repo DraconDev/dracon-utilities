@@ -1856,7 +1856,14 @@ pub(crate) async fn run_daemon(
                     continue;
                 }
             }
-            if now.duration_since(entry.changed_at) < inactivity_delay {
+            // FIX (2026-06-19): bypass the settling/inactivity delay when the
+            // ONLY dirty state is untracked files. Untracked file additions are
+            // atomic (new files appear all at once), so they don't need the
+            // stability wait that tracked file edits need to avoid committing
+            // half-written files. This eliminates the 'hangpuck' settling
+            // behavior for untracked file batches.
+            let untracked_only = status.untracked_files > 0 && status.modified_files == 0;
+            if !untracked_only && now.duration_since(entry.changed_at) < inactivity_delay {
                 // Same check for the stable-fingerprint case:
                 // allow sync if dirty for > 5s even if fingerprint is stable.
                 const MAX_DIRTY_DELAY: Duration = Duration::from_secs(5);
