@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 172047,
-    "activeSeconds": 50
+    "tokensUsed": 175030,
+    "activeSeconds": 82
   },
   "sisyphus": false,
   "createdAt": "2026-06-19T21:46:30.130Z",
-  "updatedAt": "2026-06-19T21:47:24.042Z",
+  "updatedAt": "2026-06-19T21:47:57.442Z",
   "activePath": ".pi/goals/active_goal_2026061922463013_mqlgkwvm-le1j4x.md",
   "taskList": {
     "tasks": [
@@ -26,7 +26,9 @@
       {
         "id": "audit-plaintext-siblings",
         "title": "Audit the 20 .plaintext sibling files and document the pattern",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-19T21:47:45.708Z",
+        "evidence": "Wrote 4751-byte audit to `/home/dracon/Dev/dracon-utilities/evidence/plaintext-sibling-audit-2026-06-19.md`. Audited all 20 .plaintext files. Categorized: 19 test fixtures (dracon-warden, dracon-sync,",
         "verificationContract": "List all 20 .plaintext files with their parent files. Categorize: (1) test fixtures with intentional secret patterns (should be handled by scanner natively), (2) source files with comment-out secret patterns (should be handled by scanner), (3) documentation files (already exempt by `.pi/goals/*` skip). Document the systemic fix needed in the scanner. Write findings to `/home/dracon/Dev/dracon-utilities/evidence/plaintext-sibling-audit-2026-06-19.md`.",
         "lightweightSubtasks": true
       },
@@ -73,13 +75,13 @@ Audit all 13 repos for hacky/manual solutions and replace them with systemic one
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 50s
-- Tokens used: 172K (172,047) tokens
+- Time spent: 1m22s
+- Tokens used: 175K (175,030) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
 - [x] audit-overrides: Audit the 3 per-repo override files and document why each exists — evidence: Wrote 4566-byte audit to `/home/dracon/Dev/dracon-utilities/evidence/override-audit-2026-06-19.md`. Audited all 3 overrides: rust-ai-web-auto (placeholder, no active policy), dracon-ai-lib (`owned = t
-- [ ] audit-plaintext-siblings: Audit the 20 .plaintext sibling files and document the pattern — contract: List all 20 .plaintext files with their parent files. Categorize: (1) test fixtures with intentional secret patterns (should be handled by scanner natively), (2) source files with comment-out secret patterns (should be handled by scanner), (3) documentation files (already exempt by `.pi/goals/*` skip). Document the systemic fix needed in the scanner. Write findings to `/home/dracon/Dev/dracon-utilities/evidence/plaintext-sibling-audit-2026-06-19.md`.
+- [x] audit-plaintext-siblings: Audit the 20 .plaintext sibling files and document the pattern — evidence: Wrote 4751-byte audit to `/home/dracon/Dev/dracon-utilities/evidence/plaintext-sibling-audit-2026-06-19.md`. Audited all 20 .plaintext files. Categorized: 19 test fixtures (dracon-warden, dracon-sync,
 - [ ] audit-pi-commits: Audit the 3 historical pi commits in 2 repos and document the decision — contract: Document the 3 pi commits: dracon-code (c3159191d, da74bfd20) and dracon-platform (311f1889f). For each, document: (1) the commit content, (2) how deep in history, (3) whether rewriting is feasible without violating AGENTS.md, (4) the decision (keep with override or rewrite). Write findings to `/home/dracon/Dev/dracon-utilities/evidence/pi-commit-audit-2026-06-19.md`.
 - [ ] audit-git-config: Audit the 9 repos missing local git config and fix systematically — contract: For each of the 9 repos without local user.email/user.name (ai-auto-writer, avid, dracon-ai-lib, dracon-code, DraconDev, dracon-libs, dracon-utilities, pully-fully-pull-based-fleet-reconciler, rust-ai-web-auto), set `git config --local user.email "dracsharp@gmail.com"` and `git config --local user.name "DraconDev"`. Verify with `git config --local user.email` returning the correct value for each. This prevents future agent sessions from committing as pi.
 - [ ] audit-gitignore-bypass: Fix the .gitignore bypass for .dracon/dracon-sync.toml systemically — contract: For each repo with `.dracon/dracon-sync.toml` force-added (ai-auto-writer, avid, dracon-ai-lib, dracon-platform, rust-ai-web-auto), add `!.dracon/dracon-sync.toml` to the `.gitignore` whitelist section (after the existing `!.dracon/data/keys/*.pub` line). This makes the file trackable without `git add -f`. Verify with `git check-ignore -v .dracon/dracon-sync.toml` returning the whitelist line.
