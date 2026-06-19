@@ -243,3 +243,26 @@ dracon-sync ownership --explain
     from flagging the repo as unowned. The override
     can be removed once the operator is confident the
     agent workflow is permanently fixed.
+- 2026-06-19 (third update): historical pi commit found
+  - `git rev-list --all --author='pi'` revealed 1
+    remaining pi-authored commit: `311f1889f` from
+    2026-06-19 08:27:58, a `docs(goals): add layout-width
+    recommendation research doc` commit that is 508
+    commits deep in history (not in the 4-commit rebase
+    range).
+  - **Decision: NOT rewritten**. Rewriting 508 commits
+    of history would be a massive force-push that
+    violates the AGENTS.md "NEVER rewrite history" and
+    "NEVER force-push to repos with > 5 commits ahead"
+    rules. The commit is a documentation-only change
+    (a `.md` file in `.pi/goals/`), not code.
+  - The override file at
+    `dracon-platform/.dracon/dracon-sync.toml`
+    (with `owned = true`) handles the daemon's
+    classification — the repo is correctly classified
+    as `✓ owned (override)` despite this historical
+    pi commit. `dracon-sync repos` shows
+    `🟢 synced` and hint `healthy`.
+  - The override file comment was updated to document
+    this historical pi commit and explain why it's
+    not being rewritten.
