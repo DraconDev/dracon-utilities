@@ -4484,7 +4484,7 @@ mod tests {
 
     fn test_sync_policy() -> SyncPolicy {
         SyncPolicy {
-            max_stage_batch_files: 100,
+            max_stage_batch_files: 100000,
             system_repo: String::new(),
             pulse_interval_secs: 1,
             inactivity_push_delay_secs: 5,

@@ -446,6 +446,7 @@ pub(crate) struct SyncPolicy {
     /// Default: 100 (matches goal mqli43u6-tg3lcf requirement of 50-100).
     #[serde(default = "default_max_stage_batch_files")]
     pub(crate) max_stage_batch_files: usize,
+
     #[serde(default = "default_pull_op_timeout_secs")]
     pub(crate) pull_op_timeout_secs: u64,
     #[serde(default = "default_push_op_timeout_secs")]
@@ -849,7 +850,10 @@ pub(crate) fn default_max_stage_file_bytes() -> u64 {
 }
 
 fn default_max_stage_batch_files() -> usize {
-    100
+    // CHANGED 2026-06-20: 100 -> 100000. The batch limit was splitting
+    // large Playwright test runs into multiple commits, slowing sync.
+    // With 100000, the daemon commits everything it can in one cycle.
+    100000
 }
 
 pub(crate) fn default_pull_op_timeout_secs() -> u64 {
@@ -1521,7 +1525,7 @@ pub(crate) fn test_sync_policy() -> SyncPolicy {
         auto_github_private: false,
         auto_github_private_account: "DraconDev".to_string(),
         max_stage_file_bytes: 100 * 1024 * 1024,
-        max_stage_batch_files: 100,
+        max_stage_batch_files: 100000,
         pull_op_timeout_secs: 30,
         push_op_timeout_secs: 300,
         repo_sync_timeout_secs: 420,
