@@ -763,7 +763,7 @@ pub(crate) fn default_pulse_interval() -> u64 {
 }
 
 pub(crate) fn default_inactivity_push_delay_secs() -> u64 {
-    5
+    2
 }
 
 pub(crate) fn load_repo_override(repo: &Path) -> RepoPolicyOverride {
@@ -1735,7 +1735,7 @@ mod tests {
 
     #[test]
     fn test_default_inactivity_push_delay_secs() {
-        assert_eq!(default_inactivity_push_delay_secs(), 5);
+        assert_eq!(default_inactivity_push_delay_secs(), 2);
     }
 
     #[test]
