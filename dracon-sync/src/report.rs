@@ -2266,6 +2266,7 @@ pub(crate) async fn run_repos_report(
         mk_h("🏷", "STATUS"),
         mk_h("📦", "REPO"),
         mk_h("🌿", "BRANCH"),
+        mk_h("🔗", "PUBLISH"),
         mk_h("📝", "MOD"),
         mk_h("📥", "STG"),
         mk_h("❓", "UT"),
