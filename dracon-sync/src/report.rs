@@ -4009,9 +4009,11 @@ mod tests {
     fn test_repo_is_concern_no_origin_but_has_remote() {
         // Regression test for the SSH-multi-mirror misclassification.
         // A repo with no `origin` but with at least one other remote
-        // must NOT be a concern.
+        // must NOT be a concern (provided it has a tracking upstream,
+        // which a real SSH-mirror repo has via its `main` branch
+        // tracking, e.g., `github/main`).
         let status = make_status(true, 0, 0);
-        assert!(!repo_is_concern(&status, false, false, true));
+        assert!(!repo_is_concern(&status, false, true, true));
     }
 
     #[test]
