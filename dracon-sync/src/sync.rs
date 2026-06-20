@@ -2325,6 +2325,13 @@ async fn stage_commit_and_push(
         // `test_sync_repo_mirror_failu[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA4bHNsaDJTNlRybHV2ajNZeCtNbzJoNXNKWkVBaVAwTTQ1Z0ZscXRHSDBRClJEdUJONitmdVpERjhyWE5Nak1GVVJyYlU2MnMzZDBMOGtpaTZpN1A3Z28KLT4gWDI1NTE5IHk4SVhDUWxiM0Rlb0RKb2pkVWU1RTVLYjVhOWJvemlqWXlEN0JsY3dkekUKTnQxQXlTeFhXeHJsZ010U0dGQ1FidjRYUG1jeFBFSmpQZXloQW5RMUJROAotPiBYMjU1MTkgbFhYT0x2cFE1dzB6K0x2dTFiVUJWTjJ3NHI4S2NyZEFmU2ZlNXFaS2NoZwp3M2NIWXBqWDlLaXY0cU5qN1VzMXZGcUNxdTUxOGxBaUp3d1FnSjRzRHNFCi0+IFgyNTUxOSA5QjVDNTdZWWRlN1BidDMzUUJCY3RtY09HYnkxRmpJaVNpQnRyOFo5NTA4CjBSTVBJTVpFcURib1hVQ0pxMmVSWEROV1NLcFo0YXJWbXZiQmsyRVZDUkkKLT4gWDI1NTE5IGRvMTYyQ2F5am5OTm5QUitoWHlQQUkxMVVKc25SSnhVSTVtTTZPcGtjbmcKbEJTZDEvTDI1c01waGY4Vnd4aDdoNFRVRGRtMzlsS3VRMzhVVC9kWW0xNAotPiA2RX4tZ3JlYXNlIF4kLDtWJApPVWFyTmhLQ2RjM09XNU1qNXV3OGVBZFlqK3VFVFZFUkFRMXFhY01ITjRydDgwTDVYcjVKMU5NUDlvSXRvajBsClZZcUo5WUFvR0hELzBQR3JaYkFzM0ZrTHRCaTcyclZEUTAxVU04cXFXQXZENXdwVTY5dWxHb2pxVXpPKwotLS0gK0Ztam5zY0FYeE9WTVFqOVh1VEl3UjNZSUx3TGVNU3JxZlNIZXg4V3ZVNAqPpl3vrjZOIFVT3wonvzSsHpNG+32mNdocHzYsX5MzErQl+21wdpqd2tgosG54/HbIdgOTh3zxu+g=]`.
         match push_background(repo, policy, has_origin, ctx.remote_failures.as_deref_mut()).await {
             Ok(true) => {
+                if let Err(e) = crate::daemon::refresh_publish_upstream(repo, policy).await {
+                    eprintln!(
+                        "⚠️ failed to refresh publish upstream for {}: {}",
+                        repo.display(),
+                        e
+                    );
+                }
                 crate::daemon::record_push_success(repo);
             }
             Ok(false) => {

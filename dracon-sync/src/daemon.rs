@@ -242,7 +242,10 @@ fn configured_branch_remote(repo: &Path, branch: &str) -> Option<String> {
                 None
             }
         })?;
-    if merge.starts_with("refs/heads/") && is_safe_branch_name(&merge) {
+    let Some(remote_branch) = merge.strip_prefix("refs/heads/") else {
+        return None;
+    };
+    if is_safe_branch_name(remote_branch) {
         Some(remote)
     } else {
         None
@@ -1858,6 +1861,13 @@ pub(crate) async fn run_daemon(
                     );
                 }
                 continue;
+            }
+            if let Err(e) = configure_publish_upstream_if_missing(&repo, &policy) {
+                eprintln!(
+                    "⚠️ failed to configure publish upstream for {}: {}",
+                    repo.display(),
+                    e
+                );
             }
             // Skip repos mid-checkout (clone's checkout phase holds index.lock).
             // Without this guard, the daemon can interfere with git checkout by
