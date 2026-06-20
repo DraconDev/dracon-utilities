@@ -29,6 +29,7 @@ use crate::exclude::{excluded_dir_names_set, has_sync_relevant_dirty_entries};
 use crate::git::{
     discover_git_repos, git_diff_head_files, has_both_main_and_master, has_origin_remote,
     has_tracking_upstream, is_repo_ready, repair_broken_tracking, repo_diff_entries,
+    count_unpushed_vs_mirrors,
 };
 use crate::policy::{debug_enabled, freeze_reason, timestamp_secs, SyncPolicy};
 use crate::report::{run_repair_concerns, run_repair_warns, ConcernRepairFilter};
