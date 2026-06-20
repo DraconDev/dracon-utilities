@@ -37,6 +37,29 @@ use crate::sync::{sync_repo, sync_repo_with_ahead_since, SyncOutcome};
 
 const STUCK_REPO_EXPIRY_SECS: u64 = 24 * 60 * 60; // 24 hours
 
+/// Configure standard mirror remotes only when the repo has no remotes yet.
+pub(crate) fn configure_standard_remotes_if_missing(repo: &Path, policy: &SyncPolicy) -> bool {
+    let has_any_remote = has_origin_remote(repo)
+        || !policy.remotes.is_empty()
+            && policy.remotes.iter().any(|r| {
+                crate::git::multi_remote::get_remote_url(repo, &r.name).is_some()
+            });
+    if !has_any_remote && !policy.remotes.is_empty() {
+        let repo_name = repo
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_default();
+        eprintln!(
+            "🔧 {} configuring standard mirror remotes",
+            repo.display()
+        );
+        crate::git::multi_remote::configure_all_remotes(repo, &policy.remotes, &repo_name);
+        true
+    } else {
+        false
+    }
+}
+
 fn stage_cooldown_remaining(
     stage_cooldowns: &mut HashMap<PathBuf, Instant>,
     repo: &Path,
@@ -1495,26 +1518,7 @@ pub(crate) async fn run_daemon(
             // yet, configure the standard mirror remotes before any readiness
             // or push decision. This fixes the `git init`-then-no-remotes gap
             // without overwriting operator-configured remotes.
-            let has_any_remote = has_origin_remote(&repo)
-                || !policy.remotes.is_empty()
-                    && policy.remotes.iter().any(|r| {
-                        crate::git::multi_remote::get_remote_url(&repo, &r.name).is_some()
-                    });
-            if !has_any_remote && !policy.remotes.is_empty() {
-                let repo_name = repo
-                    .file_name()
-                    .map(|n| n.to_string_lossy().to_string())
-                    .unwrap_or_default();
-                eprintln!(
-                    "🔧 {} configuring standard mirror remotes",
-                    repo.display()
-                );
-                crate::git::multi_remote::configure_all_remotes(
-                    &repo,
-                    &policy.remotes,
-                    &repo_name,
-                );
-            }
+            configure_standard_remotes_if_missing(&repo, policy);
 
             if !is_repo_ready(&repo) {
                 if debug_enabled() {
