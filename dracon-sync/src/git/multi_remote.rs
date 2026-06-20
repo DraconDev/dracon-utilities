@@ -532,6 +532,7 @@ pub(crate) async fn auto_create_all_remotes(
 /// Check if a remote repo exists by running `git ls-remote` on the given URL.
 async fn remote_repo_exists(url: &str) -> bool {
     let output = tokio_git_command()
+        .env("PATH", "/run/current-system/sw/bin")
         .args(["ls-remote", url, "HEAD"])
         .output()
         .await;
@@ -662,7 +663,8 @@ mod tests {
     }
 
     fn run_git_success(args: &[&str], cwd: Option<&Path>) {
-        let mut cmd = std::process::Command::new("/run/current-system/sw/bin/git");
+        let mut cmd = std::process::Command::new("git");
+        cmd.env("PATH", "/run/current-system/sw/bin");
         cmd.args(args);
         if let Some(cwd) = cwd {
             cmd.current_dir(cwd);
