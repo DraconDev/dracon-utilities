@@ -393,6 +393,65 @@ pub(crate) fn activity_label(row: &RepoReportRow) -> String {
     }
 }
 
+fn branch_upstream(repo: &Path, branch: &str) -> String {
+    let upstream = crate::policy::std_git_command()
+        .args(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"])
+        .current_dir(repo)
+        .output()
+        .ok()
+        .and_then(|o| {
+            if o.status.success() {
+                Some(String::from_utf8_lossy(&o.stdout).trim().to_string())
+            } else {
+                None
+            }
+        });
+    if let Some(upstream) = upstream.filter(|s| !s.is_empty()) {
+        return upstream;
+    }
+
+    if !crate::git::is_safe_branch_name(branch) {
+        return "-".to_string();
+    }
+    let remote_key = format!("branch.{branch}.remote");
+    let merge_key = format!("branch.{branch}.merge");
+    let remote = crate::policy::std_git_command()
+        .args(["config", "--get", &remote_key])
+        .current_dir(repo)
+        .output()
+        .ok()
+        .and_then(|o| {
+            if o.status.success() {
+                Some(String::from_utf8_lossy(&o.stdout).trim().to_string())
+            } else {
+                None
+            }
+        });
+    let merge = crate::policy::std_git_command()
+        .args(["config", "--get", &merge_key])
+        .current_dir(repo)
+        .output()
+        .ok()
+        .and_then(|o| {
+            if o.status.success() {
+                Some(String::from_utf8_lossy(&o.stdout).trim().to_string())
+            } else {
+                None
+            }
+        });
+    match (remote, merge) {
+        (Some(remote), Some(merge)) if merge.starts_with("refs/heads/") => {
+            let branch = merge.strip_prefix("refs/heads/").unwrap_or("");
+            if crate::git::is_safe_branch_name(branch) {
+                format!("{remote}/{branch}")
+            } else {
+                "-".to_string()
+            }
+        }
+        _ => "-".to_string(),
+    }
+}
+
 /// Read the in_flight set from disk and return whether the given
 /// repo path is in it. We use the daemon's `save_in_flight` JSON
 /// file, written on every daemon cycle. A missing file means
@@ -2064,7 +2123,8 @@ pub(crate) async fn run_repos_report(
         rows.push(RepoReportRow {
             repo: repo.display().to_string(),
             state_flags: flags,
-            branch: effective_status.branch,
+            branch: effective_status.branch.clone(),
+            upstream: branch_upstream(repo, &effective_status.branch),
             modified: effective_status.modified_files,
             staged: effective_status.staged_files,
             untracked: effective_status.untracked_files,
@@ -2184,7 +2244,7 @@ pub(crate) async fn run_repos_report(
 
     // ---- Legend line (one-liner mapping column codes to their meaning) ----
     println!(
-        "ℹ️  Legend: MOD = modified tracked · STG = staged · UT = untracked · ↑ = ahead of upstream · ↓ = behind upstream · PUSH = push status · 📊 1h/6h/24h = commits in last 1h/6h/24h · STATE = derived cause (working=daemon just synced/committing/pushing/synced=clean & in sync/stalled/dirty/untracked-only/intentional/failed/idle/cold/healthy) · ACTIVITY = real activity indicator (now=daemon processing this repo · pushing Xm (N ahead)=push in progress, N unpushed commits · dirty Xm=dirty repo, last commit X minutes ago · synced/idle/cold=clean & waiting) · DAEMON = daemon's last recorded action (e.g. '23s sync_triage') so you can tell the daemon is working through dirty rows vs. you're editing right now"
+        "ℹ️  Legend: MOD = modified tracked · STG = staged · UT = untracked · 🔗 = VS Code publish upstream (branch.remote/branch.merge or @{u}) · ↑ = ahead of upstream · ↓ = behind upstream · PUSH = push status · 📊 1h/6h/24h = commits in last 1h/6h/24h · STATE = derived cause (working=daemon just synced/committing/pushing/synced=clean & in sync/stalled/dirty/untracked-only/intentional/failed/idle/cold/healthy) · ACTIVITY = real activity indicator (now=daemon processing this repo · pushing Xm (N ahead)=push in progress, N unpushed commits · dirty Xm=dirty repo, last commit X minutes ago · synced/idle/cold=clean & waiting) · DAEMON = daemon's last recorded action (e.g. '23s sync_triage') so you can tell the daemon is working through dirty rows vs. you're editing right now"
     );
     println!();
 
