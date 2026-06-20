@@ -1687,7 +1687,7 @@ pub(crate) async fn run_daemon(
                     continue;
                 }
             };
-            let status = match svc.get_status().await {
+            let mut status = match svc.get_status().await {
                 Ok(status) => status,
                 Err(e) => {
                     eprintln!("⚠️ {} status_failed: {}", repo.display(), e);
@@ -1698,6 +1698,25 @@ pub(crate) async fn run_daemon(
             // Cache remote checks — used in both fast and slow paths
             let has_origin = has_origin_remote(&repo);
             let has_upstream = has_tracking_upstream(&repo);
+
+            // CHANGED 2026-06-20: for repos without an upstream tracking branch
+            // (mirror-only repos like `.dracon`), `git status` reports `ahead = 0`
+            // even when there ARE unpushed local commits. Override `status.ahead`
+            // from mirror tracking refs so the fast-path dispatch and the
+            // `has_local_or_pending_work` check detect the real ahead count.
+            if !has_upstream && status.ahead == 0 {
+                let unpushed = count_unpushed_vs_mirrors(&repo);
+                if unpushed > 0 {
+                    if debug_enabled() {
+                        eprintln!(
+                            "🐛 {} ahead override: status.ahead=0 → {} (no upstream)",
+                            repo.display(),
+                            unpushed
+                        );
+                    }
+                    status.ahead = unpushed as usize;
+                }
+            }
 
             // Fast path: skip expensive git diff calls for clean, synced repos.
             // Only do detailed diff analysis when the repo actually has changes.
