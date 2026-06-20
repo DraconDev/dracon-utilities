@@ -508,7 +508,7 @@ pub(crate) async fn auto_create_all_remotes(
             // `gh repo create` for repos that already exist, which causes
             // GitHub rate limiting ("You have created too many repositories,
             // too quickly").
-            if let Some(repo_path) = repo {
+            if repo.is_some() {
                 let url = remote.resolve_push_url(&resolved_name);
                 if remote_repo_exists(&url).await {
                     if debug_enabled() {
