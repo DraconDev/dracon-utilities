@@ -86,9 +86,24 @@ For a repo with a valid `origin` and a tracking `upstream` branch:
 | Unpushed commits (ahead > 0), no recent push failure | `PENDING` | No |
 | Unpushed commits (ahead > 0), recent push failure (< 10 min) | `STUCK_PUSH` | Yes |
 | Behind remote (behind > 0) | `STUCK_PULL` | Yes |
-| No `origin` remote | `NO_ORIGIN` | Yes |
-| No tracking `upstream` branch | `NO_UPSTREAM` | Yes |
+| **No remote at all** (no `origin` AND no other remote configured) | `NO_ORIGIN` | Yes |
+| No tracking `upstream` branch, `has_origin` is true | `NO_UPSTREAM` | Yes (remediation sets `origin` upstream) |
+| No tracking `upstream` branch, `has_origin` is false, but other remotes (e.g. SSH mirrors) are configured | `NO_UPSTREAM` (informational) | No (daemon pushes via explicit refspecs) |
 | No tracking `upstream` branch, repo flagged `intentional_no_upstream = true` | `INTENTIONAL_NO_UPSTREAM` | No (skipped) |
+
+### CHANGED 2026-06-20 (goal `2a11662d-2c8b-4251-8125-aea69a72cda8`)
+
+The previous row "No `origin` remote | `NO_ORIGIN` | Yes" was a
+false positive for every SSH-multi-mirror repo. After the
+migration from an `origin` (HTTPS) remote to three SSH mirror
+remotes (`github` / `gitlab` / `codeberg`), the absence of a
+literal `origin` is not a concern — the daemon pushes to all
+configured mirrors via explicit refspecs. The new semantic is
+documented in the table above and in full in
+[`no-origin-concern-ssh-2026-06-20.md`](no-origin-concern-ssh-2026-06-20.md).
+The `NO_ORIGIN` flag name is preserved (only its firing condition
+narrowed to "zero remotes at all") for backward compatibility
+with operator tooling that greps for it.
 
 `recent_push_failure` is true when the incident ledger contains an
 entry for this repo with `scope = "sync"` or `scope = "mirror"` and
