@@ -1591,7 +1591,7 @@ pub(crate) async fn run_daemon(
             // yet, configure the standard mirror remotes before any readiness
             // or push decision. This fixes the `git init`-then-no-remotes gap
             // without overwriting operator-configured remotes.
-            configure_standard_remotes_if_missing(&repo, policy);
+            configure_standard_remotes_if_missing(&repo, &policy);
 
             if !is_repo_ready(&repo) {
                 if debug_enabled() {
