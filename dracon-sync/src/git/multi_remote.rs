@@ -531,8 +531,13 @@ pub(crate) async fn auto_create_all_remotes(
 
 /// Check if a remote repo exists by running `git ls-remote` on the given URL.
 async fn remote_repo_exists(url: &str) -> bool {
+    let mut path = String::from("/run/current-system/sw/bin");
+    if let Ok(old_path) = std::env::var("PATH") {
+        path.push(':');
+        path.push_str(&old_path);
+    }
     let output = tokio_git_command()
-        .env("PATH", "/run/current-system/sw/bin")
+        .env("PATH", path)
         .args(["ls-remote", url, "HEAD"])
         .output()
         .await;
