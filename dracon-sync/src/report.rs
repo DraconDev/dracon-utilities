@@ -1027,7 +1027,17 @@ pub(crate) fn repo_state_flags_with_push_failure(
     if !has_origin && !has_any_remote {
         flags.push("NO_ORIGIN".to_string());
     }
-    if has_origin && !has_upstream {
+    // CHANGED 2026-06-20: `NO_UPSTREAM` now fires whenever the local
+    // branch has no tracking upstream, regardless of whether the repo
+    // has an `origin` remote. Previously the `has_origin &&` guard
+    // meant that a repo with only non-origin remotes (e.g. the SSH
+    // multi-mirror repos) silently swallowed the missing-upstream
+    // signal, falling through to the generic "run repair-concerns"
+    // hint instead of the more useful "set upstream" hint. The
+    // concern predicate ([`repo_is_concern_with_push_failure`]) still
+    // gates on `!has_upstream` independently, so the row remains a
+    // CONCERN; this just makes the hint text accurate.
+    if !has_upstream {
         flags.push("NO_UPSTREAM".to_string());
     }
     if status.ahead > 0 && has_origin && has_upstream && recent_push_failure {
@@ -1066,9 +1076,11 @@ pub(crate) fn apply_intentional_no_upstream(mut flags: Vec<String>) -> Vec<Strin
 /// push failures and the behind-count.
 ///
 /// CHANGED 2026-06-20: the `!has_origin` short-circuit used to flag
-/// every non-`origin` repo as a concern. After the SSH multi-mirror
-/// migration, the daemon pushes to `github` / `gitlab` / `codeberg`
-/// and the absence of a literal `origin` is not a concern. The new
+/// every non-`origin` repo as a concern, and `!has_upstream` flagged
+/// every repo with a missing branch tracking config. After the SSH
+/// multi-mirror migration, the daemon pushes to `github` / `gitlab` /
+/// `codeberg` via explicit refspecs and doesn't require either an
+/// `origin` remote or a `branch.<name>.remote` config. The new
 /// `has_any_remote` parameter lets callers distinguish "no origin
 /// but has SSH mirrors" (healthy) from "truly remote-less"
 /// (concerning). See `docs/design/no-origin-concern-ssh-2026-06-20.md`.
@@ -1079,7 +1091,10 @@ pub(crate) fn repo_is_concern(
     has_upstream: bool,
     has_any_remote: bool,
 ) -> bool {
-    (!has_origin && !has_any_remote) || !has_upstream
+    if !has_origin && !has_any_remote {
+        return true;
+    }
+    !has_upstream && has_origin
 }
 
 /// Like [`repo_is_concern`], but also flags a repo as a concern when it has
@@ -1093,7 +1108,15 @@ pub(crate) fn repo_is_concern(
 ///
 /// `has_any_remote` follows the same logic as [`repo_is_concern`]: a
 /// repo with at least one configured remote is not concerning for
-/// "no origin" alone.
+/// "no origin" alone, and a repo with any configured remote is not
+/// concerning for "no upstream" alone — the daemon's multi-mirror
+/// push path uses explicit `git push <remote> HEAD:refs/heads/<branch>`
+/// refspecs, so it does not require `branch.<name>.remote` to be set
+/// in the local config. The hint text and the `NO_UPSTREAM` flag are
+/// still emitted (so the operator can see the gap), but the row is
+/// no longer classified as a CONCERN that auto-repair will try to
+/// remediate via `git push -u origin HEAD` against a non-existent
+/// `origin`. See `docs/design/no-origin-concern-ssh-2026-06-20.md`.
 pub(crate) fn repo_is_concern_with_push_failure(
     status: &dracon_git::types::RepoStatus,
     has_origin: bool,
@@ -1101,13 +1124,16 @@ pub(crate) fn repo_is_concern_with_push_failure(
     has_any_remote: bool,
     recent_push_failure: bool,
 ) -> bool {
-    if (!has_origin && !has_any_remote) || !has_upstream {
+    if !has_origin && !has_any_remote {
         return true;
     }
     if status.behind > 0 {
         return true;
     }
-    status.ahead > 0 && recent_push_failure
+    if status.ahead > 0 && has_origin && has_upstream && recent_push_failure {
+        return true;
+    }
+    false
 }
 
 pub(crate) fn repo_is_stuck_push(
