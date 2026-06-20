@@ -1114,8 +1114,15 @@ pub(crate) fn repo_is_stuck_push(
     status: &dracon_git::types::RepoStatus,
     has_origin: bool,
     has_upstream: bool,
+    has_any_remote: bool,
     recent_push_failure: bool,
 ) -> bool {
+    // The push path requires both an `origin` and an `upstream` — these
+    // repos push via the `origin` refspec, not the multi-mirror list. So
+    // the stuck-push predicate is unchanged by the SSH-migration fix.
+    // `has_any_remote` is accepted for signature parity with
+    // `repo_is_concern_with_push_failure`; it's not consulted.
+    let _ = has_any_remote;
     status.ahead > 0 && has_origin && has_upstream && recent_push_failure
 }
 
@@ -1123,7 +1130,11 @@ pub(crate) fn repo_is_stuck_pull(
     status: &dracon_git::types::RepoStatus,
     has_origin: bool,
     has_upstream: bool,
+    has_any_remote: bool,
 ) -> bool {
+    // Same as `repo_is_stuck_push`: the pull path uses `origin` and an
+    // upstream refspec, so the predicate is unchanged by the SSH fix.
+    let _ = has_any_remote;
     status.behind > 0 && has_origin && has_upstream
 }
 
@@ -1447,12 +1458,19 @@ pub(crate) fn parse_relative_minutes(text: &str) -> Option<i64> {
 /// the row builder appends the explicit `INTENTIONAL_NO_UPSTREAM`
 /// flag. That flag is checked first here so the row reports the
 /// operator's intent instead of a misleading "set upstream" hint.
+///
+/// CHANGED 2026-06-20: the `NO_ORIGIN` hint used to say "no origin
+/// remote (using github SSH instead)" for every multi-mirror repo.
+/// With the SSH migration, that message was misleading — the daemon
+/// WAS pushing via SSH, the literal `origin` was just absent. The
+/// flag now only fires when the repo has *zero* remotes, so the hint
+/// is updated to match: "no remote configured (cannot push)".
 pub(crate) fn repo_hint(flags: &[String], warn: bool, concern: bool) -> String {
     if flags.iter().any(|f| f == "INTENTIONAL_NO_UPSTREAM") {
         return "intentional legacy isolation, no upstream configured".to_string();
     }
     if flags.iter().any(|f| f == "NO_ORIGIN") {
-        return "no origin remote (using github SSH instead)".to_string();
+        return "no remote configured (cannot push)".to_string();
     }
     if flags.iter().any(|f| f == "NO_UPSTREAM") {
         return "run repair-concerns --apply (set upstream)".to_string();
@@ -1674,6 +1692,14 @@ pub(crate) async fn run_repos_report(
 
         let has_origin = has_origin_remote(&repo);
         let has_upstream = has_tracking_upstream(&repo);
+        // CHANGED 2026-06-20: compute `has_any_remote` so the concern
+        // classifier can distinguish "no origin but has SSH mirrors"
+        // (healthy, post-multi-mirror-migration) from "truly remote-less"
+        // (concerning). This is a single `git remote` subprocess call
+        // per repo per cycle; it does not affect the fast-path skip
+        // because the fast path already short-circuits clean+synced
+        // repos before this point.
+        let has_any_remote = !crate::git::multi_remote::list_remotes(&repo).is_empty();
 
         // Classification: a repo is WARN if it has TRACKED modifications or
         // staged changes. Untracked files (e.g., target/, node_modules/) are
@@ -1700,6 +1726,7 @@ pub(crate) async fn run_repos_report(
             &effective_status,
             has_origin,
             has_upstream,
+            has_any_remote,
             recent_push_failure,
         );
         // Repos that the operator has flagged as intentionally isolated
@@ -1722,6 +1749,7 @@ pub(crate) async fn run_repos_report(
             &effective_status,
             has_origin,
             has_upstream,
+            has_any_remote,
             recent_push_failure,
         );
         if repo_override.intentional_no_upstream {
@@ -3019,6 +3047,10 @@ pub(crate) async fn run_repair_concerns(
 
         state.has_origin = has_origin_remote(&repo);
         state.has_upstream = has_tracking_upstream(&repo);
+        // CHANGED 2026-06-20: same `has_any_remote` derivation as in
+        // the `repos` command. A repo with at least one configured
+        // remote (any name) is not a "no origin" concern.
+        let has_any_remote = !crate::git::multi_remote::list_remotes(&repo).is_empty();
         // Use the same refined concern logic as the `repos` command:
         // an AHEAD repo is only a concern if a recent push failure was
         // recorded. This keeps `repair concerns` consistent with the
@@ -3035,6 +3067,7 @@ pub(crate) async fn run_repair_concerns(
             &status,
             state.has_origin,
             state.has_upstream,
+            has_any_remote,
             recent_push_failure,
         );
         if !is_concern {
@@ -3044,9 +3077,15 @@ pub(crate) async fn run_repair_concerns(
             &status,
             state.has_origin,
             state.has_upstream,
+            has_any_remote,
             recent_push_failure,
         );
-        let stuck_pull = repo_is_stuck_pull(&status, state.has_origin, state.has_upstream);
+        let stuck_pull = repo_is_stuck_pull(
+            &status,
+            state.has_origin,
+            state.has_upstream,
+            has_any_remote,
+        );
         if matches!(filter, ConcernRepairFilter::StuckPush) && !stuck_push {
             continue;
         }
@@ -3058,6 +3097,7 @@ pub(crate) async fn run_repair_concerns(
             &status,
             state.has_origin,
             state.has_upstream,
+            has_any_remote,
             recent_push_failure,
         );
         let reason = flags.join(",");
@@ -3269,6 +3309,11 @@ pub(crate) async fn run_repair_warns(
         );
         let has_origin = has_origin_remote(&repo);
         let has_upstream = has_tracking_upstream(&repo);
+        // CHANGED 2026-06-20: same `has_any_remote` derivation as the
+        // main `repos` pass. A repo with at least one configured remote
+        // is not a "no origin" concern and the WARN classification only
+        // fires for actually concerning (untracked) or dirty repos.
+        let has_any_remote = !crate::git::multi_remote::list_remotes(&repo).is_empty();
         let mut effective_status = status.clone();
         effective_status.is_clean = !effective_dirty;
         effective_status.modified_files = status.modified_files;
@@ -3289,7 +3334,12 @@ pub(crate) async fn run_repair_warns(
             continue;
         }
         warns += 1;
-        let flags = repo_state_flags(&effective_status, has_origin, has_upstream);
+        let flags = repo_state_flags(
+            &effective_status,
+            has_origin,
+            has_upstream,
+            has_any_remote,
+        );
         let reason = flags.join(",");
         out!(
             "\n🟡 {}  state={} modified={} staged={}",
