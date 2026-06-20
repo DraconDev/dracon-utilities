@@ -975,8 +975,9 @@ pub(crate) fn repo_state_flags(
     status: &dracon_git::types::RepoStatus,
     has_origin: bool,
     has_upstream: bool,
+    has_any_remote: bool,
 ) -> Vec<String> {
-    repo_state_flags_with_push_failure(status, has_origin, has_upstream, false)
+    repo_state_flags_with_push_failure(status, has_origin, has_upstream, has_any_remote, false)
 }
 
 /// Like [`repo_state_flags`], but only emits `STUCK_PUSH` when the daemon
@@ -984,10 +985,20 @@ pub(crate) fn repo_state_flags(
 /// signal, an `AHEAD:N` repo is just "has unpushed commits waiting" and
 /// should not be flagged as stuck — the daemon may be waiting for the
 /// inactivity delay or for a multi-remote round to finish.
+///
+/// `has_any_remote` is the "does the repo have at least one configured
+/// remote?" signal. When the daemon is configured to push to a list of
+/// mirror remotes (e.g. `github` / `gitlab` / `codeberg`) the absence of
+/// a literal `origin` is not a concern — those remotes are the canonical
+/// push targets. Only repos with **zero** configured remotes are
+/// genuinely remote-less and warrant a `NO_ORIGIN` flag. See
+/// `docs/design/no-origin-concern-ssh-2026-06-20.md` for the full
+/// rationale and the audit of every affected repo.
 pub(crate) fn repo_state_flags_with_push_failure(
     status: &dracon_git::types::RepoStatus,
     has_origin: bool,
     has_upstream: bool,
+    has_any_remote: bool,
     recent_push_failure: bool,
 ) -> Vec<String> {
     let mut flags = Vec::new();
@@ -1000,7 +1011,20 @@ pub(crate) fn repo_state_flags_with_push_failure(
     if status.behind > 0 {
         flags.push(format!("BEHIND:{}", status.behind));
     }
-    if !has_origin {
+    // CHANGED 2026-06-20: the `!has_origin` check used to fire `NO_ORIGIN`
+    // for every repo that didn't have a remote literally named `origin`.
+    // After the multi-mirror migration to SSH (`github` / `gitlab` /
+    // `codeberg`), every watched repo has zero `origin` remotes and the
+    // flag fired for all 10 of them, masking the row as a CONCERN even
+    // when the daemon was successfully pushing to all three mirrors.
+    //
+    // The correct semantic is: a repo is "remote-less" only when it has
+    // *no* remotes at all. If it has any remote (origin, github, etc.),
+    // the daemon can push and the row is healthy. The flag name is kept
+    // as `NO_ORIGIN` for backward compatibility (the symptom is still
+    // "no literal origin remote"); it just no longer fires when a
+    // non-origin remote exists.
+    if !has_origin && !has_any_remote {
         flags.push("NO_ORIGIN".to_string());
     }
     if has_origin && !has_upstream {
@@ -1040,13 +1064,22 @@ pub(crate) fn apply_intentional_no_upstream(mut flags: Vec<String>) -> Vec<Strin
 /// Kept for backward-compatible test coverage. New code should use
 /// [`repo_is_concern_with_push_failure`] which also considers recent
 /// push failures and the behind-count.
+///
+/// CHANGED 2026-06-20: the `!has_origin` short-circuit used to flag
+/// every non-`origin` repo as a concern. After the SSH multi-mirror
+/// migration, the daemon pushes to `github` / `gitlab` / `codeberg`
+/// and the absence of a literal `origin` is not a concern. The new
+/// `has_any_remote` parameter lets callers distinguish "no origin
+/// but has SSH mirrors" (healthy) from "truly remote-less"
+/// (concerning). See `docs/design/no-origin-concern-ssh-2026-06-20.md`.
 #[allow(dead_code, unused_variables)]
 pub(crate) fn repo_is_concern(
     _status: &dracon_git::types::RepoStatus,
     has_origin: bool,
     has_upstream: bool,
+    has_any_remote: bool,
 ) -> bool {
-    !has_origin || !has_upstream
+    (!has_origin && !has_any_remote) || !has_upstream
 }
 
 /// Like [`repo_is_concern`], but also flags a repo as a concern when it has
@@ -1057,13 +1090,18 @@ pub(crate) fn repo_is_concern(
 ///
 /// `behind > 0` remains a concern unconditionally: the local is older
 /// than the remote and risks losing history if the divergence grows.
+///
+/// `has_any_remote` follows the same logic as [`repo_is_concern`]: a
+/// repo with at least one configured remote is not concerning for
+/// "no origin" alone.
 pub(crate) fn repo_is_concern_with_push_failure(
     status: &dracon_git::types::RepoStatus,
     has_origin: bool,
     has_upstream: bool,
+    has_any_remote: bool,
     recent_push_failure: bool,
 ) -> bool {
-    if !has_origin || !has_upstream {
+    if (!has_origin && !has_any_remote) || !has_upstream {
         return true;
     }
     if status.behind > 0 {
@@ -1094,6 +1132,7 @@ pub(crate) fn repo_is_warn(
     status: &dracon_git::types::RepoStatus,
     has_origin: bool,
     has_upstream: bool,
+    has_any_remote: bool,
 ) -> bool {
     // WARN: has TRACKED modifications or staged changes, but not a concern.
     // Untracked files remain visible in the UT column, but they are not
@@ -1105,7 +1144,12 @@ pub(crate) fn repo_is_warn(
     // `is_wt_new()`-counted-as-modified bug and added `untracked_files`
     // to `RepoStatus`. Junk-Runner-bevy 91 "MOD" was 3 untracked
     // test-results/ PNGs.
-    !repo_is_concern(status, has_origin, has_upstream)
+    //
+    // CHANGED 2026-06-20: added `has_any_remote` to keep parity with
+    // `repo_is_concern`. Repos with only non-origin remotes (the
+    // post-SSH-migration case) are no longer a concern and therefore
+    // can be a WARN when dirty.
+    !repo_is_concern(status, has_origin, has_upstream, has_any_remote)
         && (status.modified_files > 0 || status.staged_files > 0)
 }
 
