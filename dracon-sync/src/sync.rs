@@ -18,6 +18,7 @@ use crate::git::multi_remote::push_mirror_remotes;
 use crate::git::origin_url;
 use crate::git::{
     cli_diff_entries, git_name_status_entries, has_origin_remote, has_tracking_upstream,
+    untracked_entries,
     is_cherry_pick_in_progress, is_merge_in_progress, is_rebase_in_progress, is_repo_ready,
     prune_other_default_branch, push_with_retries, restore_paths, run_git_capture_output,
     run_git_with_timeout, unstage_excluded_paths, unstage_oversized_paths,
@@ -628,6 +629,27 @@ async fn compute_diff_entries(svc: &GitService, repo: &Path) -> Result<DiffResul
                     status.modified_files,
                     status.staged_files,
                 );
+            }
+        }
+        // CHANGED 2026-06-20: when both libgit2 and CLI diff are empty
+        // but the repo has untracked files (e.g. .dracon/data/keys/*.pub),
+        // collect untracked entries so the auto-commit block below stages
+        // and commits them. Without this, a repo with ONLY untracked
+        // changes (no tracked modifications) enters the auto-commit block
+        // but finds `entries` empty, skips `stage_commit_and_push`, and
+        // returns `Synced` without ever committing the untracked file.
+        if entries.is_empty() {
+            let ut = untracked_entries(repo).await.unwrap_or_default();
+            if !ut.is_empty() {
+                status.is_clean = false;
+                entries = ut;
+                if debug_enabled() {
+                    eprintln!(
+                        "🐛 {} untracked entries={} => including for auto-commit",
+                        repo.display(),
+                        entries.len(),
+                    );
+                }
             }
         }
     }
