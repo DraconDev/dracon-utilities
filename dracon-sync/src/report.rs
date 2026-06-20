@@ -301,10 +301,8 @@ fn shorten_when(s: &str) -> String {
 ///                    (currently being processed)
 ///   - "pushing Xm" : push_status=PENDING, push has been in
 ///                    progress for X minutes
-///   - "stalled Xm" : dirty tracked work exists, last commit >
-///                    settle threshold, no in-flight task
-///   - "settling"   : dirty tracked work exists, fingerprint
-///                    not yet stable (waiting for inactivity delay)
+///   - "dirty Xm"    : dirty tracked work exists, last commit
+///                    was X minutes ago
 ///   - "synced Xm"  : clean, in sync, recent commit (within 1h)
 ///   - "idle Xm"    : clean, no in-flight, last commit 1h-24h ago
 ///   - "cold Xd"    : clean, no activity for > 24h
@@ -374,18 +372,10 @@ pub(crate) fn activity_label(row: &RepoReportRow) -> String {
 
     let has_dirty = row.modified > 0 || row.staged > 0;
 
-    // 3. dirty + recent commit (within settle threshold) = "settling"
+    // 3. dirty repo — show time since last commit.
     if has_dirty {
-        // The settle threshold is roughly 2× the inactivity_push_delay
-        // (default 5s × 2 = 10s, but we round up to 1m for the column).
-        let settle_threshold_mins: u64 = 1;
-        let last_mins = last_when_mins.unwrap_or(0);
-        if last_mins <= settle_threshold_mins {
-            return "⏳ settling".to_string();
-        }
-        // 4. dirty + stable fingerprint + no in-flight = "stalled Xm"
         return format!(
-            "⏸ stalled {}",
+            "⏳ dirty {}",
             last_when_mins
                 .map(|m| shorten_mins(m))
                 .unwrap_or_else(|| "?".to_string())
@@ -2144,7 +2134,7 @@ pub(crate) async fn run_repos_report(
 
     // ---- Legend line (one-liner mapping column codes to their meaning) ----
     println!(
-        "ℹ️  Legend: MOD = modified tracked · STG = staged · UT = untracked · ↑ = ahead of upstream · ↓ = behind upstream · PUSH = push status · STATE = derived cause (working=daemon just synced/committing/pushing/synced=clean & in sync/stalled/dirty/untracked-only/intentional/failed/idle/cold/healthy) · ACTIVITY = real activity indicator (now=daemon processing this repo · pushing Xm (N ahead)=push in progress, N unpushed commits · stalled Xm=dirty & no daemon action for X minutes · settling=dirty & waiting for fingerprint stability · synced/idle/cold=clean & waiting) · DAEMON = daemon's last recorded action (e.g. '23s sync_triage') so you can tell the daemon is working through dirty rows vs. you're editing right now"
+        "ℹ️  Legend: MOD = modified tracked · STG = staged · UT = untracked · ↑ = ahead of upstream · ↓ = behind upstream · PUSH = push status · STATE = derived cause (working=daemon just synced/committing/pushing/synced=clean & in sync/stalled/dirty/untracked-only/intentional/failed/idle/cold/healthy) · ACTIVITY = real activity indicator (now=daemon processing this repo · pushing Xm (N ahead)=push in progress, N unpushed commits · dirty Xm=dirty repo, last commit X minutes ago · synced/idle/cold=clean & waiting) · DAEMON = daemon's last recorded action (e.g. '23s sync_triage') so you can tell the daemon is working through dirty rows vs. you're editing right now"
     );
     println!();
 
@@ -4749,7 +4739,6 @@ mod tests {
             settling_max_delay_secs: 60,
             dirty_max_age_action: crate::policy::DirtyMaxAgeAction::Commit,
             min_commit_interval_secs: 5,
-            untracked_atomic_commit: false,
             auto_commit_exclude_patterns: vec![],
             sync_visibility: false,
             sync_visibility_interval_hours: 24,
@@ -4971,36 +4960,25 @@ mod tests {
     }
 
     #[test]
-    fn test_activity_label_dirty_recent_commit_settling() {
-        // Dirty + recent commit (within settle threshold) → "settling".
-        // Note: when in_flight is empty, settling still applies.
-        // The settle threshold is 1 minute, so 0 minutes ago is settling.
+    fn test_activity_label_dirty_recent_commit_dirty() {
+        // Dirty + recent commit → "⏳ dirty 0m".
         let row = make_activity_row("0 minutes ago", 2, 0, "OK");
         let label = activity_label(&row);
-        // Either "settling" or "stalled" is acceptable when last_when
-        // is 0 minutes; the test just ensures the function returns
-        // one of the activity states, not a bare timestamp.
         assert!(
-            label.contains("settling") || label.contains("stalled"),
-            "expected 'settling' or 'stalled', got: {}",
-            label
-        );
-        // Critically, the label must NOT be a bare timestamp like "0m".
-        assert!(
-            !label.trim().ends_with("0m") || label.contains("stalled"),
-            "label should not be a bare timestamp: {}",
+            label.contains("dirty"),
+            "expected 'dirty' in label, got: {}",
             label
         );
     }
 
     #[test]
-    fn test_activity_label_dirty_old_commit_stalled() {
-        // Dirty + old commit (8 minutes ago) + no in-flight → "stalled".
+    fn test_activity_label_dirty_old_commit_dirty() {
+        // Dirty + old commit (8 minutes ago) → "⏳ dirty 8m".
         let row = make_activity_row("8 minutes ago", 1, 0, "OK");
         let label = activity_label(&row);
         assert!(
-            label.contains("stalled"),
-            "expected 'stalled' in label, got: {}",
+            label.contains("dirty"),
+            "expected 'dirty' in label, got: {}",
             label
         );
     }
