@@ -1408,7 +1408,7 @@ pub(crate) fn repo_hint(flags: &[String], warn: bool, concern: bool) -> String {
         return "intentional legacy isolation, no upstream configured".to_string();
     }
     if flags.iter().any(|f| f == "NO_ORIGIN") {
-        return "set origin remote".to_string();
+        return "no origin remote (using github SSH instead)".to_string();
     }
     if flags.iter().any(|f| f == "NO_UPSTREAM") {
         return "run repair-concerns --apply (set upstream)".to_string();
@@ -3956,7 +3956,7 @@ mod tests {
     #[test]
     fn test_repo_hint_no_origin() {
         let hint = repo_hint(&["NO_ORIGIN".into()], false, false);
-        assert_eq!(hint, "set origin remote");
+        assert_eq!(hint, "no origin remote (using github SSH instead)");
     }
 
     #[test]
