@@ -557,6 +557,24 @@ pub(crate) struct SyncPolicy {
     /// make the daemon appear to "stall" on dirty repos.
     #[serde(default = "default_min_commit_interval_secs")]
     pub(crate) min_commit_interval_secs: u64,
+    /// When true, repos whose only dirty state is untracked
+    /// files bypass the fingerprint-stability wait and commit
+    /// as soon as `inactivity_push_delay_secs` elapses (instead
+    /// of waiting for the fingerprint to be stable for
+    /// `inactivity_push_delay_secs`). This was added 2026-06-19
+    /// to fix the 'hangpuck' behavior where Playwright test
+    /// artifacts accumulated, but it also makes the daemon
+    /// commit untracked file batches as soon as they appear
+    /// (no settle pause), which the operator does not always
+    /// want. Default `false` — the daemon waits the full
+    /// `inactivity_push_delay_secs` after the LAST change
+    /// before dispatching, regardless of whether the dirty
+    /// state is tracked edits or untracked additions. Set to
+    /// `true` ONLY if you have a known large untracked file
+    /// batch workflow (e.g. CI test artifacts) and you want
+    /// them committed as soon as they stop growing.
+    #[serde(default)]
+    pub(crate) untracked_atomic_commit: bool,
     #[serde(default)]
     pub(crate) sync_visibility: bool,
     #[serde(default = "default_sync_visibility_interval_hours")]
@@ -750,6 +768,11 @@ pub(crate) struct RepoPolicyOverride {
     /// inherits the global value.
     #[serde(default)]
     pub(crate) dirty_max_age_action: Option<DirtyMaxAgeAction>,
+    /// Per-repo override for `untracked_atomic_commit`. None
+    /// inherits the global value. See
+    /// [`SyncPolicy::untracked_atomic_commit`].
+    #[serde(default)]
+    pub(crate) untracked_atomic_commit: Option<bool>,
 }
 
 pub(crate) fn default_true() -> bool {

@@ -1856,13 +1856,24 @@ pub(crate) async fn run_daemon(
                     continue;
                 }
             }
-            // FIX (2026-06-19): bypass the settling/inactivity delay when the
-            // ONLY dirty state is untracked files. Untracked file additions are
-            // atomic (new files appear all at once), so they don't need the
-            // stability wait that tracked file edits need to avoid committing
-            // half-written files. This eliminates the 'hangpuck' settling
-            // behavior for untracked file batches.
-            let untracked_only = status.untracked_files > 0 && status.modified_files == 0;
+            // FIX (2026-06-20, goal 38142891): restore the unconditional
+            // `inactivity_delay` wait for ALL dirty state, including
+            // untracked-only. The previous 2026-06-19 fix bypassed the wait
+            // for untracked-only repos (the 'hangpuck' fix), but the
+            // side-effect was that the daemon committed untracked file
+            // batches as soon as they appeared (no settle pause), which
+            // split large artifact dumps (e.g. Playwright test runs) into
+            // 5-50-file commits instead of one batched commit. The
+            // `policy.untracked_atomic_commit` opt-in (default `false`)
+            // restores the bypass for operators who DO want the eager
+            // untracked-commit behavior. Per-repo override via
+            // `RepoPolicyOverride.untracked_atomic_commit`.
+            let repo_override_for_settle = crate::policy::load_repo_override(&repo);
+            let untracked_atomic = repo_override_for_settle
+                .untracked_atomic_commit
+                .unwrap_or(policy.untracked_atomic_commit);
+            let untracked_only =
+                untracked_atomic && status.untracked_files > 0 && status.modified_files == 0;
             if !untracked_only && now.duration_since(entry.changed_at) < inactivity_delay {
                 // Same check for the stable-fingerprint case:
                 // allow sync if dirty for > 5s even if fingerprint is stable.
