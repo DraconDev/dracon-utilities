@@ -667,45 +667,39 @@ mod tests {
         );
     }
 
-    fn run_git_success(args: &[&str], cwd: Option<&Path>) {
-        let mut cmd = std::process::Command::new("git");
-        let mut path = String::from("/run/current-system/sw/bin");
-        if let Ok(old_path) = std::env::var("PATH") {
-            path.push(':');
-            path.push_str(&old_path);
-        }
-        cmd.env("PATH", path);
-        cmd.args(args);
-        if let Some(cwd) = cwd {
-            cmd.current_dir(cwd);
-        }
-        let status = cmd.status().expect("git command should spawn");
-        assert!(status.success(), "git {:?} failed", args);
-    }
-
     #[tokio::test]
     async fn test_remote_repo_exists_checks_remote_head() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
-        let bare = tmp.path().join("remote.git");
-        let work = tmp.path().join("work");
-        let bare_path = bare.to_str().expect("bare path");
-
-        run_git_success(&["init", "--bare", "-q", bare_path], None);
-        run_git_success(&["init", "-q", "-b", "master"], Some(&work));
-        std::fs::write(work.join("file.txt"), "hello\n").expect("write file");
-        run_git_success(&["config", "user.email", "test@example.com"], Some(&work));
-        run_git_success(&["config", "user.name", "Test User"], Some(&work));
-        run_git_success(&["add", "file.txt"], Some(&work));
-        run_git_success(&["commit", "-q", "-m", "init"], Some(&work));
-        run_git_success(&["remote", "add", "origin", bare_path], Some(&work));
-        run_git_success(&["push", "-q", "origin", "master:HEAD"], Some(&work));
+        let fake_git = tmp.path().join("git");
+        std::fs::write(
+            &fake_git,
+            r#"#!/bin/sh
+if [ "$1" = "ls-remote" ] && [ "$3" = "HEAD" ]; then
+    case "$2" in
+        *existing*) echo "abcdef1234567890 HEAD"; exit 0 ;;
+        *) exit 1 ;;
+    esac
+fi
+exit 1
+"#,
+        )
+        .expect("write fake git");
+        std::fs::set_permissions(
+            &fake_git,
+            std::os::unix::fs::PermissionsExt::from_mode(0o755),
+        )
+        .expect("chmod fake git");
+        let _guard = EnvRestorer::new(
+            "DRACON_SYNC_GIT_BIN",
+            fake_git.to_str().expect("fake git path"),
+        );
 
         assert!(
-            remote_repo_exists(bare_path).await,
+            remote_repo_exists("existing-repo").await,
             "existing remote HEAD should be detected"
         );
         assert!(
-            !remote_repo_exists(tmp.path().join("missing.git").to_str().unwrap()).await,
+            !remote_repo_exists("missing-repo").await,
             "missing remote should not be treated as existing"
         );
     }
