@@ -12,8 +12,8 @@ use crate::policy::{debug_enabled, std_git_command, tokio_git_command, AuthType,
 
 use super::{
     current_branch, gh_cmd, git_ssh_hardening, is_permanent_push_rejection, is_push_rejected,
-    is_safe_branch_name, load_secret, push_https_fallback, run_git_capture_output,
-    run_git_with_timeout_env_progress,
+    is_safe_branch_name, load_secret, load_secret_or_legacy_pat, push_https_fallback,
+    run_git_capture_output, run_git_with_timeout_env_progress,
 };
 
 /// Configure a remote URL. Adds if missing, updates if URL differs.
@@ -480,8 +480,8 @@ pub(crate) async fn auto_create_repo(
                 .auto_create_token_var
                 .as_deref()
                 .unwrap_or("CODEBERG_TOKEN");
-            let token = load_secret(token_var)
-                .with_context(|| format!("missing token for Codeberg (set {} env var or ~/.dracon/utilities/sync/secrets/*.env file)", token_var))?;
+            let token = load_secret_or_legacy_pat(token_var)
+                .with_context(|| format!("missing token for Codeberg (set {} env var or put it in ~/.dracon/utilities/sync/secrets/*.env or ~/.dracon/secrets/pat/*.env)", token_var))?;
             let endpoint = config
                 .api_endpoint
                 .as_deref()

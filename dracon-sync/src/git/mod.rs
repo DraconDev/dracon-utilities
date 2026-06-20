@@ -367,6 +367,24 @@ mod tests {
     }
 
     #[test]
+    fn test_load_secret_or_legacy_pat_falls_back_to_legacy_dir() {
+        let tmp_home = tempfile::TempDir::new().expect("temp dir");
+        let _lock = acquire_path_lock();
+        let _guard = EnvRestorer::new("HOME", &tmp_home.path().to_string_lossy());
+        let _token_guard = EnvRestorer::remove("CODEBERG_TOKEN");
+        let legacy_dir = tmp_home.path().join(".dracon/secrets/pat");
+        std::fs::create_dir_all(&legacy_dir).expect("create legacy secrets dir");
+        std::fs::write(
+            legacy_dir.join("codeberg.env"),
+            "CODEBERG_TOKEN=legacy_codeberg_token\n",
+        )
+        .expect("write codeberg env");
+
+        let result = load_secret_or_legacy_pat("CODEBERG_TOKEN");
+        assert_eq!(result, Some("legacy_codeberg_token".to_string()));
+    }
+
+    #[test]
     fn test_gh_cmd_disables_prompts_without_token() {
         let tmp_home = tempfile::TempDir::new().expect("temp dir");
         let tmp_bin = tempfile::TempDir::new().expect("temp bin dir");
