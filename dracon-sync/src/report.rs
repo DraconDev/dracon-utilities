@@ -1889,7 +1889,20 @@ pub(crate) async fn run_repos_report(
                 "intentional legacy isolation, no upstream configured".to_string(),
             )
         } else if flags.iter().any(|f| f == "NO_UPSTREAM") {
-            ("FAIL".to_string(), "no upstream set".to_string())
+            // CHANGED 2026-06-20: the `NO_UPSTREAM` flag now also fires
+            // for repos with at least one non-origin remote (e.g. the
+            // SSH multi-mirror repos). For those repos, push status
+            // is OK because the daemon uses explicit refspecs and
+            // does not require `branch.<name>.remote` to be set.
+            // Only repos with `has_origin=true && !has_upstream` (the
+            // "missing tracking upstream for origin" case) are still
+            // a real push failure — `git push -u origin HEAD` would
+            // have been the recovery path.
+            if has_origin {
+                ("FAIL".to_string(), "no upstream set".to_string())
+            } else {
+                ("OK".to_string(), String::new())
+            }
         } else if effective_status.ahead > 0 && has_origin && has_upstream {
             (
                 "PENDING".to_string(),
