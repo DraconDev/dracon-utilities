@@ -560,7 +560,6 @@ async fn remote_repo_exists(url: &str) -> bool {
 mod tests {
     use super::*;
     use crate::policy::RemoteConfig;
-    use crate::test_helpers::test_git_cmd;
     use std::path::{Path, PathBuf};
 
     /// Helper: build a minimal RemoteConfig for testing.
@@ -663,7 +662,7 @@ mod tests {
     }
 
     fn run_git_success(args: &[&str], cwd: Option<&Path>) {
-        let mut cmd = test_git_cmd();
+        let mut cmd = std::process::Command::new("/run/current-system/sw/bin/git");
         cmd.args(args);
         if let Some(cwd) = cwd {
             cmd.current_dir(cwd);
