@@ -70,7 +70,7 @@ pub(crate) async fn push_mirror_remotes(
 
     configure_all_remotes(repo, remotes, &repo_name);
 
-    for (remote_name, create_result) in auto_create_all_remotes(remotes, &repo_name, private).await
+    for (remote_name, create_result) in auto_create_all_remotes(remotes, &repo_name, private, Some(repo)).await
     {
         match create_result {
             Ok(_) => {}
@@ -497,16 +497,48 @@ pub(crate) async fn auto_create_all_remotes(
     remotes: &[RemoteConfig],
     repo_name: &str,
     private: bool,
+    repo: Option<&Path>,
 ) -> Vec<(String, Result<String>)> {
     let mut results = Vec::new();
     for remote in remotes {
         if remote.auto_create {
             let resolved_name = remote.resolve_repo_name(repo_name);
+            // CHANGED 2026-06-20: check if the repo already exists on the
+            // remote before attempting to create it. This avoids spamming
+            // `gh repo create` for repos that already exist, which causes
+            // GitHub rate limiting ("You have created too many repositories,
+            // too quickly").
+            if let Some(repo_path) = repo {
+                let url = remote.resolve_push_url(&resolved_name);
+                if remote_repo_exists(&url).await {
+                    if debug_enabled() {
+                        eprintln!(
+                            "ℹ️  {} already exists on {} — skipping auto-create",
+                            resolved_name,
+                            remote.name
+                        );
+                    }
+                    results.push((remote.name.clone(), Ok(resolved_name.clone())));
+                    continue;
+                }
+            }
             let result = auto_create_repo(remote, &resolved_name, private).await;
             results.push((remote.name.clone(), result));
         }
     }
     results
+}
+
+/// Check if a remote repo exists by running `git ls-remote` on the given URL.
+async fn remote_repo_exists(url: &str) -> bool {
+    let output = tokio::process::Command::new("git")
+        .args(["ls-remote", "--heads", url, "HEAD"])
+        .output()
+        .await;
+    match output {
+        Ok(o) => o.status.success(),
+        Err(_) => false,
+    }
 }
 
 // ============================================================================
