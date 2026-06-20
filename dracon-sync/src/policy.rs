@@ -572,9 +572,7 @@ pub(crate) struct SyncPolicy {
     /// state is tracked edits or untracked additions. Set to
     /// `true` ONLY if you have a known large untracked file
     /// batch workflow (e.g. CI test artifacts) and you want
-    /// them committed as soon as they stop growing.
-    #[serde(default)]
-    pub(crate) untracked_atomic_commit: bool,
+
     #[serde(default)]
     pub(crate) sync_visibility: bool,
     #[serde(default = "default_sync_visibility_interval_hours")]
@@ -768,11 +766,7 @@ pub(crate) struct RepoPolicyOverride {
     /// inherits the global value.
     #[serde(default)]
     pub(crate) dirty_max_age_action: Option<DirtyMaxAgeAction>,
-    /// Per-repo override for `untracked_atomic_commit`. None
-    /// inherits the global value. See
-    /// [`SyncPolicy::untracked_atomic_commit`].
-    #[serde(default)]
-    pub(crate) untracked_atomic_commit: Option<bool>,
+
 }
 
 pub(crate) fn default_true() -> bool {
@@ -1572,7 +1566,6 @@ pub(crate) fn test_sync_policy() -> SyncPolicy {
         settling_max_delay_secs: 60,
         dirty_max_age_action: DirtyMaxAgeAction::Commit,
         min_commit_interval_secs: 5,
-        untracked_atomic_commit: false,
         sync_visibility: false,
         sync_visibility_interval_hours: 24,
         sync_metadata: false,
