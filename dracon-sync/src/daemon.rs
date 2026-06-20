@@ -27,9 +27,9 @@ macro_rules! veprintln {
 
 use crate::exclude::{excluded_dir_names_set, has_sync_relevant_dirty_entries};
 use crate::git::{
-    discover_git_repos, git_diff_head_files, has_both_main_and_master, has_origin_remote,
-    has_tracking_upstream, is_repo_ready, repair_broken_tracking, repo_diff_entries,
-    count_unpushed_vs_mirrors,
+    count_unpushed_vs_mirrors, current_branch, discover_git_repos, git_diff_head_files,
+    has_both_main_and_master, has_origin_remote, has_tracking_upstream, is_repo_ready,
+    is_safe_branch_name, repair_broken_tracking, repo_diff_entries, run_git_with_timeout,
 };
 use crate::policy::{debug_enabled, freeze_reason, timestamp_secs, SyncPolicy};
 use crate::report::{run_repair_concerns, run_repair_warns, ConcernRepairFilter};
@@ -106,6 +106,146 @@ pub(crate) fn configure_standard_remotes_if_missing(repo: &Path, policy: &SyncPo
         true
     } else {
         false
+    }
+}
+
+/// Return the primary remote VS Code should use for Publish Branch.
+///
+/// `origin` wins when present for backwards compatibility. For mirror-only
+/// repos, `github` is the conventional primary mirror because VS Code expects a
+/// single publish remote and the daemon still pushes explicitly to all mirrors.
+fn primary_publish_remote(repo: &Path, policy: &SyncPolicy) -> Option<String> {
+    let remotes = crate::git::multi_remote::list_remotes(repo);
+    let remote_set: HashSet<&str> = remotes.iter().map(String::as_str).collect();
+    if remote_set.contains("origin") {
+        return Some("origin".to_string());
+    }
+    if remote_set.contains("github") {
+        return Some("github".to_string());
+    }
+    policy
+        .remotes
+        .iter()
+        .find(|r| remote_set.contains(r.name.as_str()))
+        .map(|r| r.name.clone())
+}
+
+/// Configure `branch.<current>.remote` and `branch.<current>.merge` when the
+/// current branch has no upstream. This removes VS Code's "Publish Branch"
+/// prompt for mirror-only repos while preserving daemon explicit mirror pushes.
+pub(crate) fn configure_publish_upstream_if_missing(
+    repo: &Path,
+    policy: &SyncPolicy,
+) -> Result<bool> {
+    if has_tracking_upstream(repo) {
+        return Ok(false);
+    }
+    let Some(branch) = current_branch(repo) else {
+        return Ok(false);
+    };
+    if !is_safe_branch_name(&branch) {
+        return Ok(false);
+    }
+    let Some(remote) = primary_publish_remote(repo, policy) else {
+        return Ok(false);
+    };
+    let remote_key = format!("branch.{branch}.remote");
+    let merge_key = format!("branch.{branch}.merge");
+    crate::policy::std_git_command()
+        .args(["config", &remote_key, &remote])
+        .current_dir(repo)
+        .status()
+        .with_context(|| format!("failed to set {remote_key} in {}", repo.display()))?;
+    crate::policy::std_git_command()
+        .args(["config", &merge_key, &format!("refs/heads/{branch}")])
+        .current_dir(repo)
+        .status()
+        .with_context(|| format!("failed to set {merge_key} in {}", repo.display()))?;
+    eprintln!(
+        "🔧 {} configured publish upstream for {branch} on {remote}",
+        repo.display()
+    );
+    Ok(true)
+}
+
+/// Refresh the configured publish upstream after a successful push.
+///
+/// `configure_publish_upstream_if_missing` writes the branch config so VS Code
+/// stops showing "Publish Branch" immediately. Once the branch exists on the
+/// primary remote, this fetches that remote-tracking ref and points the local
+/// upstream to it so `git status --branch` is clean rather than "gone".
+pub(crate) async fn refresh_publish_upstream(repo: &Path, policy: &SyncPolicy) -> Result<bool> {
+    if !has_tracking_upstream(repo) {
+        return Ok(false);
+    }
+    let Some(branch) = current_branch(repo) else {
+        return Ok(false);
+    };
+    if !is_safe_branch_name(&branch) {
+        return Ok(false);
+    }
+    let remote = configured_branch_remote(repo, &branch)
+        .or_else(|| primary_publish_remote(repo, policy))
+        .unwrap_or_default();
+    if remote.is_empty() {
+        return Ok(false);
+    }
+    let refspec = format!("{branch}:refs/remotes/{remote}/{branch}");
+    let fetch = run_git_with_timeout(
+        repo,
+        &["fetch", "--prune", &remote, &refspec],
+        30,
+        &format!("fetch-publish-upstream-{remote}"),
+    )
+    .await;
+    if let Err(e) = fetch {
+        if debug_enabled() {
+            eprintln!(
+                "🐛 {} could not fetch publish upstream {remote}/{branch}: {}",
+                repo.display(),
+                e
+            );
+        }
+        return Ok(false);
+    }
+    crate::git::set_upstream_to_remote_branch(repo, &remote, &branch)?;
+    Ok(true)
+}
+
+fn configured_branch_remote(repo: &Path, branch: &str) -> Option<String> {
+    if !is_safe_branch_name(branch) {
+        return None;
+    }
+    let remote_key = format!("branch.{branch}.remote");
+    let merge_key = format!("branch.{branch}.merge");
+    let remote = crate::policy::std_git_command()
+        .args(["config", "--get", &remote_key])
+        .current_dir(repo)
+        .output()
+        .ok()
+        .and_then(|o| {
+            if o.status.success() {
+                Some(String::from_utf8_lossy(&o.stdout).trim().to_string())
+            } else {
+                None
+            }
+        })?;
+    let merge = crate::policy::std_git_command()
+        .args(["config", "--get", &merge_key])
+        .current_dir(repo)
+        .output()
+        .ok()
+        .and_then(|o| {
+            if o.status.success() {
+                Some(String::from_utf8_lossy(&o.stdout).trim().to_string())
+            } else {
+                None
+            }
+        })?;
+    if merge.starts_with("refs/heads/") && is_safe_branch_name(&merge) {
+        Some(remote)
+    } else {
+        None
     }
 }
 
