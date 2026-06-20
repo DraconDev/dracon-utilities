@@ -499,6 +499,7 @@ pub(crate) struct RepoReportRow {
     repo: String,
     state_flags: Vec<String>,
     branch: String,
+    upstream: String,
     modified: usize,
     staged: usize,
     untracked: usize,
