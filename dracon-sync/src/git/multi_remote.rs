@@ -566,7 +566,7 @@ async fn remote_repo_exists(url: &str) -> bool {
 mod tests {
     use super::*;
     use crate::policy::RemoteConfig;
-    use std::path::{Path, PathBuf};
+    use crate::test_helpers::EnvRestorer;
 
     /// Helper: build a minimal RemoteConfig for testing.
     /// `name` and `priority` are the only fields that affect the sort.
