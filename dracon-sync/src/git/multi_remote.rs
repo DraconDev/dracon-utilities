@@ -661,67 +661,35 @@ mod tests {
         );
     }
 
+    fn run_git_success(args: &[&str], cwd: Option<&Path>) {
+        let mut cmd = std::process::Command::new("git");
+        cmd.args(args);
+        if let Some(cwd) = cwd {
+            cmd.current_dir(cwd);
+        }
+        let status = cmd.status().expect("git command should spawn");
+        assert!(status.success(), "git {:?} failed", args);
+    }
+
     #[tokio::test]
     async fn test_remote_repo_exists_checks_remote_head() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let bare = tmp.path().join("remote.git");
         let work = tmp.path().join("work");
-        std::process::Command::new("git")
-            .args(["init", "--bare", "-q", bare.to_str().unwrap()])
-            .status()
-            .expect("git init --bare")
-            .success();
-        std::process::Command::new("git")
-            .args(["init", "-q", "-b", "master"])
-            .arg(&work)
-            .status()
-            .expect("git init work")
-            .success();
+        let bare_path = bare.to_str().expect("bare path");
+
+        run_git_success(&["init", "--bare", "-q", bare_path], None);
+        run_git_success(&["init", "-q", "-b", "master"], Some(&work));
         std::fs::write(work.join("file.txt"), "hello\n").expect("write file");
-        std::process::Command::new("git")
-            .args(["config", "user.email", "test@example.com"])
-            .current_dir(&work)
-            .status()
-            .expect("git config email")
-            .success();
-        std::process::Command::new("git")
-            .args(["config", "user.name", "Test User"])
-            .current_dir(&work)
-            .status()
-            .expect("git config name")
-            .success();
-        std::process::Command::new("git")
-            .args(["add", "file.txt"])
-            .current_dir(&work)
-            .status()
-            .expect("git add")
-            .success();
-        std::process::Command::new("git")
-            .args(["commit", "-q", "-m", "init"])
-            .current_dir(&work)
-            .status()
-            .expect("git commit")
-            .success();
-        std::process::Command::new("git")
-            .args([
-                "remote",
-                "add",
-                "origin",
-                bare.to_str().expect("bare path"),
-            ])
-            .current_dir(&work)
-            .status()
-            .expect("git remote add")
-            .success();
-        std::process::Command::new("git")
-            .args(["push", "-q", "origin", "master:HEAD"])
-            .current_dir(&work)
-            .status()
-            .expect("git push")
-            .success();
+        run_git_success(&["config", "user.email", "test@example.com"], Some(&work));
+        run_git_success(&["config", "user.name", "Test User"], Some(&work));
+        run_git_success(&["add", "file.txt"], Some(&work));
+        run_git_success(&["commit", "-q", "-m", "init"], Some(&work));
+        run_git_success(&["remote", "add", "origin", bare_path], Some(&work));
+        run_git_success(&["push", "-q", "origin", "master:HEAD"], Some(&work));
 
         assert!(
-            remote_repo_exists(bare.to_str().expect("bare path")).await,
+            remote_repo_exists(bare_path).await,
             "existing remote HEAD should be detected"
         );
         assert!(
