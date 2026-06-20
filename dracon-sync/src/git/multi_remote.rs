@@ -530,8 +530,11 @@ pub(crate) async fn auto_create_all_remotes(
 
 /// Check if a remote repo exists by running `git ls-remote` on the configured remote.
 async fn remote_repo_exists(repo: &Path, remote_name: &str) -> bool {
+    let ssh_hardening = git_ssh_hardening();
     let output = tokio_git_command()
         .current_dir(repo)
+        .env("GIT_SSH_COMMAND", ssh_hardening)
+        .env("GIT_TERMINAL_PROMPT", "0")
         .args(["ls-remote", remote_name, "HEAD"])
         .output()
         .await;
