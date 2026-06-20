@@ -1498,7 +1498,7 @@ pub(crate) async fn run_daemon(
                 let has_any_remote = has_origin_remote(&repo)
                     || !policy.remotes.is_empty()
                         && policy.remotes.iter().any(|r| {
-                            crate::git::get_remote_url(&repo, &r.name).is_some()
+                            crate::git::multi_remote::get_remote_url(&repo, &r.name).is_some()
                         });
                 if !has_any_remote && !policy.remotes.is_empty() {
                     let repo_name = repo
