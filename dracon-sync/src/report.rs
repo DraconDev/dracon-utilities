@@ -509,6 +509,12 @@ pub(crate) struct RepoReportRow {
     last_when: String,
     last_msg: String,
     last_unix: i64,
+    /// Number of commits in the last 1 hour.
+    commits_1h: usize,
+    /// Number of commits in the last 6 hours.
+    commits_6h: usize,
+    /// Number of commits in the last 24 hours.
+    commits_24h: usize,
     last_push: String,
     push_status: String,
     push_error: String,
@@ -1621,6 +1627,41 @@ fn repo_failure_message(prefix: &str, repo: &Path, error: impl std::fmt::Display
 /// even though the ref is perfectly valid. `git log -1 --format=%cr
 /// origin/<branch>` returns the committer date of the current
 /// remote-tracking tip in both cases, so it is the right primitive.
+/// Count commits in the last 1h, 6h, and 24h for a repo by reading
+/// commit timestamps from `git log --format=%ct` and bucketing in Rust.
+/// Returns `[commits_1h, commits_6h, commits_24h]`.
+/// Returns all zeros when git fails or the repo is empty.
+fn commit_counts(repo: &Path) -> [usize; 3] {
+    let repo_str = match repo.to_str() {
+        Some(s) => s.to_string(),
+        None => return [0, 0, 0],
+    };
+    // Single subprocess call per repo: get all commit timestamps from the last 24h,
+    // then bucket in Rust. This is faster than 3 separate rev-list --count calls.
+    let out = crate::git::git_cmd()
+        .args(["-C", &repo_str, "log", "--format=%ct", "--after=1 day ago", "HEAD"])
+        .output();
+    let timestamps: Vec<u64> = match out {
+        Ok(o) if o.status.success() => {
+            String::from_utf8_lossy(&o.stdout)
+                .lines()
+                .filter_map(|l| l.trim().parse::<u64>().ok())
+                .collect()
+        }
+        _ => return [0, 0, 0],
+    };
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let cutoff_1h = now.saturating_sub(3600);
+    let cutoff_6h = now.saturating_sub(21600);
+    let commits_1h = timestamps.iter().filter(|&&ts| ts >= cutoff_1h).count();
+    let commits_6h = timestamps.iter().filter(|&&ts| ts >= cutoff_6h).count();
+    let commits_24h = timestamps.len();
+    [commits_1h, commits_6h, commits_24h]
+}
+
 fn last_push_for_branch(repo: &Path, branch: &str) -> String {
     if branch.is_empty() || !crate::git::is_safe_branch_name(branch) {
         return "-".to_string();
@@ -1939,6 +1980,11 @@ pub(crate) async fn run_repos_report(
         // unsafe branch names (with shell-special chars) skip the reflog call
         // to avoid `git reflog show origin/` (ambiguous argument) errors.
         let last_push = last_push_for_branch(&repo, &effective_status.branch);
+
+        // Compute commit counts (1h, 6h, 24h) for this repo. Uses a single
+        // `git log --format=%ct` subprocess call per repo and buckets timestamps
+        // in Rust. This is faster than 3 separate `rev-list --count` calls.
+        let [commits_1h, commits_6h, commits_24h] = commit_counts(&repo);
 
         // Derive the "rough cause" classification that combines all the
         // signals above into a single small-vocabulary label. This is the
