@@ -340,17 +340,30 @@ pub(crate) async fn push_to_all_remotes(
     let mut sorted = remotes.to_vec();
     sorted.sort_by_key(|r| r.priority);
 
-    // Push to remotes sequentially, in priority order. A failure
-    // on one remote does NOT abort subsequent pushes: the daemon
-    // continues to the next remote and reports the failure in
-    // the returned Vec. The caller (sync_repo) handles per-remote
-    // failure tracking.
-    let mut results = Vec::new();
-    for remote in sorted {
+    // CHANGED 2026-06-20: sequential → parallel. Pushing to all remotes
+    // in parallel cuts push time from O(N) to O(1) for N remotes.
+    // With 4 remotes (origin, github, codeberg, gitlab), this is a
+    // 4x speedup on the push phase. Results are returned in the same
+    // order as `sorted` so callers can rely on the ordering.
+    let mut futures = Vec::with_capacity(sorted.len());
+    for remote in sorted.iter() {
+        let repo = repo.to_path_buf();
+        let name = remote.name.clone();
         let force_push = remote.force_push_when_behind;
-        let result =
-            push_to_named_remote(repo, &remote.name, timeout_secs, retries, force_push).await;
-        results.push((remote.name, result));
+        futures.push(tokio::spawn(async move {
+            let result = push_to_named_remote(&repo, &name, timeout_secs, retries, force_push).await;
+            (name, result)
+        }));
+    }
+    let mut results = Vec::with_capacity(futures.len());
+    for f in futures {
+        match f.await {
+            Ok((name, result)) => results.push((name, result)),
+            Err(e) => {
+                let name = String::from("unknown");
+                results.push((name, Err(anyhow::anyhow!("join error: {}", e))));
+            }
+        }
     }
     results
 }
