@@ -2124,7 +2124,7 @@ pub(crate) async fn run_repos_report(
             repo: repo.display().to_string(),
             state_flags: flags,
             branch: effective_status.branch.clone(),
-            upstream: branch_upstream(repo, &effective_status.branch),
+            upstream: branch_upstream(&repo, &effective_status.branch),
             modified: effective_status.modified_files,
             staged: effective_status.staged_files,
             untracked: effective_status.untracked_files,
@@ -2244,7 +2244,7 @@ pub(crate) async fn run_repos_report(
 
     // ---- Legend line (one-liner mapping column codes to their meaning) ----
     println!(
-        "ℹ️  Legend: MOD = modified tracked · STG = staged · UT = untracked · 🔗 = VS Code publish upstream (branch.remote/branch.merge or @{u}) · ↑ = ahead of upstream · ↓ = behind upstream · PUSH = push status · 📊 1h/6h/24h = commits in last 1h/6h/24h · STATE = derived cause (working=daemon just synced/committing/pushing/synced=clean & in sync/stalled/dirty/untracked-only/intentional/failed/idle/cold/healthy) · ACTIVITY = real activity indicator (now=daemon processing this repo · pushing Xm (N ahead)=push in progress, N unpushed commits · dirty Xm=dirty repo, last commit X minutes ago · synced/idle/cold=clean & waiting) · DAEMON = daemon's last recorded action (e.g. '23s sync_triage') so you can tell the daemon is working through dirty rows vs. you're editing right now"
+        "ℹ️  Legend: MOD = modified tracked · STG = staged · UT = untracked · 🔗 = VS Code publish upstream (branch.remote/branch.merge or @{{u}}) · ↑ = ahead of upstream · ↓ = behind upstream · PUSH = push status · 📊 1h/6h/24h = commits in last 1h/6h/24h · STATE = derived cause (working=daemon just synced/committing/pushing/synced=clean & in sync/stalled/dirty/untracked-only/intentional/failed/idle/cold/healthy) · ACTIVITY = real activity indicator (now=daemon processing this repo · pushing Xm (N ahead)=push in progress, N unpushed commits · dirty Xm=dirty repo, last commit X minutes ago · synced/idle/cold=clean & waiting) · DAEMON = daemon's last recorded action (e.g. '23s sync_triage') so you can tell the daemon is working through dirty rows vs. you're editing right now"
     );
     println!();
 
