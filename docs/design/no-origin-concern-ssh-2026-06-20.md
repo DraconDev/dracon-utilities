@@ -262,6 +262,110 @@ a repo with tracked modifications.)
 - `cargo deny check` → advisories ok, bans ok, licenses ok, sources ok
 - Live `dracon-sync repos` → 0 CONCERN across 11 watched repos
 
+## Install / daemon restart — a critical follow-up
+
+**Date:** 2026-06-20 (same day, follow-up goal `5f291ee1-7bd9-4abb-a44d-8e9ea1961391`)
+
+After the code fix above landed, the operator reported that
+`dracon-sync repos` STILL showed the old "no origin remote (using
+github SSH instead)" hint for all 10 SSH-mirror repos. Investigation
+proved the fix was on disk but not running:
+
+### The two-binary problem
+
+The original install workflow used `cargo install --path dracon-sync
+--locked --force`, which places the new binary at
+`/home/dracon/.cargo/bin/dracon-sync`. The daemon's systemd unit
+(`~/.config/systemd/user/dracon-sync.service`) and the canonical
+install script both target `/home/dracon/.local/bin/dracon-sync`
+instead. Result: the operator's shell (`PATH=$HOME/.local/bin:...`)
+and the running daemon were both executing the OLD binary, while the
+new binary sat unused in `~/.cargo/bin/`.
+
+Evidence captured during the follow-up investigation:
+
+```
+$ sha256sum /home/dracon/.local/bin/dracon-sync /home/dracon/.cargo/bin/dracon-sync
+99fc32720709f851a09b17ce0049c5f8a396caa311c8aefdac062bb7234eb147  /home/dracon/.local/bin/dracon-sync   # OLD (12.27 MB, mtime 01:51)
+84710c373259dfaf08c9e7e4ef9ff92346a6c96067928397e33556b421debe54  /home/dracon/.cargo/bin/dracon-sync   # NEW (10.56 MB, mtime 03:00)
+
+$ systemctl --user show -p MainPID --value dracon-sync.service
+1134988
+$ readlink /proc/1134988/exe
+/home/dracon/.local/bin/dracon-sync     # ← OLD binary still running
+```
+
+### The fix
+
+Use the project's own `install.sh` with `--upgrade --binaries-only`,
+which:
+
+1. Stops the systemd daemon (`systemctl --user stop
+   dracon-sync.service`, plus a `pkill` fallback).
+2. Removes the stale `~/.cargo/bin/dracon-sync` artifact (lines
+   156–169 of `install.sh` explicitly clean this up).
+3. Builds each package with the correct release profile.
+4. Installs to `~/.local/bin/$binary` (the canonical location the
+   systemd unit points at).
+5. Restarts the systemd daemon so the new binary is loaded.
+
+```
+$ cd /home/dracon/Dev/dracon-utilities
+$ ./install.sh --upgrade --binaries-only
+…
+  ✅ Installed ~/.local/bin/dracon-sync (updated)
+…
+$ sha256sum /home/dracon/.local/bin/dracon-sync
+84710c373259dfaf08c9e7e4ef9ff92346a6c96067928397e33556b421debe54  /home/dracon/.local/bin/dracon-sync   # matches NEW
+
+$ systemctl --user show -p MainPID --value dracon-sync.service
+1412654
+$ readlink /proc/1412654/exe
+/home/dracon/.local/bin/dracon-sync
+
+$ sha256sum /proc/1412654/exe
+84710c373259dfaf08c9e7e4ef9ff92346a6c96067928397e33556b421debe54  /proc/1412654/exe   # matches
+```
+
+After the install:
+
+- `/home/dracon/.cargo/bin/dracon-sync` is gone (cleaned up by the
+  installer as a "shadowing binary").
+- `/home/dracon/.local/bin/dracon-sync` is the NEW binary.
+- The systemd daemon (PID 1412654) is running the NEW binary.
+- `dracon-sync repos` (operator's PATH) reports 0 CONCERN across 11
+  repos. Re-checked after >60 s of daemon uptime to confirm the
+  daemon and CLI agree.
+
+### Operator action
+
+**Always use `install.sh` to deploy daemon changes — do NOT use
+`cargo install`.** `cargo install` writes to `~/.cargo/bin/` and
+leaves the daemon running the old binary in `~/.local/bin/`. The
+symptom is "fix is on disk but `dracon-sync repos` still shows the
+old hint" — confusing, because `cargo install` reports success and
+the operator has no way to know the daemon is pinned to a different
+path.
+
+```
+cd /home/dracon/Dev/dracon-utilities
+./install.sh --upgrade --binaries-only    # preferred: stop, install, restart
+# or
+./install.sh --upgrade                    # full upgrade: also re-touches configs/services
+```
+
+For dry-run preview:
+
+```
+./install.sh --dry-run --upgrade --binaries-only
+```
+
+If the operator ever needs to bypass `install.sh` (e.g. to test a
+debug build), they must also update the systemd unit's `ExecStart=`
+path and `systemctl --user daemon-reload`. The current systemd unit
+hardcodes `%h/.local/bin/dracon-sync`; a `cargo install`-only path
+will silently desync the daemon.
+
 ## Constraints preserved
 
 - The commit-all default policy (`untracked_exclude_patterns = []`)
