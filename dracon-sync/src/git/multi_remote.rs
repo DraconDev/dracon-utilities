@@ -532,7 +532,7 @@ pub(crate) async fn auto_create_all_remotes(
 /// Check if a remote repo exists by running `git ls-remote` on the given URL.
 async fn remote_repo_exists(url: &str) -> bool {
     let output = tokio::process::Command::new("git")
-        .args(["ls-remote", "--heads", url, "HEAD"])
+        .args(["ls-remote", url, "HEAD"])
         .output()
         .await;
     match output {
