@@ -107,6 +107,79 @@ fn default_push_max_retries() -> u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::policy::{AuthType, RemoteConfig};
+
+    #[test]
+    fn test_configure_standard_remotes_if_missing_adds_remotes() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .expect("git init")
+            .success();
+        let mut policy = crate::policy::test_sync_policy();
+        policy.remotes = vec![RemoteConfig {
+            name: "github".to_string(),
+            push_url: "git@github.com:DraconDev/{repo}.git".to_string(),
+            auto_create: false,
+            auto_create_account: "DraconDev".to_string(),
+            auth_type: AuthType::GitHub,
+            priority: 50,
+            api_endpoint: None,
+            auto_create_token_var: None,
+            repo_name_map: Default::default(),
+            force_push_when_behind: false,
+        }];
+
+        assert!(configure_standard_remotes_if_missing(&repo, &policy));
+        assert_eq!(
+            crate::git::multi_remote::get_remote_url(&repo, "github"),
+            Some("git@github.com:DraconDev/test-repo.git".to_string())
+        );
+    }
+
+    #[test]
+    fn test_configure_standard_remotes_if_missing_preserves_existing_remote() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let repo = tmp.path().join("test-repo");
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .expect("git init")
+            .success();
+        crate::git::git_cmd()
+            .args(["remote", "add", "origin", "git@github.com:Other/test-repo.git"])
+            .current_dir(&repo)
+            .status()
+            .expect("git remote add")
+            .success();
+        let mut policy = crate::policy::test_sync_policy();
+        policy.remotes = vec![RemoteConfig {
+            name: "github".to_string(),
+            push_url: "git@github.com:DraconDev/{repo}.git".to_string(),
+            auto_create: false,
+            auto_create_account: "DraconDev".to_string(),
+            auth_type: AuthType::GitHub,
+            priority: 50,
+            api_endpoint: None,
+            auto_create_token_var: None,
+            repo_name_map: Default::default(),
+            force_push_when_behind: false,
+        }];
+
+        assert!(!configure_standard_remotes_if_missing(&repo, &policy));
+        assert_eq!(
+            crate::git::multi_remote::get_remote_url(&repo, "origin"),
+            Some("git@github.com:Other/test-repo.git".to_string())
+        );
+        assert_eq!(
+            crate::git::multi_remote::get_remote_url(&repo, "github"),
+            None
+        );
+    }
 
     #[test]
     fn test_stuck_repo_entry_serialization() {
