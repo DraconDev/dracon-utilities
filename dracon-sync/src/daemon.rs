@@ -1846,102 +1846,21 @@ pub(crate) async fn run_daemon(
                 entry.fingerprint = fingerprint;
                 entry.changed_at = now;
                 entry.failure_count = 0;
-                // Don't skip if the repo has been dirty for > 5s —
-                // sync it regardless of fingerprint changes.
-                const MAX_DIRTY_DELAY: Duration = Duration::from_secs(5);
-                let dirty_long_enough = entry
-                    .dirty_since
-                    .is_some_and(|since| now.duration_since(since) >= MAX_DIRTY_DELAY);
-                if !dirty_long_enough {
-                    continue;
-                }
             }
-            // FIX (2026-06-20, goal 38142891): restore the unconditional
-            // `inactivity_delay` wait for ALL dirty state, including
-            // untracked-only. The previous 2026-06-19 fix bypassed the wait
-            // for untracked-only repos (the 'hangpuck' fix), but the
-            // side-effect was that the daemon committed untracked file
-            // batches as soon as they appeared (no settle pause), which
-            // split large artifact dumps (e.g. Playwright test runs) into
-            // 5-50-file commits instead of one batched commit. The
-            // `policy.untracked_atomic_commit` opt-in (default `false`)
-            // restores the bypass for operators who DO want the eager
-            // untracked-commit behavior. Per-repo override via
-            // `RepoPolicyOverride.untracked_atomic_commit`.
-            let repo_override_for_settle = crate::policy::load_repo_override(&repo);
-            let untracked_atomic = repo_override_for_settle
-                .untracked_atomic_commit
-                .unwrap_or(policy.untracked_atomic_commit);
-            let untracked_only =
-                untracked_atomic && status.untracked_files > 0 && status.modified_files == 0;
-            if !untracked_only && now.duration_since(entry.changed_at) < inactivity_delay {
-                // Same check for the stable-fingerprint case:
-                // allow sync if dirty for > 5s even if fingerprint is stable.
-                const MAX_DIRTY_DELAY: Duration = Duration::from_secs(5);
-                let dirty_long_enough = entry
-                    .dirty_since
-                    .is_some_and(|since| now.duration_since(since) >= MAX_DIRTY_DELAY);
-                if !dirty_long_enough {
-                    continue;
-                }
-            }
-            // ── Settling max-delay ──────────────────────────
-            // The user requested that the daemon "should be very
-            // actively committing" so that stale dirty state from
-            // previous sessions is drained promptly. The 5s
-            // fingerprint-stability wait above is good for
-            // actively-edited repos, but for repos that have
-            // been dirty continuously for > settling_max_delay_secs
-            // (default 60s), the daemon commits REGARDLESS of
-            // fingerprint stability. This prevents the
-            // "⏸ stalled Xm" pileup the operator was seeing.
-            //
-            // Action is configurable via policy.dirty_max_age_action
-            // (`Commit` | `Warn` | `Ignore`). Per-repo override
-            // via `RepoPolicyOverride.settling_max_delay_secs` and
-            // `RepoPolicyOverride.dirty_max_age_action`.
-            let repo_override_for_dispatch = crate::policy::load_repo_override(&repo);
-            let effective_max_delay = repo_override_for_dispatch
-                .settling_max_delay_secs
-                .unwrap_or(policy.settling_max_delay_secs);
-            let effective_max_age_action = repo_override_for_dispatch
-                .dirty_max_age_action
-                .unwrap_or(policy.dirty_max_age_action);
-            if effective_max_delay > 0 {
-                if let Some(dirty_since) = entry.dirty_since {
-                    let dirty_age = now.duration_since(dirty_since);
-                    if dirty_age >= Duration::from_secs(effective_max_delay) {
-                        match effective_max_age_action {
-                            crate::policy::DirtyMaxAgeAction::Commit => {
-                                // Pass through to dispatch. We
-                                // don't bypass the in_flight /
-                                // failures checks below — we
-                                // just don't skip on the
-                                // fingerprint gate.
-                                if debug_enabled() {
-                                    eprintln!(
-                                        "⏰ {} max-age commit ({}s ≥ {}s, fingerprint may be changing)",
-                                        repo.display(),
-                                        dirty_age.as_secs(),
-                                        effective_max_delay
-                                    );
-                                }
-                            }
-                            crate::policy::DirtyMaxAgeAction::Warn => {
-                                eprintln!(
-                                    "⚠️ {} dirty for {}s (≥ {}s, fingerprint changing) — operator action required",
-                                    repo.display(),
-                                    dirty_age.as_secs(),
-                                    effective_max_delay
-                                );
-                                continue;
-                            }
-                            crate::policy::DirtyMaxAgeAction::Ignore => {
-                                continue;
-                            }
-                        }
-                    }
-                }
+
+            // Wait `inactivity_push_delay_secs` after the last
+            // fingerprint change before committing, so rapid edits
+            // are batched into one commit. Never wait more than 5s
+            // since the repo first became dirty — this ensures
+            // continuous editing (e.g. a build process) still gets
+            // committed at a steady cadence.
+            const MAX_DIRTY_DELAY: Duration = Duration::from_secs(5);
+            let enough_time = entry.dirty_since.is_some_and(|since| {
+                now.duration_since(since) >= MAX_DIRTY_DELAY
+            }) || now.duration_since(entry.changed_at) >= inactivity_delay;
+
+            if !enough_time {
+                continue;
             }
 
             // MAX_FAILURES: per-cycle retry cap for transient errors.
