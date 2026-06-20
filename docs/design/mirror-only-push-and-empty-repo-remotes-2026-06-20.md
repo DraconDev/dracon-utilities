@@ -56,6 +56,8 @@ The helper `count_unpushed_vs_mirrors()` returns the first non-zero tracking-ref
 
 This preserves the existing `NO_UPSTREAM` reporting semantics: no tracking upstream is informational for mirror-only repos, not a concern. It only affects dispatch timing so the daemon actually reaches `handle_ahead_push`.
 
+VS Code's Source Control UI is separate: it asks to "Publish Branch" when the current branch has no `branch.<name>.remote` / `branch.<name>.merge` upstream config. That can happen even when the daemon can push successfully to explicit mirror remotes.
+
 ### 2. Configure remotes for repos with no remotes
 
 Before the daemon makes the `is_repo_ready()` decision, it now checks whether the repo has any remotes. If the repo has no remotes and the sync policy defines standard mirror remotes, the daemon calls `configure_all_remotes()` for that repo.
@@ -84,7 +86,26 @@ This keeps the existing `auto_create` behavior for genuinely missing repos while
 
 Codeberg auto-create needs an API token. The operator's Codeberg token historically lives in `~/.dracon/secrets/pat/codeberg.env`, while `load_secret()` only checked `~/.dracon/utilities/sync/secrets`. The daemon now falls back to the legacy PAT directory for Codeberg auto-create, without printing or exposing token values.
 
-### 5. Keep daemon push hooks bypassed
+### 5. Configure VS Code publish upstream for mirror-only repos
+
+After the daemon has configured remotes and the repo is ready, it now configures a publish upstream when the current branch has none:
+
+- `origin` wins if present, for backwards compatibility with traditional repos;
+- otherwise `github` is used when present, because it is the operator's primary public mirror;
+- otherwise the first configured policy remote present locally is used.
+
+The daemon writes:
+
+```text
+branch.<branch>.remote = <primary-remote>
+branch.<branch>.merge = refs/heads/<branch>
+```
+
+It does not overwrite an existing upstream. After a successful push, the daemon fetches the primary remote's branch ref and points `@{u}` at it, so `git status --branch` and VS Code see a real tracking branch instead of a missing upstream.
+
+This is only a publish-upstream hint for tools like VS Code. The daemon still pushes to every configured mirror explicitly and does not rely on `origin` or upstream tracking for mirror sync.
+
+### 6. Keep daemon push hooks bypassed
 
 The daemon intentionally runs its own security checks before auto-commit/auto-push:
 
@@ -103,6 +124,8 @@ This matters because the warden pre-push hook scans the pushed diff for plaintex
 New coverage includes:
 
 - `remote_repo_exists()` success/failure behavior via a fake git command;
+- publish upstream configuration preserves existing upstreams and adds `github/main` for mirror-only repos;
+- publish upstream refresh fetches the primary remote ref and updates `@{u}`;
 - existing configure/push tests remain intact.
 
 ### Build and policy checks
@@ -130,9 +153,11 @@ For newly initialized or no-remote repos:
 
 ```bash
 git remote -v
+git config --get-regexp '^branch\.'
+git status --short --branch
 ```
 
-Expected result: `github`, `gitlab`, and `codeberg` remotes are present and point at the standard mirror URLs, unless the operator already configured different remotes.
+Expected result: `github`, `gitlab`, and `codeberg` remotes are present and point at the standard mirror URLs, unless the operator already configured different remotes. After the repo has commits and the daemon has configured a publish upstream, `git config` shows `branch.<branch>.remote` and `branch.<branch>.merge`; after a successful push, `git status --short --branch` should show an upstream such as `github/main` instead of VS Code's "Publish Branch" condition.
 
 For repos that already have commits but no remotes, expected result after daemon processing is the same plus all three mirrors at `ahead=0` once auto-create/push completes.
 
@@ -151,3 +176,4 @@ Expected evidence: logs show the daemon processed the affected repos, configured
 - The daemon does not treat missing upstream tracking as a concern for mirror-only repos.
 - The daemon does not disable warden security scanning; it only bypasses the interactive pre-push hook for daemon-managed pushes.
 - The daemon does not print secret values when loading legacy PAT files.
+- The daemon does not change the mirror push path: it still pushes explicitly to all configured mirrors with `HEAD:refs/heads/<branch>`.
