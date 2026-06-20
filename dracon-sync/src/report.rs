@@ -4749,6 +4749,7 @@ mod tests {
             settling_max_delay_secs: 60,
             dirty_max_age_action: crate::policy::DirtyMaxAgeAction::Commit,
             min_commit_interval_secs: 5,
+            untracked_atomic_commit: false,
             auto_commit_exclude_patterns: vec![],
             sync_visibility: false,
             sync_visibility_interval_hours: 24,
