@@ -2183,7 +2183,7 @@ pub(crate) async fn run_repos_report(
 
     // ---- Legend line (one-liner mapping column codes to their meaning) ----
     println!(
-        "ℹ️  Legend: MOD = modified tracked · STG = staged · UT = untracked · ↑ = ahead of upstream · ↓ = behind upstream · PUSH = push status · STATE = derived cause (working=daemon just synced/committing/pushing/synced=clean & in sync/stalled/dirty/untracked-only/intentional/failed/idle/cold/healthy) · ACTIVITY = real activity indicator (now=daemon processing this repo · pushing Xm (N ahead)=push in progress, N unpushed commits · dirty Xm=dirty repo, last commit X minutes ago · synced/idle/cold=clean & waiting) · DAEMON = daemon's last recorded action (e.g. '23s sync_triage') so you can tell the daemon is working through dirty rows vs. you're editing right now"
+        "ℹ️  Legend: MOD = modified tracked · STG = staged · UT = untracked · ↑ = ahead of upstream · ↓ = behind upstream · PUSH = push status · 📊 1h/6h/24h = commits in last 1h/6h/24h · STATE = derived cause (working=daemon just synced/committing/pushing/synced=clean & in sync/stalled/dirty/untracked-only/intentional/failed/idle/cold/healthy) · ACTIVITY = real activity indicator (now=daemon processing this repo · pushing Xm (N ahead)=push in progress, N unpushed commits · dirty Xm=dirty repo, last commit X minutes ago · synced/idle/cold=clean & waiting) · DAEMON = daemon's last recorded action (e.g. '23s sync_triage') so you can tell the daemon is working through dirty rows vs. you're editing right now"
     );
     println!();
 
@@ -2311,6 +2311,9 @@ pub(crate) async fn run_repos_report(
             Cell::new(shorten_when(&row.last_push)),
             Cell::new(activity_label(&row)),
             Cell::new(&row.last_author),
+            Cell::new(row.commits_1h),
+            Cell::new(row.commits_6h),
+            Cell::new(row.commits_24h),
             Cell::new(format!(
                 "{} {}",
                 row.state_cause.icon(),
@@ -4911,6 +4914,9 @@ mod tests {
             last_when: "2024-01-01".to_string(),
             last_msg: "test commit".to_string(),
             last_unix: 1700000000,
+            commits_1h: 0,
+            commits_6h: 0,
+            commits_24h: 0,
             last_push: "5m ago".to_string(),
             push_status: "OK".to_string(),
             push_error: String::new(),
@@ -4970,6 +4976,9 @@ mod tests {
             last_msg: "test".to_string(),
             last_unix: 0,
             last_push: "5m ago".to_string(),
+            commits_1h: 0,
+            commits_6h: 0,
+            commits_24h: 0,
             push_status: push_status.to_string(),
             push_error: String::new(),
             concern: false,
