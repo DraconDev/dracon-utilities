@@ -1499,7 +1499,26 @@ pub(crate) fn repo_hint(flags: &[String], warn: bool, concern: bool) -> String {
         return "no remote configured (cannot push)".to_string();
     }
     if flags.iter().any(|f| f == "NO_UPSTREAM") {
-        return "run repair-concerns --apply (set upstream)".to_string();
+        // CHANGED 2026-06-20: the original hint "run repair-concerns
+        // --apply (set upstream)" was misleading for SSH multi-mirror
+        // repos that have no `origin` remote. `repair concerns --apply`
+        // would try `git push -u origin HEAD` and fail because there is
+        // no `origin` to push to. For those repos the branch's tracking
+        // config is not actually needed — the daemon's multi-mirror
+        // push path uses explicit refspecs. The `concern` parameter
+        // disambiguates:
+        //   - `concern=true`  → has_origin && !has_upstream (Case A):
+        //     the original "set upstream" hint is accurate and
+        //     `repair concerns --apply` will succeed.
+        //   - `concern=false` → has_origin=false && has_any_remote
+        //     (Case B, post-SSH-migration): the hint is informational
+        //     only, since the daemon is already pushing successfully
+        //     via explicit refspecs.
+        if concern {
+            return "run repair-concerns --apply (set upstream)".to_string();
+        }
+        return "no tracking upstream (daemon uses explicit refspecs; not a concern)"
+            .to_string();
     }
     if flags.iter().any(|f| f.starts_with("AHEAD:")) {
         if warn {
@@ -4148,8 +4167,21 @@ mod tests {
 
     #[test]
     fn test_repo_hint_no_upstream() {
-        let hint = repo_hint(&["NO_UPSTREAM".into()], false, false);
+        // CHANGED 2026-06-20: the hint is context-sensitive. When
+        // `concern=true` (i.e. the repo has `origin` but the branch
+        // isn't tracking it), the original "set upstream" hint is
+        // accurate and `repair concerns --apply` will succeed. When
+        // `concern=false` (post-SSH-migration case where the repo
+        // has only non-origin remotes), the hint is informational
+        // because the daemon is already pushing successfully via
+        // explicit refspecs and the auto-repair path would fail.
+        let hint = repo_hint(&["NO_UPSTREAM".into()], false, true);
         assert_eq!(hint, "run repair-concerns --apply (set upstream)");
+        let hint = repo_hint(&["NO_UPSTREAM".into()], false, false);
+        assert_eq!(
+            hint,
+            "no tracking upstream (daemon uses explicit refspecs; not a concern)"
+        );
     }
 
     #[test]
