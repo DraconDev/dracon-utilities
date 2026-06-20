@@ -660,4 +660,73 @@ mod tests {
             "order must be by priority even when all fail"
         );
     }
+
+    #[tokio::test]
+    async fn test_remote_repo_exists_checks_remote_head() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let bare = tmp.path().join("remote.git");
+        let work = tmp.path().join("work");
+        std::process::Command::new("git")
+            .args(["init", "--bare", "-q", bare.to_str().unwrap()])
+            .status()
+            .expect("git init --bare")
+            .success();
+        std::process::Command::new("git")
+            .args(["init", "-q", "-b", "master"])
+            .arg(&work)
+            .status()
+            .expect("git init work")
+            .success();
+        std::fs::write(work.join("file.txt"), "hello\n").expect("write file");
+        std::process::Command::new("git")
+            .args(["config", "user.email", "test@example.com"])
+            .current_dir(&work)
+            .status()
+            .expect("git config email")
+            .success();
+        std::process::Command::new("git")
+            .args(["config", "user.name", "Test User"])
+            .current_dir(&work)
+            .status()
+            .expect("git config name")
+            .success();
+        std::process::Command::new("git")
+            .args(["add", "file.txt"])
+            .current_dir(&work)
+            .status()
+            .expect("git add")
+            .success();
+        std::process::Command::new("git")
+            .args(["commit", "-q", "-m", "init"])
+            .current_dir(&work)
+            .status()
+            .expect("git commit")
+            .success();
+        std::process::Command::new("git")
+            .args([
+                "remote",
+                "add",
+                "origin",
+                bare.to_str().expect("bare path"),
+            ])
+            .current_dir(&work)
+            .status()
+            .expect("git remote add")
+            .success();
+        std::process::Command::new("git")
+            .args(["push", "-q", "origin", "master:HEAD"])
+            .current_dir(&work)
+            .status()
+            .expect("git push")
+            .success();
+
+        assert!(
+            remote_repo_exists(bare.to_str().expect("bare path")).await,
+            "existing remote HEAD should be detected"
+        );
+        assert!(
+            !remote_repo_exists(tmp.path().join("missing.git").to_str().unwrap()).await,
+            "missing remote should not be treated as existing"
+        );
+    }
 }
