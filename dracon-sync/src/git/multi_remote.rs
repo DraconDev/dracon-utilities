@@ -8,7 +8,7 @@ use tokio::time::sleep;
 use anyhow::{Context, Result};
 
 use crate::helpers::is_repo_already_exists;
-use crate::policy::{debug_enabled, std_git_command, AuthType, RemoteConfig};
+use crate::policy::{debug_enabled, std_git_command, tokio_git_command, AuthType, RemoteConfig};
 
 use super::{
     current_branch, gh_cmd, git_ssh_hardening, is_permanent_push_rejection, is_push_rejected,
@@ -531,7 +531,7 @@ pub(crate) async fn auto_create_all_remotes(
 
 /// Check if a remote repo exists by running `git ls-remote` on the given URL.
 async fn remote_repo_exists(url: &str) -> bool {
-    let output = tokio::process::Command::new("git")
+    let output = tokio_git_command()
         .args(["ls-remote", url, "HEAD"])
         .output()
         .await;
