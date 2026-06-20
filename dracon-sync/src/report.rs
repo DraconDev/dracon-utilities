@@ -2363,6 +2363,7 @@ pub(crate) async fn run_repos_report(
             Cell::new(status_text).fg(status_color),
             Cell::new(repo_name),
             Cell::new(&row.branch).fg(branch_color),
+            Cell::new(&row.upstream),
             Cell::new(row.modified).fg(modified_color),
             Cell::new(row.staged).fg(staged_color),
             Cell::new(row.untracked),
