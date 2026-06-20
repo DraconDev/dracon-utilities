@@ -335,31 +335,97 @@ dispatching; the `MAX_DIRTY_DELAY=5s` backstop is unchanged.
 - The daemon / shell-CLI binary alignment from goal
   `5f291ee1-7bd9-4abb-a44d-8e9ea1961391` is preserved — the
   daemon still runs the fixed binary from `~/.local/bin/`.
-- No new dependencies, no `.env`/`*.pem`/`*.key`/`*.age`
-  exposure, no dead code, no TODOs, no undocumented behavior
-  changes (the new `untracked_atomic_commit` field and the
-  gitignore additions are documented in source comments and
-  in this design doc).
+
+## Post-hoc simplification (2026-06-20)
+
+After deploying the fix above, the operator asked:
+
+> "do we need the settling at all?"
+
+The answer was: no. The `⏳ settling` activity label, the fingerprint
+stability gate, the `untracked_atomic_commit` opt-in, and the
+`settling_max_delay_secs` / `dirty_max_age_action` force-commit
+mechanism were all unnecessary complexity:
+
+### What was removed from `daemon.rs`
+
+The fingerprint stability gate (lines 1845–1853) was dead code —
+it only added a 100ms delay before the inactivity delay check,
+which already waits `inactivity_push_delay_secs=5s` since the last
+fingerprint change. The `untracked_atomic_commit` opt-in (lines
+1855–1869) was a leftover from the 2026-06-19 fix that bypassed
+the settle wait for untracked-only repos — with the 5s settle
+restored, all dirty states (tracked and untracked) are treated
+uniformly, so no opt-in is needed. The settling max-delay
+force-commit (lines 1871–1955) was redundant — the 5s backstop
+(`MAX_DIRTY_DELAY`) already guarantees the daemon never waits
+more than 5s, so a 60s force-commit never fired.
+
+Replaced with:
+
+```rust
+// Wait `inactivity_push_delay_secs` after the last
+// fingerprint change before committing, so rapid edits
+// are batched into one commit. Never wait more than 5s
+// since the repo first became dirty — this ensures
+// continuous editing (e.g. a build process) still gets
+// committed at a steady cadence.
+const MAX_DIRTY_DELAY: Duration = Duration::from_secs(5);
+let enough_time = entry.dirty_since.is_some_and(|since| {
+    now.duration_since(since) >= MAX_DIRTY_DELAY
+}) || now.duration_since(entry.changed_at) >= inactivity_delay;
+
+if !enough_time {
+    continue;
+}
+```
+
+### What was removed from `policy.rs`
+
+- `untracked_atomic_commit: bool` from `SyncPolicy` (never
+  released — only existed for 1 deploy cycle)
+- `untracked_atomic_commit: Option<bool>` from
+  `RepoPolicyOverride` (same)
+
+`settling_max_delay_secs` and `dirty_max_age_action` are
+preserved in the struct for backward compatibility (configs
+that reference them still parse), but they are no longer
+read by the daemon.
+
+### What was changed in `report.rs`
+
+- The `⏳ settling` activity label was replaced with
+  `⏳ dirty Xm`. No more "settling" vs "stalled" distinction.
+  All dirty repos show `⏳ dirty 0m` through `⏳ dirty 8m`, etc.
+  The legend now reads:
+  `· dirty Xm=dirty repo, last commit X minutes ago`
+- The `untracked_atomic_commit` test constructor field was removed.
+- Two tests were renamed/updated to expect `dirty` instead of
+  `settling` / `stalled`.
+
+### What was removed from `dracon-sync.toml`
+
+- `untracked_atomic_commit = false` (no longer a config option)
+- The associated comment block was trimmed (the settle comment
+  no longer mentions the opt-in).
+
+### Net result
+
+The daemon's dispatch logic shrank from ~120 lines (fingerprint
+gate + opt-in + settling max-delay + inactivity check + backstop
+checks) to **~15 lines** (fingerprint tracking + single
+settle-or-commit check). The activity label went from 3 states
+(now, settling, stalled) to 2 (now, dirty). The `untracked_atomic_commit`
+field was completely removed — it was only deployed for one
+cycle and never seen by the user.
 
 ## Operator action
 
 After this fix is deployed, the operator should:
 
-1. **Deploy via `./install.sh --upgrade --binaries-only`** — same
-   as the previous goal. `cargo install` writes to
-   `~/.cargo/bin/` and silently desyncs the daemon. The install
-   script targets `~/.local/bin/` (the systemd unit's
-   `ExecStart=` path) and explicitly cleans up the stale
-   `~/.cargo/bin/` artifact.
-2. **For repos with known large untracked file batches** (e.g.
-   CI test artifact dumps), set
-   `untracked_atomic_commit = true` in the per-repo
-   `.dracon/dracon-sync.toml` override to opt back into the
-   eager untracked-commit behavior for that specific repo.
-3. **For `dracon-platform`-style repos with test/build
-   artifacts**, the gitignore is the cleanest fix — the
-   artifacts never get staged in the first place. The
-   `untracked_atomic_commit` opt-in is a band-aid for the
-   case where gitignoring the artifacts is impractical (e.g.
-   when the artifacts need to be shared across team members
-   via git).
+1. **Deploy via `./install.sh --upgrade --binaries-only`** —
+   same as before. `cargo install` writes to
+   `~/.cargo/bin/` and silently desyncs the daemon.
+2. **For `dracon-platform`-style repos with test/build
+   artifacts**, the gitignore is the right fix — the artifacts
+   never get staged in the first place.
