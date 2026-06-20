@@ -27,36 +27,46 @@ This created two reliability gaps:
 1. **Mirror-only repos can have unpushed commits but report `ahead = 0`.**  
    `.dracon` is the key example. Without an upstream tracking branch, `git status` may report no ahead count even though `HEAD` is ahead of one or more mirror tracking refs.
 
-2. **Newly initialized repos with no commits are skipped before remotes are configured.**  
-   `dracon-strategy` was created with `git init`, but because it had no commits yet, `is_repo_ready()` returned false and the daemon skipped it before `configure_all_remotes()` could add the standard mirror remotes.
+2. **New repos with no remotes are skipped or left unpushed before remotes are configured.**  
+   `dracon-strategy` was created with `git init`, but because it had no commits yet, `is_repo_ready()` returned false and the daemon skipped it before `configure_all_remotes()` could add the standard mirror remotes. A later discovered repo, `DraconDev-private`, had commits but still no remotes; after remotes were added, the daemon also needed direct remote-HEAD detection because there were no remote-tracking refs yet.
 
 ## Fix
 
 ### 1. Detect mirror-only unpushed commits
 
-For repos without upstream tracking, the daemon now checks the known mirror tracking refs directly:
+For repos without upstream tracking, the daemon now checks for unpushed commits in two layers:
 
-```text
-refs/remotes/github/main..HEAD
-refs/remotes/gitlab/main..HEAD
-refs/remotes/codeberg/main..HEAD
-```
+1. Known mirror tracking refs, when they exist:
 
-The helper `count_unpushed_vs_mirrors()` returns the first non-zero count it finds. In the daemon pulse loop, when `!has_upstream && status.ahead == 0`, the daemon overrides `status.ahead` with that value.
+   ```text
+   refs/remotes/github/main..HEAD
+   refs/remotes/gitlab/main..HEAD
+   refs/remotes/codeberg/main..HEAD
+   ```
+
+2. Configured remote HEADs, when tracking refs are absent or stale:
+
+   ```text
+   git ls-remote github HEAD
+   git ls-remote gitlab HEAD
+   git ls-remote codeberg HEAD
+   ```
+
+The helper `count_unpushed_vs_mirrors()` returns the first non-zero tracking-ref count it finds. If that returns zero, `count_unpushed_vs_configured_remotes()` compares local `HEAD` to each configured remote's `HEAD`. Any mismatch or missing remote HEAD is treated as unpushed (`> 0`), which is enough to force dispatch to `handle_ahead_push`.
 
 This preserves the existing `NO_UPSTREAM` reporting semantics: no tracking upstream is informational for mirror-only repos, not a concern. It only affects dispatch timing so the daemon actually reaches `handle_ahead_push`.
 
-### 2. Configure remotes for empty repos
+### 2. Configure remotes for repos with no remotes
 
-Before the daemon skips an unready repo, it now checks whether the repo has any remotes. If the repo has no remotes and the sync policy defines standard mirror remotes, the daemon calls `configure_all_remotes()` for that repo.
+Before the daemon makes the `is_repo_ready()` decision, it now checks whether the repo has any remotes. If the repo has no remotes and the sync policy defines standard mirror remotes, the daemon calls `configure_all_remotes()` for that repo.
 
-This gives an empty repo its standard `github` / `gitlab` / `codeberg` remotes before the first commit is made. The daemon still does not create an artificial initial commit; once the user adds the first commit, normal push flow can use the configured mirrors.
+This covers both empty repos and repos that already have local commits. The daemon still does not create an artificial initial commit for an empty repo; once the user adds the first commit, normal push flow can use the configured mirrors.
 
 The check is intentionally non-destructive:
 
 - existing remotes are preserved;
 - `ensure_remote()` updates a remote only if the URL differs;
-- repos with any existing remote are not touched by this empty-repo path.
+- repos with any existing remote are not touched by this no-remote path.
 
 ### 3. Avoid auto-create spam for repos that already exist
 
@@ -66,11 +76,15 @@ The daemon's `auto_create` path previously attempted repository creation on ever
 GraphQL: You have created too many repositories, too quickly
 ```
 
-`auto_create_all_remotes()` now receives the local repo path and checks whether the remote repo already exists via `git ls-remote <url> HEAD` before attempting creation. If the remote repo exists, the daemon records an `Ok` result for that remote and skips the create API call.
+`auto_create_all_remotes()` now receives the local repo path and checks whether the remote repo already exists via `git ls-remote <remote-name> HEAD` before attempting creation. The check uses the same SSH hardening environment as daemon pushes. If the remote repo exists, the daemon records an `Ok` result for that remote and skips the create API call.
 
 This keeps the existing `auto_create` behavior for genuinely missing repos while preventing unnecessary create attempts for the operator's existing mirror fleet.
 
-### 4. Keep daemon push hooks bypassed
+### 4. Load Codeberg tokens from the legacy PAT directory
+
+Codeberg auto-create needs an API token. The operator's Codeberg token historically lives in `~/.dracon/secrets/pat/codeberg.env`, while `load_secret()` only checked `~/.dracon/utilities/sync/secrets`. The daemon now falls back to the legacy PAT directory for Codeberg auto-create, without printing or exposing token values.
+
+### 5. Keep daemon push hooks bypassed
 
 The daemon intentionally runs its own security checks before auto-commit/auto-push:
 
@@ -112,13 +126,15 @@ done
 
 Expected result: `0` ahead for all three mirrors.
 
-For newly initialized repos with no commits:
+For newly initialized or no-remote repos:
 
 ```bash
 git remote -v
 ```
 
 Expected result: `github`, `gitlab`, and `codeberg` remotes are present and point at the standard mirror URLs, unless the operator already configured different remotes.
+
+For repos that already have commits but no remotes, expected result after daemon processing is the same plus all three mirrors at `ahead=0` once auto-create/push completes.
 
 For daemon processing evidence:
 
@@ -134,3 +150,4 @@ Expected evidence: logs show the daemon processed the affected repos, configured
 - The daemon does not overwrite operator-configured remotes.
 - The daemon does not treat missing upstream tracking as a concern for mirror-only repos.
 - The daemon does not disable warden security scanning; it only bypasses the interactive pre-push hook for daemon-managed pushes.
+- The daemon does not print secret values when loading legacy PAT files.
