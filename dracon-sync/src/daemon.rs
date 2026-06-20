@@ -1489,32 +1489,35 @@ pub(crate) async fn run_daemon(
             }
 
             let now = Instant::now();
+
+            // CHANGED 2026-06-20: newly discovered repos may be empty or may
+            // already have local commits. In both cases, if they have no remotes
+            // yet, configure the standard mirror remotes before any readiness
+            // or push decision. This fixes the `git init`-then-no-remotes gap
+            // without overwriting operator-configured remotes.
+            let has_any_remote = has_origin_remote(&repo)
+                || !policy.remotes.is_empty()
+                    && policy.remotes.iter().any(|r| {
+                        crate::git::multi_remote::get_remote_url(&repo, &r.name).is_some()
+                    });
+            if !has_any_remote && !policy.remotes.is_empty() {
+                let repo_name = repo
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_default();
+                eprintln!(
+                    "🔧 {} configuring standard mirror remotes",
+                    repo.display()
+                );
+                crate::git::multi_remote::configure_all_remotes(
+                    &repo,
+                    &policy.remotes,
+                    &repo_name,
+                );
+            }
+
             if !is_repo_ready(&repo) {
-                // CHANGED 2026-06-20: even empty repos (no commits yet) need
-                // standard mirror remotes configured so the user can push
-                // when they make the first commit. Check if the repo has any
-                // remotes; if not, configure using the policy's RemoteConfig
-                // entries (github/gitlab/codeberg).
-                let has_any_remote = has_origin_remote(&repo)
-                    || !policy.remotes.is_empty()
-                        && policy.remotes.iter().any(|r| {
-                            crate::git::multi_remote::get_remote_url(&repo, &r.name).is_some()
-                        });
-                if !has_any_remote && !policy.remotes.is_empty() {
-                    let repo_name = repo
-                        .file_name()
-                        .map(|n| n.to_string_lossy().to_string())
-                        .unwrap_or_default();
-                    eprintln!(
-                        "🔧 {} empty repo — configuring standard mirror remotes",
-                        repo.display()
-                    );
-                    crate::git::multi_remote::configure_all_remotes(
-                        &repo,
-                        &policy.remotes,
-                        &repo_name,
-                    );
-                } else if debug_enabled() {
+                if debug_enabled() {
                     eprintln!(
                         "⏳ {} not ready (mid-clone or empty repo), skipping",
                         repo.display()
