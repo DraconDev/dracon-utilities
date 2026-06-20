@@ -560,7 +560,7 @@ async fn remote_repo_exists(url: &str) -> bool {
 mod tests {
     use super::*;
     use crate::policy::RemoteConfig;
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
 
     /// Helper: build a minimal RemoteConfig for testing.
     /// `name` and `priority` are the only fields that affect the sort.
