@@ -664,7 +664,12 @@ mod tests {
 
     fn run_git_success(args: &[&str], cwd: Option<&Path>) {
         let mut cmd = std::process::Command::new("git");
-        cmd.env("PATH", "/run/current-system/sw/bin");
+        let mut path = String::from("/run/current-system/sw/bin");
+        if let Ok(old_path) = std::env::var("PATH") {
+            path.push(':');
+            path.push_str(&old_path);
+        }
+        cmd.env("PATH", path);
         cmd.args(args);
         if let Some(cwd) = cwd {
             cmd.current_dir(cwd);
