@@ -3913,7 +3913,7 @@ mod tests {
     #[test]
     fn test_repo_state_flags_ok() {
         let status = make_status(true, 0, 0);
-        let flags = repo_state_flags(&status, true, true);
+        let flags = repo_state_flags(&status, true, true, true);
         assert!(flags.contains(&"OK".to_string()));
     }
 
@@ -3921,35 +3921,50 @@ mod tests {
     fn test_repo_state_flags_dirty() {
         let mut status = make_status(false, 0, 0);
         status.modified_files = 2;
-        let flags = repo_state_flags(&status, true, true);
+        let flags = repo_state_flags(&status, true, true, true);
         assert!(flags.contains(&"DIRTY".to_string()));
     }
 
     #[test]
     fn test_repo_state_flags_ahead() {
         let status = make_status(true, 3, 0);
-        let flags = repo_state_flags(&status, true, true);
+        let flags = repo_state_flags(&status, true, true, true);
         assert!(flags.iter().any(|f| f.starts_with("AHEAD:")));
     }
 
     #[test]
     fn test_repo_state_flags_behind() {
         let status = make_status(true, 0, 2);
-        let flags = repo_state_flags(&status, true, true);
+        let flags = repo_state_flags(&status, true, true, true);
         assert!(flags.iter().any(|f| f.starts_with("BEHIND:")));
     }
 
     #[test]
     fn test_repo_state_flags_no_origin() {
+        // CHANGED 2026-06-20: NO_ORIGIN only fires when the repo has
+        // *zero* remotes, not just no `origin`. The test now sets
+        // `has_any_remote = false` to reproduce the "truly remote-less"
+        // case that still emits NO_ORIGIN.
         let status = make_status(true, 0, 0);
-        let flags = repo_state_flags(&status, false, false);
+        let flags = repo_state_flags(&status, false, false, false);
         assert!(flags.contains(&"NO_ORIGIN".to_string()));
+    }
+
+    #[test]
+    fn test_repo_state_flags_no_origin_but_has_remote() {
+        // Regression test for the SSH-multi-mirror misclassification
+        // (goal 2026-06-20): a repo with no `origin` but with a
+        // configured non-origin remote (e.g. `github`, `gitlab`,
+        // `codeberg`) must NOT emit `NO_ORIGIN`.
+        let status = make_status(true, 0, 0);
+        let flags = repo_state_flags(&status, false, false, true);
+        assert!(!flags.contains(&"NO_ORIGIN".to_string()));
     }
 
     #[test]
     fn test_repo_state_flags_no_upstream() {
         let status = make_status(true, 0, 0);
-        let flags = repo_state_flags(&status, true, false);
+        let flags = repo_state_flags(&status, true, false, true);
         assert!(flags.contains(&"NO_UPSTREAM".to_string()));
     }
 
@@ -3958,9 +3973,10 @@ mod tests {
         let status = make_status(false, 5, 0);
         // STUCK_PUSH now requires an explicit recent push failure signal.
         // Without it, an AHEAD repo is just "has unpushed commits".
-        let flags = repo_state_flags_with_push_failure(&status, true, true, true);
+        let flags =
+            repo_state_flags_with_push_failure(&status, true, true, true, true);
         assert!(flags.contains(&"STUCK_PUSH".to_string()));
-        let flags_no_failure = repo_state_flags(&status, true, true);
+        let flags_no_failure = repo_state_flags(&status, true, true, true);
         assert!(!flags_no_failure.contains(&"STUCK_PUSH".to_string()));
         assert!(flags_no_failure.contains(&"AHEAD:5".to_string()));
     }
@@ -3968,14 +3984,14 @@ mod tests {
     #[test]
     fn test_repo_state_flags_stuck_pull() {
         let status = make_status(false, 0, 3);
-        let flags = repo_state_flags(&status, true, true);
+        let flags = repo_state_flags(&status, true, true, true);
         assert!(flags.contains(&"STUCK_PULL".to_string()));
     }
 
     #[test]
     fn test_repo_state_flags_multiple() {
         let status = make_status(false, 3, 2);
-        let flags = repo_state_flags(&status, true, true);
+        let flags = repo_state_flags(&status, true, true, true);
         assert!(flags.contains(&"DIRTY".to_string()));
         assert!(flags.iter().any(|f| f.starts_with("AHEAD:")));
         assert!(flags.iter().any(|f| f.starts_with("BEHIND:")));
@@ -3983,14 +3999,27 @@ mod tests {
 
     #[test]
     fn test_repo_is_concern_no_origin() {
+        // CHANGED 2026-06-20: only "no origin AND no remotes at all"
+        // is a concern. A repo with only non-origin remotes is fine.
         let status = make_status(true, 0, 0);
-        assert!(repo_is_concern(&status, false, false));
+        assert!(repo_is_concern(&status, false, false, false));
+    }
+
+    #[test]
+    fn test_repo_is_concern_no_origin_but_has_remote() {
+        // Regression test for the SSH-multi-mirror misclassification.
+        // A repo with no `origin` but with at least one other remote
+        // must NOT be a concern.
+        let status = make_status(true, 0, 0);
+        assert!(!repo_is_concern(&status, false, false, true));
     }
 
     #[test]
     fn test_repo_is_concern_no_upstream() {
         let status = make_status(true, 0, 0);
-        assert!(repo_is_concern(&status, true, false));
+        // `has_any_remote` is true (origin exists, just no upstream);
+        // the concern is about upstream, not origin.
+        assert!(repo_is_concern(&status, true, false, true));
     }
 
     #[test]
@@ -4000,9 +4029,19 @@ mod tests {
         // failure signal; without it, ahead is just "has unpushed
         // commits" and is a WARN, not a CONCERN.
         let status = make_status(false, 5, 0);
-        assert!(repo_is_concern_with_push_failure(&status, true, true, true));
+        assert!(repo_is_concern_with_push_failure(
+            &status,
+            true,
+            true,
+            true,
+            true
+        ));
         assert!(!repo_is_concern_with_push_failure(
-            &status, true, true, false
+            &status,
+            true,
+            true,
+            true,
+            false
         ));
     }
 
@@ -4010,7 +4049,11 @@ mod tests {
     fn test_repo_is_concern_behind() {
         let status = make_status(false, 0, 3);
         assert!(repo_is_concern_with_push_failure(
-            &status, true, true, false
+            &status,
+            true,
+            true,
+            true,
+            false
         ));
     }
 
@@ -4018,39 +4061,48 @@ mod tests {
     fn test_repo_stuck_filters_require_dry_run() {
         let ahead = make_status(false, 5, 0);
         let behind = make_status(false, 0, 3);
-        assert!(!repo_is_stuck_push(&ahead, true, true, false));
-        assert!(repo_is_stuck_push(&ahead, true, true, true));
-        assert!(!repo_is_stuck_push(&ahead, false, true, true));
-        assert!(!repo_is_stuck_push(&ahead, true, false, true));
-        assert!(repo_is_stuck_pull(&behind, true, true));
-        assert!(!repo_is_stuck_pull(&behind, false, true));
-        assert!(!repo_is_stuck_pull(&behind, true, false));
+        assert!(!repo_is_stuck_push(&ahead, true, true, true, false));
+        assert!(repo_is_stuck_push(&ahead, true, true, true, true));
+        assert!(!repo_is_stuck_push(&ahead, false, true, true, true));
+        assert!(!repo_is_stuck_push(&ahead, true, false, true, true));
+        assert!(repo_is_stuck_pull(&behind, true, true, true));
+        assert!(!repo_is_stuck_pull(&behind, false, true, true));
+        assert!(!repo_is_stuck_pull(&behind, true, false, true));
     }
 
     #[test]
     fn test_repo_is_concern_clean_healthy() {
         let status = make_status(true, 0, 0);
         assert!(!repo_is_concern_with_push_failure(
-            &status, true, true, false
+            &status,
+            true,
+            true,
+            true,
+            false
         ));
     }
 
     #[test]
     fn test_repo_is_warn_dirty() {
         let status = make_status(false, 0, 0);
-        assert!(repo_is_warn(&status, true, true));
+        assert!(repo_is_warn(&status, true, true, true));
     }
 
     #[test]
     fn test_repo_is_warn_not_concern() {
         let status = make_status(false, 0, 0);
-        assert!(!repo_is_warn(&status, false, false));
+        // has_origin=false, has_any_remote=false → still a concern,
+        // so not a WARN.
+        assert!(!repo_is_warn(&status, false, false, false));
     }
 
     #[test]
     fn test_repo_hint_no_origin() {
+        // CHANGED 2026-06-20: with the SSH-migration fix, the
+        // `NO_ORIGIN` flag only fires for truly remote-less repos
+        // (zero configured remotes). The hint is updated to match.
         let hint = repo_hint(&["NO_ORIGIN".into()], false, false);
-        assert_eq!(hint, "no origin remote (using github SSH instead)");
+        assert_eq!(hint, "no remote configured (cannot push)");
     }
 
     #[test]
@@ -4468,8 +4520,8 @@ mod tests {
         status.last_commit_hash = None;
         status.last_commit_msg = None;
 
-        assert!(!repo_is_warn(&status, true, true));
-        assert_eq!(repo_state_flags(&status, true, true), vec!["DIRTY"]);
+        assert!(!repo_is_warn(&status, true, true, true));
+        assert_eq!(repo_state_flags(&status, true, true, true), vec!["DIRTY"]);
     }
 
     #[test]
