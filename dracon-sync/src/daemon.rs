@@ -37,6 +37,55 @@ use crate::sync::{sync_repo, sync_repo_with_ahead_since, SyncOutcome};
 
 const STUCK_REPO_EXPIRY_SECS: u64 = 24 * 60 * 60; // 24 hours
 
+/// Count unpushed commits by comparing local HEAD to configured remote HEADs.
+/// This catches repos that have remotes but no upstream tracking branch and no
+/// remote-tracking refs yet (e.g. a repo that just received mirror remotes).
+pub(crate) fn count_unpushed_vs_configured_remotes(
+    repo: &Path,
+    remote_names: &[String],
+) -> u64 {
+    if remote_names.is_empty() {
+        return 0;
+    }
+    let branch = crate::git::current_branch(repo).unwrap_or_else(|| "main".to_string());
+    let local_head = crate::policy::std_git_command()
+        .args(["rev-parse", "HEAD"])
+        .current_dir(repo)
+        .output()
+        .ok()
+        .and_then(|o| {
+            if o.status.success() {
+                Some(String::from_utf8_lossy(&o.stdout).trim().to_string())
+            } else {
+                None
+            }
+        });
+    let Some(local_head) = local_head else {
+        return 0;
+    };
+
+    for remote in remote_names {
+        let output = crate::policy::std_git_command()
+            .args(["ls-remote", remote, &format!("refs/heads/{branch}")])
+            .current_dir(repo)
+            .output();
+        let Ok(output) = output else {
+            return 1;
+        };
+        if !output.status.success() {
+            return 1;
+        }
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let Some(remote_hash) = stdout.lines().next().and_then(|line| line.split_whitespace().next()) else {
+            return 1;
+        };
+        if remote_hash != local_head {
+            return 1;
+        }
+    }
+    0
+}
+
 /// Configure standard mirror remotes only when the repo has no remotes yet.
 pub(crate) fn configure_standard_remotes_if_missing(repo: &Path, policy: &SyncPolicy) -> bool {
     let has_any_remote = has_origin_remote(repo)
@@ -178,6 +227,74 @@ mod tests {
         assert_eq!(
             crate::git::multi_remote::get_remote_url(&repo, "github"),
             None
+        );
+    }
+
+    #[test]
+    fn test_count_unpushed_vs_configured_remotes_detects_new_remote_head() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let bare = tmp.path().join("remote.git");
+        let repo = tmp.path().join("work");
+        let bare_path = bare.to_str().expect("bare path");
+        crate::git::git_cmd()
+            .args(["init", "--bare", "-q", bare_path])
+            .status()
+            .expect("git init --bare")
+            .success();
+        crate::git::git_cmd()
+            .args(["init", "-q", "-b", "master"])
+            .arg(&repo)
+            .status()
+            .expect("git init work")
+            .success();
+        std::fs::write(repo.join("file.txt"), "hello\n").expect("write file");
+        crate::git::git_cmd()
+            .args(["config", "user.email", "test@example.com"])
+            .current_dir(&repo)
+            .status()
+            .expect("git config email")
+            .success();
+        crate::git::git_cmd()
+            .args(["config", "user.name", "Test User"])
+            .current_dir(&repo)
+            .status()
+            .expect("git config name")
+            .success();
+        crate::git::git_cmd()
+            .args(["add", "file.txt"])
+            .current_dir(&repo)
+            .status()
+            .expect("git add")
+            .success();
+        crate::git::git_cmd()
+            .args(["commit", "--no-verify", "-q", "-m", "init"])
+            .current_dir(&repo)
+            .status()
+            .expect("git commit")
+            .success();
+        crate::git::git_cmd()
+            .args(["remote", "add", "github", bare_path])
+            .current_dir(&repo)
+            .status()
+            .expect("git remote add")
+            .success();
+
+        let remotes = vec!["github".to_string()];
+        assert_eq!(
+            count_unpushed_vs_configured_remotes(&repo, &remotes),
+            1,
+            "local HEAD should be unpushed before the first push"
+        );
+        crate::git::git_cmd()
+            .args(["push", "--no-verify", "-q", "github", "master:refs/heads/master"])
+            .current_dir(&repo)
+            .status()
+            .expect("git push")
+            .success();
+        assert_eq!(
+            count_unpushed_vs_configured_remotes(&repo, &remotes),
+            0,
+            "local HEAD should match remote branch after push"
         );
     }
 
@@ -1810,6 +1927,14 @@ pub(crate) async fn run_daemon(
             // `has_local_or_pending_work` check detect the real ahead count.
             if !has_upstream && status.ahead == 0 {
                 let unpushed = count_unpushed_vs_mirrors(&repo);
+                let unpushed = if unpushed == 0 {
+                    count_unpushed_vs_configured_remotes(
+                        &repo,
+                        &policy.remotes.iter().map(|r| r.name.clone()).collect::<Vec<_>>(),
+                    )
+                } else {
+                    unpushed
+                };
                 if unpushed > 0 {
                     if debug_enabled() {
                         eprintln!(
