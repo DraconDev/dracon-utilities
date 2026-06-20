@@ -301,6 +301,19 @@ mod tests {
     use super::*;
     use crate::policy::{AuthType, RemoteConfig};
 
+    fn git_config_value(repo: &Path, key: &str) -> String {
+        String::from_utf8_lossy(
+            &crate::git::git_cmd()
+                .args(["config", "--get", key])
+                .current_dir(repo)
+                .output()
+                .expect("git config")
+                .stdout,
+        )
+        .trim()
+        .to_string()
+    }
+
     #[test]
     fn test_configure_standard_remotes_if_missing_adds_remotes() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
@@ -423,24 +436,9 @@ mod tests {
 
         let policy = crate::policy::test_sync_policy();
         assert!(configure_publish_upstream_if_missing(&repo, &policy).expect("configure upstream"));
+        assert_eq!(git_config_value(&repo, "branch.main.remote"), "github");
         assert_eq!(
-            crate::git::git_cmd()
-                .args(["config", "--get", "branch.main.remote"])
-                .current_dir(&repo)
-                .output()
-                .expect("remote config")
-                .stdout
-                .trim(),
-            "github"
-        );
-        assert_eq!(
-            crate::git::git_cmd()
-                .args(["config", "--get", "branch.main.merge"])
-                .current_dir(&repo)
-                .output()
-                .expect("merge config")
-                .stdout
-                .trim(),
+            git_config_value(&repo, "branch.main.merge"),
             "refs/heads/main"
         );
         assert!(!configure_publish_upstream_if_missing(&repo, &policy).expect("already configured"));
@@ -471,16 +469,7 @@ mod tests {
 
         let policy = crate::policy::test_sync_policy();
         assert!(!configure_publish_upstream_if_missing(&repo, &policy).expect("preserve upstream"));
-        assert_eq!(
-            crate::git::git_cmd()
-                .args(["config", "--get", "branch.main.remote"])
-                .current_dir(&repo)
-                .output()
-                .expect("remote config")
-                .stdout
-                .trim(),
-            "origin"
-        );
+        assert_eq!(git_config_value(&repo, "branch.main.remote"), "origin");
     }
 
     #[tokio::test]
