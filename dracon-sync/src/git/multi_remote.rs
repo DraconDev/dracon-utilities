@@ -508,9 +508,8 @@ pub(crate) async fn auto_create_all_remotes(
             // `gh repo create` for repos that already exist, which causes
             // GitHub rate limiting ("You have created too many repositories,
             // too quickly").
-            if repo.is_some() {
-                let url = remote.resolve_push_url(&resolved_name);
-                if remote_repo_exists(&url).await {
+            if let Some(repo) = repo {
+                if remote_repo_exists(repo, &remote.name).await {
                     if debug_enabled() {
                         eprintln!(
                             "ℹ️  {} already exists on {} — skipping auto-create",
@@ -529,16 +528,11 @@ pub(crate) async fn auto_create_all_remotes(
     results
 }
 
-/// Check if a remote repo exists by running `git ls-remote` on the given URL.
-async fn remote_repo_exists(url: &str) -> bool {
-    let mut path = String::from("/run/current-system/sw/bin");
-    if let Ok(old_path) = std::env::var("PATH") {
-        path.push(':');
-        path.push_str(&old_path);
-    }
+/// Check if a remote repo exists by running `git ls-remote` on the configured remote.
+async fn remote_repo_exists(repo: &Path, remote_name: &str) -> bool {
     let output = tokio_git_command()
-        .env("PATH", path)
-        .args(["ls-remote", url, "HEAD"])
+        .current_dir(repo)
+        .args(["ls-remote", remote_name, "HEAD"])
         .output()
         .await;
     match output {
@@ -694,12 +688,14 @@ exit 1
             fake_git.to_str().expect("fake git path"),
         );
 
+        let repo = tmp.path().join("repo");
+        std::fs::create_dir_all(&repo).expect("create repo dir");
         assert!(
-            remote_repo_exists("existing-repo").await,
+            remote_repo_exists(&repo, "existing-repo").await,
             "existing remote HEAD should be detected"
         );
         assert!(
-            !remote_repo_exists("missing-repo").await,
+            !remote_repo_exists(&repo, "missing-repo").await,
             "missing remote should not be treated as existing"
         );
     }
