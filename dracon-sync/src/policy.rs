@@ -1572,6 +1572,7 @@ pub(crate) fn test_sync_policy() -> SyncPolicy {
         settling_max_delay_secs: 60,
         dirty_max_age_action: DirtyMaxAgeAction::Commit,
         min_commit_interval_secs: 5,
+        untracked_atomic_commit: false,
         sync_visibility: false,
         sync_visibility_interval_hours: 24,
         sync_metadata: false,
