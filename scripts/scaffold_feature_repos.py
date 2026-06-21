@@ -75,7 +75,7 @@ UTILITIES: dict[str, dict[str, str]] = {
     },
     "dracon-system": {
         "short": "dracon-system",
-        "name": "dracon-system-di[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAxY2hRSDNDYnVSMlpkTFppWDhpRkV1M0FzYjFQTWduTXNwdkM1azV0RzBnCmN1Zkx3MzNkbTIvR216U21Tc3pDS3JHNEtUZ1pybXkwWlM5L0pVeElzMTQKLT4gWDI1NTE5IFJWSkxucHBJWklla1hrNUczTGFXMTlwUHp4R21KUHZQYm84WnRiSXRKMncKejJFTkdkN2ZiQlNvUWZCSzV2VlNFU09IRkJyTGpVQmFVenJUVnVDYUxqdwotPiBYMjU1MTkgeHdWSyt4ZUU4MGhPSk1nWE9NWEMxK1V5Vnh4UXJxNFdSZVFtbFo0aWJ4TQpCeHVCN09Tc2ZmRHYrazEvdVY1UFBEek1uL1M0TjBsMDhUeGFvR1BUTXlBCi0+IFgyNTUxOSB5WUhBVkJXdGtVZUdEMnJRVFBSN0NTU0kvNnY0WGwzQjlvclBTNEN0VjBFCmNlSFVmM0RtUldaK2Y0ODZGZmRDUXBHUnkxRFJ6M0ZVQWtrUGFlVmFNU1UKLT4gWDI1NTE5IFlMK2daRlRYUzZHL1R6SWJxMUJ6bGNTY1c0cFZiRjFIbTNTckpjSkFQenMKbGlaVFBEakRVYzdWVXIycEdtQWorcVRKNzFDWXZXV25QOU1mQVJqZGl5dwotPiA9OCpFLWdyZWFzZSAnb00kIFs+YF1NbwplWG1Na0Vjb01yMU8rOE1hVzljLwotLS0gaHRjbjhTZk9pMXlUUFU3NlBXTS82d0U4RTZ0MXJvUW51Y25LMjFzZEkzMAoUfhRcScqnOYSfVZx7Hy7tOd4UwSlKW9u9EOMHfwShxKfbLXZr7nAeLgyhkjxE5Lsuvc271IZc]",
+        "name": "dracon-system-disk-process-guard-doctor",
         "title": "Dracon System",
         "description": (
             "Disk, process, guard, doctor — local machine diagnostics and "
