@@ -2180,6 +2180,8 @@ pub(crate) async fn run_repos_report(
             _ => (0, String::new(), String::new(), "none".to_string()),
         };
 
+        let (upstream_label, publish_state) =
+            branch_upstream(&repo, &effective_status.branch);
         rows.push(RepoReportRow {
             repo: repo.display().to_string(),
             state_flags: flags,
