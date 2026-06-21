@@ -495,7 +495,11 @@ printf '  GitHub:        https://github.com/DraconDev/dracon-utilities/releases/
 printf '  crates.io:     https://crates.io/crates/dracon-sync/%s\n' "$VERSION"
 if [[ $DRY_RUN -eq 1 ]]; then
     echo
-    warn "This was a --dry-run. Local files were modified; remote state was not."
-    warn "Run 'scripts/release.sh ${VERSION} --abort' to revert local changes."
+    if [[ -n "$(git status --porcelain -- '*.toml' 'CHANGELOG.md' 'release-notes-v*.md' 2>/dev/null)" ]]; then
+        warn "This was a --dry-run. Local files were modified; remote state was not."
+        warn "Run 'scripts/release.sh ${VERSION} --abort' to revert local changes."
+    else
+        warn "This was a --dry-run. No local files were modified; remote state was not."
+    fi
     warn "Run 'scripts/release.sh ${VERSION} --yes' to actually cut the release."
 fi
