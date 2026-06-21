@@ -174,6 +174,14 @@ pub(crate) fn configure_publish_upstream_if_missing(
 /// stops showing "Publish Branch" immediately. Once the branch exists on the
 /// primary remote, this fetches that remote-tracking ref and points the local
 /// upstream to it so `git status --branch` is clean rather than "gone".
+///
+/// We skip the refresh when the configured publish upstream is `origin` and
+/// the repo also has SSH mirrors (the legacy pattern seen in `dracon-platform`):
+/// fetching from an HTTPS `origin` every daemon cycle is slow and unreliable,
+/// while the operator has already configured SSH mirror pushes for the actual
+/// sync. The publish upstream config itself is still useful (VS Code stops
+/// prompting "Publish Branch"), but pointing `@{u}` at an SSH mirror's ref
+/// adds no value when the operator chose `origin` as publish.
 pub(crate) async fn refresh_publish_upstream(repo: &Path, policy: &SyncPolicy) -> Result<bool> {
     if !has_tracking_upstream(repo) {
         return Ok(false);
@@ -188,6 +196,9 @@ pub(crate) async fn refresh_publish_upstream(repo: &Path, policy: &SyncPolicy) -
         .or_else(|| primary_publish_remote(repo, policy))
         .unwrap_or_default();
     if remote.is_empty() {
+        return Ok(false);
+    }
+    if remote == "origin" && has_ssh_mirrors(repo) {
         return Ok(false);
     }
     let refspec = format!("{branch}:refs/remotes/{remote}/{branch}");
@@ -210,6 +221,12 @@ pub(crate) async fn refresh_publish_upstream(repo: &Path, policy: &SyncPolicy) -
     }
     crate::git::set_upstream_to_remote_branch(repo, &remote, &branch)?;
     Ok(true)
+}
+
+fn has_ssh_mirrors(repo: &Path) -> bool {
+    crate::git::multi_remote::list_remotes(repo)
+        .iter()
+        .any(|name| name == "github" || name == "gitlab" || name == "codeberg")
 }
 
 fn configured_branch_remote(repo: &Path, branch: &str) -> Option<String> {
