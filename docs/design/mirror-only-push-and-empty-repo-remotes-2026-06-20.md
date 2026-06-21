@@ -105,7 +105,19 @@ It does not overwrite an existing upstream. After a successful push, the daemon 
 
 This is only a publish-upstream hint for tools like VS Code. The daemon still pushes to every configured mirror explicitly and does not rely on `origin` or upstream tracking for mirror sync.
 
-### 6. Keep daemon push hooks bypassed
+### 6. Show publish-upstream issues on the report table
+
+`dracon-sync repos` now computes a `PublishState` for each repo and renders the existing `🔗 PUBLISH` column with a visible flag when there is a problem:
+
+| State | Cell | Color | Meaning |
+| --- | --- | --- | --- |
+| `Missing` | `⚠️ none` | yellow | no `branch.<name>.remote` config and no `@{u}` |
+| `Gone` | `⚠️ <remote/branch> (gone)` | yellow | upstream configured but `refs/remotes/<remote>/<branch>` does not exist locally |
+| `Ok` | `<remote/branch>` | green | upstream configured and remote-tracking ref resolves |
+
+The legend documents the three states so the operator can spot a problem without reading source code.
+
+### 7. Keep daemon push hooks bypassed
 
 The daemon intentionally runs its own security checks before auto-commit/auto-push:
 
@@ -126,6 +138,8 @@ New coverage includes:
 - `remote_repo_exists()` success/failure behavior via a fake git command;
 - publish upstream configuration preserves existing upstreams and adds `github/main` for mirror-only repos;
 - publish upstream refresh fetches the primary remote ref and updates `@{u}`;
+- publish upstream cell rendering flags missing/gone states with `⚠️ none` / `⚠️ <remote/branch> (gone)` and color;
+- `branch_upstream` returns the correct `PublishState` for missing config and gone remote-tracking refs;
 - existing configure/push tests remain intact.
 
 ### Build and policy checks
