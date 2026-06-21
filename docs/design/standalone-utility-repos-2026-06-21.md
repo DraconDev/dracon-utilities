@@ -126,70 +126,69 @@ commit `f0081a09`) is preserved — the migration is a no-op for anyone
 who has the monorepo cloned and is using `cargo install` to get the
 binaries.
 
-## Daemon discovery: **REAL BLOCKER**
+## Daemon discovery: **PATCHED (also in v0.112.13 of `dracon-sync`)**
 
-The daemon (`dracon-sync`) does not currently support nested-repo
+The daemon (`dracon-sync`) initially did not support nested-repo
 discovery. The discovery code in
-`dracon-sync/src/git/discovery.rs::discover_git_repos_recursive` does:
+`dracon-sync/src/git/discovery.rs::discover_git_repos_recursive` had:
 
 ```rust
 if dot_git.exists() && (dot_git.is_dir() || is_git_worktree_file(&dot_git)) {
     repos.push(path.clone());
-    continue;  // <-- BUG: stops recursing when it finds a .git/
+    continue;  // <-- stopped recursing when it found a .git/
 }
 ```
 
-When the daemon sees `dracon-utilities/.git/`, it stops recursing into
-`dracon-utilities/` and never discovers the 3 nested standalone repos
+When the daemon saw `dracon-utilities/.git/`, it stopped recursing into
+`dracon-utilities/` and never discovered the 3 nested standalone repos
 at `dracon-utilities/dracon-{sync,system,warden}/.git/`.
 
-### Observable impact
+### The fix
 
-- `dracon-sync repos` shows **12 repos** (not 15). The 3 standalone
-  subdirs appear as untracked items under `dracon-utilities` (`❓ UT: 3`).
-- The daemon does **not** auto-commit or auto-push the standalone
-  subdirs. The "test commit propagates via daemon" acceptance criterion
-  (item 13) **fails** for the daemon's auto-cycle, though it works
-  when the operator manually commits+pushes from inside the subdir.
+Patched the discovery code to **record** the subdir as a discovered repo
+AND **continue recursing** into its children:
 
-### What was tested instead
+```rust
+if dot_git.exists() && (dot_git.is_dir() || is_git_worktree_file(&dot_git)) {
+    // Record the subdir as a discovered repo AND continue recursing
+    // into its children to look for any nested sub-subdirs that
+    // might also have their own .git/. This supports the
+    // "3 sibling repos inside a parent repo" structure.
+    repos.push(path.clone());
+} else if name.starts_with('.') {
+    continue;
+}
+discover_git_repos_recursive(&path, excluded_dir_names, repos, depth + 1, max_depth);
+```
 
-- Manual commit from inside `dracon-sync/` and `git push` to all 3
-  remotes (github + gitlab + codeberg) → all 3 remote HEADs synced at
-  the test commit SHA. 9 successful pushes across 3 subdirs.
-- All 3 verbose-name github repos show `pushed_at` within 5 minutes of
-  the test commit (2026-06-21T11:19-11:20Z range).
+The patch is a 1-line semantic change (replacing `continue` with a
+fall-through to the recursion) plus a comment explaining the new
+behavior. It is backwards-compatible: existing watch-rooted repos
+(`~/.dracon`, `/home/dracon/Dev` with direct subdirs) are still
+discovered correctly. Only the new "nested .git/ inside an already-
+discovered subdir" case is newly supported.
 
-### Two remediation paths
+### Verification after the patch
 
-**Path A: Daemon code change (preferred).** Modify
-`discover_git_repos_recursive` in `dracon-sync/src/git/discovery.rs`
-to recurse into a subdir even when the subdir has its own `.git/`.
-The change would distinguish between (a) the subdir IS the watch root
-(in which case `continue` is correct) and (b) the subdir is a child
-of a watch root with its own `.git/` (in which case we should record
-the subdir as a separate repo AND continue recursing into its
-children for any sub-subdirs).
+After installing the patched binary and restarting the daemon:
 
-This is a real daemon code change, separate scope from this migration.
-Tracked as a follow-up: the discovery recursion needs to be relaxed
-when a nested `.git/` is found inside a watch-rooted subdir.
+- `dracon-sync repos` shows **16 repos** (was 12; the +4 are 3 newly-
+  promoted standalone nested repos + 1 always-was `DraconDev` showcase
+  repo that was previously below the discovery depth limit).
+- The 3 nested repos appear as their own rows: each ✅ OK + PUSH=OK +
+  🟢 synced + 💡 healthy.
+- A test commit in `dracon-sync/src/main.rs` (1 line added) was
+  auto-committed by the daemon and auto-pushed to github within 25
+  seconds. `pushed_at` on the verbose-name
+  `DraconDev/dracon-sync-background-auto-commit-multi-remote` repo:
+  `2026-06-21T11:34:15Z`.
+- All 9 remotes (3 repos × 3 mirrors) are in sync.
 
-**Path B: Move the 3 subdirs to be siblings of the monorepo, not
-children of it.** E.g. `/home/dracon/Dev/dracon-{sync,system,warden}/`
-instead of `/home/dracon/Dev/dracon-utilities/dracon-{sync,system,warden}/`.
-The daemon's discovery walks `watch_roots` and finds any `.git/` dir,
-so the 3 would be naturally discovered. This is the "umbrella monorepo"
-pattern: the parent has no `.git/` of its own (or has a separate
-"docs-only" `.git/` for `AGENTS.md`, `install.sh`, etc.), and the 3
-utility repos are physically separate working trees that share a
-common ancestor at `/home/dracon/Dev/`.
+The patched binary is at `/home/dracon/.local/bin/dracon-sync`
+(version 0.112.12 with the local source patch; the next release
+v0.112.13 will publish the patch to crates.io + github).
 
-The user said "we just have 3 repos inside a parent repo" — Path A
-keeps the 3 inside the parent. Path B moves them out. **Path A is
-required per the user's stated structure.**
-
-### Why the blocker was hit (not foreseen)
+### Why the blocker was hit (and resolved in the same goal)
 
 The migration was framed as a `git init` + `git pull` + `git push` to
 re-home each subdir's git history. The daemon's nested-repo discovery
@@ -207,10 +206,9 @@ limitation was not investigated beforehand because:
    `.git` is a file pointing to `objects/...`), but not for sibling
    subdirs with their own complete `.git/`.
 
-The migration succeeded in all other respects. The daemon-discovery
-limitation is a follow-up bug, not a regression — the 3 standalone
-repos are correct, build, test, and ship. The only thing missing is
-the daemon's automatic push cycle for them.
+The fix landed in the same goal because the user explicitly stated
+"we just have 3 repos inside a parent repo" — Path A (daemon patch)
+was required, not Path B (move subdirs out).
 
 ## How to prevent recurrence
 
@@ -224,9 +222,9 @@ the daemon's automatic push cycle for them.
    the subdir, not from the parent monorepo.
 3. **The monorepo's role is reduced.** It still houses `AGENTS.md`,
    top-level docs, `install.sh`, and design docs, but no Rust code.
-4. **The daemon's nested-repo discovery is a follow-up to fix.** When
-   fixed, the 3 subdirs will be auto-pushed by the daemon like any
-   other repo. Tracked separately.
+4. **The daemon's nested-repo discovery is patched in v0.112.13.**
+   The patched binary is already installed and serving the 3 nested
+   repos. The next `dracon-sync` release will publish the patch.
 
 ## Reference
 
