@@ -459,6 +459,22 @@ fn branch_upstream(repo: &Path, branch: &str) -> (String, PublishState) {
     }
 }
 
+fn publish_cell_label(upstream: &str, state: PublishState) -> String {
+    match state {
+        PublishState::Missing => "⚠️ none".to_string(),
+        PublishState::Gone => format!("⚠️ {upstream} (gone)"),
+        PublishState::Ok => upstream.to_string(),
+    }
+}
+
+fn publish_state_color(state: PublishState) -> Color {
+    match state {
+        PublishState::Missing => Color::Yellow,
+        PublishState::Gone => Color::Yellow,
+        PublishState::Ok => Color::Green,
+    }
+}
+
 fn remote_tracking_ref_exists(repo: &Path, upstream: &str) -> bool {
     let Some(slash) = upstream.find('/') else {
         return false;
@@ -2408,7 +2424,8 @@ pub(crate) async fn run_repos_report(
             Cell::new(status_text).fg(status_color),
             Cell::new(repo_name),
             Cell::new(&row.branch).fg(branch_color),
-            Cell::new(&row.upstream),
+            Cell::new(publish_cell_label(&row.upstream, row.publish_state))
+                .fg(publish_state_color(row.publish_state)),
             Cell::new(row.modified).fg(modified_color),
             Cell::new(row.staged).fg(staged_color),
             Cell::new(row.untracked),
