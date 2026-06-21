@@ -538,6 +538,38 @@ extract the token and publish to crates.io as the operator's
 account. This is a SECURITY INCIDENT and should be the
 top priority.
 
+### GitLab-specific blocker (force-push rejected)
+
+`gitlab.com/dracondev/dracon-utilities` has `main` configured
+as a **protected branch**. When the daemon (or a manual
+`git push --force-with-lease`) attempts to overwrite the
+divergent side-branch, GitLab rejects with:
+
+```
+remote: GitLab: You are not allowed to force push code to a protected branch on this project.
+ ! [remote rejected]   main -> main (pre-receive hook declined)
+```
+
+This is verified at 2026-06-21 17:08 UTC — codeberg accepted
+the same force-with-lease (no protection on codeberg) and
+synced to 0/0; gitlab rejected it. Codeberg's protection
+state is the policy that allowed the force-push.
+
+**To unblock gitlab, the operator must either:**
+1. Unprotect `main` on `gitlab.com/dracondev/dracon-utilities`
+   via the GitLab web UI (Settings → Repository → Protected
+   branches → unprotect `main`). Then the daemon's force-push
+   will succeed and all 4 mirrors will be at 0/0.
+2. Pull the side-branch into local first (would add the
+   13 token-leaking commits to local history — security
+   regression; not recommended).
+3. Accept the divergence permanently (Path C; leaves gitlab
+   on the side-branch forever).
+
+Option 1 is the cleanest. Once unprotect is done, the daemon
+will fast-forward-push HEAD's 17 commits to gitlab on the
+next cycle.
+
 ### Why concern 1 (unmerged index) is next
 
 The unmerged index state in `dracon-platform` is the only
