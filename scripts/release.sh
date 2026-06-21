@@ -386,8 +386,13 @@ publish_if_bumped() {
     for bumped in "${BUMPED_CRATES[@]:-}"; do
         if [[ "$bumped" == "$pkg" ]]; then
             log "  publishing $pkg..."
+            # --allow-dirty because the daemon or the script itself
+            # may have uncommitted changes (e.g. the post-bump Cargo.lock
+            # that step 4 just regenerated). The publish IS the release
+            # commit; no need to require a clean tree at this point.
             run cargo publish -p "$pkg" \
-                --manifest-path "$dir/Cargo.toml"
+                --manifest-path "$dir/Cargo.toml" \
+                --allow-dirty
             return
         fi
     done
