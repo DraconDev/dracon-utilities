@@ -89,7 +89,8 @@ test_bump_and_abort() {
     make_workspace_copy "$work"
 
     # Snapshot the original version
-    local orig; orig=$(awk -F'"' '/^version[[:space:]]*=/{print $2; exit}' "$work/dracon-sync/Cargo.toml")
+    local orig
+    orig=$(awk -F'"' '/^version[[:space:]]*=/{print $2; exit}' "$work/dracon-sync/Cargo.toml")
 
     # Run a real bump (not --dry-run). The script will fail at the
     # credentials check (no ~/.cargo/credentials.toml in test env) or
@@ -103,11 +104,39 @@ test_bump_and_abort() {
     after_bump=$(awk -F'"' '/^version[[:space:]]*=/{print $2; exit}' "$work/dracon-sync/Cargo.toml")
     assert "bump mutates dracon-sync" "$after_bump" "9.9.9"
 
-    # Now abort (script will only revert the toml files it tracks).
-    # The script's abort scope is the release-flow files; we can't
-    # easily test the revert path here because the dirty tree was
-    # created by the script's own bump. Skip the abort assertion in
-    # this test; test 2 covers idempotency.
+    # Now abort (script will revert the toml files it tracks).
+    "$work/release.sh" 9.9.9 --abort >/dev/null 2>&1 || true
+
+    local after_abort
+    after_abort=$(awk -F'"' '/^version[[:space:]]*=/{print $2; exit}' "$work/dracon-sync/Cargo.toml")
+    assert "abort reverts dracon-sync" "$after_abort" "$orig"
+    rm -rf "$work"
+}
+
+# Test 1b: dry-run + abort round-trip
+# (dry-run does NOT mutate files; abort on a clean tree is a no-op)
+test_dry_run_then_abort() {
+    echo
+    echo "=== Test 1b: dry-run + abort round-trip ==="
+    local work; work=$(mktemp -d)
+    make_workspace_copy "$work"
+
+    local orig
+    orig=$(awk -F'"' '/^version[[:space:]]*=/{print $2; exit}' "$work/dracon-sync/Cargo.toml")
+
+    # Run --dry-run which does NOT mutate files (per the script's
+    # DRY_RUN gate in the bump step).
+    "$work/release.sh" 9.9.9 --dry-run --skip-facade >/dev/null 2>&1 || true
+
+    local after_dryrun
+    after_dryrun=$(awk -F'"' '/^version[[:space:]]*=/{print $2; exit}' "$work/dracon-sync/Cargo.toml")
+    assert "dry-run leaves version unchanged" "$after_dryrun" "$orig"
+
+    # Abort on a clean tree is a no-op.
+    "$work/release.sh" 9.9.9 --abort >/dev/null 2>&1 || true
+    local after_abort
+    after_abort=$(awk -F'"' '/^version[[:space:]]*=/{print $2; exit}' "$work/dracon-sync/Cargo.toml")
+    assert "abort on clean tree is no-op" "$after_abort" "$orig"
     rm -rf "$work"
 }
 
@@ -214,6 +243,7 @@ test_script_integrity() {
 test_script_integrity
 test_dry_run_is_noop
 test_bump_and_abort
+test_dry_run_then_abort
 test_preconditions
 test_dry_run_summary
 
