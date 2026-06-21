@@ -467,11 +467,11 @@ fn publish_cell_label(upstream: &str, state: PublishState) -> String {
     }
 }
 
-fn publish_state_color(state: PublishState) -> Color {
+fn publish_state_color(state: PublishState) -> comfy_table::Color {
     match state {
-        PublishState::Missing => Color::Yellow,
-        PublishState::Gone => Color::Yellow,
-        PublishState::Ok => Color::Green,
+        PublishState::Missing => comfy_table::Color::Yellow,
+        PublishState::Gone => comfy_table::Color::Yellow,
+        PublishState::Ok => comfy_table::Color::Green,
     }
 }
 
