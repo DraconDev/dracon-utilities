@@ -1,324 +1,82 @@
-# dracon-warden
+# Dracon Warden
 
-**Git filter + repo hardening tool.** Encrypts secrets at rest in git while keeping plaintext in your working tree. Uses git hooks (not a daemon) as the primary enforcement layer.
+Secret, encrypt, age, git-filter — repository hardening and smudge/clean encryption for Dracon workspaces.
 
-## Install
+This repository is the **canonical "main"** for `dracon-warden` on GitHub,
+GitLab, and Codeberg. It contains the actual source code (mirrored from the
+[`DraconDev/dracon-utilities`](https://github.com/DraconDev/dracon-utilities)
+monorepo), the `Cargo.toml`, tests, examples, and the per-utility README.
+You can build and install this utility directly from this repo.
+
+## Quick start (standalone build)
 
 ```bash
-cargo install dracon-warden
-```
-
-The binary will be at `~/.cargo/bin/dracon-warden`. Or install from the long-name façade repo:
-
-```bash
+# Clone this repo
 git clone https://github.com/DraconDev/dracon-warden-secret-encrypt-age-git-filter.git
 cd dracon-warden-secret-encrypt-age-git-filter
-cargo build --release
-```
 
-## Mental Model (Important)
+# Clone required siblings (path-dep layout)
+git clone https://github.com/DraconDev/dracon-libs.git ../dracon-libs
+# dracon-warden also needs the monorepo for the security kit
+git clone https://github.com/DraconDev/dracon-utilities.git ../dracon-utilities
 
-- **Working tree is plaintext**: `filter.smudge` decrypts so your app can read normal config/secrets.
-- **Git blobs are ciphertext**: `filter.clean` encrypts so secrets are encrypted-at-rest in history.
-
-To verify what is stored in git (not your working tree), use:
-
-```sh
-git show HEAD:path/to/file
-```
-
-If encryption is active for that path, you should see marker payloads like `[DRACON_SECRET:...]`
-in the `git show` output (even though your working tree file is plaintext).
-
-## Features
-
-### Age-Based Encryption
-- Uses [age](https://age-encryption.org/) encryption with x25519 keys
-- Secrets encrypted with per-repo keys
-- Team key distribution for collaboration
-- Master key hierarchy for key recovery
-
-### Secret Scanning
-- Comprehensive regex patterns for AWS, GCP, Azure, GitHub, Slack, etc.
-- Scans for API keys, tokens, passwords, private keys
-- Configurable allowlists for legitimate plaintext patterns
-- Prevents accidental secret exposure in git history
-
-### Clean/Smudge Filter Pipeline
-- `filter.clean`: Encrypts secrets when staging files
-- `filter.smudge`: Decrypts secrets when checking out files
-- Idempotent operations (safe to run multiple times)
-- Handles binary files, large files, already-encrypted content
-
-### Repo Hardening
-- Sets up git filter configuration
-- Publishes repo public keys
-- Manages `.gitattributes` for encryption patterns
-- Creates encryption manifests
-
-### Team Collaboration
-- Owner keys for repo authorization
-- Team keys for shared access
-- Registry credentials management
-- Key rotation support
-
-### Plaintext-Sibling Escape Hatch (Opt-In)
-- Some files contain values that should never be encrypted (public example
-  keys, fixture data, benchmark datasets)
-- Touch a `<file>.plaintext` sibling to opt a specific file in to plaintext
-  storage — the clean filter returns it unchanged, the pre-push hook
-  silently skips it
-- Revocation: `rm <file>.plaintext` and the next commit re-encrypts
-- The hatch is per-file; the rest of the repo is unaffected
-- See `docs/design/warden-plaintext-sibling.md` for threat model and
-  what the hatch does NOT protect against
-- Default install behaviour is unchanged: no `.plaintext` sibling → encryption
-
-## Installation
-
-### Quick Install
-
-Run the repository installer from the repository root:
-
-```bash
-cd dracon-utilities
-./install.sh
-```
-
-This will:
-1. Build the release binary
-2. Install to `~/.local/bin/dracon-warden`
-3. Install git hooks globally via `dracon-warden setup-hooks --global`
-
-The per-utility directories do not contain standalone installers; use the root `install.sh` for all utilities.
-
-### Manual Install
-
-```bash
 # Build
 cargo build --release
 
-# Copy binary
-cp target/release/dracon-warden ~/.local/bin/
-
-# Install git hooks globally
-dracon-warden setup-hooks --global
+# Install (binary lands in target/release/)
+sudo cp target/release/dracon-warden /usr/local/bin/
 ```
 
-## Usage
+## What is in this repo
 
-### Commands
+- `src/` — utility source code
+- `tests/` — integration tests (if present)
+- `Cargo.toml` — standalone build manifest with path-dep siblings
+- `README.md` — this file (the per-utility README from the monorepo is at `monorepo-README.md`)
+- `BLUEPRINT.md` — design notes
+- `dracon-warden.example.toml` — example config
+- `No systemd service; enforced through global git hooks.` — systemd user-service unit
+- `LICENSE`, `SECURITY.md`, `.gitignore`, `.github/` — repo metadata
+- `docs/SOURCE_OF_TRUTH.md` — architecture + invariants
 
-```bash
-# Show resolved policy path and repo roots
-dracon-warden status
+## Relationship to the monorepo
 
-# Run one hardening pass and exit
-dracon-warden once
+| Boundary | Decision |
+|----------|----------|
+| Source code | Mirrored from `dracon-utilities/dracon-warden` via `scripts/regenerate_facade_repos.py` on every monorepo commit |
+| Source of truth | `dracon-utilities` monorepo (the auto-sync is one-way) |
+| Feature surface | This repo (canonical main for `dracon-warden`) |
+| Shared libraries | Sibling `dracon-libs` workspace (`../dracon-libs`) |
+| Operational policy | `~/.dracon/utilities/` TOML files |
 
-# Generate new age keypair
-dracon-warden keygen
+## Why this name?
 
-# Git filter operations (used by git automatically)
-dracon-warden filter-clean   # stdin -> stdout
-dracon-warden filter-smudge  # stdin -> stdout
+The descriptive name is a deliberate choice for Codeberg/Forgejo, where
+descriptive repo names get upvotes and free attention because readers
+immediately know what the project does. The full word list (no fillers, no
+audience/UX claims) is documented in
+[`docs/design/github-feature-repos.md`](https://github.com/DraconDev/dracon-utilities/blob/main/docs/design/github-feature-repos.md).
 
-# Recovery tools
-dracon-warden scrub-markers   # Scan DRACON_SECRET markers
-dracon-warden scrub-markers --apply  # Fix markers in JSON
+## Purpose
 
-# Fix ciphertext stuck in working tree
-dracon-warden resmudge
-dracon-warden resmudge --apply
+Encrypts secret-shaped content at rest in git while preserving normal plaintext files in the working tree. Uses age encryption and git smudge/clean filters plus a pre-commit hook for plaintext-secret prevention.
 
-# System-wide repair pass
-dracon-warden repair
-dracon-warden repair --dry-run
-dracon-warden repair --strict
+## Runtime
 
-# Install git hooks globally (primary enforcement layer)
-dracon-warden setup-hooks --global
-```
+- Binary: `dracon-warden`
+- Service: No systemd service; enforced through global git hooks.
+- Example policy: `dracon-warden/dracon-warden.example.toml`
+- Common commands: `dracon-warden status · dracon-warden keygen · dracon-warden setup-hooks --global · dracon-warden scrub-markers`
 
-## Configuration
+## Maintenance
 
-Create `~/.dracon/utilities/warden/dracon-warden.toml`:
+When the monorepo changes the utility source code, README, or example config,
+the monorepo's `post-commit` hook calls `scripts/regenerate_facade_repos.py`
+which mirrors the changes to this repo. The `dracon-sync` daemon picks up
+the local change in `/home/dracon/Dev/facade-repos/dracon-warden-secret-encrypt-age-git-filter` and
+auto-pushes to the 3 remotes (github, gitlab, codeberg). No manual
+`--apply` or `--push-all-remotes` invocation is needed in the normal flow.
 
-```toml
-# Directories to scan for git repos (canonical field)
-repo_roots = ["/home/user/Dev"]
+## License
 
-# Additional discovery roots (optional; if omitted, repo_roots is used)
-discovery_roots = ["/home/user/Dev"]
-
-# Exclude specific directories
-exclude_dir_names = ["node_modules", "target", ".venv"]
-
-# Plaintext patterns (files that must remain plaintext in git)
-# WARNING: Must not include secret-ish patterns like .env or secrets/**
-plaintext_patterns = [
-    "*.lock",
-    "*.pub",
-    "Cargo.lock",
-    "package-lock.json",
-    "yarn.lock",
-    "pnpm-lock.yaml",
-]
-
-# Secret marker (default: DRACON_SECRET)
-secret_marker = "DRACON_SECRET"
-
-# Encryption version (1 or 2)
-encryption_version = 2
-
-# Allow V1 fallback (for migration)
-allow_v1_fallback = false
-
-# Team keys (for shared access)
-team_keys = [
-    "age1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-]
-
-# Registry credentials
-[[registries]]
-registry = "ghcr.io"
-username = "username"
-# Password stored in secrets file
-
-# Owner key (for repo authorization)
-owner_key = "~/.dracon/keys/owner.age"
-```
-
-## Safety Defaults
-
-- `plaintext_patterns` is for files that must remain plaintext in git (lockfiles, public keys, etc).
-- `plaintext_patterns` **must not include secret-ish patterns** (like `.env` or `secrets/**`).
-  dracon-warden will refuse to run if the policy tries to disable encryption for those.
-
-## Key Management
-
-### Key Hierarchy
-
-```
-~/.dracon/identity.age          — Master x25519 private key
-~/.dracon/master.age           — Sovereign master key  
-~/.dracon/keys/*.age           — Additional identities
-~/.dracon/data/keys/machine_*.age — Machine-level secret keys
-~/.dracon/data/keys/owner_*.pub  — Owner key for repo authorization
-```
-
-### Key Generation
-
-```bash
-# Generate new age keypair
-dracon-warden keygen
-
-# Keypair saved to:
-# - ~/.dracon/keys/machine_<hostname>.age (private)
-# - ~/.dracon/keys/machine_<hostname>.age.pub (public)
-```
-
-### Team Keys
-
-Team keys allow multiple users to access the same encrypted secrets:
-
-1. Each user generates their own keypair
-2. Public keys are added to the repo's team keys list
-3. Secrets are encrypted to all team keys
-4. Any team member can decrypt secrets
-
-## How It Works
-
-### Encryption Flow
-
-1. User edits `.env` file (plaintext in working tree)
-2. `git add` triggers `filter.clean`
-3. dracon-warden scans for secrets
-4. Secrets are encrypted with age encryption
-5. Encrypted content stored as `[DRACON_SECRET:base64_age_ciphertext]`
-6. Commit contains encrypted blobs
-
-### Decryption Flow
-
-1. `git checkout` triggers `filter.smudge`
-2. dracon-warden detects encrypted markers
-3. Secrets are decrypted with local private key
-4. Plaintext written to working tree
-5. App reads normal `.env` file
-
-### Secret Detection
-
-dracon-warden scans for:
-- AWS access keys, secret keys, session tokens
-- GCP API keys, OAuth tokens, service accounts
-- Azure storage keys, shared access signatures
-- GitHub tokens, SSH keys
-- Slack webhooks, bot tokens
-- Database connection strings
-- Private keys (RSA, EC, ED25519)
-- And many more patterns
-
-## Recovery Tools
-
-### scrub-markers
-
-Fixes cases where marker tokens accidentally land in plaintext JSON:
-
-```bash
-# Scan for markers
-dracon-warden scrub-markers
-
-# Fix markers
-dracon-warden scrub-markers --apply
-```
-
-### resmudge
-
-Fixes ciphertext stuck in working tree:
-
-```bash
-# Dry run
-dracon-warden resmudge
-
-# Apply fixes
-dracon-warden resmudge --apply
-```
-
-### repair
-
-System-wide repair pass:
-
-```bash
-# Dry run
-dracon-warden repair
-
-# Apply fixes
-dracon-warden repair --apply
-
-# Strict mode (more checks)
-dracon-warden repair --strict
-```
-
-## Security Considerations
-
-### What's Encrypted
-- `.env` files
-- Files matching `secret_patterns` in policy
-- Files containing detected secrets
-
-### What's NOT Encrypted
-- Files matching `plaintext_patterns` in policy
-- Lock files (Cargo.lock, package-lock.json)
-- Public keys (*.pub)
-- Configuration files without secrets
-
-### Key Storage
-- Private keys stored in `~/.dracon/`
-- Keys are never committed to git
-- Backup your keys! Loss means permanent data loss
-
-## Version
-
-```bash
-dracon-warden --version
-```
+AGPL-3.0-only — see [LICENSE](LICENSE).
