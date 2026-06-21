@@ -461,7 +461,7 @@ if [[ $SKIP_FACADE -eq 0 ]]; then
         log "  (skipped: --dry-run)"
     fi
 else
-    log "step 7/${TOTAL_STEPS}: skipped (--skip-facade)"
+    log "step 7 (optional): skipped (--skip-facade)"
 fi
 
 # ----- optional: install the post-commit hook ----------------------------

@@ -64,10 +64,12 @@ make_workspace_copy() {
     mkdir -p "$dest/dracon-sync" "$dest/dracon-warden" "$dest/dracon-system"
     # The script does `git -C $SCRIPT_DIR rev-parse --show-toplevel`,
     # so it needs to be inside a git repo. Initialize one.
+    # Disable hooks to bypass dracon-warden's filter check.
     (cd "$dest" && git init -q -b main && \
         git config user.email "test@example.com" && \
         git config user.name "Test" && \
-        git config commit.gpgsign false)
+        git config commit.gpgsign false && \
+        git config core.hooksPath /dev/null)
     cp "$MONOREPO_ROOT/Cargo.toml" "$dest/Cargo.toml"
     cp "$MONOREPO_ROOT/dracon-sync/Cargo.toml" "$dest/dracon-sync/Cargo.toml"
     cp "$MONOREPO_ROOT/dracon-warden/Cargo.toml" "$dest/dracon-warden/Cargo.toml"
