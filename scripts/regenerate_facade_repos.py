@@ -51,7 +51,7 @@ UTILITY_SOURCE_DIRS: dict[str, str] = {
 #: directory name is whatever the scaffold uses for the target).
 UTILITY_LONG_NAMES: dict[str, str] = {
     "dracon-sync": "dracon-sync-background-auto-commit-multi-remote",
-    "dracon-system": "dracon-system-di[DRACON_SECRET:YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBqU1JVckd2U2I5WC9NaTlzcUFwRTR1ZHYvOFVCUlVRdGN1cDB5aDRic0dVCjhRclRXTnJJdVVNU0dxcHZHamVsOUhzNE1kZUFBN25QOFp2UEZ2R010ek0KLT4gWDI1NTE5IFZWUWk4aGFYc2cwRjFqTUFqY1dqbHlUR3Z4dWNEdmc2R3ZHaTdzSEhaMm8KZFZWbXZZQ1pzRUcySUVHYzBSWnovKzQ3K3BJQ2NrcXY5TTg3V25WVEJ1awotPiBYMjU1MTkgaVZsdnY1eE1mMEdmdmE5dnQzTU9CYkkwNy90YWEzSUpGZnhCdm50emtuSQo0dFhwcWdrTUZPQkNESlNNeTJOZzRlYzhXT1U0a2JLN0VVbEhpUEtrK0g0Ci0+IFgyNTUxOSBMM2JZRmJodWErNGpHdXZXeGl4UEVJcEswMU14MzcwMWM5a2tMd1o0aWc0CkhVN0pHQmc5TTlBcjF3dnlpdVp2eDVhSFhHSkFIWlNvSmN0S2pEakxUNFUKLT4gWDI1NTE5IENuQUFYSXpCNUErV3g4eHFMUE1OcndtMkZNRzJtamxGaEI5MXcvY1NtRkkKYWxoRjQ2VW1rRXVwS2VVV09MWGNhc3hPOVlEdHp1MmtPTSs0K3FrNWh3bwotPiBocEQtZ3JlYXNlIDpFQ0o+QXtqIHdbIGFeU2kgZQpPb1lNL0JrTGpDQUpCSnVOaXcKLS0tIFNrUjlkLzNob0FXNkhGU2c2ZUdrdzZhY3pPZGJIb2Z6VWw0NVhuVXpLeWMK3UOn+qWXlEKTANdvU8h4Zpz7IAh+BdnPaigvKuETk9JhNQEGOImf6u6JZ0vSiQqEB2u65lD/Xw==]",
+    "dracon-system": "dracon-system-disk-process-guard-doctor",
     "dracon-warden": "dracon-warden-secret-encrypt-age-git-filter",
 }
 
