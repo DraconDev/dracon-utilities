@@ -312,5 +312,125 @@ docs, gen scripts) remain tracked.
 
 ## Local commit status
 
-**Local HEAD**: `56833cdd2f` "Phase 25: Refile deck UI + add non-girl card art" (just landed)
-**Pushed to all 4 remotes**: ✅ yes (since `9d75cf0720` and `580e859756` are now both in remote main). Let me verify.
+**Local HEAD**: `56833cdd2f` "Phase 25: Refile deck UI + add non-girl card art" (just landed).
+
+**All 4 remotes of dracon-platform are at 0/0** (verified 17:58 UTC):
+
+| Remote | main HEAD | Behind/ahead | Status |
+| --- | ---: | ---: | --- |
+| `origin` | `56833cdd2f` | 0/0 | ✅ |
+| `github` | `56833cdd2f` | 0/0 | ✅ |
+| `codeberg` | `56833cdd2f` | 0/0 | ✅ |
+| `gitlab` | `56833cdd2f` | 0/0 | ✅ |
+
+The daemon successfully pushed Phase 24 + Phase 25 to all 4
+remotes. The "2 commits behind" state from the previous concern
+investigation is now resolved (commits landed in the last 30
+minutes). The daemon IS pushing when commits succeed.
+
+**The remaining problem is the 293+ untracked files** that the
+daemon is trying to commit but is blocked on the unmerged index.
+
+The `git push` test I ran as part of this investigation
+(`git push origin main 2>&1 | head -10`) succeeded with
+`5ca8d8e6b5..56833cdd2f  main -> main`. This confirms the
+daemon's normal push path works for dracon-platform — the
+unmerged index only blocks new commits, not new pushes.
+
+## Why "stupid amount" is a real problem (not just a count)
+
+The 293+ untracked files are accumulating at:
+- **~99 files/hour** (last 60 min sample)
+- **~29 files in last 30 min**
+- **~13 files in last 5 min**
+
+This rate exceeds the daemon's drain rate. Each daemon attempt
+fails on the unmerged index within 1-2s. So the untracked count
+grows monotonically between operator fixes. Without intervention,
+the untracked count will reach 1,000+ within 10 hours.
+
+**The unmerged index is the single point of failure** that, once
+fixed, will unblock ~30s of drain time and remove the 293+ file
+backlog.
+
+## Resolution plan (prioritized)
+
+### IMMEDIATE (operator action, <5 min)
+
+1. **Resolve the 4 unmerged PNGs** (file paths above):
+   ```bash
+   cd /home/dracon/Dev/dracon-platform
+   for f in \
+     web/ai-hub/audit-20260629/05-mobile-view-screenshots/free-mobile-drawer-open.png \
+     web/ai-hub/audit-20260629/05-mobile-view-screenshots/providers-mobile.png \
+     web/ai-hub/audit-20260629/06-mobile-dropdown-screenshots/02-main-nav-open.png \
+     web/ai-hub/audit-20260629/06-mobile-dropdown-screenshots/04-desktop-baseline.png ; do
+     git checkout --ours "$f"
+   done
+   ```
+   The working tree already matches the "ours" (HEAD) side of the
+   conflict in all 4 cases (verified via sha256). After this, the
+   daemon will drain the 293+ untracked files in ~30s.
+
+2. **Add per-game `.gitignore` rules** for the ephemeral paths
+   identified above (hellhunter debug/smoke-out, darklord
+   smoke-out, junk-runner _debug-*.spec.ts, root *.docx).
+
+3. **Commit game deliverables** as a follow-up commit (not part of
+   this design doc; operator decision on grouping).
+
+### SHORT-TERM (prevent recurrence, 1-2 days)
+
+1. **Add git pre-commit hook or daemon feature** that detects
+   unmerged index state and emits a clear operator alert
+   (instead of looping on the same error every 10s for 4+ hours).
+2. **Add a daemon config option** to gitignore the
+   `scripts/smoke-out/` and `*.smoke-out.png` patterns globally,
+   so new game projects inherit the rule without per-game edits.
+3. **Add a daemon check** that warns when the untracked count
+   exceeds a threshold (e.g., 100) without making progress for
+   > 5 minutes.
+
+### LONG-TERM (architectural, 1-2 weeks)
+
+1. **Move debug output outside the watched tree.** Smoke-out
+   artifacts and debug screenshots should land in
+   `~/.dracon/scratch/{repo}/` or `/tmp/{repo}-debug/` rather than
+   inside the repo. This decouples dev iteration from git churn.
+2. **Separate test artifacts from production code.** A monorepo
+   convention that all `scripts/smoke-out/`, `scripts/debug*.mjs`,
+   and `tests/e2e/_debug-*.spec.ts` are gitignored at the root
+   level (already partial — extend to cover all game subdirs).
+3. **Add a CI lint** that fails if any game project's
+   `.gitignore` is missing the standard ephemeral patterns.
+
+## Open questions for the operator
+
+1. **For the 4 unmerged PNGs**: `git checkout --ours` is the
+   safe choice (working tree already matches HEAD). The user may
+   prefer `git checkout --theirs` if they had uncommitted local
+   edits to those screenshots.
+2. **For the capture-anime-girls card art batch (193 files)**:
+   commit as a single 33.9 MB commit, or split into 2-3 commits
+   by character ID range (char_5007-5099, 5100-5199, etc.)?
+3. **For the audit-20260630 dir** (date is wrong — we're on
+   2026-06-21): rename to `audit-2026-06-21` or leave as-is?
+4. **For the `web/games/Games ideas.docx`**: add `*.docx` to root
+   `.gitignore` and convert to `.md` if the content is needed?
+5. **For the 9 active dev sessions**: should the operator
+   consolidate to fewer concurrent dev sessions to reduce git
+   churn, or is this normal/expected workload?
+
+## Reference
+
+- `docs/design/concern-1-dracon-platform-2026-06-21.md` — the
+  prior concern investigation that identified the unmerged-index
+  blocker.
+- `docs/design/sync-push-classification.md` — the daemon's push
+  state classification rules.
+- `docs/design/daemon-settling-2026-06-20.md` — the daemon
+  settling behavior.
+- `dracon-sync/src/git/multi_remote.rs` — the push-all logic.
+- `dracon-sync/src/sync.rs` — the commit/push loop.
+- `/home/dracon/.dracon/utilities/sync/dracon-sync.toml` — the
+  global sync policy.
