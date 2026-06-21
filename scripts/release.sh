@@ -158,20 +158,28 @@ require_credentials() {
 if [[ $ABORT -eq 1 ]]; then
     log "Reverting local modifications from a previous --dry-run..."
     # Cargo.toml versions: revert via git (we know we were clean at start).
-    # Build a path list of files that ACTUALLY exist and are tracked, so
-    # git checkout doesn't fail on globs that match zero files.
-    abort_revert_paths=()
+    # Build separate lists: tracked-and-modified files go through
+    # git checkout (revert), untracked release-notes files go through
+    # rm (delete). Mixing them in one git checkout call fails because
+    # git checkout refuses unknown pathspecs.
+    abort_tracked=()
     while IFS= read -r f; do
-        abort_revert_paths+=("$f")
-    done < <(git ls-files --modified --others --exclude-standard -- '*.toml' 'CHANGELOG.md' 'release-notes-v*.md' 2>/dev/null || true)
-    if [[ ${#abort_revert_paths[@]} -gt 0 ]]; then
-        # Disable -e so we can collect warnings instead of aborting on
-        # partial-failure (a single unreadable file shouldn't kill abort).
+        abort_tracked+=("$f")
+    done < <(git ls-files --modified --exclude-standard -- '*.toml' 'CHANGELOG.md' 2>/dev/null || true)
+    abort_untracked=()
+    while IFS= read -r f; do
+        abort_untracked+=("$f")
+    done < <(git ls-files --others --exclude-standard -- 'release-notes-v*.md' 2>/dev/null || true)
+    if [[ ${#abort_tracked[@]} -gt 0 || ${#abort_untracked[@]} -gt 0 ]]; then
         set +e
-        git checkout -- "${abort_revert_paths[@]}" 2>/dev/null
-        git clean -fd -- 'release-notes-v*.md' 2>/dev/null
+        if [[ ${#abort_tracked[@]} -gt 0 ]]; then
+            git checkout -- "${abort_tracked[@]}" 2>/dev/null
+        fi
+        if [[ ${#abort_untracked[@]} -gt 0 ]]; then
+            rm -f -- "${abort_untracked[@]}" 2>/dev/null
+        fi
         set -e
-        ok "local modifications reverted (${#abort_revert_paths[@]} files)"
+        ok "local modifications reverted (${#abort_tracked[@]} tracked, ${#abort_untracked[@]} untracked)"
     else
         ok "no local modifications to revert"
     fi
