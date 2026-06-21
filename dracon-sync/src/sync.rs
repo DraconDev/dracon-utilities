@@ -2326,11 +2326,21 @@ async fn stage_commit_and_push(
         match push_background(repo, policy, has_origin, ctx.remote_failures.as_deref_mut()).await {
             Ok(true) => {
                 if let Err(e) = crate::daemon::refresh_publish_upstream(repo, policy).await {
-                    eprintln!(
-                        "⚠️ failed to refresh publish upstream for {}: {}",
-                        repo.display(),
-                        e
-                    );
+                    // The publish upstream config is already set by
+                    // `configure_publish_upstream_if_missing` and surfaces
+                    // correctly in the PUBLISH column. A failed refresh
+                    // only means `git rev-parse @{u}` still resolves
+                    // through the configured merge key, not via a fetched
+                    // remote-tracking ref. That's a transient state that
+                    // resolves on the next successful push, so log it at
+                    // debug to avoid spamming warnings on every cycle.
+                    if debug_enabled() {
+                        eprintln!(
+                            "🐛 refresh publish upstream transient for {}: {}",
+                            repo.display(),
+                            e
+                        );
+                    }
                 }
                 crate::daemon::record_push_success(repo);
             }
