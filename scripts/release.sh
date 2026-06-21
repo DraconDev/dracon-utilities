@@ -157,11 +157,21 @@ require_credentials() {
 # ----- abort path ----------------------------------------------------------
 if [[ $ABORT -eq 1 ]]; then
     log "Reverting local modifications from a previous --dry-run..."
-    # Cargo.toml versions: revert via git (we know we were clean at start)
-    if ! git diff --quiet -- '*.toml' 'CHANGELOG.md' 'release-notes-v*.md' 2>/dev/null; then
-        git checkout -- '*.toml' 'CHANGELOG.md' 'release-notes-v*.md' 2>/dev/null \
-            || warn "some files could not be reverted (manual cleanup may be needed)"
-        ok "local modifications reverted"
+    # Cargo.toml versions: revert via git (we know we were clean at start).
+    # Build a path list of files that ACTUALLY exist and are tracked, so
+    # git checkout doesn't fail on globs that match zero files.
+    abort_revert_paths=()
+    while IFS= read -r f; do
+        abort_revert_paths+=("$f")
+    done < <(git ls-files --modified --others --exclude-standard -- '*.toml' 'CHANGELOG.md' 'release-notes-v*.md' 2>/dev/null || true)
+    if [[ ${#abort_revert_paths[@]} -gt 0 ]]; then
+        # Disable -e so we can collect warnings instead of aborting on
+        # partial-failure (a single unreadable file shouldn't kill abort).
+        set +e
+        git checkout -- "${abort_revert_paths[@]}" 2>/dev/null
+        git clean -fd -- 'release-notes-v*.md' 2>/dev/null
+        set -e
+        ok "local modifications reverted (${#abort_revert_paths[@]} files)"
     else
         ok "no local modifications to revert"
     fi
