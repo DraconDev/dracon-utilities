@@ -393,7 +393,7 @@ pub(crate) fn activity_label(row: &RepoReportRow) -> String {
     }
 }
 
-fn branch_upstream(repo: &Path, branch: &str) -> String {
+fn branch_upstream(repo: &Path, branch: &str) -> (String, PublishState) {
     let upstream = crate::policy::std_git_command()
         .args(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"])
         .current_dir(repo)
@@ -407,11 +407,14 @@ fn branch_upstream(repo: &Path, branch: &str) -> String {
             }
         });
     if let Some(upstream) = upstream.filter(|s| !s.is_empty()) {
-        return upstream;
+        let state = remote_tracking_ref_exists(repo, &upstream)
+            .then_some(PublishState::Ok)
+            .unwrap_or(PublishState::Gone);
+        return (upstream, state);
     }
 
     if !crate::git::is_safe_branch_name(branch) {
-        return "-".to_string();
+        return ("-".to_string(), PublishState::Missing);
     }
     let remote_key = format!("branch.{branch}.remote");
     let merge_key = format!("branch.{branch}.merge");
@@ -443,13 +446,40 @@ fn branch_upstream(repo: &Path, branch: &str) -> String {
         (Some(remote), Some(merge)) if merge.starts_with("refs/heads/") => {
             let branch = merge.strip_prefix("refs/heads/").unwrap_or("");
             if crate::git::is_safe_branch_name(branch) {
-                format!("{remote}/{branch}")
+                let label = format!("{remote}/{branch}");
+                let state = remote_tracking_ref_exists(repo, &label)
+                    .then_some(PublishState::Ok)
+                    .unwrap_or(PublishState::Gone);
+                (label, state)
             } else {
-                "-".to_string()
+                ("-".to_string(), PublishState::Missing)
             }
         }
-        _ => "-".to_string(),
+        _ => ("-".to_string(), PublishState::Missing),
     }
+}
+
+fn remote_tracking_ref_exists(repo: &Path, upstream: &str) -> bool {
+    let Some(slash) = upstream.find('/') else {
+        return false;
+    };
+    let (remote, branch) = upstream.split_at(slash);
+    let branch = &branch[1..];
+    if remote.is_empty() || branch.is_empty() {
+        return false;
+    }
+    if !crate::git::is_safe_branch_name(remote)
+        || !crate::git::is_safe_branch_name(branch)
+    {
+        return false;
+    }
+    let refspec = format!("refs/remotes/{remote}/{branch}");
+    crate::policy::std_git_command()
+        .args(["rev-parse", "--verify", "--quiet", &refspec])
+        .current_dir(repo)
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
 }
 
 /// Read the in_flight set from disk and return whether the given
@@ -559,6 +589,13 @@ pub(crate) struct RepoReportRow {
     state_flags: Vec<String>,
     branch: String,
     upstream: String,
+    /// Visible flag describing whether the VS Code publish upstream is healthy.
+    /// `Missing` = no `branch.<name>.remote` config and no `@{u}` ref.
+    /// `Gone` = a publish upstream is configured but the remote-tracking ref
+    /// does not exist locally yet (e.g. remote was added but never pushed).
+    /// `Ok` = a publish upstream is configured and its remote-tracking ref
+    /// resolves locally.
+    publish_state: PublishState,
     modified: usize,
     staged: usize,
     untracked: usize,
@@ -623,6 +660,13 @@ pub(crate) struct RemoteStatus {
     pub(crate) auth_type: String,
     pub(crate) auto_create: bool,
     pub(crate) priority: u32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum PublishState {
+    Missing,
+    Gone,
+    Ok,
 }
 
 #[derive(Debug, Serialize)]
@@ -2124,7 +2168,8 @@ pub(crate) async fn run_repos_report(
             repo: repo.display().to_string(),
             state_flags: flags,
             branch: effective_status.branch.clone(),
-            upstream: branch_upstream(&repo, &effective_status.branch),
+            upstream: upstream_label,
+            publish_state,
             modified: effective_status.modified_files,
             staged: effective_status.staged_files,
             untracked: effective_status.untracked_files,
