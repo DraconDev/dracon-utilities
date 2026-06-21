@@ -103,6 +103,12 @@ done
 
 TAG="v${VERSION}"
 
+# Total step count depends on whether façade regen is enabled.
+# Core steps: 1 (bump) 2 (changelog) 3 (notes) 4 (dry-run) 5 (publish) 6 (tag/release)
+# Optional:    7 (façade regen)
+TOTAL_STEPS=6
+[[ $SKIP_FACADE -eq 0 ]] && TOTAL_STEPS=7
+
 # ----- colors (only on a tty) ---------------------------------------------
 if [[ -t 1 ]]; then
     C_RED=$'\033[31m'; C_GREEN=$'\033[32m'; C_YELLOW=$'\033[33m'
@@ -185,11 +191,7 @@ CRATE_TOMLS=(
 )
 
 # ----- step 1: bump versions -----------------------------------------------
-if [[ $SKIP_FACADE -eq 1 ]]; then
-    log "step 1/6: bumping versions to ${VERSION}"
-else
-    log "step 1/7: bumping versions to ${VERSION}"
-fi
+log "step 1/${TOTAL_STEPS}: bumping versions to ${VERSION}"
 
 bump_one_toml() {
     local file="$1"
@@ -263,7 +265,7 @@ if [[ -f "$SECURITY_TOML" ]]; then
 fi
 
 # ----- step 2: close CHANGELOG [Unreleased] -------------------------------
-log "step 2/6: closing CHANGELOG.md [Unreleased] → [${VERSION}]"
+log "step 2/${TOTAL_STEPS}: closing CHANGELOG.md [Unreleased] → [${VERSION}]"
 CHANGELOG="CHANGELOG.md"
 DATE=$(date -u +%Y-%m-%d)
 if [[ $DRY_RUN -eq 0 ]]; then
@@ -297,7 +299,7 @@ else
 fi
 
 # ----- step 3: create release-notes file ----------------------------------
-log "step 3/6: creating release-notes-v${VERSION}.md"
+log "step 3/${TOTAL_STEPS}: creating release-notes-v${VERSION}.md"
 NOTES_FILE="release-notes-v${VERSION}.md"
 if [[ -f "$NOTES_FILE" ]]; then
     ok "  $NOTES_FILE already exists (leaving untouched)"
@@ -342,7 +344,7 @@ fi
 # regenerate it before publishing so the lockfile matches the new versions.
 # `cargo update -w` rewrites the workspace lockfile to match the new toml
 # versions without touching external deps.
-log "step 4/6: cargo publish --workspace --dry-run"
+log "step 4/${TOTAL_STEPS}: cargo publish --workspace --dry-run"
 if [[ $DRY_RUN -eq 0 ]]; then
     log "  regenerating Cargo.lock to match bumped versions"
     cargo update -w --offline >/dev/null 2>&1 || cargo update -w >/dev/null
@@ -354,7 +356,7 @@ else
 fi
 
 # ----- step 5: cargo publish for real (per-crate, in dependency order) ----
-log "step 5/6: cargo publish for real (per-crate)"
+log "step 5/${TOTAL_STEPS}: cargo publish for real (per-crate)"
 
 # Order matters: path-deps first. dracon-security is a path dep of
 # dracon-warden, so it goes first. Skip any crate whose version did not
@@ -383,7 +385,7 @@ if [[ $DRY_RUN -eq 1 ]]; then
 fi
 
 # ----- step 6: commit, tag, push, GitHub release -------------------------
-log "step 6/6: commit, tag, push, GitHub release"
+log "step 6/${TOTAL_STEPS}: commit, tag, push, GitHub release"
 
 # 6a: stage the bumped files (NOT the release-notes or CHANGELOG edits yet —
 #     those happen together as one commit)
@@ -451,7 +453,7 @@ fi
 
 # ----- optional: regenerate the 3 façade repos ----------------------------
 if [[ $SKIP_FACADE -eq 0 ]]; then
-    log "step 7/7 (optional): regenerating 3 façade repos"
+    log "step 7/${TOTAL_STEPS} (optional): regenerating 3 façade repos"
     if [[ $DRY_RUN -eq 0 ]]; then
         run python3 scripts/regenerate_facade_repos.py --all \
             || die "façade regeneration failed; the release is on crates.io + GitHub, but the façades are stale. Re-run with --skip-facade if you want to skip this step."
@@ -459,12 +461,12 @@ if [[ $SKIP_FACADE -eq 0 ]]; then
         log "  (skipped: --dry-run)"
     fi
 else
-    log "step 7/7: skipped (--skip-facade)"
+    log "step 7/${TOTAL_STEPS}: skipped (--skip-facade)"
 fi
 
 # ----- optional: install the post-commit hook ----------------------------
 if [[ $INSTALL_HOOK -eq 1 ]]; then
-    log "step 8/8 (optional): installing monorepo post-commit hook"
+    log "(optional post-pipeline) installing monorepo post-commit hook"
     HOOK="$MONOREPO_ROOT/.git/hooks/post-commit"
     if [[ -e "$HOOK" ]]; then
         warn "  $HOOK already exists; leaving untouched. Remove it manually if you want this script to manage it."
