@@ -110,3 +110,11 @@ tasks*.json
 !rustfmt.toml
 !state/events/*.jsonl
 # --- END DRACON MANAGED BLOCK ---
+
+# --- 3 standalone repos nested inside this monorepo (goal 5297d4df) ---
+# Each has its own .git/ and is published independently to its own
+# verbose-name github/gitlab/codeberg repo. The monorepo should not
+# try to track their files.
+/dracon-sync/
+/dracon-system/
+/dracon-warden/
