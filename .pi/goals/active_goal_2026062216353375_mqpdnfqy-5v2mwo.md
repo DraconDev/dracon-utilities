@@ -5,13 +5,37 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 51315,
-    "activeSeconds": 36
+    "tokensUsed": 52345,
+    "activeSeconds": 67
   },
   "sisyphus": false,
   "createdAt": "2026-06-22T15:35:33.754Z",
-  "updatedAt": "2026-06-22T15:36:11.834Z",
-  "activePath": ".pi/goals/active_goal_2026062216353375_mqpdnfqy-5v2mwo.md"
+  "updatedAt": "2026-06-22T15:36:43.460Z",
+  "activePath": ".pi/goals/active_goal_2026062216353375_mqpdnfqy-5v2mwo.md",
+  "taskList": {
+    "tasks": [
+      {
+        "id": "1",
+        "title": "Investigate daemon stalled on dracon-sync (1 commit behind)",
+        "status": "pending",
+        "verificationContract": "Confirmed root cause: the daemon auto-committed the regenerated Cargo.lock (bump 0.112.13→0.112.14) at cc9aea6 and pushed to all 4 remotes, but the local HEAD is f60889a (one behind). Daemon can't pull-merge because local working tree is clean and the only diff is the lockfile version line."
+      },
+      {
+        "id": "2",
+        "title": "Pull/merge the missing commit (cc9aea6) into local HEAD",
+        "status": "pending",
+        "verificationContract": "Local HEAD advances from f60889a to cc9aea6. Working tree clean. Per-remote state shows 0/0 on origin (and the daemon's repo-sync flow unblocks)."
+      },
+      {
+        "id": "3",
+        "title": "Verify all 13 watched repos are healthy",
+        "status": "pending",
+        "verificationContract": "Run dracon-sync repos and confirm: 13 OK (0 WARN, 0 CONCERN), no stalled repos. The original CONCERN on dracon-sync is gone."
+      }
+    ],
+    "blockCompletion": false,
+    "proposedAt": "2026-06-22T15:36:20.178Z"
+  }
 }
 
 # Goal Prompt
@@ -127,5 +151,12 @@ dracon@nixos:~/Dev/dracon-utilities (main) %
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 36s
-- Tokens used: 51K (51,315) tokens
+- Time spent: 1m07s
+- Tokens used: 52K (52,345) tokens
+## Tasks
+
+<!-- blockCompletion: false -->
+- [ ] 1: Investigate daemon stalled on dracon-sync (1 commit behind) — contract: Confirmed root cause: the daemon auto-committed the regenerated Cargo.lock (bump 0.112.13→0.112.14) at cc9aea6 and pushed to all 4 remotes, but the local HEAD is f60889a (one behind). Daemon can't pull-merge because local working tree is clean and the only diff is the lockfile version line.
+- [ ] 2: Pull/merge the missing commit (cc9aea6) into local HEAD — contract: Local HEAD advances from f60889a to cc9aea6. Working tree clean. Per-remote state shows 0/0 on origin (and the daemon's repo-sync flow unblocks).
+- [ ] 3: Verify all 13 watched repos are healthy — contract: Run dracon-sync repos and confirm: 13 OK (0 WARN, 0 CONCERN), no stalled repos. The original CONCERN on dracon-sync is gone.
+
