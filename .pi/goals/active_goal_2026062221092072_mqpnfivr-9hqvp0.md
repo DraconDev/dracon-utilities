@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 0,
-    "activeSeconds": 0
+    "tokensUsed": 131410,
+    "activeSeconds": 4551
   },
   "sisyphus": false,
   "createdAt": "2026-06-22T20:09:20.727Z",
-  "updatedAt": "2026-06-22T20:09:20.730Z",
+  "updatedAt": "2026-06-22T21:26:37.319Z",
   "activePath": ".pi/goals/active_goal_2026062221092072_mqpnfivr-9hqvp0.md"
 }
 
@@ -132,5 +132,5 @@ dracon@nixos:~/Dev/dracon-utilities (main) %
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 0s
-- Tokens used: 0 tokens
+- Time spent: 1h15m51s
+- Tokens used: 131K (131,410) tokens
