@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 395849,
-    "activeSeconds": 5311
+    "tokensUsed": 589116,
+    "activeSeconds": 6125
   },
   "sisyphus": false,
   "createdAt": "2026-06-22T13:07:48.718Z",
-  "updatedAt": "2026-06-22T14:37:34.247Z",
+  "updatedAt": "2026-06-22T14:51:17.993Z",
   "activePath": ".pi/goals/active_goal_2026062214074871_mqp8dffy-bonnlu.md",
   "taskList": {
     "tasks": [
@@ -42,7 +42,8 @@
       {
         "id": "final-verify-repos",
         "title": "Final verification: all repos at 0/0 + new test passes",
-        "status": "pending"
+        "status": "complete",
+        "completedAt": "2026-06-22T14:45:05.922Z"
       }
     ],
     "blockCompletion": false,
@@ -59,8 +60,8 @@ we have a problem that the brwoser extenisons have archived dock that we are unt
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 1h28m31s
-- Tokens used: 396K (395,849) tokens
+- Time spent: 1h42m05s
+- Tokens used: 589K (589,116) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
@@ -68,5 +69,5 @@ we have a problem that the brwoser extenisons have archived dock that we are unt
 - [x] commit-browser-extensions-pi-files: Manually commit the 2 untracked .pi/goals/archived/ files in browser-extensions-shared
 - [x] check-dracon-platform-pi-files: Check and commit any untracked .pi files in dracon-platform
 - [x] fix-daemon-recursion-skip-bug: Fix daemon recursion-skip bug + release v0.112.14
-- [ ] final-verify-repos: Final verification: all repos at 0/0 + new test passes
+- [x] final-verify-repos: Final verification: all repos at 0/0 + new test passes
 
