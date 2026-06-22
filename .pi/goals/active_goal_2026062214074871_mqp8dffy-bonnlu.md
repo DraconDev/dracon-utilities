@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 356912,
-    "activeSeconds": 4062
+    "tokensUsed": 358446,
+    "activeSeconds": 4137
   },
   "sisyphus": false,
   "createdAt": "2026-06-22T13:07:48.718Z",
-  "updatedAt": "2026-06-22T14:16:18.954Z",
+  "updatedAt": "2026-06-22T14:17:36.628Z",
   "activePath": ".pi/goals/active_goal_2026062214074871_mqp8dffy-bonnlu.md",
   "taskList": {
     "tasks": [
@@ -30,7 +30,8 @@
       {
         "id": "check-dracon-platform-pi-files",
         "title": "Check and commit any untracked .pi files in dracon-platform",
-        "status": "pending"
+        "status": "complete",
+        "completedAt": "2026-06-22T14:17:27.509Z"
       },
       {
         "id": "fix-daemon-recursion-skip-bug",
@@ -57,14 +58,14 @@ we have a problem that the brwoser extenisons have archived dock that we are unt
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 1h07m42s
-- Tokens used: 357K (356,912) tokens
+- Time spent: 1h08m57s
+- Tokens used: 358K (358,446) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
 - [x] design-doc-dotfile-skip-bug: Document the daemon recursion-skip bug — evidence: Wrote /home/dracon/Dev/dracon-utilities/docs/design/daemon-pi-dir-skip-bug-2026-06-22.md (213 lines, 7.9KB). Documented root cause (stage_existing_files recursion's `name.starts_with('.')` skip blocks
 - [x] commit-browser-extensions-pi-files: Manually commit the 2 untracked .pi/goals/archived/ files in browser-extensions-shared
-- [ ] check-dracon-platform-pi-files: Check and commit any untracked .pi files in dracon-platform
+- [x] check-dracon-platform-pi-files: Check and commit any untracked .pi files in dracon-platform
 - [ ] fix-daemon-recursion-skip-bug: Fix daemon recursion-skip bug + release v0.112.14
 - [ ] final-verify-repos: Final verification: all repos at 0/0 + new test passes
 
