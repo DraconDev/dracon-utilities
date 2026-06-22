@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 68414,
-    "activeSeconds": 113
+    "tokensUsed": 69540,
+    "activeSeconds": 129
   },
   "sisyphus": false,
   "createdAt": "2026-06-22T15:35:33.754Z",
-  "updatedAt": "2026-06-22T15:37:31.588Z",
+  "updatedAt": "2026-06-22T15:37:48.457Z",
   "activePath": ".pi/goals/active_goal_2026062216353375_mqpdnfqy-5v2mwo.md",
   "taskList": {
     "tasks": [
@@ -25,7 +25,9 @@
       {
         "id": "2",
         "title": "Pull/merge the missing commit (cc9aea6) into local HEAD",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-22T15:37:38.155Z",
+        "evidence": "Ran `git merge --ff-only origin/HEAD` on /home/dracon/Dev/dracon-sync. Confirmed working tree was clean before FF. Local HEAD advanced from f60889a to cc9aea6 (the daemon's auto-committed Cargo.lock b",
         "verificationContract": "Local HEAD advances from f60889a to cc9aea6. Working tree clean. Per-remote state shows 0/0 on origin (and the daemon's repo-sync flow unblocks)."
       },
       {
@@ -153,12 +155,12 @@ dracon@nixos:~/Dev/dracon-utilities (main) %
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 1m53s
-- Tokens used: 68K (68,414) tokens
+- Time spent: 2m09s
+- Tokens used: 70K (69,540) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
 - [x] 1: Investigate daemon stalled on dracon-sync (1 commit behind) — evidence: Root cause confirmed via reflog inspection: reflog HEAD@{4} shows commit cc9aea6 (the Cargo.lock bump 0.112.13→0.112.14) was auto-committed by the daemon AFTER the release commit f60889a. Then the rel
-- [ ] 2: Pull/merge the missing commit (cc9aea6) into local HEAD — contract: Local HEAD advances from f60889a to cc9aea6. Working tree clean. Per-remote state shows 0/0 on origin (and the daemon's repo-sync flow unblocks).
+- [x] 2: Pull/merge the missing commit (cc9aea6) into local HEAD — evidence: Ran `git merge --ff-only origin/HEAD` on /home/dracon/Dev/dracon-sync. Confirmed working tree was clean before FF. Local HEAD advanced from f60889a to cc9aea6 (the daemon's auto-committed Cargo.lock b
 - [ ] 3: Verify all 13 watched repos are healthy — contract: Run dracon-sync repos and confirm: 13 OK (0 WARN, 0 CONCERN), no stalled repos. The original CONCERN on dracon-sync is gone.
 
