@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 195791,
-    "activeSeconds": 609
+    "tokensUsed": 199371,
+    "activeSeconds": 653
   },
   "sisyphus": false,
   "createdAt": "2026-06-22T13:07:48.718Z",
-  "updatedAt": "2026-06-22T13:18:38.727Z",
+  "updatedAt": "2026-06-22T13:19:25.219Z",
   "activePath": ".pi/goals/active_goal_2026062214074871_mqp8dffy-bonnlu.md"
 }
 
@@ -23,5 +23,5 @@ we have a problem that the brwoser extenisons have archived dock that we are unt
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 10m09s
-- Tokens used: 196K (195,791) tokens
+- Time spent: 10m53s
+- Tokens used: 199K (199,371) tokens
