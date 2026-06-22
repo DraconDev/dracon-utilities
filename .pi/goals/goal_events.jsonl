@@ -241,3 +241,5 @@
 {"type":"goal_focused","goalId":"mqlgkwvm-le1j4x","reason":"selected","at":"2026-06-19T23:44:49.916Z"}
 {"type":"goal_created","goalId":"mqp8dffy-bonnlu","objective":"we have a problem that the brwoser extenisons have archived dock that we are untracked that is incorrect we are not untracked anything but what is invalid or we would never ever want up, but anything temporary gets sent up, so 100meg sqlite or build file sure, but docs are definitley going up so check the dracon sync repos","sisyphus":false,"autoContinue":true,"at":"2026-06-22T13:07:48.718Z"}
 {"type":"task_list_set","goalId":"mqp8dffy-bonnlu","taskCount":5,"blockCompletion":false,"at":"2026-06-22T13:19:51.696Z"}
+{"type":"task_complete","goalId":"mqp8dffy-bonnlu","taskId":"design-doc-dotfile-skip-bug","evidence":"Wrote /home/dracon/Dev/dracon-utilities/docs/design/daemon-pi-dir-skip-bug-2026-06-22.md (213 lines, 7.9KB). Documented root cause (stage_existing_files recursion's `name.starts_with('.')` skip blocks","at":"2026-06-22T14:16:05.840Z"}
+{"type":"task_complete","goalId":"mqp8dffy-bonnlu","taskId":"commit-browser-extensions-pi-files","at":"2026-06-22T14:16:08.989Z"}
