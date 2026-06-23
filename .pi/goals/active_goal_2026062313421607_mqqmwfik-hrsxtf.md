@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 78344,
-    "activeSeconds": 115
+    "tokensUsed": 79543,
+    "activeSeconds": 153
   },
   "sisyphus": false,
   "createdAt": "2026-06-23T12:42:16.076Z",
-  "updatedAt": "2026-06-23T12:44:14.968Z",
+  "updatedAt": "2026-06-23T12:44:53.914Z",
   "activePath": ".pi/goals/active_goal_2026062313421607_mqqmwfik-hrsxtf.md",
   "taskList": {
     "tasks": [
@@ -73,8 +73,8 @@ Stop and ask the user. The most likely blocker is: a new goal file update from t
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 1m55s
-- Tokens used: 78K (78,344) tokens
+- Time spent: 2m33s
+- Tokens used: 80K (79,543) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
