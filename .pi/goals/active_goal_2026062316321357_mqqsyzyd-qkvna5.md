@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 802268,
-    "activeSeconds": 2721
+    "tokensUsed": 803002,
+    "activeSeconds": 2801
   },
   "sisyphus": false,
   "createdAt": "2026-06-23T15:32:13.573Z",
-  "updatedAt": "2026-06-23T17:20:31.987Z",
+  "updatedAt": "2026-06-23T17:21:53.080Z",
   "activePath": ".pi/goals/active_goal_2026062316321357_mqqsyzyd-qkvna5.md",
   "taskList": {
     "tasks": [
@@ -141,8 +141,8 @@ Stop and ask the user. The most likely blockers are:
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 45m21s
-- Tokens used: 802K (802,268) tokens
+- Time spent: 46m41s
+- Tokens used: 803K (803,002) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
