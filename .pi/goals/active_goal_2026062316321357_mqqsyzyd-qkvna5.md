@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 995295,
-    "activeSeconds": 4350
+    "tokensUsed": 996242,
+    "activeSeconds": 4368
   },
   "sisyphus": false,
   "createdAt": "2026-06-23T15:32:13.573Z",
-  "updatedAt": "2026-06-23T21:17:52.361Z",
+  "updatedAt": "2026-06-23T21:18:11.072Z",
   "activePath": ".pi/goals/active_goal_2026062316321357_mqqsyzyd-qkvna5.md",
   "taskList": {
     "tasks": [
@@ -168,8 +168,8 @@ Pre-authorized autonomous recovery paths (agent attempts the recovery before sto
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 1h12m30s
-- Tokens used: 995K (995,295) tokens
+- Time spent: 1h12m48s
+- Tokens used: 996K (996,242) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
