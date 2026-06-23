@@ -294,3 +294,4 @@
 {"type":"goal_resumed","goalId":"mqqsyzyd-qkvna5","reason":"user","at":"2026-06-23T16:38:26.033Z"}
 {"type":"task_complete","goalId":"mqqsyzyd-qkvna5","taskId":"capture-current-state","evidence":"9 evidence files in /tmp/goal-mqqsyzyd-qkvna5/ (00-timestamp, 01-current-repos + 01-recapture, 02-per-repo-status, 03-systemd-status, 04-daemon-health, 05-codeberg-ssh-probe, 06-summary, 07-investigat","at":"2026-06-23T16:40:05.029Z"}
 {"type":"task_complete","goalId":"mqqsyzyd-qkvna5","taskId":"utilities-gitlab-fix","evidence":"Action 1 (gitlab UI): Toggled \"Allowed to force push\" ON for main protected branch on gitlab.com/DraconDev/dracon-utilities (kept the protection, just enabled the force-push exception — the safer opti","at":"2026-06-23T17:11:28.224Z"}
+{"type":"goal_paused","goalId":"mqqsyzyd-qkvna5","reason":"user","status":"paused","at":"2026-06-23T18:01:22.483Z"}
