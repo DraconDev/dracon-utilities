@@ -5,19 +5,21 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 276864,
-    "activeSeconds": 288
+    "tokensUsed": 495002,
+    "activeSeconds": 1992
   },
   "sisyphus": false,
   "createdAt": "2026-06-23T15:32:13.573Z",
-  "updatedAt": "2026-06-23T16:38:56.765Z",
+  "updatedAt": "2026-06-23T17:07:48.781Z",
   "activePath": ".pi/goals/active_goal_2026062316321357_mqqsyzyd-qkvna5.md",
   "taskList": {
     "tasks": [
       {
         "id": "capture-current-state",
         "title": "Capture current state (repos snapshot, per-repo status, daemon health, codeberg reachability probe, local-vs-gitlab investigation)",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-23T16:40:05.029Z",
+        "evidence": "9 evidence files in /tmp/goal-mqqsyzyd-qkvna5/ (00-timestamp, 01-current-repos + 01-recapture, 02-per-repo-status, 03-systemd-status, 04-daemon-health, 05-codeberg-ssh-probe, 06-summary, 07-investigat",
         "verificationContract": "Live dracon-sync repos output saved; per-repo git status + ahead/behind vs github/codeberg/gitlab/origin; daemon health; codeberg SSH probe result; local-vs-gitlab dracon-sync/ comparison (file count, SHA256 spot-check, version check). All written to /tmp/goal-mqqsyzyd-qkvna5/01-*.txt and 07-*.md as durable evidence."
       },
       {
@@ -137,12 +139,12 @@ Stop and ask the user. The most likely blockers are:
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 4m48s
-- Tokens used: 277K (276,864) tokens
+- Time spent: 33m12s
+- Tokens used: 495K (495,002) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
-- [ ] capture-current-state: Capture current state (repos snapshot, per-repo status, daemon health, codeberg reachability probe, local-vs-gitlab investigation) — contract: Live dracon-sync repos output saved; per-repo git status + ahead/behind vs github/codeberg/gitlab/origin; daemon health; codeberg SSH probe result; local-vs-gitlab dracon-sync/ comparison (file count, SHA256 spot-check, version check). All written to /tmp/goal-mqqsyzyd-qkvna5/01-*.txt and 07-*.md as durable evidence.
+- [x] capture-current-state: Capture current state (repos snapshot, per-repo status, daemon health, codeberg reachability probe, local-vs-gitlab investigation) — evidence: 9 evidence files in /tmp/goal-mqqsyzyd-qkvna5/ (00-timestamp, 01-current-repos + 01-recapture, 02-per-repo-status, 03-systemd-status, 04-daemon-health, 05-codeberg-ssh-probe, 06-summary, 07-investigat
 - [ ] utilities-gitlab-fix: Resolve dracon-utilities gitlab divergence: unprotect main, force-push local (--force-with-lease), re-protect main, clear daemon stuck state — contract: dracon-utilities working tree clean; git rev-list --count gitlab/main..HEAD = 0 (also github=0, codeberg=0); git ls-remote --heads gitlab main returns local HEAD SHA; gitlab main re-protected (operator confirms via gitlab.com UI); design doc has a "Resolution" entry with before/after SHAs and the strict-superset justification (60 vs 49 files, byte-identical src/daemon.rs SHA256, v0.112.14 vs v0.1.12).
 - [ ] platform-gitlab-fix: Resolve dracon-platform gitlab 50-commit push: bump push_op_timeout_secs (global to >=900s OR per-remote for platform), one-shot manual force-push from operator shell, re-protect main, clear daemon stuck state — contract: dracon-platform git rev-list --count gitlab/main..HEAD = 0 (also github=0, codeberg=0); gitlab main re-protected; push_op_timeout_secs updated in /home/dracon/.dracon/utilities/sync/dracon-sync.toml (global or per-remote); design doc has a "Resolution" entry noting the 300s-timeout-too-short root cause and the manual-push + config-update fix; dracon-sync repos shows platform as OK.
 - [ ] codeberg-outage-triage: Triage codeberg SSH transient: probe codeberg.org SSH (already done), list affected repos, document 3+ contingency operator-action options, append to design doc — contract: ssh -vvv codeberg probe output saved; dracon-sync journalctl codeberg errors (last 24h) listed; affected repos enumerated; design doc has a codeberg triage section with at least 3 operator-action options for the contingency case: (a) wait for codeberg to recover, (b) switch codeberg remote URL from SSH to HTTPS, (c) drop codeberg remote from affected repos, (d) reconfigure SSH (verify ~/.dracon/secrets/ssh/config and ~/.ssh/known_hosts).
