@@ -128,3 +128,42 @@ main to match local. Requires unprotecting main first (option A).
   `git gc --aggressive --prune=now` would reduce that significantly,
   but it does NOT fix the gitlab storage issue (gitlab has its own
   copy, unaffected by local repack).
+
+## DEFERRED OPERATOR ACTIONS (2026-06-23 13:42 BST)
+
+Goal `mqqmwfik-hrsxtf` confirmed scope is limited to clearing WARNs for
+the 3 named repos (platform, utilities, quick-draw) and pushing
+github+codeberg only. The 2 gitlab-side items below remain open and
+require operator UI action; they will be addressed in a separate
+operator-action goal.
+
+### 1. dracon-platform gitlab — storage quota
+
+- **Action**: Either delete the gitlab mirror
+  (`gitlab.com/dracondev/dracon-platform` → Settings → Advanced →
+  Remove project) OR upgrade the gitlab plan / submit support ticket
+  for quota increase.
+- **Why deferred**: Cannot be fixed via local config change; requires
+  gitlab.com UI navigation. Deletion is preferred so the daemon can
+  recreate the mirror from scratch on the next cycle.
+- **Expected daemon outcome after fix**: WARN clears (gitlab goes
+  away → daemon auto-recreates it fresh → push succeeds).
+
+### 2. dracon-utilities gitlab — protected main + divergence
+
+- **Action**: Either (a) unprotect main on
+  `gitlab.com/dracondev/dracon-utilities` → Settings → Repository →
+  Protected branches (then re-protect after daemon force-push
+  reconciles); or (b) delete the gitlab mirror to let the daemon
+  recreate from scratch.
+- **Why deferred**: Protected branches require gitlab.com UI nav;
+  deletion is preferred for the same reason as platform.
+- **Expected daemon outcome after fix**: WARN clears (force-push
+  succeeds → mirrors converge).
+
+## Files of evidence (2026-06-23 13:42 BST)
+
+- `/tmp/goal-mqqmwfik/01-current-repos.txt` — initial `dracon-sync repos` snapshot (14 OK / 3 WARN / 0 CONCERN)
+- `/tmp/goal-mqqmwfik/02-per-repo-status.txt` — per-repo git status, ahead/behind counts
+- `/tmp/goal-mqqmwfik/05-dirty-repos.txt` — summary of dirty repos at start
+- Final snapshot will be saved as `/tmp/final-state-$(date).txt` at completion.
