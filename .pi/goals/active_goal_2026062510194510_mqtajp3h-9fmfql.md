@@ -5,24 +5,66 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 203454,
-    "activeSeconds": 724
+    "tokensUsed": 554447,
+    "activeSeconds": 1167
   },
   "sisyphus": false,
   "createdAt": "2026-06-25T09:19:45.101Z",
-  "updatedAt": "2026-06-25T09:32:11.501Z",
+  "updatedAt": "2026-06-25T09:39:45.453Z",
   "activePath": ".pi/goals/active_goal_2026062510194510_mqtajp3h-9fmfql.md",
   "taskList": {
     "tasks": [
       {
         "id": "task-1-temp-audit",
-        "title": "Task 1: Audit sizes of every tracked 'temp-like' path category in HEAD",
-        "status": "pending",
-        "verificationContract": "For each of: web/.pi-tmp/, web/screenshots/, web/test-results/, web/web/test-results/, web/test-batch-test/, wip/*/chrome-screenshots/, wip/*/.pi/, wip/*/docs/audits/, wip/*/docs/audit/, *-old/, *-padded-old/ — produce a count + MiB summary. Output: a markdown table in the design doc."
+        "title": "Task 1: Per-category size audit",
+        "status": "complete",
+        "completedAt": "2026-06-25T09:36:47.822Z",
+        "evidence": "Per-category size audit complete: 23 categories, 14.9 GiB total, 108,668 tracked blobs. Per-game source-code cross-reference: 925 MiB used vs 1,911 MiB orphan across 9 wip/ games. Full breakdown writt",
+        "verificationContract": "Each tracked-temp category (web/.pi-tmp/, web/screenshots/, web/test-results/, etc.) has a count + MiB summary. Output: design doc §1."
+      },
+      {
+        "id": "task-2-source-ref-analysis",
+        "title": "Task 2: Source-code cross-reference (used vs orphan assets)",
+        "status": "complete",
+        "completedAt": "2026-06-25T09:39:13.360Z",
+        "evidence": "Source-code cross-reference complete: per-game breakdown of used vs orphan in `wip/<game>/static/`. hegemon 532 MiB used / 1,626 MiB orphan. endless-td 30 / 272. Total across 9 games: 925 MiB used / 1",
+        "verificationContract": "Per-game breakdown of which static/assets/ subdirs are referenced by source code vs orphan. Top 15 orphan subdirs listed. Output: design doc §2."
+      },
+      {
+        "id": "task-3-gitignore-design",
+        "title": "Task 3: Smart gitignore pattern design (9 patterns)",
+        "status": "complete",
+        "completedAt": "2026-06-25T09:39:19.341Z",
+        "evidence": "9 gitignore patterns designed and verified: **/chrome-screenshots/, **/.pi/, **/screenshots/audit-*/, **/docs/audits/, **/docs/audit/, **/test-results/, **/test-batch-test/, **/*-old/, **/*-padded-old",
+        "verificationContract": "9 gitignore patterns listed with verification via `git check-ignore -v` on representative paths. Output: design doc §3."
+      },
+      {
+        "id": "task-4-bucket-strategy",
+        "title": "Task 4: OVH bucket strategy (design only)",
+        "status": "complete",
+        "completedAt": "2026-06-25T09:39:25.131Z",
+        "evidence": "OVH bucket strategy recommendation written: keep current pattern (git for dev iteration, OVH bucket for release builds). \"Bucket from dev\" deferred to a future goal due to dev workflow cost. Full desi",
+        "verificationContract": "Recommendation on whether to use bucket from dev or keep current pattern (git for dev, bucket for release). Output: design doc §4."
+      },
+      {
+        "id": "task-5-history-rewrite-runbook",
+        "title": "Task 5: History-rewrite runbook (deferred execution)",
+        "status": "complete",
+        "completedAt": "2026-06-25T09:39:32.578Z",
+        "evidence": "History-rewrite runbook written: 8-step process to shrink local .git from 19 GiB to ~3-4 GiB. Includes backup, paths-to-remove list (12 categories, 4.3 GiB of removable history), git-filter-repo comma",
+        "verificationContract": "Step-by-step runbook for shrinking local .git from 19 GiB to ~3-4 GiB. Includes paths-to-remove, commands, expected outcome, reversibility. Output: design doc §5."
+      },
+      {
+        "id": "task-6-design-doc-commit",
+        "title": "Task 6: Commit + push design doc to codeberg",
+        "status": "complete",
+        "completedAt": "2026-06-25T09:39:37.953Z",
+        "evidence": "Design doc committed (commits 270348bbf0 + 9f1ae72) and pushed to codeberg. 0 ahead, 0 behind. Daemon will see the new commits on its next cycle.",
+        "verificationContract": "Design doc committed with explicit path, pushed to codeberg, daemon sees the new commit on next cycle."
       }
     ],
-    "blockCompletion": false,
-    "proposedAt": "2026-06-25T09:19:45.103Z"
+    "blockCompletion": true,
+    "proposedAt": "2026-06-25T09:36:57.527Z"
   }
 }
 
@@ -35,10 +77,15 @@ Audit the dracon-platform repo to identify which files are "actually intended to
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 12m04s
-- Tokens used: 203K (203,454) tokens
+- Time spent: 19m27s
+- Tokens used: 554K (554,447) tokens
 ## Tasks
 
-<!-- blockCompletion: false -->
-- [ ] task-1-temp-audit: Task 1: Audit sizes of every tracked 'temp-like' path category in HEAD — contract: For each of: web/.pi-tmp/, web/screenshots/, web/test-results/, web/web/test-results/, web/test-batch-test/, wip/*/chrome-screenshots/, wip/*/.pi/, wip/*/docs/audits/, wip/*/docs/audit/, *-old/, *-padded-old/ — produce a count + MiB summary. Output: a markdown table in the design doc.
+<!-- blockCompletion: true -->
+- [x] task-1-temp-audit: Task 1: Per-category size audit — evidence: Per-category size audit complete: 23 categories, 14.9 GiB total, 108,668 tracked blobs. Per-game source-code cross-reference: 925 MiB used vs 1,911 MiB orphan across 9 wip/ games. Full breakdown writt
+- [x] task-2-source-ref-analysis: Task 2: Source-code cross-reference (used vs orphan assets) — evidence: Source-code cross-reference complete: per-game breakdown of used vs orphan in `wip/<game>/static/`. hegemon 532 MiB used / 1,626 MiB orphan. endless-td 30 / 272. Total across 9 games: 925 MiB used / 1
+- [x] task-3-gitignore-design: Task 3: Smart gitignore pattern design (9 patterns) — evidence: 9 gitignore patterns designed and verified: **/chrome-screenshots/, **/.pi/, **/screenshots/audit-*/, **/docs/audits/, **/docs/audit/, **/test-results/, **/test-batch-test/, **/*-old/, **/*-padded-old
+- [x] task-4-bucket-strategy: Task 4: OVH bucket strategy (design only) — evidence: OVH bucket strategy recommendation written: keep current pattern (git for dev iteration, OVH bucket for release builds). "Bucket from dev" deferred to a future goal due to dev workflow cost. Full desi
+- [x] task-5-history-rewrite-runbook: Task 5: History-rewrite runbook (deferred execution) — evidence: History-rewrite runbook written: 8-step process to shrink local .git from 19 GiB to ~3-4 GiB. Includes backup, paths-to-remove list (12 categories, 4.3 GiB of removable history), git-filter-repo comma
+- [x] task-6-design-doc-commit: Task 6: Commit + push design doc to codeberg — evidence: Design doc committed (commits 270348bbf0 + 9f1ae72) and pushed to codeberg. 0 ahead, 0 behind. Daemon will see the new commits on its next cycle.
 
