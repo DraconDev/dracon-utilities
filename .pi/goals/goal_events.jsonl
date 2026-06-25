@@ -344,3 +344,4 @@
 {"type":"goal_completed","goalId":"mqtajp3h-9fmfql","archivePath":".pi/goals/archived/goal_2026062511031626_mqtajp3h-9fmfql.md","at":"2026-06-25T10:03:16.265Z"}
 {"type":"goal_focused","goalId":"mqqsyzyd-qkvna5","reason":"selected","at":"2026-06-25T11:19:36.113Z"}
 {"type":"goal_resumed","goalId":"mqqsyzyd-qkvna5","reason":"user","at":"2026-06-25T11:19:36.121Z"}
+{"type":"goal_paused","goalId":"mqqsyzyd-qkvna5","reason":"user","status":"paused","at":"2026-06-25T11:22:35.006Z"}

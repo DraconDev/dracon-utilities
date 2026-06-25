@@ -10,7 +10,7 @@
   },
   "sisyphus": false,
   "createdAt": "2026-06-23T15:32:13.573Z",
-  "updatedAt": "2026-06-25T11:19:36.119Z",
+  "updatedAt": "2026-06-25T11:23:26.196Z",
   "activePath": ".pi/goals/active_goal_2026062316321357_mqqsyzyd-qkvna5.md",
   "taskList": {
     "tasks": [
