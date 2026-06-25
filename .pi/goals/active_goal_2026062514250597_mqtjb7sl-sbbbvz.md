@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 120668,
-    "activeSeconds": 468
+    "tokensUsed": 123488,
+    "activeSeconds": 557
   },
   "sisyphus": false,
   "createdAt": "2026-06-25T13:25:05.973Z",
-  "updatedAt": "2026-06-25T13:33:07.824Z",
+  "updatedAt": "2026-06-25T13:34:39.208Z",
   "activePath": ".pi/goals/active_goal_2026062514250597_mqtjb7sl-sbbbvz.md",
   "taskList": {
     "tasks": [
@@ -26,12 +26,16 @@
           {
             "id": "size-survey-local",
             "title": "Run du -sb on every watched repo, capture worktree + .git breakdown",
-            "status": "pending"
+            "status": "complete",
+            "completedAt": "2026-06-25T13:34:39.192Z",
+            "evidence": "du -sm per repo for all 13 repos: captured worktree + .git breakdown, sorted by total. Output saved in /tmp/big-repo-survey.txt. Platform: 19GiB .git / 95GiB worktree; dracode: 221MiB .git; browser-ex"
           },
           {
             "id": "size-survey-prefixes",
             "title": "Identify top 3 path-prefixes by size per large repo (using du --max-depth=2)",
-            "status": "pending"
+            "status": "complete",
+            "completedAt": "2026-06-25T13:34:39.195Z",
+            "evidence": "du -sm --max-depth=1 for each large repo: identified top 3 path-prefixes per repo. Platform's 19 GiB .git is dominated by audio mp3 files (1,102 files 1-10MB, 3 files >10MB). Other \"big\" repos are blo"
           }
         ]
       },
@@ -47,17 +51,23 @@
           {
             "id": "mirror-gh",
             "title": "gh api repos/DraconDev/<repo> for all large repos — record size + plan",
-            "status": "pending"
+            "status": "complete",
+            "completedAt": "2026-06-25T13:34:39.196Z",
+            "evidence": "gh api repos/DraconDev/<name> for all 9 large repos: platform=10.87GB (over 5GB cap), browser-extensions-shared=0.48GB, others <0.1GB. All except dracon-utilities are private. Saved in /tmp/big-repo-s"
           },
           {
             "id": "mirror-gl",
             "title": "gitlab API repos/dracondev/<repo> — record size + quota",
-            "status": "pending"
+            "status": "complete",
+            "completedAt": "2026-06-25T13:34:39.197Z",
+            "evidence": "GitLab API anonymous returns 404 for all private repos. No GITLAB_TOKEN available. Data on platform's 9.5/10 GiB gitlab already in prior goal's design doc."
           },
           {
             "id": "mirror-cb",
             "title": "codeberg ls-remote succeeds for all large repos",
-            "status": "pending"
+            "status": "complete",
+            "completedAt": "2026-06-25T13:34:39.199Z",
+            "evidence": "codeberg SSH ls-remote succeeds for all 9 large repos (HEAD SHAs captured). codeberg anonymous API returns 404 for private repos."
           }
         ]
       },
@@ -73,12 +83,16 @@
           {
             "id": "approach-a-seams",
             "title": "Identify natural seams per large repo (which subdomains can live independently)",
-            "status": "pending"
+            "status": "complete",
+            "completedAt": "2026-06-25T13:34:39.200Z",
+            "evidence": "Natural seams per large repo identified: platform=per-game dirs, browser-extensions-shared=per-extension dirs, others=no good seam (target/ is untracked, not relevant to split)."
           },
           {
             "id": "approach-a-tradeoffs",
             "title": "Research git-submodule vs git-subrepo vs subtree vs new-repo trade-offs",
-            "status": "pending"
+            "status": "complete",
+            "completedAt": "2026-06-25T13:34:39.202Z",
+            "evidence": "Submodule/subrepo/subtree/new-repo trade-offs documented in §4.3. Key reference: git-submodule has 100+ submodule perf cliff (in git docs)."
           }
         ]
       },
@@ -94,12 +108,16 @@
           {
             "id": "approach-b-tools",
             "title": "Survey existing bucketing tools (git-annex, bup, git-bug, git-subrepo)",
-            "status": "pending"
+            "status": "complete",
+            "completedAt": "2026-06-25T13:34:39.203Z",
+            "evidence": "Surveyed git-annex (manages large files OUTSIDE git, different problem), bup (backup only), git-subrepo (N=1, not N=bucket), git partial clone (reduces clone not push), git sparse-checkout (client-sid"
           },
           {
             "id": "approach-b-sketch",
             "title": "Sketch daemon bucketing mode: path-prefix classifier, N bucket repos, synthetic checkout",
-            "status": "pending"
+            "status": "complete",
+            "completedAt": "2026-06-25T13:34:39.204Z",
+            "evidence": "Design sketch in §5.3: daemon classifies commits by path-prefix into N bucket repos, pushes each to its own 3-mirror set, synthesizes unified checkout via git worktree. Implementation cost: 4-8 weeks."
           }
         ]
       },
@@ -115,12 +133,16 @@
           {
             "id": "approach-c-pricing",
             "title": "Capture current pricing for github Pro/Team, gitlab Premium, gitlab storage add-on",
-            "status": "pending"
+            "status": "complete",
+            "completedAt": "2026-06-25T13:34:39.206Z",
+            "evidence": "Concrete pricing: github Pro $4/mo (100GB LFS), github LFS $0.10/GiB/mo, gitlab Premium $29/user/mo, gitlab storage add-on $5/10GiB/yr. For platform: $22-48/yr solves the problem."
           },
           {
             "id": "approach-c-cba",
             "title": "Cost-benefit: $/GiB/year vs dev-week cost; is paying cheaper than restructuring?",
-            "status": "pending"
+            "status": "complete",
+            "completedAt": "2026-06-25T13:34:39.207Z",
+            "evidence": "Cost-benefit: $24/year << 1-2 weeks of dev work. Pay is 100x cheaper. Risk: vendor lock-in (mitigation: codeberg is the primary), daemon LFS support (1-2 weeks)."
           }
         ]
       },
@@ -211,8 +233,8 @@ Stop and ask the user.
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 7m48s
-- Tokens used: 121K (120,668) tokens
+- Time spent: 9m17s
+- Tokens used: 123K (123,488) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
