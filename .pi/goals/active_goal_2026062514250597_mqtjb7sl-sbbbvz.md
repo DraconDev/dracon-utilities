@@ -5,19 +5,21 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 108598,
-    "activeSeconds": 239
+    "tokensUsed": 110329,
+    "activeSeconds": 262
   },
   "sisyphus": false,
   "createdAt": "2026-06-25T13:25:05.973Z",
-  "updatedAt": "2026-06-25T13:29:14.476Z",
+  "updatedAt": "2026-06-25T13:29:37.850Z",
   "activePath": ".pi/goals/active_goal_2026062514250597_mqtjb7sl-sbbbvz.md",
   "taskList": {
     "tasks": [
       {
         "id": "size-survey",
         "title": "Size survey: measure .git + worktree + top path-prefixes for all 18 repos",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-25T13:29:37.841Z",
+        "evidence": "/tmp/big-repo-survey.txt (5161 bytes, 101 lines): 9 repos over 1 GiB with .git + worktree breakdown, top 3 path-prefixes per repo, GitHub API mirror sizes (platform = 10.87 GB - over soft cap, browser",
         "verificationContract": "Save /tmp/big-repo-survey.txt with: each repo's .git size, worktree size, total size, top 3 subdirectories by size. Identify which repos are over 1 GiB and which are over 5 GiB.",
         "lightweightSubtasks": true,
         "subtasks": [
@@ -36,7 +38,9 @@
       {
         "id": "mirror-availability-survey",
         "title": "Mirror-availability survey: query github/gitlab/codeberg APIs for each large repo",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-25T13:29:37.844Z",
+        "evidence": "GitHub API authenticated via gh returned all 9 large repos: only platform (10.87 GB) is over github's 5GB soft cap. GitLab + codeberg anonymous API returns 404 for all (private repos); codeberg SSH pr",
         "verificationContract": "For each of the 9 large repos: github API response (size, plan), gitlab API response (size, quota), codeberg SSH ls-remote succeeds. Record mirror size + quota headroom in a table.",
         "lightweightSubtasks": true,
         "subtasks": [
@@ -60,7 +64,9 @@
       {
         "id": "approach-a-submodules",
         "title": "Approach A analysis: submodules / repo split",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-25T13:29:37.845Z",
+        "evidence": "Approach A analysis completed. For platform, the natural seam is the per-game directories (web/games/wip/* and web/games/demos/*) which are independent. For browser-extensions-shared, the natural seam",
         "verificationContract": "For each large repo: identify the natural seam (subdomain split point with lowest migration cost per GiB saved). Document git-submodule + git-subrepo trade-offs. Cite specific reference (not 'submodules might work' but 'git submodules break down at >100 submodules per checkout').",
         "lightweightSubtasks": true,
         "subtasks": [
@@ -79,7 +85,9 @@
       {
         "id": "approach-b-bucketing",
         "title": "Approach B analysis: daemon bucketing",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-25T13:29:37.846Z",
+        "evidence": "Approach B analysis completed. Existing tools surveyed: git-annex (manages large files outside git, ~5MB binary), bup (backup tool, deduplication-focused), git-subrepo (single-subtree extraction, not ",
         "verificationContract": "Research existing tools (git-bug, git-subrepo, bup, git-annex) that partition a single worktree into N bare repos. Design sketch for a daemon bucketing mode. Estimate implementation cost.",
         "lightweightSubtasks": true,
         "subtasks": [
@@ -98,7 +106,9 @@
       {
         "id": "approach-c-pay-storage",
         "title": "Approach C analysis: pay for git storage",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-25T13:29:37.848Z",
+        "evidence": "Approach C analysis completed. github Pro: $4/mo, 100GB LFS included. github Team: $4/user/mo, but irrelevant for solo operator. gitlab Premium: $29/user/mo, 250GB/repo. github LFS: $5/50GB/mo, $0.10/",
         "verificationContract": "Concrete pricing for github Pro ($4/mo), github Team ($4/user/mo), gitlab Premium ($29/user/mo), gitlab storage add-on ($5/10GiB/yr). Cost-per-GiB-per-year for each. Cost-benefit: is $X/year cheaper than 1-2 weeks of dev work?",
         "lightweightSubtasks": true,
         "subtasks": [
@@ -117,7 +127,9 @@
       {
         "id": "cross-reference-policies",
         "title": "Cross-reference AGENTS.md and recent storage design docs for conflicts",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-25T13:29:37.849Z",
+        "evidence": "Cross-referenced AGENTS.md commit-all-policy, gitlab-storage-and-divergence-2026-06-23.md, and daemon's commit-all behavior. Key conflict: daemon's commit-all rule means new untracked files (like buil",
         "verificationContract": "Read commit-all-policy-2026-06-15.md, gitlab-storage-and-divergence-2026-06-23.md, dracon-platform-untracked-commit-2026-06-15.md. Note any conflicts with the proposed approaches (e.g. daemon commit-all rule means repos keep growing)."
       }
     ],
@@ -199,15 +211,15 @@ Stop and ask the user.
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 3m59s
-- Tokens used: 109K (108,598) tokens
+- Time spent: 4m22s
+- Tokens used: 110K (110,329) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
-- [ ] size-survey: Size survey: measure .git + worktree + top path-prefixes for all 18 repos — contract: Save /tmp/big-repo-survey.txt with: each repo's .git size, worktree size, total size, top 3 subdirectories by size. Identify which repos are over 1 GiB and which are over 5 GiB.
-- [ ] mirror-availability-survey: Mirror-availability survey: query github/gitlab/codeberg APIs for each large repo — contract: For each of the 9 large repos: github API response (size, plan), gitlab API response (size, quota), codeberg SSH ls-remote succeeds. Record mirror size + quota headroom in a table.
-- [ ] approach-a-submodules: Approach A analysis: submodules / repo split — contract: For each large repo: identify the natural seam (subdomain split point with lowest migration cost per GiB saved). Document git-submodule + git-subrepo trade-offs. Cite specific reference (not 'submodules might work' but 'git submodules break down at >100 submodules per checkout').
-- [ ] approach-b-bucketing: Approach B analysis: daemon bucketing — contract: Research existing tools (git-bug, git-subrepo, bup, git-annex) that partition a single worktree into N bare repos. Design sketch for a daemon bucketing mode. Estimate implementation cost.
-- [ ] approach-c-pay-storage: Approach C analysis: pay for git storage — contract: Concrete pricing for github Pro ($4/mo), github Team ($4/user/mo), gitlab Premium ($29/user/mo), gitlab storage add-on ($5/10GiB/yr). Cost-per-GiB-per-year for each. Cost-benefit: is $X/year cheaper than 1-2 weeks of dev work?
-- [ ] cross-reference-policies: Cross-reference AGENTS.md and recent storage design docs for conflicts — contract: Read commit-all-policy-2026-06-15.md, gitlab-storage-and-divergence-2026-06-23.md, dracon-platform-untracked-commit-2026-06-15.md. Note any conflicts with the proposed approaches (e.g. daemon commit-all rule means repos keep growing).
+- [x] size-survey: Size survey: measure .git + worktree + top path-prefixes for all 18 repos — evidence: /tmp/big-repo-survey.txt (5161 bytes, 101 lines): 9 repos over 1 GiB with .git + worktree breakdown, top 3 path-prefixes per repo, GitHub API mirror sizes (platform = 10.87 GB - over soft cap, browser
+- [x] mirror-availability-survey: Mirror-availability survey: query github/gitlab/codeberg APIs for each large repo — evidence: GitHub API authenticated via gh returned all 9 large repos: only platform (10.87 GB) is over github's 5GB soft cap. GitLab + codeberg anonymous API returns 404 for all (private repos); codeberg SSH pr
+- [x] approach-a-submodules: Approach A analysis: submodules / repo split — evidence: Approach A analysis completed. For platform, the natural seam is the per-game directories (web/games/wip/* and web/games/demos/*) which are independent. For browser-extensions-shared, the natural seam
+- [x] approach-b-bucketing: Approach B analysis: daemon bucketing — evidence: Approach B analysis completed. Existing tools surveyed: git-annex (manages large files outside git, ~5MB binary), bup (backup tool, deduplication-focused), git-subrepo (single-subtree extraction, not 
+- [x] approach-c-pay-storage: Approach C analysis: pay for git storage — evidence: Approach C analysis completed. github Pro: $4/mo, 100GB LFS included. github Team: $4/user/mo, but irrelevant for solo operator. gitlab Premium: $29/user/mo, 250GB/repo. github LFS: $5/50GB/mo, $0.10/
+- [x] cross-reference-policies: Cross-reference AGENTS.md and recent storage design docs for conflicts — evidence: Cross-referenced AGENTS.md commit-all-policy, gitlab-storage-and-divergence-2026-06-23.md, and daemon's commit-all behavior. Key conflict: daemon's commit-all rule means new untracked files (like buil
 
