@@ -345,3 +345,4 @@
 {"type":"goal_focused","goalId":"mqqsyzyd-qkvna5","reason":"selected","at":"2026-06-25T11:19:36.113Z"}
 {"type":"goal_resumed","goalId":"mqqsyzyd-qkvna5","reason":"user","at":"2026-06-25T11:19:36.121Z"}
 {"type":"goal_paused","goalId":"mqqsyzyd-qkvna5","reason":"user","status":"paused","at":"2026-06-25T11:22:35.006Z"}
+{"type":"task_complete","goalId":"mqqsyzyd-qkvna5","taskId":"platform-github-disable","evidence":"Verified: git remote -v shows ONLY codeberg (no github/gitlab/origin); daemon log confirms 0 push-to-(github|gitlab) attempts for platform; .dracon/dracon-sync.toml has exclude_remotes = ['github', 'g","at":"2026-06-25T11:23:53.988Z"}
