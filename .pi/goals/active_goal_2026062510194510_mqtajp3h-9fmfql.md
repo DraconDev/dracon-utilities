@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 752313,
-    "activeSeconds": 1691
+    "tokensUsed": 752962,
+    "activeSeconds": 1704
   },
   "sisyphus": false,
   "createdAt": "2026-06-25T09:19:45.101Z",
-  "updatedAt": "2026-06-25T09:48:31.308Z",
+  "updatedAt": "2026-06-25T09:48:44.823Z",
   "activePath": ".pi/goals/active_goal_2026062510194510_mqtajp3h-9fmfql.md",
   "taskList": {
     "tasks": [
@@ -77,8 +77,8 @@ Audit the dracon-platform repo to identify which files are "actually intended to
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 28m11s
-- Tokens used: 752K (752,313) tokens
+- Time spent: 28m24s
+- Tokens used: 753K (752,962) tokens
 ## Tasks
 
 <!-- blockCompletion: true -->
