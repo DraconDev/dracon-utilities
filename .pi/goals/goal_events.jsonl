@@ -346,3 +346,4 @@
 {"type":"goal_resumed","goalId":"mqqsyzyd-qkvna5","reason":"user","at":"2026-06-25T11:19:36.121Z"}
 {"type":"goal_paused","goalId":"mqqsyzyd-qkvna5","reason":"user","status":"paused","at":"2026-06-25T11:22:35.006Z"}
 {"type":"task_complete","goalId":"mqqsyzyd-qkvna5","taskId":"platform-github-disable","evidence":"Verified: git remote -v shows ONLY codeberg (no github/gitlab/origin); daemon log confirms 0 push-to-(github|gitlab) attempts for platform; .dracon/dracon-sync.toml has exclude_remotes = ['github', 'g","at":"2026-06-25T11:23:53.988Z"}
+{"type":"task_complete","goalId":"mqqsyzyd-qkvna5","taskId":"design-doc-update","evidence":"Design doc gitlab-storage-and-divergence-2026-06-23.md has all 4 sections: (a) utilities force-push (line 218), (b) platform 'drop github + gitlab' (line 278) with size evidence for BOTH gitlab (9.5/1","at":"2026-06-25T11:24:06.190Z"}
