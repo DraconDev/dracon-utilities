@@ -517,3 +517,75 @@ speculative to commit to without a 1-week spike.
 migration + daemon LFS support → split browser-extensions-shared per
 extension (optional, separate goal). Total cost: 30 min + 1-2 weeks +
 $22-48/year. Implementation deferred to a follow-up goal.
+
+## Addendum 2026-06-25 (goal mqtu6kd2-q6svr7) — `.gitignore` hygiene only
+
+After the operator reviewed this doc, the chosen path is **`.gitignore`
+hygiene only** — no structural changes, no LFS migration, no per-repo
+splits. The 3-mirror strategy is preserved as-is for all 18 repos.
+
+### Audit findings (2026-06-25)
+
+A per-repo audit using `git check-ignore -v <temp-dir>/` (the
+authoritative check) found:
+
+- **All standard temp dirs are already in `.gitignore`** for all 18
+  repos: `target/`, `node_modules/`, `build/`, `dist/`, `output/`,
+  `.cache/`, `__pycache__/`, `.venv/`. The earlier claim of "7 repos
+  missing `target/`" was a `grep` false positive (regex anchor issue);
+  the actual `git check-ignore` shows every relevant temp dir IS
+  ignored. **No action needed for these patterns.**
+- **The platform's `.gitignore` already has a thoughtful "Layer 3"
+  block** (`**/scripts/smoke-out/`, `**/docs/audit/`, `**/docs/screenshots/`,
+  `**/static/assets-legacy/`, `**/audit-*`, `**/.pi-tmp/`, `**/*.bak`,
+  `**/playwright-report/`) covering dev-time visual artifacts. The
+  comment block in the file explains the intent.
+- **The platform's `web/screenshots/` PNGs (29 MB, 216 files) ARE
+  referenced** by audit docs (`TASKLIST-2026-06-15.md`, `AUDIT-2026-06-15*.md`,
+  `FULL-WIDTH-2026-06-19.md`) and tests (`web/tests/games/screenshot-1mg*.spec.ts`).
+  They are part of the audit trail, not pure transient evidence. The
+  operator's caveat "we dont want to filter out all picture" applies
+  here — these are **audit fixtures**, not "obviously temporary".
+- **The `ai-auto-writer/_archive/` dir IS in `.gitignore`** (line 29).
+  Old test PNGs (`_archive/to-release/test{1-4}.png`) are in git history
+  but new captures won't be committed.
+- **`browser-extensions-shared` (719 images, 58 MB)**: all 719 images
+  are extension assets (`extensions/<name>/public/screenshots/`,
+  `extensions/<name>/.audit-ui/`, `extensions/<name>/docs/assets/screenshots/`).
+  All are referenced by extension docs and audit JSON files. **No
+  action needed.**
+
+### Single fix applied
+
+Added `evidence/` to `/home/dracon/Dev/rust-ai-web-auto/.gitignore`
+(outside the warden-managed block, with a comment explaining intent).
+This is the only repo where the LLM-fed PNG pattern was both
+**clearly transient** (zero references in code/docs) and **actively
+bloat-prone** (29 tracked PNG files, ~876 KB, all named like
+`click_chain_*.png`, `scroll_test_*.png`).
+
+```gitignore
+# AFTER the warden-managed block:
+evidence/
+```
+
+### Why we did NOT filter more aggressively
+
+- **`*.png` blanket filter**: would lose 2.41 GB of legitimate game
+  assets in platform, 58 MB of extension screenshots/icons, and book
+  covers in ai-auto-writer. The operator explicitly said "we dont want
+  to filter out all picture so need careful analysis".
+- **`web/screenshots/` in platform**: 29 MB of mixed test fixtures and
+  audit-trail PNGs. Filtering would orphan audit docs and break tests.
+- **Test fixture PNGs**: kept (referenced by `*.spec.ts` files).
+- **Book covers, extension screenshots, game backgrounds**: kept (real
+  content).
+
+### What this addendum closes
+
+This addendum supersedes §10's "Recommended path forward" for the
+short-term. The longer-term recommendations (LFS migration, daemon
+bucketing spike, browser-extensions split) are deferred to separate
+goals if/when the operator decides the cost is justified. As of
+2026-06-25, the 3-mirror strategy is preserved, the daemon is not
+committing temp files, and no repo's `.git/` is growing.
