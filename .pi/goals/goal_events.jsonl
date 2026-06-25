@@ -390,3 +390,6 @@
 {"type":"goal_resumed","goalId":"mqu2n95z-kjubl8","reason":"user","at":"2026-06-25T22:26:32.568Z"}
 {"type":"goal_paused","goalId":"mqu2n95z-kjubl8","reason":"user","status":"paused","at":"2026-06-25T22:27:45.679Z"}
 {"type":"goal_resumed","goalId":"mqu2n95z-kjubl8","reason":"user","at":"2026-06-25T22:28:02.923Z"}
+{"type":"goal_paused","goalId":"mqu2n95z-kjubl8","reason":"user","status":"paused","at":"2026-06-25T22:28:41.910Z"}
+{"type":"goal_paused","goalId":"mqu2n95z-kjubl8","reason":"user","status":"paused","at":"2026-06-25T22:28:57.312Z"}
+{"type":"goal_resumed","goalId":"mqu2n95z-kjubl8","reason":"user","at":"2026-06-25T22:28:59.549Z"}
