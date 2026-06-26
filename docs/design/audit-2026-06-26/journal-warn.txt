@@ -1,0 +1,87 @@
+Jun 20 01:34:34 nixos systemd[1214]: dracon-sync.service: State 'stop-sigterm' timed out. Killing.
+Jun 20 01:34:34 nixos systemd[1214]: dracon-sync.service: Main process exited, code=killed, status=9/KILL
+Jun 20 01:34:34 nixos systemd[1214]: dracon-sync.service: Failed with result 'timeout'.
+Jun 20 01:34:40 nixos systemd[1214]: dracon-sync.service: Main process exited, code=killed, status=9/KILL
+Jun 20 01:34:40 nixos systemd[1214]: dracon-sync.service: Failed with result 'signal'.
+Jun 20 01:35:50 nixos systemd[1214]: dracon-sync.service: Main process exited, code=killed, status=9/KILL
+Jun 20 01:35:50 nixos systemd[1214]: dracon-sync.service: Failed with result 'signal'.
+Jun 20 01:48:33 nixos systemd[1214]: dracon-sync.service: Main process exited, code=killed, status=9/KILL
+Jun 20 01:48:35 nixos systemd[1214]: dracon-sync.service: Failed with result 'signal'.
+Jun 20 01:49:10 nixos systemd[1214]: dracon-sync.service: Main process exited, code=killed, status=9/KILL
+Jun 20 01:49:10 nixos systemd[1214]: dracon-sync.service: Failed with result 'signal'.
+Jun 20 01:49:30 nixos systemd[1214]: dracon-sync.service: Main process exited, code=killed, status=9/KILL
+Jun 20 01:49:30 nixos systemd[1214]: dracon-sync.service: Failed with result 'signal'.
+Jun 20 01:50:09 nixos systemd[1214]: dracon-sync.service: Main process exited, code=killed, status=9/KILL
+Jun 20 01:50:09 nixos systemd[1214]: dracon-sync.service: Failed with result 'signal'.
+Jun 20 01:50:37 nixos systemd[1214]: dracon-sync.service: Main process exited, code=killed, status=9/KILL
+Jun 20 01:50:37 nixos systemd[1214]: dracon-sync.service: Failed with result 'signal'.
+Jun 20 01:50:53 nixos systemd[1214]: dracon-sync.service: Main process exited, code=killed, status=9/KILL
+Jun 20 01:50:53 nixos systemd[1214]: dracon-sync.service: Failed with result 'signal'.
+Jun 20 01:51:41 nixos systemd[1214]: dracon-sync.service: Main process exited, code=killed, status=9/KILL
+Jun 20 01:51:41 nixos systemd[1214]: dracon-sync.service: Failed with result 'signal'.
+Jun 20 22:06:34 nixos systemd[1214]: dracon-sync.service: State 'stop-sigterm' timed out. Killing.
+Jun 20 22:06:34 nixos systemd[1214]: dracon-sync.service: Main process exited, code=killed, status=9/KILL
+Jun 20 22:06:35 nixos systemd[1214]: dracon-sync.service: Failed with result 'timeout'.
+Jun 20 22:28:57 nixos systemd[1214]: dracon-sync.service: State 'stop-sigterm' timed out. Killing.
+Jun 20 22:28:58 nixos systemd[1214]: dracon-sync.service: Main process exited, code=killed, status=9/KILL
+Jun 20 22:28:58 nixos systemd[1214]: dracon-sync.service: Failed with result 'timeout'.
+Jun 20 22:42:45 nixos systemd[1214]: dracon-sync.service: State 'stop-sigterm' timed out. Killing.
+Jun 20 22:42:45 nixos systemd[1214]: dracon-sync.service: Main process exited, code=killed, status=9/KILL
+Jun 20 22:42:46 nixos systemd[1214]: dracon-sync.service: Failed with result 'timeout'.
+Jun 21 10:05:39 nixos systemd-coredump[885908]: Process 885881 (git) of user 1000 dumped core.
+                                                
+                                                Module libgcc_s.so.1 without build-id.
+                                                Module libz-ng.so.2 without build-id.
+                                                Module libpcre2-8.so.0 without build-id.
+                                                Stack trace of thread 885881:
+                                                #0  0x00005e0050a31e7e sha1_compression_states (/nix/store/a1q31frm84l5d2hjm25ch80wm9bxk0m9-git-2.51.2/bin/git + 0x2f6e7e)
+                                                #1  0x00005e0050a333b7 sha1_process (/nix/store/a1q31frm84l5d2hjm25ch80wm9bxk0m9-git-2.51.2/bin/git + 0x2f83b7)
+                                                #2  0x00005e0050a353b9 SHA1DCUpdate (/nix/store/a1q31frm84l5d2hjm25ch80wm9bxk0m9-git-2.51.2/bin/git + 0x2fa3b9)
+                                                #3  0x00005e0050931921 write_loose_object_common.constprop.0.isra.0 (/nix/store/a1q31frm84l5d2hjm25ch80wm9bxk0m9-git-2.51.2/bin/git + 0x1f6921)
+                                                #4  0x00005e0050933745 write_loose_object (/nix/store/a1q31frm84l5d2hjm25ch80wm9bxk0m9-git-2.51.2/bin/git + 0x1f8745)
+                                                #5  0x00005e005093436c write_object_file (/nix/store/a1q31frm84l5d2hjm25ch80wm9bxk0m9-git-2.51.2/bin/git + 0x1f936c)
+                                                #6  0x00005e0050933bd1 index_mem (/nix/store/a1q31frm84l5d2hjm25ch80wm9bxk0m9-git-2.51.2/bin/git + 0x1f8bd1)
+                                                #7  0x00005e005093491e index_fd (/nix/store/a1q31frm84l5d2hjm25ch80wm9bxk0m9-git-2.51.2/bin/git + 0x1f991e)
+                                                #8  0x00005e0050934ce3 index_path (/nix/store/a1q31frm84l5d2hjm25ch80wm9bxk0m9-git-2.51.2/bin/git + 0x1f9ce3)
+                                                #9  0x00005e005097b942 add_to_index (/nix/store/a1q31frm84l5d2hjm25ch80wm9bxk0m9-git-2.51.2/bin/git + 0x240942)
+                                                #10 0x00005e005097bf2f add_file_to_index (/nix/store/a1q31frm84l5d2hjm25ch80wm9bxk0m9-git-2.51.2/bin/git + 0x240f2f)
+                                                #11 0x00005e005097c0a1 update_callback (/nix/store/a1q31frm84l5d2hjm25ch80wm9bxk0m9-git-2.51.2/bin/git + 0x2410a1)
+                                                #12 0x00005e00508ccafe diff_flush (/nix/store/a1q31frm84l5d2hjm25ch80wm9bxk0m9-git-2.51.2/bin/git + 0x191afe)
+                                                #13 0x00005e00508b9aae run_diff_files (/nix/store/a1q31frm84l5d2hjm25ch80wm9bxk0m9-git-2.51.2/bin/git + 0x17eaae)
+                                                #14 0x00005e005097c641 add_files_to_cache (/nix/store/a1q31frm84l5d2hjm25ch80wm9bxk0m9-git-2.51.2/bin/git + 0x241641)
+                                                #15 0x00005e00507611eb cmd_add (/nix/store/a1q31frm84l5d2hjm25ch80wm9bxk0m9-git-2.51.2/bin/git + 0x261eb)
+                                                #16 0x00005e005075e4b2 handle_builtin (/nix/store/a1q31frm84l5d2hjm25ch80wm9bxk0m9-git-2.51.2/bin/git + 0x234b2)
+                                                #17 0x00005e005076014c cmd_main (/nix/store/a1q31frm84l5d2hjm25ch80wm9bxk0m9-git-2.51.2/bin/git + 0x2514c)
+                                                #18 0x00005e005075e190 main (/nix/store/a1q31frm84l5d2hjm25ch80wm9bxk0m9-git-2.51.2/bin/git + 0x23190)
+                                                #19 0x00007c183422a4d8 __libc_start_call_main (libc.so.6 + 0x2a4d8)
+                                                #20 0x00007c183422a59b __libc_start_main@@GLIBC_2.34 (libc.so.6 + 0x2a59b)
+                                                #21 0x00005e005075e1d5 _start (/nix/store/a1q31frm84l5d2hjm25ch80wm9bxk0m9-git-2.51.2/bin/git + 0x231d5)
+                                                ELF object binary architecture: AMD x86-64
+Jun 22 15:37:27 nixos systemd[1214]: dracon-sync.service: State 'stop-sigterm' timed out. Killing.
+Jun 22 15:37:28 nixos systemd[1214]: dracon-sync.service: Main process exited, code=killed, status=9/KILL
+Jun 22 15:37:28 nixos systemd[1214]: dracon-sync.service: Failed with result 'timeout'.
+-- Boot a9beaf6f964847cba289cfee12b308f6 --
+Jun 23 16:24:51 nixos systemd[1302]: dracon-sync.service: Main process exited, code=killed, status=9/KILL
+Jun 23 16:24:51 nixos systemd[1302]: dracon-sync.service: Failed with result 'signal'.
+Jun 23 16:38:10 nixos systemd[1302]: dracon-sync.service: Main process exited, code=killed, status=9/KILL
+Jun 23 16:38:11 nixos systemd[1302]: dracon-sync.service: Failed with result 'signal'.
+Jun 23 17:59:25 nixos systemd-coredump[481376]: Process 481344 (git) of user 1000 dumped core.
+                                                
+                                                Module libgcc_s.so.1 without build-id.
+                                                Module libz-ng.so.2 without build-id.
+                                                Module libpcre2-8.so.0 without build-id.
+                                                Stack trace of thread 481344:
+                                                #0  0x00005d68d6b63070 hash_chars (/nix/store/a1q31frm84l5d2hjm25ch80wm9bxk0m9-git-2.51.2/bin/git + 0x195070)
+                                                #1  0x00005d68d6b6323e diffcore_count_changes (/nix/store/a1q31frm84l5d2hjm25ch80wm9bxk0m9-git-2.51.2/bin/git + 0x19523e)
+                                                #2  0x00005d68d6b6492d estimate_similarity (/nix/store/a1q31frm84l5d2hjm25ch80wm9bxk0m9-git-2.51.2/bin/git + 0x19692d)
+                                                #3  0x00005d68d6b66dd7 diffcore_rename_extended (/nix/store/a1q31frm84l5d2hjm25ch80wm9bxk0m9-git-2.51.2/bin/git + 0x198dd7)
+                                                #4  0x00005d68d6b5c048 diffcore_std (/nix/store/a1q31frm84l5d2hjm25ch80wm9bxk0m9-git-2.51.2/bin/git + 0x18e048)
+                                                #5  0x00005d68d6b4d690 run_diff_index (/nix/store/a1q31frm84l5d2hjm25ch80wm9bxk0m9-git-2.51.2/bin/git + 0x17f690)
+                                                #6  0x00005d68d6a31e99 cmd_diff (/nix/store/a1q31frm84l5d2hjm25ch80wm9bxk0m9-git-2.51.2/bin/git + 0x63e99)
+                                                #7  0x00005d68d69f14b2 handle_builtin (/nix/store/a1q31frm84l5d2hjm25ch80wm9bxk0m9-git-2.51.2/bin/git + 0x234b2)
+                                                #8  0x00005d68d69f314c cmd_main (/nix/store/a1q31frm84l5d2hjm25ch80wm9bxk0m9-git-2.51.2/bin/git + 0x2514c)
+                                                #9  0x00005d68d69f1190 main (/nix/store/a1q31frm84l5d2hjm25ch80wm9bxk0m9-git-2.51.2/bin/git + 0x23190)
+                                                #10 0x000074081f02a4d8 __libc_start_call_main (libc.so.6 + 0x2a4d8)
+                                                #11 0x000074081f02a59b __libc_start_main@@GLIBC_2.34 (libc.so.6 + 0x2a59b)
+                                                #12 0x00005d68d69f11d5 _start (/nix/store/a1q31frm84l5d2hjm25ch80wm9bxk0m9-git-2.51.2/bin/git + 0x231d5)
+                                                ELF object binary architecture: AMD x86-64

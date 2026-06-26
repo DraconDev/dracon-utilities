@@ -1,0 +1,26 @@
+=== /home/dracon/.dracon ===
+--- no per-repo .dracon-sync.toml ---
+=== /home/dracon/Dev/dracon-platform ===
+--- no per-repo .dracon-sync.toml ---
+=== /home/dracon/Dev/pully-fully-pull-based-fleet-reconciler ===
+--- no per-repo .dracon-sync.toml ---
+=== /home/dracon/Dev/avid ===
+--- no per-repo .dracon-sync.toml ---
+=== /home/dracon/Dev/dracon-utilities ===
+--- no per-repo .dracon-sync.toml ---
+=== /home/dracon/Dev/browser-extensions-shared ===
+--- no per-repo .dracon-sync.toml ---
+=== /home/dracon/Dev/rust-ai-web-auto ===
+--- no per-repo .dracon-sync.toml ---
+=== /home/dracon/Dev/ai-auto-writer ===
+--- no per-repo .dracon-sync.toml ---
+=== /home/dracon/Dev/pi-plugins ===
+--- no per-repo .dracon-sync.toml ---
+=== /home/dracon/Dev/dracon-sync NOT FOUND ===
+=== /home/dracon/Dev/dracon-code ===
+--- no per-repo .dracon-sync.toml ---
+=== /home/dracon/Dev/dracon-strategy ===
+--- no per-repo .dracon-sync.toml ---
+=== /home/dracon/Dev/DraconDev NOT FOUND ===
+=== /home/dracon/Dev/dracon-warden NOT FOUND ===
+=== /home/dracon/Dev/dracon-system NOT FOUND ===

@@ -1,0 +1,297 @@
+
+============ /home/dracon/Dev/dracon-platform ============
+## main-temp...codeberg/main-temp [ahead 69, behind 1]
+--- HEAD ---
+9fcb7bb92c4f5433daded6d828aca525c75de756
+--- @u ---
+codeberg/main-temp
+--- last 5 ---
+9fcb7bb92c 3 file(s) in web [web/music/libs/data/cookbook.json, web/games/demos/canvas2d-animation/src/routes/+page.svelte, web/games/demos/canvas2d-animation/package.json] DELTA:+62/-9
+0cff4b1b21 6 file(s) in web [web/games/wip/capture-anime-girls/docs/PHASE23-AUDIT.json, web/games/wip/capture-anime-girls/docs/PHASE28-AUDIT.json, web/music/libs/data/cookbook.json] DELTA:+113/-1883 | DEL:docs/PHASE23-AUDIT.json,docs/PHASE24-AUDIT.json,docs/PHASE25-AUDIT.json,docs/PHASE28-AUDIT.json,docs/PHASE29-AUDIT.json
+614b6029d9 1 file(s) in web [web/games/wip/capture-anime-girls/tests/phase51.test.ts] DELTA:+7/-10 | TEST:17 TESTONLY:tests/phase51.test.ts
+86e4abfa0d 2 file(s) in web [web/games/wip/capture-anime-girls/tests/phase51.test.ts, web/music/libs/data/cookbook.json] DELTA:+203/-4 | TEST:146 NEW:tests/phase51.test.ts
+48973824a8 3 file(s) in web [web/games/wip/polis/docs/AUDIT-AND-TASKS-2026-06-26.md, web/games/wip/capture-anime-girls/src/lib/collection/store.svelte.ts, web/games/wip/capture-anime-girls/tests/storage.test.ts] DELTA:+775/-2 | TEST:2 NEW:docs/AUDIT-AND-TASKS-2026-06-26.md
+--- remotes ---
+codeberg	git@codeberg.org:dracondev/dracon-platform.git (fetch)
+codeberg	git@codeberg.org:dracondev/dracon-platform.git (push)
+--- no per-repo .dracon-sync.toml ---
+
+============ /home/dracon/Dev/pully-fully-pull-based-fleet-reconciler ============
+## main...github/main
+--- HEAD ---
+24f231dc30a10f6b399f08c814eef8a07b1afda2
+--- @u ---
+github/main
+--- last 5 ---
+24f231dc 1 file(s) in .pi [.pi/goals/active_goal_2026062620201716_mqvbfua0-y9dwt9.md] DELTA:+3/-3 | TIME:133m
+e94545d5 1 file(s) in .pi [.pi/goals/active_goal_2026062620201716_mqvbfua0-y9dwt9.md] DELTA:+27/-0 | NEW:goals/active_goal_2026062620201716_mqvbfua0-y9dwt9.md
+e7b14aeb 1 file(s) in .pi [.pi/goals/{active_goal_2026062610411982_mquqras3-z9bwwv.md => archived/goal_2026062611070213_mquqras3-z9bwwv.md}] DELTA:+6/-5 | GOAL:complete TOKENS:124K TIME:24m EVIDENCE:task-1:Pully process running (PID 2129862) s|task-2:Tested git pull responsiveness: 1. Ma|task-3:Pully auto-reconciles every ~30s (ver+6more
+608678de CLOSED: task-9 | 1 file(s) in .pi [.pi/goals/active_goal_2026062610411982_mquqras3-z9bwwv.md] DELTA:+9/-7 | TOKENS:124K TIME:24m EVIDENCE:task-1:Pully process running (PID 2129862) s|task-2:Tested git pull responsiveness: 1. Ma|task-3:Pully auto-reconciles every ~30s (ver+6more
+c4bdc60a Add pully responsiveness test report
+--- remotes ---
+codeberg	git@codeberg.org:dracondev/pully-fully-pull-based-fleet-reconciler.git (fetch)
+codeberg	git@codeberg.org:dracondev/pully-fully-pull-based-fleet-reconciler.git (push)
+github	git@github.com:DraconDev/pully-fully-pull-based-fleet-reconciler.git (fetch)
+github	git@github.com:DraconDev/pully-fully-pull-based-fleet-reconciler.git (push)
+gitlab	git@gitlab.com:dracondev/pully-fully-pull-based-fleet-reconciler.git (fetch)
+gitlab	git@gitlab.com:dracondev/pully-fully-pull-based-fleet-reconciler.git (push)
+--- no per-repo .dracon-sync.toml ---
+
+============ /home/dracon/Dev/avid ============
+## main...github/main
+--- HEAD ---
+4adc747b7981b00a7839b9fda21ab03b0cb53e24
+--- @u ---
+github/main
+--- last 5 ---
+4adc747 2 file(s) in .pi [.pi/goals/active_goal_2026062600592027_mqu5yuof-2x8oiu.md, .pi/goals/goal_events.jsonl] DELTA:+5/-3
+ff21407 1 file(s) in .pi [.pi/goals/active_goal_2026062600592027_mqu5yuof-2x8oiu.md] DELTA:+5/-5
+337cbb0 1 file(s) in .pi [.pi/goals/active_goal_2026062600592027_mqu5yuof-2x8oiu.md] DELTA:+5/-5
+0c4f65e 2 file(s) in .pi [.pi/goals/active_goal_2026062600592027_mqu5yuof-2x8oiu.md, .pi/goals/goal_events.jsonl] DELTA:+7/-5
+7bc7bab 1 file(s) in .pi [.pi/goals/active_goal_2026062600592027_mqu5yuof-2x8oiu.md] DELTA:+5/-5
+--- remotes ---
+codeberg	git@codeberg.org:dracondev/avid.git (fetch)
+codeberg	git@codeberg.org:dracondev/avid.git (push)
+github	git@github.com:DraconDev/avid.git (fetch)
+github	git@github.com:DraconDev/avid.git (push)
+gitlab	git@gitlab.com:dracondev/avid.git (fetch)
+gitlab	git@gitlab.com:dracondev/avid.git (push)
+--- no per-repo .dracon-sync.toml ---
+
+============ /home/dracon/Dev/dracon-utilities ============
+## main...origin/main
+--- HEAD ---
+a42124c3cd793ee88d9067360f98a5efc06ae0dc
+--- @u ---
+origin/main
+--- last 5 ---
+a42124c3 2 file(s) in .pi [.pi/goals/{active_goal_2026062611123024_mqurve07-a8ux0g.md => archived/goal_2026062611220415_mqurve07-a8ux0g.md}, .pi/goals/goal_events.jsonl] DELTA:+7/-4
+36d9fe26 1 file(s) in .pi [.pi/goals/goal_events.jsonl] DELTA:+2/-0
+ed9df9d9 1 file(s) in .pi [.pi/goals/active_goal_2026062611123024_mqurve07-a8ux0g.md] DELTA:+5/-5
+fc2237b9 1 file(s) in .pi [.pi/goals/active_goal_2026062611123024_mqurve07-a8ux0g.md] DELTA:+5/-5
+87bf1927 1 file(s) in .pi [.pi/goals/active_goal_2026062611123024_mqurve07-a8ux0g.md] DELTA:+5/-5
+--- remotes ---
+codeberg	git@codeberg.org:dracondev/dracon-utilities.git (fetch)
+codeberg	git@codeberg.org:dracondev/dracon-utilities.git (push)
+github	git@github.com:DraconDev/dracon-utilities.git (fetch)
+github	git@github.com:DraconDev/dracon-utilities.git (push)
+gitlab	git@gitlab.com:dracondev/dracon-utilities.git (fetch)
+gitlab	git@gitlab.com:dracondev/dracon-utilities.git (push)
+origin	https://github.com/DraconDev/dracon-utilities (fetch)
+origin	https://github.com/DraconDev/dracon-utilities (push)
+--- no per-repo .dracon-sync.toml ---
+
+============ /home/dracon/Dev/browser-extensions-shared ============
+## main...github/main
+--- HEAD ---
+83649ea9cd84db5b1fd52c4e863d39d9a8680399
+--- @u ---
+github/main
+--- last 5 ---
+83649ea9c 1 file(s) in .pi [.pi/goals/active_goal_2026062518085260_mqtrazup-h59t5c.md] DELTA:+3/-3 | TOKENS:7324K TIME:339m
+7c250b487 1 file(s) in extensions [extensions/auto-form-filler/.pi/goals/active_goal_2026062401291123_mqrc5j9i-6p9ont.md] DELTA:+5/-5
+451aef10a 1 file(s) in extensions [extensions/auto-form-filler/.pi/goals/active_goal_2026062401291123_mqrc5j9i-6p9ont.md] DELTA:+5/-5
+a45e5e813 1 file(s) in extensions [extensions/auto-form-filler/.pi/goals/active_goal_2026062401291123_mqrc5j9i-6p9ont.md] DELTA:+5/-5
+ee5a03f09 2 file(s) in .pi,extensions [extensions/auto-form-filler/.pi/goals/active_goal_2026062401291123_mqrc5j9i-6p9ont.md, .pi/goals/active_goal_2026062518085260_mqtrazup-h59t5c.md] DELTA:+8/-8 | TOKENS:7324K TIME:335m
+--- remotes ---
+codeberg	git@codeberg.org:dracondev/browser-extensions-shared.git (fetch)
+codeberg	git@codeberg.org:dracondev/browser-extensions-shared.git (push)
+github	git@github.com:DraconDev/browser-extensions-shared.git (fetch)
+github	git@github.com:DraconDev/browser-extensions-shared.git (push)
+gitlab	git@gitlab.com:dracondev/browser-extensions-shared.git (fetch)
+gitlab	git@gitlab.com:dracondev/browser-extensions-shared.git (push)
+--- no per-repo .dracon-sync.toml ---
+
+============ /home/dracon/.dracon ============
+## main...github/main
+--- HEAD ---
+ab7e009b8491503113e4c0b0f926bc20018805c2
+--- @u ---
+github/main
+--- last 5 ---
+ab7e009b8 2 file(s) in sync-notify [sync-notify/sync-notify.sh, .gitignore] DELTA:+2/-1
+10c217513 1 file(s) in sync-notify [sync-notify/sync-notify.sh] DELTA:+51/-4
+38bba360c 1 file(s) in utilities [utilities/sync/dracon-sync.toml] DELTA:+16/-0
+cee4c71ba 2 file(s) [sync-status.json, .gitignore] DELTA:+1/-209 | DEL:sync-status.json
+29936bb33 1 file(s) [sync-status.json] DELTA:+29/-29
+--- remotes ---
+codeberg	git@codeberg.org:dracondev/dracon-home.git (fetch)
+codeberg	git@codeberg.org:dracondev/dracon-home.git (push)
+github	git@github.com:DraconDev/dracon-home.git (fetch)
+github	git@github.com:DraconDev/dracon-home.git (push)
+gitlab	git@gitlab.com:dracondev/dracon-home.git (fetch)
+gitlab	git@gitlab.com:dracondev/dracon-home.git (push)
+--- no per-repo .dracon-sync.toml ---
+
+============ /home/dracon/Dev/rust-ai-web-auto ============
+## main...github/main
+--- HEAD ---
+98d193829fd31de688a25508f78bc14cf14e5c3b
+--- @u ---
+github/main
+--- last 5 ---
+98d1938 1 file(s) [.gitignore] DELTA:+11/-0
+5af2589 2 file(s) in .pi [.pi/goals/{active_goal_2026062202213262_mqoj55uc-ed77ce.md => archived/goal_2026062202323682_mqoj55uc-ed77ce.md}, .pi/goals/goal_events.jsonl] DELTA:+8/-5 | GOAL:complete TIME:9m EVIDENCE:env-handling-audit:Audited src/env_keys.rs and src/main.|book-api-research:Compiled per-platform findings: KDP h|book-api-doc:Created docs/book-platform-apis.md wi+3more
+2607eb8 CLOSED: recipes-api-note, verify-complete | 5 file(s) in .pi,docs [.pi/goals/active_goal_2026062202213262_mqoj55uc-ed77ce.md, .pi/goals/goal_events.jsonl, docs/capabilities-and-limits.md] DELTA:+21/-10 | TIME:9m EVIDENCE:env-handling-audit:Audited src/env_keys.rs and src/main.|book-api-research:Compiled per-platform findings: KDP h|book-api-doc:Created docs/book-platform-apis.md wi+3more
+f159ef8 CLOSED: book-api-doc, api-keys-encryption | 5 file(s) in .pi,docs [docs/book-platform-apis.md, docs/API_KEYS.md, .pi/goals/active_goal_2026062202213262_mqoj55uc-ed77ce.md] DELTA:+116/-11 | NEW:docs/book-platform-apis.md TIME:8m EVIDENCE:env-handling-audit:Audited src/env_keys.rs and src/main.|book-api-research:Compiled per-platform findings: KDP h|book-api-doc:Created docs/book-platform-apis.md wi+1more
+23752ab CLOSED: env-handling-audit, book-api-research | 2 file(s) in .pi [.pi/goals/active_goal_2026062202213262_mqoj55uc-ed77ce.md, .pi/goals/goal_events.jsonl] DELTA:+65/-6 | TIME:7m EVIDENCE:env-handling-audit:Audited src/env_keys.rs and src/main.|book-api-research:Compiled per-platform findings: KDP h
+--- remotes ---
+codeberg	git@codeberg.org:dracondev/rust-ai-web-auto.git (fetch)
+codeberg	git@codeberg.org:dracondev/rust-ai-web-auto.git (push)
+github	git@github.com:DraconDev/rust-ai-web-auto.git (fetch)
+github	git@github.com:DraconDev/rust-ai-web-auto.git (push)
+gitlab	git@gitlab.com:dracondev/rust-ai-web-auto.git (fetch)
+gitlab	git@gitlab.com:dracondev/rust-ai-web-auto.git (push)
+--- no per-repo .dracon-sync.toml ---
+
+============ /home/dracon/Dev/ai-auto-writer ============
+## main...github/main
+--- HEAD ---
+6b724205badf92845fe31993bc65fb034c2af22c
+--- @u ---
+github/main
+--- last 5 ---
+6b724205 1 file(s) in .pi [.pi/goals/active_goal_2026062401305754_mqrc7tai-34mn6c.md] DELTA:+5/-5
+59357a01 2 file(s) in authors [authors/fiction/ryu-hunter/books/urban-fantasy-heist-with-dragons/chapters/_generating.meta.json, authors/fiction/ryu-hunter/books/urban-fantasy-heist-with-dragons/chapters/_generating.partial.md] DELTA:+3/-3
+cb8ff2d7 2 file(s) in authors [authors/fiction/ryu-hunter/books/urban-fantasy-heist-with-dragons/chapters/_generating.meta.json, authors/fiction/ryu-hunter/books/urban-fantasy-heist-with-dragons/chapters/_generating.partial.md] DELTA:+3/-3
+bba07321 2 file(s) in authors [authors/fiction/ryu-hunter/books/urban-fantasy-heist-with-dragons/chapters/_generating.meta.json, authors/fiction/ryu-hunter/books/urban-fantasy-heist-with-dragons/chapters/_generating.partial.md] DELTA:+3/-3
+34393166 2 file(s) in authors [authors/fiction/ryu-hunter/books/urban-fantasy-heist-with-dragons/chapters/_generating.meta.json, authors/fiction/ryu-hunter/books/urban-fantasy-heist-with-dragons/chapters/_generating.partial.md] DELTA:+3/-3
+--- remotes ---
+codeberg	git@codeberg.org:dracondev/ai-auto-writer.git (fetch)
+codeberg	git@codeberg.org:dracondev/ai-auto-writer.git (push)
+github	git@github.com:DraconDev/ai-auto-writer.git (fetch)
+github	git@github.com:DraconDev/ai-auto-writer.git (push)
+gitlab	git@gitlab.com:dracondev/ai-auto-writer.git (fetch)
+gitlab	git@gitlab.com:dracondev/ai-auto-writer.git (push)
+--- no per-repo .dracon-sync.toml ---
+
+============ /home/dracon/Dev/pi-plugins ============
+## main...origin/main
+--- HEAD ---
+54322a00ceb8c7cece9b5e3b5233cf022282af3a
+--- @u ---
+origin/main
+--- last 5 ---
+54322a0 Add pi-search-skill, pi-auto-review, pi-retry-on-error to collection
+985ee02 Initial commit: pi-plugins collection
+--- remotes ---
+origin	https://github.com/DraconDev/pi-plugins (fetch)
+origin	https://github.com/DraconDev/pi-plugins (push)
+--- no per-repo .dracon-sync.toml ---
+
+============ /home/dracon/Dev/dracon-utilities/dracon-sync ============
+## HEAD (no branch)
+--- HEAD ---
+b170dbb85bab9a8bcc1c3a4bf0a5c35889ad4407
+--- @u ---
+fatal: HEAD does not point to a branch
+(no upstream)
+--- last 5 ---
+b170dbb 1 file(s) in src [src/sync.rs] DELTA:+6/-0
+26b82fd 2 file(s) in src [src/git/multi_remote.rs, src/policy.rs] DELTA:+122/-0
+a336213 2 file(s) in src [src/report.rs, src/daemon.rs] DELTA:+33/-1
+ef85ad3 3 file(s) in src [src/git/multi_remote.rs, src/policy.rs, src/git/mod.rs] DELTA:+65/-12
+cc9aea6 1 file(s) [Cargo.lock] DELTA:+1/-1 | TAG:v0.112.14
+--- remotes ---
+codeberg	git@codeberg.org:dracondev/dracon-sync-background-auto-commit-multi-remote.git (fetch)
+codeberg	git@codeberg.org:dracondev/dracon-sync-background-auto-commit-multi-remote.git (push)
+github	git@github.com:DraconDev/dracon-sync-background-auto-commit-multi-remote.git (fetch)
+github	git@github.com:DraconDev/dracon-sync-background-auto-commit-multi-remote.git (push)
+gitlab	git@gitlab.com:dracondev/dracon-sync-background-auto-commit-multi-remote.git (fetch)
+gitlab	git@gitlab.com:dracondev/dracon-sync-background-auto-commit-multi-remote.git (push)
+origin	git@github.com:DraconDev/dracon-sync-background-auto-commit-multi-remote.git (fetch)
+origin	git@github.com:DraconDev/dracon-sync-background-auto-commit-multi-remote.git (push)
+--- no per-repo .dracon-sync.toml ---
+
+============ /home/dracon/Dev/dracon-code ============
+## main...github/main
+--- HEAD ---
+8a4b8abed3976694f259e890f8572b4b434ff88b
+--- @u ---
+github/main
+--- last 5 ---
+8a4b8abed 2 file(s) in .pi [.pi/goals/{active_goal_2026062202223018_mqoj6e98-y4s4wk.md => archived/goal_2026062202292934_mqoj6e98-y4s4wk.md}, .pi/goals/goal_events.jsonl] DELTA:+7/-4 | GOAL:complete TOKENS:122K TIME:2m
+605831a0e 2 file(s) in .pi [.pi/goals/active_goal_2026062202223018_mqoj6e98-y4s4wk.md, .pi/goals/goal_events.jsonl] DELTA:+7/-5 | TOKENS:122K TIME:2m
+314974306 2 file(s) in .pi,docs [.pi/goals/active_goal_2026062202223018_mqoj6e98-y4s4wk.md, docs/README.md] DELTA:+6/-5 | TOKENS:121K TIME:2m
+e2c5f2fb6 2 file(s) in .pi,docs [docs/HOW-CLOSE-TO-MAIN-2026-06-21.md, .pi/goals/active_goal_2026062202223018_mqoj6e98-y4s4wk.md] DELTA:+110/-5 | NEW:docs/HOW-CLOSE-TO-MAIN-2026-06-21.md TOKENS:108K TIME:1m
+bd0957702 2 file(s) in .pi [.pi/goals/active_goal_2026062202223018_mqoj6e98-y4s4wk.md, .pi/goals/goal_events.jsonl] DELTA:+28/-0 | NEW:goals/active_goal_2026062202223018_mqoj6e98-y4s4wk.md TOKENS:102K
+--- remotes ---
+codeberg	git@codeberg.org:dracondev/dracon-code.git (fetch)
+codeberg	git@codeberg.org:dracondev/dracon-code.git (push)
+github	git@github.com:DraconDev/dracon-code.git (fetch)
+github	git@github.com:DraconDev/dracon-code.git (push)
+gitlab	git@gitlab.com:dracondev/dracon-code.git (fetch)
+gitlab	git@gitlab.com:dracondev/dracon-code.git (push)
+--- no per-repo .dracon-sync.toml ---
+
+============ /home/dracon/Dev/dracon-strategy ============
+## main...github/main
+--- HEAD ---
+ffa3bc24b615e068690d433640aa8a2c7bf2d8c3
+--- @u ---
+github/main
+--- last 5 ---
+ffa3bc2 Drop DraconDev ignore (now tracked)
+9ba0923 Include DraconDev as nested folder with own repo
+104ef3e Remove DraconDev submodule metadata
+014fe50 Replace DraconDev git submodule with nested repo
+6f989ee Refresh full audit report after push
+--- remotes ---
+codeberg	git@codeberg.org:dracondev/dracon-strategy.git (fetch)
+codeberg	git@codeberg.org:dracondev/dracon-strategy.git (push)
+github	git@github.com:DraconDev/dracon-strategy.git (fetch)
+github	git@github.com:DraconDev/dracon-strategy.git (push)
+gitlab	git@gitlab.com:dracondev/dracon-strategy.git (fetch)
+gitlab	git@gitlab.com:dracondev/dracon-strategy.git (push)
+--- no per-repo .dracon-sync.toml ---
+
+============ /home/dracon/Dev/dracon-strategy/DraconDev ============
+## main...origin/main
+--- HEAD ---
+f1e2b3783f946b334dab3765cbc13e43eacfd64d
+--- @u ---
+origin/main
+--- last 5 ---
+f1e2b37 Update cleanup report audit counts
+17093ac Update cleanup report counts for current profile surface
+781b809 Add clean README draft baseline
+ff11364 1 file(s) [CLEANUP_REPORT.md] DELTA:+2/-2
+5e965ee 1 file(s) [CLEANUP_REPORT.md] DELTA:+1/-1
+--- remotes ---
+origin	git@github.com:DraconDev/DraconDev.git (fetch)
+origin	git@github.com:DraconDev/DraconDev.git (push)
+--- no per-repo .dracon-sync.toml ---
+
+============ /home/dracon/Dev/dracon-utilities/dracon-warden ============
+## main...origin/main
+--- HEAD ---
+5d1c9ec0cce7fceef2166b03a1e2656737b148e7
+--- @u ---
+origin/main
+--- last 5 ---
+5d1c9ec 1 file(s) in src [src/main.rs] DELTA:+1/-0
+c8d9703 1 file(s) [.gitignore] DELTA:+2/-0
+d5cb879 fix: switch path-deps to crates.io versions for standalone repo
+09ea2cc docs: add per-repo CHANGELOG.md
+ccf9abb feat: add scripts/release.sh for standalone repo release flow
+--- remotes ---
+origin	https://github.com/DraconDev/dracon-warden-secret-encrypt-age-git-filter.git (fetch)
+origin	https://github.com/DraconDev/dracon-warden-secret-encrypt-age-git-filter.git (push)
+--- no per-repo .dracon-sync.toml ---
+
+============ /home/dracon/Dev/dracon-utilities/dracon-system ============
+## main...origin/main
+--- HEAD ---
+82da3966e9a61a15c0a7c8cd4583231890c47a92
+--- @u ---
+origin/main
+--- last 5 ---
+82da396 fix: switch path-deps to crates.io versions for standalone repo
+8800831 docs: add per-repo CHANGELOG.md
+61c6361 feat: add scripts/release.sh for standalone repo release flow
+fb405e4 docs: refresh façade from monorepo
+06a2021 20 file(s) in .github,docs,src [src/main.rs, src/tests.rs, src/policy.rs] DELTA:+6881/-58 | TEST:1032 NEW:.github/FUNDING.yml,BLUEPRINT.md,Cargo.toml,dracon-system-guard.service,dracon-system.example.toml,monorepo-README.md,src/doctor.rs,src/events.rs,src/events_tests.rs,src/guard_tests.rs+8more DEPS:+name,+version,+edition,+license,+description+16more
+--- remotes ---
+origin	https://github.com/DraconDev/dracon-system-disk-process-guard-doctor.git (fetch)
+origin	https://github.com/DraconDev/dracon-system-disk-process-guard-doctor.git (push)
+--- no per-repo .dracon-sync.toml ---
