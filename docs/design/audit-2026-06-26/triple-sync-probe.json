@@ -1,1 +1,393 @@
-{}
+{
+  "cli_auth": {
+    "gh": {
+      "account": "DraconDev",
+      "authenticated": true,
+      "protocol": "https",
+      "scopes": "gist, read:org, repo, workflow"
+    },
+    "glab": {
+      "authenticated": false,
+      "error": "no token, 401 on API. SSH configured for git operations."
+    }
+  },
+  "codeberg": {
+    ".dracon": {
+      "error": "404 Not Found",
+      "exists": false,
+      "forge_name": "dracon-home"
+    },
+    "DraconDev": {
+      "default_branch": "main",
+      "description": "",
+      "exists": true,
+      "forge_name": "DraconDev",
+      "is_private": false,
+      "ssh_url": "ssh://git@codeberg.org/dracondev/DraconDev.git",
+      "url": "https://codeberg.org/dracondev/DraconDev",
+      "visibility": null
+    },
+    "ai-auto-writer": {
+      "error": "404 Not Found",
+      "exists": false,
+      "forge_name": "ai-auto-writer"
+    },
+    "avid": {
+      "error": "404 Not Found",
+      "exists": false,
+      "forge_name": "avid"
+    },
+    "browser-extensions-shared": {
+      "error": "404 Not Found",
+      "exists": false,
+      "forge_name": "browser-extensions-shared"
+    },
+    "dracon-code": {
+      "error": "404 Not Found",
+      "exists": false,
+      "forge_name": "dracon-code"
+    },
+    "dracon-platform": {
+      "error": "404 Not Found",
+      "exists": false,
+      "forge_name": "dracon-platform"
+    },
+    "dracon-strategy": {
+      "error": "404 Not Found",
+      "exists": false,
+      "forge_name": "dracon-strategy"
+    },
+    "dracon-sync": {
+      "default_branch": "main",
+      "description": "Background auto-commit multi-remote \u2014 invisible git sync for developer workspaces.",
+      "exists": true,
+      "forge_name": "dracon-sync-background-auto-commit-multi-remote",
+      "is_private": false,
+      "ssh_url": "ssh://git@codeberg.org/dracondev/dracon-sync-background-auto-commit-multi-remote.git",
+      "url": "https://codeberg.org/dracondev/dracon-sync-background-auto-commit-multi-remote",
+      "visibility": null
+    },
+    "dracon-system": {
+      "default_branch": "main",
+      "description": "Disk, process, guard, doctor \u2014 local machine diagnostics and watchdog for Dracon workspaces.",
+      "exists": true,
+      "forge_name": "dracon-system-disk-process-guard-doctor",
+      "is_private": false,
+      "ssh_url": "ssh://git@codeberg.org/dracondev/dracon-system-disk-process-guard-doctor.git",
+      "url": "https://codeberg.org/dracondev/dracon-system-disk-process-guard-doctor",
+      "visibility": null
+    },
+    "dracon-utilities": {
+      "default_branch": "main",
+      "description": "Invisible infrastructure for Dracon developer workspaces: git sync, system guard, and warden encryption utilities.",
+      "exists": true,
+      "forge_name": "dracon-utilities",
+      "is_private": false,
+      "ssh_url": "ssh://git@codeberg.org/dracondev/dracon-utilities.git",
+      "url": "https://codeberg.org/dracondev/dracon-utilities",
+      "visibility": null
+    },
+    "dracon-warden": {
+      "default_branch": "main",
+      "description": "Secret, encrypt, age, git-filter \u2014 repository hardening and smudge/clean encryption for Dracon workspaces.",
+      "exists": true,
+      "forge_name": "dracon-warden-secret-encrypt-age-git-filter",
+      "is_private": false,
+      "ssh_url": "ssh://git@codeberg.org/dracondev/dracon-warden-secret-encrypt-age-git-filter.git",
+      "url": "https://codeberg.org/dracondev/dracon-warden-secret-encrypt-age-git-filter",
+      "visibility": null
+    },
+    "pi-plugins": {
+      "default_branch": "main",
+      "description": "",
+      "exists": true,
+      "forge_name": "pi-plugins",
+      "is_private": false,
+      "ssh_url": "ssh://git@codeberg.org/dracondev/pi-plugins.git",
+      "url": "https://codeberg.org/dracondev/pi-plugins",
+      "visibility": null
+    },
+    "pully-fully-pull-based-fleet-reconciler": {
+      "error": "404 Not Found",
+      "exists": false,
+      "forge_name": "pully-fully-pull-based-fleet-reconciler"
+    },
+    "rust-ai-web-auto": {
+      "error": "404 Not Found",
+      "exists": false,
+      "forge_name": "rust-ai-web-auto"
+    }
+  },
+  "github": {
+    ".dracon": {
+      "default_branch": "main",
+      "description": "",
+      "exists": true,
+      "forge_name": "dracon-home",
+      "is_private": true,
+      "ssh_url": "git@github.com:DraconDev/dracon-home.git",
+      "url": "https://github.com/DraconDev/dracon-home",
+      "visibility": "PRIVATE"
+    },
+    "DraconDev": {
+      "default_branch": "main",
+      "description": "Public showcase of the Dracon ecosystem.",
+      "exists": true,
+      "forge_name": "DraconDev",
+      "is_private": false,
+      "ssh_url": "git@github.com:DraconDev/DraconDev.git",
+      "url": "https://github.com/DraconDev/DraconDev",
+      "visibility": "PUBLIC"
+    },
+    "ai-auto-writer": {
+      "default_branch": "main",
+      "description": "AI-powered book generation with pluggable storage.",
+      "exists": true,
+      "forge_name": "ai-auto-writer",
+      "is_private": true,
+      "ssh_url": "git@github.com:DraconDev/ai-auto-writer.git",
+      "url": "https://github.com/DraconDev/ai-auto-writer",
+      "visibility": "PRIVATE"
+    },
+    "avid": {
+      "default_branch": "main",
+      "description": "",
+      "exists": true,
+      "forge_name": "avid",
+      "is_private": true,
+      "ssh_url": "git@github.com:DraconDev/avid.git",
+      "url": "https://github.com/DraconDev/avid",
+      "visibility": "PRIVATE"
+    },
+    "browser-extensions-shared": {
+      "default_branch": "main",
+      "description": "Monorepo of Chrome extensions built with WXT, React, TypeScript.",
+      "exists": true,
+      "forge_name": "browser-extensions-shared",
+      "is_private": true,
+      "ssh_url": "git@github.com:DraconDev/browser-extensions-shared.git",
+      "url": "https://github.com/DraconDev/browser-extensions-shared",
+      "visibility": "PRIVATE"
+    },
+    "dracon-code": {
+      "default_branch": "main",
+      "description": "Autonomous engineering runtime with dark GUI and CLI. Blueprint-first execution, fleet management, gate verification.",
+      "exists": true,
+      "forge_name": "dracon-code",
+      "is_private": true,
+      "ssh_url": "git@github.com:DraconDev/dracon-code.git",
+      "url": "https://github.com/DraconDev/dracon-code",
+      "visibility": "PRIVATE"
+    },
+    "dracon-platform": {
+      "default_branch": "main",
+      "description": "Public surfaces for the Dracon platform. Web apps, AI API gateway, dashboard.",
+      "exists": true,
+      "forge_name": "dracon-platform",
+      "is_private": true,
+      "ssh_url": "git@github.com:DraconDev/dracon-platform.git",
+      "url": "https://github.com/DraconDev/dracon-platform",
+      "visibility": "PRIVATE"
+    },
+    "dracon-strategy": {
+      "default_branch": "main",
+      "description": "",
+      "exists": true,
+      "forge_name": "dracon-strategy",
+      "is_private": true,
+      "ssh_url": "git@github.com:DraconDev/dracon-strategy.git",
+      "url": "https://github.com/DraconDev/dracon-strategy",
+      "visibility": "PRIVATE"
+    },
+    "dracon-sync": {
+      "default_branch": "main",
+      "description": "Background, auto-commit, multi-remote \u2014 invisible git sync for developer workspaces.",
+      "exists": true,
+      "forge_name": "dracon-sync-background-auto-commit-multi-remote",
+      "is_private": false,
+      "ssh_url": "git@github.com:DraconDev/dracon-sync-background-auto-commit-multi-remote.git",
+      "url": "https://github.com/DraconDev/dracon-sync-background-auto-commit-multi-remote",
+      "visibility": "PUBLIC"
+    },
+    "dracon-system": {
+      "default_branch": "main",
+      "description": "Disk, process, guard, doctor \u2014 local machine diagnostics and watchdog for Dracon workspaces.",
+      "exists": true,
+      "forge_name": "dracon-system-disk-process-guard-doctor",
+      "is_private": false,
+      "ssh_url": "git@github.com:DraconDev/dracon-system-disk-process-guard-doctor.git",
+      "url": "https://github.com/DraconDev/dracon-system-disk-process-guard-doctor",
+      "visibility": "PUBLIC"
+    },
+    "dracon-utilities": {
+      "default_branch": "main",
+      "description": "Invisible infrastructure for Dracon developer workspaces: git sync, system guard, and warden encryption utilities.",
+      "exists": true,
+      "forge_name": "dracon-utilities",
+      "is_private": false,
+      "ssh_url": "git@github.com:DraconDev/dracon-utilities.git",
+      "url": "https://github.com/DraconDev/dracon-utilities",
+      "visibility": "PUBLIC"
+    },
+    "dracon-warden": {
+      "default_branch": "main",
+      "description": "Secret, encrypt, age, git-filter \u2014 repository hardening and smudge/clean encryption for Dracon workspaces.",
+      "exists": true,
+      "forge_name": "dracon-warden-secret-encrypt-age-git-filter",
+      "is_private": false,
+      "ssh_url": "git@github.com:DraconDev/dracon-warden-secret-encrypt-age-git-filter.git",
+      "url": "https://github.com/DraconDev/dracon-warden-secret-encrypt-age-git-filter",
+      "visibility": "PUBLIC"
+    },
+    "pi-plugins": {
+      "default_branch": "main",
+      "description": "",
+      "exists": true,
+      "forge_name": "pi-plugins",
+      "is_private": false,
+      "ssh_url": "git@github.com:DraconDev/pi-plugins.git",
+      "url": "https://github.com/DraconDev/pi-plugins",
+      "visibility": "PUBLIC"
+    },
+    "pully-fully-pull-based-fleet-reconciler": {
+      "default_branch": "main",
+      "description": "Pull-based server fleet reconciler. Write desired state in git; Pully enforces it continuously without a central control plane. Fully is optional. Built for 5-100 VPSes where Kubernetes is overkill.",
+      "exists": true,
+      "forge_name": "pully-fully-pull-based-fleet-reconciler",
+      "is_private": true,
+      "ssh_url": "git@github.com:DraconDev/pully-fully-pull-based-fleet-reconciler.git",
+      "url": "https://github.com/DraconDev/pully-fully-pull-based-fleet-reconciler",
+      "visibility": "PRIVATE"
+    },
+    "rust-ai-web-auto": {
+      "default_branch": "main",
+      "description": "",
+      "exists": true,
+      "forge_name": "rust-ai-web-auto",
+      "is_private": true,
+      "ssh_url": "git@github.com:DraconDev/rust-ai-web-auto.git",
+      "url": "https://github.com/DraconDev/rust-ai-web-auto",
+      "visibility": "PRIVATE"
+    }
+  },
+  "gitlab": {
+    ".dracon": {
+      "error": "404 Not Found",
+      "exists": false,
+      "forge_name": "dracon-home"
+    },
+    "DraconDev": {
+      "default_branch": "master",
+      "description": "Public showcase of the Dracon ecosystem.",
+      "exists": true,
+      "forge_name": "DraconDev",
+      "is_private": false,
+      "ssh_url": "git@gitlab.com:DraconDev/DraconDev.git",
+      "url": "https://gitlab.com/DraconDev/DraconDev",
+      "visibility": "public"
+    },
+    "ai-auto-writer": {
+      "error": "404 Not Found",
+      "exists": false,
+      "forge_name": "ai-auto-writer"
+    },
+    "avid": {
+      "error": "404 Not Found",
+      "exists": false,
+      "forge_name": "avid"
+    },
+    "browser-extensions-shared": {
+      "error": "404 Not Found",
+      "exists": false,
+      "forge_name": "browser-extensions-shared"
+    },
+    "dracon-code": {
+      "error": "404 Not Found",
+      "exists": false,
+      "forge_name": "dracon-code"
+    },
+    "dracon-platform": {
+      "error": "404 Not Found",
+      "exists": false,
+      "forge_name": "dracon-platform"
+    },
+    "dracon-strategy": {
+      "error": "404 Not Found",
+      "exists": false,
+      "forge_name": "dracon-strategy"
+    },
+    "dracon-sync": {
+      "default_branch": "main",
+      "description": "Background auto-commit multi-remote \u2014 invisible git sync for developer workspaces.",
+      "exists": true,
+      "forge_name": "dracon-sync-background-auto-commit-multi-remote",
+      "is_private": false,
+      "ssh_url": "git@gitlab.com:DraconDev/dracon-sync-background-auto-commit-multi-remote.git",
+      "url": "https://gitlab.com/DraconDev/dracon-sync-background-auto-commit-multi-remote",
+      "visibility": "public"
+    },
+    "dracon-system": {
+      "default_branch": "main",
+      "description": "Disk, process, guard, doctor \u2014 local machine diagnostics and watchdog for Dracon workspaces.",
+      "exists": true,
+      "forge_name": "dracon-system-disk-process-guard-doctor",
+      "is_private": false,
+      "ssh_url": "git@gitlab.com:DraconDev/dracon-system-disk-process-guard-doctor.git",
+      "url": "https://gitlab.com/DraconDev/dracon-system-disk-process-guard-doctor",
+      "visibility": "public"
+    },
+    "dracon-utilities": {
+      "default_branch": "main",
+      "description": "Invisible infrastructure for Dracon developer workspaces: git sync, system guard, and warden encryption utilities.",
+      "exists": true,
+      "forge_name": "dracon-utilities",
+      "is_private": false,
+      "ssh_url": "git@gitlab.com:DraconDev/dracon-utilities.git",
+      "url": "https://gitlab.com/DraconDev/dracon-utilities",
+      "visibility": "public"
+    },
+    "dracon-warden": {
+      "default_branch": "main",
+      "description": "Secret, encrypt, age, git-filter \u2014 repository hardening and smudge/clean encryption for Dracon workspaces.",
+      "exists": true,
+      "forge_name": "dracon-warden-secret-encrypt-age-git-filter",
+      "is_private": false,
+      "ssh_url": "git@gitlab.com:DraconDev/dracon-warden-secret-encrypt-age-git-filter.git",
+      "url": "https://gitlab.com/DraconDev/dracon-warden-secret-encrypt-age-git-filter",
+      "visibility": "public"
+    },
+    "pi-plugins": {
+      "error": "404 Not Found",
+      "exists": false,
+      "forge_name": "pi-plugins"
+    },
+    "pully-fully-pull-based-fleet-reconciler": {
+      "error": "404 Not Found",
+      "exists": false,
+      "forge_name": "pully-fully-pull-based-fleet-reconciler"
+    },
+    "rust-ai-web-auto": {
+      "error": "404 Not Found",
+      "exists": false,
+      "forge_name": "rust-ai-web-auto"
+    }
+  },
+  "probed_at": "2026-06-26",
+  "ssh_auth": {
+    "codeberg.org": {
+      "exit": 0,
+      "note": "Hi there, dracondev! ... Forgejo does not provide shell access.",
+      "verdict": "authenticated"
+    },
+    "github.com": {
+      "exit": 1,
+      "note": "Hi DraconDev! ... GitHub does not provide shell access. (exit=1 is normal)",
+      "verdict": "authenticated"
+    },
+    "gitlab.com": {
+      "exit": 0,
+      "note": "Welcome to GitLab, @DraconDev!",
+      "verdict": "authenticated"
+    }
+  }
+}
