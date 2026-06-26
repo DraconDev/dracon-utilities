@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 135191,
-    "activeSeconds": 24
+    "tokensUsed": 137734,
+    "activeSeconds": 43
   },
   "sisyphus": false,
   "createdAt": "2026-06-26T23:29:02.604Z",
-  "updatedAt": "2026-06-26T23:29:29.795Z",
+  "updatedAt": "2026-06-26T23:29:50.462Z",
   "activePath": ".pi/goals/active_goal_2026062700290260_mqvkbqto-fcf86v.md",
   "taskList": {
     "tasks": [
@@ -123,8 +123,8 @@ If blocked: Stop and ask the user. Specifically: if any forge API is unreachable
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 24s
-- Tokens used: 135K (135,191) tokens
+- Time spent: 43s
+- Tokens used: 138K (137,734) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
