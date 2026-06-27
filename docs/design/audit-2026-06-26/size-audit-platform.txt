@@ -1,0 +1,62 @@
+=== top-level ===
+115G	.
+=== major subdirs ===
+83G  target
+14G  web
+11G  web/games
+2.3G  web/music
+9.1M  web/ai-hub
+38M  web/packages
+1.5M  web/tests
+34M  web/screenshots
+15M  web/docs
+8.0M  apis
+144K  scripts
+76K  docs
+=== top 20 by size (depth 2) ===
+115G	.
+83G	./target
+82G	./target/debug
+20G	./.git/objects
+20G	./.git
+14G	./web
+11G	./web/games
+2.3G	./web/music
+1.1G	./web/node_modules
+1.1G	./target/release
+64M	./target/dev-stack
+38M	./web/packages
+36M	./target/aarch64-unknown-linux-gnu
+34M	./web/screenshots
+16M	./.git/logs
+15M	./web/docs
+9.1M	./web/ai-hub
+8.0M	./apis
+7.3M	./web/dashboard
+7.0M	./.git/lost-found
+4.0M	./web/home
+=== git count-objects -vH ===
+warning: garbage found: .git/objects/06/tmp_obj_oMNMkH
+warning: garbage found: .git/objects/48/tmp_obj_dmxLiM
+warning: garbage found: .git/objects/49/tmp_obj_YJdax3
+warning: garbage found: .git/objects/4e/tmp_obj_8deUQJ
+warning: garbage found: .git/objects/51/tmp_obj_wOwCXR
+warning: garbage found: .git/objects/5e/tmp_obj_9HmEIV
+warning: garbage found: .git/objects/64/tmp_obj_KmxHJq
+warning: garbage found: .git/objects/6a/tmp_obj_lwodfN
+warning: garbage found: .git/objects/6d/tmp_obj_XFV8Um
+warning: garbage found: .git/objects/7b/tmp_obj_yVtpy9
+warning: garbage found: .git/objects/85/tmp_obj_vqpgaJ
+warning: garbage found: .git/objects/8e/tmp_obj_lXnMj7
+warning: garbage found: .git/objects/96/tmp_obj_CfIUyW
+warning: garbage found: .git/objects/9b/tmp_obj_IzlXvB
+warning: garbage found: .git/objects/dc/tmp_obj_pqcuGl
+warning: garbage found: .git/objects/f5/tmp_obj_OupxMC
+count: 10129
+size: 6.40 GiB
+in-pack: 371140
+packs: 31
+size-pack: 12.57 GiB
+prune-packable: 0
+garbage: 16
+size-garbage: 26.61 MiB
