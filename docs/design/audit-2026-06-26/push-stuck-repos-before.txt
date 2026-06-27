@@ -1,5 +1,5 @@
 📜 /home/dracon/.dracon/utilities/sync/dracon-sync.toml
-📦 15 repos  ✅ OK 14  ⚠️  WARN 0  ❌ CONCERN 1  ⛔ init/status failed: 0
+📦 15 repos  ✅ OK 13  ⚠️  WARN 1  ❌ CONCERN 1  ⛔ init/status failed: 0
 
 ℹ️  Legend (one line per category):
     MOD/STG/UT = modified/staged/untracked file counts
@@ -12,29 +12,30 @@
     DAEMON     = last action timestamp + name (e.g. '23s sync_commit')
 
 [0m[1][0m [31m❌ CONCERN[0m  dracon-platform[0m  [2m19.1 GiB[0m
-    [36mmain-temp[0m  ·  [32mcodeberg[0m  ·  [33m1243↑[0m  [31m1↓[0m  ·  [0mPUSH_STUCK[0m
+    [36mmain-temp[0m  ·  [32mcodeberg[0m  ·  [33m1254↑[0m  [31m1↓[0m  ·  [0mPUSH_STUCK[0m
     PUSH-TO  🟢codeberg [0m    [2m(excluded: 🚫 github [0m  🚫 gitlab [0m[2m)[0m
     TOKENS   🟢 codeberg  🟢 github  🟢 gitlab
-    Last  dde83e64948… "2 file(s) in web [web/games/wip/hellhun…"  ·  27s by dracon
-    [31mHint  🛑 push-stuck (127 failures): git push returned non-zero (see daemo…[0m
+    Last  f2bf55aecef… "2 file(s) in web [web/games/wip/hellhun…"  ·  8s by dracon
+    [31mHint  🛑 push-stuck (136 failures): git push returned non-zero (see daemo…[0m
 
-[0m[2][0m [32m✅ OK     [0m  browser-extensions-shared[0m  [2m526.7 MiB[0m
-    [36mmain[0m  ·  [32mgithub[0m  ·  [0m0↑[0m  [0m0↓[0m  ·  [32mOK[0m
-    PUSH-TO  🐙github [0m  🦊gitlab [0m  🟢codeberg [0m
-    TOKENS   🟢 codeberg  🟢 github  🟢 gitlab
-    Last  7ac1447c5bf… "4 file(s) in packages,wxt-starter [wxt-…"  ·  1m 14s by DraconDev
-
-[0m[3][0m [32m✅ OK     [0m  dracon-sync[0m  [2m1.4 MiB[0m
-    [36mHEAD[0m  ·  [32morigin[0m  ·  [0m0↑[0m  [0m0↓[0m  ·  [32mOK[0m
-    PUSH-TO  🐙github [0m  🦊gitlab [0m  🟢codeberg [0m
-    TOKENS   🟢 codeberg  🟢 github  🟢 gitlab
-    Last  14a19d3c63b… "1 file(s) in src [src/report.rs] DELTA:…"  ·  1h 3m by DraconDev
-
-[0m[4][0m [32m✅ OK     [0m  dracon-utilities[0m  [2m32.9 MiB[0m
+[0m[2][0m [33m⚠️  WARN  [0m  dracon-utilities[0m  [2m32.9 MiB[0m
     [36mmain[0m  ·  [32morigin[0m  ·  [0m0↑[0m  [0m0↓[0m  ·  [32mOK[0m
     PUSH-TO  🐙github [0m  🦊gitlab [0m  🟢codeberg [0m
     TOKENS   🟢 codeberg  🟢 github  🟢 gitlab
-    Last  97c63799ffa… "1 file(s) in docs [docs/design/repo-rem…"  ·  1h 6m by DraconDev
+    Last  6849d669f0c… "1 file(s) in docs [docs/design/push-stu…"  ·  3m by DraconDev
+    [33mHint  daemon handles after changes settle; run sync-now --warns to force now[0m
+
+[0m[3][0m [32m✅ OK     [0m  browser-extensions-shared[0m  [2m526.7 MiB[0m
+    [36mmain[0m  ·  [32mgithub[0m  ·  [0m0↑[0m  [0m0↓[0m  ·  [32mOK[0m
+    PUSH-TO  🐙github [0m  🦊gitlab [0m  🟢codeberg [0m
+    TOKENS   🟢 codeberg  🟢 github  🟢 gitlab
+    Last  7ac1447c5bf… "4 file(s) in packages,wxt-starter [wxt-…"  ·  7m by DraconDev
+
+[0m[4][0m [32m✅ OK     [0m  dracon-sync[0m  [2m1.4 MiB[0m
+    [36mHEAD[0m  ·  [32morigin[0m  ·  [0m0↑[0m  [0m0↓[0m  ·  [32mOK[0m
+    PUSH-TO  🐙github [0m  🦊gitlab [0m  🟢codeberg [0m
+    TOKENS   🟢 codeberg  🟢 github  🟢 gitlab
+    Last  14a19d3c63b… "1 file(s) in src [src/report.rs] DELTA:…"  ·  1h 8m by DraconDev
 
 [0m[5][0m [32m✅ OK     [0m  avid[0m  [2m32.1 MiB[0m
     [36mmain[0m  ·  [32mgithub[0m  ·  [0m0↑[0m  [0m0↓[0m  ·  [32mOK[0m
