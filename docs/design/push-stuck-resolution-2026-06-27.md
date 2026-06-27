@@ -14,6 +14,9 @@
 - `push-stuck-divergence-evidence.txt` (5,435 bytes) — full divergence investigation output
 - `push-stuck-repos-before.txt` (6,451 bytes) — `dracon-sync repos` capture BEFORE resolution
 - `push-stuck-repos-after.txt` (TBD, post-resolution) — `dracon-sync repos` capture AFTER resolution
+- `push-stuck-mergetree-conflicts.txt` (4,394 bytes) — authoritative conflict list from read-only `git merge-tree --write-tree` (16 total conflicts)
+- `push-stuck-manual-conflicts.txt` (5,933 bytes) — detailed manual conflict analysis (Map2D.svelte = RESOLVED by prior local revert, cookbook.json = trivial, proceduralSprites.ts = auto-merged)
+- `push-stuck-v11-revert-evidence.txt` (5,010 bytes) — **decisive evidence that the local side already evaluated and rejected v11 in commit `135aab9af8`** (2026-06-27 01:53:16)
 
 ---
 
@@ -95,14 +98,19 @@
 
   - **13 mechanical conflicts** (5 archived goal files, 1 rename/rename, 8 binary PNGs): all can be resolved by taking "ours" (local HEAD) — these are auto-generated state files or binary tiles where "ours" is the newer version
   - **1 trivial manual conflict** (`cookbook.json`): different content additions at different line ranges + an `updatedAt` timestamp. Take local's `updatedAt`, keep both sets of additions. Estimated 1-2 minutes.
-  - **1 REAL design conflict** (`Map2D.svelte`): fundamental v10-vs-v11 tile set disagreement. Local reverted v11 because "v11 was just diagonal stripes — stripey void on the adventure map. v10 is the painted set the user wants." Codeberg has v11 seamless + 3-variant harmonic. **Requires human judgment on which tile approach is correct.**
+  - **1 RESOLVED design conflict** (`Map2D.svelte`): **The local side has ALREADY decided this.** Commit `135aab9af8` (2026-06-27 01:53:16) explicitly reverted Map2D.svelte from v11 back to v10, with the comment "v11 was just diagonal stripes — stripey void on the adventure map. v10 is the painted set the user wants." This revert happened 4h 35m after the divergent codeberg commit (2026-06-26 21:17:34). **Resolution: take "ours" (local v10).** No new design decision needed — it was already made locally. See `audit-2026-06-26/push-stuck-v11-revert-evidence.txt` for the full timeline.
   - **1 actually auto-merged** (`proceduralSprites.ts`): initial classification was wrong; both sides made identical changes to the mixHex helper and streak rendering. Local's additional gradient block change is a "one-side-changed" case that git resolves cleanly. No action needed.
 
 **AGENTS.md implications**: ✅ NO force-push needed. The local becomes a descendant of codeberg, so a subsequent `git push` is a normal fast-forward.
 
 **Recovery procedure if it goes wrong**: `git rebase --abort` returns to the pre-rebase state. The reflog preserves the old SHAs.
 
-**Estimated effort**: 5-10 minutes for the mechanical + trivial conflicts. The Map2D.svelte design decision is the actual time sink — the operator (or developer) needs to decide between v10 painted and v11 seamless. The decision itself can be made in seconds if the operator knows which approach they want, but if a screenshot comparison is needed to verify "v11 is stripey void" vs "v10 is painted" then add 10-30 minutes for visual verification.
+**Estimated effort**: ~5 minutes total — all conflicts are mechanical:
+  - 13 mechanical "take ours" conflicts: 2 min
+  - 1 trivial manual conflict (cookbook.json): 1-2 min
+  - 1 RESOLVED design conflict (Map2D.svelte): take ours (v10), the design decision was already made locally in commit 135aab9af8. 0 min
+  - 1 auto-merged (proceduralSprites.ts): 0 min
+  - The rebase ITSELF takes a few seconds once the conflicts are resolved. Stash + restore adds 1-2 min.
 
 **Approval text needed**: `rebase`
 

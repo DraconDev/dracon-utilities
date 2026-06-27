@@ -1,0 +1,115 @@
+PUSH_STUCK v10 vs v11 design decision — definitive evidence
+=============================================================
+Run: 2026-06-27
+Purpose: determine which tile set (v10 or v11) is the operator's
+         preferred approach for the Map2D.svelte conflict.
+
+Timeline (chronological)
+=========================
+
+2026-06-26 21:17:34  +0100  commit 6a7cf69324 (CODEBERG divergent)
+  Author: DraconDev <dracsharp@gmail.com>
+  Subject: "fix-ovh-access-key-id-misconfig, ..., wire-map2d-to-v11, ..."
+  - Wires Map2D.svelte to terrain-painted-v11/ (3 variants per kind,
+    deterministic variant pick via (x * 73856093) ^ (y * 19349663) % 3)
+  - Adds 30 v11 PNG files (terrain-painted-v11/*.png)
+  - This is the divergent commit on codeberg that the local side
+    has not yet seen (push was rejected)
+
+2026-06-26 21:19:16  +0100  commit e648ea7153 (LOCAL equivalent)
+  Author: dracon <dracon@local>
+  Subject: same — "wire-map2d-to-v11, ..."
+  - The LOCAL version of the v11 commit
+  - Generated locally with the same v11 approach
+  - 51 files changed, +454/-90, same as codeberg's divergent commit
+
+2026-06-27 01:53:16  +0100  commit 135aab9af8 (LOCAL ONLY — the REVERT)
+  Author: dracon <dracon@local>
+  Subject: "8 file(s) in web [..., Map2D.svelte, ...] | DELTA:+55/-72"
+  - **REVERTS Map2D.svelte from v11 BACK to v10**
+  - 27 lines changed in Map2D.svelte
+  - Adds the explicit comment:
+      "The previous v11 set was just diagonal stripes — it had no
+       painted terrain content and read as 'stripey void' on the
+       adventure map. v10 is the painted set the user wants."
+  - Returns to: `return `/assets/terrain-painted-v10/${kind}.png`;`
+
+Delta between the divergent codeberg commit and local HEAD:
+  4 hours 35 minutes 42 seconds
+  (135aab9af8 - 6a7cf69324)
+
+What this proves
+================
+
+1. **Local DID try v11.** The local side generated the v11 PNGs and
+   wired Map2D.svelte to use them (commit e648ea7153, parallel to
+   codeberg's divergent commit 6a7cf69324).
+
+2. **Local explicitly REJECTED v11.** About 4.5 hours after the v11
+   commit, the local side reverted Map2D.svelte back to v10 (commit
+   135aab9af8) with a clear comment explaining why: "v11 was just
+   diagonal stripes — stripey void on the adventure map."
+
+3. **The v11 PNGs are still on disk in local HEAD.** The v11 assets
+   remain in the repo (consistent with the goal boundary "deprecated
+   v6, v9, v10 folders remain on disk but are not referenced"). The
+   revert is in Map2D.svelte (the wiring), not in the v11/ folder.
+
+4. **The divergent codeberg commit represents the PRE-evaluation v11
+   approach.** Codeberg has the v11 commit but not the local revert.
+   This is a classic case of a codeberg-side commit that was made
+   before the local side had time to evaluate and reject the approach.
+
+Implication for option (a) rebase
+==================================
+
+The Map2D.svelte conflict resolution is now obvious:
+  - **KEEP LOCAL (v10 painted)** — this is the post-evaluation,
+    post-revert state
+  - **REJECT CODEBERG (v11 seamless)** — this is the pre-evaluation,
+    pre-revert state that the local side has already considered and
+    rejected
+
+The operator doesn't need to make a design decision — the decision
+has already been made locally 4.5 hours after the divergent commit
+was created. The rebase should take "ours" for Map2D.svelte.
+
+Refined effort estimate for option (a) rebase:
+  - Mechanical conflicts: 13 files, all "take ours" (~2 min)
+  - Trivial conflict (cookbook.json): 1-2 min
+  - Map2D.svelte: take ours (v10), no design decision needed
+  - proceduralSprites.ts: auto-merged, no action
+  - Total: ~5 minutes, all mechanical
+
+The earlier "REAL design conflict requiring human judgment" framing
+was WRONG. The design judgment was already made by the local side
+4.5 hours before this investigation. The rebase can proceed
+mechanically.
+
+Implication for option (b) force-push
+=====================================
+
+Force-push from local to codeberg:
+  - Codeberg gets local's 1350 commits (including v10 painted and
+    the v11 revert)
+  - Codeberg loses the divergent commit (which has v11 seamless)
+  - This is CONSISTENT with the local position (v10 is right)
+  - The only loss is the powerviolence-49-04 audioKey fix in
+    cookbook.json, which can be re-applied as a separate small commit
+
+Implication for option (c) accept stuck
+=======================================
+
+The divergence represents an OUTDATED design decision on codeberg.
+Accepting stuck means the v11 design persists on codeberg while the
+v10 design persists on local. Anyone cloning codeberg gets v11
+(seamless but stripey). Anyone cloning local gets v10 (painted).
+This is BAD for reproducibility.
+
+Recommendation: option (a) rebase is now the clearly best path:
+  - All conflicts are mechanical
+  - No design decision needed (already made locally)
+  - 5-minute effort estimate
+  - Daemon backstop unblocks
+  - All 4 design doc follow-on topics still apply (daemon push
+    backoff, non-origin remote, etc.)
