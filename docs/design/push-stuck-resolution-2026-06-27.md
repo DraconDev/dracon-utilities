@@ -21,6 +21,7 @@
 - `docs/design/repo-remote-visibility-2026-06-27.md` — v1 PUSH-TO column (2026-06-27 morning)
 - `docs/design/repo-remote-visibility-v2-2026-06-27.md` — v2 card redesign (2026-06-27 midday)
 - `docs/design/auto-create-size-investigation-2026-06-27.md` — size-based auto_create skip investigation
+- `docs/design/concern-2-4remote-divergence-2026-06-21.md` — **PRIOR INCIDENT** (2026-06-21): a previous divergence investigation resulted in an UNINTENDED FORCE-PUSH to codeberg that violated AGENTS.md. This is exactly the kind of mistake the current goal's hard acceptance criterion #3 is designed to prevent. Reading this prior doc is recommended before choosing option (b).
 - `AGENTS.md` — operator's commit policy (NEVER force-push on >5-commits-ahead without explicit override)
 
 **Evidence files** (under `docs/design/audit-2026-06-26/`):
