@@ -179,6 +179,23 @@
 
 ---
 
+## Section 2.5 — Recommendation
+
+Based on the analysis in Sections 1, 2, and the evidence files, the **recommended option is (a) rebase**:
+
+1. **Conflict count is small and well-understood**: 16 total, 15 mechanical + 1 trivial (`git merge-tree --write-tree` analysis in `audit-2026-06-26/push-stuck-mergetree-conflicts.txt`)
+2. **The "design conflict" was already resolved locally**: The v10/v11 disagreement in `Map2D.svelte` was settled by the local side in commit `135aab9af8` (4.5h after the divergent codeberg commit). The local history explicitly chose v10 painted over v11 seamless. (`audit-2026-06-26/push-stuck-v11-revert-evidence.txt`)
+3. **No AGENTS.md override needed**: Force-push is forbidden on >5-commits-ahead repos without explicit override. Rebase does not require this override.
+4. **Lowest risk class**: The rebase creates new local SHAs but preserves the divergent commit on codeberg (recoverable via reflog for ~30-90 days).
+5. **Daemon backstop unblocks**: After rebase + push, `dracon-sync repos` transitions from ❌ CONCERN to ✅ OK.
+6. **Estimated effort**: ~5 minutes (was 5-30 min before the merge-tree analysis; was thought to be 1107 conflicts before any analysis)
+
+**If the operator is unsure**: rebase is the safe default. The other options are:
+- (b) force-push: only if the operator has a specific reason to destroy the divergent commit (e.g., it has bugs that can't be cleanly resolved in rebase). NOT the case here.
+- (c) accept stuck: only if the operator wants to defer the decision to a later time. NOT recommended because the daemon backstop is active and alerts are firing.
+
+---
+
 ## Section 3 — Operator's decision
 
 **Decision**: [TO BE FILLED IN BY OPERATOR — one of: rebase / force-push — I explicitly override the AGENTS.md 'NEVER force-push on >5-commits-ahead' rule for this specific case / accept stuck]
