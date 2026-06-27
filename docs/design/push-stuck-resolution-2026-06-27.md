@@ -23,10 +23,10 @@
 
 | Field | Value |
 |---|---|
-| Local HEAD | `f72097701d5834b2be65f98772078155504656e3` (2026-06-27 13:48:36) |
+| Local HEAD | `f2bf55aeceff5468d22410ef52ecf71e64578062` (2026-06-27 13:57:30) |
 | Codeberg `main-temp` | `6a7cf69324074e35cff9e64f4aa3ef15d6c3b4e5` (2026-06-26 21:17:34) |
 | Merge-base | `8fc02238f509c7e5e48106f474e65e5e7e1e603b` (2026-06-26 21:15:42) |
-| Local commits past merge-base | 1238 |
+| Local commits past merge-base | 1254 (was 1238 at investigation time; daemon is still actively committing) |
 | Codeberg commits past merge-base | 1 |
 | Divergent commit ancestor of local HEAD? | **NO** (confirmed by `git merge-base --is-ancestor`) |
 | Local HEAD descendant of codeberg tip? | **NO** (confirmed by `git merge-base --is-ancestor`) |
