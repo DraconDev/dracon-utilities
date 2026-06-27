@@ -23,11 +23,15 @@
 
 | Field | Value |
 |---|---|
-| Local HEAD | `f2bf55aeceff5468d22410ef52ecf71e64578062` (2026-06-27 13:57:30) |
+| Local HEAD (initial) | `f2bf55aeceff5468d22410ef52ecf71e64578062` (2026-06-27 13:57:30) |
+| Local HEAD (latest check) | `00c2f51dba02e6851fbcf29652549ce57a84bc65` (2026-06-27 14:31:03) |
 | Codeberg `main-temp` | `6a7cf69324074e35cff9e64f4aa3ef15d6c3b4e5` (2026-06-26 21:17:34) |
 | Merge-base | `8fc02238f509c7e5e48106f474e65e5e7e1e603b` (2026-06-26 21:15:42) |
-| Local commits past merge-base | 1254 (was 1238 at investigation time; daemon is still actively committing) |
+| Local commits past merge-base | 1321 (grew from 1238 → 1254 → 1314 → 1321 during operator-decision wait) |
 | Codeberg commits past merge-base | 1 |
+| Stash count | 22 (including `divergence-resolution-stash` from 2026-06-19 and several `ovh-*` stashes) |
+| Daemon push failures | 205+ (up from 157 at investigation time) |
+| Daemon backstop status | **ACTIVE** — daemon is skipping auto-commit for dracon-platform due to >300s push pending |
 | Divergent commit ancestor of local HEAD? | **NO** (confirmed by `git merge-base --is-ancestor`) |
 | Local HEAD descendant of codeberg tip? | **NO** (confirmed by `git merge-base --is-ancestor`) |
 | `git push` status | **REJECTED as non-fast-forward** (confirmed by `git push --dry-run`) |
