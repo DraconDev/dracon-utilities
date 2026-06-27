@@ -68,20 +68,21 @@
   - `/home/dracon/dracon/backups/*.bundle` — bundles for other repos (dracon-code, rust-ai-web-auto, etc.), no dracon-platform bundle
 - **Recovery if force-pushed**: only via local reflog for ~30-90 days, then truly gone
 
-### 1.4 Pre-resolution working tree state (latest check, 2026-06-27 16:27)
+### 1.4 Pre-resolution working tree state (latest check, 2026-06-27 16:30)
 
 ```
  M web/games/.env.ovh                              (tracked, recently committed, unstaged modification)
+ M web/music/libs/data/cookbook.json               (tracked, unstaged — NEW: local audioKey fix for drone-58-07.mp3)
 ?? web/games/wip/darklord/.tmp-audit/             (untracked audit scripts directory)
    ├─ bounding-box.mjs
    └─ capture-interactive.mjs
 ```
 
 - `.env.ovh` is TRACKED (not gitignored) and has been committed multiple times recently (with `ENV:` in the commit subject). This is the operator's intentional pattern, NOT a violation of AGENTS.md (which forbids `.env`, not `.env.ovh`).
-- The earlier `web/games/wip/hellhunter/.pi/goals/active_goal_*.md` modification has been resolved (either committed or reverted).
+- `cookbook.json` was modified locally at 2026-06-27T15:28:27 (2 minutes after HEAD's 15:26:29) — likely the daemon or a local script added an `audioKey: audio/drone-58/drone-58-07.mp3` fix. This is a working-tree change that will CONFLICT with the divergent codeberg commit's `powerviolence-49-04 audioKey` change during the rebase. Resolution: take "ours" (local's drone-58 fix is the newer one) or merge both audioKey changes.
 - `.tmp-audit/` contains 2 audit scripts (`bounding-box.mjs`, `capture-interactive.mjs`) — safe to leave untracked.
 
-**For option (a) rebase**, the 1 tracked-but-modified file and 1 untracked-dir must be stashed first (rebase requires a clean working tree). The stash command in Section 4.1 is verified against this working tree state.
+**For option (a) rebase**, the 2 tracked-but-modified files and 1 untracked-dir must be stashed first (rebase requires a clean working tree). The stash command in Section 4.1 is verified against this working tree state.
 
 ---
 
@@ -217,10 +218,11 @@ Of those, **15 are mechanical** (take "ours") and **1 is trivial manual** (cookb
 The Map2D.svelte "design conflict" is **already resolved locally** in commit `135aab9af8` (v10 revert) — take "ours".
 
 ```bash
-# 1. Stash working tree changes (1 tracked-modified + 1 untracked-dir)
+# 1. Stash working tree changes (2 tracked-modified + 1 untracked-dir)
 cd /home/dracon/Dev/dracon-platform
 git stash push --include-untracked --message "pre-rebase-stash-2026-06-27" -- \
   web/games/.env.ovh \
+  web/music/libs/data/cookbook.json \
   web/games/wip/darklord/.tmp-audit/
 
 # 2. Run the rebase
