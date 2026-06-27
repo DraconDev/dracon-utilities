@@ -241,16 +241,12 @@ git stash push --include-untracked --message "pre-rebase-stash-2026-06-27"
 git pull --rebase codeberg main-temp
 
 # 3. Resolve conflicts (16 total, all mechanical or trivial — see Section 2.1)
-#    13 mechanical: take "ours" (5 archived goal files, 1 rename/rename, 8 binary PNGs)
-#    1 trivial: cookbook.json — TWO audioKey fixes at different line ranges:
-#                codeberg: powerviolence-49-04 (line 22532+)
-#                local:    drone-58-07 (line 35698+)
-#                Both should be kept. Resolve the updatedAt timestamp conflict
-#                by taking local's (newer). The rest auto-merges.
-#    1 RESOLVED: Map2D.svelte — take "ours" (local's v10 painted is the post-revert state)
-#    1 auto-merged: proceduralSprites.ts — no action needed
+#    14 mechanical "take ours" (5 archived goal files, 1 rename/rename, 8 binary PNGs, Map2D.svelte)
+#    1 RESOLVED "take ours" (Map2D.svelte — local's v10 painted is the post-revert state)
+#    1 TRIVIAL MANUAL (cookbook.json — has TWO audioKey fixes that must be merged, not "take ours")
+#    1 auto-merged (proceduralSprites.ts — no action needed)
 #
-#    To resolve all mechanical conflicts at once:
+# 3a. Take ours for the 14 mechanical conflicts:
 git checkout --ours -- \
   apis/.pi/goals/archived/goal_2026062621244963_mqv7p5zr-0647wj.md \
   apis/.pi/goals/goal_events.jsonl \
@@ -265,9 +261,34 @@ git checkout --ours -- \
   web/games/wip/hegemon/static/assets/roads/crossroads.png \
   web/games/wip/hegemon/static/assets/roads/straight-h.png \
   web/games/wip/hegemon/static/assets/roads/straight-v.png \
-  web/games/wip/hegemon/static/assets/roads/t-junction.png \
-  web/music/libs/data/cookbook.json
-git add <all the above files>
+  web/games/wip/hegemon/static/assets/roads/t-junction.png
+git add \
+  apis/.pi/goals/archived/goal_2026062621244963_mqv7p5zr-0647wj.md \
+  apis/.pi/goals/goal_events.jsonl \
+  web/.pi/goals/archived/goal_2026062622114956_mqv7d165-k6a60f.md \
+  web/docs/archive/music-.pi-goals/active_goal_2026062602174377_mqu8rnxe-96wdi3.md \
+  web/games/.pi/goals/archived/goal_2026062702263089_mqv5yaha-e5zare.md \
+  web/games/wip/hegemon/src/lib/components/Map2D.svelte \
+  web/games/wip/hegemon/static/assets/roads/corner-ne.png \
+  web/games/wip/hegemon/static/assets/roads/corner-nw.png \
+  web/games/wip/hegemon/static/assets/roads/corner-se.png \
+  web/games/wip/hegemon/static/assets/roads/corner-sw.png \
+  web/games/wip/hegemon/static/assets/roads/crossroads.png \
+  web/games/wip/hegemon/static/assets/roads/straight-h.png \
+  web/games/wip/hegemon/static/assets/roads/straight-v.png \
+  web/games/wip/hegemon/static/assets/roads/t-junction.png
+
+# 3b. MANUAL: cookbook.json — merge TWO audioKey fixes
+#     DO NOT use 'git checkout --ours' for this file (it would lose codeberg's
+#     powerviolence-49-04 audioKey fix). The conflict structure:
+#       - codeberg added: powerviolence-49-04 audioKey at line 22532+
+#       - local added:    drone-58-07 audioKey at line 35698+ (working tree)
+#       - both changed:   updatedAt field (different timestamps)
+#     The audioKey fixes are at different line ranges and should auto-merge
+#     if the updatedAt conflict is resolved. Take local's updatedAt (newer).
+#     Manual edit: open the file, resolve the updatedAt conflict marker, save.
+${EDITOR:-vi} web/music/libs/data/cookbook.json
+git add web/music/libs/data/cookbook.json
 
 # 4. Continue the rebase
 git rebase --continue
