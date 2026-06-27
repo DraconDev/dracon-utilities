@@ -1,5 +1,18 @@
 # PUSH_STUCK Divergence Resolution — 2026-06-27
 
+## TL;DR — Decision Required
+
+**State**: `dracon-platform` has a PUSH_STUCK divergence. Local is **1365 commits ahead, 1 commit behind** codeberg (continuing to grow as the daemon keeps committing). The divergent codeberg commit `6a7cf69324` is not in local history.
+
+**Three options** (see Section 2 for full tradeoffs):
+- **(a) `rebase`** — bring local 1362 commits on top of codeberg's 1 commit. **~5 min effort. 16 total conflicts: 15 mechanical + 1 trivial. The one "design conflict" (Map2D.svelte v10/v11) was ALREADY resolved locally in commit `135aab9af8` 4.5h after the divergent commit, so this is mechanical, not a design decision.** **RECOMMENDED.**
+- **(b) `force-push — I explicitly override the AGENTS.md 'NEVER force-push on >5-commits-ahead' rule for this specific case`** — destroys the divergent codeberg commit. ~10 sec effort. Requires the EXACT override text in the goal. Loses the powerviolence-49-04 audioKey fix in `cookbook.json` (recoverable from reflog).
+- **(c) `accept stuck`** — leave the divergence, document the conscious decision. 0 sec effort. Daemon backstop stays active, alerts keep firing, divergence grows.
+
+**Recommended**: type `rebase` to execute option (a). The implementation commands are pre-filled in Section 4.1 and verified to work against the current state. The full investigation is in Sections 1-2, the evidence files are in `audit-2026-06-26/push-stuck-*.txt`.
+
+---
+
 **Date**: 2026-06-27 (BST)
 **Author**: pi (operator-instructed resolution of the PUSH_STUCK state on `dracon-platform`)
 **Mode**: operator's git state will be modified (rebase or force-push, per operator's decision); daemon source unchanged
