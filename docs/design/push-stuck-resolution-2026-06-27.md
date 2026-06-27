@@ -326,10 +326,68 @@ git push --force-with-lease codeberg main-temp
 
 ### 4.3 If option (c) accept stuck
 
+```bash
+# 1. Verify the current .dracon/dracon-sync.toml state
+cat /home/dracon/Dev/dracon-platform/.dracon/dracon-sync.toml
+
+# 2. Append a [push_stuck] section explaining the conscious decision
+#    (the file already has 'owned = true' and 'exclude_remotes = ["github", "gitlab"]';
+#     we add a new [push_stuck] table at the end)
+
+# PROPOSED — DO NOT APPLY WITHOUT REVIEW
+cat >> /home/dracon/Dev/dracon-platform/.dracon/dracon-sync.toml << 'EOF'
+
+# ADDED 2026-06-27 (goal 38e2dd78-8f93-4714-99d3-103207505c85): conscious decision
+# to accept the PUSH_STUCK divergence on this repo. The divergent codeberg commit
+# 6a7cf69324 contains a v11 terrain tile set approach that was already evaluated
+# locally in commit 135aab9af8 and rejected as "stripey void". The local side
+# uses the v10 painted tile set instead. The operator has decided to NOT
+# rebase (which would resolve the divergence cleanly) and NOT force-push
+# (which would destroy the divergent commit but is forbidden by AGENTS.md
+# without explicit override). Instead, the divergence is accepted as a
+# conscious decision: codeberg keeps the v11 attempt, local keeps the v10
+# revert. Anyone cloning codeberg gets the v11 approach; anyone cloning local
+# gets the v10 approach. This is BAD for reproducibility but accepted as a
+# conscious trade-off.
+#
+# To REMOVE this section later (when the divergence is resolved by other means),
+# delete the [push_stuck] block below and run:
+#   dracsharp@local:~$ draco_sync_repos_validate
+[push_stuck]
+  acknowledged = true
+  divergent_commit = "6a7cf69324074e35cff9e64f4aa3ef15d6c3b4e5"
+  local_head_at_decision = "<fill in local HEAD SHA at time of decision>"
+  decision_date = "2026-06-27"
+  decision_rationale = """
+    The v11 terrain tile set approach in the divergent codeberg commit was
+    already evaluated and rejected locally in commit 135aab9af8. Local uses
+    v10 painted tiles; codeberg has v11 seamless tiles. The operator has
+    consciously chosen to accept this divergence rather than rebase (which
+    would require manual conflict resolution for Map2D.svelte) or force-push
+    (which is forbidden by AGENTS.md without explicit override). The daemon
+    backstop and alert threshold will continue to fire until the divergence
+    is resolved by other means (e.g., a follow-up rebase, a codeberg-side
+    revert of the divergent commit, or a new commit on codeberg that
+    supersedes the divergent one).
+  """
+  hint_override = "conscious decision: PUSH_STUCK accepted, v10 vs v11 divergence, see [push_stuck] section"
+EOF
+
+# 3. Verify the change was appended correctly
+cat /home/dracon/Dev/dracon-platform/.dracon/dracon-sync.toml
+
+# 4. Wait for the daemon to pick up the change (next cycle, ~30-60 seconds)
+sleep 60
+dracon-sync repos
+
+# 5. Verify the new state shows the stuck classification but with the conscious-decision hint
+#    Expected: dracon-platform still ❌ CONCERN but hint now says "conscious decision: ..."
 ```
-# No implementation steps — just document the decision
-# Optional: add a note to .dracon/dracon-sync.toml explaining the conscious stuck-state decision
-```
+
+**Important notes for option (c)**:
+- The file already has `owned = true` and `exclude_remotes = ["github", "gitlab"]`. The new `[push_stuck]` table is added at the END of the file.
+- The `hint_override` field is a PROPOSED field; the daemon's actual handling of this field is not verified. The daemon may or may not display this hint. If it doesn't, the operator may need to file a follow-up goal to add daemon support for explicit stuck-state documentation.
+- The daemon will continue to try to push and fail. The backstop and alert threshold will continue to fire. The operator has accepted this as a conscious trade-off.
 
 ---
 
