@@ -1,50 +1,60 @@
 📜 /home/dracon/.dracon/utilities/sync/dracon-sync.toml
-📦 15 repos  ✅ OK 14  ⚠️  WARN 0  ❌ CONCERN 1  ⛔ init/status failed: 0
+📦 15 repos  ✅ OK 12  ⚠️  WARN 2  ❌ CONCERN 1  ⛔ init/status failed: 0
 
-ℹ️  Legend: MOD = modified tracked · STG = staged · UT = untracked · 🔗 = VS Code publish upstream — green when healthy (e.g. `github/main`), yellow ⚠️ none when no upstream is configured, yellow ⚠️ <remote/branch> (gone) when the upstream is configured but its remote-tracking ref does not exist locally · ↑ = ahead of upstream · ↓ = behind upstream · PUSH = push status · 📊 1h/6h/24h = commits in last 1h/6h/24h · STATE = derived cause (working=daemon just synced/committing/pushing/synced=clean & in sync/stalled/dirty/untracked-only/intentional/failed/idle/cold/healthy) · ACTIVITY = real activity indicator (now=daemon processing this repo · pushing Xm (N ahead)=push in progress, N unpushed commits · dirty Xm=dirty repo, last commit X minutes ago · synced/idle/cold=clean & waiting) · DAEMON = daemon's last recorded action (e.g. '23s sync_triage') so you can tell the daemon is working through dirty rows vs. you're editing right now
+ℹ️  Legend (one line per category):
+    MOD/STG/UT = modified/staged/untracked file counts
+    🔗         = VS Code publish upstream (green=healthy, yellow=missing/gone)
+    ↑/↓        = ahead/behind upstream
+    PUSH-TO    = remotes the daemon will push to (excluded remotes shown dimmed)
+    TOKENS     = 🟢 token present, 🔴 missing (pushes will fail)
+    STATE      = working/committing/pushing/synced/stalled/dirty/intentional/failed/idle/cold/healthy
+    ACTIVITY   = now=daemon processing · pushing Xm (N ahead) · dirty Xm · synced/idle/cold
+    DAEMON     = last action timestamp + name (e.g. '23s sync_commit')
 
 [0m[1][0m [31m❌ CONCERN[0m  dracon-platform[0m  [2m19.1 GiB[0m
-    [36mmain-temp[0m  ·  [32mcodeberg/main-temp[0m  ·  [33m1100↑[0m  [31m1↓[0m  ·  [32mOK[0m
+    [36mmain-temp[0m  ·  [32mcodeberg/main-temp[0m  ·  [33m1107↑[0m  [31m1↓[0m  ·  [0mPUSH_STUCK[0m
     PUSH-TO  🟢codeberg [0m    [2m(excluded: 🚫 github [0m  🚫 gitlab [0m[2m)[0m
     TOKENS   🟢 codeberg  🟢 github  🟢 gitlab
-    Last  0b57aca7edf… "CLOSED: p0-fix | 5 file(s) in apis,web [apis/docs/audits/20…"  ·  32s by dracon
-    [31mHint  run repair-concerns --apply (push or rewrite)[0m
+    Last  01a7e573515… "5 file(s) in web [web/games/.env.ovh] D…"  ·  6s by dracon
+    [31mHint  🛑 push-stuck (5 failures): git push returned non-zero (see daemon log) — run repair-concerns --apply[0m
 
-[0m[2][0m [32m✅ OK     [0m  dracon-sync[0m  [2m1.2 MiB[0m
-    [36mHEAD[0m  ·  [32morigin/HEAD[0m  ·  [0m0↑[0m  [0m0↓[0m  ·  [32mOK[0m
-    PUSH-TO  🐙github [0m  🦊gitlab [0m  🟢codeberg [0m
-    TOKENS   🟢 codeberg  🟢 github  🟢 gitlab
-    Last  7a525cb51be… "1 file(s) in src [src/report.rs] DELTA:+5/-66"  ·  2m by DraconDev
-
-[0m[3][0m [32m✅ OK     [0m  dracon-utilities[0m  [2m32.9 MiB[0m
+[0m[2][0m [33m⚠️  WARN  [0m  dracon-utilities[0m  [2m32.9 MiB[0m
     [36mmain[0m  ·  [32morigin/main[0m  ·  [0m0↑[0m  [0m0↓[0m  ·  [32mOK[0m
     PUSH-TO  🐙github [0m  🦊gitlab [0m  🟢codeberg [0m
     TOKENS   🟢 codeberg  🟢 github  🟢 gitlab
-    Last  bfdb06f5ee6… "1 file(s) in docs [docs/design/audit-2026-06-26/repos-befor…"  ·  7m by DraconDev
+    Last  dfd770ed988… "1 file(s) in docs [docs/design/audit-20…"  ·  29s by DraconDev
+    [33mHint  daemon handles after changes settle; run sync-now --warns to force now[0m
+
+[0m[3][0m [33m⚠️  WARN  [0m  dracon-sync[0m  [2m1.2 MiB[0m
+    [36mHEAD[0m  ·  [32morigin/HEAD[0m  ·  [0m0↑[0m  [0m0↓[0m  ·  [32mOK[0m
+    PUSH-TO  🐙github [0m  🦊gitlab [0m  🟢codeberg [0m
+    TOKENS   🟢 codeberg  🟢 github  🟢 gitlab
+    Last  7a525cb51be… "1 file(s) in src [src/report.rs] DELTA:…"  ·  3m by DraconDev
+    [33mHint  daemon handles after changes settle; run sync-now --warns to force now[0m
 
 [0m[4][0m [32m✅ OK     [0m  browser-extensions-shared[0m  [2m526.4 MiB[0m
     [36mmain[0m  ·  [32mgithub/main[0m  ·  [0m0↑[0m  [0m0↓[0m  ·  [32mOK[0m
     PUSH-TO  🐙github [0m  🦊gitlab [0m  🟢codeberg [0m
     TOKENS   🟢 codeberg  🟢 github  🟢 gitlab
-    Last  2f7bcd64104… "1 file(s) in extensions [extensions/vidpro-extension/AUDIT-…"  ·  18m by DraconDev
+    Last  2f7bcd64104… "1 file(s) in extensions [extensions/vid…"  ·  19m by DraconDev
 
 [0m[5][0m [32m✅ OK     [0m  avid[0m  [2m32.1 MiB[0m
     [36mmain[0m  ·  [32mgithub/main[0m  ·  [0m0↑[0m  [0m0↓[0m  ·  [32mOK[0m
     PUSH-TO  🐙github [0m  🦊gitlab [0m  🟢codeberg [0m
     TOKENS   🟢 codeberg  🟢 github  🟢 gitlab
-    Last  7e55427f6f3… "1 file(s) in .pi [.pi/goals/active_goal_2026062600592027_mq…"  ·  46m by DraconDev
+    Last  7e55427f6f3… "1 file(s) in .pi [.pi/goals/active_goal…"  ·  48m by DraconDev
 
 [0m[6][0m [32m✅ OK     [0m  pully-fully-pull-based-fleet-reconciler[0m  [2m26.6 MiB[0m
     [36mmain[0m  ·  [32mgithub/main[0m  ·  [0m0↑[0m  [0m0↓[0m  ·  [32mOK[0m
     PUSH-TO  🐙github [0m  🦊gitlab [0m  🟢codeberg [0m
     TOKENS   🟢 codeberg  🟢 github  🟢 gitlab
-    Last  58be1c5ba29… "2 file(s) in .pi [.pi/goals/archived/goal_2026062623183085_…"  ·  13h by DraconDev
+    Last  58be1c5ba29… "2 file(s) in .pi [.pi/goals/archived/go…"  ·  13h by DraconDev
 
 [0m[7][0m [32m✅ OK     [0m  .dracon[0m  [2m78.2 MiB[0m
     [36mmain[0m  ·  [32mgithub/main[0m  ·  [0m0↑[0m  [0m0↓[0m  ·  [32mOK[0m
     PUSH-TO  🐙github [0m  🦊gitlab [0m  🟢codeberg [0m
     TOKENS   🟢 codeberg  🟢 github  🟢 gitlab
-    Last  ab7e009b849… "2 file(s) in sync-notify [sync-notify/sync-notify.sh, .giti…"  ·  1d 10h by DraconDev
+    Last  ab7e009b849… "2 file(s) in sync-notify [sync-notify/s…"  ·  1d 10h by DraconDev
 
 [0m[8][0m [32m✅ OK     [0m  rust-ai-web-auto[0m  [2m9.2 MiB[0m
     [36mmain[0m  ·  [32mgithub/main[0m  ·  [0m0↑[0m  [0m0↓[0m  ·  [32mOK[0m
@@ -56,19 +66,19 @@
     [36mmain[0m  ·  [32mgithub/main[0m  ·  [0m0↑[0m  [0m0↓[0m  ·  [32mOK[0m
     PUSH-TO  🐙github [0m  🦊gitlab [0m  🟢codeberg [0m
     TOKENS   🟢 codeberg  🟢 github  🟢 gitlab
-    Last  6b724205bad… "1 file(s) in .pi [.pi/goals/active_goal_2026062401305754_mq…"  ·  2d by DraconDev
+    Last  6b724205bad… "1 file(s) in .pi [.pi/goals/active_goal…"  ·  2d by DraconDev
 
 [0m[10][0m [32m✅ OK     [0m  pi-plugins[0m  [2m145.8 KiB[0m
     [36mmain[0m  ·  [32morigin/main[0m  ·  [0m0↑[0m  [0m0↓[0m  ·  [32mOK[0m
     PUSH-TO  🐙github [0m  🦊gitlab [0m  🟢codeberg [0m
     TOKENS   🟢 codeberg  🟢 github  🟢 gitlab
-    Last  54322a00ceb… "Add pi-search-skill, pi-auto-review, pi-retry-on-error to c…"  ·  4d by DraconDev
+    Last  54322a00ceb… "Add pi-search-skill, pi-auto-review, pi…"  ·  4d by DraconDev
 
 [0m[11][0m [32m✅ OK     [0m  dracon-code[0m  [2m200.7 MiB[0m
     [36mmain[0m  ·  [32mgithub/main[0m  ·  [0m0↑[0m  [0m0↓[0m  ·  [32mOK[0m
     PUSH-TO  🐙github [0m  🦊gitlab [0m  🟢codeberg [0m
     TOKENS   🟢 codeberg  🟢 github  🟢 gitlab
-    Last  8a4b8abed39… "2 file(s) in .pi [.pi/goals/{active_goal_2026062202223018_m…"  ·  5d by DraconDev
+    Last  8a4b8abed39… "2 file(s) in .pi [.pi/goals/{active_goa…"  ·  5d by DraconDev
 
 [0m[12][0m [32m✅ OK     [0m  dracon-strategy[0m  [2m875.7 KiB[0m
     [36mmain[0m  ·  [32mgithub/main[0m  ·  [0m0↑[0m  [0m0↓[0m  ·  [32mOK[0m
@@ -86,11 +96,11 @@
     [36mmain[0m  ·  [32morigin/main[0m  ·  [0m0↑[0m  [0m0↓[0m  ·  [32mOK[0m
     PUSH-TO  🐙github [0m  🦊gitlab [0m  🟢codeberg [0m
     TOKENS   🟢 codeberg  🟢 github  🟢 gitlab
-    Last  5d1c9ec0cce… "1 file(s) in src [src/main.rs] DELTA:+1/-0"  ·  6d by DraconDev
+    Last  5d1c9ec0cce… "1 file(s) in src [src/main.rs] DELTA:+1…"  ·  6d by DraconDev
 
 [0m[15][0m [32m✅ OK     [0m  dracon-system[0m  [2m155.6 KiB[0m
     [36mmain[0m  ·  [32morigin/main[0m  ·  [0m0↑[0m  [0m0↓[0m  ·  [32mOK[0m
     PUSH-TO  🐙github [0m  🦊gitlab [0m  🟢codeberg [0m
     TOKENS   🟢 codeberg  🟢 github  🟢 gitlab
-    Last  82da3966e9a… "fix: switch path-deps to crates.io versions for standalone …"  ·  6d by DraconDev
+    Last  82da3966e9a… "fix: switch path-deps to crates.io vers…"  ·  6d by DraconDev
 
