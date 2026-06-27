@@ -190,30 +190,60 @@
 
 ### 4.1 If option (a) rebase
 
-```
-# 1. Stash working tree changes
+Verified conflict count (via read-only `git merge-tree --write-tree`): **16 total conflicts**.
+Of those, **15 are mechanical** (take "ours") and **1 is trivial manual** (cookbook.json `updatedAt` field).
+The Map2D.svelte "design conflict" is **already resolved locally** in commit `135aab9af8` (v10 revert) — take "ours".
+
+```bash
+# 1. Stash working tree changes (1 tracked-modified + 1 untracked-dir)
 cd /home/dracon/Dev/dracon-platform
 git stash push --include-untracked --message "pre-rebase-stash-2026-06-27" -- \
   web/games/.env.ovh \
-  web/games/wip/hellhunter/.pi/goals/active_goal_2026062702305590_mqvoohsw-p75onv.md \
   web/games/wip/darklord/.tmp-audit/
 
 # 2. Run the rebase
 git pull --rebase codeberg main-temp
 
-# 3. Resolve conflicts (expected on ~10 text files)
-# ... (conflict resolution details)
+# 3. Resolve conflicts (16 total, all mechanical or trivial — see Section 2.1)
+#    13 mechanical: take "ours" (5 archived goal files, 1 rename/rename, 8 binary PNGs)
+#    1 trivial: cookbook.json — take "ours" (local's updatedAt is newer)
+#    1 RESOLVED: Map2D.svelte — take "ours" (local's v10 painted is the post-revert state)
+#    1 auto-merged: proceduralSprites.ts — no action needed
+#
+#    To resolve all mechanical conflicts at once:
+git checkout --ours -- \
+  apis/.pi/goals/archived/goal_2026062621244963_mqv7p5zr-0647wj.md \
+  apis/.pi/goals/goal_events.jsonl \
+  web/.pi/goals/archived/goal_2026062622114956_mqv7d165-k6a60f.md \
+  web/docs/archive/music-.pi-goals/active_goal_2026062602174377_mqu8rnxe-96wdi3.md \
+  web/games/.pi/goals/archived/goal_2026062702263089_mqv5yaha-e5zare.md \
+  web/games/wip/hegemon/src/lib/components/Map2D.svelte \
+  web/games/wip/hegemon/static/assets/roads/corner-ne.png \
+  web/games/wip/hegemon/static/assets/roads/corner-nw.png \
+  web/games/wip/hegemon/static/assets/roads/corner-se.png \
+  web/games/wip/hegemon/static/assets/roads/corner-sw.png \
+  web/games/wip/hegemon/static/assets/roads/crossroads.png \
+  web/games/wip/hegemon/static/assets/roads/straight-h.png \
+  web/games/wip/hegemon/static/assets/roads/straight-v.png \
+  web/games/wip/hegemon/static/assets/roads/t-junction.png \
+  web/music/libs/data/cookbook.json
+git add <all the above files>
 
-# 4. Restore stashed changes
+# 4. Continue the rebase
+git rebase --continue
+
+# 5. Restore stashed changes
 git stash pop
 
-# 5. Verify state
+# 6. Verify state
 git rev-parse HEAD
 git rev-list --count codeberg/main-temp..HEAD  # should be 0 after daemon pushes
 git rev-list --count HEAD..codeberg/main-temp  # should be 0
 
-# 6. Daemon pushes the rebased local to codeberg (automatic)
+# 7. Daemon pushes the rebased local to codeberg (automatic)
 ```
+
+**Estimated effort**: ~5 minutes (the rebase itself is fast; the 15 file resolutions are bulk-applied with `git checkout --ours`; the cookbook.json `updatedAt` resolution requires a manual edit to pick local's timestamp).
 
 ### 4.2 If option (b) force-push
 
@@ -236,33 +266,91 @@ git push --force-with-lease codeberg main-temp
 
 ## Section 5 — Post-resolution verification
 
-[TO BE FILLED IN AFTER IMPLEMENTATION]
+### 5.1 Post-resolution state (commands to run after implementation)
 
-### 5.1 Post-resolution state
+```bash
+# 1. Capture post-resolution dracon-sync repos output
+dracon-sync repos > /home/dracon/Dev/dracon-utilities/docs/design/audit-2026-06-26/push-stuck-repos-after.txt 2>&1
 
-- [ ] `dracon-sync repos` shows new status (PUSH_STUCK → OK for a/b, or PUSH_STUCK with stuck-state note for c)
-- [ ] `git rev-list --count codeberg/main-temp..HEAD` = expected value
-- [ ] `git rev-list --count HEAD..codeberg/main-temp` = expected value
-- [ ] Daemon transitions from PUSH_STUCK to OK (for a/b)
+# 2. Verify divergence is gone (for option a or b)
+cd /home/dracon/Dev/dracon-platform
+git rev-list --count codeberg/main-temp..HEAD  # should be 0 after daemon pushes
+git rev-list --count HEAD..codeberg/main-temp  # should be 0
+
+# 3. Verify daemon health
+systemctl --user status dracon-sync.service
+journalctl --user -u dracon-sync.service --since "5m ago" --no-pager
+
+# 4. Check the new HEAD
+git rev-parse HEAD
+git log --oneline -1
+```
+
+Acceptance checklist for option (a) rebase:
+- [ ] `dracon-sync repos` shows dracon-platform as ✅ OK (not ❌ CONCERN)
+- [ ] `codeberg/main-temp..HEAD` count = 0
+- [ ] `HEAD..codeberg/main-temp` count = 0
+- [ ] Daemon is `active (running)`
+- [ ] Working tree is clean (or has only the original 2 uncommitted items)
 - [ ] `push-stuck-repos-after.txt` captured
 
-### 5.2 No collateral damage
+Acceptance checklist for option (b) force-push:
+- [ ] `dracon-sync repos` shows dracon-platform as ✅ OK
+- [ ] `codeberg/main-temp..HEAD` count = 0
+- [ ] `HEAD..codeberg/main-temp` count = 0
+- [ ] Daemon is `active (running)`
+- [ ] The divergent codeberg commit `6a7cf69324` is no longer on codeberg's `main-temp` branch
+- [ ] The powerviolence-49-04 audioKey fix in `cookbook.json` is re-applied as a separate commit (if not, file a follow-up goal)
+- [ ] `push-stuck-repos-after.txt` captured
 
-- [ ] `git remote -v` in `/home/dracon/Dev/dracon-platform` shows the same remotes as before this goal
-- [ ] Other 14 watched repos are untouched
-- [ ] `~/.dracon/secrets/pat/*.env` files are untouched (mode 600, contents unchanged)
+Acceptance checklist for option (c) accept stuck:
+- [ ] `dracon-sync repos` still shows dracon-platform as ❌ CONCERN but with a stuck-state note
+- [ ] `.dracon/dracon-sync.toml` has a `[push_stuck]` section explaining the conscious decision
+- [ ] Working tree is unchanged
+- [ ] Other 14 watched repos are still ✅ OK
+- [ ] `push-stuck-repos-after.txt` captured
+
+### 5.2 No collateral damage (commands to run after implementation)
+
+```bash
+# 1. Verify dracon-platform remotes are unchanged
+cd /home/dracon/Dev/dracon-platform
+git remote -v
+# Expected: just 'codeberg' remote, no 'origin' or 'github'/'gitlab' additions
+
+# 2. Verify other 14 watched repos are untouched
+dracon-sync repos
+# Expected: all 14 OK status unchanged, only dracon-platform changed
+
+# 3. Verify PAT token files are untouched
+ls -la /home/dracon/.dracon/secrets/pat/
+# Expected: mode 600, contents unchanged, mtime preserved
+
+# 4. Verify no other remotes were modified
+for repo in /home/dracon/Dev/*/; do
+  if [ -d "$repo/.git" ]; then
+    echo "=== $(basename $repo) ==="
+    git -C "$repo" remote -v 2>/dev/null
+  fi
+done | grep -E "===" -A 1
+# Expected: same remotes as before this goal
+```
 
 ---
 
 ## Section 6 — Lessons learned
-
-[TO BE FILLED IN AFTER IMPLEMENTATION]
 
 For future PUSH_STUCK situations:
 - **Check the merge-base first** — if the local is a fast-forward of the remote, a regular `git push` works (no force needed)
 - **Inspect the divergent commit's content** — force-pushing a security fix is different from force-pushing a typo fix
 - **Check the reflog** — recovery window is ~30-90 days, so force-push is not always immediately catastrophic
 - **Document the decision** — even for option (c), the conscious stuck-state decision should be recorded
+- **Use `git merge-tree --write-tree` to pre-count conflicts** — this is a READ-ONLY 3-way merge simulation that gives the exact conflict list without modifying any state. The conflict count and resolution strategy are the key input to the operator's decision. (See `audit-2026-06-26/push-stuck-mergetree-conflicts.txt`.)
+- **Verify the working tree state before designing the rebase** — tracked-modified files, untracked dirs, and `git stash list` all need to be accounted for in the stash command. Use `git status` to get the canonical list, not memory.
+- **Check if the design conflict was already resolved locally** — if the divergent commit's design choice was already tried and reverted locally, the conflict is mechanical, not a design decision. Search for the divergent commit's feature in the local history with `git log --all --oneline -S '<feature-string>'`. (See `audit-2026-06-26/push-stuck-v11-revert-evidence.txt` for the v10/v11 example.)
+- **The daemon backstop and alert threshold are correct** — daemon stops auto-committing when push is stuck >300s and alerts at 50 unpushed commits. Both fired correctly in this case. The 1340+ unpushed commits did not cause data loss.
+- **Daemon's pull/merge logic assumes `origin` remote** — this design issue should be addressed as a follow-on goal. The daemon currently skips the pull/merge step for repos that don't have an `origin` remote (like `dracon-platform`, which uses `codeberg`).
+- **Pre-fill design doc sections with implementation commands** — when the operator is slow to decide, pre-filling the design doc's Section 4 with the actual conflict resolution strategy (verified by `git merge-tree`) reduces implementation time from 30+ minutes to 5 minutes. This is preparation, not implementation.
 
 ---
 
