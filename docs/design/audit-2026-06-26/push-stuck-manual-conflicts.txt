@@ -1,0 +1,128 @@
+PUSH_STUCK manual conflict details
+=====================================
+Run: 2026-06-27
+Purpose: detail the 3 files initially classified as "manual conflict"
+         and refine the conflict categorization based on actual diff content.
+
+Refined conflict count: 16 total (not 17)
+=========================================
+- proceduralSprites.ts AUTO-MERGED (initial classification was wrong —
+  merge-tree output shows "Auto-merging" without a CONFLICT line for it)
+
+So 16 total conflicts: 7 text + 1 rename/rename + 8 binary
+Of those, only 1 is a TRUE design conflict requiring human judgment.
+
+================================================================
+MANUAL CONFLICT (1 file) — true design disagreement
+================================================================
+
+1. web/games/wip/hegemon/src/lib/components/Map2D.svelte
+   --------------------------------------------------------
+   This is a FUNDAMENTAL DESIGN DISAGREEMENT, not a mechanical conflict.
+
+   Codeberg's change (theirs):
+     - Switches terrain URL function from v10 to v11
+     - v11 = "periodic cosine harmonics so left edge = right edge and
+       top edge = bottom edge EXACTLY (L|R diff = 0, T|B diff = 0
+       pixel-perfect). Each kind has 3 variants."
+     - Variant pick: ((x * 73856093) ^ (y * 19349663)) % 3
+     - Updates .town-footprint CSS: removes hard border, adds
+       inset soft shadow tinted to v11 grass palette
+
+   Local's change (ours):
+     - STAYS on v10 (painted H3-style tile set)
+     - Local comment: "The previous v11 set was just diagonal stripes —
+       it had no painted terrain content and read as 'stripey void' on
+       the adventure map. v10 is the painted set the user wants."
+     - v10 = "10 hand-painted 64×64 PNGs (one per TileKind) with trees
+       / bushes / water / mountain peaks etc. baked in"
+     - Local also adds 11 new clickableKind entries
+       (treeOfKnowledge, grailPiece, blackMarket, etc.) — UNRELATED
+       to the v10/v11 disagreement, just adding more click handlers
+     - Local also changes townSpriteUrl3x3 to use mmx-transparent
+       variants — UNRELATED to the v10/v11 disagreement
+
+   Resolution: requires HUMAN JUDGMENT on whether v10 or v11 is the
+   right approach. The rebase alone cannot resolve this.
+
+   Practical resolution options for the rebase:
+     A) Keep local (v10 painted, plus 11 new clickableKind, plus
+        mmx-transparent townSpriteUrl3x3) — discards codeberg's v11
+        and codeberg's town-footprint CSS
+     B) Keep codeberg (v11 seamless, plus codeberg's town-footprint
+        CSS) — discards local's 11 new clickableKind and
+        mmx-transparent townSpriteUrl3x3
+     C) Hybrid: keep local's v10 + 11 new clickableKind +
+        mmx-transparent, but apply codeberg's town-footprint CSS
+
+================================================================
+LIKELY MECHANICAL CONFLICT (1 file) — needs minor manual review
+================================================================
+
+2. web/music/libs/data/cookbook.json
+   ----------------------------------
+   Codeberg's change: modifies ONE entry (powerviolence-49-04) at
+     line 22532 — adds the missing audioKey + generationParams.
+     This is the "fix powerviolence-49-04 audioKey" mentioned in
+     the divergent commit's description.
+
+   Local's change: modifies MANY entries at lines 1253+ and beyond —
+     adds cover art to multiple tracks (bossanova-22, reggae-23, etc.).
+
+   Both sides also change the `updatedAt` field at line 4:
+     Codeberg: 2026-06-26T19:31:49.379Z
+     Local:    2026-06-27T15:21:38.049Z
+
+   The content additions are at different line ranges (22532+ vs
+   1253+) so they should auto-merge if git resolves the `updatedAt`
+   conflict. The `updatedAt` conflict is trivial (take the newer).
+
+   Resolution: take local's `updatedAt`, keep both sets of content
+   additions. This should auto-merge cleanly after the updatedAt is
+   manually resolved. Estimated 1-2 minutes of human effort.
+
+================================================================
+INITIALLY-CLASSIFIED-AS-MANUAL BUT ACTUALLY AUTO-MERGED (1 file)
+================================================================
+
+3. web/games/wip/darklord/src/lib/game/proceduralSprites.ts
+   --------------------------------------------------------
+   Classification was WRONG. merge-tree output shows "Auto-merging"
+   for this file with no following CONFLICT line.
+
+   Both sides made IDENTICAL changes to:
+     - Add `mixHex()` helper function
+     - Add `darkBase` for streak darkening
+     - Modify streak rendering to use `darkBase` instead of `p.detail`
+
+   Local ALSO made an additional change to the gradient block
+   (replace radial gradient with flat base fill + tiny warm-center
+   highlight). Codeberg did NOT touch the gradient block.
+
+   This is a "one side changed, other side didn't" case that git
+   auto-merges cleanly. No manual review needed.
+
+================================================================
+SUMMARY
+================================================================
+
+Real manual review needed: 1 file (Map2D.svelte)
+Trivial manual review: 1 file (cookbook.json, 1-2 min)
+Auto-merged: 1 file (proceduralSprites.ts, the initial classification
+             was wrong)
+Mechanical "take ours": 13 files (5 archived goal files, 1 rename/
+             rename, 8 binary PNGs)
+Total conflicts: 16 (not 17)
+
+For option (a) rebase:
+  - Mechanical resolutions: 13 (all "take ours" for archived goal
+    files, rename/rename, and binary PNGs)
+  - Trivial manual: 1 (cookbook.json, 1-2 minutes)
+  - Real manual: 1 (Map2D.svelte, requires design judgment on v10
+    vs v11 tile approach)
+  - Auto-merged: 1 (proceduralSprites.ts, no action needed)
+
+The Map2D.svelte conflict is the ONLY one that requires genuine
+human judgment. The operator (or the developer who knows the tile
+generation pipeline) must decide between v10 (painted, single
+variant) and v11 (seamless, 3 variants).

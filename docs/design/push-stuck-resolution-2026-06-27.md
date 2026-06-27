@@ -91,14 +91,18 @@
 
 **Irreversibility**: Medium. The rebase creates new commit SHAs for the 1238 local commits. The old SHAs are reachable from the reflog for ~30-90 days. `git rebase --abort` works until conflicts are resolved.
 
-**Files at risk**: All 51 files from the divergent commit are also modified in the local 1238 commits. **ACTUAL CONFLICT COUNT (verified via read-only `git merge-tree --write-tree` on 2026-06-27): 17 total conflicts** — 8 text content conflicts, 1 rename/rename conflict, 8 binary file conflicts. See `audit-2026-06-26/push-stuck-mergetree-conflicts.txt` for the authoritative list.
+**Files at risk**: All 51 files from the divergent commit are also modified in the local 1350 commits. **ACTUAL CONFLICT COUNT (verified via read-only `git merge-tree --write-tree` on 2026-06-27): 16 total conflicts** — 7 text content conflicts, 1 rename/rename conflict, 8 binary file conflicts. See `audit-2026-06-26/push-stuck-mergetree-conflicts.txt` for the authoritative list and `audit-2026-06-26/push-stuck-manual-conflicts.txt` for manual-conflict details.
 
-  - **14 mechanical conflicts** (5 archived goal files, 1 rename/rename, 8 binary PNGs): all can be resolved by taking "ours" (local HEAD) — these are auto-generated state files or binary tiles where "ours" is the newer version
-  - **3 manual conflicts** (`proceduralSprites.ts`, `Map2D.svelte`, `cookbook.json`): require actual human review of the diff hunks. These are real code/data files. Estimated 15-30 minutes for a human who knows the codebase.
+  - **13 mechanical conflicts** (5 archived goal files, 1 rename/rename, 8 binary PNGs): all can be resolved by taking "ours" (local HEAD) — these are auto-generated state files or binary tiles where "ours" is the newer version
+  - **1 trivial manual conflict** (`cookbook.json`): different content additions at different line ranges + an `updatedAt` timestamp. Take local's `updatedAt`, keep both sets of additions. Estimated 1-2 minutes.
+  - **1 REAL design conflict** (`Map2D.svelte`): fundamental v10-vs-v11 tile set disagreement. Local reverted v11 because "v11 was just diagonal stripes — stripey void on the adventure map. v10 is the painted set the user wants." Codeberg has v11 seamless + 3-variant harmonic. **Requires human judgment on which tile approach is correct.**
+  - **1 actually auto-merged** (`proceduralSprites.ts`): initial classification was wrong; both sides made identical changes to the mixHex helper and streak rendering. Local's additional gradient block change is a "one-side-changed" case that git resolves cleanly. No action needed.
 
 **AGENTS.md implications**: ✅ NO force-push needed. The local becomes a descendant of codeberg, so a subsequent `git push` is a normal fast-forward.
 
 **Recovery procedure if it goes wrong**: `git rebase --abort` returns to the pre-rebase state. The reflog preserves the old SHAs.
+
+**Estimated effort**: 5-10 minutes for the mechanical + trivial conflicts. The Map2D.svelte design decision is the actual time sink — the operator (or developer) needs to decide between v10 painted and v11 seamless. The decision itself can be made in seconds if the operator knows which approach they want, but if a screenshot comparison is needed to verify "v11 is stripey void" vs "v10 is painted" then add 10-30 minutes for visual verification.
 
 **Approval text needed**: `rebase`
 
