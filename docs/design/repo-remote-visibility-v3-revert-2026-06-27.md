@@ -170,6 +170,45 @@ The table is wide (140+ columns) but fits on a typical 200+ column terminal. It 
 | 7 | V2 audit evidence captured | ✅ DONE | `docs/design/audit-2026-06-26/repo-remote-visibility-v2-revert-diff.txt` (524 lines) |
 | 8 | V3 design doc | ✅ DONE | This document |
 
+## Clone Size Behavior (added 2026-06-28)
+
+The operator's follow-up question:
+> "also we need to think about git module too that would mead that on the remote we would cloen down the entire hundreds of gigs right? assuming everything goes right"
+
+This section documents the answer based on a real test clone of a 400 MB simulated repo (4 submodules × 100 MB or annex equivalent). Pattern scales linearly to 6.7 GiB and "hundreds of gigs."
+
+### TL;DR
+
+- **Submodule with `--recurse-submodules`: YES**, you clone the entire content. At 6.7 GiB this is ~20 GB on disk, exceeding GitHub's 5 GB cap. At 100 GiB this is ~300 GB.
+- **Submodule without `--recurse-submodules`**: just SHAs (~212 KB), no content.
+- **Annex `git clone` alone**: just annex pointers (~404 KB), no content. Same as submodule without `--recurse-submodules`, but with cleaner pattern.
+- **Annex + `get --all`**: full content (~6.7 GB at real scale).
+- **Annex + `get <file>`**: one file (~25 MB at real scale).
+
+### Test data (400 MB scale)
+
+| Variation | Time | Size | Content? |
+|---|---|---|---|
+| submodule `git clone` | 0s | 212 KB | No |
+| submodule `git clone --recurse-submodules` | 1s | 1.2 GB | YES |
+| submodule `git clone --depth 1 --recurse-submodules` | 1s | 1.2 GB | YES |
+| annex `git clone` | 0s | 404 KB | No |
+| annex `git clone` + `get --all` | 3s | 402 MB | YES |
+| annex `git clone` + `get <file>` | 0s | 26 MB | 1 file |
+
+### Recommendation
+
+For 6.7+ GiB of binary content (dracon-platform):
+- **Annex with OVH bucket** is the cleanest fit: clone is small (~500 KB), content fetched on demand, OVH stays source of truth
+- **Submodule** is a "make it work" alternative but per-sub-repo 5 GB cap still applies
+- **Self-host on OVH (Gitea/Forgejo)** removes the cap entirely
+- **Git LFS** is a paid option (single-remote limitation)
+
+### Full evidence
+
+- `docs/design/audit-2026-06-26/submodule-vs-annex-clone-size.txt` — test data and command output
+- `docs/design/audit-2026-06-26/submodule-vs-annex-clone-size-comparison.md` — markdown comparison
+
 ## Related docs
 
 - `docs/design/repo-remote-visibility-2026-06-27.md` — v1 design (the target of this revert)
@@ -177,4 +216,6 @@ The table is wide (140+ columns) but fits on a typical 200+ column terminal. It 
 - `docs/design/push-stuck-resolution-2026-06-27.md` — PUSH_STUCK resolution (3 options + recommendation)
 - `docs/design/audit-2026-06-26/repo-remote-visibility-v2-revert-diff.txt` — full revert diff
 - `docs/design/audit-2026-06-26/push-stuck-alternative-paths.txt` — PUSH_STUCK alternative paths analysis
+- `docs/design/audit-2026-06-26/submodule-vs-annex-clone-size.txt` — clone size test data
+- `docs/design/audit-2026-06-26/submodule-vs-annex-clone-size-comparison.md` — clone size comparison
 - `src/report_v2_snapshot.rs` — v2 design snapshot (reference only)
