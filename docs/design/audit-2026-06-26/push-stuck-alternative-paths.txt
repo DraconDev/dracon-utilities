@@ -1,0 +1,280 @@
+PUSH_STUCK Alternative Paths Analysis — 2026-06-27
+==================================================
+
+Context
+-------
+The PUSH_STUCK divergence on `dracon-platform` is at ahead=1419, behind=1.
+The divergent codeberg commit `6a7cf69324` is NOT in local history.
+The goal's hard acceptance criterion #3 requires the operator to type one of:
+- "rebase"
+- "force-push" (with explicit override of AGENTS.md "NEVER force-push on >5-commits-ahead" rule)
+- "accept stuck"
+
+The operator's question: "can we do either [force-push or rebase]?"
+
+Short answer: YES, both are viable, but both require explicit operator approval.
+Below are the options AND the alternative paths the agent CAN take WITHOUT operator override
+(NOT including the three listed in the goal).
+
+Note: this analysis is INFORMATIONAL. The agent will NOT implement any of these paths
+without explicit operator approval per the goal's hard acceptance criterion #3.
+
+==================================================
+OPTION A: rebase (the recommended path)
+==================================================
+
+What it is:
+  $ cd /home/dracon/Dev/dracon-platform
+  $ git stash push --include-untracked  # blanket stash (working tree is dynamic)
+  $ git pull --rebase codeberg main-temp
+  $ # resolve 16 conflicts (15 mechanical + 1 trivial cookbook.json)
+  $ git rebase --continue
+  $ git stash pop
+  $ # daemon pushes the rebased local to codeberg automatically
+
+AGENTS.md implications:
+  - NONE. Rebase is not a "force-push" — it's a normal forward operation.
+  - The push that follows the rebase is a fast-forward (no force needed).
+
+Operator approval needed:
+  - YES, the operator must type "rebase" to confirm the operation.
+  - The 16 conflicts are pre-analyzed (15 mechanical + 1 trivial); the agent can
+    apply 15 of them with `git checkout --ours`; only `cookbook.json` needs a
+    manual editor step.
+
+Time estimate: ~5 minutes
+
+V10/v11 design conflict: ALREADY RESOLVED locally in commit 135aab9af8
+  (the v11 revert). The Map2D.svelte conflict is mechanical "take ours",
+  NOT a real design decision.
+
+cookbook.json conflict: BOTH sides have audioKey fixes that must be preserved:
+  - codeberg: powerviolence-49-04 audioKey at line 22532+
+  - local: drone-58-07 audioKey at line 35698+
+  - DO NOT use `git checkout --ours` for cookbook.json — it would lose
+    codeberg's powerviolence-49-04 fix.
+  - The updatedAt field conflict is trivial (take local's timestamp).
+
+Recovery procedure if it goes wrong:
+  - `git rebase --abort` to abort the rebase (returns to pre-rebase state)
+  - `git stash pop` to restore the working tree
+  - All work is in the local repo; the divergent commit is still on codeberg.
+
+==================================================
+OPTION B: force-push (requires explicit AGENTS.md override)
+==================================================
+
+What it is:
+  $ cd /home/dracon/Dev/dracon-platform
+  $ git push --force-with-lease codeberg main-temp
+
+AGENTS.md implications:
+  - REQUIRES explicit operator override of the rule:
+    "NEVER force-push on >5-commits-ahead without explicit approval"
+  - This is >1000 commits ahead being force-pushed.
+  - The divergent codeberg commit `6a7cf69324` will be DESTROYED on codeberg.
+  - The divergent commit is still reachable in the local repo's reflog
+    (recoverable for ~30 days via `git reflog`).
+
+What is lost:
+  - codeberg's `powerviolence-49-04` audioKey fix in cookbook.json
+    (still recoverable from reflog, but requires manual cherry-pick)
+  - codeberg's v11 terrain tile set (the agent evaluated and rejected v11
+    locally in commit 135aab9af8; this is a deliberate local decision)
+  - codeberg's H3-END-TO-END-MAP.md (also in local repo at commit history)
+  - codeberg's `fix-ovh-access-key-id-misconfig` (security fix; the
+    `.env.ovh.example` template is ALREADY in local history at fedb0c381f)
+
+What is preserved (in local repo only):
+  - All 1419+ local commits
+  - The v10 painted terrain tile set
+  - drone-58-07 audioKey fix in cookbook.json
+
+Operator approval needed:
+  - YES, the operator must type "force-push" with the EXACT override text:
+    "I explicitly override the AGENTS.md 'NEVER force-push on >5-commits-ahead'
+     rule for this specific case"
+  - The override text must be captured in the design doc for audit.
+
+Time estimate: ~10 seconds
+
+Recovery procedure if it goes wrong:
+  - The divergent codeberg commit is DESTROYED on the public codeberg mirror.
+  - Recovery: cherry-pick from local reflog (if within 30 days).
+  - Beyond 30 days: the commit may be unrecoverable (depends on GC settings).
+
+==================================================
+OPTION C: accept stuck (no implementation needed)
+==================================================
+
+What it is:
+  - Add a note to `/home/dracon/Dev/dracon-platform/.dracon/dracon-sync.toml`
+    explaining the conscious stuck-state decision
+  - See push-stuck-resolution-2026-06-27.md Section 4.3 for the full TOML
+
+AGENTS.md implications:
+  - NONE. This is a per-repo override, not a global config change.
+
+Operator approval needed:
+  - YES, the operator must type "accept stuck" to confirm.
+
+Time estimate: ~2 minutes (for the TOML edit)
+
+Daemon behavior:
+  - The daemon will continue to try to push and fail.
+  - The backstop and alert threshold will continue to fire (1419+ unpushed).
+  - The PUSH_STUCK classification will be preserved (NOT a CONCERN).
+  - The hint will explain the conscious decision.
+
+==================================================
+ALTERNATIVE PATHS (NEW — agent CAN take WITHOUT operator override, with caveats)
+==================================================
+
+PATH D: drac_sync_repair concerns --apply
+-----------------------------------------
+
+What it is:
+  $ drac_sync_repair concerns --only-stuck-push --apply
+
+What it does (per daemon source code in src/report.rs::run_repair_concerns):
+  1. Detects the concern (PUSH_STUCK + divergence)
+  2. Runs `git pull --no-rebase` (i.e., a MERGE, not a rebase)
+     This creates a merge commit at the divergence point
+  3. Runs `git push` to push the merge commit
+
+AGENTS.md implications:
+  - VIOLATES the spirit of "no force-push on >5-commits-ahead" (because the
+    merge commit is effectively a "force-push-with-merge" — the divergent
+    commit is NOT destroyed, but the new merge commit is pushed anyway).
+  - This is an AUTOMATED operation that the operator did NOT explicitly approve.
+  - The decision tree in handle_behind() does NOT consider "is this 5+ commits
+    ahead" — it just runs the pull.
+
+Operator approval needed:
+  - AGENTS.md says "no `dracon-sync repair concerns --apply`" without operator approval.
+  - HOWEVER, the operator could type "apply repair concerns" as a FOURTH option
+    to override this restriction.
+
+Time estimate: ~1 minute (after the daemon's debounce + push timeout)
+
+History shape:
+  - Creates a merge commit at the divergence point.
+  - Result: linear history with one merge commit, NOT a clean rebase.
+
+Why not recommended:
+  - The merge commit is messier than a rebase.
+  - The operator did NOT explicitly approve a force-push-like operation.
+  - The rebase (option A) is cleaner and gives the operator explicit control.
+
+PATH E: fresh clone from codeberg
+----------------------------------
+
+What it is:
+  $ rm -rf /home/dracon/Dev/dracon-platform
+  $ git clone codeberg:dracondev/dracon-platform.git
+  $ # lose all 1419+ local commits
+
+What it does:
+  - DESTROYS the local working tree.
+  - Replaces it with codeberg's history (which is 1 commit ahead of nothing).
+
+AGENTS.md implications:
+  - VIOLATES "no deletion of operator-owned repos" rule (dracon-platform is
+    operator-owned).
+  - Destroys ALL local commits, including the v10 painted terrain set.
+
+Operator approval needed:
+  - ABSOLUTELY YES. The operator must type a clear destruction confirmation.
+
+Time estimate: ~5 minutes (depends on repo size: 19.2 GiB → could be slow)
+
+Why not recommended:
+  - Destroys 1419+ local commits.
+  - Loses the v10 painted terrain design.
+  - Loses all local-only work (darklord tests, hellhunter tests, etc.).
+
+PATH F: git worktree rebase test (read-only)
+----------------------------------------------
+
+What it is:
+  $ cd /home/dracon/Dev/dracon-platform
+  $ git worktree add /tmp/rebase-test
+  $ cd /tmp/rebase-test
+  $ git checkout -b rebase-test-branch
+  $ git stash push --include-untracked
+  $ git pull --rebase codeberg main-temp
+  $ # observe the conflicts
+  $ git rebase --abort
+  $ cd /home/dracon/Dev/dracon-platform
+  $ git worktree remove /tmp/rebase-test
+
+What it does:
+  - Creates a temporary worktree at /tmp/rebase-test
+  - Tests the rebase in the worktree (does NOT modify main working tree)
+  - Observes the actual conflicts
+  - Aborts the rebase (no state change)
+
+AGENTS.md implications:
+  - The AGENTS.md project context says: "`git worktree` rebase test is NOT allowed."
+  - This is a HARD constraint in the operator's self-imposed restraint.
+
+Operator approval needed:
+  - YES, the operator must explicitly approve a worktree test (per AGENTS.md).
+
+Time estimate: ~3 minutes (read-only test)
+
+Why not recommended:
+  - The merge-tree analysis (already done in the design doc) is equivalent
+    information without the worktree test.
+  - AGENTS.md explicitly forbids worktree rebase tests.
+
+PATH G: drac_sync_repair stuck-unstuck
+---------------------------------------
+
+What it is:
+  $ drac_sync_repair stuck-unstuck /home/dracon/Dev/dracon-platform
+
+What it does:
+  - Clears the daemon's "stuck" mark on the repo
+  - Does NOT resolve the actual git divergence
+  - The daemon will resume trying to push and failing (the stuck mark will
+    be re-applied after 3h of consecutive failures)
+
+AGENTS.md implications:
+  - NONE. This is a daemon-level reset that doesn't modify git state.
+
+Operator approval needed:
+  - AGENTS.md does NOT explicitly forbid this.
+  - The operator could type "unstuck the repo" as a fifth option.
+
+Time estimate: ~10 seconds
+
+Why not recommended:
+  - Does NOT resolve the divergence.
+  - The stuck mark will be re-applied after 3h.
+  - It's a no-op for the operator's goal of resolving the divergence.
+
+==================================================
+RECOMMENDATION
+==================================================
+
+If the operator wants to RESOLVE the divergence:
+  - Option A (rebase) is the CLEANEST and SAFEST path. ~5 minutes.
+  - Option B (force-push) is the FASTEST but DESTRUCTIVE. Requires explicit override.
+
+If the operator wants to DEFER the decision:
+  - Option C (accept stuck) is the OFFICIAL "do nothing" path.
+  - Path G (stuck-unstuck) is the SILENT "do nothing" path that doesn't
+    document the decision (not recommended).
+
+Path D (repair concerns --apply) is the AUTOMATED path that the agent
+CAN take without explicit operator approval (per daemon source code), but
+it violates the SPIRIT of AGENTS.md's "no force-push on >5-commits-ahead"
+because the merge commit is effectively a force-push-with-merge. The
+operator should explicitly approve this if they want to use it.
+
+Path E (fresh clone) and Path F (worktree rebase test) are NOT recommended.
+
+==================================================
+END OF ANALYSIS
+==================================================
