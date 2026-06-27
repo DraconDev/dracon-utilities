@@ -1,0 +1,212 @@
+{
+  "dracon-home": {
+    "github.com": [
+      "EXISTS",
+      "ab7e009b8491503113e4c0b0f926bc20018805c2"
+    ],
+    "gitlab.com": [
+      "EXISTS",
+      "11a5de7f9514e8bb6e02d000e741c2cd4e94875a"
+    ],
+    "codeberg.org": [
+      "EXISTS",
+      "ab7e009b8491503113e4c0b0f926bc20018805c2"
+    ]
+  },
+  "dracon-platform": {
+    "github.com": [
+      "EXISTS",
+      "93ee4b4690b82bef0544b06e0f1e11172b4b4231"
+    ],
+    "gitlab.com": [
+      "EXISTS",
+      "1ef8d051320fe2ad13c58162d94cc62378f93966"
+    ],
+    "codeberg.org": [
+      "EXISTS",
+      "1ef8d051320fe2ad13c58162d94cc62378f93966"
+    ]
+  },
+  "pully-fully-pull-based-fleet-reconciler": {
+    "github.com": [
+      "EXISTS",
+      "58be1c5ba29fb0a0cb3dbd874d589297cbb6d49b"
+    ],
+    "gitlab.com": [
+      "EXISTS",
+      "58be1c5ba29fb0a0cb3dbd874d589297cbb6d49b"
+    ],
+    "codeberg.org": [
+      "EXISTS",
+      "58be1c5ba29fb0a0cb3dbd874d589297cbb6d49b"
+    ]
+  },
+  "avid": {
+    "github.com": [
+      "EXISTS",
+      "c336d01087dfa3bf702c835097af48cb8ffabd8d"
+    ],
+    "gitlab.com": [
+      "EXISTS",
+      "c336d01087dfa3bf702c835097af48cb8ffabd8d"
+    ],
+    "codeberg.org": [
+      "EXISTS",
+      "c336d01087dfa3bf702c835097af48cb8ffabd8d"
+    ]
+  },
+  "dracon-utilities": {
+    "github.com": [
+      "EXISTS",
+      "1a98935e465b04da34a30f4e0a2ca950dec8db29"
+    ],
+    "gitlab.com": [
+      "EXISTS",
+      "1a98935e465b04da34a30f4e0a2ca950dec8db29"
+    ],
+    "codeberg.org": [
+      "EXISTS",
+      "1a98935e465b04da34a30f4e0a2ca950dec8db29"
+    ]
+  },
+  "browser-extensions-shared": {
+    "github.com": [
+      "EXISTS",
+      "e5ac0cebb298a5bdf349ba989e759d594ba78360"
+    ],
+    "gitlab.com": [
+      "EXISTS",
+      "4cd434683b60b618dd6531e32d71717cc7258c76"
+    ],
+    "codeberg.org": [
+      "EXISTS",
+      "4cd434683b60b618dd6531e32d71717cc7258c76"
+    ]
+  },
+  "rust-ai-web-auto": {
+    "github.com": [
+      "EXISTS",
+      "98d193829fd31de688a25508f78bc14cf14e5c3b"
+    ],
+    "gitlab.com": [
+      "EXISTS",
+      "98d193829fd31de688a25508f78bc14cf14e5c3b"
+    ],
+    "codeberg.org": [
+      "EXISTS",
+      "98d193829fd31de688a25508f78bc14cf14e5c3b"
+    ]
+  },
+  "ai-auto-writer": {
+    "github.com": [
+      "EXISTS",
+      "6b724205badf92845fe31993bc65fb034c2af22c"
+    ],
+    "gitlab.com": [
+      "EXISTS",
+      "7b318963f576886a6eba2faf34924aef64d6367e"
+    ],
+    "codeberg.org": [
+      "EXISTS",
+      "7b318963f576886a6eba2faf34924aef64d6367e"
+    ]
+  },
+  "pi-plugins": {
+    "github.com": [
+      "EXISTS",
+      "54322a00ceb8c7cece9b5e3b5233cf022282af3a"
+    ],
+    "gitlab.com": [
+      "EXISTS",
+      "54322a00ceb8c7cece9b5e3b5233cf022282af3a"
+    ],
+    "codeberg.org": [
+      "EXISTS",
+      "54322a00ceb8c7cece9b5e3b5233cf022282af3a"
+    ]
+  },
+  "dracon-sync-background-auto-commit-multi-remote": {
+    "github.com": [
+      "EXISTS",
+      "cc9aea620b9aae5fe560ab1172a6885191638e21"
+    ],
+    "gitlab.com": [
+      "EXISTS",
+      "f3742296568e016e44b18c33e9476371224b2243"
+    ],
+    "codeberg.org": [
+      "EXISTS",
+      "f3742296568e016e44b18c33e9476371224b2243"
+    ]
+  },
+  "dracon-code": {
+    "github.com": [
+      "EXISTS",
+      "8a4b8abed3976694f259e890f8572b4b434ff88b"
+    ],
+    "gitlab.com": [
+      "EXISTS",
+      "e57bc0eda8f6009f6a1d07267462ff503cc06e7c"
+    ],
+    "codeberg.org": [
+      "EXISTS",
+      "e57bc0eda8f6009f6a1d07267462ff503cc06e7c"
+    ]
+  },
+  "dracon-strategy": {
+    "github.com": [
+      "EXISTS",
+      "ffa3bc24b615e068690d433640aa8a2c7bf2d8c3"
+    ],
+    "gitlab.com": [
+      "EXISTS",
+      "e9ba2b4f03799e167fc0ea7f9242991d8efdc5d0"
+    ],
+    "codeberg.org": [
+      "EXISTS",
+      "e9ba2b4f03799e167fc0ea7f9242991d8efdc5d0"
+    ]
+  },
+  "DraconDev": {
+    "github.com": [
+      "EXISTS",
+      "f1e2b3783f946b334dab3765cbc13e43eacfd64d"
+    ],
+    "gitlab.com": [
+      "EXISTS",
+      "0031480a64d7bc1d6a43f43cd0f03e850bee25aa"
+    ],
+    "codeberg.org": [
+      "EXISTS",
+      "c08e84bf1457d0c5cedd25700319dc83b8a6acbe"
+    ]
+  },
+  "dracon-warden-secret-encrypt-age-git-filter": {
+    "github.com": [
+      "EXISTS",
+      "5d1c9ec0cce7fceef2166b03a1e2656737b148e7"
+    ],
+    "gitlab.com": [
+      "EXISTS",
+      "d5cb8793e01d76fc50829c872a94e744fb0bd9f9"
+    ],
+    "codeberg.org": [
+      "EXISTS",
+      "d5cb8793e01d76fc50829c872a94e744fb0bd9f9"
+    ]
+  },
+  "dracon-system-disk-process-guard-doctor": {
+    "github.com": [
+      "EXISTS",
+      "82da3966e9a61a15c0a7c8cd4583231890c47a92"
+    ],
+    "gitlab.com": [
+      "EXISTS",
+      "82da3966e9a61a15c0a7c8cd4583231890c47a92"
+    ],
+    "codeberg.org": [
+      "EXISTS",
+      "82da3966e9a61a15c0a7c8cd4583231890c47a92"
+    ]
+  }
+}

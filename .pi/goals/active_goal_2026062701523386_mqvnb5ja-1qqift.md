@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 373174,
-    "activeSeconds": 342
+    "tokensUsed": 378200,
+    "activeSeconds": 472
   },
   "sisyphus": false,
   "createdAt": "2026-06-27T00:52:33.862Z",
-  "updatedAt": "2026-06-27T00:58:41.705Z",
+  "updatedAt": "2026-06-27T01:00:53.386Z",
   "activePath": ".pi/goals/active_goal_2026062701523386_mqvnb5ja-1qqift.md",
   "taskList": {
     "tasks": [
@@ -86,8 +86,8 @@ If blocked: Stop and ask the user. Specifically: if the systemd unit is too sand
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 5m42s
-- Tokens used: 373K (373,174) tokens
+- Time spent: 7m52s
+- Tokens used: 378K (378,200) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
