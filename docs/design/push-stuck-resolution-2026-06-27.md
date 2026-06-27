@@ -241,12 +241,12 @@ git stash push --include-untracked --message "pre-rebase-stash-2026-06-27"
 git pull --rebase codeberg main-temp
 
 # 3. Resolve conflicts (16 total, all mechanical or trivial — see Section 2.1)
-#    14 mechanical "take ours" (5 archived goal files, 1 rename/rename, 8 binary PNGs, Map2D.svelte)
-#    1 RESOLVED "take ours" (Map2D.svelte — local's v10 painted is the post-revert state)
+#    14 mechanical "take ours" (5 archived goal files, 8 binary PNGs, Map2D.svelte)
+#    1 RENAME/RENAME (path conflict, resolved by keeping the local path)
 #    1 TRIVIAL MANUAL (cookbook.json — has TWO audioKey fixes that must be merged, not "take ours")
 #    1 auto-merged (proceduralSprites.ts — no action needed)
 #
-# 3a. Take ours for the 14 mechanical conflicts:
+# 3a. Take ours for the 14 mechanical content conflicts:
 git checkout --ours -- \
   apis/.pi/goals/archived/goal_2026062621244963_mqv7p5zr-0647wj.md \
   apis/.pi/goals/goal_events.jsonl \
@@ -278,7 +278,15 @@ git add \
   web/games/wip/hegemon/static/assets/roads/straight-v.png \
   web/games/wip/hegemon/static/assets/roads/t-junction.png
 
-# 3b. MANUAL: cookbook.json — merge TWO audioKey fixes
+# 3b. RENAME/RENAME: goal archive file — keep the local path, drop the codeberg path
+#     Original:   web/games/wip/hegemon/.pi/goals/active_goal_2026062617464285_mqv5ych2-kblv5s.md
+#     Local kept: web/docs/archive/games-wip-hegemon-.pi-goals-archived/goal_2026062621133911_mqv5ych2-kblv5s.md
+#     Codeberg:   web/games/wip/hegemon/.pi/goals/archived/goal_2026062621133911_mqv5ych2-kblv5s.md
+git rm web/games/wip/hegemon/.pi/goals/active_goal_2026062617464285_mqv5ych2-kblv5s.md
+git rm web/games/wip/hegemon/.pi/goals/archived/goal_2026062621133911_mqv5ych2-kblv5s.md
+git add web/docs/archive/games-wip-hegemon-.pi-goals-archived/goal_2026062621133911_mqv5ych2-kblv5s.md
+
+# 3c. MANUAL: cookbook.json — merge TWO audioKey fixes
 #     DO NOT use 'git checkout --ours' for this file (it would lose codeberg's
 #     powerviolence-49-04 audioKey fix). The conflict structure:
 #       - codeberg added: powerviolence-49-04 audioKey at line 22532+
