@@ -279,10 +279,10 @@ git add \
   web/games/wip/hegemon/static/assets/roads/t-junction.png
 
 # 3b. RENAME/RENAME: goal archive file — keep the local path, drop the codeberg path
-#     Original:   web/games/wip/hegemon/.pi/goals/active_goal_2026062617464285_mqv5ych2-kblv5s.md
-#     Local kept: web/docs/archive/games-wip-hegemon-.pi-goals-archived/goal_2026062621133911_mqv5ych2-kblv5s.md
-#     Codeberg:   web/games/wip/hegemon/.pi/goals/archived/goal_2026062621133911_mqv5ych2-kblv5s.md
-git rm web/games/wip/hegemon/.pi/goals/active_goal_2026062617464285_mqv5ych2-kblv5s.md
+#     Original (already renamed, not in index): active_goal_2026062617464285_mqv5ych2-kblv5s.md
+#     Local kept:  web/docs/archive/games-wip-hegemon-.pi-goals-archived/goal_2026062621133911_mqv5ych2-kblv5s.md
+#     Codeberg:    web/games/wip/hegemon/.pi/goals/archived/goal_2026062621133911_mqv5ych2-kblv5s.md
+#     Resolution: drop the codeberg path from the index, add the local path.
 git rm web/games/wip/hegemon/.pi/goals/archived/goal_2026062621133911_mqv5ych2-kblv5s.md
 git add web/docs/archive/games-wip-hegemon-.pi-goals-archived/goal_2026062621133911_mqv5ych2-kblv5s.md
 
