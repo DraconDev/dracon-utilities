@@ -24,10 +24,10 @@
 | Field | Value |
 |---|---|
 | Local HEAD (initial) | `f2bf55aeceff5468d22410ef52ecf71e64578062` (2026-06-27 13:57:30) |
-| Local HEAD (latest check) | `00c2f51dba02e6851fbcf29652549ce57a84bc65` (2026-06-27 14:31:03) |
+| Local HEAD (latest check) | `8c95d44c356377d217554af94458182e1aab38a5` (2026-06-27 16:24:xx) |
 | Codeberg `main-temp` | `6a7cf69324074e35cff9e64f4aa3ef15d6c3b4e5` (2026-06-26 21:17:34) |
 | Merge-base | `8fc02238f509c7e5e48106f474e65e5e7e1e603b` (2026-06-26 21:15:42) |
-| Local commits past merge-base | 1321 (grew from 1238 → 1254 → 1314 → 1321 during operator-decision wait) |
+| Local commits past merge-base | 1350 (grew from 1238 → 1321 → 1340 → 1350 during operator-decision wait) |
 | Codeberg commits past merge-base | 1 |
 | Stash count | 22 (including `divergence-resolution-stash` from 2026-06-19 and several `ovh-*` stashes) |
 | Daemon push failures | 205+ (up from 157 at investigation time) |
@@ -91,7 +91,10 @@
 
 **Irreversibility**: Medium. The rebase creates new commit SHAs for the 1238 local commits. The old SHAs are reachable from the reflog for ~30-90 days. `git rebase --abort` works until conflicts are resolved.
 
-**Files at risk**: All 51 files from the divergent commit are also modified in the local 1238 commits. There will be conflicts that need resolution. The binary files (41) will auto-resolve (git uses "theirs" or "ours" — typically "ours" wins in rebase). The text files (10: cookbook.json + 9 others) may need manual conflict resolution.
+**Files at risk**: All 51 files from the divergent commit are also modified in the local 1238 commits. **ACTUAL CONFLICT COUNT (verified via read-only `git merge-tree --write-tree` on 2026-06-27): 17 total conflicts** — 8 text content conflicts, 1 rename/rename conflict, 8 binary file conflicts. See `audit-2026-06-26/push-stuck-mergetree-conflicts.txt` for the authoritative list.
+
+  - **14 mechanical conflicts** (5 archived goal files, 1 rename/rename, 8 binary PNGs): all can be resolved by taking "ours" (local HEAD) — these are auto-generated state files or binary tiles where "ours" is the newer version
+  - **3 manual conflicts** (`proceduralSprites.ts`, `Map2D.svelte`, `cookbook.json`): require actual human review of the diff hunks. These are real code/data files. Estimated 15-30 minutes for a human who knows the codebase.
 
 **AGENTS.md implications**: ✅ NO force-push needed. The local becomes a descendant of codeberg, so a subsequent `git push` is a normal fast-forward.
 

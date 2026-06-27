@@ -1,0 +1,81 @@
+PUSH_STUCK rebase conflict analysis
+====================================
+Run: 2026-06-27
+Method: git merge-tree --write-tree --messages HEAD codeberg/main-temp
+This is a READ-ONLY 3-way merge simulation — no git state was modified.
+Exit code: 1 (conflicts present)
+
+Conflict summary: 17 total conflicts
+====================================
+
+Text content conflicts (8):
+  1. apis/.pi/goals/archived/goal_2026062621244963_mqv7p5zr-0647wj.md
+     (auto-archived goal file for mqv7p5zr-0647wj — local and codeberg have different versions)
+  2. apis/.pi/goals/goal_events.jsonl
+     (JSONL append-only log: local has "audit_result: approved" + "goal_completed" event for mqv7p5zr-0647wj;
+      codeberg has the original "audit_result: disapproved" event — same goal, different verdicts)
+  3. web/.pi/goals/archived/goal_2026062622114956_mqv7d165-k6a60f.md
+     (auto-archived goal file)
+  4. web/docs/archive/music-.pi-goals/active_goal_2026062602174377_mqu8rnxe-96wdi3.md
+     (auto-archived goal file)
+  5. web/games/.pi/goals/archived/goal_2026062702263089_mqv5yaha-e5zare.md
+     (auto-archived goal file)
+  6. web/games/wip/darklord/src/lib/game/proceduralSprites.ts
+     (REAL CODE CONFLICT — game logic)
+  7. web/games/wip/hegemon/src/lib/components/Map2D.svelte
+     (REAL CODE CONFLICT — UI component)
+  8. web/music/libs/data/cookbook.json
+     (data file — likely the powerviolence-49-04 audioKey fix)
+
+Rename/rename conflict (1):
+  9. web/games/wip/hegemon/.pi/goals/active_goal_2026062617464285_mqv5ych2-kblv5s.md
+     Local renamed to: web/docs/archive/games-wip-hegemon-.pi-goals-archived/goal_2026062621133911_mqv5ych2-kblv5s.md
+     Codeberg renamed to: web/games/wip/hegemon/.pi/goals/archived/goal_2026062621133911_mqv5ych2-kblv5s.md
+     (just different archive paths for the same goal file)
+
+Binary content conflicts (8):
+  10-17. web/games/wip/hegemon/static/assets/roads/{corner-ne,corner-nw,corner-se,corner-sw,
+                                                 crossroads,straight-h,straight-v,t-junction}.png
+     (road tile PNGs — both sides modified, binary, cannot auto-merge)
+
+Resolution strategy by category
+================================
+
+AUTO-MERGEABLE (mechanical resolution possible):
+  - 5 archived goal files (#1, #3, #4, #5, #9): all are auto-generated pi state files;
+    resolve by taking "ours" (local HEAD) — these are just metadata reflecting
+    local completion state. Codeberg's divergent commit is the older snapshot.
+  - 8 binary PNGs (#10-17): both sides regenerated, but visual output is essentially
+    random tile patterns. Resolve by taking "ours" (local HEAD) since local
+    is newer; the codeberg commit's versions are from before the new audit.
+  - 1 goal_events.jsonl (#2): resolve by taking "ours" (local HEAD) — local's
+    "approved" verdict and "goal_completed" event is the authoritative state.
+
+MANUAL RESOLUTION REQUIRED (2):
+  - proceduralSprites.ts (#6): actual game code, ~1-2 hunks, must review diff
+  - Map2D.svelte (#7): UI component, multiple hunks likely, must review diff
+  - cookbook.json (#8): data file, the powerviolence-49-04 audioKey change
+    is the key one — need to verify local has the same fix
+
+Refined conflict count: 3 manual + 14 mechanical (not 0-3, not 1107)
+=====================================================================
+
+The earlier design doc estimate of "1107 rebase conflicts" was wildly wrong.
+The original "0-3 conflicts" estimate was also wrong.
+The TRUE count is 17 total, of which 3 require manual review and 14 can be
+resolved mechanically by taking "ours" (local HEAD).
+
+Tradeoff update
+===============
+- Option (a) rebase: 3 manual conflict resolutions (small files, ~5-15 minutes
+  of human review), then 14 mechanical "take ours" resolutions. Total estimated
+  effort: 15-30 minutes for a human who knows the codebase.
+- Option (b) force-push: destroys 1 divergent commit. The divergent commit is
+  the "approved" audit + "goal_completed" event + ~45 binary tiles. The tiles
+  can be re-generated from the same prompts; the goal events are auto-state
+  (recoverable from goal archive).
+- Option (c) accept stuck: daemon backstop remains active, alerts continue,
+  1340+ unpushed commits grow, future resolution becomes harder.
+
+Updated recommendation: option (a) rebase is still the safest path, but the
+effort estimate is now concrete (3 manual + 14 mechanical = 17 conflicts total).
