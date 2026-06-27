@@ -2,7 +2,7 @@
 
 ## TL;DR — Decision Required
 
-**State**: `dracon-platform` has a PUSH_STUCK divergence. Local is **1365 commits ahead, 1 commit behind** codeberg (continuing to grow as the daemon keeps committing). The divergent codeberg commit `6a7cf69324` is not in local history.
+**State**: `dracon-platform` has a PUSH_STUCK divergence. Local is **1380 commits ahead, 1 commit behind** codeberg (continuing to grow as the daemon keeps committing, ~1 commit every 30-60 seconds). 264 consecutive push failures. The divergent codeberg commit `6a7cf69324` is not in local history.
 
 **Three options** (see Section 2 for full tradeoffs):
 - **(a) `rebase`** — bring local 1362 commits on top of codeberg's 1 commit. **~5 min effort. 16 total conflicts: 15 mechanical + 1 trivial. The one "design conflict" (Map2D.svelte v10/v11) was ALREADY resolved locally in commit `135aab9af8` 4.5h after the divergent commit, so this is mechanical, not a design decision.** **RECOMMENDED.**
