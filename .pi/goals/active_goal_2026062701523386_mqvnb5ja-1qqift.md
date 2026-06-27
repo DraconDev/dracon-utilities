@@ -5,19 +5,21 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 344554,
-    "activeSeconds": 32
+    "tokensUsed": 348125,
+    "activeSeconds": 60
   },
   "sisyphus": false,
   "createdAt": "2026-06-27T00:52:33.862Z",
-  "updatedAt": "2026-06-27T00:53:08.037Z",
+  "updatedAt": "2026-06-27T00:53:37.828Z",
   "activePath": ".pi/goals/active_goal_2026062701523386_mqvnb5ja-1qqift.md",
   "taskList": {
     "tasks": [
       {
         "id": "section-1-size-audit",
         "title": "Section 1 — Size audit of dracon-platform (read-only)",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-27T00:53:26.016Z",
+        "evidence": "Section 1 deliverable (raw `du` and `git count-objects` output) saved at `docs/design/audit-2026-06-26/size-audit-platform.txt` (1.6 KiB). Numbers captured fresh at audit time 2026-06-27 01:53 BST: wo",
         "verificationContract": "Report section 1 contains fresh `du -sh` output for dracon-platform, .git, target/, web/, web/games/, .git/objects/, and the top 10 subtrees by size. Plus `git count-objects -vH` output. Numbers captured at audit time, not quoted from prior reports.",
         "lightweightSubtasks": true
       }
@@ -84,10 +86,10 @@ If blocked: Stop and ask the user. Specifically: if the systemd unit is too sand
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 32s
-- Tokens used: 345K (344,554) tokens
+- Time spent: 1m00s
+- Tokens used: 348K (348,125) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
-- [ ] section-1-size-audit: Section 1 — Size audit of dracon-platform (read-only) — contract: Report section 1 contains fresh `du -sh` output for dracon-platform, .git, target/, web/, web/games/, .git/objects/, and the top 10 subtrees by size. Plus `git count-objects -vH` output. Numbers captured at audit time, not quoted from prior reports.
+- [x] section-1-size-audit: Section 1 — Size audit of dracon-platform (read-only) — evidence: Section 1 deliverable (raw `du` and `git count-objects` output) saved at `docs/design/audit-2026-06-26/size-audit-platform.txt` (1.6 KiB). Numbers captured fresh at audit time 2026-06-27 01:53 BST: wo
 
