@@ -27,10 +27,10 @@
 | Field | Value |
 |---|---|
 | Local HEAD (initial) | `f2bf55aeceff5468d22410ef52ecf71e64578062` (2026-06-27 13:57:30) |
-| Local HEAD (latest check) | `8c95d44c356377d217554af94458182e1aab38a5` (2026-06-27 16:24:xx) |
+| Local HEAD (latest check) | `bc2e468bbd45` (2026-06-27 16:27:xx) |
 | Codeberg `main-temp` | `6a7cf69324074e35cff9e64f4aa3ef15d6c3b4e5` (2026-06-26 21:17:34) |
 | Merge-base | `8fc02238f509c7e5e48106f474e65e5e7e1e603b` (2026-06-26 21:15:42) |
-| Local commits past merge-base | 1350 (grew from 1238 → 1321 → 1340 → 1350 during operator-decision wait) |
+| Local commits past merge-base | 1361 (grew from 1238 → 1321 → 1340 → 1350 → 1358 → 1361 during operator-decision wait) |
 | Codeberg commits past merge-base | 1 |
 | Stash count | 22 (including `divergence-resolution-stash` from 2026-06-19 and several `ovh-*` stashes) |
 | Daemon push failures | 205+ (up from 157 at investigation time) |
@@ -68,19 +68,20 @@
   - `/home/dracon/dracon/backups/*.bundle` — bundles for other repos (dracon-code, rust-ai-web-auto, etc.), no dracon-platform bundle
 - **Recovery if force-pushed**: only via local reflog for ~30-90 days, then truly gone
 
-### 1.4 Pre-resolution working tree state
+### 1.4 Pre-resolution working tree state (latest check, 2026-06-27 16:27)
 
 ```
  M web/games/.env.ovh                              (tracked, recently committed, unstaged modification)
- M web/games/wip/hellhunter/.pi/goals/active_goal_*.md  (unstaged modification to a goal file)
 ?? web/games/wip/darklord/.tmp-audit/             (untracked audit scripts directory)
+   ├─ bounding-box.mjs
+   └─ capture-interactive.mjs
 ```
 
 - `.env.ovh` is TRACKED (not gitignored) and has been committed multiple times recently (with `ENV:` in the commit subject). This is the operator's intentional pattern, NOT a violation of AGENTS.md (which forbids `.env`, not `.env.ovh`).
-- The goal file modification is a working-tree-only change to an active goal file.
-- `.tmp-audit/` contains 3 audit scripts (`audit-1.mjs`, `bounding-box.mjs`, `capture-interactive.mjs`) — safe to leave untracked.
+- The earlier `web/games/wip/hellhunter/.pi/goals/active_goal_*.md` modification has been resolved (either committed or reverted).
+- `.tmp-audit/` contains 2 audit scripts (`bounding-box.mjs`, `capture-interactive.mjs`) — safe to leave untracked.
 
-**For option (a) rebase**, these must be stashed or committed first (rebase requires a clean working tree).
+**For option (a) rebase**, the 1 tracked-but-modified file and 1 untracked-dir must be stashed first (rebase requires a clean working tree). The stash command in Section 4.1 is verified against this working tree state.
 
 ---
 
@@ -163,14 +164,18 @@
 | Dimension | (a) Rebase | (b) Force-push | (c) Accept stuck |
 |---|---|---|---|
 | Preserves divergent commit | ✅ Yes | ❌ No (reflog only) | ✅ Yes (orphaned) |
-| Preserves security fix | ✅ Yes | ❌ No | ⚠️ On codeberg only |
-| AGENTS.md compliant | ✅ Yes | ❌ Needs override | ✅ Yes |
+| Preserves security fix | ✅ Yes | ⚠️ Only via local recovery | ⚠️ On codeberg only |
+| Preserves cookbook.json powerviolence-49-04 fix | ✅ Yes (auto-merged) | ❌ No (destroyed) | ⚠️ On codeberg only |
+| AGENTS.md compliant | ✅ Yes | ❌ Needs explicit override | ✅ Yes |
 | Local commits preserved | ✅ Yes (new SHAs) | ✅ Yes (same SHAs) | ✅ Yes |
-| Working tree handling | Must stash | No change needed | No change needed |
-| Conflict resolution needed | ⚠️ ~10 text files | None | None |
-| Time to complete | ~5-30 min | ~10 sec | 0 sec |
+| Working tree handling | Must stash (1 file + 1 untracked dir) | No change needed | No change needed |
+| **Conflict resolution needed** | **16 total: 15 mechanical, 1 trivial** (verified by `git merge-tree`) | None | None |
+| Design decision required | ❌ **No** (Map2D.svelte v10/v11 already resolved locally in commit `135aab9af8`) | N/A | N/A |
+| Time to complete | **~5 min** (was 5-30 min before merge-tree analysis) | ~10 sec | 0 sec |
 | Reversibility | Medium (reflog) | Low (reflog only) | High (revisit anytime) |
-| Risk class | Low | HIGH | None |
+| Risk class | **Low** | **HIGH** (force-push + cookie destroy) | **None** (daemon alert fatigue) |
+| Daemon backstop unblocks | ✅ Yes (after rebase + push) | ✅ Yes (after force-push) | ❌ No (stays active) |
+| Future rebase complexity | ✅ Lower (fewer unpushed) | ✅ Lower (none unpushed) | ❌ Higher (still growing) |
 
 ---
 
