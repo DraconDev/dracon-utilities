@@ -1,0 +1,76 @@
+=== PUSH_STUCK DIVERGENCE INVESTIGATION ===
+Date: 2026-06-27T13:51:29+01:00
+Repo: /home/dracon/Dev/dracon-platform
+
+=== STATE SUMMARY ===
+Local HEAD:    65d4ce2e375c53d740a9b3a2762fb65fdeea3e24 (2026-06-27 13:51:17 +0100)
+Codeberg tip:  6a7cf69324074e35cff9e64f4aa3ef15d6c3b4e5 (2026-06-26 21:17:34 +0100)
+Merge-base:    8fc02238f509c7e5e48106f474e65e5e7e1e603b (2026-06-26 21:15:42 +0100)
+
+Local commits past merge-base:   1242
+Codeberg commits past merge-base: 1
+
+=== IS THE DIVERGENT COMMIT AN ANCESTOR OF LOCAL HEAD? ===
+NO — divergent commit is NOT an ancestor of local HEAD (TRUE DIVERGENCE)
+
+=== IS LOCAL HEAD A DESCENDANT OF CODEBERG/MAIN-TEMP? ===
+NO — local HEAD is NOT a descendant (push would be non-fast-forward, REJECTED)
+
+=== git push dry-run ===
+To codeberg.org:dracondev/dracon-platform.git
+ ! [rejected]              main-temp -> main-temp (non-fast-forward)
+error: failed to push some refs to 'codeberg.org:dracondev/dracon-platform.git'
+hint: Updates were rejected because the tip of your current branch is behind
+hint: its remote counterpart. If you want to integrate the remote changes,
+hint: use 'git pull' before pushing again.
+hint: See the 'Note about fast-forwards' in 'git push --help' for details.
+
+=== DIVERGENT COMMIT DETAILS ===
+SHA:     6a7cf69324074e35cff9e64f4aa3ef15d6c3b4e5
+Author:  DraconDev <dracsharp@gmail.com>
+Date:    2026-06-26 21:17:34 +0100
+Subject: CLOSED: fix-ovh-access-key-id-misconfig, add-migration-safety-doc, tighten-gitignore-explicit-denylist, rename-allowed-paths-to-migration-todo, annotate-migration-todo-per-game, verify-policy-baseline, regenerate-roads, wire-map2d-to-v11, blend-town-thumbnails, final-verify-and-commit | 51 file(s) in apis,web [web/music/libs/data/cookbook.json, web/games/demos/_shared-assets/gen-walk-cycles.py, apis/.pi/goals/active_goal_2026062618353378_mqv7p5zr-0647wj.md] DELTA:+454/-90 | BIN:41 NEW:_shared-assets/gen-walk-cycles.py,visual-audit/play-v2.png
+
+=== DIVERGENT COMMIT FILE STATS ===
+ .../static/assets/terrain-painted-v11/water-v3.png | Bin 6640 -> 6556 bytes
+ .../static/assets/terrain-painted-v11/water.png    | Bin 6398 -> 6880 bytes
+ ...active_goal_2026062602174377_mqu8rnxe-96wdi3.md |  23 +--
+ web/music/libs/data/cookbook.json                  | 178 +++++++++++++++++++--
+ 51 files changed, 454 insertions(+), 90 deletions(-)
+
+=== DIVERGENT COMMIT REACHABILITY ===
+Refs containing divergent commit:
+  refs/remotes/codeberg/main-temp
+
+Reflog entries (recovery window: ~30-90 days):
+6a7cf69324 refs/remotes/codeberg/main-temp@{0}: update by push
+6a7cf69324 refs/heads/main-temp@{1250}: commit: CLOSED: fix-ovh-access-key-id-misconfig, add-migration-safety-doc, tighten-gitignore-explicit-denylist, rename-allowed-paths-to-migration-todo, annotate-migration-todo-per-game, verify-policy-baseline, regenerate-roads, wire-map2d-to-v11, blend-town-thumbnails, final-verify-and-commit | 51 file(s) in apis,web [web/music/libs/data/cookbook.json, web/games/demos/_shared-assets/gen-walk-cycles.py, apis/.pi/goals/active_goal_2026062618353378_mqv7p5zr-0647wj.md] DELTA:+454/-90 | BIN:41 NEW:_shared-assets/gen-walk-cycles.py,visual-audit/play-v2.png
+6a7cf69324 HEAD@{1256}: commit: CLOSED: fix-ovh-access-key-id-misconfig, add-migration-safety-doc, tighten-gitignore-explicit-denylist, rename-allowed-paths-to-migration-todo, annotate-migration-todo-per-game, verify-policy-baseline, regenerate-roads, wire-map2d-to-v11, blend-town-thumbnails, final-verify-and-commit | 51 file(s) in apis,web [web/music/libs/data/cookbook.json, web/games/demos/_shared-assets/gen-walk-cycles.py, apis/.pi/goals/active_goal_2026062618353378_mqv7p5zr-0647wj.md] DELTA:+454/-90 | BIN:41 NEW:_shared-assets/gen-walk-cycles.py,visual-audit/play-v2.png
+
+=== OTHER CLONES/BACKUPS ===
+  git repo: /home/dracon/Dev/dracon-platform
+  git repo: /home/dracon/Downloads/1/dracon-platform
+
+=== DIVERGENT COMMIT SEMANTIC CONTENT (extracted from subject) ===
+  - fix-ovh-access-key-id-misconfig     (SECURITY FIX)
+  - add-migration-safety-doc            (documentation)
+  - tighten-gitignore-explicit-denylist (SECURITY HARDENING)
+  - rename-allowed-paths-to-migration-todo (refactor)
+  - annotate-migration-todo-per-game   (refactor)
+  - verify-policy-baseline              (audit)
+  - regenerate-roads                    (content gen, 8 road tiles)
+  - wire-map2d-to-v11                   (code change, Map2D.svelte)
+  - blend-town-thumbnails               (image gen, 15 town tiles)
+  - final-verify-and-commit             (final commit)
+
+=== KEY TEXT-FILE DIFF (cookbook.json) ===
+commit 6a7cf69324074e35cff9e64f4aa3ef15d6c3b4e5
+Author: DraconDev <dracsharp@gmail.com>
+Date:   Fri Jun 26 21:17:34 2026 +0100
+
+    CLOSED: fix-ovh-access-key-id-misconfig, add-migration-safety-doc, tighten-gitignore-explicit-denylist, rename-allowed-paths-to-migration-todo, annotate-migration-todo-per-game, verify-policy-baseline, regenerate-roads, wire-map2d-to-v11, blend-town-thumbnails, final-verify-and-commit | 51 file(s) in apis,web [web/music/libs/data/cookbook.json, web/games/demos/_shared-assets/gen-walk-cycles.py, apis/.pi/goals/active_goal_2026062618353378_mqv7p5zr-0647wj.md] DELTA:+454/-90 | BIN:41 NEW:_shared-assets/gen-walk-cycles.py,visual-audit/play-v2.png
+
+diff --git a/web/music/libs/data/cookbook.json b/web/music/libs/data/cookbook.json
+index 57dc91ef0d..2a99cd6cca 100644
+--- a/web/music/libs/data/cookbook.json
++++ b/web/music/libs/data/cookbook.json
