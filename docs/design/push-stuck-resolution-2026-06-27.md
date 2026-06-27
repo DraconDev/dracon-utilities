@@ -82,7 +82,7 @@
 - `cookbook.json` was modified locally at 2026-06-27T15:28:27 (2 minutes after HEAD's 15:26:29) — likely the daemon or a local script added an `audioKey: audio/drone-58/drone-58-07.mp3` fix. This is a working-tree change that will CONFLICT with the divergent codeberg commit's `powerviolence-49-04 audioKey` change during the rebase. Resolution: take "ours" (local's drone-58 fix is the newer one) or merge both audioKey changes.
 - `.tmp-audit/` contains 2 audit scripts (`bounding-box.mjs`, `capture-interactive.mjs`) — safe to leave untracked.
 
-**For option (a) rebase**, the 2 tracked-but-modified files and 1 untracked-dir must be stashed first (rebase requires a clean working tree). The stash command in Section 4.1 is verified against this working tree state.
+**For option (a) rebase**, the working tree is DYNAMIC (the daemon is actively committing, and local scripts may modify tracked files between checks). The Section 4.1 stash command uses a BLANKET `git stash push --include-untracked` to capture everything, regardless of which files are currently modified. The `git status` output is captured to an evidence file before the stash.
 
 ---
 
@@ -218,19 +218,22 @@ Of those, **15 are mechanical** (take "ours") and **1 is trivial manual** (cookb
 The Map2D.svelte "design conflict" is **already resolved locally** in commit `135aab9af8` (v10 revert) — take "ours".
 
 ```bash
-# 1. Stash working tree changes (2 tracked-modified + 1 untracked-dir)
+# 1. Stash ALL working tree changes (the daemon is actively committing, so this
+#    list is dynamic — use a blanket stash to capture everything)
 cd /home/dracon/Dev/dracon-platform
-git stash push --include-untracked --message "pre-rebase-stash-2026-06-27" -- \
-  web/games/.env.ovh \
-  web/music/libs/data/cookbook.json \
-  web/games/wip/darklord/.tmp-audit/
+git status  # capture final state before stash (save to evidence file)
+git stash push --include-untracked --message "pre-rebase-stash-2026-06-27"
 
 # 2. Run the rebase
 git pull --rebase codeberg main-temp
 
 # 3. Resolve conflicts (16 total, all mechanical or trivial — see Section 2.1)
 #    13 mechanical: take "ours" (5 archived goal files, 1 rename/rename, 8 binary PNGs)
-#    1 trivial: cookbook.json — take "ours" (local's updatedAt is newer)
+#    1 trivial: cookbook.json — TWO audioKey fixes at different line ranges:
+#                codeberg: powerviolence-49-04 (line 22532+)
+#                local:    drone-58-07 (line 35698+)
+#                Both should be kept. Resolve the updatedAt timestamp conflict
+#                by taking local's (newer). The rest auto-merges.
 #    1 RESOLVED: Map2D.svelte — take "ours" (local's v10 painted is the post-revert state)
 #    1 auto-merged: proceduralSprites.ts — no action needed
 #
