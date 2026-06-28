@@ -578,16 +578,16 @@ $ grep -r "<OLD_AKIA>" /home/dracon/Dev/dracon-platform/apis/services/email-api/
 
 After pasting the 9.3 evidence into §8, call `update_goal` with `status: complete`. All 14 criteria will then be met.
 
-## 10. Final state (snapshot at 2026-06-29 00:29)
+## 10. Final state (snapshot at 2026-06-29 00:50)
 
-- **dracon-platform**: on `main`, tracking `codeberg/master`, **0/0 codeberg** (manually pushed **11 operator commits** with `main:master` refspec, including latest `8502831c51` T1.4+T1.5 gap-closure + archive renames — 15 files, +199/-92, 79 test changes, 5 binary — at 00:29); HEAD is `8502831c51` (3190+ commits ahead of github); daemon shows 🟢 synced; 2 modified gap-closure PNGs (T1.2-hegemon, T1.2-polis) + 3 modified darklord chrome screenshots
-- **dracon-utilities**: 0/0 codeberg, 0/0 gitlab, **51 ahead github** (was 40 at 22:04; growth = audit doc expansion), **173 PUSH_STUCK failures** (GH013 history issue — see §15.1 for comprehensive list: 5 files, 9 commits with literal OLD secret, 13 commits with literal OLD AKIA in this repo's git history)
+- **dracon-platform**: on `main`, tracking `codeberg/master`, **0/0 codeberg** (manually pushed **12 operator commits** with `main:master` refspec, including latest `09806419b4` CLOSED:wave-p1-engine-sprite-size — 51 files, +990/-290, 246 test changes, 12 binary, includes H3-TERRAIN-FIX-v0.91.0-MMX.md, INV_CARD_AUDIT.md, isometric world.test.ts, v91-batch4+5+final-mosaic, darklord chrome screenshots — at 00:50); HEAD is `09806419b4` (3191+ commits ahead of github); daemon shows 🟢 synced; 1 modified DESIGN.md + 1 modified d2Assets.ts
+- **dracon-utilities**: 0/0 codeberg, 0/0 gitlab, **56 ahead github** (was 51 at 00:29; growth = audit doc expansion), **173 PUSH_STUCK failures** (GH013 history issue — see §15.1 for comprehensive list: 5 files, 9 commits with literal OLD secret, 13 commits with literal OLD AKIA in this repo's git history)
 - **Daemon**: **15 OK, 1 WARN, 0 CONCERN** (1 WARN: operator's dirty working tree on `dracon-platform`; cycles between 14/2 and 15/1 due to operator's continuous game asset work — criterion 13 met)
-- **Audit doc**: `dracon-platform-aws-rotation-2026-06-28.md` (43+ KB / 775 lines / 19 sections, including §15 critical finding of recursive leak), scrubbed, committed, pushed to codeberg + gitlab at 0/0
+- **Audit doc**: `dracon-platform-aws-rotation-2026-06-28.md` (43+ KB / 780+ lines / 19 sections, including §15 critical finding of recursive leak), scrubbed, committed, pushed to codeberg + gitlab at 0/0
 - **Rotation script**: `scripts/rotate-dracon-platform-aws-key.sh` (13.3 KB) with `--check` mode + full exit-code table
 - **Warden**: v0.3.7, healthy; clean/smudge filters registered; .gitattributes covers 6 .env* patterns; hardening pass complete (repos changed: 0)
 - **Goal criteria**: 8 of 14 met (1, 2, 3, 4, 5, 11, 12, 13); 6 pending new key (6, 7, 8, 9, 10, 14)
-- **Operator activity**: focused on platform game work — **11 commits pushed today** (hegemon road/mine sprites, terrain-painted-v10 tiles, v10 tiles all fixed, H3-TERRAIN-FIX-LIVE-VERIFIED, T1.3 gap-closure bundle `c67df643bb`, **T1.4+T1.5+archive renames `8502831c51`**); NO activity on email-api/AWS keys since June 19-23
+- **Operator activity**: focused on platform game work — **12 commits pushed today** (hegemon road/mine sprites, terrain-painted-v10 tiles, v10 tiles all fixed, H3-TERRAIN-FIX-LIVE-VERIFIED, T1.3 gap-closure bundle `c67df643bb`, T1.4+T1.5+archive renames `8502831c51`, **CLOSED:wave-p1-engine-sprite-size `09806419b4`**); NO activity on email-api/AWS keys since June 19-23
 - **Operator action item**: paste NEW_AKIA + NEW_SECRET to finish, or say "defer"/"abort" to close the goal with the doc + script as the durable record
 
 ## 11. Warden infrastructure validation (2026-06-28 20:38)
