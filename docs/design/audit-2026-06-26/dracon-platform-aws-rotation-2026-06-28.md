@@ -297,10 +297,12 @@ The old key `<AKIA-REDACTED>` and secret are still in `dracon-platform` git hist
 The `dracon-platform` row in `dracon-sync repos`:
 
 ```
-│ 2  ┆ ✅ OK    ┆ dracon-platform                         ┆ main      ┆ codeberg/master ┆ 0      ┆ 0      ┆ 9     ┆ 0       ┆ 0        ┆ OK         ┆ github,gitlab,codeberg ┆ 55b7500589e… 2 file(s) in web [web/games/wip/endless-td/WAVE1_BALANCE.md, web/games/wip/… ┆ -         ┆ ⚪ idle 1h                  ┆ dracon    ┆ 0     ┆ 3178  ┆ 3178   ┆ ⚪ untracked-only ┆ 1h ago sync_commit  ┆ healthy                                                                                                 │
+│ 2  ┆ ✅ OK    ┆ dracon-platform                         ┆ main      ┆ codeberg/master ┆ 0      ┆ 0      ┆ 1     ┆ 0       ┆ 0        ┆ OK         ┆ github,gitlab,codeberg ┆ 1ebb75721c2… 8 file(s) in web DELTA:+0/-0 | BIN:8                                     ┆ -         ┆ 🟢 synced 5m                ┆ dracon    ┆ 2     ┆ 3180  ┆ 3180   ┆ ⚪ untracked-only ┆ 4m ago sync_commit  ┆ healthy                                                                                                 │
 ```
 
-✅ dracon-platform row is OK with 0/0 ahead/behind codeberg. The `⚠️ WARN 1` count in the daemon summary is on `dracon-utilities` (this repo) due to github GH013 push-protection block — separate issue from the platform key rotation. Full state captured at `dracon-platform-state-2026-06-28.txt`.
+✅ dracon-platform row is OK with 0/0 ahead/behind codeberg (verified at 22:28). HEAD is now `1ebb75721c` (operator's hegemon road sprite commit, not AWS-related). The 1-ahead-github is the size block (HTTP 500, 11.4 GB > 5 GB free tier). The 0-ahead-gitlab is the 404 (repo doesn't exist on gitlab.com). Daemon summary: 16 OK, 0 WARN, 0 CONCERN. Full state captured at `dracon-platform-state-2026-06-28.txt`.
+
+The `⚠️ WARN 1` count in the daemon summary cycles on `dracon-utilities` (this repo) due to github GH013 push-protection block — separate issue from the platform key rotation. See §15.1 for the comprehensive recursive leak analysis.
 
 ## 7. Files
 
