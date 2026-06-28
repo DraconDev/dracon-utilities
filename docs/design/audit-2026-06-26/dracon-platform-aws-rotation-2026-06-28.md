@@ -309,7 +309,7 @@ The `dracon-platform` row in `dracon-sync repos`:
 - Earlier audit (referenced): `docs/design/audit-2026-06-26/full-architecture-audit-2026-06-28.md`
 - Size unblock plan (referenced): `docs/design/audit-2026-06-26/dracon-platform-size-unblock-2026-06-28.md`
 
-## 8. Hard acceptance criteria — current status (2026-06-28 21:30, refreshed 21:36)
+## 8. Hard acceptance criteria — current status (2026-06-28 21:30, refreshed 22:13)
 
 | # | Criterion | Status |
 |---|-----------|--------|
@@ -323,14 +323,14 @@ The `dracon-platform` row in `dracon-sync repos`:
 | 8 | NEW key present in both env files | ⏳ PENDING new key |
 | 9 | `dracon-warden once` exits 0 | ⏳ PENDING rotation |
 | 10 | Files still decrypt and contain new values | ⏳ PENDING rotation |
-| 11 | This audit doc exists with all sections | ✅ DONE (13 sections, 34.5 KB) |
+| 11 | This audit doc exists with all sections | ✅ DONE (19+ sections, 43+ KB) |
 | 12 | Doc committed and pushed to codeberg + gitlab | ✅ DONE (0/0 both remotes) |
-| 13 | `dracon-sync repos` shows 16 OK, 0 WARN, 0 CONCERN | ✅ MET (verified at 21:36; may cycle to WARN) |
+| 13 | `dracon-sync repos` shows 16 OK, 0 WARN, 0 CONCERN | ✅ MET (verified at 22:13; may cycle to WARN) |
 | 14 | Working-tree scrub of old key confirmed | ⏳ PENDING new key |
 
-**8 of 14 criteria met (verified at 21:36). 6 criteria pending operator providing new key values (criteria 6, 7, 8, 9, 10, 14).**
+**8 of 14 criteria met (verified at 22:13). 6 criteria pending operator providing new key values (criteria 6, 7, 8, 9, 10, 14).**
 
-Note: criterion 13 (16 OK, 0 WARN) was previously marked TRANSIENT because the daemon's `push-stuck` counter on this repo (dracon-utilities) cycles between 0 (clean) and 1+ (WARN) as the daemon retries the github push. The GH013 history issue (commits across 3 audit doc files contain the literal OLD secret/AKIA in git history — see §15.1 for the comprehensive list of 9 commits with secret and 11 commits with AKIA) is real. At the time of writing (21:36) the daemon is in its 0-WARN phase. This criterion is a **separate concern** from the platform rotation — it requires operator action (click the unblock URLs in §15.3) or a history rewrite (AGENTS.md prohibits without override).
+Note: criterion 13 (16 OK, 0 WARN) was previously marked TRANSIENT because the daemon's `push-stuck` counter on this repo (dracon-utilities) cycles between 0 (clean) and 1+ (WARN) as the daemon retries the github push. The GH013 history issue (commits across 5 files — 4 docs + 1 script — contain the literal OLD secret/AKIA in git history — see §15.1 for the comprehensive list of 9 commits with secret and 13 commits with AKIA) is real. At the time of writing (22:13) the daemon is in its 0-WARN phase. This criterion is a **separate concern** from the platform rotation — it requires operator action (click the unblock URLs in §15.3) or a history rewrite (AGENTS.md prohibits without override).
 
 The 6 Part-B criteria (6, 7, 8, 9, 10, 14) all require the new key. The script `scripts/rotate-dracon-platform-aws-key.sh` handles all 6 in a single command, including verification and codeberg push.
 
