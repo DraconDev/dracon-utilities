@@ -66,7 +66,7 @@ gitlab:    unknown (repo 404)     (not in scope)
 
 Codeberg is in sync ✅. The 6,320-commit github lag is the size-unblock issue documented in `dracon-platform-size-unblock-2026-06-28.md` (deferred to a future goal).
 
-### 3.5 .gitignore un-ignore gap (line 67)
+### 3.5 .gitignore un-ignore gap (lines 66-71)
 
 ```
 $ grep -n '!.env' /home/dracon/Dev/dracon-platform/.gitignore
@@ -78,12 +78,88 @@ $ grep -n '!.env' /home/dracon/Dev/dracon-platform/.gitignore
 71:!.env.turso
 ```
 
-The `!.env.dev` and `!.env.prod` un-ignore patterns at lines 67-68 are what cause the env files to be tracked. **This is a known security issue from the full-architecture-audit-2026-06-28.md** but the fix requires operator authorization because:
+The `!.env.dev` (line 68) and `!.env.prod` (line 67) un-ignore patterns are what cause the env files to be tracked. **This is a known security issue from the full-architecture-audit-2026-06-28.md** but the fix requires operator authorization because:
 - The env files contain warden-encrypted secrets; removing them from tracking could break warden's encryption flow
 - A git history rewrite would be required to fully un-track them (AGENTS.md prohibits without override)
 - The 100% safe alternative is to use a secret manager (e.g. AWS Secrets Manager, Vault), not git + warden
 
 **Documented; NOT fixed in this goal.**
+
+### 3.6 Pre-flight readiness check (2026-06-28 20:22)
+
+Before requesting the new key, verified that the rotation will work cleanly:
+
+```
+$ which dracon-warden
+/home/dracon/.local/bin/dracon-warden
+$ dracon-warden --version
+dracon-warden 0.3.7
+
+$ cat /home/dracon/Dev/dracon-platform/.gitattributes
+# --- BEGIN DRACON MANAGED BLOCK ---
+*.age filter=dracon diff=dracon merge=dracon
+*.key filter=dracon diff=dracon merge=dracon
+*.pem filter=dracon diff=dracon merge=dracon
+.env filter=dracon diff=dracon merge=dracon
+.env.dev filter=dracon diff=dracon merge=dracon
+.env.ovh filter=dracon diff=dracon merge=dracon
+.env.prod filter=dracon diff=dracon merge=dracon
+.env.production filter=dracon diff=dracon merge=dracon
+.env.turso filter=dracon diff=dracon merge=dracon
+config/services.json filter=dracon diff=dracon merge=dracon
+secrets/** filter=dracon diff=dracon merge=dracon
+...
+```
+
+Confirmed:
+- Warden binary v0.3.7 present at `/home/dracon/.local/bin/dracon-warden` ✅
+- `.gitattributes` configures `dracon` filter for `.env`, `.env.dev`, `.env.prod` etc. ✅
+- Working tree shows decrypted env values (warden smudge working) ✅
+- Working tree state: clean (only 1 untracked dir, no modified tracked files) ✅
+- `git show HEAD:apis/services/email-api/.env.dev` returns `[DRACON_SECRET:...]` blob, confirming files ARE encrypted in git history (good — old values are not plaintext in commits) ✅
+
+**Conclusion**: when the new key values are provided, the rotation sequence (replace → warden re-encrypt → read-back) will work without surprises.
+
+### 3.7 CRITICAL FINDING — 13 tracked env files, not just email-api
+
+During pre-flight, discovered that the platform has **13 tracked env files** with secrets (not just `apis/services/email-api/.env.{dev,prod}`):
+
+```
+$ git -C /home/dracon/Dev/dracon-platform ls-files | grep -E "\.env(\.|$)" | grep -v example
+apis/services/ai-api/.env
+apis/services/ai-api/.env.dev
+apis/services/ai-api/.env.prod
+apis/services/auth-api/.env.dev
+apis/services/auth-api/.env.prod
+apis/services/billing-api/.env.dev
+apis/services/billing-api/.env.prod
+apis/services/email-api/.env.dev
+apis/services/email-api/.env.prod
+apis/services/music-api/.env.dev
+apis/services/music-api/.env.prod
+web/ai-hub/.env
+web/games/.env.ovh
+```
+
+Sample of what's in these files:
+- `auth-api/.env.prod`: TURSO_AUTH_TOKEN, EMAIL_API_KEY (3b6ef6f6...)
+- `billing-api/.env.prod`: BILLING_PADDLE_API_KEY (pdl_live_...), TURSO_BILLING_TOKEN
+- `music-api/.env.prod`: TURSO_MUSIC_TOKEN
+- `web/ai-hub/.env`: ARTIFICIAL_ANALYSIS_API_KEY (aa_RhYSoQr...)
+- `web/games/.env.ovh`: OVH bucket credentials (presumably)
+
+All these are encrypted in git history via warden (good — smudge filter on .env*). But:
+- They are all in git history (encrypted, but decryptable by anyone with the operator's warden key)
+- They are all decrypted in the working tree (so any process running on this machine sees plaintext)
+- The 0644 permissions on the env files mean they are readable by ALL users on the box (a separate issue)
+
+**This goal only rotates `email-api/.env.{dev,prod}` (the AWS keys per the operator's explicit ask).** The other 11 env files are out of scope for THIS goal but should be addressed in a future goal. The recommended path:
+1. Move secrets out of `apis/services/*/.env.*` to a secret manager (AWS Secrets Manager, Vault, etc.)
+2. Remove the `!.env*` un-ignore patterns from `.gitignore`
+3. Run `git rm --cached` for each tracked env file
+4. Optionally do a history rewrite to remove the encrypted blobs from history (AGENTS.md override required)
+
+This is a **future goal**, not in scope here.
 
 ### 3.6 Working-tree evidence (the keys that need rotation)
 
