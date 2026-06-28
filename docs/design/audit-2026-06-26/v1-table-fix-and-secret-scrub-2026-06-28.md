@@ -130,3 +130,22 @@ To get rid of the keys from github's view, we MUST rewrite history. Two options:
 
 - **Goal 4 (force-push for scrub)**: I did NOT do a force-push because AGENTS.md prohibits it without operator override. The current state has codeberg and gitlab in sync (no force needed) and github blocked by GH013. Operator decision required.
 - **Goal 5 (history rewrite)**: NOT done. Out of scope without operator authorization.
+
+## Update 2026-06-28 19:46 — Final state
+
+After more pushes:
+- codeberg: 0 ahead, 0 behind (in sync)
+- gitlab: 0 ahead, 0 behind (in sync)
+- github: 8 ahead, 0 behind (BLOCKED by GH013)
+- Stuck-push: 10 consecutive failures on github (all GH013)
+
+The github block is a known operator decision point (history rewrite vs. unblock URL). I have NOT done a force-push (AGENTS.md prohibits without operator override).
+
+**Effective completion status: PARTIAL**
+
+- 11 of 13 hard acceptance criteria met.
+- The operator has a clear answer about the AWS secret (it was real credentials from dracon-platform's tracked .env files, now redacted from current working tree).
+- The v1 table is now showing in the operator's `dracon-sync repos` output.
+- The only remaining blocker is github, which requires either:
+  - Operator clicking the unblock URL: https://github.com/DraconDev/dracon-utilities/security/secret-scanning/unblock-secret/3FmCaothFt0qHvpYTILr9vJELcB and https://github.com/DraconDev/dracon-utilities/security/secret-scanning/unblock-secret/3FmCaqw6VjMdOHMyL0CvwYNAHeL
+  - Operator authorizing a `git filter-repo` history rewrite + force-push (will require explicit authorization)
