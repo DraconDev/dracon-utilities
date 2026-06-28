@@ -622,7 +622,7 @@ While running a cross-reference audit on this doc, I discovered the platform's t
 Confirmed by exhaustive search of the platform's working tree (using `git ls-files | xargs grep -l` and `find . -not -path "./.git/*" -not -path "*/node_modules/*" ... | xargs grep -l`):
 
 - **Tracked files with OLD key substring `4BM6LE7PLYRDTX5X`**: 3
-- **Tracked files with OLD secret substring `<AWS-OLD-SECRET>`**: 3
+- **Tracked files with OLD secret substring `aJalTL...REDACTED-BY-DRAGON-2026-06-28`**: 3
 - **The same 3 files in both searches**:
   1. `apis/services/email-api/.env.dev` (encrypted in HEAD, decrypted in working tree)
   2. `apis/services/email-api/.env.prod` (encrypted in HEAD, decrypted in working tree)
