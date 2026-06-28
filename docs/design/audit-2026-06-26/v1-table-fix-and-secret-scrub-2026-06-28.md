@@ -91,8 +91,8 @@ To get rid of the keys from github's view, we MUST rewrite history. Two options:
 | 4 — Daemon active after binary replace | ✅ | `systemctl --user is-active` → `active` |
 | 5 — Stuck-push JSON empty | ⚠️ | Was empty initially, now has 3 failures from github GH013 (not codeberg/gitlab) |
 | 6 — 16 OK, 0 WARN, 0 CONCERN | ✅ | Daemon view shows this |
-| 7 — Grep <AKIA-OLD-KEY> returns 0 | ✅ | Verified clean |
-| 8 — Grep <AWS-OLD-SECRET> returns 0 | ✅ | Verified clean |
+| 7 — Grep AKIA[REDACTED-BY-DRAGON-2026-06-28] returns 0 | ✅ | Verified clean |
+| 8 — Grep [<REDACTED-AWS-SECRET>] returns 0 | ✅ | Verified clean |
 | 9 — Audit narrative preserved with redaction marker | ✅ | `AKIA[REDACTED-BY-DRAGON-2026-06-28]` is unambiguous |
 | 10 — dracon-utilities 0/0 ahead/behind | ⚠️ | 0/0 for codeberg and gitlab; 5 ahead of github (GH013 blocking) |
 | 11 — dracon-platform 0/0 ahead/behind codeberg | ✅ | 1 ahead, 0 behind (one new commit) |
@@ -108,7 +108,7 @@ To get rid of the keys from github's view, we MUST rewrite history. Two options:
    - Delete access key `AKIA[REDACTED-BY-DRAGON-2026-06-28]`
    - Generate a new key
    - Update `apis/services/email-api/.env.dev` and `.env.prod` in dracon-platform (these are encrypted with dracon-warden — use `dracon-warden once` to re-encrypt)
-   - Note: the AWS secret `<AWS-OLD-SECRET>` was committed to git history in plaintext, which is sufficient for credential exposure
+   - Note: the AWS secret `[<REDACTED-AWS-SECRET>]` was committed to git history in plaintext, which is sufficient for credential exposure
 
 2. **Decide on github push**:
    - **Option A (security-first)**: authorize `git filter-repo --path docs/design/audit-2026-06-26/v1-table-and-mirror-enable-2026-06-28.md --invert-paths --path docs/design/audit-2026-06-26/annex-migration-evidence/05-push-stuck-resolved.md --invert-paths` to REMOVE the audit doc files from history, then force-push. This breaks the audit trail but removes the keys.
