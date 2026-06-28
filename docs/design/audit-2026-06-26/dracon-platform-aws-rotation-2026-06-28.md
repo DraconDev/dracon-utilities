@@ -2,13 +2,13 @@
 
 > **Goal**: 007296af-5469-4a34-989e-0012219e6732
 > **Operator**: "we would want ot check on the platwhich is what i intedned ... also you are talking about this i makde a new aws key we can jsut rotate to this"
-> **Status**: PARTIAL — 9 of 14 hard criteria met. Part B (key rotation) BLOCKED on operator providing the new key values.
+> **Status**: PARTIAL — 8 of 14 hard criteria met. Part B (key rotation) BLOCKED on operator providing the new key values.
 
 ---
 
 # 🚨 OPERATOR ACTION REQUIRED — 1 command, ≤ 2 minutes
 
-## Open items (5 of 14 hard criteria pending)
+## Open items (6 of 14 hard criteria pending)
 
 - [ ] **6. OLD key absent from `.env.dev`** — currently 1 match (`<AKIA-REDACTED>` substring)
 - [ ] **7. OLD key absent from `.env.prod`** — currently 1 match
@@ -17,7 +17,7 @@
 - [ ] **10. Files still decrypt with NEW values** — read-back verify not done
 - [ ] **14. Working-tree scrub of old key confirmed** — not done
 
-## 9 criteria already met ✅
+## 8 criteria already met ✅
 Criteria 1, 2, 3, 4, 5, 11, 12, 13 are met. Audit doc is comprehensive and pushed to codeberg + gitlab. Rotation script is in place and tested.
 
 ## To finish the goal — pick one
