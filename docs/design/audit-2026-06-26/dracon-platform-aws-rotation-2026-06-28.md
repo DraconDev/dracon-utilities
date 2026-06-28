@@ -330,7 +330,7 @@ The `dracon-platform` row in `dracon-sync repos`:
 
 **8 of 14 criteria met (verified at 21:36). 6 criteria pending operator providing new key values (criteria 6, 7, 8, 9, 10, 14).**
 
-Note: criterion 13 (16 OK, 0 WARN) was previously marked TRANSIENT because the daemon's `push-stuck` counter on this repo (dracon-utilities) cycles between 0 (clean) and 1+ (WARN) as the daemon retries the github push. The GH013 history issue (commits `290e795c` and `ec7dcec7` contain the literal OLD key in audit docs) is real but at the time of writing (21:36) the daemon is in its 0-WARN phase. This criterion is a **separate concern** from the platform rotation — it requires operator action (click the unblock URL in §6.2 / §12.1) or a history rewrite (AGENTS.md prohibits without override).
+Note: criterion 13 (16 OK, 0 WARN) was previously marked TRANSIENT because the daemon's `push-stuck` counter on this repo (dracon-utilities) cycles between 0 (clean) and 1+ (WARN) as the daemon retries the github push. The GH013 history issue (commits `6d27369b`, `22133bd7`, `d5c6de97`, `7adf6db1` contain the literal OLD secret in audit docs) is real — see §15 for the full investigation. At the time of writing (21:36) the daemon is in its 0-WARN phase. This criterion is a **separate concern** from the platform rotation — it requires operator action (click the unblock URL in §6.2 / §12.1 / §15.3) or a history rewrite (AGENTS.md prohibits without override).
 
 The 6 Part-B criteria (6, 7, 8, 9, 10, 14) all require the new key. The script `scripts/rotate-dracon-platform-aws-key.sh` handles all 6 in a single command, including verification and codeberg push.
 
@@ -575,7 +575,7 @@ After pasting the 9.3 evidence into §8, call `update_goal` with `status: comple
 ## 10. Final state (snapshot at 2026-06-28 21:43)
 
 - **dracon-platform**: on `main`, tracking `codeberg/master`, 0/0 codeberg, 1 untracked dir (`web/games/wip/darklord/.tmp-audit/`)
-- **dracon-utilities**: 0/0 codeberg, 0/0 gitlab, 40 ahead github (GH013 history issue on commits `290e795c` and `ec7dcec7`)
+- **dracon-utilities**: 0/0 codeberg, 0/0 gitlab, 40 ahead github (GH013 history issue on commits `6d27369b`, `22133bd7`, `d5c6de97`, `7adf6db1` — see §15)
 - **Daemon**: 16 OK, 0 WARN, 0 CONCERN (verified at 21:43; cycles transient to 15 OK 1 WARN as daemon retries github push)
 - **Audit doc**: `dracon-platform-aws-rotation-2026-06-28.md` (37 KB / 715 lines / 18 sections), scrubbed, committed, pushed to codeberg + gitlab
 - **Rotation script**: `scripts/rotate-dracon-platform-aws-key.sh` (8.8 KB) with `--check` mode + full exit-code table
