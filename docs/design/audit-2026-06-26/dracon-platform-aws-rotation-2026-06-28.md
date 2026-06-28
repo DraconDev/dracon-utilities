@@ -309,7 +309,7 @@ The `dracon-platform` row in `dracon-sync repos`:
 - Earlier audit (referenced): `docs/design/audit-2026-06-26/full-architecture-audit-2026-06-28.md`
 - Size unblock plan (referenced): `docs/design/audit-2026-06-26/dracon-platform-size-unblock-2026-06-28.md`
 
-## 8. Hard acceptance criteria — current status (2026-06-28 21:23)
+## 8. Hard acceptance criteria — current status (2026-06-28 21:30)
 
 | # | Criterion | Status |
 |---|-----------|--------|
@@ -325,12 +325,16 @@ The `dracon-platform` row in `dracon-sync repos`:
 | 10 | Files still decrypt and contain new values | ⏳ PENDING rotation |
 | 11 | This audit doc exists with all sections | ✅ DONE (13 sections) |
 | 12 | Doc committed and pushed to codeberg + gitlab | ✅ DONE |
-| 13 | `dracon-sync repos` shows 16 OK, 0 WARN, 0 CONCERN | ✅ DONE |
+| 13 | `dracon-sync repos` shows 16 OK, 0 WARN, 0 CONCERN | ⚠️ BLOCKED — GH013 history issue on this repo (separate from platform rotation) |
 | 14 | Working-tree scrub of old key confirmed | ⏳ PENDING new key |
 
-**8 of 14 criteria met. 6 criteria pending operator providing new key values (criteria 6, 7, 8, 9, 10, 14).**
+**7 of 14 criteria met. 7 criteria pending:**
+- 6, 7, 8, 9, 10, 14: PENDING new key from operator (Part B of the goal)
+- 13: PENDING operator action — GH013 history issue on this repo. Operator unblock URLs in §6.2 and §12.1.
 
-The 6 pending criteria all require the new key. The script `scripts/rotate-dracon-platform-aws-key.sh` handles all 6 in a single command, including verification and codeberg push. After running the script, the only remaining operator action is to disable the OLD key in AWS IAM (closes the leak window for ALL 3 leak vectors: 2 env files + 1 markdown).
+Note: criterion 13 (16 OK, 0 WARN) is blocked on a **separate** concern (the GH013 history issue on this repo's commits `290e795c` and `ec7dcec7`, which contain the literal OLD key in audit docs). This is NOT blocked on the platform rotation. The platform itself is clean (✅ OK).
+
+The 6 Part-B criteria (6, 7, 8, 9, 10, 14) all require the new key. The script `scripts/rotate-dracon-platform-aws-key.sh` handles all 6 in a single command, including verification and codeberg push.
 
 ## 9. Completion Runbook (2026-06-28 20:30)
 
