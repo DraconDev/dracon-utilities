@@ -394,6 +394,59 @@ This index maps every required sub-item from the goal to its location in this do
 - **Warden infrastructure validation**: §11
 - **Section index** (this section): §14
 
+---
+
+## 15. CRITICAL FINDING (2026-06-28 21:49) — Doc history has the literal OLD secret
+
+While investigating the GH013 push rejection (which started at 20:53 and continues), I discovered that **the doc's git history still contains the literal OLD AWS secret in 4+ commits**, even though the doc HEAD is clean.
+
+### 15.1 The issue
+
+**Doc HEAD is clean** (verified just now):
+- `<AKIA-REDACTED>` in HEAD: 0 matches
+- `SECRET-KEY-REDACTED-BY-DRAGON-2026-06-28` in HEAD: 0 matches
+
+**Doc history is NOT clean** (4+ commits with literal secret):
+- `6d27369b` — original doc creation, +210 lines, includes both literal AKIA and secret
+- `22133bd7` — later edit, +20/-20
+- `d5c6de97` — later edit, +18/-0
+- `7adf6db1` — later edit, +1/-1
+
+**Doc history also has literal AKIA** (4+ commits):
+- `6d27369b`, `22133bd7`, `719587ee`, `52a6a034`
+
+**GitHub push is rejected** by GH013 because the historical commits contain the literal secret. This is why the daemon's github push for this repo (`dracon-utilities`) is in PUSH_STUCK with 171+ failures.
+
+### 15.2 Why this happened
+
+I scrubbed the doc by replacing literal keys with redaction markers in the working tree. But **scrubbing the working tree does not rewrite history**. The git history still has the literal secret in those 4 commits.
+
+This is a recursive leak: the doc I wrote to document the platform's AWS leak is itself part of the leak in git history.
+
+### 15.3 Fix paths (out of scope for this goal)
+
+The fix requires either:
+
+1. **Operator clicks the GH013 unblock URLs** (3 URLs from the daemon log):
+   - https://github.com/DraconDev/dracon-utilities/security/secret-scanning/unblock-secret/3FmCaothFt0qHvpYTILr9vJELcB (AKIA)
+   - https://github.com/DraconDev/dracon-utilities/security/secret-scanning/unblock-secret/3FmCaqw6VjMdOHMyL0CvwYNAHeL (AWS Secret Access Key)
+   - (one more URL may be needed for the 3rd commit)
+
+2. **History rewrite via `git filter-repo`** — AGENTS.md prohibits without explicit operator override. Would require destroying 4+ commits.
+
+3. **Accept the leak window** — close the leak by:
+   - Disabling the OLD key in AWS IAM (closes the live leak; the historical commits are still in git history but the key is no longer usable)
+   - This is the same approach as for the platform's env files (Part B of the goal)
+
+### 15.4 Status
+
+- **§15 is a NEW finding** (2026-06-28 21:49) — not part of the original goal's hard acceptance criteria
+- **§15 does not change the goal's hard criteria count** (still 8 of 14 met)
+- **§15 explains why criterion 13 cycles to WARN** — the GH013 history issue is on this repo's commits `6d27369b`, `22133bd7`, `d5c6de97`, `7adf6db1` (not the previously-thought `290e795c`/`ec7dcec7`)
+- **The fix paths are out of scope** for goal 007296af (which is about the platform rotation, not this repo's history)
+
+This finding strengthens the case for **disabling the OLD key in AWS IAM as the #1 operator action** — it closes the live leak window for BOTH the platform's env files AND this doc's history simultaneously.
+
 ## 9. Completion Runbook (2026-06-28 20:30)
 
 **Preferred path**: use the rotation script at `/home/dracon/Dev/dracon-utilities/scripts/rotate-dracon-platform-aws-key.sh` — handles all of §9.2 steps 1-7 automatically, including verification and codeberg push. After the operator pastes the new key:
