@@ -406,15 +406,17 @@ While investigating the GH013 push rejection (which started at 20:53 and continu
 - `<AKIA-REDACTED>` in HEAD: 0 matches (all 3 docs)
 - `SECRET-KEY-REDACTED-BY-DRAGON-2026-06-28` in HEAD: 0 matches (all 3 docs)
 
-**Audit doc history is NOT clean** — 3 files, 9 commits with literal OLD secret, 11 commits with literal OLD AKIA:
+**Audit doc history is NOT clean** — 5 files, 9 commits with literal OLD secret, 13 commits with literal OLD AKIA:
 
 | File | Commits with literal secret | Commits with literal AKIA |
 |------|------------------------------|-----------------------------|
 | `dracon-platform-aws-rotation-2026-06-28.md` | `6d27369b`, `22133bd7`, `d5c6de97`, `7adf6db1` | `6d27369b`, `22133bd7`, `719587ee`, `52a6a034` |
 | `v1-table-fix-and-secret-scrub-2026-06-28.md` | `290e795c`, `ec7dcec7`, `a8ef2069` | `290e795c`, `ec7dcec7`, `a8ef2069` |
-| `v1-table-and-mirror-enable-2026-06-28.md` | `15b6542b`, `6133547d` (also has secret) | `15b6542b`, `6133547d`, `2fbe906d`, `58b3c5e9` |
+| `v1-table-and-mirror-enable-2026-06-28.md` | `15b6542b`, `6133547d` | `15b6542b`, `6133547d`, `2fbe906d`, `58b3c5e9` |
+| `annex-migration-evidence/05-push-stuck-resolved.md` | (none) | `2fbe906d`, `58b3c5e9` |
+| `scripts/rotate-dracon-platform-aws-key.sh` | (none) | `aca79df5`, `db7f6c3f` |
 
-**Total: 9 commits with literal OLD secret, 11 commits with literal OLD AKIA across 3 audit doc files.**
+**Total: 9 commits with literal OLD secret, 13 commits with literal OLD AKIA across 5 files (4 docs + 1 script).** All file HEADs are clean (the literal keys are only in historical commits).
 
 **GitHub push is rejected** by GH013 because the historical commits contain the literal secret/AKIA. This is why the daemon's github push for this repo (`dracon-utilities`) is in PUSH_STUCK with 171+ failures.
 
