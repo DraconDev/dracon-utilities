@@ -588,7 +588,7 @@ After pasting the 9.3 evidence into §8, call `update_goal` with `status: comple
   - **Criteria 6-10, 14: NEW AKIA rotated + verified + pushed to codeberg at 02:00**
   - Criteria 11-13: §15 recursive leak finding + 5 files covered + daemon WARN within threshold
 - **CRITICAL OPERATOR ACTION REQUIRED (post-rotation)**:
-  1. **Disable OLD AWS key in IAM**: `<AKIA-OLD-KEY>` at https://console.aws.amazon.com/iam/home#/security_credentials (otherwise the leaked key remains active)
+  1. **Disable OLD AWS key in IAM**: `<AKIA-REDACTED>` (the OLD 4BM6LE7PLYRDTX5X key) at https://console.aws.amazon.com/iam/home#/security_credentials (otherwise the leaked key remains active)
   2. **Click 3 github unblock URLs** in §15.3 to unblock dracon-utilities's 63-ahead github push (separate from goal #13)
   3. **Decide on `web/docs/SITE-HEALTH-AUDIT.md`** lines 414, 422, 423, 477 (still has OLD key in plaintext; rewrite or delete)
   4. **Rotate `MUSIC_OVH_SECRET_ACCESS_KEY`** in `web/games/.env.ovh` (separate service, different key)
