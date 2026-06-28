@@ -533,3 +533,41 @@ The warden infrastructure is **fully validated and ready** for the rotation. Whe
 - The smudge filter will continue to decrypt on every checkout
 
 **All 4 of the 5 criteria that can be verified WITHOUT the new key (1, 2, 3, 4, 5, 11, 12, 13) are met.** Criteria 6, 7, 8, 9, 10, 14 are blocked on the rotation itself, which requires the new key.
+
+---
+
+## 12. Operator Decisions Pending (consolidated)
+
+The goal's completion audit requires: *"Operator has clear answer: AWS IAM rotation step, history-rewrite decision, gitlab repo create, .gitignore un-ignore fix"*. All 4 are documented below for record:
+
+### 12.1 AWS IAM rotation step ⏳ PENDING
+**Action**: Disable OLD key in AWS IAM at https://console.aws.amazon.com/iam/home#/security_credentials (delete `<AKIA-REDACTED>`).
+**Why**: Closes the leak window. Even if the key remains in git history, AWS IAM disable means no one can use the key.
+**Urgency**: HIGH — the leaked key is the actual security issue.
+**References**: §4.4 #1, §5 (history-leak risk), §11.5 (warden works correctly).
+
+### 12.2 History-rewrite decision ⏳ DEFERRED
+**Action**: Either run `git filter-repo --invert-paths --path apis/services/email-api/.env.dev --path apis/services/email-api/.env.prod` (destructive, requires override per AGENTS.md) OR accept the leak and rely on AWS IAM disable.
+**Why**: The OLD key is in tracked git history. AGENTS.md explicitly prohibits history rewrite without operator override.
+**Urgency**: LOW — AWS IAM disable is the primary fix; history rewrite is defense-in-depth.
+**References**: §5.1-§5.3 (history-leak risk analysis), §4.4 #2.
+
+### 12.3 GitLab repo create ⏳ PENDING
+**Action**: `glab auth login && glab repo create dracondev/dracon-platform --private --description "Dracon platform"`.
+**Why**: The `gitlab` remote is configured but the repo doesn't exist on gitlab.com (404). Currently the platform's gitlab push fails with 404.
+**Urgency**: LOW — codeberg push works, github push is size-blocked, gitlab is just-in-time.
+**References**: §3.2 (remotes), §4.4 #3.
+
+### 12.4 .gitignore un-ignore fix ⏳ DEFERRED
+**Action**: Remove the `!.env*` un-ignore patterns (lines 66-71) from `dracon-platform/.gitignore` so env files are NOT tracked. Requires operator authorization because removing them could break warden flow.
+**Why**: The un-ignore patterns are why the env files are tracked. Warden encrypts them in place, but they're still in git history.
+**Urgency**: LOW — warden encryption makes the tracked files safe, but the un-ignore is a known issue from `full-architecture-audit-2026-06-28.md`.
+**References**: §3.5 (un-ignore gap), §3.7 (13 env files), §4.4 #4.
+
+### 12.5 Status snapshot
+- **§12.1 (AWS IAM)**: Pending — operator action required
+- **§12.2 (history-rewrite)**: Deferred — pending operator decision
+- **§12.3 (gitlab repo)**: Pending — operator action required (1 command)
+- **§12.4 (.gitignore fix)**: Deferred — pending operator authorization
+
+All 4 are documented in this doc. The goal can be marked complete (criteria 11, 12, 13 are met) once the new key is rotated OR the operator says "defer"/"abort" with this doc as the durable record.
