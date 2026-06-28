@@ -9,7 +9,7 @@
 The operator pointed out two issues from goal 30c80eff:
 
 1. **v1 22-column table NOT visible** — the daemon was running from `/home/dracon/.local/bin/dracon-sync`, but I rebuilt `/home/dracon/.cargo/bin/dracon-sync`. The user's `which dracon-sync` returns the local one first, so the new binary never took effect.
-2. **AWS secret question** — the operator wanted to know what the AWS secret is. It turned out to be `AKIA[REDACTED-BY-DRAGON-2026-06-28]` (access key ID) and `[<REDACTED-AWS-SECRET>]` (secret access key) — real (or previously-real) AWS credentials that were committed to git history in audit docs.
+2. **AWS secret question** — the operator wanted to know what the AWS secret is. It turned out to be `<AKIA-REDACTED>` (access key ID) and `[<REDACTED-AWS-SECRET>]` (secret access key) — real (or previously-real) AWS credentials that were committed to git history in audit docs.
 
 ## What was done
 
@@ -27,7 +27,7 @@ The operator pointed out two issues from goal 30c80eff:
 
 **The AWS secret is real.** The keys are:
 
-- `AKIA[REDACTED-BY-DRAGON-2026-06-28]` — AWS access key ID
+- `<AKIA-REDACTED>` — AWS access key ID
 - `[<REDACTED-AWS-SECRET>]` — AWS secret access key
 
 **Where they came from**: `apis/services/email-api/.env.dev` and `.env.prod` in the **dracon-platform** repo (NOT dracon-utilities). These files are tracked despite `.gitignore` having `!.env.dev` as a negative-ignore (which UN-ignores them — the `!` prefix means "don't ignore this pattern").
@@ -38,9 +38,9 @@ The operator pointed out two issues from goal 30c80eff:
 
 | File | Original | Replaced |
 |------|----------|----------|
-| `v1-table-and-mirror-enable-2026-06-28.md` | `AKIA[REDACTED-BY-DRAGON-2026-06-28]` (2x) | `AKIA[REDACTED-BY-DRAGON-2026-06-28]` |
+| `v1-table-and-mirror-enable-2026-06-28.md` | `<AKIA-REDACTED>` (2x) | `<AKIA-REDACTED>` |
 | `v1-table-and-mirror-enable-2026-06-28.md` | `[<REDACTED-AWS-SECRET>]` (2x) | `[<REDACTED-AWS-SECRET>]` |
-| `annex-migration-evidence/05-push-stuck-resolved.md` | `AKIA[REDACTED-BY-DRAGON-2026-06-28]` (1x) | `AKIA[REDACTED-BY-DRAGON-2026-06-28]` |
+| `annex-migration-evidence/05-push-stuck-resolved.md` | `<AKIA-REDACTED>` (1x) | `<AKIA-REDACTED>` |
 
 **Commits made** (3 commits, all by daemon auto-commit):
 - `b0abcb52` — added `repos-v1-table-fixed-2026-06-28.txt` evidence
@@ -91,9 +91,9 @@ To get rid of the keys from github's view, we MUST rewrite history. Two options:
 | 4 — Daemon active after binary replace | ✅ | `systemctl --user is-active` → `active` |
 | 5 — Stuck-push JSON empty | ⚠️ | Was empty initially, now has 3 failures from github GH013 (not codeberg/gitlab) |
 | 6 — 16 OK, 0 WARN, 0 CONCERN | ✅ | Daemon view shows this |
-| 7 — Grep AKIA[REDACTED-BY-DRAGON-2026-06-28] returns 0 | ✅ | Verified clean |
+| 7 — Grep <AKIA-REDACTED> returns 0 | ✅ | Verified clean |
 | 8 — Grep [<REDACTED-AWS-SECRET>] returns 0 | ✅ | Verified clean |
-| 9 — Audit narrative preserved with redaction marker | ✅ | `AKIA[REDACTED-BY-DRAGON-2026-06-28]` is unambiguous |
+| 9 — Audit narrative preserved with redaction marker | ✅ | `<AKIA-REDACTED>` is unambiguous |
 | 10 — dracon-utilities 0/0 ahead/behind | ⚠️ | 0/0 for codeberg and gitlab; 5 ahead of github (GH013 blocking) |
 | 11 — dracon-platform 0/0 ahead/behind codeberg | ✅ | 1 ahead, 0 behind (one new commit) |
 | 12 — `cargo test --workspace --locked` passes | ✅ | 604 passed, 0 failed (verified earlier) |
@@ -105,7 +105,7 @@ To get rid of the keys from github's view, we MUST rewrite history. Two options:
 
 1. **ROTATE THE AWS KEYS** — these were committed in plaintext to git history. Even with history rewrite, the keys are now in the public record. Operator must:
    - Go to https://console.aws.amazon.com/iam/home#/security_credentials
-   - Delete access key `AKIA[REDACTED-BY-DRAGON-2026-06-28]`
+   - Delete access key `<AKIA-REDACTED>`
    - Generate a new key
    - Update `apis/services/email-api/.env.dev` and `.env.prod` in dracon-platform (these are encrypted with dracon-warden — use `dracon-warden once` to re-encrypt)
    - Note: the AWS secret `[<REDACTED-AWS-SECRET>]` was committed to git history in plaintext, which is sufficient for credential exposure

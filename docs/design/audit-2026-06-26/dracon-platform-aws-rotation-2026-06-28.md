@@ -8,7 +8,7 @@
 
 The operator identified two issues from the prior session:
 1. **Platform state** needed a fresh check (it was the original alarm "we still didn't hook up github and gitlab" + the underlying concern that real AWS keys were tracked in `dracon-platform`).
-2. **A new AWS key was made** to rotate to, replacing the leaked `<AKIA-OLD-KEY>` / `<AWS-OLD-SECRET>` pair from `apis/services/email-api/.env.{dev,prod}`.
+2. **A new AWS key was made** to rotate to, replacing the leaked `<AKIA-REDACTED>` / `SECRET-KEY-REDACTED-BY-DRAGON-2026-06-28` pair from `apis/services/email-api/.env.{dev,prod}`.
 
 This doc captures the platform state (Part A), documents the operator's product-direction statement (Part E), and provides the template for the rotation evidence (Part B) once the operator provides the new key values.
 
@@ -92,8 +92,8 @@ The `!.env.dev` and `!.env.prod` un-ignore patterns at lines 67-68 are what caus
 ```
 EMAIL_PROVIDER=ses
 EMAIL_API_KEY=dev-email-api-key
-SES_ACCESS_KEY=<AKIA-OLD-KEY>              <-- LEAKED, needs rotation
-SES_SECRET_KEY=<AWS-OLD-SECRET>  <-- LEAKED, needs rotation
+SES_ACCESS_KEY=<AKIA-REDACTED>              <-- LEAKED, needs rotation
+SES_SECRET_KEY=SECRET-KEY-REDACTED-BY-DRAGON-2026-06-28  <-- LEAKED, needs rotation
 SES_REGION=us-east-1
 SES_FROM_ADDRESS=noreply@dracon.uk
 EMAIL_REPLY_TO=support@dracon.uk
@@ -103,8 +103,8 @@ EMAIL_REPLY_TO=support@dracon.uk
 
 ```
 EMAIL_PROVIDER=ses
-SES_ACCESS_KEY=<AKIA-OLD-KEY>              <-- LEAKED, needs rotation
-SES_SECRET_KEY=<AWS-OLD-SECRET>  <-- LEAKED, needs rotation
+SES_ACCESS_KEY=<AKIA-REDACTED>              <-- LEAKED, needs rotation
+SES_SECRET_KEY=SECRET-KEY-REDACTED-BY-DRAGON-2026-06-28  <-- LEAKED, needs rotation
 SES_REGION=us-east-1
 SES_FROM_ADDRESS=noreply@dracon.uk
 EMAIL_REPLY_TO=support@dracon.uk
@@ -141,13 +141,13 @@ This re-encrypts the env files in place (using warden's age/sops-style encryptio
 ```bash
 $ cat /home/dracon/Dev/dracon-platform/apis/services/email-api/.env.dev
 # Should now show the new key values
-$ grep -c "<AKIA-OLD-KEY>" /home/dracon/Dev/dracon-platform/apis/services/email-api/.env.dev
+$ grep -c "<AKIA-REDACTED>" /home/dracon/Dev/dracon-platform/apis/services/email-api/.env.dev
 # Should return 0
 ```
 
 ### 4.4 Operator action items after this goal completes
 
-1. **Disable OLD key in AWS IAM** — go to https://console.aws.amazon.com/iam/home#/security_credentials and delete access key `<AKIA-OLD-KEY>`. The leak window closes once the key is disabled, even if it remains in git history.
+1. **Disable OLD key in AWS IAM** — go to https://console.aws.amazon.com/iam/home#/security_credentials and delete access key `<AKIA-REDACTED>`. The leak window closes once the key is disabled, even if it remains in git history.
 2. **History-rewrite decision** — old key still in `dracon-platform` git history. Options:
    - `git filter-repo` history rewrite + force-push (destructive, requires explicit override)
    - Accept the leak (justified if you trust the key has not been used by an attacker)
@@ -158,7 +158,7 @@ $ grep -c "<AKIA-OLD-KEY>" /home/dracon/Dev/dracon-platform/apis/services/email-
 
 ## 5. History-leak risk — Part C
 
-The old key `<AKIA-OLD-KEY>` and secret are still in `dracon-platform` git history because the files were committed in plaintext. Even after the working-tree rotation, the keys remain in every commit that touched those files.
+The old key `<AKIA-REDACTED>` and secret are still in `dracon-platform` git history because the files were committed in plaintext. Even after the working-tree rotation, the keys remain in every commit that touched those files.
 
 **The leak window closes** when:
 1. The operator disables the key in AWS IAM (immediate, this goal)
@@ -197,8 +197,8 @@ The `dracon-platform` row in `dracon-sync repos`:
 | 3 | `git remote -v` shows codeberg + github + gitlab | ✅ DONE |
 | 4 | PUSH-TO includes github,gitlab,codeberg | ✅ DONE |
 | 5 | `.gitignore` un-ignore pattern still present (line 67-68) | ✅ DOCUMENTED |
-| 6 | `<AKIA-OLD-KEY>` absent from `.env.dev` | ⏳ PENDING new key |
-| 7 | `<AKIA-OLD-KEY>` absent from `.env.prod` | ⏳ PENDING new key |
+| 6 | `<AKIA-REDACTED>` absent from `.env.dev` | ⏳ PENDING new key |
+| 7 | `<AKIA-REDACTED>` absent from `.env.prod` | ⏳ PENDING new key |
 | 8 | NEW key present in both env files | ⏳ PENDING new key |
 | 9 | `dracon-warden once` exits 0 | ⏳ PENDING rotation |
 | 10 | Files still decrypt and contain new values | ⏳ PENDING rotation |
