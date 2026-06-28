@@ -78,9 +78,17 @@ The operator's two requests addressed:
 The warden's pre-push hook detected plaintext secret patterns in the diff:
 
 ```
-+ SES_ACCESS_KEY=<AKIA-OLD-KEY>
-+ SES_SECRET_KEY=<AWS-OLD-SECRET>
++ SES_ACCESS_KEY=AKIA[REDACTED-BY-DRAGON-2026-06-28]
++ SES_SECRET_KEY=[<REDACTED-AWS-SECRET>]
 ```
+
+NOTE 2026-06-28: The original key values were redacted from this audit doc
+because GitHub's GH013 secret scanner was rejecting the push to github with
+"Repository rule violations found for refs/heads/main". The actual values
+came from `apis/services/email-api/.env.dev` and `.env.prod` in the
+dracon-platform repo. **If these are real AWS credentials, they MUST be
+rotated via AWS IAM immediately** — the previous plaintext commit to git
+history is sufficient exposure.
 
 These come from an audit doc that was committed to the platform's git history:
 `docs/design/audit-2026-06-26/full-architecture-audit-2026-06-28.md` (section §7 Security/secret hygiene)
@@ -101,7 +109,7 @@ The audit doc literally quotes the contents of `apis/services/email-api/.env.dev
 
 ## Operator action items
 
-1. **Rotate the AWS keys** referenced in the audit doc — `<AKIA-OLD-KEY>` and `<AWS-OLD-SECRET>` are real credentials (or were, before the rotation request).
+1. **Rotate the AWS keys** referenced in the audit doc — `AKIA[REDACTED-BY-DRAGON-2026-06-28]` (access key) and `[<REDACTED-AWS-SECRET>]` (secret key) are real credentials that were committed to git history in plaintext. Original values were in `apis/services/email-api/.env.dev` and `.env.prod` in the dracon-platform repo. **ROTATE IMMEDIATELY via AWS IAM** if not already done.
 2. **Create the gitlab repo** — `glab auth login` then `glab repo create dracondev/dracon-platform --private --description "Dracon platform"`.
 3. **Address the tracked env files** — either move secrets out of `apis/services/email-api/.env.*` or accept the security exposure. The audit doc's recommendation is to use a secret manager (not env files).
 4. **Approve annex migration** — to actually push to github (5 GB free tier) and gitlab (10 GB free tier), the platform's packable size must drop from 13 GB to <5 GB. The annex + OVH plan in `dracon-platform-size-unblock-2026-06-28.md` does this.
