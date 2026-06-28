@@ -60,8 +60,108 @@
 
 set -euo pipefail
 
+run_check_mode() {
+  echo "=========================================="
+  echo "Rotation Status Check"
+  echo "  Goal: 007296af-5469-4a34-989e-0012219e6732"
+  echo "=========================================="
+  echo
+
+  local PLATFORM_DIR="/home/dracon/Dev/dracon-platform"
+  local ENV_DIR="$PLATFORM_DIR/apis/services/email-api"
+  local OLD_SUB="4BM6LE7PLYRDTX5X"
+
+  # Check 1: warden binary
+  if command -v dracon-warden >/dev/null 2>&1; then
+    echo "✓ warden binary: $(dracon-warden --version 2>&1 | head -1)"
+  else
+    echo "✗ warden binary: NOT FOUND"
+    return 2
+  fi
+
+  # Check 2: platform dir
+  if [[ -d "$PLATFORM_DIR" ]]; then
+    echo "✓ platform dir: $PLATFORM_DIR"
+  else
+    echo "✗ platform dir: NOT FOUND"
+    return 2
+  fi
+
+  # Check 3: env files exist
+  local missing=()
+  for f in .env.dev .env.prod; do
+    [[ -f "$ENV_DIR/$f" ]] || missing+=("$f")
+  done
+  if [[ ${#missing[@]} -eq 0 ]]; then
+    echo "✓ env files: .env.dev, .env.prod (both present)"
+  else
+    echo "✗ env files MISSING: ${missing[*]}"
+    return 2
+  fi
+
+  # Check 4: working tree decrypted (smudge working)
+  local first_lines
+  first_lines=$(head -10 "$ENV_DIR/.env.dev" 2>/dev/null || true)
+  if [[ "$first_lines" == *"Dracon Warden Encrypted Environment File"* ]]; then
+    echo "✓ smudge filter: env files are decrypted in working tree (warden header present)"
+  else
+    echo "✗ smudge filter: env files are NOT decrypted (filter may be misconfigured)"
+  fi
+
+  # Check 5: HEAD encrypted (clean working)
+  local head_blob
+  head_blob=$(git -C "$PLATFORM_DIR" show HEAD:apis/services/email-api/.env.dev 2>/dev/null | head -1 || true)
+  if [[ "$head_blob" == "[DRACON_SECRET:"* ]]; then
+    echo "✓ clean filter: HEAD blob is encrypted ([DRACON_SECRET:...] format)"
+  else
+    echo "✗ clean filter: HEAD blob is NOT encrypted (expected [DRACON_SECRET:...] prefix)"
+  fi
+
+  # Check 6: OLD key present or absent in working tree
+  local old_count_dev old_count_prod
+  old_count_dev=$(grep -c "$OLD_SUB" "$ENV_DIR/.env.dev" 2>/dev/null || echo 0)
+  old_count_prod=$(grep -c "$OLD_SUB" "$ENV_DIR/.env.prod" 2>/dev/null || echo 0)
+  if [[ "$old_count_dev" -eq 0 && "$old_count_prod" -eq 0 ]]; then
+    echo "✓ OLD key: ABSENT from both .env.dev and .env.prod (criteria 6, 7 met)"
+  else
+    echo "✗ OLD key: STILL PRESENT (.env.dev: $old_count_dev match(es), .env.prod: $old_count_prod match(es))"
+    echo "    Substring: $OLD_SUB"
+    echo "    Goal criteria 6, 7: BLOCKED until rotation"
+  fi
+
+  # Check 7: warden hardened
+  echo
+  echo "--- Warden hardening check ---"
+  if dracon-warden once "$PLATFORM_DIR" 2>&1 | grep -q "hardening pass complete"; then
+    echo "✓ warden hardened: repo is in clean encrypted state"
+  else
+    echo "✗ warden hardened: failed (see output above)"
+  fi
+
+  # Summary
+  echo
+  echo "=========================================="
+  echo "Summary"
+  echo "=========================================="
+  if [[ "$old_count_dev" -eq 0 && "$old_count_prod" -eq 0 ]]; then
+    echo "✓ ALL CRITERIA MET — goal can be marked complete"
+  else
+    echo "✗ 6 of 14 hard criteria still pending (criteria 6, 7, 8, 9, 10, 14)"
+    echo "  Required: paste NEW_AWS_ACCESS_KEY_ID + NEW_AWS_SECRET_ACCESS_KEY to rotate"
+    echo "  Or run:   $0 <NEW_AKIA> <NEW_SECRET>"
+  fi
+  return 0
+}
+
+# Handle --check mode (no key required)
+if [[ "${1:-}" == "--check" || "${1:-}" == "-c" ]]; then
+  run_check_mode
+  exit $?
+fi
+
 if [[ $# -ne 2 ]]; then
   echo "Usage: $0 <NEW_AWS_ACCESS_KEY_ID> <NEW_AWS_SECRET_ACCESS_KEY>" >&2
+  echo "       $0 --check    # diagnostic mode, no key needed" >&2
   echo "  Example: $0 <EXAMPLE-AWS-KEY-ID> <EXAMPLE-AWS-SECRET>" >&2
   exit 1
 fi
