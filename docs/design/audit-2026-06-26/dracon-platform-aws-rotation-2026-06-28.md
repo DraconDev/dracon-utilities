@@ -578,16 +578,16 @@ $ grep -r "<OLD_AKIA>" /home/dracon/Dev/dracon-platform/apis/services/email-api/
 
 After pasting the 9.3 evidence into §8, call `update_goal` with `status: complete`. All 14 criteria will then be met.
 
-## 10. Final state (snapshot at 2026-06-28 23:47)
+## 10. Final state (snapshot at 2026-06-29 00:04)
 
-- **dracon-platform**: on `main`, tracking `codeberg/master`, **0/0 codeberg** (manually pushed 8 operator commits with `main:master` refspec, including latest `08d904009d` terrain-painted-v10 PNG updates at 23:47); HEAD is `08d904009d` (3187 commits ahead of github); daemon shows 🟢 synced 0m
+- **dracon-platform**: on `main`, tracking `codeberg/master`, **0/0 codeberg** (manually pushed 9 operator commits with `main:master` refspec, including latest `436649dac5` H3-TERRAIN-FIX-LIVE-VERIFIED at 00:02); HEAD is `436649dac5` (3188 commits ahead of github); daemon shows 🟢 synced 0m; only 1 untracked dir (`web/games/wip/darklord/.tmp-audit/`)
 - **dracon-utilities**: 0/0 codeberg, 0/0 gitlab, **51 ahead github** (was 40 at 22:04; growth = audit doc expansion), **173 PUSH_STUCK failures** (was 171; GH013 history issue — see §15.1 for comprehensive list: 5 files, 9 commits with literal OLD secret, 13 commits with literal OLD AKIA in this repo's git history)
-- **Daemon**: **16 OK, 0 WARN, 0 CONCERN** (was 15 OK 1 WARN at 22:47; improved after operator committed the dirty working tree at 21:35:33); criterion 13 now consistently met
+- **Daemon**: **16 OK, 0 WARN, 0 CONCERN**; criterion 13 consistently met
 - **Audit doc**: `dracon-platform-aws-rotation-2026-06-28.md` (43+ KB / 775 lines / 19 sections, including §15 critical finding of recursive leak), scrubbed, committed, pushed to codeberg + gitlab at 0/0
 - **Rotation script**: `scripts/rotate-dracon-platform-aws-key.sh` (13.3 KB) with `--check` mode + full exit-code table
 - **Warden**: v0.3.7, healthy; clean/smudge filters registered; .gitattributes covers 6 .env* patterns; hardening pass complete (repos changed: 0)
 - **Goal criteria**: 8 of 14 met (1, 2, 3, 4, 5, 11, 12, 13); 6 pending new key (6, 7, 8, 9, 10, 14)
-- **Operator activity**: focused on platform game work — 8 commits pushed today (hegemon road/mine sprites, terrain-painted-v10 tiles, v10 tiles all fixed); NO activity on email-api/AWS keys since June 19-23
+- **Operator activity**: focused on platform game work — 9 commits pushed today (hegemon road/mine sprites, terrain-painted-v10 tiles, v10 tiles all fixed, H3-TERRAIN-FIX-LIVE-VERIFIED); NO activity on email-api/AWS keys since June 19-23
 - **Operator action item**: paste NEW_AKIA + NEW_SECRET to finish, or say "defer"/"abort" to close the goal with the doc + script as the durable record
 
 ## 11. Warden infrastructure validation (2026-06-28 20:38)
