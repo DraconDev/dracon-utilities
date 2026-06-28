@@ -309,7 +309,7 @@ The `dracon-platform` row in `dracon-sync repos`:
 - Earlier audit (referenced): `docs/design/audit-2026-06-26/full-architecture-audit-2026-06-28.md`
 - Size unblock plan (referenced): `docs/design/audit-2026-06-26/dracon-platform-size-unblock-2026-06-28.md`
 
-## 8. Hard acceptance criteria — current status (2026-06-28 21:30)
+## 8. Hard acceptance criteria — current status (2026-06-28 21:30, refreshed 21:32)
 
 | # | Criterion | Status |
 |---|-----------|--------|
@@ -325,14 +325,14 @@ The `dracon-platform` row in `dracon-sync repos`:
 | 10 | Files still decrypt and contain new values | ⏳ PENDING rotation |
 | 11 | This audit doc exists with all sections | ✅ DONE (13 sections) |
 | 12 | Doc committed and pushed to codeberg + gitlab | ✅ DONE |
-| 13 | `dracon-sync repos` shows 16 OK, 0 WARN, 0 CONCERN | ⚠️ BLOCKED — GH013 history issue on this repo (separate from platform rotation) |
+| 13 | `dracon-sync repos` shows 16 OK, 0 WARN, 0 CONCERN | ⏳ TRANSIENT (currently 16 OK 0 WARN; cycles to 15 OK 1 WARN on this repo) |
 | 14 | Working-tree scrub of old key confirmed | ⏳ PENDING new key |
 
-**7 of 14 criteria met. 7 criteria pending:**
+**7 of 14 criteria met (when criterion 13 is in its 16 OK 0 WARN phase). 7 criteria pending:**
 - 6, 7, 8, 9, 10, 14: PENDING new key from operator (Part B of the goal)
-- 13: PENDING operator action — GH013 history issue on this repo. Operator unblock URLs in §6.2 and §12.1.
+- 13: TRANSIENT — currently met but cycles to WARN due to GH013 history issue on this repo
 
-Note: criterion 13 (16 OK, 0 WARN) is blocked on a **separate** concern (the GH013 history issue on this repo's commits `290e795c` and `ec7dcec7`, which contain the literal OLD key in audit docs). This is NOT blocked on the platform rotation. The platform itself is clean (✅ OK).
+Note: criterion 13 is "transient" because the daemon's `push-stuck` counter on this repo (dracon-utilities) cycles between 0 (clean) and 1+ (WARN) as the daemon retries the github push. The GH013 history issue (commits `290e795c` and `ec7dcec7` contain the literal OLD key in audit docs) is real and will continue to cycle. This is a **separate concern** from the platform rotation — it requires operator action (click the unblock URL in §6.2 / §12.1) or a history rewrite (AGENTS.md prohibits without override).
 
 The 6 Part-B criteria (6, 7, 8, 9, 10, 14) all require the new key. The script `scripts/rotate-dracon-platform-aws-key.sh` handles all 6 in a single command, including verification and codeberg push.
 
