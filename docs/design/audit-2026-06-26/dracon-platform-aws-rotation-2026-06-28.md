@@ -334,6 +334,66 @@ Note: criterion 13 (16 OK, 0 WARN) was previously marked TRANSIENT because the d
 
 The 6 Part-B criteria (6, 7, 8, 9, 10, 14) all require the new key. The script `scripts/rotate-dracon-platform-aws-key.sh` handles all 6 in a single command, including verification and codeberg push.
 
+---
+
+## 14. Section Index (cross-reference for Part A, C, D, E sub-items)
+
+This index maps every required sub-item from the goal to its location in this doc. Auditors and operators can use this to verify completeness at a glance.
+
+### Part A — Platform state captured (criteria 1-5)
+
+| Sub-item | Required content | Section in this doc |
+|----------|------------------|---------------------|
+| A.1 | Branch is `main` (not detached), tracking `codeberg/master` | §3.1 (Platform branch + upstream) |
+| A.2 | Remotes configured per `.dracon/dracon-sync.toml` PUSH-TO | §3.2 (Remotes) + §3.3 (PUSH-TO) |
+| A.3 | Fresh `dracon-sync repos` capture showing platform row clean | §3.3 + `dracon-platform-state-2026-06-28.txt` |
+| A.4 | 0/0 ahead/behind codeberg | §3.4 (Ahead/behind) |
+| A.5 | `.gitignore` un-ignore gap (line 67 `!.env.dev`) documented | §3.5 (Un-ignore gap) |
+
+### Part B — AWS key rotation applied (criteria 6-10, 14)
+
+| Sub-item | Required content | Section in this doc |
+|----------|------------------|---------------------|
+| B.1 | Operator provides NEW AWS access key ID and secret | §4.1 (Rotation plan) + §9 (Runbook) |
+| B.2 | Replace values in env files | §4.2 (Substitution) + §9.2.1-§9.2.2 |
+| B.3 | Re-encrypt via warden | §4.3 (Re-encrypt) + §9.2.5 + §11 (Warden validation) |
+| B.4 | Read-back verify | §4.4 (Read-back) + §9.2.6 |
+| B.5 | OLD key absent from working tree | §13 (NEW finding) + §13.1 (Comprehensive verification) |
+| B.6 | Document operator action item: disable OLD key in AWS IAM | §4.4 (Operator action items) + §12.1 |
+
+### Part C — History-leak risk documented (criteria C.1-C.3)
+
+| Sub-item | Required content | Section in this doc |
+|----------|------------------|---------------------|
+| C.1 | Old key still in `dracon-platform` git history (file changed, history intact) | §5.1 (History-leak analysis) |
+| C.2 | Surface plan: history-rewrite OR accept | §5.2 (Plan options) + §12.2 (History-rewrite decision) |
+| C.3 | Do NOT do `git filter-repo` or force-push without explicit override | §5.3 (No-action constraint) |
+
+### Part D — Audit trail in `dracon-utilities` (criteria 11-13)
+
+| Sub-item | Required content | Section in this doc |
+|----------|------------------|---------------------|
+| D.1 | New doc with all required sections: old key redacted, new key redacted/marked, warden re-encrypt command + output, operator action items, history-rewrite decision deferred, ambassador intent capture | This whole doc — see banner at top + §1, §2, §4, §5, §9, §11, §12 |
+| D.2 | Commit + push to codeberg + gitlab (github best-effort) | Top-of-doc banner ("all pushed") + §6 (Daemon view) + repo state at 0/0 codeberg + 0/0 gitlab |
+| D.3 | `dracon-sync repos` shows clean state | §6 (Daemon view) + §8 criterion 13 |
+
+### Part E — MiniMax ambassador intent captured
+
+| Sub-item | Required content | Section in this doc |
+|----------|------------------|---------------------|
+| E.1 | Operator's MiniMax integration statement captured | §2 (Operator product intent) |
+
+### Quick navigation
+
+- **Operator action required** (3 paths): top-of-doc banner
+- **Open items checklist**: top-of-doc banner
+- **Hard acceptance criteria**: §8 (this section, 14 criteria)
+- **Completion runbook** (copy-paste procedure): §9
+- **Operator decisions pending** (4 items): §12
+- **Critical new finding** (markdown file): §13
+- **Warden infrastructure validation**: §11
+- **Section index** (this section): §14
+
 ## 9. Completion Runbook (2026-06-28 20:30)
 
 **Preferred path**: use the rotation script at `/home/dracon/Dev/dracon-utilities/scripts/rotate-dracon-platform-aws-key.sh` — handles all of §9.2 steps 1-7 automatically, including verification and codeberg push. After the operator pastes the new key:
