@@ -519,14 +519,16 @@ $ grep -r "<OLD_AKIA>" /home/dracon/Dev/dracon-platform/apis/services/email-api/
 
 After pasting the 9.3 evidence into §8, call `update_goal` with `status: complete`. All 14 criteria will then be met.
 
-## 10. Final state (snapshot at 2026-06-28 20:30)
+## 10. Final state (snapshot at 2026-06-28 21:43)
 
-- **dracon-platform**: on `main`, tracking `codeberg/master`, 0/0 codeberg, 9 untracked files (1 dir)
-- **dracon-utilities**: 0/0 codeberg, 0/0 gitlab, 15 ahead github (GH013 history issue, not doc issue)
-- **Daemon**: 16 OK, 0 WARN, 0 CONCERN
-- **Audit doc**: `dracon-platform-aws-rotation-2026-06-28.md` (15.3 KB after this runbook), scrubbed, committed, pushed
-- **Warden**: v0.3.7, ready to re-encrypt
-- **Operator action item**: paste NEW_AKIA + NEW_SECRET to finish (or say "defer" to close the goal with the doc as the durable record)
+- **dracon-platform**: on `main`, tracking `codeberg/master`, 0/0 codeberg, 1 untracked dir (`web/games/wip/darklord/.tmp-audit/`)
+- **dracon-utilities**: 0/0 codeberg, 0/0 gitlab, 40 ahead github (GH013 history issue on commits `290e795c` and `ec7dcec7`)
+- **Daemon**: 16 OK, 0 WARN, 0 CONCERN (verified at 21:43; cycles transient to 15 OK 1 WARN as daemon retries github push)
+- **Audit doc**: `dracon-platform-aws-rotation-2026-06-28.md` (37 KB / 715 lines / 18 sections), scrubbed, committed, pushed to codeberg + gitlab
+- **Rotation script**: `scripts/rotate-dracon-platform-aws-key.sh` (8.8 KB) with `--check` mode + full exit-code table
+- **Warden**: v0.3.7, healthy; clean/smudge filters registered; .gitattributes covers 6 .env* patterns; hardening pass complete (repos changed: 0)
+- **Goal criteria**: 8 of 14 met (1, 2, 3, 4, 5, 11, 12, 13); 6 pending new key (6, 7, 8, 9, 10, 14)
+- **Operator action item**: paste NEW_AKIA + NEW_SECRET to finish, or say "defer"/"abort" to close the goal with the doc + script as the durable record
 
 ## 11. Warden infrastructure validation (2026-06-28 20:38)
 
