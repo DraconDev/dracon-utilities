@@ -34,6 +34,13 @@ cd /home/dracon/Dev/dracon-utilities
 ./scripts/rotate-dracon-platform-aws-key.sh <NEW_AWS_ACCESS_KEY_ID> <NEW_AWS_SECRET_ACCESS_KEY>
 ```
 
+**B2. Check progress at any time (no key needed)**:
+```bash
+cd /home/dracon/Dev/dracon-utilities
+./scripts/rotate-dracon-platform-aws-key.sh --check
+```
+This is a read-only diagnostic. It reports which criteria are met and which are pending, without modifying any files.
+
 **C. Say "defer" or "abort"** — agent closes goal with this doc + script as the durable record. You handle AWS IAM disable + history-rewrite + gitlab repo create as separate operator actions.
 
 The script handles all 5 remaining criteria (6, 7, 8, 9, 10, 14) and pushes to codeberg. On success it exits 0; on failure it exits 1-7 with a specific reason.
