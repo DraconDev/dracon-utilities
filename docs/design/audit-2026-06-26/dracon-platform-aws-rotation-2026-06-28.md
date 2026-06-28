@@ -310,7 +310,7 @@ $ git -C /home/dracon/Dev/dracon-platform status -sb
 ### 9.2 Rotation procedure (run after operator pastes key)
 
 ```bash
-NEW_AKIA="AKIA..."           # paste from operator
+NEW_AKIA="<paste-AKIA-here>"           # paste from operator
 NEW_SECRET="..."             # paste from operator (long random string)
 ENV_DIR=/home/dracon/Dev/dracon-platform/apis/services/email-api
 
