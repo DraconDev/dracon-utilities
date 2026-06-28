@@ -634,3 +634,18 @@ Confirmed by exhaustive search of the platform's working tree (using `git ls-fil
 - The script handles files #1 and #2 (env files): replace values, warden re-encrypt.
 - File #3 (markdown) is OUT OF SCOPE for the rotation script. The script does not modify `.md` files. The operator must decide separately what to do with `SITE-HEALTH-AUDIT.md`.
 - The script's substring check (`4BM6LE7PLYRDTX5X`) will continue to return 1 match after rotation because the markdown file still has the literal key. This is **expected** and **documented**: the script's exit-code-3 ("OLD key still present") is checking the env files only, not the markdown.
+
+### 13.2 Warden filter coverage verification (2026-06-28 21:21)
+
+Verified every tracked `.env*` file in the platform against the `.gitattributes` filter pattern. Results:
+
+| Tracked .env* files | Count | Filter covered? | HEAD encrypted? |
+|---------------------|-------|-----------------|-----------------|
+| `.env`, `.env.dev`, `.env.prod`, `.env.ovh` (real secrets) | 13 | ✓ | ✓ |
+| `.env.example`, `.env.ovh.example` (templates, no secrets) | 8 | ✗ | ✗ |
+
+**The 13 secret-bearing env files exactly match §3.7's count.** All 13 are covered by the `.gitattributes` filter patterns (`.env`, `.env.dev`, `.env.prod`, `.env.ovh`) and all 13 are encrypted as `[DRACON_SECRET:...]` blobs in HEAD.
+
+**The 8 .example files are intentionally NOT covered** — they're templates, not secrets. The first line of each is `═══════...` (ASCII art header) or `# Email API Configuration` (comment header), confirming they're placeholders.
+
+**This means the rotation script's exit-code-3 (OLD key still present) check is correct: it only checks the 13 secret-bearing env files, which are all covered by warden. The 1 match it reports after rotation is from the markdown file (file #3 in §13.1), not from any of the 13 env files.**
