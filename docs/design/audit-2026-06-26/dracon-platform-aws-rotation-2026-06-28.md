@@ -141,11 +141,11 @@ web/ai-hub/.env
 web/games/.env.ovh
 ```
 
-Sample of what's in these files:
-- `auth-api/.env.prod`: TURSO_AUTH_TOKEN, EMAIL_API_KEY (3b6ef6f6...)
-- `billing-api/.env.prod`: BILLING_PADDLE_API_KEY (pdl_live_...), TURSO_BILLING_TOKEN
+Sample of what's in these files (all values redacted):
+- `auth-api/.env.prod`: TURSO_AUTH_TOKEN, EMAIL_API_KEY (TURSO_JWT, hex-string)
+- `billing-api/.env.prod`: BILLING_PADDLE_API_KEY (pdl_live_REDACTED-BY-DRAGON-2026-06-28), TURSO_BILLING_TOKEN
 - `music-api/.env.prod`: TURSO_MUSIC_TOKEN
-- `web/ai-hub/.env`: ARTIFICIAL_ANALYSIS_API_KEY (aa_RhYSoQr...)
+- `web/ai-hub/.env`: ARTIFICIAL_ANALYSIS_API_KEY (aa_REDACTED-BY-DRAGON-2026-06-28)
 - `web/games/.env.ovh`: OVH bucket credentials (presumably)
 
 All these are encrypted in git history via warden (good — smudge filter on .env*). But:
