@@ -616,3 +616,21 @@ While running a cross-reference audit on this doc, I discovered the platform's t
 - The audit doc correctly identifies the leak as severity-FAIL, so the operator's audit standards support taking action.
 
 **Status**: ⏳ NEW PENDING — discovered during §12 cross-reference audit. Documented here for record.
+
+### 13.1 Comprehensive verification (2026-06-28 21:14)
+
+Confirmed by exhaustive search of the platform's working tree (using `git ls-files | xargs grep -l` and `find . -not -path "./.git/*" -not -path "*/node_modules/*" ... | xargs grep -l`):
+
+- **Tracked files with OLD key substring `4BM6LE7PLYRDTX5X`**: 3
+- **Tracked files with OLD secret substring `<AWS-OLD-SECRET>`**: 3
+- **The same 3 files in both searches**:
+  1. `apis/services/email-api/.env.dev` (encrypted in HEAD, decrypted in working tree)
+  2. `apis/services/email-api/.env.prod` (encrypted in HEAD, decrypted in working tree)
+  3. `web/docs/SITE-HEALTH-AUDIT.md` (plaintext in HEAD, plaintext in working tree)
+
+**No additional leak vectors found**. The total attack surface is exactly 3 files: 2 env files (warden-encrypted) + 1 markdown file (NOT warden-encrypted, plaintext leak).
+
+**Implication for the rotation script**:
+- The script handles files #1 and #2 (env files): replace values, warden re-encrypt.
+- File #3 (markdown) is OUT OF SCOPE for the rotation script. The script does not modify `.md` files. The operator must decide separately what to do with `SITE-HEALTH-AUDIT.md`.
+- The script's substring check (`4BM6LE7PLYRDTX5X`) will continue to return 1 match after rotation because the markdown file still has the literal key. This is **expected** and **documented**: the script's exit-code-3 ("OLD key still present") is checking the env files only, not the markdown.
