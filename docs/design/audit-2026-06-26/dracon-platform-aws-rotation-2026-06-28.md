@@ -571,3 +571,48 @@ The goal's completion audit requires: *"Operator has clear answer: AWS IAM rotat
 - **§12.4 (.gitignore fix)**: Deferred — pending operator authorization
 
 All 4 are documented in this doc. The goal can be marked complete (criteria 11, 12, 13 are met) once the new key is rotated OR the operator says "defer"/"abort" with this doc as the durable record.
+
+---
+
+## 13. CRITICAL NEW FINDING (2026-06-28 21:13) — Plaintext AWS secret in `web/docs/SITE-HEALTH-AUDIT.md`
+
+While running a cross-reference audit on this doc, I discovered the platform's tracked history contains a markdown file with the **literal OLD AWS key and secret in plaintext**:
+
+- **File**: `web/docs/SITE-HEALTH-AUDIT.md` (642 lines, tracked)
+- **HEAD blob**: 4 matches of the OLD key substring `4BM6LE7PLYRDTX5X`
+- **Line 414**: `SES_ACCESS_KEY=<AKIA-REDACTED>`
+- **Line 422**: same
+- **Line 423**: `SES_SECRET_KEY=SECRET-KEY-REDACTED-BY-DRAGON-2026-06-28`
+- **Line 429**: quoted in commentary
+- **Line 477**: tabulated in a §S-1 severity-FAIL finding
+
+**Why this matters**:
+- The warden filter only encrypts `.env*` files (per `.gitattributes`).
+- The audit doc's `.md` extension is NOT covered, so its content is **plaintext in git history**.
+- This is a **second leak vector** beyond the env files. The OLD secret is in the platform's git history in plaintext at line 423 of this markdown file.
+- The file is the platform's own audit (it correctly flags the leak as S-1 FAIL severity), so it's a self-discovered issue.
+- The file is **NOT** in scope for the rotation script (`scripts/rotate-dracon-platform-aws-key.sh`) — the script only modifies `email-api/.env.{dev,prod}`.
+
+**Comparison with §3.7**:
+- §3.7 listed 13 env files (all covered by warden)
+- This adds 1 markdown file (NOT covered by warden)
+- Total tracked files referencing OLD key: 2 env files (encrypted in HEAD) + 1 markdown file (plaintext in HEAD) = 3
+
+**History of the file**:
+- 10 commits touched it
+- Earliest touching commit: `4a6fba99f2` (2 files in web)
+- Most recent touching commit: `f970068679` (docs/health-audit: finalize §1-§10 + executive summary)
+- **All 10 commits** are in the platform's tracked history
+
+**Action item for operator (URGENT)**:
+- This file is the **easier** leak to fix. Unlike env files, the env file rotation does not change the markdown file's content. The operator should:
+  1. Read the file to see the literal secrets (`web/docs/SITE-HEALTH-AUDIT.md` lines 414, 422, 423, 477)
+  2. Decide: rewrite to use the new key + redaction marker, OR delete the file, OR leave it (rely on AWS IAM disable)
+  3. Either way, this is a separate operator action — not part of the goal's rotation script
+
+**Operator action item (NEW)**:
+- Disable OLD key in AWS IAM is the #1 priority because BOTH leak vectors (env files AND this markdown) close the moment the AWS IAM key is disabled.
+- The history-rewrite decision (§12.2) now has stronger motivation: rewriting the markdown file requires either `git filter-repo` (history rewrite) or accepting the plaintext leak.
+- The audit doc correctly identifies the leak as severity-FAIL, so the operator's audit standards support taking action.
+
+**Status**: ⏳ NEW PENDING — discovered during §12 cross-reference audit. Documented here for record.
