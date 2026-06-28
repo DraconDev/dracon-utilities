@@ -428,11 +428,10 @@ This is a recursive leak: the audit docs I wrote to document the platform's AWS 
 
 The fix requires either:
 
-1. **Operator clicks the GH013 unblock URLs** (per-commit URLs from the daemon log):
+1. **Operator clicks the GH013 unblock URLs** (3 unique URLs from the daemon log):
    - https://github.com/DraconDev/dracon-utilities/security/secret-scanning/unblock-secret/3FmCaothFt0qHvpYTILr9vJELcB (AKIA, dr-platform-aws-rotation)
-   - https://github.com/DraconDev/dracon-utilities/security/secret-scanning/unblock-secret/3FmCaqw6VjMdOHMyL0CvwYNAHeL (AWS Secret Access Key)
-   - Additional unblock URLs may exist for the v1-table-fix and v1-table-and-mirror docs (3+ files × multiple commits = many URLs)
-   - The 20:53 daemon log shows paths like `v1-table-fix-and-secret-scrub-2026-06-28.md:94` and `:95` (AKIA matches) — there are likely additional unblock URLs that need to be clicked
+   - https://github.com/DraconDev/dracon-utilities/security/secret-scanning/unblock-secret/3FmCaqw6VjMdOHMyL0CvwYNAHeL (AWS Secret Access Key, dr-platform-aws-rotation)
+   - https://github.com/DraconDev/dracon-utilities/security/secret-scanning/unblock-secret/3FQPpoPPTbnGZInz3DoLcd5X68e (likely v1-table-fix-and-secret-scrub, since log shows paths in that file at lines 12, 31, 42)
 
 2. **History rewrite via `git filter-repo`** — AGENTS.md prohibits without explicit operator override. Would require destroying 9+ commits across 3 files.
 
