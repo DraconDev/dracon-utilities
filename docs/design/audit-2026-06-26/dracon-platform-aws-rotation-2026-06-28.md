@@ -2,7 +2,26 @@
 
 > **Goal**: 007296af-5469-4a34-989e-0012219e6732
 > **Operator**: "we would want ot check on the platwhich is what i intedned ... also you are talking about this i makde a new aws key we can jsut rotate to this"
-> **Status**: PARTIAL — platform state captured (Part A done). Part B (key rotation) BLOCKED on operator providing the new key values.
+> **Status**: PARTIAL — 9 of 14 hard criteria met. Part B (key rotation) BLOCKED on operator providing the new key values.
+
+---
+
+# 🚨 OPERATOR ACTION REQUIRED — 1 command, ≤ 2 minutes
+
+To finish this goal, **paste the new key as a reply** and the agent will run the rotation script. **OR run it yourself**:
+
+```bash
+cd /home/dracon/Dev/dracon-utilities
+./scripts/rotate-dracon-platform-aws-key.sh <NEW_AWS_ACCESS_KEY_ID> <NEW_AWS_SECRET_ACCESS_KEY>
+```
+
+The script handles all 5 remaining criteria (6, 7, 8, 9, 10, 14) and pushes to codeberg. On success it exits 0; on failure it exits 1-7 with a specific reason.
+
+**After** the script runs (or you paste the key), the agent will mark the goal complete.
+
+If you say **"defer"** or **"abort"** the agent will close the goal with this doc + script as the durable record; you handle the AWS IAM disable + history-rewrite decision + gitlab repo create as separate operator actions.
+
+---
 
 ## 1. Executive summary
 
@@ -287,7 +306,16 @@ The `dracon-platform` row in `dracon-sync repos`:
 
 ## 9. Completion Runbook (2026-06-28 20:30)
 
-This is a self-contained, copy-paste runbook to finish the rotation. Once the operator pastes the new key values, the entire rotation (criteria 6, 7, 8, 9, 10, 14) can be completed in under 2 minutes by running the commands below.
+**Preferred path**: use the rotation script at `/home/dracon/Dev/dracon-utilities/scripts/rotate-dracon-platform-aws-key.sh` — handles all of §9.2 steps 1-7 automatically, including verification and codeberg push. After the operator pastes the new key:
+
+```bash
+cd /home/dracon/Dev/dracon-utilities
+./scripts/rotate-dracon-platform-aws-key.sh <NEW_AWS_ACCESS_KEY_ID> <NEW_AWS_SECRET_ACCESS_KEY>
+```
+
+This script implements all 6 of the rotation criteria (6, 7, 8, 9, 10, 14) and commits + pushes to codeberg. On success, it exits 0 with a clear success banner. On failure, it exits with a specific code (1-7) indicating which step failed.
+
+**Manual fallback**: if the script is not available, the manual procedure below also works.
 
 ### 9.1 Pre-flight (already passed, re-verified 2026-06-28 20:30)
 
