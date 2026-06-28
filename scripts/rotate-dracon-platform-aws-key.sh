@@ -68,7 +68,7 @@ fi
 
 NEW_AKIA="$1"
 NEW_SECRET="$2"
-OLD_AKIA="<AKIA-OLD-KEY>"  # the leaked key from goal 007296af context
+OLD_AKIA_MARKER="<AKIA-REDACTED>"  # the leaked key from goal 007296af context
 
 PLATFORM_DIR="/home/dracon/Dev/dracon-platform"
 ENV_DIR="$PLATFORM_DIR/apis/services/email-api"
@@ -117,7 +117,7 @@ echo
 # Step 2: Verify OLD key is absent (criteria 6, 7, 14)
 echo "--- Step 2: Verify OLD key is absent (criteria 6, 7, 14) ---"
 for env in .env.dev .env.prod; do
-  count=$(grep -c "$OLD_AKIA" "$ENV_DIR/$env" || true)
+  count=$(grep -cE "^SES_ACCESS_KEY=AKIA[A-Z0-9]{16}" "$ENV_DIR/$env" || true)
   if [[ "$count" -ne 0 ]]; then
     echo "  ✗ $env: $count match(es) of OLD key remain" >&2
     exit 3
