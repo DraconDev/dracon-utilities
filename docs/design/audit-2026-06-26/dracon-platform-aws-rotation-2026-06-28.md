@@ -323,7 +323,7 @@ sed -i "s|^SES_ACCESS_KEY=.*|SES_ACCESS_KEY=$NEW_AKIA|" "$ENV_DIR/.env.prod"
 sed -i "s|^SES_SECRET_KEY=.*|SES_SECRET_KEY=$NEW_SECRET|" "$ENV_DIR/.env.prod"
 
 # 9.2.3 — Verify replacement (old key should be 0 matches)
-grep -c "<AKIA-OLD-KEY>" "$ENV_DIR/.env.dev" "$ENV_DIR/.env.prod"
+grep -c "<OLD_AKIA>" "$ENV_DIR/.env.dev" "$ENV_DIR/.env.prod"
 # Expected: 0 in each file
 
 # 9.2.4 — Verify new key is in both files
@@ -344,7 +344,7 @@ cd /home/dracon/Dev/dracon-platform
 git add apis/services/email-api/.env.dev apis/services/email-api/.env.prod
 git commit -m "security(rotate): AWS SES key for email-api ($(date -I))
 
-Old key <AKIA-OLD-KEY> was leaked in tracked env files.
+Old key <OLD_AKIA> was leaked in tracked env files.
 New key rotated per goal 007296af-5469-4a34-989e-0012219e6732.
 Old key should now be disabled in AWS IAM by operator."
 git push codeberg main:master
@@ -358,12 +358,12 @@ After running 9.2.1 - 9.2.7, capture this evidence to update §8 (Hard acceptanc
 === Evidence capture (paste to audit doc) ===
 
 # Criterion 6 — old key absent from .env.dev
-$ grep -c "<AKIA-OLD-KEY>" /home/dracon/Dev/dracon-platform/apis/services/email-api/.env.dev
+$ grep -c "<OLD_AKIA>" /home/dracon/Dev/dracon-platform/apis/services/email-api/.env.dev
 0
 ✅ PASS
 
 # Criterion 7 — old key absent from .env.prod
-$ grep -c "<AKIA-OLD-KEY>" /home/dracon/Dev/dracon-platform/apis/services/email-api/.env.prod
+$ grep -c "<OLD_AKIA>" /home/dracon/Dev/dracon-platform/apis/services/email-api/.env.prod
 0
 ✅ PASS
 
@@ -392,7 +392,7 @@ SES_SECRET_KEY=<NEW_SECRET>
 ✅ PASS
 
 # Criterion 14 — working-tree scrub
-$ grep -r "<AKIA-OLD-KEY>" /home/dracon/Dev/dracon-platform/apis/services/email-api/
+$ grep -r "<OLD_AKIA>" /home/dracon/Dev/dracon-platform/apis/services/email-api/
 0 matches
 ✅ PASS
 ```
