@@ -284,3 +284,128 @@ The `dracon-platform` row in `dracon-sync repos`:
 | 14 | Working-tree scrub of old key confirmed | ⏳ PENDING new key |
 
 **5 of 14 criteria met (Part A + skeleton). 9 criteria pending operator providing new key values.**
+
+## 9. Completion Runbook (2026-06-28 20:30)
+
+This is a self-contained, copy-paste runbook to finish the rotation. Once the operator pastes the new key values, the entire rotation (criteria 6, 7, 8, 9, 10, 14) can be completed in under 2 minutes by running the commands below.
+
+### 9.1 Pre-flight (already passed, re-verified 2026-06-28 20:30)
+
+```bash
+$ which dracon-warden && dracon-warden --version
+/home/dracon/.local/bin/dracon-warden
+dracon-warden 0.3.7
+
+$ grep -E "^\.env" /home/dracon/Dev/dracon-platform/.gitattributes
+.env filter=dracon diff=dracon merge=dracon
+.env.dev filter=dracon diff=dracon merge=dracon
+.env.prod filter=dracon diff=dracon merge=dracon
+...
+
+$ git -C /home/dracon/Dev/dracon-platform status -sb
+## main...codeberg/master
+?? web/games/wip/darklord/.tmp-audit/   # untracked, not secret
+```
+
+### 9.2 Rotation procedure (run after operator pastes key)
+
+```bash
+NEW_AKIA="AKIA..."           # paste from operator
+NEW_SECRET="..."             # paste from operator (long random string)
+ENV_DIR=/home/dracon/Dev/dracon-platform/apis/services/email-api
+
+# 9.2.1 — Replace values in dev
+sed -i "s|^SES_ACCESS_KEY=.*|SES_ACCESS_KEY=$NEW_AKIA|" "$ENV_DIR/.env.dev"
+sed -i "s|^SES_SECRET_KEY=.*|SES_SECRET_KEY=$NEW_SECRET|" "$ENV_DIR/.env.dev"
+
+# 9.2.2 — Replace values in prod
+sed -i "s|^SES_ACCESS_KEY=.*|SES_ACCESS_KEY=$NEW_AKIA|" "$ENV_DIR/.env.prod"
+sed -i "s|^SES_SECRET_KEY=.*|SES_SECRET_KEY=$NEW_SECRET|" "$ENV_DIR/.env.prod"
+
+# 9.2.3 — Verify replacement (old key should be 0 matches)
+grep -c "<AKIA-OLD-KEY>" "$ENV_DIR/.env.dev" "$ENV_DIR/.env.prod"
+# Expected: 0 in each file
+
+# 9.2.4 — Verify new key is in both files
+grep -c "$NEW_AKIA" "$ENV_DIR/.env.dev" "$ENV_DIR/.env.prod"
+# Expected: 1 in each file
+
+# 9.2.5 — Re-encrypt with warden
+dracon-warden once /home/dracon/Dev/dracon-platform
+# Expected: ✅ scrub-markers complete · no changes needed, 🔒 hardened ...
+
+# 9.2.6 — Read-back verify (cat decrypts via smudge filter)
+cat "$ENV_DIR/.env.dev" | grep "^SES_"
+cat "$ENV_DIR/.env.prod" | grep "^SES_"
+# Expected: SES_ACCESS_KEY=$NEW_AKIA, SES_SECRET_KEY=$NEW_SECRET
+
+# 9.2.7 — Commit + push to codeberg (annex migration not done, so skip github)
+cd /home/dracon/Dev/dracon-platform
+git add apis/services/email-api/.env.dev apis/services/email-api/.env.prod
+git commit -m "security(rotate): AWS SES key for email-api ($(date -I))
+
+Old key <AKIA-OLD-KEY> was leaked in tracked env files.
+New key rotated per goal 007296af-5469-4a34-989e-0012219e6732.
+Old key should now be disabled in AWS IAM by operator."
+git push codeberg main:master
+```
+
+### 9.3 Post-rotation evidence to capture (criteria 6-10, 14)
+
+After running 9.2.1 - 9.2.7, capture this evidence to update §8 (Hard acceptance audit):
+
+```
+=== Evidence capture (paste to audit doc) ===
+
+# Criterion 6 — old key absent from .env.dev
+$ grep -c "<AKIA-OLD-KEY>" /home/dracon/Dev/dracon-platform/apis/services/email-api/.env.dev
+0
+✅ PASS
+
+# Criterion 7 — old key absent from .env.prod
+$ grep -c "<AKIA-OLD-KEY>" /home/dracon/Dev/dracon-platform/apis/services/email-api/.env.prod
+0
+✅ PASS
+
+# Criterion 8 — new key present in both
+$ grep -c "<NEW_AKIA>" /home/dracon/Dev/dracon-platform/apis/services/email-api/.env.dev
+1
+$ grep -c "<NEW_AKIA>" /home/dracon/Dev/dracon-platform/apis/services/email-api/.env.prod
+1
+✅ PASS
+
+# Criterion 9 — warden exit 0
+$ dracon-warden once /home/dracon/Dev/dracon-platform
+✅ scrub-markers complete · no changes needed (found: 0, changed: 0, skipped: 0)
+🔒 hardened /home/dracon/Dev/dracon-platform
+[2026-06-28T...] Info: harden//home/dracon/Dev/dracon-platform - repo hardened
+✅ hardening pass complete (repos changed: 1)
+✅ PASS (exit 0)
+
+# Criterion 10 — read-back verify
+$ cat /home/dracon/Dev/dracon-platform/apis/services/email-api/.env.dev | grep "^SES_"
+SES_ACCESS_KEY=<NEW_AKIA>
+SES_SECRET_KEY=<NEW_SECRET>
+$ cat /home/dracon/Dev/dracon-platform/apis/services/email-api/.env.prod | grep "^SES_"
+SES_ACCESS_KEY=<NEW_AKIA>
+SES_SECRET_KEY=<NEW_SECRET>
+✅ PASS
+
+# Criterion 14 — working-tree scrub
+$ grep -r "<AKIA-OLD-KEY>" /home/dracon/Dev/dracon-platform/apis/services/email-api/
+0 matches
+✅ PASS
+```
+
+### 9.4 Mark goal complete (only after 9.3 evidence captured)
+
+After pasting the 9.3 evidence into §8, call `update_goal` with `status: complete`. All 14 criteria will then be met.
+
+## 10. Final state (snapshot at 2026-06-28 20:30)
+
+- **dracon-platform**: on `main`, tracking `codeberg/master`, 0/0 codeberg, 9 untracked files (1 dir)
+- **dracon-utilities**: 0/0 codeberg, 0/0 gitlab, 15 ahead github (GH013 history issue, not doc issue)
+- **Daemon**: 16 OK, 0 WARN, 0 CONCERN
+- **Audit doc**: `dracon-platform-aws-rotation-2026-06-28.md` (15.3 KB after this runbook), scrubbed, committed, pushed
+- **Warden**: v0.3.7, ready to re-encrypt
+- **Operator action item**: paste NEW_AKIA + NEW_SECRET to finish (or say "defer" to close the goal with the doc as the durable record)
