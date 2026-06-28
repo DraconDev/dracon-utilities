@@ -15,7 +15,7 @@
 #   ./scripts/rotate-dracon-platform-aws-key.sh <NEW_AWS_ACCESS_KEY_ID> <NEW_AWS_SECRET_ACCESS_KEY>
 #
 # EXAMPLE
-#   ./scripts/rotate-dracon-platform-aws-key.sh AKIAIOSFODNN7EXAMPLE wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+#   ./scripts/rotate-dracon-platform-aws-key.sh <EXAMPLE-AWS-KEY-ID> <EXAMPLE-AWS-SECRET>
 #
 # WHAT THIS SCRIPT DOES (corresponds to criteria 6, 7, 8, 9, 10, 14 of goal 007296af)
 #   1. Replaces SES_ACCESS_KEY and SES_SECRET_KEY in both .env.dev and .env.prod
@@ -62,7 +62,7 @@ set -euo pipefail
 
 if [[ $# -ne 2 ]]; then
   echo "Usage: $0 <NEW_AWS_ACCESS_KEY_ID> <NEW_AWS_SECRET_ACCESS_KEY>" >&2
-  echo "  Example: $0 AKIAIOSFODNN7EXAMPLE wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" >&2
+  echo "  Example: $0 <EXAMPLE-AWS-KEY-ID> <EXAMPLE-AWS-SECRET>" >&2
   exit 1
 fi
 
