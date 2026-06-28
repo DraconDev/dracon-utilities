@@ -9,7 +9,7 @@
 The operator pointed out two issues from goal 30c80eff:
 
 1. **v1 22-column table NOT visible** — the daemon was running from `/home/dracon/.local/bin/dracon-sync`, but I rebuilt `/home/dracon/.cargo/bin/dracon-sync`. The user's `which dracon-sync` returns the local one first, so the new binary never took effect.
-2. **AWS secret question** — the operator wanted to know what the AWS secret is. It turned out to be `<AKIA-OLD-KEY>` and `<AWS-OLD-SECRET>` — real (or previously-real) AWS credentials that were committed to git history in audit docs.
+2. **AWS secret question** — the operator wanted to know what the AWS secret is. It turned out to be `AKIA[REDACTED-BY-DRAGON-2026-06-28]` (access key ID) and `[<REDACTED-AWS-SECRET>]` (secret access key) — real (or previously-real) AWS credentials that were committed to git history in audit docs.
 
 ## What was done
 
@@ -27,8 +27,8 @@ The operator pointed out two issues from goal 30c80eff:
 
 **The AWS secret is real.** The keys are:
 
-- `<AKIA-OLD-KEY>` — AWS access key ID
-- `<AWS-OLD-SECRET>` — AWS secret access key
+- `AKIA[REDACTED-BY-DRAGON-2026-06-28]` — AWS access key ID
+- `[<REDACTED-AWS-SECRET>]` — AWS secret access key
 
 **Where they came from**: `apis/services/email-api/.env.dev` and `.env.prod` in the **dracon-platform** repo (NOT dracon-utilities). These files are tracked despite `.gitignore` having `!.env.dev` as a negative-ignore (which UN-ignores them — the `!` prefix means "don't ignore this pattern").
 
@@ -38,9 +38,9 @@ The operator pointed out two issues from goal 30c80eff:
 
 | File | Original | Replaced |
 |------|----------|----------|
-| `v1-table-and-mirror-enable-2026-06-28.md` | `<AKIA-OLD-KEY>` (2x) | `AKIA[REDACTED-BY-DRAGON-2026-06-28]` |
-| `v1-table-and-mirror-enable-2026-06-28.md` | `<AWS-OLD-SECRET>` (2x) | `[<REDACTED-AWS-SECRET>]` |
-| `annex-migration-evidence/05-push-stuck-resolved.md` | `<AKIA-OLD-KEY>` (1x) | `AKIA[REDACTED-BY-DRAGON-2026-06-28]` |
+| `v1-table-and-mirror-enable-2026-06-28.md` | `AKIA[REDACTED-BY-DRAGON-2026-06-28]` (2x) | `AKIA[REDACTED-BY-DRAGON-2026-06-28]` |
+| `v1-table-and-mirror-enable-2026-06-28.md` | `[<REDACTED-AWS-SECRET>]` (2x) | `[<REDACTED-AWS-SECRET>]` |
+| `annex-migration-evidence/05-push-stuck-resolved.md` | `AKIA[REDACTED-BY-DRAGON-2026-06-28]` (1x) | `AKIA[REDACTED-BY-DRAGON-2026-06-28]` |
 
 **Commits made** (3 commits, all by daemon auto-commit):
 - `b0abcb52` — added `repos-v1-table-fixed-2026-06-28.txt` evidence
@@ -105,7 +105,7 @@ To get rid of the keys from github's view, we MUST rewrite history. Two options:
 
 1. **ROTATE THE AWS KEYS** — these were committed in plaintext to git history. Even with history rewrite, the keys are now in the public record. Operator must:
    - Go to https://console.aws.amazon.com/iam/home#/security_credentials
-   - Delete access key `<AKIA-OLD-KEY>`
+   - Delete access key `AKIA[REDACTED-BY-DRAGON-2026-06-28]`
    - Generate a new key
    - Update `apis/services/email-api/.env.dev` and `.env.prod` in dracon-platform (these are encrypted with dracon-warden — use `dracon-warden once` to re-encrypt)
    - Note: the AWS secret `<AWS-OLD-SECRET>` was committed to git history in plaintext, which is sufficient for credential exposure
