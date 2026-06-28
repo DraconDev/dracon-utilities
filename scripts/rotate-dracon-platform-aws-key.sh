@@ -132,8 +132,10 @@ run_check_mode() {
 
   # Check 6: OLD key present or absent in working tree
   local old_count_dev old_count_prod
-  old_count_dev=$(grep -c "$OLD_SUB" "$ENV_DIR/.env.dev" 2>/dev/null || echo 0)
-  old_count_prod=$(grep -c "$OLD_SUB" "$ENV_DIR/.env.prod" 2>/dev/null || echo 0)
+  old_count_dev=$(grep -cF "$OLD_SUB" "$ENV_DIR/.env.dev" 2>/dev/null; true)
+  old_count_prod=$(grep -cF "$OLD_SUB" "$ENV_DIR/.env.prod" 2>/dev/null; true)
+  old_count_dev=${old_count_dev:-0}
+  old_count_prod=${old_count_prod:-0}
   if [[ "$old_count_dev" -eq 0 && "$old_count_prod" -eq 0 ]]; then
     echo "✓ OLD key: ABSENT from both .env.dev and .env.prod (criteria 6, 7 met)"
   else

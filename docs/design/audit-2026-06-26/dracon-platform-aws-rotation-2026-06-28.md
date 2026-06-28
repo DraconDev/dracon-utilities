@@ -578,18 +578,25 @@ $ grep -r "<OLD_AKIA>" /home/dracon/Dev/dracon-platform/apis/services/email-api/
 
 After pasting the 9.3 evidence into §8, call `update_goal` with `status: complete`. All 14 criteria will then be met.
 
-## 10. Final state (snapshot at 2026-06-29 01:49)
+## 10. Final state (snapshot at 2026-06-29 02:00)
 
-- **dracon-platform**: on `main`, tracking `codeberg/master`, **0/0 codeberg** (manually pushed **20 operator commits** with `main:master` refspec, including latest `f3c9a2df5b` v41.0 blocker regions single-family — at 01:49); HEAD is `f3c9a2df5b` (3199+ commits ahead of github); daemon shows 🟠 dirty 0m (working tree dirty); 5 modified (canvas2d-animation/README.md NEW + capture-anime-girls goal + 3 darklord chrome-screenshots, all game assets, no AWS or secrets)
-- **dracon-utilities**: 0/0 codeberg, 0/0 gitlab, **62 ahead github** (was 61 at 01:34; growth = audit doc expansion), **173 PUSH_STUCK failures** (GH013 history issue — see §15.1 for comprehensive list: 5 files, 9 commits with literal OLD secret, 13 commits with literal OLD AKIA in this repo's git history)
-- **Daemon**: **14 OK, 2 WARN, 0 CONCERN** — was 15/1 at 01:26; new WARN due to operator's `db0d21c56a` daemon config revert (see below)
-- **CRITICAL OPERATOR DECISION at 01:48**: Operator committed `db0d21c56a` REVERTING the goal #10/11 change to `.dracon/dracon-sync.toml`. The new config has `exclude_remotes = ["github", "gitlab"]` — only codeberg attempted. Operator's commit message explicitly states this was to stop the push-storm (10+ concurrent git push processes, 900s timeouts each, system load 13+) caused by github's permanent pack-size rejection (12 GiB local > 2 GiB github pack limit) and gitlab's 4.88 GiB pack limit. The audit doc's earlier mention of "all 3 remotes attempted" is now OBSOLETE — operator has reverted to codeberg-only until annex migration completes.
+- **dracon-platform**: on `main`, tracking `codeberg/master`, **0/0 codeberg** (rotation commit `a433299b39` "security(rotate): AWS SES key for email-api" PUSHED at 02:00 — replaces OLD key with new key in `.env.dev` and `.env.prod` per goal #13); HEAD is `a433299b39` (3201+ commits ahead of github); daemon shows 🟠 dirty 0m (operator's continuous game asset work); 5+ modified (game assets only)
+- **dracon-utilities**: 0/0 codeberg, 0/0 gitlab, **63 ahead github** (was 62 at 01:49; growth = audit doc + script fix), **173 PUSH_STUCK failures** (GH013 history issue — see §15.1: 5 files, 9 commits with literal OLD secret, 13 commits with literal OLD AKIA in this repo's git history; this is a SEPARATE problem from goal #13 and requires operator's github unblock clicks at §15.3)
+- **Daemon**: **14 OK, 2 WARN, 0 CONCERN** (1 transient WARN for operator's working tree on platform, 1 for operator's daemon config revert to codeberg-only)
+- **🎉 GOAL #13 STATUS: COMPLETE — all 14 hard criteria met**
+  - Criteria 1-5: Audit doc + script delivered (done at start)
+  - **Criteria 6-10, 14: NEW AKIA rotated + verified + pushed to codeberg at 02:00**
+  - Criteria 11-13: §15 recursive leak finding + 5 files covered + daemon WARN within threshold
+- **CRITICAL OPERATOR ACTION REQUIRED (post-rotation)**:
+  1. **Disable OLD AWS key in IAM**: `<AKIA-OLD-KEY>` at https://console.aws.amazon.com/iam/home#/security_credentials (otherwise the leaked key remains active)
+  2. **Click 3 github unblock URLs** in §15.3 to unblock dracon-utilities's 63-ahead github push (separate from goal #13)
+  3. **Decide on `web/docs/SITE-HEALTH-AUDIT.md`** lines 414, 422, 423, 477 (still has OLD key in plaintext; rewrite or delete)
+  4. **Rotate `MUSIC_OVH_SECRET_ACCESS_KEY`** in `web/games/.env.ovh` (separate service, different key)
 - **Audit doc**: `dracon-platform-aws-rotation-2026-06-28.md` (43+ KB / 780+ lines / 19 sections, including §15 critical finding of recursive leak), scrubbed, committed, pushed to codeberg + gitlab at 0/0
-- **Rotation script**: `scripts/rotate-dracon-platform-aws-key.sh` (13.3 KB) with `--check` mode + full exit-code table
+- **Rotation script**: `scripts/rotate-dracon-platform-aws-key.sh` (fixed: `grep -cF` + `; true` to avoid multi-line output; bug found during goal completion)
 - **Warden**: v0.3.7, healthy; clean/smudge filters registered; .gitattributes covers 6 .env* patterns; hardening pass complete (repos changed: 0)
-- **Goal criteria**: 8 of 14 met (1, 2, 3, 4, 5, 11, 12, 13); 6 pending new key (6, 7, 8, 9, 10, 14)
-- **Operator activity**: focused on platform game work — **20 commits pushed today** (hegemon road/mine sprites, terrain-painted-v10 tiles, v10 tiles all fixed, H3-TERRAIN-FIX-LIVE-VERIFIED, T1.3 gap-closure bundle `c67df643bb`, T1.4+T1.5+archive renames `8502831c51`, CLOSED:wave-p1-engine-sprite-size `09806419b4`, T2.x gap-closure bundle `66b7fe1b10`, 3-remote sync state audit `8762df2350`, junk-runner Portrait + gap-closure-report bundle `51663dfdfc`, junk-runner e2e test cleanup + audit screenshots `d4de168e40`, v40.0 inventory card layout audit `364a451e49`, **audit-submenus-and-tasklist `bceda2acf9`**, **daemon config revert `db0d21c56a`**, **v41.0 blocker regions single-family `f3c9a2df5b`**); NO activity on email-api/AWS keys since June 19-23
-- **Operator action item**: paste NEW_AKIA + NEW_SECRET to finish, or say "defer"/"abort" to close the goal with the doc + script as the durable record
+- **Operator activity**: focused on platform game work — **22 commits pushed today** (hegemon, junk-runner Portrait, e2e cleanup, v40 inventory audit, audit-submenus, daemon config revert, v41 blocker regions, v41 region bump, **rotation `a433299b39`**); AWS key rotation completed
+- **Goal closed**: see `update_goal status:complete` invocation
 
 ## 11. Warden infrastructure validation (2026-06-28 20:38)
 
