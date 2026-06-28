@@ -396,43 +396,45 @@ This index maps every required sub-item from the goal to its location in this do
 
 ---
 
-## 15. CRITICAL FINDING (2026-06-28 21:49) — Doc history has the literal OLD secret
+## 15. CRITICAL FINDING (2026-06-28 21:49, expanded 21:54) — Doc history has the literal OLD secret
 
-While investigating the GH013 push rejection (which started at 20:53 and continues), I discovered that **the doc's git history still contains the literal OLD AWS secret in 4+ commits**, even though the doc HEAD is clean.
+While investigating the GH013 push rejection (which started at 20:53 and continues), I discovered that **multiple audit docs in this repo's git history still contain the literal OLD AWS secret/AKIA**, even though all doc HEADs are clean. The recursive leak is broader than initially documented.
 
-### 15.1 The issue
+### 15.1 The issue (comprehensive count)
 
-**Doc HEAD is clean** (verified just now):
-- `<AKIA-REDACTED>` in HEAD: 0 matches
-- `SECRET-KEY-REDACTED-BY-DRAGON-2026-06-28` in HEAD: 0 matches
+**All 3 audit doc HEADs are clean** (verified just now):
+- `<AKIA-REDACTED>` in HEAD: 0 matches (all 3 docs)
+- `SECRET-KEY-REDACTED-BY-DRAGON-2026-06-28` in HEAD: 0 matches (all 3 docs)
 
-**Doc history is NOT clean** (4+ commits with literal secret):
-- `6d27369b` — original doc creation, +210 lines, includes both literal AKIA and secret
-- `22133bd7` — later edit, +20/-20
-- `d5c6de97` — later edit, +18/-0
-- `7adf6db1` — later edit, +1/-1
+**Audit doc history is NOT clean** — 3 files, 9 commits with literal OLD secret, 11 commits with literal OLD AKIA:
 
-**Doc history also has literal AKIA** (4+ commits):
-- `6d27369b`, `22133bd7`, `719587ee`, `52a6a034`
+| File | Commits with literal secret | Commits with literal AKIA |
+|------|------------------------------|-----------------------------|
+| `dracon-platform-aws-rotation-2026-06-28.md` | `6d27369b`, `22133bd7`, `d5c6de97`, `7adf6db1` | `6d27369b`, `22133bd7`, `719587ee`, `52a6a034` |
+| `v1-table-fix-and-secret-scrub-2026-06-28.md` | `290e795c`, `ec7dcec7`, `a8ef2069` | `290e795c`, `ec7dcec7`, `a8ef2069` |
+| `v1-table-and-mirror-enable-2026-06-28.md` | `15b6542b`, `6133547d` (also has secret) | `15b6542b`, `6133547d`, `2fbe906d`, `58b3c5e9` |
 
-**GitHub push is rejected** by GH013 because the historical commits contain the literal secret. This is why the daemon's github push for this repo (`dracon-utilities`) is in PUSH_STUCK with 171+ failures.
+**Total: 9 commits with literal OLD secret, 11 commits with literal OLD AKIA across 3 audit doc files.**
+
+**GitHub push is rejected** by GH013 because the historical commits contain the literal secret/AKIA. This is why the daemon's github push for this repo (`dracon-utilities`) is in PUSH_STUCK with 171+ failures.
 
 ### 15.2 Why this happened
 
-I scrubbed the doc by replacing literal keys with redaction markers in the working tree. But **scrubbing the working tree does not rewrite history**. The git history still has the literal secret in those 4 commits.
+I scrubbed the docs by replacing literal keys with redaction markers in the working tree during the prior session. But **scrubbing the working tree does not rewrite history**. The git history still has the literal secret in those 9 commits across 3 files.
 
-This is a recursive leak: the doc I wrote to document the platform's AWS leak is itself part of the leak in git history.
+This is a recursive leak: the audit docs I wrote to document the platform's AWS leak are themselves part of the leak in this repo's git history.
 
 ### 15.3 Fix paths (out of scope for this goal)
 
 The fix requires either:
 
-1. **Operator clicks the GH013 unblock URLs** (3 URLs from the daemon log):
-   - https://github.com/DraconDev/dracon-utilities/security/secret-scanning/unblock-secret/3FmCaothFt0qHvpYTILr9vJELcB (AKIA)
+1. **Operator clicks the GH013 unblock URLs** (per-commit URLs from the daemon log):
+   - https://github.com/DraconDev/dracon-utilities/security/secret-scanning/unblock-secret/3FmCaothFt0qHvpYTILr9vJELcB (AKIA, dr-platform-aws-rotation)
    - https://github.com/DraconDev/dracon-utilities/security/secret-scanning/unblock-secret/3FmCaqw6VjMdOHMyL0CvwYNAHeL (AWS Secret Access Key)
-   - (one more URL may be needed for the 3rd commit)
+   - Additional unblock URLs may exist for the v1-table-fix and v1-table-and-mirror docs (3+ files × multiple commits = many URLs)
+   - The 20:53 daemon log shows paths like `v1-table-fix-and-secret-scrub-2026-06-28.md:94` and `:95` (AKIA matches) — there are likely additional unblock URLs that need to be clicked
 
-2. **History rewrite via `git filter-repo`** — AGENTS.md prohibits without explicit operator override. Would require destroying 4+ commits.
+2. **History rewrite via `git filter-repo`** — AGENTS.md prohibits without explicit operator override. Would require destroying 9+ commits across 3 files.
 
 3. **Accept the leak window** — close the leak by:
    - Disabling the OLD key in AWS IAM (closes the live leak; the historical commits are still in git history but the key is no longer usable)
@@ -440,12 +442,13 @@ The fix requires either:
 
 ### 15.4 Status
 
-- **§15 is a NEW finding** (2026-06-28 21:49) — not part of the original goal's hard acceptance criteria
+- **§15 is a NEW finding** (2026-06-28 21:49, expanded 21:54) — not part of the original goal's hard acceptance criteria
 - **§15 does not change the goal's hard criteria count** (still 8 of 14 met)
-- **§15 explains why criterion 13 cycles to WARN** — the GH013 history issue is on this repo's commits `6d27369b`, `22133bd7`, `d5c6de97`, `7adf6db1` (not the previously-thought `290e795c`/`ec7dcec7`)
+- **§15 explains why criterion 13 cycles to WARN** — the GH013 history issue is on this repo's commits across 3 files (not just 1 as initially documented in §13.4)
+- **§15.4 correction**: The original §13.4 said the GH013 commits were `290e795c` and `ec7dcec7`. Those are real (they're the v1-table-fix doc commits), but the list is incomplete — there are 9+ commits with literal OLD secret and 11+ with literal OLD AKIA across 3 audit doc files.
 - **The fix paths are out of scope** for goal 007296af (which is about the platform rotation, not this repo's history)
 
-This finding strengthens the case for **disabling the OLD key in AWS IAM as the #1 operator action** — it closes the live leak window for BOTH the platform's env files AND this doc's history simultaneously.
+This finding strengthens the case for **disabling the OLD key in AWS IAM as the #1 operator action** — it closes the live leak window for BOTH the platform's env files AND this repo's audit doc history simultaneously.
 
 ## 9. Completion Runbook (2026-06-28 20:30)
 
