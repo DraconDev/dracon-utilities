@@ -48,15 +48,28 @@
 #   - This script does NOT touch any .env file OTHER than email-api.
 #   - This script is idempotent: running it twice with the same key is a no-op.
 #
-# EXIT CODES
-#   0  success (all criteria met)
-#   1  bad arguments
-#   2  warden binary not found
-#   3  OLD key still present after rotation
-#   4  NEW key not present in both files
-#   5  warden hardened report non-zero
-#   6  git commit failed
-#   7  git push to codeberg failed
+# EXIT CODES (full reference)
+#
+#   Code  Step                     When raised
+#   ----  -----------------------  ------------------------------------------------
+#     0   success                  All criteria met; rotation committed and pushed
+#     1   bad arguments            Wrong arg count or malformed NEW_AKIA
+#     2   warden binary not found  dracon-warden missing from PATH
+#     3   OLD key still present    Substring check after rotation finds old key
+#     4   NEW key not present      Substring check finds new key missing in file
+#     5   warden hardened fail     dracon-warden once exited non-zero
+#     6   git commit failed        git commit returned non-zero
+#     7   git push failed          git push to codeberg returned non-zero
+#
+# Note: exit code 3 (OLD key still present) is checking the env files only.
+# The markdown file `web/docs/SITE-HEALTH-AUDIT.md` will still contain the
+# literal OLD key after rotation — this is documented in the audit doc §13
+# and is OUT OF SCOPE for this script. To fix the markdown, the operator
+# must take a separate action (history-rewrite, file edit, or rely on
+# AWS IAM disable to close the leak window).
+#
+# Usage:  $0 <NEW_AWS_ACCESS_KEY_ID> <NEW_AWS_SECRET_ACCESS_KEY>
+#         $0 --check    # diagnostic, no key required
 
 set -euo pipefail
 
