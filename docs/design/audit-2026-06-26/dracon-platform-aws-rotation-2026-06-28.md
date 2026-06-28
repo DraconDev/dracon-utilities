@@ -358,7 +358,7 @@ This index maps every required sub-item from the goal to its location in this do
 | B.2 | Replace values in env files | §4.2 (Substitution) + §9.2.1-§9.2.2 |
 | B.3 | Re-encrypt via warden | §4.3 (Re-encrypt) + §9.2.5 + §11 (Warden validation) |
 | B.4 | Read-back verify | §4.4 (Read-back) + §9.2.6 |
-| B.5 | OLD key absent from working tree | §13 (NEW finding) + §13.1 (Comprehensive verification) |
+| B.5 | OLD key absent from working tree | §4.1 (Substitution) + §4.4 (Read-back) + §8 criterion 14 + §9.2.4 (verification step) — see also §13 (markdown file plaintext leak, separate concern) |
 | B.6 | Document operator action item: disable OLD key in AWS IAM | §4.4 (Operator action items) + §12.1 |
 
 ### Part C — History-leak risk documented (criteria C.1-C.3)
