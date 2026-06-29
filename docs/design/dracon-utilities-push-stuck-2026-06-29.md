@@ -142,13 +142,16 @@ automatically on the next daemon tick.
 ## Follow-up
 
 1. **The redaction marker format may need to change** to
-   avoid future false-positives. Options:
-   - `AKIA_REDACTED_BY_DRAGON_2026_06_28` (use underscores
-     instead of hyphens — would NOT match GitHub's
+   avoid future false-positives. Options (the exact
+   current marker strings are deliberately not reproduced
+   here; see prior audit docs):
+   - Use underscores instead of hyphens in the
+     `AKIA-` redaction marker (would not match GitHub's
      permissive matcher)
-   - `<<AKIA-REDACTED>>` (angle brackets
-     break the marker)
-   - `<<REDACTED-AKIA-2026-06-28>>` (rephrase entirely)
+   - Wrap the `AKIA-` redaction marker in angle brackets
+     (the brackets break the marker shape)
+   - Rephrase the markers entirely to a different
+     format like `<<REDACTED-AWS-KEY-2026-06-28>>`
    Any of these can be applied via a follow-up goal
    `dracon-utilities-redaction-marker-format` if the
    operator decides to do option C above.
