@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 208938,
-    "activeSeconds": 215
+    "tokensUsed": 212809,
+    "activeSeconds": 279
   },
   "sisyphus": false,
   "createdAt": "2026-06-29T13:49:53.731Z",
-  "updatedAt": "2026-06-29T13:53:41.118Z",
+  "updatedAt": "2026-06-29T13:54:46.555Z",
   "activePath": ".pi/goals/active_goal_2026062914495373_mqz9yif7-odgchq.md",
   "taskList": {
     "tasks": [
@@ -57,7 +57,9 @@
       {
         "id": "commit-and-push-doc",
         "title": "Commit the design doc and ensure it pushes to all 3 remotes (which should now succeed since the placeholder pattern is safe)",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-29T13:54:36.433Z",
+        "evidence": "Design doc update committed at `bc1c76bd` (\"2 file(s) in .pi,docs [docs/design/dracon-utilities-push-stuck-2026-06-29.md, .pi/goals/active_goal_2026062914495373_mqz9yif7-odgchq.md] DELTA:+62/-5\"). Pus",
         "verificationContract": "`git log -1` shows the doc commit; `git ls-remote codeberg/main` returns the local HEAD; same for github and gitlab; no GH013 errors"
       }
     ],
@@ -75,8 +77,8 @@ Investigate the dracon-sync daemon's per-repo state for `/home/dracon/Dev/dracon
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 3m35s
-- Tokens used: 209K (208,938) tokens
+- Time spent: 4m39s
+- Tokens used: 213K (212,809) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
@@ -88,5 +90,5 @@ Investigate the dracon-sync daemon's per-repo state for `/home/dracon/Dev/dracon
 - [x] execute-clear: Execute the clear: edit the state file or run the daemon command, then verify the daemon's view of `dracon-utilities` shows 0 ahead / ✅ OK instead of 1 ahead / 🟣 PENDING — evidence: Action taken: `dracon-sync sync-now /home/dracon/Dev/dracon-utilities`. Result: `✅ no sync changes` (no new commits to commit). After waiting 10s for the daemon's next pulse, the table view updated:
 -
 - [x] document-fix: Document the fix in a design doc at `docs/design/daemon-stale-state-clear-2026-06-29.md` (or update existing push-stuck design doc) explaining: (a) the root cause (manual force-push from outside the daemon leaves stale state), (b) the action taken, (c) a follow-up to make the daemon detect external force-pushes (e.g., on next sync pass, re-check actual git state before claiming "1 ahead") — evidence: Added a new `### Stale "pushing 47m / 1 ahead" display (post-resolution)` subsection to the existing `docs/design/dracon-utilities-push-stuck-2026-06-29.md` design doc. The subsection covers: (1) root
-- [ ] commit-and-push-doc: Commit the design doc and ensure it pushes to all 3 remotes (which should now succeed since the placeholder pattern is safe) — contract: `git log -1` shows the doc commit; `git ls-remote codeberg/main` returns the local HEAD; same for github and gitlab; no GH013 errors
+- [x] commit-and-push-doc: Commit the design doc and ensure it pushes to all 3 remotes (which should now succeed since the placeholder pattern is safe) — evidence: Design doc update committed at `bc1c76bd` ("2 file(s) in .pi,docs [docs/design/dracon-utilities-push-stuck-2026-06-29.md, .pi/goals/active_goal_2026062914495373_mqz9yif7-odgchq.md] DELTA:+62/-5"). Pus
 
