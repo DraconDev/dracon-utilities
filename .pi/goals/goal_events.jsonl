@@ -530,3 +530,4 @@
 {"type":"task_list_set","goalId":"mqzd214r-ce1e35","taskCount":5,"blockCompletion":false,"at":"2026-06-29T20:00:52.049Z"}
 {"type":"goal_resumed","goalId":"mqzd214r-ce1e35","reason":"user","at":"2026-06-29T20:02:23.257Z"}
 {"type":"task_complete","goalId":"mqzd214r-ce1e35","taskId":"verify-annex-state","evidence":"Annex state verified. `git annex info` shows: 0 files in working tree, 4 local annex keys (5.24 MB), OVH remote UUID e59d4d5e-c3fb-4d75-93c8-9b94b6793094. `git config --get-regexp 'remote\\.ovh\\.|annex","at":"2026-06-29T20:03:20.165Z"}
+{"type":"task_complete","goalId":"mqzd214r-ce1e35","taskId":"revert-annex","evidence":"Annex fully reverted. `git annex uninit` failed (leftover test objects in .git/annex/objects/ that dropunused couldn't drop because they were \"unreachable\"). Deleted .git/annex/ directory manually (pe","at":"2026-06-29T20:05:09.129Z"}
