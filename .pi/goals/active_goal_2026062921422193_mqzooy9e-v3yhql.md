@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 143956,
-    "activeSeconds": 58
+    "tokensUsed": 289493,
+    "activeSeconds": 96
   },
   "sisyphus": false,
   "createdAt": "2026-06-29T20:42:21.938Z",
-  "updatedAt": "2026-06-29T20:43:20.912Z",
+  "updatedAt": "2026-06-29T20:43:59.454Z",
   "activePath": ".pi/goals/active_goal_2026062921422193_mqzooy9e-v3yhql.md"
 }
 
@@ -23,5 +23,5 @@ but how big is the platform does it not fit on github and gitlab? those have 10g
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 58s
-- Tokens used: 144K (143,956) tokens
+- Time spent: 1m36s
+- Tokens used: 289K (289,493) tokens
