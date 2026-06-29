@@ -468,3 +468,5 @@
 {"type":"task_complete","goalId":"mqz3fk22-s0rh0v","taskId":"fix-column-header-wrap","evidence":"All column widths bumped to max(header_text_width, content_min_width) + 2 padding. At 300 cols: 22 single-line headers. At 250 cols: 15 single-line headers. Verified visually.","at":"2026-06-29T10:55:52.922Z"}
 {"type":"task_complete","goalId":"mqz3fk22-s0rh0v","taskId":"add-wrap-detection-test","evidence":"Added 5 new wrap-detection tests: test_full_table_min_width_within_300 (verifies 22 column minimums sum + 23 borders <= 300), test_compact_table_min_width_within_250 (15 col sum + 15 borders <= 250), ","at":"2026-06-29T10:58:19.320Z"}
 {"type":"task_complete","goalId":"mqz3fk22-s0rh0v","taskId":"build-deploy-push","evidence":"Release build: cargo build --release --locked succeeded. Binary SHA256: 9a170b723a9e4de180d9e2ea8d4985ea1167145d5e969f237af6551d689aaa76. All 622 tests pass (612 unit + 10 integration). New binary ins","at":"2026-06-29T10:59:29.214Z"}
+{"type":"completion_requested","goalId":"mqz3fk22-s0rh0v","at":"2026-06-29T11:00:08.679Z"}
+{"type":"audit_started","goalId":"mqz3fk22-s0rh0v","at":"2026-06-29T11:00:08.679Z"}
