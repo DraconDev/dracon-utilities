@@ -139,6 +139,47 @@ in one go.
 preserves the audit trail. The 117-commit drain happens
 automatically on the next daemon tick.
 
+## Rendering issue (deferred, out of scope for this goal)
+
+The `dracon-sync repos` table output that prompted the
+investigation shows a separate rendering issue that is
+**not addressed in this goal** (the goal's scope is the
+push-stuck investigation, not the rendering bug):
+
+- The `#` column row number (`1`, `2`, `3`, …) is placed
+  on the **first line** of a multi-line row, with the
+  rest of the row wrapping below. The empty first column
+  on subsequent wrapped lines makes it hard to visually
+  associate which data lines belong to which row number.
+- The root cause is that `REPO` is a `LowerBoundary(17)`
+  column in `print_repos_full_table` (per prior goal
+  `mqz3fk22-s0rh0v`'s rebalanced constraints), but
+  `browser-extensions-shared` is 24 chars wide. At any
+  viewing width where the full 22-column table fits,
+  this row wraps to 4 lines and the row number is on
+  line 1 only.
+
+Three viable fix paths (none taken in this goal — they
+require a design decision the operator needs to make):
+
+| Path | Effort | Trade-off |
+|------|--------|-----------|
+| **A.** Widen REPO column to 24+ cols | small code change to `print_repos_full_table` set_constraints; bump the Full tier threshold from 300 to ~330+ cols | Pushing the tier boundary higher means most users see the compact 15-col table at typical widths |
+| **B.** Truncate/abbreviate REPO names to 17 cols (e.g. `browser-…`) | small code change in the row-building code | Loses full REPO identity in the table; operator would need to use the HINT column or `dracon-sync repos --json` for full names |
+| **C.** Repeat the row number on every wrapped line | medium code change in `comfy_table` configuration (no built-in option, requires post-processing the rendered table) | Cleanest visual; the `#` would appear on every line of the row |
+
+The code lives in `dracon-sync/src/report.rs` and is
+part of the `dracon-sync` workspace member, NOT this
+`dracon-utilities` repo, so a fix here requires either
+a follow-up `dracon-sync` development goal or a feature
+request to the daemon maintainer.
+
+This is **noted but deferred** to a future goal. The
+user's directive in the goal text was "otherwise clearly
+the next one to investigate is why this repo is stuck"
+— the rendering observation is a side comment, the
+push-stuck investigation is the deliverable.
+
 ## Follow-up
 
 1. **The redaction marker format may need to change** to
