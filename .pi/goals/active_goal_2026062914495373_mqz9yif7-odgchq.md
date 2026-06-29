@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 207527,
-    "activeSeconds": 199
+    "tokensUsed": 208938,
+    "activeSeconds": 215
   },
   "sisyphus": false,
   "createdAt": "2026-06-29T13:49:53.731Z",
-  "updatedAt": "2026-06-29T13:53:24.103Z",
+  "updatedAt": "2026-06-29T13:53:41.118Z",
   "activePath": ".pi/goals/active_goal_2026062914495373_mqz9yif7-odgchq.md",
   "taskList": {
     "tasks": [
@@ -49,7 +49,9 @@
       {
         "id": "document-fix",
         "title": "Document the fix in a design doc at `docs/design/daemon-stale-state-clear-2026-06-29.md` (or update existing push-stuck design doc) explaining: (a) the root cause (manual force-push from outside the daemon leaves stale state), (b) the action taken, (c) a follow-up to make the daemon detect external force-pushes (e.g., on next sync pass, re-check actual git state before claiming \"1 ahead\")",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-29T13:53:41.116Z",
+        "evidence": "Added a new `### Stale \"pushing 47m / 1 ahead\" display (post-resolution)` subsection to the existing `docs/design/dracon-utilities-push-stuck-2026-06-29.md` design doc. The subsection covers: (1) root",
         "verificationContract": "Design doc exists, references the design decision and the follow-up; if updating existing doc, the §\"Resolution\" section now mentions the stale-state clearing as a secondary fix"
       },
       {
@@ -73,8 +75,8 @@ Investigate the dracon-sync daemon's per-repo state for `/home/dracon/Dev/dracon
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 3m19s
-- Tokens used: 208K (207,527) tokens
+- Time spent: 3m35s
+- Tokens used: 209K (208,938) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
@@ -85,6 +87,6 @@ Investigate the dracon-sync daemon's per-repo state for `/home/dracon/Dev/dracon
 - (b) Built-in daemon command: `dracon-sync syn
 - [x] execute-clear: Execute the clear: edit the state file or run the daemon command, then verify the daemon's view of `dracon-utilities` shows 0 ahead / ✅ OK instead of 1 ahead / 🟣 PENDING — evidence: Action taken: `dracon-sync sync-now /home/dracon/Dev/dracon-utilities`. Result: `✅ no sync changes` (no new commits to commit). After waiting 10s for the daemon's next pulse, the table view updated:
 -
-- [ ] document-fix: Document the fix in a design doc at `docs/design/daemon-stale-state-clear-2026-06-29.md` (or update existing push-stuck design doc) explaining: (a) the root cause (manual force-push from outside the daemon leaves stale state), (b) the action taken, (c) a follow-up to make the daemon detect external force-pushes (e.g., on next sync pass, re-check actual git state before claiming "1 ahead") — contract: Design doc exists, references the design decision and the follow-up; if updating existing doc, the §"Resolution" section now mentions the stale-state clearing as a secondary fix
+- [x] document-fix: Document the fix in a design doc at `docs/design/daemon-stale-state-clear-2026-06-29.md` (or update existing push-stuck design doc) explaining: (a) the root cause (manual force-push from outside the daemon leaves stale state), (b) the action taken, (c) a follow-up to make the daemon detect external force-pushes (e.g., on next sync pass, re-check actual git state before claiming "1 ahead") — evidence: Added a new `### Stale "pushing 47m / 1 ahead" display (post-resolution)` subsection to the existing `docs/design/dracon-utilities-push-stuck-2026-06-29.md` design doc. The subsection covers: (1) root
 - [ ] commit-and-push-doc: Commit the design doc and ensure it pushes to all 3 remotes (which should now succeed since the placeholder pattern is safe) — contract: `git log -1` shows the doc commit; `git ls-remote codeberg/main` returns the local HEAD; same for github and gitlab; no GH013 errors
 
