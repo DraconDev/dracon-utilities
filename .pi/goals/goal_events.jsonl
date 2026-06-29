@@ -528,3 +528,4 @@
 {"type":"task_complete","goalId":"mqzd214r-ce1e35","taskId":"annex-init-ovh","evidence":"Annex initialized in `dracon-platform`:\n- `git annex init \"dracon-platform\"` — registered local repo, configured pre-commit hook (already existed, not overwritten)\n- Annex UUID: 9dd5fba5-7188-4ca3-84a","at":"2026-06-29T15:38:27.683Z"}
 {"type":"goal_tweaked","goalId":"mqzd214r-ce1e35","changeSummary":"Revised to revert annex, capture the storage-strategy analysis in the design doc, and explicitly hand off the dracon-platform structural decision (submodules, split, etc.) to the operator as out-of-scope for the daemon.","at":"2026-06-29T20:00:52.049Z"}
 {"type":"task_list_set","goalId":"mqzd214r-ce1e35","taskCount":5,"blockCompletion":false,"at":"2026-06-29T20:00:52.049Z"}
+{"type":"goal_resumed","goalId":"mqzd214r-ce1e35","reason":"user","at":"2026-06-29T20:02:23.257Z"}
