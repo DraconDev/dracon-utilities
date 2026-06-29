@@ -329,6 +329,63 @@ Once the history rewrite made the github-side GH013
 moot, `dracon-sync repair stuck-unstuck` cleared the
 STUCK flag and the daemon re-engaged normal sync.
 
+### Stale "pushing 47m / 1 ahead" display (post-resolution)
+
+After the history rewrite force-pushed from
+`/tmp/dracon-utilities-clean` (outside the daemon's
+tracking), the `dracon-sync repos` table still showed
+`🟣 PENDING pushing 47m (1 ahead)` and a HINT of
+`run repair-concerns --apply (push or rewrite)` for
+`dracon-utilities` — even though `git rev-list --count
+codeberg/main..HEAD` etc. all returned 0 (the actual
+git state was fully in sync at `ee967d9a`).
+
+**Root cause**: the per-repo "pushing Xm (N ahead)"
+state in the table is **derived at report time** from
+`dracon_git::types::RepoStatus.ahead > 0`, not stored
+in any state file. The daemon's table was a snapshot
+from when the 1 ahead was real (during the force-push
+sequence). Once the manual force-push succeeded, the
+daemon didn't internally record a corresponding
+"external push completed" event, so its next report
+still showed the pre-force-push ahead count.
+
+**Investigation of the state file**:
+
+- File: `/home/dracon/.local/state/dracon/dracon-sync-stuck-push-repos.json`
+  (default path; can be overridden via
+  `DRACON_SYNC_STATE_DIR` env var)
+- Contents: `[]` (empty) — the `STUCK_PUSH` tracker
+  had been correctly cleared by the earlier
+  `dracon-sync repair stuck-unstuck` call
+- The `1 ahead` / `pushing 47m` was NOT in this file
+
+**Fix**: `dracon-sync sync-now /home/dracon/Dev/dracon-utilities`.
+The sync pass re-evaluates the actual git state, commits
+any untracked changes, and pushes them. After the push,
+the next table report shows the real state.
+
+**Result**:
+
+| State | AHEAD | PUSH | STATE+ACT |
+|---|---|---|---|
+| Before fix | 1 | 🟣 PENDING | 🟣 pushing 47m |
+| After `sync-now` | 0 | ✅ OK | ⚪ idle |
+
+All 3 remotes now at `e5855dd` (the post-fix HEAD with
+the goal file auto-committed), 0/0 ahead/behind.
+
+**Follow-up for the daemon (not yet implemented)**:
+The daemon should detect external force-pushes and
+invalidate its derived-state cache when local refs and
+remote refs no longer match. Currently, the daemon
+trusts its own last-known state and only refreshes on
+its own next push attempt. A simple fix would be: on
+each sync pass, if `status.ahead == 0` but the
+last-known state was "pushing X ahead", reset the
+derived state to "synced" instead of preserving the
+stale "pushing" display.
+
 ## Related
 
 - Prior AWS rotation goal: `.pi/goals/archived/goal_2026062804484949_mqx91oeu-o8oz9o.md` (goal `007296af` companion)
