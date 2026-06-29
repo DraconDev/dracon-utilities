@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 168447,
-    "activeSeconds": 30
+    "tokensUsed": 170041,
+    "activeSeconds": 66
   },
   "sisyphus": false,
   "createdAt": "2026-06-29T13:49:53.731Z",
-  "updatedAt": "2026-06-29T13:50:24.321Z",
+  "updatedAt": "2026-06-29T13:51:01.316Z",
   "activePath": ".pi/goals/active_goal_2026062914495373_mqz9yif7-odgchq.md",
   "taskList": {
     "tasks": [
@@ -65,8 +65,8 @@ Investigate the dracon-sync daemon's per-repo state for `/home/dracon/Dev/dracon
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 30s
-- Tokens used: 168K (168,447) tokens
+- Time spent: 1m06s
+- Tokens used: 170K (170,041) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
