@@ -266,4 +266,77 @@ fn test_hint_one_line() {
 
 ## Status
 
-Investigation complete. Awaiting implementation.
+**IMPLEMENTED 2026-06-29.** Tiered layout is live in `dracon-sync` v0.112.14+. See commits:
+- `04363cb` deps: `unicode-width`, `terminal_size`
+- `14ccaf9` tiered dispatch + helper functions
+- `99f3f20` `push_cell_label` with icon+color
+
+Binary SHA256: `39204299d425c41717b73789edadede58b8e0f90b7f395ffdfe2fc73cca82b37`
+
+## Tiered rendering
+
+### Tier 1: Vertical (< 120 cols)
+
+```
+  1. ✅ OK  dracon-platform
+     branch:    main
+     publish:   codeberg/master
+     changes:   0 mod, 0 stg, 20 ut
+     ahead/behind: 12/0
+     push-to:   codeberg [excl:github,gitlab]
+     push:      ✅ OK
+     last:      20a84e2c58b… 2 file(s) in web [web/games/wip/junk-runner/src
+     pushed:    -
+     activity:  🟢 synced 0m
+     state:     ⚪ untracked-only
+     author:    dracon
+     hint:      run repair-concerns --apply (push or rewrite)
+```
+
+- One repo per multi-line block
+- No table borders, no letter-wrapping
+- Color: yellow for non-zero changes/ahead, red for behind/concern, white for zero
+- Truncation: `…` at word boundary, unicode-width-aware (no broken emoji/CJK)
+
+### Tier 2: Compact (120-200 cols)
+
+14-column table (drops 1h/6h/24h split, combines STATE+ACTIVITY, adds author to HINT):
+
+```
+┌───┬───────┬─────────────────────────────────────────┬───────┬──────────┬────┬────┬────┬────┬────┬─────────┬───────────────────────────────┬───────────────────────────────────────────────────────────────────────────────────────┬───────────────────────────────────────────────────────────────────┬───────────────────────────────────────────────────────────────────────────────────────┐
+│ # ┆ 🏷 STA ┆ 📦 REPO                                 ┆ 🌿    ┆ 🔗 PUBLISH ┆ M  ┆ S  ┆ U  ┆ ↑  ┆ ↓  ┆ 🚀 PUSH ┆ 🛰 PUSH-TO                     ┆ 📜 LAST COMMIT                                                                        ┆ 🩺 STATE+ACT                                                      ┆ 💡 HINT                                                                               │
+│ 1 ┆ ⚠️    ┆ dracon-utilities                        ┆ main  ┆ origin/main ┆ 1  ┆ 0  ┆ 3  ┆ 71 ┆ 0  ┆ 🟣      ┆ github,gitlab,codeberg        ┆ 3d86f029060… 1 file(s) in .pi [.pi/goals/active_goal_2026062910231802_mqz0fo21-57rpi… ┆ 🟣 pushing · 🟣 pushing 0m (71 ahead)                             ┆ daemon will push after changes settle · by DraconDev                                  │
+│   ┆ WARN  ┆                                         ┆       ┆            ┆    ┆    ┆    ┆    ┆    ┆ PENDING ┆                               ┆                                                                                       ┆                                                                   ┆                                                                                       │
+```
+
+### Tier 3: Full (>= 200 cols)
+
+Original 22-column v1 table with column constraints preventing letter-wrapping. PUSH cells show icons (✅ OK, 🟣 PENDING, 🛑 STUCK, ❌ FAIL) instead of plain text.
+
+## Evidence
+
+After-output captured at 3 widths:
+- `docs/design/push-stuck-render-evidence/after-80cols.txt` (vertical, 7.8 KB)
+- `docs/design/push-stuck-render-evidence/after-150cols.txt` (compact, 20.9 KB)
+- `docs/design/push-stuck-render-evidence/after-250cols.txt` (full, 22.5 KB)
+
+Before-output (broken letter-wrapping) was captured in earlier session: `/tmp/wide-repos.txt` (1091 lines, max width 941 chars, each cell wrapping letter-by-letter).
+
+## Test coverage
+
+14 new unit tests added in `src/report.rs`:
+- `test_truncate_unicode_width_no_truncation`
+- `test_truncate_unicode_width_emoji_safe`
+- `test_truncate_unicode_width_cjk`
+- `test_choose_layout_tier_vertical`
+- `test_choose_layout_tier_compact`
+- `test_choose_layout_tier_full`
+- `test_push_cell_label_ok`
+- `test_push_cell_label_pending`
+- `test_push_cell_label_push_stuck`
+- `test_push_cell_label_fail`
+- `test_branch_color_for_main_master`
+- `test_branch_color_for_other`
+- `test_colorize_passthrough_when_no_color`
+
+Total: 617 tests passing (607 unit + 10 integration).

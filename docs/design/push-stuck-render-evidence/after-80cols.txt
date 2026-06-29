@@ -1,0 +1,229 @@
+📜 /home/dracon/.dracon/utilities/sync/dracon-sync.toml
+📦 16 repos  ✅ OK 14  ⚠️  WARN 2  ❌ CONCERN 0  ⛔ init/status failed: 0
+
+ℹ️  Legend: MOD = modified tracked · STG = staged · UT = untracked · 🔗 = VS Code publish upstream — green when healthy (e.g. `github/main`), yellow ⚠️ none when no upstream is configured, yellow ⚠️ <remote/branch> (gone) when the upstream is configured but its remote-tracking ref does not exist locally · ↑ = ahead of upstream · ↓ = behind upstream · PUSH = push status · 📊 1h/6h/24h = commits in last 1h/6h/24h · STATE = derived cause (working=daemon just synced/committing/pushing/synced=clean & in sync/stalled/dirty/untracked-only/intentional/failed/idle/cold/healthy) · ACTIVITY = real activity indicator (now=daemon processing this repo · pushing Xm (N ahead)=push in progress, N unpushed commits · dirty Xm=dirty repo, last commit X minutes ago · synced/idle/cold=clean & waiting) · DAEMON = daemon's last recorded action (e.g. '23s sync_triage') so you can tell the daemon is working through dirty rows vs. you're editing right now
+
+  1. ⚠️  WARN  avid
+     branch:    main
+     publish:   github/main
+     changes:   1 mod, 0 stg, 1 ut
+     ahead/behind: 1/0
+     push-to:   github,gitlab,codeberg
+     push:      ✅ OK
+     last:      e2532afe902… 2 file(s) in .pi,src [.pi/goals/active_goal_20…
+     pushed:    -
+     activity:  ⏳ dirty 0m
+     state:     🟡 committing
+     author:    DraconDev
+     hint:      daemon will push after changes settle
+
+  2. ⚠️  WARN  dracon-utilities
+     branch:    main
+     publish:   origin/main
+     changes:   2 mod, 0 stg, 4 ut
+     ahead/behind: 78/0
+     push-to:   github,gitlab,codeberg
+     push:      🛑 STUCK
+     last:      8ba70ff7f64… 1 file(s) in .pi [.pi/goals/active_goal_202606…
+     pushed:    16h
+     activity:  🛑 push-stuck 0m (78 ahead)
+     state:     🟡 committing
+     author:    DraconDev
+     hint:      🛑 push-stuck (10 failures): git push returned non-zero (see daemon log) — ru…
+
+  3. ✅ OK  dracon-platform
+     branch:    sync-test-rotated-key
+     publish:   codeberg/sync-test-rotated-key
+     changes:   0 mod, 0 stg, 21 ut
+     ahead/behind: 0/0
+     push-to:   codeberg [excl:github,gitlab]
+     push:      ✅ OK
+     last:      41ea89a4cd3… 2 file(s) in web [web/games/wip/hegemon/src/li…
+     pushed:    -
+     activity:  🟢 synced 0m
+     state:     ⚪ untracked-only
+     author:    dracon
+     hint:      healthy
+
+  4. ✅ OK  browser-extensions-shared
+     branch:    main
+     publish:   github/main
+     changes:   0 mod, 0 stg, 0 ut
+     ahead/behind: 0/0
+     push-to:   github,gitlab,codeberg
+     push:      ✅ OK
+     last:      7fb3c3a9872… 2 file(s) in .pi [.pi/goals/active_goal_202606…
+     pushed:    -
+     activity:  🟢 synced 0m
+     state:     🟢 synced
+     author:    DraconDev
+     hint:      healthy
+
+  5. ✅ OK  dracon-sync
+     branch:    main
+     publish:   origin/main
+     changes:   0 mod, 0 stg, 0 ut
+     ahead/behind: 0/0
+     push-to:   github,gitlab,codeberg
+     push:      ✅ OK
+     last:      99f3f20bdb8… 1 file(s) in src [src/report.rs] DELTA:+177/-12
+     pushed:    3m
+     activity:  🟢 synced 3m
+     state:     🔄 working
+     author:    DraconDev
+     hint:      healthy
+
+  6. ✅ OK  dracon-libs
+     branch:    main
+     publish:   origin/main
+     changes:   0 mod, 0 stg, 0 ut
+     ahead/behind: 0/0
+     push-to:   github,gitlab,codeberg
+     push:      ✅ OK
+     last:      0d7bead8a86… 1 file(s) in tools [tools/media/dracon-tts-run…
+     pushed:    24m
+     activity:  🟢 synced 24m
+     state:     🟢 synced
+     author:    DraconDev
+     hint:      healthy
+
+  7. ✅ OK  .dracon
+     branch:    main
+     publish:   github/main
+     changes:   0 mod, 0 stg, 0 ut
+     ahead/behind: 0/0
+     push-to:   github,gitlab,codeberg
+     push:      ✅ OK
+     last:      355c31913b1… 1 file(s) in dotfiles [dotfiles/gitconfig] DEL…
+     pushed:    -
+     activity:  🟢 synced 24m
+     state:     🟢 synced
+     author:    DraconDev
+     hint:      healthy
+
+  8. ✅ OK  pully-fully-pull-based-fleet-reconciler
+     branch:    main
+     publish:   github/main
+     changes:   0 mod, 0 stg, 1 ut
+     ahead/behind: 1/0
+     push-to:   github,gitlab,codeberg
+     push:      ✅ OK
+     last:      a9fb93f2f31… audit: full audit report dated 2026-06-29
+     pushed:    -
+     activity:  🚫 unowned: HEAD author = Audit Bot <audit@noreply.…
+     state:     🚫 unowned
+     author:    Audit Bot
+     hint:      🚫 unowned: untrusted_author — run ownership --explain
+
+  9. ✅ OK  pi-plugins
+     branch:    main
+     publish:   origin/main
+     changes:   0 mod, 0 stg, 0 ut
+     ahead/behind: 0/0
+     push-to:   github,gitlab,codeberg
+     push:      ✅ OK
+     last:      22917c51f28… 1 file(s) in .github [.github/FUNDING.yml] DEL…
+     pushed:    19h
+     activity:  ⚪ idle 19h
+     state:     ⚪ idle
+     author:    DraconDev
+     hint:      healthy
+
+ 10. ✅ OK  rust-ai-web-auto
+     branch:    main
+     publish:   github/main
+     changes:   0 mod, 0 stg, 0 ut
+     ahead/behind: 0/0
+     push-to:   github,gitlab,codeberg
+     push:      ✅ OK
+     last:      98d193829fd… 1 file(s) [.gitignore] DELTA:+11/-0
+     pushed:    -
+     activity:  ⚫ cold 4d
+     state:     ⚫ cold
+     author:    DraconDev
+     hint:      healthy
+
+ 11. ✅ OK  ai-auto-writer
+     branch:    main
+     publish:   github/main
+     changes:   0 mod, 0 stg, 0 ut
+     ahead/behind: 0/0
+     push-to:   github,gitlab,codeberg
+     push:      ✅ OK
+     last:      6b724205bad… 1 file(s) in .pi [.pi/goals/active_goal_202606…
+     pushed:    -
+     activity:  ⚫ cold 4d
+     state:     ⚫ cold
+     author:    DraconDev
+     hint:      healthy
+
+ 12. ✅ OK  dracon-code
+     branch:    main
+     publish:   github/main
+     changes:   0 mod, 0 stg, 0 ut
+     ahead/behind: 0/0
+     push-to:   github,gitlab,codeberg
+     push:      ✅ OK
+     last:      8a4b8abed39… 2 file(s) in .pi [.pi/goals/{active_goal_20260…
+     pushed:    -
+     activity:  ⚫ cold 7d
+     state:     ⚫ cold
+     author:    DraconDev
+     hint:      healthy
+
+ 13. ✅ OK  dracon-strategy
+     branch:    main
+     publish:   github/main
+     changes:   0 mod, 0 stg, 0 ut
+     ahead/behind: 0/0
+     push-to:   github,gitlab,codeberg
+     push:      ✅ OK
+     last:      ffa3bc24b61… Drop DraconDev ignore (now tracked)
+     pushed:    -
+     activity:  ⚫ cold 7d
+     state:     ⚫ cold
+     author:    DraconDev
+     hint:      healthy
+
+ 14. ✅ OK  DraconDev
+     branch:    main
+     publish:   origin/main
+     changes:   0 mod, 0 stg, 0 ut
+     ahead/behind: 0/0
+     push-to:   github,gitlab,codeberg
+     push:      ✅ OK
+     last:      f1e2b3783f9… Update cleanup report audit counts
+     pushed:    1w 1d
+     activity:  ⚫ cold 8d
+     state:     ⚫ cold
+     author:    DraconDev
+     hint:      healthy
+
+ 15. ✅ OK  dracon-warden
+     branch:    main
+     publish:   origin/main
+     changes:   0 mod, 0 stg, 0 ut
+     ahead/behind: 0/0
+     push-to:   github,gitlab,codeberg
+     push:      ✅ OK
+     last:      5d1c9ec0cce… 1 file(s) in src [src/main.rs] DELTA:+1/-0
+     pushed:    1w 1d
+     activity:  ⚫ cold 8d
+     state:     ⚫ cold
+     author:    DraconDev
+     hint:      healthy
+
+ 16. ✅ OK  dracon-system
+     branch:    main
+     publish:   origin/main
+     changes:   0 mod, 0 stg, 0 ut
+     ahead/behind: 0/0
+     push-to:   github,gitlab,codeberg
+     push:      ✅ OK
+     last:      82da3966e9a… fix: switch path-deps to crates.io versions fo…
+     pushed:    1w 1d
+     activity:  ⚫ cold 8d
+     state:     ⚫ cold
+     author:    DraconDev
+     hint:      healthy
+
