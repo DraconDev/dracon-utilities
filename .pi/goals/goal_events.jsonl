@@ -640,3 +640,5 @@
 {"type":"goal_resumed","goalId":"mr10pdzr-i495vy","reason":"user","at":"2026-06-30T23:10:42.667Z"}
 {"type":"goal_paused","goalId":"mr10pdzr-i495vy","reason":"user","status":"paused","at":"2026-06-30T23:10:56.163Z"}
 {"type":"goal_resumed","goalId":"mr10pdzr-i495vy","reason":"user","at":"2026-06-30T23:11:10.475Z"}
+{"type":"completion_requested","goalId":"mr10pdzr-i495vy","summary":"Goal `mr10pdzr-i495vy` achieved. The daemon now auto-discovers submodules from each parent's `.gitmodules`, materializes them as standalone worktrees via `git worktree add --detach <sha>` from the parent's `.git/modules/<name>`, and syncs them as full repos with multi-remote push. End-to-end propagation (touch a file in any of the 9 game submodules → auto-commit → push to all 3 remotes → auto-commit parent with gitlink SHA update → push to codeberg) verified live. All 9 game submodules now appear as proper owned rows in `dracon-sync repos`. Test suite passes (663/0), binary deployed, daemon restarted.","at":"2026-06-30T23:16:43.822Z"}
+{"type":"audit_started","goalId":"mr10pdzr-i495vy","at":"2026-06-30T23:16:43.822Z"}
