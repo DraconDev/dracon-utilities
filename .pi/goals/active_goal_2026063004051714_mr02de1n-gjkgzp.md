@@ -5,13 +5,43 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 192915,
-    "activeSeconds": 409
+    "tokensUsed": 259521,
+    "activeSeconds": 514
   },
   "sisyphus": false,
   "createdAt": "2026-06-30T03:05:17.147Z",
-  "updatedAt": "2026-06-30T03:22:05.103Z",
-  "activePath": ".pi/goals/active_goal_2026063004051714_mr02de1n-gjkgzp.md"
+  "updatedAt": "2026-06-30T03:23:50.889Z",
+  "activePath": ".pi/goals/active_goal_2026063004051714_mr02de1n-gjkgzp.md",
+  "taskList": {
+    "tasks": [
+      {
+        "id": "task-1",
+        "title": "Add nested-repo-aware UT counter helper to git/discovery.rs",
+        "status": "pending",
+        "verificationContract": "Helper accepts a list of untracked paths (strings) and a repo path, returns count of entries that point to nested git repos (.git dir or file inside the path). Function is pub(crate)."
+      },
+      {
+        "id": "task-2",
+        "title": "Wire check_untracked_threshold to subtract nested-repo entries",
+        "status": "pending",
+        "verificationContract": "check_untracked_threshold counts the untracked entries from git ls-files, then subtracts the count of entries pointing to nested git repos before comparing against the threshold and returning. Warning text reflects the subtracted count."
+      },
+      {
+        "id": "task-3",
+        "title": "Update existing tests and add new ones for the nested-repo subtraction behavior",
+        "status": "pending",
+        "verificationContract": "Tests in sync.rs for check_untracked_threshold include a parent-with-nested-git-repo case where the returned count excludes the nested-repo entries. Existing tests (below, above, zero, gitignored) remain green."
+      },
+      {
+        "id": "task-4",
+        "title": "Verify build + all tests pass",
+        "status": "pending",
+        "verificationContract": "cargo build --release --locked succeeds and cargo test --workspace --locked runs the sync tests with the new test case passing."
+      }
+    ],
+    "blockCompletion": false,
+    "proposedAt": "2026-06-30T03:22:11.585Z"
+  }
 }
 
 # Goal Prompt
@@ -23,5 +53,13 @@ The daemon should subtract known-nested-repos from the parent's UT count
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 6m49s
-- Tokens used: 193K (192,915) tokens
+- Time spent: 8m34s
+- Tokens used: 260K (259,521) tokens
+## Tasks
+
+<!-- blockCompletion: false -->
+- [ ] task-1: Add nested-repo-aware UT counter helper to git/discovery.rs — contract: Helper accepts a list of untracked paths (strings) and a repo path, returns count of entries that point to nested git repos (.git dir or file inside the path). Function is pub(crate).
+- [ ] task-2: Wire check_untracked_threshold to subtract nested-repo entries — contract: check_untracked_threshold counts the untracked entries from git ls-files, then subtracts the count of entries pointing to nested git repos before comparing against the threshold and returning. Warning text reflects the subtracted count.
+- [ ] task-3: Update existing tests and add new ones for the nested-repo subtraction behavior — contract: Tests in sync.rs for check_untracked_threshold include a parent-with-nested-git-repo case where the returned count excludes the nested-repo entries. Existing tests (below, above, zero, gitignored) remain green.
+- [ ] task-4: Verify build + all tests pass — contract: cargo build --release --locked succeeds and cargo test --workspace --locked runs the sync tests with the new test case passing.
+
