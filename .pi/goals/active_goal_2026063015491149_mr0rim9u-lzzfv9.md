@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 282305,
-    "activeSeconds": 1849
+    "tokensUsed": 285687,
+    "activeSeconds": 1924
   },
   "sisyphus": false,
   "createdAt": "2026-06-30T14:49:11.490Z",
-  "updatedAt": "2026-06-30T15:21:15.911Z",
+  "updatedAt": "2026-06-30T15:22:33.726Z",
   "activePath": ".pi/goals/active_goal_2026063015491149_mr0rim9u-lzzfv9.md",
   "taskList": {
     "tasks": [
@@ -33,7 +33,9 @@
       {
         "id": "task-3",
         "title": "Verify build + tests + end-to-end on web-auto",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-30T15:22:33.725Z",
+        "evidence": "Verified: `cargo build --release --locked` → 0 errors, 7 pre-existing warnings only. `cargo test --locked` → 643 passed, 0 failed, 3 ignored (was 642 → 643, no regressions). Standalone `dracon-sync sy",
         "verificationContract": "`cargo build --release --locked` → 0 errors, no new warnings. `cargo test --locked` → all 642+ tests pass, 0 fail. Run `dracon-sync sync-now /home/dracon/Dev/web-auto` and confirm it completes (no \"git add failed\" / \"Pathspec is in submodule\" errors) — daemon now stages the 2 .pi/ files + submodule pointer + 1 untracked script and commits+pushes them. Verify by checking `ls-remote github` shows the new commit."
       }
     ],
@@ -55,12 +57,12 @@
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 30m49s
-- Tokens used: 282K (282,305) tokens
+- Time spent: 32m04s
+- Tokens used: 286K (285,687) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
 - [x] task-1: Fix stage_existing_files recursion to skip dirs whose .git is a DIRECTORY (not just submodule .git file) — evidence: Updated both `stage_existing_files` checks in src/sync.rs: top-level entry (was `full_dot_git.is_file()`) and inner recursion (was `inner_dot_git.is_file()`) now use `.exists()`. This catches BOTH sub
 - [x] task-2: Add regression test: nested git repo (real .git/ directory) is skipped during staging — evidence: Added `test_stage_existing_files_skips_nested_git_repo` at src/sync.rs. Creates a parent git repo with `keep.txt` and a nested `nested_subrepo/` containing a real `.git/` directory (HEAD, refs/, objec
-- [ ] task-3: Verify build + tests + end-to-end on web-auto — contract: `cargo build --release --locked` → 0 errors, no new warnings. `cargo test --locked` → all 642+ tests pass, 0 fail. Run `dracon-sync sync-now /home/dracon/Dev/web-auto` and confirm it completes (no "git add failed" / "Pathspec is in submodule" errors) — daemon now stages the 2 .pi/ files + submodule pointer + 1 untracked script and commits+pushes them. Verify by checking `ls-remote github` shows the new commit.
+- [x] task-3: Verify build + tests + end-to-end on web-auto — evidence: Verified: `cargo build --release --locked` → 0 errors, 7 pre-existing warnings only. `cargo test --locked` → 643 passed, 0 failed, 3 ignored (was 642 → 643, no regressions). Standalone `dracon-sync sy
 
