@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 404794,
-    "activeSeconds": 19327
+    "tokensUsed": 407826,
+    "activeSeconds": 19410
   },
   "sisyphus": false,
   "createdAt": "2026-06-30T03:05:17.147Z",
-  "updatedAt": "2026-06-30T08:38:32.749Z",
+  "updatedAt": "2026-06-30T08:39:58.225Z",
   "activePath": ".pi/goals/active_goal_2026063004051714_mr02de1n-gjkgzp.md",
   "taskList": {
     "tasks": [
@@ -38,7 +38,8 @@
       {
         "id": "task-4",
         "title": "Verify build + all tests pass",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-30T08:39:37.937Z",
         "verificationContract": "cargo build --release --locked succeeds and cargo test --workspace --locked runs the sync tests with the new test case passing."
       }
     ],
@@ -56,13 +57,13 @@ The daemon should subtract known-nested-repos from the parent's UT count
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 5h22m07s
-- Tokens used: 405K (404,794) tokens
+- Time spent: 5h23m30s
+- Tokens used: 408K (407,826) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
 - [x] task-1: Add nested-repo-aware UT counter helper to git/discovery.rs
 - [x] task-2: Wire check_untracked_threshold to subtract nested-repo entries
 - [x] task-3: Update existing tests and add new ones for the nested-repo subtraction behavior
-- [ ] task-4: Verify build + all tests pass — contract: cargo build --release --locked succeeds and cargo test --workspace --locked runs the sync tests with the new test case passing.
+- [x] task-4: Verify build + all tests pass
 
