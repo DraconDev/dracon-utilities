@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 198841,
-    "activeSeconds": 608
+    "tokensUsed": 199830,
+    "activeSeconds": 661
   },
   "sisyphus": true,
   "createdAt": "2026-06-30T09:48:12.009Z",
-  "updatedAt": "2026-06-30T09:59:03.852Z",
+  "updatedAt": "2026-06-30T09:59:57.871Z",
   "activePath": ".pi/goals/active_goal_2026063010481200_mr0grjhl-q1g5bo.md",
   "taskList": {
     "tasks": [
@@ -49,7 +49,9 @@
       {
         "id": "task-5",
         "title": "Verify build + tests + visual binary end-to-end",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-30T09:59:57.869Z",
+        "evidence": "All 5 success criteria verified end-to-end. (1) dracon-utilities UT=0 (was 3). (2) dracon-platform UT=10 (real untracked files preserved). (3) state for dracon-utilities is dirty/synced, not untracked",
         "verificationContract": "`cargo build --release --locked` → 0 errors; `cargo test --locked` → 637+ tests pass, 0 fail; `dracon-sync repos` shows `dracon-utilities` UT=0 and `dracon-platform` UT ≥ 1; commit auto-staged by daemon."
       }
     ],
@@ -130,8 +132,8 @@ Stop and ask the user.
 - Status: sisyphus running
 - Auto-continue: on
 - Sisyphus mode: yes (prompt/criteria style)
-- Time spent: 10m08s
-- Tokens used: 199K (198,841) tokens
+- Time spent: 11m01s
+- Tokens used: 200K (199,830) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
@@ -139,5 +141,5 @@ Stop and ask the user.
 - [x] task-2: Apply nested-repo subtraction at the two report row construction sites — evidence: Wired `nested_repo_untracked_count(&repo)` into the per-repo loop. Stored result in `effective_untracked_files` (using `saturating_sub`). Updated both report construction sites: a) line 2500 — `StateC
 - [x] task-3: Propagate corrected count to StateCauseInputs.untracked — evidence: Both construction sites (`StateCauseInputs` at line ~2510 and `RepoReportRow` at line ~2582) read from the same local `effective_untracked_files`. The local is computed once per-repo from `effective_s
 - [x] task-4: Add unit + integration tests for nested-repo subtraction — evidence: Added 4 unit/async tests: a) empty list → 0, b) ONLY sibling subrepos → 2 (with `git init` for each child so they appear as untracked dirs to parent), c) all-clean parent → 0, d) non-git path → 0 (fal
-- [ ] task-5: Verify build + tests + visual binary end-to-end — contract: `cargo build --release --locked` → 0 errors; `cargo test --locked` → 637+ tests pass, 0 fail; `dracon-sync repos` shows `dracon-utilities` UT=0 and `dracon-platform` UT ≥ 1; commit auto-staged by daemon.
+- [x] task-5: Verify build + tests + visual binary end-to-end — evidence: All 5 success criteria verified end-to-end. (1) dracon-utilities UT=0 (was 3). (2) dracon-platform UT=10 (real untracked files preserved). (3) state for dracon-utilities is dirty/synced, not untracked
 
