@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 143748,
-    "activeSeconds": 200
+    "tokensUsed": 146428,
+    "activeSeconds": 219
   },
   "sisyphus": false,
   "createdAt": "2026-06-30T09:14:52.990Z",
-  "updatedAt": "2026-06-30T09:18:32.005Z",
+  "updatedAt": "2026-06-30T09:18:53.141Z",
   "activePath": ".pi/goals/active_goal_2026063010145299_mr0fkp1a-ejheis.md"
 }
 
@@ -26,5 +26,5 @@ i mean when typing dracon sync repos but not just │   ┆           ┆       
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 3m20s
-- Tokens used: 144K (143,748) tokens
+- Time spent: 3m39s
+- Tokens used: 146K (146,428) tokens
