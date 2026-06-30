@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 111265,
-    "activeSeconds": 834
+    "tokensUsed": 116409,
+    "activeSeconds": 873
   },
   "sisyphus": false,
   "createdAt": "2026-06-30T17:44:45.688Z",
-  "updatedAt": "2026-06-30T17:59:27.349Z",
+  "updatedAt": "2026-06-30T18:00:09.205Z",
   "activePath": ".pi/goals/active_goal_2026063018444568_mr0xseig-fn9bbd.md",
   "taskList": {
     "tasks": [
@@ -113,18 +113,24 @@
       {
         "id": "fix-5",
         "title": "Build + run full test suite + end-to-end on web-auto",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-30T18:00:09.203Z",
+        "evidence": "fix-5 parent: build clean, full tests pass (650), new binary in place at md5 `d3eeee68`, daemon restarted with new binary, end-to-end verified on web-auto producing commit `6a9acd8` that propagates th",
         "verificationContract": "`cargo build --release --locked` → 0 errors, no new warnings. `cargo test --locked` → previous count +2 new tests, 0 failures. `dracon-sync sync-now /home/dracon/Dev/web-auto` produces a new parent commit that updates the `rust-ai-web-auto` gitlink to its current submodule HEAD. `git ls-remote github refs/heads/main` for web-auto shows the new commit.",
         "subtasks": [
           {
             "id": "fix-5a",
             "title": "Build release + cargo test (expect 645+ tests passing, 0 fail)",
-            "status": "pending"
+            "status": "complete",
+            "completedAt": "2026-06-30T18:00:00.157Z",
+            "evidence": "Build: `cargo build --release --locked` → 0 errors, 7 pre-existing warnings (no new). Tests: `cargo test --locked` → 650 passed (was 643 baseline → 650 = +7 new: 4 is_gitlink + 3 stage_gitlink_updates"
           },
           {
             "id": "fix-5b",
             "title": "Replace `/home/dracon/.local/bin/dracon-sync`, restart daemon, run sync-now on web-auto, verify gitlink commit + push to all 3 remotes",
-            "status": "pending"
+            "status": "complete",
+            "completedAt": "2026-06-30T18:00:05.406Z",
+            "evidence": "End-to-end verified on web-auto. Submodule advance SHA: A=`331a716ae...` (parent tracked), B=`552abf6efc...` (submodule HEAD). Daemon (PID 1288153 with new binary md5 `d3eeee68`) auto-ran at 18:58:43 "
           }
         ]
       }
@@ -143,8 +149,8 @@ Implement the parent-gitlink propagation fix in `dracon-sync`: when the daemon s
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 13m54s
-- Tokens used: 111K (111,265) tokens
+- Time spent: 14m33s
+- Tokens used: 116K (116,409) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
@@ -152,5 +158,5 @@ Implement the parent-gitlink propagation fix in `dracon-sync`: when the daemon s
 - [x] fix-2: Partition staged paths in `sync_repo` into `gitlink_paths` + `regular_paths` — evidence: fix-2 parent: `stage_commit_and_push` now partitions `to_stage` into `(gitlink_entries, regular_entries)`, then maps each to a `Vec<String>` of path strings. Each partition is handled by a different s
 - [x] fix-3: Extend `stage_existing_files` to emit `git add <path>` (no `-A`) for gitlink entries — evidence: fix-3 parent: `stage_existing_files` unchanged (still the right behaviour for non-gitlink paths); new `stage_gitlink_updates(repo, gitlinks, dry_run, stage_timeout_secs)` emits per-path `git add -- <p
 - [x] fix-4: Add regression test for the parent-gitlink propagation case — evidence: fix-4 parent: 3 regression tests added covering the parent-gitlink propagation case. Daemon auto-staged as commit `a1e5142`. All 3 pass; full suite at 640 passed (was 633 baseline + 4 is_gitlink + 3 p
-- [ ] fix-5: Build + run full test suite + end-to-end on web-auto — contract: `cargo build --release --locked` → 0 errors, no new warnings. `cargo test --locked` → previous count +2 new tests, 0 failures. `dracon-sync sync-now /home/dracon/Dev/web-auto` produces a new parent commit that updates the `rust-ai-web-auto` gitlink to its current submodule HEAD. `git ls-remote github refs/heads/main` for web-auto shows the new commit.
+- [x] fix-5: Build + run full test suite + end-to-end on web-auto — evidence: fix-5 parent: build clean, full tests pass (650), new binary in place at md5 `d3eeee68`, daemon restarted with new binary, end-to-end verified on web-auto producing commit `6a9acd8` that propagates th
 
