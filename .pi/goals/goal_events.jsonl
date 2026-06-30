@@ -553,3 +553,5 @@
 {"type":"task_complete","goalId":"mr02de1n-gjkgzp","taskId":"task-2","at":"2026-06-30T03:25:34.253Z"}
 {"type":"task_complete","goalId":"mr02de1n-gjkgzp","taskId":"task-3","at":"2026-06-30T03:27:25.431Z"}
 {"type":"task_complete","goalId":"mr02de1n-gjkgzp","taskId":"task-4","at":"2026-06-30T08:39:37.937Z"}
+{"type":"completion_requested","goalId":"mr02de1n-gjkgzp","summary":"Daemon subtracts nested git repos from the parent's UT count. Added count_nested_repo_untracked_entries helper in git/discovery.rs; modified check_untracked_threshold in sync.rs to call it and subtract via saturating_sub. Warning text now shows the breakdown (raw − nested-repo) when debug is enabled. 9 new tests added (3 sync integration tests + 6 discovery unit tests), all green; full test suite 632 passed / 0 failed.","at":"2026-06-30T08:40:17.452Z"}
+{"type":"audit_started","goalId":"mr02de1n-gjkgzp","at":"2026-06-30T08:40:17.453Z"}
