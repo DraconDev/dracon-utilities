@@ -5,19 +5,21 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 164970,
-    "activeSeconds": 93
+    "tokensUsed": 168048,
+    "activeSeconds": 124
   },
   "sisyphus": true,
   "createdAt": "2026-06-30T09:48:12.009Z",
-  "updatedAt": "2026-06-30T09:50:02.166Z",
+  "updatedAt": "2026-06-30T09:50:35.745Z",
   "activePath": ".pi/goals/active_goal_2026063010481200_mr0grjhl-q1g5bo.md",
   "taskList": {
     "tasks": [
       {
         "id": "task-1",
         "title": "Add nested_repo_untracked_count(repo) helper in src/report.rs",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-30T09:50:11.321Z",
+        "evidence": "Added `pub(crate) async fn nested_repo_untracked_count(repo: &Path) -> usize` at src/report.rs:4721. Calls `crate::git::untracked_entries(repo)` (async, returns Vec<DiffFile>), maps to `Vec<String>` o",
         "verificationContract": "Helper exists, is `async`, calls `crate::git::diff::untracked_entries(repo)` then `crate::git::count_nested_repo_untracked_entries(repo, &paths)`. Returns `usize`."
       },
       {
@@ -122,12 +124,12 @@ Stop and ask the user.
 - Status: sisyphus running
 - Auto-continue: on
 - Sisyphus mode: yes (prompt/criteria style)
-- Time spent: 1m33s
-- Tokens used: 165K (164,970) tokens
+- Time spent: 2m04s
+- Tokens used: 168K (168,048) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
-- [ ] task-1: Add nested_repo_untracked_count(repo) helper in src/report.rs — contract: Helper exists, is `async`, calls `crate::git::diff::untracked_entries(repo)` then `crate::git::count_nested_repo_untracked_entries(repo, &paths)`. Returns `usize`.
+- [x] task-1: Add nested_repo_untracked_count(repo) helper in src/report.rs — evidence: Added `pub(crate) async fn nested_repo_untracked_count(repo: &Path) -> usize` at src/report.rs:4721. Calls `crate::git::untracked_entries(repo)` (async, returns Vec<DiffFile>), maps to `Vec<String>` o
 - [ ] task-2: Apply nested-repo subtraction at the two report row construction sites — contract: Both `src/report.rs` line 2500 and line 2572 (or their equivalents after edits) use `effective_status.untracked_files.saturating_sub(nested_repo_untracked_count(&repo))` for the `untracked` field.
 - [ ] task-3: Propagate corrected count to StateCauseInputs.untracked — contract: `StateCauseInputs.untracked` field is set from the SAME corrected count used for the row, NOT from raw `effective_status.untracked_files`.
 - [ ] task-4: Add unit + integration tests for nested-repo subtraction — contract: At least 3 new tests: a) `nested_repo_untracked_count` unit test with empty paths, b) `nested_repo_untracked_count` unit test with mixed paths (3 nested + 2 plain → returns 3), c) integration test that builds a `RepoStatus` with K nested-repo untracked dirs and asserts the row reads `untracked = N - K`.
