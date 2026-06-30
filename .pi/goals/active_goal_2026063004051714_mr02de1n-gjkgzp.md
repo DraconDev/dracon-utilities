@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 266492,
-    "activeSeconds": 579
+    "tokensUsed": 281676,
+    "activeSeconds": 608
   },
   "sisyphus": false,
   "createdAt": "2026-06-30T03:05:17.147Z",
-  "updatedAt": "2026-06-30T03:25:01.389Z",
+  "updatedAt": "2026-06-30T03:25:34.254Z",
   "activePath": ".pi/goals/active_goal_2026063004051714_mr02de1n-gjkgzp.md",
   "taskList": {
     "tasks": [
@@ -24,7 +24,8 @@
       {
         "id": "task-2",
         "title": "Wire check_untracked_threshold to subtract nested-repo entries",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-30T03:25:34.253Z",
         "verificationContract": "check_untracked_threshold counts the untracked entries from git ls-files, then subtracts the count of entries pointing to nested git repos before comparing against the threshold and returning. Warning text reflects the subtracted count."
       },
       {
@@ -54,13 +55,13 @@ The daemon should subtract known-nested-repos from the parent's UT count
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 9m39s
-- Tokens used: 266K (266,492) tokens
+- Time spent: 10m08s
+- Tokens used: 282K (281,676) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
 - [x] task-1: Add nested-repo-aware UT counter helper to git/discovery.rs
-- [ ] task-2: Wire check_untracked_threshold to subtract nested-repo entries — contract: check_untracked_threshold counts the untracked entries from git ls-files, then subtracts the count of entries pointing to nested git repos before comparing against the threshold and returning. Warning text reflects the subtracted count.
+- [x] task-2: Wire check_untracked_threshold to subtract nested-repo entries
 - [ ] task-3: Update existing tests and add new ones for the nested-repo subtraction behavior — contract: Tests in sync.rs for check_untracked_threshold include a parent-with-nested-git-repo case where the returned count excludes the nested-repo entries. Existing tests (below, above, zero, gitignored) remain green.
 - [ ] task-4: Verify build + all tests pass — contract: cargo build --release --locked succeeds and cargo test --workspace --locked runs the sync tests with the new test case passing.
 
