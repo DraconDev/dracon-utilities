@@ -638,3 +638,5 @@
 {"type":"goal_resumed","goalId":"mr10pdzr-i495vy","reason":"user","at":"2026-06-30T23:10:03.658Z"}
 {"type":"goal_paused","goalId":"mr10pdzr-i495vy","reason":"user","status":"paused","at":"2026-06-30T23:10:38.524Z"}
 {"type":"goal_resumed","goalId":"mr10pdzr-i495vy","reason":"user","at":"2026-06-30T23:10:42.667Z"}
+{"type":"goal_paused","goalId":"mr10pdzr-i495vy","reason":"user","status":"paused","at":"2026-06-30T23:10:56.163Z"}
+{"type":"goal_resumed","goalId":"mr10pdzr-i495vy","reason":"user","at":"2026-06-30T23:11:10.475Z"}
