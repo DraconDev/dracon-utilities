@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 275275,
-    "activeSeconds": 1524
+    "tokensUsed": 276744,
+    "activeSeconds": 1538
   },
   "sisyphus": false,
   "createdAt": "2026-06-30T14:49:11.490Z",
-  "updatedAt": "2026-06-30T15:15:42.475Z",
+  "updatedAt": "2026-06-30T15:15:58.970Z",
   "activePath": ".pi/goals/active_goal_2026063015491149_mr0rim9u-lzzfv9.md",
   "taskList": {
     "tasks": [
@@ -55,8 +55,8 @@
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 25m24s
-- Tokens used: 275K (275,275) tokens
+- Time spent: 25m38s
+- Tokens used: 277K (276,744) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
