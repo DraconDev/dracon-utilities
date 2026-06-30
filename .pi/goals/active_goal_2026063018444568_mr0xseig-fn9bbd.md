@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 72465,
-    "activeSeconds": 363
+    "tokensUsed": 78990,
+    "activeSeconds": 445
   },
   "sisyphus": false,
   "createdAt": "2026-06-30T17:44:45.688Z",
-  "updatedAt": "2026-06-30T17:51:09.205Z",
+  "updatedAt": "2026-06-30T17:52:35.649Z",
   "activePath": ".pi/goals/active_goal_2026063018444568_mr0xseig-fn9bbd.md",
   "taskList": {
     "tasks": [
@@ -41,36 +41,48 @@
       {
         "id": "fix-2",
         "title": "Partition staged paths in `sync_repo` into `gitlink_paths` + `regular_paths`",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-30T17:52:14.307Z",
+        "evidence": "fix-2 parent: `stage_commit_and_push` now partitions `to_stage` into `(gitlink_entries, regular_entries)`, then maps each to a `Vec<String>` of path strings. Each partition is handled by a different s",
         "verificationContract": "Code change at `sync_repo` so the `to_stage` list is split into two: paths whose `is_gitlink()` returns true go to `gitlink_paths`; the rest go to `regular_paths` (existing path).",
         "subtasks": [
           {
             "id": "fix-2a",
             "title": "Split `to_stage` partition in `sync_repo_with_ahead_since` based on `is_gitlink()`",
-            "status": "pending"
+            "status": "complete",
+            "completedAt": "2026-06-30T17:52:01.659Z",
+            "evidence": "Modified `stage_commit_and_push` in src/sync.rs (line 2460+) to partition `to_stage: &[DiffFile]` into `gitlink_entries` (where `is_gitlink(repo, &e.path)` returns true) and `regular_entries` (rest). "
           },
           {
             "id": "fix-2b",
             "title": "Pass the two partitions through `stage_commit_and_push` to a new `stage_existing_files` call that distinguishes gitlink-add from regular-add",
-            "status": "pending"
+            "status": "complete",
+            "completedAt": "2026-06-30T17:52:05.496Z",
+            "evidence": "Updated `stage_commit_and_push` to call both `stage_existing_files` (for `regular_paths`) AND a new `stage_gitlink_updates` (for `gitlink_paths`). The batch-limit logic distributes the `max_batch` cap"
           }
         ]
       },
       {
         "id": "fix-3",
         "title": "Extend `stage_existing_files` to emit `git add <path>` (no `-A`) for gitlink entries",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-30T17:52:17.400Z",
+        "evidence": "fix-3 parent: `stage_existing_files` unchanged (still the right behaviour for non-gitlink paths); new `stage_gitlink_updates(repo, gitlinks, dry_run, stage_timeout_secs)` emits per-path `git add -- <p",
         "verificationContract": "Code change so a gitlink path is added to the index without recursion. The internal `expanded.push(p)` at the `.git exists()` branch should now push the bare path (kept in the gitlink-partition), and the `git add` invocation for that partition must drop `-A` so git treats it as a pointer update.",
         "subtasks": [
           {
             "id": "fix-3a",
             "title": "Make the top-level and inner-recursion submodule-skip branches emit the path as a gitlink-staging entry instead of dropping it",
-            "status": "pending"
+            "status": "complete",
+            "completedAt": "2026-06-30T17:52:08.686Z",
+            "evidence": "Implemented `stage_gitlink_updates(repo, gitlinks, dry_run, stage_timeout_secs)` in src/sync.rs (added at the same place where `stage_existing_files` is defined). The function bypasses the `.git exist"
           },
           {
             "id": "fix-3b",
             "title": "Adjust the `git add` invocation: split into `git add <gitlink>` (non-recursive) and `git add -A -- <regular>` (recursive), keeping `.gitignore` partition logic intact",
-            "status": "pending"
+            "status": "complete",
+            "completedAt": "2026-06-30T17:52:11.841Z",
+            "evidence": "Adjusted the `git add` invocation: split into TWO invocations — (1) `git add -A -- <regular_paths>` (and `git add -A -f -- <force_paths>` for tracked gitignored), unchanged; (2) `git add -- <gitlink_p"
           }
         ]
       },
@@ -125,14 +137,14 @@ Implement the parent-gitlink propagation fix in `dracon-sync`: when the daemon s
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 6m03s
-- Tokens used: 72K (72,465) tokens
+- Time spent: 7m25s
+- Tokens used: 79K (78,990) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
 - [x] fix-1: Add `is_gitlink()` helper in `dracon-sync/src/exclude.rs` — evidence: fix-1 complete. Helper `is_gitlink(repo, path) -> bool` added to src/exclude.rs. 4 unit tests cover the four path shapes (tracked gitlink, regular file, untracked sibling subrepo, missing path). All 4
-- [ ] fix-2: Partition staged paths in `sync_repo` into `gitlink_paths` + `regular_paths` — contract: Code change at `sync_repo` so the `to_stage` list is split into two: paths whose `is_gitlink()` returns true go to `gitlink_paths`; the rest go to `regular_paths` (existing path).
-- [ ] fix-3: Extend `stage_existing_files` to emit `git add <path>` (no `-A`) for gitlink entries — contract: Code change so a gitlink path is added to the index without recursion. The internal `expanded.push(p)` at the `.git exists()` branch should now push the bare path (kept in the gitlink-partition), and the `git add` invocation for that partition must drop `-A` so git treats it as a pointer update.
+- [x] fix-2: Partition staged paths in `sync_repo` into `gitlink_paths` + `regular_paths` — evidence: fix-2 parent: `stage_commit_and_push` now partitions `to_stage` into `(gitlink_entries, regular_entries)`, then maps each to a `Vec<String>` of path strings. Each partition is handled by a different s
+- [x] fix-3: Extend `stage_existing_files` to emit `git add <path>` (no `-A`) for gitlink entries — evidence: fix-3 parent: `stage_existing_files` unchanged (still the right behaviour for non-gitlink paths); new `stage_gitlink_updates(repo, gitlinks, dry_run, stage_timeout_secs)` emits per-path `git add -- <p
 - [ ] fix-4: Add regression test for the parent-gitlink propagation case — contract: Test that creates a parent repo with a tracked gitlink, advances the inner submodule HEAD, calls `sync_repo` or `stage_existing_files` and asserts the parent's index now points to the new submodule SHA.
 - [ ] fix-5: Build + run full test suite + end-to-end on web-auto — contract: `cargo build --release --locked` → 0 errors, no new warnings. `cargo test --locked` → previous count +2 new tests, 0 failures. `dracon-sync sync-now /home/dracon/Dev/web-auto` produces a new parent commit that updates the `rust-ai-web-auto` gitlink to its current submodule HEAD. `git ls-remote github refs/heads/main` for web-auto shows the new commit.
 
