@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 198431,
-    "activeSeconds": 564
+    "tokensUsed": 198841,
+    "activeSeconds": 608
   },
   "sisyphus": true,
   "createdAt": "2026-06-30T09:48:12.009Z",
-  "updatedAt": "2026-06-30T09:58:19.489Z",
+  "updatedAt": "2026-06-30T09:59:03.852Z",
   "activePath": ".pi/goals/active_goal_2026063010481200_mr0grjhl-q1g5bo.md",
   "taskList": {
     "tasks": [
@@ -130,8 +130,8 @@ Stop and ask the user.
 - Status: sisyphus running
 - Auto-continue: on
 - Sisyphus mode: yes (prompt/criteria style)
-- Time spent: 9m24s
-- Tokens used: 198K (198,431) tokens
+- Time spent: 10m08s
+- Tokens used: 199K (198,841) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
