@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 260448,
-    "activeSeconds": 1340
+    "tokensUsed": 264506,
+    "activeSeconds": 1372
   },
   "sisyphus": false,
   "createdAt": "2026-06-30T14:49:11.490Z",
-  "updatedAt": "2026-06-30T15:12:27.543Z",
+  "updatedAt": "2026-06-30T15:13:00.818Z",
   "activePath": ".pi/goals/active_goal_2026063015491149_mr0rim9u-lzzfv9.md",
   "taskList": {
     "tasks": [
@@ -25,7 +25,9 @@
       {
         "id": "task-2",
         "title": "Add regression test: nested git repo (real .git/ directory) is skipped during staging",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-30T15:13:00.817Z",
+        "evidence": "Added `test_stage_existing_files_skips_nested_git_repo` at src/sync.rs. Creates a parent git repo with `keep.txt` and a nested `nested_subrepo/` containing a real `.git/` directory (HEAD, refs/, objec",
         "verificationContract": "In src/sync.rs tests mod: add a `#[tokio::test]` that creates a parent repo with a nested git repo (real `.git/` directory containing HEAD, objects/, etc.) as a sibling subdir, plus a regular file. Pass `[parent_path]` to `stage_existing_files` and confirm: a) the regular file gets staged, b) NONE of the nested git repo's files get staged, c) the function returns Ok() (no error from trying to git add nested files)."
       },
       {
@@ -53,12 +55,12 @@
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 22m20s
-- Tokens used: 260K (260,448) tokens
+- Time spent: 22m52s
+- Tokens used: 265K (264,506) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
 - [x] task-1: Fix stage_existing_files recursion to skip dirs whose .git is a DIRECTORY (not just submodule .git file) — evidence: Updated both `stage_existing_files` checks in src/sync.rs: top-level entry (was `full_dot_git.is_file()`) and inner recursion (was `inner_dot_git.is_file()`) now use `.exists()`. This catches BOTH sub
-- [ ] task-2: Add regression test: nested git repo (real .git/ directory) is skipped during staging — contract: In src/sync.rs tests mod: add a `#[tokio::test]` that creates a parent repo with a nested git repo (real `.git/` directory containing HEAD, objects/, etc.) as a sibling subdir, plus a regular file. Pass `[parent_path]` to `stage_existing_files` and confirm: a) the regular file gets staged, b) NONE of the nested git repo's files get staged, c) the function returns Ok() (no error from trying to git add nested files).
+- [x] task-2: Add regression test: nested git repo (real .git/ directory) is skipped during staging — evidence: Added `test_stage_existing_files_skips_nested_git_repo` at src/sync.rs. Creates a parent git repo with `keep.txt` and a nested `nested_subrepo/` containing a real `.git/` directory (HEAD, refs/, objec
 - [ ] task-3: Verify build + tests + end-to-end on web-auto — contract: `cargo build --release --locked` → 0 errors, no new warnings. `cargo test --locked` → all 642+ tests pass, 0 fail. Run `dracon-sync sync-now /home/dracon/Dev/web-auto` and confirm it completes (no "git add failed" / "Pathspec is in submodule" errors) — daemon now stages the 2 .pi/ files + submodule pointer + 1 untracked script and commits+pushes them. Verify by checking `ls-remote github` shows the new commit.
 
