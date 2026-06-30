@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 89860,
-    "activeSeconds": 554
+    "tokensUsed": 92051,
+    "activeSeconds": 579
   },
   "sisyphus": false,
   "createdAt": "2026-06-30T17:44:45.688Z",
-  "updatedAt": "2026-06-30T17:54:31.208Z",
+  "updatedAt": "2026-06-30T17:54:59.763Z",
   "activePath": ".pi/goals/active_goal_2026063018444568_mr0xseig-fn9bbd.md",
   "taskList": {
     "tasks": [
@@ -89,18 +89,24 @@
       {
         "id": "fix-4",
         "title": "Add regression test for the parent-gitlink propagation case",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-30T17:54:45.980Z",
+        "evidence": "fix-4 parent: 3 regression tests added covering the parent-gitlink propagation case. Daemon auto-staged as commit `a1e5142`. All 3 pass; full suite at 640 passed (was 633 baseline + 4 is_gitlink + 3 p",
         "verificationContract": "Test that creates a parent repo with a tracked gitlink, advances the inner submodule HEAD, calls `sync_repo` or `stage_existing_files` and asserts the parent's index now points to the new submodule SHA.",
         "subtasks": [
           {
             "id": "fix-4a",
             "title": "Create test that mimics `web-auto/rust-ai-web-auto` scenario (real `.git/` directory, not `.gitmodules`-declared submodule) and asserts parent index gets the new SHA after sync",
-            "status": "pending"
+            "status": "complete",
+            "completedAt": "2026-06-30T17:54:39.130Z",
+            "evidence": "Added `test_stage_gitlink_updates_propagates_sibling_subrepo_pointer` (the web-auto/rust-ai-web-auto scenario) in src/sync.rs tests mod at line ~6247. Builds parent + sibling repo with own `.git/`, re"
           },
           {
             "id": "fix-4b",
             "title": "Create second test for the `.gitmodules`-declared case (worktree shared with parent) and assert the same behavior",
-            "status": "pending"
+            "status": "complete",
+            "completedAt": "2026-06-30T17:54:42.999Z",
+            "evidence": "Added two additional tests for the gitlink propagation helper: (1) `test_stage_gitlink_updates_no_op_for_empty_input` — empty `gitlinks` slice returns Ok without touching git; (2) `test_stage_gitlink_"
           }
         ]
       },
@@ -137,14 +143,14 @@ Implement the parent-gitlink propagation fix in `dracon-sync`: when the daemon s
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 9m14s
-- Tokens used: 90K (89,860) tokens
+- Time spent: 9m39s
+- Tokens used: 92K (92,051) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
 - [x] fix-1: Add `is_gitlink()` helper in `dracon-sync/src/exclude.rs` — evidence: fix-1 complete. Helper `is_gitlink(repo, path) -> bool` added to src/exclude.rs. 4 unit tests cover the four path shapes (tracked gitlink, regular file, untracked sibling subrepo, missing path). All 4
 - [x] fix-2: Partition staged paths in `sync_repo` into `gitlink_paths` + `regular_paths` — evidence: fix-2 parent: `stage_commit_and_push` now partitions `to_stage` into `(gitlink_entries, regular_entries)`, then maps each to a `Vec<String>` of path strings. Each partition is handled by a different s
 - [x] fix-3: Extend `stage_existing_files` to emit `git add <path>` (no `-A`) for gitlink entries — evidence: fix-3 parent: `stage_existing_files` unchanged (still the right behaviour for non-gitlink paths); new `stage_gitlink_updates(repo, gitlinks, dry_run, stage_timeout_secs)` emits per-path `git add -- <p
-- [ ] fix-4: Add regression test for the parent-gitlink propagation case — contract: Test that creates a parent repo with a tracked gitlink, advances the inner submodule HEAD, calls `sync_repo` or `stage_existing_files` and asserts the parent's index now points to the new submodule SHA.
+- [x] fix-4: Add regression test for the parent-gitlink propagation case — evidence: fix-4 parent: 3 regression tests added covering the parent-gitlink propagation case. Daemon auto-staged as commit `a1e5142`. All 3 pass; full suite at 640 passed (was 633 baseline + 4 is_gitlink + 3 p
 - [ ] fix-5: Build + run full test suite + end-to-end on web-auto — contract: `cargo build --release --locked` → 0 errors, no new warnings. `cargo test --locked` → previous count +2 new tests, 0 failures. `dracon-sync sync-now /home/dracon/Dev/web-auto` produces a new parent commit that updates the `rust-ai-web-auto` gitlink to its current submodule HEAD. `git ls-remote github refs/heads/main` for web-auto shows the new commit.
 
