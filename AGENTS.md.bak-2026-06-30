@@ -213,109 +213,14 @@ Design docs are durable. Re-read them.
 
 ## Forbidden actions
 
-> **REMOVED in draft 2026-06-30 (audit goal `mr0q2qx2-mvfs0c`)**:
-> The single-line "NEVER" list below was misleading because the daemon's
-> own auto-repair path (`dracon-sync/src/report.rs:3705` and
-> `report_v2_snapshot.rs:3166`) calls
-> `rewrite_ahead_paths()` (`dracon-sync/src/git/staging.rs:148-244`)
-> which uses `git filter-repo --invert-paths --force` when
-> `auto_repair_concerns = true` (default per
-> `dracon-sync/src/policy.rs:1580`). The 2026-06-30 audit confirmed
-> this code path has never fired on our repos (zero
-> `backup/pre-sync-largeblob-fix-*` branches found), but the
-> contradiction between "NEVER rewrite history" and the default
-> config warranted replacement rather than ad-hoc violation tracking.
-
-Each rule is now spelled out with the relevant context — including
-the daemon-side enforcement (or absence thereof) — so future
-operators know what is human-policy, what is daemon-enforced, and
-what falls in between.
-
-### For HUMAN operators (mirrors what the daemon does NOT do)
-
-- **`git add .`** — never use it; always specify explicit paths.
-  The daemon itself uses `git add -A -- <explicit-paths>` and
-  `git add -A -f -- <explicit-paths>` (see
-  `dracon-sync/src/sync.rs:858,859`) — a safer equivalent.
-- **Force-push to repos with > 5 commits ahead** — daemon default
-  is `force_push_when_behind = false` (`dracon-sync/src/git/mod.rs:684+`).
-  `--force-with-lease` may be used for one-commit-behind divergences,
-  and explicit operator overrides are tracked per-incident (see
-  `docs/design/push-stuck-resolution-2026-06-27.md` for the override
-  template).
-- **Auto-commit secrets** (`.env`, `*.pem`, `*.key`, `*.age`,
-  `secrets/**`) — warden's job per "What the daemon does NOT do"
-  section above. The daemon respects `.gitignore` (via
-  `git add --others --exclude-standard`) but does not have its own
-  secret scanner.
-
-### For BOTH humans AND daemon
-
-- **Reconnect legacy private remotes** — there is no automated
-  path for this. The daemon's `test_load_secret_or_legacy_pat_*`
-  test in `dracon-sync/src/git/mod.rs:370+` covers a fallback
-  to a legacy secrets dir at runtime, but no production code
-  reconnects old remote URLs.
-
-### For DAEMON only (cannot be violated without changing config)
-
-- **History rewrite via `filter-repo --invert-paths --force`** —
-  This is what the daemon does *automatically* during auto-repair
-  when `auto_repair_concerns = true` (default) detects large blobs
-  ahead. Code paths:
-  - Function definition: `dracon-sync/src/git/staging.rs:152`
-  - Call sites: `dracon-sync/src/report.rs:3705`,
-    `dracon-sync/src/report_v2_snapshot.rs:3166`
-  - Default: `dracon-sync/src/policy.rs:1580`
-    (`auto_repair_concerns: true`)
-
-  Audit history (2026-06-30): found 1 historical auto-rewrite
-  backup branch in `/home/dracon/Dev/avid/` —
-  `backup/pre-sync-largeblob-fix-1780417168` (branch tip
-  332a456, dated 2026-06-02 17:14:29 +0100, **before** this
-  AGENTS.md file existed). The branch is local-only (not pushed
-  to codeberg/github/gitlab). The branch tip suggests the
-  rewrite was about ML model files (`models/parakeet-ctc/onnx/`)
-  being staged but exceeded a threshold.
-
-  Since that single pre-AGENTS.md incident, **no further
-  rewrites have fired** on any watched repo (verified by
-  searching for `backup/pre-sync-largeblob-fix-*` branches:
-  only the one in `avid` exists). The daemon creates a backup
-  branch before each rewrite, so any new
-  `backup/pre-sync-largeblob-fix-*` branch is a fault requiring
-  operator review.
-
-  To PREVENT the daemon from auto-rewriting on a specific repo:
-  ```toml
-  # .dracon/dracon-sync.toml
-  auto_repair_concerns = false
-  ```
-  Use case: working in a `kiki-sassy` or `one-mil-girls`-style
-  operator-owned repo where history is sacred.
-
-### What history-rewrite means here
-
-Filter-repo --invert-paths (or filter-branch --index-filter)
-removes specified paths from every commit in the local repo
-ahead of the remote, then force-pushes. Different from:
-
-- **Orphan commit cutover** (`git checkout --orphan + git read-tree`):
-  creates a NEW root commit on a separate branch, leaves the old
-  history intact. Example: the 2026-06-30
-  `migration-light/medium/heavy` cutovers in `dracon-platform`.
-- **Local-only history operations** (rebase, reset, checkout):
-  don't touch the remote until you push.
-
-If you intend a filter-repo style rewrite, the daemon will do it
-for you on any large-blob-ahead concern; you don't need to invoke
-it manually. If you intend a rebase or orphan cutover, that's a
-separate operation not covered by the daemon's auto-repair.
-
-- **Delete operator-owned repos** (kiki-sassy, one-mil-girls)
-  without explicit approval — there is no `daemon-sync rm`
-  command. Repo deletion is a manual `gh`/`glab`/`codeberg-cli`
-  action that requires operator authorization.
+- **NEVER** use `git add .` — always explicit paths
+- **NEVER** force-push to repos with > 5 commits ahead
+- **NEVER** rewrite history
+- **NEVER** reconnect legacy private remotes
+- **NEVER** delete operator-owned repos (kiki-sassy,
+  one-mil-girls) without explicit approval
+- **NEVER** auto-commit `.env`, `*.pem`, `*.key`,
+  `*.age`, `secrets/**`
 
 ## Test discipline
 
