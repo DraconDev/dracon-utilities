@@ -5,19 +5,21 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 258327,
-    "activeSeconds": 1320
+    "tokensUsed": 260448,
+    "activeSeconds": 1340
   },
   "sisyphus": false,
   "createdAt": "2026-06-30T14:49:11.490Z",
-  "updatedAt": "2026-06-30T15:12:02.250Z",
+  "updatedAt": "2026-06-30T15:12:27.543Z",
   "activePath": ".pi/goals/active_goal_2026063015491149_mr0rim9u-lzzfv9.md",
   "taskList": {
     "tasks": [
       {
         "id": "task-1",
         "title": "Fix stage_existing_files recursion to skip dirs whose .git is a DIRECTORY (not just submodule .git file)",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-30T15:12:18.111Z",
+        "evidence": "Updated both `stage_existing_files` checks in src/sync.rs: top-level entry (was `full_dot_git.is_file()`) and inner recursion (was `inner_dot_git.is_file()`) now use `.exists()`. This catches BOTH sub",
         "verificationContract": "src/sync.rs `stage_existing_files`: both top-level entry (line ~721) and inner recursion (line ~828) check `full_dot_git.is_file()` / `inner_dot_git.is_file()`. Change BOTH to `.exists()` so they also catch the case of a nested git repo (where `.git/` is a real directory, not a submodule pointer file). Update the comments to reflect both cases."
       },
       {
@@ -51,12 +53,12 @@
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 22m00s
-- Tokens used: 258K (258,327) tokens
+- Time spent: 22m20s
+- Tokens used: 260K (260,448) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
-- [ ] task-1: Fix stage_existing_files recursion to skip dirs whose .git is a DIRECTORY (not just submodule .git file) — contract: src/sync.rs `stage_existing_files`: both top-level entry (line ~721) and inner recursion (line ~828) check `full_dot_git.is_file()` / `inner_dot_git.is_file()`. Change BOTH to `.exists()` so they also catch the case of a nested git repo (where `.git/` is a real directory, not a submodule pointer file). Update the comments to reflect both cases.
+- [x] task-1: Fix stage_existing_files recursion to skip dirs whose .git is a DIRECTORY (not just submodule .git file) — evidence: Updated both `stage_existing_files` checks in src/sync.rs: top-level entry (was `full_dot_git.is_file()`) and inner recursion (was `inner_dot_git.is_file()`) now use `.exists()`. This catches BOTH sub
 - [ ] task-2: Add regression test: nested git repo (real .git/ directory) is skipped during staging — contract: In src/sync.rs tests mod: add a `#[tokio::test]` that creates a parent repo with a nested git repo (real `.git/` directory containing HEAD, objects/, etc.) as a sibling subdir, plus a regular file. Pass `[parent_path]` to `stage_existing_files` and confirm: a) the regular file gets staged, b) NONE of the nested git repo's files get staged, c) the function returns Ok() (no error from trying to git add nested files).
 - [ ] task-3: Verify build + tests + end-to-end on web-auto — contract: `cargo build --release --locked` → 0 errors, no new warnings. `cargo test --locked` → all 642+ tests pass, 0 fail. Run `dracon-sync sync-now /home/dracon/Dev/web-auto` and confirm it completes (no "git add failed" / "Pathspec is in submodule" errors) — daemon now stages the 2 .pi/ files + submodule pointer + 1 untracked script and commits+pushes them. Verify by checking `ls-remote github` shows the new commit.
 
