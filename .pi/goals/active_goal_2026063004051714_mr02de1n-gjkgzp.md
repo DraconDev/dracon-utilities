@@ -5,19 +5,20 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 263706,
-    "activeSeconds": 546
+    "tokensUsed": 266492,
+    "activeSeconds": 579
   },
   "sisyphus": false,
   "createdAt": "2026-06-30T03:05:17.147Z",
-  "updatedAt": "2026-06-30T03:24:25.704Z",
+  "updatedAt": "2026-06-30T03:25:01.389Z",
   "activePath": ".pi/goals/active_goal_2026063004051714_mr02de1n-gjkgzp.md",
   "taskList": {
     "tasks": [
       {
         "id": "task-1",
         "title": "Add nested-repo-aware UT counter helper to git/discovery.rs",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-30T03:24:36.678Z",
         "verificationContract": "Helper accepts a list of untracked paths (strings) and a repo path, returns count of entries that point to nested git repos (.git dir or file inside the path). Function is pub(crate)."
       },
       {
@@ -53,12 +54,12 @@ The daemon should subtract known-nested-repos from the parent's UT count
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 9m06s
-- Tokens used: 264K (263,706) tokens
+- Time spent: 9m39s
+- Tokens used: 266K (266,492) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
-- [ ] task-1: Add nested-repo-aware UT counter helper to git/discovery.rs — contract: Helper accepts a list of untracked paths (strings) and a repo path, returns count of entries that point to nested git repos (.git dir or file inside the path). Function is pub(crate).
+- [x] task-1: Add nested-repo-aware UT counter helper to git/discovery.rs
 - [ ] task-2: Wire check_untracked_threshold to subtract nested-repo entries — contract: check_untracked_threshold counts the untracked entries from git ls-files, then subtracts the count of entries pointing to nested git repos before comparing against the threshold and returning. Warning text reflects the subtracted count.
 - [ ] task-3: Update existing tests and add new ones for the nested-repo subtraction behavior — contract: Tests in sync.rs for check_untracked_threshold include a parent-with-nested-git-repo case where the returned count excludes the nested-repo entries. Existing tests (below, above, zero, gitignored) remain green.
 - [ ] task-4: Verify build + all tests pass — contract: cargo build --release --locked succeeds and cargo test --workspace --locked runs the sync tests with the new test case passing.
