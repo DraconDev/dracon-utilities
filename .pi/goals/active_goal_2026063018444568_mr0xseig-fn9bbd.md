@@ -5,30 +5,36 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 49322,
-    "activeSeconds": 45
+    "tokensUsed": 54970,
+    "activeSeconds": 68
   },
   "sisyphus": false,
   "createdAt": "2026-06-30T17:44:45.688Z",
-  "updatedAt": "2026-06-30T17:45:36.620Z",
+  "updatedAt": "2026-06-30T17:46:04.657Z",
   "activePath": ".pi/goals/active_goal_2026063018444568_mr0xseig-fn9bbd.md",
   "taskList": {
     "tasks": [
       {
         "id": "fix-1",
         "title": "Add `is_gitlink()` helper in `dracon-sync/src/exclude.rs`",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-30T17:45:57.539Z",
+        "evidence": "fix-1 complete. Helper `is_gitlink(repo, path) -> bool` added to src/exclude.rs. 4 unit tests cover the four path shapes (tracked gitlink, regular file, untracked sibling subrepo, missing path). All 4",
         "verificationContract": "Public test confirming `is_gitlink(repo, \"submod\")` returns true when the path is a 160000 entry in `git ls-tree HEAD <path>` and false otherwise (regular tracked file, untracked dir, missing path).",
         "subtasks": [
           {
             "id": "fix-1a",
             "title": "Write unit test fixtures (parent + tracked gitlink + untracked dir)",
-            "status": "pending"
+            "status": "complete",
+            "completedAt": "2026-06-30T17:45:49.593Z",
+            "evidence": "4 unit tests added in src/exclude.rs::tests covering: (1) `test_is_gitlink_returns_true_for_tracked_gitlink` — creates parent + submod, registers submodule via `git add submod` (creates 160000 entry),"
           },
           {
             "id": "fix-1b",
             "title": "Implement `pub(crate) fn is_gitlink(repo, path)` returning `bool` based on `git ls-tree HEAD` output prefix `160000`",
-            "status": "pending"
+            "status": "complete",
+            "completedAt": "2026-06-30T17:45:53.833Z",
+            "evidence": "Implemented `pub(crate) fn is_gitlink(repo: &Path, path: &Path) -> bool` in src/exclude.rs at line ~610 (right above `is_gitlink_unchanged`). The function runs `git ls-tree HEAD -- <path>` and returns"
           }
         ]
       },
@@ -119,12 +125,12 @@ Implement the parent-gitlink propagation fix in `dracon-sync`: when the daemon s
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 45s
-- Tokens used: 49K (49,322) tokens
+- Time spent: 1m08s
+- Tokens used: 55K (54,970) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
-- [ ] fix-1: Add `is_gitlink()` helper in `dracon-sync/src/exclude.rs` — contract: Public test confirming `is_gitlink(repo, "submod")` returns true when the path is a 160000 entry in `git ls-tree HEAD <path>` and false otherwise (regular tracked file, untracked dir, missing path).
+- [x] fix-1: Add `is_gitlink()` helper in `dracon-sync/src/exclude.rs` — evidence: fix-1 complete. Helper `is_gitlink(repo, path) -> bool` added to src/exclude.rs. 4 unit tests cover the four path shapes (tracked gitlink, regular file, untracked sibling subrepo, missing path). All 4
 - [ ] fix-2: Partition staged paths in `sync_repo` into `gitlink_paths` + `regular_paths` — contract: Code change at `sync_repo` so the `to_stage` list is split into two: paths whose `is_gitlink()` returns true go to `gitlink_paths`; the rest go to `regular_paths` (existing path).
 - [ ] fix-3: Extend `stage_existing_files` to emit `git add <path>` (no `-A`) for gitlink entries — contract: Code change so a gitlink path is added to the index without recursion. The internal `expanded.push(p)` at the `.git exists()` branch should now push the bare path (kept in the gitlink-partition), and the `git add` invocation for that partition must drop `-A` so git treats it as a pointer update.
 - [ ] fix-4: Add regression test for the parent-gitlink propagation case — contract: Test that creates a parent repo with a tracked gitlink, advances the inner submodule HEAD, calls `sync_repo` or `stage_existing_files` and asserts the parent's index now points to the new submodule SHA.
