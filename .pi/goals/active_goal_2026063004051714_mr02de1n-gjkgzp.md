@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 289743,
-    "activeSeconds": 678
+    "tokensUsed": 293853,
+    "activeSeconds": 712
   },
   "sisyphus": false,
   "createdAt": "2026-06-30T03:05:17.147Z",
-  "updatedAt": "2026-06-30T03:26:48.638Z",
+  "updatedAt": "2026-06-30T03:27:25.432Z",
   "activePath": ".pi/goals/active_goal_2026063004051714_mr02de1n-gjkgzp.md",
   "taskList": {
     "tasks": [
@@ -31,7 +31,8 @@
       {
         "id": "task-3",
         "title": "Update existing tests and add new ones for the nested-repo subtraction behavior",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-30T03:27:25.431Z",
         "verificationContract": "Tests in sync.rs for check_untracked_threshold include a parent-with-nested-git-repo case where the returned count excludes the nested-repo entries. Existing tests (below, above, zero, gitignored) remain green."
       },
       {
@@ -55,13 +56,13 @@ The daemon should subtract known-nested-repos from the parent's UT count
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 11m18s
-- Tokens used: 290K (289,743) tokens
+- Time spent: 11m52s
+- Tokens used: 294K (293,853) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
 - [x] task-1: Add nested-repo-aware UT counter helper to git/discovery.rs
 - [x] task-2: Wire check_untracked_threshold to subtract nested-repo entries
-- [ ] task-3: Update existing tests and add new ones for the nested-repo subtraction behavior — contract: Tests in sync.rs for check_untracked_threshold include a parent-with-nested-git-repo case where the returned count excludes the nested-repo entries. Existing tests (below, above, zero, gitignored) remain green.
+- [x] task-3: Update existing tests and add new ones for the nested-repo subtraction behavior
 - [ ] task-4: Verify build + all tests pass — contract: cargo build --release --locked succeeds and cargo test --workspace --locked runs the sync tests with the new test case passing.
 
