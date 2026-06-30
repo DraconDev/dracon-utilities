@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 168048,
-    "activeSeconds": 124
+    "tokensUsed": 171693,
+    "activeSeconds": 153
   },
   "sisyphus": true,
   "createdAt": "2026-06-30T09:48:12.009Z",
-  "updatedAt": "2026-06-30T09:50:35.745Z",
+  "updatedAt": "2026-06-30T09:51:09.550Z",
   "activePath": ".pi/goals/active_goal_2026063010481200_mr0grjhl-q1g5bo.md",
   "taskList": {
     "tasks": [
@@ -25,13 +25,17 @@
       {
         "id": "task-2",
         "title": "Apply nested-repo subtraction at the two report row construction sites",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-30T09:50:42.382Z",
+        "evidence": "Wired `nested_repo_untracked_count(&repo)` into the per-repo loop. Stored result in `effective_untracked_files` (using `saturating_sub`). Updated both report construction sites: a) line 2500 — `StateC",
         "verificationContract": "Both `src/report.rs` line 2500 and line 2572 (or their equivalents after edits) use `effective_status.untracked_files.saturating_sub(nested_repo_untracked_count(&repo))` for the `untracked` field."
       },
       {
         "id": "task-3",
         "title": "Propagate corrected count to StateCauseInputs.untracked",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-06-30T09:51:02.786Z",
+        "evidence": "Both construction sites (`StateCauseInputs` at line ~2510 and `RepoReportRow` at line ~2582) read from the same local `effective_untracked_files`. The local is computed once per-repo from `effective_s",
         "verificationContract": "`StateCauseInputs.untracked` field is set from the SAME corrected count used for the row, NOT from raw `effective_status.untracked_files`."
       },
       {
@@ -124,14 +128,14 @@ Stop and ask the user.
 - Status: sisyphus running
 - Auto-continue: on
 - Sisyphus mode: yes (prompt/criteria style)
-- Time spent: 2m04s
-- Tokens used: 168K (168,048) tokens
+- Time spent: 2m33s
+- Tokens used: 172K (171,693) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
 - [x] task-1: Add nested_repo_untracked_count(repo) helper in src/report.rs — evidence: Added `pub(crate) async fn nested_repo_untracked_count(repo: &Path) -> usize` at src/report.rs:4721. Calls `crate::git::untracked_entries(repo)` (async, returns Vec<DiffFile>), maps to `Vec<String>` o
-- [ ] task-2: Apply nested-repo subtraction at the two report row construction sites — contract: Both `src/report.rs` line 2500 and line 2572 (or their equivalents after edits) use `effective_status.untracked_files.saturating_sub(nested_repo_untracked_count(&repo))` for the `untracked` field.
-- [ ] task-3: Propagate corrected count to StateCauseInputs.untracked — contract: `StateCauseInputs.untracked` field is set from the SAME corrected count used for the row, NOT from raw `effective_status.untracked_files`.
+- [x] task-2: Apply nested-repo subtraction at the two report row construction sites — evidence: Wired `nested_repo_untracked_count(&repo)` into the per-repo loop. Stored result in `effective_untracked_files` (using `saturating_sub`). Updated both report construction sites: a) line 2500 — `StateC
+- [x] task-3: Propagate corrected count to StateCauseInputs.untracked — evidence: Both construction sites (`StateCauseInputs` at line ~2510 and `RepoReportRow` at line ~2582) read from the same local `effective_untracked_files`. The local is computed once per-repo from `effective_s
 - [ ] task-4: Add unit + integration tests for nested-repo subtraction — contract: At least 3 new tests: a) `nested_repo_untracked_count` unit test with empty paths, b) `nested_repo_untracked_count` unit test with mixed paths (3 nested + 2 plain → returns 3), c) integration test that builds a `RepoStatus` with K nested-repo untracked dirs and asserts the row reads `untracked = N - K`.
 - [ ] task-5: Verify build + tests + visual binary end-to-end — contract: `cargo build --release --locked` → 0 errors; `cargo test --locked` → 637+ tests pass, 0 fail; `dracon-sync repos` shows `dracon-utilities` UT=0 and `dracon-platform` UT ≥ 1; commit auto-staged by daemon.
 
