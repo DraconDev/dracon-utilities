@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 70521,
-    "activeSeconds": 222
+    "tokensUsed": 70763,
+    "activeSeconds": 266
   },
   "sisyphus": false,
   "createdAt": "2026-06-30T17:44:45.688Z",
-  "updatedAt": "2026-06-30T17:48:46.483Z",
+  "updatedAt": "2026-06-30T17:49:30.767Z",
   "activePath": ".pi/goals/active_goal_2026063018444568_mr0xseig-fn9bbd.md",
   "taskList": {
     "tasks": [
@@ -125,8 +125,8 @@ Implement the parent-gitlink propagation fix in `dracon-sync`: when the daemon s
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 3m42s
-- Tokens used: 71K (70,521) tokens
+- Time spent: 4m26s
+- Tokens used: 71K (70,763) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
