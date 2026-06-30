@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 397035,
-    "activeSeconds": 19154
+    "tokensUsed": 398409,
+    "activeSeconds": 19217
   },
   "sisyphus": false,
   "createdAt": "2026-06-30T03:05:17.147Z",
-  "updatedAt": "2026-06-30T08:35:21.340Z",
+  "updatedAt": "2026-06-30T08:36:27.882Z",
   "activePath": ".pi/goals/active_goal_2026063004051714_mr02de1n-gjkgzp.md",
   "taskList": {
     "tasks": [
@@ -56,8 +56,8 @@ The daemon should subtract known-nested-repos from the parent's UT count
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 5h19m14s
-- Tokens used: 397K (397,035) tokens
+- Time spent: 5h20m17s
+- Tokens used: 398K (398,409) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
