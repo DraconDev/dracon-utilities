@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 165341,
-    "activeSeconds": 317
+    "tokensUsed": 170019,
+    "activeSeconds": 352
   },
   "sisyphus": false,
   "createdAt": "2026-07-01T22:35:09.624Z",
-  "updatedAt": "2026-07-01T22:40:38.430Z",
+  "updatedAt": "2026-07-01T22:41:15.875Z",
   "activePath": ".pi/goals/active_goal_2026070123350962_mr2nlpko-x1gqv1.md"
 }
 
@@ -23,5 +23,5 @@ i did an investigate and we are def wrong about that we are commting liek the de
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 5m17s
-- Tokens used: 165K (165,341) tokens
+- Time spent: 5m52s
+- Tokens used: 170K (170,019) tokens
