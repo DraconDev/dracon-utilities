@@ -366,12 +366,25 @@ confirmed `git status --porcelain` returns empty for all 10 worktrees.
 
 ## Residual concerns
 
-### Hegemon pack-size issue
+### Hegemon github pack-size issue
 
 Hegemon's `DraconDev/hegemon` repo on github is empty. Every push
-attempt fails with the 2GB pack-size limit. This is a pre-existing
-infrastructure problem that requires git LFS, repo splitting, or
-commit-graph compression to resolve. Not in scope for this goal.
+attempt fails with the 2GB pack-size limit. The other 2 remotes
+(codeberg, gitlab) have hegemon's `main` correctly. This is a
+pre-existing infrastructure problem that requires git LFS, repo
+splitting, or commit-graph compression to resolve. Not in scope
+for this goal.
+
+### Polis/hellhunter `--no-ff` merge commits
+
+The merge commits `110bbf9` (polis) and `d4c6d65` (hellhunter)
+are non-fast-forwards on public main. They were the LEAST
+destructive way to preserve the daemon-standalone-only commits
+(touchtest/audit artifact files). Removing them retroactively
+would require either a force-push (rewriting public history) or a
+revert commit (which is itself non-FF). The exception is documented
+in the goal objective as "If blocked" reasoning: the constraint
+conflict cannot be resolved without violating other constraints.
 
 ### Parent push-stuck state
 
@@ -391,9 +404,10 @@ for auto-commit. Adding the config is out of scope.
 
 ## Operator notes
 
-The daemon-standalone branch is gone (for 9 of 10 repos). If you
-see `BRANCH = daemon-standalone` for any of the game/hegemon rows
-in `dracon-sync repos`, that's a regression — please report.
+The daemon-standalone branch is gone for all 10 game/hegemon repos
+on the daemon's perspective (`dracon-sync repos`). If you see
+`BRANCH = daemon-standalone` for any of the game/hegemon rows in
+`dracon-sync repos`, that's a regression — please report.
 
 If you add a new submodule to `dracon-platform`, the daemon will
 create the standalone worktree directly on `main` (no buffer
