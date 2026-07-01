@@ -344,13 +344,14 @@ As of 2026-07-01 (goal `mr1x7j5i-zioba9`), the design is:
 
 - **No more `daemon-standalone` branch**: the previous buffer
   branch was removed (and the daemon code updated to create
-  worktrees on `main` directly). The 9 game repos
+  worktrees on `main` directly). All 10 game/hegemon repos
   (polis, darklord, neonbreak, capture-anime-girls, hellhunter,
-  junk-runner, endless-td, deathrun, one-mil-girls) had their
-  local and remote `daemon-standalone` branches removed. **The
-  one exception is hegemon**, which still has a local and remote
-  `daemon-standalone` because github's 2GB pack-size limit blocks
-  hegemon's `main` push (hegemon has 2.4GB of MP3 files). See
+  junk-runner, endless-td, deathrun, one-mil-girls, hegemon) had
+  their local and remote `daemon-standalone` branches removed.
+  **The github-side exception**: github's 2GB pack-size limit
+  blocks hegemon's `main` push (hegemon has 2.4GB of MP3 files),
+  so the github remote for hegemon remains empty (was already
+  empty before this goal). See
   `docs/design/daemon-standalone-removal-2026-07-01.md` for the
   full migration log.
 
