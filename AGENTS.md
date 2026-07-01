@@ -317,6 +317,48 @@ separate operation not covered by the daemon's auto-repair.
   command. Repo deletion is a manual `gh`/`glab`/`codeberg-cli`
   action that requires operator authorization.
 
+## Submodule standalone worktree design
+
+For each game/hegemon submodule of `dracon-platform`, the daemon
+auto-materializes a standalone worktree at `/home/dracon/Dev/<name>/`.
+As of 2026-07-01 (goal `mr1x7j5i-zioba9`), the design is:
+
+- **Standalone worktree** at `/home/dracon/Dev/<name>/`: on branch
+  `main` directly (was `daemon-standalone` before 2026-07-01).
+  Commits advance `main` with no buffer branch.
+
+- **Nested submodule checkout** inside
+  `dracon-platform/web/games/<wip|released>/<name>/`: kept
+  **DETACHED** at the parent's tracked gitlink SHA. Git allows a
+  detached worktree and a separate worktree on the same branch
+  (`main`) to coexist, because the detached worktree's HEAD is
+  independent of any branch ref.
+
+- **Convergence invariant**: for each submodule, the parent's
+  tracked gitlink SHA must equal the shared gitdir's
+  `refs/heads/main` SHA. The daemon enforces this via
+  `is_gitlink_unchanged` (which compares the gitlink to
+  `refs/heads/main` from the shared gitdir) and `stage_gitlink_updates`
+  (which writes the gitlink via `git update-index --cacheinfo`
+  when the standalone has advanced `main`).
+
+- **No more `daemon-standalone` branch**: the previous buffer
+  branch was removed (and the daemon code updated to create
+  worktrees on `main` directly). The 9 game repos
+  (polis, darklord, neonbreak, capture-anime-girls, hellhunter,
+  junk-runner, endless-td, deathrun, one-mil-girls) had their
+  local and remote `daemon-standalone` branches removed. **The
+  one exception is hegemon**, which still has a local and remote
+  `daemon-standalone` because github's 2GB pack-size limit blocks
+  hegemon's `main` push (hegemon has 2.4GB of MP3 files). See
+  `docs/design/daemon-standalone-removal-2026-07-01.md` for the
+  full migration log.
+
+- **`fast_forward_daemon_standalone_to_main`** is a no-op stub
+  preserved for backwards compatibility with existing call sites.
+  The standalone is on `main` directly, so each commit already
+  advances `main` — no fast-forward needed.
+
 ## Test discipline
 
 - `cargo test --workspace --locked` must pass
