@@ -311,6 +311,22 @@ heuristic). Adding `owned = true` to their `.dracon/dracon-sync.toml`
 is out of scope for this goal (it's a daemon config concern, not a
 daemon-standalone-removal concern).
 
+### Touch-test cleanup
+
+The 4 skipped touch tests on junk-runner, deathrun, capture-anime-girls,
+and one-mil-girls left `touchtest_*.txt` files in the working trees
+(the daemon's "unowned" filter skipped auto-commit on these repos).
+For 3 of those 4 (capture-anime-girls, junk-runner, deathrun), the
+files remained untracked. one-mil-girls was eventually committed by
+the daemon after the `owned = true` config was set on a subsequent
+discovery cycle.
+
+After the initial completion audit flagged this as a hard-constraint
+violation ("all 10 standalone worktrees must remain clean
+MOD=0, UT=0"), the 3 leftover touchtest files were removed via
+`rm touchtest_*.txt` in each affected worktree. Final verification
+confirmed `git status --porcelain` returns empty for all 10 worktrees.
+
 ## Residual concerns
 
 ### Hegemon pack-size issue
