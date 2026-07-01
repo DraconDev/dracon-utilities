@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 0,
-    "activeSeconds": 0
+    "tokensUsed": 80692,
+    "activeSeconds": 17
   },
   "sisyphus": false,
   "createdAt": "2026-07-01T20:48:20.542Z",
-  "updatedAt": "2026-07-01T20:48:20.543Z",
+  "updatedAt": "2026-07-01T20:48:40.195Z",
   "activePath": ".pi/goals/active_goal_2026070121482054_mr2jscam-26vzaa.md"
 }
 
@@ -194,5 +194,5 @@ dracon@nixos:~/Dev/dracon-utilities (main) %
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 0s
-- Tokens used: 0 tokens
+- Time spent: 17s
+- Tokens used: 81K (80,692) tokens
