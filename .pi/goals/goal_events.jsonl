@@ -783,3 +783,4 @@
 {"type":"task_list_set","goalId":"mr3g843f-lajfpg","taskCount":7,"blockCompletion":true,"at":"2026-07-02T11:56:44.960Z"}
 {"type":"task_complete","goalId":"mr3g843f-lajfpg","taskId":"investigate","evidence":"Investigation complete. Analyzed sync.rs (materialize_submodule at line 1102, stage_gitlink_updates at line 970), exclude.rs (shared_submodule_canonical_head_sha at line 1140, is_gitlink_unchanged at ","at":"2026-07-02T11:57:37.104Z"}
 {"type":"task_complete","goalId":"mr3g843f-lajfpg","taskId":"design","evidence":"I'll begin the design task. Need to write /home/dracon/Dev/dracon-utilities/docs/design/nested-on-main-architecture-2026-07-02.md with rationale, code changes, migration runbook, rollback plan. Will u","at":"2026-07-02T11:57:41.418Z"}
+{"type":"task_complete","goalId":"mr3g843f-lajfpg","taskId":"pilot","evidence":"Acknowledged — starting pilot migration on junk-runner per the design doc runbook.","at":"2026-07-02T11:58:57.166Z"}
