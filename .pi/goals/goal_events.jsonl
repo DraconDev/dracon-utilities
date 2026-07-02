@@ -758,3 +758,5 @@
 {"type":"goal_created","goalId":"mr2oq44w-99fqce","objective":"do a full audit of all repos make sure they all have remotes and we are actively pushing there","sisyphus":false,"autoContinue":true,"at":"2026-07-01T23:06:34.736Z"}
 {"type":"task_list_set","goalId":"mr2oq44w-99fqce","taskCount":7,"blockCompletion":false,"at":"2026-07-01T23:06:45.807Z"}
 {"type":"task_complete","goalId":"mr2oq44w-99fqce","taskId":"enumerate-repos","evidence":"Parsed live `dracon-sync repos` output (35 lines) to extract the 26 canonical watched repos. Cross-checked against /home/dracon/.dracon/sync-status.json for daemon-mapped disk paths. All 26 paths exis","at":"2026-07-01T23:07:12.590Z"}
+{"type":"goal_paused","goalId":"mr2oq44w-99fqce","reason":"user","status":"paused","at":"2026-07-02T01:28:45.659Z"}
+{"type":"goal_resumed","goalId":"mr2oq44w-99fqce","reason":"user","at":"2026-07-02T01:28:49.932Z"}
