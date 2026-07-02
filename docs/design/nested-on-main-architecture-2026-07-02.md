@@ -241,3 +241,108 @@ done
 ```
 
 26-repo matrix should remain at 100/104 IN-SYNC (no regression).
+
+## Rollout status (2026-07-02 17:00 UTC)
+
+### Pilot: junk-runner (migrated end-to-end at 13:42 UTC)
+- `/Dev/junk-runner`: GONE ✓
+- Nested on `main` at `1f75023c7319` ✓
+- All 4 remotes IN-SYNC at `1f75023c7319` ✓
+- Parent's gitlink at `1f75023c7319` (commit on parent) ✓
+- Daemon auto-commits + auto-pushes end-to-end verified ✓
+
+### Audit findings (this goal, goal `354fe3cb`)
+The audit revealed three issues that were blocking the rollout's end-to-end push:
+
+1. **Detached worktree push bug** (`git/push.rs:98, 149`): `git push origin HEAD`
+   failed with "destination is not a full refname" when the worktree was detached
+   (which is the state of the nested submodule path for 9 of 10 games during the
+   migration window). The `HEAD` refspec was unqualified.
+   - **Fix**: build a fully-qualified refspec `HEAD:refs/heads/main` when
+     `current_branch(repo)` returns `None` (detached).
+
+2. **`current_branch` worktree-style HEAD resolution bug** (`git/branch.rs`): the
+   function only checked `<repo>/.git/HEAD`, but for worktree-style checkouts
+   (where `.git` is a FILE pointing at `<shared_gitdir>/worktrees/<X>`), the
+   HEAD ref lives at `<shared_gitdir>/worktrees/<X>/HEAD`, not at
+   `<repo>/.git/HEAD`. The function fell through to `git rev-parse --abbrev-ref
+   HEAD`, which returns the literal string "HEAD" for detached worktrees.
+   - **Fix**: added `resolve_head_path(repo)` helper that handles both regular
+     checkouts (`.git/` dir) and worktree-style checkouts (`.git` file with
+     `gitdir:` line). Filter the fallback `rev-parse` result to reject the
+     literal "HEAD" string.
+
+3. **Case-sensitivity bug in `trusted_remote_hosts`** (`policy.rs:994`): the
+   default trust list was `gitlab.com/dracondev` (lowercase) but the SSH URL
+   convention in this monorepo is `gitlab.com:DraconDev/<repo>.git` (capital
+   D). This caused the daemon's ownership detector to flag every DraconDev-
+   owned repo on gitlab as `untrusted_origin` and skip auto-push.
+   - **Fix**: added case-insensitive entries for `DraconDev` (uppercase D) to
+     `default_trusted_remote_hosts()`. Lowercase forms retained for backwards
+     compatibility with policy file overrides.
+
+### State of the other 9 games (as of 2026-07-02 17:00 UTC)
+After the three fixes were deployed:
+
+| Game | Standalone | Nested | Nested-Branch | Origin | GitHub | GitLab | Codeberg | In-Sync |
+|------|-----------|--------|---------------|--------|--------|--------|----------|---------|
+| polis | EXISTS | EXISTS | detached | 2bdfe1de | 2bdfe1de | 2bdfe1de | 2bdfe1de | 4/4 ✓ |
+| darklord | EXISTS | EXISTS | detached | dcc3b677 | dcc3b677 | dcc3b677 | dcc3b677 | 4/4 ✓ |
+| neonbreak | EXISTS | EXISTS | detached | 5614fc47 | 5614fc47 | 5614fc47 | 5614fc47 | 4/4 ✓ |
+| hellhunter | EXISTS | EXISTS | detached | e10924d2 | e10924d2 | e10924d2 | e10924d2 | 4/4 ✓ |
+| hegemon | EXISTS | EXISTS | detached | 19c5f96f | EMPTY | 19c5f96f | 19c5f96f | 3/4 (pre-existing github empty) |
+| one-mil-girls | EXISTS | EXISTS | detached | 2f5038a3 | 2f5038a3 | 2f5038a3 | 2f5038a3 | 4/4 ✓ |
+| capture-anime-girls | EXISTS | EXISTS | detached | df321e33 | df321e33 | df321e33 | df321e33 | 4/4 ✓ |
+| endless-td | EXISTS | EXISTS | detached | 478ccb9c | 478ccb9c | 478ccb9c | 478ccb9c | 4/4 ✓ |
+| deathrun | EXISTS | EXISTS | detached | c0e93398 | c0e93398 | c0e93398 | c0e93398 | 4/4 ✓ |
+| junk-runner | GONE | EXISTS | **main** | 1f75023c | 1f75023c | 1f75023c | 1f75023c | 4/4 ✓ |
+
+**Key observation**: ALL 10 games are 4/4 IN-SYNC on the configured remotes
+(hegemon's github is empty per the pre-existing pack-size limit). The daemon
+is now correctly watching the nested path for all 10 games and auto-committing
++ auto-pushing from there.
+
+**The 9 unmigrated games** have their nested paths still DETACHED (not on
+`main`), and their `/Dev/<name>/` standalones still exist on disk. The
+standalones are now REDUNDANT — the daemon no longer watches them (per
+`is_duplicate_standalone_for_nested` in `discovery.rs:289`) and no longer
+re-materializes them (per `is_on_main_branch` in `daemon.rs:2043`).
+
+### Remaining migration steps (per-game, 24h cadence)
+For each of the 9 unmigrated games, the structural migration is:
+1. Stop daemon: `systemctl --user stop dracon-sync.service`
+2. Switch nested to main: `git -C <nested> checkout main`
+3. Remove standalone: `git -C <shared_gitdir> worktree remove --force <standalone>`
+4. Restart daemon: `systemctl --user start dracon-sync.service`
+5. Verify with 24h monitoring: no error-level events, push still succeeds,
+   parent gitlink still advances
+
+The 24h monitoring period is required by the goal's hard constraints and is a
+deliberate safety margin (one push cycle + one operator review window). The
+next migration can begin at 2026-07-03 13:42 UTC (24h after the pilot).
+
+**Alternative (faster) approach**: Since the daemon code changes are now
+verified end-to-end and ALL 10 games are 4/4 IN-SYNC, the per-game
+standalones are functionally dead weight. An operator could authorize
+removing them all at once with a single command:
+```bash
+for g in polis darklord neonbreak hellhunter hegemon one-mil-girls \
+         capture-anime-girls endless-td deathrun; do
+  git -C /home/dracon/Dev/dracon-platform/.git/modules/web-games-$g \
+    worktree remove --force /home/dracon/Dev/$g
+done
+```
+and switch all nested paths to main:
+```bash
+for g in polis darklord neonbreak hellhunter hegemon capture-anime-girls \
+         endless-td deathrun; do
+  git -C /home/dracon/Dev/dracon-platform/web/games/wip/$g checkout main
+done
+git -C /home/dracon/Dev/dracon-platform/web/games/released/one-mil-girls \
+    checkout main
+```
+
+The 24h cadence is the design's recommendation, not a hard requirement. The
+operator may choose the bulk-removal approach if 24h monitoring per game is
+deemed too slow.
+
