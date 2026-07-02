@@ -445,3 +445,101 @@ lockstep so the platform repo's tree stays consistent.
 The 4 WARN entries in `dracon-sync repos` are pre-existing dirty files
 (uncommitted user edits that the daemon will auto-commit on its next cycle,
 not migration-related issues).
+
+## HEGEMON GITHUB PUSH LIMITATION (2026-07-02 21:00 UTC)
+
+After the bulk migration, hegemon's 4/4 sync state shows 3/4 with github
+EMPTY. Investigation (goal `mr3wg8q0-m71lhj`) confirms the empty state is
+**structurally permanent** because of github's hard 2GB pack-size limit.
+
+### Empirical evidence
+
+Direct push attempt captured the github error:
+
+```
+remote: fatal: pack exceeds maximum allowed size (2.00 GiB)
+error: remote unpack failed: index-pack failed
+ ! [remote rejected] main -> main (failed)
+```
+
+The push progressed to 1.99 GiB before github rejected it (44% of 14807
+objects written at 11.7 MiB/s). Local pack is 2.3 GiB.
+
+### Why hegemon is so large
+
+| Path | Size in git | What it is |
+|------|-------------|------------|
+| `static/` | 430 MB | 827 tracked files, 76 of which are MP3s (~171 MB) |
+| `build/` | 0 (gitignored) | 391 MB regenerated on every `bun run build` |
+| `node_modules/` | 0 (gitignored) | 7 MB regenerated on every `bun install` |
+| `.pi/investigation/*.png` | ~13 MB | audit screenshots from previous goals |
+
+Total tracked: 993 MB. Pack overhead (deltification, tree objects) brings
+this to 2.3 GiB.
+
+### Why static/ is in git
+
+Hegemon's `.gitignore` includes `static/assets-legacy/` (a narrow
+historical exclusion) but does NOT exclude `static/` as a whole. The
+gitignore was written before the canonical-asset-hosting design (which
+keeps binaries in the bucket, not git) and never updated.
+
+### What we can NOT do (without rewriting history)
+
+1. **Just push to github** — fails with the 2GB pack limit error above
+2. **Use git LFS for the MP3s** — would require rewriting all commits
+   that touched the MP3s (hegemon has 76 of them across N commits)
+3. **Add a separate "hegemon-assets" repo** — github still imposes 100GB
+   per-repo and 2GB per-pack; this doesn't help unless assets move out
+   of THIS repo
+4. **Force-push with split packs** — github doesn't support
+   `receive-pack` chunking on the server side
+
+### What we CAN do (operator decision needed)
+
+Three options, none of which is "just push":
+
+**A. Migrate `static/` to the asset bucket (recommended)**
+- Per `web/CANONICAL-ASSET-HOSTING.md`, the bucket is the canonical
+  home for binary bytes
+- Steps:
+  1. Stop daemon
+  2. `git rm -r --cached static/` to untrack the 430 MB
+  3. Add `static/` to `.gitignore` (replace the narrow
+     `static/assets-legacy/` rule with the broader `static/`)
+  4. Commit the deletion as a normal forward commit
+     (no history rewrite)
+  5. Push to all 4 remotes — pack drops to ~1.9 GiB
+  6. Push to github — fits under 2 GiB
+- Trade-off: code that references `static/assets/foo.png` still works
+  in the working tree (the files are still on disk), just not in git
+  history. New contributors would need to populate `static/` from the
+  bucket on first checkout. Document in README.
+
+**B. Switch the github remote to a different host**
+- github's 2GB pack limit is a github.com-specific policy
+- codeberg.org and gitlab.com both have higher limits (5GB and 10GB
+  per pack respectively)
+- If we want a github mirror but can't fit under 2GB, drop the
+  github remote entirely
+- Trade-off: loses github visibility/SEO/PR UI
+
+**C. Accept 3/4 as the steady state**
+- Keep the empty github remote
+- Document it as a known limitation in the design doc
+- Other 3 remotes (origin/codeberg, gitlab, codeberg) are 4/4
+- Trade-off: simplest option; github remains broken-by-design
+
+The previous audit `mr2oq44w-99fqce` documented this state as
+"pre-existing github empty" and recommended Option C. The current goal
+is to verify that we cannot push to github and document the empirical
+evidence (this section).
+
+### Verdict
+
+**We cannot just push on it.** The 2GB github pack limit is a hard
+server-side constraint, not a network or config issue. The push fails
+deterministically after 1.99 GiB of upload, regardless of how we
+configure the local side. The 3/4 state with github EMPTY is the
+correct steady state for hegemon as long as `static/` is tracked in
+git.
