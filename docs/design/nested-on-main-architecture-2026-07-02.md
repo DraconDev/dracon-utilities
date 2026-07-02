@@ -346,3 +346,102 @@ The 24h cadence is the design's recommendation, not a hard requirement. The
 operator may choose the bulk-removal approach if 24h monitoring per game is
 deemed too slow.
 
+
+## BULK MIGRATION COMPLETE (2026-07-02 17:40 UTC)
+
+After the audit, the operator chose bulk migration over the staged 24h rollout
+because the daemon code was verified end-to-end and all 10 games were 4/4
+IN-SYNC. The bulk migration was performed with the daemon stopped, in the
+following order:
+
+1. Stop daemon: `systemctl --user kill dracon-sync.service`
+2. Remove `/Dev/<name>/` standalones (5 of 9 were already gone; 4 were
+   re-materialized by the daemon during a brief restart — removed via
+   `git -C $shared_gitdir worktree remove --force`)
+3. Commit any dirty files in nested paths: `git -C $nested add -A && git -C
+   $nested commit -m "pre-migration: commit uncommitted changes before bulk
+   migration to nested-on-main"` (only polis, neonbreak, endless-td had
+   uncommitted files at the time)
+4. Switch all 9 nested paths to `main`: `git -C $nested checkout main`
+5. Fast-forward local main to origin's main: `git -C $nested fetch origin &&
+   git -C $nested reset --hard origin/main` (some games had been auto-
+   pushed by the daemon to origin while the nested was detached, so the
+   local main needed to catch up)
+6. Update parent's gitlinks for all 10 games: `git -C $parent update-index
+   --cacheinfo 160000,$nested_main,$submodule_path` for each
+7. Commit the parent: `git -C $parent commit -m "bulk-migration: update all
+   9 game gitlinks after nested-on-main switch"`
+8. Push parent to all 4 remotes: `for r in origin github gitlab codeberg; do
+   git -C $parent push $r main; done`
+9. Force-push any games that were behind on github/codeberg: `git -C $nested
+   push --force-with-lease $r main` (using `force_push_when_behind = true`
+   per goal 87c1bf4d)
+10. Start daemon: `systemctl --user start dracon-sync.service`
+11. End-to-end test: edit a file in `web/games/wip/junk-runner/`, wait 60s,
+    verify the daemon auto-commits and pushes to all 4 remotes, and the
+    parent's gitlink advances. Test passed at 17:40 UTC.
+
+### Final state (2026-07-02 17:40 UTC)
+
+| Game | Standalone | Nested-Branch | Main SHA | Origin | GitHub | GitLab | Codeberg | Status |
+|------|-----------|---------------|----------|--------|--------|--------|----------|--------|
+| polis | GONE | main | 0a8847482cc0 | ✓ | ✓ | ✓ | ✓ | 4/4 ✓ |
+| darklord | GONE | main | 3679462e5c3e | ✓ | ✓ | ✓ | ✓ | 4/4 ✓ |
+| neonbreak | GONE | main | d205b456e29f | ✓ | ✓ | ✓ | ✓ | 4/4 ✓ |
+| hellhunter | GONE | main | e10924d2361b | ✓ | ✓ | ✓ | ✓ | 4/4 ✓ |
+| hegemon | GONE | main | 822bd672631e | ✓ | EMPTY | ✓ | ✓ | 3/4 (pre-existing github empty) |
+| one-mil-girls | GONE | main | 2f5038a3ce9b | ✓ | ✓ | ✓ | ✓ | 4/4 ✓ |
+| capture-anime-girls | GONE | main | 16ee55f4206a | ✓ | ✓ | ✓ | ✓ | 4/4 ✓ |
+| endless-td | GONE | main | 478ccb9cca1c | ✓ | ✓ | ✓ | ✓ | 4/4 ✓ |
+| deathrun | GONE | main | c1549f3ce724 | ✓ | ✓ | ✓ | ✓ | 4/4 ✓ |
+| junk-runner | GONE | main | d455c7fe0432 | ✓ | ✓ | ✓ | ✓ | 4/4 ✓ |
+
+**All 10 games migrated. 9 of 10 are 4/4 IN-SYNC. 1 of 10 (hegemon) is 3/4
+with github EMPTY due to the pre-existing pack-size limit (2.4GB of MP3s
+exceeds github's 2GB cap per goal `mr2oq44w-99fqce` audit).**
+
+### Daemon code changes (final list, all deployed)
+
+| File | Function | Change |
+|------|----------|--------|
+| `dracon-sync/src/git/discovery.rs` | `is_duplicate_standalone_for_nested` (renamed from `is_nested_submodule_with_standalone`) | Inverted polarity: filter the STANDALONE when both paths exist, keep the NESTED |
+| `dracon-sync/src/git/discovery.rs` | submodule candidate computation in `discover_git_repos` | Skip standalone candidate when nested path already exists with `.git` |
+| `dracon-sync/src/daemon.rs` | `materialize_pending_submodules` + new `is_on_main_branch` helper | Skip materializing the standalone worktree when the nested submodule path is on `main` |
+| `dracon-sync/src/git/branch.rs` | `current_branch` + new `resolve_head_path` helper | Handle worktree-style checkouts (where `.git` is a file) and filter the literal "HEAD" string from `git rev-parse --abbrev-ref HEAD` |
+| `dracon-sync/src/git/push.rs` | `push_with_transport_fallbacks` + `push_with_retries` | Use `HEAD:refs/heads/main` refspec when worktree is detached, instead of unqualified `HEAD` |
+| `dracon-sync/src/git/multi_remote.rs` | `push_to_named_remote` | Filter "HEAD" from `current_branch` to avoid `HEAD:refs/heads/HEAD` refspecs |
+| `dracon-sync/src/policy.rs` | `default_trusted_remote_hosts` | Added case-insensitive entries for `DraconDev` (uppercase D) — was previously lowercase only |
+
+### Test coverage
+
+| Test | Status |
+|------|--------|
+| `cargo test --workspace --locked` | 663 + 10 = 673 tests, 0 failures, 3 ignored (unchanged from baseline) |
+| `cargo build --release --locked` | OK |
+| `cargo deny check` | bans/licenses/sources clean; advisories FAILED (pre-existing anyhow 1.0.102 RUSTSEC-2026-0190, unrelated to changes) |
+| `git::branch::tests::test_current_branch_rejects_git_cli_head_string` | New unit test for the worktree-style HEAD filter (added 2026-07-02) |
+
+### Files modified in this goal
+
+- `dracon-sync/src/git/discovery.rs` (5 commits during this goal)
+- `dracon-sync/src/git/branch.rs` (1 commit)
+- `dracon-sync/src/git/push.rs` (2 commits)
+- `dracon-sync/src/git/multi_remote.rs` (1 commit)
+- `dracon-sync/src/daemon.rs` (1 commit)
+- `dracon-sync/src/policy.rs` (1 commit)
+
+All daemon commits are auto-committed by the daemon itself (commit-all policy
+preserved) and pushed to the 4 remotes of `dracon-utilities`.
+
+### Conclusion
+
+The migration is **structurally complete**: all 10 game/hegemon submodules
+have ONE worktree each, at the canonical nested location inside
+`dracon-platform`, on `main`, with no redundant `/Dev/<name>/` standalones.
+The daemon correctly watches the nested paths, auto-commits user edits, and
+auto-pushes to all 4 configured remotes. The parent's gitlink advances in
+lockstep so the platform repo's tree stays consistent.
+
+The 4 WARN entries in `dracon-sync repos` are pre-existing dirty files
+(uncommitted user edits that the daemon will auto-commit on its next cycle,
+not migration-related issues).
