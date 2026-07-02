@@ -319,46 +319,64 @@ separate operation not covered by the daemon's auto-repair.
 
 ## Submodule standalone worktree design
 
-For each game/hegemon submodule of `dracon-platform`, the daemon
-auto-materializes a standalone worktree at `/home/dracon/Dev/<name>/`.
-As of 2026-07-01 (goal `mr1x7j5i-zioba9`), the design is:
+CHANGED 2026-07-02 (goal `mr3g843f-lajfpg`/`354fe3cb`): The standalone
+worktree layout was eliminated for all 10 game/hegemon submodules of
+`dracon-platform`. The canonical architecture is now:
 
-- **Standalone worktree** at `/home/dracon/Dev/<name>/`: on branch
-  `main` directly (was `daemon-standalone` before 2026-07-01).
-  Commits advance `main` with no buffer branch.
+- **Nested submodule checkout** at
+  `/home/dracon/Dev/dracon-platform/web/games/<wip|released>/<name>/`:
+  on branch `main` directly (NOT detached). This is the only
+  worktree per shared gitdir — there is no standalone at
+  `/home/dracon/Dev/<name>/`.
 
-- **Nested submodule checkout** inside
-  `dracon-platform/web/games/<wip|released>/<name>/`: kept
-  **DETACHED** at the parent's tracked gitlink SHA. Git allows a
-  detached worktree and a separate worktree on the same branch
-  (`main`) to coexist, because the detached worktree's HEAD is
-  independent of any branch ref.
+- **Daemon watches the nested path** directly. Auto-commit +
+  auto-push happen from `/Dev/dracon-platform/web/games/<wip|released>/<name>/`.
+  The parent (`dracon-platform`) tracks the submodule via a
+  gitlink that advances in lockstep with the nested's `main` SHA.
 
 - **Convergence invariant**: for each submodule, the parent's
-  tracked gitlink SHA must equal the shared gitdir's
-  `refs/heads/main` SHA. The daemon enforces this via
-  `is_gitlink_unchanged` (which compares the gitlink to
-  `refs/heads/main` from the shared gitdir) and `stage_gitlink_updates`
-  (which writes the gitlink via `git update-index --cacheinfo`
-  when the standalone has advanced `main`).
+  tracked gitlink SHA equals the shared gitdir's `refs/heads/main`
+  SHA. The daemon enforces this via `stage_gitlink_updates`
+  (writes the gitlink via `git update-index --cacheinfo` when
+  the nested has advanced `main`).
 
-- **No more `daemon-standalone` branch**: the previous buffer
-  branch was removed (and the daemon code updated to create
-  worktrees on `main` directly). All 10 game/hegemon repos
-  (polis, darklord, neonbreak, capture-anime-girls, hellhunter,
-  junk-runner, endless-td, deathrun, one-mil-girls, hegemon) had
-  their local and remote `daemon-standalone` branches removed.
+- **Why no standalone**: as of 2026-07-02, all 10 /Dev/<name>/
+  standalones have been removed (`git worktree remove --force`).
+  The shared gitdirs (at `/Dev/dracon-platform/.git/modules/web-games-<name>/`)
+  remain intact; only the second worktree per gitdir was removed.
+
+- **Migration history**:
+  - 2026-07-01 (`mr1x7j5i-zioba9`): initial layout with
+    `daemon-standalone` branch and standalones at /Dev/<name>/.
+    See `docs/design/daemon-standalone-removal-2026-07-01.md`.
+  - 2026-07-02 (`mr3g843f-lajfpg`): pilot migration of
+    junk-runner (removed standalone, switched nested to main).
+  - 2026-07-02 (`354fe3cb`): bulk migration of all 10 games.
+    Discovered and fixed 3 daemon bugs:
+    1. Detached-HEAD push failed with "destination is not a full
+       refname" — fixed by using `HEAD:refs/heads/main` refspec
+       when the worktree is detached.
+    2. `current_branch` only checked `<repo>/.git/HEAD` (wrong
+       for worktree-style checkouts) and accepted the literal
+       "HEAD" from `git rev-parse --abbrev-ref HEAD` — fixed
+       by reading the worktree's actual HEAD file and filtering
+       "HEAD".
+    3. `default_trusted_remote_hosts` was case-sensitive
+       (lowercase `dracondev` only; SSH URLs use `DraconDev`)
+       — fixed by adding uppercase entries.
+
+- **No more `daemon-standalone` branch**: the buffer branch was
+  removed during the 2026-07-01 migration. After the 2026-07-02
+  bulk migration, the standalone worktrees themselves are gone.
   **The github-side exception**: github's 2GB pack-size limit
   blocks hegemon's `main` push (hegemon has 2.4GB of MP3 files),
-  so the github remote for hegemon remains empty (was already
-  empty before this goal). See
-  `docs/design/daemon-standalone-removal-2026-07-01.md` for the
-  full migration log.
+  so the github remote for hegemon remains empty. See
+  `docs/design/nested-on-main-architecture-2026-07-02.md` for
+  the new architecture and migration log.
 
 - **`fast_forward_daemon_standalone_to_main`** is a no-op stub
   preserved for backwards compatibility with existing call sites.
-  The standalone is on `main` directly, so each commit already
-  advances `main` — no fast-forward needed.
+  No standalones exist, so the function is never invoked.
 
 ## Test discipline
 
