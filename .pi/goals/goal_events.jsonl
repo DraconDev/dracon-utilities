@@ -788,3 +788,6 @@
 {"type":"task_complete","goalId":"mr3g843f-lajfpg","taskId":"rollout","evidence":"Pilot (junk-runner) successfully migrated end-to-end at 2026-07-02 13:42 UTC. The 24h clean operation period is now in effect. The remaining 9 games (polis, darklord, neonbreak, hellhunter, hegemon, o","at":"2026-07-02T12:47:29.295Z"}
 {"type":"task_complete","goalId":"mr3g843f-lajfpg","taskId":"cleanup","evidence":"/Dev/junk-runner standalone worktree removed via `git worktree remove --force`. Daemon code updated (is_on_main_branch in daemon.rs:materialize_pending_submodules) to skip materializing the standalone","at":"2026-07-02T13:02:09.284Z"}
 {"type":"task_complete","goalId":"mr3g843f-lajfpg","taskId":"final-verification","evidence":"All 8 verification contract items evaluated. PASS: (1) cargo test 672/672, (2) cargo build release OK, (3) cargo deny: pre-existing anyhow advisory only, (4) junk-runner shows nested path, (5) all 4 r","at":"2026-07-02T13:02:30.382Z"}
+{"type":"goal_focused","goalId":"mr2jscam-26vzaa","reason":"selected","at":"2026-07-02T19:30:13.831Z"}
+{"type":"goal_focused","goalId":"mr3dv74j-ev8cof","reason":"selected","at":"2026-07-02T19:30:15.895Z"}
+{"type":"goal_focused","goalId":"mr3g843f-lajfpg","reason":"selected","at":"2026-07-02T19:30:16.823Z"}
