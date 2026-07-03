@@ -87,14 +87,27 @@ Daemon is actively committing and pushing new work.
 
 hegemon's github push retry will still hang the daemon's
 hegemon-repo in_flight entry for ~54 minutes per retry
-(`Stuck Push Retry: retrying after 3241s`). When the daemon
-gets around to a real solution (see
-`docs/design/hegemon-binary-content-strategy-2026-07-03.md`
-deferred work), the github push will either succeed
-(no longer over 2GB) or be removed from the daemon's
-remote list.
+(`Stuck Push Retry: retrying after 3241s`).
+
+**Immediate mitigation (2026-07-03 16:27 BST)**: added
+`/home/dracon/Dev/dracon-platform/web/games/wip/hegemon/.dracon/dracon-sync.toml`
+with `exclude_remotes = ["github"]`. This stops the daemon
+from trying to push to github for hegemon specifically,
+eliminating the stuck-push serialization on the daemon's
+main loop. The same pattern was already in use for
+dracon-platform (see that repo's per-repo config).
+
+This is **only valid as long as github is structurally
+unusable for hegemon** (2GB pack limit, hegemon's pack is
+2.27 GiB). The real fix is the binary-asset migration
+planned in
+`docs/design/binary-asset-strategy-2026-07-03.md` and
+`docs/design/lfs-vs-bucket-vs-grow-2026-07-03.md` — once
+static/ moves to the OVH bucket (with gen-*.py in git and
+a Layer-2 publish step), the pack size will drop below
+github's limit and this override can be removed.
 
 Until then, the daemon's behavior is correct: it pushes
 to working remotes (origin/codeberg/gitlab) on every cycle
-and treats the github remote as "stuck" with a long retry
-backoff. Local→codeberg→gitlab→origin stays in sync.
+and never attempts github for hegemon. Local→codeberg→gitlab→origin
+stays in sync. github stays empty (structural, documented).
