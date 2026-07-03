@@ -5,19 +5,21 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 253913,
-    "activeSeconds": 1212
+    "tokensUsed": 312119,
+    "activeSeconds": 1228
   },
   "sisyphus": false,
   "createdAt": "2026-07-03T19:38:49.164Z",
-  "updatedAt": "2026-07-03T19:59:56.319Z",
+  "updatedAt": "2026-07-03T20:00:14.055Z",
   "activePath": ".pi/goals/active_goal_2026070320384916_mr5c6mz0-tbtcrj.md",
   "taskList": {
     "tasks": [
       {
         "id": "audit-writeup",
         "title": "Write full audit document to docs/design/full-audit-2026-07-03.md",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-07-03T20:00:07.247Z",
+        "evidence": "Audit doc created at docs/design/full-audit-2026-07-03.md (18136 bytes, 445 insertions). Committed locally (fd24652b4245) and pushed to all 4 remotes (origin/github/gitlab/codeberg verified ✓).",
         "verificationContract": "Audit doc created at /home/dracon/Dev/dracon-utilities/docs/design/full-audit-2026-07-03.md, includes all P0/P1/P2 findings with evidence, and is committed + pushed to all 4 remotes of dracon-utilities.",
         "lightweightSubtasks": true
       },
@@ -120,12 +122,12 @@ lets do a full audit then make a tasklist of the problems
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 20m12s
-- Tokens used: 254K (253,913) tokens
+- Time spent: 20m28s
+- Tokens used: 312K (312,119) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
-- [ ] audit-writeup: Write full audit document to docs/design/full-audit-2026-07-03.md — contract: Audit doc created at /home/dracon/Dev/dracon-utilities/docs/design/full-audit-2026-07-03.md, includes all P0/P1/P2 findings with evidence, and is committed + pushed to all 4 remotes of dracon-utilities.
+- [x] audit-writeup: Write full audit document to docs/design/full-audit-2026-07-03.md — evidence: Audit doc created at docs/design/full-audit-2026-07-03.md (18136 bytes, 445 insertions). Committed locally (fd24652b4245) and pushed to all 4 remotes (origin/github/gitlab/codeberg verified ✓).
 - [ ] stale-lock-deathrun: P0: Remove stale index.lock in /home/dracon/Dev/dracon-platform/.git/modules/web-games-deathrun/index.lock — contract: Lock file removed; daemon successfully commits to deathrun submod (verified in journal); no more 'Unable to create index.lock' errors for deathrun.
 - [ ] orphan-worktree-endless-td: P1: Remove orphan endless-td worktree at /home/dracon/Dev/endless-td/ (detached HEAD, not removed in 2026-07-02 migration) — contract: Worktree pruned via `git worktree remove --force`; no more detached-HEAD worktree for endless-td submod; daemon reports clean state.
 - [ ] orphan-worktree-darklord-baseline: P1: Remove orphan darklord worktree pointing to /tmp/baseline-check (prunable) — contract: Worktree pruned via `git worktree prune` or `git worktree remove --force /tmp/baseline-check`; no more prunable worktree entries for darklord.
