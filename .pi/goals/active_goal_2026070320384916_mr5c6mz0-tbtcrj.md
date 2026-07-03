@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 312119,
-    "activeSeconds": 1228
+    "tokensUsed": 316039,
+    "activeSeconds": 1327
   },
   "sisyphus": false,
   "createdAt": "2026-07-03T19:38:49.164Z",
-  "updatedAt": "2026-07-03T20:00:14.055Z",
+  "updatedAt": "2026-07-03T20:01:56.016Z",
   "activePath": ".pi/goals/active_goal_2026070320384916_mr5c6mz0-tbtcrj.md",
   "taskList": {
     "tasks": [
@@ -26,21 +26,27 @@
       {
         "id": "stale-lock-deathrun",
         "title": "P0: Remove stale index.lock in /home/dracon/Dev/dracon-platform/.git/modules/web-games-deathrun/index.lock",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-07-03T20:01:50.573Z",
+        "evidence": "Removed 1 stale .git/modules/web-games-deathrun/index.lock file (0 bytes, mtime 20:23:42). Pre-fix: 14 'Unable to create index.lock' errors in 2h. Post-fix: 0 lock errors. Daemon now committing to dea",
         "verificationContract": "Lock file removed; daemon successfully commits to deathrun submod (verified in journal); no more 'Unable to create index.lock' errors for deathrun.",
         "lightweightSubtasks": true
       },
       {
         "id": "orphan-worktree-endless-td",
         "title": "P1: Remove orphan endless-td worktree at /home/dracon/Dev/endless-td/ (detached HEAD, not removed in 2026-07-02 migration)",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-07-03T20:01:53.560Z",
+        "evidence": "Removed /home/dracon/Dev/endless-td orphan worktree (was detached HEAD at 8d209af, missed by 2026-07-02 migration). Pre-check: git status clean. Used `git worktree remove --force`. Post-check: /home/d",
         "verificationContract": "Worktree pruned via `git worktree remove --force`; no more detached-HEAD worktree for endless-td submod; daemon reports clean state.",
         "lightweightSubtasks": true
       },
       {
         "id": "orphan-worktree-darklord-baseline",
         "title": "P1: Remove orphan darklord worktree pointing to /tmp/baseline-check (prunable)",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-07-03T20:01:56.014Z",
+        "evidence": "Removed prunable worktree /tmp/baseline-check from darklord submod (worktree dir was already gone — only git worktree list entry remained). Used `git worktree prune`. Post-check: git worktree list sho",
         "verificationContract": "Worktree pruned via `git worktree prune` or `git worktree remove --force /tmp/baseline-check`; no more prunable worktree entries for darklord.",
         "lightweightSubtasks": true
       },
@@ -122,15 +128,15 @@ lets do a full audit then make a tasklist of the problems
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 20m28s
-- Tokens used: 312K (312,119) tokens
+- Time spent: 22m07s
+- Tokens used: 316K (316,039) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
 - [x] audit-writeup: Write full audit document to docs/design/full-audit-2026-07-03.md — evidence: Audit doc created at docs/design/full-audit-2026-07-03.md (18136 bytes, 445 insertions). Committed locally (fd24652b4245) and pushed to all 4 remotes (origin/github/gitlab/codeberg verified ✓).
-- [ ] stale-lock-deathrun: P0: Remove stale index.lock in /home/dracon/Dev/dracon-platform/.git/modules/web-games-deathrun/index.lock — contract: Lock file removed; daemon successfully commits to deathrun submod (verified in journal); no more 'Unable to create index.lock' errors for deathrun.
-- [ ] orphan-worktree-endless-td: P1: Remove orphan endless-td worktree at /home/dracon/Dev/endless-td/ (detached HEAD, not removed in 2026-07-02 migration) — contract: Worktree pruned via `git worktree remove --force`; no more detached-HEAD worktree for endless-td submod; daemon reports clean state.
-- [ ] orphan-worktree-darklord-baseline: P1: Remove orphan darklord worktree pointing to /tmp/baseline-check (prunable) — contract: Worktree pruned via `git worktree prune` or `git worktree remove --force /tmp/baseline-check`; no more prunable worktree entries for darklord.
+- [x] stale-lock-deathrun: P0: Remove stale index.lock in /home/dracon/Dev/dracon-platform/.git/modules/web-games-deathrun/index.lock — evidence: Removed 1 stale .git/modules/web-games-deathrun/index.lock file (0 bytes, mtime 20:23:42). Pre-fix: 14 'Unable to create index.lock' errors in 2h. Post-fix: 0 lock errors. Daemon now committing to dea
+- [x] orphan-worktree-endless-td: P1: Remove orphan endless-td worktree at /home/dracon/Dev/endless-td/ (detached HEAD, not removed in 2026-07-02 migration) — evidence: Removed /home/dracon/Dev/endless-td orphan worktree (was detached HEAD at 8d209af, missed by 2026-07-02 migration). Pre-check: git status clean. Used `git worktree remove --force`. Post-check: /home/d
+- [x] orphan-worktree-darklord-baseline: P1: Remove orphan darklord worktree pointing to /tmp/baseline-check (prunable) — evidence: Removed prunable worktree /tmp/baseline-check from darklord submod (worktree dir was already gone — only git worktree list entry remained). Used `git worktree prune`. Post-check: git worktree list sho
 - [ ] untracked-nested-clones: P1: Decide what to do with untracked nested clones in /home/dracon/Dev/dracon-utilities/{dracon-sync,dracon-system,dracon-warden}/ — contract: Decision documented (commit as submodules, ignore, or move to a separate root); daemon watch list updated if needed.
 - [ ] dracon-strategy-DraconDev: P1: Decide what to do with /home/dracon/Dev/dracon-strategy/DraconDev/ (a copy of DraconDev org repo) — contract: Decision documented; daemon no longer wastes cycles on this duplicate if it's a copy.
 - [ ] third-watch-root-empty: P2: Investigate /home/dracon/dracon/ watch root (3rd in watch_roots but only contains backups/utilities, no .git) — contract: Either populate /home/dracon/dracon with a git repo, or remove from watch_roots and document the change.
