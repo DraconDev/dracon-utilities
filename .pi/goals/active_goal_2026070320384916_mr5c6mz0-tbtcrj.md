@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 247551,
-    "activeSeconds": 487
+    "tokensUsed": 253913,
+    "activeSeconds": 607
   },
   "sisyphus": false,
   "createdAt": "2026-07-03T19:38:49.164Z",
-  "updatedAt": "2026-07-03T19:47:26.926Z",
+  "updatedAt": "2026-07-03T19:49:27.662Z",
   "activePath": ".pi/goals/active_goal_2026070320384916_mr5c6mz0-tbtcrj.md",
   "taskList": {
     "tasks": [
@@ -120,8 +120,8 @@ lets do a full audit then make a tasklist of the problems
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 8m07s
-- Tokens used: 248K (247,551) tokens
+- Time spent: 10m07s
+- Tokens used: 254K (253,913) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
