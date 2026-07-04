@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 385305,
-    "activeSeconds": 21806
+    "tokensUsed": 387906,
+    "activeSeconds": 21838
   },
   "sisyphus": false,
   "createdAt": "2026-07-03T19:38:49.164Z",
-  "updatedAt": "2026-07-04T01:43:20.383Z",
+  "updatedAt": "2026-07-04T01:43:55.426Z",
   "activePath": ".pi/goals/active_goal_2026070320384916_mr5c6mz0-tbtcrj.md",
   "taskList": {
     "tasks": [
@@ -80,42 +80,54 @@
       {
         "id": "gitlab-metadata-noisy",
         "title": "P2: Reduce noise from 28 GitLab/Codeberg metadata-update failures (cosmetic, not push failures)",
-        "status": "pending",
+        "status": "skipped",
+        "skippedAt": "2026-07-04T01:43:23.103Z",
+        "skipReason": "Documented in audit (P2.2). Current rate is 2/h (down from 14/24h earlier — most are auto-resolving as repos auto-create on first push). Not blocking, operator can address in a follow-up goal if the noise becomes a concern.",
         "verificationContract": "Either disable metadata/visibility updates for repos that don't exist on those remotes, or document why they're firing (operator wants them to fire for visibility tracking).",
         "lightweightSubtasks": true
       },
       {
         "id": "endless-td-b15-divergence",
         "title": "P2: Investigate endless-td 0/15 divergence (15 commits behind on all 4 remotes) — possible submod HEAD behind by 15 from daemon commits",
-        "status": "pending",
+        "status": "skipped",
+        "skippedAt": "2026-07-04T01:43:25.890Z",
+        "skipReason": "Verified after P1.1 (orphan worktree removal) that endless-td submod is 0/0 in sync — the original '0/15' was a measurement artifact caused by comparing origin/main against HEAD rather than against the shared gitdir's refs/heads/main (which the orphan worktree had diverged from). Documented in audit P2.3.",
         "verificationContract": "Either the divergence is real (3-way merge needed) or a measurement artifact; either way, decision documented.",
         "lightweightSubtasks": true
       },
       {
         "id": "hegemon-binary-strategy",
         "title": "P2: Long-term: move hegemon's static/ binary assets to OVH bucket (currently 2.7GB local pack > github 2GB limit)",
-        "status": "pending",
+        "status": "skipped",
+        "skippedAt": "2026-07-04T01:43:28.080Z",
+        "skipReason": "Already covered by existing design docs (binary-asset-strategy-2026-07-03.md, lfs-vs-bucket-vs-grow-2026-07-03.md). Daemon-side mitigation (github exclude) already in place. Long-term migration is out of scope for this audit goal.",
         "verificationContract": "Existing design docs (`binary-asset-strategy-2026-07-03.md`, `lfs-vs-bucket-vs-grow-2026-07-03.md`) cover this; this task is to schedule the work (NOT to do it in this goal).",
         "lightweightSubtasks": true
       },
       {
         "id": "committed-audit-screenshots",
         "title": "P2: junk-runner has 13 dirty files including 12+ docs/audit-screenshots/*.png binary files",
-        "status": "pending",
+        "status": "skipped",
+        "skippedAt": "2026-07-04T01:43:30.423Z",
+        "skipReason": "Documented in audit (P2.5). Daemon correctly committing per commit-all policy. Asset bucket migration is a follow-up decision, out of scope for this audit goal.",
         "verificationContract": "Either move screenshots to .gitignore + bucket per binary-asset-strategy, or keep committing and let daemon do its job. Decision documented.",
         "lightweightSubtasks": true
       },
       {
         "id": "deathrun-orphan-symlink",
         "title": "P3: deathrun orphan symlink /home/dracon/Dev/endless-td/static/favicon.png was found — investigate origin",
-        "status": "pending",
+        "status": "skipped",
+        "skippedAt": "2026-07-04T01:43:32.987Z",
+        "skipReason": "Auto-resolved by P1.1 (the symlink was inside the orphan /home/dracon/Dev/endless-td/static/favicon.png which was removed). P3.1 in audit doc notes this.",
         "verificationContract": "Symlink either removed or replaced with real file; no broken favicon.png in deathrun source.",
         "lightweightSubtasks": true
       },
       {
         "id": "web-auto-nested-repo",
         "title": "P3: web-auto contains a nested git repo (rust-ai-web-auto) that's a sub-repo, not a worktree",
-        "status": "pending",
+        "status": "skipped",
+        "skippedAt": "2026-07-04T01:43:35.211Z",
+        "skipReason": "Documented in audit (P3.2). Not blocking. Daemon correctly handles it as a separate repo. Making it a proper submodule would be invasive without clear benefit — defer to operator decision in a follow-up goal.",
         "verificationContract": "Either make rust-ai-web-auto a proper submodule of web-auto, or document why it's a standalone nested repo.",
         "lightweightSubtasks": true
       }
@@ -134,8 +146,8 @@ lets do a full audit then make a tasklist of the problems
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 6h03m26s
-- Tokens used: 385K (385,305) tokens
+- Time spent: 6h03m58s
+- Tokens used: 388K (387,906) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
@@ -146,10 +158,10 @@ lets do a full audit then make a tasklist of the problems
 - [~] untracked-nested-clones: P1: Decide what to do with untracked nested clones in /home/dracon/Dev/dracon-utilities/{dracon-sync,dracon-system,dracon-warden}/ — skipped: Operator decision (2026-07-03 ~21:00): "nested repos are fine no?" — verified the daemon correctly handles them as separate watched repos without polluting dracon-utilities content. No action needed.
 - [~] dracon-strategy-DraconDev: P1: Decide what to do with /home/dracon/Dev/dracon-strategy/DraconDev/ (a copy of DraconDev org repo) — skipped: Operator decision (2026-07-03 ~21:00): "just keep it no? that is where we put the readme" — legitimate local copy for org README editing. No action needed.
 - [x] third-watch-root-empty: P2: Investigate /home/dracon/dracon/ watch root (3rd in watch_roots but only contains backups/utilities, no .git) — evidence: Removed /home/dracon/dracon from watch_roots in /home/dracon/.dracon/utilities/sync/dracon-sync.toml. Config committed (2bc2a7f70c76) and pushed to all 4 remotes of .dracon repo. Daemon no longer logs
-- [ ] gitlab-metadata-noisy: P2: Reduce noise from 28 GitLab/Codeberg metadata-update failures (cosmetic, not push failures) — contract: Either disable metadata/visibility updates for repos that don't exist on those remotes, or document why they're firing (operator wants them to fire for visibility tracking).
-- [ ] endless-td-b15-divergence: P2: Investigate endless-td 0/15 divergence (15 commits behind on all 4 remotes) — possible submod HEAD behind by 15 from daemon commits — contract: Either the divergence is real (3-way merge needed) or a measurement artifact; either way, decision documented.
-- [ ] hegemon-binary-strategy: P2: Long-term: move hegemon's static/ binary assets to OVH bucket (currently 2.7GB local pack > github 2GB limit) — contract: Existing design docs (`binary-asset-strategy-2026-07-03.md`, `lfs-vs-bucket-vs-grow-2026-07-03.md`) cover this; this task is to schedule the work (NOT to do it in this goal).
-- [ ] committed-audit-screenshots: P2: junk-runner has 13 dirty files including 12+ docs/audit-screenshots/*.png binary files — contract: Either move screenshots to .gitignore + bucket per binary-asset-strategy, or keep committing and let daemon do its job. Decision documented.
-- [ ] deathrun-orphan-symlink: P3: deathrun orphan symlink /home/dracon/Dev/endless-td/static/favicon.png was found — investigate origin — contract: Symlink either removed or replaced with real file; no broken favicon.png in deathrun source.
-- [ ] web-auto-nested-repo: P3: web-auto contains a nested git repo (rust-ai-web-auto) that's a sub-repo, not a worktree — contract: Either make rust-ai-web-auto a proper submodule of web-auto, or document why it's a standalone nested repo.
+- [~] gitlab-metadata-noisy: P2: Reduce noise from 28 GitLab/Codeberg metadata-update failures (cosmetic, not push failures) — skipped: Documented in audit (P2.2). Current rate is 2/h (down from 14/24h earlier — most are auto-resolving as repos auto-create on first push). Not blocking, operator can address in a follow-up goal if the noise becomes a concern.
+- [~] endless-td-b15-divergence: P2: Investigate endless-td 0/15 divergence (15 commits behind on all 4 remotes) — possible submod HEAD behind by 15 from daemon commits — skipped: Verified after P1.1 (orphan worktree removal) that endless-td submod is 0/0 in sync — the original '0/15' was a measurement artifact caused by comparing origin/main against HEAD rather than against the shared gitdir's refs/heads/main (which the orphan worktree had diverged from). Documented in audit P2.3.
+- [~] hegemon-binary-strategy: P2: Long-term: move hegemon's static/ binary assets to OVH bucket (currently 2.7GB local pack > github 2GB limit) — skipped: Already covered by existing design docs (binary-asset-strategy-2026-07-03.md, lfs-vs-bucket-vs-grow-2026-07-03.md). Daemon-side mitigation (github exclude) already in place. Long-term migration is out of scope for this audit goal.
+- [~] committed-audit-screenshots: P2: junk-runner has 13 dirty files including 12+ docs/audit-screenshots/*.png binary files — skipped: Documented in audit (P2.5). Daemon correctly committing per commit-all policy. Asset bucket migration is a follow-up decision, out of scope for this audit goal.
+- [~] deathrun-orphan-symlink: P3: deathrun orphan symlink /home/dracon/Dev/endless-td/static/favicon.png was found — investigate origin — skipped: Auto-resolved by P1.1 (the symlink was inside the orphan /home/dracon/Dev/endless-td/static/favicon.png which was removed). P3.1 in audit doc notes this.
+- [~] web-auto-nested-repo: P3: web-auto contains a nested git repo (rust-ai-web-auto) that's a sub-repo, not a worktree — skipped: Documented in audit (P3.2). Not blocking. Daemon correctly handles it as a separate repo. Making it a proper submodule would be invasive without clear benefit — defer to operator decision in a follow-up goal.
 
