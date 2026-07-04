@@ -436,6 +436,26 @@ transient (user actively editing or P0/P1 cleanup needed).
 | P3.1 | (auto-resolved by P1.1) | 0 | none |
 | P3.2 | Make rust-ai-web-auto a submodule | 1 hour | medium |
 
+## Operator decisions (2026-07-03 ~21:00 BST)
+
+After presenting the audit findings, the operator chose:
+
+| Question | Operator decision |
+|----------|-------------------|
+| P1.3 nested clones (`dracon-sync/`, `dracon-system/`, `dracon-warden/`) | **Leave as-is**. "nested repos are fine no?" — verified the daemon correctly skips committing them as content of `dracon-utilities/`; the nested clones are auto-discovered as separate repos and independently committing. |
+| P1.4 `DraconDev` clone in `dracon-strategy/` | **Keep**. "just keep it no? that is where we put the readme" — it's a legitimate local copy for editing the org README. |
+| P2.1 empty `/home/dracon/dracon/` watch root | **Remove from watch_roots**. The canonical state dir is `/home/dracon/.dracon/` (with the dot). `/home/dracon/dracon/` (no dot) without git is wrong. **DONE**: `watch_roots` now contains only `/home/dracon/.dracon` + `/home/dracon/Dev`. Config committed (`.dracon` repo, 2bc2a7f70c76) and pushed to all 4 remotes. |
+
+## Work completed in this goal
+
+1. **Audit doc**: `docs/design/full-audit-2026-07-03.md` (18136 bytes) committed at fd24652b4245 and pushed to all 4 remotes of dracon-utilities.
+2. **P0.1 stale lock**: removed `/home/dracon/Dev/dracon-platform/.git/modules/web-games-deathrun/index.lock` (0 bytes, mtime 20:23). Pre-fix: 14 lock errors in 2h. Post-fix: 0 lock errors.
+3. **P1.1 endless-td orphan worktree**: removed `/home/dracon/Dev/endless-td/` (detached HEAD at 8d209af). Worktree removed via `git worktree remove --force`. Daemon now reports endless-td as OK.
+4. **P1.2 darklord `/tmp/baseline-check` worktree**: pruned (worktree dir was already gone; only the git worktree list entry remained). Daemon now reports darklord as OK.
+5. **P2.1 `/home/dracon/dracon/` watch root**: removed from `watch_roots` in `/home/dracon/.dracon/utilities/sync/dracon-sync.toml`. Committed at 2bc2a7f70c76 and pushed to all 4 remotes of `.dracon`.
+
+Daemon state improved from 16 OK / 10 WARN (pre-audit) to **18 OK / 8 WARN** (post-cleanup).
+
 ## Cross-references
 
 - `docs/design/daemon-fd-limit-fix-2026-07-03.md` — recent FD limit fix
