@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 383617,
-    "activeSeconds": 21753
+    "tokensUsed": 385305,
+    "activeSeconds": 21806
   },
   "sisyphus": false,
   "createdAt": "2026-07-03T19:38:49.164Z",
-  "updatedAt": "2026-07-04T01:42:24.844Z",
+  "updatedAt": "2026-07-04T01:43:20.383Z",
   "activePath": ".pi/goals/active_goal_2026070320384916_mr5c6mz0-tbtcrj.md",
   "taskList": {
     "tasks": [
@@ -53,21 +53,27 @@
       {
         "id": "untracked-nested-clones",
         "title": "P1: Decide what to do with untracked nested clones in /home/dracon/Dev/dracon-utilities/{dracon-sync,dracon-system,dracon-warden}/",
-        "status": "pending",
+        "status": "skipped",
+        "skippedAt": "2026-07-04T01:43:08.284Z",
+        "skipReason": "Operator decision (2026-07-03 ~21:00): \"nested repos are fine no?\" — verified the daemon correctly handles them as separate watched repos without polluting dracon-utilities content. No action needed.",
         "verificationContract": "Decision documented (commit as submodules, ignore, or move to a separate root); daemon watch list updated if needed.",
         "lightweightSubtasks": true
       },
       {
         "id": "dracon-strategy-DraconDev",
         "title": "P1: Decide what to do with /home/dracon/Dev/dracon-strategy/DraconDev/ (a copy of DraconDev org repo)",
-        "status": "pending",
+        "status": "skipped",
+        "skippedAt": "2026-07-04T01:43:11.189Z",
+        "skipReason": "Operator decision (2026-07-03 ~21:00): \"just keep it no? that is where we put the readme\" — legitimate local copy for org README editing. No action needed.",
         "verificationContract": "Decision documented; daemon no longer wastes cycles on this duplicate if it's a copy.",
         "lightweightSubtasks": true
       },
       {
         "id": "third-watch-root-empty",
         "title": "P2: Investigate /home/dracon/dracon/ watch root (3rd in watch_roots but only contains backups/utilities, no .git)",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-07-04T01:43:20.382Z",
+        "evidence": "Removed /home/dracon/dracon from watch_roots in /home/dracon/.dracon/utilities/sync/dracon-sync.toml. Config committed (2bc2a7f70c76) and pushed to all 4 remotes of .dracon repo. Daemon no longer logs",
         "verificationContract": "Either populate /home/dracon/dracon with a git repo, or remove from watch_roots and document the change.",
         "lightweightSubtasks": true
       },
@@ -128,8 +134,8 @@ lets do a full audit then make a tasklist of the problems
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 6h02m33s
-- Tokens used: 384K (383,617) tokens
+- Time spent: 6h03m26s
+- Tokens used: 385K (385,305) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
@@ -137,9 +143,9 @@ lets do a full audit then make a tasklist of the problems
 - [x] stale-lock-deathrun: P0: Remove stale index.lock in /home/dracon/Dev/dracon-platform/.git/modules/web-games-deathrun/index.lock — evidence: Removed 1 stale .git/modules/web-games-deathrun/index.lock file (0 bytes, mtime 20:23:42). Pre-fix: 14 'Unable to create index.lock' errors in 2h. Post-fix: 0 lock errors. Daemon now committing to dea
 - [x] orphan-worktree-endless-td: P1: Remove orphan endless-td worktree at /home/dracon/Dev/endless-td/ (detached HEAD, not removed in 2026-07-02 migration) — evidence: Removed /home/dracon/Dev/endless-td orphan worktree (was detached HEAD at 8d209af, missed by 2026-07-02 migration). Pre-check: git status clean. Used `git worktree remove --force`. Post-check: /home/d
 - [x] orphan-worktree-darklord-baseline: P1: Remove orphan darklord worktree pointing to /tmp/baseline-check (prunable) — evidence: Removed prunable worktree /tmp/baseline-check from darklord submod (worktree dir was already gone — only git worktree list entry remained). Used `git worktree prune`. Post-check: git worktree list sho
-- [ ] untracked-nested-clones: P1: Decide what to do with untracked nested clones in /home/dracon/Dev/dracon-utilities/{dracon-sync,dracon-system,dracon-warden}/ — contract: Decision documented (commit as submodules, ignore, or move to a separate root); daemon watch list updated if needed.
-- [ ] dracon-strategy-DraconDev: P1: Decide what to do with /home/dracon/Dev/dracon-strategy/DraconDev/ (a copy of DraconDev org repo) — contract: Decision documented; daemon no longer wastes cycles on this duplicate if it's a copy.
-- [ ] third-watch-root-empty: P2: Investigate /home/dracon/dracon/ watch root (3rd in watch_roots but only contains backups/utilities, no .git) — contract: Either populate /home/dracon/dracon with a git repo, or remove from watch_roots and document the change.
+- [~] untracked-nested-clones: P1: Decide what to do with untracked nested clones in /home/dracon/Dev/dracon-utilities/{dracon-sync,dracon-system,dracon-warden}/ — skipped: Operator decision (2026-07-03 ~21:00): "nested repos are fine no?" — verified the daemon correctly handles them as separate watched repos without polluting dracon-utilities content. No action needed.
+- [~] dracon-strategy-DraconDev: P1: Decide what to do with /home/dracon/Dev/dracon-strategy/DraconDev/ (a copy of DraconDev org repo) — skipped: Operator decision (2026-07-03 ~21:00): "just keep it no? that is where we put the readme" — legitimate local copy for org README editing. No action needed.
+- [x] third-watch-root-empty: P2: Investigate /home/dracon/dracon/ watch root (3rd in watch_roots but only contains backups/utilities, no .git) — evidence: Removed /home/dracon/dracon from watch_roots in /home/dracon/.dracon/utilities/sync/dracon-sync.toml. Config committed (2bc2a7f70c76) and pushed to all 4 remotes of .dracon repo. Daemon no longer logs
 - [ ] gitlab-metadata-noisy: P2: Reduce noise from 28 GitLab/Codeberg metadata-update failures (cosmetic, not push failures) — contract: Either disable metadata/visibility updates for repos that don't exist on those remotes, or document why they're firing (operator wants them to fire for visibility tracking).
 - [ ] endless-td-b15-divergence: P2: Investigate endless-td 0/15 divergence (15 commits behind on all 4 remotes) — possible submod HEAD behind by 15 from daemon commits — contract: Either the divergence is real (3-way merge needed) or a measurement artifact; either way, decision documented.
 - [ ] hegemon-binary-strategy: P2: Long-term: move hegemon's static/ binary assets to OVH bucket (currently 2.7GB local pack > github 2GB limit) — contract: Existing design docs (`binary-asset-strategy-2026-07-03.md`, `lfs-vs-bucket-vs-grow-2026-07-03.md`) cover this; this task is to schedule the work (NOT to do it in this goal).
