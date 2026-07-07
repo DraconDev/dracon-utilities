@@ -95,6 +95,61 @@ saw 839 untracked `static/assets` binaries (not yet ignored) and
 | Daemon | running new binary (`0f6727b`); active, no stalls |
 | `.pi/` | gitignored everywhere (0 tracked) |
 
+## Anti-rebloat rules (must hold — any loosening risks 4 GB re-bloat)
+
+`hegemon/.gitignore`:
+```
+static/assets/**/*.png
+static/assets/**/*.jpg
+static/assets/**/*.jpeg
+static/assets/**/*.mp3
+static/assets/**/*.mp4
+static/assets/**/*.mov
+static/assets/**/*.webp
+static/assets/**/*.gif
+static/assets/**/*.wav
+static/assets/**/*.ogg
+```
+
+`hegemon/.dracon/dracon-sync.toml`:
+```toml
+exclude_remotes = ["gitlab"]
+auto_commit_exclude_patterns = [
+    "**/.pi/chrome-screenshots/**",
+    "**/.pi/visual-audit/**",
+    "**/.pi/investigation/**/*.png",
+]
+```
+
+## Re-bloat recovery (the `471d6ea` pattern)
+
+If the daemon ever auto-commits binaries again (e.g. someone edits the
+`.gitignore` and a binary is staged before the daemon re-reads it):
+1. **Stop the daemon first** so it can't commit again.
+2. `git -C $WG rebase --onto <slimmed-base> <bad-commit-sha> main`
+   (drop the bad commit; replay anything on top — usually just a
+   `.gitignore` rule — onto the slimmed base).
+3. Force-push all 3 remotes with corrected syntax:
+   `git -C $WG push origin main && git -C $WG push codeberg main && git -C $WG push github main`
+4. `git -C /home/dracon/Dev/dracon-platform/.git/modules/web-games-hegemon gc --prune=now`
+5. Restart the daemon.
+6. Verify `du -sh` on the shared gitdir is back under 200 MiB and
+   `git log` shows no `BIN:` commits.
+
+## Verification — all 3 remotes in one command
+
+```bash
+WG=/home/dracon/Dev/dracon-platform/web/games/wip/hegemon
+LOCAL=$(git -C "$WG" rev-parse main)
+for r in origin codeberg github; do
+  printf "%-8s " "$r"; git -C "$WG" ls-remote --heads "$r" main 2>/dev/null | awk '{print $1}'
+done
+printf "%-8s local  %s\n" "" "$LOCAL"
+```
+
+All four lines must show the same SHA. Any divergence means a stale
+remote-tracking ref or a failed force-push that needs remediation.
+
 ## To reconcile GitLab later
 GitLab `main` (`6e718cbf`, 1,760 commits ahead of rewritten history) is the
 **only** remote with unique history. Options:
