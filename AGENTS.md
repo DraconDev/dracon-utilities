@@ -345,6 +345,19 @@ worktree layout was eliminated for all 10 game/hegemon submodules of
   The shared gitdirs (at `/Dev/dracon-platform/.git/modules/web-games-<name>/`)
   remain intact; only the second worktree per gitdir was removed.
 
+  REMOVED 2026-07-08 (goal `730eaf2a`): the daemon's
+  `materialize_pending_submodules` path had been RE-CREATING
+  top-level standalones (`/Dev/darklord` on 2026-07-04,
+  `/Dev/junk-runner` on 2026-07-08) whenever a nested submodule
+  was detached from `main` — silently defeating the 2026-07-02
+  migration. The materialization code (`materialize_submodule`
+  in `sync.rs` and the off-`main` branch in
+  `materialize_pending_submodules`) was removed; the daemon now
+  only configures multi-remote push for nested-on-`main`
+  submodules and NEVER creates a standalone worktree. The two
+  re-created standalones were pruned via `git worktree remove
+  --force`.
+
 - **Migration history**:
   - 2026-07-01 (`mr1x7j5i-zioba9`): initial layout with
     `daemon-standalone` branch and standalones at /Dev/<name>/.
@@ -364,6 +377,13 @@ worktree layout was eliminated for all 10 game/hegemon submodules of
     3. `default_trusted_remote_hosts` was case-sensitive
        (lowercase `dracondev` only; SSH URLs use `DraconDev`)
        — fixed by adding uppercase entries.
+  - 2026-07-08 (`730eaf2a`): removed the daemon's standalone
+    materialization (`materialize_submodule` + the off-`main`
+    branch of `materialize_pending_submodules`) that had been
+    silently re-creating `/Dev/darklord` and `/Dev/junk-runner`
+    since the 2026-07-02 migration. Pruned both re-created
+    standalones. Nested-on-`main` submodule discovery +
+    multi-remote config is unchanged.
 
 - **No more `daemon-standalone` branch**: the buffer branch was
   removed during the 2026-07-01 migration. After the 2026-07-02
@@ -382,7 +402,10 @@ worktree layout was eliminated for all 10 game/hegemon submodules of
 
 - **`fast_forward_daemon_standalone_to_main`** is a no-op stub
   preserved for backwards compatibility with existing call sites.
-  No standalones exist, so the function is never invoked.
+  No standalones exist (re-confirmed 2026-07-08, goal
+  `730eaf2a`, after the materialization path was removed and the
+  two re-created standalones were pruned), so the function is
+  never invoked.
 
 ## Test discipline
 
