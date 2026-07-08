@@ -368,9 +368,15 @@ worktree layout was eliminated for all 10 game/hegemon submodules of
 - **No more `daemon-standalone` branch**: the buffer branch was
   removed during the 2026-07-01 migration. After the 2026-07-02
   bulk migration, the standalone worktrees themselves are gone.
-  **The github-side exception**: github's 2GB pack-size limit
-  blocks hegemon's `main` push (hegemon has 2.4GB of MP3 files),
-  so the github remote for hegemon remains empty. See
+  **hegemon's GitHub is now synced** (2026-07-08): the daemon's
+  2GiB pack-size guard had skipped hegemon's GitHub push because
+  `.git` was inflated to ~4.9 GiB by DANGLING objects (a divergent
+  gitlab fetch done during reconciliation + pre-existing garbage),
+  not by real history. `git gc --prune=now` dropped it to ~163 MiB,
+  so the daemon now pushes hegemon `main` to GitHub natively — no
+  history rewrite was needed. (Earlier drafts claimed hegemon's
+  GitHub "remains empty" due to 2.4GiB of MP3 files; that was
+  wrong — the 4.9 GiB was garbage, not assets.) See
   `docs/design/nested-on-main-architecture-2026-07-02.md` for
   the new architecture and migration log.
 
