@@ -252,6 +252,74 @@ rewrite is the only way to claw back the .git pack size.
    `pull_merge` to git CLI) would unblock both. Deferred; the
    immediate workaround is the manual reconcile in (1).
 
+## 7. Resolution (executed 21:05 after operator escalation)
+
+After the initial "investigate" deliverable, the operator escalated
+polis and the daemon's repeated "Stuck Ahead/Behind" alerts to a real
+concern. The audit re-engaged and executed the safe-fix paths:
+
+### 7.1 polis — `git reset --hard origin/main` (zero-loss)
+- Verified the local `12648a78` tree and origin `f2638aab` tree are
+  **byte-identical** (`600f5044c5d389163c1c560e0fa3f49aaca70e07` for
+  both). All 4 conflict-overlap files (`IsoCanvas.ts`,
+  `IsoCanvas.test.ts`, `iso-camera.ts`, `play/+page.svelte`) are
+  identical between local and origin. The local session and the
+  origin session both made the SAME SA-7 fix; one was redundant.
+- Stopped daemon (`systemctl --user stop dracon-sync.service`).
+- `git reset --hard origin/main` (zero content loss, identical tree).
+- Restarted daemon. The parent (dracon-platform) gitlink was
+  automatically updated by the daemon's `stage_gitlink_updates` path
+  (commit `0d74e31bc8` on the parent).
+- Final polis state: local = origin = github = gitlab = codeberg =
+  `f2638aab`. All 4 remotes a=0/b=0. Daemon view: `OK`. Push status
+  `OK`. No flags.
+- This is the same pattern as the pully fix in goal `mrdmxu8n`:
+  when local and origin trees are byte-identical, the local-ahead
+  commit is just a redundant parallel patch.
+
+### 7.2 neonbreak — gitignore fix in submodule, not parent
+- Initial naive attempt: added `playwright-report/` to the parent
+  dracon-platform `.gitignore`. Verified that submodules do NOT
+  inherit parent .gitignore (the rule is only consulted within the
+  parent's working tree; the submodule has its own .gitignore context).
+- Real fix: added `playwright-report/` + `test-results/` to
+  `web/games/wip/neonbreak/.gitignore` in a USER section after the
+  warden managed block. Confirmed the rule with `git check-ignore
+  -v` from inside the submodule.
+- Unstaged 2 leaked files via `git rm --cached
+  playwright-report/index.html test-results/.last-run.json`.
+- Daemon committed (commit `0f5fbf95`): `.gitignore` + 2 file
+  deletions. Pushed to all 3 remotes (origin, gitlab, codeberg
+  all a=0/b=0). `git show` confirms the 2 paths return "fatal: path
+  not in tree" on all 3 remotes.
+- Final neonbreak state: OK, no flags, push OK, 0 modified,
+  0 untracked.
+
+### 7.3 deathrun .state-recon/ — deferred (operator decision required)
+- The 3 544 PNG / 701 MiB anti-rebloat recipe (gitignore + filter-repo
+  + force-push) is the same as today's hegemon `f228b540` rewrite
+  and was previously deferred from goal `mrdvbao1`. The bloat is
+  still growing (verified live: 3 544 PNGs / 701 MiB at 21:00, up
+  from 3 483 PNGs / 694 MiB at 19:58). A full filter-repo + force-push
+  is irreversible and requires explicit operator authorization
+  per the operator's commit policy. **Not executed by this audit.**
+
+### 7.4 Fleet view after fix
+| repo | a | b | ut | mod | flags | push |
+|---|---|---|---|---|---|---|
+| polis | 0 | 0 | 0 | 0 | OK | OK |
+| neonbreak | 0 | 0 | 0 | 0 | OK | OK |
+| junk-runner | 0 | 0 | 0 | 1 | DIRTY (transient) | OK |
+| deathrun | 0 | 0 | 0 | 1 | DIRTY (transient) | OK |
+| hegemon | 0 | 0 | 0 | 0 | OK | OK |
+| dracon-platform | 0 | 0 | 0 | 2 | DIRTY (transient) | OK |
+
+**Fleet totals:** 22 OK / 4 DIRTY (transient) / 0 CONCERN / 26 total.
+
+The 4 remaining DIRTY repos are normal daemon catch-up cycles and
+will clear on the next commit pass. No real divergence anywhere in
+the fleet. The polis CONCERN is gone.
+
 ## 7. Verification evidence index
 
 - Polis divergence: `git rev-list --count origin/main..HEAD = 1`,
