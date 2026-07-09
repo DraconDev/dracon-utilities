@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 202810,
-    "activeSeconds": 768
+    "tokensUsed": 212585,
+    "activeSeconds": 846
   },
   "sisyphus": false,
   "createdAt": "2026-07-09T14:21:35.425Z",
-  "updatedAt": "2026-07-09T14:34:29.128Z",
+  "updatedAt": "2026-07-09T14:35:47.396Z",
   "activePath": ".pi/goals/active_goal_2026070915213542_mrdlhsg1-0yjuwb.md"
 }
 
@@ -23,5 +23,5 @@ lets run a new audit cause i see hegemon again with changes in fact i see change
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 12m48s
-- Tokens used: 203K (202,810) tokens
+- Time spent: 14m06s
+- Tokens used: 213K (212,585) tokens
