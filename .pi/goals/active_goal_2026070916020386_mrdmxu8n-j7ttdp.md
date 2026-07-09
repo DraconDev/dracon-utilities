@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 94789,
-    "activeSeconds": 239
+    "tokensUsed": 116460,
+    "activeSeconds": 332
   },
   "sisyphus": false,
   "createdAt": "2026-07-09T15:02:03.863Z",
-  "updatedAt": "2026-07-09T15:06:05.309Z",
+  "updatedAt": "2026-07-09T15:07:40.087Z",
   "activePath": ".pi/goals/active_goal_2026070916020386_mrdmxu8n-j7ttdp.md"
 }
 
@@ -23,5 +23,5 @@ oke lets do it then run an audit
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 3m59s
-- Tokens used: 95K (94,789) tokens
+- Time spent: 5m32s
+- Tokens used: 116K (116,460) tokens
