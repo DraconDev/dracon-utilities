@@ -182,6 +182,27 @@ and is intentionally skipped for github by the daemon's size guard.
 
 ---
 
+## 8. Resolution (executed 2026-07-09, operator-approved)
+
+Operator approved the **full rewrite** (drop `b281256` + restore `.gitignore` + force-push codeberg/gitlab/origin + fast-forward github). Executed:
+
+1. **Stopped the daemon** (avoid races during the rewrite).
+2. **Dropped `b281256`** via `git rebase --onto c935a71 b281256 main` (`c935a71` = `b281256^`). The rebase hit a modify/delete conflict on `.svelte-kit/ambient.d.ts` (a build artifact added by `b281256`, modified by later commits); resolved each conflict by accepting the incoming (post-`b281256`) version. `b281256` is no longer an ancestor of `main` (new HEAD `c7c9560`).
+3. **Restored anti-rebloat `.gitignore`** as a USER section appended after the warden managed block (so warden preserves it — editing the managed block's `!*.png` is futile, warden regenerates it). Rules: `.pi/`, `screenshots/`, `crops/`, `audit-v2/`, `docs/refs-hom3/`, `static/assets/**`. The parent-dir excludes override the warden `!*.png`/`!*.jpg` negations for those paths, so audit binaries stay ignored.
+4. **Force-pushed the rewritten `main`** to all 4 remotes (`github`, `codeberg`, `gitlab`, `origin`) — `--force-with-lease` (GitHub needed an explicit lease; the rest accepted directly). All remotes advanced to `39c2beb9` (the `.gitignore` commit on top of `c7c9560`).
+5. **Pruned the binaries**: `git fetch --all` + `git reflog expire --expire=now --all` + `git gc --prune=now`. Shared gitdir dropped **4.9 GiB → 164 MiB**; reachable blob content **2.402 GiB → 0.343 GiB**; `b281256` object gone.
+6. **Restarted the daemon** — it committed the `.gitignore` change and resumed syncing hegemon to all 3 remotes, **including GitHub** (no more `skipping github` guard; pack is 0.158 GiB, under the 2 GiB limit).
+
+**Final state (verified):** hegemon `main` = `39c2beb9` on github/codeberg/gitlab/origin; GitHub pack 0.158 GiB; `dracon-sync repos` shows hegemon `OK`, healthy. Hegemon is back on GitHub.
+
+**Lesson:** the 2026-07-06 cleanup worked, but its anti-rebloat `.gitignore` rules were not durable (absent from hegemon's `.gitignore`). The daemon's commit-all policy then re-committed audit screenshots. The fix is a *user-section* `.gitignore` (outside the warden managed block) so warden preserves it.
+
+## 9. Side note — prior sync-stall fix was never deployed
+
+While investigating, found that the earlier sync-stall fix (which stops hegemon's oversized GitHub push from hanging) had **never been deployed**: `cargo build` wrote to `target/release/` but the service runs `~/.local/bin/dracon-sync`, which was the old 10:12 binary. The orphaned hegemon GitHub push had returned. Fixed by stopping the daemon, copying `target/release/dracon-sync` → `~/.local/bin/dracon-sync`, and restarting. Verified 0 orphaned pushes over a full 4-min cycle. (Recorded in `sync-stall-audit-2026-07-09.md`.)
+
+---
+
 ## 7. Evidence index
 
 - Pack size: `git rev-list --objects main | git pack-objects --stdout | wc -c`
