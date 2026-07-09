@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 128886,
-    "activeSeconds": 48
+    "tokensUsed": 150546,
+    "activeSeconds": 182
   },
   "sisyphus": true,
   "createdAt": "2026-07-09T18:56:28.609Z",
-  "updatedAt": "2026-07-09T18:57:19.221Z",
+  "updatedAt": "2026-07-09T18:59:37.388Z",
   "activePath": ".pi/goals/active_goal_2026070919562860_mrdvbao1-7triyb.md",
   "taskList": {
     "tasks": [
@@ -61,8 +61,8 @@ Audit every watched repo to (a) inventory and classify every untracked file — 
 - Status: sisyphus running
 - Auto-continue: on
 - Sisyphus mode: yes (prompt/criteria style)
-- Time spent: 48s
-- Tokens used: 129K (128,886) tokens
+- Time spent: 3m02s
+- Tokens used: 151K (150,546) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
