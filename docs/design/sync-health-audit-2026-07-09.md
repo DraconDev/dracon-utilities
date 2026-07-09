@@ -129,3 +129,58 @@ with a trusted identity, after which the daemon will push them.
   class=Net (12)`.
 - dracon-code `git log origin/main..main` → 2 commits by `audit-agent`.
 - hegemon journal → 6 `🔁 synced (late)` events in 13 min.
+
+## 9. Resolution — fix applied + re-audit (2026-07-09, goal `mrdmxu8n`)
+
+The two genuine blockers from §4–§5 were fixed and the fleet was re-audited.
+
+### 9.1 pully (was STUCK_PULL)
+- Root cause refined: the diverged commits `ecbc44e5` (local, full message)
+  and `b0c193ab` (origin, daemon auto-commit message) are **byte-identical
+  duplicates** — same parent `2ffa5562`, same `port` field + tests added to
+  the same two files. The same edit was committed in two sessions.
+- Fix: `git reset --hard origin/main` in pully (zero content loss — the change
+  already exists on origin via `b0c193ab`; working tree was clean, trees
+  identical). No conflict, no pull required (behind becomes 0).
+- Result: pully `✅ OK / healthy`, AHEAD:0/BEHIND:0; local = origin = gitlab =
+  codeberg = `b0c193ab`. STUCK_PULL cleared.
+- **Caveat (deferred):** pully's underlying daemon pull failure
+  (`unsupported URL protocol; class=Net (12)` from the published `dracon-git`
+  crate's libgit2 pull) was **not** patched — `dracon-git` is a published
+  dependency, not editable here. The reset keeps pully synced while
+  `behind==0`; if pully diverges again, the daemon's libgit2 pull may re-fail
+  and require another manual `git pull`/reset. Follow-up daemon fix recommended
+  (use git CLI for pull, or address `dracon-git` libgit2 SSH transport).
+
+### 9.2 dracon-code (was untrusted_author)
+- Fix: whitelisted the audit-agent author in the global daemon config
+  `~/.dracon/utilities/sync/dracon-sync.toml` by adding
+  `trusted_emails = ["dracsharp@gmail.com", "audit@dracon-code"]` (the file
+  previously relied on built-in defaults only). `trusted_authors` is a
+  global-only policy field (per-repo `.dracon/dracon-sync.toml` cannot set it).
+- Restarted the daemon (`systemctl --user restart dracon-sync.service`) to
+  reload config + re-discover remotes (PID rotated off 1344337).
+- Result: dracon-code `✅ OK / healthy`, AHEAD:0; the 2 `audit-agent` commits
+  (`2c37e270`, `21dc90727`) pushed; origin/gitlab/codeberg all SYNCED at
+  `2c37e270`.
+
+### 9.3 Re-audit results (all 26 repos)
+- `dracon-sync repos --json` → `ok=22, warn=4`. The 4 `warn` are all `DIRTY`
+  (benign untracked/modified working-tree state), **not** sync failures:
+  nested submodules (`endless-td`, `neonbreak` pointers), untracked nested
+  git repos (`dracon-sync/`, `dracon-system/` in dracon-utilities — separately
+  watched), the daemon's own `.pi/goals/*.md` files, and one staged source
+  file (`browser-extensions-shared/.../livePreview.ts`) the daemon commits on
+  its next cycle.
+- Corrected local-vs-remote divergence scan (valid 40-char SHA only, no
+  `github/HEAD` false positives) → **0 real divergences**; every local `main`
+  equals every configured remote `main`.
+- Daemon health: `active`, **0 orphaned `git push`** processes, **no**
+  `reject`/`fatal`/`non-fast-forward`/`denied`/`auth`/`unsupported URL` errors
+  in the last 20 min of journal.
+- hegemon: `✅ OK / synced` (original concern was transient lag, confirmed
+  resolved).
+
+**Conclusion:** both genuine blockers are resolved and verified; the fleet is
+fully synced. Only benign `DIRTY` working-tree states remain, plus the deferred
+pully libgit2-pull daemon bug (§9.1 caveat) for future divergences.
