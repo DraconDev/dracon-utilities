@@ -393,6 +393,225 @@ If every step matches the expected results above, the audit passes.
 - 2026-07-09 — initial audit. No discrepancies found. Doc written and
   committed.
 
+- 2026-07-09 — **post-audit investigation** found three real defects
+  hidden by the initial clean pass. The initial pass checked invariants
+  that pass under transient states (the daemon hadn't yet processed
+  the dirty submodules) and the `push_status=OK` + `ahead=0` columns
+  only verify the **publish upstream** (origin), not all 3 remotes.
+  A deeper investigation revealed:
+
+### Defect 1: 5 nested submodules in DETACHED HEAD state
+
+**Symptom**: `dracon-platform` parent shows convergence lag for
+`deathrun`, `darklord`, `neonbreak`, `endless-td`, `hegemon`.
+Investigation found all 5 were in **detached HEAD** state (HEAD pointed
+at a commit, not at the `main` branch ref). The local `main` branch
+ref was 2-3 commits behind the detached HEAD.
+
+**Root cause**: The 2026-07-02 nested-on-main migration
+(`mr3g843f-lajfpg`/`354fe3cb`) moved the canonical watch path to the
+nested submodule, but the nested submodule's `main` branch ref was
+not always advanced to match the detached HEAD when the daemon
+committed on the nested path. The daemon's `is_on_main_branch` check
+correctly returns `false` for detached HEAD, so the daemon's
+`materialize_pending_submodules` (which calls `configure_all_remotes`)
+**skips** the nested submodule entirely. Without `configure_all_remotes`,
+the `github` remote was never added to these 5 submodules.
+
+**Fix**: `git branch -f main origin/main && git checkout main` for
+each of the 5 submodules. `origin` for these submodules points to
+**gitlab** (not github — see Defect 2), so `origin/main` is the
+latest known good SHA already pushed to gitlab/codeberg. The fix is
+safe: it fast-forwards local `main` to `origin/main`, preserving all
+work (the detached HEAD commits are already on origin/main). The
+`main` branch ref just catches up to where the work already is.
+
+**After fix**: `is_on_main_branch` returns `true` for all 5,
+`configure_all_remotes` adds the `github` remote, and the daemon
+can push to github.
+
+**Verification**: All 5 now on `main` (not detached). Daemon
+auto-added `github` remote at the correct URL (e.g.
+`git@github.com:DraconDev/web-games-deathrun.git`).
+
+### Defect 2: github NEVER pushed for 9 submodules (mirror-exclusion logic)
+
+**Symptom**: After Defect 1 was fixed and github remotes were added,
+github was STILL not receiving commits for 9 of the 10 game
+submodules. The daemon's `push_to_remotes` JSON field showed
+`['github', 'gitlab', 'codeberg']` and `push_status=OK` and
+`ahead=0/behind=0` — but `git fetch github` on these submodules
+showed github was 0-41 commits behind local.
+
+**Root cause**: `push_background` (`src/sync.rs:1466-1516`) had
+this logic:
+
+```rust
+// ALWAYS keep github out of the mirror path. `origin` (github) is
+// pushed by the dedicated `push_with_retries` call above; routing
+// github through `push_mirror_remotes` instead makes it run
+// `auto_create_all_remotes` (`gh repo create`), which stalls
+// against an already-existing repo and blocks the gitlab/codeberg
+// pushes that follow in the same call.
+if !combined_exclude.iter().any(|e| e == "github") {
+    combined_exclude.push("github".to_string());
+}
+```
+
+This **unconditionally** excluded github from the mirror path,
+relying on the assumption that `origin` = github (so the
+`push_with_retries` call above would push to github). But for the
+10 nested game submodules, `origin` points to **gitlab** (because
+`.gitmodules` lists codeberg first and git picked that as `origin`).
+Result: github is pushed by neither the origin path nor the mirror
+path. **9 submodules' github repos were never updated.**
+
+**Why the comment's reasoning is outdated**: The "stall" the
+comment describes was real at the time it was written, but was
+later mitigated by the `remote_repo_exists` check added to
+`auto_create_all_remotes` on 2026-06-20
+(`git/multi_remote.rs:auto_create_all_remotes`). That check runs
+`git ls-remote` first; if the repo exists, `gh repo create` is
+skipped. So `auto_create_all_remotes` no longer stalls against
+existing repos.
+
+**Fix**: Make the github exclusion **conditional** on `origin`
+actually being github:
+
+```rust
+let origin_is_github = if has_origin {
+    crate::git::multi_remote::get_remote_url(repo, "origin")
+        .map(|u| u.contains("github.com"))
+        .unwrap_or(false)
+} else {
+    false
+};
+// ...
+if origin_is_github && !combined_exclude.iter().any(|e| e == "github") {
+    combined_exclude.push("github".to_string());
+}
+```
+
+When `origin` is github (most repos), the exclusion still applies
+(github is pushed by `push_with_retries`). When `origin` is NOT
+github (the 10 game submodules), github is included in the mirror
+path and pushed by `push_mirror_remotes` → `push_to_all_remotes`
+→ `push_to_named_remote`. The 2 GiB pack limit guard
+(`too_big_for_github` skip) is unaffected.
+
+**Verification**: After the fix, `cargo build --release --locked`
+succeeded (exit 0, 16 pre-existing warnings), daemon rebuilt
+(2026-07-09 ~04:55), restarted (PID 392208), and within ~3
+minutes all 10 submodules' github remotes had received pushes
+(verified by `git fetch github` + SHA comparison).
+
+### Defect 3: trailing-drain 2 s deadline kills slow github pushes
+
+**Symptom**: After Defect 2 was fixed, 8 of 10 submodules synced
+to github automatically within ~3 minutes. But `capture-anime-girls`
+had a persistent 41-commit lag that didn't shrink. The daemon was
+committing and pushing (gitlab/codeberg advanced), but github
+stayed behind.
+
+**Root cause**: The daemon's trailing-drain
+(`src/daemon.rs:2954`) used `pulse_interval_secs * 2` (default
+**2 s**) as its deadline. The trailing-drain is the bounded wait
+after the apply phase for dispatched sync tasks to complete. When
+the deadline fires, the `in_flight` HashSet is cleared for any
+repos that didn't finish — so the next cycle re-dispatches them.
+But the previous push task is STILL running in the background
+(JoinHandle drop doesn't abort tokio tasks). The new push
+conflicts with the old one (git index lock, SSH agent saturation),
+creating a "traffic jam" that delays smaller pushes.
+
+For `capture-anime-girls` (41-commit lag), the first push to
+github was a **cold pack upload** (github had no prior knowledge
+of these commits). Cold pack uploads take 30-60 s. The
+trailing-drain killed the push after 2 s, the next cycle spawned
+a duplicate push, and the cycle repeated — never completing.
+
+**Fix**: Add a dedicated `trailing_drain_deadline_secs` policy
+field (default **120 s**) that the trailing-drain uses instead
+of `pulse_interval_secs * 2`. 120 s gives most pushes enough
+time to complete while still bounding the daemon's cycle time.
+The apply-phase deadline (`pulse_interval_secs * 2 = 2 s`) is
+unchanged — that's the responsiveness budget for the main loop,
+and a new dirty file in repo A should be processed in the next
+cycle regardless of how slow repo B's push is.
+
+**Files changed**:
+- `src/policy.rs`: new field `trailing_drain_deadline_secs: u64`
+  with `default_trailing_drain_deadline_secs() -> 120`. Updated
+  `test_sync_policy()` to include the new field.
+- `src/daemon.rs:2954`: changed
+  `Duration::from_secs(policy.pulse_interval_secs.max(1) * 2)` to
+  `Duration::from_secs(policy.trailing_drain_deadline_secs.max(1))`
+  with a comment explaining the change.
+- `src/report.rs:6118`: updated test helper `test_sync_policy()`
+  to include the new field.
+
+**Tests**: `cargo test --release --locked --bin dracon-sync
+github_pack_tests` — both
+`pushed_branch_size_is_reported_for_small_repo` and
+`small_repo_is_not_too_big_for_github` pass.
+`cargo test --release --locked --bin dracon-sync
+trailing_drain` — `test_trailing_drain_clears_stuck_in_flight`
+passes.
+
+**Verification**: After the fix, `capture-anime-girls` caught up
+to github within ~2 minutes (the next cycle's push completed
+within the 120 s window). All 10 submodules now sync to github
+automatically (8 within 3 min, `capture-anime-girls` within 5 min
+including the 41-commit cold pack upload).
+
+### Report bug: `push_status=OK` only checks publish upstream, not all 3
+
+**Not a daemon push bug — a report bug.** The `push_status` and
+`ahead`/`behind` columns in `dracon-sync repos` are computed against
+the **publish upstream** (which is `origin` for most repos, = gitlab
+for the 10 game submodules). They do NOT verify that all 3 remotes
+(github, gitlab, codeberg) are at the same SHA. So a repo can show
+`push_status=OK, ahead=0, behind=0` even when github is 41 commits
+behind.
+
+**Evidence**: After the 2 daemon fixes (Defects 2 + 3), `deathrun`
+showed `push_status=OK, ahead=0, behind=0` in the JSON, but
+`git fetch github` showed github was 2 commits behind local.
+A manual `git push github HEAD:refs/heads/main` succeeded and
+brought github to the same SHA. The daemon had committed and
+pushed to gitlab/codeberg successfully, but the github push had
+been killed by the old 2 s trailing-drain (Defect 3) before the
+fix.
+
+**Follow-up (deferred)**: The report's `ahead`/`behind` and
+`push_status` fields should verify all 3 remotes, not just the
+publish upstream. Options:
+- Fetch all 3 remotes per repo and compute max(behind) across them.
+- Track per-remote `last_push_unix` and warn if any remote hasn't
+  been pushed to in N minutes.
+- Add a per-remote `push_to_<name>_status` column.
+
+Left as a follow-up; the current behavior is documented in
+`docs/design/repo-discovery-audit-2026-07-09.md` § Report bug.
+
+### Updated "Fixes applied" section
+
+The original audit said **"None required"** — that was wrong. Three
+real defects were found and fixed (this section). The original
+clean pass was a false negative because:
+- Defect 1 (detached HEAD) was masked by the `commits_1h` column
+  showing recent activity, which the audit interpreted as
+  "daemon is syncing this repo."
+- Defects 2 + 3 (github never pushed) were masked by the
+  `push_status=OK` column, which only checks the publish upstream.
+- The gitlink convergence check showed transient lag (0-3 commits)
+  during the audit's 15 s settle window, which the audit
+  attributed to "normal daemon behavior" rather than the deeper
+  github-exclusion defect.
+
+The corrected verdict: **3 real defects found and fixed** (this
+section). Audit now fully clean.
+
 ## Cross-references
 
 - `AGENTS.md` "Submodule standalone worktree design" — the 2026-07-02
