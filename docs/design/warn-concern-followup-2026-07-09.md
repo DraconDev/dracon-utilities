@@ -320,7 +320,7 @@ The 4 remaining DIRTY repos are normal daemon catch-up cycles and
 will clear on the next commit pass. No real divergence anywhere in
 the fleet. The polis CONCERN is gone.
 
-## 7. Verification evidence index
+## 8. Verification evidence index
 
 - Polis divergence: `git rev-list --count origin/main..HEAD = 1`,
   `git rev-list --count HEAD..origin/main = 1`, `git push --dry-run
