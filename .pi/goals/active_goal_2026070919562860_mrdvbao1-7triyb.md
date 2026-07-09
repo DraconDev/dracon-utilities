@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 150546,
-    "activeSeconds": 182
+    "tokensUsed": 155290,
+    "activeSeconds": 263
   },
   "sisyphus": true,
   "createdAt": "2026-07-09T18:56:28.609Z",
-  "updatedAt": "2026-07-09T18:59:37.388Z",
+  "updatedAt": "2026-07-09T19:01:00.818Z",
   "activePath": ".pi/goals/active_goal_2026070919562860_mrdvbao1-7triyb.md",
   "taskList": {
     "tasks": [
@@ -25,25 +25,33 @@
       {
         "id": "untracked-classify",
         "title": "Classify each untracked file: correctly out vs missed",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-07-09T19:00:46.909Z",
+        "evidence": "Each of the 5 untracked entries classified in audit doc §3:\n- 1 .pi/goals/active_goal_*.md (dracon-utilities) — daemon-managed goal file, will be auto-archived on next cycle. **Correctly out.**\n- 3 ne",
         "verificationContract": "evidence: doc groups untrackeds into {build artifact, session scratch, secret, potentially-legit, empty dir, other} with reasoning per file"
       },
       {
         "id": "push-verify",
         "title": "Verify the push pipeline: every committed change reaches all 3 remotes",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-07-09T19:00:51.217Z",
+        "evidence": "Audit doc §5 records daemon health: active, 0 orphan `git push` processes, 0 repos with AHEAD>0 or BEHIND>0, 0 STUCK_*, 0 untrusted_author, corrected divergence scan = 0 real divergences (after the br",
         "verificationContract": "evidence: doc shows daemon health, 0 orphaned pushes, 0 journal errors, corrected local-vs-remote divergence scan (0 real divergences across all 26 repos)"
       },
       {
         "id": "common-reasons",
         "title": "Investigate any repos currently sitting on changes or not pushing",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-07-09T19:00:57.028Z",
+        "evidence": "Audit doc §4 investigates every repo that was sitting on changes or appeared not to push:\n- §4.1 deathrun .state-recon/ anti-rebloat finding (3483 tracked PNGs / 694 MiB / actively growing — same defe",
         "verificationContract": "evidence: for each repo flagged AHEAD/BEHIND/STUCK/DIRTY, doc states root cause (transient lag, untracked miss, daemon bug, untrusted author, etc.) and whether it needs operator action"
       },
       {
         "id": "doc-commit",
         "title": "Write + commit + push the audit deliverable",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-07-09T19:01:00.814Z",
+        "evidence": "Deliverable docs/design/untrackeds-audit-2026-07-09.md written (12 340 bytes, 221 insertions), committed at 854b2e50 via daemon auto-commit, pushed to all three remotes (origin/gitlab/codeberg all SYN",
         "verificationContract": "evidence: docs/design/untrackeds-audit-2026-07-09.md committed in dracon-utilities and pushed to origin/gitlab/codeberg (all SYNCED)"
       }
     ],
@@ -61,16 +69,19 @@ Audit every watched repo to (a) inventory and classify every untracked file — 
 - Status: sisyphus running
 - Auto-continue: on
 - Sisyphus mode: yes (prompt/criteria style)
-- Time spent: 3m02s
-- Tokens used: 151K (150,546) tokens
+- Time spent: 4m23s
+- Tokens used: 155K (155,290) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
 - [x] untracked-inventory: Inventory untracked files across all 26 watched repos — evidence: Scanned all 26 watched repos via `git status --porcelain` enumerating repos from `dracon-sync repos --json`. Found untracked files in only 2 of 26 repos:
 
 (1) /home/dracon/Dev/dracon-utilities (4 entr
-- [ ] untracked-classify: Classify each untracked file: correctly out vs missed — contract: evidence: doc groups untrackeds into {build artifact, session scratch, secret, potentially-legit, empty dir, other} with reasoning per file
-- [ ] push-verify: Verify the push pipeline: every committed change reaches all 3 remotes — contract: evidence: doc shows daemon health, 0 orphaned pushes, 0 journal errors, corrected local-vs-remote divergence scan (0 real divergences across all 26 repos)
-- [ ] common-reasons: Investigate any repos currently sitting on changes or not pushing — contract: evidence: for each repo flagged AHEAD/BEHIND/STUCK/DIRTY, doc states root cause (transient lag, untracked miss, daemon bug, untrusted author, etc.) and whether it needs operator action
-- [ ] doc-commit: Write + commit + push the audit deliverable — contract: evidence: docs/design/untrackeds-audit-2026-07-09.md committed in dracon-utilities and pushed to origin/gitlab/codeberg (all SYNCED)
+- [x] untracked-classify: Classify each untracked file: correctly out vs missed — evidence: Each of the 5 untracked entries classified in audit doc §3:
+- 1 .pi/goals/active_goal_*.md (dracon-utilities) — daemon-managed goal file, will be auto-archived on next cycle. **Correctly out.**
+- 3 ne
+- [x] push-verify: Verify the push pipeline: every committed change reaches all 3 remotes — evidence: Audit doc §5 records daemon health: active, 0 orphan `git push` processes, 0 repos with AHEAD>0 or BEHIND>0, 0 STUCK_*, 0 untrusted_author, corrected divergence scan = 0 real divergences (after the br
+- [x] common-reasons: Investigate any repos currently sitting on changes or not pushing — evidence: Audit doc §4 investigates every repo that was sitting on changes or appeared not to push:
+- §4.1 deathrun .state-recon/ anti-rebloat finding (3483 tracked PNGs / 694 MiB / actively growing — same defe
+- [x] doc-commit: Write + commit + push the audit deliverable — evidence: Deliverable docs/design/untrackeds-audit-2026-07-09.md written (12 340 bytes, 221 insertions), committed at 854b2e50 via daemon auto-commit, pushed to all three remotes (origin/gitlab/codeberg all SYN
 
