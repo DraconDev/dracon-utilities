@@ -228,3 +228,36 @@ audit runs will not re-bloat the history.
 
 The operator's deferred decision (from goals `mrdvbao1` + `mrdxdtrf`) is
 now **resolved**.
+
+## 9. Continuation snapshot (10:13, 2026-07-10)
+
+Operator pasted a second snapshot showing **22 OK / 2 WARN / 0 CONCERN**.
+The 2 WARN were junk-runner + deathrun (different from goal §7 — these
+were small transient issues, not the bloat).
+
+### 9.1 Snapshot's 2 WARN repos — RESOLVED
+- **junk-runner** (WARN, dirty 2m): `tests/e2e/_dbg-set.e2e.ts` debug
+  test was untracked. Daemon auto-committed it as `7289cd06`. A 26-scene
+  refactor (`installSceneKeys(this, ...)` across all scenes) was
+  committed as `86b001a4` and pushed to all 3 remotes. Final: **clean**,
+  a=0/b=0 on codeberg/github/gitlab at `fcabf00b`.
+- **deathrun** (WARN, dirty 6m): 8 audit PNGs in `docs/audit-howto-visual/`
+  were modified. Daemon auto-committed the audit run as `e3f3e23`,
+  `c4270b3`, `b311d2b` (14 files) and pushed to all 3 remotes. Final:
+  synced at `583c80b` on all 3, a=0/b=0. A new audit cycle just started
+  (5 PNGs uncommitted — will auto-commit when audit finishes).
+
+### 9.2 Live fleet state (10:23)
+Live fleet after the daemon processed the snapshot:
+- ~18-20 OK / 5-7 DIRTY / 0 CONCERN (varies as commits land)
+- New DIRTY entries (dracon-platform, neonbreak, hegemon, dracon-utilities,
+  capture-anime-girls) are post-snapshot active operator sessions, not
+  issues from the snapshot.
+- Zero divergence on all watched repos (a=0/b=0 everywhere that's been
+  committed).
+
+### 9.3 Lesson
+With auto-commit enabled, the daemon resolves WARN/DIRTY typically
+within ~30-90s. The 2 WARN repos were resolved by the daemon without
+operator intervention. No history rewrite was needed (unlike the §7
+.state-recon/ bloat case).
