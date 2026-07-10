@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 387950,
-    "activeSeconds": 5770
+    "tokensUsed": 467556,
+    "activeSeconds": 6269
   },
   "sisyphus": false,
   "createdAt": "2026-07-10T21:51:16.394Z",
-  "updatedAt": "2026-07-10T23:27:36.460Z",
+  "updatedAt": "2026-07-10T23:37:18.535Z",
   "activePath": ".pi/goals/active_goal_2026071022511639_mrfgzxre-n5fqe6.md",
   "taskList": {
     "tasks": [
@@ -31,19 +31,25 @@
       {
         "id": "test",
         "title": "Test health: cargo test --workspace --locked (per utility)",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-07-10T23:37:18.514Z",
+        "evidence": "Ran `cargo test --locked` per crate. dracon-system: 86 passed, 0 failed (exit 0). dracon-warden: 76 + 10 doc-tests passed, 0 failed (exit 0). dracon-sync: 647 passed / 18 FAILED / 3 ignored (exit 101)",
         "verificationContract": "Report pass/fail counts per utility (dracon-sync, dracon-system, dracon-warden); note pre-existing failures."
       },
       {
         "id": "deny",
         "title": "Dependency/license health: cargo deny check",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-07-10T23:37:18.523Z",
+        "evidence": "Ran `cargo deny check` per crate. dracon-sync: exit 0, advisories/bans/licenses/sources ok (minor warning: \"unmatched skip configuration\"). dracon-system: exit 1, advisories FAILED — RUSTSEC-2026-0190",
         "verificationContract": "deny check exits clean (no license/unified-deps/advisories blockers)."
       },
       {
         "id": "report",
         "title": "Write audit report artifact + per-utility summary",
-        "status": "pending",
+        "status": "complete",
+        "completedAt": "2026-07-10T23:37:18.531Z",
+        "evidence": "Wrote /home/dracon/Dev/dracon-utilities/AUDIT-3-UTILITIES-2026-07-10.md (5010 bytes) with per-utility build/test/deny results, the dracon-sync test-failure root-cause analysis, and a priority-ordered ",
         "verificationContract": "Saved audit doc with build/test/deny results and per-utility findings; CONCERN-style issues flagged."
       }
     ],
@@ -61,14 +67,14 @@ ok focus not on repos no but us lets audit what we have all 3 projects
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 1h36m10s
-- Tokens used: 388K (387,950) tokens
+- Time spent: 1h44m29s
+- Tokens used: 468K (467,556) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
 - [x] audit-scope: Confirm audit scope: 3 utilities in dracon-utilities (dracon-sync, dracon-system, dracon-warden)
 - [x] build: Build health: cargo build --release --locked (workspace)
-- [ ] test: Test health: cargo test --workspace --locked (per utility) — contract: Report pass/fail counts per utility (dracon-sync, dracon-system, dracon-warden); note pre-existing failures.
-- [ ] deny: Dependency/license health: cargo deny check — contract: deny check exits clean (no license/unified-deps/advisories blockers).
-- [ ] report: Write audit report artifact + per-utility summary — contract: Saved audit doc with build/test/deny results and per-utility findings; CONCERN-style issues flagged.
+- [x] test: Test health: cargo test --workspace --locked (per utility) — evidence: Ran `cargo test --locked` per crate. dracon-system: 86 passed, 0 failed (exit 0). dracon-warden: 76 + 10 doc-tests passed, 0 failed (exit 0). dracon-sync: 647 passed / 18 FAILED / 3 ignored (exit 101)
+- [x] deny: Dependency/license health: cargo deny check — evidence: Ran `cargo deny check` per crate. dracon-sync: exit 0, advisories/bans/licenses/sources ok (minor warning: "unmatched skip configuration"). dracon-system: exit 1, advisories FAILED — RUSTSEC-2026-0190
+- [x] report: Write audit report artifact + per-utility summary — evidence: Wrote /home/dracon/Dev/dracon-utilities/AUDIT-3-UTILITIES-2026-07-10.md (5010 bytes) with per-utility build/test/deny results, the dracon-sync test-failure root-cause analysis, and a priority-ordered 
 
