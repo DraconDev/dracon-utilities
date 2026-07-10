@@ -261,3 +261,44 @@ With auto-commit enabled, the daemon resolves WARN/DIRTY typically
 within ~30-90s. The 2 WARN repos were resolved by the daemon without
 operator intervention. No history rewrite was needed (unlike the §7
 .state-recon/ bloat case).
+
+## 10. Continuation snapshot — third pass (10:39, 2026-07-10)
+
+A third `dracon-sync repos` snapshot showed **15 OK / 5 WARN / 0 CONCERN**.
+The 5 WARN repos: dracon-platform, hegemon, neonbreak, deathrun,
+junk-runner. All a=0/b=0; all flagged with the standard
+"daemon handles after changes settle" hint.
+
+### 10.1 What's actually going on
+- **junk-runner** (WARN, dirty 6m at snapshot time): Transient auto-merge
+  in progress. `docs/event-dialogue-classification.json` had a trivial
+  conflict (only the `generated` timestamp differed between the two
+  sides — 2026-07-08 vs 2026-07-09). The daemon's `AUTO_MERGE`
+  bookkeeping resolved it; junk-runner HEAD now at `f3f86434` with no
+  unmerged paths and pushed to all 3 remotes.
+- **dracon-platform** (WARN): Submodule gitlinks out of date (submodules
+  advanced but parent gitlink not yet updated). Daemon catching up.
+- **hegemon** (WARN): `src/lib/game/smoke.test.ts` modified (operator
+  session).
+- **neonbreak** (WARN, dirty 2m): `.pi/goals/active_goal_...md` modified
+  (active operator session). Will be auto-committed/pushed when session
+  settles or archives.
+- **deathrun** (WARN, dirty 2m): same pattern — active operator session
+  modifying the `.pi/goals/active_goal_...md` file. New audit commit
+  `c378837` ("CLOSED: fix-back-chevron-duplicate") also recorded.
+
+### 10.2 Live fleet state (10:39)
+After daemon processing:
+- **21 OK / 4 DIRTY / 0 CONCERN**
+  (junk-runner resolved; dracon-platform + 3 active operator sessions
+  remain DIRTY)
+- All 4 DIRTY are a=0/b=0, no divergence from any remote.
+- Zero real concerns; fleet is healthy.
+
+### 10.3 Lesson
+A mid-merge `UU` state in junk-runner was a **transient artifact**
+of the daemon's `AUTO_MERGE` flow, not a real conflict requiring
+manual intervention. The daemon resolves it on the next cycle and
+the working tree goes clean. Operator snapshot view can lag reality
+by a few seconds; check live fleet state before assuming any DIRTY
+entry needs manual resolution.

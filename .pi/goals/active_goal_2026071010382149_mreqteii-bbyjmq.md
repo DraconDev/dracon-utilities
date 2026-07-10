@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 65587,
-    "activeSeconds": 29
+    "tokensUsed": 76350,
+    "activeSeconds": 93
   },
   "sisyphus": false,
   "createdAt": "2026-07-10T09:38:21.498Z",
-  "updatedAt": "2026-07-10T09:38:52.200Z",
+  "updatedAt": "2026-07-10T09:40:01.855Z",
   "activePath": ".pi/goals/active_goal_2026071010382149_mreqteii-bbyjmq.md"
 }
 
@@ -190,5 +190,5 @@
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 29s
-- Tokens used: 66K (65,587) tokens
+- Time spent: 1m33s
+- Tokens used: 76K (76,350) tokens
