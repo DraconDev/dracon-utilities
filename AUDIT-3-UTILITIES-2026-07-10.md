@@ -58,20 +58,27 @@ test helpers to use a valid (non-empty) SHA or a git-2.51.2-compatible cacheinfo
 | Crate | Result | Advisories | Notes |
 |-------|--------|-----------|-------|
 | dracon-sync | PASS (exit 0) | ok | warning: "unmatched skip configuration" |
-| dracon-system | **FAIL (exit 1)** | FAILED | RUSTSEC-2026-0190 (unsound `Error::downcast_mut()` in anyhow, via dracon-system-lib) + cyclic dep dracon-system → dracon-system-lib → dracon-system |
-| dracon-warden | **FAIL (exit 1)** | FAILED | RUSTSEC-2026-0190 (anyhow unsound) + **RUSTSEC-2026-0204 (VULNERABILITY: invalid pointer dereference in `fmt::Pointer` impl for `Atomic`/`Shared` in `triomphe`, when the underlying pointer is invalid)** |
+| dracon-system | **FAIL (exit 1)** | FAILED | RUSTSEC-2026-0190 (unsound `Error::downcast_mut()` in anyhow, via the dracon-system ↔ dracon-system-lib path) |
+| dracon-warden | **FAIL (exit 1)** | FAILED | RUSTSEC-2026-0190 (anyhow unsound) + **RUSTSEC-2026-0204 (VULNERABILITY: invalid pointer dereference in `fmt::Pointer` impl for `Atomic`/`Shared` in `crossbeam-deque v0.8.6` — reached via rayon-core → rayon → dracon-security → dracon-warden)** |
 
 Both dracon-system and dracon-warden fail `cargo deny check` on advisories.
-RUSTSEC-2026-0204 (triomphe) is a **security vulnerability** — highest-priority item.
+RUSTSEC-2026-0204 (crossbeam-deque) is a **security vulnerability** — highest-priority item.
+(The `Atomic`/`Shared` `fmt::Pointer` types belong to the crossbeam family; `triomphe` is
+NOT a dependency of dracon-warden — the earlier triomphe attribution was incorrect and has
+been corrected to `crossbeam-deque v0.8.6`.)
 
 ## 4. CONCERNs (priority order)
-1. 🔴 **dracon-warden — RUSTSEC-2026-0204** (security vuln, `triomphe` `Atomic`/`Shared`
-   `fmt::Pointer` invalid-ptr deref). Patch/bump `triomphe` to a fixed version.
+1. 🔴 **dracon-warden — RUSTSEC-2026-0204** (security vuln, `crossbeam-deque v0.8.6`
+   `Atomic`/`Shared` `fmt::Pointer` invalid-ptr deref, via rayon-core → rayon →
+   dracon-security → dracon-warden). Bump `crossbeam-deque`/`rayon` to a fixed version.
+   (`triomphe` is NOT a dracon-warden dependency — corrected from earlier draft.)
 2. 🟠 **dracon-system & dracon-warden — RUSTSEC-2026-0190** (anyhow `Error::downcast_mut`
    unsound). Bump `anyhow` or apply a justified `deny.toml` skip.
-3. 🟠 **dracon-system — cyclic dependency** dracon-system → dracon-system-lib → dracon-system
-   (deny advisory graph shows the self-cycle). Resolve the split between `dracon-system`
-   and `dracon-system-lib`.
+3. 🟡 **dracon-system — NOT a cyclic dependency (corrected).** The `cargo deny` advisory
+   graph shows `dracon-system` ↔ `dracon-system-lib` paths to anyhow
+   (RUSTSEC-2026-0190). `cargo tree` exits 0, so there is **no true cyclic dependency**
+   in the resolved graph — the `(*)` marker is a graph back-reference (diamond path to
+   anyhow), not a build cycle. No action required; noted for accuracy.
 4. 🟡 **dracon-sync — 18 test failures** (git-2.51.2 `cacheinfo` test incompat). Fix test
    helpers; does not affect production.
 5. 🟡 **No workspace-root `Cargo.toml`** — README "build from monorepo root" is inaccurate;
