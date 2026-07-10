@@ -5,12 +5,12 @@
   "status": "active",
   "autoContinue": true,
   "usage": {
-    "tokensUsed": 357145,
-    "activeSeconds": 5580
+    "tokensUsed": 387950,
+    "activeSeconds": 5770
   },
   "sisyphus": false,
   "createdAt": "2026-07-10T21:51:16.394Z",
-  "updatedAt": "2026-07-10T23:24:24.702Z",
+  "updatedAt": "2026-07-10T23:27:36.460Z",
   "activePath": ".pi/goals/active_goal_2026071022511639_mrfgzxre-n5fqe6.md",
   "taskList": {
     "tasks": [
@@ -61,8 +61,8 @@ ok focus not on repos no but us lets audit what we have all 3 projects
 - Status: running
 - Auto-continue: on
 - Sisyphus mode: no
-- Time spent: 1h33m00s
-- Tokens used: 357K (357,145) tokens
+- Time spent: 1h36m10s
+- Tokens used: 388K (387,950) tokens
 ## Tasks
 
 <!-- blockCompletion: false -->
