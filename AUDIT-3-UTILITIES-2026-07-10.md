@@ -87,7 +87,7 @@ then `crossbeam-deque` — were both inaccurate; corrected 2026-07-11.)
    helpers; does not affect production.
 5. 🟡 **No workspace-root `Cargo.toml`** — README "build from monorepo root" is inaccurate;
    build per-crate.
-6. 🟢 **dracon-sync — 17 warnings** (unused/dead_code). Minor; `cargo fix` candidate.
+6. 🟢 **dracon-sync — 16 warnings** (unused/dead_code). Minor; `cargo fix` candidate.
 
 ## 5. What's healthy
 - All 3 crates compile cleanly (release, locked).
