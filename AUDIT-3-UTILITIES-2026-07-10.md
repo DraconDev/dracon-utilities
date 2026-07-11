@@ -108,26 +108,58 @@ final, cargo-deny-attributed crate is **`crossbeam-epoch v0.9.18`**; fix:
 then `crossbeam-deque` — were both inaccurate; corrected 2026-07-11.)
 
 ## 4. CONCERNs (priority order)
-1. 🔴 **dracon-warden — RUSTSEC-2026-0204** (security vuln, `crossbeam-epoch v0.9.18`
-   `Atomic`/`Shared` `fmt::Pointer` invalid-ptr deref, via crossbeam-deque → rayon-core →
-   rayon → dracon-security → dracon-warden). **Fix: `cargo update -p crossbeam-epoch` to
-   ≥0.9.20.** (`crossbeam-deque v0.8.6` only transitively depends on the vulnerable crate;
-   `triomphe` is NOT a dependency at all — both prior attributions were inaccurate.)
-2. 🟠 **dracon-system & dracon-warden — RUSTSEC-2026-0190** (anyhow `Error::downcast_mut`
-   unsound). Bump `anyhow` or apply a justified `deny.toml` skip.
+1. 🔴 ~~**dracon-warden — RUSTSEC-2026-0204**~~ **RESOLVED 2026-07-11**. Bumped
+   `crossbeam-epoch` from v0.9.18 to v0.9.20 via
+   `cargo update -p crossbeam-epoch --precise 0.9.20` (dracon-warden/Cargo.lock).
+   Verification: `cargo deny check` in dracon-warden now exits 0 with
+   `advisories ok, bans ok, licenses ok, sources ok`.
+2. 🟠 ~~**dracon-system & dracon-warden — RUSTSEC-2026-0190**~~ **RESOLVED 2026-07-11**.
+   Bumped `anyhow` from v1.0.102 to v1.0.103 in BOTH crates via
+   `cargo update -p anyhow --precise 1.0.103`. Verification: `cargo deny check` exits 0 in
+   both crates with `advisories ok`.
 3. 🟡 **dracon-system — NOT a cyclic dependency (corrected).** The `cargo deny` advisory
    graph shows `dracon-system` ↔ `dracon-system-lib` paths to anyhow
    (RUSTSEC-2026-0190). `cargo tree` exits 0, so there is **no true cyclic dependency**
    in the resolved graph — the `(*)` marker is a graph back-reference (diamond path to
    anyhow), not a build cycle. No action required; noted for accuracy.
-4. 🟡 **dracon-sync — 18 test failures** (git-2.51.2 `cacheinfo` test incompat). Fix test
-   helpers; does not affect production.
-5. 🟡 **No workspace-root `Cargo.toml`** — README "build from monorepo root" is inaccurate;
-   build per-crate.
-6. 🟢 **dracon-sync — 16 warnings** (unused/dead_code). Minor; `cargo fix` candidate.
+4. 🟡 ~~**dracon-sync — 18 test failures**~~ **RESOLVED 2026-07-11**. Root cause was the
+   global `dracon-warden` pre-commit hook (`/home/dracon/.config/git/hooks/pre-commit`)
+   blocking `git commit` in temp test repos that lack `.gitattributes` with `filter=dracon`.
+   Applied audit option (b): added `git config core.hooksPath /dev/null` after each `git init`
+   in the failing test helpers (`init_parent_repo` in git/discovery.rs,
+   `init_repo` in role.rs, `build_parent_with_standalone_submodule` in exclude.rs,
+   `init_gitlink_test_repo` and `parent_gitlink_propagates_after_standalone_commit` in
+   sync.rs, `materialize_pending_submodules_*` in daemon.rs). Verification:
+   `cargo test --workspace --locked` now passes all crates with 0 failures
+   (dracon-sync 665 + 10 doc, dracon-system 86, dracon-warden 76 + 10 doc).
+5. 🟡 ~~**No workspace-root `Cargo.toml`**~~ **RESOLVED 2026-07-11**. Added
+   `/home/dracon/Dev/dracon-utilities/Cargo.toml` workspace manifest with
+   `members = ["dracon-sync", "dracon-system", "dracon-warden"]` and
+   `resolver = "2"`. Generated root `Cargo.lock` via `cargo generate-lockfile`. Verification:
+   `cargo build --release --locked` and `cargo test --workspace --locked` both work from
+   the monorepo root as documented in README.md.
+6. 🟢 ~~**dracon-sync — 16 warnings**~~ **RESOLVED 2026-07-11**. Per-warning decisions:
+   - Removed (true dead code): `daemon.rs` duplicate `default_push_max_retries`,
+     `ownership.rs::truncate` helper, `report.rs::state_cause_as_str`,
+     `role.rs::RoleKind::detail`, unused `init_or_status_failures` initial value.
+   - Marked `#[allow(dead_code)]` with justification comment (intentional public API
+     or future-policy config): `OwnershipReport::label` / `::hint`,
+     `SyncPolicy::{push_debounce_secs, settling_max_delay_secs, dirty_max_age_action,
+     min_commit_interval_secs}`, `RepoPolicyOverride::{settling_max_delay_secs,
+     dirty_max_age_action}`.
+   - Fixed test compile errors that were latent (uncovered by the previous test failures):
+     added `use std::path::Path;` to `role.rs` test module; added
+     `use crate::policy::{default_auto_resolve_unmerged, default_push_debounce_secs,
+     default_untracked_warn_threshold};` to `report.rs` test module.
+   - Verification: `cargo build --release --locked` from the workspace root produces
+     **0 warnings** (down from 16).
 
 ## 5. What's healthy
-- All 3 crates compile cleanly (release, locked).
-- dracon-system and dracon-warden: 0 test failures; clean licenses / bans / sources.
-- dracon-sync: 647/665 tests pass; production gitlink logic verified working this session.
-- dracon-sync `cargo deny check` passes (minor skip-config warning).
+- All 3 crates compile cleanly (release, locked, **0 warnings**).
+- dracon-system: 0 test failures; clean licenses / bans / sources / advisories.
+- dracon-warden: 0 test failures; clean licenses / bans / sources / advisories.
+- dracon-sync: **665 + 10 doc tests pass, 0 failures, 3 ignored** (pre-existing); clean
+  licenses / bans / sources / advisories; production gitlink logic verified working.
+- AGENTS.md test discipline (`cargo build --release --locked`,
+  `cargo test --workspace --locked`, `cargo deny check`) passes for all 3 utilities
+  from the monorepo root.
