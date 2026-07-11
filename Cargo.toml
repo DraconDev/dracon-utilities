@@ -1,0 +1,32 @@
+[workspace]
+members = ["dracon-sync", "dracon-system", "dracon-warden"]
+resolver = "2"
+
+# Workspace-level package metadata. Each crate's own [package] block
+# overrides these on a per-crate basis. This file exists so that
+# AGENTS.md test discipline commands (`cargo build --release --locked`,
+# `cargo test --workspace --locked`) work from the monorepo root, as
+# documented in README.md ("Or install all 3 from the monorepo ... cargo build --release").
+#
+# See AUDIT-3-UTILITIES-2026-07-10.md CONCERN #5.
+#
+# NOTE: workspace.dependencies is intentionally NOT defined. The three
+# crates have diverging dep versions (e.g. rayon 1.12 vs 1.13, anyhow
+# 1.0.103 vs 1.0.103, etc.) and locking them would force a single
+# version across the workspace, which would either break the
+# `cargo install` from crates.io (which resolves each crate's own
+# Cargo.toml independently) or break cargo deny (which expects the
+# per-crate deny.toml + Cargo.lock to be authoritative). The crates
+# remain independently buildable and publishable; the workspace
+# manifest only enables the AGENTS.md monorepo-root commands.
+
+[workspace.package]
+edition = "2021"
+license = "AGPL-3.0-only"
+
+# Profile tuning shared across all members. Release builds use LTO
+# + single codegen unit so the daemon binaries match what `cargo
+# install --path` produces per-crate.
+[profile.release]
+lto = "thin"
+codegen-units = 1
