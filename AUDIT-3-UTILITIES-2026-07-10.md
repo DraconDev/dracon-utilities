@@ -16,11 +16,11 @@ instruction does not work as written (no root manifest) — build each crate und
 ## 1. Build health — `cargo build --release --locked`
 | Crate | Result | Errors | Warnings |
 |-------|--------|--------|----------|
-| dracon-sync | PASS (exit 0) | 0 | 17 (6 unused, 3 function, 2 variable, 2 fields, 1 value, 1 methods, 1 method) |
+| dracon-sync | PASS (exit 0) | 0 | 16 (6 unused, 3 function, 2 variable, 2 fields, 1 value, 1 methods, 1 method) |
 | dracon-system | PASS (exit 0) | 0 | 0 |
 | dracon-warden | PASS (exit 0) | 0 | 0 |
 
-All 3 compile cleanly. dracon-sync carries 17 dead-code/unused warnings (minor).
+All 3 compile cleanly. dracon-sync carries 16 dead-code/unused warnings (minor).
 
 ## 2. Test health — `cargo test --locked`
 | Crate | Result | Passed | Failed | Ignored |
@@ -59,19 +59,23 @@ test helpers to use a valid (non-empty) SHA or a git-2.51.2-compatible cacheinfo
 |-------|--------|-----------|-------|
 | dracon-sync | PASS (exit 0) | ok | warning: "unmatched skip configuration" |
 | dracon-system | **FAIL (exit 1)** | FAILED | RUSTSEC-2026-0190 (unsound `Error::downcast_mut()` in anyhow, via the dracon-system ↔ dracon-system-lib path) |
-| dracon-warden | **FAIL (exit 1)** | FAILED | RUSTSEC-2026-0190 (anyhow unsound) + **RUSTSEC-2026-0204 (VULNERABILITY: invalid pointer dereference in `fmt::Pointer` impl for `Atomic`/`Shared` in `crossbeam-deque v0.8.6` — reached via rayon-core → rayon → dracon-security → dracon-warden)** |
+| dracon-warden | **FAIL (exit 1)** | FAILED | RUSTSEC-2026-0190 (anyhow unsound) + **RUSTSEC-2026-0204 (VULNERABILITY: invalid pointer dereference in `fmt::Pointer` impl for `Atomic`/`Shared` in `crossbeam-epoch v0.9.18` — reached via crossbeam-deque → rayon-core → rayon → dracon-security → dracon-warden; fix: `cargo update -p crossbeam-epoch` to ≥0.9.20)** |
 
 Both dracon-system and dracon-warden fail `cargo deny check` on advisories.
-RUSTSEC-2026-0204 (crossbeam-deque) is a **security vulnerability** — highest-priority item.
-(The `Atomic`/`Shared` `fmt::Pointer` types belong to the crossbeam family; `triomphe` is
-NOT a dependency of dracon-warden — the earlier triomphe attribution was incorrect and has
-been corrected to `crossbeam-deque v0.8.6`.)
+RUSTSEC-2026-0204 (crossbeam-epoch) is a **security vulnerability** — highest-priority item.
+(The `Atomic`/`Shared` `fmt::Pointer` types belong to the crossbeam family — specifically
+`crossbeam-epoch`. `triomphe` is NOT a dependency of dracon-warden, and
+`crossbeam-deque v0.8.6` is merely a transitive dependent of the vulnerable crate. The
+final, cargo-deny-attributed crate is **`crossbeam-epoch v0.9.18`**; fix:
+`cargo update -p crossbeam-epoch` to ≥0.9.20. Two earlier draft attributions — `triomphe`,
+then `crossbeam-deque` — were both inaccurate; corrected 2026-07-11.)
 
 ## 4. CONCERNs (priority order)
-1. 🔴 **dracon-warden — RUSTSEC-2026-0204** (security vuln, `crossbeam-deque v0.8.6`
-   `Atomic`/`Shared` `fmt::Pointer` invalid-ptr deref, via rayon-core → rayon →
-   dracon-security → dracon-warden). Bump `crossbeam-deque`/`rayon` to a fixed version.
-   (`triomphe` is NOT a dracon-warden dependency — corrected from earlier draft.)
+1. 🔴 **dracon-warden — RUSTSEC-2026-0204** (security vuln, `crossbeam-epoch v0.9.18`
+   `Atomic`/`Shared` `fmt::Pointer` invalid-ptr deref, via crossbeam-deque → rayon-core →
+   rayon → dracon-security → dracon-warden). **Fix: `cargo update -p crossbeam-epoch` to
+   ≥0.9.20.** (`crossbeam-deque v0.8.6` only transitively depends on the vulnerable crate;
+   `triomphe` is NOT a dependency at all — both prior attributions were inaccurate.)
 2. 🟠 **dracon-system & dracon-warden — RUSTSEC-2026-0190** (anyhow `Error::downcast_mut`
    unsound). Bump `anyhow` or apply a justified `deny.toml` skip.
 3. 🟡 **dracon-system — NOT a cyclic dependency (corrected).** The `cargo deny` advisory
