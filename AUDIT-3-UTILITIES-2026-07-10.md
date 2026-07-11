@@ -163,3 +163,22 @@ then `crossbeam-deque` — were both inaccurate; corrected 2026-07-11.)
 - AGENTS.md test discipline (`cargo build --release --locked`,
   `cargo test --workspace --locked`, `cargo deny check`) passes for all 3 utilities
   from the monorepo root.
+
+---
+
+## 6. Rerun 2026-07-11 (audit AUDIT-3-UTILITIES-RERUN-2026-07-11.md)
+
+A fresh re-audit on the same day confirmed all 6 CONCERNs remain resolved and
+discovered one additional finding (FINDING #7: 58 warnings in `cargo build --tests`,
+all in dracon-sync test code, fixed in the same pass by wrapping each
+`.expect(...).success();` chain with `assert!(...)` and removing the unused
+`use comfy_table::Cell;` import). After the fix:
+
+- `cargo build --release --locked` from workspace root: exit 0, 0 warnings.
+- `cargo build --tests --locked` from workspace root: exit 0, 0 warnings (was 58).
+- `cargo test --workspace --locked`: 665 + 10 + 86 + 76 + 10 = 847 tests pass,
+  0 failures, 3 ignored.
+- `cargo deny check` from workspace root and per-crate: exit 0,
+  `advisories ok, bans ok, licenses ok, sources ok`.
+
+See `AUDIT-3-UTILITIES-RERUN-2026-07-11.md` for the full delta vs this audit.
