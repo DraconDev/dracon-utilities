@@ -109,7 +109,7 @@ Evidence: `cargo build --release --locked` from monorepo root: **0 warnings**.
 
 **Locations (from `/tmp/audit-rerun-build-tests.log`):**
 - `dracon-sync/src/daemon.rs`: 42 sites (lines 353, 384, 390, 425, 431, 437, 443, 450, 456, 462, 483, 489, 495, 512, 518, 524, 530, 536, 543, 549, 555, 562, 568, 574, 601, 607, 613, 619, 626, 632, 638, 644, 650, 656, 674, 679, 686, 692, 698, 704, 710, 723)
-- `dracon-sync/src/report.rs`: 15 sites + 1 unused import (line 7622)
+- `dracon-sync/src/report.rs`: 15 sites + 1 unused import (line 7622, inside `test_format_push_to_remotes_cell` — distinct from the `use comfy_table::Cell;` at line 509 inside `format_push_to_remotes_cell` which IS used)
 
 **Why the prior audit missed it:** the prior audit ran `cargo build --release --locked` only. Test code is compiled with `--tests`; release-mode binaries don't include `#[cfg(test)]` modules. The pattern `.expect(...).success();` is idiomatic test boilerplate that compiles cleanly under release but generates `unused_must_use` warnings under test compilation.
 
