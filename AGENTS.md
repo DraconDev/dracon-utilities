@@ -5,6 +5,36 @@
 > behaviors of the `dracon-sync` daemon — what to expect
 > and how to interact with it.
 
+## Repository architecture (READ THIS FIRST)
+
+`dracon-utilities` is a **meta-only repo**. It tracks **no Rust
+source** — only meta files: `AGENTS.md`, `CHANGELOG.md`, the audit
+docs (`AUDIT-*.md`, `AUDIT_REPOS_*.md`), `release-notes-v0.112.*.md`,
+`.cargo/config.toml`, the workspace `Cargo.toml`/`Cargo.lock`, and
+`.pi/goals/**`.
+
+The 3 utilities live in **nested standalone git repos** under this
+directory, each with its own `.git/`, its own remotes
+(codeberg/github/gitlab), its own history, tags, and CHANGELOG:
+
+- `dracon-sync/` → `codeberg:dracondev/dracon-sync-background-auto-commit-multi-remote`
+- `dracon-system/` → `codeberg:dracondev/dracon-system-disk-process-guard-doctor`
+- `dracon-warden/` → `codeberg:dracondev/dracon-warden-secret-encrypt-age-git-filter`
+
+The parent `Cargo.toml` is a plain `[workspace]` manifest listing
+`members = ["dracon-sync", "dracon-system", "dracon-warden"]` so the
+AGENTS.md test-discipline commands (`cargo build --release --locked`,
+`cargo test --workspace --locked`, `cargo deny check`) work from the
+monorepo root by path — it does **not** submodule or symlink the
+source. Because the source is in the nested repos, `git status` at
+the parent shows `?? dracon-sync/` etc. as "untracked": these are the
+nested repos themselves, **not** lost files. To edit a utility, `cd`
+into its nested directory and work there; the daemon commits each
+nested repo independently.
+
+This mirrors the `dracon-platform/web/games/<name>/` nested-on-`main`
+submodule design documented below, but here the crates are full
+standalone repos rather than git submodules.
 ## Commit policy (the most important section)
 
 **Default behavior (since 2026-06-17, after
