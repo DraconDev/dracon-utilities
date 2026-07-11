@@ -25,7 +25,7 @@ to any of the 3 crates between the two runs).
 | 12 | anyhow v1.0.102 in system + warden locks | v1.0.102 in both | ✅ |
 | 13 | dracon-system not a cyclic dependency (`cargo tree` exit 0) | `cargo tree` exit 0; `dracon-system` appears only as root + 1 path (no cycle) | ✅ |
 | 14 | no workspace-root `Cargo.toml` | `ls Cargo.toml` → "No such file or directory" | ✅ |
-| 15 | all production `--cacheinfo` sites use comma form `160000,<sha>,<path>` | 11 sites: discovery.rs:886/1006/1127, daemon.rs:3196, sync.rs:1014/7655, exclude.rs:685, role.rs:224 (all comma form) | ✅ |
+| 15 | all production `--cacheinfo` sites use comma form `160000,<sha>,<path>` | ❌ — original audit misattributed 7 test sites as "production". Only **`sync.rs:1014` (`stage_gitlink_updates`) is production**; the other 7 (discovery.rs:886/1006/1127, daemon.rs:3196, sync.rs:7655, exclude.rs:685, role.rs:224) are inside `#[cfg(test)]` modules (submodule_tests, daemon::submodule_materialize_tests, sync::tests, exclude::tests, role::tests). All 8 use comma form, but only sync.rs:1014 is the daemon's real gitlink-staging path. **Corrected 2026-07-11.** | ❌ (corrected) |
 
 ## Discrepancies investigated & resolved (grep artifacts, not audit errors)
 - The `^test ... FAILED` grep matched only 13–14 names, while the test summary reported
@@ -51,14 +51,43 @@ to any of the 3 crates between the two runs).
    recheck reads cargo-deny's `Cargo.lock:38:1` location and the
    `Solution: Upgrade to >=0.9.20` line and corrects it.
 2. **Build warning header said 17** — actually **16** per cargo's own summary.
+3. **Dracon-sync test-failure root cause was wrong.** The audit attributed the 18
+   failures to "tests deliberately pass an empty SHA, git 2.51.2 rejects
+   `--cacheinfo 160000,,<path>`." The actual root cause is the **globally
+   installed `dracon-warden` pre-commit hook** at
+   `/home/dracon/.config/git/hooks/pre-commit` (set via `core.hooksPath`),
+   which blocks `git commit` in any repo lacking a `.gitattributes` with
+   `filter=dracon`. The test helpers' temp repos have no warden config, so the
+   hook makes `git commit -q -m "init"` exit non-zero with
+   `❌ Warden filter missing from .gitattributes.` That cascades: 9 tests fail
+   at the commit assertion; downstream tests panic on `ls-tree`/`unwrap` of
+   missing shared-gitdir `refs/heads/main`; role tests then pass the
+   now-invalid `head` into `--cacheinfo`, which git 2.51.2 rejects — but the
+   empty SHA is a *consequence*, not a deliberate test input. Test-log
+   evidence: lines 1276, 1813–1824 of the `cargo test --locked` output.
+4. **"Production `--cacheinfo` call sites" mislabeled 7 test sites as
+   production.** Only `sync.rs:1014` (`stage_gitlink_updates`) is production;
+   the other 7 (discovery.rs:886/1006/1127, daemon.rs:3196, sync.rs:7655,
+   exclude.rs:685, role.rs:224) are inside `#[cfg(test)]` modules
+   (submodule_tests, daemon::submodule_materialize_tests, sync::tests,
+   exclude::tests, role::tests). All 8 use the comma form, but the
+   "production unaffected" framing must distinguish the single production
+   site from the 7 test helpers.
 
-Both corrections applied to `AUDIT-3-UTILITIES-2026-07-10.md` (build table + narrative,
-deny table warden row, the crossbeam-family note, CONCERN #1 + fix recommendation) and
-to this recheck document.
+All four corrections applied to `AUDIT-3-UTILITIES-2026-07-10.md` (build table
++ narrative, deny table warden row, the crossbeam-family note, CONCERN #1 +
+fix recommendation, root-cause subsection rewritten, production-vs-test
+breakdown corrected) and to this recheck document.
 
 ## Conclusion
-13 of 15 audit claims hold verbatim. 2 were inaccurate and have been corrected in both
-the original audit and this recheck. With the corrections, **all 15 claims now match the
-fresh evidence**. The corrected audit is accurate. The cyclic-dependency correction
-(dracon-system is NOT a cycle; `cargo tree` exit 0) from the first auditor pass holds.
-The audit is now right.
+The audit had **4 substantive inaccuracies** that two prior recheck passes did
+not catch (the first recheck rubber-stamped the empty-SHA narrative and the
+crossbeam-deque attribution; the second recheck still missed the root cause
+and the production-vs-test breakdown until the independent auditor pass
+surfaced them). With the corrections, **the audit's claims now match the fresh
+evidence**: (a) RUSTSEC-2026-0204 → crossbeam-epoch v0.9.18; (b) 16 build
+warnings; (c) dracon-sync test failures caused by the global dracon-warden
+pre-commit hook blocking commits in temp repos; (d) only sync.rs:1014 is a
+production `--cacheinfo` site. The cyclic-dependency correction (dracon-system
+is NOT a cycle; `cargo tree` exit 0) from the first auditor pass holds. **The
+corrected audit is right.**

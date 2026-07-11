@@ -30,29 +30,66 @@ All 3 compile cleanly. dracon-sync carries 16 dead-code/unused warnings (minor).
 | dracon-warden | PASS (exit 0) | 76 + 10 doc-tests | 0 | 0 |
 
 ### dracon-sync — 18 failures: root cause
-All 18 are in submodule/gitlink/discovery tests (`role::tests`,
+All 18 failures are inside `#[cfg(test)]` test modules: `role::tests`,
 `git::discovery::submodule_tests`, `exclude::tests`,
-`sync::tests::parent_gitlink_propagates_after_standalone_commit`,
-`daemon::submodule_materialize_tests`).
+`sync::tests::parent_gitlink_propagates_after_standalone_commit`, and
+`daemon::submodule_materialize_tests`.
 
-**Cause: git 2.51.2's stricter `git update-index --cacheinfo` validation.** The tests
-deliberately pass an **empty SHA** (e.g. `role.rs` `stage_gitlink` comment: *"empty SHA is
-fine"*), producing `--cacheinfo 160000,,<path>`, which git 2.51.2 rejects with
-`option 'cacheinfo' expects <mode>,<sha1>,<path>`. That single rejection cascades: the
-gitlink is never staged → `git ls-tree` returns empty (assertion failure) and the
-shared-gitdir `refs/heads/main` is never written (subsequent `unwrap()` panics with
-`NotFound`).
+**Root cause: the globally-installed `dracon-warden` pre-commit hook at
+`/home/dracon/.config/git/hooks/pre-commit` blocks `git commit` in any repo
+that lacks a `.gitattributes` containing `filter=dracon`.** Because
+`core.hooksPath` is set globally, every repo inherits it. The test helpers'
+temp repos (created with bare `git init`) have no warden configuration, so the
+hook fires and makes `git commit -q -m "init"` exit non-zero with:
 
-This is a **test-suite / git-version compatibility defect, NOT a daemon logic regression**:
-- Every production `--cacheinfo` call site already uses the correct comma form
-  `160000,<sha>,<path>` (discovery.rs:886/1006/1126, daemon.rs:3195, sync.rs:1017/7654,
-  exclude.rs:689, role.rs:223).
-- The daemon's real gitlink commits worked during this session (darklord + polis), proving
-  production is unaffected.
+    ❌ Warden filter missing from .gitattributes.
+       Run: dracon-warden once /tmp/.tmpXXXX
 
-**Impact:** violates AGENTS.md "`cargo test --workspace --locked` must pass" for
-dracon-sync. Pre-existing / environmental, not a recent code regression. Fix: update the
-test helpers to use a valid (non-empty) SHA or a git-2.51.2-compatible cacheinfo invocation.
+Test-log evidence: lines 1276, 1813–1824 of the `cargo test` output show this
+exact error blocking commits in `/tmp/.tmp*` temp repos. The failure cascade:
+
+1. **9 tests** fail at `assertion failed: run(&["commit", "-q", "-m", "init"]).status.success()`
+   (the hook made commit exit non-zero).
+2. **Discovery / exclude / daemon-materialize tests** then panic downstream
+   (`src/git/discovery.rs:840:9`, `src/exclude.rs:733:14`/`796:14`,
+   `src/daemon.rs:3159:9`) on assertions that depend on the now-failed commit
+   (empty `git ls-tree`, `unwrap()` on missing shared-gitdir `refs/heads/main`,
+   `sibling/` not checked out).
+3. **Role tests** (`role.rs:227`) pass the now-invalid `head` into
+   `git update-index --cacheinfo 160000,,<path>`, which git 2.51.2 rejects with
+   `option 'cacheinfo' expects <mode>,<sha1>,<path>`. The empty/bad SHA is a
+   *consequence* of the blocked commit, **not** a deliberately-passed empty
+   SHA from the test author.
+
+The earlier draft attribution ("tests pass empty SHA, git 2.51.2 rejects") was
+incomplete: the empty SHA is a downstream symptom of the hook, not the root.
+Corrected 2026-07-11.
+
+**Production is unaffected.** Mapping the 8 `--cacheinfo` call sites:
+- `sync.rs:1014` — `async fn stage_gitlink_updates` (**PRODUCTION**): the
+  daemon's real gitlink-staging function. Uses real SHAs from the shared
+  gitdir's `main` ref.
+- `discovery.rs:886/1006/1127` — inside `submodule_tests` (`#[cfg(test)]`).
+- `daemon.rs:3196` — inside `submodule_materialize_tests` (`#[cfg(test)]`).
+- `sync.rs:7655` — inside `sync::tests::parent_gitlink_propagates_after_standalone_commit`
+  (`#[cfg(test)]`).
+- `exclude.rs:685` — inside `exclude::tests::build_parent_with_standalone_submodule`
+  (`#[cfg(test)]`).
+- `role.rs:224` — inside `role::tests::stage_gitlink` helper (`#[cfg(test)]`).
+
+So **only `sync.rs:1014` is production**; the other 7 are test helpers. The
+daemon's real gitlink commits worked during this session (darklord + polis),
+confirming production `stage_gitlink_updates` is fine — the failures are purely
+in test code triggered by the global hook, not by daemon logic.
+
+**Impact:** violates AGENTS.md "`cargo test --workspace --locked` must pass"
+for dracon-sync, caused by the global hook environment, not by a code
+regression. **Fix options** (any one): (a) have the test helpers write a
+minimal `.gitattributes` with `filter=dracon` and configure
+`filter.dracon.clean` in the temp repos before commit; (b) override
+`core.hooksPath` to an empty path for test invocations, e.g.
+`git -c core.hooksPath=/dev/null ...` in `git_c` / command builders; (c) run
+the test suite in a sandbox that does not inherit the global hooksPath.
 
 ## 3. Dependency / license health — `cargo deny check`
 | Crate | Result | Advisories | Notes |
