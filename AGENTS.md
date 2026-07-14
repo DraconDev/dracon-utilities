@@ -224,6 +224,13 @@ Recent design docs (in `docs/design/`) cover:
 - `commit-all-principle-2026-06-16.md` — the operator's
   stated principle and the audit of every
   "preserve untracked" exception
+- `codeberg-quota-leak-fix-2026-07-13.md` — forward-only
+  daemon pattern fix + `scan-bloat` discovery loop.
+  Live state: 85 GiB used / 85 GiB grace quota. 9 DIR-level
+  patterns in `default_untracked_exclude_patterns` prevent
+  new leaks. Historical cleanup is deferred (would require
+  git filter-repo + force-push across 17 repos); see the
+  design doc for the full plan + risk analysis.
 - `dracon-libs-deletion-2026-06-15.md` — symlink deletion
 - `junk-runner-investigation-2026-06-15.md` — Junk-Runner-bevy policy drift
 - `dracon-platform-untracked-commit-2026-06-15.md` — what stays untracked in dracon-platform (and why)

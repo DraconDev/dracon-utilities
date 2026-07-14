@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- **`dracon-sync` v0.112.15 — Codeberg quota leak fix (goal `mrhvbn1s-codeberg-quota-leak-fix` / 2026-07-13)**:
+  - `default_untracked_exclude_patterns()` extended with 9 DIR-level patterns (`**/.pi/**`, `**/test-results/**`, `**/verify-screenshots/**`, `**/__screenshots__/**`, `**/.state-recon/**`, `**/chrome-screenshots/**`, `**/chrome-*/**`, `**/sign-in-flash-audit/**`, `**/~/**`). Empirical verification against 17 watched repos confirmed no false positives on intentional content (1mg marketing screenshots, audit REPORTS, audit SCRIPTS, intentional game art in `static/assets/`).
+  - New `dracon-sync scan-bloat` subcommand walks all watched repos, finds untracked collection dirs NOT yet covered by `untracked_exclude_patterns`, aggregates them by leaf name across repos, and emits a sorted-by-size report with suggested globs. This is the operator's manual review loop for forward compatibility: future tools using novel directory names will surface here instead of silently accumulating. Flags: `--min-size-mib`, `--min-repo-count`, `--json`.
+  - Design doc: `docs/design/codeberg-quota-leak-fix-2026-07-13.md`. Audit artifact: `AUDIT_REPOS_2026-07-10.md` (pre-existing) + codeberg API live verification (90,851,072,256 bytes = 85.00 GiB used of 85.00 GiB grace quota before the patch).
+  - **Scope (forward-only)**: this change prevents new accumulation of the named patterns. The 85 GiB historical codeberg content is NOT cleaned by this change; that requires a separate `git filter-repo --invert-paths` history cleanup + force-push loop, which is documented in the design doc as a deferred next step.
 
 ## [0.112.12] - 2026-06-21
 ## [0.112.14] - 2026-06-22
