@@ -110,3 +110,13 @@ tasks*.json
 !rustfmt.toml
 !state/events/*.jsonl
 # --- END DRACON MANAGED BLOCK ---
+
+# --- NESTED STANDALONE REPOS (NOT warden-managed) ---
+# dracon-utilities is a meta-only monorepo. The 3 utilities live in nested
+# standalone git repos (per AGENTS.md), so the parent sees them as untracked.
+# scan-bloat (v0.112.15) flagged them because their target/ build dirs are huge.
+# We exclude them from the parent so the parent stays meta-only. See
+# docs/design/scan-bloat-review-2026-07-15.md.
+dracon-sync/
+dracon-system/
+dracon-warden/
