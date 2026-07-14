@@ -2,206 +2,234 @@
 
 ## What (from audit on 2026-07-13)
 
-Codeberg account is at 85.0000 GiB used / 85.00 GiB grace quota (99.5%).
-Daemon has been failing push with `remote: Forgejo: Quota exceeded` on every repo.
+Codeberg account is at **85.0000 GiB used / 85.00 GiB grace quota (99.5%)**.
+Daemon has been failing push with `remote: Forgejo: Quota exceeded` on
+every repo.
 
 The 85 GiB is split across 86 repos (47 private + 39 public). Top 10 private
 repos account for 73.8 GiB (87%).
 
-## What was actually leaking
+## Two-track problem
 
-Investigation of `git rev-list --objects --all` on the 16 heaviest repos
-revealed three structural patterns that account for ~10.29 GiB of fixable
-bloat, distinct from the genuine game-asset intentional content (~21 GiB
-in PNGs/MP3s/FBX across the same repos):
+After auditing the 17 heaviest repos' git history AND live untracked dir
+state, the 85 GiB codeberg total decomposes into:
 
-| Leak pattern                                            | Total size | Where seen                                            |
-|---------------------------------------------------------|-----------:|-------------------------------------------------------|
-| `**/.pi/**` (universal agent session dir)                | 4.36 GiB   | Every game repo + parent; covers `.pi/goals/`, `.pi/chrome-screenshots/`, `.pi/audit-*/`, `.pi/mmx-out/`, etc. |
-| `**/test-results/**` (Playwright outputs)                | 2.40 GiB   | web-games-hegemon 698 MiB, parent 1.7 GiB             |
-| `**/verify-screenshots/**` (verification harness)       | 0.76 GiB   | web-games-junk-runner 514 MiB, others                 |
-| `**/tests/**/screenshots/**` (test framework output)    | 0.28 GiB   | scattered                                             |
-| `**/audit-*/**/*.png|*.jpg|*.mp4|*.html|...` (audit-binary)| ~2.18 GiB | deathrun 1330 MiB, capture-anime 326 MiB              |
-| `**/audit/**`, `**/chrome-screenshots/**`, `**/chrome-*/**`, etc.  | (overlap with above)  | catch-all for audit-styled dirs        |
+| Bucket                                | Size     | Where seen                       |
+|---------------------------------------|----------|----------------------------------|
+| **Intentional game art** (PNGs/MP3/FBX) | 21 GiB   | `static/assets/`, `screenshots/`, `assets/` in 17 game repos |
+| **Dracon-platform git-tracked `.pi/` + test-results + verify-screenshots + audit-binary** | 10.29 GiB | historical commits in 17 repos |
+| **Live untracked collection dirs in working trees** | 3.5 MiB  | `.pi/`, `.state-recon/`, `chrome-screenshots/`, etc. |
+| **Stray home-dir leak** (`~/`)        | 58 MiB   | browser-extensions-shared (untracked, was about to push) |
 
-**Kept (NOT excluded):**
+Two distinct problems:
 
-| Path                                                    | Why kept                                          |
-|---------------------------------------------------------|---------------------------------------------------|
-| `web/screenshots/one-mil-girls-screenshots/`             | 1mg release marketing shots, ~108 MiB              |
-| `docs/audit-*.md`, `scripts/audit-*.mjs`                 | audit reports and scripts (text, useful in git)   |
+1. **Forward leak**: any new untracked `.pi/`, `test-results/`, etc.
+   the daemon auto-commits to codeberg. Real risk: 2025-2026 the daemon
+   repeatedly committed the same kind of evidence and it piled up.
+2. **Historical pile**: 21 GiB of intentional art (committed via
+   `git add`) plus 10 GiB of accumulated session evidence. This dominates
+   the 85 GiB.
 
-**Verified preservation:** test plan below re-classifies each pattern to
-confirm 1mg marketing paths are NOT caught.
+## What we shipped in this design doc's release (v0.112.15)
 
-## Daemon fix — `default_untracked_exclude_patterns` in
-`dracon-sync/src/policy.rs`
+**Forward-only fix.** Add 9 DIR-level patterns to
+`default_untracked_exclude_patterns` to stop future accumulation, plus
+a new `scan-bloat` subcommand so future novel directory names surface
+to the operator instead of silently accumulating.
 
-Add 18 patterns covering the leak categories. The patterns target
-**agent/test/session binary evidence**, not the user's intentional
-shipping art.
+The 21 GiB historical intentional art is **not touched** — it's the
+user's cargo, not a leak. The 10 GiB historical session evidence is
+also **not yet cleaned** in this release; cleaning it requires
+`git filter-repo --invert-paths` + force-push across 17 repos, which
+is documented below as a deferred next step.
 
-```rust
-[
-    // Session / agent scratch dirs — keep local
-    "**/scratch/**",
-    "**/scratch-*",
-    "**/scratch_*",
-    "**/tmp/**",
-    "**/tmp-*",
-    "**/pi-tmp/**",
-    "**/.pi-tmp/**",
-    "**/research/scratch/**",
-    // Agent session state — never auto-stage
-    ".demon/**",
-    ".sisyphus/**",
-    ".ralph/**",
+## The 9 DIR-level patterns (verified empirically)
 
-    // === ADDED 2026-07-13 (codeberg-quota-leak-fix-2026-07-13) ===
-    //
-    // Operator observed 85 GiB / 85 GiB quota on codeberg. Investigation
-    // identified 10.29 GiB of agent/test/session evidence leaking into
-    // git history. These patterns exclude only session evidence,
-    // preserving intentional shipping art (e.g.,
-    // `web/screenshots/one-mil-girls-screenshots/` for 1mg marketing
-    // shots, audit REPORTS like `docs/audit-event-*.md`, audit SCRIPTS
-    // like `scripts/audit-*.mjs`).
+After auditing the actual untracked dirs in 17 watched repos, here are
+the unambiguous collection directory names that consistently recurred
+and produced no false positives on intentional content:
 
-    // (1) Universal agent session dir. .pi/ at any nesting — same
-    // pattern family as .demon/, .sisyphus/, .ralph/ already in this
-    // list. Covers .pi/goals/, .pi/chrome-screenshots/, .pi/audit-*/,
-    // .pi/mmx-out/, .pi/notes/, .pi/tasks/, .pi/loop-removal-backup-*/.
-    "**/.pi/**",
+| Pattern                  | What it catches (verified live)                            | Historical size |
+|--------------------------|------------------------------------------------------------|----------------:|
+| `**/.pi/**`              | `.pi/`, `.pi-tmp/`, `.pi-goals/`, `.pi-tasks/`, `.pi/mmx-out/` | 4.36 GiB |
+| `**/test-results/**`     | Playwright dumps (named with git SHA)                      | 2.40 GiB |
+| `**/verify-screenshots/**` | verification harness output                              | 0.76 GiB |
+| `**/__screenshots__/**`  | Python e2e framework convention                           | small |
+| `**/.state-recon/**`     | agent probe dirs                                          | small |
+| `**/chrome-screenshots/**` | chrome agent output                                    | 1.56 GiB |
+| `**/chrome-*/**`         | chrome-fixes, chrome-consistency, etc.                    | small |
+| `**/sign-in-flash-audit/**` | one-off verification dir                              | small |
+| `**/~/**`                | home-dir leak (e.g. browser-extensions-shared `~/` artifact)| 58 MiB |
 
-    // (2) Playwright + similar test result artifacts.
-    "**/test-results/**",
+**Why DIR-level only (not extension-level):** the operator explicitly
+stated "i dont wnat to filte out all pngs that is too intensse [sic],
+we cna jsut filter out folders that is a colleection of screnshots".
+Filtering `.png` would catch the 21 GiB of intentional game art.
+Filtering only `*.png` inside audit dirs (multi-glob) was rejected
+because the daemon's matcher can't express multi-`**` globs.
 
-    // (3) Verification harness output dir (date-stamped subdirs).
-    "**/verify-screenshots/**",
+**Verified preservation:** `test_default_untracked_exclude_patterns_preserves_intentional_content`
+in `dracon-sync/src/policy.rs` asserts each of these DOES NOT match:
 
-    // (4) Test framework screenshot output.
-    "**/tests/**/screenshots/**",
-
-    // (5) Audit-context binary evidence. The image/video/binary
-    // inside dirs whose name matches audit-/chrome-screenshots/etc.
-    // Note: text files (.md, .mjs, .json) inside these dirs are NOT
-    // affected by the extension filter — audit reports and audit
-    // scripts remain in git. Trade-off: an .html inside an audit-*/ is
-    // also caught. If a future audit report needs HTML format, move it
-    // out of an audit-named dir or add a per-repo override.
-    "**/audit-*/**/*.png",
-    "**/audit-*/**/*.jpg",
-    "**/audit-*/**/*.jpeg",
-    "**/audit-*/**/*.webp",
-    "**/audit-*/**/*.gif",
-    "**/audit-*/**/*.mp4",
-    "**/audit-*/**/*.mov",
-    "**/audit-*/**/*.html",
-    "**/audit-*/**/*.zip",
-
-    // (6) Audit-styled whole dirs as a fallback. These dir-name
-    // patterns are unambiguous session-evidence placeholders
-    // (audit/, chrome-*/ with audit-style names, etc.).
-    "**/audit/**",
-    "**/chrome-screenshots/**",
-    "**/chrome-*/**",
-    "**/.audit-*/**",
-    "**/sign-in-flash-audit/**",
-    "**/uiux-audit-*/**",
-]
+```
+web/screenshots/one-mil-girls-screenshots/01-title.png  (1mg marketing)
+docs/audit-event-2026-07-06.md                          (audit REPORT)
+scripts/audit-uiux-2026-06-26.mjs                      (audit SCRIPT)
+static/assets/texture.png                               (intentional game art)
+assets/audio/theme.mp3                                  (intentional asset)
+src/lib.rs                                               (source)
 ```
 
-## Test extension
+## The `scan-bloat` discovery loop
 
-Extend `test_default_untracked_exclude_patterns_is_commit_all_unless_scratch`
-in `dracon-sync/src/policy.rs` to assert the new patterns are present.
-The existing test still holds: `.demon/`, `.sisyphus/`, `.ralph/` and
-`.pi/` are all the same family.
+New CLI:
 
-## History cleanup
+```
+dracon-sync scan-bloat [--min-size-mib <N>] [--min-repo-count <N>] [--json]
+```
 
-For the 17 heaviest git-tracked repos, run `git filter-repo
---invert-paths` to remove the leak from history:
+Walks every watched repo via `git ls-files --others --exclude-standard
+--directory`. For each untracked directory:
+
+1. Apply the existing `untracked_exclude_patterns` matcher. If matched,
+   skip (already covered by static list).
+2. Skip `node_modules/`, `target/`, `dist/`, `build/` paths.
+3. Aggregate by leaf name across repos. e.g. `test-results/` recurring
+   in 7 repos becomes one bucket row.
+4. Filter by thresholds (default: ≥ 5 MiB total, ≥ 2 repos). Singletons
+   and tiny dirs are noise.
+5. Emit sorted-by-size report with suggested glob per bucket
+   (`**/<leaf>/**`).
+
+Live output on the 28 watched repos (default thresholds):
+
+```
+🔎 Scanned 28 repo(s) for untracked bloat (thresholds: ≥ 5 MiB total, ≥ 2 repos).
+
+DIRECTORY                            SIZE   REPOS    FILES  SUGGESTED EXCLUDE
+-----------------------------------------------------------------------------------------------
+web                             13.24 MiB       2       22  **/web/**
+-----------------------------------------------------------------------------------------------
+(TOTAL)                         13.24 MiB
+
+💡 Each row suggests a pattern like `**/<dir>/**` that you can add
+   to `untracked_exclude_patterns` in `~/.dracon/utilities/sync/dracon-sync.toml`
+   (global) or per-repo at `<repo>/.dracon/dracon-sync.toml`.
+```
+
+With relaxed thresholds (`--min-size-mib 1 --min-repo-count 1`), 7
+buckets surface:
+
+| Leaf | Size | Verdict |
+|---|---:|---|
+| `dracon-sync` | 5.36 GiB | build artifacts from per-crate compile; should be in parent `.gitignore` |
+| `assets` | 176.50 MiB | intentional game art; do **not** exclude |
+| `test-books` | 72.33 MiB | ai-auto-writer content drafts; do **not** exclude |
+| `~` | 55.85 MiB | home-dir leak; now caught by `**/~/**` |
+| `artifacts` | 34.82 MiB | `~/.dracon` system CI artifacts; system scope |
+| `.state-recon` | 29.83 MiB | agent probe; now caught by `**/.state-recon/**` |
+| `web` | 13.24 MiB | submodule working tree; intentional |
+
+**Auto-discovery captures future tools.** When a new agent or harness
+drops a new directory name (`~verify-logs-2026-08/`,
+`__harness_out__/`, `screenshots-2026-q4/`), running
+`scan-bloat` surfaces it for operator review. The operator decides:
+add to `untracked_exclude_patterns` (catch-all), add to
+`.gitignore` (commit-aware), or leave intentional.
+
+## Deferred: historical cleanup (10 GiB of `.pi/` + test-results)
+
+**Status: NOT EXECUTED in v0.112.15.** This section is the design
+plan that would clean the historical 10 GiB out of git history.
+
+For each of the 17 heaviest git-tracked repos, run:
 
 ```bash
-REPOS=(
-  /home/dracon/Dev/dracon-platform
-  /home/dracon/Dev/dracon-code
-  /home/dracon/Dev/ai-auto-writer
-  /home/dracon/Dev/avid
-  /home/dracon/Dev/Junk-Runner-bevy
-  /home/dracon/Dev/browser-extensions-shared
-  /home/dracon/Dev/web-auto/rust-ai-web-auto
-  /home/dracon/Dev/dracon-platform/web/games/released/one-mil-girls
-  /home/dracon/Dev/dracon-platform/web/games/wip/capture-anime-girls
-  /home/dracon/Dev/dracon-platform/web/games/wip/darklord
-  /home/dracon/Dev/dracon-platform/web/games/wip/deathrun
-  /home/dracon/Dev/dracon-platform/web/games/wip/endless-td
-  /home/dracon/Dev/dracon-platform/web/games/wip/hegemon
-  /home/dracon/Dev/dracon-platform/web/games/wip/hellhunter
-  /home/dracon/Dev/dracon-platform/web/games/wip/junk-runner
-  /home/dracon/Dev/dracon-platform/web/games/wip/neonbreak
-  /home/dracon/Dev/dracon-platform/web/games/wip/polis
-)
-
-for repo in "${REPOS[@]}"; do
-  cd "$repo"
-  # Safety backup of main
-  git branch backup/pre-quota-leak-cleanup-$(date +%s) main 2>/dev/null
-  git filter-repo \
-    --path-glob '*.pi/**' \
-    --path-glob '*test-results/**' \
-    --path-glob '*verify-screenshots/**' \
-    --path-glob '*tests/**/screenshots/**' \
-    --path-glob '*audit-*/**.png' \
-    --path-glob '*audit-*/**.jpg' \
-    --path-glob '*audit-*/**.jpeg' \
-    --path-glob '*audit-*/**.webp' \
-    --path-glob '*audit-*/**.gif' \
-    --path-glob '*audit-*/**.mp4' \
-    --path-glob '*audit-*/**.mov' \
-    --path-glob '*audit-*/**.html' \
-    --path-glob '*audit-*/**.zip' \
-    --path-glob '*audit/**' \
-    --path-glob '*chrome-screenshots/**' \
-    --path-glob '*chrome-*/**' \
-    --path-glob '*.audit-*/**' \
-    --path-glob '*sign-in-flash-audit/**' \
-    --path-glob '*uiux-audit-*/**' \
-    --force
-done
+cd "$repo"
+TS=$(date +%s)
+git branch backup/pre-quota-leak-cleanup-$TS main  # safety fuse
+git filter-repo --invert-paths \
+  --path-glob '*.pi/**' \
+  --path-glob '*test-results/**' \
+  --path-glob '*verify-screenshots/**' \
+  --path-glob '*__screenshots__/**' \
+  --path-glob '*.state-recon/**' \
+  --path-glob '*chrome-screenshots/**' \
+  --path-glob '*chrome-*/**' \
+  --path-glob '*sign-in-flash-audit/**' \
+  --path-glob '*~/**' \
+  --force
+git reflog expire --expire=now --all
+git gc --prune=now --aggressive
+git push --force-with-lease=codeberg/main:main codeberg main
+git push --force-with-lease=github/main:main github main
+git push --force-with-lease=gitlab/main:main gitlab main
 ```
 
-Daemon's `auto_repair_concerns = true` will force-push local main over
-remote (with `--force-with-lease` per AGENTS.md policy). The
-`backup/pre-quota-leak-cleanup-*` branches stay local-only as a rollback
-fuse.
+**Safety:** `backup/pre-quota-leak-cleanup-<ts>` is local-only. If
+the rewrite goes wrong, the rollback is
+`git reset --hard backup/pre-quota-leak-cleanup-<ts>`.
 
-## Verification
+**Per-phase override:** `auto_repair_concerns = false` in each repo's
+`.dracon/dracon-sync.toml` during the loop, to prevent the daemon
+from running its own filter-repo during our manual pass.
 
-1. **Build**: `cargo build --release --locked`, `cargo build --tests --locked`
-2. **Test**: `cargo test --workspace --locked` (existing 847 tests + 4 new asserts in
-   `test_default_untracked_exclude_patterns_is_commit_all_unless_scratch`)
-3. **Deny**: `cargo deny check` workspace + each of 3 per-crate
-4. **Live API**: re-query codeberg usage — should drop from 85.00 GiB used
-   to ~10-15 GiB used after the filter-repo push completes
-5. **Daemon log**: `journalctl --user -u dracon-sync.service --since "10m ago"`
-   should show NO `Quota exceeded` errors after the push
+**Why deferred:** the per-repo force-push loop touches codeberg/github/
+gitlab with `git filter-repo` rewrites, which is the largest blast
+radius in this whole design. Combined with the 21 GiB of intentional
+art needing separate scope review (the operator has stated "not yet"
+for that), this part is a separate go-decision. The forward-only fix
+in v0.112.15 is the safer first step.
 
-## Trade-offs and edge cases
+## Backward compatibility
 
-- **1mg marketing shots** (`web/screenshots/one-mil-girls-screenshots/`,
-  ~108 MiB) are preserved because the `**/audit-*/**/*.png` filter does
-  NOT match `one-mil-girls-screenshots/` (the directory does not have a
-  hyphen-named `audit-` prefix).
-- **Audit reports** (`docs/audit-event-*.md`, `scripts/audit-*.mjs`) are
-  preserved because the extension filter excludes image/video/binary
-  types only.
-- **Tracked audit-html** would be excluded. None observed in current
-  tree; per-repo override available if needed in future.
-- **Filter-repo rewrites local main**. AGENTS.md says daemon auto-repair
-  uses `filter-repo --invert-paths --force` with auto_repair_concerns=true
-  (default). We are following the same path. Backup branches are
-  local-only and named `backup/pre-quota-leak-cleanup-<ts>` so any
-  operator can `git checkout backup/pre-quota-leak-cleanup-<ts> -- main`
-  to recover if needed.
+- All 12 baseline patterns from 2026-06-15 are preserved unchanged.
+- Per-repo `auto_commit_exclude_patterns` still works.
+- World policy override `untracked_exclude_patterns = []` still works
+  (and currently IS empty per
+  `~/.dracon/utilities/sync/dracon-sync.toml` 2026-06-17 — the new 9
+  patterns inherit only into repos that DON'T override the field).
+- `tests/e2e/__screenshots__` was an existing per-repo entry in
+  `Junk-Runner-bevy/.dracon/dracon-sync.toml`; now covered by the
+  global default `**/__screenshots__/**`. Per-repo override can be
+  removed when convenient.
+
+## Test/Build/Deny bar
+
+- `cargo build --release --locked` — clean (0 warnings)
+- `cargo build --tests --locked` — clean (0 warnings)
+- `cargo test --workspace --locked` — 848 passed, 3 ignored, 0 failed
+- `cargo deny check` — workspace + 3 per-crate, all 4 OK
+
+## Live verification pre/post
+
+**Pre-v0.112.15** (codeberg API): 90,851,072,256 bytes used
+(85.0000 GiB / 85.00 GiB grace quota, 99.5%).
+
+**Post-v0.112.15**: unchanged. The historical 85 GiB is not addressed
+by this release. Forward prevention only.
+
+**Post-deferred-cleanup (when executed)**: expect a 5-15 GiB drop
+in codeberg quota usage after the 17-repo filter-repo loop completes
+and codeberg stat refreshes (5-10 min). Verify with:
+
+```bash
+source ~/.dracon/secrets/pat/codeberg.env
+curl -s -H "Authorization: token $CODEBERG_TOKEN" "https://codeberg.org/api/v1/user" \
+  | jq '.quota_used, .quota_limit'
+```
+
+## See also
+
+- `release-notes-v0.112.15.md` — release notes for this change.
+- `CHANGELOG.md` `[Unreleased]` — canonical changelog entry.
+- `AUDIT_REPOS_2026-07-10.md` — pre-existing codeberg size audit.
+- `AUDIT-3-UTILITIES-RERUN-2026-07-11.md` — fresh utility audit that
+  confirmed `default_untracked_exclude_patterns` was the right
+  intervention point.
+- `commit-all-policy-2026-06-15.md` — the operator's
+  "commit-all unless super-good reason" principle that this fix
+  honors (we add PATTERNS to the super-good-reason list; we do NOT
+  change the operator's commit-all default).
+</content>
+</invoke>
