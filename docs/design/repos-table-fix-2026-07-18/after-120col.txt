@@ -1,120 +1,148 @@
 📜 /home/dracon/.dracon/utilities/sync/dracon-sync.toml
-📦 31 repos  ✅ CLEAN 25  🔄 ACTIVE 3  ⚠️  WARN 0  ❌ CONCERN 3  ⛔ init/status failed: 0
+📦 31 repos  ✅ CLEAN 20  🔄 ACTIVE 8  ⚠️  WARN 0  ❌ CONCERN 3  ⛔ init/status failed: 0
 
 ℹ️  Confused by a column? Run `dracon-sync repos --legend` for the full key.
-  1. 🔄 ACTIVE  dracon-platform
-     branch:    main
-     publish:   gitlab/main
-     changes:   2 mod, 0 stg, 0 ut
-     ahead/behind: 0/0
-     push-to:   github,gitlab [excl:codeberg]
-     push:      ✅ OK
-     last:      6610666dab6… 3 file(s) in web [web/games/wip/endless-td, web/games/wip/hegemon, web/games/wip/neonb…
-     pushed:    1m 2s
-     activity:  ⏳ dirty 1m
-     state:     🟠 dirty
-     author:    dracon
-     hint:      daemon handles after changes settle; run sync-now --warns to force now
-
-  2. ✅ CLEAN  hegemon
-     branch:    main
-     publish:   github/main
-     changes:   0 mod, 0 stg, 1 ut
-     ahead/behind: 0/0
-     push-to:   github,gitlab [excl:codeberg]
-     push:      ✅ OK
-     last:      7f30398700d… 4 file(s) in docs,src [docs/visual-enrichment-prompts.md, src/lib/game/visual-enrichme…
-     pushed:    -
-     activity:  🟢 synced 1m
-     state:     ⚪ untracked-only
-     author:    DraconDev
-     hint:      healthy
-
-  3. ❌ CONCERN  endless-td
-     branch:    main
-     publish:   origin/main
-     changes:   1 mod, 0 stg, 0 ut
-     ahead/behind: 16/4
-     push-to:   github,gitlab [excl:codeberg]
-     push:      🟣 PENDING
-     last:      94571ef0a25… 4 file(s) in src [src/lib/game/map.ts, src/routes/play/+page.svelte, src/lib/component…
-     pushed:    5h
-     activity:  🟣 pushing 1m (16 ahead)
-     state:     🟣 pushing
-     author:    DraconDev
-     hint:      run repair-concerns --apply (push or rewrite)
-
-  4. ❌ CONCERN  neonbreak
+  1. 🔄 ACTIVE  browser-extensions-shared
      branch:    main
      publish:   origin/main
      changes:   0 mod, 0 stg, 0 ut
-     ahead/behind: 3/3
+     ahead/behind: 0/0
      push-to:   github,gitlab [excl:codeberg]
-     push:      🟣 PENDING
-     last:      8179936d1bc… v0.9.0 phase 2: update PLAN.md with end-of-session status
-     pushed:    2m
-     activity:  🟣 pushing 2m (3 ahead)
-     state:     🟣 pushing
+     push:      ✅ OK
+     last:      4b5d9c315ee… 2 file(s) in affiliate [affiliate/README.md, affiliate/CORPUS_INDEX.md] DELTA:+19/-6
+     pushed:    35s
+     activity:  🟢 synced 0m
+     state:     🔄 working
      author:    DraconDev
-     hint:      run repair-concerns --apply (push or rewrite)
+     hint:      healthy
 
-  5. 🔄 ACTIVE  dracon-sync
+  2. 🔄 ACTIVE  nexus-new-tab
+     branch:    main
+     publish:   origin/main
+     changes:   1 mod, 0 stg, 0 ut
+     ahead/behind: 0/0
+     push-to:   github,gitlab [excl:codeberg]
+     push:      ✅ OK
+     last:      09da9e3e33c… 1 file(s) in entrypoints [entrypoints/background.test.ts] DELTA:+148/-0
+     pushed:    35s
+     activity:  ⏳ dirty 0m
+     state:     🟠 dirty
+     author:    DraconDev
+     hint:      daemon handles after changes settle; run sync-now --warns to force now
+
+  3. 🔄 ACTIVE  dracon-utilities
+     branch:    main
+     publish:   origin/main
+     changes:   2 mod, 0 stg, 0 ut
+     ahead/behind: 0/0
+     push-to:   github,gitlab,codeberg
+     push:      ✅ OK
+     last:      2ed4ae035d5… 4 file(s) in docs [docs/design/repos-table-fix-2026-07-18.md, release-notes-v0.112.19.…
+     pushed:    1m 24s
+     activity:  ⏳ dirty 1m
+     state:     🟠 dirty
+     author:    DraconDev
+     hint:      daemon handles after changes settle; run sync-now --warns to force now
+
+  4. 🔄 ACTIVE  dracon-sync
      branch:    main
      publish:   origin/main
      changes:   0 mod, 0 stg, 0 ut
      ahead/behind: 0/0
      push-to:   github,gitlab,codeberg
      push:      ✅ OK
-     last:      dec7aa7b21a… 1 file(s) in src [src/report.rs] DELTA:+34/-5
-     pushed:    1m 18s
-     activity:  🟢 synced 1m
+     last:      b1388413206… 2 file(s) [CHANGELOG.md, Cargo.toml] DELTA:+25/-1 | DEPS:+version,-version
+     pushed:    2m
+     activity:  🟢 synced 2m
      state:     🔄 working
      author:    DraconDev
      hint:      healthy
 
-  6. 🔄 ACTIVE  .dracon
+  5. 🔄 ACTIVE  .dracon
      branch:    main
      publish:   origin/main
-     changes:   1 mod, 0 stg, 0 ut
+     changes:   2 mod, 0 stg, 0 ut
      ahead/behind: 0/0
      push-to:   github,gitlab [excl:codeberg]
      push:      ✅ OK
-     last:      511cd7accb3… 2 file(s) in utilities [utilities/sync/repos-size-cache.json, events.jsonl] DELTA:+2/-1
+     last:      ea70f6cba19… 1 file(s) in utilities [utilities/sync/repos-size-cache.json] DELTA:+1/-1
      pushed:    2m
      activity:  ⏳ dirty 2m
      state:     🟠 dirty
      author:    DraconDev
      hint:      daemon handles after changes settle; run sync-now --warns to force now
 
-  7. ✅ CLEAN  nexus-new-tab
+  6. 🔄 ACTIVE  dracon-platform
      branch:    main
-     publish:   origin/main
-     changes:   0 mod, 0 stg, 5 ut
+     publish:   gitlab/main
+     changes:   1 mod, 0 stg, 0 ut
      ahead/behind: 0/0
      push-to:   github,gitlab [excl:codeberg]
      push:      ✅ OK
-     last:      22d152c3018… 1 file(s) in entrypoints [entrypoints/newtab/components/SortMenu.test.tsx] DELTA:+86/-0
-     pushed:    2m
-     activity:  🟢 synced 2m
-     state:     ⚪ untracked-only
-     author:    DraconDev
-     hint:      healthy
+     last:      540c65727a6… 4 file(s) in web [web/games/wip/endless-td, web/games/wip/hegemon, web/games/wip/neonb…
+     pushed:    3m
+     activity:  ⏳ dirty 3m
+     state:     🟠 dirty
+     author:    dracon
+     hint:      daemon handles after changes settle; run sync-now --warns to force now
 
-  8. ✅ CLEAN  dracon-utilities
+  7. ❌ CONCERN  endless-td
      branch:    main
      publish:   origin/main
-     changes:   0 mod, 0 stg, 5 ut
-     ahead/behind: 0/0
-     push-to:   github,gitlab,codeberg
-     push:      ✅ OK
-     last:      a054b7ff0d6… 5 file(s) in docs [docs/design/repos-table-fix-2026-07-18/before-80col.txt, docs/desig…
-     pushed:    8m
-     activity:  🟢 synced 8m
-     state:     ⚪ untracked-only
+     changes:   0 mod, 0 stg, 0 ut
+     ahead/behind: 18/4
+     push-to:   github,gitlab [excl:codeberg]
+     push:      🟣 PENDING
+     last:      5e1219b2018… docs(tasklist): cluster-31 done-check + 128-SHIPPED milestone (T-NEW-A006 grid+path SV…
+     pushed:    5h
+     activity:  🟣 pushing 3m (18 ahead)
+     state:     🟣 pushing
      author:    DraconDev
+     hint:      run repair-concerns --apply (push or rewrite)
+
+  8. ❌ CONCERN  neonbreak
+     branch:    main
+     publish:   origin/main
+     changes:   0 mod, 0 stg, 0 ut
+     ahead/behind: 4/4
+     push-to:   github,gitlab [excl:codeberg]
+     push:      🟣 PENDING
+     last:      7fe005ef840… v0.9.0 phase 2: file DEFER.md for remaining Tactical full port + Step D
+     pushed:    4m
+     activity:  🟣 pushing 4m (4 ahead)
+     state:     🟣 pushing
+     author:    DraconDev
+     hint:      run repair-concerns --apply (push or rewrite)
+
+  9. 🔄 ACTIVE  hegemon
+     branch:    main
+     publish:   github/main
+     changes:   4 mod, 0 stg, 1 ut
+     ahead/behind: 0/0
+     push-to:   github,gitlab [excl:codeberg]
+     push:      ✅ OK
+     last:      da69cf2dff5… 1 file(s) in docs DELTA:+0/-0 | BIN:1 NEW:visual-enrichment-baselines/combat-after.png
+     pushed:    -
+     activity:  ⏳ dirty 4m
+     state:     🟠 dirty
+     author:    DraconDev
+     hint:      daemon handles after changes settle; run sync-now --warns to force now
+
+ 10. 🔄 ACTIVE  polis
+     branch:    main
+     publish:   origin/main
+     changes:   0 mod, 0 stg, 0 ut
+     ahead/behind: 0/0
+     push-to:   github,gitlab [excl:codeberg]
+     push:      ✅ OK
+     last:      b12afc2323f… tasklist(Task 28b): 24 modules extracted, 1146 pass, 1361 LOC (-882 / 39%)
+     pushed:    4m
+     activity:  🟢 synced 4m
+     state:     🔄 working
+     author:    dracon
      hint:      healthy
 
-  9. ✅ CLEAN  deathrun
+ 11. ✅ CLEAN  deathrun
      branch:    main
      publish:   origin/main
      changes:   0 mod, 0 stg, 0 ut
@@ -122,13 +150,13 @@
      push-to:   github,gitlab [excl:codeberg]
      push:      ✅ OK
      last:      cebc922e3c0… AUDIT_V23: add seed-999999 screenshot + final acceptance gates green
-     pushed:    8m
-     activity:  🟢 synced 8m
+     pushed:    13m
+     activity:  🟢 synced 13m
      state:     🟢 synced
      author:    DraconDev
      hint:      .git exceeds 2 GB (github limit) — may fail to push to github
 
- 10. ❌ CONCERN  junk-runner
+ 12. ❌ CONCERN  junk-runner
      branch:    main
      publish:   origin/main
      changes:   0 mod, 0 stg, 0 ut
@@ -136,27 +164,13 @@
      push-to:   github,gitlab [excl:codeberg]
      push:      🟣 PENDING
      last:      da88b340ba2… chore(.pi): reclassify P0/P1/P2 parent aggregators → screen-frozen
-     pushed:    12m
-     activity:  🟣 pushing 12m (1 ahead)
+     pushed:    16m
+     activity:  🟣 pushing 16m (1 ahead)
      state:     🟣 pushing
      author:    DraconDev
      hint:      run repair-concerns --apply (push or rewrite)
 
- 11. ✅ CLEAN  polis
-     branch:    main
-     publish:   origin/main
-     changes:   0 mod, 0 stg, 0 ut
-     ahead/behind: 0/0
-     push-to:   github,gitlab [excl:codeberg]
-     push:      ✅ OK
-     last:      421a890100a… 3 file(s) in src [src/lib/game-loop/advance-disasters.test.ts, src/lib/game-loop/index…
-     pushed:    12m
-     activity:  🟢 synced 12m
-     state:     🟢 synced
-     author:    dracon
-     hint:      healthy
-
- 12. ✅ CLEAN  darklord
+ 13. ✅ CLEAN  darklord
      branch:    main
      publish:   origin/main
      changes:   0 mod, 0 stg, 0 ut
@@ -164,13 +178,13 @@
      push-to:   github,gitlab [excl:codeberg]
      push:      ✅ OK
      last:      27b861cd5a5… AUDIT-FULL-4-006 SHA update | 1 file(s) [AUDIT-FULL-4-TASKS-2026-07-18.md] DELTA:+1/-0…
-     pushed:    20m
-     activity:  🟢 synced 20m
+     pushed:    24m
+     activity:  🟢 synced 24m
      state:     🟢 synced
      author:    darklord-dev
      hint:      healthy
 
- 13. ✅ CLEAN  hellhunter
+ 14. ✅ CLEAN  hellhunter
      branch:    main
      publish:   origin/main
      changes:   0 mod, 0 stg, 0 ut
@@ -178,13 +192,13 @@
      push-to:   github,gitlab [excl:codeberg]
      push:      ✅ OK
      last:      a7c235e16fb… 12 file(s) in .pi,src [src/lib/game/prem2-new-game-continue.test.ts, src/game/gameBrid…
-     pushed:    1h 3m
+     pushed:    1h 8m
      activity:  ⚪ idle 1h
      state:     ⚪ idle
      author:    DraconDev
      hint:      healthy
 
- 14. ✅ CLEAN  avid
+ 15. ✅ CLEAN  avid
      branch:    main
      publish:   origin/main
      changes:   0 mod, 0 stg, 0 ut
@@ -192,13 +206,13 @@
      push-to:   github,gitlab [excl:codeberg]
      push:      ✅ OK
      last:      c6a9b190fdb… docs(audit): v8 premium reboot matching YouTube ref patterns
-     pushed:    1h 4m
+     pushed:    1h 8m
      activity:  ⚪ idle 1h
      state:     ⚪ idle
      author:    DraconDev
      hint:      healthy
 
- 15. ✅ CLEAN  ai-auto-writer
+ 16. ✅ CLEAN  ai-auto-writer
      branch:    main
      publish:   origin/main
      changes:   0 mod, 0 stg, 0 ut
@@ -206,20 +220,6 @@
      push-to:   github,gitlab [excl:codeberg]
      push:      ✅ OK
      last:      63fe5c21ef0… 1 file(s) [REVIEW_2026-07-17.md] DELTA:+22/-0
-     pushed:    1h 27m
-     activity:  ⚪ idle 1h
-     state:     ⚪ idle
-     author:    DraconDev
-     hint:      healthy
-
- 16. ✅ CLEAN  browser-extensions-shared
-     branch:    main
-     publish:   origin/main
-     changes:   0 mod, 0 stg, 0 ut
-     ahead/behind: 0/0
-     push-to:   github,gitlab [excl:codeberg]
-     push:      ✅ OK
-     last:      25a96acc405… 1 file(s) in affiliate [affiliate/CORPUS_INDEX.md] DELTA:+4/-0
      pushed:    2h
      activity:  ⚪ idle 2h
      state:     ⚪ idle
