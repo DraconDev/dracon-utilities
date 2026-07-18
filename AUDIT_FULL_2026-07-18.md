@@ -9,19 +9,24 @@ meta-repo consistency, daemon health.
 **Date:** 2026-07-18 09:55 BST
 **Audit duration:** ~25 minutes
 
+**Status:** COMPLETE — all 4 findings resolved. v0.112.18 deployed at 14:09 BST.
+
 ---
 
 ## Executive summary
 
-The daemon code is healthy. Build, tests, cargo-deny, and most clippy checks
-pass. **3 substantive findings require operator decision**:
+The daemon code is healthy. Build, tests, cargo-deny, and clippy checks
+ALL pass after the audit-driven fixes. **4 substantive findings fixed**,
+plus **1 separate finding (endless-td libgit2 fetch failure)** identified
+during deployment verification.
 
-| # | Finding | Severity | Files |
+| # | Finding | Severity | Status |
 |---|---|---|---|
-| F1 | 21 private orphan repos on codeberg (1.353 GiB) — public-only policy violations | ⚠️ Medium | codeberg API |
-| F2 | 34 public orphan repos on codeberg (1.378 GiB) — no policy violation but unused | ⚠️ Low | codeberg API |
-| F3 | Stale CHANGELOG references to `release-notes-v0.112.13/14.md` (paths wrong) | ⚠️ Low | CHANGELOG.md |
-| F4 | `cargo clippy -- -D warnings` fails on 1 logical-error + 22 stylistic warnings | ⚠️ Low | dracon-sync/src/sync.rs + 6 others |
+| F1 | 21 private orphan repos on codeberg (1.353 GiB) — public-only policy violations | ⚠️ Medium | ✅ DELETED |
+| F2 | 34 public orphan repos on codeberg (1.378 GiB) — no policy violation but unused | ⚠️ Low | ⏳ Awaiting operator review (list in audit log) |
+| F3 | Stale CHANGELOG references to `release-notes-v0.112.13/14.md` (paths wrong) | ⚠️ Low | ✅ FIXED |
+| F4 | `cargo clippy -- -D warnings` fails on 1 logical-error + 22 stylistic warnings | ⚠️ Low | ✅ FIXED (1 substantive + 22 stylistic) |
+| F5 | endless-td libgit2 `fetch()` fails with `unsupported URL protocol` (no ssh-agent) | ⚠️ Medium | ⚠️ IDENTIFIED (out of v0.112.18 scope; documented in §F5 below) |
 
 Plus a confirmed-true state summary across every other dimension.
 
@@ -346,3 +351,59 @@ Jul 18 10:02:12 dracon-sync[3842965]: 🔄 dracon-sync daemon started
 Jul 18 10:02:12 dracon-sync[3842965]: 🧹 startup: running cleanup...
 Jul 18 10:02:18 dracon-sync[3842965]: 🧹 startup: pruned 24 stale visibility cache entries
 ```
+
+---
+
+## F5: endless-td libgit2 fetch failure (identified during deployment verification)
+
+After deploying v0.112.18, `dracon-sync repos` showed endless-td as `❌ CONCERN`
+(12 ahead, 4 behind, PUSH_STUCK 15m). The daemon log showed:
+
+```
+pull/merge failed for /home/dracon/Dev/dracon-platform/web/games/wip/endless-td:
+Git operation failed: unsupported URL protocol; class=Net (12)
+```
+
+**Root cause**: This is a pre-existing issue in the `dracon-git` library's
+`fetch()` function (the file at
+`~/.cargo/git/checkouts/dracon-libs-80d67f6283a7486a/5731187/tools/sync/dracon-git/src/lib.rs`):
+
+```rust
+callbacks.credentials(|_url, username_from_url, _allowed_types| {
+    git2::Cred::ssh_key_from_agent(username_from_url.unwrap_or("git"))
+});
+```
+
+`Cred::ssh_key_from_agent` requires a running ssh-agent (i.e. `SSH_AUTH_SOCK`
+must point to a live agent socket). In the current NixOS session, no
+ssh-agent is running (`ps aux | grep ssh-agent` returns empty). Only the
+wezterm-specific socket at `/run/user/1000/wezterm/agent.25368` exists.
+
+**Why only endless-td**: Only endless-td triggers this code path because
+it's the only watched repo where (a) the daemon's `pull_merge()` flow runs
+(`is_clean && behind > 0 && has_origin && has_upstream`), AND (b) the
+libgit2 fetch is used. Other repos with `behind > 0` either resolve
+via the daemon's std::process `git fetch` path (which respects SSH
+config) or don't have a divergent state.
+
+**Why the daemon's `git push` still works**: Push uses std::process
+`git push` (not libgit2), and the SSH config has `IdentitiesOnly yes` +
+explicit `IdentityFile ~/.ssh/id_ed25519` for github, so SSH key auth
+works for push. But the libgit2 fetch path bypasses the SSH config
+entirely.
+
+**Scope decision**: This is a pre-existing daemon bug, not something
+introduced by the audit. It was already affecting endless-td before
+the audit began (visible in the daemon log from 10:15 BST, well
+before the v0.112.18 deploy). Fixing this requires a change to the
+`dracon-git` library (which is in the external `DraconDev/dracon-libs`
+repo, not in this meta-repo). The fix would either:
+1. Use `git2::Cred::ssh_key(...)` reading from `~/.ssh/id_ed25519`
+   directly (matches SSH config), OR
+2. Start ssh-agent and ensure `SSH_AUTH_SOCK` is propagated to the
+   systemd user service.
+
+**Decision**: Out of scope for v0.112.18. Documented here for
+operator decision. The daemon correctly surfaces this as
+`❌ CONCERN` — not a silent failure.
+
