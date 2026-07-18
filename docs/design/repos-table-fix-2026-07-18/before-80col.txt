@@ -1,0 +1,438 @@
+📜 /home/dracon/.dracon/utilities/sync/dracon-sync.toml
+📦 31 repos  ✅ CLEAN 23  🔄 ACTIVE 6  ⚠️  WARN 0  ❌ CONCERN 2  ⛔ init/status failed: 0
+
+ℹ️  Confused by a column? Run `dracon-sync repos --legend` for the full key.
+  1. 🔄 ACTIVE  dracon-platform
+     branch:    main
+     publish:   gitlab/main
+     changes:   3 mod, 0 stg, 0 ut
+     ahead/behind: 1/0
+     push-to:   github,gitlab [excl:codeberg]
+     push:      🟣 PENDING
+     last:      a2988973ea7… 6 file(s) in web [web/games/wip/deathrun, web/…
+     pushed:    2m
+     activity:  🟣 pushing (1 ahead)
+     state:     🟣 pushing
+     author:    dracon
+     hint:      daemon will push after changes settle
+
+  2. 🔄 ACTIVE  hegemon
+     branch:    main
+     publish:   github/main
+     changes:   0 mod, 0 stg, 0 ut
+     ahead/behind: 1/0
+     push-to:   github,gitlab [excl:codeberg]
+     push:      ✅ OK
+     last:      45274e041e6… 5 file(s) in docs,src [src/lib/game/visual-enr…
+     pushed:    -
+     activity:  🟢 synced 0m
+     state:     🟡 committing
+     author:    DraconDev
+     hint:      run repair-concerns --apply (push or rewrite)
+
+  3. 🔄 ACTIVE  deathrun
+     branch:    main
+     publish:   origin/main
+     changes:   0 mod, 0 stg, 1 ut
+     ahead/behind: 1/0
+     push-to:   github,gitlab [excl:codeberg]
+     push:      🟣 PENDING
+     last:      a6eabb94ec6… 1 file(s) in .pi DELTA:+0/-0 | BIN:1 NEW:chrom…
+     pushed:    4m
+     activity:  🟣 pushing 0m (1 ahead)
+     state:     🟣 pushing
+     author:    DraconDev
+     hint:      run repair-concerns --apply (push or rewrite)
+
+  4. ❌ CONCERN  endless-td
+     branch:    main
+     publish:   origin/main
+     changes:   2 mod, 0 stg, 0 ut
+     ahead/behind: 13/4
+     push-to:   github,gitlab [excl:codeberg]
+     push:      🟣 PENDING
+     last:      18112427eb5… 1 file(s) in src [src/lib/components/game/MapS…
+     pushed:    5h
+     activity:  🟣 pushing 0m (13 ahead)
+     state:     🟣 pushing
+     author:    DraconDev
+     hint:      run repair-concerns --apply (push or rewrite)
+
+  5. ❌ CONCERN  junk-runner
+     branch:    main
+     publish:   origin/main
+     changes:   0 mod, 0 stg, 0 ut
+     ahead/behind: 1/1
+     push-to:   github,gitlab [excl:codeberg]
+     push:      🟣 PENDING
+     last:      da88b340ba2… chore(.pi): reclassify P0/P1/P2 parent aggrega…
+     pushed:    2m
+     activity:  🟣 pushing 2m (1 ahead)
+     state:     🟣 pushing
+     author:    DraconDev
+     hint:      run repair-concerns --apply (push or rewrite)
+
+  6. 🔄 ACTIVE  .dracon
+     branch:    main
+     publish:   origin/main
+     changes:   0 mod, 0 stg, 0 ut
+     ahead/behind: 0/0
+     push-to:   github,gitlab [excl:codeberg]
+     push:      ✅ OK
+     last:      56b2f55a7c0… 1 file(s) in utilities [utilities/sync/repos-s…
+     pushed:    1m 26s
+     activity:  🟢 synced 1m
+     state:     🔄 working
+     author:    DraconDev
+     hint:      healthy
+
+  7. 🔄 ACTIVE  polis
+     branch:    main
+     publish:   origin/main
+     changes:   0 mod, 0 stg, 0 ut
+     ahead/behind: 0/0
+     push-to:   github,gitlab [excl:codeberg]
+     push:      ✅ OK
+     last:      421a890100a… 3 file(s) in src [src/lib/game-loop/advance-di…
+     pushed:    2m
+     activity:  🟢 synced 2m
+     state:     🔄 working
+     author:    dracon
+     hint:      healthy
+
+  8. 🔄 ACTIVE  neonbreak
+     branch:    main
+     publish:   origin/main
+     changes:   1 mod, 0 stg, 0 ut
+     ahead/behind: 0/0
+     push-to:   github,gitlab [excl:codeberg]
+     push:      ✅ OK
+     last:      754ed9620a9… 1 file(s) in src [src/routes/geoscape/+page.sv…
+     pushed:    2m
+     activity:  ⏳ dirty 2m
+     state:     🟠 dirty
+     author:    DraconDev
+     hint:      daemon handles after changes settle; run sync-now --warns to force now
+
+  9. ✅ CLEAN  darklord
+     branch:    main
+     publish:   origin/main
+     changes:   0 mod, 0 stg, 0 ut
+     ahead/behind: 0/0
+     push-to:   github,gitlab [excl:codeberg]
+     push:      ✅ OK
+     last:      27b861cd5a5… AUDIT-FULL-4-006 SHA update | 1 file(s) [AUDIT…
+     pushed:    10m
+     activity:  🟢 synced 10m
+     state:     🟢 synced
+     author:    darklord-dev
+     hint:      healthy
+
+ 10. ✅ CLEAN  hellhunter
+     branch:    main
+     publish:   origin/main
+     changes:   0 mod, 0 stg, 0 ut
+     ahead/behind: 0/0
+     push-to:   github,gitlab [excl:codeberg]
+     push:      ✅ OK
+     last:      a7c235e16fb… 12 file(s) in .pi,src [src/lib/game/prem2-new-…
+     pushed:    54m
+     activity:  🟢 synced 54m
+     state:     🟢 synced
+     author:    DraconDev
+     hint:      healthy
+
+ 11. ✅ CLEAN  avid
+     branch:    main
+     publish:   origin/main
+     changes:   0 mod, 0 stg, 0 ut
+     ahead/behind: 0/0
+     push-to:   github,gitlab [excl:codeberg]
+     push:      ✅ OK
+     last:      c6a9b190fdb… docs(audit): v8 premium reboot matching YouTub…
+     pushed:    54m
+     activity:  🟢 synced 54m
+     state:     🟢 synced
+     author:    DraconDev
+     hint:      healthy
+
+ 12. ✅ CLEAN  dracon-utilities
+     branch:    main
+     publish:   origin/main
+     changes:   0 mod, 0 stg, 1 ut
+     ahead/behind: 0/0
+     push-to:   github,gitlab,codeberg
+     push:      ✅ OK
+     last:      d59342b9a06… 1 file(s) [AUDIT_FULL_2026-07-18.md] DELTA:+68…
+     pushed:    57m
+     activity:  🟢 synced 57m
+     state:     ⚪ untracked-only
+     author:    DraconDev
+     hint:      healthy
+
+ 13. ✅ CLEAN  dracon-sync
+     branch:    main
+     publish:   origin/main
+     changes:   0 mod, 0 stg, 0 ut
+     ahead/behind: 0/0
+     push-to:   github,gitlab,codeberg
+     push:      ✅ OK
+     last:      fecfcced20f… 1 file(s) [Cargo.toml] DELTA:+1/-1 | DEPS:+ver…
+     pushed:    1h 2m
+     activity:  ⚪ idle 1h
+     state:     ⚪ idle
+     author:    DraconDev
+     hint:      healthy
+
+ 14. ✅ CLEAN  ai-auto-writer
+     branch:    main
+     publish:   origin/main
+     changes:   0 mod, 0 stg, 0 ut
+     ahead/behind: 0/0
+     push-to:   github,gitlab [excl:codeberg]
+     push:      ✅ OK
+     last:      63fe5c21ef0… 1 file(s) [REVIEW_2026-07-17.md] DELTA:+22/-0
+     pushed:    1h 17m
+     activity:  ⚪ idle 1h
+     state:     ⚪ idle
+     author:    DraconDev
+     hint:      healthy
+
+ 15. ✅ CLEAN  browser-extensions-shared
+     branch:    main
+     publish:   origin/main
+     changes:   0 mod, 0 stg, 0 ut
+     ahead/behind: 0/0
+     push-to:   github,gitlab [excl:codeberg]
+     push:      ✅ OK
+     last:      25a96acc405… 1 file(s) in affiliate [affiliate/CORPUS_INDEX…
+     pushed:    1h 21m
+     activity:  ⚪ idle 1h
+     state:     ⚪ idle
+     author:    DraconDev
+     hint:      healthy
+
+ 16. ✅ CLEAN  nexus-new-tab
+     branch:    main
+     publish:   origin/main
+     changes:   0 mod, 0 stg, 0 ut
+     ahead/behind: 0/0
+     push-to:   github,gitlab [excl:codeberg]
+     push:      ✅ OK
+     last:      12a192f3c0d… Audit V2: enumerate 49 fresh follow-ups across…
+     pushed:    1h 21m
+     activity:  ⚪ idle 1h
+     state:     ⚪ idle
+     author:    DraconDev
+     hint:      healthy
+
+ 17. ✅ CLEAN  pi-plugins
+     branch:    main
+     publish:   origin/main
+     changes:   0 mod, 0 stg, 0 ut
+     ahead/behind: 0/0
+     push-to:   github,gitlab,codeberg
+     push:      ✅ OK
+     last:      8daa5656fdf… 1 file(s) in extensions [extensions/pi-chrome-…
+     pushed:    8h
+     activity:  ⚪ idle 8h
+     state:     ⚪ idle
+     author:    DraconDev
+     hint:      healthy
+
+ 18. ✅ CLEAN  capture-anime-girls
+     branch:    main
+     publish:   origin/main
+     changes:   0 mod, 0 stg, 0 ut
+     ahead/behind: 0/0
+     push-to:   github,gitlab [excl:codeberg]
+     push:      ✅ OK
+     last:      d7cb8fa987e… 1 file(s) in .pi [.pi/goals/sessions/019f655b-…
+     pushed:    1d 6h
+     activity:  ⚫ cold 1d
+     state:     ⚫ cold
+     author:    DraconDev
+     hint:      healthy
+
+ 19. ✅ CLEAN  dracon-code
+     branch:    main
+     publish:   origin/main
+     changes:   0 mod, 0 stg, 0 ut
+     ahead/behind: 0/0
+     push-to:   github,gitlab [excl:codeberg]
+     push:      ✅ OK
+     last:      67be621ae26… 1 file(s) [CHANGELOG.md] DELTA:+1/-1
+     pushed:    2d
+     activity:  ⚫ cold 2d
+     state:     ⚫ cold
+     author:    DraconDev
+     hint:      healthy
+
+ 20. ✅ CLEAN  opencode-plugins
+     branch:    main
+     publish:   codeberg/main
+     changes:   0 mod, 0 stg, 0 ut
+     ahead/behind: 0/0
+     push-to:   github,gitlab [excl:codeberg]
+     push:      ✅ OK
+     last:      5a2453ad5ab… 5 file(s) in .dracon,.github [LICENSE, .gitign…
+     pushed:    -
+     activity:  ⚫ cold 2d
+     state:     ⚫ cold
+     author:    DraconDev
+     hint:      healthy
+
+ 21. ✅ CLEAN  practice-form
+     branch:    main
+     publish:   origin/main
+     changes:   0 mod, 0 stg, 0 ut
+     ahead/behind: 0/0
+     push-to:   github,gitlab,codeberg
+     push:      ✅ OK
+     last:      4af8b83f5b3… Remove unneeded newsletter checkbox; drop dead…
+     pushed:    2d
+     activity:  ⚫ cold 2d
+     state:     ⚫ cold
+     author:    DraconDev
+     hint:      healthy
+
+ 22. ✅ CLEAN  pully-fully-pull-based-fleet-reconciler
+     branch:    main
+     publish:   origin/main
+     changes:   0 mod, 0 stg, 0 ut
+     ahead/behind: 0/0
+     push-to:   github,gitlab [excl:codeberg]
+     push:      ✅ OK
+     last:      e770667d64f… 1 file(s) in docs [docs/CONFIDENCE_PLAN.md] DE…
+     pushed:    3d
+     activity:  ⚫ cold 3d
+     state:     ⚫ cold
+     author:    DraconDev
+     hint:      healthy
+
+ 23. ✅ CLEAN  wezterm-config
+     branch:    main
+     publish:   origin/main
+     changes:   0 mod, 0 stg, 0 ut
+     ahead/behind: 0/0
+     push-to:   github,gitlab [excl:codeberg]
+     push:      ✅ OK
+     last:      72894f86dcf… 2 file(s) in .github [LICENSE, .github/FUNDING…
+     pushed:    3d
+     activity:  ⚫ cold 3d
+     state:     ⚫ cold
+     author:    DraconDev
+     hint:      healthy
+
+ 24. ✅ CLEAN  web-auto
+     branch:    main
+     publish:   origin/main
+     changes:   0 mod, 0 stg, 0 ut
+     ahead/behind: 0/0
+     push-to:   github,gitlab [excl:codeberg]
+     push:      ✅ OK
+     last:      ff57936deb2… 1 file(s) [rust-ai-web-auto] DELTA:+1/-1
+     pushed:    1w
+     activity:  ⚫ cold 7d
+     state:     ⚫ cold
+     author:    DraconDev
+     hint:      healthy
+
+ 25. ✅ CLEAN  rust-ai-web-auto
+     branch:    main
+     publish:   origin/main
+     changes:   0 mod, 0 stg, 0 ut
+     ahead/behind: 0/0
+     push-to:   github,gitlab [excl:codeberg]
+     push:      ✅ OK
+     last:      758c9931b02… chore: scrub 6 unused AI_KEY_* entries from .e…
+     pushed:    1w
+     activity:  ⚫ cold 7d
+     state:     ⚫ cold
+     author:    DraconDev
+     hint:      healthy
+
+ 26. ✅ CLEAN  dracon-system
+     branch:    main
+     publish:   origin/main
+     changes:   0 mod, 0 stg, 0 ut
+     ahead/behind: 0/0
+     push-to:   github,gitlab,codeberg
+     push:      ✅ OK
+     last:      31039535c57… 1 file(s) [Cargo.lock] DELTA:+2/-2
+     pushed:    1w 1d
+     activity:  ⚫ cold 8d
+     state:     ⚫ cold
+     author:    DraconDev
+     hint:      healthy
+
+ 27. ✅ CLEAN  dracon-warden
+     branch:    main
+     publish:   origin/main
+     changes:   0 mod, 0 stg, 0 ut
+     ahead/behind: 0/0
+     push-to:   github,gitlab,codeberg
+     push:      ✅ OK
+     last:      7f10bc94d66… 1 file(s) [Cargo.lock] DELTA:+2/-2
+     pushed:    1w 1d
+     activity:  ⚫ cold 8d
+     state:     ⚫ cold
+     author:    DraconDev
+     hint:      healthy
+
+ 28. ✅ CLEAN  search-daemon
+     branch:    main
+     publish:   origin/main
+     changes:   0 mod, 0 stg, 0 ut
+     ahead/behind: 0/0
+     push-to:   github,gitlab [excl:codeberg]
+     push:      ✅ OK
+     last:      6eb1e2e796c… 2 file(s) in .dracon [.gitignore, .dracon/data…
+     pushed:    1w 1d
+     activity:  ⚫ cold 8d
+     state:     ⚫ cold
+     author:    DraconDev
+     hint:      healthy
+
+ 29. ✅ CLEAN  dracon-strategy
+     branch:    main
+     publish:   github/main
+     changes:   0 mod, 0 stg, 0 ut
+     ahead/behind: 0/0
+     push-to:   github,gitlab [excl:codeberg]
+     push:      ✅ OK
+     last:      4799f5c5d07… CLOSED: research-competitors, market-scan, pmf…
+     pushed:    1w 3d
+     activity:  ⚫ cold 10d
+     state:     ⚫ cold
+     author:    DraconDev
+     hint:      healthy
+
+ 30. ✅ CLEAN  one-mil-girls
+     branch:    main
+     publish:   origin/main
+     changes:   0 mod, 0 stg, 0 ut
+     ahead/behind: 0/0
+     push-to:   github,gitlab [excl:codeberg]
+     push:      ✅ OK
+     last:      ab2c9bb69c8… 1 file(s) [package.json] DELTA:+1/-1
+     pushed:    1w 3d
+     activity:  ⚫ cold 10d
+     state:     ⚫ cold
+     author:    DraconDev
+     hint:      healthy
+
+ 31. ✅ CLEAN  DraconDev
+     branch:    main
+     publish:   origin/main
+     changes:   0 mod, 0 stg, 0 ut
+     ahead/behind: 0/0
+     push-to:   github,gitlab,codeberg
+     push:      ✅ OK
+     last:      f1e2b3783f9… Update cleanup report audit counts
+     pushed:    4w
+     activity:  —
+     state:     ⚫ cold
+     author:    DraconDev
+     hint:      healthy
+
