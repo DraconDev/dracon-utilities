@@ -1,7 +1,7 @@
 # dracon-sync v0.112.20 — CONCERN fix via dracon-git v94.7.1 patch
 
 **Date:** 2026-07-18
-**Scope:** workspace `Cargo.toml` (added `[patch.crates-io]` for dracon-git)
+**Scope:** workspace `Cargo.toml` (added `[patch.crates-io]` for dracon-git), `deny.toml` (`allow-git` updated), removed local `/home/dracon/Dev/dracon-libs` clone.
 **Motivation:** `dracon-sync repos` showed `❌ CONCERN 2` for endless-td (53-ahead push-stuck) and neonbreak (4-minute PENDING)
 
 ---
@@ -31,16 +31,27 @@ fetch code path was affected.
 
 1. **New version 0.112.20** (patch bump from 0.112.19 — purely a
    dependency change, no daemon behavior changes).
-2. **Workspace `Cargo.toml`**: added
-   ```toml
-   [patch.crates-io]
-   dracon-git = { path = "/home/dracon/Dev/dracon-libs/tools/sync/dracon-git" }
-   ```
-3. **dracon-git v94.7.1** (cloned from `DraconDev/dracon-libs`):
+2. **Workspace `Cargo.toml`**: added `[patch.crates-io]` for dracon-git
+   (initially path-based; later transitioned to git-tag — see below).
+3. **dracon-git v94.7.1** (tagged release of `DraconDev/dracon-libs`):
    - `fetch()` rewritten: CLI primary, libgit2 fallback
    - 1 new regression test `test_fetch_uses_cli_path_successfully`
    - 33 tests pass (was 32)
    - clippy clean, deny clean
+
+## Patch source transition (same release, follow-up commit)
+
+The patch initially used `path = ".../dracon-libs/tools/sync/dracon-git"`
+(operator's local clone). That was fragile: required the clone at a
+fixed absolute path. Switched to:
+```toml
+[patch.crates-io]
+dracon-git = { git = "https://github.com/DraconDev/dracon-libs", tag = "v94.7.1" }
+```
+which resolves from the github tag. Same daemon binary, same `dracon-git`
+source commit (`04ef4427`). The local clone was then removed (2.0 GB).
+
+See `docs/design/patch-to-git-tag-2026-07-18.md` for the full chain.
 
 ---
 

@@ -40,9 +40,12 @@ skip = [
 [sources]
 unknown-registry = "deny"
 unknown-git = "deny"
-allow-git = []
-# Note: previously listed "https://github.com/DraconDev/dracon-libs" but the
-# workspace depends on it via a local path, not git. Removed as dead config.
+allow-git = [
+    # 2026-07-18: workspace [patch.crates-io] pulls dracon-git v94.7.1 from
+    # the tagged release on github. Required until v94.7.1 is published to
+    # crates.io (then revert to allow-git = []).
+    "https://github.com/DraconDev/dracon-libs",
+]
 
 [licenses]
 confidence-threshold = 0.80
