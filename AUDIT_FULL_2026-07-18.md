@@ -407,3 +407,63 @@ repo, not in this meta-repo). The fix would either:
 operator decision. The daemon correctly surfaces this as
 `❌ CONCERN` — not a silent failure.
 
+---
+
+## F5 resolution appendix (2026-07-18, goal `f0c1de2e-7584-4ee6-b8d9-a319d881c2d4`)
+
+**Status: RESOLVED**. v0.112.20 deployed 2026-07-18 17:45 BST.
+
+The operator chose option 1 from the two proposed fixes: clone
+`DraconDev/dracon-libs`, patch the `dracon-git/src/lib.rs::fetch()`
+function, and use the patched crate via `[patch.crates-io]` in
+`dracon-utilities/Cargo.toml`.
+
+**The patch** (in `dracon-git/src/lib.rs`):
+- **Primary path**: `std::process::Command("git fetch origin")` —
+  respects `~/.ssh/config` (`IdentitiesOnly yes` +
+  `IdentityFile ~/.ssh/id_ed25519`). No ssh-agent required.
+- **Fallback path**: original libgit2 fetch (with `Cred::ssh_key_from_agent`)
+  for repos where the CLI fails (binary blob edge cases).
+
+**Endless-td manual fix** (operator chose reset+replay via `ask_user_question`):
+1. Save 3 untracked `.test.ts` files to `/tmp/`.
+2. `git merge --abort` to clear the MERGE_HEAD entry.
+3. `git reset --hard origin/main` to discard 57 local commits.
+4. `git cherry-pick` the 57 local commits onto the reset state.
+5. Resolve 2 conflicts on `TASKLIST_FIXES.md` by taking "theirs"
+   (the cherry-picked version).
+6. `git push origin main` and `git push github main` (~6s each).
+
+Result: HEAD `16720ca7`, all 3 remotes at HEAD, 0 ahead / 0 behind.
+
+**Neonbreak auto-recovery**: After endless-td was fixed, the daemon
+auto-cycled neonbreak; the libgit2 fix made `git fetch origin` work,
+which updated the remote tracking ref, which cleared the phantom
+MERGE_HEAD state. neonbreak went `❌ CONCERN` → `🔄 ACTIVE` (pushing)
+→ `✅ CLEAN` automatically.
+
+**Live verification (post v0.112.20 deploy)**:
+```
+$ dracon-sync repos | head -3
+📜 /home/dracon/.dracon/utilities/sync/dracon-sync.toml
+📦 32 repos  ✅ CLEAN 28  🔄 ACTIVE 4  ⚠️  WARN 0  ❌ CONCERN 0  ⛔ init/status failed: 0
+```
+
+`32 repos` = 31 original + 1 new (`dracon-libs`, auto-discovered after
+we cloned it for the source patch).
+
+**Required follow-up**: publish `dracon-git v94.7.1` to crates.io and
+remove the `[patch.crates-io]` from `dracon-utilities/Cargo.toml`.
+Requires the operator's `CARGO_REGISTRY_TOKEN`.
+
+Full design doc: `docs/design/concerns-investigation-2026-07-18.md`
+(14.7 KiB). Release notes: `release-notes-v0.112.20.md`.
+
+**Test summary**:
+- `cargo test -p dracon-git --lib`: 33 tests pass (was 32, +1 new
+  regression test `test_fetch_uses_cli_path_successfully`).
+- `cargo test --workspace --locked` (dracon-utilities): 890 tests
+  pass (no change, no daemon source modifications).
+- `cargo clippy --workspace --locked --all-targets -- -D warnings`: clean.
+- `cargo deny check`: clean.
+
