@@ -2,6 +2,19 @@
 members = ["dracon-sync", "dracon-system", "dracon-warden"]
 resolver = "2"
 
+# LOCAL PATCH (2026-07-18): pull dracon-git from the operator's local
+# DraconDev/dracon-libs checkout instead of crates.io v94.7.0. The
+# crates.io version uses libgit2 + Cred::ssh_key_from_agent which
+# requires a running ssh-agent and fails with "unsupported URL
+# protocol; class=Net (12)" in wezterm/NixOS sessions that have no
+# ssh-agent. The local checkout (v94.7.1) adds a CLI fallback for
+# `fetch()` that respects `~/.ssh/config` and works without an agent.
+#
+# Fix: see docs/design/concerns-investigation-2026-07-18.md §F5.
+# This patch should be removed once v94.7.1 is published to crates.io.
+[patch.crates-io]
+dracon-git = { path = "/home/dracon/Dev/dracon-libs/tools/sync/dracon-git" }
+
 # Workspace-level package metadata. Each crate's own [package] block
 # overrides these on a per-crate basis. This file exists so that
 # AGENTS.md test discipline commands (`cargo build --release --locked`,
