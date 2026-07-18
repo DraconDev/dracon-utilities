@@ -456,8 +456,34 @@ we cloned it for the source patch).
 remove the `[patch.crates-io]` from `dracon-utilities/Cargo.toml`.
 Requires the operator's `CARGO_REGISTRY_TOKEN`.
 
+### Patch-source transition (same release, follow-up commit)
+
+The `[patch.crates-io]` block initially used a local-path source
+(`path = "/home/dracon/Dev/dracon-libs/..."`). After confirming that
+the patched commit (`04ef4427`) was tagged as `v94.7.1` on all 3
+mirrors (github/gitlab/codeberg), the source was transitioned to:
+```toml
+[patch.crates-io]
+dracon-git = { git = "https://github.com/DraconDev/dracon-libs", tag = "v94.7.1" }
+```
+
+Same daemon binary, same `dracon-git` source commit. The local clone
+(`/home/dracon/Dev/dracon-libs`, 2.0 GB) was removed after the
+transition. `deny.toml [sources].allow-git` was updated to allow the
+github URL. See `docs/design/patch-to-git-tag-2026-07-18.md` for the
+full verification chain.
+
+**Final tally (post patch-to-git-tag transition, PID 1273667)**:
+```
+📦 31 repos · ✅ CLEAN 28 · 🔄 ACTIVE 3 · ⚠️ WARN 0 · ❌ CONCERN 0
+```
+
+`31 repos` = 32 (during dev, when `/Dev/dracon-libs` was a watched repo)
+minus 1 (clone removed, daemon auto-unregistered it).
+
 Full design doc: `docs/design/concerns-investigation-2026-07-18.md`
-(14.7 KiB). Release notes: `release-notes-v0.112.20.md`.
+(14.7 KiB). Patch-source transition: `docs/design/patch-to-git-tag-2026-07-18.md`.
+Release notes: `release-notes-v0.112.20.md`.
 
 **Test summary**:
 - `cargo test -p dracon-git --lib`: 33 tests pass (was 32, +1 new

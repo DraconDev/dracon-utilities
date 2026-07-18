@@ -58,11 +58,19 @@ See `docs/design/patch-to-git-tag-2026-07-18.md` for the full chain.
 ## Files changed
 
 - `Cargo.toml` (workspace) — added `[patch.crates-io]`
-- `Cargo.lock` — `dracon-git v94.7.0 (registry)` → `v94.7.1 (path)`
+  (initially path, transitioned to git+tag — same daemon)
+- `Cargo.lock` — `dracon-git v94.7.0 (registry)` → `v94.7.1 (git+https://github.com/DraconDev/dracon-libs?tag=v94.7.1#04ef4427)`
+- `deny.toml` — `[sources].allow-git` now includes the github URL
 - `docs/design/concerns-investigation-2026-07-18.md` — full
   root-cause analysis + resolution
-- `AUDIT_FULL_2026-07-18.md` — §F5 resolution appendix (TBD)
+- `docs/design/patch-to-git-tag-2026-07-18.md` — patch-source transition
+- `AUDIT_FULL_2026-07-18.md` — §F5 resolution appendix
 - `CHANGELOG.md` — this entry
+
+## Files removed
+
+- `/home/dracon/Dev/dracon-libs` — 2.0 GB local clone, no longer needed
+  (github tag is the source of truth).
 
 ## No changes to
 
@@ -79,10 +87,11 @@ See `docs/design/patch-to-git-tag-2026-07-18.md` for the full chain.
 ```
 $ dracon-sync repos | head -3
 📜 /home/dracon/.dracon/utilities/sync/dracon-sync.toml
-📦 32 repos  ✅ CLEAN 28  🔄 ACTIVE 4  ⚠️  WARN 0  ❌ CONCERN 0  ⛔ init/status failed: 0
+📦 31 repos  ✅ CLEAN 28  🔄 ACTIVE 3  ⚠️  WARN 0  ❌ CONCERN 0  ⛔ init/status failed: 0
 ```
 
-`32 repos` = 31 original + 1 new (`dracon-libs`, auto-discovered).
+`31 repos` (was 32 during dev, dropped by 1 after removing the local
+`dracon-libs` clone).
 
 ### Endless-td specific
 
