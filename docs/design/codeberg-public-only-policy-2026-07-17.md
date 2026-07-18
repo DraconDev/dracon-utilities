@@ -309,3 +309,127 @@ the safe-default state: codeberg excluded with `(unknown)` reason.
 - `AUDIT_REPOS_2026-07-17.md` — the audit performed prior to this
   goal that identified the 12 PUSH_STUCK repos and the 2 orphans
   (`one-mil-girls`, `web-games-hegemon`).
+
+## Follow-up 2026-07-17 (v0.112.17)
+
+The v0.112.16 deploy shipped the policy but left six follow-up items
+open. Goal `6466716b-613f-419a-b6e4-6923abc5d901` resolved all six.
+
+### 1. `refresh-visibility` subcommand (AC #1)
+
+The new `refresh-visibility` subcommand populates the cache on
+demand:
+
+```bash
+dracon-sync refresh-visibility
+# 🔄 refresh-visibility · 31 repos · refreshed 31 · skipped 0
+#   refreshed  opencode-plugins              → (private)
+#   refreshed  web-games-endless-td          → (private)
+#   refreshed  ...
+```
+
+It walks every watched repo, parses the github remote URL (trying
+`origin` first, falling back to `github` for repos that use the
+`github` remote name like `opencode-plugins`), calls
+`gh api repos/<owner>/<repo> --jq .private`, and writes the new
+cache format `visibility=<state>\n<timestamp>`. On `gh` failure or
+unparseable URL, the repo is skipped without crashing and the
+daemon falls back to `(unknown)` in the PUSH-TO column.
+
+After running it: 31 of 31 cache files in new format (was 3 of 31
+in v0.112.16; the rest were legacy 10-byte timestamp-only).
+Visibility distribution: 7 public, 24 private, 0 unknown.
+
+Implementation: `dracon-sync/src/main.rs` `Command::RefreshVisibility`
+variant + `dracon-sync/src/visibility.rs` `update_visibility_cache`
+(now `pub(crate)`). 5 new tests cover legacy-format upgrade, new-
+format preservation, SSH URL parsing, `gh` failure fallback, and
+idempotency.
+
+### 2. `web-games-hegemon` cleanup (AC #2)
+
+The 8.34 GiB orphan `dracondev/web-games-hegemon` was the legacy
+codeberg mirror from when the nested-on-main migration was first
+attempted. The local `/Dev/dracon-platform/web/games/wip/hegemon`
+repo had two codeberg remotes:
+- `codeberg` → `dracondev/hegemon.git` (active)
+- `origin` → `dracondev/web-games-hegemon.git` (legacy)
+
+The v0.112.16 `codeberg_public_only` gate filters by remote NAME
+(`codeberg`), so `origin` → codeberg push still fired every cycle
+even with codeberg excluded, failing with `Quota exceeded`. The
+fix:
+1. `DELETE /api/v1/repos/dracondev/web-games-hegemon` (8.34 GiB
+   freed)
+2. `git remote remove origin` from local hegemon
+
+After: 3 remotes remain (`codeberg`, `github`, `gitlab`); quota
+dropped from 85.0029 GiB to 75.24 GiB (88.5%).
+
+### 3. `one-mil-girls` cleanup (AC #3)
+
+The 1.42 GiB orphan `dracondev/one-mil-girls` had no local
+source-of-truth pointing to it (the active repo is
+`dracondev/web-games-one-mil-girls`). HTTP 204 on
+`DELETE /api/v1/repos/dracondev/one-mil-girls`. Codeberg quota
+freed another 1.42 GiB.
+
+After: 75.24 GiB → 73.82 GiB used (private); 88.5% → 86.8% quota.
+
+### 4. `dracon-warden` non-recreation (AC #4)
+
+The accidentally deleted `dracondev/dracon-warden` (230 KiB) was a
+**private orphan** with no local source-of-truth. Per the new
+public-only policy (this document), private repos do not belong on
+codeberg — recreating it would violate the policy. Documented as
+non-action: the actual `dracon-warden` lives at the suffixed path
+`dracon-warden-secret-encrypt-age-git-filter`, which is PUBLIC
+(verified via `gh api .private` = `false`) and is already mirrored
+to codeberg. No recreation needed.
+
+### 5. endless-td CONCERN resolution (AC #5)
+
+The endless-td CONCERN was a divergent `rollback-phaser-restore-svelte`
+branch: local at `ecafeaa`, 4 commits behind github (`127cd0d`),
+and 78 commits ahead of `main` (cluster23 engine-cleanup work
+that hadn't been pushed since the round-3 merge was reverted).
+
+Resolution:
+1. `git fetch --all`
+2. `git merge --no-ff github/rollback-phaser-restore-svelte`
+   produced 3 file conflicts:
+   - `TASKLIST_FIXES.md` (kept local — local already had SHIPPED
+     entries for T-POLISH-025/026)
+   - `cardUxAttrs.test.ts` (took remote — adds new tests)
+   - `+page.svelte` (kept local — cluster23 work is ahead)
+3. Commit `15234b2` pushed to all 3 remotes (`github` advanced
+   `127cd0d..15234b2`, codeberg advanced `ecafeaa..15234b2`,
+   gitlab advanced `127cd0d..15234b2`).
+
+No force-push used. Operator confirmed resolution strategy
+("keep local cluster23 + take remote cluster22") via
+`ask_user_question` before commit. After the push, endless-td
+shows ✅ CLEAN with `⚪ idle 8h` and `healthy` hint.
+
+### 6. URL-vs-name gate decision (AC #6)
+
+The v0.112.16 gate filters the codeberg exclusion by remote NAME
+(`codeberg`), not by remote URL. The only known conflict was
+hegemon's `origin` → codeberg push, which AC #2 removes. No
+defensive URL filter was added: it would be dead code on the only
+known case, and the name-based filter is the simpler invariant.
+
+### 7. Final tally verification (AC #8)
+
+```
+📦 31 repos · ✅ CLEAN 26 · 🔄 ACTIVE 5 · ⚠️ WARN 0 · ❌ CONCERN 0
+```
+
+Visibility distribution now clear:
+- 7 public repos keep full `github,gitlab,codeberg`
+- 24 private repos show `[excl:codeberg] (private)`
+- 0 unknown
+
+v0.112.17 release notes (`release-notes-v0.112.17.md`) document
+this follow-up. CHANGELOG.md `[Unreleased]` updated. Version
+bumped from 0.112.16 → 0.112.17.
