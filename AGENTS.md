@@ -449,6 +449,40 @@ worktree layout was eliminated for all 10 game/hegemon submodules of
 - `cargo test --workspace --locked` must pass
 - `cargo build --release --locked` must succeed
 - `cargo deny check` must be clean
+- `cargo clippy --workspace --locked -- -D warnings` must be clean
 - New code paths require unit tests
 - Backwards compatibility with all previously added
   policy fields is required
+
+## Recent audit-driven changes (2026-07-19, v0.112.21)
+
+The post-v0.112.20 audit (`AUDIT_FULL_2026-07-18-POSTFIX.md`) found
+53+ findings across the daemon, warden, system, and meta-repo. All
+**11 HIGH** (8 daemon + 3 warden) and 7 actionable **MEDIUM** findings
+were remediated in v0.112.21. Critical fixes:
+
+- **F39** ownership substring bypass — daemon's primary safety guard
+  against pushing to attacker infra is now tuple-atomic.
+- **F40** `standard_files` path traversal — absolute/`..` paths now
+  rejected by `validate_config`.
+- **F41** `git_askpass_script` race window closed — atomic
+  `O_EXCL|O_NOFOLLOW` + `mode(0o700)` + `AskpassScript` Drop guard.
+- **F30** v0.112.19 table-width fix completed (was partial; test array
+  never had ROLE).
+- **F45/F46** test infra hardened — no more `mem::forget` TempDir leaks
+  or racy `EnvRestorer::Drop`.
+
+Total daemon unit tests: **733** (was 706 before v0.112.19). Total
+workspace tests: **915** (was 890 before v0.112.21).
+
+## `[patch.crates-io]` status
+
+`[patch.crates-io]` in `Cargo.toml` currently points at
+`https://github.com/DraconDev/dracon-libs?tag=v94.7.1` (git+tag form).
+This is a temporary workaround for the libgit2 ssh-agent bug
+fixed in `dracon-git v94.7.1`. **Required follow-up**: when the
+operator publishes `dracon-git v94.7.1` to crates.io (needs
+`CARGO_REGISTRY_TOKEN`), remove `[patch.crates-io]` from
+`Cargo.toml`. The daemon will then use the crates-io version
+naturally. `deny.toml [sources].allow-git` should also be cleared
+at that point.

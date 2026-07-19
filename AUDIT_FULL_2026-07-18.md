@@ -452,6 +452,13 @@ $ dracon-sync repos | head -3
 `32 repos` = 31 original + 1 new (`dracon-libs`, auto-discovered after
 we cloned it for the source patch).
 
+**Tally drift (2026-07-19)**: post-v0.112.20 patch-source transition
+removed `/home/dracon/Dev/dracon-libs` (the local clone). The daemon
+auto-unregistered the now-absent repo and the tally dropped from
+`32/28/4/0/0` back to `31`. Live state (2026-07-19 02:00 BST):
+`📦 31 repos · ✅ CLEAN 27 · 🔄 ACTIVE 4 · ⚠️ WARN 0 · ❌ CONCERN 0`.
+See `AUDIT_FULL_2026-07-18-POSTFIX.md` for the full v0.112.21 audit.
+
 **Required follow-up**: publish `dracon-git v94.7.1` to crates.io and
 remove the `[patch.crates-io]` from `dracon-utilities/Cargo.toml`.
 Requires the operator's `CARGO_REGISTRY_TOKEN`.
