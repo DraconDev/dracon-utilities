@@ -8,23 +8,30 @@
 
 The `dracon-sync repos` command had grown to 16 columns (ROLE, BRANCH, PUBLISH, M/S/U counts, AHEAD, BEHIND, PUSH, PUSH-TO, LAST COMMIT, STATE+ACT, HINT). For the common "is anything broken?" check, this is too noisy. The operator now needs two views:
 
-1. **Glance view** (`repos --summary` / `-s`): 3 columns — STATUS, REPO, WHAT. One row per repo, no headers, no borders. WHAT = `activity + dirty-counts + hint + author` joined by ` · `.
+1. **Glance view** (`repos --summary` / `-s`): 3-column table — STATUS, REPO, WHAT. Rendered as a proper `comfy-table` with UTF8_FULL_CONDENSED borders. WHAT = `activity + dirty-counts + hint + author` joined by ` · `.
 2. **Detailed view** (default `repos`): unchanged. 16-column Compact/Full table for deep inspection.
 
 For the most common health-check pattern, combine them: `repos -s --only-concern` (only the broken ones, glance view).
 
+**R1 (2026-07-20)** — Operator feedback: "the summary needs to be a table." R0 used `println!` with manual spacing which broke alignment under ANSI color codes. R1 uses `comfy-table` with `UTF8_FULL_CONDENSED` preset, fixed-width `#` / `STATUS` / `REPO` columns (`Absolute` widths), and a `Dynamic` WHAT column that absorbs leftover terminal width.
+
 ## What `--summary` shows
 
 ```
-  1. 🔄 ACTIVE  polis                   ⏳ dirty 0m · 1 mod · daemon handles after changes settle; run sync-now --warns to force now · by dracon
-  2. 🔄 ACTIVE  dracon-platform         ⏳ dirty 0m · 2 mod · daemon handles after changes settle; run sync-now --warns to force now · by dracon
-  3. 🔄 ACTIVE  neonbreak               ⏳ dirty 0m · 3 mod + 3 stg · daemon handles after changes settle; run sync-now --warns to force now · by DraconDev
-  4. 🔄 ACTIVE  deathrun                🟢 synced 2m · .git exceeds 2 GB (github limit) — may fail to push to github · by DraconDev
-  5. ✅ CLEAN  nexus-new-tab           ⚪ idle 13h · healthy · by DraconDev
-  6. ✅ CLEAN  one-mil-girls           ⚫ cold 12d · healthy · by DraconDev
+┌────┬────────────┬────────────────────────┬────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ #  ┆ STATUS     ┆ REPO                   ┆ WHAT                                                                                                       │
+╞════╪════════════╪════════════════════════╪════════════════════════════════════════════════════════════════════════════════════════════════════════════╡
+│ 1  ┆ 🔄 ACTIVE  ┆ polis                  ┆ ⏳ dirty ? · 2 mod + 1 ut · daemon handles after changes settle; run sync-now --warns to force now · by dracon │
+│ 2  ┆ 🔄 ACTIVE  ┆ endless-td             ┆ ⏳ dirty 0m · 1 mod · daemon handles after changes settle; run sync-now --warns to force now · by DraconDev    │
+│ 3  ┆ 🔄 ACTIVE  ┆ junk-runner            ┆ ⏳ dirty 2m · 1 mod + 3 stg · daemon handles after changes settle; run sync-now --warns to force now · by DraconDev │
+│ 4  ┆ 🔄 ACTIVE  ┆ deathrun               ┆ ⏳ dirty 3m · 1 mod · .git exceeds 2 GB (github limit) — may fail to push to github · by DraconDev                  │
+│ 5  ┆ ✅ CLEAN   ┆ nexus-new-tab          ┆ ⚪ idle 14h · healthy · by DraconDev                                                                          │
+│ 6  ┆ ✅ CLEAN   ┆ one-mil-girls          ┆ ⚫ cold 12d · healthy · by DraconDev                                                                          │
+└────┴────────────┴────────────────────────┴───────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 Each row tells the operator:
+- **#** — row number in the summary (severity-sorted if `--summary-by-severity` is set)
 - **STATUS** — is this repo broken? (`❌ CONCERN` / `⚠️ WARN` / `🔄 ACTIVE` / `✅ CLEAN`)
 - **REPO** — which one
 - **WHAT** — what state is it in (`⏳ dirty 0m`), what kind of dirty work (`3 mod + 3 stg`), what should I do (`run repair-concerns --apply`), who last touched it (`by DraconDev`)
@@ -53,7 +60,7 @@ Trying to merge both into a single "smart" view that adapts column count based o
 
 - `severity_tier(row)` — returns 0 (concern) / 1 (warn) / 2 (active) / 3 (clean) for severity-sort.
 - `summary_what(row, budget)` — builds the WHAT string: `activity + dirty-counts + push-status (if stuck) + hint + author`, joined by ` · `, truncated to budget.
-- `print_repos_summary(...)` — renders the 3-column view. Always uses Vertical tier so the WHAT column is as wide as the terminal allows.
+- `print_repos_summary(...)` — renders the 3-column table using `comfy-table` with the UTF8_FULL_CONDENSED preset. The `#` / `STATUS` / `REPO` columns use `Absolute(N)` widths; the WHAT column is `Dynamic` and absorbs leftover terminal width.
 
 The default sort is `updated` (matching the detailed view's sort). With `--summary-by-severity`, the sort key is `(severity_tier, original_idx)` — within a tier, the original `updated` order is preserved.
 
@@ -61,7 +68,7 @@ The default sort is `updated` (matching the detailed view's sort). With `--summa
 
 R0 had a duplicate `1 ahead` segment when push was pending — the activity already encoded `🟣 pushing 0m (1 ahead)`, but the summary also added a separate `1 ahead`. Test `test_summary_what_pending_push_drops_redundant_ahead_note` enforces the fix: ahead count appears exactly once in the WHAT.
 
-## New regression tests (5 total)
+## New regression tests (7 total)
 
 | Test | What it verifies |
 |---|---|
@@ -70,15 +77,17 @@ R0 had a duplicate `1 ahead` segment when push was pending — the activity alre
 | `test_summary_what_pending_push_drops_redundant_ahead_note` | Push PENDING: ahead count appears exactly once (from activity, not duplicated) |
 | `test_summary_what_stuck_push_shows_status` | Push STUCK: surfaces as `push: stuck` even though activity doesn't show it |
 | `test_severity_tier_ordering` | Tier 0 = concern, 1 = warn, 2 = active, 3 = clean |
+| `test_print_repos_summary_renders_as_table` | Smoke test: `print_repos_summary()` runs without panicking on a populated row |
+| `test_summary_what_handles_long_hint_with_word_boundary` | Long hint + narrow budget: WHAT ends with `…` or natural sentence end (no mid-word clip) |
 
-Test count: **933** daemon tests passing (was 928 at v0.112.26, +5 from new tests).
+Test count: **935** daemon tests passing (was 928 at v0.112.26, +7 from new tests).
 
 ## Test discipline
 
 | Check | Result |
 |---|---|
 | `cargo build --release --locked` | ✅ green |
-| `cargo test --workspace --locked` | ✅ **933 passed, 0 failed, 3 ignored** |
+| `cargo test --workspace --locked` | ✅ **935 passed, 0 failed, 3 ignored** |
 | `cargo clippy --workspace --locked -- -D warnings` | ✅ clean |
 | `cargo deny check` | ✅ clean |
 
