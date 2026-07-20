@@ -15,7 +15,13 @@ For the most common health-check pattern, combine them: `repos -s --only-concern
 
 **R1 (2026-07-20)** — Operator feedback: "the summary needs to be a table." R0 used `println!` with manual spacing which broke alignment under ANSI color codes. R1 uses `comfy-table` with `UTF8_FULL_CONDENSED` preset, fixed-width `#` / `STATUS` / `REPO` columns (`Absolute` widths), and a `Dynamic` WHAT column that absorbs leftover terminal width.
 
-**R2 (2026-07-20)** — Operator feedback: "the authors are wrong, we're freestyling some of it." The summary's `by {author}` suffix was `git log -1 --format=%an` — the git commit author of the most recent commit. For a solo operator who freestyles git identities across repos (`DraconDev` / `dracon` / `darklord-dev`), this reads as "different people" when it's all the same operator, which is misleading noise in a glance view. R2 drops the `by {author}` suffix from the summary WHAT entirely. The detailed 16-column table keeps the author (it has a dedicated column and is part of the full record); the summary trades it for width + clarity. WHAT is now `activity + dirty-counts + push-status-if-stuck + hint`.
+**R2 (2026-07-20)** — Operator feedback: "the authors are wrong, we're freestyling some of it." The `by {author}` suffix was `git log -1 --format=%an` — the git commit author of the most recent commit. For a solo operator who freestyles git identities across repos (`DraconDev` / `dracon` / `darklord-dev`), this reads as "different people" when it's all the same operator, which is misleading noise everywhere. R2 drops the author from ALL three `repos` view variants:
+
+- **Summary view** (`repos -s`): removed `by {author}` from the WHAT string.
+- **Detailed Compact/Full table**: removed the `· by {author}` suffix from the HINT column (the Compact tier had no dedicated author column anyway — its 23-cell data row was being truncated to the 16-column header, so author was only ever visible via the HINT suffix).
+- **Vertical tier** (narrow terminals): removed the `author:` line.
+
+The `last_author` field is still computed (kept for potential future use, e.g. flagging genuinely external commits), but is no longer displayed. WHAT is now `activity + dirty-counts + push-status-if-stuck + hint`.
 
 ## What `--summary` shows
 
