@@ -8,7 +8,7 @@
 
 The `dracon-sync repos` command had grown to 16 columns (ROLE, BRANCH, PUBLISH, M/S/U counts, AHEAD, BEHIND, PUSH, PUSH-TO, LAST COMMIT, STATE+ACT, HINT). For the common "is anything broken?" check, this is too noisy. The operator now needs two views:
 
-1. **Glance view** (`repos --summary` / `-s`): 3-column table — STATUS, REPO, WHAT. Rendered as a proper `comfy-table` with UTF8_FULL_CONDENSED borders. WHAT = `activity + dirty-counts + hint + author` joined by ` · `.
+1. **Glance view** (`repos --summary` / `-s`): 3-column table — STATUS, REPO, WHAT. Rendered as a proper `comfy-table` with UTF8_FULL_CONDENSED borders. WHAT = `activity + dirty-counts + hint` joined by ` · `.
 2. **Detailed view** (default `repos`): unchanged. 16-column Compact/Full table for deep inspection.
 
 For the most common health-check pattern, combine them: `repos -s --only-concern` (only the broken ones, glance view).
@@ -36,7 +36,7 @@ Each row tells the operator:
 - **#** — row number in the summary (severity-sorted if `--summary-by-severity` is set)
 - **STATUS** — is this repo broken? (`❌ CONCERN` / `⚠️ WARN` / `🔄 ACTIVE` / `✅ CLEAN`)
 - **REPO** — which one
-- **WHAT** — what state is it in (`⏳ dirty 0m`), what kind of dirty work (`3 mod + 3 stg`), what should I do (`run repair-concerns --apply`), who last touched it (`by DraconDev`)
+- **WHAT** — what state is it in (`⏳ dirty 0m`), what kind of dirty work (`3 mod + 3 stg`), what should I do (`run repair-concerns --apply`)
 
 ## Flags
 
@@ -61,7 +61,7 @@ Trying to merge both into a single "smart" view that adapts column count based o
 ## New helpers
 
 - `severity_tier(row)` — returns 0 (concern) / 1 (warn) / 2 (active) / 3 (clean) for severity-sort.
-- `summary_what(row, budget)` — builds the WHAT string: `activity + dirty-counts + push-status (if stuck) + hint + author`, joined by ` · `, truncated to budget.
+- `summary_what(row, budget)` — builds the WHAT string: `activity + dirty-counts + push-status (if stuck) + hint`, joined by ` · `, truncated to budget. (Author intentionally omitted — see R2.)
 - `print_repos_summary(...)` — renders the 3-column table using `comfy-table` with the UTF8_FULL_CONDENSED preset. The `#` / `STATUS` / `REPO` columns use `Absolute(N)` widths; the WHAT column is `Dynamic` and absorbs leftover terminal width.
 
 The default sort is `updated` (matching the detailed view's sort). With `--summary-by-severity`, the sort key is `(severity_tier, original_idx)` — within a tier, the original `updated` order is preserved.
@@ -74,8 +74,8 @@ R0 had a duplicate `1 ahead` segment when push was pending — the activity alre
 
 | Test | What it verifies |
 |---|---|
-| `test_summary_what_clean_idle_repo` | Clean repo summary shows activity + hint + author, but NOT push status or dirty counts |
-| `test_summary_what_dirty_repo_includes_dirty_counts_and_hint` | Dirty repo summary shows `2 mod + 1 ut` + hint + author + activity |
+| `test_summary_what_clean_idle_repo` | Clean repo summary shows activity + hint, but NOT push status, dirty counts, or author |
+| `test_summary_what_dirty_repo_includes_dirty_counts_and_hint` | Dirty repo summary shows `2 mod + 1 ut` + hint + activity, but NOT `by {author}` (omitted in R2) |
 | `test_summary_what_pending_push_drops_redundant_ahead_note` | Push PENDING: ahead count appears exactly once (from activity, not duplicated) |
 | `test_summary_what_stuck_push_shows_status` | Push STUCK: surfaces as `push: stuck` even though activity doesn't show it |
 | `test_severity_tier_ordering` | Tier 0 = concern, 1 = warn, 2 = active, 3 = clean |
