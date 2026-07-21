@@ -1,5 +1,18 @@
 [workspace]
-members = ["dracon-sync", "dracon-system", "dracon-warden"]
+# CHANGED 2026-07-21 (v0.112.32, audit H9/F4.2): the security crate
+# (dracon-warden/src/security) is now a full workspace MEMBER and
+# dracon-warden depends on it BY PATH. Previously dracon-warden built
+# the published crates.io dracon-security v0.3.0, so fixes to the
+# local source never reached the warden binary — the H9 whole-file
+# binary-smudge fix lives in that source. Membership also means
+# `cargo test --workspace --locked` (AGENTS.md test discipline) runs
+# the security crate's tests.
+members = [
+    "dracon-sync",
+    "dracon-system",
+    "dracon-warden",
+    "dracon-warden/src/security",
+]
 resolver = "2"
 
 # LOCAL PATCH (2026-07-18): pull dracon-git v94.7.1 from the operator's

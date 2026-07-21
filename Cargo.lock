@@ -849,8 +849,6 @@ dependencies = [
 [[package]]
 name = "dracon-security"
 version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "34c147b2c61e2e9f25edfc18cfd1605371bd04191e6a15148065cec539a4086f"
 dependencies = [
  "aes",
  "aes-gcm",
@@ -862,6 +860,7 @@ dependencies = [
  "dirs",
  "log",
  "once_cell",
+ "proptest",
  "rand 0.8.6",
  "rayon",
  "regex",
@@ -869,6 +868,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
+ "tempfile",
  "uuid",
  "walkdir",
  "zeroize",
