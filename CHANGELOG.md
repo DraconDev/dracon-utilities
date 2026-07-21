@@ -1608,3 +1608,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **MINOR**: New features, backward compatible
 - **PATCH**: Bug fixes, documentation updates
 
+
+### Audit
+- **`AUDIT_FULL_2026-07-21.md` (2026-07-21)**: full-workspace audit following the v0.112.28–30 bug cluster. **63 findings (10 HIGH, 34 MEDIUM, 19 LOW)** across 5 parallel audit parts + a live incident. Headline: the daemon's failure-visibility stack is broken end-to-end (push failure reported as `🔁 synced`; throttled notifications fire exactly once per daemon lifetime; stuck-push ledger split-brain with `push_max_retries` never enforced); the 100 MiB hard size limit is bypassed via untracked-directory expansion; warden `harden_repo` provably wiped operator `.gitignore` rules (commit `3a67685f`); warden smudge corrupts whole-file-encrypted binary secrets; the v0.112.29 gitlab-URL bug has a codeberg twin (all codeberg visibility API calls 404). Also includes the same-day test-pollution incident (H2, fixed in `5e32547`) and the verified-live ownership-cache-forever finding (H1). Remediation plan: v0.112.31 (daemon HIGH batch), v0.112.32 (warden), v0.112.33 (MEDIUM sweep). Detail files: `.pi-tmp/audit-2026-07-21-part0..4.md`.
