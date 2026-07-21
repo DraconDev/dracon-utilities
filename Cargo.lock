@@ -876,7 +876,7 @@ dependencies = [
 
 [[package]]
 name = "dracon-sync"
-version = "0.112.30"
+version = "0.112.31"
 dependencies = [
  "anyhow",
  "clap",
