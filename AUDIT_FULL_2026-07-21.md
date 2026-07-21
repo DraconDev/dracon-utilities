@@ -1,5 +1,13 @@
 # AUDIT — dracon-utilities (2026-07-21)
 
+> **REMEDIATION STATUS (2026-07-21, same-day)**: all 10 HIGH and all
+> 34 MEDIUM findings are REMEDIATED — v0.112.31 (daemon HIGH batch:
+> H1, H3-H7, H10, M1), v0.112.32 (warden: H8, H9, M29-M32),
+> v0.112.33 (MEDIUM sweep: M2-M28, M33, M34, F4.9-F4.12, M10,
+> H2-follow-up). Remaining: the 19 LOW findings and two
+> operator-decision items (F1.16 restore semantics, live config
+> cleanup — see the end of the remediation-order section).
+
 > **Scope**: dracon-sync 0.112.30 (daemon.rs, sync.rs, git/*, policy, ownership,
 > visibility, secrets, exclude, report, main), dracon-warden 0.112.12,
 > dracon-system 0.112.12.
