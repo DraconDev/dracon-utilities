@@ -12,21 +12,26 @@ detail available **on demand** (a flag or a specific repo).
 
 ## What changed
 
-### 1. New default: rich 6-column table
+### 1. New default: rich 7-column table
 
 Plain `dracon-sync repos` now shows:
 
 ```
-│ #  ┆ STATUS     ┆ REPO              ┆ ACTIVITY            ┆ PUSH       ┆ HINT                 │
-│ 1  ┆ 🔄 ACTIVE  ┆ dracon-platform   ┆ ⏳ dirty 0m · 2 mod ┆ ✅ OK      ┆ daemon handles after…│
+│ #  ┆ STATUS     ┆ REPO              ┆ ACTIVITY            ┆ A/B   ┆ PUSH       ┆ HINT                 │
+│ 1  ┆ 🔄 ACTIVE  ┆ endless-td        ┆ ⏳ dirty 0m · 1 mod ┆ —     ┆ ✅ OK      ┆ daemon handles after…│
+│ 2  ┆ ❌ CONCERN ┆ deathrun          ┆ 🟣 pushing 0m       ┆ ↑5 ↓3 ┆ 🟣 PENDING ┆ run repair-concerns… │
 ```
 
 - **ACTIVITY** — the activity label with dirty counts inline
-  (`⏳ dirty 1d · 101 stg + 2 ut`, `🟣 pushing 0m (1 ahead)`,
-  `🟢 synced 9m`, `⚪ idle 2h`, `⚫ cold 3d`)
+  (`⏳ dirty 1d · 101 stg + 2 ut`, `🟣 pushing 0m`, `🟢 synced 9m`,
+  `⚪ idle 2h`, `⚫ cold 3d`)
+- **A/B** — NEW (R2, the most important missing field): `↑N`
+  unpushed commits (data at risk), `↓N` upstream drift (needs
+  pull), `↑N ↓M` both, `—` when in sync
 - **PUSH** — the dedicated push-state cell (✅ OK · 🟣 PENDING ·
   🛑 STUCK · ❌ FAIL)
 - **HINT** — the actionable text
+- **REPO** — branch folded in only when ≠ main (`darklord⚡master`)
 - Sorted by severity (concern → warn → active → clean)
 - At ≥140 cols a **PUBLISH** column (origin/main) is added
 
