@@ -148,6 +148,33 @@ This prevents the 2989-commit auto-commit loop that
 crashed the daemon originally. The override mechanism
 still works under the new global default.
 
+### Excluded-path semantics (CHANGED 2026-07-22, v0.112.34)
+
+`auto_commit_exclude_patterns` means **"don't auto-commit
+these files"** — nothing more. After each commit, the
+daemon UNSTAGES excluded files (so its own `git add -A`
+doesn't sweep them into YOUR next manual commit) but
+**preserves their worktree content**. Your edits to
+excluded files stay on disk, visible in `git status` as
+modified-unstaged.
+
+Before v0.112.34, the daemon ran
+`git restore --staged --worktree` on excluded files after
+every commit — **silently deleting the operator's
+uncommitted edits** (audit F1.16). That data-loss default
+was wrong for a knob named "exclude from auto-commit".
+
+Operators who WANT hygiene enforcement ("these files must
+always equal HEAD") opt in **per-repo**:
+
+```toml
+# .dracon/dracon-sync.toml
+revert_excluded_to_head = true
+```
+
+Destructive behavior requires an explicit opt-in; it is
+never the silent default.
+
 > **REMOVED 2026-06-15 (goal `76ddaa7e`)**:
 > The `auto_commit_exclude_patterns` for
 > `**/test-results/**` and `**/e2e/screenshots/**`
