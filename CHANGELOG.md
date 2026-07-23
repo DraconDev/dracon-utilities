@@ -102,7 +102,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `dracon-sync repos` shows exactly 4 healthy repos: `dracon-utilities` + the 3 long-name façade repos (`dracon-sync-background-auto-commit-multi-remote`, `dracon-system-disk-process-guard-doctor`, `dracon-warden-secret-encrypt-age-git-filter`)
   - No Set A short-name URL exists in any local clone's remotes
   - No Set A URL exists in any active config/script/code (`scripts/`, `.git/hooks/`, `install.sh`, `~/.dracon/utilities/sync/dracon-sync.toml`)
-  - Set A URLs appear only in 3 historical documents (`CHANGELOG.md`, `docs/design/github-feature-repos.md`, `release-notes-v0.112.5.md`) that document the Set A → Set B rename event as history; they are not active references
+  - Set A URLs appear only in 3 historical documents (`CHANGELOG.md`, `docs/design/github-feature-repos.md`, `docs/archive/release-notes/release-notes-v0.112.5.md`) that document the Set A → Set B rename event as history; they are not active references
   - No local clone points to a `_deletion_scheduled` URL
   - The post-commit hook + `regenerate_facade_repos.py` only target `/home/dracon/Dev/facade-repos/` (the long-name-only path)
   - All 4 watched repos are 4-remote aligned (github, gitlab, codeberg)
