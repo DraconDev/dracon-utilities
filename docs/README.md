@@ -24,6 +24,17 @@ root `*.md` = canonical audits, release notes, and core files.
 | `SECURITY.md` | Security policy |
 | `UTILITY_BOUNDARIES.md` | Where one utility ends and another begins |
 
+## Top-level docs (`docs/`)
+
+| File | What it is |
+|---|---|
+| `docs/ARCHITECTURE.md` | The 3 CLI binaries + systemd service layout |
+| `docs/OPERATIONS.md` | Systemd services, incident response, troubleshooting |
+| `docs/ROADMAP.md` | Documentation roadmap |
+| `docs/README.md` | This index |
+| `docs/design/` | Durable design + investigation docs (indexed below) |
+| `docs/archive/` | Superseded process iterations (kept for history) |
+
 ## Canonical audits (root)
 
 | File | What it is |
