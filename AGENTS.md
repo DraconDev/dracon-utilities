@@ -213,6 +213,17 @@ a file untracked are:**
    only when the operator has explicitly set them
    in `.dracon/dracon-sync.toml` with a documented
    reason in the file
+5. **Regeneratable audit frame dumps** (ADDED
+   2026-07-23, deathrun bloat fix): `.pi/
+   chrome-screenshots/` and `audit-*/screenshots/`
+   are warden-`.gitignore`d fleet-wide (via
+   `hygiene_patterns` in `dracon-warden.toml`).
+   The audit `.md` REPORTS still go up (they are
+   the deliverable); the frame dumps are
+   regeneratable on demand and were the source of
+   deathrun's 2.85 GiB pushable-branch bloat that
+   tripped github's 2 GiB pack limit. See
+   `docs/design/audit-screenshot-bloat-deathrun-2026-07-23.md`.
 
 Any file that is not in one of these categories
 should be auto-staged and committed. If the daemon
