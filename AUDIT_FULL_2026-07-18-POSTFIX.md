@@ -290,11 +290,11 @@ path. Deferred to a follow-up warden release (likely v0.113).
 | `deny.toml [sources].allow-git` | ✅ minimal | only the github URL; cleared `[]` from before |
 | `AGENTS.md` accuracy | ✅ accurate | 31 repos tally (was 32); F5 section current |
 | `CHANGELOG.md` v0.112.21 entry | ✅ added | this release |
-| `release-notes-v0.112.21.md` | ✅ present | 11 KiB |
-| `release-notes-v0.112.20.md` tally | ⚠️ says "32 repos" | was true at the time; needs note that 31 is current after patch-source → 31 |
+| `docs/archive/release-notes/docs/archive/release-notes/release-notes-v0.112.21.md` | ✅ present | 11 KiB |
+| `docs/archive/release-notes/docs/archive/release-notes/release-notes-v0.112.20.md` tally | ⚠️ says "32 repos" | was true at the time; needs note that 31 is current after patch-source → 31 |
 | `AUDIT_FULL_2026-07-18.md` §F5 tally | ⚠️ says "32 repos" | post-fix state correctly says 31; addressed inline below |
 
-### `release-notes-v0.112.20.md` tally drift
+### `docs/archive/release-notes/docs/archive/release-notes/release-notes-v0.112.20.md` tally drift
 
 The release notes mention "32 repos" because that was the live count
 when v0.112.20 was released. After the patch-source transition, the

@@ -238,8 +238,8 @@ is **retired**.
 
 - File count: local has 60 files under `dracon-sync/`, gitlab has 49
   (gitlab-only: 0; local-only: 14, all in `CHANGELOG.md`, `LICENSE`,
-  `SECURITY.md`, `monorepo-README.md`, `release-notes-v0.112.13.md`,
-  `release-notes-v0.112.14.md`, `scripts/release.sh`, `.github/`,
+  `SECURITY.md`, `monorepo-README.md`, `dracon-sync/release-notes-v0.112.13.md`,
+  `dracon-sync/release-notes-v0.112.14.md`, `scripts/release.sh`, `.github/`,
   `.gitignore`, `docs/`).
 - Byte-identical intersection: 46 files (the daemon's `src/daemon.rs`
   is **byte-identical** at 2928 lines, SHA256

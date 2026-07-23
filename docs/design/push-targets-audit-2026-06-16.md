@@ -86,7 +86,7 @@ Set A → Set B rename event:
 |------|------|--------|
 | `CHANGELOG.md` | Changelog | Documents the rename event as history (explicitly carved out) |
 | `docs/design/github-feature-repos.md` | Design doc | Section compares Set A vs Set B names; explains the rename |
-| `release-notes-v0.112.5.md` | Release notes | Documents the rename event as part of the v0.112.5 release |
+| `docs/archive/release-notes/docs/archive/release-notes/release-notes-v0.112.5.md` | Release notes | Documents the rename event as part of the v0.112.5 release |
 
 These references are **historical documentation** — they do not cause any
 push to a Set A URL, are not loaded by the daemon or any sync code, and

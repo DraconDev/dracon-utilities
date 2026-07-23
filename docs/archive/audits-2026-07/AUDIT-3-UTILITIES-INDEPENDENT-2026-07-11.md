@@ -218,7 +218,7 @@ $ grep -E '^version' dracon-sync/Cargo.toml
 version = "0.112.14"
 ```
 
-And the `release-notes-v0.112.13.md` and `release-notes-v0.112.14.md`
+And the `dracon-sync/release-notes-v0.112.13.md` and `dracon-sync/release-notes-v0.112.14.md`
 files exist in the nested `dracon-sync/` repo (tracked there,
 untracked in the parent):
 
@@ -232,7 +232,7 @@ The release commits in the nested repo:
 
 ```
 $ git log v0.112.13 -1 --format="%ai %s"
-2026-06-21 19:30:21 4 file(s) [release-notes-v0.112.13.md, Cargo.lock, Cargo.toml] DELTA:+29/-2 | NEW:release-notes-v0.112.13.md DEPS:+version,-version
+2026-06-21 19:30:21 4 file(s) [dracon-sync/release-notes-v0.112.13.md, Cargo.lock, Cargo.toml] DELTA:+29/-2 | NEW:dracon-sync/release-notes-v0.112.13.md DEPS:+version,-version
 $ git log v0.112.14 -1 --format="%ai %s"
 2026-06-22 15:35:25 release: v0.112.14
 ```

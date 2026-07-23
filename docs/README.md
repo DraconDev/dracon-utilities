@@ -199,7 +199,7 @@ root `*.md` = canonical audits, release notes, and core files.
 | `release-process-2026-06-21.md` | The release process |
 | `crates-io-publish-2026-06-16.md` | crates.io publishing |
 | `patch-to-git-tag-2026-07-18.md` | `[patch.crates-io]` → git-tag (dracon-git v94.7.1) |
-| `release-notes-v0.112.*.md` (root) | One release note per version — the release record |
+| `release-notes-v0.112.*.md` | One per version — archived 2026-07-23 (content is in `CHANGELOG.md`); see `docs/archive/release-notes/` |
 | `v2-card-design-snapshot-2026-06-16.md` | v2 card design snapshot |
 | `keep-alive.md` | Keep-alive |
 | `followup-tasklist-2026-07-03.md` | Follow-up tasklist (from full-audit-2026-07-03) |
@@ -212,6 +212,9 @@ Superseded process iterations kept for history (not for reading):
   (FINAL, FULL, INDEPENDENT, RECHECK×2, RERUN, FILTER-REPO) from
   running the 2026-07-10 audit seven ways. The canonical original is
   `AUDIT-3-UTILITIES-2026-07-10.md` at root.
+- `release-notes/` — 32 per-version release notes (v0.112.5–12, 15–39).
+  Pure duplication of `CHANGELOG.md` entries; archived 2026-07-23. The
+  v0.112.13 and v0.112.14 notes remain at `dracon-sync/`.
 - `test_activity.md` — a 1-line scratch artifact.
 
 ---

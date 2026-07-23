@@ -9,7 +9,7 @@
 
 `dracon-utilities` is a **meta-only repo**. It tracks **no Rust
 source** — only meta files: `AGENTS.md`, `CHANGELOG.md`, the audit
-docs (`AUDIT-*.md`, `AUDIT_REPOS_*.md`), `release-notes-v0.112.*.md`,
+docs (`AUDIT-*.md`, `AUDIT_REPOS_*.md`, archived `release-notes-v0.112.*.md`),
 `.cargo/config.toml`, the workspace `Cargo.toml`/`Cargo.lock`, and
 `.pi/goals/**`.
 

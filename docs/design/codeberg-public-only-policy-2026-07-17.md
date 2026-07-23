@@ -304,7 +304,7 @@ the safe-default state: codeberg excluded with `(unknown)` reason.
   "operator adds manual `exclude_remotes` per repo" to "operator
   adds one global default, per-repo overrides only when really
   needed".
-- `release-notes-v0.112.16.md` — release notes for this change.
+- `docs/archive/release-notes/docs/archive/release-notes/release-notes-v0.112.16.md` — release notes for this change.
 - `CHANGELOG.md` `[Unreleased]` — canonical changelog entry.
 - `AUDIT_REPOS_2026-07-17.md` — the audit performed prior to this
   goal that identified the 12 PUSH_STUCK repos and the 2 orphans
@@ -430,6 +430,6 @@ Visibility distribution now clear:
 - 24 private repos show `[excl:codeberg] (private)`
 - 0 unknown
 
-v0.112.17 release notes (`release-notes-v0.112.17.md`) document
+v0.112.17 release notes (`docs/archive/release-notes/docs/archive/release-notes/release-notes-v0.112.17.md`) document
 this follow-up. CHANGELOG.md `[Unreleased]` updated. Version
 bumped from 0.112.16 → 0.112.17.

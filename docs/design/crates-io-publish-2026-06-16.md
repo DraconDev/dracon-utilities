@@ -242,5 +242,5 @@ crates.io will show a deprecation banner.
 - `docs/design/github-feature-repos.md` — the 4-repo architecture
 - `docs/design/push-targets-audit-2026-06-16.md` — the push targets audit
 - `docs/design/final-audit-2026-06-16.md` — the final audit (this doc is referenced from there)
-- `release-notes-v0.112.9.md` — release notes for the v0.112.9 release
+- `docs/archive/release-notes/docs/archive/release-notes/release-notes-v0.112.9.md` — release notes for the v0.112.9 release
   (which packages the crates.io publish)

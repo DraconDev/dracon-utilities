@@ -169,7 +169,7 @@ repos are not a workaround for sync state — they are a presentation surface.
   e.g. `dracon-sync-watch-debounce-commit-push-mirror`) to Set B
   (sentence-style, e.g. `dracon-sync-background-auto-commit-multi-remote`).
   See the [`CHANGELOG`](../../CHANGELOG.md) entry for `0.112.5` and
-  `release-notes-v0.112.5.md` for the full story. The
+  `docs/archive/release-notes/docs/archive/release-notes/release-notes-v0.112.5.md` for the full story. The
   `scripts/regenerate_facade_repos.py` script + a `post-commit` hook
   automatically regenerate the 3 façade repos when a utility's source
   files change in this monorepo. The 3 façade repo clones live at
@@ -210,6 +210,6 @@ the monorepo for the source and to `install.sh` for installation.
 ## Cross-references
 
 - [`CHANGELOG.md`](../../CHANGELOG.md) — release notes
-- [`release-notes-v0.112.5.md`](../../release-notes-v0.112.5.md) — full v0.112.5 release notes
+- [`docs/archive/release-notes/docs/archive/release-notes/release-notes-v0.112.5.md`](../../docs/archive/release-notes/release-notes-v0.112.5.md) — full v0.112.5 release notes
 - [`scripts/scaffold_feature_repos.py`](../../scripts/scaffold_feature_repos.py) — generates the façade content
 - [`scripts/regenerate_facade_repos.py`](../../scripts/regenerate_facade_repos.py) — auto-sync glue

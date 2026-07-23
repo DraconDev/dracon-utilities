@@ -490,7 +490,7 @@ minus 1 (clone removed, daemon auto-unregistered it).
 
 Full design doc: `docs/design/concerns-investigation-2026-07-18.md`
 (14.7 KiB). Patch-source transition: `docs/design/patch-to-git-tag-2026-07-18.md`.
-Release notes: `release-notes-v0.112.20.md`.
+Release notes: `docs/archive/release-notes/docs/archive/release-notes/release-notes-v0.112.20.md`.
 
 **Test summary**:
 - `cargo test -p dracon-git --lib`: 33 tests pass (was 32, +1 new

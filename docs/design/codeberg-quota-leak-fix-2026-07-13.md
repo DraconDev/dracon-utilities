@@ -221,7 +221,7 @@ curl -s -H "Authorization: token $CODEBERG_TOKEN" "https://codeberg.org/api/v1/u
 
 ## See also
 
-- `release-notes-v0.112.15.md` — release notes for this change.
+- `docs/archive/release-notes/docs/archive/release-notes/release-notes-v0.112.15.md` — release notes for this change.
 - `CHANGELOG.md` `[Unreleased]` — canonical changelog entry.
 - `AUDIT_REPOS_2026-07-10.md` — pre-existing codeberg size audit.
 - `docs/archive/audits-2026-07/AUDIT-3-UTILITIES-RERUN-2026-07-11.md` — fresh utility audit that

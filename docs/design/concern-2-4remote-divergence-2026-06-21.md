@@ -316,7 +316,7 @@ ef0d66a5 1 file(s) in scripts [scripts/scaffold_feature_repos.py] DELTA:+1/-1
 dbf0b9ff docs: dragon-sync repos vs vscode discrepancy + the unstuck fix
 f2a3a3c3 chore: add .plaintext siblings for warden-sensitive test fixtures
 753f0fa5 1 file(s) in scripts [scripts/release.sh] DELTA:+6/-1
-f0081a09 7 file(s) in dracon-sync,dracon-system,dracon-warden [release-notes-v0.112.12.md, ...]
+f0081a09 7 file(s) in dracon-sync,dracon-system,dracon-warden [docs/archive/release-notes/release-notes-v0.112.12.md, ...]
 ```
 
 (15 shown; the 16th — `e77666c8 fix(release): abort path…` — is
