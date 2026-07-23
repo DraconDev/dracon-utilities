@@ -224,7 +224,7 @@ curl -s -H "Authorization: token $CODEBERG_TOKEN" "https://codeberg.org/api/v1/u
 - `release-notes-v0.112.15.md` — release notes for this change.
 - `CHANGELOG.md` `[Unreleased]` — canonical changelog entry.
 - `AUDIT_REPOS_2026-07-10.md` — pre-existing codeberg size audit.
-- `AUDIT-3-UTILITIES-RERUN-2026-07-11.md` — fresh utility audit that
+- `docs/archive/audits-2026-07/AUDIT-3-UTILITIES-RERUN-2026-07-11.md` — fresh utility audit that
   confirmed `default_untracked_exclude_patterns` was the right
   intervention point.
 - `commit-all-policy-2026-06-15.md` — the operator's

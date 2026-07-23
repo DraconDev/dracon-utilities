@@ -166,7 +166,7 @@ then `crossbeam-deque` — were both inaccurate; corrected 2026-07-11.)
 
 ---
 
-## 6. Rerun 2026-07-11 (audit AUDIT-3-UTILITIES-RERUN-2026-07-11.md)
+## 6. Rerun 2026-07-11 (audit `docs/archive/audits-2026-07/AUDIT-3-UTILITIES-RERUN-2026-07-11.md`)
 
 A fresh re-audit on the same day confirmed all 6 CONCERNs remain resolved and
 discovered one additional finding (FINDING #7: 58 warnings in `cargo build --tests`,
@@ -181,4 +181,4 @@ all in dracon-sync test code, fixed in the same pass by wrapping each
 - `cargo deny check` from workspace root and per-crate: exit 0,
   `advisories ok, bans ok, licenses ok, sources ok`.
 
-See `AUDIT-3-UTILITIES-RERUN-2026-07-11.md` for the full delta vs this audit.
+See `docs/archive/audits-2026-07/AUDIT-3-UTILITIES-RERUN-2026-07-11.md` for the full delta vs this audit.
