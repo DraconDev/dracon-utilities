@@ -296,6 +296,29 @@ starts committing, or its repo will flip to `🚫 unowned` and stop syncing
 (this is what happened to ai-auto-writer and browser-extensions-shared on
 2026-07-25 — see docs/design/incident-amend-race-and-trust-2026-07-25.md).
 
+## History-rewrite ENFORCEMENT stack (v0.113.0, 2026-07-25)
+
+The no-rewrite policy below is now enforced, not just documented:
+
+1. **warden global hooks** (`~/.config/git/hooks`, warden-owned via
+   core.hooksPath + init.templateDir): `pre-push` refuses
+   non-fast-forward updates and branch deletions; `pre-rebase`
+   refuses rebasing commits already on any remote. Escape hatch for
+   deliberate operator rewrites: `DRACON_ALLOW_REWRITE=1`.
+2. **gitlab branch protection**: every live main/master across the
+   fleet is protected (`allow_force_push=false`, maintainers push);
+   dracon-sync's gitlab auto-create protects `main` on creation.
+3. **GitHub**: all public repos protected; private repos can't be
+   (free tier) — the warden hooks are the mitigation there.
+4. **Auto-gc**: the daemon runs `git gc --prune=now` when a repo's
+   dangling garbage exceeds `auto_gc_garbage_threshold_bytes`
+   (default 2 GiB, 0 disables) — self-heals the tmp_pack_* bloat
+   class that inflated hegemon to 4.9 GiB and dracon-platform to
+   37 GiB.
+
+Details: `docs/design/incident-amend-race-and-trust-2026-07-25.md`
+("Whack-a-mole audit" section).
+
 ## Agent loops MUST NOT rewrite history (2026-07-25 incident)
 
 Loop agents working in daemon-watched repos must never `commit --amend`,

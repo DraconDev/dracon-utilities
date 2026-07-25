@@ -214,6 +214,47 @@ AGENTS.md gained an "Agent-loop git identities" section: when a new
 agent loop is created, whitelist its identity in BOTH lists **before** it
 starts committing.
 
+## Whack-a-mole audit → enforcement stack (v0.113.0)
+
+Operator question: "have we fixed the CAUSES, or are we playing
+whack-a-mole?" Causal audit of the whole incident chain:
+
+- **Root-caused at the source**: the systemd 258.7 userns ssh break
+  (v0.112.41) manufactured most of the symptom cluster (fetch_failed,
+  persistent divergence, stuck pushes); the KiB unit bug (v0.112.42)
+  had silently disabled the GitHub 2 GiB pack guard.
+- **The history-rewrite class was only SOFT-fixed** (AGENTS.md policy
+  files) — agents may not read them. Hardened into enforcement:
+  - **gitlab branch protection sweep**: 19 live branches across the
+    fleet protected (`allow_force_push=false`, maintainers push).
+    hegemon's protection is why gitlab kept the pre-rewrite history
+    (the ghost 9f1bb7f1) — the mechanism already proved itself.
+  - **GitHub**: all 23 public repos protected via API. Private repos
+    CANNOT be protected on the free tier — residual gap, covered by
+    the hooks below.
+  - **gitlab auto-create** now protects `main` immediately on repo
+    creation (dracon-sync v0.113.0) so the sweep can't silently
+    regress with the next new repo.
+  - **warden 0.113.0 global hooks** (`~/.config/git/hooks` via
+    core.hooksPath + init.templateDir — warden owns the hook layer):
+    pre-push refuses non-fast-forward updates + branch deletions,
+    pre-rebase refuses rebasing published commits. Escape hatch:
+    `DRACON_ALLOW_REWRITE=1`. Verified end-to-end: force-push of
+    rewritten history refused (the hegemon case), amend-of-unpushed
+    and rebase-of-unpublished still work.
+  - Design note: the enforcement was first built as dracon-sync
+    per-repo hooks and MOVED to warden after discovering warden
+    seeds/owns hooks fleet-wide (global hooksPath, init.templateDir,
+    hardening) — two installers would have ping-ponged ownership.
+- **Garbage bloat self-heal**: `auto_gc_garbage_threshold_bytes`
+  (default 2 GiB) — the daemon runs `git gc --prune=now` when
+  dangling tmp_pack_* debris exceeds the threshold (the hegemon
+  4.9 GiB / dracon-platform 37 GiB class, previously manual).
+- **Accepted residuals**: trust-list onboarding for brand-new loop
+  identities stays manual-but-documented (wildcard trust would weaken
+  the exfil boundary); `repos` cold path ~7s once/hour (sidecar
+  status file deferred — TTL=1h makes runs ~1s in practice).
+
 ## What was deliberately NOT done
 
 - **No force-push anywhere.** deathrun self-resolved by merge; hegemon
