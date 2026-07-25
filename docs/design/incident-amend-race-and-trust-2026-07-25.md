@@ -2,7 +2,7 @@
 
 **Date**: 2026-07-25
 **Repos affected**: deathrun, hegemon, ai-auto-writer, browser-extensions-shared, pi-plugins
-**Resolution shipped in**: dracon-sync v0.112.40 (deploy) + **dracon-git v94.7.2** (upstream fix, tag pushed)
+**Resolution shipped in**: dracon-sync v0.112.40 (perf) + **v0.112.41** (daemon-mode GIT_SSH_COMMAND) + **dracon-git v94.7.2** (git2 ssh/https features + agent-less ssh_cred)
 **Status**: all resolved; fleet 35 repos / 0 CONCERN / 0 unowned / 0 push-stuck
 
 ## Summary of the four concurrent issues
@@ -97,6 +97,52 @@ unset and with a dead socket.
 
 dracon-utilities `[patch.crates-io]` now pins `tag = "v94.7.2"`.
 All 829 daemon tests + 33 dracon-git tests pass; clippy clean.
+
+### 3b. THE THIRD SYSTEMATIC BUG: systemd 258.7 user namespace breaks plain ssh in the daemon
+
+After the v94.7.2 deploy, a NEW error surfaced on every CLI fetch/pull
+from the daemon:
+
+```
+git pull --no-rebase failed: Bad owner or permissions on
+/nix/store/...-systemd-258.7/lib/systemd/ssh_config.d/20-systemd-ssh-proxy.conf
+```
+
+Root cause (reproduced deterministically via `systemd-run --user -p
+ProtectHome=read-only ssh -G ...`): the systemd 258.7 user-service
+sandbox (`ProtectSystem=strict` / `ProtectHome=read-only` /
+`PrivateTmp`) now runs the daemon inside a **user namespace**, where
+root-owned files appear as `nobody(65534)`. OpenSSH's
+`secure_filename()` rejects any config path component not owned by euid
+or uid 0, so `/etc/ssh/ssh_config`'s system Include of systemd's
+nix-store `ssh_config.d` file failed the check. Pushes kept working
+because they already set `GIT_SSH_COMMAND` with
+`-F ~/.dracon/secrets/ssh/config`, which bypasses the broken include;
+plain-ssh paths (dracon-git's CLI-first `fetch()` / `pull_merge()` /
+`pull_rebase()`) all broke.
+
+This also retro-explains deathrun's 03:07 failure: the CLI fetch failed
+with this error first, and the broken libgit2 fallback (§3) masked it
+with `unsupported URL protocol`. Two stacked bugs, one log line.
+
+**Fix shipped in dracon-sync v0.112.41** (`main.rs`, daemon mode only):
+set `GIT_SSH_COMMAND` process-wide (unless already set) to the same
+`git_ssh_hardening()` value pushes use, so every subprocess git
+invocation inherits it. Verified: zero `Bad owner` errors post-restart;
+deathrun/hegemon/browser-extensions-shared all synced.
+
+### 3c. Structural: amend-everything loops vs auto-push
+
+The virtual-pet goal-loop (browser-extensions-shared) commits via
+`git commit --amend` EVERY iteration (~2 min cadence) and runs
+`git pull --no-rebase origin HEAD` periodically. Amending a merge
+commit drops its second parent, so every daemon/loop merge at HEAD is
+discarded at the next iteration — the ↓1 divergence is STRUCTURAL
+while the loop runs (content is always identical; pure topology noise).
+It self-resolves when the loop ends (deathrun pattern) or when the
+loop's periodic pull lands. Long-term fix belongs in the goal-loop
+tooling: don't amend once the daemon may have pushed (e.g. plain
+`git commit` checkpoints, or amend only when `HEAD` is unpushed).
 
 ### 4. Agent-loop identities vs the F44 asymmetric-trust check
 
