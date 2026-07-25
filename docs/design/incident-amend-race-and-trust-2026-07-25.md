@@ -131,6 +131,41 @@ set `GIT_SSH_COMMAND` process-wide (unless already set) to the same
 invocation inherits it. Verified: zero `Bad owner` errors post-restart;
 deathrun/hegemon/browser-extensions-shared all synced.
 
+### 3d. POST-MORTEM (same day, evening): who ran filter-branch — SOLVED
+
+The hegemon loop agent's own process notes in `.pi-glla/active.jsonl`:
+
+> "The pre-commit hook auto-committed my change before I could attach my
+> message. The fix landed as `9f1bb7f1` with the auto-generated subject
+> `1 file(s) [SPEC.md] DELTA:+18/-9`. Recovery: `git filter-branch
+> --msg-filter` rewrote just the message of `9f1bb7f1` to `b3045ebc`.
+> Force-pushed with `--force-with-lease`."
+
+The "pre-commit hook" **is the daemon**. The loop agent's established
+practice: daemon auto-commits its WIP with a generated message → agent
+rewrites the message with `git filter-branch --msg-filter` → agent
+force-pushes with `--force-with-lease`. This one habit explains the
+entire hegemon incident class:
+
+- the `filter-branch: rewrite` reflog entries (06:43, 06:50, 15:24)
+- the force-pushed ghost lines racing the daemon (the stale `9f1bb7f1`
+  SPEC.md §12.4 revert found on gitlab/main this morning)
+- the recurring ↑N ↓1 divergences (daemon pushes original, agent
+  force-pushes rewrite, both think they're ahead)
+- committed merge-conflict markers in the goal ledger (merges resolved
+  by an amending/rewriting agent mid-flight)
+
+The agent is not malfunctioning — it honestly documents the practice as
+"recovery". The tooling gap: nothing tells loop agents that (a) the
+daemon's auto-commit is already PUSHED within seconds, so rewriting it
+is a public-history rewrite, and (b) `--force-with-lease` against a
+daemon-managed remote is forbidden by fleet policy. This is the root
+fix for task "goal-loop tooling must not rewrite/amend pushed history".
+
+The virtual-pet loop (browser-extensions-shared) shows the gentler
+variant: tip-only `commit --amend` + periodic `pull --no-rebase`, no
+force-push — divergence churn without ghost lines.
+
 ### 3c. Structural: amend-everything loops vs auto-push
 
 The virtual-pet goal-loop (browser-extensions-shared) commits via
