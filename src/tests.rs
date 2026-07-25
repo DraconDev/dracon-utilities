@@ -192,7 +192,8 @@ mod tests {
     /// Empty tree SHA — used as the "remote side" when simulating the
     /// first push of a new branch (so the diff range covers the full
     /// local history).
-    const EMPTY_TREE: &str = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
+    /// What git actually sends as remote_sha for a brand-new remote ref.
+    const ZERO_SHA: &str = "0000000000000000000000000000000000000000";
 
     #[test]
     fn pre_push_hook_passes_on_clean_commit() {
@@ -207,7 +208,7 @@ mod tests {
             .trim()
             .to_string();
 
-        let (status, _stderr) = run_hook(repo, &hook_path, &head, EMPTY_TREE);
+        let (status, _stderr) = run_hook(repo, &hook_path, &head, ZERO_SHA);
         assert!(
             status.success(),
             "hook should pass on clean push, but exited with: {:?}",
@@ -233,7 +234,7 @@ mod tests {
             .trim()
             .to_string();
 
-        let (status, stderr) = run_hook(repo, &hook_path, &head, EMPTY_TREE);
+        let (status, stderr) = run_hook(repo, &hook_path, &head, ZERO_SHA);
         assert_eq!(
             status.code(),
             Some(1),
@@ -265,7 +266,7 @@ mod tests {
             .trim()
             .to_string();
 
-        let (status, stderr) = run_hook(repo, &hook_path, &head, EMPTY_TREE);
+        let (status, stderr) = run_hook(repo, &hook_path, &head, ZERO_SHA);
         assert_eq!(
             status.code(),
             Some(1),

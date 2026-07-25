@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.113.0] — 2026-07-25 — history-rewrite guard in the global hooks
+
+**Hard, forge-invariant enforcement of the fleet's no-history-rewrite
+policy** (2026-07-25 incident: hegemon filter-branch churn, virtual-pet
+amend loop, pully rebase — agent loops rewrote already-pushed history
+and raced dracon-sync's auto-push into permanent divergent-branch
+CONCERNs). AGENTS.md policy files are soft; gitlab branch protection
+covers only gitlab; GitHub free-tier private repos cannot be protected
+server-side. These hooks are the layer that always applies.
+
+- **pre-push**: refuses non-fast-forward ref updates (amend/rebase of
+  a pushed commit can never be ff) and branch deletions. Amending
+  UNPUSHED commits still pushes fine. The plaintext-secret scan and
+  test-identity guard are unchanged.
+- **pre-rebase** (new): refuses rebasing any commit already contained
+  in a remote-tracking branch; rebasing unpushed work unaffected.
+- **Escape hatch**: `DRACON_ALLOW_REWRITE=1` bypasses both guards.
+- `setup-hooks` (global + local) installs all three hooks and removes
+  stale `.pre-dracon` chaining artifacts from the brief dracon-sync
+  per-repo hook experiment.
+- `install_hooks_for_repo` also seeds `pre-rebase` (only-if-missing
+  semantics preserved — foreign hooks are never overwritten).
+- Tests: the three pre-push tests simulating a new branch now pass
+  git's real new-ref sentinel (all-zeros) instead of the empty-tree
+  SHA, which the ff-guard correctly rejects as a non-ancestor.
+
+
 All notable changes to `dracon-warden` will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
