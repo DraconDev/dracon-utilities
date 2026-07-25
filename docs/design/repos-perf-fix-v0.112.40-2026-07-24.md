@@ -81,14 +81,24 @@ the operator.
 Added `cached_at_secs: Option<u64>` to `CachedRepoSize` (serialized with
 `#[serde(default)]` for backward compat with v0.112.39 cache files).
 The lookup now accepts a cache hit when:
-- `gitdir_sig` matches (unchanged), AND
-- `missing_objects.is_some()` (unchanged from v0.112.39), AND
-- **NEW**: `cached_at_secs` is within `REPO_SIZE_CACHE_TTL_SECS = 30` of
-  `now_secs` (the 30s TTL window)
+- `cached_at_secs` is within `REPO_SIZE_CACHE_TTL_SECS = 30` of
+  `now_secs` (the 30s TTL window), AND
+- `missing_objects.is_some()` (unchanged from v0.112.39)
 
-If the gitdir mtime changed but the cache is fresh (< 30s old), the lookup
-still hits. If the cache is stale (> 30s old), the lookup falls through to
-the gitdir_sig check + recompute.
+**CRITICAL FIX (v0.112.40 R2)**: the initial implementation required
+`gitdir_sig == gitdir_sig AND cached_entry_is_fresh(c)` — which meant
+the TTL never actually fired because the daemon's gitdir mtime updates
+always invalidated the sig before the TTL could help. The corrected
+logic drops the sig check for fresh entries: if the cache was written
+within 30s, we serve it regardless of whether the daemon has since
+bumped the gitdir mtime. This was the difference between 6-7s per repo
+(`probe_missing_objects` running on every cache miss) and <1s per repo
+(cache hit).
+
+If the cache is stale (> 30s old), the lookup falls through to the
+recompute path. The sig is still recorded in the cache entry (for
+diagnostics) but is not used for the hit decision when the entry is
+fresh.
 
 **Correctness**: the gitdir_sig mismatch check still forces a recompute
 when the TTL has elapsed — so stale data can't be served beyond the 30s
