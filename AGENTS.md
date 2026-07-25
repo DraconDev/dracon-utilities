@@ -279,6 +279,23 @@ Recent design docs (in `docs/design/`) cover:
 
 Design docs are durable. Re-read them.
 
+## Agent-loop git identities (ownership guard)
+
+The daemon's ownership guard (`auto_skip_unowned`) refuses to auto-commit/
+auto-push a repo whose HEAD author is untrusted. Agent loops (pi goal-loops,
+audit agents) that set `GIT_AUTHOR_NAME`/`GIT_AUTHOR_EMAIL` env overrides
+bypass repo-local `user.*` config, so their identity MUST be whitelisted in
+BOTH lists in `~/.dracon/utilities/sync/dracon-sync.toml` (the F44
+asymmetric-trust check flags when either signal is untrusted):
+
+- `trusted_emails` — e.g. `audit@dracon.dev`, `loop@virtualpet.local`
+- `trusted_authors` — e.g. `Audit`, `Virtual Pet Loop`
+
+When a new agent loop is created, add its identity to both lists BEFORE it
+starts committing, or its repo will flip to `🚫 unowned` and stop syncing
+(this is what happened to ai-auto-writer and browser-extensions-shared on
+2026-07-25 — see docs/design/incident-amend-race-and-trust-2026-07-25.md).
+
 ## Daemon commands
 
 - `dracon-sync repos` — live state of all watched repos
