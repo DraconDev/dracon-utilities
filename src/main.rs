@@ -2462,11 +2462,24 @@ fn run_setup_hooks(mode: HookMode, repo: Option<&Path>) -> Result<()> {
 
     let pre_commit_path = dir.join("pre-commit");
     let pre_push_path = dir.join("pre-push");
+    let pre_rebase_path = dir.join("pre-rebase");
 
     fs::write(&pre_commit_path, PRE_COMMIT_HOOK)
         .with_context(|| format!("failed to write {}", pre_commit_path.display()))?;
     fs::write(&pre_push_path, PRE_PUSH_HOOK)
         .with_context(|| format!("failed to write {}", pre_push_path.display()))?;
+    // ADDED 2026-07-25 (v0.113.0): the history-rewrite guard's
+    // rebase side. Also clean up stale chaining artifacts from the
+    // brief dracon-sync per-repo hook experiment (`.pre-dracon`
+    // siblings) — warden owns this directory.
+    fs::write(&pre_rebase_path, PRE_REBASE_HOOK)
+        .with_context(|| format!("failed to write {}", pre_rebase_path.display()))?;
+    for name in ["pre-commit.pre-dracon", "pre-push.pre-dracon", "pre-rebase.pre-dracon"] {
+        let stale = dir.join(name);
+        if stale.exists() {
+            let _ = fs::remove_file(&stale);
+        }
+    }
 
     // Set executable permissions
     #[cfg(unix)]
@@ -2474,7 +2487,8 @@ fn run_setup_hooks(mode: HookMode, repo: Option<&Path>) -> Result<()> {
         use std::os::unix::fs::PermissionsExt;
         let perms = fs::Permissions::from_mode(0o755);
         fs::set_permissions(&pre_commit_path, perms.clone())?;
-        fs::set_permissions(&pre_push_path, perms)?;
+        fs::set_permissions(&pre_push_path, perms.clone())?;
+        fs::set_permissions(&pre_rebase_path, perms)?;
     }
 
     // Set core.hooksPath
@@ -2500,7 +2514,8 @@ fn run_setup_hooks(mode: HookMode, repo: Option<&Path>) -> Result<()> {
             println!("🪝 setup-hooks (global) · installed to {}", dir.display());
             println!("   core.hooksPath  = {}", dir.display());
             println!("   pre-commit hook = blocks commits if warden filter is missing");
-            println!("   pre-push hook   = scans for plaintext secrets (defense-in-depth)");
+            println!("   pre-push hook   = scans secrets + blocks non-ff (history guard)");
+            println!("   pre-rebase hook = blocks rebasing published commits (history guard)");
             println!();
             println!("   Next: commit a file with secrets to test the encryption filter");
         }
@@ -2553,9 +2568,10 @@ fn install_hooks_for_repo(repo: &Path) -> Result<()> {
 
     let pre_commit_path = hooks_dir.join("pre-commit");
     let pre_push_path = hooks_dir.join("pre-push");
+    let pre_rebase_path = hooks_dir.join("pre-rebase");
 
     // Only install if not already present (don't overwrite user hooks)
-    if pre_commit_path.exists() && pre_push_path.exists() {
+    if pre_commit_path.exists() && pre_push_path.exists() && pre_rebase_path.exists() {
         return Ok(());
     }
 
@@ -2567,6 +2583,10 @@ fn install_hooks_for_repo(repo: &Path) -> Result<()> {
     if !pre_push_path.exists() {
         fs::write(&pre_push_path, PRE_PUSH_HOOK)?;
     }
+    // ADDED 2026-07-25 (v0.113.0): history-rewrite guard, rebase side.
+    if !pre_rebase_path.exists() {
+        fs::write(&pre_rebase_path, PRE_REBASE_HOOK)?;
+    }
 
     #[cfg(unix)]
     {
@@ -2576,7 +2596,10 @@ fn install_hooks_for_repo(repo: &Path) -> Result<()> {
             fs::set_permissions(&pre_commit_path, perms.clone())?;
         }
         if pre_push_path.exists() {
-            fs::set_permissions(&pre_push_path, perms)?;
+            fs::set_permissions(&pre_push_path, perms.clone())?;
+        }
+        if pre_rebase_path.exists() {
+            fs::set_permissions(&pre_rebase_path, perms)?;
         }
     }
 
