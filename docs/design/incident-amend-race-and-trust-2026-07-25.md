@@ -179,6 +179,24 @@ loop's periodic pull lands. Long-term fix belongs in the goal-loop
 tooling: don't amend once the daemon may have pushed (e.g. plain
 `git commit` checkpoints, or amend only when `HEAD` is unpushed).
 
+### 3e. hegemon backup-branch review (AGENTS.md fault policy) — BENIGN, cleaned
+
+Per AGENTS.md ("any `backup/pre-sync-largeblob-fix-*` branch is a fault
+requiring operator review"), hegemon had THREE such branches:
+
+| branch | tip | date |
+|---|---|---|
+| backup/pre-sync-largeblob-fix-1784111638 | d58de24ae91b9f66c537f1285211f32a2a2d0ad0 | 2026-07-12 |
+| backup/pre-sync-largeblob-fix-1784111877 | 1a15c0c86e23823b37865f791877e5cafa7f4032 | 2026-07-15 |
+| backup/pre-sync-largeblob-fix-1784112055 | 1a15c0c86e23823b37865f791877e5cafa7f4032 | 2026-07-15 (also pushed to gitlab) |
+
+Review verdict: the rewrite stripped ONLY `test-results/**/trace.zip`
+Playwright artifacts (5-11 MiB each, regeneratable) from the ahead
+history — fork point d077ce57 (2026-07-10). No source, docs, or assets
+lost; development continued cleanly for 10 days after. All three local
+branches + the gitlab remote branch deleted 2026-07-25 (tips recorded
+above for recovery).
+
 ### 4. Agent-loop identities vs the F44 asymmetric-trust check
 
 The ownership guard flags a repo when **either** the HEAD author email
