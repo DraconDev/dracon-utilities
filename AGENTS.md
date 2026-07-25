@@ -296,6 +296,24 @@ starts committing, or its repo will flip to `🚫 unowned` and stop syncing
 (this is what happened to ai-auto-writer and browser-extensions-shared on
 2026-07-25 — see docs/design/incident-amend-race-and-trust-2026-07-25.md).
 
+## Agent loops MUST NOT rewrite history (2026-07-25 incident)
+
+Loop agents working in daemon-watched repos must never `commit --amend`,
+`rebase`, `filter-branch`/`filter-repo`, or force-push — the daemon pushes
+auto-commits within seconds, so any rewrite races published history and
+creates permanent divergence churn (hegemon's loop documented
+`filter-branch --msg-filter` + `--force-with-lease` as its "recovery"
+practice; browser-extensions-shared's loop amended every ~2 min).
+
+Policy AGENTS.md files were added 2026-07-25 at:
+- `dracon-platform/AGENTS.md` (covers all nested game repos)
+- `browser-extensions-shared/AGENTS.md`
+
+New repos that host agent loops should get the same file (copy the
+"dracon-sync daemon: git-history rules for agent loops" section).
+Evidence: endless-td's loop agent adapted correctly ON ITS OWN
+("force-push to protected main is blocked") — explicit policy works.
+
 ## Daemon commands
 
 - `dracon-sync repos` — live state of all watched repos
