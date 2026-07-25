@@ -2343,7 +2343,33 @@ trap 'rm -f "$SCAN_FILES_NUL"' EXIT
 
 # Read push info from stdin (remote URL and branch refs)
 while read local_ref local_sha remote_ref remote_sha; do
-    # Skip branch deletions
+    # ── History-rewrite guard (ADDED 2026-07-25, v0.113.0) ──────
+    # A non-fast-forward push means rewritten history (amend/rebase
+    # of an already-pushed commit). The 2026-07-25 incident showed
+    # agent loops doing exactly this and racing dracon-sync's
+    # auto-push, producing permanent divergent-branch churn. GitLab
+    # branch protection covers gitlab; this hook is the
+    # forge-INVARIANT enforcement (GitHub free-tier private repos
+    # cannot be protected server-side). Amending UNPUSHED commits
+    # still pushes fine (fast-forward), so normal WIP flow is
+    # unaffected. Escape hatch: DRACON_ALLOW_REWRITE=1.
+    if [ -z "$DRACON_ALLOW_REWRITE" ]; then
+        if [ "$local_sha" = "0000000000000000000000000000000000000000" ]; then
+            echo "❌ dracon-warden: refusing to delete $remote_ref (history guard)." >&2
+            echo "   Bypass: DRACON_ALLOW_REWRITE=1" >&2
+            exit 1
+        fi
+        if [ "$remote_sha" != "0000000000000000000000000000000000000000" ]; then
+            if ! git merge-base --is-ancestor "$remote_sha" "$local_sha" 2>/dev/null; then
+                echo "❌ dracon-warden: refusing non-fast-forward push to $remote_ref (history rewrite)." >&2
+                echo "   Merge instead: git pull --no-rebase" >&2
+                echo "   Bypass: DRACON_ALLOW_REWRITE=1" >&2
+                exit 1
+            fi
+        fi
+    fi
+
+    # Skip branch deletions (only reachable via the escape hatch)
     if [ "$local_sha" = "0000000000000000000000000000000000000000" ]; then
         continue
     fi
@@ -2400,6 +2426,34 @@ while read local_ref local_sha remote_ref remote_sha; do
     fi
 done
 "##;
+
+/// ADDED 2026-07-25 (v0.113.0): refuse rebases that would rewrite
+/// commits already published to any remote-tracking branch. The
+/// pre-push guard blocks the PUSH side; this blocks the rewrite at
+/// the source, before the branch diverges. Rebasing unpushed local
+/// work (including `git pull --rebase` of commits not yet pushed)
+/// is unaffected. Escape hatch: DRACON_ALLOW_REWRITE=1.
+const PRE_REBASE_HOOK: &str = r#"#!/bin/sh
+# Dracon Warden — pre-rebase hook
+# Refuse rebases that rewrite already-published history.
+# Installed by: dracon-warden setup-hooks
+# Bypass deliberately: DRACON_ALLOW_REWRITE=1 git rebase ...
+if [ -n "$DRACON_ALLOW_REWRITE" ]; then exit 0; fi
+
+upstream="$1"
+[ -z "$upstream" ] && exit 0
+
+for c in $(git rev-list "$upstream"..HEAD 2>/dev/null | head -100); do
+    if [ -n "$(git branch -r --contains "$c" 2>/dev/null)" ]; then
+        echo "❌ dracon-warden: refusing rebase — $c is already published on a remote." >&2
+        echo "   Rebasing it would rewrite pushed history and diverge the fleet mirrors." >&2
+        echo "   Merge instead: git pull --no-rebase" >&2
+        echo "   Bypass: DRACON_ALLOW_REWRITE=1" >&2
+        exit 1
+    fi
+done
+exit 0
+"#;
 
 fn run_setup_hooks(mode: HookMode, repo: Option<&Path>) -> Result<()> {
     let dir = hook_dir(mode, repo)?;
