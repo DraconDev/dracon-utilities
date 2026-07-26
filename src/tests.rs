@@ -1925,4 +1925,251 @@ protected_patterns = ["secrets.json"]
         assert_eq!(found, 0, "plaintext sibling should skip resmudge");
         assert_eq!(changed, 0, "dry-run should not change anything");
     }
+
+    // --- Behavioral tests for the pre-rebase + pre-commit hooks --------
+    //
+    // ADDED 2026-07-26 (audit H-10, H-11, M-15). Same pattern as the
+    // pre-push harness above: run the in-tree hook templates as real
+    // shell subprocesses against temp git repos.
+
+    /// Create a temp git repo on `main` with ONE named hook installed in
+    /// an isolated hooks dir (so global/template hooks cannot interfere).
+    fn make_repo_with_hook(name: &str, hook_name: &str, content: &str) -> (TestDir, std::path::PathBuf) {
+        let td = TestDir::new(name);
+        let repo = td.path();
+        run_git_in(repo, &["init", "-q", "-b", "main"]);
+        run_git_in(repo, &["config", "user.email", "test@test.local"]);
+        run_git_in(repo, &["config", "user.name", "test"]);
+        run_git_in(repo, &["config", "commit.gpgsign", "false"]);
+
+        let hooks_dir = repo.join("test-hooks");
+        fs::create_dir_all(&hooks_dir).expect("hooks dir");
+        run_git_in(
+            repo,
+            &[
+                "config",
+                "core.hooksPath",
+                hooks_dir.to_str().expect("utf8 hooks path"),
+            ],
+        );
+
+        let hook_path = hooks_dir.join(hook_name);
+        fs::write(&hook_path, content).expect("write hook");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(&hook_path, fs::Permissions::from_mode(0o755)).expect("chmod hook");
+        }
+        (td, hook_path)
+    }
+
+    /// Invoke a hook script with positional args, isolated from the
+    /// operator's global/system git config (determinism for the
+    /// `git config filter.dracon.clean` probe in the pre-commit hook).
+    /// Returns (status, stdout+stderr concatenated) — the pre-commit
+    /// hook prints to stdout, the pre-rebase hook to stderr.
+    fn run_hook_args(
+        repo: &std::path::Path,
+        hook_path: &std::path::Path,
+        args: &[&str],
+    ) -> (std::process::ExitStatus, String) {
+        use std::process::Command;
+        let output = Command::new(hook_path)
+            .current_dir(repo)
+            .args(args)
+            .env("GIT_CONFIG_GLOBAL", "/dev/null")
+            .env("GIT_CONFIG_SYSTEM", "/dev/null")
+            .output()
+            .expect("run hook");
+        let mut text = String::from_utf8_lossy(&output.stdout).to_string();
+        text.push_str(&String::from_utf8_lossy(&output.stderr));
+        (output.status, text)
+    }
+
+    /// Create `n` empty commits on the current branch.
+    fn empty_commits(repo: &std::path::Path, n: usize) {
+        for i in 0..n {
+            run_git_in(repo, &["commit", "-q", "--allow-empty", "-m", &format!("c{i}")]);
+        }
+    }
+
+    // ---- pre-rebase (H-11, M-15) ----
+
+    #[test]
+    fn pre_rebase_hook_allows_unpublished_commits() {
+        let (td, hook) = make_repo_with_hook("rebase_unpub", "pre-rebase", PRE_REBASE_HOOK);
+        let repo = td.path();
+        run_git_in(repo, &["commit", "-q", "--allow-empty", "-m", "A"]);
+        let sha_a = git_in_output(repo, &["rev-parse", "HEAD"]).trim().to_string();
+        // Remote-tracking ref at A; B is local-only.
+        run_git_in(repo, &["update-ref", "refs/remotes/origin/main", &sha_a]);
+        run_git_in(repo, &["commit", "-q", "--allow-empty", "-m", "B"]);
+
+        let (status, stderr) = run_hook_args(repo, &hook, &["origin/main"]);
+        assert!(
+            status.success(),
+            "rebase of unpublished commits must pass: {stderr}"
+        );
+    }
+
+    #[test]
+    fn pre_rebase_hook_blocks_published_boundary_commit() {
+        let (td, hook) = make_repo_with_hook("rebase_pub", "pre-rebase", PRE_REBASE_HOOK);
+        let repo = td.path();
+        run_git_in(repo, &["commit", "-q", "--allow-empty", "-m", "A"]);
+        let sha_a = git_in_output(repo, &["rev-parse", "HEAD"]).trim().to_string();
+        run_git_in(repo, &["commit", "-q", "--allow-empty", "-m", "B"]);
+        let sha_b = git_in_output(repo, &["rev-parse", "HEAD"]).trim().to_string();
+        // B is published.
+        run_git_in(repo, &["update-ref", "refs/remotes/origin/main", &sha_b]);
+
+        let (status, stderr) = run_hook_args(repo, &hook, &[&sha_a]);
+        assert!(!status.success(), "rebase of published commits must be blocked");
+        assert!(stderr.contains("refusing rebase"), "stderr: {stderr}");
+    }
+
+    /// H-11 regression: the pre-fix `head -100` checked the NEWEST 100
+    /// commits; a published commit deeper than 100 in the range escaped.
+    #[test]
+    fn pre_rebase_hook_blocks_published_commit_deeper_than_100() {
+        let (td, hook) = make_repo_with_hook("rebase_deep", "pre-rebase", PRE_REBASE_HOOK);
+        let repo = td.path();
+        run_git_in(repo, &["commit", "-q", "--allow-empty", "-m", "A"]);
+        let sha_a = git_in_output(repo, &["rev-parse", "HEAD"]).trim().to_string();
+        // 105 commits on top of A; commit #5 from the bottom is
+        // "published" — position 101 newest-first, outside head -100.
+        empty_commits(repo, 5);
+        let sha_c5 = git_in_output(repo, &["rev-parse", "HEAD"]).trim().to_string();
+        empty_commits(repo, 100);
+        run_git_in(repo, &["update-ref", "refs/remotes/origin/topic", &sha_c5]);
+
+        let (status, stderr) = run_hook_args(repo, &hook, &[&sha_a]);
+        assert!(
+            !status.success(),
+            "published commit deeper than 100 in the range must be blocked (H-11)"
+        );
+        assert!(stderr.contains("refusing rebase"), "stderr: {stderr}");
+    }
+
+    /// M-15 regression: `git rebase <upstream> <branch>` rebases $2, not
+    /// HEAD — the pre-fix HEAD-only range was empty in that form.
+    #[test]
+    fn pre_rebase_hook_two_arg_form_checks_branch_tip() {
+        let (td, hook) = make_repo_with_hook("rebase_twoarg", "pre-rebase", PRE_REBASE_HOOK);
+        let repo = td.path();
+        run_git_in(repo, &["commit", "-q", "--allow-empty", "-m", "A"]);
+        let sha_a = git_in_output(repo, &["rev-parse", "HEAD"]).trim().to_string();
+        // feature = A + F, and F is published.
+        run_git_in(repo, &["checkout", "-q", "-b", "feature"]);
+        run_git_in(repo, &["commit", "-q", "--allow-empty", "-m", "F"]);
+        let sha_f = git_in_output(repo, &["rev-parse", "HEAD"]).trim().to_string();
+        run_git_in(repo, &["update-ref", "refs/remotes/origin/topic", &sha_f]);
+        // Back on main at A — HEAD contains nothing published.
+        run_git_in(repo, &["checkout", "-q", "main"]);
+
+        let (status, stderr) = run_hook_args(repo, &hook, &[&sha_a, "feature"]);
+        assert!(
+            !status.success(),
+            "two-arg rebase of a published branch must be blocked (M-15)"
+        );
+        assert!(stderr.contains("refusing rebase"), "stderr: {stderr}");
+    }
+
+    // ---- pre-commit (H-10) ----
+
+    #[test]
+    fn pre_commit_hook_allows_unmanaged_repo() {
+        let (td, hook) = make_repo_with_hook("precommit_unmanaged", "pre-commit", PRE_COMMIT_HOOK);
+        let repo = td.path();
+        // No warden markers: no filter config, no .gitattributes, no .dracon.
+        let (status, stderr) = run_hook_args(repo, &hook, &[]);
+        assert!(
+            status.success(),
+            "unmanaged repo must be allowed to commit (H-10): {stderr}"
+        );
+    }
+
+    #[test]
+    fn pre_commit_hook_blocks_managed_repo_with_drift() {
+        let (td, hook) = make_repo_with_hook("precommit_drift", "pre-commit", PRE_COMMIT_HOOK);
+        let repo = td.path();
+        // Marker present (filter configured) but .gitattributes missing
+        // the patterns — drift must still block.
+        run_git_in(repo, &["config", "filter.dracon.clean", "dracon-warden filter-clean"]);
+
+        let (status, stderr) = run_hook_args(repo, &hook, &[]);
+        assert!(!status.success(), "managed repo with drift must be blocked");
+        assert!(stderr.contains("filter missing"), "stderr: {stderr}");
+    }
+
+    #[test]
+    fn pre_commit_hook_chains_to_foreign_repo_local_hook() {
+        let (td, hook) = make_repo_with_hook("precommit_chain", "pre-commit", PRE_COMMIT_HOOK);
+        let repo = td.path();
+        // Foreign (non-warden) repo-local hook: writes a marker, exits 0.
+        let local_hook = repo.join(".git/hooks/pre-commit");
+        fs::write(
+            &local_hook,
+            "#!/bin/sh\ntouch \"$(git rev-parse --show-toplevel)/chained-marker\"\nexit 0\n",
+        )
+        .unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(&local_hook, fs::Permissions::from_mode(0o755)).unwrap();
+        }
+
+        let (status, stderr) = run_hook_args(repo, &hook, &[]);
+        assert!(status.success(), "chained success must pass: {stderr}");
+        assert!(
+            repo.join("chained-marker").exists(),
+            "foreign repo-local pre-commit hook must have been chained"
+        );
+    }
+
+    #[test]
+    fn pre_commit_hook_propagates_foreign_hook_failure() {
+        let (td, hook) = make_repo_with_hook("precommit_chainfail", "pre-commit", PRE_COMMIT_HOOK);
+        let repo = td.path();
+        let local_hook = repo.join(".git/hooks/pre-commit");
+        fs::write(&local_hook, "#!/bin/sh\nexit 3\n").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(&local_hook, fs::Permissions::from_mode(0o755)).unwrap();
+        }
+
+        let (status, _stderr) = run_hook_args(repo, &hook, &[]);
+        assert_eq!(
+            status.code(),
+            Some(3),
+            "foreign hook's exit code must propagate"
+        );
+    }
+
+    #[test]
+    fn pre_commit_hook_does_not_recurse_into_warden_seeded_local_hook() {
+        let (td, hook) = make_repo_with_hook("precommit_norecurse", "pre-commit", PRE_COMMIT_HOOK);
+        let repo = td.path();
+        // A warden-seeded local hook (contains the header) must NOT be
+        // chained — that would recurse.
+        let local_hook = repo.join(".git/hooks/pre-commit");
+        fs::write(
+            &local_hook,
+            "#!/bin/sh\n# Dracon Warden — seeded copy\ntouch \"$(git rev-parse --show-toplevel)/should-not-exist\"\nexit 0\n",
+        )
+        .unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(&local_hook, fs::Permissions::from_mode(0o755)).unwrap();
+        }
+
+        let (status, _stderr) = run_hook_args(repo, &hook, &[]);
+        assert!(status.success());
+        assert!(
+            !repo.join("should-not-exist").exists(),
+            "warden-seeded local hook must be skipped (no recursion)"
+        );
+    }
 }
