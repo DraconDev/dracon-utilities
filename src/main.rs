@@ -2431,7 +2431,12 @@ while read local_ref local_sha remote_ref remote_sha; do
     # Scan only newly added diff lines. Deletions of old secret-shaped fixtures
     # are safe, while additions still trip the defense-in-depth guard.
     DIFF=$(xargs -0 -r git diff --unified=0 "$RANGE" -- < "$SCAN_FILES_NUL" 2>/dev/null | grep -E '^\+[^+]' || true)
-    if echo "$DIFF" | grep -qE '(A{1}KIA[A-Z0-9]{16}|-----BEGIN [A-Z]+ PRIVATE KEY|password\s*=\s*["\x27][^"\x27]+|secret\s*=\s*["\x27][^"\x27]+|api_key\s*=\s*["\x27][^"\x27]+)'; then
+    # CHANGED 2026-07-26 (v0.113.1, audit WARDEN-M2): `\x27` is NOT a
+    # hex escape in GNU grep ERE (verified grep 3.12: "stray \ before
+    # x" — the class became ["x27], matching literal x/2/7 instead of
+    # a single quote), so single-quoted secrets escaped the scan. Use
+    # the shell `'`\\`''` idiom to embed a literal single quote.
+    if echo "$DIFF" | grep -qE '(A{1}KIA[A-Z0-9]{16}|-----BEGIN [A-Z]+ PRIVATE KEY|password\s*=\s*["'\''][^"'\'']+|secret\s*=\s*["'\''][^"'\'']+|api_key\s*=\s*["'\''][^"'\'']+)'; then
         echo "⚠️  Possible plaintext secrets detected in push." >&2
         echo "   The warden filter may have been bypassed." >&2
         echo "   Run: dracon-warden once $(git rev-parse --show-toplevel)" >&2
