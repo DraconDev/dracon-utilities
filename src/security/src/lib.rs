@@ -1104,9 +1104,9 @@ impl Warden {
 /// ADDED 2026-07-26 (audit H-9): shared smudge path for both entry
 /// points. The whole-file tag MUST be tried FIRST and returned as RAW
 /// BYTES — the pre-fix code fell through to `String::from_utf8_lossy`
-/// + `smart_smudge`, replacing every invalid UTF-8 byte with U+FFFD
-/// and silently corrupting whole-file-encrypted BINARY secrets (DER
-/// keys, SQLite, .kdbx); the corrupted worktree file was then
+/// followed by `smart_smudge`, replacing every invalid UTF-8 byte with
+/// U+FFFD and silently corrupting whole-file-encrypted BINARY secrets
+/// (DER keys, SQLite, .kdbx); the corrupted worktree file was then
 /// re-encrypted into git history by the next clean. The v0.112.32
 /// `decrypt_whole_file_tag` helper was only wired into
 /// `seal_smudge`/`decrypt_file`, which the binary never calls — this
