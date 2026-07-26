@@ -2291,6 +2291,29 @@ const PRE_COMMIT_HOOK: &str = r#"#!/bin/sh
 
 REPO=$(git rev-parse --show-toplevel)
 
+# FIXED 2026-07-26 (audit H-10), two prongs:
+# (1) Global core.hooksPath shadows .git/hooks for every repo, which
+#     silently disabled husky/pre-commit-framework hooks fleet-wide.
+#     Chain to the repo-local hook when one exists and is NOT a
+#     warden-seeded copy (the header guard prevents infinite
+#     recursion through install_hooks_for_repo's seed).
+LOCAL_HOOK="$REPO/.git/hooks/pre-commit"
+if [ -x "$LOCAL_HOOK" ] && ! grep -q "Dracon Warden" "$LOCAL_HOOK" 2>/dev/null; then
+    "$LOCAL_HOOK" "$@" || exit $?
+fi
+
+# (2) The pre-fix hook exited 1 in EVERY repo lacking filter=dracon —
+#     hard-blocking commits in third-party clones and scratch repos
+#     machine-wide. Only enforce on warden-MANAGED repos (any warden
+#     marker present); a repo with NO markers is not warden's
+#     business. Drift (some markers present, some missing) still
+#     blocks below.
+MANAGED=0
+git -C "$REPO" config filter.dracon.clean >/dev/null 2>&1 && MANAGED=1
+grep -q "filter=dracon" "$REPO/.gitattributes" 2>/dev/null && MANAGED=1
+[ -d "$REPO/.dracon" ] && MANAGED=1
+[ "$MANAGED" -eq 0 ] && exit 0
+
 # Check .gitattributes has filter=dracon patterns
 if ! grep -q "filter=dracon" "$REPO/.gitattributes" 2>/dev/null; then
     echo "❌ Warden filter missing from .gitattributes."
@@ -2443,15 +2466,29 @@ if [ -n "$DRACON_ALLOW_REWRITE" ]; then exit 0; fi
 upstream="$1"
 [ -z "$upstream" ] && exit 0
 
-for c in $(git rev-list "$upstream"..HEAD 2>/dev/null | head -100); do
-    if [ -n "$(git branch -r --contains "$c" 2>/dev/null)" ]; then
-        echo "❌ dracon-warden: refusing rebase — $c is already published on a remote." >&2
-        echo "   Rebasing it would rewrite pushed history and diverge the fleet mirrors." >&2
-        echo "   Merge instead: git pull --no-rebase" >&2
-        echo "   Bypass: DRACON_ALLOW_REWRITE=1" >&2
-        exit 1
-    fi
-done
+# FIXED 2026-07-26 (audit H-11 + M-15):
+# - Range tip is $2 when given (`git rebase <upstream> <branch>`
+#   rebases $2, not HEAD — the pre-fix HEAD-only range was EMPTY in
+#   that form, silently passing while published $2 commits were
+#   rewritten).
+# - Remote containment is ancestor-closed: if the OLDEST commit in
+#   the range is not contained in any remote-tracking branch, no
+#   newer commit can be. The pre-fix `head -100` checked the NEWEST
+#   100 commits (rev-list is newest-first), letting published commits
+#   deeper than 100 escape — exactly the incident class this guard
+#   exists to prevent. Check only the boundary commit; this also
+#   removes the up-to-100 `git branch -r` subprocess spawns.
+tip="${2:-HEAD}"
+oldest=$(git rev-list "$upstream".."$tip" 2>/dev/null | tail -1)
+[ -z "$oldest" ] && exit 0
+
+if [ -n "$(git branch -r --contains "$oldest" 2>/dev/null)" ]; then
+    echo "❌ dracon-warden: refusing rebase — $oldest is already published on a remote." >&2
+    echo "   Rebasing it would rewrite pushed history and diverge the fleet mirrors." >&2
+    echo "   Merge instead: git pull --no-rebase" >&2
+    echo "   Bypass: DRACON_ALLOW_REWRITE=1" >&2
+    exit 1
+fi
 exit 0
 "#;
 
