@@ -253,3 +253,41 @@ counting + codeberg flap; F3.13 no true precedence; F1.17 batch-limit union bug 
   missing-object fail-closed, unpublished pull --rebase) all correct.
 - v0.113.1 FilterOnly fix: borrow/scope fine, PushFailed correctly recorded+mapped,
   refresh_stale_upstream_ref cannot hang (30s idle timeout, prompt disabled, detached-HEAD safe).
+
+---
+
+## Remediation addendum (2026-07-27) — ALL 13 HIGHs fixed + deployed
+
+| # | Finding | Fix release |
+|---|---------|-------------|
+| SYNC-H1 | quiet-daemon wedge valve unreachable (daemon.rs:3745 gate) | dracon-sync 0.113.2 |
+| SYNC-H2 | auto-commit backstop self-defeating (NothingToDo → success) | dracon-sync 0.113.2 |
+| SYNC-H3 | maybe_auto_gc blocking/no-timeout/prune-race | dracon-sync 0.113.2 |
+| SYNC-H4 | visibility cache-poison on transient gh failure | dracon-sync 0.113.4 |
+| SYNC-H5 | standard_files source path traversal (validation + point-of-use) | dracon-sync 0.113.4 |
+| SYNC-H6 | rewrite_ahead_paths destroyed own backup / deleted origin / no force-push | dracon-sync 0.113.3 |
+| SYNC-H7 | detect_large_blobs_ahead cat-file pipe deadlock (100 MiB guard never engaged) | dracon-sync 0.113.2 |
+| SYNC-H8 | conflict-state helpers broken for nested submodule gitdirs | dracon-sync 0.113.2 |
+| WARDEN-H1 | binary whole-file secrets corrupted by smudge UTF-8 lossy path | dracon-warden 0.113.1 |
+| WARDEN-H2 | global pre-commit blocked ALL non-hardened repos | dracon-warden 0.113.1 |
+| WARDEN-H3 | pre-rebase `head -100` newest-first miss | dracon-warden 0.113.1 |
+| SYS-H1 | guard daemon busy-loop after first interval (elapsed never reset) | dracon-system 0.112.34 |
+| SYS-H2 | `link apply` could never fix a drifted symlink | dracon-system 0.112.34 |
+
+Bonus folded in: SYNC-M7 (auto-pull: explicit refspec, --no-edit, merge --abort
+on failure) in 0.113.3; WARDEN-M2 (pre-push regex single-quote escape) in 0.113.1.
+
+Verification: full workspace test suite green (837+10 sync, 92+10 warden, 88
+system), `cargo clippy --workspace --locked -- -D warnings` clean, all three
+binaries deployed to ~/.local/bin, daemon restarted, fleet 35 repos
+0 WARN / 0 CONCERN. Behavioral e2e for warden hooks re-verified in scratch repos.
+
+**INFRA-1 (junk-runner 10 MiB warden limit)**: resolved via option 1 — surgical
+`.gitattributes` bypass (`.pi-glla/** -filter -smudge`) in junk-runner only.
+The 10 MiB fail-closed guardrail stays intact fleet-wide; orchestrator state is
+not secret material and now commits as plaintext. Verified live: the 10.4 MiB
+`.pi-glla/active.jsonl` committed + pushed as plaintext JSON; junk-runner WARN
+cleared.
+
+MEDIUM/LOW findings remain queued in the pi backlog list (23 MEDIUM, ~30 LOW,
+meta B1–B8) — deferred per plan, none are live-damage classes.
