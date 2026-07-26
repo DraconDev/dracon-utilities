@@ -2309,7 +2309,12 @@ fi
 #     business. Drift (some markers present, some missing) still
 #     blocks below.
 MANAGED=0
-git -C "$REPO" config filter.dracon.clean >/dev/null 2>&1 && MANAGED=1
+# NOTE: the filter.dracon.* check MUST be --local — the operator's
+# GLOBAL ~/.gitconfig also carries filter.dracon.clean, so a plain
+# `git config` succeeds in every repo on the machine and the
+# non-managed early-exit below would be dead code (verified
+# 2026-07-26: scratch repo blocked without --local).
+git -C "$REPO" config --local filter.dracon.clean >/dev/null 2>&1 && MANAGED=1
 grep -q "filter=dracon" "$REPO/.gitattributes" 2>/dev/null && MANAGED=1
 [ -d "$REPO/.dracon" ] && MANAGED=1
 [ "$MANAGED" -eq 0 ] && exit 0
