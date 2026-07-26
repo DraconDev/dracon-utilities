@@ -1096,13 +1096,31 @@ impl Warden {
     }
 
     pub fn smudge(&self, bytes: &[u8], _path: Option<&str>) -> Result<Vec<u8>> {
-        if is_binary_content(bytes) {
-            return Ok(bytes.to_vec());
-        }
-        let content = String::from_utf8_lossy(bytes);
-        let smudged = WardenSecurity::new(None)?.smart_smudge(&content)?;
-        Ok(smudged.into_bytes())
+        let security = WardenSecurity::new(None)?;
+        smudge_with_security(&security, bytes)
     }
+}
+
+/// ADDED 2026-07-26 (audit H-9): shared smudge path for both entry
+/// points. The whole-file tag MUST be tried FIRST and returned as RAW
+/// BYTES — the pre-fix code fell through to `String::from_utf8_lossy`
+/// + `smart_smudge`, replacing every invalid UTF-8 byte with U+FFFD
+/// and silently corrupting whole-file-encrypted BINARY secrets (DER
+/// keys, SQLite, .kdbx); the corrupted worktree file was then
+/// re-encrypted into git history by the next clean. The v0.112.32
+/// `decrypt_whole_file_tag` helper was only wired into
+/// `seal_smudge`/`decrypt_file`, which the binary never calls — this
+/// is the path `main.rs:run_filter` actually reaches.
+fn smudge_with_security(security: &WardenSecurity, bytes: &[u8]) -> Result<Vec<u8>> {
+    if let Some(result) = security.decrypt_whole_file_tag(bytes) {
+        return result;
+    }
+    if is_binary_content(bytes) {
+        return Ok(bytes.to_vec());
+    }
+    let content = String::from_utf8_lossy(bytes);
+    let smudged = security.smart_smudge(&content)?;
+    Ok(smudged.into_bytes())
 }
 
 pub struct DraconWarden;
@@ -1113,13 +1131,8 @@ impl DraconWarden {
     }
 
     pub fn smudge(&self, bytes: &[u8], _path: Option<&str>) -> Result<Vec<u8>> {
-        if is_binary_content(bytes) {
-            return Ok(bytes.to_vec());
-        }
-        let content = String::from_utf8_lossy(bytes);
         let security = WardenSecurity::get_or_init()?;
-        let smudged = security.smart_smudge(&content)?;
-        Ok(smudged.into_bytes())
+        smudge_with_security(security, bytes)
     }
 
     pub fn clean(&self, bytes: &[u8], path: Option<&str>) -> Result<Vec<u8>> {
@@ -1467,6 +1480,52 @@ API_KEY=original"#;
     /// with U+FFFD — silently corrupting DER keys, SQLite files,
     /// .kdbx, etc., and the corrupted file was later re-encrypted
     /// into history.
+    /// ADDED 2026-07-26 (audit H-9): the H9 unit test above exercises
+    /// `decrypt_whole_file_tag` directly, so it passed while the
+    /// PRODUCTION smudge path (`Warden::smudge`/`DraconWarden::smudge`
+    /// via `main.rs:run_filter`) still went through from_utf8_lossy.
+    /// This test goes through `smudge_with_security` — the exact
+    /// shared path both entry points now delegate to.
+    #[test]
+    fn test_smudge_entrypoint_binary_roundtrip_byte_identical() {
+        let security = test_security_with_identity();
+        let plaintext: Vec<u8> = vec![
+            0x00, 0xFF, 0xFE, 0x80, 0x81, 0xC3, 0x28, 0xA0, 0xC1, 0xBF, 0xED, 0xA0, 0x80, 0xF5,
+            0x90, 0x80, 0x90, 0x00, 0x01, 0x02, 0x7F, 0x80, 0x90, 0xA0, 0xB0, 0xF0, 0x90, 0x80,
+            0x90,
+        ];
+        assert!(std::str::from_utf8(&plaintext).is_err());
+
+        let tag = security.encrypt_v2_to_b64_tag(&plaintext).unwrap();
+
+        // Through the production entry-point path:
+        let smudged = smudge_with_security(&security, &tag).unwrap();
+        assert_eq!(
+            smudged, plaintext,
+            "production smudge path must return whole-file binary secrets byte-identically"
+        );
+
+        // Trailing newline variant (git sometimes appends one):
+        let mut tag_nl = tag.clone();
+        tag_nl.push(b'\n');
+        let smudged_nl = smudge_with_security(&security, &tag_nl).unwrap();
+        assert_eq!(smudged_nl, plaintext);
+
+        // Inline tag in textual content still routes to smart_smudge
+        // (use a UTF-8 payload — inline decrypt of a BINARY payload is
+        // lossy inside smart_smudge by design; binary secrets take the
+        // whole-file path above):
+        let text_tag = security.encrypt_v2_to_b64_tag(b"hunter2").unwrap();
+        let tag_str = String::from_utf8(text_tag).unwrap();
+        let inline = format!("prefix {} suffix", tag_str);
+        let smudged_inline = smudge_with_security(&security, inline.as_bytes()).unwrap();
+        assert_eq!(smudged_inline, b"prefix hunter2 suffix".to_vec());
+
+        // Genuinely binary non-tag content passes through unchanged:
+        let passthrough = smudge_with_security(&security, &plaintext).unwrap();
+        assert_eq!(passthrough, plaintext);
+    }
+
     #[test]
     fn test_whole_file_tag_binary_roundtrip_byte_identical() {
         let security = test_security_with_identity();
