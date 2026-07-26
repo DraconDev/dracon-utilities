@@ -1,315 +1,255 @@
-# AUDIT FULL — 2026-07-26 (dracon-utilities fleet)
+# AUDIT FULL — 2026-07-26 (post v0.113.1)
 
-**Scope**: dracon-sync v0.113.1 (HEAD `0676d3e`), dracon-warden v0.113.0,
-dracon-system v0.112.33, and the meta-repo (AGENTS.md / docs/design /
-live-vs-example config). Research/audit only — no code was modified.
+**Scope**: dracon-sync v0.113.1 (daemon, sync, git layer, report/policy/ownership/visibility/secrets),
+dracon-warden v0.113.0 (filter, hooks, harden), dracon-system v0.112.33, meta-repo docs/config consistency.
 
-**Method**: 6 parallel subsystem audits (part files under `.pi-tmp/`), each
-read-completely; two workers additionally ran empirical repros (filter-repo
-backup-rewrite + origin deletion; cat-file pipe deadlock; warden pre-commit
-block on a throwaway repo; GNU grep `\x27` behavior). Parts 2, 4, and 5 were
-independently spot-verified by a second reader against the cited source
-lines (all sampled claims confirmed). Part 1 contains its own second-reader
-verification pass. Part 3's findings are single-reader (line citations
-provided throughout).
+**Method**: 6 parallel audit subagents, one per subsystem, briefed on the historical bug-pattern
+catalog (raw-vs-effective accessors, uncached network in hot loops, false-healthy states, swallowed
+errors, unit mismatches, early-return starvation, pipe deadlocks). Detail files:
+`.pi-tmp/audit-2026-07-26-part{0-baseline,1-daemon-sync,2-git-layer,3-report-policy,4-warden,5-system-meta,5-sync-core-addendum}.md`.
+Every HIGH below was **independently re-verified against the code by the orchestrator** (or
+empirically reproduced by the auditing agent — marked REPRO).
 
-**Inputs**:
-- `.pi-tmp/audit-2026-07-26-part0-baseline.md` — prior-audit LOW carryover +
-  regression surface
-- `.pi-tmp/audit-2026-07-26-part1-daemon-sync.md` — daemon/sync core loop
-- `.pi-tmp/audit-2026-07-26-part2-git-layer.md` — git/*.rs operations layer
-- `.pi-tmp/audit-2026-07-26-part3-report-policy.md` — report/policy/ownership/
-  visibility/secrets
-- `.pi-tmp/audit-2026-07-26-part4-warden.md` — warden + security crate + hooks
-- `.pi-tmp/audit-2026-07-26-part5-system-meta.md` — dracon-system + meta-repo
+**Counts**: **13 HIGH, 23 MEDIUM, ~30 LOW** (LOW consolidated; includes 8 still-open + 5 partial
+carried forward from AUDIT_FULL_2026-07-21). Regression checks: all four 2026-07-21 HIGH fixes
+(push-failure-as-synced, notification cooldowns, stuck-ledger split-brain, ls-remote hot loop) **hold**.
 
-**Counts after cross-part dedup**: **13 HIGH · 16 MEDIUM · 30+ LOW** (LOW
-counted conservatively; see part files for the full tail) **· 19 carryover
-items from 2026-07-21** (5 fixed, 5 partial, 8 still-open, 1 suspected).
+**Headline theme**: the daemon's *protective* machinery is where the sharpest edges are — the
+auto-repair path (H6, H7), the auto-gc (H3), the wedge valve (H1), the backstop (H2), and warden's
+enforcement hooks (W-H2, W-H3) all have defects that either silently disable the protection or
+make it fire on the wrong targets.
 
 ---
 
-## Cross-part deduplication decisions
+## HIGH
 
-1. **auto-gc (`git gc --prune=now`)** was found three times: part1-H3
-   (blocking/no-timeout + wedge-valve re-dispatch race), part2-M1
-   (`--prune=now` grace-removal race + runs before the conflict-state check),
-   part3-L7 (no bound, no failure cooldown). **Merged into one HIGH (H-6
-   below)** — the prune-race against concurrent object writes is the
-   destructive mechanism.
-2. **Push-timeout scaling not applied to mirror pushes** (part1-L4, part2-M2):
-   same lines (`sync.rs:1619` vs `sync.rs:1823`). **Kept as MEDIUM** (part2's
-   rating) because the v0.112.10 incident that motivated scaling was itself a
-   mirror push.
-3. **`refresh_stale_upstream_ref` never-converging upstream** (part1-L1 +
-   part3-M3): per part1's own reconciliation note, **merged into one MEDIUM**
-   — the cycle-level hot ssh/push loop + perpetual false "pushing Xm" display
-   is the operator-visible harm.
-4. **`scale_push_timeout` 600s cap vs live config base 900s** (part5-B2): the
-   absolute cap silently *reduces* the operator-configured 900s to 600s on
-   every push. Related to (2) but a distinct defect (config-vs-code); kept as
-   its own MEDIUM.
-5. **gitfile blindness** appears in two codebases: dracon-sync conflict-state
-   checks (part2-H3) and warden `is_repo_checked_out`/`IndexLock`
-   (part4-M-4). Same defect class, different blast radii — cross-referenced,
-   not merged.
-6. Meta-repo findings (part5-B: stale AGENTS.md line refs, 300s-vs-900s doc
-   drift, v94.7.1-vs-v94.7.2, reversed design docs) are documentation debt,
-   tracked separately below — not mixed into the code-bug severity counts.
+### SYNC-H1. Quiet-daemon wedge: detached-task registry + 15-min valve unreachable when no new repo dispatches
+`daemon.rs:3745` — `if !to_sync.is_empty()` wraps the ENTIRE spawn/apply/trailing-drain/hand-off/
+wedge-valve block (valve at :4153-4166). A repo whose push outlives the trailing deadline stays in
+`in_flight`; the no-redispatch check skips it every cycle; if no OTHER repo dispatches (overnight,
+single active repo), the block never runs → the finished task is never applied, the wedged task is
+never force-cleared, and `save_in_flight` makes `repos` report it as actively-processing forever
+(false-healthy). Re-opens the 2026-06-15 permanent-skip class the registry was built to fix.
+**Fix**: hoist detached-registry drain + wedge valve out of the `to_sync` gate; run them every cycle.
 
----
+### SYNC-H2. Auto-commit backstop is self-defeating (and suppresses the push that would drain the backlog)
+`sync.rs:3980` — backstop returns `NothingToDo` BEFORE `handle_ahead_push`; the daemon apply phase
+maps `NothingToDo → success → activity.remove` (`daemon.rs:3830-3835` + success cleanup), which
+**destroys `ahead_since`** — the very signal `is_backstop_active` needs (≥300s). Next cycle the
+entry is recreated fresh → daemon commits anyway. The backstop only ever skips ONE dispatch per
+300s window, and during that skip the pending 20+ commits aren't even pushed. Effectively dead code.
+**Fix**: distinct outcome (or Blocked) so the apply phase retains `ahead_since`; call
+`handle_ahead_push` before returning so the backlog drains.
 
-## HIGH (13) — recommended for the remediation tasklist
+### SYNC-H3. `maybe_auto_gc`: blocking, no timeout, runs before conflict-check, prune-race via wedge valve
+`sync.rs:3684` → `git/mod.rs:3408-3465` — synchronous `std::process::Command::output()` for both
+`count-objects -v` and `git gc --prune=now` inside the async sync task: no timeout, no kill-on-drop,
+no spawn_blocking, plain `"git"` (ignores `DRACON_SYNC_GIT_BIN`). Runs BEFORE `check_conflict_state`.
+A multi-GiB gc pins a worker thread for minutes; the (SYNC-H1) wedge valve can force-clear and
+re-dispatch the repo while the old `gc --prune=now` still runs → `--prune=now` (no mtime grace)
+racing a live commit/push = the classic prune-race against in-flight object writes. gc failure also
+re-logs every cycle with no cooldown. (Merges part1-H3 + part2-M1 + part3-L7.)
+**Fix**: run via bounded tokio spawn (or spawn_blocking) with a hard timeout; move below the
+conflict check; use the shared git builder; consider plain `git gc` (2-week grace) for the
+unattended path.
 
-### H-1. dracon-sync: large-blob auto-repair rewrites its own backup, deletes `origin`, and reports real rewrites as "no-op" — never pushes the fixed history
-`git/staging.rs:229-277, 308-343`; caller `report.rs:5525-5626`. filter-repo
-rewrites ALL refs including `backup/pre-sync-largeblob-fix-*` (backup
-preserves nothing) and removes the `origin` remote (both **empirically
-reproduced**); backup-tree == HEAD-tree after any rewrite, so
-`rewrite_was_noop_then_cleanup` returns `Ok(None)` and the caller does
-nothing — no force-push. Next cycle the re-created origin push fails
-non-ff and the auto-pull **merges the >100 MiB blob back in** — the repair
-silently un-does itself. The 2026-06-30 "zero backup branches exist"
-evidence is consistent with this firing and being misreported.
-Fix: bundle/tag backup + `--refs` exclusion; no-op check on HEAD sha
-pre/post; re-run `configure_all_remotes` + explicit `--force-with-lease`.
-(Part 2, H1.)
+### SYNC-H4. `sync_mirror_visibility` violates the cache-poison invariant: transient `gh` hiccup flips public mirrors to private
+`visibility.rs:628` uses `get_github_visibility` (bool, safe-default `true`) and `visibility.rs:702`
+unconditionally writes the cache "even on partial failures" — while `get_github_visibility_opt`
+exists precisely for cache-writing callers (its doc says the bool path poisons the cache). On any
+transient gh failure the daemon (a) drives `github_private=true` into `set_gitlab_visibility` /
+`set_codeberg_visibility` — **uncommanded remote state change flipping public mirrors private** —
+and (b) caches "private" for 24h, gating the codeberg-public-only push path off. The CLI flip path
+was fixed to use `_opt` (v0.112.33); the daemon path was missed.
+**Fix**: use `_opt`; on `None` skip both the flips and the cache write.
 
-### H-2. dracon-sync: `detect_large_blobs_ahead` cat-file stdin/stdout deadlock — the 100 MiB guard silently never engages for big-ahead repos
-`git/staging.rs:118-135`: `write_all(rev_list.stdout)` before
-`wait_with_output()` drains — the exact pattern the mod.rs comment calls
-"CRITICAL deadlock avoidance" was not applied here (**reproduced**). The 60s
-tokio timeout can't cancel the `spawn_blocking` thread → permanent thread +
-child leak per repair cycle; caller `.unwrap_or_default()` → zero blobs →
-guard disabled precisely for repos with thousands of objects ahead.
-(Part 2, H2.)
+### SYNC-H5. `standard_files` source path traversal: read-anywhere → publish-everywhere
+`policy.rs:1516-1525` — target gets full component validation (absolute/`..`/root/prefix);
+**source only gets `is_absolute()`**, and `expand_tilde("~/x")` runs at USE time
+(`policy.rs:80-104`) — so `source = "~/.ssh/id_rsa"` passes validation (raw `~/...` is not
+`is_absolute`) and resolves outside the sync base. Compounding: `validate_config` is only invoked
+by the `validate`/`health` subcommands (`main.rs:805,1141`) — the daemon's execution path
+(`sync.rs:3824` → `standard_files::ensure_standard_files`) never validates at all. The copied file
+lands in every watched repo and is auto-committed + auto-pushed to public forges.
+**Fix**: validate the tilde-EXPANDED source for ParentDir/RootDir/Prefix; enforce component checks
+inside `ensure_standard_files` itself (point-of-use), not just in `validate_config`.
 
-### H-3. dracon-sync: merge/rebase/cherry-pick detection is a no-op for all 10 nested game submodules — daemon can auto-commit conflict markers and push them
-`git/status.rs:115-128` checks `<repo>/.git/MERGE_HEAD` etc.; for nested
-submodules `.git` is a FILE (ENOTDIR → always false). The sibling
-`IndexLock::acquire` was fixed via `path_gitdir()` in v0.112.33 — these
-three helpers were not. Operator mid-merge walks away → next cycle
-`git add -A` "resolves" the conflict with markers → auto-commit → pushed to
-3 forges. Compounds with part2-M3 (auto-pull can leave MERGING state,
-undetected). (Part 2, H3.)
+### SYNC-H6. `rewrite_ahead_paths` destroys its own backup, deletes `origin`, reports real rewrites as "no-op" — repair silently un-does itself (REPRO)
+`staging.rs:229-277` — backup branch created, then `git filter-repo --invert-paths --force` with
+NO `--refs` limit. Reproduced: (1) filter-repo rewrites ALL refs — the "backup" branch loses the
+blob too, preserving nothing; (2) backup and HEAD are rewritten identically →
+`rewrite_was_noop_then_cleanup` (compares backup tree vs HEAD tree) ALWAYS reports no-op → deletes
+the backup, returns `Ok(None)` → caller (`report.rs:5525-5626`) does nothing — **no force-push**;
+(3) filter-repo deletes the `origin` remote (documented upstream behavior). Next cycle
+`ensure_origin_for_vscode` re-adds origin, the push fails non-ff, and `push_with_retries`' auto-pull
+(`git pull --no-rebase origin HEAD`) **merges the pre-rewrite history back** — the >100 MiB blob
+returns to local history and is pushed to all mirrors. Note: the 2026-06-30 audit's "zero backup
+branches exist" evidence is consistent with this path having fired and been misreported as no-op.
+**Fix**: bundle-based backup (or `--refs` excluding the backup); no-op check = pre vs post HEAD sha;
+after rewrite, re-run remote configuration and push `--force-with-lease` explicitly.
 
-### H-4. dracon-sync: detached-task drain + 15-min wedge valve unreachable when no new repo dispatches — permanent in-flight wedge in the quiet-daemon case
-`daemon.rs:3745` — the entire drain/hand-off/valve block sits inside
-`if !to_sync.is_empty()`. A repo whose push outlives the trailing deadline
-stays in `in_flight` forever when no other repo has work (overnight,
-single-active-repo), rendered "🔄 now" by `repos` — false-healthy.
-Re-opens the 2026-06-15 permanent-skip class the registry was built to fix.
-(Part 1, H1.)
+### SYNC-H7. `detect_large_blobs_ahead`: cat-file stdin/stdout pipe deadlock — the 100 MiB guard silently never engages (REPRO)
+`staging.rs:118-135` — `stdin.write_all(&rev_list.stdout)` completes BEFORE
+`cat_file.wait_with_output()` starts draining: with ~4000 objects ahead, cat-file's 64 KiB stdout
+pipe fills, it stops reading stdin, parent's `write_all` blocks forever. Reproduced (>15s hang).
+The documented fixed pattern in `git/mod.rs:99-113` (writer thread) was not applied here. The 60s
+tokio timeout returns Err, but `spawn_blocking` is uncancellable → the thread stays blocked and the
+cat-file child leaks **every repair cycle**; caller does `.unwrap_or_default()` → zero entries →
+the large-blob guard never engages for exactly the repos with thousands of objects ahead.
+**Fix**: mirror the mod.rs writer-thread pattern (or pipe rev-list fd directly into cat-file stdin).
 
-### H-5. dracon-sync: auto-commit backstop is self-defeating — `NothingToDo` is mapped to success, destroying `ahead_since`; and the push is also skipped
-`sync.rs:3980` + `daemon.rs:3945-3975`: the backstop's early return is
-treated as success → activity entry removed → the 300s age window restarts
-→ the moving-target auto-commit it exists to stop fires again next cycle.
-And while active, the return happens before `handle_ahead_push`, so the 20+
-pending commits aren't even pushed. Net: effectively dead code in the
-daemon path. (Part 1, H2.)
+### SYNC-H8. Conflict-state detection is a no-op for nested submodules (all 10 nested game repos)
+`status.rs:115-128` — `is_rebase_in_progress` / `is_merge_in_progress` / `is_cherry_pick_in_progress`
+check `repo.join(".git").join("MERGE_HEAD")` etc. For nested-on-`main` submodules `.git` is a FILE
+(verified: junk-runner's is a 55-byte gitdir pointer) → ENOTDIR → always false →
+`check_conflict_state` never blocks. Operator mid-merge with conflicts walks away; daemon
+`git add -A` stages conflicted files (silently "resolving" with markers), commits, pushes to all
+forges. The sibling bug in `IndexLock::acquire` was fixed in v0.112.33 via `path_gitdir()`; these
+three helpers were missed. Compounds with SYNC-M7 (auto-pull can leave MERGING state).
+**Fix**: resolve the real gitdir via `crate::git::path_gitdir(repo)` and check the state files there.
 
-### H-6. dracon-sync: auto-gc runs `git gc --prune=now` synchronously, unbounded, before the conflict check — and the wedge valve can re-dispatch the repo mid-gc
-`git/mod.rs:3408-3465`, call site `sync.rs:3684` (before
-`check_conflict_state`). Three compounding prongs (merged from parts 1/2/3):
-(a) `--prune=now` removes git's 2-week grace — racing object writes
-(operator commit, second sync process, or a re-dispatched task after the
-15-min valve force-clears `in_flight` while gc still runs) can have fresh
-objects pruned under them; (b) blocking `.output()` on a tokio worker with
-no timeout — a 37 GiB-platform-class gc pins a worker for many minutes and
-can't be killed by the sync-task timeout; (c) plain `Command::new("git")`
-ignores `DRACON_SYNC_GIT_BIN`; failure spam has no cooldown.
-Fix: default-grace `git gc` (or `--expire=1.hour.ago`), move below the
-conflict check, spawn with timeout + kill-on-drop, honor the git-bin
-override. (Part 1 H3 + Part 2 M1 + Part 3 L7.)
+### WARDEN-H1. H9 regression CONFIRMED: production filter-smudge still corrupts whole-file-encrypted binary secrets
+`security/src/lib.rs:1115-1123` — `DraconWarden::smudge` (the path `run_filter` actually calls)
+goes straight to `String::from_utf8_lossy` → `smart_smudge`, whose decrypt arm pushes
+`from_utf8_lossy(&plaintext)` (filter.rs:361). The v0.112.32 H9 fix (`decrypt_whole_file_tag`)
+is only wired into `seal_smudge` and `decrypt_file` — and `seal_smudge`/`seal_clean`/`decrypt_path`
+have NO callers in the binary. The H9 unit test exercises the helper directly, so it passes while
+production stays broken: binary secret → whole-file `[DRACON_SECRET:<b64>]` (ASCII, passes the NUL
+check) → smudge decrypts inline → every invalid-UTF-8 byte → U+FFFD → corrupted worktree → next
+clean re-encrypts the corruption → original bytes lost from history.
+**Fix**: call `decrypt_whole_file_tag` FIRST in `DraconWarden::smudge`/`Warden::smudge`; byte-
+identical round-trip test through the production entry point.
 
-### H-7. dracon-sync: `sync_mirror_visibility` uses the safe-default visibility variant and writes the cache — a transient `gh` hiccup flips public mirrors to PRIVATE for up to 24h
-`visibility.rs:628, 702` vs the `_opt` invariant documented at
-`visibility.rs:265-291` ("Callers that write the visibility cache MUST use
-this variant"). The CLI flip path was fixed in v0.112.33; the daemon path
-was missed. Uncommanded remote state change + cache poisoning that gates
-the codeberg-public-only push path off. Fail-closed (private), so
-availability/integrity, not secrecy. (Part 3, H1.)
+### WARDEN-H2. Global pre-commit hook hard-blocks commits in EVERY non-hardened repo on the machine (REPRO)
+`main.rs:2288-2317` — `PRE_COMMIT_HOOK` exits 1 unless the repo's `.gitattributes` contains
+`filter=dracon`; `run_setup_hooks` sets GLOBAL `core.hooksPath` (`main.rs:2497-2510`). Reproduced:
+a throwaway /tmp repo cannot `git commit` ("Warden filter missing from .gitattributes"). Any
+third-party clone, scratch repo, or new repo outside warden's roots is broken until hardened (or
+`--no-verify`). The same global hooksPath also silently DISABLES all per-repo hooks fleet-wide
+(husky, pre-commit framework) by shadowing `.git/hooks`.
+**Fix**: no-op unless the repo is warden-managed (marker check); chain/preserve repo-local hooks.
 
-### H-8. dracon-sync: `standard_files` source path traversal — F40 fix incomplete, and validation never runs on the daemon path at all
-`policy.rs:1516-1525` rejects only absolute sources (no `..` check; the
-comment claims both); `expand_tilde("~/x")` bypasses the absolute check;
-and `validate_config` is only invoked by the `validate`/`health`
-subcommands — the daemon (`sync.rs:3824` → `standard_files.rs:36-70`)
-executes raw. `source = "~/.ssh/id_rsa"` or `"../../../etc/passwd"` is a
-read-anywhere → publish-everywhere primitive (daemon auto-commits + pushes
-the copied file to public forges). (Part 3, H2.)
+### WARDEN-H3. pre-rebase `head -100` checks the NEWEST 100 commits — published commits deeper in the range escape
+`main.rs:2446` — `git rev-list "$upstream"..HEAD | head -100`: rev-list is newest-first, so the cap
+drops the OLDEST commits — precisely those most likely already published. Rebase with >100 commits
+where 101+ are on a remote → guard passes → published history rewritten → divergent fleet mirrors
+(the exact incident class v0.113.0 ships to prevent). Verified: line 2446 as described.
+**Fix**: remote containment is ancestor-closed — check only the boundary commit (`tail -1`) or drop
+the cap; one `git branch -r --contains` call instead of 100 subprocesses.
 
-### H-9. dracon-warden: H9 regression CONFIRMED — production `filter-smudge` still corrupts whole-file-encrypted binary secrets
-`security/src/lib.rs:1115-1123` (`DraconWarden::smudge` — the path
-`run_filter` calls) goes straight to `from_utf8_lossy` → `smart_smudge`;
-the v0.112.32 fix (`decrypt_whole_file_tag`) is wired only into
-`seal_smudge`/`decrypt_file`, and **neither has any caller in the binary**.
-Binary secret → smudge decrypts inline → U+FFFD for every invalid-UTF-8
-byte → corrupted worktree file → next clean re-encrypts the corruption →
-original bytes lost from history. The H9 unit test passes because it
-exercises the helper directly. (Part 4, H-1.)
+### SYS-H1. dracon-system guard daemon busy-loops after the first interval
+`dracon-system/src/main.rs:3154,3230-3233` — `elapsed` declared once before the outer loop, never
+reset; inner `while elapsed < interval` runs once, then every subsequent pass spins
+`run_guard_once` back-to-back with zero delay (spawning df/ps/du/walkdir scans continuously).
+**Fix**: reset `elapsed = 0` per outer iteration (or `tokio::time::interval`); add a timing test.
 
-### H-10. dracon-warden: global pre-commit hook hard-blocks commits in EVERY non-hardened repo on the machine, and shadows all repo-local hooks fleet-wide
-`PRE_COMMIT_HOOK` (`main.rs:2288-2317`) exits 1 unless `.gitattributes`
-contains `filter=dracon`; `setup-hooks` sets global `core.hooksPath`
-(**reproduced**: a throwaway /tmp repo cannot commit). Also silently
-disables husky/pre-commit-framework/cargo-husky in every repo because
-global hooksPath overrides `.git/hooks`. (Part 4, H-2.)
-
-### H-11. dracon-warden: pre-rebase `head -100` checks the NEWEST 100 commits — published commits deeper in the range escape the guard
-`main.rs:2446`: `rev-list` is newest-first; the cap drops the oldest (most
-likely published) commits. Rebase of a >100-commit range whose 101+ commits
-are on a remote passes the guard → published history rewritten → fleet
-mirror divergence — the exact incident class v0.113.0 ships to prevent.
-Fix: check only the boundary commit (ancestor-closed), or drop the cap.
-(Part 4, H-3.)
-
-### H-12. dracon-system: guard daemon busy-loops after the first interval
-`dracon-system/src/main.rs:3154, 3230-3233`: `elapsed` is declared once and
-never reset; after the first `interval_secs` the inner sleep loop never
-runs again → `run_guard_once` executes back-to-back forever, spawning
-`df`/`ps`/`du` + walkdir scans (and at action/critical disk, full cleanup
-scans) continuously. (Part 5, A-1.)
-
-### H-13. dracon-system: `link apply` can never fix an existing symlink — its primary case
-`dracon-system/src/links.rs:135,138`: existing symlinks are routed through
-`check_safe_to_delete`, which **always refuses symlinks**
-(`safety.rs:31-38`). A drifted symlink (`link_target_mismatch`) errors the
-whole command on the first entry; with no `in_sync` short-circuit, even a
-fully-synced policy fails. `apply_link_policy` has zero test coverage.
-(Part 5, A-2.)
+### SYS-H2. `link apply` can never fix (or even re-affirm) an existing symlink
+`dracon-system/src/links.rs:135,138` — existing symlinks route through
+`check_safe_to_delete(&link, &[])` which ALWAYS bails on symlinks → (a) drifted symlinks (the
+primary case `apply` exists to fix) error out the whole command; (b) no `in_sync` short-circuit —
+even healthy symlinks fail. Zero test coverage on `apply_link_policy`.
+**Fix**: for symlinks use `fs::remove_file` directly (never touches the target); skip `in_sync`.
 
 ---
 
-## MEDIUM (16) — defer with rationale (not in the HIGH remediation tasklist)
+## MEDIUM (23; deduplicated — part1-L1+part3-M3 merged into M5; part1-L4+part2-M2 merged into M6)
 
-| # | Finding (part) | Why deferred |
-|---|---|---|
-| M-1 | Timeout scaling not applied to mirror pushes (`sync.rs:1619` vs `1823`; parts 1-L4/2-M2) | Real but bounded: live base 900s already exceeds any scaled value |
-| M-2 | `scale_push_timeout` 600s absolute cap silently reduces live-configured 900s→600s (part5-B2; code `sync.rs:167-176`) | No current incident; fix alongside M-1 (cap should be `max(base,…)`) |
-| M-3 | `refresh_stale_upstream_ref` hot loop when origin down, mirrors up — silent failed fetch + N pushes/cycle forever, "pushing Xm" never converges (merged part1-L1 + part3-M3) | 30s-bounded, no data loss; needs per-repo backoff design |
-| M-4 | Auto-pull-retry can merge wrong upstream/branch, no `--no-edit` (tty hang), leaves MERGING on conflict (`push.rs:204-212`; part2-M3) | Requires operator tty + fetch-first rejection; compounds H-3 |
-| M-5 | SSH hardening missing on branch-deletion ops (`branch.rs:158,197,240`; part2-M4) | Deletion path rarely exercised; exit status unchecked |
-| M-6 | `detached_discard` keyed per-repo not per-generation — fresh result discarded, stale applied (`daemon.rs:4027-4035, 4158-4165`; part1-M1) | Only reachable via H-4's valve; fix with H-4 |
-| M-7 | FilterOnly early return drops injected stale-gitlink entries — parent gitlink convergence starved in warden-filter repos (`sync.rs:3905-3942`; part1-M2) | Breaks convergence invariant silently; no data loss |
-| M-8 | FilterOnly path can flip benign fully-pushed mirror-only repos to PushFailed → stuck-ledger exhaustion alarm (`sync.rs:4153-4166`; part1-M3) | False alarm, not corruption; gate on `ahead > 0` |
-| M-9 | Apply-phase vs trailing-drain outcome asymmetry (part1-M4) | State skew only; unify via one `apply_outcome` |
-| M-10 | Unowned repos display "🟣 pushing" forever (report.rs:3216-3267,347-390; part3-M1) | Display-only, but on the primary safety guard |
-| M-11 | `STUCK`/`FAIL` invisible in ACTIVITY column; "pushing Xm" measures last-commit age (part3-M2) | Display-only |
-| M-12 | Ownership compare case-sensitive; only `origin` validated (part3-M4) | Fail-closed direction (availability, not bypass) |
-| M-13 | Warden `setup-hooks` overwrites foreign global hooks unconditionally, non-atomically (part4-M-1) | Operator-visible on first run; needs backup/refuse semantics |
-| M-14 | Warden pre-push secret scan: `\x27` literal in GNU grep ERE — single-quoted secrets escape (part4-M-2, verified vs grep 3.12) | Defense-in-depth layer only; filter is primary |
-| M-15 | Warden pre-rebase bypass via two-arg form `git rebase <up> <branch>` (part4-M-3) | Guard bypass but interactive-only; easy fix (`${2:-HEAD}`) |
-| M-16 | Warden `is_repo_checked_out`/`IndexLock` gitfile blindness — linked worktrees/nested submodules silently never hardened (part4-M-4) | Same class as H-3; silent skip, no corruption |
-| (M-17) | Warden `salvage_invalid_json_markers` panics on non-ASCII (part4-M-5) | Crash mid-pass, not data loss |
-| (M-18) | Warden test-identity push guard: no escape hatch + full-history scan on new branches (part4-M-6) | Only affects repos with `test@test` history; `--no-verify` workaround |
-| (M-19) | dracon-system: `guard clean --all` ignored; storage cleanup aborts on first error; log-truncate TOCTOU (part5 A-3/A-4/A-5) | Bounded blast radius; all require explicit flags |
+| # | Finding | Location | Summary |
+|---|---|---|---|
+| M1 | detached_discard generation bug | daemon.rs:4158,4027 | per-repo (not per-generation) discard: fresh result discarded, stale one applied; ledger side effects not discardable |
+| M2 | FilterOnly drops injected stale-gitlink entries | sync.rs:3905-3962 | parent gitlink convergence starved for filter-noisy parents — commit leg of the v0.113.1 starvation class |
+| M3 | FilterOnly push on zero-ahead mirror-only repos | sync.rs:3958,4160 | `!branch_has_upstream` → push attempt every 300s → spurious failure-ledger entries → false 🛑 Exhausted |
+| M4 | apply/trailing-drain outcome asymmetry | daemon.rs:3922-3972 vs 4057-4084 | same SyncOutcome mutates state differently by timing; late PushFailed never notifies |
+| M5 | refresh_stale_upstream_ref unbounded on dead origin | sync.rs:4102-4180 | fire-and-forget silent failure; 30s fetch + N pushes per cycle forever when origin down but mirrors up; no ledger/cooldown |
+| M6 | mirror pushes don't get scaled timeout | sync.rs:1821-1830 | origin gets scaled (≤600s), mirrors get raw base — the exact stall the scaling prevents |
+| M7 | auto-pull-retry hazards | push.rs:204-212 | `git pull --no-rebase origin HEAD`: HEAD = remote default branch (may differ); origin may be foreign; no `--no-edit` (tty hang); conflict leaves MERGING (invisible per SYNC-H8) |
+| M8 | SSH hardening missing on branch deletions | branch.rs:158,197,240 | no GIT_SSH_COMMAND/GIT_TERMINAL_PROMPT; stderr nulled; exit unchecked |
+| M9 | unowned repos display "🟣 pushing" false-active | report.rs:3216-3267,347-390 | ownership override never rewrites push_status; 🚫 label unreachable in ACTIVITY |
+| M10 | STUCK/FAIL invisible in ACTIVITY + label lies | report.rs:347-378 | ACTIVITY shows "synced" while PUSH cell shows 🛑 STUCK; "pushing Xm" = last-commit age (doc wrong) |
+| M11 | ownership compare case-sensitive; only origin validated | ownership.rs:295-302,263-271 | mixed-case URL → false unowned (fail-closed); mirror remote URLs never ownership-checked |
+| M12 | compute_diff_entries `unwrap_or_default` → false FilterOnly | sync.rs:657 | transient `git diff HEAD` failure → empty set → dirty repo misclassified filter-only → commit skipped + 300s cooldown, no error |
+| M13 | residual `[DRACON_SECRET:…]` ciphertext in dracon-sync source comments | sync.rs:3375,4172; daemon.rs:1110,1132 | 2026-06-21 incident residue; no warden command can repair (scrub=json-only, resmudge=protected-only, decrypt_path uncalled) |
+| M14 | scale_push_timeout 600s cap silently reduces live 900s base | sync.rs:149-176 | live config base=900 → `min(900×k, 600)` = 600 always; cap should be base-aware |
+| M15 | setup-hooks overwrites foreign global hooks, non-atomic | warden main.rs:2467-2475 | unconditional fs::write ×3; no existence check/backup/temp+rename; clobbers operator's previous hooksPath |
+| M16 | pre-push secret-scan regex: `\x27` literal in GNU ERE | warden main.rs:2406 | single-quoted secrets escape the scan; negated class refuses values containing x/2/7 (verified GNU grep 3.12) |
+| M17 | pre-rebase bypass via two-arg form | warden main.rs:2442-2446 | `git rebase main feature` → empty `$1..HEAD` range → published feature commits rewritten |
+| M18 | harden_repo silently skips gitfile repos | warden main.rs:1039-1062 | `.git` file → read fails → skip with no log: no managed blocks/filter/pubkey for worktrees+submodules |
+| M19 | salvage_invalid_json_markers panics on non-ASCII | warden main.rs:1648-1656 | byte-offset slicing of &str panics; `bytes[i] as char` mojibake; crashes whole warden pass |
+| M20 | test-identity push guard: no escape hatch, full-history scan on new branches | warden main.rs:2419-2428,2376-2382 | any historical test@ commit → branch unpushable without --no-verify; outside DRACON_ALLOW_REWRITE guard |
+| M21 | `guard clean --all` silently ignored + dead validation | system main.rs:3548,3357 | `--all --rust` cleans only rust; "no targets" warning unreachable |
+| M22 | log truncation TOCTOU + rename loses lines | system main.rs:1570-1650 | lines appended between read and rename discarded; writers keep unlinked inode |
+| M23 | storage --cleanup --apply aborts on first failure | system main.rs:2912-2919 | one protected path/IO error kills the run mid-list after partial deletions |
 
-(MEDIUM table compressed for readability; full mechanisms in the part
-files. Numbering continues informally past 16 — total actionable MEDIUM is
-19.)
+## LOW (consolidated ~30 — see part files for full detail)
 
----
+**dracon-sync**: unthrottled refresh fetch on never-converging upstreams (part1-L1); stage batching
+union 2× documented limit (part1-L2, = 2026-07-21 F1.17 partial); GIT_SSH_COMMAND dispatch-local to
+Command::Daemon (part1-L3); github_pack_too_large synchronous+uncached for ≥2 GiB repos (part1-L5,
+part2-L4); kill_process_group blocking sleep + missing-`kill` hang (part2-L1); idle-timeout resettable
+forever by `remote:` keepalives + unbounded stderr (part2-L2); askpass token file not cancellation-safe
+(part2-L3); push_to_all_remotes stale SEQUENTIAL doc (part2-L5); parse_name_status_z desyncs on U/C
+records (part2-L6); unchecked-exit residuals diff.rs/multi_remote.rs (part2-L7); git_ssh_hardening
+fails hard if config missing + unquoted HOME (part2-L8); ls_remote "not found" matches GitLab
+permission-mask + EXISTS_CACHE never populated on create + HTTPS fallback no credential + first-SSH-
+failure not screened (part2-L9); rev-list @{u} empty on upstream-less repos disables large-blob
+detection (part2-L9); refresh fetches ALL refspecs + fires on vacuous push success (addendum N3);
+size-cache gitdir_sig write-only + no schema version + stale TTL comments (part3-L1); run_git_bounded
+stdin-write deadline gap + tmp leak (part3-L2); SHA-256 repos bypass 2 GiB guard via len==40 filter
+(part3-L3); visibility cache future-timestamp freshness (part3-L4); push-failure map 500-line flap
+(part3-L5); doc-rot/dead refs incl. warn_if_world_readable message mismatch (part3-L6); visibility
+flips: no ledger record, no --dry-run/--yes on make-public (part3-L8).
 
-## LOW (30+) — deferred wholesale
+**dracon-warden**: daemon pushes always `--no-verify` — hooks never gate the fleet's primary writer
+(L-1, needs a deliberate decision); backfill_env_headers unreachable success branch (L-2); shallow-
+clone fail-closed with misleading message (L-3); replace_managed_block malformed-block deletes file
+tail (L-4); swallowed errors in hook-install/stale-removal/resmudge (L-5); per-repo hook installs
+dead under global hooksPath + installer disagreement (L-6).
 
-Representative items (full tail in part files):
-- **dracon-sync**: kill_process_group blocking sleep + missing-kill hang
-  (part2-L1); idle-timeout extendable forever by `remote:` keepalives +
-  unbounded stderr (part2-L2); askpass token file not cancellation-safe —
-  RAII guard exists but unused (part2-L3); `github_pack_too_large`
-  synchronous walk in async path (part2-L4/part1-L5); stale SEQUENTIAL doc
-  vs parallel code (part2-L5/F2.12); `parse_name_status_z` desync on `U`/`C`
-  (part2-L6); residual unchecked-exit sites (part2-L7); ssh-hardening
-  HOME-quoting + missing-config hard-fail (part2-L8); ls-remote "not found"
-  false-missing + EXISTS_CACHE never populated post-create (part2-L9);
-  SHA-256 repos return 0 from `pushed_branch_pushable_bytes` → 2 GiB guard
-  blind (part3-L3); size-cache `gitdir_sig` written-never-read + no schema
-  version (part3-L1); `run_git_bounded` stdin-write deadline gap + tmp leak
-  (part3-L2); visibility cache future-timestamps fresh forever (part3-L4);
-  ledger 500-line window flap (part3-L5); visibility flips unaudited, no
-  dry-run/confirm (part3-L8).
-- **dracon-warden**: daemon always pushes `--no-verify` → hook layer never
-  gates the fleet's primary writer — needs a deliberate policy decision
-  (part4-L-1); `backfill_env_headers` unreachable success branch (L-2);
-  shallow-clone fail-closed with misleading message (L-3);
-  `replace_managed_block` orphan-BEGIN deletes file tail (L-4); swallowed
-  hook-install errors (L-5); per-repo hook seeding dead under global
-  hooksPath (L-6/F4.11).
-- **dracon-system**: nested `node_modules` double-counted (part5-A-6); nix
-  cleanup fabricated byte counts + swallowed generation-delete errors
-  (A-7); inode monitor hardcodes `/` ignoring `disk_mount_path` (A-8);
-  daemon-lock truncate-before-lock (A-9); assorted panic nits (A-10).
+**dracon-system**: nested node_modules double-counted (LOW); fabricated nix reclaim bytes +
+conditionally swallowed generation errors (LOW); inode monitoring hardcodes `/` ignoring
+disk_mount_path (LOW); acquire_daemon_lock truncates before locking (LOW); resolve_bin poison-unwrap,
+shorten_event_time non-ASCII panic, zram ratio semantics (LOW nits). Test-coverage gaps enumerated in
+part5 (daemon loop timing, apply_link_policy, rust-target cleanup paths, truncate_log_file,
+manage_sync_freeze, renice state machine).
 
----
+**Carried forward from 2026-07-21 (verified 2026-07-26)**: STILL-OPEN — F2.10 push.rs branch-
+validation gaps; F2.12 stale SEQUENTIAL doc + lost remote names; F2.13 space-path truncation;
+F3.11 case-sensitive trust (now M11); F3.14 bump.rs comment parsing; F3.15 non-atomic ledger
+rewrite; F4.11 per-repo hook seeding inert under global hooksPath; F1.15 per-cycle spawn/log-spam.
+PARTIAL — F2.11 SIGKILL added but blocking 2s sleep remains (= part2-L1); F2.15 index.lock startup-
+only + literal `.git/index.lock` broken for submodule gitdirs; F2.16 hardcoded `main` in mirror
+counting + codeberg flap; F3.13 no true precedence; F1.17 batch-limit union bug (= part1-L2).
 
-## Carryover from the 2026-07-21 audit (part 0)
+## Meta-repo / docs findings (part5-B)
 
-18 tracked + F0.3 (promoted): **FIXED 5** (F0.3/M10, F4.9, F4.10, F4.12,
-F1.16) · **PARTIAL 5** (F2.11, F2.15, F2.16, F3.13, F1.17) · **STILL-OPEN
-8** (F2.10 branch-name validation, F2.12 stale doc/join-error, F2.13
-space-path truncation + no-upstream blind spot, F3.11 case-sensitive trust,
-F3.14 bump.rs comment parse, F3.15 ledger pruned-count/non-atomic, F4.11
-inert per-repo hooks, F1.15 ~250 spawns/sec) · **SUSPECTED 1** (F2.14 ghost
-standalones — mitigated, unverified). Note F2.13's blind spot now compounds
-H-2 (both disable large-blob detection for upstream-less repos).
+- **B1**: 7 of 7 spot-checked AGENTS.md source line refs stale (report.rs:3705→5525;
+  report_v2_snapshot.rs GONE; staging.rs:152→182; policy.rs:1580→1864; sync.rs:858→1042/1060;
+  git/mod.rs:684→1004; git/mod.rs:370→601).
+- **B2**: push-timeout doc stale — live config is 900s (since 2026-06-23), AGENTS.md says 300;
+  scale_push_timeout undocumented; example.toml still says 60. (Code bug from this = M14.)
+- **B3**: `[patch.crates-io]` section says v94.7.1, actual is v94.7.2; workspace members list
+  missing `dracon-warden/src/security`.
+- **B4**: AGENTS.md claims warden owns `init.templateDir` — no warden code touches it (the live
+  templateDir is manually installed, untracked). Claim should be "core.hooksPath only".
+- **B5**: auto_gc docs accurate. ✓
+- **B6**: two reversed design docs lack SUPERSEDED banners (daemon-standalone-removal-2026-07-01;
+  push-timeout-fix-2026-06-17).
+- **B7**: 5 live config keys undocumented in example.toml (alert_unpushed_threshold,
+  auto_github_private, auto_github_private_account, max_stage_batch_files, exclude_repos).
+- **B8**: AGENTS.md "Recent audit-driven changes" section stops at v0.112.21.
 
-## Meta-repo / documentation debt (part 5, PART B — not code bugs)
+## Verified CLEAN (regression sweep)
 
-- **All 7 spot-checked AGENTS.md source line refs are stale** —
-  `report.rs:3705`→5525, `report_v2_snapshot.rs:3166` (file deleted),
-  `staging.rs:152`→182, `policy.rs:1580`→1864, `sync.rs:858,859`→1042,1060,
-  `git/mod.rs:684`→1004, `git/mod.rs:370`→601.
-- **Push-timeout section stale**: AGENTS.md says 300s; live config has been
-  900s since 2026-06-23; code default 300; example.toml ships 60; scaling
-  (×1/2/4/6, cap 600s) undocumented (see M-2 above).
-- **`[patch.crates-io]` section stale**: says v94.7.1; Cargo.toml pins
-  v94.7.2; workspace member list missing `dracon-warden/src/security`.
-- **Enforcement-stack section**: hooks/hatch verified accurate; the
-  `init.templateDir` claim is not backed by any warden code (only
-  `core.hooksPath` is managed).
-- **auto_gc docs accurate** (2 GiB default, 0 disables).
-- **Reversed design docs without a SUPERSEDED banner**:
-  `docs/design/daemon-standalone-removal-2026-07-01.md` ("the daemon will
-  create the standalone worktree … the new invariant" — reversed next day)
-  and `docs/design/push-timeout-fix-2026-06-17.md` (300s "final").
-- **Live config vs example.toml**: `alert_unpushed_threshold`,
-  `auto_github_private`, `auto_github_private_account`,
-  `max_stage_batch_files`, `exclude_repos` are set live but absent (even as
-  comments) from the example.
-
-## Positive checks (selected — things verified NOT broken)
-
-- count-objects KiB→bytes units correct in ALL consumers post-v0.112.42
-  (report.rs, git/mod.rs, cache schema).
-- Ownership F39/F44: tuple-atomic, no substring matching anywhere; tests
-  present; fail-closed on empty/unparseable.
-- secrets.rs: no token value ever logged or placed in argv; F54 redaction.
-- askpass script: atomic `O_EXCL|O_NOFOLLOW`, mode 0700, quote-injection
-  refused.
-- `ensure_gitlab_main_protected`: correct API, argv-safe, idempotent 409.
-- warden M3 oversized-clean fail-closed; H8 managed-block preservation;
-  test git-config hermeticity — all hold.
-- 2026-07-21 HIGH fixes H3/H4/H5/H7 all still hold (part 1 regression
-  pass).
-- `hooks.rs` in dracon-sync: fully removed, no dangling references.
-
-## Remediation triage recommendation (feeds task 9)
-
-**Fix now (HIGH)**: H-1…H-13 above. Suggested grouping: (a) repair-loop
-cluster H-1 + H-2 + H-6 (staging/gc, one PR); (b) submodule-gitdir cluster
-H-3 (+ warden M-16, shared `path_gitdir` pattern); (c) daemon-state cluster
-H-4 + H-5 (+ M-6, M-9); (d) warden cluster H-9 + H-10 + H-11 (+ M-13…M-15);
-(e) system cluster H-12 + H-13; (f) visibility/config cluster H-7 + H-8.
-Every HIGH except H-4/H-5 has a one-paragraph fix sketch in its part file.
-New-code rule per AGENTS.md: each fix needs a unit test — note especially
-H-9 (byte-identical round-trip through `DraconWarden::smudge`), H-1
-(real-rewrite-not-noop), H-12 (loop-timing), H-13 (apply over existing
-symlink).
-
-**Defer with rationale**: MEDIUM table above (none is data-loss today;
-several are display-only or fail-closed). LOW: batch into a follow-up
-hygiene release. Meta/doc debt: single AGENTS.md refresh commit (line refs,
-900s, v94.7.2, templateDir, workspace members) + SUPERSEDED banners on the
-two reversed design docs.
+- 2026-07-21 HIGH fixes H3/H4/H5/H7 all hold (with tests).
+- count-objects unit handling correct everywhere post-v0.112.42 (×1024 both consumers).
+- Ownership F39/F44: tuple-atomic, no substring matching, fail-closed on empty/unparseable.
+- secrets.rs: no token ever logged/argv'd; askpass atomic O_EXCL|O_NOFOLLOW 0700.
+- is_safe_branch_name/is_safe_git_path gate all argv-bound branches/paths.
+- force-with-lease divergence path safe (stale lease fails closed; parse failure → Divergent).
+- ensure_gitlab_main_protected: correct API/params, idempotent 409, argv-only.
+- hooks.rs fully removed from dracon-sync (no dangling references).
+- Warden: oversized-clean fails closed (M3 fix holds); harden_repo managed blocks preserve operator
+  content (H8 fix holds); hook edge cases (new-branch zero-sha, tag moves, annotated-tag peeling,
+  missing-object fail-closed, unpublished pull --rebase) all correct.
+- v0.113.1 FilterOnly fix: borrow/scope fine, PushFailed correctly recorded+mapped,
+  refresh_stale_upstream_ref cannot hang (30s idle timeout, prompt disabled, detached-HEAD safe).
