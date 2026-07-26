@@ -1,5 +1,65 @@
 # Changelog
 
+## [0.113.1] — 2026-07-26 — full-audit remediation batch 2 (hook layer + smudge)
+
+Remediation batch 2 of `AUDIT_FULL_2026-07-26.md` (3 HIGH + 1 MEDIUM).
+Initial patches for H1/H2/H3 were contributed by an audit subagent;
+all were reviewed, two repaired (the pre-commit managed-marker check
+was defeated by the operator's GLOBAL `filter.dracon.clean` — now
+`--local`; the M2 quote idiom), and every fix was verified
+behaviorally against real scratch repos before deploy.
+
+### Fixed
+
+- **WARDEN-H1 — production filter-smudge still corrupted
+  whole-file-encrypted binary secrets** (the 2026-07-21 H9 regression
+  was only fixed in helpers the binary never calls):
+  `DraconWarden::smudge`/`Warden::smudge` went straight to
+  `String::from_utf8_lossy` → every invalid-UTF-8 byte of a decrypted
+  binary became U+FFFD → corrupted worktree → next clean re-encrypted
+  the corruption. Both entry points now delegate to a shared
+  `smudge_with_security` that tries `decrypt_whole_file_tag` FIRST and
+  returns raw bytes. New byte-identical round-trip test goes through
+  the production entry-point path (the old test exercised the helper
+  directly and passed while production stayed broken).
+- **WARDEN-H2 — global pre-commit hook hard-blocked commits in EVERY
+  non-hardened repo on the machine** (third-party clones, scratch
+  repos): the hook exited 1 unless `.gitattributes` contained
+  `filter=dracon`, and the global `core.hooksPath` shadowed all
+  repo-local hooks fleet-wide. The hook now (a) chains to an existing
+  repo-local `pre-commit` (anti-recursion via the warden header
+  marker), and (b) no-ops unless the repo is warden-managed
+  (repo-LOCAL `filter.dracon.clean` config, `filter=dracon` in
+  `.gitattributes`, or a `.dracon/` dir). Managed-drift (some markers
+  present, `.gitattributes` missing) still blocks.
+- **WARDEN-H3 — pre-rebase `head -100` checked the NEWEST 100
+  commits**: `git rev-list` is newest-first, so the cap dropped the
+  OLDEST commits — precisely those most likely already published.
+  Replaced with the boundary-commit check (remote containment is
+  ancestor-closed: if the oldest commit of the range is on no remote,
+  no newer one can be) — one `git branch -r --contains` instead of up
+  to 100 subprocesses. Same edit fixes WARDEN-M17: the range tip is
+  now `${2:-HEAD}` (the two-argument form `git rebase <upstream>
+  <branch>` previously computed an empty `$1..HEAD` range and passed
+  while published `$2` commits were rewritten).
+- **WARDEN-M2 — pre-push secret scan missed single-quoted secrets**:
+  `\x27` is not a hex escape in GNU grep ERE (the class became
+  `["x27]`, matching literal x/2/7). Replaced with the shell
+  `'\''` idiom; verified against GNU grep 3.12: `password = '…'`
+  and `api_key = '…'` now match, values containing x/2/7 do not
+  false-positive. E2E: a push adding `api_key = 'sk-live-123'` is
+  refused.
+
+### Verified behaviorally (scratch repos, real hooks as shell subprocesses)
+
+- non-managed repo commits ✓; managed-drift blocked ✓; hardened repo
+  commits ✓; repo-local hook chaining ✓
+- published-commit rebase blocked ✓; unpublished-only rebase passes ✓;
+  two-arg form blocked ✓; `DRACON_ALLOW_REWRITE=1` escape hatch ✓
+- whole-file-encrypted binary round-trips byte-identically through the
+  production smudge path ✓
+- single-quoted secret push refused ✓
+
 ## [0.113.0] — 2026-07-25 — history-rewrite guard in the global hooks
 
 **Hard, forge-invariant enforcement of the fleet's no-history-rewrite
