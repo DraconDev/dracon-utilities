@@ -98,6 +98,28 @@ plus the directly-implicated helpers `git/mod.rs::maybe_auto_gc`, `git/ops.rs::r
 - **H5 (stuck ledger split-brain)**: holds. Ledger reloaded from disk every cycle (`daemon.rs:2780-2782`), retry path persists `last_retry_at` instead of deleting the entry (`daemon.rs:3385-3395`), `Exhausted` arm enforces `push_max_retries` (`stuck_decision`, `daemon.rs:520-545`).
 - **H7 (ls-remote every 1s cycle for never-pushed repos)**: holds. Local-first fallback chain + `ls_remote_cooldowns` 300s throttle (`daemon.rs:3455-3490`).
 
+## Independent code-verification pass (2026-07-26, second reader)
+
+All HIGH/MEDIUM findings + L2/L4 re-checked against the v0.113.1 source this pass — every cited
+line reference and mechanism confirmed accurate: `daemon.rs:3745` gate wraps drain+valve (H1);
+`NothingToDo → sync_success=true → activity.remove` destroys `ahead_since` (H2, main apply
+`daemon.rs:3824-3836` + cleanup `~3925`); `maybe_auto_gc` sync/no-timeout (H3); per-repo
+`detached_discard` marker consumed by whichever task finishes first (M1, `daemon.rs:4027-4035` +
+`4158-4165`); gitlink injection precedes the `filter_only_cleared` check which was computed before
+injection (M2, `sync.rs:3905-3942`); `should_push = ahead>0 || !branch_has_upstream ||
+upstream_ref_missing` (M3, `sync.rs:4160-4166`); trailing-drain `NothingToDo` retains the activity
+entry while the main phase removes it (M4, `daemon.rs:4057-4062` vs `3922-3929`); batch `take(max)`
+applied to both lists (L2, `sync.rs:3170-3174`); mirror push gets unscaled `push_op_timeout_secs`
+while origin gets `scaled_timeout` (L4, `sync.rs:1693` vs `1821-1824`).
+
+**Cross-part reconciliation note for the synthesis task**: part1-L1 (this file) and
+part3-M3 (`audit-2026-07-26-part3-report-policy.md`) cover the SAME root issue —
+`refresh_stale_upstream_ref` never converging when the configured upstream remote is unreachable
+while named mirrors are up. Part1 rates the *fetch* LOW (bounded 30s, prompt-disabled); part3 rates
+the *full cycle* MEDIUM (re-push to mirrors every cycle + dead-origin fetch + perpetual "pushing Xm"
+display, no backoff since pushes "succeed"). Recommend merging into ONE MEDIUM finding in the
+synthesis: the cycle-level effect (hot ssh loop + false display) is the operator-visible harm.
+
 ## Answers to the specific v0.113.1/v0.113.0/v0.112.41 review questions
 
 1. FilterOnly + `handle_ahead_push`: borrow/scope is fine (`&mut ctx`, `&svc` disjoint). `PushFailed` from the new path IS correctly recorded (record_push_failure inside handle_ahead_push + apply-phase mapping). But yes, it can flip previously-benign repos to PushFailed — see M3. `refresh_stale_upstream_ref` cannot hang the sync path (30s idle timeout + prompt disabled), handles detached HEAD and missing branch config, and has no cooldown feedback loop — but is unthrottled on never-converging upstreams (L1).
