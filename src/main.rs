@@ -2450,7 +2450,18 @@ while read local_ref local_sha remote_ref remote_sha; do
     # after which the daemon committed with the poisoned identity and
     # the poisoned commit landed on all mirrors. Only the PUSHED
     # range is scanned, so historical commits are unaffected.
-    BAD_AUTHORS=$(git log --format='%ae%n%ce' "$RANGE" 2>/dev/null | sort -u | grep -Eix '^test@test$|^test@test\.com$|^test@example\.com$' || true)
+    #
+    # CHANGED 2026-07-27 (v0.113.2): added `--first-parent`. Earlier
+    # the scan walked ALL reachable commits, which on a TAG push
+    # (`remote_sha = 0` so the range is `empty-tree..tag-sha`) covered
+    # the entire repo history. A test-identity commit on a non-first-
+    # parent merge branch then blocked the tag push even when the
+    # first-parent history is clean — the published branch that every
+    # forge renders + every consumer reads. First-parent only is the
+    # invariant the F0.1 defense actually needs (test-id on the
+    # published chain = landed in main = block; test-id only on a
+    # side branch = invisible to consumers, no risk).
+    BAD_AUTHORS=$(git log --first-parent --format='%ae%n%ce' "$RANGE" 2>/dev/null | sort -u | grep -Eix '^test@test$|^test@test\.com$|^test@example\.com$' || true)
     if [ -n "$BAD_AUTHORS" ]; then
         echo "⚠️  Push contains commits authored by a test identity:" >&2
         echo "$BAD_AUTHORS" | sed 's/^/   /' >&2
