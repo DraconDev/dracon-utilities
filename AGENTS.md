@@ -348,12 +348,15 @@ Evidence: endless-td's loop agent adapted correctly ON ITS OWN
 
 > **REMOVED in draft 2026-06-30 (audit goal `mr0q2qx2-mvfs0c`)**:
 > The single-line "NEVER" list below was misleading because the daemon's
-> own auto-repair path (`dracon-sync/src/report.rs:3705` and
-> `report_v2_snapshot.rs:3166`) calls
+> own auto-repair path (`dracon-sync/src/report.rs:3705`) calls
 > `rewrite_ahead_paths()` (`dracon-sync/src/git/staging.rs:148-244`)
 > which uses `git filter-repo --invert-paths --force` when
 > `auto_repair_concerns = true` (default per
-> `dracon-sync/src/policy.rs:1580`). The 2026-06-30 audit confirmed
+> `dracon-sync/src/policy.rs:1864`). The 2026-06-30 audit confirmed
+> this code path has never fired on our repos (zero
+> `backup/pre-sync-largeblob-fix-*` branches found), but the
+> contradiction between "NEVER rewrite history" and the default
+> config warranted replacement rather than ad-hoc violation tracking.
 > this code path has never fired on our repos (zero
 > `backup/pre-sync-largeblob-fix-*` branches found), but the
 > contradiction between "NEVER rewrite history" and the default
@@ -550,12 +553,13 @@ worktree layout was eliminated for all 10 game/hegemon submodules of
 - Backwards compatibility with all previously added
   policy fields is required
 
-## Recent audit-driven changes (2026-07-19, v0.112.21)
+## Recent audit-driven changes
 
-The post-v0.112.20 audit (`AUDIT_FULL_2026-07-18-POSTFIX.md`) found
+### v0.112.21 (2026-07-19) — post-v0.112.20 audit (`AUDIT_FULL_2026-07-18-POSTFIX.md`)
+
 53+ findings across the daemon, warden, system, and meta-repo. All
 **11 HIGH** (8 daemon + 3 warden) and 7 actionable **MEDIUM** findings
-were remediated in v0.112.21. Critical fixes:
+were remediated. Critical fixes:
 
 - **F39** ownership substring bypass — daemon's primary safety guard
   against pushing to attacker infra is now tuple-atomic.
@@ -568,8 +572,71 @@ were remediated in v0.112.21. Critical fixes:
 - **F45/F46** test infra hardened — no more `mem::forget` TempDir leaks
   or racy `EnvRestorer::Drop`.
 
-Total daemon unit tests: **733** (was 706 before v0.112.19). Total
-workspace tests: **915** (was 890 before v0.112.21).
+### v0.113.0 (2026-07-25) — enforcement stack
+
+Warden hook enforcement moved from documentation to a hard gate:
+
+- **gitlab auto-protect**: every live main/master across the fleet
+  is protected (`allow_force_push=false`); dracon-sync auto-protects
+  on `main` creation.
+- **Warden pre-push / pre-rebase hooks** block non-fast-forward
+  pushes and rebases of already-published commits (escape hatch:
+  `DRACON_ALLOW_REWRITE=1`).
+- **`auto_gc_garbage_threshold_bytes`** (default 2 GiB) — daemon
+  self-heals the `tmp_pack_*` / dangling-object bloat class.
+
+Documented in
+[`docs/design/incident-amend-race-and-trust-2026-07-25.md`](docs/design/incident-amend-race-and-trust-2026-07-25.md)
+("Whack-a-mole audit" section).
+
+### v0.113.4 (2026-07-26) — full-audit remediation (`AUDIT_FULL_2026-07-26.md`)
+
+Fleet-wide audit found 13 HIGH / 23 MEDIUM / ~30 LOW across all three
+utilities + the meta-repo. Every HIGH was independently spot-checked
+against source before acceptance. Remediation was split into 4
+batches:
+
+- **dracon-sync v0.113.2** (SYNC-H8 conflict helpers for nested
+  submodule gitdirs; SYNC-H2 self-defeating backstop →
+  `SyncOutcome::BackstopSkipped`; SYNC-H3 `maybe_auto_gc` async via
+  `run_git_with_timeout` 600s + per-repo cooldown; SYNC-H1 quiet-
+  daemon wedge valve reachable from daemon loop; SYNC-H7 bonus
+  cat-file pipe deadlock fix).
+- **dracon-warden v0.113.1** (WARDEN-H1 binary whole-file secrets
+  corrupted by smudge UTF-8 lossy path → `smudge_with_security`
+  tries `decrypt_whole_file_tag` first; WARDEN-H2 global pre-commit
+  blocked ALL non-hardened repos → chains to repo-local hook + no-ops
+  unless warden-managed (via `git config --local filter.dracon.clean`);
+  WARDEN-H3 pre-rebase `head -100` newest-first miss → boundary-check
+  via `git branch -r --contains`; WARDEN-M2 `\x27` → shell `'\''`
+  idiom in pre-push secret scan regex).
+- **dracon-sync v0.113.3** (SYNC-H6 `rewrite_ahead_paths` destroyed
+  own backup / deleted origin / no force-push → bundle-file backup
+  via `git bundle create <gitdir>/<name>.bundle HEAD --refs HEAD`,
+  pre-rewrite capture, `--force-with-lease` anchored to pre-rewrite
+  upstream-sha; M7 auto-pull explicit `refs/heads/<branch>` +
+  `--no-edit` + `merge --abort` on failure).
+- **dracon-sync v0.113.4** (SYNC-H4 visibility cache-poison on
+  transient gh failure → `get_github_visibility_opt` skip-both-
+  flips-and-cache on `None`; SYNC-H5 `standard_files` source path
+  traversal at both `validate_config` and point-of-use, with new
+  `is_safe_standard_file_path` helper that rejects raw-absolute and
+  any `..` component but allows `~/...`).
+- **dracon-system v0.112.34** (SYS-H1 guard daemon busy-looped
+  forever after first interval → `elapsed` reset inside outer loop;
+  SYS-H2 `link apply` could never fix a drifted symlink → in-sync
+  short-circuit + direct `fs::remove_file(&link)` for drifted
+  symlinks).
+- **dracon-warden v0.113.2** (F0.1 follow-up — tag-push false-
+  positive: BAD_AUTHORS scan now distinguishes branch pushes
+  (`rev-list $local --not $remote`) from new-ref pushes
+  (`rev-list $local --not --remotes`), so a test-identity commit
+  already published via a prior branch push is no longer re-scanned
+  on a later tag push).
+
+Total workspace tests: **1038** (was 915 before v0.113.4).
+Test breakdown: dracon-sync 847 (837 + 10 integration);
+dracon-system 88; dracon-warden 103 (93 + 10 integration).
 
 ## `[patch.crates-io]` status
 
