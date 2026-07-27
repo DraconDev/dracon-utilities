@@ -69,9 +69,9 @@ published `$2` commits were rewritten).
 `["x27]`, matching literal x/2/7 instead of a single quote).
 Replaced with the shell `'\''` idiom; verified against GNU grep
 3.12: a single-quoted `password =` or `api_key =` assignment now matches; values
-containing x/2/7 do not false-positive. E2E: a push adding an
-`api_key = '<redacted>'` assignment with a live-looking value
-(e.g. `sk-live-123`) is refused.
+containing x/2/7 do not false-positive. E2E: a push adding a
+`api_key =` assignment with a live-looking single-quoted value
+(e.g. one matching `sk-live-123`) is refused.
 
 ## Tests
 
