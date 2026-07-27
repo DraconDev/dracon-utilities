@@ -436,18 +436,91 @@ mod tests {
             .trim()
             .to_string();
 
-        let (status, stderr) = run_hook(repo, &hook_path, &head, &baseline);
+        // Simulate the production case: the poisoned commits were
+        // ALREADY published in a prior branch push (modeled here by
+        // a remote-tracking branch pointing at HEAD). Pushing an
+        // ANNOTATED TAG now must not re-block on commits that have
+        // already been accepted by the F0.1 scan. The hook's new
+        // `git rev-list "$LOCAL_SHA" --not --remotes` should return
+        // empty because everything reachable from the tag is also
+        // reachable from the fake remote.
+        run_git_in(
+            repo,
+            &["update-ref", "refs/remotes/origin/main", &head],
+        );
+
+        use std::io::Write;
+        use std::process::{Command, Stdio};
+        let stdin_data = format!(
+            "refs/tags/v0.113.4 {} refs/tags/v0.113.4 0000000000000000000000000000000000000000\n",
+            head
+        );
+        let mut child = Command::new(&hook_path)
+            .current_dir(repo)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .expect("spawn hook");
+        child
+            .stdin
+            .as_mut()
+            .expect("stdin")
+            .write_all(stdin_data.as_bytes())
+            .expect("write stdin");
+        let output = child.wait_with_output().expect("wait hook");
+        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
         assert!(
-            status.success(),
-            "hook must ALLOW a push whose first-parent history is clean, even if a \
-             side-branch reachable from the tip is poisoned by a test identity. \
-             Without `--first-parent`, every consumer of the published branch sees a \
-             clean first-parent chain (this is what forges render and what `git log` \
-             shows by default in interactive shells); the F0.1 defense needs to guard \
-             the published chain, not the full reachable-commit closure. Exit: {:?}, stderr: {}",
-            status.code(),
+            output.status.success(),
+            "hook must ALLOW a TAG push whose reachable commits are ALL already on a \
+             remote-tracking branch (the production scenario from 2026-07-27: a \
+             test-identity commit reachable only via a non-first-parent merge branch \
+             was already published by a prior branch push; a later tag push should \
+             not re-block on it). Without `--not --remotes` exclusion the old \
+             `git log empty-tree..tag-sha` range covered the entire repo history \
+             and the tag push was blocked even though no NEW poison was being \
+             introduced. Exit: {:?}, stderr: {}",
+            output.status.code(),
             stderr
         );
+
+        // Counter-test: with NO remote-tracking branch (i.e. nothing
+        // published yet), the SAME scenario MUST be blocked — proving
+        // the new logic still catches truly-new test-identity commits.
+        run_git_in(
+            repo,
+            &["update-ref", "-d", "refs/remotes/origin/main"],
+        );
+        let mut child = Command::new(&hook_path)
+            .current_dir(repo)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .expect("spawn hook 2");
+        child
+            .stdin
+            .as_mut()
+            .expect("stdin")
+            .write_all(stdin_data.as_bytes())
+            .expect("write stdin");
+        let output = child.wait_with_output().expect("wait hook 2");
+        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+        assert_eq!(
+            output.status.code(),
+            Some(1),
+            "hook must REJECT a TAG push of a freshly-published test-identity commit; \
+             defense-in-depth for the new-ref case is intact. stderr: {}",
+            stderr
+        );
+        assert!(
+            stderr.contains("test identity"),
+            "stderr should name the cause, got: {}",
+            stderr
+        );
+
+        // Mark baseline as used to satisfy the linter / clippy.
+        let _ = baseline;
     }
 
     /// ADDED 2026-07-21 (v0.112.33, audit H2/F0.1 follow-up): a push

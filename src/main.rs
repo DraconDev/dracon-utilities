@@ -2451,22 +2451,45 @@ while read local_ref local_sha remote_ref remote_sha; do
     # the poisoned commit landed on all mirrors. Only the PUSHED
     # range is scanned, so historical commits are unaffected.
     #
-    # CHANGED 2026-07-27 (v0.113.2): added `--first-parent`. Earlier
-    # the scan walked ALL reachable commits, which on a TAG push
-    # (`remote_sha = 0` so the range is `empty-tree..tag-sha`) covered
-    # the entire repo history. A test-identity commit on a non-first-
-    # parent merge branch then blocked the tag push even when the
-    # first-parent history is clean — the published branch that every
-    # forge renders + every consumer reads. First-parent only is the
-    # invariant the F0.1 defense actually needs (test-id on the
-    # published chain = landed in main = block; test-id only on a
-    # side branch = invisible to consumers, no risk).
-    BAD_AUTHORS=$(git log --first-parent --format='%ae%n%ce' "$RANGE" 2>/dev/null | sort -u | grep -Eix '^test@test$|^test@test\.com$|^test@example\.com$' || true)
-    if [ -n "$BAD_AUTHORS" ]; then
-        echo "⚠️  Push contains commits authored by a test identity:" >&2
-        echo "$BAD_AUTHORS" | sed 's/^/   /' >&2
-        echo "   Amend the author identity before pushing (git commit --amend --reset-author)." >&2
-        exit 1
+    # CHANGED 2026-07-27 (v0.113.2): for TAG pushes (`remote_sha = 0`,
+    # i.e. the ref is brand new) the old `git log empty..tag-sha` range
+    # covered the ENTIRE repo history reachable from the tag object,
+    # not just the NEW commits — a test-identity commit reachable only
+    # via a non-first-parent merge of a feature branch then blocked the
+    # tag push even though the first-parent history is clean. Now the
+    # scan distinguishes:
+    #
+    #   * existing-ref update (branch push, remote_sha != 0):
+    #     `git rev-list "$LOCAL_SHA" --not "$REMOTE_SHA"` — only the
+    #     new commits being added to the branch tip.
+    #
+    #   * new-ref push (tag or new branch, remote_sha == 0):
+    #     `git rev-list "$LOCAL_SHA" --not --remotes` — only commits
+    #     reachable from the tag object that are NOT already on ANY
+    #     remote-tracking branch. Anything already published (and
+    #     therefore already accepted by a prior scan) is excluded.
+    #
+    # This is the correct F0.1 defense surface: only NEWLY-PUBLISHED
+    # commits need scrutiny. A test-identity commit on a side branch
+    # merge that was already pushed to all mirrors in a prior commit
+    # cannot be retroactively un-published, so re-scanning it on a
+    # later tag push is wasted and prone to false positives. Defense
+    # in depth is preserved for the new push itself.
+    if [ "$REMOTE_SHA" = "0000000000000000000000000000000000000000" ]; then
+        # New ref (tag or branch). Scan only commits not yet on any remote.
+        NEW_COMMITS=$(git rev-list "$LOCAL_SHA" --not --remotes 2>/dev/null || true)
+    else
+        # Existing-ref update. Scan only the new commits being added.
+        NEW_COMMITS=$(git rev-list "$LOCAL_SHA" --not "$REMOTE_SHA" 2>/dev/null || true)
+    fi
+    if [ -n "$NEW_COMMITS" ]; then
+        BAD_AUTHORS=$(printf '%s\n' "$NEW_COMMITS" | xargs -I{} git log -1 --format='%ae%n%ce' {} 2>/dev/null | sort -u | grep -Eix '^test@test$|^test@test\.com$|^test@example\.com$' || true)
+        if [ -n "$BAD_AUTHORS" ]; then
+            echo "⚠️  Push contains commits authored by a test identity:" >&2
+            echo "$BAD_AUTHORS" | sed 's/^/   /' >&2
+            echo "   Amend the author identity before pushing (git commit --amend --reset-author)." >&2
+            exit 1
+        fi
     fi
 done
 "##;
