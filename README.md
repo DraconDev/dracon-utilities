@@ -2,9 +2,27 @@
 
 Public release repository for the Dracon system service CLI utilities. These tools install to `~/.local/bin/`, run as user-level system services where appropriate, and keep operational state outside the git tree.
 
-**Current release:** `v0.112.8` — [release notes](https://github.com/DraconDev/dracon-utilities/releases/tag/v0.112.8)
-
 This repository contains the CLI wrappers and release packaging. Shared library code lives in the sibling [`dracon-libs`](https://github.com/DraconDev/dracon-libs) repository.
+
+## Latest versions (2026-07-27)
+
+| Utility | Version | What shipped | Release notes |
+|---------|---------|--------------|---------------|
+| `dracon-sync` | **v0.113.4** | Full-audit remediation batch 4 — SYNC-H4 visibility cache-poison + SYNC-H5 `standard_files` source path traversal | [release-notes-v0.113.4.md](dracon-sync/release-notes-v0.113.4.md) |
+| `dracon-warden` | **v0.113.2** | Pre-push hook `--not --remotes` scan — tag-push false-positive fix (F0.1 follow-up) | [release-notes-v0.113.2.md](dracon-warden/release-notes-v0.113.2.md) |
+| `dracon-system` | **v0.112.34** | Full-audit remediation batch 4 — SYS-H1 guard daemon busy-loop + SYS-H2 `link apply` drifted-symlink fix | [release-notes-v0.112.34.md](dracon-system/release-notes-v0.112.34.md) |
+
+Interim `dracon-sync` releases also tagged: **v0.113.1** (FilterOnly
+push starvation fix), **v0.113.2** (full-audit batch 1 — SYNC-H1/H2/H3/H7/H8),
+**v0.113.3** (full-audit batch 3 — SYNC-H6 auto-repair backup + force-push).
+
+Interim `dracon-warden` releases also tagged: **v0.113.1** (full-audit
+batch 2 — WARDEN-H1/H2/H3/M2).
+
+The 3 utilities share one test-discipline gate (`cargo test
+--workspace --locked` + `cargo clippy --workspace --locked -- -D
+warnings`). Current totals: **1038 tests passing, 0 failing**
+(`dracon-sync` 847 + `dracon-system` 88 + `dracon-warden` 103).
 
 ## Install
 
