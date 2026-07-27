@@ -45,10 +45,11 @@ behaviorally against real scratch repos before deploy.
 - **WARDEN-M2 — pre-push secret scan missed single-quoted secrets**:
   `\x27` is not a hex escape in GNU grep ERE (the class became
   `["x27]`, matching literal x/2/7). Replaced with the shell
-  `'\''` idiom; verified against GNU grep 3.12: `password = '…'`
-  and `api_key = '…'` now match, values containing x/2/7 do not
-  false-positive. E2E: a push adding `api_key = 'sk-live-123'` is
-  refused.
+  `'\''` idiom; verified against GNU grep 3.12: a single-quoted
+  `password =` or `api_key =` assignment now matches; values
+  containing x/2/7 do not false-positive. E2E: a push adding an
+  `api_key =` assignment with a live-looking single-quoted value
+  (e.g. one matching `sk-live-123`) is refused.
 
 ### Verified behaviorally (scratch repos, real hooks as shell subprocesses)
 
