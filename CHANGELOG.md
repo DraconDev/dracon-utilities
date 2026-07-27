@@ -94,7 +94,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### v0.113.2 — 2026-07-27 — pre-push hook `--first-parent` (tag-push false-positive fix)
+## [0.113.2] — 2026-07-27 — pre-push hook `--not --remotes` (tag-push false-positive fix)
 
 - **F0.1 follow-up — `--first-parent` BAD_AUTHORS scan**: the pre-push
   hook's `git log --format='%ae%n%ce' "$RANGE"` walked every reachable
