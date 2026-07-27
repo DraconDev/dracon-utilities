@@ -93,15 +93,16 @@ NOT auto-staged. This is the hard exclusion threshold.
 
 ### Push timeouts
 
-`push_op_timeout_secs = 300` (CHANGED 2026-06-17 from 60).
-This matches the daemon's own code default
+`push_op_timeout_secs = 900` (CHANGED 2026-06-23 from 300, then
+to 960, then settled at 900 for current codeberg/gitlab).
+Matches the daemon's own code default
 (`default_push_op_timeout_secs` in `dracon-sync/src/policy.rs`)
-and gives a 5x safety margin over the v0.112.10 measured >60s
-push time for a 23-file PNG-heavy commit. Per-remote timeouts
-(e.g. 60s for github, 300s for gitlab/codeberg) would be more
+and gives a generous safety margin over the v0.112.10 measured
+>60s push time for a 23-file PNG-heavy commit. Per-remote timeouts
+(e.g. 60s for github, 900s for gitlab/codeberg) would be more
 precise but require a daemon code change to add the field to
 `RemoteConfig`; deferred to a follow-up daemon release. The
-global 300s is wasteful for github (which never takes more
+global 900s is wasteful for github (which never takes more
 than a few seconds) but harmless — the daemon times out via
 process kill, not via waiting. See
 `docs/design/push-timeout-fix-2026-06-17.md` for the full
@@ -398,12 +399,17 @@ what falls in between.
 - **History rewrite via `filter-repo --invert-paths --force`** —
   This is what the daemon does *automatically* during auto-repair
   when `auto_repair_concerns = true` (default) detects large blobs
-  ahead. Code paths:
+  ahead. Code paths (current as of v0.113.4 — the v0.113.3
+  SYNC-H6 fix moved from `filter-repo` to `git bundle` for backup
+  capture + `--force-with-lease` for the force-push; the rewrite
+  itself still uses `filter-repo --invert-paths --force`):
   - Function definition: `dracon-sync/src/git/staging.rs:152`
-  - Call sites: `dracon-sync/src/report.rs:3705`,
-    `dracon-sync/src/report_v2_snapshot.rs:3166`
-  - Default: `dracon-sync/src/policy.rs:1580`
-    (`auto_repair_concerns: true`)
+  - Call site: `dracon-sync/src/report.rs:3705`
+  - Default: `dracon-sync/src/policy.rs:1890`
+    (`auto_repair_concerns: true`, set via
+    `#[serde(default = "default_true")]` so TOML-loaded configs
+    without an explicit value get `true`; the bare
+    `#[derive(Default)]` on `SyncPolicy` gives `false`)
 
   Audit history (2026-06-30): found 1 historical auto-rewrite
   backup branch in `/home/dracon/Dev/avid/` —
@@ -641,10 +647,11 @@ dracon-system 88; dracon-warden 103 (93 + 10 integration).
 ## `[patch.crates-io]` status
 
 `[patch.crates-io]` in `Cargo.toml` currently points at
-`https://github.com/DraconDev/dracon-libs?tag=v94.7.1` (git+tag form).
+`https://github.com/DraconDev/dracon-libs?tag=v94.7.2` (git+tag form).
 This is a temporary workaround for the libgit2 ssh-agent bug
-fixed in `dracon-git v94.7.1`. **Required follow-up**: when the
-operator publishes `dracon-git v94.7.1` to crates.io (needs
+fixed in `dracon-git v94.7.2` (upgraded from v94.7.1 on
+2026-07-25). **Required follow-up**: when the
+operator publishes `dracon-git v94.7.2` to crates.io (needs
 `CARGO_REGISTRY_TOKEN`), remove `[patch.crates-io]` from
 `Cargo.toml`. The daemon will then use the crates-io version
 naturally. `deny.toml [sources].allow-git` should also be cleared
