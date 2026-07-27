@@ -394,6 +394,62 @@ mod tests {
         );
     }
 
+    /// ADDED 2026-07-27 (v0.113.2): the BAD_AUTHORS scan must use
+    /// `--first-parent`. Earlier the scan walked every reachable commit
+    /// in the range, so a test-identity commit on a non-first-parent
+    /// side-merge blocked pushes even though the published branch is
+    /// clean. Build a `--no-ff`-merged feature branch where the
+    /// feature commits are authored by `test@test`; main's
+    /// first-parent history is clean and the hook should PASS.
+    #[test]
+    fn pre_push_hook_test_identity_on_non_first_parent_merge_passes() {
+        let (td, hook_path) = make_repo_with_pre_push_hook("hook_test_non_first_parent");
+        let repo = td.path();
+
+        // Baseline commit with the trusted identity.
+        fs::write(repo.join("ok.txt"), "ok\n").unwrap();
+        run_git_in(repo, &["add", "ok.txt"]);
+        run_git_in(repo, &["commit", "-q", "-m", "baseline"]);
+        let baseline = git_in_output(repo, &["rev-parse", "HEAD"])
+            .trim()
+            .to_string();
+
+        // Side branch with two commits authored by a test identity.
+        run_git_in(repo, &["checkout", "-q", "-b", "feature"]);
+        run_git_in(repo, &["config", "user.email", "test@test"]);
+        run_git_in(repo, &["config", "user.name", "test"]);
+        fs::write(repo.join("feature_a.txt"), "A\n").unwrap();
+        run_git_in(repo, &["add", "feature_a.txt"]);
+        run_git_in(repo, &["commit", "-q", "-m", "side: a"]);
+        fs::write(repo.join("feature_b.txt"), "B\n").unwrap();
+        run_git_in(repo, &["add", "feature_b.txt"]);
+        run_git_in(repo, &["commit", "-q", "-m", "side: b"]);
+
+        // --no-ff merge so the feature commits remain on a non-first-parent
+        // branch in main's history. Restore the trusted identity first so
+        // the merge commit itself is NOT poisoned.
+        run_git_in(repo, &["config", "user.email", "test@test.local"]);
+        run_git_in(repo, &["config", "user.name", "test"]);
+        run_git_in(repo, &["checkout", "-q", "main"]);
+        run_git_in(repo, &["merge", "--no-ff", "-q", "-m", "merge feature", "feature"]);
+        let head = git_in_output(repo, &["rev-parse", "HEAD"])
+            .trim()
+            .to_string();
+
+        let (status, stderr) = run_hook(repo, &hook_path, &head, &baseline);
+        assert!(
+            status.success(),
+            "hook must ALLOW a push whose first-parent history is clean, even if a \
+             side-branch reachable from the tip is poisoned by a test identity. \
+             Without `--first-parent`, every consumer of the published branch sees a \
+             clean first-parent chain (this is what forges render and what `git log` \
+             shows by default in interactive shells); the F0.1 defense needs to guard \
+             the published chain, not the full reachable-commit closure. Exit: {:?}, stderr: {}",
+            status.code(),
+            stderr
+        );
+    }
+
     /// ADDED 2026-07-21 (v0.112.33, audit H2/F0.1 follow-up): a push
     /// of commits authored ONLY by the trusted identity passes the
     /// author check.

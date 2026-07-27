@@ -94,6 +94,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### v0.113.2 — 2026-07-27 — pre-push hook `--first-parent` (tag-push false-positive fix)
+
+- **F0.1 follow-up — `--first-parent` BAD_AUTHORS scan**: the pre-push
+  hook's `git log --format='%ae%n%ce' "$RANGE"` walked every reachable
+  commit in the range. For a **branch** push the range is
+  `remote_sha..local_sha` (only the new branch tip's chain, so the
+  historical commit scope is already implicit), but for a **tag**
+  push `remote_sha = 0` so the hook computes the range as
+  `4b825dc6..tag-sha` — the EMPTY TREE to the tag-object SHA,
+  covering the ENTIRE repo history. A test-identity commit reachable
+  on a non-first-parent side-merge (e.g. a `--no-ff` merge of a
+  feature branch where the daemon's drop-test helper left a
+  test@test author on the side) then blocked the tag push even
+  though main's first-parent history is clean. The published branch
+  that every forge renders and every consumer reads is exactly the
+  first-parent chain, so it is the correct defense surface. Now
+  `git log --first-parent --format='%ae%n%ce' "$RANGE"` — the F0.1
+  defense (a test identity on the published chain = landed in main =
+  block) is preserved verbatim. Regression test added:
+  `pre_push_hook_test_identity_on_non_first_parent_merge_passes`.
+
 ### v0.112.33 — 2026-07-21 — H2 follow-up: pre-push test-identity author rejection
 
 **Operator-visible change (from `AUDIT_FULL_2026-07-21.md`, F0.1 follow-up):**
