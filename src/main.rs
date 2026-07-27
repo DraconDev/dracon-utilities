@@ -2475,12 +2475,12 @@ while read local_ref local_sha remote_ref remote_sha; do
     # cannot be retroactively un-published, so re-scanning it on a
     # later tag push is wasted and prone to false positives. Defense
     # in depth is preserved for the new push itself.
-    if [ "$REMOTE_SHA" = "0000000000000000000000000000000000000000" ]; then
+    if [ "$remote_sha" = "0000000000000000000000000000000000000000" ]; then
         # New ref (tag or branch). Scan only commits not yet on any remote.
-        NEW_COMMITS=$(git rev-list "$LOCAL_SHA" --not --remotes 2>/dev/null || true)
+        NEW_COMMITS=$(git rev-list "$local_sha" --not --remotes 2>/dev/null || true)
     else
         # Existing-ref update. Scan only the new commits being added.
-        NEW_COMMITS=$(git rev-list "$LOCAL_SHA" --not "$REMOTE_SHA" 2>/dev/null || true)
+        NEW_COMMITS=$(git rev-list "$local_sha" --not "$remote_sha" 2>/dev/null || true)
     fi
     if [ -n "$NEW_COMMITS" ]; then
         BAD_AUTHORS=$(printf '%s\n' "$NEW_COMMITS" | xargs -I{} git log -1 --format='%ae%n%ce' {} 2>/dev/null | sort -u | grep -Eix '^test@test$|^test@test\.com$|^test@example\.com$' || true)
