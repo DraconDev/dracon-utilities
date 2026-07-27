@@ -561,7 +561,7 @@ worktree layout was eliminated for all 10 game/hegemon submodules of
 
 ## Recent audit-driven changes
 
-### v0.112.21 (2026-07-19) — post-v0.112.20 audit (`AUDIT_FULL_2026-07-18-POSTFIX.md`)
+### 2026-07-19 — post-v0.112.20 audit baseline (`AUDIT_FULL_2026-07-18-POSTFIX.md`, audit B8)
 
 53+ findings across the daemon, warden, system, and meta-repo. All
 **11 HIGH** (8 daemon + 3 warden) and 7 actionable **MEDIUM** findings
