@@ -6,7 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+- **`dracon-sync` v0.113.7 — github pack-too-large → CONCERN classification + auto-repair no-op (2026-07-28, goal `20260728111602-xwwe9z`)**: a repo whose pushable branch exceeds GitHub's 2 GiB pack limit was previously emitted only as a HINT in the `repos` table while the row stayed at `🔄 ACTIVE` (the daemon's push path was silently skipping GitHub for the repo, but the row's classification didn't reflect that). Now: (1) the row is reclassified as `❌ CONCERN` (via a new `pub(crate) fn pack_too_large_forces_concern` helper at `dracon-sync/src/report.rs:1693` — the production call site at `report.rs:3157` routes the decision through the helper); (2) the HINT text is updated from "may fail to push to github" to "github push is skipped; shrink history or migrate assets to OVH" (permanence, not transient); (3) the auto-repair path (`run_repair_concerns`) short-circuits on the `PACK_SIZE_WARNING` flag with a `⏭️ skipping auto-repair` log line — the daemon has no code path that shrinks a repo's history, so attempting the repair would just produce journalctl noise every sync cycle. **Investigation**: `docs/design/cag-github-push-block-2026-07-28.md`. **Design**: `docs/design/pack-size-concern-2026-07-28.md`. **Live evidence**: `capture-anime-girls` (CAG), whose pushable branch is 2.37 GiB and was being silently skipped, now shows `❌ CONCERN` in `dracon-sync repos`. The fix surfaces the problem; the github-side remediation (orphan cutover vs OVH migration vs filter-repo) is still operator's call. **1159 tests** (was 1158), clippy + deny clean, 0 `#[allow(clippy::...)]` introduced.
+
+## [0.113.7] - 2026-07-28
 ### Added
+
 - **LOW-hygiene clippy `--all-targets` cleanup** (2026-07-28, goal
   `20260728001443-t1ckfc`): closes the 13 pre-existing test-code
   clippy lints accumulated across the v0.112.20→v0.113.4 line. All
