@@ -158,6 +158,23 @@ actually shrinks the repo. The `   remaining:` line now also
 includes `pack_too_large=true` so the operator can see at a
 glance WHY the concern isn't resolved.
 
+### 5. Auto-repair guard extracted to a testable helper (v0.113.7, follow-up)
+
+The reviewer's leftover observation #4 was specifically:
+> "For CAG specifically, no handlers match so [operations_planned=0] by accident. But for a hypothetical repo that ALSO has a CONCERN and ALSO has pack_too_large, the auto-repair would attempt handlers."
+
+The current guard at `report.rs:6495` reads `if pack_too_large`
+(unconditional on the bool) — but the predicate is now also
+extracted to a `pub(crate) fn pack_too_large_skips_repair(pack_too_large: bool) -> bool` helper at `report.rs:1728` and routed through it. The test `test_pack_too_large_skips_repair`
+at `report.rs:7971` asserts the helper returns `true` for
+`pack_too_large=true` and `false` for `false`. This makes the
+"fires regardless of other concerns" property testable in
+isolation, without spinning up a full repo + concern list.
+The hypothetical case the reviewer worried about is now
+verified by: helper returning `true` for the bool alone —
+no flags vector dependency, no coincidence on CAG's
+clean/synced state.
+
 ## Live evidence
 
 ### Before the fix (v0.113.6)
