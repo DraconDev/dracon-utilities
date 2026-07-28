@@ -22,18 +22,21 @@ This is a different cause from the existing `capture-anime-girls`
 
 Verified reachable-content breakdown of junk-runner:
 
-| Object | Size | Count | Total |
+| Object | Bytes (exact, summed) | GiB | Notes |
 |---|---|---|---|
-| `.pi-glla/active.jsonl` | 15.0 MiB | 412 | 6.18 GiB |
-| `src/assets/audio/music/cockpit/cockpit_theme_3.mp3` | 17.1 MiB | 1 | 17.1 MiB |
-| `src/assets/audio/music/planet/planet_theme_2.mp3` | 16.5 MiB | 1 | 16.5 MiB |
+| `.pi-glla/active.jsonl` (all 412 distinct blobs) | 3,096,934,514 | 2.884 | Measured via `git rev-list --all --objects \| grep pi-glla/active.jsonl \| xargs git cat-file -s \| awk '{sum+=$1}'` |
+| `src/assets/audio/music/cockpit/cockpit_theme_3.mp3` | 17,106,117 | 0.0159 | single copy |
+| `src/assets/audio/music/planet/planet_theme_2.mp3` | 16,490,266 | 0.0154 | single copy |
 | Other reachable | — | — | rest |
 
 **412 historical copies of `.pi-glla/active.jsonl` in junk-runner's
-git history.** Each daemon commit-all cycle appends 13+ lines to
-the JSONL and creates a new 15 MB blob. Over many hours of active
-glla-loop work, the JSONL grows monotonically (session-scratch
-data accumulates).
+git history.** The blobs are not all the same size: the earliest
+copy is 24,840 bytes (~24 KB) and the largest is 15,194,096 bytes
+(~14.5 MB); the average is 7,516,831 bytes (~7.2 MB). The total
+across all 412 copies is 2.884 GiB (NOT 6.18 GiB as a naïve
+`412 × 15 MiB` calculation would suggest). Each daemon commit-all
+cycle creates a new blob; the file's contents are append-only
+session-scratch that the glla orchestrator never deletes.
 
 **Why this contradicts the existing policy**: AGENTS.md says
 session-scratch dirs like `**/pi-tmp/**`, `**/scratch/**`,
@@ -69,20 +72,21 @@ modified-unstaged.)
 
 ### Affected repos
 
-| Repo | `.pi-glla/active.jsonl` in history | Add exclusion? |
+| Repo | `.pi-glla/active.jsonl` reachable blobs | Add exclusion? |
 |---|---|---|
-| `junk-runner` | 412 copies (6.18 GiB redundant) | **YES — bloat source** |
-| `dracon-platform` | 1 copy (transient) | YES — preventive |
-| `pi-goal-loop-audit` | 0 copies (separate gitdir) | NO — not affected |
+| `junk-runner` | 412 copies (2.884 GiB) | **YES — done in this session (commit `5d6d379d`)** |
+| `dracon-platform` | 0 copies (parent has `*.jsonl` in `.gitignore:18`) | NO — already ignored |
+| `pi-goal-loop-audit` | 0 copies (separate gitdir, no gitlink) | NO — not affected |
 | `dracon-utilities` | 0 copies (meta-repo) | NO — meta-repo is not auto-committed |
 
-The exact list of repos to update will be confirmed by querying
-each watched repo with `git rev-list --all --objects | grep -c pi-glla/active.jsonl`.
-Any repo with > 0 copies needs the exclusion.
+The list of repos to update was confirmed by querying each watched
+repo with `git rev-list --all --objects | grep -c pi-glla/active.jsonl`.
+Only `junk-runner` has reachable copies; `dracon-platform` is already
+covered by its existing `*.jsonl` ignore rule.
 
 ### History-rewrite (deferred)
 
-Removing the existing 6.18 GiB of `.pi-glla/active.jsonl` blobs
+Removing the existing 2.884 GiB of `.pi-glla/active.jsonl` blobs
 from junk-runner's history requires a `filter-repo --invert-paths`
 rewrite (or equivalent) + force-push. This is the same class of
 operation that AGENTS.md "History-rewrite ENFORCEMENT stack" warns
@@ -103,10 +107,15 @@ next cycle should:
    showing no `📝 committed ... pi-glla/active.jsonl` lines).
 2. Show the file as modified-unstaged in
    `git status` (per the v0.112.34 semantic).
-3. `dracon-sync repos` should show junk-runner STILL ❌ CONCERN
-   (the history still has 6.18 GiB of bloat), but the HINT
-   should change from "ongoing bloat" framing to "awaiting
-   history rewrite" framing.
+3. `dracon-sync repos junk-runner` should show junk-runner STILL
+   ❌ CONCERN (the history still has 2.884 GiB of historical bloat
+   that no per-repo exclusion can remove). The HINT column in
+   `dracon-sync repos` is GENERIC ("shrink history or migrate
+   assets to OVH") and does NOT distinguish between ongoing bloat
+   and awaiting-rewrite states. The daemon's `journalctl` log
+   explicitly says "Needs history rewrite / OVH migration; will
+   resume once shrunk below 2 GiB" — that is the authoritative
+   source of the awaiting-rewrite framing, not the HINT column.
 
 History-rewrite completion criterion (later, deferred):
 
