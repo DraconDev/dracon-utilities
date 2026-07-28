@@ -10,21 +10,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **LOW-hygiene clippy `--all-targets` cleanup** (2026-07-28, goal
   `20260728001443-t1ckfc`): closes the 13 pre-existing test-code
   clippy lints accumulated across the v0.112.20→v0.113.4 line. All
-  13 instances were FIXED in the dedicated clippy cleanup commit
-  `93790a1` (Mon 2026-07-27 23:20:24, 6 files, +14/-18); ZERO were
-  allowed via `#[allow(clippy::...)]`. The 13 fixes split into 7
-  lint categories: `int_plus_one` (1), `bool_assert_comparison`
-  (7), `cmp_owned` (1), `unused_variables` (1), `useless_vec` (1),
+  13 instances were FIXED — 12 in the dedicated clippy cleanup
+  commit `93790a1` (Mon 2026-07-27 23:20:24, 6 files, +14/-18) and
+  1 (`unused_variables` rename `remotes` → `_remotes` in
+  `src/git/mod.rs:1128`) in commit `5557f44`. ZERO were allowed
+  via `#[allow(clippy::...)]`. The 13 fixes split into 7 lint
+  categories: `int_plus_one` (1), `bool_assert_comparison` (7),
+  `cmp_owned` (1), `unused_variables` (1), `useless_vec` (1),
   `unnecessary_get_then_check` (1), `cloned_ref_to_slice_refs`
   (1). Per-lint summary with file:line refs lives at
   `docs/design/clippy-low-hygiene-2026-07-28.md`. Gate posture:
   `cargo clippy --workspace --locked --all-targets -- -D warnings`
   exits 0; `cargo test --workspace --locked` reports 1158 passed
   (≥ 1038 contract); explicit `-W clippy::<each-lint>` re-runs all
-  exit 0 against HEAD. The clippy cleanup commit is separate from
-  the M1-M4 MEDIUM-finding batch (`572f151`..`c691555`) which
-  addressed the audit findings; the two are independent work
-  items that landed in close succession.
+  exit 0 against HEAD. The clippy cleanup commits are separate
+  from the M1-M4 MEDIUM-finding batch (`572f151`..`c691555`)
+  which addressed the audit findings; the two are independent
+  work items that landed in close succession.
 - **`dracon-sync` v0.112.39 — deathrun size fix (orphan cutover) + BROKEN_HISTORY detection + frame-dump prevention (2026-07-23)**: the deathrun 2 GiB fix and the prevention work, plus an important diagnosis correction. (1) **deathrun orphan cutover**: the repo's pushable branch was 2.85 GiB (audit-screenshot churn — `docs/audit-browser-v3` alone 1.5 GiB/4311 files, `.pi/chrome-screenshots` 585 MB), tripping github's 2 GiB pack limit. Orphan-cutovered to a clean root (`a77d795b rebirth`, 2388 files, 261 MB), force-pushed to gitlab (unprotect/push/re-protect — main is protected) and github (`--force-with-lease=main`). **github accepted the push** — pushes resumed after days of the guard skipping it. All 3 forges + local at `036dedd8`, parent gitlink converged, `🟢 synced · healthy`. (2) **BROKEN_HISTORY detection**: `probe_missing_objects` (with a path-strip fix) + a `BROKEN_HISTORY:N` state flag → CONCERN with hint, cached 24h alongside the size probe. (3) **Frame-dump prevention**: warden `hygiene_patterns` now ignores `**/.pi/chrome-screenshots/` and `**/audit-*/screenshots/` fleet-wide (audit `.md` REPORTS still committed). AGENTS.md commit-all policy documents the exception. (4) **Auto-repair pre-flight**: `rewrite_ahead_paths` refuses to rewrite a damaged gitdir (missing objects) with an alert. **DIAGNOSIS CORRECTION**: the initial "2092 missing objects / broken history on both sides" was a **probe bug** — `git rev-list --objects` appends paths to blob/tree lines and `cat-file` mis-parses them as "missing". Corrected probe shows **0 missing objects everywhere**; deathrun was **fat, not broken**, and the auto-repair rewrites did NOT break history. The orphan cutover was still the right fix for the real size problem. Design doc: `docs/design/audit-screenshot-bloat-deathrun-2026-07-23.md`. **825 daemon tests**, clippy + deny clean.
 
 - **`dracon-sync` v0.112.38 — rich table default + per-repo detail (2026-07-22)**: operator-requested UX reshape of `repos`. (1) **New default view**: plain `dracon-sync repos` (at <242 cols) now shows a rich 7-column table (`# · STATUS · REPO · ACTIVITY · A/B · PUSH · HINT`) instead of the verbose per-repo block view — ACTIVITY includes dirty counts inline (`⏳ dirty 1d · 101 stg + 2 ut`); **A/B is the ahead/behind column** (`↑N` unpushed = data at risk, `↓N` upstream drift, `↑N ↓M` both, `—` in sync — the most important missing field); PUSH is the dedicated push-state cell (✅ OK / 🟣 PENDING / 🛑 STUCK / ❌ FAIL); branch is folded into REPO only when ≠ main (`darklord⚡master`). Sorted by severity. At ≥140 cols a PUBLISH column is added. (2) **Per-repo detail**: `dracon-sync repos <name>` (e.g. `repos darklord`) shows the full detailed block for ONE repo (branch, publish, changes, ahead/behind, push-to, push, last commit, pushed, activity, state, hint) — the "run details on a certain repo" path. Errors on unknown basename (exit 2) or ambiguity. (3) The old block view remains available via `--layout vertical`; `-s/--summary` (3-col glance) and `--layout compact/full` (16/23-col detailed tables at 242+/315+ cols) are unchanged. New `LayoutTier::Rich` variant + `print_repos_rich_table`; `choose_layout_tier` returns Rich for <242. **825 daemon tests** (2 tier tests updated to the new default), clippy + deny clean.

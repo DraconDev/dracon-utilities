@@ -38,38 +38,39 @@ error: could not compile `dracon-sync` (bin "dracon-sync" test) due to 13 previo
 
 **Total: 13 lints across 7 categories** (NOT 17 across 8 as an
 earlier draft of this doc claimed; that draft was produced before
-the actual baseline was re-measured. The v0.113.5 release notes'
-"14 unrelated pre-existing baseline clippy warnings" count was
-the count visible at CI baseline; the actual count after the
-release-notes were drafted is 13 because one instance was folded
-into another site during refactoring. The difference is a
-counting artifact, not a substantive disagreement.)
+the actual baseline was re-measured). The v0.113.5 release notes'
+"14 unrelated pre-existing baseline clippy warnings" figure was
+the CI-visible count including the trailing
+`could not compile … due to 13 previous errors` summary line; the
+actual lint count is 13, and 7 of those 13 are the
+`bool_assert_comparison` instances (5 single-line + 2 multi-line
+macros).
 
 ## Per-lint summary (N fixed vs M allowed)
 
-| # | Lint category | Count | Status | Fix in `93790a1` |
+| # | Lint category | Count | Status | Fix commit(s) |
 |---|---|---|---|---|
 | 1 | `int_plus_one` | 1 | FIXED | `test_helpers.rs:255` — `after_count >= initial_count + 1` → `after_count > initial_count` |
-| 2 | `unused_variables` | 1 | FIXED | `git/mod.rs:1128` — `let remotes = vec![...]` rewritten to `let remotes = [...]`; the unused-binding went away because the array literal no longer needs a name for `vec!` |
+| 2 | `unused_variables` | 1 | FIXED | `git/mod.rs:1128` — `let remotes = [...]` (in `93790a1`) was renamed to `let _remotes = [...]` in commit `5557f44`; the binding is now `#[allow(unused)]`-style (via the leading-underscore convention) and is left in place as documentation of the auto-create-remotes contract |
 | 3 | `unnecessary_get_then_check` | 1 | FIXED | `daemon.rs:1825` — `assert!(map.get(repo).is_none())` → `assert!(!map.contains_key(repo))` |
 | 4 | `cloned_ref_to_slice_refs` | 1 | FIXED | `git/branch.rs:475` — `repair_broken_tracking(&[repo.clone()])` → `repair_broken_tracking(std::slice::from_ref(&repo))` |
 | 5 | `cmp_owned` | 1 | FIXED | `policy.rs:1966` — `tx == std::path::PathBuf::from("~templates/x")` → `tx == std::path::Path::new("~templates/x")` |
 | 6 | `bool_assert_comparison` | 7 | FIXED | `sync.rs:4974, 4997, 5023, 5046, 5075, 5096, 5113` — all `assert_eq!(result.unwrap(), true/false)` rewritten to `assert!(result.unwrap())` / `assert!(!result.unwrap())` |
 | 7 | `useless_vec` | 1 | FIXED | `git/mod.rs:1128` — `let remotes = vec![...]` → `let remotes = [...]` |
-| **TOTAL** | 7 categories | **13** | **13 FIXED, 0 ALLOWED** | commit `93790a1` |
+| **TOTAL** | 7 categories | **13** | **13 FIXED, 0 ALLOWED** | commits `93790a1` + `5557f44` |
 
 ### Note on earlier draft vs actual data
 
 An earlier draft of this doc claimed the fixes were "inline in
 the M1-M4 batch commits `572f151..c691555`" with a per-commit
 breakdown. That claim was wrong — `93790a1` (a single dedicated
-clippy cleanup commit) is where all 13 fixes landed. The
-M1-M4 commits (`572f151`, `4dfc83d`, `a9a2836`, `f73737f`,
-`c691555`) are the SYNC-M1..M4 audit fixes (detached_discard,
-filter-only bypass, should_push, apply_outcome) — distinct from
-the clippy cleanup. The auditor's review of the earlier draft
-caught this misattribution; this revision points to the correct
-commit.
+clippy cleanup commit) is where 12 of the 13 fixes landed, plus
+`5557f44` for the `unused_variables` rename. The M1-M4 commits
+(`572f151`, `4dfc83d`, `a9a2836`, `f73737f`, `c691555`) are the
+SYNC-M1..M4 audit fixes (detached_discard, filter-only bypass,
+should_push, apply_outcome) — distinct from the clippy cleanup.
+The auditor's review of the earlier draft caught this
+misattribution; this revision points to the correct commits.
 
 ### Verification (current state, 2026-07-28)
 
@@ -128,7 +129,7 @@ The LOW-hygiene goal's hard-out-of-scope clause excludes:
 
 - Goal file: `dracon-utilities/.pi-glla/goals/20260728001443-t1ckfc.md`
 - Origin goal: `20260726235933-0ik9uq.md` (paused/aborted; subsumed)
-- Clippy cleanup commit: `dracon-sync` git `93790a1` (Mon 2026-07-27 23:20:24)
+- Clippy cleanup commits: `dracon-sync` git `93790a1` (Mon 2026-07-27 23:20:24 — 12 of the 13 fixes) + `5557f44` (the `unused_variables` rename to `_remotes`)
 - v0.113.5 CHANGELOG entry: `dracon-sync/CHANGELOG.md` lines 135-139
 - v0.113.5 release notes: `dracon-sync/release-notes-v0.113.5.md` lines 115-123
 - v0.113.6 (M4 completion): same files, lines covering the M4 helper extraction
