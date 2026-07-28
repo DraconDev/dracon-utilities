@@ -95,10 +95,12 @@ consistent with the pattern in the daemon's
 
 ### 3. Auto-repair is a no-op for PACK_SIZE_WARNING
 
-Added a short-circuit at `dracon-sync/src/report.rs:6417`:
+Added a short-circuit at `dracon-sync/src/report.rs:6433` (the
+guard reuses the `pack_too_large` value already computed at
+line 6391 — no extra git subprocess):
 
 ```rust
-if flags.iter().any(|f| f == "PACK_SIZE_WARNING") {
+if pack_too_large {
     out!(
         "⏭️  {}  skipping auto-repair: github push is permanently
          skipped (pushable branch > 2 GiB). Operator action required.",
@@ -118,6 +120,43 @@ Concerns" output would accumulate no-op entries every sync
 cycle. This guard is the same pattern as
 `ConcernRepairFilter::StuckPush` / `StuckPull` already in use
 two lines above.
+
+**CHANGED 2026-07-28 (v0.113.7, follow-up)**: the initial
+implementation of this guard checked `flags.iter().any(|f| f == "PACK_SIZE_WARNING")`
+— but the `flags` vector at that point was built by
+`repo_state_flags_with_push_failure`, which does NOT add
+`PACK_SIZE_WARNING` (that flag is only added in
+`run_repos_report` at line 3157). The first version was
+therefore dead code: for the specific CAG case (clean, synced,
+origin-ok, upstream-ok, 0-ahead, 0-behind) no handlers matched
+anyway, so the empirical `operations_planned: 0` was correct
+by coincidence. For a hypothetical repo with BOTH
+`PACK_SIZE_WARNING` and a real concern (e.g. `STUCK_PUSH`),
+the dead guard would have missed its short-circuit and the
+daemon would have attempted handlers — failing silently. The
+follow-up: re-use the `pack_too_large` value already computed
+at line 6391 (the early-skip) so the guard actually fires
+when the push path WOULD skip github. **Live evidence**: the
+⏭️ line now prints in the `dracon-sync repair concerns --apply`
+output, AND `concerns_resolved_now` correctly dropped from `1`
+(wrong) to `0` (the concern is genuinely still there because
+the daemon cannot fix it).
+
+### 4. Post-handler `verify_resolution` no longer falsely reports "resolved"
+
+Same root cause: the `verify_resolution` function (line 6204) had
+a `still_concern` predicate that checked `ahead > 0 || behind > 0
+|| !has_origin || !has_upstream` — but not `pack_too_large`. So
+after the auto-repair pass (where the new guard short-circuits
+CAG), the post-check would have classified CAG as "resolved"
+and printed `   resolved: concern cleared`. That message was
+misleading: the size issue is unchanged, and the next `repos`
+cycle still shows ❌ CONCERN. The fix: include
+`pack_too_large_forces_concern` in the predicate, so a
+size-only concern stays "still concerned" until the operator
+actually shrinks the repo. The `   remaining:` line now also
+includes `pack_too_large=true` so the operator can see at a
+glance WHY the concern isn't resolved.
 
 ## Live evidence
 
