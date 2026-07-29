@@ -160,35 +160,25 @@ shipped ~2.85 GiB and github really did reject it.
    is PNGs (incompressible), 2.34 GiB gitdir is a faithful
    proxy; Option A filter-repo + OVH migration unchanged.
 
-## Operator runbook: remote branch deletions (pending)
+## Remote cleanup — EXECUTED 2026-07-29 (operator-authorized, `DRACON_ALLOW_REWRITE=1`)
 
-These need `DRACON_ALLOW_REWRITE=1` (warden pre-push hook
-blocks branch deletions) and are **operator-gated** per
-AGENTS.md "For HUMAN operators". Gitlab branch protection
-covers only main/master, so these deletes are allowed
-remotely.
+Actual findings differed from the initial runbook:
 
-```bash
-# 1. deathrun's published backup branch (github + gitlab) — ~1.5 GiB reclaim
-cd /home/dracon/Dev/dracon-platform/web/games/wip/deathrun
-DRACON_ALLOW_REWRITE=1 git push github --delete backup/pre-sync-largeblob-fix-1784111463
-DRACON_ALLOW_REWRITE=1 git push gitlab --delete backup/pre-sync-largeblob-fix-1784111463
-git fetch --prune github && git fetch --prune gitlab
-git gc --prune=now
+- **deathrun `backup/pre-sync-largeblob-fix-1784111463`**: was
+  on **gitlab only** (github never had it). Deleted on
+  gitlab, `fetch --prune`, final gc → **deathrun 4.07 GiB →
+  237 MiB** (94% reclaimed; final state is the 0.25 GiB
+  pushable main + normal overhead).
+- **`daemon-standalone` on the 5 games**: already deleted on
+  gitlab long ago (2026-07-08 materialization removal era) —
+  only the local tracking refs were stale. `fetch --prune`
+  dropped them; no remote deletion needed.
+- No other stale remote branches found on the audited repos.
 
-# 2. daemon-standalone on gitlab for 5 games (superseded 2026-07-02 design; tiny)
-for g in capture-anime-girls darklord hellhunter neonbreak; do
-  git -C /home/dracon/Dev/dracon-platform/web/games/wip/$g \
-    push origin --delete daemon-standalone   # prefix with DRACON_ALLOW_REWRITE=1
-  git -C /home/dracon/Dev/dracon-platform/web/games/wip/$g fetch --prune origin
-done
-# junk-runner's daemon-standalone rides along with its pending
-# Scenario B filter-repo (docs/design/junk-runner-history-rewrite-2026-07-28.md)
-
-# 3. Force the daemon to re-measure sizes immediately:
-rm /home/dracon/.dracon/utilities/sync/repos-size-cache.json
-dracon-sync repos
-```
+Remaining fleet state after full cleanup: 30 CLEAN /
+3 ACTIVE / 2 WARN / 1 CONCERN (capture-anime-girls —
+genuine, PNG bloat; Option A filter-repo still pending
+operator authorization).
 
 ## Standing policy note
 
