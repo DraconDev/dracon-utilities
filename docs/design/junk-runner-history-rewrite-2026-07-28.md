@@ -1,5 +1,22 @@
 # junk-runner history-rewrite — 2026-07-28
 
+> **URGENCY UPDATE 2026-07-29**: demoted from "required to
+> unblock github" to **optional hygiene**. Ground-truth
+> measurement (see `stale-backup-branch-cleanup-2026-07-29.md`):
+> the next github push ships only a **14.77 MiB compressed
+> delta** (github is 96 commits behind but has the ancestor),
+> and even a fresh-remote full-history push would ship
+> **736 MiB compressed** — both far under github's 2 GiB
+> limit. The daemon guard's 3.79 GiB figure was the
+> *uncompressed* whole-branch blob sum — a false proxy for
+> junk-runner's highly-compressible JSONL bloat. The ❌
+> CONCERN cleared 2026-07-29 after the stale-backup-branch
+> gc dropped the gitdir under 2 GiB (fast-path heuristic).
+> The rewrite remains worthwhile (every fresh clone carries
+> ~736 MiB of dead scratch JSONL; post-rewrite ~250 MiB),
+> and this document's 12-step plan + recovery procedure is
+> unchanged — but nothing is blocked without it.
+
 **Decision**: **Option 1 — `filter-repo --invert-paths` + force-push**
 (commit `5d6d379d` per-repo exclusion is the bleed-stop; this
 is the history-rewrite that finishes the cleanup).

@@ -107,6 +107,59 @@ so this is disk-capacity only. Reclaim = filter-repo on the
 parent, a much bigger operation; **deferred** — the Yellow
 SIZE cell is the intended capacity-planning signal.
 
+## UNEXPECTED OUTCOME: junk-runner ❌ CONCERN cleared — the guard was over-conservative
+
+After the gc, junk-runner's gitdir dropped under 2 GiB, which
+flipped `github_pack_too_large`'s fast path
+(`dracon-sync/src/git/mod.rs:48-53`: `size < 2 GiB → false`)
+and cleared the PACK_SIZE_WARNING concern. Ground-truth
+verification:
+
+| Metric | Value | Under github's 2 GiB limit? |
+|---|---:|:---:| |
+| Whole-branch uncompressed blob sum (the guard's metric) | 3.79 GiB | ❌ (as measured) |
+| Delta to github (96 commits behind) — compressed pack | **14.77 MiB** | ✅ trivially |
+| Full-history compressed pack (fresh-remote scenario) | **736 MiB** | ✅ comfortably |
+
+**The guard's uncompressed-blob-sum metric is a false proxy
+for compressible content.** junk-runner's bloat is JSONL
+text (`active.jsonl` versions) which delta-compresses
+~5:1; the 3.79 GiB of blobs are *already on github* from
+incremental pushes before the guard existed (v0.112.38 era).
+Github's actual limit applies to the **compressed incoming
+pack**, which for junk-runner has never exceeded ~1 GiB.
+Contrast deathrun-in-July: PNG screenshots are
+incompressible, so its 2.85 GiB uncompressed genuinely
+shipped ~2.85 GiB and github really did reject it.
+
+**Implications:**
+
+1. **junk-runner's github sync is restored** — the next
+   natural commit will push the 14.77 MiB delta (daemon
+   only attempts github pushes when new commits exist; the
+   last skip fired 03:11:46, matching the last commit).
+2. **The Scenario B bulk filter-repo** (`docs/design/
+   junk-runner-history-rewrite-2026-07-28.md`) is demoted
+   from "required to unblock github" to **optional hygiene**
+   (every fresh clone still carries ~736 MiB of dead scratch
+   JSONL; the rewrite shrinks that to ~250 MiB). Still
+   recommended, no longer urgent.
+3. **Daemon guard improvement candidate (v0.113.10?)**:
+   `github_pack_too_large` should measure the
+   **delta-vs-remote compressed pack** (`git pack-objects
+   --revs --stdout main --not --remotes=<target> | wc -c`)
+   rather than the whole-branch uncompressed blob sum. This
+   handles both cases correctly: fresh remote → delta =
+   whole branch (deathrun case caught); incremental → only
+   the delta (junk-runner case cleared). Alternatively the
+   cheap fix: estimate compressed size as the gitdir pack
+   size attributable to the branch. Filed for operator
+   decision — the current guard is safe-but-noisy
+   (false-positive direction only).
+4. **capture-anime-girls' ❌ CONCERN stands** — its bloat
+   is PNGs (incompressible), 2.34 GiB gitdir is a faithful
+   proxy; Option A filter-repo + OVH migration unchanged.
+
 ## Operator runbook: remote branch deletions (pending)
 
 These need `DRACON_ALLOW_REWRITE=1` (warden pre-push hook
