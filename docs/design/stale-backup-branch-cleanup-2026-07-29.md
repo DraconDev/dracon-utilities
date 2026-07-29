@@ -198,30 +198,20 @@ operator authorization).
 
 ## v0.113.10 follow-ups (advisor review, 2026-07-29)
 
-1. **Tip-keyed verdict cache for the push-path guard** (patch
-   candidate, own schedule): `sync.rs` calls
-   `github_pack_too_large(repo, None)` fresh on every push cycle
-   (it does NOT use the 1h report cache). The expensive
-   pack-objects tier only fires for a repo that is gitdir ≥ 2 GiB
-   AND uncompressed-delta ≥ 2 GiB AND actively committing (both
-   call sites are gated on new work: `ahead > 0 ||
-   upstream_ref_missing` / post-commit push) — today's fleet
-   dodges it (CAG idle, dracon-platform delta small). If CAG
-   wakes up before its filter-repo, every ~65s cycle pays a
-   multi-second pack generation. Fix: cache the verdict keyed on
-   `(branch tip, github tracking tips)` — deterministic until a
-   tip moves, and tips move exactly when re-measurement is
-   warranted.
-2. **`release.sh` hardening before v0.113.11**: it assumes a
-   remote literally named `github` and has failed identically on
-   both v0.113.9 and v0.113.10 (nested repo names it `origin`),
-   forcing manual push + `gh release create` each time. Derive
-   the github remote from `git config --get-regexp
-   '^remote\..*\.url$'` (same logic as the guard's
-   `github_remote_names`) or iterate all configured remotes.
-   Also make step 2 idempotent — the re-run after the partial
-   failure duplicated the `## [0.113.10]` CHANGELOG header
-   (hand-fixed).
+1. **Tip-keyed verdict cache for the push-path guard** — SHIPPED in
+   v0.113.11 (goal-list item 1). Verdict cached on (branch tip,
+   github tracking tips, limit); key resolved via direct ref-file
+   reads (loose + packed-refs + config scan) so hits run zero git
+   subprocesses; only clean determinations cached; 6 new tests
+   (per-repo measurement counter). Details: `dracon-sync/
+   release-notes-v0.113.11.md`.
+2. **`release.sh` hardening** — SHIPPED in v0.113.11 (goal-list item
+   2). Github remote derived by URL (`scripts/resolve-github-remote.sh`;
+   resolved `origin` live during the v0.113.11 release itself — first
+   unattended step-6 completion); CHANGELOG close extracted to
+   `scripts/close-changelog.py` (byte-identical on re-run, verified);
+   steps 5/6 tolerate the partial-failure re-run path; mirror-tag
+   reminder printed at the end (used: gitlab + codeberg tag pushes).
 3. **Janitor production validation** (operator spot-check within
    the week): no candidates exist post-cleanup, so correct
    behavior is SILENCE — `journalctl --user -u dracon-sync.service
