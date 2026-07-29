@@ -196,6 +196,39 @@ Remaining fleet state after full cleanup: 30 CLEAN /
 genuine, PNG bloat; Option A filter-repo still pending
 operator authorization).
 
+## v0.113.10 follow-ups (advisor review, 2026-07-29)
+
+1. **Tip-keyed verdict cache for the push-path guard** (patch
+   candidate, own schedule): `sync.rs` calls
+   `github_pack_too_large(repo, None)` fresh on every push cycle
+   (it does NOT use the 1h report cache). The expensive
+   pack-objects tier only fires for a repo that is gitdir ≥ 2 GiB
+   AND uncompressed-delta ≥ 2 GiB AND actively committing (both
+   call sites are gated on new work: `ahead > 0 ||
+   upstream_ref_missing` / post-commit push) — today's fleet
+   dodges it (CAG idle, dracon-platform delta small). If CAG
+   wakes up before its filter-repo, every ~65s cycle pays a
+   multi-second pack generation. Fix: cache the verdict keyed on
+   `(branch tip, github tracking tips)` — deterministic until a
+   tip moves, and tips move exactly when re-measurement is
+   warranted.
+2. **`release.sh` hardening before v0.113.11**: it assumes a
+   remote literally named `github` and has failed identically on
+   both v0.113.9 and v0.113.10 (nested repo names it `origin`),
+   forcing manual push + `gh release create` each time. Derive
+   the github remote from `git config --get-regexp
+   '^remote\..*\.url$'` (same logic as the guard's
+   `github_remote_names`) or iterate all configured remotes.
+   Also make step 2 idempotent — the re-run after the partial
+   failure duplicated the `## [0.113.10]` CHANGELOG header
+   (hand-fixed).
+3. **Janitor production validation** (operator spot-check within
+   the week): no candidates exist post-cleanup, so correct
+   behavior is SILENCE — `journalctl --user -u dracon-sync.service
+   | grep 🧹` should show nothing and `~/dracon/backups/
+   auto-prune/` should stay empty. Absence of evidence is the
+   evidence.
+
 ## Standing policy note
 
 Per AGENTS.md, any *new* `backup/pre-sync-largeblob-fix-*`
