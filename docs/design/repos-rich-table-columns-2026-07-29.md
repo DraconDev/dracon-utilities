@@ -262,8 +262,8 @@ Updated tests:
 - `test_choose_layout_tier_fallback_no_env_no_tty_yields_compact_or_smaller`
   — 120 cols now routes to Compact (was Rich).
 
-Total daemon test count: **854** (was 854 in v0.113.7; the
-new tests added 6 net new, minus 0 removed = 854).
+Total daemon test count: **854** (was **848** in v0.113.7;
+the new tests added **6 net new**, minus 0 removed = 854).
 
 `cargo test --workspace --locked` passes (1120+ tests).
 `cargo clippy --bin dracon-sync --locked -- -D warnings`
