@@ -4,6 +4,23 @@
 > **Versions**: v0.113.7 (daemon-side reclassification + auto-repair no-op)
 > **Author**: pi goal-loop (goalId `20260728111602-xwwe9z`)
 > **Status**: shipped + deployed
+>
+> **UPDATED 2026-07-29 (v0.113.10)**: the guard's measurement changed
+> from *whole-branch uncompressed blob sum* to *per-github-remote delta
+> with a compressed-pack second chance* — see
+> `docs/design/stale-backup-branch-cleanup-2026-07-29.md` ("UNEXPECTED
+> OUTCOME" section) for the junk-runner false-positive that motivated
+> it. What this means for THIS document's semantics:
+> - `pack_pushable_bytes` is now the *decisive* figure: `.git` size on
+>   the fast path, uncompressed delta when that clears, else the
+>   compressed pack size github would actually receive.
+> - The CONCERN classification logic itself (`pack_too_large_forces_
+>   concern`, PACK_SIZE_WARNING) is unchanged — only the measured
+>   number is more faithful. Repos whose bloat is already on github
+>   (junk-runner) or is compressible now correctly stay OUT of
+>   CONCERN; repos with incompressible over-limit deltas (CAG's PNGs)
+>   remain flagged. The SIZE-column Red-iff-`pack_too_large` rule
+>   (v0.113.9) is unaffected — arguably more accurate now.
 
 ## The operator-visible bug
 

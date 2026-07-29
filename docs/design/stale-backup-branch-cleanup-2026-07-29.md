@@ -144,18 +144,34 @@ shipped ~2.85 GiB and github really did reject it.
    (every fresh clone still carries ~736 MiB of dead scratch
    JSONL; the rewrite shrinks that to ~250 MiB). Still
    recommended, no longer urgent.
-3. **Daemon guard improvement candidate (v0.113.10?)**:
-   `github_pack_too_large` should measure the
-   **delta-vs-remote compressed pack** (`git pack-objects
-   --revs --stdout main --not --remotes=<target> | wc -c`)
-   rather than the whole-branch uncompressed blob sum. This
-   handles both cases correctly: fresh remote → delta =
-   whole branch (deathrun case caught); incremental → only
-   the delta (junk-runner case cleared). Alternatively the
-   cheap fix: estimate compressed size as the gitdir pack
-   size attributable to the branch. Filed for operator
-   decision — the current guard is safe-but-noisy
-   (false-positive direction only).
+3. **Daemon guard improvement — SHIPPED in v0.113.10** (was:
+   "candidate"). `github_pack_too_large` now measures the
+   per-github-remote delta (`rev-list --objects <branch> --not
+   <remote-tip>`) with a compressed-pack second chance
+   (`git pack-objects --stdout` byte count when the uncompressed
+   delta exceeds the limit). Design corrections folded in from
+   advisor review: no-github-remote and non-ancestor tracking tips
+   degrade to whole-branch (fresh-remote / unsafe-direction cases),
+   pack generation is stream-counted with a 600s ceiling, and the
+   verdict maxes across multiple github remotes. The fast path
+   (gitdir < 2 GiB → false) is retained — sound under compressed
+   semantics since a subset pack never exceeds the whole store.
+   Side benefit: dracon-platform (12 GiB gitdir) no longer pays the
+   whole-branch slow path every sync cycle — only the delta.
+3b. **Daemon auto-GC janitor — SHIPPED in v0.113.10**: opt-in
+   `auto_prune_stale_backup_branches` (default false) automates
+   this document's manual cleanup: daily per-repo pass that
+   bundles `backup/pre-sync-largeblob-fix-*` + `daemon-standalone`
+   branches AND orphaned `refs/remotes/<removed-remote>/*`
+   tracking refs into `<backup_dir>/auto-prune/`, verifies the
+   bundle, deletes locally, and deletes remote copies whose tips
+   match (with a narrow `DRACON_ALLOW_REWRITE=1` env injection
+   into that one push command). Every deletion is `log_warn!`'d
+   with repo, ref, tip, bundle path — the journal becomes the
+   operator-review trail (AGENTS.md's "new backup/* branch =
+   review signal" policy is preserved by moving the signal, not
+   dropping it). Enabled fleet-wide in the global config on
+   2026-07-29.
 4. **capture-anime-girls' ❌ CONCERN stands** — its bloat
    is PNGs (incompressible), 2.34 GiB gitdir is a faithful
    proxy; Option A filter-repo + OVH migration unchanged.

@@ -428,6 +428,20 @@ what falls in between.
   `backup/pre-sync-largeblob-fix-*` branch is a fault requiring
   operator review.
 
+  CHANGED 2026-07-29 (v0.113.10): the 2026-07-29 fleet cleanup
+  (docs/design/stale-backup-branch-cleanup-2026-07-29.md)
+  bundled + deleted all 8 historical `backup/*` branches
+  (including avid's) — bundles live at
+  `~/dracon/backups/stale-branch-bundles-20260729/`. The new
+  opt-in janitor (`auto_prune_stale_backup_branches`, enabled
+  fleet-wide 2026-07-29) now reaps future instances daily
+  (bundle-first into `backup_dir/auto-prune/`, local + matching-
+  tip remote deletion). The operator-review signal is NOT lost:
+  every janitor deletion is `log_warn!`'d with repo, ref, tip,
+  and bundle path — review the journal instead of the branch
+  list. A branch surviving > 24h means either the janitor is
+  disabled or its bundle failed (also logged).
+
   To PREVENT the daemon from auto-rewriting on a specific repo:
   ```toml
   # .dracon/dracon-sync.toml
