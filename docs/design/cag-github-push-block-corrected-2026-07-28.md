@@ -1,5 +1,22 @@
 # capture-anime-girls (CAG) GitHub push block — corrected analysis
 
+> **EXECUTED 2026-07-29 (goal-list item 1)**: Option A shipped.
+> Bundle backup `~/dracon/backups/cag-pre-option-a-20260729.bundle`
+> (2.4 GiB, verified) → hygiene config committed (`.dracon/
+> dracon-sync.toml` excludes + `.gitignore`) → filter-repo
+> (1686 commits, `.pi/` + `.pi-tmp/` + `.pi-glla/` + `docs/audit*`
+> stripped) → gc → force-push. Results: size-pack **2.33 GiB →
+> 446 MiB**; 0 stripped paths remain in history; 31 MP3s + 771
+> sprite files intact on main; gitlab `b5050cf→807baf5` and
+> github `b6fe299→807baf5` (explicit-value `--force-with-lease`,
+> `DRACON_ALLOW_REWRITE=1` per-invocation; gitlab main unprotected
+> then re-protected, new protection id 289106624); parent gitlink
+> advanced by the daemon. `dracon-sync repos`: **✅ CLEAN, PUSH
+> ✅ OK**. One operational note: filter-repo's origin removal
+> stripped `branch.main.remote` (transient PUSH ❌ FAIL "no
+> upstream set"); the daemon's `refresh_publish_upstream` repaired
+> it on the next cycle — worth remembering for future rewrites.
+
 **Date**: 2026-07-28
 **Status**: CORRECTION to the prior design doc
 **Supersedes**: `docs/design/cag-github-push-block-2026-07-28.md`
