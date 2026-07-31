@@ -572,6 +572,22 @@ worktree layout was eliminated for all 10 game/hegemon submodules of
 - New code paths require unit tests
 - Backwards compatibility with all previously added
   policy fields is required
+- **Per-repo knobs need BOTH halves (enforced since
+  v0.113.34)**: adding a `SyncPolicy` field that a repo may
+  tune requires (1) the field, (2) an `Option<>` counterpart
+  in `RepoPolicyOverride`, (3) merge resolution at the point
+  of use (`repo_override.field.unwrap_or(policy.field)`,
+  pattern: `auto_bump_versions`).
+  `test_repo_override_field_coverage_tripwire` in
+  `dracon-sync/src/policy.rs` fails `cargo test` if you add a
+  field to either struct without deciding its per-repo story
+  (add the override half, or list the name in
+  `OVERRIDE_COVERAGE_GLOBAL_ONLY` /
+  `OVERRIDE_COVERAGE_OVERRIDE_ONLY` with a reason). This
+  exists because v0.113.29 added the SyncPolicy half of
+  `build_artifact_cleanup` without the override half — the
+  per-repo opt-out silently did nothing in production until
+  v0.113.33.
 
 ## Recent audit-driven changes
 
