@@ -280,22 +280,21 @@ Recent design docs (in `docs/design/`) cover:
 
 Design docs are durable. Re-read them.
 
-## Agent-loop git identities (ownership guard)
+## Agent-loop git identities (path ownership)
 
-The daemon's ownership guard (`auto_skip_unowned`) refuses to auto-commit/
-auto-push a repo whose HEAD author is untrusted. Agent loops (pi goal-loops,
-audit agents) that set `GIT_AUTHOR_NAME`/`GIT_AUTHOR_EMAIL` env overrides
-bypass repo-local `user.*` config, so their identity MUST be whitelisted in
-BOTH lists in `~/.dracon/utilities/sync/dracon-sync.toml` (the F44
-asymmetric-trust check flags when either signal is untrusted):
+Configured watch paths are owned by default. `owned = false` in a repo's
+`.dracon/dracon-sync.toml` is the explicit opt-out; legacy `owned = true`
+remains accepted but is no longer needed. A bad local identity, historical
+author, or foreign `origin` is therefore a **warning** for a path-owned repo,
+not an auto-commit/push gate. Pushes still go only to the configured operator
+namespaces; foreign remotes are fetch-only and warned about.
 
-- `trusted_emails` — e.g. `audit@dracon.dev`, `loop@virtualpet.local`
-- `trusted_authors` — e.g. `Audit`, `Virtual Pet Loop`
-
-When a new agent loop is created, add its identity to both lists BEFORE it
-starts committing, or its repo will flip to `🚫 unowned` and stop syncing
-(this is what happened to ai-auto-writer and browser-extensions-shared on
-2026-07-25 — see docs/design/incident-amend-race-and-trust-2026-07-25.md).
+Loops SHOULD still use a deliberate identity (`<repo>-dev` /
+`<repo>@dracon.local`) so commit attribution stays useful. Add new identities
+to `trusted_emails` and `trusted_authors` when appropriate, but the daemon
+must not expand those lists automatically and must not manufacture commits to
+restore activity totals. A repo outside a configured watch root retains the
+legacy heuristic ownership check, and `owned = false` always blocks it.
 
 ## History-rewrite ENFORCEMENT stack (v0.113.0, 2026-07-25)
 
