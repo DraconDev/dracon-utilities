@@ -109,14 +109,26 @@ def branch_and_head(repo: Path) -> tuple[str | None, str | None]:
     return (branch, head) if code == 0 else (branch, None)
 
 
-def remote_head(repo: Path, remote: str, branch: str) -> str | None:
-    code, out, _err = run(
+def remote_head(repo: Path, remote: str, branch: str) -> tuple[str | None, bool]:
+    code, out, err = run(
         ["git", "-C", str(repo), "ls-remote", remote, f"refs/heads/{branch}"],
         timeout=45,
     )
     if code != 0 or not out:
-        return None
-    return out.split()[0]
+        lower = err.lower()
+        missing = any(
+            phrase in lower
+            for phrase in (
+                "cannot find repository",
+                "repository not found",
+                "could not be found",
+                "does not exist",
+                "push to create is not enabled",
+                "404",
+            )
+        )
+        return None, missing
+    return out.split()[0], False
 
 
 def live_report_rows() -> dict[str, dict]:
@@ -198,8 +210,10 @@ def main() -> int:
                 )
                 continue
             actual_name, actual = matching
-            remote_tip = remote_head(repo, actual_name, branch)
-            if remote_tip is None:
+            remote_tip, missing = remote_head(repo, actual_name, branch)
+            if missing:
+                failures.append(f"{repo}: permitted {actual_name}/{branch} repository is missing on the forge")
+            elif remote_tip is None:
                 warnings.append(f"{repo}: {name}/{branch} could not be queried (unknown, not treated as publishable)")
             elif remote_tip != head:
                 failures.append(f"{repo}: {actual_name}/{branch}={remote_tip[:12]} differs from local {head[:12]}")
