@@ -196,7 +196,7 @@ impl WardenSecurity {
 
         Err(anyhow::anyhow!(
             "Decryption failed after trying all keys (V2 + V1 + Keychain). Magic: {:?}, Len: {}",
-            &encrypted_data.get(0..20).unwrap_or(&[]),
+            encrypted_data.get(0..20).unwrap_or(&[]),
             encrypted_data.len()
         ))
     }
