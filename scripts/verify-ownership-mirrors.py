@@ -187,8 +187,9 @@ def main() -> int:
                 row = report_rows.get(str(repo), {})
                 if row.get("codeberg_skip_reason") in {"private", "unknown"}:
                     continue
-                if local_remote(repo, name) is None:
-                    continue
+                # A positively public row is expected to have a Codeberg
+                # mirror; let the normal missing-remote failure below catch
+                # an unprovisioned mirror instead of silently accepting it.
             expected = expected_url(remote, repo.name)
             matching = find_matching_remote(repo, expected)
             if matching is None:
