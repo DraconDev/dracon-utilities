@@ -1,6 +1,6 @@
 # Ownership and Codeberg auto-provisioning
 
-**Implemented in**: dracon-sync v0.113.35
+**Implemented in**: dracon-sync v0.113.39
 **Scope**: watched-path ownership, forge provisioning, and mirror visibility
 
 ## Ownership
@@ -65,7 +65,15 @@ does not rewrite published remote history or force-push divergent branches.
 
 The `dracon-sync repos --json` report exposes effective push/exclude decisions,
 so verification tools can distinguish an intentionally skipped private or
-unknown Codeberg mirror from a failed permitted push.
+unknown Codeberg mirror from a failed permitted push. A clean repository is
+not permanently marked provisioned while Codeberg eligibility is private or
+unknown: a later positive visibility refresh can authorize creation without a
+synthetic commit.
+
+A pre-existing Codeberg mirror that is already divergent is reported as a
+warning and is not force-pushed. Normal merge reconciliation remains available,
+but choosing to merge a large historical mirror is an operator decision; the
+no-rewrite policy takes precedence over making the branch tips identical.
 
 ## Live incident outcome
 
@@ -79,3 +87,8 @@ verified at the same branch tip. No remote history rewrite was used.
 identity was corrected to `darklord-dev <darklord@dracon.local>` without
 rewriting its existing commits, then its normal fast-forward tip was pushed
 to the configured GitLab and GitHub mirrors.
+
+The public watched repositories were then provisioned on Codeberg and their
+existing local `main` tips were pushed without rewriting history. The one
+pre-existing divergent `dracon-strategy/DraconDev` Codeberg mirror remains
+explicitly preserved and reported as a warning.

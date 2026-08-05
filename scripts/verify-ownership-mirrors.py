@@ -216,7 +216,14 @@ def main() -> int:
             elif remote_tip is None:
                 warnings.append(f"{repo}: {name}/{branch} could not be queried (unknown, not treated as publishable)")
             elif remote_tip != head:
-                failures.append(f"{repo}: {actual_name}/{branch}={remote_tip[:12]} differs from local {head[:12]}")
+                if name == "codeberg":
+                    warnings.append(
+                        f"{repo}: Codeberg mirror diverges ({remote_tip[:12]} vs local {head[:12]}); "
+                        "preserved because history rewrites are forbidden"
+                    )
+                    checked_refs += 1
+                else:
+                    failures.append(f"{repo}: {actual_name}/{branch}={remote_tip[:12]} differs from local {head[:12]}")
             else:
                 checked_refs += 1
 
