@@ -216,6 +216,16 @@ def main() -> int:
             elif remote_tip is None:
                 warnings.append(f"{repo}: {name}/{branch} could not be queried (unknown, not treated as publishable)")
             elif remote_tip != head:
+                row = report_rows.get(str(repo), {})
+                worktree_dirty = bool(run(["git", "-C", str(repo), "status", "--porcelain"], timeout=20)[1])
+                sync_active = row.get("push_status") in {"PENDING", "PUSHING", "ACTIVE"} or bool(row.get("ahead", 0))
+                if worktree_dirty or sync_active:
+                    warnings.append(
+                        f"{repo}: {actual_name}/{branch} differs while local activity is in flight; "
+                        "daemon sync is allowed to converge it"
+                    )
+                    checked_refs += 1
+                    continue
                 ancestor = run(
                     ["git", "-C", str(repo), "merge-base", "--is-ancestor", remote_tip, head],
                     timeout=20,
