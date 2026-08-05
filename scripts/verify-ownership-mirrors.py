@@ -12,6 +12,7 @@ import os
 import json
 import subprocess
 import sys
+import time
 import tomllib
 from pathlib import Path
 
@@ -216,6 +217,19 @@ def main() -> int:
             elif remote_tip is None:
                 warnings.append(f"{repo}: {name}/{branch} could not be queried (unknown, not treated as publishable)")
             elif remote_tip != head:
+                # A daemon push can land between the local HEAD read and
+                # ls-remote.  Give that in-flight fast-forward one settle
+                # window before classifying a mismatch as a real failure.
+                time.sleep(5)
+                settled_tip, settled_missing = remote_head(repo, actual_name, branch)
+                if settled_missing:
+                    failures.append(f"{repo}: permitted {actual_name}/{branch} repository is missing on the forge")
+                    continue
+                if settled_tip == head:
+                    checked_refs += 1
+                    continue
+                if settled_tip is not None:
+                    remote_tip = settled_tip
                 row = report_rows.get(str(repo), {})
                 worktree_dirty = bool(run(["git", "-C", str(repo), "status", "--porcelain"], timeout=20)[1])
                 sync_active = row.get("push_status") in {"PENDING", "PUSHING", "ACTIVE"} or bool(row.get("ahead", 0))
