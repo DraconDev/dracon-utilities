@@ -216,10 +216,15 @@ def main() -> int:
             elif remote_tip is None:
                 warnings.append(f"{repo}: {name}/{branch} could not be queried (unknown, not treated as publishable)")
             elif remote_tip != head:
-                if name == "codeberg":
+                ancestor = run(
+                    ["git", "-C", str(repo), "merge-base", "--is-ancestor", remote_tip, head],
+                    timeout=20,
+                )[0] == 0
+                if not ancestor:
                     warnings.append(
-                        f"{repo}: Codeberg mirror diverges ({remote_tip[:12]} vs local {head[:12]}); "
-                        "preserved because history rewrites are forbidden"
+                        f"{repo}: {actual_name} mirror diverges or is ahead "
+                        f"({remote_tip[:12]} vs local {head[:12]}); preserved because "
+                        "history rewrites are forbidden"
                     )
                     checked_refs += 1
                 else:
