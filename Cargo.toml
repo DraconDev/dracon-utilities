@@ -15,26 +15,15 @@ members = [
 ]
 resolver = "2"
 
-# LOCAL PATCH (2026-07-18, UPDATED 2026-07-25): pull dracon-git v94.7.2 from
-# the operator's DraconDev/dracon-libs git repo at the tagged release instead
-# of crates.io v94.7.0. The crates.io version uses libgit2 +
-# Cred::ssh_key_from_agent which requires a running ssh-agent and fails with
-# "unsupported URL protocol; class=Net (12)" in wezterm/NixOS sessions that
-# have no ssh-agent. v94.7.1 added a CLI primary path for `fetch()` that
-# respects `~/.ssh/config` and works without an agent. v94.7.2 fixes the
-# libgit2 FALLBACK path: git2 0.21 changed `default = []` so the bare
-# `git2 = "0.21"` built libgit2 with NO ssh/https transports (the true
-# source of "unsupported URL protocol"), and adds an agent-less ssh_cred()
-# that probes SSH_AUTH_SOCK eagerly and falls back to ~/.ssh key files.
-#
-# Fix: see docs/design/concerns-investigation-2026-07-18.md §F5 and
-# docs/design/incident-amend-race-and-trust-2026-07-25.md.
-# This patch should be removed once v94.7.2 is published to crates.io
-# (requires operator's CARGO_REGISTRY_TOKEN), at which point
-# dracon-sync/Cargo.toml should bump `dracon-git` from "94.7.0" to "94.7.2".
-[patch.crates-io]
-dracon-git = { git = "https://github.com/DraconDev/dracon-libs", tag = "v94.7.2" }
-
+# RESOLVED 2026-08-08: dracon-git v94.7.2 is now published to crates.io — the
+# [patch.crates-io] workaround (v94.7.1/v94.7.2 fixes for the libgit2 ssh
+# transport + ssh-agent issues) is removed and dracon-sync/Cargo.toml depends
+# on `dracon-git = "94.7.2"` directly. History: the patch existed since
+# 2026-07-18 (see docs/design/concerns-investigation-2026-07-18.md §F5 and
+# docs/design/incident-amend-race-and-trust-2026-07-25.md). Note that
+# published crates drop [patch] sections, so every `cargo install` before this
+# point silently built against crates.io 94.7.0 — the phantom-untracked-count
+# incident (docs/design/installed-binary-drops-patch-dracon-git-2026-08-08.md).
 # Workspace-level package metadata. Each crate's own [package] block
 # overrides these on a per-crate basis. This file exists so that
 # AGENTS.md test discipline commands (`cargo build --release --locked`,

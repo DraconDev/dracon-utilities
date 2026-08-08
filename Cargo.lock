@@ -876,7 +876,8 @@ dependencies = [
 [[package]]
 name = "dracon-git"
 version = "94.7.2"
-source = "git+https://github.com/DraconDev/dracon-libs?tag=v94.7.2#16e8aa6d91f48927f5ab7ca9ef76679bceb7d645"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "153ee43dce26e6e9f44bd25a40f6cb1dc611bb15f80bd80d29c85671766cbc6f"
 dependencies = [
  "anyhow",
  "git2",
@@ -1061,7 +1062,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2505,7 +2506,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2818,7 +2819,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -3247,7 +3248,7 @@ dependencies = [
  "getrandom 0.3.4",
  "once_cell",
  "rustix",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -3872,7 +3873,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

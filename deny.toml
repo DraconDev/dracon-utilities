@@ -41,10 +41,10 @@ skip = [
 unknown-registry = "deny"
 unknown-git = "deny"
 allow-git = [
-    # 2026-07-18: workspace [patch.crates-io] pulls dracon-git v94.7.1 from
-    # the tagged release on github. Required until v94.7.1 is published to
-    # crates.io (then revert to allow-git = []).
-    "https://github.com/DraconDev/dracon-libs",
+    # RESOLVED 2026-08-08: dracon-git v94.7.2 published to crates.io — the
+    # git-source allowlist entry for DraconDev/dracon-libs is no longer needed.
+    # (History: 2026-07-18 [patch.crates-io] workaround; see
+    # docs/design/installed-binary-drops-patch-dracon-git-2026-08-08.md.)
 ]
 
 [licenses]
