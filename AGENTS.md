@@ -710,14 +710,18 @@ dracon-system 88; dracon-warden 103 (93 + 10 integration).
 
 ## `[patch.crates-io]` status
 
-`[patch.crates-io]` in `Cargo.toml` currently points at
-`https://github.com/DraconDev/dracon-libs?tag=v94.7.2` (git+tag form).
-This is a temporary workaround for the libgit2 ssh-agent bug
-fixed in `dracon-git v94.7.2` (upgraded from v94.7.1 on
-2026-07-25). **Required follow-up**: when the
-operator publishes `dracon-git v94.7.2` to crates.io (needs
-`CARGO_REGISTRY_TOKEN`), remove `[patch.crates-io]` from
-`Cargo.toml`. The daemon will then use the crates-io version
-naturally. `deny.toml [sources].allow-git` should also be cleared
-at that point.
+**RESOLVED 2026-08-08**: `dracon-git v94.7.2` was published to crates.io,
+`[patch.crates-io]` removed from `Cargo.toml`, the dependency bumped to
+`dracon-git = "94.7.2"`, and `deny.toml [sources].allow-git` cleared.
+
+The patch existed since 2026-07-18 as a workaround for the libgit2
+ssh-agent bug fixed in `dracon-git v94.7.2` (upgraded from v94.7.1 on
+2026-07-25). Its removal is tied to an incident: `cargo publish` **strips
+`[patch.crates-io]` from the published manifest**, so every `cargo install
+--version`-style install silently built against crates.io dracon-git
+94.7.0 (unpatched) — visible as phantom untracked counts (2026-08-08,
+`docs/design/installed-binary-drops-patch-dracon-git-2026-08-08.md`).
+Guard: `dracon-sync/scripts/verify-install.sh` (fixture check; wired into
+`scripts/release.sh` step 6 against the packaged artifact, and reminded
+after every release).
 
