@@ -204,36 +204,14 @@ log "step 2/${TOTAL_STEPS}: closing CHANGELOG.md [Unreleased] → [${VERSION}]"
 CHANGELOG="CHANGELOG.md"
 DATE=$(date -u +%Y-%m-%d)
 if [[ $DRY_RUN -eq 0 ]]; then
-    python3 - "$CHANGELOG" "$VERSION" "$DATE" <<'PY'
-import sys, pathlib
-p, version, date = sys.argv[1], sys.argv[2], sys.argv[3]
-text = pathlib.Path(p).read_text()
-marker = "## [Unreleased]"
-if marker not in text:
-    print(f"  CHANGELOG.md: no [Unreleased] section found; leaving unchanged", file=sys.stderr)
-    sys.exit(0)
-
-# Find the [Unreleased] section and the next ## [X.Y.Z] header.
-import re
-unreleased_match = re.search(r"^## \[Unreleased\][^\n]*\n", text, re.MULTILINE)
-if not unreleased_match:
-    print(f"  CHANGELOG.md: regex miss for [Unreleased] header; leaving unchanged", file=sys.stderr)
-    sys.exit(0)
-
-start = unreleased_match.end()
-# Find the next '## [' header (or end of file)
-next_match = re.search(r"^## \[[^\n]*\n", text[start:], re.MULTILINE)
-if next_match:
-    end = start + next_match.start()
-    new_header = f"## [{version}] - {date}\n"
-    insertion = f"{new_header}{text[start:end]}"
-    new_text = text[:start] + insertion + text[end:]
-else:
-    new_header = f"\n## [{version}] - {date}\n{text[start:]}"
-    new_text = text[:start] + new_header
-pathlib.Path(p).write_text(new_text)
-PY
-    ok "  CHANGELOG.md: [Unreleased] closed, [${VERSION}] - ${DATE} added"
+    # FIXED 2026-08-09 (audit MEDIUM): ported close-changelog.py from
+    # dracon-sync v0.113.11. The inline heredoc had NO already-closed
+    # guard — a re-run after a partial failure duplicated the `## [VERSION]`
+    # header (the exact v0.113.10 bug sync fixed). The script is
+    # idempotent: when `## [VERSION]` already exists, the file is left
+    # byte-identical.
+    python3 "$SCRIPT_DIR/close-changelog.py" "$CHANGELOG" "$VERSION" "$DATE"
+    ok "  CHANGELOG.md: [Unreleased] closed as [${VERSION}] - ${DATE} (or already closed)"
 else
     ok "  CHANGELOG.md: would close [Unreleased] → [${VERSION}] - ${DATE} (skipped: --dry-run)"
 fi
@@ -282,20 +260,86 @@ run cargo publish -p "$CRATE_NAME" --dry-run --allow-dirty
 
 # ----- step 5: cargo publish for real -------------------------------------
 log "step 5/${TOTAL_STEPS}: cargo publish -p $CRATE_NAME"
-run cargo publish -p "$CRATE_NAME" --allow-dirty
+# Idempotent re-run path (ported from dracon-sync v0.113.11, audit MEDIUM
+# 2026-08-09): when a previous run already published this version but
+# failed later, 'already published' / 'already exists on crates.io index'
+# is success, not a fatal error.
+if [[ $DRY_RUN -eq 1 ]]; then
+    run cargo publish -p "$CRATE_NAME" --allow-dirty
+else
+    printf '   $ cargo publish -p %s --allow-dirty\n' "$CRATE_NAME"
+    if ! publish_out="$(cargo publish -p "$CRATE_NAME" --allow-dirty 2>&1)"; then
+        if grep -qiE "already exists on crates.io index|already published" <<<"$publish_out"; then
+            ok "  $CRATE_NAME@$VERSION already published; continuing"
+        else
+            printf '%s\n' "$publish_out" >&2
+            die_pub "cargo publish failed — tag NOT created"
+        fi
+    fi
+fi
 
 # ----- step 6: commit, tag, push, gh release ------------------------------
 log "step 6/${TOTAL_STEPS}: commit + tag + push + gh release"
 run git add Cargo.toml CHANGELOG.md "$NOTES"
-run git -c user.email=dracsharp@gmail.com -c user.name=DraconDev \
-    commit --no-verify -m "release: v${VERSION}"
-run git tag "$TAG"
+# Idempotent re-run path (ported from dracon-sync v0.113.11, audit MEDIUM
+# 2026-08-09): skip the commit when there is nothing to commit, skip the
+# tag when it already exists, skip the gh release when it already exists.
+if [[ $DRY_RUN -eq 1 ]]; then
+    run git -c user.email=dracsharp@gmail.com -c user.name=DraconDev \
+        commit --no-verify -m "release: v${VERSION}"
+    run git tag "$TAG"
+else
+    if git diff --cached --quiet; then
+        ok "  nothing to commit (release commit already exists)"
+    else
+        printf '   $ git commit --no-verify -m release: v%s\n' "$VERSION"
+        git -c user.email=dracsharp@gmail.com -c user.name=DraconDev \
+            commit --no-verify -m "release: v${VERSION}"
+    fi
+    if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+        ok "  tag $TAG already exists"
+    else
+        printf '   $ git tag %s\n' "$TAG"
+        git tag "$TAG"
+    fi
+fi
 run git push "$REMOTE" main "$TAG"
 
-run gh release create "$TAG" \
-    --target main \
-    --title "v${VERSION}" \
-    --notes-file "$NOTES"
+# Idempotent re-run path: 'gh release create' fails when the release exists.
+if [[ $DRY_RUN -eq 1 ]]; then
+    run gh release create "$TAG" \
+        --target main \
+        --title "v${VERSION}" \
+        --notes-file "$NOTES"
+else
+    if gh release view "$TAG" >/dev/null 2>&1; then
+        ok "  github release $TAG already exists"
+    else
+        printf '   $ gh release create %s\n' "$TAG"
+        gh release create "$TAG" \
+            --target main \
+            --title "v${VERSION}" \
+            --notes-file "$NOTES"
+    fi
+fi
+
+# Mirror remotes (codeberg/gitlab) receive main from the daemon's normal
+# push cycles, but TAGS are operator-pushed — warden releases needed
+# manual mirror tag pushes (same class as sync's v0.113.9/v0.113.10).
+# Remind, with the exact commands.
+mirror_remotes=()
+while IFS= read -r mline; do
+    mkey="${mline%% *}"          # "remote.<name>.url" (strip the value first)
+    mname="${mkey#remote.}"; mname="${mname%.url}"
+    [[ "$mname" == "$REMOTE" ]] || mirror_remotes+=("$mname")
+done < <(git config --get-regexp '^remote\..*\.url$' || true)
+if [[ ${#mirror_remotes[@]} -gt 0 ]]; then
+    warn ""
+    warn "mirror remotes get main from the daemon, but tags are operator-pushed:"
+    for m in "${mirror_remotes[@]}"; do
+        warn "    git push $m $TAG"
+    done
+fi
 
 ok ""
 ok "════════════════════════════════════════════"
