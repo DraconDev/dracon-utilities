@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`.gitattributes` diff/merge drivers are now actually defined**: protected
+  patterns get `filter=dracon diff=dracon merge=dracon`, but
+  `ensure_repo_filter_config` only registered `filter.dracon.*` — git fell
+  back to the text driver with a warning and encrypted-file diffs/merges ran
+  on ciphertext. The config pass now also registers `diff.dracon.textconv`
+  (`dracon-warden filter-smudge` — blobs decrypt for `git diff`/`git log
+  -p`) and `merge.dracon.driver` (`dracon-warden merge %O %A %B`), plus a
+  `merge.dracon.name`. New `merge` subcommand: decrypts all three inputs
+  (whole-file tag, inline tags, or untagged passthrough), runs a 3-way text
+  merge via `git merge-file`, re-encrypts the result into %A (index keeps
+  the filter.dracon ciphertext invariant); on conflict the plaintext with
+  conflict markers is left in %A for resolution (`git add` re-encrypts) and
+  exit 1 is returned per the merge-driver contract. Tests: clean + conflict
+  `text_merge`, untagged end-to-end driver behavior (exit codes, marker
+  output), encrypted roundtrip proving ciphertext-in → plaintext merge →
+  ciphertext-out, and config registration + idempotence.
+
 ## [0.113.4] - 2026-08-09
 
 - **Test-only helper gated `#[cfg(test)]`**: `clear_filter_managed_patterns` (and its security-crate import) are only used by tests; gating them removes the dead-code warning from the release build. No behavior change. crates.io max stable; tags + gh releases on all forges.
