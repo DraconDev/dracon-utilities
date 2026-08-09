@@ -94,9 +94,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
 ## [0.113.4] - 2026-08-09
+
+- **Test-only helper gated `#[cfg(test)]`**: `clear_filter_managed_patterns` (and its security-crate import) are only used by tests; gating them removes the dead-code warning from the release build. No behavior change. crates.io max stable; tags + gh releases on all forges.
+
 ## [0.113.3] - 2026-08-09
-## [0.113.3] - 2026-08-09
+
+- **Filter `protected_patterns` wired into the clean gate (junk-runner wedge fix)**: the clean filter's "default-deny" gate read `WardenSecurity.managed_patterns`, which the production constructor initializes EMPTY — and `path_is_protected` treats empty as "scan everything (legacy)". The config's `protected_patterns` were wired into `.gitignore`/`.gitattributes` generation and `scrub_markers` but NEVER into the filter process, so every file was fully secret-scanned: a 6.87 MB `pi-session-*.html` took 16.3 s of filter CPU, git's concurrent filters blew the 30 s `FILTER_TIMEOUT_SECS`, and `git add` exited 128 every cycle — junk-runner wedged (no commits, 11 commits ahead, Changes Piling Up alert). Fix: process-wide `set_managed_patterns()` override applied inside `WardenSecurity::get_or_init()`, wired by `run_filter` from the policy via `wire_managed_patterns_from_policy()`. The same file now filters in 12–13 ms (~1250×). 104 tests (+2), clippy clean. Requires `dracon-security v0.3.1` (published first — `cargo publish` resolves the registry twin of the `path` dep, the dracon-git lesson again). Design: `docs/design/warden-filter-protected-patterns-wiring-2026-08-09.md`.
 
 ## [0.113.2] — 2026-07-27 — pre-push hook `--not --remotes` (tag-push false-positive fix)
 
