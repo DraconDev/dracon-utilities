@@ -89,15 +89,6 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Auto-resolve the github remote when --remote was not passed.
-# (FIXED 2026-08-09, audit HIGH: the hardcoded `github` default failed out
-# of the box because this repo names its github remote `origin` — ported
-# resolve-github-remote.sh from dracon-sync v0.113.11.)
-if [[ -z "$REMOTE" ]]; then
-    REMOTE="$(bash "$SCRIPT_DIR/resolve-github-remote.sh" "$REPO_ROOT")" || exit $?
-    log "Resolved github remote: $REMOTE"
-fi
-
 TAG="v${VERSION}"
 TOTAL_STEPS=6
 
@@ -145,6 +136,18 @@ require_credentials() {
     [[ -f "$HOME/.cargo/credentials.toml" ]] \
         || die_pre "missing ~/.cargo/credentials.toml; run 'cargo login <token>' first"
 }
+
+# Auto-resolve the github remote when --remote was not passed.
+# (FIXED 2026-08-09, audit HIGH: the hardcoded `github` default failed out
+# of the box because this repo names its github remote `origin` — ported
+# resolve-github-remote.sh from dracon-sync v0.113.11. Moved AFTER the
+# helper definitions 2026-08-09: it called `log` before `log` was defined,
+# dying on every real invocation; --help exited earlier so the break was
+# invisible to --help smoke tests.)
+if [[ -z "$REMOTE" ]]; then
+    REMOTE="$(bash "$SCRIPT_DIR/resolve-github-remote.sh" "$REPO_ROOT")" || exit $?
+    log "Resolved github remote: $REMOTE"
+fi
 
 # ----- abort path ----------------------------------------------------------
 if [[ $ABORT -eq 1 ]]; then
