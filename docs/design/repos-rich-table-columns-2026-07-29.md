@@ -215,14 +215,23 @@ daemon's CONCERN predicate); yellow iff gitdir ≥ 1 GiB
 
 ## Terminal-width routing
 
-`choose_layout_tier()` in `dracon-sync/src/report.rs:2474`:
+`choose_layout_tier()` in `dracon-sync/src/report.rs:2744`:
 
 | Width | Tier | Columns | Notes |
 |---:|---|---|---|
 | < 165 | Compact | 16 | Includes HINT + PUSH-TO for drill-down |
-| 165-241 | **Rich (default)** | **10** | New USED + COMMITS + SIZE + TOUCHED |
-| 242-314 | Compact | 16 | Same as < 165 |
-| ≥ 315 | Full | 22 | The 22-column full-table view from v0.113.6 |
+| ≥ 165 | **Rich (default)** | **10** | New USED + COMMITS + SIZE + TOUCHED |
+
+> **CORRECTED 2026-08-09**: this table previously listed
+> "242-314 → Compact, ≥ 315 → Full" auto-pick bands. Those bands
+> were removed the day after this doc was written (v0.113.26,
+> 2026-07-30, `choose_layout_tier()` in
+> `dracon-sync/src/report.rs:2726-2752`): a maximized terminal
+> (242+ cols) silently served the OLD 16-column compact table,
+> which the operator read as "looks like the old table — no
+> legend or indicators". Auto-pick is now ONLY `< 165 → Compact`
+> / `≥ 165 → Rich`; Compact/Full/Vertical remain reachable via
+> `--layout` (and `repos <name>` for Vertical).
 
 The Rich tier is the DEFAULT for terminals ≥ 165 cols (most
 modern wide-terminal setups). Compact is the fallback for
@@ -256,9 +265,10 @@ layout invariants:
 Updated tests:
 
 - `test_choose_layout_tier_vertical` — now exercises widths
-  165-241 (Rich zone), not 40-241.
-- `test_choose_layout_tier_compact` — now covers 90-164
-  (was: 242-299) + 242-299 (unchanged).
+  165-500 (the whole Rich zone, incl. the former band
+  boundaries 241/242/314/315), not 40-241.
+- `test_choose_layout_tier_compact` — now covers 40-164 (the
+  `< 165` fallback only — the 242-299 band no longer exists).
 - `test_choose_layout_tier_fallback_no_env_no_tty_yields_compact_or_smaller`
   — 120 cols now routes to Compact (was Rich).
 
