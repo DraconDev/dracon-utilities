@@ -1193,6 +1193,43 @@ mod tests {
     use crate::modules::filter::path_is_protected;
 
     #[test]
+    fn test_managed_patterns_override_roundtrip() {
+        // The filter binary wires the policy's protected_patterns via
+        // `set_managed_patterns`; `apply_managed_patterns_override`
+        // (called from `get_or_init`) must surface them into the gate
+        // so `path_is_protected` respects the config.
+        set_managed_patterns(vec![".env".to_string(), "secrets/**".to_string()]);
+        let mut security = WardenSecurity::new(None).unwrap();
+        security.apply_managed_patterns_override();
+        assert!(path_is_protected(".env", &security.managed_patterns));
+        assert!(path_is_protected("secrets/master.key", &security.managed_patterns));
+        assert!(!path_is_protected("src/main.rs", &security.managed_patterns));
+        assert!(!path_is_protected("pi-session-export.html", &security.managed_patterns));
+        clear_managed_patterns_override();
+        let mut security2 = WardenSecurity::new(None).unwrap();
+        security2.apply_managed_patterns_override();
+        assert!(security2.managed_patterns.is_empty());
+    }
+
+    #[test]
+    fn test_smart_clean_skips_unprotected_large_input_when_patterns_set() {
+        // Regression: with the override wired, a large NON-protected
+        // file (e.g. a 6.87 MB pi-session HTML export) must pass
+        // through the clean filter untouched instead of being
+        // secret-scanned (~16 s of regex work that blew the 30 s
+        // filter budget and wedged the sync daemon on 2026-08-09).
+        set_managed_patterns(vec![".env".to_string()]);
+        let mut security = WardenSecurity::new(None).unwrap();
+        security.apply_managed_patterns_override();
+        let big: Vec<u8> = vec![b'a'; 7 * 1024 * 1024];
+        let out = security
+            .smart_clean_with_path(&big, "pi-session-export.html")
+            .unwrap();
+        assert_eq!(out, big, "unprotected large file must pass through untouched");
+        clear_managed_patterns_override();
+    }
+
+    #[test]
     fn test_path_is_protected_legacy_empty_passes_everything() {
         // Empty protected_patterns list = scan everything (legacy).
         let patterns: Vec<String> = vec![];

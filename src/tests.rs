@@ -2,6 +2,7 @@
 #[allow(clippy::module_inception)]
 mod tests {
     use crate::*;
+    use dracon_security_kit::managed_patterns_override;
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::Mutex;
     use std::time::Duration;
@@ -976,6 +977,44 @@ mod tests {
             assert!(next.contains(BLOCK_BEGIN));
             assert!(next.contains(BLOCK_END));
         }
+    }
+
+    #[test]
+    fn wire_managed_patterns_from_policy_loads_protected_patterns() {
+        let td = TestDir::new("warden_policy_wire");
+        let config_path = td.path().join("warden.toml");
+        fs::write(
+            &config_path,
+            r#"
+[watch]
+watch_roots = ["/tmp/test"]
+protected_patterns = [".env", "secrets/**", "*.pem"]
+"#,
+        )
+        .expect("write config");
+
+        let old_val = std::env::var("DRACON_WARDEN_POLICY").ok();
+        std::env::set_var("DRACON_WARDEN_POLICY", config_path.display().to_string());
+        let wired = wire_managed_patterns_from_policy();
+        let patterns = managed_patterns_override().unwrap_or_default();
+        clear_filter_managed_patterns();
+        // Restore env var to prevent parallel test interference
+        match old_val {
+            Some(v) => std::env::set_var("DRACON_WARDEN_POLICY", v),
+            None => std::env::remove_var("DRACON_WARDEN_POLICY"),
+        }
+
+        assert!(wired, "policy should resolve and wire patterns");
+        assert!(
+            patterns.iter().any(|p| p == ".env"),
+            "patterns should include .env (got {:?})",
+            patterns
+        );
+        assert!(
+            patterns.iter().any(|p| p == "secrets/**"),
+            "patterns should include secrets/** (got {:?})",
+            patterns
+        );
     }
 
     #[test]
