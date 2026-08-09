@@ -323,6 +323,8 @@ if [[ -d "$PKG_DIR" ]]; then
             die_pub "fixture check FAILED on the packaged artifact — release is broken, do NOT tag"
         fi
     fi
+elif [[ $DRY_RUN -eq 1 ]]; then
+    warn "  packaged crate dir not present (publish was skipped in --dry-run); fixture check skipped"
 else
     die_pub "packaged crate dir $PKG_DIR missing — cannot run fixture check (publish must have failed)"
 fi
