@@ -90,7 +90,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 TAG="v${VERSION}"
-TOTAL_STEPS=6
+TOTAL_STEPS=7
 
 # ----- colors (only on a tty) ---------------------------------------------
 if [[ -t 1 ]]; then
@@ -263,6 +263,29 @@ run cargo publish -p "$CRATE_NAME" --dry-run --allow-dirty
 
 # ----- step 5: cargo publish for real -------------------------------------
 log "step 5/${TOTAL_STEPS}: cargo publish -p $CRATE_NAME"
+# Publish-order gate (audit MEDIUM 2026-08-09): the path dep on
+# dracon-security masks registry resolution — cargo publish rewrites the
+# `path` dep to its registry twin, so the crates.io twin must be at least
+# the version the packaged manifest requires. The v0.113.3/0.3.1 incident
+# (protected-patterns wiring) was only caught by manual publish-verify
+# against a manually-published twin. Fail here, before uploading, when the
+# registry twin is missing or stale.
+REQ_SEC="$(grep -oP 'dracon-security-kit[^}]*version = "\K[^"]+' Cargo.toml | head -1 || true)"
+if [[ -z "$REQ_SEC" ]]; then
+    die_pub "could not extract the required dracon-security version from Cargo.toml — publish order unverifiable"
+fi
+if [[ $DRY_RUN -eq 0 ]]; then
+    REG_SEC="$(cargo search dracon-security --limit 1 2>/dev/null | head -1 | grep -oP 'dracon-security = "\K[^"]+' || true)"
+    if [[ -z "$REG_SEC" ]]; then
+        die_pub "crates.io has no dracon-security — publish dracon-security ${REQ_SEC} FIRST (the documented publish order)"
+    fi
+    if [[ "$(printf '%s\n%s\n' "$REG_SEC" "$REQ_SEC" | sort -V | head -1)" != "$REQ_SEC" ]]; then
+        die_pub "crates.io dracon-security is $REG_SEC but Cargo.toml requires $REQ_SEC — publish the NEWER dracon-security first; the path dep would otherwise resolve the stale registry twin (the 2026-08-09 incident class)"
+    fi
+    ok "  publish order OK: crates.io dracon-security ${REG_SEC} >= required ${REQ_SEC}"
+else
+    ok "  would verify publish order (crates.io dracon-security >= ${REQ_SEC}) (skipped: --dry-run)"
+fi
 # Idempotent re-run path (ported from dracon-sync v0.113.11, audit MEDIUM
 # 2026-08-09): when a previous run already published this version but
 # failed later, 'already published' / 'already exists on crates.io index'
@@ -281,8 +304,31 @@ else
     fi
 fi
 
-# ----- step 6: commit, tag, push, gh release ------------------------------
-log "step 6/${TOTAL_STEPS}: commit + tag + push + gh release"
+# ----- step 6: fixture check on the published artifact ---------------------
+log "step 6/${TOTAL_STEPS}: fixture check on packaged artifact (protected-patterns guard)"
+# ADDED 2026-08-09 (audit MEDIUM): the v0.113.3/0.3.1 protected-patterns
+# wedge was caught only by MANUAL publish-verify. Installing from the
+# PACKAGED crate (target/package/, as produced by the publish above)
+# reproduces the exact dependency resolution a crates.io install would
+# use — if the registry twin of dracon-security is stale or the packaging
+# dropped something, verify-install.sh fails and the tag must NOT be cut.
+PKG_DIR="$(cargo metadata --no-deps --format-version 1 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin)["workspace_root"])' 2>/dev/null || echo "$REPO_ROOT")/target/package/${CRATE_NAME}-${VERSION}"
+if [[ -d "$PKG_DIR" ]]; then
+    FIXTURE_ROOT="$REPO_ROOT/target/fixture-bin"
+    if [[ $DRY_RUN -eq 1 ]]; then
+        printf '   $ cargo install --path %s --root %s --force  (skipped: --dry-run)\n' "$PKG_DIR" "$FIXTURE_ROOT"
+    else
+        run cargo install --path "$PKG_DIR" --root "$FIXTURE_ROOT" --force
+        if ! "$SCRIPT_DIR/verify-install.sh" "$FIXTURE_ROOT/bin/dracon-warden"; then
+            die_pub "fixture check FAILED on the packaged artifact — release is broken, do NOT tag"
+        fi
+    fi
+else
+    die_pub "packaged crate dir $PKG_DIR missing — cannot run fixture check (publish must have failed)"
+fi
+
+# ----- step 7: commit, tag, push, gh release ------------------------------
+log "step 7/${TOTAL_STEPS}: commit + tag + push + gh release"
 run git add Cargo.toml CHANGELOG.md "$NOTES"
 # Idempotent re-run path (ported from dracon-sync v0.113.11, audit MEDIUM
 # 2026-08-09): skip the commit when there is nothing to commit, skip the
