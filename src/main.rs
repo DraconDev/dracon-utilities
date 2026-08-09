@@ -7,6 +7,7 @@ mod print;
 use anyhow::{Context, Result};
 use clap::{ArgAction, Parser, Subcommand};
 pub(crate) use dracon_security_kit::DraconWarden;
+use dracon_security_kit::{clear_managed_patterns_override, set_managed_patterns};
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use secrecy::ExposeSecret;
 use serde::Deserialize;
@@ -462,6 +463,28 @@ impl WardenPolicy {
             eprintln!("{msg}");
         }
     }
+}
+
+/// Wire the policy's `protected_patterns` into the filter process's
+/// `WardenSecurity` gate (the "default-deny" design: only protected
+/// files are scanned/encrypted; everything else passes through
+/// untouched). Returns false when the policy cannot be resolved or
+/// loaded — the filter then keeps the legacy scan-everything
+/// behavior.
+pub(crate) fn wire_managed_patterns_from_policy() -> bool {
+    let Ok(policy_path) = resolve_policy_path_local() else {
+        return false;
+    };
+    let Ok(policy) = WardenPolicy::load(&policy_path) else {
+        return false;
+    };
+    set_managed_patterns(policy.protected_patterns.clone());
+    true
+}
+
+/// Clear the process-wide managed-patterns override (test isolation).
+pub(crate) fn clear_filter_managed_patterns() {
+    clear_managed_patterns_override();
 }
 
 pub(crate) fn resolve_policy_path_local() -> Result<PathBuf> {
@@ -2213,6 +2236,17 @@ fn filter_clean_refusal_reason(
 }
 
 fn run_filter(is_clean: bool, path: Option<&str>) -> Result<()> {
+    // Wire the policy's `protected_patterns` into the filter process
+    // (FIX 2026-08-09, warden v0.113.3): the clean-filter gate in
+    // `smart_clean_with_path` skips scanning for files that do NOT
+    // match a protected pattern, but the gate previously saw an EMPTY
+    // pattern list (legacy "scan everything"), so every file was
+    // scanned — a 6.87 MB pi-session HTML took ~16 s of regex work,
+    // and with git's concurrent filters the 30 s FILTER_TIMEOUT_SECS
+    // blew, making `git add` fail every cycle and wedging the sync
+    // daemon (junk-runner, 2026-08-09). See
+    // docs/design/warden-filter-protected-patterns-wiring-2026-08-09.md.
+    wire_managed_patterns_from_policy();
     let mut input = Vec::new();
     std::io::stdin().read_to_end(&mut input)?;
     // CHANGED 2026-07-21 (v0.112.32, audit M31/F4.5): all three

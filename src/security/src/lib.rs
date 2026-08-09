@@ -14,6 +14,7 @@ use std::io::{Read, Write};
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use std::sync::Mutex;
 
 pub mod modules;
 
@@ -27,6 +28,38 @@ pub use modules::scanner::SecretScanner;
 const DEFAULT_SECRET_MARKER: &str = "DRACON_SECRET";
 
 static DEFAULT_SECURITY_CACHE: OnceCell<WardenSecurity> = OnceCell::new();
+
+/// Managed-pattern override for the filter process. The
+/// `WardenSecurity` builder starts with an EMPTY `managed_patterns`
+/// list, and `path_is_protected` treats an empty list as "scan
+/// everything (legacy)" — so without this override the
+/// `protected_patterns` config knob was dead code in the filter path
+/// and every file was secret-scanned (~16 s of regex work for a
+/// 6.87 MB HTML, blowing the filter's 30 s budget during concurrent
+/// `git add` batches and wedging the sync daemon; junk-runner,
+/// 2026-08-09). The `dracon-warden` binary wires the policy's
+/// `protected_patterns` here once per filter invocation.
+static MANAGED_PATTERNS_OVERRIDE: Mutex<Option<Vec<String>>> = Mutex::new(None);
+
+/// Set the managed (protected) patterns for the current filter
+/// process. Called by the `dracon-warden` binary's filter path from
+/// the policy's `protected_patterns` list, so files that are NOT
+/// protected pass through the clean filter untouched (the
+/// "default-deny" design) instead of being secret-scanned.
+pub fn set_managed_patterns(patterns: Vec<String>) {
+    *MANAGED_PATTERNS_OVERRIDE.lock().unwrap() = Some(patterns);
+}
+
+/// Current managed-patterns override, if set (filter-process
+/// plumbing + diagnostics).
+pub fn managed_patterns_override() -> Option<Vec<String>> {
+    MANAGED_PATTERNS_OVERRIDE.lock().unwrap().clone()
+}
+
+/// Clear the managed-patterns override (test + diagnostics use).
+pub fn clear_managed_patterns_override() {
+    *MANAGED_PATTERNS_OVERRIDE.lock().unwrap() = None;
+}
 
 static ALLOW_V1_FALLBACK: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
@@ -163,6 +196,17 @@ impl WardenSecurity {
         &self.master_identities
     }
 
+    /// Apply the process-wide managed-patterns override (set by the
+    /// `dracon-warden` binary from the policy's `protected_patterns`).
+    /// Without this, `managed_patterns` stays empty and
+    /// `path_is_protected` falls back to the legacy scan-everything
+    /// behavior — the config gate would be dead code.
+    fn apply_managed_patterns_override(&mut self) {
+        if let Some(patterns) = MANAGED_PATTERNS_OVERRIDE.lock().unwrap().clone() {
+            self.managed_patterns = patterns;
+        }
+    }
+
     pub fn with_managed_patterns(mut self, patterns: Vec<String>) -> Self {
         self.managed_patterns = patterns;
         self
@@ -182,6 +226,7 @@ impl WardenSecurity {
     pub fn get_or_init() -> Result<&'static WardenSecurity> {
         DEFAULT_SECURITY_CACHE.get_or_try_init(|| {
             let mut security = WardenSecurity::new(None)?;
+            security.apply_managed_patterns_override();
             if let Ok(ids) = security.load_master_identities() {
                 security.master_identities = ids;
             }
