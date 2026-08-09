@@ -80,17 +80,32 @@ published mirrors and requires operator authorization per
 
 **Option 1 (recommended) — github/local is canonical; force-update
 gitlab + codeberg.** v0.34.115–117 are the newest shipped versions and
-github already has them. The 59 mirror-only commits are superseded work
-(preserved in git history + `.pi-glla/archive/`). Steps:
+github already has them. The reset was DELIBERATE hygiene: the loop's
+10:08:13 commit is "Repo hygiene: untract .pi-glla runtime state (per
+v0.34.115 contract)" and the 197-file commit it discarded was mostly
+archive/runtime state. The 59 mirror-only commits are the PRE-hygiene
+history, already preserved three ways: the loop's own local branch
+`backup-messy-history` (tip 9749b90e), the 47-ref snapshot bundle
+`~/dracon/backups/pi-goal-loop-audit-mirror-state-20260809.bundle`
+(verified 2026-08-09, contains `main`=2f564a60 + `gitlab`=a97d2255),
+and the bundle's refs themselves (nothing is force-push-destroyed; the
+bundle is the recovery). Sanity check of the 59 mirror-only commits
+(2026-08-09): 22 are .pi-glla audit runtime deltas; the rest are the
+pre-hygiene extensions/tests state that v0.34.115–117 supersede; two
+carry ship/CLOSED markers (`9749b90e`, `234d5c34`) that are already
+represented by the v0.34.114 tag present in local history.
 
-1. `dracon-sync maintenance -- git -C /home/dracon/Dev/pi-goal-loop-audit fetch --all`
-2. Sanity-check the 59 mirror-only commits for anything not archived
-   (`git log main..gitlab/main --oneline | grep -iE 'TAG:|release'`).
+Steps (operator runs the forge mutations; the daemon is not involved
+until the final unstuck):
+
+1. (done 2026-08-09) Safety bundle + sanity check as above.
+2. `git -C /home/dracon/Dev/pi-goal-loop-audit fetch gitlab main && git -C /home/dracon/Dev/pi-goal-loop-audit fetch codeberg main`
 3. Unprotect `main` on gitlab (Settings → Repository → Protected
    branches → allow force push). Codeberg has no branch protection.
 4. `cd /home/dracon/Dev/pi-goal-loop-audit && DRACON_ALLOW_REWRITE=1 git push --force-with-lease gitlab HEAD:refs/heads/main && DRACON_ALLOW_REWRITE=1 git push --force-with-lease codeberg HEAD:refs/heads/main`
 5. Re-protect `main` on gitlab.
-6. `dracon-sync unstuck pi-goal-loop-audit` (or `repair-concerns --apply`).
+6. `dracon-sync unstuck pi-goal-loop-audit` — then the daemon's next
+   cycle pushes normally and clears the ledger.
 
 **Option 2 — leave STUCK.** The daemon keeps alerting (throttled to 30
 min) and pauses auto-push. NOTE: the `Exhausted` hard-stop (v0.112.31
@@ -117,18 +132,20 @@ merge history the loop may not want.
    Manually committed + pushed to github (the Exhausted hard-stop
    paused the daemon's auto-commit for this repo).
 
-## Observability follow-up (recommended, not shipped)
+## Observability follow-up — SHIPPED in v0.113.50 (2026-08-09)
 
-The `repos`/alert path reports mirror failures as "Mirror Degraded: N
+The `repos`/alert path reported mirror failures as "Mirror Degraded: N
 consecutive push failures — mirror may be unreachable", which is wrong
 for the divergence class (the mirror is reachable; the histories
-forked). Recommended: thread the raw push error (or a classification:
-divergence / server-policy / pack-too-large / transport) into the
-stuck-ledger `last_error` and the alert text, so the operator sees
-"history divergence — remote has N commits not on local" instead of
-"may be unreachable". The raw message IS available at the push call
-sites (e.g. `push_mirror_remotes` errors in `push_background`,
-sync.rs:1858); only the per-remote count is currently persisted.
+forked). v0.113.50 ships `classify_push_failure()` (src/git/push.rs)
+mapping a raw push error to one of four operator-actionable causes
+(history divergence / server-side policy rejection / pack exceeds size
+limit / transport-auth failure); per-remote failure tracking now
+carries `RemoteFailInfo { consecutive, last_error }` (was a bare
+count), the Mirror Degraded alert names the classified cause, and the
+stuck-ledger `last_error` appends a deduplicated cause line so the
+`repos` HINT column shows WHY, not just WHO. 1244 tests (+3), clippy +
+deny clean, released + installed + fleet-verified same day.
 
 ## Related
 
