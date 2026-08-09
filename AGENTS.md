@@ -93,11 +93,18 @@ NOT auto-staged. This is the hard exclusion threshold.
 
 ### Push timeouts
 
-`push_op_timeout_secs = 900` (CHANGED 2026-06-23 from 300, then
-to 960, then settled at 900 for current codeberg/gitlab).
-Matches the daemon's own code default
-(`default_push_op_timeout_secs` in `dracon-sync/src/policy.rs`)
-and gives a generous safety margin over the v0.112.10 measured
+`push_op_timeout_secs = 900` — an OPERATOR bump, not the daemon's
+code default (FIXED 2026-08-09, audit MEDIUM: this section previously
+claimed it "matches the daemon's own code default"; it does not).
+History: 60 (pre-2026-06-17) -> 300 (2026-06-17, which DID match the
+daemon's code default) -> 900 (2026-06-23, after a 50-commit/5000+-
+file gitlab push kept timing out at 300s; see
+`~/.dracon/utilities/sync/dracon-sync.toml` comments for the full
+rationale). The daemon's code default REMAINS 300
+(`default_push_op_timeout_secs` in `dracon-sync/src/policy.rs`), so a
+fresh deployment without the config override gets 300s — operators
+tuning from this file must not treat 900 as the baseline. The 900
+gives a generous safety margin over the v0.112.10 measured
 >60s push time for a 23-file PNG-heavy commit. Per-remote timeouts
 (e.g. 60s for github, 900s for gitlab/codeberg) would be more
 precise but require a daemon code change to add the field to
