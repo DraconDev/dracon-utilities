@@ -93,9 +93,14 @@ github already has them. The 59 mirror-only commits are superseded work
 6. `dracon-sync unstuck pi-goal-loop-audit` (or `repair-concerns --apply`).
 
 **Option 2 — leave STUCK.** The daemon keeps alerting (throttled to 30
-min) and pauses auto-push. Commits continue to land locally + github.
-Acceptable only if the loop is dormant (its queue is currently empty;
-last goal completed 12:49).
+min) and pauses auto-push. NOTE: the `Exhausted` hard-stop (v0.112.31
+H5) skips the repo's ENTIRE sync cycle — **auto-commits pause too**, not
+just pushes. New local work must be committed manually (trusted
+identity + explicit paths) and pushed to github only; the mirrors stay
+untouched until the divergence is resolved. This was applied once on
+2026-08-09 for the AGENTS.md policy file (`2f564a60`). Acceptable only
+if the loop is dormant (its queue is currently empty; last goal
+completed 12:49).
 
 **Option 3 — merge rather than fork.** Rebuild local `main` to include
 both sides via `git merge` + resolve conflicts, then push to all. This
@@ -104,11 +109,13 @@ merge history the loop may not want.
 
 ## Immediate fixes applied (this incident)
 
-1. **`AGENTS.md` added to pi-goal-loop-audit** (2026-08-09): copies the
-   fleet "git-history rules for agent loops" section verbatim, adds the
-   LIVE INCIDENT block documenting this fork, and forbids `git reset`.
-   This closes the root-cause gap (missing policy file) so the loop is
-   never again unconstrained.
+1. **`AGENTS.md` added to pi-goal-loop-audit** (2026-08-09, commit
+   `2f564a60` on github): copies the fleet "git-history rules for agent
+   loops" section verbatim, adds the LIVE INCIDENT block documenting
+   this fork, and forbids `git reset`. This closes the root-cause gap
+   (missing policy file) so the loop is never again unconstrained.
+   Manually committed + pushed to github (the Exhausted hard-stop
+   paused the daemon's auto-commit for this repo).
 
 ## Observability follow-up (recommended, not shipped)
 
