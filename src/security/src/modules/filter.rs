@@ -5,7 +5,7 @@ use base64::{engine::general_purpose, Engine as _};
 use std::fs;
 use std::path::Path;
 
-use crate::make_env_version_header;
+use crate::{is_env_version_managed, make_env_version_header};
 use crate::normalize_secret_marker;
 use crate::strip_env_version_header;
 use crate::MarkerMigrationStats;
@@ -272,8 +272,11 @@ impl WardenSecurity {
                     }
                     // Add/increment version header for .env files to track changes
                     let content_to_encrypt = if filename.starts_with(".env") {
-                        // Check if this is already a warden-managed file by looking for our marker
-                        if text_content.contains("Dracon Warden") {
+                        // Managed = the warden header block sits at the top of
+                        // the file (NOT any comment mentioning Dracon Warden —
+                        // that false-positive yielded wrong/duplicated header
+                        // versions, audit LOW 2026-08-10).
+                        if is_env_version_managed(text_content) {
                             // Remove old header and add new one with incremented version
                             let stripped = strip_env_version_header(text_content);
                             format!(

@@ -88,16 +88,54 @@ const ENV_VERSION_HEADER_TEMPLATE: &str = r#"# =================================
 # =============================================================================
 "#;
 
+/// Marker line of the warden-managed `.env` header (line 2 of
+/// `ENV_VERSION_HEADER_TEMPLATE`).
+const ENV_HEADER_MARKER_LINE: &str = "# Dracon Warden Encrypted Environment File";
+
+/// Version-line prefix inside the managed header.
+const ENV_HEADER_VERSION_PREFIX: &str = "# Version: ";
+
 fn get_env_version(content: &str) -> u32 {
-    if let Some(pos) = content.find("Version: ") {
-        let after = &content[pos + 9..];
-        if let Some(end) = after.find('\n').or_else(|| after.find('\r')) {
-            if let Ok(v) = after[..end].trim().parse::<u32>() {
-                return v;
+    // Only the warden-managed header block at the TOP of the file may
+    // drive the header version. A "Version: " substring in the body
+    // (env values, comments, app-version strings) must NOT — the old
+    // whole-file `find` produced wrong/duplicated header versions on
+    // fresh files that merely contained a version line (audit LOW,
+    // 2026-08-10).
+    let mut lines = content.lines();
+    for (idx, line) in lines.by_ref().enumerate() {
+        if line.trim() == ENV_HEADER_MARKER_LINE {
+            // In the template the version line immediately follows the
+            // marker.
+            if let Some(vline) = lines.next() {
+                if let Some(rest) = vline.trim().strip_prefix(ENV_HEADER_VERSION_PREFIX) {
+                    if let Ok(v) = rest.trim().parse::<u32>() {
+                        return v;
+                    }
+                }
             }
+            return 0;
+        }
+        // The header occupies only the top few lines; past that the
+        // marker string is body content, not a header.
+        if idx >= 6 {
+            return 0;
         }
     }
     0
+}
+
+/// True when `content` carries the warden-managed `.env` header at its
+/// top (marker line within the first few lines). Used by the clean
+/// filter to decide between "increment existing header" and "first-time
+/// encryption" — the old `contains("Dracon Warden")` gate treated any
+/// comment mentioning Dracon Warden as a managed file, producing
+/// wrong/duplicated headers (audit LOW, 2026-08-10).
+pub(crate) fn is_env_version_managed(content: &str) -> bool {
+    content
+        .lines()
+        .take(6)
+        .any(|l| l.trim() == ENV_HEADER_MARKER_LINE)
 }
 
 fn make_env_version_header(content: &str) -> String {
@@ -1501,10 +1539,26 @@ API_KEY=secret"#;
 
     #[test]
     fn test_make_env_version_header_increments_version() {
-        let v1_content = r#"# Version: 1
+        // Managed header at the top → increments off the HEADER version.
+        let managed_content = r#"# =============================================================================
+# Dracon Warden Encrypted Environment File
+# Version: 1
+# =============================================================================
 API_KEY=secret"#;
-        let header = make_env_version_header(v1_content);
+        let header = make_env_version_header(managed_content);
         assert!(header.contains("Version: 2"));
+
+        // A bare "Version: " line in the BODY (no managed header) must
+        // NOT drive the header version — first-time encryption starts
+        // at 1 (audit LOW 2026-08-10).
+        let body_version = r#"# Version: 1
+API_KEY=secret"#;
+        let header = make_env_version_header(body_version);
+        assert!(
+            header.contains("Version: 1"),
+            "body version lines must be ignored: {}",
+            header
+        );
 
         let v0_content = r#"API_KEY=secret"#;
         let header = make_env_version_header(v0_content);
@@ -1556,6 +1610,78 @@ API_KEY=original"#;
             decrypted.contains("API_KEY=original"),
             "Content should be preserved"
         );
+    }
+
+    #[test]
+    fn test_fresh_env_with_warden_comment_gets_v1_header() {
+        // The finding's exact scenario: a FRESH .env that merely
+        // mentions Dracon Warden in a comment and carries an unrelated
+        // version line. The old `contains("Dracon Warden")` gate took
+        // the managed branch and parsed the body's "Version: 5" into a
+        // header claiming version 6. Now: first-time encryption starts
+        // at 1 and the body lines are preserved verbatim.
+        let mut security = WardenSecurity::new(None)
+            .unwrap()
+            .with_managed_patterns(vec![".env.local".to_string()]);
+        let identity = age::x25519::Identity::generate();
+        security.add_memory_identity(identity);
+
+        let fresh = "# managed by Dracon Warden\n# Version: 5\nAPI_KEY=secret\n";
+        let encrypted = security
+            .smart_clean_with_path(fresh.as_bytes(), ".env.local")
+            .unwrap();
+        let decrypted = security
+            .smart_smudge(&String::from_utf8_lossy(&encrypted))
+            .unwrap();
+        assert!(
+            decrypted.contains("# Version: 1"),
+            "fresh file must get a v1 header, got:\n{}",
+            decrypted
+        );
+        assert!(
+            decrypted.contains("# managed by Dracon Warden"),
+            "body comment must be preserved"
+        );
+        assert!(
+            decrypted.contains("# Version: 5"),
+            "body version line must be preserved, not re-parsed"
+        );
+        assert!(decrypted.contains("API_KEY=secret"));
+    }
+
+    #[test]
+    fn test_managed_env_body_version_line_does_not_drive_increment() {
+        // Managed header present AND the body also has a "Version: "
+        // line: the header must increment off the HEADER (1 -> 2), not
+        // the body's 99.
+        let mut security = WardenSecurity::new(None)
+            .unwrap()
+            .with_managed_patterns(vec![".env.local".to_string()]);
+        let identity = age::x25519::Identity::generate();
+        security.add_memory_identity(identity);
+
+        let managed = r#"# =============================================================================
+# Dracon Warden Encrypted Environment File
+# Version: 1
+# =============================================================================
+# Version: 99
+API_KEY=secret"#;
+        let encrypted = security
+            .smart_clean_with_path(managed.as_bytes(), ".env.local")
+            .unwrap();
+        let decrypted = security
+            .smart_smudge(&String::from_utf8_lossy(&encrypted))
+            .unwrap();
+        assert!(
+            decrypted.contains("# Version: 2"),
+            "header must increment off the header version, got:\n{}",
+            decrypted
+        );
+        assert!(
+            decrypted.contains("# Version: 99"),
+            "body version line must be preserved"
+        );
+        assert!(decrypted.contains("API_KEY=secret"));
     }
 
     #[test]
@@ -1907,7 +2033,40 @@ API_KEY=original"#;
         assert_eq!(get_env_version(""), 0);
         assert_eq!(get_env_version("no version here"), 0);
         assert_eq!(get_env_version("Version: abc\n"), 0);
-        assert_eq!(get_env_version("Version: 42\n"), 42);
+        // A bare "Version: " line WITHOUT the managed header marker is
+        // body content — must NOT be read as the header version (audit
+        // LOW 2026-08-10).
+        assert_eq!(get_env_version("Version: 42\n"), 0);
+
+        let managed = r#"# =============================================================================
+# Dracon Warden Encrypted Environment File
+# Version: 42
+# =============================================================================
+API_KEY=secret"#;
+        assert_eq!(get_env_version(managed), 42);
+
+        // A body "Version: " line AFTER a managed header is ignored.
+        let with_body_version = format!("{}\n# Version: 99\nAPI_KEY=secret", managed);
+        assert_eq!(get_env_version(&with_body_version), 42);
+    }
+
+    #[test]
+    fn test_is_env_version_managed() {
+        let managed = r#"# =============================================================================
+# Dracon Warden Encrypted Environment File
+# Version: 1
+# =============================================================================
+API_KEY=secret"#;
+        assert!(is_env_version_managed(managed));
+
+        // A comment merely MENTIONING Dracon Warden is not a managed
+        // header (audit LOW 2026-08-10).
+        let fresh = "# deployed by Dracon Warden\nAPI_KEY=secret";
+        assert!(!is_env_version_managed(fresh));
+
+        // The marker string below the top region is body content.
+        let deep = "# a\n# b\n# c\n# d\n# e\n# f\n# Dracon Warden Encrypted Environment File\nAPI_KEY=secret";
+        assert!(!is_env_version_managed(deep));
     }
 
     #[test]
