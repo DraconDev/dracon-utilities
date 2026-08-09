@@ -6,29 +6,64 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.113.50] - 2026-08-09
+
 ### Fixed
-- **dracon-warden v0.113.3 + dracon-security v0.3.1 — filter `protected_patterns` wired into the clean gate (2026-08-09, junk-runner wedge)**: the clean filter's "default-deny" gate read `WardenSecurity.managed_patterns`, which the production constructor initializes EMPTY — and `path_is_protected` treats empty as "scan everything (legacy)". The config's `protected_patterns` were wired into `.gitignore`/`.gitattributes` generation and `scrub_markers` but never into the filter process, so EVERY file was fully secret-scanned: a 6.87 MB `pi-session-*.html` took 16.3 s of filter CPU, git's concurrent filters blew the 30 s `FILTER_TIMEOUT_SECS`, and `git add` exited 128 every cycle — junk-runner wedged (no commits, 11 commits ahead, Changes Piling Up alert). Fix: process-wide `set_managed_patterns()` override applied inside `WardenSecurity::get_or_init()`, wired by `run_filter` from the policy via `wire_managed_patterns_from_policy()`. The same file now filters in 12–13 ms (~1250×). 104 tests (+2), clippy clean. Release order matters: `dracon-security` must publish first (the warden's `path` dep masks the registry resolution; the publish verify caught it — the dracon-git lesson again). v0.113.4 same day (test-only helper gated `#[cfg(test)]` for a warning-free build). Live-verified: the daemon's next cycle committed all 83 entries and pushed to github+gitlab. Design: `docs/design/warden-filter-protected-patterns-wiring-2026-08-09.md`.
 - **dracon-sync v0.113.50 — push failures classified in alerts + stuck ledger (2026-08-09, pi-goal-loop-audit divergence incident)**: the "Mirror Degraded" alert said "mirror may be unreachable" when the real cause was a history fork, and the stuck-ledger `last_error` recorded only the failing remote names. New `classify_push_failure()` (`src/git/push.rs`) maps a raw push error to one of four operator-actionable causes (history divergence / server-side policy rejection / pack exceeds size limit / transport-auth failure); per-remote failure tracking now carries `RemoteFailInfo { consecutive, last_error }`; the alert names the classified cause; the ledger appends a deduplicated cause line so the `repos` HINT shows WHY, not just WHO. **1244 tests** (was 1241), clippy + deny clean. Released + installed same day; live fleet verified. Incident analysis + reconciliation options: `docs/design/pi-goal-loop-audit-divergence-2026-08-09.md`.
+
+## [0.113.49] - 2026-08-09
+
+### Fixed
 - **dracon-sync v0.113.49 — PUSH legend documents all 8 cell labels (2026-08-09, pi-goal-list-loop-audit cascade finding)**: the `repos` legend's PUSH row listed 5 markers (`✅ OK`, `🟣 push in flight`, `❌ FAIL`, `🩹 broken history`, `🔑 forge token missing`) while `push_cell_label` (`src/report.rs:5337`) emits 8 distinct labels. Three were undocumented: `🛑 STUCK` (the `PUSH_STUCK`/`STUCK` alarm state), `🩹 BROKEN` (BROKEN cell label), `🚫 BLOCKED`, plus `✅ INTENT`. The PUSH legend now lists every cell label the code emits. New regression test `test_repos_legend_covers_all_push_cell_labels` pins the legend as the source of truth. **1241 tests** (was 1240), clippy + deny clean. Released + installed same day; verified live: `dracon-sync repos --legend` PUSH row is complete.
+
+## [0.113.48] - 2026-08-09
+
+### Fixed
 - **dracon-sync v0.113.48 — detached-HEAD push stuck on bare `HEAD` refspec (2026-08-09, pi-goal-loop-audit incident)**: three push sites (`src/git/push.rs` `push_with_transport_fallbacks`, `src/git/push.rs` `push_with_retries`, and `src/git/multi_remote.rs` `push_to_remote`'s retry loop) used the bare refspec `HEAD` when `current_branch(repo) = Some(branch)`. On a detached worktree, `HEAD` is interpreted as a commit SHA and git rejects it with `error: The destination you provided is not a full refname`. Live incident: `pi-goal-loop-audit`'s 197-file commit stuck for ~50 minutes (10:05:42 → ~10:55) on gitlab before self-recovering via the HTTPS fallback's already-correct refspec. All three sites now use `HEAD:refs/heads/<branch>` whenever a branch is known (safe for both attached and detached worktrees). Two new regression tests (`test_push_succeeds_with_detached_head`, `test_refspec_format_is_always_qualified`); the existing `test_push_to_named_remote_https_fallback_failure_still_retries_ssh` updated to assert the new (deterministic) failure mode. **1240 tests** (was 1238), clippy + deny clean. Follow-up from `pi-goal-list-loop-audit` investigation (`~/.pi-glla/notes/pi-goal-list-loop-audit-handoff-2026-08-09.md`).
+
+## [0.113.47] - 2026-08-09
+
+### Fixed
 - **dracon-sync v0.113.47 — dirty-but-nothing-to-stage repos never pushed ahead commits (2026-08-09)**: when a repo was dirty (`is_clean=false`) but nothing was committable (`to_stage` empty — every dirty file excluded by `auto_commit_exclude_patterns`, or phantom WT_MODIFIED submodule gitlinks from the libgit2 ignore bug), `sync_repo` returned `Synced` without calling `handle_ahead_push` — unpushed commits sat forever while the daemon logged `🔁 synced` every ~40s and the report showed a false "pushing Xm". Live incident: dracon-platform's `690d39180` stuck unpushed for 40+ minutes on 2026-08-09. The dirty-nothing-to-stage path now falls through to the `handle_ahead_push` gate (the committed case still returns `Synced`). New regression test (fails pre-fix, passes post-fix). Released + installed same day; verified live: stuck commit pushed, fleet `0 ahead / 0 behind`, dracon-platform `✅ CLEAN · 🟢 synced`. **1238 tests** (was 1237), clippy + deny clean. Design: `docs/design/dirty-nothing-to-stage-push-wedge-2026-08-09.md`.
 
+
+## [0.113.46] - 2026-08-08
+
+### Fixed
 - **dracon-sync v0.113.46 — `dracon-git` resolved from crates.io v94.7.2; `[patch.crates-io]` removed; release-pipeline fixture guard (2026-08-08)**: `dracon-git v94.7.2` was published to crates.io (with the `git ls-files --others --exclude-standard` untracked-count override, the git2 0.21 ssh/https transport fix, and the agent-less ssh fallback). The workspace `[patch.crates-io]` git+tag workaround (2026-07-18) is removed, `dracon-sync` depends on `dracon-git = "94.7.2"` directly, and `deny.toml [sources].allow-git` is cleared. `scripts/verify-install.sh` (fixture: scratch repo with gitignored `.pi/` dir → assert `untracked == 0`) is now release.sh step 6 — the packaged artifact is installed with fresh dependency resolution and fixture-checked BEFORE the tag is created. End-to-end verified: `cargo install dracon-sync --version 0.113.46` (crates.io) passes the fixture; live fleet shows 37 repos with zero untracked. This closes the 2026-08-08 phantom-untracked incident (`docs/design/installed-binary-drops-patch-dracon-git-2026-08-08.md`). **1237 tests**, clippy + deny clean.
 
+
+### Fixed
 - **dracon-sync — installed binary silently dropped `[patch.crates-io]` → phantom untracked counts (2026-08-08, ops incident)**: `dracon-sync repos` showed persistent, never-committed untracked counts (endless-td 294, dracon-platform 48, hellhunter 16, polis 8, deathrun 4) while `git status` in the same repos showed 0. Root cause: `cargo publish` strips `[patch.crates-io]` from the published manifest, so every `cargo install dracon-sync` builds against crates.io dracon-git **94.7.0** (the documented dracon-git 94.7.2 publish never happened), whose `get_status` lacks the `git ls-files --others --exclude-standard` override and counts raw libgit2 `wt_new` entries; libgit2 1.9.x fails to apply a handful of ignore rules (`.pi/`, `docs/screenshots/`, `static/assets/png/_v15-candidates/`, `_pre-v15-backup/`) that git CLI honors. Display/classification noise only — commit/push paths use git CLI and were never affected. Fix: reinstalled from the workspace build (`cargo build --release --locked` — honors the lock + patch → git dracon-git v94.7.2) and restarted the daemon; verified all five repos now report `untracked: 0`. Follow-ups: publish dracon-git v94.7.2 to crates.io, then remove the patch; add a post-install fixture check to the release pipeline. Design: `docs/design/installed-binary-drops-patch-dracon-git-2026-08-08.md`.
 
+
+## [0.113.45] - 2026-08-07
+
+### Fixed
 - **dracon-sync v0.113.45 — pile-up alert ages submodules by gitlink absorption time (2026-08-07)**: the "Changes Piling Up" alert aged submodule entries by the submodule DIRECTORY mtime, which only moves on file create/delete inside — healthy, actively-committing submodules fabricated huge ages (endless-td's dir mtime anchored Aug 3 while its gitlink updated every ~3 min; the alert reported a 92h pile-up that was minutes old and re-fired every cooldown). Directory entries now age by the parent's last gitlink-touching commit time — genuine stalls (the original 46.8h endless-td catch) still fire; minutes-old gitlink updates don't. Content-dirty submodule entries were already filtered and are committed by the submodules' own daemon instances (verified live: hegemon/polis). New unit test; **1237 tests** (was 1236), clippy + deny clean.
 
+
+## [0.113.44] - 2026-08-07
+
+### Fixed
 - **dracon-sync v0.113.44 — `dracon-sync maintenance -- <cmd...>` + daemon quiesce policy (2026-08-07)**: the sanctioned wrapper for git surgery on daemon-owned repos — pauses sync, runs the command, ALWAYS resumes (even on failure), propagates the exit code; a pre-existing freeze is left untouched. Replaces the `systemctl --user stop` pattern that had no backstop (`Restart=always` only covers crashes). Operational Layer 3: `dracon-sync-watchdog.{service,timer}` (user systemd, 2-min period) restarts the daemon if it is inactive and no `~/.dracon/dracon-sync.maintenance-hold` marker exists — live-tested (stop → watchdog → active). **1236 tests** (was 1232), clippy + deny clean. Design: `docs/design/daemon-quiesce-policy-2026-08-07.md`.
+
+## [0.113.43] - 2026-08-06
+
+### Fixed
 - **dracon-sync v0.113.43 — `refresh-visibility` prefers `github` remote over `origin` (2026-08-06)**: bug fix for visibility-cache poisoning. When a repo had both remotes and `origin` was mispointed (e.g. `folder-auto-banner-fab` → `DraconDev/folder-auto-banner`, a *different* intentionally-public repo), the refresh queried the wrong GitHub repo and cached the wrong visibility. The `github` remote is the canonical name the daemon uses for its multi-remote push path, so the preference is now aligned. The `origin` fallback is preserved for repos that only have `origin`. Extracted into `visibility::select_github_remote_url` for unit-testability; 4 new tests cover the regression and edge cases. Released and installed on the same day. Design: `docs/design/refresh-visibility-origin-preference-2026-08-06.md`. **1232 tests** (was 1228), clippy + deny clean, no operator action required.
 
+
+## [0.113.35] - 2026-08-04
+
+### Fixed
 - **dracon-sync v0.113.35 — path-owned synchronization and public Codeberg mirroring (2026-08-04)**: configured watch paths are owned by default with `owned = false` as the explicit opt-out; identity/origin mismatches warn without blocking path-owned sync. Any positive public GitHub/GitLab visibility enables a public Codeberg mirror, while unknown/private visibility never publishes and existing private mirrors are retained. Invalid Git history is no longer reported as an empty repository, and ownership-skipped rows show `BLOCKED` instead of active `PENDING`. Design: `docs/design/ownership-and-codeberg-auto-provisioning.md`.
 
-- **`dracon-sync` v0.113.7 — github pack-too-large → CONCERN classification + auto-repair no-op (2026-07-28, goal `20260728111602-xwwe9z`)**: a repo whose pushable branch exceeds GitHub's 2 GiB pack limit was previously emitted only as a HINT in the `repos` table while the row stayed at `🔄 ACTIVE` (the daemon's push path was silently skipping GitHub for the repo, but the row's classification didn't reflect that). Now: (1) the row is reclassified as `❌ CONCERN` (via a new `pub(crate) fn pack_too_large_forces_concern` helper at `dracon-sync/src/report.rs:1693` — the production call site at `report.rs:3157` routes the decision through the helper); (2) the HINT text is updated from "may fail to push to github" to "github push is skipped; shrink history or migrate assets to OVH" (permanence, not transient); (3) the auto-repair path (`run_repair_concerns`) short-circuits on the `PACK_SIZE_WARNING` flag with a `⏭️ skipping auto-repair` log line — the daemon has no code path that shrinks a repo's history, so attempting the repair would just produce journalctl noise every sync cycle. **Investigation**: `docs/design/cag-github-push-block-2026-07-28.md`. **Design**: `docs/design/pack-size-concern-2026-07-28.md`. **Live evidence**: `capture-anime-girls` (CAG), whose pushable branch is 2.37 GiB and was being silently skipped, now shows `❌ CONCERN` in `dracon-sync repos`. The fix surfaces the problem; the github-side remediation (orphan cutover vs OVH migration vs filter-repo) is still operator's call. **1159 tests** (was 1158), clippy + deny clean, 0 `#[allow(clippy::...)]` introduced.
 
 ## [0.113.7] - 2026-07-28
-### Added
 
+### Added
 - **LOW-hygiene clippy `--all-targets` cleanup** (2026-07-28, goal
   `20260728001443-t1ckfc`): closes the 13 pre-existing test-code
   clippy lints accumulated across the v0.112.20→v0.113.4 line. All
@@ -49,63 +84,175 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   from the M1-M4 MEDIUM-finding batch (`572f151`..`c691555`)
   which addressed the audit findings; the two are independent
   work items that landed in close succession.
+
+### Fixed
+- **`dracon-sync` v0.113.7 — github pack-too-large → CONCERN classification + auto-repair no-op (2026-07-28, goal `20260728111602-xwwe9z`)**: a repo whose pushable branch exceeds GitHub's 2 GiB pack limit was previously emitted only as a HINT in the `repos` table while the row stayed at `🔄 ACTIVE` (the daemon's push path was silently skipping GitHub for the repo, but the row's classification didn't reflect that). Now: (1) the row is reclassified as `❌ CONCERN` (via a new `pub(crate) fn pack_too_large_forces_concern` helper at `dracon-sync/src/report.rs:1693` — the production call site at `report.rs:3157` routes the decision through the helper); (2) the HINT text is updated from "may fail to push to github" to "github push is skipped; shrink history or migrate assets to OVH" (permanence, not transient); (3) the auto-repair path (`run_repair_concerns`) short-circuits on the `PACK_SIZE_WARNING` flag with a `⏭️ skipping auto-repair` log line — the daemon has no code path that shrinks a repo's history, so attempting the repair would just produce journalctl noise every sync cycle. **Investigation**: `docs/design/cag-github-push-block-2026-07-28.md`. **Design**: `docs/design/pack-size-concern-2026-07-28.md`. **Live evidence**: `capture-anime-girls` (CAG), whose pushable branch is 2.37 GiB and was being silently skipped, now shows `❌ CONCERN` in `dracon-sync repos`. The fix surfaces the problem; the github-side remediation (orphan cutover vs OVH migration vs filter-repo) is still operator's call. **1159 tests** (was 1158), clippy + deny clean, 0 `#[allow(clippy::...)]` introduced.
+
+
+## [0.113.3] - 2026-08-09
+
+### Fixed
+- **dracon-warden v0.113.3 + dracon-security v0.3.1 — filter `protected_patterns` wired into the clean gate (2026-08-09, junk-runner wedge)**: the clean filter's "default-deny" gate read `WardenSecurity.managed_patterns`, which the production constructor initializes EMPTY — and `path_is_protected` treats empty as "scan everything (legacy)". The config's `protected_patterns` were wired into `.gitignore`/`.gitattributes` generation and `scrub_markers` but never into the filter process, so EVERY file was fully secret-scanned: a 6.87 MB `pi-session-*.html` took 16.3 s of filter CPU, git's concurrent filters blew the 30 s `FILTER_TIMEOUT_SECS`, and `git add` exited 128 every cycle — junk-runner wedged (no commits, 11 commits ahead, Changes Piling Up alert). Fix: process-wide `set_managed_patterns()` override applied inside `WardenSecurity::get_or_init()`, wired by `run_filter` from the policy via `wire_managed_patterns_from_policy()`. The same file now filters in 12–13 ms (~1250×). 104 tests (+2), clippy clean. Release order matters: `dracon-security` must publish first (the warden's `path` dep masks the registry resolution; the publish verify caught it — the dracon-git lesson again). v0.113.4 same day (test-only helper gated `#[cfg(test)]` for a warning-free build). Live-verified: the daemon's next cycle committed all 83 entries and pushed to github+gitlab. Design: `docs/design/warden-filter-protected-patterns-wiring-2026-08-09.md`.
+
+## [0.112.39] - 2026-07-23
+
+### Added
 - **`dracon-sync` v0.112.39 — deathrun size fix (orphan cutover) + BROKEN_HISTORY detection + frame-dump prevention (2026-07-23)**: the deathrun 2 GiB fix and the prevention work, plus an important diagnosis correction. (1) **deathrun orphan cutover**: the repo's pushable branch was 2.85 GiB (audit-screenshot churn — `docs/audit-browser-v3` alone 1.5 GiB/4311 files, `.pi/chrome-screenshots` 585 MB), tripping github's 2 GiB pack limit. Orphan-cutovered to a clean root (`a77d795b rebirth`, 2388 files, 261 MB), force-pushed to gitlab (unprotect/push/re-protect — main is protected) and github (`--force-with-lease=main`). **github accepted the push** — pushes resumed after days of the guard skipping it. All 3 forges + local at `036dedd8`, parent gitlink converged, `🟢 synced · healthy`. (2) **BROKEN_HISTORY detection**: `probe_missing_objects` (with a path-strip fix) + a `BROKEN_HISTORY:N` state flag → CONCERN with hint, cached 24h alongside the size probe. (3) **Frame-dump prevention**: warden `hygiene_patterns` now ignores `**/.pi/chrome-screenshots/` and `**/audit-*/screenshots/` fleet-wide (audit `.md` REPORTS still committed). AGENTS.md commit-all policy documents the exception. (4) **Auto-repair pre-flight**: `rewrite_ahead_paths` refuses to rewrite a damaged gitdir (missing objects) with an alert. **DIAGNOSIS CORRECTION**: the initial "2092 missing objects / broken history on both sides" was a **probe bug** — `git rev-list --objects` appends paths to blob/tree lines and `cat-file` mis-parses them as "missing". Corrected probe shows **0 missing objects everywhere**; deathrun was **fat, not broken**, and the auto-repair rewrites did NOT break history. The orphan cutover was still the right fix for the real size problem. Design doc: `docs/design/audit-screenshot-bloat-deathrun-2026-07-23.md`. **825 daemon tests**, clippy + deny clean.
 
+
+## [0.112.38] - 2026-07-22
+
+### Added
 - **`dracon-sync` v0.112.38 — rich table default + per-repo detail (2026-07-22)**: operator-requested UX reshape of `repos`. (1) **New default view**: plain `dracon-sync repos` (at <242 cols) now shows a rich 7-column table (`# · STATUS · REPO · ACTIVITY · A/B · PUSH · HINT`) instead of the verbose per-repo block view — ACTIVITY includes dirty counts inline (`⏳ dirty 1d · 101 stg + 2 ut`); **A/B is the ahead/behind column** (`↑N` unpushed = data at risk, `↓N` upstream drift, `↑N ↓M` both, `—` in sync — the most important missing field); PUSH is the dedicated push-state cell (✅ OK / 🟣 PENDING / 🛑 STUCK / ❌ FAIL); branch is folded into REPO only when ≠ main (`darklord⚡master`). Sorted by severity. At ≥140 cols a PUBLISH column is added. (2) **Per-repo detail**: `dracon-sync repos <name>` (e.g. `repos darklord`) shows the full detailed block for ONE repo (branch, publish, changes, ahead/behind, push-to, push, last commit, pushed, activity, state, hint) — the "run details on a certain repo" path. Errors on unknown basename (exit 2) or ambiguity. (3) The old block view remains available via `--layout vertical`; `-s/--summary` (3-col glance) and `--layout compact/full` (16/23-col detailed tables at 242+/315+ cols) are unchanged. New `LayoutTier::Rich` variant + `print_repos_rich_table`; `choose_layout_tier` returns Rich for <242. **825 daemon tests** (2 tier tests updated to the new default), clippy + deny clean.
 
+
+## [0.112.37] - 2026-07-22
+
+### Added
 - **`dracon-sync` v0.112.37 — desktop notifications for sustained problem states (2026-07-22)**: operator-requested. Two new sustained-state notifications in the daemon's notification loop, closing the gaps seen in the darklord and F0.2 incidents: (1) **Blocked >30 min** — a repo continuously blocked by a needs-human guard (merge/rebase in progress, commit-time ownership check) now fires a desktop notification (`notify-rust`, Critical urgency) after 30 continuous minutes, throttled to 30 min. New `blocked_since` field on `RepoActivity` (set on `SyncOutcome::Blocked`, cleared on any non-Blocked outcome). (2) **Unowned >15 min** — a repo continuously skipped by the ownership guard now notifies after 15 minutes with a pointer to `dracon-sync ownership --explain`. New `unowned_since` field (set in the ownership-skip branch, cleared when owned). The F0.2 incident (daemon's own repo unowned for 25 minutes) had no operator signal beyond the journal. Both use the v0.112.31 expiring `notify_throttled` (re-fires every 30 min while the state persists). Extracted `sustained_threshold_met` helper (unit-tested) shared by all four sustained checks (ahead/behind/blocked/unowned). **825 daemon tests** (+1), clippy + deny clean.
 
+
+## [0.112.36] - 2026-07-22
+
+### Added
 - **`dracon-sync` v0.112.36 — M10 guard honors ownership overrides + WARN width fix (2026-07-22)**: two operator-reported fixes. (1) **darklord WARN**: the v0.112.33 M10 pre-commit identity guard did a raw trusted-list check, blocking darklord's deliberate per-repo identity (`darklord-dev <darklord@dracon.local`) despite its `owned = true` override — 101 staged files piled up for a day with a journal warning every ~50s. `commit_allowed_by_ownership` now has two acceptance paths: `owned = true` in `.dracon/dracon-sync.toml` (operator-blessed, identity is their choice) OR identity ∈ trusted lists (the F0.1 `test@test` case still blocks). It deliberately does NOT re-adjudicate origin trust (the loop's ownership gate already did). `Blocked` outcomes now also cool the repo down 300s (was ~50s retry churn). 3 new tests (override honored / untrusted blocked / trusted allowed); darklord's 101 files committed on deploy. (2) **darklord row visual drift**: the WARN status cell used ⚠️ (U+26A0) — unicode-width counts it 1 but terminals render it 2, so every WARN row's separators drifted one column right of the frame. Replaced with 🟡 (yellow circle, width 2 = rendered 2, matches the 🟢⚪⚫🟣 activity-dot family) in the STATUS cell and the tally line. **824 daemon tests** (+3), clippy + deny clean.
 
+
+## [0.112.35] - 2026-07-22
+
+### Added
 - **`dracon-sync` v0.112.35 — activity-label date parser fix (2026-07-22)**: repos whose last commit was "N weeks/months/years ago" lost their activity indicator in the `repos` WHAT cell (spotted live on `DraconDev`, last commit "4 weeks ago" → bare "healthy"). `activity_label` used a unit-limited duplicate (`parse_relative_minutes_to_u64`) of the full `parse_relative_minutes`; it now delegates to the complete parser. Verified live: `⚫ cold 28d · healthy`. **821 daemon tests** (+1), clippy + deny clean..
 
+
+## [0.112.34] - 2026-07-22
+
+### Added
 - **`dracon-sync` v0.112.34 — excluded-path semantics preserve edits + live config cleanup (2026-07-22)**: two operator-approved fixes closing the audit's decision items. (1) **F1.16**: `auto_commit_exclude_patterns` now means "don't auto-commit these" — after each commit the daemon UNSTAGES excluded files but **preserves worktree content** (was: `git restore --staged --worktree` silently DELETED the operator's uncommitted edits after every commit). Hygiene enforcement ("must equal HEAD") is now an explicit per-repo opt-in: `revert_excluded_to_head = true` in `.dracon/dracon-sync.toml`. 2 regression tests; documented in AGENTS.md. (2) **M20 live config cleanup**: `standard_files_auto = true` moved above the `[[standard_files]]` blocks in the operator's config (was silently absorbed into the last table entry) and the dead `[extra_remotes]` section deleted — verified via tomllib parse + `config validate` (zero warnings). **820 daemon tests** (+2), clippy + deny clean..
 
+
+## [0.112.33] - 2026-07-21
+
+### Added
 - **`dracon-sync` + `dracon-warden` + `dracon-system` v0.112.33 — audit MEDIUM sweep (2026-07-21)**: 26 fixes from `AUDIT_FULL_2026-07-21.md` across 4 batches. **Batch A (daemon M2-M9)**: forge-confirmed terminal state for auto-create; bootstrap Ok(false) cooldown + staged hygiene (`git rm --cached` for unborn); MAX_FAILURES becomes 15-min backoff with re-probe + Blocked excluded from budget; origin push failure no longer starves mirrors; dynamic `count_ahead_commits` (was hardcoded origin/main); SIGHUP full soft-reset; detached-task registry for trailing-drain (no more duplicate concurrent sync_repo); `SyncOutcome::FilterOnly` makes stage_cooldowns real. **Batch B (git M11-M19)**: repair checked-out branch's gone upstream; filter-branch fallback argv rebuilt; exit-code checks at 7 sites (std_git_checked; consolidate_to_main no longer branch-deletes on failed checkout); remote_repo_exists tri-state + session cache; repo-gone push failures classified permanent; IndexLock resolves real gitdir (submodule ENOTDIR); -z parsing + exit propagation in diff helpers; remove_stale_remotes scoped to daemon-managed (dracon.managed-* marker); is_safe_git_path full-depth `..` check. **Batch C (policy/visibility M20-M28)**: TOML absorbed-field warning (live-verified on operator config); config validate prints warnings; expand_tilde("~/x")→$HOME/x; visibility cache only on github-leg success (+ observed-state fallback); make-public basename ambiguity detection + resolved-path print; refresh-visibility error-aware (no more cache poisoning on gh hiccup); host-verified parse_github_owner_repo; .env-file secret control-char refusal; exclude matcher rewrite (single-/ patterns no longer dead, segment-exact replaces substring overmatch). **Batch D (system/tests)**: guard workspace-aware target protection + 60s mtime backstop; ps argv-injection /proc identity verification + PID-reuse starttime check; is_git_tracked_dir repo-relative path; load_system_policy propagates read errors; security test guards hold env mutex; **M10** pre-commit identity guard (committer must be in trusted lists); **H2** warden pre-push hook rejects test-identity-authored pushes. **Tests**: sync 818 (+21), warden 83 (+2), security ~111, system 86 — all green, clippy + deny clean..
 
+
+## [0.112.32] - 2026-07-21
+
+### Added
 - **`dracon-warden` v0.112.32 — audit warden batch (2026-07-21)**: 2 HIGH + 4 MEDIUM fixes from `AUDIT_FULL_2026-07-21.md`, plus a headline architectural change. (1) **`harden_repo` no longer wipes operator .gitignore/.gitattributes** (H8/F4.1): surgical `replace_managed_block` promoted from `#[cfg(test)]` to production for both files — verified live (`dracon-warden once` preserved the operator's nested-repo section; previously commit `3a67685f` wiped it). (2) **Whole-file-encrypted BINARY secrets round-trip as bytes** (H9/F4.2): `smart_smudge` corrupted non-UTF-8 payloads via `from_utf8_lossy` (DER keys, SQLite, .kdbx) and the corruption re-encrypted into history; new `decrypt_whole_file_tag` decrypts whole-file tags to raw bytes in `seal_smudge` + `decrypt_file`. (3) **`allow_v1_fallback` gate wired** (M29/F4.3): policy field added + set in `WardenPolicy::load` (was zero callers; documented V1 migration path was inaccessible). (4) **`setup-hooks --local` works** (M30/F4.4): was `git config local ...` (missing `--`, always failed). (5) **Filter-clean fails closed** (M31/F4.5): oversized/refused inputs previously passed plaintext through to git in the clean direction (silent secret leak). (6) **Pre-push hook handles space filenames** (M32/F4.6): NUL-delimited iteration + `xargs -0` (`--pathspec-from-file` unsupported by `git diff`, verified). **Architectural**: dracon-warden now builds the LOCAL `src/security` crate via path dependency + workspace membership (previously built published crates.io v0.3.0, so source fixes never reached the binary; the H9 fix required this)..
 
+
+## [0.112.31] - 2026-07-21
+
+### Added
 - **`dracon-sync` v0.112.31 — audit HIGH batch: failure-visibility + policy-enforcement (2026-07-21)**: 8 fixes from `AUDIT_FULL_2026-07-21.md`. (1) **Push failure ≠ "synced"** (H3/F1.3): new `SyncOutcome::PushFailed`; both push paths swallowed failures into a success outcome (apply phase logged `🔁 synced`, reset `failure_count`). Mirror-leg failure (origin ok) also returns PushFailed. (2) **Notify cooldowns expire** (H4/F1.1): `Entry::Vacant` deadlines were never read — every throttled notification fired once per daemon lifetime. New `notify_throttled` at 7 sites + SIGHUP clear. (3) **Stuck-push ledger unified + `push_max_retries` enforced** (H5/F1.2): per-cycle disk reload (split-brain), `last_retry_at` instead of delete-on-retry (budget reset every 5 min), `StuckDecision::Exhausted` hard stop with operator recovery instructions. (4) **Directory-expansion re-filter** (H6/F1.5): untracked-dir recursion staged files wholesale, bypassing the 100 MiB hard limit + all per-file excludes; new `stage_existing_files_filtered` re-applies per-file policy. (5) **Local-first ahead count** (H7/F1.4): `ls-remote` (SSH) ran every 1s cycle per never-pushed repo; missing tracking ref already implies all-commits-unpushed so local `count_all_head_commits` answers first (new `any_mirror_tracking_ref_exists`); ls-remote fallback behind 300s cooldown. (6) **Codeberg API URL fix** (H10/F3.1): v0.112.29's gitlab two-placeholder `str::replace` bug had a codeberg twin — every codeberg visibility/metadata call 404'd (`make-public --include-codeberg` could never work). Single-placeholder + pinning test + live-verified (200 vs 404). (7) **Ownership verdict 10-min TTL** (H1/F0.2): negative verdicts re-detect after 600s (verified live: daemon skipped its own repo 25 min after config fix until SIGHUP); Owned stays sticky; recovery log + skip-log SIGHUP hint. (8) **Mirror failures tracked + named** (M1/F1.7+F3.9): `mirror_consecutive_fails` was never written (Mirror-Degraded notification dead code) — now populated from `remote_failures`; stuck-ledger `last_error` names failing remotes (`remotes: bad-mirror`). **797 daemon tests** (+14), clippy + deny clean..
 
+
+## [0.112.30] - 2026-07-21
+
+### Added
 - **`dracon-sync` v0.112.30 — empty-repo bootstrap + never-pushed detection + codeberg exclusion (2026-07-21)**: fixes four bugs from the `convos` investigation (operator ran `git init`, dropped 4 files, daemon did nothing for 12h). (1) **Root-commit bootstrap**: the daemon loop bailed on `!is_repo_ready` before dispatching `sync_repo`, making the old (policy-violating, unreachable) bootstrap dead code. New `sync::bootstrap_empty_repo_commit` is gated on `git::is_stable_empty_repo` (distinguishes operator-init from mid-clone via lock-file + `tmp_pack_*` checks), applies the full staging policy (gitignore/warden secrets via `--exclude-standard`, size limits, exclude patterns, ownership gate), and uses explicit-path `git add -A -- <paths>`. Failures cool down 300s. (2) **Never-pushed no longer looks synced**: after `configure_publish_upstream_if_missing` wrote branch config, libgit2 ahead=0 (no remote-tracking ref) made `has_local_or_pending_work` false — freshly-bootstrapped repos would sit at false "synced" forever. New `upstream_tracking_ref_missing` + `count_all_head_commits` fallback in the daemon-loop ahead override; `handle_ahead_push` treats a missing tracking ref as push-needed. (3) **Codeberg exclusion for new repos**: under the v0.112.28 quota posture every push failed with `Forgejo: Push to create is not enabled`. New `codeberg_push_excluded` skips codeberg at configure+push time when effective auto_create is off AND no codeberg tracking ref exists (local check). Pre-v0.112.28 repos keep pushing; dead remote auto-removed via `remove_stale_remotes`. **Latent v0.112.28 bug**: both codeberg arms matched the raw `auth_type` field (unset in config → `GitHub` default), so the per-repo `auto_create_on_codeberg` opt-in was silently ignored — now uses `effective_auth_type()` (push_url auto-detect). (4) **v0.112.29 auto-create spam throttled** to 1 attempt/300s/repo (was 2 SSH `ls-remote`/sec per empty repo). **+25 new tests** (783 daemon, 957 workspace). Live: `convos` bootstrapped (`auto: initial commit (4 files)`), pushed to github+gitlab, codeberg remote auto-removed, `repos -s` shows `🔄 ACTIVE · 🟢 synced · healthy`. Design doc: `docs/design/empty-repo-auto-create-fix-2026-07-21.md`..
 
+
+## [0.112.29] - 2026-07-21
+
+### Added
 - **`dracon-sync` v0.112.29 — empty-repo auto-create + gitlab URL bug fix (2026-07-21)**: fixes three issues from the `convos` investigation. (1) **Empty-repo auto-create on discovery**: brand-new `git init` repos (no commits) used to be silently skipped by `is_repo_ready`, never auto-created on github/gitlab, and stuck showing "❌ CONCERN · set upstream" until first commit. Now `push_mirror_remotes_create_only` runs BEFORE the readiness check, so the daemon creates the github + gitlab repos as soon as it discovers the local repo. Idempotent via `git ls-remote` pre-check. (2) **Empty-repo hint**: new `EMPTY_REPO` flag + "no commits yet — make first commit to enable push" hint, plus `push_status = EMPTY` instead of the misleading `FAIL`. (3) **GitLab URL bug in `set_gitlab_visibility`**: the constant `GITLAB_API_PROJECTS = ".../projects/{}%2F{}"` had two `{}` placeholders, but `str::replace("{}", &encoded)` replaced both, producing `projects/owner%2Frepo%2Fowner%2Frepo` → GitLab 404. Fixed to single-placeholder `.../projects/{}`. Pre-existing since the visibility code was added; masked because the existing flow only flipped gitlab visibility when it diverged from github (rare). Now exercised by every `make-public`/`make-private` call. **+3 new regression tests** (758 daemon, 940 workspace). `cargo build/test/clippy/deny` all green. Live: `convos` repo auto-created on github + gitlab; `make-public convos` now flips both to public..
 
+
+## [0.112.28] - 2026-07-20
+
+### Added
 - **`dracon-sync` v0.112.28 — visibility-flip CLI + codeberg quota opt-in (2026-07-20)**: adds `dracon-sync make-public <repo>` and `make-private <repo>` CLI subcommands that flip repo visibility across github + gitlab (skipping codeberg by default to protect the 85 GiB grace quota; pass `--include-codeberg` to flip it too). Uses the existing `gh api` / GitLab REST / Codeberg REST API patterns. **Latent bug fixed**: `multi_remote.rs:create_repo_on_github` was hardcoded `--private` regardless of the `private` parameter in the signature — now honors the param so `auto_create_repo(..., private=false)` actually creates public repos. **Quota protection**: changed global config `codeberg.auto_create` from `true` to `false` (per-repo opt-in: `auto_create_on_codeberg = true` in `<repo>/.dracon/dracon-sync.toml`). **Noreply whitelist**: added `dracon@users.noreply.github.com` and `DraconDev@users.noreply.github.com` to `trusted_emails` in the global config — silences the `🚫 unowned` warning for repos whose HEAD commit was authored via the GitHub web UI (e.g. `pi-goal-loop-audit`). The noreply identities are not publicly forgeable (only the GitHub account holder can produce commits with them). **+2 new regression tests** (`test_create_repo_on_github_public_flag_when_private_false`, `test_auto_create_all_remotes_codeberg_override_opt_in`) — 755 daemon tests, 937 workspace total. `cargo build/test/clippy/deny` all green..
 
+
+## [0.112.27] - 2026-07-20
+
+### Added
 - **`dracon-sync` v0.112.27 — operator UX (2026-07-20)**: adds a glance view to the `repos` command. Default `repos` is unchanged (16-col Compact/Full table for deep inspection). New `repos --summary` / `-s` is a proper 3-column `comfy-table` (STATUS · REPO · WHAT) with UTF8_FULL_CONDENSED borders for "is anything broken?" checks. `#` / `STATUS` / `REPO` columns use fixed `Absolute(N)` widths; `WHAT` uses `Dynamic` to absorb leftover terminal width. Works with `--only-concern` / `--only-warn` for the common "show me just the broken ones" pattern. `--summary-by-severity` sorts concerns first, clean last. **R1 fix (2026-07-20)**: operator feedback was "the summary needs to be a table" — R0 used `println!` with manual spacing which broke alignment under ANSI color codes; R1 switches to `comfy-table` for correct unicode width + ANSI handling. **R2 fix (2026-07-20)**: operator feedback "the authors are wrong, we're freestyling some of it" — dropped the author from ALL three `repos` view variants. The author is `git log -1 --format=%an` (git commit author of the latest commit); for a solo operator who freestyles git identities (`DraconDev` / `dracon` / `darklord-dev`), this misleadingly implies multiple people. Removed from: (1) summary WHAT, (2) detailed Compact/Full HINT column suffix, (3) Vertical tier `author:` line. The `last_author` field is still computed but no longer displayed. WHAT is now `activity + dirty-counts + push-status-if-stuck + hint`. **+7 new regression tests** — 935 total. `cargo build/test/clippy/deny` all green. Verified at 80 / 120 / 300 cols..
 
+
+## [0.112.26] - 2026-07-19
+
+### Added
 - **`dracon-sync` v0.112.26 — UI polish follow-up (2026-07-19)**: fixes two cosmetic artifacts in v0.112.25's `repos` table. (1) **STATE+ACT mid-emoji truncation**: `🟠 dirty · ⏳ …` — the second emoji (⏳) was kept but the trailing text was clipped, leaving a dangling emoji. Fix: new `state_plus_act_cell()` helper drops the activity part cleanly when the 15-col budget is tight. State always renders (`🟠 dirty`); activity only when there's room (`🟠 dirty · ⏳ dirty 1h`). State is preserved over activity because state is the actionable classification. (2) **HINT column too narrow**: `daemon handles afte…` clipped the operator phrase mid-word. Fix: widened HINT column `Absolute(22)` → `Absolute(26)` (budget 20 → 24 cols). Now fits `daemon handles after ch…`. (3) Bumped Compact tier threshold from `< 238` to `< 242` to match new HINT width. **+3 new regression tests** (`test_state_plus_act_cell_drops_activity_when_tight`, `..._keeps_activity_when_it_fits`, `..._handles_dash_activity`) — 928 total. `cargo build/test/clippy/deny` all green. Verified at 240 cols (Vertical, no wrap), 300 cols (Compact, all single-line with clean STATE+ACT). Live tally: `📦 31 repos · ✅ CLEAN 19 · 🔄 ACTIVE 12 · ⚠️ WARN 0 · ❌ CONCERN 0`..
 
+
+## [0.112.25] - 2026-07-19
+
+### Added
 - **`dracon-sync` v0.112.25 — UI render fix follow-up (2026-07-19)**: v0.112.24's Compact-tier table used `LowerBoundary(N)` for REPO/ROLE/PUBLISH/STATE+ACT/HINT — meaning cells could GROW with content but not truncate. On terminals between 220-237 cols (just below the Compact tier threshold) the table was rendering but variable-length cells (ROLE labels like `parent (10 submods)`, REPO names like `pully-fully-pull-based-fleet-reconciler`) letter-wrapped to 2 lines. Fix: switched all to `Absolute(N)` widths and added `truncate_unicode_width(..., N-2)` to the cell content (`role_cell()`, `publish_cell_label()`, REPO name in the row loop). Bumped Compact tier threshold from `< 220` to `< 238` to match the new column budget. Renamed parent label `parent (N submods)` → `parent·N` (9 chars, fits in 14-col ROLE column). **+1 new regression test** (925 total). `cargo build/test/clippy/deny` all green. Verified: terminals 230 (Vertical), 240 (Compact, all single-line), 300 (Compact), 400 (Full) all render correctly. Stalled repos (neonbreak, endless-td) investigated — root cause was the user's own `pi-loop` LLM agent repeatedly regenerating `tools/spec-audit.mjs`/`docs/spec-compliance.md` while hitting Anthropic 429 rate limits. Loop is now stopped; daemon was working correctly..
 
+
+## [0.112.24] - 2026-07-19
+
+### Added
 - **`dracon-sync` v0.112.24 — goal `4555eaf6` (2026-07-19)**: fixes four operator-visible issues from `repos` table: (1) hegemon was `🚫 unowned` because HEAD author was `Hegemon Audit <hegemon@local>` and F44 flags when either name OR email is untrusted. Fix: added `hegemon@local` to `trusted_emails` AND amended the 2 audit-script commits on hegemon's main to use canonical `DraconDev` name (force-pushed to github+gitlab). (2) `opencode-plugins` (PRIVATE) showed `PUBLISH = codeberg/main` because no `origin` remote existed. Fix: `ensure_origin_for_vscode()` in `multi_remote.rs` adds `origin = github URL` when mirrors exist but origin is missing; never overwrites existing origin. (3) ROLE column for submods showed 51-char `submod (of dracon-platform/web/games/wip/<name>)`. Fix: `RoleKind::Submod` now renders just `wip/<name>` (strips `web/games/` prefix; preserves `wip` vs `released` tier marker; falls back to full path for non-standard layouts). (4) The audit-script identity impersonation itself (fixed by the hegemon amend). **+8 new regression tests** (924 total). `cargo build/test/clippy/deny` all green. Live tally: `📦 31 repos · ✅ CLEAN 26 · 🔄 ACTIVE 5 · ⚠️ WARN 0 · ❌ CONCERN 0`..
 
+
+## [0.112.23] - 2026-07-19
+
+### Added
 - **`dracon-sync` v0.112.23 — UI rendering fix (2026-07-19)**: `repos` table layout was broken — `LAST COMMIT`, `HINT`, `STATE+ACT`, `PUSH-TO`, `ACTIVITY`, `AUTHOR`, `STATE`, `DAEMON` cells were wrapping to 2-5 lines per row because `LowerBoundary` constraints allowed columns to GROW to fit the longest content (e.g. 152-char auto-commit subjects) and `truncate_unicode_width()` wasn't being applied. Fix: switch LAST COMMIT/AUTHOR/STATUS/PUSH-TO from `LowerBoundary` to `Absolute`, truncate every cell with `truncate_unicode_width(..., column_width - 2)` before passing to comfy-table, bump STATUS 11→13 cols (so `🚫 unowned` fits), bump full-tier threshold 300→315 cols. **+1 new regression test** (916 total). `cargo build/test/clippy/deny` all green. Live tally post-deploy: `📦 31 repos · ✅ CLEAN 27 · 🔄 ACTIVE 4 · ⚠️ WARN 0 · ❌ CONCERN 0`. All 30 data rows now render on single lines..
 
+
+## [0.112.22] - 2026-07-19
+
+### Added
 - **`dracon-sync` v0.112.22 — MEDIUM-sweep follow-up (2026-07-19)**: closes out 5 MEDIUM + 2 LOW findings deferred from v0.112.21. **F31** `rewrite_ahead_paths` now deletes empty backup branch when filter-repo was a no-op (was leaving `backup/pre-sync-*` clutter). **F33** `parse_name_status_line` requires a digit suffix on rename status (`R100` not bare `R`). **F34** `consolidate_to_main` CLI now defaults to DRY-RUN and requires `--apply` to actually delete master locally + remotely. **F47** `kill_process_group` 200ms→2s SIGTERM-SIGKILL gap, with diagnostic on missing `kill`. **F49** poll interval 250ms→100ms (select! was already event-driven). **F55** `classify_roles` now prefers full relative-path equality over basename-only match. **F60** `check_secrets_dir_permissions` refuses group-writable (was world-writable only). **F61** `test_git_cmd()` doc-comment corrected (was falsely claiming serialization). 9 new tests (906→915). `cargo build/test/clippy/deny` all green. Live tally post-deploy: `📦 31 repos · ✅ CLEAN 23 · 🔄 ACTIVE 7 · ⚠️ WARN 1 · ❌ CONCERN 0`.. AGENTS.md refreshed with audit summary + `[patch.crates-io]` follow-up note. Deferred to v0.113: warden FDRACONWARDEN-004..010, system FDRACONSYS-001..004, `[patch.crates-io]` removal.
 
+
+## [0.112.21] - 2026-07-19
+
+### Added
 - **`dracon-sync` v0.112.21 — post-v0.112.20 audit remediation (goal `7ee5a41d-0505-4a73-bdb1-c1fbaae4ab62` / 2026-07-19)**: remediates all 8 daemon HIGH + 3 warden HIGH findings from `AUDIT_FULL_2026-07-18-POSTFIX.md`. Key fixes: **F30** (Full table constraint sum 345→299 cols, makes v0.112.19's table fix actually work at terminal width 300 — the test array had 22 entries while production had 23; test never caught it). **F39** (`is_trusted_origin` substring bypassed by `github.com/DraconDev.evil.com`; new `parse_origin()` extracts `(host, first_path_segment)` atomically + `redact_origin_credentials()` strips passwords from logged URLs). **F40** (`standard_files` target path traversal: `target="/etc/cron.daily/evil"` no longer accepted; validate_config rejects absolute/`..` paths). **F41** (`git_askpass_script` writes token to `/tmp` with world-readable race window + no cleanup; new atomic `O_EXCL|O_NOFOLLOW` create with mode 0o700 + `AskpassScript` Drop guard). **F42** (nix.rs comment lines containing `version = "..."` no longer rewritten). **F43** (`extract_version_from_cargo` now handles trailing `;`). **F44** (ownership classify step 3 now flags if EITHER email OR name is untrusted; the previous OR-of-untrusted missed asymmetric cases). **F45** (`test_helpers.rs` no longer uses `mem::forget(tmp)`; temp dirs are registered in a global `TEST_TEMPS` and reaped at process exit). **F46** (`EnvRestorer::Drop` documented UB racy with concurrent env readers; relies on `--test-threads=1` discipline). **warden FDRACONWARDEN-001-003**: V1 deterministic-IV decryption hard-deprecated (will be removed in v0.113.0), filter path validation refuses absolute + `..`, decrypt walk uses `follow_links(false)`. **MEDIUM fixes F32/F48/F50/F51/F52/F53/F54**: stderr pipe errors now surface, `is_git_push_progress_line` switched to regex (was substring), JSON parser now uses `serde_json`, secrets env vars refuse control chars, SSH `ssh://host:port` parsing, URL credential redaction. 16 new tests (890→906). `cargo build/test/clippy/deny` all green. Live daemon tally post-deploy: `📦 31 repos · ✅ CLEAN 26 · 🔄 ACTIVE 5 · ⚠️ WARN 0 · ❌ CONCERN 0`.. Audit doc: `AUDIT_FULL_2026-07-18-POSTFIX.md`. Deferred to v0.113: F31/F33/F34/F47/F49/F55 + LOW batch.
 
+
+## [0.112.20] - 2026-07-18
+
+### Added
 - **`dracon-sync` v0.112.20 — `dracon-git` v94.7.1 patch (libgit2 ssh-agent fix, goal `f0c1de2e-7584-4ee6-b8d9-a319d881c2d4` / 2026-07-18)**: fix the 2 CONCERNs surfaced by `dracon-sync repos` (endless-td 53-ahead push-stuck with 35 consecutive failures, neonbreak 4-minute PENDING) caused by a libgit2 ssh-agent fetch bug in the external `dracon-git` crate v94.7.0. The daemon's `fetch()` used `git2::Cred::ssh_key_from_agent` which requires a running ssh-agent; the operator's wezterm/NixOS session has no ssh-agent (only the wezterm socket at `/run/user/1000/wezterm/agent.25368`), so every libgit2 fetch failed with `unsupported URL protocol; class=Net (12)`. **This release doesn't change any daemon source code** — instead, the workspace `Cargo.toml` is patched with `[patch.crates-io] dracon-git = { path = "/home/dracon/Dev/dracon-libs/tools/sync/dracon-git" }` to use a locally-built `dracon-git v94.7.1` where `fetch()` is rewritten: CLI primary path (`std::process::Command("git fetch origin")` which respects `~/.ssh/config` + `IdentitiesOnly yes` + `IdentityFile ~/.ssh/id_ed25519`) + libgit2 fallback (the original code) for binary blob edge cases. **Endless-td manual fix**: operator chose reset+replay strategy via `ask_user_question`; `git merge --abort`, `git reset --hard origin/main`, `git cherry-pick` of 57 local commits, 2 TASKLIST_FIXES.md conflicts resolved by taking theirs (the cherry-picked version), pushed to all 3 remotes (HEAD `16720ca7`). **Neonbreak manual fix**: none — auto-recovered once `git fetch origin` updated the tracking ref. 1 new test in `dracon-git` (33 total, was 32): `test_fetch_uses_cli_path_successfully`. 890 tests pass on the daemon side. Live tally post-deploy: `📦 32 repos · ✅ CLEAN 28 · 🔄 ACTIVE 4 · ⚠️ WARN 0 · ❌ CONCERN 0`. The 32nd repo is `dracon-libs` itself (auto-discovered after the clone). Patch should be removed once v94.7.1 is published to crates.io (requires operator's `CARGO_REGISTRY_TOKEN`). Design doc: `docs/design/concerns-investigation-2026-07-18.md` (14.7 KiB).. AUDIT update pending: `AUDIT_FULL_2026-07-18.md` §F5.
 
+
+## [0.112.19] - 2026-07-18
+
+### Added
 - **`dracon-sync` v0.112.19 — `repos` table fix for narrow terminals (goal `1152889f-70e7-4f7f-9265-44ca2695c2ff` / 2026-07-18)**: fix `dracon-sync repos` output producing 600+-char rows in piped / scripted / agent-captured contexts (where `terminal_size()` returns None). Three independent changes: (1) non-TTY fallback `Some(300)` → `Some(120)` so piped output defaults to Compact-or-smaller, never accidentally Full; (2) tier thresholds updated (`< 220` → Vertical, `220-299` → Compact, `≥ 300` → Full) because Compact's 15-column `LowerBoundary` minimums sum to ~215 cols — below that, comfy-table's `Dynamic` arrangement letter-wraps cells (`PUSH`/`PENDING` on separate lines, `STATUS` → `STA`/`TUS`); (3) `comfy_table::Table::set_width(w)` applied to Compact and Full tables so columns shrink to fit and content gets `…`-truncated instead of letter-wrapped. Plus `COLUMNS` env var support (ncurses convention) and new `--layout <vertical|compact|full>` CLI flag for explicit override. Before/after max line length: 120 cols 553 → 116; 220 cols 553 → 231; 300 cols 616 → 346; 400 cols 620 → 400. 3 new tests (890 total). `cargo build --release --locked`, `cargo test --workspace --locked`, `cargo clippy --workspace --locked --all-targets -- -D warnings`, `cargo deny check` all clean. Design doc: `docs/design/repos-table-fix-2026-07-18.md` (7.9 KiB).. Out-of-scope: the pre-existing libgit2 `unsupported URL protocol` fetch bug (documented in `AUDIT_FULL_2026-07-18.md` §F5) — that's a `dracon-git` library issue not caused by this fix.
 
+
+## [0.112.18] - 2026-07-18
+
+### Added
 - **`dracon-sync` v0.112.18 — Full audit + clippy cleanup + private-orphan purge (goal `e6c92613-e663-410c-b4f1-f876acb0f876` / 2026-07-18)**: full audit of daemon code + all 31 watched repos + meta-repo consistency. 4 audit findings fixed: (1) **23 clippy errors fixed** including 1 substantive bug at `sync.rs:6787` (`l != "sibling" || true` tautology that was masking a real test invariant error — the test was asserting that the staged diff should NOT contain the gitlink name `sibling`, but a successful `stage_gitlink_updates` legitimately stages `sibling` in the diff; the broken assertion was masking this), and 22 stylistic warnings (doc list indentation, `as_ref` no-ops, `let _` on unit returns, unnecessary casts, `format!`/`vec!` on literals, `sort_by_key` opportunity, duplicated `#[test]`, literal-in-format-string). `cargo clippy --workspace --locked --all-targets -- -D warnings` now passes cleanly. (2) **21 private orphan repos deleted from codeberg** (1.353 GiB total — `SamAI`, `dracon-demons`, `live`, `dracon-rust-ui`, `dracon-voice-notifications`, `dracon-spark-and-director`, `.dracon`, `kiki-sassy-desktop-announcer`, `dracon-utilities-legacy`, `shared-config`, `cli-file-manager`, `video-factory`, `wal-backup`, `video-uploader`, `quick-draw-screenshot-clipboard`, `dracon-sync`, `DraconDev-private`, `todo-addict`, `test_banner`, `test-auto-create`, `pi-global-context-limit`). All 21 verified as 404. (3) **Stale CHANGELOG references fixed**: `dracon-sync/release-notes-v0.112.14.md` and `dracon-sync/release-notes-v0.112.13.md` updated to point to the correct nested path `dracon-sync/release-notes-v0.112.1[34].md`. (4) **Audit report**: `AUDIT_FULL_2026-07-18.md` written (15.2 KiB) capturing every dimension with verdicts. 887 tests passing (1 less than 888 because the broken tautological assertion was removed). `cargo build --release --locked` clean, `cargo deny check` clean.
+
+## [0.112.17] - 2026-07-17
+
+### Added
 - **`dracon-sync` v0.112.17 — Codeberg public-only follow-up (goal `6466716b-613f-419a-b6e4-6923abc5d901` / 2026-07-17)**: final follow-up to the v0.112.16 codeberg public-only policy. New `dracon-sync refresh-visibility` subcommand populates the visibility cache on demand (tries `origin` first, falls back to `github` for repos like `opencode-plugins`; falls back to skipped on `gh` failure). 5 new tests cover legacy-format upgrade, new-format preservation, SSH URL parsing, gh-failure fallback, and idempotency (706 total, all passing). Quota cleanup: `dracondev/web-games-hegemon` (8.34 GiB orphan) deleted via API + `git remote remove origin` from local hegemon; `dracondev/one-mil-girls` (1.42 GiB orphan) deleted via API; quota dropped from 85.0029 GiB → 73.82 GiB (86.85%). Non-action: `dracondev/dracon-warden` (230 KiB orphan) NOT recreated — it was a private orphan, and per the public-only policy, private repos don't belong on codeberg. The actual `dracon-warden` lives at the suffixed path `dracon-warden-secret-encrypt-age-git-filter` which is PUBLIC (`gh api .private` = `false`) and already mirrored to codeberg. endless-td CONCERN resolved via `git merge --no-ff github/rollback-phaser-restore-svelte` (3 file conflicts: kept local for `TASKLIST_FIXES.md` and `+page.svelte`, took remote for `cardUxAttrs.test.ts`); commit `15234b2` pushed to all 3 mirrors, no force-push. Final tally: `📦 31 repos · ✅ CLEAN 26 · 🔄 ACTIVE 5 · ⚠️ WARN 0 · ❌ CONCERN 0`. Visibility: 7 public + 24 private + 0 unknown. Design doc follow-up section appended to `docs/design/codeberg-public-only-policy-2026-07-17.md`..
+
+## [0.112.16] - 2026-07-17
+
+### Added
 - **`dracon-sync` v0.112.16 — Codeberg public-only policy (goal `codeberg-public-only` / 2026-07-17)**: new global `codeberg_public_only` policy (default `true`) makes codeberg a public-only marketing mirror by auto-skipping the codeberg remote for private repos. The structural problem: codeberg has an 85 GiB global quota across ALL private repos in an account, while github/gitlab use per-repo limits with no global cap. The 12 repos that were PUSH_STUCK on 2026-07-17 due to `remote: Forgejo: Quota exceeded` are now resolved: the daemon auto-skips codeberg for them, and github/gitlab pushes succeed normally. Per-repo override via `codeberg_public_only = false` in `<repo>/.dracon/dracon-sync.toml` re-enables codeberg push for a specific private repo (operator's explicit authorization). Visibility source is the cached state from `sync_mirror_visibility` (24h interval); safe default of "skip codeberg" fires when no cache exists yet. Visibility cache file format changed from `timestamp-only` to `visibility=<public|private>\n<timestamp>` (backward-compatible: legacy files surface as `None` = unknown = safe default until next sync). New `codeberg_skip_reason` field in `RepoReportRow` annotates the PUSH-TO column with `(private)` or `(unknown)` when codeberg is policy-skipped. The 9 DIR-level patterns from v0.112.15's `default_untracked_exclude_patterns` and the `scan-bloat` subcommand remain in place. Design doc: `docs/design/codeberg-public-only-policy-2026-07-17.md` (13.6 KiB). 24 new tests added (701 total, all passing). `cargo build --release --locked` clean, `cargo deny check` clean.
+
+## [0.112.15] - 2026-07-13
+
+### Added
 - **`dracon-sync` v0.112.15 — Codeberg quota leak fix (goal `mrhvbn1s-codeberg-quota-leak-fix` / 2026-07-13)**:
   - `default_untracked_exclude_patterns()` extended with 9 DIR-level patterns (`**/.pi/**`, `**/test-results/**`, `**/verify-screenshots/**`, `**/__screenshots__/**`, `**/.state-recon/**`, `**/chrome-screenshots/**`, `**/chrome-*/**`, `**/sign-in-flash-audit/**`, `**/~/**`). Empirical verification against 17 watched repos confirmed no false positives on intentional content (1mg marketing screenshots, audit REPORTS, audit SCRIPTS, intentional game art in `static/assets/`).
   - New `dracon-sync scan-bloat` subcommand walks all watched repos, finds untracked collection dirs NOT yet covered by `untracked_exclude_patterns`, aggregates them by leaf name across repos, and emits a sorted-by-size report with suggested globs. This is the operator's manual review loop for forward compatibility: future tools using novel directory names will surface here instead of silently accumulating. Flags: `--min-size-mib`, `--min-repo-count`, `--json`.
   - Design doc: `docs/design/codeberg-quota-leak-fix-2026-07-13.md`. Audit artifact: `AUDIT_REPOS_2026-07-10.md` (pre-existing) + codeberg API live verification (90,851,072,256 bytes = 85.00 GiB used of 85.00 GiB grace quota before the patch).
   - **Scope (forward-only)**: this change prevents new accumulation of the named patterns. The 85 GiB historical codeberg content is NOT cleaned by this change; that requires a separate `git filter-repo --invert-paths` history cleanup + force-push loop, which is documented in the design doc as a deferred next step.
 
-## [0.112.12] - 2026-06-21
+
 ## [0.112.14] - 2026-06-22
+
 ### Changed
 - **`dracon-sync` version bump to 0.112.14** (per release notes `dracon-sync/release-notes-v0.112.14.md`). Routine release; no behavioral change to the daemon.
 
+
 ## [0.112.13] - 2026-06-21
+
 ### Changed
 - **`dracon-sync` version bump to 0.112.13** (per release notes `dracon-sync/release-notes-v0.112.13.md`). Routine release; no behavioral change to the daemon.
 
@@ -113,11 +260,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **dracon-code PUSH_STUCK (44 consecutive failures, 3h+) — resolved (goal `fc406135` / 2026-06-16)**: The operator saw `dracon-code` in PUSH_STUCK in the daemon's `repos` output. Investigation found a true divergence: local was 10 commits ahead of gitlab/codeberg, but gitlab/codeberg had 1 commit (`74c183107d`, the TUI brainstorm doc) not in local. The daemon's `force_push_when_behind = true` config (from goal `87c1bf4d`) only handles the "remote behind local" case, not true divergence. Resolution: chose **Option A** (merge remote into local, then push to all 4 remotes). 3 conflicts resolved by taking HEAD (local has more recent TUI work). All 4 remotes now aligned at `e53c4bd79`. PUSH_STUCK state cleared. No data loss. New design doc `docs/design/dracon-code-divergence-2026-06-16.md` captures the root cause, the resolution strategy, and a runbook for future PUSH_STUCK events. Option C (`pull_when_remote_ahead = true` daemon config) is deferred to a future daemon release.
 ### Changed
 - **Global `untracked_exclude_patterns = []` (2026-06-17)**: the operator's position is "global rule, default = commit everything, unless something would be very wrong to put on the repo". The previous list (11 patterns: `**/scratch/**`, `**/tmp/**`, `**/pi-tmp/**`, `**/.pi-tmp/**`, `**/research/scratch/**`, `.demon/**`, `.sisyphus/**`, `.ralph/**`, plus the per-prefix variants) conflated "short-lived" with "very wrong to commit". They are not the same thing. Short-lived files are valid git content: the user/agent can `rm` them from the working tree when they're done, and the daemon will commit the deletion. If the user wants to recover, the file is in git history. Things that ARE very wrong to commit (secrets, files > 100 MiB, build artifacts) are handled elsewhere (warden encryption, `max_stage_file_bytes`, `.gitignore`). `AGENTS.md` updated with the new policy + operator's verbatim framing. Design doc: `docs/design/pi-tmp-persist-policy-2026-06-16.md`.
+
+## [0.112.12] - 2026-06-21
+
 ## [0.112.11] - 2026-06-17
+
 ### Changed
 - **`push_op_timeout_secs = 300` (CHANGED 2026-06-17, was 60)**: the v0.112.10 release surfaced a 60s `push_op_timeout_secs` that was too short for a 23-file PNG-heavy commit in `dracon-platform`. The daemon's own code default is 300s (`default_push_op_timeout_secs` in `dracon-sync/src/policy.rs`); the operator's 60s was an override-down from the default. 300s gives a 5x safety margin over the v0.112.10 measured >60s push time. Per-remote timeouts (60s for github, 300s for gitlab/codeberg) would be more precise but require a daemon code change to add the field to `RemoteConfig`; deferred to a follow-up daemon release. The global 300s is wasteful for github (which never takes more than a few seconds) but harmless — the daemon times out via process kill, not via waiting. `AGENTS.md` updated with a "Push timeouts" section. Design doc: `docs/design/push-timeout-fix-2026-06-17.md` with measured push duration data and a runbook.
 ### Verified
 - **Stress test (61 files, ~1.5MB of PNG binaries)** at the new 300s timeout: github 2.35s, gitlab 2.57s, codeberg 10.51s, origin 0.64s. All 4 remotes well under the 300s budget. The v0.112.10 incident was network-related, not capacity-related.
+
 
 
 ## [0.112.10] - 2026-06-17
@@ -125,7 +277,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+
 ## [0.112.9] - 2026-06-16
+
 ### Added
 - **3 sub-crates published to crates.io (goal `0ca7e640` / 2026-06-16)**: `dracon-sync v0.1.9`, `dracon-system v0.2.4`, `dracon-warden v0.3.4` are now available on https://crates.io. Users can install any utility with `cargo install dracon-{sync,system,warden}`. Each crate has proper metadata (5 keywords, `command-line-utilities` category, updated documentation URL pointing to the crate's docs.rs landing page, `exclude` to keep the published package minimal). docs.rs pages are auto-generated on publish. See `docs/design/crates-io-publish-2026-06-16.md` for the full publish workflow + lessons learned (including the 5-keyword limit that was caught at first publish).
 - **`docs/design/final-audit-2026-06-16.md`** (10,161 bytes) — the final state-of-the-workspace audit. 10 findings, all fixed. Reviews 30 design docs + 7 READMEs + source comments + crates.io publish-readiness.
@@ -138,7 +293,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`path = "dracon-warden/src/security"` dep in root `Cargo.toml` is NOT a publish blocker**: cargo auto-rewrites the path dep to a version dep (`dracon-security v0.3.0`, which is already on crates.io) when packaging for publish. Verified by inspecting the packaged `target/package/dracon-warden-<version>/Cargo.toml` — the path dep becomes `version = "0.3.0"`. No code change needed. Documented in `docs/design/crates-io-publish-2026-06-16.md` for posterity.
 
 
+
 ## [0.112.8] - 2026-06-16
+
 ### Investigated
 - **Daemon push targets audit confirms "long-name only" (goal `d2837ddc` / 2026-06-16)**: The operator asked: "but make sure we are ignoring the previous ones now we are just directly pushing to the ones we marely with the long names right?" Verified:
   - `dracon-sync repos` shows exactly 4 healthy repos: `dracon-utilities` + the 3 long-name façade repos (`dracon-sync-background-auto-commit-multi-remote`, `dracon-system-disk-process-guard-doctor`, `dracon-warden-secret-encrypt-age-git-filter`)
@@ -153,7 +310,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **3 GitLab Set A repos: default `leave-as-is` (option A) per goal `83e42c15` / 2026-06-16**: The 3 Set A repos on GitLab are in `_deletion_scheduled` state and will be hard-deleted by GitLab automatically. The operator was offered a per-repo decision (A: leave-as-is / B: hard-delete now / C: archive + rename / D: deprecated README + archive) but did not specify a per-repo choice in the goal window; the default of `A` was applied because the repos are already effectively deprecated and invisible. To escalate any of these to `B` / `C` / `D`, the operator can reply to the goal `83e42c15` follow-up at any time and a follow-up release will cut.
 
 
+
 ## [0.112.7] - 2026-06-16
+
 ### Changed
 - **3 long-name façade repos are now real install targets, not navigation shells (goal `6a105c59` / 2026-06-16)**: The operator pushed back: "are they mains? we are not pushing to them they are still shells". The architecture has been flipped. Each façade repo (`dracon-sync-background-auto-commit-multi-remote`, `dracon-system-disk-process-guard-doctor`, `dracon-warden-secret-encrypt-age-git-filter`) now contains the actual source code (mirrored from the monorepo's per-utility subdir), a standalone `Cargo.toml` with path-dep siblings, the per-utility README, tests, examples, and the systemd service file. Each façade repo is independently buildable: `git clone <repo>; clone siblings per the README; cargo build --release` works. The auto-sync mechanism (`scripts/regenerate_facade_repos.py` + monorepo `post-commit` hook) keeps the per-utility source content in sync with the monorepo.
 ### Added
@@ -168,7 +327,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - All 3 repos are 4-remote aligned (github, gitlab, codeberg, + monorepo path)
 - File counts: sync 47, system 25, warden 50 (up from 7)
 
+
 ## [0.112.6] - 2026-06-16
+
 ### Changed
 - **Repository architecture formalized: monorepo is the dev workspace + build source; 3 long-name façade repos are the canonical "mains" for presentation + discoverability (goal `83e42c15` / 2026-06-16)**: The root `README.md` and `docs/design/github-feature-repos.md` now have explicit "Repository architecture" sections that document the 4-repo model (1 monorepo + 3 façade repos), the one-way flow from monorepo → façade repos (post-commit hook → `regenerate_facade_repos.py` → daemon auto-push), and the role of each repo. The 3 façade repos (`dracon-sync-background-auto-commit-multi-remote`, `dracon-system-disk-process-guard-doctor`, `dracon-warden-secret-encrypt-age-git-filter`) are now the canonical "mains" referenced in the root README's "Façade repos" section, in the design doc's "Supported façades" table, in the daemon's watch list, and in the `regenerate_facade_repos.py` target list. The old short-name repos (`DraconDev/dracon-sync`, etc.) no longer exist on GitHub (in-place rename → 301 redirect) or Codeberg (hard-deleted). On GitLab, the 3 Set A repos are soft-deleted with the `_deletion_scheduled-XXXXXXXX` suffix and will be hard-deleted by GitLab automatically.
 ### Added
@@ -177,7 +338,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 - **Stale `tmp/fa-clones-b/`** clone location: the 3 façade repo clones were moved from `/tmp/fa-clones-b/` to `/home/dracon/Dev/facade-repos/` (a daemon-watched path). `/tmp/fa-clones-b/` is no longer used.
 
+
 ## [0.112.5] - 2026-06-16
+
 ### Changed
 - **Façade repo names refined for human clickability
   (Set B, goal `4c2caf36` /
@@ -1556,7 +1719,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **dracon-warden**: Exact filename matching (fixes `coreutils` false positive)
   - `starts_with("core")` replaced with exact match or `"{name}."` prefix
 
+
 ## [0.112.4] - 2026-06-07
+
 
 ### Fixed
 - `dracon-sync/README.md` and `docs/OPERATIONS.md`: replaced flat CLI paths
@@ -1591,7 +1756,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Audit
 - **Audit hygiene**: internal audit artifacts were reviewed during release prep and are not included in the public tree. User-facing release notes and operational docs now carry the public guidance.
 
+
 ## [0.3.0] - 2026-06-07
+
 
 ### Breaking
 - **`dracon-warden` `watch_roots` field renamed to `repo_roots`**: The old
@@ -1626,7 +1793,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   non-git directory. The directory itself is not deleted; the user can
   decide what to do with its contents.
 
+
 ## [0.2.0] - 2024-05-03
+
 
 ### Added
 - **dracon-system**: Guard daemon for disk/process monitoring
@@ -1645,7 +1814,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Restructured as cargo workspace with separate crates
 
+
 ## [0.1.0] - 2024-04-28
+
 
 ### Added
 - **dracon-sync**: Initial release
