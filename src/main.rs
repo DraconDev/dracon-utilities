@@ -7,7 +7,9 @@ mod print;
 use anyhow::{Context, Result};
 use clap::{ArgAction, Parser, Subcommand};
 pub(crate) use dracon_security_kit::DraconWarden;
-use dracon_security_kit::{clear_managed_patterns_override, set_managed_patterns};
+use dracon_security_kit::set_managed_patterns;
+#[cfg(test)]
+use dracon_security_kit::clear_managed_patterns_override;
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use secrecy::ExposeSecret;
 use serde::Deserialize;
@@ -483,6 +485,7 @@ pub(crate) fn wire_managed_patterns_from_policy() -> bool {
 }
 
 /// Clear the process-wide managed-patterns override (test isolation).
+#[cfg(test)]
 pub(crate) fn clear_filter_managed_patterns() {
     clear_managed_patterns_override();
 }
