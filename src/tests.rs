@@ -2410,28 +2410,49 @@ protected_patterns = ["secrets.json"]
         // environment-dependent.
         let td = TestDir::new("merge_encrypted");
         let dir = td.path();
-        let mut security =
-            dracon_security_kit::WardenSecurity::new(None).expect("init security");
+        let mut security = dracon_security_kit::WardenSecurity::new(None)
+            .expect("init security")
+            .with_managed_patterns(vec!["secrets/**".to_string()]);
         let identity = age::x25519::Identity::generate();
         security.add_memory_identity(identity);
 
         let ancestor = dir.join("ancestor");
         let current = dir.join("current");
         let other = dir.join("other");
-        let ancestor_pt = b"line1\nline2\nline3\nline4\nline5\n";
-        let current_pt = b"line1\nline2-A\nline3\nline4\nline5\n";
-        let other_pt = b"line1\nline2\nline3\nline4-B\nline5\n";
-        let enc = |b: &[u8]| security.clean(b, Some("secrets/app.env")).expect("encrypt");
-        fs::write(&ancestor, enc(ancestor_pt)).unwrap();
-        fs::write(&current, enc(current_pt)).unwrap();
-        fs::write(&other, enc(other_pt)).unwrap();
+        // Inline-tag format: content carries an OpenAI sk- key (the
+        // guaranteed scanner match) so `smart_clean` emits DRACON_SECRET
+        // markers decryptable by the public `smart_smudge`.
+        let sk = "sk-abcdef0123456789abcdef0123456789";
+        let ancestor_pt = format!("line1\nline2\n{sk}\nline4\nline5\n");
+        let current_pt = format!("line1\nline2-A\n{sk}\nline4\nline5\n");
+        let other_pt = format!("line1\nline2\n{sk}\nline4-B\nline5\n");
+        let enc = |b: &[u8]| {
+            security
+                .smart_clean_with_path(b, "secrets/app.env")
+                .expect("encrypt")
+        };
+        fs::write(&ancestor, enc(ancestor_pt.as_bytes())).unwrap();
+        fs::write(&current, enc(current_pt.as_bytes())).unwrap();
+        fs::write(&other, enc(other_pt.as_bytes())).unwrap();
+
+        // Sanity: the fixture is really encrypted (the merge only proves
+        // the invariant if the inputs were ciphertext).
+        let raw_ancestor = fs::read_to_string(&ancestor).unwrap();
+        assert!(
+            raw_ancestor.contains("DRACON_SECRET"),
+            "fixture must be encrypted, got: {}",
+            &raw_ancestor[..raw_ancestor.len().min(80)]
+        );
 
         let code = run_merge_impl(
             &ancestor,
             &current,
             &other,
-            |b, p| security.smudge(b, p),
-            |b, p| security.clean(b, p),
+            |b, _p| {
+                let s = String::from_utf8_lossy(b);
+                security.smart_smudge(&s).map(|x| x.into_bytes())
+            },
+            |b, p| security.smart_clean_with_path(b, p.unwrap_or("")),
         )
         .expect("run encrypted merge");
         assert_eq!(code, 0, "clean merge exits 0");
@@ -2441,12 +2462,14 @@ protected_patterns = ["secrets.json"]
         let stored = fs::read(&current).unwrap();
         let stored_text = String::from_utf8(stored.clone()).unwrap_or_default();
         assert!(
-            stored_text.contains("DRACON_SECRET") || stored_text.contains("age-encryption"),
+            stored_text.contains("DRACON_SECRET"),
             "merged result must be encrypted, got: {}",
             &stored_text[..stored_text.len().min(80)]
         );
-        let decrypted = security.smudge(&stored, Some("secrets/app.env")).unwrap();
-        let merged_text = String::from_utf8(decrypted).unwrap();
+        let decrypted = security
+            .smart_smudge(&stored_text)
+            .expect("decrypt merged result");
+        let merged_text = decrypted;
         assert!(
             merged_text.contains("line2-A") && merged_text.contains("line4-B"),
             "both changes merged: {}",
