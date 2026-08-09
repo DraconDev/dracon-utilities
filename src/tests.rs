@@ -2346,14 +2346,16 @@ protected_patterns = ["secrets.json"]
     fn merge_driver_text_merge_clean_and_conflict() {
         // Pure 3-way logic: git merge-file -p on already-decrypted content.
         // Clean case: disjoint edits merge with both changes present.
-        let ancestor = b"line1\nline2\nline3\n";
-        let current = b"line1\nline2-A\nline3\n";
-        let other = b"line1\nline2\nline3-B\n";
+        // (Fixtures need >=2 lines of unchanged context between edits —
+        // adjacent-line changes genuinely conflict in git's diff3.)
+        let ancestor = b"line1\nline2\nline3\nline4\nline5\n";
+        let current = b"line1\nline2-A\nline3\nline4\nline5\n";
+        let other = b"line1\nline2\nline3\nline4-B\nline5\n";
         let (merged, conflicted) = text_merge(ancestor, current, other).expect("clean merge");
         assert!(!conflicted);
         let text = String::from_utf8(merged).expect("utf8");
         assert!(text.contains("line2-A"), "current-side change kept: {}", text);
-        assert!(text.contains("line3-B"), "other-side change kept: {}", text);
+        assert!(text.contains("line4-B"), "other-side change kept: {}", text);
 
         // Conflict case: both sides edit the same line.
         let other_conflict = b"line1\nline2-B\nline3\n";
@@ -2377,14 +2379,14 @@ protected_patterns = ["secrets.json"]
         let ancestor = dir.join("ancestor");
         let current = dir.join("current");
         let other = dir.join("other");
-        fs::write(&ancestor, b"line1\nline2\nline3\n").unwrap();
-        fs::write(&current, b"line1\nline2-A\nline3\n").unwrap();
-        fs::write(&other, b"line1\nline2\nline3-B\n").unwrap();
+        fs::write(&ancestor, b"line1\nline2\nline3\nline4\nline5\n").unwrap();
+        fs::write(&current, b"line1\nline2-A\nline3\nline4\nline5\n").unwrap();
+        fs::write(&other, b"line1\nline2\nline3\nline4-B\nline5\n").unwrap();
 
         let code = run_merge(&ancestor, &current, &other).expect("run clean merge");
         assert_eq!(code, 0, "clean merge exits 0");
         let merged_text = fs::read_to_string(&current).unwrap();
-        assert!(merged_text.contains("line2-A") && merged_text.contains("line3-B"));
+        assert!(merged_text.contains("line2-A") && merged_text.contains("line4-B"));
         assert!(!merged_text.contains("<<<<<<<"));
 
         // Conflict: both sides change line2.

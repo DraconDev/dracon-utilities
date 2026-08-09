@@ -2348,10 +2348,33 @@ fn run_filter(is_clean: bool, path: Option<&str>) -> Result<()> {
 /// filter. On success %A holds ciphertext and exit 0 is returned.
 fn run_merge(ancestor: &Path, current: &Path, other: &Path) -> Result<i32> {
     let warden = DraconWarden::new()?;
+    run_merge_impl(
+        ancestor,
+        current,
+        other,
+        |b, p| warden.smudge(b, p),
+        |b, p| warden.clean(b, p),
+    )
+}
+
+/// Driver logic with injectable encrypt/decrypt (unit tests inject a fresh
+/// `WardenSecurity` with a memory identity instead of the process-global
+/// one behind `DraconWarden`).
+fn run_merge_impl<D, C>(
+    ancestor: &Path,
+    current: &Path,
+    other: &Path,
+    decrypt: D,
+    encrypt: C,
+) -> Result<i32>
+where
+    D: Fn(&[u8], Option<&str>) -> Result<Vec<u8>>,
+    C: Fn(&[u8], Option<&str>) -> Result<Vec<u8>>,
+{
     let read_decrypted = |p: &Path| -> Result<Vec<u8>> {
         let bytes = fs::read(p)?;
         let path_str = p.to_string_lossy().to_string();
-        warden.smudge(&bytes, Some(&path_str))
+        decrypt(&bytes, Some(&path_str))
     };
     // %A/%B are worktree files (already plaintext after checkout); %O is
     // materialized by git as raw ciphertext. smudge handles both: tagged
@@ -2365,7 +2388,7 @@ fn run_merge(ancestor: &Path, current: &Path, other: &Path) -> Result<i32> {
         return Ok(1);
     }
     let path_str = current.to_string_lossy().to_string();
-    let encrypted = warden.clean(&merged, Some(&path_str))?;
+    let encrypted = encrypt(&merged, Some(&path_str))?;
     fs::write(current, encrypted)?;
     Ok(0)
 }
