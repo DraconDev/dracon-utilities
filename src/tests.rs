@@ -986,9 +986,10 @@ mod tests {
         fs::write(
             &config_path,
             r#"
+protected_patterns = [".env", "secrets/**", "*.pem"]
+
 [watch]
 watch_roots = ["/tmp/test"]
-protected_patterns = [".env", "secrets/**", "*.pem"]
 "#,
         )
         .expect("write config");
