@@ -263,8 +263,24 @@ impl WardenSecurity {
             .sum()
     }
 
+    /// Trim trailing line-ending artifacts (`\r`/`\n`) from the end of
+    /// a whole-file secret tag. ADDED 2026-08-09 (audit MEDIUM): the
+    /// previous single `strip_suffix(b"\n")` accepted at most ONE trailing
+    /// `\n` — a tag whose blob gained CRLF (`...]\r\n` ends with `\r`
+    /// after stripping) or 2+ trailing newlines (`...]\n\n`) was not
+    /// recognized as a whole-file tag, so on smudge the binary fell into
+    /// the UTF-8-lossy inline path (U+FFFD corruption of DER/SQLite/.kdbx)
+    /// and on clean the double-encrypt guards missed it (re-encryption).
+    fn trim_trailing_line_endings(content: &[u8]) -> &[u8] {
+        let mut end = content.len();
+        while end > 0 && matches!(content[end - 1], b'\r' | b'\n') {
+            end -= 1;
+        }
+        &content[..end]
+    }
+
     fn starts_with_any_secret_tag(&self, content: &[u8]) -> bool {
-        let trimmed = content.strip_suffix(b"\n").unwrap_or(content);
+        let trimmed = Self::trim_trailing_line_endings(content);
         self.secret_tag_prefixes()
             .iter()
             .any(|prefix| trimmed.starts_with(prefix.as_bytes()) && trimmed.ends_with(b"]"))
@@ -833,8 +849,8 @@ impl WardenSecurity {
 
     /// ADDED 2026-07-21 (v0.112.32, audit H9/F4.2): if the ENTIRE
     /// content is a single whole-file secret tag (`[MARKER:<b64>]`,
-    /// optionally with one trailing newline), decode + decrypt and
-    /// return the RAW plaintext bytes. Returns `None` when the
+    /// optionally with trailing newline/CRLF artifacts), decode +
+    /// decrypt and return the RAW plaintext bytes. Returns `None` when the
     /// content is not a whole-file tag — the caller should fall back
     /// to the inline-tag smudge path (`smart_smudge`), which remains
     /// correct for tags embedded in otherwise-textual content.
@@ -847,7 +863,11 @@ impl WardenSecurity {
     /// was later re-cleaned, so the corruption was re-encrypted into
     /// git history and the original bytes were lost.
     fn decrypt_whole_file_tag(&self, content: &[u8]) -> Option<Result<Vec<u8>>> {
-        let trimmed = content.strip_suffix(b"\n").unwrap_or(content);
+        // FIXED 2026-08-09 (audit MEDIUM): trim ALL trailing `\r`/`\n`
+        // (CRLF checkouts, editors appending newlines) — a single
+        // `strip_suffix(b"\n")` missed `...]\r\n` and `...]\n\n`, sending
+        // whole-file BINARY secrets down the UTF-8-lossy inline path.
+        let trimmed = Self::trim_trailing_line_endings(content);
         for prefix in self.secret_tag_prefixes() {
             let p = prefix.as_bytes();
             if trimmed.starts_with(p) && trimmed.ends_with(b"]") {
@@ -1649,6 +1669,82 @@ API_KEY=original"#;
         assert!(security
             .decrypt_whole_file_tag(&plaintext)
             .is_none());
+    }
+
+    /// ADDED 2026-08-09 (audit MEDIUM): whole-file-tag recognition must
+    /// tolerate CRLF and 2+ trailing newlines. The previous single
+    /// `strip_suffix(b"\n")` accepted at most ONE trailing `\n`, so a
+    /// tag whose blob gained CRLF (`...]\r\n`) or extra newlines
+    /// (`...]\n\n`) fell into the UTF-8-lossy inline smudge path (U+FFFD
+    /// corruption of DER/SQLite/.kdbx payloads) and on the clean side
+    /// the double-encrypt guard missed it (re-encrypting an already
+    /// encrypted file).
+    #[test]
+    fn test_whole_file_tag_tolerates_crlf_and_multiple_newlines() {
+        let security = test_security_with_identity();
+        let plaintext: Vec<u8> = vec![
+            0x00, 0xFF, 0xFE, 0x80, 0xC3, 0x28, 0xF5, 0x90, 0x80, 0x0A,
+        ];
+        assert!(std::str::from_utf8(&plaintext).is_err());
+
+        let tag = security.encrypt_v2_to_b64_tag(&plaintext).unwrap();
+
+        // Working-tree artifacts: CRLF checkout (core.autocrlf), editor
+        // appending one or several newlines.
+        let mut variants: Vec<Vec<u8>> = Vec::new();
+        for suffix in [b"\r\n".as_slice(), b"\n\n", b"\r\n\r\n", b"\n\n\n"] {
+            let mut v = tag.clone();
+            v.extend_from_slice(suffix);
+            variants.push(v);
+        }
+
+        // 1. Smudge-side recognition: every variant must be recognized
+        // as a whole-file tag and decrypt byte-identically.
+        for v in &variants {
+            let decrypted = security
+                .decrypt_whole_file_tag(v)
+                .unwrap_or_else(|| {
+                    panic!(
+                        "variant {:?} must be recognized as whole-file",
+                        String::from_utf8_lossy(v)
+                    )
+                })
+                .expect("decrypt must succeed");
+            assert_eq!(
+                decrypted, plaintext,
+                "binary round-trip must be byte-identical (no lossy UTF-8)"
+            );
+        }
+
+        // 2. Production smudge entry point (`smudge_with_security`, the
+        // shared path both filter entry points delegate to): raw bytes
+        // out, not U+FFFD text.
+        for v in &variants {
+            let smudged = smudge_with_security(&security, v).unwrap();
+            assert_eq!(smudged, plaintext);
+        }
+
+        // 3. Clean-side double-encrypt guard: recognition must hold so
+        // already-encrypted files pass through unchanged.
+        for v in &variants {
+            assert!(
+                security.starts_with_any_secret_tag(v),
+                "clean-side guard must recognize variant {:?}",
+                String::from_utf8_lossy(v)
+            );
+        }
+
+        // 4. End-to-end clean: an already-whole-file-tagged `.env`
+        // (full-encrypt branch, filter.rs:269) must NOT be re-encrypted
+        // into a nested tag.
+        let managed = WardenSecurity::new(None).unwrap();
+        for v in &variants {
+            let cleaned = managed.smart_clean_with_path(v, ".env").unwrap();
+            assert_eq!(
+                cleaned, *v,
+                "already-tagged .env must pass through unchanged (no double encryption)"
+            );
+        }
     }
 
     /// ADDED 2026-07-21 (v0.112.32, audit H9/F4.2): inline tags in
