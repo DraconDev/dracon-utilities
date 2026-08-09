@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`.env` header versioning no longer parses body text**: `get_env_version`
+  scanned the whole file for the first `"Version: "` substring and the
+  header-strip gate used `contains("Dracon Warden")` — an unrelated
+  version line or a comment merely mentioning Dracon Warden in a fresh
+  `.env` yielded a wrong/duplicated header version (audit LOW,
+  2026-08-10). The version is now parsed only from the warden-managed
+  header block at the top of the file (marker line within the first few
+  lines, version line immediately after the marker), and
+  `is_env_version_managed` gates header-strip on the actual header
+  marker instead of any Dracon Warden mention. Tests: bare body version
+  lines ignored (get_env_version returns 0, fresh files start at v1),
+  body version line after a managed header ignored (increment off the
+  header), `is_env_version_managed` positive/negative/deep-marker cases,
+  and end-to-end clean-path tests for both the fresh-with-comment and
+  managed-with-body-version scenarios.
+
 - **`.gitattributes` diff/merge drivers are now actually defined**: protected
   patterns get `filter=dracon diff=dracon merge=dracon`, but
   `ensure_repo_filter_config` only registered `filter.dracon.*` — git fell
