@@ -2341,4 +2341,93 @@ protected_patterns = ["secrets.json"]
             "warden-seeded local hook must be skipped (no recursion)"
         );
     }
+
+    #[test]
+    fn merge_driver_text_merge_clean_and_conflict() {
+        // Pure 3-way logic: git merge-file -p on already-decrypted content.
+        // Clean case: disjoint edits merge with both changes present.
+        let ancestor = b"line1\nline2\nline3\n";
+        let current = b"line1\nline2-A\nline3\n";
+        let other = b"line1\nline2\nline3-B\n";
+        let (merged, conflicted) = text_merge(ancestor, current, other).expect("clean merge");
+        assert!(!conflicted);
+        let text = String::from_utf8(merged).expect("utf8");
+        assert!(text.contains("line2-A"), "current-side change kept: {}", text);
+        assert!(text.contains("line3-B"), "other-side change kept: {}", text);
+
+        // Conflict case: both sides edit the same line.
+        let other_conflict = b"line1\nline2-B\nline3\n";
+        let (merged, conflicted) =
+            text_merge(ancestor, current, other_conflict).expect("conflict merge");
+        assert!(conflicted, "overlapping edits must report a conflict");
+        let text = String::from_utf8(merged).expect("utf8");
+        assert!(text.contains("<<<<<<<"), "conflict markers present");
+        assert!(text.contains(">>>>>>>"), "conflict markers present");
+        assert!(text.contains("line2-A") && text.contains("line2-B"));
+    }
+
+    #[test]
+    fn merge_driver_untagged_files_clean_and_conflict() {
+        // End-to-end driver (no crypto needed: untagged content passes
+        // through smudge/clean untouched). %A is rewritten with the merged
+        // content; exit 0 on clean, 1 with plaintext conflict markers on
+        // conflict (operator resolves, `git add` re-encrypts).
+        let td = TestDir::new("merge_untagged");
+        let dir = td.path();
+        let ancestor = dir.join("ancestor");
+        let current = dir.join("current");
+        let other = dir.join("other");
+        fs::write(&ancestor, b"line1\nline2\nline3\n").unwrap();
+        fs::write(&current, b"line1\nline2-A\nline3\n").unwrap();
+        fs::write(&other, b"line1\nline2\nline3-B\n").unwrap();
+
+        let code = run_merge(&ancestor, &current, &other).expect("run clean merge");
+        assert_eq!(code, 0, "clean merge exits 0");
+        let merged_text = fs::read_to_string(&current).unwrap();
+        assert!(merged_text.contains("line2-A") && merged_text.contains("line3-B"));
+        assert!(!merged_text.contains("<<<<<<<"));
+
+        // Conflict: both sides change line2.
+        fs::write(&ancestor, b"line1\nline2\nline3\n").unwrap();
+        fs::write(&current, b"line1\nline2-A\nline3\n").unwrap();
+        fs::write(&other, b"line1\nline2-B\nline3\n").unwrap();
+        let code = run_merge(&ancestor, &current, &other).expect("run conflict merge");
+        assert_eq!(code, 1, "conflicting merge exits 1");
+        let merged_text = fs::read_to_string(&current).unwrap();
+        assert!(merged_text.contains("<<<<<<<") && merged_text.contains(">>>>>>>"));
+        assert!(merged_text.contains("line2-A") && merged_text.contains("line2-B"));
+    }
+
+    #[test]
+    fn ensure_repo_filter_config_registers_diff_and_merge_drivers() {
+        // The .gitattributes block emits `diff=dracon merge=dracon`; the
+        // config pass must register the driver definitions too, or git
+        // falls back to the text driver with a warning and diffs/merges
+        // run on ciphertext.
+        let td = TestDir::new("filter_config_drivers");
+        let repo = td.path();
+        run_git_in(repo, &["init", "-q", "-b", "main"]);
+
+        let changed = ensure_repo_filter_config(repo).expect("ensure config");
+        assert!(changed, "first pass must write all keys");
+        for key in [
+            "filter.dracon.clean",
+            "filter.dracon.smudge",
+            "filter.dracon.required",
+            "diff.dracon.textconv",
+            "merge.dracon.driver",
+            "merge.dracon.name",
+        ] {
+            let out = git_in_output(repo, &["config", "--local", "--get", key]);
+            assert!(!out.trim().is_empty(), "key {} must be registered", key);
+        }
+        let textconv = git_in_output(repo, &["config", "--local", "--get", "diff.dracon.textconv"]);
+        assert_eq!(textconv.trim(), "dracon-warden filter-smudge");
+        let driver = git_in_output(repo, &["config", "--local", "--get", "merge.dracon.driver"]);
+        assert_eq!(driver.trim(), "dracon-warden merge %O %A %B");
+
+        // Second pass: already configured → no change.
+        let changed = ensure_repo_filter_config(repo).expect("ensure config again");
+        assert!(!changed, "idempotent second pass");
+    }
 }

@@ -252,6 +252,22 @@ enum Command {
         /// Optional path from git filter (%f)
         path: Option<String>,
     },
+    /// Git merge driver (%O %A %B). Called by git via `merge.dracon.driver`,
+    /// not for direct use.
+    ///
+    /// Decrypts all three inputs, runs a 3-way text merge via `git
+    /// merge-file`, then re-encrypts the result into %A. Exits 0 on a clean
+    /// merge; exits 1 when conflicts remain (plaintext conflict markers are
+    /// left in %A for the operator to resolve — `git add` re-encrypts via
+    /// the clean filter).
+    Merge {
+        /// Ancestor version (%O)
+        ancestor: PathBuf,
+        /// Current version (%A) — the merged result is written here
+        current: PathBuf,
+        /// Other version (%B)
+        other: PathBuf,
+    },
     /// Generate a new age keypair for this machine.
     ///
     /// Creates ~/dracon/data/keys/`machine_<hostname>`.age (secret) and
@@ -951,10 +967,20 @@ pub(crate) fn publish_repo_pubkey(repo: &Path, pubkey_path: &Path) -> Result<boo
 }
 
 fn ensure_repo_filter_config(repo: &Path) -> Result<bool> {
+    // The managed .gitattributes block marks protected patterns
+    // `filter=dracon diff=dracon merge=dracon` (see
+    // `build_gitattributes_block`). Without the diff/merge driver keys
+    // below, git would fall back to the text driver with a warning and
+    // encrypted-file diffs/merges would operate on ciphertext. textconv
+    // decrypts blobs for `git diff`/`git log -p` (git appends the file
+    // path); the merge driver decrypts, text-merges, and re-encrypts.
     let desired = [
         ("filter.dracon.clean", "dracon-warden filter-clean %f"),
         ("filter.dracon.smudge", "dracon-warden filter-smudge %f"),
         ("filter.dracon.required", "true"),
+        ("diff.dracon.textconv", "dracon-warden filter-smudge"),
+        ("merge.dracon.driver", "dracon-warden merge %O %A %B"),
+        ("merge.dracon.name", "dracon-warden secret merge (decrypt, text-merge, re-encrypt)"),
     ];
 
     let mut changed = false;
@@ -1445,6 +1471,14 @@ async fn main() -> Result<()> {
         }
         Command::FilterSmudge { path } => {
             run_filter_with_timeout(false, "filter-smudge", path).await?;
+        }
+        Command::Merge {
+            ancestor,
+            current,
+            other,
+        } => {
+            let code = run_merge(&ancestor, &current, &other)?;
+            std::process::exit(code);
         }
         Command::Status => {
             let policy_path = resolve_policy_path_local()?;
@@ -2293,6 +2327,73 @@ fn run_filter(is_clean: bool, path: Option<&str>) -> Result<()> {
     };
     std::io::stdout().write_all(&output)?;
     Ok(())
+}
+
+/// Git merge driver implementation (`dracon-warden merge %O %A %B`).
+///
+/// `.gitattributes` marks protected patterns `merge=dracon`; this is the
+/// driver `merge.dracon.driver` registers (see `ensure_repo_filter_config`).
+/// Without it git falls back to the text driver and merges CIPHERTEXT — a
+/// conflict yields undecryptable garbage. Here all three inputs are
+/// decrypted first (whole-file tag, then inline markers; untagged content
+/// passes through untouched), `git merge-file` runs a 3-way text merge on
+/// the plaintexts, and the merged result is re-encrypted into %A so the
+/// index keeps the filter.dracon invariant (index = ciphertext, worktree =
+/// plaintext).
+///
+/// Conflict semantics: git's merge driver contract is exit 0 = merged
+/// cleanly, nonzero = conflicts remain. On conflict the PLAINTEXT with
+/// conflict markers is left in %A (git marks the path unmerged); the
+/// operator resolves in plaintext and `git add` re-encrypts via the clean
+/// filter. On success %A holds ciphertext and exit 0 is returned.
+fn run_merge(ancestor: &Path, current: &Path, other: &Path) -> Result<i32> {
+    let warden = DraconWarden::new()?;
+    let read_decrypted = |p: &Path| -> Result<Vec<u8>> {
+        let bytes = fs::read(p)?;
+        let path_str = p.to_string_lossy().to_string();
+        warden.smudge(&bytes, Some(&path_str))
+    };
+    // %A/%B are worktree files (already plaintext after checkout); %O is
+    // materialized by git as raw ciphertext. smudge handles both: tagged
+    // content decrypts, untagged passes through.
+    let ancestor_pt = read_decrypted(ancestor)?;
+    let current_pt = read_decrypted(current)?;
+    let other_pt = read_decrypted(other)?;
+    let (merged, conflicted) = text_merge(&ancestor_pt, &current_pt, &other_pt)?;
+    if conflicted {
+        fs::write(current, &merged)?;
+        return Ok(1);
+    }
+    let path_str = current.to_string_lossy().to_string();
+    let encrypted = warden.clean(&merged, Some(&path_str))?;
+    fs::write(current, encrypted)?;
+    Ok(0)
+}
+
+/// 3-way text merge of already-decrypted contents via `git merge-file -p`.
+/// Returns (merged bytes, conflicted). Exit 0 from merge-file means a clean
+/// merge; exit 1 means conflict markers are present in the output.
+fn text_merge(ancestor: &[u8], current: &[u8], other: &[u8]) -> Result<(Vec<u8>, bool)> {
+    let dir = tempfile::tempdir().context("failed to create merge temp dir")?;
+    let dir = dir.path();
+    let write_tmp = |name: &str, bytes: &[u8]| -> Result<PathBuf> {
+        let p = dir.join(name);
+        fs::write(&p, bytes)?;
+        Ok(p)
+    };
+    let ancestor_path = write_tmp("ancestor", ancestor)?;
+    let current_path = write_tmp("current", current)?;
+    let other_path = write_tmp("other", other)?;
+    let output = ProcessCommand::new("git")
+        .arg("merge-file")
+        .arg("-p")
+        .arg(&current_path)
+        .arg(&ancestor_path)
+        .arg(&other_path)
+        .output()
+        .context("failed to run git merge-file")?;
+    let conflicted = !output.status.success();
+    Ok((output.stdout, conflicted))
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
