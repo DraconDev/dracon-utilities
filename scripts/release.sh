@@ -30,7 +30,8 @@
 #   --abort               Revert any local modifications made by --dry-run
 #                         (cargo + changelog + release-notes). Refuses to
 #                         run if the working tree was already dirty at start.
-#   --remote <name>       Push to this git remote (default: github).
+#   --remote <name>       Push to this git remote (default: auto-resolved —
+#                         the repo's github.com remote).
 #   --yes                 Skip the interactive "are you sure" prompt before
 #                         push/publish/tag steps. Required for non-interactive
 #                         runs.
@@ -56,7 +57,7 @@ cd "$REPO_ROOT"
 # ----- defaults ------------------------------------------------------------
 DRY_RUN=0
 ABORT=0
-REMOTE=github
+REMOTE=""
 ASSUME_YES=0
 VERSION=""
 CRATE_NAME="dracon-warden"
@@ -87,6 +88,15 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+# Auto-resolve the github remote when --remote was not passed.
+# (FIXED 2026-08-09, audit HIGH: the hardcoded `github` default failed out
+# of the box because this repo names its github remote `origin` — ported
+# resolve-github-remote.sh from dracon-sync v0.113.11.)
+if [[ -z "$REMOTE" ]]; then
+    REMOTE="$(bash "$SCRIPT_DIR/resolve-github-remote.sh" "$REPO_ROOT")" || exit $?
+    log "Resolved github remote: $REMOTE"
+fi
 
 TAG="v${VERSION}"
 TOTAL_STEPS=6
