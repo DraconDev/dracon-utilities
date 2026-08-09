@@ -2401,6 +2401,61 @@ protected_patterns = ["secrets.json"]
     }
 
     #[test]
+    fn merge_driver_encrypted_roundtrip_clean_merge() {
+        // The point of the driver: encrypted inputs are decrypted, merged
+        // as plaintext, and the result is re-encrypted into %A so the
+        // index keeps the filter.dracon invariant (index = ciphertext).
+        // Uses a FRESH WardenSecurity with a memory identity — the
+        // process-global instance behind DraconWarden is shared and
+        // environment-dependent.
+        let td = TestDir::new("merge_encrypted");
+        let dir = td.path();
+        let mut security =
+            dracon_security_kit::WardenSecurity::new(None).expect("init security");
+        let identity = age::x25519::Identity::generate();
+        security.add_memory_identity(identity);
+
+        let ancestor = dir.join("ancestor");
+        let current = dir.join("current");
+        let other = dir.join("other");
+        let ancestor_pt = b"line1\nline2\nline3\nline4\nline5\n";
+        let current_pt = b"line1\nline2-A\nline3\nline4\nline5\n";
+        let other_pt = b"line1\nline2\nline3\nline4-B\nline5\n";
+        let enc = |b: &[u8]| security.clean(b, Some("secrets/app.env")).expect("encrypt");
+        fs::write(&ancestor, enc(ancestor_pt)).unwrap();
+        fs::write(&current, enc(current_pt)).unwrap();
+        fs::write(&other, enc(other_pt)).unwrap();
+
+        let code = run_merge_impl(
+            &ancestor,
+            &current,
+            &other,
+            |b, p| security.smudge(b, p),
+            |b, p| security.clean(b, p),
+        )
+        .expect("run encrypted merge");
+        assert_eq!(code, 0, "clean merge exits 0");
+
+        // %A is ciphertext again (index invariant), decrypts back to the
+        // merged plaintext.
+        let stored = fs::read(&current).unwrap();
+        let stored_text = String::from_utf8(stored.clone()).unwrap_or_default();
+        assert!(
+            stored_text.contains("DRACON_SECRET") || stored_text.contains("age-encryption"),
+            "merged result must be encrypted, got: {}",
+            &stored_text[..stored_text.len().min(80)]
+        );
+        let decrypted = security.smudge(&stored, Some("secrets/app.env")).unwrap();
+        let merged_text = String::from_utf8(decrypted).unwrap();
+        assert!(
+            merged_text.contains("line2-A") && merged_text.contains("line4-B"),
+            "both changes merged: {}",
+            merged_text
+        );
+        assert!(!merged_text.contains("<<<<<<<"));
+    }
+
+    #[test]
     fn ensure_repo_filter_config_registers_diff_and_merge_drivers() {
         // The .gitattributes block emits `diff=dracon merge=dracon`; the
         // config pass must register the driver definitions too, or git
