@@ -2410,9 +2410,17 @@ protected_patterns = ["secrets.json"]
         // environment-dependent.
         let td = TestDir::new("merge_encrypted");
         let dir = td.path();
+        // Production git invokes the driver with repo-relative paths (the
+        // protected `secrets/**` glob then matches %A). In this test the
+        // files live under an absolute temp dir, so protect by literal
+        // basename — the same `path_is_protected` exact-match rule.
         let mut security = dracon_security_kit::WardenSecurity::new(None)
             .expect("init security")
-            .with_managed_patterns(vec!["secrets/**".to_string()]);
+            .with_managed_patterns(vec![
+                "current".to_string(),
+                "ancestor".to_string(),
+                "other".to_string(),
+            ]);
         let identity = age::x25519::Identity::generate();
         security.add_memory_identity(identity);
 
@@ -2426,14 +2434,14 @@ protected_patterns = ["secrets.json"]
         let ancestor_pt = format!("line1\nline2\n{sk}\nline4\nline5\n");
         let current_pt = format!("line1\nline2-A\n{sk}\nline4\nline5\n");
         let other_pt = format!("line1\nline2\n{sk}\nline4-B\nline5\n");
-        let enc = |b: &[u8]| {
+        let enc = |path: &std::path::Path, b: &[u8]| {
             security
-                .smart_clean_with_path(b, "secrets/app.env")
+                .smart_clean_with_path(b, path.to_string_lossy().as_ref())
                 .expect("encrypt")
         };
-        fs::write(&ancestor, enc(ancestor_pt.as_bytes())).unwrap();
-        fs::write(&current, enc(current_pt.as_bytes())).unwrap();
-        fs::write(&other, enc(other_pt.as_bytes())).unwrap();
+        fs::write(&ancestor, enc(&ancestor, ancestor_pt.as_bytes())).unwrap();
+        fs::write(&current, enc(&current, current_pt.as_bytes())).unwrap();
+        fs::write(&other, enc(&other, other_pt.as_bytes())).unwrap();
 
         // Sanity: the fixture is really encrypted (the merge only proves
         // the invariant if the inputs were ciphertext).
