@@ -1,5 +1,76 @@
 # Changelog
 
+All notable changes to `dracon-warden` will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+## [0.113.4] - 2026-08-09
+
+- **Test-only helper gated `#[cfg(test)]`**: `clear_filter_managed_patterns` (and its security-crate import) are only used by tests; gating them removes the dead-code warning from the release build. No behavior change. crates.io max stable; tags + gh releases on all forges.
+
+## [0.113.3] - 2026-08-09
+
+- **Filter `protected_patterns` wired into the clean gate (junk-runner wedge fix)**: the clean filter's "default-deny" gate read `WardenSecurity.managed_patterns`, which the production constructor initializes EMPTY — and `path_is_protected` treats empty as "scan everything (legacy)". The config's `protected_patterns` were wired into `.gitignore`/`.gitattributes` generation and `scrub_markers` but NEVER into the filter process, so every file was fully secret-scanned: a 6.87 MB `pi-session-*.html` took 16.3 s of filter CPU, git's concurrent filters blew the 30 s `FILTER_TIMEOUT_SECS`, and `git add` exited 128 every cycle — junk-runner wedged (no commits, 11 commits ahead, Changes Piling Up alert). Fix: process-wide `set_managed_patterns()` override applied inside `WardenSecurity::get_or_init()`, wired by `run_filter` from the policy via `wire_managed_patterns_from_policy()`. The same file now filters in 12–13 ms (~1250×). 104 tests (+2), clippy clean. Requires `dracon-security v0.3.1` (published first — `cargo publish` resolves the registry twin of the `path` dep, the dracon-git lesson again). Design: `docs/design/warden-filter-protected-patterns-wiring-2026-08-09.md`.
+
+## [0.113.2] — 2026-07-27 — pre-push hook `--not --remotes` (tag-push false-positive fix)
+
+- **F0.1 follow-up — `--not --remotes` BAD_AUTHORS scan (CORRECTED
+  2026-08-09, audit MEDIUM: the original entry below described a
+  `--first-parent` implementation that never shipped)**: the pre-push
+  hook's `git log --format='%ae%n%ce' "$RANGE"` walked every reachable
+  commit in the range. For a **tag** push `remote_sha = 0`, so the old
+  range computation covered the ENTIRE repo history reachable from the
+  tag object — a test-identity commit reachable only on a
+  non-first-parent side-merge (e.g. a `--no-ff` merge of a feature
+  branch where a drop-test helper left a test@test author on the side)
+  then blocked the tag push even though main's first-parent history is
+  clean. Now the scan distinguishes (see `PRE_PUSH_HOOK` in
+  `src/main.rs`):
+  - existing-ref update (branch push, `remote_sha != 0`):
+    `git rev-list "$local_sha" --not "$remote_sha"` — only the NEW
+    commits being added to the branch tip;
+  - new-ref push (tag or new branch, `remote_sha == 0`):
+    `git rev-list "$local_sha" --not --remotes` — only commits
+    reachable from the ref that are NOT already on ANY remote-tracking
+    branch.
+  Each candidate is then checked with `git log -1 --format='%ae%n%ce'`.
+  Only NEWLY-PUBLISHED commits are scrutinized — a test identity
+  landing on main is still blocked (F0.1 defense preserved for the new
+  push itself), while an already-published side-merge commit (accepted
+  by a prior scan) no longer false-positives on a later tag push.
+  Regression test added:
+  `pre_push_hook_test_identity_on_non_first_parent_merge_passes`.
+
+## [0.112.33] - 2026-07-21 — H2 follow-up: pre-push test-identity author rejection
+
+**Operator-visible change (from `AUDIT_FULL_2026-07-21.md`, F0.1 follow-up):**
+
+- **Pre-push hook now rejects pushes containing commits authored by test identities** (`test@test`, `test@test.com`, `test@example.com`) in the PUSHED range. The F0.1 incident (2026-07-21) showed a test writing `user.email = test@test` into a LIVE repo's config, after which the daemon committed with the poisoned identity and the poisoned commit landed on all mirrors. Historical commits outside the pushed range are unaffected. Hook diagnostics now go to stderr. 2 behavioral tests (reject poisoned author, pass trusted author).
+
+**Tests:** dracon-warden 83 (+2). `cargo clippy --workspace --locked -- -D warnings` clean. `cargo deny check` clean.
+
+## [0.112.32] - 2026-07-21 — audit warden batch (H8/H9 HIGH + M29-M32 MEDIUM)
+
+**Operator-visible changes (from `AUDIT_FULL_2026-07-21.md`):**
+
+1. **`harden_repo` no longer wipes operator `.gitignore` / `.gitattributes` content** (H8/F4.1). The surgical `replace_managed_block` (previously `#[cfg(test)]`-only) is now used in production for both files: replace only the delimited managed block, preserve everything outside it, append if absent. Verified live: `dracon-warden once` on dracon-utilities preserved the operator's nested-repo section (a 2026-06-28 harden pass had wiped the previous one, commit `3a67685f`).
+2. **Whole-file-encrypted BINARY secrets round-trip as bytes** (H9/F4.2). New `decrypt_whole_file_tag` in `dracon-security`: when the entire content is one secret tag (the format used for binary files in sensitive locations), decrypt to RAW BYTES in `seal_smudge` + `decrypt_file`. The previous `String::from_utf8_lossy` path corrupted non-UTF-8 payloads (DER keys, SQLite, .kdbx) with U+FFFD, and the corruption re-encrypted into history.
+3. **`allow_v1_fallback = true` policy field now works** (M29/F4.3). Wired to the runtime gate in `WardenPolicy::load` — the documented V1 (AES-CFB) migration path ("set the flag, decrypt once to re-encrypt under V2, unset") is now actually accessible.
+4. **`setup-hooks --local` works** (M30/F4.4). Was `git config local core.hooksPath <dir>` (missing `--`) — always failed after the hook files were written.
+5. **Filter-clean fails closed for oversized/refused inputs** (M31/F4.5). The >10 MiB and path guards previously passed the input through to git in the clean direction — the file was committed UNENCRYPTED with no warning. Now exit non-zero so git aborts the add.
+6. **Pre-push hook scans filenames with spaces** (M32/F4.6). NUL-delimited iteration + `xargs -0` argument passing (the old `for f in $(git diff --name-only ...)` word-split on whitespace, silently skipping space-containing filenames).
+
+**Architectural:**
+
+- dracon-warden now depends on the LOCAL `src/security` crate BY PATH (`dracon-security-kit = { package = "dracon-security", version = "0.3.0", path = "src/security" }`) — previously it built the published crates.io v0.3.0, so fixes to the local source never reached the binary. The H9 fix required this.
+- `dracon-warden/src/security` is now a full workspace member: `cargo test --workspace --locked` runs the security crate's ~109 tests.
+
+**Tests:** all workspace suites green (dracon-warden 81 incl. 4 new: M29 gate wiring, M30 --local behavioral, M31 fail-closed predicate, M32 space-filename hook; dracon-security ~109 incl. 2 new: binary round-trip byte-identical, inline-tag path). `cargo clippy --workspace --locked -- -D warnings` clean (also fixed a pre-existing needless-borrow lint exposed by membership). `cargo deny check` clean.
+
+
 ## [0.113.1] — 2026-07-26 — full-audit remediation batch 2 (hook layer + smudge)
 
 Remediation batch 2 of `AUDIT_FULL_2026-07-26.md` (3 HIGH + 1 MEDIUM).
@@ -61,6 +132,7 @@ behaviorally against real scratch repos before deploy.
   production smudge path ✓
 - single-quoted secret push refused ✓
 
+
 ## [0.113.0] — 2026-07-25 — history-rewrite guard in the global hooks
 
 **Hard, forge-invariant enforcement of the fleet's no-history-rewrite
@@ -88,75 +160,6 @@ server-side. These hooks are the layer that always applies.
   SHA, which the ff-guard correctly rejects as a non-ancestor.
 
 
-All notable changes to `dracon-warden` will be documented in this file.
-
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-
-## [Unreleased]
-
-## [0.113.4] - 2026-08-09
-
-- **Test-only helper gated `#[cfg(test)]`**: `clear_filter_managed_patterns` (and its security-crate import) are only used by tests; gating them removes the dead-code warning from the release build. No behavior change. crates.io max stable; tags + gh releases on all forges.
-
-## [0.113.3] - 2026-08-09
-
-- **Filter `protected_patterns` wired into the clean gate (junk-runner wedge fix)**: the clean filter's "default-deny" gate read `WardenSecurity.managed_patterns`, which the production constructor initializes EMPTY — and `path_is_protected` treats empty as "scan everything (legacy)". The config's `protected_patterns` were wired into `.gitignore`/`.gitattributes` generation and `scrub_markers` but NEVER into the filter process, so every file was fully secret-scanned: a 6.87 MB `pi-session-*.html` took 16.3 s of filter CPU, git's concurrent filters blew the 30 s `FILTER_TIMEOUT_SECS`, and `git add` exited 128 every cycle — junk-runner wedged (no commits, 11 commits ahead, Changes Piling Up alert). Fix: process-wide `set_managed_patterns()` override applied inside `WardenSecurity::get_or_init()`, wired by `run_filter` from the policy via `wire_managed_patterns_from_policy()`. The same file now filters in 12–13 ms (~1250×). 104 tests (+2), clippy clean. Requires `dracon-security v0.3.1` (published first — `cargo publish` resolves the registry twin of the `path` dep, the dracon-git lesson again). Design: `docs/design/warden-filter-protected-patterns-wiring-2026-08-09.md`.
-
-## [0.113.2] — 2026-07-27 — pre-push hook `--not --remotes` (tag-push false-positive fix)
-
-- **F0.1 follow-up — `--not --remotes` BAD_AUTHORS scan (CORRECTED
-  2026-08-09, audit MEDIUM: the original entry below described a
-  `--first-parent` implementation that never shipped)**: the pre-push
-  hook's `git log --format='%ae%n%ce' "$RANGE"` walked every reachable
-  commit in the range. For a **tag** push `remote_sha = 0`, so the old
-  range computation covered the ENTIRE repo history reachable from the
-  tag object — a test-identity commit reachable only on a
-  non-first-parent side-merge (e.g. a `--no-ff` merge of a feature
-  branch where a drop-test helper left a test@test author on the side)
-  then blocked the tag push even though main's first-parent history is
-  clean. Now the scan distinguishes (see `PRE_PUSH_HOOK` in
-  `src/main.rs`):
-  - existing-ref update (branch push, `remote_sha != 0`):
-    `git rev-list "$local_sha" --not "$remote_sha"` — only the NEW
-    commits being added to the branch tip;
-  - new-ref push (tag or new branch, `remote_sha == 0`):
-    `git rev-list "$local_sha" --not --remotes` — only commits
-    reachable from the ref that are NOT already on ANY remote-tracking
-    branch.
-  Each candidate is then checked with `git log -1 --format='%ae%n%ce'`.
-  Only NEWLY-PUBLISHED commits are scrutinized — a test identity
-  landing on main is still blocked (F0.1 defense preserved for the new
-  push itself), while an already-published side-merge commit (accepted
-  by a prior scan) no longer false-positives on a later tag push.
-  Regression test added:
-  `pre_push_hook_test_identity_on_non_first_parent_merge_passes`.
-
-### v0.112.33 — 2026-07-21 — H2 follow-up: pre-push test-identity author rejection
-
-**Operator-visible change (from `AUDIT_FULL_2026-07-21.md`, F0.1 follow-up):**
-
-- **Pre-push hook now rejects pushes containing commits authored by test identities** (`test@test`, `test@test.com`, `test@example.com`) in the PUSHED range. The F0.1 incident (2026-07-21) showed a test writing `user.email = test@test` into a LIVE repo's config, after which the daemon committed with the poisoned identity and the poisoned commit landed on all mirrors. Historical commits outside the pushed range are unaffected. Hook diagnostics now go to stderr. 2 behavioral tests (reject poisoned author, pass trusted author).
-
-**Tests:** dracon-warden 83 (+2). `cargo clippy --workspace --locked -- -D warnings` clean. `cargo deny check` clean.
-
-### v0.112.32 — 2026-07-21 — audit warden batch (H8/H9 HIGH + M29-M32 MEDIUM)
-
-**Operator-visible changes (from `AUDIT_FULL_2026-07-21.md`):**
-
-1. **`harden_repo` no longer wipes operator `.gitignore` / `.gitattributes` content** (H8/F4.1). The surgical `replace_managed_block` (previously `#[cfg(test)]`-only) is now used in production for both files: replace only the delimited managed block, preserve everything outside it, append if absent. Verified live: `dracon-warden once` on dracon-utilities preserved the operator's nested-repo section (a 2026-06-28 harden pass had wiped the previous one, commit `3a67685f`).
-2. **Whole-file-encrypted BINARY secrets round-trip as bytes** (H9/F4.2). New `decrypt_whole_file_tag` in `dracon-security`: when the entire content is one secret tag (the format used for binary files in sensitive locations), decrypt to RAW BYTES in `seal_smudge` + `decrypt_file`. The previous `String::from_utf8_lossy` path corrupted non-UTF-8 payloads (DER keys, SQLite, .kdbx) with U+FFFD, and the corruption re-encrypted into history.
-3. **`allow_v1_fallback = true` policy field now works** (M29/F4.3). Wired to the runtime gate in `WardenPolicy::load` — the documented V1 (AES-CFB) migration path ("set the flag, decrypt once to re-encrypt under V2, unset") is now actually accessible.
-4. **`setup-hooks --local` works** (M30/F4.4). Was `git config local core.hooksPath <dir>` (missing `--`) — always failed after the hook files were written.
-5. **Filter-clean fails closed for oversized/refused inputs** (M31/F4.5). The >10 MiB and path guards previously passed the input through to git in the clean direction — the file was committed UNENCRYPTED with no warning. Now exit non-zero so git aborts the add.
-6. **Pre-push hook scans filenames with spaces** (M32/F4.6). NUL-delimited iteration + `xargs -0` argument passing (the old `for f in $(git diff --name-only ...)` word-split on whitespace, silently skipping space-containing filenames).
-
-**Architectural:**
-
-- dracon-warden now depends on the LOCAL `src/security` crate BY PATH (`dracon-security-kit = { package = "dracon-security", version = "0.3.0", path = "src/security" }`) — previously it built the published crates.io v0.3.0, so fixes to the local source never reached the binary. The H9 fix required this.
-- `dracon-warden/src/security` is now a full workspace member: `cargo test --workspace --locked` runs the security crate's ~109 tests.
-
-**Tests:** all workspace suites green (dracon-warden 81 incl. 4 new: M29 gate wiring, M30 --local behavioral, M31 fail-closed predicate, M32 space-filename hook; dracon-security ~109 incl. 2 new: binary round-trip byte-identical, inline-tag path). `cargo clippy --workspace --locked -- -D warnings` clean (also fixed a pre-existing needless-borrow lint exposed by membership). `cargo deny check` clean.
 
 
 > **Note**: prior to 0.112.12, `dracon-warden` was developed inside the
@@ -165,8 +168,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > [`dracon-utilities/CHANGELOG.md`](https://github.com/DraconDev/dracon-utilities/blob/main/CHANGELOG.md)
 > under the `dracon-warden` heading. From 0.112.12 onward, this CHANGELOG
 > is the canonical record.
-
-## [Unreleased]
 
 ## [0.112.12] - 2026-06-21
 
