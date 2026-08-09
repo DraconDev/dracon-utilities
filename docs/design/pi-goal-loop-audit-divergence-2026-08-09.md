@@ -1,11 +1,9 @@
 # pi-goal-loop-audit history divergence — 2026-08-09
 
-> **Status**: LIVE. The repo is `🛑 STUCK` (auto-push paused) with a
-> genuine 3-way history fork between github, gitlab, and codeberg.
-> Reconciliation requires operator authorization — this document lays
-> out the evidence, the root cause, and the options. The daemon is
-> behaving CORRECTLY (it refuses to force-push divergent mirrors); no
-> daemon code change is required to fix this.
+> **Status: RESOLVED 2026-08-09 ~17:52 BST** (operator-authorized
+> reconciliation executed; all three forges at `6a77777a`, fleet
+> `🟡 0`). The analysis below documents the evidence and the executed
+> runbook.
 
 ## TL;DR
 
@@ -121,6 +119,17 @@ completed 12:49).
 both sides via `git merge` + resolve conflicts, then push to all. This
 preserves every commit but is substantially more work and produces a
 merge history the loop may not want.
+
+## Execution record (2026-08-09 ~17:45–17:56 BST, operator-authorized)
+
+1. (done earlier) Safety bundle `~/dracon/backups/pi-goal-loop-audit-mirror-state-20260809.bundle` (47 refs) + sanity check.
+2. Fetched both mirrors: gitlab `a97d2255`, codeberg `511f2e43` (codeberg was 2 commits behind gitlab in the mirror history). Note: the loop agent had resumed work and pushed v0.34.118/119 to github itself (17:00–17:51), so local main was `6a77777a` by push time.
+3. `glab api --method DELETE projects/DraconDev%2Fpi-goal-list-loop-audit/protected_branches/main` (PUT for `allow_force_push` 404'd — use DELETE+POST).
+4. `DRACON_ALLOW_REWRITE=1 git push --force-with-lease gitlab main` → `+ a97d2255...6a77777a (forced update)` ✓
+5. `DRACON_ALLOW_REWRITE=1 git push --force-with-lease codeberg main` → `+ 511f2e43...6a77777a (forced update)` ✓
+6. Re-protected immediately: `glab api --method POST .../protected_branches -f name=main -f allow_force_push=false -f push_access_level=40 -f merge_access_level=40` ✓ (verified `force_push: [False]`)
+7. `dracon-sync repair stuck-unstuck /home/dracon/Dev/pi-goal-loop-audit` (FULL PATH — the ledger keys are paths, not names) → ledger cleared.
+8. Verified: all three forges `0/0` vs local; daemon row `✅ CLEAN · ✅ OK · 🟢 synced · healthy`; fleet `🟡 0`. The v0.113.50 stuck-ledger/alert classification never had to fire on this repo again.
 
 ## Immediate fixes applied (this incident)
 
